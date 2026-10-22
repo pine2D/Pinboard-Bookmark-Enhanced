@@ -25,6 +25,8 @@
   #status_display { display: inline; float: left; margin: 3px 0 0 90px; color: #555; }
   .api_token { color: #5588aa; }
   #sub_banner a.selected { background: #ffff77; }
+  .star { color: #ddd; }
+  #tag_cloud_header { font-size: 11px; }
 </style>
 <body id="pinboard">
 <div id="content"></div>
@@ -62,5 +64,20 @@
 </template>
 <template id="completion">
   <div class="pin-ac"><div class="bd"><ul><li class="active">agriculture</li></ul></div></div>
+</template>
+<template id="bookmarks">
+  <div id="main_column"><div id="bookmarks">
+    <div class="bookmark"><div class="star"><span>✭</span></div><div class="display"><div class="description">Description<blockquote>Quoted description</blockquote></div></div></div>
+    <div class="bookmark private"><div class="star"><span>✭</span></div><div class="display"><div class="description">Private description<blockquote>Private quotation</blockquote></div></div></div>
+  </div></div>
+</template>
+<template id="subscriptions">
+  <div id="main_column"><div id="right_bar"><table><tr onmouseover="this.style.background='#ffa'" onmouseout="this.style.background='#fff'"><td><a href="#subscription" class="delete">delete</a></td></tr></table></div></div>
+</template>
+<template id="bundles">
+  <div id="main_column"><form name="sort"><table><tr onmouseover="this.style.background='#ffa'" onmouseout="this.style.background='#fff'"><td><a href="#edit" class="edit">edit</a></td><td><a href="#delete" class="destroy">delete</a></td></tr></table></form></div>
+</template>
+<template id="tag-nav">
+  <div id="tag_cloud"><div id="tag_cloud_header"><p><a href="?mode=cloud">top tags</a> <a href="?mode=list&amp;floor=1" class="tag_heading_selected">all tags</a> · <a href="?mode=list&amp;floor=2">2</a> · <a href="?mode=list&amp;floor=20">20</a> · <a href="/tags/">manage</a></p></div></div>
 </template>
 </body>

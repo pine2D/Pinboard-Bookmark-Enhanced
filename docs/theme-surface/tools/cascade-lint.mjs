@@ -209,10 +209,12 @@ const PROBES = [
     mode: "dark", theme: "flexoki",
     elem: { tag: "a", classes: ["bundle"], ancestors: [DARK_ROOT, ...SORT_TABLE, { tag: "td" }] },
     expectValue: { "font-weight": "600" } },
-  { name: "k22 html.pbp-dark sort-table td a.edit opacity at rest (light carries 0.75)",
+  // The October page audit retired the 0.75 restoration: actions must retain
+  // their derived text contrast at rest, in both light and dark modes.
+  { name: "html.pbp-dark sort-table td a.edit stays opaque at rest",
     mode: "dark", theme: "flexoki",
     elem: { tag: "a", classes: ["edit"], ancestors: [DARK_ROOT, ...SORT_TABLE, { tag: "td" }] },
-    expectValue: { opacity: "0.75" } },
+    expectValue: { opacity: "1" } },
   { name: "k22 html.pbp-dark sort-table td a.destroy font-weight (light carries 600)",
     mode: "dark", theme: "flexoki",
     elem: { tag: "a", classes: ["destroy"], ancestors: [DARK_ROOT, ...SORT_TABLE, { tag: "td" }] },

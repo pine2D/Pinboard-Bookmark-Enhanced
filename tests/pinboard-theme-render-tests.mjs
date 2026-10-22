@@ -25,7 +25,7 @@ try {
 
   async function fixture(name) {
     await page.evaluate(name => {
-      document.getElementById('content').replaceChildren(document.getElementById(name).content.cloneNode(true));
+      document.getElementById('content').replaceChildren(document.querySelector('template#' + name).content.cloneNode(true));
     }, name);
     await page.mouse.move(1400, 950);
   }
@@ -34,6 +34,9 @@ try {
   // outward. Each ancestor's opacity applies to the whole group, including its
   // own background; multiplying text alpha alone would miss nested surfaces.
   async function readable(key, selector, minimum = 4.5) {
+    // A palette change or pointer move can start a color transition. Measure
+    // its settled state rather than an arbitrary intermediate animation frame.
+    await page.evaluate(() => Promise.all(document.getAnimations().filter(a => a instanceof CSSTransition).map(a => a.finished.catch(() => {}))));
     const rows = await page.locator(selector).evaluateAll(nodes => {
       const rgba = value => {
         const parts = value.match(/[\d.]+/g).map(Number);
@@ -96,6 +99,24 @@ try {
     for (const color of ['#aaa', '#fff']) {
       await page.locator('#bulk_edit').evaluate((node, color) => { node.style.cssText = `background:${color};color:#fff;border:1px solid #999`; }, color);
       await readable(`${key}:bulk-${color}`, '#bulk_edit');
+    }
+    await fixture('bookmarks');
+    await readable(key, '.description, .description blockquote');
+    await readable(key, '.star span', 3);
+    await page.locator('.private .star').hover();
+    await readable(key + ':hover', '.private .star span', 3);
+    for (const [name, selector] of [['subscriptions', 'a.delete'], ['bundles', 'a.edit, a.destroy']]) {
+      await fixture(name);
+      await readable(key, selector);
+      await page.locator('tr').hover();
+      await readable(key + ':row-hover', selector);
+    }
+    await fixture('tag-nav');
+    await readable(key, '#tag_cloud_header a');
+    const sizes = await page.locator('#tag_cloud_header a').evaluateAll(nodes => nodes.map(n => parseFloat(getComputedStyle(n).fontSize)));
+    for (const size of sizes) {
+      checks++;
+      if (size < 11) failures.push(`${key} tag navigation text shrank to ${size}px`);
     }
   }
 } finally {

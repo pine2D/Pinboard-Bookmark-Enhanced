@@ -161,7 +161,8 @@ a.bundle:hover { color: ${v("link-hover")} !important; }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: ${v("muted-soft")} !important; }
 .star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
-.star { color: ${v("border")} !important; }
+.star { color: ${v("star-fg")} !important; }
+.star:hover { color: ${v("accent")} !important; }
 .selected_star { color: ${v("private-accent")} !important; }
 
 a.bookmark_title { color: ${v("accent")} !important; font-size: ${sizeLg} !important; text-decoration: none !important; font-weight: ${v("weight-heading")} !important; }
@@ -185,7 +186,7 @@ a.url_link {
   border-radius: ${v("radius-lg")} !important;
   font-size: ${sizeXs} !important;
 }
-.bookmark .description { color: ${v("fg")} !important; opacity: 0.85 !important; line-height: ${v("line-height")} !important; }
+.bookmark .description { color: ${v("fg")} !important; opacity: 1 !important; line-height: ${v("line-height")} !important; }
 .description blockquote { color: ${v("muted")} !important; border-left: 3px solid ${v("accent-alpha")} !important; padding-left: 10px !important; margin: 4px 0 !important; }
 
 a.tag {
@@ -240,8 +241,8 @@ a.delete, a.destroy { color: ${v("destroy")} !important; }
 #right_bar a:not(.tag):hover { color: ${v("link-hover")} !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: ${v("row-hover")} !important; }
-#right_bar table td a.delete { color: ${v("muted-soft")} !important; font-size: ${sizeXs} !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: ${v("destroy")} !important; opacity: 1 !important; }
+#right_bar table td a.delete { color: ${v("muted-soft")} !important; font-size: ${sizeXs} !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: ${v("table-destroy-hover")} !important; opacity: 1 !important; }
 #right_bar input#key {
   background: ${v("input-bg")} !important;
   color: ${v("fg")} !important;
@@ -275,8 +276,8 @@ a.delete, a.destroy { color: ${v("destroy")} !important; }
    render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
    Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
    would make them feel heavy on Windows. Decision: 2026-05-28. */
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -473,7 +474,7 @@ blockquote.note { color: ${v("fg")} !important; }
 /* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
 #main_column form[name="sort"] table tr { background: transparent !important; border-radius: ${v("radius-md")} !important; }
-#main_column form[name="sort"] table tr:hover { background: ${v("row-hover")} !important; }
+#main_column form[name="sort"] table tr:hover { background: ${v("bundle-row-hover")} !important; }
 #main_column form[name="sort"] table td { padding: 6px 10px !important; vertical-align: middle !important; border: none !important; }
 #main_column form[name="sort"] table td[style*="text-align:right"] { min-width: 160px !important; padding-right: 14px !important; white-space: nowrap !important; }
 #main_column form[name="sort"] table input[name^="id_"] {
@@ -498,10 +499,10 @@ blockquote.note { color: ${v("fg")} !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"],
 #main_column form[name="sort"] table a[style*="color: #aaa"] { color: ${v("muted")} !important; opacity: 1 !important; text-decoration: none !important; font-size: ${sizeSm} !important; margin-left: 4px !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: ${v("accent")} !important; text-decoration: underline !important; }
-#main_column form[name="sort"] table td a.edit { color: ${v("muted")} !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
-#main_column form[name="sort"] table td a.destroy { color: ${v("destroy")} !important; opacity: 0.85 !important; font-weight: ${v("weight-heading")} !important; }
-#main_column form[name="sort"] table tr:hover td a.edit { color: ${v("accent")} !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+#main_column form[name="sort"] table td a.edit { color: ${v("muted")} !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#main_column form[name="sort"] table td a.destroy { color: ${v("destroy")} !important; opacity: 1 !important; font-weight: ${v("weight-heading")} !important; }
+#main_column form[name="sort"] table tr:hover td a.edit { color: ${v("bundle-edit-hover")} !important; opacity: 1 !important; }
+#main_column form[name="sort"] table tr:hover td a.destroy { color: ${v("table-destroy-hover")} !important; opacity: 1 !important; }
 
 /* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
  * Native tagpicker.css paints every tag state with a hardcoded light fill

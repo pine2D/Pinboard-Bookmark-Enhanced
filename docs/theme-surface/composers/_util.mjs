@@ -1,6 +1,6 @@
 // Shared helpers for composers.
 
-import { hexToRgb, rgbToHex, rgbToHsl, hslToRgb, contrast, fgToAA, fgToAAMulti, bgToAA, borderToAA, isHex, resolveOpaqueBg, mix } from "./_ui-derive.mjs";
+import { hexToRgb, rgbToHex, rgbToHsl, hslToRgb, contrast, fgToAA, fgToAAMulti, bgToAA, borderToAA, isHex, isCompositableBg, resolveOpaqueBg, mix } from "./_ui-derive.mjs";
 
 export function varName(slot) {
   return `--pinboard-${slot}`;
@@ -271,12 +271,12 @@ export function expandPalette(p) {
 // 1.4.11 shapes, not 1.4.3 text -- so a theme that declares only `destroy`
 // keeps the decorative colour it chose while the TEXT role moves.
 //
-// Deliberately NOT covered: the HOVER bands (`row-hover`, which both
-// #right_bar's table and #main_column's sort table paint on tr:hover, and the
-// ~6%-accent tint some pilots override that sort-table row to). Private rows
-// are persistent bookmark surfaces and therefore ARE blocking below; transient
-// table hover tints remain a separate state-pair decision.
+// General text inks use persistent page/card/private surfaces. Table action
+// hover inks derive separately below against row-hover and bundle-row-hover;
+// those tints must not silently lower the action's contrast after pointer entry.
 const BUNDLE_CHIP_TINT_FLOOR_PCT = 4;
+// Leave a little room for alpha serialization/8-bit compositing at the AA edge.
+const TABLE_ACTION_CONTRAST = 4.55;
 
 export function expandSitePalette(raw) {
   const p = expandPalette(raw);
@@ -320,6 +320,22 @@ export function expandSitePalette(raw) {
   if (isHex(p["focus-ring"])) {
     out["focus-ring"] = rgbToHex(fgToAAMulti(hexToRgb(p["focus-ring"]), pageBases, 3));
   }
+  // An unstarred bookmark still exposes a clickable star. Borders are too
+  // faint for that control, especially when border and private-bg coincide.
+  if (p.border) out["star-fg"] = rgbToHex(fgToAAMulti(resolveOpaqueBg(p.border, bg || bgSurface), pageBases, 3));
+  // Table hover fills used to live in per-pilot CSS, outside the palette
+  // audit. Keep those tints as inputs and derive the two action inks on the
+  // fills they actually land on, including transparent tints over the page.
+  out["bundle-row-hover"] = p["bundle-row-hover"] || p["row-hover"];
+  for (const key of ["bundle-row-hover", "row-hover"]) {
+    if (!isCompositableBg(out[key], { allowTransparent: true })) {
+      throw new Error(`${key}: use a hex color (including alpha hex) or transparent for site hover derivation`);
+    }
+  }
+  const bundleHover = [bg, bgSurface].filter(Boolean).map(b => resolveOpaqueBg(out["bundle-row-hover"], b));
+  const sidebarHover = [bgSurface].filter(Boolean).map(b => resolveOpaqueBg(p["row-hover"], b));
+  out["bundle-edit-hover"] = rgbToHex(fgToAAMulti(hexToRgb(out.accent), bundleHover, TABLE_ACTION_CONTRAST));
+  out["table-destroy-hover"] = rgbToHex(fgToAAMulti(hexToRgb(out.destroy), [...bundleHover, ...sidebarHover], TABLE_ACTION_CONTRAST));
   if (isHex(p["url-link-fg"])) {
     const pill = pageBases.map((b) => resolveOpaqueBg(p["url-link-bg"], b));
     out["url-link-fg"] = rgbToHex(fgToAAMulti(hexToRgb(p["url-link-fg"]), pill));

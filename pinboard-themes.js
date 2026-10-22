@@ -31,6 +31,7 @@ const PINBOARD_THEMES = {
   --pinboard-tag-bg: #e8f0fe;
   --pinboard-tag-fg: #1967d2;
   --pinboard-row-hover: #f1f3f4;
+  --pinboard-bundle-row-hover: #1a73e80f;
   --pinboard-destroy: #d02e24;
   --pinboard-btn-bg: #1a73e8;
   --pinboard-btn-fg: #ffffff;
@@ -49,6 +50,9 @@ const PINBOARD_THEMES = {
   --pinboard-on-accent: #ffffff;
   --pinboard-on-link-hover: #ffffff;
   --pinboard-scrollbar-thumb: #5f6368;
+  --pinboard-star-fg: #878787;
+  --pinboard-bundle-edit-hover: #1565cf;
+  --pinboard-table-destroy-hover: #c72c22;
   --pinboard-help-fg: #666d74;
   --pinboard-bundle-chip-bg: #cfdef1;
   --pinboard-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -279,7 +283,8 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: var(--pinboard-muted-soft) !important; }
 .star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
-.star { color: var(--pinboard-border) !important; }
+.star { color: var(--pinboard-star-fg) !important; }
+.star:hover { color: var(--pinboard-accent) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
 a.bookmark_title { color: var(--pinboard-accent) !important; font-size: 15px !important; text-decoration: none !important; font-weight: var(--pinboard-weight-heading) !important; }
@@ -303,7 +308,7 @@ a.url_link {
   border-radius: var(--pinboard-radius-lg) !important;
   font-size: 11px !important;
 }
-.bookmark .description { color: var(--pinboard-fg) !important; opacity: 0.85 !important; line-height: var(--pinboard-line-height) !important; }
+.bookmark .description { color: var(--pinboard-fg) !important; opacity: 1 !important; line-height: var(--pinboard-line-height) !important; }
 .description blockquote { color: var(--pinboard-muted) !important; border-left: 3px solid var(--pinboard-accent-alpha) !important; padding-left: 10px !important; margin: 4px 0 !important; }
 
 a.tag {
@@ -358,8 +363,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-destroy) !important; opacity: 1 !important; }
+#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 #right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
@@ -393,8 +398,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
    render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
    Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
    would make them feel heavy on Windows. Decision: 2026-05-28. */
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -591,7 +596,7 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 /* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
 #main_column form[name="sort"] table tr { background: transparent !important; border-radius: var(--pinboard-radius-md) !important; }
-#main_column form[name="sort"] table tr:hover { background: var(--pinboard-row-hover) !important; }
+#main_column form[name="sort"] table tr:hover { background: var(--pinboard-bundle-row-hover) !important; }
 #main_column form[name="sort"] table td { padding: 6px 10px !important; vertical-align: middle !important; border: none !important; }
 #main_column form[name="sort"] table td[style*="text-align:right"] { min-width: 160px !important; padding-right: 14px !important; white-space: nowrap !important; }
 #main_column form[name="sort"] table input[name^="id_"] {
@@ -616,10 +621,10 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"],
 #main_column form[name="sort"] table a[style*="color: #aaa"] { color: var(--pinboard-muted) !important; opacity: 1 !important; text-decoration: none !important; font-size: 12px !important; margin-left: 4px !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: var(--pinboard-accent) !important; text-decoration: underline !important; }
-#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
-#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 0.85 !important; font-weight: var(--pinboard-weight-heading) !important; }
-#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 1 !important; font-weight: var(--pinboard-weight-heading) !important; }
+#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-bundle-edit-hover) !important; opacity: 1 !important; }
+#main_column form[name="sort"] table tr:hover td a.destroy { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 
 /* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
  * Native tagpicker.css paints every tag state with a hardcoded light fill
@@ -886,7 +891,7 @@ a.tag.selected::before { color: var(--pinboard-destroy) !important; opacity: 0.9
 #banner { border-radius: 8px !important; background: #fff !important; border-bottom: 1px solid #e0e0e0 !important; box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important; padding: 12px 20px !important; }
 #search_query_field { border: 1px solid #dadce0 !important; border-radius: 6px !important; padding: 8px 12px !important; background: #f8f9fa !important; }
 .bookmark { background: #fff !important; padding: 14px 18px !important; margin-bottom: 10px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important; }
-.star { color: #dadce0 !important; cursor: pointer !important; }
+.star { cursor: pointer !important; }
 .selected_star { color: #fbbc04 !important; }
 .note .note { box-shadow: none !important; }
 #banner a { color: #5f6368 !important; }
@@ -952,10 +957,8 @@ a.help { text-decoration: none !important; }
 .formtable td { color: #3c4043 !important; }
 .user_navbar a { color: #5f6368 !important; }
 h2 { color: #3c4043 !important; }
-#main_column form[name="sort"] table tr:hover { background: rgba(26,115,232,0.06) !important; }
 #main_column form[name="sort"] table input[name^="id_"] { border: 1px solid #dadce0 !important; background: #fff !important; }
 #main_column form[name="sort"] table a.bundle { border-radius: 3px !important; }
-#main_column form[name="sort"] table td a.edit { opacity: 0.7 !important; }
 #right_bar input#key { background: #f8f9fa !important; color: #3c4043 !important; border: 1px solid #dadce0 !important; }
 #right_bar input#key:focus { box-shadow: 0 0 0 2px rgba(26,115,232,0.2) !important; }
 #tweet_searchbox #search_query_field { background: #f8f9fa !important; color: #3c4043 !important; border: 1px solid #dadce0 !important; }
@@ -989,6 +992,7 @@ h2 { color: #3c4043 !important; }
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #a3be8c;
   --pinboard-row-hover: #434c5e;
+  --pinboard-bundle-row-hover: #88c0d014;
   --pinboard-destroy: #d9a2a8;
   --pinboard-btn-bg: #4d6e96;
   --pinboard-btn-bg-hover: #415d7e;
@@ -1007,6 +1011,9 @@ h2 { color: #3c4043 !important; }
   --pinboard-on-accent: #384861;
   --pinboard-on-link-hover: #35435b;
   --pinboard-scrollbar-thumb: #9cb5ce;
+  --pinboard-star-fg: #818da5;
+  --pinboard-bundle-edit-hover: #8fc4d3;
+  --pinboard-table-destroy-hover: #e2b8bc;
   --pinboard-help-fg: #9cb5ce;
   --pinboard-bundle-chip-bg: #455764;
   --pinboard-font-family: "Inter", -apple-system, sans-serif;
@@ -1237,7 +1244,8 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: var(--pinboard-muted-soft) !important; }
 .star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
-.star { color: var(--pinboard-border) !important; }
+.star { color: var(--pinboard-star-fg) !important; }
+.star:hover { color: var(--pinboard-accent) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
 a.bookmark_title { color: var(--pinboard-accent) !important; font-size: 15px !important; text-decoration: none !important; font-weight: var(--pinboard-weight-heading) !important; }
@@ -1261,7 +1269,7 @@ a.url_link {
   border-radius: var(--pinboard-radius-lg) !important;
   font-size: 11px !important;
 }
-.bookmark .description { color: var(--pinboard-fg) !important; opacity: 0.85 !important; line-height: var(--pinboard-line-height) !important; }
+.bookmark .description { color: var(--pinboard-fg) !important; opacity: 1 !important; line-height: var(--pinboard-line-height) !important; }
 .description blockquote { color: var(--pinboard-muted) !important; border-left: 3px solid var(--pinboard-accent-alpha) !important; padding-left: 10px !important; margin: 4px 0 !important; }
 
 a.tag {
@@ -1316,8 +1324,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-destroy) !important; opacity: 1 !important; }
+#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 #right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
@@ -1351,8 +1359,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
    render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
    Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
    would make them feel heavy on Windows. Decision: 2026-05-28. */
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -1549,7 +1557,7 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 /* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
 #main_column form[name="sort"] table tr { background: transparent !important; border-radius: var(--pinboard-radius-md) !important; }
-#main_column form[name="sort"] table tr:hover { background: var(--pinboard-row-hover) !important; }
+#main_column form[name="sort"] table tr:hover { background: var(--pinboard-bundle-row-hover) !important; }
 #main_column form[name="sort"] table td { padding: 6px 10px !important; vertical-align: middle !important; border: none !important; }
 #main_column form[name="sort"] table td[style*="text-align:right"] { min-width: 160px !important; padding-right: 14px !important; white-space: nowrap !important; }
 #main_column form[name="sort"] table input[name^="id_"] {
@@ -1574,10 +1582,10 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"],
 #main_column form[name="sort"] table a[style*="color: #aaa"] { color: var(--pinboard-muted) !important; opacity: 1 !important; text-decoration: none !important; font-size: 12px !important; margin-left: 4px !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: var(--pinboard-accent) !important; text-decoration: underline !important; }
-#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
-#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 0.85 !important; font-weight: var(--pinboard-weight-heading) !important; }
-#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 1 !important; font-weight: var(--pinboard-weight-heading) !important; }
+#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-bundle-edit-hover) !important; opacity: 1 !important; }
+#main_column form[name="sort"] table tr:hover td a.destroy { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 
 /* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
  * Native tagpicker.css paints every tag state with a hardcoded light fill
@@ -1847,7 +1855,7 @@ a.bookmark_title:hover { color: #8fbcbb !important; }
 a.url_display { color: #a3be8c !important; font-size: 12px !important; }
 a.url_link { padding: 1px 5px !important; background: rgba(59,66,82,0.8) !important; }
 .description { opacity: 0.8 !important; }
-.description blockquote { color: #d8dee9 !important; border-left: 3px solid #4c566a !important; }
+.description blockquote { border-left: 3px solid #4c566a !important; }
 a.copy_link { color: #81a1c1 !important; }
 #right_bar a:not(.tag) { color: #81a1c1 !important; }
 a.bundle { color: #81a1c1 !important; }
@@ -1868,10 +1876,8 @@ input[type="button"] { border: 1px solid #81a1c1 !important; }
 #bulk_edit_box { background: #434c5e !important; border: 1px solid #4c566a !important; }
 .user_navbar a { color: #81a1c1 !important; }
 a { color: #81a1c1 !important; }
-#main_column form[name="sort"] table tr:hover { background: rgba(136,192,208,0.08) !important; }
 #main_column form[name="sort"] table input[name^="id_"] { border: 1px solid #4c566a !important; background: #3b4252 !important; }
 #main_column form[name="sort"] table a.bundle { font-weight: 600 !important; border-radius: 3px !important; }
-#main_column form[name="sort"] table td a.edit { opacity: 0.75 !important; }
 #main_column form[name="sort"] table td a.destroy { font-weight: 600 !important; }
 #right_bar input#key { background: #3b4252 !important; border: 1px solid #4c566a !important; }
 #tweet_searchbox #search_query_field { background: #3b4252 !important; border: 1px solid #4c566a !important; }`
@@ -1904,6 +1910,7 @@ a { color: #81a1c1 !important; }
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #00cccc;
   --pinboard-row-hover: #0f2a0f;
+  --pinboard-bundle-row-hover: #33ff331a;
   --pinboard-destroy: #ff3333;
   --pinboard-btn-bg: #1a3a1a;
   --pinboard-btn-bg-hover: #2a5a2a;
@@ -1922,6 +1929,9 @@ a { color: #81a1c1 !important; }
   --pinboard-on-accent: #007000;
   --pinboard-on-link-hover: #007a00;
   --pinboard-scrollbar-thumb: #22aa22;
+  --pinboard-star-fg: #227722;
+  --pinboard-bundle-edit-hover: #33ff33;
+  --pinboard-table-destroy-hover: #ff4747;
   --pinboard-help-fg: #5bae5b;
   --pinboard-bundle-chip-bg: #165416;
   --pinboard-font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
@@ -2152,7 +2162,8 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: var(--pinboard-muted-soft) !important; }
 .star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
-.star { color: var(--pinboard-border) !important; }
+.star { color: var(--pinboard-star-fg) !important; }
+.star:hover { color: var(--pinboard-accent) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
 a.bookmark_title { color: var(--pinboard-accent) !important; font-size: 14px !important; text-decoration: none !important; font-weight: var(--pinboard-weight-heading) !important; }
@@ -2176,7 +2187,7 @@ a.url_link {
   border-radius: var(--pinboard-radius-lg) !important;
   font-size: 11px !important;
 }
-.bookmark .description { color: var(--pinboard-fg) !important; opacity: 0.85 !important; line-height: var(--pinboard-line-height) !important; }
+.bookmark .description { color: var(--pinboard-fg) !important; opacity: 1 !important; line-height: var(--pinboard-line-height) !important; }
 .description blockquote { color: var(--pinboard-muted) !important; border-left: 3px solid var(--pinboard-accent-alpha) !important; padding-left: 10px !important; margin: 4px 0 !important; }
 
 a.tag {
@@ -2231,8 +2242,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-destroy) !important; opacity: 1 !important; }
+#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 #right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
@@ -2266,8 +2277,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
    render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
    Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
    would make them feel heavy on Windows. Decision: 2026-05-28. */
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -2464,7 +2475,7 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 /* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
 #main_column form[name="sort"] table tr { background: transparent !important; border-radius: var(--pinboard-radius-md) !important; }
-#main_column form[name="sort"] table tr:hover { background: var(--pinboard-row-hover) !important; }
+#main_column form[name="sort"] table tr:hover { background: var(--pinboard-bundle-row-hover) !important; }
 #main_column form[name="sort"] table td { padding: 6px 10px !important; vertical-align: middle !important; border: none !important; }
 #main_column form[name="sort"] table td[style*="text-align:right"] { min-width: 160px !important; padding-right: 14px !important; white-space: nowrap !important; }
 #main_column form[name="sort"] table input[name^="id_"] {
@@ -2489,10 +2500,10 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"],
 #main_column form[name="sort"] table a[style*="color: #aaa"] { color: var(--pinboard-muted) !important; opacity: 1 !important; text-decoration: none !important; font-size: 12px !important; margin-left: 4px !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: var(--pinboard-accent) !important; text-decoration: underline !important; }
-#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
-#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 0.85 !important; font-weight: var(--pinboard-weight-heading) !important; }
-#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 1 !important; font-weight: var(--pinboard-weight-heading) !important; }
+#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-bundle-edit-hover) !important; opacity: 1 !important; }
+#main_column form[name="sort"] table tr:hover td a.destroy { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 
 /* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
  * Native tagpicker.css paints every tag state with a hardcoded light fill
@@ -2775,7 +2786,6 @@ a.bundle:hover { color: #33ff33 !important; }
 #banner_searchbox input[type="text"]:focus { box-shadow: 0 0 6px #33ff3333 !important; }
 .search_button input[type="submit"] { border: 1px solid #33ff3360 !important; font-family: inherit !important; }
 .bookmark { border-bottom: 1px dashed #33ff3325 !important; padding: 10px 8px !important; }
-.star { color: #333 !important; }
 a.bookmark_title { font-weight: normal !important; }
 a.url_display { color: #22aa22 !important; font-size: 12px !important; }
 a.url_link { background: #1a1a1a !important; padding: 1px 5px !important; }
@@ -2788,8 +2798,6 @@ a.sort_order_selected { background: #1a1a1a !important; }
 #right_bar b { color: #33ff33 !important; }
 #right_bar a:not(.tag) { color: #22aa22 !important; }
 #right_bar a:not(.tag):hover { color: #33ff33 !important; }
-#right_bar table td a.delete { color: #22aa22 !important; }
-#right_bar table tr:hover td a.delete { color: #ff5555 !important; }
 #right_bar input#key { background: #0a0a0a !important; border: 1px solid #33ff3350 !important; }
 #right_bar input#key:focus { box-shadow: 0 0 0 2px rgba(51,255,51,0.2) !important; }
 #tweet_searchbox #search_query_field { background: #0a0a0a !important; border: 1px solid #33ff3350 !important; }
@@ -2822,13 +2830,11 @@ input[type="button"] { border: 1px solid #33ff3360 !important; font-family: inhe
 #bulk_edit_box { background: #111 !important; border: 1px dashed #33ff3340 !important; }
 #popup_header { background: #0a0a0a !important; }
 .user_navbar a { color: #22aa22 !important; }
-#main_column form[name="sort"] table tr:hover { background: rgba(51,255,51,0.1) !important; }
 #main_column form[name="sort"] table td { font-family: "Fira Code", "Cascadia Code", "Consolas", monospace !important; }
 #main_column form[name="sort"] table input[name^="id_"] { border-radius: 0 !important; border: 1px solid #33ff3380 !important; background: #0a0a0a !important; font-family: "Fira Code", "Consolas", monospace !important; }
 #main_column form[name="sort"] table input[name^="id_"]:focus { box-shadow: 0 0 0 2px rgba(51,255,51,0.3), 0 0 8px rgba(51,255,51,0.4) !important; }
 #main_column form[name="sort"] table a.bundle { letter-spacing: 0.02em !important; text-transform: uppercase !important; }
-#main_column form[name="sort"] table td a.edit { opacity: 0.75 !important; transition: opacity 0.15s ease, text-shadow 0.15s ease !important; }
-#main_column form[name="sort"] table td a.destroy { color: #ff5555 !important; opacity: 0.9 !important; }
+#main_column form[name="sort"] table td a.edit { transition: opacity 0.15s ease, text-shadow 0.15s ease !important; }
 #main_column form[name="sort"] table tr:hover td a.edit { text-shadow: 0 0 4px rgba(51,255,51,0.6) !important; }
 #main_column form[name="sort"] table tr:hover td a.destroy { text-shadow: 0 0 4px rgba(255,85,85,0.6) !important; }
 h2 { color: #33ff33 !important; }
@@ -2863,6 +2869,7 @@ a.bookmark_title::before { color: #33ff3380 !important; }`
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #8b4513;
   --pinboard-row-hover: #ede4d0;
+  --pinboard-bundle-row-hover: #8b451312;
   --pinboard-destroy: #c0392b;
   --pinboard-btn-bg: #6b4c3b;
   --pinboard-btn-bg-hover: #8b6c5b;
@@ -2881,6 +2888,9 @@ a.bookmark_title::before { color: #33ff3380 !important; }`
   --pinboard-on-accent: #faf8f5;
   --pinboard-on-link-hover: #faf8f5;
   --pinboard-scrollbar-thumb: #6b4c3b;
+  --pinboard-star-fg: #9f834f;
+  --pinboard-bundle-edit-hover: #1a3a5c;
+  --pinboard-table-destroy-hover: #b83729;
   --pinboard-help-fg: #6b6b6b;
   --pinboard-bundle-chip-bg: #c2c9cf;
   --pinboard-font-family: "Georgia", "Noto Serif", "Source Serif Pro", serif;
@@ -3111,7 +3121,8 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: var(--pinboard-muted-soft) !important; }
 .star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
-.star { color: var(--pinboard-border) !important; }
+.star { color: var(--pinboard-star-fg) !important; }
+.star:hover { color: var(--pinboard-accent) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
 a.bookmark_title { color: var(--pinboard-accent) !important; font-size: 16px !important; text-decoration: none !important; font-weight: var(--pinboard-weight-heading) !important; }
@@ -3135,7 +3146,7 @@ a.url_link {
   border-radius: var(--pinboard-radius-lg) !important;
   font-size: 11px !important;
 }
-.bookmark .description { color: var(--pinboard-fg) !important; opacity: 0.85 !important; line-height: var(--pinboard-line-height) !important; }
+.bookmark .description { color: var(--pinboard-fg) !important; opacity: 1 !important; line-height: var(--pinboard-line-height) !important; }
 .description blockquote { color: var(--pinboard-muted) !important; border-left: 3px solid var(--pinboard-accent-alpha) !important; padding-left: 10px !important; margin: 4px 0 !important; }
 
 a.tag {
@@ -3190,8 +3201,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-destroy) !important; opacity: 1 !important; }
+#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 #right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
@@ -3225,8 +3236,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
    render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
    Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
    would make them feel heavy on Windows. Decision: 2026-05-28. */
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -3423,7 +3434,7 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 /* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
 #main_column form[name="sort"] table tr { background: transparent !important; border-radius: var(--pinboard-radius-md) !important; }
-#main_column form[name="sort"] table tr:hover { background: var(--pinboard-row-hover) !important; }
+#main_column form[name="sort"] table tr:hover { background: var(--pinboard-bundle-row-hover) !important; }
 #main_column form[name="sort"] table td { padding: 6px 10px !important; vertical-align: middle !important; border: none !important; }
 #main_column form[name="sort"] table td[style*="text-align:right"] { min-width: 160px !important; padding-right: 14px !important; white-space: nowrap !important; }
 #main_column form[name="sort"] table input[name^="id_"] {
@@ -3448,10 +3459,10 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"],
 #main_column form[name="sort"] table a[style*="color: #aaa"] { color: var(--pinboard-muted) !important; opacity: 1 !important; text-decoration: none !important; font-size: 12px !important; margin-left: 4px !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: var(--pinboard-accent) !important; text-decoration: underline !important; }
-#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
-#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 0.85 !important; font-weight: var(--pinboard-weight-heading) !important; }
-#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 1 !important; font-weight: var(--pinboard-weight-heading) !important; }
+#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-bundle-edit-hover) !important; opacity: 1 !important; }
+#main_column form[name="sort"] table tr:hover td a.destroy { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 
 /* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
  * Native tagpicker.css paints every tag state with a hardcoded light fill
@@ -3725,7 +3736,6 @@ a.bundle:hover { color: #8b4513 !important; }
 #search_query_field:focus { border-color: #8b6c5b !important; }
 #banner_searchbox input[type="text"]:focus { border-color: #8b6c5b !important; }
 .bookmark { border-bottom: 1px solid #e8dfd0 !important; padding: 14px 8px !important; }
-.star { color: #ddd !important; }
 .selected_star { color: #d4a017 !important; }
 a.bookmark_title { font-weight: normal !important; letter-spacing: -0.01em !important; }
 a.url_display { color: #8b6c5b !important; font-size: 12px !important; font-family: -apple-system, sans-serif !important; }
@@ -3740,8 +3750,6 @@ a.sort_order_selected { background: #e0d5c1 !important; color: #6b4c3b !importan
 #right_bar b { font-family: "Georgia", serif !important; }
 #right_bar a:not(.tag) { color: #6b4c3b !important; }
 #right_bar a:not(.tag):hover { color: #8b4513 !important; }
-#right_bar table td a.delete { color: #8b6c5b !important; }
-#right_bar table tr:hover td a.delete { color: #a0522d !important; }
 #right_bar input#key { background: #f5f0e8 !important; color: #3b2e20 !important; border: 1px solid #c9b896 !important; border-radius: 4px !important; }
 #right_bar input#key:focus { border-color: #8b4513 !important; box-shadow: 0 0 0 2px rgba(139,69,19,0.18) !important; }
 #right_bar input[type="submit"] { border-radius: 4px !important; }
@@ -3778,7 +3786,6 @@ a.help { color: #aaa !important; background: #1a1a1a !important; }
 #bulk_edit_box { border: 1px solid #e8dfd0 !important; }
 .user_navbar a { color: #6b4c3b !important; }
 #main_column form[name="sort"] > table { border-spacing: 0 6px !important; }
-#main_column form[name="sort"] table tr:hover { background: rgba(139,69,19,0.07) !important; }
 #main_column form[name="sort"] table td { padding: 7px 10px !important; font-family: "Georgia", "Noto Serif", serif !important; }
 #main_column form[name="sort"] table input[name^="id_"] { background: #fffdf6 !important; font-family: "Georgia", serif !important; }
 #main_column form[name="sort"] table input[name^="id_"]:focus { border-color: #8b4513 !important; box-shadow: 0 0 0 2px rgba(139,69,19,0.18) !important; }
@@ -3786,9 +3793,8 @@ a.help { color: #aaa !important; background: #1a1a1a !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"] { font-style: italic !important; }
 #main_column form[name="sort"] table a[style*="color: #aaa"] { font-style: italic !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: #8b4513 !important; }
-#main_column form[name="sort"] table td a.edit { opacity: 0.75 !important; font-style: italic !important; }
-#main_column form[name="sort"] table td a.destroy { color: #a03024 !important; font-weight: 600 !important; font-style: italic !important; }
-#main_column form[name="sort"] table tr:hover td a.edit { color: #8b4513 !important; }
+#main_column form[name="sort"] table td a.edit { font-style: italic !important; }
+#main_column form[name="sort"] table td a.destroy { font-weight: 600 !important; font-style: italic !important; }
 h2 { font-family: "Georgia", serif !important; }`
   },
 
@@ -3819,6 +3825,7 @@ h2 { font-family: "Georgia", serif !important; }`
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #50fa7b;
   --pinboard-row-hover: #44475a;
+  --pinboard-bundle-row-hover: #bd93f91a;
   --pinboard-destroy: #ff9c9c;
   --pinboard-btn-bg: #bd93f9;
   --pinboard-btn-bg-hover: #caa8fb;
@@ -3837,6 +3844,9 @@ h2 { font-family: "Georgia", serif !important; }`
   --pinboard-on-accent: #282a36;
   --pinboard-on-link-hover: #282a36;
   --pinboard-scrollbar-thumb: #bd93f9;
+  --pinboard-star-fg: #9397ae;
+  --pinboard-bundle-edit-hover: #8be9fd;
+  --pinboard-table-destroy-hover: #ff9c9c;
   --pinboard-help-fg: #8995ba;
   --pinboard-bundle-chip-bg: #415a68;
   --pinboard-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -4067,7 +4077,8 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: var(--pinboard-muted-soft) !important; }
 .star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
-.star { color: var(--pinboard-border) !important; }
+.star { color: var(--pinboard-star-fg) !important; }
+.star:hover { color: var(--pinboard-accent) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
 a.bookmark_title { color: var(--pinboard-accent) !important; font-size: 15px !important; text-decoration: none !important; font-weight: var(--pinboard-weight-heading) !important; }
@@ -4091,7 +4102,7 @@ a.url_link {
   border-radius: var(--pinboard-radius-lg) !important;
   font-size: 11px !important;
 }
-.bookmark .description { color: var(--pinboard-fg) !important; opacity: 0.85 !important; line-height: var(--pinboard-line-height) !important; }
+.bookmark .description { color: var(--pinboard-fg) !important; opacity: 1 !important; line-height: var(--pinboard-line-height) !important; }
 .description blockquote { color: var(--pinboard-muted) !important; border-left: 3px solid var(--pinboard-accent-alpha) !important; padding-left: 10px !important; margin: 4px 0 !important; }
 
 a.tag {
@@ -4146,8 +4157,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-destroy) !important; opacity: 1 !important; }
+#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 #right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
@@ -4181,8 +4192,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
    render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
    Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
    would make them feel heavy on Windows. Decision: 2026-05-28. */
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -4379,7 +4390,7 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 /* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
 #main_column form[name="sort"] table tr { background: transparent !important; border-radius: var(--pinboard-radius-md) !important; }
-#main_column form[name="sort"] table tr:hover { background: var(--pinboard-row-hover) !important; }
+#main_column form[name="sort"] table tr:hover { background: var(--pinboard-bundle-row-hover) !important; }
 #main_column form[name="sort"] table td { padding: 6px 10px !important; vertical-align: middle !important; border: none !important; }
 #main_column form[name="sort"] table td[style*="text-align:right"] { min-width: 160px !important; padding-right: 14px !important; white-space: nowrap !important; }
 #main_column form[name="sort"] table input[name^="id_"] {
@@ -4404,10 +4415,10 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"],
 #main_column form[name="sort"] table a[style*="color: #aaa"] { color: var(--pinboard-muted) !important; opacity: 1 !important; text-decoration: none !important; font-size: 12px !important; margin-left: 4px !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: var(--pinboard-accent) !important; text-decoration: underline !important; }
-#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
-#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 0.85 !important; font-weight: var(--pinboard-weight-heading) !important; }
-#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 1 !important; font-weight: var(--pinboard-weight-heading) !important; }
+#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-bundle-edit-hover) !important; opacity: 1 !important; }
+#main_column form[name="sort"] table tr:hover td a.destroy { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 
 /* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
  * Native tagpicker.css paints every tag state with a hardcoded light fill
@@ -4684,7 +4695,7 @@ a.bookmark_title:hover { color: #a4f0ff !important; }
 a.url_display { color: #50fa7b !important; font-size: 12px !important; }
 a.url_link { padding: 1px 5px !important; background: #2d2f40 !important; }
 .description { opacity: 0.75 !important; }
-.description blockquote { color: #f8f8f2 !important; border-left: 3px solid #6272a4 !important; }
+.description blockquote { border-left: 3px solid #6272a4 !important; }
 a.sort_order_selected { background: #343746 !important; color: #ff79c6 !important; }
 a.copy_link { color: #bd93f9 !important; }
 #right_bar a:not(.tag) { color: #bd93f9 !important; }
@@ -4718,14 +4729,11 @@ input[type="radio"] { accent-color: #bd93f9 !important; }
 #bulk_edit_box { background: #44475a !important; border: 1px solid #6272a4 !important; }
 .user_navbar a { color: #bd93f9 !important; }
 #main_column form[name="sort"] table tr { border-radius: 6px !important; }
-#main_column form[name="sort"] table tr:hover { background: rgba(189,147,249,0.1) !important; }
 #main_column form[name="sort"] table input[name^="id_"] { border-radius: 6px !important; background: #21222c !important; }
 #main_column form[name="sort"] table input[name^="id_"]:focus { border-color: #ff79c6 !important; box-shadow: 0 0 0 2px rgba(255,121,198,0.25) !important; }
 #main_column form[name="sort"] table a.bundle { border-radius: 3px !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: #ff79c6 !important; }
-#main_column form[name="sort"] table td a.edit { opacity: 0.75 !important; }
-#main_column form[name="sort"] table td a.destroy { opacity: 0.9 !important; font-weight: 600 !important; }
-#main_column form[name="sort"] table tr:hover td a.edit { color: #ff79c6 !important; }
+#main_column form[name="sort"] table td a.destroy { font-weight: 600 !important; }
 .next_prev { color: #bd93f9 !important; }
 .next_prev_widget a { color: #bd93f9 !important; }
 a { color: #bd93f9 !important; }`
@@ -4759,6 +4767,7 @@ a { color: #bd93f9 !important; }`
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #846401;
   --pinboard-row-hover: #F2F0E5;
+  --pinboard-bundle-row-hover: #205ea614;
   --pinboard-destroy: #af3029;
   --pinboard-btn-bg: #205ea6;
   --pinboard-btn-bg-hover: #205ea6;
@@ -4777,6 +4786,9 @@ a { color: #bd93f9 !important; }`
   --pinboard-on-accent: #fffcf0;
   --pinboard-on-link-hover: #fffcf0;
   --pinboard-scrollbar-thumb: #6a6964;
+  --pinboard-star-fg: #8c855c;
+  --pinboard-bundle-edit-hover: #205ea6;
+  --pinboard-table-destroy-hover: #af3029;
   --pinboard-help-fg: #6c6a5e;
   --pinboard-bundle-chip-bg: #dee4e5;
   --pinboard-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -5007,7 +5019,8 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: var(--pinboard-muted-soft) !important; }
 .star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
-.star { color: var(--pinboard-border) !important; }
+.star { color: var(--pinboard-star-fg) !important; }
+.star:hover { color: var(--pinboard-accent) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
 a.bookmark_title { color: var(--pinboard-accent) !important; font-size: 15px !important; text-decoration: none !important; font-weight: var(--pinboard-weight-heading) !important; }
@@ -5031,7 +5044,7 @@ a.url_link {
   border-radius: var(--pinboard-radius-lg) !important;
   font-size: 11px !important;
 }
-.bookmark .description { color: var(--pinboard-fg) !important; opacity: 0.85 !important; line-height: var(--pinboard-line-height) !important; }
+.bookmark .description { color: var(--pinboard-fg) !important; opacity: 1 !important; line-height: var(--pinboard-line-height) !important; }
 .description blockquote { color: var(--pinboard-muted) !important; border-left: 3px solid var(--pinboard-accent-alpha) !important; padding-left: 10px !important; margin: 4px 0 !important; }
 
 a.tag {
@@ -5086,8 +5099,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-destroy) !important; opacity: 1 !important; }
+#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 #right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
@@ -5121,8 +5134,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
    render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
    Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
    would make them feel heavy on Windows. Decision: 2026-05-28. */
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -5319,7 +5332,7 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 /* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
 #main_column form[name="sort"] table tr { background: transparent !important; border-radius: var(--pinboard-radius-md) !important; }
-#main_column form[name="sort"] table tr:hover { background: var(--pinboard-row-hover) !important; }
+#main_column form[name="sort"] table tr:hover { background: var(--pinboard-bundle-row-hover) !important; }
 #main_column form[name="sort"] table td { padding: 6px 10px !important; vertical-align: middle !important; border: none !important; }
 #main_column form[name="sort"] table td[style*="text-align:right"] { min-width: 160px !important; padding-right: 14px !important; white-space: nowrap !important; }
 #main_column form[name="sort"] table input[name^="id_"] {
@@ -5344,10 +5357,10 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"],
 #main_column form[name="sort"] table a[style*="color: #aaa"] { color: var(--pinboard-muted) !important; opacity: 1 !important; text-decoration: none !important; font-size: 12px !important; margin-left: 4px !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: var(--pinboard-accent) !important; text-decoration: underline !important; }
-#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
-#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 0.85 !important; font-weight: var(--pinboard-weight-heading) !important; }
-#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 1 !important; font-weight: var(--pinboard-weight-heading) !important; }
+#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-bundle-edit-hover) !important; opacity: 1 !important; }
+#main_column form[name="sort"] table tr:hover td a.destroy { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 
 /* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
  * Native tagpicker.css paints every tag state with a hardcoded light fill
@@ -5624,6 +5637,7 @@ html.pbp-dark {
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #d0a215;
   --pinboard-row-hover: #343331;
+  --pinboard-bundle-row-hover: #4385be1f;
   --pinboard-destroy: #db736a;
   --pinboard-btn-bg: #4989c0;
   --pinboard-btn-bg-hover: #4788bf;
@@ -5642,6 +5656,9 @@ html.pbp-dark {
   --pinboard-on-accent: #171615;
   --pinboard-on-link-hover: #1c1b1a;
   --pinboard-scrollbar-thumb: #918f8a;
+  --pinboard-star-fg: #75716d;
+  --pinboard-bundle-edit-hover: #699ecb;
+  --pinboard-table-destroy-hover: #df827a;
   --pinboard-help-fg: #a09e9a;
   --pinboard-bundle-chip-bg: #28333c;
   --pinboard-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -5872,7 +5889,8 @@ html.pbp-dark .bookmark {
 html.pbp-dark .bookmark { transition: box-shadow 0.2s ease !important; }
 html.pbp-dark .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: var(--pinboard-muted-soft) !important; }
 html.pbp-dark .star, html.pbp-dark .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
-html.pbp-dark .star { color: var(--pinboard-border) !important; }
+html.pbp-dark .star { color: var(--pinboard-star-fg) !important; }
+html.pbp-dark .star:hover { color: var(--pinboard-accent) !important; }
 html.pbp-dark .selected_star { color: var(--pinboard-private-accent) !important; }
 
 html.pbp-dark a.bookmark_title { color: var(--pinboard-accent) !important; font-size: 15px !important; text-decoration: none !important; font-weight: var(--pinboard-weight-heading) !important; }
@@ -5896,7 +5914,7 @@ html.pbp-dark a.url_link {
   border-radius: var(--pinboard-radius-lg) !important;
   font-size: 11px !important;
 }
-html.pbp-dark .bookmark .description { color: var(--pinboard-fg) !important; opacity: 0.85 !important; line-height: var(--pinboard-line-height) !important; }
+html.pbp-dark .bookmark .description { color: var(--pinboard-fg) !important; opacity: 1 !important; line-height: var(--pinboard-line-height) !important; }
 html.pbp-dark .description blockquote { color: var(--pinboard-muted) !important; border-left: 3px solid var(--pinboard-accent-alpha) !important; padding-left: 10px !important; margin: 4px 0 !important; }
 
 html.pbp-dark a.tag {
@@ -5951,8 +5969,8 @@ html.pbp-dark #right_bar a:not(.tag) { color: var(--pinboard-accent) !important;
 html.pbp-dark #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 html.pbp-dark #right_bar table tr[onmouseover] { background: transparent !important; }
 html.pbp-dark #right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-html.pbp-dark #right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-html.pbp-dark #right_bar table tr:hover td a.delete { color: var(--pinboard-destroy) !important; opacity: 1 !important; }
+html.pbp-dark #right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+html.pbp-dark #right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 html.pbp-dark #right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
@@ -5986,8 +6004,8 @@ html.pbp-dark #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent
    render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
    Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
    would make them feel heavy on Windows. Decision: 2026-05-28. */
-html.pbp-dark #tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-html.pbp-dark #tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+html.pbp-dark #tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+html.pbp-dark #tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 html.pbp-dark #tweet_searchbox { margin-bottom: 12px !important; }
@@ -6184,7 +6202,7 @@ html.pbp-dark .rss_link, html.pbp-dark .rss_linkbox a { color: var(--pinboard-mu
 /* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
 html.pbp-dark #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
 html.pbp-dark #main_column form[name="sort"] table tr { background: transparent !important; border-radius: var(--pinboard-radius-md) !important; }
-html.pbp-dark #main_column form[name="sort"] table tr:hover { background: var(--pinboard-row-hover) !important; }
+html.pbp-dark #main_column form[name="sort"] table tr:hover { background: var(--pinboard-bundle-row-hover) !important; }
 html.pbp-dark #main_column form[name="sort"] table td { padding: 6px 10px !important; vertical-align: middle !important; border: none !important; }
 html.pbp-dark #main_column form[name="sort"] table td[style*="text-align:right"] { min-width: 160px !important; padding-right: 14px !important; white-space: nowrap !important; }
 html.pbp-dark #main_column form[name="sort"] table input[name^="id_"] {
@@ -6209,10 +6227,10 @@ html.pbp-dark #main_column form[name="sort"] table a.bundle { font-weight: var(-
 html.pbp-dark #main_column form[name="sort"] table a[style*="color:#aaa"],
 html.pbp-dark #main_column form[name="sort"] table a[style*="color: #aaa"] { color: var(--pinboard-muted) !important; opacity: 1 !important; text-decoration: none !important; font-size: 12px !important; margin-left: 4px !important; }
 html.pbp-dark #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: var(--pinboard-accent) !important; text-decoration: underline !important; }
-html.pbp-dark #main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
-html.pbp-dark #main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 0.85 !important; font-weight: var(--pinboard-weight-heading) !important; }
-html.pbp-dark #main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
-html.pbp-dark #main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+html.pbp-dark #main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+html.pbp-dark #main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 1 !important; font-weight: var(--pinboard-weight-heading) !important; }
+html.pbp-dark #main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-bundle-edit-hover) !important; opacity: 1 !important; }
+html.pbp-dark #main_column form[name="sort"] table tr:hover td a.destroy { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 
 /* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
  * Native tagpicker.css paints every tag state with a hardcoded light fill
@@ -6496,14 +6514,12 @@ html.pbp-dark input[type="submit"] { border: none !important; }
 html.pbp-dark input[type="button"] { border: none !important; }
 html.pbp-dark #main_column form[name="sort"] table input[name^="id_"] { border-radius: 4px !important; }
 html.pbp-dark #main_column form[name="sort"] table a.bundle { font-weight: 600 !important; }
-html.pbp-dark #main_column form[name="sort"] table td a.edit { opacity: 0.75 !important; }
 html.pbp-dark #main_column form[name="sort"] table td a.destroy { font-weight: 600 !important; }
 
 /* ======== overrides-patch for flexoki (auto-generated by tools/generate-overrides.mjs) ========
  * Restores shipped decls the composer's token-driven output doesn't match.
  */
 #banner { border-radius: 6px !important; padding: 8px 16px !important; }
-#search_query_field { }
 .bookmark { padding: 12px 8px !important; }
 .selected_star { color: #AD8301 !important; }
 #sub_banner a { color: #5E409D !important; }
@@ -6538,7 +6554,7 @@ html.pbp-dark .bookmark { border-bottom-color: #343331 !important; }
 html.pbp-dark a.url_display { color: #879A39 !important; }
 html.pbp-dark a.url_link { background: #1C1B1A !important; }
 html.pbp-dark .description { color: #878580 !important; }
-html.pbp-dark .description blockquote { color: #878580 !important; border-left: 3px solid #403E3C !important; }
+html.pbp-dark .description blockquote { border-left: 3px solid #403E3C !important; }
 html.pbp-dark #right_bar h3 { color: #8B7EC8 !important; }
 html.pbp-dark #right_bar h4 { color: #8B7EC8 !important; }
 html.pbp-dark #right_bar b { color: #8B7EC8 !important; }
@@ -6572,19 +6588,14 @@ html.pbp-dark .bookmark_count_box { color: #878580 !important; }
 html.pbp-dark .user_navbar a { color: #8B7EC8 !important; }
 html.pbp-dark h2 { color: #8B7EC8 !important; }
 #main_column form[name="sort"] table a.bundle { font-weight: 600 !important; }
-#main_column form[name="sort"] table tr:hover { background: rgba(32,94,166,0.08) !important; }
 #main_column form[name="sort"] table input[name^="id_"] { border-radius: 4px !important; background: #F2F0E5 !important; }
 #main_column form[name="sort"] table input[name^="id_"]:focus { box-shadow: 0 0 0 2px rgba(32,94,166,0.2) !important; }
-#main_column form[name="sort"] table td a.edit { opacity: 0.75 !important; }
 #main_column form[name="sort"] table td a.destroy { font-weight: 600 !important; }
-html.pbp-dark #main_column form[name="sort"] table tr:hover { background: rgba(67,133,190,0.12) !important; }
 html.pbp-dark #main_column form[name="sort"] table input[name^="id_"] { border-color: #282726 !important; background: #1C1B1A !important; }
 html.pbp-dark #main_column form[name="sort"] table input[name^="id_"]:focus { box-shadow: 0 0 0 2px rgba(67,133,190,0.25) !important; }
 html.pbp-dark #main_column form[name="sort"] table a[style*="color:#aaa"] { color: #878580 !important; }
 html.pbp-dark #main_column form[name="sort"] table a[style*="color: #aaa"] { color: #878580 !important; }
-html.pbp-dark #main_column form[name="sort"] table td a.edit { color: #878580 !important; }
 #right_bar table tr[onmouseover]:hover { background: #e6e4d9 !important; }
-#right_bar table td a.delete { color: #6F6E69 !important; }
 #right_bar input#key { background: #F2F0E5 !important; border: 1px solid #CECDC3 !important; border-radius: 4px !important; }
 #right_bar input#key:focus { border-color: #24837B !important; box-shadow: 0 0 0 2px rgba(36,131,123,0.2) !important; }
 #right_bar input[type="submit"] { border-radius: 4px !important; }
@@ -6629,6 +6640,7 @@ html.pbp-dark #tweet_searchbox input[type="submit"]:hover { background: #A8E4D5 
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #1b6863;
   --pinboard-row-hover: #eee8d5;
+  --pinboard-bundle-row-hover: #268bd214;
   --pinboard-destroy: #c22321;
   --pinboard-btn-bg: #2076b2;
   --pinboard-btn-bg-hover: #1b6294;
@@ -6647,6 +6659,9 @@ html.pbp-dark #tweet_searchbox input[type="submit"]:hover { background: #A8E4D5 
   --pinboard-on-accent: #f8e0a1;
   --pinboard-on-link-hover: #f7d579;
   --pinboard-scrollbar-thumb: #54696f;
+  --pinboard-star-fg: #8f7d4f;
+  --pinboard-bundle-edit-hover: #1b6395;
+  --pinboard-table-destroy-hover: #b92120;
   --pinboard-help-fg: #5b6969;
   --pinboard-bundle-chip-bg: #d7ded7;
   --pinboard-font-family: "Inter", -apple-system, sans-serif;
@@ -6877,7 +6892,8 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: var(--pinboard-muted-soft) !important; }
 .star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
-.star { color: var(--pinboard-border) !important; }
+.star { color: var(--pinboard-star-fg) !important; }
+.star:hover { color: var(--pinboard-accent) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
 a.bookmark_title { color: var(--pinboard-accent) !important; font-size: 15px !important; text-decoration: none !important; font-weight: var(--pinboard-weight-heading) !important; }
@@ -6901,7 +6917,7 @@ a.url_link {
   border-radius: var(--pinboard-radius-lg) !important;
   font-size: 11px !important;
 }
-.bookmark .description { color: var(--pinboard-fg) !important; opacity: 0.85 !important; line-height: var(--pinboard-line-height) !important; }
+.bookmark .description { color: var(--pinboard-fg) !important; opacity: 1 !important; line-height: var(--pinboard-line-height) !important; }
 .description blockquote { color: var(--pinboard-muted) !important; border-left: 3px solid var(--pinboard-accent-alpha) !important; padding-left: 10px !important; margin: 4px 0 !important; }
 
 a.tag {
@@ -6956,8 +6972,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-destroy) !important; opacity: 1 !important; }
+#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 #right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
@@ -6991,8 +7007,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
    render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
    Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
    would make them feel heavy on Windows. Decision: 2026-05-28. */
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -7189,7 +7205,7 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 /* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
 #main_column form[name="sort"] table tr { background: transparent !important; border-radius: var(--pinboard-radius-md) !important; }
-#main_column form[name="sort"] table tr:hover { background: var(--pinboard-row-hover) !important; }
+#main_column form[name="sort"] table tr:hover { background: var(--pinboard-bundle-row-hover) !important; }
 #main_column form[name="sort"] table td { padding: 6px 10px !important; vertical-align: middle !important; border: none !important; }
 #main_column form[name="sort"] table td[style*="text-align:right"] { min-width: 160px !important; padding-right: 14px !important; white-space: nowrap !important; }
 #main_column form[name="sort"] table input[name^="id_"] {
@@ -7214,10 +7230,10 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"],
 #main_column form[name="sort"] table a[style*="color: #aaa"] { color: var(--pinboard-muted) !important; opacity: 1 !important; text-decoration: none !important; font-size: 12px !important; margin-left: 4px !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: var(--pinboard-accent) !important; text-decoration: underline !important; }
-#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
-#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 0.85 !important; font-weight: var(--pinboard-weight-heading) !important; }
-#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 1 !important; font-weight: var(--pinboard-weight-heading) !important; }
+#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-bundle-edit-hover) !important; opacity: 1 !important; }
+#main_column form[name="sort"] table tr:hover td a.destroy { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 
 /* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
  * Native tagpicker.css paints every tag state with a hardcoded light fill
@@ -7477,7 +7493,6 @@ a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-colo
  */
 body#pinboard { letter-spacing: 0.01em !important; }
 #banner { border-radius: 4px !important; padding: 8px 16px !important; }
-#search_query_field { }
 .bookmark { padding: 12px 14px !important; border-radius: 2px !important; border-left: 2px solid transparent !important; }
 body:not(#pinboard) { letter-spacing: 0.01em !important; }
 a.bookmark_title { font-weight: 500 !important; }
@@ -7490,7 +7505,6 @@ a.when { font-family: "Fira Code", "Cascadia Code", monospace !important; }
 a.sort_order_selected { background: #eee8d5 !important; }
 .service_box { border-radius: 2px !important; }
 .help_box { border-radius: 2px !important; }
-#main_column form[name="sort"] table tr:hover { background: rgba(38,139,210,0.08) !important; }
 #main_column form[name="sort"] table input[name^="id_"] { border-radius: 3px !important; border: 1px solid #93a1a1 !important; background: #eee8d5 !important; }
 #main_column form[name="sort"] table a.bundle { font-weight: 600 !important; letter-spacing: 0.02em !important; border-radius: 3px !important; }
 #main_column form[name="sort"] table td a.destroy { font-weight: 600 !important; }
@@ -7529,6 +7543,7 @@ a.sort_order_selected { background: #eee8d5 !important; }
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #2ca9a0;
   --pinboard-row-hover: #073642;
+  --pinboard-bundle-row-hover: #268bd21a;
   --pinboard-destroy: #e87775;
   --pinboard-btn-bg: #2076b2;
   --pinboard-btn-bg-hover: #1b6294;
@@ -7547,6 +7562,9 @@ a.sort_order_selected { background: #eee8d5 !important; }
   --pinboard-on-accent: #271d03;
   --pinboard-on-link-hover: #302403;
   --pinboard-scrollbar-thumb: #859ca3;
+  --pinboard-star-fg: #1089a4;
+  --pinboard-bundle-edit-hover: #5dabe2;
+  --pinboard-table-destroy-hover: #eb8886;
   --pinboard-help-fg: #859ca3;
   --pinboard-bundle-chip-bg: #083849;
   --pinboard-font-family: "Inter", -apple-system, sans-serif;
@@ -7777,7 +7795,8 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: var(--pinboard-muted-soft) !important; }
 .star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
-.star { color: var(--pinboard-border) !important; }
+.star { color: var(--pinboard-star-fg) !important; }
+.star:hover { color: var(--pinboard-accent) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
 a.bookmark_title { color: var(--pinboard-accent) !important; font-size: 15px !important; text-decoration: none !important; font-weight: var(--pinboard-weight-heading) !important; }
@@ -7801,7 +7820,7 @@ a.url_link {
   border-radius: var(--pinboard-radius-lg) !important;
   font-size: 11px !important;
 }
-.bookmark .description { color: var(--pinboard-fg) !important; opacity: 0.85 !important; line-height: var(--pinboard-line-height) !important; }
+.bookmark .description { color: var(--pinboard-fg) !important; opacity: 1 !important; line-height: var(--pinboard-line-height) !important; }
 .description blockquote { color: var(--pinboard-muted) !important; border-left: 3px solid var(--pinboard-accent-alpha) !important; padding-left: 10px !important; margin: 4px 0 !important; }
 
 a.tag {
@@ -7856,8 +7875,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-destroy) !important; opacity: 1 !important; }
+#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 #right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
@@ -7891,8 +7910,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
    render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
    Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
    would make them feel heavy on Windows. Decision: 2026-05-28. */
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -8089,7 +8108,7 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 /* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
 #main_column form[name="sort"] table tr { background: transparent !important; border-radius: var(--pinboard-radius-md) !important; }
-#main_column form[name="sort"] table tr:hover { background: var(--pinboard-row-hover) !important; }
+#main_column form[name="sort"] table tr:hover { background: var(--pinboard-bundle-row-hover) !important; }
 #main_column form[name="sort"] table td { padding: 6px 10px !important; vertical-align: middle !important; border: none !important; }
 #main_column form[name="sort"] table td[style*="text-align:right"] { min-width: 160px !important; padding-right: 14px !important; white-space: nowrap !important; }
 #main_column form[name="sort"] table input[name^="id_"] {
@@ -8114,10 +8133,10 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"],
 #main_column form[name="sort"] table a[style*="color: #aaa"] { color: var(--pinboard-muted) !important; opacity: 1 !important; text-decoration: none !important; font-size: 12px !important; margin-left: 4px !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: var(--pinboard-accent) !important; text-decoration: underline !important; }
-#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
-#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 0.85 !important; font-weight: var(--pinboard-weight-heading) !important; }
-#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 1 !important; font-weight: var(--pinboard-weight-heading) !important; }
+#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-bundle-edit-hover) !important; opacity: 1 !important; }
+#main_column form[name="sort"] table tr:hover td a.destroy { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 
 /* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
  * Native tagpicker.css paints every tag state with a hardcoded light fill
@@ -8395,7 +8414,6 @@ a.sort_order_selected { background: #073642 !important; }
 .suggested_tag { color: #2aa198 !important; }
 .service_box { border-radius: 2px !important; }
 .help_box { border-radius: 2px !important; }
-#main_column form[name="sort"] table tr:hover { background: rgba(38,139,210,0.1) !important; }
 #main_column form[name="sort"] table input[name^="id_"] { border-radius: 3px !important; border: 1px solid #586e75 !important; }
 #main_column form[name="sort"] table input[name^="id_"]:focus { box-shadow: 0 0 0 2px rgba(38,139,210,0.3) !important; }
 #main_column form[name="sort"] table a.bundle { font-weight: 600 !important; letter-spacing: 0.02em !important; border-radius: 3px !important; }
@@ -8433,6 +8451,7 @@ a.sort_order_selected { background: #073642 !important; }
   --pinboard-tag-bg: #dce0e8;
   --pinboard-tag-fg: #127076;
   --pinboard-row-hover: #ccd0da;
+  --pinboard-bundle-row-hover: #1e66f50f;
   --pinboard-destroy: #c80e36;
   --pinboard-btn-bg: #1761f5;
   --pinboard-btn-bg-hover: #0a51df;
@@ -8451,6 +8470,9 @@ a.sort_order_selected { background: #073642 !important; }
   --pinboard-on-accent: #f5f6f9;
   --pinboard-on-link-hover: #e2e6ed;
   --pinboard-scrollbar-thumb: #63667a;
+  --pinboard-star-fg: #79849e;
+  --pinboard-bundle-edit-hover: #0b55ea;
+  --pinboard-table-destroy-hover: #ab0c2e;
   --pinboard-help-fg: #5d6174;
   --pinboard-bundle-chip-bg: #b6cbf5;
   --pinboard-font-family: "Nunito", "Inter", -apple-system, sans-serif;
@@ -8681,7 +8703,8 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: var(--pinboard-muted-soft) !important; }
 .star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
-.star { color: var(--pinboard-border) !important; }
+.star { color: var(--pinboard-star-fg) !important; }
+.star:hover { color: var(--pinboard-accent) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
 a.bookmark_title { color: var(--pinboard-accent) !important; font-size: 15px !important; text-decoration: none !important; font-weight: var(--pinboard-weight-heading) !important; }
@@ -8705,7 +8728,7 @@ a.url_link {
   border-radius: var(--pinboard-radius-lg) !important;
   font-size: 11px !important;
 }
-.bookmark .description { color: var(--pinboard-fg) !important; opacity: 0.85 !important; line-height: var(--pinboard-line-height) !important; }
+.bookmark .description { color: var(--pinboard-fg) !important; opacity: 1 !important; line-height: var(--pinboard-line-height) !important; }
 .description blockquote { color: var(--pinboard-muted) !important; border-left: 3px solid var(--pinboard-accent-alpha) !important; padding-left: 10px !important; margin: 4px 0 !important; }
 
 a.tag {
@@ -8760,8 +8783,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-destroy) !important; opacity: 1 !important; }
+#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 #right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
@@ -8795,8 +8818,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
    render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
    Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
    would make them feel heavy on Windows. Decision: 2026-05-28. */
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -8993,7 +9016,7 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 /* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
 #main_column form[name="sort"] table tr { background: transparent !important; border-radius: var(--pinboard-radius-md) !important; }
-#main_column form[name="sort"] table tr:hover { background: var(--pinboard-row-hover) !important; }
+#main_column form[name="sort"] table tr:hover { background: var(--pinboard-bundle-row-hover) !important; }
 #main_column form[name="sort"] table td { padding: 6px 10px !important; vertical-align: middle !important; border: none !important; }
 #main_column form[name="sort"] table td[style*="text-align:right"] { min-width: 160px !important; padding-right: 14px !important; white-space: nowrap !important; }
 #main_column form[name="sort"] table input[name^="id_"] {
@@ -9018,10 +9041,10 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"],
 #main_column form[name="sort"] table a[style*="color: #aaa"] { color: var(--pinboard-muted) !important; opacity: 1 !important; text-decoration: none !important; font-size: 12px !important; margin-left: 4px !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: var(--pinboard-accent) !important; text-decoration: underline !important; }
-#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
-#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 0.85 !important; font-weight: var(--pinboard-weight-heading) !important; }
-#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 1 !important; font-weight: var(--pinboard-weight-heading) !important; }
+#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-bundle-edit-hover) !important; opacity: 1 !important; }
+#main_column form[name="sort"] table tr:hover td a.destroy { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 
 /* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
  * Native tagpicker.css paints every tag state with a hardcoded light fill
@@ -9312,11 +9335,9 @@ a.help { background: #e6e9ef !important; }
 #bulk_top_bar { border-radius: 12px !important; }
 #bulk_edit_box { border-radius: 12px !important; }
 #main_column form[name="sort"] table tr { border-radius: 8px !important; }
-#main_column form[name="sort"] table tr:hover { background: rgba(30,102,245,0.06) !important; }
 #main_column form[name="sort"] table input[name^="id_"] { background: #e6e9ef !important; }
 #main_column form[name="sort"] table input[name^="id_"]:focus { box-shadow: 0 0 0 2px rgba(30,102,245,0.2) !important; }
 #main_column form[name="sort"] table a.bundle { font-weight: 600 !important; padding: 2px 6px !important; border-radius: 6px !important; }
-#main_column form[name="sort"] table td a.edit { opacity: 0.75 !important; }
 #main_column form[name="sort"] table td a.destroy { font-weight: 600 !important; }`
   },
 
@@ -9347,6 +9368,7 @@ a.help { background: #e6e9ef !important; }
   --pinboard-tag-bg: #45475a;
   --pinboard-tag-fg: #94e2d5;
   --pinboard-row-hover: #313244;
+  --pinboard-bundle-row-hover: #89b4fa14;
   --pinboard-destroy: #f38ba8;
   --pinboard-btn-bg: #89b4fa;
   --pinboard-btn-fg: #1e1e2e;
@@ -9365,6 +9387,9 @@ a.help { background: #e6e9ef !important; }
   --pinboard-on-accent: #1e1e2e;
   --pinboard-on-link-hover: #1e1e2e;
   --pinboard-scrollbar-thumb: #a6adc8;
+  --pinboard-star-fg: #787b97;
+  --pinboard-bundle-edit-hover: #89b4fa;
+  --pinboard-table-destroy-hover: #f38ba8;
   --pinboard-help-fg: #9c9eb1;
   --pinboard-bundle-chip-bg: #394461;
   --pinboard-font-family: "Nunito", "Inter", -apple-system, sans-serif;
@@ -9595,7 +9620,8 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: var(--pinboard-muted-soft) !important; }
 .star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
-.star { color: var(--pinboard-border) !important; }
+.star { color: var(--pinboard-star-fg) !important; }
+.star:hover { color: var(--pinboard-accent) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
 a.bookmark_title { color: var(--pinboard-accent) !important; font-size: 15px !important; text-decoration: none !important; font-weight: var(--pinboard-weight-heading) !important; }
@@ -9619,7 +9645,7 @@ a.url_link {
   border-radius: var(--pinboard-radius-lg) !important;
   font-size: 11px !important;
 }
-.bookmark .description { color: var(--pinboard-fg) !important; opacity: 0.85 !important; line-height: var(--pinboard-line-height) !important; }
+.bookmark .description { color: var(--pinboard-fg) !important; opacity: 1 !important; line-height: var(--pinboard-line-height) !important; }
 .description blockquote { color: var(--pinboard-muted) !important; border-left: 3px solid var(--pinboard-accent-alpha) !important; padding-left: 10px !important; margin: 4px 0 !important; }
 
 a.tag {
@@ -9674,8 +9700,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-destroy) !important; opacity: 1 !important; }
+#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 #right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
@@ -9709,8 +9735,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
    render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
    Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
    would make them feel heavy on Windows. Decision: 2026-05-28. */
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -9907,7 +9933,7 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 /* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
 #main_column form[name="sort"] table tr { background: transparent !important; border-radius: var(--pinboard-radius-md) !important; }
-#main_column form[name="sort"] table tr:hover { background: var(--pinboard-row-hover) !important; }
+#main_column form[name="sort"] table tr:hover { background: var(--pinboard-bundle-row-hover) !important; }
 #main_column form[name="sort"] table td { padding: 6px 10px !important; vertical-align: middle !important; border: none !important; }
 #main_column form[name="sort"] table td[style*="text-align:right"] { min-width: 160px !important; padding-right: 14px !important; white-space: nowrap !important; }
 #main_column form[name="sort"] table input[name^="id_"] {
@@ -9932,10 +9958,10 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"],
 #main_column form[name="sort"] table a[style*="color: #aaa"] { color: var(--pinboard-muted) !important; opacity: 1 !important; text-decoration: none !important; font-size: 12px !important; margin-left: 4px !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: var(--pinboard-accent) !important; text-decoration: underline !important; }
-#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
-#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 0.85 !important; font-weight: var(--pinboard-weight-heading) !important; }
-#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 1 !important; font-weight: var(--pinboard-weight-heading) !important; }
+#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-bundle-edit-hover) !important; opacity: 1 !important; }
+#main_column form[name="sort"] table tr:hover td a.destroy { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 
 /* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
  * Native tagpicker.css paints every tag state with a hardcoded light fill
@@ -10239,11 +10265,9 @@ select:focus { background: #313244 !important; }
 #bulk_top_bar { border-radius: 12px !important; }
 #bulk_edit_box { border-radius: 12px !important; }
 #main_column form[name="sort"] table tr { border-radius: 8px !important; }
-#main_column form[name="sort"] table tr:hover { background: rgba(137,180,250,0.08) !important; }
 #main_column form[name="sort"] table input[name^="id_"] { background: #313244 !important; }
 #main_column form[name="sort"] table a.bundle { font-weight: 600 !important; padding: 2px 6px !important; border-radius: 6px !important; }
-#main_column form[name="sort"] table td a.edit { opacity: 0.75 !important; }
-#main_column form[name="sort"] table td a.destroy { opacity: 0.9 !important; font-weight: 600 !important; }
+#main_column form[name="sort"] table td a.destroy { font-weight: 600 !important; }
 h2 { color: #cba6f7 !important; }`
   },
 
@@ -10274,6 +10298,7 @@ h2 { color: #cba6f7 !important; }`
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #b8bb26;
   --pinboard-row-hover: #3c3836;
+  --pinboard-bundle-row-hover: #a899841f;
   --pinboard-destroy: #fc7f70;
   --pinboard-btn-bg: #83a598;
   --pinboard-btn-fg: #282828;
@@ -10292,6 +10317,9 @@ h2 { color: #cba6f7 !important; }`
   --pinboard-on-accent: #282828;
   --pinboard-on-link-hover: #282828;
   --pinboard-scrollbar-thumb: #b0a390;
+  --pinboard-star-fg: #8c8079;
+  --pinboard-bundle-edit-hover: #a1bab1;
+  --pinboard-table-destroy-hover: #fd9a8e;
   --pinboard-help-fg: #ada39c;
   --pinboard-bundle-chip-bg: #454f4b;
   --pinboard-font-family: "IBM Plex Sans", "Inter", -apple-system, sans-serif;
@@ -10522,7 +10550,8 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: var(--pinboard-muted-soft) !important; }
 .star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
-.star { color: var(--pinboard-border) !important; }
+.star { color: var(--pinboard-star-fg) !important; }
+.star:hover { color: var(--pinboard-accent) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
 a.bookmark_title { color: var(--pinboard-accent) !important; font-size: 15px !important; text-decoration: none !important; font-weight: var(--pinboard-weight-heading) !important; }
@@ -10546,7 +10575,7 @@ a.url_link {
   border-radius: var(--pinboard-radius-lg) !important;
   font-size: 11px !important;
 }
-.bookmark .description { color: var(--pinboard-fg) !important; opacity: 0.85 !important; line-height: var(--pinboard-line-height) !important; }
+.bookmark .description { color: var(--pinboard-fg) !important; opacity: 1 !important; line-height: var(--pinboard-line-height) !important; }
 .description blockquote { color: var(--pinboard-muted) !important; border-left: 3px solid var(--pinboard-accent-alpha) !important; padding-left: 10px !important; margin: 4px 0 !important; }
 
 a.tag {
@@ -10601,8 +10630,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-destroy) !important; opacity: 1 !important; }
+#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 #right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
@@ -10636,8 +10665,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
    render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
    Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
    would make them feel heavy on Windows. Decision: 2026-05-28. */
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -10834,7 +10863,7 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 /* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
 #main_column form[name="sort"] table tr { background: transparent !important; border-radius: var(--pinboard-radius-md) !important; }
-#main_column form[name="sort"] table tr:hover { background: var(--pinboard-row-hover) !important; }
+#main_column form[name="sort"] table tr:hover { background: var(--pinboard-bundle-row-hover) !important; }
 #main_column form[name="sort"] table td { padding: 6px 10px !important; vertical-align: middle !important; border: none !important; }
 #main_column form[name="sort"] table td[style*="text-align:right"] { min-width: 160px !important; padding-right: 14px !important; white-space: nowrap !important; }
 #main_column form[name="sort"] table input[name^="id_"] {
@@ -10859,10 +10888,10 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"],
 #main_column form[name="sort"] table a[style*="color: #aaa"] { color: var(--pinboard-muted) !important; opacity: 1 !important; text-decoration: none !important; font-size: 12px !important; margin-left: 4px !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: var(--pinboard-accent) !important; text-decoration: underline !important; }
-#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
-#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 0.85 !important; font-weight: var(--pinboard-weight-heading) !important; }
-#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 1 !important; font-weight: var(--pinboard-weight-heading) !important; }
+#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-bundle-edit-hover) !important; opacity: 1 !important; }
+#main_column form[name="sort"] table tr:hover td a.destroy { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 
 /* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
  * Native tagpicker.css paints every tag state with a hardcoded light fill
@@ -11121,7 +11150,6 @@ a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-colo
  */
 body#pinboard { font-weight: 450 !important; }
 #banner { border-radius: 4px !important; padding: 8px 16px !important; }
-#search_query_field { }
 .bookmark { background: #3c3836 !important; padding: 12px 14px !important; border-radius: 0 !important; margin-bottom: 4px !important; }
 body:not(#pinboard) { font-weight: 450 !important; }
 #search_query_field:focus { background: #3c3836 !important; }
@@ -11131,7 +11159,7 @@ body:not(#pinboard) { font-weight: 450 !important; }
 a.url_display { color: #fabd2f !important; font-size: 12px !important; }
 a.url_link { background: #282828 !important; padding: 1px 5px !important; border: 1px solid #504945 !important; }
 .description { color: #d5c4a1 !important; }
-.description blockquote { color: #bdae93 !important; border-left: 3px solid #fabd2f !important; }
+.description blockquote { border-left: 3px solid #fabd2f !important; }
 #right_bar h3 { color: #d3869b !important; }
 #right_bar h4 { color: #d3869b !important; }
 #right_bar b { color: #d3869b !important; }
@@ -11154,11 +11182,9 @@ input[type="button"]:hover { border-color: #b8bb26 !important; }
 #bulk_top_bar { border: 1px solid #504945 !important; }
 #bulk_edit_box { border: 1px solid #504945 !important; }
 h2 { color: #d3869b !important; }
-#main_column form[name="sort"] table tr:hover { background: rgba(168,153,132,0.12) !important; }
 #main_column form[name="sort"] table td { font-family: "IBM Plex Sans", "Inter", sans-serif !important; }
 #main_column form[name="sort"] table input[name^="id_"] { border: 1px solid #504945 !important; background: #3c3836 !important; }
 #main_column form[name="sort"] table a.bundle { letter-spacing: 0.02em !important; }
-#main_column form[name="sort"] table td a.destroy { opacity: 0.9 !important; }
 #right_bar input#key { border: 1px solid #504945 !important; border-radius: 4px !important; }
 #right_bar input#key:focus { box-shadow: 0 0 0 2px rgba(131,165,152,0.25) !important; }
 #right_bar input[type="submit"] { border-radius: 4px !important; }
@@ -11194,6 +11220,7 @@ h2 { color: #d3869b !important; }
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #9ccfd8;
   --pinboard-row-hover: #26233a;
+  --pinboard-bundle-row-hover: #c4a7e714;
   --pinboard-destroy: #eb6f92;
   --pinboard-btn-bg: #c4a7e7;
   --pinboard-btn-fg: #191724;
@@ -11212,6 +11239,9 @@ h2 { color: #d3869b !important; }
   --pinboard-on-accent: #191724;
   --pinboard-on-link-hover: #191724;
   --pinboard-scrollbar-thumb: #908caa;
+  --pinboard-star-fg: #7b74ab;
+  --pinboard-bundle-edit-hover: #c4a7e7;
+  --pinboard-table-destroy-hover: #eb6f92;
   --pinboard-help-fg: #8e8ba3;
   --pinboard-bundle-chip-bg: #443b55;
   --pinboard-font-family: "Lora", "Georgia", "Noto Serif", serif;
@@ -11442,7 +11472,8 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: var(--pinboard-muted-soft) !important; }
 .star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
-.star { color: var(--pinboard-border) !important; }
+.star { color: var(--pinboard-star-fg) !important; }
+.star:hover { color: var(--pinboard-accent) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
 a.bookmark_title { color: var(--pinboard-accent) !important; font-size: 15px !important; text-decoration: none !important; font-weight: var(--pinboard-weight-heading) !important; }
@@ -11466,7 +11497,7 @@ a.url_link {
   border-radius: var(--pinboard-radius-lg) !important;
   font-size: 11px !important;
 }
-.bookmark .description { color: var(--pinboard-fg) !important; opacity: 0.85 !important; line-height: var(--pinboard-line-height) !important; }
+.bookmark .description { color: var(--pinboard-fg) !important; opacity: 1 !important; line-height: var(--pinboard-line-height) !important; }
 .description blockquote { color: var(--pinboard-muted) !important; border-left: 3px solid var(--pinboard-accent-alpha) !important; padding-left: 10px !important; margin: 4px 0 !important; }
 
 a.tag {
@@ -11521,8 +11552,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-destroy) !important; opacity: 1 !important; }
+#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 #right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
@@ -11556,8 +11587,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
    render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
    Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
    would make them feel heavy on Windows. Decision: 2026-05-28. */
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -11754,7 +11785,7 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 /* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
 #main_column form[name="sort"] table tr { background: transparent !important; border-radius: var(--pinboard-radius-md) !important; }
-#main_column form[name="sort"] table tr:hover { background: var(--pinboard-row-hover) !important; }
+#main_column form[name="sort"] table tr:hover { background: var(--pinboard-bundle-row-hover) !important; }
 #main_column form[name="sort"] table td { padding: 6px 10px !important; vertical-align: middle !important; border: none !important; }
 #main_column form[name="sort"] table td[style*="text-align:right"] { min-width: 160px !important; padding-right: 14px !important; white-space: nowrap !important; }
 #main_column form[name="sort"] table input[name^="id_"] {
@@ -11779,10 +11810,10 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"],
 #main_column form[name="sort"] table a[style*="color: #aaa"] { color: var(--pinboard-muted) !important; opacity: 1 !important; text-decoration: none !important; font-size: 12px !important; margin-left: 4px !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: var(--pinboard-accent) !important; text-decoration: underline !important; }
-#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
-#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 0.85 !important; font-weight: var(--pinboard-weight-heading) !important; }
-#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 1 !important; font-weight: var(--pinboard-weight-heading) !important; }
+#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-bundle-edit-hover) !important; opacity: 1 !important; }
+#main_column form[name="sort"] table tr:hover td a.destroy { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 
 /* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
  * Native tagpicker.css paints every tag state with a hardcoded light fill
@@ -12055,7 +12086,7 @@ a.bookmark_title:hover { text-decoration: none !important; }
 a.url_display { color: #f6c177 !important; font-size: 12px !important; font-family: -apple-system, sans-serif !important; font-style: normal !important; }
 a.url_link { border-radius: 6px !important; font-family: -apple-system, sans-serif !important; font-style: normal !important; }
 .description { color: #908caa !important; font-style: italic !important; }
-.description blockquote { color: #e0def4 !important; border-left: 2px solid #c4a7e7 !important; padding-left: 12px !important; margin: 6px 0 !important; font-style: italic !important; }
+.description blockquote { border-left: 2px solid #c4a7e7 !important; padding-left: 12px !important; margin: 6px 0 !important; font-style: italic !important; }
 a.sort_order_selected { background: #26233a !important; }
 #right_bar h3 { color: #ebbcba !important; }
 #right_bar h4 { color: #ebbcba !important; }
@@ -12082,14 +12113,13 @@ select:focus { box-shadow: 0 0 0 2px rgba(196,167,231,0.15) !important; }
 #profile_right_column h2 { color: #ebbcba !important; }
 #note_right_column { border-radius: 8px !important; }
 #main_column form[name="sort"] > table { border-spacing: 0 6px !important; }
-#main_column form[name="sort"] table tr:hover { background: rgba(196,167,231,0.08) !important; }
 #main_column form[name="sort"] table td { padding: 7px 10px !important; font-family: "Lora", "Georgia", serif !important; }
 #main_column form[name="sort"] table input[name^="id_"] { background: #1f1d2e !important; font-family: "Lora", "Georgia", serif !important; }
 #main_column form[name="sort"] table a.bundle { font-weight: 600 !important; font-style: italic !important; letter-spacing: 0.02em !important; border-radius: 3px !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"] { font-style: italic !important; }
 #main_column form[name="sort"] table a[style*="color: #aaa"] { font-style: italic !important; }
 #main_column form[name="sort"] table td a.edit { font-style: italic !important; }
-#main_column form[name="sort"] table td a.destroy { opacity: 0.9 !important; font-weight: 600 !important; font-style: italic !important; }
+#main_column form[name="sort"] table td a.destroy { font-weight: 600 !important; font-style: italic !important; }
 h2 { color: #ebbcba !important; }`
   },
 
@@ -12117,6 +12147,7 @@ h2 { color: #ebbcba !important; }`
   --pinboard-tag-bg: #ddf4ff;
   --pinboard-tag-fg: #0550ae;
   --pinboard-row-hover: #f6f8fa;
+  --pinboard-bundle-row-hover: #0969da0f;
   --pinboard-destroy: #cf222e;
   --pinboard-btn-bg: #0969da;
   --pinboard-btn-fg: #ffffff;
@@ -12138,6 +12169,9 @@ h2 { color: #ebbcba !important; }`
   --pinboard-on-accent: #ffffff;
   --pinboard-on-link-hover: #ffffff;
   --pinboard-scrollbar-thumb: #656d76;
+  --pinboard-star-fg: #7c90a3;
+  --pinboard-bundle-edit-hover: #0964d0;
+  --pinboard-table-destroy-hover: #cf222e;
   --pinboard-help-fg: #636c76;
   --pinboard-bundle-chip-bg: #c7dbf4;
   --pinboard-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
@@ -12368,7 +12402,8 @@ a.bundle:hover { color: var(--pinboard-link-hover) !important; }
 .bookmark { transition: box-shadow 0.2s ease !important; }
 .bookmark .display { float: none !important; flex: 1 !important; width: auto !important; min-width: 0 !important; color: var(--pinboard-muted-soft) !important; }
 .star, .selected_star { margin-left: 0 !important; margin-right: 6px !important; float: none !important; flex-shrink: 0 !important; position: relative !important; top: -3px !important; }
-.star { color: var(--pinboard-border) !important; }
+.star { color: var(--pinboard-star-fg) !important; }
+.star:hover { color: var(--pinboard-accent) !important; }
 .selected_star { color: var(--pinboard-private-accent) !important; }
 
 a.bookmark_title { color: var(--pinboard-accent) !important; font-size: 15px !important; text-decoration: none !important; font-weight: var(--pinboard-weight-heading) !important; }
@@ -12392,7 +12427,7 @@ a.url_link {
   border-radius: var(--pinboard-radius-lg) !important;
   font-size: 11px !important;
 }
-.bookmark .description { color: var(--pinboard-fg) !important; opacity: 0.85 !important; line-height: var(--pinboard-line-height) !important; }
+.bookmark .description { color: var(--pinboard-fg) !important; opacity: 1 !important; line-height: var(--pinboard-line-height) !important; }
 .description blockquote { color: var(--pinboard-muted) !important; border-left: 3px solid var(--pinboard-accent-alpha) !important; padding-left: 10px !important; margin: 4px 0 !important; }
 
 a.tag {
@@ -12447,8 +12482,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
 #right_bar a:not(.tag):hover { color: var(--pinboard-link-hover) !important; }
 #right_bar table tr[onmouseover] { background: transparent !important; }
 #right_bar table tr[onmouseover]:hover { background: var(--pinboard-row-hover) !important; }
-#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 0.55 !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#right_bar table tr:hover td a.delete { color: var(--pinboard-destroy) !important; opacity: 1 !important; }
+#right_bar table td a.delete { color: var(--pinboard-muted-soft) !important; font-size: 11px !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#right_bar table tr:hover td a.delete { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 #right_bar input#key {
   background: var(--pinboard-input-bg) !important;
   color: var(--pinboard-fg) !important;
@@ -12482,8 +12517,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
    render ⊕/⊖ legibly at this size; Linux fonts (Noto/DejaVu) render them tiny.
    Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
    would make them feel heavy on Windows. Decision: 2026-05-28. */
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#tag_cloud_header a:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -12680,7 +12715,7 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 /* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
 #main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
 #main_column form[name="sort"] table tr { background: transparent !important; border-radius: var(--pinboard-radius-md) !important; }
-#main_column form[name="sort"] table tr:hover { background: var(--pinboard-row-hover) !important; }
+#main_column form[name="sort"] table tr:hover { background: var(--pinboard-bundle-row-hover) !important; }
 #main_column form[name="sort"] table td { padding: 6px 10px !important; vertical-align: middle !important; border: none !important; }
 #main_column form[name="sort"] table td[style*="text-align:right"] { min-width: 160px !important; padding-right: 14px !important; white-space: nowrap !important; }
 #main_column form[name="sort"] table input[name^="id_"] {
@@ -12705,10 +12740,10 @@ blockquote.note { color: var(--pinboard-fg) !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"],
 #main_column form[name="sort"] table a[style*="color: #aaa"] { color: var(--pinboard-muted) !important; opacity: 1 !important; text-decoration: none !important; font-size: 12px !important; margin-left: 4px !important; }
 #main_column form[name="sort"] table a[style*="color:#aaa"]:hover { color: var(--pinboard-accent) !important; text-decoration: underline !important; }
-#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 0.8 !important; transition: opacity 0.15s ease !important; }
-#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 0.85 !important; font-weight: var(--pinboard-weight-heading) !important; }
-#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
-#main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+#main_column form[name="sort"] table td a.edit { color: var(--pinboard-muted) !important; opacity: 1 !important; transition: color 0.15s ease !important; }
+#main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 1 !important; font-weight: var(--pinboard-weight-heading) !important; }
+#main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-bundle-edit-hover) !important; opacity: 1 !important; }
+#main_column form[name="sort"] table tr:hover td a.destroy { color: var(--pinboard-table-destroy-hover) !important; opacity: 1 !important; }
 
 /* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
  * Native tagpicker.css paints every tag state with a hardcoded light fill
@@ -12969,15 +13004,12 @@ a.tag.selected::before { color: var(--pinboard-destroy) !important; opacity: 0.9
  * Restores shipped decls the composer's token-driven output doesn't match.
  */
 #banner { border-radius: 4px !important; padding: 8px 16px !important; }
-#search_query_field { }
 #pinboard_name a { font-weight: 700 !important; }
 a.url_display { color: #57606a !important; font-size: 12px !important; }
 a.url_link { border-radius: 12px !important; }
 .description blockquote { border-left: 3px solid #0969da40 !important; }
 .suggested_tag { color: #1a7f37 !important; }
-#main_column form[name="sort"] table tr:hover { background: rgba(9,105,218,0.06) !important; }
 #main_column form[name="sort"] table input[name^="id_"] { border-radius: 6px !important; }
-#right_bar table td a.delete { color: #6e7781 !important; }
 #right_bar input#key { color: #24292f !important; border-radius: 4px !important; }
 #right_bar input[type="submit"] { border-radius: 4px !important; }
 #tweet_searchbox #search_query_field { color: #24292f !important; border-radius: 4px !important; }

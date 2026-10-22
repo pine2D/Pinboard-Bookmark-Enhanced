@@ -1742,6 +1742,35 @@ function auditPalette(slug, rawPalette) {
       }
     }
   }
+  {
+    const star = hexRgb(p["star-fg"] || "");
+    if (!star) {
+      const line = `  pinboard  ${slug}  star-fg  MISSING TOKEN  FAIL`;
+      console.log(line);
+      violations.push(line);
+    } else {
+      for (const [label, base] of [["bg", bg], ["bg-surface", bgSurface], ["private-bg", privateBg]]) {
+        if (base) console.log(check("pinboard", slug, `star-fg vs ${label}`, cr(base, star), 3));
+      }
+    }
+  }
+  for (const [inkRole, fillRoles] of [
+    ["bundle-edit-hover", ["bundle-row-hover"]],
+    ["table-destroy-hover", ["bundle-row-hover", "row-hover"]],
+  ]) {
+    const ink = hexRgb(p[inkRole] || "");
+    if (!ink) {
+      const line = `  pinboard  ${slug}  ${inkRole}  MISSING TOKEN  FAIL`;
+      console.log(line);
+      violations.push(line);
+      continue;
+    }
+    for (const fillRole of fillRoles) {
+      for (const [label, base] of [["bg", bg], ["bg-surface", bgSurface]]) {
+        if (base) console.log(check("pinboard", slug, `${inkRole} vs ${fillRole}@${label}`, cr(resolveOpaqueBg(p[fillRole], base), ink), 4.5));
+      }
+    }
+  }
   const urlFg = hexRgb(p["url-link-fg"] || "");
   if (!urlFg) {
     const line = `  pinboard  ${slug}  url-link-fg  MISSING TOKEN  FAIL`;
