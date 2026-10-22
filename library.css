@@ -2552,8 +2552,9 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
    A wrapping flex row, not a grid: no column is shared between rows any
    more, so each row is only as wide as its own controls. The count takes
    the slack (basis 0) and is the first thing to give way, by ellipsis; the
-   group unit's 100% basis breaks the line before and after it. Status slot /
-   help sentence: a full-width row 4 only while non-empty. */
+   group unit's 100% basis breaks the line before and after it. Help
+   sentence: a full-width row 4 only while non-empty; the status slot ends
+   row 3. */
 #vocab-selected-count { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A text button in the list header never wraps (final review #11). The
    buttons here are fixed-height sm cells: squeezed to their min-content width
@@ -2564,8 +2565,13 @@ html.motion-ready .lib-toggle { transition: background-color var(--motion-state)
    by ellipsis. Same root cause as T8e's count row, there fixed for the row. */
 :is(.notes-toolbar, .vocab-filter-row, .lib-count-row, .vocab-batch-bar, .notes-batch-bar) .btn { white-space: nowrap; }
 .vocab-batch-bar > .vocab-group-unit { flex: 1 1 100%; min-width: 0; max-width: none; }
-.vocab-batch-bar > .vocab-group-help,
-.vocab-batch-bar > .lib-batch-status > .save-status { flex: 1 1 100%; }
+.vocab-batch-bar > .vocab-group-help { flex: 1 1 100%; }
+/* The status sentence closes row 3, after Known / Learning (critique round
+   5, 2026-10-22: a fourth row pushed the list down for three seconds and
+   pulled it back up). Basis 0 keeps it on row 3 and wraps the sentence inside
+   the room left there -- a second text line grows the row by a few px, not by
+   a row; only when less than 7em is left does it take a row of its own. */
+.vocab-batch-bar > .lib-batch-status > .save-status { flex: 1 1 0; min-width: 7em; }
 /* Notes: one row -- count | Select all | invert + clear | (slack) | delete. */
 .notes-batch-bar > #notes-batch-delete { margin-inline-start: auto; }
 /* The slot is only a home for the moving status node: its contents become

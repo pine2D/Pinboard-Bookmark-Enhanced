@@ -186,6 +186,7 @@ function _pbpVocabRowSelect(w, range) {
   // the checkbox era expressed this as `checkbox.disabled`, which went away
   // with the checkbox.
   if (_vocabBatchBusy) return;
+  _pbpVocabDropDoneMessage();
   const want = !_vocabSelected.has(w.id);
   if (range && _vocabLastSelectedId) {
     _vocabSelected = pbpVocabSelectRange(_vocabSelected, _vocabViewRows,
@@ -204,6 +205,7 @@ function _pbpVocabRowSelect(w, range) {
 // others first. Split out of the click handler because the same activation is
 // now one of three things a click can mean (see the handler below).
 function _pbpVocabActivateRow(w, card) {
+  _pbpVocabDropDoneMessage();
   _pbpVocabOnRowActivate(w);
   document.querySelectorAll("#vocab-list .vocab-card[aria-current]").forEach((el) => el.removeAttribute("aria-current"));
   card.setAttribute("aria-current", "true");
@@ -1706,6 +1708,39 @@ function _pbpVocabFlashStatus(ok, text) {
   if (ok) _vocabFlashTimer = setTimeout(() => { el.textContent = ""; }, 3000);
 }
 
+// A success line has done its job once the user moves on: the next row
+// click, selection change or arrow-followed row takes it down at once instead
+// of leaving it to its three-second timer (critique round 5, 2026-10-22: the
+// "added to group" line stayed up over the next word). Failures stay -- they
+// are recovery instructions.
+function _pbpVocabDropDoneMessage() {
+  const el = $id("vocab-status");
+  if (!el || !el.classList.contains("ok") || el.dataset.vocabLoading === "true" || !el.textContent) return;
+  clearTimeout(_vocabFlashTimer);
+  el.textContent = "";
+}
+
+// Spoken, not painted: for a result the row already shows in place (K flips
+// the row's own "known" mark, and since round 5 the row no longer moves), a
+// visible line under the count row only shoved the list down and back up.
+// Assistive tech still hears it through this visually hidden live region.
+function _pbpVocabAnnounce(text) {
+  const pane = $id("vocab-list-pane");
+  if (!pane) return;
+  let el = $id("vocab-announce");
+  if (!el) {
+    el = document.createElement("span");
+    el.id = "vocab-announce";
+    el.className = "sr-only";
+    el.setAttribute("role", "status");
+    el.setAttribute("aria-live", "polite");
+    pane.appendChild(el);
+  }
+  // Same text twice in a row (K, K on two words) must be announced twice.
+  el.textContent = "";
+  requestAnimationFrame(() => { el.textContent = text; });
+}
+
 function _pbpVocabSetLoading(loading) {
   const list = $id("vocab-list");
   if (list) list.setAttribute("aria-busy", loading ? "true" : "false");
@@ -2086,6 +2121,11 @@ function _pbpVocabApplyView(resetLimit) {
     ($id("vocab-sort") || {}).value || "latest",
     ($id("vocab-status-filter") || {}).value || "");
   if (_vocabFrozenOrder) _vocabViewRows = pbpVocabApplyFrozenOrder(_vocabViewRows, _vocabFrozenOrder);
+  // Nothing matches: the reading pane goes back to the cover instead of
+  // keeping a word the filters have just ruled out (critique round 5). The
+  // single-pane layout is left alone -- there the open word is the whole
+  // screen and the search box is not on it.
+  if (!_vocabViewRows.length && _vocabRows.length && _pbpVocabDetailWordId && !_pbpVocabNarrowMode()) _pbpVocabRenderDetail(null);
   _pbpVocabRenderList();
   _pbpVocabRenderCover();
 }
@@ -3153,7 +3193,7 @@ async function _pbpVocabToggleKnownFromRow(w) {
     if (!_pbpVocabFocusRow(w.id)) _pbpVocabFocusStable();
     if (!ok) _pbpVocabFlashStatus(false, t("vocabBatchFailed"));
     else if (!refreshed) _pbpVocabFlashStatus(false, t("vocabRefreshFailed"));
-    else _pbpVocabFlashStatus(true, t(known ? "vocabBatchKnownDoneOne" : "vocabBatchLearningDoneOne", "1"));
+    else _pbpVocabAnnounce(t(known ? "vocabBatchKnownDoneOne" : "vocabBatchLearningDoneOne", "1"));
   } catch (err) {
     console.warn("vocab status toggle failed:", err && err.name, err && err.message);
     if (owner) { await _pbpVocabReloadAfterMutation(owner, gen); restoreSelection(); }

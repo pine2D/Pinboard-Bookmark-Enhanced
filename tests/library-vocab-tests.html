@@ -1584,6 +1584,44 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     pbpVocabAll = raceRealAll;
   }
 
+  // Critique round 5: a success line comes down with the user's next row
+  // action (a failure stays), and a search that matches nothing returns the
+  // reading pane to the cover.
+  {
+    const realNarrow = _pbpVocabNarrowMode;
+    try {
+      _pbpVocabNarrowMode = () => false;
+      $id("vocab-search").value = "";
+      $id("vocab-group-filter").value = "";
+      $id("vocab-status-filter").value = "";
+      _vocabRows = sample;
+      _pbpVocabThawOrder();
+      _pbpVocabApplyView(true);
+      _pbpVocabClearSelection();
+      _pbpVocabFlashStatus(true, "done");
+      _pbpVocabRowSelect(_vocabViewRows[0], false);
+      const okCleared = $id("vocab-status").textContent === "";
+      _pbpVocabFlashStatus(false, "failed");
+      _pbpVocabRowSelect(_vocabViewRows[1], false);
+      const badKept = $id("vocab-status").textContent.includes("failed");
+      check("the next row selection takes a success line down at once; a failure line stays", okCleared && badKept,
+        `${okCleared} ${badKept}`);
+      _pbpVocabClearSelection();
+      _pbpVocabSyncSelectionUi();
+      $id("vocab-status").textContent = "";
+      _pbpVocabRenderDetail(_vocabViewRows[0]);
+      const openBefore = _pbpVocabDetailWordId;
+      $id("vocab-search").value = "no word looks like this";
+      _pbpVocabApplyView(true);
+      check("a search that matches nothing puts the cover back instead of keeping a filtered-out word",
+        !!openBefore && _pbpVocabDetailWordId === null && $id("vocab-detail").hidden && !$id("vocab-detail-empty").hidden);
+      $id("vocab-search").value = "";
+      _pbpVocabApplyView(true);
+    } finally {
+      _pbpVocabNarrowMode = realNarrow;
+    }
+  }
+
   // ---- Phase C: detail pane / list state across reloads --------------
   // One shared mock store for the whole block; `settle` drains the
   // fire-and-forget mutation chains (click handlers are not awaitable) without
@@ -2994,15 +3032,18 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       check("in narrow mode the arrows only move focus: opening a word would replace the list", opened.join(",") === "kb2");
       _pbpVocabNarrowMode = () => false;
       head("kb1").focus();
+      const flashedBeforeK = flashed.length;
       key(head("kb1"), "k");
-      await tick();
-      check("K marks the focused row's word known, reports it and keeps focus on the row",
-        writes.join("|") === "kb1:known" && flashed[flashed.length - 1] === "vocabBatchKnownDoneOne:1" && document.activeElement === head("kb1"),
-        writes.join("|") + " / " + flashed.join("|"));
+      await tick(60);
+      const announced = () => ($id("vocab-announce") || {}).textContent;
+      check("K marks the focused row's word known, announces it without painting a status line, and keeps focus on the row",
+        writes.join("|") === "kb1:known" && announced() === "vocabBatchKnownDoneOne:1" && flashed.length === flashedBeforeK &&
+        $id("vocab-announce").classList.contains("sr-only") && document.activeElement === head("kb1"),
+        writes.join("|") + " / " + announced() + " / " + flashed.join("|"));
       key(head("kb2"), "\u043b", { code: "KeyK" });
-      await tick();
+      await tick(60);
       check("on another layout the same physical key flips a known word back to learning",
-        writes[writes.length - 1] === "kb2:new" && flashed[flashed.length - 1] === "vocabBatchLearningDoneOne:1", writes.join("|"));
+        writes[writes.length - 1] === "kb2:new" && announced() === "vocabBatchLearningDoneOne:1", writes.join("|"));
       const before = writes.length;
       key(head("kb1"), "k", { ctrlKey: true });
       await tick();

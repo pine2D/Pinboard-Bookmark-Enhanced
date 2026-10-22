@@ -322,7 +322,7 @@ A small anchored bubble rather than a modal. It has panel ground, a 1px structur
 - **Group labels:** 11px uppercase overline in hint color, not interactive. A busy tab shows a 6px pulsing dot.
 
 ### Library Index Row (signature)
-A full-width row button with no border, laid out as a 10px highlight-color dot and the content. The excerpt is 14/20 clamped to 2 lines, the note line is 13/18 muted with a 12px pencil, and meta is 12/16. State is carried by background alone: hover, current, batch-selected band, and selected-and-current, each a derived fill with 8px inset corners. Pressing deepens the row instead of scaling it. Focus is a 2px inset outline.
+A full-width row button with no border, laid out as a 10px highlight-color dot and the content. The excerpt is 14/20 clamped to 2 lines, the note line is 13/18 muted with a 12px pencil, and meta is 12/16. State is carried by the fill: hover, current, batch-selected band, and selected-and-current, each a derived fill with 8px inset corners. The batch-selected band adds a 1px accent inner ring, because in the darker presets its fill sits too close to the canvas to carry the state alone. Pressing deepens the row instead of scaling it. Focus is a 2px inset outline.
 
 ### Reader Rail & Pills (signature)
 The reader's rail is a 256px surface column with uppercase overline section heads, each over a 1px top rule, and CSS-drawn disclosure triangles. Pill toggles and segmented buttons show "pressed" as the hover fill plus a `--link` border and `--link-on-raised` text (the plain link blue fails 4.5:1 on that fill in dark). Inverted near-black chips are not used. Reader focus is its own 2px link-colored outline offset 2px. Hover never opens an overlay in the reader.
