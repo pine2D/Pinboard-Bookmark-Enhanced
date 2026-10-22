@@ -9229,10 +9229,21 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "library: the three status toggles (All / Learning / Known) are missing, not hidden until the first count, or not all wired to the #vocab-status-filter carrier");
   check(/\.lib-toggle\[hidden\] \{ display: none; \}/.test(hand),
     "library.css: .lib-toggle is inline-flex, which outranks the UA [hidden] rule -- the toggles would show empty before the first count");
-  check(/<button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="vocab-filter-set" aria-expanded="false">/.test(libraryHtml) &&
+  check(/<button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="vocab-filter-set" aria-expanded="false"[^>]*>/.test(libraryHtml) &&
     /<div class="vocab-filter-set" id="vocab-filter-set" popover="auto">/.test(libraryHtml) &&
     (libraryHtml.match(/id="vocab-group-filter"/g) || []).length === 1,
-    "library.html: the narrow-index Filter button / popover is missing, or the group filter was copied instead of moved (one DOM for both forms, spec §3.4)");
+    "library.html: the narrow-index group door / popover is missing, or the group filter was copied instead of moved (one DOM for both forms, spec §3.4)");
+  // Critique round 5 (2026-10-22): the status toggles stand on a row of
+  // their own, outside the filter row and its popover, at every width --
+  // folded away they took two clicks and hid which status was in force.
+  {
+    const statusAt = libraryHtml.indexOf('<span class="vocab-status-toggles" id="vocab-status-toggles"');
+    const rowAt = libraryHtml.indexOf('<div class="vocab-filter-row">');
+    const setBody = (libraryHtml.match(/<div class="vocab-filter-set" id="vocab-filter-set" popover="auto">([\s\S]*?)<\/div>/) || [])[1] || "";
+    check(statusAt > 0 && rowAt > statusAt && !/vocab-stat-|vocab-status-/.test(setBody) &&
+      declarationValueMap(hand, ".vocab-list-pane > .vocab-status-toggles").get("display") === "flex",
+      "library: the status toggles must sit on their own row ahead of the filter row (a .vocab-list-pane child), never inside the Filter popover");
+  }
   // The wide / narrow form follows the pane's data-header-fit (user ruling
   // 10-04: fits on one line -> wide, otherwise the Filter popover), never a
   // fixed @container width.
@@ -9249,15 +9260,13 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     declarationValueMap(hand, ".vocab-list-pane[data-header-fit] .vocab-filter-set[popover]:not(:popover-open)", narrow860).get("display") === "none",
     "library.css: below the 860px single-pane break the vocabulary filters must always fold into the Filter popover, at the wide rule's specificity");
   // Vocabulary starts UNDECIDED (no attribute: neither form shows -- the
-  // Filter button keeps its box, not its ink) until the counts land, so a
-  // wide window never flashes the narrow form first; notes start with their
-  // numbers (the colour row itself is hidden until its counts).
+  // group door keeps its box, not its ink) until its first measurement, so
+  // a wide window never flashes the narrow form first; notes start with
+  // their numbers (the colour row itself is hidden until its counts).
   check(/<div class="vocab-list-pane" id="vocab-list-pane">/.test(libraryHtml) &&
     /<div class="notes-list-pane" data-header-fit="wide">/.test(libraryHtml) &&
-    declarationValueMap(hand, ".vocab-list-pane:not([data-header-fit]) #vocab-filter-narrow").get("visibility") === "hidden" &&
-    /toggles\.toggleAttribute\("data-counts-ready", !loading\)/.test(libraryVocabJs) &&
-    /if \(toggles && !toggles\.hasAttribute\("data-counts-ready"\)\) return NaN;/.test(libJs),
-    "library: the vocabulary list pane must start undecided (no data-header-fit, Filter button visibility:hidden) and decide when _pbpVocabSetLoading marks the counts ready; notes start with numbers");
+    declarationValueMap(hand, ".vocab-list-pane:not([data-header-fit]) #vocab-filter-narrow").get("visibility") === "hidden",
+    "library: the vocabulary list pane must start undecided (no data-header-fit, group door visibility:hidden); notes start with numbers");
   check(/function pbpLibWireHeaderFit\(pane, row, measureNeed, opts = \{\}\)/.test(libJs) &&
     /pbpLibWireVocabHeaderFit\(\$id\("vocab-list-pane"\)\);/.test(libJs) &&
     /pbpLibWireNotesHeaderFit\(document\.querySelector\("\.notes-list-pane"\)\);/.test(libJs) &&

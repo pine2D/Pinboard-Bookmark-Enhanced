@@ -4129,8 +4129,6 @@
   "libraryColorFilterAria": { "message": "$COLOR$、$COUNT$ 件", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
   "libraryColorFilterAriaOne": { "message": "$COLOR$、$COUNT$ 件", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
   "libraryFilterAll": { "message": "すべて" },
-  "libraryFilterNarrow": { "message": "絞り込み" },
-  "libraryFilterNarrowActive": { "message": "絞り込み · $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent7": { "message": "7日間で $D7$ 件追加", "placeholders": { "d7": { "content": "$1" } } },
   "libraryStatsWordsFiltered": { "message": "$SHOWN$ / $TOTAL$ 語", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
   "libraryStatsWordsFilteredOne": { "message": "$SHOWN$ / $TOTAL$ 語", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },

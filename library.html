@@ -67,41 +67,46 @@
       <div class="notes-toolbar vocab-filter-toolbar">
         <input type="search" id="vocab-search" placeholder="Search words, definitions, context, and groups" data-i18n-placeholder="vocabSearchPlaceholder" data-i18n-aria="vocabSearchPlaceholder" aria-label="Search words, definitions, context, and groups" autocomplete="off" />
       </div>
-      <!-- Filter row (spec §3.1 / §3.4). Wide form (the pane's
-           data-header-fit="wide": the row's content -- measured with the
-           group listbox at its 120px floor -- fits the index on one line,
-           above the 860px single-pane break): the group filter, a float
-           listbox (listbox.js renders #vocab-group-filter as the
-           #vocab-group-filter-btn value box; the select stays the hidden
-           value carrier), and the three status toggles sit inline inside
-           .vocab-filter-set. Narrow form: the SAME nodes fold into that
-           element's popover, opened by #vocab-filter-narrow -- one DOM, never
-           a copy; the listbox's own panel then opens as a second top-layer
-           popover above it. library.js decides the form
-           (pbpLibWireVocabHeaderFit; undecided -- no attribute, neither form
-           shown -- until the first counts land) and wires the popover
-           (pbpLibWireFilterPopover). -->
+      <!-- Status row (critique round 5, 2026-10-22): the three status
+           toggles on a row of their own under the search, at every width.
+           Learning / known is the slice used most; folded into the Filter
+           popover it took two clicks and its state was invisible, and in
+           most locales the three toggles alone (210-330px) leave no room on
+           a 360px index for anything beside them. #vocab-status-filter stays
+           their hidden value carrier, as #vocab-sort is for the sort button.
+           The span is `hidden` while there are no words at all; its buttons
+           are `hidden` until the first render has counts (library-vocab.js),
+           so the cold page never shows three empty toggles. -->
+      <label class="sr-only" for="vocab-status-filter" data-i18n="vocabStatusFilterAria">Filter by status</label>
+      <select id="vocab-status-filter" data-i18n-aria="vocabStatusFilterAria" aria-label="Filter by status" hidden>
+        <option value="" data-i18n="vocabStatusAll">All statuses</option>
+        <option value="new" data-i18n="vocabStatusLearning">Learning</option>
+        <option value="known" data-i18n="vocabStatusKnown">Known</option>
+      </select>
+      <span class="vocab-status-toggles" id="vocab-status-toggles" role="group" data-i18n-aria="vocabStatusFilterAria" aria-label="Filter by status">
+        <button type="button" class="lib-toggle" id="vocab-stat-all" data-status="" aria-pressed="true" data-i18n="libraryFilterAll" hidden>All</button>
+        <button type="button" class="lib-toggle" id="vocab-stat-learning" data-status="new" aria-pressed="false" hidden></button>
+        <button type="button" class="lib-toggle" id="vocab-stat-known" data-status="known" aria-pressed="false" hidden></button>
+      </span>
+      <!-- Filter row (spec §3.1 / §3.4): the group filter and the sort
+           button. Wide form (the pane's data-header-fit="wide": the row's
+           content -- measured with the group listbox at its 120px floor --
+           fits the index on one line, above the 860px single-pane break): the
+           group filter, a float listbox (listbox.js renders
+           #vocab-group-filter as the #vocab-group-filter-btn value box; the
+           select stays the hidden value carrier), sits inline inside
+           .vocab-filter-set. Narrow form: the SAME node folds into that
+           element's popover, opened by #vocab-filter-narrow, whose label is
+           the group in force -- one DOM, never a copy; the listbox's own
+           panel then opens as a second top-layer popover above it. library.js
+           decides the form (pbpLibWireVocabHeaderFit; undecided -- no
+           attribute, neither form shown -- until its first measurement) and
+           wires the popover (pbpLibWireFilterPopover). -->
       <div class="vocab-filter-row">
-        <button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="vocab-filter-set" aria-expanded="false"><span class="btn-ic" data-ic="chevronDown"></span><span data-i18n="libraryFilterNarrow">Filter</span></button>
+        <button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="vocab-filter-set" aria-expanded="false" data-i18n-title="vocabGroupFilterAria" title="Filter by group"><span class="btn-ic" data-ic="chevronDown"></span><span data-i18n="vocabAllGroups">All groups</span></button>
         <div class="vocab-filter-set" id="vocab-filter-set" popover="auto">
           <label class="sr-only" for="vocab-group-filter" data-i18n="vocabGroupFilterAria">Filter by group</label>
           <select id="vocab-group-filter" data-listbox="float" data-i18n-aria="vocabGroupFilterAria" aria-label="Filter by group"><option value="" data-i18n="vocabAllGroups">All groups</option></select>
-          <label class="sr-only" for="vocab-status-filter" data-i18n="vocabStatusFilterAria">Filter by status</label>
-          <!-- Hidden state carrier, same pattern as #vocab-sort below: the three
-               toggles write into it and dispatch `change`, so every handler and
-               every test still talks to a <select>. -->
-          <select id="vocab-status-filter" data-i18n-aria="vocabStatusFilterAria" aria-label="Filter by status" hidden>
-            <option value="" data-i18n="vocabStatusAll">All statuses</option>
-            <option value="new" data-i18n="vocabStatusLearning">Learning</option>
-            <option value="known" data-i18n="vocabStatusKnown">Known</option>
-          </select>
-          <!-- `hidden` until the first render has counts (library-vocab.js
-               clears it), so the cold page never shows three empty toggles. -->
-          <span class="vocab-status-toggles" id="vocab-status-toggles" role="group" data-i18n-aria="vocabStatusFilterAria" aria-label="Filter by status">
-            <button type="button" class="lib-toggle" id="vocab-stat-all" data-status="" aria-pressed="true" data-i18n="libraryFilterAll" hidden>All</button>
-            <button type="button" class="lib-toggle" id="vocab-stat-learning" data-status="new" aria-pressed="false" hidden></button>
-            <button type="button" class="lib-toggle" id="vocab-stat-known" data-status="known" aria-pressed="false" hidden></button>
-          </span>
         </div>
         <label class="sr-only" id="vocab-sort-label" for="vocab-sort" data-i18n="vocabSortAria">Sort vocabulary</label>
         <span class="sr-only" id="vocab-sort-face"></span>

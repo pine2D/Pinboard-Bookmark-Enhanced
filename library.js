@@ -430,11 +430,9 @@ function pbpLibMeasureCopyWidth(row, prepare) {
 // single-pane lookup door out, the .vocab-filter-set laid out inline (the
 // popover's nodes in a row, gap = the row's), and any shrinkable child with a
 // px floor (the group filter's min-width) at that floor -- the wide form lets
-// it shrink there. NaN until library-vocab.js marks the counts as landed
-// (data-counts-ready on .vocab-status-toggles, set once the list has loaded,
-// cleared while it reloads): the form is not decided on a row that is about
-// to grow. Landed with no words at all, the toggles stay hidden and the row
-// is measured without them -- a decided form either way.
+// it shrink there. Nothing on the row moves with the counts (the status
+// toggles have a row of their own since critique round 5), so the form is
+// decided as soon as the row is laid out.
 // Two listbox details (T6b): a listbox's popover never takes row width (it
 // is a top-layer panel; in the copy it would lose [popover] and lay out in
 // flow), so the copies drop every .listbox-pop. And a ghost trigger (the
@@ -444,8 +442,6 @@ function pbpLibMeasureCopyWidth(row, prepare) {
 function pbpLibVocabFilterNeed(row) {
   const set = row && row.querySelector(".vocab-filter-set");
   if (!set) return NaN;
-  const toggles = row.querySelector(".vocab-status-toggles");
-  if (toggles && !toggles.hasAttribute("data-counts-ready")) return NaN;
   const gap = getComputedStyle(row).columnGap;
   return pbpLibMeasureCopyWidth(row, (copy, counterpart) => {
     // Resolve every copy before removing any: counterpart() walks child
@@ -496,7 +492,7 @@ function pbpLibNotesColorNeed(row) {
 function pbpLibRowState(row) {
   let out = row.textContent;
   for (const el of row.querySelectorAll("*")) {
-    out += `\u0001${el.hidden ? "h" : ""}${el.getAttribute("aria-pressed") || ""}:${el.getAttribute("class") || ""}${el.hasAttribute("data-counts-ready") ? ":r" : ""}`;
+    out += `\u0001${el.hidden ? "h" : ""}${el.getAttribute("aria-pressed") || ""}:${el.getAttribute("class") || ""}`;
   }
   return out;
 }
@@ -509,7 +505,7 @@ function pbpLibWireHeaderFit(pane, row, measureNeed, opts = {}) {
   // Hot path: a vocabulary re-render (every keystroke in the undebounced
   // search box) rewrites the count text, which fires the row observer. The
   // measurement only runs when something it depends on changed -- the row's
-  // state (pbpLibRowState: text, hidden / pressed / class, counts-ready),
+  // state (pbpLibRowState: text, hidden / pressed / class),
   // <html> language / theme / density, or the room -- and otherwise only
   // re-asserts the last verdict.
   let lastSig = null, lastForm = null;
@@ -569,7 +565,7 @@ function pbpLibWireHeaderFit(pane, row, measureNeed, opts = {}) {
   }
   if (typeof MutationObserver === "function") {
     new MutationObserver(() => schedule()).observe(row, { subtree: true, childList: true, characterData: true,
-      attributes: true, attributeFilter: ["hidden", "aria-pressed", "class", "data-counts-ready"] });
+      attributes: true, attributeFilter: ["hidden", "aria-pressed", "class"] });
     new MutationObserver(() => schedule()).observe(html, { attributes: true, attributeFilter: ["lang", "data-theme", "data-density"] });
   }
   document.addEventListener("pbp:i18n-applied", () => schedule());

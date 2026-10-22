@@ -2275,10 +2275,13 @@ html.motion-ready .vocab-note-save {
   font-size: var(--lib-text-body);
   line-height: calc(var(--lib-control-h) - 2px);
 }
-/* Narrow-index door to the filters: ghost md, label before the chevron.
-   Filtered = label "Filter · N" in bold (no fill); open = the ghost hover
-   fill. The two can stack (spec §3.4, §11 V10 / V25). */
-#vocab-filter-narrow { flex: none; flex-direction: row-reverse; }
+/* Narrow-index door to the group filter: ghost md, label before the
+   chevron. Filtered = the group's name in bold (no fill); open = the ghost
+   hover fill. The two can stack (spec §3.4, §11 V10 / V25). */
+#vocab-filter-narrow { flex: 0 1 auto; min-width: 0; flex-direction: row-reverse; }
+/* The label is the group in force (a user-named group can be long): it
+   gives way before the status toggles or the sort button do. */
+#vocab-filter-narrow > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 #vocab-filter-narrow[data-filtered="true"] { font-weight: bold; color: var(--lib-btn-fg); }
 #vocab-filter-narrow[aria-expanded="true"] { background: var(--lib-btn-hover); color: var(--lib-btn-fg); }
 /* The popover form. Every author `display` here would beat the UA's
@@ -2300,6 +2303,20 @@ html.motion-ready .vocab-note-save {
   overflow: visible;
 }
 .vocab-status-toggles { display: inline-flex; flex: none; align-items: center; gap: var(--lib-sp-0); }
+/* The status row (critique round 5, 2026-10-22): the toggles on a line of
+   their own between the search and the filter row, the same sp-3 step every
+   header row keeps. The row's height is held before the counts land (its
+   buttons are hidden until then); with no words at all the span itself is
+   hidden. Four-digit counts in Polish outgrow a 360px index by a few px:
+   the last toggle then takes a second line rather than spill past the edge. */
+.vocab-list-pane > .vocab-status-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: var(--lib-sp-1);
+  min-height: var(--lib-control-h);
+  margin-bottom: var(--lib-sp-3);
+}
+.vocab-list-pane > .vocab-status-toggles[hidden] { display: none; }
 /* Keyboard shortcuts panel (critique round 3, 2026-10-20): opened by the
    header's keyboard button, placed by pbpListboxPlace. Popover chrome =
    the Filter panel's (panel fill, 1px frame, radius-lg, sp-3 inset). Keys on

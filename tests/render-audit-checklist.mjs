@@ -1130,20 +1130,19 @@ export const CHECKS = [
   // `expect` vocabulary note near the top of this file. ----
 
   // ---- library T4b (spec §3.2 / §3.4): the status toggles are the
-  // .lib-toggle primitive, md 32 / 28 with no frame. At the runner's 1280
-  // viewport the index is 360 wide, so they live in the closed "Filter"
-  // popover; `open` focuses #vocab-filter-narrow and presses a real Space
-  // (the popovertarget path), then Escape closes it again. All is pressed at
-  // rest (btn-fg on btn-bg); its text must also clear the hover fill (btn-hover
-  // until T5 moves the toggle hover to row-bg-hover). ----
-  { surface: "library", page: "library.html", selector: "#vocab-stat-all", state: "open",
-    open: { click: "#vocab-filter-narrow" },
+  // .lib-toggle primitive, md 32 / 28 with no frame. Since critique round 5
+  // (2026-10-22) they stand on their own row at every width, so they are
+  // measured at rest. All is pressed at rest (btn-fg on btn-bg); its text
+  // must also clear the hover fill (btn-hover until T5 moves the toggle hover
+  // to row-bg-hover). ----
+  { surface: "library", page: "library.html", selector: "#vocab-stat-all", state: "default",
     expect: { heightPx: { comfortable: 32, compact: 28 }, textContrastMulti: { ratio: 4.5, extraBgSelectorVar: "btn-hover" } } },
-  { surface: "library", page: "library.html", selector: "#vocab-stat-learning", state: "open",
-    open: { click: "#vocab-filter-narrow" },
+  { surface: "library", page: "library.html", selector: "#vocab-stat-learning", state: "default",
     expect: { heightPx: { comfortable: 32, compact: 28 }, textContrast: 4.5 } },
   // The popover itself: the one place on this page that paints panel + 1px
-  // border + radius-lg (spec §3.4, §11 V25).
+  // border + radius-lg (spec §3.4, §11 V25). It holds the group filter alone
+  // and exists only on a narrow index: the runner narrows the index first
+  // (libForceNarrowIndex) for `open` on the group door.
   { surface: "library", page: "library.html", selector: "#vocab-filter-set", state: "open",
     open: { click: "#vocab-filter-narrow" },
     expect: { borderTopWidthPx: { value: 1 }, borderRadiusPx: { radiusVar: "radius-lg" }, bgEqVar: "panel" } },
@@ -1165,9 +1164,12 @@ export const CHECKS = [
   // synthetic rows and viewport sizes never leak into the shared page. Only
   // density changes geometry, so they measure "" (comfortable) and terminal
   // (compact) -- the top-level `themes` key, as for the T3 gates.
-  // G3: at 900px tall the list shows 12-13 rows at a 56px pitch, >=15 at 44.
+  // G3: at 900px tall the list shows 11-13 rows at a 56px pitch, >=15 at 44.
+  // The floor was 12 until critique round 5 (2026-10-22) gave the status
+  // toggles a header row of their own (32 + the 12px step): always-visible
+  // status filters cost one row of list at this height, by choice.
   { surface: "library", page: "library.html", selector: "#vocab-list", state: "visibleRowCount", themes: ["", "terminal"],
-    expect: { visibleRowCount: { width: 1280, height: 900, comfortable: { pitch: 56, min: 12, max: 13 }, compact: { pitch: 44, min: 15 } } } },
+    expect: { visibleRowCount: { width: 1280, height: 900, comfortable: { pitch: 56, min: 11, max: 13 }, compact: { pitch: 44, min: 15 } } } },
   // G2: ArrowDown from the first row never leaves the focused row outside the
   // list region -- browsing, with the batch row in the header, and on a 360px
   // German index.

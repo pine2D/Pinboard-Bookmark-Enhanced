@@ -1709,12 +1709,6 @@ function _pbpVocabFlashStatus(ok, text) {
 function _pbpVocabSetLoading(loading) {
   const list = $id("vocab-list");
   if (list) list.setAttribute("aria-busy", loading ? "true" : "false");
-  // The filter row's wide / narrow form is decided once the counts have
-  // landed (library.js pbpLibVocabFilterNeed): every path that ends a load
-  // renders its final counts in the same task, so the decision lands with
-  // them -- and an empty word list still gets one.
-  const toggles = $id("vocab-status-toggles");
-  if (toggles) toggles.toggleAttribute("data-counts-ready", !loading);
   const status = $id("vocab-status");
   if (!status) return;
   if (loading) {
@@ -2039,6 +2033,10 @@ function _pbpVocabRenderStats() {
   const count = $id("vocab-count");
   const toggles = ["vocab-stat-all", "vocab-stat-learning", "vocab-stat-known"].map((id) => $id(id)).filter(Boolean);
   _pbpVocabSyncFilterNarrow();
+  // No words at all: the status row folds away with its toggles (no empty
+  // 32px band above the empty-state sentence).
+  const strip = $id("vocab-status-toggles");
+  if (strip) strip.hidden = !_vocabRows.length;
   if (!_vocabRows.length) {
     for (const el of toggles) el.hidden = true;
     pbpLibRenderCount(count, [], "");
@@ -2706,17 +2704,20 @@ for (const chipId of ["vocab-stat-all", "vocab-stat-learning", "vocab-stat-known
     filter.dispatchEvent(new Event("change"));
   });
 }
-// The narrow-index Filter button names how many non-default filters are on
-// (spec §3.4, §11 V10): group not "All groups" counts 1, status not "All"
-// counts 1. Bold via data-filtered; the popover's own open state is written
-// onto the button by library.js (pbpLibWireFilterPopover).
+// The narrow-index door to the group filter says which group is in force
+// (critique round 5, 2026-10-22: "Filter · 1" named a count, not a
+// condition): "All groups", or the group's own name in bold via
+// data-filtered. The status toggles sit on the row itself, so the door is
+// only ever about the group. The popover's own open state is written onto
+// the button by library.js (pbpLibWireFilterPopover).
 function _pbpVocabSyncFilterNarrow() {
   const btn = $id("vocab-filter-narrow");
   if (!btn) return;
-  const active = (($id("vocab-group-filter") || {}).value ? 1 : 0) + (($id("vocab-status-filter") || {}).value ? 1 : 0);
+  const group = $id("vocab-group-filter");
+  const value = (group || {}).value || "";
   const label = btn.lastElementChild;
-  if (label) label.textContent = active ? t("libraryFilterNarrowActive", String(active)) : t("libraryFilterNarrow");
-  if (active) btn.dataset.filtered = "true";
+  if (label) label.textContent = value ? value : t("vocabAllGroups");
+  if (value) btn.dataset.filtered = "true";
   else delete btn.dataset.filtered;
 }
 // applyI18n rewrites the label span from its static data-i18n key on every

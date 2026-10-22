@@ -4129,8 +4129,6 @@
   "libraryColorFilterAria": { "message": "$COLOR$, $COUNT$ surlignages", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
   "libraryColorFilterAriaOne": { "message": "$COLOR$, $COUNT$ surlignage", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
   "libraryFilterAll": { "message": "Tous" },
-  "libraryFilterNarrow": { "message": "Filtrer" },
-  "libraryFilterNarrowActive": { "message": "Filtrer · $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent7": { "message": "Ajouts sur 7 jours : $D7$", "placeholders": { "d7": { "content": "$1" } } },
   "libraryStatsWordsFiltered": { "message": "$SHOWN$ / $TOTAL$ mots", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
   "libraryStatsWordsFilteredOne": { "message": "$SHOWN$ / $TOTAL$ mot", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },

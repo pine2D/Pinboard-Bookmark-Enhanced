@@ -3390,6 +3390,14 @@ async function driveHeaderRows(page, check, theme) {
 // fixed` would wreck the wide form the next time the index crosses the
 // threshold.
 async function driveFilterPopoverKeys(page, theme, check) {
+  await libForceNarrowIndex(page, true);
+  try {
+    return await driveFilterPopoverKeysNarrow(page, theme, check);
+  } finally {
+    await libForceNarrowIndex(page, false);
+  }
+}
+async function driveFilterPopoverKeysNarrow(page, theme, check) {
   const { set } = check.expect.filterPopoverKeys;
   const ready = await page.evaluate(({ btnSel, setSel }) => {
     const b = document.querySelector(btnSel), s = document.querySelector(setSel);
@@ -3398,7 +3406,7 @@ async function driveFilterPopoverKeys(page, theme, check) {
     b.focus();
     return document.activeElement === b ? "ok" : "unfocusable";
   }, { btnSel: check.selector, setSel: set });
-  if (ready !== "ok") throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|filterPopoverKeys]: ${ready} -- the library viewport must leave the index narrow`);
+  if (ready !== "ok") throw new Error(`SETUP ERROR [library|${theme}|${check.selector}|filterPopoverKeys]: ${ready} -- libForceNarrowIndex did not leave the index narrow`);
   const bad = [];
   await page.keyboard.press("Space");
   await settleAnimations(page);
@@ -3637,7 +3645,7 @@ const LIST_HEADER_FIT_SCAN = ({ view, extraRows = [] }) => {
   const left = pr.left + (parseFloat(pcs.paddingLeft) || 0) + (parseFloat(pcs.borderLeftWidth) || 0);
   const right = pr.right - (parseFloat(pcs.paddingRight) || 0) - (parseFloat(pcs.borderRightWidth) || 0);
   const rows = (vocab
-    ? ["#view-vocab .notes-toolbar", "#view-vocab .vocab-filter-row", "#vocab-context-bar", "#vocab-batch-toolbar"]
+    ? ["#view-vocab .notes-toolbar", "#vocab-status-toggles", "#view-vocab .vocab-filter-row", "#vocab-context-bar", "#vocab-batch-toolbar"]
     : ["#view-notes .notes-toolbar", "#notes-color-filters", "#notes-context-bar", "#notes-batch-toolbar"]).concat(extraRows);
   const shown = (el) => { const cs = getComputedStyle(el); return cs.display !== "none" && cs.visibility !== "hidden"; };
   const nameOf = (el) => el.id ? `#${el.id}` : `${el.tagName.toLowerCase()}.${String(el.getAttribute("class") || "").trim().split(/\s+/).join(".")}`;
@@ -4003,7 +4011,7 @@ async function driveListHeaderFit(page, extBase, theme, check) {
 async function driveScrollResetToggles(page, extBase, theme, check) {
   const bad = [];
   const cases = [
-    { view: "vocab", viewport: { width: 1280, height: 900 }, region: ".vocab-list-region", click: "#vocab-stat-all", popover: true },
+    { view: "vocab", viewport: { width: 1280, height: 900 }, region: ".vocab-list-region", click: "#vocab-stat-all", popover: false },
     { view: "notes", viewport: { width: 1280, height: 360 }, region: ".notes-list-region", click: '#notes-color-filters .lib-toggle[data-color="all"]', popover: false },
   ];
   for (const c of cases) {
@@ -4274,6 +4282,9 @@ async function runOneCheckInPanel(page, theme, check, results, extBase) {
   // The hover state's probe result: read inside the pointer hold, reused by
   // the shared evaluation below instead of a second probe.
   let hoverRaw = null;
+  // An "open" row on the group door narrows the index first (libForceNarrowIndex)
+  // and lifts the override once the probe has read.
+  let forcedNarrow = false;
   // seedChecked (taste-uplift batch4 T1, render-audit-checklist.mjs header):
   // pin a checkbox-driven state by writing the input's `.checked` property
   // (no change event, so options.js's autosave never fires), settle past the
@@ -4709,6 +4720,11 @@ async function runOneCheckInPanel(page, theme, check, results, extBase) {
     // above.
     if (!check.open?.click) throw new Error(`"open" state on ${check.selector} has no open.click target`);
     const { click: openTarget } = check.open;
+    // The group door only renders on a narrow index (see libForceNarrowIndex).
+    if (openTarget === "#vocab-filter-narrow") {
+      forcedNarrow = true;
+      if (!(await libForceNarrowIndex(page, true))) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: libForceNarrowIndex did not show ${openTarget}`);
+    }
     const focused = await page.evaluate((sel) => {
       const el = document.querySelector(sel);
       if (!el) return false;
@@ -4724,6 +4740,7 @@ async function runOneCheckInPanel(page, theme, check, results, extBase) {
     throw new Error(`unsupported state "${check.state}" on ${check.selector} -- extend runOneCheck() before adding non-default states to the checklist`);
   }
   const raw = hoverRaw ?? await page.evaluate(probeSelector, probeArgsFor(check, theme));
+  if (forcedNarrow) await libForceNarrowIndex(page, false);
   if (focusBaseline) raw.focusBaseline = focusBaseline;
   if (stabilityBaseline) raw.stabilityBaseline = stabilityBaseline;
   if (restBgStack) raw.restBgStack = restBgStack;
@@ -4863,7 +4880,7 @@ function needsGroupEditorOpen(selector) {
 // `open`-state rows open it themselves through the real button.
 // T6: the group filter is measured as its listbox button (the native select
 // is the hidden carrier).
-const FILTER_SET_SELECTORS = new Set(["#vocab-group-filter-btn", "#vocab-stat-all", "#vocab-stat-learning", "#vocab-stat-known"]);
+const FILTER_SET_SELECTORS = new Set(["#vocab-group-filter-btn"]);
 function needsFilterSetOpen(check) {
   return FILTER_SET_SELECTORS.has(check.selector) && ["default", "hover", "focusWithin"].includes(check.state);
 }
@@ -4880,12 +4897,36 @@ async function setFilterSetOpen(page, open) {
   }, open);
 }
 
+// Critique round 5 (2026-10-22) moved the status toggles out of the Filter
+// popover, which left the filter row (group listbox at its floor + sort)
+// short enough to stay wide on every two-pane index, the runner's 360px one
+// at 1280 included. The popover only exists in the narrow form, so a probe
+// of the popover itself first narrows the index the way G7 does (an inline
+// --lib-index-w on <html>, read by the grid) and waits for library.js's
+// header fit to fold the row; `on: false` lifts the override again, which
+// turns the form wide and closes an open popover (pbpLibWireVocabHeaderFit's
+// onChange). Returns whether the group door is showing afterwards.
+const LIB_FORCED_INDEX_PX = 200;
+async function libForceNarrowIndex(page, on) {
+  const shown = await page.evaluate(async ({ want, px }) => {
+    const html = document.documentElement;
+    if (want) html.style.setProperty("--lib-index-w", `${px}px`);
+    else html.style.removeProperty("--lib-index-w");
+    if (!html.getAttribute("style")) html.removeAttribute("style");
+    for (let i = 0; i < 4; i++) await new Promise((r) => requestAnimationFrame(r));
+    const btn = document.getElementById("vocab-filter-narrow");
+    return !!btn && getComputedStyle(btn).display !== "none";
+  }, { want: on, px: LIB_FORCED_INDEX_PX });
+  await settleAnimations(page);
+  return shown;
+}
+
 // ---- The Filter popover (spec §3.4, library redesign T4/T6). Whenever the
 // index takes its narrow form (data-header-fit="narrow": the filter row's
-// own content does not fit it on one line -- the runner's 1280 viewport with
-// the seeded counts, and everything at or under 860px), the group listbox
-// (and T4's status toggles) live in the closed #vocab-filter-set auto
-// popover. A row that reads anything inside it opens it first, the way a
+// own content does not fit it on one line -- everything at or under 860px,
+// or an index libForceNarrowIndex has narrowed), the group listbox lives in
+// the closed #vocab-filter-set auto popover (the status toggles left it in
+// critique round 5). A row that reads anything inside it opens it first, the way a
 // user does (a real click on #vocab-filter-narrow), and closes it again so it
 // never covers the next row's element. Returns whether it opened the popover
 // (false in the wide form, where the element is inline and rendered).
@@ -4920,6 +4961,19 @@ async function libHideFilterSet(page) {
 // (the sort menu button, T6b): no reveal is expected and no row is recorded.
 async function libPickListboxOption(page, results, theme, selectId, index, { nested = true } = {}) {
   const btnSel = `#${selectId}-btn`;
+  const narrowed = nested ? await libForceNarrowIndex(page, true) : false;
+  try {
+    await libPickListboxOptionIn(page, results, theme, selectId, index, nested, btnSel);
+  } finally {
+    if (nested) await libForceNarrowIndex(page, false);
+  }
+  if (nested && !narrowed) {
+    results.push({ surface: "library", theme, selector: "#vocab-filter-set", state: "filterScrollReset",
+      ...verdict("filterSetSurvivesPick", false, "door hidden", "group door shown on a forced-narrow index",
+        `libForceNarrowIndex(${LIB_FORCED_INDEX_PX}px) did not fold the filter row`) });
+  }
+}
+async function libPickListboxOptionIn(page, results, theme, selectId, index, nested, btnSel) {
   const revealed = await libRevealFilterSet(page, btnSel);
   await page.click(btnSel);
   const opt = page.locator(`#${selectId}-list .listbox-opt`).nth(index);
@@ -8624,12 +8678,18 @@ async function runSweep(page, sw, extBase) {
   add(await runFamilySweep(page), "library", "vocab-list");
   // Library redesign T4b: the "Filter" popover is interaction-only UI
   // (ui-primitives.md: register how it opens or it is outside every family).
+  // Since critique round 5 the 1280 runner's index is wide: narrow it so
+  // the popover form exists at all (libForceNarrowIndex).
+  if (!(await libForceNarrowIndex(page, true))) throw new Error("SETUP: sweep could not fold the vocabulary filter row (libForceNarrowIndex)");
   if ((await setFilterSetOpen(page, true)) === "ok") {
     await settleAnimations(page);
     add(await runFamilySweep(page), "library", "vocab-filter-set");
     await setFilterSetOpen(page, false);
     await settleAnimations(page);
+  } else {
+    throw new Error("SETUP: sweep could not open #vocab-filter-set on the forced-narrow index");
   }
+  await libForceNarrowIndex(page, false);
   // The group listbox renders inside the closed Filter popover whenever the
   // index takes its narrow form (inline in the wide one): open the popover
   // once, the way a user does, then the listbox itself -- the one place its

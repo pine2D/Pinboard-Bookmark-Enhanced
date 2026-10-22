@@ -4129,8 +4129,6 @@
   "libraryColorFilterAria": { "message": "$COLOR$，$COUNT$ 筆", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
   "libraryColorFilterAriaOne": { "message": "$COLOR$，$COUNT$ 筆", "placeholders": { "color": { "content": "$1" }, "count": { "content": "$2" } } },
   "libraryFilterAll": { "message": "全部" },
-  "libraryFilterNarrow": { "message": "篩選" },
-  "libraryFilterNarrowActive": { "message": "篩選 · $COUNT$", "placeholders": { "count": { "content": "$1" } } },
   "libraryStatsRecent7": { "message": "近 7 天新增 $D7$", "placeholders": { "d7": { "content": "$1" } } },
   "libraryStatsWordsFiltered": { "message": "$SHOWN$ / $TOTAL$ 個詞", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },
   "libraryStatsWordsFilteredOne": { "message": "$SHOWN$ / $TOTAL$ 個詞", "placeholders": { "shown": { "content": "$1" }, "total": { "content": "$2" } } },

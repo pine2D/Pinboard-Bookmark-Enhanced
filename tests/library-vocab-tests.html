@@ -577,13 +577,16 @@ $id("vocab-group-filter").appendChild(new Option("G1", "G1"));
 $id("vocab-group-filter").value = "";
 if (typeof _pbpVocabSyncFilterNarrow === "function") _pbpVocabSyncFilterNarrow();
 const narrowLabel = () => $id("vocab-filter-narrow").lastElementChild.textContent;
-check("the narrow Filter button reads Filter while nothing is filtered",
-  narrowLabel() === "libraryFilterNarrow" && !("filtered" in $id("vocab-filter-narrow").dataset), narrowLabel());
-$id("vocab-group-filter").value = "G1";
+check("the narrow group door reads All groups while no group is chosen",
+  narrowLabel() === "vocabAllGroups" && !("filtered" in $id("vocab-filter-narrow").dataset), narrowLabel());
 $id("vocab-status-filter").value = "known";
 if (typeof _pbpVocabSyncFilterNarrow === "function") _pbpVocabSyncFilterNarrow();
-check("the narrow Filter button counts each non-default filter and marks itself filtered",
-  narrowLabel() === "libraryFilterNarrowActive:2" && $id("vocab-filter-narrow").dataset.filtered === "true", narrowLabel());
+check("a status filter leaves the group door alone (the status toggles are on the row itself)",
+  narrowLabel() === "vocabAllGroups" && !("filtered" in $id("vocab-filter-narrow").dataset), narrowLabel());
+$id("vocab-group-filter").value = "G1";
+if (typeof _pbpVocabSyncFilterNarrow === "function") _pbpVocabSyncFilterNarrow();
+check("the narrow group door names the group in force and marks itself filtered",
+  narrowLabel() === "G1" && $id("vocab-filter-narrow").dataset.filtered === "true", narrowLabel());
 $id("vocab-group-filter").value = "";
 $id("vocab-status-filter").value = "";
 $id("vocab-group-filter").lastElementChild.remove();
@@ -3112,7 +3115,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         // sweep that caught the German long-compound-word row overflow).
         panel.querySelector('[data-label="lookup-input"]').placeholder = m.libraryLookupPlaceholder.message;
         panel.querySelector('[data-label="lookup-go"]').textContent = m.libraryLookupGo.message;
-        panel.querySelector('[data-label="filter-narrow"] span').textContent = m.libraryFilterNarrowActive.message.replace("$COUNT$", "2");
+        panel.querySelector('[data-label="filter-narrow"] span').textContent = m.vocabAllGroups.message;
         panel.querySelector('[data-label="stat-all"]').textContent = m.libraryFilterAll.message;
         panel.querySelector('[data-label="stat-learning"]').textContent = m.libraryStatsLearning.message.replace("$COUNT$", "2500");
         panel.querySelector('[data-label="stat-known"]').textContent = m.libraryStatsKnown.message.replace("$COUNT$", "2500");
@@ -3268,7 +3271,6 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
           <div class="vocab-filter-set" id="fit-set" popover="auto">
             <!-- The group filter as listbox.js leaves it (T6): hidden carrier + listbox. -->
             <select data-listbox="float" hidden><option>All groups</option></select><div class="listbox"><button type="button" class="listbox-btn"><span class="listbox-value">All groups</span><span class="btn-ic"></span><span class="listbox-sizer">All groups</span></button><div class="listbox-pop" popover="manual" hidden><ul class="listbox-list"><li class="listbox-opt">All groups</li></ul></div></div>
-            <span class="vocab-status-toggles" data-counts-ready><button type="button" class="lib-toggle" aria-pressed="true">All</button><button type="button" class="lib-toggle" aria-pressed="false">Learning 12</button><button type="button" class="lib-toggle" aria-pressed="false">Known 3</button></span>
           </div>
           <!-- The sort control as listbox.js leaves it (T6b): hidden carrier + ghost trigger. -->
           <select data-listbox="float" data-listbox-face="ghost" hidden><option value="latest" data-face-label="Date" selected>Recently updated</option><option value="oldest" data-face-label="Date">Least recently updated</option><option value="az" data-face-label="Alphabetical">A-Z</option><option value="za" data-face-label="Alphabetical">Z-A</option></select><div class="listbox"><button type="button" class="listbox-trigger btn ghost"><span class="btn-ic"><svg width="14" height="14" viewBox="0 0 24 24"></svg></span><span>Date</span></button><div class="listbox-pop" popover="manual" hidden><ul class="listbox-list"><li class="listbox-opt">Recently updated</li></ul></div></div>
@@ -3279,7 +3281,14 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     const pane = host.firstElementChild;
     const row = pane.querySelector(".vocab-filter-row");
     const set = pane.querySelector(".vocab-filter-set");
-    const known = set.querySelectorAll(".lib-toggle")[2];
+    // A language change rewrites the sort button's face words (and its
+    // options' data-face-label): the one thing on this row whose width
+    // follows the UI language.
+    const sortOpts = () => [...row.querySelector("select[data-listbox-face]").options];
+    const relabelSort = (date, alpha) => {
+      for (const o of sortOpts()) o.dataset.faceLabel = /^(az|za)$/.test(o.value) ? alpha : date;
+      row.querySelector(".listbox-trigger").lastElementChild.textContent = date;
+    };
     try {
       const update = pbpLibWireVocabHeaderFit(pane);
       const need = pbpLibVocabFilterNeed(row);
@@ -3355,14 +3364,14 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       pane.style.width = `${Math.ceil(need)}px`;
       await fitFrames();
       check("header fit: widening back to the need returns to wide", pane.dataset.headerFit === "wide", `${pane.style.width} ${pane.dataset.headerFit}`);
-      known.textContent = "Bereits sicher gelernt: 5000";
+      relabelSort("Zuletzt aktualisierte Vokabeln zuerst anzeigen", "Alphabetisch");
       await fitTicks();
       check("header fit: longer labels (a language change) are re-measured at once and fold the row",
         pane.dataset.headerFit === "narrow" && pbpLibVocabFilterNeed(row) > need, `${pane.dataset.headerFit} ${pbpLibVocabFilterNeed(row)}`);
-      known.textContent = "Known 3";
+      relabelSort("Date", "Alphabetical");
       await fitTicks();
       check("header fit: and the short labels coming back unfold it", pane.dataset.headerFit === "wide", pane.dataset.headerFit);
-      pane.style.width = "300px";
+      pane.style.width = `${Math.floor(need) - 20}px`;
       await fitFrames();
       set.showPopover();
       pane.style.width = "640px";
@@ -3379,13 +3388,13 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       try {
         update();
         update();
-        known.setAttribute("title", "a tooltip is not layout");
+        row.querySelector(".listbox-trigger").setAttribute("title", "a tooltip is not layout");
         await fitTicks();
         check("header fit: an unchanged row, language, density and room are not re-measured", copies === 0, `${copies} copies`);
         passes = 0;
         document.documentElement.lang = "de";
         document.dispatchEvent(new Event("pbp:i18n-applied"));
-        known.textContent = "Gelernt: 3";
+        relabelSort("Datum", "Alphabetisch");
         await fitTicks();
         check("header fit: a language change (html lang + i18n-applied + relabel in one task) runs one pass and measures once",
           copies === 1 && passes === 1, `${copies} copies, ${passes} passes`);
@@ -3393,19 +3402,12 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         pbpLibMeasureCopyWidth = realCopy;
         pbpLibRowState = realState;
         document.documentElement.lang = lang0;
-        known.textContent = "Known 3";
+        relabelSort("Date", "Alphabetical");
         await fitTicks();
       }
-      set.querySelector(".vocab-status-toggles").removeAttribute("data-counts-ready");
-      pane.style.width = "200px";
-      await fitFrames();
-      check("header fit: before the counts land (no data-counts-ready) the form is left as it is",
-        Number.isNaN(pbpLibVocabFilterNeed(row)) && pane.dataset.headerFit === "wide", pane.dataset.headerFit);
-      set.querySelector(".vocab-status-toggles").setAttribute("data-counts-ready", "");
-      for (const b of set.querySelectorAll(".lib-toggle")) b.hidden = true;
       pane.style.width = "640px";
       await fitFrames();
-      check("header fit: counts landed with no words (toggles stay hidden) still decide a form",
+      check("header fit: the row waits on no counts (the status toggles have their own row) -- a form is always decided",
         Number.isFinite(pbpLibVocabFilterNeed(row)) && pane.dataset.headerFit === "wide", `${pbpLibVocabFilterNeed(row)} ${pane.dataset.headerFit}`);
       const forcedPane = pane.cloneNode(true);
       host.appendChild(forcedPane);
@@ -3441,11 +3443,11 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       check("drive line: any connection or dataset error is a problem line, even with an earlier success",
         problems.every((line) => line?.kind === "problem" && line.text === t("libraryDriveProblem")), JSON.stringify(problems));
     }
-    // First frame (review round 1): before the counts land the pane carries
-    // no data-header-fit and the Filter button keeps its box but not its ink,
-    // at ANY width -- a window wide enough for the wide form never paints the
-    // narrow one first. The id is the real one: library.css keys the button
-    // rules on it.
+    // First frame (review round 1, re-cut in critique round 5): the form is
+    // decided at wiring, before anything paints, and the row's need (group
+    // listbox at its floor + sort) fits every two-pane index width, so the
+    // narrow door never shows on a wide window -- not even for a frame. The
+    // id is the real one: library.css keys the button rules on it.
     const host2 = document.createElement("div");
     host2.innerHTML = `
       <div class="vocab-list-pane" style="position:fixed;left:-9999px;top:0;width:520px">
@@ -3453,7 +3455,6 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
           <button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="fit-set2" aria-expanded="false"><span>Filter</span></button>
           <div class="vocab-filter-set" id="fit-set2" popover="auto">
             <select data-listbox="float" hidden><option>All groups</option></select><div class="listbox"><button type="button" class="listbox-btn"><span class="listbox-value">All groups</span><span class="btn-ic"></span><span class="listbox-sizer">All groups</span></button><div class="listbox-pop" popover="manual" hidden><ul class="listbox-list"><li class="listbox-opt">All groups</li></ul></div></div>
-            <span class="vocab-status-toggles"><button type="button" class="lib-toggle" hidden>All</button><button type="button" class="lib-toggle" hidden></button><button type="button" class="lib-toggle" hidden></button></span>
           </div>
           <!-- The sort control as listbox.js leaves it (T6b): hidden carrier + ghost trigger. -->
           <select data-listbox="float" data-listbox-face="ghost" hidden><option value="latest" data-face-label="Date" selected>Recently updated</option><option value="oldest" data-face-label="Date">Least recently updated</option><option value="az" data-face-label="Alphabetical">A-Z</option><option value="za" data-face-label="Alphabetical">Z-A</option></select><div class="listbox"><button type="button" class="listbox-trigger btn ghost"><span class="btn-ic"><svg width="14" height="14" viewBox="0 0 24 24"></svg></span><span>Date</span></button><div class="listbox-pop" popover="manual" hidden><ul class="listbox-list"><li class="listbox-opt">Recently updated</li></ul></div></div>
@@ -3471,15 +3472,8 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
         const cs = getComputedStyle(filterBtn);
         seen.push(`${w}:${pane2.getAttribute("data-header-fit")}/${cs.visibility}/${cs.display}/${filterBtn.getBoundingClientRect().height}`);
       }
-      check("header fit: before the counts land, no width shows the Filter button (box kept, ink hidden, form undecided)",
-        seen.every((v) => /^\d+:null\/hidden\/(?!none)[a-z-]+\/[1-9]/.test(v)), seen.join(" "));
-      const toggles2 = pane2.querySelector(".vocab-status-toggles");
-      for (const b of toggles2.children) { b.hidden = false; b.textContent ||= "Known 3"; }
-      toggles2.setAttribute("data-counts-ready", "");
-      await fitTicks();
-      check("header fit: the counts landing decide the form in the same turn (wide at 2000px, Filter button gone)",
-        pane2.dataset.headerFit === "wide" && getComputedStyle(filterBtn).display === "none",
-        `${pane2.dataset.headerFit} ${getComputedStyle(filterBtn).display}`);
+      check("header fit: from the first measurement every two-pane width (360-2000px) is wide and the group door never shows",
+        seen.every((v) => /^\d+:wide\/[a-z]+\/none\/0$/.test(v)), seen.join(" "));
     } finally {
       host2.remove();
     }
