@@ -1712,6 +1712,23 @@ function auditPalette(slug, rawPalette) {
       }
     }
   }
+  // Tag bundle editor chip (classic-list-v2 "Tag bundle editor"): a bundled
+  // .tagNode -- and the active show: all/unbundled link -- is fg text on
+  // bundle-chip-bg, an opaque accent tint derived in expandSitePalette. The
+  // selected chip reuses btn-bg/btn-fg and is gated above. Before 2026-10-22
+  // the page kept tagpicker.css's hardcoded light fills under themed fg text
+  // and shipped 1.07:1 on dracula with no row here to notice. A MISSING token
+  // is a failure: the derivation only skips when bg/accent/fg are not hex.
+  {
+    const chip = hexRgb(p["bundle-chip-bg"] || "");
+    if (!chip || !fg) {
+      const line = `  pinboard  ${slug}  bundle-chip-bg  MISSING TOKEN  FAIL`;
+      console.log(line);
+      violations.push(line);
+    } else {
+      console.log(check("pinboard", slug, "fg vs bundle-chip-bg", cr(chip, fg), 4.5));
+    }
+  }
   const urlFg = hexRgb(p["url-link-fg"] || "");
   if (!urlFg) {
     const line = `  pinboard  ${slug}  url-link-fg  MISSING TOKEN  FAIL`;

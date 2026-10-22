@@ -50,6 +50,7 @@ const PINBOARD_THEMES = {
   --pinboard-on-link-hover: #ffffff;
   --pinboard-scrollbar-thumb: #5f6368;
   --pinboard-help-fg: #666d74;
+  --pinboard-bundle-chip-bg: #cfdef1;
   --pinboard-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --pinboard-font-size-base: 13px;
   --pinboard-font-size-sm: 12px;
@@ -612,6 +613,73 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 #main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
 #main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
 
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+#tagpicker .tagNode, #bundle .tagNode {
+  background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+}
+#tagpicker .tagNode.unbundled { background: transparent !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#bundle {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+#bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+#bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+#tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+}
+#tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
+#tagPickerFilterLinks { gap: 6px !important; }
+#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+#tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+#tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#tagPickerSelectLinks a[style*="255, 255, 170"] { background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+#tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+#tagPickerNav input[type="button"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: var(--pinboard-weight-body) !important;
+}
+#tagPickerNav input[type="button"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+#bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+#bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+#bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+#bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+#bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+#save_changes_marker {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+#save_changes_marker:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; color: var(--pinboard-btn-fg) !important; }
+
 /* ---- Pagination ---- */
 .next_prev, .next_prev_widget a { color: var(--pinboard-accent) !important; }
 .next_prev:hover, .next_prev_widget a:hover { color: var(--pinboard-link-hover) !important; }
@@ -924,6 +992,7 @@ h2 { color: #3c4043 !important; }
   --pinboard-on-link-hover: #35435b;
   --pinboard-scrollbar-thumb: #9cb5ce;
   --pinboard-help-fg: #9cb5ce;
+  --pinboard-bundle-chip-bg: #455764;
   --pinboard-font-family: "Inter", -apple-system, sans-serif;
   --pinboard-font-size-base: 13px;
   --pinboard-font-size-sm: 12px;
@@ -1486,6 +1555,73 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 #main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
 #main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
 
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+#tagpicker .tagNode, #bundle .tagNode {
+  background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+}
+#tagpicker .tagNode.unbundled { background: transparent !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#bundle {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+#bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+#bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+#tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+}
+#tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
+#tagPickerFilterLinks { gap: 6px !important; }
+#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+#tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+#tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#tagPickerSelectLinks a[style*="255, 255, 170"] { background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+#tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+#tagPickerNav input[type="button"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: var(--pinboard-weight-body) !important;
+}
+#tagPickerNav input[type="button"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+#bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+#bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+#bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+#bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+#bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+#save_changes_marker {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+#save_changes_marker:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; color: var(--pinboard-btn-fg) !important; }
+
 /* ---- Pagination ---- */
 .next_prev, .next_prev_widget a { color: var(--pinboard-accent) !important; }
 .next_prev:hover, .next_prev_widget a:hover { color: var(--pinboard-link-hover) !important; }
@@ -1755,6 +1891,7 @@ a { color: #81a1c1 !important; }
   --pinboard-on-link-hover: #007a00;
   --pinboard-scrollbar-thumb: #22aa22;
   --pinboard-help-fg: #5bae5b;
+  --pinboard-bundle-chip-bg: #165416;
   --pinboard-font-family: "Fira Code", "Cascadia Code", "Consolas", monospace;
   --pinboard-font-size-base: 13px;
   --pinboard-font-size-sm: 12px;
@@ -2317,6 +2454,73 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 #main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
 #main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
 
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+#tagpicker .tagNode, #bundle .tagNode {
+  background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+}
+#tagpicker .tagNode.unbundled { background: transparent !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#bundle {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+#bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+#bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+#tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+}
+#tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
+#tagPickerFilterLinks { gap: 6px !important; }
+#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+#tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+#tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#tagPickerSelectLinks a[style*="255, 255, 170"] { background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+#tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+#tagPickerNav input[type="button"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: var(--pinboard-weight-body) !important;
+}
+#tagPickerNav input[type="button"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+#bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+#bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+#bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+#bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+#bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+#save_changes_marker {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+#save_changes_marker:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; color: var(--pinboard-btn-fg) !important; }
+
 /* ---- Pagination ---- */
 .next_prev, .next_prev_widget a { color: var(--pinboard-accent) !important; }
 .next_prev:hover, .next_prev_widget a:hover { color: var(--pinboard-link-hover) !important; }
@@ -2630,6 +2834,7 @@ a.bookmark_title::before { color: #33ff3380 !important; }`
   --pinboard-on-link-hover: #faf8f5;
   --pinboard-scrollbar-thumb: #6b4c3b;
   --pinboard-help-fg: #6b6b6b;
+  --pinboard-bundle-chip-bg: #c2c9cf;
   --pinboard-font-family: "Georgia", "Noto Serif", "Source Serif Pro", serif;
   --pinboard-font-size-base: 14px;
   --pinboard-font-size-sm: 12px;
@@ -3192,6 +3397,73 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 #main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
 #main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
 
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+#tagpicker .tagNode, #bundle .tagNode {
+  background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+}
+#tagpicker .tagNode.unbundled { background: transparent !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#bundle {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+#bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+#bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+#tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+}
+#tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
+#tagPickerFilterLinks { gap: 6px !important; }
+#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+#tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+#tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#tagPickerSelectLinks a[style*="255, 255, 170"] { background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+#tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+#tagPickerNav input[type="button"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: var(--pinboard-weight-body) !important;
+}
+#tagPickerNav input[type="button"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+#bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+#bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+#bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+#bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+#bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+#save_changes_marker {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+#save_changes_marker:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; color: var(--pinboard-btn-fg) !important; }
+
 /* ---- Pagination ---- */
 .next_prev, .next_prev_widget a { color: var(--pinboard-accent) !important; }
 .next_prev:hover, .next_prev_widget a:hover { color: var(--pinboard-link-hover) !important; }
@@ -3502,6 +3774,7 @@ h2 { font-family: "Georgia", serif !important; }`
   --pinboard-on-link-hover: #282a36;
   --pinboard-scrollbar-thumb: #bd93f9;
   --pinboard-help-fg: #8995ba;
+  --pinboard-bundle-chip-bg: #415a68;
   --pinboard-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --pinboard-font-size-base: 13px;
   --pinboard-font-size-sm: 12px;
@@ -4064,6 +4337,73 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 #main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
 #main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
 
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+#tagpicker .tagNode, #bundle .tagNode {
+  background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+}
+#tagpicker .tagNode.unbundled { background: transparent !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#bundle {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+#bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+#bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+#tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+}
+#tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
+#tagPickerFilterLinks { gap: 6px !important; }
+#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+#tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+#tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#tagPickerSelectLinks a[style*="255, 255, 170"] { background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+#tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+#tagPickerNav input[type="button"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: var(--pinboard-weight-body) !important;
+}
+#tagPickerNav input[type="button"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+#bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+#bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+#bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+#bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+#bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+#save_changes_marker {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+#save_changes_marker:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; color: var(--pinboard-btn-fg) !important; }
+
 /* ---- Pagination ---- */
 .next_prev, .next_prev_widget a { color: var(--pinboard-accent) !important; }
 .next_prev:hover, .next_prev_widget a:hover { color: var(--pinboard-link-hover) !important; }
@@ -4359,6 +4699,7 @@ a { color: #bd93f9 !important; }`
   --pinboard-on-link-hover: #fffcf0;
   --pinboard-scrollbar-thumb: #6a6964;
   --pinboard-help-fg: #6c6a5e;
+  --pinboard-bundle-chip-bg: #dee4e5;
   --pinboard-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --pinboard-font-size-base: 13px;
   --pinboard-font-size-sm: 12px;
@@ -4921,6 +5262,73 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 #main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
 #main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
 
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+#tagpicker .tagNode, #bundle .tagNode {
+  background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+}
+#tagpicker .tagNode.unbundled { background: transparent !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#bundle {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+#bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+#bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+#tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+}
+#tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
+#tagPickerFilterLinks { gap: 6px !important; }
+#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+#tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+#tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#tagPickerSelectLinks a[style*="255, 255, 170"] { background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+#tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+#tagPickerNav input[type="button"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: var(--pinboard-weight-body) !important;
+}
+#tagPickerNav input[type="button"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+#bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+#bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+#bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+#bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+#bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+#save_changes_marker {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+#save_changes_marker:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; color: var(--pinboard-btn-fg) !important; }
+
 /* ---- Pagination ---- */
 .next_prev, .next_prev_widget a { color: var(--pinboard-accent) !important; }
 .next_prev:hover, .next_prev_widget a:hover { color: var(--pinboard-link-hover) !important; }
@@ -5140,6 +5548,7 @@ html.pbp-dark {
   --pinboard-on-link-hover: #1c1b1a;
   --pinboard-scrollbar-thumb: #918f8a;
   --pinboard-help-fg: #a09e9a;
+  --pinboard-bundle-chip-bg: #28333c;
   --pinboard-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --pinboard-font-size-base: 13px;
   --pinboard-font-size-sm: 12px;
@@ -5702,6 +6111,73 @@ html.pbp-dark #main_column form[name="sort"] table td a.destroy { color: var(--p
 html.pbp-dark #main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
 html.pbp-dark #main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
 
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+html.pbp-dark #tagpicker .tagNode, html.pbp-dark #bundle .tagNode {
+  background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+}
+html.pbp-dark #tagpicker .tagNode.unbundled { background: transparent !important; }
+html.pbp-dark #tagpicker .tagNode:hover, html.pbp-dark #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+html.pbp-dark #tagpicker .tagNode.tagSelected, html.pbp-dark #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+html.pbp-dark #tagpicker .tagNode.tagSelected:hover, html.pbp-dark #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+html.pbp-dark #bundle {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+html.pbp-dark #bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+html.pbp-dark #bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+html.pbp-dark #tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+}
+html.pbp-dark #tagPickerFilterLinks, html.pbp-dark #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
+html.pbp-dark #tagPickerFilterLinks { gap: 6px !important; }
+html.pbp-dark #tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+html.pbp-dark #tagPickerSelectLinks > span[style*="color:#aaa"], html.pbp-dark #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+html.pbp-dark #tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+html.pbp-dark #tagPickerSelectLinks a[style*="255, 255, 170"] { background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+html.pbp-dark #tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+html.pbp-dark #tagPickerNav input[type="button"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: var(--pinboard-weight-body) !important;
+}
+html.pbp-dark #tagPickerNav input[type="button"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+html.pbp-dark #bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+html.pbp-dark #bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+html.pbp-dark #bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+html.pbp-dark #bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+html.pbp-dark #bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+html.pbp-dark #save_changes_marker {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+html.pbp-dark #save_changes_marker:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; color: var(--pinboard-btn-fg) !important; }
+
 /* ---- Pagination ---- */
 html.pbp-dark .next_prev, html.pbp-dark .next_prev_widget a { color: var(--pinboard-accent) !important; }
 html.pbp-dark .next_prev:hover, html.pbp-dark .next_prev_widget a:hover { color: var(--pinboard-link-hover) !important; }
@@ -6061,6 +6537,7 @@ html.pbp-dark #tweet_searchbox input[type="submit"]:hover { background: #A8E4D5 
   --pinboard-on-link-hover: #f7d579;
   --pinboard-scrollbar-thumb: #54696f;
   --pinboard-help-fg: #5b6969;
+  --pinboard-bundle-chip-bg: #d7ded7;
   --pinboard-font-family: "Inter", -apple-system, sans-serif;
   --pinboard-font-size-base: 13px;
   --pinboard-font-size-sm: 12px;
@@ -6623,6 +7100,73 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 #main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
 #main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
 
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+#tagpicker .tagNode, #bundle .tagNode {
+  background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+}
+#tagpicker .tagNode.unbundled { background: transparent !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#bundle {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+#bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+#bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+#tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+}
+#tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
+#tagPickerFilterLinks { gap: 6px !important; }
+#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+#tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+#tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#tagPickerSelectLinks a[style*="255, 255, 170"] { background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+#tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+#tagPickerNav input[type="button"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: var(--pinboard-weight-body) !important;
+}
+#tagPickerNav input[type="button"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+#bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+#bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+#bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+#bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+#bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+#save_changes_marker {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+#save_changes_marker:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; color: var(--pinboard-btn-fg) !important; }
+
 /* ---- Pagination ---- */
 .next_prev, .next_prev_widget a { color: var(--pinboard-accent) !important; }
 .next_prev:hover, .next_prev_widget a:hover { color: var(--pinboard-link-hover) !important; }
@@ -6877,6 +7421,7 @@ a.sort_order_selected { background: #eee8d5 !important; }
   --pinboard-on-link-hover: #302403;
   --pinboard-scrollbar-thumb: #859ca3;
   --pinboard-help-fg: #859ca3;
+  --pinboard-bundle-chip-bg: #083849;
   --pinboard-font-family: "Inter", -apple-system, sans-serif;
   --pinboard-font-size-base: 13px;
   --pinboard-font-size-sm: 12px;
@@ -7439,6 +7984,73 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 #main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
 #main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
 
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+#tagpicker .tagNode, #bundle .tagNode {
+  background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+}
+#tagpicker .tagNode.unbundled { background: transparent !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#bundle {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+#bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+#bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+#tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+}
+#tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
+#tagPickerFilterLinks { gap: 6px !important; }
+#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+#tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+#tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#tagPickerSelectLinks a[style*="255, 255, 170"] { background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+#tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+#tagPickerNav input[type="button"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: var(--pinboard-weight-body) !important;
+}
+#tagPickerNav input[type="button"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+#bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+#bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+#bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+#bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+#bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+#save_changes_marker {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+#save_changes_marker:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; color: var(--pinboard-btn-fg) !important; }
+
 /* ---- Pagination ---- */
 .next_prev, .next_prev_widget a { color: var(--pinboard-accent) !important; }
 .next_prev:hover, .next_prev_widget a:hover { color: var(--pinboard-link-hover) !important; }
@@ -7697,6 +8309,7 @@ a.sort_order_selected { background: #073642 !important; }
   --pinboard-on-link-hover: #e2e6ed;
   --pinboard-scrollbar-thumb: #63667a;
   --pinboard-help-fg: #5d6174;
+  --pinboard-bundle-chip-bg: #b6cbf5;
   --pinboard-font-family: "Nunito", "Inter", -apple-system, sans-serif;
   --pinboard-font-size-base: 13px;
   --pinboard-font-size-sm: 12px;
@@ -8259,6 +8872,73 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 #main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
 #main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
 
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+#tagpicker .tagNode, #bundle .tagNode {
+  background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+}
+#tagpicker .tagNode.unbundled { background: transparent !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#bundle {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+#bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+#bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+#tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+}
+#tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
+#tagPickerFilterLinks { gap: 6px !important; }
+#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+#tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+#tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#tagPickerSelectLinks a[style*="255, 255, 170"] { background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+#tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+#tagPickerNav input[type="button"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: var(--pinboard-weight-body) !important;
+}
+#tagPickerNav input[type="button"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+#bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+#bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+#bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+#bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+#bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+#save_changes_marker {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+#save_changes_marker:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; color: var(--pinboard-btn-fg) !important; }
+
 /* ---- Pagination ---- */
 .next_prev, .next_prev_widget a { color: var(--pinboard-accent) !important; }
 .next_prev:hover, .next_prev_widget a:hover { color: var(--pinboard-link-hover) !important; }
@@ -8527,6 +9207,7 @@ a.help { background: #e6e9ef !important; }
   --pinboard-on-link-hover: #1e1e2e;
   --pinboard-scrollbar-thumb: #a6adc8;
   --pinboard-help-fg: #9c9eb1;
+  --pinboard-bundle-chip-bg: #394461;
   --pinboard-font-family: "Nunito", "Inter", -apple-system, sans-serif;
   --pinboard-font-size-base: 13px;
   --pinboard-font-size-sm: 12px;
@@ -9089,6 +9770,73 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 #main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
 #main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
 
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+#tagpicker .tagNode, #bundle .tagNode {
+  background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+}
+#tagpicker .tagNode.unbundled { background: transparent !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#bundle {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+#bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+#bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+#tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+}
+#tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
+#tagPickerFilterLinks { gap: 6px !important; }
+#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+#tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+#tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#tagPickerSelectLinks a[style*="255, 255, 170"] { background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+#tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+#tagPickerNav input[type="button"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: var(--pinboard-weight-body) !important;
+}
+#tagPickerNav input[type="button"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+#bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+#bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+#bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+#bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+#bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+#save_changes_marker {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+#save_changes_marker:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; color: var(--pinboard-btn-fg) !important; }
+
 /* ---- Pagination ---- */
 .next_prev, .next_prev_widget a { color: var(--pinboard-accent) !important; }
 .next_prev:hover, .next_prev_widget a:hover { color: var(--pinboard-link-hover) !important; }
@@ -9370,6 +10118,7 @@ h2 { color: #cba6f7 !important; }`
   --pinboard-on-link-hover: #282828;
   --pinboard-scrollbar-thumb: #b0a390;
   --pinboard-help-fg: #ada39c;
+  --pinboard-bundle-chip-bg: #454f4b;
   --pinboard-font-family: "IBM Plex Sans", "Inter", -apple-system, sans-serif;
   --pinboard-font-size-base: 13px;
   --pinboard-font-size-sm: 12px;
@@ -9932,6 +10681,73 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 #main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
 #main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
 
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+#tagpicker .tagNode, #bundle .tagNode {
+  background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+}
+#tagpicker .tagNode.unbundled { background: transparent !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#bundle {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+#bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+#bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+#tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+}
+#tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
+#tagPickerFilterLinks { gap: 6px !important; }
+#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+#tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+#tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#tagPickerSelectLinks a[style*="255, 255, 170"] { background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+#tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+#tagPickerNav input[type="button"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: var(--pinboard-weight-body) !important;
+}
+#tagPickerNav input[type="button"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+#bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+#bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+#bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+#bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+#bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+#save_changes_marker {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+#save_changes_marker:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; color: var(--pinboard-btn-fg) !important; }
+
 /* ---- Pagination ---- */
 .next_prev, .next_prev_widget a { color: var(--pinboard-accent) !important; }
 .next_prev:hover, .next_prev_widget a:hover { color: var(--pinboard-link-hover) !important; }
@@ -10206,6 +11022,7 @@ h2 { color: #d3869b !important; }
   --pinboard-on-link-hover: #191724;
   --pinboard-scrollbar-thumb: #908caa;
   --pinboard-help-fg: #8e8ba3;
+  --pinboard-bundle-chip-bg: #443b55;
   --pinboard-font-family: "Lora", "Georgia", "Noto Serif", serif;
   --pinboard-font-size-base: 14px;
   --pinboard-font-size-sm: 12px;
@@ -10768,6 +11585,73 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 #main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
 #main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
 
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+#tagpicker .tagNode, #bundle .tagNode {
+  background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+}
+#tagpicker .tagNode.unbundled { background: transparent !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#bundle {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+#bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+#bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+#tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+}
+#tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
+#tagPickerFilterLinks { gap: 6px !important; }
+#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+#tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+#tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#tagPickerSelectLinks a[style*="255, 255, 170"] { background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+#tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+#tagPickerNav input[type="button"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: var(--pinboard-weight-body) !important;
+}
+#tagPickerNav input[type="button"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+#bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+#bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+#bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+#bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+#bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+#save_changes_marker {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+#save_changes_marker:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; color: var(--pinboard-btn-fg) !important; }
+
 /* ---- Pagination ---- */
 .next_prev, .next_prev_widget a { color: var(--pinboard-accent) !important; }
 .next_prev:hover, .next_prev_widget a:hover { color: var(--pinboard-link-hover) !important; }
@@ -11048,6 +11932,7 @@ h2 { color: #ebbcba !important; }`
   --pinboard-on-link-hover: #ffffff;
   --pinboard-scrollbar-thumb: #656d76;
   --pinboard-help-fg: #636c76;
+  --pinboard-bundle-chip-bg: #c7dbf4;
   --pinboard-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
   --pinboard-font-size-base: 13px;
   --pinboard-font-size-sm: 12px;
@@ -11609,6 +12494,73 @@ a.help { color: var(--pinboard-help-fg) !important; background: var(--pinboard-a
 #main_column form[name="sort"] table td a.destroy { color: var(--pinboard-destroy) !important; opacity: 0.85 !important; font-weight: var(--pinboard-weight-heading) !important; }
 #main_column form[name="sort"] table tr:hover td a.edit { color: var(--pinboard-accent) !important; opacity: 1 !important; }
 #main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
+
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+#tagpicker .tagNode, #bundle .tagNode {
+  background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+}
+#tagpicker .tagNode.unbundled { background: transparent !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px var(--pinboard-accent) !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: var(--pinboard-btn-bg-hover) !important; box-shadow: none !important; }
+#bundle {
+  background: var(--pinboard-input-bg) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  border-radius: var(--pinboard-radius-md) !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+#bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+#bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+#tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+}
+#tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
+#tagPickerFilterLinks { gap: 6px !important; }
+#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+#tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+#tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
+#tagPickerSelectLinks a[style*="255, 255, 170"] { background: var(--pinboard-bundle-chip-bg) !important; color: var(--pinboard-fg) !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+#tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+#tagPickerNav input[type="button"] {
+  background: var(--pinboard-bg-surface) !important; color: var(--pinboard-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: var(--pinboard-weight-body) !important;
+}
+#tagPickerNav input[type="button"]:hover { background: var(--pinboard-row-hover) !important; border-color: var(--pinboard-accent) !important; color: var(--pinboard-accent) !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+#bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+#bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+#bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+#bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+#bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+#save_changes_marker {
+  background: var(--pinboard-btn-bg) !important; color: var(--pinboard-btn-fg) !important;
+  border: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-btn-bg) !important;
+  border-radius: var(--pinboard-radius-sm) !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+#save_changes_marker:hover { background: var(--pinboard-btn-bg-hover) !important; border-color: var(--pinboard-btn-bg-hover) !important; color: var(--pinboard-btn-fg) !important; }
 
 /* ---- Pagination ---- */
 .next_prev, .next_prev_widget a { color: var(--pinboard-accent) !important; }

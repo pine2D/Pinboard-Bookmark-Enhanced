@@ -495,6 +495,73 @@ a.help { color: ${v("help-fg")} !important; background: ${v("accent-soft")} !imp
 #main_column form[name="sort"] table tr:hover td a.edit { color: ${v("accent")} !important; opacity: 1 !important; }
 #main_column form[name="sort"] table tr:hover td a.destroy { opacity: 1 !important; }
 
+/* ---- Tag bundle editor — /u/<user>/bundle:<name>/edit/ (tagpicker.css + TagPicker.js) ----
+ * Native tagpicker.css paints every tag state with a hardcoded light fill
+ * (.tagNode #fec, .tagSelected #fa9, :hover #ffc / #acf, #bundle #fffaf7) while
+ * the app-shell span rule above forces the text to fg — light-on-light on every
+ * dark preset. All states are re-tokenized here: bundled = bundle-chip-bg (an
+ * opaque accent tint derived to AA in _util.expandSitePalette), unbundled = bare text, selected = the solid button pair, hover = accent ring
+ * (so it never introduces a third fill). Padding stays identical across states;
+ * native trades 1px of padding for a dotted border on select, which jitters. */
+#tagpicker .tagNode, #bundle .tagNode {
+  background: ${v("bundle-chip-bg")} !important; color: ${v("fg")} !important;
+  border: none !important; padding: 2px 5px !important; white-space: nowrap !important;
+  border-radius: ${v("radius-sm")} !important;
+}
+#tagpicker .tagNode.unbundled { background: transparent !important; }
+#tagpicker .tagNode:hover, #bundle .tagNode:hover { box-shadow: inset 0 0 0 1px ${v("accent")} !important; }
+#tagpicker .tagNode.tagSelected, #bundle .tagNode.tagSelected { background: ${v("btn-bg")} !important; color: ${v("btn-fg")} !important; }
+#tagpicker .tagNode.tagSelected:hover, #bundle .tagNode.tagSelected:hover { background: ${v("btn-bg-hover")} !important; box-shadow: none !important; }
+#bundle {
+  background: ${v("input-bg")} !important; color: ${v("fg")} !important;
+  border: ${v("border-width")} ${v("border-style")} ${v("border")} !important;
+  border-radius: ${v("radius-md")} !important;
+  padding: 6px !important; box-sizing: border-box !important; width: 100% !important;
+}
+/* ...and the auto-layout table around it has to span the column, or the cell
+   shrinks to the box and the "go to bundles list" / "select all" floats above
+   it collide. */
+#bundle_column > form > table { width: 100% !important; border-collapse: collapse !important; }
+#bundle_column > form > table > tbody > tr > td { padding: 0 !important; }
+/* Toolbar: native fixes #tagPickerNav at 30px and floats three blocks into it, so
+   the themed 30px-tall filter field overran the rule line. Flex row, auto height. */
+#tagPickerNav {
+  display: flex !important; align-items: center !important; gap: 16px !important;
+  height: auto !important; padding-bottom: 8px !important;
+  border-bottom: ${v("border-width")} ${v("border-style")} ${v("border")} !important;
+}
+#tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: ${sizeSm} !important; white-space: nowrap !important; }
+#tagPickerFilterLinks { gap: 6px !important; }
+#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+#tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: ${v("muted")} !important; }
+/* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
+#tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: ${v("radius-sm")} !important; }
+#tagPickerSelectLinks a[style*="255, 255, 170"] { background: ${v("bundle-chip-bg")} !important; color: ${v("fg")} !important; }
+/* Move ←/→: secondary weight (the input[type=reset] family) — they were the heaviest
+   fill on the page, outweighing the save action. */
+#tagPickerNav > div[style*="float:right"] { float: none !important; margin-left: auto !important; display: flex !important; gap: 6px !important; }
+#tagPickerNav input[type="button"] {
+  background: ${v("bg-surface")} !important; color: ${v("fg")} !important;
+  border: ${v("border-width")} ${v("border-style")} ${v("border")} !important;
+  height: 26px !important; padding: 0 12px !important; line-height: 1 !important; font-weight: ${v("weight-body")} !important;
+}
+#tagPickerNav input[type="button"]:hover { background: ${v("row-hover")} !important; border-color: ${v("accent")} !important; color: ${v("accent")} !important; }
+/* Name + save row: two floats in a fixed 350px column with zero slack — the field's
+   width comes from size="28" in whatever font the platform resolves, so save · cancel
+   wrapped or not by a few pixels of font metrics. Flex lets the field absorb it. */
+#bundle_column > form > div:first-of-type { display: flex !important; align-items: center !important; gap: 10px !important; }
+#bundle_column > form > div:first-of-type > div { float: none !important; margin: 0 !important; }
+#bundle_column > form > div:first-of-type > div:first-child { flex: 1 1 auto !important; min-width: 0 !important; display: flex !important; align-items: center !important; gap: 6px !important; }
+#bundle_column > form > div:first-of-type > div:last-child { flex: none !important; white-space: nowrap !important; }
+#bundle_column #name { flex: 1 1 0 !important; width: 0 !important; min-width: 0 !important; }
+#save_changes_marker {
+  background: ${v("btn-bg")} !important; color: ${v("btn-fg")} !important;
+  border: ${v("border-width")} ${v("border-style")} ${v("btn-bg")} !important;
+  border-radius: ${v("radius-sm")} !important;
+  padding: 4px 12px !important; font-weight: 600 !important; text-decoration: none !important;
+}
+#save_changes_marker:hover { background: ${v("btn-bg-hover")} !important; border-color: ${v("btn-bg-hover")} !important; color: ${v("btn-fg")} !important; }
+
 /* ---- Pagination ---- */
 .next_prev, .next_prev_widget a { color: ${v("accent")} !important; }
 .next_prev:hover, .next_prev_widget a:hover { color: ${v("link-hover")} !important; }

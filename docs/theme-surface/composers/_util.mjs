@@ -1,6 +1,6 @@
 // Shared helpers for composers.
 
-import { hexToRgb, rgbToHex, rgbToHsl, hslToRgb, contrast, fgToAA, fgToAAMulti, bgToAA, borderToAA, isHex, resolveOpaqueBg } from "./_ui-derive.mjs";
+import { hexToRgb, rgbToHex, rgbToHsl, hslToRgb, contrast, fgToAA, fgToAAMulti, bgToAA, borderToAA, isHex, resolveOpaqueBg, mix } from "./_ui-derive.mjs";
 
 export function varName(slot) {
   return `--pinboard-${slot}`;
@@ -276,6 +276,8 @@ export function expandPalette(p) {
 // ~6%-accent tint some pilots override that sort-table row to). Private rows
 // are persistent bookmark surfaces and therefore ARE blocking below; transient
 // table hover tints remain a separate state-pair decision.
+const BUNDLE_CHIP_TINT_FLOOR_PCT = 4;
+
 export function expandSitePalette(raw) {
   const p = expandPalette(raw);
   const bg = isHex(p["bg"]) ? hexToRgb(p["bg"]) : null;
@@ -321,6 +323,28 @@ export function expandSitePalette(raw) {
   if (isHex(p["muted-soft"])) {
     const badge = pageBases.map((b) => resolveOpaqueBg(p["accent-soft"], b));
     out["help-fg"] = rgbToHex(fgToAAMulti(hexToRgb(p["muted-soft"]), badge));
+  }
+  // Tag bundle editor chip (/u:<user>/bundle:<name>/edit/): a bundled tag is
+  // fg text on an accent tint. The tint is OPAQUE (accent mixed into bg) so it
+  // reads the same in the picker on bg and in the #bundle box on input-bg, and
+  // its strength starts at the theme's own accent-alpha and steps down 1% at a
+  // time until fg clears AA on it -- solarized's fg sits too close to AA for a
+  // 25% accent wash. Floor 4% keeps a visible tint; below that it throws, same
+  // contract as the library's note-mark derivation.
+  if (bg && isHex(out["accent"]) && isHex(out["fg"])) {
+    const fg = hexToRgb(out["fg"]);
+    const accent = hexToRgb(out["accent"]);
+    const m = typeof p["accent-alpha"] === "string" && p["accent-alpha"].match(/^rgba\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*,\s*([\d.]+)\s*\)$/);
+    let pct = Math.round((m ? parseFloat(m[1]) : 0.2) * 100);
+    let chip = mix(bg, accent, pct / 100).map(Math.round);
+    while (contrast(fg, chip) < 4.5 && pct > BUNDLE_CHIP_TINT_FLOOR_PCT) {
+      pct -= 1;
+      chip = mix(bg, accent, pct / 100).map(Math.round);
+    }
+    if (contrast(fg, chip) < 4.5) {
+      throw new Error(`bundle-chip-bg: fg ${out["fg"]} cannot clear 4.5:1 on a ${BUNDLE_CHIP_TINT_FLOOR_PCT}% accent tint over ${p["bg"]}`);
+    }
+    out["bundle-chip-bg"] = rgbToHex(chip);
   }
   return out;
 }
