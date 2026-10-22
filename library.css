@@ -1001,11 +1001,14 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
    page, a heading over each page's rows. A flat-canvas section head -- type
    and space only, no fill, rule or frame (canvasStructures). Its text starts
    on the rows' dot column; 16 above a heading, none below (the rows' own 2px
-   margin), the first one flush with the list's top. */
+   margin), the first one flush with the list's top. The title has a line of
+   its own (two at most), the day and count under it (critique round 5,
+   2026-10-22: side by side, the count squeezed a German title down to a few
+   words). */
 .notes-page-head {
   display: flex;
-  align-items: baseline;
-  gap: var(--lib-sp-2);
+  flex-direction: column;
+  gap: 0;
   min-width: 0;
   margin: var(--lib-sp-4) var(--lib-sp-1) 0;
   padding: var(--lib-sp-1) var(--lib-row-pad-x) var(--lib-sp-0);
@@ -1014,16 +1017,16 @@ html.motion-ready .notes-hit-btn { transition: background-color var(--motion-sta
 }
 .notes-page-head:first-child { margin-top: 0; }
 .notes-page-title {
-  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
   font-weight: 600;
   color: var(--lib-fg);
 }
 .notes-page-count {
-  flex: none;
   font-size: var(--lib-text-meta);
   line-height: var(--lib-lh-meta);
   color: var(--lib-fg-muted);

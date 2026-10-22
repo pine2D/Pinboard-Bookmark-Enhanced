@@ -248,9 +248,8 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-note")?.textContent === "note on a2" &&
     !rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-text .notes-hit-note") &&
     !rowEl("pbp_hl_alpha#a1").querySelector(".notes-hit-note"));
-  check("a row on its page's day says only the time (pbpLibFormatTime); the heading carries the day",
-    typeof pbpLibFormatTime === "function" &&
-    rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-meta > .notes-meta-chip")?.textContent === pbpLibFormatTime(400));
+  check("a row on its page's day carries no meta line at all; the heading carries the day",
+    !!rowEl("pbp_hl_alpha#a2") && !rowEl("pbp_hl_alpha#a2").querySelector(".notes-hit-meta"));
   check("pbpNotesStats counts highlights, distinct pages and the 7 / 30-day gain",
     typeof pbpNotesStats === "function" && (() => {
       const NOW = 100 * 86400000;
@@ -417,11 +416,11 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     check("the index runs a page's rows in the detail's order",
       rowKeys().split(",").filter((k) => k.startsWith("pbp_hl_times#")).map((k) => k.split("#")[1]).join(",") === "x1,x2,x4,x3,x6,x5",
       rowKeys());
-    check("a row from another day than its page's last one gives day and time; one from that day, the time",
-      listWhen("x2") === day(at(-1, 23, 58)) + " " + time(at(-1, 23, 58)) && listWhen("x6") === time(pageTs),
+    check("a row from another day than its page's last one gives its day, never the time; one from that day, nothing",
+      listWhen("x2") === day(at(-1, 23, 58)) && listWhen("x6") === undefined && !rowEl("pbp_hl_times#x6").querySelector(".notes-hit-meta"),
       `${listWhen("x2")} | ${listWhen("x6")}`);
     const listSr = (id) => rowEl("pbp_hl_times#" + id)?.querySelector(".notes-hit-body > .sr-only:last-child")?.textContent;
-    check("screen readers get the day the heading carries when the row shows only the time, never twice",
+    check("screen readers get the day the heading carries when the row shows no day, never twice",
       listSr("x6") === " \u2014 Times page \u00b7 " + day(pageTs) && listSr("x2") === " \u2014 Times page",
       `${listSr("x6")} | ${listSr("x2")}`);
     check("a highlight from the page's own day is labelled with its time only",

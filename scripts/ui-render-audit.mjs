@@ -9353,7 +9353,10 @@ async function main() {
         title: seed.multiTitle,
         items: [
           { id: "m1", ts: now - 40 * minute, quote: "Attention is the one resource every element on the page competes for.", note: "", color: 1 },
-          { id: "m2", ts: now - 35 * minute, quote: "A border costs the reader a glance whether or not it carries meaning.", note: "The real price of a decorative frame.", color: 2 },
+          // Two days back (critique round 5): an index row shows a meta line
+          // only for a day other than its page's last, and the row-state gate
+          // needs one row carrying text, note and meta together.
+          { id: "m2", ts: now - 2 * 86400000, quote: "A border costs the reader a glance whether or not it carries meaning.", note: "The real price of a decorative frame.", color: 2 },
           { id: "m3", ts: now - 30 * minute, quote: "Quiet is not the absence of design; it is design that stopped asking for attention.", note: "", color: 3 },
           { id: "m4", ts: now - 25 * minute, quote: "The best index is the one you stop noticing while you read.", note: "", color: 5 },
         ],
@@ -9409,7 +9412,8 @@ async function main() {
       diacriticPage: pages.some(([, rec]) => rec.url === seed.diacriticUrl && rec.title === seed.diacriticTitle && rec.items.length === 1),
       highlights: items.length,
       fixtureHighlightNewest: !!newest && items.every((it) => it === newest || it.ts < newest.ts),
-      multiShape: !!multi && multi.title === seed.multiTitle && multi.items.length >= 3 && multi.items.some((it) => String(it.note || "").trim()),
+      multiShape: !!multi && multi.title === seed.multiTitle && multi.items.length >= 3 &&
+        multi.items.some((it) => String(it.note || "").trim() && new Date(it.ts).toDateString() !== new Date(Math.max(...multi.items.map((x) => x.ts))).toDateString()),
       soloShape: !!solo && solo.items.length === 1 && solo.title === seed.cjkTitle,
     };
   }, { owner: SEED_OWNER, seed: LIB_SEED });
@@ -9423,7 +9427,7 @@ async function main() {
     seedShape.diacriticPage ? null : `${LIB_SEED.diacriticUrl} is not exactly one highlight titled ${LIB_SEED.diacriticTitle}`,
     seedShape.highlights >= 14 ? null : `highlights ${seedShape.highlights} (want >= 14)`,
     seedShape.fixtureHighlightNewest ? null : "the fixture highlight is not the newest",
-    seedShape.multiShape ? null : `${LIB_SEED.multiUrl} is not titled ${LIB_SEED.multiTitle} or lacks >= 3 highlights with one note`,
+    seedShape.multiShape ? null : `${LIB_SEED.multiUrl} is not titled ${LIB_SEED.multiTitle} or lacks >= 3 highlights with one noted highlight from an earlier day`,
     seedShape.soloShape ? null : `${LIB_SEED.soloUrl} is not exactly one highlight titled ${LIB_SEED.cjkTitle}`,
   ].filter(Boolean);
   if (seedProblems.length) {

@@ -572,20 +572,23 @@ function _pbpNotesBuildRow(hit) {
   }
 
   // The page heading above (_pbpNotesBuildPageHead) carries the page and its
-  // day, so a row says only when: the time, or day and time for a highlight
-  // from another day than the page's last one -- the excerpt labels' rule.
-  const meta = document.createElement("span");
-  meta.className = "notes-hit-meta";
-  const when = document.createElement("span");
-  when.className = "notes-meta-chip";
-  const time = pbpLibFormatTime(hit.ts);
+  // day, so a row on that day says nothing more, and one from another day
+  // says only its day. The time of day stays in the reading pane's excerpt
+  // labels (critique round 5, 2026-10-22: one "12:13" line per row cost
+  // each row a line and told the eye nothing within one page).
   const day = pbpLibSameDay(hit.ts, hit.row.lastTs) ? "" : pbpLibFormatDay(hit.ts);
-  when.textContent = [day, time].filter(Boolean).join(" ");
-  if (when.textContent) meta.appendChild(when);
-  body.appendChild(meta);
+  if (day) {
+    const meta = document.createElement("span");
+    meta.className = "notes-hit-meta";
+    const when = document.createElement("span");
+    when.className = "notes-meta-chip";
+    when.textContent = day;
+    meta.appendChild(when);
+    body.appendChild(meta);
+  }
   // The heading is presentation only (a grid takes rows), so each row gives
   // assistive tech what the eye reads off it: the page, and the day the
-  // heading carries when the row itself shows only the time.
+  // heading carries when the row itself shows no day.
   const pageName = document.createElement("span");
   pageName.className = "sr-only";
   pageName.textContent = " \u2014 " + [_pbpNotesPageName(hit.row), day ? "" : pbpLibFormatDay(hit.ts)].filter(Boolean).join(" \u00b7 ");
