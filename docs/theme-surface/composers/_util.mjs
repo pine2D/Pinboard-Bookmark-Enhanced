@@ -299,6 +299,9 @@ export function expandSitePalette(raw) {
     if (!isHex(p[key])) continue;
     out[key] = rgbToHex(fgToAAMulti(hexToRgb(p[key]), pageBases));
   }
+  // Non-link anchors formerly colored by two pilots' bare-a overrides.
+  out["anchor-fg"] = isHex(p["anchor-fg"])
+    ? rgbToHex(fgToAAMulti(hexToRgb(p["anchor-fg"]), pageBases)) : out.accent;
 
   // accent/link-hover are dual-purpose site tokens: text in ordinary links,
   // fills in selected navigation controls. If their text floor moved the fill,

@@ -118,6 +118,32 @@ try {
       checks++;
       if (size < 11) failures.push(`${key} tag navigation text shrank to ${size}px`);
     }
+    for (const name of ['import-layout', 'toc-layout']) {
+      await fixture(name);
+      for (const width of [390, 768, 1024, 1440]) {
+        await page.setViewportSize({ width, height: 1000 });
+        const layout = await page.evaluate(() => {
+          const rect = id => { const r = document.getElementById(id).getBoundingClientRect(); return { x: r.x, right: r.right, y: r.y, bottom: r.bottom }; };
+          const history = document.getElementById('import_history_table');
+          return { width: document.documentElement.scrollWidth, first: rect(history ? 'settings_panel' : 'left_toc'), second: rect(history ? 'import_history_table' : 'content_column') };
+        });
+        checks++;
+        if (width < 1100) {
+          if (layout.width > width || layout.second.right > width || layout.second.y < layout.first.bottom) failures.push(`${key} ${name}@${width}: narrow columns overflow or overlap ${JSON.stringify(layout)}`);
+        } else if (layout.second.x < layout.first.right) failures.push(`${key} ${name}: desktop columns no longer side by side`);
+      }
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await fixture('widget');
+    for (const state of ['rest', 'hover']) {
+      if (state === 'hover') await page.locator('#right_column > div a').first().hover();
+      const colors = await page.locator('#right_column > div a').evaluateAll(nodes => nodes.map(n => getComputedStyle(n).color));
+      checks++;
+      if (colors.join('|') !== 'rgb(162, 97, 49)|rgb(140, 84, 42)') failures.push(`${key} widget:${state} replaced preview colors: ${colors}`);
+    }
+    await readable(key, '#right_column > p a');
+    await fixture('blog-sidebar');
+    await readable(key, '#right_column a');
   }
 } finally {
   await browser.close();

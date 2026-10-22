@@ -27,6 +27,11 @@
   #sub_banner a.selected { background: #ffff77; }
   .star { color: #ddd; }
   #tag_cloud_header { font-size: 11px; }
+  #settings_panel { margin-top: 1em; }
+  #import_history_table { float: left; padding: 5px; border: 1px solid #ccc; }
+  #left_toc { float: left; width: 220px; margin-right: 20px; }
+  #content_column { float: left; min-width: 200px; width: 70%; }
+  @media (max-width: 1100px) { #content { width: auto; } }
 </style>
 <body id="pinboard">
 <div id="content"></div>
@@ -79,5 +84,18 @@
 </template>
 <template id="tag-nav">
   <div id="tag_cloud"><div id="tag_cloud_header"><p><a href="?mode=cloud">top tags</a> <a href="?mode=list&amp;floor=1" class="tag_heading_selected">all tags</a> · <a href="?mode=list&amp;floor=2">2</a> · <a href="?mode=list&amp;floor=20">20</a> · <a href="/tags/">manage</a></p></div></div>
+</template>
+<template id="import-layout">
+  <div id="main_column"><div id="settings_panel"><h2>Import bookmarks</h2><p>Choose a bookmarks file.</p><input type="file"></div><table id="import_history_table"><caption>Import history</caption><tr><td>2026-10-22</td><td>Completed</td></tr></table></div>
+</template>
+<template id="toc-layout">
+  <div id="main_column"><div id="left_toc"><ul><li><a href="#answer">Contents</a></li></ul></div><div id="content_column"><h2 id="answer">Frequently asked questions</h2><p>A readable answer with room to wrap across a narrow window.</p></div></div>
+</template>
+<template id="widget">
+  <form action="/widgets/tag_cloud"><label>Start color <input name="start_color" value="a26131"></label></form>
+  <div id="right_column"><p><a href="#instructions">Widget instructions</a></p><div><a href="#preview-one" style="font-size:20px;color:#a26131">garden</a> <a href="#preview-two" style="font-size:23px;color:#8c542a">science</a></div></div>
+</template>
+<template id="blog-sidebar">
+  <div id="right_column"><div><a href="#archive" style="color:#11a">Blog archive</a></div></div>
 </template>
 </body>

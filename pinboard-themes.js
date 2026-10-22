@@ -50,6 +50,7 @@ const PINBOARD_THEMES = {
   --pinboard-on-accent: #ffffff;
   --pinboard-on-link-hover: #ffffff;
   --pinboard-scrollbar-thumb: #5f6368;
+  --pinboard-anchor-fg: #166ad8;
   --pinboard-star-fg: #878787;
   --pinboard-bundle-edit-hover: #1565cf;
   --pinboard-table-destroy-hover: #c72c22;
@@ -212,9 +213,9 @@ body { color-scheme: light !important; }
    escape exactly this.) Emitting it first lets every later intent rule win its own
    tie, with no specificity change — so the pilot overrides appended last still beat
    the composer, which is what keeps a.url_display on each pilot own shipped colour.
-   Do NOT drop a:link or wrap this in :where(): that lowers the fallback below
-   (0,1,1) and revives the dead bare-a overrides two pilots still carry. */
-a, a:link { color: var(--pinboard-accent) !important; }
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)) { color: var(--pinboard-anchor-fg) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):link { color: var(--pinboard-accent) !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -557,6 +558,27 @@ body .api_token { color: var(--pinboard-fg) !important; }
 #main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
 #main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
+/* These desktop-only placements must yield before their combined 1030px
+   columns exceed the viewport. Scope to these pages, leaving list layouts alone. */
+@media (max-width: 1100px) {
+  #content:has(#import_history_table), #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  #main_column:has(#import_history_table), #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+  #main_column > #import_history_table {
+    position: static !important; float: none !important; width: 100% !important;
+    margin-top: 16px !important;
+  }
+  #main_column:has(#left_toc) > #left_toc,
+  #main_column:has(#left_toc) > #content_column {
+    float: none !important; width: 100% !important; max-width: 100% !important;
+    margin-right: 0 !important; box-sizing: border-box !important;
+  }
+}
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -823,8 +845,8 @@ html, body, textarea, .description, .pin-ac .bd {
    composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
    :focus-visible stay at the tail, where they still beat the element+class rules
    above, so hover and visited behaviour is unchanged. */
-a:hover { color: var(--pinboard-link-hover) !important; }
-a:visited { color: var(--pinboard-link-visited) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):hover { color: var(--pinboard-link-hover) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
@@ -851,7 +873,7 @@ pre {
 /* ---- blog.pinboard.in sidebar ---- */
 /* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
    Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
-   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
    Keep its native 20px padding. */
 #right_column {
   background: var(--pinboard-bg-surface) !important;
@@ -1008,6 +1030,7 @@ h2 { color: #3c4043 !important; }
   --pinboard-sidebar-btn-bg: #4d6e96;
   --pinboard-sidebar-btn-fg: #eceff4;
   --pinboard-sidebar-btn-bg-hover: #415d7e;
+  --pinboard-anchor-fg: #9cb5ce;
   --pinboard-on-accent: #384861;
   --pinboard-on-link-hover: #35435b;
   --pinboard-scrollbar-thumb: #9cb5ce;
@@ -1173,9 +1196,9 @@ body { color-scheme: dark !important; }
    escape exactly this.) Emitting it first lets every later intent rule win its own
    tie, with no specificity change — so the pilot overrides appended last still beat
    the composer, which is what keeps a.url_display on each pilot own shipped colour.
-   Do NOT drop a:link or wrap this in :where(): that lowers the fallback below
-   (0,1,1) and revives the dead bare-a overrides two pilots still carry. */
-a, a:link { color: var(--pinboard-accent) !important; }
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)) { color: var(--pinboard-anchor-fg) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):link { color: var(--pinboard-accent) !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -1518,6 +1541,27 @@ body .api_token { color: var(--pinboard-fg) !important; }
 #main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
 #main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
+/* These desktop-only placements must yield before their combined 1030px
+   columns exceed the viewport. Scope to these pages, leaving list layouts alone. */
+@media (max-width: 1100px) {
+  #content:has(#import_history_table), #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  #main_column:has(#import_history_table), #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+  #main_column > #import_history_table {
+    position: static !important; float: none !important; width: 100% !important;
+    margin-top: 16px !important;
+  }
+  #main_column:has(#left_toc) > #left_toc,
+  #main_column:has(#left_toc) > #content_column {
+    float: none !important; width: 100% !important; max-width: 100% !important;
+    margin-right: 0 !important; box-sizing: border-box !important;
+  }
+}
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -1784,8 +1828,8 @@ html, body, textarea, .description, .pin-ac .bd {
    composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
    :focus-visible stay at the tail, where they still beat the element+class rules
    above, so hover and visited behaviour is unchanged. */
-a:hover { color: var(--pinboard-link-hover) !important; }
-a:visited { color: var(--pinboard-link-visited) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):hover { color: var(--pinboard-link-hover) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
@@ -1812,7 +1856,7 @@ pre {
 /* ---- blog.pinboard.in sidebar ---- */
 /* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
    Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
-   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
    Keep its native 20px padding. */
 #right_column {
   background: var(--pinboard-bg-surface) !important;
@@ -1875,7 +1919,6 @@ input[type="button"] { border: 1px solid #81a1c1 !important; }
 #bulk_top_bar { background: #434c5e !important; border: 1px solid #4c566a !important; }
 #bulk_edit_box { background: #434c5e !important; border: 1px solid #4c566a !important; }
 .user_navbar a { color: #81a1c1 !important; }
-a { color: #81a1c1 !important; }
 #main_column form[name="sort"] table input[name^="id_"] { border: 1px solid #4c566a !important; background: #3b4252 !important; }
 #main_column form[name="sort"] table a.bundle { font-weight: 600 !important; border-radius: 3px !important; }
 #main_column form[name="sort"] table td a.destroy { font-weight: 600 !important; }
@@ -1929,6 +1972,7 @@ a { color: #81a1c1 !important; }
   --pinboard-on-accent: #007000;
   --pinboard-on-link-hover: #007a00;
   --pinboard-scrollbar-thumb: #22aa22;
+  --pinboard-anchor-fg: #33ff33;
   --pinboard-star-fg: #227722;
   --pinboard-bundle-edit-hover: #33ff33;
   --pinboard-table-destroy-hover: #ff4747;
@@ -2091,9 +2135,9 @@ body { color-scheme: dark !important; }
    escape exactly this.) Emitting it first lets every later intent rule win its own
    tie, with no specificity change — so the pilot overrides appended last still beat
    the composer, which is what keeps a.url_display on each pilot own shipped colour.
-   Do NOT drop a:link or wrap this in :where(): that lowers the fallback below
-   (0,1,1) and revives the dead bare-a overrides two pilots still carry. */
-a, a:link { color: var(--pinboard-accent) !important; }
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)) { color: var(--pinboard-anchor-fg) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):link { color: var(--pinboard-accent) !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -2436,6 +2480,27 @@ body .api_token { color: var(--pinboard-fg) !important; }
 #main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
 #main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
+/* These desktop-only placements must yield before their combined 1030px
+   columns exceed the viewport. Scope to these pages, leaving list layouts alone. */
+@media (max-width: 1100px) {
+  #content:has(#import_history_table), #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  #main_column:has(#import_history_table), #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+  #main_column > #import_history_table {
+    position: static !important; float: none !important; width: 100% !important;
+    margin-top: 16px !important;
+  }
+  #main_column:has(#left_toc) > #left_toc,
+  #main_column:has(#left_toc) > #content_column {
+    float: none !important; width: 100% !important; max-width: 100% !important;
+    margin-right: 0 !important; box-sizing: border-box !important;
+  }
+}
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -2702,8 +2767,8 @@ html, body, textarea, .description, .pin-ac .bd {
    composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
    :focus-visible stay at the tail, where they still beat the element+class rules
    above, so hover and visited behaviour is unchanged. */
-a:hover { color: var(--pinboard-link-hover) !important; }
-a:visited { color: var(--pinboard-link-visited) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):hover { color: var(--pinboard-link-hover) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
@@ -2730,7 +2795,7 @@ pre {
 /* ---- blog.pinboard.in sidebar ---- */
 /* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
    Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
-   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
    Keep its native 20px padding. */
 #right_column {
   background: var(--pinboard-bg-surface) !important;
@@ -2888,6 +2953,7 @@ a.bookmark_title::before { color: #33ff3380 !important; }`
   --pinboard-on-accent: #faf8f5;
   --pinboard-on-link-hover: #faf8f5;
   --pinboard-scrollbar-thumb: #6b4c3b;
+  --pinboard-anchor-fg: #1a3a5c;
   --pinboard-star-fg: #9f834f;
   --pinboard-bundle-edit-hover: #1a3a5c;
   --pinboard-table-destroy-hover: #b83729;
@@ -3050,9 +3116,9 @@ body { color-scheme: light !important; }
    escape exactly this.) Emitting it first lets every later intent rule win its own
    tie, with no specificity change — so the pilot overrides appended last still beat
    the composer, which is what keeps a.url_display on each pilot own shipped colour.
-   Do NOT drop a:link or wrap this in :where(): that lowers the fallback below
-   (0,1,1) and revives the dead bare-a overrides two pilots still carry. */
-a, a:link { color: var(--pinboard-accent) !important; }
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)) { color: var(--pinboard-anchor-fg) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):link { color: var(--pinboard-accent) !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -3395,6 +3461,27 @@ body .api_token { color: var(--pinboard-fg) !important; }
 #main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
 #main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
+/* These desktop-only placements must yield before their combined 1030px
+   columns exceed the viewport. Scope to these pages, leaving list layouts alone. */
+@media (max-width: 1100px) {
+  #content:has(#import_history_table), #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  #main_column:has(#import_history_table), #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+  #main_column > #import_history_table {
+    position: static !important; float: none !important; width: 100% !important;
+    margin-top: 16px !important;
+  }
+  #main_column:has(#left_toc) > #left_toc,
+  #main_column:has(#left_toc) > #content_column {
+    float: none !important; width: 100% !important; max-width: 100% !important;
+    margin-right: 0 !important; box-sizing: border-box !important;
+  }
+}
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -3661,8 +3748,8 @@ html, body, textarea, .description, .pin-ac .bd {
    composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
    :focus-visible stay at the tail, where they still beat the element+class rules
    above, so hover and visited behaviour is unchanged. */
-a:hover { color: var(--pinboard-link-hover) !important; }
-a:visited { color: var(--pinboard-link-visited) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):hover { color: var(--pinboard-link-hover) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
@@ -3689,7 +3776,7 @@ pre {
 /* ---- blog.pinboard.in sidebar ---- */
 /* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
    Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
-   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
    Keep its native 20px padding. */
 #right_column {
   background: var(--pinboard-bg-surface) !important;
@@ -3841,6 +3928,7 @@ h2 { font-family: "Georgia", serif !important; }`
   --pinboard-sidebar-btn-bg: #bd93f9;
   --pinboard-sidebar-btn-fg: #282a36;
   --pinboard-sidebar-btn-bg-hover: #ff79c6;
+  --pinboard-anchor-fg: #cfb0fb;
   --pinboard-on-accent: #282a36;
   --pinboard-on-link-hover: #282a36;
   --pinboard-scrollbar-thumb: #bd93f9;
@@ -4006,9 +4094,9 @@ body { color-scheme: dark !important; }
    escape exactly this.) Emitting it first lets every later intent rule win its own
    tie, with no specificity change — so the pilot overrides appended last still beat
    the composer, which is what keeps a.url_display on each pilot own shipped colour.
-   Do NOT drop a:link or wrap this in :where(): that lowers the fallback below
-   (0,1,1) and revives the dead bare-a overrides two pilots still carry. */
-a, a:link { color: var(--pinboard-accent) !important; }
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)) { color: var(--pinboard-anchor-fg) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):link { color: var(--pinboard-accent) !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -4351,6 +4439,27 @@ body .api_token { color: var(--pinboard-fg) !important; }
 #main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
 #main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
+/* These desktop-only placements must yield before their combined 1030px
+   columns exceed the viewport. Scope to these pages, leaving list layouts alone. */
+@media (max-width: 1100px) {
+  #content:has(#import_history_table), #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  #main_column:has(#import_history_table), #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+  #main_column > #import_history_table {
+    position: static !important; float: none !important; width: 100% !important;
+    margin-top: 16px !important;
+  }
+  #main_column:has(#left_toc) > #left_toc,
+  #main_column:has(#left_toc) > #content_column {
+    float: none !important; width: 100% !important; max-width: 100% !important;
+    margin-right: 0 !important; box-sizing: border-box !important;
+  }
+}
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -4617,8 +4726,8 @@ html, body, textarea, .description, .pin-ac .bd {
    composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
    :focus-visible stay at the tail, where they still beat the element+class rules
    above, so hover and visited behaviour is unchanged. */
-a:hover { color: var(--pinboard-link-hover) !important; }
-a:visited { color: var(--pinboard-link-visited) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):hover { color: var(--pinboard-link-hover) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
@@ -4645,7 +4754,7 @@ pre {
 /* ---- blog.pinboard.in sidebar ---- */
 /* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
    Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
-   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
    Keep its native 20px padding. */
 #right_column {
   background: var(--pinboard-bg-surface) !important;
@@ -4736,7 +4845,7 @@ input[type="radio"] { accent-color: #bd93f9 !important; }
 #main_column form[name="sort"] table td a.destroy { font-weight: 600 !important; }
 .next_prev { color: #bd93f9 !important; }
 .next_prev_widget a { color: #bd93f9 !important; }
-a { color: #bd93f9 !important; }`
+`
   },
 
   // ---- 6. Flexoki Adaptive (Light + Dark) ----
@@ -4786,6 +4895,7 @@ a { color: #bd93f9 !important; }`
   --pinboard-on-accent: #fffcf0;
   --pinboard-on-link-hover: #fffcf0;
   --pinboard-scrollbar-thumb: #6a6964;
+  --pinboard-anchor-fg: #205ea6;
   --pinboard-star-fg: #8c855c;
   --pinboard-bundle-edit-hover: #205ea6;
   --pinboard-table-destroy-hover: #af3029;
@@ -4948,9 +5058,9 @@ body { color-scheme: light !important; }
    escape exactly this.) Emitting it first lets every later intent rule win its own
    tie, with no specificity change — so the pilot overrides appended last still beat
    the composer, which is what keeps a.url_display on each pilot own shipped colour.
-   Do NOT drop a:link or wrap this in :where(): that lowers the fallback below
-   (0,1,1) and revives the dead bare-a overrides two pilots still carry. */
-a, a:link { color: var(--pinboard-accent) !important; }
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)) { color: var(--pinboard-anchor-fg) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):link { color: var(--pinboard-accent) !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -5293,6 +5403,27 @@ body .api_token { color: var(--pinboard-fg) !important; }
 #main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
 #main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
+/* These desktop-only placements must yield before their combined 1030px
+   columns exceed the viewport. Scope to these pages, leaving list layouts alone. */
+@media (max-width: 1100px) {
+  #content:has(#import_history_table), #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  #main_column:has(#import_history_table), #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+  #main_column > #import_history_table {
+    position: static !important; float: none !important; width: 100% !important;
+    margin-top: 16px !important;
+  }
+  #main_column:has(#left_toc) > #left_toc,
+  #main_column:has(#left_toc) > #content_column {
+    float: none !important; width: 100% !important; max-width: 100% !important;
+    margin-right: 0 !important; box-sizing: border-box !important;
+  }
+}
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -5559,8 +5690,8 @@ html, body, textarea, .description, .pin-ac .bd {
    composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
    :focus-visible stay at the tail, where they still beat the element+class rules
    above, so hover and visited behaviour is unchanged. */
-a:hover { color: var(--pinboard-link-hover) !important; }
-a:visited { color: var(--pinboard-link-visited) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):hover { color: var(--pinboard-link-hover) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
@@ -5587,7 +5718,7 @@ pre {
 /* ---- blog.pinboard.in sidebar ---- */
 /* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
    Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
-   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
    Keep its native 20px padding. */
 #right_column {
   background: var(--pinboard-bg-surface) !important;
@@ -5656,6 +5787,7 @@ html.pbp-dark {
   --pinboard-on-accent: #171615;
   --pinboard-on-link-hover: #1c1b1a;
   --pinboard-scrollbar-thumb: #918f8a;
+  --pinboard-anchor-fg: #5a94c6;
   --pinboard-star-fg: #75716d;
   --pinboard-bundle-edit-hover: #699ecb;
   --pinboard-table-destroy-hover: #df827a;
@@ -5818,9 +5950,9 @@ html.pbp-dark body { color-scheme: dark !important; }
    escape exactly this.) Emitting it first lets every later intent rule win its own
    tie, with no specificity change — so the pilot overrides appended last still beat
    the composer, which is what keeps a.url_display on each pilot own shipped colour.
-   Do NOT drop a:link or wrap this in :where(): that lowers the fallback below
-   (0,1,1) and revives the dead bare-a overrides two pilots still carry. */
-html.pbp-dark a, html.pbp-dark a:link { color: var(--pinboard-accent) !important; }
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+html.pbp-dark a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)) { color: var(--pinboard-anchor-fg) !important; }
+html.pbp-dark a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):link { color: var(--pinboard-accent) !important; }
 
 /* ---- Banner & navigation ---- */
 html.pbp-dark #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -6163,6 +6295,27 @@ html.pbp-dark #main_column > #import_history_table td { color: var(--pinboard-fg
 html.pbp-dark #main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
 html.pbp-dark #main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
+/* These desktop-only placements must yield before their combined 1030px
+   columns exceed the viewport. Scope to these pages, leaving list layouts alone. */
+@media (max-width: 1100px) {
+  html.pbp-dark #content:has(#import_history_table), html.pbp-dark #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  html.pbp-dark #main_column:has(#import_history_table), html.pbp-dark #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+  html.pbp-dark #main_column > #import_history_table {
+    position: static !important; float: none !important; width: 100% !important;
+    margin-top: 16px !important;
+  }
+  html.pbp-dark #main_column:has(#left_toc) > #left_toc,
+  html.pbp-dark #main_column:has(#left_toc) > #content_column {
+    float: none !important; width: 100% !important; max-width: 100% !important;
+    margin-right: 0 !important; box-sizing: border-box !important;
+  }
+}
+
 /* ---- Profile page ---- */
 html.pbp-dark .service_box, html.pbp-dark .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -6429,8 +6582,8 @@ html.pbp-dark ::-webkit-scrollbar-corner { background: var(--pinboard-bg-surface
    composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
    :focus-visible stay at the tail, where they still beat the element+class rules
    above, so hover and visited behaviour is unchanged. */
-html.pbp-dark a:hover { color: var(--pinboard-link-hover) !important; }
-html.pbp-dark a:visited { color: var(--pinboard-link-visited) !important; }
+html.pbp-dark a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):hover { color: var(--pinboard-link-hover) !important; }
+html.pbp-dark a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):visited { color: var(--pinboard-link-visited) !important; }
 html.pbp-dark a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 html.pbp-dark h2 { color: var(--pinboard-muted) !important; }
 html.pbp-dark hr { border-color: var(--pinboard-border) !important; }
@@ -6457,7 +6610,7 @@ html.pbp-dark pre {
 /* ---- blog.pinboard.in sidebar ---- */
 /* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
    Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
-   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
    Keep its native 20px padding. */
 html.pbp-dark #right_column {
   background: var(--pinboard-bg-surface) !important;
@@ -6659,6 +6812,7 @@ html.pbp-dark #tweet_searchbox input[type="submit"]:hover { background: #A8E4D5 
   --pinboard-on-accent: #f8e0a1;
   --pinboard-on-link-hover: #f7d579;
   --pinboard-scrollbar-thumb: #54696f;
+  --pinboard-anchor-fg: #1d699e;
   --pinboard-star-fg: #8f7d4f;
   --pinboard-bundle-edit-hover: #1b6395;
   --pinboard-table-destroy-hover: #b92120;
@@ -6821,9 +6975,9 @@ body { color-scheme: light !important; }
    escape exactly this.) Emitting it first lets every later intent rule win its own
    tie, with no specificity change — so the pilot overrides appended last still beat
    the composer, which is what keeps a.url_display on each pilot own shipped colour.
-   Do NOT drop a:link or wrap this in :where(): that lowers the fallback below
-   (0,1,1) and revives the dead bare-a overrides two pilots still carry. */
-a, a:link { color: var(--pinboard-accent) !important; }
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)) { color: var(--pinboard-anchor-fg) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):link { color: var(--pinboard-accent) !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -7166,6 +7320,27 @@ body .api_token { color: var(--pinboard-fg) !important; }
 #main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
 #main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
+/* These desktop-only placements must yield before their combined 1030px
+   columns exceed the viewport. Scope to these pages, leaving list layouts alone. */
+@media (max-width: 1100px) {
+  #content:has(#import_history_table), #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  #main_column:has(#import_history_table), #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+  #main_column > #import_history_table {
+    position: static !important; float: none !important; width: 100% !important;
+    margin-top: 16px !important;
+  }
+  #main_column:has(#left_toc) > #left_toc,
+  #main_column:has(#left_toc) > #content_column {
+    float: none !important; width: 100% !important; max-width: 100% !important;
+    margin-right: 0 !important; box-sizing: border-box !important;
+  }
+}
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -7432,8 +7607,8 @@ html, body, textarea, .description, .pin-ac .bd {
    composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
    :focus-visible stay at the tail, where they still beat the element+class rules
    above, so hover and visited behaviour is unchanged. */
-a:hover { color: var(--pinboard-link-hover) !important; }
-a:visited { color: var(--pinboard-link-visited) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):hover { color: var(--pinboard-link-hover) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
@@ -7460,7 +7635,7 @@ pre {
 /* ---- blog.pinboard.in sidebar ---- */
 /* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
    Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
-   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
    Keep its native 20px padding. */
 #right_column {
   background: var(--pinboard-bg-surface) !important;
@@ -7562,6 +7737,7 @@ a.sort_order_selected { background: #eee8d5 !important; }
   --pinboard-on-accent: #271d03;
   --pinboard-on-link-hover: #302403;
   --pinboard-scrollbar-thumb: #859ca3;
+  --pinboard-anchor-fg: #4ca2df;
   --pinboard-star-fg: #1089a4;
   --pinboard-bundle-edit-hover: #5dabe2;
   --pinboard-table-destroy-hover: #eb8886;
@@ -7724,9 +7900,9 @@ body { color-scheme: dark !important; }
    escape exactly this.) Emitting it first lets every later intent rule win its own
    tie, with no specificity change — so the pilot overrides appended last still beat
    the composer, which is what keeps a.url_display on each pilot own shipped colour.
-   Do NOT drop a:link or wrap this in :where(): that lowers the fallback below
-   (0,1,1) and revives the dead bare-a overrides two pilots still carry. */
-a, a:link { color: var(--pinboard-accent) !important; }
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)) { color: var(--pinboard-anchor-fg) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):link { color: var(--pinboard-accent) !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -8069,6 +8245,27 @@ body .api_token { color: var(--pinboard-fg) !important; }
 #main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
 #main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
+/* These desktop-only placements must yield before their combined 1030px
+   columns exceed the viewport. Scope to these pages, leaving list layouts alone. */
+@media (max-width: 1100px) {
+  #content:has(#import_history_table), #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  #main_column:has(#import_history_table), #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+  #main_column > #import_history_table {
+    position: static !important; float: none !important; width: 100% !important;
+    margin-top: 16px !important;
+  }
+  #main_column:has(#left_toc) > #left_toc,
+  #main_column:has(#left_toc) > #content_column {
+    float: none !important; width: 100% !important; max-width: 100% !important;
+    margin-right: 0 !important; box-sizing: border-box !important;
+  }
+}
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -8335,8 +8532,8 @@ html, body, textarea, .description, .pin-ac .bd {
    composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
    :focus-visible stay at the tail, where they still beat the element+class rules
    above, so hover and visited behaviour is unchanged. */
-a:hover { color: var(--pinboard-link-hover) !important; }
-a:visited { color: var(--pinboard-link-visited) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):hover { color: var(--pinboard-link-hover) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
@@ -8363,7 +8560,7 @@ pre {
 /* ---- blog.pinboard.in sidebar ---- */
 /* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
    Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
-   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
    Keep its native 20px padding. */
 #right_column {
   background: var(--pinboard-bg-surface) !important;
@@ -8470,6 +8667,7 @@ a.sort_order_selected { background: #073642 !important; }
   --pinboard-on-accent: #f5f6f9;
   --pinboard-on-link-hover: #e2e6ed;
   --pinboard-scrollbar-thumb: #63667a;
+  --pinboard-anchor-fg: #0b59f4;
   --pinboard-star-fg: #79849e;
   --pinboard-bundle-edit-hover: #0b55ea;
   --pinboard-table-destroy-hover: #ab0c2e;
@@ -8632,9 +8830,9 @@ body { color-scheme: light !important; }
    escape exactly this.) Emitting it first lets every later intent rule win its own
    tie, with no specificity change — so the pilot overrides appended last still beat
    the composer, which is what keeps a.url_display on each pilot own shipped colour.
-   Do NOT drop a:link or wrap this in :where(): that lowers the fallback below
-   (0,1,1) and revives the dead bare-a overrides two pilots still carry. */
-a, a:link { color: var(--pinboard-accent) !important; }
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)) { color: var(--pinboard-anchor-fg) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):link { color: var(--pinboard-accent) !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -8977,6 +9175,27 @@ body .api_token { color: var(--pinboard-fg) !important; }
 #main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
 #main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
+/* These desktop-only placements must yield before their combined 1030px
+   columns exceed the viewport. Scope to these pages, leaving list layouts alone. */
+@media (max-width: 1100px) {
+  #content:has(#import_history_table), #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  #main_column:has(#import_history_table), #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+  #main_column > #import_history_table {
+    position: static !important; float: none !important; width: 100% !important;
+    margin-top: 16px !important;
+  }
+  #main_column:has(#left_toc) > #left_toc,
+  #main_column:has(#left_toc) > #content_column {
+    float: none !important; width: 100% !important; max-width: 100% !important;
+    margin-right: 0 !important; box-sizing: border-box !important;
+  }
+}
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -9243,8 +9462,8 @@ html, body, textarea, .description, .pin-ac .bd {
    composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
    :focus-visible stay at the tail, where they still beat the element+class rules
    above, so hover and visited behaviour is unchanged. */
-a:hover { color: var(--pinboard-link-hover) !important; }
-a:visited { color: var(--pinboard-link-visited) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):hover { color: var(--pinboard-link-hover) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
@@ -9271,7 +9490,7 @@ pre {
 /* ---- blog.pinboard.in sidebar ---- */
 /* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
    Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
-   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
    Keep its native 20px padding. */
 #right_column {
   background: var(--pinboard-bg-surface) !important;
@@ -9387,6 +9606,7 @@ a.help { background: #e6e9ef !important; }
   --pinboard-on-accent: #1e1e2e;
   --pinboard-on-link-hover: #1e1e2e;
   --pinboard-scrollbar-thumb: #a6adc8;
+  --pinboard-anchor-fg: #89b4fa;
   --pinboard-star-fg: #787b97;
   --pinboard-bundle-edit-hover: #89b4fa;
   --pinboard-table-destroy-hover: #f38ba8;
@@ -9549,9 +9769,9 @@ body { color-scheme: dark !important; }
    escape exactly this.) Emitting it first lets every later intent rule win its own
    tie, with no specificity change — so the pilot overrides appended last still beat
    the composer, which is what keeps a.url_display on each pilot own shipped colour.
-   Do NOT drop a:link or wrap this in :where(): that lowers the fallback below
-   (0,1,1) and revives the dead bare-a overrides two pilots still carry. */
-a, a:link { color: var(--pinboard-accent) !important; }
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)) { color: var(--pinboard-anchor-fg) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):link { color: var(--pinboard-accent) !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -9894,6 +10114,27 @@ body .api_token { color: var(--pinboard-fg) !important; }
 #main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
 #main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
+/* These desktop-only placements must yield before their combined 1030px
+   columns exceed the viewport. Scope to these pages, leaving list layouts alone. */
+@media (max-width: 1100px) {
+  #content:has(#import_history_table), #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  #main_column:has(#import_history_table), #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+  #main_column > #import_history_table {
+    position: static !important; float: none !important; width: 100% !important;
+    margin-top: 16px !important;
+  }
+  #main_column:has(#left_toc) > #left_toc,
+  #main_column:has(#left_toc) > #content_column {
+    float: none !important; width: 100% !important; max-width: 100% !important;
+    margin-right: 0 !important; box-sizing: border-box !important;
+  }
+}
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -10160,8 +10401,8 @@ html, body, textarea, .description, .pin-ac .bd {
    composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
    :focus-visible stay at the tail, where they still beat the element+class rules
    above, so hover and visited behaviour is unchanged. */
-a:hover { color: var(--pinboard-link-hover) !important; }
-a:visited { color: var(--pinboard-link-visited) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):hover { color: var(--pinboard-link-hover) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
@@ -10188,7 +10429,7 @@ pre {
 /* ---- blog.pinboard.in sidebar ---- */
 /* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
    Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
-   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
    Keep its native 20px padding. */
 #right_column {
   background: var(--pinboard-bg-surface) !important;
@@ -10317,6 +10558,7 @@ h2 { color: #cba6f7 !important; }`
   --pinboard-on-accent: #282828;
   --pinboard-on-link-hover: #282828;
   --pinboard-scrollbar-thumb: #b0a390;
+  --pinboard-anchor-fg: #89a99d;
   --pinboard-star-fg: #8c8079;
   --pinboard-bundle-edit-hover: #a1bab1;
   --pinboard-table-destroy-hover: #fd9a8e;
@@ -10479,9 +10721,9 @@ body { color-scheme: dark !important; }
    escape exactly this.) Emitting it first lets every later intent rule win its own
    tie, with no specificity change — so the pilot overrides appended last still beat
    the composer, which is what keeps a.url_display on each pilot own shipped colour.
-   Do NOT drop a:link or wrap this in :where(): that lowers the fallback below
-   (0,1,1) and revives the dead bare-a overrides two pilots still carry. */
-a, a:link { color: var(--pinboard-accent) !important; }
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)) { color: var(--pinboard-anchor-fg) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):link { color: var(--pinboard-accent) !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -10824,6 +11066,27 @@ body .api_token { color: var(--pinboard-fg) !important; }
 #main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
 #main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
+/* These desktop-only placements must yield before their combined 1030px
+   columns exceed the viewport. Scope to these pages, leaving list layouts alone. */
+@media (max-width: 1100px) {
+  #content:has(#import_history_table), #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  #main_column:has(#import_history_table), #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+  #main_column > #import_history_table {
+    position: static !important; float: none !important; width: 100% !important;
+    margin-top: 16px !important;
+  }
+  #main_column:has(#left_toc) > #left_toc,
+  #main_column:has(#left_toc) > #content_column {
+    float: none !important; width: 100% !important; max-width: 100% !important;
+    margin-right: 0 !important; box-sizing: border-box !important;
+  }
+}
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -11090,8 +11353,8 @@ html, body, textarea, .description, .pin-ac .bd {
    composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
    :focus-visible stay at the tail, where they still beat the element+class rules
    above, so hover and visited behaviour is unchanged. */
-a:hover { color: var(--pinboard-link-hover) !important; }
-a:visited { color: var(--pinboard-link-visited) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):hover { color: var(--pinboard-link-hover) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
@@ -11118,7 +11381,7 @@ pre {
 /* ---- blog.pinboard.in sidebar ---- */
 /* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
    Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
-   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
    Keep its native 20px padding. */
 #right_column {
   background: var(--pinboard-bg-surface) !important;
@@ -11239,6 +11502,7 @@ h2 { color: #d3869b !important; }
   --pinboard-on-accent: #191724;
   --pinboard-on-link-hover: #191724;
   --pinboard-scrollbar-thumb: #908caa;
+  --pinboard-anchor-fg: #c4a7e7;
   --pinboard-star-fg: #7b74ab;
   --pinboard-bundle-edit-hover: #c4a7e7;
   --pinboard-table-destroy-hover: #eb6f92;
@@ -11401,9 +11665,9 @@ body { color-scheme: dark !important; }
    escape exactly this.) Emitting it first lets every later intent rule win its own
    tie, with no specificity change — so the pilot overrides appended last still beat
    the composer, which is what keeps a.url_display on each pilot own shipped colour.
-   Do NOT drop a:link or wrap this in :where(): that lowers the fallback below
-   (0,1,1) and revives the dead bare-a overrides two pilots still carry. */
-a, a:link { color: var(--pinboard-accent) !important; }
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)) { color: var(--pinboard-anchor-fg) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):link { color: var(--pinboard-accent) !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -11746,6 +12010,27 @@ body .api_token { color: var(--pinboard-fg) !important; }
 #main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
 #main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
+/* These desktop-only placements must yield before their combined 1030px
+   columns exceed the viewport. Scope to these pages, leaving list layouts alone. */
+@media (max-width: 1100px) {
+  #content:has(#import_history_table), #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  #main_column:has(#import_history_table), #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+  #main_column > #import_history_table {
+    position: static !important; float: none !important; width: 100% !important;
+    margin-top: 16px !important;
+  }
+  #main_column:has(#left_toc) > #left_toc,
+  #main_column:has(#left_toc) > #content_column {
+    float: none !important; width: 100% !important; max-width: 100% !important;
+    margin-right: 0 !important; box-sizing: border-box !important;
+  }
+}
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -12012,8 +12297,8 @@ html, body, textarea, .description, .pin-ac .bd {
    composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
    :focus-visible stay at the tail, where they still beat the element+class rules
    above, so hover and visited behaviour is unchanged. */
-a:hover { color: var(--pinboard-link-hover) !important; }
-a:visited { color: var(--pinboard-link-visited) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):hover { color: var(--pinboard-link-hover) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
@@ -12040,7 +12325,7 @@ pre {
 /* ---- blog.pinboard.in sidebar ---- */
 /* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
    Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
-   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
    Keep its native 20px padding. */
 #right_column {
   background: var(--pinboard-bg-surface) !important;
@@ -12169,6 +12454,7 @@ h2 { color: #ebbcba !important; }`
   --pinboard-on-accent: #ffffff;
   --pinboard-on-link-hover: #ffffff;
   --pinboard-scrollbar-thumb: #656d76;
+  --pinboard-anchor-fg: #0969da;
   --pinboard-star-fg: #7c90a3;
   --pinboard-bundle-edit-hover: #0964d0;
   --pinboard-table-destroy-hover: #cf222e;
@@ -12331,9 +12617,9 @@ body { color-scheme: light !important; }
    escape exactly this.) Emitting it first lets every later intent rule win its own
    tie, with no specificity change — so the pilot overrides appended last still beat
    the composer, which is what keeps a.url_display on each pilot own shipped colour.
-   Do NOT drop a:link or wrap this in :where(): that lowers the fallback below
-   (0,1,1) and revives the dead bare-a overrides two pilots still carry. */
-a, a:link { color: var(--pinboard-accent) !important; }
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)) { color: var(--pinboard-anchor-fg) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):link { color: var(--pinboard-accent) !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: var(--pinboard-bg-surface) !important; border-color: var(--pinboard-border) !important; max-width: 1030px !important; box-sizing: border-box !important; }
@@ -12676,6 +12962,27 @@ body .api_token { color: var(--pinboard-fg) !important; }
 #main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
 #main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
+/* These desktop-only placements must yield before their combined 1030px
+   columns exceed the viewport. Scope to these pages, leaving list layouts alone. */
+@media (max-width: 1100px) {
+  #content:has(#import_history_table), #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  #main_column:has(#import_history_table), #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+  #main_column > #import_history_table {
+    position: static !important; float: none !important; width: 100% !important;
+    margin-top: 16px !important;
+  }
+  #main_column:has(#left_toc) > #left_toc,
+  #main_column:has(#left_toc) > #content_column {
+    float: none !important; width: 100% !important; max-width: 100% !important;
+    margin-right: 0 !important; box-sizing: border-box !important;
+  }
+}
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: var(--pinboard-bg-surface) !important;
@@ -12942,8 +13249,8 @@ html, body, textarea, .description, .pin-ac .bd {
    composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
    :focus-visible stay at the tail, where they still beat the element+class rules
    above, so hover and visited behaviour is unchanged. */
-a:hover { color: var(--pinboard-link-hover) !important; }
-a:visited { color: var(--pinboard-link-visited) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):hover { color: var(--pinboard-link-hover) !important; }
+a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a)):visited { color: var(--pinboard-link-visited) !important; }
 a:focus-visible { outline: 2px solid var(--pinboard-focus-ring) !important; outline-offset: 2px !important; }
 h2 { color: var(--pinboard-muted) !important; }
 hr { border-color: var(--pinboard-border) !important; }
@@ -12970,7 +13277,7 @@ pre {
 /* ---- blog.pinboard.in sidebar ---- */
 /* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
    Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
-   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
    Keep its native 20px padding. */
 #right_column {
   background: var(--pinboard-bg-surface) !important;

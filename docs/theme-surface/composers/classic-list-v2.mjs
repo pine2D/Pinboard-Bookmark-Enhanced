@@ -45,6 +45,9 @@ function emit(tokens) {
   const sizeSm = tokens.typo?.["size-sm"] || sizeBase;
   const sizeXs = tokens.typo?.["size-xs"] || sizeSm;
   const sizeLg = tokens.typo?.["size-lg"] || sizeBase;
+  // The widget preview's inline colors are the product being configured.
+  // :where keeps the exclusion specificity-neutral for existing intent rules.
+  const anchor = 'a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a))';
 
   return `
 /* === composer: classic-list-v2 — canonical surface inventory === */
@@ -88,9 +91,9 @@ body { color-scheme: ${schemeFor(tokens)} !important; }
    escape exactly this.) Emitting it first lets every later intent rule win its own
    tie, with no specificity change — so the pilot overrides appended last still beat
    the composer, which is what keeps a.url_display on each pilot own shipped colour.
-   Do NOT drop a:link or wrap this in :where(): that lowers the fallback below
-   (0,1,1) and revives the dead bare-a overrides two pilots still carry. */
-a, a:link { color: ${v("accent")} !important; }
+   Keep a:link at (0,1,1); only the preview exclusion belongs in :where(). */
+${anchor} { color: ${v("anchor-fg")} !important; }
+${anchor}:link { color: ${v("accent")} !important; }
 
 /* ---- Banner & navigation ---- */
 #banner { background: ${v("bg-surface")} !important; border-color: ${v("border")} !important; ${maxWidth && maxWidth !== "none" ? `max-width: ${maxWidth} !important; box-sizing: border-box !important;` : ""} }
@@ -435,6 +438,27 @@ body .api_token { color: ${v("fg")} !important; }
 #main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
 #main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
 
+/* These desktop-only placements must yield before their combined 1030px
+   columns exceed the viewport. Scope to these pages, leaving list layouts alone. */
+@media (max-width: 1100px) {
+  #content:has(#import_history_table), #content:has(#left_toc) {
+    width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
+  }
+  #main_column:has(#import_history_table), #main_column:has(#left_toc) {
+    width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
+    float: none !important; box-sizing: border-box !important;
+  }
+  #main_column > #import_history_table {
+    position: static !important; float: none !important; width: 100% !important;
+    margin-top: 16px !important;
+  }
+  #main_column:has(#left_toc) > #left_toc,
+  #main_column:has(#left_toc) > #content_column {
+    float: none !important; width: 100% !important; max-width: 100% !important;
+    margin-right: 0 !important; box-sizing: border-box !important;
+  }
+}
+
 /* ---- Profile page ---- */
 .service_box, .help_box {
   background: ${v("bg-surface")} !important;
@@ -701,8 +725,8 @@ html, body, textarea, .description, .pin-ac .bd {
    composer (see "Global anchor rest-colour fallback"). Only :hover / :visited /
    :focus-visible stay at the tail, where they still beat the element+class rules
    above, so hover and visited behaviour is unchanged. */
-a:hover { color: ${v("link-hover")} !important; }
-a:visited { color: ${v("link-visited")} !important; }
+${anchor}:hover { color: ${v("link-hover")} !important; }
+${anchor}:visited { color: ${v("link-visited")} !important; }
 a:focus-visible { outline: 2px solid ${v("focus-ring")} !important; outline-offset: 2px !important; }
 h2 { color: ${v("muted")} !important; }
 hr { border-color: ${v("border")} !important; }
@@ -729,7 +753,7 @@ pre {
 /* ---- blog.pinboard.in sidebar ---- */
 /* #right_column has a hardcoded #ffffcc background — themed light text on yellow is unreadable.
    Theme it as a panel; its text/links already inherit themed fg/accent via body#pinboard + bare a.
-   #right_column is blog-only (distinct from #right_bar / #note_right_column / #profile_right_column).
+   #right_column is shared by blog and widget pages (distinct from #right_bar).
    Keep its native 20px padding. */
 #right_column {
   background: ${v("bg-surface")} !important;
