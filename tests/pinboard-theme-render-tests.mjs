@@ -26,6 +26,48 @@ try {
   async function fixture(name) {
     await page.evaluate(name => {
       document.getElementById('content').replaceChildren(document.querySelector('template#' + name).content.cloneNode(true));
+      // Real native structures, synthetic content. Stress size and wrapping;
+      // these inputs must not be derived from the theme's CSS or token values.
+      if (name === 'tag-list') {
+        document.querySelectorAll('.tag_table tbody').forEach((body, column) => {
+          for (let i = 0; i < 508; i++) {
+            const cell = body.insertRow().insertCell();
+            cell.setAttribute('width', '138'); cell.style.overflow = 'hidden';
+            const link = document.createElement('a'); link.className = 'tag'; link.href = '#tag';
+            link.textContent = `${column ? 'topic' : 'archive'}-${i}` + (i % 97 === 0 ? '-long-unbroken-标签名称'.repeat(3) : '');
+            link.style.fontSize = i % 17 === 0 ? '110%' : '100%';
+            cell.append(link);
+          }
+        });
+      }
+      if (name === 'toc-layout') {
+        const list = document.querySelector('#left_toc ul');
+        for (let i = 0; i < 65; i++) {
+          const li = document.createElement('li'), link = document.createElement('a');
+          link.href = '#answer'; link.textContent = `How do I manage my saved bookmarks and tags? (${i + 1})`;
+          li.append(link); list.append(li);
+        }
+      }
+      if (name === 'bundle-density') {
+        const body = document.querySelector('form[name="sort"] tbody');
+        for (let i = 0; i < 16; i++) {
+          const row = body.insertRow();
+          const input = document.createElement('input'); input.name = `id_${i}`; input.type = 'text'; input.value = String(i + 1);
+          input.style.cssText = 'border:1px dotted #bbb;width:20px;margin-right:10px';
+          row.insertCell().append(input);
+          const nameCell = row.insertCell(); nameCell.setAttribute('style', 'text-align:right');
+          const bundle = document.createElement('a'); bundle.className = 'bundle'; bundle.href = '#bundle';
+          bundle.textContent = ['Main topic classifications', 'archive_reference_collection_2026', 'Reading'][i % 3]; nameCell.append(bundle);
+          const tags = row.insertCell();
+          for (let j = 0; j < [1, 6, 12, 4][i % 4]; j++) {
+            const link = document.createElement('a'); link.className = 'tag'; link.href = '#tag';
+            link.textContent = ['agriculture', 'cooking', 'literature', 'technology'][j % 4]; tags.append(link, ' ');
+          }
+          const edit = document.createElement('a'); edit.className = 'edit'; edit.href = '#edit'; edit.textContent = 'edit'; row.insertCell().append(edit);
+          const destroy = document.createElement('a'); destroy.className = 'destroy'; destroy.href = '#delete'; destroy.textContent = 'delete';
+          const actions = row.insertCell(); actions.setAttribute('width', '100'); actions.append(destroy);
+        }
+      }
     }, name);
     await page.mouse.move(1400, 950);
   }
@@ -118,19 +160,56 @@ try {
       checks++;
       if (size < 11) failures.push(`${key} tag navigation text shrank to ${size}px`);
     }
+    await fixture('tag-list');
+    const tagLayout = await page.evaluate(() => {
+      const columns = [...document.querySelectorAll('.tag_table')].map(n => n.getBoundingClientRect().toJSON());
+      const clipped = [...document.querySelectorAll('.tag_table td')].filter(n => n.scrollWidth > n.clientWidth + 1).length;
+      return { columns, clipped, count: document.querySelectorAll('.tag_table a.tag').length };
+    });
+    checks++;
+    if (tagLayout.count !== 1016 || Math.abs(tagLayout.columns[0].y - tagLayout.columns[1].y) > 1 || tagLayout.columns[1].x < tagLayout.columns[0].right || tagLayout.clipped) {
+      failures.push(`${key} tag list loses columns or clips labels: ${JSON.stringify(tagLayout)}`);
+    }
+    await fixture('tag-cloud');
+    const cloud = await page.locator('#tag_cloud a.tag').evaluateAll(nodes => nodes.map(n => ({ size: parseFloat(getComputedStyle(n).fontSize), display: getComputedStyle(n).display })));
+    checks++;
+    if (cloud.some(n => n.display !== 'inline') || cloud[1].size / cloud[0].size < 2) failures.push(`${key} frequency-sized inline cloud was flattened`);
+    await fixture('bundle-density');
+    const bundleLayout = await page.evaluate(() => {
+      const table = document.querySelector('form[name="sort"] > table');
+      const style = document.getElementById('theme-under-test'), css = style.textContent;
+      // Compare native table geometry in the SAME font family: a monospace
+      // theme naturally wraps sooner than native Arial. No theme spacing,
+      // widths or line-height rules are used to construct the reference.
+      const family = getComputedStyle(table.querySelector('td')).fontFamily;
+      style.textContent = ''; document.body.style.fontFamily = family;
+      const native = table.getBoundingClientRect().toJSON();
+      document.body.style.fontFamily = ''; style.textContent = css;
+      return { native, themed: table.getBoundingClientRect().toJSON() };
+    });
+    checks++;
+    if (bundleLayout.themed.width < bundleLayout.native.width - 1 || bundleLayout.themed.height > bundleLayout.native.height * 1.35) failures.push(`${key} bundle density: ${JSON.stringify(bundleLayout)}`);
     for (const name of ['import-layout', 'toc-layout']) {
       await fixture(name);
-      for (const width of [390, 768, 1024, 1440]) {
+      for (const width of [390, 641, 768, 1024, 1080, 1440]) {
         await page.setViewportSize({ width, height: 1000 });
         const layout = await page.evaluate(() => {
           const rect = id => { const r = document.getElementById(id).getBoundingClientRect(); return { x: r.x, right: r.right, y: r.y, bottom: r.bottom }; };
           const history = document.getElementById('import_history_table');
-          return { width: document.documentElement.scrollWidth, first: rect(history ? 'settings_panel' : 'left_toc'), second: rect(history ? 'import_history_table' : 'content_column') };
+          const image = document.querySelector('#content_column img');
+          const imageStyle = image && getComputedStyle(image);
+          const imageRatio = image && (image.getBoundingClientRect().width - parseFloat(imageStyle.borderLeftWidth) - parseFloat(imageStyle.borderRightWidth)) / (image.getBoundingClientRect().height - parseFloat(imageStyle.borderTopWidth) - parseFloat(imageStyle.borderBottomWidth));
+          return { width: document.documentElement.scrollWidth, firstVisible: (history || document.getElementById('left_toc')).checkVisibility(), first: rect(history ? 'settings_panel' : 'left_toc'), second: rect(history ? 'import_history_table' : 'content_column'), imageRatio };
         });
         checks++;
-        if (width < 1100) {
-          if (layout.width > width || layout.second.right > width || layout.second.y < layout.first.bottom) failures.push(`${key} ${name}@${width}: narrow columns overflow or overlap ${JSON.stringify(layout)}`);
-        } else if (layout.second.x < layout.first.right) failures.push(`${key} ${name}: desktop columns no longer side by side`);
+        if (layout.width > width || layout.second.right > width) failures.push(`${key} ${name}@${width}: horizontal overflow ${JSON.stringify(layout)}`);
+        if (name === 'toc-layout') {
+          if (layout.second.y > 100 || (width > 640 && (!layout.firstVisible || layout.second.x < layout.first.right))) failures.push(`${key} TOC blocks the article@${width}: ${JSON.stringify(layout)}`);
+          if (width <= 640 && layout.firstVisible) failures.push(`${key} native phone TOC visibility changed`);
+          if (Math.abs(layout.imageRatio - 2) > .02) failures.push(`${key} tour image lost its aspect ratio@${width}`);
+        } else if (width >= 1080) {
+          if (layout.second.x < layout.first.right || layout.second.y > 100) failures.push(`${key} import history moved below a form that fits@${width}: ${JSON.stringify(layout)}`);
+        } else if (layout.second.y < layout.first.bottom) failures.push(`${key} narrow import columns overlap@${width}: ${JSON.stringify(layout)}`);
       }
     }
     await page.setViewportSize({ width: 1440, height: 1000 });

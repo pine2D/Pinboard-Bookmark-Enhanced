@@ -6,8 +6,9 @@
      no account data, server scripts or external resources belong in this file. -->
 <style>
   body { margin: 8px; color: #000; background: #fff; font: 13px Arial, sans-serif; }
-  #content { width: 1050px; }
+  #content { width: 1050px; margin: auto; padding-left: 10px; }
   #main_column { width: 700px; position: relative; }
+  td { font-size: 13px; }
   blockquote { color: #224477; }
   .tagNode { padding: 3px; background: #fec; }
   .tagSelected { background: #fa9; border: 1px dotted #a82; padding: 2px; }
@@ -27,11 +28,19 @@
   #sub_banner a.selected { background: #ffff77; }
   .star { color: #ddd; }
   #tag_cloud_header { font-size: 11px; }
+  #right_bar { float: left; margin-left: 10px; width: 320px; }
+  #tag_cloud { float: left; width: 350px; text-align: justify; line-height: 110%; margin-top: 20px; }
+  #tag_cloud table { line-height: 100%; }
+  .tag_table { float: left; margin-right: 10px; }
   #settings_panel { margin-top: 1em; }
   #import_history_table { float: left; padding: 5px; border: 1px solid #ccc; }
-  #left_toc { float: left; width: 220px; margin-right: 20px; }
+  #left_toc { float: left; max-width: 220px; margin-right: 20px; }
   #content_column { float: left; min-width: 200px; width: 70%; }
   @media (max-width: 1100px) { #content { width: auto; } }
+  @media (max-width: 640px) {
+    #left_toc, #right_bar { display: none; }
+    #content_column { width: 90%; padding: 1em; }
+  }
 </style>
 <body id="pinboard">
 <div id="content"></div>
@@ -85,11 +94,23 @@
 <template id="tag-nav">
   <div id="tag_cloud"><div id="tag_cloud_header"><p><a href="?mode=cloud">top tags</a> <a href="?mode=list&amp;floor=1" class="tag_heading_selected">all tags</a> · <a href="?mode=list&amp;floor=2">2</a> · <a href="?mode=list&amp;floor=20">20</a> · <a href="/tags/">manage</a></p></div></div>
 </template>
+<template id="tag-list">
+  <div id="right_bar"><div id="tag_cloud"><div id="tag_cloud_header"><p>top tags · all tags · 2 · 5 · 10 · 20</p></div>
+    <div class="tag_table"><table border="0" cellpadding="0" width="140" cellspacing="0"><tbody></tbody></table></div>
+    <div class="tag_table"><table border="0" cellpadding="0" width="140" cellspacing="0"><tbody></tbody></table></div>
+  </div></div>
+</template>
+<template id="tag-cloud">
+  <div id="right_bar"><div id="tag_cloud"><a href="#small" class="tag" style="font-size:80%">small</a> <a href="#large" class="tag" style="font-size:180%">large</a> <a href="#medium" class="tag" style="font-size:100%">medium</a></div></div>
+</template>
+<template id="bundle-density">
+  <div id="main_column" style="float:left;width:690px"><p>Drag bundles to reorder, or edit their position.</p><form name="sort"><table style="width:830px"><tbody></tbody></table></form></div>
+</template>
 <template id="import-layout">
-  <div id="main_column"><div id="settings_panel"><h2>Import bookmarks</h2><p>Choose a bookmarks file.</p><input type="file"></div><table id="import_history_table"><caption>Import history</caption><tr><td>2026-10-22</td><td>Completed</td></tr></table></div>
+  <div id="main_column"><div id="settings_panel"><h2>Import bookmarks</h2><p>Choose a bookmarks file.</p><input type="file"><div id="settings_tab_panes" style="min-height:1100px"><p>Import options and instructions</p></div></div><table id="import_history_table"><caption>Import history</caption><tr><td>2026-10-22</td><td>Completed</td></tr></table></div>
 </template>
 <template id="toc-layout">
-  <div id="main_column"><div id="left_toc"><ul><li><a href="#answer">Contents</a></li></ul></div><div id="content_column"><h2 id="answer">Frequently asked questions</h2><p>A readable answer with room to wrap across a narrow window.</p></div></div>
+  <div id="main_column"><div id="left_toc"><ul></ul></div><div id="content_column"><h2 id="answer">Frequently asked questions</h2><p>A readable answer with room to wrap across a narrow window.</p><p><img alt="Tour example" width="600" height="300" style="border:2px solid #aaa" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='300'%3E%3C/svg%3E"></p><p><img alt="Indented tour example" width="400" height="200" style="margin-left:34px" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3C/svg%3E"></p></div><div style="clear:both"></div></div>
 </template>
 <template id="widget">
   <form action="/widgets/tag_cloud"><label>Start color <input name="start_color" value="a26131"></label></form>

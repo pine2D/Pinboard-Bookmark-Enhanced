@@ -271,6 +271,12 @@ a.delete, a.destroy { color: ${v("destroy")} !important; }
 
 /* ---- Tag cloud ---- */
 #tag_cloud { max-width: 100% !important; overflow-wrap: break-word !important; }
+/* Native list mode has two floated .tag_table wrappers. Sidebar padding must
+   not push the second table below hundreds of tags in the first. Constrain
+   those tables only; cloud mode keeps its inline, frequency-sized links. */
+#tag_cloud .tag_table { width: 50% !important; margin-right: 0 !important; padding-right: 10px !important; box-sizing: border-box !important; }
+#tag_cloud .tag_table table { width: 100% !important; table-layout: fixed !important; }
+#tag_cloud .tag_table td { width: auto !important; overflow-wrap: anywhere !important; }
 #tag_cloud a:not(.tag) { color: ${v("accent")} !important; }
 #tag_cloud a:not(.tag):hover { color: ${v("link-hover")} !important; }
 #tag_cloud_header a:not(.tag), a.tag_heading_selected { color: ${v("muted-soft")} !important; }
@@ -413,15 +419,19 @@ body .api_token { color: ${v("fg")} !important; }
 #settings_tab_panes { border: none !important; }
 #settings_tab_panes table td { color: ${v("fg")} !important; }
 
-/* /settings/import nests #import_history_table as a sibling BELOW the 700px #settings_panel,
-   leaving it orphaned and narrow. Same gutter trick as #right_bar: absolutely position it into
-   the right gutter as a themed sidebar panel. #import_history_table only exists on this page. */
+/* Import form + history need 700 + 10 + 320px. Wrap according to the available
+   column width, not an early viewport breakpoint that hides history below a
+   long form even when both columns still fit. */
+#main_column:has(> #import_history_table) {
+  display: flex !important; flex-wrap: wrap !important; align-items: flex-start !important;
+  column-gap: 10px !important; width: 1030px !important; max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+#main_column:has(> #import_history_table) > #settings_panel { flex: 1 1 700px !important; min-width: 0 !important; box-sizing: border-box !important; }
 #main_column > #import_history_table {
-  position: absolute !important;
-  top: 13px !important; /* 13px = #settings_panel margin-top, aligns top edges */
-  left: 710px !important;
-  width: 320px !important;
-  margin: 0 !important;
+  position: static !important; float: none !important;
+  flex: 1 1 320px !important; width: 320px !important; max-width: 100% !important;
+  margin: 13px 0 0 !important;
   box-sizing: border-box !important;
   background: ${v("bg-surface")} !important;
   border: ${v("border-width")} ${v("border-style")} ${v("border")} !important;
@@ -431,15 +441,20 @@ body .api_token { color: ${v("fg")} !important; }
 #main_column > #import_history_table td { color: ${v("fg")} !important; padding: 2px 6px !important; }
 
 /* ---- Doc pages with a left TOC (/faq/, /tour/, ...) ---- */
-/* #left_toc(220) + #content_column(490 native) + 20px gap = 730 > the 700px #main_column → content
-   wraps BELOW the tall TOC although #content is 1050px. Widen #main_column to fill #content and
-   stretch #content_column to use the freed space so they sit side by side. :has scopes BOTH to TOC
-   pages — /security/ (no #left_toc) keeps the native 490px column. */
-#main_column:has(#left_toc) { width: 1030px !important; max-width: 1030px !important; }
-#main_column:has(#left_toc) > #content_column { width: 780px !important; max-width: 780px !important; }
+/* Keep a long TOC beside the article as the content column shrinks. Native
+   phone CSS hides the TOC at 640px; do not turn it into a full-width preamble.
+   Pages without a TOC retain their native content column. */
+#main_column:has(#left_toc) { display: flex !important; align-items: flex-start !important; width: 1030px !important; max-width: 100% !important; }
+#main_column:has(#left_toc) > #left_toc { flex: 0 1 auto !important; min-width: 0 !important; overflow-wrap: anywhere !important; }
+#main_column:has(#left_toc) > #content_column { flex: 1 1 780px !important; width: auto !important; min-width: 0 !important; max-width: 780px !important; box-sizing: border-box !important; }
+#main_column:has(#left_toc) > #content_column img { max-width: 100% !important; height: auto !important; box-sizing: border-box !important; }
+/* The native Tour screenshot's 34px indent sits outside its border box.
+   Include it in the width budget, including just above the phone breakpoint
+   when the TOC reappears, while preserving the original image alignment. */
+#main_column:has(#left_toc) > #content_column img[style*="margin-left:34px"],
+#main_column:has(#left_toc) > #content_column img[style*="margin-left: 34px"] { max-width: calc(100% - 34px) !important; }
 
-/* These desktop-only placements must yield before their combined 1030px
-   columns exceed the viewport. Scope to these pages, leaving list layouts alone. */
+/* Let these page containers shrink without forcing their children to stack. */
 @media (max-width: 1100px) {
   #content:has(#import_history_table), #content:has(#left_toc) {
     width: auto !important; max-width: 100% !important; box-sizing: border-box !important;
@@ -447,15 +462,6 @@ body .api_token { color: ${v("fg")} !important; }
   #main_column:has(#import_history_table), #main_column:has(#left_toc) {
     width: 100% !important; max-width: 100% !important; margin-left: 0 !important;
     float: none !important; box-sizing: border-box !important;
-  }
-  #main_column > #import_history_table {
-    position: static !important; float: none !important; width: 100% !important;
-    margin-top: 16px !important;
-  }
-  #main_column:has(#left_toc) > #left_toc,
-  #main_column:has(#left_toc) > #content_column {
-    float: none !important; width: 100% !important; max-width: 100% !important;
-    margin-right: 0 !important; box-sizing: border-box !important;
   }
 }
 
@@ -496,19 +502,24 @@ blockquote.note { color: ${v("fg")} !important; }
 .rss_link, .rss_linkbox a { color: ${v("muted-soft")} !important; }
 
 /* ---- Bundles (P4-table) — /u/<user>/bundles/ ---- */
-#main_column form[name="sort"] > table { width: 100% !important; max-width: 880px !important; border-collapse: separate !important; border-spacing: 0 4px !important; margin-top: 8px !important; }
+/* Native table is 830px inside a 690px wrapper. Give it that room instead of
+   squeezing every bundle's tags into extra rows, and retain table density. */
+#main_column:has(> form[name="sort"]) { width: 830px !important; max-width: 100% !important; }
+#main_column form[name="sort"] > table { width: 100% !important; max-width: 830px !important; border-collapse: separate !important; border-spacing: 0 2px !important; margin-top: 8px !important; }
 #main_column form[name="sort"] table tr { background: transparent !important; border-radius: ${v("radius-md")} !important; }
 #main_column form[name="sort"] table tr:hover { background: ${v("bundle-row-hover")} !important; }
-#main_column form[name="sort"] table td { padding: 6px 10px !important; vertical-align: middle !important; border: none !important; }
-#main_column form[name="sort"] table td[style*="text-align:right"] { min-width: 160px !important; padding-right: 14px !important; white-space: nowrap !important; }
+#main_column form[name="sort"] table td { padding: 1px 4px !important; line-height: normal !important; vertical-align: middle !important; border: none !important; }
+/* Reserve room for names as well as tags: intrinsic sizing alone can squeeze
+   long names into several lines, especially in monospace themes. */
+#main_column form[name="sort"] table td[style*="text-align:right"] { width: 20% !important; white-space: normal !important; overflow-wrap: anywhere !important; }
 #main_column form[name="sort"] table input[name^="id_"] {
   border: ${v("border-width")} ${v("border-style")} ${v("border")} !important;
   background: ${v("input-bg")} !important;
   color: ${v("fg")} !important;
-  width: 38px !important;
-  min-width: 38px !important;
-  max-width: 38px !important;
-  padding: 3px 4px !important;
+  width: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
+  padding: 2px !important;
   margin-right: 10px !important;
   font-size: 12px !important;
   line-height: 1.2 !important;
