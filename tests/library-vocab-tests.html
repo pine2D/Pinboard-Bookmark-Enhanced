@@ -383,7 +383,8 @@ check("a list of one row has nothing to multi-select: no hint",
     pbpLibSyncSelectHint($id("vocab-select-hint"), 2, 1); return none; })());
 // Mac strings (critique round 5): Ctrl-click is the context menu there, so
 // every place that names the mouse chord swaps to its Mac key -- the hint,
-// the Select all titles and the shortcut panel line -- and nothing else.
+// the Select all titles and the shortcut panel's Ctrl key cap -- and nothing
+// else.
 check("on a Mac every Ctrl-click wording swaps to its Cmd key, attributes of both kinds, unrelated keys untouched",
   (() => {
     const box = document.createElement("div");
@@ -391,7 +392,7 @@ check("on a Mac every Ctrl-click wording swaps to its Cmd key, attributes of bot
       '<dd data-i18n="libraryKeysAdd"></dd><dd data-i18n="libraryKeysRange"></dd><kbd data-i18n="libraryKeyCtrl"></kbd>';
     pbpLibUseMacStrings(box);
     const keys = [...box.children].map((el) => `${el.getAttribute("data-i18n")}/${el.getAttribute("data-i18n-title") || ""}`).join(" ");
-    return keys === "vocabSelectHintMac/ vocabSelectAll/vocabSelectHintMac libraryKeysAddMac/ libraryKeysRange/ libraryKeyCtrl/";
+    return keys === "vocabSelectHintMac/ vocabSelectAll/vocabSelectHintMac libraryKeysAdd/ libraryKeysRange/ libraryKeyCmd/";
   })());
 check("the empty index carries a short line beside the cover and the whole sentence for the single-pane layout",
   (() => { const prev = _vocabRows; _vocabRows = []; _pbpVocabRenderList(); const e = $id("vocab-empty");
@@ -856,8 +857,8 @@ check("every row is a grid row that reports its own selected state",
   renderedCards.every((card) => card.getAttribute("role") === "row" &&
     card.getAttribute("aria-selected") === "false" &&
     card.querySelector('.notes-card-top[role="gridcell"]')));
-check("the row head advertises its selection keyboard shortcuts",
-  renderedHeads.every((head) => head.getAttribute("aria-keyshortcuts") === "Control+Space Shift+Space / K Delete Escape"));
+check("the row head advertises its keyboard shortcuts, and no multi-select chord (pointer-only since 2026-10-22)",
+  renderedHeads.every((head) => head.getAttribute("aria-keyshortcuts") === "/ K Delete Escape"));
 check("the per-row checkbox is gone from every rendered row",
   !$id("vocab-list").querySelector('input[type="checkbox"]'));
 const unknownLanguageRow = _pbpVocabBuildRow({
@@ -927,22 +928,22 @@ check("real Shift-click selects the complete current-view interval", _vocabSelec
 // case that has to DE-select.
 renderedHeads[0].dispatchEvent(new MouseEvent("click", { bubbles:true, cancelable:true, shiftKey:true }));
 check("Shift-click back over an already-selected range clears that range", _vocabSelected.size === 0);
-// Keyboard twins: Ctrl+Space toggles, Shift+Space spans -- and both suppress
-// the button's own Space activation so a row never activates while selecting.
+// Multi-select is pointer-only since 2026-10-22 (user ruling): a modified
+// Space selects nothing and is swallowed -- its synthesised click would carry
+// the modifier into the click handler -- while a plain Space stays the
+// button's own activation key.
 _pbpVocabClearSelection();
 _pbpVocabSyncSelectionUi();
 const ctrlSpace = new KeyboardEvent("keydown", { key:" ", ctrlKey:true, bubbles:true, cancelable:true });
 renderedHeads[0].dispatchEvent(ctrlSpace);
-check("Ctrl+Space selects the focused row and swallows the activation",
-  _vocabSelected.size === 1 && ctrlSpace.defaultPrevented);
 const shiftSpace = new KeyboardEvent("keydown", { key:" ", shiftKey:true, bubbles:true, cancelable:true });
 renderedHeads[2].dispatchEvent(shiftSpace);
-check("Shift+Space spans the interval from the keyboard",
-  _vocabSelected.size === 3 && shiftSpace.defaultPrevented);
+check("Ctrl+Space and Shift+Space select nothing and are swallowed",
+  _vocabSelected.size === 0 && ctrlSpace.defaultPrevented && shiftSpace.defaultPrevented);
 const plainSpace = new KeyboardEvent("keydown", { key:" ", bubbles:true, cancelable:true });
 renderedHeads[1].dispatchEvent(plainSpace);
 check("unmodified Space stays the button's own activation key",
-  _vocabSelected.size === 3 && !plainSpace.defaultPrevented);
+  _vocabSelected.size === 0 && !plainSpace.defaultPrevented);
 // A batch mutation owns the rows it is about to rewrite; the checkbox era
 // spelled this `checkbox.disabled`, which went away with the checkbox.
 _pbpVocabClearSelection();
@@ -2740,12 +2741,12 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     check("Home jumps back to the first row", document.activeElement === heads[0]);
     check("navigation keys are swallowed so the page does not scroll under them",
       press("ArrowDown") === false && press("ArrowUp") === false);
-    // Navigation must not have eaten the selection chords the row owns.
+    // A modified Space neither navigates nor selects (pointer-only selection).
     _pbpVocabClearSelection();
     heads[0].focus();
     press(" ", { ctrlKey: true });
-    check("a modified Space still selects the row rather than navigating",
-      _vocabSelected.size === 1 && document.activeElement === heads[0]);
+    check("a modified Space neither moves focus nor selects",
+      _vocabSelected.size === 0 && document.activeElement === heads[0]);
     // K89: "/" jumps from a focused row back to the search box, the same
     // gesture md-reader.js's "/" already offers inside the article.
     _pbpVocabClearSelection();
@@ -3044,6 +3045,25 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       await tick(60);
       check("on another layout the same physical key flips a known word back to learning",
         writes[writes.length - 1] === "kb2:new" && announced() === "vocabBatchLearningDoneOne:1", writes.join("|"));
+      // The list keys work from anywhere outside a text field (2026-10-22):
+      // with focus on <body>, a key is handed to the row the reading pane
+      // shows and replayed there.
+      head("kb2").closest(".vocab-card").setAttribute("aria-current", "true");
+      document.activeElement.blur();
+      key(document.body, "ArrowDown");
+      const fromBodyDown = document.activeElement === head("kb3");
+      head("kb3").blur();
+      const writesBeforeBodyK = writes.length;
+      key(document.body, "k");
+      await tick(60);
+      check("from outside the list, ArrowDown and K act on the row the reading pane shows",
+        fromBodyDown && writes.length === writesBeforeBodyK + 1 && writes[writes.length - 1] === "kb2:new",
+        `${fromBodyDown} ${writes.join("|")}`);
+      const search = $id("vocab-search");
+      search.focus();
+      const typed = key(search, "k");
+      check("inside a text field the list keys stay the field's own", typed === true && document.activeElement === search);
+      search.blur();
       const before = writes.length;
       key(head("kb1"), "k", { ctrlKey: true });
       await tick();

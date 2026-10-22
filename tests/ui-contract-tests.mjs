@@ -1290,7 +1290,7 @@ check(vocabGdriveJs.includes("function pbpCreateVocabDriveSyncRunner("),
   const used = new Set([...libraryHtml.matchAll(/data-i18n(?:-title|-aria)?="([^"]+)"/g)].map((m) => m[1]));
   const chordKeys = [...used].filter((k) => en[k] && /\bCtrl[-+]\s?(?:click|clic)/i.test(en[k].message));
   const missing = chordKeys.filter((k) => !macMap[k] || !en[macMap[k]] || /Ctrl/.test(en[macMap[k]].message));
-  check(chordKeys.length >= 2 && missing.length === 0,
+  check(chordKeys.length >= 1 && missing.length === 0,
     `library: keys naming the Ctrl-click chord need a Cmd twin in PBP_LIB_MAC_KEYS (library.js) -- missing or still Ctrl: ${missing.join(", ") || "(no chord keys found)"}`);
 }
 for (const id of ["vocab-search", "vocab-group-filter", "vocab-sort", "vocab-select-all",
@@ -1380,39 +1380,41 @@ check(libraryVocabJs.includes('card.setAttribute("aria-selected", isSelected ? "
   })() &&
   /\nfunction _pbpVocabToggleGroupEditor\(/.test(libraryVocabJs),
   "library-vocab.js/library.html: vocabulary rows lost the grid/aria-selected selection path or master-detail activation state");
-// The keyboard half of that ruling. Ctrl/Shift+click has no keyboard twin
-// unless something intercepts Space BEFORE the button's own activation, so
-// the preventDefault is the contract, not decoration -- without it the row
-// would both select and open, and a keyboard user could never build a
-// multi-row selection at all.
-check(/head\.addEventListener\("keydown"[\s\S]{0,400}e\.preventDefault\(\)[\s\S]{0,120}_pbpVocabRowSelect\(w, true\)/.test(libraryVocabJs) &&
-  /_pbpVocabRowSelect\(w, false\)/.test(libraryVocabJs) &&
-  libraryVocabJs.includes('head.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space / K Delete Escape")'),
-  "library-vocab.js: the keyboard multi-select path (Ctrl+Space toggle / Shift+Space range, announced via aria-keyshortcuts) is gone");
-// K89: "/" must be tested BEFORE the existing ctrl/meta/alt/shift gate (not
-// gating shiftKey itself) in both list keydown handlers, or German
-// QWERTZ/French AZERTY users -- who need Shift to type "/" -- could never
-// trigger it. A ".test(...)" against a $id-scoped snippet, not a bare
-// substring include, so the ordering (branch first, gate second) is what
-// this actually pins, not just the branch's presence somewhere in the file.
+// Multi-select is a pointer gesture only (user ruling 2026-10-22: the
+// Ctrl+Space / Shift+Space chords collided with the macOS input-source
+// switch and Spotlight). Both lists still swallow a modified Space -- the
+// button's synthesised click would carry the modifier into the click
+// handler and select after all -- and neither keydown path selects.
 {
-  const vocabListKeydown = libraryVocabJs.slice(libraryVocabJs.indexOf('$id("vocab-list");\nif (_vocabListEl)'),
-    libraryVocabJs.indexOf("const card = e.target"));
-  check(/if \(e\.key === "\/" && !e\.ctrlKey && !e\.metaKey && !e\.altKey\) \{[\s\S]{0,300}\$id\("vocab-search"\)/.test(vocabListKeydown) &&
-    vocabListKeydown.indexOf('e.key === "/"') < vocabListKeydown.indexOf("e.ctrlKey || e.metaKey || e.altKey || e.shiftKey"),
-    "library-vocab.js: #vocab-list's \"/\" search-focus branch is missing or no longer precedes the ctrl/meta/alt/shift gate (breaks it on Shift-requiring keyboard layouts)");
-  // finding 7: this is the whole-file source, not a keydown-only slice --
-  // notesKeydownSlice below is the actual keydown slice, and the
-  // aria-keyshortcuts check further down also reads directly off the
-  // whole-file source.
   const libraryNotesSrc = read("library-notes.js");
-  const notesKeydownSlice = libraryNotesSrc.slice(libraryNotesSrc.indexOf('$id("notes-list");\n  if (_notesListEl)'),
-    libraryNotesSrc.indexOf("const row = e.target"));
-  check(/if \(e\.key === "\/" && !e\.ctrlKey && !e\.metaKey && !e\.altKey\) \{[\s\S]{0,300}\$id\("notes-filter"\)/.test(notesKeydownSlice) &&
-    notesKeydownSlice.indexOf('e.key === "/"') < notesKeydownSlice.indexOf("e.ctrlKey || e.metaKey || e.altKey || e.shiftKey"),
-    "library-notes.js: #notes-list's \"/\" search-focus branch is missing or no longer precedes the ctrl/meta/alt/shift gate (breaks it on Shift-requiring keyboard layouts)");
-  check(libraryNotesSrc.includes('btn.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space / Delete Escape")'),
-    "library-notes.js: the row button lost its \"/\" aria-keyshortcuts announcement");
+  const spaceHandler = (src, anchor) => {
+    const at = src.indexOf(anchor);
+    return at < 0 ? "" : src.slice(at, src.indexOf("});", at));
+  };
+  const vocabSpace = spaceHandler(libraryVocabJs, 'head.addEventListener("keydown"');
+  const notesSpace = spaceHandler(libraryNotesSrc, 'btn.addEventListener("keydown"');
+  check([vocabSpace, notesSpace].every((h) => /e\.key !== " "/.test(h) && /e\.preventDefault\(\)/.test(h) && !/RowSelect/.test(h)) &&
+    libraryVocabJs.includes('head.setAttribute("aria-keyshortcuts", "/ K Delete Escape")') &&
+    libraryNotesSrc.includes('btn.setAttribute("aria-keyshortcuts", "/ Delete Escape")') &&
+    !/Control\+Space|Shift\+Space/.test([...(libraryVocabJs + libraryNotesSrc).matchAll(/aria-keyshortcuts", "([^"]*)"/g)].map((m) => m[1]).join(" ") + libraryHtml),
+    "library: multi-select must stay pointer-only -- a row keydown handler selects on Space again, stopped swallowing a modified Space, or a Control+Space / Shift+Space announcement came back");
+  // "/" and "?" are page-wide (2026-10-22: "/" used to live on the two
+  // lists and died once focus left them), in library.js, gated on the
+  // focused element being no text field and on ctrl/meta/alt only -- never
+  // shift, which German / French layouts need for "/" and every layout for
+  // "?". The list handlers must not grow their own "/" branch back.
+  const libJsSrc = read("library.js");
+  const pageKey = libJsSrc.slice(libJsSrc.indexOf("function pbpLibOnPageKey("), libJsSrc.indexOf('document.addEventListener("keydown", pbpLibOnPageKey);'));
+  check(/document\.addEventListener\("keydown", pbpLibOnPageKey\);/.test(libJsSrc) &&
+    /e\.ctrlKey \|\| e\.metaKey \|\| e\.altKey/.test(pageKey) && !/shiftKey/.test(pageKey) &&
+    /pbpLibIsTypingTarget\(document\.activeElement\)/.test(pageKey) &&
+    /\$id\("vocab-search"\)/.test(pageKey) && /\$id\("notes-filter"\)/.test(pageKey) && /\$id\("lib-keys-open"\)/.test(pageKey) &&
+    !/e\.key === "\/"/.test(libraryVocabJs + libraryNotesSrc) &&
+    /^function pbpLibOnPageKey\(e\) \{\n  pbpLibRouteListKey\(e\);/m.test(libJsSrc) &&
+    /function pbpLibRouteListKey\(e\)[\s\S]{0,400}pbpLibIsTypingTarget\(ae\)/.test(libJsSrc) &&
+    /id="lib-keys-open"[^>]*aria-keyshortcuts="\?"/.test(libraryHtml) &&
+    /<kbd>\?<\/kbd><\/dt><dd data-i18n="kbdHelpShowHelp">/.test(libraryHtml),
+    "library: \"/\" and \"?\" must be page-wide keys in library.js pbpLibOnPageKey (no text field, no ctrl/meta/alt, shift allowed), listed in the shortcuts panel and announced on its button, and the list keys must be routed to the open list from outside it (pbpLibRouteListKey)");
 }
 check(vocabStore.includes('const _PBP_VOCAB_DB_VERSION = 2'),
   "vocabulary database is upgraded through the dedicated store");

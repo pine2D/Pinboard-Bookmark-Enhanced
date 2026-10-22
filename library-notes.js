@@ -528,7 +528,7 @@ function _pbpNotesBuildRow(hit) {
   // multi-select chords -- it fires from anywhere in the list (see the
   // #notes-list keydown below), not just this row, but this is the only
   // per-row control an assistive-tech user reading a row would query.
-  btn.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space / Delete Escape");
+  btn.setAttribute("aria-keyshortcuts", "/ Delete Escape");
   // Roving tabindex (see _pbpNotesSyncRowTabStops): every row builds OUT of
   // the tab order, and exactly one is put back after the render.
   btn.tabIndex = -1;
@@ -599,8 +599,8 @@ function _pbpNotesBuildRow(hit) {
   // both views: plain click reads the highlight, Ctrl/Cmd+click adds it to the
   // batch selection without moving the reading pane, Shift+click spans the
   // interval from the anchor (and clears it when the anchor gesture was a
-  // clear). Space is the button's own activation key, so the modified keyboard
-  // forms are caught on keydown and preventDefault'd.
+  // clear). Selecting has no keyboard chord (2026-10-22): a modified Space is
+  // swallowed on keydown below.
   btn.addEventListener("click", (e) => {
     if (e.shiftKey) { _pbpNotesRowSelect(hit.key, true); return; }
     if (e.ctrlKey || e.metaKey) { _pbpNotesRowSelect(hit.key, false); return; }
@@ -608,8 +608,9 @@ function _pbpNotesBuildRow(hit) {
   });
   btn.addEventListener("keydown", (e) => {
     if (e.key !== " " && e.key !== "Spacebar") return;
-    if (e.shiftKey) { e.preventDefault(); _pbpNotesRowSelect(hit.key, true); }
-    else if (e.ctrlKey || e.metaKey) { e.preventDefault(); _pbpNotesRowSelect(hit.key, false); }
+    // Pointer-only multi-select (2026-10-22, the vocabulary list's rule): a
+    // modified Space is swallowed so its synthesised click cannot select.
+    if (e.shiftKey || e.ctrlKey || e.metaKey) e.preventDefault();
   });
   cell.appendChild(btn);
   rowEl.appendChild(cell);
@@ -2380,24 +2381,11 @@ if (typeof $id === "function") {
   // preventDefault'd (they would otherwise scroll the page); in the two-pane
   // layout the row they land on opens a beat later (_pbpNotesScheduleFollow,
   // the vocabulary list's rule), in narrow mode opening stays a click or an
-  // unmodified Space. The modified Space chords keep their own handler.
+  // unmodified Space.
   const _notesListEl = $id("notes-list");
   if (_notesListEl) _notesListEl.addEventListener("keydown", (e) => {
-    // K89: "/" jumps back to the search filter, the twin of md-reader.js's
-    // "/" search shortcut. Placed BEFORE the modifier gate below and only
-    // excludes ctrl/meta/alt (not shift) -- on German QWERTZ / French
-    // AZERTY "/" needs Shift, and on US layouts Shift+/ yields "?" so
-    // e.key already disambiguates (same reasoning md-reader.js's "/" search
-    // shortcut uses). No typing-context guard is needed: this listener only
-    // ever fires with focus on a row inside #notes-list, and the page's
-    // filter field lives outside that container in the toolbar, so its
-    // keydowns never bubble here.
-    if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      e.preventDefault();
-      const filter = $id("notes-filter");
-      if (_pbpNotesFocus(filter)) filter.select();
-      return;
-    }
+    // "/" (back to the search filter) is a page-wide key since 2026-10-22:
+    // library.js pbpLibOnPageKey, which this keydown bubbles up to.
     if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
     const row = e.target && typeof e.target.closest === "function" ? e.target.closest(".notes-hit") : null;
     if (!row) return;

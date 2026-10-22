@@ -33,10 +33,8 @@ function pbpLibSyncSelectHint(hint, rowCount, selectedCount) {
 // macOS reads Ctrl-click as a secondary click (the context menu), so the
 // mouse half of multi-select is Cmd-click there; both lists already accept
 // metaKey wherever they accept ctrlKey. The hint, the Select all titles and
-// the shortcut panel's "(or Ctrl-click)" switch to their Mac strings before
-// the first applyI18n, so no Ctrl wording is ever painted on a Mac. The
-// keyboard chord stays Ctrl+Space: the Control key exists on a Mac keyboard,
-// and Cmd+Space is Spotlight.
+// the shortcut panel's Ctrl key cap switch to their Mac strings before the
+// first applyI18n, so no Ctrl wording is ever painted on a Mac.
 function pbpLibIsMac() {
   try {
     const p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
@@ -45,7 +43,7 @@ function pbpLibIsMac() {
     return false;
   }
 }
-const PBP_LIB_MAC_KEYS = { vocabSelectHint: "vocabSelectHintMac", libraryKeysAdd: "libraryKeysAddMac" };
+const PBP_LIB_MAC_KEYS = { vocabSelectHint: "vocabSelectHintMac", libraryKeyCtrl: "libraryKeyCmd" };
 function pbpLibUseMacStrings(root) {
   for (const attr of ["data-i18n", "data-i18n-title"]) {
     for (const el of root.querySelectorAll(`[${attr}]`)) {
@@ -55,6 +53,91 @@ function pbpLibUseMacStrings(root) {
   }
 }
 if (pbpLibIsMac()) pbpLibUseMacStrings(document);
+
+// Page-wide keys, the reader's grammar (md-reader.js): "/" goes to the open
+// view's search box and "?" opens the shortcuts panel, from anywhere on the
+// page except a text field (user ruling 2026-10-22: "/" used to live on the
+// two lists and did nothing once focus had left them). Shift is not a
+// modifier here: "?" is Shift+/ on most layouts, and "/" itself needs Shift
+// on German and French ones -- e.key already tells the two apart. A
+// confirmation popover owns the keyboard while it is open.
+function pbpLibIsTypingTarget(el) {
+  return !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName || ""));
+}
+// The list keys of the shortcuts panel -- arrows, Home / End, K, Delete,
+// Escape -- are bound on the two lists, so they too used to stop working the
+// moment focus left a row (a click in the reading pane, on the canvas, on a
+// header button). From anywhere outside a text field or a widget with arrow
+// keys of its own, they are handed to the open view's list: focus goes back
+// to the row the reading pane shows (else the list's tab stop) and the key is
+// replayed there, so the list's own handlers -- and their confirmations --
+// decide what it does. Escape is only handed over while there is a
+// selection to drop; with none it means nothing to the list.
+const PBP_LIB_LIST_KEYS = new Set(["ArrowUp", "ArrowDown", "Home", "End", "Delete", "Backspace", "Escape", "k", "K"]);
+const PBP_LIB_OWN_KEYS_SELECTOR = '[role="listbox"], [role="option"], [role="menu"], [role="menuitem"], [role="menuitemradio"], [role="tablist"], [role="tab"], [role="slider"], .listbox-btn, [aria-haspopup]';
+function pbpLibRouteListKey(e) {
+  if (!PBP_LIB_LIST_KEYS.has(e.key) && e.code !== "KeyK") return;
+  if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || e.isComposing || e.defaultPrevented) return;
+  const ae = document.activeElement;
+  if (pbpLibIsTypingTarget(ae)) return;
+  const target = e.target instanceof Element ? e.target : null;
+  if (target && target.closest("#vocab-list, #notes-list, #vocab-batch-toolbar, #notes-batch-toolbar")) return;
+  if (target && target !== document.body && target.closest(PBP_LIB_OWN_KEYS_SELECTOR)) return;
+  if (document.querySelector(".confirm-popover, :popover-open")) return;
+  const notesView = $id("view-notes");
+  const notes = !!notesView && !notesView.hidden;
+  if (e.key === "Escape") {
+    const selected = notes ? (typeof _notesSelected !== "undefined" && _notesSelected.size) : (typeof _vocabSelected !== "undefined" && _vocabSelected.size);
+    if (!selected) return;
+  }
+  const list = $id(notes ? "notes-list" : "vocab-list");
+  if (!list) return;
+  const row = list.querySelector(notes ? ".notes-hit[aria-current] .notes-hit-btn" : ".vocab-card[aria-current] .notes-card-head") ||
+    list.querySelector(notes ? '.notes-hit-btn[tabindex="0"]' : '.notes-card-head[tabindex="0"]');
+  // Not on screen (the single-pane layout showing a word, an empty list):
+  // there is no row for the key to act on.
+  if (!row || row.getClientRects().length === 0) return;
+  e.preventDefault();
+  try { row.focus({ preventScroll: true }); } catch (_) { row.focus(); }
+  if (document.activeElement !== row) return;
+  row.dispatchEvent(new KeyboardEvent("keydown", { key: e.key, code: e.code, bubbles: true, cancelable: true }));
+}
+
+function pbpLibOnPageKey(e) {
+  pbpLibRouteListKey(e);
+  if (e.key !== "/" && e.key !== "?") return;
+  if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+  if (pbpLibIsTypingTarget(document.activeElement)) return;
+  if (document.querySelector(".confirm-popover")) return;
+  const keys = $id("lib-keys");
+  if (e.key === "?") {
+    const open = $id("lib-keys-open");
+    if (!keys || !open || open.getClientRects().length === 0) return;
+    e.preventDefault();
+    // Through the button, so the panel opens exactly as a click opens it
+    // (placement, aria-expanded); already open stays open, as in the reader.
+    if (!keys.matches(":popover-open")) open.click();
+    return;
+  }
+  const target = e.target instanceof Element ? e.target : null;
+  const inView = (id) => !!(target && target.closest(`#${id}`));
+  const notesView = $id("view-notes");
+  const notes = inView("view-notes") || (!inView("view-vocab") && !!notesView && !notesView.hidden);
+  let landed = false;
+  if (notes) {
+    const filter = $id("notes-filter");
+    landed = typeof _pbpNotesFocus === "function" && _pbpNotesFocus(filter);
+    if (landed) filter.select();
+  } else {
+    const search = $id("vocab-search");
+    landed = typeof _pbpVocabFocusStable === "function" && _pbpVocabFocusStable();
+    if (landed) search.select();
+  }
+  if (!landed) return;
+  e.preventDefault();
+  if (keys && keys.matches(":popover-open")) keys.hidePopover();
+}
+document.addEventListener("keydown", pbpLibOnPageKey);
 
 function pbpLibActiveView() {
   return $id("view-notes").hidden ? "vocab" : "notes";

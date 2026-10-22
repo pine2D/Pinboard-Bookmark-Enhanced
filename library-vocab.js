@@ -271,7 +271,7 @@ function _pbpVocabBuildRow(w) {
   // multi-select chords -- it fires from anywhere in the list (see the
   // #vocab-list keydown below), not just this row, but this is the only
   // per-row control an assistive-tech user reading a row would query.
-  head.setAttribute("aria-keyshortcuts", "Control+Space Shift+Space / K Delete Escape");
+  head.setAttribute("aria-keyshortcuts", "/ K Delete Escape");
   // Roving tabindex (see _pbpVocabSyncRowTabStops): every row builds OUT of
   // the tab order and exactly one is put back in per render.
   head.tabIndex = -1;
@@ -346,17 +346,14 @@ function _pbpVocabBuildRow(w) {
     if (e.ctrlKey || e.metaKey) { _pbpVocabRowSelect(w, false); return; }
     _pbpVocabActivateRow(w, card);
   });
-  // Keyboard twins of those two modifiers, so multi-select never requires a
-  // pointer. Space is the button's OWN activation key, so the modified forms
-  // have to be caught on keydown and preventDefault'd -- otherwise the
-  // browser also synthesises the plain click and the row would activate as
-  // well as toggle. Announced through aria-keyshortcuts (below); the visible
-  // hint rides on "Select all"'s title, the one always-present control in the
-  // same region (a title on every row would tooltip the whole list).
+  // Multi-select is a pointer gesture only (user ruling 2026-10-22: the
+  // Ctrl+Space / Shift+Space chords are gone -- on a Mac they collide with
+  // the input-source switch and Spotlight). A modified Space is swallowed
+  // rather than left to the button: its synthesised click would carry the
+  // modifier into the click handler above and select after all.
   head.addEventListener("keydown", (e) => {
     if (e.key !== " " && e.key !== "Spacebar") return;
-    if (e.shiftKey) { e.preventDefault(); _pbpVocabRowSelect(w, true); }
-    else if (e.ctrlKey || e.metaKey) { e.preventDefault(); _pbpVocabRowSelect(w, false); }
+    if (e.shiftKey || e.ctrlKey || e.metaKey) e.preventDefault();
   });
 
   return card;
@@ -399,7 +396,7 @@ function _pbpVocabBuildNoteEditor(w) {
   noteInput.value = w.note || "";
   // Announced, not labelled: the chords have no visible affordance of their
   // own, and the page already declares its shortcuts this way (the row head's
-  // Control+Space / Shift+Space).
+  // "/ K Delete Escape").
   noteInput.setAttribute("aria-keyshortcuts", "Control+Enter Escape");
   // At rest a long note shows four whole lines (library.css clips on the
   // content box, so nothing hints at the rest): this button, shown only while
@@ -3093,28 +3090,11 @@ if (_vocabLoadMore) _vocabLoadMore.addEventListener("click", () => {
 // fields, where they are the caret's own keys. ArrowUp/Down are
 // preventDefault'd (they would otherwise scroll the page); in the two-pane
 // layout the row they land on opens a beat later, in narrow mode opening a
-// word stays a click or an unmodified Space. The modified Space chords keep
-// their own handler on the row head.
+// word stays a click or an unmodified Space.
 const _vocabListEl = $id("vocab-list");
 if (_vocabListEl) _vocabListEl.addEventListener("keydown", (e) => {
-  // K89: "/" jumps back to the search box, the twin of md-reader.js's "/"
-  // search shortcut. Placed BEFORE the modifier gate below and only
-  // excludes ctrl/meta/alt (not shift) -- on German QWERTZ / French AZERTY
-  // "/" needs Shift, and on US layouts Shift+/ yields "?" so e.key already
-  // disambiguates (same reasoning md-reader.js's "/" search shortcut uses).
-  // No typing-context guard is needed: this listener only ever fires with
-  // focus on a row inside #vocab-list, and the page's other text inputs
-  // (search, group input, lookup input, the note textarea) all live outside
-  // that container in the toolbar/detail pane, so their keydowns never
-  // bubble here.
-  if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    e.preventDefault();
-    const search = $id("vocab-search");
-    // select() only when focus really landed -- library-notes.js's twin branch
-    // reads `if (_pbpNotesFocus(filter)) filter.select()` for the same reason.
-    if (search && _pbpVocabFocusStable()) search.select();
-    return;
-  }
+  // "/" (back to the search box) is a page-wide key since 2026-10-22:
+  // library.js pbpLibOnPageKey, which this keydown bubbles up to.
   if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
   const card = e.target && typeof e.target.closest === "function" ? e.target.closest(".vocab-card") : null;
   if (!card) return;

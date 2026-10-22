@@ -1352,13 +1352,16 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     _notesSelected.size === 3 && _notesSelected.has("pbp_hl_alpha#a2"));
   btnOf("pbp_hl_alpha#a1").dispatchEvent(mouse({ shiftKey: true }));
   check("Shift-click back over the same range clears it", _notesSelected.size === 0);
+  // Multi-select is pointer-only since 2026-10-22: a modified Space selects
+  // nothing, and is swallowed so its synthesised click cannot select either.
   const nKeySpan = new KeyboardEvent("keydown", { key: " ", ctrlKey: true, bubbles: true, cancelable: true });
   btnOf("pbp_hl_alpha#a1").dispatchEvent(nKeySpan);
-  check("Ctrl+Space selects from the keyboard and swallows the activation",
-    _notesSelected.size === 1 && nKeySpan.defaultPrevented);
   const nShiftSpan = new KeyboardEvent("keydown", { key: " ", shiftKey: true, bubbles: true, cancelable: true });
   btnOf("pbp_hl_alpha#a3").dispatchEvent(nShiftSpan);
-  check("Shift+Space spans from the keyboard", _notesSelected.size === 3 && nShiftSpan.defaultPrevented);
+  check("Ctrl+Space and Shift+Space select nothing and are swallowed",
+    _notesSelected.size === 0 && nKeySpan.defaultPrevented && nShiftSpan.defaultPrevented);
+  btnOf("pbp_hl_alpha#a1").dispatchEvent(mouse({ ctrlKey: true }));
+  btnOf("pbp_hl_alpha#a3").dispatchEvent(mouse({ shiftKey: true }));
   $id("notes-invert-selection").click();
   check("Invert flips the whole visible set", _notesSelected.size === 3 && !_notesSelected.has("pbp_hl_alpha#a1"));
   $id("notes-select-all").click();
