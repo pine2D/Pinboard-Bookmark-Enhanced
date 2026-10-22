@@ -3541,6 +3541,9 @@
     "vocabSelectHint": {
       "message": "Ctrl+点击条目即可选中，Shift+点击可选中连续多条"
     },
+    "vocabSelectHintMac": {
+      "message": "Cmd+点击条目即可选中，Shift+点击可选中连续多条"
+    },
     "vocabResultCount": {
       "message": "找到 $RESULTS$ 条；当前 Pinboard 账号（$OWNER$）共保存 $TOTAL$ 条",
       "placeholders": {
@@ -4094,6 +4097,7 @@
   "libraryKeysMoveHighlight": { "message": "上一条或下一条高亮" },
   "libraryKeysEnds": { "message": "跳到列表开头或末尾" },
   "libraryKeysAdd": { "message": "加入或移出选择（也可 Ctrl+点击）" },
+  "libraryKeysAddMac": { "message": "加入或移出选择（也可 Cmd+点击）" },
   "libraryKeysRange": { "message": "连续选择（也可 Shift+点击）" },
   "libraryKeysKnown": { "message": "在已掌握和学习中之间切换" },
   "libraryKeysDelete": { "message": "删除（会先确认）" },

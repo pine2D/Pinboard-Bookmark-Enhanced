@@ -3541,6 +3541,9 @@
     "vocabSelectHint": {
       "message": "Ctrl+kliknięcie zaznacza wpis, Shift+kliknięcie zaznacza zakres"
     },
+    "vocabSelectHintMac": {
+      "message": "Cmd+kliknięcie zaznacza wpis, Shift+kliknięcie zaznacza zakres"
+    },
     "vocabResultCount": {
       "message": "Bieżące konto Pinboard ($OWNER$): wyniki $RESULTS$ · zapisane $TOTAL$",
       "placeholders": {
@@ -4100,6 +4103,7 @@
   "libraryKeysMoveHighlight": { "message": "Poprzednie lub następne zaznaczenie" },
   "libraryKeysEnds": { "message": "Początek lub koniec listy" },
   "libraryKeysAdd": { "message": "Dodaj do zaznaczenia lub usuń z niego (albo Ctrl+kliknięcie)" },
+  "libraryKeysAddMac": { "message": "Dodaj do zaznaczenia lub usuń z niego (albo Cmd+kliknięcie)" },
   "libraryKeysRange": { "message": "Zaznacz zakres (albo Shift+kliknięcie)" },
   "libraryKeysKnown": { "message": "Przełącz między „Opanowane” a „W nauce”" },
   "libraryKeysDelete": { "message": "Usuń po potwierdzeniu" },

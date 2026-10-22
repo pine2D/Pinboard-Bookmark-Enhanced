@@ -3541,6 +3541,9 @@
     "vocabSelectHint": {
       "message": "Ctrl+clic pour sélectionner une entrée, Maj+clic pour sélectionner une plage"
     },
+    "vocabSelectHintMac": {
+      "message": "Cmd+clic pour sélectionner une entrée, Maj+clic pour sélectionner une plage"
+    },
     "vocabResultCount": {
       "message": "Compte Pinboard actuel ($OWNER$) : $RESULTS$ · $TOTAL$",
       "placeholders": {
@@ -4100,6 +4103,7 @@
   "libraryKeysMoveHighlight": { "message": "Surlignage précédent ou suivant" },
   "libraryKeysEnds": { "message": "Début ou fin de la liste" },
   "libraryKeysAdd": { "message": "Ajouter à la sélection ou l'en retirer (ou Ctrl+clic)" },
+  "libraryKeysAddMac": { "message": "Ajouter à la sélection ou l'en retirer (ou Cmd+clic)" },
   "libraryKeysRange": { "message": "Sélectionner une plage (ou Maj+clic)" },
   "libraryKeysKnown": { "message": "Basculer entre « Acquis » et « En cours »" },
   "libraryKeysDelete": { "message": "Supprimer, après confirmation" },

@@ -1278,6 +1278,21 @@ check(vocabGdriveJs.includes("function pbpCreateVocabDriveSyncRunner("),
     "md-preview.js: pbpRailSettingsBtnInit lost its idempotency guard (rail-bottom-row family precedent)");
 }
 
+// Critique round 5 (2026-10-22): macOS reads Ctrl-click as the context
+// menu. Every key library.html shows that names the Ctrl/Strg mouse chord
+// must have a Mac twin in library.js's PBP_LIB_MAC_KEYS, and the twin must
+// exist in en. The keys are read from the attributes library.html really
+// applies, the chord from the message itself, so a new hint cannot slip by.
+{
+  const en = JSON.parse(read("_locales/en/messages.json"));
+  const libJsSrc = read("library.js");
+  const macMap = Object.fromEntries([...((libJsSrc.match(/const PBP_LIB_MAC_KEYS = \{([^}]*)\}/) || [])[1] || "").matchAll(/(\w+): "(\w+)"/g)].map((m) => [m[1], m[2]]));
+  const used = new Set([...libraryHtml.matchAll(/data-i18n(?:-title|-aria)?="([^"]+)"/g)].map((m) => m[1]));
+  const chordKeys = [...used].filter((k) => en[k] && /\bCtrl[-+]\s?(?:click|clic)/i.test(en[k].message));
+  const missing = chordKeys.filter((k) => !macMap[k] || !en[macMap[k]] || /Ctrl/.test(en[macMap[k]].message));
+  check(chordKeys.length >= 2 && missing.length === 0,
+    `library: keys naming the Ctrl-click chord need a Cmd twin in PBP_LIB_MAC_KEYS (library.js) -- missing or still Ctrl: ${missing.join(", ") || "(no chord keys found)"}`);
+}
 for (const id of ["vocab-search", "vocab-group-filter", "vocab-sort", "vocab-select-all",
   "vocab-invert-selection", "vocab-batch-toolbar", "vocab-group-input", "vocab-add-group",
   "vocab-batch-delete", "vocab-no-results", "vocab-load-more", "vocab-list",

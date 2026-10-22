@@ -3541,6 +3541,9 @@
     "vocabSelectHint": {
       "message": "Ctrl+點擊條目即可選取，Shift+點擊可選取連續多筆"
     },
+    "vocabSelectHintMac": {
+      "message": "Cmd+點擊條目即可選取，Shift+點擊可選取連續多筆"
+    },
     "vocabResultCount": {
       "message": "找到 $RESULTS$ 筆；目前 Pinboard 帳號（$OWNER$）共儲存 $TOTAL$ 筆",
       "placeholders": {
@@ -4100,6 +4103,7 @@
   "libraryKeysMoveHighlight": { "message": "上一則或下一則螢光標記" },
   "libraryKeysEnds": { "message": "跳到清單開頭或結尾" },
   "libraryKeysAdd": { "message": "加入或移出選取（也可 Ctrl+點擊）" },
+  "libraryKeysAddMac": { "message": "加入或移出選取（也可 Cmd+點擊）" },
   "libraryKeysRange": { "message": "選取連續範圍（也可 Shift+點擊）" },
   "libraryKeysKnown": { "message": "在已掌握和學習中之間切換" },
   "libraryKeysDelete": { "message": "刪除（會先確認）" },

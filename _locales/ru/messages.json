@@ -3541,6 +3541,9 @@
     "vocabSelectHint": {
       "message": "Ctrl+щелчок выделяет запись, Shift+щелчок — диапазон"
     },
+    "vocabSelectHintMac": {
+      "message": "Cmd+щелчок выделяет запись, Shift+щелчок — диапазон"
+    },
     "vocabResultCount": {
       "message": "Текущий аккаунт Pinboard ($OWNER$): найдено $RESULTS$ · сохранено $TOTAL$",
       "placeholders": {
@@ -4100,6 +4103,7 @@
   "libraryKeysMoveHighlight": { "message": "Предыдущее или следующее выделение" },
   "libraryKeysEnds": { "message": "В начало или в конец списка" },
   "libraryKeysAdd": { "message": "Добавить в выделение или убрать из него (или Ctrl+щелчок)" },
+  "libraryKeysAddMac": { "message": "Добавить в выделение или убрать из него (или Cmd+щелчок)" },
   "libraryKeysRange": { "message": "Выделить диапазон (или Shift+щелчок)" },
   "libraryKeysKnown": { "message": "Переключить «Выучено» и «Изучается»" },
   "libraryKeysDelete": { "message": "Удалить после подтверждения" },

@@ -3541,6 +3541,9 @@
     "vocabSelectHint": {
       "message": "Ctrl キーを押しながらクリックで選択、Shift キーを押しながらクリックで範囲選択します"
     },
+    "vocabSelectHintMac": {
+      "message": "Command キーを押しながらクリックで選択、Shift キーを押しながらクリックで範囲選択します"
+    },
     "vocabResultCount": {
       "message": "現在の Pinboard アカウント（$OWNER$）：$RESULTS$ 件一致・$TOTAL$ 件保存済み",
       "placeholders": {
@@ -4100,6 +4103,7 @@
   "libraryKeysMoveHighlight": { "message": "前または次のハイライト" },
   "libraryKeysEnds": { "message": "リストの先頭または末尾" },
   "libraryKeysAdd": { "message": "選択に追加または選択から除外（Ctrl キーを押しながらクリックでも可）" },
+  "libraryKeysAddMac": { "message": "選択に追加または選択から除外（Command キーを押しながらクリックでも可）" },
   "libraryKeysRange": { "message": "範囲選択（Shift キーを押しながらクリックでも可）" },
   "libraryKeysKnown": { "message": "習得済みと学習中を切り替え" },
   "libraryKeysDelete": { "message": "削除（確認あり）" },

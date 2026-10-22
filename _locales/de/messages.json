@@ -3541,6 +3541,9 @@
     "vocabSelectHint": {
       "message": "Mit Strg+Klick einen Eintrag auswählen, mit Umschalt+Klick einen Bereich"
     },
+    "vocabSelectHintMac": {
+      "message": "Mit Cmd+Klick einen Eintrag auswählen, mit Umschalt+Klick einen Bereich"
+    },
     "vocabResultCount": {
       "message": "Aktuelles Pinboard-Konto ($OWNER$): $RESULTS$ Treffer · $TOTAL$ gespeichert",
       "placeholders": {
@@ -4100,6 +4103,7 @@
   "libraryKeysMoveHighlight": { "message": "Vorherige oder nächste Markierung" },
   "libraryKeysEnds": { "message": "Anfang oder Ende der Liste" },
   "libraryKeysAdd": { "message": "Zur Auswahl hinzufügen oder daraus entfernen (auch Strg+Klick)" },
+  "libraryKeysAddMac": { "message": "Zur Auswahl hinzufügen oder daraus entfernen (auch Cmd+Klick)" },
   "libraryKeysRange": { "message": "Bereich auswählen (auch Umschalt+Klick)" },
   "libraryKeysKnown": { "message": "Zwischen „Gelernt“ und „Wird gelernt“ wechseln" },
   "libraryKeysDelete": { "message": "Löschen, nach Bestätigung" },

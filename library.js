@@ -30,6 +30,32 @@ function pbpLibSyncSelectHint(hint, rowCount, selectedCount) {
   hint.hidden = _pbpLibSelectHintRetired || rowCount < 2;
 }
 
+// macOS reads Ctrl-click as a secondary click (the context menu), so the
+// mouse half of multi-select is Cmd-click there; both lists already accept
+// metaKey wherever they accept ctrlKey. The hint, the Select all titles and
+// the shortcut panel's "(or Ctrl-click)" switch to their Mac strings before
+// the first applyI18n, so no Ctrl wording is ever painted on a Mac. The
+// keyboard chord stays Ctrl+Space: the Control key exists on a Mac keyboard,
+// and Cmd+Space is Spotlight.
+function pbpLibIsMac() {
+  try {
+    const p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+    return /mac/i.test(p);
+  } catch (_) {
+    return false;
+  }
+}
+const PBP_LIB_MAC_KEYS = { vocabSelectHint: "vocabSelectHintMac", libraryKeysAdd: "libraryKeysAddMac" };
+function pbpLibUseMacStrings(root) {
+  for (const attr of ["data-i18n", "data-i18n-title"]) {
+    for (const el of root.querySelectorAll(`[${attr}]`)) {
+      const mac = PBP_LIB_MAC_KEYS[el.getAttribute(attr)];
+      if (mac) el.setAttribute(attr, mac);
+    }
+  }
+}
+if (pbpLibIsMac()) pbpLibUseMacStrings(document);
+
 function pbpLibActiveView() {
   return $id("view-notes").hidden ? "vocab" : "notes";
 }

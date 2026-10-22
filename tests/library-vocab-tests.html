@@ -381,6 +381,18 @@ check("a list of one row has nothing to multi-select: no hint",
   (() => { localStorage.removeItem(PBP_LIB_SELECT_HINT_KEY); _pbpLibSelectHintRetired = false;
     pbpLibSyncSelectHint($id("vocab-select-hint"), 1, 0); const none = $id("vocab-select-hint").hidden === true;
     pbpLibSyncSelectHint($id("vocab-select-hint"), 2, 1); return none; })());
+// Mac strings (critique round 5): Ctrl-click is the context menu there, so
+// every place that names the mouse chord swaps to its Mac key -- the hint,
+// the Select all titles and the shortcut panel line -- and nothing else.
+check("on a Mac every Ctrl-click wording swaps to its Cmd key, attributes of both kinds, unrelated keys untouched",
+  (() => {
+    const box = document.createElement("div");
+    box.innerHTML = '<p data-i18n="vocabSelectHint"></p><button data-i18n="vocabSelectAll" data-i18n-title="vocabSelectHint"></button>' +
+      '<dd data-i18n="libraryKeysAdd"></dd><dd data-i18n="libraryKeysRange"></dd><kbd data-i18n="libraryKeyCtrl"></kbd>';
+    pbpLibUseMacStrings(box);
+    const keys = [...box.children].map((el) => `${el.getAttribute("data-i18n")}/${el.getAttribute("data-i18n-title") || ""}`).join(" ");
+    return keys === "vocabSelectHintMac/ vocabSelectAll/vocabSelectHintMac libraryKeysAddMac/ libraryKeysRange/ libraryKeyCtrl/";
+  })());
 check("the empty index carries a short line beside the cover and the whole sentence for the single-pane layout",
   (() => { const prev = _vocabRows; _vocabRows = []; _pbpVocabRenderList(); const e = $id("vocab-empty");
     const ok = e.querySelector(".vocab-empty-short")?.textContent === "libraryVocabEmptyShort" &&
