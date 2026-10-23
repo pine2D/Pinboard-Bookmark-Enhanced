@@ -11,9 +11,11 @@
   td { font-size: 13px; }
   blockquote { color: #224477; }
   .tagNode { padding: 3px; background: #fec; }
+  .unbundled { color: #543; background: none; }
   .tagSelected { background: #fa9; border: 1px dotted #a82; padding: 2px; }
   .tagNode:hover { background: #ffc; }
-  .tagSelected:hover { background: #acf; }
+  .unbundled:hover { background: #acf; }
+  .tagSelected:hover { background: #89d; }
   #help_banner { color: #11a; }
   code { color: #22a; font-family: monaco; }
   tt { background: #ffa; font-family: verdana; color: #37d; }
@@ -36,6 +38,20 @@
   #import_history_table { float: left; padding: 5px; border: 1px solid #ccc; }
   #left_toc { float: left; max-width: 220px; margin-right: 20px; }
   #content_column { float: left; min-width: 200px; width: 70%; }
+  /* Native tagpicker.css / bundles.css, inspected 2026-10-23. These fixed
+     widths intentionally retain the native narrow-page overflow model. */
+  #tagpicker_column { width: 660px; float: left; }
+  #bundle_column { width: 350px; text-align: left; float: left; margin-left: 10px; }
+  #bundle_header { height: 30px; width: 450px; text-align: left; float: left; }
+  #bundle_header h2 { margin-top: 0; }
+  #tagPickerContainer { width: 290px; float: left; border: 0 solid red; }
+  #tagPickerNav { font-size: 14px; height: 30px; border-bottom: 1px solid #aaa; }
+  #tagPickerSelectLinks { float: left; margin-left: 20px; margin-top: 4px; font-size: 12px; }
+  #tagPickerFilterLinks { float: left; border: 0 solid blue; font-size: 12px; vertical-align: middle; }
+  #typer_box { border: 1px solid orange; }
+  #tagpicker { cursor: pointer; width: 90%; line-height: 2em; text-align: left; border: 1px solid #ccc; float: left; margin-top: 20px; }
+  #bundle { float: left; cursor: pointer; width: 320px; min-height: 500px; line-height: 1.7em; border: 1px solid #333; background: #fffaf7; padding: 5px 20px 0 5px; }
+  #save_changes_marker { color: black; background: #ddd; padding: 4px; border: 1px solid #aaa; }
   @media (max-width: 1100px) { #content { width: auto; } }
   @media (max-width: 640px) {
     #left_toc, #right_bar { display: none; }
@@ -138,6 +154,49 @@
 </template>
 <template id="bundle-density">
   <div id="main_column" style="float:left;width:690px"><p>Drag bundles to reorder, or edit their position.</p><form name="sort"><table style="width:830px"><tbody></tbody></table></form></div>
+</template>
+<!-- Reduced by hand from the logged-in bundle editor's DOM, not the composer.
+     Keep the native floats, form/table nesting, size attribute and inline fills;
+     only text and destinations are synthetic. State changes are exercised by
+     the runner, so this fixture contains no server or TagPicker scripts. -->
+<template id="bundle-editor">
+  <div id="tagpicker_column">
+    <div id="bundle_header"><h2 style="margin-left:32px">Editing Tag Bundle: Reference</h2></div>
+    <form method="get">
+      <div id="tagPickerContainer" style="width:600px">
+        <div id="tagPickerNav">
+          <div id="tagPickerFilterLinks">filter: <input type="text" id="typer_box" title="Filter tags"></div>
+          <div id="tagPickerSelectLinks">
+            <span style="color:#aaa">select:</span> <a href="#select-all">all</a> · <a href="#select-none">none</a>&nbsp;&nbsp;&nbsp;&nbsp;
+            <span style="color:#aaa">show:</span> <a href="#show-all" id="show_all_link">all</a> · <a href="#show-unbundled" id="show_unbundled_link">unbundled</a>
+          </div>
+          <div style="float:right"><input type="button" value="←" title="Move left"> <input type="button" value="→" title="Move right"></div>
+        </div>
+      </div>
+    </form>
+    <div id="tagpicker" style="border:0px">
+      <span class="tagNode unbundled" style="font-size:12px">reference</span> <span class="tagNode" style="font-size:14px">science</span>
+      <span class="tagNode unbundled" style="font-size:13px">中文标签</span> <span class="tagNode" style="font-size:14px">research</span>
+    </div>
+  </div>
+  <div id="bundle_column">
+    <form method="get" name="bundleform">
+      <br><p class="error" id="error"> </p>
+      <div>
+        <div style="float:left">name: <input type="text" size="28" id="name" name="name" value="Reference collection"></div>
+        <div style="float:right;margin-left:10px;margin-top:4px"><a href="#save" id="save_changes_marker">save</a> · <a href="#cancel">cancel</a></div>
+      </div>
+      <br><br><br>
+      <table><tbody><tr><td valign="top">
+        <div style="float:left"><a href="#bundles">go to bundles list</a></div>
+        <div style="float:right;height:20px"><span style="color:#aaa">select</span> <a href="#bundle-all">all</a> · <a href="#bundle-none">none</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+        <div style="clear:both"></div>
+        <div id="bundle" title="Tags in this bundle"><span class="tagNode" style="font-size:12px">science</span> <span class="tagNode" style="font-size:12px">中文标签</span></div>
+      </td></tr><tr><td></td></tr></tbody></table>
+      <div style="margin-top:40px" class="help_box"><h2>How This Works</h2><p>Select tags, then move them between the two boxes.</p></div>
+    </form>
+  </div>
+  <div style="clear:both"></div>
 </template>
 <template id="import-layout">
   <div id="main_column"><div id="settings_panel"><h2>Import bookmarks</h2><p>Choose a bookmarks file.</p><input type="file"><div id="settings_tab_panes" style="min-height:1100px"><p>Import options and instructions</p></div></div><table id="import_history_table"><caption>Import history</caption><tr><td>2026-10-22</td><td>Completed</td></tr></table></div>

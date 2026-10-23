@@ -75,11 +75,11 @@ try {
   // Composite both the ink pixel and the background-only pixel from the leaf
   // outward. Each ancestor's opacity applies to the whole group, including its
   // own background; multiplying text alpha alone would miss nested surfaces.
-  async function readable(key, selector, minimum = 4.5) {
+  async function readable(key, selector, minimum = 4.5, requireHover = false) {
     // A palette change or pointer move can start a color transition. Measure
     // its settled state rather than an arbitrary intermediate animation frame.
     await page.evaluate(() => Promise.all(document.getAnimations().filter(a => a instanceof CSSTransition).map(a => a.finished.catch(() => {}))));
-    const rows = await page.locator(selector).evaluateAll(nodes => {
+    const rows = await (typeof selector === 'string' ? page.locator(selector) : selector).evaluateAll(nodes => {
       const rgba = value => {
         const parts = value.match(/[\d.]+/g).map(Number);
         return [...parts.slice(0, 3), parts[3] ?? 1];
@@ -101,13 +101,14 @@ try {
         }
         const a = luminance(over(ink, [255, 255, 255, 1]));
         const b = luminance(over(background, [255, 255, 255, 1]));
-        return { element: node.tagName.toLowerCase() + (node.id ? '#' + node.id : '') + (node.className ? '.' + node.className.trim().replaceAll(' ', '.') : ''), ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05), visible: node.checkVisibility() && node.getBoundingClientRect().height > 0 };
+        return { element: node.tagName.toLowerCase() + (node.id ? '#' + node.id : '') + (node.className ? '.' + node.className.trim().replaceAll(' ', '.') : ''), ratio: (Math.max(a, b) + .05) / (Math.min(a, b) + .05), visible: node.checkVisibility() && node.getBoundingClientRect().height > 0, hovered: node.matches(':hover') };
       });
     });
     assert.ok(rows.length, `fixture selector missing: ${selector}`);
     for (const row of rows) {
       checks++;
       if (!row.visible || row.ratio < minimum) failures.push(`${key} ${row.element}: ${row.ratio.toFixed(3)} < ${minimum}${row.visible ? '' : ' (hidden)'}`);
+      if (requireHover && !row.hovered) failures.push(`${key} ${row.element}: requested hover state was lost`);
     }
   }
 
@@ -186,7 +187,7 @@ try {
     const cloud = await page.locator('#tag_cloud a.tag').evaluateAll(nodes => nodes.map(n => ({ size: parseFloat(getComputedStyle(n).fontSize), display: getComputedStyle(n).display })));
     checks++;
     if (cloud.some(n => n.display !== 'inline') || cloud[1].size / cloud[0].size < 2) failures.push(`${key} frequency-sized inline cloud was flattened`);
-    if (['modern-card', 'paper-ink', 'github-light', 'flexoki', 'flexoki:dark', 'dracula', 'rose-pine', 'catppuccin-mocha', 'solarized-light', 'catppuccin-latte'].includes(key)) {
+    {
       await fixture('sidebar-tag-frequency');
       const selector = '#tag_cloud a.tag:not(.selected)';
       await readable(`${key}:low-frequency`, selector);
@@ -222,6 +223,75 @@ try {
       checks++;
       if (selectedHover[0] !== selectedHover[1]) failures.push(`${key} sidebar selected-tag hover was recolored`);
     }
+    await fixture('bundle-editor');
+    await readable(`${key}:bundle-editor`, '#tagpicker .tagNode, #bundle .tagNode, #save_changes_marker, #tagPickerSelectLinks span');
+    // Native arrow glyphs are graphical controls, like the star above; their
+    // 3:1 floor is separate from save/filter/tag text's 4.5:1 floor.
+    await readable(`${key}:bundle-move`, '#tagPickerNav input[type="button"]', 3);
+    const pickerTags = page.locator('#tagpicker .tagNode, #bundle .tagNode');
+    for (let i = 0; i < await pickerTags.count(); i++) {
+      const tag = pickerTags.nth(i);
+      const before = await tag.evaluate(n => {
+        const r = n.getBoundingClientRect(), s = getComputedStyle(n);
+        return { x: r.x, y: r.y, width: r.width, height: r.height, fontSize: s.fontSize, opacity: s.opacity };
+      });
+      for (const selected of [false, true]) {
+        await page.mouse.move(1400, 950);
+        await tag.evaluate((n, selected) => n.classList.toggle('tagSelected', selected), selected);
+        if (selected) await readable(`${key}:bundle-editor:selected`, tag);
+        await tag.hover();
+        await readable(`${key}:bundle-editor:${selected ? 'selected-hover' : 'hover'}`, tag, 4.5, true);
+        const after = await tag.evaluate(n => {
+          const r = n.getBoundingClientRect(), s = getComputedStyle(n);
+          return { x: r.x, y: r.y, width: r.width, height: r.height, fontSize: s.fontSize, opacity: s.opacity };
+        });
+        checks++;
+        if (JSON.stringify(after) !== JSON.stringify(before)) failures.push(`${key} bundle tag ${selected ? 'selected-hover' : 'hover'} shifts native geometry or frequency: ${JSON.stringify({ before, after })}`);
+      }
+      await tag.evaluate(n => n.classList.remove('tagSelected'));
+    }
+    // TagPicker's hilight()/unhilight() write inline yellow/white fills.
+    // Exercise both links in both states rather than pinning one current ID.
+    const filterLinks = page.locator('#tagPickerSelectLinks a[id]');
+    for (const active of [0, 1]) {
+      await page.mouse.move(1400, 950);
+      await filterLinks.evaluateAll((nodes, active) => nodes.forEach((n, i) => { n.style.backgroundColor = i === active ? '#ffffaa' : '#fff'; }), active);
+      await readable(`${key}:bundle-filter`, '#tagPickerSelectLinks a[id]');
+      for (let i = 0; i < await filterLinks.count(); i++) {
+        await filterLinks.nth(i).hover();
+        await readable(`${key}:bundle-filter:hover`, '#tagPickerSelectLinks a[id]:hover');
+      }
+    }
+    for (const [selector, minimum] of [['#save_changes_marker', 4.5], ['#tagPickerNav input[type="button"]', 3]]) {
+      for (let i = 0; i < await page.locator(selector).count(); i++) {
+        await page.locator(selector).nth(i).hover();
+        await readable(`${key}:bundle-action:hover`, `${selector}:hover`, minimum);
+      }
+    }
+    for (const width of [390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.mouse.move(1, 1);
+      const layout = await page.evaluate(() => {
+        const rect = n => { const r = n.getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; };
+        const toolbar = document.getElementById('tagPickerNav');
+        const row = document.querySelector('#bundle_column > form > div:first-of-type');
+        const column = document.getElementById('bundle_column');
+        const bundle = document.getElementById('bundle');
+        const rowParts = [...row.children].map(rect);
+        return { toolbar: rect(toolbar), toolbarControls: [...toolbar.querySelectorAll('input, a')].map(rect), row: rect(row), rowParts, rowControls: [...row.querySelectorAll('input, a')].map(rect), column: rect(column), bundle: rect(bundle), table: rect(column.querySelector('table')) };
+      });
+      // Native bundle columns can overflow a phone viewport. Protect controls
+      // inside their own native-sized rows, without redesigning that model.
+      const within = (child, parent) => child.width > 0 && child.height > 0 && child.x >= parent.x - 1 && child.right <= parent.right + 1 && child.y >= parent.y - 1 && child.bottom <= parent.bottom + 1;
+      const controlsOverlap = controls => controls.some((a, i) => controls.slice(i + 1).some(b => Math.min(a.right, b.right) - Math.max(a.x, b.x) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.y, b.y) > 1));
+      checks++;
+      if (!layout.toolbarControls.every(r => within(r, layout.toolbar)) || controlsOverlap(layout.toolbarControls)) failures.push(`${key} bundle toolbar controls escape their row or overlap@${width}: ${JSON.stringify(layout)}`);
+      checks++;
+      if (!layout.rowControls.every(r => within(r, layout.row)) || layout.rowParts[0].right > layout.rowParts[1].x + 1 || layout.rowParts[0].y >= layout.rowParts[1].bottom || layout.rowParts[1].y >= layout.rowParts[0].bottom) failures.push(`${key} bundle name/save controls wrap or overlap@${width}: ${JSON.stringify(layout)}`);
+      checks++;
+      if (layout.table.width < layout.column.width - 2 || layout.bundle.right > layout.column.right + 1) failures.push(`${key} bundle table shrinks or overflows its column@${width}: ${JSON.stringify(layout)}`);
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await fixture('bundle-density');
     const bundleLayout = await page.evaluate(() => {
       const table = document.querySelector('form[name="sort"] > table');
