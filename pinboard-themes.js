@@ -54,6 +54,7 @@ const PINBOARD_THEMES = {
   --pinboard-scrollbar-thumb: #5f6368;
   --pinboard-sidebar-link-fg: #166ad8;
   --pinboard-sidebar-link-hover: #174ea6;
+  --pinboard-sidebar-tag-hover-bg: rgba(26,115,232,0.15);
   --pinboard-anchor-fg: #166ad8;
   --pinboard-star-fg: #878787;
   --pinboard-bundle-edit-hover: #1565cf;
@@ -1055,6 +1056,7 @@ h2 { color: #3c4043 !important; }
   --pinboard-scrollbar-thumb: #9cb5ce;
   --pinboard-sidebar-tag-fg: #a3be8c;
   --pinboard-sidebar-tag-hover: #88c0d0;
+  --pinboard-sidebar-tag-hover-bg: rgba(136,192,208,0.25);
   --pinboard-star-fg: #818da5;
   --pinboard-bundle-edit-hover: #8fc4d3;
   --pinboard-table-destroy-hover: #e2b8bc;
@@ -2009,6 +2011,7 @@ input[type="button"] { border: 1px solid #81a1c1 !important; }
   --pinboard-sidebar-link-hover: #99ff99;
   --pinboard-sidebar-tag-fg: #00cccc;
   --pinboard-sidebar-tag-hover: #33ff33;
+  --pinboard-sidebar-tag-hover-bg: rgba(51,255,51,0.3);
   --pinboard-anchor-fg: #33ff33;
   --pinboard-star-fg: #227722;
   --pinboard-bundle-edit-hover: #33ff33;
@@ -3005,6 +3008,7 @@ a.bookmark_title::before { color: #33ff3380 !important; }`
   --pinboard-scrollbar-thumb: #6b4c3b;
   --pinboard-sidebar-link-fg: #1a3a5c;
   --pinboard-sidebar-link-hover: #2a5a8c;
+  --pinboard-sidebar-tag-hover-bg: rgba(26,58,92,0.25);
   --pinboard-anchor-fg: #1a3a5c;
   --pinboard-star-fg: #9f834f;
   --pinboard-bundle-edit-hover: #1a3a5c;
@@ -4000,6 +4004,7 @@ h2 { font-family: "Georgia", serif !important; }`
   --pinboard-scrollbar-thumb: #bd93f9;
   --pinboard-sidebar-link-fg: #8be9fd;
   --pinboard-sidebar-link-hover: #ff98d3;
+  --pinboard-sidebar-tag-hover-bg: rgba(139,233,253,0.25);
   --pinboard-star-fg: #9397ae;
   --pinboard-bundle-edit-hover: #8be9fd;
   --pinboard-table-destroy-hover: #ff9c9c;
@@ -4980,6 +4985,7 @@ input[type="radio"] { accent-color: #bd93f9 !important; }
   --pinboard-scrollbar-thumb: #6a6964;
   --pinboard-sidebar-link-fg: #205ea6;
   --pinboard-sidebar-link-hover: #163b66;
+  --pinboard-sidebar-tag-hover-bg: rgba(32,94,166,0.15);
   --pinboard-anchor-fg: #205ea6;
   --pinboard-star-fg: #8c855c;
   --pinboard-bundle-edit-hover: #205ea6;
@@ -5889,6 +5895,7 @@ html.pbp-dark {
   --pinboard-on-accent: #171615;
   --pinboard-on-link-hover: #1c1b1a;
   --pinboard-scrollbar-thumb: #918f8a;
+  --pinboard-sidebar-tag-hover-bg: rgba(67,133,190,0.2);
   --pinboard-anchor-fg: #5a94c6;
   --pinboard-star-fg: #75716d;
   --pinboard-bundle-edit-hover: #699ecb;
@@ -6929,6 +6936,7 @@ html.pbp-dark #tweet_searchbox input[type="submit"] { border-radius: 4px !import
   --pinboard-sidebar-link-hover: #1b6863;
   --pinboard-sidebar-tag-fg: #1b6863;
   --pinboard-sidebar-tag-hover: #1d699e;
+  --pinboard-sidebar-tag-hover-bg: rgba(38,139,210,0.25);
   --pinboard-anchor-fg: #1d699e;
   --pinboard-star-fg: #8f7d4f;
   --pinboard-bundle-edit-hover: #1b6395;
@@ -7869,6 +7877,7 @@ a.sort_order_selected { background: #eee8d5 !important; }
   --pinboard-sidebar-link-hover: #2ca9a0;
   --pinboard-sidebar-tag-fg: #2ca9a0;
   --pinboard-sidebar-tag-hover: #4ca2df;
+  --pinboard-sidebar-tag-hover-bg: rgba(38,139,210,0.25);
   --pinboard-anchor-fg: #4ca2df;
   --pinboard-star-fg: #1089a4;
   --pinboard-bundle-edit-hover: #5dabe2;
@@ -8814,6 +8823,7 @@ a.sort_order_selected { background: #073642 !important; }
   --pinboard-sidebar-link-hover: #127076;
   --pinboard-sidebar-tag-fg: #127076;
   --pinboard-sidebar-tag-hover: #0b59f4;
+  --pinboard-sidebar-tag-hover-bg: rgba(30,102,245,0.25);
   --pinboard-anchor-fg: #0b59f4;
   --pinboard-star-fg: #79849e;
   --pinboard-bundle-edit-hover: #0b55ea;
@@ -9744,6 +9754,9 @@ a.help { background: #e6e9ef !important; }
   --pinboard-selection-fg: #cdd6f4;
   --pinboard-tag-bg: #45475a;
   --pinboard-tag-fg: #94e2d5;
+  --pinboard-sidebar-tag-fg: #94e2d5;
+  --pinboard-sidebar-tag-hover: #cdd6f4;
+  --pinboard-sidebar-tag-hover-bg: rgba(137,180,250,0.075);
   --pinboard-row-hover: #313244;
   --pinboard-bundle-row-hover: #89b4fa14;
   --pinboard-destroy: #f38ba8;
@@ -9766,8 +9779,6 @@ a.help { background: #e6e9ef !important; }
   --pinboard-scrollbar-thumb: #a6adc8;
   --pinboard-sidebar-link-fg: #89b4fa;
   --pinboard-sidebar-link-hover: #cba6f7;
-  --pinboard-sidebar-tag-fg: #94e2d5;
-  --pinboard-sidebar-tag-hover: #89b4fa;
   --pinboard-anchor-fg: #89b4fa;
   --pinboard-star-fg: #787b97;
   --pinboard-bundle-edit-hover: #89b4fa;
@@ -10623,6 +10634,8 @@ a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboa
 a.tag:hover::before { color: var(--pinboard-accent) !important; opacity: 0.9 !important; }
 a.tag.selected { color: var(--pinboard-destroy) !important; font-weight: 700 !important; }
 a.tag.selected::before { color: var(--pinboard-destroy) !important; opacity: 0.9 !important; }
+#tag_cloud a.tag:not(.selected) { color: var(--pinboard-sidebar-tag-fg) !important; }
+#tag_cloud a.tag:not(.selected):hover { color: var(--pinboard-sidebar-tag-hover) !important; background: var(--pinboard-sidebar-tag-hover-bg) !important; text-shadow: 0.5px 0 0 currentColor !important; }
 #search_query_field:focus, #banner_searchbox input[type="text"]:focus, #right_bar input#key:focus, #tweet_searchbox #search_query_field:focus {
   box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important;
   outline: none !important;
@@ -10735,6 +10748,7 @@ h2 { color: #cba6f7 !important; }`
   --pinboard-sidebar-link-hover: #d68da1;
   --pinboard-sidebar-tag-fg: #b8bb26;
   --pinboard-sidebar-tag-hover: #89a99d;
+  --pinboard-sidebar-tag-hover-bg: rgba(131,165,152,0.3);
   --pinboard-anchor-fg: #89a99d;
   --pinboard-star-fg: #8c8079;
   --pinboard-bundle-edit-hover: #a1bab1;
@@ -11694,6 +11708,7 @@ h2 { color: #d3869b !important; }
   --pinboard-scrollbar-thumb: #908caa;
   --pinboard-sidebar-link-fg: #c4a7e7;
   --pinboard-sidebar-link-hover: #ebbcba;
+  --pinboard-sidebar-tag-hover-bg: rgba(196,167,231,0.25);
   --pinboard-anchor-fg: #c4a7e7;
   --pinboard-star-fg: #7b74ab;
   --pinboard-bundle-edit-hover: #c4a7e7;
@@ -12662,6 +12677,7 @@ h2 { color: #ebbcba !important; }`
   --pinboard-scrollbar-thumb: #656d76;
   --pinboard-sidebar-link-fg: #0969da;
   --pinboard-sidebar-link-hover: #0550ae;
+  --pinboard-sidebar-tag-hover-bg: rgba(9,105,218,0.2);
   --pinboard-anchor-fg: #0969da;
   --pinboard-star-fg: #7c90a3;
   --pinboard-bundle-edit-hover: #0964d0;

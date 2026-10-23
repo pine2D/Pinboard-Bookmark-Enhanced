@@ -305,6 +305,7 @@ export function expandSitePalette(raw) {
   out["sidebar-link-hover"] = p["sidebar-link-hover"] || out["link-hover"];
   out["sidebar-tag-fg"] = p["sidebar-tag-fg"] || out["tag-fg"];
   out["sidebar-tag-hover"] = p["sidebar-tag-hover"] || out.accent;
+  out["sidebar-tag-hover-bg"] = p["sidebar-tag-hover-bg"] || out["accent-alpha"];
   // Non-link anchors formerly colored by two pilots' bare-a overrides.
   out["anchor-fg"] = isHex(p["anchor-fg"])
     ? rgbToHex(fgToAAMulti(hexToRgb(p["anchor-fg"]), pageBases)) : out.accent;
