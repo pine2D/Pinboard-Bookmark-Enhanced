@@ -11,18 +11,23 @@ import { resolve, dirname, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { isolatedFontconfigEnv, parityProbeEnv, parityReproduceCommand } from "./ci-fonts-env.mjs";
+import { auditSelection } from "./audit-scope.mjs";
+import { HELP_SCENARIOS, HELP_ROLES, HELP_LOCALES, HELP_DPRS } from "./audit-help-scenarios.mjs";
+
+const audit = auditSelection({ runner: "help", scenarios: HELP_SCENARIOS });
+if (audit.maybePrintPlan()) process.exit(0);
+if (audit.filters.axes.font?.some(font => font !== (process.env.FONTCONFIG_FILE ? "ci" : "native"))) {
+  throw new Error("Requested help font environment does not match FONTCONFIG_FILE; use scripts/audit.mjs to select it");
+}
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const requireFromQa = createRequire(resolve(ROOT, ".qa-scan", "package.json"));
 const { chromium } = requireFromQa("playwright");
 const { PNG } = requireFromQa("pngjs");
 
-const ROLES = Object.freeze(["section", "field", "choice", "group", "action"]);
-const LOCALES = Object.freeze([
-  { id: "zh-CN", messagesDir: "zh_CN" },
-  { id: "en", messagesDir: "en" },
-]);
-const DPR_VALUES = Object.freeze([1, 1.25, 1.5, 2]);
+const ROLES = HELP_ROLES;
+const LOCALES = HELP_LOCALES.filter(locale => audit.selected.some(row => audit.values(row.id, "locale", HELP_LOCALES.map(v => v.messagesDir)).includes(locale.messagesDir)));
+const DPR_VALUES = HELP_DPRS.filter(dpr => audit.selected.some(row => audit.values(row.id, "dpr", HELP_DPRS).includes(dpr)));
 // One CSS layout can land on opposite half-pixel edges under Verdana/YaHei
 // and Liberation/WenQuanYi rasterization. Two physical pixels keep both font
 // paths within 1 CSS px at DPR 2 while still rejecting the visible 3px drift
@@ -380,11 +385,12 @@ try {
       const page = await context.newPage();
       await preparePage(page, locale);
       const items = await inventory(page);
-      const missing = items.filter((item) => !ROLES.includes(item.declaredRole));
+      const scopedItems = audit.selected.length === ROLES.length ? items : items.filter(item => audit.has('help.options.' + item.declaredRole) || audit.has('help.options.' + item.inferredRole) || (!item.declaredRole && !item.inferredRole));
+      const missing = scopedItems.filter((item) => !ROLES.includes(item.declaredRole));
       if (missing.length) {
         failures.push(`${locale.id}@${dpr}: ${missing.length} host(s) lack a declared semantic role`);
       }
-      const mismatched = items.filter((item) => item.declaredRole && item.declaredRole !== item.inferredRole);
+      const mismatched = scopedItems.filter((item) => item.declaredRole && item.declaredRole !== item.inferredRole);
       if (mismatched.length) {
         failures.push(`${locale.id}@${dpr}: role mismatch ${mismatched.slice(0, 4).map((item) => `${item.key}:${item.declaredRole}/${item.inferredRole}`).join(", ")}`);
       }
@@ -394,11 +400,16 @@ try {
       }
       const firstByRole = ROLES.map((role) => items.find((item) => (item.declaredRole || item.inferredRole) === role)).filter(Boolean);
       const selected = dpr === 1.5 || dpr === 2 ? items : firstByRole;
+      const measuredRoles = new Set();
       for (const item of selected) {
         const role = item.declaredRole || item.inferredRole;
         if (!ROLES.includes(role)) continue;
+        const sceneId = "help.options." + role;
+        if (!audit.has(sceneId)) continue;
+        audit.start(sceneId);
         const result = await capturePair(page, item);
         probes += 1;
+        measuredRoles.add(role);
         if (result.error) {
           failures.push(`${locale.id}@${dpr} ${role}/${item.key}: ${result.error}`);
           continue;
@@ -411,6 +422,10 @@ try {
           failures.push(`${locale.id}@${dpr} ${item.declaredScript}/${role}/${item.key}: raster center delta=${result.deltaPhysicalPx}px scale=${result.rasterScale} copy=${result.copyInkY} icon=${result.iconInkY}`);
         }
       }
+      for (const row of audit.selected) {
+        if (!measuredRoles.has(row.role)) throw new Error(`${row.id}: selected help role was not measured`);
+        audit.complete(row.id, { locale: locale.messagesDir, dpr, font: process.env.FONTCONFIG_FILE ? 'ci' : 'native' });
+      }
       await context.close();
     }
   }
@@ -418,6 +433,7 @@ try {
   await browser.close();
 }
 
+audit.finish();
 if (failures.length) {
   console.error(`[options-help-render] FAIL ${failures.length} violation(s), ${probes} raster probes`);
   failures.slice(0, 40).forEach((failure) => console.error(`  ${failure}`));
@@ -427,7 +443,7 @@ if (failures.length) {
   });
   process.exit(1);
 }
-console.log(`[options-help-render] OK ${probes} raster probes across ${DPR_VALUES.length} DPRs, ${LOCALES.length} locales and ${ROLES.length} roles`);
+console.log(`[options-help-render] OK ${probes} raster probes across ${DPR_VALUES.length} DPRs, ${LOCALES.length} locales and ${audit.selected.length} roles`);
 if (PRINT_RANGES) {
   [...samples.entries()].sort().forEach(([key, values]) => {
     console.log(`  range ${key}: ${Math.min(...values)}..${Math.max(...values)}px (${values.length})`);

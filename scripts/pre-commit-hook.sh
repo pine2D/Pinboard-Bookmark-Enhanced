@@ -30,7 +30,8 @@ UI_HTML_CHANGED=$(printf '%s
 ' "$STAGED" | grep -E "$UI_HTML_RE")
 UI_VOCAB_CHANGED=$(printf '%s
 ' "$STAGED" | grep -E "$UI_VOCAB_RE")
-if [ -z "$CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ]; then
+AUDIT_CHANGED=$(printf '%s\n' "$STAGED" | grep -E '^(scripts/(audit[^/]*|ui-render-audit|qa-drive|options-help-render-audit)\.mjs|tests/(audit[^/]*-tests|pinboard-theme-render-tests|render-audit-checklist)\.mjs|scripts/(verify|pre-commit-hook)\.sh)$')
+if [ -z "$CHANGED" ] && [ -z "$UI_HTML_CHANGED" ] && [ -z "$UI_VOCAB_CHANGED" ] && [ -z "$AUDIT_CHANGED" ]; then
   exit 0
 fi
 
@@ -41,6 +42,13 @@ fi
 
 # Run from repo root so relative imports in the .mjs work correctly.
 REPO_ROOT=$(git rev-parse --show-toplevel)
+
+if [ -n "$AUDIT_CHANGED" ]; then
+  echo "[audit-scope] checking scenario routing (no product browser matrix)"
+  for scope_test in "$REPO_ROOT"/tests/audit*-tests.mjs; do
+    node "$scope_test" || exit 1
+  done
+fi
 
 if [ -n "$CHANGED" ]; then
 echo "[drift-guard] theme-surface files changed — running read-only factory gates"

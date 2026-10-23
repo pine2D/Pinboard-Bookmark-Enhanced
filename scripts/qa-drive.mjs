@@ -46,12 +46,42 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isolatedFontconfigEnv, parityProbeEnv } from "./ci-fonts-env.mjs";
+import { auditSelection } from "./audit-scope.mjs";
+import { QA_SCENARIOS, QA_OPTIONS_PANELS, QA_THEME_PRESETS, runQaScenarios, qaThemeCases, qaReaderControlCases, qaExpectedCases, assertQaCases } from "./audit-qa-scenarios.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(SCRIPT_DIR, "..");
 const QA_SCAN = resolve(REPO, ".qa-scan");
 const REPORT_ROOT = resolve(QA_SCAN, "report");
 const TIMEOUT_MS = 15_000;
+const argv = process.argv.slice(2);
+const flag = (name, fallback) => {
+  const index = argv.findIndex(arg => arg === name || arg.startsWith(`${name}=`));
+  return index < 0 ? fallback : argv[index] === name ? argv[index + 1] : argv[index].slice(name.length + 1);
+};
+const LEGACY_SURFACES = new Set(QA_SCENARIOS.map(row => row.driver));
+const requestedLegacySurfaces = flag("--surfaces", null);
+if (requestedLegacySurfaces !== null) {
+  for (const surface of (requestedLegacySurfaces || "").split(",")) {
+    if (!LEGACY_SURFACES.has(surface)) throw new Error(`Unknown --surfaces value: ${surface || "(empty)"}`);
+  }
+}
+const AUDIT = argv.some(arg => arg.startsWith("--audit-"))
+  ? auditSelection({ runner: "qa", scenarios: QA_SCENARIOS, argv }) : null;
+for (const scenario of AUDIT?.selected || []) qaThemeCases(scenario, scenario.selectedAxes);
+if (AUDIT?.maybePrintPlan()) {
+  await new Promise(resolve => process.stdout.write("", resolve));
+  process.exit(0);
+}
+const actualFont = process.env.FONTCONFIG_FILE ? "ci" : "native";
+if (AUDIT?.filters.axes.font?.some(font => font !== actualFont)) {
+  throw new Error(`QA font environment mismatch: requested ${AUDIT.filters.axes.font.join(",")}, actual ${actualFont}. Run each font separately with its FONTCONFIG_FILE environment.`);
+}
+let activeScenario = null;
+let activeCases = [];
+const recordCase = axes => { if (activeScenario) activeCases.push({ font: actualFont, dpr: 1, ...axes }); };
+const includesStep = step => !activeScenario || activeScenario.step === step;
+const axisValues = (axis, defaults) => activeScenario ? AUDIT.values(activeScenario.id, axis, defaults) : defaults;
 const FONTCONFIG_ISOLATION = isolatedFontconfigEnv("qa-drive");
 if (FONTCONFIG_ISOLATION) {
   if (!isAbsolute(process.env.FONTCONFIG_FILE)) throw new Error("FONTCONFIG_FILE must be an absolute path");
@@ -61,8 +91,6 @@ if (FONTCONFIG_ISOLATION) {
 }
 
 // ---- CLI ----
-const argv = process.argv.slice(2);
-const flag = (n, d) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : d; };
 const hasFlag = (n) => argv.includes(n);
 const FAULTS = ["ai-429", "ai-500", "ai-malformed", "ai-truncated", "pb-401", "pb-500"];
 const CONFIG = {
@@ -78,6 +106,13 @@ const CONFIG = {
   // the `faults` surface screenshots the resulting error UI. No random fuzz.
   fault: flag("--fault", ""),
 };
+for (const surface of CONFIG.surfaces) {
+  if (!LEGACY_SURFACES.has(surface)) throw new Error(`Unknown --surfaces value: ${surface}`);
+}
+if (AUDIT) {
+  if (CONFIG.headless && AUDIT.selected.some(row => row.headed)) throw new Error("Selected QA scenario needs a headed browser; remove --headless or exclude toolbar/drafts");
+  CONFIG.surfaces = [...new Set(AUDIT.selected.map(row => row.driver))];
+}
 if (!/^[A-Za-z0-9._-]+$/.test(CONFIG.label)) {
   console.error("[qa-drive] --label may contain only letters, numbers, dot, underscore, hyphen");
   process.exit(2);
@@ -86,7 +121,7 @@ if (CONFIG.fault && !FAULTS.includes(CONFIG.fault)) {
   console.error(`[qa-drive] --fault must be one of: ${FAULTS.join(", ")}`);
   process.exit(2);
 }
-if (CONFIG.fault && !CONFIG.surfaces.some((s) => ["faults", "translate-stop"].includes(s))) {
+if (!AUDIT && CONFIG.fault && !CONFIG.surfaces.some((s) => ["faults", "translate-stop"].includes(s))) {
   console.warn(`[qa-drive] --fault ${CONFIG.fault} set — running the faults surface only`);
   CONFIG.surfaces = ["faults"];
 }
@@ -275,16 +310,19 @@ function startAiMock() {
           return;
         }
         if (CONFIG.fault === "ai-500") {
+          requests.push({ path: req.url, model: body?.model || null, stream: !!body?.stream, fault: "ai-500" });
           res.writeHead(500, { "Content-Type": "application/json" });
           res.end('{"error":{"message":"qa-mock internal error"}}');
           return;
         }
         if (CONFIG.fault === "ai-malformed") {
+          requests.push({ path: req.url, model: body?.model || null, stream: !!body?.stream, fault: "ai-malformed" });
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end('{"choices":[{"message":{"role":"assistant","content":"{\\"translations\\": [{oops"}}]}');
           return;
         }
         if (CONFIG.fault === "ai-truncated" && body?.stream) {
+          requests.push({ path: req.url, model: body?.model || null, stream: true, fault: "ai-truncated" });
           res.writeHead(200, { "Content-Type": "text/event-stream" });
           res.write('data: {"choices":[{"delta":{"content":"{\\"translations\\":[{\\"id\\":1,\\"te"}}]}\n\n');
           setTimeout(() => res.destroy(), 150); // cut mid-stream, no [DONE]
@@ -330,6 +368,13 @@ function startAiMock() {
 // ============================================================
 
 async function installRoutes(context, records, aiPort) {
+  // Include bootstrap pages in the scope evidence, not only HTTP requests.
+  context.on("page", page => page.on("framenavigated", frame => {
+    if (frame.parentFrame()) return;
+    const url = new URL(frame.url());
+    if (url.protocol !== "chrome-extension:") return;
+    records.push({ disposition: "page-navigation", origin: `chrome-extension://${url.host}`, path: url.pathname });
+  }));
   await context.route(/^https?:\/\//, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -348,7 +393,9 @@ async function installRoutes(context, records, aiPort) {
         return;
       }
       if (url.hostname === "api.pinboard.in") {
-        if (CONFIG.fault === "pb-401" || CONFIG.fault === "pb-500") {
+        // Fail the save itself. Faulting unrelated boot requests logs the user
+        // out before the popup can exercise its save-error path.
+        if (["pb-401", "pb-500"].includes(CONFIG.fault) && url.pathname === "/v1/posts/add") {
           rec.disposition = `pinboard-fault-${CONFIG.fault}`;
           records.push(rec);
           await route.fulfill({
@@ -581,21 +628,28 @@ async function seedPreviewData(worker, storageKey = PREVIEW_KEY) {
 async function finishSeed(context, worker) {
   const page = await context.newPage();
   const extId = new URL(worker.url()).hostname;
-  await page.goto(`chrome-extension://${extId}/options.html#general`, { waitUntil: "load", timeout: TIMEOUT_MS });
-  await page.evaluate(async () => {
-    const response = await fetch(chrome.runtime.getURL("_locales/zh_CN/messages.json"));
-    const messages = await response.json();
-    localStorage.setItem("pp-sync-enabled", "0");
-    localStorage.setItem("pp-i18n-lang", "zh_CN");
-    localStorage.setItem("pp-i18n-msgs", JSON.stringify(messages));
-    localStorage.setItem("pp-logged-in", "1");
-    localStorage.setItem("pp-theme", "light");
-    localStorage.setItem("pp-theme-preset", "");
-    localStorage.setItem("pp-theme-follow", "1");
-    localStorage.setItem("pp-popup-width", "550");
-    localStorage.setItem("md-preview-theme", "light");
-  });
-  await page.close();
+  // The mirrors are origin-scoped. A packaged image gives us that origin
+  // without executing an unrelated UI's startup, storage migrations or hooks.
+  // Use an absolute resource URL: a non-HTML document need not expose chrome.runtime.
+  try {
+    await page.goto(`chrome-extension://${extId}/icons/pin-default-16.png`, { waitUntil: "load", timeout: TIMEOUT_MS });
+    await page.evaluate(async (localeUrl) => {
+      const response = await fetch(localeUrl);
+      if (!response.ok) throw new Error(`QA locale bootstrap failed: ${response.status}`);
+      const messages = await response.json();
+      localStorage.setItem("pp-sync-enabled", "0");
+      localStorage.setItem("pp-i18n-lang", "zh_CN");
+      localStorage.setItem("pp-i18n-msgs", JSON.stringify(messages));
+      localStorage.setItem("pp-logged-in", "1");
+      localStorage.setItem("pp-theme", "light");
+      localStorage.setItem("pp-theme-preset", "");
+      localStorage.setItem("pp-theme-follow", "1");
+      localStorage.setItem("pp-popup-width", "550");
+      localStorage.setItem("md-preview-theme", "light");
+    }, `chrome-extension://${extId}/_locales/zh_CN/messages.json`);
+  } finally {
+    await page.close();
+  }
 }
 
 // ============================================================
@@ -691,10 +745,7 @@ class Reporter {
 // harness (same auto-coverage idea as sitePresetKeys); fallback keeps the
 // harness alive if the markup pattern ever changes.
 function optionsTabs() {
-  const src = readFileSync(join(REPO, "options.html"), "utf8");
-  const tabs = [...src.matchAll(/id="tab-([a-z-]+)"/g)].map((m) => m[1]);
-  return tabs.length ? tabs : ["general", "popup", "bookmarks", "quick", "ai", "ai-behavior",
-    "reader", "notes", "vocab", "markdown", "tags", "archive", "appearance", "storage"];
+  return QA_OPTIONS_PANELS;
 }
 
 async function driveOptions(context, extId, rep) {
@@ -703,10 +754,12 @@ async function driveOptions(context, extId, rep) {
   const detach = rep.attach(page, s);
   try {
     await page.goto(`chrome-extension://${extId}/options.html#general`, { waitUntil: "load", timeout: TIMEOUT_MS });
+    if (activeScenario) await page.waitForFunction(() => document.documentElement.hasAttribute("data-options-ready"));
     await page.waitForTimeout(800);
     for (const tab of optionsTabs()) {
+      if (!includesStep(tab)) continue;
       try {
-        await page.locator(`#tab-${tab}`).click({ timeout: 3000 });
+        await page.locator(`#tab-${tab}`).click({ timeout: activeScenario ? TIMEOUT_MS : 3000 });
         await page.waitForTimeout(tab === "vocab" ? 1200 : 400);
         await rep.shot(page, s, `tab-${tab}`, { fullPage: true });
         if (tab === "general") {
@@ -771,14 +824,17 @@ async function driveLibrary(context, extId, rep) {
   const page = await context.newPage();
   const detach = rep.attach(page, s);
   const step = async (state, fn) => {
+    if (!includesStep(state)) return;
     try { await fn(); } catch (e) { s.failures.push(`${state}: ${e.message}`); }
   };
   try {
     await page.goto(`chrome-extension://${extId}/library.html#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
     await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS }).catch(() => {});
     await page.waitForTimeout(400);
-    await rep.shot(page, s, "vocab-list", { fullPage: true });
-    await axeScan(page, s, "library");
+    if (includesStep("vocab-list")) {
+      await rep.shot(page, s, "vocab-list", { fullPage: true });
+      await axeScan(page, s, "library");
+    }
 
     await step("vocab-detail", async () => {
       await page.locator("#vocab-list .vocab-card .notes-card-head").first().click({ timeout: 3000 });
@@ -825,6 +881,8 @@ async function driveLibrary(context, extId, rep) {
     });
 
     await step("notes-same-page", async () => {
+      await page.locator("#lib-tab-notes").click({ timeout: 3000 });
+      await page.waitForSelector("#notes-list .notes-hit", { timeout: TIMEOUT_MS });
       await page.locator("#notes-list .notes-hit-btn").filter({ hasText: "这是第一条固定高亮" }).click();
       await page.waitForSelector("#notes-detail .notes-excerpt-jump");
       if (await page.locator("#notes-detail .notes-excerpt").count() !== 7) throw new Error("same-page excerpts missing or foreign item leaked");
@@ -849,6 +907,7 @@ async function driveLibrary(context, extId, rep) {
       await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS }).catch(() => {});
       await page.waitForTimeout(400);
       await rep.shot(page, s, "narrow-vocab-list", { fullPage: true });
+      recordCase({ viewport: 420 });
     });
   } catch (e) {
     s.failures.push(`library open: ${e.message}`);
@@ -1264,6 +1323,7 @@ async function drivePreview(context, worker, extId, rep) {
   const page = await context.newPage();
   const detach = rep.attach(page, s);
   const step = async (state, fn) => {
+    if (!includesStep(state)) return;
     try { await fn(); } catch (e) { s.failures.push(`${state}: ${e.message}`); }
   };
   try {
@@ -1271,8 +1331,10 @@ async function drivePreview(context, worker, extId, rep) {
     await page.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}`, { waitUntil: "load", timeout: TIMEOUT_MS });
     await page.waitForFunction(() => document.querySelectorAll("#rendered-view [data-pb]").length > 0, { timeout: TIMEOUT_MS });
     await page.waitForTimeout(800);
-    await rep.shot(page, s, "base");
-    await axeScan(page, s, "preview");
+    if (includesStep("base")) {
+      await rep.shot(page, s, "base");
+      await axeScan(page, s, "preview");
+    }
 
     await step("help-overlay", async () => {
       await page.locator("#rendered-view").click({ position: { x: 20, y: 10 } });
@@ -1446,8 +1508,7 @@ async function drivePinboard(context, rep) {
 // Adaptive umbrellas resolve their variant from optTheme at render time.
 
 function uiPresetKeys() {
-  const src = readFileSync(join(REPO, "options.html"), "utf8");
-  return [...new Set([...src.matchAll(/theme-preset-btn" data-theme="([a-z0-9-]*)"/g)].map((m) => m[1]))];
+  return axisValues("theme", QA_THEME_PRESETS).map(preset => preset === "default" ? "" : preset);
 }
 
 function adaptivePresetKeys() {
@@ -1460,6 +1521,16 @@ async function driveThemes(context, worker, extId, rep) {
   const s = rep.surface("themes");
   const presets = uiPresetKeys();
   const adaptive = new Set(adaptivePresetKeys());
+  const themeCases = activeScenario?.axes.theme ? qaThemeCases(activeScenario, AUDIT.filters.axes) : [];
+  const modesFor = (preset, legacy = ["light", "dark"]) => activeScenario
+    ? themeCases.filter(item => item.theme === (preset || "default")).map(item => item.scheme) : legacy;
+  const verifyScheme = async (page, mode, site = false) => {
+    if (!activeScenario) return;
+    await page.waitForFunction(({ mode, site }) => {
+      const scheme = getComputedStyle(site ? document.body : document.documentElement).colorScheme;
+      return (scheme === "normal" ? "light" : scheme) === mode;
+    }, { mode, site }, { timeout: TIMEOUT_MS });
+  };
   const setTheme = (preset, mode) => worker.evaluate(async ({ p, m }) => {
     await chrome.storage.local.set({ themePresetKey: p, optTheme: m });
   }, { p: preset, m: mode });
@@ -1469,14 +1540,16 @@ async function driveThemes(context, worker, extId, rep) {
   const page = await context.newPage();
   const detach = rep.attach(page, s);
   try {
-    for (const preset of presets) {
-      for (const mode of ["light", "dark"]) {
+    for (const preset of includesStep("options") ? presets : []) {
+      for (const mode of modesFor(preset)) {
         try {
           await setTheme(preset, mode);
           await page.goto(`chrome-extension://${extId}/options.html#appearance`, { waitUntil: "load", timeout: TIMEOUT_MS });
           await page.reload({ waitUntil: "load", timeout: TIMEOUT_MS });
           await page.waitForTimeout(350);
+          await verifyScheme(page, mode);
           await rep.shot(page, s, `options-${preset || "default"}-${mode}`);
+          recordCase({ theme: preset || "default", scheme: mode });
         } catch (e) {
           s.failures.push(`options-${preset || "default"}-${mode}: ${e.message}`);
         }
@@ -1489,8 +1562,8 @@ async function driveThemes(context, worker, extId, rep) {
     // same "#vocab" fragment risks Chromium treating it as a same-document
     // navigation and silently skipping the reload (same gotcha documented in
     // ui-render-audit.mjs's runLibraryTheme, reused verbatim here).
-    for (const preset of presets) {
-      for (const mode of ["light", "dark"]) {
+    for (const preset of includesStep("library") ? presets : []) {
+      for (const mode of modesFor(preset)) {
         try {
           await setTheme(preset, mode);
           const url = `chrome-extension://${extId}/library.html?_qa=${encodeURIComponent(preset)}-${mode}#vocab`;
@@ -1502,34 +1575,40 @@ async function driveThemes(context, worker, extId, rep) {
           // uncommented): options' single #appearance panel fits the viewport,
           // but the vocab list's height varies with word count and routinely
           // exceeds it -- a non-fullPage shot would crop it.
+          await verifyScheme(page, mode);
           await rep.shot(page, s, `library-${preset || "default"}-${mode}`, { fullPage: true });
+          recordCase({ theme: preset || "default", scheme: mode });
         } catch (e) {
           s.failures.push(`library-${preset || "default"}-${mode}: ${e.message}`);
         }
       }
     }
     // md-preview follows optTheme light/dark only.
-    for (const mode of ["light", "dark"]) {
+    for (const mode of includesStep("reader") ? axisValues("scheme", ["light", "dark"]) : []) {
       try {
         await setTheme("", mode);
         await seedPreviewData(worker);
         await page.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}`, { waitUntil: "load", timeout: TIMEOUT_MS });
         await page.waitForFunction(() => document.querySelectorAll("#rendered-view [data-pb]").length > 0, { timeout: TIMEOUT_MS });
         await page.waitForTimeout(600);
+        await verifyScheme(page, mode);
         await rep.shot(page, s, `preview-${mode}`);
+        recordCase({ scheme: mode });
       } catch (e) {
         s.failures.push(`preview-${mode}: ${e.message}`);
       }
     }
     // pinboard.in site fixture: adaptive umbrellas render a different variant
     // per light/dark, so they get two shots; fixed presets get one.
-    for (const preset of presets.filter(Boolean)) {
-      for (const mode of adaptive.has(preset) ? ["light", "dark"] : ["light"]) {
+    for (const preset of includesStep("site") ? presets.filter(Boolean) : []) {
+      for (const mode of modesFor(preset, adaptive.has(preset) ? ["light", "dark"] : ["light"])) {
         try {
           await setTheme(preset, mode);
           await page.goto("https://pinboard.in/u:qa/", { waitUntil: "load", timeout: TIMEOUT_MS });
           await page.waitForTimeout(700);
-          await rep.shot(page, s, adaptive.has(preset) ? `site-${preset}-${mode}` : `site-${preset}`, { fullPage: true });
+          await verifyScheme(page, mode, true);
+          await rep.shot(page, s, activeScenario || adaptive.has(preset) ? `site-${preset}-${mode}` : `site-${preset}`, { fullPage: true });
+          recordCase({ theme: preset, scheme: mode });
         } catch (e) {
           s.failures.push(`site-${preset}-${mode}: ${e.message}`);
         }
@@ -1554,13 +1633,16 @@ async function driveThemes(context, worker, extId, rep) {
     for (const [label, url] of [
       ["options", `chrome-extension://${extId}/options.html#appearance`],
       ["library", `chrome-extension://${extId}/library.html?_qa=unset#vocab`],
-    ]) {
+    ].filter(([label]) => includesStep(`${label}-unset`))) {
       try {
+        await page.emulateMedia({ colorScheme: "light" });
         await clearTheme();
         await page.goto(url, { waitUntil: "load", timeout: TIMEOUT_MS });
         await page.reload({ waitUntil: "load", timeout: TIMEOUT_MS });
         await page.waitForTimeout(350);
+        await verifyScheme(page, "light");
         await rep.shot(page, s, `${label}-unset-light`);
+        recordCase({ scheme: "light" });
       } catch (e) {
         s.failures.push(`${label}-unset-light: ${e.message}`);
       }
@@ -1572,14 +1654,16 @@ async function driveThemes(context, worker, extId, rep) {
     // acceptance grid needs a popup row per preset just like options/library.
     try {
       await page.setViewportSize({ width: 550, height: 680 });
-      for (const preset of presets) {
-        for (const mode of ["light", "dark"]) {
+      for (const preset of includesStep("popup") ? presets : []) {
+        for (const mode of modesFor(preset)) {
           try {
             await setTheme(preset, mode);
             const url = `chrome-extension://${extId}/popup.html?_qa=${encodeURIComponent(preset)}-${mode}`;
             await page.goto(url, { waitUntil: "load", timeout: TIMEOUT_MS });
             await page.waitForTimeout(350);
+            await verifyScheme(page, mode);
             await rep.shot(page, s, `popup-${preset || "default"}-${mode}`);
+            recordCase({ theme: preset || "default", scheme: mode });
           } catch (e) {
             s.failures.push(`popup-${preset || "default"}-${mode}: ${e.message}`);
           }
@@ -1589,7 +1673,7 @@ async function driveThemes(context, worker, extId, rep) {
       s.failures.push(`popup-preset-matrix: ${e.message}`);
     }
     try {
-      for (const scheme of ["light", "dark"]) {
+      for (const scheme of includesStep("popup-unset") ? axisValues("scheme", ["light", "dark"]) : []) {
         await clearTheme();
         await page.emulateMedia({ colorScheme: scheme });
         await page.goto(`chrome-extension://${extId}/popup.html?_qa=unset-${scheme}`, { waitUntil: "load", timeout: TIMEOUT_MS });
@@ -1601,7 +1685,9 @@ async function driveThemes(context, worker, extId, rep) {
         // its own page.
         await page.reload({ waitUntil: "load", timeout: TIMEOUT_MS });
         await page.waitForTimeout(600);
+        await verifyScheme(page, scheme);
         await rep.shot(page, s, `popup-unset-${scheme}`);
+        recordCase({ scheme });
       }
     } catch (e) {
       s.failures.push(`popup-unset: ${e.message}`);
@@ -1618,9 +1704,34 @@ async function driveThemes(context, worker, extId, rep) {
 // happy-path tour): translate failure pills + retry, popup save failure. ----
 
 async function driveFaults(context, worker, extId, rep) {
-  const s = rep.surface(`faults-${CONFIG.fault || "none"}`);
-  if (!CONFIG.fault) { s.notes.push("未指定 --fault，无事可做"); return; }
-  if (CONFIG.fault.startsWith("ai-")) {
+  const profile = CONFIG.fault;
+  const s = rep.surface(`faults-${profile || "none"}`);
+  if (!profile) { s.failures.push("SETUP: no fault profile selected"); return; }
+  const aiStart = aiRequests.length;
+  const networkStart = rep.network.length;
+  const faultHits = () => profile.startsWith("ai-")
+    ? aiRequests.slice(aiStart).filter(row => row.fault === profile)
+    : rep.network.slice(networkStart).filter(row => row.disposition === `pinboard-fault-${profile}`);
+  const requireHit = () => {
+    const count = faultHits().length;
+    if (!count) throw new Error(`SETUP: ${profile} produced no matching fault response`);
+    return count;
+  };
+  // Only after both the response and error UI are proved, exclude the exact
+  // expected transport error from the verdict. Raw screenshot events remain.
+  const recordExpectedErrors = () => {
+    const status = { "ai-429": "429 (Too Many Requests)", "ai-500": "500 (Internal Server Error)",
+      "pb-401": "401 (Unauthorized)", "pb-500": "500 (Internal Server Error)" }[profile];
+    const expected = new Set(status ? [`Failed to load resource: the server responded with a status of ${status}`] : []);
+    if (profile === "ai-truncated") {
+      expected.add("Failed to load resource: net::ERR_INCOMPLETE_CHUNKED_ENCODING");
+      expected.add(`requestfailed: http://127.0.0.1:${aiPort}/v1/chat/completions (net::ERR_INCOMPLETE_CHUNKED_ENCODING)`);
+    }
+    const count = s.consoleErrors.filter(message => expected.has(message)).length;
+    s.consoleErrors = s.consoleErrors.filter(message => !expected.has(message));
+    s.notes.push(`Verified ${profile}: ${requireHit()} matching response(s), ${count} expected transport error(s).`);
+  };
+  if (profile.startsWith("ai-")) {
     const page = await context.newPage();
     const detach = rep.attach(page, s);
     try {
@@ -1629,17 +1740,21 @@ async function driveFaults(context, worker, extId, rep) {
       await page.waitForFunction(() => document.querySelectorAll("#rendered-view [data-pb]").length > 0, { timeout: TIMEOUT_MS });
       await page.locator("#rendered-view").click({ position: { x: 20, y: 10 } });
       await page.keyboard.press("t");
-      await page.waitForFunction(() => document.querySelectorAll(".pb-tr-err").length > 0, { timeout: 30_000 })
-        .catch(() => s.notes.push("30s 内未出现 .pb-tr-err 失败 pill——检查该 fault 是否走了别的失败路径"));
+      // Rate limiting exhausts real 2s + 8s + 32s retries before rendering
+      // the failure card; the ordinary 30s wait would never reach that state.
+      await page.waitForFunction(() => [...document.querySelectorAll(".pb-tr-err")].some(el => el.checkVisibility()), null,
+        { timeout: profile === "ai-429" ? 60_000 : 30_000 });
+      requireHit();
       await page.waitForTimeout(1500);
-      await page.evaluate(() => document.querySelector(".pb-tr-err")?.scrollIntoView({ block: "center", behavior: "instant" }));
-      await page.waitForTimeout(300);
+      await page.locator(".pb-tr-err").first().scrollIntoViewIfNeeded();
       await rep.shot(page, s, "translate-error");
       const counts = await page.evaluate(() => ({
-        pills: document.querySelectorAll(".pb-tr-err").length,
+        pills: [...document.querySelectorAll(".pb-tr-err")].filter(el => el.checkVisibility()).length,
         filled: document.querySelectorAll(".pb-tr").length,
       }));
-      s.notes.push(`fault=${CONFIG.fault}：失败 pill ×${counts.pills}，成功填充 ×${counts.filled}`);
+      if (!counts.pills) throw new Error(`SETUP: ${profile} has no visible translation error pill`);
+      s.notes.push(`fault=${profile}：失败 pill ×${counts.pills}，成功填充 ×${counts.filled}`);
+      recordExpectedErrors();
     } catch (e) {
       s.failures.push(`translate-error: ${e.message}`);
     } finally {
@@ -1647,27 +1762,52 @@ async function driveFaults(context, worker, extId, rep) {
       await page.close().catch(() => {});
     }
   } else {
+    const source = await context.newPage();
     const page = await context.newPage();
     await page.setViewportSize({ width: 550, height: 680 });
     const detach = rep.attach(page, s);
     try {
+      // The popup needs a real saveable source tab. The existing Pinboard
+      // page fixture is already inside required host permissions, so this
+      // does not grant an unrelated optional origin for a Pinboard-only test.
+      await source.goto("https://pinboard.in/u:qa/", { waitUntil: "load", timeout: TIMEOUT_MS });
+      const sourceTab = await worker.evaluate(async url => (await chrome.tabs.query({ url }))[0], source.url());
+      if (!sourceTab?.id) throw new Error("SETUP: fault fixture source tab is missing");
+      await page.addInitScript(sourceTab => {
+        const query = chrome.tabs.query.bind(chrome.tabs);
+        chrome.tabs.query = (info, ...rest) => info.active ? Promise.resolve([sourceTab]) : query(info, ...rest);
+      }, sourceTab);
       await page.goto(`chrome-extension://${extId}/popup.html`, { waitUntil: "load", timeout: TIMEOUT_MS });
-      await page.waitForTimeout(2000); // boot status checks hit the fault
+      await page.waitForFunction(() => typeof _pageInfoReady !== "undefined" && _pageInfoReady && _popupDraftContext?.ready);
       await rep.shot(page, s, "popup-boot");
-      // Under pb faults the popup may legitimately land in a login/offline
-      // state with no visible save button — that IS the state under test.
-      if (await page.locator("#submit-btn").isVisible().catch(() => false)) {
-        await page.locator("#submit-btn").click({ timeout: 3000 });
-        await page.waitForTimeout(2500);
-        await rep.shot(page, s, "popup-save-error");
-      } else {
-        s.notes.push("保存按钮不可见——popup 在该故障下落入登录/离线态（见 popup-boot 截图），保存路径无从触发");
+      const submit = page.locator("#submit-btn");
+      if (!(await submit.isVisible()) || !(await submit.isEnabled())) {
+        throw new Error(`SETUP: ${profile} cannot exercise save: submit is hidden or disabled`);
       }
+      const saveStart = rep.network.length;
+      await submit.click({ timeout: 3000 });
+      await page.waitForFunction(profile => {
+        const visibleMessage = el => el && el.checkVisibility() && !!el.textContent.trim();
+        // A rejected token clears the session and reloads into the login form;
+        // its one-shot auth-reset explanation is the expected error surface.
+        if (profile === "pb-401") return visibleMessage(document.querySelector("#login-error")) &&
+          document.querySelector("#login-section")?.checkVisibility() &&
+          document.querySelector("#login-error").textContent === t("pinboardErrorAuth");
+        return [...document.querySelectorAll(".feedback-card")].some(el =>
+          ["error", "warning"].includes(el.dataset.variant) && visibleMessage(el.querySelector(".fc-message")) &&
+          [t("saveQueuedServer"), t("pinboardErrorServer")].includes(el.querySelector(".fc-message").textContent));
+      }, profile, { timeout: TIMEOUT_MS });
+      requireHit();
+      const saveHits = rep.network.slice(saveStart).filter(row => row.disposition === `pinboard-fault-${profile}` && row.path === "/v1/posts/add");
+      if (!saveHits.length) throw new Error(`SETUP: ${profile} save dispatched no matching bookmark fault request`);
+      await rep.shot(page, s, "popup-save-error");
+      recordExpectedErrors();
     } catch (e) {
-      s.failures.push(`popup-boot: ${e.message}`);
+      s.failures.push(`popup-save-error: ${e.message}`);
     } finally {
       detach();
       await page.close().catch(() => {});
+      await source.close().catch(() => {});
     }
   }
 }
@@ -1773,7 +1913,8 @@ async function drivePopupPage(context, extId, rep, s) {
 
 async function drivePopup(context, worker, extId, rep) {
   const s = rep.surface("popup");
-  await drivePopupPage(context, extId, rep, s);
+  if (includesStep("page")) await drivePopupPage(context, extId, rep, s);
+  if (!includesStep("toolbar")) return;
   if (CONFIG.headless) {
     s.notes.push("headless：真实工具栏弹窗需要 headed，已跳过（page-mode 已覆盖）");
     return;
@@ -2094,7 +2235,8 @@ async function driveReaderControls(context, worker, extId, rep) {
   const beforeAi = aiRequests.length;
   const settingKeys = ["optLang", "pbp_font_tier", "pbp_leading_tier", "pbp_color_scheme", "customModel"];
   const original = await worker.evaluate(keys => chrome.storage.local.get(keys), settingKeys);
-  const locales = CONFIG.readerControlsRepresentative ? ["zh_CN", "de"] : ["zh_CN", "en", "de", "fr", "ja", "pl", "ru", "zh_TW", "zh_HK"];
+  const locales = activeScenario?.step === "stop" ? ["zh_CN"] : activeScenario && AUDIT.filters.axes.locale
+    ? AUDIT.filters.axes.locale : CONFIG.readerControlsRepresentative ? ["zh_CN", "de"] : ["zh_CN", "en", "de", "fr", "ja", "pl", "ru", "zh_TW", "zh_HK"];
   const longModel = "qa-very-long-model-identifier-".repeat(8);
   const requireState = (ok, message) => { if (!ok) throw new Error(message); };
   const record = (label, errors) => { for (const error of errors) s.failures.push(label + ": " + error); };
@@ -2112,6 +2254,7 @@ async function driveReaderControls(context, worker, extId, rep) {
   const chosenShot = (locale, c) => CONFIG.readerControlsRepresentative || (locale === "zh_CN" && c.width === 1440 && c.tier === 0)
     || (locale === "de" && c.mode === "light" && c.width === 360 && c.tier === 2);
   let matrixCases = 0;
+  const capturedLocales = new Set();
   let stoppedExpected = false;
   try {
     await page.emulateMedia({ reducedMotion: "reduce" });
@@ -2122,17 +2265,17 @@ async function driveReaderControls(context, worker, extId, rep) {
       await page.goto("chrome-extension://" + extId + "/md-preview.html?k=" + PREVIEW_KEY, { waitUntil: "load" });
       await page.evaluate(async () => { initI18n(); await pbpI18nReady(); applyI18n(); });
       await settled();
-      const cases = [];
-      if (CONFIG.readerControlsRepresentative) {
-        for (const mode of ["light", "dark"]) cases.push({ mode, width: 360, tier: 2 });
-      } else {
-        for (const mode of ["light", "dark"]) for (const width of [1440, 360]) for (const tier of [0, 2]) cases.push({ mode, width, tier });
-        if (locale === "zh_CN" || locale === "de") for (const mode of ["light", "dark"]) cases.push({ mode, width: 320, tier: 2 });
-      }
+      let cases = qaReaderControlCases(locale, activeScenario ? AUDIT.filters.axes : {}, {
+        representative: CONFIG.readerControlsRepresentative, scoped: !!activeScenario,
+      });
+      if (activeScenario?.step === "history") cases = [{ mode: "dark", width: 360, tier: 2 }];
+      if (!cases.length) continue;
+      if (includesStep("editor")) {
       await page.keyboard.press("Shift+s");
       await page.locator("#reader-bookmark-editor:popover-open").waitFor();
       requireState(await page.locator("#reader-bookmark-title").evaluate(el => document.activeElement === el), locale + ": Shift+S did not focus title");
       for (const c of cases) {
+        const previousFailures = s.failures.length;
         const label = locale + "/" + c.mode + "/" + c.width + "/tier" + c.tier;
         await arrange(c);
         record(label + "/editor", await page.evaluate(({ mode, locale }) => {
@@ -2164,7 +2307,12 @@ async function driveReaderControls(context, worker, extId, rep) {
           }
           return errors;
         }, { mode: c.mode, locale }));
-        if (chosenShot(locale, c)) await rep.shot(page, s, "editor-" + label.replaceAll("/", "-"));
+        if (activeScenario ? !capturedLocales.has(locale) || s.failures.length > previousFailures : chosenShot(locale, c)) {
+          await rep.shot(page, s, "editor-" + label.replaceAll("/", "-"));
+          capturedLocales.add(locale);
+        }
+        if (activeScenario) matrixCases++;
+        recordCase({ locale, viewport: c.width, scheme: c.mode, density: c.tier === 2 ? "large" : "default" });
       }
       // Exercise label activation and native Space, then inspect the actual
       // keyboard focus ring instead of assuming that a CSS selector is enough.
@@ -2185,9 +2333,12 @@ async function driveReaderControls(context, worker, extId, rep) {
       }
       await page.keyboard.press("Escape");
       await page.locator("#reader-bookmark-editor:popover-open").waitFor({ state: "hidden" });
+      }
+      if (activeScenario?.step === "editor") continue;
       await page.evaluate(() => window.pbpAskOpenPanel());
       await page.waitForFunction(() => !document.getElementById("ask-panel").hidden);
-      for (const c of cases) {
+      for (const c of includesStep("ask") ? cases : []) {
+        const previousFailures = s.failures.length;
         const label = locale + "/" + c.mode + "/" + c.width + "/tier" + c.tier;
         await arrange(c);
         await page.locator("#ask-input").fill("A short question?");
@@ -2214,9 +2365,14 @@ async function driveReaderControls(context, worker, extId, rep) {
           return errors;
         }, { shortHeight, longModel }));
         await page.locator("#ask-input").fill("");
-        if (chosenShot(locale, c)) await rep.shot(page, s, "ask-" + label.replaceAll("/", "-"));
+        if (activeScenario ? !capturedLocales.has(locale) || s.failures.length > previousFailures : chosenShot(locale, c)) {
+          await rep.shot(page, s, "ask-" + label.replaceAll("/", "-"));
+          capturedLocales.add(locale);
+        }
         matrixCases++;
+        recordCase({ locale, viewport: c.width, scheme: c.mode, density: c.tier === 2 ? "large" : "default" });
       }
+      if (includesStep("history")) {
       // Restore five actual persisted rounds, then let the real near-context
       // builder derive partial coverage from timed, already-indexed paragraphs.
       await page.evaluate(async () => {
@@ -2229,7 +2385,7 @@ async function driveReaderControls(context, worker, extId, rep) {
         document.dispatchEvent(new CustomEvent("pbp:video-position"));
       });
       await page.locator("#ask-scope-near").click();
-      await arrange({ mode: "dark", width: 360, tier: 2 });
+      await arrange(activeScenario ? cases[0] : { mode: "dark", width: 360, tier: 2 });
       record(locale + "/disclosures", await page.evaluate(() => {
         const st = _pbpAskState, note = document.querySelector(".ask-meta-note"), scope = document.getElementById("ask-scope-near"), errors = [];
         if (!st.scopeNear || !st.ctx.near || st.ctx.sentBlocks >= st.ctx.totalBlocks || scope.getAttribute("aria-pressed") !== "true") errors.push("near-context fixture did not reach real partial scope");
@@ -2240,11 +2396,16 @@ async function driveReaderControls(context, worker, extId, rep) {
         }
         return errors;
       }));
-      if (locale === "de") await rep.shot(page, s, "ask-de-partial-history-360");
+      if (locale === "de" || activeScenario) await rep.shot(page, s, activeScenario ? `ask-${locale}-partial-history` : "ask-de-partial-history-360");
+      if (activeScenario) matrixCases++;
+      recordCase({ locale, viewport: 360, scheme: "dark", density: "large" });
       await page.evaluate(() => pbpAskHistSet(_pbpAskState.url, [], _pbpAskState.account));
+      }
       console.log("[qa-drive]   reader-controls: " + locale + " (" + cases.length + " layout cases)");
     }
+    requireState(activeScenario?.step === "stop" || matrixCases > 0, "No reader-controls matrix cases match the requested axes");
     requireState(aiRequests.length === beforeAi, "layout/history checks unexpectedly called AI");
+    if (includesStep("stop")) {
     // A single deliberately slow loopback SSE response tests the native
     // keyboard Send -> Stop -> Send focus handoff, without an external model.
     await page.evaluate(() => { _pbpAskState.s.customModel = "qa-controls-slow"; });
@@ -2257,7 +2418,8 @@ async function driveReaderControls(context, worker, extId, rep) {
     stoppedExpected = true;
     requireState(await page.evaluate(() => document.activeElement.id === "ask-send" && document.getElementById("ask-stop").hidden), "Stop did not return keyboard focus to Send");
     requireState(aiRequests.length === beforeAi + 1, "expected exactly one loopback AI request for Stop");
-    s.notes.push("PASS: " + matrixCases + " layout cases (" + (CONFIG.readerControlsRepresentative ? "Chinese/German × light/dark × 360px × largest prose tier" : "9 locales × light/dark × 1440/360px × default/largest prose tier, plus Chinese/German 320px") + "); real Shift+S editor, label/Space toggles, focus-visible, native forced-colors; 26px icon controls, fixed 13px Ask input, short/long auto-growth, full model title and ellipsis, no horizontal overflow; persisted five-round history and timed partial context; one real loopback SSE Send/Stop focus test. Expected Stop request cancellation is excluded from errors.");
+    }
+    s.notes.push(activeScenario ? `PASS: ${activeScenario.id}; ${matrixCases} selected layout cases. Only the selected controls scenario ran.` : "PASS: " + matrixCases + " layout cases (" + (CONFIG.readerControlsRepresentative ? "Chinese/German × light/dark × 360px × largest prose tier" : "9 locales × light/dark × 1440/360px × default/largest prose tier, plus Chinese/German 320px") + "); real Shift+S editor, label/Space toggles, focus-visible, native forced-colors; 26px icon controls, fixed 13px Ask input, short/long auto-growth, full model title and ellipsis, no horizontal overflow; persisted five-round history and timed partial context; one real loopback SSE Send/Stop focus test. Expected Stop request cancellation is excluded from errors.");
   } catch (e) { s.failures.push(e.stack); }
   finally {
     await page.evaluate(() => _pbpAskState && pbpAskHistSet(_pbpAskState.url, [], _pbpAskState.account)).catch(() => {});
@@ -2284,6 +2446,7 @@ async function driveDiscovery(context, worker, extId, rep) {
   try {
     await options.goto(`chrome-extension://${extId}/options.html#general`,{waitUntil:"load"});
     await options.waitForFunction(()=>document.documentElement.hasAttribute("data-options-ready"));
+    if (includesStep("appearance")) {
     await options.evaluate(() => document.querySelector('.tab-btn[data-panel="appearance"]').click());
     await options.waitForSelector('.theme-preset-btn[data-theme="flexoki"]');
     await options.locator('.theme-preset-btn[data-theme="flexoki"]').click();
@@ -2299,6 +2462,8 @@ async function driveDiscovery(context, worker, extId, rep) {
     await options.emulateMedia({colorScheme: 'light'});
     await options.waitForFunction(() => document.getElementById('preset-preview-content').textContent === PINBOARD_THEMES['solarized-light'].css);
     await rep.shot(options, s, 'appearance-css-controls');
+    }
+    if (includesStep('reader-setup')) {
     await seedPreviewData(worker);
     await worker.evaluate(async()=>chrome.storage.local.set({aiProvider:'custom',customApiKey:'',previewAiEnabled:true,optShowAiTags:true,optShowAiSummary:true}));
     await reader.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}`,{waitUntil:'load'});
@@ -2354,6 +2519,9 @@ async function driveDiscovery(context, worker, extId, rep) {
     await reader.reload();
     await reader.waitForSelector('#rendered-view [data-pb]');
     requireState(await reader.locator('#reader-ai-configure,#ask-open,#btn-translate').count()===0,"reader master-off ignored");
+    }
+    if (includesStep('popup-setup')) {
+    await worker.evaluate(async token=>chrome.storage.local.set({optSyncEnabled:false,pinboardToken:obfuscateKey(token),customApiKey:'',previewAiEnabled:false,optShowAiTags:false,optShowAiSummary:false}),FAKE_TOKEN);
     await source.goto(ARTICLE_URL,{waitUntil:'load'});
     const sourceTab=await worker.evaluate(async url=>(await chrome.tabs.query({url}))[0],ARTICLE_URL);
     await popup.addInitScript(({sourceTab})=>{const query=chrome.tabs.query.bind(chrome.tabs);chrome.tabs.query=async opts=>opts?.active?[sourceTab]:query(opts);},{sourceTab});
@@ -2366,7 +2534,8 @@ async function driveDiscovery(context, worker, extId, rep) {
     await popup.locator('#ai-configure-btn').click();
     await options.waitForURL('**/options.html#ai');
     requireState(aiRequests.length===aiBefore,"setup/initialization dispatched paid AI");
-    s.notes.push("PASS: read-only preset CSS follows system light/dark in auto mode; source controls/AI setup/master-off; account switch and split settings initialize controls once; no AI request.");
+    }
+    s.notes.push(activeScenario ? "PASS: selected discovery scenario, without paid AI requests." : "PASS: read-only preset CSS follows system light/dark in auto mode; source controls/AI setup/master-off; account switch and split settings initialize controls once; no AI request.");
   } catch(e){s.failures.push(e.stack);}
   finally {for(const d of detach)d();for(const p of [options,reader,popup,source])await p.close();}
 }
@@ -2375,30 +2544,44 @@ async function driveNarrowLayouts(context, worker, extId, rep) {
   const s = rep.surface("layouts");
   const page = await context.newPage();
   const detach = rep.attach(page, s);
+  const capturedLocales = new Set();
   try {
+    if (!activeScenario || activeScenario.step.startsWith("options-")) {
     await page.goto(`chrome-extension://${extId}/options.html#appearance`, {waitUntil:"load"});
     await page.waitForFunction(() => document.documentElement.hasAttribute("data-options-ready"));
-    for (const locale of ["de","fr","pl","ru","en","zh_CN","zh_TW","zh_HK","ja"]) {
+    for (const locale of axisValues("locale", ["de","fr","pl","ru","en","zh_CN","zh_TW","zh_HK","ja"])) {
       await page.evaluate(async lang=>{await chrome.storage.local.set({optLang:lang});initI18n();await pbpI18nReady();},locale);
-      for (const density of ["comfortable","compact"]) for (const mode of ["light","dark"]) for (const width of [320,420]) {
+      for (const density of axisValues("density", ["comfortable","compact"])) for (const mode of axisValues("scheme", ["light","dark"])) for (const width of axisValues("viewport", [320,420])) {
         await page.setViewportSize({width,height:720});
         await page.evaluate(({density,mode})=>{document.documentElement.dataset.density=density;document.documentElement.dataset.theme=mode==='light'?'modern-card':'catppuccin-mocha';},{density,mode});
         for (const tab of await page.locator('.tabs [data-panel]').evaluateAll(els=>els.map(el=>el.dataset.panel))) {
+          if (!includesStep(`options-${tab}`)) continue;
+          const previousFailures = s.failures.length;
           await page.evaluate(tab=>document.querySelector('.tabs [data-panel="'+tab+'"]').click(),tab);
           const g = await page.evaluate(()=>({viewport:innerWidth,scroll:document.documentElement.scrollWidth, controls:[...document.querySelectorAll('.panel.active input,.panel.active textarea,.panel.active .listbox-btn,.options-nav button,.panel.active .btn')].filter(el=>el.getBoundingClientRect().width).map(el=>({id:el.id||el.className,left:el.getBoundingClientRect().left,right:el.getBoundingClientRect().right}))}));
           if(g.scroll>width) s.failures.push(`${locale}/${density}/${mode}/${width}/${tab}: scrollWidth=${g.scroll}`);
           for(const c of g.controls) if(c.left<0||c.right>width+1) s.failures.push(`${locale}/${width}/${tab}: ${c.id} outside viewport`);
+          if (activeScenario) {
+            s.notes.push(JSON.stringify({ locale, density, scheme: mode, viewport: width, panel: tab, measuredControls: g.controls.length, scrollWidth: g.scroll }));
+            if (!capturedLocales.has(locale) || s.failures.length > previousFailures) {
+              await rep.shot(page, s, `${tab}-${locale}-${density}-${mode}-${width}`);
+              capturedLocales.add(locale);
+            }
+            recordCase({ locale, density, scheme: mode, viewport: width });
+          }
         }
-        if(locale==='de'&&width===320&&density==='comfortable'&&mode==='light') {await page.evaluate(()=>document.querySelector('.tabs [data-panel="appearance"]').click());await rep.shot(page,s,'de-appearance-320');}
+        if(!activeScenario&&locale==='de'&&width===320&&density==='comfortable'&&mode==='light') {await page.evaluate(()=>document.querySelector('.tabs [data-panel="appearance"]').click());await rep.shot(page,s,'de-appearance-320');}
       }
     }
-    s.notes.push("9 locales × 2 densities × 2 themes × 2 widths × all settings tabs measured.");
+    s.notes.push(activeScenario ? "Selected locale/density/scheme/width cases and settings panel measured." : "9 locales × 2 densities × 2 themes × 2 widths × all settings tabs measured.");
+    }
+    if (includesStep("reader-ask")) {
     await seedPreviewData(worker);
     await page.setViewportSize({width:1024,height:900});
     await page.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}`,{waitUntil:"load"});
     await page.waitForFunction(()=>document.querySelectorAll('#rendered-view [data-pb]').length>0);
     await page.locator('#ask-open').click();
-    for(const width of [880,1000,1001,1024,1100,1199,1200,1280,1440]) {
+    for(const width of axisValues("viewport", [880,1000,1001,1024,1100,1199,1200,1280,1440])) {
       await page.setViewportSize({width,height:900});
       await page.waitForTimeout(220);
       const g=await page.evaluate(()=>({width:document.querySelector('.doc-body').getBoundingClientRect().width,scroll:document.documentElement.scrollWidth,ask:document.getElementById('ask-panel').getBoundingClientRect().toJSON(), rail:document.getElementById('rail').getBoundingClientRect().toJSON()}));
@@ -2406,15 +2589,24 @@ async function driveNarrowLayouts(context, worker, extId, rep) {
       if(g.scroll>width) s.failures.push(`Ask ${width}: horizontal overflow`);
       if(width>1000&&g.ask.left<g.rail.right-1) s.failures.push(`Ask ${width}: panel behind visible rail`);
       s.notes.push(JSON.stringify({viewport:width,...g}));
-      if(width===1024)await rep.shot(page,s,'ask-1024');
+      if(activeScenario ? !capturedLocales.has("reader-ask") : width===1024) {
+        await rep.shot(page,s,`ask-${width}`);
+        capturedLocales.add("reader-ask");
+      }
+      recordCase({ viewport: width });
     }
+    }
+    if (includesStep("popup-form") || includesStep("popup-login")) {
     await page.goto(`chrome-extension://${extId}/popup.html`,{waitUntil:"load"});
     await page.waitForFunction(()=>!document.getElementById('main-section').classList.contains('hidden'));
     for(const section of ['main-section','login-section']) {
+      if (!includesStep(section === 'main-section' ? 'popup-form' : 'popup-login')) continue;
       await page.evaluate(section=>{for(const id of ['main-section','login-section']) document.getElementById(id).classList.toggle('hidden',id!==section);document.documentElement.dataset.section=section==='main-section'?'main':'login';},section);
       const semantic=await page.evaluate(()=>document.querySelectorAll('main').length===1&&[...document.querySelectorAll('h1')].filter(el=>el.getBoundingClientRect().width).length===1);
       if(!semantic)s.failures.push(`${section}: visible main/heading semantics missing`);
       await axeScan(page,s,`popup-${section}`);
+      if (activeScenario) await rep.shot(page, s, section);
+    }
     }
   } catch(e){s.failures.push(e.stack);}
   finally {detach();await page.close();}
@@ -2697,6 +2889,7 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
   const detach = rep.attach(page, s);
   const requireState = (ok, message) => { if (!ok) throw new Error(message); };
   try {
+    if (includesStep("locale-refresh")) {
     // Opening the default General tab does not click a category. Exercise
     // that entry with an older same-version dictionary.
     await page.goto(`chrome-extension://${extId}/options.html`);
@@ -2730,9 +2923,19 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
       && !Object.keys(await chrome.storage.local.get(null)).some((key) => /^driveSync/.test(key))),
       "default General tab still renders or writes the retired Drive data-scope controls");
     s.notes.push("PASS: default General entry refreshes a same-version stale locale and renders no Drive data-scope controls.");
+    }
+    if (!includesStep("save-failure")) return;
     await page.goto(`chrome-extension://${extId}/options.html#general`);
     await page.waitForFunction(() => document.documentElement.hasAttribute("data-options-ready")
       && document.getElementById("notify-errors").dataset.autosaveReady === "1");
+    if (activeScenario) {
+      await page.setViewportSize({ width: axisValues("viewport", [320,420])[0], height: 640 });
+      await page.evaluate(async ({locale,mode,density}) => {
+        await chrome.storage.local.set({optLang:locale}); initI18n(); await pbpI18nReady();
+        document.documentElement.dataset.theme = mode === "dark" ? "catppuccin-mocha" : "modern-card";
+        document.documentElement.dataset.density = density;
+      }, {locale: axisValues("locale", ["en","zh_CN","zh_TW","zh_HK","ja","de","fr","pl","ru"])[0], mode: axisValues("scheme", ["light","dark"])[0], density: axisValues("density", ["comfortable","compact"])[0]});
+    }
     let failureAttempt = 0;
     const fail = async () => {
       failureAttempt = await page.evaluate(() => {
@@ -2823,9 +3026,9 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
     })) throw new Error("Queued newer edit did not finish saving");
     await page.evaluate(() => { persistSettings = window.qaOriginalPersist; });
 
-    for (const locale of ["en","zh_CN","zh_TW","zh_HK","ja","de","fr","pl","ru"]) {
+    for (const locale of axisValues("locale", ["en","zh_CN","zh_TW","zh_HK","ja","de","fr","pl","ru"])) {
       await page.evaluate(async (lang) => { await chrome.storage.local.set({optLang:lang}); initI18n(); await pbpI18nReady(); }, locale);
-      for (const mode of ["light","dark"]) for (const density of ["comfortable","compact"]) for (const width of [320,420]) {
+      for (const mode of axisValues("scheme", ["light","dark"])) for (const density of axisValues("density", ["comfortable","compact"])) for (const width of axisValues("viewport", [320,420])) {
         await page.setViewportSize({width,height:640});
         await page.evaluate(({mode,density}) => {
           document.documentElement.dataset.theme = mode === "dark" ? "catppuccin-mocha" : "modern-card";
@@ -2853,9 +3056,10 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
         await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
         s.notes.push(JSON.stringify({locale,mode,density,width,...g}));
         if (["en","zh_CN","de"].includes(locale) && width === 320 && density === "comfortable") await rep.shot(page,s,`${locale}-${mode}-320`);
+        recordCase({ locale, scheme: mode, density, viewport: width });
       }
     }
-    s.notes.push("PASS: persistent failure, same-error live-region dedupe, keyboard retry, queued edit status, 72 locale/theme/density/width title-error geometries, original brief success feedback.");
+    s.notes.push("PASS: persistent failure, same-error live-region dedupe, keyboard retry, queued edit status, selected locale/theme/density/width title-error geometries, original brief success feedback.");
   } catch (e) { s.failures.push(e.stack); }
   finally {
     detach();
@@ -2993,8 +3197,10 @@ mkdirSync(runDir, { recursive: true });
 const rep = new Reporter(runDir);
 const profile = join(runDir, ".profile");
 
-const { server: aiServer, port: aiPort, requests: aiRequests } = await startAiMock();
-console.log(`[qa-drive] AI mock on http://127.0.0.1:${aiPort}/v1 (chat/completions)`);
+const needsOptionalHosts = !AUDIT || AUDIT.selected.some(row => row.needsNetwork);
+const { server: aiServer, port: aiPort, requests: aiRequests } = needsOptionalHosts
+  ? await startAiMock() : { server: null, port: 0, requests: [] };
+if (aiServer) console.log(`[qa-drive] AI mock on http://127.0.0.1:${aiPort}/v1 (chat/completions)`);
 
 let context = null;
 try {
@@ -3007,6 +3213,8 @@ try {
   console.log(`[qa-drive] extension: ${extId}`);
   await new Promise((r) => setTimeout(r, 1200));
   await seedAll(context, worker, aiPort);
+  let grants = {};
+  if (needsOptionalHosts) {
   await context.close();
   context = null;
 
@@ -3018,7 +3226,7 @@ try {
   worker = await getWorker(context);
   // Probe EVERY origin the prefs patch claims to grant (Codex review: a
   // single-origin probe can green-light a half-applied grant).
-  const grants = await worker.evaluate(async (origins) => {
+  grants = await worker.evaluate(async (origins) => {
     const out = {};
     for (const o of origins) out[o] = await chrome.permissions.contains({ origins: [o] });
     return out;
@@ -3026,32 +3234,61 @@ try {
   const granted = Object.values(grants).every(Boolean);
   console.log(`[qa-drive] host permission grants: ${JSON.stringify(grants)}`);
   if (!granted) console.warn("[qa-drive] WARN: prefs grant did not (fully) stick — AI/dictionary states will fail with host_permission");
+  }
   worker.on("console", (m) => {
     if (m.type() === "error") rep.network.push({ disposition: "sw-console-error", origin: "sw", path: m.text().slice(0, 160) });
   });
 
-  // Surfaces
-  for (const surface of CONFIG.surfaces) {
-    console.log(`[qa-drive] surface: ${surface}`);
-    if (surface === "options") await driveOptions(context, extId, rep);
-    else if (surface === "library") await driveLibrary(context, extId, rep);
-    else if (surface === "journey") await driveJourney(context, worker, extId, rep);
-    else if (surface === "preview") await drivePreview(context, worker, extId, rep);
-    else if (surface === "selection") await driveSelection(context, worker, extId, rep);
-    else if (surface === "pinboard") await drivePinboard(context, rep);
-    else if (surface === "popup") await drivePopup(context, worker, extId, rep);
-    else if (surface === "drafts") await drivePopupDrafts(context, worker, extId, rep);
-    else if (surface === "discovery") await driveDiscovery(context, worker, extId, rep);
-    else if (surface === "reader-export") await driveReaderExport(context, worker, extId, rep);
-    else if (surface === "reader-bookmark") await driveReaderBookmark(context, worker, extId, rep);
-    else if (surface === "reader-controls") await driveReaderControls(context, worker, extId, rep);
-    else if (surface === "layouts") await driveNarrowLayouts(context, worker, extId, rep);
-    else if (surface === "translate-stop") await driveTranslateStop(context, worker, extId, rep);
-    else if (surface === "options-save") await driveOptionsSaveFeedback(context, extId, rep);
-    else if (surface === "themes") await driveThemes(context, worker, extId, rep);
-    else if (surface === "faults") await driveFaults(context, worker, extId, rep);
-    else if (surface === "reader-edge") await driveReaderEdge(context, worker, extId, rep);
-    else console.warn(`[qa-drive] unknown surface: ${surface}`);
+  const drivers = {
+    options: () => driveOptions(context, extId, rep),
+    library: () => driveLibrary(context, extId, rep),
+    journey: () => driveJourney(context, worker, extId, rep),
+    preview: () => drivePreview(context, worker, extId, rep),
+    selection: () => driveSelection(context, worker, extId, rep),
+    pinboard: () => drivePinboard(context, rep),
+    popup: () => drivePopup(context, worker, extId, rep),
+    drafts: () => drivePopupDrafts(context, worker, extId, rep),
+    discovery: () => driveDiscovery(context, worker, extId, rep),
+    "reader-export": () => driveReaderExport(context, worker, extId, rep),
+    "reader-bookmark": () => driveReaderBookmark(context, worker, extId, rep),
+    "reader-controls": () => driveReaderControls(context, worker, extId, rep),
+    layouts: () => driveNarrowLayouts(context, worker, extId, rep),
+    "translate-stop": () => driveTranslateStop(context, worker, extId, rep),
+    "options-save": () => driveOptionsSaveFeedback(context, extId, rep),
+    themes: () => driveThemes(context, worker, extId, rep),
+    faults: () => driveFaults(context, worker, extId, rep),
+    "reader-edge": () => driveReaderEdge(context, worker, extId, rep),
+  };
+  if (AUDIT) {
+    const scopedDrivers = Object.fromEntries(Object.entries(drivers).map(([name, drive]) => [name, async scenario => {
+      console.log(`[qa-drive] scenario: ${scenario.id}`);
+      activeScenario = scenario;
+      activeCases = [];
+      const expectedCases = qaExpectedCases(scenario, AUDIT.filters.axes, { font: actualFont, representative: CONFIG.readerControlsRepresentative });
+      CONFIG.fault = "";
+      // Reset fixture settings between independently selected scenarios. No
+      // scenario relies on another driver's theme, locale or account writes.
+      await seedAll(context, worker, aiPort);
+      CONFIG.fault = scenario.fault || "";
+      const first = rep.surfaces.length;
+      await drive();
+      const surfaces = rep.surfaces.slice(first);
+      const matrix = expectedCases.some(row => Object.keys(row).some(axis => !["font", "dpr", "fault"].includes(axis)));
+      if (!matrix) recordCase(scenario.fault ? { fault: CONFIG.fault } : {});
+      try { assertQaCases(expectedCases, activeCases); }
+      catch (error) { surfaces[0].failures.push(error.message); }
+      const failures = surfaces.flatMap(surface => surface.failures);
+      const errors = surfaces.flatMap(surface => [...surface.pageErrors, ...surface.consoleErrors]);
+      return { status: failures.length || errors.length ? "failed" : "passed", failures, errors, cases: activeCases,
+        shots: surfaces.flatMap(surface => surface.states.map(state => state.file)) };
+    }]));
+    await runQaScenarios(AUDIT, scopedDrivers);
+    activeScenario = null;
+  } else {
+    for (const surface of CONFIG.surfaces) {
+      console.log(`[qa-drive] surface: ${surface}`);
+      await drivers[surface]();
+    }
   }
 
   writeFileSync(join(runDir, "ai-requests.json"), JSON.stringify(aiRequests, null, 2));
@@ -3080,12 +3317,13 @@ try {
   const failures = rep.surfaces.reduce((n, s) => n + s.failures.length, 0);
   const errors = rep.surfaces.reduce((n, s) => n + s.pageErrors.length + s.consoleErrors.length, 0);
   console.log(`[qa-drive] done: ${rep.shotSeq} shots, ${failures} driver failure(s), ${errors} page/console error(s)`);
-  if (CONFIG.check && (failures || errors)) process.exitCode = 1;
+  if ((CONFIG.check || AUDIT) && (failures || errors)) process.exitCode = 1;
 } catch (error) {
   console.error(`[qa-drive] fatal: ${error.message}`);
   process.exitCode = 2;
 } finally {
   await context?.close().catch(() => {});
-  aiServer.close();
+  aiServer?.close();
+  try { AUDIT?.finish(); } catch (error) { console.error(`[qa-drive] coverage: ${error.message}`); process.exitCode = 2; }
   if (!CONFIG.keepProfile) rmSync(profile, { recursive: true, force: true });
 }

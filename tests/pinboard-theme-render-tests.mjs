@@ -2,13 +2,15 @@
 // Catches missing selectors, inline state colors and ancestor-opacity regressions
 // that palette-pair assertions cannot see. No login or network is required.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import vm from 'node:vm';
+import { auditSelection } from '../scripts/audit-scope.mjs';
+import { SITE_SCENARIOS, SITE_VARIANTS, SITE_WIDTHS, siteVariants } from '../scripts/audit-site-scenarios.mjs';
 import { chromium } from '../.qa-scan/node_modules/playwright/index.mjs';
 
-const themes = vm.runInNewContext(readFileSync(new URL('../pinboard-themes.js', import.meta.url), 'utf8') + '; PINBOARD_THEMES');
-const variants = Object.entries(themes).map(([key, { css }]) => ({ key, css, dark: false }));
-variants.push({ key: 'flexoki:dark', css: themes.flexoki.css, dark: true });
+const audit = auditSelection({ runner: 'site', scenarios: SITE_SCENARIOS });
+if (audit.maybePrintPlan()) process.exit(0);
+if (process.env.FONTCONFIG_FILE) throw new Error('Site theme audit uses native fonts; CI font overrides belong to extension UI audits');
+for (const scene of audit.selected) if (!siteVariants(audit, scene.id).length) throw new Error(`No valid theme/scheme combination for ${scene.id}`);
+const variants = SITE_VARIANTS.filter(v => audit.selected.some(scene => siteVariants(audit, scene.id).some(x => x.key === v.key)));
 const failures = [];
 let checks = 0;
 const browser = await chromium.launch();
@@ -118,6 +120,19 @@ try {
       document.documentElement.classList.toggle('pbp-dark', dark);
     }, variant);
     const { key } = variant;
+    const run = async (name, body) => {
+      const id = 'site.' + name;
+      if (!audit.has(id) || !siteVariants(audit, id).some(v => v.key === key)) return;
+      audit.start(id);
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.mouse.move(1, 1);
+      const before = checks;
+      const viewports = [];
+      await body(width => viewports.push(width));
+      assert.ok(checks > before, `${id}: no assertions executed`);
+      if (!SITE_WIDTHS[name]) viewports.push(1440);
+      audit.complete(id, { theme: key, scheme: variant.scheme, font: 'native', viewports, checks: checks - before });
+    };
     for (const [name, selector] of [
       ['note', 'blockquote.note, blockquote.note p, blockquote.note strong'],
       ['help', '#help_banner .logo, #help_content .tagNode'],
@@ -126,6 +141,7 @@ try {
       ['status', '#status_display'], ['token', '.api_token'],
       ['nav', '#sub_banner a.selected'], ['completion', '.pin-ac .active'],
     ]) {
+      await run(name, async () => {
       await fixture(name);
       await readable(key, selector);
       if (name === 'help') {
@@ -136,16 +152,20 @@ try {
         await page.locator('a.selected').hover();
         await readable(key + ':hover', 'a.selected');
       }
+      });
     }
+    await run('bulk', async () => {
     await fixture('bulk');
     // The native toggle writes these two states, not a class on the link.
     for (const color of ['#aaa', '#fff']) {
       await page.locator('#bulk_edit').evaluate((node, color) => { node.style.cssText = `background:${color};color:#fff;border:1px solid #999`; }, color);
       await readable(`${key}:bulk-${color}`, '#bulk_edit');
     }
+    });
     // Native sidebar/Tweets submit labels must stay readable after all dark
     // mode and literal overrides, not just in the derived palette pairs.
     for (const name of ['search-sidebar', 'search-tweets']) {
+      await run(name, async () => {
       await fixture(name);
       const selector = '#right_bar input[type="submit"]';
       await readable(`${key}:${name}`, selector);
@@ -154,18 +174,24 @@ try {
         await buttons.nth(i).hover();
         await readable(`${key}:${name}:hover`, `${selector}:hover`);
       }
+      });
     }
+    await run('bookmarks', async () => {
     await fixture('bookmarks');
     await readable(key, '.description, .description blockquote');
     await readable(key, '.star span', 3);
     await page.locator('.private .star').hover();
     await readable(key + ':hover', '.private .star span', 3);
+    });
     for (const [name, selector] of [['subscriptions', 'a.delete'], ['bundles', 'a.edit, a.destroy']]) {
+      await run(name, async () => {
       await fixture(name);
       await readable(key, selector);
       await page.locator('tr').hover();
       await readable(key + ':row-hover', selector);
+      });
     }
+    await run('tag-nav', async () => {
     await fixture('tag-nav');
     await readable(key, '#tag_cloud_header a');
     const sizes = await page.locator('#tag_cloud_header a').evaluateAll(nodes => nodes.map(n => parseFloat(getComputedStyle(n).fontSize)));
@@ -173,6 +199,8 @@ try {
       checks++;
       if (size < 11) failures.push(`${key} tag navigation text shrank to ${size}px`);
     }
+    });
+    await run('tag-list', async () => {
     await fixture('tag-list');
     const tagLayout = await page.evaluate(() => {
       const columns = [...document.querySelectorAll('.tag_table')].map(n => n.getBoundingClientRect().toJSON());
@@ -183,10 +211,14 @@ try {
     if (tagLayout.count !== 1016 || Math.abs(tagLayout.columns[0].y - tagLayout.columns[1].y) > 1 || tagLayout.columns[1].x < tagLayout.columns[0].right || tagLayout.clipped) {
       failures.push(`${key} tag list loses columns or clips labels: ${JSON.stringify(tagLayout)}`);
     }
+    });
+    await run('tag-cloud', async () => {
     await fixture('tag-cloud');
     const cloud = await page.locator('#tag_cloud a.tag').evaluateAll(nodes => nodes.map(n => ({ size: parseFloat(getComputedStyle(n).fontSize), display: getComputedStyle(n).display })));
     checks++;
     if (cloud.some(n => n.display !== 'inline') || cloud[1].size / cloud[0].size < 2) failures.push(`${key} frequency-sized inline cloud was flattened`);
+    });
+    await run('sidebar-tag-frequency', async () => {
     {
       await fixture('sidebar-tag-frequency');
       const selector = '#tag_cloud a.tag:not(.selected)';
@@ -223,6 +255,8 @@ try {
       checks++;
       if (selectedHover[0] !== selectedHover[1]) failures.push(`${key} sidebar selected-tag hover was recolored`);
     }
+    });
+    await run('bundle-editor', async (recordViewport) => {
     await fixture('bundle-editor');
     await readable(`${key}:bundle-editor`, '#tagpicker .tagNode, #bundle .tagNode, #save_changes_marker, #tagPickerSelectLinks span');
     // Native arrow glyphs are graphical controls, like the star above; their
@@ -268,7 +302,7 @@ try {
         await readable(`${key}:bundle-action:hover`, `${selector}:hover`, minimum);
       }
     }
-    for (const width of [390, 768, 1440]) {
+    for (const width of audit.values('site.bundle-editor', 'viewport', SITE_WIDTHS['bundle-editor'])) {
       await page.setViewportSize({ width, height: 1000 });
       await page.mouse.move(1, 1);
       const layout = await page.evaluate(() => {
@@ -290,8 +324,11 @@ try {
       if (!layout.rowControls.every(r => within(r, layout.row)) || layout.rowParts[0].right > layout.rowParts[1].x + 1 || layout.rowParts[0].y >= layout.rowParts[1].bottom || layout.rowParts[1].y >= layout.rowParts[0].bottom) failures.push(`${key} bundle name/save controls wrap or overlap@${width}: ${JSON.stringify(layout)}`);
       checks++;
       if (layout.table.width < layout.column.width - 2 || layout.bundle.right > layout.column.right + 1) failures.push(`${key} bundle table shrinks or overflows its column@${width}: ${JSON.stringify(layout)}`);
+      recordViewport(width);
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
+    });
+    await run('bundle-density', async () => {
     await fixture('bundle-density');
     const bundleLayout = await page.evaluate(() => {
       const table = document.querySelector('form[name="sort"] > table');
@@ -307,9 +344,11 @@ try {
     });
     checks++;
     if (bundleLayout.themed.width < bundleLayout.native.width - 1 || bundleLayout.themed.height > bundleLayout.native.height * 1.35) failures.push(`${key} bundle density: ${JSON.stringify(bundleLayout)}`);
+    });
     for (const name of ['import-layout', 'toc-layout']) {
+      await run(name, async (recordViewport) => {
       await fixture(name);
-      for (const width of [390, 641, 768, 1024, 1080, 1440]) {
+      for (const width of audit.values('site.' + name, 'viewport', SITE_WIDTHS[name])) {
         await page.setViewportSize({ width, height: 1000 });
         const layout = await page.evaluate(() => {
           const rect = id => { const r = document.getElementById(id).getBoundingClientRect(); return { x: r.x, right: r.right, y: r.y, bottom: r.bottom }; };
@@ -328,11 +367,14 @@ try {
         } else if (width >= 1080) {
           if (layout.second.x < layout.first.right || layout.second.y > 100) failures.push(`${key} import history moved below a form that fits@${width}: ${JSON.stringify(layout)}`);
         } else if (layout.second.y < layout.first.bottom) failures.push(`${key} narrow import columns overlap@${width}: ${JSON.stringify(layout)}`);
+        recordViewport(width);
       }
+      });
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
+    await run('profile-layout', async (recordViewport) => {
     await fixture('profile-layout');
-    for (const width of [320, 390, 640, 641, 768, 1440]) {
+    for (const width of audit.values('site.profile-layout', 'viewport', SITE_WIDTHS['profile-layout'])) {
       await page.setViewportSize({ width, height: 1000 });
       const profile = await page.evaluate(() => {
         const rect = n => { const r = n.getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, width: r.width }; };
@@ -363,8 +405,11 @@ try {
         const sameRow = Math.abs(reference.left.y - reference.right.y) < 1;
         if (Math.abs(actual.main.width - reference.main.width) > 1 || Math.abs(actual.left.width - reference.left.width) > 1 || Math.abs(actual.right.width + actual.margin - reference.right.width) > 1 || Math.abs(actual.margin - 20) > 1 || Math.abs((actual.right.y - actual.left.y) - (reference.right.y - reference.left.y)) > 1 || Math.abs((actual.right.x - actual.main.x) - (reference.right.x - reference.main.x) - (sameRow ? actual.margin : 0)) > 1) failures.push(`${key} profile desktop columns changed@${width}: ${JSON.stringify(profile)}`);
       }
+      recordViewport(width);
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
+    });
+    await run('widget', async () => {
     await fixture('widget');
     for (const state of ['rest', 'hover']) {
       if (state === 'hover') await page.locator('#right_column > div a').first().hover();
@@ -373,12 +418,16 @@ try {
       if (colors.join('|') !== 'rgb(162, 97, 49)|rgb(140, 84, 42)') failures.push(`${key} widget:${state} replaced preview colors: ${colors}`);
     }
     await readable(key, '#right_column > p a');
-    await fixture('blog-sidebar');
-    await readable(key, '#right_column a');
+    });
+    await run('blog-sidebar', async () => {
+      await fixture('blog-sidebar');
+      await readable(key, '#right_column a');
+    });
   }
 } finally {
   await browser.close();
 }
+audit.finish();
 if (failures.length) console.error(failures.slice(0, 45).join('\n'));
 assert.equal(failures.length, 0, `${failures.length}/${checks} Pinboard render checks failed`);
 console.log(`Pinboard theme render: ${checks} checks passed across ${variants.length} theme states`);

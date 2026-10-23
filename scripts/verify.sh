@@ -4,6 +4,19 @@ set -eu
 ROOT=$(git rev-parse --show-toplevel)
 cd "$ROOT"
 
+# Explicit development scopes; no-argument CI keeps every existing gate below.
+if [ "$#" -gt 0 ]; then
+  if [ "$#" -eq 1 ] && [ "$1" = "--all" ]; then
+    shift
+  else
+    exec node scripts/audit.mjs "$@"
+  fi
+fi
+echo "[audit-scope] checking selection, dependencies, matrices and runner plans"
+for scope_test in tests/audit*-tests.mjs; do
+  node "$scope_test"
+done
+
 set -- tests/*-tests.html
 if [ ! -f "$1" ]; then
   echo "[browser] no tests/*-tests.html suites found" >&2

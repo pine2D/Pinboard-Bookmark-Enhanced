@@ -9,6 +9,11 @@ paths:
   - "tests/render-audit-known-failures.json"
   - "tests/ui-contract-tests.mjs"
   - "scripts/ui-render-audit.mjs"
+  - "scripts/audit*.mjs"
+  - "scripts/qa-drive.mjs"
+  - "scripts/options-help-render-audit.mjs"
+  - "tests/audit*-tests.mjs"
+  - "tests/pinboard-theme-render-tests.mjs"
 ---
 
 # Theme Factory 深水区（站点主题 + 三表面 UI 主题）
@@ -37,6 +42,17 @@ Pre-commit 有两组触发。主题组使用**同一组触发条件**（theme-su
 **verify.sh [theme] 段**还执行 `tests/theme-contract-tests.mjs`、`tests/theme-tooling-tests.mjs`、`tests/theme-css-syntax-tests.mjs`、`tests/theme-ui-derive-tests.mjs`、`tests/theme-override-debt-tests.mjs` 与 `tests/theme-sync-check-tests.mjs`；最后一项同时快照内容与 mtime，证明 `--check` 全程零写入。
 
 **verify.sh [render-audit] 段**：`scripts/ui-render-audit.mjs` 用 playwright 装未打包扩展，逐主题量 `getComputedStyle` 与几何；断言清单来自**手写**的 `tests/render-audit-checklist.mjs`——**禁止从配方源生成**（同源会让「组件漏注册」类缺陷在生成器与审计器两侧同时消失）。`render-audit-known-failures.json` 是迁移期基线，**当前为空**（命中区债战役已清零，2026-08）。`hitAreaMin` 族不手工枚举选择器，由 runner 的 sweepProbe（family 4）类扫描全部无文字子节点的 `<button>`，一次通过覆盖全部主题。
+
+### 开发时按场景选择审计
+
+- 统一入口 `node scripts/audit.mjs`（也可 `bash scripts/verify.sh <筛选参数>`）；先 `--changed --plan` 看工作区含暂存改动的影响建议，或用 `--staged` / `--base=<ref>` 指定范围。计划不启动浏览器。没有参数时拒绝猜测范围；`verify.sh` 无参数及仅 `--all` 仍执行原全套 CI 门，不作为普通编辑的默认动作。
+- `--surface=popup,options,library,reader,site,background,tooling`、`--scenario=<稳定ID或通配符>`、`--feature`、`--kind`；其他维度用 `--theme`、`--scheme`、`--locale`、`--viewport`、`--dpr`、`--font`、`--density`、`--state`、`--input`、`--fault`、`--data`、`--tier`。只接受场景实际支持的值，`--list` 可查支持轴；同轴并集、跨轴交集，随后补必需前置，非法/空组合直接失败。未提供的轴保留该场景原有覆盖，不自行缩成一个样本。
+- `input`、`data`、`tier` 是已登记场景的分类标签：例如 keyboard、saved-history、smoke/matrix/journey；它们筛选真实交互/夹具，不额外生成输入方式或环境组合。`tier` 表示执行层次，阅读器字号仍由 density=default/large 选择。
+- surface 是多值归属，选 reader 会包含真实依赖其他表面的 journey；需要单面流程时选具体 scenario，计划会展示其表面与前置。
+- 例：`--scenario=qa.popup.login`；`--scenario=qa.options.layout.ai --locale=de --viewport=320 --scheme=dark --density=compact`；`--scenario=render.library.sweep.notes-color-menu` 会包含 notes-detail 前置；`--scenario=qa.reader.controls.ask --locale=de --viewport=360 --scheme=dark --density=large` 只运行 Ask 子流程。先加 `--plan` 审阅，移去它即执行。
+- 影响推荐按消费者与功能估计，计划列明依据；`listbox.js` 对应 options/library，已证明仅新增图标时按新增符号使用方缩小范围，无法判定的共享改动明确扩大理由。推荐不是依赖分析证明，未映射输入会告警，需用显式场景补齐。已知纯逻辑改动用 `--kind=logic,contract,security`，不为其运行视觉矩阵。
+- 真实调度层是 `scripts/audit-*-scenarios.mjs`；新增场景在此注册并提供实际 opener/driver。运行报告比较计划/完成 ID，记录各任务耗时，子进程失败、漏执行、打开失败均不能通过。局部审计禁写全局基线、不做全局 STALE 清理。`--sweep` 仍是发现模式，不能替代正式选中场景的门禁。
+- 改几何须对受影响场景补 `--font=ci`；native/ci 可同轴选取，入口分别设置字体环境。站点主题保持 native，不套扩展 UI 的 CI 字体配置。共同设置/基线前置允许保留，不能因此运行未选页面。同一轮已通过检查除非有新改动或新问题，不重复执行。
 
 ## 迁移与删改陷阱（真实事故沉淀）
 

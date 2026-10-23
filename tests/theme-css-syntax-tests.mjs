@@ -76,6 +76,34 @@ if (syntax) {
     "custom property names remain case-sensitive while ordinary properties normalize",
   );
 
+  const locatedCss = [
+    "/* first", "second */", "@media print {", " .one {", "  color: red;", " }",
+    " @supports (display: grid) {", "  .two,", "  .three { color: blue; }", " }", "}", "", ".last { color: black; }",
+  ].join("\r\n");
+  equal(syntax.parseStyleRules(locatedCss).map(({ selectorText, lineNum, sourceOrder, context }) => ({ selectorText, lineNum, sourceOrder, context })), [
+    { selectorText: ".one", lineNum: 4, sourceOrder: 0, context: ["@media print"] },
+    { selectorText: ".two, .three", lineNum: 8, sourceOrder: 1, context: ["@media print", "@supports (display: grid)"] },
+    { selectorText: ".last", lineNum: 13, sourceOrder: 2, context: [] },
+  ], "line numbers follow source positions across CRLF, multiline selectors, nested groups and blank lines");
+  equal(syntax.parseStyleRules(".a {} .b {}\n\n@supports (display: grid) { .c {} .d {} }\n.e {}")
+    .map(({ lineNum }) => lineNum), [1, 1, 3, 3, 4],
+  "multiple rules on one line share its number, including nested grouping rules");
+
+  const mutableRules = syntax.parseStyleRules(locatedCss);
+  mutableRules[0].selectors.push(".changed");
+  mutableRules[0].context.push("@media screen");
+  mutableRules[0].lineNum = -1;
+  mutableRules.pop();
+  const freshRules = syntax.parseStyleRules(locatedCss);
+  equal([freshRules.length, freshRules[0].selectors, freshRules[0].context, freshRules[0].lineNum],
+    [3, [".one"], ["@media print"], 4],
+  "shared parser results remain caller-owned: mutation cannot affect a later parse");
+  const mutableDeclarations = syntax.parseDeclarations("color: red;");
+  mutableDeclarations[0].value = "changed";
+  mutableDeclarations.pop();
+  equal(syntax.parseDeclarations("color: red;").map(({ property, value }) => [property, value]), [["color", "red"]],
+    "shared declaration parser results remain caller-owned across calls");
+
   equal(
     [...syntax.declarationValueMap(`
 :root { --Brand-Color: #abc; color: red; }

@@ -228,6 +228,11 @@ export function parseDeclarations(body) {
 export function parseStyleRules(css) {
   const output = [];
   let sourceOrder = 0;
+  // The recursive walk visits qualified rules in source order. Advance the
+  // newline cursor once across the sheet instead of splitting its growing
+  // prefix for every rule (quadratic on large generated theme sheets).
+  let lineNum = 1;
+  let nextLineBreak = css.indexOf("\n");
 
   function walk(start, end, context) {
     for (const rule of scanRuleList(css, start, end)) {
@@ -235,11 +240,15 @@ export function parseStyleRules(css) {
         const selectorText = normalizeWhitespace(rule.prelude);
         const selectors = splitSelectorList(rule.prelude);
         if (!selectors.length) continue;
+        while (nextLineBreak !== -1 && nextLineBreak < rule.start) {
+          lineNum++;
+          nextLineBreak = css.indexOf("\n", nextLineBreak + 1);
+        }
         output.push({
           selectorText,
           selectors,
           body: css.slice(rule.bodyStart, rule.blockEnd),
-          lineNum: css.slice(0, rule.start).split("\n").length,
+          lineNum,
           sourceOrder: sourceOrder++,
           context,
         });

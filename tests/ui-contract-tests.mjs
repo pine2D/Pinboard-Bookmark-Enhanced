@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import { runInNewContext } from "node:vm";
-import { parseStyleRules, parseDeclarations, declarationValueMap, splitSelectorList, closeOfBracket, cmpSpecificity, selectorSpecificity } from "../docs/theme-surface/tools/css-syntax.mjs";
+import { parseStyleRules as scanStyleRules, parseDeclarations as scanDeclarations, splitSelectorList, closeOfBracket, cmpSpecificity, selectorSpecificity } from "../docs/theme-surface/tools/css-syntax.mjs";
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
 import { contrast, hexToRgb, FILL_SEPARATE_MIN, FIELD_ROLES, UI_DERIVED_OUTPUT_ROLES } from "../docs/theme-surface/composers/_ui-derive.mjs";
 import { FIELD_TARGETS } from "../docs/theme-surface/composers/ui-components.mjs";
@@ -11,10 +11,82 @@ import { composeOptionsThemeMap } from "../docs/theme-surface/composers/options-
 import { composePopupThemeMap, POPUP_THEME_MAP } from "../docs/theme-surface/composers/popup-chrome.mjs";
 import { composeLibraryThemeMap } from "../docs/theme-surface/composers/library-chrome.mjs";
 
+// The audit repeatedly reads the same sheets and declaration bodies. Cache
+// by exact source text (including fixture variants), for this process only.
+// Freeze every shared array/object; value maps below remain caller-owned.
+// The shared scanner keeps its existing mutable-return API for other tools.
+const timingEnabled = process.env.PBP_UI_CONTRACT_TIMING === "1";
+const auditStarted = performance.now();
+const cssCacheStats = {};
+function memoizeCss(name, scan, freeze) {
+  const cache = new Map();
+  const stats = cssCacheStats[name] = { calls: 0, misses: 0, milliseconds: 0 };
+  return (text) => {
+    stats.calls++;
+    if (!cache.has(text)) {
+      const started = timingEnabled ? performance.now() : 0;
+      cache.set(text, freeze(scan(text)));
+      stats.misses++;
+      if (timingEnabled) stats.milliseconds += performance.now() - started;
+    }
+    return cache.get(text);
+  };
+}
+const parseStyleRules = memoizeCss("rules", scanStyleRules, (rules) => Object.freeze(rules.map((rule) => {
+  Object.freeze(rule.selectors);
+  Object.freeze(rule.context);
+  return Object.freeze(rule);
+})));
+const parseDeclarations = memoizeCss("declarations", scanDeclarations,
+  (declarations) => Object.freeze(declarations.map(Object.freeze)));
+function declarationValueMap(css, selector, { context = [] } = {}) {
+  const output = new Map();
+  for (const rule of parseStyleRules(css)) {
+    if (rule.context.length !== context.length || rule.context.some((item, index) => item !== context[index])) continue;
+    if (!rule.selectors.includes(selector)) continue;
+    for (const declaration of parseDeclarations(rule.body)) {
+      output.set(declaration.property, `${declaration.value}${declaration.important ? " !important" : ""}`);
+    }
+  }
+  return output;
+}
+
 const root = resolve(import.meta.dirname, "..");
 const read = (file) => readFileSync(resolve(root, file), "utf8");
 const fail = [];
 const check = (ok, msg) => { if (!ok) fail.push(msg); };
+
+// Cached syntax data is shared only within this audit invocation. These
+// fixtures guard both the context/source-order contract and accidental
+// mutation leaking from one gate to a later gate.
+{
+  const css = `.same, .peer { color: red !important; content: ":;"; --Brand: first; }
+.same { color: blue; --brand: second; }
+@media print { .same { color: black !important; } }
+@supports (display: grid) { @media print { .same { color: green; } } }`;
+  const rules = parseStyleRules(css);
+  check(rules === parseStyleRules(css) && Object.isFrozen(rules) &&
+    rules.every((rule) => Object.isFrozen(rule) && Object.isFrozen(rule.selectors) && Object.isFrozen(rule.context)),
+  "ui-contract CSS cache: repeated text must reuse deeply immutable rules");
+  const body = rules[0].body;
+  const declarations = parseDeclarations(body);
+  check(declarations === parseDeclarations(body) && Object.isFrozen(declarations) && declarations.every(Object.isFrozen),
+    "ui-contract CSS cache: repeated bodies must reuse immutable declarations");
+  const plain = declarationValueMap(css, ".same");
+  check(JSON.stringify([...plain]) === JSON.stringify([["color", "blue"], ["content", '":;"'], ["--Brand", "first"], ["--brand", "second"]]),
+    "ui-contract CSS cache: source order, quoted values and custom-property case must survive reuse");
+  plain.set("color", "mutated");
+  plain.clear();
+  check(declarationValueMap(css, ".same").get("color") === "blue" &&
+    declarationValueMap(css, ".peer").get("color") === "red !important" &&
+    declarationValueMap(css, ".same", { context: ["@media print"] }).get("color") === "black !important" &&
+    declarationValueMap(css, ".same", { context: ["@supports (display: grid)", "@media print"] }).get("color") === "green" &&
+    declarationValueMap(css, ".missing").size === 0,
+  "ui-contract CSS cache: value maps must be fresh and isolate selectors and ordered at-rule contexts");
+  check(declarationValueMap(css.replace("color: blue", "color: orange"), ".same").get("color") === "orange",
+    "ui-contract CSS cache: changed text must never reuse stale syntax or declarations");
+}
+
 const extensionIdFromKey = (key) => {
   const hex = createHash("sha256").update(Buffer.from(key, "base64")).digest("hex").slice(0, 32);
   return [...hex].map((char) => String.fromCharCode(97 + Number.parseInt(char, 16))).join("");
@@ -6589,7 +6661,10 @@ function stripJsComments(input) {
       }
       continue;
     }
-    const prev = prevSignificant();
+    // Indexing the growing output flattens V8's string rope. Only a slash
+    // needs this look-behind; doing it for every character makes the scan
+    // quadratic even for plain source without comments or regex literals.
+    const prev = c === "/" ? prevSignificant() : "";
     if (c === "/" && (prev === "" || REGEX_CAN_FOLLOW.includes(prev))) { // regex literal
       out += c; i++;
       let inClass = false;
@@ -6630,6 +6705,18 @@ function stripJsComments(input) {
     src.includes('o + "/*"') &&
     src.includes("i.test(srcUrlForSwitch)"),
     "ui-contract: the md-preview.js comment stripper is broken -- it must remove line AND block comments while preserving string literals like `o + \"/*\"` and regex literals like /^https?:\\/\\//i; until it is correct, every invariant in this block is unverified");
+  const scannerCases = [
+    ["const a = 1; // hidden\nnext();", "const a = 1; \nnext();"],
+    ["x /* hidden\n\n */ / 2;", "x \n\n / 2;"],
+    ['const a = "/*"; const b = \'//\'; `/* ${x} */`;', 'const a = "/*"; const b = \'//\'; `/* ${x} */`;'],
+    [String.raw`const re = /https?:\/\/a[/*]b/g; /* hidden */done();`, String.raw`const re = /https?:\/\/a[/*]b/g; done();`],
+    [String.raw`value = /* hidden */ /[/*]\/\//g; // hidden`, String.raw`value =  /[/*]\/\//g; `],
+    ["a\r/2;\t/*x*/ b / c;", "a\r/2;\t b / c;"],
+  ];
+  for (const [input, expected] of scannerCases) {
+    check(stripJsComments(input) === expected,
+      `ui-contract: comment scanner changed a string/regex/division boundary in ${JSON.stringify(input)}`);
+  }
 
   const slice = (startNeedle, endNeedle, label) => {
     const a = src.indexOf(startNeedle);
@@ -9789,6 +9876,13 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     `popup.css: only ${rungRules} hand-written rule(s) read var(--pp-control-h / -sm); .qbtn, .offline-clear, .offline-toggle and .md-strip-btn all should (vacuity guard)`);
 }
 
+if (timingEnabled) {
+  console.error(`[ui-contract timing] ${JSON.stringify({
+    totalMilliseconds: Math.round(performance.now() - auditStarted),
+    css: Object.fromEntries(Object.entries(cssCacheStats).map(([name, stats]) =>
+      [name, { ...stats, milliseconds: Math.round(stats.milliseconds) }])),
+  })}`);
+}
 if (fail.length) {
   console.error(fail.join("\n"));
   process.exit(1);

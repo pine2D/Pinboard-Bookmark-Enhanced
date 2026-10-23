@@ -122,7 +122,7 @@ popup / options / library 三个扩展表面是短命单次渲染、无暖 shape
 
 - 设计技能 [make-interfaces-feel-better](https://github.com/jakubkrehel/make-interfaces-feel-better) 与 [Impeccable](https://github.com/pbakaus/impeccable) 自 2026-10-02 起为用户级安装（`~/.agents/skills`，Claude Code 与 Codex 共用，由本机更新脚本跟随上游维护），不再随项目安装或锁定版本。
 - 采用 Impeccable 的 Operate 模式审视 popup/options/library，Read 模式审视阅读器；先检查实际界面的任务路径、层级和边界状态，再按 polish 工作流修正，最后用 make-interfaces-feel-better 检查排版、状态、图标、动效与性能。已有主题与 `COMPONENTS.md` 是设计依据。
-- 优先复用 `scripts/qa-drive.mjs` 的隔离夹具和截图，对涉及的窄窗口、长文案、九种语言及明暗主题做真实渲染检查；改完执行对应编辑期 lint、主题工厂只读检查与渲染门。检测器结果须结合截图判断，不因通用建议改动已裁决的设计。
+- 开发审计先用 `node scripts/audit.mjs --changed --plan` 检查影响推荐，再按 `--surface` / `--scenario` / `--kind` 与所需语言、窗口、主题等维度执行；popup、options、library、reader、site、background 均可选择。复用 `qa-drive` 隔离夹具，只检查受影响流程；纯逻辑修改选择逻辑/契约检查，不机械截图无关页面。推荐是有理由的保守估计，跨界面流程与共同前置由场景注册表保留；规则及例子见 `.claude/rules/theme-factory.md`。改完执行对应编辑期 lint、必需主题只读门与所选渲染门；检测器结合截图判断，不因通用建议改动已裁决的设计。
 - 本项目的快 CJK 字体栈、Lucide stroke 2、控件阶梯、主题 token 与冷启动要求优先于技能的通用字体、40/44px 命中区、按压缩放或装饰动效建议。高频操作保留即时反馈；不引入运行时依赖、远程字体或首屏入场动画。
 
 ## 测试与夹具
@@ -186,7 +186,7 @@ bash scripts/release.sh         # 打 ZIP + GH release + changelog；--build-onl
 
 | 改这些文件 | 必读 |
 |------|------|
-| docs/theme-surface/**、popup/options/library.css、pinboard-themes.js、render-audit 家族 | `.claude/rules/theme-factory.md` |
+| docs/theme-surface/**、popup/options/library.css、pinboard-themes.js、audit / render-audit 家族、qa-drive | `.claude/rules/theme-factory.md` |
 | vocab-store.js、vocab-gdrive.js、notes-sync.js、notes-gdrive.js、options-vocab.js、library-vocab.js、anki-connect.js、eudic-sync.js | `.claude/rules/vocab-sync.md` |
 | md-preview.*、md-translate / md-ask / md-reader / md-highlight / md-ai-core 等 md-*.js | `.claude/rules/md-preview.md` |
 | md-dict.js、dict-pack.js、md-vocab-echo.js、ai-cache.js | `.claude/rules/dict.md` |

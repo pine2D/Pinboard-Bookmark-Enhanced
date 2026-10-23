@@ -19,6 +19,12 @@
 //   node scripts/ui-render-audit.mjs --write-spacing-baseline  # (re)freeze the spacingScale ratchet ledger
 //   node scripts/ui-render-audit.mjs --shard=i/n           # run only theme slice i of n (verify.sh)
 //   node scripts/ui-render-audit.mjs --json=<path>         # also dump the raw results array (equivalence checks)
+//   node scripts/ui-render-audit.mjs --audit-surface=popup --audit-state=hover --audit-theme=default
+//   node scripts/ui-render-audit.mjs --audit-scenario=render.options.sweep.tab-reader --audit-plan
+//   node scripts/ui-render-audit.mjs --audit-scenario=render.md-preview.sweep.explain-dict --audit-scheme=dark
+//   --audit-list lists the registry; --audit-report=<path> records planned/completed/missing scenarios.
+//   Scope filters also cover kind, feature and the actually supported theme/scheme/state/dpr/font axes.
+//   Partial runs never rewrite baselines or reconcile global STALE entries.
 //
 // --shard=i/n splits the surface x theme matrix across n independent
 // PROCESSES, which is how scripts/verify.sh runs this gate (this one script
@@ -77,6 +83,10 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { isolatedFontconfigEnv, parityProbeEnv, parityReproduceCommand } from "./ci-fonts-env.mjs";
+import { auditSelection } from "./audit-scope.mjs";
+import { RENDER_SCENARIOS, RENDER_SWEEP_CONTEXTS, RENDER_OPTIONS_TABS, RENDER_READER_CONTEXTS,
+  RENDER_DARK_THEMES, checkScenarioId, sweepScenarioId, paintScenarioId, mediaScenarioId,
+  renderThemes, renderSweepPlan, runRenderScenario, popupCheckSetup } from "./audit-render-scenarios.mjs";
 
 import {
   CHECKS,
@@ -189,6 +199,53 @@ const JSON_OUT = (() => {
   return value ? resolve(process.cwd(), value) : null;
 })();
 
+// Resolve the entire effective scope before requiring Playwright or starting Chromium.
+// Shards retain their old theme allocation, including relocated expensive rows.
+const effectiveScenarios = RENDER_SCENARIOS.flatMap((row) => {
+  if ((SWEEP || WRITE_SPACING) && row.type !== "sweep") return [];
+  if (row.type === "sweep") return RUNS_SWEEP ? [row] : [];
+  if (!SHARD) return [row];
+  const themes = row.axes.theme.filter((name) => {
+    const theme = name === "default" ? "" : name;
+    if (row.type !== "checks") return SHARD_THEMES.includes(theme);
+    return CHECKS.some((check) => checkScenarioId(check) === row.id && (!check.themes || check.themes.includes(theme)) &&
+      (relocatedRow(check, theme) ? relocatedTarget(relocatedRow(check, theme)) === SHARD.i : SHARD_THEMES.includes(theme)));
+  });
+  return themes.length ? [{ ...row, axes: { ...row.axes, theme: themes } }] : [];
+});
+let audit;
+try {
+  audit = auditSelection({ runner: "render", scenarios: effectiveScenarios, argv: process.argv.slice(2) });
+  if (audit.partial && (UPDATE || WRITE_SPACING)) throw new Error("partial audit cannot rewrite known-failures or spacing baselines");
+  for (const row of audit.selected) {
+    if (row.type !== "sweep" && !renderThemes(audit, row.id).length) {
+      throw new Error(`no executable theme/scheme combination for ${row.id}`);
+    }
+  }
+  if (audit.maybePrintPlan()) process.exit(0);
+  const fonts = audit.filters.axes.font;
+  const actualFont = process.env.FONTCONFIG_FILE ? "ci" : "native";
+  if (fonts && (fonts.length !== 1 || fonts[0] !== actualFont)) {
+    throw new Error(`font request ${fonts.join(",")} does not match configured ${actualFont} environment; run one font per process and set FONTCONFIG_FILE for ci`);
+  }
+} catch (error) {
+  console.error(`[render-audit] ${error.message}`);
+  process.exit(2);
+}
+const wantsPaint = (surface, theme) => renderThemes(audit, paintScenarioId(surface)).includes(theme);
+const selectedSweep = (surface) => renderSweepPlan(surface, RENDER_SWEEP_CONTEXTS[surface]
+  .filter(({ name }) => audit.has(sweepScenarioId(surface, name))).map(({ name }) => name));
+const completedChecks = new Map();
+let auditFinished = false;
+function finishAudit() {
+  try { return audit.finish(); } finally { auditFinished = true; }
+}
+process.once("exit", () => {
+  if (!auditFinished) {
+    try { finishAudit(); } catch (error) { console.error(`[render-audit] ${error.message}`); }
+  }
+});
+
 let chromium;
 try {
   const req = createRequire(resolve(ROOT, ".qa-scan", "package.json"));
@@ -267,10 +324,7 @@ const ADAPTIVE_VARIANTS = {
 // -- all three surfaces render the identical 14-id data-theme set (same
 // census the checklist's own THEMES comment documents) -- NOT imported, same
 // independence-from-the-composer-layer reasoning as ADAPTIVE_VARIANTS above.
-const DARK_THEME_IDS = new Set([
-  "nord-night", "terminal", "dracula", "flexoki-dark",
-  "solarized-dark", "catppuccin-mocha", "gruvbox-dark", "rose-pine",
-]);
+const DARK_THEME_IDS = RENDER_DARK_THEMES;
 function isDarkTheme(themeKey) { return DARK_THEME_IDS.has(themeKey); }
 
 function themeToStorage(themeKey) {
@@ -4229,6 +4283,7 @@ function probeArgsFor(check, theme) {
 // tabs (2026-10-15 options IA moved Data Sync, Backup, Notifications,
 // Language and Diagnostics off the General/Account tab).
 async function runOneCheck(page, theme, check, results, extBase) {
+  audit.start(checkScenarioId(check));
   let restoreTab = null;
   if (check.page === "options.html" && check.selector) {
     restoreTab = await page.evaluate((sel) => {
@@ -4245,7 +4300,9 @@ async function runOneCheck(page, theme, check, results, extBase) {
     if (restoreTab) await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   }
   try {
-    return await runOneCheckInPanel(page, theme, check, results, extBase);
+    const value = await runOneCheckInPanel(page, theme, check, results, extBase);
+    completedChecks.set(checkScenarioId(check), (completedChecks.get(checkScenarioId(check)) || 0) + 1);
+    return value;
   } finally {
     if (restoreTab) await page.evaluate((id) => document.getElementById(id)?.click(), restoreTab).catch(() => {});
   }
@@ -6444,7 +6501,7 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
   // no detail pane open, no row selected -- captured BEFORE anything below
   // opens either for some OTHER check's sake. (It covered the retired sort
   // segment's unpressed cell, D6/T4's real consumer, until T6.)
-  await recordWeakTextHits(page, "library", theme, results, "vocab-rest");
+  if (wantsPaint("library", theme)) await recordWeakTextHits(page, "library", theme, results, "vocab-rest");
 
   const vocabChecks = checks.filter((c) => libraryView(c.selector) === "vocab");
   const notesChecks = checks.filter((c) => libraryView(c.selector) === "notes");
@@ -6571,19 +6628,21 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
   // needsBatchBarOpen() opens above for other checks, but UNCONDITIONALLY --
   // this family's own coverage of .vocab-row-gloss/.notes-row-meta must not
   // depend on some other CHECKS entry happening to need the same state.
-  if (!(await page.$(".vocab-card.selected"))) {
-    const head = page.locator("#vocab-list .vocab-card .notes-card-head").first();
-    // F5(b), T5 review: this opener used to be fail-OPEN (`if (await head.
-    // count())`) -- a missing head silently skipped the click and the scan
-    // below ran against the UNSELECTED band, reporting a false "0 FAIL"
-    // instead of failing loudly the way every sibling opener in this file
-    // does (needsDetailOpen/needsBatchBarOpen above throw on the same miss).
-    if (!(await head.count())) {
-      throw new Error(`SETUP: no "#vocab-list .vocab-card .notes-card-head" to open the batch-selected band for weakTextOnFill (theme=${theme}) -- seed fixture broken or markup renamed`);
+  if (wantsPaint("library", theme)) {
+    if (!(await page.$(".vocab-card.selected"))) {
+      const head = page.locator("#vocab-list .vocab-card .notes-card-head").first();
+      // F5(b), T5 review: this opener used to be fail-OPEN (`if (await head.
+      // count())`) -- a missing head silently skipped the click and the scan
+      // below ran against the UNSELECTED band, reporting a false "0 FAIL"
+      // instead of failing loudly the way every sibling opener in this file
+      // does (needsDetailOpen/needsBatchBarOpen above throw on the same miss).
+      if (!(await head.count())) {
+        throw new Error(`SETUP: no "#vocab-list .vocab-card .notes-card-head" to open the batch-selected band for weakTextOnFill (theme=${theme}) -- seed fixture broken or markup renamed`);
+      }
+      await head.click({ modifiers: ["Control"] }); await page.waitForTimeout(300);
     }
-    await head.click({ modifiers: ["Control"] }); await page.waitForTimeout(300);
+    await recordWeakTextHits(page, "library", theme, results, "vocab-batch");
   }
-  await recordWeakTextHits(page, "library", theme, results, "vocab-batch");
 
   if (notesChecks.length) {
     await page.click("#lib-tab-notes");
@@ -6605,7 +6664,7 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
       await page.waitForSelector("#notes-batch-toolbar.selecting", { timeout: TIMEOUT_MS });
     }
     for (const check of notesChecks) await runOneCheck(page, theme, check, results, extBase);
-  } else {
+  } else if (wantsPaint("library", theme)) {
     // weakTextOnFill still needs the notes tab even on a theme slice whose
     // CHECKS happen to carry no notes-scoped entry -- this family's coverage
     // must not depend on notesChecks staying non-empty.
@@ -6615,24 +6674,26 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
   }
 
   // ---- weakTextOnFill (family 13, T5): the notes batch-selected band.
-  if (!(await page.$(".notes-hit.selected"))) {
-    const hit = page.locator("#notes-list .notes-hit-btn").first();
-    // F5(b), T5 review: same fail-closed fix as the vocab band opener above.
-    if (!(await hit.count())) {
-      throw new Error(`SETUP: no "#notes-list .notes-hit-btn" to open the notes batch-selected band for weakTextOnFill (theme=${theme}) -- seed fixture broken or markup renamed`);
+  if (wantsPaint("library", theme)) {
+    if (!(await page.$(".notes-hit.selected"))) {
+      const hit = page.locator("#notes-list .notes-hit-btn").first();
+      // F5(b), T5 review: same fail-closed fix as the vocab band opener above.
+      if (!(await hit.count())) {
+        throw new Error(`SETUP: no "#notes-list .notes-hit-btn" to open the notes batch-selected band for weakTextOnFill (theme=${theme}) -- seed fixture broken or markup renamed`);
+      }
+      await hit.click({ modifiers: ["Control"] }); await page.waitForTimeout(300);
     }
-    await hit.click({ modifiers: ["Control"] }); await page.waitForTimeout(300);
-  }
-  await recordWeakTextHits(page, "library", theme, results, "notes-batch");
+    await recordWeakTextHits(page, "library", theme, results, "notes-batch");
 
-  // ---- fieldHoverContrast (family 14), the library value-box leg (stage 4
-  // Task 7, spec §5.2; R7: the same functions as popup's leg). Last on
-  // purpose: its vocab leg reloads the page and opens a word with a selection
-  // (the notes leg then reuses that page), which must not widen family 13's
-  // vocab / notes scans above; the run-level valueBoxLegCoverage /
-  // valueBoxFocusCoverage checks hold every theme to all eight boxes measured
-  // and the dictionary language's listbox button read focused.
-  await recordValueBoxHover(page, "library", `${extBase}library.html`, theme, results, null);
+    // ---- fieldHoverContrast (family 14), the library value-box leg (stage 4
+    // Task 7, spec §5.2; R7: the same functions as popup's leg). Last on
+    // purpose: its vocab leg reloads the page and opens a word with a selection
+    // (the notes leg then reuses that page), which must not widen family 13's
+    // vocab / notes scans above; the run-level valueBoxLegCoverage /
+    // valueBoxFocusCoverage checks hold every theme to all eight boxes measured
+    // and the dictionary language's listbox button read focused.
+    await recordValueBoxHover(page, "library", `${extBase}library.html`, theme, results, null);
+  }
 }
 
 // The provider <select> is a listbox-enhanced value carrier (hidden;
@@ -6675,6 +6736,7 @@ async function selectProviderViaListbox(page, value, sw) {
 }
 
 async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
+  const popupSetup = popupCheckSetup(checks, { paint: wantsPaint(surface, theme) });
   // .saved-theme-btn only renders once storage has at least one entry
   // (options.js renderSavedThemes(), read once at init via syncGetLarge) --
   // seed it BEFORE the navigation below, the same way pinboardToken is
@@ -6740,8 +6802,7 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
   // contrast (WCAG 1.4.3, the runner SKIPs it) -- so leaving them as-is
   // would have turned every submit-bar assertion into a silent SKIP dressed
   // up as coverage.
-  if (surface === "popup" && checks.some((c) => c.state === "focusWithin"
-      || c.selector === "#submit-btn" || c.selector === ".del-btn")) {
+  if (surface === "popup" && popupSetup.form) {
     const shown = await page.evaluate(() => {
       const main = document.getElementById("main-section");
       const strip = document.getElementById("md-actions-strip");
@@ -6791,7 +6852,7 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
   // (top-level, un-closured) function directly with a real http(s) URL
   // sidesteps that early return without touching popup.js's own gating
   // logic or faking a second "active tab".
-  if (surface === "popup") {
+  if (surface === "popup" && popupSetup.chips) {
     const suggestReady = await page.evaluate(async (token) => {
       if (typeof fetchPinboardSuggestTags !== "function") return false;
       await fetchPinboardSuggestTags(token, "https://example.com/render-audit-fixture");
@@ -7282,6 +7343,7 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // re-close every panel/popover this loop opens) guarantees a clean
     // dataset.theme before ANY of this loop's own clicks run, independent
     // of whatever the CHECKS groups above left the page in.
+    if (!wantsPaint("options", theme)) return;
     const { themePresetKey: _wtPresetKey, optTheme: _wtMode } = themeToStorage(theme);
     await setTheme(sw, _wtPresetKey, _wtMode);
     await page.goto(url, { waitUntil: "load", timeout: TIMEOUT_MS });
@@ -7420,43 +7482,46 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
   // other `.hidden` removals earlier in this function. Runs BEFORE the
   // confirm-popover open below so it can't be affected by that popover's
   // focusout-dismiss behaviour.
-  await page.evaluate(() => { document.getElementById("md-actions-strip")?.classList.remove("hidden"); });
-  await recordWeakTextHits(page, "popup", theme, results, "rest");
+  if (wantsPaint("popup", theme)) {
+    await page.evaluate(() => { document.getElementById("md-actions-strip")?.classList.remove("hidden"); });
+    await recordWeakTextHits(page, "popup", theme, results, "rest");
 
-  // ---- weakTextOnFill (family 13, T5 fix wave F5a): the 11 hidden-by-
-  // default popup states runSweep already knows how to reveal
-  // (POPUP_HIDDEN_LEG_IDS, shared with runSweep so the two lists can't
-  // drift), reused here rather than re-invented -- modelled on that same
-  // class-toggle list since none of these 11 legs are mutually exclusive and
-  // the sweep already established that a simultaneous unhide is a faithful
-  // rendering of each one's own recipe (they carry their own button recipes
-  // -- .fc-btn, .md-strip-btn, .offline-queue-item > .actions button -- that
-  // the default popup never renders, and this family had zero coverage of
-  // any of them before this fix). The extra toggle click renders the
-  // offline-queue ROWS themselves (no class toggle can conjure them --
-  // popup-offline.js only builds them inside renderList(), same reasoning
-  // as runSweep's own comment on this exact click).
-  await page.evaluate((ids) => {
-    for (const id of ids) {
-      document.getElementById(id)?.classList.remove("hidden");
+    // ---- weakTextOnFill (family 13, T5 fix wave F5a): the 11 hidden-by-
+    // default popup states runSweep already knows how to reveal
+    // (POPUP_HIDDEN_LEG_IDS, shared with runSweep so the two lists can't
+    // drift), reused here rather than re-invented -- modelled on that same
+    // class-toggle list since none of these 11 legs are mutually exclusive and
+    // the sweep already established that a simultaneous unhide is a faithful
+    // rendering of each one's own recipe (they carry their own button recipes
+    // -- .fc-btn, .md-strip-btn, .offline-queue-item > .actions button -- that
+    // the default popup never renders, and this family had zero coverage of
+    // any of them before this fix). The extra toggle click renders the
+    // offline-queue ROWS themselves (no class toggle can conjure them --
+    // popup-offline.js only builds them inside renderList(), same reasoning
+    // as runSweep's own comment on this exact click).
+    await page.evaluate((ids) => {
+      for (const id of ids) {
+        document.getElementById(id)?.classList.remove("hidden");
+      }
+      const fb = document.getElementById("ai-error-fallback");
+      if (fb && !fb.textContent.trim()) fb.textContent = "Use fallback";
+    }, POPUP_HIDDEN_LEG_IDS);
+    await page.evaluate(() => document.getElementById("offline-queue-toggle")?.click());
+    await page.waitForSelector(".offline-queue-item, .offline-queue-empty", { timeout: TIMEOUT_MS }).catch(() => {});
+    // Behavioural fix, not a throw -- the other 10 legs are static popup.html
+    // markup that's always present just CSS-hidden, but the queue ROWS are
+    // genuinely absent whenever the fixture's offline-queue seed data is
+    // missing, the same condition runSweep already warns about (below in this
+    // file). Mirrors runSweep's own console.warn for the identical check so a
+    // missing leg is visible in the log instead of silently scanning an empty
+    // list.
+    if (!(await page.$(".offline-queue-item"))) {
+      throw new Error("SETUP: weakTextOnFill popup hidden-legs: no .offline-queue-item rendered -- offline queue fixture is missing");
     }
-    const fb = document.getElementById("ai-error-fallback");
-    if (fb && !fb.textContent.trim()) fb.textContent = "Use fallback";
-  }, POPUP_HIDDEN_LEG_IDS);
-  await page.evaluate(() => document.getElementById("offline-queue-toggle")?.click());
-  await page.waitForSelector(".offline-queue-item, .offline-queue-empty", { timeout: TIMEOUT_MS }).catch(() => {});
-  // Behavioural fix, not a throw -- the other 10 legs are static popup.html
-  // markup that's always present just CSS-hidden, but the queue ROWS are
-  // genuinely absent whenever the fixture's offline-queue seed data is
-  // missing, the same condition runSweep already warns about (below in this
-  // file). Mirrors runSweep's own console.warn for the identical check so a
-  // missing leg is visible in the log instead of silently scanning an empty
-  // list.
-  if (!(await page.$(".offline-queue-item"))) {
-    console.warn("[render-audit] weakTextOnFill popup hidden-legs: no .offline-queue-item rendered -- the offline queue seed is missing, .offline-queue-item's fill/text pair is NOT being scanned");
+    await page.waitForTimeout(150);
+    await recordWeakTextHits(page, "popup", theme, results, "hidden-legs");
   }
-  await page.waitForTimeout(150);
-  await recordWeakTextHits(page, "popup", theme, results, "hidden-legs");
+  if (!wantsPaint("popup", theme) && !confirmChecks.length) return;
 
   // ---- weakTextOnFill (family 13, T5 fix wave F5a): the confirm popover.
   // Opened UNCONDITIONALLY -- this family's own coverage must not depend on
@@ -7475,13 +7540,13 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
   await page.click("#logout-link");
   await page.waitForSelector(".confirm-popover .confirm-yes", { timeout: TIMEOUT_MS });
   await page.waitForTimeout(150);
-  await recordWeakTextHits(page, "popup", theme, results, "confirm");
+  if (wantsPaint("popup", theme)) await recordWeakTextHits(page, "popup", theme, results, "confirm");
   if (confirmChecks.length) {
     for (const check of confirmChecks) await runOneCheck(page, theme, check, results);
   }
   // fieldHoverContrast (family 14), popup leg: its own fresh navigations
   // (the confirm popover above is left open on this page).
-  await recordValueBoxHover(page, "popup", url, theme, results, sw);
+  if (wantsPaint("popup", theme)) await recordValueBoxHover(page, "popup", url, theme, results, sw);
 }
 
 // Runs inside the page. It reports used values and structural state only;
@@ -7706,6 +7771,9 @@ async function runMediaPreferenceChecks(page, cdp, surface, theme, results) {
 
   let probes = 0;
   for (const scenario of MEDIA_SCENARIOS) {
+    const id = mediaScenarioId(surface, scenario.id);
+    if (!renderThemes(audit, id).includes(theme)) continue;
+    audit.start(id);
     await cdp.send("Emulation.setEmulatedMedia", { features: scenario.features });
     try {
       await page.waitForTimeout(120);
@@ -8477,8 +8545,8 @@ function reconcileSpacing(sweepHits) {
   const unique = uniqueSpacingHits(sweepHits);
   const fresh = unique.filter((h) => !baseline.has(spacingKey(h)));
   const seen = new Set(unique.map(spacingKey));
-  const stale = [...baseline.keys()].filter((k) => !seen.has(k));
-  console.log(`[render-audit] spacingScale: ${unique.length} off-scale identit(ies), ${unique.length - fresh.length} held by ${SPACING_BASELINE_PATH.replace(ROOT + "/", "")}, ${fresh.length} new, ${stale.length} stale`);
+  const stale = audit.partial ? [] : [...baseline.keys()].filter((k) => !seen.has(k));
+  console.log(`[render-audit] spacingScale: ${unique.length} off-scale identit(ies), ${unique.length - fresh.length} held by ${SPACING_BASELINE_PATH.replace(ROOT + "/", "")}, ${fresh.length} new, ${audit.partial ? "global stale reconciliation skipped (partial run)" : `${stale.length} stale`}`);
   if (stale.length) {
     console.log(`[render-audit] spacingScale ledger entries that no longer reproduce -- delete them (the ledger only shrinks):`);
     for (const k of stale) console.log(`  STALE  ${k}`);
@@ -8493,7 +8561,7 @@ function reconcileSpacing(sweepHits) {
 // the dictionary view), so "explain-pop" leaves it open and "explain-dict"
 // closes it. The answered-state footer actions are unhidden by hand: they
 // appear once a reply lands, and the sweep measures geometry, not the flow.
-const READER_SURFACES = ["reader-source-details", "export-more", "reader-bookmark-footer", "reader-bookmark-editor", "explain-pop", "explain-dict", "ask-panel", "search-pop", "kbd-help-pop", "typo-pop", "pb-hl-card", "send-menu", "confirm-popover", "tr-ask"];
+const READER_SURFACES = RENDER_READER_CONTEXTS;
 async function openReaderSurface(name) {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const shown = (el) => !!(el && el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) && el.getBoundingClientRect().width > 0);
@@ -8633,6 +8701,25 @@ async function runFamilySweep(page) {
 
 async function runSweep(page, sw, extBase) {
   const hits = [];
+  const contexts = Object.fromEntries(Object.keys(RENDER_SWEEP_CONTEXTS).map((surface) => [surface, new Set(selectedSweep(surface))]));
+  const wants = (surface, name) => contexts[surface].has(name);
+  let readerScheme = null;
+  const scan = async (surface, name, open = async () => true) => {
+    if (!wants(surface, name)) return;
+    await runRenderScenario(audit, sweepScenarioId(surface, name), async () => {
+      const opened = await open();
+      if (opened !== true) return opened;
+      if (surface === "md-preview") {
+        const measured = await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme);
+        if (measured !== readerScheme) return `scheme ${measured}, expected ${readerScheme}`;
+      }
+      const target = RENDER_SWEEP_CONTEXTS[surface].find((item) => item.name === name).target;
+      if (target && !(await page.locator(target).first().isVisible())) return `target not visible: ${target}`;
+      return true;
+    }, async () => {
+      add(await runFamilySweep(page), surface, name);
+    });
+  };
   // family 9 liveness (stage 4): sweepProbe reports every value box whose
   // four corners it measured as a `radiusValueBoxMeasured` marker; those are
   // counted per surface and kind here and never reach the hit list (they
@@ -8661,120 +8748,143 @@ async function runSweep(page, sw, extBase) {
   // ---- options: every tab panel (each is display:none until clicked, so a
   // border/chevron bug on a panel-scoped element only surfaces once its tab
   // is active -- exactly how the user found the preset-preview bug). ----
-  await page.goto(`${extBase}options.html`, { waitUntil: "load", timeout: TIMEOUT_MS });
-  await page.waitForTimeout(500);
-  // Playwright's page.$$eval (DOM query + in-page callback), not JS eval() --
-  // no string-to-code execution, same API runOneCheck already relies on via
-  // page.evaluate elsewhere in this file.
-  const tabIds = await page.$$eval(".tab-btn", (els) => els.map((e) => e.id));
-  for (const tabId of tabIds) {
-    await page.click(`#${tabId}`);
-    await page.waitForTimeout(150);
-    // Open every non-help disclosure (details.disclosure: vocab sections,
-    // tag-gov low-count, Send-to cards) so their contents are measured too: the
-    // AnkiConnect/Eudic rows that started the fgRhythm family live inside a
-    // closed vocabulary disclosure. Contextual
-    // help stays closed -- the default state is the one the rhythm rules
-    // describe.
-    await page.evaluate(() => { document.querySelectorAll(".panel.active details:not(.context-help)").forEach((d) => { d.open = true; }); });
-    await page.waitForTimeout(100);
-    if (tabId === "tab-appearance") {
-      // #preset-preview-section carries the `hidden` attribute until a
-      // site-theme preset is picked (options.js renderPresetPreview) --
-      // click one so this disclosure (and its chevron/padding) actually
-      // renders for the sweep, same reasoning as the vocab detail-pane/
-      // batch-bar opens below.
-      const presetBtn = page.locator(".theme-preset-btn[data-theme='flexoki']").first();
-      if (await presetBtn.count()) { await presetBtn.click(); await page.waitForTimeout(150); }
+  if (contexts.options.size) {
+    await page.goto(`${extBase}options.html`, { waitUntil: "load", timeout: TIMEOUT_MS });
+    await page.waitForTimeout(500);
+    // Playwright's page.$$eval (DOM query + in-page callback), not JS eval() --
+    // no string-to-code execution, same API runOneCheck already relies on via
+    // page.evaluate elsewhere in this file.
+    const tabIds = await page.$$eval(".tab-btn", (els) => els.map((e) => e.id));
+    const unknownTabs = tabIds.filter((id) => !RENDER_OPTIONS_TABS.includes(id));
+    if (unknownTabs.length) throw new Error(`SETUP: options tabs missing from render registry: ${unknownTabs.join(", ")}`);
+    for (const tabId of RENDER_OPTIONS_TABS.filter((id) => wants("options", id))) {
+      if (!tabIds.includes(tabId)) throw new Error(`SETUP: selected options tab ${tabId} is missing`);
+      await page.click(`#${tabId}`);
+      await page.waitForTimeout(150);
+      // Open every non-help disclosure (details.disclosure: vocab sections,
+      // tag-gov low-count, Send-to cards) so their contents are measured too: the
+      // AnkiConnect/Eudic rows that started the fgRhythm family live inside a
+      // closed vocabulary disclosure. Contextual
+      // help stays closed -- the default state is the one the rhythm rules
+      // describe.
+      await page.evaluate(() => { document.querySelectorAll(".panel.active details:not(.context-help)").forEach((d) => { d.open = true; }); });
+      await page.waitForTimeout(100);
+      if (tabId === "tab-appearance") {
+        // #preset-preview-section carries the `hidden` attribute until a
+        // site-theme preset is picked (options.js renderPresetPreview) --
+        // click one so this disclosure (and its chevron/padding) actually
+        // renders for the sweep, same reasoning as the vocab detail-pane/
+        // batch-bar opens below.
+        const presetBtn = page.locator(".theme-preset-btn[data-theme='flexoki']").first();
+        if (!(await presetBtn.count())) throw new Error("SETUP: appearance preset preview opener is missing");
+        await presetBtn.click(); await page.waitForTimeout(150);
+      }
+      await scan("options", tabId);
     }
-    add(await runFamilySweep(page), "options", tabId);
-  }
 
-  // Geometry fixture for the normally hidden failure/retry state. The real
-  // persistence and repeated-error flow is covered by qa-drive options-save.
-  await page.evaluate(() => {
-    document.getElementById("auto-save-status").classList.add("hidden");
-    const alert = document.getElementById("opt-global-alert");
-    alert.textContent = t("optSaveFailed"); alert.classList.remove("hidden");
-    document.getElementById("opt-global-error").classList.remove("hidden");
-    const retry = document.getElementById("auto-save-retry");
-    retry.hidden = false; retry.disabled = false;
-  });
-  add(await runFamilySweep(page), "options", "save-failure");
+    // Geometry fixture for the normally hidden failure/retry state. The real
+    // persistence and repeated-error flow is covered by qa-drive options-save.
+    if (wants("options", "save-failure")) {
+      await page.evaluate(() => {
+        document.getElementById("auto-save-status").classList.add("hidden");
+        const alert = document.getElementById("opt-global-alert");
+        alert.textContent = t("optSaveFailed"); alert.classList.remove("hidden");
+        document.getElementById("opt-global-error").classList.remove("hidden");
+        const retry = document.getElementById("auto-save-retry");
+        retry.hidden = false; retry.disabled = false;
+      });
+      await scan("options", "save-failure");
+    }
+  }
 
   // ---- library: vocab (list, detail pane, batch bar) + notes (list, detail pane). ----
-  await page.goto(`${extBase}library.html?_ra=sweep#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
-  await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS }).catch(() => {});
-  await page.waitForTimeout(300);
-  add(await runFamilySweep(page), "library", "vocab-list");
-  // Library redesign T4b: the "Filter" popover is interaction-only UI
-  // (ui-primitives.md: register how it opens or it is outside every family).
-  // Since critique round 5 the 1280 runner's index is wide: narrow it so
-  // the popover form exists at all (libForceNarrowIndex).
-  if (!(await libForceNarrowIndex(page, true))) throw new Error("SETUP: sweep could not fold the vocabulary filter row (libForceNarrowIndex)");
-  if ((await setFilterSetOpen(page, true)) === "ok") {
-    await settleAnimations(page);
-    add(await runFamilySweep(page), "library", "vocab-filter-set");
-    await setFilterSetOpen(page, false);
-    await settleAnimations(page);
-  } else {
-    throw new Error("SETUP: sweep could not open #vocab-filter-set on the forced-narrow index");
-  }
-  await libForceNarrowIndex(page, false);
-  // The group listbox renders inside the closed Filter popover whenever the
-  // index takes its narrow form (inline in the wide one): open the popover
-  // once, the way a user does, then the listbox itself -- the one place its
-  // option rows render (ui-primitives: interaction-only UI must be reachable
-  // by the gates) -- and sweep that state. T4b's block right above already
-  // swept the open Filter popover as "vocab-filter-set"; here only the open
-  // listbox is new.
-  const filterSetRevealed = await libRevealFilterSet(page, "#vocab-group-filter-btn");
-  await page.click("#vocab-group-filter-btn");
-  await page.waitForSelector("#vocab-group-filter-list .listbox-opt", { state: "visible", timeout: TIMEOUT_MS });
-  add(await runFamilySweep(page), "library", "vocab-listbox-open");
-  await page.keyboard.press("Escape");
-  if (filterSetRevealed) await libHideFilterSet(page);
-  // The count row's Export menu (TSV / Anki / Eudic / settings door) exists
-  // only while open -- built per click, like the notes colour menu below.
-  if (await page.locator("#vocab-export-open:not([disabled])").count()) {
-    await page.click("#vocab-export-open");
-    await page.waitForSelector(".vocab-export-menu:popover-open", { timeout: TIMEOUT_MS });
-    add(await runFamilySweep(page), "library", "vocab-export-menu");
-    await page.keyboard.press("Escape");
-  }
-  const vocabHead = page.locator("#vocab-list .vocab-card .notes-card-head").first();
-  if (await vocabHead.count()) {
-    await vocabHead.click(); await page.waitForTimeout(250);
-    add(await runFamilySweep(page), "library", "vocab-detail");
-  }
-  // Ctrl+click on the row head, not a checkbox click: the per-row checkbox was
-  // removed 2026-08-06 and selection is now a modified click on the row itself.
-  if (await vocabHead.count()) {
-    await vocabHead.click({ modifiers: ["Control"] }); await page.waitForTimeout(350);
-    add(await runFamilySweep(page), "library", "vocab-batch-bar");
-  }
-  await page.click("#lib-tab-notes");
-  await page.waitForSelector("#notes-list .notes-hit", { timeout: TIMEOUT_MS }).catch(() => {});
-  await page.waitForTimeout(250);
-  add(await runFamilySweep(page), "library", "notes-list");
-  const notesHit = page.locator("#notes-list .notes-hit-btn").first();
-  if (await notesHit.count()) {
-    await notesHit.click(); await page.waitForTimeout(250);
-    add(await runFamilySweep(page), "library", "notes-detail");
-    await page.locator(".notes-excerpt-color").first().click();
-    await page.waitForSelector(".notes-color-menu:popover-open", { timeout: TIMEOUT_MS });
-    add(await runFamilySweep(page), "library", "notes-color-menu");
-    await page.keyboard.press("Escape");
-  }
-  // Ctrl+click to open .notes-batch-bar.selecting (independent review F3):
-  // the sweep used to only single-click a notes row, so .notes-batch-bar's
-  // own buttons (including #notes-clear-selection, which shares vocab's
-  // "cross" glyph and its 23px hit-area shortfall) were never rendered in
-  // an on-screen, selected state and this debt was invisible to the gate.
-  // Same modifier-click contract as the vocab list above.
-  if (await notesHit.count()) {
-    await notesHit.click({ modifiers: ["Control"] }); await page.waitForTimeout(350);
-    add(await runFamilySweep(page), "library", "notes-batch-bar");
+  if (contexts.library.size) {
+    await page.goto(`${extBase}library.html?_ra=sweep#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
+    await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS }).catch(() => {});
+    await page.waitForTimeout(300);
+    await scan("library", "vocab-list");
+    // Library redesign T4b: the "Filter" popover is interaction-only UI
+    // (ui-primitives.md: register how it opens or it is outside every family).
+    // Since critique round 5 the 1280 runner's index is wide: narrow it so
+    // the popover form exists at all (libForceNarrowIndex).
+    if (wants("library", "vocab-filter-set")) {
+      if (!(await libForceNarrowIndex(page, true))) throw new Error("SETUP: sweep could not fold the vocabulary filter row (libForceNarrowIndex)");
+      if ((await setFilterSetOpen(page, true)) === "ok") {
+        await settleAnimations(page);
+        await scan("library", "vocab-filter-set");
+        await setFilterSetOpen(page, false);
+        await settleAnimations(page);
+      } else {
+        throw new Error("SETUP: sweep could not open #vocab-filter-set on the forced-narrow index");
+      }
+      await libForceNarrowIndex(page, false);
+    }
+    // The group listbox renders inside the closed Filter popover whenever the
+    // index takes its narrow form (inline in the wide one): open the popover
+    // once, the way a user does, then the listbox itself -- the one place its
+    // option rows render (ui-primitives: interaction-only UI must be reachable
+    // by the gates) -- and sweep that state. T4b's block right above already
+    // swept the open Filter popover as "vocab-filter-set"; here only the open
+    // listbox is new.
+    if (wants("library", "vocab-listbox-open")) {
+      const filterSetRevealed = await libRevealFilterSet(page, "#vocab-group-filter-btn");
+      await page.click("#vocab-group-filter-btn");
+      await page.waitForSelector("#vocab-group-filter-list .listbox-opt", { state: "visible", timeout: TIMEOUT_MS });
+      await scan("library", "vocab-listbox-open");
+      await page.keyboard.press("Escape");
+      if (filterSetRevealed) await libHideFilterSet(page);
+    }
+    // The count row's Export menu (TSV / Anki / Eudic / settings door) exists
+    // only while open -- built per click, like the notes colour menu below.
+    if (wants("library", "vocab-export-menu")) {
+      if (!(await page.locator("#vocab-export-open:not([disabled])").count())) throw new Error("SETUP: vocabulary export opener is missing or disabled");
+      await page.click("#vocab-export-open");
+      await page.waitForSelector(".vocab-export-menu:popover-open", { timeout: TIMEOUT_MS });
+      await scan("library", "vocab-export-menu");
+      await page.keyboard.press("Escape");
+    }
+    const vocabHead = page.locator("#vocab-list .vocab-card .notes-card-head").first();
+    if (wants("library", "vocab-detail")) {
+      if (!(await vocabHead.count())) throw new Error("SETUP: vocabulary detail opener is missing");
+      await vocabHead.click(); await page.waitForTimeout(250);
+      await scan("library", "vocab-detail");
+    }
+    // Ctrl+click on the row head, not a checkbox click: the per-row checkbox was
+    // removed 2026-08-06 and selection is now a modified click on the row itself.
+    if (wants("library", "vocab-batch-bar")) {
+      if (!(await vocabHead.count())) throw new Error("SETUP: vocabulary batch opener is missing");
+      await vocabHead.click({ modifiers: ["Control"] }); await page.waitForTimeout(350);
+      await scan("library", "vocab-batch-bar");
+    }
+    if ([...contexts.library].some((name) => name.startsWith("notes-"))) {
+      await page.click("#lib-tab-notes");
+      await page.waitForSelector("#notes-list .notes-hit", { timeout: TIMEOUT_MS }).catch(() => {});
+      await page.waitForTimeout(250);
+      await scan("library", "notes-list");
+      const notesHit = page.locator("#notes-list .notes-hit-btn").first();
+      if (wants("library", "notes-detail")) {
+        if (!(await notesHit.count())) throw new Error("SETUP: notes detail opener is missing");
+        await notesHit.click(); await page.waitForTimeout(250);
+        await scan("library", "notes-detail");
+        if (wants("library", "notes-color-menu")) {
+          await page.locator(".notes-excerpt-color").first().click();
+          await page.waitForSelector(".notes-color-menu:popover-open", { timeout: TIMEOUT_MS });
+          await scan("library", "notes-color-menu");
+          await page.keyboard.press("Escape");
+        }
+      }
+      // Ctrl+click to open .notes-batch-bar.selecting (independent review F3):
+      // the sweep used to only single-click a notes row, so .notes-batch-bar's
+      // own buttons (including #notes-clear-selection, which shares vocab's
+      // "cross" glyph and its 23px hit-area shortfall) were never rendered in
+      // an on-screen, selected state and this debt was invisible to the gate.
+      // Same modifier-click contract as the vocab list above.
+      if (wants("library", "notes-batch-bar")) {
+        if (!(await notesHit.count())) throw new Error("SETUP: notes batch opener is missing");
+        await notesHit.click({ modifiers: ["Control"] }); await page.waitForTimeout(350);
+        await scan("library", "notes-batch-bar");
+      }
+    }
   }
 
   // ---- md-preview: the reader's chrome, static AND interaction-only. The
@@ -8790,116 +8900,135 @@ async function runSweep(page, sw, extBase) {
   // pbp_hl_* key; the reader never matched it). Before 2026-09-06 the
   // highlight section, its card and every popover were never rendered here:
   // a 17px delete button and 36px footer buttons lived there unmeasured. ----
-  const readerUrl = "https://example.com/render-audit-fixture";
-  const readerPayload = (k, url = readerUrl) => ({ [`md_preview_data_${k}`]: {
-    markdown: "# Render audit fixture\n\nA paragraph with a [link](https://example.com/) and the quick brown fox.\n\n## Section\n\n- item one\n- item two\n\n`code` and **bold**.\n",
-    contentHtml: "", title: "Render Audit Fixture", url, baseUrl: url,
-    tags: ["qa"], tokens: 0, hasApiKey: true, source: "local", math: false, forum: false, account: SEED_TOKEN_ACCOUNT, ts: Date.now(),
-  } });
-  await sw.evaluate((o) => chrome.storage.local.set(o), {
-    ...readerPayload("render-audit-sweep"),
-    aiProvider: "openai", openaiApiKey: "sk-render-audit-fixture", previewSkimEnabled: true,
-    // two Send-to targets: the split button's menu lists only the non-primary ones, so one target renders an empty menu
-    exportTargets: { obsidian: { enabled: true, vault: "Render QA", folder: "" }, webhook: { enabled: true, url: "https://example.com/hook" } },
-  });
-  await page.goto(`${extBase}md-preview.html?k=render-audit-sweep`, { waitUntil: "load", timeout: TIMEOUT_MS });
-  await page.waitForTimeout(900);
-  const hlKey = await page.evaluate((u) => (typeof _pbpHlKey === "function" ? _pbpHlKey(u) : null), readerUrl);
-  if (hlKey) {
-    await sw.evaluate((o) => chrome.storage.local.set(o), { ...readerPayload("render-audit-sweep2"), [hlKey]: {
-      url: readerUrl, title: "Render Audit Fixture Page",
-      items: [{ id: "h1", ts: Date.now(), quote: "quick brown fox", note: "A short fixture note for the render audit.", color: 1 }],
-    } });
-    await page.goto(`${extBase}md-preview.html?k=render-audit-sweep2`, { waitUntil: "load", timeout: TIMEOUT_MS });
-    await page.waitForTimeout(900);
-  } else console.warn("[render-audit] reader: _pbpHlKey is not a function; the highlight section stays unseeded");
-  add(await runFamilySweep(page), "md-preview", "reader");
+  if (contexts["md-preview"].size) {
+    const readerSchemes = new Set([...contexts["md-preview"]].flatMap((name) =>
+      audit.values(sweepScenarioId("md-preview", name), "scheme", audit.filters.axes.scheme ? ["light", "dark"] : ["light"])));
+    for (const scheme of readerSchemes) {
+      readerScheme = scheme;
+      console.log(`[render-audit] reader scheme: ${scheme}`);
+      await sw.evaluate((mode) => chrome.storage.local.set({ pbp_color_scheme: mode }), scheme);
+      const readerUrl = "https://example.com/render-audit-fixture";
+      const readerPayload = (k, url = readerUrl) => ({ [`md_preview_data_${k}`]: {
+        markdown: "# Render audit fixture\n\nA paragraph with a [link](https://example.com/) and the quick brown fox.\n\n## Section\n\n- item one\n- item two\n\n`code` and **bold**.\n",
+        contentHtml: "", title: "Render Audit Fixture", url, baseUrl: url,
+        tags: ["qa"], tokens: 0, hasApiKey: true, source: "local", math: false, forum: false, account: SEED_TOKEN_ACCOUNT, ts: Date.now(),
+      } });
+      if ([...contexts["md-preview"]].some((name) => name !== "video")) {
+        await sw.evaluate((o) => chrome.storage.local.set(o), {
+          ...readerPayload("render-audit-sweep"),
+          aiProvider: "openai", openaiApiKey: "sk-render-audit-fixture", previewSkimEnabled: true,
+          // two Send-to targets: the split button's menu lists only the non-primary ones, so one target renders an empty menu
+          exportTargets: { obsidian: { enabled: true, vault: "Render QA", folder: "" }, webhook: { enabled: true, url: "https://example.com/hook" } },
+        });
+        await page.goto(`${extBase}md-preview.html?k=render-audit-sweep`, { waitUntil: "load", timeout: TIMEOUT_MS });
+        await page.waitForTimeout(900);
+        const hlKey = await page.evaluate((u) => (typeof _pbpHlKey === "function" ? _pbpHlKey(u) : null), readerUrl);
+        if (hlKey) {
+          await sw.evaluate((o) => chrome.storage.local.set(o), { ...readerPayload("render-audit-sweep2"), [hlKey]: {
+            url: readerUrl, title: "Render Audit Fixture Page",
+            items: [{ id: "h1", ts: Date.now(), quote: "quick brown fox", note: "A short fixture note for the render audit.", color: 1 }],
+          } });
+          await page.goto(`${extBase}md-preview.html?k=render-audit-sweep2`, { waitUntil: "load", timeout: TIMEOUT_MS });
+          await page.waitForTimeout(900);
+        } else console.warn("[render-audit] reader: _pbpHlKey is not a function; the highlight section stays unseeded");
+        await scan("md-preview", "reader");
 
-  // Each interaction-only surface is opened through the page's own opener,
-  // probed as its own context, then closed. A surface that fails to render
-  // is printed, never skipped silently -- the gate's coverage is the point.
-  for (const name of READER_SURFACES) {
-    const ok = await page.evaluate(openReaderSurface, name).catch((e) => `threw: ${e.message}`);
-    if (ok !== true) { console.warn(`[render-audit] reader surface NOT RENDERED: ${name} (${ok || "opener returned false"}) -- its controls were not measured`); continue; }
-    await page.waitForTimeout(150);
-    add(await runFamilySweep(page), "md-preview", name);
-    await page.evaluate(closeReaderSurface, name).catch(() => {});
+        // Each interaction-only surface is opened through the page's own opener,
+        // probed as its own context, then closed. A surface that fails to render
+        // is printed, never skipped silently -- the gate's coverage is the point.
+        for (const name of READER_SURFACES.filter((name) => wants("md-preview", name))) {
+          await scan("md-preview", name, async () => {
+            const ok = await page.evaluate(openReaderSurface, name).catch((e) => `threw: ${e.message}`);
+            if (ok === true) await page.waitForTimeout(150);
+            return ok;
+          });
+          await page.evaluate(closeReaderSurface, name).catch(() => {});
+        }
+
+      }
+
+      // ---- video workbench. A YouTube payload renders only the poster card: the
+      // bar, the view toggle and the cue list appear after a user-gesture origin
+      // grant plus live caption traffic, which no sweep can produce. md-video.js's
+      // prepareVideoSession honours window.pbpVideoFixture (tracks / segments in
+      // the module's own normalized shapes, the ones tests/md-video-tests.html
+      // builds) and skips the grant and the fetch; the poster click then mounts
+      // the real workbench offline. Before 2026-09-06 these controls were never
+      // measured (their 28 -> 26px move had CSS arithmetic as its only evidence).
+      if (wants("md-preview", "video")) {
+        const videoUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+        await sw.evaluate((o) => chrome.storage.local.set(o), readerPayload("render-audit-video", videoUrl));
+        await page.goto(`${extBase}md-preview.html?k=render-audit-video`, { waitUntil: "load", timeout: TIMEOUT_MS });
+        await page.waitForTimeout(900);
+        const videoOk = await page.evaluate(async (url) => {
+          window.pbpVideoFixture = {
+            tracks: [{ baseUrl: "https://x/en.xml", lang: "en", label: "English", asr: false }, { baseUrl: "https://x/zh.xml", lang: "zh-Hans", label: "Chinese (Simplified)", asr: false }],
+            track: { baseUrl: "https://x/en.xml", lang: "en", label: "English", asr: false },
+            segments: [{ from: 0, to: 2.4, content: "Render audit fixture, first cue." }, { from: 2.4, to: 5.1, content: "Second cue of the fixture transcript." }, { from: 5.1, to: 9, content: "Third cue, long enough to wrap inside the study column at a narrow width." }],
+            meta: { title: "Render Audit Video", url, trackLabel: "English" },
+          };
+          const poster = document.querySelector(".pbv-poster");
+          if (!poster) return "no .pbv-poster";
+          poster.click();
+          await new Promise((r) => setTimeout(r, 1500));
+          const bar = document.querySelector(".pbv-bar"), rows = document.querySelectorAll(".pbv-row");
+          if (!bar || !bar.checkVisibility()) return "no visible .pbv-bar after the poster click";
+          if (!rows.length) return ".pbv-bar rendered but no .pbv-row cues";
+          return true;
+        }, videoUrl).catch((e) => `threw: ${e.message}`);
+        if (videoOk !== true) throw new Error(`SETUP: selected reader video workbench did not open (${videoOk})`);
+        await scan("md-preview", "video");
+      }
+    }
   }
-
-  // ---- video workbench. A YouTube payload renders only the poster card: the
-  // bar, the view toggle and the cue list appear after a user-gesture origin
-  // grant plus live caption traffic, which no sweep can produce. md-video.js's
-  // prepareVideoSession honours window.pbpVideoFixture (tracks / segments in
-  // the module's own normalized shapes, the ones tests/md-video-tests.html
-  // builds) and skips the grant and the fetch; the poster click then mounts
-  // the real workbench offline. Before 2026-09-06 these controls were never
-  // measured (their 28 -> 26px move had CSS arithmetic as its only evidence).
-  const videoUrl = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
-  await sw.evaluate((o) => chrome.storage.local.set(o), readerPayload("render-audit-video", videoUrl));
-  await page.goto(`${extBase}md-preview.html?k=render-audit-video`, { waitUntil: "load", timeout: TIMEOUT_MS });
-  await page.waitForTimeout(900);
-  const videoOk = await page.evaluate(async (url) => {
-    window.pbpVideoFixture = {
-      tracks: [{ baseUrl: "https://x/en.xml", lang: "en", label: "English", asr: false }, { baseUrl: "https://x/zh.xml", lang: "zh-Hans", label: "Chinese (Simplified)", asr: false }],
-      track: { baseUrl: "https://x/en.xml", lang: "en", label: "English", asr: false },
-      segments: [{ from: 0, to: 2.4, content: "Render audit fixture, first cue." }, { from: 2.4, to: 5.1, content: "Second cue of the fixture transcript." }, { from: 5.1, to: 9, content: "Third cue, long enough to wrap inside the study column at a narrow width." }],
-      meta: { title: "Render Audit Video", url, trackLabel: "English" },
-    };
-    const poster = document.querySelector(".pbv-poster");
-    if (!poster) return "no .pbv-poster";
-    poster.click();
-    await new Promise((r) => setTimeout(r, 1500));
-    const bar = document.querySelector(".pbv-bar"), rows = document.querySelectorAll(".pbv-row");
-    if (!bar || !bar.checkVisibility()) return "no visible .pbv-bar after the poster click";
-    if (!rows.length) return ".pbv-bar rendered but no .pbv-row cues";
-    return true;
-  }, videoUrl).catch((e) => `threw: ${e.message}`);
-  if (videoOk !== true) console.warn(`[render-audit] reader surface NOT RENDERED: video workbench (${videoOk}) -- its controls were not measured`);
-  else add(await runFamilySweep(page), "md-preview", "video");
 
   // ---- popup: default light + no-preset dark (since batch 2 D6 the latter
   // resolves to the flexoki-dark preset, same as options/library; kept as a
   // separate sweep context because the popup's dark layout deltas live in
   // its own hand-written rules). ----
   await setTheme(sw, "", "light");
-  await page.goto(`${extBase}popup.html?_ra=sweeplight`, { waitUntil: "load", timeout: TIMEOUT_MS });
-  await page.waitForTimeout(500);
-  await page.evaluate(async () => { if (window.PPOffline) await window.PPOffline.refresh(); }).catch(() => {});
-  await page.waitForSelector("#offline-queue-bar:not(.hidden)", { timeout: TIMEOUT_MS }).catch(() => {});
-  add(await runFamilySweep(page), "popup", "light");
-  // Hidden-by-default states -- feedback card (with its fallback action),
-  // URL warning and clean hint, presets and suggest rows, batch permission
-  // card and progress bar, markdown strip, expanded offline queue -- shown
-  // by class rather than by driving the flows that show them: the families
-  // gate geometry, and these blocks carry their own button recipes (.fc-btn,
-  // .md-strip-btn, .offline-queue-item > .actions button) that the default
-  // popup never renders.
-  await page.evaluate((ids) => {
-    for (const id of ids) {
-      document.getElementById(id)?.classList.remove("hidden");
+  if (wants("popup", "light") || wants("popup", "states")) {
+    await page.goto(`${extBase}popup.html?_ra=sweeplight`, { waitUntil: "load", timeout: TIMEOUT_MS });
+    await page.waitForTimeout(500);
+    await page.evaluate(async () => { if (window.PPOffline) await window.PPOffline.refresh(); }).catch(() => {});
+    await page.waitForSelector("#offline-queue-bar:not(.hidden)", { timeout: TIMEOUT_MS }).catch(() => {});
+    await scan("popup", "light");
+    // Hidden-by-default states -- feedback card (with its fallback action),
+    // URL warning and clean hint, presets and suggest rows, batch permission
+    // card and progress bar, markdown strip, expanded offline queue -- shown
+    // by class rather than by driving the flows that show them: the families
+    // gate geometry, and these blocks carry their own button recipes (.fc-btn,
+    // .md-strip-btn, .offline-queue-item > .actions button) that the default
+    // popup never renders.
+    if (wants("popup", "states")) {
+      await page.evaluate((ids) => {
+        for (const id of ids) {
+          document.getElementById(id)?.classList.remove("hidden");
+        }
+        const fb = document.getElementById("ai-error-fallback");
+        if (fb && !fb.textContent.trim()) fb.textContent = "Use fallback";
+      }, POPUP_HIDDEN_LEG_IDS);
+      // ...except the queue ROWS, which no class toggle can conjure: popup-offline.js
+      // builds .offline-queue-item (and its two icon-only action buttons) only inside
+      // renderList(), which runs on the toggle's click -- `expanded` starts false. The
+      // unhide above therefore measured an EMPTY list for as long as this leg existed,
+      // while its own comment claimed .offline-queue-item > .actions button as covered
+      // (they shipped 17px tall against the 24px floor, 2026-09-18 audit M4). Driving
+      // the toggle is the only way to render them, so this one block is driven, not
+      // unhidden.
+      await page.evaluate(() => document.getElementById("offline-queue-toggle")?.click());
+      // Wait for either outcome of renderList(): rows, or the empty placeholder.
+      // A bare .offline-queue-item wait would burn the full timeout and then
+      // measure an empty list in silence if the seeded queue record ever went
+      // missing -- exactly the blind spot this leg exists to close.
+      await page.waitForSelector(".offline-queue-item, .offline-queue-empty", { timeout: TIMEOUT_MS }).catch(() => {});
+      if (!(await page.$(".offline-queue-item"))) {
+        throw new Error("SETUP: popup states: no .offline-queue-item rendered -- offline queue fixture is missing");
+      }
+      await page.waitForTimeout(150);
+      await scan("popup", "states");
     }
-    const fb = document.getElementById("ai-error-fallback");
-    if (fb && !fb.textContent.trim()) fb.textContent = "Use fallback";
-  }, POPUP_HIDDEN_LEG_IDS);
-  // ...except the queue ROWS, which no class toggle can conjure: popup-offline.js
-  // builds .offline-queue-item (and its two icon-only action buttons) only inside
-  // renderList(), which runs on the toggle's click -- `expanded` starts false. The
-  // unhide above therefore measured an EMPTY list for as long as this leg existed,
-  // while its own comment claimed .offline-queue-item > .actions button as covered
-  // (they shipped 17px tall against the 24px floor, 2026-09-18 audit M4). Driving
-  // the toggle is the only way to render them, so this one block is driven, not
-  // unhidden.
-  await page.evaluate(() => document.getElementById("offline-queue-toggle")?.click());
-  // Wait for either outcome of renderList(): rows, or the empty placeholder.
-  // A bare .offline-queue-item wait would burn the full timeout and then
-  // measure an empty list in silence if the seeded queue record ever went
-  // missing -- exactly the blind spot this leg exists to close.
-  await page.waitForSelector(".offline-queue-item, .offline-queue-empty", { timeout: TIMEOUT_MS }).catch(() => {});
-  if (!(await page.$(".offline-queue-item"))) {
-    console.warn("[render-audit] popup states: no .offline-queue-item rendered -- the offline queue seed is missing, .offline-queue-item > .actions button is NOT being measured");
   }
-  await page.waitForTimeout(150);
-  add(await runFamilySweep(page), "popup", "states");
 
   // ---- popup, the bookmark FORM (stage 4 Task 6, T6-b). Every leg above
   // opens popup.html as its own chrome-extension:// tab, which popup.js
@@ -8916,18 +9045,20 @@ async function runSweep(page, sw, extBase) {
   // (padding-left 72px on .bottom-bar / .submit-bar); that is now the derived
   // --pp-label-indent token and a spacingScale derivedOffset, and a full
   // sweep of the form reports nothing else (2026-10-02).
-  await page.goto(`${extBase}popup.html?_ra=sweepform`, { waitUntil: "load", timeout: TIMEOUT_MS });
-  await page.waitForTimeout(500);
-  const formShown = await page.evaluate(() => {
-    const main = document.getElementById("main-section");
-    const search = document.querySelector(".search-row");
-    main?.classList.remove("hidden", "unsupported-url");
-    search?.classList.remove("hidden");
-    return !!main && !!search;
-  });
-  if (!formShown) throw new Error("SETUP ERROR: popup form sweep leg: popup.html is missing #main-section / .search-row");
-  await page.waitForTimeout(150);
-  add(await runFamilySweep(page), "popup", "form");
+  if (wants("popup", "form")) {
+    await page.goto(`${extBase}popup.html?_ra=sweepform`, { waitUntil: "load", timeout: TIMEOUT_MS });
+    await page.waitForTimeout(500);
+    const formShown = await page.evaluate(() => {
+      const main = document.getElementById("main-section");
+      const search = document.querySelector(".search-row");
+      main?.classList.remove("hidden", "unsupported-url");
+      search?.classList.remove("hidden");
+      return !!main && !!search;
+    });
+    if (!formShown) throw new Error("SETUP ERROR: popup form sweep leg: popup.html is missing #main-section / .search-row");
+    await page.waitForTimeout(150);
+    await scan("popup", "form");
+  }
 
   // ---- popup, hi-DPI width cap (2026-10-02). Chrome caps an action popup at
   // 800px; popup.css zooms the body at >=144dpi / >=192dpi, so the width the
@@ -8939,7 +9070,8 @@ async function runSweep(page, sw, extBase) {
   // from popup-theme-early.js's clamp), rendered at each tier's dpr, must
   // come out <= 800px; a tier that does not zoom is a SETUP ERROR (the
   // emulation did not reach the media query and the check would be vacuous).
-  {
+  if (wants("popup", "dpi")) {
+    audit.start(sweepScenarioId("popup", "dpi"));
     const earlySrc = readFileSync(resolve(ROOT, "popup-theme-early.js"), "utf8");
     const maxes = [...earlySrc.matchAll(/Math\.min\((\d+),/g)].map((m) => Number(m[1]));
     if (!maxes.length || new Set(maxes).size !== 1) throw new Error(`SETUP ERROR: popup hi-DPI cap: cannot read one popup width ceiling from popup-theme-early.js (found ${JSON.stringify(maxes)})`);
@@ -8952,7 +9084,8 @@ async function runSweep(page, sw, extBase) {
     const dpiPage = await page.context().newPage();
     const dpiSession = await page.context().newCDPSession(dpiPage);
     try {
-      for (const dpr of [1.5, 2]) {
+      const dprs = audit.values(sweepScenarioId("popup", "dpi"), "dpr", [1.5, 2]);
+      for (const dpr of dprs) {
         await dpiSession.send("Emulation.setDeviceMetricsOverride", { width: 1000, height: 700, deviceScaleFactor: dpr, mobile: false });
         await dpiPage.goto(`${extBase}popup.html?_ra=sweepdpi${dpr}`, { waitUntil: "load", timeout: TIMEOUT_MS });
         await dpiPage.waitForTimeout(400);
@@ -8966,7 +9099,8 @@ async function runSweep(page, sw, extBase) {
         if (m.setting !== `${widest}px`) throw new Error(`SETUP ERROR: popup hi-DPI cap: --pp-popup-width is ${m.setting}, expected the ${widest}px ceiling`);
         if (m.width > 800) hits.push({ surface: "popup", context: `dpr${dpr}`, kind: "popupWidthCap", path: "body", width: Math.round(m.width * 100) / 100, zoom: m.zoom, setting: widest });
       }
-      console.log(`[render-audit] popup hi-DPI cap: ${widest}px measured at dpr 1.5 and 2 (zoomed body <= 800px)`);
+      audit.complete(sweepScenarioId("popup", "dpi"));
+      console.log(`[render-audit] popup hi-DPI cap: ${widest}px measured at dpr ${dprs.join(" and ")} (zoomed body <= 800px)`);
     } finally {
       await dpiSession.detach().catch(() => {});
       await dpiPage.close().catch(() => {});
@@ -8974,12 +9108,14 @@ async function runSweep(page, sw, extBase) {
     }
   }
 
-  await setTheme(sw, "", "dark");
-  await page.goto(`${extBase}popup.html?_ra=sweepdark`, { waitUntil: "load", timeout: TIMEOUT_MS });
-  await page.waitForTimeout(500);
-  await page.evaluate(async () => { if (window.PPOffline) await window.PPOffline.refresh(); }).catch(() => {});
-  await page.waitForSelector("#offline-queue-bar:not(.hidden)", { timeout: TIMEOUT_MS }).catch(() => {});
-  add(await runFamilySweep(page), "popup", "dark");
+  if (wants("popup", "dark")) {
+    await setTheme(sw, "", "dark");
+    await page.goto(`${extBase}popup.html?_ra=sweepdark`, { waitUntil: "load", timeout: TIMEOUT_MS });
+    await page.waitForTimeout(500);
+    await page.evaluate(async () => { if (window.PPOffline) await window.PPOffline.refresh(); }).catch(() => {});
+    await page.waitForSelector("#offline-queue-bar:not(.hidden)", { timeout: TIMEOUT_MS }).catch(() => {});
+    await scan("popup", "dark");
+  }
 
   // ---- popup, LOGGED OUT (popup button-family campaign, 2026-08-07). The
   // two passes above seed a token, so popup.js's `if (!settings.pinboardToken)
@@ -8990,13 +9126,15 @@ async function runSweep(page, sw, extBase) {
   // 24px floor, and nothing caught it). Clearing the token is the whole
   // setup; restore it immediately afterwards so this stays the last popup
   // leg regardless of who calls runSweep.
-  await sw.evaluate(() => chrome.storage.local.set({ pinboardToken: "" }));
-  await setTheme(sw, "", "light");
-  await page.goto(`${extBase}popup.html?_ra=sweeplogin`, { waitUntil: "load", timeout: TIMEOUT_MS });
-  await page.waitForSelector("#login-section:not(.hidden)", { timeout: TIMEOUT_MS }).catch(() => {});
-  await page.waitForTimeout(300);
-  add(await runFamilySweep(page), "popup", "login");
-  await sw.evaluate((tok) => chrome.storage.local.set({ pinboardToken: tok }), SEED_TOKEN_OBF);
+  if (wants("popup", "login")) {
+    await sw.evaluate(() => chrome.storage.local.set({ pinboardToken: "" }));
+    await setTheme(sw, "", "light");
+    await page.goto(`${extBase}popup.html?_ra=sweeplogin`, { waitUntil: "load", timeout: TIMEOUT_MS });
+    await page.waitForSelector("#login-section:not(.hidden)", { timeout: TIMEOUT_MS }).catch(() => {});
+    await page.waitForTimeout(300);
+    await scan("popup", "login");
+    await sw.evaluate((tok) => chrome.storage.local.set({ pinboardToken: tok }), SEED_TOKEN_OBF);
+  }
 
   console.log("[radiusScale] value boxes measured (four corners == md): " + ["options", "library", "md-preview", "popup"]
     .map((s) => `${s}=${valueBoxRadii[s]?.measured || 0} (${valueBoxRadii[s]?.paths.size || 0} unique; ${JSON.stringify(valueBoxRadii[s]?.kinds || {})})`).join(" "));
@@ -9006,6 +9144,9 @@ async function runSweep(page, sw, extBase) {
   // stale `valueBoxes` selector, a visibility change, a fixture that stopped
   // rendering the box).
   for (const [surface, kinds] of Object.entries(RADIUS_VALUE_BOX_REQUIRED)) {
+    // A per-surface kind census is meaningful only when all its contexts ran.
+    // Partial runs instead require every selected opener and scan to complete.
+    if (contexts[surface].size !== RENDER_SWEEP_CONTEXTS[surface].length) continue;
     const missing = kinds.filter((k) => !valueBoxRadii[surface]?.kinds[k]);
     if (missing.length) {
       throw new Error(`SETUP ERROR: radiusScale (family 9) measured no visible ${missing.join(" / ")} value box on ${surface} (measured kinds ${JSON.stringify(valueBoxRadii[surface]?.kinds || {})}) -- the four-corners-equal-md law is vacuous there`);
@@ -9022,7 +9163,7 @@ function reportSweep(hits) {
     if (!dedup.has(key)) dedup.set(key, h);
   }
   const unique = [...dedup.values()];
-  console.log(`[render-audit --sweep] ${hits.length} raw hit(s) across all contexts, ${unique.length} unique (deduped by surface+kind+element)`);
+  console.log(`[render-audit --sweep] ${hits.length} raw hit(s) across ${audit.selected.filter((row) => row.type === "sweep").length} planned contexts, ${unique.length} unique (deduped by surface+kind+element)`);
   for (const h of unique) {
     if (h.kind === "textInset") console.log(`  textInset          [${h.surface}/${h.context}]  ${h.path}  minH=${h.minH}px minV=${h.minV}px  rung=${h.rung}`);
     else if (h.kind === "childContainment") console.log(`  childContainment   [${h.surface}/${h.context}]  host=${h.path}  child=${h.childKind}  overflow=${JSON.stringify(h.overflow)}`);
@@ -9121,12 +9262,12 @@ function report(results) {
   // ledger's bgEqVar / borderSidesEqVar / ... entries for that row.
   const setupPrefixes = [...new Set(setupRows.map((r) => `${r.surface}|${r.theme}|${r.selector}|${r.state}|`))];
   const unmeasuredKnown = Object.keys(known).filter((k) => !seenKeys.has(k) && setupPrefixes.some((p) => k.startsWith(p)));
-  const stale = SHARD ? [] : Object.keys(known).filter((k) => !seenKeys.has(k) && !unmeasuredKnown.includes(k));
+  const stale = SHARD || audit.partial ? [] : Object.keys(known).filter((k) => !seenKeys.has(k) && !unmeasuredKnown.includes(k));
 
   console.log(`[render-audit] ${okCount} OK, ${skipCount} SKIP, ${warnings.length} WARN (known), ${violations.length} FAIL (new), ${setupRows.length} SETUP (harness)${SHARD_TAG}`);
   if (skipCount) console.log(`[render-audit] SKIP = disabled controls exempted from contrast checks (WCAG 1.4.3), not a failure`);
-  if (SHARD && Object.keys(known).length) {
-    console.log(`[render-audit] stale known-failure reconciliation skipped${SHARD_TAG} -- rerun without --shard to find ledger entries that no longer reproduce`);
+  if ((SHARD || audit.partial) && Object.keys(known).length) {
+    console.log(`[render-audit] stale known-failure reconciliation skipped${SHARD_TAG} -- rerun without scope filters or --shard to reconcile the whole ledger`);
   }
   if (warnings.length) {
     console.log(`[render-audit] known failures still outstanding (see ${KNOWN_FAILURES_PATH}):`);
@@ -9481,6 +9622,14 @@ async function main() {
     }],
   }), SEED_TOKEN_ACCOUNT);
 
+  const navigatedSurfaces = new Set();
+  ctx.on("page", (openedPage) => openedPage.on("framenavigated", (frame) => {
+    if (frame.parentFrame()) return;
+    const url = new URL(frame.url());
+    if (url.protocol !== "chrome-extension:") return;
+    const surface = url.pathname.replace(/^\//, "").replace(/\.html$/, "");
+    if (["popup", "options", "library", "md-preview"].includes(surface)) navigatedSurfaces.add(surface);
+  }));
   const page = await ctx.newPage();
 
   // popup's suggest-row (D6/D7, taste-uplift batch3 Task 5): fetchPinboardSuggestTags
@@ -9520,6 +9669,8 @@ async function main() {
       await ctx.close().catch(() => {});
       rmSync(userDataDir, { recursive: true, force: true });
     }
+    finishAudit();
+    console.log(`[render-audit] navigated surfaces: ${[...navigatedSurfaces].join(", ")}`);
     if (WRITE_SPACING) writeSpacingBaseline(hits);
     if (SWEEP) reportSweep(hits);
     return;
@@ -9530,43 +9681,57 @@ async function main() {
   let mediaProbeCount = 0;
   try {
     for (const surface of Object.keys(SURFACE_PAGES)) {
-      const checks = CHECKS.filter((c) => c.surface === surface);
-      if (!checks.length) continue;
-      for (const theme of SHARD_THEMES) {
-        // No bare-dark state on any surface: no-preset+dark resolves to
-        // data-theme="flexoki-dark" on popup, options and library alike (batch
-        // 2 D6), so the "flexoki-dark" THEMES entry covers it everywhere.
+      const checks = CHECKS.filter((check) => check.surface === surface && audit.has(checkScenarioId(check)));
+      const paintId = paintScenarioId(surface);
+      const mediaIds = MEDIA_SCENARIOS.map(({ id }) => mediaScenarioId(surface, id));
+      const themeIds = [...new Set([...checks.map(checkScenarioId), paintId, ...mediaIds])];
+      const themes = SHARD_THEMES.filter((theme) => themeIds.some((id) => renderThemes(audit, id).includes(theme)));
+      for (const theme of themes) {
         const { themePresetKey, optTheme } = themeToStorage(theme);
         await setTheme(sw, themePresetKey, optTheme);
-        // `themes` (render-audit-checklist.mjs header) pins a layout entry to
-        // the theme states whose geometry differs; everything else runs on all.
-        // A relocated row runs only in its target shard (RELOCATED_ROWS above).
-        const themeChecks = checks.filter((c) => {
-          if (c.themes && !c.themes.includes(theme)) return false;
-          const moved = SHARD && relocatedRow(c, theme);
+        const themeChecks = checks.filter((check) => {
+          if (!renderThemes(audit, checkScenarioId(check)).includes(theme)) return false;
+          if (check.themes && !check.themes.includes(theme)) return false;
+          const moved = SHARD && relocatedRow(check, theme);
           return !moved || relocatedTarget(moved) === SHARD.i;
         });
-        if (surface === "library") await runLibraryTheme(page, extBase, theme, themeChecks, results);
-        else await runSimpleTheme(page, `${extBase}${SURFACE_PAGES[surface]}`, theme, themeChecks, results, surface, sw);
-        if (MEDIA_THEME_SET.has(theme)) {
+        const paint = wantsPaint(surface, theme);
+        if (paint) audit.start(paintId);
+        if (themeChecks.length || paint) {
+          if (surface === "library") await runLibraryTheme(page, extBase, theme, themeChecks, results);
+          else await runSimpleTheme(page, `${extBase}${SURFACE_PAGES[surface]}`, theme, themeChecks, results, surface, sw);
+        }
+        if (paint) audit.complete(paintId, { theme: theme || "default" });
+        const media = mediaIds.filter((id) => renderThemes(audit, id).includes(theme));
+        if (media.length) {
+          // Media-only selections need their own surface navigation.
+          if (!themeChecks.length && !paint) await page.goto(`${extBase}${SURFACE_PAGES[surface]}`, { waitUntil: "load", timeout: TIMEOUT_MS });
           mediaProbeCount += await runMediaPreferenceChecks(page, mediaSession, surface, theme, results);
+          for (const id of media) audit.complete(id, { theme: theme || "default" });
         }
       }
-      // The relocated rows of OTHER shards' themes. They drive scratch pages
-      // of their own (no shared-page state), so only the theme's storage is
-      // set first; the shard's own theme loop has already finished with it.
       if (SHARD) {
         for (const theme of THEMES.filter((t) => !SHARD_THEMES.includes(t))) {
-          const moved = checks.filter((c) => {
-            const row = relocatedRow(c, theme);
-            return row && relocatedTarget(row) === SHARD.i && (!c.themes || c.themes.includes(theme));
+          const moved = checks.filter((check) => {
+            const row = relocatedRow(check, theme);
+            return renderThemes(audit, checkScenarioId(check)).includes(theme) && row &&
+              relocatedTarget(row) === SHARD.i && (!check.themes || check.themes.includes(theme));
           });
           if (!moved.length) continue;
           const { themePresetKey, optTheme } = themeToStorage(theme);
           await setTheme(sw, themePresetKey, optTheme);
+          // Relocated drivers create their own scratch pages.
           for (const check of moved) await runOneCheck(page, theme, check, results, extBase);
         }
       }
+    }
+    for (const row of audit.selected.filter((entry) => entry.type === "checks")) {
+      const expected = CHECKS.filter((check) => checkScenarioId(check) === row.id).reduce((count, check) => count +
+        renderThemes(audit, row.id).filter((theme) => (!check.themes || check.themes.includes(theme)) &&
+          (!SHARD || (relocatedRow(check, theme) ? relocatedTarget(relocatedRow(check, theme)) === SHARD.i : SHARD_THEMES.includes(theme)))).length, 0);
+      const actual = completedChecks.get(row.id) || 0;
+      if (!expected || actual !== expected) throw new Error(`SETUP: ${row.id} measured ${actual}/${expected} planned checklist rows`);
+      audit.complete(row.id, { measured: actual, expected });
     }
 
     // ---- hitAreaMin class-scan (design-uplift final-fix I2). Reuses the
@@ -9583,7 +9748,7 @@ async function main() {
     // them once is full coverage, while running them in every shard would
     // pay the sweep N times and report each hit N times. The other shards
     // get an empty hit list, so all six family loops below are no-ops there.
-    const sweepHits = RUNS_SWEEP ? await runSweep(page, sw, extBase) : [];
+    const sweepHits = RUNS_SWEEP && audit.selected.some((row) => row.type === "sweep") ? await runSweep(page, sw, extBase) : [];
     const hitAreaHits = sweepHits.filter((h) => h.kind === "hitAreaMin");
     for (const h of hitAreaHits) {
       results.push({
@@ -9634,7 +9799,7 @@ async function main() {
     // as for every other check). Guarded (not just fed an empty array) so a
     // shard that did not sweep never reconciles the ledger against nothing
     // and calls every entry in it stale.
-    if (RUNS_SWEEP) {
+    if (RUNS_SWEEP && audit.selected.some((row) => row.type === "sweep")) {
       for (const h of reconcileSpacing(sweepHits)) {
         results.push({
           surface: h.surface, theme: "", selector: h.path, state: h.prop, check: "spacingScale", status: "FAIL",
@@ -9652,8 +9817,10 @@ async function main() {
 
   // Denominator is what THIS process ran: MEDIA_THEMES for a full run (all
   // four are THEMES entries), a shard's slice of them under --shard.
-  const mediaThemes = SHARD_THEMES.filter((t) => MEDIA_THEME_SET.has(t)).length;
-  console.log(`[render-audit] media preferences: ${mediaProbeCount} probes across ${mediaThemes} themes x ${MEDIA_CHECKS.length} surfaces x ${MEDIA_SCENARIOS.length} scenarios${SHARD_TAG}`);
+  const mediaExpected = audit.selected.filter((row) => row.type === "media")
+    .reduce((count, row) => count + renderThemes(audit, row.id, SHARD_THEMES).length, 0);
+  console.log(`[render-audit] media preferences: ${mediaProbeCount}/${mediaExpected} planned probes${SHARD_TAG}`);
+  if (mediaProbeCount !== mediaExpected) throw new Error(`SETUP: media preferences measured ${mediaProbeCount}/${mediaExpected} planned probes`);
   // weakTextOnFill (family 13): per-surface scanned counts so a future "0
   // FAIL" can be told apart from "scanned nothing" (task spec) -- this
   // process's own slice only, same denominator discipline as mediaThemes
@@ -9677,7 +9844,8 @@ async function main() {
       byContext[key].scanned += entry.scanned;
       byContext[key].themes += 1;
     }
-    console.log(`[render-audit] weakTextOnFill per (surface, panel/leg) -- scanned total across ${SHARD_THEMES.length} theme(s) this process ran, and the (surface, theme) count that reached it:`);
+    const plannedPaintThemes = new Set(audit.selected.filter((row) => row.type === "paint").flatMap((row) => renderThemes(audit, row.id, SHARD_THEMES))).size;
+    console.log(`[render-audit] weakTextOnFill per (surface, panel/leg) -- scanned total across ${plannedPaintThemes} planned theme(s), and the (surface, theme) count that reached it:`);
     for (const [key, v] of Object.entries(byContext).sort()) {
       console.log(`  ${key}: scanned=${v.scanned} themes=${v.themes}`);
     }
@@ -9704,7 +9872,8 @@ async function main() {
     const measured = logs.reduce((sum, entry) => sum + entry.measured.length, 0);
     const unmeasured = logs.reduce((sum, entry) => sum + entry.unmeasured.length, 0);
     console.log(`[render-audit] fieldHoverContrast ${surface}: ${measured} value box(es) measured across ${logs.length} theme(s) this run, ${unmeasured} unmeasured (SETUP)${SHARD_TAG}`);
-    if (!CHECKS.some((c) => c.surface === surface)) continue;
+    const plannedThemes = renderThemes(audit, paintScenarioId(surface), SHARD_THEMES);
+    if (!plannedThemes.length) continue;
     const focusRequired = VALUE_BOX_FOCUS_REQUIRED[surface] || [];
     const focusDeclared = new Set(VALUE_BOX_LEGS[surface].legs.flatMap((leg) => leg.focus || []));
     const focusUnpinned = focusRequired.filter((sel) => !focusDeclared.has(sel));
@@ -9720,22 +9889,22 @@ async function main() {
     const focusBoxes = new Set([...focusRequired, ...focusDeclared]).size;
     const focusMeasured = logs.reduce((sum, entry) => sum + entry.focusMeasured.length, 0);
     if (focusBoxes) console.log(`[render-audit] fieldFocusPaint ${surface}: ${focusMeasured} focused value box(es) measured across ${logs.length} theme(s) this run${SHARD_TAG}`);
-    if (focusMeasured < SHARD_THEMES.length * focusBoxes) {
+    if (focusMeasured < plannedThemes.length * focusBoxes) {
       results.push({
         surface, theme: "", selector: "(run)", state: "fieldFocusPaint", check: "valueBoxFocusCoverage",
         status: "SETUP", setup: "legVacuous",
         actual: `${focusMeasured} focused value box(es) measured across ${logs.length} theme(s)`,
-        expected: `${SHARD_THEMES.length * focusBoxes} = ${SHARD_THEMES.length} theme(s) run x ${focusBoxes} focus box(es) (VALUE_BOX_FOCUS_REQUIRED.${surface} + the legs' \`focus\` keys)`,
+        expected: `${plannedThemes.length * focusBoxes} = ${plannedThemes.length} theme(s) run x ${focusBoxes} focus box(es) (VALUE_BOX_FOCUS_REQUIRED.${surface} + the legs' \`focus\` keys)`,
         note: `the family-14 ${surface} leg read fewer focused boxes than the run requires (see their own SETUP rows)`,
       });
     }
-    const required = SHARD_THEMES.length * VALUE_BOX_LEGS[surface].boxes.length;
+    const required = plannedThemes.length * VALUE_BOX_LEGS[surface].boxes.length;
     if (measured < required) {
       results.push({
         surface, theme: "", selector: "(run)", state: "fieldHoverContrast", check: "valueBoxLegCoverage",
         status: "SETUP", setup: "legVacuous",
         actual: `${measured} value box(es) measured across ${logs.length} theme(s) (${unmeasured} reached but unmeasured)`,
-        expected: `${required} = ${SHARD_THEMES.length} theme(s) run x ${VALUE_BOX_LEGS[surface].boxes.length} VALUE_BOX_LEGS.${surface} boxes (spec 2026-09-30-ui-fields-stage4-design §5.2)`,
+        expected: `${required} = ${plannedThemes.length} theme(s) run x ${VALUE_BOX_LEGS[surface].boxes.length} VALUE_BOX_LEGS.${surface} boxes (spec 2026-09-30-ui-fields-stage4-design §5.2)`,
         note: `the family-14 ${surface} value-box leg measured fewer boxes than the run requires -- recordValueBoxHover was not called for every theme, or boxes were left unmeasured (see their own SETUP rows)`,
       });
     }
@@ -9749,10 +9918,13 @@ async function main() {
     writeFileSync(JSON_OUT, JSON.stringify(results, null, 2) + "\n");
     console.log(`[render-audit] wrote ${results.length} result row(s) to ${JSON_OUT}`);
   }
+  const coverage = finishAudit();
+  console.log(`[render-audit] scenarios: ${coverage.completed.length}/${coverage.expected.length} completed; navigated surfaces: ${[...navigatedSurfaces].join(", ")}`);
   report(results);
 }
 
 main().catch((e) => {
+  try { finishAudit(); } catch (coverageError) { console.error(`[render-audit] ${coverageError.message}`); }
   console.error(`[render-audit] fatal: ${e.stack || e.message}`);
   process.exit(2);
 });
