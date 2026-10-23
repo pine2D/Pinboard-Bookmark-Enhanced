@@ -1256,7 +1256,7 @@ suite("md-ai IDB key conventions", () => {
     const run = _pbpAskRun.toString();
     assert(run.includes("pbpAskHistReplaceLast(st.url, record, st.account)"), "replaceLast owner missing");
     assert(run.includes("pbpAskHistAppend(st.url, record, st.account)"), "append owner missing");
-    assert(_pbpAskClearThread.toString().includes("pbpAskHistSet(_pbpAskState.url, [], _pbpAskState.account)"), "clear owner missing");
+    assert(_pbpAskClearThread.toString().includes("pbpAskHistSet(clearedUrl, [], clearedAccount)"), "clear captured owner missing");
     assert(_pbpAskHistRestore.toString().includes("pbpAskHistGet(_pbpAskHistUrl, _pbpAskHistAccount)"), "restore owner missing");
     assert(pbpAskInit.toString().includes('account: String((detail && detail.account) || "")'), "render detail owner not captured");
   });
@@ -2947,7 +2947,7 @@ suiteIf("pbpAskBuildPrompt", "pbpAskBuildContext", () => {
     const run = _pbpAskRun.toString();
     assert(run.indexOf('aEl.dataset.askStopped = "1"') !== -1, "stopped flag missing");
     assert(run.indexOf("acc && aEl.isConnected") !== -1, "detached (cleared) elements must not finalize");
-    assert(run.indexOf("_pbpAskFinalize(aEl, acc, st.ctx && st.ctx.sent)") !== -1, "abort visual finalize missing");
+    assert(run.indexOf("_pbpAskFinalize(aEl, acc, runCtx && runCtx.sent, runCtx && runCtx.sources)") !== -1, "abort visual finalize missing");
     assert(run.indexOf("delete aEl.dataset.askStopped") !== -1, "flag not cleared on a successful re-run");
     assert(_pbpAskRegenerate.toString().indexOf("replaceLast: !el.dataset.askStopped") !== -1,
       "stopped-round regenerate must append, not replace");

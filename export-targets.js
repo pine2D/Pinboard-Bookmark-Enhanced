@@ -90,6 +90,7 @@ function _pbpNotionDashUuid(h) {
 const PBP_EXPORT_TARGETS = {
   obsidian: {
     id: "obsidian",
+    citationStyle: "footnotes",
     label: "Obsidian",
     icon: _PBP_ICON_OBSIDIAN,
     mechanism: "url-scheme",
@@ -131,6 +132,7 @@ const PBP_EXPORT_TARGETS = {
   // PATCH /v1/pages/{id}/markdown is a later phase).
   notion: {
     id: "notion",
+    citationStyle: "sources",
     label: "Notion",
     icon: _PBP_ICON_NOTION,
     mechanism: "token-api",
@@ -186,6 +188,7 @@ const PBP_EXPORT_TARGETS = {
   // grants (pbpRequestTargetPermission short-circuits: no buildRequest).
   notebooklm: {
     id: "notebooklm",
+    citationStyle: "sources",
     label: "NotebookLM",
     icon: _PBP_ICON_NOTEBOOKLM,
     mechanism: "url-scheme",
@@ -205,6 +208,7 @@ const PBP_EXPORT_TARGETS = {
   // fine-grained tokens can't create gists -- nor that they can.
   github: {
     id: "github",
+    citationStyle: "footnotes",
     label: "GitHub Gist",
     icon: _PBP_ICON_GITHUB,
     mechanism: "token-api",
@@ -248,6 +252,7 @@ const PBP_EXPORT_TARGETS = {
   // receivers (n8n / Make / Zapier / Readwise / Discord-via-relay).
   webhook: {
     id: "webhook",
+    citationStyle: "sources",
     label: "Webhook",
     icon: _PBP_ICON_WEBHOOK,
     mechanism: "token-api",

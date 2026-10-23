@@ -141,9 +141,10 @@ blockquote{border-left:3px solid #999;margin:1em 0;padding:0 1em}`;
 // leak as literal text into the XHTML body, same reasoning as composeStyledHtml).
 // `images`: the fetched Map from resolveEmbed(..., {keepUrls:true}) (absUrl ->
 // {mime, bytes}), or empty/undefined when the export image policy isn't "embed".
-function pbpBuildEpub({ md, meta, images }) {
+function pbpBuildEpub({ md, meta, images, ask }) {
   const host = document.createElement("div");
   host.innerHTML = renderMarkdown(md);            // 单点 sanitize：唯一入口
+  if (ask && typeof pbpAskExportHtml === "function") host.insertAdjacentHTML("beforeend", pbpAskExportHtml(ask, { occupied: host.innerHTML }));
   // B1: mermaid fences already rendered on the page swap to their cached
   // light-theme data-URI figures (data URLs in img are EPUB-3.3-legal and
   // need no manifest entry). typeof-guarded for the md-convert test harness.

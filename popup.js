@@ -1273,6 +1273,14 @@ async function htmlToMarkdownAsync(html, opts) {
               // next local re-extract (Codex acceptance HIGH-3). It is also the
               // Referer origin source, which must be the real page.
               sourceTabUrl: tab.url || url,
+              sourceIncognito: tab.incognito === true,
+              bookmarkDraft: {
+                title: $id("title-input")?.value || result.title || "",
+                tags: Array.isArray(currentTags) ? currentTags.join(" ") : "",
+                notes: $id("description-input")?.value || "",
+                private: $id("private-check")?.checked === true,
+                toread: $id("readlater-check")?.checked === true,
+              },
               account: sessionAccount,
               tags: Array.isArray(currentTags) ? currentTags.slice() : [],
               description: $id("description-input")?.value || "",

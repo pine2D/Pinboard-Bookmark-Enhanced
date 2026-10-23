@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Ask export tests</title></head><body>
+<div id="results"></div><div id="summary"></div>
+<script src="../vendor/marked.min.js"></script><script src="../vendor/purify.min.js"></script>
+<script src="../md-convert.js"></script><script src="../export-targets.js"></script><script src="../md-export-send.js"></script><script src="../ai-cache.js"></script><script src="../md-ai-core.js"></script><script src="../md-ask.js"></script><script src="../md-epub.js"></script>
+<script>
+let pass=0,fail=0;
+function assert(x,msg){if(!x)throw Error(msg||'assertion failed');}
+async function test(name,fn){const row=document.createElement('div');try{await fn();row.className='pass';row.textContent='PASS '+name;pass++;}catch(e){row.className='fail';row.textContent='FAIL '+name+': '+e.message;fail++;}document.getElementById('results').appendChild(row);}
+const url='https://example.com/article';
+const round={q:'What <script>alert(1)</scr'+'ipt> & [x]?',a:'Claim [P1] and again [P1]. `literal [P2]`\n\n~~~js\n[P2]\n~~~\n\nCITES:\nP1: "Original quote"\nP2: "code only"',ts:1760000000000,model:'test-model',blocksHash:'old',evidence:[{p:1,quote:'Original <quote> & [brackets]',state:'matched',sourceUrl:url}]};
+const snapshot={url,account:'alice',title:'Article',rounds:[round],count:1};
+const realAskHistory = { get: pbpAskHistGet, append: pbpAskHistAppend, replace: pbpAskHistReplaceLast, set: pbpAskHistSet };
+async function withAskRunnerFixture(fn) {
+  const savedState = _pbpAskState;
+  const names = ['t', 'getOrCreateInflight', 'callAIStream', 'pbpAskHistGet', 'pbpAskHistAppend', 'pbpAskHistReplaceLast', '_pbpAskProviderLabel', 'pbpAiResolveModelOverride', 'pbpVideoDeepLink'];
+  const saved = Object.fromEntries(names.map((n) => [n, window[n]]));
+  const article = document.createElement('div');
+  article.innerHTML = '<p data-t="10">Original sent quote.</p><p data-t="95">Later unsent quote.</p>';
+  pbpAiIndexBlocks(article);
+  const answer = document.createElement('div');
+  answer.className = 'ask-a'; document.body.appendChild(answer);
+  window.t = (k) => k;
+  window.getOrCreateInflight = (k, factory) => factory();
+  window._pbpAskProviderLabel = () => 'test-model';
+  window.pbpAiResolveModelOverride = () => undefined;
+  window.pbpAskHistGet = realAskHistory.get;
+  window.pbpAskHistAppend = realAskHistory.append;
+  window.pbpAskHistReplaceLast = realAskHistory.replace;
+  _pbpAskUnpersisted = [];
+  _pbpAskState = {s: {}, url: url + '/review', title: 'Review', account: 'alice', forum: false, ctx: {text: '[P1] Original sent quote.', sent: new Set([1])}, rounds: [], records: [], running: false};
+  try { await fn({article, answer, state: _pbpAskState}); }
+  finally {
+    Object.assign(window, saved); _pbpAskState = savedState; _pbpAskUnpersisted = [];
+    answer.remove(); document.getElementById('ask-clear')?.remove();
+  }
+}
+
+(async()=>{
+await test('public snapshot API exists',()=>assert(typeof pbpAskExportSnapshot==='function'));
+await test('snapshot works without panel or AI settings',async()=>{window.pbpAskHistGet=async(u,a)=>a==='alice'?[round]:[];const s=await pbpAskExportSnapshot({url,account:'alice',title:'Article'});assert(s.count===1);assert(!document.getElementById('ask-panel'));assert(Object.isFrozen(s)&&Object.isFrozen(s.rounds[0]));});
+await test('different owner cannot see history',async()=>assert((await pbpAskExportSnapshot({url,account:'bob'})).count===0));
+await test('snapshot excludes incomplete records',async()=>{window.pbpAskHistGet=async()=>[round,{q:'partial',a:'',ts:1},{q:'stopped',a:'partial',status:'aborted'}];assert((await pbpAskExportSnapshot({url,account:'alice'})).count===1);});
+await test('footnotes preserve code literals',()=>{const m=pbpAskExportMarkdown(snapshot);assert(m.includes('`literal [P2]`'));assert(m.includes('~~~js\n[P2]\n~~~'));assert(!m.includes('code only'));});
+await test('repeated citations share one source',()=>{const m=pbpAskExportMarkdown(snapshot);assert((m.match(/\]: /g)||[]).length===1);});
+await test('round namespaces never collide',()=>{const m=pbpAskExportMarkdown({...snapshot,rounds:[round,round]});const ids=[...m.matchAll(/^\[\^([^\]]+)\]:/gm)].map(x=>x[1]);assert(ids.length===2&&new Set(ids).size===2);});
+await test('article footnote labels cannot collide',()=>{const body='Article [^pbp-ask-r1-1]\n\n[^pbp-ask-r1-1]: own';const m=composeExport(body,{}, {ask:snapshot});const labels=[...m.matchAll(/^\[\^([^\]]+)\]:/gm)].map(x=>x[1]);assert(labels.length===2&&new Set(labels).size===2);});
+await test('questions and original quotes are escaped',()=>{const m=pbpAskExportMarkdown(snapshot);assert(!m.includes('<script>'));assert(!m.includes('<quote>'));assert(m.includes('Original &lt;quote&gt;'));});
+await test('legacy evidence is unverified',()=>{const m=pbpAskExportMarkdown({...snapshot,rounds:[{...round,evidence:undefined}]});assert(m.includes('not verified'));assert(!m.includes('Excerpt matched'));});
+await test('source changed evidence remains honest',()=>{const m=pbpAskExportMarkdown({...snapshot,rounds:[{...round,evidence:[{...round.evidence[0],state:'source-changed'}]}]});assert(m.includes('Source changed'));assert(m.includes('Original &lt;quote&gt;'));});
+await test('video citation preserves real time and deep URL',()=>{const m=pbpAskExportMarkdown({...snapshot,rounds:[{...round,evidence:[{...round.evidence[0],time:83,deepUrl:'https://www.youtube.com/watch?v=abc&t=83s'}]}]});assert(m.includes('1:23'));assert(m.includes('t=83s'));});
+await test('portable sources use numbers and no footnote syntax',()=>{const m=pbpAskExportMarkdown(snapshot,{citationStyle:'sources'});assert(!m.includes('[^'));assert(m.includes('Claim [1]'));assert(m.includes('1. '));});
+await test('HTML has bidirectional offline anchors',()=>{const host=document.createElement('div');host.innerHTML=pbpAskExportHtml(snapshot);const refs=[...host.querySelectorAll('sup a')];assert(refs.length===2);for(const a of refs){const dest=host.querySelector('[id="'+a.hash.slice(1)+'"]');assert(dest);assert(dest.querySelector('a[href="#'+a.id+'"]'));}});
+await test('HTML is sanitized and contains no interactive chip',()=>{const host=document.createElement('div');host.innerHTML=pbpAskExportHtml({...snapshot,rounds:[{...round,a:round.a+'\n<script>x</scr'+'ipt><div id="ask-input" class="rail-scrim" onclick="x()">x</div>'}]});assert(!host.querySelector('script,button,.ask-chip,.rail-scrim,#ask-input,[onclick]'));});
+await test('styled HTML adds Ask once without literal footnotes',()=>{const h=composeStyledHtml('Article',{}, {ask:snapshot});assert(!h.includes('[^'));assert((h.match(/Questions and answers/g)||[]).length===1);assert(h.includes('href="#pbp-ask-'));});
+await test('EPUB retains bidirectional citation anchors',async()=>{const blob=pbpBuildEpub({md:'Article',meta:{title:'Article',url},ask:snapshot});const text=await blob.text();assert(text.includes('href="#pbp-ask-'));assert(text.includes('Original &lt;quote&gt;'));assert(!text.includes('[^'));});
+await test('unknown citations are not silently rebound',()=>{const m=pbpAskExportMarkdown({...snapshot,rounds:[{...round,a:'Unknown [P99]',cites:[],evidence:[]}]});assert(m.includes('[P99]'));assert(!m.includes('[^'));});
+await test('evidence captures original substring only for sent paragraphs',()=>{const root=document.createElement('div');root.innerHTML='<p>Original source phrase.</p><p>Unsent phrase.</p>';pbpAiIndexBlocks(root);const e=pbpAskFreezeEvidence([{p:1,quote:'Original source phrase.'},{p:2,quote:'Unsent phrase.'}],new Set([1]),url);assert(e[0].state==='matched');assert(e[1].state==='unverified');});
+await test('copy serializer leaves inline and fenced citations literal',()=>{const m=_pbpAskBuildCopyText('Real [P1] `code [P1]`\n\n```\n[P1]\n```',[{p:1,quote:'source'}]);assert(m.includes('`code [P1]`'));assert(m.includes('```\n[P1]\n```'));});
+await test('table code citations remain literal',()=>{const r={...round,a:'| Example |\n| --- |\n| `literal [P1]` and real [P1] |',cites:[{p:1,quote:'Original quote'}]};const m=pbpAskExportMarkdown({...snapshot,rounds:[r]});assert(m.includes('`literal [P1]`'));assert(m.includes('real [^'));});
+await test('multi-backtick and multiline code remain literal',()=>{const r={...round,a:'``literal ` [P1]\nnext`` and real [P1]',cites:[{p:1,quote:'Original quote'}]};const m=pbpAskExportMarkdown({...snapshot,rounds:[r]});assert(m.includes('``literal ` [P1]\nnext``'));assert(m.includes('real [^'));});
+await test('owner or clear changes invalidate pending snapshot',async()=>{let release;window.pbpAskHistGet=()=>new Promise(r=>release=r);const pending=pbpAskExportSnapshot({url,account:'alice'});_pbpAskHistoryChanged();release([round]);let rejected=false;try{await pending;}catch(e){rejected=e.message==='ask-history-changed';}assert(rejected);});
+await test('snapshot does not invent original evidence from current text',async()=>{window.pbpAskHistGet=async()=>[{...round,blocksHash:undefined,evidence:undefined}];const s=await pbpAskExportSnapshot({url,account:'alice'});assert(s.rounds[0].evidence.length===0);assert(pbpAskExportMarkdown(s).includes('not verified'));});
+await test('HTML namespace avoids original article IDs',()=>{const original='<h2 id="pbp-ask-r1-s1">original</h2>';const h=composeStyledHtml(original,{}, {ask:snapshot});const doc=new DOMParser().parseFromString(h,'text/html');const ids=[...doc.querySelectorAll('[id]')].map(x=>x.id);assert(new Set(ids).size===ids.length);const a=doc.querySelector('sup a');assert(doc.getElementById(a.hash.slice(1)).tagName==='LI');});
+await test('video export retains source URL alongside deep link',()=>{const m=pbpAskExportMarkdown({...snapshot,rounds:[{...round,evidence:[{...round.evidence[0],time:83,deepUrl:'https://www.youtube.com/watch?v=abc&t=83s'}]}]});assert(m.includes('<'+url+'>'));assert(m.includes('t=83s'));});
+await test('completed session round survives persistence failure without duplicate',async()=>{window.pbpAskHistGet=async()=>[];_pbpAskUnpersisted=[{url,account:'alice',record:round}];assert((await pbpAskExportSnapshot({url,account:'alice'})).count===1);assert((await pbpAskExportSnapshot({url,account:'bob'})).count===0);window.pbpAskHistGet=async()=>[round];assert((await pbpAskExportSnapshot({url,account:'alice'})).count===1);
+const previousUrl=_pbpAskHistUrl,previousAccount=_pbpAskHistAccount;_pbpAskHistUrl=url;_pbpAskHistAccount='alice';window.pbpAskHistGet=async()=>[];
+try{document.dispatchEvent(new CustomEvent('pbp:ask-history-external',{detail:{type:'clear',url,account:'bob'}}));assert(_pbpAskUnpersisted.length===1);document.dispatchEvent(new CustomEvent('pbp:ask-history-external',{detail:{type:'append',url,account:'alice'}}));assert(_pbpAskUnpersisted.length===1);document.dispatchEvent(new CustomEvent('pbp:ask-history-external',{detail:{type:'clear',url,account:'alice'}}));assert(_pbpAskUnpersisted.length===0);assert((await pbpAskExportSnapshot({url,account:'alice'})).count===0);}finally{_pbpAskHistUrl=previousUrl;_pbpAskHistAccount=previousAccount;_pbpAskUnpersisted=[];}});
+await test('clear in progress suppresses persisted rounds immediately',async()=>{window.pbpAskHistGet=async()=>[round];const key=_pbpAskHistKey(url,'alice');_pbpAskClearing.add(key);try{assert((await pbpAskExportSnapshot({url,account:'alice'})).count===0);}finally{_pbpAskClearing.delete(key);}});
+await test('successful runner preserves completed answer when history write fails',async()=>{const savedState=_pbpAskState;const names=['t','getOrCreateInflight','callAIStream','pbpAskHistAppend','_pbpAskProviderLabel','pbpAiResolveModelOverride'];const saved=Object.fromEntries(names.map(n=>[n,window[n]]));const answer=document.createElement('div');answer.className='ask-a';document.body.appendChild(answer);try{window.t=k=>k;window.getOrCreateInflight=(k,fn)=>fn();window.callAIStream=async()=>round.a;window.pbpAskHistAppend=async()=>{throw Error('disk unavailable');};window._pbpAskProviderLabel=()=> 'test-model';window.pbpAiResolveModelOverride=()=>undefined;window.pbpAskHistGet=async()=>[];_pbpAskState={s:{},url,title:'Article',account:'alice',forum:false,ctx:{text:'source',sent:new Set([1])},rounds:[],records:[],running:false};await _pbpAskRun('saved session question',answer);const result=await pbpAskExportSnapshot({url,account:'alice'});assert(result.count===1);assert(result.rounds[0].q==='saved session question');assert(answer.textContent.includes('Claim'));assert(!answer.querySelector('.ask-err'));_pbpAskUnpersisted=[];_pbpAskState.records=[];_pbpAskState.rounds=[];window.callAIStream=async()=>{_pbpAskState.ctrl.abort();return round.a;};await _pbpAskRun('aborted final chunk',answer);assert((await pbpAskExportSnapshot({url,account:'alice'})).count===0);}finally{Object.assign(window,saved);_pbpAskState=savedState;_pbpAskUnpersisted=[];answer.remove();document.getElementById('ask-clear')?.remove();}});
+await test('real swallowed IndexedDB abort retains pending append and replacement',async()=>{
+  await withAskRunnerFixture(async({answer,state})=>{
+    const txOriginal=IDBDatabase.prototype.transaction;
+    const question='silent history failure';
+    window.callAIStream=async()=> 'Completed [P1]\n\nCITES:\nP1: "Original sent quote."';
+    try {
+      for(const replaceLast of [false,true]) {
+        const old={q:question,a:'Previous completed answer',ts:1,model:'old'};
+        await realAskHistory.set(state.url,replaceLast?[old]:[],state.account);
+        state.rounds=replaceLast?[{q:question,a:old.a}]:[]; state.records=[]; _pbpAskUnpersisted=[];
+        IDBDatabase.prototype.transaction=function(...args){const tx=txOriginal.apply(this,args);if(args[1]==='readwrite')tx.abort();return tx;};
+        await _pbpAskRun(question,answer,{replaceLast});
+        const persisted=await realAskHistory.get(state.url,state.account);
+        assert(persisted.length===(replaceLast?1:0));
+        if(replaceLast)assert(persisted[0].a===old.a);
+        assert(_pbpAskUnpersisted.length===1,'unconfirmed write lost its completed record');
+        const exported=await pbpAskExportSnapshot({url:state.url,account:state.account});
+        assert(exported.count===1&&exported.rounds[0].a.includes('Completed'));
+        IDBDatabase.prototype.transaction=txOriginal;
+      }
+      _pbpAskUnpersisted=[];state.rounds=[];state.records=[];
+      await _pbpAskRun('confirmed durable completion',answer);
+      assert(_pbpAskUnpersisted.length===0,'confirmed durable write remained pending');
+      assert((await realAskHistory.get(state.url,state.account)).some(r=>r.q==='confirmed durable completion'));
+    }finally{IDBDatabase.prototype.transaction=txOriginal;await realAskHistory.set(state.url,[],state.account);}
+  });
+});
+await test('runner freezes sent window, original excerpts and video times before streaming',async()=>{
+  await withAskRunnerFixture(async({article,answer,state})=>{
+    const sent=state.ctx.sent;
+    document.body.classList.add('video-mode');
+    window.pbpVideoDeepLink=(u,time)=>u+'?t='+time;
+    await realAskHistory.set(state.url,[],state.account);
+    window.callAIStream=async(s,prompt)=>{
+      assert(prompt.includes('[P1] Original sent quote.'));
+      sent.clear();sent.add(2);
+      state.ctx={text:'[P2] Later unsent quote.',sent:new Set([2])};
+      article.children[0].dataset.t='700';
+      article.children[0].textContent='Source changed after dispatch.';pbpAiIndexBlocks(article);
+      return 'First [P1], second [P2]\n\nCITES:\nP1: "Original sent quote."\nP2: "Later unsent quote."';
+    };
+    try{
+      await _pbpAskRun('frozen source context',answer);
+      const r=state.records[0];assert(r);
+      const first=r.evidence.find(e=>e.p===1),second=r.evidence.find(e=>e.p===2);
+      assert(first.state==='matched'&&first.quote==='Original sent quote.');
+      assert(first.time===10&&first.deepUrl.endsWith('t=10'),'time changed after request dispatch');
+      assert(second.state==='unverified','new nearby window upgraded an unsent citation');
+      assert(!answer.querySelector('.ask-chip[data-p="1"]').classList.contains('verified'),'changed DOM must not borrow old offsets');
+      const exported=await pbpAskExportSnapshot({url:state.url,account:state.account});assert(exported.rounds[0].sourceChanged);assert(exported.rounds[0].evidence[0].quote==='Original sent quote.');
+      assert(!answer.querySelector('.ask-chip[data-p="2"]').classList.contains('verified'));
+    }finally{document.body.classList.remove('video-mode');await realAskHistory.set(state.url,[],state.account);}
+  });
+});
+await test('nested blockquote and list code citations stay literal',()=>{
+  const samples=['> ```js\n> [P2]\n> ```\n> Claim [P1]','- Item\n\n  ```js\n  [P2]\n  ```\n\n  Claim [P1]','> ``start\n> [P2] end`` and [P1]','> - Item\n>\n>   ~~~js\n>   [P2]\n>   ~~~\n>\n>   Claim [P1]'];
+  for(const body of samples){const r={...round,a:body,cites:[{p:1,quote:'real source'},{p:2,quote:'code only'}],evidence:[]};const m=pbpAskExportMarkdown({...snapshot,rounds:[r]});assert(m.includes('[P2]'),'code token changed: '+body);assert(!m.includes('code only'),'code citation became a source');assert((m.match(/^\[\^.*\]:/gm)||[]).length===1,'prose citation lost: '+body);const copied=_pbpAskBuildCopyText(body,r.cites);assert(copied.includes('[P2]'),'copy changed nested code: '+body);}
+});
+await test('silent real IndexedDB clear failure is suppressed, visible and retryable',async()=>{
+  await withAskRunnerFixture(async({answer,state})=>{
+    const host=document.createElement('div'),thread=document.createElement('div');thread.id='ask-thread';host.appendChild(thread);document.body.appendChild(host);thread.appendChild(answer);
+    const txOriginal=IDBDatabase.prototype.transaction,key=_pbpAskHistKey(state.url,state.account);
+    const original={q:'saved question',a:'Saved completed answer',ts:1};
+    try{
+      await realAskHistory.set(state.url,[original],state.account);
+      _pbpAskEnsureClear();const clearButton=document.getElementById('ask-clear');
+      IDBDatabase.prototype.transaction=function(...args){const tx=txOriginal.apply(this,args);if(args[1]==='readwrite')tx.abort();return tx;};
+      assert(await _pbpAskClearThread()===false);
+      assert((await realAskHistory.get(state.url,state.account)).length===1,'fixture did not preserve failed clear');
+      assert(_pbpAskClearing.has(key));assert((await pbpAskExportSnapshot({url:state.url,account:state.account})).count===0);
+      assert(!clearButton.hidden,'Clear retry entry vanished');assert(host.querySelector('#ask-clear-error[role="alert"]').textContent.includes('Could not clear'));
+      clearButton.click();assert(document.getElementById('ask-clear-confirm'));document.querySelector('.ask-clear-no').click();
+      IDBDatabase.prototype.transaction=txOriginal;
+      assert(await _pbpAskClearThread()===true);
+      assert((await realAskHistory.get(state.url,state.account)).length===0);assert(!_pbpAskClearing.has(key));assert(!document.getElementById('ask-clear-error'));assert(clearButton.hidden);
+    }finally{IDBDatabase.prototype.transaction=txOriginal;_pbpAskClearing.delete(key);host.remove();await realAskHistory.set(state.url,[],state.account);}
+  });
+});
+await test('per-answer copy rejects its completed record after external Clear',async()=>{
+  await withAskRunnerFixture(async({answer,state})=>{
+    const names=['pbpReadSettingsWithSecrets','pbpPinboardAccountFromToken','flashButtonLabel'];const saved=Object.fromEntries(names.map(n=>[n,window[n]]));const descriptor=Object.getOwnPropertyDescriptor(navigator,'clipboard');
+    const record={q:'copied question',a:'Kept completed answer',ts:3,model:'test-model'};let copies=0,notify;
+    Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{copies++;notify?.();}}});
+    window.pbpReadSettingsWithSecrets=async()=>({pinboardToken:'alice:test-token'});window.pbpPinboardAccountFromToken=token=>token.split(':')[0];window.flashButtonLabel=()=>{};
+    try{
+      await realAskHistory.set(state.url,[record],state.account);answer._askExportRecord=record;_pbpAskFinalize(answer,record.a);
+      const copied=new Promise(resolve=>notify=resolve);answer.querySelector('.ask-copy-btn').click();await Promise.race([copied,new Promise((_,reject)=>setTimeout(()=>reject(Error('initial copy did not finish')),1000))]);assert(copies===1);
+      await realAskHistory.set(state.url,[],state.account);document.dispatchEvent(new CustomEvent('pbp:ask-history-external',{detail:{type:'clear',url:state.url,account:state.account}}));
+      answer.querySelector('.ask-copy-btn').click();await new Promise(resolve=>setTimeout(resolve,60));assert(copies===1,'deleted completed record reached clipboard');
+    }finally{Object.assign(window,saved);if(descriptor)Object.defineProperty(navigator,'clipboard',descriptor);else delete navigator.clipboard;await realAskHistory.set(state.url,[],state.account);}
+  });
+});
+const originalClipboard=Object.getOwnPropertyDescriptor(navigator,'clipboard');
+const originalOpen=window.open, originalFetch=window.fetch, originalChrome=window.chrome;
+let written=0,opened=0,dispatched=0,current=true;
+Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{written++;}}});
+window.open=()=>{opened++;return {};};window.fetch=async()=>{dispatched++;return {ok:true,status:200,json:async()=>({id:'created'})};};
+window.chrome={permissions:{contains:async()=>true}};
+PBP_EXPORT_TARGETS.guardtest={id:'guardtest',mechanism:'token-api',frontmatter:'strip',origin:'https://example.com/*',settings:[],buildRequest:()=>({url:'https://example.com/create',method:'POST',body:'content'})};
+const guard=()=>current;
+await test('send blocks initially stale output',async()=>{current=false;const r=await pbpSendToTarget('notebooklm',{rawBody:'private'}, {isCurrent:guard});assert(r.error==='context_changed');assert(!written&&!opened&&!dispatched);});
+await test('send checks after permission wait',async()=>{current=true;chrome.permissions.contains=async()=>{current=false;return true;};const r=await pbpSendToTarget('guardtest',{rawBody:'private'},{isCurrent:guard});assert(r.error==='context_changed');assert(!written&&!dispatched);});
+await test('stale permission failure does not copy private fallback',async()=>{current=true;chrome.permissions.contains=async()=>{current=false;throw Error('revoked');};const r=await pbpSendToTarget('guardtest',{rawBody:'private'},{isCurrent:guard});assert(r.error==='context_changed');assert(!written&&!dispatched);});
+await test('send checks after preflight before content dispatch',async()=>{current=true;chrome.permissions.contains=async()=>true;PBP_EXPORT_TARGETS.guardtest.precheckRequest=()=>({url:'https://example.com/check',method:'GET'});window.fetch=async()=>{dispatched++;current=false;return {ok:true,status:200};};const r=await pbpSendToTarget('guardtest',{rawBody:'private'},{isCurrent:guard});assert(r.error==='context_changed');assert(dispatched===1&&!written);delete PBP_EXPORT_TARGETS.guardtest.precheckRequest;});
+await test('send checks after clipboard before opening another app',async()=>{current=true;navigator.clipboard.writeText=async()=>{written++;current=false;};const r=await pbpSendToTarget('notebooklm',{rawBody:'private'},{isCurrent:guard});assert(r.error==='context_changed');assert(opened===0);});
+await test('stale network failure never falls back to clipboard',async()=>{current=true;written=0;window.fetch=async()=>{current=false;throw Error('network');};const r=await pbpSendToTarget('guardtest',{rawBody:'private'},{isCurrent:guard});assert(r.error==='context_changed');assert(written===0);});
+await test('send awaits asynchronous owner guard before dispatch',async()=>{current=true;written=0;let reads=0;const r=await pbpSendToTarget('notebooklm',{rawBody:'private'},{isCurrent:async()=>{reads++;await Promise.resolve();return false;}});assert(r.error==='context_changed');assert(reads===1&&written===0&&opened===0);});
+await test('target registry declares portable citation support',()=>{assert(PBP_EXPORT_TARGETS.obsidian.citationStyle==='footnotes');assert(PBP_EXPORT_TARGETS.github.citationStyle==='footnotes');for(const id of ['notion','notebooklm','webhook'])assert(PBP_EXPORT_TARGETS[id].citationStyle==='sources');});
+if(originalClipboard)Object.defineProperty(navigator,'clipboard',originalClipboard);else delete navigator.clipboard;
+window.open=originalOpen;window.fetch=originalFetch;window.chrome=originalChrome;delete PBP_EXPORT_TARGETS.guardtest;
+document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
+})();
+</script></body></html>

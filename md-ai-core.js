@@ -982,7 +982,7 @@ async function pbpAskHistGet(url, account) {
 }
 
 async function pbpAskHistSet(url, arr, account) {
-  await pbpAiCacheSet(_pbpAskHistKey(url, account), _pbpAskHistTrim(arr), Date.now());
+  return await pbpAiCacheSet(_pbpAskHistKey(url, account), _pbpAskHistTrim(arr), Date.now());
 }
 
 // Atomic history append (D2-2): a plain pbpAskHistGet()+push+pbpAskHistSet()

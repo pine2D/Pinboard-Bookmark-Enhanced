@@ -29,8 +29,10 @@
 
 # Read
 - Any page becomes a clean reader: a Markdown view with table of contents, search, and footnote peek; math, diagrams, and tables render properly
+- Save from the reader: bookmark the article or edit its bookmark without returning to the popup
 - Five-color highlights with notes: they stay in place through translation and even later edits to the page
 - Translate the page or ask it questions: full-page translation with a bilingual view; answers cite the source and jump straight to it
+- Keep questions and answers with their citations: export completed conversations on their own or alongside the article
 - Look up words as you read: definitions open on the sense that fits your sentence; send saved words to Anki or Eudic in one click, or add offline Chinese-English and English-Chinese dictionaries
 - A full page for notes and vocabulary: saved words and highlights in one place, with dictionary lookup and batch management
 - Send or download: send articles to your notes app or your own webhook, or save them as e-books for your e-reader
@@ -63,8 +65,10 @@
 
 # 阅读
 - 网页变成清爽的阅读器：Markdown 视图，带目录、搜索和脚注速览；公式、图表、表格都正常显示
+- 阅读时直接收藏：在阅读器里保存文章或编辑书签，不用切回弹窗
 - 五色高亮与笔记：切换翻译、原文改动后仍留在原处
 - 整页翻译，或向文章提问：双语对照；回答附引用，点击直达原文出处
+- 问答连同引用一起留存：完整问答可单独导出，也可附在正文后
 - 边读边查词：先显示贴合当前句子的释义；生词一键发到 Anki 和欧路词典，还可以选择离线汉英、英汉词典包
 - 笔记和生词独立成页：生词和高亮集中一处，随手查词、批量管理
 - 发送或下载：把文章发到常用的笔记应用或你自己的 webhook，或者存成电子书放进阅读器
@@ -97,8 +101,10 @@
 
 # 閱讀
 - 網頁變成清爽的閱讀器：Markdown 檢視，內建目錄、搜尋與註腳速覽；數學式、圖表與表格都正確呈現
+- 閱讀時直接收藏：在閱讀器裡儲存文章或編輯書籤，不用切回彈出視窗
 - 五色劃重點與筆記：切換翻譯、原文改動後仍留在原處
 - 整頁翻譯，或向文章提問：雙語對照；回答附引用，一按即跳回原文出處
+- 問答與引用一起留存：完整問答可單獨匯出，也可附在正文後
 - 邊讀邊查詞：先顯示最貼近句子的釋義；生詞一鍵傳送到 Anki 與歐路詞典，也可以選用離線中英、英中詞典包
 - 筆記與生詞獨立成頁：生詞與劃重點集中在同一頁，隨手查詞、批次管理
 - 傳送或下載：把文章傳到常用的筆記應用程式或你自己的 webhook，或存成電子書放進閱讀器
@@ -131,8 +137,10 @@
 
 # 閱讀
 - 網頁變成清爽的閱讀器：Markdown 檢視，附目錄、搜尋與註腳速覽；數學公式、圖表與表格都正常顯示
+- 閱讀時直接收藏：在閱讀器內儲存文章或編輯書籤，不用切回彈出視窗
 - 五色高亮與筆記：切換翻譯、原文改動後仍留在原處
 - 整頁翻譯，或向文章提問：雙語對照；答案附引註，一按即跳回原文出處
+- 問答連同引用一併保留：完整問答可獨立匯出，亦可附在正文後
 - 邊讀邊查詞：先顯示切合該句的釋義；生詞一鍵傳送到 Anki 及歐路詞典，亦可選用離線中英、英中詞典包
 - 筆記與生詞獨立成頁：生詞與高亮集中在同一頁，隨手查詞、批量管理
 - 傳送或下載：把文章傳到常用的筆記應用程式或你自己的 webhook，或存成電子書放進閱讀器
@@ -165,8 +173,10 @@
 
 # Lesen
 - Jede Seite wird zur Leseansicht: Markdown-Ansicht mit Inhaltsverzeichnis, Suche und Fußnoten-Vorschau; Formeln, Diagramme und Tabellen werden sauber dargestellt
+- Direkt im Reader speichern: Artikel als Lesezeichen speichern oder das Lesezeichen bearbeiten, ohne zum Popup zurückzukehren
 - Markieren in fünf Farben, mit Notizen: beide bleiben an ihrer Stelle, auch nach der Übersetzung und späteren Änderungen an der Seite
 - Seite übersetzen oder befragen: Ganzseiten-Übersetzung mit zweisprachiger Ansicht; Antworten zitieren die Quelle, ein Klick führt direkt zur Fundstelle
+- Fragen und Antworten mit Quellen behalten: abgeschlossene Gespräche einzeln oder zusammen mit dem Artikel exportieren
 - Wörter beim Lesen nachschlagen: Definitionen zeigen zuerst die zum Satz passende Bedeutung; gespeicherte Vokabeln gehen mit einem Klick an Anki oder Eudic, dazu auf Wunsch Offline-Wörterbücher für Chinesisch–Englisch und Englisch–Chinesisch
 - Eine eigene Seite für Notizen und Vokabeln: gespeicherte Wörter und Markierungen an einem Ort, mit Wörterbuchsuche und Stapelbearbeitung
 - Senden oder herunterladen: Artikel an deine Notiz-App oder deinen eigenen Webhook senden oder als E-Book für den E-Reader speichern
@@ -199,8 +209,10 @@
 
 # Lecture
 - Chaque page passe en mode lecture épuré : vue Markdown avec table des matières, recherche et aperçu des notes de bas de page ; formules, diagrammes et tableaux s'affichent correctement
+- Enregistrez depuis le lecteur : ajoutez l’article aux signets ou modifiez son signet sans revenir au popup
 - Surlignage en cinq couleurs, avec notes : les deux restent à leur place après une traduction, et même si la page change ensuite
 - Traduisez la page ou posez-lui vos questions : traduction intégrale avec vue bilingue ; les réponses citent la source et y renvoient d'un clic
+- Conservez les questions et réponses avec leurs citations : exportez les conversations terminées seules ou avec l’article
 - Cherchez les mots au fil de la lecture : le dictionnaire affiche d'abord le sens qui correspond à votre phrase ; envoyez les mots enregistrés vers Anki ou Eudic en un clic, et ajoutez si vous le souhaitez des dictionnaires hors connexion chinois-anglais et anglais-chinois
 - Une page entière pour les notes et le vocabulaire : mots enregistrés et surlignages réunis au même endroit, avec recherche dans le dictionnaire et gestion par lots
 - Envoyer ou télécharger : envoyez vos articles vers votre application de notes ou votre propre webhook, ou enregistrez-les en livre numérique pour votre liseuse
@@ -233,8 +245,10 @@
 
 # リーダー
 - どんなページもすっきりしたリーダーに：目次・検索・脚注プレビュー付きの Markdown 表示。数式・図・表もきちんと表示されます
+- リーダーからそのまま保存：ポップアップに戻らず、記事の保存やブックマークの編集ができます
 - 5 色のハイライトとメモ：翻訳しても、あとでページが書き換わっても、元の位置に残ります
 - ページ全体の翻訳とページへの質問：対訳表示に対応し、回答には出典への引用が付き、クリックで該当箇所へジャンプします
+- 質問と回答を引用付きで残す：完了した会話を単独でエクスポートすることも、記事に添えることもできます
 - 読みながら単語を調べる：読んでいる文に合った語義がまず表示されます。保存した単語はワンクリックで Anki や Eudic に送れ、中英・英中のオフライン辞書パックも選べます
 - メモと単語帳に専用ページ：保存した単語とハイライトが一か所に集まり、辞書検索も一括管理もできます
 - 送信もダウンロードも：記事を普段使いのノートアプリや自分の webhook に送ったり、電子書籍として保存してリーダーで読んだりできます
@@ -267,8 +281,10 @@
 
 # Czytanie
 - Każda strona staje się czytelna — widok Markdown ze spisem treści, wyszukiwaniem i podglądem przypisów; wzory, diagramy i tabele wyświetlają się poprawnie
+- Zapisuj prosto z czytnika — dodawaj artykuł do zakładek lub edytuj jego zakładkę bez wracania do okienka
 - Zaznaczenia w pięciu kolorach, z notatkami — zostają na swoim miejscu mimo tłumaczenia, a nawet późniejszych zmian na stronie
 - Przetłumacz stronę albo zadaj jej pytanie — tłumaczenie całości z widokiem dwujęzycznym; odpowiedzi cytują źródło i prowadzą prosto do niego
+- Zachowaj pytania i odpowiedzi z cytatami — eksportuj ukończone rozmowy osobno lub wraz z artykułem
 - Sprawdzaj słownictwo podczas czytania — słownik pokazuje najpierw znaczenie pasujące do bieżącego zdania; zapisane słówka wyślesz jednym kliknięciem do Anki lub Eudic, a do wyboru masz też słowniki offline chińsko-angielski i angielsko-chiński
 - Notatki i słówka mają własną stronę — zapisane słówka i zaznaczenia w jednym miejscu, z wyszukiwaniem w słowniku i zarządzaniem partiami
 - Wyślij albo pobierz — wyślij artykuł do swojej aplikacji z notatkami lub własnego webhooka albo zapisz go jako e-book na czytnik
@@ -301,8 +317,10 @@
 
 # Чтение
 - Любая страница превращается в режим чтения — Markdown-просмотр с оглавлением, поиском и предпросмотром сносок; формулы, диаграммы и таблицы отображаются правильно
+- Сохраняйте прямо из режима чтения — добавляйте статью в закладки или редактируйте её закладку, не возвращаясь к окну расширения
 - Выделения пяти цветов с заметками — остаются на своих местах и после перевода, и после правок на самой странице
 - Переведите страницу или задайте ей вопрос — полный перевод с двуязычным режимом; ответы ссылаются на источник, и клик ведёт прямо к нему
+- Сохраняйте вопросы и ответы вместе с цитатами — экспортируйте завершённые беседы отдельно или вместе со статьёй
 - Ищите слова во время чтения — словарь сразу показывает значение, подходящее к предложению; сохранённые слова отправляются в Anki или Eudic в один клик, а офлайн-словари (китайско-английский и англо-китайский) подключаются по желанию
 - У заметок и словарика своя страница — сохранённые слова и выделения в одном месте, с поиском по словарю и пакетными действиями
 - Отправить или скачать — отправляйте статьи в своё приложение для заметок или на собственный вебхук либо сохраняйте их как электронные книги для читалки

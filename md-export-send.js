@@ -33,13 +33,23 @@ async function pbpRequestTargetPermission(id, cfg) {
 }
 
 // Send one clip to a target. Returns { ok, fellBack, error }. Never throws.
-async function pbpSendToTarget(id, ctx) {
+// Optional synchronous/async guard fences the owner/article/export snapshot at
+// each output boundary. A stale job must never copy its private fallback.
+async function pbpSendToTarget(id, ctx, options = {}) {
   ctx = ctx || {};
   const row = PBP_EXPORT_TARGETS[id];
   if (!row) return { ok: false, fellBack: false, error: "unknown target" };
   const meta = ctx.meta || {};
   const rawBody = ctx.rawBody || "";
   const cfg = ctx.cfg || {};
+  const isCurrent = (options && options.isCurrent) || ctx.isCurrent;
+  const assertCurrent = async () => {
+    if (typeof isCurrent !== "function") return;
+    let current = false;
+    try { current = (await isCurrent()) === true; }
+    catch (error) { console.warn("[pbp-send] context check failed:", error?.name, error?.message); }
+    if (!current) throw new Error("context_changed");
+  };
 
   // Required-config guard (e.g. Capacities spaceId): block with a clear error
   // rather than firing a broken URI.
@@ -47,6 +57,7 @@ async function pbpSendToTarget(id, ctx) {
   if (missing) return { ok: false, fellBack: false, error: "missing:" + missing.key };
 
   try {
+    await assertCurrent();
     // Token-API path: permission -> precheck -> optional preRequest -> request,
     // with a clipboard-safe failure fallback. GitHub Gist ships on this branch
     // today; it is also the generic template for further token-api targets.
@@ -68,34 +79,41 @@ async function pbpSendToTarget(id, ctx) {
       // api-insecure message makes no clipboard claim, so it stays actionable.
       const apiFail = async (errCode) => {
         let copied = true;
+        await assertCurrent();
         try { await navigator.clipboard.writeText(pbpBuildFileBody(id, meta, rawBody)); } catch (_) { copied = false; }
+        await assertCurrent();
         return { ok: false, fellBack: false, error: (copied || errCode === "api-insecure") ? errCode : "" };
       };
       // Execution is contains-only. The direct click path may request first,
       // but this second gate also protects background/retry callers and later
       // permission revocation.
       const origin = (typeof row.origin === "function") ? row.origin(cfg) : row.origin;
-      if (!origin) return apiFail("api-insecure");
+      if (!origin) return await apiFail("api-insecure");
       try {
         const has = await chrome.permissions.contains({ origins: [origin] });
-        if (!has) return apiFail("api-perm");
-      } catch (error) { console.warn("[pbp-send] perm-check failed:", error?.name, error?.message); return apiFail("api-perm"); }
+        await assertCurrent();
+        if (!has) return await apiFail("api-perm");
+      } catch (error) { await assertCurrent(); console.warn("[pbp-send] perm-check failed:", error?.name, error?.message); return await apiFail("api-perm"); }
       // Liveness/token precheck.
       if (row.precheckRequest) {
         try {
           const pr = row.precheckRequest(cfg, token);
+          await assertCurrent();
           const presp = await fetch(pr.url, { method: pr.method, headers: pr.headers, body: pr.body, redirect: "error", signal: AbortSignal.timeout(20000) });
-          if (presp.status === 401) return apiFail("api-token");
-          if (!presp.ok) return apiFail("api-down");
-        } catch (error) { console.warn("[pbp-send] precheck failed:", error?.name, error?.message); return apiFail("api-down"); }
+          await assertCurrent();
+          if (presp.status === 401) return await apiFail("api-token");
+          if (!presp.ok) return await apiFail("api-down");
+        } catch (error) { await assertCurrent(); console.warn("[pbp-send] precheck failed:", error?.name, error?.message); return await apiFail("api-down"); }
       }
       // Best-effort pre-request (e.g. create the target container/page).
       // Failures are swallowed — the main request below is the source of truth.
       if (row.preRequest) {
         try {
           const prq = row.preRequest(meta, cfg, token);
+          await assertCurrent();
           await fetch(prq.url, { method: prq.method, headers: prq.headers, body: prq.body, redirect: "error" });
-        } catch (_) {}
+          await assertCurrent();
+        } catch (_) { await assertCurrent(); }
       }
       // Send. buildRequest gets the body with the row's frontmatter policy
       // applied (inline keeps YAML, strip drops it) — same shaping as the
@@ -109,23 +127,26 @@ async function pbpSendToTarget(id, ctx) {
         // K49: the options page's export-target Test button calls this same
         // row.precheckRequest (see the testBtn click handler in renderExportTargets,
         // options.js) with its own 20s deadline -- keep both in sync.
+        await assertCurrent();
         const resp = await fetch(req.url, { method: req.method, headers: req.headers, body: req.body, redirect: "error", signal: AbortSignal.timeout(20000) });
-        if (resp.status === 401) return apiFail("api-token");
+        await assertCurrent();
+        if (resp.status === 401) return await apiFail("api-token");
         // GitHub-only: a token can pass the /user precheck (401 never fires)
         // yet have POST /gists answer 403/404 because it lacks gist write
         // access (classic PAT without the `gist` scope; fine-grained support
         // is unverified -- registry comment, export-targets.js). Reuse the
         // "api-token" code so the user is sent to check the token in Settings
         // instead of a dead-end "request failed".
-        if (id === "github" && (resp.status === 403 || resp.status === 404)) return apiFail("api-token");
+        if (id === "github" && (resp.status === 403 || resp.status === 404)) return await apiFail("api-token");
         // Notion-only: 404 object_not_found (and 403 restricted_resource) on
         // POST /pages almost always means the parent page was never shared
         // with the integration -- the single most common Notion setup
         // mistake. Surface dedicated guidance instead of a dead-end
         // "request failed".
-        if (id === "notion" && (resp.status === 404 || resp.status === 403)) return apiFail("api-notion-share");
-        if (!resp.ok) return apiFail("api-failed");
+        if (id === "notion" && (resp.status === 404 || resp.status === 403)) return await apiFail("api-notion-share");
+        if (!resp.ok) return await apiFail("api-failed");
         const json = await resp.json().catch(() => null);
+        await assertCurrent();
         // Success: row-defined (webhook = any 2xx, since it returns no id) else
         // the id/uuid heuristic (gist returns id). url = the created resource's
         // web link when the API returns one (gist: html_url).
@@ -133,8 +154,8 @@ async function pbpSendToTarget(id, ctx) {
         if (ok) {
           return { ok: true, fellBack: false, error: null, url: (json && (json.html_url || json.url)) || null };
         }
-        return apiFail("api-failed");
-      } catch (error) { console.warn("[pbp-send] request failed:", error?.name, error?.message); return apiFail("api-down"); }
+        return await apiFail("api-failed");
+      } catch (error) { await assertCurrent(); console.warn("[pbp-send] request failed:", error?.name, error?.message); return await apiFail("api-down"); }
     }
 
     if (row.mechanism === "url-scheme") {
@@ -142,11 +163,14 @@ async function pbpSendToTarget(id, ctx) {
         // Body rides the clipboard; the URI references it (never too long).
         const fileBody = pbpBuildFileBody(id, meta, rawBody);
         let copied = true;
+        await assertCurrent();
         try { await navigator.clipboard.writeText(fileBody); } catch (_) { copied = false; }
+        await assertCurrent();
         // If the clipboard write failed, opening the app would create an EMPTY
         // note while claiming success — report failure instead (no data loss).
         if (!copied) return { ok: false, fellBack: false, error: "" };
         const uri = row.buildUri(meta, rawBody, cfg);
+        await assertCurrent();
         const win = window.open(uri, "_blank");
         // window.open returns null when the popup was blocked or the user
         // cancelled the browser's "open <app>?" external-protocol prompt
@@ -164,12 +188,15 @@ async function pbpSendToTarget(id, ctx) {
         // (a short, valid URI) so the user lands paste-ready and finishes with one Ctrl+V.
         const fileBody = pbpBuildFileBody(id, meta, rawBody);
         let copied = true;
+        await assertCurrent();
         try { await navigator.clipboard.writeText(fileBody); } catch (_) { copied = false; }
+        await assertCurrent();
         // If the clipboard write failed, opening the app would land the user in an
         // EMPTY note with nothing to paste while claiming "full text copied" --
         // report failure instead (no data loss, matches the viaClipboard path above).
         if (!copied) return { ok: false, fellBack: false, error: "" };
         const openUri = row.buildUri(meta, "", cfg); // empty content -> short URI -> opens app
+        await assertCurrent();
         const win = window.open(openUri, "_blank");
         // win is null only when the popup was blocked or the user cancelled the
         // browser's "open <app>?" external-protocol prompt. copied is already true
@@ -185,6 +212,7 @@ async function pbpSendToTarget(id, ctx) {
       // "full text copied to clipboard" claim, so a blocked open here degrades
       // through the generic error path instead of inventing a claim this
       // branch can't back up.
+      await assertCurrent();
       window.open(uri, "_blank");
       return { ok: true, fellBack: false, error: null };
     }

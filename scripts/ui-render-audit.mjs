@@ -8493,7 +8493,7 @@ function reconcileSpacing(sweepHits) {
 // the dictionary view), so "explain-pop" leaves it open and "explain-dict"
 // closes it. The answered-state footer actions are unhidden by hand: they
 // appear once a reply lands, and the sweep measures geometry, not the flow.
-const READER_SURFACES = ["reader-source-details", "export-more", "explain-pop", "explain-dict", "ask-panel", "search-pop", "kbd-help-pop", "typo-pop", "pb-hl-card", "send-menu", "confirm-popover", "tr-ask"];
+const READER_SURFACES = ["reader-source-details", "export-more", "reader-bookmark-footer", "reader-bookmark-editor", "explain-pop", "explain-dict", "ask-panel", "search-pop", "kbd-help-pop", "typo-pop", "pb-hl-card", "send-menu", "confirm-popover", "tr-ask"];
 async function openReaderSurface(name) {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const shown = (el) => !!(el && el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) && el.getBoundingClientRect().width > 0);
@@ -8513,6 +8513,36 @@ async function openReaderSurface(name) {
       if (sec.classList.contains("rail-collapsed")) { sec.querySelector(".rail-sec-head")?.click(); await wait(400); }
       details.open = true;
       return shown(document.getElementById("btn-dl-epub"));
+    }
+    case "reader-bookmark-footer": {
+      const footer = document.getElementById(name);
+      if (!footer) return "reader save footer did not mount";
+      footer.scrollIntoView({ block: "center", behavior: "instant" });
+      return shown(footer);
+    }
+    case "reader-bookmark-editor": {
+      if (typeof window.pbpReaderBookmarkAction !== "function") return "reader bookmark module not loaded";
+      // Only this audit request is replaced: real editor construction and
+      // layout run unchanged, without a live Pinboard bookmark lookup.
+      const key = new URL(location.href).searchParams.get("k");
+      const row = (await chrome.storage.local.get("md_preview_data_" + key))["md_preview_data_" + key];
+      if (!row?.account) return "reader bookmark fixture has no owner";
+      const send = chrome.runtime.sendMessage;
+      chrome.runtime.sendMessage = function (message, ...args) {
+        if (message?.type === "mdReaderBookmarkState") return Promise.resolve({ account: row.account, known: true, bookmarked: true, bookmark: { title: "Render audit bookmark", tags: "qa reader", notes: "A reader bookmark note.", private: true, toread: true } });
+        return send.call(chrome.runtime, message, ...args);
+      };
+      try {
+        // Cancel any real initial lookup still pending in the save module,
+        // then replay this same fixture owner/article with the stub active.
+        document.dispatchEvent(new CustomEvent("pbp:account-changed", { detail: { account: row.account } }));
+        document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { account: row.account, url: row.url, title: row.title, bookmark: { tags: row.tags || [], notes: row.description || "" } } }));
+        await wait(50);
+        await window.pbpReaderBookmarkAction("edit");
+      }
+      finally { chrome.runtime.sendMessage = send; }
+      await wait(100);
+      return shown(document.getElementById(name));
     }
     case "explain-pop": {
       const p = document.querySelector("#rendered-view p");
@@ -8574,6 +8604,7 @@ function closeReaderSurface(name) {
   switch (name) {
     case "reader-source-details": { document.getElementById(name).open = false; return; }
     case "export-more": { document.getElementById(name).open = false; return; }
+    case "reader-bookmark-footer": { window.scrollTo({ top: 0, behavior: "instant" }); return; }
     case "explain-pop": return; // stays open for explain-dict
     case "explain-dict": { const pop = document.getElementById("explain-pop"); if (pop && typeof _pbpExplainClose === "function") _pbpExplainClose(pop); return; }
     case "ask-panel": { const btn = document.getElementById("ask-open"); const panel = document.getElementById("ask-panel"); if (btn && panel && !panel.hidden) btn.click(); return; }

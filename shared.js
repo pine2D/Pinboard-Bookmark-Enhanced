@@ -483,7 +483,7 @@ const SETTINGS_DEFAULTS = {
   themePresetKey: "", optPopupFollowTheme: true,
   popupWidth: 550,
   mdExportFrontmatter: true, mdExportImagePolicy: "keep", mdExportIncludeToc: false,
-  mdExportIncludeHighlights: true,
+  mdExportIncludeHighlights: true, mdExportIncludeAsk: false,
   // Default-on: attaches author/published/site/image/words to export meta when
   // available. Off = byte-identical legacy exports (X4).
   mdExportExtendedMeta: true,

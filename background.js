@@ -930,7 +930,7 @@ function queueRecordFromSaveIntent(intent, token) {
   };
 }
 
-function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "" } = {}) {
+function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", readerAction = "", readerDraft = null } = {}) {
   return runSaveDeliveryTransaction(async () => {
     let settings;
     try { settings = await loadSettings(); }
@@ -954,6 +954,14 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "" } =
     }
     const deliverySettings = { ...settings, pinboardToken: deliveryAuth.token };
 
+    // Reader edits/flag changes resolve server metadata inside this same
+    // lookup-to-write transaction. The offline record remains a normal intent.
+    if (readerAction) {
+      const prepared = await pbpPrepareReaderSaveIntent(intent, readerAction, readerDraft, deliverySettings, deliveryAuth);
+      if (prepared.result) return prepared.result;
+      intent = prepared.intent;
+    }
+
     let envelope;
     try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth); }
     catch (e) {
@@ -968,6 +976,11 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "" } =
         : envelope.result;
     }
     if (!envelope.retryable || !deliverySettings.offlineQueueEnabled) return envelope.result;
+    // A reader flag-only update carries freshly read server metadata solely
+    // to preserve it during this dispatch. Replaying that snapshot later
+    // could overwrite another client's newer notes/privacy; require a retry
+    // that re-reads the bookmark instead of queueing the resolved update.
+    if ((readerAction === "read" || readerAction === "later") && intent.mode === "update") return envelope.result;
 
     try {
       const queueId = await enqueueOfflineSave(queueRecordFromSaveIntent(intent, deliverySettings.pinboardToken));
@@ -1079,6 +1092,112 @@ function submitPopupSaveIntent(intent, expectedAccount) {
   }
   return submitSaveIntent(intent, { expectedAccount });
 }
+
+// ---- Reader bookmark workflow ----
+// Persisted preview slots survive SW restarts. Only the exact top-level reader
+// document may consume its slot; source-tab liveness is deliberately irrelevant.
+function pbpReaderDocumentUrl(raw) {
+  try {
+    const u = new URL(raw);
+    return u.protocol === "chrome-extension:" && u.host === chrome.runtime.id
+      && u.pathname === "/md-preview.html" ? u : null;
+  } catch (_) { return null; }
+}
+
+async function pbpReaderBookmarkContext(sender, account) {
+  if (sender?.id !== chrome.runtime.id || sender.frameId !== 0
+      || !Number.isInteger(sender.tab?.id) || !account) return null;
+  const doc = pbpReaderDocumentUrl(sender.url);
+  const key = doc?.searchParams.get("k");
+  if (!key || !/^[a-zA-Z0-9_-]{1,100}$/.test(key)) return null;
+  // sender.url/frameId/id are browser-authenticated at dispatch. Saving the
+  // frozen slot never acts on a live tab, so closing/navigating the reader
+  // immediately after clicking must not cancel an already-delivered intent.
+  const storageKey = "md_preview_data_" + key;
+  const stored = (await chrome.storage.local.get(storageKey))[storageKey];
+  const auth = await pbpReadFreshPinboardAuthForAccount(account);
+  if (!stored || stored.account !== account || !auth?.token) return null;
+  try { if (!/^https?:$/.test(new URL(stored.url).protocol)) return null; }
+  catch (_) { return null; }
+  return { ...stored, account };
+}
+
+async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth) {
+  if (action === "save") return { intent: { ...intent, mode: "skip" } };
+  const lookup = await fetchExistingBookmark(intent.url, settings.pinboardToken, auth);
+  if (!pbpPinboardAuthIsCurrent(auth)) return { result: pbpSaveFailure("account_changed") };
+  if (lookup.lookupFailed) {
+    // Without server metadata a queued flag change cannot preserve both an
+    // existing record and a new bookmark's privacy/defaults. Fail closed;
+    // ordinary save's skip intent can still safely enter the offline queue.
+    return { result: pbpSaveFailure(lookup.reason || "lookup") };
+  }
+  if (!lookup.exists) {
+    if (action === "read") return { result: pbpSaveFailure("lookup") };
+    return { intent: { ...intent, mode: "create", ...(action === "edit" ? draft : {}), toread: action === "later" || (action === "edit" ? draft.toread : intent.toread) } };
+  }
+  const plan = pbpResolveSavePlan({ ...intent, mode: "overwrite", tags: lookup.post?.tags, private: false, toread: false }, lookup);
+  if (plan.action !== "send") return { result: plan.result || pbpSaveFailure("lookup") };
+  if (action !== "edit" && plan.fields.toread === (action === "later")) {
+    return { intent: { ...intent, mode: "skip" } };
+  }
+  return { intent: { ...plan.fields, mode: "update", ...(action === "edit" ? draft : { toread: action === "later" }), time: plan.fields.time } };
+}
+
+function pbpReaderInitialIntent(context, settings, action) {
+  const originalDraft = context.bookmarkDraft;
+  return {
+    mode: "skip", url: context.url,
+    title: typeof originalDraft?.title === "string" ? originalDraft.title : context.title || context.url,
+    notes: typeof originalDraft?.notes === "string" ? originalDraft.notes : typeof context.description === "string" ? context.description : "",
+    tags: typeof originalDraft?.tags === "string" ? originalDraft.tags : Array.isArray(context.tags) ? context.tags.join(" ") : "",
+    private: typeof originalDraft?.private === "boolean" ? originalDraft.private : pbpEffectivePrivate(settings, { incognito: context.sourceIncognito === true }),
+    toread: action === "later" || (typeof originalDraft?.toread === "boolean" ? originalDraft.toread : settings.optReadlaterDefault === true),
+  };
+}
+
+async function pbpReaderBookmarkRequest(message, sender) {
+  const context = await pbpReaderBookmarkContext(sender, message.account);
+  if (!context) return pbpSaveFailure("account_changed");
+  if (message.type === "mdReaderBookmarkState") {
+    const auth = await pbpReadFreshPinboardAuthForAccount(context.account);
+    if (!auth) return pbpSaveFailure("account_changed");
+    const lookup = await fetchExistingBookmark(context.url, auth.token, auth);
+    let result = { known: false, account: context.account };
+    if (!lookup.lookupFailed && !lookup.exists) {
+      result = { known: true, bookmarked: false, bookmark: pbpReaderInitialIntent(context, await loadSettings(), "save"), account: context.account };
+    } else if (!lookup.lookupFailed) {
+      const plan = pbpResolveSavePlan({ mode: "overwrite", url: context.url, tags: lookup.post?.tags }, lookup);
+      if (plan.action === "send") result = { known: true, bookmarked: true, bookmark: plan.fields, account: context.account };
+    }
+    // Token rotation under the same owner does not invalidate display metadata.
+    // Re-read the effective owner after every await before returning it to UI.
+    return await pbpReadFreshPinboardAuthForAccount(context.account) ? result : pbpSaveFailure("account_changed");
+  }
+  const action = message.action;
+  if (!["save", "later", "read", "edit"].includes(action)) return pbpSaveFailure("invalid");
+  let draft = null;
+  if (action === "edit") {
+    const input = message.draft;
+    if (!input || typeof input.title !== "string" || typeof input.tags !== "string"
+        || typeof input.notes !== "string" || typeof input.private !== "boolean" || typeof input.toread !== "boolean") return pbpSaveFailure("invalid");
+    draft = { title: input.title, tags: input.tags, notes: input.notes, private: input.private, toread: input.toread };
+  }
+  const settings = await loadSettings();
+  const intent = pbpReaderInitialIntent(context, settings, action);
+  const result = await submitSaveIntent(intent, { expectedAccount: context.account, readerAction: action, readerDraft: draft });
+  const current = await pbpReadFreshPinboardAuthForAccount(context.account);
+  if (!current) return pbpSaveFailure("account_changed");
+  return { ...result, account: context.account };
+}
+
+async function pbpRouteReaderSaveCommand(command, tab) {
+  if (!["quick_save", "read_later"].includes(command) || !pbpReaderDocumentUrl(tab?.url)) return false;
+  try { await chrome.tabs.sendMessage(tab.id, { type: "PBP_READER_BOOKMARK_COMMAND", action: command === "read_later" ? "later" : "save" }); }
+  catch (e) { console.warn("reader save command unavailable:", e?.name, e?.message); }
+  return true;
+}
+// ---- End reader bookmark workflow ----
 
 // ---- P1: Shared save function ----
 async function saveFromBackground({ url, title, tab, settingsOverrides, toread, notifyId, notifyTitle, notifyCategory }) {
@@ -3440,6 +3559,13 @@ async function pbpRunPopupDraft(message) {
 // 21 branches were the largest untestable block in the extension. Behavior
 // is unchanged; registration stays top-level synchronous per MV3 rules.
 function handleRuntimeMessage(message, sender, sendResponse) {
+  if (message?.type === "mdReaderBookmarkState" || message?.type === "mdReaderBookmarkSave") {
+    pbpReaderBookmarkRequest(message, sender).then(sendResponse).catch(e => {
+      console.warn("reader bookmark request failed:", e?.name, e?.message);
+      sendResponse(pbpSaveFailure("internal"));
+    });
+    return true;
+  }
   if (!message || typeof message !== "object") { sendResponse({ error: "invalid" }); return true; }
   // Structural gate (defense in depth): accept only messages from this
   // extension's own PAGES. Today this is unreachable — no content script calls
@@ -3967,6 +4093,8 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         account: typeof stored.account === "string" ? stored.account : "",
         tags: Array.isArray(stored.tags) ? stored.tags.slice() : [],
         description: typeof stored.description === "string" ? stored.description : "",
+        sourceIncognito: stored.sourceIncognito === true,
+        bookmarkDraft: stored.bookmarkDraft,
       };
       // sourceTabUrl is IMMUTABLE tab identity (hotlink round): prefer the
       // slot's own record, else the message's, else the legacy url. It must
@@ -4029,6 +4157,8 @@ function handleRuntimeMessage(message, sender, sendResponse) {
           account: owner.account,
           tags: owner.tags,
           description: owner.description,
+          sourceIncognito: owner.sourceIncognito,
+          ...(owner.bookmarkDraft ? { bookmarkDraft: owner.bookmarkDraft } : {}),
           ts: Date.now() // sweep grace (see pbpSweepPreviewOrphans)
         }
       });
@@ -4844,6 +4974,7 @@ async function openMarkdownPreviewFromShortcut() {
       ["md_preview_data_" + k]: {
         pending: true, engine, source: engine,
         tabId: tab.id, url: tab.url, baseUrl: tab.url, sourceTabUrl: tab.url, title: tab.title || "",
+        sourceIncognito: tab.incognito === true,
         account: auth.account || "", tags: [], description: "", ts: Date.now() // sweep grace (see pbpSweepPreviewOrphans)
       }
     });
@@ -4896,6 +5027,7 @@ chrome.commands.onCommand.addListener(async (command) => {
   if (!cfg) return;
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (await pbpRouteReaderSaveCommand(command, tab)) return;
     if (!tab?.url || !tab.url.startsWith("http")) {
       showNotification(`${cfg.notifyId}-error`, t("bgCannotSave"), t("bgCannotBookmark"), "error");
       return;

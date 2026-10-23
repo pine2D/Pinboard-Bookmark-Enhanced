@@ -31,8 +31,10 @@ Une extension Chrome pour [Pinboard](https://pinboard.in) : étiquettes et résu
 
 ### Lecture
 - **Chaque page passe en mode lecture épuré** : vue Markdown avec table des matières, recherche et aperçu des notes de bas de page ; formules, diagrammes et tableaux s'affichent correctement
+- **Enregistrez depuis le lecteur** : ajoutez l’article aux signets ou modifiez son signet sans revenir au popup
 - **Surlignage en cinq couleurs, avec notes** : les deux restent à leur place après une traduction, et même si la page change ensuite
 - **Traduisez la page ou posez-lui vos questions** : traduction intégrale avec vue bilingue ; les réponses citent la source et y renvoient d'un clic
+- **Conservez les questions et réponses avec leurs citations** : exportez les conversations terminées seules ou avec l’article
 - **Cherchez les mots au fil de la lecture** : le dictionnaire affiche d'abord le sens qui correspond à votre phrase ; envoyez les mots enregistrés vers Anki ou Eudic en un clic, et ajoutez si vous le souhaitez des dictionnaires hors connexion chinois-anglais et anglais-chinois
 - **Une page entière pour les notes et le vocabulaire** : mots enregistrés et surlignages réunis au même endroit, avec recherche dans le dictionnaire et gestion par lots
 - **Envoyer ou télécharger** : vers [Obsidian](https://obsidian.md), Notion, NotebookLM, un Gist GitHub ou n'importe quel webhook ; ou en `.md`, `.html`, `.epub` pour votre liseuse

@@ -34,6 +34,12 @@
     </div>
     <div class="rail-section" id="export-section">
       <div class="rail-label" data-i18n="mdExportSection">Export</div>
+      <div class="exp-scope row" role="group" aria-label="Export content" data-i18n-aria="mdExportScope">
+        <button id="exp-scope-article" type="button" class="action-btn" aria-pressed="true" data-i18n="mdExportArticle">Article</button>
+        <button id="exp-scope-ask" type="button" class="action-btn" aria-pressed="false" data-i18n="mdExportAskOnly">Q&amp;A only</button>
+      </div>
+      <div id="export-summary" class="msg-bar" role="status" aria-live="polite"></div>
+      <button id="exp-include-ask" type="button" class="action-btn exp-tgl" aria-pressed="false" hidden>Include Q&amp;A (0)</button>
       <!-- Resident actions (critique 2026-10-20 #3): the two most used exits.
            Everything else -- the other downloads and the three options plus
            the image policy that shape every output -- is one disclosure down. -->
@@ -162,6 +168,7 @@
   <script defer src="md-highlight.js"></script>
   <script defer src="md-vocab-echo.js"></script>
   <script defer src="md-reader.js"></script>
+  <script defer src="md-bookmark.js"></script>
   <script defer src="md-skim.js"></script>
 </body>
 </html>

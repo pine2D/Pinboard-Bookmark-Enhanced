@@ -545,7 +545,7 @@ async function seedAll(context, worker, aiPort) {
 // Preview article payload (same shape as popup writes before opening).
 // One-shot: md-preview consumes the key on load, so re-seed before EVERY
 // md-preview navigation (perf-cold-sample re-seeds per open for the same reason).
-async function seedPreviewData(worker) {
+async function seedPreviewData(worker, storageKey = PREVIEW_KEY) {
   await worker.evaluate(async ({ storageKey, markdown, title, url }) => {
     const auth = await getCurrentPinboardAuth();
     await chrome.storage.local.set({
@@ -555,7 +555,7 @@ async function seedPreviewData(worker) {
         source: "local", math: false, forum: false, account: auth.account || "", ts: Date.now(),
       },
     });
-  }, { storageKey: PREVIEW_KEY, markdown: SYNTHETIC_MARKDOWN, title: ARTICLE_TITLE, url: ARTICLE_URL });
+  }, { storageKey, markdown: SYNTHETIC_MARKDOWN, title: ARTICLE_TITLE, url: ARTICLE_URL });
 }
 
 async function finishSeed(context, worker) {
@@ -1903,6 +1903,168 @@ async function diffAgainstPrev(runDir, prevDir) {
 // ============================================================
 // Main
 // ============================================================
+async function driveReaderExport(context, worker, extId, rep) {
+  const s = rep.surface("reader-export");
+  const page = await context.newPage();
+  const detach = rep.attach(page, s);
+  let peer = null, detachPeer = () => {};
+  const requireState = (ok, message) => { if (!ok) throw new Error(message); };
+  const downloadText = async (id) => {
+    const pending = page.waitForEvent("download");
+    await page.locator(id).click();
+    const download = await pending;
+    const file = await download.path();
+    return readFileSync(file, "utf8");
+  };
+  try {
+    await seedPreviewData(worker);
+    await page.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}`, { waitUntil: "load" });
+    await page.waitForSelector("#rendered-view p");
+    await page.waitForSelector("#exp-include-ask", { state: "attached", timeout: 5000 });
+    await page.evaluate(async ({ url }) => {
+      await pbpAskHistSet(url, [
+        { q: "What does serendipity mean here?", a: "A portable answer.[P2]\n\nCITES:\nP2: The word serendipity appears here", ts: 1700000000000, model: "qa-export-model" },
+        { q: "Keep the code example?", a: "Keep `[P2]` literal. Another answer.[P2]\n\nCITES:\nP2: The word serendipity appears here", ts: 1700000001000, model: "qa-export-model" }
+      ], "qa");
+      document.dispatchEvent(new CustomEvent("pbp:ask-history-changed"));
+      window.pbpReaderOpenExport();
+      document.getElementById("export-more").open = true;
+    }, { url: ARTICLE_URL });
+    await page.waitForFunction(() => !document.getElementById("exp-include-ask").hidden);
+    requireState(await page.locator("#exp-include-ask").getAttribute("aria-pressed") === "false", "Q&A export must default off");
+    const article = await downloadText("#btn-dl-md");
+    requireState(article.includes("Serendipity in Systems") && !article.includes("A portable answer"), "article-only export included private Q&A");
+    await page.locator("#exp-include-ask").click();
+    const combined = await downloadText("#btn-dl-md");
+    requireState(combined.includes("What does serendipity") && combined.includes("A portable answer") && combined.includes("qa-export-model"), "combined export omitted question, answer or model");
+    requireState(combined.includes("`[P2]`"), "citation conversion rewrote code");
+    const html = await downloadText("#btn-dl-html");
+    requireState(html.includes("A portable answer") && !html.includes("[^ask-"), "HTML contains raw Markdown citation syntax");
+    const links = await page.evaluate((htmlText) => {
+      const doc = new DOMParser().parseFromString(htmlText, "text/html");
+      const refs = [...doc.querySelectorAll('a[href^="#"]')].filter(a => /ask/.test(a.getAttribute("href")));
+      return { count: refs.length, valid: refs.every(a => doc.getElementById(decodeURIComponent(a.getAttribute("href").slice(1)))) };
+    }, html);
+    requireState(links.count >= 4 && links.valid, "HTML Q&A references/backlinks do not resolve inside the downloaded document");
+    await page.locator("#exp-scope-ask").click();
+    const only = await downloadText("#btn-dl-md");
+    requireState(only.includes("A portable answer") && !only.includes("Paragraph 12:"), "standalone Q&A export still includes article body");
+    const epub = await downloadText("#btn-dl-epub");
+    requireState(epub.includes("content.xhtml") && epub.includes("pbp-ask-") && epub.includes("A portable answer") && !epub.includes("Paragraph 12:"), "standalone EPUB lost Q&A anchors or retained article body");
+    await rep.shot(page, s, "ask-only-scope");
+    await seedPreviewData(worker, PREVIEW_KEY + "-peer");
+    peer = await context.newPage();
+    detachPeer = rep.attach(peer, s);
+    await peer.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}-peer`, { waitUntil: "load" });
+    await peer.waitForFunction(() => document.getElementById("exp-scope-ask")?.disabled === false);
+    let unexpectedDownloads = 0;
+    page.on("download", () => { unexpectedDownloads++; });
+    await page.evaluate(() => {
+      window._qaExportWaiting = false;
+      window._qaMermaidExport = window.pbpMermaidWarmExport;
+      window.pbpMermaidWarmExport = async () => {
+        window._qaExportWaiting = true;
+        await new Promise(resolve => { window._qaResumeExport = resolve; });
+      };
+    });
+    await page.locator("#btn-dl-html").click();
+    await page.waitForFunction(() => window._qaExportWaiting);
+    await peer.evaluate(async ({ url }) => {
+      await pbpAskHistSet(url, [], "qa");
+      _pbpAskHistoryChanged({ type: "clear", url, account: "qa" });
+    }, { url: ARTICLE_URL });
+    await page.waitForFunction(() => document.getElementById("exp-scope-ask").disabled);
+    await page.evaluate(() => {
+      window._qaResumeExport();
+      window.pbpMermaidWarmExport = window._qaMermaidExport;
+    });
+    await page.waitForFunction(() => document.getElementById("btn-dl-html").getAttribute("aria-busy") === "false");
+    requireState(unexpectedDownloads === 0, "conversation deleted by another reader was still downloaded");
+    requireState(await page.locator("#export-note").textContent() === await page.evaluate(() => t("mdExportContextChanged")), "cross-reader cancellation did not explain the changed history");
+    s.notes.push("PASS: default article excludes Q&A; existing history exports without opening Ask; MD/HTML/EPUB preserve citations/code and scope; another reader clearing history cancels a pending export and refreshes counts.");
+  } catch (e) { s.failures.push(e.stack); }
+  finally { detachPeer(); if (peer) await peer.close(); detach(); await page.close(); }
+}
+
+async function driveReaderBookmark(context, worker, extId, rep) {
+  const s = rep.surface("reader-bookmark");
+  const page = await context.newPage();
+  const source = await context.newPage();
+  const detach = rep.attach(page, s);
+  const writes = [];
+  const aiBefore = aiRequests.length;
+  let post = null;
+  const apiPattern = /^https:\/\/api\.pinboard\.in\/v1\/posts\/(?:get|add)(?:\?|$)/;
+  const routeBookmark = async route => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get("url") !== ARTICLE_URL) return route.fallback();
+    rep.network.push({ method: "GET", origin: url.origin, path: url.pathname, disposition: "reader-bookmark-fixture" });
+    let body;
+    if (url.pathname.endsWith("/get")) {
+      body = { date: "2026-10-23T00:00:00Z", user: "qa", posts: post ? [{ ...post }] : [] };
+    } else if (post && url.searchParams.get("replace") === "no") {
+      body = { result_code: "item already exists" };
+    } else {
+      // Hand-written Pinboard wire shape. The response is independent of the
+      // production intent/plan constructors; record the actual dispatched data.
+      post = {
+        href: url.searchParams.get("url"), description: url.searchParams.get("description"),
+        extended: url.searchParams.get("extended"), tags: url.searchParams.get("tags"),
+        shared: url.searchParams.get("shared"), toread: url.searchParams.get("toread"),
+        time: url.searchParams.get("dt") || "2020-01-02T03:04:05Z", hash: "qa-reader-hash", meta: "qa-reader-meta",
+      };
+      writes.push({ ...post }); body = { result_code: "done" };
+    }
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+  };
+  const requireState = (ok, message) => { if (!ok) throw new Error(message); };
+  const settled = async () => page.waitForFunction(() => {
+    const button = document.getElementById("reader-bookmark-save");
+    return button && !button.disabled && button.getAttribute("aria-busy") === "false";
+  }, null, { timeout: 30_000 });
+  try {
+    await context.route(apiPattern, routeBookmark);
+    await source.goto(ARTICLE_URL, { waitUntil: "load" });
+    await seedPreviewData(worker);
+    await worker.evaluate(async ({ key, sourceUrl }) => {
+      const [tab] = await chrome.tabs.query({ url: sourceUrl });
+      const slot = (await chrome.storage.local.get(key))[key];
+      await chrome.storage.local.set({ [key]: { ...slot, tabId: tab.id, sourceTabUrl: sourceUrl, sourceIncognito: false,
+        bookmarkDraft: { title: "Reader frozen title", tags: "reading qa", notes: "Frozen reader notes", private: true, toread: false } } });
+    }, { key: "md_preview_data_" + PREVIEW_KEY, sourceUrl: ARTICLE_URL });
+    await page.goto(`chrome-extension://${extId}/md-preview.html?k=${PREVIEW_KEY}`, { waitUntil: "load" });
+    await settled();
+    requireState(await page.locator("#reader-bookmark-status").isHidden(), "successful initial lookup still shows checking status");
+    requireState(await page.evaluate(() => !document.getElementById("rendered-view").contains(document.getElementById("reader-bookmark-footer"))), "footer leaked into article/export DOM");
+    await source.close();
+    await page.keyboard.press("s"); await settled();
+    requireState(writes.length === 1 && post.href === ARTICLE_URL && post.description === "Reader frozen title" && post.shared === "no", "closed-source keyboard save lost frozen URL/draft privacy");
+    await page.locator("#reader-bookmark-footer-save").click(); await settled();
+    requireState(writes.length === 1, "ordinary saved action rewrote server metadata");
+    await page.keyboard.press("l"); await settled();
+    requireState(writes.length === 2 && post.toread === "yes" && post.extended === "Frozen reader notes" && post.tags === "reading qa", "readlater changed untouched bookmark metadata");
+    await page.keyboard.press("s"); await settled();
+    requireState(writes.length === 3 && post.toread === "no" && post.time === "2020-01-02T03:04:05Z", "mark-read did not preserve timestamp");
+    await page.keyboard.press("Shift+s");
+    await page.locator("#reader-bookmark-editor:popover-open").waitFor();
+    await rep.shot(page, s, "edit-bookmark");
+    await page.locator("#reader-bookmark-title").fill("Reader edited title");
+    await page.locator("#reader-bookmark-tags").fill("edited qa");
+    await page.locator("#reader-bookmark-notes").fill("Edited notes");
+    await page.locator("#reader-bookmark-apply").click(); await settled();
+    requireState(writes.length === 4 && post.description === "Reader edited title" && post.tags === "edited qa" && post.extended === "Edited notes" && post.shared === "no" && post.time === "2020-01-02T03:04:05Z", "editor lost server fields or original bookmark timestamp");
+    await page.locator("#reader-bookmark-footer-export").click();
+    requireState(await page.locator("#export-section").isVisible(), "footer export did not reveal existing export controls");
+    requireState(aiRequests.length === aiBefore, "reader save/edit/readlater unexpectedly dispatched an AI request");
+    await rep.shot(page, s, "saved-reader");
+    s.notes.push("PASS: keyboard save/later/mark-read and Shift+S editor; ordinary saved action is idempotent; original date/privacy/notes/tags survive flag changes; closed source tab saves frozen article; footer stays outside exported article; no AI requests.");
+  } catch (e) { s.failures.push(e.stack); }
+  finally {
+    await context.unroute(apiPattern, routeBookmark);
+    detach(); await source.close().catch(() => {}); await page.close().catch(() => {});
+  }
+}
+
 async function driveDiscovery(context, worker, extId, rep) {
   const s = rep.surface("discovery");
   const options = await context.newPage();
@@ -2673,6 +2835,8 @@ try {
     else if (surface === "popup") await drivePopup(context, worker, extId, rep);
     else if (surface === "drafts") await drivePopupDrafts(context, worker, extId, rep);
     else if (surface === "discovery") await driveDiscovery(context, worker, extId, rep);
+    else if (surface === "reader-export") await driveReaderExport(context, worker, extId, rep);
+    else if (surface === "reader-bookmark") await driveReaderBookmark(context, worker, extId, rep);
     else if (surface === "layouts") await driveNarrowLayouts(context, worker, extId, rep);
     else if (surface === "translate-stop") await driveTranslateStop(context, worker, extId, rep);
     else if (surface === "options-save") await driveOptionsSaveFeedback(context, extId, rep);

@@ -149,7 +149,8 @@ async function loadLocale(loc) {
   // Per-locale exemptions: a word that is genuinely the same in that one
   // language, so the key stays checked everywhere else.
   const LOCALE_SAME_OK = {
-    fr: new Set(["libraryCountPages", "libraryCountPagesOne"]), // "page(s)" is the same word in French
+    fr: new Set(["libraryCountPages", "libraryCountPagesOne", "readerBookmarkNotes", "askExportSources", "mdExportArticle", "mdExportSummaryArticle"]), // These words are also French
+    pl: new Set(["askExportModel"]), // "Model" is also Polish
   };
   for (const loc of ["de","fr","pl","ru","zh_HK"]) {
     const offenders = Object.keys(msgs.en).filter(k =>

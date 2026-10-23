@@ -31,8 +31,10 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in): KI-Tags und Zusamm
 
 ### Lesen
 - **Jede Seite wird zur Leseansicht**: Markdown-Ansicht mit Inhaltsverzeichnis, Suche und Fußnoten-Vorschau; Formeln, Diagramme und Tabellen werden sauber dargestellt
+- **Direkt im Reader speichern**: Artikel als Lesezeichen speichern oder das Lesezeichen bearbeiten, ohne zum Popup zurückzukehren
 - **Markieren in fünf Farben, mit Notizen**: beide bleiben an ihrer Stelle, auch nach der Übersetzung und späteren Änderungen an der Seite
 - **Seite übersetzen oder befragen**: Ganzseiten-Übersetzung mit zweisprachiger Ansicht; Antworten zitieren die Quelle, ein Klick führt direkt zur Fundstelle
+- **Fragen und Antworten mit Quellen behalten**: abgeschlossene Gespräche einzeln oder zusammen mit dem Artikel exportieren
 - **Wörter beim Lesen nachschlagen**: Definitionen zeigen zuerst die zum Satz passende Bedeutung; gespeicherte Vokabeln gehen mit einem Klick an Anki oder Eudic, dazu auf Wunsch Offline-Wörterbücher für Chinesisch–Englisch und Englisch–Chinesisch
 - **Eine eigene Seite für Notizen und Vokabeln**: gespeicherte Wörter und Markierungen an einem Ort, mit Wörterbuchsuche und Stapelbearbeitung
 - **Senden oder herunterladen**: an [Obsidian](https://obsidian.md), Notion, NotebookLM, ein GitHub Gist oder einen beliebigen Webhook; als `.md`, `.html` oder `.epub` für den E-Reader

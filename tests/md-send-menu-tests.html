@@ -20,26 +20,37 @@ async function fixture() {
   const state = {
     settings: { exportTargets: { github: { enabled: true, token: "first" } } },
     flags: { optSyncEnabled: false, syncApiKeys: false },
+    markdown: "Fixture body", includeAsk: false,
+    askSnapshot: { url: "https://fixture.test/article", account: "qa", title: "Fixture", rounds: [{ q: "Question", a: "Answer" }], count: 1 },
+    sendGuardWaits: [],
     reads: [], lastReads: [], listeners: [], sends: [], sendWaits: [], permissionWaits: [], lastWrites: [], optionsTabs: []
   };
   const params = {
     exportSettings: {},
+    previewAccount: "qa", _articleRevision: 0, exportAskRevision: 0,
+    exportScope: "article", expIncludeAsk: {}, pbpExpTglOn: () => state.includeAsk,
+    url: "https://fixture.test/article", title: "Fixture",
+    pbpAskExportSnapshot: async () => structuredClone(state.askSnapshot),
+    SETTINGS_DEFAULTS: { pinboardToken: "" },
+    pbpPinboardAccountFromToken: token => String(token || "").split(":")[0],
     PBP_EXPORT_TARGETS,
     pbpExportTargetIds,
-    pbpReadSettingsWithSecrets: async () => state.reads.length ? state.reads.shift().promise : structuredClone(state.settings),
+    pbpReadSettingsWithSecrets: async () => state.reads.length ? state.reads.shift().promise : ({ pinboardToken: "qa:key", ...structuredClone(state.settings) }),
     pbpReadSecretSyncState: async () => ({ ...state.flags }),
     pbpSettingsAreaName: async () => state.flags.optSyncEnabled ? "sync" : "local",
     pbpGetLastTarget: async () => state.lastReads.length ? state.lastReads.shift().promise : "github",
     pbpSetLastTarget: async () => state.lastWrites.length ? state.lastWrites.shift().promise : undefined,
     pbpRequestTargetPermission: async () => state.permissionWaits.length ? state.permissionWaits.shift().promise : true,
-    pbpSendToTarget: async (id, ctx) => {
+    pbpSendToTarget: async (id, ctx, options) => {
+      if (state.sendGuardWaits.length) await state.sendGuardWaits.shift().promise;
+      if (!await options.isCurrent()) return { ok: false, error: "context_changed" };
       state.sends.push({ id, ctx });
       return state.sendWaits.length ? state.sendWaits.shift().promise : { ok: true, fellBack: false };
     },
     buildMeta: () => ({ title: "Fixture", url: "https://fixture.test/article" }),
     buildExportOpts: () => ({ imagePolicy: "keep" }),
     composeExport: body => body,
-    getViewMarkdown: () => "Fixture body",
+    getViewMarkdown: () => state.markdown,
     imgFixExportNote: () => {},
     PBP_ICONS: { gear: "<svg data-ic=gear></svg>" },
     pbpOpenOptionsTab: tab => state.optionsTabs.push(tab),
@@ -51,9 +62,12 @@ async function fixture() {
   assert(begin >= 0 && end > begin, "production Send-to lifecycle block missing");
   const flashStart = source.indexOf("function flashButtonLabel(");
   const flashEnd = source.indexOf("\n// renderMarkdown", flashStart);
+  const captureStart = source.indexOf("  function captureExportJob()");
+  const captureEnd = source.indexOf("  function updateExportSummary()", captureStart);
+  assert(captureStart >= 0 && captureEnd > captureStart, "production export job helpers missing");
   const AsyncFunction = w.eval("(async function(){}).constructor");
   const api = await new AsyncFunction(...Object.keys(params),
-    source.slice(flashStart, flashEnd) + "\n" + source.slice(begin, end) + "\nreturn { refresh: setupSendMenu };")(...Object.values(params));
+    source.slice(flashStart, flashEnd) + "\n" + source.slice(captureStart, captureEnd) + "\n" + source.slice(begin, end) + "\nreturn { refresh: setupSendMenu, retireArticle: () => { _articleRevision++; } };")(...Object.values(params));
   return {
     ...api, state, d,
     click: () => d.getElementById("send-primary").click(),
@@ -100,6 +114,35 @@ async function test(name, fn) {
     f.click(); await settle();
     assert(f.state.sends.length === 1 && f.state.sends[0].id === "github"
       && f.state.sends[0].ctx.cfg.token === "first" && f.state.sends[0].ctx.rawBody === "Fixture body", "wrong outbound clip");
+  });
+  await test("permission wait retains the captured article view", async f => {
+    const wait = deferred(); f.state.permissionWaits.push(wait);
+    f.click(); await settle(); f.state.markdown = "Replacement view";
+    wait.resolve(true); await settle();
+    assert(f.state.sends.length === 1 && f.state.sends[0].ctx.rawBody === "Fixture body", "view changed inside pending export");
+  });
+  await test("article replacement cancels a pending export", async f => {
+    const wait = deferred(); f.state.permissionWaits.push(wait);
+    f.click(); await settle(); f.retireArticle(); wait.resolve(true); await settle();
+    assert(f.state.sends.length === 0, "obsolete article escaped");
+    assert(f.d.getElementById("send-status").textContent === "mdExportContextChanged", "missing context feedback");
+  });
+  await test("fresh credential owner cancels even before storage event arrives", async f => {
+    const wait = deferred(); f.state.permissionWaits.push(wait);
+    f.click(); await settle(); f.state.settings.pinboardToken = "bob:new";
+    wait.resolve(true); await settle();
+    assert(f.state.sends.length === 0, "previous owner's export escaped before storage event");
+    assert(f.d.getElementById("send-status").textContent === "mdExportContextChanged", "missing account feedback");
+  });
+  await test("another reader deleting persisted history cancels captured Q&A", async f => {
+    f.state.includeAsk = true;
+    const wait = deferred(); f.state.sendGuardWaits.push(wait);
+    f.click(); await settle();
+    // No local history event: another extension page committed this deletion.
+    f.state.askSnapshot = { ...f.state.askSnapshot, rounds: [], count: 0 };
+    wait.resolve(); await settle();
+    assert(f.state.sends.length === 0, "deleted conversation escaped from old snapshot");
+    assert(f.d.getElementById("send-status").textContent === "mdExportContextChanged", "missing deletion feedback");
   });
   await test("double click shares one pending send", async f => {
     const wait = deferred(); f.state.sendWaits.push(wait);

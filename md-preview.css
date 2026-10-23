@@ -4562,3 +4562,50 @@ details#video-description .desc-body a { color: var(--link); }
    pushes it there (the head rule's own .rail-sec-label does the same). */
 #reader-source-details > summary > span:first-child { flex: 1 1 auto; min-width: 0; }
 #reader-source-details[open] > summary .rail-sec-tri { transform: translateY(1px) rotate(225deg); }
+
+
+/* Reader save and export controls use the existing 26px chrome rung. */
+.exp-scope > .action-btn { min-height: 26px; flex: 1 1 auto; min-width: 0; justify-content: center; white-space: normal; overflow-wrap: anywhere; }
+.exp-scope > .action-btn[aria-pressed="true"] {
+  background: var(--btn-hover); border-color: var(--link); color: var(--link-on-raised);
+}
+#export-summary { margin-block: var(--sp-2); padding: 0; border: 0; border-radius: 0; background: none; font-size: 12px; }
+#export-summary:empty { display: none; }
+#exp-include-ask { min-height: 26px; margin-bottom: var(--sp-2); max-width: 100%; padding: var(--sp-1) var(--sp-2); white-space: normal; overflow-wrap: anywhere; }
+#exp-include-ask[hidden] { display: none; }
+#reader-bookmark-section > .row + .action-btn,
+#reader-bookmark-section > .msg-bar { margin-top: var(--sp-2); }
+#reader-bookmark-section .action-btn,
+#reader-bookmark-footer .action-btn { min-height: 26px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+#reader-bookmark-section > .msg-bar,
+#reader-bookmark-footer > .msg-bar { font-size: 12px; }
+#reader-bookmark-footer { max-width: var(--pbp-width, 720px); margin: var(--sp-5) auto 0; padding-top: var(--sp-4); border-top: 1px solid var(--border-light); }
+#reader-bookmark-footer > .msg-bar { margin-top: var(--sp-2); }
+body.raw-active #reader-bookmark-footer { display: none; }
+#reader-bookmark-editor {
+  position: fixed; inset: 0; margin: auto;
+  width: min(420px, calc(100vw - 2 * var(--sp-4)));
+  max-height: calc(100dvh - 2 * var(--sp-4)); overflow: auto;
+}
+#reader-bookmark-editor:popover-open { display: grid; gap: var(--sp-3); }
+#reader-bookmark-editor > label { display: grid; gap: var(--sp-1); font-size: 13px; line-height: 18px; }
+#reader-bookmark-editor > label.row { display: flex; gap: var(--sp-2); min-height: 26px; cursor: pointer; }
+#reader-bookmark-editor input[type="text"],
+#reader-bookmark-editor textarea {
+  box-sizing: border-box; width: 100%; min-width: 0;
+  padding: var(--sp-1) var(--sp-2); border: 1px solid var(--btn-border);
+  border-radius: var(--radius-md); color: var(--btn-fg); background: var(--btn-bg);
+  font-size: 13px; line-height: 16px;
+}
+#reader-bookmark-editor input[type="text"] { height: 26px; }
+#reader-bookmark-editor textarea { min-height: calc(4 * var(--sp-5)); resize: vertical; }
+#reader-bookmark-editor input[type="checkbox"] { flex: none; width: 16px; height: 16px; margin: 0; accent-color: var(--link); }
+#reader-bookmark-editor input:focus-visible,
+#reader-bookmark-editor textarea:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+#reader-bookmark-editor > div.row { justify-content: flex-end; }
+#reader-bookmark-editor .action-btn { min-height: 26px; }
+@media print { #reader-bookmark-footer, #reader-bookmark-editor { display: none; } }
+@media (forced-colors: active) {
+  #reader-bookmark-editor input:focus-visible,
+  #reader-bookmark-editor textarea:focus-visible { outline-color: Highlight; }
+}

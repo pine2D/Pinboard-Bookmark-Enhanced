@@ -1176,6 +1176,8 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   let previewAccount = typeof info.account === "string" ? info.account : "";
   let tags = Array.isArray(info.tags) ? info.tags : [];
   let description = info.description || "";
+  const sourceIncognito = info.sourceIncognito === true;
+  let bookmarkDraft = info.bookmarkDraft && typeof info.bookmarkDraft === "object" ? info.bookmarkDraft : null;
   // X4: raw metadata transported by popup.js/background.js's widened
   // extraction payload. Gated by buildMeta()'s exportSettings.mdExportExtendedMeta
   // check (design spec 4.2) -- this file only reads them here; T4's buildMeta()
@@ -1246,6 +1248,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       // of attributing the previous account's to this one.
       tags = [];
       description = "";
+      bookmarkDraft = null;
       // Same reason, for the account-derived UI already on screen.
       if (_badgeArmed) refreshBookmarkBadge();
       else pbpClearBookmarkBadge();
@@ -1436,7 +1439,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
             videoDescriptionMd: descMd,
             url, baseUrl, sourceTabUrl, tabId: srcTabId,
             source: source === "jina" ? "jina" : "local",
-            account: previewAccount, tags, description, ts: Date.now(),
+            sourceIncognito, bookmarkDraft, account: previewAccount, tags, description, ts: Date.now(),
             nonce: _pageNonce
           }
         });
@@ -1667,7 +1670,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
             await chrome.storage.local.set({ [MP_KEY]: {
               markdown: "", title: title || "", url, baseUrl, sourceTabUrl, tabId: srcTabId,
               source: attemptedEngine === "jina" ? "jina" : "local",
-              account: previewAccount, tags, description, ts: Date.now(), nonce: _pageNonce
+              sourceIncognito, bookmarkDraft, account: previewAccount, tags, description, ts: Date.now(), nonce: _pageNonce
             } });
           }
           location.reload();
@@ -1899,7 +1902,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         videoDescriptionMd: (window.pbpVideoDoc && window.pbpVideoDoc.descriptionMarkdown) || "",
         title: title || "", url, baseUrl, sourceTabUrl, tabId: srcTabId,
         source: source === "jina" ? "jina" : "local",
-        account: previewAccount, tags, description, ts: Date.now(),
+        sourceIncognito, bookmarkDraft, account: previewAccount, tags, description, ts: Date.now(),
         nonce: _pageNonce
       }
     : {
@@ -1907,7 +1910,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         // while re-extracting, and a failed attempt otherwise read "Untitled".
         restore: true, title: title || "", url, tabId: srcTabId, sourceTabUrl,
         engine: source === "jina" ? "jina" : "local",
-        account: previewAccount, tags, description, ts: Date.now(),
+        sourceIncognito, bookmarkDraft, account: previewAccount, tags, description, ts: Date.now(),
         nonce: _pageNonce
       };
   try {
@@ -1932,6 +1935,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     mdExportImagePolicy: "keep",
     mdExportIncludeToc: false,
     mdExportIncludeHighlights: true,
+    mdExportIncludeAsk: false,
     mdExportExtendedMeta: true,
     obsidianEnabled: false,
     obsidianVault: "",
@@ -1951,6 +1955,14 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   const expImagePolicy = document.getElementById("exp-image-policy");
   const expIncludeToc = document.getElementById("exp-include-toc");
   const expIncludeHl = document.getElementById("exp-include-hl");
+  const expIncludeAsk = document.getElementById("exp-include-ask");
+  const expScopeArticle = document.getElementById("exp-scope-article");
+  const expScopeAsk = document.getElementById("exp-scope-ask");
+  let exportScope = "article";
+  let exportAskCount = 0;
+  let exportAskRevision = 0;
+  let exportCountRead = 0;
+  let exportCollapse = null;
   // exp-frontmatter/-include-toc/-include-hl are real <button aria-pressed>
   // toggles now (rail redesign spec sec.1/4), not checkboxes -- pbpExpTglOn
   // reads the pressed state, pbpExpTglSet writes it. Same session-only
@@ -1964,8 +1976,12 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   if (expImagePolicy) expImagePolicy.value = exportSettings.mdExportImagePolicy || "keep";
   pbpExpTglSet(expIncludeToc, !!exportSettings.mdExportIncludeToc);
   pbpExpTglSet(expIncludeHl, !!exportSettings.mdExportIncludeHighlights);
+  pbpExpTglSet(expIncludeAsk, !!exportSettings.mdExportIncludeAsk);
   for (const tgl of [expFrontmatter, expIncludeToc, expIncludeHl]) {
-    tgl?.addEventListener("click", () => pbpExpTglSet(tgl, !pbpExpTglOn(tgl)));
+    tgl?.addEventListener("click", () => {
+      pbpExpTglSet(tgl, !pbpExpTglOn(tgl));
+      updateExportSummary();
+    });
   }
 
   function pad2(n) { return n < 10 ? "0" + n : "" + n; }
@@ -2074,14 +2090,145 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     if (!desc) return md;
     return String(md || "").replace(/\s+$/, "") + "\n\n## " + t("mdVideoDescription") + "\n\n" + desc + "\n";
   }
-  function buildExportMarkdown() {
-    const opts = buildExportOpts();
-    // Copy cannot embed (no resolveEmbed pass in its click chain): clamp
-    // explicitly like Send-to does instead of leaning on applyImagePolicy's
-    // incidental keep fall-through for unknown values (Codex, plan A).
-    if (opts.imagePolicy === "embed") opts.imagePolicy = "keep";
-    return composeExport(getViewMarkdown(), buildMeta(), opts);
+  // Capture the whole export before its first await. Changing the view or a
+  // toggle while images/fonts load cannot splice two different exports together.
+  function captureExportJob() {
+    const opts = structuredClone(buildExportOpts());
+    const askOnly = exportScope === "ask";
+    if (askOnly) { opts.highlights = []; opts.includeToc = false; opts.imagePolicy = "keep"; }
+    return {
+      account: previewAccount, revision: _articleRevision, askRevision: exportAskRevision,
+      askOnly, includeAsk: askOnly || pbpExpTglOn(expIncludeAsk),
+      md: askOnly ? "" : getViewMarkdown(), meta: structuredClone(buildMeta()), opts,
+      lang: !askOnly && (document.body.classList.contains("tr-only") || document.body.classList.contains("tr-bilingual"))
+        && typeof window.pbpTrExportTargetLang === "function" ? window.pbpTrExportTargetLang() : "und"
+    };
   }
+  function exportJobCurrent(job) {
+    return job.account === previewAccount && job.revision === _articleRevision
+      && (!job.includeAsk || job.askRevision === exportAskRevision);
+  }
+  function requireExportJob(job) {
+    if (!exportJobCurrent(job)) throw new Error("export-context-changed");
+  }
+  async function exportJobOwnerCurrent(job) {
+    if (!exportJobCurrent(job)) return false;
+    // Storage events are asynchronous: check the effective credential itself
+    // immediately before an output, including every Send-to dispatch.
+    const settings = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
+    if (!exportJobCurrent(job) || (pbpPinboardAccountFromToken(settings.pinboardToken) || "") !== job.account) return false;
+    if (job.includeAsk) {
+      // Another reader can clear IDB without this document receiving its
+      // notification yet. Re-read the data at the actual output boundary.
+      const latest = await pbpAskExportSnapshot({ url, account: job.account, title });
+      if (JSON.stringify(latest) !== JSON.stringify(job.opts.ask)) return false;
+    }
+    return exportJobCurrent(job);
+  }
+  async function requireExportOwner(job) {
+    if (!await exportJobOwnerCurrent(job)) throw new Error("export-context-changed");
+  }
+  async function prepareExportAsk(job) {
+    requireExportJob(job);
+    if (job.includeAsk) {
+      job.opts.ask = await pbpAskExportSnapshot({ url, account: job.account, title });
+      requireExportJob(job);
+      if (job.askOnly && !job.opts.ask.count) throw new Error("export-ask-empty");
+    }
+  }
+  function exportErrorText(error) {
+    return t(error?.message === "export-ask-empty" ? "mdExportAskEmpty"
+      : /(?:context|history)-changed/.test(error?.message || "") ? "mdExportContextChanged" : "mdPreviewFailed");
+  }
+  function buildExportMarkdown(job) {
+    return composeExport(job.md, job.meta, { ...job.opts,
+      imagePolicy: job.opts.imagePolicy === "embed" ? "keep" : job.opts.imagePolicy });
+  }
+  function updateExportSummary() {
+    const askOnly = exportScope === "ask";
+    pbpExpTglSet(expScopeArticle, !askOnly);
+    pbpExpTglSet(expScopeAsk, askOnly);
+    if (expScopeAsk) expScopeAsk.disabled = !exportAskCount;
+    if (expIncludeAsk) {
+      expIncludeAsk.hidden = askOnly || !exportAskCount;
+      expIncludeAsk.textContent = t("mdExportIncludeAsk", String(exportAskCount));
+    }
+    if (expIncludeHl) expIncludeHl.disabled = askOnly;
+    if (expIncludeToc) expIncludeToc.disabled = askOnly;
+    if (expImagePolicy) expImagePolicy.disabled = askOnly;
+    let summary = t(buildExportOpts().highlights.length ? "mdExportSummaryHighlights" : "mdExportSummaryArticle");
+    if (askOnly) summary = t("mdExportSummaryAsk", String(exportAskCount));
+    else if (pbpExpTglOn(expIncludeAsk) && exportAskCount) summary = t("mdExportSummaryWithAsk", summary, String(exportAskCount));
+    const el = document.getElementById("export-summary");
+    if (el) el.textContent = summary;
+  }
+  async function refreshExportCount() {
+    const generation = ++exportCountRead, account = previewAccount;
+    try {
+      const snapshot = await pbpAskExportSnapshot({ url, account, title });
+      if (generation !== exportCountRead || account !== previewAccount) return;
+      exportAskCount = snapshot.count;
+      if (!exportAskCount) exportScope = "article";
+      updateExportSummary();
+    } catch (e) {
+      if (generation !== exportCountRead) return;
+      exportAskCount = 0;
+      exportScope = "article";
+      updateExportSummary();
+      console.warn("[export] history read failed:", e?.name, e?.message);
+    }
+  }
+  expIncludeAsk?.addEventListener("click", async () => {
+    const enabled = !pbpExpTglOn(expIncludeAsk);
+    pbpExpTglSet(expIncludeAsk, enabled);
+    updateExportSummary();
+    const result = await persistSettings({ mdExportIncludeAsk: enabled });
+    if (!result.ok) showExportNote(t("mdPreviewFailed"));
+  });
+  expScopeArticle?.addEventListener("click", () => { exportScope = "article"; updateExportSummary(); });
+  expScopeAsk?.addEventListener("click", () => { exportScope = "ask"; updateExportSummary(); });
+  window.pbpReaderOpenExport = function (scope) {
+    if (scope === "ask") exportScope = "ask";
+    updateExportSummary();
+    if (document.body.classList.contains("zen")) document.getElementById("zen-exit-btn")?.click();
+    exportCollapse?.expand(true);
+    if (window.matchMedia("(max-width: 1000px)").matches && !document.body.classList.contains("rail-open")) {
+      document.getElementById("rail-toggle")?.click();
+    }
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const target = document.getElementById("btn-copy-md");
+      target?.scrollIntoView({ block: "nearest" });
+      target?.focus({ preventScroll: true });
+    }));
+  };
+  document.addEventListener("pbp:export-ask", () => window.pbpReaderOpenExport("ask"));
+  const exportHistoryChannel = typeof window.BroadcastChannel === "function" ? new window.BroadcastChannel("pbp-ask-history") : null;
+  const sameHistoryUrl = other => typeof other === "string"
+    && (typeof pbpAiCacheUrlNorm === "function" ? pbpAiCacheUrlNorm(other) === pbpAiCacheUrlNorm(url) : other === url);
+  exportHistoryChannel?.addEventListener("message", e => {
+    const change = e.data;
+    if (!change || change.account !== previewAccount || !sameHistoryUrl(change.url)) return;
+    document.dispatchEvent(new CustomEvent("pbp:ask-history-external", { detail: change }));
+    exportAskRevision++;
+    refreshExportCount();
+  });
+  for (const name of ["pbp:ask-history-changed", "pbp:account-changed", "pbp:article-replaced"]) {
+    document.addEventListener(name, e => {
+      exportAskRevision++;
+      if (name === "pbp:ask-history-changed") {
+        exportHistoryChannel?.postMessage({ type: e.detail?.type === "clear" ? "clear" : "changed",
+          account: e.detail?.account ?? previewAccount, url: e.detail?.url ?? url });
+      }
+      refreshExportCount();
+    });
+  }
+  window.addEventListener("focus", refreshExportCount);
+  window.addEventListener("pagehide", () => exportHistoryChannel?.close(), { once: true });
+  document.addEventListener("pbp:bookmark-changed", (e) => {
+    if (e.detail?.account === previewAccount && e.detail?.url === url) refreshBookmarkBadge();
+  });
+  document.addEventListener("pbp:rendered", refreshExportCount, { once: true });
+  updateExportSummary();
 
   // Codex-P4: status-line helper for the export section (no existing export
   // status affordance in this file to reuse) -- transient, self-hiding notice
@@ -2106,6 +2253,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // yet -- hence "may not display", never a safety claim. And an error is any
   // load failure (404, network, hotlink), so the copy never says "hotlink".
   function imgFixExportNote(exitEmbeds) {
+    if (exportScope === "ask") return;
     const policy = expImagePolicy ? expImagePolicy.value : (exportSettings.mdExportImagePolicy || "keep");
     const clamped = policy === "embed" && !exitEmbeds;
     if (!clamped && policy !== "keep") return;
@@ -2142,7 +2290,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // rw.dropped is always 0 and the shared formula below already reduces to
   // spec's keepUrls count (blobs + unfetched candidates + kept, no dropped).
   async function resolveEmbed(rawMd, meta, opts) {
-    const policy = expImagePolicy ? expImagePolicy.value : (exportSettings.mdExportImagePolicy || "keep");
+    const policy = opts?.imagePolicy || (expImagePolicy ? expImagePolicy.value : (exportSettings.mdExportImagePolicy || "keep"));
     if (policy !== "embed") return { md: rawMd, note: 0, fetched: new Map() };
     const keepUrls = !!(opts && opts.keepUrls);
     // Codex-C1a: no separate applyImagePolicy("keep") absolutize pass here --
@@ -3018,7 +3166,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // rebuildToc is what lets the collapsed/expanded state survive a rebuild.
   pbpRailCollapsible(tocNav, "toc", { label: tocNav.querySelector(".rail-label"), defaultCollapsed: false });
   const expSec = document.getElementById("export-section");
-  if (expSec) pbpRailCollapsible(expSec, "export", { label: expSec.querySelector(".rail-label"), defaultCollapsed: true });
+  if (expSec) exportCollapse = pbpRailCollapsible(expSec, "export", { label: expSec.querySelector(".rail-label"), defaultCollapsed: true });
   // ONE delegated click handler for the whole TOC, bound to the container that
   // outlives every rebuild. It used to be an anonymous listener added inside
   // the "has headings" branch, i.e. per build — harmless while there was only
@@ -3103,7 +3251,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   const _isForumPage = (typeof pbpForumShouldMark === "function")
     ? !!pbpForumShouldMark(info, renderedView) : !!info.forum;
   await pbpDeferredScriptsReady;
-  document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { url, title, forum: _isForumPage, account: previewAccount } }));
+  document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { url, title, forum: _isForumPage, account: previewAccount, bookmark: { tags, notes: description, sourceTabId: srcTabId, sourceTabUrl, draft: bookmarkDraft } } }));
 
   // Raw view populated lazily on first switch
 
@@ -3437,8 +3585,23 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
 
   // Copy buttons
   document.getElementById("btn-copy-md").addEventListener("click", async (e) => {
-    imgFixExportNote(false);
-    await copyToClipboard(buildExportMarkdown(), e.currentTarget);
+    if (_exporting) return;
+    const btn = e.currentTarget;
+    const job = captureExportJob();
+    _exporting = true;
+    setExportBusy(true);
+    let failure = null;
+    try {
+      await prepareExportAsk(job);
+      const body = buildExportMarkdown(job);
+      await requireExportOwner(job);
+      await copyToClipboard(body, btn);
+    } catch (error) {
+      failure = error;
+      console.warn("[export] markdown copy failed:", error?.name, error?.message);
+    } finally { setExportBusy(false); _exporting = false; }
+    if (failure) showExportNote(exportErrorText(failure));
+    else imgFixExportNote(false);
   });
   document.getElementById("btn-copy-html").addEventListener("click", async (e) => {
     // Capture the target BEFORE any await — per DOM spec, currentTarget is nulled
@@ -3456,7 +3619,8 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     if (_exporting) return;
     _exporting = true;
     setExportBusy(true);
-    let failed = false;
+    let failed = null;
+    const job = captureExportJob();
     try {
       // Same content as the HTML download: a complete styled doc that follows the
       // original/bilingual/translation-only view (getViewMarkdown), copied as
@@ -3469,22 +3633,24 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       const hljsCss = await loadHljsCss();
       if (info.math) await ensureKatex(); // so composeStyledHtml renders math (mirrors hljs above)
       const katexCss = info.math ? await loadKatexCss() : "";
-      const _copyOpts = buildExportOpts();
+      await prepareExportAsk(job);
+      const _copyOpts = job.opts;
       // Copy cannot embed: clamp like buildExportMarkdown above (Codex, plan A).
       if (typeof pbpMermaidWarmExport === "function") await pbpMermaidWarmExport(renderedView);
-      const doc = composeStyledHtml(getViewMarkdown(), buildMeta(), { ..._copyOpts, imagePolicy: _copyOpts.imagePolicy === "embed" ? "keep" : _copyOpts.imagePolicy, hljsCss, katexCss });
+      const doc = composeStyledHtml(job.md, job.meta, { ..._copyOpts, imagePolicy: _copyOpts.imagePolicy === "embed" ? "keep" : _copyOpts.imagePolicy, hljsCss, katexCss });
+      await requireExportOwner(job);
       await copyToClipboard(doc, btn);
     } catch (err) {
       // ensureHljs/ensureKatex reject on a failed injection and the mermaid warm
       // pass can throw on malformed diagram source; name/message only, per the
       // swallowed-exception rule.
-      failed = true;
+      failed = err;
       console.warn("[export] styled HTML copy failed:", err && err.name, err && err.message);
     } finally {
       setExportBusy(false);
       _exporting = false;
     }
-    if (failed) { showExportNote(t("mdPreviewFailed")); return; }
+    if (failed) { showExportNote(exportErrorText(failed)); return; }
     // After the busy line is cleared, never before it -- the same ordering the
     // downloads keep for their honest notes (the busy text shares this element).
     imgFixExportNote(false);
@@ -3501,9 +3667,8 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // Copy HTML shares the gate (its handler above reads these through the
   // closure): it runs no resolveEmbed pass, but it does lazily inject hljs and
   // KaTeX and warm every mermaid diagram first, which is the same seconds of
-  // stillness from the reader's side. Copy MD is the only export exit left
-  // outside, and it earns that: buildExportMarkdown composes synchronously and
-  // its single await is the clipboard write copyToClipboard flashes about.
+  // stillness from the reader's side. Copy MD shares the gate now that it may
+  // load a completed Ask history snapshot before composing the clipboard text.
   let _exporting = false;
   // Busy line for an export in flight. Deliberately NOT showExportNote: that
   // helper arms a 4-12s self-hide, which would drop the indicator mid-run.
@@ -3511,7 +3676,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // be on screen. aria-busy, never the disabled property, on the buttons --
   // disabling the control the user just pressed drops focus to <body> in
   // Chromium (the rule the img-fix button and the engine segments follow).
-  const _dlButtons = ["btn-dl-md", "btn-dl-html", "btn-dl-epub"]
+  const _dlButtons = ["btn-dl-md", "btn-dl-html", "btn-dl-epub", "btn-copy-md", "btn-copy-html"]
     .map((id) => document.getElementById(id)).filter(Boolean);
   function setExportBusy(on) {
     _dlButtons.forEach((b) => b.setAttribute("aria-busy", on ? "true" : "false"));
@@ -3528,19 +3693,22 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     _exporting = true;
     setExportBusy(true); // synchronous: the gesture-sensitive await below must still be the first one
     let note = 0;
-    let failed = false;
+    let failed = null;
+    const job = captureExportJob();
     try {
       // First await in the direct click chain: resolveEmbed()'s chrome.permissions.request()
       // must run while the user gesture is still active (same invariant as Send-to below).
-      const meta = buildMeta(), opts = buildExportOpts();
-      const emb = await resolveEmbed(getViewMarkdown(), meta);
+      const { meta, opts } = job;
+      const emb = await resolveEmbed(job.md, meta, { imagePolicy: opts.imagePolicy });
+      await prepareExportAsk(job);
       note = emb.note;
       // imagePolicy is clamped to "keep" here -- the data URIs resolveEmbed already
       // substituted have a scheme, so applyImagePolicy's "keep" pass absolutizes
       // any remaining plain src and leaves data: URIs untouched (Codex-P1: one
       // composeExport pass, no double transform of the export markdown).
       const body = composeExport(emb.md, meta, { ...opts, imagePolicy: opts.imagePolicy === "embed" ? "keep" : opts.imagePolicy });
-      downloadFile(safeTitle + ".md", body, "text/markdown;charset=utf-8");
+      await requireExportOwner(job);
+      downloadFile(safeTitle + (job.askOnly ? "-qa" : "") + ".md", body, "text/markdown;charset=utf-8");
     } catch (e) {
       // Without this the throw escaped the async listener: finally had
       // already wiped the busy line, so the reader saw "Preparing the
@@ -3548,7 +3716,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       // indistinguishable from a finished export. resolveEmbed can throw
       // (chrome.permissions.request), and so can Blob/createObjectURL.
       // name/message only, per the swallowed-exception rule.
-      failed = true;
+      failed = e;
       console.warn("[export] markdown download failed:", e && e.name, e && e.message);
     } finally {
       setExportBusy(false);
@@ -3557,7 +3725,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // Ahead of the honest-notes pair below: a failed export has no image note
     // to give and no partial-embed count worth reporting, and either would
     // paint over the only word the reader gets about the failure.
-    if (failed) { showExportNote(t("mdPreviewFailed")); return; }
+    if (failed) { showExportNote(exportErrorText(failed)); return; }
     // The honest notes speak AFTER the busy line is cleared, never before it:
     // imgFixExportNote is a single merged call by design, and the busy text
     // would have overwritten it.
@@ -3569,13 +3737,15 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     _exporting = true;
     setExportBusy(true);
     let note = 0;
-    let failed = false;
+    let failed = null;
+    const job = captureExportJob();
     try {
       // First await in the direct click chain: resolveEmbed()'s chrome.permissions.request()
       // must run while the user gesture is still active, so it runs before the
       // (also-awaited, but not gesture-sensitive) hljs/katex CSS loads below.
-      const meta = buildMeta(), opts = buildExportOpts();
-      const emb = await resolveEmbed(getViewMarkdown(), meta);
+      const { meta, opts } = job;
+      const emb = await resolveEmbed(job.md, meta, { imagePolicy: opts.imagePolicy });
+      await prepareExportAsk(job);
       note = emb.note;
       if (renderedView.querySelector("pre > code")) await ensureHljs(); // so composeStyledHtml highlights the export
       const hljsCss = await loadHljsCss();
@@ -3587,7 +3757,8 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       // YAML-prefixed buildExportMarkdown() rendered the YAML into the body as text.
       if (typeof pbpMermaidWarmExport === "function") await pbpMermaidWarmExport(renderedView);
       const doc = composeStyledHtml(emb.md, meta, { ...opts, imagePolicy: opts.imagePolicy === "embed" ? "keep" : opts.imagePolicy, hljsCss, katexCss });
-      downloadFile(safeTitle + ".html", doc, "text/html;charset=utf-8");
+      await requireExportOwner(job);
+      downloadFile(safeTitle + (job.askOnly ? "-qa" : "") + ".html", doc, "text/html;charset=utf-8");
     } catch (e) {
       // Without this the throw escaped the async listener: finally had
       // already wiped the busy line, so the reader saw "Preparing the
@@ -3595,7 +3766,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       // indistinguishable from a finished export. resolveEmbed can throw
       // (chrome.permissions.request), and so can Blob/createObjectURL.
       // name/message only, per the swallowed-exception rule.
-      failed = true;
+      failed = e;
       console.warn("[export] styled HTML download failed:", e && e.name, e && e.message);
     } finally {
       setExportBusy(false);
@@ -3604,7 +3775,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // Ahead of the honest-notes pair below: a failed export has no image note
     // to give and no partial-embed count worth reporting, and either would
     // paint over the only word the reader gets about the failure.
-    if (failed) { showExportNote(t("mdPreviewFailed")); return; }
+    if (failed) { showExportNote(exportErrorText(failed)); return; }
     imgFixExportNote(true);
     if (note > 0) showExportNote(t("mdEmbedPartial", String(note))); // args through t() -- chrome.i18n consumes $COUNT$ before a manual replace could
   });
@@ -3613,34 +3784,37 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     _exporting = true;
     setExportBusy(true);
     let note = 0;
-    let failed = false;
+    let failed = null;
+    const job = captureExportJob();
     try {
       // First await in the direct click chain: resolveEmbed()'s chrome.permissions.request()
       // must run while the user gesture is still active (same invariant as above).
       // keepUrls:true (Task 6): successfully fetched images stay at their absolute
       // URL in emb.md -- pbpBuildEpub finds them via <img src="abs"> and rewrites
       // to a relative images/ path itself while adding the zip entry (emb.fetched).
-      const meta = buildMeta(), opts = buildExportOpts();
-      const emb = await resolveEmbed(getViewMarkdown(), meta, { keepUrls: true });
+      const { meta, opts } = job;
+      const emb = await resolveEmbed(job.md, meta, { keepUrls: true, imagePolicy: opts.imagePolicy });
+      await prepareExportAsk(job);
       note = emb.note;
       // Codex F5: EPUB gets its own composeExport call -- frontmatter/inline
       // ==marks== don't belong in content.xhtml (dc:* metadata covers title/
       // author/date/etc, and marked doesn't parse "==...==" so an inline mark
       // would leak as literal text, same reasoning as composeStyledHtml above).
       const md = composeExport(emb.md, meta, {
-        ...opts, frontmatter: false, highlightsInline: false,
+        ...opts, ask: null, frontmatter: false, highlightsInline: false,
         imagePolicy: opts.imagePolicy === "embed" ? "keep" : opts.imagePolicy
       });
       // dc:language (spec §3): only meaningful once the reader is actually
       // looking at a translated view; original/auto exports stay "und" (unknown)
       // rather than guessing. md-translate.js loads after this file, hence the
       // typeof guard on window.pbpTrExportTargetLang.
-      const inTrView = document.body.classList.contains("tr-only") || document.body.classList.contains("tr-bilingual");
       // Codex-C3: pbpEpubLang canonicalizes to BCP-47 (or "und") -- the translate
       // target can be a free-text label ("Classical Chinese") that isn't a legal tag.
-      meta.lang = pbpEpubLang((inTrView && typeof window.pbpTrExportTargetLang === "function" && window.pbpTrExportTargetLang()) || "und");
+      meta.lang = pbpEpubLang(job.lang || "und");
       if (typeof pbpMermaidWarmExport === "function") await pbpMermaidWarmExport(renderedView);
-      downloadFile(safeTitle + ".epub", pbpBuildEpub({ md, meta, images: emb.fetched }), "application/epub+zip");
+      const epub = pbpBuildEpub({ md, meta, images: emb.fetched, ask: opts.ask });
+      await requireExportOwner(job);
+      downloadFile(safeTitle + (job.askOnly ? "-qa" : "") + ".epub", epub, "application/epub+zip");
     } catch (e) {
       // Without this the throw escaped the async listener: finally had
       // already wiped the busy line, so the reader saw "Preparing the
@@ -3649,7 +3823,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       // (chrome.permissions.request), and so can Blob/createObjectURL and
       // pbpBuildEpub on malformed content.
       // name/message only, per the swallowed-exception rule.
-      failed = true;
+      failed = e;
       console.warn("[export] EPUB download failed:", e && e.name, e && e.message);
     } finally {
       setExportBusy(false);
@@ -3658,7 +3832,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // Ahead of the honest-notes pair below: a failed export has no image note
     // to give and no partial-embed count worth reporting, and either would
     // paint over the only word the reader gets about the failure.
-    if (failed) { showExportNote(t("mdPreviewFailed")); return; }
+    if (failed) { showExportNote(exportErrorText(failed)); return; }
     imgFixExportNote(true);
     if (note > 0) showExportNote(t("mdEmbedPartial", String(note))); // args through t() -- chrome.i18n consumes $COUNT$ before a manual replace could
   });
@@ -3788,6 +3962,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       // POST must not allow a second click to create another remote resource.
       if (_sendInFlight || _sig.aborted) return;
       _sendInFlight = true;
+      const job = captureExportJob();
       try {                                 // (the "mdSending" label is the affordance;
         const row = PBP_EXPORT_TARGETS[id]; // not disabling keeps the restored focus, F8)
         setPrimary(id);
@@ -3798,20 +3973,21 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         if (_sig.aborted) return;
         await pbpSetLastTarget(id);
         if (_sig.aborted) return;
-        const meta = buildMeta();
-        const _exp = buildExportOpts();
+        await prepareExportAsk(job);
+        const meta = job.meta;
+        const _exp = job.opts;
         imgFixExportNote(false);
         clearTimeout(sendStatusTimer);
         if (sendStatus) { sendStatus.hidden = true; sendStatus.textContent = ""; }
         // Send-to never runs resolveEmbed (no permission-gesture flow here) --
         // "embed" clamps to "keep" so a plain absolute link is sent instead of
         // a dangling literal "embed" policy string reaching applyImagePolicy.
-        const _sendBody = composeExport(getViewMarkdown(), meta, { frontmatter: false, imagePolicy: _exp.imagePolicy === "embed" ? "keep" : _exp.imagePolicy, includeToc: _exp.includeToc, highlights: _exp.highlights, hlView: _exp.hlView }); // H5 (spec 1.6): send-to honors the exported view's tri-state too
+        const _sendBody = composeExport(job.md, meta, { ..._exp, askCitationStyle: row.citationStyle || "sources", frontmatter: false, imagePolicy: _exp.imagePolicy === "embed" ? "keep" : _exp.imagePolicy, includeToc: _exp.includeToc, highlights: _exp.highlights, hlView: _exp.hlView }); // H5 (spec 1.6): send-to honors the exported view's tri-state too
         primary.classList.add("sending");
         primaryLabel.textContent = t("mdSending");
         let res;
         try {
-          res = await pbpSendToTarget(id, { meta, rawBody: _sendBody, cfg });
+          res = await pbpSendToTarget(id, { meta, rawBody: _sendBody, cfg }, { isCurrent: () => exportJobOwnerCurrent(job) });
         } catch (_) {
           res = { ok: false, fellBack: false, error: "" };
         }
@@ -3829,6 +4005,8 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
             if (!_sig.aborted) flashButtonLabel(primary, t("mdSentTo").replace("{name}", row.label)); // short -> button
             if (res.url) showSendStatus(t("mdSentTo").replace("{name}", row.label), false, res.url, row.viewLabel ? t(row.viewLabel) : undefined); // + clickable link
           }
+        } else if (res.error === "context_changed") {
+          showSendStatus(t("mdExportContextChanged"), true);
         } else if (res.error === "open-blocked") {
           showSendStatus(t("mdSendOpenBlocked"), true);
         } else if (res.ok) {
@@ -3858,6 +4036,10 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         } else {
           showSendStatus(t("mdSendFailed"), true);
         }
+      } catch (error) {
+        console.warn("[export] send preparation failed:", error?.name, error?.message);
+        showSendStatus(exportErrorText(error), true);
+        if (!_sig.aborted) setPrimary(id);
       } finally {
         _sendInFlight = false;
         primary.classList.remove("sending");

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Reader Bookmark Tests</title></head><body>
+<div id="results"></div><script src="../shared.js"></script><script src="../wayback.js"></script><script>
+function assert(x, msg) { if (!x) throw new Error(msg || "assertion failed"); }
+function equal(a, b) { assert(a === b, JSON.stringify(a) + " !== " + JSON.stringify(b)); }
+async function test(name, fn) {
+  const row = document.createElement("div");
+  try { await fn(); row.className = "pass"; row.textContent = "PASS " + name; }
+  catch (e) { row.className = "fail"; row.textContent = "FAIL " + name + ": " + e.message; }
+  document.getElementById("results").append(row);
+}
+const URL_ARTICLE = "https://example.com/article";
+// Hand-authored Pinboard posts/get response, including its real yes/no flags.
+const POST = { href: URL_ARTICLE, description: "Server title", extended: "Server notes", tags: "server two", shared: "no", toread: "yes", time: "2020-01-02T03:04:05Z", hash: "abc", meta: "def" };
+const SLOT = { url: URL_ARTICLE, title: "Reader title", account: "alice", tabId: 8, sourceTabUrl: URL_ARTICLE, sourceIncognito: true, tags: ["draft"], description: "Draft notes" };
+const READER = "chrome-extension://test-id/md-preview.html?k=reader-key";
+const SENDER = { id: "test-id", frameId: 0, url: READER, tab: { id: 9, url: READER } };
+let background, runtime;
+async function harness(options = {}) {
+  background ||= await (await fetch("../background.js")).text();
+  const start = background.indexOf("// ---- Reader bookmark workflow ----");
+  const end = background.indexOf("// ---- End reader bookmark workflow ----", start);
+  assert(start >= 0 && end > start, "reader bookmark workflow is not implemented");
+  const env = { token: "alice:new-token", account: "alice", epoch: 1, calls: [], requests: [], post: { ...POST }, ...options };
+  const deps = {
+    chrome: { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p }, storage: { local: { get: async key => ({ [key]: options.slot === null ? null : { ...SLOT, ...(options.slot || {}) } }) } }, tabs: { get: async () => { if (env.closedReader) throw new Error("reader closed after sending"); return { id: 9, url: READER }; }, sendMessage: async (id, msg) => { env.requests.push({ id, msg }); return { ok: true }; } } },
+    getCurrentPinboardAuth: async () => ({ token: env.token, account: env.account, epoch: env.epoch }),
+    pbpReadFreshPinboardAuthForAccount: async account => account === env.account ? { token: env.token, account: env.account, epoch: env.epoch } : null,
+    pbpPinboardAuthIsCurrent: auth => auth.account === env.account && auth.epoch === env.epoch,
+    fetchExistingBookmark: async (url, token) => { env.calls.push({ url, token }); if (env.onLookup) env.onLookup(); return env.lookup || { exists: !!env.post, lookupFailed: false, post: env.post }; },
+    pbpSaveFailure: reason => ({ status: "failed", reason }),
+    pbpResolveSavePlan, pbpEffectivePrivate,
+    loadSettings: async () => ({ optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false, qsDefaultTags: "quick", rlDefaultTags: "later" }),
+    submitSaveIntent: async (intent, opts) => { env.submitted = { intent, opts }; if (env.onSubmit) env.onSubmit(); return env.result || { status: "saved", mutation: "created", account: "alice" }; },
+  };
+  const api = new Function(...Object.keys(deps), background.slice(start, end) + "\nreturn { pbpReaderBookmarkContext, pbpPrepareReaderSaveIntent, pbpReaderBookmarkRequest, pbpRouteReaderSaveCommand }; ")(...Object.values(deps));
+  return { ...api, env };
+}
+function base() { return { mode: "skip", url: URL_ARTICLE, title: "Reader title", notes: "Draft notes", tags: "draft", private: false, toread: false }; }
+async function pipelineHarness(options = {}) {
+  background ||= await (await fetch("../background.js")).text();
+  const start = background.indexOf("const PBP_SAVE_MODES");
+  const end = background.indexOf("// ---- P1: Shared save function ----", start);
+  const env = { account: "alice", token: "alice:rotated-token", epoch: 1, post: { ...POST }, calls: [], queue: [], ...options };
+  const deps = {
+    chrome: { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p }, storage: { local: { get: async key => ({ offlineQueue: env.queue, [typeof key === "string" ? key : "unused"]: key === "offlineQueue" ? env.queue : { ...SLOT } }), set: async values => { if (values.offlineQueue) env.queue = values.offlineQueue; } } }, tabs: { query: async () => [], get: async tabId => { assert(tabId === 9, "saving must never inspect the source tab"); if (env.readerClosed) throw new Error("reader closed"); return { id: 9, url: READER }; } } },
+    console, pbpCreateRecoveringTail, pbpOfflineQueueReduce, pbpPinboardAccountFromToken, pbpEffectivePrivate,
+    pbpResolveOfflineQueueToken, pbpDrainOfflineQueue, pbpResolveSavePlan, buildPostsAddUri, POSTS_ADD_URI_BUDGET,
+    loadSettings: async () => ({ pinboardToken: "alice:stale-token", offlineQueueEnabled: true, optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false }),
+    getCurrentPinboardAuth: async () => ({ account: env.account, token: env.token, epoch: env.epoch }),
+    pbpCapturePinboardAuth: () => ({ account: env.account, epoch: env.epoch }),
+    pbpPinboardAuthIsCurrent: auth => auth.account === env.account && auth.epoch === env.epoch,
+    pbpStatusCacheSet: () => false, pbpStatusCacheGet: () => null,
+    pbpReadFreshPinboardAuthForAccount: async account => account === env.account ? { account, token: env.token, epoch: env.epoch } : null,
+    pbpWaybackArchive: async () => {}, updateBadge: async () => {}, setIcon: () => {},
+    pinboardFetch: async raw => {
+      const url = new URL(raw); env.calls.push(url);
+      if (env.networkDown) throw new Error("offline");
+      if (url.pathname.endsWith("/get")) {
+        if (env.onLookup) await env.onLookup();
+        return { ok: true, status: 200, json: async () => ({ date: "2026-10-23T00:00:00Z", user: "alice", posts: env.post ? [{ ...env.post }] : [] }) };
+      }
+      if (env.onWrite) await env.onWrite();
+      env.post = { href: url.searchParams.get("url"), description: url.searchParams.get("description"), extended: url.searchParams.get("extended"), tags: url.searchParams.get("tags"), shared: url.searchParams.get("shared"), toread: url.searchParams.get("toread"), time: url.searchParams.get("dt") || "2026-10-23T00:00:00Z", hash: "abc", meta: "def" };
+      return { ok: true, status: 200, json: async () => ({ result_code: "done" }) };
+    },
+  };
+  return { ...new Function(...Object.keys(deps), background.slice(start, end) + "\nreturn { submitSaveIntent, pbpReaderBookmarkRequest }; ")(...Object.values(deps)), env };
+}
+(async () => {
+await test("trusted reader derives frozen URL and owner from its own persisted slot", async () => {
+  const h = await harness(); const c = await h.pbpReaderBookmarkContext(SENDER, "alice"); equal(c.url, URL_ARTICLE); equal(c.account, "alice");
+});
+await test("foreign origin, prefix lookalike, subframe and foreign extension cannot impersonate reader", async () => {
+  const h = await harness();
+  for (const sender of [{ ...SENDER, url: "https://evil.test/md-preview.html?k=reader-key" }, { ...SENDER, url: READER.replace(".html?", ".html.evil?") }, { ...SENDER, frameId: 1 }, { ...SENDER, id: "foreign" }]) equal(await h.pbpReaderBookmarkContext(sender, "alice"), null);
+});
+await test("missing slot and another account fail closed after worker restart", async () => {
+  equal(await (await harness({ slot: null })).pbpReaderBookmarkContext(SENDER, "alice"), null);
+  equal(await (await harness()).pbpReaderBookmarkContext(SENDER, "bob"), null);
+});
+await test("browser-authenticated reader message retains its frozen slot when reader closes immediately after send", async () => {
+  const h = await harness({ closedReader: true }); const c = await h.pbpReaderBookmarkContext(SENDER, "alice"); equal(c?.url, URL_ARTICLE); equal(c?.account, "alice");
+});
+await test("later preserves server title notes tags privacy and original bookmark time", async () => {
+  const h = await harness({ post: { ...POST, toread: "no" } }); const p = await h.pbpPrepareReaderSaveIntent(base(), "later", null, { pinboardToken: "alice:new-token" }, { account: "alice", epoch: 1 });
+  equal(p.intent.title, "Server title"); equal(p.intent.notes, "Server notes"); equal(p.intent.tags, "server two"); equal(p.intent.private, true); equal(p.intent.time, "2020-01-02T03:04:05Z"); equal(p.intent.toread, true);
+});
+await test("mark read only clears toread and repeated read remains idempotent", async () => {
+  const h = await harness(); let p = await h.pbpPrepareReaderSaveIntent(base(), "read", null, { pinboardToken: h.env.token }, { account: "alice", epoch: 1 }); equal(p.intent.toread, false); equal(p.intent.tags, "server two");
+  h.env.post.toread = "no"; p = await h.pbpPrepareReaderSaveIntent(base(), "read", null, { pinboardToken: h.env.token }, { account: "alice", epoch: 1 }); equal(p.intent.mode, "skip");
+});
+await test("plain save uses skip so existing server metadata cannot be overwritten", async () => {
+  const h = await harness(); const p = await h.pbpPrepareReaderSaveIntent(base(), "save", null, {}, { account: "alice", epoch: 1 }); equal(p.intent.mode, "skip");
+});
+await test("unknown lookup never becomes an update or creates an edit", async () => {
+  const h = await harness({ lookup: { exists: false, lookupFailed: true, reason: "lookup", retryable: true } }); const p = await h.pbpPrepareReaderSaveIntent(base(), "edit", { title: "bad" }, { pinboardToken: h.env.token }, { account: "alice", epoch: 1 }); equal(p.result.reason, "lookup"); assert(!p.intent);
+});
+await test("unknown readlater fails closed instead of queueing an intent that loses new-bookmark privacy", async () => {
+  const h = await harness({ lookup: { exists: false, lookupFailed: true, retryable: true } }); const p = await h.pbpPrepareReaderSaveIntent(base(), "later", null, { pinboardToken: h.env.token }, { account: "alice", epoch: 1 }); equal(p.result?.reason, "lookup"); assert(!p.intent);
+});
+await test("edit changes only explicit fields and preserves original server timestamp", async () => {
+  const h = await harness(); const p = await h.pbpPrepareReaderSaveIntent(base(), "edit", { title: "Edited", tags: "only", notes: "", private: false, toread: false, time: "2099" }, { pinboardToken: h.env.token }, { account: "alice", epoch: 1 }); equal(p.intent.time, "2020-01-02T03:04:05Z"); equal(p.intent.title, "Edited"); equal(p.intent.notes, ""); equal(p.intent.private, false);
+});
+await test("owner change during lookup cancels prepared mutation", async () => {
+  const h = await harness(); h.env.onLookup = () => { h.env.account = "bob"; h.env.epoch++; }; const p = await h.pbpPrepareReaderSaveIntent(base(), "read", null, { pinboardToken: h.env.token }, { account: "alice", epoch: 1 }); equal(p.result.reason, "account_changed");
+});
+await test("new saved context honors original source incognito rather than reader tab", async () => {
+  const h = await harness({ post: null }); await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "save", url: "https://evil.test/" }, SENDER); equal(h.env.submitted.intent.url, URL_ARTICLE); equal(h.env.submitted.intent.private, true); equal(h.env.submitted.opts.expectedAccount, "alice");
+});
+await test("status unknown is explicitly unknown rather than unbookmarked", async () => {
+  const h = await harness({ lookup: { lookupFailed: true, exists: false } }); const r = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account: "alice" }, SENDER); equal(r.known, false); assert(r.bookmarked !== false);
+});
+await test("queued response is passed through honestly without saved metadata", async () => {
+  const h = await harness({ result: { status: "queued", queueId: "q1", cause: "network" } }); const r = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "save" }, SENDER); equal(r.status, "queued"); assert(!r.bookmark);
+});
+await test("same-owner token rotation after successful dispatch does not misreport saved as account changed", async () => {
+  const h = await harness(); h.env.onSubmit = () => { h.env.token = "alice:rotated-again"; h.env.epoch++; };
+  const r = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "save" }, SENDER); equal(r.status, "saved"); equal(r.account, "alice");
+});
+await test("global commands route to active reader and ordinary web tabs retain old path", async () => {
+  const h = await harness(); equal(await h.pbpRouteReaderSaveCommand("quick_save", { id: 9, url: READER }), true); equal(h.env.requests[0].msg.action, "save"); equal(await h.pbpRouteReaderSaveCommand("read_later", { id: 9, url: READER }), true); equal(h.env.requests[1].msg.action, "later"); equal(await h.pbpRouteReaderSaveCommand("quick_save", { id: 8, url: URL_ARTICLE }), false);
+});
+await test("real save pipeline dispatches same-owner rotated token and idempotently skips saved normal bookmarks", async () => {
+  const h = await pipelineHarness(); const r = await h.submitSaveIntent(base(), { expectedAccount: "alice", readerAction: "save" }); equal(r.status, "skipped"); equal(h.env.calls.length, 1); equal(h.env.calls[0].searchParams.get("auth_token"), "alice:rotated-token");
+});
+await test("real pipeline preserves all untouched server fields while serializing later then read", async () => {
+  const h = await pipelineHarness({ post: { ...POST, toread: "no" } });
+  const results = await Promise.all([h.submitSaveIntent(base(), { expectedAccount: "alice", readerAction: "later" }), h.submitSaveIntent(base(), { expectedAccount: "alice", readerAction: "read" })]);
+  equal(results[0].status, "saved"); equal(results[1].status, "saved"); equal(h.env.post.toread, "no"); equal(h.env.post.description, "Server title"); equal(h.env.post.extended, "Server notes"); equal(h.env.post.tags, "server two"); equal(h.env.post.shared, "no"); equal(h.env.post.time, "2020-01-02T03:04:05Z");
+});
+await test("real pipeline queues only a safe owner-bound plain save without credentials when offline", async () => {
+  const h = await pipelineHarness({ networkDown: true }); const r = await h.submitSaveIntent({ ...base(), private: true }, { expectedAccount: "alice", readerAction: "save" }); equal(r.status, "queued"); equal(h.env.queue.length, 1); equal(h.env.queue[0].account, "alice"); equal(h.env.queue[0].mode, "skip"); equal(h.env.queue[0].private, true); assert(!JSON.stringify(h.env.queue).includes("token"));
+});
+for (const action of ["read", "later"]) await test("real pipeline does not queue stale server metadata after " + action + " flag dispatch fails", async () => {
+  const h = await pipelineHarness({ post: { ...POST, toread: action === "read" ? "yes" : "no" }, onWrite: () => { throw new Error("connection lost during add"); } });
+  const result = await h.submitSaveIntent(base(), { expectedAccount: "alice", readerAction: action });
+  equal(result.status, "failed"); equal(result.reason, "network");
+  equal(h.env.calls.filter(url => url.pathname.endsWith("/get")).length, 1);
+  equal(h.env.calls.filter(url => url.pathname.endsWith("/add")).length, 1);
+  equal(h.env.queue.length, 0);
+  equal(h.env.post.extended, "Server notes"); equal(h.env.post.shared, "no");
+});
+await test("real pipeline owner switch during lookup sends no mutation and queues nothing", async () => {
+  const h = await pipelineHarness(); h.env.onLookup = () => { h.env.account = "bob"; h.env.token = "bob:token"; h.env.epoch++; }; const r = await h.submitSaveIntent(base(), { expectedAccount: "alice", readerAction: "later" }); equal(r.reason, "account_changed"); equal(h.env.calls.filter(x => x.pathname.endsWith("/add")).length, 0); equal(h.env.queue.length, 0);
+});
+await test("accepted save completes after reader closes without consulting closed or navigated source tab", async () => {
+  const h = await pipelineHarness({ post: null }); h.env.onLookup = () => { h.env.readerClosed = true; };
+  const r = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "save", url: "https://navigated.test/" }, SENDER); equal(r.status, "saved"); equal(h.env.post.href, URL_ARTICLE); equal(h.env.post.shared, "no");
+});
+await test("runtime script implements guarded shared keyboard and action state", async () => {
+  runtime = await (await fetch("../md-bookmark.js")).text(); assert(!runtime.startsWith("<!DOCTYPE"), "reader runtime is not implemented");
+  const frame = document.createElement("iframe"); document.body.append(frame); const w = frame.contentWindow;
+  w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+  const calls = []; w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p, sendMessage: async msg => { calls.push(msg); return msg.type === "mdReaderBookmarkState" ? { known: true, bookmarked: false, account: "alice" } : { status: "queued", account: "alice" }; }, onMessage: { addListener: fn => { w._runtimeHandler = fn; } } } };
+  w.t = k => k; w.eval(runtime); w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account: "alice", bookmark: { tags: [], notes: "" } } })); await new Promise(r => setTimeout(r, 20));
+  for (const opts of [{ repeat: true }, { ctrlKey: true }, { metaKey: true }, { altKey: true }, { isComposing: true }, { keyCode: 229 }]) w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "s", bubbles: true, ...opts })); equal(calls.filter(x => x.type === "mdReaderBookmarkSave").length, 0);
+  const input = w.document.createElement("input"); w.document.body.append(input); input.focus(); input.dispatchEvent(new w.KeyboardEvent("keydown", { key: "s", bubbles: true })); equal(calls.filter(x => x.type === "mdReaderBookmarkSave").length, 0); input.blur();
+  const overlay = w.document.createElement("div"); overlay.setAttribute("popover", "auto"); w.document.body.append(overlay); overlay.showPopover(); w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "s", bubbles: true })); equal(calls.filter(x => x.type === "mdReaderBookmarkSave").length, 0); overlay.hidePopover();
+  w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "s", bubbles: true })); w.pbpReaderBookmarkAction("later"); w.document.getElementById("reader-bookmark-footer-save").click(); await new Promise(r => setTimeout(r, 20)); equal(calls.filter(x => x.type === "mdReaderBookmarkSave").length, 1); equal(w.document.getElementById("reader-bookmark-status").textContent, "readerBookmarkQueued");
+  w._runtimeHandler({ type: "PBP_READER_BOOKMARK_COMMAND", action: "save" }, { id: "foreign" }, () => {}); w._runtimeHandler({ type: "PBP_READER_BOOKMARK_COMMAND", action: "save" }, { id: "test-id", tab: { id: 1 } }, () => {}); equal(calls.filter(x => x.type === "mdReaderBookmarkSave").length, 1);
+  w.document.dispatchEvent(new w.CustomEvent("pbp:account-changed", { detail: { account: "bob" } })); w.pbpReaderBookmarkAction("save"); equal(calls.filter(x => x.type === "mdReaderBookmarkSave").length, 1); equal(w.document.getElementById("reader-bookmark-status").textContent, "readerBookmarkAccountChanged");
+  assert(!w.document.getElementById("rendered-view").contains(w.document.getElementById("reader-bookmark-footer")), "footer must stay outside exported article"); frame.remove();
+});
+document.body.dataset.complete = "true";
+})();
+</script></body></html>

@@ -6947,17 +6947,26 @@ function stripJsComments(input) {
 // (1a) Export distill (critique 2026-10-20 #3): the expanded section keeps at
 // most three resident actions; every other control sits one native
 // disclosure down. A split button's caret is part of its primary action, not
-// a fourth one. Counted over every control tag, so a new button, select or
-// input added outside the disclosure trips this whatever it is.
+// a fourth one. Content-scope toggles and Include Q&A configure the export;
+// they are not output exits. Every other resident control still counts.
 {
   const start = mdHtml.indexOf('id="export-section"');
   const end = mdHtml.indexOf('<nav id="toc"', start);
   const sec = start >= 0 && end > start ? mdHtml.slice(start, end) : "";
   check(!!sec, "md-preview.html: #export-section markup not found");
-  const CONTROL = /<(button|select|input|textarea)\b[^>]*>/g;
   const detailsBlocks = [...sec.matchAll(/<details\b[^>]*>[\s\S]*?<\/details>/g)].map((m) => m[0]);
   const resident = detailsBlocks.reduce((acc, d) => acc.replace(d, ""), sec);
-  const residentActions = [...resident.matchAll(CONTROL)].filter((m) => !/class="[^"]*\bsend-caret\b/.test(m[0]));
+  const scopeToggleIds = new Set(["exp-scope-article", "exp-scope-ask"]);
+  const residentActions = htmlNodes(resident).filter((node) => {
+    if (!["button", "select", "input", "textarea"].includes(node.tag) || node.classes.includes("send-caret")) return false;
+    if (node.attrs.id === "exp-include-ask") return false;
+    if (scopeToggleIds.has(node.attrs.id)) {
+      for (let parent = node.parent; parent; parent = parent.parent) {
+        if (parent.classes.includes("exp-scope")) return false;
+      }
+    }
+    return true;
+  });
   check(residentActions.length >= 1 && residentActions.length <= 3,
     `md-preview.html: #export-section shows ${residentActions.length} resident action(s); keep 1-3 (Copy Markdown + Send to) and move the rest into its .rail-disclosure`);
   const folded = detailsBlocks.filter((d) => /<(button|select|input|textarea)\b/.test(d));
@@ -7505,12 +7514,14 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
   // -- eleven CSS rules (.src-seg alone contributes two declarations,
   // .active and [aria-pressed="true"], for one control family, which is why
   // "ten consumers" and "eleven rules" are both correct at once) -- plus
-  // .toc-list a.active on --border-light: twelve. Expected non-match, which
+  // .toc-list a.active on --border-light: twelve; export content scope
+  // .exp-scope > .action-btn[aria-pressed="true"] adds the thirteenth.
+  // Expected non-match, which
   // correctly stays OUT of this gate: .hl-card-dot.active (no background
   // declared at all). The contrast numbers themselves, including non-pressed
   // hover rules, live in tests/md-preview-contrast-tests.mjs's rule scan.
-  check(matchedSelectors.length === 12,
-    `md-preview.css: pressed-state raised-fill rule count drifted from the expected 12 (found ${matchedSelectors.length}) -- a consumer was added, removed, or changed its fill; update this gate's comment and expectation once the drift is intentional`);
+  check(matchedSelectors.length === 13,
+    `md-preview.css: pressed-state raised-fill rule count drifted from the expected 13 (found ${matchedSelectors.length}) -- a consumer was added, removed, or changed its fill; update this gate's comment and expectation once the drift is intentional`);
 }
 
 // T3 (D5, taste-uplift batch3): browsers synthesize an oblique for CJK glyphs

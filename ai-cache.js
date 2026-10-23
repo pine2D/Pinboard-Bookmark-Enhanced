@@ -303,6 +303,7 @@ async function _pbpAiWriteAndPrune(key, makeResult, ts, readExisting) {
       const getReq = store.get(key);
       getReq.onsuccess = () => write(getReq.result ? getReq.result.result : undefined);
     });
+    return true;
   } catch (e) {
     // Degrading to a no-op stays the contract (a failed cache write must not
     // break the paid call that produced the value), but the swallow still has
@@ -310,11 +311,14 @@ async function _pbpAiWriteAndPrune(key, makeResult, ts, readExisting) {
     // keys embed the looked-up word verbatim and `summary_owner_` embeds the
     // Pinboard account name -- exactly what the leave-a-trace rule bars.
     try { console.warn("[pbp-ai-cache] write failed pool=" + _pbpAiPoolForKey(key) + ":", (e && e.name) || "", (e && e.message) || ""); } catch (_) {}
+    return false;
   }
 }
 
+// Optional durability receipt; ignored by existing cache consumers. Failures
+// still resolve without interrupting the paid work which produced the value.
 async function pbpAiCacheSet(key, result, ts) {
-  await _pbpAiWriteAndPrune(key, () => result, ts, false);
+  return await _pbpAiWriteAndPrune(key, () => result, ts, false);
 }
 
 // Atomic get-then-transform-then-put, in ONE readwrite IDB transaction

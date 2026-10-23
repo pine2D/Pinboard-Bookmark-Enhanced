@@ -58,6 +58,9 @@ node scripts/qa-drive.mjs --headless --surfaces journey --check --label notes-ed
 echo "[discovery] source controls, AI setup and preset CSS"
 node scripts/qa-drive.mjs --headless --surfaces discovery --check --label discovery-contract
 
+echo "[reader-save-export] bookmark completion and portable Q&A exports"
+node scripts/qa-drive.mjs --headless --surfaces reader-bookmark,reader-export --check --label reader-save-export-contract
+
 echo "[syntax] checking JavaScript"
 git ls-files -- '*.js' '*.mjs' |
   while IFS= read -r file; do

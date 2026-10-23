@@ -7,7 +7,7 @@
 
 ## 项目概述
 
-Chrome Extension (Manifest V3)，一键将当前页面保存到 Pinboard，支持多 LLM 提供商的 AI 标签/摘要/全文翻译/Ask-the-page 问答与 opt-in 要点提炼（skim）。md-preview 阅读器带划词高亮/笔记/搜索/专注模式、YouTube / B 站视频页的播放器+多语种字幕面板、在线词典与可选离线词典（CC-CEDICT 汉英 + 用户自备 ECDICT 英汉）；高亮/笔记与生词集中在独立的「笔记与生词本」页（library.html，索引 + 详情平铺双栏）；生词按当前 Pinboard 账号隔离，可管理/导出/发送到 Anki 或欧路词典；连接 Google Drive 即同步生词、高亮与笔记。导出可 Send-to Obsidian/Notion/NotebookLM/Gist/Webhook，另有 Wayback 自动归档、标签治理和 13 套 pinboard.in 站点主题。功能全貌见 README.md。
+Chrome Extension (Manifest V3)，一键将当前页面保存到 Pinboard，支持多 LLM 提供商的 AI 标签/摘要/全文翻译/Ask-the-page 问答与 opt-in 要点提炼（skim）。md-preview 阅读器支持直接保存/编辑 Pinboard 书签，完整 Ask 问答可连同引用单独导出或附在正文后；带划词高亮/笔记/搜索/专注模式、YouTube / B 站视频页的播放器+多语种字幕面板、在线词典与可选离线词典（CC-CEDICT 汉英 + 用户自备 ECDICT 英汉）；高亮/笔记与生词集中在独立的「笔记与生词本」页（library.html，索引 + 详情平铺双栏）；生词按当前 Pinboard 账号隔离，可管理/导出/发送到 Anki 或欧路词典；连接 Google Drive 即同步生词、高亮与笔记。导出可 Send-to Obsidian/Notion/NotebookLM/Gist/Webhook，另有 Wayback 自动归档、标签治理和 13 套 pinboard.in 站点主题。功能全貌见 README.md。
 
 ## 技术栈
 

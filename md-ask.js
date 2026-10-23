@@ -190,6 +190,7 @@ function _pbpAskBuildPanel() {
     // under that same key and the same clipboard icon. Sibling of askClear
     // ("Clear conversation") and askCopyAnswer ("Copy answer").
     '  <button type="button" id="ask-export" class="ask-ic" data-i18n-title="askCopyThread" data-i18n-aria="askCopyThread">' + PBP_ASK_COPY_SVG + '</button>',
+    '  <button type="button" id="ask-export-conversation" class="ask-ic" data-i18n-title="askExportConversation" data-i18n-aria="askExportConversation">' + (typeof PBP_ICONS !== "undefined" ? PBP_ICONS.download : "") + '</button>',
     '  <button type="button" id="ask-clear" class="ask-ic" data-i18n-title="askClear" data-i18n-aria="askClear">' + PBP_ASK_CLEAR_SVG + '</button>',
     '  <button type="button" id="ask-close" class="ask-ic" data-i18n-title="askClose" data-i18n-aria="askClose">' + PBP_ASK_CLOSE_SVG + '</button>',
     '</header>',
@@ -251,6 +252,7 @@ function _pbpAskBuildPanel() {
     if (typeof _pbpAskUpdateMeta === "function") _pbpAskUpdateMeta();
   });
   panel.querySelector("#ask-export").addEventListener("click", _pbpAskCopyThread);
+  panel.querySelector("#ask-export-conversation").addEventListener("click", () => document.dispatchEvent(new CustomEvent("pbp:export-ask")));
   // Clear seam: Task 15 appends _pbpAskShowClearConfirm (inline confirm
   // strip) to this same file - function declarations hoist file-wide, so
   // once Task 15 lands this click routes to the confirm strip; until then
@@ -487,16 +489,53 @@ async function _pbpAskClearThread() {
   // just-cleared thread (its own frag guard fires too late to stop that) -
   // letting the export button copy history the user had erased.
   _pbpAskHistRestored = false;
+  const clearedUrl = _pbpAskState ? _pbpAskState.url : _pbpAskHistUrl;
+  const clearedAccount = _pbpAskState ? _pbpAskState.account : _pbpAskHistAccount;
+  const clearedKey = _pbpAskHistKey(clearedUrl, clearedAccount);
+  _pbpAskClearing.add(clearedKey);
+  _pbpAskUnpersisted = _pbpAskUnpersisted.filter((item) => item.url !== clearedUrl || item.account !== clearedAccount);
+  _pbpAskHistoryChanged({ type: "clear", url: clearedUrl, account: clearedAccount });
   if (_pbpAskState) {
     _pbpAskState.rounds = [];
     _pbpAskState.records = [];
     if (_pbpAskState.ctrl) _pbpAskState.ctrl.abort();
   }
   _pbpAskResetThreadView();
-  if (_pbpAskState) await pbpAskHistSet(_pbpAskState.url, [], _pbpAskState.account);
+  let cleared = false;
+  try {
+    const written = clearedUrl ? await pbpAskHistSet(clearedUrl, [], clearedAccount) : true;
+    const remaining = clearedUrl ? await pbpAskHistGet(clearedUrl, clearedAccount) : [];
+    cleared = written === true && remaining.length === 0;
+  } catch (error) {
+    console.warn("[pbp-ask] history clear failed:", error?.name, error?.message);
+  }
+  if (cleared) _pbpAskClearing.delete(clearedKey);
+  const currentUrl = _pbpAskState ? _pbpAskState.url : _pbpAskHistUrl;
+  const currentAccount = _pbpAskState ? _pbpAskState.account : _pbpAskHistAccount;
+  if (currentUrl === clearedUrl && currentAccount === clearedAccount) {
+    const oldError = document.getElementById("ask-clear-error");
+    if (oldError) oldError.remove();
+    if (!cleared) {
+      _pbpAskEnsureClear(); // same Clear control remains available for retry
+      const thread = _pbpAskHistThread();
+      if (thread && thread.parentNode) {
+        const error = document.createElement("div");
+        error.id = "ask-clear-error";
+        error.className = "msg-bar error";
+        error.setAttribute("role", "alert");
+        error.textContent = _pbpAskExportLabel("askClearFailed", "Could not clear saved history. Retry before closing this reader.");
+        thread.parentNode.insertBefore(error, thread);
+      }
+    } else {
+      const clearButton = document.getElementById("ask-clear");
+      if (clearButton) clearButton.hidden = true;
+    }
+  }
+  _pbpAskHistoryChanged();
   // Rounds were just wiped - drop the stale token estimate and the
   // long-thread window note from the transparency line immediately.
   if (typeof _pbpAskUpdateMeta === "function") _pbpAskUpdateMeta();
+  return cleared;
 }
 
 // Send-flow seam: _pbpAskSend lands in the next task (same file, function
@@ -1059,6 +1098,7 @@ async function _pbpAskRun(question, aEl, opts) {
   let raf = 0;
   let acc = "";
   let langJudged = false;
+  let runCtx = null;
   const paint = () => {
     raf = 0;
     if (!langJudged && acc.replace(/\s+/g, "").length >= PBP_ASK_LANG_SAMPLE) {
@@ -1069,6 +1109,12 @@ async function _pbpAskRun(question, aEl, opts) {
   };
   try {
     _pbpAskEnsureCtx(st);
+    const runSent = new Set(st.ctx && st.ctx.sent || []);
+    runCtx = {
+      text: String(st.ctx && st.ctx.text || ""), sent: runSent,
+      sources: new Map([...runSent].map((p) => [p, _pbpAskCaptureSource(p, st.url)])),
+      blocksHash: typeof pbpAiBlocksFingerprint === "function" ? pbpAiBlocksFingerprint() : ""
+    };
     // Regenerate must not show the model the very answer it is replacing:
     // replaceLast swaps st.rounds only AFTER success, so at build time the
     // old round is still the last element - and a model that sees its own
@@ -1076,7 +1122,7 @@ async function _pbpAskRun(question, aEl, opts) {
     const promptHistory = (opts.replaceLast && st.rounds.length)
       ? st.rounds.slice(0, -1) : st.rounds;
     const built = pbpAskBuildPrompt({
-      context: st.ctx.text, history: promptHistory, question,
+      context: runCtx.text, history: promptHistory, question,
       title: st.title, forum: st.forum
     });
     const full = await getOrCreateInflight("ask_" + st.url + "_" + question, () =>
@@ -1092,6 +1138,13 @@ async function _pbpAskRun(question, aEl, opts) {
         if (!raf) raf = requestAnimationFrame(paint);
       })
     );
+    // Stop/Clear can race the final stream chunk. A resolved provider promise
+    // must not turn an explicitly aborted round into completed export history.
+    if (st.ctrl && st.ctrl.signal.aborted) {
+      const abortedErr = new Error("aborted");
+      abortedErr.name = "AbortError";
+      throw abortedErr;
+    }
     // The article was replaced while this answer streamed (the abort raced the
     // final chunk and lost). The text below describes paragraphs that are no
     // longer on the page, so it must not be finalized, counted or persisted --
@@ -1118,7 +1171,7 @@ async function _pbpAskRun(question, aEl, opts) {
     // Same follow, once more: finalize swaps the plain text for rendered
     // markdown and appends the cite chips plus the copy/regenerate row, so the
     // bubble grows again after the last streamed frame.
-    const parsed = _pbpAskKeepPinned(() => _pbpAskFinalize(aEl, full, st.ctx && st.ctx.sent));
+    const parsed = _pbpAskKeepPinned(() => _pbpAskFinalize(aEl, full, runCtx.sent, runCtx.sources));
     const record = {
       q: question,
       a: full,
@@ -1127,7 +1180,8 @@ async function _pbpAskRun(question, aEl, opts) {
       model: _pbpAskProviderLabel(st.s),
       // Compared against the live fingerprint at restore time to catch a
       // stale [Pn] index after an engine switch (audit #29).
-      blocksHash: (typeof pbpAiBlocksFingerprint === "function") ? pbpAiBlocksFingerprint() : ""
+      blocksHash: runCtx.blocksHash,
+      evidence: pbpAskFreezeEvidence(parsed.cites, runCtx.sent, st.url, runCtx.sources)
     };
     if (opts.replaceLast && st.rounds.length) {
       st.rounds[st.rounds.length - 1] = { q: question, a: parsed.body };
@@ -1145,16 +1199,37 @@ async function _pbpAskRun(question, aEl, opts) {
       st.records.push(record);
       st.records = _pbpAskHistTrim(st.records);
     }
+    aEl._askExportRecord = record;
+    const pending = { url: st.url, account: runAccount, record, replaceLast: !!opts.replaceLast };
+    _pbpAskUnpersisted.push(pending);
+    _pbpAskUnpersisted = _pbpAskHistTrim(_pbpAskUnpersisted);
+    _pbpAskHistoryChanged();
     // Persisted append: st.running only serializes sends WITHIN this tab,
     // not across tabs, so a plain get+push+set here would race two preview
     // tabs open on the same URL (D2-2). pbpAskHistAppend runs the
     // read-modify-write in one IDB transaction instead, which IndexedDB
     // serializes across tabs - no lost update.
-    if (opts.replaceLast && typeof pbpAskHistReplaceLast === "function") {
-      await pbpAskHistReplaceLast(st.url, record, st.account);
-    } else {
-      await pbpAskHistAppend(st.url, record, st.account);
+    try {
+      if (opts.replaceLast && typeof pbpAskHistReplaceLast === "function") {
+        await pbpAskHistReplaceLast(st.url, record, st.account);
+      } else {
+        await pbpAskHistAppend(st.url, record, st.account);
+      }
+      // ai-cache deliberately resolves write failures as a no-op. Awaiting
+      // the write is not proof of durability: confirm the exact completed
+      // record (including frozen evidence) before dropping the session copy.
+      const saved = await pbpAskHistGet(pending.url, pending.account);
+      const confirmed = saved.some((r) => r && r.q === record.q && r.a === record.a && r.ts === record.ts
+        && r.model === record.model && r.blocksHash === record.blocksHash
+        && JSON.stringify(r.cites) === JSON.stringify(record.cites)
+        && JSON.stringify(r.evidence) === JSON.stringify(record.evidence));
+      if (confirmed) _pbpAskUnpersisted = _pbpAskUnpersisted.filter((item) => item !== pending);
+    } catch (error) {
+      // A cache failure cannot undo a completed answer or remove it from
+      // this session's exports. Retain only its bounded pending record.
+      console.warn("[pbp-ask] history persistence failed:", error?.name, error?.message);
     }
+    _pbpAskHistoryChanged();
     pbpAiBumpCounter("ask");
   } catch (e) {
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
@@ -1187,7 +1262,7 @@ async function _pbpAskRun(question, aEl, opts) {
       // later Regenerate to append-mode - this round is not in st.rounds,
       // so replaceLast would clobber the previous round instead.
       aEl.dataset.askStopped = "1";
-      try { _pbpAskFinalize(aEl, acc, st.ctx && st.ctx.sent); } catch (_) { aEl.textContent = acc; }
+      try { _pbpAskFinalize(aEl, acc, runCtx && runCtx.sent, runCtx && runCtx.sources); } catch (_) { aEl.textContent = acc; }
     } else {
       aEl.textContent = acc; // keep whatever already streamed in
     }
@@ -1311,7 +1386,7 @@ function _pbpAskStripCiteTokens(text) {
 // failed verification must never render as a link). Verification (fuzzy
 // quote locate) runs once per unique paragraph; chips are numbered
 // sequentially per answer (data-seq) in reading order.
-function _pbpAskChipPass(el, cites, sent) {
+function _pbpAskChipPass(el, cites, sent, sourceSnapshot) {
   const maxP = pbpAiBlocks().length;
   // Set of paragraph numbers actually SENT to the model (pbpAskBuildContext
   // .sent). A cite of a sampled-out paragraph is post-rationalization by
@@ -1343,8 +1418,10 @@ function _pbpAskChipPass(el, cites, sent) {
       // pbpAiFuzzyFind's exact-miss sliding scan, which is O(block length) and
       // runs synchronously here (twenty restored records, two per frame).
       // Offsets stay block-relative, so _pbpAskRangeFromOffsets is unaffected.
-      verifyByP.set(p, quote
-        ? pbpAiFuzzyFind(quote, String(pbpAiTextOfKatex(p) || "").slice(0, PBP_ASK_BLOCK_CAP))
+      const text = String(pbpAiTextOfKatex(p) || "").slice(0, PBP_ASK_BLOCK_CAP);
+      const original = sourceSnapshot && sourceSnapshot.get(p);
+      verifyByP.set(p, quote && (!sourceSnapshot || original && original.text === text)
+        ? pbpAiFuzzyFind(quote, original ? original.text : text)
         : null);
     }
     return verifyByP.get(p);
@@ -1392,9 +1469,11 @@ function _pbpAskChipPass(el, cites, sent) {
       // sequence number -- the chip list becomes a chapter list, and the
       // model never sees or invents a time (it still cites [Pn]).
       const cel = pbpAiBlockEl(seg.p);
-      if (document.body.classList.contains("video-mode") && cel && cel.dataset && cel.dataset.t != null
+      const original = sourceSnapshot && sourceSnapshot.get(seg.p);
+      const time = sourceSnapshot ? original && original.time : cel && cel.dataset && cel.dataset.t != null ? Number(cel.dataset.t) : null;
+      if (document.body.classList.contains("video-mode") && Number.isFinite(time)
           && typeof pbpVideoFmtTime === "function") {
-        const tl = pbpVideoFmtTime(Number(cel.dataset.t));
+        const tl = pbpVideoFmtTime(time);
         chip.textContent = tl;
         chip.classList.add("ask-chip--time");
         chip.setAttribute("aria-label", "P" + seg.p + " · " + tl);
@@ -1644,7 +1723,7 @@ function _pbpAskTipHide() {
 // Stream-end finalizer, called by the Task 13 send path and the Task 15
 // history restore. el = the .ask-a element that held streamed plain text.
 // Returns {body, cites} so the caller can persist them with the record.
-function _pbpAskFinalize(el, fullText, sent) {
+function _pbpAskFinalize(el, fullText, sent, sourceSnapshot) {
   const parsed = pbpAiParseCites(String(fullText == null ? "" : fullText));
   // renderMarkdown (md-convert.js) is the SINGLE sanitize point (marked +
   // DOMPurify); assigning its return via innerHTML is the established
@@ -1656,7 +1735,7 @@ function _pbpAskFinalize(el, fullText, sent) {
   const qText = el.dataset ? el.dataset.askQuestion : "";
   pbpAiSetLang(el, _pbpAskAnswerLang(parsed.body, pbpAiContentLang(qText, [_pbpAskViewLang()])));
   el.innerHTML = renderMarkdown(parsed.body);
-  _pbpAskChipPass(el, parsed.cites, sent);
+  _pbpAskChipPass(el, parsed.cites, sent, sourceSnapshot);
   // Task 15 hook (copy button + history chrome). typeof-guarded so this
   // Task 14 commit stands alone before Task 15 lands.
   if (typeof _pbpAskDecorate === "function") _pbpAskDecorate(el, parsed);
@@ -1675,6 +1754,313 @@ function _pbpAskFinalize(el, fullText, sent) {
 // md-preview.html). Constant string, never model text.
 // Alias of the shared copy icon (was a hand-copied Feather twin of it).
 const PBP_ASK_COPY_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.copy : "";
+
+// Export history independently of the lazy panel and AI availability. The
+// snapshot is a detached value: an export never re-reads a moving conversation.
+let _pbpAskExportRevision = 0;
+// Only completed writes still in progress or failed live here. Persisted
+// records always come from IDB, so a deletion in another reader is respected.
+let _pbpAskUnpersisted = [];
+const _pbpAskClearing = new Set();
+function _pbpAskHistoryChanged(detail) {
+  _pbpAskExportRevision++;
+  document.dispatchEvent(new CustomEvent("pbp:ask-history-changed", { detail }));
+}
+// The reader owns cross-window transport. Its external notification is
+// deliberately not re-emitted, and only an explicit clear retires pending
+// completed records from that same owner/article scope.
+document.addEventListener("pbp:ask-history-external", (event) => {
+  const detail = event.detail || {};
+  const url = _pbpAskState ? _pbpAskState.url : _pbpAskHistUrl;
+  const account = _pbpAskState ? _pbpAskState.account : _pbpAskHistAccount;
+  if (String(detail.account || "") !== String(account || "")
+      || pbpAiCacheUrlNorm(detail.url) !== pbpAiCacheUrlNorm(url)) return;
+  _pbpAskExportRevision++;
+  if (detail.type === "clear") _pbpAskUnpersisted = _pbpAskUnpersisted.filter((pending) =>
+    pending.account !== account || pbpAiCacheUrlNorm(pending.url) !== pbpAiCacheUrlNorm(url));
+});
+async function _pbpAskExportOwnerCurrent(account, revision, articleRevision, snapshot) {
+  const current = () => _pbpAskState && _pbpAskState.account === account
+    && _pbpAskExportRevision === revision && _pbpAskArticleRev === articleRevision;
+  if (!current() || typeof pbpReadSettingsWithSecrets !== "function" || typeof pbpPinboardAccountFromToken !== "function") return false;
+  try {
+    const settings = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
+    if (!current() || (pbpPinboardAccountFromToken(settings.pinboardToken) || "") !== account) return false;
+    if (snapshot) {
+      const fresh = await pbpAskExportSnapshot({ url: snapshot.url, account, title: snapshot.title });
+      if (JSON.stringify(fresh.rounds) !== JSON.stringify(snapshot.rounds)) return false;
+    }
+    return current();
+  } catch (error) {
+    console.warn("[pbp-ask] export owner read failed:", error?.name, error?.message);
+    return false;
+  }
+}
+function _pbpAskExportLabel(key, fallback) {
+  const value = typeof t === "function" ? t(key) : "";
+  return value && value !== key ? value : fallback;
+}
+function _pbpAskExportSafeUrl(value) {
+  try {
+    const u = new URL(String(value || ""));
+    return /^https?:$/.test(u.protocol) && !u.username && !u.password ? u.href : "";
+  } catch (_) { return ""; }
+}
+function _pbpAskExportEscape(value) {
+  return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/([\\`*_[\]{}#!|])/g, "\\$1");
+}
+function _pbpAskExportFreeze(value) {
+  if (value && typeof value === "object") {
+    Object.values(value).forEach(_pbpAskExportFreeze);
+    Object.freeze(value);
+  }
+  return value;
+}
+async function pbpAskExportSnapshot({ url, account, title } = {}) {
+  url = String(url || ""); account = String(account || "");
+  const revision = _pbpAskExportRevision;
+  const historyKey = _pbpAskHistKey(url, account);
+  let records = url && !_pbpAskClearing.has(historyKey) ? await pbpAskHistGet(url, account) : [];
+  // Clear/account changes while the read was pending must not resurrect data.
+  if (revision !== _pbpAskExportRevision) throw new Error("ask-history-changed");
+  records = Array.isArray(records) ? records.slice() : [];
+  const normalizedUrl = typeof pbpAiCacheUrlNorm === "function" ? pbpAiCacheUrlNorm(url) : url;
+  for (const pending of _pbpAskUnpersisted) {
+    const pendingUrl = typeof pbpAiCacheUrlNorm === "function" ? pbpAiCacheUrlNorm(pending.url) : pending.url;
+    if (pending.account !== account || pendingUrl !== normalizedUrl) continue;
+    const r = pending.record;
+    if (records.some((existing) => existing && existing.ts === r.ts && existing.q === r.q && existing.a === r.a)) continue;
+    if (pending.replaceLast && records.length && records[records.length - 1].q === r.q) records[records.length - 1] = r;
+    else records.push(r);
+  }
+  const currentHash = typeof pbpAiBlocksFingerprint === "function" && pbpAiBlocks().length ? pbpAiBlocksFingerprint() : "";
+  const rounds = (Array.isArray(records) ? records : []).filter((r) => r && typeof r.q === "string" && typeof r.a === "string" && r.a.trim()
+    && !r.aborted && !r.partial && !r.deleted && (!r.status || r.status === "completed"))
+    .map((r) => {
+      const stale = !!(r.blocksHash && currentHash && r.blocksHash !== currentHash);
+      return {
+        q: r.q, a: r.a, ts: Number.isFinite(r.ts) ? r.ts : null, model: String(r.model || ""),
+        cites: (Array.isArray(r.cites) ? r.cites : []).filter((c) => c && Number.isInteger(c.p) && c.p > 0).map((c) => ({ p: c.p, quote: String(c.quote || "") })),
+        evidence: (Array.isArray(r.evidence) ? r.evidence : []).filter((e) => e && Number.isInteger(e.p) && e.p > 0).map((e) => ({
+          p: e.p, quote: String(e.quote || ""), state: stale ? "source-changed" : (e.state === "matched" || e.state === "source-changed" ? e.state : "unverified"),
+          sourceUrl: _pbpAskExportSafeUrl(e.sourceUrl),
+          ...(Number.isFinite(e.time) && e.time >= 0 ? { time: e.time, deepUrl: _pbpAskExportSafeUrl(e.deepUrl) } : {})
+        })), sourceChanged: stale
+      };
+    });
+  return _pbpAskExportFreeze({ url, account, title: String(title || ""), rounds, count: rounds.length });
+}
+
+// Freeze only evidence available at successful completion. The match is a
+// source-excerpt match, never a truth check of the answer. No later paragraph
+// index lookup may upgrade a historical record without this evidence.
+function _pbpAskCaptureSource(p, sourceUrl) {
+  const source = { text: String(pbpAiTextOfKatex(p) || "").slice(0, PBP_ASK_BLOCK_CAP) };
+  const el = pbpAiBlockEl(p);
+  // data-t is committed by the real transcript paragraph mapping. Capture it
+  // before streaming, because playback and the nearby context keep moving.
+  if (document.body.classList.contains("video-mode") && el && el.dataset && el.dataset.t != null) {
+    const time = Number(el.dataset.t);
+    if (Number.isFinite(time) && time >= 0 && typeof pbpVideoDeepLink === "function") {
+      const deepUrl = _pbpAskExportSafeUrl(pbpVideoDeepLink(sourceUrl, time));
+      if (deepUrl) { source.time = time; source.deepUrl = deepUrl; }
+    }
+  }
+  return Object.freeze(source);
+}
+function pbpAskFreezeEvidence(cites, sent, sourceUrl, sourceSnapshot) {
+  const seen = new Set();
+  return (Array.isArray(cites) ? cites : []).filter((c) => c && Number.isInteger(c.p) && !seen.has(c.p) && seen.add(c.p)).map((c) => {
+    const source = sourceSnapshot ? sourceSnapshot.get(c.p) : _pbpAskCaptureSource(c.p, sourceUrl);
+    const text = source ? source.text : "";
+    const hit = sent && sent.has(c.p) && c.quote ? pbpAiFuzzyFind(c.quote, text) : null;
+    const e = { p: c.p, quote: hit ? text.slice(hit.start, hit.end) : String(c.quote || ""), state: hit ? "matched" : "unverified", sourceUrl: _pbpAskExportSafeUrl(sourceUrl) };
+    if (source && source.deepUrl) { e.time = source.time; e.deepUrl = source.deepUrl; }
+    return e;
+  });
+}
+
+// Transform prose only. Marked's lexer identifies CommonMark block/inline
+// code (including tilde fences and multi-backtick spans); raw model HTML is
+// escaped for portable Markdown so it cannot inject export chrome.
+function _pbpAskExportMapProse(md, transform, escapeHtml) {
+  const source = String(md || "");
+  if (typeof marked === "undefined") return transform(source);
+  const ranges = [];
+  const protect = (map, html = false) => {
+    if (map.length) ranges.push([map[0], map[map.length - 1] + 1, html]);
+  };
+  // Marked removes container prefixes before lexing children. Carry their
+  // character positions back to the original Markdown instead of searching
+  // child.raw in a string which still contains every > / list indentation.
+  const container = (raw, text, map) => {
+    const rawLines = raw.split("\n"), lines = text.split("\n"), positions = [];
+    if (lines.length > rawLines.length) return null;
+    let at = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const offset = rawLines[i].lastIndexOf(lines[i]);
+      if (offset < 0) return null;
+      for (let j = 0; j < lines[i].length; j++) positions.push(map[at + offset + j]);
+      if (i < lines.length - 1) positions.push(map[at + rawLines[i].length]);
+      at += rawLines[i].length + 1;
+    }
+    return positions;
+  };
+  const collect = (tokens, input, map) => {
+    let cursor = 0;
+    for (const token of tokens || []) {
+      if (!token.raw) continue;
+      const start = input.indexOf(token.raw, cursor);
+      // Unknown normalization must degrade to literal citations; it cannot
+      // expose an unlocated code span to the prose transform.
+      if (start < 0) { protect(map); return; }
+      const end = start + token.raw.length, ownMap = map.slice(start, end);
+      cursor = end;
+      if (token.type === "code" || token.type === "codespan" || token.type === "link" || token.type === "image") protect(ownMap);
+      else if (token.type === "html") protect(ownMap, !!escapeHtml);
+      else if ((token.type === "blockquote" || token.type === "list_item") && token.tokens) {
+        const childMap = container(token.raw, token.text, ownMap);
+        if (childMap) collect(token.tokens, token.text, childMap); else protect(ownMap);
+      } else if (token.tokens) collect(token.tokens, token.raw, ownMap);
+      else if (token.items) collect(token.items, token.raw, ownMap);
+      else if (token.type === "table") {
+        let cellAt = 0;
+        for (const cell of token.header.concat(...token.rows)) {
+          const found = token.raw.indexOf(cell.text, cellAt);
+          if (found < 0) { protect(ownMap); break; }
+          collect(cell.tokens, cell.text, ownMap.slice(found, found + cell.text.length));
+          cellAt = found + cell.text.length;
+        }
+      }
+    }
+  };
+  // Marked normalizes CRLF/CR to LF before producing token.raw.
+  let normalized = ""; const positions = [];
+  for (let i = 0; i < source.length; i++) {
+    positions.push(i);
+    normalized += source[i] === "\r" ? "\n" : source[i];
+    if (source[i] === "\r" && source[i + 1] === "\n") i++;
+  }
+  collect(marked.lexer(normalized), normalized, positions);
+  ranges.sort((a, b) => a[0] - b[0] || b[1] - a[1]);
+  let out = "", at = 0;
+  for (const [start, end, html] of ranges) {
+    if (start < at) continue;
+    out += transform(source.slice(at, start));
+    out += html ? source.slice(start, end).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : source.slice(start, end);
+    at = end;
+  }
+  return out + transform(source.slice(at));
+}
+function _pbpAskExportSources(round, pageUrl) {
+  const parsed = pbpAiParseCites(String(round.a || ""));
+  const candidates = new Map();
+  for (const c of parsed.cites.concat(Array.isArray(round.cites) ? round.cites : [])) {
+    if (c && Number.isInteger(c.p) && !candidates.has(c.p)) candidates.set(c.p, { p: c.p, quote: String(c.quote || ""), state: round.sourceChanged ? "source-changed" : "unverified", sourceUrl: _pbpAskExportSafeUrl(pageUrl) });
+  }
+  for (const e of Array.isArray(round.evidence) ? round.evidence : []) {
+    if (!e || !Number.isInteger(e.p)) continue;
+    candidates.set(e.p, { p: e.p, quote: String(e.quote || ""), state: round.sourceChanged ? "source-changed" : e.state === "matched" || e.state === "source-changed" ? e.state : "unverified", sourceUrl: _pbpAskExportSafeUrl(e.sourceUrl || pageUrl), time: e.time, deepUrl: _pbpAskExportSafeUrl(e.deepUrl) });
+  }
+  const sources = [], byP = new Map();
+  _pbpAskExportMapProse(parsed.body, (text) => _pbpAskSplitCiteTokens(text).map((seg) => {
+    if (seg.kind === "cite" && candidates.has(seg.p) && !byP.has(seg.p)) {
+      byP.set(seg.p, sources.length + 1); sources.push(candidates.get(seg.p));
+    }
+    return seg.kind === "text" ? seg.text : seg.token;
+  }).join(""));
+  return { body: parsed.body, sources, byP };
+}
+function _pbpAskExportEvidenceState(source) {
+  if (source.state === "matched") return _pbpAskExportLabel("askExportMatched", "Excerpt matched in the source sent to the model; this does not verify the answer.");
+  if (source.state === "source-changed") return _pbpAskExportLabel("askExportSourceChanged", "Source changed since this answer was generated.");
+  return _pbpAskExportLabel("askExportUnverified", "Excerpt not verified against the source sent to the model.");
+}
+function _pbpAskExportTime(time) {
+  return Math.floor(time / 60) + ":" + String(Math.floor(time % 60)).padStart(2, "0");
+}
+function pbpAskExportNamespace(snapshot, occupied, preferred) {
+  let ns = String(preferred || "pbp-ask").replace(/[^a-zA-Z0-9_-]/g, "-") || "pbp-ask";
+  const text = String(occupied || "") + (snapshot.rounds || []).map((r) => r.a).join("\n");
+  while (text.includes(ns + "-")) ns += "x";
+  return ns;
+}
+function pbpAskExportMarkdown(snapshot, opts = {}) {
+  if (!snapshot || !snapshot.rounds || !snapshot.rounds.length) return "";
+  const ns = pbpAskExportNamespace(snapshot, "", opts.namespace);
+  const portable = opts.citationStyle === "sources";
+  const parts = ["## " + _pbpAskExportEscape(_pbpAskExportLabel("askExportHeading", "Questions and answers"))];
+  snapshot.rounds.forEach((r, i) => {
+    const { body, sources, byP } = _pbpAskExportSources(r, snapshot.url);
+    const label = (n) => portable ? "[" + n + "]" : "[^" + ns + "-r" + (i + 1) + "-" + n + "]";
+    const answer = _pbpAskExportMapProse(body, (text) => _pbpAskSplitCiteTokens(text).map((s) => s.kind === "text" ? s.text : byP.has(s.p) ? label(byP.get(s.p)) : s.token).join(""), true);
+    const metadata = [];
+    if (r.model) metadata.push(_pbpAskExportLabel("askExportModel", "Model") + ": " + _pbpAskExportEscape(r.model));
+    if (Number.isFinite(r.ts) && !isNaN(new Date(r.ts).getTime())) metadata.push(_pbpAskExportLabel("askExportGenerated", "Generated") + ": " + new Date(r.ts).toISOString());
+    parts.push("### Q" + (i + 1) + "\n\n" + _pbpAskExportEscape(r.q) + "\n\n" + metadata.join(" · ") + "\n\n" + answer);
+    if (sources.length) {
+      if (portable) parts.push("#### " + _pbpAskExportLabel("askExportSources", "Sources"));
+      parts.push(sources.map((s, j) => {
+        const sourceLink = s.sourceUrl ? " <" + s.sourceUrl.replace(/[\s<>]/g, (c) => encodeURIComponent(c)) + ">" : "";
+        const timeLink = s.deepUrl && Number.isFinite(s.time) && s.time >= 0 ? " [" + _pbpAskExportTime(s.time) + "](<" + s.deepUrl.replace(/[\s<>]/g, (c) => encodeURIComponent(c)) + ">)" : "";
+        const desc = '"' + _pbpAskExportEscape(s.quote) + '" — P' + s.p + (Number.isFinite(s.time) && s.time >= 0 ? " · " + _pbpAskExportTime(s.time) : "")
+          + ". " + _pbpAskExportEscape(_pbpAskExportEvidenceState(s)) + sourceLink + timeLink;
+        return (portable ? (j + 1) + ". " : label(j + 1) + ": ") + desc.replace(/\n/g, "\n    ");
+      }).join("\n"));
+    }
+  });
+  return parts.join("\n\n").trim();
+}
+function pbpAskExportHtml(snapshot, opts = {}) {
+  if (!snapshot || !snapshot.rounds || !snapshot.rounds.length) return "";
+  const doc = document.implementation.createHTMLDocument("");
+  const root = doc.createElement("section");
+  const ns = pbpAskExportNamespace(snapshot, opts.occupied || "", opts.namespace);
+  const add = (tag, text, parent = root) => { const el = doc.createElement(tag); el.textContent = text; parent.appendChild(el); return el; };
+  add("h2", _pbpAskExportLabel("askExportHeading", "Questions and answers"));
+  snapshot.rounds.forEach((r, i) => {
+    add("h3", "Q" + (i + 1)); add("p", r.q);
+    const metadata = [];
+    if (r.model) metadata.push(_pbpAskExportLabel("askExportModel", "Model") + ": " + r.model);
+    if (Number.isFinite(r.ts) && !isNaN(new Date(r.ts).getTime())) metadata.push(_pbpAskExportLabel("askExportGenerated", "Generated") + ": " + new Date(r.ts).toISOString());
+    if (metadata.length) add("p", metadata.join(" · "));
+    const { body, sources, byP } = _pbpAskExportSources(r, snapshot.url);
+    const answer = doc.createElement("div");
+    answer.innerHTML = renderMarkdown(body); // canonical single sanitizer
+    // All exported IDs below belong to trusted generation; no model ID can
+    // claim a reference/source target or collide with the enclosing article.
+    answer.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
+    const refs = new Map();
+    const walker = doc.createTreeWalker(answer, NodeFilter.SHOW_TEXT), nodes = [];
+    let node; while ((node = walker.nextNode())) if (!node.parentElement.closest("pre,code,a")) nodes.push(node);
+    for (const text of nodes) {
+      const frag = doc.createDocumentFragment();
+      for (const seg of _pbpAskSplitCiteTokens(text.nodeValue)) {
+        const n = seg.kind === "cite" && byP.get(seg.p);
+        if (!n) { frag.appendChild(doc.createTextNode(seg.kind === "text" ? seg.text : seg.token)); continue; }
+        const sid = ns + "-r" + (i + 1) + "-s" + n;
+        const list = refs.get(n) || []; const rid = sid + "-ref" + (list.length + 1);
+        const sup = doc.createElement("sup"), a = doc.createElement("a");
+        a.id = rid; a.href = "#" + sid; a.textContent = "[" + n + "]";
+        sup.appendChild(a); frag.appendChild(sup); list.push(rid); refs.set(n, list);
+      }
+      text.replaceWith(frag);
+    }
+    root.appendChild(answer);
+    if (sources.length) {
+      add("h4", _pbpAskExportLabel("askExportSources", "Sources")); const list = doc.createElement("ol"); root.appendChild(list);
+      sources.forEach((s, j) => {
+        const n = j + 1, li = add("li", '"' + s.quote + '" — P' + s.p + ". " + _pbpAskExportEvidenceState(s), list);
+        li.id = ns + "-r" + (i + 1) + "-s" + n;
+        if (s.sourceUrl) { li.appendChild(doc.createTextNode(" ")); const a = add("a", s.sourceUrl, li); a.href = s.sourceUrl; a.rel = "noopener noreferrer"; }
+        if (s.deepUrl && Number.isFinite(s.time) && s.time >= 0) { li.appendChild(doc.createTextNode(" ")); const a = add("a", _pbpAskExportTime(s.time), li); a.href = s.deepUrl; a.rel = "noopener noreferrer"; }
+        (refs.get(n) || []).forEach((rid, k) => { li.appendChild(doc.createTextNode(" ")); const a = add("a", "[" + n + "." + (k + 1) + "]", li); a.href = "#" + rid; });
+      });
+    }
+  });
+  return root.outerHTML;
+}
 
 // Pure: compose the copied markdown = answer body + footnote block from
 // the parsed cites. Inline [Pn] tokens become [^k] references matching
@@ -1699,14 +2085,14 @@ function _pbpAskBuildCopyText(body, cites, prefix) {
     }
   }
   const label = (k) => "[^" + pre + k + "]";
-  const linked = _pbpAskSplitCiteTokens(b)
+  const linked = _pbpAskExportMapProse(b, (text) => _pbpAskSplitCiteTokens(text)
     .map((seg) => {
       if (seg.kind !== "cite") return seg.text;
       return idxByP.has(seg.p) ? label(idxByP.get(seg.p)) : seg.token;
     })
-    .join("");
+    .join(""), true);
   const foot = uniq
-    .map((c, i) => label(i + 1) + ': "' + c.quote + '" — P' + c.p)
+    .map((c, i) => label(i + 1) + ': "' + _pbpAskExportEscape(c.quote) + '" — P' + c.p)
     .join("\n");
   return linked + "\n\n" + foot;
 }
@@ -1717,13 +2103,13 @@ function _pbpAskBuildThreadExport(rounds, page) {
   const parts = [];
   const title = String(meta.title || "").trim();
   const url = String(meta.url || "").trim();
-  if (title) parts.push("# " + title);
+  if (title) parts.push("# " + _pbpAskExportEscape(title));
   if (url) parts.push(url);
   list.forEach((r, i) => {
     const parsed = pbpAiParseCites(String((r && r.a) || ""));
     parts.push([
       "## Q" + (i + 1),
-      "**Q:** " + String((r && r.q) || "").trim(),
+      "**Q:** " + _pbpAskExportEscape(String((r && r.q) || "").trim()),
       "**A:**",
       // Per-round label prefix: without it, every answer's footnotes
       // restart at [^1] and collide inside the single exported document.
@@ -1737,8 +2123,13 @@ async function _pbpAskCopyThread() {
   const st = _pbpAskState;
   const btn = document.getElementById("ask-export");
   if (!st || !btn) return;
-  const records = (st.records && st.records.length) ? st.records : (st.rounds || []);
-  const text = _pbpAskBuildThreadExport(records, { title: st.title, url: st.url });
+  const account = st.account;
+  const revision = _pbpAskExportRevision;
+  const articleRevision = _pbpAskArticleRev;
+  let snapshot;
+  try { snapshot = await pbpAskExportSnapshot({ title: st.title, url: st.url, account }); } catch (_) { return; }
+  const text = pbpAskExportMarkdown(snapshot);
+  if (st.account !== account || revision !== _pbpAskExportRevision) return;
   if (!text) return;
   const origTitle = btn.title;
   const origAria = btn.getAttribute("aria-label") || "";
@@ -1754,6 +2145,7 @@ async function _pbpAskCopyThread() {
     }, 1500);
   };
   try {
+    if (!await _pbpAskExportOwnerCurrent(account, revision, articleRevision, snapshot)) return;
     await navigator.clipboard.writeText(text);
     flash(t("askCopied"));
   } catch (_) {
@@ -1779,9 +2171,23 @@ function _pbpAskDecorate(el, parsed) {
     label.className = "btn-label";
     label.textContent = t("askCopyAnswer");
     btn.appendChild(label);
-    const text = _pbpAskBuildCopyText(parsed.body, parsed.cites);
     btn.addEventListener("click", async () => {
       try {
+        const st = _pbpAskState;
+        if (!el.isConnected || !st) return;
+        const account = st.account, revision = _pbpAskExportRevision, articleRevision = _pbpAskArticleRev;
+        const record = el._askExportRecord || { q: "", a: parsed.body, cites: parsed.cites };
+        let snapshot;
+        if (el._askExportRecord) {
+          snapshot = await pbpAskExportSnapshot({ url: st.url, account, title: st.title });
+          const present = snapshot.rounds.some((r) => r.q === record.q && r.a === record.a
+            && r.ts === (Number.isFinite(record.ts) ? record.ts : null) && r.model === String(record.model || ""));
+          if (!present) return; // an external Clear may leave this old bubble visible
+        }
+        const currentHash = typeof pbpAiBlocksFingerprint === "function" && pbpAiBlocks().length ? pbpAiBlocksFingerprint() : "";
+        const sourceChanged = !!(record.blocksHash && currentHash && record.blocksHash !== currentHash);
+        const text = pbpAskExportMarkdown({ url: st.url, rounds: [{ ...record, sourceChanged }] });
+        if (!await _pbpAskExportOwnerCurrent(account, revision, articleRevision, snapshot) || !el.isConnected) return;
         await navigator.clipboard.writeText(text);
         flashButtonLabel(btn, t("askCopied"));
       } catch (_) {
@@ -2036,6 +2442,7 @@ async function _pbpAskHistRestore() {
         // SAME pipeline as live answers: pbpAiParseCites -> renderMarkdown
         // (single sanitize point) -> chip pass -> verification runs AGAIN
         // against the current block index -> decorate (copy button).
+        aEl._askExportRecord = rec;
         const parsed = _pbpAskFinalize(aEl, rec.a);
         const stale = !!(rec.blocksHash && curFp && rec.blocksHash !== curFp);
         if (stale) {
@@ -2080,6 +2487,7 @@ async function _pbpAskHistRestore() {
     _pbpAskState.rounds = _pbpAskHistTrim(restoredRounds.concat(_pbpAskState.rounds || []));
   }
   thread.insertBefore(frag, thread.firstChild);
+  _pbpAskHistoryChanged();
   _pbpAskSyncRegenerate();
 }
 
@@ -3548,6 +3956,8 @@ function _pbpAskOnAccountChanged(account) {
   // new partition, and an older restore still parked on its IDB read/rAF loop
   // compares against this same variable to discover it has been superseded.
   _pbpAskHistAccount = acct;
+  _pbpAskUnpersisted = [];
+  _pbpAskHistoryChanged();
   const st = _pbpAskState;
   if (st) {
     st.account = acct;
@@ -3566,6 +3976,8 @@ function _pbpAskOnAccountChanged(account) {
   if (clearBtn) clearBtn.hidden = true;
   const strip = document.getElementById("ask-clear-confirm");
   if (strip) strip.remove();
+  const clearError = document.getElementById("ask-clear-error");
+  if (clearError) clearError.remove();
   // Show the new owner's transcript for this URL, exactly as a fresh page open
   // would. Safe to re-arm unconditionally (unlike the article-replaced path):
   // the account fence inside the restore stops any older run from inserting.

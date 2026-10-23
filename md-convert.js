@@ -1228,6 +1228,11 @@ function composeExport(canonicalMd, meta, opts) {
   if (hlItems && hlItems.length && typeof pbpHlComposeSection === "function") {
     body = body + "\n\n" + pbpHlComposeSection(hlItems);
   }
+  if (opts.ask && typeof pbpAskExportMarkdown === "function") {
+    const namespace = pbpAskExportNamespace(opts.ask, body);
+    const ask = pbpAskExportMarkdown(opts.ask, { citationStyle: opts.askCitationStyle, namespace });
+    if (ask) body += (body ? "\n\n" : "") + ask;
+  }
   if (opts.frontmatter) {
     body = applyFrontmatter(body, meta, {});
   }
@@ -1584,6 +1589,7 @@ function composeStyledHtml(canonicalMd, meta, opts) {
     highlightsInline: false
   });
   let article = renderMarkdown(bodyMd);
+  if (opts.ask && typeof pbpAskExportHtml === "function") article += pbpAskExportHtml(opts.ask, { occupied: article });
   if (typeof document !== "undefined" && typeof hljs !== "undefined") {
     const tmp = _pbpConvertScratchDiv();
     tmp.innerHTML = article;
