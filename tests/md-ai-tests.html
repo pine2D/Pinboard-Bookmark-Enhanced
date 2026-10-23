@@ -12864,8 +12864,6 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
   }
   function ktest(name, fn) { try { fn(); report(name); } catch (e) { report(name, e); } }
   async function katest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
-  const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
-
   const N = 40, ENTRY = 20, RAIL_H = 100;
   // Kept off the element so the counting accessor below can delegate to the real
   // implementation instead of shadowing it with a plain data property.
@@ -13160,8 +13158,24 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
   });
 
   await katest("through the real scroll-spy: the first activation moves the rail, a repeat of the SAME slug writes nothing", async () => {
-    const f = setup();
-    const view = document.createElement("div");
+    // Other async cases render Notebook sections into the parent #rail. An
+    // insertion before #toc triggers native scroll anchoring without a setter
+    // write, so keep this multi-frame fixture in its own document. Run the real
+    // functions and the SAME setup() there; only their document/window change.
+    const frame = document.createElement("iframe");
+    frame.style.cssText = "position:fixed; left:-9999px; top:0; width:1280px; height:800px; border:0;";
+    document.body.appendChild(frame);
+    const win = frame.contentWindow, doc = frame.contentDocument;
+    const runtime = doc.createElement("script");
+    runtime.textContent = [keepTocEntryVisible, setupScrollSpy, trOnlyScrollTarget, cssEscape]
+      .map((fn) => fn.toString()).join("\n") +
+      "\nconst N = " + N + ", ENTRY = " + ENTRY + ", RAIL_H = " + RAIL_H + ";" +
+      '\nconst SCROLL_DESC = Object.getOwnPropertyDescriptor(Element.prototype, "scrollTop");' +
+      "\nwindow.makeFixture = " + setup.toString() + ";";
+    doc.head.appendChild(runtime);
+    const f = win.makeFixture();
+    const nextFrame = () => new Promise((r) => win.requestAnimationFrame(() => r()));
+    const view = doc.createElement("div");
     let dispose = null;
     try {
       // top:-300px parks headings 0..32 above runFallback's 28px line (10px each),
@@ -13169,21 +13183,21 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
       // far below a 5-entry rail viewport, i.e. a guaranteed first correction.
       view.style.cssText = "position:fixed; left:-9999px; top:-300px; width:300px; margin:0; padding:0;";
       for (let i = 0; i < N; i++) {
-        const hd = document.createElement("h2");
+        const hd = doc.createElement("h2");
         hd.id = "k85-" + i;
         hd.textContent = "heading " + i;
         hd.style.cssText = "height:10px; line-height:10px; margin:0; padding:0; font-size:8px;";
         view.appendChild(hd);
       }
-      document.body.appendChild(view);
+      doc.body.appendChild(view);
       f.seed(0);
-      dispose = setupScrollSpy(view, f.list);
-      window.dispatchEvent(new Event("scroll"));
+      dispose = win.setupScrollSpy(view, f.list);
+      win.dispatchEvent(new win.Event("scroll"));
       await nextFrame(); await nextFrame();
       assertEq(f.activeIndex(), 32, "the scroll fallback activated the entry this fixture is built around");
       assertEq(f.writes(), 1, "the activation brought the entry back into the rail exactly once");
       assertEq(f.raw(), 560, "bottom-aligned: 660 - 100");
-      window.dispatchEvent(new Event("scroll"));
+      win.dispatchEvent(new win.Event("scroll"));
       await nextFrame(); await nextFrame();
       assertEq(f.writes(), 1, "same slug: setActive early-returns, so no second forced layout and no drift");
       assertEq(f.raw(), 560, "rail position unchanged on the repeat");
@@ -13191,6 +13205,7 @@ suiteIf("_pbpAskSetOpen scroll preservation (K84)", "_pbpAskSetOpen", () => {
       if (dispose) dispose();
       view.remove();
       f.done();
+      frame.remove();
     }
   });
 })();
