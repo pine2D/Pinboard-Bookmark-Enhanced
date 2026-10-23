@@ -2979,16 +2979,16 @@
     "message": "Stop"
   },
   "askPlaceholder": {
-    "message": "Ask about this article… (Enter to send, Shift+Enter for a new line)"
+    "message": "Ask about this page…"
   },
-  "askWillSend": {
-    "message": "Will send about $TOKENS$ tokens · $MODEL$",
+  "askInputHint": {
+    "message": "Enter to send · Shift+Enter for a new line"
+  },
+  "askTokenEstimate": {
+    "message": "~$TOKENS$ tokens",
     "placeholders": {
       "tokens": {
         "content": "$1"
-      },
-      "model": {
-        "content": "$2"
       }
     }
   },

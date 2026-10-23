@@ -203,14 +203,15 @@ function _pbpAskBuildPanel() {
     '  <button type="button" class="ask-chip" data-i18n="askChipData"></button>',
     '</div>',
     '<form id="ask-form">',
-    '  <textarea id="ask-input" rows="2" dir="auto" maxlength="4000" data-i18n-placeholder="askPlaceholder"></textarea>',
+    '  <textarea id="ask-input" rows="2" dir="auto" maxlength="4000" data-i18n-placeholder="askPlaceholder" data-i18n-aria="askTitle" aria-describedby="ask-input-hint"></textarea>',
+    '  <button type="button" id="ask-scope-near" class="action-btn" aria-pressed="false" hidden data-i18n="askScopeNear" data-i18n-title="askScopeNearHint" data-i18n-aria="askScopeNear"></button>',
     '  <div class="ask-actions">',
-    '    <button type="button" id="ask-scope-near" class="action-btn" aria-pressed="false" hidden data-i18n="askScopeNear" data-i18n-title="askScopeNearHint" data-i18n-aria="askScopeNear"></button>',
-    '    <button type="button" id="ask-stop" class="action-btn" hidden data-i18n="askStop">Stop</button>',
-    '    <button type="submit" id="ask-send" class="action-btn">' + PBP_ASK_SEND_SVG + '<span class="btn-label" data-i18n="askSend">Send</span></button>',
+    '    <div id="ask-meta" aria-live="polite"></div>',
+    '    <button type="button" id="ask-stop" class="action-btn" hidden data-i18n-title="askStop" data-i18n-aria="askStop">' + (typeof PBP_ICONS !== "undefined" ? PBP_ICONS.stop : "") + '</button>',
+    '    <button type="submit" id="ask-send" class="action-btn" data-i18n-title="askSend" data-i18n-aria="askSend">' + PBP_ASK_SEND_SVG + '</button>',
     '  </div>',
     '</form>',
-    '<div id="ask-meta" aria-live="polite"></div>'
+    '<div id="ask-input-hint" data-i18n="askInputHint"></div>'
   ].join("\n");
   // Starter chips: applyI18n fills them from data-i18n - each locale's
   // message is a complete, natural question. (A JS pass used to append
@@ -887,16 +888,13 @@ function _pbpAskUpdateMeta() {
   // x3 cushion; a Chinese article used to under-report by about 2.5x. Display
   // only -- the admission side (sampleFit / PBP_ASK_CTX_BUDGET) is untouched.
   const tokens = pbpAiEstimateTokensText(_askBuilt.system + _askBuilt.prompt);
-  // Glue each figure to its words the way the rail's done line does
-  // (md-translate.js _pbpTrPaintDone) so the price never splits between a
-  // number and "tokens". The model goes in its own no-wrap span: an id such
-  // as "gpt-5.4-nano" otherwise breaks at its hyphens. The locale string keeps
-  // its word order; it is split at the model's slot, not rebuilt.
-  const SLOT = "\u0001";
-  const shaped = t("askWillSend", String(tokens), SLOT)
-    .replace(/(?<![\u00b7/]) (?![\u00b7/])/g, "\u00a0");
-  const at = shaped.indexOf(SLOT);
-  let tail = at < 0 ? "" : shaped.slice(at + 1);
+  // Keep the estimate and model as two stable UI lines, independent of
+  // article typography and locale sentence length. Only the model ellipsizes;
+  // partial-context and history disclosures must remain readable in full.
+  const estimate = document.createElement("span");
+  estimate.className = "ask-meta-estimate";
+  estimate.textContent = t("askTokenEstimate", String(tokens));
+  let tail = "";
   if (st.ctx.sentBlocks < st.ctx.totalBlocks) {
     tail += " " + t("askSentPartial", String(st.ctx.sentBlocks), String(st.ctx.totalBlocks));
   }
@@ -904,11 +902,16 @@ function _pbpAskUpdateMeta() {
   // once the thread outgrows the 4-round prompt window, say so instead
   // of silently reinterpreting follow-ups against a truncated history.
   if (_askRounds.length > 4) tail += " " + t("askHistWindowNote");
-  if (at < 0) { meta.textContent = shaped + tail; return; }
   const model = document.createElement("span");
   model.className = "ask-meta-model";
   model.textContent = model.title = _pbpAskProviderLabel(st.s);
-  meta.replaceChildren(document.createTextNode(shaped.slice(0, at)), model, document.createTextNode(tail));
+  meta.replaceChildren(estimate, model);
+  if (tail) {
+    const note = document.createElement("span");
+    note.className = "ask-meta-note";
+    note.textContent = tail.trim();
+    meta.appendChild(note);
+  }
 }
 
 // One-time Stop wiring (the panel markup belongs to Task 12; same
@@ -1093,8 +1096,10 @@ async function _pbpAskRun(question, aEl, opts) {
   _pbpAskWireStop();
   const stopBtn = document.getElementById("ask-stop");
   const sendBtn = document.getElementById("ask-send");
+  const sendHadFocus = document.activeElement === sendBtn;
   if (stopBtn) stopBtn.hidden = false;
-  if (sendBtn) sendBtn.disabled = true;
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.hidden = true; }
+  if (sendHadFocus && stopBtn) stopBtn.focus({ preventScroll: true });
   let raf = 0;
   let acc = "";
   let langJudged = false;
@@ -1277,8 +1282,10 @@ async function _pbpAskRun(question, aEl, opts) {
   } finally {
     st.running = false;
     st.ctrl = null;
+    const stopHadFocus = document.activeElement === stopBtn;
     if (stopBtn) stopBtn.hidden = true;
-    if (sendBtn) sendBtn.disabled = false;
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.hidden = false; }
+    if (stopHadFocus && sendBtn) sendBtn.focus({ preventScroll: true });
     // Refresh the transparency line NOW: st.rounds just changed, and the
     // 4-round window note (B2) must appear as soon as the 5th round
     // lands, not on the next open/send.

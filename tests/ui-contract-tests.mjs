@@ -7515,13 +7515,15 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
   // .active and [aria-pressed="true"], for one control family, which is why
   // "ten consumers" and "eleven rules" are both correct at once) -- plus
   // .toc-list a.active on --border-light: twelve; export content scope
-  // .exp-scope > .action-btn[aria-pressed="true"] adds the thirteenth.
+  // .exp-scope > .action-btn[aria-pressed="true"] adds the thirteenth;
+  // reader bookmark actions (saved/read-later grouped rule) and the editor's
+  // native checked input bring the count to fifteen.
   // Expected non-match, which
   // correctly stays OUT of this gate: .hl-card-dot.active (no background
   // declared at all). The contrast numbers themselves, including non-pressed
   // hover rules, live in tests/md-preview-contrast-tests.mjs's rule scan.
-  check(matchedSelectors.length === 13,
-    `md-preview.css: pressed-state raised-fill rule count drifted from the expected 13 (found ${matchedSelectors.length}) -- a consumer was added, removed, or changed its fill; update this gate's comment and expectation once the drift is intentional`);
+  check(matchedSelectors.length === 15,
+    `md-preview.css: pressed-state raised-fill rule count drifted from the expected 15 (found ${matchedSelectors.length}) -- a consumer was added, removed, or changed its fill; update this gate's comment and expectation once the drift is intentional`);
 }
 
 // T3 (D5, taste-uplift batch3): browsers synthesize an oblique for CJK glyphs

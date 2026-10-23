@@ -23,6 +23,8 @@
 //   node scripts/qa-drive.mjs --surfaces options,preview
 //   node scripts/qa-drive.mjs --headless --surfaces journey  # reader → notes → source + account isolation
 //   node scripts/qa-drive.mjs --headless --surfaces selection --click-dismiss --check
+//   node scripts/qa-drive.mjs --headless --surfaces reader-controls --check
+//   FONTCONFIG_FILE="$PWD/scripts/ci-fonts.conf" node scripts/qa-drive.mjs --headless --surfaces reader-controls --reader-controls-representative --check
 //   node scripts/qa-drive.mjs --surfaces themes --label themes  # 13 preset × 明暗矩阵 + default + library + popup
 //   node scripts/qa-drive.mjs --site-theme dracula  # pinboard.in theme shot
 //   node scripts/qa-drive.mjs --label after-fix
@@ -41,14 +43,22 @@ import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isolatedFontconfigEnv, parityProbeEnv } from "./ci-fonts-env.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(SCRIPT_DIR, "..");
 const QA_SCAN = resolve(REPO, ".qa-scan");
 const REPORT_ROOT = resolve(QA_SCAN, "report");
 const TIMEOUT_MS = 15_000;
+const FONTCONFIG_ISOLATION = isolatedFontconfigEnv("qa-drive");
+if (FONTCONFIG_ISOLATION) {
+  if (!isAbsolute(process.env.FONTCONFIG_FILE)) throw new Error("FONTCONFIG_FILE must be an absolute path");
+  const resolved = execFileSync("fc-match", ["Microsoft YaHei"], { encoding: "utf8", env: parityProbeEnv(FONTCONFIG_ISOLATION.env) }).trim();
+  if (!resolved.includes("DejaVu")) throw new Error("CI font configuration did not take effect: " + resolved);
+  console.log("[qa-drive] CI font parity: " + resolved);
+}
 
 // ---- CLI ----
 const argv = process.argv.slice(2);
@@ -61,6 +71,7 @@ const CONFIG = {
   keepProfile: hasFlag("--keep-profile"),
   check: hasFlag("--check"),
   clickDismiss: hasFlag("--click-dismiss"),
+  readerControlsRepresentative: hasFlag("--reader-controls-representative"),
   siteTheme: flag("--site-theme", "modern-card"),
   surfaces: (flag("--surfaces", "options,preview,popup,pinboard,library,journey")).split(",").filter(Boolean),
   // Named fault profile (error-state tour): mocks answer per the profile and
@@ -289,6 +300,14 @@ function startAiMock() {
         });
         if (body?.stream) {
           res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" });
+          // This fixture leaves time to exercise keyboard Stop against a real
+          // streaming HTTP response. Other tours retain their immediate mock.
+          if (body.model === "qa-controls-slow") {
+            res.write('data: {"choices":[{"delta":{"content":"QA controls streaming"}}]}\n\n');
+            const timer = setTimeout(() => res.end("data: [DONE]\n\n"), 3000);
+            res.on("close", () => clearTimeout(timer));
+            return;
+          }
           // Split into a few deltas so streaming parsers see realistic chunking.
           const step = Math.max(1, Math.ceil(content.length / 4));
           for (let i = 0; i < content.length; i += step) {
@@ -393,6 +412,7 @@ const LAUNCH_ARGS = [
 
 function launchContext(profile) {
   return chromium.launchPersistentContext(profile, {
+    ...(FONTCONFIG_ISOLATION ? { env: FONTCONFIG_ISOLATION.env } : {}),
     executablePath: chromium.executablePath(),
     headless: CONFIG.headless,
     locale: "zh-CN",
@@ -2065,6 +2085,193 @@ async function driveReaderBookmark(context, worker, extId, rep) {
   }
 }
 
+// Reader controls: real extension DOM and native interactions, with only the
+// article, persisted history, player position and network supplied as fixtures.
+async function driveReaderControls(context, worker, extId, rep) {
+  const s = rep.surface("reader-controls");
+  const page = await context.newPage();
+  const detach = rep.attach(page, s);
+  const beforeAi = aiRequests.length;
+  const settingKeys = ["optLang", "pbp_font_tier", "pbp_leading_tier", "pbp_color_scheme", "customModel"];
+  const original = await worker.evaluate(keys => chrome.storage.local.get(keys), settingKeys);
+  const locales = CONFIG.readerControlsRepresentative ? ["zh_CN", "de"] : ["zh_CN", "en", "de", "fr", "ja", "pl", "ru", "zh_TW", "zh_HK"];
+  const longModel = "qa-very-long-model-identifier-".repeat(8);
+  const requireState = (ok, message) => { if (!ok) throw new Error(message); };
+  const record = (label, errors) => { for (const error of errors) s.failures.push(label + ": " + error); };
+  const settled = () => page.waitForFunction(() => {
+    const btn = document.getElementById("reader-bookmark-save");
+    return btn && !btn.disabled && btn.getAttribute("aria-busy") === "false" && !!window.pbpAskOpenPanel;
+  }, null, { timeout: 30_000 });
+  const arrange = async ({ mode, width, tier }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(({ mode, tier }) => {
+      pbpReaderSchemeSet(mode); _pbpTypoSet(tier, 0);
+      return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }, { mode, tier });
+  };
+  const chosenShot = (locale, c) => CONFIG.readerControlsRepresentative || (locale === "zh_CN" && c.width === 1440 && c.tier === 0)
+    || (locale === "de" && c.mode === "light" && c.width === 360 && c.tier === 2);
+  let matrixCases = 0;
+  let stoppedExpected = false;
+  try {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await worker.evaluate(model => chrome.storage.local.set({ customModel: model }), longModel);
+    for (const locale of locales) {
+      await worker.evaluate(lang => chrome.storage.local.set({ optLang: lang }), locale);
+      await seedPreviewData(worker);
+      await page.goto("chrome-extension://" + extId + "/md-preview.html?k=" + PREVIEW_KEY, { waitUntil: "load" });
+      await page.evaluate(async () => { initI18n(); await pbpI18nReady(); applyI18n(); });
+      await settled();
+      const cases = [];
+      if (CONFIG.readerControlsRepresentative) {
+        for (const mode of ["light", "dark"]) cases.push({ mode, width: 360, tier: 2 });
+      } else {
+        for (const mode of ["light", "dark"]) for (const width of [1440, 360]) for (const tier of [0, 2]) cases.push({ mode, width, tier });
+        if (locale === "zh_CN" || locale === "de") for (const mode of ["light", "dark"]) cases.push({ mode, width: 320, tier: 2 });
+      }
+      await page.keyboard.press("Shift+s");
+      await page.locator("#reader-bookmark-editor:popover-open").waitFor();
+      requireState(await page.locator("#reader-bookmark-title").evaluate(el => document.activeElement === el), locale + ": Shift+S did not focus title");
+      for (const c of cases) {
+        const label = locale + "/" + c.mode + "/" + c.width + "/tier" + c.tier;
+        await arrange(c);
+        record(label + "/editor", await page.evaluate(({ mode, locale }) => {
+          const errors = [], fail = (ok, text) => { if (!ok) errors.push(text); };
+          const editor = document.getElementById("reader-bookmark-editor"), box = editor.getBoundingClientRect();
+          fail(getComputedStyle(document.documentElement).colorScheme === mode, "wrong color scheme");
+          fail(box.left >= 0 && box.right <= innerWidth + 1 && editor.scrollWidth <= editor.clientWidth + 1, "editor overflows");
+          const labels = [...document.querySelectorAll("#reader-bookmark-options > label")];
+          fail(labels.length === 2, "checkbox options missing");
+          const options = document.getElementById("reader-bookmark-options"), row = options.getBoundingClientRect();
+          const gap = parseFloat(getComputedStyle(options).columnGap);
+          const widths = labels.map(el => el.getBoundingClientRect().width);
+          if (widths.reduce((a, b) => a + b, 0) + gap <= row.width + 1 || (locale === "zh_CN" && innerWidth >= 360)) {
+            fail(Math.abs(labels[0].getBoundingClientRect().top - labels[1].getBoundingClientRect().top) < 1, "fitting checkbox groups unexpectedly wrap");
+          }
+          for (const label of labels) {
+            const input = label.querySelector("input"), caption = label.lastElementChild, lb = label.getBoundingClientRect(), cb = caption.getBoundingClientRect();
+            fail(input.labels.length === 1 && input.labels[0] === label, "checkbox lost associated label");
+            fail(label.textContent.trim() === t(input.id.endsWith("private") ? "readerBookmarkPrivate" : "readerBookmarkLater"), "checkbox label truncated in DOM");
+            fail(lb.left >= row.left - 1 && lb.right <= row.right + 1 && cb.right <= lb.right + 1 && caption.scrollWidth <= caption.clientWidth + 1, "checkbox group or full label clips");
+          }
+          const icons = [...document.querySelectorAll("#reader-bookmark-section .reader-bookmark-ic,#reader-bookmark-footer .reader-bookmark-ic")];
+          fail(icons.length === 7, "rail/footer icon control missing");
+          for (const btn of icons) {
+            const r = btn.getBoundingClientRect(), key = btn.getAttribute("data-i18n-aria");
+            fail(Math.abs(r.width - 26) < 1 && Math.abs(r.height - 26) < 1, btn.id + " is not 26px");
+            fail(!!btn.querySelector("svg") && !btn.textContent.trim(), btn.id + " lost icon-only presentation");
+            fail(!!key && btn.title === t(key) && btn.getAttribute("aria-label") === t(key), btn.id + " lacks complete localized title/name");
+          }
+          return errors;
+        }, { mode: c.mode, locale }));
+        if (chosenShot(locale, c)) await rep.shot(page, s, "editor-" + label.replaceAll("/", "-"));
+      }
+      // Exercise label activation and native Space, then inspect the actual
+      // keyboard focus ring instead of assuming that a CSS selector is enough.
+      for (const name of ["private", "toread"]) {
+        const checkbox = page.locator("#reader-bookmark-" + name);
+        const initial = await checkbox.isChecked();
+        await page.locator("#reader-bookmark-options > label").filter({ has: checkbox }).locator(":scope > span:last-child").click();
+        requireState(await checkbox.isChecked() !== initial, locale + ": label did not toggle " + name);
+        await checkbox.focus(); await page.keyboard.press("Space");
+        requireState(await checkbox.isChecked() === initial, locale + ": Space did not toggle " + name);
+        requireState(await checkbox.evaluate(el => el.matches(":focus-visible") && parseFloat(getComputedStyle(el).outlineWidth) >= 2), locale + ": checkbox keyboard focus is invisible");
+      }
+      if (locale === "zh_CN") {
+        await page.emulateMedia({ forcedColors: "active" });
+        requireState(await page.locator("#reader-bookmark-private").evaluate(el => getComputedStyle(el).appearance === "auto" && getComputedStyle(el.nextElementSibling).display === "none"), "forced-colors did not restore native checkbox");
+        await rep.shot(page, s, "editor-forced-colors");
+        await page.emulateMedia({ forcedColors: "none" });
+      }
+      await page.keyboard.press("Escape");
+      await page.locator("#reader-bookmark-editor:popover-open").waitFor({ state: "hidden" });
+      await page.evaluate(() => window.pbpAskOpenPanel());
+      await page.waitForFunction(() => !document.getElementById("ask-panel").hidden);
+      for (const c of cases) {
+        const label = locale + "/" + c.mode + "/" + c.width + "/tier" + c.tier;
+        await arrange(c);
+        await page.locator("#ask-input").fill("A short question?");
+        const shortHeight = await page.locator("#ask-input").evaluate(el => el.getBoundingClientRect().height);
+        await page.locator("#ask-input").fill(Array.from({ length: 12 }, (_, i) => "Question line " + (i + 1)).join("\n"));
+        record(label + "/ask", await page.evaluate(({ shortHeight, longModel }) => {
+          const errors = [], fail = (ok, text) => { if (!ok) errors.push(text); };
+          const input = document.getElementById("ask-input"), style = getComputedStyle(input);
+          fail(style.fontSize === "13px", "input follows prose size");
+          fail(input.placeholder === t("askPlaceholder") && !/enter|shift|ctrl|cmd|⌘/i.test(input.placeholder), "placeholder includes keyboard instructions");
+          fail(input.getAttribute("aria-label") === t("askTitle") && input.getAttribute("aria-describedby") === "ask-input-hint" && document.getElementById("ask-input-hint").textContent === t("askInputHint"), "input accessible name/hint missing");
+          fail(input.getBoundingClientRect().height > shortHeight + 20 && input.getBoundingClientRect().height <= parseFloat(style.maxHeight) + 1 && input.scrollHeight > input.clientHeight, "long question does not auto-grow to a scrolling cap");
+          const send = document.getElementById("ask-send"), r = send.getBoundingClientRect();
+          fail(Math.abs(r.width - 26) < 1 && Math.abs(r.height - 26) < 1 && !!send.querySelector("svg") && !send.textContent.trim() && send.title === t("askSend") && send.getAttribute("aria-label") === t("askSend"), "submit icon size/name changed");
+          const model = document.querySelector(".ask-meta-model"), ms = getComputedStyle(model), estimate = document.querySelector(".ask-meta-estimate");
+          fail(model.title === model.textContent && model.title.includes(longModel) && ms.textOverflow === "ellipsis" && ms.whiteSpace === "nowrap" && model.scrollWidth > model.clientWidth, "long model lacks full title or ellipsis");
+          fail(/\d/.test(estimate.textContent) && !estimate.textContent.includes("askTokenEstimate") && estimate.scrollWidth <= estimate.clientWidth + 1, "token estimate missing or clipped");
+          fail(document.documentElement.scrollWidth <= innerWidth + 1, "document horizontal overflow");
+          for (const selector of ["#ask-panel", "#ask-form", "#ask-input", "#ask-meta", ".ask-meta-note", "#ask-input-hint"]) {
+            const el = document.querySelector(selector); if (!el) continue;
+            const b = el.getBoundingClientRect();
+            fail(b.left >= -1 && b.right <= innerWidth + 1 && el.scrollWidth <= el.clientWidth + 1, selector + " overflows");
+          }
+          return errors;
+        }, { shortHeight, longModel }));
+        await page.locator("#ask-input").fill("");
+        if (chosenShot(locale, c)) await rep.shot(page, s, "ask-" + label.replaceAll("/", "-"));
+        matrixCases++;
+      }
+      // Restore five actual persisted rounds, then let the real near-context
+      // builder derive partial coverage from timed, already-indexed paragraphs.
+      await page.evaluate(async () => {
+        const st = _pbpAskState;
+        await pbpAskHistSet(st.url, Array.from({ length: 5 }, (_, i) => ({ q: "Fixture question " + i, a: "Fixture answer " + i, ts: 1700000000000 + i, model: "qa-mock" })), st.account);
+        _pbpAskHistRestored = false; await _pbpAskHistRestore();
+        [...document.querySelectorAll("#rendered-view > p")].forEach((el, i) => { el.dataset.t = String(i * 30); });
+        document.body.classList.add("video-mode");
+        window.pbpVideoCurrentTime = () => 90;
+        document.dispatchEvent(new CustomEvent("pbp:video-position"));
+      });
+      await page.locator("#ask-scope-near").click();
+      await arrange({ mode: "dark", width: 360, tier: 2 });
+      record(locale + "/disclosures", await page.evaluate(() => {
+        const st = _pbpAskState, note = document.querySelector(".ask-meta-note"), scope = document.getElementById("ask-scope-near"), errors = [];
+        if (!st.scopeNear || !st.ctx.near || st.ctx.sentBlocks >= st.ctx.totalBlocks || scope.getAttribute("aria-pressed") !== "true") errors.push("near-context fixture did not reach real partial scope");
+        if (st.rounds.length !== 5 || !note?.textContent.includes(t("askSentPartial", String(st.ctx.sentBlocks), String(st.ctx.totalBlocks))) || !note?.textContent.includes(t("askHistWindowNote"))) errors.push("partial/history disclosure missing");
+        for (const el of [note, scope, document.getElementById("ask-form")]) {
+          const r = el.getBoundingClientRect();
+          if (r.left < -1 || r.right > innerWidth + 1 || el.scrollWidth > el.clientWidth + 1) errors.push(el.id || el.className + " disclosure overflows");
+        }
+        return errors;
+      }));
+      if (locale === "de") await rep.shot(page, s, "ask-de-partial-history-360");
+      await page.evaluate(() => pbpAskHistSet(_pbpAskState.url, [], _pbpAskState.account));
+      console.log("[qa-drive]   reader-controls: " + locale + " (" + cases.length + " layout cases)");
+    }
+    requireState(aiRequests.length === beforeAi, "layout/history checks unexpectedly called AI");
+    // A single deliberately slow loopback SSE response tests the native
+    // keyboard Send -> Stop -> Send focus handoff, without an external model.
+    await page.evaluate(() => { _pbpAskState.s.customModel = "qa-controls-slow"; });
+    await page.locator("#ask-input").fill("Keyboard stop fixture");
+    await page.locator("#ask-send").focus(); await page.keyboard.press("Enter");
+    await page.waitForFunction(() => _pbpAskState.running && document.querySelector(".ask-a.streaming")?.textContent.includes("QA controls streaming"));
+    requireState(await page.evaluate(() => document.activeElement.id === "ask-stop" && document.getElementById("ask-send").hidden), "Send did not hand keyboard focus to Stop");
+    await page.keyboard.press("Space");
+    await page.waitForFunction(() => !_pbpAskState.running && !!document.querySelector(".ask-stopped"));
+    stoppedExpected = true;
+    requireState(await page.evaluate(() => document.activeElement.id === "ask-send" && document.getElementById("ask-stop").hidden), "Stop did not return keyboard focus to Send");
+    requireState(aiRequests.length === beforeAi + 1, "expected exactly one loopback AI request for Stop");
+    s.notes.push("PASS: " + matrixCases + " layout cases (" + (CONFIG.readerControlsRepresentative ? "Chinese/German × light/dark × 360px × largest prose tier" : "9 locales × light/dark × 1440/360px × default/largest prose tier, plus Chinese/German 320px") + "); real Shift+S editor, label/Space toggles, focus-visible, native forced-colors; 26px icon controls, fixed 13px Ask input, short/long auto-growth, full model title and ellipsis, no horizontal overflow; persisted five-round history and timed partial context; one real loopback SSE Send/Stop focus test. Expected Stop request cancellation is excluded from errors.");
+  } catch (e) { s.failures.push(e.stack); }
+  finally {
+    await page.evaluate(() => _pbpAskState && pbpAskHistSet(_pbpAskState.url, [], _pbpAskState.account)).catch(() => {});
+    detach(); await page.close();
+    // Chromium may deliver requestfailed after the stopped UI is already
+    // settled. Filter only this expected loopback abort, after detaching.
+    if (stoppedExpected) s.consoleErrors = s.consoleErrors.filter(text => text !== "requestfailed: http://127.0.0.1:" + aiPort + "/v1/chat/completions (net::ERR_ABORTED)");
+    await worker.evaluate(async ({ keys, values }) => {
+      await chrome.storage.local.set(values);
+      await chrome.storage.local.remove(keys.filter(key => !(key in values)));
+    }, { keys: settingKeys, values: original });
+  }
+}
+
 async function driveDiscovery(context, worker, extId, rep) {
   const s = rep.surface("discovery");
   const options = await context.newPage();
@@ -2837,6 +3044,7 @@ try {
     else if (surface === "discovery") await driveDiscovery(context, worker, extId, rep);
     else if (surface === "reader-export") await driveReaderExport(context, worker, extId, rep);
     else if (surface === "reader-bookmark") await driveReaderBookmark(context, worker, extId, rep);
+    else if (surface === "reader-controls") await driveReaderControls(context, worker, extId, rep);
     else if (surface === "layouts") await driveNarrowLayouts(context, worker, extId, rep);
     else if (surface === "translate-stop") await driveTranslateStop(context, worker, extId, rep);
     else if (surface === "options-save") await driveOptionsSaveFeedback(context, extId, rep);
@@ -2864,6 +3072,7 @@ try {
       chromium: context.browser()?.version() || null,
       node: process.version,
       platform: process.platform,
+      fontconfig: process.env.FONTCONFIG_FILE || null,
     },
   });
   await diffAgainstPrev(runDir, prevDir).catch((e) => console.warn(`[qa-drive] diff failed: ${e.message}`));

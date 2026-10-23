@@ -2969,16 +2969,16 @@
     "message": "停止"
   },
   "askPlaceholder": {
-    "message": "针对本文提问…（Enter 发送，Shift+Enter 换行）"
+    "message": "针对本文提问…"
   },
-  "askWillSend": {
-    "message": "将发送约 $TOKENS$ tokens · $MODEL$",
+  "askInputHint": {
+    "message": "Enter 发送 · Shift+Enter 换行"
+  },
+  "askTokenEstimate": {
+    "message": "约 $TOKENS$ tokens",
     "placeholders": {
       "tokens": {
         "content": "$1"
-      },
-      "model": {
-        "content": "$2"
       }
     }
   },

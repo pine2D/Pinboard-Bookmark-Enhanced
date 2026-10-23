@@ -2969,16 +2969,16 @@
     "message": "Stopp"
   },
   "askPlaceholder": {
-    "message": "Frage zu diesem Artikel stellen… (Enter senden, Shift+Enter neue Zeile)"
+    "message": "Frage zu dieser Seite stellen…"
   },
-  "askWillSend": {
-    "message": "Sendet etwa $TOKENS$ Tokens · $MODEL$",
+  "askInputHint": {
+    "message": "Enter: senden · Shift+Enter: neue Zeile"
+  },
+  "askTokenEstimate": {
+    "message": "Ca. $TOKENS$ Tokens",
     "placeholders": {
       "tokens": {
         "content": "$1"
-      },
-      "model": {
-        "content": "$2"
       }
     }
   },

@@ -2402,9 +2402,9 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
    tabular so a column of them lines up as a chapter list. */
 .ask-chip--time { padding: 0 var(--sp-2); font-variant-numeric: tabular-nums; }
 /* Ask scope toggle (research T1.5): a real toggle in the project's
-   aria-pressed vocabulary (same pressed look as .pbv-follow); sits left of
-   Stop/Send. Hidden unless the transcript paragraphs are timed. */
-#ask-scope-near { margin-right: auto; }
+   aria-pressed vocabulary (same pressed look as .pbv-follow); has its own
+   composer row. Hidden unless the transcript paragraphs are timed. */
+#ask-scope-near { align-self: flex-start; margin: 0 var(--sp-3); max-width: calc(100% - 2 * var(--sp-3)); white-space: normal; text-align: start; }
 #ask-scope-near[hidden] { display: none; }
 /* Text is --link-on-raised, not a flat link -- see the .toggle-
    btn.active comment (md-preview.css ~:265) for the measured numbers;
@@ -3143,11 +3143,8 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 /* panel width (380) + panel padding (--sp-4) */
 body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
 
-/* Region buttons inside the panel follow the panel's em base, not the rail's
-   fixed md tier -- a 13px Send next to the payload-size input read tiny. */
-/* Content-attached micro actions keep the sm step below region buttons --
-   they carry .action-btn too, so the panel-scope rule above would flatten
-   the two tiers without this heavier selector. */
+/* Controls stay on the fixed UI type scale; only questions and answers
+   follow the reader's payload size. */
 #ask-panel .ask-copy-btn, #ask-panel .ask-regenerate,
 #ask-panel .ask-retry, #ask-panel .ask-clear-btn { font-size: 12px; } /* secondary md face, in px: control faces do not follow the panel's prose scale */
 .ask-ic {
@@ -3195,7 +3192,7 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
    citation-pipeline task later appends a bare .ask-chip rule for the tiny
    superscript chips inside answers; this ID+class selector wins for the
    starter chips regardless of source order. */
-#ask-chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+#ask-chips { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
 #ask-chips .ask-chip {
   display: inline-flex;
   align-items: center;
@@ -3208,47 +3205,52 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
   border-radius: var(--radius-full);
   background: transparent;
   color: var(--fg-secondary);
-  font-size: 13px; /* md face in px */
+  font-size: 12px;
   font-weight: 400;
   vertical-align: baseline;
   cursor: pointer;
 }
 #ask-chips .ask-chip:hover { background: var(--btn-hover); border-color: var(--link); color: var(--fg); }
 
-#ask-form { display: flex; flex-direction: column; gap: var(--sp-2); }
+#ask-form {
+  display: flex; flex-direction: column; gap: 0; min-width: 0;
+  border: 1px solid var(--btn-border); border-radius: var(--radius-md);
+  background: var(--btn-bg);
+}
+#ask-form:focus-within { outline: 2px solid var(--link); outline-offset: 1px; }
 #ask-input {
-  width: 100%;
-  /* Auto-grow (chat-input convention: ChatGPT/Claude/Slack all grow-with-
-     content to a cap, then scroll INSIDE the field). field-sizing: content
-     is the zero-JS native path (Chrome 123+, already our floor via
-     light-dark()). Cap = 8 text lines in em so it scales with the payload
-     size (a fixed 160px was 8 lines at the 17px floor but only 5 on 4K);
-     the manual resize handle is dropped -- auto-sizing owns the height. */
+  box-sizing: border-box; width: 100%; min-width: 0;
+  /* Auto-grow from two to eight UI-sized lines, independent of prose size. */
   field-sizing: content;
   resize: none;
-  min-height: 44px;
-  max-height: calc(12em + 18px); /* 8 lines x 1.5 line-height + padding/border */
+  min-height: calc(40px + 2 * var(--sp-2));
+  max-height: calc(160px + 2 * var(--sp-2));
   padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--btn-border);
+  border: 0;
   border-radius: var(--radius-md);
-  background: var(--btn-bg);
+  background: transparent;
   color: var(--fg);
   font-family: inherit;
-  font-size: var(--panel-payload-fs);
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 20px;
 }
-#ask-input:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
-.ask-actions { display: flex; justify-content: flex-end; gap: var(--sp-2); }
-#ask-send svg { width: 14px; height: 14px; flex-shrink: 0; }
-
-#ask-meta { min-height: 16px; font-size: 0.75em; line-height: 1.5; color: var(--fg-muted); }
-/* "provider · model" stays on one line (a model id would otherwise break at
-   its hyphens) and, like the rail's .tr-est-model, is the part that
-   ellipsizes; its title carries the full name. */
+#ask-input::placeholder { color: var(--fg-muted); opacity: 1; }
+#ask-input:focus-visible { outline: none; }
+.ask-actions { display: flex; align-items: flex-end; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); }
+#ask-send, #ask-stop {
+  flex: none; width: 26px; height: 26px; padding: 0; justify-content: center;
+  background: var(--btn-hover); border-color: var(--link); color: var(--link-on-raised);
+}
+#ask-send svg, #ask-stop svg { width: 15px; height: 15px; flex-shrink: 0; }
+#ask-meta { flex: 1; min-width: 0; min-height: 32px; font-size: 11px; line-height: 16px; color: var(--fg-muted); }
+#ask-meta .ask-meta-estimate { display: block; font-size: 12px; color: var(--fg-secondary); font-variant-numeric: tabular-nums; }
+/* Model names have one quiet line; title preserves the unabridged name. */
 #ask-meta .ask-meta-model {
-  display: inline-block; max-width: 100%; vertical-align: bottom;
+  display: block; max-width: 100%;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+#ask-meta .ask-meta-note { display: block; overflow-wrap: anywhere; margin-top: var(--sp-1); }
+#ask-input-hint { font-size: 11px; line-height: 16px; color: var(--fg-muted); overflow-wrap: anywhere; }
 
 /* Keep at least ~460px of article beside the rail and Ask; use a sheet earlier. */
 @media (max-width: 1200px) {
@@ -4573,10 +4575,13 @@ details#video-description .desc-body a { color: var(--link); }
 #export-summary:empty { display: none; }
 #exp-include-ask { min-height: 26px; margin-bottom: var(--sp-2); max-width: 100%; padding: var(--sp-1) var(--sp-2); white-space: normal; overflow-wrap: anywhere; }
 #exp-include-ask[hidden] { display: none; }
-#reader-bookmark-section > .row + .action-btn,
 #reader-bookmark-section > .msg-bar { margin-top: var(--sp-2); }
-#reader-bookmark-section .action-btn,
-#reader-bookmark-footer .action-btn { min-height: 26px; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+#reader-bookmark-section > .row,
+#reader-bookmark-footer > .row { gap: var(--sp-1); }
+.reader-bookmark-ic.action-btn { flex: none; width: 26px; height: 26px; padding: 0; justify-content: center; }
+.reader-bookmark-ic svg { width: 15px; height: 15px; }
+.reader-bookmark-ic[data-saved="true"],
+.reader-bookmark-ic[aria-pressed="true"] { background: var(--btn-hover); border-color: var(--link); color: var(--link-on-raised); }
 #reader-bookmark-section > .msg-bar,
 #reader-bookmark-footer > .msg-bar { font-size: 12px; }
 #reader-bookmark-footer { max-width: var(--pbp-width, 720px); margin: var(--sp-5) auto 0; padding-top: var(--sp-4); border-top: 1px solid var(--border-light); }
@@ -4589,7 +4594,8 @@ body.raw-active #reader-bookmark-footer { display: none; }
 }
 #reader-bookmark-editor:popover-open { display: grid; gap: var(--sp-3); }
 #reader-bookmark-editor > label { display: grid; gap: var(--sp-1); font-size: 13px; line-height: 18px; }
-#reader-bookmark-editor > label.row { display: flex; gap: var(--sp-2); min-height: 26px; cursor: pointer; }
+#reader-bookmark-options { column-gap: var(--sp-4); }
+#reader-bookmark-options > label { flex-wrap: nowrap; min-height: 26px; font-size: 13px; line-height: 18px; cursor: pointer; }
 #reader-bookmark-editor input[type="text"],
 #reader-bookmark-editor textarea {
   box-sizing: border-box; width: 100%; min-width: 0;
@@ -4599,13 +4605,26 @@ body.raw-active #reader-bookmark-footer { display: none; }
 }
 #reader-bookmark-editor input[type="text"] { height: 26px; }
 #reader-bookmark-editor textarea { min-height: calc(4 * var(--sp-5)); resize: vertical; }
-#reader-bookmark-editor input[type="checkbox"] { flex: none; width: 16px; height: 16px; margin: 0; accent-color: var(--link); }
+.reader-bookmark-check { display: grid; flex: none; width: 16px; height: 16px; }
+.reader-bookmark-check > input,
+.reader-bookmark-check > svg { grid-area: 1 / 1; }
+#reader-bookmark-editor input[type="checkbox"] {
+  appearance: none; width: 16px; height: 16px; margin: 0; cursor: pointer;
+  border: 1px solid var(--fg-muted); border-radius: var(--radius-sm); background: var(--btn-bg);
+}
+#reader-bookmark-editor input[type="checkbox"]:checked { border-color: var(--link); background: var(--btn-hover); color: var(--link-on-raised); }
+.reader-bookmark-check > svg { width: 14px; height: 14px; place-self: center; color: var(--link-on-raised); pointer-events: none; visibility: hidden; }
+.reader-bookmark-check > input:checked + svg { visibility: visible; }
 #reader-bookmark-editor input:focus-visible,
 #reader-bookmark-editor textarea:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-#reader-bookmark-editor > div.row { justify-content: flex-end; }
+#reader-bookmark-editor > div.row:last-child { justify-content: flex-end; }
 #reader-bookmark-editor .action-btn { min-height: 26px; }
+#reader-bookmark-apply { background: var(--btn-hover); border-color: var(--link); color: var(--link-on-raised); }
 @media print { #reader-bookmark-footer, #reader-bookmark-editor { display: none; } }
 @media (forced-colors: active) {
+  #ask-form:focus-within { outline-color: Highlight; }
+  #reader-bookmark-editor input[type="checkbox"] { appearance: auto; }
+  .reader-bookmark-check > svg { display: none; }
   #reader-bookmark-editor input:focus-visible,
   #reader-bookmark-editor textarea:focus-visible { outline-color: Highlight; }
 }

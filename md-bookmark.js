@@ -18,12 +18,23 @@
     node.setAttribute("data-i18n", key);
   }
 
+  function iconLabel(node, key, icon) {
+    node.title = text(key);
+    node.setAttribute("aria-label", text(key));
+    node.setAttribute("data-i18n-title", key);
+    node.setAttribute("data-i18n-aria", key);
+    if (node.dataset.icon !== icon) {
+      node.innerHTML = typeof PBP_ICONS !== "undefined" ? PBP_ICONS[icon] || "" : "";
+      node.dataset.icon = icon;
+    }
+  }
+
   function button(parent, name, key, action) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.id = "reader-bookmark-" + name;
-    btn.className = "action-btn";
-    label(btn, key);
+    btn.className = "action-btn reader-bookmark-ic";
+    iconLabel(btn, key, { save: "bookmarkPlus", later: "clock", edit: "pencil" }[action]);
     btn.addEventListener("click", () => window.pbpReaderBookmarkAction(action));
     parent.appendChild(btn);
     buttons.push({ btn, action });
@@ -35,10 +46,12 @@
       btn.disabled = !context?.account;
       btn.setAttribute("aria-busy", String(inflight));
       if (action === "save") {
-        label(btn, state.known && state.bookmarked ? (state.bookmark?.toread ? "readerBookmarkMarkRead" : "readerBookmarkSaved") : "readerBookmarkSave");
+        const saved = Boolean(state.known && state.bookmarked);
+        iconLabel(btn, saved ? (state.bookmark?.toread ? "readerBookmarkMarkRead" : "readerBookmarkSaved") : "readerBookmarkSave", saved ? "check" : "bookmarkPlus");
+        btn.dataset.saved = String(saved);
         btn.setAttribute("aria-keyshortcuts", "s");
       } else if (action === "later") {
-        label(btn, "readerBookmarkLater");
+        iconLabel(btn, "readerBookmarkLater", "clock");
         btn.setAttribute("aria-pressed", String(state.known && state.bookmarked && state.bookmark?.toread === true));
         btn.setAttribute("aria-keyshortcuts", "l");
       } else if (action === "edit") btn.setAttribute("aria-keyshortcuts", "Shift+S");
@@ -66,9 +79,9 @@
     section.appendChild(heading);
     const row = document.createElement("div"); row.className = "row";
     button(row, "save", "readerBookmarkSave", "save");
+    button(row, "later", "readerBookmarkLater", "later");
     button(row, "edit", "readerBookmarkEdit", "edit");
     section.appendChild(row);
-    button(section, "later", "readerBookmarkLater", "later");
     const status = document.createElement("div");
     status.id = "reader-bookmark-status";
     status.className = "msg-bar";
@@ -86,8 +99,8 @@
     const exportBtn = document.createElement("button");
     exportBtn.type = "button";
     exportBtn.id = "reader-bookmark-footer-export";
-    exportBtn.className = "action-btn";
-    label(exportBtn, "readerBookmarkExport");
+    exportBtn.className = "action-btn reader-bookmark-ic";
+    iconLabel(exportBtn, "readerBookmarkExport", "download");
     exportBtn.addEventListener("click", () => window.pbpReaderOpenExport?.());
     footerRow.appendChild(exportBtn);
     footer.appendChild(footerRow);
@@ -133,16 +146,24 @@
     const title = document.createElement("h2");
     title.id = "reader-bookmark-editor-title";
     label(title, "readerBookmarkEdit"); head.appendChild(title); editor.appendChild(head);
+    const options = document.createElement("div");
+    options.id = "reader-bookmark-options"; options.className = "row";
     for (const [name, key, type] of [["title", "readerBookmarkTitle", "text"], ["tags", "readerBookmarkTags", "text"], ["notes", "readerBookmarkNotes", "textarea"], ["private", "readerBookmarkPrivate", "checkbox"], ["toread", "readerBookmarkLater", "checkbox"]]) {
       const field = document.createElement("label");
       const caption = document.createElement("span"); label(caption, key);
       const input = type === "textarea" ? document.createElement("textarea") : document.createElement("input");
       input.id = "reader-bookmark-" + name;
       if (type !== "textarea") input.type = type;
-      if (type === "checkbox") { field.className = "row"; field.append(input, caption); }
-      else field.append(caption, input);
-      editor.appendChild(field);
+      if (type === "checkbox") {
+        field.className = "row";
+        const mark = document.createElement("span"); mark.className = "reader-bookmark-check";
+        mark.innerHTML = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.check : "";
+        mark.prepend(input); field.append(mark, caption); options.appendChild(field);
+      } else {
+        field.append(caption, input); editor.appendChild(field);
+      }
     }
+    editor.appendChild(options);
     const row = document.createElement("div"); row.className = "row";
     const apply = document.createElement("button");
     apply.id = "reader-bookmark-apply"; apply.type = "button"; apply.className = "action-btn";

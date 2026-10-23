@@ -2969,16 +2969,16 @@
     "message": "Arrêter"
   },
   "askPlaceholder": {
-    "message": "Posez une question sur cet article… (Entrée pour envoyer, Maj+Entrée pour une nouvelle ligne)"
+    "message": "Posez une question sur cette page…"
   },
-  "askWillSend": {
-    "message": "Enverra environ $TOKENS$ tokens · $MODEL$",
+  "askInputHint": {
+    "message": "Entrée : envoyer · Maj+Entrée : saut de ligne"
+  },
+  "askTokenEstimate": {
+    "message": "Env. $TOKENS$ tokens",
     "placeholders": {
       "tokens": {
         "content": "$1"
-      },
-      "model": {
-        "content": "$2"
       }
     }
   },

@@ -2969,16 +2969,16 @@
     "message": "Остановить"
   },
   "askPlaceholder": {
-    "message": "Задайте вопрос об этой статье… (Enter отправить, Shift+Enter новая строка)"
+    "message": "Задайте вопрос об этой странице…"
   },
-  "askWillSend": {
-    "message": "Будет отправлено около $TOKENS$ токенов · $MODEL$",
+  "askInputHint": {
+    "message": "Enter: отправить · Shift+Enter: новая строка"
+  },
+  "askTokenEstimate": {
+    "message": "Токены: ~$TOKENS$",
     "placeholders": {
       "tokens": {
         "content": "$1"
-      },
-      "model": {
-        "content": "$2"
       }
     }
   },

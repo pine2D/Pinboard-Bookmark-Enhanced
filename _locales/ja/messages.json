@@ -2969,16 +2969,16 @@
     "message": "停止"
   },
   "askPlaceholder": {
-    "message": "この記事について質問…（Enter で送信、Shift+Enter で改行）"
+    "message": "このページについて質問…"
   },
-  "askWillSend": {
-    "message": "約 $TOKENS$ トークンを送信 · $MODEL$",
+  "askInputHint": {
+    "message": "Enter で送信 · Shift+Enter で改行"
+  },
+  "askTokenEstimate": {
+    "message": "約 $TOKENS$ トークン",
     "placeholders": {
       "tokens": {
         "content": "$1"
-      },
-      "model": {
-        "content": "$2"
       }
     }
   },
