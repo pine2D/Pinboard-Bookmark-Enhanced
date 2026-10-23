@@ -48,6 +48,14 @@ function emit(tokens) {
   // The widget preview's inline colors are the product being configured.
   // :where keeps the exclusion specificity-neutral for existing intent rules.
   const anchor = 'a:not(:where(#content:has(form[action="/widgets/tag_cloud"]) #right_column > div a))';
+  // Optional sidebar roles follow the tag-navigation rules below so both
+  // ordinary links and navigation text use the same state colors. Keep them
+  // scoped to #right_bar; .tag retains its frequency/color treatment. The
+  // explicit header path also beats legacy header overrides inside the sidebar.
+  const sidebarLinks = [
+    tokens.palette?.["sidebar-link-fg"] && `\n#right_bar a:not(.tag), #right_bar #tag_cloud_header a:not(.tag) { color: ${v("sidebar-link-fg")} !important; }`,
+    tokens.palette?.["sidebar-link-hover"] && `\n#right_bar a:not(.tag):hover, #right_bar #tag_cloud_header a:not(.tag):hover { color: ${v("sidebar-link-hover")} !important; }`,
+  ].filter(Boolean).join("");
 
   return `
 /* === composer: classic-list-v2 — canonical surface inventory === */
@@ -286,7 +294,7 @@ a.delete, a.destroy { color: ${v("destroy")} !important; }
    Accepted trade-off — these filter buttons are rarely clicked; bumping to 9px+
    would make them feel heavy on Windows. Decision: 2026-05-28. */
 #tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
-#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+#tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }${sidebarLinks}
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }

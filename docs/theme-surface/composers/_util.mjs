@@ -299,6 +299,10 @@ export function expandSitePalette(raw) {
     if (!isHex(p[key])) continue;
     out[key] = rgbToHex(fgToAAMulti(hexToRgb(p[key]), pageBases));
   }
+  // Site-only defaults keep every referenced role resolvable. The composer
+  // opts into sidebar overrides only when a pilot explicitly declares them.
+  out["sidebar-link-fg"] = p["sidebar-link-fg"] || out.accent;
+  out["sidebar-link-hover"] = p["sidebar-link-hover"] || out["link-hover"];
   // Non-link anchors formerly colored by two pilots' bare-a overrides.
   out["anchor-fg"] = isHex(p["anchor-fg"])
     ? rgbToHex(fgToAAMulti(hexToRgb(p["anchor-fg"]), pageBases)) : out.accent;

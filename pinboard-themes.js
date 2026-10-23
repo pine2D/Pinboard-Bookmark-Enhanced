@@ -50,6 +50,8 @@ const PINBOARD_THEMES = {
   --pinboard-on-accent: #ffffff;
   --pinboard-on-link-hover: #ffffff;
   --pinboard-scrollbar-thumb: #5f6368;
+  --pinboard-sidebar-link-fg: #166ad8;
+  --pinboard-sidebar-link-hover: #174ea6;
   --pinboard-anchor-fg: #166ad8;
   --pinboard-star-fg: #878787;
   --pinboard-bundle-edit-hover: #1565cf;
@@ -1042,6 +1044,8 @@ h2 { color: #3c4043 !important; }
   --pinboard-sidebar-btn-fg: #eceff4;
   --pinboard-sidebar-btn-bg-hover: #415d7e;
   --pinboard-anchor-fg: #9cb5ce;
+  --pinboard-sidebar-link-fg: #88c0d0;
+  --pinboard-sidebar-link-hover: #8fbcbb;
   --pinboard-on-accent: #384861;
   --pinboard-on-link-hover: #35435b;
   --pinboard-scrollbar-thumb: #9cb5ce;
@@ -1401,6 +1405,8 @@ a.delete, a.destroy { color: var(--pinboard-destroy) !important; }
    would make them feel heavy on Windows. Decision: 2026-05-28. */
 #tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 #tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+#right_bar a:not(.tag), #right_bar #tag_cloud_header a:not(.tag) { color: var(--pinboard-sidebar-link-fg) !important; }
+#right_bar a:not(.tag):hover, #right_bar #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-sidebar-link-hover) !important; }
 
 /* ---- Tweets page searchbox ---- */
 #tweet_searchbox { margin-bottom: 12px !important; }
@@ -1923,7 +1929,6 @@ a.url_link { padding: 1px 5px !important; background: rgba(59,66,82,0.8) !import
 .description { opacity: 0.8 !important; }
 .description blockquote { border-left: 3px solid #4c566a !important; }
 a.copy_link { color: #81a1c1 !important; }
-#right_bar a:not(.tag) { color: #81a1c1 !important; }
 a.bundle { color: #81a1c1 !important; }
 a.sort_order_selected { background: #434c5e !important; }
 .next_prev { color: #81a1c1 !important; }
@@ -1994,6 +1999,8 @@ input[type="button"] { border: 1px solid #81a1c1 !important; }
   --pinboard-on-accent: #007000;
   --pinboard-on-link-hover: #007a00;
   --pinboard-scrollbar-thumb: #22aa22;
+  --pinboard-sidebar-link-fg: #33ff33;
+  --pinboard-sidebar-link-hover: #99ff99;
   --pinboard-anchor-fg: #33ff33;
   --pinboard-star-fg: #227722;
   --pinboard-bundle-edit-hover: #33ff33;
@@ -2986,6 +2993,8 @@ a.bookmark_title::before { color: #33ff3380 !important; }`
   --pinboard-on-accent: #faf8f5;
   --pinboard-on-link-hover: #faf8f5;
   --pinboard-scrollbar-thumb: #6b4c3b;
+  --pinboard-sidebar-link-fg: #1a3a5c;
+  --pinboard-sidebar-link-hover: #2a5a8c;
   --pinboard-anchor-fg: #1a3a5c;
   --pinboard-star-fg: #9f834f;
   --pinboard-bundle-edit-hover: #1a3a5c;
@@ -3975,6 +3984,8 @@ h2 { font-family: "Georgia", serif !important; }`
   --pinboard-on-accent: #282a36;
   --pinboard-on-link-hover: #282a36;
   --pinboard-scrollbar-thumb: #bd93f9;
+  --pinboard-sidebar-link-fg: #8be9fd;
+  --pinboard-sidebar-link-hover: #ff98d3;
   --pinboard-star-fg: #9397ae;
   --pinboard-bundle-edit-hover: #8be9fd;
   --pinboard-table-destroy-hover: #ff9c9c;
@@ -4949,6 +4960,8 @@ input[type="radio"] { accent-color: #bd93f9 !important; }
   --pinboard-on-accent: #fffcf0;
   --pinboard-on-link-hover: #fffcf0;
   --pinboard-scrollbar-thumb: #6a6964;
+  --pinboard-sidebar-link-fg: #205ea6;
+  --pinboard-sidebar-link-hover: #163b66;
   --pinboard-anchor-fg: #205ea6;
   --pinboard-star-fg: #8c855c;
   --pinboard-bundle-edit-hover: #205ea6;
@@ -5849,6 +5862,8 @@ html.pbp-dark {
   --pinboard-sidebar-btn-bg: #3aa99f;
   --pinboard-sidebar-btn-fg: #1C1B1A;
   --pinboard-sidebar-btn-bg-hover: #5abdac;
+  --pinboard-sidebar-link-fg: #A699D0;
+  --pinboard-sidebar-link-hover: #C4B9E0;
   --pinboard-on-accent: #171615;
   --pinboard-on-link-hover: #1c1b1a;
   --pinboard-scrollbar-thumb: #918f8a;
@@ -6209,6 +6224,8 @@ html.pbp-dark #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-accent
    would make them feel heavy on Windows. Decision: 2026-05-28. */
 html.pbp-dark #tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected) { font-size: 7px !important; opacity: 0.7 !important; vertical-align: middle !important; margin-left: -2px !important; transition: opacity 0.15s ease, color 0.15s ease !important; }
 html.pbp-dark #tag_cloud_header a[href="#"]:not(.tag):not(.tag_heading_selected):hover { opacity: 1 !important; }
+html.pbp-dark #right_bar a:not(.tag), html.pbp-dark #right_bar #tag_cloud_header a:not(.tag) { color: var(--pinboard-sidebar-link-fg) !important; }
+html.pbp-dark #right_bar a:not(.tag):hover, html.pbp-dark #right_bar #tag_cloud_header a:not(.tag):hover { color: var(--pinboard-sidebar-link-hover) !important; }
 
 /* ---- Tweets page searchbox ---- */
 html.pbp-dark #tweet_searchbox { margin-bottom: 12px !important; }
@@ -6787,8 +6804,6 @@ html.pbp-dark .description blockquote { border-left: 3px solid #403E3C !importan
 html.pbp-dark #right_bar h3 { color: #8B7EC8 !important; }
 html.pbp-dark #right_bar h4 { color: #8B7EC8 !important; }
 html.pbp-dark #right_bar b { color: #8B7EC8 !important; }
-html.pbp-dark #right_bar a:not(.tag) { color: #8B7EC8 !important; }
-html.pbp-dark #right_bar a:not(.tag):hover { color: #A699D0 !important; }
 html.pbp-dark a.bundle { color: #8B7EC8 !important; }
 html.pbp-dark a.bundle:hover { color: #A699D0 !important; }
 html.pbp-dark #tag_cloud_header a:not(.tag):hover { color: #8B7EC8 !important; }
@@ -6886,6 +6901,8 @@ html.pbp-dark #tweet_searchbox input[type="submit"] { border-radius: 4px !import
   --pinboard-on-accent: #f8e0a1;
   --pinboard-on-link-hover: #f7d579;
   --pinboard-scrollbar-thumb: #54696f;
+  --pinboard-sidebar-link-fg: #1d699e;
+  --pinboard-sidebar-link-hover: #1b6863;
   --pinboard-anchor-fg: #1d699e;
   --pinboard-star-fg: #8f7d4f;
   --pinboard-bundle-edit-hover: #1b6395;
@@ -7822,6 +7839,8 @@ a.sort_order_selected { background: #eee8d5 !important; }
   --pinboard-on-accent: #271d03;
   --pinboard-on-link-hover: #302403;
   --pinboard-scrollbar-thumb: #859ca3;
+  --pinboard-sidebar-link-fg: #4ca2df;
+  --pinboard-sidebar-link-hover: #2ca9a0;
   --pinboard-anchor-fg: #4ca2df;
   --pinboard-star-fg: #1089a4;
   --pinboard-bundle-edit-hover: #5dabe2;
@@ -8763,6 +8782,8 @@ a.sort_order_selected { background: #073642 !important; }
   --pinboard-on-accent: #f5f6f9;
   --pinboard-on-link-hover: #e2e6ed;
   --pinboard-scrollbar-thumb: #63667a;
+  --pinboard-sidebar-link-fg: #0b59f4;
+  --pinboard-sidebar-link-hover: #127076;
   --pinboard-anchor-fg: #0b59f4;
   --pinboard-star-fg: #79849e;
   --pinboard-bundle-edit-hover: #0b55ea;
@@ -9713,6 +9734,8 @@ a.help { background: #e6e9ef !important; }
   --pinboard-on-accent: #1e1e2e;
   --pinboard-on-link-hover: #1e1e2e;
   --pinboard-scrollbar-thumb: #a6adc8;
+  --pinboard-sidebar-link-fg: #89b4fa;
+  --pinboard-sidebar-link-hover: #cba6f7;
   --pinboard-anchor-fg: #89b4fa;
   --pinboard-star-fg: #787b97;
   --pinboard-bundle-edit-hover: #89b4fa;
@@ -10676,6 +10699,8 @@ h2 { color: #cba6f7 !important; }`
   --pinboard-on-accent: #282828;
   --pinboard-on-link-hover: #282828;
   --pinboard-scrollbar-thumb: #b0a390;
+  --pinboard-sidebar-link-fg: #89a99d;
+  --pinboard-sidebar-link-hover: #d68da1;
   --pinboard-anchor-fg: #89a99d;
   --pinboard-star-fg: #8c8079;
   --pinboard-bundle-edit-hover: #a1bab1;
@@ -11631,6 +11656,8 @@ h2 { color: #d3869b !important; }
   --pinboard-on-accent: #191724;
   --pinboard-on-link-hover: #191724;
   --pinboard-scrollbar-thumb: #908caa;
+  --pinboard-sidebar-link-fg: #c4a7e7;
+  --pinboard-sidebar-link-hover: #ebbcba;
   --pinboard-anchor-fg: #c4a7e7;
   --pinboard-star-fg: #7b74ab;
   --pinboard-bundle-edit-hover: #c4a7e7;
@@ -12593,6 +12620,8 @@ h2 { color: #ebbcba !important; }`
   --pinboard-on-accent: #ffffff;
   --pinboard-on-link-hover: #ffffff;
   --pinboard-scrollbar-thumb: #656d76;
+  --pinboard-sidebar-link-fg: #0969da;
+  --pinboard-sidebar-link-hover: #0550ae;
   --pinboard-anchor-fg: #0969da;
   --pinboard-star-fg: #7c90a3;
   --pinboard-bundle-edit-hover: #0964d0;

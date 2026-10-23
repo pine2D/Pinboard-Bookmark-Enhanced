@@ -1563,6 +1563,11 @@ function auditPalette(slug, rawPalette) {
   const sbHover = hexRgb(p["sidebar-btn-bg-hover"] || "");
   if (sbBg && sbFg) console.log(check("pinboard", slug, "sidebar-btn-bg vs fg", cr(sbBg, sbFg), 4.5));
   if (sbHover && sbFg) console.log(check("pinboard", slug, "sidebar-btn-hover vs fg", cr(sbHover, sbFg), 4.5));
+  // Optional non-tag sidebar link roles are text on the raised sidebar fill.
+  for (const role of ["sidebar-link-fg", "sidebar-link-hover"]) {
+    const ink = hexRgb(p[role] || "");
+    if (bgSurface && ink) console.log(check("pinboard", slug, `${role} vs bg-surface`, cr(bgSurface, ink), 4.5));
+  }
   // The two muted TEXT tiers (BLOCKING, 4.5:1) against BOTH bases the composer
   // paints them on: the page bg and the elevated bg-surface that card-style
   // pilots give every .bookmark. Nothing here checked either tier as text until
