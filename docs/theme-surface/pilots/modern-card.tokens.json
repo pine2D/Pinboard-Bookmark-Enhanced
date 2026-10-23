@@ -33,6 +33,8 @@
     "selection-fg": "#ffffff",
     "tag-bg": "#e8f0fe",
     "tag-fg": "#1967d2",
+    "sidebar-tag-fg": "#0f3c7b",
+    "sidebar-tag-hover": "#0a2f60",
     "row-hover": "#f1f3f4",
     "bundle-row-hover": "#1a73e80f",
     "destroy": "#d93025",

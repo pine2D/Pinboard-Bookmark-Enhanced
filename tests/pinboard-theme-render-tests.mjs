@@ -186,6 +186,42 @@ try {
     const cloud = await page.locator('#tag_cloud a.tag').evaluateAll(nodes => nodes.map(n => ({ size: parseFloat(getComputedStyle(n).fontSize), display: getComputedStyle(n).display })));
     checks++;
     if (cloud.some(n => n.display !== 'inline') || cloud[1].size / cloud[0].size < 2) failures.push(`${key} frequency-sized inline cloud was flattened`);
+    if (['modern-card', 'paper-ink', 'github-light'].includes(key)) {
+      await fixture('sidebar-tag-frequency');
+      const selector = '#tag_cloud a.tag:not(.selected)';
+      await readable(`${key}:low-frequency`, selector);
+      const frequency = await page.locator(selector).evaluateAll(nodes => nodes.map(n => {
+        const s = getComputedStyle(n), r = n.getBoundingClientRect();
+        return { opacity: s.opacity, size: parseFloat(s.fontSize), width: r.width, height: r.height };
+      }));
+      checks++;
+      if (frequency.map(n => n.opacity).join('|') !== '0.7|0.83|1|0.71|0.91' || frequency[2].size / frequency[0].size < 2) failures.push(`${key} native frequency tiers changed`);
+      const tags = page.locator(selector);
+      for (let i = 0; i < await tags.count(); i++) {
+        // Exercise the faint Latin/CJK boundary. The reduced native table's
+        // fixed line-height can overlap a large tag with the row above it.
+        if (Number(frequency[i].opacity) > .71) continue;
+        await tags.nth(i).hover();
+        await readable(`${key}:low-frequency:hover`, `${selector}:hover`);
+        const size = await tags.nth(i).evaluate(n => { const r = n.getBoundingClientRect(); return { width: r.width, height: r.height, opacity: getComputedStyle(n).opacity }; });
+        checks++;
+        if (size.width !== frequency[i].width || size.height !== frequency[i].height || size.opacity !== frequency[i].opacity) failures.push(`${key} tag hover changes size or frequency opacity`);
+      }
+      await page.mouse.move(1400, 950);
+      const scope = await page.evaluate(() => {
+        const ink = selector => getComputedStyle(document.querySelector(selector)).color;
+        return { selected: ink('#tag_cloud .selected'), control: ink('.bookmark .selected'), outside: ink('#right_bar > a.tag'), body: ink('.bookmark a.tag:not(.selected)') };
+      });
+      checks++;
+      if (scope.selected !== scope.control || scope.outside !== scope.body) failures.push(`${key} sidebar tag colors leak outside the unselected cloud`);
+      const selectedHover = [];
+      for (const selected of ['#tag_cloud .selected', '.bookmark .selected']) {
+        await page.locator(selected).hover();
+        selectedHover.push(await page.locator(selected).evaluate(n => getComputedStyle(n).color));
+      }
+      checks++;
+      if (selectedHover[0] !== selectedHover[1]) failures.push(`${key} sidebar selected-tag hover was recolored`);
+    }
     await fixture('bundle-density');
     const bundleLayout = await page.evaluate(() => {
       const table = document.querySelector('form[name="sort"] > table');

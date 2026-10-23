@@ -119,6 +119,23 @@
 <template id="tag-cloud">
   <div id="right_bar"><div id="tag_cloud"><a href="#small" class="tag" style="font-size:80%">small</a> <a href="#large" class="tag" style="font-size:180%">large</a> <a href="#medium" class="tag" style="font-size:100%">medium</a></div></div>
 </template>
+<template id="sidebar-tag-frequency">
+  <!-- Native list structure and inline frequency tiers, with synthetic labels.
+       0.70 is a conservative boundary for the live 0.71 low-frequency sample. -->
+  <div id="main_column"><div class="bookmark"><a href="#body-tag" class="tag">body tag</a> <a href="#body-selected" class="tag selected">selected control</a></div></div>
+  <div id="right_bar"><a href="#other-tag" class="tag">outside cloud</a><div id="tag_cloud">
+    <div class="tag_table"><table border="0" cellpadding="0" width="140" cellspacing="0"><tbody>
+      <tr><td width="138" style="overflow:hidden"><a href="#low" class="tag" style="opacity:0.70;font-size:100%">low</a></td></tr>
+      <tr><td width="138" style="overflow:hidden"><a href="#mid" class="tag" style="opacity:0.83;font-size:100%">medium</a></td></tr>
+      <tr><td width="138" style="overflow:hidden"><a href="#high" class="tag" style="opacity:1;font-size:200%">frequent</a></td></tr>
+    </tbody></table></div>
+    <div class="tag_table"><table border="0" cellpadding="0" width="140" cellspacing="0"><tbody>
+      <tr><td width="138" style="overflow:hidden"><a href="#low-cjk" class="tag" style="opacity:0.71;font-size:100%">低频标签</a></td></tr>
+      <tr><td width="138" style="overflow:hidden"><a href="#mid-cjk" class="tag" style="opacity:0.91;font-size:100%">常用标签</a></td></tr>
+      <tr><td width="138" style="overflow:hidden"><a href="#selected" class="tag selected" style="opacity:1;font-size:100%">selected</a></td></tr>
+    </tbody></table></div>
+  </div></div>
+</template>
 <template id="bundle-density">
   <div id="main_column" style="float:left;width:690px"><p>Drag bundles to reorder, or edit their position.</p><form name="sort"><table style="width:830px"><tbody></tbody></table></form></div>
 </template>

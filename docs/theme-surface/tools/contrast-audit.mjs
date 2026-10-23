@@ -1568,6 +1568,15 @@ function auditPalette(slug, rawPalette) {
     const ink = hexRgb(p[role] || "");
     if (bgSurface && ink) console.log(check("pinboard", slug, `${role} vs bg-surface`, cr(bgSurface, ink), 4.5));
   }
+  // Opt-in cloud inks have a separate site-only scope. The native opacity
+  // and hover fill are covered by pinboard-theme-render-tests; check their
+  // declared text roles here without opting other themes into the treatment.
+  if (rawPalette["sidebar-tag-fg"]) {
+    for (const role of ["sidebar-tag-fg", "sidebar-tag-hover"]) {
+      const ink = hexRgb(p[role] || "");
+      if (bgSurface && ink) console.log(check("pinboard", slug, `${role} vs bg-surface`, cr(bgSurface, ink), 4.5));
+    }
+  }
   // The two muted TEXT tiers (BLOCKING, 4.5:1) against BOTH bases the composer
   // paints them on: the page bg and the elevated bg-surface that card-style
   // pilots give every .bookmark. Nothing here checked either tier as text until

@@ -29,10 +29,15 @@ export function patternsLayer(tokens) {
   // Both states use `text-shadow: 0.5px 0 0 currentColor` instead of font-weight
   // changes on hover, preserving width so dense tag clouds don't reflow.
   const tagStyle = pat["tag-style"];
+  const tagHoverFeedback = tagStyle === "flat"
+    ? `background: ${v("accent-alpha")} !important; text-shadow: 0.5px 0 0 currentColor !important;`
+    : tagStyle === "underline"
+      ? `background: ${v("accent-soft")} !important; text-decoration-color: ${v("accent")} !important; text-decoration-thickness: 2.5px !important; text-decoration-skip-ink: none !important; text-shadow: 0.5px 0 0 currentColor !important;`
+      : "";
   if (tagStyle === "flat") {
     out.push(
       `a.tag::before { content: "#" !important; opacity: 0.45 !important; margin-right: 1px !important; }`,
-      `a.tag:hover { color: ${v("accent")} !important; background: ${v("accent-alpha")} !important; text-shadow: 0.5px 0 0 currentColor !important; }`,
+      `a.tag:hover { color: ${v("accent")} !important; ${tagHoverFeedback} }`,
       `a.tag:hover::before { color: ${v("accent")} !important; opacity: 0.9 !important; }`,
       `a.tag.selected { color: ${v("destroy")} !important; font-weight: 700 !important; }`,
       `a.tag.selected::before { color: ${v("destroy")} !important; opacity: 0.9 !important; }`
@@ -40,13 +45,23 @@ export function patternsLayer(tokens) {
   } else if (tagStyle === "underline") {
     out.push(
       `a.tag { text-decoration: underline !important; text-decoration-color: ${v("accent-alpha")} !important; text-decoration-thickness: 1px !important; text-decoration-skip-ink: none !important; text-underline-offset: 2px !important; }`,
-      `a.tag:hover { color: ${v("accent")} !important; background: ${v("accent-soft")} !important; text-decoration-color: ${v("accent")} !important; text-decoration-thickness: 2.5px !important; text-decoration-skip-ink: none !important; text-shadow: 0.5px 0 0 currentColor !important; }`,
+      `a.tag:hover { color: ${v("accent")} !important; ${tagHoverFeedback} }`,
       `a.tag.selected { color: ${v("destroy")} !important; text-decoration-color: ${v("destroy")} !important; text-decoration-skip-ink: none !important; font-weight: 600 !important; }`
     );
   } else if (tagStyle != null) {
     throw new Error(`tag-style: unknown value "${tagStyle}" (expected "flat" or "underline")`);
   }
   // tag-style absent → composer base alone (no hover, no selected styling).
+
+  // Opt-in cloud inks compensate for native low-frequency opacity without
+  // changing font size, opacity, bookmark tags or selected tags. Reuse the
+  // full hover feedback so the scoped rule keeps the tag-style treatment.
+  if (tokens.palette?.["sidebar-tag-fg"]) {
+    out.push(
+      `#tag_cloud a.tag:not(.selected) { color: ${v("sidebar-tag-fg")} !important; }`,
+      `#tag_cloud a.tag:not(.selected):hover { color: ${v("sidebar-tag-hover")} !important; ${tagHoverFeedback} }`
+    );
+  }
 
   // ---- P0: bookmark-title-prefix ----
   const titlePrefix = pat["bookmark-title-prefix"];
