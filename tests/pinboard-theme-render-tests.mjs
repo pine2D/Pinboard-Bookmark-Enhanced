@@ -331,6 +331,40 @@ try {
       }
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
+    await fixture('profile-layout');
+    for (const width of [320, 390, 640, 641, 768, 1440]) {
+      await page.setViewportSize({ width, height: 1000 });
+      const profile = await page.evaluate(() => {
+        const rect = n => { const r = n.getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, width: r.width }; };
+        const main = document.getElementById('profile_main_column');
+        const left = document.getElementById('profile_left_column');
+        const right = document.getElementById('profile_right_column');
+        const read = () => ({ main: rect(main), left: rect(left), right: rect(right), scroll: document.documentElement.scrollWidth, content: rect(document.getElementById('content')), margin: parseFloat(getComputedStyle(left).marginRight) });
+        const actual = read();
+        // Restore only the independently captured native column constraints.
+        // Retain the theme's font, boxes and colours so text metrics agree.
+        const native = document.createElement('style');
+        native.textContent = 'html:root #profile_main_column { max-width:1200px !important; box-sizing:content-box !important; } html:root #profile_left_column { margin-right:0 !important; } html:root #profile_right_column { width:auto !important; max-width:450px !important; box-sizing:content-box !important; }';
+        document.head.append(native);
+        const reference = read();
+        native.remove();
+        return { actual, reference };
+      });
+      const { actual, reference } = profile;
+      checks++;
+      if (width <= 640) {
+        // The native 350px left float may itself overflow a 320px phone.
+        // Do not redesign it: reject only the theme's extra overflow and
+        // require the main/right boxes to respect their containing width.
+        if (actual.main.width > actual.content.width + 1 || actual.right.right > actual.main.right + 1 || actual.scroll > Math.max(width, reference.scroll) + 1) failures.push(`${key} profile adds phone overflow@${width}: ${JSON.stringify(profile)}`);
+      } else {
+        // Preserve the shipped desktop balance: native 350+450 becomes
+        // 350+20px gap+430, keeping the same envelope and float wrapping.
+        const sameRow = Math.abs(reference.left.y - reference.right.y) < 1;
+        if (Math.abs(actual.main.width - reference.main.width) > 1 || Math.abs(actual.left.width - reference.left.width) > 1 || Math.abs(actual.right.width + actual.margin - reference.right.width) > 1 || Math.abs(actual.margin - 20) > 1 || Math.abs((actual.right.y - actual.left.y) - (reference.right.y - reference.left.y)) > 1 || Math.abs((actual.right.x - actual.main.x) - (reference.right.x - reference.main.x) - (sameRow ? actual.margin : 0)) > 1) failures.push(`${key} profile desktop columns changed@${width}: ${JSON.stringify(profile)}`);
+      }
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
     await fixture('widget');
     for (const state of ['rest', 'hover']) {
       if (state === 'hover') await page.locator('#right_column > div a').first().hover();

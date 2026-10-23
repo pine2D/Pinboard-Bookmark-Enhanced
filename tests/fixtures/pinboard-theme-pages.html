@@ -38,6 +38,12 @@
   #import_history_table { float: left; padding: 5px; border: 1px solid #ccc; }
   #left_toc { float: left; max-width: 220px; margin-right: 20px; }
   #content_column { float: left; min-width: 200px; width: 70%; }
+  /* Native /stylesheets/profile.css, inspected directly 2026-10-23.
+     The right float has a maximum, not a fixed width; its content can shrink. */
+  #profile_main_column { max-width: 1200px; float: left; text-align: left; border: 0 solid red; padding: 1em; }
+  #profile_left_column { width: 350px; float: left; border: 0 solid blue; }
+  #profile_right_column { float: left; max-width: 450px; border: 0 solid yellow; }
+  #profile_left_column .service_box { float: left; width: 350px; margin-bottom: 20px; }
   /* Native tagpicker.css / bundles.css, inspected 2026-10-23. These fixed
      widths intentionally retain the native narrow-page overflow model. */
   #tagpicker_column { width: 660px; float: left; }
@@ -200,6 +206,20 @@
 </template>
 <template id="import-layout">
   <div id="main_column"><div id="settings_panel"><h2>Import bookmarks</h2><p>Choose a bookmarks file.</p><input type="file"><div id="settings_tab_panes" style="min-height:1100px"><p>Import options and instructions</p></div></div><table id="import_history_table"><caption>Import history</caption><tr><td>2026-10-22</td><td>Completed</td></tr></table></div>
+</template>
+<!-- Reduced by hand from the account/profile page's native floats and boxes.
+     All text, links, names and values are synthetic; no account data or scripts. -->
+<template id="profile-layout">
+  <div id="profile_main_column">
+    <div id="profile_left_column">
+      <div class="service_box"><h2>Example account</h2><p>Account display name</p><input type="text" name="example-name" value="Example account"><p><a href="#example-settings">Account settings</a></p></div>
+      <div class="service_box"><h2>Example services</h2><table><tbody><tr><td>Service</td><td><a href="#example-service">Example connection</a></td></tr><tr><td>Status</td><td>Not connected</td></tr></tbody></table></div>
+    </div>
+    <div id="profile_right_column"><div class="help_box">
+      <h2>Account information</h2><div><p>This synthetic account description has enough ordinary words to fill the native right column at desktop width and wrap naturally on a phone.</p><p>No real account details or credentials are included in this fixture.</p><table><tbody><tr><td>Plan</td><td>Example plan</td></tr><tr><td>Renewal</td><td>Example date</td></tr></tbody></table></div>
+      <div><h2>More information</h2><p><a href="#example-invoices">Example invoices</a> and account instructions.</p></div>
+    </div></div>
+  </div><div style="clear:both"></div>
 </template>
 <template id="toc-layout">
   <div id="main_column"><div id="left_toc"><ul></ul></div><div id="content_column"><h2 id="answer">Frequently asked questions</h2><p>A readable answer with room to wrap across a narrow window.</p><p><img alt="Tour example" width="600" height="300" style="border:2px solid #aaa" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='300'%3E%3C/svg%3E"></p><p><img alt="Indented tour example" width="400" height="200" style="margin-left:34px" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3C/svg%3E"></p></div><div style="clear:both"></div></div>

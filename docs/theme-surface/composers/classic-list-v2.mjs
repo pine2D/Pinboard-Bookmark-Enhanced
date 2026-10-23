@@ -485,6 +485,11 @@ body .api_token { color: ${v("fg")} !important; }
 .service_box .service_box { border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; width: auto !important; box-sizing: border-box !important; }
 #profile_left_column { margin-right: 20px !important; }
 #profile_right_column { width: 430px !important; }
+/* Cap the shrink-to-fit parent as well as its fixed-width details column.
+   Retain the native left column and the existing desktop column balance. */
+@media (max-width: 640px) {
+  #profile_main_column, #profile_right_column { max-width: 100% !important; box-sizing: border-box !important; }
+}
 #profile_main_column h2, #profile_left_column h2, #profile_right_column h2 { color: ${v("muted")} !important; }
 #profile_main_column table td, #profile_right_column table td { color: ${v("fg")} !important; }
 

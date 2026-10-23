@@ -1,6 +1,6 @@
 # Pinboard Theme Surface — Spec v1
 
-Updated: 2026-08-30 · Version: 2.0.0
+Updated: 2026-10-23 · Version: 2.0.0
 
 A three-layer architecture for Pinboard custom themes that separates **what a
 surface is** (manifest) from **what colors/spacing it uses** (tokens) from
@@ -106,6 +106,114 @@ are filled by sensible fallbacks in `composers/_util.mjs::expandPalette()`.
 **Extension slots** — `fx` / `motion` / `assets` / `ext` — are open. Composers
 that opt in read them; composers that don't will ignore unknown keys.
 `overrides` is the escape hatch for surface-scoped custom CSS fragments.
+
+### Color sources and purpose
+
+The pilots and composers remain the source of truth. This decision record
+covers the site roles reviewed on 2026-10-23; it is not a second palette
+registry. A theme's upstream palette supplies color swatches, not an upstream
+specification for this extension's layouts or role assignments.
+
+| Kind | Meaning and authoring location |
+|------|--------------------------------|
+| **O: official literal** | An intentionally selected, exact upstream swatch, with its color name and source below. Matching a hex value alone does not establish provenance or an official UI pairing. |
+| **H: human-derived** | A project-approved shade or alpha choice stored explicitly in a pilot's `palette` or `overrides.css`. A helper may have calculated the candidate, but the literal input is maintained by hand. If a later contrast pass adjusts it, classify that emitted result as A. |
+| **P: project-authored** | A project palette with no claimed upstream source. Modern Card, Paper & Ink and Terminal belong here; their manually adjusted shades are marked H below. |
+| **A: automatic contrast-derived** | A value resolved during generation by `_util.mjs` / `_ui-derive.mjs` against the role's actual backgrounds. An adjusted output is not an official swatch, even when its input is one; already-passing inputs may remain unchanged. |
+
+#### Sidebar tag inks
+
+These are the emitted `sidebar-tag-fg` / `sidebar-tag-hover` values for all
+13 pilot files and 14 site states. The opt-in rules in `_patterns.mjs` target
+only `#tag_cloud a.tag:not(.selected)` and its hover state. They preserve native
+frequency opacity, font sizes, italics, inline clouds and table columns;
+bookmark tags, selected tags and other links keep their own roles. Terminal
+uses the unchanged `tag-fg` / `accent` fallbacks rather than an opt-in override.
+
+| Site state | Ordinary ink | Hover ink | Palette source / provenance |
+|------------|--------------|-----------|-----------------------------|
+| Modern Card | `#0F3C7B` H | `#0A2F60` H | Shades of the project-authored palette |
+| Nord Night | `#D7E2CD` H | `#E5F1F5` H | Shades derived from the [Nord][color-nord] green / frost family; not Nord swatches |
+| Terminal | `#00CCCC` P | `#33FF33` P | Project-authored, unchanged fallbacks |
+| Paper & Ink | `#562B0C` H | `#193757` H | Shades of the project-authored palette |
+| Dracula | `#50FA7B` O: green | `#C8F5FE` H | [Dracula][color-dracula]; hover is a project shade of cyan |
+| Flexoki light | `#3A2D04` O: yellow-900 | `#133051` O: blue-850 | [Flexoki][color-flexoki] |
+| Flexoki dark | `#ECCB60` O: yellow-200 | `#ABCFE2` O: blue-150 | [Flexoki][color-flexoki] |
+| Solarized Light | `#0F3835` H | `#0F3550` H | Project shades of the [Solarized][color-solarized] cyan / blue family |
+| Solarized Dark | `#6BD9D1` H | `#A0CDEE` H | Project shades of the [Solarized][color-solarized] cyan / blue family |
+| Catppuccin Latte | `#09383C` H | `#031B4B` H | Project shades of the [Catppuccin][color-catppuccin] teal / blue family |
+| Catppuccin Mocha | `#94E2D5` O: teal | `#CDD6F4` O: text | [Catppuccin Mocha][color-catppuccin] |
+| Gruvbox Dark | `#D5D942` H | `#EBDBB2` O: light1 | [Gruvbox][color-gruvbox]; ordinary ink is a project shade of bright_green |
+| Rosé Pine | `#9CCFD8` O: foam | `#E4D7F4` H | [Rosé Pine main][color-rose-pine]; hover is a project shade of iris |
+| GitHub Light | `#033D8B` O: base.color.blue.7 | `#002155` O: base.color.blue.9 | [Primer light primitives][color-primer] |
+
+Two opt-in `sidebar-tag-hover-bg` values also belong to this decision. Both
+are H alpha composites using an official hue; neither RGBA value is an
+upstream UI prescription. They affect only the unselected cloud-tag hover
+rule, leaving each theme's global `accent-alpha`, other tag fills and
+focus-ring roles unchanged:
+
+| Site state | Local hover fill | Hue source | Retained global `accent-alpha` |
+|------------|------------------|------------|--------------------------------|
+| Nord Night | `rgba(136,192,208,0.1)` H | [Nord][color-nord] nord8 `#88C0D0` | `rgba(136,192,208,0.25)` |
+| Catppuccin Mocha | `rgba(137,180,250,0.075)` H | [Mocha][color-catppuccin] blue `#89B4FA` | `rgba(137,180,250,0.25)` |
+
+The independent site render tests exercise generated CSS with native tag
+opacity, including simulated `.70` Latin / `.71` CJK boundary cases. Those
+fixtures are conservative simulations, not a claim about every live page's
+minimum opacity; a raw token-pair contrast result does not cover them.
+
+#### Other reviewed site roles
+
+The URL ink below is the explicit `a.url_display` color in `overrides.css`,
+not the separate URL-link pill's `url-link-fg` role. These overrides keep URL
+text subordinate to the bookmark title on ordinary and private rows.
+
+| Site state | URL ink | Source |
+|------------|---------|--------|
+| Modern Card | `#397A37` H | Project-authored green family |
+| Paper & Ink | `#886959` H | Project-authored brown family |
+| Flexoki light | `#536907` O: green-700 | [Flexoki][color-flexoki] |
+| Flexoki dark, retained | `#879A39` O: green-400 | [Flexoki][color-flexoki]; the light URL repair does not replace this mode override |
+| Solarized Light | `#5A6900` H | Project shade of Solarized green |
+| Solarized Dark | `#8EA400` H | Project shade of Solarized green |
+| Catppuccin Latte | `#157700` H | Project shade of Latte green |
+
+| Site role / scope | Explicit choice | Source and purpose |
+|-------------------|-----------------|--------------------|
+| Nord Night `sidebar-link-fg` / `sidebar-link-hover` | `#88C0D0` / `#8FBCBB` O | [Nord][color-nord] nord8 / nord7; non-tag links in `#right_bar`, including tag-cloud navigation |
+| Flexoki dark `sidebar-link-fg` / `sidebar-link-hover` | `#A699D0` / `#C4B9E0` O | [Flexoki][color-flexoki] purple-300 / purple-200; the same non-tag scope, independent of cloud-tag inks |
+| Flexoki dark `sidebar-btn-bg` / `sidebar-btn-bg-hover` / `sidebar-btn-fg` | `#3AA99F` / `#5ABDAC` / `#1C1B1A` O | [Flexoki][color-flexoki] cyan-400 / cyan-300 / base-950; sidebar and Tweets submit buttons, keeping a darker fill and dark text |
+
+These are project role assignments using official literals. They do not claim
+that Nord or Flexoki prescribes those control pairings. Other button families
+still go through `deriveBtnFamily()` in `_util.mjs`: for example, Nord's
+official nord10 / nord9 seeds `#5E81AC` / `#81A1C1` emit sidebar fills
+`#4D6E96` / `#415D7E` after contrast derivation. Those outputs are A, not
+official Nord swatches. Site accent text can likewise move: Solarized blue
+`#268BD2` resolves to `#1D699E` in light mode and `#4CA2DF` in dark mode.
+
+Popup, options and library derive their own semantic roles through
+`_ui-derive.mjs` and each surface composer, including any explicit `ui`
+overrides. Preserve theme identity and state meaning across surfaces; do not
+force identical hex values onto different backgrounds. Trace a color through
+the raw pilot, mode merge, derivation and any consuming override before naming
+its source. This record does not attribute every retained legacy literal.
+
+When changing a decision, edit its pilot or composer, run `sync-all.mjs` and
+its read-only `--check` mode, then verify the generated CSS and rendered state.
+Never repair these colors by hand in `pinboard-themes.js` or the extension CSS
+generated regions. Update the relevant row here when an explicit decision
+changes; automatically derived roles remain owned by their algorithms.
+
+[color-nord]: https://www.nordtheme.com/docs/colors-and-palettes/
+[color-dracula]: https://draculatheme.com/spec
+[color-flexoki]: https://stephango.com/flexoki
+[color-solarized]: https://ethanschoonover.com/solarized/
+[color-catppuccin]: https://catppuccin.com/palette/
+[color-gruvbox]: https://github.com/morhetz/gruvbox/blob/master/colors/gruvbox.vim
+[color-rose-pine]: https://rosepinetheme.com/palette/
+[color-primer]: https://github.com/primer/primitives/blob/main/src/tokens/base/color/light/light.json5
 
 ## §4 · Composers
 
