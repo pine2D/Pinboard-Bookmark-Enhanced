@@ -142,6 +142,18 @@ try {
       await page.locator('#bulk_edit').evaluate((node, color) => { node.style.cssText = `background:${color};color:#fff;border:1px solid #999`; }, color);
       await readable(`${key}:bulk-${color}`, '#bulk_edit');
     }
+    // Native sidebar/Tweets submit labels must stay readable after all dark
+    // mode and literal overrides, not just in the derived palette pairs.
+    for (const name of ['search-sidebar', 'search-tweets']) {
+      await fixture(name);
+      const selector = '#right_bar input[type="submit"]';
+      await readable(`${key}:${name}`, selector);
+      const buttons = page.locator(selector);
+      for (let i = 0; i < await buttons.count(); i++) {
+        await buttons.nth(i).hover();
+        await readable(`${key}:${name}:hover`, `${selector}:hover`);
+      }
+    }
     await fixture('bookmarks');
     await readable(key, '.description, .description blockquote');
     await readable(key, '.star span', 3);

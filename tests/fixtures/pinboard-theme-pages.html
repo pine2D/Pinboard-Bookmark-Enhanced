@@ -79,6 +79,22 @@
 <template id="completion">
   <div class="pin-ac"><div class="bd"><ul><li class="active">agriculture</li></ul></div></div>
 </template>
+<!-- Search form shapes inspected on the logged-in home/Tweets pages 2026-10-23.
+     Keep the sidebar, search_button wrapper and both home submits: these bring
+     competing button families into the actual cascade. No scripts or writes. -->
+<template id="search-sidebar">
+  <div id="main_column"><div id="right_bar"><div id="searchbox"><form method="get" action="#search">
+    <input tabindex="1" type="text" autocomplete="off" autocorrect="off" id="search_query_field" size="30" name="query"><br>
+    <div class="search_button"><input type="submit" name="mine" value="Search Mine"> <input name="all" type="submit" value="Search All"></div>
+    <div class="search_button"><p><label style="display:inline" for="fulltext">search full text</label> <input type="checkbox" id="fulltext" name="fulltext"></p></div>
+  </form></div></div></div>
+</template>
+<template id="search-tweets">
+  <div id="main_column"><div id="right_bar"><div id="tweet_searchbox"><form method="get" action="#search-tweets">
+    <input type="text" name="query" id="search_query_field" size="30"><br>
+    <input type="submit" value="Search Tweets">
+  </form></div></div></div>
+</template>
 <template id="bookmarks">
   <div id="main_column"><div id="bookmarks">
     <div class="bookmark"><div class="star"><span>✭</span></div><div class="display"><div class="description">Description<blockquote>Quoted description</blockquote></div></div></div>

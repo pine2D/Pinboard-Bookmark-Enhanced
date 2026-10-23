@@ -5846,9 +5846,9 @@ html.pbp-dark {
   --pinboard-link-visited: #d36da1;
   --pinboard-focus-ring: #4385be;
   --pinboard-unread: #D14D41;
-  --pinboard-sidebar-btn-bg: #238179;
-  --pinboard-sidebar-btn-fg: #FFFCF0;
-  --pinboard-sidebar-btn-bg-hover: #1b655f;
+  --pinboard-sidebar-btn-bg: #3aa99f;
+  --pinboard-sidebar-btn-fg: #1C1B1A;
+  --pinboard-sidebar-btn-bg-hover: #5abdac;
   --pinboard-on-accent: #171615;
   --pinboard-on-link-hover: #1c1b1a;
   --pinboard-scrollbar-thumb: #918f8a;
@@ -6834,12 +6834,10 @@ html.pbp-dark #main_column form[name="sort"] table a[style*="color: #aaa"] { col
 html.pbp-dark #right_bar table tr[onmouseover]:hover { background: #282726 !important; }
 html.pbp-dark #right_bar input#key { background: #1C1B1A !important; border-radius: 4px !important; }
 html.pbp-dark #right_bar input#key:focus { border-color: #87D3C3 !important; box-shadow: 0 0 0 2px rgba(135,211,195,0.22) !important; }
-html.pbp-dark #right_bar input[type="submit"] { background: #87D3C3 !important; border-radius: 4px !important; }
-html.pbp-dark #right_bar input[type="submit"]:hover { background: #A8E4D5 !important; }
+html.pbp-dark #right_bar input[type="submit"] { border-radius: 4px !important; }
 html.pbp-dark #tweet_searchbox #search_query_field { background: #1C1B1A !important; border-radius: 4px !important; font-size: 13px !important; }
 html.pbp-dark #tweet_searchbox #search_query_field:focus { border-color: #87D3C3 !important; box-shadow: 0 0 0 2px rgba(135,211,195,0.22) !important; }
-html.pbp-dark #tweet_searchbox input[type="submit"] { background: #87D3C3 !important; border-radius: 4px !important; }
-html.pbp-dark #tweet_searchbox input[type="submit"]:hover { background: #A8E4D5 !important; }`
+html.pbp-dark #tweet_searchbox input[type="submit"] { border-radius: 4px !important; }`
   },
 
   // ---- 7. Solarized Light ----
