@@ -7905,12 +7905,15 @@ const SWEEP_CFG = {
       ".vocab-pron-row, .vocab-manage-row",
     ].join(", "),
   },
-  // 12. clusterGap -- the icon-button cluster rung: 4px on every surface. The
-  //     three clusters actionRowGap exempts are the same shape under three
-  //     names (library .lib-cluster, popup .header-icons, reader
-  //     .xp-window-actions); popup's sat at 2px until 2026-09-06 -- the drift a
-  //     shared name would have caught, so the gate holds the shape instead.
-  clusterGap: { selectors: { library: ".lib-cluster", popup: ".header-icons", "md-preview": ".xp-window-actions" }, expected: 4 },
+  // 12. clusterGap -- the icon-button cluster rung: 4px on every surface.
+  //     Besides named cluster containers, registered compact members identify
+  //     a cluster only when they are every visible child and carry no label.
+  //     An arbitrary icon-only action row (e.g. export toggles) still uses 8px.
+  clusterGap: {
+    selectors: { library: ".lib-cluster", popup: ".header-icons", "md-preview": ".xp-window-actions" },
+    members: { "md-preview": ".reader-bookmark-ic" },
+    expected: 4,
+  },
   // 9. radiusScale -- every chromed box's uniform border-radius must be one of
   //    the surface's radius TOKENS as currently resolved on <html> (they are
   //    theme-variant: 15 presets restyle --opt-radius-md, so the probe reads
@@ -8377,23 +8380,30 @@ function sweepProbe(cfg) {
       }
     }
     const allowedGaps = cfg.actionRowGap.allowed[surface] || [];
+    const clusterSel = cfg.clusterGap && cfg.clusterGap.selectors[surface];
+    const clusterMembers = cfg.clusterGap?.members?.[surface];
+    const clusters = new Set(clusterSel ? document.querySelectorAll(clusterSel) : []);
     for (const el of document.querySelectorAll("*")) {
       if (!visible(el) || excluded(el) || el.matches(cfg.actionRowGap.exempt) || el.closest(cfg.actionRowGap.exempt)) continue;
       const cs = getComputedStyle(el);
       if (!/flex|grid/.test(cs.display) || cs.justifyContent === "space-between") continue;
       const kids = Array.from(el.children).filter(visible);
       if (kids.length < 2 || !kids.some((k) => k.matches("button, .btn, a.btn"))) continue;
+      // Classify this row only: mixed rows and nested action rows must still
+      // be measured. innerText excludes hidden labels but catches own text.
+      if (clusterMembers && kids.every((k) => k.matches("button") && k.matches(clusterMembers)) && !el.innerText.replace(/\u00D7/g, "").trim()) {
+        clusters.add(el);
+        continue;
+      }
+      if (surface === "md-preview" && kids.every((k) => k.matches("button.ask-chip"))) continue;
       const gap = cs.columnGap === "normal" ? 0 : Math.round(parseFloat(cs.columnGap));
       if (!allowedGaps.includes(gap)) hits.push({ kind: "actionRowGap", path: pathOf(el), gap, allowed: allowedGaps, detail: `${gap}px` });
     }
-    const clusterSel = cfg.clusterGap && cfg.clusterGap.selectors[surface];
-    if (clusterSel) {
-      for (const el of document.querySelectorAll(clusterSel)) {
-        if (!visible(el) || excluded(el)) continue;
-        const cs = getComputedStyle(el);
-        const gap = cs.columnGap === "normal" ? 0 : Math.round(parseFloat(cs.columnGap) * 100) / 100;
-        if (Math.abs(gap - cfg.clusterGap.expected) > 0.5) hits.push({ kind: "clusterGap", path: pathOf(el), gap, expected: cfg.clusterGap.expected, detail: `${gap}px` });
-      }
+    for (const el of clusters) {
+      if (!visible(el) || excluded(el)) continue;
+      const cs = getComputedStyle(el);
+      const gap = cs.columnGap === "normal" ? 0 : Math.round(parseFloat(cs.columnGap) * 100) / 100;
+      if (Math.abs(gap - cfg.clusterGap.expected) > 0.5) hits.push({ kind: "clusterGap", path: pathOf(el), gap, expected: cfg.clusterGap.expected, detail: `${gap}px` });
     }
     const rootCs = getComputedStyle(document.documentElement);
     const liveTokens = (cfg.radiusScale.names || []).map((n) => parseFloat(rootCs.getPropertyValue(`${cfg.radiusScale.prefix[surface] || "--radius-"}${n}`))).filter((v) => Number.isFinite(v));
