@@ -4575,7 +4575,16 @@ details#video-description .desc-body a { color: var(--link); }
 #export-summary:empty { display: none; }
 #exp-include-ask { min-height: 26px; margin-bottom: var(--sp-2); max-width: 100%; padding: var(--sp-1) var(--sp-2); white-space: normal; overflow-wrap: anywhere; }
 #exp-include-ask[hidden] { display: none; }
-#reader-bookmark-section > .msg-bar { margin-top: var(--sp-2); }
+/* Keep the rail heading and compact actions together; wrap the cluster as a
+   unit when the title needs more room. The section owns its full-width rule. */
+#reader-bookmark-section {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: var(--sp-2) var(--sp-3);
+  margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--border);
+}
+#reader-bookmark-section > .rail-label { flex: none; max-width: 100%; overflow-wrap: anywhere; margin: 0; padding: 0; border: 0; }
+#reader-bookmark-section > .row { flex: none; flex-wrap: nowrap; }
+#reader-bookmark-section > .msg-bar { flex-basis: 100%; min-width: 0; margin: 0; overflow-wrap: anywhere; }
 #reader-bookmark-section > .row,
 #reader-bookmark-footer > .row { gap: var(--sp-1); }
 .reader-bookmark-ic.action-btn { flex: none; width: 26px; height: 26px; padding: 0; justify-content: center; }
