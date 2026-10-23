@@ -4954,6 +4954,8 @@ input[type="radio"] { accent-color: #bd93f9 !important; }
   --pinboard-selection-fg: #100f0f;
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #846401;
+  --pinboard-sidebar-tag-fg: #3A2D04;
+  --pinboard-sidebar-tag-hover: #133051;
   --pinboard-row-hover: #F2F0E5;
   --pinboard-bundle-row-hover: #205ea614;
   --pinboard-destroy: #af3029;
@@ -4976,8 +4978,6 @@ input[type="radio"] { accent-color: #bd93f9 !important; }
   --pinboard-scrollbar-thumb: #6a6964;
   --pinboard-sidebar-link-fg: #205ea6;
   --pinboard-sidebar-link-hover: #163b66;
-  --pinboard-sidebar-tag-fg: #846401;
-  --pinboard-sidebar-tag-hover: #205ea6;
   --pinboard-anchor-fg: #205ea6;
   --pinboard-star-fg: #8c855c;
   --pinboard-bundle-edit-hover: #205ea6;
@@ -5831,6 +5831,8 @@ pre {
 a.tag { text-decoration: underline !important; text-decoration-color: var(--pinboard-accent-alpha) !important; text-decoration-thickness: 1px !important; text-decoration-skip-ink: none !important; text-underline-offset: 2px !important; }
 a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-decoration-skip-ink: none !important; text-shadow: 0.5px 0 0 currentColor !important; }
 a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-color: var(--pinboard-destroy) !important; text-decoration-skip-ink: none !important; font-weight: 600 !important; }
+#tag_cloud a.tag:not(.selected) { color: var(--pinboard-sidebar-tag-fg) !important; }
+#tag_cloud a.tag:not(.selected):hover { color: var(--pinboard-sidebar-tag-hover) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-decoration-skip-ink: none !important; text-shadow: 0.5px 0 0 currentColor !important; }
 #search_query_field:focus, #banner_searchbox input[type="text"]:focus, #right_bar input#key:focus, #tweet_searchbox #search_query_field:focus {
   box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important;
   outline: none !important;
@@ -5861,6 +5863,8 @@ html.pbp-dark {
   --pinboard-selection-fg: #cecdc3;
   --pinboard-tag-bg: transparent;
   --pinboard-tag-fg: #d0a215;
+  --pinboard-sidebar-tag-fg: #ECCB60;
+  --pinboard-sidebar-tag-hover: #ABCFE2;
   --pinboard-row-hover: #343331;
   --pinboard-bundle-row-hover: #4385be1f;
   --pinboard-destroy: #db736a;
@@ -5883,8 +5887,6 @@ html.pbp-dark {
   --pinboard-on-accent: #171615;
   --pinboard-on-link-hover: #1c1b1a;
   --pinboard-scrollbar-thumb: #918f8a;
-  --pinboard-sidebar-tag-fg: #d0a215;
-  --pinboard-sidebar-tag-hover: #5a94c6;
   --pinboard-anchor-fg: #5a94c6;
   --pinboard-star-fg: #75716d;
   --pinboard-bundle-edit-hover: #699ecb;
@@ -6740,6 +6742,8 @@ html.pbp-dark ::-moz-selection { background: var(--pinboard-selection-bg) !impor
 html.pbp-dark a.tag { text-decoration: underline !important; text-decoration-color: var(--pinboard-accent-alpha) !important; text-decoration-thickness: 1px !important; text-decoration-skip-ink: none !important; text-underline-offset: 2px !important; }
 html.pbp-dark a.tag:hover { color: var(--pinboard-accent) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-decoration-skip-ink: none !important; text-shadow: 0.5px 0 0 currentColor !important; }
 html.pbp-dark a.tag.selected { color: var(--pinboard-destroy) !important; text-decoration-color: var(--pinboard-destroy) !important; text-decoration-skip-ink: none !important; font-weight: 600 !important; }
+html.pbp-dark #tag_cloud a.tag:not(.selected) { color: var(--pinboard-sidebar-tag-fg) !important; }
+html.pbp-dark #tag_cloud a.tag:not(.selected):hover { color: var(--pinboard-sidebar-tag-hover) !important; background: var(--pinboard-accent-soft) !important; text-decoration-color: var(--pinboard-accent) !important; text-decoration-thickness: 2.5px !important; text-decoration-skip-ink: none !important; text-shadow: 0.5px 0 0 currentColor !important; }
 html.pbp-dark #search_query_field:focus, html.pbp-dark #banner_searchbox input[type="text"]:focus, html.pbp-dark #right_bar input#key:focus, html.pbp-dark #tweet_searchbox #search_query_field:focus {
   box-shadow: 0 0 0 2px var(--pinboard-accent-alpha) !important;
   outline: none !important;
