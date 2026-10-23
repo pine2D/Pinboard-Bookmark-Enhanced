@@ -1618,7 +1618,7 @@
     "message": "启用后，弹窗、本设置页和笔记与生词本页使用所选 Pinboard 预设的配色；关闭则按上方的明暗模式使用默认配色。阅读器始终使用自己的阅读配色。"
   },
   "optFollowNeedsPreset": {
-    "message": "先在下面选一个 Pinboard 预设。选「无」时没有可跟随的配色。"
+    "message": "先在下面选一个 Pinboard 预设。选「不使用预设」时没有可跟随的配色。"
   },
   "optThemeOverridden": {
     "message": "弹窗、本设置页和笔记与生词本页正在跟随 $PRESET$，这些页面的明暗由它决定。",
@@ -1678,16 +1678,16 @@
     "message": "主题预设"
   },
   "themeGroupNone": {
-    "message": "无"
+    "message": "不使用预设"
   },
   "themeGroupAdaptive": {
     "message": "自适应"
   },
   "themeGroupLight": {
-    "message": "浅色"
+    "message": "固定浅色"
   },
   "themeGroupDark": {
-    "message": "深色"
+    "message": "固定深色"
   },
   "labelSavedThemes": {
     "message": "已保存的主题"
@@ -4365,5 +4365,6 @@
   "batchConfirmDetailAi": { "message": "已收藏的页面会跳过。每个新标签页都会调用一次 AI，费用计入你的 API Key。" },
   "aiErrorUnreachable": { "message": "连不上 $PROVIDER$（$HOST$）。请检查接口地址、网络或代理。", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
   "loginNeedsPaid": { "message": "需要付费的 Pinboard 账号。" },
-  "popupDraftDiscard": { "message": "丢弃草稿" }
+  "popupDraftDiscard": { "message": "丢弃草稿" },
+  "themeGroupAdaptiveHint": {"message": "自适应预设跟随上方「扩展外观」中的明暗设置。"}
 }

@@ -1618,7 +1618,7 @@
     "message": "Eingeschaltet verwenden Popup, diese Einstellungsseite und die Seite „Notizen & Vokabeln“ die Farben des gewählten Pinboard-Presets; ausgeschaltet die Standardpalette im oben gewählten Hell-/Dunkelmodus. Die Leseansicht behält immer ihre eigene Lesepalette."
   },
   "optFollowNeedsPreset": {
-    "message": "Wähle zuerst unten ein Pinboard-Preset. Bei „Keine“ gibt es keine Farben, denen die Seiten folgen könnten."
+    "message": "Wähle zuerst unten ein Pinboard-Preset. Bei „Kein Preset“ gibt es keine Palette zum Übernehmen."
   },
   "optThemeOverridden": {
     "message": "Popup, diese Einstellungsseite und die Seite „Notizen & Vokabeln“ folgen $PRESET$, dort bestimmt also dieses Preset Hell oder Dunkel.",
@@ -1678,16 +1678,16 @@
     "message": "Presets"
   },
   "themeGroupNone": {
-    "message": "Keine"
+    "message": "Kein Preset"
   },
   "themeGroupAdaptive": {
     "message": "Adaptiv"
   },
   "themeGroupLight": {
-    "message": "Hell"
+    "message": "Immer hell"
   },
   "themeGroupDark": {
-    "message": "Dunkel"
+    "message": "Immer dunkel"
   },
   "labelSavedThemes": {
     "message": "Gespeicherte Themes"
@@ -4371,5 +4371,6 @@
   "batchConfirmDetailAi": { "message": "Bereits gespeicherte Seiten werden übersprungen. Für jeden neuen Tab läuft die KI und wird über deinen API-Schlüssel abgerechnet." },
   "aiErrorUnreachable": { "message": "$PROVIDER$ ($HOST$) ist nicht erreichbar. Prüfe die Base URL, dein Netzwerk oder deinen Proxy.", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
   "loginNeedsPaid": { "message": "Erfordert ein kostenpflichtiges Pinboard-Konto." },
-  "popupDraftDiscard": { "message": "Entwurf verwerfen" }
+  "popupDraftDiscard": { "message": "Entwurf verwerfen" },
+  "themeGroupAdaptiveHint": {"message": "Adaptive Presets folgen der Hell-/Dunkeleinstellung oben unter „Darstellung der Erweiterung“."}
 }

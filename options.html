@@ -1107,37 +1107,45 @@
               <p class="hint context-help-body" id="opt-popup-follow-theme-hint" data-i18n="popupFollowHint">When on, the popup, this settings page and the notes &amp; vocabulary page use the palette of the selected Pinboard preset; when off they use the default palette in the light/dark mode above. The reader always keeps its own reading palette.</p>
             </details><span class="switch-track" aria-hidden="true"></span></label>
           </div>
-          <p class="hint" id="opt-popup-follow-theme-needs-preset" data-i18n="optFollowNeedsPreset" hidden>Pick a Pinboard preset below first. With None there is no palette to follow.</p>
+          <p class="hint" id="opt-popup-follow-theme-needs-preset" data-i18n="optFollowNeedsPreset" hidden>Pick a Pinboard preset below first. With No preset there is no palette to follow.</p>
         </div>
       </section>
       <section class="settings-section">
         <h2 class="section-title" data-i18n="secCustomStyle">Pinboard.in Custom Style</h2>
         <div class="fg">
           <label class="bl subhead" data-i18n="labelThemePresets">Theme Presets</label>
-          <div class="theme-presets-group" role="group" aria-labelledby="theme-group-none">
-            <span id="theme-group-none" class="sr-only" data-i18n="themeGroupNone">None</span>
-            <button class="btn btn-sm theme-preset-btn" data-theme="" data-i18n="themeGroupNone" aria-pressed="false">None</button>
+          <div class="theme-presets-group">
+            <button class="btn btn-sm theme-preset-btn" data-theme="" data-i18n="themeGroupNone" aria-pressed="false">No preset</button>
           </div>
-          <div class="theme-presets-group" role="group" aria-labelledby="theme-group-adaptive">
-            <span id="theme-group-adaptive" class="theme-group-label" data-i18n="themeGroupAdaptive">Adaptive</span>
-            <button class="btn btn-sm theme-preset-btn" data-theme="flexoki" aria-pressed="false">Flexoki</button>
-            <button class="btn btn-sm theme-preset-btn" data-theme="solarized" aria-pressed="false">Solarized</button>
-            <button class="btn btn-sm theme-preset-btn" data-theme="catppuccin" aria-pressed="false">Catppuccin</button>
+          <div class="theme-preset-groups">
+            <div class="theme-presets-group" role="group" aria-labelledby="theme-group-adaptive">
+              <span id="theme-group-adaptive" class="theme-group-label" data-i18n="themeGroupAdaptive">Adaptive</span>
+              <div class="fg-actions">
+                <button class="btn btn-sm theme-preset-btn" data-theme="flexoki" aria-pressed="false">Flexoki</button>
+                <button class="btn btn-sm theme-preset-btn" data-theme="solarized" aria-pressed="false">Solarized</button>
+                <button class="btn btn-sm theme-preset-btn" data-theme="catppuccin" aria-pressed="false">Catppuccin</button>
+              </div>
+            </div>
+            <div class="theme-presets-group" role="group" aria-labelledby="theme-group-light">
+              <span id="theme-group-light" class="theme-group-label" data-i18n="themeGroupLight">Fixed light</span>
+              <div class="fg-actions">
+                <button class="btn btn-sm theme-preset-btn" data-theme="modern-card" aria-pressed="false">Modern Card</button>
+                <button class="btn btn-sm theme-preset-btn" data-theme="paper-ink" aria-pressed="false">Paper &amp; Ink</button>
+                <button class="btn btn-sm theme-preset-btn" data-theme="github-light" aria-pressed="false">GitHub Light</button>
+              </div>
+            </div>
+            <div class="theme-presets-group" role="group" aria-labelledby="theme-group-dark">
+              <span id="theme-group-dark" class="theme-group-label" data-i18n="themeGroupDark">Fixed dark</span>
+              <div class="fg-actions">
+                <button class="btn btn-sm theme-preset-btn" data-theme="nord-night" aria-pressed="false">Nord Night</button>
+                <button class="btn btn-sm theme-preset-btn" data-theme="terminal" aria-pressed="false">Terminal</button>
+                <button class="btn btn-sm theme-preset-btn" data-theme="dracula" aria-pressed="false">Dracula</button>
+                <button class="btn btn-sm theme-preset-btn" data-theme="gruvbox-dark" aria-pressed="false">Gruvbox Dark</button>
+                <button class="btn btn-sm theme-preset-btn" data-theme="rose-pine" aria-pressed="false">Rosé Pine</button>
+              </div>
+            </div>
           </div>
-          <div class="theme-presets-group" role="group" aria-labelledby="theme-group-light">
-            <span id="theme-group-light" class="theme-group-label" data-i18n="themeGroupLight">Light</span>
-            <button class="btn btn-sm theme-preset-btn" data-theme="modern-card" aria-pressed="false">Modern Card</button>
-            <button class="btn btn-sm theme-preset-btn" data-theme="paper-ink" aria-pressed="false">Paper &amp; Ink</button>
-            <button class="btn btn-sm theme-preset-btn" data-theme="github-light" aria-pressed="false">GitHub Light</button>
-          </div>
-          <div class="theme-presets-group" role="group" aria-labelledby="theme-group-dark">
-            <span id="theme-group-dark" class="theme-group-label" data-i18n="themeGroupDark">Dark</span>
-            <button class="btn btn-sm theme-preset-btn" data-theme="nord-night" aria-pressed="false">Nord Night</button>
-            <button class="btn btn-sm theme-preset-btn" data-theme="terminal" aria-pressed="false">Terminal</button>
-            <button class="btn btn-sm theme-preset-btn" data-theme="dracula" aria-pressed="false">Dracula</button>
-            <button class="btn btn-sm theme-preset-btn" data-theme="gruvbox-dark" aria-pressed="false">Gruvbox Dark</button>
-            <button class="btn btn-sm theme-preset-btn" data-theme="rose-pine" aria-pressed="false">Rosé Pine</button>
-          </div>
+          <p class="hint" data-i18n="themeGroupAdaptiveHint">Adaptive presets follow the light/dark setting under Extension Appearance above.</p>
         </div>
         <div class="fg" id="saved-themes-section" hidden>
           <label class="bl subhead" data-i18n="labelSavedThemes">Saved Themes</label>

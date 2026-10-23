@@ -1618,7 +1618,7 @@
     "message": "Po włączeniu okienko, ta strona ustawień i strona „Notatki i słówka” używają palety wybranego motywu Pinboard; po wyłączeniu używają domyślnej palety w wybranym wyżej trybie jasnym/ciemnym. Czytnik zawsze zachowuje własną paletę czytania."
   },
   "optFollowNeedsPreset": {
-    "message": "Najpierw wybierz poniżej motyw Pinboard. Przy „Brak” nie ma palety, za którą można podążać."
+    "message": "Najpierw wybierz poniżej motyw Pinboard. Przy „Bez motywu” nie ma palety do zastosowania."
   },
   "optThemeOverridden": {
     "message": "Okienko, ta strona ustawień i strona „Notatki i słówka” korzystają z motywu $PRESET$, więc to on decyduje tam o trybie jasnym lub ciemnym.",
@@ -1678,16 +1678,16 @@
     "message": "Motywy predefiniowane"
   },
   "themeGroupNone": {
-    "message": "Brak"
+    "message": "Bez motywu"
   },
   "themeGroupAdaptive": {
     "message": "Adaptacyjny"
   },
   "themeGroupLight": {
-    "message": "Jasny"
+    "message": "Zawsze jasny"
   },
   "themeGroupDark": {
-    "message": "Ciemny"
+    "message": "Zawsze ciemny"
   },
   "labelSavedThemes": {
     "message": "Zapisane motywy"
@@ -4371,5 +4371,6 @@
   "batchConfirmDetailAi": { "message": "Strony, które już zapisano, zostaną pominięte. Dla każdej nowej karty uruchomi się AI, a koszt obciąży twój klucz API." },
   "aiErrorUnreachable": { "message": "Nie można połączyć się z $PROVIDER$ ($HOST$). Sprawdź Base URL, sieć lub serwer proxy.", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
   "loginNeedsPaid": { "message": "Wymaga płatnego konta Pinboard." },
-  "popupDraftDiscard": { "message": "Odrzuć szkic" }
+  "popupDraftDiscard": { "message": "Odrzuć szkic" },
+  "themeGroupAdaptiveHint": {"message": "Motywy adaptacyjne stosują tryb jasny lub ciemny wybrany powyżej w sekcji „Wygląd rozszerzenia”."}
 }

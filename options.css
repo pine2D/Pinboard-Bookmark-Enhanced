@@ -2146,10 +2146,35 @@ html.motion-ready #preset-preview-section > summary::after {
 
 /* ---- Theme preset buttons ---- */
 .theme-presets-group { display: flex; gap: var(--opt-sp-3); flex-wrap: wrap; align-items: center; margin-bottom: var(--opt-sp-5); }
-/* The group name takes its own line above the chips: as an inline column it
-   was 66-90px wide depending on the locale, so no two groups' chips -- and
-   never the unlabeled "None" -- started at the same x. */
-.theme-group-label { flex-basis: 100%; font-size: 11px; color: var(--opt-fg-hint); text-transform: uppercase; letter-spacing: 0.05em; }
+/* All preset groups share one label track; chips wrap only in their own
+   track. Subgrid keeps each accessible group intact without per-row widths. */
+.theme-preset-groups {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--opt-sp-5) var(--opt-sp-6);
+}
+.theme-preset-groups > .theme-presets-group {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  column-gap: inherit;
+  align-items: start;
+  margin: 0;
+}
+.theme-group-label {
+  display: flex;
+  align-items: center;
+  min-height: calc(var(--opt-control-h) - 4px);
+  font-size: var(--opt-text-body);
+  color: var(--opt-fg-muted);
+}
+.theme-preset-groups .fg-actions { min-width: 0; }
+.theme-preset-groups + .hint { margin-top: var(--opt-sp-4); }
+@media (max-width: 600px) {
+  .theme-preset-groups { grid-template-columns: minmax(0, 1fr); gap: var(--opt-sp-6); }
+  .theme-preset-groups > .theme-presets-group { row-gap: var(--opt-sp-2); }
+  .theme-group-label { min-height: 0; }
+}
 /* Borderless swatch pill (design-uplift, user-selected Variant A,
    2026-08-04) -- shared base for .theme-preset-btn and .saved-theme-btn; see
    COMPONENTS.md Appendix C's preset-row-redesign entry for the full

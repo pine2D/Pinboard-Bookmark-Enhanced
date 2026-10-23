@@ -1618,7 +1618,7 @@
     "message": "啟用後，彈出視窗、此設定頁和筆記與生詞本頁會使用所選 Pinboard 預設的配色；關閉則依上方的明暗模式使用預設配色。閱讀器一律使用自己的閱讀配色。"
   },
   "optFollowNeedsPreset": {
-    "message": "先在下方選一個 Pinboard 預設。選「無」時沒有可跟隨的配色。"
+    "message": "先在下方選一個 Pinboard 預設。選「不使用預設」時沒有可跟隨的配色。"
   },
   "optThemeOverridden": {
     "message": "彈出視窗、此設定頁和筆記與生詞本頁正在跟隨 $PRESET$，這些頁面的明暗由它決定。",
@@ -1678,16 +1678,16 @@
     "message": "主題預設"
   },
   "themeGroupNone": {
-    "message": "無"
+    "message": "不使用預設"
   },
   "themeGroupAdaptive": {
     "message": "自適應"
   },
   "themeGroupLight": {
-    "message": "淺色"
+    "message": "固定淺色"
   },
   "themeGroupDark": {
-    "message": "深色"
+    "message": "固定深色"
   },
   "labelSavedThemes": {
     "message": "已儲存的主題"
@@ -4371,5 +4371,6 @@
   "batchConfirmDetailAi": { "message": "已收藏的頁面會略過。每個新分頁都會呼叫一次 AI，費用計入你的 API Key。" },
   "aiErrorUnreachable": { "message": "無法連線到 $PROVIDER$（$HOST$）。請檢查端點網址、網路或 Proxy。", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
   "loginNeedsPaid": { "message": "需要付費的 Pinboard 帳號。" },
-  "popupDraftDiscard": { "message": "捨棄草稿" }
+  "popupDraftDiscard": { "message": "捨棄草稿" },
+  "themeGroupAdaptiveHint": {"message": "自適應預設會依照上方「擴充功能外觀」的明暗設定切換。"}
 }

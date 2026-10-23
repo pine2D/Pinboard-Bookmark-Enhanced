@@ -153,7 +153,8 @@
         "settings-section",
         "switch",
         "switch-text",
-        "switch-track"
+        "switch-track",
+        "theme-preset-groups"
       ],
       "regions": [
         "auto-save-hint",

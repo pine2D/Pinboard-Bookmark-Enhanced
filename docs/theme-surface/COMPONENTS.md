@@ -1580,6 +1580,7 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 | 表面 | 原语 | 契约（拥有的几何） |
 |---|---|---|
 | options | `.fg` | 表单组；`margin-bottom: var(--opt-rhythm)`（12px）= 组间节律的唯一主人 |
+| options | `.theme-preset-groups` | 共享 `max-content` 标签列与按钮列；分组沿用 subgrid，按钮复用 `.fg-actions` 独立换行；列间 sp-6、组间 sp-5，≤600px 改标签在上并以 sp-6 分组 |
 | options | `.fg-actions` | 按钮/状态行：flex + gap sp-4；作 `.fg` 末子元素时 `margin-top: --opt-label-gap`（8/4），作 `.fg` 的兄弟或 `.pf` 子元素时 `sp-6`；Send-to 卡片测试行 `sp-6` |
 | options | `.hint` / `.hint-warn` | 辅助文字 `--opt-text-helper`/`--opt-lh-helper`（12/18）；`.fg > .hint` 距控件 sp-1；组外 `margin: sp-1 0 rhythm` |
 | options | `.section-title` | h2，`--opt-text-section`/`--opt-lh-section`，600，`margin: 0 0 --opt-sp-5` |

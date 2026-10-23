@@ -1618,7 +1618,7 @@
     "message": "Lorsque l'option est activée, le popup, cette page de réglages et la page Bloc-notes et vocabulaire utilisent la palette du préréglage Pinboard sélectionné ; lorsqu'elle est désactivée, ils utilisent la palette par défaut dans le mode clair/sombre ci-dessus. La page Lecture conserve toujours sa propre palette de lecture."
   },
   "optFollowNeedsPreset": {
-    "message": "Choisissez d’abord un préréglage Pinboard ci-dessous. Avec « Aucun », il n’y a aucune palette à suivre."
+    "message": "Choisissez d’abord un préréglage Pinboard ci-dessous. Avec « Sans préréglage », il n’y a aucune palette à suivre."
   },
   "optThemeOverridden": {
     "message": "Le popup, cette page de réglages et la page Bloc-notes et vocabulaire suivent $PRESET$ : c’est lui qui y décide du mode clair ou sombre.",
@@ -1678,16 +1678,16 @@
     "message": "Thèmes prédéfinis"
   },
   "themeGroupNone": {
-    "message": "Aucun"
+    "message": "Sans préréglage"
   },
   "themeGroupAdaptive": {
     "message": "Adaptatif"
   },
   "themeGroupLight": {
-    "message": "Clair"
+    "message": "Toujours clair"
   },
   "themeGroupDark": {
-    "message": "Sombre"
+    "message": "Toujours sombre"
   },
   "labelSavedThemes": {
     "message": "Thèmes enregistrés"
@@ -4371,5 +4371,6 @@
   "batchConfirmDetailAi": { "message": "Les pages déjà enregistrées sont ignorées. L’IA s’exécute pour chaque nouvel onglet et est facturée sur votre clé API." },
   "aiErrorUnreachable": { "message": "Impossible de joindre $PROVIDER$ ($HOST$). Vérifiez l’URL de base, votre réseau ou votre proxy.", "placeholders": {"provider": {"content": "$1"}, "host": {"content": "$2"}} },
   "loginNeedsPaid": { "message": "Nécessite un compte Pinboard payant." },
-  "popupDraftDiscard": { "message": "Supprimer le brouillon" }
+  "popupDraftDiscard": { "message": "Supprimer le brouillon" },
+  "themeGroupAdaptiveHint": {"message": "Les préréglages adaptatifs suivent le mode clair ou sombre choisi plus haut dans « Apparence de l’extension »."}
 }
