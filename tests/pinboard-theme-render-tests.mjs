@@ -186,7 +186,7 @@ try {
     const cloud = await page.locator('#tag_cloud a.tag').evaluateAll(nodes => nodes.map(n => ({ size: parseFloat(getComputedStyle(n).fontSize), display: getComputedStyle(n).display })));
     checks++;
     if (cloud.some(n => n.display !== 'inline') || cloud[1].size / cloud[0].size < 2) failures.push(`${key} frequency-sized inline cloud was flattened`);
-    if (['modern-card', 'paper-ink', 'github-light', 'flexoki', 'flexoki:dark'].includes(key)) {
+    if (['modern-card', 'paper-ink', 'github-light', 'flexoki', 'flexoki:dark', 'dracula', 'rose-pine'].includes(key)) {
       await fixture('sidebar-tag-frequency');
       const selector = '#tag_cloud a.tag:not(.selected)';
       await readable(`${key}:low-frequency`, selector);
