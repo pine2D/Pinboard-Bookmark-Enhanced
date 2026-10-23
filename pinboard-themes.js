@@ -707,8 +707,9 @@ blockquote.note { color: var(--pinboard-fg) !important; }
   border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
 }
 #tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
-#tagPickerFilterLinks { gap: 6px !important; }
-#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+#tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+#tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
 #tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
 /* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
 #tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
@@ -1715,8 +1716,9 @@ blockquote.note { color: var(--pinboard-fg) !important; }
   border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
 }
 #tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
-#tagPickerFilterLinks { gap: 6px !important; }
-#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+#tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+#tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
 #tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
 /* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
 #tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
@@ -2676,8 +2678,9 @@ blockquote.note { color: var(--pinboard-fg) !important; }
   border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
 }
 #tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
-#tagPickerFilterLinks { gap: 6px !important; }
-#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+#tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+#tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
 #tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
 /* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
 #tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
@@ -3678,8 +3681,9 @@ blockquote.note { color: var(--pinboard-fg) !important; }
   border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
 }
 #tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
-#tagPickerFilterLinks { gap: 6px !important; }
-#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+#tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+#tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
 #tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
 /* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
 #tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
@@ -4678,8 +4682,9 @@ blockquote.note { color: var(--pinboard-fg) !important; }
   border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
 }
 #tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
-#tagPickerFilterLinks { gap: 6px !important; }
-#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+#tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+#tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
 #tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
 /* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
 #tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
@@ -5665,8 +5670,9 @@ blockquote.note { color: var(--pinboard-fg) !important; }
   border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
 }
 #tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
-#tagPickerFilterLinks { gap: 6px !important; }
-#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+#tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+#tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
 #tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
 /* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
 #tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
@@ -6582,8 +6588,9 @@ html.pbp-dark #tagPickerNav {
   border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
 }
 html.pbp-dark #tagPickerFilterLinks, html.pbp-dark #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
-html.pbp-dark #tagPickerFilterLinks { gap: 6px !important; }
-html.pbp-dark #tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+html.pbp-dark #tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+html.pbp-dark #tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
 html.pbp-dark #tagPickerSelectLinks > span[style*="color:#aaa"], html.pbp-dark #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
 /* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
 html.pbp-dark #tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
@@ -7626,8 +7633,9 @@ blockquote.note { color: var(--pinboard-fg) !important; }
   border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
 }
 #tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
-#tagPickerFilterLinks { gap: 6px !important; }
-#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+#tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+#tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
 #tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
 /* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
 #tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
@@ -8574,8 +8582,9 @@ blockquote.note { color: var(--pinboard-fg) !important; }
   border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
 }
 #tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
-#tagPickerFilterLinks { gap: 6px !important; }
-#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+#tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+#tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
 #tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
 /* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
 #tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
@@ -9527,8 +9536,9 @@ blockquote.note { color: var(--pinboard-fg) !important; }
   border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
 }
 #tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
-#tagPickerFilterLinks { gap: 6px !important; }
-#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+#tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+#tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
 #tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
 /* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
 #tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
@@ -10489,8 +10499,9 @@ blockquote.note { color: var(--pinboard-fg) !important; }
   border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
 }
 #tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
-#tagPickerFilterLinks { gap: 6px !important; }
-#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+#tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+#tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
 #tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
 /* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
 #tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
@@ -11464,8 +11475,9 @@ blockquote.note { color: var(--pinboard-fg) !important; }
   border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
 }
 #tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
-#tagPickerFilterLinks { gap: 6px !important; }
-#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+#tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+#tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
 #tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
 /* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
 #tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
@@ -12431,8 +12443,9 @@ blockquote.note { color: var(--pinboard-fg) !important; }
   border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
 }
 #tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
-#tagPickerFilterLinks { gap: 6px !important; }
-#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+#tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+#tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
 #tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
 /* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
 #tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }
@@ -13405,8 +13418,9 @@ blockquote.note { color: var(--pinboard-fg) !important; }
   border-bottom: var(--pinboard-border-width) var(--pinboard-border-style) var(--pinboard-border) !important;
 }
 #tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: 12px !important; white-space: nowrap !important; }
-#tagPickerFilterLinks { gap: 6px !important; }
-#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+#tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+#tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
 #tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: var(--pinboard-muted) !important; }
 /* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
 #tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: var(--pinboard-radius-sm) !important; }

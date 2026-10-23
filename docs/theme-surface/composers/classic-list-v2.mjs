@@ -590,8 +590,9 @@ blockquote.note { color: ${v("fg")} !important; }
   border-bottom: ${v("border-width")} ${v("border-style")} ${v("border")} !important;
 }
 #tagPickerFilterLinks, #tagPickerSelectLinks { float: none !important; margin: 0 !important; display: flex !important; align-items: center !important; gap: 4px !important; font-size: ${sizeSm} !important; white-space: nowrap !important; }
-#tagPickerFilterLinks { gap: 6px !important; }
-#tagPickerNav #typer_box { width: 140px !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
+/* Let the filter field absorb wider font metrics without splitting the control groups. */
+#tagPickerFilterLinks { gap: 6px !important; min-width: 0 !important; }
+#tagPickerNav #typer_box { width: 140px !important; min-width: 0 !important; height: 26px !important; padding: 2px 8px !important; line-height: 1.2 !important; }
 #tagPickerSelectLinks > span[style*="color:#aaa"], #bundle_column span[style*="color:#aaa"] { color: ${v("muted")} !important; }
 /* hilight()/unhilight() write inline #ffffaa / #fff onto the show: all/unbundled links. */
 #tagPickerSelectLinks a[style*="background"] { background: transparent !important; padding: 1px 4px !important; border-radius: ${v("radius-sm")} !important; }
