@@ -940,7 +940,7 @@ a.tag.selected::before { color: var(--pinboard-destroy) !important; opacity: 0.9
 #search_query_field:focus { background: #fff !important; }
 #banner_searchbox input[type="text"]:focus { background: #fff !important; }
 .search_button input[type="submit"] { color: #fff !important; border: none !important; border-radius: 4px !important; padding: 4px 12px !important; font-size: 12px !important; }
-a.url_display { color: #3c8039 !important; font-size: 12px !important; text-decoration: none !important; }
+a.url_display { color: #397a37 !important; font-size: 12px !important; text-decoration: none !important; }
 a.url_link { font-size: 12px !important; padding: 1px 5px !important; border-radius: 3px !important; }
 .description { color: #5f6368 !important; font-size: 13px !important; margin-top: 4px !important; }
 a.cached { text-decoration: none !important; font-size: 12px !important; }
@@ -3878,7 +3878,7 @@ a.bundle:hover { color: #8b4513 !important; }
 .bookmark { border-bottom: 1px solid #e8dfd0 !important; padding: 14px 8px !important; }
 .selected_star { color: #d4a017 !important; }
 a.bookmark_title { font-weight: normal !important; letter-spacing: -0.01em !important; }
-a.url_display { color: #8b6c5b !important; font-size: 12px !important; font-family: -apple-system, sans-serif !important; }
+a.url_display { color: #886959 !important; font-size: 12px !important; font-family: -apple-system, sans-serif !important; }
 a.when { font-family: -apple-system, sans-serif !important; }
 a.url_link { padding: 1px 5px !important; }
 .description { color: #555 !important; font-size: 13px !important; line-height: 1.6 !important; margin-top: 4px !important; }
@@ -6770,7 +6770,7 @@ html.pbp-dark #main_column form[name="sort"] table td a.destroy { font-weight: 6
 .selected_star { color: #AD8301 !important; }
 #sub_banner a { color: #5E409D !important; }
 .search_button input[type="submit"] { border: none !important; }
-a.url_display { color: #637c02 !important; font-size: 12px !important; }
+a.url_display { color: #536907 !important; font-size: 12px !important; }
 a.url_link { padding: 1px 5px !important; border-radius: 3px !important; }
 .description { color: #6F6E69 !important; }
 #right_bar h3 { color: #5E409D !important; }
@@ -7773,7 +7773,7 @@ body#pinboard { letter-spacing: 0.01em !important; }
 .bookmark { padding: 12px 14px !important; border-radius: 2px !important; border-left: 2px solid transparent !important; }
 body:not(#pinboard) { letter-spacing: 0.01em !important; }
 a.bookmark_title { font-weight: 500 !important; }
-a.url_display { color: #667700 !important; font-family: "Fira Code", "Cascadia Code", monospace !important; }
+a.url_display { color: #5a6900 !important; font-family: "Fira Code", "Cascadia Code", monospace !important; }
 .bookmark .description { opacity: 1 !important; }
 a.url_link { padding: 1px 5px !important; }
 .description blockquote { border-left: 2px solid #268bd2 !important; }
@@ -8716,7 +8716,7 @@ body:not(#pinboard) { letter-spacing: 0.01em !important; }
 #banner_searchbox input[type="text"]:focus { background: #073642 !important; }
 .search_button input[type="submit"] { text-transform: uppercase !important; font-size: 11px !important; letter-spacing: 0.05em !important; }
 a.bookmark_title { font-weight: 500 !important; }
-a.url_display { color: #859900 !important; font-family: "Fira Code", "Cascadia Code", monospace !important; }
+a.url_display { color: #8ea400 !important; font-family: "Fira Code", "Cascadia Code", monospace !important; }
 a.url_link { background: #002b36 !important; padding: 1px 5px !important; }
 .bookmark .description { opacity: 1 !important; }
 .description blockquote { border-left: 2px solid #268bd2 !important; }
@@ -9658,7 +9658,7 @@ input[type="submit"], input[type="button"], .search_button input[type="submit"] 
 .bookmark { padding: 14px 18px !important; border-radius: 12px !important; margin-bottom: 8px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.06) !important; }
 a.bookmark_title { font-weight: 600 !important; }
 a.bookmark_title:hover { text-decoration: none !important; }
-a.url_display { color: #167e00 !important; font-size: 12px !important; }
+a.url_display { color: #157700 !important; font-size: 12px !important; }
 a.url_link { padding: 2px 8px !important; border-radius: 10px !important; }
 .description { color: #5c5f77 !important; }
 .description blockquote { border-left: 3px solid #8839ef !important; padding-left: 12px !important; margin: 6px 0 !important; }
