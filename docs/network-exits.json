@@ -98,6 +98,7 @@
   },
   "userConfiguredExits": "custom OpenAI-compatible endpoint, non-loopback Ollama, webhook export target and batch-save tab origins are user-supplied at runtime; the endpoint validator enforces HTTPS (loopback-literal HTTP only) and runtime grants are exact origins — see CLAUDE.md 跨领域安全铁律 and privacy.md.",
   "nonExitHosts": {
+    "github.com": "discussion sample URL and source permalinks; DOM-only extraction, no background fetch",
     "math.stackexchange.com": "site-rule sample URL only; no background fetch",
     "stackoverflow.com": "site-rule sample URL only; no background fetch",
     "v2ex.com": "site-rule sample URL only; no background fetch",

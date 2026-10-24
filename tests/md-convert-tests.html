@@ -3961,6 +3961,53 @@ section("source fragments follow surviving Markdown headings only");
 </script>
 
 <script>
+section("GitHub Discussions pilot: loaded thread fidelity and narrow dispatch");
+{
+  const url = 'https://github.com/owner/repo/discussions/42';
+  const parse = html => new DOMParser().parseFromString(html, 'text/html');
+  // Shape follows public GitHub Discussion 93390, including the outer target,
+  // owned metadata and the child-comments container. Content is hand-authored.
+  const html = '<h1><span class="js-issue-title">A discussion</span></h1><div class="js-discussion">'
+    + '<div id="discussion-900"><div class="js-discussion-comment"><a data-hovercard-type="user" href="/starter">Starter</a><a class="js-timestamp" href="#discussion-900"><relative-time datetime="2026-10-01T00:00:00Z">Oct 1</relative-time></a><div class="js-comment-body"><p>Main post</p><pre><code class="language-js">const price = "$5";</code></pre><img src="/assets/chart.png" alt="Chart"><button>Copy noise</button><span hidden>Hidden noise</span></div><div class="discussion-answer-preview">A short accepted answer preview</div></div></div>'
+    + '<div id="discussioncomment-10"><div class="js-discussion-comment"><a data-hovercard-type="user" href="/parent">Parent</a><a class="js-timestamp" href="#discussioncomment-10"><relative-time datetime="2026-10-02T00:00:00Z">Oct 2</relative-time></a><div class="js-comment-body"><p>Parent comment</p><blockquote><p>Quoted evidence</p></blockquote><p>Parent conclusion</p></div><div data-child-comments id="child-comments-discussioncomment-10">'
+    + '<div id="discussioncomment-11"><div class="js-discussion-comment"><a class="author" href="/child">Child</a><a class="js-timestamp" href="#discussioncomment-11"><relative-time datetime="2026-10-03T00:00:00Z">Oct 3</relative-time></a><div class="timeline-chosen-answer"><div class="js-comment-body"><p>Accepted child reply</p><a href="/owner/repo/issues/1">Issue context</a></div></div></div></div></div></div></div>'
+    + '<div id="discussioncomment-12"><div class="js-discussion-comment"><a class="author">Sibling</a><div class="js-comment-body"><p>Sibling comment</p></div></div></div>'
+    + '<form class="ajax-pagination-form"><button>Load more</button></form></div>';
+  const doc = parse(html), before = doc.documentElement.outerHTML;
+  const hit = applySiteRule(doc, url), body = parse(hit?.contentHtml || '');
+  check('GitHub pilot matches a discussion detail and marks a forum', hit?.id === 'github-discussion' && hit.forum && hit.title === 'A discussion', JSON.stringify(hit));
+  check('main post and each loaded comment survive exactly once', ['Main post','Parent comment','Parent conclusion','Accepted child reply','Sibling comment'].every(text => body.body.textContent.split(text).length === 2), body.body.innerHTML);
+  const quotes = [...body.querySelectorAll('blockquote')];
+  const parent = quotes.find(b => b.textContent.includes('Parent comment'));
+  const child = quotes.find(b => b.textContent.includes('Accepted child reply') && !b.textContent.includes('Parent comment'));
+  check('reply nesting stays under its parent and not a sibling', !!parent && !!child && parent.contains(child) && !parent.textContent.includes('Sibling comment'), body.body.innerHTML);
+  check('metadata is owned by each row rather than its first nested reply', !!parent && parent.firstElementChild.textContent.includes('Parent') && parent.firstElementChild.textContent.includes('2026-10-02') && !parent.firstElementChild.textContent.includes('Child'), body.body.innerHTML);
+  check('accepted marker belongs only to the accepted reply', body.body.textContent.split('[accepted]').length === 2 && !!child && child.firstElementChild.textContent.includes('[accepted]'), body.body.innerHTML);
+  check('comment permalinks keep their discussion source', [...body.querySelectorAll('a')].some(a => a.getAttribute('href') === url + '#discussioncomment-11'), body.body.innerHTML);
+  check('loaded count and remaining-content notice precede the main post', body.body.textContent.includes('3 comments/replies') && body.body.textContent.indexOf('Only content currently loaded') < body.body.textContent.indexOf('Main post') && body.body.textContent.includes('More comments or replies'), body.body.innerHTML);
+  check('code and media survive without UI controls or answer-preview duplication', body.querySelector('pre code')?.textContent.includes('$5') && body.querySelector('img')?.getAttribute('alt') === 'Chart' && !/Copy noise|Hidden noise|short accepted answer preview/.test(body.body.textContent) && hit?.math === false, body.body.innerHTML);
+  check('the source document is never mutated', doc.documentElement.outerHTML === before);
+  const offScope = ['/owner/repo/issues/42','/owner/repo/pull/42','/owner/repo/discussions','/owner/repo/discussions/categories/help','/owner/repo/discussions/42/comments/10','/owner/repo?redirect=/discussions/42'].map(path => 'https://github.com' + path).concat('https://gist.github.com/owner/repo/discussions/42','https://github.com.evil.test/owner/repo/discussions/42');
+  check('issues, PRs, indexes, subresources and other hosts stay with Defuddle', offScope.every(u => applySiteRule(parse(html), u) === null));
+  check('an empty or structurally changed discussion falls back to Defuddle', applySiteRule(parse('<h1>Empty</h1>'), url) === null);
+  const parentBody = '<p>Parent comment</p><blockquote><p>Quoted evidence</p></blockquote><p>Parent conclusion</p>';
+  const emptyParent = parse(applySiteRule(parse(html.replace(parentBody, '')), url)?.contentHtml || '');
+  const parentLink = emptyParent.querySelector('a[href="' + url + '#discussioncomment-10"]');
+  const parentShell = parentLink?.closest('blockquote');
+  check('an empty parent remains a source-linked context for loaded child replies', !!parentShell && parentShell.querySelector('blockquote')?.textContent.includes('Accepted child reply') && parentShell.textContent.includes('Comment body unavailable.') && emptyParent.body.textContent.includes('2 comments/replies'), emptyParent.body.innerHTML);
+  const noParentBody = parse(applySiteRule(parse(html.replace('<div class="js-comment-body">' + parentBody + '</div>', '')), url)?.contentHtml || '');
+  check('a parent with no body element still anchors its loaded child', !!noParentBody.querySelector('a[href="' + url + '#discussioncomment-10"]')?.closest('blockquote')?.querySelector('blockquote'), noParentBody.body.innerHTML);
+  const duplicate = html.replace('</form>', '</form><div id="discussioncomment-10"><div class="js-discussion-comment"><div class="js-comment-body"><p>' + 'Expanded parent body. '.repeat(20) + '</p></div></div></div>');
+  const duplicateBody = parse(applySiteRule(parse(duplicate), url)?.contentHtml || '');
+  const duplicateHeader = duplicateBody.querySelector('a[href="' + url + '#discussioncomment-10"]')?.parentElement;
+  check('a fuller duplicate without metadata cannot erase the original author and time', duplicateHeader?.textContent.includes('Parent') && duplicateHeader.textContent.includes('2026-10-02'), duplicateBody.body.innerHTML);
+  const repeated = html.replace('</form>', '</form><div id="discussioncomment-12"><div class="js-discussion-comment"><div class="js-comment-body"><p>Sibling comment</p></div></div></div>');
+  const repeatHit = applySiteRule(parse(repeated), url);
+  check('repeated answer/comment IDs cannot duplicate exported bodies', (repeatHit?.contentHtml || '').split('Sibling comment').length === 2, repeatHit?.contentHtml);
+}
+</script>
+
+<script>
 window._pbpSiteEntryDone = (async () => {
   section("site identity: actual popup, background and AI entry points");
   const sources = await Promise.all(["popup.js", "background.js", "ai.js"].map(async f => {

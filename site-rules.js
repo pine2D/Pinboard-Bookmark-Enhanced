@@ -673,6 +673,76 @@
     return { contentHtml: parts.join("\n"), title: title };
   }
 
+  // ---- GitHub Discussions (loaded main post + comment/reply tree) -------
+  // Pilot verified against public discussions 3940 (next-auth, paginated)
+  // and 93390 (next.js, accepted answer with replies). No API/pagination fetch;
+  // Issues, PRs and indexes remain owned by Defuddle's native extractor.
+  function extractGithubDiscussion(doc, url) {
+    var root = doc.querySelector(".js-discussion");
+    if (!root) return null;
+    var source = new URL(url);
+    var base = source.origin + source.pathname.replace(/\/$/, "");
+    var byId = new Map(), byRow = new Map(), nodes = [];
+    root.querySelectorAll(".js-discussion-comment").forEach(function (row) {
+      var target = row.closest('[id^="discussion-"], [id^="discussioncomment-"]');
+      if (!target || !/^discussion(?:comment)?-\d+$/.test(target.id) || row.closest("[hidden],template")) return;
+      var body = Array.from(row.querySelectorAll(".js-comment-body")).find(function (el) {
+        return el.closest(".js-discussion-comment") === row && !el.closest("[hidden],template");
+      });
+      var clean = inertDoc().createElement("div");
+      clean.innerHTML = cleanBodyHtml(body ? body.innerHTML : "");
+      clean.querySelectorAll("button,clipboard-copy,tool-tip,script,style,template,[hidden],svg.octicon,a.anchor").forEach(function (el) { el.remove(); });
+      var hasBody = !!(clean.textContent.trim() || clean.querySelector("img,svg,math,video,audio"));
+      function owned(selector) {
+        return Array.from(row.querySelectorAll(selector)).find(function (el) {
+          return el.closest(".js-discussion-comment") === row && !el.closest(".js-comment-body") && (el.textContent.trim() || el.hasAttribute("datetime"));
+        });
+      }
+      var authorEl = owned('a.author, a[data-hovercard-type="user"]');
+      var timeEl = owned("a.js-timestamp relative-time, a.js-timestamp time");
+      var accepted = body && body.closest(".timeline-chosen-answer");
+      var node = { id: target.id, row: row, author: authorEl ? authorEl.textContent.trim() : "",
+        when: timeEl ? (timeEl.getAttribute("datetime") || timeEl.textContent.trim()) : "",
+        accepted: !!accepted && accepted.closest(".js-discussion-comment") === row,
+        bodyHtml: hasBody ? clean.innerHTML : "", dead: !hasBody, children: [] };
+      var existing = byId.get(node.id);
+      if (existing) {
+        // A duplicated preview must not repeat a body or replace the full one.
+        if (node.bodyHtml.length > existing.bodyHtml.length) {
+          existing.bodyHtml = node.bodyHtml; existing.row = node.row; existing.dead = node.dead;
+        }
+        if (node.author) existing.author = node.author;
+        if (node.when) existing.when = node.when;
+        existing.accepted = existing.accepted || node.accepted;
+        byRow.set(row, existing);
+      } else {
+        byId.set(node.id, node); byRow.set(row, node); nodes.push(node);
+      }
+    });
+    var main = nodes.find(function (node) { return /^discussion-/.test(node.id); });
+    if (!main || main.dead) return null;
+    var comments = nodes.filter(function (node) { return /^discussioncomment-/.test(node.id); });
+    var roots = [];
+    comments.forEach(function (node) {
+      var parentRow = node.row.parentElement && node.row.parentElement.closest(".js-discussion-comment");
+      var parent = byRow.get(parentRow);
+      if (parent && parent !== main && parent !== node) parent.children.push(node);
+      else roots.push(node);
+    });
+    function content(node) {
+      return '<p><a href="' + escapeHtml(base + "#" + node.id) + '"><strong>' + escapeHtml(node.author || "Anonymous") + '</strong></a>' +
+        (node.when ? " · " + escapeHtml(node.when.replace("T", " ").replace(/Z$/, " UTC")) : "") + (node.accepted ? " [accepted]" : "") + "</p>" +
+        (node.dead ? "<p><em>Comment body unavailable.</em></p>" : node.bodyHtml);
+    }
+    var loaded = comments.filter(function (node) { return !node.dead; }).length;
+    roots = pruneDeadLeaves(roots); // empty parents keep their loaded descendants
+    var notice = "Loaded discussion: main post and " + loaded + " comments/replies. Only content currently loaded on the source page is included.";
+    if (root.querySelector(".ajax-pagination-form")) notice += " More comments or replies are available on the source page.";
+    var html = "<p><em>" + escapeHtml(notice) + '</em> <a href="' + escapeHtml(base) + '">Open discussion</a></p>' + content(main);
+    if (roots.length) html += "<h2>Comments and replies (" + loaded + ")</h2>" + renderThreadHtml(roots, 0, { maxDepth: 8, headFn: content });
+    return { contentHtml: html, title: pickText(doc, ["h1 .js-issue-title", ".js-issue-title"]) || doc.title };
+  }
+
   // ---- X / Twitter: single status page ----------------------------------
   // Scope is deliberately narrow: keep the tweet text's inline <br> fidelity, and
   // leave thread/reply expansion to Defuddle or a future explicit rule.
@@ -1104,6 +1174,9 @@
        sampleUrl: "https://arxiv.org/abs/1706.03762v1", match: { host: "arxiv.org", url: /\/abs\// }, extract: extractArxiv }
     ,{ id: "hackernews", source: "self", forum: true, lastVerified: "2026-10-24", driftCheck: "manual",
        sampleUrl: "https://news.ycombinator.com/item?id=8863", match: { host: "news.ycombinator.com", url: /\/item\?id=\d+/ }, extract: extractHackerNews }
+    ,{ id: "github-discussion", source: "self", forum: true, lastVerified: "2026-10-24", driftCheck: "auto",
+       sampleUrl: "https://github.com/nextauthjs/next-auth/discussions/3940",
+       match: { host: "github.com", url: /^https:\/\/github\.com\/[^/?#]+\/[^/?#]+\/discussions\/\d+\/?(?:[?#].*)?$/ }, extract: extractGithubDiscussion }
     ,{ id: "x-status", source: "self", lastVerified: "2026-07-09", driftCheck: "manual",
        sampleUrl: "", match: { host: "x.com", url: /\/status\/\d+/ }, extract: extractTwitterStatus }
     ,{ id: "twitter-status", source: "self", lastVerified: "2026-07-09", driftCheck: "manual",

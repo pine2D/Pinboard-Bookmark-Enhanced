@@ -60,11 +60,23 @@ try {
         const custom = applySiteRule(doc, url);
         let native, nativeError;
         try { native = new Defuddle(doc.cloneNode(true), { url }).parse(); } catch (error) { nativeError = error.message; }
+        // Independent source-content oracle for the discussion pilot. This
+        // checks text retention, not merely a larger output or node count.
+        const normalize = text => text.replace(/\s+/g, '').replace(/[\u200B-\u200D\uFEFF]/g, '');
+        const bodies = id === 'github-discussion' ? Array.from(doc.querySelectorAll('.js-comment-body'), body => {
+          const copy = body.cloneNode(true);
+          copy.querySelectorAll('button,svg,[hidden],clipboard-copy').forEach(el => el.remove());
+          return { text: normalize(copy.textContent), paragraphs: Array.from(copy.querySelectorAll('p'), p => normalize(p.textContent)).filter(p => p.length >= 30) };
+        }).filter(body => body.text) : [];
         const measure = content => {
           const box = doc.createElement('div');
           box.innerHTML = renderMarkdown(htmlToMarkdown(content || '', { baseUrl: url }));
+          const text = normalize(box.textContent);
           return { characters: box.textContent.trim().length, paragraphs: box.querySelectorAll('p').length,
-            links: box.querySelectorAll('a[href]').length, images: box.querySelectorAll('img').length };
+            links: box.querySelectorAll('a[href]').length, images: box.querySelectorAll('img').length,
+            ...(bodies.length ? { sourceBodies: bodies.length, preservedBodies: bodies.filter(body => text.includes(body.text)).length,
+              sourceParagraphs: bodies.reduce((n, body) => n + body.paragraphs.length, 0),
+              preservedParagraphs: bodies.reduce((n, body) => n + body.paragraphs.filter(p => text.includes(p)).length, 0) } : {}) };
         };
         return { status: custom?.contentHtml && custom.id === id && before === doc.documentElement.outerHTML ? 'extracted' : 'drift',
           rule: id, url, title: custom?.title, math: custom?.math, error: custom?.error,

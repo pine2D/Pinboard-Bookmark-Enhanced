@@ -35,6 +35,7 @@ How to add or maintain a per-site Markdown-extraction rule in `site-rules.js`. R
 | arxiv | auto | canary (validated live: ~1.3k chars) |
 | stackoverflow / stackexchange | auto | canary on YOUR machine (CI IP hits Cloudflare challenge) |
 | v2ex | auto | canary on YOUR machine (reply author = `a[href^="/member/"]`) |
+| github-discussion | auto | exact discussion detail path only; loaded main post, comments/replies, accepted marker and source links |
 | hackernews | manual | saved/live public DOM; same checker supports its sample URL |
 | x-status / twitter-status | manual | logged-in DOM; verify target identity and media |
 | zhihu-* | manual | login-walled → periodic human check + cross-source |
@@ -63,3 +64,16 @@ Shared helpers available to `extract`: `cleanBodyHtml(html)` (HTML string → in
 - No literal emoji/dingbats (incl. `✓`/`❤`) anywhere — use words (`[accepted]`, `N votes`, `感谢 N`). They render in the preview and can trigger the font-fallback stall.
 - Read-only on the live DOM; mutate only nodes of the inert document (`cleanBodyHtml` already does) — detaching is NOT enough: a div created from the live document still fetches every `<img>` it holds.
 - The long tail we don't rule-ify falls back to Defuddle; for perfect-fidelity bulk export, recommend users the dedicated tools (csdn2md, wechat-article-exporter, 简悦 SimpRead) rather than building.
+
+## GitHub Discussions pilot
+
+The rule matches only `https://github.com/<owner>/<repo>/discussions/<number>` (query/fragment allowed). Issues, PRs, discussion indexes and comment API paths still use Defuddle. It reads the current DOM without requesting more pages. The leading notice reports the loaded comment/reply count; a present pagination control adds a remaining-content notice. Hidden or empty bodies are not counted as complete comments. An empty parent with loaded replies retains its author, source link and an explicit body-unavailable placeholder, so its replies keep their original parent. A missing discussion/main-post structure falls back to Defuddle.
+
+Same-HTML comparison on 2026-10-24, using the bundled Defuddle 0.19.4 and the production HTML → Markdown → sanitized reader chain:
+
+| Public sample | Custom bodies / source | Defuddle bodies / source | Custom paragraphs / source | Defuddle paragraphs / source |
+|---|---:|---:|---:|---:|
+| [next-auth #3940](https://github.com/nextauthjs/next-auth/discussions/3940), pagination present | 53/53 | 14/53 | 142/142 | 61/142 |
+| [next.js #93390](https://github.com/vercel/next.js/discussions/93390), accepted answer with replies | 8/8 | 8/8 | 20/20 | 20/20 |
+
+Bodies are nonempty `.js-comment-body` elements after removing control text; paragraphs have at least 30 non-whitespace characters. Exact normalized body/paragraph containment is the metric, not output length. On the second sample, the gain is preserved reply nesting, one accepted marker and all eight post/comment permalinks, rather than additional text. These samples justify the narrow pilot, not a claim that every discussion improves. Re-run the checker with `--rule=github-discussion --html=<saved HTML> --url=<original URL>` for a comparable capture.
