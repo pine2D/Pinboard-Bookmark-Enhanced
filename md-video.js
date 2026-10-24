@@ -252,7 +252,7 @@ function pbpYtRescueTracks(tracks) {
 // ("&amp;amp;" -> pass 1 "&amp;" -> pass 2 "&"), so a single ordered
 // replace chain cannot resolve it — each pass must independently handle
 // numeric refs before named refs, then the whole thing runs twice.
-function _pbpVideoDecodeEntities(s) {
+function _pbpVideoDecodeEntities(s, passes = 2) {
   // fromCodePoint, not fromCharCode: supplementary characters (emoji in
   // captions arrive as &#128512;) truncate to a garbage BMP unit under
   // fromCharCode. Hex refs (&#x1F600;) are legal XML and appear too; a
@@ -268,7 +268,28 @@ function _pbpVideoDecodeEntities(s) {
     .replace(/&#(\d+);/g, (m, n) => { const c = num(n); return c == null ? m : c; })
     .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
     .replace(/&amp;/g, "&");
-  return once(once(s));
+  return passes === 1 ? once(s) : once(once(s));
+}
+
+// Styled YouTube tracks can paint the SAME cue more than once (different
+// outline/shadow pens). Keep one text record per exact time range + text,
+// before punctuation, paragraphs, search, AI or export can consume it.
+// U+200B pads those layers; ZWNJ/ZWJ are meaningful text and must survive.
+function pbpYtNormalizeSegments(segments) {
+  const out = [], seen = new Set();
+  for (const seg of segments) {
+    const content = seg.content.replace(/\u200b/g, "").replace(/\s+/g, " ").trim();
+    if (!content) continue;
+    // A panel may expose only a rounded display second and no end time.
+    // Two identical utterances within that second are not proven copies.
+    if (Number.isFinite(seg.from) && Number.isFinite(seg.to) && seg.to > seg.from) {
+      const key = JSON.stringify([seg.from, seg.to, content]);
+      if (seen.has(key)) continue;
+      seen.add(key);
+    }
+    out.push({ ...seg, content });
+  }
+  return out;
 }
 
 function pbpYtParseTimedtextXml(xmlText) {
@@ -286,10 +307,19 @@ function pbpYtParseTimedtextXml(xmlText) {
     const durM = attrs.match(/\bdur="([\d.]+)"/);
     const from = parseFloat(startM[1]);
     const dur = durM ? parseFloat(durM[1]) : 0;
-    const content = _pbpVideoDecodeEntities(m[2].replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim();
+    // srv1 entity-encodes its formatting. Strip paired known styles after
+    // the XML layer's decode, BEFORE decoding escaped spoken text: code
+    // examples (&amp;lt;b&amp;gt;) and unpaired literal tags must survive.
+    let content = _pbpVideoDecodeEntities(m[2].replace(/<[^>]+>/g, ""), 1);
+    const formatting = /<(font|b|i|u)(?:\s[^>]*)?>([\s\S]*?)<\/\1\s*>/gi;
+    for (let prev; prev !== content;) {
+      prev = content;
+      content = content.replace(formatting, "$2");
+    }
+    content = _pbpVideoDecodeEntities(content, 1);
     if (content) out.push({ from, to: from + dur, content });
   }
-  return out;
+  return pbpYtNormalizeSegments(out);
 }
 
 function pbpYtParseJson3(jsonText) {
@@ -305,7 +335,7 @@ function pbpYtParseJson3(jsonText) {
     const to = from + (ev.dDurationMs || 0) / 1000;
     out.push({ from, to, content });
   }
-  return out;
+  return pbpYtNormalizeSegments(out);
 }
 
 // Reading-paragraph merge for the Markdown copy (the interactive panel keeps
@@ -1464,7 +1494,7 @@ function pbpYtParseTranscriptPanel(data) {
       out.push({ from, to, content });
     }
   }
-  return out;
+  return pbpYtNormalizeSegments(out);
 }
 
 // Deep-scan parser for captured transcript network bodies. YouTube is
@@ -1509,7 +1539,7 @@ function pbpYtParseTranscriptDeep(data) {
     }
   };
   walk(data, 0);
-  return out;
+  return pbpYtNormalizeSegments(out);
 }
 
 // ---- Bilibili WBI-signed subtitle extraction ---------------------------
@@ -2772,7 +2802,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       }
       return null;
     }
-    return (r.segs && r.segs.length) ? r.segs : null;
+    return (r.segs && r.segs.length) ? pbpYtNormalizeSegments(r.segs) : null;
   }
 
   // Player-driven caption capture: the one per-language fetch route that

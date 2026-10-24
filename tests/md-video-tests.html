@@ -358,6 +358,76 @@ check("json3: ms converted to seconds", sj[0].from === 0 && sj[0].to === 1.5 && 
 assertEq(pbpYtParseJson3("not json").length, 0, "bad json3 yields empty");
 assertEq(pbpYtParseTimedtextXml("<transcript></transcript>").length, 0, "empty xml yields empty");
 
+section("YouTube layered captions (v9QtM6qnG50, captured 2026-10-24)");
+await (async () => {
+  // Hand-transcribed from this video's JSON3 response, not made by a writer:
+  // identical cue times/text, different pens (edge types 4 and 3). U+200B
+  // pads the styled lines. The XML response also repeats both layers.
+  const layeredJson = JSON.stringify({ wireMagic: "pb3", events: [
+    { tStartMs: 0, dDurationMs: 3667, segs: [
+      { utf8: "\u200b", pPenId: 1 }, { utf8: "\u200b" },
+      { utf8: "\u200b \u200b我身后的这片空地 \u200b \u200b", pPenId: 3 },
+      { utf8: "\u200b\n\u200b", pPenId: 1 },
+      { utf8: "\u200b \u200b在视频结束时将变成一座城市\u200b \u200b", pPenId: 3 }, { utf8: "\u200b", pPenId: 1 }
+    ], wpWinPosId: 1, wsWinStyleId: 1 },
+    { tStartMs: 0, dDurationMs: 3667, segs: [
+      { utf8: "\u200b", pPenId: 1 }, { utf8: "\u200b" },
+      { utf8: "\u200b \u200b我身后的这片空地 \u200b \u200b", pPenId: 4 },
+      { utf8: "\u200b\n\u200b", pPenId: 1 },
+      { utf8: "\u200b \u200b在视频结束时将变成一座城市\u200b \u200b", pPenId: 4 }, { utf8: "\u200b", pPenId: 1 }
+    ], wpWinPosId: 1, wsWinStyleId: 1 }
+  ] });
+  const layeredXml = '<transcript><text start="0" dur="3.667">\u200b\u200b&lt;font color=&quot;#00BCE7&quot;&gt;&lt;b&gt;\u200b \u200b我身后的这片空地 \u200b \u200b&lt;/b&gt;&lt;/font&gt;\u200b\n\u200b&lt;font color=&quot;#00BCE7&quot;&gt;&lt;b&gt;\u200b \u200b在视频结束时将变成一座城市\u200b \u200b&lt;/b&gt;&lt;/font&gt;\u200b</text><text start="0" dur="3.667">\u200b\u200b&lt;font color=&quot;#00BCE7&quot;&gt;&lt;b&gt;\u200b \u200b我身后的这片空地 \u200b \u200b&lt;/b&gt;&lt;/font&gt;\u200b\n\u200b&lt;font color=&quot;#00BCE7&quot;&gt;&lt;b&gt;\u200b \u200b在视频结束时将变成一座城市\u200b \u200b&lt;/b&gt;&lt;/font&gt;\u200b</text></transcript>';
+  const want = "我身后的这片空地 在视频结束时将变成一座城市";
+  const js = pbpYtParseJson3(layeredJson), xml = pbpYtParseTimedtextXml(layeredXml);
+  assertEq(js.length, 1, "json3: two display layers become one spoken cue");
+  assertEq(js[0].content, want, "json3: zero-width styling padding cannot contaminate text/search/export");
+  assert(js[0].from === 0 && js[0].to === 3.667, "json3: precise original cue times are retained");
+  assertEq(xml.length, 1, "xml: repeated display layers become one spoken cue");
+  assertEq(xml[0].content, want, "xml: entity-encoded font/b markup is styling, not transcript text");
+  assertEq(pbpYtParseTimedtextXml('<transcript><text start="0" dur="1">&lt;3 &amp;amp; &lt;example&gt;</text></transcript>')[0].content,
+    "<3 & <example>", "xml: literal angle brackets and non-formatting tags in spoken text survive");
+  assertEq(pbpYtParseTimedtextXml('<transcript><text start="0" dur="1">The &amp;lt;b&amp;gt; tag makes text bold.</text></transcript>')[0].content,
+    "The <b> tag makes text bold.", "xml: double-escaped code is decoded as text after formatting is removed");
+  assertEq(pbpYtParseTimedtextXml('<transcript><text start="0" dur="1">The &lt;b&gt; tag makes text bold.</text></transcript>')[0].content,
+    "The <b> tag makes text bold.", "xml: an unpaired literal tag is not caption formatting");
+  assertEq(pbpYtParseTimedtextXml('<transcript><text start="0" dur="1">Use &amp;lt;b&amp;gt;bold&amp;lt;/b&amp;gt; in HTML.</text></transcript>')[0].content,
+    "Use <b>bold</b> in HTML.", "xml: double-escaped paired code tags are preserved too");
+  const xmlFlow = await pbpYtFetchCaptionBody("https://www.youtube.com/api/timedtext?v=fixture", async () => ({ ok: true, text: async () => layeredXml }));
+  assert(xmlFlow.length === 1 && xmlFlow[0].content === want, "fetch: XML-first route returns normalized source cues");
+  const jsonFlow = await pbpYtFetchCaptionBody("https://www.youtube.com/api/timedtext?v=fixture", async url => ({ ok: true, text: async () => url.includes("fmt=json3") ? layeredJson : "" }));
+  assert(jsonFlow.length === 1 && jsonFlow[0].content === want, "fetch: JSON3 fallback returns normalized source cues");
+  assertEq(pbpVideoMergeParagraphs(js).join(""), want, "reading paragraphs receive one copy, before punctuation or AI");
+  // Same-time different speakers, later repeated words, different durations,
+  // and language-significant joiners must not be erased by broad dedup.
+  const edgeJson = JSON.stringify({ events: [
+    { tStartMs: 1000, dDurationMs: 1000, segs: [{ utf8: "yes" }] },
+    { tStartMs: 1000, dDurationMs: 1000, segs: [{ utf8: "no" }] },
+    { tStartMs: 1000, dDurationMs: 1000, segs: [{ utf8: "\u200byes\u200b" }] },
+    { tStartMs: 2000, dDurationMs: 1000, segs: [{ utf8: "yes" }] },
+    { tStartMs: 2000, dDurationMs: 2000, segs: [{ utf8: "yes" }] },
+    { tStartMs: 5000, dDurationMs: 1000, segs: [{ utf8: "\u200b \u200b" }] },
+    { tStartMs: 6000, dDurationMs: 1000, segs: [{ utf8: "می\u200cروم 👩\u200d💻" }] }
+  ] });
+  const edge = pbpYtParseJson3(edgeJson);
+  assertEq(edge.map(s => s.content).join("|"), "yes|no|yes|yes|می\u200cروم 👩\u200d💻", "json3: dedup preserves distinct cues and ZWNJ/ZWJ; padding-only cues disappear");
+  assertEq(edge.map(s => s.from + ":" + s.to).join("|"), "1:2|1:2|2:3|2:4|6:7", "json3: dedup uses full cue timing, not just words or the starting second");
+  const classic = { actions: [{ appendContinuationItemsAction: { continuationItems: [
+    { transcriptSegmentRenderer: { startMs: "1000", endMs: "2000", snippet: { runs: [{ text: "\u200bfirst" }] } } },
+    { transcriptSegmentRenderer: { startMs: "1000", endMs: "2000", snippet: { runs: [{ text: "first" }] } } },
+    { transcriptSegmentRenderer: { startMs: "1000", endMs: "2000", snippet: { runs: [{ text: "second" }] } } }
+  ] } }] };
+  assertEq(pbpYtParseTranscriptPanel(classic).map(s => s.content).join("|"), "first|second", "classic panel: normalize display copies without dropping same-time distinct lines");
+  const modern = { contents: [
+    { transcriptSegmentViewModel: { timestamp: "0:01", simpleText: "\u200bfirst" } },
+    { transcriptSegmentViewModel: { timestamp: "0:01", simpleText: "first" } },
+    { transcriptSegmentViewModel: { timestamp: "0:01", simpleText: "second" } }
+  ] };
+  assertEq(pbpYtParseTranscriptDeep(modern).map(s => s.content).join("|"), "first|first|second", "modern panel: whole-second timestamps without end times cannot prove two cues are duplicates");
+  assertEq(pbpYtParseJson3('{"events":[{"tStartMs":1234,"segs":[{"utf8":"again"}]},{"tStartMs":1234,"segs":[{"utf8":"again"}]}]}').length,
+    2, "json3: missing durations cannot prove two text events are duplicate display layers");
+})();
+
 section("merge + markdown + time");
 const SEGS = [ { from: 0, to: 2, content: "Sentence one." }, { from: 2.1, to: 4, content: "and continues" }, { from: 10, to: 12, content: "After a gap" } ];
 const paras = pbpVideoMergeParagraphs(SEGS);
