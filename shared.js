@@ -3207,6 +3207,9 @@ function pbpDismissActiveConfirm(anchor) {
 // choice `altText` + `onAlt`, rendered before the solid-danger Confirm for a
 // decision that has two real outcomes besides Cancel (options' Chrome Sync
 // conflict: use the cloud copy / overwrite it / keep sync off).
+// `container` may be the owning popover: native auto-popover light dismiss
+// then treats pointer clicks on the nested confirm as inside its editor.
+// It still uses the top layer and viewport positioning; default is <body>.
 // `onDismiss` runs on EVERY close -- including the silent ones (another
 // confirm replacing this one, pbpDismissActiveConfirm) that skip onCancel --
 // before the chosen handler, if any. `variant: "decision"` marks a question
@@ -3253,7 +3256,7 @@ function showConfirmPopover(anchor, opts) {
     pop.append(alt);
   }
   pop.append(yes, no);
-  document.body.appendChild(pop);
+  (opts?.container || document.body).appendChild(pop);
   // Anchors living in the top layer (native [popover] hosts, e.g. the
   // reader's highlight card) would paint OVER a plain body child; promote
   // the confirm itself to a manual popover so it stacks above its opener.

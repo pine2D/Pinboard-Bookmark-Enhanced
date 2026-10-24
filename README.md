@@ -31,7 +31,7 @@ A Chrome extension for [Pinboard](https://pinboard.in): AI tags and summaries, a
 
 ### Read
 - **Any page becomes a clean reader**: a Markdown view with table of contents, search, and footnote peek; math, diagrams, and tables render properly
-- **Save from the reader**: bookmark the article or edit its bookmark without returning to the popup
+- **Manage bookmarks as you read**: save, edit, or delete the article’s Pinboard bookmark without returning to the popup
 - **Five-color highlights with notes**: they stay in place through translation and even later edits to the page
 - **Translate the page or ask it questions**: full-page translation with a bilingual view; answers cite the source and jump straight to it
 - **Keep questions and answers with their citations**: export completed conversations on their own or alongside the article

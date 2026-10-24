@@ -8598,7 +8598,8 @@ async function openReaderSurface(name) {
       footer.scrollIntoView({ block: "center", behavior: "instant" });
       return shown(footer);
     }
-    case "reader-bookmark-editor": {
+    case "reader-bookmark-editor":
+    case "reader-bookmark-delete-confirm": {
       if (typeof window.pbpReaderBookmarkAction !== "function") return "reader bookmark module not loaded";
       // Only this audit request is replaced: real editor construction and
       // layout run unchanged, without a live Pinboard bookmark lookup.
@@ -8620,7 +8621,12 @@ async function openReaderSurface(name) {
       }
       finally { chrome.runtime.sendMessage = send; }
       await wait(100);
-      return shown(document.getElementById(name));
+      if (name === "reader-bookmark-delete-confirm") {
+        document.getElementById("reader-bookmark-delete")?.click();
+        await wait(300);
+        return shown(document.querySelector(".confirm-popover"));
+      }
+      return shown(document.getElementById("reader-bookmark-editor"));
     }
     case "explain-pop": {
       const p = document.querySelector("#rendered-view p");
@@ -8683,6 +8689,10 @@ function closeReaderSurface(name) {
     case "reader-source-details": { document.getElementById(name).open = false; return; }
     case "export-more": { document.getElementById(name).open = false; return; }
     case "reader-bookmark-footer": { window.scrollTo({ top: 0, behavior: "instant" }); return; }
+    case "reader-bookmark-delete-confirm": {
+      document.querySelector(".confirm-popover .confirm-no")?.click();
+      document.getElementById("reader-bookmark-cancel")?.click(); return;
+    }
     case "explain-pop": return; // stays open for explain-dict
     case "explain-dict": { const pop = document.getElementById("explain-pop"); if (pop && typeof _pbpExplainClose === "function") _pbpExplainClose(pop); return; }
     case "ask-panel": { const btn = document.getElementById("ask-open"); const panel = document.getElementById("ask-panel"); if (btn && panel && !panel.hidden) btn.click(); return; }

@@ -31,7 +31,7 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in): tagi i streszczenia od 
 
 ### Czytanie
 - **Każda strona staje się czytelna** — widok Markdown ze spisem treści, wyszukiwaniem i podglądem przypisów; wzory, diagramy i tabele wyświetlają się poprawnie
-- **Zapisuj prosto z czytnika** — dodawaj artykuł do zakładek lub edytuj jego zakładkę bez wracania do okienka
+- **Zarządzaj zakładkami podczas czytania** — zapisuj, edytuj lub usuwaj zakładkę artykułu w Pinboard bez wracania do okienka
 - **Zaznaczenia w pięciu kolorach, z notatkami** — zostają na swoim miejscu mimo tłumaczenia, a nawet późniejszych zmian na stronie
 - **Przetłumacz stronę albo zadaj jej pytanie** — tłumaczenie całości z widokiem dwujęzycznym; odpowiedzi cytują źródło i prowadzą prosto do niego
 - **Zachowaj pytania i odpowiedzi z cytatami** — eksportuj ukończone rozmowy osobno lub wraz z artykułem

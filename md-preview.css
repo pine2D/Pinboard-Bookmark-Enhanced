@@ -4656,8 +4656,12 @@ body.raw-active #reader-bookmark-footer { display: none; }
 .reader-bookmark-check > input:checked + svg { visibility: visible; }
 #reader-bookmark-editor input:focus-visible,
 #reader-bookmark-editor textarea:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-#reader-bookmark-editor > div.row:last-child { justify-content: flex-end; }
+#reader-bookmark-actions { justify-content: space-between; gap: var(--sp-2); }
+#reader-bookmark-actions > .row { margin-left: auto; gap: var(--sp-2); }
 #reader-bookmark-editor .action-btn { min-height: 26px; }
+#reader-bookmark-delete { color: var(--danger); }
+#reader-bookmark-delete:hover { border-color: var(--danger); }
+#reader-bookmark-editor-status { margin: 0; font-size: 12px; }
 #reader-bookmark-apply { background: var(--btn-hover); border-color: var(--link); color: var(--link-on-raised); }
 @media print { #reader-bookmark-footer, #reader-bookmark-editor { display: none; } }
 @media (forced-colors: active) {

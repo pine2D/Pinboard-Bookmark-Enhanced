@@ -4392,6 +4392,21 @@
   "readerBookmarkNotes": {"message": "メモ"},
   "readerBookmarkPrivate": {"message": "非公開"},
   "readerBookmarkCancel": {"message": "キャンセル"},
+  "readerBookmarkDelete": {
+    "message": "ブックマークを削除"
+  },
+  "readerBookmarkDeleteConfirm": {
+    "message": "このブックマークをPinboardから削除しますか？リーダーのハイライトとメモは残ります。"
+  },
+  "readerBookmarkDeleting": {
+    "message": "ブックマークを削除中…"
+  },
+  "readerBookmarkDeleted": {
+    "message": "Pinboardからブックマークを削除しました"
+  },
+  "readerBookmarkDeleteFailed": {
+    "message": "削除を確認できませんでした。もう一度お試しください。"
+  },
   "readerBookmarkExport": {"message": "エクスポート"},
   "kbdHelpSave": {"message": "保存 / 既読にする"},
   "kbdHelpReadLater": {"message": "あとで読む"},

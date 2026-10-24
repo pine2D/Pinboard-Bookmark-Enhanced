@@ -4392,6 +4392,21 @@
   "readerBookmarkNotes": {"message": "Notizen"},
   "readerBookmarkPrivate": {"message": "Privat"},
   "readerBookmarkCancel": {"message": "Abbrechen"},
+  "readerBookmarkDelete": {
+    "message": "Lesezeichen löschen"
+  },
+  "readerBookmarkDeleteConfirm": {
+    "message": "Dieses Lesezeichen aus Pinboard löschen? Markierungen und Notizen im Reader bleiben erhalten."
+  },
+  "readerBookmarkDeleting": {
+    "message": "Lesezeichen wird gelöscht…"
+  },
+  "readerBookmarkDeleted": {
+    "message": "Lesezeichen aus Pinboard gelöscht"
+  },
+  "readerBookmarkDeleteFailed": {
+    "message": "Löschen konnte nicht bestätigt werden. Bitte erneut versuchen."
+  },
   "readerBookmarkExport": {"message": "Exportieren"},
   "kbdHelpSave": {"message": "Speichern / als gelesen markieren"},
   "kbdHelpReadLater": {"message": "Später lesen"},

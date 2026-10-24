@@ -4386,6 +4386,21 @@
   "readerBookmarkNotes": {"message": "备注"},
   "readerBookmarkPrivate": {"message": "私密"},
   "readerBookmarkCancel": {"message": "取消"},
+  "readerBookmarkDelete": {
+    "message": "删除书签"
+  },
+  "readerBookmarkDeleteConfirm": {
+    "message": "从 Pinboard 删除此书签？高亮和阅读笔记会保留。"
+  },
+  "readerBookmarkDeleting": {
+    "message": "正在删除书签…"
+  },
+  "readerBookmarkDeleted": {
+    "message": "已从 Pinboard 删除书签"
+  },
+  "readerBookmarkDeleteFailed": {
+    "message": "无法确认删除结果，请重试。"
+  },
   "readerBookmarkExport": {"message": "导出"},
   "kbdHelpSave": {"message": "保存 / 标为已读"},
   "kbdHelpReadLater": {"message": "稍后阅读"},

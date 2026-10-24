@@ -4392,6 +4392,21 @@
   "readerBookmarkNotes": {"message": "Notes"},
   "readerBookmarkPrivate": {"message": "Privé"},
   "readerBookmarkCancel": {"message": "Annuler"},
+  "readerBookmarkDelete": {
+    "message": "Supprimer le signet"
+  },
+  "readerBookmarkDeleteConfirm": {
+    "message": "Supprimer ce signet de Pinboard ? Les surlignages et les notes du lecteur seront conservés."
+  },
+  "readerBookmarkDeleting": {
+    "message": "Suppression du signet…"
+  },
+  "readerBookmarkDeleted": {
+    "message": "Signet supprimé de Pinboard"
+  },
+  "readerBookmarkDeleteFailed": {
+    "message": "Impossible de confirmer la suppression. Réessayez."
+  },
   "readerBookmarkExport": {"message": "Exporter"},
   "kbdHelpSave": {"message": "Enregistrer / marquer comme lu"},
   "kbdHelpReadLater": {"message": "Lire plus tard"},

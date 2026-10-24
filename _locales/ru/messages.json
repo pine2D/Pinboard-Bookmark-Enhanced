@@ -4392,6 +4392,21 @@
   "readerBookmarkNotes": {"message": "Заметки"},
   "readerBookmarkPrivate": {"message": "Приватная"},
   "readerBookmarkCancel": {"message": "Отмена"},
+  "readerBookmarkDelete": {
+    "message": "Удалить закладку"
+  },
+  "readerBookmarkDeleteConfirm": {
+    "message": "Удалить эту закладку из Pinboard? Выделения и заметки в режиме чтения сохранятся."
+  },
+  "readerBookmarkDeleting": {
+    "message": "Удаление закладки…"
+  },
+  "readerBookmarkDeleted": {
+    "message": "Закладка удалена из Pinboard"
+  },
+  "readerBookmarkDeleteFailed": {
+    "message": "Не удалось подтвердить удаление. Попробуйте ещё раз."
+  },
   "readerBookmarkExport": {"message": "Экспорт"},
   "kbdHelpSave": {"message": "Сохранить / отметить как прочитанное"},
   "kbdHelpReadLater": {"message": "Прочитать позже"},

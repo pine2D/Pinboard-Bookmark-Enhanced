@@ -5,8 +5,10 @@
   let context = null;
   let generation = 0;
   let inflight = false;
+  let deleting = false;
   let state = { known: false };
   let statusKey = "readerBookmarkChecking";
+  let editorStatusKey = "";
   let editor = null;
   let editorSource = null;
   const buttons = [];
@@ -60,7 +62,18 @@
       const el = id(name);
       if (el) { label(el, statusKey); el.hidden = !statusKey; }
     }
-    if (id("apply")) { id("apply").disabled = !context?.account; id("apply").setAttribute("aria-busy", String(inflight)); }
+    if (id("apply")) { id("apply").disabled = !context?.account || inflight; id("apply").setAttribute("aria-busy", String(inflight)); }
+    if (id("delete")) {
+      id("delete").hidden = !(state.known && state.bookmarked);
+      id("delete").disabled = !context?.account || inflight;
+      id("delete").setAttribute("aria-busy", String(deleting));
+    }
+    if (id("editor-status")) {
+      label(id("editor-status"), editorStatusKey);
+      id("editor-status").hidden = !editorStatusKey;
+      id("editor-status").dataset.state = editorStatusKey === "readerBookmarkDeleteFailed" ? "error" : "";
+    }
+    if (editor) for (const input of editor.querySelectorAll("input, textarea")) input.disabled = deleting;
   }
 
   function showStatus(key) { statusKey = key; paint(); }
@@ -131,7 +144,12 @@
   }
 
   function closeEditor() {
-    if (editor?.matches(":popover-open")) editor.hidePopover();
+    if (typeof pbpDismissActiveConfirm === "function" && id("delete")) pbpDismissActiveConfirm(id("delete"));
+    if (editor?.matches(":popover-open")) {
+      const restore = editor.contains(document.activeElement) || document.activeElement === document.body;
+      editor.hidePopover();
+      if (restore && editorSource?.isConnected) editorSource.focus({ preventScroll: true });
+    }
   }
 
   function ensureEditor() {
@@ -164,7 +182,17 @@
       }
     }
     editor.appendChild(options);
+    const status = document.createElement("div");
+    status.id = "reader-bookmark-editor-status"; status.className = "msg-bar";
+    status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite"); status.hidden = true;
+    editor.appendChild(status);
     const row = document.createElement("div"); row.className = "row";
+    row.id = "reader-bookmark-actions";
+    const remove = document.createElement("button");
+    remove.id = "reader-bookmark-delete"; remove.type = "button"; remove.className = "action-btn";
+    label(remove, "readerBookmarkDelete"); remove.addEventListener("click", confirmDelete);
+    row.appendChild(remove);
+    const submit = document.createElement("div"); submit.className = "row";
     const apply = document.createElement("button");
     apply.id = "reader-bookmark-apply"; apply.type = "button"; apply.className = "action-btn";
     label(apply, "readerBookmarkApply");
@@ -175,8 +203,9 @@
     const cancel = document.createElement("button");
     cancel.id = "reader-bookmark-cancel"; cancel.type = "button"; cancel.className = "action-btn";
     label(cancel, "readerBookmarkCancel"); cancel.addEventListener("click", closeEditor);
-    row.append(apply, cancel); editor.appendChild(row); document.body.appendChild(editor);
+    submit.append(apply, cancel); row.appendChild(submit); editor.appendChild(row); document.body.appendChild(editor);
     editor.addEventListener("toggle", event => {
+      if (event.newState === "closed" && typeof pbpDismissActiveConfirm === "function") pbpDismissActiveConfirm(remove);
       if (event.newState === "closed" && editor.contains(document.activeElement) && editorSource?.isConnected) editorSource.focus({ preventScroll: true });
     });
   }
@@ -189,6 +218,7 @@
     inflight = false; paint();
     if (!known) return;
     ensureEditor();
+    editorStatusKey = ""; paint();
     const values = state.bookmark || context.bookmark?.draft || {};
     id("title").value = typeof values.title === "string" ? values.title : context.title || "";
     id("tags").value = typeof values.tags === "string" ? values.tags : (context.bookmark?.tags || []).join(" ");
@@ -196,6 +226,41 @@
     id("private").checked = values.private === true; id("toread").checked = values.toread === true;
     editorSource = document.activeElement;
     editor.showPopover(); id("title").focus();
+  }
+
+  function confirmDelete() {
+    if (inflight || !context?.account || !state.known || !state.bookmarked || !editor?.matches(":popover-open")) return;
+    const gen = generation;
+    showConfirmPopover(id("delete"), {
+      container: editor,
+      msg: text("readerBookmarkDeleteConfirm"), yesText: text("delete"), noText: text("readerBookmarkCancel"),
+      onConfirm: () => {
+        if (gen === generation && editor?.matches(":popover-open")) return deleteBookmark();
+      },
+    });
+  }
+
+  async function deleteBookmark() {
+    if (inflight || !context?.account || !state.known || !state.bookmarked) return;
+    const gen = generation;
+    inflight = true; deleting = true; editorStatusKey = "readerBookmarkDeleting";
+    showStatus(editorStatusKey);
+    const result = await request({ type: "mdReaderBookmarkDelete" });
+    if (gen !== generation) return;
+    inflight = false; deleting = false;
+    if (result?.status === "deleted" && result.account === context.account) {
+      // The successful delete is authoritative; a second lookup could fail
+      // or return stale data and must not paint the removed bookmark as saved.
+      state = { known: true, bookmarked: false, account: context.account };
+      editorStatusKey = ""; statusKey = "readerBookmarkDeleted";
+      closeEditor();
+      document.dispatchEvent(new CustomEvent("pbp:bookmark-changed", { detail: { url: context.url, account: context.account } }));
+    } else {
+      editorStatusKey = result?.reason === "account_changed" || result?.reason === "not_logged_in"
+        || (result?.account && result.account !== context.account) ? "readerBookmarkAccountChanged" : "readerBookmarkDeleteFailed";
+      statusKey = editorStatusKey;
+    }
+    paint();
   }
 
   async function save(action, draft) {
@@ -248,12 +313,13 @@
     const next = event.detail;
     // A second render of the same article must not unlock an in-flight write.
     if (context?.url === next?.url && context?.account === next?.account) return;
-    generation++; context = next; state = { known: false }; inflight = true;
+    closeEditor();
+    generation++; context = next; state = { known: false }; inflight = true; deleting = false; editorStatusKey = "";
     mount(); showStatus("readerBookmarkChecking"); const gen = generation;
     refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); } });
   });
   document.addEventListener("pbp:account-changed", () => {
-    generation++; context = null; state = { known: false }; inflight = false;
+    generation++; context = null; state = { known: false }; inflight = false; deleting = false; editorStatusKey = "";
     closeEditor();
     if (editor) for (const input of editor.querySelectorAll("input, textarea")) { input.value = ""; input.checked = false; }
     showStatus("readerBookmarkAccountChanged");

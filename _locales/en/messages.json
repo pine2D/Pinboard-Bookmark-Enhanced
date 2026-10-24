@@ -4399,6 +4399,21 @@
   "readerBookmarkNotes": {"message": "Notes"},
   "readerBookmarkPrivate": {"message": "Private"},
   "readerBookmarkCancel": {"message": "Cancel"},
+  "readerBookmarkDelete": {
+    "message": "Delete bookmark"
+  },
+  "readerBookmarkDeleteConfirm": {
+    "message": "Delete this bookmark from Pinboard? Reader highlights and notes will be kept."
+  },
+  "readerBookmarkDeleting": {
+    "message": "Deleting bookmark…"
+  },
+  "readerBookmarkDeleted": {
+    "message": "Bookmark deleted from Pinboard"
+  },
+  "readerBookmarkDeleteFailed": {
+    "message": "Could not confirm deletion. Please retry."
+  },
   "readerBookmarkExport": {"message": "Export"},
   "kbdHelpSave": {"message": "Save / mark as read"},
   "kbdHelpReadLater": {"message": "Read later"},

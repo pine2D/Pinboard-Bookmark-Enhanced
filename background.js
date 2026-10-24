@@ -1156,9 +1156,61 @@ function pbpReaderInitialIntent(context, settings, action) {
   };
 }
 
+function pbpDeleteReaderBookmark(context) {
+  // Wait for replay as well as live saves. Otherwise a queued snapshot that
+  // was read before this deletion could recreate the bookmark afterwards.
+  return runOfflineQueueConsumer(() => runSaveDeliveryTransaction(async () => {
+    let failure = "storage";
+    try {
+      let auth = await pbpReadFreshPinboardAuthForAccount(context.account);
+      if (!auth) return pbpSaveFailure("account_changed");
+      // This explicit delete supersedes earlier pending saves, including when
+      // its response is lost or the owner switches during the request. Cancel
+      // those saves while we still own the account, before any remote mutation.
+      const cleared = await runOfflineQueueWrite(async () => {
+        const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
+        auth = await pbpReadFreshPinboardAuthForAccount(context.account);
+        if (!auth) return false;
+        if (Array.isArray(offlineQueue)) {
+          // Only this exact bookmark and owner. Other URLs and accounts are
+          // untouched; legacy queue records may still carry a token binding.
+          const next = offlineQueue.filter(item => item?.url !== context.url
+            || (item.account || pbpPinboardAccountFromToken(item.token)) !== context.account);
+          if (next.length !== offlineQueue.length) await chrome.storage.local.set({ offlineQueue: next });
+        }
+        return true;
+      });
+      auth = await pbpReadFreshPinboardAuthForAccount(context.account);
+      if (!cleared || !auth) return pbpSaveFailure("account_changed");
+      failure = "network";
+      const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?auth_token=${auth.token}&url=${encodeURIComponent(context.url)}&format=json`);
+      if (!resp.ok) return pbpSaveFailure(resp.status === 401 || resp.status === 403 ? "not_logged_in" : "http", { httpStatus: resp.status });
+      const data = await resp.json();
+      auth = await pbpReadFreshPinboardAuthForAccount(context.account);
+      if (!auth) return pbpSaveFailure("account_changed");
+      if (data?.result_code !== "done" && data?.result_code !== "item not found") return pbpSaveFailure("api");
+      try {
+        if (pbpStatusCacheSet(context.url, auth, { bookmarked: false, timestamp: Date.now(), posts: [] })) {
+          const tabs = await chrome.tabs.query({});
+          for (const tab of tabs) {
+            if (pbpPinboardAuthIsCurrent(auth) && tab.id && pbpSameBookmark(tab.url, context.url)) setIcon(tab.id, "default");
+          }
+        }
+        await updateBadge();
+      } catch (e) { console.warn("reader bookmark delete status failed:", e?.name, e?.message); }
+      return await pbpReadFreshPinboardAuthForAccount(context.account)
+        ? { status: "deleted", account: context.account } : pbpSaveFailure("account_changed");
+    } catch (e) {
+      console.warn("reader bookmark delete failed:", e?.name, pbpSaveFailure(failure, { detail: e?.message }).detail);
+      return pbpSaveFailure(e?.code === "account_changed" ? "account_changed" : failure);
+    }
+  }));
+}
+
 async function pbpReaderBookmarkRequest(message, sender) {
   const context = await pbpReaderBookmarkContext(sender, message.account);
   if (!context) return pbpSaveFailure("account_changed");
+  if (message.type === "mdReaderBookmarkDelete") return pbpDeleteReaderBookmark(context);
   if (message.type === "mdReaderBookmarkState") {
     const auth = await pbpReadFreshPinboardAuthForAccount(context.account);
     if (!auth) return pbpSaveFailure("account_changed");
@@ -3559,7 +3611,7 @@ async function pbpRunPopupDraft(message) {
 // 21 branches were the largest untestable block in the extension. Behavior
 // is unchanged; registration stays top-level synchronous per MV3 rules.
 function handleRuntimeMessage(message, sender, sendResponse) {
-  if (message?.type === "mdReaderBookmarkState" || message?.type === "mdReaderBookmarkSave") {
+  if (message?.type === "mdReaderBookmarkState" || message?.type === "mdReaderBookmarkSave" || message?.type === "mdReaderBookmarkDelete") {
     pbpReaderBookmarkRequest(message, sender).then(sendResponse).catch(e => {
       console.warn("reader bookmark request failed:", e?.name, e?.message);
       sendResponse(pbpSaveFailure("internal"));

@@ -20,7 +20,7 @@ export const RENDER_OPTIONS_TABS = Object.freeze([
   'tab-reader', 'tab-vocab', 'tab-markdown', 'tab-tags', 'tab-archive', 'tab-appearance', 'tab-storage',
 ]);
 export const RENDER_READER_CONTEXTS = Object.freeze([
-  'reader-source-details', 'export-more', 'reader-bookmark-footer', 'reader-bookmark-editor',
+  'reader-source-details', 'export-more', 'reader-bookmark-footer', 'reader-bookmark-editor', 'reader-bookmark-delete-confirm',
   'explain-pop', 'explain-dict', 'ask-panel', 'search-pop', 'kbd-help-pop', 'typo-pop',
   'pb-hl-card', 'send-menu', 'confirm-popover', 'tr-ask',
 ]);

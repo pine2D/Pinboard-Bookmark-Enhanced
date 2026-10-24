@@ -4392,6 +4392,21 @@
   "readerBookmarkNotes": {"message": "備註"},
   "readerBookmarkPrivate": {"message": "私人"},
   "readerBookmarkCancel": {"message": "取消"},
+  "readerBookmarkDelete": {
+    "message": "刪除書籤"
+  },
+  "readerBookmarkDeleteConfirm": {
+    "message": "從 Pinboard 刪除此書籤？標記和閱讀筆記會保留。"
+  },
+  "readerBookmarkDeleting": {
+    "message": "正在刪除書籤…"
+  },
+  "readerBookmarkDeleted": {
+    "message": "已從 Pinboard 刪除書籤"
+  },
+  "readerBookmarkDeleteFailed": {
+    "message": "無法確認刪除結果，請重試。"
+  },
   "readerBookmarkExport": {"message": "匯出"},
   "kbdHelpSave": {"message": "儲存 / 標為已讀"},
   "kbdHelpReadLater": {"message": "稍後閱讀"},

@@ -43,14 +43,14 @@ async function pipelineHarness(options = {}) {
   const end = background.indexOf("// ---- P1: Shared save function ----", start);
   const env = { account: "alice", token: "alice:rotated-token", epoch: 1, post: { ...POST }, calls: [], queue: [], ...options };
   const deps = {
-    chrome: { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p }, storage: { local: { get: async key => ({ offlineQueue: env.queue, [typeof key === "string" ? key : "unused"]: key === "offlineQueue" ? env.queue : { ...SLOT, ...env.slot } }), set: async values => { if (values.offlineQueue) env.queue = values.offlineQueue; } } }, tabs: { query: async () => [], get: async tabId => { assert(tabId === 9, "saving must never inspect the source tab"); if (env.readerClosed) throw new Error("reader closed"); return { id: 9, url: READER }; } } },
+    chrome: { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p }, storage: { local: { get: async key => ({ offlineQueue: env.queue, [typeof key === "string" ? key : "unused"]: key === "offlineQueue" ? env.queue : { ...SLOT, ...env.slot } }), set: async values => { if (env.queueWriteFailure) throw new Error("queue storage unavailable"); if (values.offlineQueue) env.queue = values.offlineQueue; } } }, tabs: { query: async () => [], get: async tabId => { assert(tabId === 9, "saving must never inspect the source tab"); if (env.readerClosed) throw new Error("reader closed"); return { id: 9, url: READER }; } } },
     console, pbpCreateRecoveringTail, pbpOfflineQueueReduce, pbpPinboardAccountFromToken, pbpEffectivePrivate,
     pbpResolveOfflineQueueToken, pbpDrainOfflineQueue, pbpResolveSavePlan, buildPostsAddUri, POSTS_ADD_URI_BUDGET,
     loadSettings: async () => ({ pinboardToken: "alice:stale-token", offlineQueueEnabled: true, optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false, ...env.settings }),
     getCurrentPinboardAuth: async () => ({ account: env.account, token: env.token, epoch: env.epoch }),
     pbpCapturePinboardAuth: () => ({ account: env.account, epoch: env.epoch }),
     pbpPinboardAuthIsCurrent: auth => auth.account === env.account && auth.epoch === env.epoch,
-    pbpStatusCacheSet: () => false, pbpStatusCacheGet: () => null,
+    pbpStatusCacheSet: (url, auth, state) => { (env.cacheWrites ||= []).push({ url, account: auth.account, ...state }); return false; }, pbpStatusCacheGet: () => null,
     pbpReadFreshPinboardAuthForAccount: async account => account === env.account ? { account, token: env.token, epoch: env.epoch } : null,
     pbpWaybackArchive: async () => {}, updateBadge: async () => {}, setIcon: () => {},
     pinboardFetch: async raw => {
@@ -60,12 +60,19 @@ async function pipelineHarness(options = {}) {
         if (env.onLookup) await env.onLookup();
         return { ok: true, status: 200, json: async () => ({ date: "2026-10-23T00:00:00Z", user: "alice", posts: env.post ? [{ ...env.post }] : [] }) };
       }
+      if (url.pathname.endsWith("/delete")) {
+        if (env.onDelete) await env.onDelete();
+        const status = env.deleteHttp === undefined ? 200 : env.deleteHttp;
+        const result_code = env.deleteCode === undefined ? (env.post ? "done" : "item not found") : env.deleteCode;
+        if (status === 200 && ["done", "item not found"].includes(result_code)) env.post = null;
+        return { ok: status === 200, status, json: async () => { if (env.badDeleteJson) throw new SyntaxError("Invalid JSON"); return { result_code }; } };
+      }
       if (env.onWrite) await env.onWrite();
       env.post = { href: url.searchParams.get("url"), description: url.searchParams.get("description"), extended: url.searchParams.get("extended"), tags: url.searchParams.get("tags"), shared: url.searchParams.get("shared"), toread: url.searchParams.get("toread"), time: url.searchParams.get("dt") || "2026-10-23T00:00:00Z", hash: "abc", meta: "def" };
       return { ok: true, status: 200, json: async () => ({ result_code: "done" }) };
     },
   };
-  return { ...new Function(...Object.keys(deps), background.slice(start, end) + "\nreturn { submitSaveIntent, pbpReaderBookmarkRequest }; ")(...Object.values(deps)), env };
+  return { ...new Function(...Object.keys(deps), background.slice(start, end) + "\nreturn { submitSaveIntent, pbpReaderBookmarkRequest, processOfflineQueue }; ")(...Object.values(deps)), env };
 }
 (async () => {
 await test("trusted reader derives frozen URL and owner from its own persisted slot", async () => {
@@ -204,6 +211,73 @@ await test("accepted save completes after reader closes without consulting close
   const h = await pipelineHarness({ post: null }); h.env.onLookup = () => { h.env.readerClosed = true; };
   const r = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "save", url: "https://navigated.test/" }, SENDER); equal(r.status, "saved"); equal(h.env.post.href, URL_ARTICLE); equal(h.env.post.shared, "no");
 });
+const deleteMessage = { type: "mdReaderBookmarkDelete", account: "alice" };
+await test("delete uses the frozen reader URL and current owner token after source navigation", async () => {
+  const h = await pipelineHarness({ readerClosed: true });
+  const result = await h.pbpReaderBookmarkRequest({ ...deleteMessage, url: "https://wrong.test/" }, SENDER);
+  equal(result.status, "deleted"); equal(result.account, "alice"); equal(h.env.post, null);
+  const call = h.env.calls.find(url => url.pathname.endsWith("/delete"));
+  equal(call.searchParams.get("url"), URL_ARTICLE); equal(call.searchParams.get("auth_token"), "alice:rotated-token");
+  equal(h.env.cacheWrites.at(-1).bookmarked, false); equal(h.env.queue.length, 0);
+});
+await test("delete rejects forged readers and a changed owner without a network request", async () => {
+  for (const sender of [{ ...SENDER, id: "foreign" }, { ...SENDER, frameId: 1 }, { ...SENDER, url: READER.replace(".html?", ".html.evil?") }]) {
+    const h = await pipelineHarness(); equal((await h.pbpReaderBookmarkRequest(deleteMessage, sender)).status, "failed"); equal(h.env.calls.length, 0);
+  }
+  const h = await pipelineHarness({ account: "bob", token: "bob:token" });
+  equal((await h.pbpReaderBookmarkRequest(deleteMessage, SENDER)).reason, "account_changed"); equal(h.env.calls.length, 0);
+});
+await test("delete is idempotent when Pinboard already removed the bookmark", async () => {
+  const h = await pipelineHarness({ post: null });
+  equal((await h.pbpReaderBookmarkRequest(deleteMessage, SENDER)).status, "deleted"); equal(h.env.cacheWrites.at(-1).bookmarked, false);
+});
+await test("delete errors never enqueue a deletion or clear saved state", async () => {
+  for (const opts of [{ networkDown: true }, { deleteHttp: 401 }, { deleteHttp: 403 }, { deleteHttp: 429 }, { deleteHttp: 500 }, { deleteCode: "invalid url" }, { deleteCode: "" }, { badDeleteJson: true }]) {
+    const h = await pipelineHarness(opts);
+    equal((await h.pbpReaderBookmarkRequest(deleteMessage, SENDER)).status, "failed");
+    equal(h.env.queue.length, 0); assert(!h.env.cacheWrites?.some(item => item.bookmarked === false), "failed deletion cleared saved cache");
+  }
+});
+await test("account switch during deletion suppresses success and foreign-account side effects", async () => {
+  const h = await pipelineHarness({ onDelete: () => { h.env.account = "bob"; h.env.token = "bob:token"; h.env.epoch++; } });
+  equal((await h.pbpReaderBookmarkRequest(deleteMessage, SENDER)).reason, "account_changed");
+  assert(!h.env.cacheWrites?.length); equal(h.env.queue.length, 0);
+});
+await test("accepted deletion cannot be resurrected by an old save after switching accounts", async () => {
+  const h = await pipelineHarness({ queue: [{ ...base(), mode: "merge", account: "alice", queueId: "old-save" }],
+    onDelete: () => { h.env.account = "bob"; h.env.token = "bob:token"; h.env.epoch++; } });
+  equal((await h.pbpReaderBookmarkRequest(deleteMessage, SENDER)).reason, "account_changed"); equal(h.env.post, null);
+  h.env.account = "alice"; h.env.token = "alice:newer-token"; h.env.epoch++;
+  await h.processOfflineQueue();
+  equal(h.env.post, null); equal(h.env.queue.length, 0);
+  assert(!h.env.calls.some(url => url.pathname.endsWith("/add")), "old queued save recreated the deleted bookmark");
+});
+await test("a delete intent cancels older saves even when the server result cannot be confirmed", async () => {
+  for (const opts of [{ networkDown: true }, { badDeleteJson: true }, { deleteHttp: 500 }]) {
+    const h = await pipelineHarness({ ...opts, queue: [{ ...base(), mode: "merge", account: "alice", queueId: "old-save" }] });
+    equal((await h.pbpReaderBookmarkRequest(deleteMessage, SENDER)).status, "failed"); equal(h.env.queue.length, 0);
+  }
+});
+await test("failed pending-save cancellation prevents remote deletion", async () => {
+  const h = await pipelineHarness({ queueWriteFailure: true, queue: [{ ...base(), account: "alice", queueId: "old-save" }] });
+  equal((await h.pbpReaderBookmarkRequest(deleteMessage, SENDER)).reason, "storage");
+  equal(h.env.calls.length, 0); equal(h.env.queue.length, 1); assert(h.env.post);
+});
+await test("delete runs after an in-flight save and removes only this owner's exact-URL queued saves", async () => {
+  let began, release; const started = new Promise(resolve => { began = resolve; }); const blocked = new Promise(resolve => { release = resolve; });
+  const h = await pipelineHarness({ post: { ...POST, toread: "no" }, onWrite: async () => { began(); await blocked; }, queue: [
+    { queueId: "same", account: "alice", url: URL_ARTICLE, mode: "merge" },
+    { queueId: "other-owner", account: "bob", url: URL_ARTICLE, mode: "merge" },
+    { queueId: "other-url", account: "alice", url: URL_ARTICLE + "?utm_source=keep", mode: "merge" },
+  ] });
+  const saving = h.submitSaveIntent(base(), { expectedAccount: "alice", readerAction: "later" });
+  await started;
+  const deleting = h.pbpReaderBookmarkRequest(deleteMessage, SENDER);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert(!h.env.calls.some(url => url.pathname.endsWith("/delete")), "delete raced an in-flight save");
+  release(); await saving; equal((await deleting).status, "deleted"); equal(h.env.post, null);
+  equal(h.env.queue.map(item => item.queueId).join(","), "other-owner,other-url");
+});
 await test("runtime script implements guarded shared keyboard and action state", async () => {
   runtime = await (await fetch("../md-bookmark.js")).text(); assert(!runtime.startsWith("<!DOCTYPE"), "reader runtime is not implemented");
   const frame = document.createElement("iframe"); document.body.append(frame); const w = frame.contentWindow;
@@ -243,6 +317,91 @@ await test("real reader editor shows the configured privacy default and saves th
       equal(h.env.post.shared, privateDefault ? "yes" : "no");
     } finally { frame.remove(); }
   }
+});
+async function deleteUiHarness(options = {}) {
+  const h = await pipelineHarness(options);
+  const frame = document.createElement("iframe"); frame.width = 800; frame.height = 600; document.body.append(frame);
+  const w = frame.contentWindow;
+  w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"><p>Keep reading</p></div><div id="reader-notes">Keep highlight notes</div>';
+  w.eval(await (await fetch("../shared.js")).text());
+  const requests = [];
+  w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
+    sendMessage: msg => { requests.push(msg); return h.pbpReaderBookmarkRequest(msg, SENDER); }, onMessage: { addListener: () => {} } } };
+  w.t = k => k; w.eval(runtime);
+  const settle = async () => {
+    for (let i = 0; i < 200; i++) {
+      await new Promise(resolve => setTimeout(resolve, 1));
+      if (w.document.getElementById("reader-bookmark-save")?.getAttribute("aria-busy") === "false") return;
+    }
+    throw new Error("reader remained busy");
+  };
+  w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account: "alice", bookmark: { tags: [], notes: "" } } }));
+  await settle(); await w.pbpReaderBookmarkAction("edit");
+  return { ...h, w, frame, requests, settle, node: name => w.document.getElementById("reader-bookmark-" + name) };
+}
+await test("editor offers delete only for a known saved bookmark; cancel and Escape preserve edits", async () => {
+  for (const saved of [false, true]) {
+    const h = await deleteUiHarness({ post: saved ? { ...POST } : null });
+    try {
+      assert(h.node("delete"), "delete button is missing"); equal(h.node("delete").hidden, !saved);
+      h.node("title").value = "Unsaved title"; h.node("delete").click();
+      if (saved) {
+        assert(h.w.document.querySelector(".confirm-popover:popover-open"), "confirmation must be above the open editor");
+        assert(h.node("editor").contains(h.w.document.querySelector(".confirm-popover")), "native pointer clicks must stay inside the auto editor");
+        equal(h.w.document.activeElement.className, "confirm-no");
+        h.w.document.querySelector(".confirm-no").click();
+        equal(h.node("title").value, "Unsaved title"); assert(h.node("editor").matches(":popover-open"));
+        h.node("delete").click(); h.w.document.dispatchEvent(new h.w.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        assert(!h.w.document.querySelector(".confirm-popover")); assert(h.node("editor").matches(":popover-open"));
+      }
+      equal(h.requests.filter(msg => msg.type === "mdReaderBookmarkDelete").length, 0);
+    } finally { h.frame.remove(); }
+  }
+});
+await test("failed delete preserves editor and saved state; retry clears both save controls without changing content", async () => {
+  const h = await deleteUiHarness({ deleteHttp: 500 });
+  try {
+    h.node("notes").value = "Unsaved notes";
+    const article = h.w.document.getElementById("rendered-view").innerHTML;
+    h.node("delete").click(); h.w.document.querySelector(".confirm-yes").click(); await h.settle();
+    assert(h.node("editor").matches(":popover-open")); equal(h.node("notes").value, "Unsaved notes");
+    equal(h.node("save").dataset.saved, "true"); equal(h.node("editor-status").textContent, "readerBookmarkDeleteFailed");
+    h.env.deleteHttp = 200;
+    h.node("delete").click(); h.w.document.querySelector(".confirm-yes").click(); await h.settle();
+    assert(!h.node("editor").matches(":popover-open"));
+    for (const name of ["save", "footer-save"]) equal(h.node(name).dataset.saved, "false");
+    for (const name of ["later", "footer-later"]) equal(h.node(name).getAttribute("aria-pressed"), "false");
+    equal(h.node("status").textContent, "readerBookmarkDeleted"); equal(h.env.post, null);
+    equal(h.w.document.getElementById("rendered-view").innerHTML, article);
+    equal(h.w.document.getElementById("reader-notes").textContent, "Keep highlight notes");
+  } finally { h.frame.remove(); }
+});
+await test("closing the editor or changing account dismisses pending delete confirmation", async () => {
+  const h = await deleteUiHarness();
+  try {
+    h.node("delete").click(); h.node("cancel").click();
+    assert(!h.w.document.querySelector(".confirm-popover"), "closed editor left a live destructive confirmation");
+    await h.w.pbpReaderBookmarkAction("edit"); h.node("delete").click();
+    const staleConfirm = h.w.document.querySelector(".confirm-yes");
+    h.w.document.dispatchEvent(new h.w.CustomEvent("pbp:account-changed", { detail: { account: "bob" } }));
+    staleConfirm.click(); await h.settle();
+    assert(!h.w.document.querySelector(".confirm-popover"));
+    equal(h.requests.filter(msg => msg.type === "mdReaderBookmarkDelete").length, 0);
+  } finally { h.frame.remove(); }
+});
+await test("delete ignores duplicate confirmation and stale completion after account change", async () => {
+  let release, began; const started = new Promise(resolve => { began = resolve; }); const blocked = new Promise(resolve => { release = resolve; });
+  const h = await deleteUiHarness({ onDelete: async () => { began(); await blocked; } });
+  try {
+    h.node("delete").click(); const yes = h.w.document.querySelector(".confirm-yes"); yes.click(); yes.click();
+    await started;
+    equal(h.requests.filter(msg => msg.type === "mdReaderBookmarkDelete").length, 1);
+    assert(h.node("delete").disabled && h.node("apply").disabled && h.node("title").disabled);
+    h.w.document.dispatchEvent(new h.w.CustomEvent("pbp:account-changed", { detail: { account: "bob" } }));
+    release(); await h.settle(); await new Promise(resolve => setTimeout(resolve, 5));
+    equal(h.node("status").textContent, "readerBookmarkAccountChanged");
+    assert(!h.node("editor").matches(":popover-open")); equal(h.node("notes").value, "");
+  } finally { release(); h.frame.remove(); }
 });
 document.body.dataset.complete = "true";
 })();

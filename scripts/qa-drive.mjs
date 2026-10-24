@@ -2155,7 +2155,9 @@ async function driveReaderBookmark(context, worker, extId, rep) {
   const writes = [];
   const aiBefore = aiRequests.length;
   let post = null;
-  const apiPattern = /^https:\/\/api\.pinboard\.in\/v1\/posts\/(?:get|add)(?:\?|$)/;
+  let deleteHttp = 200;
+  let deletions = 0;
+  const apiPattern = /^https:\/\/api\.pinboard\.in\/v1\/posts\/(?:get|add|delete)(?:\?|$)/;
   const routeBookmark = async route => {
     const url = new URL(route.request().url());
     if (url.searchParams.get("url") !== ARTICLE_URL) return route.fallback();
@@ -2163,6 +2165,12 @@ async function driveReaderBookmark(context, worker, extId, rep) {
     let body;
     if (url.pathname.endsWith("/get")) {
       body = { date: "2026-10-23T00:00:00Z", user: "qa", posts: post ? [{ ...post }] : [] };
+    } else if (url.pathname.endsWith("/delete")) {
+      deletions++;
+      body = { result_code: post ? "done" : "item not found" };
+      if (deleteHttp === 200) post = null;
+      await route.fulfill({ status: deleteHttp, contentType: "application/json", body: JSON.stringify(body) });
+      return;
     } else if (post && url.searchParams.get("replace") === "no") {
       body = { result_code: "item already exists" };
     } else {
@@ -2216,9 +2224,30 @@ async function driveReaderBookmark(context, worker, extId, rep) {
     requireState(writes.length === 4 && post.description === "Reader edited title" && post.tags === "edited qa" && post.extended === "Edited notes" && post.shared === "no" && post.time === "2020-01-02T03:04:05Z", "editor lost server fields or original bookmark timestamp");
     await page.locator("#reader-bookmark-footer-export").click();
     requireState(await page.locator("#export-section").isVisible(), "footer export did not reveal existing export controls");
+    await page.locator("#reader-bookmark-footer-edit").click();
+    const retained = await page.evaluate(() => ({ article: document.getElementById("rendered-view").innerHTML, scroll: scrollY }));
+    await page.locator("#reader-bookmark-delete").click();
+    await rep.shot(page, s, "delete-confirm");
+    requireState(await page.locator(".confirm-popover:not(.is-closing) .confirm-no").evaluate(el => document.activeElement === el), "delete confirmation must focus Cancel");
+    await page.keyboard.press("Escape");
+    requireState(deletions === 0 && await page.locator("#reader-bookmark-editor:popover-open").isVisible(), "Escape deleted or closed the editor");
+    await page.locator("#reader-bookmark-notes").fill("Unsaved notes retained on failure");
+    deleteHttp = 500;
+    await page.locator("#reader-bookmark-delete").click(); await page.locator(".confirm-popover:not(.is-closing) .confirm-yes").click(); await settled();
+    requireState(post !== null && await page.locator("#reader-bookmark-notes").inputValue() === "Unsaved notes retained on failure", "failed delete discarded the bookmark or edits");
+    requireState(await page.locator("#reader-bookmark-editor-status").isVisible(), "delete failure is hidden behind the editor");
+    await rep.shot(page, s, "delete-error");
+    deleteHttp = 200;
+    await page.locator("#reader-bookmark-delete").click(); await page.locator(".confirm-popover:not(.is-closing) .confirm-yes").click(); await settled();
+    requireState(post === null && deletions === 2, "delete retry did not reach Pinboard exactly once");
+    requireState(await page.locator("#reader-bookmark-save").getAttribute("data-saved") === "false" && await page.locator("#reader-bookmark-footer-save").getAttribute("data-saved") === "false", "saved controls were not cleared together");
+    requireState(await page.evaluate(before => document.getElementById("rendered-view").innerHTML === before.article && Math.abs(scrollY - before.scroll) <= 1, retained), "delete changed article content or reading position");
+    await page.locator("#reader-bookmark-footer-edit").click();
+    requireState(await page.locator("#reader-bookmark-delete").isHidden(), "new bookmark editor still offers delete");
+    await page.locator("#reader-bookmark-cancel").click();
     requireState(aiRequests.length === aiBefore, "reader save/edit/readlater unexpectedly dispatched an AI request");
     await rep.shot(page, s, "saved-reader");
-    s.notes.push("PASS: keyboard save/later/mark-read and Shift+S editor; ordinary saved action is idempotent; original date/privacy/notes/tags survive flag changes; closed source tab saves frozen article; footer stays outside exported article; no AI requests.");
+    s.notes.push("PASS: keyboard save/later/mark-read and Shift+S editor; flag changes preserve server metadata; closed-source save; delete confirmation/cancel/error/retry and hidden unsaved delete; rail/footer state updates preserve article and reading position; no AI requests.");
   } catch (e) { s.failures.push(e.stack); }
   finally {
     await context.unroute(apiPattern, routeBookmark);
@@ -2271,8 +2300,20 @@ async function driveReaderControls(context, worker, extId, rep) {
       if (activeScenario?.step === "history") cases = [{ mode: "dark", width: 360, tier: 2 }];
       if (!cases.length) continue;
       if (includesStep("editor")) {
+      // Geometry includes the saved-only delete control. The editor and its
+      // confirmation are real; only the status response is a wire fixture.
+      await page.evaluate(() => {
+        const send = chrome.runtime.sendMessage;
+        window.qaRestoreBookmarkState = () => { chrome.runtime.sendMessage = send; };
+        chrome.runtime.sendMessage = function (message, ...args) {
+          if (message?.type === "mdReaderBookmarkState") return Promise.resolve({ account: message.account, known: true, bookmarked: true,
+            bookmark: { title: "Saved reader bookmark", tags: "qa reader", notes: "Bookmark notes", private: true, toread: false } });
+          return send.call(chrome.runtime, message, ...args);
+        };
+      });
       await page.keyboard.press("Shift+s");
       await page.locator("#reader-bookmark-editor:popover-open").waitFor();
+      await page.evaluate(() => { qaRestoreBookmarkState(); delete window.qaRestoreBookmarkState; });
       requireState(await page.locator("#reader-bookmark-title").evaluate(el => document.activeElement === el), locale + ": Shift+S did not focus title");
       for (const c of cases) {
         const previousFailures = s.failures.length;
@@ -2305,8 +2346,26 @@ async function driveReaderControls(context, worker, extId, rep) {
             fail(!!btn.querySelector("svg") && !btn.textContent.trim(), btn.id + " lost icon-only presentation");
             fail(!!key && btn.title === t(key) && btn.getAttribute("aria-label") === t(key), btn.id + " lacks complete localized title/name");
           }
+          const remove = document.getElementById("reader-bookmark-delete");
+          fail(!remove.hidden && remove.textContent === t("readerBookmarkDelete"), "saved bookmark delete is missing or untranslated");
+          for (const btn of document.querySelectorAll("#reader-bookmark-actions button")) {
+            const r = btn.getBoundingClientRect();
+            fail(r.left >= box.left && r.right <= box.right && btn.scrollWidth <= btn.clientWidth + 1 && r.height >= 26, btn.id + " clips or misses its height rung");
+          }
           return errors;
         }, { mode: c.mode, locale }));
+        await page.locator("#reader-bookmark-delete").click();
+        await page.locator(".confirm-popover:popover-open").waitFor();
+        record(label + "/delete-confirm", await page.evaluate(() => {
+          const pop = document.querySelector(".confirm-popover"), r = pop.getBoundingClientRect(), errors = [];
+          if (r.left < 0 || r.top < 0 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1 || pop.scrollWidth > pop.clientWidth + 1) errors.push("confirmation overflows viewport");
+          if (pop.querySelector(".confirm-msg").textContent !== t("readerBookmarkDeleteConfirm")) errors.push("confirmation is not localized");
+          if (document.activeElement !== pop.querySelector(".confirm-no")) errors.push("confirmation did not focus Cancel");
+          return errors;
+        }));
+        if (locale === "de" && c.width === 320 || locale === "zh_CN" && c.width === 1440) await rep.shot(page, s, "delete-confirm-" + label.replaceAll("/", "-"));
+        await page.keyboard.press("Escape");
+        requireState(await page.locator("#reader-bookmark-editor:popover-open").isVisible(), "confirmation Escape closed editor");
         if (activeScenario ? !capturedLocales.has(locale) || s.failures.length > previousFailures : chosenShot(locale, c)) {
           await rep.shot(page, s, "editor-" + label.replaceAll("/", "-"));
           capturedLocales.add(locale);

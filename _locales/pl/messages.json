@@ -4392,6 +4392,21 @@
   "readerBookmarkNotes": {"message": "Notki"},
   "readerBookmarkPrivate": {"message": "Prywatne"},
   "readerBookmarkCancel": {"message": "Anuluj"},
+  "readerBookmarkDelete": {
+    "message": "Usuń zakładkę"
+  },
+  "readerBookmarkDeleteConfirm": {
+    "message": "Usunąć tę zakładkę z Pinboard? Zaznaczenia i notatki w czytniku pozostaną."
+  },
+  "readerBookmarkDeleting": {
+    "message": "Usuwanie zakładki…"
+  },
+  "readerBookmarkDeleted": {
+    "message": "Zakładka usunięta z Pinboard"
+  },
+  "readerBookmarkDeleteFailed": {
+    "message": "Nie udało się potwierdzić usunięcia. Spróbuj ponownie."
+  },
   "readerBookmarkExport": {"message": "Eksportuj"},
   "kbdHelpSave": {"message": "Zapisz / oznacz jako przeczytane"},
   "kbdHelpReadLater": {"message": "Przeczytaj później"},

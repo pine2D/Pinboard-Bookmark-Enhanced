@@ -31,7 +31,7 @@ Une extension Chrome pour [Pinboard](https://pinboard.in) : étiquettes et résu
 
 ### Lecture
 - **Chaque page passe en mode lecture épuré** : vue Markdown avec table des matières, recherche et aperçu des notes de bas de page ; formules, diagrammes et tableaux s'affichent correctement
-- **Enregistrez depuis le lecteur** : ajoutez l’article aux signets ou modifiez son signet sans revenir au popup
+- **Gérez vos signets pendant la lecture** : enregistrez, modifiez ou supprimez le signet Pinboard de l’article sans revenir au popup
 - **Surlignage en cinq couleurs, avec notes** : les deux restent à leur place après une traduction, et même si la page change ensuite
 - **Traduisez la page ou posez-lui vos questions** : traduction intégrale avec vue bilingue ; les réponses citent la source et y renvoient d'un clic
 - **Conservez les questions et réponses avec leurs citations** : exportez les conversations terminées seules ou avec l’article
