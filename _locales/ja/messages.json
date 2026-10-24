@@ -4490,5 +4490,22 @@
   "multiPackActionFailed": {"message": "辞書を変更できませんでした。再試行してください。"},
   "dictPackResultsLimited": {"message": "一部の一致する項目は表示されていません。より具体的な単語で検索してください。"},
   "dictOnlineLanguageUnavailable": {"message": "この言語ではオンライン検索を利用できません。"},
-  "dictTagReading": {"message": "読み"}
+  "dictTagReading": {"message": "読み"},
+  "dictAssistRecommend": {"message": "AI で語義を探す"},
+  "dictAssistExplain": {"message": "AI で語義を解説"},
+  "dictAssistUseMeaning": {"message": "この辞書の語義を選ぶ"},
+  "dictAssistNeedContext": {"message": "文に合う語義を探すには、文中の単語を調べるか、出典の文を含む保存済みの単語を開いてください。"},
+  "dictAssistChooseMeaning": {"message": "解説する辞書の語義を選んでください。"},
+  "dictAssistNoSources": {"message": "AI で利用できる辞書の語義がありません。単語帳の設定で辞書の AI 利用を許可できます。"},
+  "dictAssistSourceChanged": {"message": "単語または辞書の出典が変わりました。現在の語義でもう一度お試しください。"},
+  "dictAssistSourceNotAllowed": {"message": "この辞書の出典は AI 利用が許可されていません。単語帳の設定で利用許可を確認してください。"},
+  "dictAssistNoMatch": {"message": "この文に明確に当てはまる辞書の語義はありません。"},
+  "dictAssistRecommended": {"message": "候補の辞書語義"},
+  "dictAssistContext": {"message": "使用した文"},
+  "dictAssistBusy": {"message": "辞書の語義を確認中…"},
+  "dictAssistCopy": {"message": "AI の解説をコピー"},
+  "dictAssistCopied": {"message": "解説をコピーしました"},
+  "dictAssistCopyFailed": {"message": "解説をコピーできませんでした。テキストを選択して手動でコピーしてください。"},
+  "dictAssistFailed": {"message": "AIがこのリクエストを処理できませんでした。もう一度お試しください。"},
+  "dictAssistAllowedSources": {"message": "AI 利用を許可した辞書の出典のみが対象です。"}
 }

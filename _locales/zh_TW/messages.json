@@ -4490,5 +4490,22 @@
   "multiPackActionFailed": {"message": "無法變更詞典，請重試。"},
   "dictPackResultsLimited": {"message": "部分符合的結果未顯示，請嘗試更明確的詞語。"},
   "dictOnlineLanguageUnavailable": {"message": "此語言暫不支援線上查詞。"},
-  "dictTagReading": {"message": "讀音"}
+  "dictTagReading": {"message": "讀音"},
+  "dictAssistRecommend": {"message": "用 AI 比對詞義"},
+  "dictAssistExplain": {"message": "用 AI 解釋詞義"},
+  "dictAssistUseMeaning": {"message": "選取此詞典詞義"},
+  "dictAssistNeedContext": {"message": "若要比對詞義，請在句子中查詞，或開啟附有來源句子的已存生詞。"},
+  "dictAssistChooseMeaning": {"message": "請選取要解釋的詞典詞義。"},
+  "dictAssistNoSources": {"message": "目前沒有允許 AI 使用的詞典詞義。可在生詞設定中允許詞典來源供 AI 使用。"},
+  "dictAssistSourceChanged": {"message": "詞語或詞典來源已變更，請使用目前的詞義重試。"},
+  "dictAssistSourceNotAllowed": {"message": "此詞典來源尚未允許 AI 使用，請在生詞設定中檢查授權。"},
+  "dictAssistNoMatch": {"message": "這些詞典詞義中，沒有明確符合目前句子的釋義。"},
+  "dictAssistRecommended": {"message": "建議的詞典詞義"},
+  "dictAssistContext": {"message": "使用的句子"},
+  "dictAssistBusy": {"message": "正在查看詞典詞義…"},
+  "dictAssistCopy": {"message": "複製 AI 解釋"},
+  "dictAssistCopied": {"message": "已複製解釋"},
+  "dictAssistCopyFailed": {"message": "無法複製解釋，請選取文字後手動複製。"},
+  "dictAssistFailed": {"message": "AI 未能完成這次請求。請重試。"},
+  "dictAssistAllowedSources": {"message": "僅使用已獲准供 AI 使用的詞典來源。"}
 }

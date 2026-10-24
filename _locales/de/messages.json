@@ -4490,5 +4490,22 @@
   "multiPackActionFailed": {"message": "Das Wörterbuch konnte nicht geändert werden. Versuche es erneut."},
   "dictPackResultsLimited": {"message": "Einige Treffer werden nicht angezeigt. Versuche es mit einem genaueren Suchwort."},
   "dictOnlineLanguageUnavailable": {"message": "Die Online-Suche ist für diese Sprache nicht verfügbar."},
-  "dictTagReading": {"message": "Aussprache"}
+  "dictTagReading": {"message": "Aussprache"},
+  "dictAssistRecommend": {"message": "Bedeutung mit KI finden"},
+  "dictAssistExplain": {"message": "Bedeutung mit KI erklären"},
+  "dictAssistUseMeaning": {"message": "Diese Wörterbuchbedeutung auswählen"},
+  "dictAssistNeedContext": {"message": "Um eine passende Bedeutung zu finden, schlage das Wort in einem Satz nach oder öffne ein gespeichertes Wort mit einem Quellsatz."},
+  "dictAssistChooseMeaning": {"message": "Wähle eine Wörterbuchbedeutung aus, um sie erklären zu lassen."},
+  "dictAssistNoSources": {"message": "Keine Wörterbuchbedeutungen sind für die KI freigegeben. Du kannst eine Wörterbuchquelle in den Vokabeleinstellungen freigeben."},
+  "dictAssistSourceChanged": {"message": "Das Wort oder die Wörterbuchquelle hat sich geändert. Versuche es mit den aktuellen Bedeutungen erneut."},
+  "dictAssistSourceNotAllowed": {"message": "Diese Wörterbuchquelle ist nicht für die KI freigegeben. Prüfe ihre Berechtigung in den Vokabeleinstellungen."},
+  "dictAssistNoMatch": {"message": "Keine dieser Wörterbuchbedeutungen passt eindeutig zu diesem Satz."},
+  "dictAssistRecommended": {"message": "Vorgeschlagene Wörterbuchbedeutung"},
+  "dictAssistContext": {"message": "Verwendeter Satz"},
+  "dictAssistBusy": {"message": "Wörterbuchbedeutungen werden gelesen…"},
+  "dictAssistCopy": {"message": "KI-Erklärung kopieren"},
+  "dictAssistCopied": {"message": "Erklärung kopiert"},
+  "dictAssistCopyFailed": {"message": "Die Erklärung konnte nicht kopiert werden. Markiere den Text und kopiere ihn manuell."},
+  "dictAssistFailed": {"message": "Die KI konnte diese Anfrage nicht abschließen. Versuche es erneut."},
+  "dictAssistAllowedSources": {"message": "Es werden nur Wörterbuchquellen berücksichtigt, die für die KI freigegeben sind."}
 }

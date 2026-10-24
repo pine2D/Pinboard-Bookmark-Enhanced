@@ -238,7 +238,8 @@ const PINBOARD_API = new Map([
   ["/v1/user/api_token", '{"result":"0000000000000000000000000000000000000000"}'],
 ]);
 
-// freedictionaryapi.com fixture for "serendipity" (shape per pbpDictNormalizeEntry).
+// Handwritten freedictionaryapi.com response shape (official API reference);
+// license.name matches the real 2026-07/08 captures in md-dict-tests.html.
 const DICT_FIXTURE = JSON.stringify({
   word: "serendipity",
   entries: [{
@@ -247,11 +248,12 @@ const DICT_FIXTURE = JSON.stringify({
     pronunciations: [{ type: "ipa", text: "/ˌsɛɹ.ənˈdɪp.ɪ.ti/", tags: ["UK"] }],
     forms: [{ word: "serendipities", tags: ["plural"] }],
     senses: [
-      { definition: "An unsought, unintended, and/or unexpected, but fortunate, discovery.", examples: ["The discovery was pure serendipity."], tags: [], synonyms: ["fluke", "happenstance"], antonyms: [], subsenses: [] },
-      { definition: "The gift of finding valuable things not sought for.", examples: [], tags: ["uncountable"], synonyms: [], antonyms: [], subsenses: [] },
+      { definition: "An unsought, unintended, and/or unexpected, but fortunate, discovery.", examples: ["The discovery was pure serendipity."], quotes: [], tags: [], synonyms: ["fluke", "happenstance"], antonyms: [], subsenses: [] },
+      { definition: "The gift of finding valuable things not sought for.", examples: [], quotes: [], tags: ["uncountable"], synonyms: [], antonyms: [], subsenses: [] },
     ],
+    synonyms: [], antonyms: [],
   }],
-  source: { url: "https://en.wiktionary.org/wiki/serendipity", license: { name: "CC BY-SA", url: "https://creativecommons.org/licenses/by-sa/4.0" } },
+  source: { url: "https://en.wiktionary.org/wiki/serendipity", license: { name: "CC BY-SA 4.0", url: "https://creativecommons.org/licenses/by-sa/4.0/" } },
 });
 
 // ============================================================

@@ -2104,6 +2104,22 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-connect:hover:not(:disabled) { background: var(--lib-btn-hover); }
 #vocab-ref-result .xp-dict-connect:focus-visible { outline: none; border-color: var(--lib-focus-bd); box-shadow: var(--lib-focus-ring); }
 #vocab-ref-result .xp-dict-connect:disabled { opacity: 0.6; cursor: default; }
+#vocab-ref-result .xp-dict-assist { margin-top: var(--lib-sp-4); min-width: 0; overflow-wrap: anywhere; }
+#vocab-ref-result .xp-dict-assist:not([hidden]),
+#vocab-ref-result .dict-assist-result:not(:empty) { display: grid; gap: var(--lib-sp-2); }
+#vocab-ref-result .xp-dict-assist > :empty,
+#vocab-ref-result .xp-dict-assist [hidden] { display: none; }
+#vocab-ref-result .dict-assist-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--lib-sp-2); }
+#vocab-ref-result .xp-dict-assist .xp-dict-connect:not([hidden]) { display: inline-flex; align-items: center; gap: var(--lib-sp-1); margin-top: 0; max-width: 100%; justify-self: start; }
+#vocab-ref-result .xp-dict-assist .xp-dict-connect svg { width: 14px; height: 14px; flex: none; }
+#vocab-ref-result .dict-assist-context,
+#vocab-ref-result .dict-assist-meaning,
+#vocab-ref-result .dict-assist-explanation { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+#vocab-ref-result .dict-assist-context-wrap > p { margin-top: var(--lib-sp-1); }
+#vocab-ref-result .xp-dict-assist .xp-dict-local-title { margin-bottom: 0; }
+#vocab-ref-result .xp-dict-assist .xp-dict-src,
+#vocab-ref-result .xp-dict-assist .xp-dict-ailabel { margin-top: 0; }
+#vocab-ref-result .xp-dict-assist .xp-dict-ailabel { font-size: var(--lib-text-secondary); color: var(--lib-fg-muted); }
 /* md-dict's own Retry after a load failure: this page already has "Look up
    again" under the source line (.vocab-ref-foot), which re-runs the same
    query -- two buttons for one action, side by side (critique round 3).

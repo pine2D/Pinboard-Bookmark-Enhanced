@@ -4497,5 +4497,22 @@
   "multiPackActionFailed": {"message": "The dictionary could not be changed. Try again."},
   "dictPackResultsLimited": {"message": "Some matches are not shown. Try a more specific word."},
   "dictOnlineLanguageUnavailable": {"message": "Online lookup is not available for this language."},
-  "dictTagReading": {"message": "Reading"}
+  "dictTagReading": {"message": "Reading"},
+  "dictAssistRecommend": {"message": "Find meaning with AI"},
+  "dictAssistExplain": {"message": "Explain meaning with AI"},
+  "dictAssistUseMeaning": {"message": "Select this dictionary meaning"},
+  "dictAssistNeedContext": {"message": "To match a meaning, look up the word in a sentence or open a saved word with a source sentence."},
+  "dictAssistChooseMeaning": {"message": "Select a dictionary meaning to explain it."},
+  "dictAssistNoSources": {"message": "No dictionary meanings are allowed for AI. You can allow a dictionary source in Vocabulary settings."},
+  "dictAssistSourceChanged": {"message": "The word or dictionary source changed. Try again with the current meanings."},
+  "dictAssistSourceNotAllowed": {"message": "This dictionary source is not enabled for AI. Check its permission in Vocabulary settings."},
+  "dictAssistNoMatch": {"message": "None of these dictionary meanings clearly fits this sentence."},
+  "dictAssistRecommended": {"message": "Suggested dictionary meaning"},
+  "dictAssistContext": {"message": "Sentence used"},
+  "dictAssistBusy": {"message": "Reading the dictionary meanings…"},
+  "dictAssistCopy": {"message": "Copy AI explanation"},
+  "dictAssistCopied": {"message": "Explanation copied"},
+  "dictAssistCopyFailed": {"message": "Could not copy the explanation. Select its text and copy it manually."},
+  "dictAssistFailed": {"message": "AI could not complete this request. Try again."},
+  "dictAssistAllowedSources": {"message": "Only dictionary sources allowed for AI are included."}
 }

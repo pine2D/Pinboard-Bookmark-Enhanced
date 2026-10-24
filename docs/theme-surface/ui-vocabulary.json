@@ -246,7 +246,9 @@
         "notes-page-head",
         "notes-page-side",
         "notes-toolbar",
-        "vocab-batch-bar"
+        "vocab-batch-bar",
+        "dict-assist-actions",
+        "xp-dict-assist"
       ],
       "regions": [
         "lib-header",
@@ -362,7 +364,10 @@
         "xp-dict-online",
         "xp-dict-slot",
         "notes-note-save",
-        "notes-note-cancel"
+        "notes-note-cancel",
+        "dict-assist-context-wrap",
+        "dict-assist-context",
+        "dict-assist-result"
       ],
       "canvasStructures": [
         "lib-header",
@@ -381,7 +386,12 @@
         "notes-sheet",
         "notes-excerpt",
         "notes-page-head",
-        "notes-page-side"
+        "notes-page-side",
+        "xp-dict-assist",
+        "dict-assist-actions",
+        "dict-assist-context-wrap",
+        "dict-assist-context",
+        "dict-assist-result"
       ]
     },
     "listbox": {
@@ -435,7 +445,9 @@
         "rail-section",
         "row",
         "send-menu",
-        "send-mi"
+        "send-mi",
+        "dict-assist-actions",
+        "xp-dict-assist"
       ],
       "regions": [
         "ask-a",
@@ -587,7 +599,10 @@
         "xp-term",
         "xp-vocab",
         "xp-vocab-status",
-        "zen-btn"
+        "zen-btn",
+        "dict-assist-context-wrap",
+        "dict-assist-context",
+        "dict-assist-result"
       ]
     },
     "shared": {

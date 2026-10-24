@@ -540,6 +540,11 @@ async function _ensureAIHostPermission(s) {
 }
 
 // ---- AI dispatcher ----
+// Non-streaming callers may provide beforeRequest(): resolve to allow this
+// dispatch, throw to refuse it. Each provider awaits it immediately before
+// fetch (including dialect retries), after permission and memo reads. Keep
+// the signal check in that same continuation so cancellation during the gate
+// cannot send a request. Calls without the callback retain their existing path.
 async function callAI(s, prompt, opts = {}) {
   await _ensureAIHostPermission(s);
   const p = s.aiProvider || "gemini";
@@ -579,6 +584,10 @@ async function _callGeminiOnce(s, model, prompt, opts, extraBody) {
   // the OpenAI-compat callers use — apply the one relevant key explicitly.
   if (extraBody && extraBody.thinkingConfig) generationConfig.thinkingConfig = extraBody.thinkingConfig;
   // Gemini API requires key as URL param (no Authorization header support) — API design limitation
+  if (typeof opts.beforeRequest === "function") {
+    await opts.beforeRequest();
+    opts.signal?.throwIfAborted();
+  }
   const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${s.geminiApiKey}`, {
     method: "POST", headers: { "Content-Type": "application/json" }, signal: opts.signal,
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig })
@@ -591,6 +600,10 @@ async function _callGeminiOnce(s, model, prompt, opts, extraBody) {
 
 async function callClaude(s, prompt, opts = {}) {
   const maxTokens = opts.maxTokens || 1024;
+  if (typeof opts.beforeRequest === "function") {
+    await opts.beforeRequest();
+    opts.signal?.throwIfAborted();
+  }
   const res = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
     method: "POST", signal: opts.signal,
     headers: { "Content-Type": "application/json", "x-api-key": s.claudeApiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
@@ -606,6 +619,10 @@ async function callOpenAICompat(baseUrl, apiKey, model, prompt, opts = {}) {
   const maxTokens = opts.maxTokens || 1024;
   const headers = { "Content-Type": "application/json" };
   if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+  if (typeof opts.beforeRequest === "function") {
+    await opts.beforeRequest();
+    opts.signal?.throwIfAborted();
+  }
   const res = await fetchWithTimeout(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
     method: "POST", headers, signal: opts.signal,
     body: JSON.stringify({
@@ -624,6 +641,10 @@ async function callOpenAICompat(baseUrl, apiKey, model, prompt, opts = {}) {
 
 async function callOllama(s, prompt, opts = {}) {
   const base = (s.ollamaBaseUrl || "http://localhost:11434").replace(/\/+$/, "");
+  if (typeof opts.beforeRequest === "function") {
+    await opts.beforeRequest();
+    opts.signal?.throwIfAborted();
+  }
   const res = await fetchWithTimeout(`${base}/api/chat`, {
     method: "POST", headers: { "Content-Type": "application/json" }, signal: opts.signal,
     // options mirrors the streaming path (_streamOllama): without num_predict

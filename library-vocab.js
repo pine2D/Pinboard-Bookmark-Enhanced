@@ -1149,8 +1149,10 @@ function _pbpVocabAcceptLookupResult(state, source, norm) {
     if (heading) heading.textContent = norm.word;
   }
   state.sources.set(source, _pbpVocabLookupChoices(norm, state.lang));
+  if (state.norms) { if (norm) state.norms.set(source, norm); else state.norms.delete(source); }
   if (![...state.sources.values()].some(rows => rows.length)) {
     state.panel?.remove(); state.panel = null;
+    state.assist?.update([...state.norms.values()]);
     return;
   }
   if (!state.panel) {
@@ -1174,8 +1176,8 @@ function _pbpVocabAcceptLookupResult(state, source, norm) {
     feedback.setAttribute("aria-live", "polite");
     panel.append(label, definition, button, feedback);
     Object.assign(state, { panel, select: definition, button, feedback });
-    state.host.insertBefore(panel, state.host.querySelector(".vocab-ref-foot"));
-    definition.addEventListener("change", () => _pbpVocabSyncLookupSave(state));
+    state.host.insertBefore(panel, state.assistHost || state.host.querySelector(".vocab-ref-foot"));
+    definition.addEventListener("change", () => { _pbpVocabSyncLookupSave(state); state.assist?.selectionChanged(); });
     button.addEventListener("click", () => _pbpVocabSaveLookup(state));
     window.pbpEnhanceListbox?.(definition);
   }
@@ -1193,6 +1195,7 @@ function _pbpVocabAcceptLookupResult(state, source, norm) {
   }
   state.select.value = state.choices.has(selected) ? selected : "";
   _pbpVocabSyncLookupSave(state);
+  state.assist?.update([...state.norms.values()]);
 }
 
 async function _pbpVocabSaveLookup(state) {
@@ -1247,9 +1250,9 @@ async function _pbpVocabSaveLookup(state) {
 
 // Shared dictionary run core, extracted from _pbpVocabRelookup so free lookup
 // (a later task) can reuse it verbatim. Reuses md-dict's pure query seams
-// (_pbpDictSlotRun online chain + _pbpDictEcdictSide local pack) with NO AI
-// leg: the lemma promise resolves empty immediately (ai.js is not loaded on
-// this page). Participates in md-dict's staleness token so a second run or a
+// (_pbpDictSlotRun online chain + _pbpDictEcdictSide local pack) with no
+// automatic AI leg: the lemma promise resolves empty immediately. Explicit
+// assistance uses the displayed original meanings. Participates in md-dict's staleness token so a second run or a
 // word switch invalidates the previous one exactly like explain-pop does.
 // `els` = { localEl, onlineEl } (the two stable slot children -- see the
 // slot-invariant comment at each call site). `rerun` is the caller's "run
@@ -1299,10 +1302,24 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
   _pbpDictCurrent = cur;
   const host = $id("vocab-ref-result");
   host?.querySelector(".vocab-save-controls")?.remove();
-  const state = { owner: _vocabCurrentOwner, lang, host, intent, sources: new Map(), choices: new Map(), busy: false };
+  const state = { owner: _vocabCurrentOwner, lang, host, intent, sources: new Map(), choices: new Map(), norms: new Map(), busy: false };
   state.live = () => _pbpDictCurrent === cur && _pbpVocabDictChildCtrl === child && !signal.aborted &&
     _vocabCurrentOwner === state.owner && !!host?.contains(onlineEl);
   cur.isCurrent = state.live;
+  host?.querySelector(".xp-dict-assist")?.remove();
+  state.assist = _pbpDictAssistMount(host, { term, lang, sentence, owner: state.owner, signal,
+    isCurrent: state.live, settings: pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS),
+    getSelection: () => state.choices.get(state.select?.value) || null,
+    onSelect: choice => {
+      for (const [key, row] of state.choices) if (row.term === choice.term && row.gloss === choice.gloss &&
+        row.packId === choice.packId && row.sourceLabel === choice.sourceLabel) {
+        state.select.value = key; state.select.dispatchEvent(new Event("change")); break;
+      }
+    } });
+  if (state.assist) {
+    state.assistHost = state.assist.element;
+    host.insertBefore(state.assistHost, host.querySelector(".vocab-ref-foot"));
+  }
   const acceptLocal = norm => _pbpVocabAcceptLookupResult(state, "local", norm);
   const ecdictEl = document.createElement("div"), packsEl = document.createElement("div");
   localEl.replaceChildren(packsEl, ecdictEl);
@@ -1312,6 +1329,7 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
     if (!state.live()) return;
     state.packRevision = (state.packRevision || 0) + 1;
     for (const key of state.sources.keys()) if (key.startsWith("pack:")) state.sources.delete(key);
+    for (const key of state.norms.keys()) if (key.startsWith("pack:")) state.norms.delete(key);
     _pbpVocabAcceptLookupResult(state, "pack:cleared", null);
     packsEl.replaceChildren(); showPacks();
   };
@@ -1459,7 +1477,7 @@ async function _pbpVocabAutoLookup(w) {
   const stale = () => signal.aborted || _pbpVocabDetailWordId !== wordId ||
     _vocabCurrentOwner !== owner;
   const lang = sel.value || (w.language && w.language !== "und" ? w.language : "") || _vocabLookupLang;
-  const sentence = (w.contexts && w.contexts[0] && w.contexts[0].quote) || "";
+  const sentence = w.contexts?.find(context => typeof context?.quote === "string" && context.quote.trim())?.quote || "";
   const begin = () => {
     const els = _pbpVocabRefSlot();
     host.dataset.refState = "word";
@@ -1661,7 +1679,7 @@ function _pbpVocabRelookup(w) {
   delete host.dataset.refTerm;
   delete host.dataset.refLang;
   const lang = sel.value || (w.language && w.language !== "und" ? w.language : "") || _vocabLookupLang;
-  const sentence = (w.contexts && w.contexts[0] && w.contexts[0].quote) || "";
+  const sentence = w.contexts?.find(context => typeof context?.quote === "string" && context.quote.trim())?.quote || "";
   const run = () => _pbpVocabDictRun(w.term, lang, els, sentence, run);
   run();
 }

@@ -4490,5 +4490,22 @@
   "multiPackActionFailed": {"message": "Impossible de modifier le dictionnaire. Réessayez."},
   "dictPackResultsLimited": {"message": "Certains résultats ne sont pas affichés. Essayez un mot plus précis."},
   "dictOnlineLanguageUnavailable": {"message": "La recherche en ligne n’est pas disponible pour cette langue."},
-  "dictTagReading": {"message": "Prononciation"}
+  "dictTagReading": {"message": "Prononciation"},
+  "dictAssistRecommend": {"message": "Trouver le sens avec l’IA"},
+  "dictAssistExplain": {"message": "Expliquer le sens avec l’IA"},
+  "dictAssistUseMeaning": {"message": "Sélectionner ce sens du dictionnaire"},
+  "dictAssistNeedContext": {"message": "Pour trouver le sens qui convient, recherchez le mot dans une phrase ou ouvrez un mot enregistré avec une phrase source."},
+  "dictAssistChooseMeaning": {"message": "Sélectionnez un sens du dictionnaire pour obtenir une explication."},
+  "dictAssistNoSources": {"message": "Aucun sens de dictionnaire n’est autorisé pour l’IA. Vous pouvez autoriser une source dans les paramètres du vocabulaire."},
+  "dictAssistSourceChanged": {"message": "Le mot ou la source du dictionnaire a changé. Réessayez avec les sens actuels."},
+  "dictAssistSourceNotAllowed": {"message": "Cette source de dictionnaire n’est pas autorisée pour l’IA. Vérifiez son autorisation dans les paramètres du vocabulaire."},
+  "dictAssistNoMatch": {"message": "Aucun de ces sens du dictionnaire ne correspond clairement à cette phrase."},
+  "dictAssistRecommended": {"message": "Sens du dictionnaire suggéré"},
+  "dictAssistContext": {"message": "Phrase utilisée"},
+  "dictAssistBusy": {"message": "Lecture des sens du dictionnaire…"},
+  "dictAssistCopy": {"message": "Copier l’explication de l’IA"},
+  "dictAssistCopied": {"message": "Explication copiée"},
+  "dictAssistCopyFailed": {"message": "Impossible de copier l’explication. Sélectionnez le texte et copiez-le manuellement."},
+  "dictAssistFailed": {"message": "L’IA n’a pas pu traiter cette demande. Réessayez."},
+  "dictAssistAllowedSources": {"message": "Seules les sources de dictionnaire autorisées pour l’IA sont prises en compte."}
 }

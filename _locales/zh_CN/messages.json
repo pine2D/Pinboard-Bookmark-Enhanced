@@ -4484,5 +4484,22 @@
   "multiPackActionFailed": {"message": "无法更改词典，请重试。"},
   "dictPackResultsLimited": {"message": "部分匹配结果未显示，请尝试更具体的词语。"},
   "dictOnlineLanguageUnavailable": {"message": "此语言暂不支持在线查词。"},
-  "dictTagReading": {"message": "读音"}
+  "dictTagReading": {"message": "读音"},
+  "dictAssistRecommend": {"message": "用 AI 匹配义项"},
+  "dictAssistExplain": {"message": "用 AI 解释义项"},
+  "dictAssistUseMeaning": {"message": "选择此词典义项"},
+  "dictAssistNeedContext": {"message": "要匹配义项，请在句子中查词，或打开带有来源句子的已存生词。"},
+  "dictAssistChooseMeaning": {"message": "请选择要解释的词典义项。"},
+  "dictAssistNoSources": {"message": "暂无允许 AI 使用的词典义项。可在生词设置中允许词典来源供 AI 使用。"},
+  "dictAssistSourceChanged": {"message": "词语或词典来源已变化，请用当前义项重试。"},
+  "dictAssistSourceNotAllowed": {"message": "此词典来源尚未允许 AI 使用，请在生词设置中检查授权。"},
+  "dictAssistNoMatch": {"message": "这些词典义项中，没有明确符合当前句子的释义。"},
+  "dictAssistRecommended": {"message": "建议的词典义项"},
+  "dictAssistContext": {"message": "使用的句子"},
+  "dictAssistBusy": {"message": "正在查看词典义项…"},
+  "dictAssistCopy": {"message": "复制 AI 解释"},
+  "dictAssistCopied": {"message": "已复制解释"},
+  "dictAssistCopyFailed": {"message": "无法复制解释，请选中文字后手动复制。"},
+  "dictAssistFailed": {"message": "AI 未能完成此次请求。请重试。"},
+  "dictAssistAllowedSources": {"message": "仅使用已获准供 AI 使用的词典来源。"}
 }

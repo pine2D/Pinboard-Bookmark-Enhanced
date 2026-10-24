@@ -12,6 +12,7 @@ h2 { margin-top: 24px; }
 <div id="results"></div>
 <script src="../vocab-store.js"></script>
 <script src="../md-dict.js"></script>
+<script src="../dict-assist.js"></script>
 <script src="../md-vocab-echo.js"></script>
 <script>
 const root = document.getElementById("results");
@@ -2153,6 +2154,96 @@ async function runMultiPackIntegrationTests() {
   }
 }
 
+async function runDictionaryAssistUiTests() {
+  section("Explicit dictionary AI assistance");
+  if (typeof _pbpDictAssistMount !== "function") { check("dictionary assistance has an explicit shared UI controller",false);return; }
+  const saved={run:pbpDictAssistRun,key:window.hasAIKey,grant:window.ensureAIHostPermissionWithGesture,icons:window.PBP_ICONS};
+  const host=document.createElement("div");document.body.appendChild(host);
+  const norm={word:"Gift",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/Gift",license:"CC BY-SA 4.0",definitionLang:"en",entries:[{ipas:[],forms:[],senses:[{definition:"poison"},{definition:"a present"}]}]};
+  const denied={...norm,packId:"private-pack",generation:"g1",sourceLabel:"Private source",aiAllowed:false};
+  const settings={aiProvider:"ollama",previewAiEnabled:true,dictDefinitionLang:"zh-Hans"};
+  let selected=pbpDictNormChoices(norm,"de")[1],applied=0,calls=[],events=[],release;
+  let current=true;const ctrl=new AbortController();
+  try {
+    window.PBP_ICONS=saved.icons||{robot:""};window.hasAIKey=()=>true;
+    window.ensureAIHostPermissionWithGesture=async()=>{events.push("permission");};
+    pbpDictAssistRun=async input=>{events.push("request");calls.push(input);return {choiceId:input.choices[0].id,explanation:"<img src=x onerror=alert(1)> 原义译释",targetLang:input.target.lang};};
+    const ui=_pbpDictAssistMount(host,{term:"Gift",lang:"de",sentence:"Das Gift wirkt.",owner:"acct_assist",signal:ctrl.signal,isCurrent:()=>current,settings,getSelection:()=>selected,onSelect:choice=>{selected=choice;applied++;}});
+    ui.update([denied,norm]);
+    check("dictionary AI never runs merely because dictionary meanings rendered",calls.length===0);
+    host.querySelector('.dict-assist-recommend').click();await new Promise(r=>setTimeout(r,0));
+    check("AI host permission is the first asynchronous click step",events.join("|")==="permission|request");
+    check("recommendation sends only allowed meanings and the real source sentence",calls[0]?.choices.every(c=>!c.packId)&&calls[0]?.sentence==="Das Gift wirkt.");
+    check("dictionary AI respects independent explanation language and text direction",calls[0]?.target.lang==="zh-Hans"&&host.querySelector('.dict-assist-explanation')?.lang==="zh-Hans"&&host.querySelector('.dict-assist-explanation')?.dir==="auto");
+    check("recommendation displays the original sense without changing the selected meaning",applied===0&&selected.gloss==="a present"&&host.querySelector('.dict-assist-result').textContent.includes("poison"));
+    check("AI content is plain text rather than interpreted markup",!host.querySelector('.dict-assist-result img')&&host.querySelector('.dict-assist-result').textContent.includes("<img src=x"));
+    check("the actual sentence used by AI remains visible with per-text direction",host.querySelector('.dict-assist-context')?.textContent==="Das Gift wirkt."&&host.querySelector('.dict-assist-context')?.dir==="auto"&&host.querySelector('.dict-assist-meaning')?.dir==="auto");
+    const oldUse=host.querySelector('.dict-assist-use');oldUse.click();
+    check("only explicit confirmation selects the original dictionary meaning",applied===1&&selected.gloss==="poison");
+    host.querySelector('.dict-assist-explain').click();await new Promise(r=>setTimeout(r,0));
+    check("independent explanation sends exactly the selected original sense",calls.at(-1)?.task==="explain"&&calls.at(-1)?.choices.length===1&&calls.at(-1)?.choices[0].definition==="poison"&&selected.gloss==="poison");
+    check("independent explanation provides an explicit copy action",!!host.querySelector('.dict-assist-copy'));
+    pbpDictAssistRun=async input=>({choiceId:null,explanation:"No supplied sense fits.",targetLang:input.target.lang});
+    host.querySelector('.dict-assist-recommend').click();await new Promise(r=>setTimeout(r,0));
+    check("no-match advice does not invent a selectable dictionary sense",host.querySelector('.dict-assist-result').textContent.includes("dictAssistNoMatch")&&!host.querySelector('.dict-assist-use'));
+    pbpDictAssistRun=()=>new Promise(r=>{release=r;});
+    host.querySelector('.dict-assist-recommend').click();await new Promise(r=>setTimeout(r,0));
+    host.querySelector('.dict-assist-stop').click();release?.({choiceId:null,explanation:"cancelled answer",targetLang:"zh-Hans"});await new Promise(r=>setTimeout(r,0));
+    check("Stop cancels only the current advice and keeps the dictionary controls usable",!host.textContent.includes("cancelled answer")&&!host.querySelector('.dict-assist-recommend').disabled&&host.querySelector('.dict-assist-stop').hidden);
+    host.querySelector('.dict-assist-recommend').click();await new Promise(r=>setTimeout(r,0));
+    ui.update([norm]);release?.({choiceId:null,explanation:"stale answer",targetLang:"zh-Hans"});await new Promise(r=>setTimeout(r,0));
+    check("source changes abort and discard pending AI results",!host.textContent.includes("stale answer"));
+    const changed=host.querySelector('.dict-assist-result').textContent==="dictAssistSourceChanged";ui.update([]);
+    check("source changes explain why advice was cleared even when every source was removed",changed&&!host.querySelector('.xp-dict-assist').hidden&&host.querySelector('.dict-assist-result').textContent==="dictAssistSourceChanged");
+    ui.update([norm]);
+    const appliedBefore=applied;oldUse.click();
+    check("a detached recommendation cannot select a meaning after candidate identities changed",applied===appliedBefore);
+    selected=pbpDictNormChoices(denied,"de")[0];ui.selectionChanged();
+    check("an unapproved selected source cannot trigger independent explanation",host.querySelector('.dict-assist-explain').disabled&&host.textContent.includes("dictAssistSourceNotAllowed")&&!!host.querySelector('a[href="options.html#vocab"]'));
+    selected=pbpDictNormChoices(norm,"de")[0];ui.selectionChanged();
+    host.querySelector('.dict-assist-recommend').click();await new Promise(r=>setTimeout(r,0));
+    current=false;release?.({choiceId:null,explanation:"previous account answer",targetLang:"zh-Hans"});await new Promise(r=>setTimeout(r,0));
+    check("an account or lookup change suppresses a late answer",!host.textContent.includes("previous account answer"));
+    ctrl.abort();host.replaceChildren();current=true;
+    const noContext=_pbpDictAssistMount(host,{term:"Gift",lang:"de",sentence:"",owner:"acct_assist",signal:new AbortController().signal,isCurrent:()=>true,settings,getSelection:()=>selected,onSelect:()=>{}});
+    noContext.update([norm]);
+    check("without a real source sentence recommendation is disabled with a clear reason",host.querySelector('.dict-assist-recommend').disabled&&host.textContent.includes("dictAssistNeedContext"));
+    check("an original meaning can still be explained without invented context",!host.querySelector('.dict-assist-explain').disabled);
+    host.replaceChildren();window.hasAIKey=()=>false;
+    const unconfigured=_pbpDictAssistMount(host,{term:"Gift",lang:"de",owner:"acct_assist",signal:new AbortController().signal,isCurrent:()=>true,settings,getSelection:()=>selected,onSelect:()=>{}});
+    unconfigured.update([norm]);
+    check("unconfigured AI gives a usable configuration link and no enabled paid action",!!host.querySelector('a[href="options.html#ai"]')&&host.querySelector('.dict-assist-explain').disabled);
+    host.replaceChildren();window.hasAIKey=()=>true;selected=null;
+    const decomposed={...norm,word:"cafe\u0301",sourceUrl:"https://en.wiktionary.org/wiki/caf%C3%A9",entries:[{ipas:[],forms:[],senses:[{definition:"coffee"}]}]};
+    pbpDictAssistRun=async input=>{calls.push(input);return {choiceId:input.choices[0].id,explanation:"A coffee.",targetLang:input.target.lang};};
+    const nfd=_pbpDictAssistMount(host,{term:"café",lang:"fr",sentence:"Un café, merci.",owner:"acct_assist",signal:new AbortController().signal,isCurrent:()=>true,settings,getSelection:()=>selected,onSelect:choice=>{selected=choice;nfd.selectionChanged();}});
+    nfd.update([decomposed]);host.querySelector('.dict-assist-recommend').click();await new Promise(r=>setTimeout(r,0));
+    check("a decomposed dictionary headword still maps recommendation to its original saved meaning",!!host.querySelector('.dict-assist-use'));
+    host.querySelector('.dict-assist-use')?.click();host.querySelector('.dict-assist-explain').click();await new Promise(r=>setTimeout(r,0));
+    check("a normalized saved choice still explains the exact original source headword",selected?.term==="café"&&calls.at(-1)?.task==="explain"&&calls.at(-1)?.choices[0].headword==="cafe\u0301");
+    const reader={resolve:_pbpDictResolveLang,online:_pbpDictSlotRun,ctx:_pbpDictCtxRun,local:_pbpDictEcdictSide,load:_pbpDictLoadPack,get:pbpVocabGet,owner:_pbpDictOwner,current:_pbpDictCurrent};
+    const pop=document.createElement("div");pop.innerHTML='<div class="xp-body"></div><button class="xp-vocab"></button>';document.body.appendChild(pop);
+    try {
+      window.hasAIKey=()=>true;_pbpDictResolveLang=async()=>"de";_pbpDictLoadPack=async()=>false;_pbpDictEcdictSide=async()=>{};pbpVocabGet=async()=>null;_pbpDictOwner="acct_assist";
+      _pbpDictSlotRun=async el=>{_pbpDictRenderEntry(el,norm,"Gift","de");return norm;};
+      _pbpDictCtxRun=async(_el,_cap,_ctx,_settings,_signal,resolve)=>{resolve("");return {gloss:"Automatic contextual gloss",lemma:""};};
+      pbpDictAssistRun=async input=>{calls.push(input);return {choiceId:input.choices[0].id,explanation:"Independent explanation",targetLang:input.target.lang};};
+      await pbpDictRun({text:"Gift"},{sentence:"Das Gift wirkt."},pop,new AbortController(),settings);
+      const selection=pop.querySelector('.xp-dict-online select');
+      check("reader online meanings expose explicit selection alongside pack meanings",selection?.options.length===3);
+      if(selection){selection.value="1";selection.dispatchEvent(new Event("change"));await new Promise(r=>setTimeout(r,0));}
+      pop.querySelector('.dict-assist-explain').click();await new Promise(r=>setTimeout(r,0));
+      check("reader assistance consumes the chosen online sense and retains it as the save definition",calls.at(-1)?.choices[0].definition==="a present"&&_pbpDictCurrent.gloss==="a present");
+      pbpDictAssistRun=async()=>{throw Object.assign(new Error("revoked"),{code:"source_not_allowed"});};
+      pop.querySelector('.dict-assist-explain').click();await new Promise(r=>setTimeout(r,0));
+      check("a dispatch-time source revocation keeps its recovery link after busy state clears",pop.querySelector('.dict-assist-result').textContent.includes("dictAssistSourceNotAllowed")&&!!pop.querySelector('.xp-dict-assist a[href="options.html#vocab"]')&&!pop.querySelector('.dict-assist-explain').disabled);
+    } finally {pop.remove();_pbpDictResolveLang=reader.resolve;_pbpDictSlotRun=reader.online;_pbpDictCtxRun=reader.ctx;_pbpDictEcdictSide=reader.local;_pbpDictLoadPack=reader.load;pbpVocabGet=reader.get;_pbpDictOwner=reader.owner;_pbpDictCurrent=reader.current;}
+  } finally {
+    host.remove();pbpDictAssistRun=saved.run;
+    for(const [key,value] of [["hasAIKey",saved.key],["ensureAIHostPermissionWithGesture",saved.grant],["PBP_ICONS",saved.icons]]){if(value===undefined)delete window[key];else window[key]=value;}
+  }
+}
+
 (async function () {
   await runDictReviewRegressionTests();
   await runDictDefinitionLanguageTests();
@@ -2167,6 +2258,7 @@ async function runMultiPackIntegrationTests() {
   await runDictResolveLangLadderTests();
   await runVocabIdbTests();
   await runMultiPackIntegrationTests();
+  await runDictionaryAssistUiTests();
   document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 })();
 </script>

@@ -12,6 +12,7 @@ A Chrome extension for [Pinboard](https://pinboard.in) with AI tags and summarie
 - Save the article to Pinboard or edit its bookmark directly in the reader.
 - Choose the language for AI dictionary explanations independently of the interface, and filter saved vocabulary by language. Dictionary entries retain their original language.
 - Import Yomitan v3 ZIP dictionaries for offline definitions and readings on this device. Dictionary packs are excluded from Drive sync and JSON backups.
+- Ask AI which dictionary meaning fits the current sentence or get a separate explanation in your preferred language. Original definitions stay intact; imported dictionaries require explicit permission for AI use.
 - Save a word directly from its dictionary result and choose the definition to keep. Link related forms through an editable base form; notes and learning status remain separate for each word.
 - In Vocabulary settings, choose the optional multilingual Anki format to keep same-spelled words from different languages separate. It creates a separate note type, leaves existing cards untouched, and skips existing notes on repeated sends. Complete TSV includes notes, base forms and every context with its source; the original six-field formats remain available. Use JSON backup to restore vocabulary in the extension.
 - Export completed Ask-the-page questions and answers with their citations, either on their own or alongside the article, through the reader’s existing download, copy, and Send-to actions.

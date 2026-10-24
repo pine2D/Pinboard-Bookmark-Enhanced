@@ -78,13 +78,17 @@ export function inferAuditImpact(catalog, changes, { consumers = [] } = {}) {
     } else if (['_locales/', 'i18n.js'].some(p => path.startsWith(p))) {
       surfaces = ['popup', 'options', 'library', 'md-preview']; reason = 'localized content consumers';
     } else if (path === 'ai.js' || path === 'ai-cache.js') {
-      surfaces = ['popup', 'options', 'md-preview', 'background']; reason = 'AI shared consumers';
+      surfaces = ['popup', 'options', 'library', 'md-preview', 'background']; reason = 'AI shared consumers';
+    } else if (path === 'md-dict.js' || path === 'dict-assist.js') {
+      surfaces = ['library', 'md-preview']; reason = 'shared dictionary: library and reader consumers';
+    } else if (path === 'dict-pack.js') {
+      surfaces = ['options', 'library', 'md-preview']; reason = 'dictionary packages: management and lookup consumers';
     }
     if (surfaces) {
       // A caller can attest a non-UI change; otherwise module-level JS is
       // conservative. Explicit --kind still intersects the recommendation.
       const candidates = catalog.filter(row => owns(row, surfaces) && (!(path === 'listbox.js' || isolated) || !visual(row) || row.surfaces.every(s => surfaces.includes(canonical(s)))));
-      const feature = ({ 'md-ask.js': 'ask', 'md-translate.js': 'translation', 'md-dict.js': 'dictionary', 'md-video.js': 'video', 'library-notes.js': 'notes', 'library-vocab.js': 'vocab', 'popup-tags.js': 'tag', 'popup-ai.js': 'ai' })[path];
+      const feature = ({ 'md-ask.js': 'ask', 'md-translate.js': 'translation', 'md-dict.js': 'dictionary', 'dict-assist.js': 'dictionary', 'dict-pack.js': 'dictionary', 'md-video.js': 'video', 'library-notes.js': 'notes', 'library-vocab.js': 'vocab', 'popup-tags.js': 'tag', 'popup-ai.js': 'ai' })[path];
       const rows = candidates.filter(row => {
         if (change.logicOnly && visual(row)) return false;
         if (feature && visual(row)) return (row.features || []).some(f => f.includes(feature)) || row.id.includes(feature);

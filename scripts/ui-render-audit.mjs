@@ -104,6 +104,7 @@ import { cr, hexRgb, parseRgba, composite } from "../docs/theme-surface/tools/co
 import { CHIP_TARGETS } from "../docs/theme-surface/composers/ui-components.mjs";
 // Options density per theme, from the pilots (docs/theme-surface/tools/options-density.mjs).
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
+import { installDictAssistFixture, openDictAssistState } from "./audit-dict-assist-fixture.mjs";
 import { openVocabPackPreview, installVocabPackFixture } from "./audit-vocab-pack-fixture.mjs";
 // Family 14's fill-separation floor (spec 2026-09-30-ui-fields-stage4-design
 // §2.3 F1-F3) is the derivation's own constant, imported, never a hand-typed
@@ -8014,6 +8015,13 @@ const SWEEP_CFG = {
     hairline: 1, // <= 1px is a border/optical compensation, not a rhythm value
     margins: ["margin-top", "margin-right", "margin-bottom", "margin-left"],
     insets: ["padding-top", "padding-right", "padding-bottom", "padding-left", "row-gap", "column-gap"],
+    // Reader payload rhythm follows its font size, unlike chrome spacing.
+    // Check only these properties: descendants (including lemma buttons)
+    // and the other geometry families retain their ordinary checks.
+    proseRhythm: [
+      { surface: "md-preview", selector: ".xp-md p", properties: ["margin-top", "margin-bottom"], em: 0.5, tol: 0.05 },
+      { surface: "md-preview", selector: "ol.xp-dict-senses", properties: ["padding-left"], em: 1.4, tol: 0.05 },
+    ],
     componentInset: [
       "button", ".btn", "input", "select", "textarea", "[role='button']", "kbd", "summary",
       ...CHIP_TARGETS.map((t) => t.selector),
@@ -8476,6 +8484,7 @@ function sweepProbe(cfg) {
       const liveScale = sc.names.map((n) => parseFloat(rootCs.getPropertyValue(`${sc.prefix[surface]}${n}`))).filter((v) => Number.isFinite(v));
       const scale = liveScale.length ? liveScale : (sc.tokens[surface] || []);
       const onScale = (v) => v <= sc.hairline || scale.some((t) => Math.abs(v - t) <= sc.tol);
+      const proseRules = (sc.proseRhythm || []).filter((rule) => rule.surface === surface);
       const identOf = (el) => {
         if (!el || el === document) return "";
         if (el.id) return "#" + el.id;
@@ -8492,11 +8501,13 @@ function sweepProbe(cfg) {
         // component geometry (own inset of a control / chip / badge): margins only
         const component = el.matches(sc.componentInset) || (/^inline/.test(cs.display) && isChromed(cs));
         const props = component ? sc.margins : sc.margins.concat(sc.insets);
+        const prose = proseRules.filter((rule) => el.matches(rule.selector));
         const map = typeof el.computedStyleMap === "function" ? el.computedStyleMap() : null;
         for (const prop of props) {
           if (/gap$/.test(prop) && !laidOut) continue;
+          const rhythm = prose.find((rule) => rule.properties.includes(prop));
           let v = null;
-          if (map) {
+          if (map && !rhythm) {
             const cv = map.get(prop);
             if (!cv || !(cv instanceof CSSUnitValue) || cv.unit !== "px") continue; // keyword, percentage, unresolved calc
             v = cv.value;
@@ -8505,13 +8516,17 @@ function sweepProbe(cfg) {
             if (!/px$/.test(raw)) continue;
             v = parseFloat(raw);
           }
-          if (!Number.isFinite(v) || v < 0 || onScale(v)) continue;
+          if (!Number.isFinite(v)) continue;
+          // Evaluate prose before the chrome scale: a fixed 8px margin is
+          // on that scale but must still fail at a 19px payload font size.
+          const expected = rhythm ? parseFloat(cs.fontSize) * rhythm.em : null;
+          if (rhythm ? Math.abs(v - expected) <= rhythm.tol : v < 0 || onScale(v)) continue;
           const value = Math.round(v * 100) / 100;
           const ident = `${identOf(el.parentElement)} > ${identOf(el)}`;
           const key = `${ident}|${prop}|${value}`;
           if (seen.has(key)) continue;
           seen.add(key);
-          hits.push({ kind: "spacingScale", path: ident, prop, value, scale, detail: `${prop}=${value}px` });
+          hits.push({ kind: "spacingScale", path: ident, prop, value, scale: rhythm ? [expected] : scale, detail: `${prop}=${value}px` });
         }
       }
     }
@@ -8756,6 +8771,9 @@ async function runSweep(page, sw, extBase) {
       add(await runFamilySweep(page), surface, name);
     });
   };
+  if (Object.values(contexts).some(names => [...names].some(name => name.startsWith("dict-assist-")))) {
+    await sw.evaluate(() => chrome.storage.local.set({ aiProvider: "openai", openaiApiKey: obfuscateKey("render-fixture-key"), previewAiEnabled: true, dictDefinitionLang: "zh-Hans" }));
+  }
   // family 9 liveness (stage 4): sweepProbe reports every value box whose
   // four corners it measured as a `radiusValueBoxMeasured` marker; those are
   // counted per surface and kind here and never reach the hit list (they
@@ -8894,6 +8912,14 @@ async function runSweep(page, sw, extBase) {
       await vocabHead.click(); await page.waitForTimeout(250);
       await scan("library", "vocab-detail");
     }
+    if (wants("library", "dict-assist-idle")) {
+      await installDictAssistFixture(page);
+      await vocabHead.click();
+      await page.locator("#vocab-lookup-go").click();
+      for (const state of ["idle", "busy", "result"]) {
+        if (wants("library", "dict-assist-" + state)) await scan("library", "dict-assist-" + state, () => openDictAssistState(page, state));
+      }
+    }
     // Ctrl+click on the row head, not a checkbox click: the per-row checkbox was
     // removed 2026-08-06 and selection is now a modified click on the row itself.
     if (wants("library", "vocab-batch-bar")) {
@@ -8982,6 +9008,16 @@ async function runSweep(page, sw, extBase) {
         // probed as its own context, then closed. A surface that fails to render
         // is printed, never skipped silently -- the gate's coverage is the point.
         for (const name of READER_SURFACES.filter((name) => wants("md-preview", name))) {
+          if (name.startsWith("dict-assist-")) {
+            if (name === "dict-assist-idle") {
+              await installDictAssistFixture(page);
+              if (await page.evaluate(openReaderSurface, "explain-pop") !== true || await page.evaluate(openReaderSurface, "explain-dict") !== true) throw new Error("SETUP: dictionary assistance opener failed");
+              await page.selectOption(".xp-dict-lang:not([data-pack-id])", "en");
+            }
+            await scan("md-preview", name, () => openDictAssistState(page, name.slice("dict-assist-".length)));
+            if (name === "dict-assist-result") await page.evaluate(closeReaderSurface, "explain-dict");
+            continue;
+          }
           await scan("md-preview", name, async () => {
             const ok = await page.evaluate(openReaderSurface, name).catch((e) => `threw: ${e.message}`);
             if (ok === true) await page.waitForTimeout(150);

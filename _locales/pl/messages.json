@@ -4490,5 +4490,22 @@
   "multiPackActionFailed": {"message": "Nie udało się zmienić słownika. Spróbuj ponownie."},
   "dictPackResultsLimited": {"message": "Część pasujących wyników nie jest wyświetlana. Spróbuj użyć bardziej precyzyjnego słowa."},
   "dictOnlineLanguageUnavailable": {"message": "Wyszukiwanie online nie jest dostępne dla tego języka."},
-  "dictTagReading": {"message": "Wymowa"}
+  "dictTagReading": {"message": "Wymowa"},
+  "dictAssistRecommend": {"message": "Znajdź znaczenie z AI"},
+  "dictAssistExplain": {"message": "Wyjaśnij znaczenie z AI"},
+  "dictAssistUseMeaning": {"message": "Wybierz to znaczenie ze słownika"},
+  "dictAssistNeedContext": {"message": "Aby dopasować znaczenie, sprawdź słowo w zdaniu lub otwórz zapisane słowo ze zdaniem źródłowym."},
+  "dictAssistChooseMeaning": {"message": "Wybierz znaczenie ze słownika, aby uzyskać wyjaśnienie."},
+  "dictAssistNoSources": {"message": "Żadne znaczenia ze słowników nie są dopuszczone do użycia z AI. Możesz zezwolić na użycie źródła słownikowego w sekcji „Słówka” w ustawieniach."},
+  "dictAssistSourceChanged": {"message": "Słowo lub źródło słownikowe uległo zmianie. Spróbuj ponownie z aktualnymi znaczeniami."},
+  "dictAssistSourceNotAllowed": {"message": "To źródło słownikowe nie jest dopuszczone do użycia z AI. Sprawdź zgodę w sekcji „Słówka” w ustawieniach."},
+  "dictAssistNoMatch": {"message": "Żadne z tych znaczeń słownikowych nie pasuje jednoznacznie do tego zdania."},
+  "dictAssistRecommended": {"message": "Sugerowane znaczenie ze słownika"},
+  "dictAssistContext": {"message": "Użyte zdanie"},
+  "dictAssistBusy": {"message": "Odczytywanie znaczeń słownikowych…"},
+  "dictAssistCopy": {"message": "Kopiuj wyjaśnienie AI"},
+  "dictAssistCopied": {"message": "Wyjaśnienie skopiowane"},
+  "dictAssistCopyFailed": {"message": "Nie udało się skopiować wyjaśnienia. Zaznacz tekst i skopiuj go ręcznie."},
+  "dictAssistFailed": {"message": "AI nie udało się zrealizować tego żądania. Spróbuj ponownie."},
+  "dictAssistAllowedSources": {"message": "Uwzględniane są tylko źródła słownikowe dopuszczone do użycia z AI."}
 }

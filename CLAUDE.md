@@ -37,8 +37,9 @@ md-*.js                      # 阅读器子模块：ai-core / translate / ask / 
 vocab-store.js               # pbp-vocab IndexedDB 唯一写边界（words + vector/outbox/tombstone/sync 状态）
 vocab-gdrive.js              # SW-only Google Drive appDataFolder 同步
 dict-pack.js                 # 离线词典包导入（CC-CEDICT / ECDICT / 多语言 Yomitan v3；词包仅本机）
+dict-assist.js               # 阅读器/生词页共用的显式义项 AI（来源授权、结构化回答、独立缓存）
 anki-connect.js / eudic-sync.js  # 生词外发（本机 AnkiConnect / 欧路 OpenAPI；纯层，测试页可载）
-ai.js / ai-cache.js          # AI 调用核心（popup/options/md-preview 共载）/ 结果 IDB 缓存
+ai.js / ai-cache.js          # AI 调用核心（popup/options/library/md-preview 共载）/ 结果 IDB 缓存
 export-targets.js            # Send-to 目标注册表（Obsidian / Notion / NotebookLM / Gist / Webhook；纯层）
 shared.js                    # 跨文件常量 + $id 记忆化 DOM 缓存
 jina.js / i18n.js / tag-gov.js / wayback.js / site-rules.js  # 兜底抽取 / 多语言 / 标签治理 / 归档队列 / 站点适配器

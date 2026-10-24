@@ -56,12 +56,14 @@ const html = `<!doctype html><html><head><style>
 
 let browser;
 let hits;
+const proseHits = new Map();
 before(async () => {
   browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 800, height: 1000 } });
   await page.route('https://audit.test/md-preview.html', route => route.fulfill({ contentType: 'text/html', body: html }));
   await page.goto('https://audit.test/md-preview.html');
   hits = await page.evaluate(probe, cfg);
+  await collectProseHits();
 });
 after(async () => { await browser?.close(); });
 
@@ -83,3 +85,55 @@ test('chip-row exemption still leaves off-token rhythm to spacingScale', () => {
     .map(hit => [hit.prop, hit.value]).sort(), [['column-gap', 5], ['row-gap', 5]]);
   assert.ok(!hits.some(hit => hit.path === 'body > #chips-4' && hit.kind === 'spacingScale'), '4px chip-row gap is on scale');
 });
+
+// Reader prose uses em rhythm; the chrome spacing scale must not override it.
+// These are independent CSS fixtures, exercised at two actual font sizes.
+async function collectProseHits() {
+  for (const size of [19, 27]) {
+    const page = await browser.newPage({ viewport: { width: 800, height: 1000 } });
+    const body = `<!doctype html><html><head><style>
+      body { margin: 16px; font: ${size}px/1.6 sans-serif; }
+      .xp-md p { margin: .5em 0; }
+      .xp-dict-senses { padding-left: 1.4em; margin: 8px 0; }
+      button { height: 31px; margin: 5px; padding: 0 8px; font: 12px sans-serif; }
+    </style></head><body>
+      <div class="xp-md">
+        <p id="prose-relative">Original definition <button id="prose-control">Look up base</button></p>
+        <p id="prose-fixed" style="margin-top:9.5px;margin-bottom:9.5px">Fixed at one size</p>
+        <p id="prose-token" style="margin-top:8px;margin-bottom:8px">Incorrect fixed chrome token</p>
+        <p id="prose-other" style="padding-left:5px">Other properties still use the scale</p>
+      </div>
+      <ol id="senses-relative" class="xp-dict-senses"><li>A meaning</li></ol>
+      <ol id="senses-fixed" class="xp-dict-senses" style="padding-left:26.6px"><li>Fixed at one size</li></ol>
+      <ol id="senses-token" class="xp-dict-senses" style="padding-left:24px"><li>Incorrect chrome token</li></ol>
+      <ol id="senses-other" class="xp-dict-senses" style="margin-top:5px"><li>Other margins stay checked</li></ol>
+      <div id="senses-wrong-tag" class="xp-dict-senses">This is not a prose list</div>
+    </body></html>`;
+    await page.route('https://audit.test/md-preview.html', route => route.fulfill({ contentType: 'text/html', body }));
+    await page.goto('https://audit.test/md-preview.html');
+    proseHits.set(size, await page.evaluate(probe, cfg));
+    await page.close();
+  }
+}
+const spacingAt = (size, id, prop) => proseHits.get(size).some(hit => hit.kind === 'spacingScale' && hit.path.endsWith(' > #' + id) && hit.prop === prop);
+for (const size of [19, 27]) {
+  test(`reader prose relative rhythm is accepted at ${size}px`, () => {
+    for (const prop of ['margin-top', 'margin-bottom']) assert.equal(spacingAt(size, 'prose-relative', prop), false, prop);
+    assert.equal(spacingAt(size, 'senses-relative', 'padding-left'), false);
+  });
+  test(`reader prose fixed dimensions cannot hide behind a matching first size or chrome token at ${size}px`, () => {
+    for (const prop of ['margin-top', 'margin-bottom']) {
+      assert.equal(spacingAt(size, 'prose-fixed', prop), size !== 19, prop);
+      assert.equal(spacingAt(size, 'prose-token', prop), true, 'fixed 8px must not replace .5em');
+    }
+    assert.equal(spacingAt(size, 'senses-fixed', 'padding-left'), size !== 19);
+    assert.equal(spacingAt(size, 'senses-token', 'padding-left'), true, 'fixed 24px must not replace 1.4em');
+  });
+  test(`reader prose handling retains all other geometry checks at ${size}px`, () => {
+    assert.equal(spacingAt(size, 'prose-other', 'padding-left'), true);
+    assert.equal(spacingAt(size, 'senses-other', 'margin-top'), true);
+    assert.equal(spacingAt(size, 'senses-wrong-tag', 'padding-left'), true);
+    assert.equal(spacingAt(size, 'prose-control', 'margin-top'), true);
+    assert.ok(proseHits.get(size).some(hit => hit.kind === 'controlRung' && hit.path === '#prose-control'));
+  });
+}

@@ -1101,6 +1101,110 @@ suite("endpoint origin policy", () => {
       assertEq("thinkingConfig" in bodies[1].generationConfig, false, "reader path sends no thinking config either way");
     });
 
+    // Each route must revalidate the caller at the final dispatch boundary:
+    // permissions and model-dialect storage may both have awaited since click.
+    const guardedProviders = [
+      { aiProvider: "gemini", geminiApiKey: "fixture", geminiModel: "guard-model" },
+      { aiProvider: "claude", claudeApiKey: "fixture", claudeModel: "guard-model" },
+      { aiProvider: "ollama", ollamaBaseUrl: "http://127.0.0.1:11434", ollamaModel: "guard-model" },
+      { aiProvider: "openai", openaiApiKey: "fixture", openaiModel: "guard-model" },
+    ];
+    const guardedReply = provider => new Response(JSON.stringify(
+      provider === "gemini" ? { candidates: [{ content: { parts: [{ text: "allowed" }] } }] } :
+      provider === "claude" ? { content: [{ type: "text", text: "allowed" }] } :
+      provider === "ollama" ? { message: { role: "assistant", content: "allowed" }, done: true } :
+      { choices: [{ message: { role: "assistant", content: "allowed" } }] }
+    ), { status: 200, headers: { "Content-Type": "application/json" } });
+    function guardedChrome({ contains = async () => true, get = async () => ({}), set = async () => {} } = {}) {
+      window.chrome = { runtime: { id: "test-extension" }, i18n: { getMessage: () => "" },
+        permissions: { contains }, storage: { local: { get, set } } };
+    }
+    for (const settings of guardedProviders) {
+      const provider = settings.aiProvider;
+      await atest(provider + " stops dispatch when the owner changes during permission await", async () => {
+        let owner = "old", fetches = 0, calls = 0;
+        guardedChrome({ contains: async () => { await Promise.resolve(); owner = "new"; return true; } });
+        window.fetch = async () => { fetches++; return guardedReply(provider); };
+        const stale = Object.assign(new Error("owner changed"), { code: "owner_changed" });
+        let caught;
+        try { await callAI(settings, "fixture", { beforeRequest: async () => { calls++; if (owner !== "old") throw stale; } }); }
+        catch (error) { caught = error; }
+        assertEq(fetches, 0, "stale owner reached network");
+        assert(caught === stale && calls === 1, "caller error must propagate unchanged");
+      });
+      await atest(provider + " awaits the final gate before dispatching an allowed request", async () => {
+        let fetches = 0, release, calls = 0;
+        const gate = new Promise(resolve => { release = resolve; });
+        guardedChrome(); window.fetch = async () => { fetches++; return guardedReply(provider); };
+        const pending = callAI(settings, "fixture", { beforeRequest: async () => { calls++; await gate; } });
+        let result;
+        try {
+          await new Promise(resolve => setTimeout(resolve, 10));
+          assertEq(fetches, 0, "request ran ahead of caller validation");
+          assertEq(calls, 1, "dispatch did not reach the caller gate");
+        } finally { release(); result = await pending; }
+        assertEq(result, "allowed", "provider result");
+        assertEq(fetches, 1, "one allowed request");
+      });
+      await atest(provider + " checks cancellation after the asynchronous final gate", async () => {
+        const controller = new AbortController(); let fetches = 0, caught;
+        guardedChrome(); window.fetch = async () => { fetches++; return guardedReply(provider); };
+        try { await callAI(settings, "fixture", { signal: controller.signal, beforeRequest: async () => {
+          await Promise.resolve(); controller.abort();
+        } }); } catch (error) { caught = error; }
+        assertEq(fetches, 0, "cancelled request reached fetch");
+        assertEq(caught?.name, "AbortError", "caller cancellation");
+      });
+    }
+    for (const settings of guardedProviders.filter(s => ["gemini", "openai"].includes(s.aiProvider))) {
+      const provider = settings.aiProvider;
+      await atest(provider + " revalidates after model-dialect memo awaits", async () => {
+        let current = true, fetches = 0, caught;
+        guardedChrome({ get: async () => { await Promise.resolve(); current = false; return {}; } });
+        window.fetch = async () => { fetches++; return guardedReply(provider); };
+        try { await callAI(settings, "fixture", { beforeRequest: async () => {
+          if (!current) throw Object.assign(new Error("stale caller"), { code: "stale" });
+        } }); } catch (error) { caught = error; }
+        assertEq(fetches, 0, "memo-await invalidation reached fetch");
+        assertEq(caught?.code, "stale", "caller error");
+      });
+      await atest(provider + " stops a dialect retry when its source loses authorization", async () => {
+        let current = true, fetches = 0, calls = 0, caught;
+        guardedChrome(); window.fetch = async () => {
+          fetches++;
+          if (fetches === 1) { current = false; return new Response('{"error":{"message":"Unsupported thinking configuration"}}', { status: 400 }); }
+          return guardedReply(provider);
+        };
+        try { await callAI(settings, "fixture", { beforeRequest: async () => {
+          calls++; if (!current) throw Object.assign(new Error("source unavailable"), { code: "source_not_allowed" });
+        } }); } catch (error) { caught = error; }
+        assertEq(fetches, 1, "unauthorized second request escaped");
+        assertEq(calls, 2, "retry must re-enter caller validation");
+        assertEq(caught?.code, "source_not_allowed", "caller refusal");
+      });
+      await atest(provider + " revalidates and preserves an allowed dialect retry", async () => {
+        let fetches = 0, calls = 0;
+        guardedChrome(); window.fetch = async () => ++fetches === 1
+          ? new Response('{"error":{"message":"Unsupported thinking configuration"}}', { status: 422 }) : guardedReply(provider);
+        const result = await callAI(settings, "fixture", { beforeRequest: async () => { calls++; } });
+        assertEq(calls, 2, "both dispatches require validation");
+        assertEq(fetches, 2, "allowed retry count");
+        assertEq(result, "allowed", "fallback result unchanged");
+      });
+    }
+    await atest("OpenAI parameter-repair persistence cannot bypass a changed owner", async () => {
+      let current = true, fetches = 0, caught;
+      guardedChrome({ set: async () => { await Promise.resolve(); current = false; } });
+      window.fetch = async () => ++fetches === 1
+        ? new Response('{"error":{"message":"Unsupported temperature","param":"temperature","type":"invalid_request_error"}}', { status: 400 })
+        : guardedReply("openai");
+      try { await callAI(guardedProviders[3], "fixture", { beforeRequest: async () => {
+        if (!current) throw Object.assign(new Error("owner changed"), { code: "owner_changed" });
+      } }); } catch (error) { caught = error; }
+      assertEq(fetches, 1, "owner changed during repair memo but retry dispatched");
+      assertEq(caught?.code, "owner_changed", "owner gate survives dialect repair");
+    });
+
     // ---- K96: the provider Test also exercises the Reader's model override ----
     // The first call keeps sending the provider's CONFIGURED model -- what popup
     // tags and summaries, background quick-save, Batch and tag governance

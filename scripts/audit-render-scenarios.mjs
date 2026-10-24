@@ -21,7 +21,7 @@ export const RENDER_OPTIONS_TABS = Object.freeze([
 ]);
 export const RENDER_READER_CONTEXTS = Object.freeze([
   'reader-source-details', 'export-more', 'reader-bookmark-footer', 'reader-bookmark-editor', 'reader-bookmark-delete-confirm',
-  'explain-pop', 'explain-dict', 'ask-panel', 'search-pop', 'kbd-help-pop', 'typo-pop',
+  'explain-pop', 'explain-dict', 'dict-assist-idle', 'dict-assist-busy', 'dict-assist-result', 'ask-panel', 'search-pop', 'kbd-help-pop', 'typo-pop',
   'pb-hl-card', 'send-menu', 'confirm-popover', 'tr-ask',
 ]);
 const context = (name, dependencies = [], extra = {}) => ({ name, dependencies, ...extra });
@@ -36,6 +36,9 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('vocab-listbox-open', [], { target: '#vocab-group-filter-list .listbox-opt' }),
     context('vocab-export-menu', [], { target: '.vocab-export-menu:popover-open' }),
     context('vocab-detail', [], { target: '#vocab-detail:not([hidden])' }),
+    context('dict-assist-idle', [], { target: '.xp-dict-assist' }),
+    context('dict-assist-busy', ['dict-assist-idle'], { target: '.dict-assist-stop:not([hidden])' }),
+    context('dict-assist-result', ['dict-assist-busy'], { target: '.dict-assist-use' }),
     context('vocab-batch-bar', ['vocab-detail'], { target: '#vocab-batch-toolbar.selecting' }),
     context('notes-list', [], { target: '#notes-list .notes-hit' }),
     context('notes-detail', [], { target: '#notes-detail:not([hidden])' }),
@@ -43,7 +46,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('notes-batch-bar', ['notes-detail'], { target: '#notes-batch-toolbar.selecting' }),
   ],
   'md-preview': [context('reader', [], { target: '#rendered-view' }), ...RENDER_READER_CONTEXTS.map((name) => context(name,
-    name === 'explain-dict' ? ['explain-pop'] : [])), context('video', [], { target: '.pbv-bar' })],
+    name === 'explain-dict' ? ['explain-pop'] : name === 'dict-assist-busy' ? ['dict-assist-idle'] : name === 'dict-assist-result' ? ['dict-assist-busy'] : [])), context('video', [], { target: '.pbv-bar' })],
   popup: [context('light', [], { target: '#main-section' }), context('states', [], { target: '.offline-queue-item' }),
     context('form', [], { target: '#url-input' }), context('dpi', [], { dpr: [1.5, 2] }),
     context('dark', [], { theme: 'flexoki-dark', scheme: 'dark', target: '#main-section' }),
@@ -92,7 +95,8 @@ export const RENDER_SCENARIOS = Object.freeze([
     return row(sweepScenarioId(surface, item.name), surface, themes, {
       type: 'sweep', context: item.name,
       ...(item.name.startsWith('vocab-pack-') ? { files: [...files(surface), 'options-vocab.js', 'dict-pack.js', 'scripts/audit-vocab-pack-fixture.mjs'] } : {}),
-      features: [...new Set([item.name, item.name.replace(/^tab-/, ''), surface])], kinds: ['layout'], axes: { ...axes, state: [item.name] },
+      ...(item.name.startsWith('dict-assist-') ? { files: [...files(surface), 'md-dict.js', 'dict-assist.js', 'ai.js', 'ai-cache.js', 'library-vocab.js', 'scripts/audit-dict-assist-fixture.mjs'] } : {}),
+      features: [...new Set([item.name, item.name.replace(/^tab-/, ''), surface, ...(item.name.startsWith('dict-assist-') ? ['dictionary', 'dictionary-assist'] : [])])], kinds: ['layout'], axes: { ...axes, state: [item.name] },
       defaults: surface === 'md-preview' ? { scheme: ['light'] } : {},
       dependencies: item.dependencies.map((name) => sweepScenarioId(surface, name)),
     });

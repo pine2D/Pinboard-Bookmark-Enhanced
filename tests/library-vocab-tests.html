@@ -136,6 +136,7 @@ document.documentElement.setAttribute("data-listbox-ready", "");
 <script src="../shared.js"></script>
 <script src="../vocab-store.js"></script>
 <script src="../md-dict.js"></script>
+<script src="../dict-assist.js"></script>
 <script src="../dict-pack.js"></script>
 <!-- pbpVocabCurrentOwner (shared.js) routes through pbpReadSettingsWithSecrets,
      which without this stub hits the real chrome.storage/navigator.locks
@@ -4396,6 +4397,53 @@ await (async () => {
       _pbpDictLoadPack=old.load;window.pbpDictPackLookup=old.lookup;window.pbpDictPackList=old.list;
       _pbpDictSlotRun=old.remote;_pbpDictEcdictSide=old.local;pbpVocabCurrentOwner=old.owner;pbpVocabGet=old.get;
       pbpVocabSaveWord=old.save;_pbpVocabReloadAfterMutation=old.reload;pbpReadSettingsWithSecrets=old.read;_pbpVocabAutoLookup=old.auto;
+    }
+  }
+
+  // Explicit dictionary AI uses the selected source's original meaning and
+  // the actual saved sentence, without turning advice into an automatic save.
+  {
+    const old={remote:_pbpDictSlotRun,local:_pbpDictEcdictSide,load:_pbpDictLoadPack,lookup:window.pbpDictPackLookup,list:window.pbpDictPackList,
+      read:pbpReadSettingsWithSecrets,auto:_pbpVocabAutoLookup,run:pbpDictAssistRun,key:window.hasAIKey,grant:window.ensureAIHostPermissionWithGesture,
+      owner:pbpVocabCurrentOwner,get:pbpVocabGet,save:pbpVocabSaveWord,reload:_pbpVocabReloadAfterMutation};
+    const scope="acct_ai_ui",calls=[],writes=[],events=[];
+    const word={id:pbpDictVocabKey(scope,"de","Gift"),owner:scope,term:"Gift",language:"de",gloss:"old saved gloss",contexts:[{quote:""},{quote:"Das Gift wirkt.",articleUrl:"https://example.test/article"}],groups:[]};
+    const norm={word:"Gift",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/Gift",license:"CC BY-SA 4.0",definitionLang:"en",entries:[{ipas:[],forms:[],senses:[{definition:"poison"},{definition:"a present"}]}]};
+    try {
+      _vocabCurrentOwner=scope;_vocabRows=[word];_pbpVocabAutoLookup=async()=>{};
+      _pbpDictLoadPack=async()=>true;window.pbpDictPackLookup=async()=>({state:"unavailable",hits:[]});window.pbpDictPackList=async()=>[];
+      _pbpDictEcdictSide=async()=>{};_pbpDictSlotRun=async()=>norm;
+      window.hasAIKey=()=>true;pbpReadSettingsWithSecrets=async()=>({aiProvider:"ollama",previewAiEnabled:true,dictDefinitionLang:"es"});
+      window.ensureAIHostPermissionWithGesture=async()=>{events.push("permission");};
+      pbpDictAssistRun=async input=>{events.push("request");calls.push(input);return {choiceId:input.choices[0].id,explanation:"Explicación independiente",targetLang:input.target.lang};};
+      pbpVocabCurrentOwner=async()=>scope;pbpVocabGet=async()=>word;
+      pbpVocabSaveWord=async(owner,data,opts)=>{writes.push({owner,data,opts});return {...word,...data};};_pbpVocabReloadAfterMutation=async()=>false;
+      _pbpVocabRenderDetail(word);_pbpVocabRelookup(word);await settle();
+      const host=$id("vocab-ref-result");
+      check("AI: opening dictionary meanings never makes an AI request",calls.length===0);
+      host.querySelector('.dict-assist-recommend').click();await settle();
+      check("AI: library uses and displays the first real saved sentence rather than an empty context",calls[0]?.sentence==="Das Gift wirkt."&&host.querySelector('.dict-assist-context')?.textContent==="Das Gift wirkt.");
+      check("AI: library requests endpoint permission before dispatch and uses the independent target language",events.join("|")==="permission|request"&&calls[0]?.target.lang==="es");
+      check("AI: a recommendation does not save or replace the current saved gloss",writes.length===0&&_vocabRows[0].gloss==="old saved gloss"&&host.querySelector('.vocab-save-definition').value==="");
+      host.querySelector('.dict-assist-use').click();await settle();
+      check("AI: confirming a recommendation selects the original definition without writing",writes.length===0&&host.querySelector('.vocab-save-definition').selectedOptions[0]?.textContent.includes("poison"));
+      check("AI: choosing the recommended original keeps its separate explanation available to copy",host.querySelector('.dict-assist-explanation')?.textContent==="Explicación independiente"&&!!host.querySelector('.dict-assist-copy'));
+      host.querySelector('.dict-assist-explain').click();await settle();
+      check("AI: explaining a selected sense sends one original meaning and does not overwrite it",calls.at(-1)?.task==="explain"&&calls.at(-1)?.choices.length===1&&calls.at(-1)?.choices[0].definition==="poison"&&host.querySelector('.vocab-save-definition').selectedOptions[0]?.textContent.includes("poison"));
+      host.querySelector('.vocab-lookup-save').click();await settle();
+      check("AI: only explicit Update writes the original dictionary gloss and source",writes.length===1&&writes[0].data.gloss==="poison"&&writes[0].data.sourceUrl===norm.sourceUrl&&!writes[0].data.gloss.includes("Explicación"));
+      _pbpVocabLookupOther("Gift","de");await settle();
+      check("AI: free lookup does not reuse a saved word's unrelated sentence",host.querySelector('.dict-assist-recommend').disabled&&!host.querySelector('.dict-assist-context'));
+      let resolveSettings;pbpReadSettingsWithSecrets=()=>new Promise(resolve=>{resolveSettings=resolve;});
+      _pbpVocabLookupOther("Gift","de");await settle();
+      check("AI: paid controls remain disabled until their settings snapshot is ready",host.querySelector('.dict-assist-explain').disabled&&host.querySelector('.dict-assist-recommend').disabled);
+      resolveSettings?.({aiProvider:"ollama",previewAiEnabled:false});await settle();
+      check("AI: the reader master switch remains authoritative in library with an actionable settings link",host.querySelector('.dict-assist-explain').disabled&&!!host.querySelector('a[href="options.html#ai-behavior"]'));
+    } finally {
+      _pbpVocabDictCtrl?.abort();_pbpVocabDictChildCtrl?.abort();_pbpVocabRenderDetail(null);
+      _pbpDictSlotRun=old.remote;_pbpDictEcdictSide=old.local;_pbpDictLoadPack=old.load;window.pbpDictPackLookup=old.lookup;window.pbpDictPackList=old.list;
+      pbpReadSettingsWithSecrets=old.read;_pbpVocabAutoLookup=old.auto;pbpDictAssistRun=old.run;pbpVocabCurrentOwner=old.owner;pbpVocabGet=old.get;pbpVocabSaveWord=old.save;_pbpVocabReloadAfterMutation=old.reload;
+      for(const [key,value] of [["hasAIKey",old.key],["ensureAIHostPermissionWithGesture",old.grant]]){if(value===undefined)delete window[key];else window[key]=value;}
     }
   }
 

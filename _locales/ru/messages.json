@@ -4490,5 +4490,22 @@
   "multiPackActionFailed": {"message": "Не удалось изменить словарь. Повторите попытку."},
   "dictPackResultsLimited": {"message": "Некоторые совпадения не показаны. Попробуйте более точное слово."},
   "dictOnlineLanguageUnavailable": {"message": "Онлайн-поиск для этого языка недоступен."},
-  "dictTagReading": {"message": "Произношение"}
+  "dictTagReading": {"message": "Произношение"},
+  "dictAssistRecommend": {"message": "Найти значение с ИИ"},
+  "dictAssistExplain": {"message": "Объяснить значение с ИИ"},
+  "dictAssistUseMeaning": {"message": "Выбрать это словарное значение"},
+  "dictAssistNeedContext": {"message": "Чтобы подобрать значение, найдите слово в предложении или откройте сохранённое слово с исходным предложением."},
+  "dictAssistChooseMeaning": {"message": "Выберите словарное значение, которое нужно объяснить."},
+  "dictAssistNoSources": {"message": "Ни одно словарное значение не разрешено использовать с ИИ. Разрешение для источника словаря можно включить в настройках раздела «Словарик»."},
+  "dictAssistSourceChanged": {"message": "Слово или источник словаря изменились. Попробуйте снова с текущими значениями."},
+  "dictAssistSourceNotAllowed": {"message": "Этот источник словаря не разрешён для ИИ. Проверьте разрешение в настройках раздела «Словарик»."},
+  "dictAssistNoMatch": {"message": "Ни одно из этих словарных значений явно не подходит к предложению."},
+  "dictAssistRecommended": {"message": "Предлагаемое словарное значение"},
+  "dictAssistContext": {"message": "Использованное предложение"},
+  "dictAssistBusy": {"message": "Чтение словарных значений…"},
+  "dictAssistCopy": {"message": "Копировать объяснение ИИ"},
+  "dictAssistCopied": {"message": "Объяснение скопировано"},
+  "dictAssistCopyFailed": {"message": "Не удалось скопировать объяснение. Выделите текст и скопируйте его вручную."},
+  "dictAssistFailed": {"message": "ИИ не удалось выполнить этот запрос. Попробуйте ещё раз."},
+  "dictAssistAllowedSources": {"message": "Учитываются только источники словарей, для которых разрешено использование с ИИ."}
 }
