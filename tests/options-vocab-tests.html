@@ -479,6 +479,120 @@ delete document.documentElement.dataset.theme;
     await _pbpVocabSendEudic();
     check("generic Eudic failure no longer reuses a Jina conversion error", $id("vocab-eudic-test-status").textContent.includes("dictEudicFailed"));
 
+    // Keep the real shared sender and HTTP client in this block. Only storage,
+    // host permission and the external API response are fixtures: a mocked
+    // pbpAnkiSendRows would hide both stale endpoints and late-owner results.
+    const sendRealFetch = window.fetch;
+    const sendRealZhMap = pbpVocabSendZhMap;
+    const sendRealZhTag = pbpVocabSendEcdictTag;
+    const originalPortField = $id("dict-anki-port").value;
+    const ankiFixtureReply = (action) => {
+      const replies = {
+        requestPermission: { result:{ permission:"granted", version:6, requireApikey:false }, error:null },
+        createDeck: { result:123, error:null },
+        modelNames: { result:["Pinboard Vocab"], error:null },
+        modelFieldNames: { result:["Term", "Reading", "Definition", "Context", "Source", "License"], error:null },
+        canAddNotesWithErrorDetail: { result:[{ canAdd:true, error:null }], error:null },
+        addNotes: { result:[9001], error:null }
+      };
+      if (!(action in replies)) throw new Error("unexpected Anki action: " + action);
+      return new Response(JSON.stringify(replies[action]), { status:200 });
+    };
+    const realSendFixture = () => {
+      resetActions();
+      pbpAnkiCall = realAnkiCall;
+      pbpAnkiSendRows = realAnkiSendRows;
+      pbpEudicSendRows = realEudicSendRows;
+      pbpVocabSendZhMap = async () => new Map();
+      pbpVocabSendEcdictTag = async () => "";
+      pbpVocabAll = async () => [{ id:"alice-secret", term:"ALICE_ONLY_WORD", language:"en", contexts:[] }];
+    };
+    try {
+      realSendFixture();
+      let savedPort = "8765";
+      const portEvents = [];
+      $id("dict-anki-port").value = "9999";
+      pbpReadSettingsWithSecrets = async () => {
+        portEvents.push({ kind:"read" });
+        return { dictAnkiPort:savedPort, dictAnkiDeck:"Deck", dictAnkiKey:"" };
+      };
+      window.chrome.permissions.request = async ({ origins }) => {
+        portEvents.push({ kind:"permission", origins });
+        return true;
+      };
+      window.pbpOptionsFlushAutoSave = async () => {
+        portEvents.push({ kind:"flush" });
+        savedPort = $id("dict-anki-port").value;
+        return { ok:true };
+      };
+      window.fetch = async (url, init) => {
+        const request = JSON.parse(init.body);
+        portEvents.push({ kind:"request", url:String(url), action:request.action });
+        return ankiFixtureReply(request.action);
+      };
+      const firstSend = _pbpVocabSendAnki();
+      await _pbpVocabSendAnki(); // a second click while the first is pending
+      await firstSend;
+      const portRequests = portEvents.filter(event => event.kind === "request");
+      check("a just-edited Anki port owns the first permission and every request before auto-save lands",
+        savedPort === "9999" && portEvents[0]?.kind === "permission" &&
+        portEvents[0].origins.join() === "http://127.0.0.1:9999/*" &&
+        portRequests.length === 6 && portRequests.every(event => event.url === "http://127.0.0.1:9999") &&
+        $id("vocab-anki-test-status").textContent.includes("dictAnkiResult:1,0,0"), JSON.stringify(portEvents));
+      check("Anki's in-flight guard still permits only one addNotes dispatch",
+        portRequests.filter(event => event.action === "addNotes").length === 1 && !$id("vocab-anki-btn").disabled);
+
+      realSendFixture();
+      const libraryOrigins = [], libraryRequests = [];
+      pbpReadSettingsWithSecrets = async () => ({ dictAnkiPort:"9876", dictAnkiDeck:"Deck", dictAnkiKey:"" });
+      window.chrome.permissions.request = async ({ origins }) => { libraryOrigins.push(...origins); return true; };
+      window.fetch = async (url, init) => {
+        libraryRequests.push(String(url));
+        return ankiFixtureReply(JSON.parse(init.body).action);
+      };
+      await pbpVocabSendToAnki({ flash:_pbpVocabFlashStatus }); // library has no editable port field
+      check("a sender without a form snapshot still uses its saved port for permission and transport",
+        libraryOrigins.join() === "http://127.0.0.1:9876/*" && libraryRequests.length === 6 &&
+        libraryRequests.every(url => url === "http://127.0.0.1:9876"));
+
+      for (const target of ["anki", "eudic"]) {
+        for (const ownerReadFails of [false, true]) {
+          realSendFixture();
+          let responseReturned = false;
+          let finalOwnerReads = 0;
+          pbpVocabCurrentOwner = async () => {
+            if (!responseReturned) return "acct_alice";
+            finalOwnerReads++;
+            if (ownerReadFails) throw new Error("owner storage unavailable");
+            return "acct_bob";
+          };
+          window.fetch = async (_url, init) => {
+            const request = JSON.parse(init.body);
+            if (target === "anki" && request.action !== "addNotes") return ankiFixtureReply(request.action);
+            responseReturned = true;
+            return target === "anki"
+              ? new Response('{"result":[null],"error":null}', { status:200 })
+              : new Response('{"message":"temporary server failure"}', { status:500 });
+          };
+          if (target === "anki") await _pbpVocabSendAnki();
+          else await _pbpVocabSendEudic();
+          const status = $id("vocab-" + target + "-test-status");
+          check(`${target} result with ${ownerReadFails ? "an unreadable owner" : "a changed owner"} never publishes the previous owner's failed words`,
+            finalOwnerReads > 0 && status.classList.contains("bad") &&
+            !status.textContent.includes("ALICE_ONLY_WORD") &&
+            !status.textContent.includes("vocabFailedTerms") &&
+            !status.textContent.includes("dictAnkiResult") &&
+            (ownerReadFails || status.textContent.includes("vocabAccountChanged")), status.textContent);
+        }
+      }
+    } finally {
+      window.fetch = sendRealFetch;
+      pbpVocabSendZhMap = sendRealZhMap;
+      pbpVocabSendEcdictTag = sendRealZhTag;
+      $id("dict-anki-port").value = originalPortField;
+      resetActions();
+    }
+
     resetActions();
     pbpReadSettingsWithSecrets = async () => { throw new Error("storage unavailable"); };
     let ankiRejected = false;

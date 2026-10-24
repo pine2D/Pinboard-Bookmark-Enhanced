@@ -574,9 +574,11 @@ function pbpDictBuildCtxPrompt(p) {
 }
 
 // Anki CSV-style field quoting.
-function pbpDictTsvField(v) {
+function pbpDictTsvField(v, columnIndex) {
   const s = String(v == null ? "" : v);
-  if (/[\t\n\r"]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  // Anki treats an unquoted # at record start as a comment. Quote that first
+  // field; # on a continuation line inside a quoted field is already data.
+  if ((columnIndex === 0 && s.startsWith("#")) || /[\t\n\r"]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
   return s;
 }
 

@@ -541,6 +541,21 @@ assert(tsv.indexOf("我在读一本书。") >= 0, "CJK golden row survives");
 assertEq(pbpDictTsv([]), "#separator:Tab\n#html:false\n#columns:Term\tReading\tDefinition\tContext\tSource\tLicense\n", "empty -> header only");
 assert(tsv.indexOf('say "hi" x') === -1 || tsv.indexOf('"say ""hi"" x"') >= 0, "inner quotes doubled when field needs quoting");
 
+// Anki's CSV reader uses comment(Some(b'#')): only an UNQUOTED # at the
+// start of a record is a comment. A # inside a quoted multiline field stays
+// data. Hand-written output follows that reader contract, not an encoder
+// helper (rslib/src/import_export/text/csv/import.rs, build_csv_reader).
+const tsvHeader = "#separator:Tab\n#html:false\n#columns:Term\tReading\tDefinition\tContext\tSource\tLicense\n";
+assertEq(pbpDictTsv([{ term:"#include", definition:"directive" }]),
+  tsvHeader + '"#include"\t\tdirective\t\t\t\n',
+  "a hash-prefixed first field is data rather than an Anki comment");
+assertEq(pbpDictTsv([{ term:"#html:true", definition:"literal header-like term" }]),
+  tsvHeader + '"#html:true"\t\tliteral header-like term\t\t\t\n',
+  "a header-like saved term cannot become an import directive");
+assertEq(pbpDictTsv([{ term:"#term\n#continuation", definition:'a "quoted" definition', contexts:["first\n#keep this line", "last\tcolumn"] }]),
+  tsvHeader + '"#term\n#continuation"\t\t"a ""quoted"" definition"\t"first\n#keep this line\nlast\tcolumn"\t\t\n',
+  "hash lines inside quoted multiline fields retain newlines, tabs and escaped quotes");
+
 section("pbpEchoTermSet");
 const _ets = (rows, cap) => pbpEchoTermSet(rows, cap);
 {

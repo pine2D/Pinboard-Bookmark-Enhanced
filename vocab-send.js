@@ -8,6 +8,8 @@
 //   flush()          -- optional; resolves { ok } once a pending settings
 //                       auto-save has landed (options only: the deck, port
 //                       and tokens are edited there)
+//   port             -- optional Anki port captured from the form at click
+//                       time, before any permission or auto-save await
 // Scope never follows a UI selection or search: every send reads the current
 // owner's full vocabulary (rules/vocab-sync.md, UI-layer invariants).
 // Call-time deps: shared.js (pbpReadSettingsWithSecrets, deobfuscateSettings,
@@ -175,22 +177,24 @@ async function pbpVocabExportTsv({ flash, flush } = {}) {
 }
 
 // Send-to-Anki chain. Ordering is the spec (anki spec rev2 §3):
-// (1) FIRST await after a single settings read = chrome.permissions.request
+// (1) FIRST await = chrome.permissions.request when the caller supplies its
+// form's port; without a form, one settings read supplies the port first
 // (user gesture; already-granted resolves true without UI), (2)
 // requestPermission as the first AnkiConnect action, (3..n) owner derived
 // AFTER the permission awaits and re-checked via ownerCheck before every later
 // dispatch -- the permission dialogs can sit open long enough for an account
 // switch (fail-closed invariant). The caller must reach this with no await of
 // its own in between, or the click's transient activation can lapse.
-async function pbpVocabSendToAnki({ flash, flush } = {}) {
+async function pbpVocabSendToAnki({ flash, flush, port: clickedPort } = {}) {
   try {
-    // The permission pattern depends on the configurable port, so one fast
-    // settings read precedes permissions.request. Transient activation is a
-    // TIME window (~5s), not a microtask budget; a single storage read stays
-    // well inside it. A port typed within the 500ms auto-save debounce may
-    // read stale once -- worst case is a connection error and a retry.
-    const preRead = await pbpReadSettingsWithSecrets({ dictAnkiPort: SETTINGS_DEFAULTS.dictAnkiPort });
-    const port = preRead.dictAnkiPort;
+    // Options supplies the live field synchronously: reading storage before
+    // its auto-save flush could send to an old, still-running Anki instance.
+    // Keep that click's port for BOTH the first permission request and every
+    // dispatch, including when a permission dialog outlives another edit.
+    // Library has no editable field, so its one fast settings read remains.
+    const port = clickedPort === undefined
+      ? (await pbpReadSettingsWithSecrets({ dictAnkiPort: SETTINGS_DEFAULTS.dictAnkiPort })).dictAnkiPort
+      : clickedPort;
     const pattern = pbpEndpointOriginPattern(pbpAnkiEndpointFor(port));
     let granted = false;
     try { granted = await chrome.permissions.request({ origins: [pattern] }); }
@@ -232,6 +236,7 @@ async function pbpVocabSendToAnki({ flash, flush } = {}) {
       port,
       ownerCheck: async () => (await pbpVocabCurrentOwner()) === owner
     });
+    if ((await pbpVocabCurrentOwner()) !== owner) { flash(false, t("vocabAccountChanged")); return; }
     if (res.stage === "done") {
       let msg = t("dictAnkiResult", String(res.added), String(res.skipped), String(res.failed));
       // Name the casualties: a bare count leaves "re-send the whole library
@@ -281,6 +286,7 @@ async function pbpVocabSendToEudic({ flash, flush } = {}) {
       token: s.dictEudicToken,
       ownerCheck: async () => (await pbpVocabCurrentOwner()) === owner
     });
+    if ((await pbpVocabCurrentOwner()) !== owner) { flash(false, t("vocabAccountChanged")); return; }
     if (res.stage === "owner") {
       flash(false, t("vocabAccountChanged"));
     } else if (res.stage === "auth") {

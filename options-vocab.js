@@ -727,7 +727,10 @@ async function _pbpVocabSendAnki() {
   const orig = btn.textContent;
   try {
     btn.textContent = t("dictAnkiSending");
-    await pbpVocabSendToAnki(_pbpVocabSendOptions("vocab-anki-test-status"));
+    await pbpVocabSendToAnki({
+      ..._pbpVocabSendOptions("vocab-anki-test-status"),
+      port: $id("dict-anki-port")?.value
+    });
   } finally {
     btn.textContent = orig;
     btn.disabled = false;
