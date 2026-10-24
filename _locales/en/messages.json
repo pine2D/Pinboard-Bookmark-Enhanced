@@ -802,6 +802,9 @@
   "mdEngineExtractFailed": {
     "message": "Couldn't extract this page. Please try again."
   },
+  "mdSiteTargetMissing": {
+    "message": "The requested post is not fully loaded or could not be identified. Open the original page, wait for the post to appear, then retry."
+  },
   "mdEngineTabGone": {
     "message": "The original tab is no longer available. Reopen the page to use Defuddle."
   },

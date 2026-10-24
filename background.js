@@ -4783,6 +4783,7 @@ function extractPageForMarkdown() {
   try {
     if (typeof applySiteRule === "function") {
       const hit = applySiteRule(document, location.href);
+      if (hit && hit.error) return { error: hit.error };
       if (hit && hit.contentHtml) {
         // E1: normalize lazy-load img placeholders (data-src/srcset) on an
         // INERT-document div -- a div from the LIVE document fetches every
@@ -4830,7 +4831,7 @@ function extractPageForMarkdown() {
     // author/published/site/image alongside content/title/url/math.
     return {
       contentHtml: result.content, title: result.title || document.title, url: location.href,
-      math: !!document.querySelector("math"),
+      math: !!document.querySelector("math") || (typeof pbpContentHasMath === "function" && pbpContentHasMath(result.content)),
       author: result.author || "", published: result.published || "", site: result.site || "", image: result.image || "",
       // Source page language for the reader's article lang (see popup.js twin).
       lang: result.language || document.documentElement.lang || ""

@@ -93,9 +93,10 @@ async function getPageInfoFromTab(tabId, opts = {}) {
         if (typeof applySiteRule === "function") {
           try {
             const hit = applySiteRule(document, location.href);
+            if (hit && hit.error) return null;
             const text = (hit && hit.contentHtml && typeof pbpSiteRuleText === "function")
               ? pbpSiteRuleText(hit.contentHtml) : "";
-            if (text.length > 50) {
+            if (text.length > 50 || (text && hit && /^(x|twitter)-status$/.test(hit.id))) {
               info.pageText = text.substring(0, 8000);
               return info;
             }

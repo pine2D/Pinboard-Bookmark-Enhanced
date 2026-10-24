@@ -456,7 +456,7 @@ async function runPopupObsidianTests() {
   if (loaderBegin < 0 || loaderEnd <= loaderBegin) throw new Error("popup Markdown loader missing");
   for (const alreadyConverted of [false, true]) {
     const state = { appended: [], pending: [] };
-    const globals = { htmlToMarkdown: alreadyConverted ? () => "" : undefined, marked: undefined };
+    const globals = { htmlToMarkdown: alreadyConverted ? () => "" : undefined, marked: undefined, DOMPurify: undefined };
     const doc = {
       createElement: () => ({}),
       head: { appendChild: script => { state.appended.push(script.src); state.pending.push(script); } }
@@ -470,12 +470,14 @@ async function runPopupObsidianTests() {
       const script = state.pending.shift();
       if (script.src === "md-convert.js") globals.htmlToMarkdown = () => "";
       if (script.src === "vendor/marked.min.js") globals.marked = { lexer: () => [] };
+      if (script.src === "vendor/purify.min.js") globals.DOMPurify = { sanitize: () => "" };
       script.onload();
       await Promise.resolve();
     }
     await pending;
-    assert(!beforeLoads && state.appended.includes("vendor/marked.min.js") && typeof globals.marked?.lexer === "function",
-      "popup loader waits for marked even when md-convert " + (alreadyConverted ? "already exists" : "is absent"));
+    assert(!beforeLoads && state.appended.includes("vendor/marked.min.js") && typeof globals.marked?.lexer === "function"
+      && state.appended.includes("vendor/purify.min.js") && typeof globals.DOMPurify?.sanitize === "function",
+      "popup loader waits for lexer and sanitizer even when md-convert " + (alreadyConverted ? "already exists" : "is absent"));
   }
 }
 

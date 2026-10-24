@@ -797,6 +797,9 @@
   "mdEngineExtractFailed": {
     "message": "このページを抽出できませんでした。もう一度お試しください。"
   },
+  "mdSiteTargetMissing": {
+    "message": "対象の投稿が読み込まれていないか、特定できませんでした。元のページを開き、投稿が表示されてから再試行してください。"
+  },
   "mdEngineTabGone": {
     "message": "元のタブはもう利用できません。Defuddle を使うには、ページを開き直してください。"
   },

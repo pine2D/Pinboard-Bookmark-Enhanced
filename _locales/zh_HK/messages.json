@@ -797,6 +797,9 @@
   "mdEngineExtractFailed": {
     "message": "無法擷取此頁面，請重試。"
   },
+  "mdSiteTargetMissing": {
+    "message": "目標帖文尚未完整載入，或未能確認帖文身份。請開啟原頁面，待目標帖文出現後再試。"
+  },
   "mdEngineTabGone": {
     "message": "原標籤頁已無法使用，重新開啟該頁面才能使用 Defuddle。"
   },

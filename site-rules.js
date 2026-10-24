@@ -4,7 +4,9 @@
 // Injected (with vendor/defuddle.js) into the active tab's ISOLATED world by
 // popup.js extractLocalMarkdown(). Runs BEFORE Defuddle: a matching rule returns
 // clean { contentHtml, title } that reuses the existing Turndown path; no match
-// (or empty content) → caller falls back to Defuddle.
+// (or empty content) → caller falls back to Defuddle. A recognized status
+// with unverified identity returns an explicit error; generic extraction
+// must not silently substitute a different post.
 //
 // Self-contained: no imports, DOM-only. Exposes globals SITE_RULES / matchRule /
 // applySiteRule so the injected inline func (page context) can call them.
@@ -201,6 +203,23 @@
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
 
+  function safeSourceHref(href, base) {
+    if (!href) return "";
+    try {
+      var u = new URL(href, base);
+      return /^(https?:)$/.test(u.protocol) && !u.username && !u.password ? u.href : "";
+    } catch (_) { return ""; }
+  }
+
+  // Structured math is evidence; a dollar in prose or code is not. The same
+  // predicate is available to both extractor wrappers after Defuddle.parse().
+  function pbpContentHasMath(html) {
+    var root = inertDoc().createElement("div");
+    root.innerHTML = html || "";
+    return Array.from(root.querySelectorAll('math, mjx-container, .katex, .math-container, .MathJax, .MathJax_Display, script[type^="math/tex"]'))
+      .some(function (el) { return !el.closest("pre,code"); });
+  }
+
   // Zhihu lazy-loads images: real URL in data-original / data-actualsrc / data-src. Promote
   // to src so markdown keeps them. Operates on a node of the INERT document
   // (see inertDoc) — never the live DOM, and never a node that could fetch.
@@ -241,7 +260,18 @@
     var head = "<h2>" + escapeHtml(author || "匿名用户") + "</h2>";
     var meta = "<p>" + escapeHtml(String(voteup || 0) + " 赞同") +
       (permalink ? ' · <a href="' + escapeHtml(permalink) + '">链接</a>' : "") + "</p>";
-    return head + meta + (bodyHtml || "");
+    var body = inertDoc().createElement("div");
+    body.innerHTML = bodyHtml || "";
+    var headings = Array.from(body.querySelectorAll("h1,h2,h3,h4,h5,h6"));
+    var firstLevel = headings.reduce(function (min, h) { return Math.min(min, Number(h.tagName.slice(1))); }, 6);
+    var offset = Math.max(0, 3 - firstLevel);
+    if (offset) headings.forEach(function (h) {
+      var replacement = inertDoc().createElement("h" + Math.min(6, Number(h.tagName.slice(1)) + offset));
+      Array.from(h.attributes).forEach(function (a) { replacement.setAttribute(a.name, a.value); });
+      while (h.firstChild) replacement.appendChild(h.firstChild);
+      h.replaceWith(replacement);
+    });
+    return head + meta + body.innerHTML;
   }
 
   // Parse a Zhihu vote count from text / aria-label: "赞同 430" -> 430, "1.2万" -> 12000.
@@ -486,7 +516,7 @@
   }
 
   // ---- V2EX (topic + threaded replies) ----------------------------------
-  function extractV2ex(doc) {
+  function extractV2ex(doc, url) {
     var title = pickText(doc, ["h1"]);
     var parts = [];
     var topic = doc.querySelector(".topic_content");
@@ -547,16 +577,32 @@
       parts.push(renderThreadHtml(buildReplyTree(replies), 0));
     }
     if (!parts.join("")) return null;
-    var pages = doc.querySelectorAll("#Main .box .inner .page_normal, #Main .box .inner .page_current");
+    // Current V2EX uses .cell.ps_container; older pages use .inner. Top and
+    // bottom pagers repeat the same numbers, so count pages, not DOM nodes.
+    var pageCount = 1;
+    doc.querySelectorAll("#Main .box .page_normal, #Main .box .page_current").forEach(function (page) {
+      var n = Number((page.textContent || "").trim());
+      if (Number.isInteger(n) && n > pageCount) pageCount = n;
+    });
+    var total = 0, loaded = replies ? replies.length : 0;
+    doc.querySelectorAll("#Main .box .cell > .gray").forEach(function (label) {
+      var m = (label.textContent || "").match(/([\d,]+)\s*条回复/);
+      if (m) total = Math.max(total, parseCount(m[1]));
+    });
     var note = "";
-    if (pages.length > 1) note = "<blockquote><p>" + escapeHtml("注：仅提取当前页回复（共 " + pages.length + " 页）。") + "</p></blockquote>";
+    if (pageCount > 1 || total > loaded) {
+      note = "<blockquote><p>" + escapeHtml("注：已载入 " + loaded + (total ? "/" + total : "") + " 条回复，仅提取当前页" + (pageCount > 1 ? "（共 " + pageCount + " 页）" : "") + "。") +
+        (url ? ' <a href="' + escapeHtml(url) + '">查看原文</a>' : "") + "</p></blockquote>";
+    }
     return { contentHtml: note + parts.join("\n"), title: title };
   }
 
   // ---- Hacker News (item page: story title + threaded comments) ----------
   // No floor/thanks/@-strip (HN-specific). Header = author; body = .commtext.
   function hnReplyHtml(node) {
-    return "<p><strong>" + escapeHtml(node.author || "匿名") + "</strong></p>" + (node.bodyHtml || "");
+    var author = "<strong>" + escapeHtml(node.author || "匿名") + "</strong>";
+    if (node.url) author = '<a href="' + escapeHtml(node.url) + '">' + author + "</a>";
+    return "<p>" + author + "</p>" + (node.bodyHtml || "");
   }
 
   // Drop dead placeholders that shield no live descendants (bottom-up).
@@ -571,9 +617,12 @@
     return out;
   }
 
-  function extractHackerNews(doc) {
+  function extractHackerNews(doc, url) {
     var title = pickText(doc, [".fatitem .titleline > a", ".titleline > a", ".athing .titleline a"]) || doc.title;
     var parts = [];
+    var story = doc.querySelector(".fatitem .titleline > a, .titleline > a");
+    var storyUrl = safeSourceHref(story && story.getAttribute("href"), url);
+    if (storyUrl) parts.push('<p><a href="' + escapeHtml(storyUrl) + '">' + escapeHtml(storyUrl) + '</a></p>');
     // Optional Ask-HN / self-post body (the toptext under the title).
     var top = doc.querySelector(".fatitem .toptext") || doc.querySelector("td.cell .toptext");
     if (top && top.textContent.trim()) parts.push(cleanBodyHtml(top.innerHTML));
@@ -611,7 +660,8 @@
       // Cap trips only on a LIVE row: breaking on a dead tail row would flag
       // truncation ("N+" and the note) when nothing visible was omitted.
       if (live >= globalCap) { capped = true; break; }
-      replies.push({ author: author, bodyHtml: bodyHtml, depth: depth });
+      var permalink = /^\d+$/.test(row.id) ? "https://news.ycombinator.com/item?id=" + row.id : "";
+      replies.push({ author: author, bodyHtml: bodyHtml, depth: depth, url: permalink });
       live++;
     }
     if (live) {
@@ -627,32 +677,49 @@
   // Scope is deliberately narrow: keep the tweet text's inline <br> fidelity, and
   // leave thread/reply expansion to Defuddle or a future explicit rule.
   function extractTwitterStatus(doc, url) {
-    // A reply's status page renders the PARENT tweet above the target, so
-    // first-article grabs the wrong status. Anchor on the id from the URL:
-    // the target tweet's own timestamp/analytics links carry /status/<id>
-    // inside its article. Fall back to the old first-article heuristic when
-    // the id link isn't rendered (test fixtures, markup drift).
+    // Only the post's own timestamp proves identity. Body links and quote
+    // cards can point at the requested status from an unrelated article.
+    // Missing identity is an explicit failure: Defuddle's first-article
+    // fallback would otherwise repeat the very same misattribution.
     var sid = (String(url || "").match(/\/status\/(\d+)/) || [])[1];
     var article = null;
+    var timeEl = null;
+    function own(el, container) {
+      if (el.closest("article") !== container || el.closest('[data-testid="quoteTweet"], [data-testid="card.wrapper"]')) return false;
+      // Real timestamp/photo anchors also carry role=link. A quoted-post
+      // card is a containing div with its own author, not an ordinary link.
+      var card = el.closest('div[role="link"]');
+      return !(card && container.contains(card) && card.querySelector('[data-testid="User-Name"]'));
+    }
     if (sid) {
-      // href*= is substring matching — /status/22 would hit /status/222 —
-      // so re-verify each candidate against an end-or-delimiter boundary.
-      var bnd = new RegExp("/status/" + sid + "(?:$|[/?#])");
-      var links = doc.querySelectorAll('article a[href*="/status/' + sid + '"]');
+      var links = doc.querySelectorAll('article a[href]');
       for (var li = 0; li < links.length; li++) {
-        if (bnd.test(links[li].getAttribute("href") || "")) {
-          article = links[li].closest ? links[li].closest("article") : null;
-          break;
-        }
+        var link = links[li], container = link.closest("article");
+        if (!link.querySelector("time") || !own(link, container) || link.closest('[data-testid="tweetText"]')) continue;
+        var href = safeSourceHref(link.getAttribute("href"), url);
+        if (!href) continue;
+        var u = new URL(href);
+        if (!/^(?:www\.)?(?:x|twitter)\.com$/.test(u.hostname)) continue;
+        var linked = u.pathname.match(/^\/[^/]+\/status\/(\d+)(?:\/|$)/);
+        if (linked && linked[1] === sid) { article = container; timeEl = link.querySelector("time"); break; }
       }
     }
-    article = article || doc.querySelector('article[data-testid="tweet"]') || doc.querySelector("article");
-    if (!article) return null;
-    var textEl = article.querySelector('[data-testid="tweetText"]');
-    if (!textEl || !textEl.textContent.trim()) return null;
+    if (!article) return { error: "site_target_missing" };
+    var textEl = Array.from(article.querySelectorAll('[data-testid="tweetText"]')).find(function (el) { return own(el, article); });
+    var photos = Array.from(article.querySelectorAll('[data-testid="tweetPhoto"] img'))
+      .filter(function (el) { return own(el, article); });
+    var body = textEl ? cleanBodyHtml(textEl.innerHTML) : "";
+    var seen = new Set();
+    photos.forEach(function (photo) {
+      var src = safeSourceHref(photo.getAttribute("src"), url);
+      if (!src || seen.has(src)) return;
+      seen.add(src);
+      body += '<p><img src="' + escapeHtml(src) + '" alt="' + escapeHtml(photo.getAttribute("alt") || "") + '"></p>';
+    });
+    if (!body) return { error: "site_target_missing" };
 
     var spans = [];
-    var userEl = article.querySelector('[data-testid="User-Name"]');
+    var userEl = Array.from(article.querySelectorAll('[data-testid="User-Name"]')).find(function (el) { return own(el, article); });
     if (userEl) {
       userEl.querySelectorAll("span").forEach(function (s) {
         var t = (s.textContent || "").trim();
@@ -660,16 +727,15 @@
       });
     }
     var author = spans.slice(0, 2).join(" ");
-    var timeEl = article.querySelector("time");
     var when = timeEl ? ((timeEl.getAttribute("datetime") || timeEl.textContent || "").trim()) : "";
-    var titleText = (textEl.textContent || "").replace(/\s+/g, " ").trim();
+    var titleText = (textEl ? pbpSiteRuleText(textEl.innerHTML) : "").replace(/\s+/g, " ").trim();
     // Truncate by code points, not UTF-16 units — string slice can split a
     // surrogate pair (emoji) at the boundary into a lone high surrogate.
     var titleChars = Array.from(titleText);
     var title = titleChars.length > 90 ? titleChars.slice(0, 87).join("") + "..." : titleText;
     var meta = author || when ? "<p><strong>" + escapeHtml(author || "X/Twitter") + "</strong>" +
       (when ? " · " + escapeHtml(when) : "") + "</p>" : "";
-    return { contentHtml: meta + '<div class="tweet-text">' + cleanBodyHtml(textEl.innerHTML) + "</div>", title: title || doc.title };
+    return { contentHtml: meta + '<div class="tweet-text">' + body + "</div>", title: title || doc.title };
   }
 
   // Decode TeX text-mode accents/ligatures in PROSE (e.g. Andr\'e -> André). Punctuation
@@ -716,7 +782,7 @@
   }
 
   // ---- arXiv (/abs/ citation_* meta card) -------------------------------
-  function extractArxiv(doc) {
+  function extractArxiv(doc, url) {
     function metas(name) { return Array.prototype.map.call(doc.querySelectorAll('meta[name="' + name + '"]'), function (m) { return m.getAttribute("content") || ""; }).filter(Boolean); }
     function domText(sel) { var e = doc.querySelector(sel); return e ? e.textContent.replace(/\s+/g, " ").trim() : ""; }
     // Titles use the same TeX-escaped-accent convention as abstracts; decode
@@ -731,13 +797,18 @@
     var abs = metas("citation_abstract")[0] || domText("blockquote.abstract").replace(/^Abstract:?\s*/i, "");
     abs = decodeTexText(abs); // \'e -> é etc. in prose; $...$ math left intact for KaTeX
     var id = metas("citation_arxiv_id")[0] || "";
+    // citation_* can describe the unversioned work even on a v1 page. The
+    // address identifies what was read, including old archive/NNNNNNN IDs.
+    var addressed = "";
+    try { addressed = (new URL(url).pathname.match(/^\/abs\/((?:\d{4}\.\d{4,5}|[a-z][a-z.-]*\/\d{7})(?:v\d+)?)\/?$/i) || [])[1] || ""; } catch (_) {}
+    if (addressed) id = addressed;
     var date = metas("citation_date")[0] || domText(".dateline").replace(/[\[\]]/g, "").trim();
     var subjects = domText(".subjects");
     var comments = domText(".comments");
     var msc = domText(".msc-classes");
     var doi = domText(".doi a") || domText(".doi");
     var jref = domText(".jref");
-    var pdf = metas("citation_pdf_url")[0] || (id ? "https://arxiv.org/pdf/" + id : "");
+    var pdf = addressed ? "https://arxiv.org/pdf/" + addressed : (metas("citation_pdf_url")[0] || (id ? "https://arxiv.org/pdf/" + id : ""));
     var absUrl = id ? "https://arxiv.org/abs/" + id : "";
     if (!abs && !authors.length) return null;
     var html = "";
@@ -746,7 +817,11 @@
     var rows = "";
     function row(label, val) { if (val) rows += "<li><strong>" + escapeHtml(label) + ":</strong> " + escapeHtml(val) + "</li>"; }
     row("arXiv", id); row("Subjects", subjects); row("Submitted", date); row("Comments", comments);
-    row("MSC", msc); row("Journal", jref); row("DOI", doi);
+    row("MSC", msc); row("Journal", jref);
+    var doiEl = doc.querySelector(".doi a");
+    var doiUrl = safeSourceHref(doiEl && doiEl.getAttribute("href"), url);
+    if (doi && doiUrl) rows += '<li><strong>DOI:</strong> <a href="' + escapeHtml(doiUrl) + '">' + escapeHtml(doi) + '</a></li>';
+    else row("DOI", doi);
     if (rows) html += "<ul>" + rows + "</ul>";
     if (abs) html += "<h2>Abstract</h2><p>" + escapeHtml(abs) + "</p>"; // keeps $...$/$$...$$ → KaTeX
     var links = [];
@@ -880,6 +955,7 @@
     for (var k = 0; k < replies.length; k++) {
       var r0 = replies[k];
       var nd = { author: r0.author, bodyHtml: r0.bodyHtml, depth: r0.depth || 0, children: [] };
+      if (r0.url) nd.url = r0.url;
       if (r0.dead) nd.dead = true; // HN placeholder rows; pruned later when childless
       var d = nd.depth;
       if (d === 0 || !stack[d - 1]) roots.push(nd);
@@ -1019,15 +1095,15 @@
     { id: "zhihu-zhuanlan", source: "self", lastVerified: "2026-06-05", driftCheck: "manual",
       match: { host: "zhuanlan.zhihu.com", url: /\/p\/\d+/ }, extract: extractZhihuArticle }
     ,{ id: "stackoverflow", source: "json-ld+self", forum: true, lastVerified: "2026-06-06", driftCheck: "auto",
-       sampleUrl: "", match: { host: "stackoverflow.com", url: /\/questions\/\d+/ }, extract: function (d) { return extractStackOverflow(d); } }
+       sampleUrl: "https://stackoverflow.com/questions/11227809", match: { host: "stackoverflow.com", url: /\/questions\/\d+/ }, extract: function (d) { return extractStackOverflow(d); } }
     ,{ id: "stackexchange", source: "json-ld+self", forum: true, lastVerified: "2026-06-06", driftCheck: "auto",
-       sampleUrl: "", match: { host: "stackexchange.com", url: /\/questions\/\d+/ }, extract: function (d) { return extractStackOverflow(d); } }
-    ,{ id: "v2ex",  source: "self", forum: true, lastVerified: "2026-06-06", driftCheck: "auto",
-       sampleUrl: "", match: { host: "v2ex.com", url: /\/t\/\d+/ }, extract: function (d) { return extractV2ex(d); } }
-    ,{ id: "arxiv", source: "self", lastVerified: "2026-06-06", driftCheck: "auto",
-       sampleUrl: "", match: { host: "arxiv.org", url: /\/abs\// }, extract: function (d) { return extractArxiv(d); } }
-    ,{ id: "hackernews", source: "self", forum: true, lastVerified: "2026-06-16", driftCheck: "manual",
-       sampleUrl: "", match: { host: "news.ycombinator.com", url: /\/item\?id=\d+/ }, extract: function (d) { return extractHackerNews(d); } }
+       sampleUrl: "https://math.stackexchange.com/questions/1", match: { host: "stackexchange.com", url: /\/questions\/\d+/ }, extract: function (d) { return extractStackOverflow(d); } }
+    ,{ id: "v2ex",  source: "self", forum: true, lastVerified: "2026-10-24", driftCheck: "auto",
+       sampleUrl: "https://v2ex.com/t/1030069", match: { host: "v2ex.com", url: /\/t\/\d+/ }, extract: extractV2ex }
+    ,{ id: "arxiv", source: "self", lastVerified: "2026-10-24", driftCheck: "auto",
+       sampleUrl: "https://arxiv.org/abs/1706.03762v1", match: { host: "arxiv.org", url: /\/abs\// }, extract: extractArxiv }
+    ,{ id: "hackernews", source: "self", forum: true, lastVerified: "2026-10-24", driftCheck: "manual",
+       sampleUrl: "https://news.ycombinator.com/item?id=8863", match: { host: "news.ycombinator.com", url: /\/item\?id=\d+/ }, extract: extractHackerNews }
     ,{ id: "x-status", source: "self", lastVerified: "2026-07-09", driftCheck: "manual",
        sampleUrl: "", match: { host: "x.com", url: /\/status\/\d+/ }, extract: extractTwitterStatus }
     ,{ id: "twitter-status", source: "self", lastVerified: "2026-07-09", driftCheck: "manual",
@@ -1040,8 +1116,9 @@
       if (!matchRule(rule.match, doc, url)) continue;
       var out = null;
       try { out = rule.extract(doc, url); } catch (_) { out = null; }
+      if (out && out.error) return { id: rule.id, error: out.error, url: url };
       if (out && out.contentHtml) {
-        return { id: rule.id, contentHtml: out.contentHtml, title: out.title || doc.title || "", url: url, math: !!out.math, forum: !!rule.forum };
+        return { id: rule.id, contentHtml: out.contentHtml, title: out.title || doc.title || "", url: url, math: !!out.math || pbpContentHasMath(out.contentHtml), forum: !!rule.forum };
       }
       break; // matched site but produced nothing → fall back to Defuddle
     }
@@ -1054,6 +1131,7 @@
   g.matchRule = matchRule;
   g.applySiteRule = applySiteRule;
   g.pbpSiteRuleText = pbpSiteRuleText;
+  g.pbpContentHasMath = pbpContentHasMath;
   g.pbpNormalizeLazyImages = pbpNormalizeLazyImages;
   g.pbpUpgradeSrcsetImages = pbpUpgradeSrcsetImages;
   g.buildReplyTree = buildReplyTree;

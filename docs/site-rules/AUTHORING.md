@@ -8,7 +8,7 @@ How to add or maintain a per-site Markdown-extraction rule in `site-rules.js`. R
 2. **Choose a source** for the selectors (see *Source-selection priority* below). Prefer an active, license-clean source; cross-check across ≥2 where possible.
 3. **Add the rule — but first decide if one is warranted.** Single-article pages (blogs, news, one article) are handled well by Defuddle generic, so do NOT write a rule for them: a custom rule adds maintenance + regression risk for no gain (verified 2026-06 — WeChat/CSDN/掘金/dev.to showed no improvement over Defuddle and 掘金 regressed by leaking `<style>`). Write a rule ONLY for **multi-item pages Defuddle structurally can't do**: Q&A (question + answers), forums (topic + replies), or structured-metadata cards (arXiv). Add a bespoke `extract(doc,url)` fn to `SITE_RULES` (see `extractZhihuQuestion`/`extractStackOverflow`/`extractV2ex`/`extractArxiv`); fill the metadata (schema below); set `lastVerified` to the date YOU confirmed it live.
 4. **Add a fixture** to `md-convert-tests.html` (copy a sibling rule's block): a `DOMParser` fixture + `check(...)` assertions for id/title/body/strip. Put noise nodes INSIDE the content container so the strip logic is actually exercised. Escape any literal `</script>` inside fixture strings as `<\/script>`.
-5. **Verify** — `cd .qa-scan && node run-md-tests.mjs` (offline, must be FAIL 0) and, if the site is public, add the rule's `sampleUrl` to `.qa-scan/site-rules-drift.mjs` and run `node site-rules-drift.mjs` (live).
+5. **Verify** from the repository root: `node .qa-scan/run-test.mjs tests/md-convert-tests.html` (offline, must be FAIL 0), then `node scripts/site-rules-check.mjs` (validates the actual registry). For a public page run `node scripts/site-rules-check.mjs --rule=<id> --live`; for a saved DOM use `--html=/tmp/page.html --url=https://original/page` instead. The checker uses the local `.qa-scan` Playwright installation, blocks all browser subresources and compares custom/Defuddle output from the same HTML through the production conversion chain. Counts are diagnostics, not proof of better extraction: inspect preservation of the actual bodies, structure and sources before approving a rule.
 6. **Commit** with provenance, e.g. `feat(extract): site rule for <site>`.
 
 ## Source-selection priority (answers "is this selector still good?")
@@ -25,8 +25,8 @@ How to add or maintain a per-site Markdown-extraction rule in `site-rules.js`. R
 
 1. **Import-time** — never ship a selector you haven't confirmed against the live site (step 1/5). Set `lastVerified`.
 2. **Offline fixture regression** — `md-convert-tests.html` proves the runner logic and guards against future code changes.
-3. **Live drift canary** — `.qa-scan/site-rules-drift.mjs` loads each public `sampleUrl` and asserts non-empty extraction. Run on demand. It flags anti-bot/challenge pages separately from real drift.
-4. **Graceful fallback** — empty/throw → Defuddle. Drift is a quality regression to generic, never an outage. Preserve this (every `extract` must return `null`, not throw, on no-content).
+3. **Live drift canary** — `scripts/site-rules-check.mjs --rule=<id> --live` loads one public `sampleUrl` on demand. Exit 0 means extraction succeeded, 1 means drift or invalid setup, and 2 means access was blocked or unavailable and needs manual verification. A saved challenge/login page is not a verified content fixture.
+4. **Graceful fallback** — ordinary empty/throw → Defuddle. Return `null` on absent content. Exception: a recognized X status URL whose target cannot be identified returns `site_target_missing`; all three consumers stop instead of silently extracting a different post. Do not turn an identity failure into a generic fallback.
 
 ## Drift coverage
 
@@ -35,6 +35,8 @@ How to add or maintain a per-site Markdown-extraction rule in `site-rules.js`. R
 | arxiv | auto | canary (validated live: ~1.3k chars) |
 | stackoverflow / stackexchange | auto | canary on YOUR machine (CI IP hits Cloudflare challenge) |
 | v2ex | auto | canary on YOUR machine (reply author = `a[href^="/member/"]`) |
+| hackernews | manual | saved/live public DOM; same checker supports its sample URL |
+| x-status / twitter-status | manual | logged-in DOM; verify target identity and media |
 | zhihu-* | manual | login-walled → periodic human check + cross-source |
 
 Note: the CI/WSL environment can't load most CN or Cloudflare-fronted sites (anti-bot). The canary reports those as "verify on your own machine", not as drift. Real-DOM verification for those rules is the maintainer's gate-1 step in a logged-in browser.

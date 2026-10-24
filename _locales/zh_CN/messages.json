@@ -797,6 +797,9 @@
   "mdEngineExtractFailed": {
     "message": "无法抽取此页面，请重试。"
   },
+  "mdSiteTargetMissing": {
+    "message": "尚未加载完整的目标帖子，或无法确认帖子身份。请打开原页面，等待目标帖子出现后重试。"
+  },
   "mdEngineTabGone": {
     "message": "原标签页已不可用，重新打开该页面才能使用 Defuddle。"
   },

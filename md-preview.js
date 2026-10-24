@@ -113,6 +113,7 @@ function pbpExtractFailPrimary(code, engine, hasAlt) {
 // generic line, never a guess.
 function pbpEngineErrText(r, engine) {
   const code = r && r.error;
+  if (code === "site_target_missing") return t("mdSiteTargetMissing");
   if (code === "tab_unavailable" || code === "tab_navigated") return t("mdEngineTabGone");
   if (code === "empty") return engine === "jina" ? t("mdPreviewNoContent") + " " + t("mdEngineJinaNoLogin") : t("mdPreviewNoContent");
   if (code === "host_permission") return t("aiErrorHostPermission", "https://r.jina.ai");
@@ -2386,6 +2387,8 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   const previewTitleEl = document.getElementById("preview-title");
   previewTitleEl.textContent = title || t("mdPreviewUntitled");
   previewTitleEl.title = title || t("mdPreviewUntitled");
+  const articleTitleEl = document.getElementById("article-title");
+  articleTitleEl.textContent = title || t("mdPreviewUntitled");
   fillPreviewUrl(url);
 
   // X2: bookmarked badge. Fire-and-forget against the same checkBookmarked/
@@ -3083,6 +3086,9 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // for what deliberately survives).
     imgFixResetForNewArticle();
     renderedView.innerHTML = renderedHtml;
+    const firstHeading = renderedView.firstElementChild;
+    articleTitleEl.hidden = !!(firstHeading && /^H[1-6]$/.test(firstHeading.tagName)
+      && firstHeading.textContent.trim() === (title || "").trim());
     // Forum pages + any page with a nested blockquote: split into per-comment blocks
     // BEFORE the AI layer indexes (pbp:rendered). Structural detection (blockquote blockquote)
     // means Reddit and similar pages benefit without a per-site rule. Single-level quotes
@@ -3101,6 +3107,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // "und", for everything glyphs cannot place (pbpReaderArticleLang).
     const readingLang = pbpReaderArticleLang(markdown, info && info.lang);
     if (readingLang) renderedView.lang = readingLang; // article-script font + the language assistive tech reads it in
+    articleTitleEl.lang = readingLang || "";
     // The script-level verdict translation keys on (entry hiding, the
     // source-script check, the section's default fold): CJK / RTL only, ""
     // for everything else -- a site-template lang="en" on a German page must
@@ -3111,6 +3118,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // D9-3: RTL article -> container-level dir, so the text and the logical
     // (inline-start) borders/insets of blockquotes, lists and the TOC mirror.
     if (rtlArticle) renderedView.dir = "rtl";
+    articleTitleEl.dir = rtlArticle ? "rtl" : "ltr";
     // First measurement runs in rAF, after article injection/layout. The
     // ResizeObserver that keeps it fresh is installed ONCE at the call site
     // below — it observes #rendered-view, which this function never replaces.
@@ -3136,17 +3144,17 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // Math rendering — ONLY for LaTeX-bearing content (info.math, e.g. arXiv). Gating on
     // the flag (not just a "$") keeps KaTeX off every other page so currency like "$5"
     // is never mangled. Off the first-paint path (rAF), degrades to $...$ source on error.
-    if (info.math && /\$/.test(renderedView.textContent)) {
+    if (info.math && /\$/.test(renderedView.textContent + title)) {
       requestAnimationFrame(() => {
         if (rev !== _articleRevision) return;
         return ensureKatex().then(() => {
           if (rev !== _articleRevision) return;
           if (typeof renderMathInElement === "function") {
             try {
-              renderMathInElement(renderedView, {
+              [renderedView, previewTitleEl, articleTitleEl].forEach(el => renderMathInElement(el, {
                 delimiters: [{ left: "$$", right: "$$", display: true }, { left: "$", right: "$", display: false }],
                 throwOnError: false
-              });
+              }));
             } catch (_) { /* leave $...$ source visible on failure */ }
           }
         });

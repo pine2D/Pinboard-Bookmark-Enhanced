@@ -127,35 +127,41 @@ function pbpAiBlocksFingerprint() {
 // after marked, one top-level thread = one block, so translate/ask/explain would
 // treat the whole thread as a single unit. Earlier we FLATTENED (hoisted each
 // comment to a top-level blockquote), which destroyed the nested-blockquote
-// styling. Instead we mark IN PLACE: each comment's own content (its leading
-// non-blockquote children) is wrapped in a <div class="pb-comment-body">, while
+// styling. Instead we mark IN PLACE: each uninterrupted run of a comment's
+// own content is wrapped in a <div class="pb-comment-body">, while
 // the reply <blockquote>s stay nested exactly where they are. The block indexer
-// (pbpAiIndexBlocks) then indexes each .pb-comment-body as one comment, so
-// per-comment translation is unchanged; but the nested DOM is preserved, so
+// (pbpAiIndexBlocks) indexes every run in document order, including prose that
+// follows an embedded quotation. The nested DOM is preserved, so
 // md-preview.css renders the thread like the exported/downloaded HTML. Moves
-// already-sanitized element nodes — never builds markup other than the wrapper
-// <div>. Relies on marked wrapping blockquote text in <p> (element children
-// carry all content). canonicalMarkdown (export/Copy/Raw) is unaffected — this
+// already-sanitized nodes — never builds markup other than the wrapper
+// <div>. canonicalMarkdown (export/Copy/Raw) is unaffected — this
 // only mutates the rendered DOM. md-preview runs it when info.forum is set OR
 // when pbpForumShouldMark detects the structural trigger (nested blockquote),
 // right after innerHTML, before pbpAiIndexBlocks.
 function _pbpMarkComment(bq) {
-  const own = [];
-  const childBqs = [];
-  let seenBq = false;
-  for (const c of Array.from(bq.children)) {    // snapshot: we reparent live nodes
-    if (c.tagName === "BLOCKQUOTE") { childBqs.push(c); seenBq = true; }
-    else if (!seenBq) own.push(c);              // LEADING non-blockquote = this comment's own header + body
-    // non-blockquote nodes AFTER the first reply stay in place (don't reorder them: `> A / >> B / > C`
-    // renders as <bq><p>A</p><bq>B</bq><p>C</p></bq> and must keep document order A,B,C)
-  }
-  if (own.length) {                             // skip shells with no own content
+  let own = [];
+  const flush = () => {
+    if (!own.some(n => n.nodeType === 1 || (n.textContent || "").trim())) { own = []; return; }
     const body = document.createElement("div");
     body.className = "pb-comment-body";
-    bq.insertBefore(body, own[0]);              // wrapper takes the leading content's slot,
-    for (const c of own) body.appendChild(c);   // ...ahead of the reply blockquotes
+    bq.insertBefore(body, own[0]);
+    for (const c of own) body.appendChild(c);
+    own = [];
+  };
+  // Wrap each contiguous prose run, including text AFTER an embedded quote.
+  // A/B/C must remain A/B/C in both the visible DOM and the shared AI index.
+  // Existing wrappers are boundaries too, making a repeated marking harmless.
+  for (const c of Array.from(bq.childNodes)) {
+    if (c.nodeName === "BLOCKQUOTE") {
+      flush();
+      _pbpMarkComment(c);
+    } else if (c.nodeType === 1 && c.classList.contains("pb-comment-body")) {
+      flush();
+    } else {
+      own.push(c);
+    }
   }
-  for (const c of childBqs) _pbpMarkComment(c); // recurse into replies (nesting kept)
+  flush();
 }
 
 function pbpForumMarkComments(rootEl) {

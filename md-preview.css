@@ -672,6 +672,20 @@ body.ask-open #zen-bar { right: calc(380px + 12px); }
    leading var must cover the container AND p AND li -- p/li carried their own
    hardcoded line-heights, and a tier that skipped them would only move the
    gaps BETWEEN blocks (Codex must-fix 5). Headings/pre keep their own values. */
+.article-title {
+  display: none;
+  margin: 0 0 var(--sp-6);
+  color: var(--fg);
+  font-size: calc(var(--prose-fs) * 1.5);
+  line-height: 1.4;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.article-title:lang(zh), .article-title:lang(ja), .article-title:lang(ko) {
+  text-wrap: wrap;
+  word-break: auto-phrase;
+}
 #rendered-view {
   color: var(--fg);
   font-size: var(--prose-fs); /* 17px floor → ~22px on 4K; rem honors zoom (see :root) */
@@ -876,7 +890,7 @@ body.ask-open #zen-bar { right: calc(380px + 12px); }
    text in the reader means "link". The .pb-comment-body variant covers forum
    comments (own body wrapped). */
 #rendered-view blockquote > p:first-child > strong:first-child,
-#rendered-view blockquote > .pb-comment-body > p:first-child > strong:first-child { color: var(--fg); }
+#rendered-view blockquote > .pb-comment-body:first-child > p:first-child > strong:first-child { color: var(--fg); }
 /* Nested levels (deep reply threads): thin neutral guide + a small elbow connector,
    no tint stacking, tighter — reads as a comment tree instead of stacked blue bars.
    Only the outermost quote keeps the accent bar + tint.
@@ -884,25 +898,26 @@ body.ask-open #zen-bar { right: calc(380px + 12px); }
    lowest value that clears 3:1 non-text-UI contrast against both --bq-bg tints
    (D8-3; re-measured on the warm tints 2026-10-21): light 3.03:1, dark 3.51:1. */
 #rendered-view blockquote blockquote {
+  --thread-inset: var(--sp-4);
   position: relative;
   background: transparent;
   border-inline-start: 1px solid rgba(128, 128, 128, 0.9);
   padding-block: 4px;
-  padding-inline: 16px 0;
+  padding-inline: var(--thread-inset) 0;
   margin: 0.4em 0;
   border-radius: 0;
 }
 /* Elbow connector anchored to the author line so it sits on its vertical centre
    (top:50% of the header <p>, not a fixed em — robust to font size / wrapping). */
 #rendered-view blockquote blockquote > p:first-child,
-#rendered-view blockquote blockquote > .pb-comment-body > p:first-child { position: relative; }
+#rendered-view blockquote blockquote > .pb-comment-body:first-child > p:first-child { position: relative; }
 #rendered-view blockquote blockquote > p:first-child::before,
-#rendered-view blockquote blockquote > .pb-comment-body > p:first-child::before {
+#rendered-view blockquote blockquote > .pb-comment-body:first-child > p:first-child::before {
   content: "";
   position: absolute;
-  inset-inline-start: -16px;
+  inset-inline-start: calc(-1 * var(--thread-inset));
   top: 50%;
-  width: 14px;
+  width: max(0px, calc(var(--thread-inset) - 2px));
   height: 1px;
   background: rgba(128, 128, 128, 0.9);
   transform: translateY(-50%);
@@ -912,14 +927,14 @@ body.ask-open #zen-bar { right: calc(380px + 12px); }
    bilingual (original still shown) never gets a duplicate elbow. `blockquote > .pb-tr`
    only matches forum comment translations (a non-forum block's .pb-tr sits beside the
    blockquote, not inside it), so non-forum views are unaffected. */
-body.tr-only #rendered-view blockquote > .pb-tr > p:first-child > strong:first-child { color: var(--fg); }
-body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child { position: relative; }
-body.tr-only #rendered-view blockquote blockquote > .pb-tr > p:first-child::before {
+body.tr-only #rendered-view blockquote > .pb-comment-body:first-child + .pb-tr > p:first-child > strong:first-child { color: var(--fg); }
+body.tr-only #rendered-view blockquote blockquote > .pb-comment-body:first-child + .pb-tr > p:first-child { position: relative; }
+body.tr-only #rendered-view blockquote blockquote > .pb-comment-body:first-child + .pb-tr > p:first-child::before {
   content: "";
   position: absolute;
-  inset-inline-start: -16px;
+  inset-inline-start: calc(-1 * var(--thread-inset));
   top: 50%;
-  width: 14px;
+  width: max(0px, calc(var(--thread-inset) - 2px));
   height: 1px;
   background: rgba(128, 128, 128, 0.9);
   transform: translateY(-50%);
@@ -1714,6 +1729,15 @@ body.rail-open .rail-toggle .rail-toggle-close { display: block; }
    outrank the print block's bare `main { padding: 0 }`. */
 @media screen and (max-width: 1000px) {
   body.zen main, body.md-empty main { padding-left: 20px; }
+  body:not(.raw-active):not(.video-mode) .article-title:not(:empty):not([hidden]) { display: block; }
+}
+/* Keep deep threads readable without changing their semantic nesting or exports. */
+@media screen and (max-width: 600px) {
+  #rendered-view blockquote blockquote { --thread-inset: var(--sp-1); }
+  #rendered-view blockquote blockquote blockquote blockquote blockquote {
+    --thread-inset: 0px;
+    border-inline-start-width: 0;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .rail { transition: none; }

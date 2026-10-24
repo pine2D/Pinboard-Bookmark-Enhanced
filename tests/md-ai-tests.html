@@ -811,8 +811,17 @@ suiteIf("pbpForumMarkComments", "pbpForumMarkComments", () => {
     assertEq(outer.children[0].className, "pb-comment-body", "leading A wrapped");
     assertEq(outer.children[0].textContent.trim(), "A", "only leading A in the wrapper");
     assertEq(outer.children[1].tagName, "BLOCKQUOTE", "reply blockquote second");
-    assertEq(outer.children[2].tagName, "P", "trailing C stays as a bare sibling");
+    assertEq(outer.children[2].className, "pb-comment-body", "trailing C remains an indexed sibling");
     assertEq(outer.children[2].textContent.trim(), "C", "C in place");
+    pbpAiIndexBlocks(r);
+    assertEq(pbpAiBlocks().map(b => b.el.textContent.trim()).join(","), "A,B,C", "AI receives every visible fragment in order");
+  });
+
+  test("interleaved quotations retain all prose and list fragments exactly once", () => {
+    const r = root("<blockquote><p>Before</p><blockquote><p>Quote one</p></blockquote><p>Between</p><ul><li>Evidence</li></ul><blockquote><p>Quote two</p></blockquote><p>After</p></blockquote>");
+    pbpForumMarkComments(r);
+    pbpAiIndexBlocks(r);
+    assertEq(pbpAiBlocks().map(b => b.el.textContent.trim()).join("|"), "Before|Quote one|BetweenEvidence|Quote two|After", "no omissions, duplication or reordering");
   });
 
   test("null root is a no-op (no throw)", () => {
@@ -8676,6 +8685,7 @@ suiteIf("extraction error shell: open original (item 6)", "renderErrorState", ()
     window.t = (k, ...a) => k + (a.length ? "(" + a.join(",") + ")" : "");
     try {
       const E = (error, engine) => pbpEngineErrText({ ok: false, error }, engine);
+      assertEq(E("site_target_missing", "local"), "mdSiteTargetMissing", "an unverified post gets a specific recovery instruction");
       assertEq(E("empty", "jina"), "mdPreviewNoContent mdEngineJinaNoLogin", "Jina's empty answer says why: its servers have no sign-in");
       assertEq(E("empty", "local"), "mdPreviewNoContent", "Defuddle reads the signed-in tab: no such reason");
       assertEq(E("rate_limited", "jina"), "pinboardErrorRateLimit");

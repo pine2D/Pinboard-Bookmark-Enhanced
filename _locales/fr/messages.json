@@ -797,6 +797,9 @@
   "mdEngineExtractFailed": {
     "message": "Impossible d'extraire cette page. Veuillez réessayer."
   },
+  "mdSiteTargetMissing": {
+    "message": "La publication demandée n’est pas entièrement chargée ou n’a pas pu être identifiée. Ouvrez la page d’origine, attendez qu’elle s’affiche, puis réessayez."
+  },
   "mdEngineTabGone": {
     "message": "L'onglet d'origine n'est plus disponible. Rouvrez la page pour utiliser Defuddle."
   },

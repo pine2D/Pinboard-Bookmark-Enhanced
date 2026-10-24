@@ -797,6 +797,9 @@
   "mdEngineExtractFailed": {
     "message": "Nie udało się wyodrębnić tej strony. Spróbuj ponownie."
   },
+  "mdSiteTargetMissing": {
+    "message": "Żądany wpis nie został w pełni wczytany lub nie udało się go rozpoznać. Otwórz stronę źródłową, poczekaj na wyświetlenie wpisu i spróbuj ponownie."
+  },
   "mdEngineTabGone": {
     "message": "Pierwotna karta nie jest już dostępna. Otwórz stronę ponownie, aby użyć Defuddle."
   },

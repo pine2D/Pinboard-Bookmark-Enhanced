@@ -952,6 +952,7 @@ async function extractLocalMarkdown(tabId) {
         try {
           if (typeof applySiteRule === "function") {
             const hit = applySiteRule(document, location.href);
+            if (hit && hit.error) return { error: hit.error };
             if (hit && hit.contentHtml) {
               // E1: normalize lazy-load img placeholders (data-src/srcset) on
               // an INERT-document div -- a div from the LIVE document fetches
@@ -1005,7 +1006,7 @@ async function extractLocalMarkdown(tabId) {
           // resolution) -- keep them so the preview/export layer can surface them.
           return {
             contentHtml: result.content, title: result.title || document.title, url: location.href,
-            math: !!document.querySelector("math"),
+            math: !!document.querySelector("math") || (typeof pbpContentHasMath === "function" && pbpContentHasMath(result.content)),
             author: result.author || "", published: result.published || "", site: result.site || "", image: result.image || "",
             // The source page's declared language: the reader can only tell
             // CJK and RTL scripts apart by glyphs, so Latin / Cyrillic
@@ -1020,7 +1021,7 @@ async function extractLocalMarkdown(tabId) {
   } catch (e) { return { error: e.message }; }
 }
 
-// Lazy-load md-convert.js and its Markdown lexer on demand (saves parse/compile from every
+// Lazy-load md-convert.js, lexer and sanitizer on demand (saves parse/compile from every
 // popup open — its only popup consumers are the Markdown preview/copy/export
 // button flow and the AI pageText fallback, never the first paint). Same
 // pattern as ensureTurndown below; md-convert.js ships in the ZIP as a root
@@ -1029,14 +1030,16 @@ let _mdConvertLoadPromise = null;
 function ensureMdConvert() {
   const hasConverter = typeof htmlToMarkdown !== "undefined";
   const hasLexer = typeof marked !== "undefined" && typeof marked.lexer === "function";
-  if (hasConverter && hasLexer) return Promise.resolve();
+  const hasSanitizer = typeof DOMPurify !== "undefined" && typeof DOMPurify.sanitize === "function";
+  if (hasConverter && hasLexer && hasSanitizer) return Promise.resolve();
   if (_mdConvertLoadPromise) return _mdConvertLoadPromise;
   _mdConvertLoadPromise = (async () => {
     const files = [];
     if (!hasLexer) files.push("vendor/marked.min.js");
+    if (!hasSanitizer) files.push("vendor/purify.min.js");
     if (!hasConverter) files.push("md-convert.js");
     // Sequential loads leave no pending duplicate injection if a failed load
-    // is retried, and resolve only when both conversion dependencies are ready.
+    // is retried, and resolve only when every conversion dependency is ready.
     for (const src of files) await new Promise((resolve, reject) => {
       const s = document.createElement("script");
       s.src = src;
@@ -1176,12 +1179,13 @@ async function htmlToMarkdownAsync(html, opts) {
           return;
         }
         jinaMdBtn.innerHTML = PBP_ICONS.cross + " " + t("jinaFailed");
-        jinaMdBtn.title = result.error;
+        const extractMessage = result.error === "site_target_missing" ? t("mdSiteTargetMissing") : result.error;
+        jinaMdBtn.title = extractMessage;
         // Persistent, specific status — so the user can tell API-key vs other failures
         if (settings.aiContentSource === "jina" && result.authFailed) {
           showStatus("status-msg", t("jinaAuthFailed"), "error");
         } else {
-          showStatus("status-msg", t("jinaFailedDetail", result.error), "error");
+          showStatus("status-msg", t("jinaFailedDetail", extractMessage), "error");
         }
         setTimeout(() => { setBtnIcon(jinaMdBtn, "doc", origLabel); jinaMdBtn.disabled = false; jinaMdBtn.title = ""; }, 2000);
         return;

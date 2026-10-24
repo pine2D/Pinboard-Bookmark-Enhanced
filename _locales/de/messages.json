@@ -797,6 +797,9 @@
   "mdEngineExtractFailed": {
     "message": "Diese Seite konnte nicht extrahiert werden. Bitte erneut versuchen."
   },
+  "mdSiteTargetMissing": {
+    "message": "Der gewünschte Beitrag ist noch nicht vollständig geladen oder konnte nicht eindeutig erkannt werden. Öffne die Originalseite und versuche es erneut, sobald der Beitrag angezeigt wird."
+  },
   "mdEngineTabGone": {
     "message": "Der ursprüngliche Tab ist nicht mehr verfügbar. Öffne die Seite erneut, um Defuddle zu nutzen."
   },

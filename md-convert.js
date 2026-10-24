@@ -454,12 +454,13 @@ function _pbpGetTurndown() {
 // Site-rule contentHtml preserves the page's relative hrefs (V2EX /member/…,
 // X /hashtag/…, SO /questions/…); Turndown copies href verbatim, so those links
 // would resolve against chrome-extension:// in the preview and stay dead in
-// exported .md. Absolutize non-fragment relative a[href] against baseUrl before
+// exported .md. Absolutize relative a[href] against baseUrl before
 // conversion — the anchor-side mirror of applyImagePolicy's img-src handling.
 // Protocol-relative //host/x IS absolutized here (new URL gives it baseUrl's
 // scheme): left alone it resolves against chrome-extension:// in the preview,
-// exactly the failure this pass exists to prevent. Skips: #fragments and
-// absolute schemes only.
+// exactly the failure this pass exists to prevent. Source heading fragments
+// are mapped to the IDs our Markdown renderer creates. Other source IDs do
+// not survive Turndown/sanitization, so their links return to the source.
 function _pbpAbsolutizeLinks(html, baseUrl) {
   if (typeof document === "undefined" || html.indexOf("href") === -1) return html;
   // Inert document (same pattern as _splitMergedComments): scripts never
@@ -468,10 +469,64 @@ function _pbpAbsolutizeLinks(html, baseUrl) {
   const root = doc.createElement("div");
   root.innerHTML = html;
   let touched = false;
-  root.querySelectorAll("a[href]").forEach((a) => {
+  const links = Array.from(root.querySelectorAll("a[href]"));
+  const isHeadingLink = a => !!a.closest("h1,h2,h3,h4,h5,h6");
+  const resolve = a => {
+    try { a.setAttribute("href", new URL(a.getAttribute("href"), baseUrl).href); touched = true; } catch (_) { /* keep original */ }
+  };
+  // Normalize links INSIDE headings first: URLs are part of marked's raw
+  // heading token and therefore of the existing slug contract. Resolving
+  // them after computing the slug would make the map point at a stale ID.
+  for (const a of links) {
     const href = a.getAttribute("href") || "";
-    if (!href || href.startsWith("#") || /^[a-z][a-z0-9+.-]*:/i.test(href)) return;
-    try { a.setAttribute("href", new URL(href, baseUrl).href); touched = true; } catch (_) { /* keep original */ }
+    if (href && !/^[a-z][a-z0-9+.-]*:/i.test(href) && (!href.startsWith("#") || isHeadingLink(a))) resolve(a);
+  }
+  const sourceIds = new Map(), seen = Object.create(null);
+  // Later media rewriting can also change duplicate-heading suffixes after
+  // that heading. In that case all source fragments stay on the source.
+  const hasMediaHeading = Array.from(root.querySelectorAll("h1,h2,h3,h4,h5,h6"))
+    .some(h => h.querySelector("img,picture,svg,video,audio"));
+  if (root.querySelector('a[href^="#"]') && !hasMediaHeading && typeof marked !== "undefined" && typeof DOMPurify !== "undefined") {
+    // Only headings that survive the COMPLETE conversion get renderer IDs.
+    // Figures/callout titles can discard headings; raw tables retain HTML
+    // headings without IDs. Inert sentinels identify surviving heading tokens
+    // without leaking into the real content or guessing by a repeated title.
+    const probe = root.cloneNode(true);
+    let prefix = "PBPHEADINGMAP";
+    while (html.includes(prefix)) prefix += "X";
+    const originals = new Map();
+    probe.querySelectorAll("h1,h2,h3,h4,h5,h6").forEach((h, i) => {
+      const marker = prefix + i + "END";
+      originals.set(marker, h.id);
+      h.appendChild(doc.createTextNode(" " + marker));
+    });
+    const markerPattern = new RegExp("\\s*(" + prefix + "\\d+END)", "g");
+    const probeMd = _pbpGetTurndown().turndown(probe.innerHTML);
+    const tokens = marked.lexer(probeMd);
+    // DOMPurify can remove clobbering IDs such as "title" even from a real
+    // Markdown heading. Verify the final sanitized targets as well.
+    const rendered = doc.createElement("div");
+    rendered.innerHTML = renderMarkdown(probeMd.replace(markerPattern, ""));
+    const survivingIds = new Set(Array.from(rendered.querySelectorAll("h1[id],h2[id],h3[id],h4[id],h5[id],h6[id]"), h => h.id));
+    marked.walkTokens(tokens, token => {
+      if (token.type !== "heading") return;
+      let original = "";
+      const text = token.text.replace(markerPattern, (_, marker) => { original = originals.get(marker) || ""; return ""; });
+      const slug = _pbpUniqueHeadingSlug(slugify(text), seen);
+      if (original && slug && survivingIds.has(slug) && !sourceIds.has(original)) sourceIds.set(original, slug);
+    });
+  }
+  links.forEach((a) => {
+    const href = a.getAttribute("href") || "";
+    if (!href || /^[a-z][a-z0-9+.-]*:/i.test(href)) return;
+    if (href.startsWith("#")) {
+      let id = href.slice(1);
+      try { id = decodeURIComponent(id); } catch (_) {}
+      if (sourceIds.has(id)) {
+        a.setAttribute("href", "#" + sourceIds.get(id)); touched = true; return;
+      }
+    }
+    resolve(a);
   });
   return touched ? root.innerHTML : html;
 }

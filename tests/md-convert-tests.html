@@ -1133,7 +1133,7 @@ function assertEq(actual, expected, label) {
       '<a href="https://abs.example/p">abs</a> <a href="//cdn.example/x">pr</a> <a href="member/1">rel2</a></p>', { baseUrl: base });
     check("root-relative href resolves against origin", md.indexOf("(https://x.com/hashtag/pbp)") !== -1, md);
     check("path-relative href resolves against page path", md.indexOf("(https://x.com/alice/status/member/1)") !== -1, md);
-    check("fragment href untouched", md.indexOf("(#sec)") !== -1, md);
+    check("fragment without a retained target returns to the original page", md.indexOf("(" + base + "#sec)") !== -1, md);
     check("absolute href untouched", md.indexOf("(https://abs.example/p)") !== -1, md);
     check("protocol-relative href gets baseUrl's scheme", md.indexOf("(https://cdn.example/x)") !== -1, md);
     const noBase = htmlToMarkdown('<p><a href="/hashtag/pbp">#pbp</a></p>', {});
@@ -2112,7 +2112,7 @@ section("site-rules: X/Twitter status");
     '<article data-testid="tweet">' +
       '<div data-testid="User-Name"><span>Alice</span><span>@alice</span></div>' +
       '<div data-testid="tweetText"><span>Line one</span><br><span>Line two </span><a href="/hashtag/pbp">#pbp</a></div>' +
-      '<time datetime="2026-07-09T01:00:00.000Z">Jul 9</time>' +
+      '<a href="/alice/status/1234567890"><time datetime="2026-07-09T01:00:00.000Z">Jul 9</time></a>' +
     '</article></body></html>';
   const doc = new DOMParser().parseFromString(X, "text/html");
   const r = applySiteRule(doc, "https://x.com/alice/status/1234567890");
@@ -2142,7 +2142,7 @@ section("site-rules: X/Twitter status");
   const rp = applySiteRule(rdoc, "https://x.com/parent/status/111");
   check("x parent URL on same DOM → parent extracted", rp && /Parent tweet body/.test(rp.contentHtml), JSON.stringify(rp && rp.contentHtml));
   const rf = applySiteRule(rdoc, "https://x.com/ghost/status/999");
-  check("x unknown id → falls back to first article", rf && /Parent tweet body/.test(rf.contentHtml), JSON.stringify(rf && rf.contentHtml));
+  check("x unknown id → explicit failure, never another post", rf && rf.error === "site_target_missing" && !rf.contentHtml, JSON.stringify(rf));
 
   // Substring trap: target id 22 must NOT match the /status/222 link of an
   // earlier article; boundary check routes to the true /status/22 article.
@@ -2167,7 +2167,7 @@ section("site-rules: X/Twitter status");
   const XM = '<html><body><article data-testid="tweet">' +
     '<div data-testid="User-Name"><span>Alice</span><span>Alice</span><span>@alice</span><span>Jul 9</span></div>' +
     '<div data-testid="tweetText"><span>' + LONG + '</span></div>' +
-    '<time datetime="2026-07-09T01:00:00.000Z">Jul 9</time>' +
+    '<a href="/alice/status/42"><time datetime="2026-07-09T01:00:00.000Z">Jul 9</time></a>' +
     '</article></body></html>';
   const mdoc = new DOMParser().parseFromString(XM, "text/html");
   const rm = applySiteRule(mdoc, "https://x.com/alice/status/42");
@@ -2182,7 +2182,7 @@ section("site-rules: X/Twitter status");
   // vanish whole, never become a lone surrogate half.
   const EMO = Array(87).join("A") + "😀😀😀😀😀"; // 86 ASCII + 5 astral => 91 code points
   const XE = XM.replace('<span>' + LONG + '</span>', '<span>' + EMO + '</span>');
-  const re2 = applySiteRule(new DOMParser().parseFromString(XE, "text/html"), "https://x.com/alice/status/43");
+  const re2 = applySiteRule(new DOMParser().parseFromString(XE, "text/html"), "https://x.com/alice/status/42");
   check("x title → surrogate pair never split at the truncation point",
     re2 && /\.\.\.$/.test(re2.title) && !/[\uD800-\uDBFF]\.\.\.$/.test(re2.title) && Array.from(re2.title).length === 90,
     JSON.stringify(re2 && re2.title));
@@ -3870,7 +3870,137 @@ window._pbpExportFixDone = (async () => {
 </script>
 
 <script>
+section("site fidelity: identity, media, math, provenance and loaded scope");
+(() => {
+  const parse = html => new DOMParser().parseFromString(html, "text/html");
+  const tweet = (id, body, extra = "") => '<article data-testid="tweet"><div data-testid="User-Name"><span>User' + id + '</span></div><a role="link" href="/user/status/' + id + '"><time datetime="2026-10-24T00:00:00Z">Today</time></a><div data-testid="tweetText">' + body + '</div>' + extra + '</article>';
+  const xUrl = "https://x.com/user/status/222";
+  const x = applySiteRule(parse(tweet("111", 'FOREIGN <a href="/user/status/222">linked target</a>') + tweet("222", "RIGHT<br>BODY", '<div data-testid="tweetPhoto"><img src="https://pbs.twimg.com/media/plot.jpg" alt="Measured results"></div><img src="https://pbs.twimg.com/profile_images/avatar.jpg">')), xUrl);
+  check("X body links cannot impersonate the target's identity", x && /RIGHT/.test(x.contentHtml) && !/FOREIGN/.test(x.contentHtml), JSON.stringify(x));
+  const xRendered = parse(renderMarkdown(htmlToMarkdown(x && x.contentHtml, { baseUrl: xUrl })));
+  check("X target photo and alternative text survive the complete conversion", xRendered.images.length === 1 && xRendered.images[0].alt === "Measured results" && /media\/plot/.test(xRendered.images[0].src), xRendered.body.innerHTML);
+  check("X title keeps spaces across source line breaks", x && /RIGHT BODY/.test(x.title), x && x.title);
+  const uncertain = applySiteRule(parse('<article data-testid="tweet"><div data-testid="tweetText">UNIDENTIFIED</div></article>'), xUrl);
+  check("X unidentifiable article blocks fallback without claiming its content", uncertain && uncertain.error === "site_target_missing" && !uncertain.contentHtml, JSON.stringify(uncertain));
+  const photoOnly = applySiteRule(parse(tweet("222", "", '<div data-testid="tweetPhoto"><img src="https://pbs.twimg.com/media/only.jpg" alt="Photo-only post"></div>')), xUrl);
+  check("X photo-only target remains readable", !!parse(photoOnly && photoOnly.contentHtml || "").querySelector('img[alt="Photo-only post"]'), JSON.stringify(photoOnly));
+  const quote = '<div role="link"><div data-testid="User-Name">Quoted author</div><a role="link" href="/user/status/222"><time>Quoted time</time></a><div data-testid="tweetText">Quoted snippet</div></div>';
+  const quoted = applySiteRule(parse(tweet("111", "FOREIGN", quote) + tweet("222", "Full target")), xUrl);
+  check("quoted timestamps never identify their containing foreign post", quoted && /Full target/.test(quoted.contentHtml) && !/FOREIGN/.test(quoted.contentHtml), JSON.stringify(quoted));
+
+  for (const mathHtml of ['<math><semantics><mi>x</mi><annotation encoding="application/x-tex">x^2</annotation></semantics></math>', '<span class="math-container">$x^2$</span>']) {
+    const r = applySiteRule(parse('<div id="question"><div class="s-prose js-post-body">A formula: ' + mathHtml + '</div></div>'), "https://math.stackexchange.com/questions/1/test");
+    check("structured math opts the custom answer into KaTeX: " + mathHtml.slice(0, 30), r && r.math === true && /x/.test(htmlToMarkdown(r.contentHtml)), JSON.stringify(r));
+  }
+  const currency = applySiteRule(parse('<div id="question"><div class="s-prose js-post-body"><p>The price is $10 or $20.</p><pre><code>$variable</code></pre></div></div>'), "https://stackoverflow.com/questions/1/test");
+  check("currency and code do not opt an ordinary answer into math", currency && currency.math === false, JSON.stringify(currency));
+
+  const paper = '<meta name="citation_title" content="Versioned paper"><meta name="citation_arxiv_id" content="1706.03762"><meta name="citation_pdf_url" content="https://arxiv.org/pdf/1706.03762"><meta name="citation_author" content="Author, First"><blockquote class="abstract">Abstract: Version one.</blockquote><a class="abs-button download-pdf" href="/pdf/1706.03762v1">PDF</a><div class="doi"><a href="https://doi.org/10.1000/example">10.1000/example</a></div>';
+  const arxiv = applySiteRule(parse(paper), "https://arxiv.org/abs/1706.03762v1");
+  const links = [...parse(arxiv && arxiv.contentHtml || "").querySelectorAll("a")].map(a => a.getAttribute("href"));
+  check("arXiv versioned abstract and PDF stay on the requested version", links.includes("https://arxiv.org/abs/1706.03762v1") && links.includes("https://arxiv.org/pdf/1706.03762v1"), JSON.stringify(links));
+  check("arXiv DOI remains a usable source link", links.includes("https://doi.org/10.1000/example"), JSON.stringify(links));
+  const legacyPaper = applySiteRule(parse(paper.replaceAll("1706.03762", "hep-th/9901001")), "https://arxiv.org/abs/hep-th/9901001v2");
+  check("arXiv legacy identifiers keep the URL's version instead of stale metadata", /https:\/\/arxiv.org\/pdf\/hep-th\/9901001v2/.test(legacyPaper && legacyPaper.contentHtml), JSON.stringify(legacyPaper));
+
+  const pager = '<div class="cell ps_container"><a class="page_current">1</a><a class="page_normal" href="?p=2">2</a></div>';
+  const v2 = applySiteRule(parse('<h1>Topic</h1><div class="topic_content">Topic body</div><div id="Main"><div class="box"><div class="cell"><span class="gray">200 条回复</span></div>' + pager + '<div class="cell" id="r_103"><a href="/member/a">a</a><span class="no">1</span><div class="reply_content">Current reply</div></div>' + pager + '</div></div>'), "https://v2ex.com/t/1030069");
+  const v2Text = parse(v2 && v2.contentHtml || "").body.textContent;
+  check("V2EX real pager shape reports distinct pages and extracted/total replies", /共 2 页/.test(v2Text) && /1\/200/.test(v2Text) && !/共 4 页/.test(v2Text), v2Text);
+  check("V2EX partial scope precedes all topic and reply content", v2Text.indexOf("1/200") >= 0 && v2Text.indexOf("1/200") < v2Text.indexOf("Topic body"), v2Text);
+
+  const hn = applySiteRule(parse('<table class="fatitem"><tr><td class="titleline"><a href="https://research.example/paper">Paper</a></td></tr></table><table class="comment-tree"><tr class="athing comtr" id="9224"><td class="ind" indent="0"></td><td><span class="comhead"><a class="hnuser">A</a><span class="age"><a href="item?id=9224">today</a></span></span><div class="comment"><div class="commtext">Comment body</div></div></td></tr></table>'), "https://news.ycombinator.com/item?id=8863");
+  const hnDoc = parse(renderMarkdown(htmlToMarkdown(hn && hn.contentHtml, { baseUrl: "https://news.ycombinator.com/item?id=8863" })));
+  check("HN retains both the linked story and comment permalink", !!hnDoc.querySelector('a[href="https://research.example/paper"]') && !!hnDoc.querySelector('a[href="https://news.ycombinator.com/item?id=9224"]'), hnDoc.body.innerHTML);
+
+  const baseUrl = "https://stackoverflow.com/questions/1/example";
+  const source = '<h2 id="source-heading">Local section</h2><a href="#source-heading">Contents</a><h2 id="repeat">Local section</h2><a href="#repeat">Second</a><a href="#answer-123">Answer</a><a href="#r_103">Reply</a>';
+  const converted = parse(renderMarkdown(htmlToMarkdown(source, { baseUrl })));
+  const anchors = [...converted.querySelectorAll("a")];
+  check("source heading IDs map to actual reader headings, including duplicates", anchors.slice(0, 2).every((a, i) => converted.getElementById(a.getAttribute("href").slice(1)) === converted.querySelectorAll("h2")[i]), converted.body.innerHTML);
+  check("unavailable source fragment targets become original-page links", anchors[2]?.getAttribute("href") === baseUrl + "#answer-123" && anchors[3]?.getAttribute("href") === baseUrl + "#r_103", converted.body.innerHTML);
+  const linkedHeading = parse(renderMarkdown(htmlToMarkdown('<h2 id="original"><a href="/guide">Linked heading</a></h2><a href="#original">Jump</a>', { baseUrl })));
+  const jump = [...linkedHeading.querySelectorAll('a')].find(a => a.textContent === "Jump");
+  check("source TOC targets survive URL normalization inside the heading", jump && linkedHeading.getElementById(jump.getAttribute("href").slice(1)) === linkedHeading.querySelector("h2"), linkedHeading.body.innerHTML);
+  const zh = applySiteRule(parse('<h1 class="QuestionHeader-title">Question</h1><div class="ContentItem AnswerItem" name="1"><span class="AuthorInfo-name">Author</span><div class="RichText ztext"><h1>Part</h1><h2>Section</h2><h6>Detail</h6><p>Body</p></div></div>'), "https://www.zhihu.com/question/1");
+  const levels = [...parse(zh && zh.contentHtml || "").querySelectorAll("h1,h2,h3,h4,h5,h6")].map(h => h.tagName);
+  check("answer chapter headings remain below the author and never exceed h6", levels.join(",") === "H2,H3,H4,H6", levels.join(","));
+})();
+</script>
+
+<script>
+section("X metadata belongs to the identified target");
+{
+  const html = '<article><div data-testid="quoteTweet"><div data-testid="User-Name"><span>Quoted author</span></div><a href="/quote/status/111"><time datetime="2020-01-01">Old</time></a></div><div data-testid="User-Name"><span>Target author</span></div><a href="/target/status/222"><time datetime="2026-10-24">Today</time></a><div data-testid="tweetText">Target content</div></article>';
+  const hit = applySiteRule(new DOMParser().parseFromString(html, "text/html"), "https://x.com/target/status/222");
+  check("quote-first DOM cannot supply the target author or date", !!hit?.contentHtml && hit.contentHtml.includes("Target author") && hit.contentHtml.includes("2026-10-24") && !hit.contentHtml.includes("Quoted author") && !hit.contentHtml.includes("2020-01-01"), hit?.contentHtml);
+}
+</script>
+
+<script>
+section("source fragments follow surviving Markdown headings only");
+{
+  const baseUrl = "https://example.com/post";
+  const converted = html => new DOMParser().parseFromString(renderMarkdown(htmlToMarkdown(html, { baseUrl })), "text/html");
+  const empty = converted('<h2 id="src"></h2><a href="#src">Jump</a>');
+  check("empty source headings never produce a bare hash link", empty.querySelector('a').getAttribute('href') === baseUrl + '#src', empty.body.innerHTML);
+  const diagram = converted('<h2 id="src"><svg width="100" height="100"><title>Chart</title><rect width="100" height="100"/></svg>Heading</h2><a href="#src">Jump</a>');
+  check("media headings use the source when later image conversion changes their slug", diagram.querySelector('a').getAttribute('href') === baseUrl + '#src', diagram.body.innerHTML);
+  const afterDiagram = converted('<h2><svg width="100" height="100"><text>Chart</text></svg>Heading</h2><h2 id="src">ChartHeading</h2><a href="#src">Jump</a>');
+  check("media heading rewrites cannot shift later duplicate heading targets", afterDiagram.querySelector('a').getAttribute('href') === baseUrl + '#src', afterDiagram.body.innerHTML);
+  const clobber = converted('<h2 id="src">Title</h2><a href="#src">Jump</a>');
+  check("sanitizer-removed heading IDs fall back to the source", clobber.querySelector("a").getAttribute("href") === baseUrl + "#src", clobber.body.innerHTML);
+  const table = converted('<table><tr><td><h2 id="src">Hello</h2></td></tr></table><a href="#src">Jump</a>');
+  check("raw-table heading without a rendered ID links back to the source", table.querySelector('a').getAttribute('href') === baseUrl + '#src', table.body.innerHTML);
+  const gone = converted('<figure><h2 id="gone">Same</h2><img src="https://example.com/pic.png"></figure><h2 id="kept">Same</h2><a href="#kept">Jump</a>');
+  const jump = gone.querySelector('a');
+  check("discarded figure headings do not shift real heading IDs", jump && gone.getElementById(jump.getAttribute('href').slice(1)) === gone.querySelector('h2'), gone.body.innerHTML);
+  const collision = converted('<p id="results">Original target</p><h2>Results</h2><a href="#results">Jump</a>');
+  check("a source paragraph ID is never reassigned to a same-name heading", collision.querySelector('a').getAttribute('href') === baseUrl + '#results', collision.body.innerHTML);
+}
+</script>
+
+<script>
+window._pbpSiteEntryDone = (async () => {
+  section("site identity: actual popup, background and AI entry points");
+  const sources = await Promise.all(["popup.js", "background.js", "ai.js"].map(async f => {
+    try { return await (await fetch("../" + f)).text(); } catch (_) { return ""; }
+  }));
+  const entries = ["extractLocalMarkdown", "extractPageForMarkdown", "getPageInfoFromTab"];
+  const sample = '<article data-testid="tweet"><div data-testid="User-Name"><span>Alice</span></div><a role="link" href="/alice/status/222"><time datetime="2026-10-24">Today</time></a><div data-testid="tweetText">Short post</div></article>';
+  for (let i = 0; i < entries.length; i++) {
+    for (const mode of ["missing", "short", "generic"]) {
+      const label = entries[i] + " / " + mode;
+      if (!sources[i]) {
+        const row = document.createElement("div"); row.className = "case skip";
+        row.textContent = label + " (file:// source fetch unavailable)"; root.appendChild(row); continue;
+      }
+      try {
+        const name = entries[i], start = sources[i].search(new RegExp("(?:async )?function " + name + "\\("));
+        const end = sources[i].indexOf("\n}", start) + 2;
+        const source = sources[i].slice(start, end);
+        const url = mode === "generic" ? "https://example.com/article" : "https://x.com/alice/status/222";
+        const doc = new DOMParser().parseFromString(mode === "missing" ? sample.replace('/alice/status/222', '/other/status/111') : sample, "text/html");
+        let calls = 0;
+        const genericText = "Ordinary article content retained by the Defuddle fallback. ".repeat(3);
+        class NativeExtractor { parse() { calls++; return { content: '<p>' + genericText + '</p>', textContent: genericText, title: 'Ordinary article' }; } }
+        const win = { URL, __pp_urlShimInstalled: true, getSelection: () => null, addEventListener() {}, removeEventListener() {} };
+        const execute = async options => options.func ? [{ result: await options.func(...(options.args || [])) }] : [{}];
+        const fn = new Function("document", "location", "window", "Defuddle", "_cbExecuteScript", "_cbTabsGet", "AI_CONTENT_HEAD", "AI_CONTENT_TAIL", "setTimeout", source + "\nreturn " + name)(doc, new URL(url), win, NativeExtractor, execute, async () => ({ url }), 3200, 800, () => 0);
+        const result = await fn(7, { withDefuddle: true, expectedUrl: url });
+        const okay = mode === "missing" ? (i === 2 ? result === null : result?.error === "site_target_missing") && calls === 0
+          : mode === "short" ? (i === 2 ? result?.pageText : result?.contentHtml)?.includes("Short post") && calls === 0
+          : (i === 2 ? result?.pageText : result?.contentHtml)?.includes(genericText) && calls === 1;
+        check(label, okay, JSON.stringify({ result, calls }));
+      } catch (e) { check(label, false, e.message); }
+    }
+  }
+})();
+</script>
+
+<script>
 (async () => {
+  if (window._pbpSiteEntryDone) await window._pbpSiteEntryDone;
   if (window._pbpExportFixDone) await window._pbpExportFixDone;
   if (window._pbpEpubIntegrationDone) await window._pbpEpubIntegrationDone;
   if (window._pbpEpubA8Done) await window._pbpEpubA8Done;
