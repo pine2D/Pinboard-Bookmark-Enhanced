@@ -3854,7 +3854,7 @@
     "message": "Quelle:"
   },
   "dictAiNotConfigured": {
-    "message": "Für Erklärungen im Kontext richte in den Einstellungen einen KI-Anbieter ein und aktiviere die KI-Funktionen in der Leseansicht."
+    "message": "Richte in den Einstellungen einen KI-Anbieter ein und aktiviere die KI der Leseansicht, um Einträge zu erstellen."
   },
   "dictVocabEmpty": {
     "message": "Für das aktuelle Pinboard-Konto ($OWNER$) sind noch keine Vokabeln gespeichert. Speichere Wörter aus der Wörterbuchansicht des Readers.",
@@ -4433,8 +4433,8 @@
   "mdExportAskEmpty": {"message": "Keine abgeschlossenen Fragen und Antworten zum Exportieren vorhanden."},
   "mdExportContextChanged": {"message": "Das Konto, der Artikel oder das Gespräch hat sich geändert. Starte den Export erneut."},
   "themeGroupAdaptiveHint": {"message": "Adaptive Presets folgen der Hell-/Dunkeleinstellung oben unter „Darstellung der Erweiterung“."},
-  "dictDefinitionLangLabel": { "message": "Sprache der KI-Erklärungen" },
-  "dictDefinitionLangHint": { "message": "Legt die Sprache der kontextbezogenen KI-Erklärungen fest. Wörterbucheinträge bleiben in ihrer ursprünglichen Sprache." },
+  "dictDefinitionLangLabel": { "message": "Definitionssprache der KI-Einträge" },
+  "dictDefinitionLangHint": { "message": "Wähle, in welcher Sprache KI-Einträge die Bedeutung erklären sollen, unabhängig von der Sprache des gesuchten Wortes. Originaldefinitionen bleiben in ihrer eigenen Sprache." },
   "dictDefinitionLangUi": { "message": "Sprache der Oberfläche verwenden" },
   "vocabLanguageFilterAria": { "message": "Nach Sprache filtern" },
   "vocabAllLanguages": { "message": "Alle Sprachen" },
@@ -4522,5 +4522,19 @@
   "dictQueryBack": {"message": "Zurück zum Original"},
   "dictAssistResultReady": {"message": "KI-Ergebnis bereit"},
   "dictAssistErrorReady": {"message": "Problem bei der KI-Anfrage"},
-  "dictAssistViewResult": {"message": "Ansehen"}
+  "dictAssistViewResult": {"message": "Ansehen"},
+  "dictEntryGenerate": {"message": "KI-Eintrag erstellen"},
+  "dictEntryGenerating": {"message": "Eintrag wird erstellt…"},
+  "dictEntryUnavailable": {"message": "Der Eintrag konnte nicht erstellt werden. Versuche es erneut."},
+  "dictEntryNoEntry": {"message": "Die KI konnte für dieses Wort keine verlässliche Bedeutung bestimmen."},
+  "dictEntrySource": {"message": "KI-Eintrag"},
+  "dictEntryDetails": {"message": "Wortherkunft und verwandte Wörter"},
+  "dictEntryExamples": {"message": "Beispiele"},
+  "dictEntryEtymology": {"message": "Wortherkunft"},
+  "dictEntryRelated": {"message": "Verwandte Wörter"},
+  "dictEntryShowDictionary": {"message": "Wörterbuch anzeigen"},
+  "dictEntryShowAi": {"message": "KI-Eintrag anzeigen"},
+  "dictEntryNotCached": {"message": "Dieser Eintrag konnte auf diesem Gerät nicht zwischengespeichert werden."},
+  "dictAiAutoGenerateLabel": {"message": "KI-Einträge automatisch erstellen"},
+  "dictAiAutoGenerateHint": {"message": "Wenn kein KI-Eintrag zwischengespeichert ist, erstellt das KI-Modell der Leseansicht beim Nachschlagen einen neuen. Das verbraucht Tokens. Standardmäßig aus; Einträge lassen sich auch manuell erstellen."}
 }

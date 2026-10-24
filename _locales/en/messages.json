@@ -3865,7 +3865,7 @@
     "message": "Source:"
   },
   "dictAiNotConfigured": {
-    "message": "For contextual explanations, set up an AI provider and turn on reader AI features in Settings."
+    "message": "Set up an AI provider and enable reader AI in Settings to generate entries."
   },
   "dictVocabEmpty": {
     "message": "No words saved for current Pinboard account: $OWNER$. Save words from the reader's dictionary view.",
@@ -4440,8 +4440,8 @@
   "mdExportAskEmpty": {"message": "No completed questions and answers to export."},
   "mdExportContextChanged": {"message": "The account, article, or conversation changed. Start the export again."},
   "themeGroupAdaptiveHint": {"message": "Adaptive presets follow the light/dark setting under Extension Appearance above."},
-  "dictDefinitionLangLabel": { "message": "AI definition language" },
-  "dictDefinitionLangHint": { "message": "Sets the language of AI contextual definitions. Dictionary entries keep their original language." },
+  "dictDefinitionLangLabel": { "message": "AI entry definition language" },
+  "dictDefinitionLangHint": { "message": "Choose the language used to explain words in AI entries, independently of the word’s language. Original dictionary definitions keep their own language." },
   "dictDefinitionLangUi": { "message": "Follow interface language" },
   "vocabLanguageFilterAria": { "message": "Filter by language" },
   "vocabAllLanguages": { "message": "All languages" },
@@ -4529,5 +4529,19 @@
   "dictQueryBack": {"message": "Back to original"},
   "dictAssistResultReady": {"message": "AI result ready"},
   "dictAssistErrorReady": {"message": "AI needs attention"},
-  "dictAssistViewResult": {"message": "View"}
+  "dictAssistViewResult": {"message": "View"},
+  "dictEntryGenerate": {"message": "Generate AI entry"},
+  "dictEntryGenerating": {"message": "Generating entry…"},
+  "dictEntryUnavailable": {"message": "Could not generate this entry. Try again."},
+  "dictEntryNoEntry": {"message": "AI could not identify a reliable meaning for this word."},
+  "dictEntrySource": {"message": "AI entry"},
+  "dictEntryDetails": {"message": "Word origin and related words"},
+  "dictEntryExamples": {"message": "Examples"},
+  "dictEntryEtymology": {"message": "Word origin"},
+  "dictEntryRelated": {"message": "Related words"},
+  "dictEntryShowDictionary": {"message": "View dictionary"},
+  "dictEntryShowAi": {"message": "View AI entry"},
+  "dictEntryNotCached": {"message": "This entry could not be cached on this device."},
+  "dictAiAutoGenerateLabel": {"message": "Generate AI entries automatically"},
+  "dictAiAutoGenerateHint": {"message": "When no AI entry is cached, use the reader’s AI model to generate one during lookup. Uses tokens. Off by default; you can still generate entries manually."}
 }

@@ -21,7 +21,7 @@ export const RENDER_OPTIONS_TABS = Object.freeze([
 ]);
 export const RENDER_READER_CONTEXTS = Object.freeze([
   'reader-source-details', 'export-more', 'reader-bookmark-footer', 'reader-bookmark-editor', 'reader-bookmark-delete-confirm',
-  'explain-pop', 'explain-dict', 'dict-assist-idle', 'dict-assist-busy', 'dict-assist-result', 'dict-assist-copy-failure', 'dict-assist-ready', 'dict-assist-error', 'dict-analyze-idle', 'dict-analyze-busy', 'dict-analyze-result', 'dict-analyze-derived', 'ask-panel', 'search-pop', 'kbd-help-pop', 'typo-pop',
+  'explain-pop', 'explain-dict', 'dict-entry-idle', 'dict-entry-busy', 'dict-entry-result', 'dict-entry-details', 'dict-entry-cached', 'dict-entry-error', 'ask-panel', 'search-pop', 'kbd-help-pop', 'typo-pop',
   'pb-hl-card', 'send-menu', 'confirm-popover', 'tr-ask',
 ]);
 const context = (name, dependencies = [], extra = {}) => ({ name, dependencies, ...extra });
@@ -36,15 +36,12 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('vocab-listbox-open', [], { target: '#vocab-group-filter-list .listbox-opt' }),
     context('vocab-export-menu', [], { target: '.vocab-export-menu:popover-open' }),
     context('vocab-detail', [], { target: '#vocab-detail:not([hidden])' }),
-    context('dict-assist-idle', [], { target: '.xp-dict-assist' }),
-    context('dict-assist-busy', ['dict-assist-idle'], { target: '.dict-assist-stop:not([hidden])' }),
-    context('dict-assist-result', ['dict-assist-busy'], { target: '.dict-assist-use' }),
-    context('dict-assist-copy-failure', ['dict-assist-result'], { target: '.dict-assist-copy-status:not([hidden])' }),
-    context('dict-assist-ready', ['dict-assist-idle'], { target: '.dict-assist-notice:not([hidden])' }),
-    context('dict-assist-error', ['dict-assist-idle'], { target: '.dict-assist-notice:not([hidden])' }),
-    context('dict-analyze-idle', [], { target: '.dict-assist-analyze' }),
-    context('dict-analyze-busy', ['dict-analyze-idle'], { target: '.dict-assist-stop:not([hidden])' }),
-    context('dict-analyze-result', ['dict-analyze-busy'], { target: '.dict-assist-lookup' }),
+    context('dict-entry-idle', [], { target: '.xp-dict-ai-generate:not([disabled])' }),
+    context('dict-entry-busy', ['dict-entry-idle'], { target: '.xp-dict-ai-stop:not([hidden])' }),
+    context('dict-entry-result', ['dict-entry-busy'], { target: '.xp-dict-ai-content:not([hidden])' }),
+    context('dict-entry-details', ['dict-entry-result'], { target: '.xp-dict-ai-details[open]' }),
+    context('dict-entry-cached', ['dict-entry-result'], { target: '.xp-dict-ai-content:not([hidden])' }),
+    context('dict-entry-error', ['dict-entry-idle'], { target: '.xp-dict-ai-status:not([hidden])' }),
     context('vocab-batch-bar', ['vocab-detail'], { target: '#vocab-batch-toolbar.selecting' }),
     context('notes-list', [], { target: '#notes-list .notes-hit' }),
     context('notes-detail', [], { target: '#notes-detail:not([hidden])' }),
@@ -52,7 +49,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('notes-batch-bar', ['notes-detail'], { target: '#notes-batch-toolbar.selecting' }),
   ],
   'md-preview': [context('reader', [], { target: '#rendered-view' }), ...RENDER_READER_CONTEXTS.map((name) => context(name,
-    name === 'explain-dict' ? ['explain-pop'] : name === 'dict-assist-busy' ? ['dict-assist-idle'] : name === 'dict-assist-result' ? ['dict-assist-busy'] : name === 'dict-assist-copy-failure' ? ['dict-assist-result'] : ['dict-assist-ready', 'dict-assist-error'].includes(name) ? ['dict-assist-idle'] : name === 'dict-analyze-derived' ? ['dict-analyze-result'] : name === 'dict-analyze-busy' ? ['dict-analyze-idle'] : name === 'dict-analyze-result' ? ['dict-analyze-busy'] : [])), context('video', [], { target: '.pbv-bar' })],
+    name === 'explain-dict' ? ['explain-pop'] : name === 'dict-entry-busy' ? ['dict-entry-idle'] : name === 'dict-entry-result' ? ['dict-entry-busy'] : ['dict-entry-details', 'dict-entry-cached'].includes(name) ? ['dict-entry-result'] : name === 'dict-entry-error' ? ['dict-entry-idle'] : [])), context('video', [], { target: '.pbv-bar' })],
   popup: [context('light', [], { target: '#main-section' }), context('states', [], { target: '.offline-queue-item' }),
     context('form', [], { target: '#url-input' }), context('dpi', [], { dpr: [1.5, 2] }),
     context('dark', [], { theme: 'flexoki-dark', scheme: 'dark', target: '#main-section' }),
@@ -101,8 +98,8 @@ export const RENDER_SCENARIOS = Object.freeze([
     return row(sweepScenarioId(surface, item.name), surface, themes, {
       type: 'sweep', context: item.name,
       ...(item.name.startsWith('vocab-pack-') ? { files: [...files(surface), 'options-vocab.js', 'dict-pack.js', 'scripts/audit-vocab-pack-fixture.mjs'] } : {}),
-      ...(/^dict-(assist|analyze)-/.test(item.name) ? { files: [...files(surface), 'md-dict.js', 'dict-assist.js', 'ai.js', 'ai-cache.js', 'library-vocab.js', 'scripts/audit-dict-assist-fixture.mjs'] } : {}),
-      features: [...new Set([item.name, item.name.replace(/^tab-/, ''), surface, ...(/^dict-(assist|analyze)-/.test(item.name) ? ['dictionary', 'dictionary-assist', ...(item.name.startsWith('dict-analyze-') ? ['dictionary-analysis'] : [])] : [])])], kinds: ['layout'], axes: { ...axes, state: [item.name] },
+      ...(/^dict-entry-/.test(item.name) ? { files: [...files(surface), 'md-dict.js', 'dict-entry.js', 'ai.js', 'ai-cache.js', 'library-vocab.js', 'scripts/audit-dict-entry-fixture.mjs'] } : {}),
+      features: [...new Set([item.name, item.name.replace(/^tab-/, ''), surface, ...(/^dict-entry-/.test(item.name) ? ['dictionary', 'dictionary-entry'] : [])])], kinds: ['layout'], axes: { ...axes, state: [item.name] },
       defaults: surface === 'md-preview' ? { scheme: ['light'] } : {},
       dependencies: item.dependencies.map((name) => sweepScenarioId(surface, name)),
     });

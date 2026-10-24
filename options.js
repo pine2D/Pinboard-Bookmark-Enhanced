@@ -1933,6 +1933,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     vocab: {
       fields: {
         "dict-echo-enabled": true,
+        "dict-ai-auto-generate": false,
         "dict-definition-lang": "", "dict-definition-lang-custom": "",
         "dict-anki-format": "legacy",
         "dict-anki-deck": "Pinboard Vocab",
@@ -2822,7 +2823,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-preview-ai-enabled": s.previewAiEnabled !== false,
     "opt-preview-skim": s.previewSkimEnabled === true,
     "opt-tr-hotkey-confirm": s.trHotkeyConfirm !== false,
-    "dict-echo-enabled": s.dictEchoEnabled === true
+    "dict-echo-enabled": s.dictEchoEnabled === true,
+    "dict-ai-auto-generate": s.dictAiAutoGenerate === true
   };
   for (const [id, val] of Object.entries(checkMap)) {
     const el = $id(id);
@@ -3662,6 +3664,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       trHotkeyConfirm: $id("opt-tr-hotkey-confirm").checked,
       dictEchoEnabled: $id("dict-echo-enabled").checked,
       dictDefinitionLang: resolveDictDefinitionLang(),
+      dictAiAutoGenerate: $id("dict-ai-auto-generate").checked,
       dictAnkiFormat: $id("dict-anki-format").value === "multilingual" ? "multilingual" : "legacy",
       dictAnkiDeck: $id("dict-anki-deck").value.trim(),
       dictAnkiPort: $id("dict-anki-port").value.trim(),

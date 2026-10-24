@@ -136,7 +136,7 @@ document.documentElement.setAttribute("data-listbox-ready", "");
 <script src="../shared.js"></script>
 <script src="../vocab-store.js"></script>
 <script src="../md-dict.js"></script>
-<script src="../dict-assist.js"></script>
+<script src="../dict-entry.js"></script>
 <script src="../dict-pack.js"></script>
 <!-- pbpVocabCurrentOwner (shared.js) routes through pbpReadSettingsWithSecrets,
      which without this stub hits the real chrome.storage/navigator.locks
@@ -4400,92 +4400,115 @@ await (async () => {
     }
   }
 
-  // Explicit dictionary AI uses the selected source's original meaning and
-  // the actual saved sentence, without turning advice into an automatic save.
+  // AI produces reusable entry data, never a contextual answer or an
+  // implicit vocabulary mutation. Source switching preserves save choice.
   {
     const old={remote:_pbpDictSlotRun,local:_pbpDictEcdictSide,load:_pbpDictLoadPack,lookup:window.pbpDictPackLookup,list:window.pbpDictPackList,
-      read:pbpReadSettingsWithSecrets,auto:_pbpVocabAutoLookup,run:pbpDictAssistRun,key:window.hasAIKey,grant:window.ensureAIHostPermissionWithGesture,
+      read:pbpReadSettingsWithSecrets,auto:_pbpVocabAutoLookup,entryRead:pbpDictEntryRead,run:pbpDictEntryRun,key:window.hasAIKey,grant:window.ensureAIHostPermissionWithGesture,
       owner:pbpVocabCurrentOwner,get:pbpVocabGet,save:pbpVocabSaveWord,reload:_pbpVocabReloadAfterMutation};
-    const scope="acct_ai_ui",calls=[],writes=[],events=[];
-    const word={id:pbpDictVocabKey(scope,"de","Gift"),owner:scope,term:"Gift",language:"de",gloss:"old saved gloss",contexts:[{quote:""},{quote:"Das Gift wirkt.",articleUrl:"https://example.test/article"}],groups:[]};
+    const scope="acct_ai_entry_ui",calls=[],writes=[],events=[];
+    const word={id:pbpDictVocabKey(scope,"de","Gift"),owner:scope,term:"Gift",language:"de",gloss:"old saved gloss",contexts:[{quote:"Das Gift wirkt.",articleUrl:"https://example.test/private-article"}],groups:[]};
     const norm={word:"Gift",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/Gift",license:"CC BY-SA 4.0",definitionLang:"en",entries:[{ipas:[],forms:[],senses:[{definition:"poison"},{definition:"a present"}]}]};
+    const record={entry:{word:"Gift",language:"de",pronunciation:"/ɡɪft/",meanings:[{partOfSpeech:"sustantivo",definition:"veneno",examples:[{text:"Das Gift ist gefährlich.",translation:"El veneno es peligroso."}]}],etymology:"",relatedWords:["giftig"]},provider:"ollama",model:"fixture-model",generatedAt:1792800000000,cached:false,cacheSaved:true};
+    let cached=null;
     try {
       _vocabCurrentOwner=scope;_vocabRows=[word];_pbpVocabAutoLookup=async()=>{};
       _pbpDictLoadPack=async()=>true;window.pbpDictPackLookup=async()=>({state:"unavailable",hits:[]});window.pbpDictPackList=async()=>[];
       _pbpDictEcdictSide=async()=>{};_pbpDictSlotRun=async()=>norm;
-      window.hasAIKey=()=>true;pbpReadSettingsWithSecrets=async()=>({aiProvider:"ollama",previewAiEnabled:true,dictDefinitionLang:"es"});
+      window.hasAIKey=()=>true;pbpReadSettingsWithSecrets=async()=>({aiProvider:"ollama",previewAiEnabled:true,dictDefinitionLang:"es",dictAiAutoGenerate:false});
       window.ensureAIHostPermissionWithGesture=async()=>{events.push("permission");};
-      pbpDictAssistRun=async input=>{events.push("request");calls.push(input);return {choiceId:input.choices[0].id,explanation:"Explicación independiente",targetLang:input.target.lang};};
+      pbpDictEntryRead=async()=>cached;
+      pbpDictEntryRun=async input=>{events.push("request");calls.push(input);cached={...record,cached:true};return record;};
       pbpVocabCurrentOwner=async()=>scope;pbpVocabGet=async()=>word;
       pbpVocabSaveWord=async(owner,data,opts)=>{writes.push({owner,data,opts});return {...word,...data};};_pbpVocabReloadAfterMutation=async()=>false;
       _pbpVocabRenderDetail(word);_pbpVocabRelookup(word);await settle();
       const host=$id("vocab-ref-result");
-      check("AI: opening dictionary meanings never makes an AI request",calls.length===0);
-      host.querySelector('.dict-assist-recommend').click();await settle();
-      check("AI: library uses and displays the first real saved sentence rather than an empty context",calls[0]?.sentence==="Das Gift wirkt."&&host.querySelector('.dict-assist-context')?.textContent==="Das Gift wirkt.");
-      check("AI: library requests endpoint permission before dispatch and uses the independent target language",events.join("|")==="permission|request"&&calls[0]?.target.lang==="es");
-      check("AI: a recommendation does not save or replace the current saved gloss",writes.length===0&&_vocabRows[0].gloss==="old saved gloss"&&host.querySelector('.vocab-save-definition').value==="");
-      host.querySelector('.dict-assist-use').click();await settle();
-      check("AI: confirming a recommendation selects the original definition without writing",writes.length===0&&host.querySelector('.vocab-save-definition').selectedOptions[0]?.textContent.includes("poison"));
-      check("AI: choosing the recommended original keeps its separate explanation available to copy",host.querySelector('.dict-assist-explanation')?.textContent==="Explicación independiente"&&!!host.querySelector('.dict-assist-copy'));
-      host.querySelector('.dict-assist-explain').click();await settle();
-      check("AI: explaining a selected sense sends one original meaning and does not overwrite it",calls.at(-1)?.task==="explain"&&calls.at(-1)?.choices.length===1&&calls.at(-1)?.choices[0].definition==="poison"&&host.querySelector('.vocab-save-definition').selectedOptions[0]?.textContent.includes("poison"));
+      check("AI entry: ordinary lookup makes no paid request by default",calls.length===0&&!!host.querySelector('.xp-dict-ai-generate')&&getComputedStyle(host.querySelector('.xp-dict-ai-switch')).display==="none"&&getComputedStyle(host.querySelector('.xp-dict-ai-stop')).display==="none");
+      check("AI entry: obsolete matching, explanation and analysis actions are absent",!host.querySelector('.dict-assist-recommend,.dict-assist-explain,.dict-assist-analyze'));
+      const choice=host.querySelector('.vocab-save-definition');choice.value="online:0";choice.dispatchEvent(new Event("change"));
+      host.querySelector('.xp-dict-ai-generate').click();await settle();
+      check("AI entry: manual generation requests exact endpoint permission before dispatch",events.join("|")==="permission|request");
+      check("AI entry: the request has independent source and definition languages",calls[0]?.sourceLanguage==="de"&&calls[0]?.target.lang==="es");
+      check("AI entry: neither article context nor original dictionary data enters generation",!!calls[0]&&!["sentence","title","choices","candidates","norms"].some(key=>key in calls[0])&&!JSON.stringify(calls[0]).includes("private-article"));
+      check("AI entry: a complete entry displays its meaning and bilingual example",host.querySelector('.xp-dict-ai-content')?.textContent.includes("veneno")&&host.querySelector('.xp-dict-ai-content')?.textContent.includes("Das Gift ist gefährlich.")&&host.querySelector('.xp-dict-ai-content')?.textContent.includes("El veneno es peligroso."));
+      check("AI entry: only one source occupies the result view",host.querySelector('.xp-dict-slot').hidden&&!host.querySelector('.xp-dict-ai-content').hidden&&getComputedStyle(host.querySelector('.xp-dict-ai-generate')).display==="none");
+      check("AI entry: generation leaves existing vocabulary and the selected original definition untouched",writes.length===0&&_vocabRows[0].gloss==="old saved gloss"&&choice.value==="online:0");
+      check("AI entry: the AI source is available as an explicit save choice",[...choice.options].some(option=>option.value==="ai:0"&&option.textContent.includes("veneno")&&option.textContent.includes("AI")));
+      host.querySelector('.xp-dict-ai-switch').click();await settle();
+      check("AI entry: switching back restores the original source without another request",!host.querySelector('.xp-dict-slot').hidden&&host.querySelector('.xp-dict-ai-content').hidden&&calls.length===1&&choice.value==="online:0");
       host.querySelector('.vocab-lookup-save').click();await settle();
-      check("AI: only explicit Update writes the original dictionary gloss and source",writes.length===1&&writes[0].data.gloss==="poison"&&writes[0].data.sourceUrl===norm.sourceUrl&&!writes[0].data.gloss.includes("Explicación"));
+      check("AI entry: explicit Update keeps the selected original meaning and attribution",writes.length===1&&writes[0].data.gloss==="poison"&&writes[0].data.sourceUrl===norm.sourceUrl);
+      choice.value="ai:0";choice.dispatchEvent(new Event("change"));host.querySelector('.vocab-lookup-save').click();await settle();
+      check("AI entry: explicitly saving AI content retains AI provenance and never claims Wiktionary",writes.length===2&&writes[1].data.gloss==="veneno"&&writes[1].data.sourceUrl===""&&writes[1].data.license.includes("AI")&&!writes[1].data.license.includes("Wiktionary"));
       _pbpVocabLookupOther("Gift","de");await settle();
-      check("AI: free lookup does not reuse a saved word's unrelated sentence",host.querySelector('.dict-assist-recommend').disabled&&!host.querySelector('.dict-assist-context'));
-      let resolveSettings;pbpReadSettingsWithSecrets=()=>new Promise(resolve=>{resolveSettings=resolve;});
+      check("AI entry: the reusable cache is shown in a new lookup without a paid request",calls.length===1&&host.querySelector('.xp-dict-ai-content')?.textContent.includes("veneno"));
+      check("AI entry: cached data never silently chooses a definition to overwrite",host.querySelector('.vocab-save-definition').value===""&&writes.length===2);
+      cached=null;let resolveSettings;pbpReadSettingsWithSecrets=()=>new Promise(resolve=>{resolveSettings=resolve;});
       _pbpVocabLookupOther("Gift","de");await settle();
-      check("AI: paid controls remain disabled until their settings snapshot is ready",host.querySelector('.dict-assist-explain').disabled&&host.querySelector('.dict-assist-recommend').disabled);
-      resolveSettings?.({aiProvider:"ollama",previewAiEnabled:false});await settle();
-      check("AI: the reader master switch remains authoritative in library with an actionable settings link",host.querySelector('.dict-assist-explain').disabled&&!!host.querySelector('a[href="options.html#ai-behavior"]'));
+      check("AI entry: generation stays disabled until its settings snapshot is ready",host.querySelector('.xp-dict-ai-generate').disabled);
+      resolveSettings?.({aiProvider:"ollama",previewAiEnabled:false,dictAiAutoGenerate:true});await settle();
+      check("AI entry: the reader master switch blocks paid generation despite automatic mode",calls.length===1&&host.querySelector('.xp-dict-ai').hidden&&!host.querySelector('.xp-dict-slot').hidden);
+      pbpReadSettingsWithSecrets=async()=>({aiProvider:"ollama",previewAiEnabled:true,dictDefinitionLang:"es",dictAiAutoGenerate:true});
+      events.length=0;_pbpVocabLookupOther("Gift","de");await settle();
+      check("AI entry: opted-in automatic generation never requests browser permission",calls.length===2&&events.join("|")==="request");
+      cached={...record,cached:true};pbpReadSettingsWithSecrets=async()=>({aiProvider:"ollama",previewAiEnabled:false,dictDefinitionLang:"es"});
+      _pbpVocabLookupOther("Gift","de");await settle();
+      check("AI entry: disabling generation keeps already cached dictionary data readable",calls.length===2&&host.querySelector('.xp-dict-ai-content')?.textContent.includes("veneno"));
+      const prefix={word:"中国",sourceLabel:"CC-CEDICT",sourceUrl:"https://cc-cedict.org",license:"CC BY-SA 4.0",definitionLang:"en",entries:[{ipas:[],forms:[],senses:[{definition:"China"}]}]};
+      const chinese={...record,entry:{word:"中国人",language:"zh",pronunciation:"Zhōngguórén",meanings:[{partOfSpeech:"noun",definition:"Chinese person",examples:[]}],etymology:"",relatedWords:[]}};
+      cached=null;pbpReadSettingsWithSecrets=async()=>({aiProvider:"ollama",previewAiEnabled:true,dictDefinitionLang:"en",dictAiAutoGenerate:false});
+      _pbpDictSlotRun=async()=>prefix;pbpDictEntryRun=async()=>chinese;
+      _pbpVocabLookupOther("中国人","zh");await settle();
+      check("AI entry: a native prefix result displays its actual shorter headword",host.dataset.refTerm==="中国"&&host.querySelector('.vocab-ref-term').textContent==="中国");
+      host.querySelector('.xp-dict-ai-generate').click();await settle();
+      check("AI entry: source switching restores the full AI word for heading and pronunciation",host.dataset.refTerm==="中国人"&&host.querySelector('.vocab-ref-term').textContent==="中国人"&&host.querySelector('.xp-dict-ai-content').textContent.includes("Chinese person"));
+      host.querySelector('.xp-dict-ai-switch').click();await settle();
+      check("AI entry: returning to a prefix dictionary restores its shorter headword",host.dataset.refTerm==="中国"&&host.querySelector('.vocab-ref-term').textContent==="中国");
+      let resolveNative;_pbpDictSlotRun=()=>new Promise(resolve=>{resolveNative=resolve;});cached={...chinese,cached:true};
+      _pbpVocabLookupOther("中国人","zh");await settle();resolveNative?.(prefix);await settle();
+      check("AI entry: a late prefix dictionary cannot rename the visible full AI entry",host.dataset.refTerm==="中国人"&&host.querySelector('.vocab-ref-term').textContent==="中国人");
+      cached=null;_pbpDictSlotRun=async()=>null;_pbpDictCurrent.rerun();await settle();
+      check("AI entry: restarting a cached-AI view restores normal dictionary visibility on a cache miss",!host.querySelector('.xp-dict-slot').hidden&&host.querySelector('.xp-dict-ai-content').hidden);
+      let resolveCache;pbpDictEntryRead=()=>new Promise(resolve=>{resolveCache=resolve;});
+      _pbpVocabLookupOther("Gift","de");await settle();_vocabCurrentOwner="acct_other";resolveCache?.({...record,cached:true});await settle();
+      check("AI entry: late cache completion after account change cannot populate this view",!host.querySelector('.xp-dict-ai-content')?.textContent.includes("veneno"));
     } finally {
       _pbpVocabDictCtrl?.abort();_pbpVocabDictChildCtrl?.abort();_pbpVocabRenderDetail(null);
       _pbpDictSlotRun=old.remote;_pbpDictEcdictSide=old.local;_pbpDictLoadPack=old.load;window.pbpDictPackLookup=old.lookup;window.pbpDictPackList=old.list;
-      pbpReadSettingsWithSecrets=old.read;_pbpVocabAutoLookup=old.auto;pbpDictAssistRun=old.run;pbpVocabCurrentOwner=old.owner;pbpVocabGet=old.get;pbpVocabSaveWord=old.save;_pbpVocabReloadAfterMutation=old.reload;
+      pbpReadSettingsWithSecrets=old.read;_pbpVocabAutoLookup=old.auto;pbpDictEntryRead=old.entryRead;pbpDictEntryRun=old.run;pbpVocabCurrentOwner=old.owner;pbpVocabGet=old.get;pbpVocabSaveWord=old.save;_pbpVocabReloadAfterMutation=old.reload;
       for(const [key,value] of [["hasAIKey",old.key],["ensureAIHostPermissionWithGesture",old.grant]]){if(value===undefined)delete window[key];else window[key]=value;}
     }
   }
 
-  // A confirmed analysis starts an ordinary lookup with the real sentence;
-  // it never writes a saved lemma or silently creates a new word.
+  // Removing AI analysis must preserve ordinary form-of navigation and its
+  // genuine saved sentence; unrelated free lookup starts without that context.
   {
     const old={remote:_pbpDictSlotRun,local:_pbpDictEcdictSide,load:_pbpDictLoadPack,lookup:window.pbpDictPackLookup,list:window.pbpDictPackList,
-      read:pbpReadSettingsWithSecrets,auto:_pbpVocabAutoLookup,run:pbpDictAssistRun,key:window.hasAIKey,grant:window.ensureAIHostPermissionWithGesture,
+      read:pbpReadSettingsWithSecrets,auto:_pbpVocabAutoLookup,entryRead:pbpDictEntryRead,
       owner:pbpVocabCurrentOwner,get:pbpVocabGet,save:pbpVocabSaveWord};
-    const owner="acct_analyze_library",sentence="Er hört jetzt auf zu arbeiten.",queries=[],requests=[],writes=[];
+    const owner="acct_entry_navigation",sentence="Er hört jetzt auf zu arbeiten.",queries=[],writes=[];
     const word={id:pbpDictVocabKey(owner,"de","hört"),owner,term:"hört",language:"de",gloss:"hears",lemma:"",contexts:[{quote:sentence}],groups:[]};
     try {
       _vocabCurrentOwner=owner;_vocabRows=[word];_pbpVocabAutoLookup=async()=>{};
       _pbpDictLoadPack=async()=>true;window.pbpDictPackLookup=async()=>({state:"unavailable",hits:[]});window.pbpDictPackList=async()=>[];_pbpDictEcdictSide=async()=>{};
-      _pbpDictSlotRun=async(_el,term,lang,_signal,_lemma,_rerun,context)=>{queries.push({term,lang,sentence:context});return term==="hört"?null:{word:term,sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/aufh%C3%B6ren",license:"CC BY-SA 4.0",definitionLang:"en",entries:[{ipas:[],forms:[],senses:[{definition:"to stop"}]}]};};
-      window.hasAIKey=()=>true;window.ensureAIHostPermissionWithGesture=async()=>{};
-      pbpReadSettingsWithSecrets=async()=>({aiProvider:"ollama",previewAiEnabled:true,dictDefinitionLang:"es"});
+      _pbpDictSlotRun=async(_el,term,lang,_signal,_lemma,_rerun,context)=>{queries.push({term,lang,sentence:context});return null;};
+      pbpReadSettingsWithSecrets=async()=>({previewAiEnabled:false});pbpDictEntryRead=async()=>null;
       pbpVocabCurrentOwner=async()=>owner;pbpVocabGet=async()=>null;pbpVocabSaveWord=async(...args)=>{writes.push(args);return null;};
-      pbpDictAssistRun=async input=>{requests.push(input);return input.task==="analyze"?{suggestions:[{kind:"lemma",headword:"aufhören",evidence:["hört","auf"],explanation:"Forma base posible."}],targetLang:"es"}:{choiceId:input.choices[0].id,explanation:"Sentido de esta frase.",targetLang:"es"};};
       _pbpVocabRenderDetail(word);_pbpVocabRelookup(word);await settle();const host=$id("vocab-ref-result");
-      check("analysis: a saved word with context can be analyzed after every dictionary misses",!!host.querySelector('.dict-assist-analyze')&&!host.querySelector('.dict-assist-analyze').disabled);
-      host.querySelector('.dict-assist-analyze').click();await settle();
-      check("analysis: a displayed suggestion alone does not query its headword or write vocabulary",queries.length===1&&queries[0].term==="hört"&&writes.length===0&&word.lemma==="");
-      host.querySelector('.dict-assist-lookup').click();await settle();
-      check("analysis: confirming a base form reruns its exact identity with the original sentence",queries.at(-1)?.term==="aufhören"&&queries.at(-1)?.lang==="de"&&queries.at(-1)?.sentence===sentence&&host.dataset.refTerm==="aufhören"&&_pbpDictCurrent.term==="aufhören");
-      check("analysis: a confirmed base form avoids a false source-match warning while contextual sense matching remains available",host.querySelector('.dict-assist-analyze').disabled&&!host.querySelector('.dict-assist-recommend').disabled&&!host.textContent.includes("dictAssistAnalysisNeedsMatch"));
-      host.querySelector('.dict-assist-recommend').click();await settle();
-      check("analysis: contextual sense matching after confirmation still receives the genuine original sentence",requests.at(-1)?.task==="recommend"&&requests.at(-1)?.term==="aufhören"&&requests.at(-1)?.sentence===sentence);
+      check("navigation: the original dictionary query retains its genuine saved context",queries.length===1&&queries[0].term==="hört"&&queries[0].sentence===sentence);
+      _pbpDictCurrent.rerunWith("hören");await settle();
+      check("navigation: an ordinary form-of jump keeps exact identity and the real sentence",queries.at(-1)?.term==="hören"&&queries.at(-1)?.lang==="de"&&queries.at(-1)?.sentence===sentence&&host.dataset.refTerm==="hören");
       host.querySelector('.vocab-ref-relookup').click();await settle();
-      check("analysis: the visible Look up again action keeps the confirmed suggestion's source sentence without a false match warning",queries.at(-1)?.term==="aufhören"&&queries.at(-1)?.sentence===sentence&&!host.textContent.includes("dictAssistAnalysisNeedsMatch"));
-      _pbpDictCurrent.rerunWith("arbeiten");await settle();
-      check("analysis: a later dictionary form-of jump also keeps the real source sentence",queries.at(-1)?.term==="arbeiten"&&queries.at(-1)?.sentence===sentence);
+      check("navigation: Look up again keeps the current dictionary term and context",queries.at(-1)?.term==="hören"&&queries.at(-1)?.sentence===sentence);
       $id("vocab-lookup-lang").value="en";_pbpVocabLookupLangChanged();await settle();
-      check("analysis: an explicit language change preserves the current lookup's real sentence without a false match warning",queries.at(-1)?.lang==="en"&&queries.at(-1)?.sentence===sentence&&!host.textContent.includes("dictAssistAnalysisNeedsMatch"));
+      check("navigation: a language override preserves the active query's real sentence",queries.at(-1)?.lang==="en"&&queries.at(-1)?.sentence===sentence);
       _pbpVocabLookupOther("Gift","de");await settle();
-      check("analysis: an unrelated free lookup starts without borrowing the previous sentence",queries.at(-1)?.term==="Gift"&&queries.at(-1)?.sentence===""&&host.querySelector('.dict-assist-analyze').disabled);
-      check("analysis: the whole suggest/confirm/retry journey leaves saved identities and lemma relations unchanged",writes.length===0&&_vocabRows[0].term==="hört"&&_vocabRows[0].lemma==="");
+      check("navigation: an unrelated free lookup does not borrow the saved sentence",queries.at(-1)?.term==="Gift"&&queries.at(-1)?.sentence==="");
+      check("navigation: lookups do not alter saved identities or manual lemma relations",writes.length===0&&_vocabRows[0].term==="hört"&&_vocabRows[0].lemma==="");
     } finally {
       _pbpVocabDictCtrl?.abort();_pbpVocabDictChildCtrl?.abort();_pbpVocabRenderDetail(null);
       _pbpDictSlotRun=old.remote;_pbpDictEcdictSide=old.local;_pbpDictLoadPack=old.load;window.pbpDictPackLookup=old.lookup;window.pbpDictPackList=old.list;
-      pbpReadSettingsWithSecrets=old.read;_pbpVocabAutoLookup=old.auto;pbpDictAssistRun=old.run;pbpVocabCurrentOwner=old.owner;pbpVocabGet=old.get;pbpVocabSaveWord=old.save;
-      for(const [key,value] of [["hasAIKey",old.key],["ensureAIHostPermissionWithGesture",old.grant]]){if(value===undefined)delete window[key];else window[key]=value;}
+      pbpReadSettingsWithSecrets=old.read;_pbpVocabAutoLookup=old.auto;pbpDictEntryRead=old.entryRead;pbpVocabCurrentOwner=old.owner;pbpVocabGet=old.get;pbpVocabSaveWord=old.save;
     }
   }
 

@@ -93,19 +93,20 @@ test('shared dictionary modules route by consumers rather than filename prefix',
   const surfaces = ['reader', 'library', 'options'];
   const fixture = surfaces.map(surface => ({ id: 'dictionary.' + surface, runner: 'qa', surfaces: [surface], features: ['dictionary'] }));
   fixture.push({ id: 'library.unrelated', runner: 'qa', surfaces: ['library'], features: ['notes'] });
-  for (const [path, expected] of [['md-dict.js', ['reader', 'library']], ['dict-assist.js', ['reader', 'library']], ['dict-pack.js', surfaces]]) {
+  for (const [path, expected] of [['md-dict.js', ['reader', 'library']], ['dict-entry.js', ['reader', 'library']], ['dict-pack.js', surfaces]]) {
     const impact = inferAuditImpact(fixture, [{ path }]);
     assert.deepEqual(impact.ids.sort(), expected.map(surface => 'dictionary.' + surface).sort(), path);
     assert.equal(impact.warnings.length, 0, path);
   }
 });
-test('dictionary feature plans retain the actual registered assistance states on both surfaces', () => {
-  const rows = catalog.filter(row => row.runner === 'render' && row.features?.includes('dictionary-assist'));
-  assert.ok(rows.length >= 6, 'the idle/busy/result scenarios must be registered for reader and library');
+test('dictionary feature plans retain the actual registered AI entry states on both surfaces', () => {
+  const rows = catalog.filter(row => row.runner === 'render' && row.features?.includes('dictionary-entry'));
+  assert.equal(rows.length, 12, 'idle/busy/result/details/cached/error must be registered for reader and library');
+  assert.equal(catalog.some(row => /dict-(assist|analyze)-/.test(row.id)), false, 'retired AI action states must not remain registered');
   for (const surface of ['library', 'reader']) {
     assert.ok(rows.some(row => row.surfaces.some(value => value === surface || surface === 'reader' && value === 'md-preview')), surface);
   }
-  for (const path of ['md-dict.js', 'dict-assist.js', 'dict-pack.js', 'ai.js', 'ai-cache.js']) {
+  for (const path of ['md-dict.js', 'dict-entry.js', 'dict-pack.js', 'ai.js', 'ai-cache.js']) {
     const impact = inferAuditImpact(catalog, [{ path }]);
     const result = createAuditPlan(catalog, parseAuditArgs(['--changed', '--feature=dictionary', '--plan']), impact);
     for (const row of rows) assert.ok(result.scenarios.some(selected => selected.id === row.id), `${path}: ${row.id}`);

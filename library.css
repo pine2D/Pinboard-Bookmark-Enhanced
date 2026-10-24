@@ -2088,8 +2088,7 @@ html.motion-ready .vocab-note-save {
 /* Connect (manual path only): an sm button in md-dict's own class, painted
    with the .btn fill (Soft Fill: filled at rest, never a white outlined box --
    it used the code-block fill until critique round 3, 2026-10-20). */
-#vocab-ref-result .xp-dict-connect,
-#vocab-dict-notice .xp-dict-connect {
+#vocab-ref-result .xp-dict-connect {
   height: calc(var(--lib-control-h) - 4px);
   margin-top: var(--lib-sp-2);
   padding: 0 var(--lib-control-pad-x-sm);
@@ -2102,47 +2101,33 @@ html.motion-ready .vocab-note-save {
   cursor: pointer;
   white-space: nowrap;
 }
-#vocab-ref-result .xp-dict-connect:hover:not(:disabled),
-#vocab-dict-notice .xp-dict-connect:hover:not(:disabled) { background: var(--lib-btn-hover); }
-#vocab-ref-result .xp-dict-connect:focus-visible,
-#vocab-dict-notice .xp-dict-connect:focus-visible { outline: none; border-color: var(--lib-focus-bd); box-shadow: var(--lib-focus-ring); }
-#vocab-ref-result .xp-dict-connect:disabled,
-#vocab-dict-notice .xp-dict-connect:disabled { opacity: 0.6; cursor: default; }
-#vocab-ref-result .xp-dict-assist { margin-top: var(--lib-sp-4); min-width: 0; overflow-wrap: anywhere; }
-#vocab-ref-result .xp-dict-assist:not([hidden]),
-#vocab-ref-result .dict-assist-result:not(:empty) { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--lib-sp-2); }
-#vocab-ref-result .xp-dict-assist > :empty,
-#vocab-ref-result .xp-dict-assist [hidden] { display: none; }
-#vocab-ref-result .dict-assist-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--lib-sp-2); }
-#vocab-ref-result .xp-dict-assist .xp-dict-connect:not([hidden]) { display: inline-flex; align-items: center; gap: var(--lib-sp-1); margin-top: 0; max-width: 100%; justify-self: start; }
-#vocab-ref-result .xp-dict-assist .xp-dict-connect svg { width: 14px; height: 14px; flex: none; }
-#vocab-ref-result .dict-assist-context,
-#vocab-ref-result .dict-assist-headword,
-#vocab-ref-result .dict-assist-evidence,
-#vocab-ref-result .dict-assist-meaning,
-#vocab-ref-result .dict-assist-explanation { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-#vocab-ref-result .dict-assist-suggestion { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: var(--lib-sp-1); column-gap: var(--lib-sp-2); min-width: 0; }
-#vocab-ref-result .dict-assist-headword { font-weight: 600; }
-#vocab-ref-result .dict-assist-context-wrap > p { margin-top: var(--lib-sp-1); }
-#vocab-ref-result .xp-dict-assist .xp-dict-local-title { margin-bottom: 0; }
-#vocab-ref-result .xp-dict-assist .xp-dict-src,
-#vocab-ref-result .xp-dict-assist .xp-dict-ailabel { margin-top: 0; }
-#vocab-ref-result .xp-dict-assist .xp-dict-ailabel { font-size: var(--lib-text-secondary); color: var(--lib-fg-muted); }
-/* Out-of-view results get an actionable cue without moving the sheet.
-   A zero-height sticky host preserves the scroll geometry on completion. */
-.vocab-dict-notice { position: sticky; top: 100%; height: 0; min-width: 0; z-index: var(--lib-z-sticky); }
-#vocab-dict-notice .dict-assist-notice:not([hidden]) {
-  position: absolute; bottom: 0; left: 0;
+#vocab-ref-result .xp-dict-connect:hover:not(:disabled) { background: var(--lib-btn-hover); }
+#vocab-ref-result .xp-dict-connect:focus-visible { outline: none; border-color: var(--lib-focus-bd); box-shadow: var(--lib-focus-ring); }
+#vocab-ref-result .xp-dict-connect:disabled { opacity: 0.6; cursor: default; }
+/* One source occupies the lookup view at a time. The entry controls use
+   the existing compact button and text tiers rather than a second panel. */
+#vocab-ref-result .xp-dict-ai { min-width: 0; overflow-wrap: anywhere; }
+#vocab-ref-result .xp-dict-ai-controls {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--lib-sp-2);
-  width: fit-content; max-width: 100%; box-sizing: border-box;
-  padding: var(--lib-sp-1) var(--lib-sp-2);
-  background: var(--lib-bg);
-  font-size: var(--lib-text-secondary); line-height: var(--lib-lh-meta);
+  margin-bottom: var(--lib-sp-3);
 }
-#vocab-dict-notice .dict-assist-notice[hidden] { display: none; }
-#vocab-dict-notice .dict-assist-notice-text { flex: 1 1 100px; min-width: 0; overflow-wrap: anywhere; }
-#vocab-dict-notice .xp-dict-connect { flex: none; margin: 0; }
-#vocab-ref-result .dict-assist-copy-status { margin: 0; white-space: normal; overflow-wrap: anywhere; color: var(--lib-danger); }
+#vocab-ref-result .xp-dict-ai-controls .xp-dict-connect {
+  display: inline-flex; align-items: center; gap: var(--lib-sp-1);
+  margin-top: 0; max-width: 100%;
+}
+#vocab-ref-result .xp-dict-ai-controls .xp-dict-connect svg { width: 14px; height: 14px; flex: none; }
+#vocab-ref-result .xp-dict-ai [hidden] { display: none; }
+#vocab-ref-result .xp-dict-ai-content { min-width: 0; }
+#vocab-ref-result .xp-dict-ai-status:empty { display: none; }
+#vocab-ref-result .xp-dict-ai-status:not(:empty) { margin-bottom: var(--lib-sp-2); }
+#vocab-ref-result .xp-dict-ai-details { margin-top: var(--lib-sp-4); font-size: var(--lib-text-secondary); line-height: var(--lib-lh-secondary); }
+#vocab-ref-result .xp-dict-ai-details > summary {
+  min-height: calc(var(--lib-control-h) - 4px); font-size: calc(var(--lib-text-body) - 1px);
+  line-height: calc(var(--lib-control-h) - 4px); cursor: pointer; color: var(--lib-link);
+}
+#vocab-ref-result .xp-dict-ai-details > summary:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
+#vocab-ref-result .xp-dict-ai-details p { margin: var(--lib-sp-2) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+#vocab-ref-result .xp-dict-ai-details .xp-dict-src { margin-top: var(--lib-sp-3); }
 /* md-dict's own Retry after a load failure: this page already has "Look up
    again" under the source line (.vocab-ref-foot), which re-runs the same
    query -- two buttons for one action, side by side (critique round 3).

@@ -70,7 +70,7 @@ function pbpDictNormChoices(norm, lang, sourcePrefix = "Source:") {
     const visit = (sense) => {
       const gloss = typeof sense === "string" ? sense : sense?.definition;
       if (gloss) choices.push({ term, language: lang, gloss,
-        ipa: entry.ipas?.[0]?.text || "", sourceUrl: norm.sourceUrl || "", license,
+        ipa: entry.ipas?.[0]?.text || (norm.aiGenerated ? norm.pronunciation || "" : ""), sourceUrl: norm.sourceUrl || "", license,
         definitionLang: pbpDictDefinitionLang(norm), sourceLabel: norm.sourceLabel || "Wiktionary", packId: norm.packId || "" });
       for (const sub of sense?.subsenses || []) visit(sub);
     };
@@ -567,67 +567,6 @@ function pbpDictCircuitAfter(state, event, now) {
     : { failures, openUntil: 0 };
 }
 
-// LEMMA-first-line protocol (spec §3). "LEMMA: -" or missing marker = none.
-function pbpDictParseCtxAnswer(full) {
-  const text = String(full || "");
-  const m = text.match(/^\s*LEMMA:\s*(.*)\s*$/m);
-  let lemma = "";
-  if (m) {
-    const v = m[1].trim();
-    if (v && v !== "-") lemma = v;
-  }
-  const gloss = text.replace(/^\s*LEMMA:.*$/m, "").trim();
-  return { lemma, gloss };
-}
-
-// Progressive-display helper: hide a complete LEMMA line, and hide the
-// accumulator entirely while it is still a strict prefix of a LEMMA line
-// ("L", "LE", ..., "LEMMA: ru" with no newline yet). Ordinary text like
-// "Hello" or "AI" must pass through untouched.
-function pbpDictStripLemmaLine(acc) {
-  const s = String(acc || "");
-  const firstLine = s.split("\n", 1)[0];
-  if (s.indexOf("\n") === -1) {
-    const marker = "LEMMA:";
-    if (marker.startsWith(firstLine.trim()) && firstLine.trim() !== "") return "";
-    if (firstLine.trim().startsWith(marker)) return "";
-  }
-  return s.replace(/^\s*LEMMA:.*$/m, "").replace(/^\s+/, "");
-}
-
-// djb2, base36 — context hash for the gloss cache key.
-function pbpDictCtxHash(str) {
-  let h = 5381;
-  const s = String(str || "");
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
-  return h.toString(36);
-}
-
-// Contextual-gloss prompt (spec §3): selection + host sentence + title ONLY.
-function pbpDictBuildCtxPrompt(p) {
-  const selection = String((p && p.selection) || "").slice(0, 400);
-  const sentence = String((p && p.sentence) || "").slice(0, 1000);
-  const title = String((p && p.title) || "(untitled)");
-  const answerLang = (p && p.answerLang) || "English";
-  const system = "You are a precise contextual dictionary embedded in an article reader. " +
-    "Explain what the selected term means in this specific sentence, in " + answerLang + ". " +
-    "Write the ENTIRE answer in " + answerLang + " and never switch languages, even when the " +
-    "selected term is a grammar particle or function word (models drift to English there). " +
-    "The FIRST line of your answer must be exactly 'LEMMA: <dictionary base form of the selected term>' " +
-    "(write 'LEMMA: -' if it is already the base form or has none). " +
-    "Then a blank line, then 1-3 short sentences: the part of speech if known, and the sense the term carries in THIS sentence. " +
-    "Do not output IPA or any phonetic transcription. Do not invent example sentences. No headings, no lists.";
-  const parts = [];
-  parts.push("Article title: " + title);
-  if (sentence) parts.push("Sentence containing the term:\n" + sentence);
-  parts.push("Selected term:\n" + selection);
-  // Language directive repeated LAST: recency measurably improves compliance
-  // on small/fast models, which otherwise answer function-word queries in
-  // English regardless of the system instruction (real-device report).
-  parts.push("Answer language: " + answerLang + " only.");
-  return { system, prompt: parts.join("\n\n") };
-}
-
 // Anki CSV-style field quoting.
 function pbpDictTsvField(v, columnIndex) {
   const s = String(v == null ? "" : v);
@@ -663,44 +602,6 @@ const PBP_DICT_SPEAKER_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.speake
 // Alias of the shared book icon (Lucide book-open) -- same glyph the
 // explain-pop action switch and the highlight card use for Dictionary.
 const PBP_DICT_BOOK_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.book : "";
-
-// Ready signal: Lucide arrow-down (PBP_ICONS.arrowDownLine) -- "the AI
-// gloss landed below, jump to it". A direction, not a state, so it must not
-// borrow the link-coloured border the reader uses for pressed toggles.
-const PBP_DICT_CTX_READY_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.arrowDownLine : "";
-
-// The AI gloss streams in seconds after the (often cached, instant) online
-// entry, and it renders at the BOTTOM of the popover body -- a long entry
-// pushes it out of view, and there is no signal when it lands. When the
-// finished gloss sits below the fold, light the head-row dot; clicking it
-// scrolls the gloss into view. It self-clears once the gloss is seen.
-// Explicit click, never hover; no auto-scroll steals the reading position.
-function _pbpDictCtxSignal(body, ctxEl, btn) {
-  if (!body || !btn || !ctxEl.isConnected) return;
-  const br = body.getBoundingClientRect();
-  if (ctxEl.getBoundingClientRect().top < br.bottom - 12) return; // already visible
-  btn.hidden = false;
-  // The button appearing is the only signal, and it says nothing to a
-  // screen reader on its own.
-  if (typeof pbpAnnounce === "function") pbpAnnounce(btn.getAttribute("aria-label") || "");
-  const io = new IntersectionObserver((entries) => {
-    if (entries.some((e) => e.isIntersecting)) {
-      btn.hidden = true;
-      io.disconnect();
-      if (_pbpDictCtxIo === io) _pbpDictCtxIo = null;
-    }
-  }, { root: body });
-  io.observe(ctxEl);
-  _pbpDictCtxIo = io;
-  btn.addEventListener("click", () => {
-    // shared.js pbpScrollIntoView owns the reduced-motion downgrade -- the
-    // md-preview.css comment already points every smooth scroll at it.
-    pbpScrollIntoView(ctxEl, { block: "start", behavior: "smooth" });
-    btn.hidden = true;
-    io.disconnect();
-    if (_pbpDictCtxIo === io) _pbpDictCtxIo = null;
-  }, { once: true });
-}
 
 let _pbpDictSpeakSeq = 0;
 function pbpDictSpeak(text, lang) {
@@ -872,8 +773,15 @@ function _pbpDictSenseLi(s, formOf, termLang, definitionLang) {
     const ex = document.createElement("div");
     ex.className = "xp-dict-example";
     ex.lang = termLang || "und";
-    ex.textContent = x;
+    ex.dir = "auto";
+    ex.textContent = typeof x === "string" ? x : x.text;
     li.appendChild(ex);
+    if (typeof x === "object" && x.translation) {
+      const translation = document.createElement("div");
+      translation.className = "xp-dict-example";
+      translation.lang = definitionLang || "und"; translation.dir = "auto";
+      translation.textContent = x.translation; li.appendChild(translation);
+    }
   }
   for (const [key, words] of [["dictSynonyms", s.synonyms], ["dictAntonyms", s.antonyms]]) {
     if (!words || !words.length) continue;
@@ -973,12 +881,13 @@ function _pbpDictRenderEntry(slot, norm, term, lang, selectedTerm, sentence) {
   // its own spacing; only a half-width one (en "Source:", ja "出典:") gets a space.
   const srcLabel = t("dictSource");
   label.textContent = /[\u3000-\u303f\uff00-\uffef]$/.test(srcLabel) ? srcLabel : srcLabel + " ";
-  const sourceUrl = pbpDictSafeUrl(norm.sourceUrl) || (!norm.packId ? pbpDictWiktionaryUrl(term) : "");
+  const sourceUrl = pbpDictSafeUrl(norm.sourceUrl) || (!norm.packId && !norm.aiGenerated ? pbpDictWiktionaryUrl(term) : "");
   const a = document.createElement(sourceUrl ? "a" : "span");
   // Defense-in-depth: sourceUrl is already sanitized at the normalize/merge
   // layers, but this is the only point it reaches a live href.
   if (sourceUrl) { a.href = sourceUrl; a.target = "_blank"; a.rel = "noopener noreferrer"; }
-  a.textContent = [norm.sourceLabel || "Wiktionary", norm.license || (!norm.packId ? "CC BY-SA" : ""), norm.attribution || ""].filter(Boolean).join(" · ");
+  a.textContent = norm.aiGenerated ? t("dictAiLabel") :
+    [norm.sourceLabel || "Wiktionary", norm.license || (!norm.packId ? "CC BY-SA" : ""), norm.attribution || ""].filter(Boolean).join(" · ");
   src.appendChild(label);
   src.appendChild(a);
   slot.appendChild(src);
@@ -1388,7 +1297,7 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
   return null;
 }
 
-// ---- Contextual-gloss slot + run assembly -------------------------------
+// ---- Dictionary lookup + reusable AI entry -------------------------------
 let _pbpDictRunSeq = 0;
 // Manual language override: PER-DOCUMENT memory only (reset on pbp:rendered).
 // It used to persist via settings, which silently forced every later lookup
@@ -1398,12 +1307,6 @@ let _pbpDictManualLang = "";
 let _pbpDictCurrent = null;      // merged results of the LIVE run only
 let _pbpDictChildCtrl = null;    // the live run's own controller (child of md-ask's)
 let _pbpDictParentCleanup = null; // removes the previous run's parent-abort listener
-// The AI-gloss "landed below the fold" observer (_pbpDictCtxSignal) has only
-// two disconnect paths: scrolled into view, or the ready-dot clicked. A run
-// that does neither (reader just queries the next word, or the popover
-// closes) leaves a detached-subtree observer per lookup, so the next run and
-// an action switch tear it down explicitly (K151).
-let _pbpDictCtxIo = null;
 let _pbpDictSaveTarget = null;   // {itemId} | {range} | null — explain-shaped
 let _pbpDictOwner = "ownerless"; // set from pbp:rendered detail.account (Task 8 listener)
 
@@ -1506,349 +1409,182 @@ async function _pbpDictResolveLang(cap, ctx, manual, installedLanguages) {
   return pbpDictLatinFallback(sel, bySentence.lang, byBlock.lang);
 }
 
-// Whole function wrapped so EVERY exit resolves the lemma exactly once
-// (Codex HIGH 4) and no pre-try throw can hang the dictionary slot's 404 wait.
-async function _pbpDictCtxRun(el, cap, ctx, s, signal, resolveLemmaOnce, lang) {
-  try {
-    if (typeof pbpAiAvailable === "function" && !pbpAiAvailable(s)) {
-      const msg = document.createElement("div");
-      msg.className = "xp-dict-msg";
-      msg.textContent = t("dictAiNotConfigured");
-      el.replaceChildren(msg);
-      return null; // finally resolves lemma
-    }
-    const answerLanguage = pbpDictDefinitionLanguage(s.dictDefinitionLang, uiLangToBCP47());
-    const langName = answerLanguage.name;
-    const title = document.getElementById("preview-title").textContent;
-    const { system, prompt } = pbpDictBuildCtxPrompt({
-      selection: cap.text, sentence: ctx.sentence, title, answerLang: langName
-    });
-    const provider = s.aiProvider || "gemini";
-    const model = (typeof pbpAiEffectiveModel === "function" ? pbpAiEffectiveModel(s) : "") || "";
-    // Case matters to meaning: US/us and Polish/polish can occur in the
-    // SAME sentence. v2 folded the selection, so even lowercase cache rows
-    // may contain an uppercase term's answer. A new subnamespace retires
-    // folded rows while keeping ai-cache's existing dictctx2_ LRU pool.
-    const cacheKey = "dictctx2_exact_" + _pbpDictOwner + "_" + provider + "_" + model + "_"
-      + pbpDictCacheKeyExact(lang, cap.text) + "_" + pbpDictCtxHash(ctx.sentence + "␟" + title + "␟" + langName);
-    const finish = (full) => {
-      const parsed = pbpDictParseCtxAnswer(full);
-      const md = document.createElement("div");
-      md.className = "xp-md";
-      md.lang = answerLanguage.lang;
-      md.innerHTML = renderMarkdown(parsed.gloss); // single sanitize point
-      const tag = document.createElement("div");
-      tag.className = "xp-dict-ailabel";
-      // Label only marks the content as AI-generated; the provider and model
-      // already sit in the footer's .xp-model (real-device report: showing
-      // the provider twice read as clutter).
-      tag.textContent = t("dictAiLabel");
-      el.replaceChildren(md, tag);
-      return parsed;
-    };
-    const hit = await pbpAiCacheGet(cacheKey).catch(() => null);
-    if (hit && typeof hit.result === "string") {
-      const parsed = finish(hit.result);
-      resolveLemmaOnce(parsed.lemma);
-      return parsed;
-    }
-    const streamEl = document.createElement("div");
-    streamEl.className = "xp-stream";
-    streamEl.lang = answerLanguage.lang;
-    let started = false, pending = "", rafId = 0;
-    const flush = () => { rafId = 0; streamEl.textContent = pbpDictStripLemmaLine(pending); };
-    try {
-      pbpAiBumpCounter("explain"); // dict shares the explain usage bucket
-      const full = await callAIStream(s, prompt, {
-        maxTokens: 512, model: pbpAiResolveModelOverride(s), system, signal
-      }, (delta, acc) => {
-        if (!started) { started = true; el.replaceChildren(streamEl); }
-        pending = acc;
-        if (!rafId) rafId = requestAnimationFrame(flush);
-      });
-      if (rafId) cancelAnimationFrame(rafId);
-      const parsed = finish(full);
-      try { await pbpAiCacheSet(cacheKey, full, Date.now()); } catch (_) {}
-      resolveLemmaOnce(parsed.lemma);
-      return parsed;
-    } catch (e) {
-      if (rafId) cancelAnimationFrame(rafId);
-      if (e && e.name === "AbortError") return null;
-      const wrap = document.createElement("div");
-      wrap.className = "xp-error";
-      const msg = document.createElement("p");
-      msg.textContent = (e && e.message) || t("aiErrRequestFailed");
-      const retry = document.createElement("button");
-      retry.type = "button";
-      retry.className = "xp-retry";
-      retry.innerHTML = PBP_ICONS.refresh; // static shared constant, never page content
-      retry.append(t(e && e.code === "host_permission" ? "aiGrantRetry" : "explainErrRetry"));
-      retry.addEventListener("click", async () => {
-        if (retry.disabled) return;
-        retry.disabled = true;
-        try {
-          // First await in the click chain: pbpAiRetryWithPermission issues the
-          // exact-origin permissions.request for host_permission errors, then
-          // runs the retry callback (a full run-level rerun, never slot recursion
-          // — Codex HIGH 2).
-          const recovered = await pbpAiRetryWithPermission(e, s, async () => {
-            if (_pbpDictCurrent && typeof _pbpDictCurrent.rerun === "function") _pbpDictCurrent.rerun();
-          });
-          if (!recovered) retry.disabled = false;
-        } catch (_) { retry.disabled = false; }
-      });
-      wrap.appendChild(msg);
-      wrap.appendChild(retry);
-      el.replaceChildren(wrap);
-      return null;
-    }
-  } finally {
-    resolveLemmaOnce(""); // once-only resolver: no-op if already resolved
-  }
+// One reusable entry view for reader and library. Ordinary dictionaries remain
+// mounted in their stable host while the user switches between sources.
+function pbpDictEntryNorm(record, target) {
+  const entry = record.entry;
+  return { word: entry.word, pronunciation: entry.pronunciation, definitionLang: target.lang, sourceLabel: "AI", sourceUrl: "",
+    license: "AI-generated · " + record.provider + " / " + record.model, aiGenerated: true,
+    entries: entry.meanings.map((meaning, index) => ({ pos: meaning.partOfSpeech,
+      ipas: index === 0 && entry.pronunciation ? [{ text: entry.pronunciation, tags: [] }] : [],
+      ipaMore: 0, forms: [], senses: [{ definition: meaning.definition, tags: [], subsenses: [],
+        examples: meaning.examples, synonyms: [], antonyms: [] }] })) };
 }
 
-// Shared explicit assistance for reader and library. Original dictionary
-// choices remain owned by the caller; AI advice never writes vocabulary.
-function _pbpDictAssistMount(host, opts) {
-  if (typeof pbpDictAssistChoices !== "function" || typeof pbpDictAssistRun !== "function") return null;
-  const panel = document.createElement("div"); panel.className = "xp-dict-assist";
-  const actions = document.createElement("div"); actions.className = "dict-assist-actions";
-  const button = (key, name, ai = false) => {
+function _pbpDictEntryMount(host, opts) {
+  if (typeof pbpDictEntryRead !== "function" || typeof pbpDictEntryRun !== "function") return null;
+  const panel = document.createElement("div"); panel.className = "xp-dict-ai";
+  const controls = document.createElement("div"); controls.className = "row xp-dict-ai-controls";
+  const button = (key, name) => {
     const el = document.createElement("button"); el.type = "button";
-    el.className = "xp-dict-connect " + name;
-    if (ai && typeof PBP_ICONS === "object" && PBP_ICONS.robot) el.innerHTML = PBP_ICONS.robot;
-    el.append(t(key)); return el;
+    el.className = "xp-dict-connect " + name; el.textContent = t(key); return el;
   };
-  const recommend = button("dictAssistRecommend", "dict-assist-recommend", true);
-  const explain = button("dictAssistExplain", "dict-assist-explain", true);
-  const analyze = button("dictAssistAnalyze", "dict-assist-analyze", true);
-  analyze.hidden = typeof opts.onLookup !== "function";
-  const stop = button("askStop", "dict-assist-stop"); stop.hidden = true;
-  actions.append(recommend, explain, analyze, stop);
-  const hint = document.createElement("div"); hint.className = "xp-dict-msg dict-assist-hint";
-  const links = document.createElement("div"); links.className = "xp-dict-src";
-  const context = document.createElement("div"); context.className = "dict-assist-context-wrap";
-  context.hidden = true;
-  if (opts.sentence) {
-    const label = document.createElement("div"); label.className = "xp-dict-local-title";
-    label.textContent = t("dictAssistContext");
-    const quote = document.createElement("p"); quote.className = "dict-assist-context";
-    quote.textContent = opts.sentence; quote.lang = opts.lang || "und"; quote.dir = "auto";
-    context.append(label, quote);
+  const generate = button("dictEntryGenerate", "xp-dict-ai-generate");
+  if (typeof PBP_ICONS === "object" && PBP_ICONS.robot) {
+    generate.innerHTML = PBP_ICONS.robot; generate.append(t("dictEntryGenerate"));
   }
-  const result = document.createElement("div"); result.className = "dict-assist-result";
-  result.setAttribute("role", "status"); result.setAttribute("aria-live", "polite");
-  result.tabIndex = -1;
-  panel.append(actions, hint, links, context, result); host.appendChild(panel);
-  const notice = document.createElement("div"); notice.className = "dict-assist-notice"; notice.hidden = true;
-  notice.setAttribute("role", "status"); notice.setAttribute("aria-live", "polite");
-  const noticeText = document.createElement("span"); noticeText.className = "dict-assist-notice-text";
-  const view = button("dictAssistViewResult", "dict-assist-view");
-  notice.append(noticeText, view); (opts.noticeHost || panel).prepend(notice);
-  const scrollHost = opts.scrollHost || host.closest(".xp-body");
-  let settled = false;
-  const syncNotice = () => {
-    if (!alive() || !settled || !result.textContent || !scrollHost?.isConnected) { notice.hidden = true; return; }
-    const bounds = scrollHost.getBoundingClientRect(), rect = result.getBoundingClientRect();
-    const inset = parseFloat(getComputedStyle(scrollHost).scrollPaddingTop) || 0;
-    const top = Math.max(bounds.top + scrollHost.clientTop + inset, 0), bottom = Math.min(bounds.bottom, window.innerHeight);
-    notice.hidden = rect.bottom > top && rect.top < bottom;
-    noticeText.textContent = t(lastError ? "dictAssistErrorReady" : "dictAssistResultReady");
-  };
-  view.addEventListener("click", () => {
-    if (!alive() || !settled || !scrollHost?.isConnected) return;
-    // Only this explicit action reveals the result. Never scrollIntoView:
-    // that can also move the article or an outer sheet behind this surface.
-    const inset = (parseFloat(getComputedStyle(scrollHost).scrollPaddingTop) || 0) + 4;
-    scrollHost.scrollTop += result.getBoundingClientRect().top - scrollHost.getBoundingClientRect().top - scrollHost.clientTop - inset;
-    result.focus({ preventScroll: true }); notice.hidden = true;
-  });
-  const listenerOptions = opts.signal ? { passive: true, signal: opts.signal } : { passive: true };
-  scrollHost?.addEventListener("scroll", syncNotice, listenerOptions);
-  window.addEventListener("resize", syncNotice, listenerOptions);
-  let norms = [], choices = [], epoch = 0, active = null, busy = false, lastError = "", applying = false, lastTask = "";
-  let settings = opts.settings && typeof opts.settings.then !== "function" ? opts.settings : null;
+  generate.disabled = true;
+  const toggle = button("dictEntryShowDictionary", "xp-dict-ai-switch"); toggle.hidden = true;
+  const stop = button("askStop", "xp-dict-ai-stop"); stop.hidden = true;
+  const configure = document.createElement("a"); configure.className = "xp-dict-ai-configure";
+  configure.href = "options.html#ai"; configure.target = "_blank"; configure.rel = "noopener noreferrer";
+  configure.textContent = t("aiConfigure"); configure.hidden = true;
+  controls.append(generate, toggle, stop, configure);
+  const status = document.createElement("div"); status.className = "xp-dict-msg xp-dict-ai-status";
+  status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite"); status.hidden = true;
+  const content = document.createElement("div"); content.className = "xp-dict-ai-content"; content.hidden = true;
+  panel.append(controls, status, content); host.appendChild(panel);
+  let settings = null, record = null, busy = false, active = null, epoch = 0, mode = "dictionary";
   const alive = () => !opts.signal?.aborted && panel.isConnected && opts.isCurrent();
-  const located = () => !!opts.term && !!opts.sentence && opts.sentence.normalize("NFC").includes(opts.term.normalize("NFC"));
-  const same = (candidate, choice) => !!choice && pbpDictNormalizeTerm(candidate.headword) === choice.term && candidate.definition === choice.gloss &&
-    (candidate.packId || "") === (choice.packId || "") && candidate.sourceLabel === choice.sourceLabel;
-  const originalChoice = candidate => norms.flatMap(norm => pbpDictNormChoices(norm, opts.lang, t("dictSource"))).find(choice => same(candidate, choice));
-  const selectedCandidate = () => {
-    const selected = opts.getSelection();
-    if (!selected) return null;
-    const norm = norms.find(row => pbpDictNormalizeTerm(row.word) === selected.term && (row.packId || "") === (selected.packId || "") && row.sourceLabel === selected.sourceLabel);
-    // A selected sense beyond the recommendation cap still has an explicit
-    // one-sense explanation path. No candidate is inferred from DOM text.
-    return norm ? pbpDictAssistChoices([{ ...norm, entries: [{ senses: [{ definition: selected.gloss }] }] }])[0] : null;
-  };
-  const settingsLink = page => {
-    const link = document.createElement("a"); link.href = "options.html#" + page;
-    link.target = "_blank"; link.rel = "noopener noreferrer";
-    link.textContent = t(page === "ai" ? "aiConfigure" : "settings"); links.appendChild(link);
-  };
+  const configured = () => settings && settings.previewAiEnabled !== false && typeof hasAIKey === "function" && hasAIKey(settings);
+  const target = () => pbpDictDefinitionLanguage(settings?.dictDefinitionLang,
+    typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : document.documentElement.lang || "en");
+  const message = text => { status.textContent = text; status.hidden = !text; };
   const sync = () => {
-    if (!alive()) return;
-    panel.hidden = norms.length === 0 && !result.textContent && !opts.sentence;
-    const configured = !!settings && settings.previewAiEnabled !== false && typeof hasAIKey === "function" && hasAIKey(settings);
-    const selected = selectedCandidate(), eligible = choices.filter(choice => choice.eligible === true);
-    recommend.disabled = busy || !configured || !opts.sentence || !eligible.length;
-    explain.disabled = busy || !configured || selected?.eligible !== true;
-    analyze.disabled = busy || !configured || !located();
-    explain.title = t(opts.getSelection() ? "dictAssistExplain" : "dictAssistChooseMeaning");
-    recommend.title = t(opts.sentence ? "dictAssistAllowedSources" : "dictAssistNeedContext");
-    stop.hidden = !busy;
+    generate.hidden = !!record || !configured(); generate.disabled = busy || !settings;
+    toggle.hidden = !record; stop.hidden = !busy;
+    configure.hidden = !!record || !settings || settings.previewAiEnabled === false || configured();
+    panel.hidden = !record && !!settings && settings.previewAiEnabled === false;
     panel.setAttribute("aria-busy", busy ? "true" : "false");
-    links.replaceChildren();
-    if (!settings) hint.textContent = t("dictLoading");
-    else if (!configured) {
-      hint.textContent = t("dictAiNotConfigured"); settingsLink(settings.previewAiEnabled === false ? "ai-behavior" : "ai");
-    } else {
-      hint.textContent = t(opts.sentence && !located() && !analyze.hidden && !opts.derived ? "dictAssistAnalysisNeedsMatch" :
-        !eligible.length && located() && !analyze.hidden ? "dictAssistAnalysisHint" : !eligible.length ? "dictAssistNoSources" :
-        opts.getSelection() && selected?.eligible !== true ? "dictAssistSourceNotAllowed" :
-        !opts.sentence ? "dictAssistNeedContext" : "dictAssistAllowedSources");
-      if (!eligible.length || (opts.getSelection() && selected?.eligible !== true) || lastError === "dictAssistSourceNotAllowed") settingsLink("vocab");
-    }
   };
-  const invalidate = () => { epoch++; active?.abort(); active = null; busy = false; settled = false; notice.hidden = true; lastError = ""; lastTask = ""; result.replaceChildren(); context.hidden = true; };
-  const renderAnalysis = (response, current) => {
-    if (!response.suggestions.length) { result.textContent = t("dictAssistAnalysisEmpty"); return; }
-    const label = document.createElement("div"); label.className = "xp-dict-ailabel"; label.textContent = t("dictAiLabel"); result.appendChild(label);
-    for (const suggestion of response.suggestions) {
-      const group = document.createElement("div"); group.className = "dict-assist-suggestion";
-      const kind = document.createElement("div"); kind.className = "xp-dict-local-title";
-      kind.textContent = t(suggestion.kind === "lemma" ? "dictAssistLemmaSuggestion" : "dictAssistPhraseSuggestion");
-      const headword = document.createElement("p"); headword.className = "dict-assist-headword";
-      headword.textContent = suggestion.headword; headword.lang = opts.lang || "und"; headword.dir = "auto";
-      const evidenceLabel = document.createElement("div"); evidenceLabel.className = "xp-dict-local-title"; evidenceLabel.textContent = t("dictAssistEvidence");
-      group.append(kind, headword, evidenceLabel);
-      for (const fragment of suggestion.evidence) {
-        const evidence = document.createElement("p"); evidence.className = "dict-assist-evidence";
-        evidence.textContent = fragment; evidence.lang = opts.lang || "und"; evidence.dir = "auto"; group.appendChild(evidence);
-      }
-      const explanation = document.createElement("p"); explanation.className = "dict-assist-explanation";
-      explanation.textContent = suggestion.explanation; explanation.lang = response.targetLang || "und"; explanation.dir = "auto";
-      const lookup = button("dictAssistLookupSuggestion", "dict-assist-lookup");
-      lookup.title = suggestion.headword;
-      lookup.setAttribute("aria-label", t("dictAssistLookupSuggestion") + " " + suggestion.headword);
-      lookup.addEventListener("click", async () => {
-        if (!current() || lookup.disabled) return;
-        lookup.disabled = true;
-        try {
-          const owner = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : null;
-          if (!current()) return;
-          const canonical = value => value == null || value === "ownerless" ? "" : value;
-          if (typeof pbpVocabCurrentOwner !== "function" || canonical(owner) !== canonical(opts.owner)) {
-            lastError = "vocabAccountChanged"; result.textContent = t(lastError); syncNotice(); return;
-          }
-          opts.onLookup(pbpDictNormalizeTerm(suggestion.headword));
-        } catch (error) {
-          console.warn("[dict] suggested lookup account read failed:", error?.name, "Unable to verify current account");
-          if (current()) { lastError = "vocabAccountChanged"; result.textContent = t(lastError); syncNotice(); lookup.disabled = false; }
-        }
+  const show = next => {
+    if (!alive()) return;
+    mode = next;
+    if (opts.dictionaryHost) opts.dictionaryHost.hidden = mode === "ai";
+    content.hidden = mode !== "ai";
+    toggle.textContent = t(mode === "ai" ? "dictEntryShowDictionary" : "dictEntryShowAi");
+    opts.onView?.(mode);
+  };
+  const render = (value, answerLanguage) => {
+    record = value;
+    const norm = pbpDictEntryNorm(record, answerLanguage);
+    _pbpDictRenderEntry(content, norm, opts.term, opts.lang, opts.term, "");
+    if (!record.entry.meanings.length) {
+      const empty = document.createElement("p"); empty.className = "xp-dict-msg";
+      empty.textContent = t("dictEntryNoEntry"); content.prepend(empty);
+    }
+    const details = document.createElement("details"); details.className = "xp-dict-ai-details";
+    const summary = document.createElement("summary");
+    summary.textContent = t(record.entry.etymology || record.entry.relatedWords.length ? "dictEntryDetails" : "dictEntrySource");
+    details.appendChild(summary);
+    if (record.entry.etymology) {
+      const p = document.createElement("p"); p.lang = answerLanguage.lang; p.dir = "auto";
+      p.textContent = record.entry.etymology; details.appendChild(p);
+    }
+    if (record.entry.relatedWords.length) {
+      const words = document.createElement("p"); words.className = "xp-dict-rel"; words.lang = opts.lang || "und"; words.dir = "auto";
+      const label = document.createElement("span"); label.lang = document.documentElement.lang || "und";
+      label.textContent = t("dictEntryRelated") + ": "; words.appendChild(label);
+      record.entry.relatedWords.forEach((word, index) => {
+        if (index) words.append(" · ");
+        if (typeof opts.onLookup !== "function") { words.append(word); return; }
+        const link = button("dictLookupSelection", "xp-dict-lemma-link");
+        link.className = "xp-dict-lemma-link"; link.textContent = word;
+        link.addEventListener("click", () => { if (alive()) opts.onLookup(word); }); words.appendChild(link);
       });
-      group.append(explanation, lookup); result.appendChild(group);
+      details.appendChild(words);
     }
+    const provenance = document.createElement("p"); provenance.className = "xp-dict-src";
+    provenance.textContent = [t("dictAiLabel"), record.provider, record.model,
+      new Date(record.generatedAt).toLocaleDateString()].join(" · ");
+    details.appendChild(provenance); content.appendChild(details);
+    opts.onEntry?.(norm, record, content);
+    // Move focus off a disappearing action without scrolling the article.
+    const hadFocus = document.activeElement === generate || document.activeElement === stop;
+    show("ai"); sync();
+    if (hadFocus) toggle.focus({ preventScroll: true });
+    message(record.cacheSaved === false ? t("dictEntryNotCached") : "");
   };
-  const run = async task => {
-    if (!alive() || busy || !settings || settings.previewAiEnabled === false || typeof hasAIKey !== "function" || !hasAIKey(settings)) return;
-    const selected = selectedCandidate();
-    const candidates = task === "analyze" ? [] : task === "explain" ? selected?.eligible === true ? [selected] : [] : choices.filter(choice => choice.eligible === true);
-    if (task === "analyze" ? !located() || analyze.hidden : !candidates.length || (task === "recommend" && !opts.sentence)) return;
-    invalidate(); const version = epoch, ctrl = new AbortController(); active = ctrl; busy = true; lastTask = task;
-    const current = () => alive() && epoch === version && !ctrl.signal.aborted;
-    // Capture source identities before any await; later source arrivals or
-    // replacement invalidate this entire response, including its use button.
-    const originals = new Map(candidates.map(candidate => [candidate.id, originalChoice(candidate)]));
-    context.hidden = !opts.sentence;
-    result.textContent = t(task === "analyze" ? "dictAssistAnalysisBusy" : "dictAssistBusy"); sync();
+  const input = (signal, isCurrent) => ({ term: opts.term, sourceLanguage: opts.lang || "und", target: target(),
+    owner: opts.owner, settings, signal, isCurrent });
+  const run = async manual => {
+    if (!alive() || busy || !configured()) return;
+    const version = ++epoch, controller = new AbortController(); active = controller; busy = true;
+    const current = () => alive() && epoch === version && !controller.signal.aborted;
+    message(t("dictEntryGenerating")); sync();
     try {
-      // First asynchronous operation of the direct click: request only the
-      // configured exact AI origin. Owner/consent are rechecked at dispatch.
-      await ensureAIHostPermissionWithGesture(settings);
+      // The automatic path never requests permission. Only this direct click
+      // can open Chrome's exact-origin permission prompt, before any other await.
+      if (manual) await ensureAIHostPermissionWithGesture(settings);
       if (!current()) return;
-      const locale = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : document.documentElement.lang || "en";
-      const response = await pbpDictAssistRun({ task, term: opts.term, sourceLanguage: opts.lang,
-        sentence: opts.sentence || "", target: pbpDictDefinitionLanguage(settings.dictDefinitionLang, locale),
-        choices: candidates, owner: opts.owner, settings, signal: ctrl.signal, isCurrent: current });
-      if (!current()) return;
-      result.replaceChildren();
-      if (task === "analyze") {
-        opts.onAnalysis?.(response);
-        renderAnalysis(response, current); return;
-      }
-      if (task === "recommend") {
-        const candidate = candidates.find(choice => choice.id === response.choiceId);
-        const original = originals.get(response.choiceId);
-        const title = document.createElement("div"); title.className = "xp-dict-local-title";
-        title.textContent = t(candidate && original ? "dictAssistRecommended" : "dictAssistNoMatch"); result.appendChild(title);
-        if (candidate && original) {
-          const meaning = document.createElement("p"); meaning.className = "dict-assist-meaning";
-          meaning.lang = candidate.definitionLang || "und"; meaning.dir = "auto"; meaning.textContent = candidate.definition;
-          const source = document.createElement("div"); source.className = "xp-dict-src";
-          source.textContent = candidate.headword + " · " + candidate.sourceLabel;
-          const use = button("dictAssistUseMeaning", "dict-assist-use");
-          use.addEventListener("click", () => {
-            if (!current()) return;
-            applying = true;
-            try { opts.onSelect(original); use.disabled = true; }
-            finally { applying = false; sync(); }
-          });
-          result.append(meaning, source, use);
-        }
-      }
-      const label = document.createElement("div"); label.className = "xp-dict-ailabel"; label.textContent = t("dictAiLabel");
-      const text = document.createElement("p"); text.className = "dict-assist-explanation";
-      text.lang = response.targetLang || "und"; text.dir = "auto"; text.textContent = response.explanation;
-      const copy = button("dictAssistCopy", "dict-assist-copy");
-      const copyStatus = document.createElement("p"); copyStatus.className = "dict-assist-copy-status";
-      copyStatus.setAttribute("role", "status"); copyStatus.hidden = true;
-      copy.addEventListener("click", async () => {
-        if (!current()) return;
-        try {
-          await navigator.clipboard.writeText(response.explanation);
-          if (current()) { copy.textContent = t("dictAssistCopied"); copyStatus.textContent = ""; copyStatus.hidden = true; }
-        } catch (_) {
-          if (current()) { copy.textContent = t("dictAssistCopy"); copyStatus.textContent = t("dictAssistCopyFailed"); copyStatus.hidden = false; }
-        }
-      });
-      result.append(label, text, copyStatus, copy);
+      if (typeof pbpAiBumpCounter === "function") pbpAiBumpCounter("explain");
+      const request = input(controller.signal, current);
+      const result = await pbpDictEntryRun(request);
+      if (current()) render(result, request.target);
     } catch (error) {
-      if (!current() || error?.name === "AbortError") return;
-      const key = error?.code === "source_not_allowed" ? "dictAssistSourceNotAllowed" :
-        error?.code === "owner_changed" ? "vocabAccountChanged" : error?.code === "stale" ? "dictAssistSourceChanged" :
-        task === "analyze" ? "dictAssistAnalysisFailed" : "dictAssistFailed";
-      lastError = key;
-      result.textContent = error?.code === "host_permission" && typeof pbpAiErrorText === "function" ? pbpAiErrorText(error) : t(key);
-      if (key === "dictAssistSourceNotAllowed" && !links.childElementCount) settingsLink("vocab");
-    } finally { if (current()) { busy = false; settled = true; sync(); syncNotice(); } }
+      if (!current()) return;
+      console.warn("[dict-entry] generation failed:", error?.name, error?.code || "request_failed");
+      message(t(error?.code === "host_permission" ? "aiGrantRetry" :
+        error?.code === "owner_changed" ? "vocabAccountChanged" : "dictEntryUnavailable"));
+    } finally {
+      if (epoch === version) { busy = false; active = null; if (alive()) sync(); }
+    }
   };
-  recommend.addEventListener("click", () => run("recommend"));
-  explain.addEventListener("click", () => run("explain"));
-  analyze.addEventListener("click", () => run("analyze"));
-  stop.addEventListener("click", () => { invalidate(); sync(); });
-  opts.signal?.addEventListener("abort", () => { invalidate(); notice.remove(); }, { once: true });
-  if (!settings && opts.settings) Promise.resolve(opts.settings).then(value => { settings = value || {}; sync(); }, error => {
-    console.warn("[dict] AI settings read failed:", error?.name, "Unable to load settings"); settings = {}; sync();
+  generate.addEventListener("click", () => run(true));
+  toggle.addEventListener("click", () => show(mode === "ai" ? "dictionary" : "ai"));
+  stop.addEventListener("click", () => {
+    epoch++; active?.abort(); active = null; busy = false; message(""); sync();
+    if (!generate.hidden) generate.focus({ preventScroll: true });
   });
-  sync();
-  if (opts.initialAnalysis && alive()) {
-    const version = epoch; lastTask = "analyze"; settled = true; context.hidden = !opts.sentence;
-    renderAnalysis(opts.initialAnalysis, () => alive() && epoch === version);
-    sync(); syncNotice();
+  opts.signal?.addEventListener("abort", () => { epoch++; active?.abort(); }, { once: true });
+  const ready = Promise.resolve(opts.settings).then(async value => {
+    if (!alive()) return;
+    settings = value || {}; sync();
+    const version = epoch;
+    const request = input(opts.signal, () => alive() && epoch === version);
+    const hit = await pbpDictEntryRead(request);
+    if (!alive() || epoch !== version) return;
+    if (hit) render(hit, request.target);
+    else if (settings.dictAiAutoGenerate === true) await run(false);
+  }).catch(error => {
+    if (!alive() || error?.name === "AbortError" || error?.code === "stale") return;
+    console.warn("[dict-entry] initialization failed:", error?.name, error?.code || "settings_failed");
+    if (error?.code === "owner_changed") message(t("vocabAccountChanged"));
+    sync();
+  });
+  // Settings changed in another extension tab must invalidate the old action
+  // before it can dispatch with a stale enabled flag or language pair.
+  if (opts.onSettingsChange && typeof chrome !== "undefined" && chrome.storage?.onChanged) {
+    let settingsSequence = 0, lastRelevant = 0;
+    const listener = async (changes, area) => {
+      const keys = Object.keys(changes);
+      if (!alive() || !["sync", "local"].includes(area) || !keys.some(key =>
+        ["dictAiAutoGenerate", "dictDefinitionLang", "previewAiEnabled", "aiProvider", "previewAiModelByProvider", "optSyncEnabled", "syncApiKeys"].includes(key) ||
+        /(?:Model|ApiKey|BaseUrl)$/.test(key))) return;
+      const sequence = ++settingsSequence;
+      if (!changes.optSyncEnabled && typeof pbpReadSecretSyncState === "function") {
+        const flags = await pbpReadSecretSyncState({ persistInferredState: false });
+        const mainArea = flags.optSyncEnabled ? "sync" : "local";
+        const secretArea = typeof pbpSecretRoutingActive === "function" && pbpSecretRoutingActive(flags.optSyncEnabled, flags.syncApiKeys) ? "local" : mainArea;
+        if (!keys.some(key => area === (typeof API_KEY_FIELDS !== "undefined" && API_KEY_FIELDS.includes(key) ? secretArea : mainArea))) return;
+      } else if (!changes.optSyncEnabled && typeof pbpSettingsAreaName === "function" && area !== await pbpSettingsAreaName()) return;
+      if (!alive() || sequence < lastRelevant) return;
+      lastRelevant = sequence;
+      const revision = ++epoch; active?.abort(); active = null; busy = false; generate.disabled = true;
+      try {
+        const next = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
+        if (alive() && epoch === revision) opts.onSettingsChange(next);
+      } catch (error) {
+        console.warn("[dict-entry] settings refresh failed:", error?.name);
+        if (alive() && epoch === revision) { settings = null; message(t("dictEntryUnavailable")); sync(); }
+      }
+    };
+    const changed = (changes, area) => listener(changes, area).catch(error =>
+      console.warn("[dict-entry] settings routing read failed:", error?.name));
+    chrome.storage.onChanged.addListener(changed);
+    opts.signal?.addEventListener("abort", () => chrome.storage.onChanged.removeListener(changed), { once: true });
   }
-  return {
-    element: panel,
-    update(next) {
-      if (!alive()) return;
-      if (lastTask === "analyze") { norms = next.filter(Boolean); choices = pbpDictAssistChoices(norms); sync(); syncNotice(); return; }
-      const hadAdvice = busy || !!result.textContent;
-      invalidate(); norms = next.filter(Boolean); choices = pbpDictAssistChoices(norms);
-      if (hadAdvice) { lastError = "dictAssistSourceChanged"; result.textContent = t(lastError); settled = true; }
-      sync(); syncNotice();
-    },
-    selectionChanged() { if (!alive()) return; if (!applying && lastTask !== "analyze") invalidate(); sync(); }
-  };
+  return { element: panel, ready, show };
 }
 
 const PBP_DICT_LANGS = ["auto", ...PBP_DICT_QUERY_LANGS];
@@ -1858,7 +1594,6 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   // A language switch / rerun aborts ONLY the old child (Codex HIGH 1).
   if (_pbpDictChildCtrl) _pbpDictChildCtrl.abort();
   if (_pbpDictParentCleanup) { _pbpDictParentCleanup(); _pbpDictParentCleanup = null; }
-  if (_pbpDictCtxIo) { try { _pbpDictCtxIo.disconnect(); } catch (_) {} _pbpDictCtxIo = null; }
   const child = new AbortController();
   _pbpDictChildCtrl = child;
   const onParentAbort = () => child.abort();
@@ -1871,17 +1606,17 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
 
   const runId = ++_pbpDictRunSeq;
   const origin = navigation && navigation.owner === _pbpDictOwner ? navigation :
-    { cap, owner: _pbpDictOwner, analyses: new Map() };
+    { cap, owner: _pbpDictOwner };
   const derived = cap.text !== origin.cap.text;
   const title = pop.querySelector(".xp-term");
   if (title) { title.textContent = cap.text; title.title = cap.text; }
   const cur = {
-    runId, term: cap.text, lang: "", gloss: "", lemma: "", ipa: "",
-    sourceUrl: "", license: "", sentence: ctx.sentence || "", saved: false,
+    runId, term: cap.text, queryTerm: cap.text, lang: "", gloss: "", lemma: "", ipa: "",
+    sourceUrl: "", license: "", sentence: ctx.sentence || "", saved: false, entryView: "dictionary",
     owner: _pbpDictOwner,
     rerun: () => { if (cur.isCurrent() && !signal.aborted) pbpDictRun(cap, ctx, pop, ctrl, s, origin); },
     // Lemma click-through (form-of pointers): a fresh full run on the base
-    // form, so language detection, vocab identity and the AI slot all see
+    // form, so language detection, vocab identity and the AI entry all see
     // the lemma as the selection. Same guard as rerun.
     rerunWith: (term) => {
       const next = pbpDictNormalizeTerm(term);
@@ -1891,7 +1626,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   _pbpDictCurrent = cur;
   cur.isCurrent = () => _pbpDictCurrent === cur && _pbpDictOwner === cur.owner;
 
-  // Vocab button: disabled until BOTH slots settle so a save is never empty
+  // Vocab button is reset before language detection so a stale lookup cannot save
   // (Codex HIGH 3). dataset.runId guards stale promise writes. Set the
   // moment this run becomes current -- BEFORE the first await
   // (_pbpDictResolveLang) below, not after -- otherwise the OLD run's button
@@ -1937,18 +1672,10 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   const speak = document.createElement("button");
   speak.type = "button";
   speak.className = "xp-dict-speak";
-  speak.setAttribute("aria-label", t("dictSpeak")); // no title — a11y label only
+  speak.setAttribute("aria-label", t("dictSpeak"));
+  speak.title = t("dictSpeak");
   speak.innerHTML = PBP_DICT_SPEAKER_SVG; // static constant, never model text
-  const ctxReady = document.createElement("button");
-  ctxReady.type = "button";
-  ctxReady.className = "xp-dict-speak xp-dict-ctx-ready"; // same head-button family
-  ctxReady.title = t("dictCtxReady");
-  ctxReady.setAttribute("aria-label", t("dictCtxReady"));
-  ctxReady.innerHTML = PBP_DICT_CTX_READY_SVG; // static constant
-  ctxReady.hidden = true;
-  head.appendChild(sel);
-  head.appendChild(speak);
-  head.appendChild(ctxReady);
+  head.append(sel, speak);
   const slot = document.createElement("div");
   slot.className = "xp-dict-slot";
   // Two stable children. Every online path -- skeleton, permission prompt,
@@ -1961,8 +1688,6 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   onlineEl.className = "xp-dict-online";
   slot.appendChild(localEl);
   slot.appendChild(onlineEl);
-  const ctxEl = document.createElement("div");
-  ctxEl.className = "xp-dict-ctx";
   wrap.appendChild(head);
   if (derived) {
     const source = document.createElement("div"); source.className = "xp-dict-origin";
@@ -1981,7 +1706,6 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
     source.append(label, back); wrap.appendChild(source);
   }
   wrap.appendChild(slot);
-  wrap.appendChild(ctxEl);
   body.replaceChildren(wrap);
   _pbpDictSlotSkeleton(onlineEl);
 
@@ -2008,38 +1732,33 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
     _pbpDictManualLang = sel.value; // per-document only; never persisted
     cur.rerun(); // abort old requests NOW
   });
-  speak.addEventListener("click", () => pbpDictSpeak(cur.term || cap.text, cur.lang));
+  speak.addEventListener("click", () => {
+    const visible = cur.entryView === "ai" ? cur.aiNorm : cur.dictionaryNorm;
+    pbpDictSpeak(visible?.word || cap.text, lang);
+  });
   cur.refreshLanguages = () => _pbpDictRefreshPackLangs(sel, languageLocale, true,
     () => !signal.aborted && _pbpDictCurrent === cur).then(codes => {
       if (!signal.aborted && _pbpDictCurrent === cur && _pbpDictManualLang && !codes.includes(_pbpDictManualLang)) _pbpDictManualLang = "";
     });
   cur.meaningSources = new Map();
-  const assistHost = document.createElement("div"); slot.after(assistHost);
-  const noticeHost = document.createElement("div"); noticeHost.className = "xp-dict-notice"; body.after(noticeHost);
-  signal.addEventListener("abort", () => noticeHost.remove(), { once: true });
-  const analysisKey = lang + ":" + cap.text;
+  const aiHost = document.createElement("div"); slot.before(aiHost);
   const originalTerm = wrap.querySelector(".xp-dict-origin-term"); if (originalTerm) originalTerm.lang = lang || "und";
-  cur.assist = _pbpDictAssistMount(assistHost, { term: cap.text, lang, sentence: cur.sentence, owner: cur.owner,
-    signal, isCurrent: cur.isCurrent, settings: s, getSelection: () => cur.packChoice || null,
-    derived, noticeHost, scrollHost: body, initialAnalysis: origin.analyses.get(analysisKey),
-    onAnalysis: response => { if (cur.isCurrent()) origin.analyses.set(analysisKey, response); },
-    onLookup: headword => { if (cur.isCurrent()) cur.rerunWith(headword); },
-    onSelect: choice => {
-      for (const source of cur.meaningSources.values()) {
-        const index = source.choices.findIndex(row => row.term === choice.term && row.gloss === choice.gloss &&
-          row.packId === choice.packId && row.sourceLabel === choice.sourceLabel);
-        if (index >= 0) { source.select.value = String(index); source.select.dispatchEvent(new Event("change")); break; }
-      }
+  cur.ai = _pbpDictEntryMount(aiHost, { term: cap.text, lang, owner: cur.owner,
+    signal, isCurrent: cur.isCurrent, settings: s, dictionaryHost: slot,
+    onSettingsChange: next => { if (cur.isCurrent()) pbpDictRun(cap, ctx, pop, ctrl, next, origin); },
+    onLookup: term => cur.rerunWith(term),
+    onEntry: (norm, record, content) => {
+      cur.aiNorm = norm;
+      _pbpDictReaderPackChoices(norm, content, cur, pop, signal);
+    },
+    onView: mode => {
+      cur.entryView = mode;
+      _pbpDictApplyVisibleChoice(cur);
+      _pbpDictSyncMeaningSelect(cur);
+      _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name));
     } });
 
-  let lemmaSettled = false;
-  let resolveLemmaRaw;
-  const lemmaPromise = new Promise((r) => { resolveLemmaRaw = r; });
-  const resolveLemmaOnce = (v) => { if (!lemmaSettled) { lemmaSettled = true; resolveLemmaRaw(v); } };
-
-  // Deliberately NOT part of the allSettled below: putting it there would make
-  // the whole run's completion wait on an IDB read, and the online chain is the
-  // one thing that must never be delayed by the local pack.
+  // Local dictionaries load independently of the online request and AI entry.
   const ecdictEl = document.createElement("div"), packsEl = document.createElement("div");
   localEl.append(packsEl, ecdictEl);
   _pbpDictEcdictSide(ecdictEl, cap.text, lang, signal, cur,
@@ -2051,7 +1770,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
     cur.packRevision = (cur.packRevision || 0) + 1;
     cur.packSelects = (cur.packSelects || []).filter(select => !select.dataset.packId);
     for (const [key, source] of cur.meaningSources) if (source.norm.packId) cur.meaningSources.delete(key);
-    cur.assist?.update([...cur.meaningSources.values()].map(source => source.norm));
+    _pbpDictSyncMeaningSelect(cur);
     if (cur.packChoice?.packId) {
       cur.packChoice = null;
       // A revoked source must not silently change the selected headword or
@@ -2066,65 +1785,40 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   };
   showPacks();
 
-  const results = await Promise.allSettled([
-    _pbpDictSlotRun(onlineEl, cap.text, lang, signal, lemmaPromise, cur.rerun, ctx.sentence).then((norm) => {
-      // Sync the defined word the moment the dictionary slot settles -- the
-      // speak button is live before the (slower) AI slot finishes.
-      if (norm && norm.sourceLabel === "CC-CEDICT" && norm.word && _pbpDictCurrent === cur && !cur.packChoice) cur.term = norm.word;
-      if (norm && !signal.aborted && _pbpDictCurrent === cur) _pbpDictReaderPackChoices(norm, onlineEl, cur, pop, signal);
-      return norm;
-    }),
-    _pbpDictCtxRun(ctxEl, cap, ctx, s, signal, resolveLemmaOnce, lang)
-  ]);
+  const norm = await _pbpDictSlotRun(onlineEl, cap.text, lang, signal, Promise.resolve(""), cur.rerun, ctx.sentence);
   if (signal.aborted || _pbpDictCurrent !== cur) return;
-  const norm = results[0].status === "fulfilled" ? results[0].value : null;
-  const parsed = results[1].status === "fulfilled" ? results[1].value : null;
-  const savedChoice = cur.packChoice;
-  const preservedTerm = cur.term;
-  if (savedChoice || cur.packInvalidated) {
-    cur.term = norm?.sourceLabel === "CC-CEDICT" && norm.word ? norm.word : cap.text;
-    cur.gloss = ""; cur.ipa = ""; cur.sourceUrl = ""; cur.license = ""; cur.lemma = "";
-  }
-  if (norm) {
-    // The reader saves what they see. The slot renders the context-ordered
-    // view, so the persisted gloss/ipa must read the SAME view -- reading
-    // norm.entries[0] (API order) can save a different sense from the one on
-    // top of the screen. norm itself stays untouched: it is the object in the
-    // dict2_ cache.
-    const ordered = pbpDictOrderForContext(norm.entries, cur.sentence);
-    const first = ordered[0];
-    cur.ipa = first && first.ipas[0] ? first.ipas[0].text : "";
-    cur.sourceUrl = norm.sourceUrl;
-    cur.license = norm.license;
-    if (first && first.senses[0]) cur.gloss = first.senses[0].definition;
-  }
-  // A CC-CEDICT PREFIX hit (norm.word shorter than the raw selection --
-  // e.g. selecting "中国人" resolves the dictionary slot to "中国") means the
-  // AI context slot explained the ORIGINAL long selection, not the prefix
-  // word the dictionary matched. Its gloss/lemma belong to a different piece
-  // of text and must not overwrite what the dictionary slot already wrote
-  // into cur (or, transitively, the saved vocab record) -- the AI slot's own
-  // on-screen rendering is untouched, this only guards persistence.
-  const prefixHit = norm && norm.sourceLabel === "CC-CEDICT" && norm.word && norm.word !== cap.text;
-  if (parsed && !prefixHit) {
-    if (parsed.gloss) {
-      // Contextual sense first (it is why the reader looked the word up),
-      // dictionary general sense on its own line below -- away from the
-      // sentence (an Anki back, the vocab list) the narrow sense alone is
-      // often unreadable. The card renders pre-wrap; TSV/Anki flatten the
-      // newline, so no export contract changes.
-      const dictGloss = cur.gloss && cur.gloss !== parsed.gloss ? cur.gloss : "";
-      cur.gloss = dictGloss ? parsed.gloss + "\n" + dictGloss : parsed.gloss;
-    }
-    cur.lemma = parsed.lemma;
-  }
-  if (parsed) _pbpDictCtxSignal(body, ctxEl, ctxReady);
-  if (cur.packInvalidated && !cur.packChoice) {
-    cur.term = preservedTerm; cur.gloss = ""; cur.ipa = ""; cur.sourceUrl = ""; cur.license = ""; cur.lemma = "";
-    return;
-  }
-  if (cur.packChoice) _pbpDictApplyPackChoice(cur, cur.packChoice);
+  cur.dictionaryNorm = norm;
+  if (norm) _pbpDictReaderPackChoices(norm, onlineEl, cur, pop, signal);
+  if (cur.packInvalidated && !cur.packChoice) return;
+  _pbpDictApplyVisibleChoice(cur);
+  _pbpDictSyncMeaningSelect(cur);
   await _pbpDictRefreshSave(pop, cur, signal);
+}
+
+function _pbpDictApplyVisibleChoice(cur) {
+  if (cur.packChoice) { _pbpDictApplyPackChoice(cur, cur.packChoice); return; }
+  const norm = cur.entryView === "ai" ? cur.aiNorm : cur.dictionaryNorm;
+  const choice = norm && pbpDictNormChoices({ ...norm,
+    entries: pbpDictOrderForContext(norm.entries, cur.entryView === "ai" ? "" : cur.sentence) }, cur.lang, t("dictSource"))[0];
+  if (choice) _pbpDictApplyPackChoice(cur, choice);
+  else Object.assign(cur, { term: cur.queryTerm || cur.term, gloss: "", ipa: "", sourceUrl: "", license: "", lemma: "" });
+}
+
+function _pbpDictSyncMeaningSelect(cur) {
+  const select = cur.meaningSelect;
+  if (!select) return;
+  const rows = [...cur.meaningSources.values()].flatMap(source => source.choices);
+  cur.meaningChoices = rows;
+  select.replaceChildren(new Option(t("vocabSaveDefinitionLabel"), ""));
+  rows.forEach((choice, index) => {
+    const option = new Option(choice.term + " · " + choice.gloss + " (" + choice.sourceLabel + ")", String(index));
+    option.lang = choice.definitionLang; select.appendChild(option);
+  });
+  const selected = rows.findIndex(choice => choice.term === cur.term && choice.gloss === cur.gloss &&
+    choice.sourceUrl === cur.sourceUrl && choice.license === cur.license);
+  select.value = selected >= 0 ? String(selected) : "";
+  select.hidden = !rows.length || (rows.length === 1 && selected === 0 && !cur.packChoice);
+  select.title = selected >= 0 ? rows[selected].gloss + " (" + rows[selected].sourceLabel + ")" : t("vocabSaveDefinitionLabel");
 }
 
 function _pbpDictApplyPackChoice(cur, choice) {
@@ -2135,30 +1829,25 @@ function _pbpDictApplyPackChoice(cur, choice) {
 function _pbpDictReaderPackChoices(norm, box, cur, pop, signal) {
   const choices = pbpDictNormChoices(norm, cur.lang, t("dictSource"));
   if (!choices.length) return;
-  const select = document.createElement("select");
-  select.className = "xp-dict-lang";
-  if (norm.packId) select.dataset.packId = norm.packId;
   const key = (norm.packId || norm.sourceLabel) + ":" + norm.word;
-  cur.meaningSources?.set(key, { norm, select, choices });
-  select.setAttribute("aria-label", t("vocabSaveDefinitionLabel"));
-  select.appendChild(new Option(t("vocabSaveDefinitionLabel"), ""));
-  choices.forEach((choice, index) => {
-    const option = new Option(choice.term + " · " + choice.gloss, String(index));
-    option.lang = choice.definitionLang; select.appendChild(option);
-  });
-  (cur.packSelects || (cur.packSelects = [])).push(select);
-  select.addEventListener("change", () => {
-    const choice = choices[Number(select.value)];
-    if (select.value === "" || !choice || signal.aborted || _pbpDictCurrent !== cur) return;
-    for (const other of cur.packSelects) if (other !== select) other.value = "";
-    cur.packChoice = choice; cur.packInvalidated = false;
-    cur.packRevision = (cur.packRevision || 0) + 1;
-    _pbpDictApplyPackChoice(cur, choice);
-    cur.assist?.selectionChanged();
-    _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name, error?.message));
-  });
-  box.appendChild(select);
-  cur.assist?.update([...cur.meaningSources.values()].map(source => source.norm));
+  cur.meaningSources?.set(key, { norm, choices });
+  if (!cur.meaningSelect) {
+    const select = document.createElement("select");
+    select.className = "xp-dict-lang xp-dict-save-meaning";
+    select.setAttribute("aria-label", t("vocabSaveDefinitionLabel"));
+    cur.meaningSelect = select;
+    (pop.querySelector(".xp-foot") || box).prepend(select);
+    signal.addEventListener("abort", () => select.remove(), { once: true });
+    select.addEventListener("change", () => {
+      const choice = cur.meaningChoices[Number(select.value)];
+      if (select.value === "" || !choice || signal.aborted || _pbpDictCurrent !== cur) return;
+      cur.packChoice = choice; cur.packInvalidated = false;
+      cur.packRevision = (cur.packRevision || 0) + 1;
+      _pbpDictApplyPackChoice(cur, choice); _pbpDictSyncMeaningSelect(cur);
+      _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name));
+    });
+  }
+  _pbpDictSyncMeaningSelect(cur);
 }
 
 async function _pbpDictRefreshSave(pop, cur, signal) {
@@ -2391,7 +2080,6 @@ window.pbpDictOnActionSwitch = () => {
   _pbpDictSaveTarget = null;
   if (_pbpDictChildCtrl) _pbpDictChildCtrl.abort(); // invalidate the run, not just the range
   _pbpDictCurrent = null;
-  if (_pbpDictCtxIo) { try { _pbpDictCtxIo.disconnect(); } catch (_) {} _pbpDictCtxIo = null; }
 };
 
 // Owner arrives with the page render (dict-run/save read _pbpDictOwner; the

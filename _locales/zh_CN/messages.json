@@ -3149,7 +3149,7 @@
     "message": "复制代码"
   },
   "dictMoreSenses": {
-    "message": "展开其余 $COUNT$ 条义项",
+    "message": "展开其余 $COUNT$ 种含义",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -3854,7 +3854,7 @@
     "message": "来源："
   },
   "dictAiNotConfigured": {
-    "message": "要获得语境释义，请在设置中配置 AI 服务商并开启阅读器 AI 功能。"
+    "message": "在设置中配置 AI 服务商并开启阅读器 AI 后，即可生成词条。"
   },
   "dictVocabEmpty": {
     "message": "当前 Pinboard 账号（$OWNER$）还没有生词。可在阅读器的词典视图中保存单词。",
@@ -4427,8 +4427,8 @@
   "mdExportAskEmpty": {"message": "没有可导出的完整问答。"},
   "mdExportContextChanged": {"message": "账号、文章或问答记录已发生变化，请重新开始导出。"},
   "themeGroupAdaptiveHint": {"message": "自适应预设跟随上方「扩展外观」中的明暗设置。"},
-  "dictDefinitionLangLabel": { "message": "AI 释义语言" },
-  "dictDefinitionLangHint": { "message": "设置 AI 语境释义的语言。词典条目保留原有语言。" },
+  "dictDefinitionLangLabel": { "message": "AI 词条释义语言" },
+  "dictDefinitionLangHint": { "message": "选择 AI 词条中解释词义所用的语言，可与所查词语的语言不同。原词典释义保留原有语言。" },
   "dictDefinitionLangUi": { "message": "跟随界面语言" },
   "vocabLanguageFilterAria": { "message": "按语言筛选" },
   "vocabAllLanguages": { "message": "全部语言" },
@@ -4485,18 +4485,18 @@
   "dictPackResultsLimited": {"message": "部分匹配结果未显示，请尝试更具体的词语。"},
   "dictOnlineLanguageUnavailable": {"message": "此语言暂不支持在线查词。"},
   "dictTagReading": {"message": "读音"},
-  "dictAssistRecommend": {"message": "用 AI 匹配义项"},
-  "dictAssistExplain": {"message": "用 AI 解释义项"},
-  "dictAssistUseMeaning": {"message": "选择此词典义项"},
-  "dictAssistNeedContext": {"message": "要匹配义项，请在句子中查词，或打开带有来源句子的已存生词。"},
-  "dictAssistChooseMeaning": {"message": "请选择要解释的词典义项。"},
-  "dictAssistNoSources": {"message": "暂无允许 AI 使用的词典义项。可在生词设置中允许词典来源供 AI 使用。"},
-  "dictAssistSourceChanged": {"message": "词语或词典来源已变化，请用当前义项重试。"},
+  "dictAssistRecommend": {"message": "用 AI 匹配含义"},
+  "dictAssistExplain": {"message": "用 AI 解释含义"},
+  "dictAssistUseMeaning": {"message": "选择此词典含义"},
+  "dictAssistNeedContext": {"message": "要匹配含义，请在句子中查词，或打开带有来源句子的已存生词。"},
+  "dictAssistChooseMeaning": {"message": "请选择要解释的词典含义。"},
+  "dictAssistNoSources": {"message": "暂无允许 AI 使用的词典含义。可在生词设置中允许词典来源供 AI 使用。"},
+  "dictAssistSourceChanged": {"message": "词语或词典来源已变化，请用当前含义重试。"},
   "dictAssistSourceNotAllowed": {"message": "此词典来源尚未允许 AI 使用，请在生词设置中检查授权。"},
-  "dictAssistNoMatch": {"message": "这些词典义项中，没有明确符合当前句子的释义。"},
-  "dictAssistRecommended": {"message": "建议的词典义项"},
+  "dictAssistNoMatch": {"message": "这些词典含义中，没有明确符合当前句子的释义。"},
+  "dictAssistRecommended": {"message": "建议的词典含义"},
   "dictAssistContext": {"message": "使用的句子"},
-  "dictAssistBusy": {"message": "正在查看词典义项…"},
+  "dictAssistBusy": {"message": "正在查看词典含义…"},
   "dictAssistCopy": {"message": "复制 AI 解释"},
   "dictAssistCopied": {"message": "已复制解释"},
   "dictAssistCopyFailed": {"message": "无法复制解释，请选中文字后手动复制。"},
@@ -4516,5 +4516,19 @@
   "dictQueryBack": {"message": "返回原选内容"},
   "dictAssistResultReady": {"message": "AI 结果已就绪"},
   "dictAssistErrorReady": {"message": "AI 请求出现问题"},
-  "dictAssistViewResult": {"message": "查看"}
+  "dictAssistViewResult": {"message": "查看"},
+  "dictEntryGenerate": {"message": "生成 AI 词条"},
+  "dictEntryGenerating": {"message": "正在生成词条…"},
+  "dictEntryUnavailable": {"message": "未能生成词条，请重试。"},
+  "dictEntryNoEntry": {"message": "AI 未能确定这个词的可靠含义。"},
+  "dictEntrySource": {"message": "AI 词条"},
+  "dictEntryDetails": {"message": "词源与相关词"},
+  "dictEntryExamples": {"message": "例句"},
+  "dictEntryEtymology": {"message": "词源"},
+  "dictEntryRelated": {"message": "相关词"},
+  "dictEntryShowDictionary": {"message": "查看词典"},
+  "dictEntryShowAi": {"message": "查看 AI 词条"},
+  "dictEntryNotCached": {"message": "未能将此词条缓存到本机。"},
+  "dictAiAutoGenerateLabel": {"message": "自动生成 AI 词条"},
+  "dictAiAutoGenerateHint": {"message": "查词时若没有已缓存的 AI 词条，使用阅读器 AI 模型生成，会消耗 tokens。默认关闭，仍可手动生成。"}
 }

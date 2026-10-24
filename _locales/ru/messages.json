@@ -3854,7 +3854,7 @@
     "message": "Источник:"
   },
   "dictAiNotConfigured": {
-    "message": "Чтобы получать контекстные объяснения, настройте AI-провайдера и включите в настройках функции AI на странице «Чтение»."
+    "message": "Чтобы создавать статьи, настройте провайдера AI и включите функции AI для чтения в настройках."
   },
   "dictVocabEmpty": {
     "message": "В текущем аккаунте Pinboard ($OWNER$) пока нет сохранённых слов. Сохраняйте их из словаря в режиме чтения.",
@@ -4433,8 +4433,8 @@
   "mdExportAskEmpty": {"message": "Нет завершённых вопросов и ответов для экспорта."},
   "mdExportContextChanged": {"message": "Аккаунт, статья или беседа изменились. Начните экспорт заново."},
   "themeGroupAdaptiveHint": {"message": "Адаптивные пресеты следуют светлому или тёмному режиму, выбранному выше в разделе «Оформление расширения»."},
-  "dictDefinitionLangLabel": { "message": "Язык объяснений ИИ" },
-  "dictDefinitionLangHint": { "message": "Задаёт язык контекстных объяснений ИИ. Словарные статьи сохраняют исходный язык." },
+  "dictDefinitionLangLabel": { "message": "Язык определений в статьях AI" },
+  "dictDefinitionLangHint": { "message": "Выберите язык объяснений в статьях AI независимо от языка искомого слова. Исходные словарные определения сохраняют свой язык." },
   "dictDefinitionLangUi": { "message": "Использовать язык интерфейса" },
   "vocabLanguageFilterAria": { "message": "Фильтр по языку" },
   "vocabAllLanguages": { "message": "Все языки" },
@@ -4522,5 +4522,19 @@
   "dictQueryBack": {"message": "Вернуться к исходному"},
   "dictAssistResultReady": {"message": "Результат ИИ готов"},
   "dictAssistErrorReady": {"message": "Проблема с запросом к ИИ"},
-  "dictAssistViewResult": {"message": "Показать"}
+  "dictAssistViewResult": {"message": "Показать"},
+  "dictEntryGenerate": {"message": "Создать статью с AI"},
+  "dictEntryGenerating": {"message": "Создание статьи…"},
+  "dictEntryUnavailable": {"message": "Не удалось создать статью. Повторите попытку."},
+  "dictEntryNoEntry": {"message": "AI не удалось достоверно определить значение этого слова."},
+  "dictEntrySource": {"message": "Статья AI"},
+  "dictEntryDetails": {"message": "Происхождение и связанные слова"},
+  "dictEntryExamples": {"message": "Примеры"},
+  "dictEntryEtymology": {"message": "Происхождение слова"},
+  "dictEntryRelated": {"message": "Связанные слова"},
+  "dictEntryShowDictionary": {"message": "Открыть словарь"},
+  "dictEntryShowAi": {"message": "Открыть статью AI"},
+  "dictEntryNotCached": {"message": "Не удалось сохранить эту статью в кеше устройства."},
+  "dictAiAutoGenerateLabel": {"message": "Создавать статьи AI автоматически"},
+  "dictAiAutoGenerateHint": {"message": "Если статьи AI нет в кеше, при поиске её создаст модель AI для чтения. Это расходует токены. По умолчанию выключено; статьи можно создавать вручную."}
 }

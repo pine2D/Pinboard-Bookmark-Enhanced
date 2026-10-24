@@ -3854,7 +3854,7 @@
     "message": "出典:"
   },
   "dictAiNotConfigured": {
-    "message": "文脈に応じた説明を得るには、設定で AI プロバイダーを設定し、リーダーの AI 機能を有効にしてください。"
+    "message": "設定でAIプロバイダーを設定し、リーダーのAI機能を有効にすると辞書項目を生成できます。"
   },
   "dictVocabEmpty": {
     "message": "現在の Pinboard アカウント（$OWNER$）には単語が保存されていません。リーダーの辞書ビューから保存できます。",
@@ -4433,8 +4433,8 @@
   "mdExportAskEmpty": {"message": "エクスポートできる完了済みの質問と回答がありません。"},
   "mdExportContextChanged": {"message": "アカウント、記事、または会話履歴が変わりました。エクスポートをやり直してください。"},
   "themeGroupAdaptiveHint": {"message": "アダプティブプリセットは、上の「拡張機能の外観」で選んだライト／ダーク設定に従います。"},
-  "dictDefinitionLangLabel": { "message": "AIによる語義説明の言語" },
-  "dictDefinitionLangHint": { "message": "AIによる文脈に応じた語義説明の言語を設定します。辞書の項目は元の言語のまま表示されます。" },
+  "dictDefinitionLangLabel": { "message": "AI辞書の説明言語" },
+  "dictDefinitionLangHint": { "message": "AI辞書で意味を説明する言語を選びます。調べる単語の言語とは別に設定できます。元の辞書の定義は元の言語のまま表示されます。" },
   "dictDefinitionLangUi": { "message": "表示言語に合わせる" },
   "vocabLanguageFilterAria": { "message": "言語で絞り込む" },
   "vocabAllLanguages": { "message": "すべての言語" },
@@ -4522,5 +4522,19 @@
   "dictQueryBack": {"message": "元の選択に戻る"},
   "dictAssistResultReady": {"message": "AI の結果を表示できます"},
   "dictAssistErrorReady": {"message": "AI の処理で問題が発生しました"},
-  "dictAssistViewResult": {"message": "表示"}
+  "dictAssistViewResult": {"message": "表示"},
+  "dictEntryGenerate": {"message": "AIで辞書項目を生成"},
+  "dictEntryGenerating": {"message": "辞書項目を生成中…"},
+  "dictEntryUnavailable": {"message": "辞書項目を生成できませんでした。もう一度お試しください。"},
+  "dictEntryNoEntry": {"message": "AIはこの単語の意味を確実に特定できませんでした。"},
+  "dictEntrySource": {"message": "AI辞書"},
+  "dictEntryDetails": {"message": "語源と関連語"},
+  "dictEntryExamples": {"message": "例文"},
+  "dictEntryEtymology": {"message": "語源"},
+  "dictEntryRelated": {"message": "関連語"},
+  "dictEntryShowDictionary": {"message": "辞書を見る"},
+  "dictEntryShowAi": {"message": "AI辞書を見る"},
+  "dictEntryNotCached": {"message": "この辞書項目をデバイスにキャッシュできませんでした。"},
+  "dictAiAutoGenerateLabel": {"message": "AI辞書項目を自動生成"},
+  "dictAiAutoGenerateHint": {"message": "キャッシュにAI辞書項目がない場合、検索時にリーダーのAIモデルで生成します。トークンを消費します。初期設定ではオフですが、手動でも生成できます。"}
 }

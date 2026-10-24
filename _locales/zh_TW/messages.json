@@ -3149,7 +3149,7 @@
     "message": "複製程式碼"
   },
   "dictMoreSenses": {
-    "message": "展開其餘 $COUNT$ 個義項",
+    "message": "展開其餘 $COUNT$ 個詞義",
     "placeholders": {
       "count": {
         "content": "$1"
@@ -3854,7 +3854,7 @@
     "message": "來源："
   },
   "dictAiNotConfigured": {
-    "message": "要取得語境釋義，請在設定中設定 AI 服務商並開啟閱讀器 AI 功能。"
+    "message": "在設定中設定 AI 服務商並開啟閱讀器 AI 後，即可產生詞條。"
   },
   "dictVocabEmpty": {
     "message": "目前 Pinboard 帳號（$OWNER$）還沒有生詞。可從閱讀器的詞典檢視儲存單字。",
@@ -4433,8 +4433,8 @@
   "mdExportAskEmpty": {"message": "沒有可匯出的完整問答。"},
   "mdExportContextChanged": {"message": "帳號、文章或問答紀錄已變更，請重新開始匯出。"},
   "themeGroupAdaptiveHint": {"message": "自適應預設會依照上方「擴充功能外觀」的明暗設定切換。"},
-  "dictDefinitionLangLabel": { "message": "AI 釋義語言" },
-  "dictDefinitionLangHint": { "message": "設定 AI 語境釋義使用的語言。詞典條目保留原有語言。" },
+  "dictDefinitionLangLabel": { "message": "AI 詞條釋義語言" },
+  "dictDefinitionLangHint": { "message": "選擇 AI 詞條解釋詞義時使用的語言，可與查詢詞語的語言不同。原詞典釋義保留原有語言。" },
   "dictDefinitionLangUi": { "message": "跟隨介面語言" },
   "vocabLanguageFilterAria": { "message": "依語言篩選" },
   "vocabAllLanguages": { "message": "所有語言" },
@@ -4522,5 +4522,19 @@
   "dictQueryBack": {"message": "返回原選內容"},
   "dictAssistResultReady": {"message": "AI 結果已就緒"},
   "dictAssistErrorReady": {"message": "AI 請求出現問題"},
-  "dictAssistViewResult": {"message": "查看"}
+  "dictAssistViewResult": {"message": "查看"},
+  "dictEntryGenerate": {"message": "產生 AI 詞條"},
+  "dictEntryGenerating": {"message": "正在產生詞條…"},
+  "dictEntryUnavailable": {"message": "無法產生詞條，請重試。"},
+  "dictEntryNoEntry": {"message": "AI 無法確定這個詞的可靠含義。"},
+  "dictEntrySource": {"message": "AI 詞條"},
+  "dictEntryDetails": {"message": "詞源與相關詞"},
+  "dictEntryExamples": {"message": "例句"},
+  "dictEntryEtymology": {"message": "詞源"},
+  "dictEntryRelated": {"message": "相關詞"},
+  "dictEntryShowDictionary": {"message": "查看詞典"},
+  "dictEntryShowAi": {"message": "查看 AI 詞條"},
+  "dictEntryNotCached": {"message": "無法將此詞條快取到這部裝置。"},
+  "dictAiAutoGenerateLabel": {"message": "自動產生 AI 詞條"},
+  "dictAiAutoGenerateHint": {"message": "查詞時若沒有已快取的 AI 詞條，使用閱讀器的 AI 模型產生，會消耗 tokens。預設關閉，仍可手動產生。"}
 }

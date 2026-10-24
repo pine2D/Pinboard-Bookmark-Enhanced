@@ -1313,7 +1313,7 @@ async function _pbpMultiPackRefresh() {
         const credits=document.createElement("p"); credits.className="hint dict-pack-copy"; credits.dir="auto"; credits.textContent=pack.attribution; row.appendChild(credits);
       }
       const actions=document.createElement("div"); actions.className="fg-actions";
-      for (const [action, key] of [["enabled",pack.enabled ? "multiPackDisable":"multiPackEnable"], ["ai",pack.aiAllowed ? "multiPackBlockAi":"multiPackAllowAi"], ["delete","delete"]]) {
+      for (const [action, key] of [["enabled",pack.enabled ? "multiPackDisable":"multiPackEnable"], ["delete","delete"]]) {
         const button=document.createElement("button"); button.type="button"; button.className="btn btn-sm"+(action==="delete" ? " danger":"");
         button.textContent=t(key); button.dataset.packId=pack.id; button.dataset.packAction=action; button.disabled=_pbpMultiPackBusy;
         button.addEventListener("click", () => {
@@ -1327,8 +1327,7 @@ async function _pbpMultiPackRefresh() {
             $id("multi-pack-status").textContent="";
             try {
               if (action==="delete") await pbpDictPackDelete(pack.id, pack.activeGeneration);
-              else if (action==="enabled") await pbpDictPackSetEnabled(pack.id, !pack.enabled);
-              else await pbpDictPackSetAiAllowed(pack.id, !pack.aiAllowed, pack.activeGeneration);
+              else await pbpDictPackSetEnabled(pack.id, !pack.enabled);
               await _pbpMultiPackRefresh();
             } catch (e) {
               console.warn("[dict-pack] package action failed:", e?.name, e?.message);
@@ -1337,14 +1336,14 @@ async function _pbpMultiPackRefresh() {
               _pbpMultiPackLock(false);
             }
           };
-          if (action==="delete" || (action==="ai" && !pack.aiAllowed)) {
+          if (action==="delete") {
             let outsidePointer=false, confirmation=null;
             const pointer=event=>{
               if (!button.contains(event.target) && !event.target.closest?.(".confirm-popover")) outsidePointer=true;
             };
             const cleanup=()=>document.removeEventListener("pointerdown",pointer,true);
             document.addEventListener("pointerdown",pointer,true);
-            const shown=showConfirmPopover(button, {msg:t(action==="delete" ? "dictPackDeleteConfirm":"multiPackAiConfirm"), yesText:t(key), noText:t("cancel"),
+            const shown=showConfirmPopover(button, {msg:t("dictPackDeleteConfirm"), yesText:t(key), noText:t("cancel"),
               onDismiss:cleanup, onConfirm:()=>{cleanup();return run(true);}, onCancel:()=>{
                 cleanup();
                 // Tab's focusout runs before its destination receives focus.

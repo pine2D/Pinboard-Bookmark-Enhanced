@@ -1144,15 +1144,13 @@ function _pbpVocabSyncLookupSave(state) {
 function _pbpVocabAcceptLookupResult(state, source, norm) {
   if (!state.live() || !String(state.owner || "").startsWith("acct_")) return;
   if (norm?.sourceLabel === "CC-CEDICT" && norm.word && state.host.dataset.refState === "other") {
-    state.host.dataset.refTerm = norm.word;
-    const heading = state.host.querySelector(".vocab-ref-term");
-    if (heading) heading.textContent = norm.word;
+    state.dictionaryTerm = norm.word;
+    state.syncHeading?.();
   }
   state.sources.set(source, _pbpVocabLookupChoices(norm, state.lang));
   if (state.norms) { if (norm) state.norms.set(source, norm); else state.norms.delete(source); }
   if (![...state.sources.values()].some(rows => rows.length)) {
     state.panel?.remove(); state.panel = null;
-    state.assist?.update([...state.norms.values()]);
     return;
   }
   if (!state.panel) {
@@ -1176,8 +1174,8 @@ function _pbpVocabAcceptLookupResult(state, source, norm) {
     feedback.setAttribute("aria-live", "polite");
     panel.append(label, definition, button, feedback);
     Object.assign(state, { panel, select: definition, button, feedback });
-    state.host.insertBefore(panel, state.assistHost || state.host.querySelector(".vocab-ref-foot"));
-    definition.addEventListener("change", () => { _pbpVocabSyncLookupSave(state); state.assist?.selectionChanged(); });
+    state.host.insertBefore(panel, state.host.querySelector(".vocab-ref-foot"));
+    definition.addEventListener("change", () => _pbpVocabSyncLookupSave(state));
     button.addEventListener("click", () => _pbpVocabSaveLookup(state));
     window.pbpEnhanceListbox?.(definition);
   }
@@ -1195,7 +1193,6 @@ function _pbpVocabAcceptLookupResult(state, source, norm) {
   }
   state.select.value = state.choices.has(selected) ? selected : "";
   _pbpVocabSyncLookupSave(state);
-  state.assist?.update([...state.norms.values()]);
 }
 
 async function _pbpVocabSaveLookup(state) {
@@ -1250,9 +1247,9 @@ async function _pbpVocabSaveLookup(state) {
 
 // Shared dictionary run core, extracted from _pbpVocabRelookup so free lookup
 // (a later task) can reuse it verbatim. Reuses md-dict's pure query seams
-// (_pbpDictSlotRun online chain + _pbpDictEcdictSide local pack) with no
-// automatic AI leg: the lemma promise resolves empty immediately. Explicit
-// assistance uses the displayed original meanings. Participates in md-dict's staleness token so a second run or a
+// (_pbpDictSlotRun online chain + _pbpDictEcdictSide local pack). Reusable AI
+// entries share the result view; they never consume article context or pack
+// contents. Participates in md-dict's staleness token so a second run or a
 // word switch invalidates the previous one exactly like explain-pop does.
 // `els` = { localEl, onlineEl } (the two stable slot children -- see the
 // slot-invariant comment at each call site). `rerun` is the caller's "run
@@ -1306,22 +1303,33 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
   state.live = () => _pbpDictCurrent === cur && _pbpVocabDictChildCtrl === child && !signal.aborted &&
     _vocabCurrentOwner === state.owner && !!host?.contains(onlineEl);
   cur.isCurrent = state.live;
-  host?.querySelector(".xp-dict-assist")?.remove();
-  state.assist = _pbpDictAssistMount(host, { term, lang, sentence, owner: state.owner, signal,
-    derived, noticeHost: $id("vocab-dict-notice"), scrollHost: $id("vocab-detail-pane"),
-    isCurrent: state.live, settings: pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS),
-    getSelection: () => state.choices.get(state.select?.value) || null,
-    onLookup: headword => { if (state.live()) _pbpVocabLookupOther(headword, lang, sentence, { derived: true }); },
-    onSelect: choice => {
-      for (const [key, row] of state.choices) if (row.term === choice.term && row.gloss === choice.gloss &&
-        row.packId === choice.packId && row.sourceLabel === choice.sourceLabel) {
-        state.select.value = key; state.select.dispatchEvent(new Event("change")); break;
-      }
-    } });
-  if (state.assist) {
-    state.assistHost = state.assist.element;
-    host.insertBefore(state.assistHost, host.querySelector(".vocab-ref-foot"));
-  }
+  state.dictionaryTerm = term;
+  state.view = "dictionary";
+  state.syncHeading = () => {
+    if (!state.live() || host.dataset.refState !== "other") return;
+    const shown = state.view === "ai" ? term : state.dictionaryTerm;
+    host.dataset.refTerm = shown;
+    const heading = host.querySelector(".vocab-ref-term");
+    if (heading) heading.textContent = shown;
+  };
+  state.syncHeading();
+  host?.querySelector(".xp-dict-ai")?.remove();
+  const dictionaryHost = onlineEl.closest(".xp-dict-slot");
+  if (dictionaryHost) dictionaryHost.hidden = false;
+  // AI is one source in the same lookup view. A late result adds choices,
+  // but never changes the definition already selected for saving.
+  const entryView = _pbpDictEntryMount(host, { term, lang, owner: state.owner, signal,
+    dictionaryHost, isCurrent: state.live, settings: pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS),
+    onSettingsChange: () => { if (state.live()) cur.rerun(); },
+    onView: mode => { state.view = mode; state.syncHeading(); },
+    onEntry: norm => {
+      if (!state.live()) return;
+      _pbpVocabAcceptLookupResult(state, "ai", norm);
+      _pbpVocabSyncDictPronunciation();
+    },
+    onLookup: headword => { if (state.live()) _pbpVocabLookupOther(headword, lang); }
+  });
+  if (entryView && dictionaryHost) dictionaryHost.before(entryView.element);
   const acceptLocal = norm => _pbpVocabAcceptLookupResult(state, "local", norm);
   const ecdictEl = document.createElement("div"), packsEl = document.createElement("div");
   localEl.replaceChildren(packsEl, ecdictEl);

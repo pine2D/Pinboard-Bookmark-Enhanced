@@ -247,9 +247,10 @@
         "notes-page-side",
         "notes-toolbar",
         "vocab-batch-bar",
-        "dict-assist-actions",
-        "xp-dict-assist",
-        "dict-assist-notice"
+        "xp-dict-ai",
+        "xp-dict-ai-controls",
+        "xp-dict-ai-content",
+        "xp-dict-ai-details"
       ],
       "regions": [
         "lib-header",
@@ -366,14 +367,11 @@
         "xp-dict-slot",
         "notes-note-save",
         "notes-note-cancel",
-        "dict-assist-context-wrap",
-        "dict-assist-context",
-        "dict-assist-result",
-        "dict-assist-suggestion",
-        "dict-assist-notice-text",
-        "dict-assist-view",
-        "dict-assist-copy-status",
-        "vocab-dict-notice"
+        "xp-dict-ai-generate",
+        "xp-dict-ai-switch",
+        "xp-dict-ai-stop",
+        "xp-dict-ai-configure",
+        "xp-dict-ai-status"
       ],
       "canvasStructures": [
         "lib-header",
@@ -393,15 +391,10 @@
         "notes-excerpt",
         "notes-page-head",
         "notes-page-side",
-        "xp-dict-assist",
-        "dict-assist-actions",
-        "dict-assist-context-wrap",
-        "dict-assist-context",
-        "dict-assist-result",
-        "dict-assist-suggestion",
-        "dict-assist-notice",
-        "dict-assist-notice-text",
-        "vocab-dict-notice"
+        "xp-dict-ai",
+        "xp-dict-ai-controls",
+        "xp-dict-ai-content",
+        "xp-dict-ai-details"
       ]
     },
     "listbox": {
@@ -456,10 +449,11 @@
         "row",
         "send-menu",
         "send-mi",
-        "dict-assist-actions",
-        "xp-dict-assist",
-        "dict-assist-notice",
-        "xp-dict-origin"
+        "xp-dict-origin",
+        "xp-dict-ai",
+        "xp-dict-ai-controls",
+        "xp-dict-ai-content",
+        "xp-dict-ai-details"
       ],
       "regions": [
         "ask-a",
@@ -612,16 +606,13 @@
         "xp-vocab",
         "xp-vocab-status",
         "zen-btn",
-        "dict-assist-context-wrap",
-        "dict-assist-context",
-        "dict-assist-result",
-        "dict-assist-suggestion",
-        "dict-assist-notice-text",
-        "dict-assist-view",
-        "dict-assist-copy-status",
-        "xp-dict-notice",
         "xp-dict-origin-term",
-        "xp-dict-return"
+        "xp-dict-return",
+        "xp-dict-ai-generate",
+        "xp-dict-ai-switch",
+        "xp-dict-ai-stop",
+        "xp-dict-ai-configure",
+        "xp-dict-ai-status"
       ]
     },
     "shared": {

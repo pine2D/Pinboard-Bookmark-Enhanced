@@ -12,7 +12,7 @@ h2 { margin-top: 24px; }
 <div id="results"></div>
 <script src="../vocab-store.js"></script>
 <script src="../md-dict.js"></script>
-<script src="../dict-assist.js"></script>
+<script src="../dict-entry.js"></script>
 <script src="../md-vocab-echo.js"></script>
 <script>
 const root = document.getElementById("results");
@@ -488,37 +488,6 @@ _pbpDictRenderEntry(tagSlot, { word: "漢字", entries: [{ pos: "", ipas: [{ tex
 assert(tagSlot.textContent.includes("dictTagPinyin") && tagSlot.textContent.includes("dictTagSimplified") && tagSlot.textContent.includes("dictTagTraditional"),
   "CC-CEDICT technical tags render through localized labels");
 assert(!/\b(?:simp|trad|Pinyin)\b/.test(tagSlot.textContent), "raw simp/trad/Pinyin labels are not exposed");
-
-section("pbpDictParseCtxAnswer / StripLemmaLine");
-const ans = "LEMMA: run\n\nIn this sentence it means to manage a business.";
-assertEq(pbpDictParseCtxAnswer(ans).lemma, "run", "lemma parsed");
-assert(pbpDictParseCtxAnswer(ans).gloss.indexOf("LEMMA") === -1, "gloss excludes lemma line");
-assertEq(pbpDictParseCtxAnswer("LEMMA: -\n\ngloss").lemma, "", "'-' -> empty lemma");
-assertEq(pbpDictParseCtxAnswer("no marker at all").lemma, "", "missing marker tolerated");
-assertEq(pbpDictParseCtxAnswer("no marker at all").gloss, "no marker at all", "gloss = full text when no marker");
-assertEq(pbpDictStripLemmaLine("L"), "", "partial marker prefix hidden: L");
-assertEq(pbpDictStripLemmaLine("LEMM"), "", "partial marker prefix hidden: LEMM");
-assertEq(pbpDictStripLemmaLine("LEMMA: ru"), "", "partial lemma line hidden");
-assertEq(pbpDictStripLemmaLine("Hello"), "Hello", "ordinary token NOT swallowed");
-assertEq(pbpDictStripLemmaLine("AI"), "AI", "short ordinary token NOT swallowed");
-assertEq(pbpDictStripLemmaLine("Meaning of the word"), "Meaning of the word", "L-adjacent word NOT swallowed");
-assert(pbpDictStripLemmaLine(ans).indexOf("manage") >= 0, "strip keeps gloss");
-
-section("pbpDictCtxHash");
-assertEq(pbpDictCtxHash("abc"), pbpDictCtxHash("abc"), "deterministic");
-assert(pbpDictCtxHash("abc") !== pbpDictCtxHash("abd"), "differs");
-assertEq(pbpDictCtxHash(""), pbpDictCtxHash(null), "null == empty");
-
-section("pbpDictBuildCtxPrompt");
-const cp = pbpDictBuildCtxPrompt({ selection: "bank", sentence: "He sat by the river bank.", title: "T", answerLang: "Simplified Chinese" });
-assert(cp.system.indexOf("LEMMA:") >= 0, "system demands LEMMA first line");
-assert(/do not output ipa/i.test(cp.system), "system forbids IPA");
-assert(cp.system.indexOf("Simplified Chinese") >= 0, "answer lang injected");
-assert(cp.prompt.indexOf("bank") >= 0 && cp.prompt.indexOf("river") >= 0, "prompt carries selection + sentence");
-assert(cp.prompt.indexOf("T") >= 0, "prompt carries title (title is part of cache identity)");
-const longSel = "x".repeat(500);
-assert(pbpDictBuildCtxPrompt({ selection: longSel, sentence: "", title: "", answerLang: "English" }).prompt.indexOf("x".repeat(401)) === -1, "selection capped at 400");
-assert(cp.prompt.endsWith("Answer language: Simplified Chinese only."), "language directive is the LAST prompt part (recency compliance)");
 
 section("pbpDictMergeContext");
 const c1 = { quote: "q1", articleUrl: "u1", articleTitle: "t1", highlightId: null, createdAt: 1 };
@@ -1342,29 +1311,14 @@ async function runDictPermissionFeedbackTests() {
 }
 
 async function runDictNoAiAndSavedStateTests() {
-  section("dictionary contextual AI and existing-vocabulary state");
-  const realAvailable = window.pbpAiAvailable;
-  let lemmaResolved = null;
-  window.pbpAiAvailable = () => false;
-  try {
-    const ctxSlot = document.createElement("div");
-    await _pbpDictCtxRun(ctxSlot, { text: "word" }, { sentence: "word" }, {}, new AbortController().signal,
-      (value) => { lemmaResolved = value; }, "en");
-    assert(ctxSlot.textContent === "dictAiNotConfigured", "Dictionary keeps its contextual-AI-specific no-provider message");
-    assertEq(lemmaResolved, "", "Dictionary no-AI context slot still settles the lemma chain");
-  } finally {
-    if (realAvailable === undefined) delete window.pbpAiAvailable; else window.pbpAiAvailable = realAvailable;
-  }
-
+  section("dictionary existing-vocabulary state without automatic AI");
   const realResolveLang = _pbpDictResolveLang;
   const realSlotRun = _pbpDictSlotRun;
-  const realCtxRun = _pbpDictCtxRun;
   const realVocabGet = pbpVocabGet;
   const realSetStatus = pbpVocabBatchSetStatus;
   const previousOwner = _pbpDictOwner;
   _pbpDictResolveLang = async () => "en";
   _pbpDictSlotRun = async () => pbpDictNormalizeEntry(FDA_SAMPLE);
-  _pbpDictCtxRun = async (_el, _cap, _ctx, _s, _signal, resolveLemmaOnce) => { resolveLemmaOnce(""); return null; };
   _pbpDictOwner = "acct_a";
   // The gloss and IPA a "hello" lookup in the sentence "hello" saves -- the
   // context-ordered first entry, exactly what pbpDictRun writes into cur.
@@ -1462,95 +1416,9 @@ async function runDictNoAiAndSavedStateTests() {
   } finally {
     _pbpDictResolveLang = realResolveLang;
     _pbpDictSlotRun = realSlotRun;
-    _pbpDictCtxRun = realCtxRun;
     pbpVocabGet = realVocabGet;
     pbpVocabBatchSetStatus = realSetStatus;
     _pbpDictOwner = previousOwner;
-  }
-}
-
-async function runDictCtxObserverLifecycleTests() {
-  section("dictionary AI-gloss fold observer lifecycle (K151)");
-  const realResolveLang = _pbpDictResolveLang;
-  const realSlotRun = _pbpDictSlotRun;
-  const realCtxRun = _pbpDictCtxRun;
-  const realIO = window.IntersectionObserver;
-  const realGBCR = Element.prototype.getBoundingClientRect;
-
-  // Counting fake: constructor increments live, disconnect decrements
-  // (idempotently -- a second disconnect on the same instance is a no-op,
-  // matching real IntersectionObserver semantics), observe just records the
-  // target. instances[] lets the test grab a specific run's observer back
-  // out to fire its callback directly, simulating a late/stale notification.
-  class FakeIO {
-    constructor(cb) {
-      this.cb = cb;
-      this._live = true;
-      FakeIO.live++;
-      FakeIO.instances.push(this);
-    }
-    observe(el) { this.target = el; }
-    disconnect() { if (this._live) { this._live = false; FakeIO.live--; } }
-    unobserve() {}
-  }
-  FakeIO.live = 0;
-  FakeIO.instances = [];
-
-  _pbpDictResolveLang = async () => "en";
-  _pbpDictSlotRun = async () => null;
-  _pbpDictCtxRun = async (_el, _cap, _ctx, _s, _signal, resolveLemmaOnce) => {
-    resolveLemmaOnce("");
-    return { gloss: "ctx gloss", lemma: "" }; // truthy `parsed` -> _pbpDictCtxSignal runs
-  };
-  window.IntersectionObserver = FakeIO;
-  // _pbpDictCtxSignal's own fold check reads real getBoundingClientRect() off
-  // the popover body and the ctx element; force every reading "below the
-  // fold" (ctxEl.top >= body.bottom - 12) so the observer actually gets built
-  // instead of early-returning as already-visible.
-  Element.prototype.getBoundingClientRect = function () {
-    return { top: 500, bottom: 100, left: 0, right: 0, width: 0, height: 0 };
-  };
-
-  const pop = document.createElement("div");
-  pop.innerHTML = '<div class="xp-body"></div>'; // no .xp-vocab -> skips the vocab-lookup branch
-  document.body.appendChild(pop); // .xp-dict-ctx must be isConnected for _pbpDictCtxSignal to arm
-  try {
-    // (a) two consecutive lookups, neither scrolled into view nor dot-clicked:
-    // the first run's observer must be torn down when the second run starts,
-    // not left to accumulate. RED (pre-fix): 2.
-    await pbpDictRun({ text: "alpha" }, { sentence: "alpha" }, pop, new AbortController(), {});
-    await pbpDictRun({ text: "beta" }, { sentence: "beta" }, pop, new AbortController(), {});
-    assertEq(FakeIO.live, 1, "a second lookup's teardown leaves only the newest fold observer live");
-
-    // (b) action switch (leaving the reader action / pbp:article-will-replace)
-    // is the other teardown point -- it must disconnect whatever is still live.
-    window.pbpDictOnActionSwitch();
-    assertEq(FakeIO.live, 0, "an action switch disconnects the still-live fold observer");
-
-    // (c) identity guard: a stale observer's callback firing AFTER a newer
-    // run has already replaced the module handle must not null out the NEW
-    // handle -- only the run's own teardown (or the newer run's) may do that.
-    await pbpDictRun({ text: "gamma" }, { sentence: "gamma" }, pop, new AbortController(), {});
-    const staleIo = FakeIO.instances[FakeIO.instances.length - 1];
-    await pbpDictRun({ text: "delta" }, { sentence: "delta" }, pop, new AbortController(), {});
-    const freshIo = FakeIO.instances[FakeIO.instances.length - 1];
-    assert(staleIo !== freshIo, "each run allocates its own observer instance");
-    // "delta"'s run-top teardown already disconnected staleIo. Firing its
-    // (now-stale) callback simulates a notification that was queued before
-    // disconnect landed -- it must not clobber the module handle, which by
-    // now points at freshIo.
-    staleIo.cb([{ isIntersecting: true }]);
-    assert(_pbpDictCtxIo === freshIo,
-      "a stale observer's late callback does not null out a newer run's live handle");
-    window.pbpDictOnActionSwitch();
-    assertEq(FakeIO.live, 0, "the current handle still tears down normally after a stale callback no-ops");
-  } finally {
-    _pbpDictResolveLang = realResolveLang;
-    _pbpDictSlotRun = realSlotRun;
-    _pbpDictCtxRun = realCtxRun;
-    window.IntersectionObserver = realIO;
-    Element.prototype.getBoundingClientRect = realGBCR;
-    pop.remove();
   }
 }
 
@@ -1751,34 +1619,6 @@ async function runDictResolveLangLadderTests() {
 // Regression cases from the multilingual vocabulary review. These exercise
 // the renderer/lookup/scanner consumers, not a second copy of their rules.
 async function runDictReviewRegressionTests() {
-  section("context cache preserves case-sensitive meanings");
-  const names = ["pbpAiAvailable", "pbpAiCacheGet", "pbpAiCacheSet", "pbpExplainLangName", "uiLangToBCP47",
-    "pbpAiEffectiveModel", "pbpAiResolveModelOverride", "pbpAiBumpCounter", "callAIStream", "renderMarkdown"];
-  const saved = new Map(names.map((name) => [name, window[name]]));
-  const title = document.createElement("h1"); title.id = "preview-title"; title.textContent = "Case-sensitive terms";
-  const oldTitle = document.getElementById("preview-title"); oldTitle?.remove(); document.body.appendChild(title);
-  const cache = new Map(); let calls = 0;
-  Object.assign(window, {
-    pbpAiAvailable: () => true, pbpAiCacheGet: async (key) => cache.has(key) ? { result: cache.get(key) } : null,
-    pbpAiCacheSet: async (key, value) => { cache.set(key, value); }, pbpExplainLangName: () => "English",
-    uiLangToBCP47: () => "en", pbpAiEffectiveModel: () => "fixture", pbpAiResolveModelOverride: () => "fixture",
-    pbpAiBumpCounter: () => {}, renderMarkdown: (text) => text,
-    callAIStream: async (_settings, prompt) => { calls++; return "LEMMA: -\n\n" + (prompt.includes("Selected term:\nUS\n") ? "United States" : "the object form of we"); }
-  });
-  try {
-    const el = document.createElement("div"), ctx = { sentence: "The US invited us." };
-    const run = (term) => _pbpDictCtxRun(el, { text: term }, ctx, { aiProvider: "custom" }, new AbortController().signal, () => {}, "en");
-    const upper = await run("US"), lower = await run("us");
-    assertEq(upper.gloss, "United States", "US receives the country meaning");
-    assertEq(lower.gloss, "the object form of we", "us in the same sentence never reuses US's cached country meaning");
-    await run("US");
-    assertEq(calls, 2, "distinct case-sensitive meanings each call AI once and a repeated identical lookup uses its cache");
-    assertEq(el.querySelector(".xp-md")?.lang, "en", "the contextual definition carries its known answer language");
-  } finally {
-    for (const [name, value] of saved) { if (value === undefined) delete window[name]; else window[name] = value; }
-    title.remove(); if (oldTitle) document.body.appendChild(oldTitle);
-  }
-
   section("cached form-of entries follow the same lemma chain as cold entries");
   const savedPerm = _pbpDictHasPerm, savedFetch = _pbpDictFetch;
   const savedGet = window.pbpAiCacheGet, savedSet = window.pbpAiCacheSet;
@@ -1820,78 +1660,20 @@ async function runDictReviewRegressionTests() {
 
 async function runDictDefinitionLanguageTests() {
   section("dictionary definition language is independent of UI and lookup language");
-  const names = ["pbpAiAvailable", "pbpAiCacheGet", "pbpAiCacheSet", "pbpExplainLangName", "uiLangToBCP47",
-    "pbpAiEffectiveModel", "pbpAiResolveModelOverride", "pbpAiBumpCounter", "callAIStream", "renderMarkdown"];
-  const saved = new Map(names.map((name) => [name, window[name]]));
-  const oldTitle = document.getElementById("preview-title"); oldTitle?.remove();
-  const title = document.createElement("h1"); title.id = "preview-title"; title.textContent = "German vocabulary";
-  document.body.appendChild(title);
-  const el = document.createElement("div"), cache = new Map(), requests = [];
-  let uiLanguage = "en", streamLanguage = "", duringStream = null;
-  Object.assign(window, {
-    pbpAiAvailable: () => true,
-    pbpAiCacheGet: async (key) => cache.has(key) ? { result: cache.get(key) } : null,
-    pbpAiCacheSet: async (key, value) => { cache.set(key, value); },
-    // The old Explain helper only supports UI locales; this intentional
-    // fallback must never silently turn Spanish/Portuguese into English.
-    pbpExplainLangName: (code) => ({ "en": "English", "zh-Hant": "Traditional Chinese" }[code] || "English"),
-    uiLangToBCP47: () => uiLanguage,
-    pbpAiEffectiveModel: () => "fixture", pbpAiResolveModelOverride: () => "fixture",
-    pbpAiBumpCounter: () => {}, renderMarkdown: (text) => text,
-    callAIStream: async (_settings, prompt, options, onDelta) => {
-      const answer = /Answer language: (.+) only\./.exec(prompt)?.[1] || "missing";
-      requests.push({ prompt, system: options.system, answer });
-      const result = "LEMMA: -\n\n" + answer;
-      onDelta(result, result);
-      streamLanguage = el.querySelector(".xp-stream")?.lang;
-      if (duringStream) duringStream();
-      return result;
-    }
-  });
-  const run = (preference) => _pbpDictCtxRun(el, { text: "Gift" }, { sentence: "Das Gift ist gefährlich." },
-    { aiProvider: "custom", dictDefinitionLang: preference }, new AbortController().signal, () => {}, "de");
-  try {
-    for (const [preference, name, lang] of [
-      ["zh-Hans", "Simplified Chinese", "zh-Hans"], ["zh-Hant", "Traditional Chinese", "zh-Hant"],
-      ["es", "Spanish", "es"], ["pt", "Portuguese", "pt"], ["pt-BR", "Brazilian Portuguese", "pt-BR"],
-      ["ar", "Arabic", "ar"], ["Latin", "Latin", "und"], ["en-???", "en-???", "und"]
-    ]) {
-      const result = await run(preference);
-      assertEq(result?.gloss, name, preference + " chooses its own answer language while the interface stays English");
-      assertEq(el.querySelector(".xp-md")?.lang, lang, preference + " output has accurate language metadata");
-      assertEq(streamLanguage, lang, preference + " streaming output uses the same language metadata");
-    }
-    assert(requests[0]?.prompt.includes("Selected term:\nGift\n") && requests[0]?.prompt.includes("Das Gift ist gefährlich.") &&
-      requests[0]?.system.includes("ENTIRE answer in Simplified Chinese"),
-    "Chinese explanation keeps the selected German term and context intact in an English UI");
-    const beforeRepeat = requests.length;
-    await run("es"); await run("pt");
-    assertEq(requests.length, beforeRepeat, "switching definition languages reuses only each language's own cached explanation");
-    await run(" \u0000La\u202etin\n ");
-    assertEq(el.querySelector(".xp-md")?.textContent, "Latin", "custom language names lose control characters before prompt/cache use");
-    assertEq(requests.length, beforeRepeat, "a sanitized custom language shares the equivalent clean preference's cache");
-    const longName = "Custom ".repeat(40).trim();
-    const longResult = await run(longName);
-    assertEq(longResult?.gloss.length, 80, "custom definition-language names have a bounded prompt footprint");
-    assertEq(el.querySelector(".xp-md")?.lang, "und", "an unrecognized long custom name never invents BCP47 metadata");
-    uiLanguage = "zh-Hant";
-    const inherited = await run("");
-    assertEq(inherited?.gloss, "Traditional Chinese", "empty preference follows the current interface language");
-    assertEq(el.querySelector(".xp-md")?.lang, "zh-Hant", "the inherited UI language is reflected in output metadata");
-    uiLanguage = "en";
-    const controlOnly = await run("\u0000\n\u202e");
-    assertEq(controlOnly?.gloss, "English", "a preference emptied by sanitation follows the interface language");
-    const invalidType = await run({ language: "es" });
-    assertEq(invalidType?.gloss, "English", "a malformed non-string setting falls back without leaking object text to the prompt");
-    duringStream = () => { uiLanguage = "en"; };
-    uiLanguage = "de";
-    const snapshotted = await run("");
-    assert(snapshotted?.gloss === "German" && streamLanguage === "de" && el.querySelector(".xp-md")?.lang === "de",
-      "a running answer keeps its requested language metadata even if the UI language changes mid-stream");
-  } finally {
-    for (const [name, value] of saved) { if (value === undefined) delete window[name]; else window[name] = value; }
-    title.remove(); if (oldTitle) document.body.appendChild(oldTitle);
+  for (const [preference, name, lang] of [
+    ["zh-Hans", "Simplified Chinese", "zh-Hans"], ["zh-Hant", "Traditional Chinese", "zh-Hant"],
+    ["es", "Spanish", "es"], ["pt", "Portuguese", "pt"], ["pt-BR", "Brazilian Portuguese", "pt-BR"],
+    ["ar", "Arabic", "ar"], ["Latin", "Latin", "und"], ["en-???", "en-???", "und"]
+  ]) {
+    const target=pbpDictDefinitionLanguage(preference,"en");
+    assertEq(target.name,name,preference+" chooses its own definition language while the interface stays English");
+    assertEq(target.lang,lang,preference+" output has accurate language metadata");
   }
+  assertEq(pbpDictDefinitionLanguage(" \u0000La\u202etin\n ","en").name,"Latin","custom language names lose control characters before prompt/cache use");
+  assertEq(pbpDictDefinitionLanguage("Custom ".repeat(40),"en").name.length,80,"custom definition-language names have a bounded prompt footprint");
+  assertEq(pbpDictDefinitionLanguage("","zh-Hant").lang,"zh-Hant","empty preference follows the current interface language");
+  assertEq(pbpDictDefinitionLanguage("\u0000\n\u202e","en").name,"English","a preference emptied by sanitation follows the interface language");
+  assertEq(pbpDictDefinitionLanguage({language:"es"},"en").name,"English","a malformed non-string setting never leaks object text to the prompt");
 }
 
 async function runEchoLanguageAndInlineTests() {
@@ -2034,7 +1816,7 @@ async function runEchoLanguageAndInlineTests() {
 async function runMultiPackIntegrationTests() {
   section("Multilingual dictionary pack integration");
   const original = { load:_pbpDictLoadPack, current:_pbpDictCurrent, resolve:_pbpDictResolveLang,
-    online:_pbpDictSlotRun, ctx:_pbpDictCtxRun, local:_pbpDictEcdictSide, get:pbpVocabGet,
+    online:_pbpDictSlotRun, entry:_pbpDictEntryMount, local:_pbpDictEcdictSide, get:pbpVocabGet,
     owner:_pbpDictOwner, liveOwner:window.pbpVocabCurrentOwner, save:pbpVocabSaveWord, icons:window.PBP_ICONS, list:window.pbpDictPackList, lookup:window.pbpDictPackLookup, detect:_pbpDictDetect, article:_pbpDictArticleCld, fetch:_pbpDictFetch };
   const norm = (id, language, word="Gift") => ({ word, packId:id, sourceLabel:id, definitionLang:language,
     sourceLanguage:"de", aiAllowed:false, sourceUrl:"https://example.test/"+id, license:"Test license",
@@ -2091,24 +1873,24 @@ async function runMultiPackIntegrationTests() {
 
     // A real reader run: the local result must be usable before its remote
     // and AI siblings settle, and those later siblings must not overwrite it.
-    let finishOnline,finishAi;
+    let finishOnline;
     _pbpDictResolveLang=async()=>"de";
     _pbpDictSlotRun=()=>new Promise(r=>{finishOnline=r;});
-    _pbpDictCtxRun=(_el,_cap,_ctx,_s,_signal,lemma)=>new Promise(r=>{finishAi=value=>{lemma("");r(value);};});
+    _pbpDictEntryMount=()=>null;
     _pbpDictEcdictSide=async()=>{};pbpVocabGet=async()=>null;_pbpDictOwner="acct_pack";
-    const pop=document.createElement("div");pop.innerHTML='<div class="xp-body"></div><button class="xp-vocab"></button>';document.body.appendChild(pop);
+    const pop=document.createElement("div");pop.innerHTML='<div class="xp-body"></div><div class="xp-foot"><button class="xp-vocab"></button></div>';document.body.appendChild(pop);
     const running=pbpDictRun({text:"Gift"},{sentence:"Gift wirkt."},pop,new AbortController(),{dictDefinitionLang:"zh-Hans"});await tick();
-    const choose=pop.querySelector('select[data-pack-id="zh-pack"]');
-    check("reader makes installed-pack senses explicitly selectable before online or AI completion",!!choose&&choose.options.length===2);
-    if(choose){choose.value="0";choose.dispatchEvent(new Event("change"));await tick();}
+    const choose=pop.querySelector('.xp-dict-save-meaning');
+    check("reader exposes one save-definition picker before online completion",!!choose&&[...choose.options].filter(option=>option.value!=="").length===3&&pop.querySelectorAll('.xp-dict-save-meaning').length===1);
+    if(choose){choose.value=String(_pbpDictCurrent.meaningChoices.findIndex(c=>c.packId==='zh-pack'));choose.dispatchEvent(new Event("change"));await tick();}
     check("choosing a local pack sense enables collection while other requests are pending",_pbpDictCurrent?.gloss==="zh-pack meaning"&&!pop.querySelector('.xp-vocab').disabled);
-    finishOnline?.(null);finishAi?.({gloss:"late AI paraphrase",lemma:"other"});await running;
-    check("late AI and online failure preserve the chosen pack's original definition and identity",_pbpDictCurrent?.gloss==="zh-pack meaning"&&_pbpDictCurrent?.term==="Gift"&&_pbpDictCurrent?.sourceUrl==="https://example.test/zh-pack"&&_pbpDictCurrent?.lemma!=="other");
+    finishOnline?.(null);await running;
+    check("online failure preserves the chosen pack's original definition and identity",_pbpDictCurrent?.gloss==="zh-pack meaning"&&_pbpDictCurrent?.term==="Gift"&&_pbpDictCurrent?.sourceUrl==="https://example.test/zh-pack"&&_pbpDictCurrent?.lemma!=="other");
     pbpVocabGet=async()=>({id:"saved-gift",term:"Gift",language:"de",gloss:"old",contexts:[]});
     await _pbpDictRefreshSave(pop,_pbpDictCurrent,new AbortController().signal);
     pbpVocabGet=async()=>null;
-    const other=pop.querySelector('select[data-pack-id="en-pack"]');
-    if(other){other.value="0";other.dispatchEvent(new Event("change"));await tick();}
+    const other=pop.querySelector('.xp-dict-save-meaning');
+    if(other){other.value=String(_pbpDictCurrent.meaningChoices.findIndex(c=>c.packId==='en-pack'));other.dispatchEvent(new Event("change"));await tick();}
     check("switching from a saved headword to an unsaved pack choice resets the save face",!_pbpDictCurrent.saved&&pop.querySelector('.xp-vocab').textContent==="dictSaveVocab");
     let releaseOwner,writes=0;window.pbpVocabCurrentOwner=()=>new Promise(resolve=>{releaseOwner=resolve;});
     pbpVocabSaveWord=async()=>{writes++;return {};};
@@ -2119,7 +1901,7 @@ async function runMultiPackIntegrationTests() {
     releaseOwner?.("acct_pack");await saving;
     check("revoking a pack during the live owner read prevents its pending collection",writes===0);
     check("revoking a pack removes stale choices and disables their collection without changing the chosen word",
-      !pop.querySelector('select[data-pack-id]')&&pop.querySelector('.xp-vocab').disabled&&_pbpDictCurrent.term==="Gift");
+      !_pbpDictCurrent.meaningChoices.some(c=>c.packId)&&pop.querySelector('.xp-vocab').disabled&&_pbpDictCurrent.term==="Gift");
     pop.remove();
     const supported=Promise.resolve([...PBP_DICT_QUERY_LANGS,"ar","he","uk","fi"]);
     const route=(text,ctx={},allow=supported)=>original.resolve({text},ctx,"",allow);
@@ -2147,243 +1929,203 @@ async function runMultiPackIntegrationTests() {
     check("pack-only languages do not issue unsupported online requests or claim a dictionary miss",network===0&&online.textContent==="dictOnlineLanguageUnavailable");
   } finally {
     target.remove();_pbpDictLoadPack=original.load;_pbpDictCurrent=original.current;_pbpDictResolveLang=original.resolve;
-    _pbpDictSlotRun=original.online;_pbpDictCtxRun=original.ctx;_pbpDictEcdictSide=original.local;pbpVocabGet=original.get;_pbpDictOwner=original.owner;pbpVocabCurrentOwner=original.liveOwner;pbpVocabSaveWord=original.save;_pbpDictDetect=original.detect;_pbpDictArticleCld=original.article;_pbpDictFetch=original.fetch;
+    _pbpDictSlotRun=original.online;_pbpDictEntryMount=original.entry;_pbpDictEcdictSide=original.local;pbpVocabGet=original.get;_pbpDictOwner=original.owner;pbpVocabCurrentOwner=original.liveOwner;pbpVocabSaveWord=original.save;_pbpDictDetect=original.detect;_pbpDictArticleCld=original.article;_pbpDictFetch=original.fetch;
     if(original.list===undefined)delete window.pbpDictPackList;else window.pbpDictPackList=original.list;
     if(original.lookup===undefined)delete window.pbpDictPackLookup;else window.pbpDictPackLookup=original.lookup;
     if(original.icons===undefined)delete window.PBP_ICONS;else window.PBP_ICONS=original.icons;
   }
 }
 
-async function runDictionaryAssistUiTests() {
-  section("Explicit dictionary AI assistance");
-  if (typeof _pbpDictAssistMount !== "function") { check("dictionary assistance has an explicit shared UI controller",false);return; }
-  const saved={run:pbpDictAssistRun,key:window.hasAIKey,grant:window.ensureAIHostPermissionWithGesture,icons:window.PBP_ICONS};
-  const host=document.createElement("div");document.body.appendChild(host);
-  const norm={word:"Gift",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/Gift",license:"CC BY-SA 4.0",definitionLang:"en",entries:[{ipas:[],forms:[],senses:[{definition:"poison"},{definition:"a present"}]}]};
-  const denied={...norm,packId:"private-pack",generation:"g1",sourceLabel:"Private source",aiAllowed:false};
-  const settings={aiProvider:"ollama",previewAiEnabled:true,dictDefinitionLang:"zh-Hans"};
-  let selected=pbpDictNormChoices(norm,"de")[1],applied=0,calls=[],events=[],release;
-  let current=true;const ctrl=new AbortController();
+async function runDictionaryEntryUiTests() {
+  section("Reusable AI entries in the shared lookup view");
+  const names=["pbpDictEntryRead","pbpDictEntryRun","hasAIKey","ensureAIHostPermissionWithGesture","uiLangToBCP47","PBP_ICONS","pbpAiBumpCounter"];
+  const saved=new Map(names.map(name=>[name,window[name]]));
+  const fixtures=[];let reads=[],calls=[],grants=0,view=[],selected=[],lookups=[],uiLanguage="en";
+  const settings={aiProvider:"fixture",previewAiEnabled:true,dictDefinitionLang:"es",dictAiAutoGenerate:false};
+  const record=(extra={})=>({entry:{word:"Gift",language:"de",pronunciation:"/ɡɪft/",meanings:[{partOfSpeech:"sustantivo",definition:"<img src=x onerror=alert(1)> veneno",examples:[{text:"Das Gift wirkt.",translation:"El veneno hace efecto."}]}],etymology:"Origen de prueba.",relatedWords:["giftig"]},provider:"fixture",model:"fixture-model",generatedAt:1700000000000,cached:false,cacheSaved:true,...extra});
+  const settle=async()=>{for(let i=0;i<8;i++)await new Promise(r=>setTimeout(r,0));};
+  const mount=(extra={})=>{
+    const root=document.createElement("div"),dict=document.createElement("div"),host=document.createElement("div"),ctrl=new AbortController();
+    dict.textContent="Original dictionary definition";root.append(dict,host);document.body.appendChild(root);fixtures.push({root,ctrl});
+    const ui=_pbpDictEntryMount(host,{term:"Gift",lang:"de",owner:"ownerless",settings,signal:ctrl.signal,isCurrent:()=>true,dictionaryHost:dict,
+      onView:mode=>view.push(mode),onEntry:(norm,r)=>selected.push({norm,r}),onLookup:word=>lookups.push(word),...extra});
+    return {root,host,dict,ctrl,ui};
+  };
   try {
-    window.PBP_ICONS=saved.icons||{robot:""};window.hasAIKey=()=>true;
-    window.ensureAIHostPermissionWithGesture=async()=>{events.push("permission");};
-    pbpDictAssistRun=async input=>{events.push("request");calls.push(input);return {choiceId:input.choices[0].id,explanation:"<img src=x onerror=alert(1)> 原义译释",targetLang:input.target.lang};};
-    const ui=_pbpDictAssistMount(host,{term:"Gift",lang:"de",sentence:"Das Gift wirkt.",owner:"acct_assist",signal:ctrl.signal,isCurrent:()=>current,settings,getSelection:()=>selected,onSelect:choice=>{selected=choice;applied++;}});
-    ui.update([denied,norm]);
-    check("dictionary AI never runs merely because dictionary meanings rendered",calls.length===0);
-    host.querySelector('.dict-assist-recommend').click();await new Promise(r=>setTimeout(r,0));
-    check("AI host permission is the first asynchronous click step",events.join("|")==="permission|request");
-    check("recommendation sends only allowed meanings and the real source sentence",calls[0]?.choices.every(c=>!c.packId)&&calls[0]?.sentence==="Das Gift wirkt.");
-    check("dictionary AI respects independent explanation language and text direction",calls[0]?.target.lang==="zh-Hans"&&host.querySelector('.dict-assist-explanation')?.lang==="zh-Hans"&&host.querySelector('.dict-assist-explanation')?.dir==="auto");
-    check("recommendation displays the original sense without changing the selected meaning",applied===0&&selected.gloss==="a present"&&host.querySelector('.dict-assist-result').textContent.includes("poison"));
-    check("AI content is plain text rather than interpreted markup",!host.querySelector('.dict-assist-result img')&&host.querySelector('.dict-assist-result').textContent.includes("<img src=x"));
-    check("the actual sentence used by AI remains visible with per-text direction",host.querySelector('.dict-assist-context')?.textContent==="Das Gift wirkt."&&host.querySelector('.dict-assist-context')?.dir==="auto"&&host.querySelector('.dict-assist-meaning')?.dir==="auto");
-    const oldUse=host.querySelector('.dict-assist-use');oldUse.click();
-    check("only explicit confirmation selects the original dictionary meaning",applied===1&&selected.gloss==="poison");
-    host.querySelector('.dict-assist-explain').click();await new Promise(r=>setTimeout(r,0));
-    check("independent explanation sends exactly the selected original sense",calls.at(-1)?.task==="explain"&&calls.at(-1)?.choices.length===1&&calls.at(-1)?.choices[0].definition==="poison"&&selected.gloss==="poison");
-    check("independent explanation provides an explicit copy action",!!host.querySelector('.dict-assist-copy'));
-    pbpDictAssistRun=async input=>({choiceId:null,explanation:"No supplied sense fits.",targetLang:input.target.lang});
-    host.querySelector('.dict-assist-recommend').click();await new Promise(r=>setTimeout(r,0));
-    check("no-match advice does not invent a selectable dictionary sense",host.querySelector('.dict-assist-result').textContent.includes("dictAssistNoMatch")&&!host.querySelector('.dict-assist-use'));
-    pbpDictAssistRun=()=>new Promise(r=>{release=r;});
-    host.querySelector('.dict-assist-recommend').click();await new Promise(r=>setTimeout(r,0));
-    host.querySelector('.dict-assist-stop').click();release?.({choiceId:null,explanation:"cancelled answer",targetLang:"zh-Hans"});await new Promise(r=>setTimeout(r,0));
-    check("Stop cancels only the current advice and keeps the dictionary controls usable",!host.textContent.includes("cancelled answer")&&!host.querySelector('.dict-assist-recommend').disabled&&host.querySelector('.dict-assist-stop').hidden);
-    host.querySelector('.dict-assist-recommend').click();await new Promise(r=>setTimeout(r,0));
-    ui.update([norm]);release?.({choiceId:null,explanation:"stale answer",targetLang:"zh-Hans"});await new Promise(r=>setTimeout(r,0));
-    check("source changes abort and discard pending AI results",!host.textContent.includes("stale answer"));
-    const changed=host.querySelector('.dict-assist-result').textContent==="dictAssistSourceChanged";ui.update([]);
-    check("source changes explain why advice was cleared even when every source was removed",changed&&!host.querySelector('.xp-dict-assist').hidden&&host.querySelector('.dict-assist-result').textContent==="dictAssistSourceChanged");
-    ui.update([norm]);
-    const appliedBefore=applied;oldUse.click();
-    check("a detached recommendation cannot select a meaning after candidate identities changed",applied===appliedBefore);
-    selected=pbpDictNormChoices(denied,"de")[0];ui.selectionChanged();
-    check("an unapproved selected source cannot trigger independent explanation",host.querySelector('.dict-assist-explain').disabled&&host.textContent.includes("dictAssistSourceNotAllowed")&&!!host.querySelector('a[href="options.html#vocab"]'));
-    selected=pbpDictNormChoices(norm,"de")[0];ui.selectionChanged();
-    host.querySelector('.dict-assist-recommend').click();await new Promise(r=>setTimeout(r,0));
-    current=false;release?.({choiceId:null,explanation:"previous account answer",targetLang:"zh-Hans"});await new Promise(r=>setTimeout(r,0));
-    check("an account or lookup change suppresses a late answer",!host.textContent.includes("previous account answer"));
-    ctrl.abort();host.replaceChildren();current=true;
-    const noContext=_pbpDictAssistMount(host,{term:"Gift",lang:"de",sentence:"",owner:"acct_assist",signal:new AbortController().signal,isCurrent:()=>true,settings,getSelection:()=>selected,onSelect:()=>{}});
-    noContext.update([norm]);
-    check("without a real source sentence recommendation is disabled with a clear reason",host.querySelector('.dict-assist-recommend').disabled&&host.textContent.includes("dictAssistNeedContext"));
-    check("an original meaning can still be explained without invented context",!host.querySelector('.dict-assist-explain').disabled);
-    host.replaceChildren();window.hasAIKey=()=>false;
-    const unconfigured=_pbpDictAssistMount(host,{term:"Gift",lang:"de",owner:"acct_assist",signal:new AbortController().signal,isCurrent:()=>true,settings,getSelection:()=>selected,onSelect:()=>{}});
-    unconfigured.update([norm]);
-    check("unconfigured AI gives a usable configuration link and no enabled paid action",!!host.querySelector('a[href="options.html#ai"]')&&host.querySelector('.dict-assist-explain').disabled);
-    host.replaceChildren();window.hasAIKey=()=>true;selected=null;
-    const decomposed={...norm,word:"cafe\u0301",sourceUrl:"https://en.wiktionary.org/wiki/caf%C3%A9",entries:[{ipas:[],forms:[],senses:[{definition:"coffee"}]}]};
-    pbpDictAssistRun=async input=>{calls.push(input);return {choiceId:input.choices[0].id,explanation:"A coffee.",targetLang:input.target.lang};};
-    const nfd=_pbpDictAssistMount(host,{term:"café",lang:"fr",sentence:"Un café, merci.",owner:"acct_assist",signal:new AbortController().signal,isCurrent:()=>true,settings,getSelection:()=>selected,onSelect:choice=>{selected=choice;nfd.selectionChanged();}});
-    nfd.update([decomposed]);host.querySelector('.dict-assist-recommend').click();await new Promise(r=>setTimeout(r,0));
-    check("a decomposed dictionary headword still maps recommendation to its original saved meaning",!!host.querySelector('.dict-assist-use'));
-    host.querySelector('.dict-assist-use')?.click();host.querySelector('.dict-assist-explain').click();await new Promise(r=>setTimeout(r,0));
-    check("a normalized saved choice still explains the exact original source headword",selected?.term==="café"&&calls.at(-1)?.task==="explain"&&calls.at(-1)?.choices[0].headword==="cafe\u0301");
-    const reader={resolve:_pbpDictResolveLang,online:_pbpDictSlotRun,ctx:_pbpDictCtxRun,local:_pbpDictEcdictSide,load:_pbpDictLoadPack,get:pbpVocabGet,owner:_pbpDictOwner,current:_pbpDictCurrent};
-    const pop=document.createElement("div");pop.innerHTML='<div class="xp-body"></div><button class="xp-vocab"></button>';document.body.appendChild(pop);
-    try {
-      window.hasAIKey=()=>true;_pbpDictResolveLang=async()=>"de";_pbpDictLoadPack=async()=>false;_pbpDictEcdictSide=async()=>{};pbpVocabGet=async()=>null;_pbpDictOwner="acct_assist";
-      _pbpDictSlotRun=async el=>{_pbpDictRenderEntry(el,norm,"Gift","de");return norm;};
-      _pbpDictCtxRun=async(_el,_cap,_ctx,_settings,_signal,resolve)=>{resolve("");return {gloss:"Automatic contextual gloss",lemma:""};};
-      pbpDictAssistRun=async input=>{calls.push(input);return {choiceId:input.choices[0].id,explanation:"Independent explanation",targetLang:input.target.lang};};
-      await pbpDictRun({text:"Gift"},{sentence:"Das Gift wirkt."},pop,new AbortController(),settings);
-      const selection=pop.querySelector('.xp-dict-online select');
-      check("reader online meanings expose explicit selection alongside pack meanings",selection?.options.length===3);
-      if(selection){selection.value="1";selection.dispatchEvent(new Event("change"));await new Promise(r=>setTimeout(r,0));}
-      pop.querySelector('.dict-assist-explain').click();await new Promise(r=>setTimeout(r,0));
-      check("reader assistance consumes the chosen online sense and retains it as the save definition",calls.at(-1)?.choices[0].definition==="a present"&&_pbpDictCurrent.gloss==="a present");
-      pbpDictAssistRun=async()=>{throw Object.assign(new Error("revoked"),{code:"source_not_allowed"});};
-      pop.querySelector('.dict-assist-explain').click();await new Promise(r=>setTimeout(r,0));
-      check("a dispatch-time source revocation keeps its recovery link after busy state clears",pop.querySelector('.dict-assist-result').textContent.includes("dictAssistSourceNotAllowed")&&!!pop.querySelector('.xp-dict-assist a[href="options.html#vocab"]')&&!pop.querySelector('.dict-assist-explain').disabled);
-    } finally {pop.remove();_pbpDictResolveLang=reader.resolve;_pbpDictSlotRun=reader.online;_pbpDictCtxRun=reader.ctx;_pbpDictEcdictSide=reader.local;_pbpDictLoadPack=reader.load;pbpVocabGet=reader.get;_pbpDictOwner=reader.owner;_pbpDictCurrent=reader.current;}
+    Object.assign(window,{hasAIKey:()=>true,ensureAIHostPermissionWithGesture:async()=>{grants++;},uiLangToBCP47:()=>uiLanguage,PBP_ICONS:{robot:""},pbpAiBumpCounter:()=>{},
+      pbpDictEntryRead:async input=>{reads.push(input);return null;},pbpDictEntryRun:async input=>{calls.push(input);return record();}});
+    const multi = record();
+    multi.entry.meanings.push({partOfSpeech:"sustantivo",definition:"A second meaning",examples:[]});
+    check("every AI meaning retains the word's pronunciation when saved",pbpDictNormChoices(pbpDictEntryNorm(multi,{lang:"es"}),"de").every(choice=>choice.ipa==="/ɡɪft/"));
+    const a=mount();await a.ui.ready;
+    check("opening lookup reads existing AI data without generating by default",reads.length===1&&calls.length===0&&grants===0);
+    check("one generation entry replaces all three former AI operations",a.host.querySelectorAll('.xp-dict-ai-generate').length===1&&!a.host.querySelector('.dict-assist-recommend,.dict-assist-explain,.dict-assist-analyze'));
+    check("default lookup keeps the dictionary visible with no AI answer panel",!a.dict.hidden&&a.host.querySelector('.xp-dict-ai-content').hidden);
+    a.host.querySelector('.xp-dict-ai-generate').click();await settle();
+    check("manual generation obtains permission before issuing one request",calls.length===1&&grants===1);
+    check("entry generation carries only the query and independently chosen language",calls[0].term==="Gift"&&calls[0].sourceLanguage==="de"&&calls[0].target.lang==="es"&&!("sentence" in calls[0])&&!("choices" in calls[0]));
+    check("AI content and the original dictionary share one mutually exclusive view",a.dict.hidden&&!a.host.querySelector('.xp-dict-ai-content').hidden&&view.at(-1)==="ai");
+    check("AI text is inert even when a model returns markup-shaped text",!a.host.querySelector('img')&&a.host.textContent.includes("<img src=x"));
+    check("generated definitions carry their explanation language and examples retain source language",a.host.querySelector('.xp-dict-senses > li')?.lang==="es"&&a.host.querySelector('.xp-dict-example')?.lang==="de");
+    check("the AI entry is attributed without a fabricated Wiktionary link or license",selected[0].norm.aiGenerated===true&&selected[0].norm.sourceUrl===""&&!a.host.querySelector('a[href*="wiktionary"]')&&!a.host.textContent.includes("CC BY-SA"));
+    check("entry details start collapsed and include generation provenance",!a.host.querySelector('details').open&&a.host.querySelector('details').textContent.includes("fixture-model"));
+    a.host.querySelector('.xp-dict-ai-switch').click();
+    check("switching back reveals the untouched original dictionary",!a.dict.hidden&&a.dict.textContent==="Original dictionary definition"&&a.host.querySelector('.xp-dict-ai-content').hidden);
+    a.host.querySelector('.xp-dict-ai-switch').click();
+    check("switching back to the generated entry never calls AI again",a.dict.hidden&&calls.length===1&&grants===1);
+    a.host.querySelector('.xp-dict-lemma-link').click();
+    check("related words navigate only when explicitly selected",lookups.join("|")==="giftig");
+
+    const beforeCache=calls.length;window.pbpDictEntryRead=async()=>record({cached:true});
+    const cached=mount({settings:{...settings,previewAiEnabled:false}});await cached.ui.ready;
+    check("cached entries display even when generation is disabled",cached.dict.hidden&&!cached.host.querySelector('.xp-dict-ai').hidden&&calls.length===beforeCache);
+    check("cache hits add no paid generation action",cached.host.querySelector('.xp-dict-ai-generate').hidden);
+    window.pbpDictEntryRead=async()=>null;
+    const disabled=mount({settings:{...settings,previewAiEnabled:false}});await disabled.ui.ready;
+    check("disabled AI leaves the ordinary dictionary free of inactive AI controls",disabled.host.querySelector('.xp-dict-ai').hidden&&!disabled.dict.hidden);
+    window.hasAIKey=()=>false;
+    const unconfigured=mount();await unconfigured.ui.ready;
+    check("unconfigured AI offers its settings link without enabling a paid action",!unconfigured.host.querySelector('.xp-dict-ai-configure').hidden&&unconfigured.host.querySelector('.xp-dict-ai-configure').getAttribute('href')==="options.html#ai"&&unconfigured.host.querySelector('.xp-dict-ai-generate').hidden);
+    window.hasAIKey=()=>true;
+    const beforeAuto={calls:calls.length,grants};const automatic=mount({settings:{...settings,dictAiAutoGenerate:true}});await automatic.ui.ready;
+    check("automatic entry generation requires explicit opt-in",calls.length===beforeAuto.calls+1&&automatic.dict.hidden);
+    check("automatic generation never opens a permission request",grants===beforeAuto.grants);
+
+    let release;window.pbpDictEntryRun=input=>{calls.push(input);return new Promise(resolve=>{release=resolve;});};
+    const cancelled=mount();await cancelled.ui.ready;cancelled.host.querySelector('.xp-dict-ai-generate').click();await settle();
+    const pending=calls.at(-1).signal;cancelled.host.querySelector('.xp-dict-ai-stop').click();release(record());await settle();
+    check("Stop aborts the pending entry and discards late completion",pending.aborted&&!cancelled.dict.hidden&&cancelled.host.querySelector('.xp-dict-ai-content').hidden);
+    check("Stop leaves a usable generation entry and clears busy feedback",!cancelled.host.querySelector('.xp-dict-ai-generate').disabled&&cancelled.host.querySelector('.xp-dict-ai-stop').hidden&&cancelled.host.querySelector('.xp-dict-ai-status').hidden);
+    const aborted=mount();await aborted.ui.ready;aborted.host.querySelector('.xp-dict-ai-generate').click();await settle();
+    const pendingAbort=calls.at(-1).signal;aborted.ctrl.abort();release(record());await settle();
+    check("closing lookup aborts generation and never changes the dictionary view afterward",pendingAbort.aborted&&!aborted.dict.hidden);
+    let current=true;const replaced=mount({isCurrent:()=>current});await replaced.ui.ready;replaced.host.querySelector('.xp-dict-ai-generate').click();await settle();current=false;release(record());await settle();
+    check("a superseded query ignores a late generated entry",!replaced.dict.hidden&&replaced.host.querySelector('.xp-dict-ai-content').hidden);
+    window.pbpDictEntryRun=async()=>{throw Object.assign(new Error("Invalid model output"),{code:"invalid_response"});};
+    const failed=mount();await failed.ui.ready;failed.host.querySelector('.xp-dict-ai-generate').click();await settle();
+    check("a generation error leaves the dictionary readable and retry possible",!failed.dict.hidden&&!failed.host.querySelector('.xp-dict-ai-generate').disabled&&failed.host.textContent.includes("dictEntryUnavailable"));
+    const requestsBeforePermission=calls.length;window.ensureAIHostPermissionWithGesture=async()=>{throw Object.assign(new Error("Permission needed"),{code:"host_permission"});};
+    failed.host.querySelector('.xp-dict-ai-generate').click();await settle();
+    check("permission denial shows actionable recovery without generating",calls.length===requestsBeforePermission&&failed.host.textContent.includes("aiGrantRetry"));
+    window.ensureAIHostPermissionWithGesture=async()=>{};window.pbpDictEntryRun=async()=>record({cacheSaved:false});
+    const notCached=mount();await notCached.ui.ready;notCached.host.querySelector('.xp-dict-ai-generate').click();await settle();
+    check("cache failures keep the generated content and explain its temporary state",notCached.dict.hidden&&notCached.host.textContent.includes("dictEntryNotCached"));
+    window.pbpDictEntryRun=async()=>record({entry:{word:"Gift",language:"de",pronunciation:"",meanings:[],etymology:"",relatedWords:[]}});
+    const empty=mount();await empty.ui.ready;empty.host.querySelector('.xp-dict-ai-generate').click();await settle();
+    check("an unknown expression has an explicit empty result rather than invented definitions",empty.host.textContent.includes("dictEntryNoEntry")&&!empty.host.querySelector('.xp-dict-senses'));
+    window.pbpDictEntryRun=input=>{calls.push(input);return new Promise(resolve=>{release=resolve;});};
+    uiLanguage="de";const snapshot=mount({settings:{...settings,dictDefinitionLang:""}});await snapshot.ui.ready;snapshot.host.querySelector('.xp-dict-ai-generate').click();await settle();uiLanguage="en";release(record());await settle();
+    check("a pending entry keeps the requested definition language when interface language changes",calls.at(-1).target.lang==="de"&&snapshot.host.querySelector('.xp-dict-senses > li')?.lang==="de");
   } finally {
-    host.remove();pbpDictAssistRun=saved.run;
-    for(const [key,value] of [["hasAIKey",saved.key],["ensureAIHostPermissionWithGesture",saved.grant],["PBP_ICONS",saved.icons]]){if(value===undefined)delete window[key];else window[key]=value;}
+    for(const fixture of fixtures){fixture.ctrl.abort();fixture.root.remove();}
+    for(const[name,value]of saved){if(value===undefined)delete window[name];else window[name]=value;}
   }
 }
 
-async function runDictionaryAnalyzeUiTests() {
-  section("Explicit phrase and word-form analysis");
-  const saved={run:pbpDictAssistRun,key:window.hasAIKey,grant:window.ensureAIHostPermissionWithGesture,owner:window.pbpVocabCurrentOwner};
-  const host=document.createElement("div");document.body.appendChild(host);
-  const settings={aiProvider:"ollama",previewAiEnabled:true,dictDefinitionLang:"es"};
-  const sentence="Er hört jetzt auf zu arbeiten.",calls=[],lookups=[];
-  const answer={suggestions:[{kind:"lemma",headword:"aufhören",evidence:["hört","auf"],explanation:"Forma base posible."},{kind:"phrase",headword:"aufhören zu arbeiten",evidence:["hört","auf","zu arbeiten"],explanation:"Una expresión en esta frase."}],targetLang:"es"};
-  let selected=null,current=true,releaseOwner,release;
-  const ctrl=new AbortController();
+async function runDictionaryEntrySettingsTests() {
+  section("Dictionary entry settings routing and concurrent updates");
+  const names=["chrome","pbpSettingsAreaName","pbpReadSecretSyncState","pbpSecretRoutingActive","API_KEY_FIELDS","pbpReadSettingsWithSecrets","SETTINGS_DEFAULTS","hasAIKey","pbpDictEntryRead"];
+  const saved=new Map(names.map(name=>[name,window[name]]));
+  const listeners=[],fixtures=[];
+  const settle=async()=>{for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout(resolve,0));};
+  const mount=async onSettingsChange=>{
+    const host=document.createElement('div');document.body.append(host);const ctrl=new AbortController();fixtures.push({host,ctrl});
+    const ui=_pbpDictEntryMount(host,{term:'Bank',lang:'de',owner:'ownerless',settings:{previewAiEnabled:true},signal:ctrl.signal,isCurrent:()=>true,onSettingsChange});
+    await ui.ready;return {host,ctrl,listener:listeners.at(-1)};
+  };
   try {
-    window.hasAIKey=()=>true;window.ensureAIHostPermissionWithGesture=async()=>{};window.pbpVocabCurrentOwner=async()=>"acct_analyze";
-    pbpDictAssistRun=async input=>{calls.push(input);return answer;};
-    const ui=_pbpDictAssistMount(host,{term:"hört",lang:"de",sentence,owner:"acct_analyze",signal:ctrl.signal,isCurrent:()=>current,settings,getSelection:()=>selected,onSelect:()=>{},onLookup:term=>lookups.push(term)});
-    ui.update([]);
-    if(!host.querySelector('.dict-assist-analyze')){check("word-form analysis has a real-context entry even without a dictionary hit",false);return;}
-    const analyze=host.querySelector('.dict-assist-analyze');
-    check("word-form analysis is available on a dictionary miss without making an automatic request",!host.querySelector('.xp-dict-assist').hidden&&!analyze.disabled&&calls.length===0);
-    analyze.click();await new Promise(r=>setTimeout(r,0));
-    check("analysis sends the original selected form and real sentence without dictionary candidates",calls[0]?.task==="analyze"&&calls[0]?.term==="hört"&&calls[0]?.sentence===sentence&&(!calls[0]?.choices||calls[0].choices.length===0));
-    check("analysis labels possible base forms and phrases as suggestions",host.textContent.includes("dictAssistLemmaSuggestion")&&host.textContent.includes("dictAssistPhraseSuggestion")&&host.querySelectorAll('.dict-assist-suggestion').length===2);
-    check("each evidence fragment is shown separately and exactly as it appeared in the source",[...host.querySelectorAll('.dict-assist-evidence')].map(el=>el.textContent).join("|")==="hört|auf|hört|auf|zu arbeiten");
-    check("analysis evidence and explanation keep their respective language and automatic direction",host.querySelector('.dict-assist-evidence')?.lang==="de"&&host.querySelector('.dict-assist-evidence')?.dir==="auto"&&host.querySelector('.dict-assist-explanation')?.lang==="es"&&host.querySelector('.dict-assist-headword')?.dir==="auto");
-    check("displaying analysis does not automatically look up or save a suggested identity",lookups.length===0);
-    window.pbpVocabCurrentOwner=()=>new Promise(resolve=>{releaseOwner=resolve;});
-    host.querySelector('.dict-assist-lookup').click();await new Promise(r=>setTimeout(r,0));
-    check("confirming a suggested lookup waits for the current account gate",lookups.length===0);
-    releaseOwner?.("acct_analyze");await new Promise(r=>setTimeout(r,0));
-    check("a confirmed suggestion queries the exact proposed headword",lookups.join("|")==="aufhören");
-    window.pbpVocabCurrentOwner=async()=>"acct_other";
-    host.querySelectorAll('.dict-assist-lookup')[1].click();await new Promise(r=>setTimeout(r,0));
-    check("switching accounts blocks a previously displayed suggestion's lookup",lookups.length===1&&host.textContent.includes("vocabAccountChanged"));
-    window.pbpVocabCurrentOwner=async()=>"acct_analyze";
-    pbpDictAssistRun=input=>{calls.push(input);return new Promise(resolve=>{release=resolve;});};
-    analyze.click();await new Promise(r=>setTimeout(r,0));
-    const norm={word:"hört",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/h%C3%B6rt",license:"CC BY-SA 4.0",entries:[{ipas:[],forms:[],senses:[{definition:"hears"}]}]};
-    ui.update([norm]);
-    check("a dictionary result arriving later does not cancel analysis that never used its meanings",calls.at(-1)?.signal.aborted===false);
-    release?.(answer);await new Promise(r=>setTimeout(r,0));
-    check("analysis still finishes after independent dictionary sources change",host.querySelectorAll('.dict-assist-suggestion').length===2);
-    analyze.click();await new Promise(r=>setTimeout(r,0));host.querySelector('.dict-assist-stop').click();release?.(answer);await new Promise(r=>setTimeout(r,0));
-    check("Stop cancels analysis and discards late suggestions",!host.querySelector('.dict-assist-suggestion')&&!analyze.disabled);
-    pbpDictAssistRun=async()=>({suggestions:[],targetLang:"es"});analyze.click();await new Promise(r=>setTimeout(r,0));
-    check("an empty analysis is an honest no-suggestion state with no lookup action",host.textContent.includes("dictAssistAnalysisEmpty")&&!host.querySelector('.dict-assist-lookup'));
-    pbpDictAssistRun=async()=>{throw Object.assign(new Error("invalid response"),{code:"invalid_response"});};analyze.click();await new Promise(r=>setTimeout(r,0));
-    check("invalid analysis output leaves a retryable analysis-specific error",host.textContent.includes("dictAssistAnalysisFailed")&&!analyze.disabled);
-    ctrl.abort();host.replaceChildren();
-    const unmatched=_pbpDictAssistMount(host,{term:"aufhören",lang:"de",sentence,owner:"acct_analyze",signal:new AbortController().signal,isCurrent:()=>true,settings,getSelection:()=>null,onSelect:()=>{},onLookup:()=>{}});
-    unmatched.update([]);
-    check("a saved lemma absent from its source sentence is not treated as a located surface form",host.querySelector('.dict-assist-analyze').disabled&&host.textContent.includes("dictAssistAnalysisNeedsMatch"));
-    host.replaceChildren();
-    const nfd=_pbpDictAssistMount(host,{term:"cafe\u0301",lang:"fr",sentence:"Un café, merci.",owner:"acct_analyze",signal:new AbortController().signal,isCurrent:()=>true,settings,getSelection:()=>null,onSelect:()=>{},onLookup:()=>{}});
-    nfd.update([]);
-    check("source-location checks accept canonical Unicode equivalence without case folding",!host.querySelector('.dict-assist-analyze').disabled);
-    const reader={resolve:_pbpDictResolveLang,online:_pbpDictSlotRun,ctx:_pbpDictCtxRun,local:_pbpDictEcdictSide,load:_pbpDictLoadPack,get:pbpVocabGet,owner:_pbpDictOwner,current:_pbpDictCurrent};
-    const pop=document.createElement("div");pop.innerHTML='<span class="xp-term">hört</span><div class="xp-body"></div><button class="xp-vocab"></button>';document.body.appendChild(pop);
-    const readerCtrl=new AbortController(),queries=[];
-    try {
-      _pbpDictResolveLang=async()=>"de";_pbpDictLoadPack=async()=>false;_pbpDictEcdictSide=async()=>{};pbpVocabGet=async()=>null;_pbpDictOwner="acct_analyze";
-      const base={word:"aufhören",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/aufh%C3%B6ren",license:"CC BY-SA 4.0",entries:[{ipas:[],forms:[],senses:[{definition:"to stop"}]}]};
-      _pbpDictSlotRun=async(el,term,lang,_signal,_lemma,_rerun,quote)=>{queries.push({term,lang,quote});_pbpDictRenderEntry(el,base,term,lang);return base;};
-      _pbpDictCtxRun=async(_el,_cap,_ctx,_settings,_signal,resolve)=>{resolve("");return null;};
-      pbpDictAssistRun=async input=>{calls.push(input);return answer;};
-      await pbpDictRun({text:"hört"},{sentence},pop,readerCtrl,settings);
-      const selection=pop.querySelector('.xp-dict-online select');selection.value="0";selection.dispatchEvent(new Event("change"));
-      pop.querySelector('.dict-assist-analyze').click();await new Promise(r=>setTimeout(r,0));
-      check("reader analysis uses the native selection rather than a subsequently chosen dictionary headword",_pbpDictCurrent.term==="aufhören"&&calls.at(-1)?.term==="hört"&&calls.at(-1)?.sentence===sentence);
-      const originalSuggestion=pop.querySelector('.dict-assist-lookup');
-      originalSuggestion.click();for(let i=0;i<8;i++)await new Promise(r=>setTimeout(r,0));
-      check("reader confirmation runs a complete lookup with the suggested identity, original sentence and owner",queries.at(-1)?.term==="aufhören"&&queries.at(-1)?.quote===sentence&&_pbpDictCurrent.term==="aufhören"&&_pbpDictCurrent.owner==="acct_analyze");
-      check("a suggested query shows its current headword and the original selection",pop.querySelector('.xp-term').textContent==="aufhören"&&pop.querySelector('.xp-dict-origin-term')?.textContent==="hört");
-      check("a legitimate suggested query has a return path instead of a missing-source warning",!!pop.querySelector('.xp-dict-return')&&!pop.querySelector('.dict-assist-hint').textContent.includes("dictAssistAnalysisNeedsMatch")&&pop.querySelector('.dict-assist-analyze').disabled);
-      const countBeforeReturn=calls.length, oldSuggestion=originalSuggestion;
-      pop.querySelector('.xp-dict-return')?.click();for(let i=0;i<8;i++)await new Promise(r=>setTimeout(r,0));
-      check("returning restores the original selected query and source sentence",queries.at(-1)?.term==="hört"&&queries.at(-1)?.quote===sentence&&pop.querySelector('.xp-term').textContent==="hört");
-      check("returning restores prior analysis without another AI request",pop.querySelectorAll('.dict-assist-suggestion').length===2&&calls.length===countBeforeReturn);
-      const restored=pop.querySelector('.dict-assist-lookup');restored?.click();for(let i=0;i<8;i++)await new Promise(r=>setTimeout(r,0));
-      check("restored advice keeps a working explicit lookup bound to the current session",queries.at(-1)?.term==="aufhören"&&pop.querySelector('.xp-term').textContent==="aufhören");
-      const beforeOld=queries.length;oldSuggestion?.click();await new Promise(r=>setTimeout(r,0));
-      check("a stale detached suggestion cannot navigate the current query",queries.length===beforeOld);
-      pop.querySelector('.xp-dict-return')?.click();for(let i=0;i<8;i++)await new Promise(r=>setTimeout(r,0));
-      const liveChild=_pbpDictChildCtrl,liveNotice=pop.querySelector('.dict-assist-notice');
-      document.dispatchEvent(new CustomEvent("pbp:account-changed",{detail:{account:"analyze"}}));
-      check("a same-owner credential event retains the current query and its ready notification",!liveChild.signal.aborted&&liveNotice?.isConnected);
-      document.dispatchEvent(new CustomEvent("pbp:account-changed",{detail:{account:"other"}}));
-      check("an actual owner change immediately removes old ready notifications",liveChild.signal.aborted&&!liveNotice?.isConnected&&!pop.querySelector('.xp-dict-notice'));
-      let lateAnswer;pbpDictAssistRun=input=>{calls.push(input);return new Promise(resolve=>{lateAnswer=resolve;});};
-      await pbpDictRun({text:"hört"},{sentence},pop,readerCtrl,settings);
-      pop.querySelector('.dict-assist-analyze').click();await new Promise(r=>setTimeout(r,0));
-      const pendingSignal=calls.at(-1)?.signal;
-      document.dispatchEvent(new CustomEvent("pbp:account-changed",{detail:{account:"third"}}));
-      lateAnswer?.(answer);await new Promise(r=>setTimeout(r,0));
-      check("an owner event aborts pending advice and its late completion cannot restore a cue",pendingSignal?.aborted&&!pop.querySelector('.dict-assist-suggestion')&&!pop.querySelector('.xp-dict-notice'));
+    window.chrome={storage:{onChanged:{addListener:listener=>listeners.push(listener),removeListener:()=>{}}}};
+    window.pbpSettingsAreaName=async()=>"sync";
+    window.pbpReadSecretSyncState=async()=>({optSyncEnabled:true,syncApiKeys:false});
+    window.pbpSecretRoutingActive=(enabled,keys)=>!!enabled&&!keys;
+    window.API_KEY_FIELDS=["openaiApiKey"];
+    window.SETTINGS_DEFAULTS={};window.hasAIKey=()=>true;window.pbpDictEntryRead=async()=>null;
+    let reads=0,applied=[];
+    window.pbpReadSettingsWithSecrets=async()=>{reads++;return {openaiApiKey:"rotated-fixture"};};
+    const secret=await mount(next=>applied.push(next));
+    await secret.listener({openaiApiKey:{newValue:"rotated-fixture"}},"local");
+    await secret.listener({dictDefinitionLang:{newValue:"foreign-value"}},"local");
+    await secret.listener({openaiApiKey:{newValue:"foreign-secret"}},"sync");
+    check("local API-key changes refresh a sync-settings lookup while foreign-area changes remain ignored",reads===1&&applied.length===1&&applied[0].openaiApiKey==="rotated-fixture");
+    secret.ctrl.abort();
 
-    } finally {readerCtrl.abort();pop.remove();_pbpDictResolveLang=reader.resolve;_pbpDictSlotRun=reader.online;_pbpDictCtxRun=reader.ctx;_pbpDictEcdictSide=reader.local;_pbpDictLoadPack=reader.load;pbpVocabGet=reader.get;_pbpDictOwner=reader.owner;_pbpDictCurrent=reader.current;}
+    const pending=[];applied=[];
+    window.pbpReadSettingsWithSecrets=()=>new Promise(resolve=>pending.push(resolve));
+    const concurrent=await mount(next=>{applied.push(next.dictDefinitionLang);concurrent.ctrl.abort();});
+    const first=concurrent.listener({dictDefinitionLang:{newValue:"es"}},"sync");
+    const latest=concurrent.listener({dictDefinitionLang:{newValue:"de"}},"sync");
+    await settle();pending[0]({dictDefinitionLang:"es"});await first;pending[1]({dictDefinitionLang:"de"});await latest;
+    check("an older settings read cannot rebuild the lookup and cancel a newer language change",applied.join("|")==="de");
+
+    const flags=[];applied=[];reads=0;
+    window.pbpReadSecretSyncState=()=>new Promise(resolve=>flags.push(resolve));
+    window.pbpReadSettingsWithSecrets=async()=>{reads++;return {dictDefinitionLang:"de"};};
+    const reversed=await mount(next=>applied.push(next.dictDefinitionLang));
+    const oldFlags=reversed.listener({dictDefinitionLang:{newValue:"es"}},"sync");
+    const newFlags=reversed.listener({dictDefinitionLang:{newValue:"de"}},"sync");
+    flags[1]({optSyncEnabled:true,syncApiKeys:false});await newFlags;
+    flags[0]({optSyncEnabled:true,syncApiKeys:false});await oldFlags;
+    check("out-of-order storage-routing reads cannot revive an older setting event",reads===1&&applied.join("|")==="de");
   } finally {
-    ctrl.abort();host.remove();pbpDictAssistRun=saved.run;
-    for(const [key,value] of [["hasAIKey",saved.key],["ensureAIHostPermissionWithGesture",saved.grant],["pbpVocabCurrentOwner",saved.owner]]){if(value===undefined)delete window[key];else window[key]=value;}
+    for(const{host,ctrl}of fixtures){ctrl.abort();host.remove();}
+    for(const[name,value]of saved){if(value===undefined)delete window[name];else window[name]=value;}
   }
 }
 
-async function runDictionaryAssistPolishTests() {
-  section("Dictionary AI completion and copy recovery");
-  const saved={run:pbpDictAssistRun,key:window.hasAIKey,grant:window.ensureAIHostPermissionWithGesture,clipboard:Object.getOwnPropertyDescriptor(navigator,"clipboard")};
-  const root=document.createElement("div"),scroll=document.createElement("div"),host=document.createElement("div"),notice=document.createElement("div"),pad=document.createElement("div");
-  root.style.cssText="position:fixed;top:10px;left:10px;z-index:5";
-  scroll.style.cssText="height:120px;overflow:auto;width:320px;scroll-padding-top:20px";pad.style.height="500px";
-  scroll.append(pad,host);root.append(scroll,notice);document.body.appendChild(root);
-  const ctrl=new AbortController(),settings={previewAiEnabled:true,aiProvider:"ollama"};
-  const norm={word:"bank",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/bank",license:"CC BY-SA 4.0",definitionLang:"en",entries:[{ipas:[],forms:[],senses:[{definition:"a financial institution"}]}]};
-  let release,reject,current=true;
-  const settle=()=>new Promise(r=>setTimeout(r,20));
+async function runDictionaryEntryReaderTests() {
+  section("Reader dictionary sources, save identity and related-word navigation");
+  const saved={resolve:_pbpDictResolveLang,online:_pbpDictSlotRun,local:_pbpDictEcdictSide,load:_pbpDictLoadPack,get:pbpVocabGet,owner:_pbpDictOwner,current:_pbpDictCurrent};
+  const names=["pbpDictEntryRead","pbpDictEntryRun","hasAIKey","ensureAIHostPermissionWithGesture","uiLangToBCP47","pbpVocabCurrentOwner","PBP_ICONS","pbpAiBumpCounter"];
+  const globals=new Map(names.map(name=>[name,window[name]]));
+  const pop=document.createElement("div");pop.innerHTML='<span class="xp-term"></span><div class="xp-body"></div><div class="xp-foot"><button class="xp-vocab"></button></div>';document.body.appendChild(pop);
+  const ctrl=new AbortController(),settings={previewAiEnabled:true,dictDefinitionLang:"en",dictAiAutoGenerate:false};let calls=[],finishOnline;
+  const norm={word:"Gift",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/Gift",license:"CC BY-SA 4.0",entries:[{pos:"noun",ipas:[],forms:[],senses:[{definition:"original poison",examples:[],subsenses:[]},{definition:"original second meaning",examples:[],subsenses:[]}]}]};
+  const record=(word="Gift")=>({entry:{word,language:"de",pronunciation:"/ɡɪft/",meanings:[{partOfSpeech:"noun",definition:"generated poison",examples:[]}],etymology:"",relatedWords:["giftig"]},provider:"fixture",model:"fixture",generatedAt:1700000000000,cacheSaved:true,cached:false});
+  const settle=async()=>{for(let i=0;i<8;i++)await new Promise(r=>setTimeout(r,0));};
   try {
-    window.hasAIKey=()=>true;window.ensureAIHostPermissionWithGesture=async()=>{};
-    pbpDictAssistRun=()=>new Promise((yes,no)=>{release=yes;reject=no;});
-    const ui=_pbpDictAssistMount(host,{term:"bank",lang:"en",sentence:"I went to the bank.",owner:"ownerless",signal:ctrl.signal,isCurrent:()=>current,settings,scrollHost:scroll,noticeHost:notice,getSelection:()=>pbpDictNormChoices(norm,"en")[0],onSelect:()=>{}});
-    ui.update([norm]);host.querySelector('.dict-assist-recommend').click();await settle();
-    scroll.scrollTop=0;const before={scroll:scroll.scrollTop,window:window.scrollY,focus:document.activeElement};
-    release({choiceId:null,explanation:"The financial institution.",targetLang:"en"});await settle();
-    check("offscreen AI completion exposes a visible external ready and View action",!!notice.querySelector('.dict-assist-view')&&!notice.querySelector('.dict-assist-notice')?.hidden&&notice.textContent.includes("dictAssistResultReady"));
-    check("AI completion keeps the internal and article scroll and focus unchanged",scroll.scrollTop===before.scroll&&window.scrollY===before.window&&document.activeElement===before.focus);
-    notice.querySelector('.dict-assist-view')?.click();await settle();
-    check("View moves only the internal scroll and focuses the finished result",scroll.scrollTop>before.scroll&&window.scrollY===before.window&&document.activeElement===host.querySelector('.dict-assist-result'));
-    check("the readiness hint clears when its result is visible",!notice.querySelector('.dict-assist-notice')||notice.querySelector('.dict-assist-notice').hidden);
-    Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText:async()=>{throw new DOMException("fixture denied","NotAllowedError");}}});
-    host.querySelector('.dict-assist-copy').click();await settle();
-    check("copy denial keeps a short action and puts recovery guidance in a separate status",host.querySelector('.dict-assist-copy').textContent==="dictAssistCopy"&&host.querySelector('.dict-assist-copy-status')?.textContent==="dictAssistCopyFailed"&&host.querySelector('.dict-assist-copy-status')?.getAttribute("role")==="status");
-    Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText:async()=>{}}});host.querySelector('.dict-assist-copy').click();await settle();
-    check("a successful copy retry removes the obsolete failure explanation",host.querySelector('.dict-assist-copy').textContent==="dictAssistCopied"&&!host.querySelector('.dict-assist-copy-status')?.textContent);
-    host.querySelector('.dict-assist-explain').click();await settle();scroll.scrollTop=0;
-    reject(Object.assign(new Error("fixture failure"),{code:"invalid_response"}));await settle();
-    check("an offscreen AI error has its own visible attention and View cue",notice.textContent.includes("dictAssistErrorReady")&&!notice.querySelector('.dict-assist-notice')?.hidden&&scroll.scrollTop===0);
-    host.querySelector('.dict-assist-explain').click();await settle();host.querySelector('.dict-assist-stop').click();release({choiceId:null,explanation:"late",targetLang:"en"});await settle();
-    check("Stop removes the ready cue and a late result cannot restore it",!host.textContent.includes("late")&&(!notice.querySelector('.dict-assist-notice')||notice.querySelector('.dict-assist-notice').hidden));
-    ctrl.abort();check("closing a lookup removes its external notification nodes",notice.childElementCount===0);
+    _pbpDictResolveLang=async()=>"de";_pbpDictLoadPack=async()=>false;_pbpDictEcdictSide=async()=>{};pbpVocabGet=async()=>null;_pbpDictOwner="acct_entry";
+    Object.assign(window,{hasAIKey:()=>true,ensureAIHostPermissionWithGesture:async()=>{},uiLangToBCP47:()=>"en",pbpVocabCurrentOwner:async()=>"acct_entry",PBP_ICONS:{robot:"",refresh:""},pbpAiBumpCounter:()=>{},pbpDictEntryRead:async()=>null,pbpDictEntryRun:async input=>{calls.push(input);return record(input.term);}});
+    _pbpDictSlotRun=async(_el,term)=>({...norm,word:term});
+    await pbpDictRun({text:"Gift"},{sentence:"Das Gift wirkt."},pop,ctrl,settings);await _pbpDictCurrent.ai.ready;
+    check("ordinary lookup finishes without waiting for or calling automatic AI",calls.length===0&&_pbpDictCurrent.gloss==="original poison"&&!pop.querySelector('.xp-vocab').disabled);
+    check("lookup no longer mounts a second contextual explanation or three AI actions",!pop.querySelector('.xp-dict-ctx,.xp-dict-assist,.dict-assist-actions'));
+    check("one save-definition picker lives with the save action",pop.querySelectorAll('.xp-dict-save-meaning').length===1&&!!pop.querySelector('.xp-foot .xp-dict-save-meaning'));
+    pop.querySelector('.xp-dict-ai-generate').click();await settle();
+    check("generated entry becomes the default save source when no meaning was explicitly chosen",_pbpDictCurrent.gloss==="generated poison"&&_pbpDictCurrent.license.includes("AI-generated")&&_pbpDictCurrent.sourceUrl==="");
+    pop.querySelector('.xp-dict-ai-switch').click();await settle();
+    check("returning to the original dictionary restores its default save source",_pbpDictCurrent.gloss==="original poison"&&_pbpDictCurrent.sourceUrl.includes("wiktionary"));
+    const choose=pop.querySelector('.xp-dict-save-meaning');choose.value=String(_pbpDictCurrent.meaningChoices.findIndex(c=>c.gloss==="original second meaning"));choose.dispatchEvent(new Event("change"));
+    pop.querySelector('.xp-dict-ai-switch').click();await settle();
+    check("switching sources never silently replaces an explicitly chosen save definition",_pbpDictCurrent.gloss==="original second meaning"&&_pbpDictCurrent.packChoice?.gloss==="original second meaning");
+    const countBeforeRelated=calls.length;pop.querySelector('.xp-dict-lemma-link').click();await settle();
+    check("a related-word lookup retains the original sentence and provides a return path",_pbpDictCurrent.term==="giftig"&&_pbpDictCurrent.sentence==="Das Gift wirkt."&&!!pop.querySelector('.xp-dict-return')&&pop.querySelector('.xp-term').textContent==="giftig");
+    check("following a related word does not automatically request a second generated entry",calls.length===countBeforeRelated);
+    pop.querySelector('.xp-dict-return').click();await settle();
+    check("returning from a related word restores the original selected query",pop.querySelector('.xp-term').textContent==="Gift"&&_pbpDictCurrent.sentence==="Das Gift wirkt.");
+
+    _pbpDictSlotRun=()=>new Promise(resolve=>{finishOnline=resolve;});
+    const pending=pbpDictRun({text:"Gift"},{sentence:"Das Gift wirkt."},pop,ctrl,settings);await settle();await _pbpDictCurrent.ai.ready;
+    pop.querySelector('.xp-dict-ai-generate').click();await settle();finishOnline(norm);await pending;
+    check("late ordinary dictionary results cannot replace the currently displayed AI save definition",_pbpDictCurrent.entryView==="ai"&&_pbpDictCurrent.gloss==="generated poison"&&_pbpDictCurrent.sourceUrl==="");
+
+    _pbpDictSlotRun=async()=>null;
+    await pbpDictRun({text:"Gift"},{sentence:"Das Gift wirkt."},pop,ctrl,settings);await _pbpDictCurrent.ai.ready;
+    pop.querySelector('.xp-dict-ai-generate').click();await settle();pop.querySelector('.xp-dict-ai-switch').click();await settle();
+    check("switching to an empty dictionary view clears an implicit AI save definition",_pbpDictCurrent.entryView==="dictionary"&&_pbpDictCurrent.gloss==="");
+
+    _pbpDictSlotRun=async(_el,term)=>({...norm,word:term});
+    window.pbpDictEntryRun=async()=>record();
+    await pbpDictRun({text:"Gift"},{sentence:"Das Gift wirkt."},pop,ctrl,settings);await _pbpDictCurrent.ai.ready;
+    let release;window.pbpDictEntryRun=input=>{calls.push(input);return new Promise(resolve=>{release=resolve;});};
+    pop.querySelector('.xp-dict-ai-generate').click();await settle();const signal=calls.at(-1).signal;
+    document.dispatchEvent(new CustomEvent("pbp:account-changed",{detail:{account:"new-account"}}));release(record());await settle();
+    check("account changes abort pending generation and prevent old-account content from landing",signal.aborted&&!pop.querySelector('.xp-dict-ai-content')?.textContent.includes("generated poison"));
   } finally {
-    ctrl.abort();root.remove();pbpDictAssistRun=saved.run;
-    for(const [key,value] of [["hasAIKey",saved.key],["ensureAIHostPermissionWithGesture",saved.grant]]){if(value===undefined)delete window[key];else window[key]=value;}
-    if(saved.clipboard)Object.defineProperty(navigator,"clipboard",saved.clipboard);else delete navigator.clipboard;
+    ctrl.abort();pop.remove();_pbpDictResolveLang=saved.resolve;_pbpDictSlotRun=saved.online;_pbpDictEcdictSide=saved.local;_pbpDictLoadPack=saved.load;pbpVocabGet=saved.get;_pbpDictOwner=saved.owner;_pbpDictCurrent=saved.current;
+    for(const[name,value]of globals){if(value===undefined)delete window[name];else window[name]=value;}
   }
 }
+
 
 (async function () {
   await runDictReviewRegressionTests();
@@ -2395,13 +2137,12 @@ async function runDictionaryAssistPolishTests() {
   await runDictPackRoutingTests();
   await runDictPermissionFeedbackTests();
   await runDictNoAiAndSavedStateTests();
-  await runDictCtxObserverLifecycleTests();
   await runDictResolveLangLadderTests();
   await runVocabIdbTests();
   await runMultiPackIntegrationTests();
-  await runDictionaryAssistUiTests();
-  await runDictionaryAnalyzeUiTests();
-  await runDictionaryAssistPolishTests();
+  await runDictionaryEntryUiTests();
+  await runDictionaryEntryReaderTests();
+  await runDictionaryEntrySettingsTests();
   document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 })();
 </script>

@@ -2296,10 +2296,6 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-dict-speak:hover { background: var(--btn-hover); }
 .xp-dict-speak:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 .xp-dict-speak svg { width: 14px; height: 14px; }
-/* AI-gloss ready signal: same head-button family as speak. Only the arrow
-   takes the link colour; a link-coloured border would read as a pressed
-   toggle (.toggle-btn.active) instead of "jump to what landed below". */
-.xp-dict-ctx-ready { color: var(--link); }
 /* Click-to-expand for senses past SHOW: text-link styling, one line. */
 .xp-dict-more {
   display: block;
@@ -2308,7 +2304,8 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 0.85em;
+  font-size: 12px;
+  min-height: 26px;
   color: var(--link);
 }
 .xp-dict-more:hover { color: var(--link-hover); text-decoration: underline; }
@@ -2350,45 +2347,24 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 /* .xp-dict-rel-label: no rule of its own -- upright (CJK has no true
    italic), inheriting --fg-muted from .xp-dict-rel above. Renders
    dictSynonyms/dictAntonyms ("近义词"/"反义词" in zh-CN). */
-.xp-dict-src { font-size: 0.75em; color: var(--fg-muted); margin-top: var(--sp-2); }
+.xp-dict-src { font-size: 12px; color: var(--fg-muted); margin-top: var(--sp-2); }
 .xp-dict-src a { color: inherit; }
-.xp-dict-ctx { border-top: 1px solid var(--border); margin-top: var(--sp-2); padding-top: var(--sp-2); }
-.xp-dict-ailabel { font-size: 0.75em; color: var(--fg-muted); margin-top: var(--sp-1); }
+.xp-dict-ailabel { font-size: 12px; color: var(--fg-muted); margin-top: var(--sp-1); }
 .xp-dict-msg { color: var(--fg-muted); padding: var(--sp-1) 0; }
-.xp-dict-assist { margin-top: var(--sp-4); min-width: 0; overflow-wrap: anywhere; }
-.xp-dict-assist:not([hidden]), .dict-assist-result:not(:empty) { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-2); }
-.xp-dict-assist > :empty, .xp-dict-assist [hidden] { display: none; }
-.dict-assist-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
-.xp-dict-assist .xp-dict-connect { gap: var(--sp-1); max-width: 100%; justify-self: start; }
-.xp-dict-assist .xp-dict-connect svg { width: 14px; height: 14px; flex: none; }
-.xp-dict-assist .dict-assist-context,
-.xp-dict-assist .dict-assist-headword,
-.xp-dict-assist .dict-assist-evidence,
-.xp-dict-assist .dict-assist-meaning,
-.xp-dict-assist .dict-assist-explanation { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.dict-assist-suggestion { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: var(--sp-1); column-gap: var(--sp-2); min-width: 0; }
-.dict-assist-headword { font-weight: 600; }
-.dict-assist-context-wrap > p { margin-top: var(--sp-1); }
-.xp-dict-assist .xp-dict-src, .xp-dict-assist .xp-dict-ailabel { margin-top: 0; font-size: 11px; }
-/* The completion cue overlays the bottom edge of the scroll area. Its
-   stable zero-height host never resizes or repositions the open popover. */
-.xp-dict-notice { position: relative; flex: none; height: 0; z-index: 1; }
-.xp-dict-notice > .dict-assist-notice {
-  position: absolute; bottom: 0; left: var(--sp-3); right: var(--sp-3);
-  padding: var(--sp-1) var(--sp-2);
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
-}
-.dict-assist-notice:not([hidden]), .xp-dict-origin {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
-  font-size: 12px; line-height: 18px;
-}
-.dict-assist-notice[hidden] { display: none; }
-.dict-assist-notice-text { flex: 1 1 100px; min-width: 0; overflow-wrap: anywhere; }
-.dict-assist-notice .xp-dict-connect { flex: none; margin: 0; }
-.xp-dict-origin { margin-bottom: var(--sp-2); color: var(--fg-muted); }
+.xp-dict-ai { min-width: 0; overflow-wrap: anywhere; }
+.xp-dict-ai-controls { flex-wrap: wrap; margin-bottom: var(--sp-2); }
+.xp-dict-ai .xp-dict-connect { gap: var(--sp-1); max-width: 100%; }
+.xp-dict-ai .xp-dict-connect svg { width: 14px; height: 14px; flex: none; }
+.xp-dict-ai-status, .xp-dict-ai-configure { font-size: 12px; line-height: 18px; }
+.xp-dict-ai-status { margin-bottom: var(--sp-2); }
+.xp-dict-ai-details { margin-top: var(--sp-2); }
+.xp-dict-ai-details > summary { cursor: pointer; color: var(--link); font-size: 12px; line-height: 18px; min-height: 26px; padding: var(--sp-1) 0; box-sizing: border-box; }
+.xp-dict-ai-details > summary:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.xp-dict-ai-details > p { margin: var(--sp-2) 0 0; }
+.xp-dict-ai-details > .xp-dict-src { font-size: 11px; }
+.xp-foot > .xp-dict-save-meaning { flex: 1 1 100px; width: 100px; min-width: 0; max-width: 100%; text-overflow: ellipsis; }
+.xp-dict-origin { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); font-size: 12px; line-height: 18px; margin-bottom: var(--sp-2); color: var(--fg-muted); }
 .xp-dict-origin-term { min-width: 0; overflow-wrap: anywhere; }
-.xp-dict-assist .dict-assist-copy-status { margin: 0; white-space: normal; overflow-wrap: anywhere; color: var(--danger); }
-.dict-assist-result:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 
 .xp-model {
   /* The AI end of the footer: price + model label + "ask more" (md-ask.js).

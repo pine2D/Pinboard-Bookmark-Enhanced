@@ -104,7 +104,7 @@ import { cr, hexRgb, parseRgba, composite } from "../docs/theme-surface/tools/co
 import { CHIP_TARGETS } from "../docs/theme-surface/composers/ui-components.mjs";
 // Options density per theme, from the pilots (docs/theme-surface/tools/options-density.mjs).
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
-import { installDictAssistFixture, openDictAssistState } from "./audit-dict-assist-fixture.mjs";
+import { installDictEntryFixture, openDictEntryState } from "./audit-dict-entry-fixture.mjs";
 import { openVocabPackPreview, installVocabPackFixture } from "./audit-vocab-pack-fixture.mjs";
 // Family 14's fill-separation floor (spec 2026-09-30-ui-fields-stage4-design
 // §2.3 F1-F3) is the derivation's own constant, imported, never a hand-typed
@@ -8808,8 +8808,8 @@ async function runSweep(page, sw, extBase) {
       add(await runFamilySweep(page), surface, name);
     });
   };
-  if (Object.values(contexts).some(names => [...names].some(name => /^dict-(assist|analyze)-/.test(name)))) {
-    await sw.evaluate(() => chrome.storage.local.set({ aiProvider: "openai", openaiApiKey: obfuscateKey("render-fixture-key"), previewAiEnabled: true, dictDefinitionLang: "zh-Hans" }));
+  if (Object.values(contexts).some(names => [...names].some(name => /^dict-entry-/.test(name)))) {
+    await sw.evaluate(() => chrome.storage.local.set({ aiProvider: "openai", openaiApiKey: obfuscateKey("render-fixture-key"), previewAiEnabled: true, dictAiAutoGenerate: false, dictDefinitionLang: "zh-Hans" }));
   }
   // family 9 liveness (stage 4): sweepProbe reports every value box whose
   // four corners it measured as a `radiusValueBoxMeasured` marker; those are
@@ -8949,22 +8949,12 @@ async function runSweep(page, sw, extBase) {
       await vocabHead.click(); await page.waitForTimeout(250);
       await scan("library", "vocab-detail");
     }
-    if (wants("library", "dict-assist-idle")) {
-      await installDictAssistFixture(page);
+    if (wants("library", "dict-entry-idle")) {
+      await installDictEntryFixture(page);
       await vocabHead.click();
       await page.locator("#vocab-lookup-go").click();
-      for (const state of ["idle", "busy", "result", "copy-failure", "ready", "error"]) {
-        if (wants("library", "dict-assist-" + state)) await scan("library", "dict-assist-" + state, () => openDictAssistState(page, state));
-      }
-    }
-    if (wants("library", "dict-analyze-idle")) {
-      await installDictAssistFixture(page, { analyze: true });
-      const analysisHead = page.locator("#vocab-list .vocab-card .notes-card-head")
-        .filter({ has: page.locator(".notes-row-title", { hasText: new RegExp(`^${LIB_SEED.richTerm}$`) }) });
-      await analysisHead.click();
-      await page.locator("#vocab-lookup-go").click();
-      for (const state of ["idle", "busy", "result"]) {
-        if (wants("library", "dict-analyze-" + state)) await scan("library", "dict-analyze-" + state, () => openDictAssistState(page, state, { analyze: true }));
+      for (const state of ["idle", "busy", "result", "details", "cached", "error"]) {
+        if (wants("library", "dict-entry-" + state)) await scan("library", "dict-entry-" + state, () => openDictEntryState(page, state));
       }
     }
     // Ctrl+click on the row head, not a checkbox click: the per-row checkbox was
@@ -9055,16 +9045,15 @@ async function runSweep(page, sw, extBase) {
         // probed as its own context, then closed. A surface that fails to render
         // is printed, never skipped silently -- the gate's coverage is the point.
         for (const name of READER_SURFACES.filter((name) => wants("md-preview", name))) {
-          if (/^dict-(assist|analyze)-/.test(name)) {
-            const analyze = name.startsWith("dict-analyze-");
+          if (/^dict-entry-/.test(name)) {
             if (name.endsWith("-idle")) {
-              await installDictAssistFixture(page, { analyze });
-              if (await page.evaluate(openReaderSurface, "explain-pop") !== true || await page.evaluate(openReaderSurface, "explain-dict") !== true) throw new Error("SETUP: dictionary assistance opener failed");
+              await installDictEntryFixture(page);
+              if (await page.evaluate(openReaderSurface, "explain-pop") !== true || await page.evaluate(openReaderSurface, "explain-dict") !== true) throw new Error("SETUP: dictionary entry opener failed");
               await page.selectOption(".xp-dict-head > .xp-dict-lang", "en");
             }
-            await scan("md-preview", name, () => openDictAssistState(page, name.replace(/^dict-(assist|analyze)-/, ""), { analyze }));
+            await scan("md-preview", name, () => openDictEntryState(page, name.replace(/^dict-entry-/, "")));
             const following = READER_SURFACES.slice(READER_SURFACES.indexOf(name) + 1).find(next => wants("md-preview", next));
-            if (!following?.startsWith(analyze ? "dict-analyze-" : "dict-assist-")) await page.evaluate(closeReaderSurface, "explain-dict");
+            if (!following?.startsWith("dict-entry-")) await page.evaluate(closeReaderSurface, "explain-dict");
             continue;
           }
           await scan("md-preview", name, async () => {

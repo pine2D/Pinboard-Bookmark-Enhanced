@@ -3854,7 +3854,7 @@
     "message": "Source :"
   },
   "dictAiNotConfigured": {
-    "message": "Pour obtenir des explications contextuelles, configurez un fournisseur d'IA et activez les fonctionnalités IA de la page Lecture dans les Paramètres."
+    "message": "Pour générer des entrées, configurez un fournisseur d’IA et activez l’IA de la page Lecture dans les paramètres."
   },
   "dictVocabEmpty": {
     "message": "Aucun mot n'est enregistré pour le compte Pinboard actuel ($OWNER$). Enregistrez-en depuis la vue dictionnaire du lecteur.",
@@ -4433,8 +4433,8 @@
   "mdExportAskEmpty": {"message": "Aucune question avec réponse complète à exporter."},
   "mdExportContextChanged": {"message": "Le compte, l’article ou la conversation a changé. Relancez l’export."},
   "themeGroupAdaptiveHint": {"message": "Les préréglages adaptatifs suivent le mode clair ou sombre choisi plus haut dans « Apparence de l’extension »."},
-  "dictDefinitionLangLabel": { "message": "Langue des définitions IA" },
-  "dictDefinitionLangHint": { "message": "Définit la langue des explications contextuelles de l’IA. Les entrées du dictionnaire conservent leur langue d’origine." },
+  "dictDefinitionLangLabel": { "message": "Langue des définitions des entrées IA" },
+  "dictDefinitionLangHint": { "message": "Choisissez la langue des explications dans les entrées IA, indépendamment de celle du mot recherché. Les définitions originales gardent leur langue." },
   "dictDefinitionLangUi": { "message": "Utiliser la langue de l’interface" },
   "vocabLanguageFilterAria": { "message": "Filtrer par langue" },
   "vocabAllLanguages": { "message": "Toutes les langues" },
@@ -4522,5 +4522,19 @@
   "dictQueryBack": {"message": "Revenir à l’original"},
   "dictAssistResultReady": {"message": "Résultat de l’IA prêt"},
   "dictAssistErrorReady": {"message": "Problème avec la demande IA"},
-  "dictAssistViewResult": {"message": "Afficher"}
+  "dictAssistViewResult": {"message": "Afficher"},
+  "dictEntryGenerate": {"message": "Générer une entrée IA"},
+  "dictEntryGenerating": {"message": "Génération de l’entrée…"},
+  "dictEntryUnavailable": {"message": "Impossible de générer cette entrée. Réessayez."},
+  "dictEntryNoEntry": {"message": "L’IA n’a pas pu déterminer de sens fiable pour ce mot."},
+  "dictEntrySource": {"message": "Entrée IA"},
+  "dictEntryDetails": {"message": "Étymologie et mots associés"},
+  "dictEntryExamples": {"message": "Exemples"},
+  "dictEntryEtymology": {"message": "Étymologie"},
+  "dictEntryRelated": {"message": "Mots associés"},
+  "dictEntryShowDictionary": {"message": "Voir le dictionnaire"},
+  "dictEntryShowAi": {"message": "Voir l’entrée IA"},
+  "dictEntryNotCached": {"message": "Cette entrée n’a pas pu être mise en cache sur cet appareil."},
+  "dictAiAutoGenerateLabel": {"message": "Générer automatiquement les entrées IA"},
+  "dictAiAutoGenerateHint": {"message": "Si aucune entrée IA n’est en cache, le modèle IA de la page Lecture en génère une lors de la recherche. Cela consomme des jetons. Désactivé par défaut ; la génération manuelle reste disponible."}
 }

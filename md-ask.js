@@ -3616,7 +3616,9 @@ async function _pbpExplainRun(cap, ctx, pop) {
   // No-AI users never initialize the ask panel, so "Ask more" would silently
   // no-op for them -- hide it whenever AI is unavailable, any action.
   const askBtn = pop.querySelector(".xp-ask");
-  if (askBtn) askBtn.hidden = !_pbpExplainAiOk;
+  if (askBtn) askBtn.hidden = !_pbpExplainAiOk || _pbpExplainAction === "dict";
+  const modelFooter = pop.querySelector(".xp-model");
+  if (modelFooter) modelFooter.hidden = _pbpExplainAction === "dict";
   _pbpExplainSaveTarget = cap.itemId ? { itemId: cap.itemId } : { range: cap.range };
   // Skeleton: 3 shimmer lines + an SR-only loading announcement.
   if (body.contains(document.activeElement)) {

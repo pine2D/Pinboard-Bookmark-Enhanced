@@ -829,11 +829,20 @@
             <button type="button" class="btn btn-sm" id="vocab-drive-pointer-open" data-i18n="vocabDriveManage">Manage in Data</button>
           </div>
         </div>
+        <div class="pref-group">
+          <div class="pref-row context-help-host" data-help-role="choice">
+            <label class="switch"><input type="checkbox" role="switch" id="dict-ai-auto-generate" aria-labelledby="dict-ai-auto-generate-label" /> <span class="switch-text" id="dict-ai-auto-generate-label" data-i18n="dictAiAutoGenerateLabel">Generate AI entries automatically</span>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="dictAiAutoGenerateHint">When no AI entry is cached, use the reader’s AI model to generate one during lookup. Uses tokens. Off by default; you can still generate entries manually.</p>
+            </details><span class="switch-track" aria-hidden="true"></span></label>
+          </div>
+        </div>
         <div class="fg entry-block context-help-host" data-help-role="field">
-          <label class="bl" id="dict-definition-lang-label" for="dict-definition-lang" data-i18n="dictDefinitionLangLabel">AI definition language</label>
+          <label class="bl" id="dict-definition-lang-label" for="dict-definition-lang" data-i18n="dictDefinitionLangLabel">AI entry definition language</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="dictDefinitionLangHint">Sets the language of AI contextual definitions. Dictionary entries keep their original language.</p>
+            <p class="hint context-help-body" data-i18n="dictDefinitionLangHint">Choose the language used to explain words in AI entries, independently of the word’s language. Original dictionary definitions keep their own language.</p>
           </details>
           <select id="dict-definition-lang" data-listbox>
             <option value="" data-i18n="dictDefinitionLangUi">Follow interface language</option>

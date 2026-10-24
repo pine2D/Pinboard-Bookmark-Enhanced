@@ -10,10 +10,10 @@ A Chrome extension for [Pinboard](https://pinboard.in) with AI tags and summarie
 ## Reading and translation
 
 - Save the article to Pinboard or edit its bookmark directly in the reader.
-- Choose the language for AI dictionary explanations independently of the interface, and filter saved vocabulary by language. Dictionary entries retain their original language.
+- Choose the definition language for AI entries independently of the interface or the word’s language, and filter saved vocabulary by language. Original dictionary definitions retain their own language.
 - Import Yomitan v3 ZIP dictionaries for offline definitions and readings on this device. Dictionary packs are excluded from Drive sync and JSON backups.
-- Ask AI which dictionary meaning fits the current sentence or get a separate explanation in your preferred language. Original definitions stay intact; imported dictionaries require explicit permission for AI use.
-- Explore possible base forms and phrases with excerpts from the original sentence, then confirm a suggestion to look it up without changing saved words.
+- Generate AI dictionary entries with definitions, pronunciation and examples, then reuse them from the local cache. Word origins and related words are available in the details. Automatic generation is off by default.
+- Use Explain for a word or passage in the current article. Dictionary lookup provides general meanings and usage; AI entries do not include article context or imported dictionary text.
 - Save a word directly from its dictionary result and choose the definition to keep. Link related forms through an editable base form; notes and learning status remain separate for each word.
 - In Vocabulary settings, choose the optional multilingual Anki format to keep same-spelled words from different languages separate. It creates a separate note type, leaves existing cards untouched, and skips existing notes on repeated sends. Complete TSV includes notes, base forms and every context with its source; the original six-field formats remain available. Use JSON backup to restore vocabulary in the extension.
 - Export completed Ask-the-page questions and answers with their citations, either on their own or alongside the article, through the reader’s existing download, copy, and Send-to actions.

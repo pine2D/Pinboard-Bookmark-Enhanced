@@ -3854,7 +3854,7 @@
     "message": "Źródło:"
   },
   "dictAiNotConfigured": {
-    "message": "Aby otrzymywać wyjaśnienia kontekstowe, skonfiguruj dostawcę AI i włącz w ustawieniach funkcje AI w czytniku."
+    "message": "Aby generować hasła, skonfiguruj dostawcę AI i włącz funkcje AI czytnika w ustawieniach."
   },
   "dictVocabEmpty": {
     "message": "Na bieżącym koncie Pinboard ($OWNER$) nie ma zapisanych słówek. Zapisuj je z widoku słownika w czytniku.",
@@ -4433,8 +4433,8 @@
   "mdExportAskEmpty": {"message": "Brak ukończonych pytań i odpowiedzi do eksportu."},
   "mdExportContextChanged": {"message": "Konto, artykuł lub rozmowa uległy zmianie. Rozpocznij eksport ponownie."},
   "themeGroupAdaptiveHint": {"message": "Motywy adaptacyjne stosują tryb jasny lub ciemny wybrany powyżej w sekcji „Wygląd rozszerzenia”."},
-  "dictDefinitionLangLabel": { "message": "Język definicji AI" },
-  "dictDefinitionLangHint": { "message": "Określa język objaśnień AI uwzględniających kontekst. Hasła słownikowe pozostają w oryginalnym języku." },
+  "dictDefinitionLangLabel": { "message": "Język definicji w hasłach AI" },
+  "dictDefinitionLangHint": { "message": "Wybierz język objaśnień w hasłach AI niezależnie od języka szukanego słowa. Oryginalne definicje słownikowe pozostają w swoim języku." },
   "dictDefinitionLangUi": { "message": "Użyj języka interfejsu" },
   "vocabLanguageFilterAria": { "message": "Filtruj według języka" },
   "vocabAllLanguages": { "message": "Wszystkie języki" },
@@ -4522,5 +4522,19 @@
   "dictQueryBack": {"message": "Wróć do oryginału"},
   "dictAssistResultReady": {"message": "Wynik AI jest gotowy"},
   "dictAssistErrorReady": {"message": "Problem z żądaniem AI"},
-  "dictAssistViewResult": {"message": "Pokaż"}
+  "dictAssistViewResult": {"message": "Pokaż"},
+  "dictEntryGenerate": {"message": "Wygeneruj hasło z AI"},
+  "dictEntryGenerating": {"message": "Generowanie hasła…"},
+  "dictEntryUnavailable": {"message": "Nie udało się wygenerować hasła. Spróbuj ponownie."},
+  "dictEntryNoEntry": {"message": "AI nie zdołała wiarygodnie ustalić znaczenia tego słowa."},
+  "dictEntrySource": {"message": "Hasło AI"},
+  "dictEntryDetails": {"message": "Pochodzenie i powiązane słowa"},
+  "dictEntryExamples": {"message": "Przykłady"},
+  "dictEntryEtymology": {"message": "Pochodzenie słowa"},
+  "dictEntryRelated": {"message": "Powiązane słowa"},
+  "dictEntryShowDictionary": {"message": "Pokaż słownik"},
+  "dictEntryShowAi": {"message": "Pokaż hasło AI"},
+  "dictEntryNotCached": {"message": "Nie udało się zapisać tego hasła w pamięci podręcznej urządzenia."},
+  "dictAiAutoGenerateLabel": {"message": "Automatycznie generuj hasła AI"},
+  "dictAiAutoGenerateHint": {"message": "Jeśli nie ma hasła AI w pamięci podręcznej, podczas wyszukiwania utworzy je model AI czytnika. Zużywa to tokeny. Domyślnie wyłączone; hasła można też generować ręcznie."}
 }
