@@ -3763,6 +3763,9 @@ window._pbpExportFixDone = (async () => {
   const kept = parse(composeStyledHtml(md, meta, { imagePolicy: "keep" }));
   assertEq(JSON.stringify([...kept.images].map(img => img.getAttribute("src"))), JSON.stringify(urls), "raw gallery/table images keep absolute source URLs");
   assert(!kept.querySelector('img[srcset]') || kept.querySelector('img[srcset]').getAttribute("srcset").includes("https://export.example/articles/pics/one-large.png"), "responsive candidates cannot override the absolute export src with a relative URL");
+  const srcsetOnly = '<ul class="gallery"><li><img srcset="https://cdn.example/one.png 1x" alt="One"><p>First</p></li><li><img srcset="https://cdn.example/two.png 1x" alt="Two"><p>Second</p></li></ul>';
+  const srcsetOnlyDoc = parse(composeStyledHtml(htmlToMarkdown(srcsetOnly, { baseUrl: meta.url }), meta, { imagePolicy: "keep" }));
+  assertEq(JSON.stringify([...srcsetOnlyDoc.images].map(img => img.getAttribute("srcset"))), JSON.stringify(["https://cdn.example/one.png 1x", "https://cdn.example/two.png 1x"]), "keep retains a gallery image's only source when it has srcset without src");
   const alt = parse(composeStyledHtml(md, meta, { imagePolicy: "alt" }));
   assert(alt.images.length === 0 && alt.body.textContent.includes("First & best") && alt.body.textContent.includes("Table image"), "alt policy replaces raw gallery/table images with literal alternative text");
   const stripped = parse(composeStyledHtml(md, meta, { imagePolicy: "strip" }));

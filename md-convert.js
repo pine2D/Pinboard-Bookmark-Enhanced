@@ -1220,9 +1220,9 @@ function pbpMapExportImages(md, transform) {
           if (next == null) return altText();
           const copy = img.cloneNode(false);
           if (next !== src) copy.setAttribute("src", next);
-          // Exports use the canonical src. Responsive candidates must never
-          // override an embedded/package src (nor a relative one offline).
-          if (copy.hasAttribute("srcset") && (embed || baseUrl)) copy.removeAttribute("srcset");
+          // Responsive candidates must never override an exported canonical
+          // src. Without src, preserve srcset as the image's only source.
+          if (next && copy.hasAttribute("srcset") && (embed || baseUrl)) copy.removeAttribute("srcset");
           return copy.outerHTML === img.outerHTML ? raw : _pbpRawBlockOneLine(copy.outerHTML);
         }
       }), inTable);
