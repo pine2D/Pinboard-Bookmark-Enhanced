@@ -2012,6 +2012,26 @@ function pbpHlCurrentItems() {
   return _pbpHlState ? _pbpHlState.items.slice() : [];
 }
 
+// Capture the editor intent at the export click, then read the committed items
+// in the same queue as writes. Blur starts an async save before the click, and
+// keyboard activation may not blur at all. A failed save must not export the
+// previous note as though the edit had succeeded.
+function pbpHlExportItems() {
+  const state = _pbpHlState;
+  if (!state) return Promise.resolve([]);
+  const revision = _pbpHlArticleRev, ownerRevision = _pbpHlOwnerRevision, owner = _pbpHlOwner;
+  const pendingNote = _pbpHlCommitNote();
+  const current = () => state === _pbpHlState && revision === _pbpHlArticleRev
+    && ownerRevision === _pbpHlOwnerRevision && !_pbpHlOwnerPending && owner === _pbpHlOwner;
+  return _pbpHlQueueWrite(async () => {
+    if (pendingNote && !await pendingNote) throw new Error("highlight-save-failed");
+    if (!current()) throw new Error("export-context-changed");
+    const liveOwner = await _pbpHlLiveOwner();
+    if (!current() || liveOwner === null || liveOwner !== owner) throw new Error("export-context-changed");
+    return structuredClone(state.items);
+  });
+}
+
 // ---- H6 (spec sec.2): cross-file accessor for md-reader.js's note-search
 // hook -- the underlying Range lives in _pbpHlState.ranges, never exposed
 // directly (md-reader.js must not reach into another file's private state).
@@ -2472,13 +2492,14 @@ async function _pbpHlSwitchColor(color) {
 }
 
 let _pbpHlNoteDirty = false;
+let _pbpHlPendingNoteCommit = null;
 document.addEventListener("input", (e) => {
   if (e.target && e.target.classList && e.target.classList.contains("hl-card-note")) _pbpHlNoteDirty = true;
 });
 
 // Blur AND explicit Save button both route here (spec: "note textarea(失焦或保存钮落存储)").
 function _pbpHlCommitNote() {
-  if (!_pbpHlNoteDirty || !_pbpHlCardItemId || !_pbpHlState) return;
+  if (!_pbpHlNoteDirty || !_pbpHlCardItemId || !_pbpHlState) return _pbpHlPendingNoteCommit;
   const pendingId = _pbpHlCardItemId;
   const card = _pbpHlCard;
   const noteEl = card && card.querySelector(".hl-card-note");
@@ -2491,7 +2512,7 @@ function _pbpHlCommitNote() {
   // list's note-excerpt line does need to reflect the edit.
   let mergedNote = nextNote;
   let gone = false;
-  _pbpHlCommit((stored) => {
+  const pending = _pbpHlCommit((stored) => {
     const item = stored.find((it) => it.id === pendingId);
     // Deleted elsewhere while this note was being typed: drop the edit rather
     // than re-inserting the item to carry it (the resurrection bug).
@@ -2542,6 +2563,10 @@ function _pbpHlCommitNote() {
     }
     return true;
   });
+  _pbpHlPendingNoteCommit = pending;
+  const clearPending = () => { if (_pbpHlPendingNoteCommit === pending) _pbpHlPendingNoteCommit = null; };
+  pending.then(clearPending, clearPending);
+  return pending;
 }
 
 // Shared delete core (spec 2.1: the list's x button and the card's delete
@@ -2722,7 +2747,8 @@ function _pbpHlBuildNotebookDom(rail) {
   copyBtn.setAttribute("aria-label", t("hlCopyMd"));
   copyBtn.addEventListener("click", async () => {
     try {
-      await navigator.clipboard.writeText(pbpHlComposeSection(_pbpHlState ? _pbpHlState.items : []));
+      const items = await pbpHlExportItems();
+      await navigator.clipboard.writeText(pbpHlComposeSection(items));
       flashButtonLabel(copyBtn, t("hlCopied"));
     } catch (_) {
       flashButtonLabel(copyBtn, t("mdPreviewFailed"), false);

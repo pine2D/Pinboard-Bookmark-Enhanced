@@ -12,6 +12,9 @@ h2 { margin-top: 24px; }
 <div id="summary"></div>
 <div id="results"></div>
 
+<script src="../vendor/marked.min.js"></script>
+<script src="../vendor/purify.min.js"></script>
+<script src="../md-convert.js"></script>
 <script src="../md-embed.js"></script>
 <script>
 const root = document.getElementById("results");
@@ -407,6 +410,33 @@ section("pbpEmbedFetchAll concurrency cap");
   const map = await pbpEmbedFetchAll(urls, limits);
   assertEq(map.size, urls.length, "all 5 candidates are eventually fetched despite the concurrency cap");
   assert(maxInFlight <= 2, "observed max concurrent in-flight fetches (" + maxInFlight + ") respects limits.concurrency=2");
+}
+
+section("HTML images use the same scan, fetch, rewrite and budget pipeline");
+{
+  const base = "https://cdn.example.com/articles/post";
+  const body = '<div class="pbp-gallery"><figure><img src="../a.png" srcset="../a-big.png 2x" alt="A &amp; B" title="Gallery"></figure></div>\n\n'
+    + '<table><tr><td colspan="2"><img src="/b.png" alt="B"></td></tr></table>\n\n'
+    + '`<img src="https://ignored.example/code.png">`';
+  fetchCalls = [];
+  globalThis.fetch = tableFetch({
+    "https://cdn.example.com/a.png": { contentType: "image/png", chunks: [bytesOf("A")] },
+    "https://cdn.example.com/b.png": { contentType: "image/png", chunks: [bytesOf("B")] }
+  });
+  const scan = pbpEmbedScan(body, base);
+  const fetched = await pbpEmbedFetchAll(scan.candidates, SHORT_LIMITS);
+  assertEq(JSON.stringify(fetchCalls.map(call => call.url).sort()), JSON.stringify(["https://cdn.example.com/a.png", "https://cdn.example.com/b.png"]), "only real HTML images are fetched; code samples never produce requests");
+  const replacements = Object.fromEntries([...fetched].map(([url, img]) => [url, img.dataUri]));
+  const rewritten = pbpEmbedRewrite(body, replacements, base, pbpEmbedBudget(999999));
+  const doc = new DOMParser().parseFromString(composeStyledHtml(rewritten.md, { url: base }, { imagePolicy: "keep" }), "text/html");
+  assert(doc.images.length === 2 && [...doc.images].every(img => img.getAttribute("src").startsWith("data:image/png;base64,") && !img.hasAttribute("srcset")), "both fetched images become offline data URIs without a remote srcset override");
+  assert(doc.images[0].alt === "A & B" && doc.images[0].title === "Gallery", "embedding preserves decoded alt and title through HTML export");
+  const refused = pbpEmbedRewrite(body, replacements, base, pbpEmbedBudget(0));
+  assert(refused.dropped === 2 && refused.md === body, "raw HTML replacements obey the output budget and retain the original image when refused");
+  const blob = '<img src="blob:https://page.example/id" alt="&lt;literal&gt;">';
+  assertEq(JSON.stringify(pbpEmbedScan(blob, base).blobs), JSON.stringify(["blob:https://page.example/id"]), "raw blob URLs participate in the same unembeddable count");
+  const blobDoc = new DOMParser().parseFromString(composeStyledHtml(pbpEmbedRewrite(blob, { "blob:https://page.example/id": null }, base).md, {}, {}), "text/html");
+  assert(blobDoc.images.length === 0 && blobDoc.body.textContent.includes("<literal>"), "raw blob images degrade to literal alt text without introducing HTML");
 }
 
 document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;

@@ -1020,21 +1020,33 @@ async function extractLocalMarkdown(tabId) {
   } catch (e) { return { error: e.message }; }
 }
 
-// Lazy-load md-convert.js on demand (saves ~79KB of parse/compile from every
+// Lazy-load md-convert.js and its Markdown lexer on demand (saves parse/compile from every
 // popup open — its only popup consumers are the Markdown preview/copy/export
 // button flow and the AI pageText fallback, never the first paint). Same
 // pattern as ensureTurndown below; md-convert.js ships in the ZIP as a root
 // *.js automatically.
 let _mdConvertLoadPromise = null;
 function ensureMdConvert() {
-  if (typeof htmlToMarkdown !== "undefined") return Promise.resolve();
+  const hasConverter = typeof htmlToMarkdown !== "undefined";
+  const hasLexer = typeof marked !== "undefined" && typeof marked.lexer === "function";
+  if (hasConverter && hasLexer) return Promise.resolve();
   if (_mdConvertLoadPromise) return _mdConvertLoadPromise;
-  _mdConvertLoadPromise = new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = "md-convert.js";
-    s.onload = () => resolve();
-    s.onerror = () => { _mdConvertLoadPromise = null; reject(new Error("md-convert load failed")); };
-    document.head.appendChild(s);
+  _mdConvertLoadPromise = (async () => {
+    const files = [];
+    if (!hasLexer) files.push("vendor/marked.min.js");
+    if (!hasConverter) files.push("md-convert.js");
+    // Sequential loads leave no pending duplicate injection if a failed load
+    // is retried, and resolve only when both conversion dependencies are ready.
+    for (const src of files) await new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error(src + " load failed"));
+      document.head.appendChild(s);
+    });
+  })().catch(error => {
+    _mdConvertLoadPromise = null;
+    throw error;
   });
   return _mdConvertLoadPromise;
 }
@@ -1339,6 +1351,11 @@ async function htmlToMarkdownAsync(html, opts) {
         });
         downloadFile(safeFilename(meta.title) + ".md", out, "text/markdown;charset=utf-8");
       };
+      const obsidianCfg = settings.exportTargets?.obsidian || {
+        enabled: !!settings.obsidianEnabled,
+        vault: settings.obsidianVault || "",
+        folder: settings.obsidianFolder || ""
+      };
       const sendObsidian = async () => {
         const meta = attachExtendedMeta({
           title: result.title || $id("title-input")?.value || "",
@@ -1375,9 +1392,12 @@ async function htmlToMarkdownAsync(html, opts) {
           showStatus("status-msg", t("obsidianClipboardFailed"), "error");
           return;
         }
+        const route = obsidianCfg.route === "append" || obsidianCfg.route === "daily" ? obsidianCfg.route : "new";
         const uri = buildObsidianUri({
-          vault: settings.obsidianVault,
-          folder: settings.obsidianFolder,
+          action: route === "daily" ? "daily" : "new",
+          append: route === "append" || route === "daily",
+          vault: obsidianCfg.vault,
+          folder: route === "daily" ? "" : obsidianCfg.folder,
           name: safeFilename(meta.title),
           clipboard: true,
           content: ""
@@ -1402,7 +1422,7 @@ async function htmlToMarkdownAsync(html, opts) {
         const obsBtn = $id("md-strip-obsidian");
         // (The old "shorten Download to .md when Obsidian shows" width dance is
         // gone -- icon-only cells have nothing to shorten.)
-        if (settings.obsidianEnabled) {
+        if (obsidianCfg.enabled) {
           if (obsBtn) { obsBtn.style.display = ""; obsBtn.onclick = sendObsidian; }
         } else if (obsBtn) {
           obsBtn.style.display = "none";

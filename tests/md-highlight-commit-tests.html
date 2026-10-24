@@ -1510,6 +1510,95 @@ function selectionRange(n, start, end) {
     padded[0] && _pbpHlState.ranges[padded[0].id].range.toString());
   spillList.remove();
 
+  section("(11) exports wait for the edit captured by blur or the export click");
+  const copiedNotes = [];
+  Object.defineProperty(navigator, "clipboard", { configurable: true,
+    value: { writeText: async (text) => { copiedNotes.push(text); } } });
+  const turn = () => new Promise(resolve => setTimeout(resolve, 0));
+  async function editForExport(note = "Newest note") {
+    FAIL_READS = false; OWNER_NOW = "ownerless"; OWNER_READS.length = 0;
+    _pbpHlOwner = ""; _pbpHlOwnerPending = false;
+    await boot(baseRecord());
+    _pbpHlCard = fakeCard; _pbpHlCardItemId = "h-alpha";
+    cardNote.value = note; _pbpHlCardBaseNote = ""; _pbpHlNoteDirty = true;
+    _pbpHlNotebookRender(); copiedNotes.length = 0;
+  }
+  function pauseNoteSave() {
+    let release, enter;
+    const started = new Promise(resolve => { enter = resolve; });
+    SET_GATE = new Promise(resolve => { release = resolve; });
+    ON_SET = () => { ON_SET = null; enter(); };
+    _pbpHlCommitNote();
+    return { release, started };
+  }
+  const copyNotes = () => document.getElementById("hl-rail-copy").click();
+  await editForExport();
+  const heldNote = pauseNoteSave(); await heldNote.started;
+  copyNotes(); await turn();
+  check("notebook copy does not publish while the blurred note is saving", copiedNotes.length === 0);
+  heldNote.release(); await flush(); await turn();
+  check("notebook copy includes the just-saved note", copiedNotes.length === 1 && copiedNotes[0].includes("Newest note"), copiedNotes);
+
+  await editForExport("Keyboard edit");
+  copyNotes(); await flush(); await turn();
+  check("copy also commits a dirty editor when no blur occurred", copiedNotes.length === 1 && copiedNotes[0].includes("Keyboard edit"), copiedNotes);
+
+  await editForExport();
+  ON_SET = () => { ON_SET = null; throw new Error("simulated failed note save"); };
+  _pbpHlCommitNote(); copyNotes(); await flush(); await turn();
+  check("a failed pending save cannot export the previous note", copiedNotes.length === 0, copiedNotes);
+  cardNote.value = "Retried edit"; _pbpHlNoteDirty = true;
+  copyNotes(); await flush(); await turn();
+  check("a new edit after a failed save can be exported without a stale failure", copiedNotes.length === 1 && copiedNotes[0].includes("Retried edit"), copiedNotes);
+
+  await editForExport();
+  const heldOwner = pauseNoteSave(); await heldOwner.started;
+  copyNotes(); OWNER_NOW = "other-account"; heldOwner.release(); await flush(); await turn();
+  check("a live account switch cancels pending notebook copy before its storage event", copiedNotes.length === 0, copiedNotes);
+
+  await editForExport(); _pbpHlNoteDirty = false;
+  OWNER_READS.push(() => Promise.reject(new Error("simulated export owner read failure")));
+  copyNotes(); await flush(); await turn();
+  check("an unreadable owner fails closed before notebook copy", copiedNotes.length === 0, copiedNotes);
+
+  await editForExport();
+  const heldArticle = pauseNoteSave(); await heldArticle.started;
+  copyNotes(); _pbpHlArticleRev++; heldArticle.release(); await flush(); await turn();
+  check("article replacement cancels the pending notebook copy", copiedNotes.length === 0, copiedNotes);
+
+  // Load the reader's real capture/prepare helpers: all file and Send-to
+  // handlers share them. Only UI settings and unrelated Ask data are fixtures.
+  const exportHelpers = previewSource.slice(previewSource.indexOf("  function captureExportJob()"),
+    previewSource.indexOf("  function exportErrorText("));
+  const readerExports = new Function("buildExportOpts", "pbpHlExportItems", `
+    const exportScope = "article", previewAccount = "", _articleRevision = 1, exportAskRevision = 1;
+    const expIncludeAsk = false, expIncludeHl = true, exportSettings = {};
+    const pbpExpTglOn = value => value;
+    const getViewMarkdown = () => "Article", buildMeta = () => ({ title: "Fixture" });
+    ${exportHelpers}
+    return { capture: captureExportJob, prepare: prepareExportAsk };
+  `)(() => ({ highlights: pbpHlCurrentItems() }),
+    typeof pbpHlExportItems === "function" ? pbpHlExportItems : undefined);
+  await editForExport("Reader export edit");
+  const heldReader = pauseNoteSave(); await heldReader.started;
+  const readerJob = readerExports.capture();
+  let readerDone = false;
+  const preparedReader = readerExports.prepare(readerJob).then(() => { readerDone = true; });
+  await turn();
+  check("reader export preparation waits for the captured note save", !readerDone);
+  heldReader.release(); await preparedReader; await flush();
+  check("reader file and Send-to composition receive the freshly saved note",
+    readerJob.opts.highlights.some(item => item.note === "Reader export edit"), readerJob.opts.highlights);
+
+  await editForExport();
+  ON_SET = () => { ON_SET = null; throw new Error("simulated reader note save failure"); };
+  _pbpHlCommitNote();
+  const failedReader = readerExports.capture();
+  let readerRejected = false;
+  try { await readerExports.prepare(failedReader); } catch (_) { readerRejected = true; }
+  await flush();
+  check("reader exports reject a failed pending note save", readerRejected);
+
   document.getElementById("summary").textContent =
     "PASS " + PASS + " / FAIL " + FAIL + " (total " + (PASS + FAIL) + ")";
   document.getElementById("summary").style.color = FAIL ? "#c00" : "#0a0";

@@ -630,6 +630,16 @@ function slugify(text) {
     .replace(/^-+|-+$/g, "");
 }
 
+// Reserve the final id as well as the base counter. A real "Contents-1"
+// heading must not collide with the suffix assigned to a second "Contents".
+function _pbpUniqueHeadingSlug(base, seen) {
+  let slug = base, n = seen[base] || 0;
+  while (Object.prototype.hasOwnProperty.call(seen, slug)) slug = base + "-" + (++n);
+  seen[base] = n;
+  seen[slug] = 0;
+  return slug;
+}
+
 // ---- Markdown -> safe HTML (preview only; needs marked + DOMPurify) ----
 let _markedConfigured = false;
 // Reset per renderMarkdown() call (one parse = one heading-id namespace) so the
@@ -648,10 +658,7 @@ function _configureMarked() {
     let id = slugify(token.text);
     // Same -1/-2 dedup rule as buildToc (below), so a TOC anchor built there
     // always resolves to a real heading id here even when headings repeat.
-    if (_headingSeen) {
-      if (_headingSeen[id] != null) { _headingSeen[id] += 1; id = id + "-" + _headingSeen[id]; }
-      else _headingSeen[id] = 0;
-    }
+    if (_headingSeen) id = _pbpUniqueHeadingSlug(id, _headingSeen);
     return `<h${token.depth} id="${id}">${text}</h${token.depth}>\n`;
   };
   // Wide tables used to punch through the article column and put a
@@ -1062,7 +1069,7 @@ function publishedIso(s) {
 
 // meta: {title,url,date,tags,source,description?,author?,published?,clipped?,site?,image?,words?}
 // opts.fields: ordered subset of [title,url,date,tags,source]; description always
-// trails (only when present). Bare scalars for url/date/source; quoted for
+// trails (only when present). Bare scalars for url/ISO date/source; quoted for
 // title/description; tags as an inline flow array whose ITEMS are quoted the
 // same way -- Pinboard splits tags on whitespace only, so ",", "[", "]", '"'
 // and "#" are all legal inside one tag: a bare item silently splits "a,b" into
@@ -1079,7 +1086,7 @@ function applyFrontmatter(md, meta, opts) {
   for (const f of fields) {
     if (f === "title") lines.push("title: " + yamlString(meta.title || ""));
     else if (f === "url") lines.push("url: " + (meta.url || ""));
-    else if (f === "date") lines.push("date: " + (meta.date || ""));
+    else if (f === "date") lines.push("date: " + (!meta.date || /^\d{4}-\d{2}-\d{2}$/.test(meta.date) ? (meta.date || "") : yamlString(meta.date)));
     else if (f === "tags") lines.push("tags: [" + (Array.isArray(meta.tags) ? meta.tags.map(yamlString).join(", ") : "") + "]");
     else if (f === "source") lines.push("source: " + (meta.source || ""));
   }
@@ -1105,6 +1112,209 @@ function applyFrontmatter(md, meta, opts) {
   return lines.join("\n") + "\n\n" + (md || "");
 }
 
+// Map actual image tokens back to their source ranges. The same walk feeds
+// image policies and embedding: code/escapes/comments cannot become network
+// requests, and raw gallery/table HTML has the same export semantics as ![]().
+// No rendered-HTML round trip: unrelated Markdown, reference definitions and
+// container prefixes stay byte-for-byte intact. marked is already vendored;
+// popup's ensureMdConvert loads it only when conversion is requested.
+function pbpExportImageUrl(src, baseUrl) {
+  if (!src || !baseUrl || /^[a-z][a-z0-9+.-]*:/i.test(src)) return src;
+  try { return new URL(src, baseUrl).href; } catch (_) { return src; }
+}
+
+function _pbpImageDecode(text) {
+  if (!String(text || "").includes("&")) return String(text || "");
+  const el = _pbpConvertScratchDiv().ownerDocument.createElement("textarea");
+  el.innerHTML = String(text || "");
+  return el.value;
+}
+function _pbpImageAltMarkdown(text) {
+  return _xmlEscape(text).replace(/([\\`*_[\]{}#!|])/g, "\\$1").replace(/\s*\n\s*/g, " ");
+}
+function _pbpImageMarkdown(token, src) {
+  // Keep the source alt markup (including escaped/nested brackets). Only the
+  // destination is replaced; a reference image becomes inline without editing
+  // a definition which may also serve ordinary links.
+  let end = 2, depth = 1;
+  for (; end < token.raw.length; end++) {
+    if (token.raw[end] === "\\") { end++; continue; }
+    if (token.raw[end] === "[") depth++;
+    else if (token.raw[end] === "]" && --depth === 0) break;
+  }
+  const alt = token.raw.slice(2, end).replace(/\s*\n\s*/g, " ");
+  let dest = String(src).replace(/[<>\r\n]/g, c => encodeURIComponent(c));
+  if (/[\s()\\]/.test(dest)) dest = "<" + dest.replace(/\\/g, "%5C") + ">";
+  const title = token.title == null ? "" : ' "' + String(token.title).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\s*\n\s*/g, " ") + '"';
+  return "![" + alt + "](" + dest + title + ")";
+}
+
+function pbpMapExportImages(md, transform) {
+  const source = String(md || "");
+  if (!/!\[|<img\b/i.test(source)) return source;
+  if (typeof marked === "undefined") throw new Error("markdown-lexer-unavailable");
+  // Embedded data URIs can occupy tens of MB. Source maps are lazy ranges,
+  // not per-character arrays, including inside lists/tables. Only removed
+  // CRLF bytes and actual container-prefix changes need explicit entries.
+  const range = (length, at, offset = 0) => ({
+    length, at: i => at(offset + i),
+    slice: (start, end = length) => range(end - start, at, offset + start)
+  });
+  const concat = parts => {
+    const ends = []; let length = 0;
+    for (const part of parts) { length += part.length; ends.push(length); }
+    return range(length, i => {
+      let lo = 0, hi = ends.length;
+      while (lo < hi) { const mid = (lo + hi) >>> 1; if (ends[mid] <= i) lo = mid + 1; else hi = mid; }
+      return parts[lo]?.at(i - (lo ? ends[lo - 1] : 0));
+    });
+  };
+  const removed = [], patches = [], htmlStack = [];
+  const normalized = source.includes("\r") ? source.replace(/\r\n?/g, (m, at) => {
+    if (m.length === 2) removed.push(at - removed.length);
+    return "\n";
+  }) : source;
+  const positions = range(normalized.length, i => {
+    let lo = 0, hi = removed.length;
+    while (lo < hi) { const mid = (lo + hi) >>> 1; if (removed[mid] < i) lo = mid + 1; else hi = mid; }
+    return i + lo;
+  });
+  const patch = (map, replacement, inTable) => {
+    if (!map.length || replacement == null) return;
+    const start = map.at(0), end = map.at(map.length - 1) + 1;
+    if (replacement === source.slice(start, end)) return;
+    if (inTable) replacement = replacement.replace(/(\\*)\|/g, (whole, slashes) => slashes.length % 2 ? whole : "\\" + whole);
+    patches.push({ start, end, replacement });
+  };
+  const rawHtml = (token, map, inTable) => {
+    // Locate tags without reserializing their enclosing HTML block: closing a
+    // partial <div> here would change the Markdown blocks that follow it. DOM
+    // parsing of each image is inert and handles quoting/entities for us.
+    const tag = /<!--[\s\S]*?(?:-->|$)|<(\/?)([a-z][a-z0-9:-]*)\b(?:[^"'<>]|"[^"]*"|'[^']*')*>/gi;
+    let m;
+    while ((m = tag.exec(token.raw))) {
+      if (!m[2]) continue;
+      const name = m[2].toLowerCase();
+      if (/^(?:script|style|textarea)$/.test(htmlStack.at(-1) || "")) {
+        if (m[1] && htmlStack.at(-1) === name) htmlStack.pop();
+        continue;
+      }
+      if (/^(?:pre|code|script|style|textarea)$/.test(name)) {
+        if (m[1]) { if (htmlStack.at(-1) === name) htmlStack.pop(); }
+        else if (!/\/\s*>$/.test(m[0])) htmlStack.push(name);
+        continue;
+      }
+      if (htmlStack.length || name !== "img" || m[1]) continue;
+      const host = _pbpConvertScratchDiv();
+      host.innerHTML = m[0];
+      const img = host.querySelector("img");
+      if (!img) continue;
+      const own = map.slice(m.index, m.index + m[0].length);
+      const raw = source.slice(own.at(0), own.at(own.length - 1) + 1);
+      const src = img.getAttribute("src") || "", alt = img.getAttribute("alt") || "";
+      const altText = () => token.block ? _pbpRawBlockOneLine(_xmlEscape(alt)) : _pbpImageAltMarkdown(alt);
+      patch(own, transform({
+        raw, src,
+        alt: altText,
+        replace: (next, embed, baseUrl) => {
+          if (next == null) return altText();
+          const copy = img.cloneNode(false);
+          if (next !== src) copy.setAttribute("src", next);
+          // Exports use the canonical src. Responsive candidates must never
+          // override an embedded/package src (nor a relative one offline).
+          if (copy.hasAttribute("srcset") && (embed || baseUrl)) copy.removeAttribute("srcset");
+          return copy.outerHTML === img.outerHTML ? raw : _pbpRawBlockOneLine(copy.outerHTML);
+        }
+      }), inTable);
+    }
+  };
+  const containerMap = (raw, text, map) => {
+    const rawLines = raw.split("\n"), lines = text.split("\n"), child = [];
+    if (lines.length > rawLines.length) return null;
+    let offset = 0;
+    for (let i = 0; i < lines.length; i++) {
+      let line = rawLines[i], lineMap = map.slice(offset, offset + line.length);
+      let start = line.lastIndexOf(lines[i]);
+      // marked expands leading tabs in list continuations before stripping
+      // the list indent. Map each expanded space back to its original tab;
+      // image spans themselves still point at the original source bytes.
+      if (start < 0 && /^[ \t]*\t/.test(line)) {
+        const prefix = line.match(/^[ \t]*/)[0];
+        let expanded = ""; const expandedMap = [];
+        for (let j = 0; j < prefix.length; j++) {
+          const count = prefix[j] === "\t" ? 4 - expanded.length % 4 : 1;
+          expanded += " ".repeat(count);
+          for (let k = 0; k < count; k++) expandedMap.push(lineMap.at(j));
+        }
+        line = expanded + line.slice(prefix.length);
+        lineMap = concat([expandedMap, lineMap.slice(prefix.length)]);
+        start = line.lastIndexOf(lines[i]);
+      }
+      if (start < 0) return null;
+      child.push(lineMap.slice(start, start + lines[i].length));
+      if (i < lines.length - 1) child.push(map.slice(offset + rawLines[i].length, offset + rawLines[i].length + 1));
+      offset += rawLines[i].length + 1;
+    }
+    return concat(child);
+  };
+  const walk = (tokens, input, map, inTable = false) => {
+    let cursor = 0;
+    for (const token of tokens || []) {
+      if (!token.raw) continue;
+      const start = input.indexOf(token.raw, cursor);
+      if (start < 0) continue; // unknown normalization: leave source intact
+      cursor = start + token.raw.length;
+      const own = map.slice(start, cursor);
+      if (token.type === "html") rawHtml(token, own, inTable);
+      else if (token.type === "image" && !htmlStack.length) {
+        const text = marked.Parser.parseInline(token.tokens || [], { renderer: new marked.TextRenderer() });
+        const src = _pbpImageDecode(token.href);
+        patch(own, transform({
+          raw: source.slice(own.at(0), own.at(own.length - 1) + 1), src,
+          alt: () => _pbpImageAltMarkdown(_pbpImageDecode(text)),
+          replace: (next) => next == null ? _pbpImageAltMarkdown(_pbpImageDecode(text))
+            : next === src ? source.slice(own.at(0), own.at(own.length - 1) + 1) : _pbpImageMarkdown(token, next)
+        }), inTable);
+      } else if (token.type === "code" || token.type === "codespan" || token.type === "escape") continue;
+      else if ((token.type === "blockquote" || token.type === "list_item") && token.tokens) {
+        const child = containerMap(token.raw, token.text, own);
+        if (child) walk(token.tokens, token.text, child, inTable);
+      } else if (token.type === "table") {
+        const lines = token.raw.split("\n");
+        let offset = 0;
+        for (let i = 0; i < lines.length; i++) {
+          const cells = i === 0 ? token.header : i > 1 ? token.rows[i - 2] : null;
+          if (cells) {
+            let cellAt = 0, at = 0; const parts = [];
+            const line = lines[i].replace(/\\\|/g, (m, j) => {
+              parts.push(own.slice(offset + at, offset + j), own.slice(offset + j + 1, offset + j + 2));
+              at = j + 2;
+              return "|";
+            });
+            parts.push(own.slice(offset + at, offset + lines[i].length));
+            const lineMap = concat(parts);
+            for (const cell of cells) {
+              const at = line.indexOf(cell.text, cellAt);
+              if (at < 0) break;
+              walk(cell.tokens, cell.text, lineMap.slice(at, at + cell.text.length), true);
+              cellAt = at + cell.text.length;
+            }
+          }
+          offset += lines[i].length + 1;
+        }
+      } else if (token.tokens) walk(token.tokens, token.raw, own, inTable);
+      else if (token.items) walk(token.items, token.raw, own, inTable);
+    }
+  };
+  walk(marked.lexer(normalized), normalized, positions);
+  let out = "", at = 0;
+  for (const p of patches.sort((a, b) => a.start - b.start)) {
+    if (p.start < at) continue;
+    out += source.slice(at, p.start) + p.replacement; at = p.end;
+  }
+  return out + source.slice(at);
+}
+
 // ── Export transform ②: image policy ──
 // policy: "keep" (absolutize relative src via new URL(src, baseUrl)) |
 //         "alt"  (![alt](src) -> alt text; drop image when alt empty) |
@@ -1113,27 +1323,11 @@ function applyImagePolicy(md, opts) {
   opts = opts || {};
   const policy = opts.policy || "keep";
   const baseUrl = opts.baseUrl || "";
-  const IMG = /!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)/g;
-  const rewrite = (line) => {
-    if (policy === "strip") return line.replace(IMG, "");
-    if (policy === "alt") return line.replace(IMG, (_, alt) => (alt || ""));
-    // keep: absolutize relative src
-    return line.replace(IMG, (whole, alt, src) => {
-      let abs = src;
-      if (baseUrl && !/^[a-z][a-z0-9+.-]*:/i.test(src) && !src.startsWith("//")) {
-        try { abs = new URL(src, baseUrl).href; } catch (_) { return whole; }
-      }
-      return "![" + alt + "](" + abs + ")";
-    });
-  };
-  // Same inFence line-scan as buildToc: a code sample showing ![alt](src)
-  // syntax is literal content, not a real image, and must not be rewritten.
-  let inFence = false;
-  return (md || "").split("\n").map((line) => {
-    if (line.match(/^\s*(```|~~~)/)) { inFence = !inFence; return line; }
-    if (inFence) return line;
-    return rewrite(line);
-  }).join("\n");
+  return pbpMapExportImages(md, image => {
+    if (policy === "strip") return "";
+    if (policy === "alt") return image.alt();
+    return image.replace(pbpExportImageUrl(image.src, baseUrl), false, baseUrl);
+  });
 }
 
 // ── Export transform ③: table of contents ──
@@ -1147,6 +1341,7 @@ function buildToc(md, opts) {
   const lines = (md || "").split("\n");
   const headings = [];
   const seen = Object.create(null);
+  if (opts.reserveTocHeading) seen.contents = 0;
   let inFence = false;
   for (const line of lines) {
     const fence = line.match(/^\s*(```|~~~)/);
@@ -1161,9 +1356,7 @@ function buildToc(md, opts) {
     // out-of-range heading still occupies a slug slot at render time, so it must
     // burn one here too or a later in-range TOC entry would point at a slug the
     // renderer already reassigned to a different (out-of-range) heading.
-    let slug = slugify(text);
-    if (seen[slug] != null) { seen[slug] += 1; slug = slug + "-" + seen[slug]; }
-    else seen[slug] = 0;
+    const slug = _pbpUniqueHeadingSlug(slugify(text), seen);
     if (level < minLevel || level > maxLevel) continue;
     headings.push({ level, text, slug });
   }
@@ -1222,7 +1415,7 @@ function composeExport(canonicalMd, meta, opts) {
     body = pbpHlInlineMark(body, hlItems, opts.hlView); // H5 (spec 1.6): filter marks by the exported view
   }
   if (opts.includeToc) {
-    const { tocMarkdown } = buildToc(body, { minLevel: 2, maxLevel: 4 });
+    const { tocMarkdown } = buildToc(body, { minLevel: 2, maxLevel: 4, reserveTocHeading: true });
     if (tocMarkdown) body = tocMarkdown + "\n\n" + body;
   }
   if (hlItems && hlItems.length && typeof pbpHlComposeSection === "function") {
@@ -1242,11 +1435,11 @@ function composeExport(canonicalMd, meta, opts) {
 // ── Shared download helpers (used by popup + preview) ──
 // safeFilename: blacklist filesystem-hostile chars (/ \ ? % * : | " < > # +
 // control chars) -> "_"; all other Unicode (kana, hangul, cyrillic, accented
-// latin, ...) passes through untouched; cap at 80; empty -> "untitled".
+// latin, ...) passes through untouched; cap at 80 code points; empty -> "untitled".
 // (Moved/unified from md-preview.js. Was a script whitelist until B3 -- that
 // collapsed ja/ko/ru/de titles into underscore strings.)
 function safeFilename(title) {
-  const base = (title || "untitled").replace(/[\\/?%*:|"<>#\x00-\x1F]/g, "_").slice(0, 80);
+  const base = Array.from((title || "untitled").replace(/[\\/?%*:|"<>#\x00-\x1F]/g, "_")).slice(0, 80).join("");
   return base || "untitled";
 }
 

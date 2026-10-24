@@ -3750,7 +3750,125 @@ section("mathml + pbpLatexNormalize: doubled backslashes survive normalization")
 </script>
 
 <script>
+// Export regressions exercise the same HTML -> Markdown -> file composition
+// path as popup/reader, including raw HTML emitted by our own table/gallery rules.
+window._pbpExportFixDone = (async () => {
+  section("Export image syntax, metadata and filename regressions");
+  const meta = { title: "Export fixture", url: "https://export.example/articles/post", date: "2026-10-24" };
+  const source = '<ul class="gallery"><li><img src="pics/one.png" srcset="pics/one-large.png 2x" alt="First &amp; best" title="A &quot;title&quot;" width="160"><p>First caption</p></li><li><img src="/two.png" alt="Second"><p>Second caption</p></li></ul>'
+    + '<table><tbody><tr><td colspan="2"><img src="images/table.png" alt="Table image" title="Table title"></td></tr></tbody></table>';
+  const md = htmlToMarkdown(source, { baseUrl: meta.url });
+  const parse = (html) => new DOMParser().parseFromString(html, "text/html");
+  const urls = ["https://export.example/articles/pics/one.png", "https://export.example/two.png", "https://export.example/articles/images/table.png"];
+  const kept = parse(composeStyledHtml(md, meta, { imagePolicy: "keep" }));
+  assertEq(JSON.stringify([...kept.images].map(img => img.getAttribute("src"))), JSON.stringify(urls), "raw gallery/table images keep absolute source URLs");
+  assert(!kept.querySelector('img[srcset]') || kept.querySelector('img[srcset]').getAttribute("srcset").includes("https://export.example/articles/pics/one-large.png"), "responsive candidates cannot override the absolute export src with a relative URL");
+  const alt = parse(composeStyledHtml(md, meta, { imagePolicy: "alt" }));
+  assert(alt.images.length === 0 && alt.body.textContent.includes("First & best") && alt.body.textContent.includes("Table image"), "alt policy replaces raw gallery/table images with literal alternative text");
+  const stripped = parse(composeStyledHtml(md, meta, { imagePolicy: "strip" }));
+  assert(stripped.images.length === 0 && stripped.body.textContent.includes("First caption") && !stripped.body.textContent.includes("Table image"), "strip removes raw images while retaining surrounding captions and table structure");
+  const scan = pbpEmbedScan(md, meta.url);
+  assertEq(JSON.stringify(scan.candidates), JSON.stringify(urls), "embedding scans the actual gallery/table image sources");
+  const dataUri = "data:image/png;base64,iVBORw0KGgo=";
+  const embedded = pbpEmbedRewrite(md, Object.fromEntries(urls.map(url => [url, dataUri])), meta.url, pbpEmbedBudget(999999));
+  const embeddedDoc = parse(composeStyledHtml(embedded.md, meta, { imagePolicy: "keep" }));
+  assert(embeddedDoc.images.length === 3 && [...embeddedDoc.images].every(img => img.getAttribute("src") === dataUri && !img.hasAttribute("srcset")), "embedded raw images use the embedded bytes without a responsive network override");
+  assert(embeddedDoc.images[0].getAttribute("width") === "160" && embeddedDoc.images[0].alt === "First & best" && embeddedDoc.images[2].title === "Table title", "raw image rewrite preserves size, escaped alt text and existing titles");
+  const epubMd = composeExport(md, meta, { imagePolicy: "keep" });
+  const images = new Map(urls.map(url => [url, { mime: "image/png", bytes: new Uint8Array([1, 2, 3]) }]));
+  const entries = _pbpZipEntries(new Uint8Array(await pbpBuildEpub({ md: epubMd, meta, images }).arrayBuffer()));
+  const xhtml = new DOMParser().parseFromString(new TextDecoder().decode(entries.find(e => e.name === "OEBPS/content.xhtml").data), "application/xhtml+xml");
+  assert(entries.filter(e => e.name.startsWith("OEBPS/images/")).length === 3 && [...xhtml.querySelectorAll("img")].every(img => img.getAttribute("src").startsWith("images/")), "EPUB packages raw gallery/table images and points XHTML at packaged entries");
+
+  const literalUrl = "https://literal.example/pic.png";
+  const literalImage = "![literal](" + literalUrl + ")";
+  const literals = [
+    ["inline code", "Use `" + literalImage + "` here."],
+    ["escaped image", "Show \\" + literalImage + " here."],
+    ["indented code", "    " + literalImage],
+    ["long fence containing a shorter fence", "````markdown\n```\n" + literalImage + "\n```\n````"],
+    ["tilde fence containing backticks", "~~~\n```\n" + literalImage + "\n```\n~~~"],
+    ["blockquote fence", "> ```\n> " + literalImage + "\n> ```"],
+    ["list fence", "- ```\n  " + literalImage + "\n  ```"],
+    ["multiline code span", "Use ``first\n" + literalImage + "\nlast`` here."],
+    ["multiline HTML comment", "<!-- first\n" + literalImage + "\nlast -->"]
+  ];
+  for (const [name, literal] of literals) {
+    const policyResults = ["keep", "alt", "strip"].map(imagePolicy => composeExport(literal, meta, { imagePolicy }));
+    const rewritten = pbpEmbedRewrite(literal, { [literalUrl]: dataUri }, meta.url).md;
+    assert(policyResults.every(result => result === literal) && rewritten === literal && !pbpEmbedScan(literal, meta.url).candidates.length,
+      name + " preserves image-looking source bytes and never becomes an embed request: " + JSON.stringify(policyResults));
+  }
+  const syntax = [
+    ["nested destination parentheses", '![Caption](pics/a(b).png "Image title")', "https://export.example/articles/pics/a(b).png", "Caption", "Image title"],
+    ["angle destination and single-quoted title", "![Caption](<pics/space name.png> 'Image title')", "https://export.example/articles/pics/space%20name.png", "Caption", "Image title"],
+    ["escaped alternative text", '![A \\[bracket\\] and \\*star\\*](pics/a.png "Image title")', "https://export.example/articles/pics/a.png", "A [bracket] and *star*", "Image title"],
+    ["full reference", '![Caption][picture]\n\n[picture]: pics/a.png "Image title"', "https://export.example/articles/pics/a.png", "Caption", "Image title"],
+    ["collapsed reference", '![Caption][]\n\n[Caption]: pics/a.png "Image title"', "https://export.example/articles/pics/a.png", "Caption", "Image title"],
+    ["image inside a link", '[![Caption](pics/a.png "Image title")](https://linked.example/)', "https://export.example/articles/pics/a.png", "Caption", "Image title"],
+    ["pipe-table image", '| Picture |\n| --- |\n| ![Caption](pics/a.png "Image title") |', "https://export.example/articles/pics/a.png", "Caption", "Image title"]
+  ];
+  for (const [name, body, url, text, title] of syntax) {
+    const doc = parse(composeStyledHtml(body, meta, { imagePolicy: "keep" }));
+    const img = doc.querySelector("img");
+    assert(!!img && img.getAttribute("src") === url && img.alt === text && img.title === title, name + " retains the rendered image, title and alt while resolving its URL: " + doc.body.innerHTML);
+  }
+  const sharedReference = '[ordinary link][shared]\n\n![image][shared]\n\n[shared]: pics/shared.png "Shared title"';
+  const sharedDoc = parse(composeStyledHtml(sharedReference, meta, { imagePolicy: "strip" }));
+  assert(!sharedDoc.querySelector("img") && sharedDoc.querySelector("a")?.getAttribute("href") === "pics/shared.png", "removing reference images does not change a reference definition also used by ordinary links");
+  const rawAttr = '<img src="pics/a.png" alt="&lt;b&gt;literal&lt;/b&gt;" title="x &gt; y" onerror="alert(1)">';
+  const rawAlt = parse(composeStyledHtml(rawAttr, meta, { imagePolicy: "alt" }));
+  assert(!rawAlt.querySelector("img,b,script,[onerror]") && rawAlt.body.textContent.includes("<b>literal</b>"), "raw image alt remains text, including HTML-looking characters and quoted greater-than attributes");
+  const pipeDoc = parse(composeStyledHtml('| Image |\n| --- |\n| ![A \\| B](pics/a.png "Pipe \\| title") |', meta, { imagePolicy: "keep" }));
+  assert(pipeDoc.querySelectorAll("td").length === 1 && pipeDoc.querySelector("img")?.alt === "A | B" && pipeDoc.querySelector("img")?.title === "Pipe | title", "rewriting a pipe-table image retains escaped pipes in the alt and title without splitting its cell");
+  const crlfImage = '<div>\r\n<img\r\n src="https://export.example/a.png" alt="A">\r\n</div>';
+  assertEq(pbpEmbedRewrite(crlfImage, {}, meta.url).md, crlfImage, "an unfetched multiline HTML image keeps its original CRLF source bytes");
+  const rawText = '<script>const sample = "<code><img src=\'https://ignored.example/fake.png\'>";</scr' + 'ipt>\n\n![Real](https://export.example/real.png)';
+  assertEq(JSON.stringify(pbpEmbedScan(rawText, meta.url).candidates), JSON.stringify(["https://export.example/real.png"]), "fake protected tags inside script text cannot hide later real images from embedding");
+  const inlineCodeHtml = '<code><img src="https://ignored.example/code.png"></code> and <img src="https://export.example/real.png">';
+  assertEq(JSON.stringify(pbpEmbedScan(inlineCodeHtml, meta.url).candidates), JSON.stringify(["https://export.example/real.png"]), "inline HTML code protects its image-looking contents without hiding following images");
+  for (const indent of ["\t", "\t\t"]) {
+    const listImage = "- first\n" + indent + "![A](image.png)";
+    const listDoc = parse(composeStyledHtml(listImage, meta, { imagePolicy: "keep" }));
+    assert(listDoc.querySelector("img")?.getAttribute("src") === "https://export.example/articles/image.png"
+      && pbpEmbedScan(listImage, meta.url).candidates.length === 1
+      && !parse(composeStyledHtml(listImage, meta, { imagePolicy: "strip" })).querySelector("img"),
+    "tab-indented continuation images follow the rendered list semantics for keep, strip and embed (tabs=" + indent.length + ")");
+  }
+  const multilineAlt = "First\n\n![Unexpected](https://alt.example/unexpected.png)";
+  const multilineTable = htmlToMarkdown('<table><tr><td colspan="2"><img src="image.png" alt="First&#10;&#10;![Unexpected](https://alt.example/unexpected.png)"></td></tr></table>', { baseUrl: meta.url });
+  const multilineAltDoc = parse(composeStyledHtml(multilineTable, meta, { imagePolicy: "alt" }));
+  assert(!multilineAltDoc.querySelector("img") && multilineAltDoc.querySelector("td")?.textContent === multilineAlt, "multiline alternative text stays literal inside a raw HTML table instead of ending the block and creating a new image");
+  const multilineKeepDoc = parse(composeStyledHtml(multilineTable, meta, { imagePolicy: "keep" }));
+  assert(multilineKeepDoc.images.length === 1 && multilineKeepDoc.images[0].alt === multilineAlt
+    && multilineKeepDoc.images[0].getAttribute("src") === "https://export.example/articles/image.png", "reserializing a raw image tag retains entity-encoded newlines inside its attributes without breaking the table block");
+
+  const date = "发布时间: 2026年3月4日";
+  const fm = composeExport("Body", { ...meta, date: publishedIso(date), published: publishedIso(date) }, { frontmatter: true });
+  assertEq(fm.split("\n").find(line => line.startsWith("date:")), 'date: "发布时间: 2026年3月4日"', "unparsed publication dates are one quoted YAML scalar");
+  assert(composeExport("Body", meta, { frontmatter: true }).includes("\ndate: 2026-10-24\n"), "normalized ISO date keeps its existing bare date representation");
+  const astral = String.fromCodePoint(0x1f680);
+  const filename = safeFilename("a".repeat(79) + astral + "tail");
+  let filenameUri = "";
+  try { filenameUri = buildObsidianUri({ name: filename, clipboard: true }); } catch (_) {}
+  assert([...filename].length === 80 && filename.endsWith(astral) && filenameUri.includes(encodeURIComponent(astral)), "filename truncation retains a complete astral code point and stays URI-encodable");
+  const tocDoc = parse(composeStyledHtml("## Contents\n\nFirst body.\n\n## Contents\n\nSecond body.", meta, { includeToc: true }));
+  const tocHeadings = [...tocDoc.querySelectorAll("h2")], tocLinks = [...tocDoc.querySelectorAll('a[href^="#"]')];
+  assert(tocLinks.length === 2 && tocLinks.every((a, i) => tocDoc.getElementById(a.getAttribute("href").slice(1)) === tocHeadings[i + 1]), "generated Contents heading cannot steal either original Contents section's directory link");
+  assertEq(buildToc("## Contents").headings[0].slug, "contents", "reader sidebar slugs remain unchanged when no export TOC is prepended");
+  for (const headings of [["Contents", "Contents-1"], ["Contents-1", "Contents"]]) {
+    const doc = parse(composeStyledHtml(headings.map(h => "## " + h + "\n\nBody.").join("\n\n"), meta, { includeToc: true }));
+    const realHeadings = [...doc.querySelectorAll("h2")], links = [...doc.querySelectorAll('a[href^="#"]')];
+    assert(new Set(realHeadings.map(h => h.id)).size === realHeadings.length
+      && links.every((a, i) => doc.getElementById(a.getAttribute("href").slice(1)) === realHeadings[i + 1]),
+    "TOC reserves final derived slugs when an article already uses Contents-1: " + headings.join(", "));
+  }
+})();
+</script>
+
+<script>
 (async () => {
+  if (window._pbpExportFixDone) await window._pbpExportFixDone;
   if (window._pbpEpubIntegrationDone) await window._pbpEpubIntegrationDone;
   if (window._pbpEpubA8Done) await window._pbpEpubA8Done;
   if (window._pbpInertDocDone) await window._pbpInertDocDone;

@@ -2100,10 +2100,16 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     const opts = structuredClone(buildExportOpts());
     const askOnly = exportScope === "ask";
     if (askOnly) { opts.highlights = []; opts.includeToc = false; opts.imagePolicy = "keep"; }
+    // Start at the click, before any image permission prompt or other await.
+    // Capture rejection as data immediately: a permission dialog may outlive
+    // the note save. prepareExportAsk consumes it before any output is built.
+    const includeHighlights = !askOnly && (expIncludeHl ? pbpExpTglOn(expIncludeHl) : !!exportSettings.mdExportIncludeHighlights);
+    const highlightsReady = includeHighlights && typeof pbpHlExportItems === "function"
+      ? pbpHlExportItems().then(items => ({ items }), error => ({ error })) : null;
     return {
       account: previewAccount, revision: _articleRevision, askRevision: exportAskRevision,
       askOnly, includeAsk: askOnly || pbpExpTglOn(expIncludeAsk),
-      md: askOnly ? "" : getViewMarkdown(), meta: structuredClone(buildMeta()), opts,
+      md: askOnly ? "" : getViewMarkdown(), meta: structuredClone(buildMeta()), opts, highlightsReady,
       lang: !askOnly && (document.body.classList.contains("tr-only") || document.body.classList.contains("tr-bilingual"))
         && typeof window.pbpTrExportTargetLang === "function" ? window.pbpTrExportTargetLang() : "und"
     };
@@ -2134,6 +2140,12 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   }
   async function prepareExportAsk(job) {
     requireExportJob(job);
+    if (job.highlightsReady) {
+      const highlights = await job.highlightsReady;
+      requireExportJob(job);
+      if (highlights.error) throw highlights.error;
+      job.opts.highlights = highlights.items;
+    }
     if (job.includeAsk) {
       job.opts.ask = await pbpAskExportSnapshot({ url, account: job.account, title });
       requireExportJob(job);
@@ -3882,7 +3894,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     const menu = document.getElementById("send-menu");
     const sendStatus = document.getElementById("send-status");
     function showSendStatus(msg, isError, url, viewLabel) {
-      if (!sendStatus) return;
+      if (_sig.aborted || !sendStatus) return;
       clearTimeout(sendStatusTimer);
       sendStatus.classList.toggle("error", !!isError);
       sendStatus.hidden = false;          // unhide before setting text so aria-live announces it
@@ -3915,7 +3927,10 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       // acts on inside six seconds. Same lifetime the other .msg-bar consumer
       // gives an error: md-video.js's pbvSetStatus returns before arming any
       // fade for kind "error".
-      if (!hasLink && !isError) sendStatusTimer = setTimeout(() => { sendStatus.hidden = true; sendStatus.textContent = ""; }, 6000);
+      if (!hasLink && !isError) sendStatusTimer = setTimeout(() => {
+        if (_sig.aborted) return;
+        sendStatus.hidden = true; sendStatus.textContent = "";
+      }, 6000);
     }
     if (sendStatus) sendStatus.addEventListener("click", () => {
       clearTimeout(sendStatusTimer); sendStatus.hidden = true; sendStatus.textContent = "";
@@ -3978,6 +3993,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         await pbpSetLastTarget(id);
         if (_sig.aborted) return;
         await prepareExportAsk(job);
+        if (_sig.aborted) return;
         const meta = job.meta;
         const _exp = job.opts;
         imgFixExportNote(false);
@@ -3991,10 +4007,18 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         primaryLabel.textContent = t("mdSending");
         let res;
         try {
-          res = await pbpSendToTarget(id, { meta, rawBody: _sendBody, cfg }, { isCurrent: () => exportJobOwnerCurrent(job) });
+          res = await pbpSendToTarget(id, { meta, rawBody: _sendBody, cfg }, { isCurrent: async () => {
+            // A settings refresh invalidates the captured destination as well
+            // as its UI. Fence both sides of the asynchronous owner/history
+            // check so a pending precheck cannot submit the old configuration.
+            if (_sig.aborted) return false;
+            const current = await exportJobOwnerCurrent(job);
+            return !_sig.aborted && current;
+          } });
         } catch (_) {
           res = { ok: false, fellBack: false, error: "" };
         }
+        if (_sig.aborted) return;
         primary.classList.remove("sending");
         if (!_sig.aborted) setPrimary(id);
         if (res.ok && !res.fellBack) {
@@ -4041,6 +4065,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
           showSendStatus(t("mdSendFailed"), true);
         }
       } catch (error) {
+        if (_sig.aborted) return;
         console.warn("[export] send preparation failed:", error?.name, error?.message);
         showSendStatus(exportErrorText(error), true);
         if (!_sig.aborted) setPrimary(id);

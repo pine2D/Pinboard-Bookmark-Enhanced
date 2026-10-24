@@ -1,6 +1,9 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Reader Send-to lifecycle tests</title></head><body>
 <h1>Reader Send-to lifecycle tests</h1><div id="results"></div>
+<script src="../shared.js"></script>
+<script src="../vendor/marked.min.js"></script>
+<script src="../md-convert.js"></script>
 <script src="../export-targets.js"></script>
 <script>
 const assert = (ok, message) => { if (!ok) throw new Error(message); };
@@ -11,8 +14,8 @@ const deferred = () => {
 };
 const tick = () => new Promise(r => setTimeout(r, 0));
 async function settle() { for (let i = 0; i < 5; i++) await tick(); }
-let source;
-async function fixture() {
+let source, sendSource;
+async function fixture({ realRuntime = false } = {}) {
   const frame = document.createElement("iframe");
   document.body.appendChild(frame);
   const w = frame.contentWindow, d = w.document;
@@ -22,20 +25,23 @@ async function fixture() {
     flags: { optSyncEnabled: false, syncApiKeys: false },
     markdown: "Fixture body", includeAsk: false,
     askSnapshot: { url: "https://fixture.test/article", account: "qa", title: "Fixture", rounds: [{ q: "Question", a: "Answer" }], count: 1 },
-    sendGuardWaits: [],
+    sendGuardWaits: [], ownerReads: [], askReads: [], requests: [], networkWaits: [], copied: [],
     reads: [], lastReads: [], listeners: [], sends: [], sendWaits: [], permissionWaits: [], lastWrites: [], optionsTabs: []
   };
   const params = {
     exportSettings: {},
     previewAccount: "qa", _articleRevision: 0, exportAskRevision: 0,
-    exportScope: "article", expIncludeAsk: {}, pbpExpTglOn: () => state.includeAsk,
+    exportScope: "article", expIncludeAsk: {}, expIncludeHl: null, pbpExpTglOn: () => state.includeAsk,
     url: "https://fixture.test/article", title: "Fixture",
-    pbpAskExportSnapshot: async () => structuredClone(state.askSnapshot),
+    pbpAskExportSnapshot: async () => state.askReads.length ? state.askReads.shift().promise : structuredClone(state.askSnapshot),
     SETTINGS_DEFAULTS: { pinboardToken: "" },
     pbpPinboardAccountFromToken: token => String(token || "").split(":")[0],
     PBP_EXPORT_TARGETS,
     pbpExportTargetIds,
-    pbpReadSettingsWithSecrets: async () => state.reads.length ? state.reads.shift().promise : ({ pinboardToken: "qa:key", ...structuredClone(state.settings) }),
+    pbpReadSettingsWithSecrets: async defaults => {
+      if (Object.hasOwn(defaults, "pinboardToken") && state.ownerReads.length) return state.ownerReads.shift().promise;
+      return state.reads.length ? state.reads.shift().promise : ({ pinboardToken: "qa:key", ...structuredClone(state.settings) });
+    },
     pbpReadSecretSyncState: async () => ({ ...state.flags }),
     pbpSettingsAreaName: async () => state.flags.optSyncEnabled ? "sync" : "local",
     pbpGetLastTarget: async () => state.lastReads.length ? state.lastReads.shift().promise : "github",
@@ -57,6 +63,27 @@ async function fixture() {
     t: key => key === "mdSendTo" ? "Send to {name}" : key,
     chrome: { storage: { onChanged: { addListener: fn => state.listeners.push(fn) } } }
   };
+  if (realRuntime) {
+    // Run the production sender, including its output-boundary guard. Only the
+    // browser APIs and remote responses are fixtures; no mock decides whether
+    // a stale send is allowed to reach POST or the clipboard.
+    params.chrome.permissions = { request: async () => true, contains: async () => true };
+    const fetchFixture = async (url, opts) => {
+      state.requests.push({ url, ...opts });
+      if (state.networkWaits[0]?.method === opts.method) return state.networkWaits.shift().wait.promise;
+      if (opts.method === "GET") return { ok: true, status: 200 };
+      if (url === "https://api.notion.com/v1/pages") {
+        return { ok: true, status: 200, json: async () => ({ object: "page", id: "fixture-created", url: "https://fixture.test/created" }) };
+      }
+      return { ok: true, status: 201, json: async () => ({ id: "fixture-created", html_url: "https://fixture.test/created" }) };
+    };
+    const runtime = new w.Function("PBP_EXPORT_TARGETS", "pbpBuildFileBody", "deobfuscateKey", "chrome", "fetch", "navigator",
+      sendSource + "\nreturn { pbpSendToTarget, pbpRequestTargetPermission };")(
+      PBP_EXPORT_TARGETS, pbpBuildFileBody, deobfuscateKey, params.chrome, fetchFixture,
+      { clipboard: { writeText: async body => { state.copied.push(body); } } });
+    params.pbpSendToTarget = runtime.pbpSendToTarget;
+    params.pbpRequestTargetPermission = runtime.pbpRequestTargetPermission;
+  }
   const begin = source.indexOf("  let _sendMenuCtl = null;");
   const end = source.indexOf("\n})().catch", begin);
   assert(begin >= 0 && end > begin, "production Send-to lifecycle block missing");
@@ -79,16 +106,17 @@ async function fixture() {
   };
 }
 let pass = 0, fail = 0;
-async function test(name, fn) {
+async function test(name, fn, options) {
   const row = document.createElement("div");
   let f;
-  try { f = await fixture(); await fn(f); pass++; row.className = "pass"; row.textContent = "PASS " + name; }
+  try { f = await fixture(options); await fn(f); pass++; row.className = "pass"; row.textContent = "PASS " + name; }
   catch (e) { fail++; row.className = "fail"; row.textContent = "FAIL " + name + " — " + e.message; }
   finally { if (f) f.close(); }
   document.getElementById("results").appendChild(row);
 }
 (async () => {
   source = await (await fetch("../md-preview.js")).text();
+  sendSource = await (await fetch("../md-export-send.js")).text();
   await test("empty state names the settings action: label, gear, no caret, click opens settings", async f => {
     f.state.settings = { exportTargets: {} }; await f.refresh();
     const p = f.d.getElementById("send-primary");
@@ -254,6 +282,89 @@ async function test(name, fn) {
     old.click(); await settle();
     assert(f.state.sends.length === 0, "old menu listener sent to disabled destination");
   });
+  await test("production runtime sends the current clip through precheck and POST", async f => {
+    f.click(); await settle();
+    assert(f.state.requests.map(r => r.method).join(",") === "GET,POST", "production request chain did not run");
+    const body = JSON.parse(f.state.requests[1].body);
+    assert(Object.values(body.files)[0].content.includes("Fixture body") && body.public === false, "wrong Gist content");
+    assert(f.d.querySelector('#send-status a[href="https://fixture.test/created"]'), "current success receipt missing");
+  }, { realRuntime: true });
+  for (const id of ["github", "notion"]) {
+    await test(id + " disabled during precheck cannot POST or replace current status", async f => {
+      f.state.settings = { exportTargets: { [id]: { enabled: true, token: "first", parent: "0123456789abcdef0123456789abcdef" } } };
+      await f.refresh();
+      const wait = deferred(); f.state.networkWaits.push({ method: "GET", wait });
+      f.click(); await settle();
+      assert(f.state.requests.length === 1 && f.state.requests[0].method === "GET", "precheck did not start");
+      f.state.settings = { exportTargets: {} }; await f.refresh();
+      const status = f.d.getElementById("send-status"); status.textContent = "Current menu status";
+      wait.resolve({ ok: true, status: 200 }); await settle();
+      assert(f.state.requests.length === 1 && f.state.copied.length === 0, "disabled target emitted the private body");
+      assert(status.textContent === "Current menu status", "obsolete send overwrote current status");
+      assert(f.d.getElementById("send-primary-label").textContent === "mdSendSetupEllipsis", "obsolete send changed the current label");
+    }, { realRuntime: true });
+  }
+  await test("changed Notion configuration cancels old POST and permits a new explicit send", async f => {
+    f.state.settings = { exportTargets: { notion: { enabled: true, token: "first", parent: "0123456789abcdef0123456789abcdef" } } };
+    await f.refresh();
+    const wait = deferred(); f.state.networkWaits.push({ method: "GET", wait });
+    f.click(); await settle();
+    f.state.settings.exportTargets.notion.parent = "ffffffffffffffffffffffffffffffff";
+    await f.refresh(); f.click(); await settle();
+    assert(f.state.requests.length === 1, "menu refresh reset the pending-send guard");
+    wait.resolve({ ok: true, status: 200 }); await settle();
+    assert(f.state.requests.length === 1, "old parent received a POST");
+    f.click(); await settle();
+    const posts = f.state.requests.filter(r => r.method === "POST");
+    assert(posts.length === 1 && JSON.parse(posts[0].body).parent.page_id === "ffffffff-ffff-ffff-ffff-ffffffffffff", "retry did not use the new parent");
+  }, { realRuntime: true });
+  await test("target invalidation during an owner read is checked again before POST", async f => {
+    const precheck = deferred(); f.state.networkWaits.push({ method: "GET", wait: precheck });
+    f.click(); await settle();
+    const owner = deferred(); f.state.ownerReads.push(owner);
+    precheck.resolve({ ok: true, status: 200 }); await settle();
+    assert(f.state.ownerReads.length === 0, "owner read did not pause the output guard");
+    f.state.settings = { exportTargets: {} }; await f.refresh();
+    owner.resolve({ pinboardToken: "qa:key" }); await settle();
+    assert(f.state.requests.length === 1 && f.state.copied.length === 0, "guard reused the target state from before its await");
+  }, { realRuntime: true });
+  await test("target invalidation during Q&A preparation leaves the new menu untouched", async f => {
+    f.state.includeAsk = true;
+    const ask = deferred(); f.state.askReads.push(ask);
+    f.click(); await settle();
+    assert(f.state.askReads.length === 0, "Q&A preparation did not start");
+    f.state.settings = { exportTargets: {} }; await f.refresh();
+    const status = f.d.getElementById("send-status"); status.textContent = "Current menu status";
+    ask.resolve(structuredClone(f.state.askSnapshot)); await settle();
+    assert(f.state.requests.length === 0 && f.state.copied.length === 0, "obsolete prepared content escaped");
+    assert(status.textContent === "Current menu status" && f.d.getElementById("send-primary-label").textContent === "mdSendSetupEllipsis", "obsolete preparation changed new UI");
+  }, { realRuntime: true });
+  for (const statusCode of [201, 500]) {
+    await test("obsolete POST " + statusCode + " completion cannot publish feedback or fallback", async f => {
+      const wait = deferred(); f.state.networkWaits.push({ method: "POST", wait });
+      f.click(); await settle();
+      assert(f.state.requests.length === 2, "POST did not start");
+      f.state.settings = { exportTargets: { notebooklm: { enabled: true } } }; await f.refresh();
+      const status = f.d.getElementById("send-status"); status.textContent = "Current menu status";
+      wait.resolve({ ok: statusCode === 201, status: statusCode, json: async () => ({ id: "old", html_url: "https://fixture.test/old" }) }); await settle();
+      assert(status.textContent === "Current menu status" && !status.querySelector("a"), "old completion published feedback");
+      assert(f.state.copied.length === 0, "old failure copied a stale private fallback");
+    }, { realRuntime: true });
+  }
+  for (const change of ["owner", "article", "ask"]) {
+    await test("production runtime retains the " + change + " guard while precheck waits", async f => {
+      f.state.includeAsk = change === "ask";
+      const wait = deferred(); f.state.networkWaits.push({ method: "GET", wait });
+      f.click(); await settle();
+      assert(f.state.requests.length === 1, "precheck did not start");
+      if (change === "owner") f.state.settings.pinboardToken = "bob:new";
+      else if (change === "article") f.retireArticle();
+      else f.state.askSnapshot = { ...f.state.askSnapshot, rounds: [], count: 0 };
+      wait.resolve({ ok: true, status: 200 }); await settle();
+      assert(f.state.requests.length === 1 && f.state.copied.length === 0, "stale " + change + " content escaped");
+      assert(f.d.getElementById("send-status").textContent === "mdExportContextChanged", "missing context feedback");
+    }, { realRuntime: true });
+  }
   document.title = (fail ? "FAIL" : "PASS") + " Reader Send-to lifecycle tests";
 })().catch(e => { const row = document.createElement("div"); row.className = "fail"; row.textContent = e.stack; document.getElementById("results").appendChild(row); });
 </script></body></html>

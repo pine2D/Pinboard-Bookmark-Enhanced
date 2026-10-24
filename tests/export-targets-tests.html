@@ -399,9 +399,90 @@ async function runOptionsTestButtonDeadlineTests() {
     "K49: the disabled/aria-busy reset stays in the existing finally, so a 20s timeout still re-enables the button instead of leaving it stuck");
 }
 
+async function runPopupObsidianTests() {
+  section("popup Obsidian click closure");
+  const popupSource = await (await fetch("../popup.js")).text();
+  const begin = popupSource.indexOf("      const downloadMd = () => {");
+  const end = popupSource.indexOf('\n      // No "Copied" state', begin);
+  if (begin < 0 || end <= begin) throw new Error("popup export closures missing");
+  const make = settings => {
+    const host = document.createElement("div");
+    host.innerHTML = '<div id="md-actions-strip"><button id="md-strip-copy"></button><button id="md-strip-preview"></button><button id="md-strip-dl"></button><button id="md-strip-obsidian"></button></div>';
+    const state = { opened: [], copied: [], messages: [], failClipboard: false };
+    const params = {
+      settings, result: { title: "Fixture", url: "https://fixture.test/article" },
+      attachExtendedMeta: meta => meta, $id: id => host.querySelector("#" + id),
+      clippedDate: "2026-10-24", currentTags: ["fixture"], url: "https://fixture.test/article", markdown: "Fixture body",
+      composeExport, applyFrontmatter, safeFilename, buildObsidianUri,
+      navigator: { clipboard: { writeText: async body => {
+        if (state.failClipboard) throw new Error("clipboard unavailable");
+        state.copied.push(body);
+      } } },
+      window: { open: uri => { state.opened.push(uri); return {}; } },
+      sessionStorage: { getItem: () => true }, t: key => key,
+      showStatus: (...args) => state.messages.push(args),
+      copyMd: () => {}, openPreview: () => {}, downloadFile: () => {}, pbpScrollIntoView: () => {}
+    };
+    new Function(...Object.keys(params), popupSource.slice(begin, end))(...Object.values(params));
+    return { state, button: host.querySelector("#md-strip-obsidian") };
+  };
+  const legacy = { obsidianEnabled: true, obsidianVault: "Legacy vault", obsidianFolder: "Legacy folder" };
+  const cases = [
+    { name: "legacy settings retain new-note behavior", settings: legacy, action: "new", vault: "Legacy vault", file: "Legacy folder/Fixture", append: false },
+    { name: "append uses the configured vault and folder", settings: { ...legacy, exportTargets: { obsidian: { enabled: true, route: "append", vault: "New vault", folder: "New folder" } } }, action: "new", vault: "New vault", file: "New folder/Fixture", append: true },
+    { name: "daily appends to the daily note without a file path", settings: { ...legacy, exportTargets: { obsidian: { enabled: true, route: "daily", vault: "Daily vault", folder: "Ignored" } } }, action: "daily", vault: "Daily vault", file: null, append: true },
+    { name: "explicit empty modern fields do not revive legacy values", settings: { ...legacy, exportTargets: { obsidian: { enabled: true, route: "new", vault: "", folder: "" } } }, action: "new", vault: null, file: "Fixture", append: false },
+    { name: "modern enabled state overrides a disabled legacy mirror", settings: { ...legacy, obsidianEnabled: false, exportTargets: { obsidian: { enabled: true, route: "append", vault: "New vault", folder: "" } } }, action: "new", vault: "New vault", file: "Fixture", append: true }
+  ];
+  for (const tc of cases) {
+    const f = make(tc.settings);
+    await f.button.onclick?.();
+    const parsed = f.state.opened[0] ? new URL(f.state.opened[0]) : null;
+    assert(f.button.style.display !== "none" && parsed?.hostname === tc.action
+      && parsed.searchParams.get("vault") === tc.vault && parsed.searchParams.get("file") === tc.file
+      && parsed.searchParams.has("append") === tc.append && parsed.searchParams.has("clipboard")
+      && f.state.copied.length === 1 && f.state.copied[0].includes("Fixture body"), "popup: " + tc.name);
+  }
+  const disabled = make({ ...legacy, exportTargets: { obsidian: { enabled: false, route: "daily" } } });
+  assert(disabled.button.style.display === "none" && !disabled.button.onclick, "popup: modern disabled state suppresses a stale enabled mirror");
+  const failed = make({ ...legacy, exportTargets: { obsidian: { enabled: true, route: "daily", vault: "Fixture" } } });
+  failed.state.failClipboard = true;
+  await failed.button.onclick?.();
+  assert(failed.state.opened.length === 0 && failed.state.messages.some(args => args[1] === "obsidianClipboardFailed"), "popup: clipboard failure blocks the protocol handoff");
+
+  section("popup Markdown dependency readiness");
+  const loaderBegin = popupSource.indexOf("let _mdConvertLoadPromise = null;");
+  const loaderEnd = popupSource.indexOf("\nlet _turndownLoadPromise", loaderBegin);
+  if (loaderBegin < 0 || loaderEnd <= loaderBegin) throw new Error("popup Markdown loader missing");
+  for (const alreadyConverted of [false, true]) {
+    const state = { appended: [], pending: [] };
+    const globals = { htmlToMarkdown: alreadyConverted ? () => "" : undefined, marked: undefined };
+    const doc = {
+      createElement: () => ({}),
+      head: { appendChild: script => { state.appended.push(script.src); state.pending.push(script); } }
+    };
+    const scope = new Function("document", "globals", "with (globals) { " + popupSource.slice(loaderBegin, loaderEnd) + "\nreturn ensureMdConvert; }")(doc, globals);
+    let resolved = false;
+    const pending = scope().then(() => { resolved = true; });
+    await Promise.resolve();
+    const beforeLoads = resolved;
+    while (state.pending.length) {
+      const script = state.pending.shift();
+      if (script.src === "md-convert.js") globals.htmlToMarkdown = () => "";
+      if (script.src === "vendor/marked.min.js") globals.marked = { lexer: () => [] };
+      script.onload();
+      await Promise.resolve();
+    }
+    await pending;
+    assert(!beforeLoads && state.appended.includes("vendor/marked.min.js") && typeof globals.marked?.lexer === "function",
+      "popup loader waits for marked even when md-convert " + (alreadyConverted ? "already exists" : "is absent"));
+  }
+}
+
 (async function () {
   await runSendNetworkPolicyTests();
   await runOptionsTestButtonDeadlineTests();
+  await runPopupObsidianTests();
   document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 })();
 </script>
