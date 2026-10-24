@@ -43,10 +43,10 @@ async function pipelineHarness(options = {}) {
   const end = background.indexOf("// ---- P1: Shared save function ----", start);
   const env = { account: "alice", token: "alice:rotated-token", epoch: 1, post: { ...POST }, calls: [], queue: [], ...options };
   const deps = {
-    chrome: { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p }, storage: { local: { get: async key => ({ offlineQueue: env.queue, [typeof key === "string" ? key : "unused"]: key === "offlineQueue" ? env.queue : { ...SLOT } }), set: async values => { if (values.offlineQueue) env.queue = values.offlineQueue; } } }, tabs: { query: async () => [], get: async tabId => { assert(tabId === 9, "saving must never inspect the source tab"); if (env.readerClosed) throw new Error("reader closed"); return { id: 9, url: READER }; } } },
+    chrome: { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p }, storage: { local: { get: async key => ({ offlineQueue: env.queue, [typeof key === "string" ? key : "unused"]: key === "offlineQueue" ? env.queue : { ...SLOT, ...env.slot } }), set: async values => { if (values.offlineQueue) env.queue = values.offlineQueue; } } }, tabs: { query: async () => [], get: async tabId => { assert(tabId === 9, "saving must never inspect the source tab"); if (env.readerClosed) throw new Error("reader closed"); return { id: 9, url: READER }; } } },
     console, pbpCreateRecoveringTail, pbpOfflineQueueReduce, pbpPinboardAccountFromToken, pbpEffectivePrivate,
     pbpResolveOfflineQueueToken, pbpDrainOfflineQueue, pbpResolveSavePlan, buildPostsAddUri, POSTS_ADD_URI_BUDGET,
-    loadSettings: async () => ({ pinboardToken: "alice:stale-token", offlineQueueEnabled: true, optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false }),
+    loadSettings: async () => ({ pinboardToken: "alice:stale-token", offlineQueueEnabled: true, optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false, ...env.settings }),
     getCurrentPinboardAuth: async () => ({ account: env.account, token: env.token, epoch: env.epoch }),
     pbpCapturePinboardAuth: () => ({ account: env.account, epoch: env.epoch }),
     pbpPinboardAuthIsCurrent: auth => auth.account === env.account && auth.epoch === env.epoch,
@@ -108,6 +108,62 @@ await test("owner change during lookup cancels prepared mutation", async () => {
 await test("new saved context honors original source incognito rather than reader tab", async () => {
   const h = await harness({ post: null }); await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "save", url: "https://evil.test/" }, SENDER); equal(h.env.submitted.intent.url, URL_ARTICLE); equal(h.env.submitted.intent.private, true); equal(h.env.submitted.opts.expectedAccount, "alice");
 });
+for (const privateDefault of [false, true]) await test("new bookmark state and save/later/edit honor default private=" + privateDefault, async () => {
+  for (const action of ["save", "later", "edit"]) {
+    const h = await pipelineHarness({ post: null, slot: { sourceIncognito: false }, settings: { optPrivateDefault: privateDefault } });
+    const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account: "alice" }, SENDER);
+    equal(state.known, true); equal(state.bookmarked, false); equal(state.bookmark.private, privateDefault);
+    const result = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action, ...(action === "edit" ? { draft: state.bookmark } : {}) }, SENDER);
+    equal(result.status, "saved");
+    const add = h.env.calls.find(url => url.pathname.endsWith("/add"));
+    assert(add, "new bookmark must reach posts/add"); equal(add.searchParams.get("shared"), privateDefault ? "no" : "yes");
+    equal(add.searchParams.get("toread"), action === "later" ? "yes" : "no");
+  }
+});
+await test("reader with no explicit draft rereads changed privacy defaults before saving", async () => {
+  for (const initial of [false, true]) {
+    const h = await pipelineHarness({ post: null, slot: { sourceIncognito: false }, settings: { optPrivateDefault: initial } });
+    const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account: "alice" }, SENDER);
+    equal(state.bookmark.private, initial);
+    h.env.settings.optPrivateDefault = !initial;
+    const result = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "save" }, SENDER);
+    equal(result.status, "saved"); equal(h.env.post.shared, initial ? "yes" : "no");
+  }
+});
+for (const shared of ["yes", "no"]) await test("existing bookmark shared=" + shared + " survives opposite defaults on save/later/read/edit", async () => {
+  for (const action of ["save", "later", "read", "edit"]) {
+    const h = await pipelineHarness({ post: { ...POST, shared }, settings: { optPrivateDefault: shared === "yes" } });
+    const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account: "alice" }, SENDER);
+    equal(state.bookmarked, true); equal(state.bookmark.private, shared === "no");
+    const result = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action, ...(action === "edit" ? { draft: { ...state.bookmark, title: "Edited title" } } : {}) }, SENDER);
+    assert(result.status === "saved" || result.status === "skipped"); equal(h.env.post.shared, shared);
+    for (const add of h.env.calls.filter(url => url.pathname.endsWith("/add"))) equal(add.searchParams.get("shared"), shared);
+  }
+});
+await test("explicit editor privacy overrides the new-bookmark default in both directions", async () => {
+  for (const privateDefault of [false, true]) {
+    const h = await pipelineHarness({ post: null, slot: { sourceIncognito: false }, settings: { optPrivateDefault: privateDefault } });
+    const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account: "alice" }, SENDER);
+    const result = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "edit", draft: { ...state.bookmark, private: !privateDefault } }, SENDER);
+    equal(result.status, "saved"); equal(h.env.post.shared, privateDefault ? "yes" : "no");
+  }
+});
+await test("popup privacy draft remains an explicit choice when opening the reader", async () => {
+  for (const isPrivate of [false, true]) {
+    const h = await pipelineHarness({ post: null, slot: { sourceIncognito: false, bookmarkDraft: { private: isPrivate } }, settings: { optPrivateDefault: !isPrivate } });
+    const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account: "alice" }, SENDER);
+    equal(state.bookmark.private, isPrivate);
+    const result = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "save" }, SENDER);
+    equal(result.status, "saved"); equal(h.env.post.shared, isPrivate ? "no" : "yes");
+  }
+});
+await test("incognito default is independently configurable and private default still takes precedence", async () => {
+  for (const [optPrivateDefault, optPrivateIncognito, isPrivate] of [[false, false, false], [false, true, true], [true, false, true]]) {
+    const h = await pipelineHarness({ post: null, slot: { sourceIncognito: true }, settings: { optPrivateDefault, optPrivateIncognito } });
+    const result = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "save" }, SENDER);
+    equal(result.status, "saved"); equal(h.env.post.shared, isPrivate ? "no" : "yes");
+  }
+});
 await test("status unknown is explicitly unknown rather than unbookmarked", async () => {
   const h = await harness({ lookup: { lookupFailed: true, exists: false } }); const r = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account: "alice" }, SENDER); equal(r.known, false); assert(r.bookmarked !== false);
 });
@@ -161,6 +217,32 @@ await test("runtime script implements guarded shared keyboard and action state",
   w._runtimeHandler({ type: "PBP_READER_BOOKMARK_COMMAND", action: "save" }, { id: "foreign" }, () => {}); w._runtimeHandler({ type: "PBP_READER_BOOKMARK_COMMAND", action: "save" }, { id: "test-id", tab: { id: 1 } }, () => {}); equal(calls.filter(x => x.type === "mdReaderBookmarkSave").length, 1);
   w.document.dispatchEvent(new w.CustomEvent("pbp:account-changed", { detail: { account: "bob" } })); w.pbpReaderBookmarkAction("save"); equal(calls.filter(x => x.type === "mdReaderBookmarkSave").length, 1); equal(w.document.getElementById("reader-bookmark-status").textContent, "readerBookmarkAccountChanged");
   assert(!w.document.getElementById("rendered-view").contains(w.document.getElementById("reader-bookmark-footer")), "footer must stay outside exported article"); frame.remove();
+});
+await test("real reader editor shows the configured privacy default and saves the user's checkbox choice", async () => {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  for (const privateDefault of [false, true]) {
+    const h = await pipelineHarness({ post: null, slot: { sourceIncognito: false }, settings: { optPrivateDefault: privateDefault } });
+    const frame = document.createElement("iframe"); document.body.append(frame);
+    try {
+      const w = frame.contentWindow;
+      w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+      const pending = [];
+      w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
+        sendMessage: msg => { const request = h.pbpReaderBookmarkRequest(msg, SENDER); pending.push(request); return request; },
+        onMessage: { addListener: () => {} } } };
+      w.t = k => k; w.eval(runtime);
+      w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account: "alice", bookmark: { tags: [], notes: "" } } }));
+      await Promise.all(pending); await new Promise(resolve => setTimeout(resolve, 0));
+      await w.pbpReaderBookmarkAction("edit");
+      const checkbox = w.document.getElementById("reader-bookmark-private");
+      assert(w.document.getElementById("reader-bookmark-editor").matches(":popover-open"), "editor did not open");
+      equal(checkbox.checked, privateDefault);
+      checkbox.checked = !privateDefault;
+      w.document.getElementById("reader-bookmark-apply").click();
+      await Promise.all(pending);
+      equal(h.env.post.shared, privateDefault ? "yes" : "no");
+    } finally { frame.remove(); }
+  }
 });
 document.body.dataset.complete = "true";
 })();
