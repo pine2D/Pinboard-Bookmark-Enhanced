@@ -4517,5 +4517,10 @@
   "dictAssistEvidence": {"message": "Aus dem Satz"},
   "dictAssistLookupSuggestion": {"message": "Vorschlag nachschlagen"},
   "dictAssistAnalysisBusy": {"message": "Ausdruck wird analysiert…"},
-  "dictAssistAnalysisFailed": {"message": "Der Ausdruck konnte nicht analysiert werden. Versuche es erneut."}
+  "dictAssistAnalysisFailed": {"message": "Der Ausdruck konnte nicht analysiert werden. Versuche es erneut."},
+  "dictQueryFrom": {"message": "Aus „$TERM$“", "placeholders": {"term": {"content": "$1"}}},
+  "dictQueryBack": {"message": "Zurück zum Original"},
+  "dictAssistResultReady": {"message": "KI-Ergebnis bereit"},
+  "dictAssistErrorReady": {"message": "Problem bei der KI-Anfrage"},
+  "dictAssistViewResult": {"message": "Ansehen"}
 }

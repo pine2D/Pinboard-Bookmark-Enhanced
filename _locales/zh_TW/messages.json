@@ -4517,5 +4517,10 @@
   "dictAssistEvidence": {"message": "原句片段"},
   "dictAssistLookupSuggestion": {"message": "查詢此項"},
   "dictAssistAnalysisBusy": {"message": "正在分析表達…"},
-  "dictAssistAnalysisFailed": {"message": "未能分析這段表達。請重試。"}
+  "dictAssistAnalysisFailed": {"message": "未能分析這段表達。請重試。"},
+  "dictQueryFrom": {"message": "原選內容：「$TERM$」", "placeholders": {"term": {"content": "$1"}}},
+  "dictQueryBack": {"message": "返回原選內容"},
+  "dictAssistResultReady": {"message": "AI 結果已就緒"},
+  "dictAssistErrorReady": {"message": "AI 請求出現問題"},
+  "dictAssistViewResult": {"message": "查看"}
 }

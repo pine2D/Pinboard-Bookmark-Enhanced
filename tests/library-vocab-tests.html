@@ -4469,15 +4469,15 @@ await (async () => {
       check("analysis: a displayed suggestion alone does not query its headword or write vocabulary",queries.length===1&&queries[0].term==="hört"&&writes.length===0&&word.lemma==="");
       host.querySelector('.dict-assist-lookup').click();await settle();
       check("analysis: confirming a base form reruns its exact identity with the original sentence",queries.at(-1)?.term==="aufhören"&&queries.at(-1)?.lang==="de"&&queries.at(-1)?.sentence===sentence&&host.dataset.refTerm==="aufhören"&&_pbpDictCurrent.term==="aufhören");
-      check("analysis: a new base form absent from the quote explains its analysis limit while contextual sense matching remains available",host.querySelector('.dict-assist-analyze').disabled&&!host.querySelector('.dict-assist-recommend').disabled&&host.textContent.includes("dictAssistAnalysisNeedsMatch"));
+      check("analysis: a confirmed base form avoids a false source-match warning while contextual sense matching remains available",host.querySelector('.dict-assist-analyze').disabled&&!host.querySelector('.dict-assist-recommend').disabled&&!host.textContent.includes("dictAssistAnalysisNeedsMatch"));
       host.querySelector('.dict-assist-recommend').click();await settle();
       check("analysis: contextual sense matching after confirmation still receives the genuine original sentence",requests.at(-1)?.task==="recommend"&&requests.at(-1)?.term==="aufhören"&&requests.at(-1)?.sentence===sentence);
       host.querySelector('.vocab-ref-relookup').click();await settle();
-      check("analysis: the visible Look up again action keeps the confirmed suggestion's source sentence",queries.at(-1)?.term==="aufhören"&&queries.at(-1)?.sentence===sentence);
+      check("analysis: the visible Look up again action keeps the confirmed suggestion's source sentence without a false match warning",queries.at(-1)?.term==="aufhören"&&queries.at(-1)?.sentence===sentence&&!host.textContent.includes("dictAssistAnalysisNeedsMatch"));
       _pbpDictCurrent.rerunWith("arbeiten");await settle();
       check("analysis: a later dictionary form-of jump also keeps the real source sentence",queries.at(-1)?.term==="arbeiten"&&queries.at(-1)?.sentence===sentence);
       $id("vocab-lookup-lang").value="en";_pbpVocabLookupLangChanged();await settle();
-      check("analysis: an explicit language change preserves the current lookup's real sentence",queries.at(-1)?.lang==="en"&&queries.at(-1)?.sentence===sentence);
+      check("analysis: an explicit language change preserves the current lookup's real sentence without a false match warning",queries.at(-1)?.lang==="en"&&queries.at(-1)?.sentence===sentence&&!host.textContent.includes("dictAssistAnalysisNeedsMatch"));
       _pbpVocabLookupOther("Gift","de");await settle();
       check("analysis: an unrelated free lookup starts without borrowing the previous sentence",queries.at(-1)?.term==="Gift"&&queries.at(-1)?.sentence===""&&host.querySelector('.dict-assist-analyze').disabled);
       check("analysis: the whole suggest/confirm/retry journey leaves saved identities and lemma relations unchanged",writes.length===0&&_vocabRows[0].term==="hört"&&_vocabRows[0].lemma==="");

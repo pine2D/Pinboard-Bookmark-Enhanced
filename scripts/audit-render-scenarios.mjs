@@ -21,7 +21,7 @@ export const RENDER_OPTIONS_TABS = Object.freeze([
 ]);
 export const RENDER_READER_CONTEXTS = Object.freeze([
   'reader-source-details', 'export-more', 'reader-bookmark-footer', 'reader-bookmark-editor', 'reader-bookmark-delete-confirm',
-  'explain-pop', 'explain-dict', 'dict-assist-idle', 'dict-assist-busy', 'dict-assist-result', 'dict-analyze-idle', 'dict-analyze-busy', 'dict-analyze-result', 'ask-panel', 'search-pop', 'kbd-help-pop', 'typo-pop',
+  'explain-pop', 'explain-dict', 'dict-assist-idle', 'dict-assist-busy', 'dict-assist-result', 'dict-assist-copy-failure', 'dict-assist-ready', 'dict-assist-error', 'dict-analyze-idle', 'dict-analyze-busy', 'dict-analyze-result', 'dict-analyze-derived', 'ask-panel', 'search-pop', 'kbd-help-pop', 'typo-pop',
   'pb-hl-card', 'send-menu', 'confirm-popover', 'tr-ask',
 ]);
 const context = (name, dependencies = [], extra = {}) => ({ name, dependencies, ...extra });
@@ -39,6 +39,9 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('dict-assist-idle', [], { target: '.xp-dict-assist' }),
     context('dict-assist-busy', ['dict-assist-idle'], { target: '.dict-assist-stop:not([hidden])' }),
     context('dict-assist-result', ['dict-assist-busy'], { target: '.dict-assist-use' }),
+    context('dict-assist-copy-failure', ['dict-assist-result'], { target: '.dict-assist-copy-status:not([hidden])' }),
+    context('dict-assist-ready', ['dict-assist-idle'], { target: '.dict-assist-notice:not([hidden])' }),
+    context('dict-assist-error', ['dict-assist-idle'], { target: '.dict-assist-notice:not([hidden])' }),
     context('dict-analyze-idle', [], { target: '.dict-assist-analyze' }),
     context('dict-analyze-busy', ['dict-analyze-idle'], { target: '.dict-assist-stop:not([hidden])' }),
     context('dict-analyze-result', ['dict-analyze-busy'], { target: '.dict-assist-lookup' }),
@@ -49,7 +52,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('notes-batch-bar', ['notes-detail'], { target: '#notes-batch-toolbar.selecting' }),
   ],
   'md-preview': [context('reader', [], { target: '#rendered-view' }), ...RENDER_READER_CONTEXTS.map((name) => context(name,
-    name === 'explain-dict' ? ['explain-pop'] : name === 'dict-assist-busy' ? ['dict-assist-idle'] : name === 'dict-assist-result' ? ['dict-assist-busy'] : name === 'dict-analyze-busy' ? ['dict-analyze-idle'] : name === 'dict-analyze-result' ? ['dict-analyze-busy'] : [])), context('video', [], { target: '.pbv-bar' })],
+    name === 'explain-dict' ? ['explain-pop'] : name === 'dict-assist-busy' ? ['dict-assist-idle'] : name === 'dict-assist-result' ? ['dict-assist-busy'] : name === 'dict-assist-copy-failure' ? ['dict-assist-result'] : ['dict-assist-ready', 'dict-assist-error'].includes(name) ? ['dict-assist-idle'] : name === 'dict-analyze-derived' ? ['dict-analyze-result'] : name === 'dict-analyze-busy' ? ['dict-analyze-idle'] : name === 'dict-analyze-result' ? ['dict-analyze-busy'] : [])), context('video', [], { target: '.pbv-bar' })],
   popup: [context('light', [], { target: '#main-section' }), context('states', [], { target: '.offline-queue-item' }),
     context('form', [], { target: '#url-input' }), context('dpi', [], { dpr: [1.5, 2] }),
     context('dark', [], { theme: 'flexoki-dark', scheme: 'dark', target: '#main-section' }),

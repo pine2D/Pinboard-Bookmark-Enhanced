@@ -1638,7 +1638,34 @@ function _pbpDictAssistMount(host, opts) {
   }
   const result = document.createElement("div"); result.className = "dict-assist-result";
   result.setAttribute("role", "status"); result.setAttribute("aria-live", "polite");
+  result.tabIndex = -1;
   panel.append(actions, hint, links, context, result); host.appendChild(panel);
+  const notice = document.createElement("div"); notice.className = "dict-assist-notice"; notice.hidden = true;
+  notice.setAttribute("role", "status"); notice.setAttribute("aria-live", "polite");
+  const noticeText = document.createElement("span"); noticeText.className = "dict-assist-notice-text";
+  const view = button("dictAssistViewResult", "dict-assist-view");
+  notice.append(noticeText, view); (opts.noticeHost || panel).prepend(notice);
+  const scrollHost = opts.scrollHost || host.closest(".xp-body");
+  let settled = false;
+  const syncNotice = () => {
+    if (!alive() || !settled || !result.textContent || !scrollHost?.isConnected) { notice.hidden = true; return; }
+    const bounds = scrollHost.getBoundingClientRect(), rect = result.getBoundingClientRect();
+    const inset = parseFloat(getComputedStyle(scrollHost).scrollPaddingTop) || 0;
+    const top = Math.max(bounds.top + scrollHost.clientTop + inset, 0), bottom = Math.min(bounds.bottom, window.innerHeight);
+    notice.hidden = rect.bottom > top && rect.top < bottom;
+    noticeText.textContent = t(lastError ? "dictAssistErrorReady" : "dictAssistResultReady");
+  };
+  view.addEventListener("click", () => {
+    if (!alive() || !settled || !scrollHost?.isConnected) return;
+    // Only this explicit action reveals the result. Never scrollIntoView:
+    // that can also move the article or an outer sheet behind this surface.
+    const inset = (parseFloat(getComputedStyle(scrollHost).scrollPaddingTop) || 0) + 4;
+    scrollHost.scrollTop += result.getBoundingClientRect().top - scrollHost.getBoundingClientRect().top - scrollHost.clientTop - inset;
+    result.focus({ preventScroll: true }); notice.hidden = true;
+  });
+  const listenerOptions = opts.signal ? { passive: true, signal: opts.signal } : { passive: true };
+  scrollHost?.addEventListener("scroll", syncNotice, listenerOptions);
+  window.addEventListener("resize", syncNotice, listenerOptions);
   let norms = [], choices = [], epoch = 0, active = null, busy = false, lastError = "", applying = false, lastTask = "";
   let settings = opts.settings && typeof opts.settings.then !== "function" ? opts.settings : null;
   const alive = () => !opts.signal?.aborted && panel.isConnected && opts.isCurrent();
@@ -1676,14 +1703,53 @@ function _pbpDictAssistMount(host, opts) {
     else if (!configured) {
       hint.textContent = t("dictAiNotConfigured"); settingsLink(settings.previewAiEnabled === false ? "ai-behavior" : "ai");
     } else {
-      hint.textContent = t(opts.sentence && !located() && !analyze.hidden ? "dictAssistAnalysisNeedsMatch" :
+      hint.textContent = t(opts.sentence && !located() && !analyze.hidden && !opts.derived ? "dictAssistAnalysisNeedsMatch" :
         !eligible.length && located() && !analyze.hidden ? "dictAssistAnalysisHint" : !eligible.length ? "dictAssistNoSources" :
         opts.getSelection() && selected?.eligible !== true ? "dictAssistSourceNotAllowed" :
         !opts.sentence ? "dictAssistNeedContext" : "dictAssistAllowedSources");
       if (!eligible.length || (opts.getSelection() && selected?.eligible !== true) || lastError === "dictAssistSourceNotAllowed") settingsLink("vocab");
     }
   };
-  const invalidate = () => { epoch++; active?.abort(); active = null; busy = false; lastError = ""; lastTask = ""; result.replaceChildren(); context.hidden = true; };
+  const invalidate = () => { epoch++; active?.abort(); active = null; busy = false; settled = false; notice.hidden = true; lastError = ""; lastTask = ""; result.replaceChildren(); context.hidden = true; };
+  const renderAnalysis = (response, current) => {
+    if (!response.suggestions.length) { result.textContent = t("dictAssistAnalysisEmpty"); return; }
+    const label = document.createElement("div"); label.className = "xp-dict-ailabel"; label.textContent = t("dictAiLabel"); result.appendChild(label);
+    for (const suggestion of response.suggestions) {
+      const group = document.createElement("div"); group.className = "dict-assist-suggestion";
+      const kind = document.createElement("div"); kind.className = "xp-dict-local-title";
+      kind.textContent = t(suggestion.kind === "lemma" ? "dictAssistLemmaSuggestion" : "dictAssistPhraseSuggestion");
+      const headword = document.createElement("p"); headword.className = "dict-assist-headword";
+      headword.textContent = suggestion.headword; headword.lang = opts.lang || "und"; headword.dir = "auto";
+      const evidenceLabel = document.createElement("div"); evidenceLabel.className = "xp-dict-local-title"; evidenceLabel.textContent = t("dictAssistEvidence");
+      group.append(kind, headword, evidenceLabel);
+      for (const fragment of suggestion.evidence) {
+        const evidence = document.createElement("p"); evidence.className = "dict-assist-evidence";
+        evidence.textContent = fragment; evidence.lang = opts.lang || "und"; evidence.dir = "auto"; group.appendChild(evidence);
+      }
+      const explanation = document.createElement("p"); explanation.className = "dict-assist-explanation";
+      explanation.textContent = suggestion.explanation; explanation.lang = response.targetLang || "und"; explanation.dir = "auto";
+      const lookup = button("dictAssistLookupSuggestion", "dict-assist-lookup");
+      lookup.title = suggestion.headword;
+      lookup.setAttribute("aria-label", t("dictAssistLookupSuggestion") + " " + suggestion.headword);
+      lookup.addEventListener("click", async () => {
+        if (!current() || lookup.disabled) return;
+        lookup.disabled = true;
+        try {
+          const owner = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : null;
+          if (!current()) return;
+          const canonical = value => value == null || value === "ownerless" ? "" : value;
+          if (typeof pbpVocabCurrentOwner !== "function" || canonical(owner) !== canonical(opts.owner)) {
+            lastError = "vocabAccountChanged"; result.textContent = t(lastError); syncNotice(); return;
+          }
+          opts.onLookup(pbpDictNormalizeTerm(suggestion.headword));
+        } catch (error) {
+          console.warn("[dict] suggested lookup account read failed:", error?.name, "Unable to verify current account");
+          if (current()) { lastError = "vocabAccountChanged"; result.textContent = t(lastError); syncNotice(); lookup.disabled = false; }
+        }
+      });
+      group.append(explanation, lookup); result.appendChild(group);
+    }
+  };
   const run = async task => {
     if (!alive() || busy || !settings || settings.previewAiEnabled === false || typeof hasAIKey !== "function" || !hasAIKey(settings)) return;
     const selected = selectedCandidate();
@@ -1708,44 +1774,8 @@ function _pbpDictAssistMount(host, opts) {
       if (!current()) return;
       result.replaceChildren();
       if (task === "analyze") {
-        if (!response.suggestions.length) { result.textContent = t("dictAssistAnalysisEmpty"); return; }
-        const label = document.createElement("div"); label.className = "xp-dict-ailabel"; label.textContent = t("dictAiLabel"); result.appendChild(label);
-        for (const suggestion of response.suggestions) {
-          const group = document.createElement("div"); group.className = "dict-assist-suggestion";
-          const kind = document.createElement("div"); kind.className = "xp-dict-local-title";
-          kind.textContent = t(suggestion.kind === "lemma" ? "dictAssistLemmaSuggestion" : "dictAssistPhraseSuggestion");
-          const headword = document.createElement("p"); headword.className = "dict-assist-headword";
-          headword.textContent = suggestion.headword; headword.lang = opts.lang || "und"; headword.dir = "auto";
-          const evidenceLabel = document.createElement("div"); evidenceLabel.className = "xp-dict-local-title"; evidenceLabel.textContent = t("dictAssistEvidence");
-          group.append(kind, headword, evidenceLabel);
-          for (const fragment of suggestion.evidence) {
-            const evidence = document.createElement("p"); evidence.className = "dict-assist-evidence";
-            evidence.textContent = fragment; evidence.lang = opts.lang || "und"; evidence.dir = "auto"; group.appendChild(evidence);
-          }
-          const explanation = document.createElement("p"); explanation.className = "dict-assist-explanation";
-          explanation.textContent = suggestion.explanation; explanation.lang = response.targetLang || "und"; explanation.dir = "auto";
-          const lookup = button("dictAssistLookupSuggestion", "dict-assist-lookup");
-          lookup.title = suggestion.headword;
-          lookup.setAttribute("aria-label", t("dictAssistLookupSuggestion") + " " + suggestion.headword);
-          lookup.addEventListener("click", async () => {
-            if (!current() || lookup.disabled) return;
-            lookup.disabled = true;
-            try {
-              const owner = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : null;
-              if (!current()) return;
-              const canonical = value => value == null || value === "ownerless" ? "" : value;
-              if (typeof pbpVocabCurrentOwner !== "function" || canonical(owner) !== canonical(opts.owner)) {
-                result.textContent = t("vocabAccountChanged"); return;
-              }
-              opts.onLookup(pbpDictNormalizeTerm(suggestion.headword));
-            } catch (error) {
-              console.warn("[dict] suggested lookup account read failed:", error?.name, "Unable to verify current account");
-              if (current()) { result.textContent = t("vocabAccountChanged"); lookup.disabled = false; }
-            }
-          });
-          group.append(explanation, lookup); result.appendChild(group);
-        }
-        return;
+        opts.onAnalysis?.(response);
+        renderAnalysis(response, current); return;
       }
       if (task === "recommend") {
         const candidate = candidates.find(choice => choice.id === response.choiceId);
@@ -1771,12 +1801,18 @@ function _pbpDictAssistMount(host, opts) {
       const text = document.createElement("p"); text.className = "dict-assist-explanation";
       text.lang = response.targetLang || "und"; text.dir = "auto"; text.textContent = response.explanation;
       const copy = button("dictAssistCopy", "dict-assist-copy");
+      const copyStatus = document.createElement("p"); copyStatus.className = "dict-assist-copy-status";
+      copyStatus.setAttribute("role", "status"); copyStatus.hidden = true;
       copy.addEventListener("click", async () => {
         if (!current()) return;
-        try { await navigator.clipboard.writeText(response.explanation); if (current()) copy.textContent = t("dictAssistCopied"); }
-        catch (_) { if (current()) copy.textContent = t("dictAssistCopyFailed"); }
+        try {
+          await navigator.clipboard.writeText(response.explanation);
+          if (current()) { copy.textContent = t("dictAssistCopied"); copyStatus.textContent = ""; copyStatus.hidden = true; }
+        } catch (_) {
+          if (current()) { copy.textContent = t("dictAssistCopy"); copyStatus.textContent = t("dictAssistCopyFailed"); copyStatus.hidden = false; }
+        }
       });
-      result.append(label, text, copy);
+      result.append(label, text, copyStatus, copy);
     } catch (error) {
       if (!current() || error?.name === "AbortError") return;
       const key = error?.code === "source_not_allowed" ? "dictAssistSourceNotAllowed" :
@@ -1785,26 +1821,31 @@ function _pbpDictAssistMount(host, opts) {
       lastError = key;
       result.textContent = error?.code === "host_permission" && typeof pbpAiErrorText === "function" ? pbpAiErrorText(error) : t(key);
       if (key === "dictAssistSourceNotAllowed" && !links.childElementCount) settingsLink("vocab");
-    } finally { if (epoch === version) { busy = false; sync(); } }
+    } finally { if (current()) { busy = false; settled = true; sync(); syncNotice(); } }
   };
   recommend.addEventListener("click", () => run("recommend"));
   explain.addEventListener("click", () => run("explain"));
   analyze.addEventListener("click", () => run("analyze"));
   stop.addEventListener("click", () => { invalidate(); sync(); });
-  opts.signal?.addEventListener("abort", invalidate, { once: true });
+  opts.signal?.addEventListener("abort", () => { invalidate(); notice.remove(); }, { once: true });
   if (!settings && opts.settings) Promise.resolve(opts.settings).then(value => { settings = value || {}; sync(); }, error => {
     console.warn("[dict] AI settings read failed:", error?.name, "Unable to load settings"); settings = {}; sync();
   });
   sync();
+  if (opts.initialAnalysis && alive()) {
+    const version = epoch; lastTask = "analyze"; settled = true; context.hidden = !opts.sentence;
+    renderAnalysis(opts.initialAnalysis, () => alive() && epoch === version);
+    sync(); syncNotice();
+  }
   return {
     element: panel,
     update(next) {
       if (!alive()) return;
-      if (lastTask === "analyze") { norms = next.filter(Boolean); choices = pbpDictAssistChoices(norms); sync(); return; }
+      if (lastTask === "analyze") { norms = next.filter(Boolean); choices = pbpDictAssistChoices(norms); sync(); syncNotice(); return; }
       const hadAdvice = busy || !!result.textContent;
       invalidate(); norms = next.filter(Boolean); choices = pbpDictAssistChoices(norms);
-      if (hadAdvice) result.textContent = t("dictAssistSourceChanged");
-      sync();
+      if (hadAdvice) { lastError = "dictAssistSourceChanged"; result.textContent = t(lastError); settled = true; }
+      sync(); syncNotice();
     },
     selectionChanged() { if (!alive()) return; if (!applying && lastTask !== "analyze") invalidate(); sync(); }
   };
@@ -1812,7 +1853,7 @@ function _pbpDictAssistMount(host, opts) {
 
 const PBP_DICT_LANGS = ["auto", ...PBP_DICT_QUERY_LANGS];
 
-async function pbpDictRun(cap, ctx, pop, ctrl, s) {
+async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   // Child controller: this run's own signal, chained to md-ask's parent ctrl.
   // A language switch / rerun aborts ONLY the old child (Codex HIGH 1).
   if (_pbpDictChildCtrl) _pbpDictChildCtrl.abort();
@@ -1829,17 +1870,22 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   const signal = child.signal;
 
   const runId = ++_pbpDictRunSeq;
+  const origin = navigation && navigation.owner === _pbpDictOwner ? navigation :
+    { cap, owner: _pbpDictOwner, analyses: new Map() };
+  const derived = cap.text !== origin.cap.text;
+  const title = pop.querySelector(".xp-term");
+  if (title) { title.textContent = cap.text; title.title = cap.text; }
   const cur = {
     runId, term: cap.text, lang: "", gloss: "", lemma: "", ipa: "",
     sourceUrl: "", license: "", sentence: ctx.sentence || "", saved: false,
     owner: _pbpDictOwner,
-    rerun: () => { if (_pbpDictCurrent === cur) pbpDictRun(cap, ctx, pop, ctrl, s); },
+    rerun: () => { if (cur.isCurrent() && !signal.aborted) pbpDictRun(cap, ctx, pop, ctrl, s, origin); },
     // Lemma click-through (form-of pointers): a fresh full run on the base
     // form, so language detection, vocab identity and the AI slot all see
     // the lemma as the selection. Same guard as rerun.
     rerunWith: (term) => {
       const next = pbpDictNormalizeTerm(term);
-      if (next && _pbpDictCurrent === cur) pbpDictRun({ ...cap, text: next }, ctx, pop, ctrl, s);
+      if (next && cur.isCurrent() && !signal.aborted) pbpDictRun({ ...cap, text: next }, ctx, pop, ctrl, s, origin);
     }
   };
   _pbpDictCurrent = cur;
@@ -1918,6 +1964,22 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   const ctxEl = document.createElement("div");
   ctxEl.className = "xp-dict-ctx";
   wrap.appendChild(head);
+  if (derived) {
+    const source = document.createElement("div"); source.className = "xp-dict-origin";
+    const label = document.createElement("span");
+    // A marker keeps the source term in the translated sentence's own order,
+    // with an independent language/direction span and no model-authored HTML.
+    const marker = "\uFFF0", template = t("dictQueryFrom", marker), at = template.indexOf(marker);
+    const original = document.createElement("span"); original.className = "xp-dict-origin-term";
+    original.textContent = origin.cap.text; original.lang = "und"; original.dir = "auto";
+    label.append(at < 0 ? template + " " : template.slice(0, at), original, at < 0 ? "" : template.slice(at + marker.length));
+    const back = document.createElement("button"); back.type = "button"; back.className = "xp-dict-connect xp-dict-return";
+    back.textContent = t("dictQueryBack");
+    back.addEventListener("click", () => {
+      if (cur.isCurrent() && !signal.aborted) pbpDictRun(origin.cap, ctx, pop, ctrl, s, origin);
+    });
+    source.append(label, back); wrap.appendChild(source);
+  }
   wrap.appendChild(slot);
   wrap.appendChild(ctxEl);
   body.replaceChildren(wrap);
@@ -1953,8 +2015,14 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
     });
   cur.meaningSources = new Map();
   const assistHost = document.createElement("div"); slot.after(assistHost);
+  const noticeHost = document.createElement("div"); noticeHost.className = "xp-dict-notice"; body.after(noticeHost);
+  signal.addEventListener("abort", () => noticeHost.remove(), { once: true });
+  const analysisKey = lang + ":" + cap.text;
+  const originalTerm = wrap.querySelector(".xp-dict-origin-term"); if (originalTerm) originalTerm.lang = lang || "und";
   cur.assist = _pbpDictAssistMount(assistHost, { term: cap.text, lang, sentence: cur.sentence, owner: cur.owner,
     signal, isCurrent: cur.isCurrent, settings: s, getSelection: () => cur.packChoice || null,
+    derived, noticeHost, scrollHost: body, initialAnalysis: origin.analyses.get(analysisKey),
+    onAnalysis: response => { if (cur.isCurrent()) origin.analyses.set(analysisKey, response); },
     onLookup: headword => { if (cur.isCurrent()) cur.rerunWith(headword); },
     onSelect: choice => {
       for (const source of cur.meaningSources.values()) {
@@ -2347,17 +2415,12 @@ document.addEventListener("pbp:rendered", (e) => pbpDictOnArticle((e && e.detail
 // state, exactly as a fresh render would.
 document.addEventListener("pbp:article-will-replace", () => window.pbpDictOnActionSwitch());
 document.addEventListener("pbp:article-replaced", (e) => pbpDictOnArticle((e && e.detail) || null));
-// Live Pinboard account switch (md-preview.js's credential listener, same
-// {account} detail shape the article events carry). Only the owner moves --
-// the document underneath is unchanged, so the per-document manual language
-// and CLD prior stay exactly as the reader left them. Re-scoping does NOT by
-// itself neutralise the popover already on screen -- `cur`, its buttons and
-// the handlers closed over them all survive this listener untouched. What
-// fences it is that every vocabulary write in this file (pbpDictSaveCurrent
-// and the .xp-vocab-status control alike) compares cur.owner against _pbpDictOwner
-// AND re-reads the live account before it commits, so both refuse an entry
-// captured under the previous owner. Any new write path added here owes the
-// same two gates -- do not assume this listener covers it.
+// An owner change ends the old query and its external completion cue. A
+// same-owner token rotation keeps both: document language/prior are unchanged.
+// Commit-time owner reads still guard writes that race an unseen storage event.
 document.addEventListener("pbp:account-changed", (e) => {
-  _pbpDictOwner = pbpDictOwnerScope(e && e.detail ? e.detail.account : "");
+  const next = pbpDictOwnerScope(e && e.detail ? e.detail.account : "");
+  if (next === _pbpDictOwner) return;
+  _pbpDictOwner = next;
+  window.pbpDictOnActionSwitch();
 });

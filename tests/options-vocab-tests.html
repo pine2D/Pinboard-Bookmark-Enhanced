@@ -273,6 +273,99 @@ delete document.documentElement.dataset.theme;
     }
   }
 
+  // Real confirmer + independently ordered list responses reproduce the
+  // local notification / explicit refresh / cross-page broadcast race.
+  {
+    const names=["pbpDictPackList","pbpDictPackSetEnabled","pbpDictPackSetAiAllowed","pbpDictPackDelete"];
+    const saved=Object.fromEntries(names.map(name=>[name,window[name]]));
+    const section=$id("multi-pack-section"),wasOpen=section.open;
+    const outside=document.createElement("button");outside.textContent="Other settings";document.body.appendChild(outside);
+    const channel=new BroadcastChannel("pbp-dict-packs");
+    const pack={id:"focus-pack",activeGeneration:"focus-generation",title:"Focus dictionary",sourceLanguage:"de",targetLanguage:"en",entries:2,enabled:true,aiAllowed:false};
+    let rows=[{...pack}],pending=null;
+    const snapshot=()=>rows.map(row=>({...row}));
+    const action=kind=>$id("multi-pack-list").querySelector('[data-pack-id="focus-pack"][data-pack-action="'+kind+'"]');
+    const owns=kind=>document.activeElement===action(kind);
+    const until=async predicate=>{for(let n=0;n<100&&!predicate();n++)await task();if(!predicate())throw new Error("Pack focus fixture did not settle");};
+    const notify=()=>window.dispatchEvent(new CustomEvent("pbp-dict-packs-changed"));
+    const finalRefresh=async()=>{
+      await until(()=>pending.length===2);
+      channel.postMessage({type:"changed",id:pack.id,action:"changed"});
+      await until(()=>pending.length===3);
+      pending[0](snapshot());pending[1](snapshot());await task();await task();
+      pending[2](snapshot());await task();await task();pending=null;
+    };
+    try {
+      section.open=true;
+      window.pbpDictPackList=()=>pending ? new Promise(resolve=>pending.push(resolve)) : Promise.resolve(snapshot());
+      window.pbpDictPackSetEnabled=async(id,value)=>{rows[0].enabled=value;notify();};
+      window.pbpDictPackSetAiAllowed=async(id,value)=>{rows[0].aiAllowed=value;notify();};
+      window.pbpDictPackDelete=async()=>{rows=[];notify();};
+      await _pbpMultiPackRefresh();
+      action("enabled").focus();pending=[];action("enabled").click();await finalRefresh();
+      check("the last broadcast refresh preserves the toggled pack action's keyboard focus",owns("enabled")&&!rows[0].enabled);
+      check("the final refreshed action is enabled after the busy operation settles",!action("enabled").disabled&&!_pbpMultiPackBusy);
+
+      action("ai").focus();action("ai").click();
+      const yes=document.querySelector(".confirm-yes");yes.focus();pending=[];yes.click();await finalRefresh();
+      check("the real AI confirmation returns focus through the final notification refresh",owns("ai")&&rows[0].aiAllowed);
+
+      action("enabled").focus();pending=[];action("enabled").click();outside.focus();await finalRefresh();
+      check("an action never steals focus that moved to another settings control",document.activeElement===outside);
+      action("enabled").focus();pending=[];action("enabled").click();outside.focus();outside.blur();await finalRefresh();
+      check("moving outside then blurring still cancels the previous action's focus claim",document.activeElement===document.body);
+      action("enabled").focus();pending=[];action("enabled").click();
+      document.body.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));await finalRefresh();
+      check("clicking non-focusable space outside the row cancels pending focus restoration",document.activeElement===document.body);
+
+      action("ai").focus();pending=[];channel.postMessage({type:"changed"});await until(()=>pending.length===1);pending[0](snapshot());await task();pending=null;
+      check("a refresh from another page preserves the currently focused pack action",owns("ai"));
+      action("ai").focus();pending=[];channel.postMessage({type:"changed"});await until(()=>pending.length===1);outside.focus();pending[0](snapshot());await task();pending=null;
+      check("a cross-page refresh leaves focus alone when the user has left the row",document.activeElement===outside);
+
+      action("enabled").focus();pending=[];const oldRefresh=_pbpMultiPackRefresh(),newRefresh=_pbpMultiPackRefresh();
+      const newer=snapshot();newer[0].revision="newer";pending[1](newer);await newRefresh;
+      pending[0]([{...pack,revision:"stale"}]);await oldRefresh;pending=null;
+      check("an obsolete list response cannot replace the focused current render",owns("enabled")&&$id("multi-pack-list").textContent.includes("newer")&&!$id("multi-pack-list").textContent.includes("stale"));
+
+      rows=[{...pack}];await _pbpMultiPackRefresh();action("ai").focus();action("ai").click();
+      const cancel=document.querySelector(".confirm-no");await _pbpMultiPackRefresh();
+      check("a background list refresh does not move focus out of the open confirmation",document.activeElement===cancel);
+      cancel.click();await task();
+      check("cancelling after the opener was replaced returns to its current pack action",owns("ai"));
+      const hadMotion=document.documentElement.classList.contains("motion-ready");
+      document.documentElement.classList.add("motion-ready");
+      action("ai").focus();action("ai").click();await _pbpMultiPackRefresh();
+      const animatedCancel=document.querySelector(".confirm-no");animatedCancel.focus();animatedCancel.click();
+      await new Promise(resolve=>setTimeout(resolve,250));
+      check("animated cancellation restores a replaced opener before its inert surface disappears",owns("ai"));
+      document.documentElement.classList.toggle("motion-ready",hadMotion);
+      action("ai").focus();action("ai").click();await _pbpMultiPackRefresh();
+      outside.focus();await task();
+      check("keyboard focus leaving a replaced confirmation opener reaches its outside target",document.activeElement===outside);
+      action("ai").focus();action("ai").click();await _pbpMultiPackRefresh();
+      document.body.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));await task();
+      check("light dismissal on blank space does not revive a replaced pack opener",document.activeElement===document.body);
+      action("ai").focus();action("ai").click();await _pbpMultiPackRefresh();
+      const staleYes=document.querySelector(".confirm-yes");staleYes.focus();pending=[];staleYes.click();await finalRefresh();
+      check("confirming after a background render restores the current replacement action",owns("ai"));
+
+      action("delete").focus();action("delete").click();const del=document.querySelector(".confirm-yes");del.focus();pending=[];del.click();await finalRefresh();
+      check("deleting the focused dictionary falls back to Choose file after all refreshes",document.activeElement===$id("multi-pack-choose")&&rows.length===0);
+
+      rows=[{...pack}];await _pbpMultiPackRefresh();action("enabled").focus();
+      window.pbpDictPackSetEnabled=async()=>{throw new Error("fixture action failed");};
+      action("enabled").click();await task();await task();
+      check("a failed package action restores its enabled keyboard control",owns("enabled")&&!action("enabled").disabled);
+      action("enabled").focus();window.pbpDictPackList=async()=>{throw new Error("fixture list failed");};await _pbpMultiPackRefresh();
+      check("a failed list read moves a removed focused action to the import fallback",document.activeElement===$id("multi-pack-choose"));
+    } finally {
+      channel.close();outside.remove();section.open=wasOpen;
+      for(const name of names)window[name]=saved[name];
+      await _pbpMultiPackRefresh();
+    }
+  }
+
   const realPackMeta = pbpPackMeta;
   const realPackDelete = pbpPackDelete;
   try {

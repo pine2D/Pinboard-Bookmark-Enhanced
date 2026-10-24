@@ -248,7 +248,8 @@
         "notes-toolbar",
         "vocab-batch-bar",
         "dict-assist-actions",
-        "xp-dict-assist"
+        "xp-dict-assist",
+        "dict-assist-notice"
       ],
       "regions": [
         "lib-header",
@@ -368,7 +369,11 @@
         "dict-assist-context-wrap",
         "dict-assist-context",
         "dict-assist-result",
-        "dict-assist-suggestion"
+        "dict-assist-suggestion",
+        "dict-assist-notice-text",
+        "dict-assist-view",
+        "dict-assist-copy-status",
+        "vocab-dict-notice"
       ],
       "canvasStructures": [
         "lib-header",
@@ -393,7 +398,10 @@
         "dict-assist-context-wrap",
         "dict-assist-context",
         "dict-assist-result",
-        "dict-assist-suggestion"
+        "dict-assist-suggestion",
+        "dict-assist-notice",
+        "dict-assist-notice-text",
+        "vocab-dict-notice"
       ]
     },
     "listbox": {
@@ -449,7 +457,9 @@
         "send-menu",
         "send-mi",
         "dict-assist-actions",
-        "xp-dict-assist"
+        "xp-dict-assist",
+        "dict-assist-notice",
+        "xp-dict-origin"
       ],
       "regions": [
         "ask-a",
@@ -605,7 +615,13 @@
         "dict-assist-context-wrap",
         "dict-assist-context",
         "dict-assist-result",
-        "dict-assist-suggestion"
+        "dict-assist-suggestion",
+        "dict-assist-notice-text",
+        "dict-assist-view",
+        "dict-assist-copy-status",
+        "xp-dict-notice",
+        "xp-dict-origin-term",
+        "xp-dict-return"
       ]
     },
     "shared": {

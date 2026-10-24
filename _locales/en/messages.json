@@ -4524,5 +4524,10 @@
   "dictAssistEvidence": {"message": "From the sentence"},
   "dictAssistLookupSuggestion": {"message": "Look up suggestion"},
   "dictAssistAnalysisBusy": {"message": "Analyzing the expression…"},
-  "dictAssistAnalysisFailed": {"message": "Could not analyze this expression. Try again."}
+  "dictAssistAnalysisFailed": {"message": "Could not analyze this expression. Try again."},
+  "dictQueryFrom": {"message": "From “$TERM$”", "placeholders": {"term": {"content": "$1"}}},
+  "dictQueryBack": {"message": "Back to original"},
+  "dictAssistResultReady": {"message": "AI result ready"},
+  "dictAssistErrorReady": {"message": "AI needs attention"},
+  "dictAssistViewResult": {"message": "View"}
 }

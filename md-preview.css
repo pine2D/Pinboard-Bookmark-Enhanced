@@ -2370,6 +2370,25 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .dict-assist-headword { font-weight: 600; }
 .dict-assist-context-wrap > p { margin-top: var(--sp-1); }
 .xp-dict-assist .xp-dict-src, .xp-dict-assist .xp-dict-ailabel { margin-top: 0; font-size: 11px; }
+/* The completion cue overlays the bottom edge of the scroll area. Its
+   stable zero-height host never resizes or repositions the open popover. */
+.xp-dict-notice { position: relative; flex: none; height: 0; z-index: 1; }
+.xp-dict-notice > .dict-assist-notice {
+  position: absolute; bottom: 0; left: var(--sp-3); right: var(--sp-3);
+  padding: var(--sp-1) var(--sp-2);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);
+}
+.dict-assist-notice:not([hidden]), .xp-dict-origin {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2);
+  font-size: 12px; line-height: 18px;
+}
+.dict-assist-notice[hidden] { display: none; }
+.dict-assist-notice-text { flex: 1 1 100px; min-width: 0; overflow-wrap: anywhere; }
+.dict-assist-notice .xp-dict-connect { flex: none; margin: 0; }
+.xp-dict-origin { margin-bottom: var(--sp-2); color: var(--fg-muted); }
+.xp-dict-origin-term { min-width: 0; overflow-wrap: anywhere; }
+.xp-dict-assist .dict-assist-copy-status { margin: 0; white-space: normal; overflow-wrap: anywhere; color: var(--danger); }
+.dict-assist-result:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 
 .xp-model {
   /* The AI end of the footer: price + model label + "ask more" (md-ask.js).

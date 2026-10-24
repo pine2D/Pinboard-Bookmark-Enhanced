@@ -4517,5 +4517,10 @@
   "dictAssistEvidence": {"message": "Ze zdania"},
   "dictAssistLookupSuggestion": {"message": "Wyszukaj sugestię"},
   "dictAssistAnalysisBusy": {"message": "Analizowanie wyrażenia…"},
-  "dictAssistAnalysisFailed": {"message": "Nie udało się przeanalizować tego wyrażenia. Spróbuj ponownie."}
+  "dictAssistAnalysisFailed": {"message": "Nie udało się przeanalizować tego wyrażenia. Spróbuj ponownie."},
+  "dictQueryFrom": {"message": "Z „$TERM$”", "placeholders": {"term": {"content": "$1"}}},
+  "dictQueryBack": {"message": "Wróć do oryginału"},
+  "dictAssistResultReady": {"message": "Wynik AI jest gotowy"},
+  "dictAssistErrorReady": {"message": "Problem z żądaniem AI"},
+  "dictAssistViewResult": {"message": "Pokaż"}
 }

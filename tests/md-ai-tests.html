@@ -7870,6 +7870,31 @@ suite("skim status line", () => {
     }
   });
 
+  await atest("switching from a suggested dictionary query explains and translates the original selection", async () => {
+    await reset();
+    const original = { settings: _pbpExplainSettings, aiOk: _pbpExplainAiOk, stream: window.callAIStream,
+      cap: _pbpExplainCap, ctx: _pbpExplainCtx, action: _pbpExplainAction };
+    const cap = { text: "steht", range: document.createRange() };
+    const ctx = { sentence: "Sie steht früh auf.", blockText: "Sie steht früh auf.", prevText: "", nextText: "" };
+    const sent = [];
+    try {
+      _pbpExplainSettings = { aiProvider: "gemini", geminiApiKey: "test-key" }; _pbpExplainAiOk = true;
+      _pbpExplainCap = cap; _pbpExplainCtx = ctx;
+      window.callAIStream = async (_settings, prompt) => { sent.push(prompt); return "done"; };
+      for (const action of ["translate", "explain"]) {
+        _pbpExplainAction = "dict"; _pbpExplainSyncActButtons(pop);
+        pop.querySelector(".xp-term").textContent = "aufstehen";
+        pop.querySelector('.xp-act[data-action="' + action + '"]').click(); await task();
+        assertEq(pop.querySelector(".xp-term").textContent, "steht", action + " title restores original selection");
+        assert(sent.at(-1)?.includes("steht") && sent.at(-1)?.includes(ctx.sentence), action + " retains the original expression and sentence");
+        assert(_pbpExplainCap === cap && _pbpExplainCtx === ctx, action + " did not mutate the native capture");
+      }
+    } finally {
+      _pbpExplainSettings = original.settings; _pbpExplainAiOk = original.aiOk; window.callAIStream = original.stream;
+      _pbpExplainCap = original.cap; _pbpExplainCtx = original.ctx; _pbpExplainAction = original.action;
+    }
+  });
+
   await atest("no-AI Explain and Translate report their own unavailable actions", async () => {
     await reset();
     const realSettings = _pbpExplainSettings;

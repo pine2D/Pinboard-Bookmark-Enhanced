@@ -3785,6 +3785,24 @@ const LIST_HEADER_FIT_SCAN = ({ view, extraRows = [] }) => {
     if (!row || !shown(row)) continue;
     measured++;
     scanText(sel, row);
+    // A wrapped header must reserve its painted control height, not only
+    // stay above the list. Otherwise the next count row can cover a button.
+    if (vocab && row.matches(".vocab-filter-row")) {
+      const rr = row.getBoundingClientRect();
+      for (const child of row.children) {
+        if (!shown(child) || !child.getClientRects().length || /absolute|fixed/.test(getComputedStyle(child).position)) continue;
+        const cr = child.getBoundingClientRect();
+        if (cr.height > 0.5 && (cr.top < rr.top - 0.5 || cr.bottom > rr.bottom + 0.5)) bad.push(`${sel} ${nameOf(child)} paints outside its row height`);
+      }
+      const lookup = row.querySelector("#vocab-lookup-narrow");
+      if (lookup && shown(lookup) && lookup.getClientRects().length) {
+        const lr = lookup.getBoundingClientRect();
+        if (lr.width > 0.5 && lr.height > 0.5) {
+          const hit = document.elementFromPoint(lr.left + lr.width / 2, lr.top + lr.height / 2);
+          if (!hit || !lookup.contains(hit)) bad.push(`${sel} #vocab-lookup-narrow center is covered by ${hit ? nameOf(hit) : "nothing"}`);
+        }
+      }
+    }
     for (const el of [row, ...row.querySelectorAll("*")]) {
       if (skipped(el)) continue;
       const cs = getComputedStyle(el);
@@ -3963,6 +3981,25 @@ async function driveListHeaderFit(page, extBase, theme, check) {
     }
   };
   try {
+    // Full narrow-window layout is a different flex axis from the wide
+    // window's constrained index. Drive the actual German pointer entry.
+    for (const narrowWidth of [320, 360]) {
+      const narrow = await libScratchPage(page, extBase, theme, `g7-narrow-${narrowWidth}`, "vocab", { width: narrowWidth, height });
+      try {
+        await setLibraryLocale(narrow, extBase, "de");
+        await settleAnimations(narrow);
+        const res = await narrow.evaluate(LIST_HEADER_FIT_SCAN, { view: "vocab" });
+        if (res.error) throw new Error(`SETUP ERROR [library|${theme}|listHeaderFit]: ${res.error}`);
+        for (const item of res.bad) bad.push(`vocab de viewport ${narrowWidth}: ${item}`);
+        const door = narrow.locator("#vocab-lookup-narrow");
+        if (!(await door.isVisible())) throw new Error(`SETUP ERROR [library|${theme}|listHeaderFit]: narrow lookup is missing at ${narrowWidth}`);
+        try {
+          await door.click({ timeout: 3000 });
+          if (!(await narrow.locator("#vocab-lookup-input").isVisible())) bad.push(`vocab de viewport ${narrowWidth}: pointer lookup did not reveal its field`);
+          await narrow.locator("#vocab-detail-back").click({ timeout: 3000 });
+        } catch (error) { bad.push(`vocab de viewport ${narrowWidth}: pointer lookup failed (${error.name})`); }
+      } finally { await narrow.close(); }
+    }
     await scratch.evaluate((n) => {
       const langs = ["en", "de", "fr", "es", "it", "ja", "zh", "ru", "pl"];
       const now = Date.now();
@@ -8916,7 +8953,7 @@ async function runSweep(page, sw, extBase) {
       await installDictAssistFixture(page);
       await vocabHead.click();
       await page.locator("#vocab-lookup-go").click();
-      for (const state of ["idle", "busy", "result"]) {
+      for (const state of ["idle", "busy", "result", "copy-failure", "ready", "error"]) {
         if (wants("library", "dict-assist-" + state)) await scan("library", "dict-assist-" + state, () => openDictAssistState(page, state));
       }
     }
@@ -9023,10 +9060,11 @@ async function runSweep(page, sw, extBase) {
             if (name.endsWith("-idle")) {
               await installDictAssistFixture(page, { analyze });
               if (await page.evaluate(openReaderSurface, "explain-pop") !== true || await page.evaluate(openReaderSurface, "explain-dict") !== true) throw new Error("SETUP: dictionary assistance opener failed");
-              await page.selectOption(".xp-dict-lang:not([data-pack-id])", "en");
+              await page.selectOption(".xp-dict-head > .xp-dict-lang", "en");
             }
-            await scan("md-preview", name, () => openDictAssistState(page, name.slice(name.lastIndexOf("-") + 1), { analyze }));
-            if (name.endsWith("-result")) await page.evaluate(closeReaderSurface, "explain-dict");
+            await scan("md-preview", name, () => openDictAssistState(page, name.replace(/^dict-(assist|analyze)-/, ""), { analyze }));
+            const following = READER_SURFACES.slice(READER_SURFACES.indexOf(name) + 1).find(next => wants("md-preview", next));
+            if (!following?.startsWith(analyze ? "dict-analyze-" : "dict-assist-")) await page.evaluate(closeReaderSurface, "explain-dict");
             continue;
           }
           await scan("md-preview", name, async () => {

@@ -3585,6 +3585,10 @@ function _pbpExplainPackContext(cap) {
 
 // ---- Explain: streamed request into the popover body ----
 async function _pbpExplainRun(cap, ctx, pop) {
+  // Dictionary suggestion navigation has its own query identity. Explain and
+  // Translate still act on the original native selection and captured context.
+  const heading = pop.querySelector(".xp-term");
+  if (heading) { heading.textContent = cap.text; heading.title = cap.text; }
   const s = _pbpExplainSettings || await pbpAiGetSettings();
   const body = pop.querySelector(".xp-body");
   // H4 2.2: reset the save button on every run -- hidden + re-enabled +

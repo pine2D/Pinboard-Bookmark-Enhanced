@@ -4517,5 +4517,10 @@
   "dictAssistEvidence": {"message": "元の文から"},
   "dictAssistLookupSuggestion": {"message": "候補を調べる"},
   "dictAssistAnalysisBusy": {"message": "表現を分析中…"},
-  "dictAssistAnalysisFailed": {"message": "この表現を分析できませんでした。もう一度お試しください。"}
+  "dictAssistAnalysisFailed": {"message": "この表現を分析できませんでした。もう一度お試しください。"},
+  "dictQueryFrom": {"message": "元の選択「$TERM$」", "placeholders": {"term": {"content": "$1"}}},
+  "dictQueryBack": {"message": "元の選択に戻る"},
+  "dictAssistResultReady": {"message": "AI の結果を表示できます"},
+  "dictAssistErrorReady": {"message": "AI の処理で問題が発生しました"},
+  "dictAssistViewResult": {"message": "表示"}
 }

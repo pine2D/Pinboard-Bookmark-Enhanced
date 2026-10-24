@@ -2298,7 +2298,7 @@ async function runDictionaryAnalyzeUiTests() {
     nfd.update([]);
     check("source-location checks accept canonical Unicode equivalence without case folding",!host.querySelector('.dict-assist-analyze').disabled);
     const reader={resolve:_pbpDictResolveLang,online:_pbpDictSlotRun,ctx:_pbpDictCtxRun,local:_pbpDictEcdictSide,load:_pbpDictLoadPack,get:pbpVocabGet,owner:_pbpDictOwner,current:_pbpDictCurrent};
-    const pop=document.createElement("div");pop.innerHTML='<div class="xp-body"></div><button class="xp-vocab"></button>';document.body.appendChild(pop);
+    const pop=document.createElement("div");pop.innerHTML='<span class="xp-term">hört</span><div class="xp-body"></div><button class="xp-vocab"></button>';document.body.appendChild(pop);
     const readerCtrl=new AbortController(),queries=[];
     try {
       _pbpDictResolveLang=async()=>"de";_pbpDictLoadPack=async()=>false;_pbpDictEcdictSide=async()=>{};pbpVocabGet=async()=>null;_pbpDictOwner="acct_analyze";
@@ -2310,12 +2310,78 @@ async function runDictionaryAnalyzeUiTests() {
       const selection=pop.querySelector('.xp-dict-online select');selection.value="0";selection.dispatchEvent(new Event("change"));
       pop.querySelector('.dict-assist-analyze').click();await new Promise(r=>setTimeout(r,0));
       check("reader analysis uses the native selection rather than a subsequently chosen dictionary headword",_pbpDictCurrent.term==="aufhören"&&calls.at(-1)?.term==="hört"&&calls.at(-1)?.sentence===sentence);
-      pop.querySelector('.dict-assist-lookup').click();for(let i=0;i<8;i++)await new Promise(r=>setTimeout(r,0));
+      const originalSuggestion=pop.querySelector('.dict-assist-lookup');
+      originalSuggestion.click();for(let i=0;i<8;i++)await new Promise(r=>setTimeout(r,0));
       check("reader confirmation runs a complete lookup with the suggested identity, original sentence and owner",queries.at(-1)?.term==="aufhören"&&queries.at(-1)?.quote===sentence&&_pbpDictCurrent.term==="aufhören"&&_pbpDictCurrent.owner==="acct_analyze");
+      check("a suggested query shows its current headword and the original selection",pop.querySelector('.xp-term').textContent==="aufhören"&&pop.querySelector('.xp-dict-origin-term')?.textContent==="hört");
+      check("a legitimate suggested query has a return path instead of a missing-source warning",!!pop.querySelector('.xp-dict-return')&&!pop.querySelector('.dict-assist-hint').textContent.includes("dictAssistAnalysisNeedsMatch")&&pop.querySelector('.dict-assist-analyze').disabled);
+      const countBeforeReturn=calls.length, oldSuggestion=originalSuggestion;
+      pop.querySelector('.xp-dict-return')?.click();for(let i=0;i<8;i++)await new Promise(r=>setTimeout(r,0));
+      check("returning restores the original selected query and source sentence",queries.at(-1)?.term==="hört"&&queries.at(-1)?.quote===sentence&&pop.querySelector('.xp-term').textContent==="hört");
+      check("returning restores prior analysis without another AI request",pop.querySelectorAll('.dict-assist-suggestion').length===2&&calls.length===countBeforeReturn);
+      const restored=pop.querySelector('.dict-assist-lookup');restored?.click();for(let i=0;i<8;i++)await new Promise(r=>setTimeout(r,0));
+      check("restored advice keeps a working explicit lookup bound to the current session",queries.at(-1)?.term==="aufhören"&&pop.querySelector('.xp-term').textContent==="aufhören");
+      const beforeOld=queries.length;oldSuggestion?.click();await new Promise(r=>setTimeout(r,0));
+      check("a stale detached suggestion cannot navigate the current query",queries.length===beforeOld);
+      pop.querySelector('.xp-dict-return')?.click();for(let i=0;i<8;i++)await new Promise(r=>setTimeout(r,0));
+      const liveChild=_pbpDictChildCtrl,liveNotice=pop.querySelector('.dict-assist-notice');
+      document.dispatchEvent(new CustomEvent("pbp:account-changed",{detail:{account:"analyze"}}));
+      check("a same-owner credential event retains the current query and its ready notification",!liveChild.signal.aborted&&liveNotice?.isConnected);
+      document.dispatchEvent(new CustomEvent("pbp:account-changed",{detail:{account:"other"}}));
+      check("an actual owner change immediately removes old ready notifications",liveChild.signal.aborted&&!liveNotice?.isConnected&&!pop.querySelector('.xp-dict-notice'));
+      let lateAnswer;pbpDictAssistRun=input=>{calls.push(input);return new Promise(resolve=>{lateAnswer=resolve;});};
+      await pbpDictRun({text:"hört"},{sentence},pop,readerCtrl,settings);
+      pop.querySelector('.dict-assist-analyze').click();await new Promise(r=>setTimeout(r,0));
+      const pendingSignal=calls.at(-1)?.signal;
+      document.dispatchEvent(new CustomEvent("pbp:account-changed",{detail:{account:"third"}}));
+      lateAnswer?.(answer);await new Promise(r=>setTimeout(r,0));
+      check("an owner event aborts pending advice and its late completion cannot restore a cue",pendingSignal?.aborted&&!pop.querySelector('.dict-assist-suggestion')&&!pop.querySelector('.xp-dict-notice'));
+
     } finally {readerCtrl.abort();pop.remove();_pbpDictResolveLang=reader.resolve;_pbpDictSlotRun=reader.online;_pbpDictCtxRun=reader.ctx;_pbpDictEcdictSide=reader.local;_pbpDictLoadPack=reader.load;pbpVocabGet=reader.get;_pbpDictOwner=reader.owner;_pbpDictCurrent=reader.current;}
   } finally {
     ctrl.abort();host.remove();pbpDictAssistRun=saved.run;
     for(const [key,value] of [["hasAIKey",saved.key],["ensureAIHostPermissionWithGesture",saved.grant],["pbpVocabCurrentOwner",saved.owner]]){if(value===undefined)delete window[key];else window[key]=value;}
+  }
+}
+
+async function runDictionaryAssistPolishTests() {
+  section("Dictionary AI completion and copy recovery");
+  const saved={run:pbpDictAssistRun,key:window.hasAIKey,grant:window.ensureAIHostPermissionWithGesture,clipboard:Object.getOwnPropertyDescriptor(navigator,"clipboard")};
+  const root=document.createElement("div"),scroll=document.createElement("div"),host=document.createElement("div"),notice=document.createElement("div"),pad=document.createElement("div");
+  root.style.cssText="position:fixed;top:10px;left:10px;z-index:5";
+  scroll.style.cssText="height:120px;overflow:auto;width:320px;scroll-padding-top:20px";pad.style.height="500px";
+  scroll.append(pad,host);root.append(scroll,notice);document.body.appendChild(root);
+  const ctrl=new AbortController(),settings={previewAiEnabled:true,aiProvider:"ollama"};
+  const norm={word:"bank",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/bank",license:"CC BY-SA 4.0",definitionLang:"en",entries:[{ipas:[],forms:[],senses:[{definition:"a financial institution"}]}]};
+  let release,reject,current=true;
+  const settle=()=>new Promise(r=>setTimeout(r,20));
+  try {
+    window.hasAIKey=()=>true;window.ensureAIHostPermissionWithGesture=async()=>{};
+    pbpDictAssistRun=()=>new Promise((yes,no)=>{release=yes;reject=no;});
+    const ui=_pbpDictAssistMount(host,{term:"bank",lang:"en",sentence:"I went to the bank.",owner:"ownerless",signal:ctrl.signal,isCurrent:()=>current,settings,scrollHost:scroll,noticeHost:notice,getSelection:()=>pbpDictNormChoices(norm,"en")[0],onSelect:()=>{}});
+    ui.update([norm]);host.querySelector('.dict-assist-recommend').click();await settle();
+    scroll.scrollTop=0;const before={scroll:scroll.scrollTop,window:window.scrollY,focus:document.activeElement};
+    release({choiceId:null,explanation:"The financial institution.",targetLang:"en"});await settle();
+    check("offscreen AI completion exposes a visible external ready and View action",!!notice.querySelector('.dict-assist-view')&&!notice.querySelector('.dict-assist-notice')?.hidden&&notice.textContent.includes("dictAssistResultReady"));
+    check("AI completion keeps the internal and article scroll and focus unchanged",scroll.scrollTop===before.scroll&&window.scrollY===before.window&&document.activeElement===before.focus);
+    notice.querySelector('.dict-assist-view')?.click();await settle();
+    check("View moves only the internal scroll and focuses the finished result",scroll.scrollTop>before.scroll&&window.scrollY===before.window&&document.activeElement===host.querySelector('.dict-assist-result'));
+    check("the readiness hint clears when its result is visible",!notice.querySelector('.dict-assist-notice')||notice.querySelector('.dict-assist-notice').hidden);
+    Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText:async()=>{throw new DOMException("fixture denied","NotAllowedError");}}});
+    host.querySelector('.dict-assist-copy').click();await settle();
+    check("copy denial keeps a short action and puts recovery guidance in a separate status",host.querySelector('.dict-assist-copy').textContent==="dictAssistCopy"&&host.querySelector('.dict-assist-copy-status')?.textContent==="dictAssistCopyFailed"&&host.querySelector('.dict-assist-copy-status')?.getAttribute("role")==="status");
+    Object.defineProperty(navigator,"clipboard",{configurable:true,value:{writeText:async()=>{}}});host.querySelector('.dict-assist-copy').click();await settle();
+    check("a successful copy retry removes the obsolete failure explanation",host.querySelector('.dict-assist-copy').textContent==="dictAssistCopied"&&!host.querySelector('.dict-assist-copy-status')?.textContent);
+    host.querySelector('.dict-assist-explain').click();await settle();scroll.scrollTop=0;
+    reject(Object.assign(new Error("fixture failure"),{code:"invalid_response"}));await settle();
+    check("an offscreen AI error has its own visible attention and View cue",notice.textContent.includes("dictAssistErrorReady")&&!notice.querySelector('.dict-assist-notice')?.hidden&&scroll.scrollTop===0);
+    host.querySelector('.dict-assist-explain').click();await settle();host.querySelector('.dict-assist-stop').click();release({choiceId:null,explanation:"late",targetLang:"en"});await settle();
+    check("Stop removes the ready cue and a late result cannot restore it",!host.textContent.includes("late")&&(!notice.querySelector('.dict-assist-notice')||notice.querySelector('.dict-assist-notice').hidden));
+    ctrl.abort();check("closing a lookup removes its external notification nodes",notice.childElementCount===0);
+  } finally {
+    ctrl.abort();root.remove();pbpDictAssistRun=saved.run;
+    for(const [key,value] of [["hasAIKey",saved.key],["ensureAIHostPermissionWithGesture",saved.grant]]){if(value===undefined)delete window[key];else window[key]=value;}
+    if(saved.clipboard)Object.defineProperty(navigator,"clipboard",saved.clipboard);else delete navigator.clipboard;
   }
 }
 
@@ -2335,6 +2401,7 @@ async function runDictionaryAnalyzeUiTests() {
   await runMultiPackIntegrationTests();
   await runDictionaryAssistUiTests();
   await runDictionaryAnalyzeUiTests();
+  await runDictionaryAssistPolishTests();
   document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 })();
 </script>

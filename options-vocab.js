@@ -1231,6 +1231,22 @@ let _pbpMultiPackSeq = 0;
 let _pbpMultiPackRenderSeq = 0;
 let _pbpMultiPackBusy = false;
 let _pbpMultiPackController = null;
+let _pbpMultiPackFocus = null;
+
+function _pbpMultiPackFocusAt(node) {
+  return $id("multi-pack-list")?.contains(node) && node?.matches("button[data-pack-id][data-pack-action]")
+    ? { id:node.dataset.packId, action:node.dataset.packAction } : null;
+}
+function _pbpMultiPackRestoreFocus(closingControl = null) {
+  if (_pbpMultiPackBusy || !_pbpMultiPackFocus) return;
+  const wanted=_pbpMultiPackFocus;
+  _pbpMultiPackFocus=null;
+  const current=document.activeElement, same=_pbpMultiPackFocusAt(current);
+  if (current!==document.body && current!==closingControl && (!same || same.id!==wanted.id || same.action!==wanted.action)) return;
+  const target=Array.from($id("multi-pack-list")?.querySelectorAll("button") || [])
+    .find(button=>button.dataset.packId===wanted.id && button.dataset.packAction===wanted.action);
+  (target || $id("multi-pack-choose"))?.focus({preventScroll:true});
+}
 
 function _pbpMultiPackError(error) {
   if (error?.name === "AbortError") return "multiPackCancelled";
@@ -1247,11 +1263,14 @@ function _pbpMultiPackStatus(key, tone = "pending", ...args) {
   _pbpPackSetStatus($id("multi-pack-status"), t(key, ...args), tone);
 }
 function _pbpMultiPackLock(busy) {
+  // Disabling a focused button blurs it before any IDB/notification awaits.
+  if (busy) _pbpMultiPackFocus=_pbpMultiPackFocusAt(document.activeElement) || _pbpMultiPackFocus;
   _pbpMultiPackBusy = busy;
   for (const id of ["multi-pack-choose", "multi-pack-install", "multi-pack-source-language", "multi-pack-target-language", "multi-pack-source-url", "multi-pack-license"]) {
     const el = $id(id); if (el) el.disabled = busy;
   }
   for (const button of $id("multi-pack-list")?.querySelectorAll("button") || []) button.disabled = busy;
+  if (!busy) _pbpMultiPackRestoreFocus();
 }
 function _pbpMultiPackLanguage(code) {
   try { return new Intl.DisplayNames([uiLangToBCP47()], {type:"language"}).of(code) || code; }
@@ -1299,9 +1318,11 @@ async function _pbpMultiPackRefresh() {
         button.textContent=t(key); button.dataset.packId=pack.id; button.dataset.packAction=action; button.disabled=_pbpMultiPackBusy;
         button.addEventListener("click", () => {
           if (_pbpMultiPackBusy) return;
-          const run=async () => {
+          const run=async (confirmed=false) => {
             if (_pbpMultiPackBusy) return;
-            const restore=document.activeElement===button;
+            // The confirmer may have lost its original opener to a background
+            // render. Its explicit Yes still belongs to this pack/action.
+            if (confirmed) _pbpMultiPackFocus={id:pack.id,action};
             _pbpMultiPackLock(true);
             $id("multi-pack-status").textContent="";
             try {
@@ -1314,25 +1335,47 @@ async function _pbpMultiPackRefresh() {
               _pbpMultiPackStatus("multiPackActionFailed", "bad");
             } finally {
               _pbpMultiPackLock(false);
-              if (restore) {
-                const target=Array.from(list.querySelectorAll("button")).find(b=>b.dataset.packId===pack.id && b.dataset.packAction===action);
-                (target || $id("multi-pack-choose"))?.focus({preventScroll:true});
-              }
             }
           };
           if (action==="delete" || (action==="ai" && !pack.aiAllowed)) {
-            showConfirmPopover(button, {msg:t(action==="delete" ? "dictPackDeleteConfirm":"multiPackAiConfirm"), yesText:t(key), noText:t("cancel"), onConfirm:run});
+            let outsidePointer=false, confirmation=null;
+            const pointer=event=>{
+              if (!button.contains(event.target) && !event.target.closest?.(".confirm-popover")) outsidePointer=true;
+            };
+            const cleanup=()=>document.removeEventListener("pointerdown",pointer,true);
+            document.addEventListener("pointerdown",pointer,true);
+            const shown=showConfirmPopover(button, {msg:t(action==="delete" ? "dictPackDeleteConfirm":"multiPackAiConfirm"), yesText:t(key), noText:t("cancel"),
+              onDismiss:cleanup, onConfirm:()=>{cleanup();return run(true);}, onCancel:()=>{
+                cleanup();
+                // Tab's focusout runs before its destination receives focus.
+                // Only explicit cancellation may rescue a replaced opener;
+                // outside clicks and the eventual outside focus win instead.
+                queueMicrotask(()=>{
+                  const current=document.activeElement;
+                  const leaving=confirmation?.inert && confirmation.contains(current);
+                  if (outsidePointer || _pbpMultiPackBusy || (current!==document.body && !leaving)) return;
+                  _pbpMultiPackFocus={id:pack.id,action}; _pbpMultiPackRestoreFocus(leaving ? current : null);
+                });
+              }});
+            confirmation=document.activeElement?.closest(".confirm-popover") || null;
+            if (shown===false) cleanup();
           } else run();
         });
         actions.appendChild(button);
       }
       row.appendChild(actions); frag.appendChild(row);
     }
+    // Only the winning render captures focus. Every notification can replace
+    // these nodes, including one that finishes after the action's own refresh.
+    _pbpMultiPackFocus=_pbpMultiPackFocusAt(document.activeElement) || _pbpMultiPackFocus;
     list.replaceChildren(frag);
+    _pbpMultiPackRestoreFocus();
     const summary=$id("multi-pack-summary"); if(summary)summary.textContent=t("multiPackCount",_pbpVocabNum(packs.length));
   } catch (e) {
     if (seq !== _pbpMultiPackRenderSeq) return;
+    _pbpMultiPackFocus=_pbpMultiPackFocusAt(document.activeElement) || _pbpMultiPackFocus;
     list.replaceChildren();
+    _pbpMultiPackRestoreFocus();
     console.warn("[dict-pack] package list failed:", e?.name, e?.message);
     _pbpMultiPackStatus("multiPackReadFailed", "bad");
   }
@@ -1418,6 +1461,14 @@ function _pbpMultiPackWire() {
   }
   window.addEventListener("pbp-dict-packs-changed", _pbpMultiPackRefresh);
   window.addEventListener("focus", _pbpMultiPackRefresh);
+  document.addEventListener("focusin", event=>{
+    const next=_pbpMultiPackFocusAt(event.target);
+    if (!next || next.id!==_pbpMultiPackFocus?.id || next.action!==_pbpMultiPackFocus?.action) _pbpMultiPackFocus=null;
+  });
+  document.addEventListener("pointerdown", event=>{
+    const next=_pbpMultiPackFocusAt(event.target.closest?.("button"));
+    if (!next || next.id!==_pbpMultiPackFocus?.id || next.action!==_pbpMultiPackFocus?.action) _pbpMultiPackFocus=null;
+  });
   try {
     const channel=new BroadcastChannel("pbp-dict-packs");
     channel.onmessage=_pbpMultiPackRefresh;

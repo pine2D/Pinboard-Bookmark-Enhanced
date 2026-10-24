@@ -2088,7 +2088,8 @@ html.motion-ready .vocab-note-save {
 /* Connect (manual path only): an sm button in md-dict's own class, painted
    with the .btn fill (Soft Fill: filled at rest, never a white outlined box --
    it used the code-block fill until critique round 3, 2026-10-20). */
-#vocab-ref-result .xp-dict-connect {
+#vocab-ref-result .xp-dict-connect,
+#vocab-dict-notice .xp-dict-connect {
   height: calc(var(--lib-control-h) - 4px);
   margin-top: var(--lib-sp-2);
   padding: 0 var(--lib-control-pad-x-sm);
@@ -2101,9 +2102,12 @@ html.motion-ready .vocab-note-save {
   cursor: pointer;
   white-space: nowrap;
 }
-#vocab-ref-result .xp-dict-connect:hover:not(:disabled) { background: var(--lib-btn-hover); }
-#vocab-ref-result .xp-dict-connect:focus-visible { outline: none; border-color: var(--lib-focus-bd); box-shadow: var(--lib-focus-ring); }
-#vocab-ref-result .xp-dict-connect:disabled { opacity: 0.6; cursor: default; }
+#vocab-ref-result .xp-dict-connect:hover:not(:disabled),
+#vocab-dict-notice .xp-dict-connect:hover:not(:disabled) { background: var(--lib-btn-hover); }
+#vocab-ref-result .xp-dict-connect:focus-visible,
+#vocab-dict-notice .xp-dict-connect:focus-visible { outline: none; border-color: var(--lib-focus-bd); box-shadow: var(--lib-focus-ring); }
+#vocab-ref-result .xp-dict-connect:disabled,
+#vocab-dict-notice .xp-dict-connect:disabled { opacity: 0.6; cursor: default; }
 #vocab-ref-result .xp-dict-assist { margin-top: var(--lib-sp-4); min-width: 0; overflow-wrap: anywhere; }
 #vocab-ref-result .xp-dict-assist:not([hidden]),
 #vocab-ref-result .dict-assist-result:not(:empty) { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--lib-sp-2); }
@@ -2124,6 +2128,21 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-assist .xp-dict-src,
 #vocab-ref-result .xp-dict-assist .xp-dict-ailabel { margin-top: 0; }
 #vocab-ref-result .xp-dict-assist .xp-dict-ailabel { font-size: var(--lib-text-secondary); color: var(--lib-fg-muted); }
+/* Out-of-view results get an actionable cue without moving the sheet.
+   A zero-height sticky host preserves the scroll geometry on completion. */
+.vocab-dict-notice { position: sticky; top: 100%; height: 0; min-width: 0; z-index: var(--lib-z-sticky); }
+#vocab-dict-notice .dict-assist-notice:not([hidden]) {
+  position: absolute; bottom: 0; left: 0;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--lib-sp-2);
+  width: fit-content; max-width: 100%; box-sizing: border-box;
+  padding: var(--lib-sp-1) var(--lib-sp-2);
+  background: var(--lib-bg);
+  font-size: var(--lib-text-secondary); line-height: var(--lib-lh-meta);
+}
+#vocab-dict-notice .dict-assist-notice[hidden] { display: none; }
+#vocab-dict-notice .dict-assist-notice-text { flex: 1 1 100px; min-width: 0; overflow-wrap: anywhere; }
+#vocab-dict-notice .xp-dict-connect { flex: none; margin: 0; }
+#vocab-ref-result .dict-assist-copy-status { margin: 0; white-space: normal; overflow-wrap: anywhere; color: var(--lib-danger); }
 /* md-dict's own Retry after a load failure: this page already has "Look up
    again" under the source line (.vocab-ref-foot), which re-runs the same
    query -- two buttons for one action, side by side (critique round 3).
@@ -2194,6 +2213,9 @@ html.motion-ready .vocab-note-save {
    control on it is already a md rung (32 / 28). */
 .vocab-filter-row {
   display: flex;
+  /* Preserve the full wrapped height in the list pane's flex column, so
+     the count row cannot cover the narrow-screen lookup button. */
+  flex-shrink: 0;
   align-items: center;
   flex-wrap: nowrap;
   gap: var(--lib-sp-2);
@@ -3050,7 +3072,7 @@ body { display: flex; flex-direction: column; }
   html, body, .lib-main, .lib-view:not([hidden]), .vocab-workbench, .notes-workbench { height: auto; display: block; }
   .vocab-list-region, .notes-list-region { overflow: visible; }
   .lib-header, .vocab-list-pane, .notes-list-pane, #vocab-lookup-bar, .vocab-detail-back, .notes-detail-back,
-  #vocab-detail-pane .btn, #notes-detail-pane .btn,
+  #vocab-detail-pane .btn, #notes-detail-pane .btn, .vocab-dict-notice,
   #vocab-ref-result .vocab-ref-foot, #vocab-ref-result .vocab-ref-idle, .vocab-edit-groups, .vocab-group-editor,
   .vocab-detail-status, .vocab-detail-speak, #vocab-detail-tail { display: none; }
   #vocab-detail-pane, #notes-detail-pane { display: block; overflow: visible; margin: 0; padding: 0; }

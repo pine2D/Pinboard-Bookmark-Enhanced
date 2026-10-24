@@ -4517,5 +4517,10 @@
   "dictAssistEvidence": {"message": "Из предложения"},
   "dictAssistLookupSuggestion": {"message": "Найти в словаре"},
   "dictAssistAnalysisBusy": {"message": "Анализ выражения…"},
-  "dictAssistAnalysisFailed": {"message": "Не удалось разобрать это выражение. Попробуйте ещё раз."}
+  "dictAssistAnalysisFailed": {"message": "Не удалось разобрать это выражение. Попробуйте ещё раз."},
+  "dictQueryFrom": {"message": "Из «$TERM$»", "placeholders": {"term": {"content": "$1"}}},
+  "dictQueryBack": {"message": "Вернуться к исходному"},
+  "dictAssistResultReady": {"message": "Результат ИИ готов"},
+  "dictAssistErrorReady": {"message": "Проблема с запросом к ИИ"},
+  "dictAssistViewResult": {"message": "Показать"}
 }

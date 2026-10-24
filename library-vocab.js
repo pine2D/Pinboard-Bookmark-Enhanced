@@ -1261,7 +1261,7 @@ async function _pbpVocabSaveLookup(state) {
 // `online: false` runs the local ECDICT block alone (open-to-look-up, T7).
 // #vocab-ref-result is aria-busy while the live run fills it; only the run
 // still live when its legs settle takes the flag down.
-function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, packResult } = {}) {
+function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, packResult, derived = false } = {}) {
   const { localEl, onlineEl } = els;
   if (_pbpVocabDictChildCtrl) _pbpVocabDictChildCtrl.abort();
   if (_pbpVocabDictChildCleanup) { _pbpVocabDictChildCleanup(); _pbpVocabDictChildCleanup = null; }
@@ -1284,7 +1284,7 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
   const signal = child.signal;
 
   const intent = ++_vocabLookupIntent;
-  const cur = { term, lang, sentence };
+  const cur = { term, lang, sentence, derived };
   cur.rerun = () => { if (_pbpDictCurrent === cur) rerun(); };
   // Form-of pointer jump (md-dict's .xp-dict-lemma-link): its click handler
   // only fires when the LIVE run carries a rerunWith, so without this the
@@ -1297,7 +1297,7 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
   cur.rerunWith = (base) => {
     const next = pbpDictNormalizeTerm(base);
     if (!next || _pbpDictCurrent !== cur || !cur.isCurrent?.()) return;
-    _pbpVocabLookupOther(next, lang, sentence);
+    _pbpVocabLookupOther(next, lang, sentence, { derived: true });
   };
   _pbpDictCurrent = cur;
   const host = $id("vocab-ref-result");
@@ -1308,9 +1308,10 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
   cur.isCurrent = state.live;
   host?.querySelector(".xp-dict-assist")?.remove();
   state.assist = _pbpDictAssistMount(host, { term, lang, sentence, owner: state.owner, signal,
+    derived, noticeHost: $id("vocab-dict-notice"), scrollHost: $id("vocab-detail-pane"),
     isCurrent: state.live, settings: pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS),
     getSelection: () => state.choices.get(state.select?.value) || null,
-    onLookup: headword => { if (state.live()) _pbpVocabLookupOther(headword, lang, sentence); },
+    onLookup: headword => { if (state.live()) _pbpVocabLookupOther(headword, lang, sentence, { derived: true }); },
     onSelect: choice => {
       for (const [key, row] of state.choices) if (row.term === choice.term && row.gloss === choice.gloss &&
         row.packId === choice.packId && row.sourceLabel === choice.sourceLabel) {
@@ -1578,7 +1579,7 @@ function _pbpVocabRefSlot() {
     if (host && host.dataset.refState === "other") {
       const cur = _pbpDictCurrent;
       if (!cur?.isCurrent?.()) return;
-      _pbpVocabLookupOther(host.dataset.refTerm || "", host.dataset.refLang || _vocabLookupLang, cur.sentence);
+      _pbpVocabLookupOther(host.dataset.refTerm || "", host.dataset.refLang || _vocabLookupLang, cur.sentence, { derived: cur.derived });
     } else {
       const w = _vocabRows.find((row) => row.id === _pbpVocabDetailWordId);
       if (!w) return;
@@ -1717,7 +1718,7 @@ function _pbpVocabRevealSavedWord(id) {
 // column, the open word and the current row stay. Its own head names the word
 // (with Pronounce, kept from the old free-lookup view) and, when that word is
 // saved, the "In your vocabulary · view" door.
-function _pbpVocabLookupOther(term, lang, sentence = "") {
+function _pbpVocabLookupOther(term, lang, sentence = "", { derived = false } = {}) {
   const host = $id("vocab-ref-result");
   if (!host || !term) return;
   _pbpVocabRelookedWordId = null;
@@ -1757,7 +1758,7 @@ function _pbpVocabLookupOther(term, lang, sentence = "") {
   host.prepend(head);
   // `lang`, not the list box: md-dict's rerun fires long after submit, and by
   // then the list box may name the language picked for the NEXT lookup.
-  const run = () => _pbpVocabDictRun(term, lang, els, sentence, run);
+  const run = () => _pbpVocabDictRun(term, lang, els, sentence, run, { derived });
   run();
 }
 
@@ -1787,8 +1788,8 @@ function _pbpVocabLookupLangChanged() {
   if (!sel) return;
   if (host && host.dataset.refState === "other") {
     _vocabLookupLang = sel.value;
-    const sentence = _pbpDictCurrent?.isCurrent?.() ? _pbpDictCurrent.sentence : "";
-    _pbpVocabLookupOther(host.dataset.refTerm || "", sel.value, sentence);
+    const cur = _pbpDictCurrent?.isCurrent?.() ? _pbpDictCurrent : null;
+    _pbpVocabLookupOther(host.dataset.refTerm || "", sel.value, cur?.sentence || "", { derived: cur?.derived });
     return;
   }
   const w = _pbpVocabDetailWordId ? _vocabRows.find((row) => row.id === _pbpVocabDetailWordId) : null;
