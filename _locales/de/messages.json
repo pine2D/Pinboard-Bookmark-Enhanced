@@ -4432,5 +4432,12 @@
   "mdExportSummaryWithAsk": {"message": "$SCOPE$ + Fragen und Antworten ($COUNT$)", "placeholders": {"scope": {"content": "$1"}, "count": {"content": "$2"}}},
   "mdExportAskEmpty": {"message": "Keine abgeschlossenen Fragen und Antworten zum Exportieren vorhanden."},
   "mdExportContextChanged": {"message": "Das Konto, der Artikel oder das Gespräch hat sich geändert. Starte den Export erneut."},
-  "themeGroupAdaptiveHint": {"message": "Adaptive Presets folgen der Hell-/Dunkeleinstellung oben unter „Darstellung der Erweiterung“."}
+  "themeGroupAdaptiveHint": {"message": "Adaptive Presets folgen der Hell-/Dunkeleinstellung oben unter „Darstellung der Erweiterung“."},
+  "dictDefinitionLangLabel": { "message": "Sprache der KI-Erklärungen" },
+  "dictDefinitionLangHint": { "message": "Legt die Sprache der kontextbezogenen KI-Erklärungen fest. Wörterbucheinträge bleiben in ihrer ursprünglichen Sprache." },
+  "dictDefinitionLangUi": { "message": "Sprache der Oberfläche verwenden" },
+  "vocabLanguageFilterAria": { "message": "Nach Sprache filtern" },
+  "vocabAllLanguages": { "message": "Alle Sprachen" },
+  "vocabUnknownLanguage": { "message": "Sprache nicht erkannt" },
+  "vocabFiltersAria": { "message": "Nach Sprache und Gruppe filtern" }
 }

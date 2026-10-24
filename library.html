@@ -97,19 +97,20 @@
            button. Wide form (the pane's data-header-fit="wide": the row's
            content -- measured with the group listbox at its 120px floor --
            fits the index on one line, above the 860px single-pane break): the
-           group filter, a float listbox (listbox.js renders
-           #vocab-group-filter as the #vocab-group-filter-btn value box; the
-           select stays the hidden value carrier), sits inline inside
-           .vocab-filter-set. Narrow form: the SAME node folds into that
+           language and group filters use float listboxes (listbox.js keeps
+           the selects as hidden value carriers) inline inside
+           .vocab-filter-set. Narrow form: the SAME nodes fold into that
            element's popover, opened by #vocab-filter-narrow, whose label is
-           the group in force -- one DOM, never a copy; the listbox's own
+           the language and group in force -- one DOM, never a copy; each listbox's own
            panel then opens as a second top-layer popover above it. library.js
            decides the form (pbpLibWireVocabHeaderFit; undecided -- no
            attribute, neither form shown -- until its first measurement) and
            wires the popover (pbpLibWireFilterPopover). -->
       <div class="vocab-filter-row">
-        <button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="vocab-filter-set" aria-expanded="false" data-i18n-title="vocabGroupFilterAria" title="Filter by group"><span class="btn-ic" data-ic="chevronDown"></span><span data-i18n="vocabAllGroups">All groups</span></button>
+        <button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="vocab-filter-set" aria-expanded="false" data-i18n-title="vocabFiltersAria" data-i18n-aria="vocabFiltersAria" aria-label="Filter by language and group" title="Filter by language and group"><span class="btn-ic" data-ic="chevronDown"></span><span data-i18n="vocabAllGroups">All groups</span></button>
         <div class="vocab-filter-set" id="vocab-filter-set" popover="auto">
+          <label class="sr-only" for="vocab-language-filter" data-i18n="vocabLanguageFilterAria" hidden>Filter by language</label>
+          <select id="vocab-language-filter" data-listbox="float" data-i18n-aria="vocabLanguageFilterAria" aria-label="Filter by language" hidden><option value="" data-i18n="vocabAllLanguages">All languages</option></select>
           <label class="sr-only" for="vocab-group-filter" data-i18n="vocabGroupFilterAria">Filter by group</label>
           <select id="vocab-group-filter" data-listbox="float" data-i18n-aria="vocabGroupFilterAria" aria-label="Filter by group"><option value="" data-i18n="vocabAllGroups">All groups</option></select>
         </div>

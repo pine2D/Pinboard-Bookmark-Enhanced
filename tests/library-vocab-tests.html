@@ -41,6 +41,8 @@ body.test-scroll-region .vocab-list-region{max-height:60px;overflow-y:auto}
       <div class="vocab-filter-row">
         <button type="button" class="btn ghost" id="vocab-filter-narrow" popovertarget="vocab-filter-set" aria-expanded="false"><span class="btn-ic" data-ic="chevronDown"></span><span>Filter</span></button>
         <div class="vocab-filter-set" id="vocab-filter-set" popover="auto">
+          <label class="sr-only" for="vocab-language-filter" hidden>Filter by language</label>
+          <select id="vocab-language-filter" data-listbox="float" aria-label="Filter by language" hidden><option value="">All languages</option></select>
           <select id="vocab-group-filter" data-listbox="float" aria-label="Filter by group"><option value="">All groups</option></select>
           <select id="vocab-status-filter" aria-label="Filter by status" hidden>
             <option value="">All statuses</option>
@@ -3873,6 +3875,128 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
     $id('vocab-clear-filters').click();
     check('clear vocabulary resets search, group and status together',!$id('vocab-search').value&&!$id('vocab-group-filter').value&&!$id('vocab-status-filter').value);
     check('clear vocabulary restores current-owner words',_vocabViewRows.length===_vocabRows.length&&_vocabRows.length>0);
+  }
+  // Language filters: run actual list/owner pipelines with only storage mocked.
+  {
+  const languageIds = rows => rows.map(row => row.id).sort().join(",");
+const rows = [
+  {id:"en1",language:"en-US",term:"gift",groups:["Basics"],gloss:"present",status:"new"},
+  {id:"en2",language:"EN_gb",term:"give",groups:["Basics"],gloss:"offer",status:"known"},
+  {id:"de1",language:"de",term:"Gift",groups:["Basics"],gloss:"poison",status:"new"},
+  {id:"de2",language:"de",term:"geben",groups:["Verbs"],gloss:"offer",status:"known"},
+  {id:"zh1",language:"zh-Hans",term:"呼吸",groups:[],gloss:"breathe",status:"new"},
+  {id:"u1",term:"unclassified",groups:[],status:"new"},
+];
+check("A primary language filter groups regional English records", languageIds(pbpVocabFilterSort(rows,"","","latest","","en")) === "en1,en2");
+check("A primary language filter accepts a regional filter value", languageIds(pbpVocabFilterSort(rows,"","","latest","","EN_us")) === "en1,en2");
+check("A language filter intersects search and groups", languageIds(pbpVocabFilterSort(rows,"offer","Verbs","latest","known","en")) === "");
+check("A unknown language is a selectable category", languageIds(pbpVocabFilterSort(rows,"","","latest","","und")) === "u1");
+check("A all languages keeps every source record", pbpVocabFilterSort(rows,"","","latest","","").length === rows.length);
+
+await (async () => {
+  const originalOwner = pbpVocabCurrentOwner, originalAll = pbpVocabAll;
+  const originalLang = window.uiLangToBCP47;
+  let owner = "acct_language_a", store = rows, locale = "en";
+  const sel = $id("vocab-language-filter");
+  const optionValues = () => [...sel.options].map(o => o.value).sort().join(",");
+  const filterVisible = () => {
+    const box = sel.nextElementSibling?.classList.contains("listbox") ? sel.nextElementSibling : sel;
+    return getComputedStyle(box).display !== "none";
+  };
+  // Independently exercise change/clear paths even if option population fails.
+  // Seeding one option does not satisfy the population assertions above it.
+  const choose = value => {
+    if (![...sel.options].some(o => o.value === value)) sel.add(new Option(value, value));
+    sel.value = value; sel.dispatchEvent(new Event("change"));
+  };
+  try {
+    window.uiLangToBCP47 = () => locale;
+    pbpVocabCurrentOwner = async () => owner;
+    pbpVocabAll = async () => store.map(r => ({...r, owner}));
+    await renderVocabPanel();
+    check("A language options derive from all rows and collapse regional codes", optionValues() === ",de,en,und,zh", optionValues());
+    check("A multiple languages expose the language picker", filterVisible());
+    choose("de");
+    check("A picker change filters actual view rows", languageIds(_vocabViewRows) === "de1,de2", languageIds(_vocabViewRows));
+    check("A result count uses filtered rows and all saved rows", $id("vocab-count").querySelector(".lib-count-full")?.textContent.startsWith("vocabResultCount:vocabResultFound:2,vocabResultSaved:6"));
+    $id("vocab-group-filter").value = "Basics";
+    $id("vocab-group-filter").dispatchEvent(new Event("change"));
+    check("A narrow filter label includes selected language and group", $id("vocab-filter-narrow").lastElementChild.textContent.includes(sel.selectedOptions[0].textContent) && $id("vocab-filter-narrow").lastElementChild.textContent.includes("Basics"));
+    check("A language options survive other filters", optionValues() === ",de,en,und,zh", optionValues());
+    $id("vocab-group-filter").value = "";
+    $id("vocab-group-filter").dispatchEvent(new Event("change"));
+    _vocabSelected = new Set(["de1"]);
+    choose("en");
+    check("A language changes clear old selections", _vocabSelected.size === 0);
+    await _pbpVocabReloadAfterMutation(owner, ++_vocabRenderGen, false);
+    check("A same-owner reload preserves the selected language", sel.value === "en" && languageIds(_vocabViewRows) === "en1,en2");
+    await renderVocabPanel();
+    check("A re-entering the same owner's vocabulary preserves the language filter", sel.value === "en" && languageIds(_vocabViewRows) === "en1,en2");
+    locale = "fr";
+    const beforeLanguageT = t;
+    try {
+      t = (key, ...values) => key === "vocabAllGroups" ? "Tous les groupes" : beforeLanguageT(key, ...values);
+      $id("vocab-group-filter").value = "Basics";
+      document.dispatchEvent(new Event("pbp:i18n-applied"));
+      check("A locale switches refresh the neighboring group label without dropping its selection",
+        $id("vocab-group-filter").options[0].textContent === "Tous les groupes" && $id("vocab-group-filter").value === "Basics");
+    } finally {
+      t = beforeLanguageT;
+      $id("vocab-group-filter").value = "";
+    }
+    check("A locale switches refresh language labels without changing filter", sel.value === "en" && sel.selectedOptions[0]?.textContent === pbpDictLanguageLabel("en", "fr"));
+    choose("de");
+    store = rows.filter(r => r.id.startsWith("en"));
+    await _pbpVocabReloadAfterMutation(owner, ++_vocabRenderGen, false);
+    check("A removed selected language stays visible and clearable", sel.value === "de" && filterVisible() && [...sel.options].some(o => o.value === "de"));
+    check("A removed selected language produces an honest empty result", _vocabViewRows.length === 0 && !$id("vocab-no-results").hidden);
+    $id("vocab-clear-filters").click();
+    check("A clear filters clears language and restores owner rows", sel.value === "" && languageIds(_vocabViewRows) === "en1,en2");
+    check("A one primary language hides an unselected picker", !filterVisible());
+    choose("de");
+    const filterSet = $id("vocab-filter-set");
+    const filterSetWasOpen = filterSet.matches(":popover-open");
+    if (!filterSetWasOpen) filterSet.showPopover();
+    sel.focus();
+    choose("");
+    check("A clearing the last language filter hands focus to the group picker", !filterVisible() && document.activeElement === $id("vocab-group-filter"), document.activeElement?.id);
+    if (!filterSetWasOpen) filterSet.hidePopover();
+    store = [...Array.from({length:140}, (_,i) => ({id:"bulk-en" + i,term:"word" + i,language:"en",groups:[]})), {id:"bulk-de",term:"Wort",language:"de",groups:[]}];
+    await _pbpVocabReloadAfterMutation(owner, ++_vocabRenderGen, false);
+    choose("en");
+    $id("vocab-select-all").click();
+    check("A select all covers filtered matches beyond the render cap only", _vocabSelected.size === 140 && !_vocabSelected.has("bulk-de") && $id("vocab-list").children.length === 100);
+    choose("de");
+    owner = "acct_language_b";
+    store = [{id:"b-ja",term:"語",language:"ja",groups:[]}];
+    await renderVocabPanel();
+    check("A owner switch clears language and previous option names", sel.value === "" && optionValues() === ",ja" && languageIds(_vocabViewRows) === "b-ja");
+    let releaseOld, announceRead;
+    const oldRead = new Promise(resolve => {announceRead = resolve;});
+    pbpVocabAll = async requested => {
+      if (requested === "acct_language_b") { announceRead(); return new Promise(resolve => {releaseOld = resolve;}); }
+      return [{id:"c-es",term:"palabra",language:"es",groups:[],owner:requested}];
+    };
+    const pending = _pbpVocabReloadAfterMutation(owner, ++_vocabRenderGen, false);
+    await oldRead;
+    owner = "acct_language_c";
+    await renderVocabPanel();
+    releaseOld([{id:"b-late",term:"spät",language:"de",groups:[],owner:"acct_language_b"}]);
+    await pending;
+    check("A late previous-owner read cannot restore old filter options", sel.value === "" && optionValues() === ",es" && languageIds(_vocabViewRows) === "c-es", optionValues());
+    owner = "ownerless";
+    await renderVocabPanel();
+    check("A sign-out removes previous language choices and hides the picker", sel.value === "" && optionValues() === "" && !filterVisible());
+  } catch (error) {
+    check("A fixture completes without a runtime exception", false, error.stack);
+  } finally {
+    pbpVocabCurrentOwner = originalOwner; pbpVocabAll = originalAll;
+    if (originalLang === undefined) delete window.uiLangToBCP47; else window.uiLangToBCP47 = originalLang;
+    _pbpVocabRenderDetail(null);
+    _pbpVocabClearFilters();
+  }
+})();
+
   }
   document.title = fail ? "FAIL library-vocab Tests" : "PASS library-vocab Tests";
 })();

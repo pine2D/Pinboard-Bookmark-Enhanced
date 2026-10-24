@@ -4432,5 +4432,12 @@
   "mdExportSummaryWithAsk": {"message": "$SCOPE$ + 問答（$COUNT$）", "placeholders": {"scope": {"content": "$1"}, "count": {"content": "$2"}}},
   "mdExportAskEmpty": {"message": "沒有可匯出的完整問答。"},
   "mdExportContextChanged": {"message": "帳號、文章或問答紀錄已變更，請重新開始匯出。"},
-  "themeGroupAdaptiveHint": {"message": "自適應預設會依照上方「擴充功能外觀」的明暗設定切換。"}
+  "themeGroupAdaptiveHint": {"message": "自適應預設會依照上方「擴充功能外觀」的明暗設定切換。"},
+  "dictDefinitionLangLabel": { "message": "AI 釋義語言" },
+  "dictDefinitionLangHint": { "message": "設定 AI 語境釋義使用的語言。詞典條目保留原有語言。" },
+  "dictDefinitionLangUi": { "message": "跟隨介面語言" },
+  "vocabLanguageFilterAria": { "message": "依語言篩選" },
+  "vocabAllLanguages": { "message": "所有語言" },
+  "vocabUnknownLanguage": { "message": "未辨識語言" },
+  "vocabFiltersAria": { "message": "依語言與分組篩選" }
 }

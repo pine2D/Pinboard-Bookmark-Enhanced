@@ -1802,6 +1802,82 @@ async function runDictReviewRegressionTests() {
   }
 }
 
+async function runDictDefinitionLanguageTests() {
+  section("dictionary definition language is independent of UI and lookup language");
+  const names = ["pbpAiAvailable", "pbpAiCacheGet", "pbpAiCacheSet", "pbpExplainLangName", "uiLangToBCP47",
+    "pbpAiEffectiveModel", "pbpAiResolveModelOverride", "pbpAiBumpCounter", "callAIStream", "renderMarkdown"];
+  const saved = new Map(names.map((name) => [name, window[name]]));
+  const oldTitle = document.getElementById("preview-title"); oldTitle?.remove();
+  const title = document.createElement("h1"); title.id = "preview-title"; title.textContent = "German vocabulary";
+  document.body.appendChild(title);
+  const el = document.createElement("div"), cache = new Map(), requests = [];
+  let uiLanguage = "en", streamLanguage = "", duringStream = null;
+  Object.assign(window, {
+    pbpAiAvailable: () => true,
+    pbpAiCacheGet: async (key) => cache.has(key) ? { result: cache.get(key) } : null,
+    pbpAiCacheSet: async (key, value) => { cache.set(key, value); },
+    // The old Explain helper only supports UI locales; this intentional
+    // fallback must never silently turn Spanish/Portuguese into English.
+    pbpExplainLangName: (code) => ({ "en": "English", "zh-Hant": "Traditional Chinese" }[code] || "English"),
+    uiLangToBCP47: () => uiLanguage,
+    pbpAiEffectiveModel: () => "fixture", pbpAiResolveModelOverride: () => "fixture",
+    pbpAiBumpCounter: () => {}, renderMarkdown: (text) => text,
+    callAIStream: async (_settings, prompt, options, onDelta) => {
+      const answer = /Answer language: (.+) only\./.exec(prompt)?.[1] || "missing";
+      requests.push({ prompt, system: options.system, answer });
+      const result = "LEMMA: -\n\n" + answer;
+      onDelta(result, result);
+      streamLanguage = el.querySelector(".xp-stream")?.lang;
+      if (duringStream) duringStream();
+      return result;
+    }
+  });
+  const run = (preference) => _pbpDictCtxRun(el, { text: "Gift" }, { sentence: "Das Gift ist gefährlich." },
+    { aiProvider: "custom", dictDefinitionLang: preference }, new AbortController().signal, () => {}, "de");
+  try {
+    for (const [preference, name, lang] of [
+      ["zh-Hans", "Simplified Chinese", "zh-Hans"], ["zh-Hant", "Traditional Chinese", "zh-Hant"],
+      ["es", "Spanish", "es"], ["pt", "Portuguese", "pt"], ["pt-BR", "Brazilian Portuguese", "pt-BR"],
+      ["ar", "Arabic", "ar"], ["Latin", "Latin", "und"], ["en-???", "en-???", "und"]
+    ]) {
+      const result = await run(preference);
+      assertEq(result?.gloss, name, preference + " chooses its own answer language while the interface stays English");
+      assertEq(el.querySelector(".xp-md")?.lang, lang, preference + " output has accurate language metadata");
+      assertEq(streamLanguage, lang, preference + " streaming output uses the same language metadata");
+    }
+    assert(requests[0]?.prompt.includes("Selected term:\nGift\n") && requests[0]?.prompt.includes("Das Gift ist gefährlich.") &&
+      requests[0]?.system.includes("ENTIRE answer in Simplified Chinese"),
+    "Chinese explanation keeps the selected German term and context intact in an English UI");
+    const beforeRepeat = requests.length;
+    await run("es"); await run("pt");
+    assertEq(requests.length, beforeRepeat, "switching definition languages reuses only each language's own cached explanation");
+    await run(" \u0000La\u202etin\n ");
+    assertEq(el.querySelector(".xp-md")?.textContent, "Latin", "custom language names lose control characters before prompt/cache use");
+    assertEq(requests.length, beforeRepeat, "a sanitized custom language shares the equivalent clean preference's cache");
+    const longName = "Custom ".repeat(40).trim();
+    const longResult = await run(longName);
+    assertEq(longResult?.gloss.length, 80, "custom definition-language names have a bounded prompt footprint");
+    assertEq(el.querySelector(".xp-md")?.lang, "und", "an unrecognized long custom name never invents BCP47 metadata");
+    uiLanguage = "zh-Hant";
+    const inherited = await run("");
+    assertEq(inherited?.gloss, "Traditional Chinese", "empty preference follows the current interface language");
+    assertEq(el.querySelector(".xp-md")?.lang, "zh-Hant", "the inherited UI language is reflected in output metadata");
+    uiLanguage = "en";
+    const controlOnly = await run("\u0000\n\u202e");
+    assertEq(controlOnly?.gloss, "English", "a preference emptied by sanitation follows the interface language");
+    const invalidType = await run({ language: "es" });
+    assertEq(invalidType?.gloss, "English", "a malformed non-string setting falls back without leaking object text to the prompt");
+    duringStream = () => { uiLanguage = "en"; };
+    uiLanguage = "de";
+    const snapshotted = await run("");
+    assert(snapshotted?.gloss === "German" && streamLanguage === "de" && el.querySelector(".xp-md")?.lang === "de",
+      "a running answer keeps its requested language metadata even if the UI language changes mid-stream");
+  } finally {
+    for (const [name, value] of saved) { if (value === undefined) delete window[name]; else window[name] = value; }
+    title.remove(); if (oldTitle) document.body.appendChild(oldTitle);
+  }
+}
+
 async function runEchoLanguageAndInlineTests() {
   section("vocabulary echo respects language and complete inline words");
   const saved = { owner: _echoOwner, enabled: _echoEnabled, epoch: _echoEpoch, terms: _echoTerms,
@@ -1941,6 +2017,7 @@ async function runEchoLanguageAndInlineTests() {
 
 (async function () {
   await runDictReviewRegressionTests();
+  await runDictDefinitionLanguageTests();
   await runEchoLanguageAndInlineTests();
   await runVocabEchoWiringTests();
   await runDictNetworkTests();

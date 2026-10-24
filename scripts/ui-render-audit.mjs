@@ -4937,7 +4937,7 @@ function needsGroupEditorOpen(selector) {
 // `open`-state rows open it themselves through the real button.
 // T6: the group filter is measured as its listbox button (the native select
 // is the hidden carrier).
-const FILTER_SET_SELECTORS = new Set(["#vocab-group-filter-btn"]);
+const FILTER_SET_SELECTORS = new Set(["#vocab-language-filter-btn", "#vocab-group-filter-btn"]);
 function needsFilterSetOpen(check) {
   return FILTER_SET_SELECTORS.has(check.selector) && ["default", "hover", "focusWithin"].includes(check.state);
 }
@@ -6107,8 +6107,8 @@ const VALUE_BOX_LEGS = Object.freeze({
     ]),
   }),
   // library (stage 4 Task 7, spec §5.2): the eight value boxes -- the three
-  // search fields, the two listbox buttons (the group filter and, since
-  // library redesign T7, the dictionary language), the two
+  // search fields, the three listbox buttons (language/group filters and
+  // the dictionary language), the two
   // .vocab-group-unit shells (the shell carries the look; its text input is
   // a transparent passenger) and the note editor. Named rather than class-scanned, like
   // popup's. The vocab leg navigates fresh instead of inheriting whatever the
@@ -6119,7 +6119,7 @@ const VALUE_BOX_LEGS = Object.freeze({
     ns: "lib",
     radiusVar: "--lib-radius-md",
     boxes: Object.freeze([
-      ["#vocab-search", null], ["#vocab-group-filter-btn", null], ["#vocab-lookup-input", null], ["#vocab-lookup-lang-btn", null],
+      ["#vocab-search", null], ["#vocab-language-filter-btn", null], ["#vocab-group-filter-btn", null], ["#vocab-lookup-input", null], ["#vocab-lookup-lang-btn", null],
       ["#vocab-detail .vocab-note-input", null],
       ["#vocab-batch-toolbar .vocab-group-unit", null], ["#vocab-detail .vocab-group-unit", null],
       ["#notes-filter", null], ["#notes-detail .vocab-note-input", null],
@@ -6189,7 +6189,7 @@ const VALUE_BOX_LEGS = Object.freeze({
         // so the open top-layer panel never covers the batch row's group unit
         // that the vocab leg hovers. The returned closer hides it again.
         context: "vocab-filter",
-        boxes: ["#vocab-group-filter-btn"],
+        boxes: ["#vocab-language-filter-btn", "#vocab-group-filter-btn"],
         async open(page, url, theme) {
           await page.goto(`${url}?_ra=${encodeURIComponent(`fieldfilter-${theme}`)}#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
           await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS });
@@ -6199,8 +6199,10 @@ const VALUE_BOX_LEGS = Object.freeze({
           }
           await page.mouse.move(0, 0);
           await settleAnimations(page);
-          if (!(await page.$eval("#vocab-group-filter-btn", (el) => el.getClientRects().length > 0))) {
-            throw new Error(`SETUP: fieldHoverContrast library: #vocab-group-filter-btn is not rendered after opening the Filter popover (theme=${theme})`);
+          for (const selector of ["#vocab-language-filter-btn", "#vocab-group-filter-btn"]) {
+            if (!(await page.$eval(selector, (el) => el.getClientRects().length > 0))) {
+              throw new Error(`SETUP: fieldHoverContrast library: ${selector} is not rendered after opening the Filter popover (theme=${theme})`);
+            }
           }
           return async () => { await setFilterSetOpen(page, false); };
         },

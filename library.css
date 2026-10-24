@@ -3106,6 +3106,9 @@ select[data-listbox] { height: var(--lib-control-h); box-sizing: border-box; }
    holds the same slot before the swap. */
 .vocab-filter-set > select[data-listbox],
 .vocab-filter-set > .listbox { flex: 1 1 0; min-width: 120px; }
+/* Language filtering is only offered for a multilingual list or an active
+   language filter. The listbox's author display must respect this state. */
+.vocab-filter-set > .listbox[hidden] { display: none; }
 /* Sort menu button (spec §3.3): listbox.js's ghost face, a .btn.ghost md
    trigger -- the short word first, the direction arrow after it. It ends
    the filter row; its auto margin is the row's flexible space (spec §3.1:

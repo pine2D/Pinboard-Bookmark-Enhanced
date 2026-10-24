@@ -4432,5 +4432,12 @@
   "mdExportSummaryWithAsk": {"message": "$SCOPE$ + pytania i odpowiedzi ($COUNT$)", "placeholders": {"scope": {"content": "$1"}, "count": {"content": "$2"}}},
   "mdExportAskEmpty": {"message": "Brak ukończonych pytań i odpowiedzi do eksportu."},
   "mdExportContextChanged": {"message": "Konto, artykuł lub rozmowa uległy zmianie. Rozpocznij eksport ponownie."},
-  "themeGroupAdaptiveHint": {"message": "Motywy adaptacyjne stosują tryb jasny lub ciemny wybrany powyżej w sekcji „Wygląd rozszerzenia”."}
+  "themeGroupAdaptiveHint": {"message": "Motywy adaptacyjne stosują tryb jasny lub ciemny wybrany powyżej w sekcji „Wygląd rozszerzenia”."},
+  "dictDefinitionLangLabel": { "message": "Język definicji AI" },
+  "dictDefinitionLangHint": { "message": "Określa język objaśnień AI uwzględniających kontekst. Hasła słownikowe pozostają w oryginalnym języku." },
+  "dictDefinitionLangUi": { "message": "Użyj języka interfejsu" },
+  "vocabLanguageFilterAria": { "message": "Filtruj według języka" },
+  "vocabAllLanguages": { "message": "Wszystkie języki" },
+  "vocabUnknownLanguage": { "message": "Nie rozpoznano języka" },
+  "vocabFiltersAria": { "message": "Filtruj według języka i grupy" }
 }

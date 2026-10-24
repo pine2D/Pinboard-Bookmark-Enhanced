@@ -4426,5 +4426,12 @@
   "mdExportSummaryWithAsk": {"message": "$SCOPE$ + 问答（$COUNT$）", "placeholders": {"scope": {"content": "$1"}, "count": {"content": "$2"}}},
   "mdExportAskEmpty": {"message": "没有可导出的完整问答。"},
   "mdExportContextChanged": {"message": "账号、文章或问答记录已发生变化，请重新开始导出。"},
-  "themeGroupAdaptiveHint": {"message": "自适应预设跟随上方「扩展外观」中的明暗设置。"}
+  "themeGroupAdaptiveHint": {"message": "自适应预设跟随上方「扩展外观」中的明暗设置。"},
+  "dictDefinitionLangLabel": { "message": "AI 释义语言" },
+  "dictDefinitionLangHint": { "message": "设置 AI 语境释义的语言。词典条目保留原有语言。" },
+  "dictDefinitionLangUi": { "message": "跟随界面语言" },
+  "vocabLanguageFilterAria": { "message": "按语言筛选" },
+  "vocabAllLanguages": { "message": "全部语言" },
+  "vocabUnknownLanguage": { "message": "未识别语言" },
+  "vocabFiltersAria": { "message": "按语言和分组筛选" }
 }

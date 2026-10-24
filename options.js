@@ -1933,6 +1933,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     vocab: {
       fields: {
         "dict-echo-enabled": true,
+        "dict-definition-lang": "", "dict-definition-lang-custom": "",
         "dict-anki-deck": "Pinboard Vocab",
         "dict-anki-port": "8765"
       },
@@ -2239,6 +2240,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     return (customEl && customEl.value.trim()) || "auto";
   }
 
+  function syncDictDefinitionLangCustomState() {
+    const sel = $id("dict-definition-lang");
+    const custom = $id("dict-definition-lang-custom");
+    if (!sel || !custom) return;
+    custom.classList.toggle("hidden", sel.value !== "custom");
+    window.pbpListboxSync?.(sel);
+  }
+
+  function resolveDictDefinitionLang() {
+    const sel = $id("dict-definition-lang");
+    const value = sel?.value === "custom" ? $id("dict-definition-lang-custom")?.value : sel?.value;
+    return String(value || "").replace(/[\p{Cc}\p{Cf}]/gu, "").trim().slice(0, 80);
+  }
+
   // Reset a panel's controls to defaults. Handles three address modes that the
   // old id-only loop missed: (a) radio GROUPS addressed by name (popup-width,
   // tag-sync-mode, ai-content-source), (b) the nested urlClean object, (c)
@@ -2436,6 +2451,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         // fields stayed on screen -- keys typed there landed on the wrong
         // provider. Both calls are no-ops on panels that lack the control.
         syncTranslateLangCustomState();
+        syncDictDefinitionLangCustomState();
         updateProviderFields();
         // Same class, one panel over: the General reset puts #opt-lang back to
         // "auto" by assignment, so the language handler (pause auto-save ->
@@ -2830,6 +2846,21 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       syncTranslateLangCustomState();
       sel.addEventListener("change", syncTranslateLangCustomState);
+    }
+  }
+
+  // Keep the AI definition preference independent of both the UI locale and
+  // the source-language selector. The custom sentinel never reaches storage.
+  {
+    const sel = $id("dict-definition-lang");
+    const custom = $id("dict-definition-lang-custom");
+    if (sel && custom) {
+      const stored = String(s.dictDefinitionLang || "").replace(/[\p{Cc}\p{Cf}]/gu, "").trim().slice(0, 80);
+      const known = [...sel.options].some(o => o.value === stored && o.value !== "custom");
+      sel.value = stored === "custom" ? "" : known ? stored : "custom";
+      custom.value = known || stored === "custom" ? "" : stored;
+      syncDictDefinitionLangCustomState();
+      sel.addEventListener("change", syncDictDefinitionLangCustomState);
     }
   }
 
@@ -3628,6 +3659,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       translateGlossary: $id("opt-translate-glossary").value,
       trHotkeyConfirm: $id("opt-tr-hotkey-confirm").checked,
       dictEchoEnabled: $id("dict-echo-enabled").checked,
+      dictDefinitionLang: resolveDictDefinitionLang(),
       dictAnkiDeck: $id("dict-anki-deck").value.trim(),
       dictAnkiPort: $id("dict-anki-port").value.trim(),
       dictAnkiKey: obfuscateKey($id("dict-anki-key").value.trim()),

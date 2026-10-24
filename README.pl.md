@@ -36,7 +36,7 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in): tagi i streszczenia od 
 - **Zaznaczenia w pięciu kolorach, z notatkami** — zostają na swoim miejscu mimo tłumaczenia, a nawet późniejszych zmian na stronie
 - **Przetłumacz stronę albo zadaj jej pytanie** — tłumaczenie całości z widokiem dwujęzycznym; odpowiedzi cytują źródło i prowadzą prosto do niego
 - **Zachowaj pytania i odpowiedzi z cytatami** — eksportuj ukończone rozmowy osobno lub wraz z artykułem
-- **Sprawdzaj słownictwo podczas czytania** — słownik pokazuje najpierw znaczenie pasujące do bieżącego zdania; zapisane słówka wyślesz jednym kliknięciem do Anki lub Eudic, a do wyboru masz też słowniki offline chińsko-angielski i angielsko-chiński
+- **Sprawdzaj słownictwo podczas czytania** — słownik pokazuje najpierw znaczenie pasujące do bieżącego zdania; zapisane słówka wyślesz jednym kliknięciem do Anki lub Eudic, a do wyboru masz też słowniki offline chińsko-angielski i angielsko-chiński. Wybierz język definicji AI niezależnie od języka interfejsu i filtruj zapisane słowa według języka.
 - **Notatki i słówka mają własną stronę** — zapisane słówka i zaznaczenia w jednym miejscu, z wyszukiwaniem w słowniku i zarządzaniem partiami
 - **Wyślij albo pobierz** — do [Obsidiana](https://obsidian.md), Notion, NotebookLM, do serwisu GitHub Gist lub dowolnego webhooka; albo jako `.md`, `.html`, `.epub` na czytnik e-booków
 - **Oglądaj podczas czytania** — filmy z YouTube i Bilibili wyświetlają się obok transkrypcji, która podąża za odtwarzaniem; tagi i podsumowania AI mogą czytać napisy

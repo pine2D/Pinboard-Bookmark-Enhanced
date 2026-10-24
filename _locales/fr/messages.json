@@ -4432,5 +4432,12 @@
   "mdExportSummaryWithAsk": {"message": "$SCOPE$ + questions et réponses ($COUNT$)", "placeholders": {"scope": {"content": "$1"}, "count": {"content": "$2"}}},
   "mdExportAskEmpty": {"message": "Aucune question avec réponse complète à exporter."},
   "mdExportContextChanged": {"message": "Le compte, l’article ou la conversation a changé. Relancez l’export."},
-  "themeGroupAdaptiveHint": {"message": "Les préréglages adaptatifs suivent le mode clair ou sombre choisi plus haut dans « Apparence de l’extension »."}
+  "themeGroupAdaptiveHint": {"message": "Les préréglages adaptatifs suivent le mode clair ou sombre choisi plus haut dans « Apparence de l’extension »."},
+  "dictDefinitionLangLabel": { "message": "Langue des définitions IA" },
+  "dictDefinitionLangHint": { "message": "Définit la langue des explications contextuelles de l’IA. Les entrées du dictionnaire conservent leur langue d’origine." },
+  "dictDefinitionLangUi": { "message": "Utiliser la langue de l’interface" },
+  "vocabLanguageFilterAria": { "message": "Filtrer par langue" },
+  "vocabAllLanguages": { "message": "Toutes les langues" },
+  "vocabUnknownLanguage": { "message": "Langue non identifiée" },
+  "vocabFiltersAria": { "message": "Filtrer par langue et par groupe" }
 }

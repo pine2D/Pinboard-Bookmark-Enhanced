@@ -46,6 +46,21 @@ function pbpDictLanguageLabel(code, locale) {
   } catch (_) { return ""; }
 }
 
+// Definition language is independent of both the UI and the queried word.
+// Codes use the platform's known English names in prompts; free-form names
+// stay useful without pretending that their BCP47 metadata is known.
+function pbpDictDefinitionLanguage(preference, uiLanguage) {
+  const clean = (value) => typeof value === "string"
+    ? value.replace(/[\p{Cc}\p{Cf}]/gu, "").trim().slice(0, 80) : "";
+  const requested = clean(preference) || clean(uiLanguage) || "en";
+  try {
+    const lang = Intl.getCanonicalLocales(requested)[0];
+    const name = new Intl.DisplayNames(["en"], { type: "language", fallback: "none" }).of(lang);
+    if (name && lang !== "und" && lang !== "mul" && lang !== "zxx") return { name, lang };
+  } catch (_) { /* A user-entered name need not be a language code. */ }
+  return { name: requested, lang: "und" };
+}
+
 // Language routing (spec §3): manual override wins; then a reliable
 // detection; then the article-level fallback; "" = unknown. "und" never routes.
 function pbpDictRouteLang(detected, isReliable, articleLang, manual) {
@@ -1335,7 +1350,8 @@ async function _pbpDictCtxRun(el, cap, ctx, s, signal, resolveLemmaOnce, lang) {
       el.replaceChildren(msg);
       return null; // finally resolves lemma
     }
-    const langName = pbpExplainLangName(uiLangToBCP47());
+    const answerLanguage = pbpDictDefinitionLanguage(s.dictDefinitionLang, uiLangToBCP47());
+    const langName = answerLanguage.name;
     const title = document.getElementById("preview-title").textContent;
     const { system, prompt } = pbpDictBuildCtxPrompt({
       selection: cap.text, sentence: ctx.sentence, title, answerLang: langName
@@ -1352,7 +1368,7 @@ async function _pbpDictCtxRun(el, cap, ctx, s, signal, resolveLemmaOnce, lang) {
       const parsed = pbpDictParseCtxAnswer(full);
       const md = document.createElement("div");
       md.className = "xp-md";
-      md.lang = uiLangToBCP47() || "und";
+      md.lang = answerLanguage.lang;
       md.innerHTML = renderMarkdown(parsed.gloss); // single sanitize point
       const tag = document.createElement("div");
       tag.className = "xp-dict-ailabel";
@@ -1371,7 +1387,7 @@ async function _pbpDictCtxRun(el, cap, ctx, s, signal, resolveLemmaOnce, lang) {
     }
     const streamEl = document.createElement("div");
     streamEl.className = "xp-stream";
-    streamEl.lang = uiLangToBCP47() || "und";
+    streamEl.lang = answerLanguage.lang;
     let started = false, pending = "", rafId = 0;
     const flush = () => { rafId = 0; streamEl.textContent = pbpDictStripLemmaLine(pending); };
     try {

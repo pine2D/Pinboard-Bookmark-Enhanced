@@ -2318,7 +2318,7 @@ const LIBRARY_VALUE_BOX = (() => {
     selectClasses: new Set(built.filter((b) => /:select\./.test(b)).map(classOf)),
   };
 })();
-check(JSON.stringify([...LIBRARY_VALUE_BOX.ids].sort()) === JSON.stringify(["notes-filter", "vocab-group-filter", "vocab-group-filter-btn", "vocab-group-input", "vocab-lookup-input", "vocab-lookup-lang", "vocab-lookup-lang-btn", "vocab-search"]),
+check(JSON.stringify([...LIBRARY_VALUE_BOX.ids].sort()) === JSON.stringify(["notes-filter", "vocab-group-filter", "vocab-group-filter-btn", "vocab-group-input", "vocab-language-filter-btn", "vocab-lookup-input", "vocab-lookup-lang", "vocab-lookup-lang-btn", "vocab-search"]),
   `ui-contract-tests.mjs: the library.html value-box id harvest drifted -- got ${JSON.stringify([...LIBRARY_VALUE_BOX.ids].sort())}. ` +
   "A new value box must join composers/ui-components.mjs FIELD_TARGETS.lib and scripts/ui-render-audit.mjs's VALUE_BOX_LEGS.library in the same commit; then update this list.");
 check(JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort()) === JSON.stringify(["vocab-sort-btn"]) &&
@@ -8927,9 +8927,9 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(libSelects.length === 0 && selectMiss.length === 0,
     `library.html + runtime boxes / FIELD_TARGETS.lib: every rendered <select> must be the rest box of exactly one entry -- ${libSelects.length} select(s) (expected 0: every rendered select is a listbox carrier since T7), unpainted or doubly painted: ${selectMiss.map((n) => n.attrs.id ? `#${n.attrs.id}` : `select.${n.classes.join(".")}`).join(", ") || "none"}`);
   const listboxMiss = listboxBtnNodes.filter((n) => LIB.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, n))).length !== 1);
-  check(listboxBtnNodes.length === 2 && listboxMiss.length === 0,
+  check(listboxBtnNodes.length === 3 && listboxMiss.length === 0,
     `library.html + listbox.js / FIELD_TARGETS.lib: every listbox button must be the rest box of exactly one entry -- ${listboxBtnNodes.length} button(s) ` +
-    `(expected 2: #vocab-group-filter-btn, #vocab-lookup-lang-btn), unpainted or doubly painted: ${listboxMiss.map((n) => `#${n.attrs.id}`).join(", ") || "none"}`);
+    `(expected 3: #vocab-language-filter-btn, #vocab-group-filter-btn, #vocab-lookup-lang-btn), unpainted or doubly painted: ${listboxMiss.map((n) => `#${n.attrs.id}`).join(", ") || "none"}`);
   // The ghost trigger is a .btn: no registry entry may name it, in any role,
   // on any surface (spec §8.3) -- judged on each selector's subject compound.
   const triggerInRegistry = Object.entries(FIELD_TARGETS).flatMap(([ns, entries]) => entries.flatMap((t) =>
@@ -9471,9 +9471,17 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(/\sdata-listbox="float"/.test(groupTag) && !/\sdata-listbox-face=/.test(groupTag) &&
     /<label class="sr-only" for="vocab-group-filter"/.test(libraryHtml),
     "library.html: #vocab-group-filter must be a float listbox (data-listbox=\"float\", the value-box face) named by its sr-only label[for]");
+  const languageTag = (/<select\b[^>]*\bid="vocab-language-filter"[^>]*>/.exec(libraryHtml) || [""])[0];
+  check(/\sdata-listbox="float"/.test(languageTag) && !/\sdata-listbox-face=/.test(languageTag) &&
+    /<label class="sr-only" for="vocab-language-filter"/.test(libraryHtml) &&
+    (libraryHtml.match(/id="vocab-language-filter"/g) || []).length === 1 &&
+    /id="vocab-filter-narrow"[^>]*data-i18n-aria="vocabFiltersAria"/.test(libraryHtml),
+    "library.html: language filtering must reuse one named float listbox and the shared narrow filter door must name both filters");
   check(/filter\.value = groups\.includes\(previous\) \? previous : "";\s*\n(?:\s*\/\/[^\n]*\n)*\s*window\.pbpListboxSync\?\.\(filter\);/.test(libraryVocabJs),
     "library-vocab.js: _pbpVocabRefreshGroupOptions must re-sync the group listbox right after it rewrites the options and the value -- a refresh that drops the chosen group would otherwise leave the button naming it");
   const hand = stripGeneratedRegions(libraryCss).replace(/\/\*[\s\S]*?\*\//g, "");
+  check(declarationValueMap(hand, ".vocab-filter-set > .listbox[hidden]").get("display") === "none",
+    "library.css: a hidden language listbox must release its width instead of retaining the primitive's author display");
   check(declarationValueMap(hand, "html:not([data-listbox-ready]) select[data-listbox]").get("visibility") === "hidden" &&
     declarationValueMap(hand, "select[data-listbox]").get("height") === "var(--lib-control-h)" &&
     declarationValueMap(hand, ".listbox-btn").get("height") === "var(--lib-control-h)",

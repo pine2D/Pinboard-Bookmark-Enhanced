@@ -71,15 +71,17 @@ function pbpVocabSearchText(value) {
     .trim();
 }
 
-function pbpVocabFilterSort(rows, query, group, sortMode, status) {
+function pbpVocabFilterSort(rows, query, group, sortMode, status, language) {
   const needle = pbpVocabSearchText(query);
   const groupName = typeof pbpVocabNormalizeGroupName === "function"
     ? pbpVocabNormalizeGroupName(group) : String(group || "").trim();
   // Two states only ("known" and everything else): the store clamps writes
   // to new/known, and records predating the flag read as "new" here.
   const wantStatus = status === "known" || status === "new" ? status : "";
+  const wantLanguage = pbpDictPrimaryLang(language);
   const filtered = (Array.isArray(rows) ? rows : []).filter((row) => {
     const groups = typeof pbpVocabGroups === "function" ? pbpVocabGroups(row) : [];
+    if (wantLanguage && (pbpDictPrimaryLang(row && row.language) || "und") !== wantLanguage) return false;
     if (groupName && !groups.includes(groupName)) return false;
     if (wantStatus && (String((row && row.status) || "new") === "known" ? "known" : "new") !== wantStatus) return false;
     if (!needle) return true;
@@ -2013,6 +2015,40 @@ function _pbpVocabRefreshGroupOptions(preserveSelection) {
   }
 }
 
+// Read the whole owner's vocabulary, never the filtered view. Keep an
+// active language even after its last word disappears so the empty result
+// stays explainable and the user can clear it. Full owner reads can restore
+// their captured selection only after verifying the same owner returned.
+function _pbpVocabRefreshLanguageOptions(preserveSelection, selectedLanguage) {
+  const filter = $id("vocab-language-filter");
+  if (!filter) return;
+  const previous = preserveSelection ? pbpDictPrimaryLang(selectedLanguage ?? filter.value) : "";
+  const languages = new Set(_vocabRows.map(row => pbpDictPrimaryLang(row && row.language) || "und"));
+  const show = languages.size > 1 || !!previous;
+  if (previous) languages.add(previous);
+  const locale = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : document.documentElement.lang;
+  const labels = [...languages].map(code => [code, code === "und"
+    ? t("vocabUnknownLanguage") : pbpDictLanguageLabel(code, locale) || code]);
+  labels.sort((a, b) => _vocabCollator.compare(a[1], b[1]));
+  const all = new Option(t("vocabAllLanguages"), "");
+  filter.replaceChildren(all, ...labels.map(([code, label]) => new Option(label, code)));
+  filter.value = previous;
+  window.pbpListboxSync?.(filter);
+  // The primitive inserts its visible box beside the select, whose hidden
+  // attribute belongs to enhancement. Native test/fallback controls still
+  // follow the same visibility rule without undoing that enhancement.
+  const box = filter.nextElementSibling;
+  const visibleControl = box?.classList.contains("listbox") ? box : filter;
+  if (!show && visibleControl.contains(document.activeElement)) {
+    ($id("vocab-group-filter-btn") || $id("vocab-group-filter"))?.focus({ preventScroll: true });
+  }
+  if (box?.classList.contains("listbox")) box.hidden = !show;
+  else filter.hidden = !show;
+  const label = filter.previousElementSibling;
+  if (label?.tagName === "LABEL") label.hidden = !show;
+  _pbpVocabSyncFilterNarrow();
+}
+
 // "Load N more" from the current view and render limit -- the list render
 // and a language switch (pbp:i18n-applied) both write it through here.
 function _pbpVocabSyncLoadMore() {
@@ -2143,7 +2179,8 @@ function _pbpVocabApplyView(resetLimit) {
     ($id("vocab-search") || {}).value || "",
     ($id("vocab-group-filter") || {}).value || "",
     ($id("vocab-sort") || {}).value || "latest",
-    ($id("vocab-status-filter") || {}).value || "");
+    ($id("vocab-status-filter") || {}).value || "",
+    ($id("vocab-language-filter") || {}).value || "");
   if (_vocabFrozenOrder) _vocabViewRows = pbpVocabApplyFrozenOrder(_vocabViewRows, _vocabFrozenOrder);
   // Nothing matches: the reading pane goes back to the cover instead of
   // keeping a word the filters have just ruled out (critique round 5). The
@@ -2217,6 +2254,7 @@ function _pbpVocabSetAccountState(owner) {
     if (status) status.value = "";
     const group = $id("vocab-group-filter");
     if (group) { group.value = ""; window.pbpListboxSync?.(group); }
+    _pbpVocabRefreshLanguageOptions(false);
     _pbpVocabResetListScroll();
   }
   _pbpVocabRenderCover();
@@ -2242,6 +2280,7 @@ function _pbpVocabClearVisibleState() {
     const el = $id(id); if (el) el.hidden = true;
   }
   _pbpVocabRefreshGroupOptions(false);
+  _pbpVocabRefreshLanguageOptions(false);
   _pbpVocabRenderStats();
   _pbpVocabSyncSelectionUi();
   const cover = $id("vocab-detail-empty");
@@ -2386,6 +2425,7 @@ async function _pbpVocabReloadAfterMutation(expectedOwner, requestedGen, broadca
     _vocabCurrentOwner = expectedOwner;
     _pbpVocabClearSelection();
     _pbpVocabRefreshGroupOptions(true);
+    _pbpVocabRefreshLanguageOptions(true);
     _pbpVocabSetLoading(false);
     // Keep the render depth: a mutation is not a reason to throw away the
     // pages a user loaded with "Load more" (the row cap still clamps to the
@@ -2424,6 +2464,8 @@ async function _pbpVocabReloadAfterMutation(expectedOwner, requestedGen, broadca
 async function renderVocabPanel() {
   if (!$id("vocab-list")) return;
   const gen = ++_vocabRenderGen;
+  const previousOwner = _vocabCurrentOwner;
+  const previousLanguage = ($id("vocab-language-filter") || {}).value || "";
   // Clear first, before any await: an account-change render must never leave
   // the previous owner's rows, selection, or derived group names visible.
   _pbpVocabClearVisibleState();
@@ -2471,6 +2513,7 @@ async function renderVocabPanel() {
   _pbpVocabSetAccountState(owner);
   _pbpVocabSetLoading(false);
   _pbpVocabRefreshGroupOptions(false);
+  _pbpVocabRefreshLanguageOptions(true, owner === previousOwner ? previousLanguage : "");
   _pbpVocabApplyView(true);
   // Same reconcile the mutation reload does: re-entering the view (or any
   // other full re-read) must not leave a word in the detail pane that the
@@ -2719,7 +2762,7 @@ async function _pbpVocabApplyStatusChange(known) {
 }
 
 // Filters and sort start the list again from its first row (library redesign
-// §2.5 #1): the list region is the scroll container now. Only the four user
+// §2.5 #1): the list region is the scroll container now. Only the five user
 // inputs below call this -- never _pbpVocabApplyView itself, which the
 // reload path (_pbpVocabSoftReload, a reconcile from another tab) also calls
 // and which must keep the user's place.
@@ -2730,9 +2773,10 @@ function _pbpVocabResetListScroll() {
 
 function _pbpVocabClearFilters() {
   const search = $id("vocab-search");if(search)search.value = "";
-  for(const id of ["vocab-group-filter", "vocab-status-filter"]) {
+  for(const id of ["vocab-group-filter", "vocab-status-filter", "vocab-language-filter"]) {
     const control = $id(id);if(control){control.value="";window.pbpListboxSync?.(control);}
   }
+  _pbpVocabRefreshLanguageOptions(true);
   _pbpVocabClearSelection();_pbpVocabThawOrder();_pbpVocabApplyView(true);_pbpVocabResetListScroll();
   if(search)search.focus({preventScroll:true});
 }
@@ -2746,9 +2790,10 @@ if (_vocabSearch) _vocabSearch.addEventListener("input", () => {
   _pbpVocabApplyView(true);
   _pbpVocabResetListScroll();
 });
-for (const id of ["vocab-group-filter", "vocab-status-filter"]) {
+for (const id of ["vocab-group-filter", "vocab-status-filter", "vocab-language-filter"]) {
   const control = $id(id);
   if (control) control.addEventListener("change", () => {
+    if (id === "vocab-language-filter") _pbpVocabRefreshLanguageOptions(true);
     _pbpVocabClearSelection();
     _pbpVocabThawOrder();
     _pbpVocabApplyView(true);
@@ -2768,25 +2813,24 @@ for (const chipId of ["vocab-stat-all", "vocab-stat-learning", "vocab-stat-known
     filter.dispatchEvent(new Event("change"));
   });
 }
-// The narrow-index door to the group filter says which group is in force
-// (critique round 5, 2026-10-22: "Filter · 1" named a count, not a
-// condition): "All groups", or the group's own name in bold via
-// data-filtered. The status toggles sit on the row itself, so the door is
-// only ever about the group. The popover's own open state is written onto
-// the button by library.js (pbpLibWireFilterPopover).
+// The narrow-index door names the active language and group. Status toggles
+// stay on the row itself. library.js owns the popover's open state.
 function _pbpVocabSyncFilterNarrow() {
   const btn = $id("vocab-filter-narrow");
   if (!btn) return;
   const group = $id("vocab-group-filter");
   const value = (group || {}).value || "";
+  const language = $id("vocab-language-filter");
+  const languageLabel = language?.value ? language.selectedOptions[0]?.textContent : "";
   const label = btn.lastElementChild;
-  if (label) label.textContent = value ? value : t("vocabAllGroups");
-  if (value) btn.dataset.filtered = "true";
+  if (label) label.textContent = [languageLabel, value || t("vocabAllGroups")].filter(Boolean).join(" \u00b7 ");
+  if (value || language?.value) btn.dataset.filtered = "true";
   else delete btn.dataset.filtered;
 }
 // applyI18n rewrites the label span from its static data-i18n key on every
 // language change; put the live reading back right after it.
 document.addEventListener("pbp:i18n-applied", _pbpVocabSyncFilterNarrow);
+document.addEventListener("DOMContentLoaded", () => _pbpVocabRefreshLanguageOptions(true), { once: true });
 // Free-lookup toolbar: one-time wiring alongside the status toggles above (see
 // _pbpVocabWireLookupBar's own comment -- no per-render rebuild, so no
 // "already wired" guard is needed here either).
@@ -2795,6 +2839,8 @@ _pbpVocabWireLookupBar();
 // depend on state), so they follow a language switch the way applyI18n's
 // data-i18n attributes do.
 document.addEventListener("pbp:i18n-applied", () => {
+  _pbpVocabRefreshGroupOptions(true);
+  _pbpVocabRefreshLanguageOptions(true);
   const host = $id("vocab-ref-result");
   if (host && host.dataset.refState === "free") _pbpVocabRenderRefIdle("free");
   else if (host && host.dataset.refState === "idle") _pbpVocabRenderRefIdle("word");

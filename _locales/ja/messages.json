@@ -4432,5 +4432,12 @@
   "mdExportSummaryWithAsk": {"message": "$SCOPE$ + 質問と回答（$COUNT$）", "placeholders": {"scope": {"content": "$1"}, "count": {"content": "$2"}}},
   "mdExportAskEmpty": {"message": "エクスポートできる完了済みの質問と回答がありません。"},
   "mdExportContextChanged": {"message": "アカウント、記事、または会話履歴が変わりました。エクスポートをやり直してください。"},
-  "themeGroupAdaptiveHint": {"message": "アダプティブプリセットは、上の「拡張機能の外観」で選んだライト／ダーク設定に従います。"}
+  "themeGroupAdaptiveHint": {"message": "アダプティブプリセットは、上の「拡張機能の外観」で選んだライト／ダーク設定に従います。"},
+  "dictDefinitionLangLabel": { "message": "AIによる語義説明の言語" },
+  "dictDefinitionLangHint": { "message": "AIによる文脈に応じた語義説明の言語を設定します。辞書の項目は元の言語のまま表示されます。" },
+  "dictDefinitionLangUi": { "message": "表示言語に合わせる" },
+  "vocabLanguageFilterAria": { "message": "言語で絞り込む" },
+  "vocabAllLanguages": { "message": "すべての言語" },
+  "vocabUnknownLanguage": { "message": "言語不明" },
+  "vocabFiltersAria": { "message": "言語とグループで絞り込む" }
 }
