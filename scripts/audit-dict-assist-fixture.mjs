@@ -1,8 +1,8 @@
 // Render-only boundaries: handwritten official FreeDictionary data and strict
 // AI JSON. The real normalizer, consent guard, candidate identity, UI builders
 // and click handlers run unchanged. No real provider or permission prompt.
-export async function installDictAssistFixture(page) {
-  await page.evaluate(() => {
+export async function installDictAssistFixture(page, { analyze = false } = {}) {
+  await page.evaluate(analyze => {
     _pbpDictHasPerm = async () => true;
     _pbpDictCacheGet = async () => null;
     _pbpDictFetch = async (lang, term) => ({ status: 200, data: {
@@ -21,30 +21,37 @@ export async function installDictAssistFixture(page) {
       await opts.beforeRequest?.(); opts.signal?.throwIfAborted();
       let task;
       for (const match of prompt.matchAll(/\{/g)) {
-        try { const parsed = JSON.parse(prompt.slice(match.index)); if (parsed.task && Array.isArray(parsed.candidates)) { task = parsed; break; } } catch (_) {}
+        try { const parsed = JSON.parse(prompt.slice(match.index)); if (parsed.task && (Array.isArray(parsed.candidates) || parsed.task === "analyze")) { task = parsed; break; } } catch (_) {}
       }
-      if (task?.task !== 'recommend' || task.candidates.length !== 2 || !task.candidates[0].definition.startsWith('An original dictionary meaning')) throw new Error('SETUP: unexpected dictionary AI prompt');
+      if (analyze) {
+        if (task?.task !== 'analyze' || !task.sentence?.includes(task.selectedTerm) || 'candidates' in task) throw new Error('SETUP: unexpected expression analysis prompt');
+      } else if (task?.task !== 'recommend' || task.candidates.length !== 2 || !task.candidates[0].definition.startsWith('An original dictionary meaning')) throw new Error('SETUP: unexpected dictionary AI prompt');
       window._auditDictAssist.entered = true;
       await new Promise(resolve => { window._auditDictAssist.release = resolve; });
       opts.signal?.throwIfAborted();
       // Only echo the opaque input ID. Response fields are protocol literals,
       // never constructed by the implementation under test.
+      if (analyze) return JSON.stringify({ suggestions: [
+        { kind: 'lemma', headword: 'constrain', evidence: [task.selectedTerm], explanation: 'A possible base form, supported by the selected source fragment.\nThe saved word is unchanged.' },
+        { kind: 'phrase', headword: 'a constraint', evidence: [task.selectedTerm], explanation: 'A possible expression for a separate dictionary lookup.' }
+      ] });
       return JSON.stringify({ choiceId: task.candidates[0].id, explanation: '这条释义符合原句中的用法。\nThis separate AI explanation leaves the original dictionary definition intact.' });
     };
-  });
+  }, analyze);
 }
 
-export async function openDictAssistState(page, state) {
+export async function openDictAssistState(page, state, { analyze = false } = {}) {
+  const action = analyze ? '.dict-assist-analyze' : '.dict-assist-recommend';
   if (state === 'idle') {
-    await page.locator('.dict-assist-recommend:not([disabled])').waitFor();
+    await page.locator(action + ':not([disabled])').waitFor();
     return page.locator('.xp-dict-assist').isVisible();
   }
   if (state === 'busy') {
-    await page.locator('.dict-assist-recommend').click();
+    await page.locator(action).click();
     await page.waitForFunction(() => window._auditDictAssist?.entered);
     return page.locator('.dict-assist-stop:not([hidden])').isVisible();
   }
   await page.evaluate(() => { if (!window._auditDictAssist?.release) throw new Error('SETUP: no pending AI request'); window._auditDictAssist.release(); });
-  await page.locator('.dict-assist-explanation').waitFor();
-  return page.locator('.dict-assist-use').isVisible();
+  await page.locator('.dict-assist-explanation').first().waitFor();
+  return page.locator(analyze ? '.dict-assist-lookup' : '.dict-assist-use').first().isVisible();
 }

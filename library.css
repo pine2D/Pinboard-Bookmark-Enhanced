@@ -2106,15 +2106,19 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-connect:disabled { opacity: 0.6; cursor: default; }
 #vocab-ref-result .xp-dict-assist { margin-top: var(--lib-sp-4); min-width: 0; overflow-wrap: anywhere; }
 #vocab-ref-result .xp-dict-assist:not([hidden]),
-#vocab-ref-result .dict-assist-result:not(:empty) { display: grid; gap: var(--lib-sp-2); }
+#vocab-ref-result .dict-assist-result:not(:empty) { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-assist > :empty,
 #vocab-ref-result .xp-dict-assist [hidden] { display: none; }
 #vocab-ref-result .dict-assist-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-assist .xp-dict-connect:not([hidden]) { display: inline-flex; align-items: center; gap: var(--lib-sp-1); margin-top: 0; max-width: 100%; justify-self: start; }
 #vocab-ref-result .xp-dict-assist .xp-dict-connect svg { width: 14px; height: 14px; flex: none; }
 #vocab-ref-result .dict-assist-context,
+#vocab-ref-result .dict-assist-headword,
+#vocab-ref-result .dict-assist-evidence,
 #vocab-ref-result .dict-assist-meaning,
 #vocab-ref-result .dict-assist-explanation { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+#vocab-ref-result .dict-assist-suggestion { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: var(--lib-sp-1); column-gap: var(--lib-sp-2); min-width: 0; }
+#vocab-ref-result .dict-assist-headword { font-weight: 600; }
 #vocab-ref-result .dict-assist-context-wrap > p { margin-top: var(--lib-sp-1); }
 #vocab-ref-result .xp-dict-assist .xp-dict-local-title { margin-bottom: 0; }
 #vocab-ref-result .xp-dict-assist .xp-dict-src,

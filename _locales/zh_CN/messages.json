@@ -4501,5 +4501,15 @@
   "dictAssistCopied": {"message": "已复制解释"},
   "dictAssistCopyFailed": {"message": "无法复制解释，请选中文字后手动复制。"},
   "dictAssistFailed": {"message": "AI 未能完成此次请求。请重试。"},
-  "dictAssistAllowedSources": {"message": "仅使用已获准供 AI 使用的词典来源。"}
+  "dictAssistAllowedSources": {"message": "仅使用已获准供 AI 使用的词典来源。"},
+  "dictAssistAnalyze": {"message": "用 AI 分析"},
+  "dictAssistAnalysisHint": {"message": "根据原句分析所选表达。"},
+  "dictAssistAnalysisNeedsMatch": {"message": "无法在这句中找到所选表达。请查询原句中的词形。"},
+  "dictAssistAnalysisEmpty": {"message": "未找到有原句依据的原形或短语建议。"},
+  "dictAssistLemmaSuggestion": {"message": "可能的原形"},
+  "dictAssistPhraseSuggestion": {"message": "可能的短语"},
+  "dictAssistEvidence": {"message": "原句片段"},
+  "dictAssistLookupSuggestion": {"message": "查询此项"},
+  "dictAssistAnalysisBusy": {"message": "正在分析表达…"},
+  "dictAssistAnalysisFailed": {"message": "未能分析这段表达。请重试。"}
 }

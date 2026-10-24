@@ -4514,5 +4514,15 @@
   "dictAssistCopied": {"message": "Explanation copied"},
   "dictAssistCopyFailed": {"message": "Could not copy the explanation. Select its text and copy it manually."},
   "dictAssistFailed": {"message": "AI could not complete this request. Try again."},
-  "dictAssistAllowedSources": {"message": "Only dictionary sources allowed for AI are included."}
+  "dictAssistAllowedSources": {"message": "Only dictionary sources allowed for AI are included."},
+  "dictAssistAnalyze": {"message": "Analyze with AI"},
+  "dictAssistAnalysisHint": {"message": "Analyze the selected expression using its source sentence."},
+  "dictAssistAnalysisNeedsMatch": {"message": "The selected expression could not be located in this sentence. Look up the form that appears there."},
+  "dictAssistAnalysisEmpty": {"message": "No supported base form or phrase was found in this sentence."},
+  "dictAssistLemmaSuggestion": {"message": "Possible base form"},
+  "dictAssistPhraseSuggestion": {"message": "Possible phrase"},
+  "dictAssistEvidence": {"message": "From the sentence"},
+  "dictAssistLookupSuggestion": {"message": "Look up suggestion"},
+  "dictAssistAnalysisBusy": {"message": "Analyzing the expression…"},
+  "dictAssistAnalysisFailed": {"message": "Could not analyze this expression. Try again."}
 }

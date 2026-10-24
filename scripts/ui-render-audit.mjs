@@ -8771,7 +8771,7 @@ async function runSweep(page, sw, extBase) {
       add(await runFamilySweep(page), surface, name);
     });
   };
-  if (Object.values(contexts).some(names => [...names].some(name => name.startsWith("dict-assist-")))) {
+  if (Object.values(contexts).some(names => [...names].some(name => /^dict-(assist|analyze)-/.test(name)))) {
     await sw.evaluate(() => chrome.storage.local.set({ aiProvider: "openai", openaiApiKey: obfuscateKey("render-fixture-key"), previewAiEnabled: true, dictDefinitionLang: "zh-Hans" }));
   }
   // family 9 liveness (stage 4): sweepProbe reports every value box whose
@@ -8920,6 +8920,16 @@ async function runSweep(page, sw, extBase) {
         if (wants("library", "dict-assist-" + state)) await scan("library", "dict-assist-" + state, () => openDictAssistState(page, state));
       }
     }
+    if (wants("library", "dict-analyze-idle")) {
+      await installDictAssistFixture(page, { analyze: true });
+      const analysisHead = page.locator("#vocab-list .vocab-card .notes-card-head")
+        .filter({ has: page.locator(".notes-row-title", { hasText: new RegExp(`^${LIB_SEED.richTerm}$`) }) });
+      await analysisHead.click();
+      await page.locator("#vocab-lookup-go").click();
+      for (const state of ["idle", "busy", "result"]) {
+        if (wants("library", "dict-analyze-" + state)) await scan("library", "dict-analyze-" + state, () => openDictAssistState(page, state, { analyze: true }));
+      }
+    }
     // Ctrl+click on the row head, not a checkbox click: the per-row checkbox was
     // removed 2026-08-06 and selection is now a modified click on the row itself.
     if (wants("library", "vocab-batch-bar")) {
@@ -9008,14 +9018,15 @@ async function runSweep(page, sw, extBase) {
         // probed as its own context, then closed. A surface that fails to render
         // is printed, never skipped silently -- the gate's coverage is the point.
         for (const name of READER_SURFACES.filter((name) => wants("md-preview", name))) {
-          if (name.startsWith("dict-assist-")) {
-            if (name === "dict-assist-idle") {
-              await installDictAssistFixture(page);
+          if (/^dict-(assist|analyze)-/.test(name)) {
+            const analyze = name.startsWith("dict-analyze-");
+            if (name.endsWith("-idle")) {
+              await installDictAssistFixture(page, { analyze });
               if (await page.evaluate(openReaderSurface, "explain-pop") !== true || await page.evaluate(openReaderSurface, "explain-dict") !== true) throw new Error("SETUP: dictionary assistance opener failed");
               await page.selectOption(".xp-dict-lang:not([data-pack-id])", "en");
             }
-            await scan("md-preview", name, () => openDictAssistState(page, name.slice("dict-assist-".length)));
-            if (name === "dict-assist-result") await page.evaluate(closeReaderSurface, "explain-dict");
+            await scan("md-preview", name, () => openDictAssistState(page, name.slice(name.lastIndexOf("-") + 1), { analyze }));
+            if (name.endsWith("-result")) await page.evaluate(closeReaderSurface, "explain-dict");
             continue;
           }
           await scan("md-preview", name, async () => {

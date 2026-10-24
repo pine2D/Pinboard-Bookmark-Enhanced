@@ -4507,5 +4507,15 @@
   "dictAssistCopied": {"message": "Erklärung kopiert"},
   "dictAssistCopyFailed": {"message": "Die Erklärung konnte nicht kopiert werden. Markiere den Text und kopiere ihn manuell."},
   "dictAssistFailed": {"message": "Die KI konnte diese Anfrage nicht abschließen. Versuche es erneut."},
-  "dictAssistAllowedSources": {"message": "Es werden nur Wörterbuchquellen berücksichtigt, die für die KI freigegeben sind."}
+  "dictAssistAllowedSources": {"message": "Es werden nur Wörterbuchquellen berücksichtigt, die für die KI freigegeben sind."},
+  "dictAssistAnalyze": {"message": "Mit KI analysieren"},
+  "dictAssistAnalysisHint": {"message": "Analysiere den ausgewählten Ausdruck anhand seines Quellsatzes."},
+  "dictAssistAnalysisNeedsMatch": {"message": "Der ausgewählte Ausdruck wurde in diesem Satz nicht gefunden. Schlage die dort verwendete Form nach."},
+  "dictAssistAnalysisEmpty": {"message": "In diesem Satz wurde keine belegbare Grundform oder Wendung gefunden."},
+  "dictAssistLemmaSuggestion": {"message": "Mögliche Grundform"},
+  "dictAssistPhraseSuggestion": {"message": "Mögliche Wendung"},
+  "dictAssistEvidence": {"message": "Aus dem Satz"},
+  "dictAssistLookupSuggestion": {"message": "Vorschlag nachschlagen"},
+  "dictAssistAnalysisBusy": {"message": "Ausdruck wird analysiert…"},
+  "dictAssistAnalysisFailed": {"message": "Der Ausdruck konnte nicht analysiert werden. Versuche es erneut."}
 }

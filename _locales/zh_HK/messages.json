@@ -4507,5 +4507,15 @@
   "dictAssistCopied": {"message": "已複製解釋"},
   "dictAssistCopyFailed": {"message": "無法複製解釋，請選取文字後手動複製。"},
   "dictAssistFailed": {"message": "AI 未能完成這次請求。請重試。"},
-  "dictAssistAllowedSources": {"message": "僅使用已獲准供 AI 使用的詞典來源。"}
+  "dictAssistAllowedSources": {"message": "僅使用已獲准供 AI 使用的詞典來源。"},
+  "dictAssistAnalyze": {"message": "用 AI 分析"},
+  "dictAssistAnalysisHint": {"message": "按原句分析所選表達。"},
+  "dictAssistAnalysisNeedsMatch": {"message": "無法在這句中找到所選表達。請查詢原句中的詞形。"},
+  "dictAssistAnalysisEmpty": {"message": "未找到有原句依據的原形或短語建議。"},
+  "dictAssistLemmaSuggestion": {"message": "可能的原形"},
+  "dictAssistPhraseSuggestion": {"message": "可能的短語"},
+  "dictAssistEvidence": {"message": "原句片段"},
+  "dictAssistLookupSuggestion": {"message": "查詢此項"},
+  "dictAssistAnalysisBusy": {"message": "正在分析表達…"},
+  "dictAssistAnalysisFailed": {"message": "未能分析這段表達。請重試。"}
 }

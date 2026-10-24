@@ -1296,8 +1296,8 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
   // pronunciation and retry/language-change identity along with save choices.
   cur.rerunWith = (base) => {
     const next = pbpDictNormalizeTerm(base);
-    if (!next || _pbpDictCurrent !== cur) return;
-    _pbpVocabLookupOther(next, lang);
+    if (!next || _pbpDictCurrent !== cur || !cur.isCurrent?.()) return;
+    _pbpVocabLookupOther(next, lang, sentence);
   };
   _pbpDictCurrent = cur;
   const host = $id("vocab-ref-result");
@@ -1310,6 +1310,7 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
   state.assist = _pbpDictAssistMount(host, { term, lang, sentence, owner: state.owner, signal,
     isCurrent: state.live, settings: pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS),
     getSelection: () => state.choices.get(state.select?.value) || null,
+    onLookup: headword => { if (state.live()) _pbpVocabLookupOther(headword, lang, sentence); },
     onSelect: choice => {
       for (const [key, row] of state.choices) if (row.term === choice.term && row.gloss === choice.gloss &&
         row.packId === choice.packId && row.sourceLabel === choice.sourceLabel) {
@@ -1575,7 +1576,9 @@ function _pbpVocabRefSlot() {
   setBtnIcon(again, "refresh", t("libraryRelookup"));
   again.addEventListener("click", () => {
     if (host && host.dataset.refState === "other") {
-      _pbpVocabLookupOther(host.dataset.refTerm || "", host.dataset.refLang || _vocabLookupLang);
+      const cur = _pbpDictCurrent;
+      if (!cur?.isCurrent?.()) return;
+      _pbpVocabLookupOther(host.dataset.refTerm || "", host.dataset.refLang || _vocabLookupLang, cur.sentence);
     } else {
       const w = _vocabRows.find((row) => row.id === _pbpVocabDetailWordId);
       if (!w) return;
@@ -1714,7 +1717,7 @@ function _pbpVocabRevealSavedWord(id) {
 // column, the open word and the current row stay. Its own head names the word
 // (with Pronounce, kept from the old free-lookup view) and, when that word is
 // saved, the "In your vocabulary · view" door.
-function _pbpVocabLookupOther(term, lang) {
+function _pbpVocabLookupOther(term, lang, sentence = "") {
   const host = $id("vocab-ref-result");
   if (!host || !term) return;
   _pbpVocabRelookedWordId = null;
@@ -1754,7 +1757,7 @@ function _pbpVocabLookupOther(term, lang) {
   host.prepend(head);
   // `lang`, not the list box: md-dict's rerun fires long after submit, and by
   // then the list box may name the language picked for the NEXT lookup.
-  const run = () => _pbpVocabDictRun(term, lang, els, "", run);
+  const run = () => _pbpVocabDictRun(term, lang, els, sentence, run);
   run();
 }
 
@@ -1784,7 +1787,8 @@ function _pbpVocabLookupLangChanged() {
   if (!sel) return;
   if (host && host.dataset.refState === "other") {
     _vocabLookupLang = sel.value;
-    _pbpVocabLookupOther(host.dataset.refTerm || "", sel.value);
+    const sentence = _pbpDictCurrent?.isCurrent?.() ? _pbpDictCurrent.sentence : "";
+    _pbpVocabLookupOther(host.dataset.refTerm || "", sel.value, sentence);
     return;
   }
   const w = _pbpVocabDetailWordId ? _vocabRows.find((row) => row.id === _pbpVocabDetailWordId) : null;

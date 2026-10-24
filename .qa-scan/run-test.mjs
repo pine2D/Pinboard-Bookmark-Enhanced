@@ -19,7 +19,10 @@ if (!file) {
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const abs = resolve(file);
 const rel = relative(ROOT, abs).split("\\").join("/");
-const TEST_TIMEOUT_MS = rel === "tests/md-convert-tests.html" ? 45000 : 30000;
+// These larger suites include real asynchronous DOM/IDB work. Library's
+// complete run takes about 32s here, beyond the 24s inner wait left
+// by the normal 30s deadline after reserving diagnostics and cleanup.
+const TEST_TIMEOUT_MS = ["tests/md-convert-tests.html", "tests/library-vocab-tests.html"].includes(rel) ? 45000 : 30000;
 const CLEANUP_TIMEOUT_MS = 5000;
 // Cushion between "the wait-for-rows deadline + the diagnostic sample's own
 // bound" and the outer bounded("test", TEST_TIMEOUT_MS) deadline (started
@@ -48,7 +51,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/bili-bridge-tests.html": 3,
   "tests/contrast-tests.html": 6,
   "tests/dict-pack-tests.html": 286,
-  "tests/dict-assist-tests.html": 46,
+  "tests/dict-assist-tests.html": 64,
   "tests/escape-html-tests.html": 8,
   "tests/eudic-sync-tests.html": 39,
   "tests/export-targets-tests.html": 153,
@@ -59,13 +62,13 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/jina-cache-tests.html": 28,
   "tests/library-listbox-tests.html": 72,
   "tests/library-notes-tests.html": 319,
-  "tests/library-vocab-tests.html": 511,
+  "tests/library-vocab-tests.html": 521,
   "tests/md-ai-tests.html": 1084,
   "tests/md-ask-export-tests.html": 42,
   "tests/reader-bookmark-tests.html": 46,
   "tests/md-ai-setup-tests.html": 18,
   "tests/md-convert-tests.html": 827,
-  "tests/md-dict-tests.html": 612,
+  "tests/md-dict-tests.html": 630,
   "tests/md-embed-tests.html": 54,
   "tests/md-explain-layout-tests.html": 10,
   "tests/md-highlight-commit-tests.html": 259,

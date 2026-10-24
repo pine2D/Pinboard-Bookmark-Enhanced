@@ -1579,7 +1579,7 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 
 | 表面 | 原语 | 契约（拥有的几何） |
 |---|---|---|
-| library / md-preview | `.xp-dict-assist` / `.dict-assist-actions` | 共用词典义项 AI 渲染器的平铺区与按钮行；区前 sp-4、内容 gap sp-2，按钮 flex-wrap + gap sp-2（8px）。子元素 `.dict-assist-context-wrap` 的标签至原句 `.dict-assist-context` 为 sp-1，`.dict-assist-result` 结果网格 gap sp-2；原句/原义/译释保留换行并可断长词。保留两面既有 `.xp-dict-connect` 高度；无面板底色、边框或阴影。library 的 `.lib-cluster` 是 4px 图标簇，不用于这行文字按钮 |
+| library / md-preview | `.xp-dict-assist` / `.dict-assist-actions` | 共用词典 AI 渲染器的平铺区与按钮行；区前 sp-4、内容 gap sp-2，按钮 flex-wrap + gap sp-2（8px）。子元素 `.dict-assist-context-wrap` 的标签至原句 `.dict-assist-context` 为 sp-1，`.dict-assist-result` 结果网格 gap sp-2；各 `.dict-assist-suggestion` 是单列 minmax(0,1fr) 文字组，row-gap sp-1、column-gap sp-2，词头用 600 字重，原句证据/原义/译释保留换行并可断长词。保留两面既有 `.xp-dict-connect` 高度；无面板底色、边框或阴影。library 的 `.lib-cluster` 是 4px 图标簇，不用于这行文字按钮 |
 | options | `.fg` | 表单组；`margin-bottom: var(--opt-rhythm)`（12px）= 组间节律的唯一主人 |
 | options | `.theme-preset-groups` | 共享 `max-content` 标签列与按钮列；分组沿用 subgrid，按钮复用 `.fg-actions` 独立换行；列间 sp-6、组间 sp-5，≤600px 改标签在上并以 sp-6 分组 |
 | md-preview | `.exp-scope.row` | 导出内容选择沿用 26px action-btn 与 sp-2 按钮间距；短文案同排、长文案按钮独立换行；摘要和附问答开关由相邻关系以 sp-2 分隔 |

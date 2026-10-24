@@ -4507,5 +4507,15 @@
   "dictAssistCopied": {"message": "Wyjaśnienie skopiowane"},
   "dictAssistCopyFailed": {"message": "Nie udało się skopiować wyjaśnienia. Zaznacz tekst i skopiuj go ręcznie."},
   "dictAssistFailed": {"message": "AI nie udało się zrealizować tego żądania. Spróbuj ponownie."},
-  "dictAssistAllowedSources": {"message": "Uwzględniane są tylko źródła słownikowe dopuszczone do użycia z AI."}
+  "dictAssistAllowedSources": {"message": "Uwzględniane są tylko źródła słownikowe dopuszczone do użycia z AI."},
+  "dictAssistAnalyze": {"message": "Analizuj z AI"},
+  "dictAssistAnalysisHint": {"message": "Przeanalizuj zaznaczone wyrażenie na podstawie zdania źródłowego."},
+  "dictAssistAnalysisNeedsMatch": {"message": "Nie znaleziono zaznaczonego wyrażenia w tym zdaniu. Wyszukaj formę, która w nim występuje."},
+  "dictAssistAnalysisEmpty": {"message": "Nie znaleziono formy podstawowej ani frazy, którą można potwierdzić na podstawie tego zdania."},
+  "dictAssistLemmaSuggestion": {"message": "Możliwa forma podstawowa"},
+  "dictAssistPhraseSuggestion": {"message": "Możliwa fraza"},
+  "dictAssistEvidence": {"message": "Ze zdania"},
+  "dictAssistLookupSuggestion": {"message": "Wyszukaj sugestię"},
+  "dictAssistAnalysisBusy": {"message": "Analizowanie wyrażenia…"},
+  "dictAssistAnalysisFailed": {"message": "Nie udało się przeanalizować tego wyrażenia. Spróbuj ponownie."}
 }

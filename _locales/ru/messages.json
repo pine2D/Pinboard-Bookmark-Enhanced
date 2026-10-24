@@ -4507,5 +4507,15 @@
   "dictAssistCopied": {"message": "Объяснение скопировано"},
   "dictAssistCopyFailed": {"message": "Не удалось скопировать объяснение. Выделите текст и скопируйте его вручную."},
   "dictAssistFailed": {"message": "ИИ не удалось выполнить этот запрос. Попробуйте ещё раз."},
-  "dictAssistAllowedSources": {"message": "Учитываются только источники словарей, для которых разрешено использование с ИИ."}
+  "dictAssistAllowedSources": {"message": "Учитываются только источники словарей, для которых разрешено использование с ИИ."},
+  "dictAssistAnalyze": {"message": "Разобрать с ИИ"},
+  "dictAssistAnalysisHint": {"message": "Разберите выделенное выражение по исходному предложению."},
+  "dictAssistAnalysisNeedsMatch": {"message": "Выделенное выражение не найдено в этом предложении. Найдите форму, которая в нём используется."},
+  "dictAssistAnalysisEmpty": {"message": "Не найдена начальная форма или выражение, подтверждённые этим предложением."},
+  "dictAssistLemmaSuggestion": {"message": "Возможная начальная форма"},
+  "dictAssistPhraseSuggestion": {"message": "Возможное выражение"},
+  "dictAssistEvidence": {"message": "Из предложения"},
+  "dictAssistLookupSuggestion": {"message": "Найти в словаре"},
+  "dictAssistAnalysisBusy": {"message": "Анализ выражения…"},
+  "dictAssistAnalysisFailed": {"message": "Не удалось разобрать это выражение. Попробуйте ещё раз."}
 }

@@ -4447,6 +4447,48 @@ await (async () => {
     }
   }
 
+  // A confirmed analysis starts an ordinary lookup with the real sentence;
+  // it never writes a saved lemma or silently creates a new word.
+  {
+    const old={remote:_pbpDictSlotRun,local:_pbpDictEcdictSide,load:_pbpDictLoadPack,lookup:window.pbpDictPackLookup,list:window.pbpDictPackList,
+      read:pbpReadSettingsWithSecrets,auto:_pbpVocabAutoLookup,run:pbpDictAssistRun,key:window.hasAIKey,grant:window.ensureAIHostPermissionWithGesture,
+      owner:pbpVocabCurrentOwner,get:pbpVocabGet,save:pbpVocabSaveWord};
+    const owner="acct_analyze_library",sentence="Er hört jetzt auf zu arbeiten.",queries=[],requests=[],writes=[];
+    const word={id:pbpDictVocabKey(owner,"de","hört"),owner,term:"hört",language:"de",gloss:"hears",lemma:"",contexts:[{quote:sentence}],groups:[]};
+    try {
+      _vocabCurrentOwner=owner;_vocabRows=[word];_pbpVocabAutoLookup=async()=>{};
+      _pbpDictLoadPack=async()=>true;window.pbpDictPackLookup=async()=>({state:"unavailable",hits:[]});window.pbpDictPackList=async()=>[];_pbpDictEcdictSide=async()=>{};
+      _pbpDictSlotRun=async(_el,term,lang,_signal,_lemma,_rerun,context)=>{queries.push({term,lang,sentence:context});return term==="hört"?null:{word:term,sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/aufh%C3%B6ren",license:"CC BY-SA 4.0",definitionLang:"en",entries:[{ipas:[],forms:[],senses:[{definition:"to stop"}]}]};};
+      window.hasAIKey=()=>true;window.ensureAIHostPermissionWithGesture=async()=>{};
+      pbpReadSettingsWithSecrets=async()=>({aiProvider:"ollama",previewAiEnabled:true,dictDefinitionLang:"es"});
+      pbpVocabCurrentOwner=async()=>owner;pbpVocabGet=async()=>null;pbpVocabSaveWord=async(...args)=>{writes.push(args);return null;};
+      pbpDictAssistRun=async input=>{requests.push(input);return input.task==="analyze"?{suggestions:[{kind:"lemma",headword:"aufhören",evidence:["hört","auf"],explanation:"Forma base posible."}],targetLang:"es"}:{choiceId:input.choices[0].id,explanation:"Sentido de esta frase.",targetLang:"es"};};
+      _pbpVocabRenderDetail(word);_pbpVocabRelookup(word);await settle();const host=$id("vocab-ref-result");
+      check("analysis: a saved word with context can be analyzed after every dictionary misses",!!host.querySelector('.dict-assist-analyze')&&!host.querySelector('.dict-assist-analyze').disabled);
+      host.querySelector('.dict-assist-analyze').click();await settle();
+      check("analysis: a displayed suggestion alone does not query its headword or write vocabulary",queries.length===1&&queries[0].term==="hört"&&writes.length===0&&word.lemma==="");
+      host.querySelector('.dict-assist-lookup').click();await settle();
+      check("analysis: confirming a base form reruns its exact identity with the original sentence",queries.at(-1)?.term==="aufhören"&&queries.at(-1)?.lang==="de"&&queries.at(-1)?.sentence===sentence&&host.dataset.refTerm==="aufhören"&&_pbpDictCurrent.term==="aufhören");
+      check("analysis: a new base form absent from the quote explains its analysis limit while contextual sense matching remains available",host.querySelector('.dict-assist-analyze').disabled&&!host.querySelector('.dict-assist-recommend').disabled&&host.textContent.includes("dictAssistAnalysisNeedsMatch"));
+      host.querySelector('.dict-assist-recommend').click();await settle();
+      check("analysis: contextual sense matching after confirmation still receives the genuine original sentence",requests.at(-1)?.task==="recommend"&&requests.at(-1)?.term==="aufhören"&&requests.at(-1)?.sentence===sentence);
+      host.querySelector('.vocab-ref-relookup').click();await settle();
+      check("analysis: the visible Look up again action keeps the confirmed suggestion's source sentence",queries.at(-1)?.term==="aufhören"&&queries.at(-1)?.sentence===sentence);
+      _pbpDictCurrent.rerunWith("arbeiten");await settle();
+      check("analysis: a later dictionary form-of jump also keeps the real source sentence",queries.at(-1)?.term==="arbeiten"&&queries.at(-1)?.sentence===sentence);
+      $id("vocab-lookup-lang").value="en";_pbpVocabLookupLangChanged();await settle();
+      check("analysis: an explicit language change preserves the current lookup's real sentence",queries.at(-1)?.lang==="en"&&queries.at(-1)?.sentence===sentence);
+      _pbpVocabLookupOther("Gift","de");await settle();
+      check("analysis: an unrelated free lookup starts without borrowing the previous sentence",queries.at(-1)?.term==="Gift"&&queries.at(-1)?.sentence===""&&host.querySelector('.dict-assist-analyze').disabled);
+      check("analysis: the whole suggest/confirm/retry journey leaves saved identities and lemma relations unchanged",writes.length===0&&_vocabRows[0].term==="hört"&&_vocabRows[0].lemma==="");
+    } finally {
+      _pbpVocabDictCtrl?.abort();_pbpVocabDictChildCtrl?.abort();_pbpVocabRenderDetail(null);
+      _pbpDictSlotRun=old.remote;_pbpDictEcdictSide=old.local;_pbpDictLoadPack=old.load;window.pbpDictPackLookup=old.lookup;window.pbpDictPackList=old.list;
+      pbpReadSettingsWithSecrets=old.read;_pbpVocabAutoLookup=old.auto;pbpDictAssistRun=old.run;pbpVocabCurrentOwner=old.owner;pbpVocabGet=old.get;pbpVocabSaveWord=old.save;
+      for(const [key,value] of [["hasAIKey",old.key],["ensureAIHostPermissionWithGesture",old.grant]]){if(value===undefined)delete window[key];else window[key]=value;}
+    }
+  }
+
   document.title = fail ? "FAIL library-vocab Tests" : "PASS library-vocab Tests";
 })();
 </script></body></html>

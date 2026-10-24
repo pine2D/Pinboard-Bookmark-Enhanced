@@ -4507,5 +4507,15 @@
   "dictAssistCopied": {"message": "Explication copiée"},
   "dictAssistCopyFailed": {"message": "Impossible de copier l’explication. Sélectionnez le texte et copiez-le manuellement."},
   "dictAssistFailed": {"message": "L’IA n’a pas pu traiter cette demande. Réessayez."},
-  "dictAssistAllowedSources": {"message": "Seules les sources de dictionnaire autorisées pour l’IA sont prises en compte."}
+  "dictAssistAllowedSources": {"message": "Seules les sources de dictionnaire autorisées pour l’IA sont prises en compte."},
+  "dictAssistAnalyze": {"message": "Analyser avec l’IA"},
+  "dictAssistAnalysisHint": {"message": "Analysez l’expression sélectionnée à partir de sa phrase source."},
+  "dictAssistAnalysisNeedsMatch": {"message": "L’expression sélectionnée est introuvable dans cette phrase. Recherchez la forme qui y apparaît."},
+  "dictAssistAnalysisEmpty": {"message": "Aucune forme de base ni expression étayée par cette phrase n’a été trouvée."},
+  "dictAssistLemmaSuggestion": {"message": "Forme de base possible"},
+  "dictAssistPhraseSuggestion": {"message": "Expression possible"},
+  "dictAssistEvidence": {"message": "Extrait de la phrase"},
+  "dictAssistLookupSuggestion": {"message": "Rechercher la suggestion"},
+  "dictAssistAnalysisBusy": {"message": "Analyse de l’expression…"},
+  "dictAssistAnalysisFailed": {"message": "Impossible d’analyser cette expression. Réessayez."}
 }

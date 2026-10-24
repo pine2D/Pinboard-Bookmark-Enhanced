@@ -4507,5 +4507,15 @@
   "dictAssistCopied": {"message": "解説をコピーしました"},
   "dictAssistCopyFailed": {"message": "解説をコピーできませんでした。テキストを選択して手動でコピーしてください。"},
   "dictAssistFailed": {"message": "AIがこのリクエストを処理できませんでした。もう一度お試しください。"},
-  "dictAssistAllowedSources": {"message": "AI 利用を許可した辞書の出典のみが対象です。"}
+  "dictAssistAllowedSources": {"message": "AI 利用を許可した辞書の出典のみが対象です。"},
+  "dictAssistAnalyze": {"message": "AI で分析"},
+  "dictAssistAnalysisHint": {"message": "元の文をもとに、選択した表現を分析します。"},
+  "dictAssistAnalysisNeedsMatch": {"message": "選択した表現がこの文に見つかりません。文中にある語形を調べてください。"},
+  "dictAssistAnalysisEmpty": {"message": "この文に基づく基本形やフレーズの候補は見つかりませんでした。"},
+  "dictAssistLemmaSuggestion": {"message": "基本形の候補"},
+  "dictAssistPhraseSuggestion": {"message": "フレーズの候補"},
+  "dictAssistEvidence": {"message": "元の文から"},
+  "dictAssistLookupSuggestion": {"message": "候補を調べる"},
+  "dictAssistAnalysisBusy": {"message": "表現を分析中…"},
+  "dictAssistAnalysisFailed": {"message": "この表現を分析できませんでした。もう一度お試しください。"}
 }

@@ -1621,8 +1621,10 @@ function _pbpDictAssistMount(host, opts) {
   };
   const recommend = button("dictAssistRecommend", "dict-assist-recommend", true);
   const explain = button("dictAssistExplain", "dict-assist-explain", true);
+  const analyze = button("dictAssistAnalyze", "dict-assist-analyze", true);
+  analyze.hidden = typeof opts.onLookup !== "function";
   const stop = button("askStop", "dict-assist-stop"); stop.hidden = true;
-  actions.append(recommend, explain, stop);
+  actions.append(recommend, explain, analyze, stop);
   const hint = document.createElement("div"); hint.className = "xp-dict-msg dict-assist-hint";
   const links = document.createElement("div"); links.className = "xp-dict-src";
   const context = document.createElement("div"); context.className = "dict-assist-context-wrap";
@@ -1637,9 +1639,10 @@ function _pbpDictAssistMount(host, opts) {
   const result = document.createElement("div"); result.className = "dict-assist-result";
   result.setAttribute("role", "status"); result.setAttribute("aria-live", "polite");
   panel.append(actions, hint, links, context, result); host.appendChild(panel);
-  let norms = [], choices = [], epoch = 0, active = null, busy = false, lastError = "", applying = false;
+  let norms = [], choices = [], epoch = 0, active = null, busy = false, lastError = "", applying = false, lastTask = "";
   let settings = opts.settings && typeof opts.settings.then !== "function" ? opts.settings : null;
   const alive = () => !opts.signal?.aborted && panel.isConnected && opts.isCurrent();
+  const located = () => !!opts.term && !!opts.sentence && opts.sentence.normalize("NFC").includes(opts.term.normalize("NFC"));
   const same = (candidate, choice) => !!choice && pbpDictNormalizeTerm(candidate.headword) === choice.term && candidate.definition === choice.gloss &&
     (candidate.packId || "") === (choice.packId || "") && candidate.sourceLabel === choice.sourceLabel;
   const originalChoice = candidate => norms.flatMap(norm => pbpDictNormChoices(norm, opts.lang, t("dictSource"))).find(choice => same(candidate, choice));
@@ -1658,11 +1661,12 @@ function _pbpDictAssistMount(host, opts) {
   };
   const sync = () => {
     if (!alive()) return;
-    panel.hidden = norms.length === 0 && !result.textContent;
+    panel.hidden = norms.length === 0 && !result.textContent && !opts.sentence;
     const configured = !!settings && settings.previewAiEnabled !== false && typeof hasAIKey === "function" && hasAIKey(settings);
     const selected = selectedCandidate(), eligible = choices.filter(choice => choice.eligible === true);
     recommend.disabled = busy || !configured || !opts.sentence || !eligible.length;
     explain.disabled = busy || !configured || selected?.eligible !== true;
+    analyze.disabled = busy || !configured || !located();
     explain.title = t(opts.getSelection() ? "dictAssistExplain" : "dictAssistChooseMeaning");
     recommend.title = t(opts.sentence ? "dictAssistAllowedSources" : "dictAssistNeedContext");
     stop.hidden = !busy;
@@ -1672,25 +1676,26 @@ function _pbpDictAssistMount(host, opts) {
     else if (!configured) {
       hint.textContent = t("dictAiNotConfigured"); settingsLink(settings.previewAiEnabled === false ? "ai-behavior" : "ai");
     } else {
-      hint.textContent = t(!eligible.length ? "dictAssistNoSources" :
+      hint.textContent = t(opts.sentence && !located() && !analyze.hidden ? "dictAssistAnalysisNeedsMatch" :
+        !eligible.length && located() && !analyze.hidden ? "dictAssistAnalysisHint" : !eligible.length ? "dictAssistNoSources" :
         opts.getSelection() && selected?.eligible !== true ? "dictAssistSourceNotAllowed" :
         !opts.sentence ? "dictAssistNeedContext" : "dictAssistAllowedSources");
       if (!eligible.length || (opts.getSelection() && selected?.eligible !== true) || lastError === "dictAssistSourceNotAllowed") settingsLink("vocab");
     }
   };
-  const invalidate = () => { epoch++; active?.abort(); active = null; busy = false; lastError = ""; result.replaceChildren(); context.hidden = true; };
+  const invalidate = () => { epoch++; active?.abort(); active = null; busy = false; lastError = ""; lastTask = ""; result.replaceChildren(); context.hidden = true; };
   const run = async task => {
     if (!alive() || busy || !settings || settings.previewAiEnabled === false || typeof hasAIKey !== "function" || !hasAIKey(settings)) return;
     const selected = selectedCandidate();
-    const candidates = task === "explain" ? selected?.eligible === true ? [selected] : [] : choices.filter(choice => choice.eligible === true);
-    if (!candidates.length || (task === "recommend" && !opts.sentence)) return;
-    invalidate(); const version = epoch, ctrl = new AbortController(); active = ctrl; busy = true;
+    const candidates = task === "analyze" ? [] : task === "explain" ? selected?.eligible === true ? [selected] : [] : choices.filter(choice => choice.eligible === true);
+    if (task === "analyze" ? !located() || analyze.hidden : !candidates.length || (task === "recommend" && !opts.sentence)) return;
+    invalidate(); const version = epoch, ctrl = new AbortController(); active = ctrl; busy = true; lastTask = task;
     const current = () => alive() && epoch === version && !ctrl.signal.aborted;
     // Capture source identities before any await; later source arrivals or
     // replacement invalidate this entire response, including its use button.
     const originals = new Map(candidates.map(candidate => [candidate.id, originalChoice(candidate)]));
     context.hidden = !opts.sentence;
-    result.textContent = t("dictAssistBusy"); sync();
+    result.textContent = t(task === "analyze" ? "dictAssistAnalysisBusy" : "dictAssistBusy"); sync();
     try {
       // First asynchronous operation of the direct click: request only the
       // configured exact AI origin. Owner/consent are rechecked at dispatch.
@@ -1702,6 +1707,46 @@ function _pbpDictAssistMount(host, opts) {
         choices: candidates, owner: opts.owner, settings, signal: ctrl.signal, isCurrent: current });
       if (!current()) return;
       result.replaceChildren();
+      if (task === "analyze") {
+        if (!response.suggestions.length) { result.textContent = t("dictAssistAnalysisEmpty"); return; }
+        const label = document.createElement("div"); label.className = "xp-dict-ailabel"; label.textContent = t("dictAiLabel"); result.appendChild(label);
+        for (const suggestion of response.suggestions) {
+          const group = document.createElement("div"); group.className = "dict-assist-suggestion";
+          const kind = document.createElement("div"); kind.className = "xp-dict-local-title";
+          kind.textContent = t(suggestion.kind === "lemma" ? "dictAssistLemmaSuggestion" : "dictAssistPhraseSuggestion");
+          const headword = document.createElement("p"); headword.className = "dict-assist-headword";
+          headword.textContent = suggestion.headword; headword.lang = opts.lang || "und"; headword.dir = "auto";
+          const evidenceLabel = document.createElement("div"); evidenceLabel.className = "xp-dict-local-title"; evidenceLabel.textContent = t("dictAssistEvidence");
+          group.append(kind, headword, evidenceLabel);
+          for (const fragment of suggestion.evidence) {
+            const evidence = document.createElement("p"); evidence.className = "dict-assist-evidence";
+            evidence.textContent = fragment; evidence.lang = opts.lang || "und"; evidence.dir = "auto"; group.appendChild(evidence);
+          }
+          const explanation = document.createElement("p"); explanation.className = "dict-assist-explanation";
+          explanation.textContent = suggestion.explanation; explanation.lang = response.targetLang || "und"; explanation.dir = "auto";
+          const lookup = button("dictAssistLookupSuggestion", "dict-assist-lookup");
+          lookup.title = suggestion.headword;
+          lookup.setAttribute("aria-label", t("dictAssistLookupSuggestion") + " " + suggestion.headword);
+          lookup.addEventListener("click", async () => {
+            if (!current() || lookup.disabled) return;
+            lookup.disabled = true;
+            try {
+              const owner = typeof pbpVocabCurrentOwner === "function" ? await pbpVocabCurrentOwner() : null;
+              if (!current()) return;
+              const canonical = value => value == null || value === "ownerless" ? "" : value;
+              if (typeof pbpVocabCurrentOwner !== "function" || canonical(owner) !== canonical(opts.owner)) {
+                result.textContent = t("vocabAccountChanged"); return;
+              }
+              opts.onLookup(pbpDictNormalizeTerm(suggestion.headword));
+            } catch (error) {
+              console.warn("[dict] suggested lookup account read failed:", error?.name, "Unable to verify current account");
+              if (current()) { result.textContent = t("vocabAccountChanged"); lookup.disabled = false; }
+            }
+          });
+          group.append(explanation, lookup); result.appendChild(group);
+        }
+        return;
+      }
       if (task === "recommend") {
         const candidate = candidates.find(choice => choice.id === response.choiceId);
         const original = originals.get(response.choiceId);
@@ -1735,7 +1780,8 @@ function _pbpDictAssistMount(host, opts) {
     } catch (error) {
       if (!current() || error?.name === "AbortError") return;
       const key = error?.code === "source_not_allowed" ? "dictAssistSourceNotAllowed" :
-        error?.code === "owner_changed" ? "vocabAccountChanged" : error?.code === "stale" ? "dictAssistSourceChanged" : "dictAssistFailed";
+        error?.code === "owner_changed" ? "vocabAccountChanged" : error?.code === "stale" ? "dictAssistSourceChanged" :
+        task === "analyze" ? "dictAssistAnalysisFailed" : "dictAssistFailed";
       lastError = key;
       result.textContent = error?.code === "host_permission" && typeof pbpAiErrorText === "function" ? pbpAiErrorText(error) : t(key);
       if (key === "dictAssistSourceNotAllowed" && !links.childElementCount) settingsLink("vocab");
@@ -1743,6 +1789,7 @@ function _pbpDictAssistMount(host, opts) {
   };
   recommend.addEventListener("click", () => run("recommend"));
   explain.addEventListener("click", () => run("explain"));
+  analyze.addEventListener("click", () => run("analyze"));
   stop.addEventListener("click", () => { invalidate(); sync(); });
   opts.signal?.addEventListener("abort", invalidate, { once: true });
   if (!settings && opts.settings) Promise.resolve(opts.settings).then(value => { settings = value || {}; sync(); }, error => {
@@ -1753,12 +1800,13 @@ function _pbpDictAssistMount(host, opts) {
     element: panel,
     update(next) {
       if (!alive()) return;
+      if (lastTask === "analyze") { norms = next.filter(Boolean); choices = pbpDictAssistChoices(norms); sync(); return; }
       const hadAdvice = busy || !!result.textContent;
       invalidate(); norms = next.filter(Boolean); choices = pbpDictAssistChoices(norms);
       if (hadAdvice) result.textContent = t("dictAssistSourceChanged");
       sync();
     },
-    selectionChanged() { if (!alive()) return; if (!applying) invalidate(); sync(); }
+    selectionChanged() { if (!alive()) return; if (!applying && lastTask !== "analyze") invalidate(); sync(); }
   };
 }
 
@@ -1907,6 +1955,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   const assistHost = document.createElement("div"); slot.after(assistHost);
   cur.assist = _pbpDictAssistMount(assistHost, { term: cap.text, lang, sentence: cur.sentence, owner: cur.owner,
     signal, isCurrent: cur.isCurrent, settings: s, getSelection: () => cur.packChoice || null,
+    onLookup: headword => { if (cur.isCurrent()) cur.rerunWith(headword); },
     onSelect: choice => {
       for (const source of cur.meaningSources.values()) {
         const index = source.choices.findIndex(row => row.term === choice.term && row.gloss === choice.gloss &&

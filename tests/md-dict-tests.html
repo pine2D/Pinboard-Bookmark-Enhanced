@@ -2244,6 +2244,81 @@ async function runDictionaryAssistUiTests() {
   }
 }
 
+async function runDictionaryAnalyzeUiTests() {
+  section("Explicit phrase and word-form analysis");
+  const saved={run:pbpDictAssistRun,key:window.hasAIKey,grant:window.ensureAIHostPermissionWithGesture,owner:window.pbpVocabCurrentOwner};
+  const host=document.createElement("div");document.body.appendChild(host);
+  const settings={aiProvider:"ollama",previewAiEnabled:true,dictDefinitionLang:"es"};
+  const sentence="Er hört jetzt auf zu arbeiten.",calls=[],lookups=[];
+  const answer={suggestions:[{kind:"lemma",headword:"aufhören",evidence:["hört","auf"],explanation:"Forma base posible."},{kind:"phrase",headword:"aufhören zu arbeiten",evidence:["hört","auf","zu arbeiten"],explanation:"Una expresión en esta frase."}],targetLang:"es"};
+  let selected=null,current=true,releaseOwner,release;
+  const ctrl=new AbortController();
+  try {
+    window.hasAIKey=()=>true;window.ensureAIHostPermissionWithGesture=async()=>{};window.pbpVocabCurrentOwner=async()=>"acct_analyze";
+    pbpDictAssistRun=async input=>{calls.push(input);return answer;};
+    const ui=_pbpDictAssistMount(host,{term:"hört",lang:"de",sentence,owner:"acct_analyze",signal:ctrl.signal,isCurrent:()=>current,settings,getSelection:()=>selected,onSelect:()=>{},onLookup:term=>lookups.push(term)});
+    ui.update([]);
+    if(!host.querySelector('.dict-assist-analyze')){check("word-form analysis has a real-context entry even without a dictionary hit",false);return;}
+    const analyze=host.querySelector('.dict-assist-analyze');
+    check("word-form analysis is available on a dictionary miss without making an automatic request",!host.querySelector('.xp-dict-assist').hidden&&!analyze.disabled&&calls.length===0);
+    analyze.click();await new Promise(r=>setTimeout(r,0));
+    check("analysis sends the original selected form and real sentence without dictionary candidates",calls[0]?.task==="analyze"&&calls[0]?.term==="hört"&&calls[0]?.sentence===sentence&&(!calls[0]?.choices||calls[0].choices.length===0));
+    check("analysis labels possible base forms and phrases as suggestions",host.textContent.includes("dictAssistLemmaSuggestion")&&host.textContent.includes("dictAssistPhraseSuggestion")&&host.querySelectorAll('.dict-assist-suggestion').length===2);
+    check("each evidence fragment is shown separately and exactly as it appeared in the source",[...host.querySelectorAll('.dict-assist-evidence')].map(el=>el.textContent).join("|")==="hört|auf|hört|auf|zu arbeiten");
+    check("analysis evidence and explanation keep their respective language and automatic direction",host.querySelector('.dict-assist-evidence')?.lang==="de"&&host.querySelector('.dict-assist-evidence')?.dir==="auto"&&host.querySelector('.dict-assist-explanation')?.lang==="es"&&host.querySelector('.dict-assist-headword')?.dir==="auto");
+    check("displaying analysis does not automatically look up or save a suggested identity",lookups.length===0);
+    window.pbpVocabCurrentOwner=()=>new Promise(resolve=>{releaseOwner=resolve;});
+    host.querySelector('.dict-assist-lookup').click();await new Promise(r=>setTimeout(r,0));
+    check("confirming a suggested lookup waits for the current account gate",lookups.length===0);
+    releaseOwner?.("acct_analyze");await new Promise(r=>setTimeout(r,0));
+    check("a confirmed suggestion queries the exact proposed headword",lookups.join("|")==="aufhören");
+    window.pbpVocabCurrentOwner=async()=>"acct_other";
+    host.querySelectorAll('.dict-assist-lookup')[1].click();await new Promise(r=>setTimeout(r,0));
+    check("switching accounts blocks a previously displayed suggestion's lookup",lookups.length===1&&host.textContent.includes("vocabAccountChanged"));
+    window.pbpVocabCurrentOwner=async()=>"acct_analyze";
+    pbpDictAssistRun=input=>{calls.push(input);return new Promise(resolve=>{release=resolve;});};
+    analyze.click();await new Promise(r=>setTimeout(r,0));
+    const norm={word:"hört",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/h%C3%B6rt",license:"CC BY-SA 4.0",entries:[{ipas:[],forms:[],senses:[{definition:"hears"}]}]};
+    ui.update([norm]);
+    check("a dictionary result arriving later does not cancel analysis that never used its meanings",calls.at(-1)?.signal.aborted===false);
+    release?.(answer);await new Promise(r=>setTimeout(r,0));
+    check("analysis still finishes after independent dictionary sources change",host.querySelectorAll('.dict-assist-suggestion').length===2);
+    analyze.click();await new Promise(r=>setTimeout(r,0));host.querySelector('.dict-assist-stop').click();release?.(answer);await new Promise(r=>setTimeout(r,0));
+    check("Stop cancels analysis and discards late suggestions",!host.querySelector('.dict-assist-suggestion')&&!analyze.disabled);
+    pbpDictAssistRun=async()=>({suggestions:[],targetLang:"es"});analyze.click();await new Promise(r=>setTimeout(r,0));
+    check("an empty analysis is an honest no-suggestion state with no lookup action",host.textContent.includes("dictAssistAnalysisEmpty")&&!host.querySelector('.dict-assist-lookup'));
+    pbpDictAssistRun=async()=>{throw Object.assign(new Error("invalid response"),{code:"invalid_response"});};analyze.click();await new Promise(r=>setTimeout(r,0));
+    check("invalid analysis output leaves a retryable analysis-specific error",host.textContent.includes("dictAssistAnalysisFailed")&&!analyze.disabled);
+    ctrl.abort();host.replaceChildren();
+    const unmatched=_pbpDictAssistMount(host,{term:"aufhören",lang:"de",sentence,owner:"acct_analyze",signal:new AbortController().signal,isCurrent:()=>true,settings,getSelection:()=>null,onSelect:()=>{},onLookup:()=>{}});
+    unmatched.update([]);
+    check("a saved lemma absent from its source sentence is not treated as a located surface form",host.querySelector('.dict-assist-analyze').disabled&&host.textContent.includes("dictAssistAnalysisNeedsMatch"));
+    host.replaceChildren();
+    const nfd=_pbpDictAssistMount(host,{term:"cafe\u0301",lang:"fr",sentence:"Un café, merci.",owner:"acct_analyze",signal:new AbortController().signal,isCurrent:()=>true,settings,getSelection:()=>null,onSelect:()=>{},onLookup:()=>{}});
+    nfd.update([]);
+    check("source-location checks accept canonical Unicode equivalence without case folding",!host.querySelector('.dict-assist-analyze').disabled);
+    const reader={resolve:_pbpDictResolveLang,online:_pbpDictSlotRun,ctx:_pbpDictCtxRun,local:_pbpDictEcdictSide,load:_pbpDictLoadPack,get:pbpVocabGet,owner:_pbpDictOwner,current:_pbpDictCurrent};
+    const pop=document.createElement("div");pop.innerHTML='<div class="xp-body"></div><button class="xp-vocab"></button>';document.body.appendChild(pop);
+    const readerCtrl=new AbortController(),queries=[];
+    try {
+      _pbpDictResolveLang=async()=>"de";_pbpDictLoadPack=async()=>false;_pbpDictEcdictSide=async()=>{};pbpVocabGet=async()=>null;_pbpDictOwner="acct_analyze";
+      const base={word:"aufhören",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/aufh%C3%B6ren",license:"CC BY-SA 4.0",entries:[{ipas:[],forms:[],senses:[{definition:"to stop"}]}]};
+      _pbpDictSlotRun=async(el,term,lang,_signal,_lemma,_rerun,quote)=>{queries.push({term,lang,quote});_pbpDictRenderEntry(el,base,term,lang);return base;};
+      _pbpDictCtxRun=async(_el,_cap,_ctx,_settings,_signal,resolve)=>{resolve("");return null;};
+      pbpDictAssistRun=async input=>{calls.push(input);return answer;};
+      await pbpDictRun({text:"hört"},{sentence},pop,readerCtrl,settings);
+      const selection=pop.querySelector('.xp-dict-online select');selection.value="0";selection.dispatchEvent(new Event("change"));
+      pop.querySelector('.dict-assist-analyze').click();await new Promise(r=>setTimeout(r,0));
+      check("reader analysis uses the native selection rather than a subsequently chosen dictionary headword",_pbpDictCurrent.term==="aufhören"&&calls.at(-1)?.term==="hört"&&calls.at(-1)?.sentence===sentence);
+      pop.querySelector('.dict-assist-lookup').click();for(let i=0;i<8;i++)await new Promise(r=>setTimeout(r,0));
+      check("reader confirmation runs a complete lookup with the suggested identity, original sentence and owner",queries.at(-1)?.term==="aufhören"&&queries.at(-1)?.quote===sentence&&_pbpDictCurrent.term==="aufhören"&&_pbpDictCurrent.owner==="acct_analyze");
+    } finally {readerCtrl.abort();pop.remove();_pbpDictResolveLang=reader.resolve;_pbpDictSlotRun=reader.online;_pbpDictCtxRun=reader.ctx;_pbpDictEcdictSide=reader.local;_pbpDictLoadPack=reader.load;pbpVocabGet=reader.get;_pbpDictOwner=reader.owner;_pbpDictCurrent=reader.current;}
+  } finally {
+    ctrl.abort();host.remove();pbpDictAssistRun=saved.run;
+    for(const [key,value] of [["hasAIKey",saved.key],["ensureAIHostPermissionWithGesture",saved.grant],["pbpVocabCurrentOwner",saved.owner]]){if(value===undefined)delete window[key];else window[key]=value;}
+  }
+}
+
 (async function () {
   await runDictReviewRegressionTests();
   await runDictDefinitionLanguageTests();
@@ -2259,6 +2334,7 @@ async function runDictionaryAssistUiTests() {
   await runVocabIdbTests();
   await runMultiPackIntegrationTests();
   await runDictionaryAssistUiTests();
+  await runDictionaryAnalyzeUiTests();
   document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 })();
 </script>

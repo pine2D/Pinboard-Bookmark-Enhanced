@@ -367,7 +367,8 @@
         "notes-note-cancel",
         "dict-assist-context-wrap",
         "dict-assist-context",
-        "dict-assist-result"
+        "dict-assist-result",
+        "dict-assist-suggestion"
       ],
       "canvasStructures": [
         "lib-header",
@@ -391,7 +392,8 @@
         "dict-assist-actions",
         "dict-assist-context-wrap",
         "dict-assist-context",
-        "dict-assist-result"
+        "dict-assist-result",
+        "dict-assist-suggestion"
       ]
     },
     "listbox": {
@@ -602,7 +604,8 @@
         "zen-btn",
         "dict-assist-context-wrap",
         "dict-assist-context",
-        "dict-assist-result"
+        "dict-assist-result",
+        "dict-assist-suggestion"
       ]
     },
     "shared": {
