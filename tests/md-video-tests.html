@@ -1508,6 +1508,15 @@ section("extracted runtime primitives (audit E1/E4/E5)");
   assert(srt === "1\n00:00:00,000 --> 00:00:02,500\n第一句\n\n2\n00:00:02,500 --> 00:00:04,000\n第二句\n\n3\n00:00:05,000 --> 00:00:08,000\n末句\n",
     "srt: numbered cues, comma millis, a missing end runs to the next cue's start (even a skipped empty one) or +3s at the tail");
   assert(pbpVideoSrtTime(3661.25) === "01:01:01,250", "srt time: hours roll over and millis keep three digits");
+  assert(pbpVideoSrtTime(0.9998) === "00:00:01,000", "srt time: rounding carries milliseconds into the next second");
+  assert(pbpVideoSrtTime(59.9998) === "00:01:00,000", "srt time: rounding carries across a minute");
+  assert(pbpVideoSrtTime(3599.9998) === "01:00:00,000", "srt time: rounding carries across an hour");
+  const biliRounded = pbpBiliParseSubtitleJson({ body: [{ from: 0, to: 0.9998, content: "First" }, { from: 0.9998, to: 2, content: "Second" }] });
+  assert(pbpVideoSrt(biliRounded) === "1\n00:00:00,000 --> 00:00:01,000\nFirst\n\n2\n00:00:01,000 --> 00:00:02,000\nSecond\n",
+    "srt: Bilibili sub-millisecond cue boundaries survive parsing and export");
+  const ytRounded = pbpYtParseTimedtextXml('<transcript><text start="59.9998" dur="1">Minute</text></transcript>');
+  assert(pbpVideoSrt(ytRounded) === "1\n00:01:00,000 --> 00:01:01,000\nMinute\n",
+    "srt: YouTube XML sub-millisecond cue boundaries survive parsing and export");
   const tmMeta = { title: "T", url: "https://www.youtube.com/watch?v=abcdefghijk", trackLabel: "中文" };
   const tmSegs = [{ from: 0, to: 2, content: "第一段第一句。" }, { from: 65, to: 67, content: "第二段。" }];
   const tm = pbpVideoTimedMarkdown(tmSegs, tmMeta, null);

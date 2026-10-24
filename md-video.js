@@ -1019,9 +1019,10 @@ function pbpVideoTranscriptHeaderLines(meta, headingOverride, rawTitle) {
 
 // SRT timestamp: HH:MM:SS,mmm (comma is the SRT spec's decimal mark).
 function pbpVideoSrtTime(sec) {
-  const s = Math.max(0, Number(sec) || 0);
+  const totalMs = Math.round(Math.max(0, Number(sec) || 0) * 1000);
+  const s = Math.floor(totalMs / 1000);
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = Math.floor(s % 60);
-  const ms = Math.round((s - Math.floor(s)) * 1000) % 1000;
+  const ms = totalMs % 1000;
   const p2 = (n) => String(n).padStart(2, "0");
   return p2(h) + ":" + p2(m) + ":" + p2(r) + "," + String(ms).padStart(3, "0");
 }
