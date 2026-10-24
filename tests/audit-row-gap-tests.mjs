@@ -94,7 +94,9 @@ async function collectProseHits() {
     const body = `<!doctype html><html><head><style>
       body { margin: 16px; font: ${size}px/1.6 sans-serif; }
       .xp-md p { margin: .5em 0; }
-      .xp-dict-senses { padding-left: 1.4em; margin: 8px 0; }
+      ol.xp-dict-senses { padding: 0; margin: 8px 0; }
+      ol.xp-dict-senses > li { margin: 4px 0; margin-inline-start: 1.4em; }
+      ol.xp-dict-senses > li:only-child { margin-inline-start: 0; }
       button { height: 31px; margin: 5px; padding: 0 8px; font: 12px sans-serif; }
     </style></head><body>
       <div class="xp-md">
@@ -103,11 +105,18 @@ async function collectProseHits() {
         <p id="prose-token" style="margin-top:8px;margin-bottom:8px">Incorrect fixed chrome token</p>
         <p id="prose-other" style="padding-left:5px">Other properties still use the scale</p>
       </div>
-      <ol id="senses-relative" class="xp-dict-senses"><li>A meaning</li></ol>
-      <ol id="senses-fixed" class="xp-dict-senses" style="padding-left:26.6px"><li>Fixed at one size</li></ol>
-      <ol id="senses-token" class="xp-dict-senses" style="padding-left:24px"><li>Incorrect chrome token</li></ol>
-      <ol id="senses-other" class="xp-dict-senses" style="margin-top:5px"><li>Other margins stay checked</li></ol>
-      <div id="senses-wrong-tag" class="xp-dict-senses">This is not a prose list</div>
+      <ol class="xp-dict-senses"><li id="senses-relative">A meaning</li><li>Another meaning</li></ol>
+      <ol class="xp-dict-senses"><li id="senses-fixed" style="margin-inline-start:26.6px">Fixed at one size</li><li>Another meaning</li></ol>
+      <ol class="xp-dict-senses"><li id="senses-token" style="margin-inline-start:24px">Incorrect chrome token</li><li>Another meaning</li></ol>
+      <ol class="xp-dict-senses"><li id="senses-rtl-relative" dir="auto">قصر (Schloss)</li><li dir="rtl">معنى آخر</li></ol>
+      <ol class="xp-dict-senses"><li id="senses-rtl-fixed" dir="rtl" style="margin-inline-start:26.6px">قصر (Schloss)</li><li dir="rtl">معنى آخر</li></ol>
+      <ol class="xp-dict-senses"><li id="senses-rtl-token" dir="rtl" style="margin-inline-start:24px">قصر (Schloss)</li><li dir="rtl">معنى آخر</li></ol>
+      <ol class="xp-dict-senses"><li id="senses-single">A single meaning has no marker indent</li></ol>
+      <ol class="xp-dict-senses"><li id="senses-rtl-single" dir="rtl">معنى وحيد</li></ol>
+      <ol class="xp-dict-senses"><li id="senses-single-invalid" style="margin-inline-start:5px">Off-scale single meaning</li></ol>
+      <ol class="xp-dict-senses"><li id="senses-rtl-single-invalid" dir="rtl" style="margin-inline-start:5px">معنى وحيد</li></ol>
+      <ol class="xp-dict-senses"><li id="senses-other" style="margin-top:5px">Other margins stay checked</li><li>Another meaning</li></ol>
+      <div id="senses-wrong-tag" class="xp-dict-senses" style="padding-left:1.4em">This is not a prose list</div>
     </body></html>`;
     await page.route('https://audit.test/md-preview.html', route => route.fulfill({ contentType: 'text/html', body }));
     await page.goto('https://audit.test/md-preview.html');
@@ -119,15 +128,25 @@ const spacingAt = (size, id, prop) => proseHits.get(size).some(hit => hit.kind =
 for (const size of [19, 27]) {
   test(`reader prose relative rhythm is accepted at ${size}px`, () => {
     for (const prop of ['margin-top', 'margin-bottom']) assert.equal(spacingAt(size, 'prose-relative', prop), false, prop);
-    assert.equal(spacingAt(size, 'senses-relative', 'padding-left'), false);
+    assert.equal(spacingAt(size, 'senses-relative', 'margin-left'), false);
+    assert.equal(spacingAt(size, 'senses-rtl-relative', 'margin-right'), false);
   });
   test(`reader prose fixed dimensions cannot hide behind a matching first size or chrome token at ${size}px`, () => {
     for (const prop of ['margin-top', 'margin-bottom']) {
       assert.equal(spacingAt(size, 'prose-fixed', prop), size !== 19, prop);
       assert.equal(spacingAt(size, 'prose-token', prop), true, 'fixed 8px must not replace .5em');
     }
-    assert.equal(spacingAt(size, 'senses-fixed', 'padding-left'), size !== 19);
-    assert.equal(spacingAt(size, 'senses-token', 'padding-left'), true, 'fixed 24px must not replace 1.4em');
+    for (const [prefix, prop] of [['senses', 'margin-left'], ['senses-rtl', 'margin-right']]) {
+      assert.equal(spacingAt(size, prefix + '-fixed', prop), size !== 19);
+      assert.equal(spacingAt(size, prefix + '-token', prop), true, 'fixed 24px must not replace 1.4em');
+    }
+  });
+  test(`single dictionary meanings use the ordinary spacing scale in either direction at ${size}px`, () => {
+    for (const id of ['senses-single', 'senses-rtl-single']) {
+      for (const prop of ['margin-left', 'margin-right']) assert.equal(spacingAt(size, id, prop), false);
+    }
+    assert.equal(spacingAt(size, 'senses-single-invalid', 'margin-left'), true);
+    assert.equal(spacingAt(size, 'senses-rtl-single-invalid', 'margin-right'), true);
   });
   test(`reader prose handling retains all other geometry checks at ${size}px`, () => {
     assert.equal(spacingAt(size, 'prose-other', 'padding-left'), true);

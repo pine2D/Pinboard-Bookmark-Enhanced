@@ -8057,7 +8057,8 @@ const SWEEP_CFG = {
     // and the other geometry families retain their ordinary checks.
     proseRhythm: [
       { surface: "md-preview", selector: ".xp-md p", properties: ["margin-top", "margin-bottom"], em: 0.5, tol: 0.05 },
-      { surface: "md-preview", selector: "ol.xp-dict-senses", properties: ["padding-left"], em: 1.4, tol: 0.05 },
+      { surface: "md-preview", selector: "ol.xp-dict-senses > li:not(:only-child):dir(ltr)", properties: ["margin-left"], em: 1.4, tol: 0.05 },
+      { surface: "md-preview", selector: "ol.xp-dict-senses > li:not(:only-child):dir(rtl)", properties: ["margin-right"], em: 1.4, tol: 0.05 },
     ],
     componentInset: [
       "button", ".btn", "input", "select", "textarea", "[role='button']", "kbd", "summary",

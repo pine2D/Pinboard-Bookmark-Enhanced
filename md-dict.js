@@ -735,10 +735,12 @@ function _pbpDictSenseLi(s, formOf, termLang, definitionLang) {
   // The dictionary edition owns the definition language; the query owns the
   // example/lemma language. Neither may inherit the extension's UI locale.
   li.lang = definitionLang || "und";
+  li.dir = "auto";
   const stags = s.tags || [];
   if (stags.length) {
     const tg = document.createElement("span");
     tg.className = "xp-dict-sense-tag";
+    tg.dir = "auto";
     tg.textContent = "(" + stags.join(", ") + ")";
     li.appendChild(tg);
     li.appendChild(document.createTextNode(" "));
@@ -753,6 +755,7 @@ function _pbpDictSenseLi(s, formOf, termLang, definitionLang) {
     jump.type = "button";
     jump.className = "xp-dict-lemma-link";
     jump.lang = termLang || "und";
+    jump.dir = "auto";
     jump.textContent = pointer.lemma;
     jump.addEventListener("click", () => {
       const live = _pbpDictCurrent;
@@ -766,6 +769,7 @@ function _pbpDictSenseLi(s, formOf, termLang, definitionLang) {
   for (const d of s.subsenses || []) {
     const sub = document.createElement("div");
     sub.className = "xp-dict-subsense";
+    sub.dir = "auto";
     sub.textContent = d;
     li.appendChild(sub);
   }
@@ -788,6 +792,7 @@ function _pbpDictSenseLi(s, formOf, termLang, definitionLang) {
     const row = document.createElement("div");
     row.className = "xp-dict-rel";
     row.lang = termLang || "und";
+    row.dir = "auto";
     const lb = document.createElement("span");
     lb.className = "xp-dict-rel-label";
     lb.lang = document.documentElement.lang || "und";
@@ -1509,9 +1514,11 @@ function _pbpDictEntryMount(host, opts) {
     owner: opts.owner, settings, signal, isCurrent });
   const run = async manual => {
     if (!alive() || busy || !configured()) return;
+    const hadFocus = manual && document.activeElement === generate;
     const version = ++epoch, controller = new AbortController(); active = controller; busy = true;
     const current = () => alive() && epoch === version && !controller.signal.aborted;
     message(t("dictEntryGenerating")); sync();
+    if (hadFocus) stop.focus({ preventScroll: true });
     try {
       // The automatic path never requests permission. Only this direct click
       // can open Chrome's exact-origin permission prompt, before any other await.
@@ -1527,7 +1534,14 @@ function _pbpDictEntryMount(host, opts) {
       message(t(error?.code === "host_permission" ? "aiGrantRetry" :
         error?.code === "owner_changed" ? "vocabAccountChanged" : "dictEntryUnavailable"));
     } finally {
-      if (epoch === version) { busy = false; active = null; if (alive()) sync(); }
+      if (epoch === version) {
+        busy = false; active = null;
+        if (alive()) {
+          const stopFocused = document.activeElement === stop;
+          sync();
+          if (stopFocused && !generate.hidden) generate.focus({ preventScroll: true });
+        }
+      }
     }
   };
   generate.addEventListener("click", () => run(true));

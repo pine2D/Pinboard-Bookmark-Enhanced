@@ -1958,10 +1958,15 @@ async function runDictionaryEntryUiTests() {
     multi.entry.meanings.push({partOfSpeech:"sustantivo",definition:"A second meaning",examples:[]});
     check("every AI meaning retains the word's pronunciation when saved",pbpDictNormChoices(pbpDictEntryNorm(multi,{lang:"es"}),"de").every(choice=>choice.ipa==="/ɡɪft/"));
     const a=mount();await a.ui.ready;
+    const rtl=_pbpDictSenseLi({definition:'قصر يُسمى Schloss (2).',tags:['formal'],subsenses:['A Latin clarification (3).'],examples:[{text:'Das Schloss ist groß.',translation:'القصر كبير (4).'}]},false,'de','ar');
+    a.root.appendChild(rtl);
+    check("RTL definitions follow their text even when a Latin usage tag precedes them",getComputedStyle(rtl).direction==="rtl");
+    check("examples and subsidiary definitions resolve their own writing direction",getComputedStyle(rtl.querySelector('.xp-dict-subsense')).direction==="ltr"&&getComputedStyle(rtl.querySelectorAll('.xp-dict-example')[0]).direction==="ltr"&&getComputedStyle(rtl.querySelectorAll('.xp-dict-example')[1]).direction==="rtl");
     check("opening lookup reads existing AI data without generating by default",reads.length===1&&calls.length===0&&grants===0);
     check("one generation entry replaces all three former AI operations",a.host.querySelectorAll('.xp-dict-ai-generate').length===1&&!a.host.querySelector('.dict-assist-recommend,.dict-assist-explain,.dict-assist-analyze'));
     check("default lookup keeps the dictionary visible with no AI answer panel",!a.dict.hidden&&a.host.querySelector('.xp-dict-ai-content').hidden);
-    a.host.querySelector('.xp-dict-ai-generate').click();await settle();
+    a.host.querySelector('.xp-dict-ai-generate').focus();a.host.querySelector('.xp-dict-ai-generate').click();await settle();
+    check("keyboard generation finishes on the replacement source action",document.activeElement===a.host.querySelector('.xp-dict-ai-switch'));
     check("manual generation obtains permission before issuing one request",calls.length===1&&grants===1);
     check("entry generation carries only the query and independently chosen language",calls[0].term==="Gift"&&calls[0].sourceLanguage==="de"&&calls[0].target.lang==="es"&&!("sentence" in calls[0])&&!("choices" in calls[0]));
     check("AI content and the original dictionary share one mutually exclusive view",a.dict.hidden&&!a.host.querySelector('.xp-dict-ai-content').hidden&&view.at(-1)==="ai");
@@ -1987,13 +1992,16 @@ async function runDictionaryEntryUiTests() {
     const unconfigured=mount();await unconfigured.ui.ready;
     check("unconfigured AI offers its settings link without enabling a paid action",!unconfigured.host.querySelector('.xp-dict-ai-configure').hidden&&unconfigured.host.querySelector('.xp-dict-ai-configure').getAttribute('href')==="options.html#ai"&&unconfigured.host.querySelector('.xp-dict-ai-generate').hidden);
     window.hasAIKey=()=>true;
-    const beforeAuto={calls:calls.length,grants};const automatic=mount({settings:{...settings,dictAiAutoGenerate:true}});await automatic.ui.ready;
+    const beforeAuto={calls:calls.length,grants,focus:document.activeElement};const automatic=mount({settings:{...settings,dictAiAutoGenerate:true}});await automatic.ui.ready;
+    check("automatic generation does not move the existing keyboard focus",document.activeElement===beforeAuto.focus);
     check("automatic entry generation requires explicit opt-in",calls.length===beforeAuto.calls+1&&automatic.dict.hidden);
     check("automatic generation never opens a permission request",grants===beforeAuto.grants);
 
     let release;window.pbpDictEntryRun=input=>{calls.push(input);return new Promise(resolve=>{release=resolve;});};
-    const cancelled=mount();await cancelled.ui.ready;cancelled.host.querySelector('.xp-dict-ai-generate').click();await settle();
+    const cancelled=mount();await cancelled.ui.ready;cancelled.host.querySelector('.xp-dict-ai-generate').focus();cancelled.host.querySelector('.xp-dict-ai-generate').click();await settle();
+    check("keyboard generation keeps a visible focus target while waiting",document.activeElement===cancelled.host.querySelector('.xp-dict-ai-stop'));
     const pending=calls.at(-1).signal;cancelled.host.querySelector('.xp-dict-ai-stop').click();release(record());await settle();
+    check("cancelling generation returns focus to the available generation action",document.activeElement===cancelled.host.querySelector('.xp-dict-ai-generate'));
     check("Stop aborts the pending entry and discards late completion",pending.aborted&&!cancelled.dict.hidden&&cancelled.host.querySelector('.xp-dict-ai-content').hidden);
     check("Stop leaves a usable generation entry and clears busy feedback",!cancelled.host.querySelector('.xp-dict-ai-generate').disabled&&cancelled.host.querySelector('.xp-dict-ai-stop').hidden&&cancelled.host.querySelector('.xp-dict-ai-status').hidden);
     const aborted=mount();await aborted.ui.ready;aborted.host.querySelector('.xp-dict-ai-generate').click();await settle();
@@ -2002,7 +2010,8 @@ async function runDictionaryEntryUiTests() {
     let current=true;const replaced=mount({isCurrent:()=>current});await replaced.ui.ready;replaced.host.querySelector('.xp-dict-ai-generate').click();await settle();current=false;release(record());await settle();
     check("a superseded query ignores a late generated entry",!replaced.dict.hidden&&replaced.host.querySelector('.xp-dict-ai-content').hidden);
     window.pbpDictEntryRun=async()=>{throw Object.assign(new Error("Invalid model output"),{code:"invalid_response"});};
-    const failed=mount();await failed.ui.ready;failed.host.querySelector('.xp-dict-ai-generate').click();await settle();
+    const failed=mount();await failed.ui.ready;failed.host.querySelector('.xp-dict-ai-generate').focus();failed.host.querySelector('.xp-dict-ai-generate').click();await settle();
+    check("failed generation restores the retry action when focus is still on Stop",document.activeElement===failed.host.querySelector('.xp-dict-ai-generate'));
     check("a generation error leaves the dictionary readable and retry possible",!failed.dict.hidden&&!failed.host.querySelector('.xp-dict-ai-generate').disabled&&failed.host.textContent.includes("dictEntryUnavailable"));
     const requestsBeforePermission=calls.length;window.ensureAIHostPermissionWithGesture=async()=>{throw Object.assign(new Error("Permission needed"),{code:"host_permission"});};
     failed.host.querySelector('.xp-dict-ai-generate').click();await settle();
@@ -2014,7 +2023,9 @@ async function runDictionaryEntryUiTests() {
     const empty=mount();await empty.ui.ready;empty.host.querySelector('.xp-dict-ai-generate').click();await settle();
     check("an unknown expression has an explicit empty result rather than invented definitions",empty.host.textContent.includes("dictEntryNoEntry")&&!empty.host.querySelector('.xp-dict-senses'));
     window.pbpDictEntryRun=input=>{calls.push(input);return new Promise(resolve=>{release=resolve;});};
-    uiLanguage="de";const snapshot=mount({settings:{...settings,dictDefinitionLang:""}});await snapshot.ui.ready;snapshot.host.querySelector('.xp-dict-ai-generate').click();await settle();uiLanguage="en";release(record());await settle();
+    uiLanguage="de";const snapshot=mount({settings:{...settings,dictDefinitionLang:""}});await snapshot.ui.ready;snapshot.host.querySelector('.xp-dict-ai-generate').focus();snapshot.host.querySelector('.xp-dict-ai-generate').click();await settle();
+    const outside=document.createElement('button');snapshot.root.appendChild(outside);outside.focus();uiLanguage="en";release(record());await settle();
+    check("late completion never steals focus after the user has moved elsewhere",document.activeElement===outside);
     check("a pending entry keeps the requested definition language when interface language changes",calls.at(-1).target.lang==="de"&&snapshot.host.querySelector('.xp-dict-senses > li')?.lang==="de");
   } finally {
     for(const fixture of fixtures){fixture.ctrl.abort();fixture.root.remove();}
