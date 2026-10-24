@@ -1217,6 +1217,9 @@ async function runDictPermissionFeedbackTests() {
       sourceLabel: "ECDICT", sourceUrl: "", license: ""
     };
     let lookups = [];
+    const deliveries = [];
+    const receive = (norm) => deliveries.push({ norm, rendered: !!el.querySelector(".xp-dict-local-box") });
+    let el;
     _pbpDictLoadPack = async () => true;
     window.pbpEcdictEntryToNorm = () => zhNorm;
     try {
@@ -1224,25 +1227,32 @@ async function runDictPermissionFeedbackTests() {
 
       // The language gate: nothing at all happens outside English.
       window.pbpEcdictLookup = async (t) => { lookups.push(t); return { state: "hit", matched: t, rows: [{}] }; };
-      let el = document.createElement("div"); document.body.appendChild(el);
-      await _pbpDictEcdictSide(el, "词", "zh", null, cur);
+      el = document.createElement("div"); document.body.appendChild(el);
+      await _pbpDictEcdictSide(el, "词", "zh", null, cur, receive);
       assert(lookups.length === 0 && el.childNodes.length === 0, "a non-English lookup never starts the local branch");
+      assertEq(deliveries.length, 0, "a non-English local lookup never reports a result");
 
       // English hit renders into its own container, and only that container.
       lookups = [];
       el = document.createElement("div"); document.body.appendChild(el);
-      await _pbpDictEcdictSide(el, "ephemeral", "en", null, cur);
+      const returned = await _pbpDictEcdictSide(el, "ephemeral", "en", null, cur, receive);
       assert(lookups.join() === "ephemeral", "an English lookup consults the local pack");
       assert(!!el.querySelector(".xp-dict-local-box") && el.textContent.includes("朝生暮死的"),
         "a local hit renders a Chinese block");
       assert(el.textContent.includes("dictZhBlockTitle"), "the block is labelled as coming from the pack");
+      assert(deliveries.length === 1 && deliveries[0].norm === zhNorm,
+        "the optional callback receives the same normalized local result exactly once without another lookup");
+      assert(deliveries[0]?.rendered, "the local-result callback runs only after its dictionary block has rendered");
+      assert(returned === undefined && Object.keys(cur).length === 0,
+        "reporting a local result preserves the reader's undefined return and leaves current vocabulary fields untouched");
 
       // Every non-hit state is silent: no empty box, no error text.
       for (const state of ["ready-miss", "unavailable", "error"]) {
         window.pbpEcdictLookup = async () => ({ state });
         el = document.createElement("div"); document.body.appendChild(el);
-        await _pbpDictEcdictSide(el, "ephemeral", "en", null, cur);
+        await _pbpDictEcdictSide(el, "ephemeral", "en", null, cur, receive);
         assert(el.childNodes.length === 0, `local state "${state}" renders nothing at all`);
+        assertEq(deliveries.length, 1, `local state "${state}" never delivers a result to save`);
       }
 
       // Thrown faults stay invisible to the reader but must leave a trace, and
@@ -1250,17 +1260,19 @@ async function runDictPermissionFeedbackTests() {
       warnings.length = 0;
       window.pbpEcdictLookup = async () => { throw new TypeError("idb exploded"); };
       el = document.createElement("div"); document.body.appendChild(el);
-      await _pbpDictEcdictSide(el, "ephemeral", "en", null, cur);
+      await _pbpDictEcdictSide(el, "ephemeral", "en", null, cur, receive);
       assert(el.childNodes.length === 0, "a thrown lookup renders nothing");
       assert(warnings.some((w) => w.includes("TypeError") && w.includes("idb exploded")),
         "a thrown lookup is still reported to the console");
       assert(!warnings.some((w) => w.includes("ephemeral")), "the console trace carries no looked-up term");
+      assertEq(deliveries.length, 1, "a failed local read never delivers a result to save");
 
       warnings.length = 0;
       _pbpDictLoadPack = async () => { throw new Error("inject failed"); };
       el = document.createElement("div"); document.body.appendChild(el);
-      await _pbpDictEcdictSide(el, "ephemeral", "en", null, cur);
+      await _pbpDictEcdictSide(el, "ephemeral", "en", null, cur, receive);
       assert(el.childNodes.length === 0 && warnings.length === 1, "a loader rejection is silent but traced");
+      assertEq(deliveries.length, 1, "a failed pack load never delivers a result to save");
       _pbpDictLoadPack = async () => true;
 
       // A slow answer that arrives after the run was superseded must not write.
@@ -1269,23 +1281,26 @@ async function runDictPermissionFeedbackTests() {
         return { state: "hit", matched: t, rows: [{}] };
       };
       el = document.createElement("div"); document.body.appendChild(el);
-      await _pbpDictEcdictSide(el, "ephemeral", "en", null, cur);
+      await _pbpDictEcdictSide(el, "ephemeral", "en", null, cur, receive);
       assert(el.childNodes.length === 0, "a late answer does not write into a superseded lookup");
+      assertEq(deliveries.length, 1, "a superseded local query cannot supply another word's save candidates");
 
       // Same for an aborted one.
       _pbpDictCurrent = cur;
       const ac = new AbortController();
       window.pbpEcdictLookup = async (t) => { ac.abort(); return { state: "hit", matched: t, rows: [{}] }; };
       el = document.createElement("div"); document.body.appendChild(el);
-      await _pbpDictEcdictSide(el, "ephemeral", "en", ac.signal, cur);
+      await _pbpDictEcdictSide(el, "ephemeral", "en", ac.signal, cur, receive);
       assert(el.childNodes.length === 0, "an aborted lookup does not write");
+      assertEq(deliveries.length, 1, "an aborted local query never delivers a result to save");
 
       // A detached container is not written either: the panel may already be gone.
       _pbpDictCurrent = cur;
       window.pbpEcdictLookup = async (t) => ({ state: "hit", matched: t, rows: [{}] });
       el = document.createElement("div");   // never appended
-      await _pbpDictEcdictSide(el, "ephemeral", "en", null, cur);
+      await _pbpDictEcdictSide(el, "ephemeral", "en", null, cur, receive);
       assert(el.childNodes.length === 0, "a detached container is left alone");
+      assertEq(deliveries.length, 1, "a removed dictionary panel never delivers a result to save");
     } finally {
       _pbpDictLoadPack = realLoad;
       window.pbpEcdictLookup = realLookup;

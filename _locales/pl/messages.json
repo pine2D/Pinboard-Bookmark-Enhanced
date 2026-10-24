@@ -4439,5 +4439,13 @@
   "vocabLanguageFilterAria": { "message": "Filtruj według języka" },
   "vocabAllLanguages": { "message": "Wszystkie języki" },
   "vocabUnknownLanguage": { "message": "Nie rozpoznano języka" },
-  "vocabFiltersAria": { "message": "Filtruj według języka i grupy" }
+  "vocabFiltersAria": { "message": "Filtruj według języka i grupy" },
+  "vocabLemmaLabel": { "message": "Forma podstawowa" },
+  "vocabLemmaPlaceholder": { "message": "Pozostaw puste, aby nie łączyć" },
+  "vocabLemmaHint": { "message": "Łączy zapisane formy w tym samym języku. Każde słowo zachowuje własne notatki i stan nauki." },
+  "vocabWordFamily": { "message": "Powiązane formy" },
+  "vocabLookupBaseForm": { "message": "Wyszukaj formę podstawową" },
+  "vocabSaveDefinitionLabel": { "message": "Definicja do zapisania" },
+  "vocabSavedOutsideFilters": { "message": "Zapisano. To słowo nie pasuje do bieżących filtrów." },
+  "vocabShowSavedWord": { "message": "Pokaż na liście" }
 }

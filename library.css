@@ -1987,6 +1987,11 @@ html.motion-ready .vocab-note-save {
 .vocab-ref-term { min-width: 0; font-size: 20px; line-height: 28px; font-weight: 700; color: var(--lib-fg); overflow-wrap: anywhere; }
 .vocab-ref-head > .vocab-lookup-saved { margin-inline-start: auto; }
 .vocab-ref-foot { margin-top: var(--lib-sp-1); }
+.vocab-save-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--lib-sp-2); margin-top: var(--lib-sp-3); }
+.vocab-save-controls > .listbox { flex: 1 1 240px; min-width: 0; max-width: 100%; }
+.vocab-save-controls > .save-status { flex-basis: 100%; }
+.vocab-lemma-hint, .vocab-hidden-word { margin-top: var(--lib-sp-2); }
+.vocab-word-family { display: flex; flex-wrap: wrap; gap: var(--lib-sp-1); margin-top: var(--lib-sp-2); }
 /* md-dict output, scoped to the column (md-dict.js is shared with the reader
    and untouched; md-preview.css keeps its own .xp-dict-* rules). Every size is
    px (the reader's em scale was relative to a pane font this page no longer

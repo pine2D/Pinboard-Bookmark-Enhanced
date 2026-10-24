@@ -4446,5 +4446,13 @@
   "vocabLanguageFilterAria": { "message": "Filter by language" },
   "vocabAllLanguages": { "message": "All languages" },
   "vocabUnknownLanguage": { "message": "Language not identified" },
-  "vocabFiltersAria": { "message": "Filter by language and group" }
+  "vocabFiltersAria": { "message": "Filter by language and group" },
+  "vocabLemmaLabel": { "message": "Base form" },
+  "vocabLemmaPlaceholder": { "message": "Leave blank if unlinked" },
+  "vocabLemmaHint": { "message": "Links saved forms in this language. Each word keeps its own notes and learning status." },
+  "vocabWordFamily": { "message": "Related forms" },
+  "vocabLookupBaseForm": { "message": "Look up base form" },
+  "vocabSaveDefinitionLabel": { "message": "Definition to save" },
+  "vocabSavedOutsideFilters": { "message": "Saved. This word is outside the current filters." },
+  "vocabShowSavedWord": { "message": "Show in list" }
 }

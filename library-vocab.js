@@ -19,6 +19,9 @@ var _vocabFlashTimer = 0; // guards two flashes racing to clear each other's tex
 var _vocabExportSession = null; // the open Export menu (count row), if any
 var _vocabExportBusy = false;    // a TSV / Anki / Eudic export is running
 let _vocabRows = [];     // last render's rows for the current owner
+// A completed write refreshes data even after navigation; only the latest
+// query may reopen its result. Reconcile-only clears do not change intent.
+let _vocabLookupIntent = 0;
 let _vocabViewRows = []; // current filtered + sorted view (selection boundary)
 let _vocabSelected = new Set();
 let _vocabFrozenOrder = null; // Map id -> row position while edits hold the order (pbpVocabApplyFrozenOrder)
@@ -362,6 +365,104 @@ function _pbpVocabBuildRow(w) {
   return card;
 }
 
+function _pbpVocabBuildLemmaEditor(w) {
+  const owner = _vocabCurrentOwner;
+  const { sec, body } = _pbpVocabHangSection("vocab-sec-lemma", "vocabLemmaLabel");
+  const unit = document.createElement("span");
+  unit.className = "vocab-group-unit vocab-lemma-control";
+  const lemmaInput = document.createElement("input");
+  lemmaInput.type = "text";
+  lemmaInput.className = "vocab-lemma-input";
+  lemmaInput.value = lemmaInput.defaultValue = w.lemma || "";
+  lemmaInput.lang = w.language || "und";
+  lemmaInput.autocomplete = "off";
+  lemmaInput.placeholder = t("vocabLemmaPlaceholder");
+  lemmaInput.setAttribute("aria-label", t("vocabLemmaLabel"));
+  lemmaInput.setAttribute("aria-describedby", "vocab-lemma-hint");
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "btn btn-sm vocab-group-step vocab-lemma-save";
+  setBtnIcon(save, "check", "");
+  save.title = t("hlSave");
+  save.setAttribute("aria-label", t("hlSave"));
+  const dirty = () => pbpDictNormalizeTerm(lemmaInput.value) !== pbpDictNormalizeTerm(lemmaInput.defaultValue);
+  const sync = () => { save.disabled = !dirty(); };
+  lemmaInput.addEventListener("input", sync);
+  lemmaInput.addEventListener("keydown", event => {
+    if (event.isComposing || event.keyCode === 229) return;
+    if (event.key === "Escape" && dirty()) {
+      event.preventDefault(); event.stopPropagation();
+      lemmaInput.value = lemmaInput.defaultValue; sync();
+    } else if (event.key === "Enter" && !save.disabled) {
+      event.preventDefault(); save.click();
+    }
+  });
+  save.addEventListener("click", async () => {
+    if (save.disabled) return;
+    save.disabled = true;
+    lemmaInput.disabled = true;
+    const gen = ++_vocabRenderGen;
+    const lemma = pbpDictNormalizeTerm(lemmaInput.value);
+    const live = () => gen === _vocabRenderGen && _vocabCurrentOwner === owner &&
+      _pbpVocabDetailWordId === w.id && lemmaInput.isConnected;
+    try {
+      const currentOwner = await pbpVocabCurrentOwner();
+      if (!live()) return;
+      if (_pbpVocabOwnerMoved(currentOwner, owner, gen)) return;
+      const ok = await pbpVocabSetLemma(w.id, owner, lemma);
+      const refreshed = await _pbpVocabReloadAfterMutation(owner, gen);
+      if (gen === _vocabRenderGen && (!ok || !refreshed)) _pbpVocabFlashStatus(false, t(!ok ? "vocabBatchFailed" : "vocabRefreshFailed"));
+    } catch (err) {
+      console.warn("library base form save failed:", err.name, err.message);
+      if (live()) _pbpVocabFlashStatus(false, t("vocabBatchFailed"));
+    } finally {
+      if (lemmaInput.isConnected) { lemmaInput.disabled = false; sync(); }
+    }
+  });
+  sync();
+  unit.append(lemmaInput, save);
+  const hint = document.createElement("p");
+  hint.id = "vocab-lemma-hint";
+  hint.className = "vocab-ref-free vocab-lemma-hint";
+  hint.textContent = t("vocabLemmaHint");
+  body.append(unit, hint);
+  const base = pbpDictNormalizeTerm(w.lemma) || w.term;
+  const key = pbpDictCacheKeyPublic(w.language, base);
+  const relatives = _vocabRows.filter(row => row.id !== w.id && row.owner === owner &&
+    (pbpDictCacheKeyPublic(row.language, pbpDictNormalizeTerm(row.lemma) || row.term) === key ||
+      pbpDictCacheKeyPublic(row.language, row.term) === key));
+  const storedBase = _vocabRows.some(row => row.owner === owner && pbpDictCacheKeyPublic(row.language, row.term) === key);
+  if (relatives.length || (w.lemma && !storedBase)) {
+    const family = document.createElement("div");
+    family.className = "vocab-word-family";
+    family.setAttribute("role", "group");
+    family.setAttribute("aria-label", t("vocabWordFamily"));
+    for (const related of relatives) {
+      const link = document.createElement("button");
+      link.type = "button";
+      link.className = "btn btn-sm ghost vocab-family-word";
+      link.lang = related.language || "und";
+      link.textContent = related.term;
+      link.addEventListener("click", () => {
+        if (_vocabCurrentOwner === owner) _pbpVocabOpenSavedWord(related.id);
+      });
+      family.appendChild(link);
+    }
+    if (w.lemma && !storedBase) {
+      const lookup = document.createElement("button");
+      lookup.type = "button";
+      lookup.className = "btn btn-sm ghost vocab-lookup-base";
+      setBtnIcon(lookup, "book", t("vocabLookupBaseForm"));
+      lookup.addEventListener("click", () => {
+        if (_vocabCurrentOwner === owner && _pbpVocabDetailWordId === w.id) _pbpVocabLookupOther(base, w.language);
+      });
+      family.appendChild(lookup);
+    }
+    body.appendChild(family);
+  }
+  return sec;
+}
+
 // The word whose resting note the reader expanded ("Show full note"), and one
 // ResizeObserver for every note box (_pbpVocabSyncNoteMore).
 let _vocabNoteExpandedId = null;
@@ -653,7 +754,7 @@ function _pbpVocabToggleGroupEditor(open, moveFocus = true) {
 // (mutation reload, view re-entry) keep whichever pane the user is on --
 // otherwise every sibling mutation would yank a narrow reader into the
 // detail, and library.js's view switch could never hand the list back.
-function _pbpVocabRenderDetail(w, enterNarrow) {
+function _pbpVocabRenderDetail(w, enterNarrow, reconcileOnly = false) {
   const empty = $id("vocab-detail-empty");
   const detail = $id("vocab-detail");
   // No-op where the detail pane doesn't exist -- library-vocab.js's row
@@ -674,7 +775,7 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
   const nextId = w ? w.id : null;
   const changed = nextId !== _pbpVocabDetailWordId;
   _pbpVocabDetailWordId = nextId;
-  if (changed) _pbpVocabResetRef(w || null);
+  if (changed) _pbpVocabResetRef(w || null, reconcileOnly);
   empty.hidden = !!w;
   detail.hidden = !w;
   if (!w) document.body.classList.remove("lib-narrow-detail");
@@ -848,7 +949,22 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
     editor.appendChild(chipList);
   }
   head.appendChild(editor);
+  if (_vocabRows.some(row => row.id === w.id) && !_vocabViewRows.some(row => row.id === w.id)) {
+    const notice = document.createElement("div");
+    notice.className = "vocab-hidden-word";
+    const message = document.createElement("p");
+    message.className = "vocab-ref-free";
+    message.textContent = t("vocabSavedOutsideFilters");
+    const reveal = document.createElement("button");
+    reveal.type = "button";
+    reveal.className = "btn btn-sm ghost lib-hang-start vocab-show-in-list-btn";
+    reveal.textContent = t("vocabShowSavedWord");
+    reveal.addEventListener("click", () => _pbpVocabRevealSavedWord(w.id));
+    notice.append(message, reveal);
+    head.appendChild(notice);
+  }
   frag.appendChild(head);
+  frag.appendChild(_pbpVocabBuildLemmaEditor(w));
 
   // 2. Context (spec §4.6): each saved sentence with the word in bold, then
   // its source link and "site · date". No section at all without one.
@@ -981,6 +1097,141 @@ function _pbpVocabSyncDictPronunciation() {
   }
 }
 
+// Choices retain the normalized source record, never dictionary DOM text.
+// A source may resolve a shorter headword (CC-CEDICT prefix matching), so
+// every option names the exact word whose definition it would save.
+function _pbpVocabLookupChoices(norm, lang) {
+  if (!norm) return [];
+  const term = pbpDictNormalizeTerm(norm.word);
+  if (!term) return [];
+  const definitionLang = norm.sourceLabel === "ECDICT" ? "zh" :
+    ["Wiktionary", "CC-CEDICT"].includes(norm.sourceLabel) ? "en" : "und";
+  const choices = [];
+  for (const entry of norm.entries || []) {
+    const visit = sense => {
+      const definition = typeof sense === "string" ? sense : sense?.definition;
+      if (definition) choices.push({ term, language: lang, gloss: definition,
+        ipa: entry.ipas?.[0]?.text || "", sourceUrl: norm.sourceUrl || "", license: norm.license || "",
+        definitionLang, sourceLabel: norm.sourceLabel || "Wiktionary" });
+      for (const sub of sense?.subsenses || []) visit(sub);
+    };
+    for (const sense of entry.senses || []) visit(sense);
+  }
+  return choices;
+}
+
+function _pbpVocabSyncLookupSave(state) {
+  const choice = state.choices.get(state.select.value);
+  const id = choice && pbpDictVocabKey(state.owner, choice.language, choice.term);
+  state.expectedExisting = !!id && _vocabRows.some(w => w.id === id);
+  setBtnIcon(state.button, "bookMarked", t(state.expectedExisting ? "dictUpdateVocab" : "dictSaveVocab"));
+  state.button.disabled = state.busy || !choice;
+  state.select.disabled = state.busy;
+  window.pbpListboxSync?.(state.select);
+  const value = state.select.nextElementSibling?.querySelector(".listbox-value");
+  if (value) value.lang = choice?.definitionLang || document.documentElement.lang || "und";
+}
+
+function _pbpVocabAcceptLookupResult(state, source, norm) {
+  if (!state.live() || !String(state.owner || "").startsWith("acct_")) return;
+  if (norm?.sourceLabel === "CC-CEDICT" && norm.word && state.host.dataset.refState === "other") {
+    state.host.dataset.refTerm = norm.word;
+    const heading = state.host.querySelector(".vocab-ref-term");
+    if (heading) heading.textContent = norm.word;
+  }
+  state.sources.set(source, _pbpVocabLookupChoices(norm, state.lang));
+  if (![...state.sources.values()].some(rows => rows.length)) return;
+  if (!state.panel) {
+    const panel = document.createElement("div");
+    panel.className = "vocab-save-controls";
+    const label = document.createElement("label");
+    label.className = "sr-only";
+    label.htmlFor = "vocab-save-definition";
+    label.textContent = t("vocabSaveDefinitionLabel");
+    const definition = document.createElement("select");
+    definition.className = "vocab-save-definition";
+    definition.id = "vocab-save-definition";
+    definition.dataset.listbox = "float";
+    definition.setAttribute("aria-label", t("vocabSaveDefinitionLabel"));
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn btn-sm vocab-lookup-save";
+    const feedback = document.createElement("span");
+    feedback.className = "save-status";
+    feedback.setAttribute("role", "status");
+    feedback.setAttribute("aria-live", "polite");
+    panel.append(label, definition, button, feedback);
+    Object.assign(state, { panel, select: definition, button, feedback });
+    state.host.insertBefore(panel, state.host.querySelector(".vocab-ref-foot"));
+    definition.addEventListener("change", () => _pbpVocabSyncLookupSave(state));
+    button.addEventListener("click", () => _pbpVocabSaveLookup(state));
+    window.pbpEnhanceListbox?.(definition);
+  }
+  const selected = state.select.value;
+  state.choices.clear();
+  state.select.replaceChildren(new Option(t("vocabSaveDefinitionLabel"), ""));
+  for (const [kind, choices] of state.sources) {
+    choices.forEach((choice, index) => {
+      const key = `${kind}:${index}`;
+      state.choices.set(key, choice);
+      const option = new Option(`${choice.term} · ${choice.gloss} (${choice.sourceLabel})`, key);
+      option.lang = choice.definitionLang;
+      state.select.appendChild(option);
+    });
+  }
+  state.select.value = state.choices.has(selected) ? selected : "";
+  _pbpVocabSyncLookupSave(state);
+}
+
+async function _pbpVocabSaveLookup(state) {
+  const choice = state.choices.get(state.select.value);
+  if (!choice || state.busy || !state.live()) return;
+  const expectedExisting = state.expectedExisting;
+  const gen = ++_vocabRenderGen;
+  state.busy = true;
+  _pbpVocabSyncLookupSave(state);
+  const live = () => gen === _vocabRenderGen && state.live();
+  try {
+    const owner = await pbpVocabCurrentOwner();
+    if (!live()) return;
+    if (_pbpVocabOwnerMoved(owner, state.owner, gen)) return;
+    const id = pbpDictVocabKey(owner, choice.language, choice.term);
+    const current = await pbpVocabGet(id);
+    if (!live()) return;
+    // A create/delete elsewhere must not silently change Save into Update
+    // or revive a deleted word. Refresh the action, then require a new click.
+    if (!!current !== expectedExisting) {
+      _vocabRows = _vocabRows.filter(w => w.id !== id);
+      if (current) _vocabRows.push(current);
+      setStatusIcon(state.feedback, !!current, t(current ? "dictSavedVocab" : "dictVocabSaveFailed"));
+      return;
+    }
+    const ownerNow = await pbpVocabCurrentOwner();
+    if (!live()) return;
+    if (_pbpVocabOwnerMoved(ownerNow, owner, gen)) return;
+    const saved = await pbpVocabSaveWord(owner, {
+      term: choice.term, language: choice.language, gloss: choice.gloss,
+      ipa: choice.ipa, sourceUrl: choice.sourceUrl, license: choice.license,
+    }, { replaceDefinition: true, expectExisting: expectedExisting });
+    if (!saved) {
+      await _pbpVocabReloadAfterMutation(owner, gen);
+      if (live()) setStatusIcon(state.feedback, false, t("dictVocabSaveFailed"));
+      return;
+    }
+    const refreshed = await _pbpVocabReloadAfterMutation(owner, gen);
+    if (gen !== _vocabRenderGen || state.intent !== _vocabLookupIntent) return;
+    if (!refreshed) { _pbpVocabFlashStatus(false, t("vocabRefreshFailed")); return; }
+    _pbpVocabOpenSavedWord(saved.id);
+    _pbpVocabFlashStatus(true, t("dictSavedVocab"));
+  } catch (err) {
+    console.warn("library lookup save failed:", err.name, err.message);
+    if (live()) setStatusIcon(state.feedback, false, t("dictVocabSaveFailed"));
+  } finally {
+    state.busy = false;
+    if (state.live()) _pbpVocabSyncLookupSave(state);
+  }
+}
+
 // Shared dictionary run core, extracted from _pbpVocabRelookup so free lookup
 // (a later task) can reuse it verbatim. Reuses md-dict's pure query seams
 // (_pbpDictSlotRun online chain + _pbpDictEcdictSide local pack) with NO AI
@@ -1016,6 +1267,7 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true } = 
   }
   const signal = child.signal;
 
+  const intent = ++_vocabLookupIntent;
   const cur = { term, lang, sentence };
   cur.rerun = () => { if (_pbpDictCurrent === cur) rerun(); };
   // Form-of pointer jump (md-dict's .xp-dict-lemma-link): its click handler
@@ -1024,19 +1276,20 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true } = 
   // page -- while the same control works in the reader. That link exists to
   // open exactly the dead end a user with no AI key hits on an inflected
   // form, so swallowing it here costs the feature its reason to exist.
-  // Same liveness guard as `rerun`; the re-entry keeps this run's language,
-  // slot pair and sentence and only swaps the query, the way md-dict's own
-  // rerunWith does with `{ ...cap, text: next }`. It re-points `rerun` at the
-  // base form too: the caller's callback re-runs the word this pane was
-  // opened for, which is no longer the query on screen after the jump.
+  // The full query re-entry keeps its language and updates the visible head,
+  // pronunciation and retry/language-change identity along with save choices.
   cur.rerunWith = (base) => {
     const next = pbpDictNormalizeTerm(base);
     if (!next || _pbpDictCurrent !== cur) return;
-    const again = () => _pbpVocabDictRun(next, lang, els, sentence, again);
-    again();
+    _pbpVocabLookupOther(next, lang);
   };
   _pbpDictCurrent = cur;
   const host = $id("vocab-ref-result");
+  host?.querySelector(".vocab-save-controls")?.remove();
+  const state = { owner: _vocabCurrentOwner, lang, host, intent, sources: new Map(), choices: new Map(), busy: false };
+  state.live = () => _pbpDictCurrent === cur && _pbpVocabDictChildCtrl === child && !signal.aborted &&
+    _vocabCurrentOwner === state.owner && !!host?.contains(onlineEl);
+  const acceptLocal = norm => _pbpVocabAcceptLookupResult(state, "local", norm);
   if (host && host.contains(onlineEl)) host.setAttribute("aria-busy", "true");
   const settled = () => {
     if (host && _pbpVocabDictChildCtrl === child && !child.signal.aborted) {
@@ -1048,12 +1301,13 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true } = 
     // Open-to-look-up after an offline-pack hit: the local block only. The
     // online chain does not start, so it neither renders nor sends anything;
     // "Look up again" runs the full chain.
-    _pbpDictEcdictSide(localEl, term, lang, signal, cur).finally(settled);
+    _pbpDictEcdictSide(localEl, term, lang, signal, cur, acceptLocal).finally(settled);
     return;
   }
   _pbpDictSlotSkeleton(onlineEl);
-  const local = _pbpDictEcdictSide(localEl, term, lang, signal, cur);
+  const local = _pbpDictEcdictSide(localEl, term, lang, signal, cur, acceptLocal);
   const remote = _pbpDictSlotRun(onlineEl, term, lang, signal, Promise.resolve(""), cur.rerun, cur.sentence)
+    .then(norm => _pbpVocabAcceptLookupResult(state, "online", norm))
     .catch((err) => console.warn("library relookup failed:", err.name, err.message));
   Promise.allSettled([local, remote]).then(settled);
 }
@@ -1334,7 +1588,8 @@ function _pbpVocabRenderRefIdle(mode) {
 // the list box shows the open word's language (spec §4.10 -- an "und" word
 // leaves it alone) or, on the cover, the session language. For a word,
 // open-to-look-up takes over the column (T7c).
-function _pbpVocabResetRef(w) {
+function _pbpVocabResetRef(w, reconcileOnly = false) {
+  if (!reconcileOnly) _vocabLookupIntent++;
   if (_pbpVocabDictCtrl) { _pbpVocabDictCtrl.abort(); _pbpVocabDictCtrl = null; }
   clearTimeout(_pbpVocabAutoTimer);
   _pbpVocabRelookedWordId = null;
@@ -1373,6 +1628,32 @@ function _pbpVocabRelookup(w) {
   run();
 }
 
+function _pbpVocabOpenSavedWord(id) {
+  const fresh = _vocabRows.find(w => w.id === id && (!w.owner || w.owner === _vocabCurrentOwner));
+  if (!fresh) return;
+  if (_pbpVocabDetailWordId !== id) _pbpVocabRenderDetail(fresh, true);
+  _pbpVocabMarkCurrentRow(id);
+  const row = document.querySelector(`#vocab-list .vocab-card[data-vocab-id="${CSS.escape(id)}"]`);
+  row?.scrollIntoView({ block: "nearest" });
+  if (_pbpVocabNarrowMode()) return;
+  const head = row?.querySelector(".notes-card-head");
+  const target = head || $id("vocab-detail")?.querySelector(".vocab-detail-term");
+  if (!target) return;
+  if (head) _pbpVocabSetRowTabStop(head);
+  else target.tabIndex = -1;
+  target.focus({ preventScroll: true });
+}
+
+function _pbpVocabRevealSavedWord(id) {
+  _pbpVocabClearFilters();
+  const index = _vocabViewRows.findIndex(w => w.id === id);
+  if (index < 0) return;
+  _vocabRenderLimit = Math.max(_vocabRenderLimit, Math.ceil((index + 1) / PBP_VOCAB_RENDER_BATCH) * PBP_VOCAB_RENDER_BATCH);
+  _pbpVocabApplyView(false);
+  _pbpVocabReconcileDetail();
+  _pbpVocabOpenSavedWord(id);
+}
+
 // Another word's result, in the column (spec §4.8 submit rules, V6): the main
 // column, the open word and the current row stay. Its own head names the word
 // (with Pronounce, kept from the old free-lookup view) and, when that word is
@@ -1402,7 +1683,7 @@ function _pbpVocabLookupOther(term, lang) {
   setBtnIcon(speak, "speaker", "");
   speak.title = t("dictSpeak");
   speak.setAttribute("aria-label", t("dictSpeak"));
-  speak.addEventListener("click", () => pbpDictSpeak(term, lang));
+  speak.addEventListener("click", () => pbpDictSpeak(host.dataset.refTerm || term, lang));
   head.appendChild(speak);
   const identity = pbpDictCacheKeyPublic(lang, term);
   const saved = _vocabRows.find((r) => pbpDictCacheKeyPublic(r.language, r.term) === identity);
@@ -1411,28 +1692,7 @@ function _pbpVocabLookupOther(term, lang) {
     hint.type = "button";
     hint.className = "btn btn-sm ghost vocab-lookup-saved";
     setBtnIcon(hint, "bookMarked", t("libraryLookupSaved"));
-    hint.addEventListener("click", () => {
-      // The hint outlives reloads while this result stays on screen: re-read
-      // the CURRENT rows, and a vanished id is a no-op, never a ghost detail.
-      const fresh = _vocabRows.find((r) => r.id === saved.id);
-      if (!fresh) return;
-      _pbpVocabRenderDetail(fresh, true);
-      _pbpVocabMarkCurrentRow(fresh.id);
-      const row = document.querySelector(`#vocab-list .vocab-card[data-vocab-id="${CSS.escape(fresh.id)}"]`);
-      if (row) row.scrollIntoView({ block: "nearest" });
-      // Opening another word rebuilt this column, so the button just pressed
-      // is gone and focus would fall to <body>. Narrow mode already handed it
-      // to Back (_pbpVocabFocusNarrowBack). Otherwise it goes where a row
-      // click leaves it, on the word's row; a row filtered out of (or not
-      // yet loaded into) the list leaves the opened word's heading instead.
-      if (_pbpVocabNarrowMode()) return;
-      const head = row && row.querySelector(".notes-card-head");
-      const target = head || $id("vocab-detail")?.querySelector(".vocab-detail-term");
-      if (!target) return;
-      if (head) _pbpVocabSetRowTabStop(head);
-      else target.tabIndex = -1;
-      try { target.focus({ preventScroll: true }); } catch (_) { target.focus(); }
-    });
+    hint.addEventListener("click", () => _pbpVocabOpenSavedWord(saved.id));
     head.appendChild(hint);
   }
   host.prepend(head);
@@ -2186,7 +2446,7 @@ function _pbpVocabApplyView(resetLimit) {
   // keeping a word the filters have just ruled out (critique round 5). The
   // single-pane layout is left alone -- there the open word is the whole
   // screen and the search box is not on it.
-  if (!_vocabViewRows.length && _vocabRows.length && _pbpVocabDetailWordId && !_pbpVocabNarrowMode()) _pbpVocabRenderDetail(null);
+  if (!_vocabViewRows.length && _vocabRows.length && _pbpVocabDetailWordId && !_pbpVocabNarrowMode()) _pbpVocabRenderDetail(null, false, true);
   _pbpVocabRenderList();
   _pbpVocabRenderCover();
 }
@@ -2298,6 +2558,7 @@ function _pbpVocabClearVisibleState() {
 // its own row is the nearest thing the user was working in.
 function _pbpVocabDetailFocusTargets(el) {
   if (!el) return [];
+  if (el.closest(".vocab-lemma-control")) return [".vocab-lemma-input"];
   if (el.classList.contains("vocab-note-save")) return [".vocab-note-save", ".vocab-note-input"];
   if (el.classList.contains("vocab-note-more")) return [".vocab-note-more", ".vocab-note-input"];
   if (el.closest(".vocab-note-edit")) return [".vocab-note-input"];
@@ -2341,6 +2602,9 @@ function _pbpVocabReconcileDetail() {
   const liveGroup = detail.querySelector(".vocab-group-unit input");
   const draftNote = liveNote ? liveNote.value : null;
   const draftGroup = liveGroup ? liveGroup.value : "";
+  const liveLemma = detail.querySelector(".vocab-lemma-input");
+  const draftLemma = liveLemma && pbpDictNormalizeTerm(liveLemma.value) !== pbpDictNormalizeTerm(liveLemma.defaultValue)
+    ? liveLemma.value : null;
   // The group editor is the user's open tool, not store state: a mutation
   // fired from inside it (a chip's x, + / -) hands it back open.
   const editorOpen = !!detail.querySelector("#vocab-group-editor:not([hidden])");
@@ -2349,7 +2613,7 @@ function _pbpVocabReconcileDetail() {
   // the open word as known drops it out of _vocabViewRows, and reading the
   // word from there reset the pane the button was clicked in.
   const fresh = _vocabRows.find((row) => row.id === _pbpVocabDetailWordId);
-  _pbpVocabRenderDetail(fresh || null);
+  _pbpVocabRenderDetail(fresh || null, false, true);
   if (!fresh) return;
   // No-op when the fresh row is outside the current view (filtered out, or
   // past the load-more depth) -- the pane still reads it, the list just has
@@ -2364,6 +2628,11 @@ function _pbpVocabReconcileDetail() {
   }
   const group = detail.querySelector(".vocab-group-unit input");
   if (group && draftGroup) group.value = draftGroup;
+  const lemma = detail.querySelector(".vocab-lemma-input");
+  if (lemma && draftLemma !== null) {
+    lemma.value = draftLemma;
+    lemma.dispatchEvent(new Event("input"));
+  }
   // Only when the rebuild actually dropped it: these paths await an owner read
   // and a full IDB re-read, and the user may well have clicked into the note
   // box and started typing meanwhile -- taking that focus away would be worse
@@ -2412,7 +2681,7 @@ async function _pbpVocabReloadAfterMutation(expectedOwner, requestedGen, broadca
       // I1: the list clear above leaves a stale word from the PREVIOUS owner
       // sitting in the detail pane -- at <860px that stale detail is the
       // only thing on screen, an owner-isolation breach.
-      _pbpVocabRenderDetail(null);
+      _pbpVocabRenderDetail(null, false, true);
       renderVocabPanel();
       return false;
     }
@@ -2450,7 +2719,7 @@ async function _pbpVocabReloadAfterMutation(expectedOwner, requestedGen, broadca
   } catch (_) {
     if (gen !== _vocabRenderGen) return false;
     _pbpVocabClearVisibleState();
-    _pbpVocabRenderDetail(null); // I1: the clear never touched the detail pane
+    _pbpVocabRenderDetail(null, false, true); // I1: the clear never touched the detail pane
     _pbpVocabSetLoading(false);
     return false;
   }

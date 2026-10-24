@@ -4433,5 +4433,13 @@
   "vocabLanguageFilterAria": { "message": "按语言筛选" },
   "vocabAllLanguages": { "message": "全部语言" },
   "vocabUnknownLanguage": { "message": "未识别语言" },
-  "vocabFiltersAria": { "message": "按语言和分组筛选" }
+  "vocabFiltersAria": { "message": "按语言和分组筛选" },
+  "vocabLemmaLabel": { "message": "原形" },
+  "vocabLemmaPlaceholder": { "message": "不关联时留空" },
+  "vocabLemmaHint": { "message": "关联同一语言中已保存的词形。每个词保留自己的笔记和学习状态。" },
+  "vocabWordFamily": { "message": "相关词形" },
+  "vocabLookupBaseForm": { "message": "查询原形" },
+  "vocabSaveDefinitionLabel": { "message": "要保存的释义" },
+  "vocabSavedOutsideFilters": { "message": "已保存。该词不在当前筛选结果中。" },
+  "vocabShowSavedWord": { "message": "在列表中显示" }
 }

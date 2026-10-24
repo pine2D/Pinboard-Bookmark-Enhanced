@@ -37,7 +37,7 @@ A Chrome extension for [Pinboard](https://pinboard.in): AI tags and summaries, a
 - **Translate the page or ask it questions**: full-page translation with a bilingual view; answers cite the source and jump straight to it
 - **Keep questions and answers with their citations**: export completed conversations on their own or alongside the article
 - **Look up words as you read**: definitions open on the sense that fits your sentence; send saved words to Anki or Eudic in one click, or add offline Chinese-English and English-Chinese dictionaries. Choose the language for AI definitions independently of the interface, and filter saved words by language.
-- **A full page for notes and vocabulary**: saved words and highlights in one place, with dictionary lookup and batch management
+- **A full page for notes and vocabulary**: saved words and highlights in one place, with dictionary lookup and batch management. Save words straight from dictionary results, choose a definition, and link related word forms through an editable base form. Each word keeps its own notes and learning status.
 - **Send or download**: [Obsidian](https://obsidian.md), Notion, NotebookLM, a GitHub Gist, or any webhook; `.md`, `.html`, or `.epub` for your e-reader
 - **Watch while you read**: YouTube and bilibili videos sit beside a transcript that follows playback; AI tags and summaries can read the subtitles
 

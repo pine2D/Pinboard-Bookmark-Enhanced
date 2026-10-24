@@ -4439,5 +4439,13 @@
   "vocabLanguageFilterAria": { "message": "Фильтр по языку" },
   "vocabAllLanguages": { "message": "Все языки" },
   "vocabUnknownLanguage": { "message": "Язык не определён" },
-  "vocabFiltersAria": { "message": "Фильтр по языку и группе" }
+  "vocabFiltersAria": { "message": "Фильтр по языку и группе" },
+  "vocabLemmaLabel": { "message": "Начальная форма" },
+  "vocabLemmaPlaceholder": { "message": "Оставьте пустым, если связи нет" },
+  "vocabLemmaHint": { "message": "Связывает сохранённые формы слов одного языка. У каждого слова остаются свои заметки и статус изучения." },
+  "vocabWordFamily": { "message": "Связанные формы" },
+  "vocabLookupBaseForm": { "message": "Найти начальную форму" },
+  "vocabSaveDefinitionLabel": { "message": "Определение для сохранения" },
+  "vocabSavedOutsideFilters": { "message": "Сохранено. Слово не соответствует текущим фильтрам." },
+  "vocabShowSavedWord": { "message": "Показать в списке" }
 }

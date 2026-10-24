@@ -4439,5 +4439,13 @@
   "vocabLanguageFilterAria": { "message": "言語で絞り込む" },
   "vocabAllLanguages": { "message": "すべての言語" },
   "vocabUnknownLanguage": { "message": "言語不明" },
-  "vocabFiltersAria": { "message": "言語とグループで絞り込む" }
+  "vocabFiltersAria": { "message": "言語とグループで絞り込む" },
+  "vocabLemmaLabel": { "message": "基本形" },
+  "vocabLemmaPlaceholder": { "message": "関連付けない場合は空欄" },
+  "vocabLemmaHint": { "message": "同じ言語の保存済み語形を関連付けます。メモと学習状態は単語ごとに保持されます。" },
+  "vocabWordFamily": { "message": "関連する語形" },
+  "vocabLookupBaseForm": { "message": "基本形を調べる" },
+  "vocabSaveDefinitionLabel": { "message": "保存する語義" },
+  "vocabSavedOutsideFilters": { "message": "保存しました。この単語は現在の絞り込み条件に一致しません。" },
+  "vocabShowSavedWord": { "message": "一覧に表示" }
 }

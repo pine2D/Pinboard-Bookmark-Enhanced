@@ -4439,5 +4439,13 @@
   "vocabLanguageFilterAria": { "message": "Filtrer par langue" },
   "vocabAllLanguages": { "message": "Toutes les langues" },
   "vocabUnknownLanguage": { "message": "Langue non identifiée" },
-  "vocabFiltersAria": { "message": "Filtrer par langue et par groupe" }
+  "vocabFiltersAria": { "message": "Filtrer par langue et par groupe" },
+  "vocabLemmaLabel": { "message": "Forme de base" },
+  "vocabLemmaPlaceholder": { "message": "Laisser vide pour ne pas lier" },
+  "vocabLemmaHint": { "message": "Relie les formes enregistrées dans cette langue. Chaque mot conserve ses notes et son état d’apprentissage." },
+  "vocabWordFamily": { "message": "Formes associées" },
+  "vocabLookupBaseForm": { "message": "Rechercher la forme de base" },
+  "vocabSaveDefinitionLabel": { "message": "Définition à enregistrer" },
+  "vocabSavedOutsideFilters": { "message": "Enregistré. Ce mot ne correspond pas aux filtres actuels." },
+  "vocabShowSavedWord": { "message": "Afficher dans la liste" }
 }

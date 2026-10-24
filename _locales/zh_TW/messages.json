@@ -4439,5 +4439,13 @@
   "vocabLanguageFilterAria": { "message": "依語言篩選" },
   "vocabAllLanguages": { "message": "所有語言" },
   "vocabUnknownLanguage": { "message": "未辨識語言" },
-  "vocabFiltersAria": { "message": "依語言與分組篩選" }
+  "vocabFiltersAria": { "message": "依語言與分組篩選" },
+  "vocabLemmaLabel": { "message": "原形" },
+  "vocabLemmaPlaceholder": { "message": "不建立關聯時留空" },
+  "vocabLemmaHint": { "message": "關聯同一語言中已儲存的詞形。各詞保留自己的筆記與學習狀態。" },
+  "vocabWordFamily": { "message": "相關詞形" },
+  "vocabLookupBaseForm": { "message": "查詢原形" },
+  "vocabSaveDefinitionLabel": { "message": "要儲存的釋義" },
+  "vocabSavedOutsideFilters": { "message": "已儲存。此詞不在目前的篩選結果中。" },
+  "vocabShowSavedWord": { "message": "在清單中顯示" }
 }

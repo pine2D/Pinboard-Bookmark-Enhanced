@@ -11,6 +11,7 @@ A Chrome extension for [Pinboard](https://pinboard.in) with AI tags and summarie
 
 - Save the article to Pinboard or edit its bookmark directly in the reader.
 - Choose the language for AI dictionary explanations independently of the interface, and filter saved vocabulary by language. Dictionary entries retain their original language.
+- Save a word directly from its dictionary result and choose the definition to keep. Link related forms through an editable base form; notes and learning status remain separate for each word.
 - Export completed Ask-the-page questions and answers with their citations, either on their own or alongside the article, through the reader’s existing download, copy, and Send-to actions.
 - The reader translates the extracted article text rather than the live page, so headings, lists, tables, code blocks, and math keep their structure in both the bilingual and translated views.
 - Translation runs between your browser and the AI provider you configured with your own key. The extension operates no translation snapshot or sharing service, so a translated page cannot appear on a public URL unless you export it yourself.

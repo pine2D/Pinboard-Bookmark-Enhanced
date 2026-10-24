@@ -2095,14 +2095,15 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       _pbpVocabRenderDetail(_vocabRows[0]);
       const d = $id("vocab-detail");
       const kinds = [...d.children].map((el) => el.matches("header.vocab-detail-head") ? "head"
+        : el.matches("section.lib-hang-sec.vocab-sec-lemma") ? "lemma"
         : el.matches("section.lib-hang-sec.vocab-sec-context") ? "context"
         : el.matches("section.lib-hang-sec.vocab-sec-note") ? "note" : el.className);
       const sectionsNamed = [...d.querySelectorAll("section.lib-hang-sec")].every((sec) => {
         const label = sec.querySelector(":scope > h3.lib-hang-label");
         return !!label && sec.getAttribute("aria-labelledby") === label.id && !!sec.querySelector(":scope > .lib-hang-body");
       });
-      check("T7 the detail reads head, context, my note -- each section named by a real h3 label",
-        kinds.join(",") === "head,context,note" && sectionsNamed, kinds.join(","));
+      check("T7 the detail reads head, base form, context, my note -- each section named by a real h3 label",
+        kinds.join(",") === "head,lemma,context,note" && sectionsNamed, kinds.join(","));
       const pron = d.querySelector(".vocab-detail-head > .vocab-pron-row");
       const pronKinds = pron ? [...pron.children].map((el) => el.classList.contains("vocab-pron-ipa") ? "ipa"
         : el.classList.contains("vocab-pron-lang") ? "lang" : el.classList.contains("vocab-detail-speak") ? "speak" : el.className) : [];
@@ -3998,6 +3999,268 @@ await (async () => {
 })();
 
   }
+  // Library lookup collection and explicit base-form editing. Dictionary
+  // results are handwritten normalized records; store/owner seams only are
+  // mocked, while the real library runner and DOM event handlers execute.
+  {
+    const real = { owner: pbpVocabCurrentOwner, all: pbpVocabAll, get: pbpVocabGet,
+      save: pbpVocabSaveWord, lemma: window.pbpVocabSetLemma,
+      remote: _pbpDictSlotRun, local: _pbpDictEcdictSide, lookup: _pbpVocabAutoLookup };
+    const ownerA = "acct_related", ownerB = "acct_foreign";
+    let owner = ownerA, store = [], writes = [], lemmaWrites = [];
+    const norm = { word: "run", sourceLabel: "Wiktionary", sourceUrl: "https://en.wiktionary.org/wiki/run", license: "CC BY-SA 4.0",
+      entries: [{ pos: "verb", ipas: [{text:"/rʌn/"}], forms: [], senses: [
+        { definition: "Move swiftly on foot.", examples: [] }, { definition: "Operate or manage something.", examples: [] },
+      ] }] };
+    const row = (term,language="en",extra={}) => ({id:pbpDictVocabKey(ownerA,language,term),owner:ownerA,term,language,groups:[],contexts:[],note:"",status:"new",...extra});
+    const panel = () => $id("vocab-ref-result");
+    const select = () => panel().querySelector(".vocab-save-definition");
+    const save = () => panel().querySelector(".vocab-lookup-save");
+    const choose = text => {
+      const sel=select(), opt=sel&&[...sel.options].find(o=>o.textContent.includes(text));
+      if(opt){sel.value=opt.value;sel.dispatchEvent(new Event("change"));}return !!opt;
+    };
+    const run = async (term="run",lang="en") => { _pbpVocabLookupOther(term,lang); await settle(); };
+    const reload = async () => { _vocabRows=store.map(w=>({...w}));_vocabCurrentOwner=owner;_pbpVocabRefreshGroupOptions(true);_pbpVocabRefreshLanguageOptions(true);_pbpVocabApplyView(true); };
+    try {
+      _pbpVocabRenderDetail(null); _pbpVocabClearFilters();
+      _vocabCurrentOwner=ownerA;
+      pbpVocabCurrentOwner=async()=>owner;
+      pbpVocabAll=async requested=>store.filter(w=>w.owner===requested).map(w=>({...w}));
+      pbpVocabGet=async id=>store.find(w=>w.id===id)||null;
+      pbpVocabSaveWord=async (requested,w)=>{
+        writes.push({owner:requested,word:{...w}});
+        const id=pbpDictVocabKey(requested,w.language,w.term), old=store.find(w=>w.id===id);
+        const fresh={...row(w.term,w.language),...old,...w,id,owner:requested,contexts:old?.contexts||[]};
+        store=store.filter(w=>w.id!==id).concat(fresh);return fresh;
+      };
+      window.pbpVocabSetLemma=async(id,requested,lemma)=>{
+        lemmaWrites.push({id,owner:requested,lemma});
+        const w=store.find(w=>w.id===id&&w.owner===requested);if(!w)return false;
+        w.lemma=pbpDictNormalizeTerm(lemma)||null;return true;
+      };
+      _pbpDictSlotRun=async()=>norm;
+      _pbpDictEcdictSide=async()=>{};
+      // Opening a saved detail should not start unrelated dictionary work.
+      _pbpVocabAutoLookup=async()=>"idle";
+      await reload(); await run();
+      check("B successful lookup offers each definition and requires an explicit choice", !!select()&&select().options.length===3&&select().value===""&&save()?.disabled===true);
+      choose("Operate");
+      check("B choosing a definition enables collection", save()?.disabled===false&&save()?.textContent.includes("dictSaveVocab"));
+      save()?.click(); await settle();
+      check("B lookup saves the selected definition through the store without invented context", writes.length===1&&writes[0].word.gloss==="Operate or manage something."&&!Object.hasOwn(writes[0].word,"context")&&!Object.hasOwn(writes[0].word,"contexts")&&store[0]?.contexts.length===0);
+      check("B lookup preserves pronunciation and source attribution", writes[0]?.word.ipa==="/rʌn/"&&writes[0]?.word.sourceUrl===norm.sourceUrl&&writes[0]?.word.license===norm.license);
+      check("B collecting opens the saved word's detail", _pbpVocabDetailWordId===pbpDictVocabKey(ownerA,"en","run"));
+
+      if(store[0]){store[0].note="keep this note";store[0].status="known";store[0].groups=["Keep"];}
+      await reload();await run();choose("Move swiftly");
+      check("B an existing identity explicitly offers Update saved word", save()?.textContent.includes("dictUpdateVocab"));
+      save()?.click();await settle();
+      check("B updating a definition leaves notes, groups and learning state alone", store[0]?.note==="keep this note"&&store[0]?.status==="known"&&store[0]?.groups[0]==="Keep"&&store[0]?.gloss==="Move swiftly on foot.");
+
+      await run();choose("Operate");store=[];
+      const beforeDeleted=writes.length;save()?.click();await settle();
+      check("B an Update whose word was deleted requires an explicit new Save",writes.length===beforeDeleted&&save()?.textContent.includes("dictSaveVocab"));
+      await run();choose("Operate");store=[row("run","en",{gloss:"saved elsewhere"})];
+      const beforeCreated=writes.length;save()?.click();await settle();
+      check("B a Save whose word was created elsewhere requires an explicit Update",writes.length===beforeCreated&&store[0].gloss==="saved elsewhere"&&save()?.textContent.includes("dictUpdateVocab"));
+
+      store=[row("gehen","de")];await reload();
+      $id("vocab-language-filter").value="de";$id("vocab-language-filter").dispatchEvent(new Event("change"));
+      await run();choose("Operate");save()?.click();await settle();
+      check("B collecting outside the active language filter keeps the filter and shows the saved detail",$id("vocab-language-filter").value==="de"&&_pbpVocabDetailWordId===pbpDictVocabKey(ownerA,"en","run")&&_vocabViewRows.every(w=>w.language==="de"));
+      const reveal=$id("vocab-detail").querySelector(".vocab-show-in-list-btn");
+      check("B a filtered-out saved detail offers an explicit Show in list",!!reveal&&$id("vocab-detail").textContent.includes("vocabSavedOutsideFilters"));
+      reveal?.click();
+      check("B Show in list clears filters and exposes the saved row",!$id("vocab-language-filter").value&&!!$id("vocab-list").querySelector(`[data-vocab-id="${CSS.escape(pbpDictVocabKey(ownerA,"en","run"))}"]`));
+
+      _pbpDictSlotRun=async()=>null;
+      _pbpDictEcdictSide=async(_el,_term,_lang,_signal,_cur,onResult)=>{onResult?.({word:"run",sourceLabel:"ECDICT",sourceUrl:"",license:"",entries:[{pos:"verb",ipas:[{text:"rʌn"}],forms:[],senses:[{definition:"跑；运作",examples:[]}]}]});};
+      await run();choose("跑");
+      check("B local ECDICT supplies explicit selectable definitions with their own language",!!select()&&[...select().options].some(o=>o.textContent.includes("跑")&&o.lang==="zh"));
+      save()?.click();await settle();
+      check("B explicit local save stores chosen Chinese text without inventing a license",writes.at(-1)?.word.gloss==="跑；运作"&&!writes.at(-1)?.word.license);
+
+      _pbpDictEcdictSide=async()=>{};
+      _pbpDictSlotRun=async()=>({...norm,word:"中国",sourceLabel:"CC-CEDICT",entries:[{pos:"",ipas:[{text:"Zhōng guó"}],forms:[],senses:[{definition:"China",examples:[]}]}]});
+      await run("中国人","zh");choose("China");save()?.click();await settle();
+      check("B a CC-CEDICT prefix lookup saves the displayed shorter headword",writes.at(-1)?.word.term==="中国"&&writes.at(-1)?.word.language==="zh");
+
+      _pbpDictSlotRun=async()=>norm;
+      await run();choose("Operate");const before=writes.length;
+      let releaseOwner;
+      pbpVocabCurrentOwner=()=>new Promise(resolve=>{releaseOwner=resolve;});
+      save()?.click();await task();
+      _pbpVocabLookupOther("new query","en");
+      releaseOwner?.(ownerA);await settle();
+      check("B a new query during the owner check prevents an obsolete save",writes.length===before);
+      pbpVocabCurrentOwner=async()=>ownerB;
+      await run();choose("Operate");save()?.click();await settle();
+      check("B an owner change before dispatch prevents collection",writes.length===before);
+      pbpVocabCurrentOwner=async()=>owner;
+      _vocabCurrentOwner=ownerA;
+
+      store=[row("run"),row("running","en",{lemma:"run",note:"independent",status:"known"}),row("ran","en",{lemma:"run"}),row("run","de"),{...row("runs","en",{lemma:"run"}),owner:ownerB,id:pbpDictVocabKey(ownerB,"en","runs")}];
+      await reload();_pbpVocabRenderDetail(store[1]);
+      const family=()=>[...$id("vocab-detail").querySelectorAll(".vocab-family-word")].map(el=>el.textContent).sort().join(",");
+      check("B related forms stay inside the same owner and primary language",family()==="ran,run",family());
+      $id("vocab-detail").querySelector(".vocab-family-word")?.click();
+      check("B a related form opens its own saved detail",_pbpVocabDetailWordId!==store[1].id&&store.slice(0,3).some(w=>w.id===_pbpVocabDetailWordId));
+      _pbpVocabRenderDetail(store[1]);
+      const lemmaInput=()=>$id("vocab-detail").querySelector(".vocab-lemma-input");
+      const lemmaSave=()=>$id("vocab-detail").querySelector(".vocab-lemma-save");
+      if(lemmaInput()){lemmaInput().value="sprint";lemmaInput().dispatchEvent(new Event("input"));lemmaInput().dispatchEvent(new Event("blur"));}
+      await settle();
+      check("B editing a base form waits for explicit Save",lemmaInput()?.value==="sprint"&&lemmaWrites.length===0&&lemmaSave()?.disabled===false);
+      _pbpVocabReconcileDetail();
+      check("B a same-owner refresh preserves the unsaved base-form draft",lemmaInput()?.value==="sprint"&&lemmaSave()?.disabled===false);
+      lemmaSave()?.click();await settle();
+      check("B explicit base-form save uses the owner-checked primitive",lemmaWrites.at(-1)?.id===store[1].id&&lemmaWrites.at(-1)?.owner===ownerA&&lemmaWrites.at(-1)?.lemma==="sprint");
+      check("B changing one base form leaves every word's notes and state independent",store[1].note==="independent"&&store[1].status==="known"&&store[0].status==="new");
+      check("B an unstored base form offers dictionary lookup",!!$id("vocab-detail").querySelector(".vocab-lookup-base"));
+      if(lemmaInput()){lemmaInput().value="";lemmaInput().dispatchEvent(new Event("input"));}lemmaSave()?.click();await settle();
+      check("B clearing a base form removes the association",store[1].lemma===null&&family()==="");
+      if(lemmaInput()){lemmaInput().value="run";lemmaInput().dispatchEvent(new Event("input"));}
+      const lemmaBefore=lemmaWrites.length;
+      pbpVocabCurrentOwner=async()=>ownerB;lemmaSave()?.click();await settle();
+      check("B owner changes block base-form edits",lemmaWrites.length===lemmaBefore);
+// Insert inside the existing B test block's try, after its last owner-change
+// assertion and before finally. Reuses that block's fixtures. Exactly 3 checks.
+      owner = ownerA;
+      pbpVocabCurrentOwner = async () => owner;
+      store = [row("running", "en", { lemma: "run" }), row("other")];
+      await reload(); _pbpVocabRenderDetail(store[0]);
+      const lemmaFixture = window.pbpVocabSetLemma;
+      let releaseLemmaCommit, lemmaCommitted;
+      const lemmaCommitReached = new Promise(resolve => { lemmaCommitted = resolve; });
+      const lemmaCommitGate = new Promise(resolve => { releaseLemmaCommit = resolve; });
+      window.pbpVocabSetLemma = async (...args) => {
+        const ok = await lemmaFixture(...args);
+        lemmaCommitted(); await lemmaCommitGate; return ok;
+      };
+      lemmaInput().value = "sprint";
+      lemmaInput().dispatchEvent(new Event("input"));
+      lemmaSave().click(); await lemmaCommitReached;
+      _pbpVocabRenderDetail(store[1]);
+      releaseLemmaCommit(); await settle();
+      check("B a committed lemma edit refreshes rows after navigation without reopening the old word",
+        _vocabRows.find(w => w.term === "running")?.lemma === "sprint" &&
+        _pbpVocabDetailWordId === store[1].id);
+      window.pbpVocabSetLemma = lemmaFixture;
+
+      store = [row("was", "en", { lemma: "be" }), row("be", "en", { lemma: "exist" })];
+      await reload(); _pbpVocabRenderDetail(store[0]);
+      const directBases = [...$id("vocab-detail").querySelectorAll(".vocab-family-word")]
+        .filter(el => el.textContent === "be");
+      directBases[0]?.click();
+      check("B a saved base form remains directly reachable even when it has its own base form",
+        directBases.length === 1 && _pbpVocabDetailWordId === store[1].id);
+
+      store = []; _pbpVocabRenderDetail(null); await reload();
+      _pbpDictSlotRun = async () => norm;
+      _pbpDictEcdictSide = async () => {};
+      await run(); choose("Operate");
+      const saveFixture = pbpVocabSaveWord;
+      let releaseLookupCommit, lookupCommitted;
+      const lookupCommitReached = new Promise(resolve => { lookupCommitted = resolve; });
+      const lookupCommitGate = new Promise(resolve => { releaseLookupCommit = resolve; });
+      pbpVocabSaveWord = async (...args) => {
+        const saved = await saveFixture(...args);
+        lookupCommitted(); await lookupCommitGate; return saved;
+      };
+      save().click(); await lookupCommitReached;
+      _pbpVocabLookupOther("new query", "en");
+      releaseLookupCommit(); await settle();
+      check("B a committed lookup save refreshes rows while preserving a later query",
+        _vocabRows.some(w => w.id === pbpDictVocabKey(ownerA, "en", "run")) &&
+        panel().dataset.refState === "other" && panel().dataset.refTerm === "new query");
+      pbpVocabSaveWord = saveFixture;
+
+    } finally {
+      pbpVocabCurrentOwner=real.owner;pbpVocabAll=real.all;pbpVocabGet=real.get;pbpVocabSaveWord=real.save;
+      if(real.lemma===undefined)delete window.pbpVocabSetLemma;else window.pbpVocabSetLemma=real.lemma;
+      _pbpDictSlotRun=real.remote;_pbpDictEcdictSide=real.local;_pbpVocabAutoLookup=real.lookup;
+      _pbpVocabRenderDetail(null);_pbpVocabClearFilters();
+    }
+  }
+  // Independent review regressions: real runner/render/reconcile paths, only
+  // external dictionary and owner/store seams mocked. Exactly 7 checks.
+  {
+    const saved = { owner: pbpVocabCurrentOwner, all: pbpVocabAll, get: pbpVocabGet,
+      save: pbpVocabSaveWord, remote: _pbpDictSlotRun, local: _pbpDictEcdictSide,
+      auto: _pbpVocabAutoLookup, speak: pbpDictSpeak };
+    const scope = "acct_breview";
+    let rows = [], readFails = false, removeOldAtCommit = false, spoken = "", queries = [];
+    const word = term => ({ id: pbpDictVocabKey(scope, "en", term), owner: scope, term, language: "en",
+      gloss: "old", lemma: null, ipa: null, note: "", groups: [], status: "new", contexts: [], createdAt: 1, updatedAt: 1 });
+    const entry = term => ({ word: term, sourceLabel: "Wiktionary", sourceUrl: "https://en.wiktionary.org/wiki/" + term,
+      license: "CC BY-SA 4.0", formOfOnly: term === "running", entries: [{ pos: "verb", ipas: [], forms: [], senses: [{
+        definition: term === "running" ? "present participle of run" : "move quickly", tags: term === "running" ? ["form-of"] : [],
+        examples: [], synonyms: [], antonyms: [], subsenses: [] }] }] });
+    const prepare = () => {
+      _vocabRenderGen++; _vocabCurrentOwner = scope; _vocabRows = rows.map(row => ({ ...row }));
+      _pbpVocabClearFilters(); _pbpVocabRefreshLanguageOptions(true); _pbpVocabApplyView(true);
+    };
+    const collect = async () => {
+      const select = $id("vocab-ref-result").querySelector(".vocab-save-definition");
+      if (select) { select.value = "online:0"; select.dispatchEvent(new Event("change")); }
+      $id("vocab-ref-result").querySelector(".vocab-lookup-save")?.click();
+      await settle();
+    };
+    try {
+      pbpVocabCurrentOwner = async () => scope;
+      pbpVocabAll = async () => { if (readFails) throw new Error("fixture read failure"); return rows.map(row => ({ ...row })); };
+      pbpVocabGet = async id => rows.find(row => row.id === id) || null;
+      pbpVocabSaveWord = async (owner, data) => {
+        const id = pbpDictVocabKey(owner, data.language, data.term);
+        const fresh = { ...word(data.term), ...rows.find(row => row.id === id), ...data, id, owner };
+        rows = (removeOldAtCommit ? [] : rows.filter(row => row.id !== id)).concat(fresh);
+        return fresh;
+      };
+      _pbpDictEcdictSide = async () => {};
+      _pbpDictSlotRun = async (el, term, lang) => {
+        queries.push({ term, lang });
+        const norm = entry(term); _pbpDictRenderEntry(el, norm, term, lang, term, ""); return norm;
+      };
+      _pbpVocabAutoLookup = async () => "idle";
+      pbpDictSpeak = term => { spoken = term; };
+      prepare(); _pbpVocabRenderDetail(null); _pbpVocabLookupOther("running", "en"); await settle();
+      $id("vocab-ref-result").querySelector(".xp-dict-lemma-link")?.click(); await settle();
+      check("B pointer navigation keeps the visible heading and query identity on the new base form",
+        $id("vocab-ref-result").querySelector(".vocab-ref-term")?.textContent === "run" &&
+        $id("vocab-ref-result").dataset.refTerm === "run" && _pbpDictCurrent?.term === "run");
+      $id("vocab-ref-result").querySelector(".vocab-ref-speak")?.click();
+      check("B pronunciation after a pointer jump speaks the newly displayed base form", spoken === "run", spoken);
+      $id("vocab-lookup-lang").value = "de"; _pbpVocabLookupLangChanged(); await settle();
+      check("B changing language after a pointer jump keeps the new query rather than restoring the old inflection",
+        queries.at(-1)?.term === "run" && queries.at(-1)?.lang === "de", JSON.stringify(queries.at(-1)));
+
+      rows = [word("existing")]; prepare(); _pbpVocabRenderDetail(rows[0]);
+      _pbpVocabLookupOther("run", "en"); await settle(); removeOldAtCommit = true; await collect(); removeOldAtCommit = false;
+      check("B saving still opens and confirms the new word when the previously open word vanished before refresh",
+        rows.some(row => row.term === "run") && _pbpVocabDetailWordId === pbpDictVocabKey(scope, "en", "run") &&
+        $id("vocab-status").textContent.includes("dictSavedVocab"));
+
+      rows = [word("existing")]; prepare(); _pbpVocabRenderDetail(rows[0]);
+      _pbpVocabLookupOther("run", "en"); await settle(); readFails = true; await collect(); readFails = false;
+      check("B refresh failure does not undo the already committed word", rows.some(row => row.term === "run"));
+      check("B a read failure after successful collection remains visible after the old result is detached",
+        $id("vocab-status").textContent.includes("vocabRefreshFailed"), $id("vocab-status").textContent);
+
+      // Real normalizer consumes an API-shaped response: subsenses in the
+      // canonical result are strings, unlike the response's objects.
+      const normalized = pbpDictNormalizeEntry({ word: "run", entries: [{ partOfSpeech: "verb", senses: [
+        { definition: "main meaning", subsenses: [{ definition: "visible secondary meaning" }] }
+      ] }] }, "run", "en");
+      check("B every visible normalized subsense is also selectable for saving",
+        _pbpVocabLookupChoices(normalized, "en").map(choice => choice.gloss).join("|") === "main meaning|visible secondary meaning");
+    } finally {
+      pbpVocabCurrentOwner = saved.owner; pbpVocabAll = saved.all; pbpVocabGet = saved.get; pbpVocabSaveWord = saved.save;
+      _pbpDictSlotRun = saved.remote; _pbpDictEcdictSide = saved.local; _pbpVocabAutoLookup = saved.auto; pbpDictSpeak = saved.speak;
+      _pbpVocabRenderDetail(null); _pbpVocabClearFilters();
+    }
+  }
+
   document.title = fail ? "FAIL library-vocab Tests" : "PASS library-vocab Tests";
 })();
 </script></body></html>

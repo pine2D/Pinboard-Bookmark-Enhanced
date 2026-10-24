@@ -6121,6 +6121,7 @@ const VALUE_BOX_LEGS = Object.freeze({
     boxes: Object.freeze([
       ["#vocab-search", null], ["#vocab-language-filter-btn", null], ["#vocab-group-filter-btn", null], ["#vocab-lookup-input", null], ["#vocab-lookup-lang-btn", null],
       ["#vocab-detail .vocab-note-input", null],
+      ["#vocab-detail .vocab-lemma-control", null], ["#vocab-save-definition-btn", null],
       ["#vocab-batch-toolbar .vocab-group-unit", null], ["#vocab-detail .vocab-group-unit", null],
       ["#notes-filter", null], ["#notes-detail .vocab-note-input", null],
     ]),
@@ -6134,12 +6135,23 @@ const VALUE_BOX_LEGS = Object.freeze({
         // shell the hover recipe excludes, so it could never be measured).
         context: "vocab",
         boxes: ["#vocab-search", "#vocab-lookup-input", "#vocab-lookup-lang-btn",
-          "#vocab-detail .vocab-note-input",
+          "#vocab-detail .vocab-note-input", "#vocab-detail .vocab-lemma-control", "#vocab-save-definition-btn",
           "#vocab-batch-toolbar .vocab-group-unit", "#vocab-detail .vocab-group-unit"],
-        focus: ["#vocab-lookup-lang-btn"],
+        focus: ["#vocab-lookup-lang-btn", "#vocab-save-definition-btn"],
         async open(page, url, theme) {
           await page.goto(`${url}?_ra=${encodeURIComponent(`fieldhover-${theme}`)}#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
           await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS });
+          // A handwritten public cache record makes the definition picker a
+          // deterministic value box without a permission prompt or network.
+          await page.evaluate(async term => {
+            await pbpAiCacheSet(pbpDictQueryCacheKey("en", term), {
+              word: term, senseKeep: PBP_DICT_SENSE_KEEP, sourceLabel: "Wiktionary",
+              sourceUrl: "https://en.wiktionary.org/wiki/constraint", license: "CC BY-SA 4.0",
+              entries: [{ pos: "noun", ipas: [], forms: [], senses: [
+                { definition: "Something that limits an action.", examples: [], tags: [], synonyms: [], antonyms: [], subsenses: [] },
+              ] }],
+            }, Date.now());
+          }, LIB_SEED.richTerm);
           // The rich LIB_SEED word: the detail's value boxes include its note
           // and its group editor's unit.
           const head = page.locator("#vocab-list .vocab-card")
@@ -6149,6 +6161,7 @@ const VALUE_BOX_LEGS = Object.freeze({
             throw new Error(`SETUP: fieldHoverContrast library: no vocabulary row titled ${JSON.stringify(LIB_SEED.richTerm)} (theme=${theme}) -- LIB_SEED broken or the row title class renamed`);
           }
           await head.click();
+          await page.waitForSelector("#vocab-save-definition-btn", { state: "visible", timeout: TIMEOUT_MS });
           await page.click("#vocab-detail .vocab-edit-groups");
           await page.waitForSelector("#vocab-detail #vocab-group-editor:not([hidden]) .vocab-group-unit", { timeout: TIMEOUT_MS });
           await head.click({ modifiers: ["Control"] });
@@ -6216,7 +6229,7 @@ const VALUE_BOX_LEGS = Object.freeze({
 // requires every entry here to be named by some leg's `focus` and measured on
 // every theme it ran.
 const VALUE_BOX_FOCUS_REQUIRED = Object.freeze({
-  library: Object.freeze(["#vocab-lookup-lang-btn"]),
+  library: Object.freeze(["#vocab-lookup-lang-btn", "#vocab-save-definition-btn"]),
 });
 const valueBoxHoverLog = [];
 // One colour parser for every read of this leg (Task 7 fix round 1): a hex

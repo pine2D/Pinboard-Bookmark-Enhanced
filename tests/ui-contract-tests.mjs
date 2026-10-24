@@ -2325,10 +2325,12 @@ check(JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort()) === JSON.strin
   ![...LIBRARY_VALUE_BOX.ghostTriggers].some((id) => LIBRARY_VALUE_BOX.ids.has(id)),
   `ui-contract-tests.mjs: the library ghost-trigger harvest drifted -- got ${JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort())}. ` +
   "A select with data-listbox-face=\"ghost\" renders a .btn trigger, not a value box: it must never also land in LIBRARY_VALUE_BOX.ids.");
-check(JSON.stringify(LIBRARY_VALUE_BOX.built) === JSON.stringify(['library-notes.js:textarea.vocab-note-input', 'library-vocab.js:input[type="text"]', "library-vocab.js:textarea.vocab-note-input"]) &&
-  /groupUnit\.className = "vocab-group-unit";[\s\S]{0,400}groupUnit\.appendChild\(groupInput\);/.test(libraryVocabJs),
+check(JSON.stringify(LIBRARY_VALUE_BOX.built) === JSON.stringify(['library-notes.js:textarea.vocab-note-input', 'library-vocab.js:input[type="text"]', 'library-vocab.js:input[type="text"].vocab-lemma-input', 'library-vocab.js:select.vocab-save-definition', "library-vocab.js:textarea.vocab-note-input"]) &&
+  /groupUnit\.className = "vocab-group-unit";[\s\S]{0,400}groupUnit\.appendChild\(groupInput\);/.test(libraryVocabJs) &&
+  /unit\.className = "vocab-group-unit vocab-lemma-control"/.test(libraryVocabJs) && /unit\.append\(lemmaInput, save\)/.test(libraryVocabJs) &&
+  /definition\.dataset\.listbox = "float"/.test(libraryVocabJs) && /window\.pbpEnhanceListbox\?\.\(definition\)/.test(libraryVocabJs),
   `ui-contract-tests.mjs: the runtime library value-box harvest drifted -- got ${JSON.stringify(LIBRARY_VALUE_BOX.built)} ` +
-  "(expected both note editor textareas and the vocabulary group-unit input; the relookup language select merged into #vocab-lookup-lang in T7). " +
+  "(expected both note editors, group/base-form shell passengers, and the enhanced definition selector). " +
   "A new runtime value box must join FIELD_TARGETS.lib and VALUE_BOX_LEGS.library; then update this list.");
 function isValueBoxCompound(compound) {
   const c = classifyCompound(compound);
@@ -8871,7 +8873,11 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
       `ui-components.mjs FIELD_TARGETS.lib ${t.id}: ${isSelect ? "a native <select> family -- library emits no --lib-field-chevron any more; restore the role before registering one" : "chevron must be null"} -- got ${JSON.stringify(t.chevron)}`);
   }
   const coveredClasses = new Set(LIB.flatMap((t) => selectorListOf(t.rest).flatMap((sel) => subjects(sel).flatMap((c) => c.classes))));
-  const uncoveredClasses = [...LIBRARY_VALUE_BOX.classes].filter((cl) => !coveredClasses.has(cl));
+  // These two runtime hooks do not paint themselves: the pinned builders
+  // above put one in the fused shell and enhance the other to .listbox-btn.
+  // Structural coverage below still requires exactly one actual paint owner.
+  const indirectRuntimeClasses = new Set(["vocab-lemma-input", "vocab-save-definition"]);
+  const uncoveredClasses = [...LIBRARY_VALUE_BOX.classes].filter((cl) => !coveredClasses.has(cl) && !indirectRuntimeClasses.has(cl));
   check(uncoveredClasses.length === 0, `ui-components.mjs FIELD_TARGETS.lib covers no rest selector for the library value box class(es) ${JSON.stringify(uncoveredClasses)}`);
 
   // (a2) Coverage, structurally (valueBoxCoverage, the popup model): library
@@ -8889,9 +8895,11 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     const m = /^[^:]+:(\w+)(?:\[type="([^"]+)"\])?(?:\.([\w-]+))?$/.exec(b);
     if (!m) return [];
     const [, tag, type, cls] = m;
-    const el = `<${tag}${type ? ` type="${type}"` : ""}${cls ? ` class="${cls}"` : ""}>${tag === "input" ? "" : `</${tag}>`}`;
-    const nodes = htmlNodes(cls ? el : `<span class="${[...LIBRARY_VALUE_BOX.shells][0]}">${el}</span>`);
-    const parent = LIB_TREE.find(n => n.attrs.id === (b.startsWith("library-notes.js:") ? "notes-detail" : "vocab-detail"));
+    const enhanced = cls === "vocab-save-definition";
+    const el = `<${tag}${type ? ` type="${type}"` : ""}${cls ? ` class="${cls}"` : ""}${enhanced ? ' id="vocab-save-definition" data-listbox="float" hidden' : ""}>${tag === "input" ? "" : `</${tag}>`}`;
+    const inShell = !cls || cls === "vocab-lemma-input";
+    const nodes = htmlNodes(inShell ? `<span class="${[...LIBRARY_VALUE_BOX.shells][0]}">${el}</span>` : el);
+    const parent = LIB_TREE.find(n => n.attrs.id === (b.startsWith("library-notes.js:") ? "notes-detail" : enhanced ? "vocab-ref-result" : "vocab-detail"));
     check(!!parent, `runtime field has no detail host: ${b}`);
     for (const n of nodes) {
       if (n.parent?.tag === "#root") n.parent = parent;
@@ -8907,7 +8915,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   // and the first-frame gate keeps it invisible until then. A ghost face
   // (data-listbox-face="ghost", the sort menu button) is a .btn: not grafted.
   const listboxGraftNodes = [];
-  for (const carrier of LIB_TREE.filter((n) => n.tag === "select" && Object.hasOwn(n.attrs, "data-listbox") && n.attrs["data-listbox-face"] !== "ghost")) {
+  for (const carrier of [...LIB_TREE, ...runtimeNodes].filter((n) => n.tag === "select" && Object.hasOwn(n.attrs, "data-listbox") && n.attrs["data-listbox-face"] !== "ghost")) {
     for (const n of htmlNodes(`<div class="listbox"><button type="button" class="listbox-btn" id="${carrier.attrs.id}-btn"></button></div>`)) {
       if (n.parent?.tag === "#root") n.parent = carrier.parent;
       n.unplaced = true;
@@ -8916,20 +8924,20 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   }
   const listboxBtnNodes = listboxGraftNodes.filter((n) => n.tag === "button");
   const LIB_NODES = [...LIB_TREE, ...runtimeNodes, ...listboxGraftNodes];
-  check(!!detailNode && runtimeNodes.length === 4,
-    `ui-contract-tests.mjs: the library tree model could not graft the runtime value boxes under #vocab-detail (${detailNode ? "found" : "no"} #vocab-detail, ${runtimeNodes.length} runtime node(s), expected 4)`);
+  check(!!detailNode && runtimeNodes.length === 7,
+    `ui-contract-tests.mjs: the library tree model could not graft the runtime value boxes (${detailNode ? "found" : "no"} #vocab-detail, ${runtimeNodes.length} runtime node(s), expected 7)`);
   const libCov = valueBoxCoverage(LIB_NODES, LIB);
-  check(libCov.entries === 7 && libCov.uncovered.length === 0,
-    `library.html + runtime boxes / FIELD_TARGETS.lib: every text-entry control must be painted by exactly one registry entry (as its box or as a shell's passenger) -- ${libCov.entries} controls (expected 7); ${libCov.uncovered.join(" | ") || "none uncovered"}`);
+  check(libCov.entries === 8 && libCov.uncovered.length === 0,
+    `library.html + runtime boxes / FIELD_TARGETS.lib: every text-entry control must be painted by exactly one registry entry (as its box or as a shell's passenger) -- ${libCov.entries} controls (expected 8); ${libCov.uncovered.join(" | ") || "none uncovered"}`);
   check(libCov.dead.length === 0, `ui-components.mjs: FIELD_TARGETS.lib entries whose rest selector reaches nothing in library.html + the runtime boxes: ${libCov.dead.map((t) => t.id).join(", ")}`);
   const libSelects = LIB_NODES.filter((n) => n.tag === "select" && !Object.hasOwn(n.attrs, "hidden") && !Object.hasOwn(n.attrs, "data-listbox"));
   const selectMiss = libSelects.filter((n) => LIB.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, n))).length !== 1);
   check(libSelects.length === 0 && selectMiss.length === 0,
     `library.html + runtime boxes / FIELD_TARGETS.lib: every rendered <select> must be the rest box of exactly one entry -- ${libSelects.length} select(s) (expected 0: every rendered select is a listbox carrier since T7), unpainted or doubly painted: ${selectMiss.map((n) => n.attrs.id ? `#${n.attrs.id}` : `select.${n.classes.join(".")}`).join(", ") || "none"}`);
   const listboxMiss = listboxBtnNodes.filter((n) => LIB.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, n))).length !== 1);
-  check(listboxBtnNodes.length === 3 && listboxMiss.length === 0,
+  check(listboxBtnNodes.length === 4 && listboxMiss.length === 0,
     `library.html + listbox.js / FIELD_TARGETS.lib: every listbox button must be the rest box of exactly one entry -- ${listboxBtnNodes.length} button(s) ` +
-    `(expected 3: #vocab-language-filter-btn, #vocab-group-filter-btn, #vocab-lookup-lang-btn), unpainted or doubly painted: ${listboxMiss.map((n) => `#${n.attrs.id}`).join(", ") || "none"}`);
+    `(expected 4: language/group filters, lookup language, definition selector), unpainted or doubly painted: ${listboxMiss.map((n) => `#${n.attrs.id}`).join(", ") || "none"}`);
   // The ghost trigger is a .btn: no registry entry may name it, in any role,
   // on any surface (spec §8.3) -- judged on each selector's subject compound.
   const triggerInRegistry = Object.entries(FIELD_TARGETS).flatMap(([ns, entries]) => entries.flatMap((t) =>
@@ -9573,7 +9581,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     `library-vocab.js: the lookup button's first await must be chrome.permissions.request (the user gesture is spent by any earlier await) -- got ${JSON.stringify(firstAwait)}`);
   check(!fnBody(libraryVocabJs, "function _pbpVocabReconcileDetail() {").includes("vocab-detail-dict"),
     "library-vocab.js: _pbpVocabReconcileDetail still carries dictionary nodes -- #vocab-ref-result is static and a same-word refresh never rebuilds it");
-  check(/function _pbpVocabRenderDetail\(w, enterNarrow\) \{[\s\S]{0,2400}?const changed = nextId !== _pbpVocabDetailWordId;[\s\S]{0,200}?if \(changed\) _pbpVocabResetRef\(w \|\| null\);/.test(libraryVocabJs),
+  check(/function _pbpVocabRenderDetail\(w, enterNarrow, reconcileOnly = false\) \{[\s\S]{0,2400}?const changed = nextId !== _pbpVocabDetailWordId;[\s\S]{0,200}?if \(changed\) _pbpVocabResetRef\(w \|\| null, reconcileOnly\);/.test(libraryVocabJs),
     "library-vocab.js: only a CHANGE of the open entry may reset the dictionary column (a refresh or a second activation of the same word keeps the result and its run)");
   const hand = stripGeneratedRegions(libraryCss).replace(/\/\*[\s\S]*?\*\//g, "");
   check(!/\.xp-dict-(?:lang|head)\b/.test(hand) && !/\.vocab-lookup-bar select\b/.test(hand) && !/\.vocab-filter-toolbar select\b/.test(hand),
@@ -9687,12 +9695,12 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   const staleChecks = (auto.match(/if \(stale\(\)\) return "stale";/g) || []).length;
   check(/const stale = \(\) => signal\.aborted \|\| _pbpVocabDetailWordId !== wordId \|\|/.test(auto) && staleChecks >= 3,
     `library-vocab.js: open-to-look-up must re-check the run, the open word and the owner after every await before it writes (found ${staleChecks} re-checks)`);
-  check(!/_pbpVocabRelookedWordId = /.test(auto) && /if \(w\) _pbpVocabAutoLookup\(w\)\.catch\(/.test(fnBody(libraryVocabJs, "function _pbpVocabResetRef(w) {")),
+  check(!/_pbpVocabRelookedWordId = /.test(auto) && /if \(w\) _pbpVocabAutoLookup\(w\)\.catch\(/.test(fnBody(libraryVocabJs, "function _pbpVocabResetRef(w, reconcileOnly = false) {")),
     "library-vocab.js: a word switch must start open-to-look-up, and that path must never mark the word as looked up by hand");
   const privacy = read("docs/privacy.md");
   check(privacy.includes("opening a saved word on that page also looks it up automatically when no installed offline dictionary has an entry for it") &&
     privacy.includes("(opening a saved word never asks for this grant)") &&
-    privacy.includes("which also runs automatically when you open a saved word there once you have granted access") &&
+    privacy.includes("Opening a saved word on that page can also trigger the existing automatic lookup after permission has been granted") &&
     privacy.includes("opening a saved word on the Notes & Vocabulary page can also look it up automatically") &&
     !privacy.includes("The lookup is never contacted automatically or in the background"),
     "docs/privacy.md: the Free Dictionary API passages no longer describe open-to-look-up (spec §4.10; the Summary, Network Requests, Permissions and Third-Party change with the code)");

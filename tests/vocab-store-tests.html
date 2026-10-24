@@ -1054,11 +1054,196 @@ async function runIdbChecks() {
   await deleteVocabDb();
 }
 
+async function runLemmaChecks() {
+  const previousChrome = globalThis.chrome;
+  const owner = "acct_lemma_test", ownerHash = "e".repeat(64);
+  let dirty = 0;
+  window.chrome = { runtime: { sendMessage: () => { dirty++; return Promise.resolve(); } } };
+  const assert = (ok, message) => { if (!ok) throw new Error(message); };
+  const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const rows = storeRows;
+  const snapshot = async () => JSON.stringify({ words: await rows("words"), sync: await rows("sync"), dirty });
+  const reset = async () => { await deleteVocabDb(); dirty = 0; };
+  const seed = async (scope = owner) => {
+    const word = await pbpVocabSaveWord(scope, {
+      term: "Cafés", language: "fr", lemma: "ancien", gloss: "coffee shops",
+      ipa: "/kafe/", sourceUrl: "https://dictionary.test/cafe", license: "CC0",
+      context: { articleUrl: "https://article.test/one", articleTitle: "First", quote: "Les cafés sont ouverts.", createdAt: 123 }
+    });
+    await pbpVocabSetNote(word.id, scope, "Do not change my note");
+    await pbpVocabBatchAddGroup([word.id], scope, "Chapter 1");
+    await pbpVocabBatchSetStatus([word.id], scope, "known");
+    return pbpVocabGet(word.id);
+  };
+  const invoke = (...args) => {
+    assert(typeof pbpVocabSetLemma === "function", "pbpVocabSetLemma is not defined");
+    return pbpVocabSetLemma(...args);
+  };
+  const untouched = (word) => {
+    const copy = structuredClone(word); delete copy.lemma; delete copy.updatedAt; return copy;
+  };
+  const test = async (name, fn) => {
+    try { await reset(); await fn(); check(name, true); }
+    catch (error) { check(name, false, error.message); }
+  };
+  try {
+    await test("lemma edit normalizes NFC and whitespace without changing identity or other fields", async () => {
+      const before = await seed();
+      const meta = (await rows("sync")).find(row => row.key === "meta");
+      const beforeDirty = dirty;
+      assert(await invoke(before.id, owner, " \tcafe\u0301\n  noir\u00a0 ") === true, "edit failed");
+      const after = await pbpVocabGet(before.id), outbox = await pbpVocabListOutbox(owner);
+      assert(after.lemma === "café noir" && equal(untouched(before), untouched(after)), "other fields changed or normalization failed");
+      assert(outbox.length === 1 && outbox[0].event.value.lemma === "café noir" && outbox[0].event.dot.counter === meta.counter + 1 && dirty === beforeDirty + 1, "edit did not commit one synchronized mutation");
+    });
+    await test("normalized-equivalent repeated lemma edits create no mutation or dirty notification", async () => {
+      const word = await seed(); await invoke(word.id, owner, "café noir");
+      const before = await snapshot();
+      for (const value of ["café noir", "  cafe\u0301\tnoir  ", "café\nnoir"]) assert(await invoke(word.id, owner, value) === true, "no-op failed");
+      assert(await snapshot() === before, "same lemma changed timestamps, vector, outbox, or dirty state");
+    });
+    await test("clearing produces synced null and repeated blank/null/undefined clears are no-ops", async () => {
+      const before = await seed();
+      assert(await invoke(before.id, owner, "\t\n\u00a0 ") === true, "clear failed");
+      const after = await pbpVocabGet(before.id), outbox = await pbpVocabListOutbox(owner);
+      assert(after.lemma === null && outbox[0].event.value.lemma === null && equal(untouched(before), untouched(after)), "clear did not preserve fields or sync null");
+      const empty = await snapshot();
+      for (const value of ["", null, undefined, "  "]) assert(await invoke(before.id, owner, value) === true, "empty no-op failed");
+      assert(await snapshot() === empty, "repeated clear mutated state");
+    });
+    await test("foreign owner is rejected atomically even when requested lemma equals existing value", async () => {
+      const word = await seed(), before = await snapshot();
+      assert(await invoke(word.id, "acct_other", "ancien") === false, "foreign owner accepted same-value edit");
+      assert(await invoke(word.id, "acct_other", "nouveau") === false, "foreign owner accepted mutation");
+      assert(await snapshot() === before, "foreign owner edit changed either store");
+    });
+    await test("deleted or missing word is not revived and remains a successful no-op like SetNote", async () => {
+      const word = await seed(); await pbpVocabDelete(word.id, owner);
+      const before = await snapshot();
+      assert(await invoke(word.id, owner, "café") === true, "missing-row no-op failed");
+      assert(await snapshot() === before && await pbpVocabGet(word.id) === null, "lemma edit revived deleted word or changed tombstone");
+    });
+    await test("ownerless edit uses the same transaction boundary", async () => {
+      const word = await seed("ownerless");
+      assert(await invoke(word.id, undefined, "café") === true && (await pbpVocabGet(word.id)).lemma === "café", "ownerless edit failed");
+      assert((await pbpVocabListOutbox("ownerless"))[0].event.value.lemma === "café", "ownerless edit not queued");
+    });
+    await test("failure after word write rolls back word, vector, outbox, and dirty notification", async () => {
+      const word = await seed(), before = await snapshot();
+      const realPut = IDBObjectStore.prototype.put;
+      IDBObjectStore.prototype.put = function (value, ...args) {
+        if (this.name === "sync" && value?.key?.startsWith(`outbox:${owner}:`)) throw new DOMException("test quota", "QuotaExceededError");
+        return realPut.call(this, value, ...args);
+      };
+      let result;
+      try { result = await invoke(word.id, owner, "café"); }
+      finally { IDBObjectStore.prototype.put = realPut; }
+      assert(result === false && await snapshot() === before, "failed synchronized edit partially committed");
+    });
+    await test("editing a concurrent frontier absorbs both causes into one local event", async () => {
+      const value = { term: "Cafés", lemma: "café", language: "fr", gloss: "coffee shops", ipa: null, sourceUrl: null, license: null, contexts: [], groups: [], note: "", status: "new", createdAt: 1, updatedAt: 2 };
+      const make = (deviceId, counter, lemma) => ({ recordKey: "fr|cafés", vector: { [deviceId]: counter }, dot: { deviceId, counter }, deleted: false, value: { ...value, lemma } });
+      const incoming = { schema: 2, ownerHash, deviceId: "remote", createdAt: 3, entries: [make("a", 2, "café a"), make("b", 3, "café b")] };
+      assert((await pbpVocabApplyRemotePage(owner, ownerHash, [incoming], null)).ok, "frontier setup failed");
+      assert(await invoke(`${owner}|fr|cafés`, owner, "café") === true, "frontier edit failed");
+      const event = (await pbpVocabListOutbox(owner))[0].event;
+      assert(event.value.lemma === "café" && event.vector.a === 2 && event.vector.b === 3 && !event.versions && pbpVocabValidateEvent(event), "edit did not causally absorb frontier");
+    });
+    await test("set and clear events both apply on a fresh receiver using existing schema 2", async () => {
+      const word = await seed(); await invoke(word.id, owner, "café");
+      const set = structuredClone((await pbpVocabListOutbox(owner))[0].event);
+      await invoke(word.id, owner, null);
+      const clear = structuredClone((await pbpVocabListOutbox(owner))[0].event);
+      await reset();
+      const incoming = (event) => ({ schema: 2, ownerHash, deviceId: event.dot.deviceId, createdAt: 3, entries: [event] });
+      assert((await pbpVocabApplyRemotePage(owner, ownerHash, [incoming(set)], null)).ok && (await pbpVocabGet(word.id)).lemma === "café", "set not received");
+      assert((await pbpVocabApplyRemotePage(owner, ownerHash, [incoming(clear)], null)).ok && (await pbpVocabGet(word.id)).lemma === null, "clear not received");
+      assert(equal(untouched(word), untouched(await pbpVocabGet(word.id))), "receiver lost unrelated fields");
+    });
+    await test("lemma casing is preserved because it is display data, not an identity key", async () => {
+      const word = await seed(); await invoke(word.id, owner, "\tLaut  ");
+      assert((await pbpVocabGet(word.id)).lemma === "Laut", "lemma was case-folded");
+    });
+    await test("default word save retains reader merge behavior for reading, provenance and lemma", async () => {
+      const before = await seed();
+      const after = await pbpVocabSaveWord(owner, {
+        term: before.term, language: before.language, gloss: "another meaning", ipa: "/another/",
+        lemma: "automatic lemma", sourceUrl: null, license: null
+      });
+      assert(after.gloss === "another meaning" && after.ipa === before.ipa && after.lemma === before.lemma &&
+        after.sourceUrl === before.sourceUrl && after.license === before.license,
+      "default save changed the reader's merge behavior");
+    });
+    await test("explicit local definition replaces reading and clears online provenance atomically", async () => {
+      const before = await seed();
+      const after = await pbpVocabSaveWord(owner, {
+        term: before.term, language: before.language, gloss: "local meaning", ipa: "/selected/",
+        lemma: "automatic lemma", sourceUrl: null, license: null
+      }, { replaceDefinition: true });
+      const payload = (await pbpVocabListOutbox(owner))[0].event.value;
+      assert(after.gloss === "local meaning" && after.ipa === "/selected/" && after.sourceUrl === null && after.license === null,
+        "selected local definition retained an old reading or online provenance");
+      assert(after.id === before.id && after.term === before.term && after.lemma === before.lemma && after.status === before.status &&
+        after.note === before.note && equal(after.groups, before.groups) && equal(after.contexts, before.contexts) && after.createdAt === before.createdAt,
+        "explicit definition changed identity, relationship, or user data");
+      assert(payload.gloss === after.gloss && payload.ipa === after.ipa && payload.sourceUrl === null && payload.license === null &&
+        !Object.hasOwn(after, "replaceDefinition") && !Object.hasOwn(payload, "replaceDefinition"),
+        "definition and provenance were not queued together or options leaked into data");
+    });
+    await test("explicit empty definition fields clear old data without restoring a manually cleared lemma", async () => {
+      const before = await seed(); await invoke(before.id, owner, null);
+      const after = await pbpVocabSaveWord(owner, {
+        term: before.term, language: before.language, gloss: "", ipa: "", sourceUrl: "", license: "", lemma: "automatic lemma"
+      }, { replaceDefinition: true });
+      const payload = (await pbpVocabListOutbox(owner))[0].event.value;
+      assert(after.gloss === "" && after.ipa === null && after.sourceUrl === null && after.license === null && after.lemma === null &&
+        payload.gloss === "" && payload.ipa === null && payload.lemma === null,
+        "explicit blanks retained old definition data or revived a cleared relationship");
+    });
+    await test("explicit online selection uses its paired pronunciation and provenance", async () => {
+      const before = await seed();
+      const after = await pbpVocabSaveWord(owner, {
+        term: before.term, language: before.language, gloss: "selected meaning", ipa: "/entry-two/",
+        sourceUrl: "https://dictionary.test/entry-two", license: "CC BY-SA 4.0"
+      }, { replaceDefinition: true });
+      assert(after.gloss === "selected meaning" && after.ipa === "/entry-two/" &&
+        after.sourceUrl === "https://dictionary.test/entry-two" && after.license === "CC BY-SA 4.0",
+        "reading and provenance do not belong to the selected definition");
+    });
+    await test("a stale Save cannot overwrite a word created after the lookup's existence check", async () => {
+      const id = pbpDictVocabKey(owner, "fr", "Cafés");
+      assert(await pbpVocabGet(id) === null, "lookup preflight expected a missing word");
+      const otherPage = await seed(), before = await snapshot();
+      const input = { term: otherPage.term, language: otherPage.language, gloss: "selected meaning" };
+      const rejected = await pbpVocabSaveWord(owner, input, { replaceDefinition: true, expectExisting: false });
+      assert(rejected === null && await snapshot() === before, "stale Save overwrote the other page's word");
+      const confirmed = await pbpVocabSaveWord(owner, input, { replaceDefinition: true, expectExisting: true });
+      assert(confirmed?.gloss === "selected meaning", "an explicit follow-up Update could not save");
+    });
+    await test("a stale Update cannot revive a deleted word without a new explicit Save", async () => {
+      const existing = await seed();
+      assert(await pbpVocabGet(existing.id), "lookup preflight expected an existing word");
+      await pbpVocabDelete(existing.id, owner);
+      const before = await snapshot(), input = { term: existing.term, language: existing.language, gloss: "selected meaning" };
+      const rejected = await pbpVocabSaveWord(owner, input, { replaceDefinition: true, expectExisting: true });
+      assert(rejected === null && await snapshot() === before, "stale Update revived a deleted word");
+      const confirmed = await pbpVocabSaveWord(owner, input, { replaceDefinition: true, expectExisting: false });
+      assert(confirmed?.gloss === "selected meaning", "an explicit follow-up Save could not create");
+    });
+    await reset();
+  } finally {
+    if (previousChrome === undefined) delete globalThis.chrome;
+    else globalThis.chrome = previousChrome;
+  }
+}
+
+
 (async () => {
   try {
     await runIdbChecks();
+    await runLemmaChecks();
   } catch (error) {
-    while (pass + fail < 84) check("IDB harness completed", false, error && (error.stack || error.message));
+    while (pass + fail < 100) check("IDB harness completed", false, error && (error.stack || error.message));
   }
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();

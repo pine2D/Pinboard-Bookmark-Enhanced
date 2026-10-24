@@ -677,11 +677,37 @@ async function pbpVocabSetNote(id, expectedOwner, rawNote) {
   return result.ok;
 }
 
-async function pbpVocabSaveWord(owner, w) {
-  const scope = owner || "ownerless";
-  const id = pbpDictVocabKey(scope, w.language, w.term);
+// Lemma is editable display data, never part of a word's identity. Clearing
+// it uses the existing nullable wire field; the transaction still owns owner
+// checks, causal metadata, and the outbox, including its unchanged-value skip.
+async function pbpVocabSetLemma(id, expectedOwner, rawLemma) {
+  const scope = expectedOwner || "ownerless";
+  const lemma = pbpDictNormalizeTerm(String(rawLemma == null ? "" : rawLemma)) || null;
   const now = Date.now();
   const result = await _pbpVocabLocalMutation(scope, [{ id }], (record) => {
+    if (!record) return { changed: false, result: null };
+    const recordKey = _pbpVocabRecordKey(scope, record);
+    if (!recordKey) return { invalid: true };
+    if ((record.lemma ?? null) === lemma) return { changed: false, result: record };
+    const word = { ...record, lemma, updatedAt: now };
+    return { changed: true, deleted: false, recordKey, word, result: word };
+  });
+  return result.ok;
+}
+
+async function pbpVocabSaveWord(owner, w, options = {}) {
+  const scope = owner || "ownerless";
+  const id = pbpDictVocabKey(scope, w.language, w.term);
+  const replaceDefinition = options?.replaceDefinition === true;
+  const expectExisting = options?.expectExisting;
+  const now = Date.now();
+  const result = await _pbpVocabLocalMutation(scope, [{ id }], (record) => {
+    // Save/Update labels describe an existence snapshot, not permission to
+    // overwrite a word another page just created or revive a deleted word.
+    // Check that precondition here, in the same transaction as the write.
+    if (typeof expectExisting === "boolean" && !!record !== expectExisting) {
+      return { changed: false, result: null };
+    }
     const cur = record ? { ...record } : {
       id, owner: scope,
       term: String(w.term || "").normalize("NFC").trim(),
@@ -690,10 +716,19 @@ async function pbpVocabSaveWord(owner, w) {
       contexts: [], groups: [], note: "", status: "new", createdAt: now, updatedAt: now
     };
     cur.groups = pbpVocabGroups(cur);
-    if (w.lemma && !cur.lemma) cur.lemma = String(w.lemma);
-    if (w.gloss) cur.gloss = String(w.gloss);
-    if (w.ipa && !cur.ipa) cur.ipa = String(w.ipa);
-    if (w.sourceUrl || w.license) {
+    // An explicit library selection replaces the whole definition source,
+    // including empty local-pack provenance/reading. Its existing lemma is a
+    // separate user relationship: even a deliberate null must stay intact.
+    // Default reader saves retain their established fill/merge behavior.
+    if (w.lemma && !cur.lemma && (!record || !replaceDefinition)) cur.lemma = String(w.lemma);
+    if (replaceDefinition) {
+      cur.gloss = String(w.gloss == null ? "" : w.gloss);
+      cur.ipa = w.ipa ? String(w.ipa) : null;
+    } else {
+      if (w.gloss) cur.gloss = String(w.gloss);
+      if (w.ipa && !cur.ipa) cur.ipa = String(w.ipa);
+    }
+    if (replaceDefinition || w.sourceUrl || w.license) {
       cur.sourceUrl = w.sourceUrl ? (pbpDictSafeUrl(w.sourceUrl) || null) : null;
       cur.license = w.license ? String(w.license) : null;
     }

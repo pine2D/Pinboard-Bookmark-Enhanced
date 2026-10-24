@@ -981,7 +981,10 @@ function _pbpDictSlotFallback(slot, text, term) {
 //     write into a container that belongs to a newer lookup.
 //  5. Contributes nothing to _pbpDictSlotRun's return value.
 //  6. Writes no cur.* field, so the saved vocabulary record is unaffected.
-async function _pbpDictEcdictSide(localEl, term, lang, parentSignal, cur) {
+// The library may opt into the already-rendered normalized result through
+// onResult. This synchronous notification adds no reads or reader wait and
+// does not change this branch's undefined return value.
+async function _pbpDictEcdictSide(localEl, term, lang, parentSignal, cur, onResult) {
   if (lang !== "en") return;
   const alive = () => !(parentSignal && parentSignal.aborted) && _pbpDictCurrent === cur && localEl.isConnected;
   try {
@@ -1014,6 +1017,7 @@ async function _pbpDictEcdictSide(localEl, term, lang, parentSignal, cur) {
     // first and silently drop the other.
     for (const e of norm.entries) _pbpDictRenderSenses(box, e.senses, false, lang, "zh");
     localEl.replaceChildren(box);
+    if (typeof onResult === "function" && alive()) onResult(norm);
   } catch (e) {
     // Swallowing without a trace is what turns a platform fault into a silent
     // "no Chinese for this word" that nobody can diagnose.
