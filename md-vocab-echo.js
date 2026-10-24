@@ -37,6 +37,8 @@ function pbpEchoTermSet(rows, cap) {
     // export/search presence) stays, only the underline retires. Skipping
     // here also frees the term's slot in the cap for a word still learning.
     if (String(r.status || "new") === "known") continue;
+    const language = pbpDictPrimaryLang(r.language);
+    if (!language || language === "und") continue; // no language identity, no claim that this is the saved word
     const display = r.term.normalize("NFC").trim();
     if (!display) continue;
     const bound = pbpEchoNeedsBoundary(display);
@@ -48,14 +50,15 @@ function pbpEchoTermSet(rows, cap) {
     // Case folding that changes length (Turkish İ) breaks index mapping --
     // degrade that term to exact-case matching instead of guessing offsets.
     if (key.length !== display.length) key = display;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const id = language + "|" + key;
+    if (seen.has(id)) continue;
+    seen.add(id);
     // fold = the form _echoScanBlock's block prefilter compares against a
     // lowercased copy of the block text. Identical to the old inline
     // key.toLowerCase() -- a normal key is already lowercase, and a degraded
     // key (İ, kept at original case above) folds here exactly as it did in the
     // loop -- just computed once per term instead of once per (block x term).
-    out.push({ key, display, bound, fold: key.toLowerCase() });
+    out.push({ id, key, language, display, bound, fold: key.toLowerCase() });
     if (out.length >= limit) break;
   }
   out.sort((a, b) => b.key.length - a.key.length);
@@ -80,25 +83,36 @@ function pbpEchoBoundaryOk(text, start, end) {
   return true;
 }
 
-// One text-node's data -> matches. Case-insensitive via a lowercased copy;
-// when folding shifts indices (İ in the node) degrade to exact-case so the
-// reported offsets always index the ORIGINAL string. Overlaps: terms arrive
-// longest-first, first claim wins. perTermCaps (Map key->remaining budget)
+// One logical text stream -> matches. Case-insensitive via a lowercased copy;
+// when folding shifts indices (İ), map complete folded-character boundaries
+// back to ORIGINAL UTF-16 offsets. Lowercase the whole string so contextual
+// casing (Greek final sigma) survives. Overlaps: terms arrive
+// longest-first, first claim wins. perTermCaps (Map id->remaining budget)
 // lives INSIDE the matcher: a term past its budget must not ghost-claim a
 // region and block shorter terms from it (Codex plan-review MEDIUM 4).
-function pbpEchoFindInText(text, terms, maxHits, perTermCaps) {
+function pbpEchoFindInText(text, terms, maxHits, perTermCaps, acceptMatch) {
   const src = String(text || "");
   const folded = src.toLowerCase();
-  const caseOk = folded.length === src.length;
-  const hay = caseOk ? folded : src;
+  let offsets = null;
+  if (folded.length !== src.length) {
+    offsets = new Map([[0, 0]]);
+    let originalEnd = 0, foldedEnd = 0;
+    for (const cp of src) {
+      originalEnd += cp.length;
+      foldedEnd += cp.toLowerCase().length;
+      offsets.set(foldedEnd, originalEnd);
+    }
+  }
   const cap = maxHits == null ? Infinity : maxHits;
   const out = [];
   const taken = [];
   for (const t of terms) {
     if (out.length >= cap) break;
-    const termCap = perTermCaps && perTermCaps.has(t.key) ? perTermCaps.get(t.key) : Infinity;
+    const termCap = perTermCaps && perTermCaps.has(t.id) ? perTermCaps.get(t.id) : Infinity;
     if (termCap <= 0) continue;
-    const needle = caseOk ? t.key : t.display;
+    const exact = t.key !== t.fold; // the term itself has a length-changing fold
+    const hay = exact ? src : folded;
+    const needle = exact ? t.display : t.key;
     let termHits = 0;
     let from = 0;
     while (out.length < cap && termHits < termCap) {
@@ -106,10 +120,14 @@ function pbpEchoFindInText(text, terms, maxHits, perTermCaps) {
       if (i === -1) break;
       const e = i + needle.length;
       from = i + 1;
-      if (t.bound && !pbpEchoBoundaryOk(src, i, e)) continue;
-      if (taken.some(([s, x]) => i < x && e > s)) continue;
-      taken.push([i, e]);
-      out.push({ start: i, end: e, key: t.key });
+      const start = offsets && !exact ? offsets.get(i) : i;
+      const end = offsets && !exact ? offsets.get(e) : e;
+      if (start === undefined || end === undefined) continue;
+      if (t.bound && !pbpEchoBoundaryOk(src, start, end)) continue;
+      if (acceptMatch && !acceptMatch(t, start, end)) continue;
+      if (taken.some(([s, x]) => start < x && end > s)) continue;
+      taken.push([start, end]);
+      out.push({ start, end, key: t.key, id: t.id, language: t.language });
       termHits++;
       from = e;
     }
@@ -138,6 +156,9 @@ let _echoDirty = new Set();
 let _echoDebounce = 0;
 let _echoIdles = new Set(); // ALL pending idle handles (concurrent scan loops)
 let _echoReadSeq = 0;       // guards stale settings reads from clobbering newer state
+let _echoArticleLang = "";  // reliable original-prose prior, never the UI language
+const _echoScanTickets = new Map();
+let _echoLanguageCache = new WeakMap(); // per-element text snapshot -> reliable detection promise
 
 function _echoView() { return document.getElementById("rendered-view"); }
 
@@ -221,12 +242,13 @@ function _echoKeyOf(el) {
 }
 
 function _echoDropKey(key) {
+  _echoScanTickets.delete(key); // also cancels a language read that has not painted yet
   const list = _echoRanges.get(key);
   if (!list) return;
   for (const it of list) {
     if (_echoHl) _echoHl.delete(it.range);
-    const c = _echoCounts.get(it.key) || 0;
-    if (c > 1) _echoCounts.set(it.key, c - 1); else _echoCounts.delete(it.key);
+    const c = _echoCounts.get(it.id) || 0;
+    if (c > 1) _echoCounts.set(it.id, c - 1); else _echoCounts.delete(it.id);
     _echoTotal--;
   }
   _echoRanges.delete(key);
@@ -265,6 +287,7 @@ function _echoCancelWork() {
 function _echoClearAll() {
   _echoCancelWork();
   _echoDirty.clear();
+  _echoScanTickets.clear();
   _echoRanges.clear();
   _echoCounts.clear();
   _echoTotal = 0;
@@ -282,15 +305,91 @@ function _echoBailClosed() {
   _echoStandDown();
 }
 
-function _echoScanBlock(key) {
+// Stop before the extension's <html lang>: that describes its controls, not
+// the article. An explicit unknown inline language blocks an inherited prior;
+// rendered-view's und only means its initial article detection was undecided.
+// Translations and companion subtitles are separate language blocks: absent
+// or empty metadata asks for their own reliable detection, never source prose.
+function _echoDeclaredLang(el, articlePrior = "") {
+  const view = _echoView();
+  for (let cur = el; cur && cur !== document.body && cur !== document.documentElement; cur = cur.parentElement) {
+    const translated = cur.classList.contains("pb-tr") || cur.classList.contains("pbv-tr");
+    if (cur.hasAttribute("lang")) {
+      const raw = cur.getAttribute("lang").trim();
+      const lang = pbpDictPrimaryLang(raw);
+      if (lang && lang !== "und") return lang;
+      if (!raw && translated) return "";
+      if (cur !== view) return "und";
+    }
+    if (translated) return "";
+    if (cur === view || cur.classList.contains("pbv-col-study")) break;
+  }
+  return articlePrior;
+}
+
+// One logical text stream makes inline markup transparent to word boundaries
+// (inter<em>net</em> is still internet, co<em>operate</em> is still cooperate).
+// Structural breaks and ignored code are separators, never silent joins.
+const PBP_ECHO_BLOCK_TAGS = new Set(["ADDRESS", "ARTICLE", "ASIDE", "BLOCKQUOTE", "DIV", "DL", "DT", "DD",
+  "FIGCAPTION", "FIGURE", "FOOTER", "HEADER", "H1", "H2", "H3", "H4", "H5", "H6", "HR", "LI", "MAIN",
+  "NAV", "OL", "P", "SECTION", "TABLE", "TR", "TD", "TH", "UL"]);
+function _echoTextStream(el) {
+  let text = "";
+  const nodes = [];
+  const langs = new WeakMap();
+  const walk = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (!node.data) return;
+      const parent = node.parentElement;
+      if (!langs.has(parent)) langs.set(parent, _echoDeclaredLang(parent, _echoArticleLang));
+      const start = text.length;
+      text += node.data;
+      nodes.push({ node, start, end: text.length, language: langs.get(parent) });
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    if (node.matches("pre, code, script, style, img, video, audio, iframe, object, embed, canvas, svg, math, input, textarea, select, .pb-tr-err, .pbp-img-fix-ui")) { text += "\0"; return; }
+    if (node.tagName === "BR") { text += "\n"; return; }
+    const boundary = node !== el && PBP_ECHO_BLOCK_TAGS.has(node.tagName);
+    if (boundary) text += "\n";
+    for (const child of node.childNodes) walk(child);
+    if (boundary) text += "\n";
+  };
+  walk(el);
+  return { text, nodes };
+}
+
+async function _echoScanBlock(key) {
   _echoDropKey(key);
   if (_echoTotal >= PBP_ECHO_TOTAL) return;
   const el = _echoKeyEl(key);
   if (!el) return;
   const blockFold = (el.textContent || "").toLowerCase();
   const live = _echoTerms.filter((t) =>
-    (_echoCounts.get(t.key) || 0) < PBP_ECHO_PER_TERM && blockFold.includes(t.fold));
+    (_echoCounts.get(t.id) || 0) < PBP_ECHO_PER_TERM && blockFold.includes(t.fold));
   if (!live.length) return;
+  const ticket = {}, epoch = _echoEpoch, owner = _echoOwner, snapshot = el.textContent;
+  _echoScanTickets.set(key, ticket);
+  const valid = () => _echoEnabled && epoch === _echoEpoch && owner === _echoOwner &&
+    _echoScanTickets.get(key) === ticket && el.isConnected && _echoKeyEl(key) === el && el.textContent === snapshot;
+  const stream = _echoTextStream(el);
+  const unknown = stream.nodes.filter((part) => !part.language);
+  if (unknown.length) {
+    // Most original paragraphs share one reliable article prior and translated
+    // blocks carry lang, so only genuinely undecided matching blocks pay this
+    // read. Repeated scans of unchanged text share its result, reliable or not.
+    const sample = unknown.map((part) => part.node.data).join(" ").slice(0, 800);
+    let entry = _echoLanguageCache.get(el);
+    if (!entry || entry.sample !== sample) {
+      entry = { sample, result: typeof _pbpDictDetect === "function" ? _pbpDictDetect(sample) : Promise.resolve(null) };
+      _echoLanguageCache.set(el, entry);
+    }
+    const detected = await entry.result;
+    if (!valid()) return;
+    const language = detected && detected.reliable ? pbpDictPrimaryLang(detected.lang) : "";
+    for (const part of unknown) part.language = language === "und" ? "" : language;
+  }
+  if (!valid()) return;
   // Registry init BEFORE any counting: if CSS.highlights.set throws we bail
   // with zero side effects -- counts bumped ahead of a failed commit could
   // never be rolled back by _echoDropKey (Codex plan-review LOW 6).
@@ -304,28 +403,20 @@ function _echoScanBlock(key) {
   }
   const n = Number(key.slice(1));
   const found = [];
-  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
-    acceptNode(node) {
-      const p = node.parentElement;
-      return (p && p.closest("pre, code")) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
-    }
-  });
-  let node;
-  while ((node = walker.nextNode())) {
-    if (_echoTotal >= PBP_ECHO_TOTAL) break;
-    const text = node.data;
-    if (!text) continue; // NOT length<2: single-char CJK nodes must scan
-    const usable = live.filter((t) => (_echoCounts.get(t.key) || 0) < PBP_ECHO_PER_TERM);
-    if (!usable.length) break;
-    const remaining = new Map(usable.map((t) => [t.key, PBP_ECHO_PER_TERM - (_echoCounts.get(t.key) || 0)]));
-    for (const m of pbpEchoFindInText(text, usable, PBP_ECHO_TOTAL - _echoTotal, remaining)) {
-      const r = new Range();
-      try { r.setStart(node, m.start); r.setEnd(node, m.end); } catch (_) { continue; }
-      found.push({ range: r, key: m.key, n });
-      _echoCounts.set(m.key, (_echoCounts.get(m.key) || 0) + 1);
-      _echoTotal++;
-      if (_echoTotal >= PBP_ECHO_TOTAL) break;
-    }
+  const usable = live.filter((t) => (_echoCounts.get(t.id) || 0) < PBP_ECHO_PER_TERM);
+  const remaining = new Map(usable.map((t) => [t.id, PBP_ECHO_PER_TERM - (_echoCounts.get(t.id) || 0)]));
+  const sameLanguage = (term, start, end) => stream.nodes
+    .filter((part) => part.start < end && part.end > start)
+    .every((part) => part.language === term.language);
+  for (const m of pbpEchoFindInText(stream.text, usable, PBP_ECHO_TOTAL - _echoTotal, remaining, sameLanguage)) {
+    const first = stream.nodes.find((part) => part.start <= m.start && part.end > m.start);
+    const last = stream.nodes.find((part) => part.start < m.end && part.end >= m.end);
+    if (!first || !last) continue;
+    const r = new Range();
+    try { r.setStart(first.node, m.start - first.start); r.setEnd(last.node, m.end - last.start); } catch (_) { continue; }
+    found.push({ range: r, key: m.key, id: m.id, language: m.language, n });
+    _echoCounts.set(m.id, (_echoCounts.get(m.id) || 0) + 1);
+    _echoTotal++;
   }
   if (!found.length) return;
   for (const it of found) _echoHl.add(it.range);
@@ -345,7 +436,9 @@ function _echoScheduleScan(keys) {
     if (!valid()) return;
     let floor = 4; // progress floor even when timeRemaining is stingy
     while (queue.length && (floor-- > 0 || (deadline && deadline.timeRemaining() > 4))) {
-      _echoScanBlock(queue.shift());
+      _echoScanBlock(queue.shift()).catch((err) => {
+        console.warn("[echo] block scan failed:", err && err.name, err && err.message);
+      });
     }
     if (queue.length) _echoRequestIdle(step);
   };
@@ -408,6 +501,15 @@ async function _echoRestart() {
   }
   const rows = await (typeof pbpVocabAll === "function" ? pbpVocabAll(owner).catch(() => []) : []);
   if (epoch !== _echoEpoch || owner !== _echoOwner || !_echoEnabled) return;
+  // The source article is sampled once by md-dict. Reliable-only, with no
+  // Latin-script or UI-locale fallback; inline and translated lang still win.
+  let articleLang = _echoDeclaredLang(view);
+  if (!articleLang && typeof _pbpDictArticleCld === "function") {
+    const prior = await _pbpDictArticleCld();
+    if (epoch !== _echoEpoch || owner !== _echoOwner || !_echoEnabled) return;
+    articleLang = prior && prior.reliable ? pbpDictPrimaryLang(prior.lang) : "";
+  }
+  _echoArticleLang = articleLang === "und" ? "" : articleLang;
   _echoTerms = pbpEchoTermSet(rows);
   // An empty term set is a bail-out like the other two, so it fails closed for
   // the same reason: a bare return leaves the previous generation's underlines
@@ -436,7 +538,7 @@ async function _echoRestart() {
 function _echoArmTimeline() {
   const list = _echoTimelineList();
   if (!list) return false;
-  if (_echoObserver) _echoObserver.observe(list, { childList: true, subtree: true, characterData: true });
+  if (_echoObserver) _echoObserver.observe(list, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["lang"] });
   if (!list._pbpEchoClick) { list._pbpEchoClick = true; list.addEventListener("click", _echoOnClick, true); }
   return true;
 }
@@ -468,6 +570,7 @@ function _echoObserve() {
         continue;
       }
       if (m.type === "characterData") { mark(m.target); continue; }
+      if (m.type === "attributes") { mark(m.target); continue; }
       for (const node of m.addedNodes) mark(node);
       for (const node of m.removedNodes) {
         // Detached nodes have lost their siblings/parent; a removed block,
@@ -497,7 +600,7 @@ function _echoObserve() {
       _echoScheduleScan(keys);
     }, 400);
   });
-  _echoObserver.observe(view, { childList: true, subtree: true, characterData: true });
+  _echoObserver.observe(view, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["lang"] });
   // Timeline rows arrive in rAF batches and are rebuilt on every track
   // switch / AI pass (research T2.2): the same observer watches the list.
   // No list yet means md-video has not mounted the workspace (it may never
@@ -547,6 +650,7 @@ function _echoOnClick(e) {
   e.stopPropagation(); // keep .pb-tr peek handlers out of this click
   window.pbpExplainOpenForItem({
     text: hit.range.toString(),
+    lang: hit.language,
     n: hit.n,
     range: hit.range.cloneRange(),
     rect: hit.range.getBoundingClientRect(),
@@ -581,6 +685,8 @@ function _echoOnArticle(detail) {
   // BLOCKER). _echoEnabled=false makes every in-flight valid() fail.
   _echoEpoch++;
   _echoEnabled = false;
+  _echoArticleLang = "";
+  _echoLanguageCache = new WeakMap();
   _echoClearAll();
   _echoDisconnect();
   _echoOwner = owner;

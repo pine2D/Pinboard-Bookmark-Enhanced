@@ -78,6 +78,8 @@
 
 Google Drive 需在每部裝置分別連線，連線後同步目前 Pinboard 帳戶的生詞、標記與筆記。Drive 私有 appDataFolder 中的副本是明文，未經端對端加密。
 
+使用生詞同步的裝置都需要更新擴充功能。新版可讀取現有生詞資料，但舊版無法接收新版寫入的生詞變更。
+
 ## 授權
 
 MIT，見 [LICENSE](LICENSE)。

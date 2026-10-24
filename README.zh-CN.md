@@ -78,6 +78,8 @@
 
 Google Drive 需在每台设备上分别连接，连接后同步当前 Pinboard 账号的生词、高亮与笔记。Drive 私有 appDataFolder 中的副本是明文，未经端到端加密。
 
+使用生词同步的设备都需要更新扩展。新版可以读取已有生词数据，但旧版无法接收新版写入的生词更改。
+
 ## 许可证
 
 MIT，见 [LICENSE](LICENSE)。

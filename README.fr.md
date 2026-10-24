@@ -78,6 +78,8 @@ Aucun tracking, aucune analytique, aucune télémétrie. Pour les nouveaux utili
 
 Google Drive se connecte séparément sur chaque appareil, puis synchronise le vocabulaire, les surlignages et les notes du compte Pinboard actuel. Les copies dans le dossier privé appDataFolder de Drive sont en texte clair, sans chiffrement de bout en bout.
 
+Mettez à jour l’extension sur tous les appareils qui synchronisent le vocabulaire. Cette version lit les données existantes, mais les anciennes versions ne peuvent pas recevoir les modifications de vocabulaire enregistrées par cette version.
+
 ## Licence
 
 MIT. Voir [LICENSE](LICENSE).

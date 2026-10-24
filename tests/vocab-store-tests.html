@@ -120,6 +120,65 @@ check("causally newer canonical aliases replace the older display value", (() =>
 })());
 check("cross-vector merge converges in both directions", (() => { const a = live("a", 2, {}, { a: 2, b: 5 }); const b = live("b", 4, {}, { a: 3, b: 4 }); const ab = pbpVocabMergeEvents(a, b); const ba = pbpVocabMergeEvents(b, a); return [ab, ba].every((m) => m.kind === "merged" && pbpVocabValidateEvent(m.event) && m.event.vector.a === 3 && m.event.vector.b === 5 && m.event.dot.deviceId === "b" && m.event.dot.counter === 4 && m.requeue) && pbpVocabEventContentEqual(ab.event, ba.event); })());
 
+// Replicas may receive the same immutable edits in any order and grouping.
+function vocabPermutations(items) {
+  return items.length < 2 ? [items] : items.flatMap((item, index) =>
+    vocabPermutations(items.filter((_, at) => at !== index)).map(rest => [item, ...rest]));
+}
+check("three concurrent edits converge across every order and grouping", (() => {
+  const edits = [
+    live("a", 3, { groups: ["A"], contexts: [{ articleUrl: "https://a.test/", quote: "A" }] }),
+    live("b", 2, { groups: ["B"], contexts: [{ articleUrl: "https://b.test/", quote: "B" }], note: "B note" }),
+    live("c", 1, { groups: ["C"], contexts: [{ articleUrl: "https://c.test/", quote: "C" }], note: "C note" })
+  ];
+  const results = vocabPermutations(edits).flatMap(([a,b,c]) => [
+    pbpVocabMergeEvents(pbpVocabMergeEvents(a,b).event,c).event,
+    pbpVocabMergeEvents(a,pbpVocabMergeEvents(b,c).event).event
+  ]);
+  return results.every(event => event && pbpVocabValidateEvent(event) &&
+    event.value.note === "B note" && event.value.contexts.length === 3 &&
+    event.value.groups.slice().sort().join() === "A,B,C" &&
+    pbpVocabMergeEvents(results[0],event).kind === "noop");
+})());
+check("two replicas discard superseded note and group values before projection", (() => {
+  const a1 = live("a", 1, { note: "Old note", groups: ["Removed"] });
+  const a2 = live("a", 2, { note: "New note", groups: ["Removed"] });
+  const a3 = live("a", 3, { note: "New note", groups: [] });
+  const b4 = live("b", 4);
+  const left = [a1,a2,a3].reduce((event,next) => pbpVocabMergeEvents(event,next).event,b4);
+  const right = pbpVocabMergeEvents(a3,b4).event;
+  return left && right && left.value.note === "New note" && left.value.groups.length === 0 &&
+    pbpVocabMergeEvents(left,right).kind === "noop";
+})());
+check("a causally newer deletion removes the old live leaf before concurrent live wins", (() => {
+  const old = live("a", 1, { note: "Deleted note", groups: ["Deleted group"] });
+  const gone = tombstone("a", 2);
+  const concurrent = live("b", 3, { note: "Retained note", groups: ["Retained group"] });
+  const results = vocabPermutations([old,gone,concurrent]).map(events =>
+    events.slice(1).reduce((event,next) => pbpVocabMergeEvents(event,next).event,events[0]));
+  return results.every(event => event && !event.deleted && event.value.note === "Retained note" &&
+    event.value.groups.join() === "Retained group" && pbpVocabMergeEvents(results[0],event).kind === "noop");
+})());
+check("frontier validation rejects spoofed projection and nested or dominated leaves", (() => {
+  const merged = pbpVocabMergeEvents(live("a",1),live("b",2)).event;
+  if (!Array.isArray(merged?.versions)) return false;
+  const spoofed = structuredClone(merged); spoofed.value.gloss = "forged";
+  const nested = structuredClone(merged); nested.versions[0].versions = merged.versions;
+  const dominated = structuredClone(merged); dominated.versions.push(live("a",2));
+  return pbpVocabValidateEvent(merged) && !pbpVocabValidateEvent(spoofed) &&
+    !pbpVocabValidateEvent(nested) && !pbpVocabValidateEvent(dominated);
+})());
+
+check("legacy projections preserve known provenance but divergent opaque values still fail closed", (() => {
+  const modern = pbpVocabMergeEvents(live("a",1),live("b",2)).event;
+  const legacy = {...modern}; delete legacy.versions;
+  const divergent = structuredClone(legacy); divergent.value.note = "lost legacy history";
+  const forward = pbpVocabMergeEvents(legacy,modern), reverse = pbpVocabMergeEvents(modern,legacy);
+  return pbpVocabValidateEvent(legacy) && forward.kind === "apply" && reverse.kind === "noop" &&
+    forward.event.versions?.length === 2 && reverse.event.versions?.length === 2 &&
+    pbpVocabMergeEvents(modern,divergent).kind === "corrupt";
+})());
+
 function idbReq(req) {
   return new Promise((resolve, reject) => {
     req.onsuccess = () => resolve(req.result);
@@ -957,13 +1016,49 @@ async function runIdbChecks() {
     JSON.stringify(clearRead));
 
   await deleteVocabDb();
+  {
+  const frontierOwner = "acct_frontier", frontierHash = "f".repeat(64);
+  const a1 = live("a",1,{note:"old"}), a2 = live("a",2,{note:"new"}), b3 = live("b",3);
+  const batch = entries => ({schema:2,ownerHash:frontierHash,deviceId:"wire",createdAt:1,entries});
+  const first = await pbpVocabApplyRemotePage(frontierOwner,frontierHash,[batch([a1,b3])],null);
+  await closeVocabDb();
+  const second = await pbpVocabApplyRemotePage(frontierOwner,frontierHash,[batch([a2])],null);
+  const uploaded = (await pbpVocabListOutbox(frontierOwner))[0]?.event;
+  const checkpointed = await pbpVocabCheckpointOwner(frontierOwner);
+  const afterCheckpoint = (await pbpVocabListOutbox(frontierOwner))[0]?.event;
+  const edited = await pbpVocabSetNote(frontierOwner+"|en|word",frontierOwner,"local edit");
+  const localEdit = (await pbpVocabListOutbox(frontierOwner))[0]?.event;
+  check("IDB reopen and checkpoint retain causal leaves while a local edit absorbs them",
+    first.ok && second.ok && uploaded?.value.note === "new" && uploaded.versions?.length === 2 &&
+    checkpointed === 1 && pbpVocabEventContentEqual(uploaded,afterCheckpoint) && edited &&
+    localEdit?.versions === undefined && localEdit?.value.note === "local edit" &&
+    localEdit.vector.a === 2 && localEdit.vector.b === 3);
+  }
+  {
+    const hash = "9".repeat(64);
+    await pbpVocabActivateAccount("old-drive",hash);
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function(value, ...args) {
+      if (value?.key === `active-account:${hash}` && value.drivePermissionId === "new-drive") {
+        throw new DOMException("fixture quota", "QuotaExceededError");
+      }
+      return put.call(this,value,...args);
+    };
+    let activated;
+    try { activated = await pbpVocabActivateAccount("new-drive",hash); }
+    finally { IDBObjectStore.prototype.put = put; }
+    check("an interrupted account switch rolls back both active identity and checkpoint intent",
+      activated === false && (await syncGet(`active-account:${hash}`))?.drivePermissionId === "old-drive" &&
+      (await pbpVocabGetAccountState("new-drive",hash)) === null);
+  }
+  await deleteVocabDb();
 }
 
 (async () => {
   try {
     await runIdbChecks();
   } catch (error) {
-    while (pass + fail < 77) check("IDB harness completed", false, error && (error.stack || error.message));
+    while (pass + fail < 84) check("IDB harness completed", false, error && (error.stack || error.message));
   }
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();

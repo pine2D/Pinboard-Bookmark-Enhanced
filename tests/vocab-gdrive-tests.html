@@ -64,11 +64,11 @@ function sizedEntry(targetBodyBytes, term) {
   return entry;
 }
 function metadata(ownerHash = OWNER_HASH, deviceId = DEVICE_ID) {
-  return pbpVocabDriveMetadata(DRIVE_FILE_ID, ownerHash, deviceId);
+  return pbpVocabDriveMetadata(DRIVE_FILE_ID, ownerHash, deviceId, { ...PBP_VOCAB_DRIVE_PROTOCOL, schema: 1 });
 }
 function splitBodiesValidate(result, envelope = ENVELOPE) {
   return result.ok && result.batches.every((batch) =>
-    pbpVocabValidateDriveBatch(metadata(envelope.ownerHash, envelope.deviceId), batch.body, envelope.ownerHash));
+    pbpVocabValidateDriveBatch(pbpVocabDriveMetadata(DRIVE_FILE_ID, envelope.ownerHash, envelope.deviceId), batch.body, envelope.ownerHash));
 }
 async function asyncCheck(name, fn) {
   // The Drive identity cache is module-level and most cases share "token-a";
@@ -141,7 +141,7 @@ function syncHarness(options = {}) {
   const seedResults = [...(options.seedResults || [0])];
   const pending = [...(options.pending || [])];
   const outbox = [...(options.outbox || [])];
-  let accountState = options.accountState ? { ...options.accountState } : null;
+  let accountState = options.accountState ? { protocolSchema: 2, ...options.accountState } : null;
   let preflightState = options.preflightState ? { ...options.preflightState } : null;
   // The orchestrator's shared per-owner connection record. `null` opts a
   // case out of the record entirely; omitted means an empty in-memory one.
@@ -383,7 +383,7 @@ function syncHarness(options = {}) {
     const entry = live();
     const split = pbpVocabSplitDriveEntries([entry], ENVELOPE);
     const exact = JSON.stringify({
-      schema: 1, ownerHash: OWNER_HASH, deviceId: DEVICE_ID, createdAt: 123, entries: [entry]
+      schema: 2, ownerHash: OWNER_HASH, deviceId: DEVICE_ID, createdAt: 123, entries: [entry]
     });
     const extra = JSON.stringify({ ...bodyObject([entry]), cursor: "secret" });
     return splitBodiesValidate(split) && split.batches[0].body === exact &&
@@ -2673,6 +2673,128 @@ function syncHarness(options = {}) {
     const result = await h.runner()();
     return result.error === "account_changed" && !h.calls.some((call) => call.startsWith("seed:")) &&
       !h.calls.some((call) => call.startsWith("upload:"));
+  });
+  await asyncCheck("returning to an existing Drive account republishes edits consumed by the other account", async () => {
+    const owner = "acct_drive-cycle", ownerHash = "c".repeat(64);
+    let permissionId = "drive-cycle-A", nextId = 0;
+    const uploads = {"drive-cycle-A":[],"drive-cycle-B":[]};
+    const client = { async openSession() {
+      const bound = permissionId;
+      return {ok:true,permissionId:bound,about:async()=>({ok:true,permissionId:bound}),
+        getStartPageToken:async()=>({ok:true,pageToken:"start"}),
+        listFiles:async()=>({ok:true,files:[],nextPageToken:null}),
+        listChanges:async()=>({ok:true,changes:[],nextPageToken:null,newStartPageToken:"next"}),
+        generateId:async()=>({ok:true,fileId:"cycle-"+(++nextId)}),
+        upload:async(metadata,body)=>{uploads[bound].push(...JSON.parse(body).entries);return {ok:true};}};
+    }};
+    const runner = pbpCreateVocabDriveSyncRunner({client,hashOwner:async()=>ownerHash,
+      getCurrentPinboardAuth:async()=>({account:"drive-cycle"}),pinboardAuthIsCurrent:()=>true});
+    await pbpVocabSaveWord(owner,{term:"Haus",language:"de",gloss:"house"});
+    if (!(await runner()).ok) return false;
+    permissionId = "drive-cycle-B";
+    if (!(await runner({force:true})).ok) return false;
+    await pbpVocabSaveWord(owner,{term:"Wort",language:"de",gloss:"word"});
+    if (!(await runner()).ok) return false;
+    permissionId = "drive-cycle-A";
+    const returned = await runner({force:true});
+    const before = uploads[permissionId].length;
+    const repeated = await runner();
+    return returned.ok && repeated.ok && (await pbpVocabListOutbox(owner)).length === 0 &&
+      uploads[permissionId].some(event=>event.recordKey==="de|wort") &&
+      uploads[permissionId].length === before;
+  });
+  await asyncCheck("v2 writes are isolated from v1 while list queries continue reading both", async () => {
+    let query = "";
+    const client = pbpCreateVocabDriveClient({identity:identityFixture(),fetchImpl:async url=>{
+      query = new URL(url).searchParams.get("q"); return jsonResponse({files:[]});
+    }});
+    const listed = await client.listFiles(OWNER_HASH);
+    const written = pbpVocabSplitDriveEntries([live()],ENVELOPE);
+    const created = pbpVocabDriveMetadata("v2-file",OWNER_HASH,DEVICE_ID);
+    return listed.ok && created.appProperties.schema === "2" && JSON.parse(written.batches[0].body).schema === 2 &&
+      query.includes("value='1'") && query.includes("value='2'") && query.includes(" or ");
+  });
+  await asyncCheck("mixed-version changes keep v1 and v2 and reject mismatched schema metadata", async () => {
+    const old = driveFile("mixed-old"), modern = driveFile("mixed-new");
+    modern.meta.appProperties.schema = "2";
+    modern.body = JSON.stringify({...JSON.parse(modern.body),schema:2});
+    const h = syncHarness({files:[old,modern],accountState:{key:`account:perm-a:${OWNER_HASH}`,
+      drivePermissionId:"perm-a",ownerHash:OWNER_HASH,bootstrapComplete:true,pageToken:"mixed",protocolSchema:2},
+      changePages:[{changes:[old,modern].map(file=>({fileId:file.meta.id,file:file.meta,removed:false})),
+        nextPageToken:null,newStartPageToken:"mixed-end"}]});
+    const result = await h.runner()();
+    const mismatch = {...modern.meta,appProperties:{...modern.meta.appProperties,schema:"1"}};
+    return result.ok && h.calls.includes("download:mixed-old") && h.calls.includes("download:mixed-new") &&
+      !pbpVocabValidateDriveBatch(mismatch,modern.body,OWNER_HASH);
+  });
+  await asyncCheck("a v1 account restarts discovery once so previously skipped v2 files are not lost", async () => {
+    const h = syncHarness({accountState:{key:`account:perm-a:${OWNER_HASH}`,drivePermissionId:"perm-a",
+      ownerHash:OWNER_HASH,bootstrapComplete:true,pageToken:"old-version-cursor",protocolSchema:1},
+      filePages:[{ok:false,error:"network",retryable:true},{files:[],nextPageToken:null}]});
+    const interrupted = await h.runner()();
+    const result = await h.runner()({force:true});
+    return interrupted.error === "network" && result.ok && h.calls.includes("files:") &&
+      !h.calls.includes("changes:old-version-cursor") && h.calls.filter(call=>call==="start").length===1 &&
+      h.state().protocolSchema === 2 && h.calls.includes("checkpoint");
+  });
+  await asyncCheck("a frozen v1 upload keeps its original schema and ID when a retry receives 409", async () => {
+    const owner = "acct_v1-pending", ownerHash = "8".repeat(64), permissionId = "pending-drive";
+    const oldBody = JSON.stringify({schema:1,ownerHash,deviceId:"old-device",createdAt:42,entries:[live("Legacy","en",{},"old-device")]});
+    await pbpVocabFreezeOutbox(owner,permissionId,ownerHash,"original-v1-id",oldBody);
+    const requests = [], sent = [];
+    // Read-side metadata uses the opaque folder ID, not appDataFolder.
+    const oldMeta = {id:"original-v1-id",name:"pbp-vocab-original-v1-id.json",parents:["opaque-old-folder"],
+      mimeType:"application/json",appProperties:{pbpKind:"vocab-batch",schema:"1",owner:ownerHash,device:"old-device"}};
+    const client = pbpCreateVocabDriveClient({identity:identityFixture(),fetchImpl:async(url,init)=>{
+      const path = new URL(url).pathname; requests.push(init.method+" "+path);
+      if (path.endsWith("/about")) return jsonResponse({user:{permissionId}});
+      if (path.endsWith("/changes/startPageToken")) return jsonResponse({startPageToken:"pending-start"});
+      if (path === "/drive/v3/files") return jsonResponse({files:[]});
+      if (path === "/drive/v3/changes") return jsonResponse({changes:[],newStartPageToken:"pending-end"});
+      if (path === "/upload/drive/v3/files") { sent.push(init.body); return jsonResponse({},409); }
+      if (path.endsWith("/original-v1-id")) return jsonResponse(oldMeta);
+      throw new Error("unexpected legacy fixture request");
+    }});
+    const runner = pbpCreateVocabDriveSyncRunner({client,getCurrentPinboardAuth:async()=>({account:"v1-pending"}),
+      pinboardAuthIsCurrent:()=>true,hashOwner:async()=>ownerHash});
+    const result = await runner();
+    return result.ok && sent.length === 1 && sent[0].includes(oldBody) &&
+      sent[0].includes('"schema":"1"') && sent[0].includes('"id":"original-v1-id"') &&
+      (await pbpVocabListPendingBatches(permissionId,ownerHash)).length === 0 &&
+      requests.every(request=>request.startsWith("GET ") || request === "POST /upload/drive/v3/files");
+  });
+  await asyncCheck("real runner exchanges two-device causal frontiers without corrupt or stale edits", async () => {
+    const owner = "acct_frontier-runner", ownerHash = "7".repeat(64);
+    const edit = (device,counter,patch={}) => ({recordKey:"en|word",vector:{[device]:counter},
+      dot:{deviceId:device,counter},deleted:false,value:{term:"Word",lemma:null,language:"en",gloss:"word",ipa:null,
+        sourceUrl:null,license:null,contexts:[],groups:[],note:"",status:"new",createdAt:1,updatedAt:2,...patch}});
+    const a1=edit("a",1,{note:"old",groups:["Removed"]}),a2=edit("a",2,{note:"new",groups:["Removed"]});
+    const a3=edit("a",3,{note:"new"}),b4=edit("b",4);
+    // Independent replica's expected projection and causal leaves, hand-written.
+    const converged={recordKey:"en|word",vector:{a:3,b:4},dot:{deviceId:"b",counter:4},deleted:false,
+      value:{...b4.value,note:"new"},versions:[a3,b4]};
+    const files = new Map();
+    const file=(id,entries,schema=2)=>{
+      const meta={id,name:`pbp-vocab-${id}.json`,parents:["opaque-frontier-folder"],mimeType:"application/json",
+        appProperties:{pbpKind:"vocab-batch",schema:String(schema),owner:ownerHash,device:"other-replica"}};
+      files.set(id,JSON.stringify({schema,ownerHash,deviceId:"other-replica",createdAt:1,entries}));return meta;
+    };
+    const earlier=file("earlier",[a1,b4],1),later=file("later",[a2,a3]),echo=file("echo",[converged]);
+    let changes=0;const uploads=[];
+    const client={openSession:async()=>({ok:true,permissionId:"frontier-drive",
+      about:async()=>({ok:true,permissionId:"frontier-drive"}),
+      getStartPageToken:async()=>({ok:true,pageToken:"first"}),
+      listFiles:async()=>({ok:true,files:[earlier],nextPageToken:null}),
+      listChanges:async()=>({ok:true,changes:[{fileId:changes++ ? echo.id : later.id,file:changes===1 ? later : echo}],
+        nextPageToken:null,newStartPageToken:"next"}),download:async id=>({ok:true,body:files.get(id)}),
+      generateId:async()=>({ok:true,fileId:"frontier-upload"}),
+      upload:async(meta,body)=>{uploads.push(JSON.parse(body));return {ok:true};}})};
+    const runner=pbpCreateVocabDriveSyncRunner({client,getCurrentPinboardAuth:async()=>({account:"frontier-runner"}),
+      pinboardAuthIsCurrent:()=>true,hashOwner:async()=>ownerHash});
+    const first=await runner(),second=await runner();
+    const words=await pbpVocabAll(owner),preflight=await pbpVocabGetPreflightState(ownerHash);
+    return first.ok && second.ok && !preflight && words[0]?.note==="new" && words[0].groups.length===0 &&
+      uploads[0]?.schema===2 && uploads[0].entries[0].versions.length===2 && uploads.length===1;
   });
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();

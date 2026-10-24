@@ -78,6 +78,8 @@ Bez śledzenia, bez analityki, bez telemetrii. W przypadku nowych użytkowników
 
 Z Dyskiem Google łączysz się osobno na każdym urządzeniu. Po połączeniu synchronizowane są słówka, zaznaczenia i notatki bieżącego konta Pinboard. Kopie w prywatnym folderze appDataFolder Dysku są zapisane jawnym tekstem, bez szyfrowania end-to-end.
 
+Zaktualizuj rozszerzenie na wszystkich urządzeniach synchronizujących słownictwo. Ta wersja odczytuje dotychczasowe dane, ale starsze wersje nie odbierają zmian słownictwa zapisanych przez tę wersję.
+
 ## Licencja
 
 MIT — patrz [LICENSE](LICENSE).

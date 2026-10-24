@@ -15,7 +15,8 @@ paths:
 ## 生词同步不变量
 
 - `vocab-store.js` 是 `pbp-vocab` IDB（schema v2）的唯一写入口。每次本地 mutation 在同一 IDB transaction 中核验 owner，并原子更新 word 或 tombstone、版本向量和 coalesced outbox；删除保留 tombstone，不自动 GC。
-- 远端批次用 owner hash 隔离，vector dominance 与稳定 dot 决定收敛；并发删除遇到新修改时 live 胜出并留下持久 notice，用户再次删除后 tombstone 才支配。
+- 远端批次用 owner hash 隔离，事件保留未被因果支配的原始叶（`versions`），按稳定 dot 确定投影；本地编辑吸收完整向量后产生新叶。不得把合并后的字段当成单一 dot 的原始内容，否则事件顺序会改变结果。并发删除遇到新修改时 live 胜出并留下持久 notice，用户再次删除后 tombstone 才支配。
+- 生词 wire batch 写 schema 2、持续读取 schema 1/2，Drive 文件按 `appProperties.schema` 分流；旧端不会读取 schema 2，所有设备须升级才能完整双向同步。旧无 `versions` 事件作为不可拆的叶读取，已丢失的历史来源不能猜测恢复。首次协议升级重新 bootstrap/checkpoint；已经冻结的 schema 1 pending 按原文件 ID、原内容和原 schema 重试，保持 409 幂等。版本来源仅进同步 metadata，不进入运行时 word 或手工备份。
 - 每个网络 await 和 IDB commit 前都重核验 Pinboard owner 与 Drive `permissionId`，变化时不得推进游标或上传旧账号数据。`permissionId` 的核验手段是「重取 token，与已核验 token 的身份比对」（见下文《Drive 身份缓存》），不是每次都发 `about.get`。
 
 ## 高亮与笔记同步不变量

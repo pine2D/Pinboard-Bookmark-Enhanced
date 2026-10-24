@@ -1,8 +1,8 @@
-const PBP_VOCAB_BATCH_SCHEMA = 1;
+const PBP_VOCAB_BATCH_SCHEMA = 2;
 const PBP_VOCAB_BATCH_MAX_BYTES = 4 * 1024 * 1024;
 // The transport is shared; each dataset owns its wire validation and identity.
 const PBP_VOCAB_DRIVE_PROTOCOL = Object.freeze({
-  kind: "vocab-batch", schema: PBP_VOCAB_BATCH_SCHEMA, filePrefix: "pbp-vocab",
+  kind: "vocab-batch", schema: PBP_VOCAB_BATCH_SCHEMA, readSchemas: [1, 2], filePrefix: "pbp-vocab",
   validateEvent: (event) => pbpVocabValidateEvent(event),
   validBatchBody: (body, ownerHash) => _pbpVocabValidBatchBody(body, ownerHash)
 });
@@ -18,12 +18,19 @@ function _pbpVocabDriveValidProperty(key, value) {
 
 function _pbpVocabDriveBody(entries, envelope, protocol = PBP_VOCAB_DRIVE_PROTOCOL) {
   return JSON.stringify({
-    schema: protocol.schema,
+    schema: envelope.schema === undefined ? protocol.schema : envelope.schema,
     ownerHash: envelope.ownerHash,
     deviceId: envelope.deviceId,
     createdAt: envelope.createdAt,
     entries
   });
+}
+
+// The schema property separates readers: old clients query only schema 1
+// and must never receive the causal frontier they cannot validate. Upgraded
+// clients continue reading old-device edits while all new batches use v2.
+function _pbpVocabDriveReadsSchema(protocol, schema) {
+  return (protocol.readSchemas || [protocol.schema]).some(value => String(value) === schema);
 }
 
 function _pbpVocabDriveValidMetadata(metadata, protocol = PBP_VOCAB_DRIVE_PROTOCOL) {
@@ -37,7 +44,7 @@ function _pbpVocabDriveValidMetadata(metadata, protocol = PBP_VOCAB_DRIVE_PROTOC
     metadata.mimeType === "application/json" &&
     _pbpVocabOnlyKeys(properties, ["pbpKind", "schema", "owner", "device"]) &&
     Object.keys(properties).length === 4 && properties.pbpKind === protocol.kind &&
-    properties.schema === String(protocol.schema) &&
+    _pbpVocabDriveReadsSchema(protocol, properties.schema) &&
     _pbpVocabValidOwnerHash(properties.owner) && _pbpVocabDeviceId(properties.device) &&
     Object.entries(properties).every(([key, value]) => _pbpVocabDriveValidProperty(key, value));
 }
@@ -76,6 +83,7 @@ function pbpVocabValidateDriveBatch(metadata, body, expectedOwnerHash, protocol 
   let parsed;
   try { parsed = JSON.parse(body); } catch (_) { return false; }
   if (!protocol.validBatchBody(parsed, expectedOwnerHash) ||
+      metadata.appProperties.schema !== String(parsed.schema) ||
       metadata.appProperties.device !== parsed.deviceId ||
       body !== _pbpVocabDriveBody(parsed.entries, parsed, protocol)) return false;
   return true;
@@ -545,10 +553,12 @@ function pbpCreateVocabDriveClient({
     const url = new URL(`${apiBase}/files`);
     url.searchParams.set("spaces", "appDataFolder");
     url.searchParams.set("pageSize", "1000");
+    const schemaQuery = (protocol.readSchemas || [protocol.schema]).map(schema =>
+      `appProperties has { key='schema' and value='${schema}' }`).join(" or ");
     url.searchParams.set("q",
       "'appDataFolder' in parents and trashed = false and " +
       `appProperties has { key='pbpKind' and value='${protocol.kind}' } and ` +
-      `appProperties has { key='schema' and value='${protocol.schema}' } and ` +
+      `(${schemaQuery}) and ` +
       `appProperties has { key='owner' and value='${ownerHash}' }`);
     url.searchParams.set("fields", `nextPageToken,files(${metadataFields})`);
     if (pageToken !== undefined) url.searchParams.set("pageToken", pageToken);
@@ -769,6 +779,7 @@ function _pbpVocabDriveDefaultStore() {
     putPreflightState: pbpVocabPutPreflightState,
     deletePreflightState: pbpVocabDeletePreflightState,
     getAccountState: pbpVocabGetAccountState,
+    activateAccount: pbpVocabActivateAccount,
     putAccountState: pbpVocabPutAccountState,
     seedLegacy: pbpVocabSeedLegacy,
     applyRemotePage: pbpVocabApplyRemotePage,
@@ -1047,7 +1058,7 @@ function pbpCreateVocabDriveSyncRunner({
         }
         const properties = change.file?.appProperties;
         if (!properties || properties.pbpKind !== protocol.kind ||
-            properties.schema !== String(protocol.schema) ||
+            !_pbpVocabDriveReadsSchema(protocol, properties.schema) ||
             properties.owner !== ownerHash) {
           continue;
         }
@@ -1124,6 +1135,16 @@ function pbpCreateVocabDriveSyncRunner({
         await putConnection({ ...connState, lastError: null, retryAt: null, authAttempts: 0 });
       }
 
+      // Vocabulary has one owner outbox shared by Google accounts. Returning
+      // to a previously connected account must checkpoint edits another account
+      // already consumed. The store persists the switch and checkpoint intent
+      // atomically, before any cursor or upload can advance.
+      if (store.activateAccount) {
+        if (!await readStore(() => store.activateAccount(session.permissionId, ownerHash))) {
+          return finishFailure({ error: "local_store" });
+        }
+        if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });
+      }
       state = await readStore(() => store.getAccountState(session.permissionId, ownerHash));
       if (!await stillCurrent()) {
         return normalizedFailure({ error: "account_changed" });
@@ -1139,6 +1160,10 @@ function pbpCreateVocabDriveSyncRunner({
       // account already enrolled. A checkpoint rebuilds the outbox from the
       // local records, and it runs after the download pass so the upload
       // carries the merged state.
+      // A v1 cursor may already have passed v2 files from upgraded devices.
+      // Discover all supported files once on upgrade, retaining pending uploads
+      // and local records. Persist the marker with the first bootstrap cursor.
+      const protocolUpgrade = protocol.schema > 1 && state?.protocolSchema !== protocol.schema;
       const freshAccount = !state;
       state = {
         ...(state || {}),
@@ -1147,16 +1172,21 @@ function pbpCreateVocabDriveSyncRunner({
         emailAddress: session.emailAddress || "",
         displayName: session.displayName || "",
         ownerHash,
-        bootstrapComplete: state?.bootstrapComplete === true,
+        bootstrapComplete: !protocolUpgrade && state?.bootstrapComplete === true,
+        protocolSchema: protocol.schema,
         pageToken: state?.pageToken || null,
         // Persist it with the very first account row rather than keeping it in
         // a local: bootstrap commits several rows before the changes loop
         // reaches the point that writes the flag, and a failure in between
         // would leave a row that never checkpoints -- the second account would
         // download forever and never upload this device's vocabulary.
-        ...(freshAccount || state?.needsCheckpoint === true
+        ...(freshAccount || protocolUpgrade || state?.needsCheckpoint === true
           ? { needsCheckpoint: true } : {})
       };
+      if (protocolUpgrade) {
+        for (const key of ["pageToken", "bootstrapStartToken", "bootstrapListComplete",
+          "bootstrapFilePageToken", "bootstrapChangePageToken", "cursorRejected"]) delete state[key];
+      }
       // A cursor Drive has rejected cannot be resumed, so for that one case
       // force means "start the bootstrap over"; every other force still resumes
       // where the last run stopped. The rebuilt outbox has to carry the whole
@@ -1312,7 +1342,7 @@ function pbpCreateVocabDriveSyncRunner({
         let metadata;
         try {
           metadata = pbpVocabDriveMetadata(
-            pending.driveFileId, ownerHash, parsed.deviceId, protocol
+            pending.driveFileId, ownerHash, parsed.deviceId, { ...protocol, schema: parsed.schema }
           );
         } catch (_) {
           return normalizedFailure({ error: "invalid_response" });

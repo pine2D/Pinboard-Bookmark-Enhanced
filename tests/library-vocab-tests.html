@@ -478,6 +478,10 @@ check("a row keeps language and status as plain text on line one and its groups 
   check("the common language's label is for screen readers only; a minority language still shows",
     langOf("cl1")?.className === "sr-only" && langOf("cl1")?.textContent !== "" &&
     langOf("cl3")?.className === "notes-meta-chip");
+  check("row terms carry their own language without changing the language of their UI labels",
+    $id("vocab-list").querySelector('[data-vocab-id="cl1"] .notes-row-title').lang === "en" &&
+    $id("vocab-list").querySelector('[data-vocab-id="cl3"] .notes-row-title').lang === "de" &&
+    !$id("vocab-list").querySelector('[data-vocab-id="cl3"]').hasAttribute("lang"));
   $id("vocab-search").value = "drei";
   _pbpVocabApplyView(true);
   check("filtering down to the minority word keeps its label visible", langOf("cl3")?.className === "notes-meta-chip");
@@ -709,6 +713,28 @@ check("lookup bar wiring populates the language select with no Auto leg",
     _pbpVocabFreeLookup();
     check("T7 a lookup with no stored match shows no saved-word hint", !result.querySelector(".vocab-lookup-saved"));
 
+    // Search folding is deliberately wider than vocabulary identity: a
+    // German homograph or ss/ß spelling must not own an English lookup.
+    const identityRows = [
+      { id: "gift-de", term: "Gift", language: "de", groups: [], contexts: [] },
+      { id: "gift-en", term: "gift", language: "en", groups: [], contexts: [] },
+      { id: "mass-de", term: "Maß", language: "de", groups: [], contexts: [] },
+    ];
+    _vocabRows = identityRows;
+    _pbpVocabRenderDetail(null);
+    _pbpVocabLookupOther("GIFT", "en-US");
+    result.querySelector(".vocab-lookup-saved")?.click();
+    check("a saved-word link opens the query language's word even when another language's homograph comes first",
+      _pbpVocabDetailWordId === "gift-en", String(_pbpVocabDetailWordId));
+    _pbpVocabLookupOther("gift", "fr");
+    check("a word stored only in other languages offers no saved-word link",
+      !result.querySelector(".vocab-lookup-saved"));
+    _pbpVocabLookupOther("Mass", "de");
+    check("saved-word links use vocabulary identity rather than broader search spelling folds",
+      !result.querySelector(".vocab-lookup-saved"));
+    _vocabRows = lookupSample;
+    _pbpVocabRenderDetail(null);
+
     // md-dict's rerun fires long after submit (retry, permission grant): it
     // answers the submitted question, not whatever the list box names now.
     runCalls.length = 0;
@@ -866,6 +892,8 @@ const unknownLanguageRow = _pbpVocabBuildRow({
 });
 check("production vocabulary row hides the unknown language code",
   !unknownLanguageRow.querySelector(".notes-row-meta").textContent.includes("UND"));
+check("an unknown word language is explicit instead of inheriting the interface language",
+  unknownLanguageRow.querySelector(".notes-row-title").lang === "und");
 const fullGlossRow = _pbpVocabBuildRow({
   id:"full-gloss", term:"run", language:"en", ipa:"/rʌn/",
   gloss:"contextual sense line\ngeneral sense line", groups:[], contexts:[]
@@ -2282,6 +2310,36 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       check("T7 with the grant and nothing local or cached, a plain lowercase word costs exactly one request and renders",
         calls.fetch.join(",") === "constraint" && calls.request === 0 &&
         !!result.querySelector(".xp-dict-online .xp-dict-entry") && "sameWord" in result.dataset, JSON.stringify(calls));
+      const renderedIpa = () => result.querySelector(".xp-dict-ipa");
+      const ipaVisible = () => !!renderedIpa() && getComputedStyle(renderedIpa()).display !== "none";
+      check("a saved word without an IPA still displays pronunciation returned by its dictionary",
+        !$id("vocab-detail").querySelector(".vocab-pron-ipa") && ipaVisible());
+      rows[0].ipa = "/kənˈstreɪnt/";
+      _pbpVocabRenderDetail(rows[0]);
+      _pbpVocabRelookup(rows[0]);
+      await until(() => !!renderedIpa() && !result.hasAttribute("aria-busy"));
+      check("an identical pronunciation already displayed in the heading is not repeated in the dictionary",
+        $id("vocab-detail").querySelector(".vocab-pron-ipa").textContent === "/kənˈstreɪnt/" && !ipaVisible());
+      rows[0].ipa = "/əˈnʌðə/";
+      _pbpVocabRenderDetail(rows[0]);
+      check("a dictionary pronunciation that differs from the saved heading stays visible after a detail refresh",
+        renderedIpa()?.textContent === "/kənˈstreɪnt/" && ipaVisible());
+      delete rows[0].ipa;
+
+      // A real local-pack shape, not a normalized dictionary fixture: a
+      // word saved before installing CC-CEDICT has no persisted pinyin.
+      const chinese = { ...word("zh-new-pack", "呼吸"), language: "zh" };
+      pbpPackLookup = async () => ({ state: "hit", matched: "呼吸", rows: [
+        { trad: "呼吸", simp: "呼吸", pinyin: "hu1 xi1", defs: ["to breathe", "breathing"] },
+      ] });
+      rows.push(chinese);
+      _pbpVocabRenderDetail(chinese);
+      await until(() => !!renderedIpa() && !result.hasAttribute("aria-busy"));
+      check("installing CC-CEDICT after saving a Chinese word reveals the newly available pinyin",
+        !$id("vocab-detail").querySelector(".vocab-pron-ipa") &&
+        renderedIpa()?.textContent === "hū xī" && ipaVisible());
+      pbpPackLookup = async () => ({ state: "unavailable" });
+      rows.pop();
 
       open("a2");
       await dwell();
@@ -2291,6 +2349,59 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       await until(() => !!result.querySelector(".xp-dict-online .xp-dict-entry"), 200);
       check("T7 a word already in the dict2_ cache renders at once with zero requests",
         calls.fetch.length === 0 && !!result.querySelector(".xp-dict-online .xp-dict-entry"), JSON.stringify(calls));
+
+      // A persisted grammar pointer is not a complete answer: the shared
+      // lookup chain may continue to an uncached lowercase form. Keep the
+      // real chain and fetch boundary here; stubbing _pbpVocabDictRun would
+      // miss the cross-module request that escaped the automatic dwell.
+      const running = word("cached-form-of", "Running");
+      cache.set("dict2_en|Running", {
+        word: "Running", formOfOnly: true, senseKeep: PBP_DICT_SENSE_KEEP,
+        entries: [{ pos: "verb", ipas: [], forms: [], senses: [{
+          definition: "present participle of run", tags: ["form-of"],
+          examples: [], synonyms: [], antonyms: [], subsenses: [],
+        }] }],
+        sourceUrl: "https://en.wiktionary.org/wiki/Running", license: "CC BY-SA 4.0",
+      });
+      rows.push(running);
+      reset();
+      _pbpVocabRenderDetail(running);
+      await new Promise(resolve => setTimeout(resolve, 60));
+      check("a cached form-of pointer cannot send an uncached candidate before the automatic dwell",
+        calls.fetch.length === 0, JSON.stringify(calls));
+      await dwell();
+      await until(() => !!online());
+      check("a cached form-of pointer continues the normal lookup after the automatic dwell",
+        calls.fetch.join(",") === "running" && calls.request === 0 && !!online(), JSON.stringify(calls));
+
+      _pbpVocabRenderDetail(null);
+      reset();
+      _pbpVocabRenderDetail(running);
+      await new Promise(resolve => setTimeout(resolve, 60));
+      open("a1"); // cached real definition: switching here costs no request
+      await dwell();
+      check("passing a cached form-of word inside the dwell sends no lowercase request",
+        calls.fetch.length === 0 && _pbpVocabDetailWordId === "a1", JSON.stringify(calls));
+
+      reset();
+      _pbpVocabRenderDetail(running);
+      await new Promise(resolve => setTimeout(resolve, 60));
+      _vocabCurrentOwner = "acct_other";
+      await dwell();
+      check("an owner switch cancels the pending cached form-of continuation",
+        calls.fetch.length === 0 && !online(), JSON.stringify(calls));
+      _vocabCurrentOwner = "acct_auto";
+      _pbpVocabRenderDetail(null);
+
+      granted = false;
+      reset();
+      _pbpVocabRenderDetail(running);
+      await dwell();
+      check("a cached form-of pointer never requests a grant or fetches automatically without permission",
+        calls.fetch.length === 0 && calls.request === 0, JSON.stringify(calls));
+      granted = true;
+      _pbpVocabRenderDetail(null);
+      rows.pop();
 
       pbpEcdictLookup = async (t) => (t === "ephemeral"
         ? { state: "hit", matched: "ephemeral", rows: [{ word: "ephemeral", translation: "a. 朝生暮死的, 短命的, 短暂的\\n[医] 暂时的" }] }

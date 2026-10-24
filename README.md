@@ -78,6 +78,8 @@ No tracking, no analytics, no telemetry. For new users, settings and credentials
 
 Google Drive connects separately on each device and syncs the current Pinboard account's vocabulary, highlights, and notes. Drive copies are plaintext in the private appDataFolder and are not end-to-end encrypted.
 
+Update the extension on every device that syncs vocabulary. This version reads existing vocabulary data, but older versions cannot receive vocabulary changes written by this version.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

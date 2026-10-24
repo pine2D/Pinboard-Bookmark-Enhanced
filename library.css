@@ -1999,8 +1999,9 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-pos { font-size: 13px; line-height: 18px; font-weight: 700; color: var(--lib-fg-muted); }
 #vocab-ref-result .xp-dict-ipa { font-size: 14px; line-height: 20px; color: var(--lib-fg-muted); }
 #vocab-ref-result .xp-dict-ipa-tag { font-size: 12px; line-height: 16px; color: var(--lib-fg-muted); }
-/* Looking up the open word: its IPA is already on the pronunciation line. */
-#vocab-ref-result[data-same-word] :is(.xp-dict-ipa, .xp-dict-ipa-tag) { display: none; }
+/* Only hide a reading already displayed in the open word's heading. A
+   newly installed dictionary can supply an IPA the saved word never had. */
+#vocab-ref-result [data-repeated-ipa] { display: none; }
 #vocab-ref-result .xp-dict-forms { margin-top: var(--lib-sp-1); font-size: 12px; line-height: 16px; color: var(--lib-fg-muted); }
 /* Numbered senses: a 24px number column drawn by a counter, the text in the
    rest. Absolute ::before, not a grid: md-dict writes each sense as mixed

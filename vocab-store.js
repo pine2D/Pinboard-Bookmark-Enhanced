@@ -150,8 +150,8 @@ function _pbpVocabCanonicalRecordKey(recordKey) {
     !!canonicalTerm && canonicalTerm === term;
 }
 
-function pbpVocabValidateEvent(event, expectedRecordKey) {
-  if (!_pbpVocabOnlyKeys(event, ["recordKey", "vector", "dot", "deleted", "value"]) ||
+function pbpVocabValidateEvent(event, expectedRecordKey, leaf = false) {
+  if (!_pbpVocabOnlyKeys(event, ["recordKey", "vector", "dot", "deleted", "value", "versions"]) ||
       !_pbpVocabCanonicalRecordKey(event.recordKey) ||
       (expectedRecordKey !== undefined && event.recordKey !== expectedRecordKey) ||
       !_pbpVocabValidVector(event.vector) || !_pbpVocabOnlyKeys(event.dot, ["deviceId", "counter"]) ||
@@ -161,6 +161,14 @@ function pbpVocabValidateEvent(event, expectedRecordKey) {
         !_pbpVocabPositiveInteger(_pbpVocabOwnValue(event.vector, event.dot.deviceId)) ||
         _pbpVocabOwnValue(event.vector, event.dot.deviceId) < event.dot.counter) return false;
   } catch (_) { return false; }
+  if (Object.prototype.hasOwnProperty.call(event, "versions")) {
+    if (leaf || !_pbpVocabDenseArray(event.versions) || event.versions.length < 2 ||
+        !event.versions.every(version => pbpVocabValidateEvent(version, event.recordKey, true)) ||
+        !_pbpVocabFrontierValid(event.versions, event.vector)) return false;
+    const projected = _pbpVocabProject(event.recordKey, event.vector, event.versions).event;
+    const actual = { ...event }; delete actual.versions;
+    if (!pbpVocabEventContentEqual(actual, projected)) return false;
+  }
   if (event.deleted) return !Object.prototype.hasOwnProperty.call(event, "value");
   const value = event.value;
   const fields = ["term", "lemma", "language", "gloss", "ipa", "sourceUrl", "license", "contexts", "groups", "note", "status", "createdAt", "updatedAt"];
@@ -191,47 +199,93 @@ function _pbpVocabMergedVector(left, right) {
   return vector;
 }
 
-function _pbpVocabMergeLiveValues(winner, other) {
-  const value = winner.value;
-  const contexts = value.contexts.slice();
-  for (const context of other.value.contexts) {
-    const next = pbpDictMergeContext(contexts, context);
-    contexts.length = 0;
-    contexts.push(...next);
+// Each leaf keeps the vector of the edit that produced its value. Joining
+// only vectors and values loses that provenance: a later A2 cannot remove A1
+// from an earlier merge(A1,B1), and two replicas then disagree at one vector.
+// Legacy events without versions remain opaque leaves; never invent their
+// lost causal history. A local edit absorbs the frontier into one new leaf.
+function _pbpVocabLeafCompare(left, right) {
+  return pbpVocabDotCompare(left.dot, right.dot) ||
+    _pbpVocabCodePointCompare(_pbpVocabCanonicalJson(left), _pbpVocabCanonicalJson(right));
+}
+
+function _pbpVocabFrontierValid(versions, vector) {
+  const joined = versions.reduce((all, version) => _pbpVocabMergedVector(all, version.vector), {});
+  if (pbpVocabVectorRelation(joined, vector) !== "equal") return false;
+  for (let i = 0; i < versions.length; i++) {
+    if (i && _pbpVocabLeafCompare(versions[i - 1], versions[i]) >= 0) return false;
+    for (let j = 0; j < i; j++) {
+      if (pbpVocabVectorRelation(versions[i].vector, versions[j].vector) !== "concurrent") return false;
+    }
   }
-  const groups = pbpVocabGroups({ groups: [...value.groups, ...other.value.groups] });
-  return {
-    term: value.term, lemma: value.lemma, language: value.language, gloss: value.gloss, ipa: value.ipa,
-    sourceUrl: value.sourceUrl, license: value.license, contexts, groups,
-    note: value.note || other.value.note, status: value.status,
-    createdAt: Math.min(value.createdAt, other.value.createdAt), updatedAt: Math.max(value.updatedAt, other.value.updatedAt)
-  };
+  return true;
+}
+
+function _pbpVocabProject(recordKey, vector, versions) {
+  const ordered = versions.slice().sort(_pbpVocabLeafCompare).reverse();
+  const live = ordered.filter(version => !version.deleted);
+  const winner = live[0] || ordered[0];
+  const event = { recordKey, vector, dot: { ...winner.dot }, deleted: !live.length };
+  if (live.length) {
+    let contexts = [];
+    for (const version of live) {
+      for (const context of version.value.contexts) contexts = pbpDictMergeContext(contexts, context);
+    }
+    // Sets have a canonical wire order; duplicate context metadata comes from
+    // the greatest live dot, independent of arrival order or batch grouping.
+    contexts.sort((a, b) => _pbpVocabCodePointCompare(_pbpVocabCanonicalJson(a), _pbpVocabCanonicalJson(b)));
+    event.value = {
+      ...winner.value,
+      contexts,
+      groups: pbpVocabGroups({ groups: live.flatMap(version => version.value.groups) }).sort(_pbpVocabCodePointCompare),
+      note: live.find(version => version.value.note)?.value.note || "",
+      createdAt: Math.min(...live.map(version => version.value.createdAt)),
+      updatedAt: Math.max(...live.map(version => version.value.updatedAt))
+    };
+  }
+  return { event, notice: live.length && live.length !== versions.length ? "delete-live-conflict" : null };
 }
 
 function pbpVocabMergeEvents(localEvent, remoteEvent) {
   const invalid = { kind: "invalid", event: null, requeue: false, notice: null };
   if (!pbpVocabValidateEvent(localEvent) || !pbpVocabValidateEvent(remoteEvent, localEvent.recordKey)) return invalid;
   const relation = pbpVocabVectorRelation(localEvent.vector, remoteEvent.vector);
-  if (relation === "equal") return pbpVocabEventContentEqual(localEvent, remoteEvent)
-    ? { kind: "noop", event: localEvent, requeue: false, notice: null }
-    : { kind: "corrupt", event: localEvent, requeue: false, notice: null };
-  // Validation above compares canonical recordKey identity. Display spelling
-  // and regional language tags may differ on two devices without denoting a
-  // different word; preserve the existing vector/dot winner for those values.
+  if (relation === "equal") {
+    if (pbpVocabEventContentEqual(localEvent, remoteEvent)) {
+      return { kind: "noop", event: localEvent, requeue: false, notice: null };
+    }
+    // A legacy peer can echo a projection it already knew without the new
+    // frontier. An exactly matching value is safe, but the causal evidence
+    // must survive. Different values at one vector still fail closed.
+    const left = { ...localEvent }, right = { ...remoteEvent };
+    delete left.versions; delete right.versions;
+    if (!!localEvent.versions !== !!remoteEvent.versions && pbpVocabEventContentEqual(left, right)) {
+      return localEvent.versions
+        ? { kind: "noop", event: localEvent, requeue: false, notice: null }
+        : { kind: "apply", event: remoteEvent, requeue: false, notice: null };
+    }
+    return { kind: "corrupt", event: localEvent, requeue: false, notice: null };
+  }
   if (relation === "left") return { kind: "noop", event: localEvent, requeue: false, notice: null };
   if (relation === "right") return { kind: "apply", event: remoteEvent, requeue: false, notice: null };
-  const winner = pbpVocabDotCompare(localEvent.dot, remoteEvent.dot) >= 0 ? localEvent : remoteEvent;
-  const other = winner === localEvent ? remoteEvent : localEvent;
-  const live = !localEvent.deleted ? localEvent : (!remoteEvent.deleted ? remoteEvent : null);
-  const provenance = localEvent.deleted === remoteEvent.deleted ? winner : live;
-  const event = {
-    recordKey: localEvent.recordKey, vector: _pbpVocabMergedVector(localEvent.vector, remoteEvent.vector),
-    dot: { deviceId: provenance.dot.deviceId, counter: provenance.dot.counter }, deleted: !live
-  };
-  if (live) event.value = !localEvent.deleted && !remoteEvent.deleted
-    ? _pbpVocabMergeLiveValues(winner, other)
-    : { ...live.value, contexts: live.value.contexts.slice(), groups: live.value.groups.slice() };
-  return { kind: "merged", event, requeue: true, notice: live && (localEvent.deleted || remoteEvent.deleted) ? "delete-live-conflict" : null };
+  const candidates = [...(localEvent.versions || [localEvent]), ...(remoteEvent.versions || [remoteEvent])];
+  const versions = [];
+  for (const candidate of candidates) {
+    let dominated = false;
+    for (const other of candidates) {
+      if (candidate === other) continue;
+      const leafRelation = pbpVocabVectorRelation(candidate.vector, other.vector);
+      if (leafRelation === "equal" && !pbpVocabEventContentEqual(candidate, other)) {
+        return { kind: "corrupt", event: localEvent, requeue: false, notice: null };
+      }
+      if (leafRelation === "right") { dominated = true; break; }
+    }
+    if (!dominated && !versions.some(version => pbpVocabEventContentEqual(candidate, version))) versions.push(candidate);
+  }
+  versions.sort(_pbpVocabLeafCompare);
+  const result = _pbpVocabProject(localEvent.recordKey, _pbpVocabMergedVector(localEvent.vector, remoteEvent.vector), versions);
+  if (versions.length > 1) result.event.versions = versions;
+  return { kind: "merged", event: result.event, requeue: true, notice: result.notice };
 }
 
 // NOT the ai-cache DB (vocab is permanent, never LRU'd, own version track).
@@ -368,7 +422,8 @@ function _pbpVocabStoredEvent(metadata, word) {
     recordKey: metadata.recordKey,
     vector: metadata.vector,
     dot: metadata.dot,
-    deleted: metadata.deleted === true
+    deleted: metadata.deleted === true,
+    ...(metadata.versions ? { versions: metadata.versions } : {})
   };
   if (!event.deleted) {
     if (!word) return null;
@@ -692,10 +747,37 @@ function _pbpVocabValidPreflightState(state) {
 function _pbpVocabValidBatchBody(body, expectedOwnerHash) {
   return _pbpVocabValidOwnerHash(expectedOwnerHash) &&
     _pbpVocabOnlyKeys(body, ["schema", "ownerHash", "deviceId", "createdAt", "entries"]) &&
-    Object.keys(body).length === 5 && body.schema === 1 &&
+    Object.keys(body).length === 5 && (body.schema === 1 || body.schema === 2) &&
     body.ownerHash === expectedOwnerHash && _pbpVocabDeviceId(body.deviceId) &&
     Number.isFinite(body.createdAt) && Array.isArray(body.entries) &&
-    body.entries.every((event) => pbpVocabValidateEvent(event));
+    body.entries.every((event) => pbpVocabValidateEvent(event) &&
+      (body.schema !== 1 || event.versions === undefined));
+}
+
+async function pbpVocabActivateAccount(drivePermissionId, ownerHash) {
+  if (typeof drivePermissionId !== "string" || !drivePermissionId || !_pbpVocabValidOwnerHash(ownerHash)) return false;
+  let tx = null, done = null;
+  try {
+    const db = await _pbpVocabOpenDB();
+    tx = db.transaction("sync", "readwrite");
+    done = _pbpVocabTransactionDone(tx);
+    const sync = tx.objectStore("sync");
+    const key = `active-account:${ownerHash}`;
+    const active = await _pbpVocabRequest(sync.get(key));
+    if (active?.drivePermissionId !== drivePermissionId) {
+      const accountKey = _pbpVocabAccountKey(drivePermissionId, ownerHash);
+      const account = await _pbpVocabRequest(sync.get(accountKey));
+      sync.put({ ...(account || {}), key: accountKey, drivePermissionId, ownerHash, needsCheckpoint: true });
+      sync.put({ key, ownerHash, drivePermissionId });
+    }
+    await done;
+    return true;
+  } catch (error) {
+    console.warn("[vocab-store] account activation failed:", error?.name, error?.message);
+    try { if (tx) tx.abort(); } catch (_) {}
+    if (done) await done.catch(() => {});
+    return false;
+  }
 }
 
 async function pbpVocabGetAccountState(drivePermissionId, ownerHash) {
@@ -989,7 +1071,8 @@ async function pbpVocabApplyRemotePage(owner, ownerHash, batches, cursorCommit) 
       else words.put(_pbpVocabWordFromEvent(scope, event));
       sync.put({
         key: `record:${scope}:${event.recordKey}`, owner: scope, recordKey: event.recordKey,
-        vector: event.vector, dot: event.dot, deleted: event.deleted
+        vector: event.vector, dot: event.dot, deleted: event.deleted,
+        ...(event.versions ? { versions: event.versions } : {})
       });
       if (outcome.requeue) {
         sync.put({ key: `outbox:${scope}:${event.recordKey}`, owner: scope, recordKey: event.recordKey, event });

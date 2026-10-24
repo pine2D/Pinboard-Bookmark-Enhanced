@@ -557,7 +557,7 @@ assertEq(pbpDictTsv([{ term:"#term\n#continuation", definition:'a "quoted" defin
   "hash lines inside quoted multiline fields retain newlines, tabs and escaped quotes");
 
 section("pbpEchoTermSet");
-const _ets = (rows, cap) => pbpEchoTermSet(rows, cap);
+const _ets = (rows, cap) => pbpEchoTermSet(rows.map((row) => ({ ...row, language: row.language === undefined ? "en" : row.language })), cap);
 {
   const set1 = _ets([{ term: "net" }, { term: "internet" }, { term: "NET" }]);
   assertEq(set1.length, 2, "dedup by folded key");
@@ -596,7 +596,7 @@ assertEq(pbpEchoNeedsBoundary("书"), false, "han is substring-matched");
 assertEq(pbpEchoNeedsBoundary("ひらがな"), false, "kana is substring-matched");
 
 section("pbpEchoFindInText");
-const _terms = (list) => pbpEchoTermSet(list.map((t) => ({ term: t })));
+const _terms = (list) => pbpEchoTermSet(list.map((t) => ({ term: t, language: "en" })));
 {
   assertEq(pbpEchoFindInText("running fast", _terms(["run"])).length, 0, "latin: no hit inside a longer word");
   const hit1 = pbpEchoFindInText("a run.", _terms(["run"]));
@@ -611,7 +611,7 @@ const _terms = (list) => pbpEchoTermSet(list.map((t) => ({ term: t })));
   const ov = pbpEchoFindInText("internet", _terms(["net", "internet"]));
   assert(ov.length === 1 && ov[0].key === "internet", "overlap: longest term claims first");
   {
-    const caps = new Map([["读书", 1]]);
+    const caps = new Map([["en|读书", 1]]);
     const r = pbpEchoFindInText("读书读书", _terms(["书", "读书"]), 10, caps);
     assert(r.length === 2 && r[0].key === "读书" && r[0].start === 0 && r[1].key === "书" && r[1].start === 3,
       "per-term cap inside the matcher frees the region for the shorter term (no ghost claim)");
@@ -732,6 +732,7 @@ async function runVocabEchoWiringTests() {
     const docBody = document.createElement("div");
     const view = document.createElement("div");
     view.id = "rendered-view";
+    view.lang = "en";
     docBody.appendChild(view);
     document.body.appendChild(docBody);
     // One real block, so a rebuild has something to repaint and "the
@@ -751,8 +752,8 @@ async function runVocabEchoWiringTests() {
       h.add(r);
       CSS.highlights.set("pbp-vocab-echo", h);
       _echoHl = h;
-      _echoRanges.set("o1", [{ range: r, key: "residue", n: 1 }]);
-      _echoCounts.set("residue", 1);
+      _echoRanges.set("o1", [{ range: r, key: "residue", id: "en|residue", language: "en", n: 1 }]);
+      _echoCounts.set("en|residue", 1);
       _echoTotal = 1;
       return h;
     };
@@ -767,13 +768,13 @@ async function runVocabEchoWiringTests() {
     try {
       window.pbpAiBlocks = () => [{ n: 1, el: para }];
       window.pbpAiBlockEl = (n) => (Number(n) === 1 ? para : null);
-      window.pbpVocabAll = async () => [{ term: "residue" }];
+      window.pbpVocabAll = async () => [{ term: "residue", language: "en" }];
       // The live account (B) is no longer the one this document rendered
       // under (A) -- the fail-closed branch.
       window.pbpVocabCurrentOwner = async () => "acct_Yg";
       _echoOwner = "acct_YQ";
       _echoEnabled = true;
-      _echoTerms = pbpEchoTermSet([{ term: "residue" }]);
+      _echoTerms = pbpEchoTermSet([{ term: "residue", language: "en" }]);
       _echoObserve();
       assert(_echoObserver !== null, "precondition: the previous account's scan left the observer attached");
       const stalePaint = seedPaint();
@@ -784,7 +785,7 @@ async function runVocabEchoWiringTests() {
       assertEq(drawn(), null, "and takes the previous account's underlines off the screen: the rebuild clears late, so this branch clears itself");
       assertEq(_echoTotal, 0, "releasing their draw budget with them");
 
-      _echoTerms = pbpEchoTermSet([{ term: "residue" }]);
+      _echoTerms = pbpEchoTermSet([{ term: "residue", language: "en" }]);
       _echoObserve();
       seedPaint();
       _echoEnabled = false;
@@ -801,7 +802,7 @@ async function runVocabEchoWiringTests() {
       _echoEnabled = true;
       const kept = seedPaint();
       let releaseRows = null;
-      window.pbpVocabAll = () => new Promise((r) => { releaseRows = () => r([{ term: "residue" }]); });
+      window.pbpVocabAll = () => new Promise((r) => { releaseRows = () => r([{ term: "residue", language: "en" }]); });
       const restarting = _echoRestart();
       await tick();
       assert(releaseRows !== null, "precondition: the restart is parked on the vocabulary read");
@@ -834,7 +835,7 @@ async function runVocabEchoWiringTests() {
       // has already painted -- stopped being its to erase at the recheck.
       let releaseOwner = null;
       window.pbpVocabCurrentOwner = () => new Promise((r) => { releaseOwner = () => r("acct_YQ"); });
-      window.pbpVocabAll = async () => [{ term: "residue" }];
+      window.pbpVocabAll = async () => [{ term: "residue", language: "en" }];
       _echoEnabled = true;
       const stale1 = _echoRestart();
       await tick();
@@ -848,7 +849,7 @@ async function runVocabEchoWiringTests() {
 
       window.pbpVocabCurrentOwner = async () => "acct_YQ";
       releaseRows = null;
-      window.pbpVocabAll = () => new Promise((r) => { releaseRows = () => r([{ term: "residue" }]); });
+      window.pbpVocabAll = () => new Promise((r) => { releaseRows = () => r([{ term: "residue", language: "en" }]); });
       const stale2 = _echoRestart();
       await tick();
       assert(releaseRows !== null, "precondition: the second restart is parked on the vocabulary read");
@@ -892,7 +893,7 @@ async function runVocabEchoWiringTests() {
       // like the rest, and say so in the console instead of vanishing.
       const realWarn = console.warn;
       const warned = [];
-      window.pbpVocabAll = async () => [{ term: "residue" }];
+      window.pbpVocabAll = async () => [{ term: "residue", language: "en" }];
       window.pbpAiBlocks = () => [];
       window.pbpAiIndexBlocks = () => { throw new TypeError("index exploded"); };
       _echoEnabled = true;
@@ -939,6 +940,7 @@ async function runVocabEchoWiringTests() {
     const docBody = document.createElement("div"); // stands in for .doc-body
     const view = document.createElement("div");
     view.id = "rendered-view";
+    view.lang = "en";
     docBody.appendChild(view);
     document.body.appendChild(docBody);
     try {
@@ -1730,7 +1732,216 @@ async function runDictResolveLangLadderTests() {
   }
 }
 
+// Regression cases from the multilingual vocabulary review. These exercise
+// the renderer/lookup/scanner consumers, not a second copy of their rules.
+async function runDictReviewRegressionTests() {
+  section("context cache preserves case-sensitive meanings");
+  const names = ["pbpAiAvailable", "pbpAiCacheGet", "pbpAiCacheSet", "pbpExplainLangName", "uiLangToBCP47",
+    "pbpAiEffectiveModel", "pbpAiResolveModelOverride", "pbpAiBumpCounter", "callAIStream", "renderMarkdown"];
+  const saved = new Map(names.map((name) => [name, window[name]]));
+  const title = document.createElement("h1"); title.id = "preview-title"; title.textContent = "Case-sensitive terms";
+  const oldTitle = document.getElementById("preview-title"); oldTitle?.remove(); document.body.appendChild(title);
+  const cache = new Map(); let calls = 0;
+  Object.assign(window, {
+    pbpAiAvailable: () => true, pbpAiCacheGet: async (key) => cache.has(key) ? { result: cache.get(key) } : null,
+    pbpAiCacheSet: async (key, value) => { cache.set(key, value); }, pbpExplainLangName: () => "English",
+    uiLangToBCP47: () => "en", pbpAiEffectiveModel: () => "fixture", pbpAiResolveModelOverride: () => "fixture",
+    pbpAiBumpCounter: () => {}, renderMarkdown: (text) => text,
+    callAIStream: async (_settings, prompt) => { calls++; return "LEMMA: -\n\n" + (prompt.includes("Selected term:\nUS\n") ? "United States" : "the object form of we"); }
+  });
+  try {
+    const el = document.createElement("div"), ctx = { sentence: "The US invited us." };
+    const run = (term) => _pbpDictCtxRun(el, { text: term }, ctx, { aiProvider: "custom" }, new AbortController().signal, () => {}, "en");
+    const upper = await run("US"), lower = await run("us");
+    assertEq(upper.gloss, "United States", "US receives the country meaning");
+    assertEq(lower.gloss, "the object form of we", "us in the same sentence never reuses US's cached country meaning");
+    await run("US");
+    assertEq(calls, 2, "distinct case-sensitive meanings each call AI once and a repeated identical lookup uses its cache");
+    assertEq(el.querySelector(".xp-md")?.lang, "en", "the contextual definition carries its known answer language");
+  } finally {
+    for (const [name, value] of saved) { if (value === undefined) delete window[name]; else window[name] = value; }
+    title.remove(); if (oldTitle) document.body.appendChild(oldTitle);
+  }
+
+  section("cached form-of entries follow the same lemma chain as cold entries");
+  const savedPerm = _pbpDictHasPerm, savedFetch = _pbpDictFetch;
+  const savedGet = window.pbpAiCacheGet, savedSet = window.pbpAiCacheSet;
+  const entries = new Map(); const queries = [];
+  _pbpDictHasPerm = async () => true;
+  window.pbpAiCacheGet = async (key) => entries.has(key) ? { result: entries.get(key) } : null;
+  window.pbpAiCacheSet = async (key, value) => { entries.set(key, value); };
+  // API-shaped fixtures written by hand: the pointer is tagged in the raw
+  // sense, not manufactured by pbpDictNormalizeEntry or a writer helper.
+  _pbpDictFetch = async (_lang, term) => {
+    queries.push(term);
+    return { status: 200, data: term === "aprovecho"
+      ? { word: "aprovecho", entries: [{ partOfSpeech: "verb", senses: [{ definition: "first-person singular present indicative of aprovechar", tags: ["form-of"] }] }] }
+      : { word: "aprovechar", entries: [{ partOfSpeech: "verb", senses: [{ definition: "to use to one's advantage", examples: ["Aprovecha el tiempo."] }] }] } };
+  };
+  try {
+    const slot = document.createElement("div");
+    const cold = await _pbpDictSlotRun(slot, "aprovecho", "es", null, Promise.resolve("aprovechar"), null);
+    assertEq(cold?.word, "aprovechar", "cold form-of lookup follows the lemma to a real meaning");
+    queries.length = 0;
+    const warm = await _pbpDictSlotRun(slot, "aprovecho", "es", null, Promise.resolve("aprovechar"), null);
+    assertEq(warm?.word, "aprovechar", "warm form-of lookup still follows the lemma instead of stopping at a grammar pointer");
+    assertEq(queries.length, 0, "warm pointer and lemma are both served from cache without extra requests");
+    assertEq(slot.querySelector(".xp-dict-senses > li")?.lang, "en", "English Wiktionary definitions are marked English in a Spanish lookup");
+    assertEq(slot.querySelector(".xp-dict-example")?.lang, "es", "a Spanish dictionary example retains Spanish instead of inheriting definition language");
+    _pbpDictHasPerm = async () => false;
+    const offline = await _pbpDictSlotRun(slot, "aprovecho", "es", null, Promise.resolve(""), null);
+    assertEq(offline?.word, "aprovecho", "without online permission the cached pointer remains readable");
+    assertEq(slot.querySelector(".xp-dict-lemma-link")?.lang, "es", "the lemma link keeps the queried language inside its English pointer");
+    const unknown = { word: "word", sourceLabel: "unidentified", entries: [{ pos: "", ipas: [], forms: [], senses: [{ definition: "unidentified text", examples: [] }] }] };
+    _pbpDictRenderEntry(slot, unknown, "word", "", "word", "");
+    assertEq(slot.querySelector(".xp-dict-senses > li")?.lang, "und", "unidentified dictionary text is not guessed from the interface language");
+  } finally {
+    _pbpDictHasPerm = savedPerm; _pbpDictFetch = savedFetch;
+    if (savedGet === undefined) delete window.pbpAiCacheGet; else window.pbpAiCacheGet = savedGet;
+    if (savedSet === undefined) delete window.pbpAiCacheSet; else window.pbpAiCacheSet = savedSet;
+  }
+}
+
+async function runEchoLanguageAndInlineTests() {
+  section("vocabulary echo respects language and complete inline words");
+  const saved = { owner: _echoOwner, enabled: _echoEnabled, epoch: _echoEpoch, terms: _echoTerms,
+    articleLang: _echoArticleLang, languageCache: _echoLanguageCache };
+  const oldView = document.getElementById("rendered-view"); oldView?.remove();
+  const view = document.createElement("div"); view.id = "rendered-view";
+  const block = document.createElement("div"); block.dataset.pb = "1"; view.appendChild(block); document.body.appendChild(view);
+  const oldBlock = window.pbpAiBlockEl, oldDetect = _pbpDictDetect;
+  window.pbpAiBlockEl = () => block;
+  _pbpDictDetect = async () => ({ lang: "en", reliable: false });
+  _echoOwner = "acct_review"; _echoEnabled = true; _echoEpoch++;
+  _echoArticleLang = ""; _echoLanguageCache = new WeakMap();
+  const scan = async (html, lang, rows) => {
+    _echoClearAll(); view.lang = lang; block.innerHTML = html;
+    _echoTerms = pbpEchoTermSet(rows);
+    await _echoScanBlock("o1");
+    return [..._echoRanges.values()].flat();
+  };
+  try {
+    let hits = await scan("Die Hoffnung ist wichtig.", "de", [{ term: "die", language: "en" }]);
+    assertEq(hits.length, 0, "an English saved die never marks a German article as already learned");
+    hits = await scan("Die Hoffnung ist wichtig.", "de", [{ term: "die", language: "en" }, { term: "die", language: "de" }]);
+    assertEq(hits.length, 1, "same-spelled words in two languages retain separate identities and match the right one");
+    assertEq(hits[0]?.language, "de", "the rendered hit keeps its language for the dictionary click");
+    const oldCaret = document.caretRangeFromPoint, oldOpen = window.pbpExplainOpenForItem;
+    const oldHighlight = window.pbpHlItemIdAtRange;
+    let opened = null;
+    try {
+      window.getSelection().removeAllRanges();
+      document.caretRangeFromPoint = () => hits[0].range.cloneRange();
+      window.pbpHlItemIdAtRange = () => null;
+      window.pbpExplainOpenForItem = (item) => { opened = item; };
+      _echoOnClick({ target: block, clientX: 0, clientY: 0, preventDefault() {}, stopPropagation() {} });
+      assertEq(opened?.lang, "de", "clicking an echoed homograph forwards the saved language to dictionary lookup");
+    } finally {
+      document.caretRangeFromPoint = oldCaret;
+      if (oldOpen === undefined) delete window.pbpExplainOpenForItem; else window.pbpExplainOpenForItem = oldOpen;
+      if (oldHighlight === undefined) delete window.pbpHlItemIdAtRange; else window.pbpHlItemIdAtRange = oldHighlight;
+    }
+    hits = await scan('die <span lang="en">die</span>', "de", [{ term: "die", language: "en" }]);
+    assertEq(hits.map((h) => h.range.startContainer.parentElement.tagName).join(","), "SPAN", "inline language metadata overrides the article language without leaking to adjacent prose");
+    hits = await scan("die", "und", [{ term: "die", language: "en" }]);
+    assertEq(hits.length, 0, "an unknown block with unreliable detection never inherits the UI language or English fallback");
+    hits = await scan("inter<em>net</em>", "en", [{ term: "net", language: "en" }]);
+    assertEq(hits.length, 0, "an inline node boundary cannot turn the suffix of internet into the word net");
+    hits = await scan("co<em>operate</em>", "en", [{ term: "cooperate", language: "en" }]);
+    assertEq(hits.map((h) => h.range.toString()).join(","), "cooperate", "a complete saved word spanning inline text nodes receives one full range");
+    hits = await scan("<span>İstanbul</span> <em>DIE</em>", "de", [{ term: "die", language: "de" }]);
+    assert(hits.length === 1 && hits[0].range.toString() === "DIE" && hits[0].range.startContainer.parentElement.tagName === "EM",
+      "a length-changing case fold elsewhere preserves case-insensitive matching and original DOM offsets");
+    hits = await scan("İ <em>ΟΣ</em>", "el", [{ term: "ος", language: "el" }]);
+    assertEq(hits[0]?.range.toString(), "ΟΣ", "fold-offset mapping preserves whole-string Greek final-sigma casing");
+    hits = await scan("İstanbul <em>DIE</em>", "de", [{ term: "İstanbul", language: "de" }, { term: "die", language: "de" }]);
+    assertEq(hits.map((h) => h.range.toString()).join(","), "İstanbul,DIE", "a term whose own fold grows still matches exactly alongside normally folded terms");
+    hits = await scan("汉İ", "zh", [{ term: "汉i", language: "zh" }]);
+    assertEq(hits.length, 0, "a match cannot end halfway through a character expanded by case folding");
+    const joinedAcrossMedia = [];
+    for (const media of ["img", "video", "audio", "iframe", "object", "embed", "canvas", "svg", "math", "input", "textarea", "select"]) {
+      hits = await scan("co<" + media + "></" + media + ">operate", "en", [{ term: "cooperate", language: "en" }]);
+      if (hits.length) joinedAcrossMedia.push(media);
+    }
+    assertEq(joinedAcrossMedia.join(","), "", "replaced and embedded elements separate prose instead of manufacturing complete words");
+    hits = await scan("<p>co</p><p>operate</p>", "en", [{ term: "cooperate", language: "en" }]);
+    assertEq(hits.length, 0, "separate paragraph boundaries never manufacture a complete word");
+    hits = await scan('co<code>ignored</code>operate', "en", [{ term: "cooperate", language: "en" }]);
+    assertEq(hits.length, 0, "ignored code interrupts prose rather than joining two fragments into a new word");
+    hits = await scan('co<span lang="de">operate</span>', "en", [{ term: "cooperate", language: "en" }]);
+    assertEq(hits.length, 0, "a match cannot span text in different languages");
+    let detections = 0;
+    _pbpDictDetect = async () => { detections++; return { lang: "de", reliable: true }; };
+    hits = await scan("Die Hoffnung bleibt.", "und", [{ term: "die", language: "de" }]);
+    assertEq(hits[0]?.language, "de", "reliable detection supplies a language for otherwise unknown matching prose");
+    await _echoScanBlock("o1");
+    assertEq(detections, 1, "unchanged unknown prose shares its detection result across rescans");
+    const timeline = document.createElement("div"); timeline.className = "pbv-col-study";
+    timeline.innerHTML = '<div class="pbv-list"><div class="pbv-row" data-i="0"><span class="pbv-text">original</span><span class="pbv-tr" lang="de">Die Hoffnung bleibt.</span></div></div>';
+    document.body.appendChild(timeline);
+    try {
+      _echoClearAll();
+      await _echoScanBlock("rt0");
+      assertEq(_echoTotal, 1, "a German timeline translation receives its saved German-word marker");
+      _echoObserve();
+      timeline.querySelector(".pbv-tr").lang = "en";
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      assertEq(_echoTotal, 0, "changing only timeline lang immediately removes the previous language's marker");
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      assertEq(_echoTotal, 0, "the queued timeline rescan does not restore a marker belonging to another language");
+      _echoDisconnect();
+      view.lang = "en"; _echoArticleLang = "en";
+      const line = timeline.querySelector(".pbv-tr");
+      line.removeAttribute("lang");
+      _echoTerms = pbpEchoTermSet([{ term: "die", language: "en" }]);
+      await _echoScanBlock("rt0");
+      assertEq(_echoTotal, 0, "an unlabelled German companion track never borrows the English original-prose prior");
+      _echoTerms = pbpEchoTermSet([{ term: "die", language: "en" }, { term: "die", language: "de" }]);
+      await _echoScanBlock("rt0");
+      assertEq(_echoRanges.get("rt0")?.[0]?.language, "de", "reliable companion-track detection matches the saved German homograph");
+      line.lang = "";
+      await _echoScanBlock("rt0");
+      assertEq(_echoRanges.get("rt0")?.[0]?.language, "de", "empty companion-track lang is undecided and can use reliable block detection");
+      line.lang = "und";
+      await _echoScanBlock("rt0");
+      assertEq(_echoTotal, 0, "explicitly unknown companion-track language remains fail-closed");
+      line.removeAttribute("lang"); line.textContent = "die";
+      _pbpDictDetect = async () => ({ lang: "de", reliable: false });
+      await _echoScanBlock("rt0");
+      assertEq(_echoTotal, 0, "unreliable companion-track detection cannot fall back to the original language");
+      const translated = document.createElement("div"); translated.className = "pb-tr";
+      translated.textContent = "Die Hoffnung bleibt."; block.after(translated);
+      try {
+        _pbpDictDetect = async () => ({ lang: "de", reliable: true });
+        await _echoScanBlock("t1");
+        assertEq(_echoRanges.get("t1")?.[0]?.language, "de", "an unlabelled reader translation also blocks its English view's language inheritance");
+      } finally { translated.remove(); }
+    } finally {
+      _echoDisconnect(); _echoClearAll(); timeline.remove();
+    }
+    _echoClearAll(); view.lang = "und"; _echoArticleLang = ""; block.textContent = "Die Hoffnung ist wichtig.";
+    let release = null;
+    _pbpDictDetect = () => new Promise((resolve) => { release = resolve; });
+    _echoTerms = pbpEchoTermSet([{ term: "die", language: "de" }]);
+    const pending = _echoScanBlock("o1");
+    await Promise.resolve();
+    assert(typeof release === "function", "an unlabelled block waits for a reliable content-language result");
+    _echoEpoch++; _echoEnabled = false; _echoClearAll();
+    if (release) release({ lang: "de", reliable: true });
+    await pending;
+    assertEq(_echoTotal, 0, "a late language result cannot repaint after the document scan was invalidated");
+  } finally {
+    _echoClearAll(); _echoDisconnect(); view.remove(); if (oldView) document.body.appendChild(oldView);
+    if (oldBlock === undefined) delete window.pbpAiBlockEl; else window.pbpAiBlockEl = oldBlock;
+    _pbpDictDetect = oldDetect;
+    _echoOwner = saved.owner; _echoEnabled = saved.enabled; _echoEpoch = saved.epoch; _echoTerms = saved.terms;
+    _echoArticleLang = saved.articleLang; _echoLanguageCache = saved.languageCache;
+  }
+}
+
 (async function () {
+  await runDictReviewRegressionTests();
+  await runEchoLanguageAndInlineTests();
   await runVocabEchoWiringTests();
   await runDictNetworkTests();
   await runDictLookupChainTests();

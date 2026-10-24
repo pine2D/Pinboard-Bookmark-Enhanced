@@ -287,6 +287,7 @@ function _pbpVocabBuildRow(w) {
   headline.className = "vocab-row-headline";
   const titleEl = document.createElement("span");
   titleEl.className = "notes-row-title";
+  titleEl.lang = w.language || "und";
   titleEl.textContent = w.term;
   headline.appendChild(titleEl);
 
@@ -923,6 +924,7 @@ function _pbpVocabRenderDetail(w, enterNarrow) {
 
   detail.replaceChildren(frag);
   $id("vocab-detail-tail").replaceChildren(footer);
+  _pbpVocabSyncDictPronunciation();
   // Same focus handoff the lookup door does, at the root every activation
   // passes through: a row click hides the list the head button lives in.
   if (enterNarrow) _pbpVocabFocusNarrowBack();
@@ -957,6 +959,25 @@ let _pbpVocabDictCtrl = null;
 // every caller of _pbpVocabDictRun below shares one child-run slot.
 let _pbpVocabDictChildCtrl = null;
 let _pbpVocabDictChildCleanup = null;
+
+// Deduplicate only the reading actually shown in the current heading; new
+// dictionary readings (including pinyin after a pack import) stay visible.
+function _pbpVocabSyncDictPronunciation() {
+  const host = $id("vocab-ref-result");
+  if (!host) return;
+  const term = $id("vocab-detail")?.querySelector(".vocab-detail-term");
+  const headingIpa = $id("vocab-detail")?.querySelector(".vocab-pron-ipa");
+  const cur = _pbpDictCurrent;
+  const sameWord = host.hasAttribute("data-same-word") && term && cur &&
+    pbpDictCacheKeyPublic(cur.lang, cur.term) === pbpDictCacheKeyPublic(term.lang, term.textContent);
+  const shown = sameWord && headingIpa ? headingIpa.textContent.trim() : "";
+  for (const ipa of host.querySelectorAll(".xp-dict-ipa")) {
+    const repeated = !!shown && ipa.textContent.trim() === shown;
+    ipa.toggleAttribute("data-repeated-ipa", repeated);
+    const tag = ipa.nextElementSibling;
+    if (tag?.classList.contains("xp-dict-ipa-tag")) tag.toggleAttribute("data-repeated-ipa", repeated);
+  }
+}
 
 // Shared dictionary run core, extracted from _pbpVocabRelookup so free lookup
 // (a later task) can reuse it verbatim. Reuses md-dict's pure query seams
@@ -1016,7 +1037,10 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true } = 
   const host = $id("vocab-ref-result");
   if (host && host.contains(onlineEl)) host.setAttribute("aria-busy", "true");
   const settled = () => {
-    if (host && _pbpVocabDictChildCtrl === child && !child.signal.aborted) host.removeAttribute("aria-busy");
+    if (host && _pbpVocabDictChildCtrl === child && !child.signal.aborted) {
+      _pbpVocabSyncDictPronunciation();
+      host.removeAttribute("aria-busy");
+    }
   };
   if (!online) {
     // Open-to-look-up after an offline-pack hit: the local block only. The
@@ -1045,9 +1069,11 @@ let _pbpVocabRefOwner;
 
 // Open-to-look-up (spec §4.8, user ruling 10-03). Opening a saved word looks
 // it up on its own, local first: an installed offline dictionary (ECDICT for
-// en, CC-CEDICT for zh), then the dict2_ result cache -- both zero network,
-// and either one answering ends it. Only when neither has the word AND the
-// freedictionaryapi grant already exists (permissions.contains -- this path
+// en, CC-CEDICT for zh), then a complete dict2_ result -- both zero network,
+// and either one answering ends it. A cached form-of pointer may need an
+// uncached candidate, so it follows the same dwell as a miss. Only when no
+// complete local answer exists AND the freedictionaryapi grant already
+// exists (permissions.contains -- this path
 // never calls permissions.request) does it go online, and only after the word
 // has stayed open for PBP_VOCAB_AUTO_ONLINE_DELAY_MS, so arrowing through the
 // list never sends the words it passes. Without the grant the column shows
@@ -1157,10 +1183,11 @@ async function _pbpVocabAutoLookup(w) {
   }
   await ownerBack();
   if (stale()) return "stale";
-  if (hit) {
+  if (hit && !(hit.source === "cache" && hit.norm.formOfOnly)) {
     // An ECDICT hit shows its block alone (online: false). A CC-CEDICT or a
-    // cache hit goes through the normal chain, which answers it before the
-    // grant check -- still zero network.
+    // complete cache hit goes through the normal chain, which answers it
+    // before the grant check -- still zero network. A grammar pointer is
+    // excluded because that chain can fetch another candidate.
     const { els, again } = begin();
     _pbpVocabDictRun(w.term, lang, els, sentence, again, { online: hit.source !== "ecdict" });
     return hit.source === "cache" ? "cache" : "local";
@@ -1375,8 +1402,8 @@ function _pbpVocabLookupOther(term, lang) {
   speak.setAttribute("aria-label", t("dictSpeak"));
   speak.addEventListener("click", () => pbpDictSpeak(term, lang));
   head.appendChild(speak);
-  const folded = pbpVocabSearchText(term);
-  const saved = _vocabRows.find((r) => pbpVocabSearchText(r.term) === folded);
+  const identity = pbpDictCacheKeyPublic(lang, term);
+  const saved = _vocabRows.find((r) => pbpDictCacheKeyPublic(r.language, r.term) === identity);
   if (saved) {
     const hint = document.createElement("button");
     hint.type = "button";

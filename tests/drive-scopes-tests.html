@@ -125,7 +125,7 @@ async function connectDuringSync(source, sessionPermissionId, { pinIdentity = fa
         async getPreflightState() { return null; }, async deletePreflightState() { return true; },
         async getAccountState(permissionId, ownerHash) {
           return states.get(permissionId) || { key: "account:" + permissionId + ":" + ownerHash,
-            drivePermissionId: permissionId, ownerHash, bootstrapComplete: true, pageToken: "before-connect" };
+            drivePermissionId: permissionId, ownerHash, protocolSchema: 2, bootstrapComplete: true, pageToken: "before-connect" };
         },
         async getMeta() { return { deviceId: "device-a", counter: 1 }; },
         async applyRemotePage(_owner, _hash, _batches, cursor) {

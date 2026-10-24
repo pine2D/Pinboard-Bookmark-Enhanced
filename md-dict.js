@@ -774,8 +774,11 @@ function _pbpDictTagLabel(tag) {
 // Shared by the online entry and the local ECDICT block. Every read is
 // defensive: CC-CEDICT norms and dict2_ records cached before these fields
 // existed carry none of them.
-function _pbpDictSenseLi(s, formOf) {
+function _pbpDictSenseLi(s, formOf, termLang, definitionLang) {
   const li = document.createElement("li");
+  // The dictionary edition owns the definition language; the query owns the
+  // example/lemma language. Neither may inherit the extension's UI locale.
+  li.lang = definitionLang || "und";
   const stags = s.tags || [];
   if (stags.length) {
     const tg = document.createElement("span");
@@ -793,6 +796,7 @@ function _pbpDictSenseLi(s, formOf) {
     const jump = document.createElement("button");
     jump.type = "button";
     jump.className = "xp-dict-lemma-link";
+    jump.lang = termLang || "und";
     jump.textContent = pointer.lemma;
     jump.addEventListener("click", () => {
       const live = _pbpDictCurrent;
@@ -812,6 +816,7 @@ function _pbpDictSenseLi(s, formOf) {
   for (const x of s.examples || []) {
     const ex = document.createElement("div");
     ex.className = "xp-dict-example";
+    ex.lang = termLang || "und";
     ex.textContent = x;
     li.appendChild(ex);
   }
@@ -819,8 +824,10 @@ function _pbpDictSenseLi(s, formOf) {
     if (!words || !words.length) continue;
     const row = document.createElement("div");
     row.className = "xp-dict-rel";
+    row.lang = termLang || "und";
     const lb = document.createElement("span");
     lb.className = "xp-dict-rel-label";
+    lb.lang = document.documentElement.lang || "und";
     lb.textContent = t(key);
     row.appendChild(lb);
     row.appendChild(document.createTextNode(" " + words.join(", ")));
@@ -832,11 +839,11 @@ function _pbpDictSenseLi(s, formOf) {
 // Default density is unchanged: SHOW senses render, the rest sit behind an
 // explicit click ("expand the other N"). The data is already in memory and
 // in the dict2_ cache -- the button costs no request. Click, never hover.
-function _pbpDictRenderSenses(parent, senses, formOf) {
+function _pbpDictRenderSenses(parent, senses, formOf, termLang, definitionLang) {
   const ol = document.createElement("ol");
   ol.className = "xp-dict-senses";
   const rest = senses.slice(PBP_DICT_SENSE_SHOW);
-  for (const s of senses.slice(0, PBP_DICT_SENSE_SHOW)) ol.appendChild(_pbpDictSenseLi(s, formOf));
+  for (const s of senses.slice(0, PBP_DICT_SENSE_SHOW)) ol.appendChild(_pbpDictSenseLi(s, formOf, termLang, definitionLang));
   parent.appendChild(ol);
   if (rest.length) {
     const more = document.createElement("button");
@@ -844,7 +851,7 @@ function _pbpDictRenderSenses(parent, senses, formOf) {
     more.className = "xp-dict-more";
     more.textContent = t("dictMoreSenses", String(rest.length));
     more.addEventListener("click", () => {
-      for (const s of rest) ol.appendChild(_pbpDictSenseLi(s, formOf));
+      for (const s of rest) ol.appendChild(_pbpDictSenseLi(s, formOf, termLang, definitionLang));
       more.remove();
     });
     parent.appendChild(more);
@@ -853,6 +860,8 @@ function _pbpDictRenderSenses(parent, senses, formOf) {
 
 function _pbpDictRenderEntry(slot, norm, term, lang, selectedTerm, sentence) {
   slot.replaceChildren();
+  const definitionLang = norm.sourceLabel === "ECDICT" ? "zh" :
+    (norm.sourceLabel === "Wiktionary" || norm.sourceLabel === "CC-CEDICT") ? "en" : "und";
   const actual = pbpDictNormalizeTerm(norm.word || term);
   const selected = pbpDictNormalizeTerm(selectedTerm);
   if (selected && actual && actual !== selected) {
@@ -870,6 +879,7 @@ function _pbpDictRenderEntry(slot, norm, term, lang, selectedTerm, sentence) {
       if (e.pos) {
         const pos = document.createElement("span");
         pos.className = "xp-dict-pos";
+        pos.lang = definitionLang;
         pos.textContent = e.pos;
         line.appendChild(pos);
       }
@@ -899,7 +909,7 @@ function _pbpDictRenderEntry(slot, norm, term, lang, selectedTerm, sentence) {
       forms.textContent = e.forms.map((f) => f.word + (f.tags.length ? " (" + f.tags.map(_pbpDictTagLabel).join(", ") + ")" : "")).join(" · ");
       ent.appendChild(forms);
     }
-    if (e.senses.length) _pbpDictRenderSenses(ent, e.senses, !!norm.formOfOnly);
+    if (e.senses.length) _pbpDictRenderSenses(ent, e.senses, !!norm.formOfOnly, lang, definitionLang);
     slot.appendChild(ent);
   }
   const src = document.createElement("div");
@@ -987,7 +997,7 @@ async function _pbpDictEcdictSide(localEl, term, lang, parentSignal, cur) {
     // one key -- "US" (the country) and "us" (the pronoun) both fold to "us" --
     // so rendering entries[0] would show whichever the file happened to list
     // first and silently drop the other.
-    for (const e of norm.entries) _pbpDictRenderSenses(box, e.senses);
+    for (const e of norm.entries) _pbpDictRenderSenses(box, e.senses, false, lang, "zh");
     localEl.replaceChildren(box);
   } catch (e) {
     // Swallowing without a trace is what turns a platform fault into a silent
@@ -1092,11 +1102,17 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
   }
   const exactHit = await _pbpDictCacheGet(lang, exact);
   if (parentSignal && parentSignal.aborted) return null;
-  if (exactHit) {
+  if (exactHit && !exactHit.formOfOnly) {
     _pbpDictRenderEntry(slot, exactHit, exact, lang, term, sentence);
     return exactHit;
   }
   if (!(await _pbpDictHasPerm())) {
+    // A cached grammar pointer is still useful offline. With permission it
+    // must follow the same lemma chain as a freshly fetched pointer below.
+    if (exactHit) {
+      _pbpDictRenderEntry(slot, exactHit, exact, lang, term, sentence);
+      return exactHit;
+    }
     slot.replaceChildren();
     const btn = document.createElement("button");
     btn.type = "button";
@@ -1138,6 +1154,7 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
     const key = pbpDictCacheKeyExact(lang, candidate);
     if (tried.has(key)) return { kind: "miss", norm: null };
     tried.add(key);
+    if (candidate === exact && exactHit) return { kind: "hit", norm: exactHit };
     return _pbpDictLookupCandidate(lang, candidate, parentSignal, skipCache);
   };
   const finish = async (candidate, result, aliasExact) => {
@@ -1325,16 +1342,17 @@ async function _pbpDictCtxRun(el, cap, ctx, s, signal, resolveLemmaOnce, lang) {
     });
     const provider = s.aiProvider || "gemini";
     const model = (typeof pbpAiEffectiveModel === "function" ? pbpAiEffectiveModel(s) : "") || "";
-    // dictctx2: prompt-version bump. The v1 prompt let models answer
-    // function-word queries in English regardless of the answer-language
-    // instruction, and those drifted answers were cached under the correct
-    // language key -- a prefix bump orphans them (LRU evicts naturally).
-    const cacheKey = "dictctx2_" + _pbpDictOwner + "_" + provider + "_" + model + "_"
-      + pbpDictCacheKeyPublic(lang, cap.text) + "_" + pbpDictCtxHash(ctx.sentence + "␟" + title + "␟" + langName);
+    // Case matters to meaning: US/us and Polish/polish can occur in the
+    // SAME sentence. v2 folded the selection, so even lowercase cache rows
+    // may contain an uppercase term's answer. A new subnamespace retires
+    // folded rows while keeping ai-cache's existing dictctx2_ LRU pool.
+    const cacheKey = "dictctx2_exact_" + _pbpDictOwner + "_" + provider + "_" + model + "_"
+      + pbpDictCacheKeyExact(lang, cap.text) + "_" + pbpDictCtxHash(ctx.sentence + "␟" + title + "␟" + langName);
     const finish = (full) => {
       const parsed = pbpDictParseCtxAnswer(full);
       const md = document.createElement("div");
       md.className = "xp-md";
+      md.lang = uiLangToBCP47() || "und";
       md.innerHTML = renderMarkdown(parsed.gloss); // single sanitize point
       const tag = document.createElement("div");
       tag.className = "xp-dict-ailabel";
@@ -1353,6 +1371,7 @@ async function _pbpDictCtxRun(el, cap, ctx, s, signal, resolveLemmaOnce, lang) {
     }
     const streamEl = document.createElement("div");
     streamEl.className = "xp-stream";
+    streamEl.lang = uiLangToBCP47() || "und";
     let started = false, pending = "", rafId = 0;
     const flush = () => { rafId = 0; streamEl.textContent = pbpDictStripLemmaLine(pending); };
     try {

@@ -78,6 +78,8 @@ Kein Tracking, keine Analytik, keine Telemetrie. Für neue Nutzer werden Einstel
 
 Google Drive wird auf jedem Gerät separat verbunden und synchronisiert danach Vokabeln, Markierungen und Notizen des aktuellen Pinboard-Kontos. Kopien im privaten appDataFolder von Drive liegen im Klartext vor und sind nicht Ende-zu-Ende-verschlüsselt.
 
+Aktualisiere die Erweiterung auf allen Geräten, die Vokabeln synchronisieren. Diese Version liest vorhandene Vokabeldaten; ältere Versionen können jedoch keine Vokabeländerungen empfangen, die mit dieser Version gespeichert wurden.
+
 ## Lizenz
 
 MIT. Siehe [LICENSE](LICENSE).

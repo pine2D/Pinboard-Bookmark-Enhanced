@@ -9570,8 +9570,13 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   const hand = stripGeneratedRegions(libraryCss).replace(/\/\*[\s\S]*?\*\//g, "");
   check(!/\.xp-dict-(?:lang|head)\b/.test(hand) && !/\.vocab-lookup-bar select\b/.test(hand) && !/\.vocab-filter-toolbar select\b/.test(hand),
     "library.css: a hand rule still styles the retired relookup select / head or a native lookup select");
-  check(declarationValueMap(hand, "#vocab-ref-result[data-same-word] :is(.xp-dict-ipa, .xp-dict-ipa-tag)").get("display") === "none",
-    "library.css: a lookup of the open word repeats its IPA in the dictionary result (spec §4.9: hide .xp-dict-ipa / -tag under #vocab-ref-result[data-same-word])");
+  // Same-word does not imply repeated pronunciation: an offline pack may
+  // supply the first reading for a word saved without one. Browser cases
+  // cover missing/different/identical heading IPA; the CSS contract checks
+  // the marker they exercise and excludes the old unconditional hide.
+  check(declarationValueMap(hand, "#vocab-ref-result [data-repeated-ipa]").get("display") === "none" &&
+    declarationValueMap(hand, "#vocab-ref-result[data-same-word] :is(.xp-dict-ipa, .xp-dict-ipa-tag)").get("display") !== "none",
+    "library.css: only IPA and tags marked data-repeated-ipa may be hidden; same-word alone must keep newly available pronunciation visible");
   const connectDecl = declarationValueMap(hand, "#vocab-ref-result .xp-dict-connect");
   check(connectDecl.get("border-radius") === "var(--lib-radius-md)" && connectDecl.get("background") === "var(--lib-btn-bg)",
     "library.css: the dictionary connect button lost its scoped rule, went back to a literal radius (spec §4.9: --lib-radius-md) or stopped using the .btn fill (Soft Fill)");
