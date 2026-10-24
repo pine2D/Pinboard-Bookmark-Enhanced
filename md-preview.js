@@ -1156,6 +1156,10 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // it (the restore record carries this same fallback value forward); only
   // opening a fresh preview from the popup/shortcut seeds the real tab URL.
   const sourceTabUrl = (typeof info.sourceTabUrl === "string" && info.sourceTabUrl) || url || "";
+  // Common boot path for popup and shortcut, before extraction or the lazy
+  // video module. This runs once per reader document, not on track/view
+  // switches, and a missing source tab never delays rendering.
+  void pbpPauseSourceVideo(srcTabId, sourceTabUrl);
   // Not const: this is a SNAPSHOT of the account that was signed in when the
   // preview was opened, and a reader tab outlives an account switch. Every
   // owner-scoped consumer downstream (the vocabulary commit in md-dict.js, the

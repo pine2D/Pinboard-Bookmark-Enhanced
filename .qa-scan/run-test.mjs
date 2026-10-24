@@ -70,7 +70,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/md-highlight-commit-tests.html": 248,
   "tests/md-mermaid-tests.html": 14,
   "tests/md-send-menu-tests.html": 24,
-  "tests/md-video-tests.html": 566,
+  "tests/md-video-tests.html": 578,
   "tests/offline-queue-tests.html": 22,
   "tests/options-notes-tests.html": 36,
   "tests/options-context-help-tests.html": 34,

@@ -352,6 +352,38 @@ function pbpVideoDetect(pageUrl) {
   return null;
 }
 
+// Pause once when the reader opens, independently of caption permissions or
+// extraction success. The popup/shortcut's activeTab grant already covers
+// the source; never request a new host permission on this automatic path.
+async function pbpPauseSourceVideo(tabId, sourceUrl) {
+  if (!Number.isInteger(tabId) || tabId < 0 || typeof sourceUrl !== "string"
+      || !/^https?:\/\//.test(sourceUrl) || !pbpVideoDetect(sourceUrl)) return false;
+  try {
+    if (typeof chrome === "undefined" || !chrome.scripting?.executeScript) return false;
+    const results = await chrome.scripting.executeScript({
+      target: { tabId }, world: "MAIN", injectImmediately: true,
+      args: [sourceUrl],
+      func: (expectedUrl) => {
+        // A tab id is only a weak handle: an SPA navigation (including a
+        // different bilibili part) can happen before this function dispatches.
+        if (location.href !== expectedUrl) return 0;
+        let count = 0;
+        for (const media of document.querySelectorAll("video, bwp-video")) {
+          if (typeof media.pause !== "function") continue;
+          try { media.pause(); count++; }
+          catch (e) { console.warn("[pbp-video] source media pause:", e?.name, e?.message); }
+        }
+        return count;
+      },
+    });
+    return (results || []).some(result => result?.result > 0);
+  } catch (e) {
+    // Closed/navigated tabs and revoked access must not block the reader.
+    console.warn("[pbp-video] source pause unavailable:", e?.name, e?.message);
+    return false;
+  }
+}
+
 // Opens one of the extension's own pages, reusing the tab already showing it
 // instead of stacking a duplicate on every click, and only then moving its
 // hash. Generalised from the options-only version below, which every other

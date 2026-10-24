@@ -43,6 +43,62 @@ assertEq(pbpVideoDetect("https://example.com/watch?v=dQw4w9WgXcQ"), null, "non-Y
 assertEq(pbpVideoDetect("https://www.youtube.com/feed/subscriptions"), null, "non-video YouTube page is null");
 assertEq(pbpVideoDetect("not a url"), null, "garbage is null");
 
+section("pause the source video on preview open");
+await (async () => {
+  const pauseSource = typeof pbpPauseSourceVideo === "function" ? pbpPauseSourceVideo : async () => false;
+  const savedChrome = window.chrome;
+  const savedWarn = console.warn;
+  const frame = document.createElement("iframe"); document.body.appendChild(frame);
+  const doc = frame.contentDocument;
+  doc.body.innerHTML = '<video></video><bwp-video></bwp-video><video></video>';
+  let paused = [], injections = [], warnings = [];
+  const media = Array.from(doc.querySelectorAll("video, bwp-video"));
+  media.forEach((el, i) => { el.pause = () => { paused.push(i); }; });
+  const yt = "https://www.youtube.com/watch?v=v9QtM6qnG50";
+  const bili = "https://www.bilibili.com/video/BV1xx411c7mD?p=2";
+  let liveUrl = yt;
+  window.chrome = { scripting: { executeScript: async (options) => {
+    injections.push(options);
+    // Like executeScript, serialize the function into a separate global:
+    // page DOM is real; only Chrome dispatch and the page URL are fixtures.
+    const run = frame.contentWindow.Function("location", "args", "return (" + options.func.toString() + ")(...args);");
+    return [{ result: run({ href: liveUrl }, options.args) }];
+  } } };
+  console.warn = (...args) => warnings.push(args);
+  frame.contentWindow.console.warn = console.warn;
+  try {
+    await pauseSource(41, yt);
+    assertEq(paused.join(","), "0,1,2", "pause: source media including bilibili WASM media are paused");
+    assert(injections.length === 1 && injections[0].target.tabId === 41 && !injections[0].target.allFrames,
+      "pause: only the remembered source tab's main frame is targeted");
+    assertEq(injections[0]?.world, "MAIN", "pause: custom media methods run in their owning page world");
+    paused = []; liveUrl = bili;
+    await pauseSource(42, bili);
+    assertEq(paused.join(","), "0,1,2", "pause: bilibili source uses the same pause path without requesting subtitle permission");
+    paused = []; liveUrl = "https://www.youtube.com/watch?v=OTHERID0001";
+    await pauseSource(41, yt);
+    assertEq(paused.length, 0, "pause: navigating to another video before dispatch leaves it playing");
+    liveUrl = "https://www.bilibili.com/video/BV1xx411c7mD?p=3";
+    await pauseSource(42, bili);
+    assertEq(paused.length, 0, "pause: a different bilibili part is not the source video");
+    const before = injections.length;
+    for (const [id, url] of [[null, yt], [-1, yt], ["41", yt], [41, "https://example.com/watch?v=v9QtM6qnG50"], [41, "file://www.youtube.com/watch?v=v9QtM6qnG50"]]) {
+      await pauseSource(id, url);
+    }
+    assertEq(injections.length, before, "pause: invalid tab handles and non-web/non-video sources never inject");
+    liveUrl = yt;
+    media[0].pause = () => { throw new Error("media unavailable"); };
+    await pauseSource(41, yt);
+    assertEq(paused.join(","), "1,2", "pause: one broken media element does not prevent the others pausing");
+    assert(warnings.some(args => args.includes("media unavailable")), "pause: media errors retain diagnostic evidence");
+    window.chrome.scripting.executeScript = async () => { throw new Error("No tab with id: 41"); };
+    assertEq(await pauseSource(41, yt), false, "pause: a closed source tab does not reject reader startup");
+    window.chrome.scripting.executeScript = async () => { throw new Error("Cannot access contents of the page"); };
+    assertEq(await pauseSource(41, yt), false, "pause: lost activeTab permission does not reject reader startup");
+    assert(warnings.some(args => args.includes("Cannot access contents of the page")), "pause: injection errors retain diagnostic evidence");
+  } finally { window.chrome = savedChrome; console.warn = savedWarn; frame.remove(); }
+})();
+
 section("pbpYtParseTranscriptPanel");
 (() => {
   // Hand-written from the real get_transcript response shape (verified via
