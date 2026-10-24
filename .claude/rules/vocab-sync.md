@@ -50,6 +50,7 @@ paths:
 
 - 生词列表、筛选、选择、单删、批删与加组都限定当前非秘密 Pinboard owner；账号切换先清空旧 owner 的可见行，再读取新 owner，失败时保持 fail-closed。
 - 原形通过 `pbpVocabSetLemma` 在事务内校验 owner 后修改；不改词条身份，不联动相关词形的笔记／学习状态。词形关系只在同 owner、同主语言内派生；无阅读语境的查词保存不得伪造句子或来源。
+- 多语言 Anki 与完整 TSV 从原始词条保留笔记、原形及完整 context/source 对应。WordID 为已校验 `w.id` 的本机 SHA-256（`pbp-v1-` 前缀），不外发原始 owner；哈希等异步读取后重验 owner。多语言笔记类型显式 opt-in，默认原六字段；只新增／跳过重复，不迁移、修改或删除已有 Anki 笔记。
 - UI 选择只影响批量删除和添加分组；TSV 与 Anki 始终处理当前 owner 的全部生词，欧路词典始终从当前 owner 全量中只发送 `en/fr/de/es`。
 - 每次 mutation 在用户确认时取得刷新代际，旧 IDB 快照不得晚写覆盖新状态；最新 mutation 即使失败也要重读真实 IDB。事务内逐条 owner 校验不得移到 UI 层或省略。
 

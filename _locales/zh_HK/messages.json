@@ -4447,5 +4447,13 @@
   "vocabLookupBaseForm": { "message": "查詢原形" },
   "vocabSaveDefinitionLabel": { "message": "要儲存的釋義" },
   "vocabSavedOutsideFilters": { "message": "已儲存。此詞不在目前的篩選結果中。" },
-  "vocabShowSavedWord": { "message": "在清單中顯示" }
+  "vocabShowSavedWord": { "message": "在清單中顯示" },
+  "dictAnkiFormatLabel": { "message": "Anki 筆記格式" },
+  "dictAnkiFormatLegacy": { "message": "原版（六欄位）" },
+  "dictAnkiFormatMultilingual": { "message": "多語言（完整資料）" },
+  "dictAnkiFormatHint": { "message": "多語言格式使用獨立的筆記類型，可能在原有卡片之外新增卡片。再次傳送會略過已有筆記，不會更新內容。" },
+  "dictExportCompleteTsv": { "message": "匯出完整 TSV" },
+  "dictExportLegacyTsv": { "message": "匯出六欄位 TSV" },
+  "vocabCompleteExportHint": { "message": "完整 TSV 包含語言、原形、筆記及每段語境對應的來源。還原本擴充功能的資料請使用 JSON 備份。" },
+  "dictAnkiModelMismatchNamed": {"message": "Anki 中「$MODEL$」筆記類型的欄位不符。請還原原有欄位，或重新命名此類型以便建立新的筆記類型，然後重試。", "placeholders": {"model": {"content": "$1"}}}
 }

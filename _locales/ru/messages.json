@@ -4447,5 +4447,13 @@
   "vocabLookupBaseForm": { "message": "Найти начальную форму" },
   "vocabSaveDefinitionLabel": { "message": "Определение для сохранения" },
   "vocabSavedOutsideFilters": { "message": "Сохранено. Слово не соответствует текущим фильтрам." },
-  "vocabShowSavedWord": { "message": "Показать в списке" }
+  "vocabShowSavedWord": { "message": "Показать в списке" },
+  "dictAnkiFormatLabel": { "message": "Формат заметок Anki" },
+  "dictAnkiFormatLegacy": { "message": "Исходный (шесть полей)" },
+  "dictAnkiFormatMultilingual": { "message": "Многоязычный (полные данные)" },
+  "dictAnkiFormatHint": { "message": "Многоязычный формат использует отдельный тип заметок, поэтому рядом с прежними карточками могут появиться новые. Повторная отправка пропускает существующие заметки, не обновляя их." },
+  "dictExportCompleteTsv": { "message": "Экспорт полного TSV" },
+  "dictExportLegacyTsv": { "message": "Экспорт TSV с шестью полями" },
+  "vocabCompleteExportHint": { "message": "Полный TSV содержит язык, начальную форму, заметки и все контексты с их источниками. Для восстановления данных в расширении используйте резервную копию JSON." },
+  "dictAnkiModelMismatchNamed": {"message": "У типа заметок «$MODEL$» в Anki другой набор полей. Восстановите исходные поля или переименуйте тип, чтобы можно было создать новый, затем повторите попытку.", "placeholders": {"model": {"content": "$1"}}}
 }

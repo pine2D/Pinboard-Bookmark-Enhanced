@@ -556,6 +556,7 @@ const SETTINGS_DEFAULTS = {
   trHotkeyConfirm: true,    // reader t key asks first when the rail price is not visible / >= 5000 tokens
   dictEchoEnabled: true,    // md-vocab-echo: underline saved vocab words in the reader
   dictDefinitionLang: "",   // AI contextual definitions; empty follows the interface language
+  dictAnkiFormat: "legacy", // Explicit opt-in uses a separate multilingual note type
   dictAnkiDeck: "Pinboard Vocab", // anki-connect: target deck for Send to Anki
   dictAnkiPort: "8765",         // anki-connect: AnkiConnect port (host stays loopback-only)
   dictAnkiKey: "",              // anki-connect: optional AnkiConnect API key (credential)

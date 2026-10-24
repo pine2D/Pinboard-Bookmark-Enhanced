@@ -1356,9 +1356,10 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     // (obsidian-route, the one select-type Send-to field, enhanced from
     // inside renderExportTargets once its card is connected). Stage-3b Task 4
     // (appearance) adds #opt-theme, a tenth; independent dictionary
-    // definition language adds #dict-definition-lang, an eleventh.
+    // definition language adds #dict-definition-lang, an eleventh;
+    // the Anki note format adds #dict-anki-format, a twelfth.
     const targets = [...doc.querySelectorAll("select[data-listbox]")];
-    assert(targets.length === 11, "expected 11 data-listbox selects on the page, got " + targets.length);
+    assert(targets.length === 12, "expected 12 data-listbox selects on the page, got " + targets.length);
     assert(doc.querySelectorAll(".listbox").length === targets.length,
       "expected one .listbox wrapper per data-listbox select, got " + doc.querySelectorAll(".listbox").length + " for " + targets.length);
   });

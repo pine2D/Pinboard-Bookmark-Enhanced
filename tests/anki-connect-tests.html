@@ -87,6 +87,175 @@ section("pbpAnkiModelDef");
 const md = pbpAnkiModelDef();
 assert(md.modelName === "Pinboard Vocab" && md.inOrderFields.join(",") === "Term,Reading,Definition,Context,Source,License", "model def fields in contract order");
 
+async function runMultilingualChecks() {
+  const legacyFields = ['Term','Reading','Definition','Context','Source','License'];
+  const completeFields = ['WordID','Term','Language','Lemma','Reading','Definition','Note','Contexts','DictionarySource','License','Groups','Status','CreatedAt','UpdatedAt','SupplementalDefinition','SupplementalSource'];
+  const modelName = 'Pinboard Vocab Multilingual';
+  const originalFetch = window.fetch;
+  const same = (a,b) => JSON.stringify(a) === JSON.stringify(b);
+  const assert = (ok, message) => { if (!ok) throw new Error(message); };
+  const call = (name,...args) => window[name](...args);
+  const row = {
+    wordId:'pbp-v1-'+'a'.repeat(64), term:'Gift', language:'de', lemma:'Gift', reading:'/ɡɪft/',
+    definition:'poison\nsecond line', note:'Keep <this> & "that"',
+    contexts:[{quote:'Das Gift ist <gefährlich>.',articleTitle:'First & title',articleUrl:'https://one.test/?a=1&b=2',createdAt:0},
+      {quote:'Second example',articleTitle:'Second title',articleUrl:'https://two.test/path',highlightId:'hl-2',createdAt:123}],
+    dictionarySource:'https://dictionary.test/?a=1&b=2',license:'CC <BY>',groups:['Chapter 1','考试 词汇'],status:'known',createdAt:0,updatedAt:123,
+    zh:'毒物 <n.>',zhNote:'Local pack <R1>'
+  };
+  const legacyRow = {term:'Gift',reading:'/ɡɪft/',definition:'poison',contexts:['First','Second'],source:'https://one.test/',license:'CC0',language:'de',groups:['Chapter 1']};
+  const test = async (name, fn) => { try { await fn(); check(name,true); } catch(e) { check(name,false,e.message); } };
+  // Hand-written v6 responses from official API schema, never from a production note/model builder.
+  async function withService(options, callback) {
+    const requests=[];
+    window.fetch = async (endpoint, init) => {
+      const request=JSON.parse(init.body);requests.push({endpoint,request});
+      assert(request.version===6 && request.key==='fixture-key' && !('key' in request.params),'wrong v6 envelope');
+      let result=null,error=null;
+      switch(request.action) {
+        case 'createDeck':result=1700000000001;break;
+        case 'modelNames':result=options.models ?? ['Pinboard Vocab','Pinboard Vocab Multilingual'];if(options.afterModels)options.afterModels();break;
+        case 'modelFieldNames':result=options.fields ?? (request.params.modelName===modelName ? completeFields : legacyFields);break;
+        case 'createModel':result={id:1700000000002,name:modelName,type:0,flds:[],tmpls:[],css:''};break;
+        case 'canAddNotesWithErrorDetail':result=options.precheck ?? [{canAdd:true}];if(options.afterPrecheck)options.afterPrecheck();break;
+        case 'addNotes':result=options.addError ? null : (options.added ?? [1700000000003]);error=options.addError ?? null;break;
+        default:throw new Error('unexpected mutating or unsupported action '+request.action);
+      }
+      return {ok:true,text:async()=>JSON.stringify({result,error})};
+    };
+    try { return await callback(requests); }
+    finally { window.fetch=originalFetch; }
+  }
+  const sendOptions=(extra={})=>({deck:'Fixture Deck',key:'fixture-key',port:'9999',ownerCheck:async()=>true,format:'multilingual',...extra});
+  await test('default model and unknown formats remain the legacy six-field contract',()=>{
+    for(const format of [undefined,'legacy','bad',null]) {
+      const model=call('pbpAnkiModelDef',format),note=call('pbpAnkiNoteFromRow',legacyRow,'Deck',format);
+      assert(model.modelName==='Pinboard Vocab' && same(model.inOrderFields,legacyFields) && same(Object.keys(note.fields),legacyFields),'legacy changed');
+    }
+  });
+  await test('multilingual model is independent and puts WordID first in the fixed 16-field order',()=>{
+    const model=call('pbpAnkiModelDef','multilingual');
+    assert(model.modelName===modelName && same(model.inOrderFields,completeFields),'wrong multilingual model/fields');
+  });
+  await test('multilingual model templates display Term and Language, not the private identity digest',()=>{
+    const model=call('pbpAnkiModelDef','multilingual'),template=model.cardTemplates[0];
+    assert(template.Front.includes('{{Term}}')&&template.Front.includes('{{Language}}')&&!template.Front.includes('{{WordID}}'),'wrong front presentation');
+    assert(!/<script|on\w+\s*=/i.test(template.Front+template.Back),'active template markup');
+  });
+  await test('field matching is strict and scoped to selected model',()=>{
+    assert(call('pbpAnkiFieldsMatch',completeFields,'multilingual')&&!call('pbpAnkiFieldsMatch',legacyFields,'multilingual')&&!call('pbpAnkiFieldsMatch',completeFields),'model contracts overlap');
+    assert(!call('pbpAnkiFieldsMatch',[...completeFields].reverse(),'multilingual'),'order mismatch accepted');
+  });
+  await test('complete note retains word identity, language, lemma, user note and 0 timestamps',()=>{
+    const note=call('pbpAnkiNoteFromRow',row,'Deck','multilingual');
+    assert(note.modelName===modelName&&same(Object.keys(note.fields),completeFields),'wrong fields');
+    assert(note.fields.WordID===row.wordId&&note.fields.Language==='de'&&note.fields.Lemma==='Gift'&&note.fields.CreatedAt==='0'&&note.fields.UpdatedAt==='123','identity/data missing');
+    assert(note.fields.Note==='Keep &lt;this&gt; &amp; &quot;that&quot;'&&note.fields.Status==='known','note/status lost');
+  });
+  await test('each context retains its own quote, title and URL; dictionary provenance is separate',()=>{
+    const fields=call('pbpAnkiNoteFromRow',row,'Deck','multilingual').fields;
+    for(const c of row.contexts)for(const value of [c.quote,c.articleTitle,c.articleUrl])assert(fields.Contexts.includes(call('pbpAnkiEscapeHtml',value)),'context fact missing');
+    assert(fields.DictionarySource==='https://dictionary.test/?a=1&amp;b=2'&&fields.License==='CC &lt;BY&gt;','dictionary provenance merged/lost');
+  });
+  await test('groups and supplemental content retain independent fields with escaped data',()=>{
+    const note=call('pbpAnkiNoteFromRow',row,'Deck','multilingual');
+    assert(note.fields.Groups.includes('Chapter 1')&&note.fields.Groups.includes('考试 词汇'),'groups lost to tag normalization');
+    assert(note.fields.SupplementalDefinition==='毒物 &lt;n.&gt;'&&note.fields.SupplementalSource==='Local pack &lt;R1&gt;','supplemental data lost or unsafe');
+    assert(note.tags.includes('Chapter-1')&&note.tags.includes('pbp-lang-de'),'existing tag behavior lost');
+  });
+  await test('missing/malformed WordID cannot produce a multilingual note',()=>{
+    for(const wordId of ['',null,'acct_secret|de|gift','pbp-v1-nothex']) {
+      let rejected=false;try{call('pbpAnkiNoteFromRow',{...row,wordId},'Deck','multilingual');}catch(_){rejected=true;}
+      assert(rejected,'invalid first-field identity accepted');
+    }
+  });
+  await test('send checks only selected existing multilingual model and leaves legacy notes untouched',()=>withService({},async requests=>{
+    const result=await call('pbpAnkiSendRows',[row],sendOptions());
+    assert(result.stage==='done'&&result.added===1,'send failed');
+    const fieldCall=requests.find(x=>x.request.action==='modelFieldNames'),add=requests.find(x=>x.request.action==='addNotes');
+    assert(fieldCall.request.params.modelName===modelName&&add.request.params.notes[0].modelName===modelName,'wrong target model');
+    assert(requests.every(x=>x.endpoint==='http://127.0.0.1:9999'),'clicked port changed');
+  }));
+  await test('explicit multilingual selection creates only the new missing model',()=>withService({models:['Pinboard Vocab']},async requests=>{
+    await call('pbpAnkiSendRows',[row],sendOptions());
+    const create=requests.find(x=>x.request.action==='createModel');
+    assert(create?.request.params.modelName===modelName&&same(create.request.params.inOrderFields,completeFields),'new model not created correctly');
+  }));
+  await test('an incompatible multilingual model aborts before precheck/add without changing any model',()=>withService({fields:['WordID','Term']},async requests=>{
+    const result=await call('pbpAnkiSendRows',[row],sendOptions());
+    assert(result.stage==='modelMismatch'&&!requests.some(x=>['addNotes','canAddNotesWithErrorDetail','createModel'].includes(x.request.action)),'incompatible model altered or notes sent');
+  }));
+  await test('real precheck schema classifies duplicate separately and sends only addable complete rows',()=>withService({precheck:[{canAdd:false,error:'cannot create note because it is a duplicate'},{canAdd:true},{canAdd:false,error:'cannot create note because it is empty'}]},async requests=>{
+    const rows=[row,{...row,wordId:'pbp-v1-'+'b'.repeat(64),term:'gift',language:'en'},{...row,wordId:'pbp-v1-'+'c'.repeat(64),term:'invalid'}];
+    const result=await call('pbpAnkiSendRows',rows,sendOptions());
+    const notes=requests.find(x=>x.request.action==='addNotes')?.request.params.notes;
+    assert(result.added===1&&result.skipped===1&&result.failed===1&&notes.length===1&&notes[0].fields.WordID===rows[1].wordId,'precheck result or complete row mapping failed');
+  }));
+  await test('official atomic addNotes error reports the entire addable batch as failed',()=>withService({precheck:[{canAdd:true},{canAdd:true}],addError:"['cannot create note because it is a duplicate']"},async()=>{
+    const result=await call('pbpAnkiSendRows',[row,{...row,wordId:'pbp-v1-'+'b'.repeat(64)}],sendOptions());
+    assert(result.stage==='add'&&result.added===0&&result.failed===2,'atomic failure misreported');
+  }));
+  await test('owner change during precheck prevents addNotes',async()=>{
+    let current=true;
+    await withService({afterPrecheck:()=>{current=false;}},async requests=>{
+      const result=await call('pbpAnkiSendRows',[row],sendOptions({ownerCheck:async()=>current}));
+      assert(result.stage==='owner'&&!requests.some(x=>x.request.action==='addNotes'),'stale owner dispatched note');
+    });
+  });
+
+  await test('every multilingual data fragment remains inert HTML, including context metadata',()=>{
+    const injection='<img src=x onerror="window.bad=1"><script>bad()<\/script>&\'';
+    const hostile={...row,term:injection,language:injection,lemma:injection,reading:injection,definition:injection,note:injection,
+      contexts:[{quote:injection,articleTitle:injection,articleUrl:'javascript:bad()',highlightId:injection,createdAt:0}],
+      dictionarySource:injection,license:injection,groups:[injection],zh:injection,zhNote:injection};
+    const note=call('pbpAnkiNoteFromRow',hostile,'Deck','multilingual');
+    const rendered=document.createElement('div');rendered.innerHTML=Object.values(note.fields).join(' ');
+    assert(!rendered.querySelector('img,script,iframe,svg,[onerror],[onload],a[href^="javascript:"]'),'untrusted markup became active content');
+    assert(rendered.textContent.includes(injection),'escaping lost data');
+  });
+  await test('complete fields preserve multiline text and zero context timestamps',()=>{
+    const note=call('pbpAnkiNoteFromRow',row,'Deck','multilingual');
+    assert(note.fields.Definition==='poison\nsecond line','saved definition newlines lost');
+    const contexts=document.createElement('div');contexts.innerHTML=note.fields.Contexts;
+    assert(contexts.querySelector('[data-created-at="0"]')&&contexts.querySelector('[data-highlight-id="hl-2"]'),'context metadata lost');
+    assert(call('pbpAnkiModelDef','multilingual').css.includes('pre-wrap'),'multiline display collapses whitespace');
+  });
+  await test('management fields are retained without displaying identity, timestamps or learning status on cards',()=>{
+    const model=call('pbpAnkiModelDef','multilingual'),template=model.cardTemplates[0];
+    assert(model.inOrderFields.includes('Status')&&model.inOrderFields.includes('CreatedAt'),'management data missing');
+    for(const field of ['WordID','CreatedAt','UpdatedAt','Status'])assert(!(`${template.Front}${template.Back}`).includes('{{'+field+'}}'),'internal field shown on card: '+field);
+  });
+  await test('card Term and Lemma carry escaped language metadata without guessing definition or note language',()=>{
+    const template=call('pbpAnkiModelDef','multilingual').cardTemplates[0];
+    for(const language of ['de','zh-Hans','es','en\" onmouseover=\"bad()']) {
+      const fields=call('pbpAnkiNoteFromRow',{...row,term:'TERM',lemma:'LEMMA',definition:'DEFINITION',note:'NOTE',language},'Deck','multilingual').fields;
+      // Anki substitutes field contents in HTML attributes as well as text;
+      // its documented dictionary-link example uses the same replacement.
+      const render=(source)=>source.replace(/{{[#/][^}]+}}/g,'').replace(/{{([^}]+)}}/g,(_,name)=>fields[name]||'');
+      const card=document.createElement('div');card.innerHTML=render(template.Front)+render(template.Back);
+      const nodeFor=(text)=>[...card.querySelectorAll('*')].find(el=>el.children.length===0&&el.textContent===text);
+      assert(nodeFor('TERM')?.getAttribute('lang')===language&&nodeFor('LEMMA')?.getAttribute('lang')===language,'word language metadata missing');
+      assert(!nodeFor('DEFINITION')?.closest('[lang]')&&!nodeFor('NOTE')?.closest('[lang]'),'unknown definition/note language guessed');
+      assert(!card.querySelector('[onmouseover],script,img'),'language attribute escaped unsafely');
+    }
+  });
+  await test('invalid multilingual WordID fails before any Anki request',()=>withService({},async requests=>{
+    let result;try{result=await call('pbpAnkiSendRows',[{...row,wordId:'acct_private|de|gift'}],sendOptions());}catch(_){assert(false,'pipeline threw instead of reporting invalid input');}
+    assert(result.stage==='input'&&requests.length===0,'invalid identity reached Anki');
+  }));
+  await test('an already-stale owner performs no Anki dispatch',()=>withService({},async requests=>{
+    const result=await call('pbpAnkiSendRows',[row],sendOptions({ownerCheck:async()=>false}));
+    assert(result.stage==='owner'&&requests.length===0,'stale owner still changed Anki');
+  }));
+  await test('owner change during model discovery prevents model creation and note dispatch',async()=>{
+    let current=true;
+    await withService({models:['Pinboard Vocab'],afterModels:()=>{current=false;}},async requests=>{
+      const result=await call('pbpAnkiSendRows',[row],sendOptions({ownerCheck:async()=>current}));
+      assert(result.stage==='owner'&&!requests.some(x=>['createModel','canAddNotesWithErrorDetail','addNotes'].includes(x.request.action)),'stale model lookup continued dispatch');
+    });
+  });
+}
+
 (async () => {
   section("pbpAnkiSendRows model-field diagnosis");
   const realCall = pbpAnkiCall;
@@ -111,6 +280,7 @@ assert(md.modelName === "Pinboard Vocab" && md.inOrderFields.join(",") === "Term
   } finally {
     pbpAnkiCall = realCall;
   }
+  await runMultilingualChecks();
   document.getElementById("summary").textContent = pass + " passed, " + fail + " failed";
 })();
 

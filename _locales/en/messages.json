@@ -4454,5 +4454,13 @@
   "vocabLookupBaseForm": { "message": "Look up base form" },
   "vocabSaveDefinitionLabel": { "message": "Definition to save" },
   "vocabSavedOutsideFilters": { "message": "Saved. This word is outside the current filters." },
-  "vocabShowSavedWord": { "message": "Show in list" }
+  "vocabShowSavedWord": { "message": "Show in list" },
+  "dictAnkiFormatLabel": { "message": "Anki note format" },
+  "dictAnkiFormatLegacy": { "message": "Original (six fields)" },
+  "dictAnkiFormatMultilingual": { "message": "Multilingual (full details)" },
+  "dictAnkiFormatHint": { "message": "Multilingual uses a separate note type, so it can add cards alongside your original cards. Sending again skips existing notes; it does not update them." },
+  "dictExportCompleteTsv": { "message": "Export complete TSV" },
+  "dictExportLegacyTsv": { "message": "Export six-field TSV" },
+  "vocabCompleteExportHint": { "message": "Complete TSV includes language, base form, notes and every context with its source. Use JSON backup to restore data in this extension." },
+  "dictAnkiModelMismatchNamed": {"message": "The \"$MODEL$\" note type in Anki has different fields. Restore its original fields, or rename it so a new one can be created, then try again.", "placeholders": {"model": {"content": "$1"}}}
 }

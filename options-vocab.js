@@ -709,14 +709,15 @@ function _pbpVocabSendOptions(statusId = "") {
   };
 }
 
-async function _pbpVocabExport() {
-  const btn = $id("vocab-export-btn");
+async function _pbpVocabExport(format = "legacy") {
+  const btn = $id(format === "complete" ? "vocab-export-complete-btn" : "vocab-export-btn");
   if (!btn || btn.disabled) return; // double-click guard, same as the Anki/Eudic buttons
-  btn.disabled = true;
+  const buttons = [$id("vocab-export-btn"), $id("vocab-export-complete-btn")].filter(Boolean);
+  buttons.forEach(button => { button.disabled = true; });
   try {
-    await pbpVocabExportTsv(_pbpVocabSendOptions());
+    await pbpVocabExportTsv({ ..._pbpVocabSendOptions(), format });
   } finally {
-    btn.disabled = false;
+    buttons.forEach(button => { button.disabled = false; });
   }
 }
 
@@ -908,7 +909,9 @@ const _vocabEudicTestBtn = $id("vocab-eudic-test-btn");
 if (_vocabEudicTestBtn) _vocabEudicTestBtn.addEventListener("click", _pbpVocabTestEudic);
 
 const _vocabExportBtn = $id("vocab-export-btn");
-if (_vocabExportBtn) _vocabExportBtn.addEventListener("click", _pbpVocabExport);
+if (_vocabExportBtn) _vocabExportBtn.addEventListener("click", () => _pbpVocabExport("legacy"));
+const _vocabExportCompleteBtn = $id("vocab-export-complete-btn");
+if (_vocabExportCompleteBtn) _vocabExportCompleteBtn.addEventListener("click", () => _pbpVocabExport("complete"));
 
 const _vocabDriveConnect = $id("vocab-drive-connect");
 if (_vocabDriveConnect) _vocabDriveConnect.addEventListener("click", _pbpVocabDriveConnect);

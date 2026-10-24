@@ -1934,6 +1934,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       fields: {
         "dict-echo-enabled": true,
         "dict-definition-lang": "", "dict-definition-lang-custom": "",
+        "dict-anki-format": "legacy",
         "dict-anki-deck": "Pinboard Vocab",
         "dict-anki-port": "8765"
       },
@@ -2718,6 +2719,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-preview-ai-model": _previewModelMap[s.aiProvider || "gemini"] ?? "",
     "opt-translate-glossary": s.translateGlossary,
     "opt-selection-trigger": s.selectionTrigger,
+    "dict-anki-format": s.dictAnkiFormat === "multilingual" ? "multilingual" : "legacy",
     "dict-anki-deck": s.dictAnkiDeck || "",
     "dict-anki-port": s.dictAnkiPort || "8765",
     "dict-anki-key": s.dictAnkiKey || "",
@@ -3660,6 +3662,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       trHotkeyConfirm: $id("opt-tr-hotkey-confirm").checked,
       dictEchoEnabled: $id("dict-echo-enabled").checked,
       dictDefinitionLang: resolveDictDefinitionLang(),
+      dictAnkiFormat: $id("dict-anki-format").value === "multilingual" ? "multilingual" : "legacy",
       dictAnkiDeck: $id("dict-anki-deck").value.trim(),
       dictAnkiPort: $id("dict-anki-port").value.trim(),
       dictAnkiKey: obfuscateKey($id("dict-anki-key").value.trim()),

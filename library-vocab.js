@@ -3273,8 +3273,8 @@ if (_vocabInvert) _vocabInvert.addEventListener("click", () => {
   if (!_vocabSelected.size) _pbpVocabFocusCountRowSelectAll();
 });
 
-// Export menu (count row). The three whole-vocabulary exits from settings,
-// where a reviewing learner already is: the TSV download, Send all to Anki and
+// Export menu (count row). Whole-vocabulary exits from settings, where a
+// reviewing learner already is: complete/legacy TSV, Send all to Anki and
 // Send all supported words to Eudic (vocab-send.js, shared with options). They
 // ALWAYS act on the current owner's whole vocabulary -- never the selection or
 // the filtered view -- which is why they sit in the count row (the whole
@@ -3308,7 +3308,9 @@ function _pbpVocabRunExport(kind) {
     status.classList.remove("ok", "bad");
     status.textContent = t(sending);
   }
-  const done = run({ flash: _pbpVocabFlashStatus });
+  const options = { flash: _pbpVocabFlashStatus };
+  if (kind === "tsv-complete" || kind === "tsv-legacy") options.format = kind === "tsv-complete" ? "complete" : "legacy";
+  const done = run(options);
   Promise.resolve(done).catch((err) => {
     console.warn("vocab export failed:", err && err.name, err && err.message);
   }).finally(() => {
@@ -3339,7 +3341,8 @@ async function _pbpVocabOpenExportMenu(anchor) {
   _vocabExportSession = session;
   anchor.setAttribute("aria-expanded", "true");
   menu.append(
-    _pbpVocabExportItem(t("dictExportTsv"), "download", () => _pbpVocabRunExport("tsv")),
+    _pbpVocabExportItem(t("dictExportCompleteTsv"), "download", () => _pbpVocabRunExport("tsv-complete")),
+    _pbpVocabExportItem(t("dictExportLegacyTsv"), "download", () => _pbpVocabRunExport("tsv-legacy")),
     _pbpVocabExportItem(t("dictAnkiSend"), "send", () => _pbpVocabRunExport("anki"))
   );
   // Eudic only when it has something to do (a token, and words in a language

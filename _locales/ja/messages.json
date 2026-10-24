@@ -4447,5 +4447,13 @@
   "vocabLookupBaseForm": { "message": "基本形を調べる" },
   "vocabSaveDefinitionLabel": { "message": "保存する語義" },
   "vocabSavedOutsideFilters": { "message": "保存しました。この単語は現在の絞り込み条件に一致しません。" },
-  "vocabShowSavedWord": { "message": "一覧に表示" }
+  "vocabShowSavedWord": { "message": "一覧に表示" },
+  "dictAnkiFormatLabel": { "message": "Ankiのノート形式" },
+  "dictAnkiFormatLegacy": { "message": "従来形式（6フィールド）" },
+  "dictAnkiFormatMultilingual": { "message": "多言語形式（詳細情報付き）" },
+  "dictAnkiFormatHint": { "message": "多言語形式では別のノートタイプを使うため、従来のカードとは別にカードが追加されることがあります。再送信時は既存のノートをスキップし、内容を更新しません。" },
+  "dictExportCompleteTsv": { "message": "完全なTSVをエクスポート" },
+  "dictExportLegacyTsv": { "message": "6フィールドのTSVをエクスポート" },
+  "vocabCompleteExportHint": { "message": "完全なTSVには言語、基本形、メモ、各文脈とその出典が含まれます。この拡張機能にデータを復元するにはJSONバックアップを使ってください。" },
+  "dictAnkiModelMismatchNamed": {"message": "Ankiのノートタイプ「$MODEL$」のフィールドが一致しません。元のフィールドに戻すか、名前を変更して新しいノートタイプを作成できるようにしてから、再試行してください。", "placeholders": {"model": {"content": "$1"}}}
 }

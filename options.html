@@ -877,6 +877,13 @@
           <summary data-i18n="vocabLearningSection">Export and integrations</summary>
           <div class="disclosure-body">
             <div class="fg"><div class="bl subhead" role="heading" aria-level="3">Anki</div></div>
+            <div class="fg entry-block"><label class="bl" for="dict-anki-format" data-i18n="dictAnkiFormatLabel">Anki note format</label>
+              <select id="dict-anki-format" data-listbox aria-describedby="dict-anki-format-hint">
+                <option value="legacy" data-i18n="dictAnkiFormatLegacy">Original (six fields)</option>
+                <option value="multilingual" data-i18n="dictAnkiFormatMultilingual">Multilingual (full details)</option>
+              </select>
+              <p class="hint" id="dict-anki-format-hint" data-i18n="dictAnkiFormatHint">Multilingual uses a separate note type, so it can add cards alongside your original cards. Sending again skips existing notes; it does not update them.</p>
+            </div>
             <div class="fg entry-block"><label class="bl" for="dict-anki-deck" data-i18n="dictAnkiDeckLabel">Anki deck</label>
               <input type="text" id="dict-anki-deck" placeholder="Pinboard Vocab" /></div>
             <div class="fg entry-block"><label class="bl" for="dict-anki-port" data-i18n="dictAnkiPortLabel">AnkiConnect port</label>
@@ -888,9 +895,11 @@
               <div class="fg-actions"><button type="button" class="btn btn-sm" id="vocab-eudic-test-btn" data-i18n="dictEudicTest">Test Eudic connection</button><button type="button" class="btn btn-sm" id="vocab-eudic-btn" data-i18n="dictEudicSend" hidden>Send all supported words to Eudic</button><span class="save-status" id="vocab-eudic-test-status" role="status" aria-live="polite"></span></div></div>
             <div class="fg"><div class="bl subhead" role="heading" aria-level="3" data-i18n="vocabFileExportHeading">File export</div></div>
             <div class="vocab-toolbar">
-              <button type="button" class="btn btn-sm" id="vocab-export-btn" data-i18n="dictExportTsv">Export all (.tsv)</button>
+              <button type="button" class="btn btn-sm" id="vocab-export-complete-btn" data-i18n="dictExportCompleteTsv">Export complete TSV</button>
+              <button type="button" class="btn btn-sm" id="vocab-export-btn" data-i18n="dictExportLegacyTsv">Export six-field TSV</button>
               <span class="save-status" id="vocab-status" role="status" aria-live="polite"></span>
             </div>
+            <p class="hint" data-i18n="vocabCompleteExportHint">Complete TSV includes language, base form, notes and every context with its source. Use JSON backup to restore data in this extension.</p>
           </div>
         </details>
         <details class="disclosure" data-acc-key="vocab-ecdict-pack">

@@ -15,7 +15,8 @@
 // Call-time deps: shared.js (pbpReadSettingsWithSecrets, deobfuscateSettings,
 // pbpEndpointOriginPattern, t), vocab-store.js (pbpVocabAll,
 // pbpVocabCurrentOwner, pbpVocabGroups, pbpDictPrimaryLang), md-dict.js
-// (pbpDictTsv), dict-pack.js (pbpEcdict*), anki-connect.js, eudic-sync.js.
+// (pbpDictTsv, pbpDictTsvField), dict-pack.js (pbpEcdict*), anki-connect.js,
+// eudic-sync.js. Complete exports hash identities locally with crypto.subtle.
 // ============================================================
 
 // First few names only: the status line is one line, and five terms are
@@ -99,6 +100,69 @@ function pbpVocabSendCanonicalRow(w, zhMap, tag) {
   };
 }
 
+// Only verified store identities may become an external duplicate key. Hash
+// the canonical ID, not editable content, and never expose its raw owner.
+async function pbpVocabSendWordId(w, owner) {
+  if (!w || typeof owner !== "string" || !owner.trim() || w.owner !== owner ||
+      typeof w.term !== "string" || !pbpDictNormalizeTerm(w.term) ||
+      typeof w.language !== "string" || !pbpDictPrimaryLang(w.language) ||
+      typeof w.id !== "string" || w.id !== pbpDictVocabKey(owner, w.language, w.term)) {
+    throw new Error("invalid vocabulary identity");
+  }
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(w.id));
+  return "pbp-v1-" + Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+// This parallel projection deliberately starts from stored rows. The legacy
+// projection folds newlines and strips context provenance, so it cannot be a
+// source for complete exports. Enumerating content fields also keeps causal
+// versions and other sync-only metadata out of both external formats.
+async function pbpVocabSendCompleteRows(words, owner, zhMap, tag) {
+  return Promise.all(words.map(async (w) => {
+    const wordId = await pbpVocabSendWordId(w, owner);
+    const zh = pbpVocabSendZhFor(w, zhMap);
+    return {
+      wordId,
+      term: w.term,
+      language: w.language,
+      lemma: w.lemma ?? null,
+      reading: w.ipa ?? "",
+      definition: w.gloss ?? "",
+      note: w.note ?? "",
+      contexts: (Array.isArray(w.contexts) ? w.contexts : []).map((context) => {
+        const copy = {};
+        for (const key of ["quote", "articleUrl", "articleTitle", "highlightId", "createdAt"]) {
+          if (context && Object.hasOwn(context, key)) copy[key] = context[key];
+        }
+        return copy;
+      }),
+      dictionarySource: w.sourceUrl ?? "",
+      license: w.license ?? "",
+      groups: Array.isArray(w.groups) ? w.groups.slice() : [],
+      status: w.status ?? "",
+      createdAt: w.createdAt ?? "",
+      updatedAt: w.updatedAt ?? "",
+      zh,
+      zhNote: zh ? t("vocabZhFromPack") + (tag ? " (" + tag + ")" : "") : ""
+    };
+  }));
+}
+
+// Plain-text content export, not an Anki model definition or restore backup.
+// JSON cells retain each context's own provenance and the full group list.
+function pbpVocabCompleteTsv(rows) {
+  const columns = ["WordID", "Term", "Language", "Lemma", "Reading", "Definition", "Note", "ContextsJSON",
+    "DictionarySource", "License", "GroupsJSON", "Status", "CreatedAt", "UpdatedAt",
+    "SupplementalDefinition", "SupplementalSource"];
+  const lines = ["#separator:Tab", "#html:false", "#columns:" + columns.join("\t"), "#pbp-vocab-schema:complete-v1"];
+  for (const row of rows) {
+    lines.push([row.wordId, row.term, row.language, row.lemma, row.reading, row.definition, row.note,
+      JSON.stringify(row.contexts), row.dictionarySource, row.license, JSON.stringify(row.groups),
+      row.status, row.createdAt, row.updatedAt, row.zh, row.zhNote].map(pbpDictTsvField).join("\t"));
+  }
+  return lines.join("\n") + "\n";
+}
+
 // Diagnostic identity of the imported pack: rung plus a short slice of the
 // CRC32. Not an identity or licence claim -- 32 bits collide.
 // Read AFTER the lookup and passed per export, never held in a module variable:
@@ -145,7 +209,7 @@ async function pbpVocabEudicReady() {
 // TSV download. The owner is captured before reading the rows and re-checked
 // after every await and before the Blob is built: never download the previous
 // account's words under the new account's export click.
-async function pbpVocabExportTsv({ flash, flush } = {}) {
+async function pbpVocabExportTsv({ flash, flush, format = "legacy" } = {}) {
   try {
     if (!(await _pbpVocabSendFlushed(flush, flash))) return;
     const owner = await pbpVocabCurrentOwner();
@@ -160,13 +224,20 @@ async function pbpVocabExportTsv({ flash, flush } = {}) {
     const zhMap = await pbpVocabSendZhMap(rows);
     const zhTag = await pbpVocabSendEcdictTag();
     if ((await pbpVocabCurrentOwner()) !== owner) { flash(false, t("vocabAccountChanged")); return; }
-    const tsv = pbpDictTsv(rows.map((w) => pbpVocabSendCanonicalRow(w, zhMap, zhTag)));
+    const complete = format === "complete";
+    const canonical = complete
+      ? await pbpVocabSendCompleteRows(rows, owner, zhMap, zhTag)
+      : rows.map((w) => pbpVocabSendCanonicalRow(w, zhMap, zhTag));
+    // Hashing adds an asynchronous boundary. A switch during local crypto
+    // must abort before any previous account's content reaches a download.
+    if (complete && (await pbpVocabCurrentOwner()) !== owner) { flash(false, t("vocabAccountChanged")); return; }
+    const tsv = complete ? pbpVocabCompleteTsv(canonical) : pbpDictTsv(canonical);
     const blob = new Blob([tsv], { type: "text/tab-separated-values" });
     const a = document.createElement("a");
     const d = new Date();
     const stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
     a.href = URL.createObjectURL(blob);
-    a.download = "vocab-" + stamp + ".tsv";
+    a.download = "vocab-" + stamp + (complete ? "-complete" : "") + ".tsv";
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -218,7 +289,8 @@ async function pbpVocabSendToAnki({ flash, flush, port: clickedPort } = {}) {
     if (!(await _pbpVocabSendFlushed(flush, flash))) return;
     const raw = await pbpReadSettingsWithSecrets({
       dictAnkiDeck: SETTINGS_DEFAULTS.dictAnkiDeck,
-      dictAnkiKey: SETTINGS_DEFAULTS.dictAnkiKey
+      dictAnkiKey: SETTINGS_DEFAULTS.dictAnkiKey,
+      dictAnkiFormat: SETTINGS_DEFAULTS.dictAnkiFormat
     });
     const s = deobfuscateSettings(raw);
     if (keyRequired && !s.dictAnkiKey) { flash(false, t("dictAnkiKeyRequired")); return; }
@@ -229,11 +301,16 @@ async function pbpVocabSendToAnki({ flash, flush, port: clickedPort } = {}) {
     const zhMap = await pbpVocabSendZhMap(rows);
     const zhTag = await pbpVocabSendEcdictTag();
     if ((await pbpVocabCurrentOwner()) !== owner) { flash(false, t("vocabAccountChanged")); return; }
-    const canonical = rows.map((w) => pbpVocabSendCanonicalRow(w, zhMap, zhTag));
+    const format = s.dictAnkiFormat === "multilingual" ? "multilingual" : "legacy";
+    const canonical = format === "multilingual"
+      ? await pbpVocabSendCompleteRows(rows, owner, zhMap, zhTag)
+      : rows.map((w) => pbpVocabSendCanonicalRow(w, zhMap, zhTag));
+    if (format === "multilingual" && (await pbpVocabCurrentOwner()) !== owner) { flash(false, t("vocabAccountChanged")); return; }
     const res = await pbpAnkiSendRows(canonical, {
       deck: s.dictAnkiDeck || "Pinboard Vocab",
       key: s.dictAnkiKey || "",
       port,
+      format,
       ownerCheck: async () => (await pbpVocabCurrentOwner()) === owner
     });
     if ((await pbpVocabCurrentOwner()) !== owner) { flash(false, t("vocabAccountChanged")); return; }
@@ -246,7 +323,9 @@ async function pbpVocabSendToAnki({ flash, flush, port: clickedPort } = {}) {
       }
       flash(res.failed === 0, msg);
     } else if (res.stage === "modelMismatch") {
-      flash(false, t("dictAnkiModelMismatch"));
+      flash(false, format === "multilingual"
+        ? t("dictAnkiModelMismatchNamed", pbpAnkiModelDef(format).modelName)
+        : t("dictAnkiModelMismatch"));
     } else if (res.stage === "modelFields") {
       flash(false, t("dictAnkiFieldCheckFailed"));
     } else if (res.stage === "owner") {

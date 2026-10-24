@@ -4441,5 +4441,13 @@
   "vocabLookupBaseForm": { "message": "查询原形" },
   "vocabSaveDefinitionLabel": { "message": "要保存的释义" },
   "vocabSavedOutsideFilters": { "message": "已保存。该词不在当前筛选结果中。" },
-  "vocabShowSavedWord": { "message": "在列表中显示" }
+  "vocabShowSavedWord": { "message": "在列表中显示" },
+  "dictAnkiFormatLabel": { "message": "Anki 笔记格式" },
+  "dictAnkiFormatLegacy": { "message": "原版（六字段）" },
+  "dictAnkiFormatMultilingual": { "message": "多语言（完整信息）" },
+  "dictAnkiFormatHint": { "message": "多语言格式使用独立的笔记类型，可能在原有卡片之外新增卡片。重复发送会跳过已有笔记，不会更新内容。" },
+  "dictExportCompleteTsv": { "message": "导出完整 TSV" },
+  "dictExportLegacyTsv": { "message": "导出六字段 TSV" },
+  "vocabCompleteExportHint": { "message": "完整 TSV 包含语言、原形、笔记和每段语境对应的来源。恢复本扩展数据请使用 JSON 备份。" },
+  "dictAnkiModelMismatchNamed": {"message": "Anki 中的「$MODEL$」笔记类型字段不匹配。请恢复其原始字段，或将它重命名以便创建新的笔记类型，然后重试。", "placeholders": {"model": {"content": "$1"}}}
 }

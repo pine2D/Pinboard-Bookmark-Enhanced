@@ -1570,7 +1570,8 @@ check(optionsJs.includes('input[type="checkbox"]:not([data-no-autosave])') &&
   optionsJs.includes('input[type="text"]:not([data-no-autosave])') &&
   optionsJs.includes('select:not([data-no-autosave])'),
   "options.js: the autosave sweep dropped its [data-no-autosave] exclusion on the checkbox/text/select field families");
-check(/data-i18n="dictExportTsv"/.test(optionsHtml) && /data-i18n="dictAnkiSend"/.test(optionsHtml) &&
+check(/id="vocab-export-complete-btn"[^>]*data-i18n="dictExportCompleteTsv"/.test(optionsHtml) &&
+  /id="vocab-export-btn"[^>]*data-i18n="dictExportLegacyTsv"/.test(optionsHtml) && /data-i18n="dictAnkiSend"/.test(optionsHtml) &&
   /data-i18n="dictEudicSend"/.test(optionsHtml) && /data-i18n="dictEudicSupportedHint"/.test(optionsHtml) &&
   /data-i18n="dictPackImportHint"/.test(optionsHtml) &&
   /id="dict-pack-file"[^>]*accept="[^"]*\.txt[^"]*\.txt\.gz[^"]*\.zip/.test(optionsHtml),
@@ -4350,6 +4351,7 @@ for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-l
 // unwatched.
 {
   const DEFAULT_EQ_ALLOWLIST = {
+    "dict-anki-format": "Strict enum hydration: only multilingual opts into a separate model; absent or invalid values keep the legacy default.",
     // customOverlayCSS is not a SETTINGS_DEFAULTS key at all -- it is a
     // schema-v2 large-value field synced outside the settings.get() default
     // merge (shared.js:1187-1199, options.js ~1814), so there is nothing in

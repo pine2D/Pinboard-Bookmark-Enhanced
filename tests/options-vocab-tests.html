@@ -68,6 +68,7 @@ body{font-family:monospace;padding:16px}.case{padding:5px;border-bottom:1px soli
       </div>
       <div class="vocab-toolbar">
         <button type="button" class="btn btn-sm" id="vocab-export-btn">Export all (.tsv)</button>
+        <button type="button" class="btn btn-sm" id="vocab-export-complete-btn">Export complete vocabulary (.tsv)</button>
         <span class="save-status" id="vocab-status" role="status" aria-live="polite"></span>
       </div>
     </div>
@@ -1390,6 +1391,112 @@ delete document.documentElement.dataset.theme;
     hoverFailures.length === 0, hoverFailures.slice(0, 12).join("; "));
   delete document.documentElement.dataset.theme;
   hoverHost.remove();
+  // Complete export reads the real shared exporter and real browser SHA-256.
+  // Raw rows are independent stored-record fixtures, never writer-generated.
+  {
+    const original = { owner:pbpVocabCurrentOwner, all:pbpVocabAll, read:pbpReadSettingsWithSecrets,
+      ankiCall:pbpAnkiCall, ankiSend:pbpAnkiSendRows, zhMap:pbpVocabSendZhMap, zhTag:pbpVocabSendEcdictTag,
+      chrome:window.chrome, flush:window.pbpOptionsFlushAutoSave, digest:crypto.subtle.digest,
+      create:URL.createObjectURL, click:HTMLAnchorElement.prototype.click };
+    const first = { id:"acct_alice|en|gift", owner:"acct_alice", term:"Gift", language:"en", lemma:"give", ipa:"ɡɪft",
+      gloss:'A present.\n#A second line\twith "quotes" and <b>markup</b>.', note:'Keep <img src=x> as text.\r\nSecond note line.',
+      contexts:[{quote:'A "gift"\tarrived.\n#Still quoted text.',articleUrl:"https://one.example/path?a=1&b=2",articleTitle:"Artículo 中文",highlightId:"hl-one",createdAt:0},
+        {quote:"",articleUrl:"https://two.example/",createdAt:2}],
+      sourceUrl:"https://en.wiktionary.org/wiki/gift", license:"CC BY-SA 4.0", groups:["Two words","中文"],status:"known",createdAt:0,updatedAt:0,
+      versions:[{privateProtocol:"must not export"}] };
+    const second = { ...first,id:"acct_alice|de|gift",language:"de",lemma:null,gloss:"poison",contexts:[],groups:[],note:"",createdAt:3,updatedAt:4 };
+    let rows=[first,second], owner="acct_alice", format="legacy", downloads=[], payloads=[], flashes=[], digestCalls=0;
+    const flash=(ok,text)=>flashes.push({ok,text});
+    const digest = original.digest.bind(crypto.subtle);
+    const reset = () => { rows=[first,second];owner="acct_alice";format="legacy";downloads=[];payloads=[];flashes=[];digestCalls=0;
+      crypto.subtle.digest=(...args)=>{digestCalls++;return digest(...args);}; };
+    // Independent quoted-TSV reader, including multiline fields and doubled quotes.
+    const parseTsv = text => {
+      const lines=text.split("\n");const columns=(lines.find(line=>line.startsWith("#columns:"))||"").slice(9).split("\t");
+      while(lines.length&&lines[0].startsWith("#"))lines.shift();
+      const body=lines.join("\n"), records=[];let row=[],cell="",quoted=false;
+      for(let i=0;i<body.length;i++){
+        const ch=body[i];
+        if(ch==='"'){if(quoted&&body[i+1]==='"'){cell+='"';i++;}else quoted=!quoted;}
+        else if(!quoted&&(ch==='\t'||ch==='\n')){row.push(cell);cell="";if(ch==='\n'){records.push(row);row=[];}}
+        else cell+=ch;
+      }
+      if(cell||row.length){row.push(cell);records.push(row);}
+      return {columns,records};
+    };
+    try {
+      window.chrome={permissions:{request:async()=>true}};
+      window.pbpOptionsFlushAutoSave=async()=>({ok:true});
+      pbpVocabCurrentOwner=async()=>owner;
+      pbpVocabAll=async requested=>rows.filter(row=>row.owner===requested);
+      pbpReadSettingsWithSecrets=async()=>({dictAnkiPort:"8765",dictAnkiDeck:"Review",dictAnkiKey:"",dictAnkiFormat:format});
+      pbpAnkiCall=async()=>pbpAnkiParseResult('{"result":{"permission":"granted","version":6,"requireApiKey":false},"error":null}');
+      pbpAnkiSendRows=async(data,opts)=>{payloads.push({rows:data,format:opts.format});return {stage:"done",added:data.length,skipped:0,failed:0};};
+      pbpVocabSendZhMap=async()=>new Map([["gift",[{translation:"n. 礼物"}]]]);
+      pbpVocabSendEcdictTag=async()=>"ECDICT R1 abcdef01";
+      const blobs=new Map();URL.createObjectURL=blob=>{const url=original.create.call(URL,blob);blobs.set(url,blob);return url;};
+      HTMLAnchorElement.prototype.click=function(){downloads.push({name:this.download,blob:blobs.get(this.href)});};
+      reset();
+      await pbpVocabExportTsv({flash});
+      const legacy=await downloads[0].blob.text();
+      check("C default TSV keeps the existing six columns and avoids hashing",parseTsv(legacy).columns.join("|")==="Term|Reading|Definition|Context|Source|License"&&digestCalls===0);
+      check("C legacy TSV remains byte-identical to the established canonical projection",
+        legacy===pbpDictTsv(rows.map(row=>pbpVocabSendCanonicalRow(row,new Map([["gift",[{translation:"n. 礼物"}]]]),"ECDICT R1 abcdef01"))));
+      downloads=[];await pbpVocabExportTsv({flash,format:"malformed"});
+      check("C an unknown TSV format remains legacy",await downloads[0].blob.text()===legacy&&digestCalls===0);
+      downloads=[];await pbpVocabExportTsv({flash,format:"complete"});
+      const complete=await downloads[0].blob.text(), parsed=parseTsv(complete), record=Object.fromEntries(parsed.columns.map((key,index)=>[key,parsed.records[0]?.[index]]));
+      check("C complete TSV declares its schema and sixteen explicit columns",complete.includes("#pbp-vocab-schema:complete-v1\n")&&parsed.columns.join("|")==="WordID|Term|Language|Lemma|Reading|Definition|Note|ContextsJSON|DictionarySource|License|GroupsJSON|Status|CreatedAt|UpdatedAt|SupplementalDefinition|SupplementalSource");
+      check("C complete TSV has a distinct filename and plain-text mode",downloads[0].name.endsWith("-complete.tsv")&&complete.includes("#html:false\n"));
+      check("C complete TSV hashes every row once and keeps multilingual identities distinct",digestCalls===2&&record.WordID==="pbp-v1-11618b578fa55988ca222bd62662c418156b27e5276980ed65eb5e8778e1ea31"&&parsed.records[1]?.[0]==="pbp-v1-1e8e32795131801ba87a323a950082a9c838a9d1a53173a89f45b4953a1d1c0f");
+      check("C definition and note retain multiline quotes, tabs and HTML-looking text",record.Definition===first.gloss&&record.Note===first.note);
+      check("C every context and optional provenance field survives as JSON",record.ContextsJSON===JSON.stringify(first.contexts));
+      check("C groups, empty/zero timestamps and status retain their original values",record.GroupsJSON===JSON.stringify(first.groups)&&record.CreatedAt==="0"&&record.UpdatedAt==="0"&&record.Status==="known"&&parsed.records[1]?.[3]==="");
+      check("C dictionary provenance remains separate from article sources and supplemental definitions",record.DictionarySource===first.sourceUrl&&record.License===first.license&&record.SupplementalDefinition==="n. 礼物"&&record.SupplementalSource.includes("ECDICT R1 abcdef01"));
+      check("C complete export contains no raw owner identity or sync protocol metadata",!complete.includes("acct_alice")&&!complete.includes("privateProtocol")&&!complete.includes("must not export"));
+      const project=async(data,scope)=>typeof pbpVocabSendCompleteRows==="function"?pbpVocabSendCompleteRows(data,scope,new Map(),""):[];
+      const changed=await project([{...first,lemma:"donate",gloss:"new",note:"edited",groups:[],contexts:[],updatedAt:99}],"acct_alice");
+      check("C editing vocabulary content does not change its stable WordID",changed[0]?.wordId===record.WordID&&!!record.WordID);
+      const other=await project([{...first,id:"acct_bob|en|gift",owner:"acct_bob"}],"acct_bob");
+      check("C another owner gets a different locally hashed identity",other[0]?.wordId==="pbp-v1-a4e3967bfcc88b986185d56205070c2e4baa1c05b339319a2e3f439ab8006d76");
+      const regional=await project([{...first,id:"acct_alice|fr|défense",term:"De\u0301fense",language:"fr-CA"}],"acct_alice");
+      check("C NFC/primary-language identity validation preserves the saved display spelling and language tag",regional[0]?.wordId==="pbp-v1-69751917b8808febf3a829e6c762e8557a908af9064b12706c92b1eab64edc2c"&&regional[0]?.term==="De\u0301fense"&&regional[0]?.language==="fr-CA");
+      const invalid=[{...first,id:""},{...first,id:"acct_alice|de|gift"},{...first,owner:"acct_bob"},{...first,term:""},{...first,language:""}];
+      let rejected=0;for(const word of invalid){try{await project([word],"acct_alice");}catch(_){rejected++;}}
+      check("C missing or inconsistent canonical identities fail closed",rejected===invalid.length);
+      reset();format="multilingual";await pbpVocabSendToAnki({flash,port:"8765"});
+      check("C multilingual Anki receives the complete projection and explicit selected format",payloads[0]?.format==="multilingual"&&payloads[0]?.rows[0]?.wordId==="pbp-v1-11618b578fa55988ca222bd62662c418156b27e5276980ed65eb5e8778e1ea31");
+      check("C Anki full rows retain all contexts, note, base form and dictionary source",JSON.stringify(payloads[0]?.rows[0]?.contexts)===JSON.stringify(first.contexts)&&payloads[0]?.rows[0]?.note===first.note&&payloads[0]?.rows[0]?.lemma==="give"&&payloads[0]?.rows[0]?.dictionarySource===first.sourceUrl);
+      reset();format=undefined;await pbpVocabSendToAnki({flash,port:"8765"});format="malformed";await pbpVocabSendToAnki({flash,port:"8765"});
+      check("C absent/invalid Anki preference keeps legacy payloads and skips hashing",payloads.length===2&&payloads.every(p=>p.format==="legacy"&&!Object.hasOwn(p.rows[0],"wordId")&&typeof p.rows[0].contexts[0]==="string")&&digestCalls===0);
+      reset();await pbpVocabSendToAnki({flash,port:"8765",flush:async()=>{format="multilingual";return {ok:true};}});
+      check("C format is read after the settings flush",payloads[0]?.format==="multilingual");
+      for(const target of ["tsv","anki"]){
+        reset();format="multilingual";
+        crypto.subtle.digest=async(...args)=>{const out=await digest(...args);owner="acct_bob";return out;};
+        if(target==="tsv")await pbpVocabExportTsv({flash,format:"complete"});else await pbpVocabSendToAnki({flash,port:"8765"});
+        check("C "+target+" blocks output when the owner changes while local hashes are pending",downloads.length===0&&payloads.length===0&&flashes.at(-1)?.text.includes("vocabAccountChanged"));
+      }
+      for(const target of ["tsv","anki"]){
+        reset();format="multilingual";rows=[{...first,id:"wrong-id"}];
+        if(target==="tsv")await pbpVocabExportTsv({flash,format:"complete"});else await pbpVocabSendToAnki({flash,port:"8765"});
+        check("C "+target+" refuses malformed word identities before download/note dispatch",downloads.length===0&&payloads.length===0&&flashes.at(-1)?.ok===false);
+      }
+      reset();pbpAnkiSendRows=async()=>({stage:"modelMismatch"});format="multilingual";await pbpVocabSendToAnki({flash,port:"8765"});
+      check("C multilingual model mismatch names the separate model",flashes.at(-1)?.text.includes("dictAnkiModelMismatchNamed:Pinboard Vocab Multilingual"));
+      reset();await pbpVocabSendToAnki({flash,port:"8765"});
+      check("C legacy model mismatch preserves its existing message",flashes.at(-1)?.text==="dictAnkiModelMismatch");
+      reset();$id("vocab-export-complete-btn").click();
+      for(let i=0;i<100&&$id("vocab-export-complete-btn").disabled;i++)await new Promise(resolve=>setTimeout(resolve,5));
+      check("C the actual complete-export button chooses the complete format and settles both controls",downloads.length===1&&(await downloads[0].blob.text()).includes("#pbp-vocab-schema:complete-v1")&&!$id("vocab-export-complete-btn").disabled&&!$id("vocab-export-btn").disabled);
+    } finally {
+      pbpVocabCurrentOwner=original.owner;pbpVocabAll=original.all;pbpReadSettingsWithSecrets=original.read;
+      pbpAnkiCall=original.ankiCall;pbpAnkiSendRows=original.ankiSend;pbpVocabSendZhMap=original.zhMap;pbpVocabSendEcdictTag=original.zhTag;
+      if(original.chrome===undefined)delete window.chrome;else window.chrome=original.chrome;
+      if(original.flush===undefined)delete window.pbpOptionsFlushAutoSave;else window.pbpOptionsFlushAutoSave=original.flush;
+      crypto.subtle.digest=original.digest;URL.createObjectURL=original.create;HTMLAnchorElement.prototype.click=original.click;
+    }
+  }
   document.title = fail ? "FAIL options-vocab Tests" : "PASS options-vocab Tests";
 })();
 </script></body></html>

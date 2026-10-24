@@ -4447,5 +4447,13 @@
   "vocabLookupBaseForm": { "message": "Grundform nachschlagen" },
   "vocabSaveDefinitionLabel": { "message": "Zu speichernde Definition" },
   "vocabSavedOutsideFilters": { "message": "Gespeichert. Dieses Wort liegt außerhalb der aktuellen Filter." },
-  "vocabShowSavedWord": { "message": "In der Liste anzeigen" }
+  "vocabShowSavedWord": { "message": "In der Liste anzeigen" },
+  "dictAnkiFormatLabel": { "message": "Anki-Notizformat" },
+  "dictAnkiFormatLegacy": { "message": "Original (sechs Felder)" },
+  "dictAnkiFormatMultilingual": { "message": "Mehrsprachig (vollständige Angaben)" },
+  "dictAnkiFormatHint": { "message": "Das mehrsprachige Format nutzt einen eigenen Notiztyp und kann zusätzliche Karten neben den bisherigen anlegen. Erneutes Senden überspringt vorhandene Notizen, statt sie zu aktualisieren." },
+  "dictExportCompleteTsv": { "message": "Vollständige TSV exportieren" },
+  "dictExportLegacyTsv": { "message": "TSV mit sechs Feldern exportieren" },
+  "vocabCompleteExportHint": { "message": "Die vollständige TSV enthält Sprache, Grundform, Notizen und alle Kontexte mit ihren Quellen. Zum Wiederherstellen in dieser Erweiterung dient die JSON-Sicherung." },
+  "dictAnkiModelMismatchNamed": {"message": "Der Notiztyp „$MODEL$“ in Anki hat andere Felder. Stelle seine ursprünglichen Felder wieder her oder benenne ihn um, damit ein neuer Notiztyp erstellt werden kann. Versuche es dann erneut.", "placeholders": {"model": {"content": "$1"}}}
 }

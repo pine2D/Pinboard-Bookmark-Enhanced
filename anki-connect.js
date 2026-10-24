@@ -3,13 +3,10 @@
 // Send saved vocabulary to a locally running Anki via the AnkiConnect
 // add-on's HTTP API (http://127.0.0.1:8765, API v6). Pure helpers above
 // PURE END load in tests/anki-connect-tests.html via file://; the client
-// layer below runs only in options.html (options-vocab.js wires the button).
-// Known limit: the 6-field contract has no Language column, so same-spelled
-// terms across languages dedupe against each other inside one deck (matches
-// the TSV contract; accepted for v1). Language and the user's manual groups
-// DO travel as note tags -- tags sit outside the checked field envelope and
-// outside AnkiConnect's fields[0]-checksum dedupe, so adding them changes
-// no dedupe behaviour.
+// layer below is shared by the options and library vocabulary exports.
+// The default six-field contract remains compatible with existing notes.
+// Explicit multilingual export uses a separate model whose first field is a
+// stable WordID; neither path migrates or updates the other model's notes.
 // ============================================================
 
 // Port is user-configurable (AnkiConnect's own config allows changing it);
@@ -22,10 +19,16 @@ function pbpAnkiEndpointFor(port) {
 }
 const PBP_ANKI_MODEL = "Pinboard Vocab";
 const PBP_ANKI_FIELDS = ["Term", "Reading", "Definition", "Context", "Source", "License"];
+const PBP_ANKI_MULTILINGUAL_MODEL = "Pinboard Vocab Multilingual";
+const PBP_ANKI_MULTILINGUAL_FIELDS = Object.freeze([
+  "WordID", "Term", "Language", "Lemma", "Reading", "Definition", "Note", "Contexts",
+  "DictionarySource", "License", "Groups", "Status", "CreatedAt", "UpdatedAt",
+  "SupplementalDefinition", "SupplementalSource"
+]);
 
 // Anki fields are HTML. External dictionary content is DATA, never markup
 // (Yomitan advisory GHSA-g3p8-q34q-x686) -- escape every field; the only
-// markup a note ever contains is our own literal <br> joining contexts.
+// markup a note ever contains is our own static layout around escaped data.
 function pbpAnkiEscapeHtml(s) {
   return String(s == null ? "" : s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -38,14 +41,33 @@ function pbpAnkiTagify(s) {
   return String(s == null ? "" : s).trim().replace(/\s+/g, "-");
 }
 
-// row: the same canonical shape options-vocab.js feeds pbpDictTsv
-// ({term, reading, definition, contexts[], source, license}, plus language
-// and groups[] which only this builder reads) -- derived from the raw vocab
-// record, NEVER from already-HTML-escaped values (the TSV path stays
-// #html:false plain text).
-function pbpAnkiNoteFromRow(row, deck) {
+function _pbpAnkiContextsHtml(contexts) {
+  return (Array.isArray(contexts) ? contexts : []).filter(Boolean).map((context) => {
+    // These optional source details remain in the field for export/browser
+    // use without showing internal highlight ids or raw epochs on the card.
+    const metadata = (context.createdAt === undefined ? "" :
+      ' data-created-at="' + pbpAnkiEscapeHtml(context.createdAt) + '"') +
+      (context.highlightId === undefined ? "" :
+        ' data-highlight-id="' + pbpAnkiEscapeHtml(context.highlightId) + '"');
+    const source = [context.articleTitle, context.articleUrl].filter(Boolean)
+      .map(pbpAnkiEscapeHtml).join("<br>");
+    return '<div class="pbp-vocab-context"' + metadata + '><div class="pbp-vocab-text">' +
+      pbpAnkiEscapeHtml(context.quote) + "</div>" +
+      (source ? '<div class="pbp-vocab-source">' + source + "</div>" : "") + "</div>";
+  }).join("");
+}
+
+// Legacy rows share the six-field TSV projection, with quote-only contexts.
+// Multilingual rows come from the complete projection: wordId, user fields,
+// and context objects with individual sources. Both contain raw data, never
+// pre-escaped HTML (the TSV paths remain #html:false plain text).
+function pbpAnkiNoteFromRow(row, deck, format = "legacy") {
   const r = row || {};
-  const contexts = (Array.isArray(r.contexts) ? r.contexts : [])
+  const multilingual = format === "multilingual";
+  if (multilingual && (typeof r.wordId !== "string" || !/^pbp-v1-[0-9a-f]{64}$/.test(r.wordId))) {
+    throw new TypeError("invalid vocabulary identity");
+  }
+  const contexts = multilingual ? "" : (Array.isArray(r.contexts) ? r.contexts : [])
     .filter(Boolean).map(pbpAnkiEscapeHtml).join("<br>");
   // Groups are the vocab page's one organizational axis; dropping them made
   // every send land as an undifferentiated pile. They become plain tags
@@ -60,8 +82,25 @@ function pbpAnkiNoteFromRow(row, deck) {
   }
   return {
     deckName: String(deck || PBP_ANKI_MODEL),
-    modelName: PBP_ANKI_MODEL,
-    fields: {
+    modelName: multilingual ? PBP_ANKI_MULTILINGUAL_MODEL : PBP_ANKI_MODEL,
+    fields: multilingual ? {
+      WordID: r.wordId,
+      Term: pbpAnkiEscapeHtml(r.term),
+      Language: pbpAnkiEscapeHtml(r.language),
+      Lemma: pbpAnkiEscapeHtml(r.lemma),
+      Reading: pbpAnkiEscapeHtml(r.reading),
+      Definition: pbpAnkiEscapeHtml(r.definition),
+      Note: pbpAnkiEscapeHtml(r.note),
+      Contexts: _pbpAnkiContextsHtml(r.contexts),
+      DictionarySource: pbpAnkiEscapeHtml(r.dictionarySource),
+      License: pbpAnkiEscapeHtml(r.license),
+      Groups: (Array.isArray(r.groups) ? r.groups : []).map(pbpAnkiEscapeHtml).join("<br>"),
+      Status: pbpAnkiEscapeHtml(r.status),
+      CreatedAt: pbpAnkiEscapeHtml(r.createdAt),
+      UpdatedAt: pbpAnkiEscapeHtml(r.updatedAt),
+      SupplementalDefinition: pbpAnkiEscapeHtml(r.zh),
+      SupplementalSource: pbpAnkiEscapeHtml(r.zhNote)
+    } : {
       Term: pbpAnkiEscapeHtml(r.term),
       Reading: pbpAnkiEscapeHtml(r.reading),
       // Each piece is escaped on its OWN, then joined with our literal <br>.
@@ -82,9 +121,30 @@ function pbpAnkiNoteFromRow(row, deck) {
   };
 }
 
-// createModel params: 6 fields + one minimal Term->rest template. Pure
-// {{Field}} references only -- no scripts, no styling beyond a plain card.
-function pbpAnkiModelDef() {
+// Existing six-field models stay unchanged. The independent complete model
+// keeps management fields in Anki's browser while its card shows learning
+// content and sources. Only static markup and field/conditional references.
+function pbpAnkiModelDef(format = "legacy") {
+  if (format === "multilingual") {
+    return {
+      modelName: PBP_ANKI_MULTILINGUAL_MODEL,
+      inOrderFields: PBP_ANKI_MULTILINGUAL_FIELDS.slice(),
+      css: ".card { font-family: sans-serif; font-size: 18px; text-align: left; overflow-wrap: anywhere; } " +
+        ".pbp-vocab-text { white-space: pre-wrap; } .pbp-vocab-context { margin: 1em 0; } " +
+        ".pbp-vocab-source { font-size: 0.8em; margin-top: 0.4em; }",
+      cardTemplates: [{
+        Name: "Vocabulary",
+        Front: '<div class="pbp-vocab-text" lang="{{Language}}">{{Term}}</div>{{#Language}}<small>{{Language}}</small>{{/Language}}' +
+          '{{#Reading}}<div>{{Reading}}</div>{{/Reading}}',
+        Back: '{{FrontSide}}<hr id=answer><div class="pbp-vocab-text">{{Definition}}</div>' +
+          '{{#Lemma}}<p lang="{{Language}}">{{Lemma}}</p>{{/Lemma}}{{#Note}}<div class="pbp-vocab-text">{{Note}}</div>{{/Note}}' +
+          '{{#Contexts}}{{Contexts}}{{/Contexts}}{{#DictionarySource}}<div class="pbp-vocab-source">{{DictionarySource}}</div>{{/DictionarySource}}' +
+          '{{#License}}<div class="pbp-vocab-source">{{License}}</div>{{/License}}' +
+          '{{#SupplementalDefinition}}<div class="pbp-vocab-text">{{SupplementalDefinition}}</div>{{/SupplementalDefinition}}' +
+          '{{#SupplementalSource}}<div class="pbp-vocab-source">{{SupplementalSource}}</div>{{/SupplementalSource}}'
+      }]
+    };
+  }
   return {
     modelName: PBP_ANKI_MODEL,
     inOrderFields: PBP_ANKI_FIELDS.slice(),
@@ -117,20 +177,21 @@ function pbpAnkiParseResult(text) {
   return { ok: true, result: "result" in data ? data.result : null, error: null };
 }
 
-// Strict name+order equality against the 6-field contract. AnkiConnect
+// Strict name+order equality against the selected model's contract. AnkiConnect
 // silently drops values for field names the model doesn't have, so a
 // user-modified model must ABORT the send, never silently lose data.
-function pbpAnkiFieldsMatch(names) {
-  if (!Array.isArray(names) || names.length !== PBP_ANKI_FIELDS.length) return false;
-  for (let i = 0; i < PBP_ANKI_FIELDS.length; i++) {
-    if (names[i] !== PBP_ANKI_FIELDS[i]) return false;
+function pbpAnkiFieldsMatch(names, format = "legacy") {
+  const fields = format === "multilingual" ? PBP_ANKI_MULTILINGUAL_FIELDS : PBP_ANKI_FIELDS;
+  if (!Array.isArray(names) || names.length !== fields.length) return false;
+  for (let i = 0; i < fields.length; i++) {
+    if (names[i] !== fields[i]) return false;
   }
   return true;
 }
 
 // ---- PURE END ----
 
-// ---- Client (options.html only) -----------------------------------------
+// ---- Client (options.html and library.html) ------------------------------
 
 // No Content-Type header ON PURPOSE: a string body ships as text/plain,
 // which is CORS-simple and skips the OPTIONS preflight. Before an origin is
@@ -154,7 +215,7 @@ async function pbpAnkiCall(action, params, key, timeoutMs, port) {
   }
 }
 
-// Full send pipeline. opts: {deck, key, ownerCheck: async () => bool}.
+// Full send pipeline. opts: {deck, key, port, format, ownerCheck: async () => bool}.
 // ownerCheck re-derives the CURRENT owner and compares to the rows' owner --
 // called before every dispatch that follows a potentially long await
 // (fail-closed account isolation; the Anki permission dialog can sit open
@@ -164,28 +225,40 @@ async function pbpAnkiSendRows(rows, opts) {
   const key = (opts && opts.key) || "";
   const ownerCheck = (opts && opts.ownerCheck) || (async () => true);
   const port = (opts && opts.port) || "";
+  const format = opts?.format === "multilingual" ? "multilingual" : "legacy";
+  const modelName = format === "multilingual" ? PBP_ANKI_MULTILINGUAL_MODEL : PBP_ANKI_MODEL;
   // failedTerms names every counted failure so the UI can say WHICH words
   // need attention -- a bare count sent users re-sending the whole library.
   const out = { stage: "", added: 0, skipped: 0, failed: 0, failedTerms: [], error: null };
+  let notes;
+  try { notes = rows.map((r) => pbpAnkiNoteFromRow(r, deck, format)); }
+  catch (_) {
+    out.stage = "input";
+    out.error = "invalid vocabulary identity";
+    return out;
+  }
 
   // requestPermission/version/keyRequired happen in _pbpVocabSendAnki BEFORE
   // settings/owner (spec §3 ordering) -- this pipeline starts at createDeck.
+  if (!(await ownerCheck())) { out.stage = "owner"; out.error = "account changed"; return out; }
   const deckRes = await pbpAnkiCall("createDeck", { deck }, key, 10000, port); // idempotent
   if (!deckRes.ok) { out.stage = "deck"; out.error = deckRes.error; return out; }
 
+  if (!(await ownerCheck())) { out.stage = "owner"; out.error = "account changed"; return out; }
   const models = await pbpAnkiCall("modelNames", {}, key, 10000, port);
   if (!models.ok || !Array.isArray(models.result)) { out.stage = "model"; out.error = models.error || "modelNames failed"; return out; }
-  if (!models.result.includes(PBP_ANKI_MODEL)) {
-    const created = await pbpAnkiCall("createModel", pbpAnkiModelDef(), key, 10000, port);
+  if (!(await ownerCheck())) { out.stage = "owner"; out.error = "account changed"; return out; }
+  if (!models.result.includes(modelName)) {
+    const created = await pbpAnkiCall("createModel", pbpAnkiModelDef(format), key, 10000, port);
     if (!created.ok) { out.stage = "model"; out.error = created.error; return out; }
   } else {
-    const fields = await pbpAnkiCall("modelFieldNames", { modelName: PBP_ANKI_MODEL }, key, 10000, port);
+    const fields = await pbpAnkiCall("modelFieldNames", { modelName }, key, 10000, port);
     if (!fields.ok || !Array.isArray(fields.result)) {
       out.stage = "modelFields";
       out.error = fields.error || "modelFieldNames failed";
       return out;
     }
-    if (!pbpAnkiFieldsMatch(fields.result)) {
+    if (!pbpAnkiFieldsMatch(fields.result, format)) {
       // AnkiConnect silently drops values for unknown field names -- a
       // user-modified model must abort, never silently lose data.
       out.stage = "modelMismatch";
@@ -195,7 +268,6 @@ async function pbpAnkiSendRows(rows, opts) {
   }
 
   if (!(await ownerCheck())) { out.stage = "owner"; out.error = "account changed"; return out; }
-  const notes = rows.map((r) => pbpAnkiNoteFromRow(r, deck));
   const can = await pbpAnkiCall("canAddNotesWithErrorDetail", { notes }, key, 30000, port);
   if (!can.ok || !Array.isArray(can.result) || can.result.length !== notes.length) {
     out.stage = "precheck";

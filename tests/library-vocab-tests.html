@@ -70,6 +70,7 @@ body.test-scroll-region .vocab-list-region{max-height:60px;overflow-y:auto}
           <span id="vocab-count" class="notes-count" aria-live="polite"></span>
         </span>
         <div class="lib-cluster" role="group" aria-label="Selection actions">
+          <button type="button" class="btn btn-sm ghost" id="vocab-export-open" aria-haspopup="menu" aria-expanded="false">Export</button>
           <button type="button" class="btn btn-sm ghost lib-hang-end" id="vocab-select-all">Select all</button>
         </div>
       </div>
@@ -4258,6 +4259,68 @@ await (async () => {
       pbpVocabCurrentOwner = saved.owner; pbpVocabAll = saved.all; pbpVocabGet = saved.get; pbpVocabSaveWord = saved.save;
       _pbpDictSlotRun = saved.remote; _pbpDictEcdictSide = saved.local; _pbpVocabAutoLookup = saved.auto; pbpDictSpeak = saved.speak;
       _pbpVocabRenderDetail(null); _pbpVocabClearFilters();
+    }
+  }
+
+  // Both TSV downloads are whole-owner operations. Exercise the actual
+  // menu and click wiring; only the external send/download boundary is fake.
+  {
+    const names = ["pbpVocabExportTsv", "pbpVocabSendToAnki", "pbpVocabSendToEudic", "pbpVocabEudicReady"];
+    const previous = names.map(name => ({ name, had: name in window, value: window[name] }));
+    const calls = [];
+    const anchor = $id("vocab-export-open");
+    const owner = "acct_export_menu";
+    const rows = [
+      { id: "export-en", owner, term: "run", language: "en", gloss: "move", groups: [], contexts: [], status: "new", updatedAt: 2 },
+      { id: "export-de", owner, term: "gehen", language: "de", gloss: "walk", groups: [], contexts: [], status: "new", updatedAt: 1 }
+    ];
+    const menuItems = () => [...document.querySelectorAll(".vocab-export-menu [role=menuitem]")];
+    const clickChoice = async key => {
+      anchor.click(); await settle();
+      const choice = menuItems().find(item => item.textContent === key);
+      choice?.click(); await settle();
+    };
+    try {
+      window.pbpVocabExportTsv = opts => { calls.push({ kind: "tsv", opts }); };
+      window.pbpVocabSendToAnki = opts => { calls.push({ kind: "anki", opts }); };
+      window.pbpVocabSendToEudic = opts => { calls.push({ kind: "eudic", opts }); };
+      window.pbpVocabEudicReady = async () => true;
+      _vocabRenderGen++; _vocabCurrentOwner = owner; _vocabRows = rows;
+      _pbpVocabClearFilters(); _pbpVocabRefreshLanguageOptions(true); _pbpVocabApplyView(true);
+      $id("vocab-language-filter").value = "en";
+      $id("vocab-language-filter").dispatchEvent(new Event("change"));
+      _vocabSelected = new Set(["export-en"]); _pbpVocabSyncSelectionUi();
+      anchor.click(); await settle();
+      check("C export menu puts complete TSV first and legacy TSV second",
+        menuItems().slice(0, 2).map(item => item.textContent).join("|") === "dictExportCompleteTsv|dictExportLegacyTsv");
+      check("C complete TSV is the initially focused export choice",
+        document.activeElement === menuItems()[0] && document.activeElement.textContent === "dictExportCompleteTsv");
+      _pbpVocabCloseExportMenu(false);
+      await clickChoice("dictExportCompleteTsv");
+      check("C clicking complete TSV dispatches its explicit format to the shared exporter",
+        calls.at(-1)?.kind === "tsv" && calls.at(-1)?.opts.format === "complete" && typeof calls.at(-1)?.opts.flash === "function");
+      await clickChoice("dictExportLegacyTsv");
+      check("C clicking legacy TSV explicitly retains the six-column format",
+        calls.at(-1)?.kind === "tsv" && calls.at(-1)?.opts.format === "legacy");
+      check("C both TSV actions pass no filtered or selected rows and preserve the active view",
+        calls.length === 2 && calls.every(call => Object.keys(call.opts).sort().join(",") === "flash,format") &&
+        _vocabRows.length === 2 && _vocabViewRows.length === 1 && _vocabSelected.has("export-en") && $id("vocab-language-filter").value === "en");
+      await clickChoice("dictAnkiSend");
+      check("C Anki remains one action with shared settings deciding its format",
+        calls.at(-1)?.kind === "anki" && Object.keys(calls.at(-1).opts).join(",") === "flash");
+      await clickChoice("dictEudicSend");
+      check("C Eudic keeps the same whole-owner dispatch after the additional TSV item",
+        calls.at(-1)?.kind === "eudic" && Object.keys(calls.at(-1).opts).join(",") === "flash");
+      anchor.click(); await settle();
+      document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: "End", bubbles: true }));
+      const endIsSettings = document.activeElement === menuItems().at(-1) && document.activeElement.getAttribute("href") === "options.html#vocab";
+      document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: "Home", bubbles: true }));
+      check("C export keyboard navigation spans the extra format choice and returns to complete TSV",
+        endIsSettings && document.activeElement.textContent === "dictExportCompleteTsv");
+    } finally {
+      _pbpVocabCloseExportMenu(false);
+      for (const old of previous) { if (old.had) window[old.name] = old.value; else delete window[old.name]; }
+      _pbpVocabClearFilters(); _vocabSelected.clear(); _pbpVocabSyncSelectionUi();
     }
   }
 

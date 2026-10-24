@@ -4447,5 +4447,13 @@
   "vocabLookupBaseForm": { "message": "Rechercher la forme de base" },
   "vocabSaveDefinitionLabel": { "message": "Définition à enregistrer" },
   "vocabSavedOutsideFilters": { "message": "Enregistré. Ce mot ne correspond pas aux filtres actuels." },
-  "vocabShowSavedWord": { "message": "Afficher dans la liste" }
+  "vocabShowSavedWord": { "message": "Afficher dans la liste" },
+  "dictAnkiFormatLabel": { "message": "Format des notes Anki" },
+  "dictAnkiFormatLegacy": { "message": "Original (six champs)" },
+  "dictAnkiFormatMultilingual": { "message": "Multilingue (données complètes)" },
+  "dictAnkiFormatHint": { "message": "Le format multilingue utilise un type de note distinct et peut donc ajouter des cartes à côté des anciennes. Un nouvel envoi ignore les notes existantes sans les mettre à jour." },
+  "dictExportCompleteTsv": { "message": "Exporter le TSV complet" },
+  "dictExportLegacyTsv": { "message": "Exporter le TSV à six champs" },
+  "vocabCompleteExportHint": { "message": "Le TSV complet contient la langue, la forme de base, les notes et chaque contexte avec sa source. Utilisez la sauvegarde JSON pour restaurer les données dans l’extension." },
+  "dictAnkiModelMismatchNamed": {"message": "Le type de note « $MODEL$ » dans Anki comporte des champs différents. Rétablissez ses champs d’origine ou renommez-le pour permettre la création d’un nouveau type, puis réessayez.", "placeholders": {"model": {"content": "$1"}}}
 }
