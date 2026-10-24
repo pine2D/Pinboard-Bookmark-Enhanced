@@ -1222,3 +1222,207 @@ function _pbpEcdictWire() {
   _pbpEcdictRefreshStatus();
 }
 _pbpEcdictWire();
+
+// Multilingual packages are device resources, independent of Pinboard owners.
+// Inspection is read-only. The importer activates a replacement atomically;
+// cancelling or failing never deletes an installed package.
+let _pbpMultiPackPending = null;
+let _pbpMultiPackSeq = 0;
+let _pbpMultiPackRenderSeq = 0;
+let _pbpMultiPackBusy = false;
+let _pbpMultiPackController = null;
+
+function _pbpMultiPackError(error) {
+  if (error?.name === "AbortError") return "multiPackCancelled";
+  return ({ invalid_pack:"multiPackInvalid", invalid_language:"multiPackLanguageRequired",
+    language_required:"multiPackLanguageRequired", too_large:"multiPackTooLarge",
+    too_many_packs:"multiPackTooMany" })[error?.code] || "multiPackFailed";
+}
+function _pbpMultiPackReport(error) {
+  if(error?.name==="AbortError") return;
+  const expected=["invalid_pack","invalid_language","language_required","too_large","too_many_packs"].includes(error?.code);
+  (expected ? console.info:console.warn)("[dict-pack] import failed:",error?.name,error?.message);
+}
+function _pbpMultiPackStatus(key, tone = "pending", ...args) {
+  _pbpPackSetStatus($id("multi-pack-status"), t(key, ...args), tone);
+}
+function _pbpMultiPackLock(busy) {
+  _pbpMultiPackBusy = busy;
+  for (const id of ["multi-pack-choose", "multi-pack-install", "multi-pack-source-language", "multi-pack-target-language", "multi-pack-source-url", "multi-pack-license"]) {
+    const el = $id(id); if (el) el.disabled = busy;
+  }
+  for (const button of $id("multi-pack-list")?.querySelectorAll("button") || []) button.disabled = busy;
+}
+function _pbpMultiPackLanguage(code) {
+  try { return new Intl.DisplayNames([uiLangToBCP47()], {type:"language"}).of(code) || code; }
+  catch (_) { return code; }
+}
+function _pbpMultiPackLink(raw) {
+  try {
+    const u = new URL(raw);
+    return ["https:", "http:"].includes(u.protocol) && !u.username && !u.password ? u.href : "";
+  } catch (_) { return ""; }
+}
+async function _pbpMultiPackRefresh() {
+  const list = $id("multi-pack-list");
+  if (!list) return;
+  const seq = ++_pbpMultiPackRenderSeq;
+  try {
+    const packs = await pbpDictPackList();
+    if (seq !== _pbpMultiPackRenderSeq) return;
+    const frag = document.createDocumentFragment();
+    if (!packs.length) {
+      const empty = document.createElement("p"); empty.className="hint"; empty.textContent=t("multiPackEmpty"); frag.appendChild(empty);
+    }
+    for (const pack of packs) {
+      const row = document.createElement("div"); row.className="fg";
+      const name = document.createElement("div"); name.className="bl subhead dict-pack-name"; name.dir="auto";
+      name.textContent=pack.title; row.appendChild(name);
+      const meta = document.createElement("p"); meta.className="hint dict-pack-copy"; meta.dir="auto";
+      meta.textContent=t("multiPackSummary", _pbpMultiPackLanguage(pack.sourceLanguage), _pbpMultiPackLanguage(pack.targetLanguage), _pbpVocabNum(pack.entries), pack.revision || t("multiPackNotDeclared"));
+      row.appendChild(meta);
+      const provenance = document.createElement("p"); provenance.className="hint dict-pack-copy"; provenance.dir="auto";
+      provenance.textContent=pack.license || t("multiPackNotDeclared");
+      const source = _pbpMultiPackLink(pack.sourceUrl);
+      if (source) {
+        provenance.appendChild(document.createTextNode(" · "));
+        const a = document.createElement("a"); a.href=source; a.target="_blank"; a.rel="noopener noreferrer";
+        a.textContent=source; provenance.appendChild(a);
+      }
+      row.appendChild(provenance);
+      if (pack.attribution) {
+        const credits=document.createElement("p"); credits.className="hint dict-pack-copy"; credits.dir="auto"; credits.textContent=pack.attribution; row.appendChild(credits);
+      }
+      const actions=document.createElement("div"); actions.className="fg-actions";
+      for (const [action, key] of [["enabled",pack.enabled ? "multiPackDisable":"multiPackEnable"], ["ai",pack.aiAllowed ? "multiPackBlockAi":"multiPackAllowAi"], ["delete","delete"]]) {
+        const button=document.createElement("button"); button.type="button"; button.className="btn btn-sm"+(action==="delete" ? " danger":"");
+        button.textContent=t(key); button.dataset.packId=pack.id; button.dataset.packAction=action; button.disabled=_pbpMultiPackBusy;
+        button.addEventListener("click", () => {
+          if (_pbpMultiPackBusy) return;
+          const run=async () => {
+            if (_pbpMultiPackBusy) return;
+            const restore=document.activeElement===button;
+            _pbpMultiPackLock(true);
+            $id("multi-pack-status").textContent="";
+            try {
+              if (action==="delete") await pbpDictPackDelete(pack.id, pack.activeGeneration);
+              else if (action==="enabled") await pbpDictPackSetEnabled(pack.id, !pack.enabled);
+              else await pbpDictPackSetAiAllowed(pack.id, !pack.aiAllowed, pack.activeGeneration);
+              await _pbpMultiPackRefresh();
+            } catch (e) {
+              console.warn("[dict-pack] package action failed:", e?.name, e?.message);
+              _pbpMultiPackStatus("multiPackActionFailed", "bad");
+            } finally {
+              _pbpMultiPackLock(false);
+              if (restore) {
+                const target=Array.from(list.querySelectorAll("button")).find(b=>b.dataset.packId===pack.id && b.dataset.packAction===action);
+                (target || $id("multi-pack-choose"))?.focus({preventScroll:true});
+              }
+            }
+          };
+          if (action==="delete" || (action==="ai" && !pack.aiAllowed)) {
+            showConfirmPopover(button, {msg:t(action==="delete" ? "dictPackDeleteConfirm":"multiPackAiConfirm"), yesText:t(key), noText:t("cancel"), onConfirm:run});
+          } else run();
+        });
+        actions.appendChild(button);
+      }
+      row.appendChild(actions); frag.appendChild(row);
+    }
+    list.replaceChildren(frag);
+    const summary=$id("multi-pack-summary"); if(summary)summary.textContent=t("multiPackCount",_pbpVocabNum(packs.length));
+  } catch (e) {
+    if (seq !== _pbpMultiPackRenderSeq) return;
+    list.replaceChildren();
+    console.warn("[dict-pack] package list failed:", e?.name, e?.message);
+    _pbpMultiPackStatus("multiPackReadFailed", "bad");
+  }
+}
+async function _pbpMultiPackPrepare(file) {
+  if (!file || _pbpMultiPackBusy) return;
+  const seq=++_pbpMultiPackSeq;
+  _pbpMultiPackPending=null;
+  $id("multi-pack-preview").hidden=true;
+  _pbpMultiPackStatus("multiPackInspecting");
+  try {
+    const meta=await pbpYomitanInspectFile(file);
+    if (seq!==_pbpMultiPackSeq) return;
+    _pbpMultiPackPending={file,meta,seq};
+    $id("multi-pack-name").textContent=meta.title+(meta.revision ? " · "+meta.revision:"");
+    for(const [id,key] of [["source-language","sourceLanguage"],["target-language","targetLanguage"],["source-url","sourceUrl"],["license","license"]]) $id("multi-pack-"+id).value=meta[key] || "";
+    $id("multi-pack-preview").hidden=false;
+    $id("multi-pack-status").textContent="";
+    $id("multi-pack-source-language").focus({preventScroll:true});
+  } catch(e) {
+    _pbpMultiPackReport(e);
+    if(seq===_pbpMultiPackSeq) _pbpMultiPackStatus(_pbpMultiPackError(e),"bad");
+  }
+}
+async function _pbpMultiPackInstall() {
+  const pending=_pbpMultiPackPending;
+  if(!pending || _pbpMultiPackBusy) return;
+  const options={};
+  for(const [id,key] of [["source-language","sourceLanguage"],["target-language","targetLanguage"],["source-url","sourceUrl"],["license","license"]]) options[key]=$id("multi-pack-"+id).value.trim();
+  _pbpMultiPackLock(true);
+  let meta, installed;
+  try {
+    meta=await pbpYomitanInspectFile(pending.file,options);
+    installed=await pbpDictPackList();
+  } catch(e) { _pbpMultiPackReport(e); if(pending===_pbpMultiPackPending)_pbpMultiPackStatus(_pbpMultiPackError(e),"bad"); }
+  finally { _pbpMultiPackLock(false); }
+  if(!meta || !installed || pending!==_pbpMultiPackPending) return;
+  const run=async () => {
+    if(pending!==_pbpMultiPackPending || _pbpMultiPackBusy) return;
+    // A confirmation belongs to the reviewed metadata, not just the file.
+    // Reinspect edits and show a fresh replacement confirmation if needed.
+    for(const [id,key] of [["source-language","sourceLanguage"],["target-language","targetLanguage"],["source-url","sourceUrl"],["license","license"]]) {
+      if($id("multi-pack-"+id).value.trim()!==options[key]) return _pbpMultiPackInstall();
+    }
+    _pbpMultiPackLock(true);
+    const controller=new AbortController(); _pbpMultiPackController=controller;
+    let last=0;
+    try {
+      _pbpMultiPackStatus("dictPackImporting","pending","0");
+      const result=await pbpYomitanImportFile(pending.file,{...options,signal:controller.signal,onProgress:(progress)=>{
+        const now=performance.now(); if(now-last<1000)return; last=now;
+        _pbpMultiPackStatus("dictPackImporting","pending",_pbpVocabNum(progress.entries));
+      }});
+      _pbpMultiPackPending=null; $id("multi-pack-preview").hidden=true;
+      _pbpMultiPackStatus("dictPackDone","ok",_pbpVocabNum(result.entries));
+      await _pbpMultiPackRefresh();
+    } catch(e) {
+      _pbpMultiPackReport(e);
+      _pbpMultiPackStatus(_pbpMultiPackError(e), e?.name==="AbortError" ? "pending":"bad");
+    } finally {
+      _pbpMultiPackController=null; _pbpMultiPackLock(false);
+      if(!_pbpMultiPackPending)$id("multi-pack-choose").focus({preventScroll:true});
+    }
+  };
+  if(installed.some(pack=>pack.id===meta.id)) showConfirmPopover($id("multi-pack-install"), {msg:t("multiPackReplacing"),yesText:t("multiPackInstall"),noText:t("cancel"),onConfirm:run});
+  else await run();
+}
+function _pbpMultiPackWire() {
+  const section=$id("multi-pack-section");
+  if(!section || section.dataset.wired) return;
+  section.dataset.wired="true";
+  $id("multi-pack-choose").addEventListener("click",()=>{if(!_pbpMultiPackBusy)$id("multi-pack-file").click();});
+  $id("multi-pack-file").addEventListener("change",event=>{const file=event.target.files?.[0];event.target.value="";_pbpMultiPackPrepare(file);});
+  $id("multi-pack-install").addEventListener("click",_pbpMultiPackInstall);
+  $id("multi-pack-cancel").addEventListener("click",()=>{
+    if(_pbpMultiPackController){_pbpMultiPackController.abort();return;}
+    ++_pbpMultiPackSeq; _pbpMultiPackPending=null; $id("multi-pack-preview").hidden=true;
+    $id("multi-pack-choose").focus({preventScroll:true});
+  });
+  const languages=$id("multi-pack-languages");
+  if(languages) for(const code of ["ar","bg","bn","cs","da","de","el","en","es","fa","fi","fr","he","hi","hu","id","it","ja","ko","lt","nl","no","pl","pt","ro","ru","sk","sv","sw","ta","th","tr","uk","ur","vi","zh","zh-Hant"]) {
+    const option=document.createElement("option"); option.value=code;option.label=_pbpMultiPackLanguage(code);languages.appendChild(option);
+  }
+  window.addEventListener("pbp-dict-packs-changed", _pbpMultiPackRefresh);
+  window.addEventListener("focus", _pbpMultiPackRefresh);
+  try {
+    const channel=new BroadcastChannel("pbp-dict-packs");
+    channel.onmessage=_pbpMultiPackRefresh;
+    window.addEventListener("pagehide", ()=>channel.close(), {once:true});
+  } catch (_) { /* Focus refresh remains available without BroadcastChannel. */ }
+  _pbpMultiPackRefresh();
+}
+_pbpMultiPackWire();

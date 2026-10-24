@@ -1128,6 +1128,154 @@ section("pbpCedictLines");
   const zipRes = await pbpPackImportFile(zipFile, null);
   check("pbpPackImportFile imports a .zip end to end", zipRes.entries === 1);
 
+  section("Yomitan multilingual packs — official v3 schema, independent fixtures");
+  // Fixtures follow Yomitan's dictionary-index-schema.json and
+  // dictionary-term-bank-v3-schema.json, not a production row constructor.
+  {
+    async function ytest(name, fn) { try { check(name, await fn()); } catch (error) { check(name, false, error.name + ": " + error.message); } }
+    const enc = new TextEncoder();
+    function crc(bytes) { let c=0xffffffff; for(const b of bytes){c^=b;for(let i=0;i<8;i++)c=(c>>>1)^((c&1)?0xedb88320:0);}return(c^0xffffffff)>>>0; }
+    function zip(files) {
+      const locals=[],centrals=[];let offset=0;
+      for(const [name,content] of files){const n=enc.encode(name),d=enc.encode(typeof content==='string'?content:JSON.stringify(content)),sum=crc(d);
+        const l=new Uint8Array(30+n.length),lv=new DataView(l.buffer);lv.setUint32(0,0x04034b50,true);lv.setUint16(4,20,true);lv.setUint16(6,0x800,true);lv.setUint32(14,sum,true);lv.setUint32(18,d.length,true);lv.setUint32(22,d.length,true);lv.setUint16(26,n.length,true);l.set(n,30);
+        const c=new Uint8Array(46+n.length),cv=new DataView(c.buffer);cv.setUint32(0,0x02014b50,true);cv.setUint16(4,20,true);cv.setUint16(6,20,true);cv.setUint16(8,0x800,true);cv.setUint32(16,sum,true);cv.setUint32(20,d.length,true);cv.setUint32(24,d.length,true);cv.setUint16(28,n.length,true);cv.setUint32(42,offset,true);c.set(n,46);locals.push(l,d);centrals.push(c);offset+=l.length+d.length;
+      }
+      const end=new Uint8Array(22),v=new DataView(end.buffer);v.setUint32(0,0x06054b50,true);v.setUint16(8,files.length,true);v.setUint16(10,files.length,true);v.setUint32(12,centrals.reduce((n,c)=>n+c.length,0),true);v.setUint32(16,offset,true);return new File([...locals,...centrals,end],'fixture.zip');
+    }
+    const index={title:'Independent German',revision:'r1',format:3,sourceLanguage:'de',targetLanguage:'en',url:'https://example.org/dictionary',attribution:'Declared attribution',license:'CC BY-SA 4.0'};
+    const terms=[['ging','','verb','v',1,['went'],12,''],['Gift','','noun','n',2,[{type:'text',text:'poison'}],13,''],['gift','','noun','n',1,['lowercase distinction'],14,'']];
+    const pack=(meta=index,bank=terms,extra=[])=>zip([['index.json',meta],['term_bank_1.json',bank],...extra]);
+    const lookup=(term,extra={})=>pbpDictPackLookup(term,{sourceLanguage:'de',...extra});
+    const active=async()=> (await pbpDictPackList()).find(p=>p.title===index.title);
+    let firstId='', firstGeneration='';
+    await ytest('Yomitan inspect reads stable identity and declared languages without installing',async()=>{const m=await pbpYomitanInspectFile(pack());firstId=m.id;return /^yomitan-[0-9a-f]{64}$/.test(m.id)&&m.sourceLanguage==='de'&&m.targetLanguage==='en'&&!(await pbpDictPackList()).some(p=>p.id===m.id);});
+    await ytest('Yomitan import persists enabled metadata and starts AI permission off',async()=>{const m=await pbpYomitanImportFile(pack());firstId=m.id;firstGeneration=m.activeGeneration;return m.entries===3&&m.enabled===true&&m.aiAllowed===false&&m.sourceUrl===index.url&&m.license===index.license;});
+    await ytest('Yomitan lookup keeps exact case before folded candidates',async()=>{const r=await lookup('Gift');return r.state==='hit'&&r.hits.length===1&&r.hits[0].norm.word==='Gift'&&r.hits[0].norm.entries[0].senses[0].definition==='poison';});
+    await ytest('Yomitan folded lookup preserves the actual entry identity',async()=>{const r=await lookup('GIFT');return r.hits.some(h=>h.norm.word==='Gift')&&r.hits.some(h=>h.norm.word==='gift');});
+    await ytest('Yomitan source language isolates identical spelling',async()=>{const r=await pbpDictPackLookup('Gift',{sourceLanguage:'en'});return r.state==='unavailable'&&r.hits.length===0;});
+    await ytest('Yomitan missing word distinguishes installed-ready miss',async()=>(await lookup('absent')).state==='ready-miss');
+    await ytest('Yomitan normalization carries source, definition language, pack and AI provenance',async()=>{const n=(await lookup('ging')).hits[0].norm;return n.sourceLabel===index.title&&n.sourceUrl===index.url&&n.definitionLang==='en'&&n.sourceLanguage==='de'&&n.targetLanguage==='en'&&n.packId===firstId&&n.aiAllowed===false;});
+    await ytest('Yomitan packages do not overwrite another source’s same term',async()=>{await pbpYomitanImportFile(pack({...index,title:'Second German',license:''},[['Gift','','','',0,['different source'],1,'']]));return(await lookup('Gift')).hits.length===2;});
+    await ytest('Yomitan target filter selects definition language separately',async()=>{await pbpYomitanImportFile(pack({...index,title:'German for French',targetLanguage:'fr'},[['Gift','','','',0,['poison en français'],1,'']]));return(await lookup('Gift',{targetLanguage:'fr-CA'})).hits.length===1;});
+    await ytest('Yomitan source region and BCP47 casing normalize without losing the declared tag',async()=>{const m=await pbpYomitanImportFile(pack({...index,title:'Regional German',sourceLanguage:'de-AT',targetLanguage:'en-GB'}));return m.sourceLanguage==='de-AT'&&m.targetLanguage==='en-GB'&&(await lookup('ging',{packId:m.id})).hits[0].norm.definitionLang==='en-GB';});
+    await ytest('Yomitan disable persists and excludes the package from lookups',async()=>{await pbpDictPackSetEnabled(firstId,false);return(await active()).enabled===false&&!(await lookup('ging')).hits.some(h=>h.pack.id===firstId);});
+    await ytest('Yomitan re-enable and explicit AI permission apply independently',async()=>{await pbpDictPackSetEnabled(firstId,true);await pbpDictPackSetAiAllowed(firstId,true);return(await lookup('ging',{packId:firstId})).hits[0].norm.aiAllowed===true;});
+    await ytest('Yomitan a valid replacement resets AI permission and atomically changes generation',async()=>{const m=await pbpYomitanImportFile(pack({...index,revision:'r2'},[['neu','','','',0,['new'],1,'']]));return m.id===firstId&&m.activeGeneration!==firstGeneration&&!m.aiAllowed&&(await lookup('ging',{packId:firstId})).state==='ready-miss'&&(await lookup('neu',{packId:firstId})).state==='hit';});
+    await ytest('Yomitan replacement retains a deliberately disabled package',async()=>{await pbpDictPackSetEnabled(firstId,false);const m=await pbpYomitanImportFile(pack({...index,revision:'r3'},[['neu','','','',0,['kept disabled'],1,'']]));await pbpDictPackSetEnabled(firstId,true);return m.enabled===false;});
+    await ytest('Yomitan malformed later bank leaves the entire old ready generation queryable',async()=>{const old=await active();let rejected=false;try{await pbpYomitanImportFile(pack({...index,revision:'bad'},terms,[['term_bank_2.json',[[1]]]]));}catch(_){rejected=true;}const now=await active();return rejected&&old.activeGeneration===now.activeGeneration&&(await lookup('neu',{packId:firstId})).state==='hit';});
+    await ytest('Yomitan explicit abort after staging leaves the old ready generation intact',async()=>{const old=await active(),ctrl=new AbortController();let rejected=false;try{await pbpYomitanImportFile(pack({...index,revision:'cancel'},terms),{signal:ctrl.signal,onProgress:p=>{if(p.phase==='staging')ctrl.abort();}});}catch(e){rejected=e.name==='AbortError';}return rejected&&(await active()).activeGeneration===old.activeGeneration;});
+    await ytest('Yomitan unknown format is rejected before replacing old data',async()=>{let rejected=false;try{await pbpYomitanImportFile(pack({...index,format:99}));}catch(_){rejected=true;}return rejected&&(await active()).revision==='r3';});
+    await ytest('Yomitan absent languages require explicit user completion rather than UI guesses',async()=>{const unknown={title:'Unknown language',revision:'1',format:3};const p=await pbpYomitanInspectFile(pack(unknown));let rejected=false;try{await pbpYomitanImportFile(pack(unknown));}catch(e){rejected=e.code==='language_required';}return p.id===null&&p.missingLanguages.length===2&&rejected;});
+    await ytest('Yomitan user-supplied language metadata permits importing legacy metadata',async()=>{const m=await pbpYomitanImportFile(pack({title:'Explicit languages',revision:'1',format:3}),{sourceLanguage:'de',targetLanguage:'es'});return m.sourceLanguage==='de'&&m.targetLanguage==='es'&&m.license==='';});
+    await ytest('Yomitan licenses are not inferred from titles, URLs or descriptions',async()=>{const m=await pbpYomitanInspectFile(pack({title:'Wiktionary CC-BY-SA',revision:'1',format:3,sourceLanguage:'de',targetLanguage:'en',url:'https://wiktionary.org',description:'Creative Commons data'}));return m.license==='';});
+    await ytest('Yomitan executable URLs are rejected as source provenance',async()=>{let rejected=false;try{await pbpYomitanInspectFile(pack({...index,url:'javascript:alert(1)'}));}catch(_){rejected=true;}return rejected;});
+    await ytest('Yomitan structured content extracts text and ignores styling without executing markup',async()=>{const term=['安全','あんぜん','adj-na','adj-na',0,[{type:'structured-content',content:{tag:'div',style:{color:'red'},data:{content:'glossary'},content:[{tag:'span',content:'safe'}, {tag:'br'}, {tag:'a',href:'https://example.org',content:'secure'}]}}],42,''];const m=await pbpYomitanImportFile(pack({...index,title:'Japanese structured',sourceLanguage:'ja'},[term],[['styles.css','body{display:none}']]));const n=(await pbpDictPackLookup('安全',{sourceLanguage:'ja',packId:m.id})).hits[0].norm;return n.entries[0].senses[0].definition==='safe\nsecure'&&n.entries[0].ipas[0].tags.includes('Reading')&&n.entries[0].ipas[0].text==='あんぜん';});
+    await ytest('Yomitan reading index returns actual Japanese spellings as separate hits',async()=>{const m=await pbpYomitanImportFile(pack({...index,title:'Japanese readings',sourceLanguage:'ja'},[['橋','はし','','',0,['bridge'],1,''],['箸','はし','','',0,['chopsticks'],2,'']]));const r=await pbpDictPackLookup('はし',{sourceLanguage:'ja',packId:m.id});return r.hits.map(h=>h.norm.word).sort().join('|')===['橋','箸'].sort().join('|');});
+    await ytest('Yomitan unknown structured tags are rejected as unsupported schema',async()=>{let rejected=false;try{await pbpYomitanImportFile(pack({...index,revision:'script'},[['bad','','','',0,[{type:'structured-content',content:{tag:'script',content:'alert(1)'}}],1,'']]));}catch(_){rejected=true;}return rejected;});
+    await ytest('Yomitan HTML-looking plain text remains literal data',async()=>{const m=await pbpYomitanImportFile(pack({...index,title:'Literal text'},[['literal','','','',0,['<img src=x onerror=alert(1)>'],1,'']]));return(await lookup('literal',{packId:m.id})).hits[0].norm.entries[0].senses[0].definition==='<img src=x onerror=alert(1)>';});
+    await ytest('Yomitan declared deinflection tuples retain the base-form relation',async()=>{const m=await pbpYomitanImportFile(pack({...index,title:'Form pointers'},[['ging','','','',0,[['gehen',['past']]],1,'']]));const h=(await lookup('ging',{packId:m.id})).hits[0];return h.rows[0].lemmas[0].term==='gehen'&&h.norm.formOfOnly===true;});
+    await ytest('Yomitan result limit is explicit and does not silently overrun',async()=>{const r=await lookup('Gift',{limit:1});return r.hits.length===1&&r.truncated===true&&Array.isArray(r.truncatedPackIds)&&r.truncatedPackIds.length>0;});
+    await ytest('Yomitan metadata and lookup survive closing and reopening the database',async()=>{const db=await _pbpMultiOpenDB();db.close();_pbpMultiDbPromise=null;return(await active()).revision==='r3'&&(await lookup('neu',{packId:firstId})).state==='hit';});
+    await ytest('Yomitan uninstall removes metadata and prevents further hits',async()=>{await pbpDictPackDelete(firstId);return!(await active())&&(await lookup('neu',{packId:firstId})).state==='unavailable';});
+    await ytest('Yomitan unknown mutation ids do not create ghost packages',async()=>!(await pbpDictPackSetEnabled('absent',true))&&!(await pbpDictPackSetAiAllowed('absent',true))&&!(await pbpDictPackDelete('absent')));
+    await ytest('Yomitan import and a later delete serialize without resurrecting the package',async()=>{const inspect=await pbpYomitanInspectFile(pack());const importing=pbpYomitanImportFile(pack());const deleting=pbpDictPackDelete(inspect.id);await Promise.all([importing,deleting]);return!(await pbpDictPackList()).some(p=>p.id===inspect.id);});
+    // Independently encode DEFLATE with data descriptors, the streamed ZIP
+    // layout used by exporters; rows remain hand-written schema fixtures.
+    async function compressedZip(files, corrupt=false) {
+      const locals=[], centrals=[]; let offset=0;
+      for(const [name,content] of files){
+        const n=enc.encode(name), raw=enc.encode(JSON.stringify(content)), sum=crc(raw);
+        const data=corrupt&&name.startsWith('term_')?new Uint8Array([255,255,255]):new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer());
+        const l=new Uint8Array(30+n.length),lv=new DataView(l.buffer);lv.setUint32(0,0x04034b50,true);lv.setUint16(4,20,true);lv.setUint16(6,0x808,true);lv.setUint16(8,8,true);lv.setUint16(26,n.length,true);l.set(n,30);
+        const d=new Uint8Array(16),dv=new DataView(d.buffer);dv.setUint32(0,0x08074b50,true);dv.setUint32(4,sum,true);dv.setUint32(8,data.length,true);dv.setUint32(12,raw.length,true);
+        const c=new Uint8Array(46+n.length),cv=new DataView(c.buffer);cv.setUint32(0,0x02014b50,true);cv.setUint16(4,20,true);cv.setUint16(6,20,true);cv.setUint16(8,0x808,true);cv.setUint16(10,8,true);cv.setUint32(16,sum,true);cv.setUint32(20,data.length,true);cv.setUint32(24,raw.length,true);cv.setUint16(28,n.length,true);cv.setUint32(42,offset,true);c.set(n,46);
+        locals.push(l,data,d);centrals.push(c);offset+=l.length+data.length+d.length;
+      }
+      const e=new Uint8Array(22),v=new DataView(e.buffer);v.setUint32(0,0x06054b50,true);v.setUint16(8,files.length,true);v.setUint16(10,files.length,true);v.setUint32(12,centrals.reduce((n,c)=>n+c.length,0),true);v.setUint32(16,offset,true);
+      return new File([...locals,...centrals,e],'streamed.zip');
+    }
+    await ytest('Yomitan DEFLATE members with signed data descriptors import intact',async()=>{const m=await pbpYomitanImportFile(await compressedZip([['index.json',index],['term_bank_1.json',terms]]));firstId=m.id;return m.entries===3&&(await lookup('ging',{packId:m.id})).hits[0].norm.entries[0].senses[0].definition==='went';});
+    await ytest('Yomitan corrupt compressed bank is invalid_pack rather than a storage failure',async()=>{const old=await active();try{await pbpYomitanImportFile(await compressedZip([['index.json',index],['term_bank_1.json',terms]],true));return false;}catch(e){return e.code==='invalid_pack'&&(await active()).activeGeneration===old.activeGeneration;}});
+    await ytest('Yomitan inspect maps native numeric DOMException codes to product string codes',async()=>{try{await pbpYomitanInspectFile({size:40,slice(){throw new DOMException('Fixture unreadable','InvalidStateError');}});return false;}catch(e){return e.code==='invalid_pack';}});
+    await ytest('Yomitan a mid-staging transaction abort retains old metadata and terms',async()=>{const old=await active(),put=IDBObjectStore.prototype.put;let n=0,rejected=false;try{IDBObjectStore.prototype.put=function(...args){const r=put.apply(this,args);if(this.name==='terms'&&++n===2)r.addEventListener('success',()=>this.transaction.abort());return r;};try{await pbpYomitanImportFile(pack({...index,revision:'staging-fail'},terms));}catch(e){rejected=e.code==='storage';}}finally{IDBObjectStore.prototype.put=put;}return rejected&&(await active()).activeGeneration===old.activeGeneration&&(await lookup('ging',{packId:firstId})).state==='hit';});
+    await ytest('Yomitan activation transaction abort preserves both the old pointer and old rows',async()=>{const old=await active(),put=IDBObjectStore.prototype.put;let rejected=false;try{IDBObjectStore.prototype.put=function(...args){const r=put.apply(this,args);if(this.name==='packs'&&args[0]?.revision==='activation-fail')r.addEventListener('success',()=>this.transaction.abort());return r;};try{await pbpYomitanImportFile(pack({...index,revision:'activation-fail'},[['replacement','','','',0,['new'],1,'']]));}catch(e){rejected=e.code==='storage';}}finally{IDBObjectStore.prototype.put=put;}return rejected&&(await active()).activeGeneration===old.activeGeneration&&(await lookup('ging',{packId:firstId})).state==='hit'&&(await lookup('replacement',{packId:firstId})).state==='ready-miss';});
+    await ytest('Yomitan restart removes orphan staging generations while retaining active terms',async()=>{let db=await _pbpMultiOpenDB();await new Promise((resolve,reject)=>{const tx=db.transaction(['generations','terms'],'readwrite');tx.objectStore('generations').put({id:'orphan-fixture',packId:firstId});tx.objectStore('terms').put({generation:'orphan-fixture',row:1,term:'orphan'});tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);});db.close();_pbpMultiDbPromise=null;await pbpDictPackList();await navigator.locks.request('pbp-multidict-write',()=>{});db=await _pbpMultiOpenDB();const remaining=await new Promise((resolve,reject)=>{const r=db.transaction('generations').objectStore('generations').get('orphan-fixture');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});return !remaining&&(await lookup('ging',{packId:firstId})).state==='hit';});
+    await ytest('Yomitan malformed language tags fail before any installation',async()=>{for(const tag of ['en_US',' en','en-@','']){try{await pbpYomitanImportFile(pack({...index,title:'Invalid language',sourceLanguage:tag}));return false;}catch(e){if(!['invalid_language','language_required'].includes(e.code))return false;}}return!(await pbpDictPackList()).some(m=>m.title==='Invalid language');});
+    await ytest('Yomitan explicit metadata overrides retain identity and declared provenance',async()=>{const m=await pbpYomitanInspectFile(pack({...index,sourceLanguage:'ja',targetLanguage:'fr'}),{sourceLanguage:'de',targetLanguage:'en',sourceUrl:'https://example.net/revised',license:'User declaration'});return m.id===firstId&&m.sourceUrl==='https://example.net/revised'&&m.license==='User declaration';});
+    await ytest('Yomitan committed settings changes notify the active page',async()=>{const events=[],listen=e=>events.push(e.detail);window.addEventListener('pbp-dict-packs-changed',listen);try{await pbpDictPackSetEnabled(firstId,false);await pbpDictPackSetAiAllowed(firstId,true);await pbpDictPackSetEnabled(firstId,true);}finally{window.removeEventListener('pbp-dict-packs-changed',listen);}return events.map(e=>e.action).join('|')==='enabled|aiAllowed|enabled'&&events.every(e=>e.type==='changed'&&e.id===firstId);});
+    await ytest('Yomitan cancel while queued behind another writer rejects before that writer releases',async()=>{let release,acquired;const ready=new Promise(r=>acquired=r),held=navigator.locks.request('pbp-multidict-write',()=>{acquired();return new Promise(r=>release=r);});await ready;const controller=new AbortController(),pending=pbpYomitanImportFile(pack(),{signal:controller.signal}).then(()=>false,e=>e.name==='AbortError');controller.abort();const cancelled=await Promise.race([pending,new Promise(r=>setTimeout(()=>r(false),100))]);release();await held;await pending;return cancelled;});
+    await ytest('Yomitan source and definition languages must name a concrete language',async()=>{for(const field of ['sourceLanguage','targetLanguage'])for(const tag of ['und','mul','zxx','und-Latn']){try{await pbpYomitanInspectFile(pack({...index,[field]:tag}));return false;}catch(e){if(e.code!=='invalid_language')return false;}}return true;});
+    {
+// Independent ZIP fixtures for import-boundary review. No production ZIP writer.
+const utf8=value=>new TextEncoder().encode(value);
+const concat=arrays=>{const out=new Uint8Array(arrays.reduce((n,x)=>n+x.length,0));let pos=0;for(const x of arrays){out.set(x,pos);pos+=x.length;}return out;};
+const crc32=bytes=>{let crc=0xffffffff;for(const b of bytes){crc^=b;for(let i=0;i<8;i++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}return (crc^0xffffffff)>>>0;};
+const header=(length,fields)=>{const bytes=new Uint8Array(length),view=new DataView(bytes.buffer);for(const [offset,width,value] of fields)view[width===2?'setUint16':'setUint32'](offset,value,true);return bytes;};
+function storedZip(entries,{comment='',endPatch={}}={}){
+ const locals=[],centrals=[];let offset=0;
+ for(const entry of entries){
+  const data=typeof entry.data==='string'?utf8(entry.data):entry.data;
+  const localName=utf8(entry.localName??entry.name),centralName=utf8(entry.name);
+  const flags=entry.flags??0,method=entry.method??0,crc=entry.crc??crc32(data),csize=entry.csize??data.length,usize=entry.usize??data.length;
+  const local=header(30,[[0,4,0x04034b50],[4,2,20],[6,2,entry.localFlags??flags],[8,2,entry.localMethod??method],[14,4,entry.localCrc??crc],[18,4,entry.localCsize??csize],[22,4,entry.localUsize??usize],[26,2,localName.length],[28,2,0]]);
+  const central=header(46,[[0,4,0x02014b50],[4,2,0x0314],[6,2,20],[8,2,flags],[10,2,method],[16,4,crc],[20,4,csize],[24,4,usize],[28,2,centralName.length],[30,2,0],[32,2,0],[34,2,entry.disk??0],[38,4,entry.externalAttrs??0],[42,4,entry.offset??offset]]);
+  const part=concat([local,localName,data]);locals.push(part);centrals.push(concat([central,centralName]));offset+=part.length;
+ }
+ const central=concat(centrals),commentBytes=utf8(comment);
+ const end=header(22,[[0,4,0x06054b50],[4,2,endPatch.disk??0],[6,2,endPatch.centralDisk??0],[8,2,endPatch.diskCount??entries.length],[10,2,endPatch.count??entries.length],[12,4,endPatch.centralSize??central.length],[16,4,endPatch.centralOffset??offset],[20,2,commentBytes.length]]);
+ return concat([...locals,central,end,commentBytes]);
+}
+const index=revision=>JSON.stringify({title:'Independent ZIP safety fixture',format:3,revision,sequenced:true,author:'QA fixture',description:'Synthetic local test data'});
+const bank=JSON.stringify([['house','','noun','',0,['A fixture dwelling.'],1,'']]);
+const entries=(revision='new')=>[{name:'index.json',data:index(revision)},{name:'term_bank_1.json',data:bank},{name:'tag_bank_1.json',data:JSON.stringify([['noun','partOfSpeech',0,'noun',0]])}];
+const change=(field,value,entryIndex=1)=>{const e=entries();e[entryIndex][field]=value;return storedZip(e);};
+const validOldZip=storedZip(entries('old'));
+const validNewZip=storedZip(entries('new'));
+const zipSafetyCases=[
+ ['local-central-name-mismatch',change('localName','term_bank_9.json')],
+ ['parent-traversal',change('name','../term_bank_1.json')],
+ ['backslash-path',change('name','folder\\term_bank_1.json')],
+ ['absolute-path',change('name','/term_bank_1.json')],
+ ['drive-path',change('name','C:/term_bank_1.json')],
+ ['nul-name',change('name','term_bank_1.json\u0000extra')],
+ ['duplicate-index',storedZip([...entries(),{name:'index.json',data:index('evil')}])],
+ ['duplicate-bank',storedZip([...entries(),{name:'term_bank_1.json',data:bank}])],
+ ['crc-mismatch-payload',change('crc',0)],
+ ['crc-local-central-mismatch',change('localCrc',0)],
+ ['truncated-eocd',validNewZip.slice(0,-4)],
+ ['truncated-central-offset',storedZip(entries(),{endPatch:{centralOffset:0xfffffff0}})],
+ ['declared-uncompressed-too-small',change('usize',1)],
+ ['declared-compressed-too-small',change('csize',1)],
+ ['declared-uncompressed-over-cap',change('usize',0x7ffffffe)],
+ ['declared-compressed-over-cap',change('csize',0x7ffffffe)],
+ ['encrypted',change('flags',1)],
+ ['local-encrypted-only',change('localFlags',1)],
+ ['zip64-size-sentinel',change('usize',0xffffffff)],
+ ['zip64-eocd-sentinel',storedZip(entries(),{endPatch:{count:0xffff}})],
+ ['unsupported-compression',change('method',99)],
+ ['compression-local-central-mismatch',change('localMethod',8)],
+ ['multi-disk',storedZip(entries(),{endPatch:{disk:1}})],
+ ['entry-other-disk',change('disk',1)],
+ ['overlapping-local-offset',change('offset',0)],
+ ['symlink-entry',change('externalAttrs',(0xa1ff<<16)>>>0)]
+].map(([name,bytes])=>({name,bytes}));
+
+
+const options={sourceLanguage:'en',targetLanguage:'en'};
+let baseline;
+await ytest('Yomitan independent ZIP fixture installs with exact metadata and text',async()=>{baseline=await pbpYomitanImportFile(new File([validOldZip],'old.zip'),options);return baseline.revision==='old'&&(await pbpDictPackLookup('house',{...options,packId:baseline.id})).state==='hit';});
+const snapshot=async()=>JSON.stringify({meta:(await pbpDictPackList()).find(p=>p.id===baseline.id),lookup:await pbpDictPackLookup('house',{...options,packId:baseline.id})});
+for(const item of zipSafetyCases)await ytest('Yomitan archive rejects '+item.name+' and retains all old metadata and rows',async()=>{const before=await snapshot();let rejected=false;try{await pbpYomitanImportFile(new File([item.bytes],item.name+'.zip'),options);}catch(e){rejected=['invalid_pack','too_large'].includes(e.code);}return rejected&&before===await snapshot();});
+await ytest('Yomitan independent valid replacement switches only the expected active package',async()=>{const next=await pbpYomitanImportFile(new File([validNewZip],'new.zip'),options);return next.id===baseline.id&&next.revision==='new'&&next.activeGeneration!==baseline.activeGeneration&&(await pbpDictPackList()).filter(p=>p.id===baseline.id).length===1;});
+    }
+    await ytest('Yomitan bundled nested font licenses are inert metadata as in Jitendex 2026.10.03',async()=>{const m=await pbpYomitanImportFile(pack({...index,title:'Nested license fixture'},terms,[['jitendex/HanaMinA/LICENSE','Public-domain font license'],['jitendex/HanaMinA/font.woff2','unused media bytes']]));return m.entries===3&&m.ignoredFiles===2;});
+    await ytest('Yomitan stale confirmations cannot authorize AI or delete a replacement generation',async()=>{const old=await pbpYomitanImportFile(pack({...index,title:'Confirmation race'}));const next=await pbpYomitanImportFile(pack({...index,title:'Confirmation race',revision:'new'}));let blocked=0;for(const action of [()=>pbpDictPackSetAiAllowed(old.id,true,old.activeGeneration),()=>pbpDictPackDelete(old.id,old.activeGeneration)])try{await action();}catch(e){if(e.code==='stale_pack')blocked++;}const stored=(await pbpDictPackList()).find(p=>p.id===next.id);return blocked===2&&stored?.activeGeneration===next.activeGeneration&&stored.aiAllowed===false;});
+    await ytest('Yomitan confirmations for the current generation can authorize AI and remove it',async()=>{const m=await pbpYomitanImportFile(pack({...index,title:'Current confirmation'}));return await pbpDictPackSetAiAllowed(m.id,true,m.activeGeneration)&&await pbpDictPackDelete(m.id,m.activeGeneration)&&!(await pbpDictPackList()).some(p=>p.id===m.id);});
+    await ytest('Yomitan normalized results carry their exact package generation and revision',async()=>{const m=await pbpYomitanImportFile(pack({...index,title:'Generation provenance',revision:'exact-revision'}));const n=(await lookup('ging',{packId:m.id})).hits[0].norm;return n.generation===m.activeGeneration&&n.revision===m.revision;});
+    if(typeof pbpDictPackList==='function')for(const m of await pbpDictPackList())await pbpDictPackDelete(m.id);
+  }
+
   document.getElementById("summary").textContent = pass + " passed, " + fail + " failed";
 })();
 </script>

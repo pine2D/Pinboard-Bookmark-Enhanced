@@ -28,7 +28,7 @@ const row = (id, driver, step, surfaces, features, kinds = ['interaction'], axes
   files: [...new Set(surfaces.flatMap(surface => files[surface] || []))], dependencies: [], axes: { ...runtimeAxes, ...axes }, ...extra,
 });
 export const QA_SCENARIOS = [
-  ...QA_OPTIONS_PANELS.map(panel => row(`options.panel.${panel}`, 'options', panel, ['options'], [panel, 'settings'], ['interaction', 'layout'])),
+  ...QA_OPTIONS_PANELS.map(panel => row(`options.panel.${panel}`, 'options', panel, ['options'], [panel, 'settings', ...(panel === 'vocab' ? ['dictionary-packs'] : [])], ['interaction', 'layout'], {}, panel === 'vocab' ? { files: [...files.options, 'dict-pack.js', 'scripts/audit-vocab-pack-fixture.mjs'] } : {})),
   ...QA_OPTIONS_PANELS.map(panel => row(`options.layout.${panel}`, 'layouts', `options-${panel}`, ['options'], [panel, 'settings'], ['layout'], narrowAxes)),
   row('options.locale-refresh', 'options-save', 'locale-refresh', ['options'], ['settings', 'locale'], ['interaction']),
   row('options.save-failure', 'options-save', 'save-failure', ['options'], ['settings', 'save', 'retry'], ['interaction', 'layout', 'error'], narrowAxes),

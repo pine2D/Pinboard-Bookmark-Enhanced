@@ -104,6 +104,7 @@ import { cr, hexRgb, parseRgba, composite } from "../docs/theme-surface/tools/co
 import { CHIP_TARGETS } from "../docs/theme-surface/composers/ui-components.mjs";
 // Options density per theme, from the pilots (docs/theme-surface/tools/options-density.mjs).
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
+import { openVocabPackPreview, installVocabPackFixture } from "./audit-vocab-pack-fixture.mjs";
 // Family 14's fill-separation floor (spec 2026-09-30-ui-fields-stage4-design
 // §2.3 F1-F3) is the derivation's own constant, imported, never a hand-typed
 // 1.10; its frame step measures perceptual distance with the same CIEDE2000
@@ -8815,6 +8816,15 @@ async function runSweep(page, sw, extBase) {
         await presetBtn.click(); await page.waitForTimeout(150);
       }
       await scan("options", tabId);
+    }
+
+    if (wants("options", "vocab-pack-preview") || wants("options", "vocab-pack-installed")) {
+      await openVocabPackPreview(page);
+      await scan("options", "vocab-pack-preview");
+      if (wants("options", "vocab-pack-installed")) {
+        await installVocabPackFixture(page);
+        await scan("options", "vocab-pack-installed");
+      }
     }
 
     // Geometry fixture for the normally hidden failure/retry state. The real

@@ -1012,3 +1012,436 @@ async function pbpEcdictImportFile(file, opts) {
   const gzip = head[0] === 0x1f && head[1] === 0x8b;
   return pbpEcdictImport(pbpCedictLines(file.stream(), gzip, stats, PBP_ECDICT_MAX_BYTES), stats, opts);
 }
+
+// ---- User-supplied multilingual Yomitan v3 packs -------------------------
+// Separate device-local DB: installing a generic pack never upgrades or clears
+// the established CC-CEDICT/ECDICT stores. No network or permission requests.
+// Format references: yomidevs/yomitan ext/data/schemas/dictionary-{index,
+// term-bank-v3,tag-bank-v3}-schema.json. Imported content is DATA only.
+const PBP_YOMITAN_LIMITS = Object.freeze({
+  zipBytes: 128 * 1024 * 1024, decodedBytes: 640 * 1024 * 1024,
+  bankBytes: 32 * 1024 * 1024, payloadBytes: 512 * 1024 * 1024,
+  entries: 1500000, files: 8192, packs: 16, rowUnits: 65536,
+  hits: 20, rowsPerHit: 40, sensesPerHit: 80
+});
+const _PBP_MULTI_DB = "pbp-multidict";
+const _PBP_MULTI_LOCK = "pbp-multidict-write";
+let _pbpMultiDbPromise = null;
+function _pbpYomitanError(code, message) { return Object.assign(new Error(message), { code }); }
+function _pbpYomitanCheck(ok, message, code = "invalid_pack") { if (!ok) throw _pbpYomitanError(code, message); }
+function _pbpYomitanAbort(signal) { if (signal?.aborted) throw new DOMException("Dictionary import cancelled", "AbortError"); }
+function _pbpYomitanPlain(value) { return !!value && typeof value === "object" && !Array.isArray(value); }
+function _pbpYomitanText(value, max, required = false) {
+  _pbpYomitanCheck(typeof value === "string" && value.length <= max && (!required || value.trim()), "Invalid dictionary text");
+  return value.normalize("NFC");
+}
+function _pbpYomitanLanguage(value) {
+  if (value == null || value === "") return "";
+  try {
+    if (typeof value !== "string" || value.length > 80 || value.trim() !== value) throw new Error();
+    const canonical = Intl.getCanonicalLocales(value)[0] || "";
+    if (["und", "mul", "zxx"].includes(canonical.toLowerCase().split("-")[0])) throw new Error();
+    return canonical;
+  } catch (_) { throw _pbpYomitanError("invalid_language", "Invalid dictionary language tag"); }
+}
+function _pbpYomitanPrimary(value) { return String(value || "").toLowerCase().split("-")[0]; }
+function _pbpYomitanKey(value) { return String(value || "").normalize("NFC").trim().replace(/\s+/g, " "); }
+function _pbpYomitanSource(value) {
+  if (value == null || value === "") return "";
+  const text = _pbpYomitanText(value, 2048);
+  try { const u = new URL(text); if (u.protocol !== "https:" || u.username || u.password) throw new Error(); return u.href; }
+  catch (_) { throw _pbpYomitanError("invalid_pack", "Invalid dictionary source URL"); }
+}
+function _pbpYomitanPath(name) {
+  _pbpYomitanCheck(name && name.length <= 512 && !/[\\:\u0000-\u001f\u007f]/.test(name) && !name.startsWith("/") &&
+    name.split("/").every((part, i, all) => part !== "." && part !== ".." && (part !== "" || i === all.length - 1)), "Unsafe ZIP path");
+  return name;
+}
+function _pbpYomitanFileKind(name) {
+  if (name === "index.json") return "index";
+  if (/^term_bank_[1-9]\d*\.json$/.test(name)) return "terms";
+  if (/^tag_bank_[1-9]\d*\.json$/.test(name)) return "tags";
+  if (/^(?:term_meta|kanji|kanji_meta)_bank_[1-9]\d*\.json$/.test(name)) return "ignored";
+  if (name.endsWith("/") || name === "styles.css" || /(?:^|\/)(?:README|LICENSE|COPYING)(?:\.[a-z0-9]+)?$/i.test(name) ||
+      /\.(?:png|jpe?g|gif|webp|svg|avif|mp3|ogg|wav|woff2?|ttf)$/i.test(name)) return "ignored";
+  throw _pbpYomitanError("invalid_pack", "Unsupported dictionary archive member");
+}
+
+// Strict multi-member ZIP boundary. Unlike the legacy single-text reader,
+// consumed members have CRC/size verification and local/central agreement.
+async function _pbpYomitanZip(file, signal) {
+  _pbpYomitanAbort(signal);
+  _pbpYomitanCheck(file && Number.isSafeInteger(file.size) && file.size >= 22, "Not a ZIP file");
+  _pbpYomitanCheck(file.size <= PBP_YOMITAN_LIMITS.zipBytes, "ZIP exceeds import limit", "too_large");
+  const tailStart = Math.max(0, file.size - 65557);
+  const tail = new Uint8Array(await file.slice(tailStart).arrayBuffer());
+  const tv = new DataView(tail.buffer, tail.byteOffset, tail.byteLength);
+  let end = -1;
+  for (let i = tail.length - 22; i >= 0; i--) {
+    if (tv.getUint32(i, true) === 0x06054b50 && i + 22 + tv.getUint16(i + 20, true) === tail.length) { end = i; break; }
+  }
+  _pbpYomitanCheck(end >= 0, "ZIP end record missing");
+  const count = tv.getUint16(end + 10, true), cdSize = tv.getUint32(end + 12, true), cdStart = tv.getUint32(end + 16, true);
+  _pbpYomitanCheck(!tv.getUint16(end + 4, true) && !tv.getUint16(end + 6, true) && tv.getUint16(end + 8, true) === count &&
+    count > 0 && count !== 65535 && cdStart !== 0xffffffff && cdSize !== 0xffffffff, "Unsupported multi-disk or ZIP64 archive");
+  _pbpYomitanCheck(count <= PBP_YOMITAN_LIMITS.files && cdSize <= 4 * 1024 * 1024, "ZIP directory exceeds import limit", "too_large");
+  _pbpYomitanCheck(cdStart + cdSize === tailStart + end, "Invalid ZIP directory boundary");
+  const bytes = await file.slice(cdStart, cdStart + cdSize).arrayBuffer(), cd = new DataView(bytes);
+  const decoder = new TextDecoder("utf-8", { fatal: true }), entries = [], names = new Set();
+  let p = 0, total = 0;
+  for (let i = 0; i < count; i++) {
+    _pbpYomitanAbort(signal);
+    _pbpYomitanCheck(p + 46 <= cd.byteLength && cd.getUint32(p, true) === 0x02014b50, "Invalid ZIP central entry");
+    const flags = cd.getUint16(p + 8, true), method = cd.getUint16(p + 10, true), crc = cd.getUint32(p + 16, true);
+    const compressed = cd.getUint32(p + 20, true), decoded = cd.getUint32(p + 24, true), local = cd.getUint32(p + 42, true);
+    const nl = cd.getUint16(p + 28, true), xl = cd.getUint16(p + 30, true), cl = cd.getUint16(p + 32, true);
+    _pbpYomitanCheck(p + 46 + nl + xl + cl <= cd.byteLength && nl > 0, "Truncated ZIP entry");
+    _pbpYomitanCheck(!(flags & 0x2041) && !cd.getUint16(p + 34, true) && cd.getUint16(p + 6, true) <= 20 &&
+      compressed !== 0xffffffff && decoded !== 0xffffffff && local !== 0xffffffff, "Unsupported encrypted or ZIP64 entry");
+    _pbpYomitanCheck(method === 0 || method === 8, "Unsupported ZIP compression");
+    _pbpYomitanCheck(((cd.getUint32(p + 38, true) >>> 16) & 0xf000) !== 0xa000, "ZIP symbolic links are unsupported");
+    const name = _pbpYomitanPath(decoder.decode(new Uint8Array(bytes, p + 46, nl)));
+    _pbpYomitanCheck(!names.has(name.normalize("NFC")), "Duplicate ZIP member"); names.add(name.normalize("NFC"));
+    const kind = _pbpYomitanFileKind(name);
+    total += decoded;
+    _pbpYomitanCheck(total <= PBP_YOMITAN_LIMITS.decodedBytes && compressed <= PBP_YOMITAN_LIMITS.zipBytes &&
+      (kind === "ignored" || decoded <= (kind === "index" ? 128 * 1024 : PBP_YOMITAN_LIMITS.bankBytes)), "ZIP member exceeds import limit", "too_large");
+    _pbpYomitanCheck(local + 30 <= cdStart, "Invalid ZIP local offset");
+    const header = new DataView(await file.slice(local, local + 30).arrayBuffer());
+    _pbpYomitanCheck(header.byteLength === 30 && header.getUint32(0, true) === 0x04034b50 && header.getUint16(6, true) === flags &&
+      header.getUint16(8, true) === method && header.getUint16(4, true) <= 20, "ZIP local and central headers disagree");
+    const localNameLength = header.getUint16(26, true), localExtraLength = header.getUint16(28, true);
+    const dataStart = local + 30 + localNameLength + localExtraLength;
+    _pbpYomitanCheck(dataStart + compressed <= cdStart, "ZIP payload crosses directory");
+    const localName = decoder.decode(await file.slice(local + 30, local + 30 + localNameLength).arrayBuffer());
+    _pbpYomitanCheck(localName === name, "ZIP local path differs from directory");
+    let dataEnd = dataStart + compressed;
+    if (!(flags & 8)) {
+      _pbpYomitanCheck(header.getUint32(14, true) === crc && header.getUint32(18, true) === compressed && header.getUint32(22, true) === decoded, "ZIP local sizes or CRC disagree");
+    } else {
+      const descriptor = new DataView(await file.slice(dataEnd, Math.min(cdStart, dataEnd + 16)).arrayBuffer());
+      _pbpYomitanCheck(descriptor.byteLength >= 12, "ZIP data descriptor missing");
+      const d = descriptor.getUint32(0, true) === 0x08074b50 ? 4 : 0;
+      _pbpYomitanCheck(descriptor.byteLength >= d + 12 && descriptor.getUint32(d, true) === crc && descriptor.getUint32(d + 4, true) === compressed && descriptor.getUint32(d + 8, true) === decoded, "ZIP data descriptor disagrees");
+      dataEnd += d + 12;
+    }
+    entries.push({ name, kind, method, crc, compressed, decoded, local, dataStart, dataEnd });
+    p += 46 + nl + xl + cl;
+  }
+  _pbpYomitanCheck(p === cd.byteLength, "Unexpected ZIP directory trailing data");
+  const physical = entries.slice().sort((a, b) => a.local - b.local);
+  for (let i = 1; i < physical.length; i++) _pbpYomitanCheck(physical[i - 1].dataEnd <= physical[i].local, "Overlapping ZIP entries");
+  _pbpYomitanCheck(entries.some(e => e.kind === "index") && entries.some(e => e.kind === "terms"), "Dictionary index or term bank missing");
+  return { entries, decodedBytes: total };
+}
+async function _pbpYomitanReadJson(file, entry, signal) {
+  _pbpYomitanAbort(signal);
+  const chunks = []; let length = 0, crc = 0;
+  try {
+    let stream = file.slice(entry.dataStart, entry.dataStart + entry.compressed).stream();
+    if (entry.method === 8) stream = stream.pipeThrough(new DecompressionStream("deflate-raw"));
+    for await (const chunk of stream) {
+      _pbpYomitanAbort(signal); length += chunk.length;
+      _pbpYomitanCheck(length <= entry.decoded && length <= PBP_YOMITAN_LIMITS.bankBytes, "ZIP decompression exceeds declared size", "too_large");
+      crc = pbpCrc32Update(crc, chunk); chunks.push(chunk);
+    }
+  } catch (error) {
+    if (typeof error?.code === "string" || error?.name === "AbortError") throw error;
+    console.warn("[pack] dictionary decompression failed:", error?.name, "Unable to decode archive member");
+    throw _pbpYomitanError("invalid_pack", "Unable to decode archive member");
+  }
+  _pbpYomitanCheck(length === entry.decoded && crc === entry.crc, "ZIP data size or CRC mismatch");
+  const bytes = new Uint8Array(length); let p = 0;
+  for (const chunk of chunks) { bytes.set(chunk, p); p += chunk.length; }
+  try { return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)); }
+  catch (_) { throw _pbpYomitanError("invalid_pack", "Dictionary JSON or UTF-8 is invalid"); }
+}
+async function _pbpYomitanManifest(index, options = {}) {
+  _pbpYomitanCheck(_pbpYomitanPlain(index) && (index.format ?? index.version) === 3 &&
+    (index.format === undefined || index.version === undefined || index.format === index.version), "Only Yomitan v3 term dictionaries are supported");
+  const title = _pbpYomitanText(index.title, 256, true).trim(), revision = _pbpYomitanText(index.revision, 256, true);
+  const sourceLanguage = _pbpYomitanLanguage(options.sourceLanguage ?? index.sourceLanguage);
+  const targetLanguage = _pbpYomitanLanguage(options.targetLanguage ?? index.targetLanguage);
+  const sourceUrl = _pbpYomitanSource(options.sourceUrl ?? index.url);
+  const license = _pbpYomitanText(options.license ?? index.license ?? "", 8192);
+  const attribution = _pbpYomitanText(index.attribution ?? "", 65536);
+  const description = _pbpYomitanText(index.description ?? "", 65536);
+  const missingLanguages = [!sourceLanguage && "sourceLanguage", !targetLanguage && "targetLanguage"].filter(Boolean);
+  let id = null;
+  if (!missingLanguages.length) {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify([title, sourceLanguage, targetLanguage])));
+    id = "yomitan-" + Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+  }
+  return { id, title, revision, format: 3, sourceLanguage, targetLanguage, sourceUrl, license, attribution, description, missingLanguages };
+}
+async function pbpYomitanInspectFile(file, options = {}) {
+  try {
+    const zip = await _pbpYomitanZip(file, options.signal);
+    return await _pbpYomitanManifest(await _pbpYomitanReadJson(file, zip.entries.find(e => e.kind === "index"), options.signal), options);
+  } catch (error) {
+    if (typeof error?.code === "string" || error?.name === "AbortError") throw error;
+    console.warn("[pack] dictionary inspection failed:", error?.name, "Unable to read archive");
+    throw _pbpYomitanError("invalid_pack", "Unable to read dictionary archive");
+  }
+}
+
+// Structured content is traversed as JSON, never fed to a DOM parser. Styles,
+// links, images and data attributes are not returned or executed. Limits bound
+// hostile nesting as well as large flat child arrays before string assembly.
+function _pbpYomitanGloss(value) {
+  let nodes = 0, units = 0;
+  function text(s) { _pbpYomitanCheck(typeof s === "string", "Invalid structured text"); units += s.length; _pbpYomitanCheck(units <= PBP_YOMITAN_LIMITS.rowUnits, "Dictionary definition too large", "too_large"); return s; }
+  function walk(node, depth) {
+    _pbpYomitanCheck(++nodes <= 8192 && depth <= 32, "Structured definition exceeds limits", "too_large");
+    if (typeof node === "string") return text(node);
+    if (Array.isArray(node)) return node.map(child => walk(child, depth + 1)).join("");
+    _pbpYomitanCheck(_pbpYomitanPlain(node), "Invalid structured definition");
+    const tag = node.tag;
+    _pbpYomitanCheck(["br", "ruby", "rt", "rp", "table", "thead", "tbody", "tfoot", "tr", "td", "th", "span", "div", "ol", "ul", "li", "details", "summary", "img", "a"].includes(tag), "Unsupported structured definition tag");
+    _pbpYomitanCheck(Object.keys(node).every(key => ["tag", "content", "data", "lang", "style", "title", "open", "colSpan", "rowSpan", "href", "path", "width", "height", "alt", "description", "pixelated", "imageRendering", "appearance", "background", "collapsed", "collapsible", "verticalAlign", "border", "borderRadius", "sizeUnits"].includes(key)), "Unsupported structured definition property");
+    if (tag === "br") return "\n";
+    if (tag === "img") return typeof node.alt === "string" ? text(node.alt) : "";
+    const body = node.content === undefined ? "" : walk(node.content, depth + 1);
+    return ["div", "ol", "ul", "li", "details", "summary", "table", "tr"].includes(tag) ? "\n" + body + "\n" : body;
+  }
+  let result;
+  if (typeof value === "string") result = text(value);
+  else {
+    _pbpYomitanCheck(_pbpYomitanPlain(value), "Invalid dictionary definition");
+    if (value.type === "text") { _pbpYomitanCheck(Object.keys(value).every(k => ["type", "text"].includes(k)), "Invalid text definition"); result = text(value.text); }
+    else if (value.type === "structured-content") { _pbpYomitanCheck(Object.keys(value).every(k => ["type", "content"].includes(k)), "Invalid structured definition"); result = walk(value.content, 0); }
+    else if (value.type === "image") { result = typeof value.alt === "string" ? text(value.alt) : ""; }
+    else throw _pbpYomitanError("invalid_pack", "Unsupported definition schema");
+  }
+  return result.replace(/[ \t]+\n/g, "\n").replace(/\n[ \t]+/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+function _pbpYomitanRow(raw) {
+  _pbpYomitanCheck(Array.isArray(raw) && raw.length === 8 && typeof raw[0] === "string" && typeof raw[1] === "string" &&
+    (raw[2] === null || typeof raw[2] === "string") && typeof raw[3] === "string" && Number.isFinite(raw[4]) && Array.isArray(raw[5]) &&
+    Number.isSafeInteger(raw[6]) && typeof raw[7] === "string", "Invalid Yomitan v3 term row");
+  const term = _pbpYomitanKey(_pbpYomitanText(raw[0], 256, true)), reading = _pbpYomitanKey(_pbpYomitanText(raw[1], 256));
+  _pbpYomitanText(raw[2] ?? "", 2048); _pbpYomitanText(raw[3], 2048); _pbpYomitanText(raw[7], 2048);
+  _pbpYomitanCheck(raw[5].length <= 256, "Too many definitions in one row", "too_large");
+  const definitions = [], lemmas = [];
+  for (const item of raw[5]) {
+    if (Array.isArray(item)) {
+      _pbpYomitanCheck(item.length === 2 && typeof item[0] === "string" && Array.isArray(item[1]) && item[1].length <= 64 && item[1].every(rule => typeof rule === "string" && rule.length <= 128), "Invalid deinflection tuple");
+      lemmas.push({ term: _pbpYomitanText(item[0], 256, true), rules: item[1].slice() });
+    } else { const definition = _pbpYomitanGloss(item); if (definition) definitions.push(definition); }
+  }
+  _pbpYomitanCheck(definitions.length || lemmas.length, "Term contains no supported text definitions");
+  const row = { term, reading, folded: term.toLowerCase(), definitions, lemmas, definitionTags: raw[2] || "", rules: raw[3], score: raw[4], sequence: raw[6], termTags: raw[7] };
+  _pbpYomitanCheck(JSON.stringify(row).length <= PBP_YOMITAN_LIMITS.rowUnits, "Term row exceeds import limit", "too_large");
+  return row;
+}
+function _pbpYomitanNorm(rows, pack) {
+  let remaining = PBP_YOMITAN_LIMITS.sensesPerHit;
+  const entries = rows.map(row => {
+    const definitions = row.definitions.length ? row.definitions : row.lemmas.map(item => item.term);
+    const senses = definitions.slice(0, remaining).map(definition => ({ definition, examples: [], tags: row.definitions.length ? [] : ["form-of"], synonyms: [], antonyms: [], subsenses: [] }));
+    remaining -= senses.length;
+    return { pos: row.definitionTags, ipas: row.reading ? [{ text: row.reading, tags: ["Reading"] }] : [], forms: row.lemmas.map(item => ({ word: item.term, tags: ["lemma"] })), senses };
+  }).filter(entry => entry.senses.length);
+  return { word: rows[0].term, entries, sourceLabel: pack.title, sourceUrl: pack.sourceUrl, license: pack.license,
+    attribution: pack.attribution, definitionLang: pack.targetLanguage, sourceLanguage: pack.sourceLanguage,
+    targetLanguage: pack.targetLanguage, packId: pack.id, aiAllowed: pack.aiAllowed === true,
+    generation: pack.activeGeneration, revision: pack.revision,
+    formOfOnly: rows.every(row => !row.definitions.length) };
+}
+
+function _pbpMultiOpenDB() {
+  if (_pbpMultiDbPromise) return _pbpMultiDbPromise;
+  _pbpMultiDbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open(_PBP_MULTI_DB, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      db.createObjectStore("packs", { keyPath: "id" });
+      db.createObjectStore("generations", { keyPath: "id" });
+      const terms = db.createObjectStore("terms", { keyPath: ["generation", "row"] });
+      for (const [name, field] of [["term", "term"], ["folded", "folded"], ["reading", "reading"]]) terms.createIndex(name, ["generation", field]);
+    };
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onversionchange = () => { db.close(); _pbpMultiDbPromise = null; };
+      resolve(db);
+      // Another tab's import owns this same lock until activation/rollback.
+      // Cleanup therefore never mistakes its in-progress generation for an orphan.
+      navigator.locks.request(_PBP_MULTI_LOCK, () => _pbpMultiCleanup(db)).catch(error => console.warn("[pack] multidict cleanup failed:", error?.name, "Unable to remove incomplete generations"));
+    };
+    request.onblocked = () => console.warn("[pack] multidict database open blocked");
+    request.onerror = () => { _pbpMultiDbPromise = null; console.warn("[pack] multidict open failed:", request.error?.name, "Dictionary database unavailable"); reject(_pbpYomitanError("storage", "Dictionary database unavailable")); };
+  });
+  return _pbpMultiDbPromise;
+}
+function _pbpMultiRange(generation) { return IDBKeyRange.bound([generation, 0], [generation, Number.MAX_SAFE_INTEGER]); }
+async function _pbpMultiCleanup(db) {
+  await _pbpPackTx(db, "readwrite", tx => {
+    const request = tx.objectStore("packs").getAll();
+    request.onsuccess = () => {
+      const active = new Set(request.result.map(pack => pack.activeGeneration));
+      const cursor = tx.objectStore("generations").openCursor();
+      cursor.onsuccess = () => {
+        const item = cursor.result; if (!item) return;
+        if (!active.has(item.key)) { tx.objectStore("terms").delete(_pbpMultiRange(item.key)); item.delete(); }
+        item.continue();
+      };
+    };
+  }, ["packs", "generations", "terms"]);
+}
+function _pbpMultiNotify(id, action) {
+  const detail = { type: "changed", id, action };
+  try { const channel = new BroadcastChannel("pbp-dict-packs"); channel.postMessage(detail); channel.close(); } catch (_) {}
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pbp-dict-packs-changed", { detail }));
+}
+async function pbpDictPackList() {
+  try {
+    const db = await _pbpMultiOpenDB();
+    return await _pbpPackTx(db, "readonly", tx => { const r = tx.objectStore("packs").getAll(); return { value: () => r.result.sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id)) }; }, ["packs"]);
+  } catch (error) { console.warn("[pack] multidict list failed:", error?.name, "Unable to read installed dictionaries"); throw _pbpYomitanError("storage", "Unable to read installed dictionaries"); }
+}
+async function _pbpMultiChange(id, field, value, expectedGeneration) {
+  return navigator.locks.request(_PBP_MULTI_LOCK, async () => {
+    let stale = false;
+    try {
+      const db = await _pbpMultiOpenDB(); let changed = false;
+      await _pbpPackTx(db, "readwrite", tx => {
+        const store = tx.objectStore("packs"), request = store.get(id);
+        request.onsuccess = () => {
+          const pack = request.result;
+          // The confirmation describes one version's data and license. A
+          // queued replacement must not inherit that previous consent.
+          if (expectedGeneration !== undefined && pack?.activeGeneration !== expectedGeneration) {
+            stale = true; tx.abort(); return;
+          }
+          if (!pack) return;
+          changed = true;
+          if (field === "delete") { store.delete(id); tx.objectStore("terms").delete(_pbpMultiRange(pack.activeGeneration)); tx.objectStore("generations").delete(pack.activeGeneration); }
+          else { pack[field] = value === true; store.put(pack); }
+        };
+      }, field === "delete" ? ["packs", "terms", "generations"] : ["packs"]);
+      if (changed) _pbpMultiNotify(id, field); return changed;
+    } catch (error) {
+      if (stale) throw _pbpYomitanError("stale_pack", "Dictionary version changed before confirmation");
+      console.warn("[pack] multidict change failed:", error?.name, "Unable to update dictionary");
+      throw _pbpYomitanError("storage", "Unable to update dictionary");
+    }
+  });
+}
+function pbpDictPackSetEnabled(id, enabled) { return _pbpMultiChange(id, "enabled", enabled); }
+function pbpDictPackSetAiAllowed(id, allowed, expectedGeneration) { return _pbpMultiChange(id, "aiAllowed", allowed, expectedGeneration); }
+function pbpDictPackDelete(id, expectedGeneration) { return _pbpMultiChange(id, "delete", undefined, expectedGeneration); }
+
+function pbpYomitanImportFile(file, options = {}) {
+  // Acquire at invocation, before any parsing await: a subsequent delete/toggle
+  // queues after this install instead of being undone by its eventual commit.
+  return navigator.locks.request(_PBP_MULTI_LOCK, { signal: options.signal }, async () => {
+    let db, generation, activated = false;
+    const progress = payload => { if (options.onProgress) { try { options.onProgress(payload); } catch (_) {} } };
+    try {
+      const zip = await _pbpYomitanZip(file, options.signal);
+      const manifest = await _pbpYomitanManifest(await _pbpYomitanReadJson(file, zip.entries.find(e => e.kind === "index"), options.signal), options);
+      _pbpYomitanCheck(!manifest.missingLanguages.length, "Dictionary languages must be supplied", "language_required");
+      _pbpYomitanAbort(options.signal);
+      db = await _pbpMultiOpenDB();
+      const installed = await pbpDictPackList(), previous = installed.find(pack => pack.id === manifest.id);
+      _pbpYomitanCheck(previous || installed.length < PBP_YOMITAN_LIMITS.packs, "Too many installed dictionary packs", "too_many_packs");
+      generation = crypto.randomUUID();
+      await _pbpPackTx(db, "readwrite", tx => tx.objectStore("generations").put({ id: generation, packId: manifest.id }), ["generations"]);
+      let count = 0, payloadBytes = 0;
+      const encoder = new TextEncoder(), tags = {};
+      const banks = zip.entries.filter(entry => entry.kind === "terms" || entry.kind === "tags").sort((a, b) => a.name.localeCompare(b.name, "en", { numeric: true }));
+      for (const entry of banks) {
+        _pbpYomitanAbort(options.signal);
+        const raw = await _pbpYomitanReadJson(file, entry, options.signal);
+        _pbpYomitanCheck(Array.isArray(raw), "Dictionary bank is not an array");
+        if (entry.kind === "tags") {
+          for (const tag of raw) {
+            _pbpYomitanCheck(Array.isArray(tag) && tag.length === 5 && typeof tag[0] === "string" && typeof tag[1] === "string" && Number.isFinite(tag[2]) && typeof tag[3] === "string" && Number.isFinite(tag[4]), "Invalid dictionary tag bank");
+            _pbpYomitanCheck(Object.keys(tags).length < 4096 && tag[0].length <= 256 && tag[3].length <= 4096, "Dictionary tags exceed limit", "too_large");
+            Object.defineProperty(tags, tag[0], { value: { category: tag[1], notes: tag[3] }, enumerable: true, configurable: true });
+          }
+          continue;
+        }
+        for (let i = 0; i < raw.length; i += 200) {
+          _pbpYomitanAbort(options.signal);
+          const batch = raw.slice(i, i + 200).map(value => {
+            const row = _pbpYomitanRow(value); payloadBytes += encoder.encode(JSON.stringify(row)).length; count++;
+            _pbpYomitanCheck(count <= PBP_YOMITAN_LIMITS.entries && payloadBytes <= PBP_YOMITAN_LIMITS.payloadBytes, "Dictionary content exceeds import limit", "too_large");
+            return { ...row, generation, row: count };
+          });
+          await _pbpPackTx(db, "readwrite", tx => { for (const row of batch) tx.objectStore("terms").put(row); }, ["terms"]);
+          progress({ phase: "staging", entries: count, decodedBytes: zip.decodedBytes });
+        }
+      }
+      _pbpYomitanCheck(count > 0, "Dictionary contains no terms");
+      _pbpYomitanAbort(options.signal);
+      const meta = { ...manifest, state: "ready", activeGeneration: generation, entries: count, payloadBytes,
+        decodedBytes: zip.decodedBytes, importedAt: Date.now(), enabled: previous ? previous.enabled : true,
+        aiAllowed: false, tags, ignoredFiles: zip.entries.filter(entry => entry.kind === "ignored" && !entry.name.endsWith("/")).length };
+      await _pbpPackTx(db, "readwrite", tx => {
+        _pbpYomitanAbort(options.signal); tx.objectStore("packs").put(meta);
+        if (previous) { tx.objectStore("terms").delete(_pbpMultiRange(previous.activeGeneration)); tx.objectStore("generations").delete(previous.activeGeneration); }
+      }, ["packs", "terms", "generations"]);
+      activated = true; _pbpMultiNotify(meta.id, "import"); progress({ phase: "complete", entries: count, decodedBytes: zip.decodedBytes }); return meta;
+    } catch (error) {
+      if (db && generation && !activated) {
+        try { await _pbpPackTx(db, "readwrite", tx => { tx.objectStore("terms").delete(_pbpMultiRange(generation)); tx.objectStore("generations").delete(generation); }, ["terms", "generations"]); }
+        catch (cleanupError) { console.warn("[pack] staging cleanup failed:", cleanupError?.name, "Unable to remove incomplete generation"); }
+      }
+      if (typeof error?.code === "string" || error?.name === "AbortError") throw error;
+      console.warn("[pack] multilingual import failed:", error?.name, "Unable to install dictionary");
+      throw _pbpYomitanError(db ? "storage" : "invalid_pack", "Dictionary import failed");
+    }
+  });
+}
+
+async function pbpDictPackLookup(term, options = {}) {
+  const empty = state => ({ state, hits: [], truncated: false, truncatedPackIds: [] });
+  try {
+    const key = _pbpYomitanKey(term), language = _pbpYomitanPrimary(_pbpYomitanLanguage(options.sourceLanguage));
+    const target = _pbpYomitanPrimary(_pbpYomitanLanguage(options.targetLanguage));
+    if (!key || key.length > 256 || !language) return empty("unavailable");
+    const limit = Math.max(1, Math.min(PBP_YOMITAN_LIMITS.hits, Number.isInteger(options.limit) ? options.limit : PBP_YOMITAN_LIMITS.hits));
+    const db = await _pbpMultiOpenDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(["packs", "terms"], "readonly"), perPack = [], truncated = new Set(); let candidates = 0;
+      const packs = tx.objectStore("packs").getAll();
+      packs.onsuccess = () => {
+        for (const pack of packs.result) {
+          if (!pack.enabled || (options.packId && options.packId !== pack.id) || _pbpYomitanPrimary(pack.sourceLanguage) !== language || (target && _pbpYomitanPrimary(pack.targetLanguage) !== target)) continue;
+          candidates++;
+          const queries = [["term", key], ["reading", key], ["folded", key.toLowerCase()]];
+          const next = index => {
+            const [field, value] = queries[index], request = tx.objectStore("terms").index(field).getAll([pack.activeGeneration, value], 161);
+            request.onsuccess = () => {
+              const rows = request.result;
+              if (!rows.length) { if (index < queries.length - 1) next(index + 1); return; }
+              if (rows.length > 160) truncated.add(pack.id);
+              const groups = new Map();
+              for (const row of rows.slice(0, 160)) {
+                if (!groups.has(row.term)) groups.set(row.term, []);
+                const group = groups.get(row.term);
+                if (group.length < PBP_YOMITAN_LIMITS.rowsPerHit) group.push(row); else truncated.add(pack.id);
+              }
+              perPack.push([...groups.values()].map(group => {
+                if (group.reduce((n, row) => n + (row.definitions.length || row.lemmas.length), 0) > PBP_YOMITAN_LIMITS.sensesPerHit) truncated.add(pack.id);
+                return { pack, rows: group, norm: _pbpYomitanNorm(group, pack) };
+              }));
+            };
+          };
+          next(0);
+        }
+      };
+      tx.oncomplete = () => {
+        const hits = []; let n = 0;
+        perPack.sort((a, b) => a[0].pack.title.localeCompare(b[0].pack.title) || a[0].pack.id.localeCompare(b[0].pack.id));
+        while (perPack.some(groups => groups.length > n)) {
+          for (const groups of perPack) { if (!groups[n]) continue; if (hits.length < limit) hits.push(groups[n]); else truncated.add(groups[n].pack.id); }
+          n++;
+        }
+        resolve({ state: hits.length ? "hit" : candidates ? "ready-miss" : "unavailable", hits, truncated: truncated.size > 0, truncatedPackIds: [...truncated] });
+      };
+      tx.onabort = tx.onerror = () => reject(tx.error || new Error("Dictionary lookup failed"));
+    });
+  } catch (error) { console.warn("[pack] multilingual lookup failed:", error?.name, "Unable to read dictionary results"); return empty("error"); }
+}

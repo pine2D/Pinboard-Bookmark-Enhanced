@@ -2030,6 +2030,129 @@ async function runEchoLanguageAndInlineTests() {
   }
 }
 
+async function runMultiPackIntegrationTests() {
+  section("Multilingual dictionary pack integration");
+  const original = { load:_pbpDictLoadPack, current:_pbpDictCurrent, resolve:_pbpDictResolveLang,
+    online:_pbpDictSlotRun, ctx:_pbpDictCtxRun, local:_pbpDictEcdictSide, get:pbpVocabGet,
+    owner:_pbpDictOwner, liveOwner:window.pbpVocabCurrentOwner, save:pbpVocabSaveWord, icons:window.PBP_ICONS, list:window.pbpDictPackList, lookup:window.pbpDictPackLookup, detect:_pbpDictDetect, article:_pbpDictArticleCld, fetch:_pbpDictFetch };
+  const norm = (id, language, word="Gift") => ({ word, packId:id, sourceLabel:id, definitionLang:language,
+    sourceLanguage:"de", aiAllowed:false, sourceUrl:"https://example.test/"+id, license:"Test license",
+    entries:[{pos:"noun",ipas:[{text:"ɡɪft",tags:["Reading"]}],forms:[],senses:[{definition:id+" meaning",examples:["Gift wirkt."]}]}] });
+  const hits=[{pack:{id:"en-pack",title:"English pack",enabled:true,sourceLanguage:"de",targetLanguage:"en"},norm:norm("en-pack","en")},
+    {pack:{id:"zh-pack",title:"中文词库",enabled:true,sourceLanguage:"de",targetLanguage:"zh-Hans"},norm:norm("zh-pack","zh-Hans")},
+    {pack:{id:"en-pack",title:"English pack",enabled:true,sourceLanguage:"de",targetLanguage:"en"},norm:norm("en-pack","en","gift")}];
+  const target=document.createElement("div"); document.body.appendChild(target);
+  const ctrl=new AbortController(); let calls=[], accepted=[];
+  const side=(...args)=>typeof _pbpDictPackSide==="function"?_pbpDictPackSide(...args):Promise.resolve();
+  const tick=async()=>{for(let i=0;i<8;i++)await new Promise(r=>setTimeout(r,0));};
+  try {
+    window.PBP_ICONS=original.icons||{refresh:""};
+    _pbpDictLoadPack=async()=>true;
+    window.pbpDictPackList=async()=>[...hits.map(h=>h.pack),{id:"ar-pack",enabled:true,sourceLanguage:"ar",targetLanguage:"en"},{id:"off",enabled:false,sourceLanguage:"fi"}];
+    window.pbpDictPackLookup=async(term,opts)=>{calls.push({term,opts});return {state:"hit",hits,truncated:true};};
+    const cur={};_pbpDictCurrent=cur;
+    await side(target,"Gift","de",ctrl.signal,cur,(n)=>accepted.push(n),"zh-Hans");
+    check("packs show every matched source and actual case-sensitive headword",accepted.length===3&&accepted.map(n=>n.word).join("|").includes("Gift|gift"));
+    check("packs prefer the explanation language without excluding other definition languages",accepted[0]?.definitionLang==="zh-Hans"&&accepted.filter(n=>n.definitionLang==="en").length===2);
+    check("packs lookup preserves the exact query and does not filter out other target languages",calls[0]?.term==="Gift"&&calls[0]?.opts.sourceLanguage==="de"&&!calls[0]?.opts.targetLanguage);
+    check("pack sense and example nodes retain their distinct language metadata",target.querySelector('[lang="zh-Hans"]')&&[...target.querySelectorAll('.xp-dict-example')].every(n=>n.lang==="de"));
+    check("pack results expose source links and a bounded-results explanation",target.querySelectorAll('.xp-dict-src a').length===3&&target.textContent.includes("dictPackResultsLimited"));
+    const blank=norm("private","es");blank.sourceUrl="";blank.license="";
+    const box=document.createElement("div");_pbpDictRenderEntry(box,blank,"Gift","de");
+    check("a user pack with no URL or confirmed license invents neither Wiktionary nor CC BY-SA",!box.querySelector('.xp-dict-src a')&&!box.textContent.includes("CC BY-SA"));
+    const choices=typeof pbpDictNormChoices==="function"?pbpDictNormChoices(hits[1].norm,"de"):[];
+    check("pack choices preserve actual term, source, reading and definition language",choices[0]?.term==="Gift"&&choices[0]?.sourceUrl.endsWith("zh-pack")&&choices[0]?.ipa==="ɡɪft"&&choices[0]?.definitionLang==="zh-Hans");
+    const declared={...hits[1].norm,packRevision:"2026.10",attribution:"Original author\nUnmodified attribution"};
+    const notice=pbpDictNormChoices(declared,"de","Source:")[0]?.license;
+    check("explicit pack saving retains source revision, license and attribution as distinct notice paragraphs",notice==="Source: zh-pack · 2026.10\n\nTest license\n\nOriginal author\nUnmodified attribution");
+    check("the saved notice never replaces or recursively expands the original dictionary license",declared.license==="Test license"&&pbpDictNormChoices(declared,"de","Source:")[0]?.license===notice);
+    check("generic readings use the localized reading tag",_pbpDictTagLabel("Reading")==="dictTagReading");
+    const sel=document.createElement("select");document.body.appendChild(sel);
+    if(typeof _pbpDictRefreshPackLangs==="function")await _pbpDictRefreshPackLangs(sel,"en",true,()=>true);
+    check("installed enabled source languages extend rather than replace the twelve shipped choices",[...sel.options].some(o=>o.value==="ar")&&PBP_DICT_QUERY_LANGS.every(code=>[...sel.options].some(o=>o.value===code)));
+    check("disabled pack languages are not added and installed language names are readable",![...sel.options].some(o=>o.value==="fi")&&[...sel.options].find(o=>o.value==="ar")?.textContent!=="ar");
+    sel.remove();
+    window.pbpDictPackLookup=async()=>({state:"error",hits:[]});
+    await side(target,"Gift","de",ctrl.signal,cur,()=>{},"en");
+    check("a failed local dictionary read exposes a localized retry action",target.textContent.includes("dictLoadFailed")&&!!target.querySelector("button"));
+    window.pbpDictPackLookup=async()=>({state:"hit",hits});
+    target.querySelector("button")?.click();await tick();
+    check("retrying a local read replaces its error with the recovered source groups",target.querySelectorAll('.xp-dict-local-box').length===3&&!target.textContent.includes("dictLoadFailed"));
+    target.replaceChildren();window.pbpDictPackLookup=async()=>({state:"ready-miss",hits:[]});
+    await side(target,"Gift","de",ctrl.signal,cur,()=>{},"en");
+    check("an installed pack miss is not reported as a storage failure",target.childElementCount===0);
+    let release;window.pbpDictPackLookup=()=>new Promise(r=>{release=r;});
+    target.replaceChildren();accepted=[];const stale=side(target,"Gift","de",ctrl.signal,cur,n=>accepted.push(n),"en");await tick();
+    _pbpDictCurrent={};release?.({state:"hit",hits});await stale;
+    check("late pack results cannot render into another lookup or expose its choices",target.childElementCount===0&&accepted.length===0);
+    _pbpDictCurrent=cur;window.pbpDictPackLookup=async()=>({state:"hit",hits});ctrl.abort();await side(target,"Gift","de",ctrl.signal,cur,n=>accepted.push(n),"en");
+    check("aborted pack results never render or notify",target.childElementCount===0&&accepted.length===0);
+
+    // A real reader run: the local result must be usable before its remote
+    // and AI siblings settle, and those later siblings must not overwrite it.
+    let finishOnline,finishAi;
+    _pbpDictResolveLang=async()=>"de";
+    _pbpDictSlotRun=()=>new Promise(r=>{finishOnline=r;});
+    _pbpDictCtxRun=(_el,_cap,_ctx,_s,_signal,lemma)=>new Promise(r=>{finishAi=value=>{lemma("");r(value);};});
+    _pbpDictEcdictSide=async()=>{};pbpVocabGet=async()=>null;_pbpDictOwner="acct_pack";
+    const pop=document.createElement("div");pop.innerHTML='<div class="xp-body"></div><button class="xp-vocab"></button>';document.body.appendChild(pop);
+    const running=pbpDictRun({text:"Gift"},{sentence:"Gift wirkt."},pop,new AbortController(),{dictDefinitionLang:"zh-Hans"});await tick();
+    const choose=pop.querySelector('select[data-pack-id="zh-pack"]');
+    check("reader makes installed-pack senses explicitly selectable before online or AI completion",!!choose&&choose.options.length===2);
+    if(choose){choose.value="0";choose.dispatchEvent(new Event("change"));await tick();}
+    check("choosing a local pack sense enables collection while other requests are pending",_pbpDictCurrent?.gloss==="zh-pack meaning"&&!pop.querySelector('.xp-vocab').disabled);
+    finishOnline?.(null);finishAi?.({gloss:"late AI paraphrase",lemma:"other"});await running;
+    check("late AI and online failure preserve the chosen pack's original definition and identity",_pbpDictCurrent?.gloss==="zh-pack meaning"&&_pbpDictCurrent?.term==="Gift"&&_pbpDictCurrent?.sourceUrl==="https://example.test/zh-pack"&&_pbpDictCurrent?.lemma!=="other");
+    pbpVocabGet=async()=>({id:"saved-gift",term:"Gift",language:"de",gloss:"old",contexts:[]});
+    await _pbpDictRefreshSave(pop,_pbpDictCurrent,new AbortController().signal);
+    pbpVocabGet=async()=>null;
+    const other=pop.querySelector('select[data-pack-id="en-pack"]');
+    if(other){other.value="0";other.dispatchEvent(new Event("change"));await tick();}
+    check("switching from a saved headword to an unsaved pack choice resets the save face",!_pbpDictCurrent.saved&&pop.querySelector('.xp-vocab').textContent==="dictSaveVocab");
+    let releaseOwner,writes=0;window.pbpVocabCurrentOwner=()=>new Promise(resolve=>{releaseOwner=resolve;});
+    pbpVocabSaveWord=async()=>{writes++;return {};};
+    const saving=pbpDictSaveCurrent();await tick();
+    window.pbpDictPackLookup=async()=>({state:"unavailable",hits:[]});
+    window.pbpDictPackList=async()=>[];
+    window.dispatchEvent(new CustomEvent("pbp-dict-packs-changed",{detail:{type:"changed",id:"zh-pack",action:"delete"}}));await tick();
+    releaseOwner?.("acct_pack");await saving;
+    check("revoking a pack during the live owner read prevents its pending collection",writes===0);
+    check("revoking a pack removes stale choices and disables their collection without changing the chosen word",
+      !pop.querySelector('select[data-pack-id]')&&pop.querySelector('.xp-vocab').disabled&&_pbpDictCurrent.term==="Gift");
+    pop.remove();
+    const supported=Promise.resolve([...PBP_DICT_QUERY_LANGS,"ar","he","uk","fi"]);
+    const route=(text,ctx={},allow=supported)=>original.resolve({text},ctx,"",allow);
+    _pbpDictArticleCld=async()=>({lang:"",reliable:false});
+    _pbpDictDetect=async()=>({lang:"ar",reliable:true});
+    check("installed Arabic accepts reliable sentence detection with Arabic script",await route("كتاب",{sentence:"هذا كتاب"})==="ar");
+    check("Arabic detection cannot reroute Latin text to an Arabic pack",await route("brand",{sentence:"هذا brand"})!=="ar");
+    check("a reliable unsupported source language remains outside the active dictionary set",await route("كتاب",{},Promise.resolve(PBP_DICT_QUERY_LANGS))!=="ar");
+    _pbpDictDetect=async()=>({lang:"he",reliable:true});
+    check("installed Hebrew accepts its own script",await route("שלום")==="he");
+    check("Hebrew metadata rejects Arabic-script selection",await route("كتاب",{selLang:"he"})!=="he");
+    _pbpDictDetect=async()=>({lang:"uk",reliable:true});
+    check("installed Cyrillic language is resolved by reliable CLD instead of the Russian-only script shortcut",await route("мова")==="uk");
+    _pbpDictDetect=async()=>({lang:"fi",reliable:true});
+    check("installed Finnish accepts reliable Latin-script detection",await route("sana")==="fi");
+    check("an explicit installed language takes precedence over unreliable short-text guesses",await route("كتاب",{selLang:"ar"})==="ar");
+    _pbpDictDetect=async()=>({lang:"",reliable:false});
+    _pbpDictArticleCld=async()=>({lang:"ar",reliable:true});
+    check("installed languages also accept a reliable full-article prior",await route("كتاب")==="ar");
+    _pbpDictArticleCld=async()=>({lang:"ar",reliable:false});
+    check("an unreliable article prior cannot invent an installed-language identity",await route("كتاب")!=="ar");
+    let network=0;_pbpDictFetch=async()=>{network++;return {status:404};};
+    const online=document.createElement("div");
+    await original.online(online,"كتاب","ar",new AbortController().signal,Promise.resolve(""));
+    check("pack-only languages do not issue unsupported online requests or claim a dictionary miss",network===0&&online.textContent==="dictOnlineLanguageUnavailable");
+  } finally {
+    target.remove();_pbpDictLoadPack=original.load;_pbpDictCurrent=original.current;_pbpDictResolveLang=original.resolve;
+    _pbpDictSlotRun=original.online;_pbpDictCtxRun=original.ctx;_pbpDictEcdictSide=original.local;pbpVocabGet=original.get;_pbpDictOwner=original.owner;pbpVocabCurrentOwner=original.liveOwner;pbpVocabSaveWord=original.save;_pbpDictDetect=original.detect;_pbpDictArticleCld=original.article;_pbpDictFetch=original.fetch;
+    if(original.list===undefined)delete window.pbpDictPackList;else window.pbpDictPackList=original.list;
+    if(original.lookup===undefined)delete window.pbpDictPackLookup;else window.pbpDictPackLookup=original.lookup;
+    if(original.icons===undefined)delete window.PBP_ICONS;else window.PBP_ICONS=original.icons;
+  }
+}
+
 (async function () {
   await runDictReviewRegressionTests();
   await runDictDefinitionLanguageTests();
@@ -2043,6 +2166,7 @@ async function runEchoLanguageAndInlineTests() {
   await runDictCtxObserverLifecycleTests();
   await runDictResolveLangLadderTests();
   await runVocabIdbTests();
+  await runMultiPackIntegrationTests();
   document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 })();
 </script>

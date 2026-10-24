@@ -845,6 +845,31 @@ function _pbpVocabRenderDetail(w, enterNarrow, reconcileOnly = false) {
     gloss.textContent = w.gloss;
     head.appendChild(gloss);
   }
+  // Saved provenance belongs to the word, so it remains available after a
+  // local dictionary is removed and does not depend on another lookup.
+  const dictionaryUrl = pbpDictSafeUrl(w.sourceUrl);
+  if (w.license || dictionaryUrl) {
+    const source = document.createElement("div");
+    source.className = "vocab-context-source vocab-detail-source";
+    if (w.license) {
+      const notice = document.createElement("span"); notice.className = "vocab-context-meta";
+      String(w.license).split("\n").forEach((line, index) => {
+        if (index) notice.appendChild(document.createElement("br"));
+        notice.appendChild(document.createTextNode(line));
+      });
+      source.appendChild(notice);
+    }
+    if (dictionaryUrl) {
+      const link = document.createElement("a"); link.className = "notes-row-open";
+      link.href = dictionaryUrl; link.target = "_blank"; link.rel = "noopener noreferrer";
+      const label = document.createElement("span"); label.className = "notes-row-open-text";
+      label.textContent = t("dictSource") + " " + dictionaryUrl;
+      link.appendChild(label);
+      link.insertAdjacentHTML("beforeend", PBP_ICONS.extOpen.replace('<svg ', '<svg class="ext-icon" '));
+      source.appendChild(link);
+    }
+    head.appendChild(source);
+  }
 
   const manage = document.createElement("div");
   manage.className = "vocab-manage-row";
@@ -1101,23 +1126,7 @@ function _pbpVocabSyncDictPronunciation() {
 // A source may resolve a shorter headword (CC-CEDICT prefix matching), so
 // every option names the exact word whose definition it would save.
 function _pbpVocabLookupChoices(norm, lang) {
-  if (!norm) return [];
-  const term = pbpDictNormalizeTerm(norm.word);
-  if (!term) return [];
-  const definitionLang = norm.sourceLabel === "ECDICT" ? "zh" :
-    ["Wiktionary", "CC-CEDICT"].includes(norm.sourceLabel) ? "en" : "und";
-  const choices = [];
-  for (const entry of norm.entries || []) {
-    const visit = sense => {
-      const definition = typeof sense === "string" ? sense : sense?.definition;
-      if (definition) choices.push({ term, language: lang, gloss: definition,
-        ipa: entry.ipas?.[0]?.text || "", sourceUrl: norm.sourceUrl || "", license: norm.license || "",
-        definitionLang, sourceLabel: norm.sourceLabel || "Wiktionary" });
-      for (const sub of sense?.subsenses || []) visit(sub);
-    };
-    for (const sense of entry.senses || []) visit(sense);
-  }
-  return choices;
+  return pbpDictNormChoices(norm, lang, t("dictSource"));
 }
 
 function _pbpVocabSyncLookupSave(state) {
@@ -1140,7 +1149,10 @@ function _pbpVocabAcceptLookupResult(state, source, norm) {
     if (heading) heading.textContent = norm.word;
   }
   state.sources.set(source, _pbpVocabLookupChoices(norm, state.lang));
-  if (![...state.sources.values()].some(rows => rows.length)) return;
+  if (![...state.sources.values()].some(rows => rows.length)) {
+    state.panel?.remove(); state.panel = null;
+    return;
+  }
   if (!state.panel) {
     const panel = document.createElement("div");
     panel.className = "vocab-save-controls";
@@ -1187,10 +1199,11 @@ async function _pbpVocabSaveLookup(state) {
   const choice = state.choices.get(state.select.value);
   if (!choice || state.busy || !state.live()) return;
   const expectedExisting = state.expectedExisting;
+  const packRevision = state.packRevision || 0;
   const gen = ++_vocabRenderGen;
   state.busy = true;
   _pbpVocabSyncLookupSave(state);
-  const live = () => gen === _vocabRenderGen && state.live();
+  const live = () => gen === _vocabRenderGen && state.live() && (!choice.packId || (state.packRevision || 0) === packRevision);
   try {
     const owner = await pbpVocabCurrentOwner();
     if (!live()) return;
@@ -1245,7 +1258,7 @@ async function _pbpVocabSaveLookup(state) {
 // `online: false` runs the local ECDICT block alone (open-to-look-up, T7).
 // #vocab-ref-result is aria-busy while the live run fills it; only the run
 // still live when its legs settle takes the flag down.
-function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true } = {}) {
+function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, packResult } = {}) {
   const { localEl, onlineEl } = els;
   if (_pbpVocabDictChildCtrl) _pbpVocabDictChildCtrl.abort();
   if (_pbpVocabDictChildCleanup) { _pbpVocabDictChildCleanup(); _pbpVocabDictChildCleanup = null; }
@@ -1289,7 +1302,20 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true } = 
   const state = { owner: _vocabCurrentOwner, lang, host, intent, sources: new Map(), choices: new Map(), busy: false };
   state.live = () => _pbpDictCurrent === cur && _pbpVocabDictChildCtrl === child && !signal.aborted &&
     _vocabCurrentOwner === state.owner && !!host?.contains(onlineEl);
+  cur.isCurrent = state.live;
   const acceptLocal = norm => _pbpVocabAcceptLookupResult(state, "local", norm);
+  const ecdictEl = document.createElement("div"), packsEl = document.createElement("div");
+  localEl.replaceChildren(packsEl, ecdictEl);
+  const showPacks = result => _pbpDictPackSide(packsEl, term, lang, signal, cur,
+    norm => _pbpVocabAcceptLookupResult(state, "pack:" + norm.packId + ":" + norm.word, norm), undefined, result);
+  cur.refreshPacks = () => {
+    if (!state.live()) return;
+    state.packRevision = (state.packRevision || 0) + 1;
+    for (const key of state.sources.keys()) if (key.startsWith("pack:")) state.sources.delete(key);
+    _pbpVocabAcceptLookupResult(state, "pack:cleared", null);
+    packsEl.replaceChildren(); showPacks();
+  };
+  const packs = showPacks(packResult);
   if (host && host.contains(onlineEl)) host.setAttribute("aria-busy", "true");
   const settled = () => {
     if (host && _pbpVocabDictChildCtrl === child && !child.signal.aborted) {
@@ -1301,15 +1327,15 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true } = 
     // Open-to-look-up after an offline-pack hit: the local block only. The
     // online chain does not start, so it neither renders nor sends anything;
     // "Look up again" runs the full chain.
-    _pbpDictEcdictSide(localEl, term, lang, signal, cur, acceptLocal).finally(settled);
+    Promise.allSettled([_pbpDictEcdictSide(ecdictEl, term, lang, signal, cur, acceptLocal), packs]).then(settled);
     return;
   }
   _pbpDictSlotSkeleton(onlineEl);
-  const local = _pbpDictEcdictSide(localEl, term, lang, signal, cur, acceptLocal);
+  const local = _pbpDictEcdictSide(ecdictEl, term, lang, signal, cur, acceptLocal);
   const remote = _pbpDictSlotRun(onlineEl, term, lang, signal, Promise.resolve(""), cur.rerun, cur.sentence)
     .then(norm => _pbpVocabAcceptLookupResult(state, "online", norm))
     .catch((err) => console.warn("library relookup failed:", err.name, err.message));
-  Promise.allSettled([local, remote]).then(settled);
+  Promise.allSettled([local, packs, remote]).then(settled);
 }
 
 // Session-only memory of the language the cover lookup uses -- never
@@ -1376,9 +1402,21 @@ async function _pbpVocabLocalProbe(term, lang, signal) {
       console.warn("library auto lookup: local pack failed:", err.name, err.message);
     }
   }
+  let packResult;
+  try {
+    const loaded = await _pbpDictLoadPack();
+    if (signal.aborted) return null;
+    if (loaded && typeof pbpDictPackLookup === "function") {
+      packResult = await pbpDictPackLookup(exact, { sourceLanguage: lang, limit: 20 });
+      if (signal.aborted) return null;
+      if (packResult?.state === "hit" && packResult.hits?.length) return { source: "packs", packResult };
+    }
+  } catch (error) {
+    console.warn("library auto lookup: multilingual pack failed:", error?.name, error?.message);
+  }
   const cached = await _pbpDictCacheGet(lang, exact); // swallows its own errors (returns null)
   if (signal.aborted) return null;
-  return cached ? { source: "cache", norm: cached, matched: exact } : null;
+  return cached ? { source: "cache", norm: cached, matched: exact, packResult } : null;
 }
 
 async function _pbpVocabAutoLookup(w) {
@@ -1445,7 +1483,7 @@ async function _pbpVocabAutoLookup(w) {
     // before the grant check -- still zero network. A grammar pointer is
     // excluded because that chain can fetch another candidate.
     const { els, again } = begin();
-    _pbpVocabDictRun(w.term, lang, els, sentence, again, { online: hit.source !== "ecdict" });
+    _pbpVocabDictRun(w.term, lang, els, sentence, again, { online: hit.source !== "ecdict" && hit.source !== "packs", packResult: hit.packResult });
     return hit.source === "cache" ? "cache" : "local";
   }
   let granted = false;
@@ -1597,9 +1635,9 @@ function _pbpVocabResetRef(w, reconcileOnly = false) {
   if (input) input.value = "";
   const sel = $id("vocab-lookup-lang");
   if (sel) {
-    const code = w && w.language && w.language !== "und" ? w.language : "";
+    const code = w && w.language && w.language !== "und" ? pbpDictPrimaryLang(w.language) : "";
     if (!w) sel.value = _vocabLookupLang;
-    else if (code && [...sel.options].some((o) => o.value === code)) sel.value = code;
+    else if (code) sel.value = code;
     window.pbpListboxSync?.(sel);
   }
   _pbpVocabSyncLookupPlaceholder();
@@ -1756,6 +1794,7 @@ function _pbpVocabFillLookupLangs(sel, locale) {
   }
   if (keep) sel.value = keep;
   if (typeof pbpListboxSync === "function") pbpListboxSync(sel);
+  _pbpDictRefreshPackLangs(sel, locale, false);
 }
 
 // One-time wiring for the lookup row, from the guarded top-level section at

@@ -48,6 +48,7 @@ import { fileURLToPath } from "node:url";
 import { isolatedFontconfigEnv, parityProbeEnv } from "./ci-fonts-env.mjs";
 import { auditSelection } from "./audit-scope.mjs";
 import { QA_SCENARIOS, QA_OPTIONS_PANELS, QA_THEME_PRESETS, runQaScenarios, qaThemeCases, qaReaderControlCases, qaExpectedCases, assertQaCases } from "./audit-qa-scenarios.mjs";
+import { openVocabPackPreview, installVocabPackFixture } from "./audit-vocab-pack-fixture.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(SCRIPT_DIR, "..");
@@ -794,15 +795,12 @@ async function driveOptions(context, extId, rep) {
             s.failures.push(`tab-tags-lowcount-open: ${e.message}`);
           }
         }
-        // The vocab-batch-bar / select-all / batch-delete flow this used to
-        // drive here (#vocab-select-all, #vocab-batch-delete) moved to
-        // library.html when the vocab list left options for its own page --
-        // #panel-vocab now only hosts the "Open notes and vocabulary" link
-        // and Drive sync settings, neither id exists in options.html any
-        // more (stale since the library migration, debt-sweep 2026-08-07
-        // removed the dead selectors rather than fix them in place; the real
-        // batch-selection flow is driveLibrary's own vocab-batch-bar step,
-        // which already uses the current Ctrl+click-row gesture).
+        if (tab === "vocab") {
+          await openVocabPackPreview(page);
+          await rep.shot(page, s, "tab-vocab-pack-preview", { fullPage: true });
+          await installVocabPackFixture(page);
+          await rep.shot(page, s, "tab-vocab-pack-installed", { fullPage: true });
+        }
       } catch (e) {
         s.failures.push(`tab-${tab}: ${e.message}`);
       }

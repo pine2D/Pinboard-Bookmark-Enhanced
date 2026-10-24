@@ -38,12 +38,45 @@ const PBP_DICT_CIRCUIT_COOLDOWN_MS = 60000;
 // or unsupported codes stay hidden instead of leaking technical identifiers.
 function pbpDictLanguageLabel(code, locale) {
   const primary = pbpDictPrimaryLang(code);
-  if (!primary || primary === "und" || !PBP_DICT_QUERY_LANGS.includes(primary)) return "";
+  if (!primary || primary === "und") return "";
   try {
-    const names = new Intl.DisplayNames([String(locale || "en").replace("_", "-")], { type: "language" });
-    const label = names.of(primary);
+    const names = new Intl.DisplayNames([String(locale || "en").replace("_", "-")], { type: "language", fallback: "none" });
+    const label = names.of(String(code).replace(/_/g, "-"));
     return label && label.toLowerCase() !== primary ? label : "";
   } catch (_) { return ""; }
+}
+
+function pbpDictDefinitionLang(norm) {
+  if (norm && typeof norm.definitionLang === "string" && norm.definitionLang) return norm.definitionLang;
+  return norm?.sourceLabel === "ECDICT" ? "zh" :
+    ["Wiktionary", "CC-CEDICT"].includes(norm?.sourceLabel) ? "en" : "und";
+}
+
+// Shared by both save pickers: retain the matched headword and original
+// definition, never the input reading or a translated/AI paraphrase.
+function pbpDictNormChoices(norm, lang, sourcePrefix = "Source:") {
+  if (!norm) return [];
+  const term = pbpDictNormalizeTerm(norm.word);
+  if (!term) return [];
+  const choices = [];
+  // The existing saved license field is a complete attribution notice. Keep
+  // original dictionary metadata immutable; only an explicit save projection
+  // adds the source identifier and its revision, with no inferred license.
+  const license = norm.packId ? [
+    norm.sourceLabel ? sourcePrefix + " " + [norm.sourceLabel, norm.packRevision].filter(Boolean).join(" · ") : "",
+    norm.license, norm.attribution
+  ].filter(Boolean).join("\n\n") : norm.license || "";
+  for (const entry of norm.entries || []) {
+    const visit = (sense) => {
+      const gloss = typeof sense === "string" ? sense : sense?.definition;
+      if (gloss) choices.push({ term, language: lang, gloss,
+        ipa: entry.ipas?.[0]?.text || "", sourceUrl: norm.sourceUrl || "", license,
+        definitionLang: pbpDictDefinitionLang(norm), sourceLabel: norm.sourceLabel || "Wiktionary", packId: norm.packId || "" });
+      for (const sub of sense?.subsenses || []) visit(sub);
+    };
+    for (const sense of entry.senses || []) visit(sense);
+  }
+  return choices;
 }
 
 // Definition language is independent of both the UI and the queried word.
@@ -116,19 +149,26 @@ const PBP_DICT_SCRIPT_RES = Object.freeze({
   // this matches is counter-evidence against a Latin-language route.
   nonLatinLetter: /(?!\p{Script=Latin})\p{L}/u,
 });
-function pbpDictScriptCompatible(primary, selText) {
+function pbpDictScriptCompatible(primary, selText, languageTag = primary) {
   const s = String(selText || "");
   const R = PBP_DICT_SCRIPT_RES;
   if (primary === "zh") return R.han.test(s);
   if (primary === "ja") return R.kana.test(s) || R.han.test(s);
   if (primary === "ko") return R.hangul.test(s) || R.han.test(s);
   if (primary === "ru") return R.cyrillic.test(s) && !R.nonRuCyr.test(s);
-  return R.latin.test(s); // the Latin 8
+  if (PBP_DICT_LATIN_QUERY_LANGS.includes(primary)) return R.latin.test(s);
+  // Installed languages need their own script fit, not the old Latin-only
+  // fallback. CLD/explicit metadata establish the language; this only rejects
+  // a contradictory alphabet and never guesses a new route from its script.
+  try {
+    const script = new Intl.Locale(String(languageTag).replace(/_/g, "-")).maximize().script;
+    return !!script && new RegExp("\\p{Script=" + script + "}", "u").test(s);
+  } catch (_) { return false; }
 }
-function pbpDictAcceptLang(code, selText) {
+function pbpDictAcceptLang(code, selText, supported = PBP_DICT_QUERY_LANGS) {
   const p = pbpDictPrimaryLang(code);
-  if (!PBP_DICT_QUERY_LANGS.includes(p)) return "";
-  return pbpDictScriptCompatible(p, selText) ? p : "";
+  if (!supported.includes(p)) return "";
+  return pbpDictScriptCompatible(p, selText, code) ? p : "";
 }
 
 // Selection-level script rung, AHEAD of CLD: for every non-Latin script in
@@ -780,7 +820,7 @@ async function _pbpDictFetch(lang, term, parentSignal) {
 
 // External dictionary data renders through textContent ONLY.
 function _pbpDictTagLabel(tag) {
-  const key = { pinyin: "dictTagPinyin", simp: "dictTagSimplified", trad: "dictTagTraditional" }[
+  const key = { pinyin: "dictTagPinyin", simp: "dictTagSimplified", trad: "dictTagTraditional", reading: "dictTagReading" }[
     String(tag || "").toLowerCase()
   ];
   return key ? t(key) : String(tag || "");
@@ -875,8 +915,7 @@ function _pbpDictRenderSenses(parent, senses, formOf, termLang, definitionLang) 
 
 function _pbpDictRenderEntry(slot, norm, term, lang, selectedTerm, sentence) {
   slot.replaceChildren();
-  const definitionLang = norm.sourceLabel === "ECDICT" ? "zh" :
-    (norm.sourceLabel === "Wiktionary" || norm.sourceLabel === "CC-CEDICT") ? "en" : "und";
+  const definitionLang = pbpDictDefinitionLang(norm);
   const actual = pbpDictNormalizeTerm(norm.word || term);
   const selected = pbpDictNormalizeTerm(selectedTerm);
   if (selected && actual && actual !== selected) {
@@ -934,13 +973,12 @@ function _pbpDictRenderEntry(slot, norm, term, lang, selectedTerm, sentence) {
   // its own spacing; only a half-width one (en "Source:", ja "出典:") gets a space.
   const srcLabel = t("dictSource");
   label.textContent = /[\u3000-\u303f\uff00-\uffef]$/.test(srcLabel) ? srcLabel : srcLabel + " ";
-  const a = document.createElement("a");
+  const sourceUrl = pbpDictSafeUrl(norm.sourceUrl) || (!norm.packId ? pbpDictWiktionaryUrl(term) : "");
+  const a = document.createElement(sourceUrl ? "a" : "span");
   // Defense-in-depth: sourceUrl is already sanitized at the normalize/merge
   // layers, but this is the only point it reaches a live href.
-  a.href = pbpDictSafeUrl(norm.sourceUrl) || pbpDictWiktionaryUrl(term);
-  a.target = "_blank";
-  a.rel = "noopener noreferrer";
-  a.textContent = (norm.sourceLabel || "Wiktionary") + " · " + (norm.license || "CC BY-SA");
+  if (sourceUrl) { a.href = sourceUrl; a.target = "_blank"; a.rel = "noopener noreferrer"; }
+  a.textContent = [norm.sourceLabel || "Wiktionary", norm.license || (!norm.packId ? "CC BY-SA" : ""), norm.attribution || ""].filter(Boolean).join(" · ");
   src.appendChild(label);
   src.appendChild(a);
   slot.appendChild(src);
@@ -1025,6 +1063,96 @@ async function _pbpDictEcdictSide(localEl, term, lang, parentSignal, cur, onResu
   }
 }
 
+// Every enabled matching source has its own section. This leg neither waits
+// for the online result nor mutates its cache/current-word save state.
+const _pbpDictPackRefresh = new WeakMap();
+async function _pbpDictPackSide(el, term, lang, signal, cur, onResult, preference, cachedResult) {
+  const token = {}; _pbpDictPackRefresh.set(el, token);
+  const alive = () => !signal?.aborted && _pbpDictPackRefresh.get(el) === token &&
+    _pbpDictCurrent === cur && el.isConnected && (!cur.isCurrent || cur.isCurrent());
+  const failed = () => {
+    if (!alive()) return;
+    _pbpDictSlotMsg(el, t("dictLoadFailed"));
+    const retry = document.createElement("button");
+    retry.type = "button"; retry.className = "xp-retry";
+    retry.innerHTML = PBP_ICONS.refresh; // Static shared icon, never source data.
+    retry.append(t("explainErrRetry"));
+    retry.addEventListener("click", () => {
+      if (!alive()) return;
+      retry.disabled = true;
+      _pbpDictPackSide(el, term, lang, signal, cur, onResult, preference);
+    });
+    el.appendChild(retry);
+  };
+  try {
+    if (!lang || !(await _pbpDictLoadPack()) || !alive() || typeof pbpDictPackLookup !== "function") return;
+    const result = cachedResult || await pbpDictPackLookup(term, { sourceLanguage: lang, limit: 20 });
+    if (!alive()) return;
+    if (result?.state === "error") { failed(); return; }
+    if (result?.state !== "hit") return;
+    if (preference === undefined && typeof pbpReadSettingsWithSecrets === "function") {
+      const settings = await pbpReadSettingsWithSecrets({ dictDefinitionLang: "" });
+      if (!alive()) return;
+      preference = settings.dictDefinitionLang;
+    }
+    const locale = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : document.documentElement.lang || "en";
+    const target = pbpDictDefinitionLanguage(preference, locale).lang;
+    const score = (hit) => {
+      const code = pbpDictDefinitionLang(hit.norm);
+      return code === target ? 0 : pbpDictPrimaryLang(code) === pbpDictPrimaryLang(target) ? 1 : 2;
+    };
+    const hits = (result.hits || []).filter(hit => hit?.norm?.entries?.length && hit.pack?.enabled !== false)
+      .slice().sort((a, b) => score(a) - score(b));
+    el.replaceChildren();
+    for (const hit of hits) {
+      const norm = { ...hit.norm, attribution: hit.pack?.attribution || hit.norm.attribution || "",
+        packRevision: hit.pack?.revision || "", generation: hit.pack?.activeGeneration || hit.norm.generation || "" };
+      const box = document.createElement("div"); box.className = "xp-dict-local-box";
+      box.dataset.packId = norm.packId;
+      const title = document.createElement("div"); title.className = "xp-dict-local-title";
+      title.textContent = [hit.pack?.title || norm.sourceLabel, pbpDictLanguageLabel(pbpDictDefinitionLang(norm), locale)].filter(Boolean).join(" · ");
+      const entry = document.createElement("div");
+      _pbpDictRenderEntry(entry, norm, norm.word, lang, term, cur.sentence);
+      box.append(title, entry); el.appendChild(box);
+      if (typeof onResult === "function" && alive()) onResult(norm, box);
+    }
+    if (result.truncated) {
+      const hint = document.createElement("div"); hint.className = "xp-dict-msg";
+      hint.textContent = t("dictPackResultsLimited"); el.appendChild(hint);
+    }
+  } catch (error) {
+    console.warn("[dict] multilingual pack lookup failed:", error?.name, error?.message);
+    failed();
+  }
+}
+
+// Reading metadata is local-only. Keep both the shipped languages and the
+// user's current choice; a stale page/run must never rebuild a newer select.
+const _pbpDictLangRefresh = new WeakMap();
+async function _pbpDictRefreshPackLangs(sel, locale, includeAuto, isCurrent = () => true) {
+  const token = {}; _pbpDictLangRefresh.set(sel, token);
+  try {
+    if (!(await _pbpDictLoadPack()) || typeof pbpDictPackList !== "function") return [...PBP_DICT_QUERY_LANGS];
+    const packs = await pbpDictPackList();
+    const codes = new Set(PBP_DICT_QUERY_LANGS);
+    for (const pack of packs) {
+      const code = pbpDictPrimaryLang(pack.sourceLanguage);
+      if (pack.enabled && pbpDictLanguageLabel(code, locale)) codes.add(code);
+    }
+    if (!sel.isConnected || !isCurrent() || _pbpDictLangRefresh.get(sel) !== token) return [...codes];
+    const keep = sel.value, oldAuto = sel.querySelector('option[value=""]')?.textContent;
+    sel.replaceChildren();
+    if (includeAuto) sel.appendChild(new Option(oldAuto || t("dictLangAuto"), ""));
+    for (const code of codes) sel.appendChild(new Option(pbpDictLanguageLabel(code, locale) || code, code));
+    if (keep === "" && includeAuto || codes.has(keep)) sel.value = keep;
+    if (typeof pbpListboxSync === "function") pbpListboxSync(sel);
+    return [...codes];
+  } catch (error) {
+    console.warn("[dict] installed language read failed:", error?.name, error?.message);
+    return [...PBP_DICT_QUERY_LANGS];
+  }
+}
+
 function _pbpDictSlotSkeleton(slot) {
   slot.replaceChildren();
   const sk = document.createElement("div");
@@ -1035,6 +1163,25 @@ function _pbpDictSlotSkeleton(slot) {
   sr.textContent = t("dictLoading");
   slot.appendChild(sr);
 }
+
+let _pbpDictPackNoticeTimer = 0;
+function _pbpDictPacksChanged() {
+  if (_pbpDictPackNoticeTimer) return;
+  _pbpDictPackNoticeTimer = setTimeout(() => {
+    _pbpDictPackNoticeTimer = 0;
+    _pbpDictCurrent?.refreshPacks?.();
+    _pbpDictCurrent?.refreshLanguages?.();
+    const select = document.getElementById("vocab-lookup-lang");
+    if (select) _pbpDictRefreshPackLangs(select,
+      typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : document.documentElement.lang || "en", false);
+  }, 0);
+}
+window.addEventListener("pbp-dict-packs-changed", _pbpDictPacksChanged);
+try {
+  const channel = new BroadcastChannel("pbp-dict-packs");
+  channel.addEventListener("message", event => { if (event.data?.type === "changed") _pbpDictPacksChanged(); });
+  window.addEventListener("pagehide", () => channel.close(), { once: true });
+} catch (_) { /* Same-page notifications still work without BroadcastChannel. */ }
 
 // dict-pack.js is NOT in md-preview.html: most users never import the pack,
 // and the reader stays lean. First zh lookup injects it once (CSP 'self').
@@ -1089,6 +1236,9 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
   // "no entry" here reads as "the dictionary is missing this word" and makes
   // Auto look broken; name the visible control the reader can fix it with.
   if (!lang) { _pbpDictSlotFallback(slot, t("dictLangUnknown"), term); return null; }
+  if (!PBP_DICT_QUERY_LANGS.includes(pbpDictPrimaryLang(lang))) {
+    _pbpDictSlotMsg(slot, t("dictOnlineLanguageUnavailable")); return null;
+  }
   if (lang === "zh") {
     const loaded = await _pbpDictLoadPack();
     if (parentSignal && parentSignal.aborted) return null;
@@ -1316,29 +1466,42 @@ function _pbpDictDetect(text) {
 // last resort. EVERY automatic rung passes pbpDictAcceptLang, so a
 // confident detection can no longer route a query the dropdown cannot
 // express or the selection's script contradicts.
-async function _pbpDictResolveLang(cap, ctx, manual) {
+async function _pbpDictResolveLang(cap, ctx, manual, installedLanguages) {
   const view = document.getElementById("rendered-view");
   // "und" (an article whose language nothing could establish) is no route.
   const articleLang = view ? (view.getAttribute("lang") || "").replace(/^und$/i, "") : "";
-  if (pbpDictPrimaryLang(manual)) return pbpDictPrimaryLang(manual);
+  if (pbpDictPrimaryLang(manual)) {
+    const code = pbpDictPrimaryLang(manual);
+    if (PBP_DICT_QUERY_LANGS.includes(code) || (installedLanguages && (await installedLanguages).includes(code))) return code;
+  }
   const sel = String(cap.text || "");
-  const explicit = pbpDictAcceptLang(ctx.selLang || "", sel);
+  const accept = async (code) => {
+    if (!pbpDictPrimaryLang(code)) return "";
+    if (PBP_DICT_QUERY_LANGS.includes(pbpDictPrimaryLang(code))) return pbpDictAcceptLang(code, sel);
+    const supported = installedLanguages ? await installedLanguages : PBP_DICT_QUERY_LANGS;
+    return pbpDictAcceptLang(code, sel, supported);
+  };
+  const explicit = await accept(ctx.selLang || "");
   if (explicit) return explicit;
   const byScript = pbpDictScriptLang(sel, ctx.sentence || "");
-  if (byScript) return pbpDictCorrectCjkLang(byScript, articleLang);
+  if (byScript) {
+    const supported = installedLanguages ? await installedLanguages : PBP_DICT_QUERY_LANGS;
+    const ambiguous = supported.some(code => !PBP_DICT_QUERY_LANGS.includes(code) && pbpDictScriptCompatible(code, sel));
+    if (!ambiguous) return pbpDictCorrectCjkLang(byScript, articleLang);
+  }
   const bySentence = await _pbpDictDetect(ctx.sentence || cap.text);
-  const first = pbpDictAcceptLang(pbpDictRouteLang(bySentence.lang, bySentence.reliable, "", ""), sel);
+  const first = await accept(pbpDictRouteLang(bySentence.lang, bySentence.reliable, "", ""));
   if (first) return pbpDictCorrectCjkLang(first, articleLang);
   const byBlock = await _pbpDictDetect(ctx.blockText || "");
-  const routed = pbpDictAcceptLang(
-    pbpDictCorrectCjkLang(pbpDictRouteLang(byBlock.lang, byBlock.reliable, articleLang, ""), articleLang), sel);
+  const routed = await accept(
+    pbpDictCorrectCjkLang(pbpDictRouteLang(byBlock.lang, byBlock.reliable, articleLang, ""), articleLang));
   if (routed) return routed;
   // Article prior: a reliable full-prose read routes a selection whose local
   // context was too short or too jargon-heavy to decide (a German word
   // selected alone in a German article). Reliable-only: an unreliable
   // article read means the document itself is mixed, no prior to take.
   const byArticle = await _pbpDictArticleCld();
-  const prior = pbpDictAcceptLang(pbpDictRouteLang(byArticle.lang, byArticle.reliable, "", ""), sel);
+  const prior = await accept(pbpDictRouteLang(byArticle.lang, byArticle.reliable, "", ""));
   if (prior) return pbpDictCorrectCjkLang(prior, articleLang);
   return pbpDictLatinFallback(sel, bySentence.lang, byBlock.lang);
 }
@@ -1477,6 +1640,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
     }
   };
   _pbpDictCurrent = cur;
+  cur.isCurrent = () => _pbpDictCurrent === cur && _pbpDictOwner === cur.owner;
 
   // Vocab button: disabled until BOTH slots settle so a save is never empty
   // (Codex HIGH 3). dataset.runId guards stale promise writes. Set the
@@ -1557,7 +1721,9 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   _pbpDictSlotSkeleton(onlineEl);
 
   const manual = _pbpDictManualLang;
-  const lang = await _pbpDictResolveLang(cap, ctx, manual);
+  const installedLanguages = _pbpDictRefreshPackLangs(sel, languageLocale, true,
+    () => !signal.aborted && _pbpDictCurrent === cur);
+  const lang = await _pbpDictResolveLang(cap, ctx, manual, installedLanguages);
   if (signal.aborted || _pbpDictCurrent !== cur) return;
   cur.lang = lang;
   const effectiveLang = lang || "und"; // vocab identity: query and save agree (Codex HIGH 6)
@@ -1566,7 +1732,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   // ONLY when the user picked it this document. The old display put the
   // detected language in the box as a bare code, indistinguishable from a
   // stuck manual override.
-  if (manual && PBP_DICT_LANGS.includes(manual)) {
+  if (manual && [...sel.options].some(option => option.value === manual)) {
     sel.value = manual;
   } else {
     sel.value = "";
@@ -1578,6 +1744,10 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
     cur.rerun(); // abort old requests NOW
   });
   speak.addEventListener("click", () => pbpDictSpeak(cur.term || cap.text, cur.lang));
+  cur.refreshLanguages = () => _pbpDictRefreshPackLangs(sel, languageLocale, true,
+    () => !signal.aborted && _pbpDictCurrent === cur).then(codes => {
+      if (!signal.aborted && _pbpDictCurrent === cur && _pbpDictManualLang && !codes.includes(_pbpDictManualLang)) _pbpDictManualLang = "";
+    });
 
   let lemmaSettled = false;
   let resolveLemmaRaw;
@@ -1587,13 +1757,34 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   // Deliberately NOT part of the allSettled below: putting it there would make
   // the whole run's completion wait on an IDB read, and the online chain is the
   // one thing that must never be delayed by the local pack.
-  _pbpDictEcdictSide(localEl, cap.text, lang, signal, cur);
+  const ecdictEl = document.createElement("div"), packsEl = document.createElement("div");
+  localEl.append(packsEl, ecdictEl);
+  _pbpDictEcdictSide(ecdictEl, cap.text, lang, signal, cur);
+  const showPacks = () => _pbpDictPackSide(packsEl, cap.text, lang, signal, cur,
+    (norm, box) => _pbpDictReaderPackChoices(norm, box, cur, pop, signal), s.dictDefinitionLang);
+  cur.refreshPacks = () => {
+    if (signal.aborted || _pbpDictCurrent !== cur) return;
+    cur.packRevision = (cur.packRevision || 0) + 1;
+    cur.packSelects = [];
+    if (cur.packChoice) {
+      cur.packChoice = null;
+      // A revoked source must not silently change the selected headword or
+      // leave its old definition collectible while the refreshed packs load.
+      cur.packInvalidated = true;
+      cur.gloss = ""; cur.ipa = ""; cur.sourceUrl = ""; cur.license = "";
+      if (vocabBtn) { vocabBtn.hidden = false; vocabBtn.disabled = true; }
+      const status = pop.querySelector(".xp-vocab-status");
+      if (status) { status.hidden = true; status.onclick = null; }
+    }
+    packsEl.replaceChildren(); showPacks();
+  };
+  showPacks();
 
   const results = await Promise.allSettled([
     _pbpDictSlotRun(onlineEl, cap.text, lang, signal, lemmaPromise, cur.rerun, ctx.sentence).then((norm) => {
       // Sync the defined word the moment the dictionary slot settles -- the
       // speak button is live before the (slower) AI slot finishes.
-      if (norm && norm.sourceLabel === "CC-CEDICT" && norm.word && _pbpDictCurrent === cur) cur.term = norm.word;
+      if (norm && norm.sourceLabel === "CC-CEDICT" && norm.word && _pbpDictCurrent === cur && !cur.packChoice) cur.term = norm.word;
       return norm;
     }),
     _pbpDictCtxRun(ctxEl, cap, ctx, s, signal, resolveLemmaOnce, lang)
@@ -1601,6 +1792,12 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
   if (signal.aborted || _pbpDictCurrent !== cur) return;
   const norm = results[0].status === "fulfilled" ? results[0].value : null;
   const parsed = results[1].status === "fulfilled" ? results[1].value : null;
+  const savedChoice = cur.packChoice;
+  const preservedTerm = cur.term;
+  if (savedChoice || cur.packInvalidated) {
+    cur.term = norm?.sourceLabel === "CC-CEDICT" && norm.word ? norm.word : cap.text;
+    cur.gloss = ""; cur.ipa = ""; cur.sourceUrl = ""; cur.license = ""; cur.lemma = "";
+  }
   if (norm) {
     // The reader saves what they see. The slot renders the context-ordered
     // view, so the persisted gloss/ipa must read the SAME view -- reading
@@ -1635,6 +1832,57 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
     cur.lemma = parsed.lemma;
   }
   if (parsed) _pbpDictCtxSignal(body, ctxEl, ctxReady);
+  if (cur.packInvalidated && !cur.packChoice) {
+    cur.term = preservedTerm; cur.gloss = ""; cur.ipa = ""; cur.sourceUrl = ""; cur.license = ""; cur.lemma = "";
+    return;
+  }
+  if (cur.packChoice) _pbpDictApplyPackChoice(cur, cur.packChoice);
+  await _pbpDictRefreshSave(pop, cur, signal);
+}
+
+function _pbpDictApplyPackChoice(cur, choice) {
+  Object.assign(cur, { term: choice.term, lang: choice.language, gloss: choice.gloss,
+    ipa: choice.ipa, sourceUrl: choice.sourceUrl, license: choice.license, lemma: "" });
+}
+
+function _pbpDictReaderPackChoices(norm, box, cur, pop, signal) {
+  const choices = pbpDictNormChoices(norm, cur.lang, t("dictSource"));
+  if (!choices.length) return;
+  const select = document.createElement("select");
+  select.className = "xp-dict-lang";
+  select.dataset.packId = norm.packId;
+  select.setAttribute("aria-label", t("vocabSaveDefinitionLabel"));
+  select.appendChild(new Option(t("vocabSaveDefinitionLabel"), ""));
+  choices.forEach((choice, index) => {
+    const option = new Option(choice.term + " · " + choice.gloss, String(index));
+    option.lang = choice.definitionLang; select.appendChild(option);
+  });
+  (cur.packSelects || (cur.packSelects = [])).push(select);
+  select.addEventListener("change", () => {
+    const choice = choices[Number(select.value)];
+    if (select.value === "" || !choice || signal.aborted || _pbpDictCurrent !== cur) return;
+    for (const other of cur.packSelects) if (other !== select) other.value = "";
+    cur.packChoice = choice; cur.packInvalidated = false;
+    cur.packRevision = (cur.packRevision || 0) + 1;
+    _pbpDictApplyPackChoice(cur, choice);
+    _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name, error?.message));
+  });
+  box.appendChild(select);
+}
+
+async function _pbpDictRefreshSave(pop, cur, signal) {
+  const vocabBtn = pop.querySelector(".xp-vocab"), runId = cur.runId, choice = cur.packChoice;
+  if (signal.aborted || _pbpDictCurrent !== cur) return;
+  cur.saved = false; cur.savedRecord = null;
+  if (vocabBtn) {
+    vocabBtn.hidden = false; vocabBtn.disabled = false;
+    delete vocabBtn.dataset.face;
+    if (typeof _pbpExplainIconBtn === "function") {
+      _pbpExplainIconBtn(vocabBtn, PBP_EXPLAIN_VOCAB_ADD_SVG, t("dictSaveVocab"));
+    } else vocabBtn.textContent = t("dictSaveVocab");
+  }
+  const status = pop.querySelector(".xp-vocab-status");
+  if (status) { status.hidden = true; status.onclick = null; }
   if (vocabBtn && vocabBtn.dataset.runId === String(runId)) {
     // Owner gate on the READ side as well: `hit` comes out of cur.owner's
     // partition and everything derived from it -- the "already saved" face,
@@ -1648,8 +1896,8 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s) {
     // below are the ones that must be fail-closed against a token swap this
     // page has not seen yet.
     if (cur.owner !== _pbpDictOwner) { vocabBtn.disabled = false; return; }
-    const hit = await pbpVocabGet(pbpDictVocabKey(cur.owner, effectiveLang, cur.term));
-    if (signal.aborted || _pbpDictCurrent !== cur || vocabBtn.dataset.runId !== String(runId)) return;
+    const hit = await pbpVocabGet(pbpDictVocabKey(cur.owner, cur.lang || "und", cur.term));
+    if (signal.aborted || _pbpDictCurrent !== cur || cur.packChoice !== choice || vocabBtn.dataset.runId !== String(runId)) return;
     if (cur.owner !== _pbpDictOwner) { vocabBtn.disabled = false; return; } // switch landed during the read
     if (hit) {
       cur.saved = true;
@@ -1776,6 +2024,7 @@ window.pbpDictRun = pbpDictRun;
 
 async function pbpDictSaveCurrent() {
   const cur = _pbpDictCurrent;
+  const packRevision = cur?.packRevision || 0;
   if (!cur || !cur.term) return false;
   if (cur.owner !== _pbpDictOwner) return false; // owner re-check at commit time (invariant)
   const urlEl = document.getElementById("preview-url");
@@ -1822,6 +2071,7 @@ async function pbpDictSaveCurrent() {
     const live = await pbpVocabCurrentOwner().catch(() => null);
     if (live !== cur.owner) return false;
   }
+  if (cur.packInvalidated || (cur.packRevision || 0) !== packRevision) return false;
   const entry = await pbpVocabSaveWord(cur.owner, {
     term: cur.term, lemma: cur.lemma, language: cur.lang || "und",
     gloss: cur.gloss, ipa: cur.ipa, sourceUrl: cur.sourceUrl, license: cur.license,

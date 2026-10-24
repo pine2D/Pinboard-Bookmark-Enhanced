@@ -103,6 +103,16 @@ body{font-family:monospace;padding:16px}.case{padding:5px;border-bottom:1px soli
     </div>
   </details>
 </div>
+<details id="multi-pack-section">
+  <summary><span id="multi-pack-summary"></span></summary>
+  <button id="multi-pack-choose">Choose file</button><input id="multi-pack-file" type="file">
+  <p id="multi-pack-status"></p><div id="multi-pack-list"></div>
+  <div id="multi-pack-preview" hidden>
+    <p id="multi-pack-name"></p><input id="multi-pack-source-language"><input id="multi-pack-target-language">
+    <input id="multi-pack-source-url"><textarea id="multi-pack-license"></textarea>
+    <button id="multi-pack-install">Import</button><button id="multi-pack-cancel">Cancel</button>
+  </div>
+</details>
 <div id="results"></div>
 <script>
 function t(key, ...values) { return key + (values.length ? ":" + values.join(",") : ""); }
@@ -182,6 +192,86 @@ delete document.documentElement.dataset.theme;
 
 (async () => {
   const task = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  check("multilingual pack management exposes import preview and installed-source controls",
+    typeof _pbpMultiPackPrepare === "function" && typeof _pbpMultiPackRefresh === "function");
+  if (typeof _pbpMultiPackPrepare === "function") {
+    const names = ["pbpDictPackList", "pbpYomitanInspectFile", "pbpYomitanImportFile", "pbpDictPackSetEnabled", "pbpDictPackSetAiAllowed", "pbpDictPackDelete"];
+    const originals = Object.fromEntries(names.map(name => [name, window[name]]));
+    const realConfirm = showConfirmPopover;
+    const pack = {id:"test-pack", activeGeneration:"reviewed-generation", title:"<img src=x onerror=alert(1)>", revision:"2026.10", sourceLanguage:"de", targetLanguage:"en", sourceUrl:"https://example.org/dictionary", license:"CC BY-SA 4.0\nAttribution preserved verbatim", entries:4, enabled:true, aiAllowed:false};
+    let rows = [pack], confirmed = null, writes = [], inspections = [];
+    try {
+      window.pbpDictPackList = async () => rows;
+      window.pbpDictPackSetEnabled = async (id, value) => { writes.push(["enabled",id,value]); pack.enabled=value; };
+      window.pbpDictPackSetAiAllowed = async (id, value, generation) => { writes.push(["ai",id,value,generation]); pack.aiAllowed=value; };
+      window.pbpDictPackDelete = async (id, generation) => { writes.push(["delete",id,generation]); rows=[]; };
+      showConfirmPopover = (_button, spec) => { confirmed = spec; };
+      await _pbpMultiPackRefresh();
+      check("pack names are rendered as text, never dictionary HTML", !$id("multi-pack-list").querySelector("img") && $id("multi-pack-list").textContent.includes(pack.title));
+      check("installed pack provenance remains visible", $id("multi-pack-list").textContent.includes(pack.license) && $id("multi-pack-list").querySelector('a[href="https://example.org/dictionary"]'));
+      const source = $id("multi-pack-list").querySelector("a");
+      check("source links prevent opener access", source.rel.includes("noopener") && source.target==="_blank");
+      $id("multi-pack-list").querySelector('[data-pack-action="enabled"]').click(); await task(); await task();
+      check("enable action changes only the selected dictionary", JSON.stringify(writes[0])===JSON.stringify(["enabled","test-pack",false]));
+      $id("multi-pack-list").querySelector('[data-pack-action="ai"]').click();
+      check("allowing dictionary AI use requires the explicit source disclosure", !!confirmed && writes.length===1);
+      await confirmed.onConfirm(); await task();
+      check("the explicit AI choice persists separately from lookup enablement", writes.some(w=>w[0]==="ai" && w[2]===true && w[3]===pack.activeGeneration) && pack.enabled===false);
+      $id("multi-pack-list").querySelector('[data-pack-action="delete"]').click();
+      check("deletion does not run before confirmation", !writes.some(w=>w[0]==="delete"));
+      await confirmed.onConfirm();
+      check("deletion refreshes the empty list", rows.length===0 && writes.some(w=>w[0]==="delete" && w[2]===pack.activeGeneration) && $id("multi-pack-list").textContent.includes("multiPackEmpty"));
+      let resolveOld;
+      window.pbpYomitanInspectFile = async f => { inspections.push(f.name); return f.name==="old.zip" ? new Promise(resolve=>{resolveOld=resolve;}) : {...pack,title:f.name}; };
+      const old = _pbpMultiPackPrepare({name:"old.zip"});
+      await _pbpMultiPackPrepare({name:"new.zip"});
+      resolveOld({...pack,title:"old.zip"}); await old;
+      check("a late file inspection cannot replace the newer preview", $id("multi-pack-name").textContent.includes("new.zip") && !$id("multi-pack-name").textContent.includes("old.zip"));
+      check("import preview preserves separate word and definition languages", $id("multi-pack-source-language").value==="de" && $id("multi-pack-target-language").value==="en");
+      check("license review preserves multiline source notices verbatim", $id("multi-pack-license").value===pack.license);
+      $id("multi-pack-cancel").click();
+      check("cancelling the preview hides it without changing installed packs", $id("multi-pack-preview").hidden && rows.length===0);
+      rows=[pack]; confirmed=null;
+      window.pbpYomitanInspectFile=async (_file, options={})=>({...pack,...options});
+      let imports=[];
+      window.pbpYomitanImportFile=async (file,options)=>{imports.push({file,options});return {...pack,entries:7};};
+      await _pbpMultiPackPrepare({name:"replacement.zip"});
+      $id("multi-pack-source-language").value="es";
+      $id("multi-pack-target-language").value="de";
+      await _pbpMultiPackInstall();
+      check("replacement waits for confirmation before touching dictionary data", !!confirmed && imports.length===0 && ! $id("multi-pack-install").disabled);
+      const staleConfirmation=confirmed;
+      $id("multi-pack-target-language").value="fr";
+      await staleConfirmation.onConfirm();
+      check("editing reviewed metadata requires a fresh replacement confirmation", imports.length===0 && confirmed!==staleConfirmation);
+      $id("multi-pack-target-language").value="de";
+      await _pbpMultiPackInstall();
+      await confirmed.onConfirm();
+      check("install carries the reviewed language pair without enabling AI", imports.length===1 && imports[0].options.sourceLanguage==="es" && imports[0].options.targetLanguage==="de" && imports[0].options.aiAllowed!==true);
+      check("successful install settles the preview and controls", $id("multi-pack-preview").hidden && !$id("multi-pack-choose").disabled && $id("multi-pack-status").classList.contains("ok"));
+      await _pbpMultiPackPrepare({name:"bad.zip"});
+      window.pbpYomitanInspectFile=async()=>{throw Object.assign(new Error("language required"),{code:"invalid_language"});};
+      await _pbpMultiPackInstall();
+      check("invalid language metadata blocks import and offers correction", imports.length===1 && !$id("multi-pack-preview").hidden && $id("multi-pack-status").textContent==="multiPackLanguageRequired" && !$id("multi-pack-install").disabled);
+      window.pbpYomitanInspectFile=async()=>({...pack,id:"new-pack"});
+      window.pbpYomitanImportFile=async (_file,options)=>new Promise((_resolve,reject)=>options.signal.addEventListener("abort",()=>reject(new DOMException("cancelled","AbortError")),{once:true}));
+      await _pbpMultiPackPrepare({name:"cancel.zip"});
+      const installing=_pbpMultiPackInstall(); await task(); await task();
+      check("an active import locks edits but leaves cancellation reachable", $id("multi-pack-install").disabled && $id("multi-pack-source-language").disabled && !$id("multi-pack-cancel").disabled);
+      $id("multi-pack-cancel").click(); await installing;
+      check("cancelling an active import restores controls and preserves the installed list", $id("multi-pack-status").textContent==="multiPackCancelled" && !$id("multi-pack-install").disabled && rows[0]===pack);
+      rows=[];
+      window.dispatchEvent(new CustomEvent("pbp-dict-packs-changed")); await task(); await task();
+      check("package notifications refresh settings after changes in another view", $id("multi-pack-list").textContent.includes("multiPackEmpty"));
+      window.pbpDictPackList = async () => {throw new Error("read failed");};
+      await _pbpMultiPackRefresh();
+      check("unreadable dictionary storage is an error instead of an empty-list success", $id("multi-pack-status").textContent==="multiPackReadFailed" && $id("multi-pack-status").classList.contains("bad"));
+    } finally {
+      for (const name of names) { if(originals[name]===undefined)delete window[name];else window[name]=originals[name]; }
+      showConfirmPopover=realConfirm;
+    }
+  }
 
   const realPackMeta = pbpPackMeta;
   const realPackDelete = pbpPackDelete;

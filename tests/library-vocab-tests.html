@@ -4324,6 +4324,81 @@ await (async () => {
     }
   }
 
+  // Imported sources retain their own identities and can be collected even
+  // when the independent online leg has not answered.
+  {
+    const old={load:_pbpDictLoadPack,lookup:window.pbpDictPackLookup,list:window.pbpDictPackList,
+      remote:_pbpDictSlotRun,local:_pbpDictEcdictSide,owner:pbpVocabCurrentOwner,get:pbpVocabGet,
+      save:pbpVocabSaveWord,reload:_pbpVocabReloadAfterMutation,read:pbpReadSettingsWithSecrets,auto:_pbpVocabAutoLookup};
+    const owner="acct_multilingual",writes=[];
+    const entry=(term,gloss,definitionLang)=>({word:term,packId:"custom-pack",sourceLabel:"User dictionary",sourceLanguage:"de",definitionLang,
+      sourceUrl:"https://example.test/dictionary",license:"User-supplied",aiAllowed:false,
+      entries:[{pos:"noun",ipas:[{text:"reading",tags:["Reading"]}],forms:[],senses:[{definition:gloss}]}]});
+    const one=entry("Gift","poison","en"),two=entry("gift","gabe","de");
+    const packed={state:"hit",hits:[{pack:{id:"custom-pack",title:"User dictionary",revision:"v2",attribution:"Author credit\nOriginal terms",enabled:true},norm:one},{pack:{id:"custom-pack",title:"User dictionary",revision:"v2",enabled:true},norm:two}]};
+    let lookupCalls=0,remoteCalls=0,releaseRemote;
+    try {
+      _pbpVocabRenderDetail(null);_vocabCurrentOwner=owner;_vocabRows=[];
+      _pbpDictLoadPack=async()=>true;
+      window.pbpDictPackList=async()=>[{id:"custom-pack",enabled:true,sourceLanguage:"ar",targetLanguage:"en"}];
+      window.pbpDictPackLookup=async()=>{lookupCalls++;return packed;};
+      _pbpDictEcdictSide=async()=>{};
+      _pbpDictSlotRun=()=>{remoteCalls++;return new Promise(resolve=>{releaseRemote=resolve;});};
+      pbpVocabCurrentOwner=async()=>owner;pbpVocabGet=async()=>null;
+      pbpReadSettingsWithSecrets=async()=>({dictDefinitionLang:"de"});
+      pbpVocabSaveWord=async(scope,data,opts)=>{writes.push({scope,data,opts});return {id:pbpDictVocabKey(scope,data.language,data.term),...data};};
+      _pbpVocabReloadAfterMutation=async()=>false;
+      check("packs: selectable meanings use the pack's actual definition language",
+        _pbpVocabLookupChoices(two,"de")[0]?.definitionLang==="de");
+      _pbpVocabLookupOther("gift","de");await settle();
+      let select=$id("vocab-ref-result").querySelector(".vocab-save-definition");
+      check("packs: two actual headwords from one source remain independently selectable",select?.options.length===3);
+      check("packs: local choices appear while the online lookup is still pending",!!select&&remoteCalls===1&&$id("vocab-ref-result").getAttribute("aria-busy")==="true");
+      const opt=select&&[...select.options].find(option=>option.textContent.includes("Gift · poison"));
+      if(opt){select.value=opt.value;select.dispatchEvent(new Event("change"));$id("vocab-ref-result").querySelector(".vocab-lookup-save").click();await settle();}
+      check("packs: Save writes the matched headword, original gloss and reading",writes[0]?.data.term==="Gift"&&writes[0]?.data.gloss==="poison"&&writes[0]?.data.ipa==="reading");
+      check("packs: explicit collection preserves source revision, full notice and account",writes[0]?.scope===owner&&writes[0]?.data.sourceUrl==="https://example.test/dictionary"&&writes[0]?.data.license==="dictSource User dictionary · v2\n\nUser-supplied\n\nAuthor credit\nOriginal terms"&&writes[0]?.opts.replaceDefinition===true);
+      releaseRemote?.(null);await settle();
+      check("packs: an online miss leaves local results and choices available",$id("vocab-ref-result").querySelectorAll('.xp-dict-local-box').length===2&&$id("vocab-ref-result").querySelector('.vocab-save-definition')?.options.length===3);
+      _pbpVocabDictCtrl?.abort();_pbpVocabDictCtrl=new AbortController();
+      const probe=await _pbpVocabLocalProbe("gift","de",_pbpVocabDictCtrl.signal);
+      check("packs: open-to-look-up finds installed sources before a network grant",probe?.source==="packs"&&probe?.packResult?.hits.length===2);
+      const before=lookupCalls,remotes=remoteCalls;const els=_pbpVocabRefSlot();
+      _pbpVocabDictRun("gift","de",els,"",()=>{}, {online:false,packResult:probe?.packResult});await settle();
+      check("packs: the local probe result is reused without a second lookup or online request",lookupCalls===before&&remoteCalls===remotes&&$id("vocab-ref-result").querySelectorAll('.xp-dict-local-box').length===2);
+      _pbpVocabFillLookupLangs($id("vocab-lookup-lang"),"en");await settle();
+      check("packs: library language choices include installed Arabic and retain English",[...$id("vocab-lookup-lang").options].some(o=>o.value==="ar")&&[...$id("vocab-lookup-lang").options].some(o=>o.value==="en"));
+      const queryTerm=_pbpDictCurrent.term,queryLang=_pbpDictCurrent.lang;
+      select=$id("vocab-ref-result").querySelector(".vocab-save-definition");
+      if(select){select.selectedIndex=1;select.dispatchEvent(new Event("change"));}
+      let releaseOwner;pbpVocabCurrentOwner=()=>new Promise(resolve=>{releaseOwner=resolve;});
+      $id("vocab-ref-result").querySelector(".vocab-lookup-save")?.click();await settle();
+      const beforeRevocation=writes.length;
+      window.pbpDictPackLookup=async()=>({state:"unavailable",hits:[]});
+      window.pbpDictPackList=async()=>[];
+      window.dispatchEvent(new CustomEvent("pbp-dict-packs-changed",{detail:{type:"changed",id:"custom-pack",action:"delete"}}));await settle();
+      releaseOwner?.(owner);await settle();pbpVocabCurrentOwner=async()=>owner;
+      check("packs: source revocation during the owner read cancels pending collection",writes.length===beforeRevocation);
+      check("packs: a committed deletion removes stale sources and their save choices",!$id("vocab-ref-result").querySelector('.vocab-save-definition')&&!$id("vocab-ref-result").querySelector('.xp-dict-local-box'));
+      check("packs: removing an installed language option does not mutate the active query identity",![...$id("vocab-lookup-lang").options].some(o=>o.value==="ar")&&_pbpDictCurrent.term===queryTerm&&_pbpDictCurrent.lang===queryLang);
+      let release;window.pbpDictPackLookup=()=>new Promise(resolve=>{release=resolve;});
+      _pbpVocabLookupOther("gift","de");await settle();_vocabCurrentOwner="acct_other";release?.(packed);await settle();
+      check("packs: results received after an account switch cannot render sources or create save choices",!$id("vocab-ref-result").querySelector('.vocab-save-definition')&&!$id("vocab-ref-result").querySelector('.xp-dict-local-box'));
+      releaseRemote?.(null);await settle();
+      _vocabCurrentOwner=owner;_pbpVocabAutoLookup=async()=>{};
+      const stored={id:pbpDictVocabKey(owner,"de","Gift"),owner,term:"Gift",language:"de",gloss:"poison",contexts:[],groups:[],license:"Source: User dictionary · v2\n\nUser-supplied\n\nAuthor credit",sourceUrl:"https://example.test/dictionary"};
+      _pbpVocabRenderDetail(stored);
+      check("packs: saved provenance and its true source link remain visible after the dictionary was deleted",document.querySelector('.vocab-detail-source')?.textContent.includes("Author credit")&&document.querySelector('.vocab-detail-source a')?.href==="https://example.test/dictionary");
+      _pbpVocabRenderDetail({...stored,sourceUrl:"javascript:alert(1)",license:"<img src=x onerror=alert(1)>"});
+      check("packs: stored source notices are plain text and unsafe source URLs never become links",document.querySelector('.vocab-detail-source')?.textContent.includes("<img src=x onerror=alert(1)>")&&!document.querySelector('.vocab-detail-source a, .vocab-detail-source img'));
+    } finally {
+      _pbpVocabDictCtrl?.abort();_pbpVocabDictChildCtrl?.abort();_pbpVocabRenderDetail(null);
+      _pbpDictLoadPack=old.load;window.pbpDictPackLookup=old.lookup;window.pbpDictPackList=old.list;
+      _pbpDictSlotRun=old.remote;_pbpDictEcdictSide=old.local;pbpVocabCurrentOwner=old.owner;pbpVocabGet=old.get;
+      pbpVocabSaveWord=old.save;_pbpVocabReloadAfterMutation=old.reload;pbpReadSettingsWithSecrets=old.read;_pbpVocabAutoLookup=old.auto;
+    }
+  }
+
   document.title = fail ? "FAIL library-vocab Tests" : "PASS library-vocab Tests";
 })();
 </script></body></html>

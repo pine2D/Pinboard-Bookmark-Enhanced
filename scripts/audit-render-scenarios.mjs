@@ -27,6 +27,8 @@ export const RENDER_READER_CONTEXTS = Object.freeze([
 const context = (name, dependencies = [], extra = {}) => ({ name, dependencies, ...extra });
 export const RENDER_SWEEP_CONTEXTS = Object.freeze({
   options: [...RENDER_OPTIONS_TABS.map((name) => context(name, [], { target: `#panel-${name.slice(4)}.active` })),
+    context('vocab-pack-preview', [], { target: '#multi-pack-preview:not([hidden])' }),
+    context('vocab-pack-installed', ['vocab-pack-preview'], { target: '#multi-pack-list button[data-pack-action]' }),
     context('save-failure', [], { target: '#auto-save-retry' })],
   library: [
     context('vocab-list', [], { target: '#vocab-list .vocab-card' }),
@@ -89,6 +91,7 @@ export const RENDER_SCENARIOS = Object.freeze([
     if (item.dpr) axes.dpr = item.dpr;
     return row(sweepScenarioId(surface, item.name), surface, themes, {
       type: 'sweep', context: item.name,
+      ...(item.name.startsWith('vocab-pack-') ? { files: [...files(surface), 'options-vocab.js', 'dict-pack.js', 'scripts/audit-vocab-pack-fixture.mjs'] } : {}),
       features: [...new Set([item.name, item.name.replace(/^tab-/, ''), surface])], kinds: ['layout'], axes: { ...axes, state: [item.name] },
       defaults: surface === 'md-preview' ? { scheme: ['light'] } : {},
       dependencies: item.dependencies.map((name) => sweepScenarioId(surface, name)),

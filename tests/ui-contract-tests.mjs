@@ -1374,14 +1374,14 @@ for (const id of ["vocab-search", "vocab-group-filter", "vocab-sort", "vocab-sel
 // options.html no longer renders the word list (retired for the library
 // page, Task 9) -- what has to hold here is that the settings tab still
 // opens with the entry link, ahead of the collapsed secondary settings.
-check((optionsHtml.match(/<details class="disclosure" data-acc-key="vocab-/g) || []).length === 4 &&
+check((optionsHtml.match(/<details class="disclosure"(?: id="[^"]+")? data-acc-key="vocab-/g) || []).length === 5 &&
   optionsHtml.indexOf('id="vocab-open-library"') < optionsHtml.indexOf('id="dict-anki-deck"'),
   "options.html: the library entry link is not first or secondary settings are not collapsed");
 const disclosureKeys = [...optionsHtml.matchAll(
   /<details class="disclosure"(?: id="[^"]+")? data-acc-key="([^"]+)"/g
 )].map((match) => match[1]);
 check(disclosureKeys.join(",") ===
-  "connection-overview,vocab-reading,vocab-learning,vocab-ecdict-pack,vocab-dictionary-pack",
+  "connection-overview,vocab-reading,vocab-learning,vocab-multilingual-packs,vocab-ecdict-pack,vocab-dictionary-pack",
   "options.html: settings disclosures lack stable pp-acc keys");
 check(optionsJs.includes('querySelectorAll("details[data-acc-key]")') &&
   /addEventListener\("toggle",[\s\S]{0,500}pbpAccSet\(det\.dataset\.accKey, det\.open\)/.test(optionsJs),
@@ -4247,6 +4247,8 @@ for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-l
       "backup-section-vocabulary", "backup-section-secrets",          // import preview pickers: session UI
     ],
     tags: ["tag-gov-select-all"],         // list selection helper, not a setting
+    // Per-file import review, discarded on cancel/reload; never a setting.
+    vocab: ["multi-pack-source-language", "multi-pack-target-language", "multi-pack-source-url", "multi-pack-license"],
     // Interface language changes only through its own save-and-reload path; a
     // silent reset write would leave the page in the old language.
     appearance: ["opt-lang"],

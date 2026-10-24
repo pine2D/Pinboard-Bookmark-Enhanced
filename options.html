@@ -902,6 +902,27 @@
             <p class="hint" data-i18n="vocabCompleteExportHint">Complete TSV includes language, base form, notes and every context with its source. Use JSON backup to restore data in this extension.</p>
           </div>
         </details>
+        <details class="disclosure" id="multi-pack-section" data-acc-key="vocab-multilingual-packs">
+          <summary><span data-i18n="multiPackSection">Multilingual offline dictionaries</span><span class="summary-state" id="multi-pack-summary"></span></summary>
+          <div class="disclosure-body">
+            <p class="hint" data-i18n="multiPackHint">Import a Yomitan v3 ZIP dictionary. Definitions and readings stay on this device. Styles, images and audio are not imported.</p>
+            <p class="hint"><a href="https://yomitan.wiki/dictionaries/" target="_blank" rel="noopener noreferrer" data-i18n="multiPackBrowse">Find dictionary files</a> · <a href="https://yomidevs.github.io/wiktionary-to-yomitan/download/" target="_blank" rel="noopener noreferrer">WTY</a> · <a href="https://jitendex.org/pages/downloads.html" target="_blank" rel="noopener noreferrer">Jitendex</a></p>
+            <div class="fg"><div class="fg-actions"><button type="button" class="btn btn-sm" id="multi-pack-choose" data-i18n="multiPackChoose">Choose a ZIP file</button><span class="save-status" id="multi-pack-status" role="status" aria-live="polite"></span></div></div>
+            <input type="file" id="multi-pack-file" accept=".zip" hidden />
+            <div id="multi-pack-preview" hidden>
+              <div class="fg"><div class="bl subhead" role="heading" aria-level="3" data-i18n="multiPackPreview">Review dictionary</div><p class="hint dict-pack-copy" id="multi-pack-name" dir="auto"></p></div>
+              <div class="fg entry-block"><label class="bl" for="multi-pack-source-language" data-i18n="multiPackSourceLanguage">Word language</label><input type="text" id="multi-pack-source-language" list="multi-pack-languages" spellcheck="false" autocomplete="off" maxlength="80" aria-describedby="multi-pack-language-hint" /></div>
+              <div class="fg entry-block"><label class="bl" for="multi-pack-target-language" data-i18n="multiPackTargetLanguage">Definition language</label><input type="text" id="multi-pack-target-language" list="multi-pack-languages" spellcheck="false" autocomplete="off" maxlength="80" aria-describedby="multi-pack-language-hint" /><p class="hint" id="multi-pack-language-hint" data-i18n="multiPackLanguageHint">Use language codes, such as de, en or zh-Hant. Check both languages before importing.</p></div>
+              <datalist id="multi-pack-languages"></datalist>
+              <div class="fg entry-block"><label class="bl" for="multi-pack-source-url" data-i18n="multiPackSourceUrl">Source URL (optional)</label><input type="text" inputmode="url" id="multi-pack-source-url" spellcheck="false" autocomplete="off" maxlength="2048" /></div>
+              <div class="fg entry-block"><label class="bl" for="multi-pack-license" data-i18n="multiPackLicense">License statement (optional)</label><textarea id="multi-pack-license" rows="3" maxlength="8192" aria-describedby="multi-pack-license-hint"></textarea><p class="hint" id="multi-pack-license-hint" data-i18n="multiPackLicenseHint">These details come from the file or your edits. Check the source's terms before using or sharing its contents.</p>
+                <div class="fg-actions"><button type="button" class="btn btn-sm" id="multi-pack-install" data-i18n="multiPackInstall">Import dictionary</button><button type="button" class="btn btn-sm ghost" id="multi-pack-cancel" data-i18n="cancel">Cancel</button></div>
+              </div>
+            </div>
+            <p class="hint" data-i18n="multiPackAiHint">AI use is off by default. Allow it only when the source's terms permit sending definitions to your configured AI provider.</p>
+            <div id="multi-pack-list"></div>
+          </div>
+        </details>
         <details class="disclosure" data-acc-key="vocab-ecdict-pack">
           <summary><span data-i18n="ecdictSection">Offline English–Chinese dictionary</span><span class="summary-state" id="ecdict-pack-summary"></span></summary>
           <div class="disclosure-body">
