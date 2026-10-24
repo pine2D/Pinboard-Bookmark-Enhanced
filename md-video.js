@@ -2391,11 +2391,22 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   // Fail-closed: any paragraph-count or character-stream disagreement means
   // no gutter at all rather than a wrong time on a right paragraph.
   function applyParaTimes() {
-    if (!document.body.classList.contains("video-mode")) return;
-    if (!window.pbpVideoDoc || window.pbpVideoDoc.kind !== "video-transcript") return;
-    if (!_segments.length) return;
     const view = document.getElementById("rendered-view");
     if (!view) return;
+    const transcript = document.body.classList.contains("video-mode") && window.pbpVideoDoc?.kind === "video-transcript";
+    // Compact the generated metadata on screen; keep the canonical heading,
+    // source link and paragraph text intact for export, anchors and translation.
+    view.classList.toggle("pbv-transcript", transcript);
+    if (transcript) {
+      const heading = view.firstElementChild;
+      if (heading?.tagName === "H2") {
+        heading.classList.add("pbv-transcript-heading");
+        let source = heading.nextElementSibling;
+        while (source?.matches(".pb-tr, .pb-tr-err")) source = source.nextElementSibling;
+        if (source?.tagName === "BLOCKQUOTE") source.classList.add("pbv-transcript-source");
+      }
+    }
+    if (!transcript || !_segments.length) return;
     const paras = (_aiPunctParas && _aiPunctParas.length) ? _aiPunctParas : pbpVideoMergeParagraphs(_segments);
     const starts = pbpVideoParaStarts(_segments, paras);
     if (!starts) { console.info("[pbp-video] para-times: stream mismatch -- gutter skipped"); return; }
@@ -5317,6 +5328,9 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
 
   function setStudyView(mode, persist) {
     const reading = mode !== "timeline";
+    const focused = document.activeElement;
+    const outgoing = reading ? _studyListEl : _studyReadingEl;
+    const focusWillHide = (outgoing && outgoing.contains(focused)) || (reading && focused === _densityBtn);
     // Save the outgoing view's scroll, restore the incoming view's (audit
     // U11) -- only when this call actually flips the views.
     let flipped = false;
@@ -5352,6 +5366,12 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       _toggleTimelineBtn.setAttribute("aria-pressed", !reading ? "true" : "false");
     }
     if (_densityBtn) _densityBtn.hidden = reading;
+    // Keyboard view switches must leave the next Tab in the visible view.
+    // Keep focus on controls outside the hidden panel (including mouse clicks).
+    if (flipped && focusWillHide) {
+      const toggle = reading ? _toggleReadingBtn : _toggleTimelineBtn;
+      if (toggle) toggle.focus({ preventScroll: true });
+    }
     // Returning to the timeline while paused: replay the last reported
     // position so the current-row highlight survives the round trip (B13).
     if (!reading) replayHighlight();
@@ -6304,7 +6324,14 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         aiCancelBtn.disabled = true;
         if (_aiAbort) { try { _aiAbort.abort(); } catch (_) {} } // research T4.4
       });
-      bar.appendChild(trackSel); bar.appendChild(auxSel); bar.appendChild(copyGroup); bar.appendChild(aiBtn); bar.appendChild(aiNote); bar.appendChild(aiCancelBtn); bar.appendChild(retryBtn);
+      // Wrap related controls together instead of breaking the playback
+      // sequence across lines. Reuse the reader's row layout primitive.
+      const tracks = el("div", "row");
+      tracks.append(trackSel, auxSel);
+      const transcriptActions = el("div", "row");
+      transcriptActions.append(copyGroup, aiBtn, aiNote, aiCancelBtn, retryBtn);
+      const playback = el("div", "row");
+      bar.append(tracks, transcriptActions, playback);
       {
         // Follow toggle (Task 6). Same bar-button family as Copy / AI
         // punctuation (.pbv-copy, .pbv-ai-punct in md-preview.css), plus the
@@ -6327,7 +6354,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         setFollow(true); // default ON; also writes the initial aria-pressed
         followBtn.setAttribute("aria-keyshortcuts", "f");
         followBtn.addEventListener("click", () => setFollow(!_followOn));
-        bar.appendChild(followBtn);
+        playback.appendChild(followBtn);
         // Learning loop (research T3.2/T3.3): repeat the current cue, pause
         // at every cue end, playback rate. Same 28px icon family; real
         // toggles in the aria-pressed vocabulary; unhidden with follow.
@@ -6341,7 +6368,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         loopBtn.setAttribute("aria-keyshortcuts", "r");
         loopBtn.addEventListener("click", () => setLoop(!_loopOn));
         _loopBtn = loopBtn;
-        bar.appendChild(loopBtn);
+        playback.appendChild(loopBtn);
         const apBtn = el("button", "pbv-autopause");
         apBtn.type = "button";
         apBtn.hidden = true;
@@ -6352,7 +6379,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         apBtn.setAttribute("aria-keyshortcuts", "p");
         apBtn.addEventListener("click", () => setAutoPause(!_autoPauseOn));
         _autoPauseBtn = apBtn;
-        bar.appendChild(apBtn);
+        playback.appendChild(apBtn);
         const rateSel = document.createElement("select");
         rateSel.className = "pbv-tracks pbv-rate";
         rateSel.hidden = true;
@@ -6376,7 +6403,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
           if (_detectedNow && r >= 0.25 && r <= 2) pbpVideoSaveView(_detectedNow, { rate: r });
         });
         _rateSel = rateSel;
-        bar.appendChild(rateSel);
+        playback.appendChild(rateSel);
         // Below the workspace's container breakpoint the columns stack and
         // the player stops being sticky -- a lit follow toggle there is a
         // no-op lie (audit B14). The COMPUTED sticky state is the layout
@@ -6406,7 +6433,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
         estBtn.setAttribute("aria-pressed", "false");
         estBtn.addEventListener("click", () => setEstimate(!_estOn));
         _estBtn = estBtn;
-        bar.appendChild(estBtn);
+        playback.appendChild(estBtn);
         // Readers who granted captions before the bridge existed: one click
         // requests exactly the player origin (the click IS the gesture),
         // registers the bridge and reloads the frame paused where it was.
@@ -6434,7 +6461,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
           } catch (_) {}
         });
         _bridgeBtn = bridgeBtn;
-        bar.appendChild(bridgeBtn);
+        playback.appendChild(bridgeBtn);
       }
       // Player-failure degrade for BOTH providers (audit U12: bilibili had
       // no way out when its embed or login wall misbehaved): an
@@ -6452,7 +6479,7 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
       const extLabel = t(detected.provider === "bilibili" ? "mdVideoOpenExternalBili" : "mdVideoOpenExternal");
       openExt.title = extLabel;
       openExt.setAttribute("aria-label", extLabel);
-      bar.appendChild(openExt);
+      playback.appendChild(openExt);
       bar.appendChild(status);
       bar.appendChild(resume);
       // Video-mode workspaces already have an empty .pbv-list waiting in the

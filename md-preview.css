@@ -4152,18 +4152,14 @@ body.zen #tr-ask { top: calc(12px + 36px + var(--sp-2)); }
    a plain #video-panel .pbv-media iframe selector, not workspace-gated. */
 .pbv-media { margin-bottom: var(--sp-2); position: relative; }
 .pbv-media iframe { border: 0; border-radius: var(--radius-lg); }
-.pbv-bar { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-bottom: var(--sp-2); }
-/* Three semantic groups (T7.6) read through spacing alone, no dividers:
-   tracks / status | transcript actions (copy, AI) | playback / view. The
-   gap sits on each group's first child (.pb-hl-explain-btn uses the same
-   first-child idiom); .pbv-follow and .pbv-estimate are never visible
-   together (syncLiveControls), so the third gap applies once. A hidden
-   first child collapses its gap with it -- an empty group gets no gap. */
-.pbv-copy-group, .pbv-follow, .pbv-estimate { margin-left: var(--sp-3); }
+.pbv-bar { display: flex; align-items: center; gap: var(--sp-2) var(--sp-3); flex-wrap: wrap; margin-bottom: var(--sp-2); }
+/* Tracks, transcript actions and playback each wrap as one row. Native
+   selects can shrink inside their row on the narrowest windows. */
+.pbv-bar > .row { flex-wrap: nowrap; max-width: 100%; }
 /* ONE control family for the whole strip (device feedback 2026-08-25: the
    selects sat at 32px/16px, the icon buttons at 28px, the state chip at
    26px/12.5px and the bridge text button at 30px/13px -- four sizes in a
-   single row). Every direct control -- the track / aux / rate <select>, the
+   single row). Every grouped control -- the track / aux / rate <select>, the
    icon buttons, the bridge text button, the external-link <a>, the state
    chip -- plus the copy split one level down shares ONE height and ONE type
    size. :where() keeps the family at .pbv-bar's own specificity, so the
@@ -4172,7 +4168,7 @@ body.zen #tr-ask { top: calc(12px + 36px + var(--sp-2)); }
    hides. The <select> keeps its native arrow; box-sizing pins it to the
    buttons' height instead of letting padding + 16px text grow it to 32; that
    height is the md rung, 26px, since 2026-09-06 (it was the old 28px icon size). */
-.pbv-bar > :where(select, button, a, .pbv-ai-note), .pbv-copy-group > :where(button) {
+.pbv-bar > :where(.row) > :where(select, button, a, .pbv-ai-note), .pbv-copy-group > :where(button) {
   box-sizing: border-box; height: 26px; min-height: 26px; padding: 0 var(--sp-3);
   font: inherit; font-size: 13px; font-weight: 500; line-height: 1; white-space: nowrap;
   display: inline-flex; align-items: center; justify-content: center;
@@ -4183,9 +4179,9 @@ body.zen #tr-ask { top: calc(12px + 36px + var(--sp-2)); }
    wrapped in :where() so it stays weightless: the family comment above pins
    these rules at .pbv-bar's own specificity precisely so the per-class rules
    below (pressed, copied, narrow) keep winning by source order alone. */
-.pbv-bar > :where(select, button, a):where(:not(:disabled)):hover, .pbv-copy-group > :where(button):where(:not(:disabled)):hover { background: var(--btn-hover); }
-.pbv-bar > :where(select, button, a):focus-visible, .pbv-copy-group > :where(button):focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-.pbv-tracks { max-width: 16em; }
+.pbv-bar > :where(.row) > :where(select, button, a):where(:not(:disabled)):hover, .pbv-copy-group > :where(button):where(:not(:disabled)):hover { background: var(--btn-hover); }
+.pbv-bar > :where(.row) > :where(select, button, a):focus-visible, .pbv-copy-group > :where(button):focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.pbv-tracks { min-width: 0; max-width: 16em; }
 /* Playback-rate select: the same family, narrower. */
 .pbv-rate { max-width: 5.5em; padding: 0 var(--sp-1); font-variant-numeric: tabular-nums; }
 /* Icon-only members: square, glyph centred. Enumerated by CLASS (not
@@ -4197,7 +4193,13 @@ body.zen #tr-ask { top: calc(12px + 36px + var(--sp-2)); }
    (min-width beats the icon rule's explicit width); the chip is not a
    target and keeps the resting size. */
 @media (pointer: coarse) {
-  .pbv-bar > :where(select, button, a), .pbv-copy-group > :where(button) { height: 44px; min-height: 44px; min-width: 44px; }
+  .pbv-bar > :where(.row) > :where(select, button, a), .pbv-copy-group > :where(button) { height: 44px; min-height: 44px; min-width: 44px; }
+}
+/* Long locales can wrap within a group. Keep the neighbouring icons at
+   their usual size and retain the 26/44px minimum height for the action. */
+.pbv-bridge-enable, .pbv-ai-note {
+  min-width: 0; height: auto; white-space: normal; overflow-wrap: anywhere;
+  line-height: 18px; padding: var(--sp-0) var(--sp-3);
 }
 /* Back-to-current (research T3.7): a labelled button, sticky under the
    timeline so it stays reachable while the page scrolls away from the
@@ -4245,7 +4247,7 @@ body.zen #tr-ask { top: calc(12px + 36px + var(--sp-2)); }
    aria-pressed="true" while it is disabled in the reading view, so the
    pressed tint above would otherwise paint a lit toggle that does nothing.
    No `a` in the selector: :disabled never matches the family's one anchor. */
-.pbv-bar > :where(select, button):disabled, .pbv-copy-group > :where(button):disabled { opacity: 0.45; cursor: not-allowed; }
+.pbv-bar > :where(.row) > :where(select, button):disabled, .pbv-copy-group > :where(button):disabled { opacity: 0.45; cursor: not-allowed; }
 /* Status as a MESSAGE BAR (audit U5 / 方案A): .msg-bar (T7.9) carries the
    look and the busy / error / fading states (driven by pbvSetStatus's
    data-state / data-fading). Own full-width row; empty = gone. */
@@ -4425,8 +4427,16 @@ body.video-mode .doc-body { max-width: min(2160px, 100%); container-type: inline
      here would put the whole study column -- article included -- above the
      player, which is wrong. Simplest correct stack: player on top, study
      (skim, then article) below it, same order as the pre-workspace panel. */
-  .pbv-workspace { grid-template-columns: 1fr; }
+  .pbv-workspace { grid-template-columns: minmax(0, 1fr); }
   .pbv-col-player #video-panel { position: static; top: auto; }
+  /* Reserve 380px for page insets, wrapped controls, loading/status, study
+     metadata and the first caption line in short windows. The 120px floor
+     keeps the player's own controls usable when the viewport is tiny.
+     Poster and player share the same centred 16:9 box. */
+  .pbv-media, .pbv-poster {
+    max-width: min(100%, calc(45dvh * 16 / 9), calc(max(120px, 100dvh - 380px) * 16 / 9));
+    margin-inline: auto;
+  }
 }
 
 /* Reading/timeline toggle (Task 4) -- reuses .source-badge/.src-seg (see
@@ -4461,6 +4471,26 @@ body.video-mode .pbv-text { font-size: var(--panel-payload-fs); line-height: var
    .doc-body's 720px fallback, which is also a net win on ultra-wide
    two-column layouts where the study column outgrows a readable measure. */
 body.video-mode .pbv-col-study #rendered-view { max-width: var(--pbp-width, 720px); }
+
+/* The transcript's generated heading/source are metadata, not a second
+   article hero. Screen-only: print and Markdown retain their full hierarchy. */
+@media screen {
+  body.video-mode #rendered-view.pbv-transcript > .pbv-transcript-heading,
+  body.video-mode #rendered-view.pbv-transcript > .pbv-transcript-heading + .pb-tr > h2 {
+    margin: 0 0 var(--sp-2); padding: 0; border: 0;
+    font-size: 13px; font-weight: 500; letter-spacing: normal;
+    color: var(--fg-secondary);
+  }
+  body.video-mode #rendered-view.pbv-transcript > .pbv-transcript-source,
+  body.video-mode #rendered-view.pbv-transcript > .pbv-transcript-source + .pb-tr > blockquote {
+    margin: 0 0 var(--sp-4); padding: 0; border: 0;
+    background: transparent; font-size: 13px;
+  }
+  body.video-mode #rendered-view.pbv-transcript > .pbv-transcript-source > p,
+  body.video-mode #rendered-view.pbv-transcript > .pbv-transcript-source + .pb-tr > blockquote > p { margin: 0; line-height: 1.5; }
+  body.video-mode #rendered-view.pbv-transcript > .pbv-transcript-heading + .pb-tr { margin: 0 0 var(--sp-2); }
+  body.video-mode #rendered-view.pbv-transcript > .pbv-transcript-source + .pb-tr { margin: 0 0 var(--sp-4); }
+}
 
 /* Player scales to its column instead of a fixed height computed against
    .pbv-media's own aspect-ratio box (the pre-workspace method, now

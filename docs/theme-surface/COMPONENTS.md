@@ -1630,6 +1630,7 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 | md-preview | `.rail-section` / `.rail-label` / `.rail-sec-head` | 侧栏分区容器 / 静态标题 / 可折叠标题（共享 margin sp-3 0 sp-2 契约） |
 | md-preview | `.rail-disclosure` | 分区内的二级折叠：原生 `<details>` + `<summary>`（键盘与展开态由浏览器给），summary 12px secondary、`min-height` 24、右缘细箭头（与 `.rail-sec-head` 同形），本体上距 sp-2；不画底色、边框或分隔线。用于术语命中、翻译完成态的目标语言与跳过段、导出的「更多格式与选项」；分区级折叠仍用 `.rail-sec-head`，成本信息（预估 / 用量）不进折叠 |
 | md-preview | `.msg-bar` | 状态/提示/错误条（padding sp-2 sp-3，与 `.send-status` / `.export-note` / `#ask-tip` 同一条家族；`data-state`） |
+| md-preview | `.pbv-transcript-heading` / `.pbv-transcript-source` | 字幕正文原有 h2 / 来源 blockquote 的元信息变体，不增加包装；仅屏幕显示为 13px、无底纹或分隔线，标题后距 sp-2、来源后距 sp-4，来源段落无额外 margin。原文、双语及仅译文共用此层级；打印和 Markdown 保留原有标题与来源语义。视频工具条复用 `.row`，组内 gap sp-2、按组换行；授权按钮和标点状态允许长文案在组内折行。 |
 | md-preview | `.send-menu` / `.send-mi` | 下拉菜单与菜单项 |
 | md-preview | `.pop-panel` | 浮层面板 chrome：`--surface` 底、`--border` 1px 边、`--radius-lg`、统一阴影、13px、内距 sp-3；高亮卡 / 脚注 / 字号面板 / 快捷键帮助 / 搜索条五个 popover 共用，id 规则只留各自的定位与尺寸（帮助对话框内距 sp-4、搜索条 sp-2 sp-3 属有意覆盖） |
 | md-preview | `.row` | 控件行（flex wrap，align center，gap sp-2）：导出开关行、翻译按钮行、字号步进行、高亮色板行、侧栏底部图标行；placement 归父级或 id |

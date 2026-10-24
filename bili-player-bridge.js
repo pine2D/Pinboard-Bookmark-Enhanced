@@ -79,7 +79,7 @@
     try { m.currentTime = seekGuard.target; } catch (_) { selfSeek = false; }
   }
   function onState() {
-    const m = media();
+    const m = bind();
     if (m) guardSeek(m);
     stopTimer();
     postTime();
@@ -89,10 +89,14 @@
   // quality change: (re)bind to whatever element is current.
   function bind() {
     const m = media();
-    if (!m) return null;
     if (m !== bound) {
       if (bound) { for (const ev of EVENTS) bound.removeEventListener(ev, onState); bound.removeEventListener("seeking", onSeeking); bound.removeEventListener("play", onPlay); }
       bound = m;
+      // A resume guard belongs to one media element, never its replacement.
+      seekGuard = null;
+      selfSeek = false;
+      lastPlayAt = -1e9;
+      if (!m) return null;
       // onPlay FIRST: listeners run in registration order, and onState's own
       // play handler (guardSeek) reads lastPlayAt (Codex r9 H1 -- registered
       // last, the stamp it read was the previous play's).
@@ -105,12 +109,11 @@
   function arm() {
     if (armed) return;
     armed = true;
-    if (!bind()) {
-      const mo = new MutationObserver(() => { if (bind()) { mo.disconnect(); onState(); } });
-      mo.observe(document.documentElement, { childList: true, subtree: true });
-    } else {
-      onState();
-    }
+    // Stay subscribed after boot: a paused player has no polling timer to
+    // discover a quality/fallback replacement, including a gap with no media.
+    const mo = new MutationObserver(() => { if (media() !== bound) onState(); });
+    mo.observe(document.documentElement, { childList: true, subtree: true });
+    onState();
   }
   window.addEventListener("message", (e) => {
     if (e.source !== window.parent || e.origin !== EXT_ORIGIN) return;

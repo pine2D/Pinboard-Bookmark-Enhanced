@@ -52,6 +52,36 @@ function makeBridgeFrame() {
   return ifr;
 }
 
+// A real child document and MutationObserver; only the platform media state
+// and the extension-origin handshake are supplied by the fixture.
+async function bridgeCase(run) {
+  const calls = [];
+  window.postMessage = (message) => calls.push(message);
+  const frame = makeBridgeFrame();
+  try {
+    const loaded = new Promise((resolve) => frame.onload = resolve);
+    document.body.appendChild(frame);
+    await loaded;
+    const w = frame.contentWindow, d = frame.contentDocument;
+    assert(w.__pbpBiliBridge === 1, "bridge script did not execute");
+    const media = (tag, time, paused = true) => {
+      const node = d.createElement(tag);
+      for (const [key, value] of Object.entries({ currentTime: time, paused, ended: false, readyState: 4, duration: 120, playbackRate: 1 })) {
+        Object.defineProperty(node, key, { value, writable: true });
+      }
+      return node;
+    };
+    const hello = () => w.dispatchEvent(new w.MessageEvent("message", {
+      source: window, origin: "chrome-extension://test-ext-id", data: { pbpVideo: 1, func: "hello" }
+    }));
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
+    await run({ w, d, calls, media, hello, settle });
+  } finally {
+    frame.remove();
+    delete window.postMessage;
+  }
+}
+
 (async () => {
   await test("inert until greeted: zero postMessage calls before any hello", async () => {
     // A real window.addEventListener("message", ...) listener on this page
@@ -93,6 +123,45 @@ function makeBridgeFrame() {
       delete window.postMessage;
     }
   });
+  await test("paused media replacement resumes progress without another reader command", () => bridgeCase(async ({ w, d, calls, media, hello, settle }) => {
+    const old = media("video", 10);
+    d.body.appendChild(old);
+    hello();
+    assert(calls.some((m) => m.event === "time" && m.t === 10 && m.state === 2), "initial pause was not reported");
+    calls.length = 0;
+    const next = media("bwp-video", 42, false);
+    old.replaceWith(next);
+    next.dispatchEvent(new w.Event("playing"));
+    await settle();
+    assert(calls.some((m) => m.event === "time" && m.t === 42 && m.state === 1), "replacement started playing but progress never resumed");
+    next.currentTime = 43;
+    next.paused = true;
+    next.dispatchEvent(new w.Event("pause"));
+    assert(calls.some((m) => m.event === "time" && m.t === 43 && m.state === 2), "new media's state events were not bound");
+    calls.length = 0;
+    old.dispatchEvent(new w.Event("pause"));
+    assert(calls.length === 0, "detached media retained its bridge listeners");
+  }));
+  await test("media can disappear and arrive later without stale events or a new handshake", () => bridgeCase(async ({ w, d, calls, media, hello, settle }) => {
+    hello();
+    const first = media("video", 12);
+    d.body.appendChild(first);
+    await settle();
+    assert(calls.some((m) => m.event === "time" && m.t === 12), "delayed initial media was not found");
+    first.remove();
+    await settle();
+    calls.length = 0;
+    first.dispatchEvent(new w.Event("playing"));
+    assert(calls.length === 0, "removed media still reports");
+    const second = media("video", 50);
+    d.body.appendChild(second);
+    await settle();
+    assert(calls.some((m) => m.event === "time" && m.t === 50), "media after a gap was not rebound");
+    calls.length = 0;
+    d.body.appendChild(d.createElement("div"));
+    await settle();
+    assert(calls.length === 0, "unrelated player DOM churn generated progress messages");
+  }));
 })();
 </script>
 </body></html>

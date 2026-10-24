@@ -2006,6 +2006,71 @@ window.pbpVideoFixture = {
   const listed = Array.from(ul.querySelectorAll(".kbd-help-chip")).map((k) => k.textContent);
   const live = w.pbpVideoShortcutKeys();
   check("every visible bar key promise is live and listed in the panel", promised.length >= 3 && promised.every((k) => live.has(k) && listed.includes(k)), "promised: " + promised.join(","));
+
+  // The outgoing view must not retain focus after the b shortcut hides it.
+  // Otherwise the browser's next Tab skips the article and jumps to its end.
+  w.pbpVideoStudyView("timeline");
+  d.querySelector(".pbv-time").focus();
+  key("b", d.activeElement);
+  const readingToggle = d.querySelector('[data-view="reading"]');
+  const timelineToggle = d.querySelector('[data-view="timeline"]');
+  check("b moves focus from a hidden timeline into the visible reading toggle",
+    w.pbpVideoStudyView() === "reading" && d.activeElement === readingToggle && readingToggle.checkVisibility());
+  const articleLink = d.createElement("a");
+  articleLink.href = "#reading";
+  articleLink.textContent = "Reading source";
+  d.getElementById("rendered-view").appendChild(articleLink);
+  articleLink.focus();
+  key("b", articleLink);
+  check("b moves focus out of a hidden reading block into the timeline toggle",
+    w.pbpVideoStudyView() === "timeline" && d.activeElement === timelineToggle && timelineToggle.checkVisibility());
+  ap.focus();
+  w.pbpVideoStudyView("reading");
+  check("a programmatic view switch preserves focus outside the outgoing view", d.activeElement === ap);
+  timelineToggle.focus();
+  timelineToggle.click();
+  check("clicking a view button keeps its focus", d.activeElement === timelineToggle);
+  d.querySelector(".pbv-density").focus();
+  key("b", d.activeElement);
+  check("b moves focus when its density control is hidden with the timeline", d.activeElement === readingToggle);
+
+  // Use the shipped CSS and the translated sibling structure from _pbpTrFill.
+  // Hidden translation siblings remain in the DOM when returning to original.
+  const css = d.createElement("link");
+  css.rel = "stylesheet";
+  css.href = "../md-preview.css";
+  const styled = new Promise((resolve, reject) => { css.onload = resolve; css.onerror = reject; });
+  d.head.appendChild(css);
+  await styled;
+  const view = d.getElementById("rendered-view");
+  view.innerHTML = '<h2>Transcript (English)</h2><blockquote><p><a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">Fixture</a></p></blockquote><p>First cue. Second cue.</p>';
+  const originalText = view.textContent;
+  w.pbpVideoDoc = { kind: "video-transcript" };
+  d.dispatchEvent(new w.CustomEvent("pbp:article-replaced"));
+  const heading = view.querySelector("h2"), source = view.querySelector("blockquote");
+  check("transcript metadata styling preserves heading, link and body text", view.textContent === originalText && source.querySelector("a").href.endsWith("dQw4w9WgXcQ"));
+  const trHead = d.createElement("div"), trSource = d.createElement("div");
+  trHead.className = trSource.className = "pb-tr";
+  trHead.innerHTML = "<h2>字幕稿（英语）</h2>";
+  trSource.innerHTML = '<blockquote><p><a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">示例视频</a></p></blockquote>';
+  heading.after(trHead); source.after(trSource);
+  heading.dataset.pbTrDone = source.dataset.pbTrDone = "1";
+  // Reapplying paragraph metadata must skip translated siblings as well.
+  d.dispatchEvent(new w.CustomEvent("pbp:article-replaced"));
+  for (const mode of ["original", "tr-bilingual", "tr-only", "original-again"]) {
+    d.body.classList.remove("tr-bilingual", "tr-only");
+    if (mode.startsWith("tr-")) d.body.classList.add(mode);
+    const heads = mode === "tr-only" ? [trHead.firstElementChild] : mode === "tr-bilingual" ? [heading, trHead.firstElementChild] : [heading];
+    const sources = mode === "tr-only" ? [trSource.firstElementChild] : mode === "tr-bilingual" ? [source, trSource.firstElementChild] : [source];
+    check("transcript metadata stays compact in " + mode,
+      heads.every((e) => w.getComputedStyle(e).fontSize === "13px") && sources.every((e) => {
+        const s = w.getComputedStyle(e);
+        return s.borderLeftWidth === "0px" && s.paddingLeft === "0px" && s.fontSize === "13px";
+      }));
+  }
+  w.pbpVideoDoc = { kind: "video-fallback" };
+  d.dispatchEvent(new w.CustomEvent("pbp:article-replaced"));
+  check("ordinary video descriptions retain normal heading and quote hierarchy", w.getComputedStyle(heading).fontSize !== "13px" && w.getComputedStyle(source).borderLeftWidth !== "0px");
   frame.remove();
 }
 
