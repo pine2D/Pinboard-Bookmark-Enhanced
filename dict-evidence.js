@@ -12,6 +12,20 @@ const PBP_DICT_EVIDENCE_LANGUAGES = Object.freeze({
   ja: { name: /^日本語$/, etymology: /^語源(?:\s*\d+)?$/, chapter: "第" },
   ko: { name: /^한국어$/, etymology: /^어원(?:\s*\d+)?$/, chapter: "장" }
 });
+// Refine by the queried language, never by UI language or a particular word.
+// General search remains a fallback: not all cultural uses are internet slang.
+const PBP_DICT_CULTURE_SEARCH = Object.freeze({
+  en: 'slang OR meme OR "internet culture"',
+  zh: '俚语 OR 俚語 OR 网络用语 OR 網路用語 OR 迷因',
+  es: 'jerga OR meme OR "cultura de internet"',
+  de: 'Slang OR Meme OR Netzkultur',
+  fr: 'argot OR mème OR "culture Internet"',
+  it: 'gergo OR meme OR "cultura di Internet"',
+  pt: 'gíria OR meme OR "cultura da internet"',
+  ru: 'сленг OR мем OR "интернет-культура"',
+  ja: 'スラング OR ネット用語 OR ミーム',
+  ko: '은어 OR 신조어 OR "인터넷 밈"'
+});
 function _pbpDictEvidenceError(code) { return Object.assign(new Error(code), { code }); }
 function _pbpDictEvidenceLang(language) {
   try { return Intl.getCanonicalLocales(language || "und")[0]; } catch (_) { return "und"; }
@@ -236,18 +250,28 @@ async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, before
       await check(); return result;
     }
     const escaped = term.replace(/["\\]/g, " ");
-    const searches = ['"' + escaped + '"'];
+    const exact = '"' + escaped + '"', searches = [];
     if (kind === "literature") {
       const chapter = PBP_DICT_EVIDENCE_LANGUAGES[language.split("-")[0]].chapter;
-      searches.push('"' + escaped + '" intitle:' + chapter +
+      searches.push(exact + ' intitle:' + chapter +
         (language.startsWith("en") ? " -intitle:Code -intitle:Title -intitle:Manual -intitle:Report -intitle:Copyright" : ""));
+    } else {
+      const scope = PBP_DICT_CULTURE_SEARCH[language.split("-")[0]];
+      searches.push(exact + (scope ? " (" + scope + ")" : " articletopic:internet-culture"));
     }
-    const candidates = [];
+    searches.push(exact);
+    // Direct page lookup is independent of full-text ranking (common words can
+    // be buried under incidental mentions). Still verify the retrieved body.
+    const candidates = kind === "culture" && term.length <= 200 && !term.includes(":") ? [term] : [], pools = [];
     for (const query of searches) {
       const json = await fetchJson({ action: "query", list: "search", srnamespace: "0", srsearch: query, srlimit: kind === "literature" ? "8" : "5", srprop: "" });
       if (!Array.isArray(json?.query?.search)) throw _pbpDictEvidenceError("source_failed");
-      for (const row of json.query.search) if (row?.ns === 0 && Number.isSafeInteger(row.pageid) && row.pageid > 0 && typeof row.title === "string" && row.title.length <= 200 &&
-          !row.title.includes(":") && !candidates.includes(row.title)) candidates.push(row.title);
+      pools.push(json.query.search.filter(row => row?.ns === 0 && Number.isSafeInteger(row.pageid) && row.pageid > 0 && typeof row.title === "string" && row.title.length <= 200 &&
+        !row.title.includes(":")).map(row => row.title));
+    }
+    // Share the existing candidate budget: neither query may starve the other.
+    for (let index = 0; index < Math.max(...pools.map(pool => pool.length)); index++) {
+      for (const pool of pools) if (pool[index] && !candidates.includes(pool[index])) candidates.push(pool[index]);
     }
     const result = [], works = new Set(); let examined = 0;
     for (const title of candidates) {
@@ -256,7 +280,10 @@ async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, before
       const loaded = await load(title); if (!loaded) continue;
       const { page, root } = loaded;
       const excerpt = _pbpDictEvidenceExcerpt(_pbpDictEvidenceParagraphs(root), term, language); if (!excerpt) continue;
-      if (kind === "culture") { result.push(make(page, excerpt.text, { location: "¶ " + excerpt.paragraph })); continue; }
+      if (kind === "culture") {
+        if (!result.some(source => source.revision === String(page.revid))) result.push(make(page, excerpt.text, { location: "¶ " + excerpt.paragraph }));
+        continue;
+      }
       const metadata = _pbpDictEvidenceMetadata(page, root, origin);
       if (metadata.forbidden) continue;
       let frontier = metadata.links;

@@ -256,6 +256,51 @@ await test('supplement prompt states the existing aggregate limit and retains it
   existing();await pbpDictSupplementRun(request({category:'collocations'}));
   return calls[0].prompt.includes('12000')&&calls[0].prompt.includes('including separators')&&calls[0].options.maxTokens===2048;
 });
+await test('source-backed tasks label each source index explicitly without mutating stored evidence',async()=>{
+ for(const category of ['culture','literature']){
+  reset();existing();usageResponse(d=>{d.items[0].sourceIndex=0;d.items[0].example='';});
+  const result=await pbpDictSupplementRun(request({category}));
+  const input=JSON.parse(calls[0].prompt.split('\n').at(-1));
+  if(input.sources[0].sourceIndex!==0||Object.hasOwn(result.sources[0],'sourceIndex')||calls.length!==1)return false;
+ }
+ return true;
+});
+await test('culture does not require an unused quotation or translation placeholder',async()=>{
+ for(const missing of [true,false]){
+  reset();existing();usageResponse(d=>{d.items[0].sourceIndex=0;if(missing){delete d.items[0].example;delete d.items[0].translation;}else{d.items[0].example=null;d.items[0].translation=null;}});
+  const result=await pbpDictSupplementRun(request({category:'culture'}));
+  if(!result.archiveSaved||result.learning.items[0].example!==''||result.learning.items[0].translation!==''||calls.length!==1)return false;
+ }
+ return true;
+});
+await test('source-backed prompts do not ask the model to copy original quotations',async()=>{
+ for(const category of ['culture','literature']){
+  reset();existing();usageResponse(d=>{d.items[0].sourceIndex=0;d.items[0].example='';});
+  await pbpDictSupplementRun(request({category}));
+  const schema=calls[0].prompt.match(/Return exactly (.*)\. Copy language/)[1];
+  if(schema.includes('"example"')||!schema.includes('"sourceIndex"'))return false;
+ }
+ return true;
+});
+await test('whitespace-equivalent complete quotations are canonicalized to the retrieved original',async()=>{
+ for(const category of ['culture','literature'])for(const [original,quote] of [
+  ['I am restless.\n\nI am athirst for faraway things.','I am restless. I am athirst for faraway things.'],
+  ['A faraway café.','A faraway cafe\u0301.']
+ ]){
+  reset();existing();sourceResult[0].excerpt=original;
+  usageResponse(d=>{d.items[0].sourceIndex=0;d.items[0].example=quote;});
+  const result=await pbpDictSupplementRun(request({category}));
+  if(result.learning.items[0].example!==sourceResult[0].excerpt||calls.length!==1||!result.archiveSaved)return false;
+ }
+ return true;
+});
+await test('quote normalization never accepts omitted sentences or altered wording',async()=>{
+ for(const category of ['culture','literature'])for(const quote of ['I am restless.','I am restless. I am athirst for nearby things.']){
+  reset();existing();usageResponse(d=>{d.items[0].sourceIndex=0;d.items[0].example=quote;});
+  try{await pbpDictSupplementRun(request({category}));return false;}catch(e){if(e.reason!=='supplement_quote'||appended.length||calls.length!==1)return false;}
+ }
+ return true;
+});
 await test('normalized supplement round-trips the real archive while its raw variants remain invalid',async()=>{
   existing();usageResponse(d=>{d.summary=null;d.items=d.items[0];d.items.sense='1';d.items.sourceIndex='-1';});
   const raw=JSON.parse(usageAnswer),supplement=await pbpDictSupplementRun(request({category:'grammar'}));
@@ -265,6 +310,19 @@ await test('normalized supplement round-trips the real archive while its raw var
     const read=await api.roundTripNormalized({...ORIGINAL,term:req.term,sourceLanguage:req.sourceLanguage,target:req.target},supplement);
     return read.supplements.length===1&&JSON.stringify(read.supplements[0].learning)===JSON.stringify(supplement.learning)&&calls.length===1;
   }finally{frame.remove();}
+});
+await test('both source-backed formats round-trip the unchanged archive schema',async()=>{
+ const frame=document.createElement('iframe');frame.hidden=true;const ready=new Promise(resolve=>frame.onload=resolve);frame.src='fixtures/dict-normalization-archive.html';document.body.append(frame);
+ try{await ready;
+  for(const category of ['culture','literature']){
+   reset();existing();sourceResult[0].excerpt='I am restless.\n\nI am athirst for faraway things.';
+   usageResponse(d=>{d.items[0].sourceIndex=0;if(category==='culture'){delete d.items[0].example;delete d.items[0].translation;}else d.items[0].example=sourceResult[0].excerpt.replace(/\s+/g,' ');});
+   const supplement=await pbpDictSupplementRun(request({category})),req=request();
+   const read=await frame.contentWindow.roundTripNormalized({...ORIGINAL,term:req.term,sourceLanguage:req.sourceLanguage,target:req.target},supplement);
+   if(read.supplements.length!==1||JSON.stringify(read.supplements[0].learning)!==JSON.stringify(supplement.learning)||calls.length!==1)return false;
+  }
+  return true;
+ }finally{frame.remove();}
 });
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();

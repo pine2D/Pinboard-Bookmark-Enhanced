@@ -20,7 +20,7 @@ globalThis.chrome=chrome;
 async function fetch(raw,options){
  const url=new URL(raw);calls.push({url,options});
  let value;
- if(url.searchParams.get('action')==='query')value=responses.search;
+ if(url.searchParams.get('action')==='query')value=typeof responses.search==='function'?responses.search(url.searchParams.get('srsearch')):responses.search;
  else value=responses.pages[url.searchParams.get('page')];
  if(afterFetch)await afterFetch();
  if(value instanceof Error)throw value;
@@ -56,6 +56,43 @@ await test('sources keep revision-specific URLs and collection time',async()=>{c
 await test('evidence carries only the declared bounded metadata fields',async()=>{const r=(await pbpDictEvidenceFetch(request()))[0];return Object.keys(r).sort().join(',')==='author,excerpt,genre,language,location,retrievedAt,revision,title,url,work'&&r.excerpt.length<=600;});
 await test('search snippets are never used as source text',async()=>{responses.search.query.search[1].snippet='FAKE provider quote';const r=await pbpDictEvidenceFetch(request());return r.length===1&&!r[0].excerpt.includes('FAKE');});
 await test('provider lookup refines candidates with a second chapter query',async()=>{await pbpDictEvidenceFetch(request());return calls.filter(c=>c.url.searchParams.get('action')==='query').length===2&&calls.some(c=>c.url.searchParams.get('srsearch')?.includes('intitle:chapter'));});
+await test('broad nonliterary hits cannot exhaust the candidate budget before a focused chapter',async()=>{
+ const broad=Array.from({length:8},(_,i)=>({ns:0,pageid:100+i,title:'Reference volume '+i}));
+ const focused=[{ns:0,pageid:201,title:'Unqualified chapter one'},{ns:0,pageid:202,title:'Unqualified chapter two'},{ns:0,pageid:CHAPTER.parse.pageid,title:CHAPTER.parse.title}];
+ for(const item of [...broad,...focused.slice(0,2)])responses.pages[item.title]={parse:{title:item.title,pageid:item.pageid,revid:99,categories:[],text:'<p>A reference work without the requested expression.</p>'}};
+ // Reverse the pools too: the broad fallback must have a fair share as well.
+ for(const reverse of [false,true]){
+  calls=[];responses.search=query=>({query:{search:query.includes('intitle:')!==reverse?focused:broad}});
+  const result=await pbpDictEvidenceFetch(request());
+  if(result.length!==1||result[0].work!=='The Pickwick Papers'||calls.length>26)return false;
+ }
+ return true;
+});
+await test('focused search misses retain the general literary fallback',async()=>{
+ const general=responses.search;responses.search=query=>query.includes('intitle:')?{query:{search:[]}}:general;
+ return (await pbpDictEvidenceFetch(request())).length===1;
+});
+await test('culture reads an exact page even when full-text ranking omits that term',async()=>{
+ responses.search={query:{search:[]}};
+ responses.pages.provider={parse:{title:'Provider',pageid:18,revid:180,categories:[],text:'<p>The expression <b>provider</b> is discussed in a particular community.</p>'}};
+ const result=await pbpDictEvidenceFetch(request({kind:'culture'}));
+ return result.length===1&&result[0].title==='Provider'&&result[0].revision==='180';
+});
+await test('culture gives focused usage sources priority over incidental word hits',async()=>{
+ responses.pages.provider={error:{code:'missingtitle'}};
+ const broad=Array.from({length:5},(_,i)=>({ns:0,pageid:100+i,title:'General subject '+i}));
+ const focused={ns:0,pageid:200,title:'Community expression'};
+ responses.search=query=>({query:{search:query.includes(' OR ')?[focused]:broad}});
+ for(const item of [...broad,focused])responses.pages[item.title]={parse:{title:item.title,pageid:item.pageid,revid:99,categories:[],text:'<p>The word provider occurs in this original public passage.</p>'}};
+ const result=await pbpDictEvidenceFetch(request({kind:'culture'}));
+ return result[0]?.title===focused.title&&result.length<=3&&calls.length<=26;
+});
+await test('culture refinement uses the source language rather than English keywords',async()=>{
+ responses.search={query:{search:[]}};
+ await pbpDictEvidenceFetch(request({kind:'culture',term:'遠い',sourceLanguage:'ja'}));
+ const queries=calls.map(call=>call.url.searchParams.get('srsearch')).filter(Boolean);
+ return queries.some(query=>query.includes('スラング'))&&!queries.some(query=>query.includes('slang'))&&queries.includes('"遠い"');
+});
 await test('legal search hits are rejected before fetching their body',async()=>{await pbpDictEvidenceFetch(request());return !calls.some(c=>c.url.searchParams.get('page')?.startsWith('United States Code'));});
 await test('unknown genre yields no literary result even with a matching term',async()=>{responses.pages[WORK.parse.title].parse.categories=[];return !(await pbpDictEvidenceFetch(request())).length;});
 await test('missing authors are not invented from a title',async()=>{pageOnly('<p>A provider supplies things needed by someone.</p>');return !(await pbpDictEvidenceFetch(request())).length;});
@@ -77,7 +114,7 @@ await test('oversized advertised response is refused before reading',async()=>{l
 await test('oversized streamed response is cancelled',async()=>{let cancelled=false;responses.search={response:{ok:true,body:{getReader:()=>({read:async()=>({done:false,value:new Uint8Array(1800001)}),cancel:async()=>{cancelled=true;}})}}};return await rejects(()=>pbpDictEvidenceFetch(request()),'source_failed')&&cancelled;});
 await test('a deleted candidate is skipped rather than fabricated',async()=>{responses.pages[CHAPTER.parse.title]={error:{code:'missingtitle'}};return !(await pbpDictEvidenceFetch(request())).length;});
 await test('invalid parse metadata cannot generate a source URL',async()=>{responses.pages[CHAPTER.parse.title].parse.revid='13788016';return await rejects(()=>pbpDictEvidenceFetch(request()),'source_failed');});
-await test('culture uses article body from the source-language edition',async()=>{const r=await pbpDictEvidenceFetch(request({kind:'culture',sourceLanguage:'de'}));return r.length===1&&r[0].genre==='culture'&&calls.every(c=>c.url.origin==='https://de.wikipedia.org')&&calls.filter(c=>c.url.searchParams.get('action')==='query').length===1;});
+await test('culture uses article body from the source-language edition',async()=>{const r=await pbpDictEvidenceFetch(request({kind:'culture',sourceLanguage:'de'}));return r.length>0&&r.every(s=>s.genre==='culture')&&calls.every(c=>c.url.origin==='https://de.wikipedia.org')&&calls.filter(c=>c.url.searchParams.get('action')==='query').length===2;});
 await test('culture retrieval does not label the passage as a verified meme',async()=>{const r=(await pbpDictEvidenceFetch(request({kind:'culture'})))[0];return r.genre==='culture'&&!Object.hasOwn(r,'popular')&&!Object.hasOwn(r,'originDate');});
 await test('etymology is restricted to the requested language and section',async()=>{const r=await pbpDictEvidenceFetch(request({kind:'etymology'}));return r[0].excerpt==='From provide + -er.'&&!JSON.stringify(r).includes('Wrong language')&&!JSON.stringify(r).includes('Unrelated definition');});
 await test('etymology follows one explicit formation link on the same origin',async()=>{const r=await pbpDictEvidenceFetch(request({kind:'etymology'}));return r.length===2&&r[1].title==='provide'&&r[1].excerpt.includes('Latin')&&calls.length===2&&calls.every(c=>c.url.origin==='https://en.wiktionary.org');});
