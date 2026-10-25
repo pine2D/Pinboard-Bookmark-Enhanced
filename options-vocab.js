@@ -185,6 +185,7 @@ function _pbpVocabDriveErrorText(code, { retryAt = null, blocked = false, connec
   let key = _pbpVocabDriveErrorKey(code);
   if (scope === "notes" && code === "entry_too_large") key = "driveNotesErrorEntryTooLarge";
   if (scope === "dictionary" && code === "entry_too_large") key = "driveDictionaryErrorEntryTooLarge";
+  if (scope === "ask" && code === "entry_too_large") key = "driveAskErrorEntryTooLarge";
   // Connected, Connect is hidden and Sync now is the way on; the disconnected
   // sentence ("…then connect again") stays for the state that shows Connect.
   if (code === "pinboard_auth" && connected) key = "vocabDriveErrorPinboardAuthSync";
@@ -207,7 +208,7 @@ function _pbpVocabDriveErrorText(code, { retryAt = null, blocked = false, connec
   }
   const message = parts.join(" ");
   if (!scope) return message;
-  return t(scope === "notes" ? "driveNotesStatus" : scope === "dictionary" ? "driveDictionaryStatus" : "driveVocabularyStatus", message);
+  return t(scope === "notes" ? "driveNotesStatus" : scope === "dictionary" ? "driveDictionaryStatus" : scope === "ask" ? "driveAskStatus" : "driveVocabularyStatus", message);
 }
 
 // The only writer of #vocab-drive-error. Identical sentences collapse to one,
@@ -251,7 +252,7 @@ function _pbpVocabDriveStatusLines(status) {
       retryAt: connection.retryAt, blocked: connection.blocked === true, connected: true
     }));
   }
-  for (const scope of ["vocabulary", "notes", "dictionary"]) {
+  for (const scope of ["vocabulary", "notes", "dictionary", "ask"]) {
     const row = status[scope];
     if (!row?.lastError || _PBP_DRIVE_UI_CONNECTION_CODES.has(row.lastError)) continue;
     lines.push(_pbpVocabDriveErrorText(row.lastError, {
@@ -379,7 +380,7 @@ function _pbpVocabDriveResponseLines(response, status) {
   const connected = status?.connected === true;
   const lines = [];
   const reported = new Set();
-  for (const scope of ["vocabulary", "notes", "dictionary"]) {
+  for (const scope of ["vocabulary", "notes", "dictionary", "ask"]) {
     const result = response?.results?.[scope];
     const code = result && result.ok !== true ? result.error : null;
     if (!code || _PBP_DRIVE_UI_SILENT_CODES.has(code) || _PBP_DRIVE_UI_CONNECTION_CODES.has(code)) continue;

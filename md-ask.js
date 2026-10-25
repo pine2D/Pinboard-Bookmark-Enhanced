@@ -43,7 +43,7 @@ async function pbpAskInit(detail) {
   if (!view || _pbpAskState) return;
   const s = await pbpAiGetSettings();
   if (_pbpAskState) return; // another lifecycle initializer finished this await
-  if (!pbpAiAvailable(s)) return; // master off / no key: no button, no hotkey, no bridge
+  if (!pbpAiAvailable(s) && typeof pbpAskArchiveRead !== "function") return;
   if (typeof pbpAiResolveInitDetail === "function") detail = await pbpAiResolveInitDetail(detail);
   if (!detail || _pbpAskState) return; // owner/lifecycle changed during the read
   // Idempotent index guard: md-translate may have indexed already; an
@@ -65,6 +65,9 @@ async function pbpAskInit(detail) {
     panel: null,
     ctx: null,        // lazy context cache (filled by the send-flow task)
     records: [],
+    sessionId: String(detail.askSession || new URL(location.href).searchParams.get("askSession") || ""),
+    archiveRev: 0,
+    temporary: false,
     running: false,
     ctrl: null        // shared AbortController (Stop button aborts it)
   };
@@ -107,6 +110,17 @@ async function pbpAskInit(detail) {
   window.addEventListener("pagehide", () => {
     if (_pbpAskState && _pbpAskState.ctrl) _pbpAskState.ctrl.abort();
   });
+}
+
+// Settings changes affect new requests, while saved history stays readable.
+function pbpAskRefreshSettings(settings) {
+  const st = _pbpAskState;
+  if (!st) return;
+  st.s = settings;
+  if (!pbpAiAvailable(settings) && st.ctrl) st.ctrl.abort();
+  _pbpAskArchiveStatus();
+  _pbpAskSyncRegenerate();
+  _pbpAskUpdateMeta();
 }
 
 // Rail entry. Generated markup (exact):
@@ -184,16 +198,20 @@ function _pbpAskBuildPanel() {
   panel.setAttribute("aria-labelledby", "ask-title");
   panel.innerHTML = [
     '<header class="panel-head">',
-    '  <h2 id="ask-title" data-i18n="askTitle">Ask the page</h2>',
+    '  <h2 id="ask-title" data-i18n="askTitle" data-i18n-title="askTitle">Ask the page</h2>',
+    '  <button type="button" id="ask-new" class="ask-ic" data-i18n-title="askNewConversation" data-i18n-aria="askNewConversation">' + (typeof PBP_ICONS !== "undefined" ? PBP_ICONS.plus : "") + '</button>',
+    '  <button type="button" id="ask-history" class="ask-ic" data-i18n-title="askHistory" data-i18n-aria="askHistory">' + (typeof PBP_ICONS !== "undefined" ? PBP_ICONS.clock : "") + '</button>',
     // askCopyThread, not mdCopyMarkdown: this button copies the Q&A thread
     // (_pbpAskCopyThread), while the rail's #btn-copy-md copies the ARTICLE
     // under that same key and the same clipboard icon. Sibling of askClear
     // ("Clear conversation") and askCopyAnswer ("Copy answer").
     '  <button type="button" id="ask-export" class="ask-ic" data-i18n-title="askCopyThread" data-i18n-aria="askCopyThread">' + PBP_ASK_COPY_SVG + '</button>',
     '  <button type="button" id="ask-export-conversation" class="ask-ic" data-i18n-title="askExportConversation" data-i18n-aria="askExportConversation">' + (typeof PBP_ICONS !== "undefined" ? PBP_ICONS.download : "") + '</button>',
-    '  <button type="button" id="ask-clear" class="ask-ic" data-i18n-title="askClear" data-i18n-aria="askClear">' + PBP_ASK_CLEAR_SVG + '</button>',
+    '  <button type="button" id="ask-clear" class="ask-ic" data-i18n-title="askDeleteConversation" data-i18n-aria="askDeleteConversation">' + PBP_ASK_CLEAR_SVG + '</button>',
     '  <button type="button" id="ask-close" class="ask-ic" data-i18n-title="askClose" data-i18n-aria="askClose">' + PBP_ASK_CLOSE_SVG + '</button>',
     '</header>',
+    '<div id="ask-storage" role="status" aria-live="polite"></div>',
+    '<label id="ask-temporary-label"><input type="checkbox" id="ask-temporary"><span data-i18n="askTemporary"></span></label>',
     '<div id="ask-thread" role="log" aria-live="polite">',
     '  <p id="ask-empty" class="ask-empty" data-i18n="askEmptyHint"></p>',
     '</div>',
@@ -220,6 +238,16 @@ function _pbpAskBuildPanel() {
   applyI18n(panel);
   document.body.appendChild(panel);
   _pbpAskState.panel = panel;
+  panel.querySelector("#ask-new").addEventListener("click", () => _pbpAskNewConversation());
+  panel.querySelector("#ask-history").addEventListener("click", () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL("library.html#ask") });
+  });
+  panel.querySelector("#ask-temporary").addEventListener("change", (event) => {
+    const st = _pbpAskState;
+    if (!st || st.running || st.records.length) return;
+    st.temporary = event.target.checked;
+    _pbpAskArchiveStatus();
+  });
   // The bottom sheet's real height, for the article's scroll room under it
   // (md-preview.css `body.ask-open main { margin-bottom }`, <=1200px). A
   // fixed 70vh (the sheet's max-height) left most of a blank screen after
@@ -430,7 +458,7 @@ function _pbpAskSetOpen(open) {
     // Transparency-line seam: implemented by the send-flow task.
     if (typeof _pbpAskUpdateMeta === "function") _pbpAskUpdateMeta();
     const ta = document.getElementById("ask-input");
-    if (ta) ta.focus();
+    (ta && !ta.disabled ? ta : document.getElementById("ask-history"))?.focus({ preventScroll: true });
   } else {
     const op = _pbpAskState.opener;
     const isVisible = (el) => {
@@ -451,15 +479,9 @@ function _pbpAskSetOpen(open) {
   _pbpAskSettleAnchor(anchor);
 }
 
-// Clear: wipe the visible thread, restore starter chips + empty hint,
-// and erase the persisted ask_<url> history.
-// WONTFIX (ask campaign 2026-07, Codex finding): with TWO preview tabs on
-// the same URL, a round that tab B already had in flight when tab A
-// cleared will still append once it finishes - the wiped history "grows
-// back" one round. Guarding it needs a cross-tab tombstone/epoch in the
-// IDB entry, and the semantics are genuinely arguable (from B's view its
-// just-finished answer SHOULD persist). Scope: same account, same URL,
-// two open readers, mid-stream clear - accepted as-is.
+// Visible reset is shared by New conversation, explicit deletion and owner
+// changes. Only explicit deletion writes an archive tombstone; opening a new
+// conversation never removes earlier paid answers.
 // Visible half of a wipe: empty-state hint back, starter chips back. Shared by
 // Clear (which also erases the persisted history below) and by the account
 // switch (which must NOT erase anything -- it only stops showing the previous
@@ -477,7 +499,171 @@ function _pbpAskResetThreadView() {
   if (chips) chips.hidden = false;
 }
 
+// Archive identity is independent of model settings and of the short prompt window.
+function _pbpAskArchiveEnabled() { return typeof pbpAskArchiveRead === "function"; }
+function _pbpAskArchiveOwnerOf(account) { return pbpDictOwnerScope(account); }
+function _pbpAskCurrentVersions(records) {
+  const replaced = new Set(records.map(record => record.replacesId).filter(Boolean));
+  return records.filter(record => !record.id || !replaced.has(record.id));
+}
+function _pbpAskArchiveStateCurrent(st, account, revision) {
+  return _pbpAskState === st && st.account === account && (st.archiveRev || 0) === revision;
+}
+async function _pbpAskLoadArchive(st) {
+  if (!_pbpAskArchiveEnabled()) return null;
+  if (st.archiveReady) return st.archiveReady;
+  const account = st.account, revision = st.archiveRev || 0;
+  const current = () => _pbpAskArchiveStateCurrent(st, account, revision);
+  st.archiveLoading = true;
+  _pbpAskArchiveStatus();
+  const load = async () => {
+    const owner = _pbpAskArchiveOwnerOf(account);
+    const legacy = await pbpAskHistGet(st.url, account);
+    if (!current()) return null;
+    await pbpAskArchiveMigrate({ owner, url: st.url, title: st.title, records: legacy, isCurrent: current });
+    let sessions = await pbpAskArchiveRead({ owner, url: st.url });
+    if (!current()) return null;
+    if ((!sessions.length || (st.sessionId && !sessions.some(session => session.id === st.sessionId))) && owner !== "ownerless" && globalThis.chrome?.runtime?.sendMessage) {
+      const result = await chrome.runtime.sendMessage({ type: "PBP_ASK_ARCHIVE_RESTORE", owner });
+      if (!current()) return null;
+      if (result && result.ok === false && result.code !== "not_connected") throw new Error(result.code || "sync_failed");
+      sessions = await pbpAskArchiveRead({ owner, url: st.url });
+    }
+    if (!current()) return null;
+    const selected = st.sessionId ? sessions.find(session => session.id === st.sessionId) : sessions[0];
+    st.archiveMissing = !!st.sessionId && !selected;
+    st.sessionId = selected ? selected.id : st.sessionId || crypto.randomUUID();
+    st.archiveSession = selected || null;
+    st.archiveAllRecords = selected ? selected.records : [];
+    st.archiveError = false;
+    return selected;
+  };
+  st.archiveReady = load().catch(error => {
+    if (current()) { st.archiveError = true; st.archiveReady = null; }
+    console.warn("[pbp-ask] archive restore failed:", error?.name, error?.code || error?.message);
+    throw error;
+  }).finally(() => {
+    if (current()) { st.archiveLoading = false; _pbpAskArchiveStatus(); }
+  });
+  return st.archiveReady;
+}
+function _pbpAskArchiveStatus() {
+  const st = _pbpAskState, host = document.getElementById("ask-storage");
+  if (!st || !host || !_pbpAskArchiveEnabled()) return;
+  _pbpAskSyncRegenerate();
+  const pending = _pbpAskUnpersisted.filter(item => item.account === st.account && item.sessionId === st.sessionId);
+  const key = st.archiveLoading ? "askHistoryLoading" : st.archiveError ? "askHistoryLoadFailed"
+    : st.archiveMissing ? "askHistoryUnavailable" : st.temporary ? "askTemporaryHint" : pending.length ? "askSaveFailed"
+      : st.records?.length ? "askSavedLocal" : "";
+  host.replaceChildren();
+  if (key) host.textContent = t(key);
+  if (pending.length || st.archiveError || st.archiveStale) {
+    const retry = document.createElement("button"); retry.type = "button"; retry.className = "action-btn";
+    retry.textContent = t(st.archiveStale || st.archiveError ? "askHistoryRefresh" : "askSaveRetry");
+    retry.addEventListener("click", async (event) => {
+      const keyboard = event.detail === 0;
+      retry.disabled = true;
+      if (st.archiveStale) {
+        await _pbpAskRefreshArchivedView(st);
+      } else if (st.archiveError) {
+        _pbpAskHistRestored = false;
+        await _pbpAskHistRestore().catch(() => {});
+      } else {
+        for (const item of pending) await _pbpAskPersistArchive(item).catch(() => {});
+      }
+      _pbpAskArchiveStatus();
+      if (keyboard && (!document.activeElement || document.activeElement === document.body || document.activeElement === retry)) {
+        (host.querySelector("button") || document.querySelector("#ask-input:not(:disabled)") || document.getElementById("ask-history"))?.focus({ preventScroll: true });
+      }
+    });
+    host.appendChild(retry);
+  } else if (st.records?.length && !st.temporary && !st.archiveLoading) {
+    const account = st.account, revision = st.archiveRev || 0, sessionId = st.sessionId;
+    Promise.all([
+      pbpAskArchiveRead({ owner: _pbpAskArchiveOwnerOf(account), sessionId }),
+      chrome.runtime.sendMessage({ type: "vocabDriveStatus" }).catch(() => null)
+    ]).then(([sessions, status]) => {
+      if (!_pbpAskArchiveStateCurrent(st, account, revision) || st.sessionId !== sessionId || host.querySelector("button")) return;
+      const connected = status?.connected === true || status?.status?.connected === true;
+      host.textContent = t(connected ? sessions[0]?.hasPending ? "askSyncPending" : "askSynced" : "askSavedLocal");
+    }).catch(error => console.warn("[pbp-ask] archive status failed:", error?.name));
+  }
+  const temporary = document.getElementById("ask-temporary"), label = document.getElementById("ask-temporary-label");
+  if (temporary) { temporary.checked = !!st.temporary; temporary.disabled = st.running || st.archiveLoading || !!st.records?.length; }
+  if (label) { label.hidden = !!st.records?.length; label.title = t("askTemporaryHint"); }
+  const create = document.getElementById("ask-new");
+  if (create) create.disabled = st.running || st.archiveLoading || !!pending.length;
+  const input = document.getElementById("ask-input"), send = document.getElementById("ask-send");
+  const unavailable = !pbpAiAvailable(st.s);
+  if (input) {
+    input.disabled = unavailable || !!st.archiveError || !!st.archiveMissing || st.archiveLoading;
+    input.placeholder = t(unavailable ? "askConfigureToContinue" : "askPlaceholder");
+  }
+  if (send && !st.running) send.disabled = unavailable || !!st.archiveError || !!st.archiveMissing || st.archiveLoading;
+}
+async function _pbpAskRefreshArchivedView(st) {
+  if (_pbpAskState !== st || st.running || _pbpAskUnpersisted.some(item => item.sessionId === st.sessionId)) return;
+  st.archiveRev = (st.archiveRev || 0) + 1;
+  st.archiveReady = null; st.archiveStale = false; st.records = []; st.rounds = [];
+  _pbpAskHistRestored = false;
+  _pbpAskResetThreadView();
+  await _pbpAskHistRestore();
+}
+async function _pbpAskPersistArchive(pending) {
+  const st = _pbpAskState;
+  if (!st || pending.account !== st.account || pending.sessionId !== st.sessionId) return;
+  const revision = st.archiveRev || 0;
+  const saved = await pbpAskArchiveAppend({ owner: _pbpAskArchiveOwnerOf(pending.account),
+    url: pending.url, title: pending.title, sessionId: pending.sessionId,
+    record: pending.record, replacesId: pending.replacesId || "",
+    isCurrent: () => _pbpAskArchiveStateCurrent(st, pending.account, revision) && st.sessionId === pending.sessionId });
+  if (!_pbpAskArchiveStateCurrent(st, pending.account, revision)) return;
+  Object.assign(pending.record, { id: saved.id, replacesId: saved.replacesId });
+  st.archiveAllRecords = (st.archiveAllRecords || []).filter(record => record.id !== saved.id).concat(saved);
+  _pbpAskUnpersisted = _pbpAskUnpersisted.filter(item => item !== pending);
+  _pbpAskHistoryChanged({ url: pending.url, account: pending.account, sessionId: pending.sessionId });
+  _pbpAskArchiveStatus();
+}
+function _pbpAskNewConversation() {
+  const st = _pbpAskState;
+  if (!st || st.running || _pbpAskUnpersisted.some(item => item.account === st.account && item.sessionId === st.sessionId)) return;
+  st.archiveRev = (st.archiveRev || 0) + 1;
+  st.sessionId = crypto.randomUUID(); st.archiveSession = null; st.archiveAllRecords = [];
+  st.archiveReady = Promise.resolve(null); st.archiveStale = false; st.archiveLoading = false; st.archiveError = false; st.archiveMissing = false; st.temporary = false;
+  st.rounds = []; st.records = []; st.ctrl = null;
+  const stop = document.getElementById("ask-stop"), send = document.getElementById("ask-send");
+  if (stop) stop.hidden = true;
+  if (send) send.hidden = false;
+  _pbpAskHistRestored = true;
+  _pbpAskResetThreadView();
+  for (const id of ["ask-clear-confirm", "ask-clear-error"]) document.getElementById(id)?.remove();
+  _pbpAskHistoryChanged(); _pbpAskArchiveStatus(); _pbpAskUpdateMeta();
+  (document.querySelector("#ask-input:not(:disabled)") || document.getElementById("ask-history"))?.focus({ preventScroll: true });
+}
+async function _pbpAskDeleteArchivedConversation() {
+  const st = _pbpAskState;
+  if (!st || !st.sessionId) return false;
+  const account = st.account, sessionId = st.sessionId, revision = st.archiveRev || 0;
+  if (st.ctrl) st.ctrl.abort();
+  try {
+    if (!st.temporary) await pbpAskArchiveDelete({ owner: _pbpAskArchiveOwnerOf(account), sessionId,
+      isCurrent: () => _pbpAskArchiveStateCurrent(st, account, revision) });
+    if (!_pbpAskArchiveStateCurrent(st, account, revision)) return false;
+    _pbpAskUnpersisted = _pbpAskUnpersisted.filter(item => item.account !== account || item.sessionId !== sessionId);
+    st.running = false;
+    _pbpAskNewConversation();
+    return true;
+  } catch (error) {
+    console.warn("[pbp-ask] archive delete failed:", error?.name, error?.code);
+    const host = document.getElementById("ask-storage");
+    if (host && _pbpAskArchiveStateCurrent(st, account, revision)) host.textContent = t("askClearFailed");
+    const clear = document.getElementById("ask-clear"); if (clear) clear.hidden = false;
+    return false;
+  }
+}
+
 async function _pbpAskClearThread() {
+  if (_pbpAskArchiveEnabled()) return _pbpAskDeleteArchivedConversation();
   // Wipe the in-memory conversation FIRST: st.rounds feeds every future
   // prompt (_pbpAskRun/_pbpAskUpdateMeta), and aborting any in-flight
   // request sends it down the AbortError branch of _pbpAskRun's catch -
@@ -1077,7 +1263,7 @@ function _pbpAskErrorUi(aEl, error, question) {
 // Core runner: stream into aEl, finalize, persist, count.
 async function _pbpAskRun(question, aEl, opts) {
   const st = _pbpAskState;
-  if (!st || st.running) return;
+  if (!st || st.running || !pbpAiAvailable(st.s) || st.archiveMissing || st.archiveError) return;
   opts = opts || {};
   st.rounds = st.rounds || []; // lazy: Task 12's state object predates this field
   st.running = true;
@@ -1092,7 +1278,12 @@ async function _pbpAskRun(question, aEl, opts) {
   // reader's own words, and ask_<owner>_<url> is where the OTHER account will
   // read it back.
   const runAccount = st.account;
+  const runSettings = st.s;
+  const runSession = st.sessionId;
+  const runArchiveRev = st.archiveRev || 0;
+  const replacedRecord = opts.replaceLast ? st.records?.[st.records.length - 1] : null;
   st.ctrl = new AbortController();
+  const runCtrl = st.ctrl;
   _pbpAskWireStop();
   const stopBtn = document.getElementById("ask-stop");
   const sendBtn = document.getElementById("ask-send");
@@ -1130,12 +1321,21 @@ async function _pbpAskRun(question, aEl, opts) {
       context: runCtx.text, history: promptHistory, question,
       title: st.title, forum: st.forum
     });
-    const full = await getOrCreateInflight("ask_" + st.url + "_" + question, () =>
-      callAIStream(st.s, built.prompt, {
+    const full = await getOrCreateInflight("ask_" + _pbpTrOwnerScope(runAccount) + "_" + st.url + "_" + (runSession || "") + "_" + question, () =>
+      callAIStream(runSettings, built.prompt, {
         maxTokens: 4096,
-        model: pbpAiResolveModelOverride(st.s),
+        model: pbpAiResolveModelOverride(runSettings),
         system: built.system,
-        signal: st.ctrl.signal
+        signal: st.ctrl.signal,
+        beforeRequest: async () => {
+          const fresh = await pbpAiGetSettings();
+          const live = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
+          if (runCtrl.signal.aborted || !pbpAiAvailable(fresh) || st.account !== runAccount ||
+              (pbpPinboardAccountFromToken(live.pinboardToken) || "") !== runAccount ||
+              (st.archiveRev || 0) !== runArchiveRev || st.sessionId !== runSession) {
+            throw Object.assign(new Error("request cancelled"), { name: "AbortError" });
+          }
+        }
       }, (d, accText) => {
         // rAF throttle: deltas land as plain textContent at most once per
         // frame; markdown renders exactly once, at finalize.
@@ -1164,7 +1364,7 @@ async function _pbpAskRun(question, aEl, opts) {
     // lose. Route it down the identical branch -- nothing finalized (the
     // element is detached by now), nothing counted, and above all nothing
     // written into the new account's partition.
-    if (st.account !== runAccount) {
+    if (st.account !== runAccount || (st.archiveRev || 0) !== runArchiveRev || st.sessionId !== runSession) {
       const switchedErr = new Error("account changed");
       switchedErr.name = "AbortError";
       throw switchedErr;
@@ -1182,7 +1382,7 @@ async function _pbpAskRun(question, aEl, opts) {
       a: full,
       cites: parsed.cites,
       ts: Date.now(),
-      model: _pbpAskProviderLabel(st.s),
+      model: _pbpAskProviderLabel(runSettings),
       // Compared against the live fingerprint at restore time to catch a
       // stale [Pn] index after an engine switch (audit #29).
       blocksHash: runCtx.blocksHash,
@@ -1193,21 +1393,20 @@ async function _pbpAskRun(question, aEl, opts) {
     } else {
       st.rounds.push({ q: question, a: parsed.body });
     }
-    // In-memory history must stay bounded too (D6-5): reuse the persisted
-    // layer's trim (md-ai-core.js _pbpAskHistTrim, PBP_ASK_HIST_MAX=20)
-    // instead of maintaining a second cap here.
+    // Keep model context bounded separately from durable history. The prompt
+    // applies its smaller four-round/token window; saved answers are not LRU data.
     st.rounds = _pbpAskHistTrim(st.rounds);
-    st.records = _pbpAskHistTrim((st.records || []).slice());
+    st.records = _pbpAskArchiveEnabled() ? (st.records || []).slice() : _pbpAskHistTrim((st.records || []).slice());
     if (opts.replaceLast && st.records.length && st.records[st.records.length - 1].q === question) {
       st.records[st.records.length - 1] = record;
     } else {
       st.records.push(record);
-      st.records = _pbpAskHistTrim(st.records);
+      if (!_pbpAskArchiveEnabled()) st.records = _pbpAskHistTrim(st.records);
     }
     aEl._askExportRecord = record;
-    const pending = { url: st.url, account: runAccount, record, replaceLast: !!opts.replaceLast };
-    _pbpAskUnpersisted.push(pending);
-    _pbpAskUnpersisted = _pbpAskHistTrim(_pbpAskUnpersisted);
+    const pending = { url: st.url, title: st.title, account: runAccount, sessionId: runSession, record, replaceLast: !!opts.replaceLast, replacesId: replacedRecord?.id || "" };
+    if (!st.temporary) _pbpAskUnpersisted.push(pending);
+    if (!_pbpAskArchiveEnabled()) _pbpAskUnpersisted = _pbpAskHistTrim(_pbpAskUnpersisted);
     _pbpAskHistoryChanged();
     // Persisted append: st.running only serializes sends WITHIN this tab,
     // not across tabs, so a plain get+push+set here would race two preview
@@ -1215,6 +1414,9 @@ async function _pbpAskRun(question, aEl, opts) {
     // read-modify-write in one IDB transaction instead, which IndexedDB
     // serializes across tabs - no lost update.
     try {
+      if (_pbpAskArchiveEnabled()) {
+        if (!st.temporary) await _pbpAskPersistArchive(pending);
+      } else {
       if (opts.replaceLast && typeof pbpAskHistReplaceLast === "function") {
         await pbpAskHistReplaceLast(st.url, record, st.account);
       } else {
@@ -1229,12 +1431,15 @@ async function _pbpAskRun(question, aEl, opts) {
         && JSON.stringify(r.cites) === JSON.stringify(record.cites)
         && JSON.stringify(r.evidence) === JSON.stringify(record.evidence));
       if (confirmed) _pbpAskUnpersisted = _pbpAskUnpersisted.filter((item) => item !== pending);
+      }
     } catch (error) {
       // A cache failure cannot undo a completed answer or remove it from
       // this session's exports. Retain only its bounded pending record.
       console.warn("[pbp-ask] history persistence failed:", error?.name, error?.message);
     }
     _pbpAskHistoryChanged();
+    _pbpAskArchiveStatus();
+    _pbpAskAddVersions(aEl);
     pbpAiBumpCounter("ask");
   } catch (e) {
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
@@ -1280,6 +1485,7 @@ async function _pbpAskRun(question, aEl, opts) {
       _pbpAskErrorUi(aEl, e || new Error(t("aiErrRequestFailed")), question);
     }
   } finally {
+    if (st.ctrl !== runCtrl) return;
     st.running = false;
     st.ctrl = null;
     const stopHadFocus = document.activeElement === stopBtn;
@@ -1290,6 +1496,7 @@ async function _pbpAskRun(question, aEl, opts) {
     // 4-round window note (B2) must appear as soon as the 5th round
     // lands, not on the next open/send.
     _pbpAskUpdateMeta();
+    _pbpAskArchiveStatus();
   }
 }
 
@@ -1303,6 +1510,11 @@ async function _pbpAskSend() {
   const question = ta ? ta.value.trim() : "";
   if (!question) { if (ta) ta.focus(); return; }
   if (!pbpAiAvailable(st.s)) return;
+  if (_pbpAskArchiveEnabled()) {
+    const revision = st.archiveRev || 0;
+    try { await _pbpAskLoadArchive(st); } catch (_) { return; }
+    if (st !== _pbpAskState || (st.archiveRev || 0) !== revision || st.running || st.archiveMissing) return;
+  }
   _pbpAskUpdateMeta(); // refresh the transparency line BEFORE the request
   const aEl = _pbpAskAppendRound(question);
   if (!aEl) return;
@@ -1754,8 +1966,8 @@ function _pbpAskFinalize(el, fullText, sent, sourceSnapshot) {
 // ============================================================
 // DOM contract (Task 12/13): panel #ask-panel, conversation container
 // #ask-thread, question/answer elements .ask-q/.ask-a. Records persisted
-// by the Task 13 send path as {q, a: full raw model text, cites, ts, model}
-// via pbpAskHistAppend (atomic append + cap 20, md-ai-core; D2-2).
+// as complete immutable archive records, including frozen citation evidence.
+// pbpAskHist* remains the legacy cache/migration boundary for older consumers.
 
 // Static inline SVG (clipboard, same path set as the rail Copy buttons in
 // md-preview.html). Constant string, never model text.
@@ -1828,14 +2040,29 @@ async function pbpAskExportSnapshot({ url, account, title } = {}) {
   url = String(url || ""); account = String(account || "");
   const revision = _pbpAskExportRevision;
   const historyKey = _pbpAskHistKey(url, account);
-  let records = url && !_pbpAskClearing.has(historyKey) ? await pbpAskHistGet(url, account) : [];
+  let records = [];
+  let archiveSessionId = "";
+  if (_pbpAskArchiveEnabled() && url) {
+    const st = _pbpAskState;
+    const matching = st && st.account === account && pbpAiCacheUrlNorm(st.url) === pbpAiCacheUrlNorm(url);
+    if (matching && st.temporary) records = st.records || [];
+    else {
+      await pbpAskArchiveMigrate({ owner: _pbpAskArchiveOwnerOf(account), url, title: String(title || ""),
+        records: await pbpAskHistGet(url, account), isCurrent: () => revision === _pbpAskExportRevision });
+      const sessions = await pbpAskArchiveRead({ owner: _pbpAskArchiveOwnerOf(account), url,
+        ...(matching && st.sessionId ? { sessionId: st.sessionId } : {}) });
+      const session = sessions[0];
+      archiveSessionId = matching ? st.sessionId : session?.id || "";
+      records = session ? _pbpAskCurrentVersions(session.records) : [];
+    }
+  } else records = url && !_pbpAskClearing.has(historyKey) ? await pbpAskHistGet(url, account) : [];
   // Clear/account changes while the read was pending must not resurrect data.
   if (revision !== _pbpAskExportRevision) throw new Error("ask-history-changed");
   records = Array.isArray(records) ? records.slice() : [];
   const normalizedUrl = typeof pbpAiCacheUrlNorm === "function" ? pbpAiCacheUrlNorm(url) : url;
   for (const pending of _pbpAskUnpersisted) {
     const pendingUrl = typeof pbpAiCacheUrlNorm === "function" ? pbpAiCacheUrlNorm(pending.url) : pending.url;
-    if (pending.account !== account || pendingUrl !== normalizedUrl) continue;
+    if (pending.account !== account || pendingUrl !== normalizedUrl || (_pbpAskArchiveEnabled() && pending.sessionId !== archiveSessionId)) continue;
     const r = pending.record;
     if (records.some((existing) => existing && existing.ts === r.ts && existing.q === r.q && existing.a === r.a)) continue;
     if (pending.replaceLast && records.length && records[records.length - 1].q === r.q) records[records.length - 1] = r;
@@ -2169,6 +2396,7 @@ function _pbpAskHistThread() {
 // makes sure the clear control exists once the thread has content.
 function _pbpAskDecorate(el, parsed) {
   _pbpAskEnsureClear();
+  _pbpAskAddVersions(el);
   if (!el.querySelector(".ask-copy-btn")) {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -2218,18 +2446,33 @@ function _pbpAskDecorate(el, parsed) {
   _pbpAskSyncRegenerate();
 }
 
+function _pbpAskAddVersions(el) {
+  if (!el?._askExportRecord?.replacesId || el.querySelector(".ask-versions")) return;
+  const sessionId = _pbpAskState?.sessionId;
+  if (!sessionId) return;
+  const button = document.createElement("button");
+  button.type = "button"; button.className = "action-btn ask-versions";
+  button.textContent = t("askVersions");
+  button.addEventListener("click", () => chrome.tabs.create({
+    url: chrome.runtime.getURL("library.html?askSession=" + encodeURIComponent(sessionId) + "#ask")
+  }));
+  el.appendChild(button);
+}
+
 function _pbpAskSyncRegenerate() {
   const btns = Array.from(document.querySelectorAll("#ask-thread .ask-regenerate"));
   btns.forEach((btn, i) => {
     const latest = i === btns.length - 1;
     btn.hidden = !latest;
-    btn.disabled = !latest;
+    const unsaved = _pbpAskUnpersisted.some(item => item.record === btn.closest(".ask-a")?._askExportRecord);
+    btn.disabled = !latest || !_pbpAskState || !pbpAiAvailable(_pbpAskState.s) || (_pbpAskArchiveEnabled() && unsaved);
   });
 }
 
 function _pbpAskRegenerate(el) {
   const st = _pbpAskState;
-  if (!st || st.running || !el || !el.dataset.askQuestion) return;
+  if (!st || st.running || !pbpAiAvailable(st.s) || st.archiveMissing || st.archiveError || !el || !el.dataset.askQuestion) return;
+  if (_pbpAskArchiveEnabled() && _pbpAskUnpersisted.some(item => item.record === el._askExportRecord)) return;
   const oldNodes = Array.from(el.childNodes);
   if (el.contains(document.activeElement)) {
     el.tabIndex = -1;
@@ -2278,10 +2521,10 @@ function _pbpAskShowClearConfirm() {
   strip.id = "ask-clear-confirm";
   strip.className = "ask-clear-confirm";
   strip.setAttribute("role", "alertdialog");
-  strip.setAttribute("aria-label", t("askClearConfirm"));
+  strip.setAttribute("aria-label", t(_pbpAskArchiveEnabled() ? "askDeleteConversationConfirm" : "askClearConfirm"));
   const msg = document.createElement("span");
   msg.className = "ask-clear-msg";
-  msg.textContent = t("askClearConfirm");
+  msg.textContent = t(_pbpAskArchiveEnabled() ? "askDeleteConversationConfirm" : "askClearConfirm");
   const yes = document.createElement("button");
   yes.type = "button";
   yes.className = "action-btn ask-clear-yes";
@@ -2375,7 +2618,14 @@ async function _pbpAskHistRestore() {
     pbpAiCacheDelete(_pbpAskHistLegacyKey(_pbpAskHistUrl)).catch(() => {});
   }
   let hist = [];
-  try { hist = await pbpAskHistGet(_pbpAskHistUrl, _pbpAskHistAccount); } catch (_) {}
+  const archiveRevision = _pbpAskState?.archiveRev || 0;
+  try {
+    if (_pbpAskArchiveEnabled() && _pbpAskState) {
+      const session = await _pbpAskLoadArchive(_pbpAskState);
+      hist = session ? _pbpAskCurrentVersions(session.records) : [];
+    } else hist = await pbpAskHistGet(_pbpAskHistUrl, _pbpAskHistAccount);
+  } catch (_) { _pbpAskHistRestored = false; return; }
+  if ((_pbpAskState?.archiveRev || 0) !== archiveRevision) return;
   // Re-check after the await: a Clear that landed while the IDB read was
   // in flight dropped the flag synchronously - this stale result must not
   // repopulate st.records (export would copy erased history) or touch the
@@ -2423,7 +2673,7 @@ async function _pbpAskHistRestore() {
       // calls it exactly once), so on THIS path the flag only ever goes
       // true->false - making it safe to re-check directly. Stop seeding
       // st.rounds from now-erased history and never insert frag.
-      if (!_pbpAskHistRestored) { resolve(); return; }
+      if (!_pbpAskHistRestored || (_pbpAskState?.archiveRev || 0) !== archiveRevision) { resolve(); return; }
       // An account switch DOES flip it back to true (the handler re-arms the
       // restore for the new owner synchronously), so that check alone is ABA-
       // blind here: compare the owner this fragment was built for instead.
@@ -2493,7 +2743,9 @@ async function _pbpAskHistRestore() {
   if (_pbpAskState) {
     _pbpAskState.rounds = _pbpAskHistTrim(restoredRounds.concat(_pbpAskState.rounds || []));
   }
+  if ((_pbpAskState?.archiveRev || 0) !== archiveRevision) return;
   thread.insertBefore(frag, thread.firstChild);
+  _pbpAskArchiveStatus();
   _pbpAskHistoryChanged();
   _pbpAskSyncRegenerate();
 }
@@ -3968,6 +4220,9 @@ function _pbpAskOnAccountChanged(account) {
   const st = _pbpAskState;
   if (st) {
     st.account = acct;
+    st.archiveRev = (st.archiveRev || 0) + 1;
+    st.sessionId = ""; st.archiveReady = null; st.archiveSession = null; st.archiveAllRecords = [];
+    st.archiveError = false; st.archiveMissing = false; st.temporary = false;
     // Same order Clear uses: memory first, then the DOM. An in-flight answer
     // takes the AbortError branch, which never pushes to rounds/records and
     // never persists.
@@ -3999,4 +4254,35 @@ if (typeof document !== "undefined") {
   document.addEventListener("pbp:article-will-replace", (e) => _pbpAskOnArticleWillReplace((e && e.detail) || {}));
   document.addEventListener("pbp:article-replaced", (e) => _pbpAskOnArticleReplaced((e && e.detail) || {}));
   document.addEventListener("pbp:account-changed", (e) => _pbpAskOnAccountChanged((e && e.detail && e.detail.account) || ""));
+}
+
+if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+  chrome.runtime.onMessage.addListener((message) => {
+    if (!["PBP_ASK_ARCHIVE_SYNCED", "PBP_ASK_ARCHIVE_DIRTY"].includes(message?.type)) return;
+    const st = _pbpAskState;
+    if (!st || !st.sessionId || st.temporary || !_pbpAskArchiveEnabled() ||
+        (message.owner && message.owner !== _pbpAskArchiveOwnerOf(st.account))) return;
+    const account = st.account, revision = st.archiveRev || 0, sessionId = st.sessionId;
+    pbpAskArchiveRead({ owner: _pbpAskArchiveOwnerOf(account), sessionId }).then(sessions => {
+      if (!_pbpAskArchiveStateCurrent(st, account, revision) || st.sessionId !== sessionId) return;
+      if (!sessions.length && st.records?.length && !_pbpAskUnpersisted.some(item => item.sessionId === sessionId)) {
+        if (st.ctrl) st.ctrl.abort();
+        st.running = false;
+        _pbpAskNewConversation();
+      } else {
+        const changed = sessions[0] && JSON.stringify(sessions[0].records.map(record => record.id).sort()) !==
+          JSON.stringify((st.archiveAllRecords || []).map(record => record.id).sort());
+        const pending = _pbpAskUnpersisted.some(item => item.sessionId === sessionId);
+        if (changed && !pending) {
+          st.archiveStale = true;
+          const input = document.getElementById("ask-input"), thread = document.getElementById("ask-thread");
+          if (!st.running && !input?.value && !thread?.contains(document.activeElement)) {
+            _pbpAskRefreshArchivedView(st).catch(error => console.warn("[pbp-ask] archive refresh failed:", error?.name));
+          }
+        }
+        _pbpAskHistoryChanged();
+        _pbpAskArchiveStatus();
+      }
+    }).catch(error => console.warn("[pbp-ask] archive notification failed:", error?.name));
+  });
 }

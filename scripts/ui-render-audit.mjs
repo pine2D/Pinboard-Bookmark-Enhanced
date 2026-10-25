@@ -105,6 +105,7 @@ import { CHIP_TARGETS } from "../docs/theme-surface/composers/ui-components.mjs"
 // Options density per theme, from the pilots (docs/theme-surface/tools/options-density.mjs).
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
 import { installDictEntryFixture, openDictEntryState } from "./audit-dict-entry-fixture.mjs";
+import { installAskHistoryFixture, openAskHistoryState } from "./audit-ask-history-fixture.mjs";
 import { openVocabPackPreview, installVocabPackFixture } from "./audit-vocab-pack-fixture.mjs";
 // Family 14's fill-separation floor (spec 2026-09-30-ui-fields-stage4-design
 // §2.3 F1-F3) is the derivation's own constant, imported, never a hand-typed
@@ -6163,7 +6164,7 @@ const VALUE_BOX_LEGS = Object.freeze({
       ["#vocab-detail .vocab-lemma-control", null], ["#vocab-save-definition-btn", null],
       ["#dict-supplement-kind-btn", null], ["input.xp-dict-supplement-topic", null],
       ["#vocab-batch-toolbar .vocab-group-unit", null], ["#vocab-detail .vocab-group-unit", null],
-      ["#notes-filter", null], ["#notes-detail .vocab-note-input", null],
+      ["#notes-filter", null], ["#notes-detail .vocab-note-input", null], ["#ask-library-search", null],
     ]),
     legs: Object.freeze([
       {
@@ -6233,6 +6234,16 @@ const VALUE_BOX_LEGS = Object.freeze({
             throw new Error(`SETUP: fieldHoverContrast library: the notes view did not open (theme=${theme})`);
           }
           return null;
+        },
+      },
+      {
+        context: "ask-history",
+        boxes: ["#ask-library-search"],
+        async open(page) {
+          await page.locator("#lib-tab-ask").click();
+          await page.waitForSelector("#ask-library-search", { state: "visible", timeout: TIMEOUT_MS });
+          await page.evaluate(() => document.activeElement?.blur?.());
+          await page.mouse.move(0, 0); await settleAnimations(page); return null;
         },
       },
       {
@@ -7966,7 +7977,7 @@ const SWEEP_CFG = {
       ".action-link", ".clear-all-link", ".reset-tab-btn",
       ".tr-link", ".xp-dict-more", ".xp-dict-lemma-link", ".pbp-img-fix-btn", ".pbv-time", // link-styled, no chrome (COMPONENTS.md §0); .pbv-time is the cue row's timestamp (24px hit floor)
       ".notes-excerpt-color",                       // inline semantic label action; 24px hit floor, can wrap in the hang column
-      "summary", ".rail-sec-head", ".notes-hit-btn", ".notes-card-head", ".notes-card-top", ".notes-excerpt-jump", ".connection-health-row", ".hl-item-main", ".send-mi", ".pbv-poster", // row rung: whole-row clickables / section headers / status cards / menu rows / the video poster card
+      "summary", ".rail-sec-head", ".notes-hit-btn", ".ask-library-hit", ".notes-card-head", ".notes-card-top", ".notes-excerpt-jump", ".connection-health-row", ".hl-item-main", ".send-mi", ".pbv-poster", // row rung: whole-row clickables / section headers / status cards / menu rows / the video poster card
       ".theme-preset-btn", ".saved-theme-btn",       // borderless swatch pills (user-selected variant A, d57cdcf): the sm rung minus the collapsed frame
       ".tags-input-wrap > input", ".vocab-group-unit > input", ".source-badge > .src-seg", ".view-toggle > .toggle-btn", // fused-shell inners: the shell is measured instead
       "select > button",                           // customizable select's inert face; measure the parent select
@@ -9012,6 +9023,13 @@ async function runSweep(page, sw, extBase) {
       if (!(await vocabHead.count())) throw new Error("SETUP: vocabulary batch opener is missing");
       await vocabHead.click({ modifiers: ["Control"] }); await page.waitForTimeout(350);
       await scan("library", "vocab-batch-bar");
+    }
+    if ([...contexts.library].some(name => name.startsWith("ask-history-"))) {
+      await installAskHistoryFixture(page);
+      for (const state of ["list", "detail", "evidence", "versions", "delete"]) {
+        if (wants("library", "ask-history-" + state)) await scan("library", "ask-history-" + state, () => openAskHistoryState(page, state));
+      }
+      await page.keyboard.press("Escape");
     }
     if ([...contexts.library].some((name) => name.startsWith("notes-"))) {
       await page.click("#lib-tab-notes");

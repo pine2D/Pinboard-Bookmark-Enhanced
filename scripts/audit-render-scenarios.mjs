@@ -43,6 +43,11 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('dict-entry-cached', ['dict-entry-result'], { target: '.xp-dict-ai-content:not([hidden])' }),
     context('dict-entry-error', ['dict-entry-idle'], { target: '.xp-dict-ai-status:not([hidden])' }),
     context('vocab-batch-bar', ['vocab-detail'], { target: '#vocab-batch-toolbar.selecting' }),
+    context('ask-history-list', [], { target: '#ask-library-list .ask-library-hit' }),
+    context('ask-history-detail', ['ask-history-list'], { target: '#ask-library-detail:not([hidden])' }),
+    context('ask-history-evidence', ['ask-history-detail'], { target: '.ask-library-round .ask-library-evidence[open]' }),
+    context('ask-history-versions', ['ask-history-detail'], { target: '#ask-library-detail > .ask-library-evidence[open]' }),
+    context('ask-history-delete', ['ask-history-detail'], { target: '.confirm-popover' }),
     context('notes-list', [], { target: '#notes-list .notes-hit' }),
     context('notes-detail', [], { target: '#notes-detail:not([hidden])' }),
     context('notes-color-menu', ['notes-detail'], { target: '.notes-color-menu:popover-open' }),
@@ -57,7 +62,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
 });
 
 function files(surface) {
-  return [`${surface}.html`, `${surface}.css`, `${surface}.js`, ...(surface === 'md-preview' ? ['md-*.js'] : [])];
+  return [`${surface}.html`, `${surface}.css`, `${surface}.js`, ...(surface === 'md-preview' ? ['md-*.js'] : surface === 'library' ? ['library-*.js', 'scripts/audit-ask-history-fixture.mjs'] : [])];
 }
 function row(id, surface, themes, extra) {
   return { id, runner: 'render', surfaces: [surface], files: files(surface), dependencies: [],

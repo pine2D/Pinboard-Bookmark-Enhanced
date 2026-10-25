@@ -436,41 +436,7 @@ function pbpAiMakeStreamJsonParser(onItem) {
   };
 }
 
-// ---- CITES block parser (ask answers) ----
-// Answer format: body with inline [Pn], then a trailing block:
-//   CITES:
-//   P7: "verbatim quote"
-// Tolerates: absence, curly/straight/missing quotes, "- " list dashes,
-// junk lines, stream truncation mid-line. Anchors on the LAST "CITES:"
-// line so a body that mentions the word is not split early.
-// Full-width colon (：) and CJK corner quotes (「」『』) are accepted
-// everywhere ASCII forms are: models generating Chinese output routinely
-// emit them despite the ASCII wire format in the prompt, and a missed
-// marker dumps the whole CITES block into the rendered body.
-function pbpAiParseCites(fullText) {
-  const text = String(fullText == null ? "" : fullText);
-  // The marker must END its line (or the text — stream truncation): without
-  // the anchor, a body line like "CITES：这是正文" would split the answer
-  // and swallow everything after it.
-  const markerRe = /(?:^|\n)[ \t]*CITES[:：][ \t]*\r?(?:\n|$)/g;
-  let m;
-  let last = null;
-  while ((m = markerRe.exec(text)) !== null) last = m;
-  if (!last) return { body: text.trim(), cites: [] };
-  const body = text.slice(0, last.index).trim();
-  const cites = [];
-  for (let line of text.slice(last.index + last[0].length).split("\n")) {
-    line = line.replace(/\r$/, "");
-    const lm = line.match(/^[ \t]*[-*]?[ \t]*P(\d+)[ \t]*[:：][ \t]*(.+)$/);
-    if (!lm) continue;
-    const quote = lm[2].trim()
-      .replace(/^["“'‘「『]/, "")
-      .replace(/["”'’」』]$/, "")
-      .trim();
-    if (quote) cites.push({ p: Number(lm[1]), quote });
-  }
-  return { body, cites };
-}
+// Ask answer parsing is shared with the durable history surface in shared.js.
 
 // ---- Fuzzy quote locator (client-side citation verification) ----
 // Whitespace-normalized; returns ORIGINAL haystack indices {start,end} for
@@ -626,6 +592,7 @@ async function pbpAiRefreshSetup() {
   if (revision !== _pbpAiSetupRevision) return;
   pbpAiRenderSetupEntry(s);
   if (typeof pbpExplainRefreshSettings === "function") pbpExplainRefreshSettings(s);
+  if (typeof pbpAskRefreshSettings === "function") pbpAskRefreshSettings(s);
   // Eligibility is state, not the setup button's presence. A newer settings
   // write or owner event may supersede this read after that button is removed;
   // every subsequent refresh must still be able to initialize missing controls.

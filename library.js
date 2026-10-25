@@ -4,7 +4,7 @@
 // notes). The memory key is page-local UI state,
 // never synced.
 const PBP_LIB_VIEW_KEY = "pbp-lib-last-view";
-const PBP_LIB_VIEWS = ["notes", "vocab"];
+const PBP_LIB_VIEWS = ["notes", "vocab", "ask"];
 // The multi-select hint is said until the first selection in either view,
 // then retired for good on this device -- page-local UI state like the view
 // memory above. The module flag keeps it retired for the page's life when
@@ -76,6 +76,7 @@ function pbpLibIsTypingTarget(el) {
 const PBP_LIB_LIST_KEYS = new Set(["ArrowUp", "ArrowDown", "Home", "End", "Delete", "Backspace", "Escape", "k", "K"]);
 const PBP_LIB_OWN_KEYS_SELECTOR = '[role="listbox"], [role="option"], [role="menu"], [role="menuitem"], [role="menuitemradio"], [role="tablist"], [role="tab"], [role="slider"], .listbox-btn, [aria-haspopup]';
 function pbpLibRouteListKey(e) {
+  if (pbpLibActiveView() === "ask") { if (typeof pbpLibAskRouteListKey === "function") pbpLibAskRouteListKey(e); return; }
   if (!PBP_LIB_LIST_KEYS.has(e.key) && e.code !== "KeyK") return;
   if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey || e.isComposing || e.defaultPrevented) return;
   const ae = document.activeElement;
@@ -119,6 +120,17 @@ function pbpLibOnPageKey(e) {
     if (!keys.matches(":popover-open")) open.click();
     return;
   }
+  if (pbpLibActiveView() === "ask") {
+    const search = $id("ask-library-search");
+    if (search && search.getClientRects().length) {
+      search.focus();
+      if (document.activeElement === search) {
+        e.preventDefault(); search.select();
+        if (keys && keys.matches(":popover-open")) keys.hidePopover();
+      }
+    }
+    return;
+  }
   const target = e.target instanceof Element ? e.target : null;
   const inView = (id) => !!(target && target.closest(`#${id}`));
   const notesView = $id("view-notes");
@@ -140,14 +152,16 @@ function pbpLibOnPageKey(e) {
 document.addEventListener("keydown", pbpLibOnPageKey);
 
 function pbpLibActiveView() {
-  return $id("view-notes").hidden ? "vocab" : "notes";
+  return PBP_LIB_VIEWS.find(name => $id("view-" + name) && !$id("view-" + name).hidden) || "notes";
 }
 
 function _pbpLibApplyView(view, pushHash) {
   const v = PBP_LIB_VIEWS.includes(view) ? view : "notes";
   for (const name of PBP_LIB_VIEWS) {
     const active = name === v;
-    $id("view-" + name).hidden = !active;
+    const pane = $id("view-" + name);
+    if (!pane) continue;
+    pane.hidden = !active;
     const tab = $id("lib-tab-" + name);
     tab.setAttribute("aria-selected", String(active));
     tab.classList.toggle("active", active);
@@ -162,6 +176,7 @@ function _pbpLibApplyView(view, pushHash) {
   // views never share one flag, so neither can strand the other's pane.)
   if (v === "vocab") document.body.classList.remove("lib-narrow-detail");
   if (v === "notes") document.body.classList.remove("lib-narrow-notes");
+  if (v === "ask") document.body.classList.remove("lib-narrow-ask");
   // The keyboard-shortcut panel lists the open view's keys.
   const keys = $id("lib-keys");
   if (keys) keys.dataset.view = v;
@@ -235,16 +250,18 @@ document.addEventListener("DOMContentLoaded", () => {
   // its arrow-key half too -- same pattern as options.js's activateTab
   // keydown handler, ArrowLeft/ArrowRight (this tab strip is horizontal, not
   // options' vertical sidebar) with wrap-around.
-  PBP_LIB_VIEWS.forEach((name, i) => {
+  const viewNames = PBP_LIB_VIEWS.filter(name => $id("lib-tab-" + name));
+  viewNames.forEach((name, i) => {
     const tab = $id("lib-tab-" + name);
+    if (!tab) return;
     tab.addEventListener("click", () => _pbpLibApplyView(name, true));
     tab.addEventListener("keydown", (e) => {
       let n = -1;
-      if (e.key === "ArrowRight") n = (i + 1) % PBP_LIB_VIEWS.length;
-      else if (e.key === "ArrowLeft") n = (i - 1 + PBP_LIB_VIEWS.length) % PBP_LIB_VIEWS.length;
+      if (e.key === "ArrowRight") n = (i + 1) % viewNames.length;
+      else if (e.key === "ArrowLeft") n = (i - 1 + viewNames.length) % viewNames.length;
       else return;
       e.preventDefault();
-      const target = PBP_LIB_VIEWS[n];
+      const target = viewNames[n];
       _pbpLibApplyView(target, true);
       $id("lib-tab-" + target).focus();
     });
@@ -734,7 +751,7 @@ function pbpLibDriveLine(status, currentOwner) {
   const owner = typeof status.owner === "string" && status.owner && typeof pbpDictOwnerScope === "function"
     ? pbpDictOwnerScope(status.owner) : "";
   if (!owner || owner !== currentOwner) return null;
-  const errors = [status.connection, status.vocabulary, status.notes, status.dictionary]
+  const errors = [status.connection, status.vocabulary, status.notes, status.dictionary, status.ask]
     .map((part) => part && part.lastError)
     .filter((code) => typeof code === "string" && code && code !== "not_connected");
   if (errors.length) return { kind: "problem", text: t("libraryDriveProblem") };
@@ -794,7 +811,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((message) => {
-      if (message && (message.type === "PBP_VOCAB_SYNCED" || message.type === "PBP_NOTES_SYNCED")) pbpLibRefreshDriveLine();
+      if (message && (message.type === "PBP_VOCAB_SYNCED" || message.type === "PBP_NOTES_SYNCED" || message.type === "PBP_DICT_ARCHIVE_SYNCED" || message.type === "PBP_ASK_ARCHIVE_SYNCED")) pbpLibRefreshDriveLine();
     });
   }
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {

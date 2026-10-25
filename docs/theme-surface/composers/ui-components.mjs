@@ -777,7 +777,7 @@ export const FIELD_TARGETS = Object.freeze({
   // stays hand-written in library.css, keyed on fieldRingSelectors (the
   // entry's focus selector, :focus -> :focus-visible).
   lib: Object.freeze([
-    // #vocab-search, #vocab-lookup-input, #notes-filter. Focus on :focus.
+    // #vocab-search, #vocab-lookup-input, #notes-filter, #ask-library-search. Focus on :focus.
     Object.freeze({
       id: "lib-toolbar-search",
       rest: '.notes-toolbar input[type="search"], .vocab-lookup-bar input[type="search"]',

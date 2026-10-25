@@ -3235,7 +3235,9 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
    follow the reader's payload size. */
 #ask-panel .ask-copy-btn, #ask-panel .ask-regenerate,
 #ask-panel .ask-retry, #ask-panel .ask-clear-btn { font-size: 12px; } /* secondary md face, in px: control faces do not follow the panel's prose scale */
+#ask-panel .panel-head > h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ask-ic {
+  flex: none;
   display: inline-flex; align-items: center; justify-content: center;
   width: 26px; height: 26px; padding: 0; /* md rung (was 28): the reader's icon buttons share .action-btn's height */
   border: 1px solid transparent; border-radius: var(--radius-md);
@@ -3244,6 +3246,18 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
 .ask-ic:hover { background: var(--btn-hover); color: var(--fg); }
 .ask-ic:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 .ask-ic svg { width: 15px; height: 15px; }
+#ask-storage {
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2);
+  font-size: 11px; line-height: 16px; color: var(--fg-muted);
+}
+#ask-storage:empty { display: none; }
+#ask-storage .action-btn { font-size: 12px; }
+#ask-temporary-label {
+  display: flex; align-items: center; gap: var(--sp-1);
+  font-size: 12px; line-height: 18px; min-height: 26px; color: var(--fg-muted);
+}
+#ask-temporary { margin: 0; accent-color: var(--link); }
+#ask-panel .ask-versions { font-size: 12px; }
 /* Shared hover fade for the 26px icon-button family: these reuse .ask-ic's
    look (see .skim-ic note) but half the family lacked .action-btn's 150ms
    fade -- one declaration keeps the whole family in step. */

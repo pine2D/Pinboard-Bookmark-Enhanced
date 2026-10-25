@@ -9,6 +9,7 @@ import { HELP_SCENARIOS } from './audit-help-scenarios.mjs';
 export const AUDIT_SURFACES = Object.freeze(['popup', 'options', 'library', 'md-preview', 'pinboard', 'background', 'tooling']);
 const ui = ['popup', 'options', 'library', 'md-preview'];
 function ownership(name) {
+  if (name === 'ask-history') return ['md-preview'];
   if (/^ask-archive(?:-|$)/.test(name)) return ['background', 'library', 'md-preview'];
   if (name === 'tag-gov-layout') return ['options'];
   if (name === 'save-pipeline') return ['background', 'popup', 'md-preview'];
@@ -46,8 +47,8 @@ export const TEST_SCENARIOS = testFiles.filter(name => name !== 'pinboard-theme-
   const file = 'tests/' + name;
   return {
     id: 'test.' + base, runner: name.endsWith('.html') ? 'html' : 'node', file,
-    surfaces, features: features(base), kinds: base === 'popup-label-fit' ? ['layout', 'i18n'] : [name.endsWith('.html') ? 'logic' : 'contract'],
-    browser: base === 'popup-label-fit',
+    surfaces, features: features(base), kinds: base === 'popup-label-fit' ? ['layout', 'i18n'] : [name.endsWith('.html') || ['ask-history', 'library-ask-history'].includes(base) ? 'logic' : 'contract'],
+    browser: ['popup-label-fit', 'ask-history', 'library-ask-history'].includes(base),
     files: [file, base + '.js', ...surfaces.flatMap(s => sourcePatterns[s] || []), ...(base.startsWith('theme-') ? ['docs/theme-surface/**'] : [])],
     dependencies: [], axes: {},
   };

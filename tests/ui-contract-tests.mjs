@@ -1584,7 +1584,8 @@ check(!read("anki-connect.js").includes("PBP_ANKI_ENDPOINT"),
   // Narrow mode: only a genuine view switch hands the list back. The
   // visibilitychange re-fire dispatches pbp-lib-view WITHOUT going through
   // _pbpLibApplyView, which is exactly what keeps an open detail alive.
-  check(/function _pbpLibApplyView[\s\S]{0,900}classList\.remove\("lib-narrow-detail"\)/.test(libraryJs) &&
+  const applyViewBody = libraryJs.slice(libraryJs.indexOf("function _pbpLibApplyView("), libraryJs.indexOf("function _pbpLibInitialView("));
+  check(/classList\.remove\("lib-narrow-detail"\)/.test(applyViewBody) &&
     // The re-fire dispatches pbp-lib-view straight, never through
     // _pbpLibApplyView -- that split is the whole mechanism. The window is
     // sized to the listener body, so routing it through the view applier
@@ -2326,7 +2327,7 @@ const LIBRARY_VALUE_BOX = (() => {
     selectClasses: new Set(built.filter((b) => /:select\./.test(b)).map(classOf)),
   };
 })();
-check(JSON.stringify([...LIBRARY_VALUE_BOX.ids].sort()) === JSON.stringify(["notes-filter", "vocab-group-filter", "vocab-group-filter-btn", "vocab-group-input", "vocab-language-filter-btn", "vocab-lookup-input", "vocab-lookup-lang", "vocab-lookup-lang-btn", "vocab-search"]),
+check(JSON.stringify([...LIBRARY_VALUE_BOX.ids].sort()) === JSON.stringify(["ask-library-search", "notes-filter", "vocab-group-filter", "vocab-group-filter-btn", "vocab-group-input", "vocab-language-filter-btn", "vocab-lookup-input", "vocab-lookup-lang", "vocab-lookup-lang-btn", "vocab-search"]),
   `ui-contract-tests.mjs: the library.html value-box id harvest drifted -- got ${JSON.stringify([...LIBRARY_VALUE_BOX.ids].sort())}. ` +
   "A new value box must join composers/ui-components.mjs FIELD_TARGETS.lib and scripts/ui-render-audit.mjs's VALUE_BOX_LEGS.library in the same commit; then update this list.");
 check(JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort()) === JSON.stringify(["vocab-sort-btn"]) &&
@@ -8938,8 +8939,8 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(!!detailNode && runtimeNodes.length === 9,
     `ui-contract-tests.mjs: the library tree model could not graft the runtime value boxes (${detailNode ? "found" : "no"} #vocab-detail, ${runtimeNodes.length} runtime node(s), expected 9)`);
   const libCov = valueBoxCoverage(LIB_NODES, LIB);
-  check(libCov.entries === 9 && libCov.uncovered.length === 0,
-    `library.html + runtime boxes / FIELD_TARGETS.lib: every text-entry control must be painted by exactly one registry entry (as its box or as a shell's passenger) -- ${libCov.entries} controls (expected 9); ${libCov.uncovered.join(" | ") || "none uncovered"}`);
+  check(libCov.entries === 10 && libCov.uncovered.length === 0,
+    `library.html + runtime boxes / FIELD_TARGETS.lib: every text-entry control must be painted by exactly one registry entry (as its box or as a shell's passenger) -- ${libCov.entries} controls (expected 10); ${libCov.uncovered.join(" | ") || "none uncovered"}`);
   check(libCov.dead.length === 0, `ui-components.mjs: FIELD_TARGETS.lib entries whose rest selector reaches nothing in library.html + the runtime boxes: ${libCov.dead.map((t) => t.id).join(", ")}`);
   const libSelects = LIB_NODES.filter((n) => n.tag === "select" && !Object.hasOwn(n.attrs, "hidden") && !Object.hasOwn(n.attrs, "data-listbox"));
   const selectMiss = libSelects.filter((n) => LIB.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, n))).length !== 1);

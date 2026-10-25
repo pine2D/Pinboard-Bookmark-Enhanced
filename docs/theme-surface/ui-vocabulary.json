@@ -227,7 +227,8 @@
         "library.html",
         "library.js",
         "library-vocab.js",
-        "library-notes.js"
+        "library-notes.js",
+        "library-ask.js"
       ],
       "exactStructural": [],
       "primitives": [
@@ -254,7 +255,14 @@
         "xp-dict-example-pair",
         "xp-dict-packs",
         "xp-dict-legacy",
-        "vocab-lookup-actions"
+        "vocab-lookup-actions",
+        "ask-library-workbench",
+        "ask-library-index",
+        "ask-library-scroll",
+        "ask-library-pane",
+        "ask-library-actions",
+        "ask-library-round",
+        "ask-library-answer"
       ],
       "regions": [
         "lib-header",
@@ -376,6 +384,15 @@
         "xp-dict-ai-stop",
         "xp-dict-ai-configure",
         "xp-dict-ai-status",
+        "ask-library-hit",
+        "ask-library-question",
+        "ask-library-stamp",
+        "ask-library-page",
+        "ask-library-title",
+        "ask-library-source",
+        "ask-library-evidence",
+        "ask-library-back",
+        "ask-library-delete",
         "listbox-option-text",
         "listbox-option-meta"
       ],
@@ -404,7 +421,14 @@
         "xp-dict-example-pair",
         "xp-dict-packs",
         "xp-dict-legacy",
-        "vocab-lookup-actions"
+        "vocab-lookup-actions",
+        "ask-library-workbench",
+        "ask-library-index",
+        "ask-library-scroll",
+        "ask-library-pane",
+        "ask-library-actions",
+        "ask-library-round",
+        "ask-library-answer"
       ]
     },
     "listbox": {

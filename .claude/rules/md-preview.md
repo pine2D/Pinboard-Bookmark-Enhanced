@@ -52,3 +52,7 @@ block 切分 → `pbpAiShield` 占位符 `⟦C/L/I/M/T\d+⟧` 屏蔽代码/链�
 - YouTube 救援链顺序由 `pbp_video_tier_youtube` 缓存决定（上次成功层优先，`pbpVideoTierOrder`）；所有标签页注入经 `queueTabInjection` 串行，并持 90s tap lease；注入前后都要做 videoId 守卫（标签页可能已 SPA 导航到别的视频）。
 - **`readyState=complete` 不等于 SPA 水合**（2026-08-26 真机：`ytd-watch-flexy` 比 complete 晚 20 余秒）。DOM 层先用 playerResponse 判有无字幕轨，再等 `ytd-watch-flexy` 出现（默认 20s）才找转录入口；三种 trace 语义分明：`video has no caption tracks` / `page not hydrated within Nms` / `no transcript entry in page`。取数标签页同视频内 `complete` 优先于 `loading`。
 - 权限路径铁律在 CLAUDE.md「网络端点与 host 权限」；自动路径只 `permissions.contains`，首次申请只能来自用户点击。
+
+## Ask 持久历史
+
+完成回答自动写 Ask 归档，保存失败只重试写入，不能再付费重跑；临时会话跳过持久化。新对话保留旧会话，删除单独确认并写同步墓碑。指定 askSession 已删除或不可用时，必须先开始新对话，不向旧 sessionId 发送新问题。模型上下文窗口与历史保留分离。

@@ -1,3 +1,68 @@
+/* Ask history follows the library's flat index/detail canvas. */
+.ask-library-workbench {
+  display: grid;
+  grid-template-columns: var(--lib-index-w) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  column-gap: var(--lib-gap);
+  padding-inline-start: var(--lib-page-pad);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.ask-library-index { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding-bottom: var(--lib-sp-4); }
+.ask-library-index .notes-toolbar { display: flex; flex-wrap: nowrap; gap: var(--lib-sp-2); }
+.ask-library-index input[type="search"] { flex: 1; min-width: 0; width: 100%; }
+.ask-library-index .notes-toolbar > .btn { flex: none; }
+.ask-library-scroll { flex: 1; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; padding-block: var(--lib-sp-2); }
+.ask-library-page { margin: var(--lib-sp-4) var(--lib-sp-3) var(--lib-sp-1); font-size: var(--lib-text-secondary); line-height: var(--lib-lh-secondary); overflow-wrap: anywhere; }
+.ask-library-page:first-child { margin-top: 0; }
+.ask-library-hit { display: grid; gap: var(--lib-sp-1); width: 100%; box-sizing: border-box; padding: var(--lib-row-pad-y) var(--lib-row-pad-x); border: 0; border-radius: var(--lib-radius-md); background: transparent; color: var(--lib-fg); cursor: pointer; text-align: start; }
+.ask-library-hit:hover { background: var(--lib-row-bg-hover); }
+.ask-library-hit[aria-current] { background: var(--lib-row-current-bg); color: var(--lib-row-selected-fg); }
+.ask-library-hit[aria-current]:hover { background: var(--lib-row-current-bg-hover); }
+.ask-library-hit:focus-visible { outline: 2px solid var(--lib-focus-bd); outline-offset: -2px; box-shadow: none; }
+.ask-library-hit .ask-library-question { font-size: var(--lib-text-row-title); line-height: var(--lib-lh-row-title); font-weight: bold; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ask-library-hit[aria-current] .ask-library-stamp { color: var(--lib-row-current-fg-muted); }
+.ask-library-pane { min-width: 0; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; padding: var(--lib-sp-2) var(--lib-page-pad) var(--lib-sp-9) var(--lib-sp-4); margin-block-start: calc(-1 * var(--lib-sp-2)); margin-inline-start: calc(-1 * var(--lib-sp-4)); }
+#ask-library-detail { max-width: 72ch; font-size: 15px; line-height: 25px; overflow-wrap: anywhere; }
+.ask-library-title { font-size: 28px; line-height: 38px; margin: 0 0 var(--lib-sp-2); }
+.ask-library-source { display: block; margin-bottom: var(--lib-sp-4); color: var(--lib-link); font-size: var(--lib-text-secondary); line-height: var(--lib-lh-secondary); }
+.ask-library-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--lib-sp-2); }
+.ask-library-round { margin-top: var(--lib-sp-6); }
+.ask-library-question { margin: 0; font-size: 18px; line-height: 28px; }
+.ask-library-stamp { margin: var(--lib-sp-1) 0 0; color: var(--lib-fg-muted); font-size: var(--lib-text-meta); line-height: var(--lib-lh-meta); }
+.ask-library-answer { margin-top: var(--lib-sp-3); }
+.ask-library-answer > :first-child { margin-top: 0; }
+.ask-library-answer > :last-child { margin-bottom: 0; }
+.ask-library-answer p, .ask-library-answer ul, .ask-library-answer ol { margin-block: var(--lib-sp-3); }
+.ask-library-answer ul, .ask-library-answer ol { padding-inline-start: var(--lib-sp-5); }
+.ask-library-answer h1, .ask-library-answer h2, .ask-library-answer h3, .ask-library-answer h4 { font-size: 17px; line-height: 26px; margin: var(--lib-sp-4) 0 var(--lib-sp-2); }
+.ask-library-answer pre { overflow-x: auto; padding: var(--lib-sp-3); background: var(--lib-code-bg); border-radius: var(--lib-radius-md); }
+.ask-library-answer code { font-family: "SF Mono", Consolas, Menlo, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "微软雅黑", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; font-size: 13px; }
+.ask-library-answer table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+.ask-library-answer th, .ask-library-answer td { padding: var(--lib-sp-2); text-align: start; }
+.ask-library-answer a, .ask-library-evidence a { color: var(--lib-link); }
+.ask-library-evidence { margin-top: var(--lib-sp-3); }
+.ask-library-evidence > summary { display: flex; justify-content: space-between; align-items: center; gap: var(--lib-sp-2); min-height: calc(var(--lib-control-h) - 4px); cursor: pointer; color: var(--lib-link); font-size: var(--lib-text-secondary); line-height: var(--lib-lh-secondary); list-style: none; }
+.ask-library-evidence > summary::-webkit-details-marker { display: none; }
+.ask-library-evidence > summary .btn-ic { transform: rotate(-90deg); flex: none; }
+.ask-library-evidence[open] > summary .btn-ic { transform: none; }
+.ask-library-evidence > summary:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
+.ask-library-evidence blockquote { margin: var(--lib-sp-3) 0 var(--lib-sp-1); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ask-library-delete { margin-top: var(--lib-sp-6); }
+.ask-library-back { display: none; }
+.lib-keys[data-view="ask"] [data-keys-for="selection"], .lib-keys[data-view="ask"] [data-keys-for="notes"], .lib-keys[data-view="ask"] [data-keys-for="vocab"] { display: none; }
+.lib-keys:not([data-view="ask"]) [data-keys-for="ask"] { display: none; }
+@media (max-width: 860px) {
+  .ask-library-workbench { grid-template-columns: minmax(0, 1fr); column-gap: 0; }
+  .ask-library-index { margin-inline-end: var(--lib-page-pad); }
+  body.lib-narrow-ask .ask-library-index { display: none; }
+  body:not(.lib-narrow-ask) .ask-library-pane { display: none; }
+  .ask-library-back { display: inline-flex; margin-bottom: var(--lib-sp-4); }
+}
+@media (forced-colors: active) {
+  .ask-library-hit[aria-current] { outline: 1px solid Highlight; outline-offset: -1px; }
+}
+
 /* ============================================================
    Library page (notes + vocabulary) — standalone stylesheet.
    Hand-maintained layer above; @generated:ui-themes region below

@@ -1237,6 +1237,21 @@ delete document.documentElement.dataset.theme;
       _pbpVocabDriveResponseLines({ ok:false, error:"corrupt", results:{ dictionary:{ ok:false, error:"corrupt" } } }, quiet)
         .filter(line => line.includes("driveDictionaryStatus")).length === 1);
 
+    matrixRow("Ask history dataset errors retain their own subject and recovery", [
+      { label:"Ask blocked", status:withDataset("ask", { lastError:"corrupt", blocked:true }),
+        state:"vocabDriveConnected", buttons:"-++", has:["driveAskStatus:vocabDriveErrorCorrupt", "vocabDriveSyncNowRequired"],
+        not:["driveVocabularyStatus", "driveDictionaryStatus"] },
+      { label:"Ask unreadable", status:withDataset("ask", { lastError:"status_unavailable" }),
+        state:"vocabDriveConnected", buttons:"-++", has:["driveAskStatus:vocabDriveStatusFailed"],
+        not:["vocabDriveSyncNowRequired"] },
+      { label:"Ask oversized", status:withDataset("ask", { lastError:"entry_too_large", blocked:true }),
+        state:"vocabDriveConnected", buttons:"-++", has:["driveAskStatus:driveAskErrorEntryTooLarge"],
+        not:["vocabDriveErrorEntryTooLarge", "driveDictionaryErrorEntryTooLarge"] }
+    ]);
+    check("Ask response failures have one correctly scoped error line",
+      _pbpVocabDriveResponseLines({ ok:false, error:"corrupt", results:{ ask:{ ok:false, error:"corrupt" } } }, quiet)
+        .filter(line => line.includes("driveAskStatus")).length === 1);
+
     _pbpVocabDriveShowError("auth", null, true, true);
     const connectedHint = errorText();
     _pbpVocabDriveShowError("auth", null, true, false);

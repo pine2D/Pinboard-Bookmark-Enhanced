@@ -18,6 +18,7 @@
            toolbar popup and the settings page, the common doors, open #vocab. -->
       <button type="button" class="lib-tab" id="lib-tab-notes" role="tab" aria-selected="false" aria-controls="view-notes" data-i18n="tabNotes">Notes</button>
       <button type="button" class="lib-tab" id="lib-tab-vocab" role="tab" aria-selected="true" aria-controls="view-vocab" data-i18n="dictVocabSection">Vocabulary</button>
+      <button type="button" class="lib-tab" id="lib-tab-ask" role="tab" aria-selected="false" aria-controls="view-ask" data-i18n="askHistoryTab">Questions</button>
     </nav>
     <!-- Google Drive status, one read-only line for both views (library.js
          pbpLibRefreshDriveLine): hidden unless this device is connected for
@@ -42,12 +43,13 @@
       <dl>
         <div data-keys-for="vocab"><dt><kbd><span class="btn-ic" data-ic="arrowUpLine"></span></kbd> <kbd><span class="btn-ic" data-ic="arrowDownLine"></span></kbd></dt><dd data-i18n="libraryKeysMoveWord">Previous or next word</dd></div>
         <div data-keys-for="notes"><dt><kbd><span class="btn-ic" data-ic="arrowUpLine"></span></kbd> <kbd><span class="btn-ic" data-ic="arrowDownLine"></span></kbd></dt><dd data-i18n="libraryKeysMoveHighlight">Previous or next highlight</dd></div>
+        <div data-keys-for="ask"><dt><kbd><span class="btn-ic" data-ic="arrowUpLine"></span></kbd> <kbd><span class="btn-ic" data-ic="arrowDownLine"></span></kbd></dt><dd data-i18n="askHistoryKeysMove">Previous or next conversation</dd></div>
         <div><dt><kbd data-i18n="libraryKeyHome">Home</kbd> <kbd data-i18n="libraryKeyEnd">End</kbd></dt><dd data-i18n="libraryKeysEnds">First or last in the list</dd></div>
-        <div><dt><kbd data-i18n="libraryKeyCtrl">Ctrl</kbd>+<span data-i18n="libraryKeyClick">click</span></dt><dd data-i18n="libraryKeysAdd">Add to or remove from the selection</dd></div>
-        <div><dt><kbd data-i18n="libraryKeyShift">Shift</kbd>+<span data-i18n="libraryKeyClick">click</span></dt><dd data-i18n="libraryKeysRange">Select a range</dd></div>
+        <div data-keys-for="selection"><dt><kbd data-i18n="libraryKeyCtrl">Ctrl</kbd>+<span data-i18n="libraryKeyClick">click</span></dt><dd data-i18n="libraryKeysAdd">Add to or remove from the selection</dd></div>
+        <div data-keys-for="selection"><dt><kbd data-i18n="libraryKeyShift">Shift</kbd>+<span data-i18n="libraryKeyClick">click</span></dt><dd data-i18n="libraryKeysRange">Select a range</dd></div>
         <div data-keys-for="vocab"><dt><kbd>K</kbd></dt><dd data-i18n="libraryKeysKnown">Switch between known and learning</dd></div>
         <div><dt><kbd data-i18n="libraryKeyDelete">Delete</kbd></dt><dd data-i18n="libraryKeysDelete">Delete, after you confirm</dd></div>
-        <div><dt><kbd data-i18n="libraryKeyEsc">Esc</kbd></dt><dd data-i18n="libraryKeysClear">Clear the selection</dd></div>
+        <div data-keys-for="selection"><dt><kbd data-i18n="libraryKeyEsc">Esc</kbd></dt><dd data-i18n="libraryKeysClear">Clear the selection</dd></div>
         <div><dt><kbd>/</kbd></dt><dd data-i18n="libraryKeysSearch">Go to the search box</dd></div>
         <div><dt><kbd>?</kbd></dt><dd data-i18n="kbdHelpShowHelp">Show this shortcuts list</dd></div>
       </dl>
@@ -336,6 +338,28 @@
         </aside>
       </div>
     </section>
+    <section id="view-ask" class="lib-view" role="tabpanel" aria-labelledby="lib-tab-ask" hidden>
+      <div class="ask-library-workbench">
+        <div class="ask-library-index">
+          <div class="notes-toolbar">
+            <input type="search" id="ask-library-search" data-i18n-placeholder="askHistorySearch" data-i18n-aria="askHistorySearch" aria-label="Search articles, questions and answers" placeholder="Search articles, questions and answers" autocomplete="off" />
+            <button type="button" class="btn" id="ask-library-retry" data-i18n-title="askHistoryRefresh" data-i18n-aria="askHistoryRefresh" title="Refresh history" aria-label="Refresh history"><span class="btn-ic" data-ic="refresh"></span></button>
+          </div>
+          <p class="save-status" id="ask-library-status" role="status" aria-live="polite"></p>
+          <div class="ask-library-scroll">
+            <div id="ask-library-list" data-i18n-aria="askHistory" aria-label="Conversation history"></div>
+            <p class="notes-empty" id="ask-library-empty" data-i18n="askHistoryEmpty">Completed answers appear here automatically. Temporary conversations are not saved.</p>
+          </div>
+        </div>
+        <aside class="ask-library-pane" id="ask-library-detail-pane" data-i18n-aria="askHistory" aria-label="Conversation history">
+          <div class="lib-cover" id="ask-library-cover">
+            <h2 class="lib-cover-title lib-first-line" data-i18n="askHistoryTab">Questions</h2>
+            <p class="lib-cover-hint" data-i18n="askHistorySelect">Choose a conversation to read its answers and source excerpts, or continue in the reader.</p>
+          </div>
+          <div id="ask-library-detail" hidden></div>
+        </aside>
+      </div>
+    </section>
   </main>
 
   <script defer src="i18n.js"></script>
@@ -346,6 +370,7 @@
   <script defer src="ai.js"></script>
   <script defer src="ai-cache.js"></script>
   <script defer src="dict-archive.js"></script>
+  <script defer src="ask-archive.js"></script>
   <script defer src="dict-entry.js"></script>
   <script defer src="md-dict.js"></script>
   <script defer src="dict-pack.js"></script>
@@ -354,6 +379,7 @@
   <script defer src="vocab-send.js"></script>
   <script defer src="library-notes.js"></script>
   <script defer src="library-vocab.js"></script>
+  <script defer src="library-ask.js"></script>
   <script defer src="library.js"></script>
 </body>
 </html>

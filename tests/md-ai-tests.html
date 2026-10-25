@@ -11599,7 +11599,7 @@ window._t4AsyncDone = (async function () {
   }
   function mkAskState(url) {
     return {
-      s: { aiProvider: "gemini" },
+      s: { aiProvider: "gemini", previewAiEnabled: true, geminiApiKey: "fixture-key" },
       url, title: "T4 transcript", account: "", forum: false,
       panel: null, ctx: { text: "context", sent: [], sentBlocks: 1, totalBlocks: 1 },
       rounds: [], records: [], running: false, ctrl: null
