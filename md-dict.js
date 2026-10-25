@@ -1833,6 +1833,12 @@ function _pbpDictEntryMount(host, opts) {
           for (const point of learning.items) {
             const unit = document.createElement("div"); unit.className = "xp-dict-learning-item";
             const title = document.createElement("p"); const strong = document.createElement("strong"); strong.textContent = point.title; title.appendChild(strong);
+            if (addition.category === "etymology" && ["family", "cognate", "synonym", "topic"].includes(point.kind) && typeof opts.onLookup === "function") {
+              const word = button("dictLookupSelection", "xp-dict-lemma-link"); word.className = "xp-dict-lemma-link";
+              word.textContent = point.title; word.lang = opts.lang || "und"; word.title = t("dictLookupSelection");
+              word.addEventListener("click", () => { if (alive()) opts.onLookup(point.title); });
+              strong.replaceChildren(word);
+            }
             if (addition.category === "etymology" && point.kind) {
               const key = ["formation", "history"].includes(point.kind) ? "dictEntry" : "dictEntryRelation";
               const label = document.createElement("span"); label.className = "xp-dict-src";
@@ -2009,6 +2015,7 @@ function _pbpDictEntryMount(host, opts) {
     const refresh = () => {
       const hasEtymology = (record.supplements || []).some(item => item.category === "etymology");
       etymology.hidden = hasEtymology;
+      etymologyTitle.textContent = t(record.entry.etymology || record.entry.relatedWords.length ? "dictEtymologyGenerate" : "dictSupplementEtymology");
       if (!etymology.isConnected) content.insertBefore(etymology, disclosure);
       usageDrafts.set(usageCategory, topic.value);
       if (usageCategory !== kind.value) {

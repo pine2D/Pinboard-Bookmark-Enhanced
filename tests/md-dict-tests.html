@@ -2271,10 +2271,13 @@ async function runDictionaryEntryUiTests() {
     etymologyRequest.onStage('checking');
     check("content checking keeps the same cancellation action and focus",originAction.parentElement.querySelector('.xp-dict-usage-status').textContent==='dictSupplementChecking'&&
       document.activeElement===originAction.parentElement.querySelector('.xp-dict-usage-stop'));
-    resolveUsage({...addition,id:'5'.repeat(64),category:'etymology'});await settle();
+    resolveUsage({...addition,id:'5'.repeat(64),category:'etymology',learning:{version:2,language:{name:'Spanish',lang:'es'},summary:'Una palabra relacionada.',replacesId:'',
+      items:[{sense:1,kind:'family',title:'giftig',explanation:'Significa venenoso.',example:'',translation:'',sourceIndex:-1}]}});await settle();
     check("completed etymology replaces its generation prompt with a focusable saved result",originAction.closest('details').hidden&&
       document.activeElement===separateOrigin.host.querySelector('[data-supplement-id] > summary')&&
       separateOrigin.host.querySelector('[data-supplement-id]').textContent.includes('dictSupplementEtymology'));
+    const relatedWord=separateOrigin.host.querySelector('[data-supplement-id] .xp-dict-lemma-link');relatedWord.click();
+    check("new etymology relations keep direct lookup and original-language pronunciation semantics",lookups.at(-1)==='giftig'&&relatedWord.lang==='de'&&!!relatedWord.title);
     const partial={...addition,id:'6'.repeat(64),learning:{version:2,language:{name:'Spanish',lang:'es'},summary:'',replacesId:'',omittedItems:1,
       items:[{sense:1,title:'A valid pattern',explanation:'Una explicación útil.',example:'Ein Beispiel.',translation:'Un ejemplo.',sourceIndex:-1}]}};
     window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[partial]});

@@ -51,14 +51,17 @@ export async function installDictEntryFixture(page) {
         await new Promise(resolve => { state.usageRelease = resolve; });
         opts.signal?.throwIfAborted();
         if (state.usageFail) throw Object.assign(new Error('Synthetic truncated completion'), { code: 'output_truncated', status: 200 });
+        if (lookup.category === 'etymology') return JSON.stringify({ language: 'zh-Hans', summary: '通过相关词区分表达形式与含义。', items: [
+          { sense: 0, kind: 'topic', title: 'expression', explanation: '强调表达形式，可用于对照词汇和短语。', sourceIndex: -1 },
+          { sense: 0, kind: 'topic', title: 'meaning', explanation: '表示词语在特定语境中表达的含义。', sourceIndex: -1 }
+        ] });
         return JSON.stringify({ language: 'zh-Hans', summary: '先选定要表达的含义，再选择与情境相符的搭配。以下为独立编写的例句。', items: [
           { sense: 1, title: 'a practical example', explanation: '用于把抽象的说明落实到可操作的例子中，适合讨论工作方法或学习步骤。', example: 'Please give us a practical example.', translation: '请给我们一个实际的例子。', sourceIndex: -1 },
           { sense: 2, title: 'a clear expression of an idea', explanation: '强调想法表达得明确，读者能够据此区分不同含义；可根据需要替换后面的名词。', example: 'This is a clear expression of the main idea.', translation: '这清楚地表达了中心思想。', sourceIndex: -1 }
         ] });
       }
-      if (!lookup || Object.keys(lookup).sort().join(',') !== 'etymologyEvidence,sourceLanguage,targetLanguage,term' ||
-        !lookup.term || !lookup.sourceLanguage || lookup.targetLanguage?.lang !== 'zh-Hans' ||
-        !Array.isArray(lookup.etymologyEvidence) || lookup.etymologyEvidence.length) {
+      if (!lookup || Object.keys(lookup).sort().join(',') !== 'sourceLanguage,targetLanguage,term' ||
+        !lookup.term || !lookup.sourceLanguage || lookup.targetLanguage?.lang !== 'zh-Hans') {
         throw new Error('SETUP: expected a reusable dictionary entry request without article or dictionary content');
       }
       const state = window._auditDictEntry;
@@ -74,12 +77,7 @@ export async function installDictEntryFixture(page) {
             examples: [{ text: 'This is an original example sentence.', translation: '这是一句独立编写的例句。' }] },
           { partOfSpeech: '名词', definition: '另一种常见含义，便于区分不同用法。',
             examples: [{ text: 'The second example illustrates another use.', translation: '第二句例句展示另一种用法。' }] }
-        ], etymology: '', relatedWords: ['example', 'expression', 'meaning'],
-        learning: { version: 2, formation: '构词说明按这个词本身展开，不依赖当前文章。', history: '', related: [
-          { word: 'example', relation: 'topic', note: '用于展示词语在句子中的实际用法。' },
-          { word: 'expression', relation: 'topic', note: '强调表达形式，可用于对照词汇和短语。' },
-          { word: 'meaning', relation: 'topic', note: '表示词语在特定语境中表达的含义。' }
-        ] } });
+        ] });
     };
   });
 }
@@ -112,15 +110,19 @@ export async function openDictEntryState(page, state) {
     return page.locator('.xp-dict-ai-switch:not([hidden])').isVisible();
   }
   if (state === 'details') {
-    await page.locator('.xp-dict-ai-details > summary').first().click();
-    const details = page.locator('.xp-dict-ai-details[open]').first();
-    await details.locator('.xp-dict-lemma-link, bdi').first().waitFor({ state: 'visible' });
+    const action = page.locator('.xp-dict-etymology-generate');
+    await action.locator('xpath=ancestor::details[1]').locator(':scope > summary').click();
+    await action.click();
+    await page.waitForFunction(() => window._auditDictEntry?.usageEntered);
+    await page.evaluate(() => window._auditDictEntry.usageRelease());
+    const details = page.locator('.xp-dict-ai-details[data-supplement-id][open]').first();
+    await details.locator('.xp-dict-supplement-text').waitFor({ state: 'visible' });
     // The scenario audits the opened state. User-triggered folds now animate;
     // wait for their actual endpoint rather than sampling the first frame.
     await details.evaluate(async node => {
       await Promise.all(node.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
     });
-    return details.locator('.xp-dict-lemma-link, bdi').first().isVisible();
+    return details.locator('.xp-dict-supplement-text').isVisible();
   }
   if (state === 'usage-scope') {
     const form = page.locator('.xp-dict-supplement');
