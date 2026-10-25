@@ -17,6 +17,32 @@ const REMOTE = { recordKey: "346c52a911f6006b324ad42c81cf52a9f0a353b66a5e922432c
     entry: { word: "May", language: "en", pronunciation: "/meɪ/",
       meanings: [{ partOfSpeech: "noun", definition: "五月", examples: [{ text: "May comes after April.", translation: "四月之后是五月。" }] }],
       etymology: "", relatedWords: [] } } };
+// Schema 2 fixtures are also handwritten and hashed outside the production
+// serializer. The source revision is a deterministic test value, not a claim
+// about the live Wikisource revision at the time these tests run.
+const REMOTE_V2_ENTRY = { recordKey: "4edec14099bf10bdeb792197e931ad70fed7375b48163691af8ed89807a0b298",
+  value: { kind: "entry", term: "provider", sourceLanguage: "en", target: { name: "Chinese", lang: "zh-CN" },
+    provider: "peer-provider", model: "peer-model", generatedAt: 300,
+    entry: { word: "provider", language: "en", pronunciation: "/prəˈvaɪdə/",
+      meanings: [{ partOfSpeech: "名词", definition: "提供所需事物的人或机构。", examples: [
+        { text: "Choose a reliable provider.", translation: "选择可靠的提供方。" }] }],
+      etymology: "provide 加表示行为执行者的 -er。", relatedWords: ["provide"],
+      learning: { version: 2, formation: "provide 加表示行为执行者的 -er。", history: "",
+        related: [{ word: "provide", relation: "family", note: "动词，表示提供。" }], sources: [] } } } };
+const REMOTE_V2_SUPPLEMENT = { recordKey: "1336dfdc416c58b801b3ad3c79ee7faba9f03500205298a79c574fd1cd64a139",
+  value: { kind: "supplement", term: "provider", sourceLanguage: "en", target: { name: "Chinese", lang: "zh-CN" },
+    provider: "peer-provider", model: "peer-model", generatedAt: 301,
+    archiveId: "4edec14099bf10bdeb792197e931ad70fed7375b48163691af8ed89807a0b298", category: "literature",
+    profile: { nativeLanguage: "Chinese", level: "intermediate", topic: "" },
+    content: "这里指提供饮食和生活照料的人。",
+    sources: [{ title: "The Pickwick Papers / Chapter XIV",
+      url: "https://en.wikisource.org/wiki/The_Works_of_Charles_Dickens/Volume_1/Chapter_14",
+      excerpt: "Thoughtful creature! Comfortable provider!", author: "Charles Dickens", work: "The Pickwick Papers",
+      location: "Chapter XIV", language: "en", genre: "novel", revision: "123456", retrievedAt: 1700000000000 }],
+    learning: { version: 2, language: { name: "Chinese", lang: "zh-CN" }, summary: "小说中的人物评价。",
+      items: [{ sense: 1, title: "狄更斯《匹克威克外传》", explanation: "女主人安排早餐，人物称赞她照料周到。",
+        example: "Thoughtful creature! Comfortable provider!", translation: "真体贴！把吃住照料得真周到！", sourceIndex: 0 }],
+      replacesId: "" } } };
 const request = (patch = {}) => ({ owner: OWNER, term: "May", sourceLanguage: "en",
   target: { name: "Chinese", lang: "zh-CN" }, ...patch });
 const input = (patch = {}) => ({ ...request(), record: { entry: clone(REMOTE.value.entry), provider: "local-provider",
@@ -25,6 +51,8 @@ const supplement = (archiveId, patch = {}) => ({ owner: OWNER, archiveId, catego
   profile: { nativeLanguage: "Chinese", level: "beginner", topic: "" }, content: "in May: 在五月。",
   sources: [], provider: "local-provider", model: "local-model", generatedAt: 201, ...patch });
 const batch = (entries = [clone(REMOTE)]) => ({ schema: 1, ownerHash: HASH, deviceId: "peer-a", createdAt: 123, entries });
+const batchV2 = (entries = [clone(REMOTE_V2_ENTRY), clone(REMOTE_V2_SUPPLEMENT)]) => ({
+  schema: 2, ownerHash: HASH, deviceId: "peer-a", createdAt: 123, entries });
 const state = (patch = {}) => ({ key: "account:google-a:" + HASH, ownerHash: HASH, drivePermissionId: "google-a", ...patch });
 function fixture(options = {}) {
   let owner = options.owner === undefined ? OWNER : options.owner;
@@ -111,6 +139,48 @@ test("supplements from concurrent entry versions remain visible together", async
   assert(read.archiveId === second.archiveId && read.supplements.length === 2);
   assert(new Set(read.supplements.map(row => row.archiveId)).size === 2);
 });
+test("explicit base updates expose paid prior entries while leaving them byte-for-byte intact", async () => {
+  const f = fixture(), first = await f.store.save(input());
+  const paidUsage = await f.store.append(supplement(first.archiveId));
+  const replacement = input(); replacement.record.generatedAt = 400;
+  replacement.record.entry.meanings[0].definition = "五月，一年中的第五个月。";
+  const updated = await f.store.save(replacement), reopened = await f.reopen();
+  const read = await reopened.read(request());
+  assert(updated.previousEntries.length === 1 && updated.previousEntries[0].archiveId === first.archiveId);
+  assert(updated.supplements.length === 1 && updated.supplements[0].id === paidUsage.id);
+  assert(read.archiveId === updated.archiveId && read.previousEntries.length === 1);
+  assert(read.previousEntries[0].entry.meanings[0].definition === "五月");
+  assert(read.previousEntries[0].generatedAt === 200 && !read.previousEntries[0].previousEntries.length);
+  const oldEvent = (await reopened.listOutbox(OWNER)).find(row => row.event.recordKey === first.archiveId).event;
+  assert(oldEvent.value.entry.meanings[0].definition === "五月" && oldEvent.value.generatedAt === 200);
+});
+test("an explicit base replacement wins over a future-dated original without altering timestamps", async () => {
+  const f = fixture(), original = input(); original.record.generatedAt = 900;
+  const first = await f.store.save(original), replacement = input(); replacement.record.generatedAt = 300;
+  replacement.record.entry.learning = { version: 2, formation: "", history: "", related: [], sources: [], replacesId: first.archiveId };
+  const newer = await f.store.save(replacement), read = await f.store.read(request());
+  assert(read.archiveId === newer.archiveId && read.generatedAt === 300);
+  assert(read.previousEntries[0].archiveId === first.archiveId && read.previousEntries[0].generatedAt === 900);
+});
+test("local replacement references cannot cross query, owner, record kind or supplement profile", async () => {
+  const f = fixture(), first = await f.store.save(input());
+  const replacement = input({ term: "June" }); replacement.record.entry.word = "June";
+  replacement.record.entry.learning = { version: 2, formation: "", history: "", related: [], sources: [], replacesId: first.archiveId };
+  await rejects(() => f.store.save(replacement), "invalid_request");
+  replacement.term = "May"; replacement.record.entry.word = "May"; replacement.record.entry.learning.replacesId = "c".repeat(64);
+  await rejects(() => f.store.save(replacement), "invalid_request");
+  const oldUsage = await f.store.append(supplement(first.archiveId));
+  replacement.record.entry.learning.replacesId = oldUsage.id;
+  await rejects(() => f.store.save(replacement), "invalid_request");
+  const update = supplement(first.archiveId, { category: "grammar", learning: { version: 2,
+    language: { name: "Chinese", lang: "zh-CN" }, summary: "", replacesId: oldUsage.id,
+    items: [{ sense: 1, title: "月份", explanation: "月份前使用介词。", example: "in May", translation: "在五月", sourceIndex: -1 }] } });
+  await rejects(() => f.store.append(update), "invalid_request");
+  update.category = "collocations"; update.profile.topic = "travel";
+  await rejects(() => f.store.append(update), "invalid_request");
+  f.owner(OTHER); update.owner = OTHER;
+  await rejects(() => f.store.append(update), "invalid_request");
+});
 test("supplement retries are idempotent and keep source provenance", async () => {
   const f = fixture(), saved = await f.store.save(input());
   const value = supplement(saved.archiveId, { sources: [{ title: "Public source", url: "https://example.test/source", excerpt: "A short excerpt." }] });
@@ -124,6 +194,85 @@ test("supplements reject foreign parents and unsafe or oversized sources", async
     await rejects(() => f.store.append(supplement(saved.archiveId, { sources: [{ title: "source", url, excerpt: "" }] })), "invalid_response");
   }
   await rejects(() => f.store.append(supplement(saved.archiveId, { content: "a".repeat(12001) })), "invalid_response");
+});
+test("schema 2 accepts both generations while schema 1 remains a frozen legacy contract", () => {
+  assert(pbpDictArchiveValidBatchBody(batch(), HASH));
+  assert(pbpDictArchiveValidBatchBody(batchV2(), HASH));
+  assert(pbpDictArchiveValidBatchBody(batchV2([clone(REMOTE)]), HASH));
+  assert(!pbpDictArchiveValidBatchBody(batch([clone(REMOTE_V2_ENTRY)]), HASH));
+  assert(!pbpDictArchiveValidBatchBody(batch([clone(REMOTE_V2_SUPPLEMENT)]), HASH));
+  assert(!pbpDictArchiveValidBatchBody({ ...batchV2(), schema: 3 }, HASH));
+});
+test("remote structured entry and literary evidence survive reopen without rewriting old paid records", async () => {
+  const f = fixture(); await f.store.applyRemotePage(OWNER, HASH, [batch(), batchV2()], state());
+  const reopened = await f.reopen(), value = await reopened.read(request({ term: "provider" }));
+  assert(value.archiveId === REMOTE_V2_ENTRY.recordKey && value.entry.learning.related[0].relation === "family");
+  assert(value.supplements[0].learning.items[0].example === REMOTE_V2_SUPPLEMENT.value.sources[0].excerpt);
+  assert(value.supplements[0].sources[0].author === "Charles Dickens");
+  assert(value.supplements[0].sources[0].revision === "123456");
+  assert((await reopened.read(request())).archiveId === REMOTE.recordKey);
+  assert((await reopened.listOutbox(OWNER)).length === 0);
+});
+test("structured append and an explicit updated version retain both paid results", async () => {
+  const f = fixture(), remote = REMOTE_V2_ENTRY.value;
+  const saved = await f.store.save({ ...request({ term: "provider" }), record: {
+    entry: clone(remote.entry), provider: remote.provider, model: remote.model, generatedAt: remote.generatedAt } });
+  const firstInput = { ...clone(REMOTE_V2_SUPPLEMENT.value), archiveId: saved.archiveId, owner: OWNER };
+  const first = await f.store.append(firstInput);
+  const updated = clone(firstInput); updated.generatedAt++; updated.content = "更新后的释读。";
+  updated.learning.replacesId = first.id; updated.learning.summary = "保留来源的新版释读。";
+  const second = await f.store.append(updated), read = await f.store.read(request({ term: "provider" }));
+  assert(read.supplements.length === 2 && first.id !== second.id);
+  assert(read.supplements[0].learning.summary === "小说中的人物评价。");
+  assert(read.supplements[1].learning.replacesId === first.id && read.supplements[1].sources[0].retrievedAt === 1700000000000);
+  assert((await f.store.listOutbox(OWNER)).length === 3);
+});
+test("structured source provenance rejects absent, unsafe, oversized and foreign fields", () => {
+  const mutations = [source => { source.author = ""; }, source => { source.work = ""; },
+    source => { source.location = ""; }, source => { source.revision = ""; }, source => { source.retrievedAt = 0; },
+    source => { source.language = "not a locale"; }, source => { source.genre = "law"; },
+    source => { source.excerpt = "x".repeat(601); }, source => { source.url = "https://user:secret@example.test/"; },
+    source => { source.token = "must not escape"; }];
+  for (const mutate of mutations) { const event = clone(REMOTE_V2_SUPPLEMENT); mutate(event.value.sources[0]);
+    assert(!pbpDictArchiveValidateEvent(event), "invalid source accepted"); }
+});
+test("literary quotations must match the referenced original excerpt exactly", () => {
+  for (const patch of [{ example: "An invented provider quotation." }, { sourceIndex: -1 }, { sourceIndex: 1 }, { translation: "" }]) {
+    const event = clone(REMOTE_V2_SUPPLEMENT); Object.assign(event.value.learning.items[0], patch);
+    assert(!pbpDictArchiveValidateEvent(event));
+  }
+  const snippets = clone(REMOTE_V2_SUPPLEMENT);
+  snippets.value.sources = [{ title: "Only search metadata", url: "https://example.test", excerpt: snippets.value.sources[0].excerpt }];
+  assert(!pbpDictArchiveValidateEvent(snippets));
+});
+test("structured entry relations and historical claims require their declared evidence", () => {
+  const invalidRelation = clone(REMOTE_V2_ENTRY); invalidRelation.value.entry.learning.related[0].relation = "similar-looking";
+  assert(!pbpDictArchiveValidateEvent(invalidRelation));
+  const unsupported = clone(REMOTE_V2_ENTRY); unsupported.value.entry.learning.history = "An unsupported history.";
+  assert(!pbpDictArchiveValidateEvent(unsupported));
+  const extra = clone(REMOTE_V2_ENTRY); extra.value.entry.learning.related[0].privateNotes = "must not escape";
+  assert(!pbpDictArchiveValidateEvent(extra));
+});
+test("structured output rejects malformed version, sense, language and extra fields", () => {
+  const mutations = [value => { value.learning.version = 3; }, value => { value.learning.items[0].sense = 5; },
+    value => { value.learning.items[0].sense = .5; }, value => { value.learning.language.lang = "zh_cn"; },
+    value => { value.learning.items = []; }, value => { value.learning.replacesId = "unknown"; },
+    value => { value.learning.items[0].token = "secret"; }, value => { value.learning.language.owner = OWNER; },
+    value => { value.learning.debug = "secret"; }];
+  for (const mutate of mutations) { const event = clone(REMOTE_V2_SUPPLEMENT); mutate(event.value);
+    assert(!pbpDictArchiveValidateEvent(event)); }
+});
+test("structured culture results require a real source index", () => {
+  const event = clone(REMOTE_V2_SUPPLEMENT); event.value.category = "culture";
+  event.value.learning.items[0].sourceIndex = -1;
+  assert(!pbpDictArchiveValidateEvent(event));
+});
+test("a malformed structured event rejects its entire remote page and cursor", async () => {
+  const f = fixture(), invalid = clone(REMOTE_V2_SUPPLEMENT);
+  invalid.value.learning.items[0].example = "Fabricated text.";
+  const result = await f.store.applyRemotePage(OWNER, HASH, [batch(), batchV2([REMOTE_V2_ENTRY, invalid])], state({ pageToken: "bad" }));
+  assert(result.error === "invalid_remote_page" && !await f.store.getAccountState("google-a", HASH));
+  assert(await f.store.read(request()) === null && await f.store.read(request({ term: "provider" })) === null);
 });
 test("wire validation rejects extra owner or credential fields recursively", () => {
   for (const location of [value => value, value => value.entry, value => value.entry.meanings[0], value => value.target]) {
@@ -199,9 +348,12 @@ function driveFixture(options = {}) {
   let owner = OWNER, enabled = true, permissionId = "google-a", sessionPermissionId = "", failUpload = !!options.failUpload;
   const calls = [], uploads = [], connectionPuts = [];
   let connectionState = null;
-  const metadata = { id: "peer-file", name: "pbp-dict-entry-peer-file.json", parents: ["1opaque-appdata-folder"],
-    mimeType: "application/json", appProperties: { pbpKind: "dict-entry-batch", schema: "1", owner: HASH, device: "peer-a" } };
-  const body = JSON.stringify(batch());
+  const metadata = options.version2
+    ? { id: "peer-file", name: "pbp-dict-entry-peer-file.json", parents: ["1opaque-appdata-folder"],
+      mimeType: "application/json", appProperties: { pbpKind: "dict-entry-batch", schema: "2", owner: HASH, device: "peer-a" } }
+    : { id: "peer-file", name: "pbp-dict-entry-peer-file.json", parents: ["1opaque-appdata-folder"],
+      mimeType: "application/json", appProperties: { pbpKind: "dict-entry-batch", schema: "1", owner: HASH, device: "peer-a" } };
+  const body = JSON.stringify(options.version2 ? batchV2() : batch());
   const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
   const client = pbpCreateVocabDriveClient({ protocol: PBP_DICT_ARCHIVE_DRIVE_PROTOCOL,
     identity: { getAuthToken: async () => ({ token: "token:" + permissionId }), removeCachedAuthToken: async () => {} },
@@ -259,6 +411,38 @@ test("real runner bootstraps an empty device and reuses a peer's complete entry"
   assert(result.ok && result.changed && result.status.bootstrapComplete && read.model === "peer-model");
   assert((await f.store.getAccountState("google-a", HASH)).pageToken === "after" && f.uploads.length === 1);
   assert(!f.uploads[0].body.includes(OWNER) && f.uploads[0].metadata.appProperties.pbpKind === "dict-entry-batch");
+});
+test("real runner downloads independently authored schema 2 literary evidence and emits schema 2", async () => {
+  const f = driveFixture({ remote: true, version2: true }), result = await f.run();
+  const read = await f.store.read(request({ term: "provider" }));
+  assert(result.ok && read.archiveId === REMOTE_V2_ENTRY.recordKey && read.supplements.length === 1);
+  assert(read.supplements[0].learning.language.lang === "zh-CN");
+  assert(read.supplements[0].sources[0].work === "The Pickwick Papers");
+  assert(f.uploads.length === 1 && f.uploads[0].metadata.appProperties.schema === "2");
+  assert(JSON.parse(f.uploads[0].body).entries.some(event => event.recordKey === REMOTE_V2_SUPPLEMENT.recordKey));
+  assert((await f.store.getAccountState("google-a", HASH)).protocolSchema === 2);
+});
+test("protocol upgrade rediscovers schema 2 files beyond an old completed cursor", async () => {
+  const f = driveFixture({ remote: true, version2: true });
+  await f.store.putAccountState(state({ protocolSchema: 1, bootstrapComplete: true, pageToken: "old-complete" }));
+  assert((await f.run()).ok);
+  assert(f.calls.some(call => call.startsWith("/drive/v3/changes/startPageToken")));
+  const listing = f.calls.find(call => call.startsWith("/drive/v3/files?"));
+  const query = new URL("https://www.googleapis.com" + listing).searchParams.get("q");
+  assert(query.includes("value='1'") && query.includes("value='2'"));
+  assert((await f.store.read(request({ term: "provider" }))).supplements[0].id === REMOTE_V2_SUPPLEMENT.recordKey);
+  assert((await f.store.getAccountState("google-a", HASH)).pageToken === "after");
+});
+test("upgrading preserves a frozen schema 1 file ID and body before writing new schema 2 checkpoints", async () => {
+  const f = driveFixture();
+  await f.store.applyRemotePage(OWNER, HASH, [batch()], state({ protocolSchema: 1, bootstrapComplete: true, pageToken: "old" }));
+  await f.store.checkpointOwner(OWNER);
+  const oldBody = JSON.stringify(batch()), bytes = new TextEncoder().encode(oldBody).length;
+  await f.store.freezeOutbox(OWNER, "google-a", HASH, "frozen-v1-id", { body: oldBody, bytes });
+  assert((await f.run()).ok && f.uploads.length === 2);
+  assert(f.uploads[0].metadata.id === "frozen-v1-id" && f.uploads[0].metadata.appProperties.schema === "1");
+  assert(f.uploads[0].body === oldBody && f.uploads[1].metadata.appProperties.schema === "2");
+  assert(!(await f.store.listPendingBatches("google-a", HASH)).length);
 });
 test("complete entry and supplements transfer between independent devices", async () => {
   const a = fixture(), b = fixture(); const saved = await a.store.save(input());

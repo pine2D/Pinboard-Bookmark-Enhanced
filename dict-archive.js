@@ -29,7 +29,10 @@ function _pbpDictArchiveLookup(value) {
     value.target.lang === "und" ? value.target.name : ""]);
 }
 function _pbpDictArchiveEntry(entry, value) {
-  return _pbpDictArchiveObject(entry, ["word", "language", "pronunciation", "meanings", "etymology", "relatedWords"]) &&
+  const keys = ["word", "language", "pronunciation", "meanings", "etymology", "relatedWords"];
+  const enriched = Object.hasOwn(entry || {}, "learning");
+  if (enriched) keys.push("learning");
+  return _pbpDictArchiveObject(entry, keys) &&
     entry.word === value.term && entry.language === value.sourceLanguage &&
     _pbpDictArchiveText(entry.pronunciation, 256, true) && _pbpDictArchiveText(entry.etymology, 1200, true) &&
     Array.isArray(entry.meanings) && entry.meanings.length <= 4 && entry.meanings.every(meaning =>
@@ -40,19 +43,68 @@ function _pbpDictArchiveEntry(entry, value) {
         _pbpDictArchiveText(example.text, 600) && _pbpDictArchiveText(example.translation, 600, true))) &&
     Array.isArray(entry.relatedWords) && entry.relatedWords.length <= 8 &&
     entry.relatedWords.every(word => _pbpDictArchiveText(word, 128) && !/[\r\n\t]/.test(word)) &&
-    (entry.meanings.length > 0 || (!entry.pronunciation && !entry.etymology && !entry.relatedWords.length));
+    (entry.meanings.length > 0 || (!entry.pronunciation && !entry.etymology && !entry.relatedWords.length)) &&
+    (!enriched || _pbpDictArchiveEntryLearning(entry.learning, entry));
 }
 function _pbpDictArchiveSource(source) {
-  if (!_pbpDictArchiveObject(source, ["title", "url", "excerpt"]) ||
+  const keys = ["title", "url", "excerpt"];
+  const enriched = Object.hasOwn(source || {}, "retrievedAt");
+  if (enriched) keys.push("author", "work", "location", "language", "genre", "revision", "retrievedAt");
+  if (!_pbpDictArchiveObject(source, keys) ||
       !_pbpDictArchiveText(source.title, 200) || !_pbpDictArchiveText(source.url, 2048) ||
-      !_pbpDictArchiveText(source.excerpt, 1200, true)) return false;
+      !_pbpDictArchiveText(source.excerpt, enriched ? 600 : 1200, !enriched)) return false;
+  if (enriched && (!["author", "work", "location"].every(key => _pbpDictArchiveText(source[key], 200, true)) ||
+      !_pbpDictArchiveLang(source.language) || !_pbpDictArchiveText(source.genre, 200) ||
+      !_pbpDictArchiveText(source.revision, 80) || !Number.isSafeInteger(source.retrievedAt) || source.retrievedAt <= 0)) return false;
   try { const url = new URL(source.url); return url.protocol === "https:" && !url.username && !url.password; }
   catch (_) { return false; }
+}
+function _pbpDictArchiveEntryLearning(learning, entry) {
+  const keys = ["version", "formation", "history", "related", "sources"];
+  const replaces = Object.hasOwn(learning || {}, "replacesId");
+  if (replaces) keys.push("replacesId");
+  return _pbpDictArchiveObject(learning, keys) &&
+    (!replaces || (typeof learning.replacesId === "string" && /^[0-9a-f]{64}$/.test(learning.replacesId))) &&
+    learning.version === 2 && _pbpDictArchiveText(learning.formation, 1200, true) &&
+    _pbpDictArchiveText(learning.history, 1200, true) &&
+    Array.isArray(learning.related) && learning.related.length <= 5 && learning.related.every(item =>
+      _pbpDictArchiveObject(item, ["word", "relation", "note"]) &&
+      _pbpDictArchiveText(item.word, 128) && !/[\r\n\t]/.test(item.word) &&
+      ["family", "cognate", "synonym", "topic"].includes(item.relation) && _pbpDictArchiveText(item.note, 400)) &&
+    Array.isArray(learning.sources) && learning.sources.length <= 5 && learning.sources.every(source =>
+      _pbpDictArchiveSource(source) && Object.hasOwn(source, "retrievedAt") && source.genre === "etymology") &&
+    (!learning.history || learning.sources.length > 0) &&
+    (entry.meanings.length > 0 || (!learning.formation && !learning.history && !learning.related.length && !learning.sources.length));
+}
+function _pbpDictArchiveSupplementLearning(learning, value) {
+  if (!_pbpDictArchiveObject(learning, ["version", "language", "summary", "items", "replacesId"]) ||
+      learning.version !== 2 || !_pbpDictArchiveObject(learning.language, ["name", "lang"]) ||
+      !_pbpDictArchiveText(learning.language.name, 80) || !_pbpDictArchiveLang(learning.language.lang) ||
+      !_pbpDictArchiveText(learning.summary, 800, true) ||
+      typeof learning.replacesId !== "string" || (learning.replacesId !== "" && !/^[0-9a-f]{64}$/.test(learning.replacesId)) ||
+      !Array.isArray(learning.items) || !learning.items.length || learning.items.length > 5) return false;
+  return learning.items.every(item => {
+    if (!_pbpDictArchiveObject(item, ["sense", "title", "explanation", "example", "translation", "sourceIndex"]) ||
+        !Number.isSafeInteger(item.sense) || item.sense < 0 || item.sense > 4 ||
+        !_pbpDictArchiveText(item.title, 240) || !_pbpDictArchiveText(item.explanation, 1400) ||
+        !_pbpDictArchiveText(item.example, 600, true) || !_pbpDictArchiveText(item.translation, 600, true) ||
+        !Number.isSafeInteger(item.sourceIndex) || item.sourceIndex < -1 || item.sourceIndex >= value.sources.length) return false;
+    const source = value.sources[item.sourceIndex];
+    if (["culture", "literature"].includes(value.category) &&
+        (!source || !Object.hasOwn(source, "retrievedAt"))) return false;
+    if (value.category !== "literature") return true;
+    return source && Object.hasOwn(source, "retrievedAt") &&
+      ["novel", "short-story", "poetry", "drama", "literary-essay"].includes(source.genre) &&
+      ["author", "work", "location"].every(key => _pbpDictArchiveText(source[key], 200)) &&
+      source.language !== "und" && item.example === source.excerpt && !!item.translation.trim();
+  });
 }
 function _pbpDictArchiveValue(value) {
   const common = ["kind", "term", "sourceLanguage", "target", "provider", "model", "generatedAt"];
   const keys = value?.kind === "entry" ? [...common, "entry"] :
     [...common, "archiveId", "category", "profile", "content", "sources"];
+  const enriched = value?.kind === "supplement" && Object.hasOwn(value, "learning");
+  if (enriched) keys.push("learning");
   if (!_pbpDictArchiveObject(value, keys) || !_pbpDictArchiveText(value.term, 256) ||
       pbpDictNormalizeTerm(value.term) !== value.term || !_pbpDictArchiveLang(value.sourceLanguage) ||
       !_pbpDictArchiveObject(value.target, ["name", "lang"]) || !_pbpDictArchiveText(value.target.name, 80) ||
@@ -65,7 +117,8 @@ function _pbpDictArchiveValue(value) {
     _pbpDictArchiveText(value.profile.nativeLanguage, 80, true) &&
     ["", "beginner", "intermediate", "advanced"].includes(value.profile.level) &&
     _pbpDictArchiveText(value.profile.topic, 120, true) && _pbpDictArchiveText(value.content, 12000) &&
-    Array.isArray(value.sources) && value.sources.length <= 5 && value.sources.every(_pbpDictArchiveSource);
+    Array.isArray(value.sources) && value.sources.length <= 5 && value.sources.every(_pbpDictArchiveSource) &&
+    (!enriched || _pbpDictArchiveSupplementLearning(value.learning, value));
 }
 function pbpDictArchiveValidateEvent(event) {
   return _pbpDictArchiveObject(event, ["recordKey", "value"]) &&
@@ -73,9 +126,12 @@ function pbpDictArchiveValidateEvent(event) {
 }
 function pbpDictArchiveValidBatchBody(body, ownerHash) {
   return _pbpDictArchiveObject(body, ["schema", "ownerHash", "deviceId", "createdAt", "entries"]) &&
-    body.schema === 1 && /^[0-9a-f]{64}$/.test(ownerHash) && body.ownerHash === ownerHash &&
+    [1, 2].includes(body.schema) && /^[0-9a-f]{64}$/.test(ownerHash) && body.ownerHash === ownerHash &&
     _pbpVocabDeviceId(body.deviceId) && Number.isFinite(body.createdAt) &&
-    Array.isArray(body.entries) && body.entries.every(pbpDictArchiveValidateEvent);
+    Array.isArray(body.entries) && body.entries.every(event => pbpDictArchiveValidateEvent(event) &&
+      (body.schema === 2 || (!Object.hasOwn(event.value, "learning") &&
+        !Object.hasOwn(event.value.entry || {}, "learning") &&
+        (event.value.sources || []).every(source => !Object.hasOwn(source, "retrievedAt")))));
 }
 async function _pbpDictArchiveHash(value) {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(_pbpVocabCanonicalJson(value)));
@@ -200,16 +256,50 @@ function pbpCreateDictArchiveStore({
   const entryValue = input => ({ kind: "entry", term: input.term, sourceLanguage: input.sourceLanguage,
     target: input.target, provider: input.record.provider, model: input.record.model,
     generatedAt: input.record.generatedAt, entry: input.record.entry });
-  const output = (event, supplements = []) => ({ entry: event.value.entry, provider: event.value.provider,
+  const entryVersions = (rows, owner) => {
+    const entries = rows.filter(row => row.owner === owner &&
+      row.event.value.kind === "entry" && pbpDictArchiveValidateEvent(row.event));
+    // Explicit user updates supersede their originals even when two devices'
+    // clocks disagree. Concurrent, unrelated heads retain deterministic order.
+    const replaced = new Set(entries.map(row => row.event.value.entry.learning?.replacesId).filter(Boolean));
+    return entries.sort((a, b) => Number(replaced.has(a.event.recordKey)) - Number(replaced.has(b.event.recordKey)) ||
+      b.event.value.generatedAt - a.event.value.generatedAt || a.event.recordKey.localeCompare(b.event.recordKey));
+  };
+  const supplementVersions = (rows, owner, entries) => {
+    const parents = new Set(entries.map(row => row.event.recordKey));
+    return rows.filter(row => row.owner === owner && row.event.value.kind === "supplement" &&
+      parents.has(row.event.value.archiveId) && pbpDictArchiveValidateEvent(row.event))
+      .map(row => ({ ...row.event.value, id: row.event.recordKey, archiveSaved: true }))
+      .sort((a, b) => a.generatedAt - b.generatedAt || a.id.localeCompare(b.id));
+  };
+  const output = (event, supplements = [], previousEntries = []) => ({ entry: event.value.entry, provider: event.value.provider,
     model: event.value.model, generatedAt: event.value.generatedAt, archiveId: event.recordKey,
-    cached: true, cacheSaved: true, archiveSaved: true, supplements });
+    cached: true, cacheSaved: true, archiveSaved: true, supplements, previousEntries });
+  const checkReplacement = async (owner, value) => {
+    const replacesId = value.kind === "entry" ? value.entry.learning?.replacesId : value.learning?.replacesId;
+    if (!replacesId) return;
+    if (typeof replacesId !== "string" || !/^[0-9a-f]{64}$/.test(replacesId)) throw _pbpDictArchiveError("invalid_request");
+    const row = await _pbpDictArchiveRequest((await open()).transaction("records", "readonly").objectStore("records")
+      .get(keyOf(owner, replacesId)));
+    if (!row || row.owner !== owner || row.event.value.kind !== value.kind ||
+        _pbpDictArchiveLookup(row.event.value) !== _pbpDictArchiveLookup(value) ||
+        (value.kind === "supplement" && (row.event.value.category !== value.category ||
+          _pbpVocabCanonicalJson(row.event.value.profile) !== _pbpVocabCanonicalJson(value.profile)))) {
+      throw _pbpDictArchiveError("invalid_request");
+    }
+  };
   async function save(input) {
     const owner = _pbpDictArchiveOwner(input.owner), value = structuredClone(entryValue(input));
     await checkOwner(owner);
+    await checkReplacement(owner, value);
     const event = { recordKey: await _pbpDictArchiveHash(value), value };
     await insert(owner, event, true, { isCurrent: input.isCurrent });
+    const rows = await _pbpDictArchiveRequest((await open()).transaction("records", "readonly").objectStore("records")
+      .index("lookup").getAll([owner, _pbpDictArchiveLookup(value)]));
     await checkOwner(owner);
-    return output(event);
+    const entries = entryVersions(rows, owner);
+    return output(event, supplementVersions(rows, owner, entries), entries.filter(row => row.event.recordKey !== event.recordKey)
+      .map(row => output(row.event)));
   }
   async function append(input) {
     const owner = _pbpDictArchiveOwner(input.owner);
@@ -222,6 +312,8 @@ function pbpCreateDictArchiveStore({
       provider: input.provider, model: input.model, generatedAt: input.generatedAt,
       archiveId: input.archiveId, category: input.category, profile: structuredClone(input.profile),
       content: input.content, sources: structuredClone(input.sources || []) };
+    if (Object.hasOwn(input, "learning")) value.learning = structuredClone(input.learning);
+    await checkReplacement(owner, value);
     const event = { recordKey: await _pbpDictArchiveHash(value), value };
     await insert(owner, event, true, { isCurrent: input.isCurrent }); await checkOwner(owner);
     return { ...value, id: event.recordKey, archiveSaved: true };
@@ -252,17 +344,12 @@ function pbpCreateDictArchiveStore({
     const db = await open(); await checkOwner(owner);
     const rows = await _pbpDictArchiveRequest(db.transaction("records", "readonly").objectStore("records")
       .index("lookup").getAll([owner, _pbpDictArchiveLookup(input)]));
-    const entries = rows.filter(row => row.owner === owner && row.event.value.kind === "entry" && pbpDictArchiveValidateEvent(row.event))
-      .sort((a, b) => b.event.value.generatedAt - a.event.value.generatedAt || a.event.recordKey.localeCompare(b.event.recordKey));
+    const entries = entryVersions(rows, owner);
     if (!entries.length) { await checkOwner(owner); return null; }
     const event = entries[0].event;
-    const parents = new Set(entries.map(row => row.event.recordKey));
-    const additions = rows.filter(row => row.owner === owner && row.event.value.kind === "supplement" &&
-      parents.has(row.event.value.archiveId) && pbpDictArchiveValidateEvent(row.event))
-      .map(row => ({ ...row.event.value, id: row.event.recordKey, archiveSaved: true }))
-      .sort((a, b) => a.generatedAt - b.generatedAt || a.id.localeCompare(b.id));
+    const additions = supplementVersions(rows, owner, entries);
     await checkOwner(owner);
-    return output(event, additions);
+    return output(event, additions, entries.slice(1).map(row => output(row.event)));
   }
   async function getMeta() {
     const db = await open(), tx = db.transaction("sync", "readwrite"), done = _pbpDictArchiveDone(tx);
