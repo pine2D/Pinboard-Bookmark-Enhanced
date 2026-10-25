@@ -1986,6 +1986,38 @@ async function runDictionaryEntryUiTests() {
       onView:mode=>view.push(mode),onEntry:(norm,r)=>selected.push({norm,r}),onLookup:word=>lookups.push(word),...extra});
     return {root,host,dict,ctrl,ui};
   };
+  const checkFailureDiagnostics=async(label,runName,trigger,prefix)=>{
+    const originalWarn=console.warn,originalRun=window[runName],warnings=[];
+    const secret="PRIVATE_HTTP_RESPONSE_TOKEN_AND_LOOKUP";
+    try {
+      console.warn=(...args)=>warnings.push(args);
+      const attempt=async error=>{
+        window[runName]=async()=>{throw error;};
+        const before=warnings.length;trigger();await settle();
+        const rows=warnings.slice(before).filter(args=>args[0]===prefix);
+        return rows.length===1?rows[0]:[];
+      };
+      const statuses=[];
+      for(const status of [400,429,500,599]) {
+        const args=await attempt(Object.assign(new Error(secret),{status}));
+        statuses.push(args.length===4&&args[1]==="Error"&&args[2]==="request_failed"&&args[3]==="http_"+status);
+      }
+      check(label+" retains bounded HTTP statuses through the actual failure catch",statuses.every(Boolean));
+      const known=await attempt(Object.assign(new Error(secret),{status:503,reason:"response_json"}));
+      check(label+" preserves a known validation reason ahead of HTTP status",known.length===4&&known[3]==="response_json");
+      const untrusted=await attempt(Object.assign(new Error(secret),{status:429,reason:secret}));
+      check(label+" falls back to HTTP status without printing an arbitrary reason",untrusted.length===4&&untrusted[3]==="http_429");
+      const invalid=[];
+      for(const status of [undefined,null,"429",399,600,429.5,NaN,Infinity,{}]) {
+        const args=await attempt(Object.assign(new Error(secret),{status,reason:secret}));
+        invalid.push(args.length===4&&args[3]==="");
+      }
+      check(label+" rejects nonnumeric, fractional and out-of-range HTTP status diagnostics",invalid.every(Boolean));
+      const generic=await attempt(new TypeError(secret));
+      check(label+" leaves a generic TypeError unclassified instead of calling it a network failure",generic.length===4&&generic[1]==="TypeError"&&generic[2]==="request_failed"&&generic[3]==="");
+      check(label+" never logs the error message, raw reason or exception object",warnings.length>0&&warnings.every(args=>args.every(value=>typeof value==="string"))&&!JSON.stringify(warnings).includes(secret));
+    } finally {console.warn=originalWarn;window[runName]=originalRun;}
+  };
   try {
     Object.assign(window,{hasAIKey:()=>true,ensureAIHostPermissionWithGesture:async()=>{grants++;},uiLangToBCP47:()=>uiLanguage,PBP_ICONS:Object.fromEntries(["wandSparkles","bookOpenText","sparkles","stop","gear"].map(name=>[name,'<svg viewBox="0 0 24 24" aria-hidden="true"></svg>'])),pbpAiBumpCounter:()=>{},
       pbpDictEntryRead:async input=>{reads.push(input);return null;},pbpDictEntryRun:async input=>{calls.push(input);return record();}});
@@ -2058,6 +2090,7 @@ async function runDictionaryEntryUiTests() {
     const failed=mount();await failed.ui.ready;failed.host.querySelector('.xp-dict-ai-generate').focus();failed.host.querySelector('.xp-dict-ai-generate').click();await settle();
     check("failed generation restores the retry action when focus is still on Stop",document.activeElement===failed.host.querySelector('.xp-dict-ai-generate'));
     check("a generation error leaves the dictionary readable and retry possible",!failed.dict.hidden&&!failed.host.querySelector('.xp-dict-ai-generate').disabled&&failed.host.textContent.includes("dictSupplementInvalid"));
+    await checkFailureDiagnostics("base generation", "pbpDictEntryRun", ()=>failed.host.querySelector('.xp-dict-ai-generate').click(), "[dict-entry] generation failed:");
     const requestsBeforePermission=calls.length;window.ensureAIHostPermissionWithGesture=async()=>{throw Object.assign(new Error("Permission needed"),{code:"host_permission"});};
     failed.host.querySelector('.xp-dict-ai-generate').click();await settle();
     check("permission denial shows actionable recovery without generating",calls.length===requestsBeforePermission&&failed.host.textContent.includes("aiGrantRetry"));
@@ -2146,6 +2179,7 @@ async function runDictionaryEntryUiTests() {
     const nextTopic=usage.host.querySelector('.xp-dict-supplement-topic');nextTopic.value='travel';nextTopic.dispatchEvent(new Event('input'));
     submit=usage.host.querySelector('.xp-dict-supplement-generate');submit.focus();submit.click();await settle();
     check("failed supplement returns keyboard focus to its retryable action",document.activeElement===submit&&!submit.disabled);
+    await checkFailureDiagnostics("supplement generation", "pbpDictSupplementRun", ()=>submit.click(), "[dict-entry] usage generation failed:");
     window.pbpDictSupplementRun=()=>new Promise(resolve=>{resolveUsage=resolve;});submit.click();await settle();usage.host.querySelector('.xp-dict-ai-stop').focus();usage.host.querySelector('.xp-dict-ai-stop').click();resolveUsage(addition);await settle();
     check("stopping a supplement leaves focus on a visible control",document.activeElement===usage.host.querySelector('.xp-dict-ai-switch')&&!document.activeElement.hidden);
 

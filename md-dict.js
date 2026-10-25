@@ -1513,7 +1513,7 @@ function pbpDictEntryNorm(record, target) {
     entries };
 }
 
-// Only fixed validation labels may enter diagnostics; never log model output,
+// Only fixed validation labels and HTTP status may enter diagnostics; never log model output,
 // lookup text, or a provider-supplied arbitrary reason string.
 function _pbpDictFailureReason(error) {
   const allowed = ["response_size", "response_json", "entry_fields", "entry_identity", "entry_pronunciation",
@@ -1521,7 +1521,9 @@ function _pbpDictFailureReason(error) {
     "entry_sources", "entry_legacy", "entry_unknown", "explanation_metadata", "explanation_script",
     "explanation_language", "supplement_fields", "supplement_item", "supplement_source", "supplement_quote",
     "supplement_example", "supplement_size"];
-  return allowed.includes(error?.reason) ? error.reason : "";
+  if (allowed.includes(error?.reason)) return error.reason;
+  const status = error?.status;
+  return Number.isInteger(status) && status >= 400 && status <= 599 ? "http_" + status : "";
 }
 
 function _pbpDictEntryMount(host, opts) {
