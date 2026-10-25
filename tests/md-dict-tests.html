@@ -1966,7 +1966,7 @@ async function runMultiPackIntegrationTests() {
 
 async function runDictionaryEntryUiTests() {
   section("Reusable AI entries in the shared lookup view");
-  const names=["chrome","pbpDictEntryRead","pbpDictEntryRun","pbpDictSupplementRun","hasAIKey","ensureAIHostPermissionWithGesture","uiLangToBCP47","PBP_ICONS","pbpAiBumpCounter"];
+  const names=["chrome","pbpDictEntryRead","pbpDictEntryRun","pbpDictSupplementRun","pbpDictSupplementSave","hasAIKey","ensureAIHostPermissionWithGesture","uiLangToBCP47","PBP_ICONS","pbpAiBumpCounter"];
   const saved=new Map(names.map(name=>[name,window[name]]));
   const fixtures=[];let reads=[],calls=[],grants=0,view=[],selected=[],lookups=[],uiLanguage="en";
   const settings={aiProvider:"fixture",previewAiEnabled:true,dictDefinitionLang:"es",dictAiAutoGenerate:false};
@@ -2099,6 +2099,13 @@ async function runDictionaryEntryUiTests() {
     check("saved AI entry has one collapsed supplement entry",usage.host.querySelectorAll('.xp-dict-supplement').length===1&&!usage.host.querySelector('.xp-dict-supplement').open);
     check("supplement categories cover the seven accepted learning uses",usage.host.querySelector('.xp-dict-supplement-kind').options.length===7);
     check("supplement topic has an accessible optional field with a bounded length",usage.host.querySelector('.xp-dict-supplement-topic').getAttribute('aria-label')==='dictSupplementTopic'&&usage.host.querySelector('.xp-dict-supplement-topic').maxLength===120);
+    check("supplement topic has a visible label and explains the empty-field behavior",usage.host.querySelector('.xp-dict-supplement-topic').closest('label')?.textContent.includes('dictSupplementTopic')&&usage.host.querySelector('.xp-dict-supplement-hint')?.textContent==='dictSupplementTopicHint');
+    check("an unspecified learner profile makes no claim about a native language or level",!usage.host.querySelector('.xp-dict-supplement-profile bdi')&&usage.host.querySelector('.xp-dict-profile-link')?.textContent==='dictSupplementProfileSet'&&usage.host.querySelector('.xp-dict-profile-link')?.getAttribute('href')==='options.html#vocab-learning');
+    const configuredProfile=mount({settings:{...settings,dictLearnerNativeLanguage:'English',dictLearnerLevel:'beginner'}});await configuredProfile.ui.ready;
+    check("learner summary shows the explicit profile independently of UI and definition languages",configuredProfile.host.querySelector('.xp-dict-supplement-profile')?.textContent.includes('dictSupplementNativeLanguage:English')&&configuredProfile.host.querySelector('.xp-dict-supplement-profile')?.textContent.includes('dictSupplementLevel:dictLearnerLevelBeginner')&&reads.at(-1).target.lang==='es');
+    const baseBeforeUsage=usage.host.querySelector('.xp-dict-entry');
+    const originBeforeUsage=usage.host.querySelector('.xp-dict-ai-details');originBeforeUsage.open=true;
+    const formBeforeUsage=usage.host.querySelector('.xp-dict-supplement');
     let resolveUsage;
     window.pbpDictSupplementRun=()=>new Promise(resolve=>{resolveUsage=resolve;});
     const addition={id:'b'.repeat(64),category:'collocations',profile:{nativeLanguage:'',level:'',topic:''},content:'An original example',sources:[],provider:'fixture',model:'fixture-model',generatedAt:1700000000000,archiveSaved:true};
@@ -2107,12 +2114,27 @@ async function runDictionaryEntryUiTests() {
     check("supplement generation preserves a visible keyboard target on Stop",document.activeElement===usage.host.querySelector('.xp-dict-ai-stop'));
     resolveUsage(addition);await settle();
     check("completed supplement moves keyboard focus to its own summary",document.activeElement===usage.host.querySelector('[data-supplement-id] > summary'));
+    check("appending usage keeps the base definition and open etymology nodes intact",usage.host.querySelector('.xp-dict-entry')===baseBeforeUsage&&usage.host.querySelector('.xp-dict-ai-details')===originBeforeUsage&&originBeforeUsage.open);
+    check("appending usage preserves the mounted form and its open state",usage.host.querySelector('.xp-dict-supplement')===formBeforeUsage&&formBeforeUsage.open);
     submit=usage.host.querySelector('.xp-dict-supplement-generate');submit.focus();submit.click();
     check("viewing existing usage keeps keyboard focus on the opened result",document.activeElement===usage.host.querySelector('[data-supplement-id] > summary'));
+    const oldAddition=usage.host.querySelector('[data-supplement-id]');oldAddition.open=false;
     const topicInput=usage.host.querySelector('.xp-dict-supplement-topic');topicInput.value='work';topicInput.dispatchEvent(new Event('input'));
     submit=usage.host.querySelector('.xp-dict-supplement-generate');submit.focus();submit.click();await settle();
     outside.focus();resolveUsage({...addition,id:'c'.repeat(64),profile:{...addition.profile,topic:'work'}});await settle();
     check("supplement completion never steals focus after the user moves elsewhere",document.activeElement===outside);
+    check("a second supplement does not reopen or replace an earlier closed supplement",usage.host.querySelector('[data-supplement-id]')===oldAddition&&!oldAddition.open&&originBeforeUsage.open);
+    check("the topic field and typed scene survive addition updates",usage.host.querySelector('.xp-dict-supplement-topic')===topicInput&&topicInput.value==='work');
+    window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[{...addition,archiveSaved:false}]});
+    const retryUsage=mount();await retryUsage.ui.ready;
+    const retryOrigin=retryUsage.host.querySelector('.xp-dict-ai-details');retryOrigin.open=true;
+    const retrySection=retryUsage.host.querySelector('[data-supplement-id]');retrySection.open=true;
+    const retryButton=retrySection.querySelector('.xp-dict-retry-save');
+    const beforeRetryCalls=calls.length;
+    window.pbpDictSupplementSave=async(_input,value)=>({...value,archiveSaved:true});
+    retryButton.focus();retryButton.click();await settle();
+    check("retry saving a supplement updates its receipt without recreating open content or calling AI",retryUsage.host.querySelector('[data-supplement-id]')===retrySection&&retrySection.open&&retryOrigin.open&&!retrySection.querySelector('.xp-dict-retry-save')&&document.activeElement===retrySection.querySelector('summary')&&calls.length===beforeRetryCalls);
+    window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[]});
     window.pbpDictSupplementRun=async()=>{throw new Error('fixture failure');};
     const nextTopic=usage.host.querySelector('.xp-dict-supplement-topic');nextTopic.value='travel';nextTopic.dispatchEvent(new Event('input'));
     submit=usage.host.querySelector('.xp-dict-supplement-generate');submit.focus();submit.click();await settle();
@@ -2137,6 +2159,15 @@ async function runDictionaryEntryUiTests() {
     const unpaidWrite=mount();await unpaidWrite.ui.ready;const beforeFailedWrite=remoteReads;
     messageListeners.at(-1)({type:'PBP_DICT_ARCHIVE_SYNCED',owner:'ownerless'});await settle();
     check("a passive sync cannot overwrite paid output whose local save failed",remoteReads===beforeFailedWrite&&!!unpaidWrite.host.querySelector('.xp-dict-retry-save'));
+    window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[addition]});
+    const localScroll=mount();await localScroll.ui.ready;
+    localScroll.root.className='xp-body';localScroll.root.style.cssText='position:fixed;top:0;left:0;width:400px;height:140px;overflow:auto';
+    const spacer=document.createElement('div');spacer.style.height='500px';localScroll.root.prepend(spacer);
+    localScroll.host.querySelector('.xp-dict-supplement').open=true;
+    const scrollAction=localScroll.host.querySelector('.xp-dict-supplement-generate');scrollAction.focus({preventScroll:true});
+    localScroll.root.scrollTop=0;const pageScrollBefore=document.scrollingElement.scrollTop;scrollAction.click();
+    const headingRect=localScroll.host.querySelector('[data-supplement-id] > summary').getBoundingClientRect(),scrollRect=localScroll.root.getBoundingClientRect();
+    check("viewing saved usage reveals its heading only within the lookup scroller",localScroll.root.scrollTop>0&&headingRect.top>=scrollRect.top&&headingRect.bottom<=scrollRect.bottom&&document.scrollingElement.scrollTop===pageScrollBefore);
     const beforeClose=messageListeners.length;remote.ctrl.abort();
     check("closing lookup removes its archive sync listener",messageListeners.length===beforeClose-1);
     outsideControls.ctrl.abort();

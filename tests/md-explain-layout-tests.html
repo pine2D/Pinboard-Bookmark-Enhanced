@@ -481,5 +481,114 @@ function assertLayout(frame, locale) {
       } finally { frame.remove(); }
     }
   });
+  // Production native-details transitions and their input gate. The body stays
+  // real flowing text; the reader deliberately fades rather than animating its
+  // height, which would make the selection-anchored shell reposition per frame.
+  async function makeDisclosureFrame(surface) {
+    const frame = document.createElement("iframe");
+    frame.style.cssText = "width:800px;height:620px;border:0";
+    frame.srcdoc = `<!doctype html><html><head><link rel="stylesheet" href="../${surface === "reader" ? "md-preview" : "library"}.css"></head>
+      <body>${surface === "reader" ? '<div id="explain-pop" data-action="dict" popover="manual" style="left:8px;top:8px"><div class="xp-body">' : '<div id="vocab-ref-result">'}
+        <details class="xp-dict-ai-details"><summary>Word origin</summary><p>${"A flowing dictionary paragraph with actual words and spaces. ".repeat(8)}</p><input class="xp-dict-supplement-topic" aria-label="Scene"></details>
+      ${surface === "reader" ? '</div></div>' : '</div>'}</body></html>`;
+    document.body.appendChild(frame);
+    await new Promise(resolve => frame.addEventListener("load", resolve, { once: true }));
+    const doc = frame.contentDocument, win = frame.contentWindow;
+    const script = doc.createElement("script"); script.src = "../shared.js";
+    const loaded = new Promise(resolve => script.addEventListener("load", resolve, { once: true }));
+    doc.body.appendChild(script); await loaded;
+    const host = doc.querySelector(surface === "reader" ? "#explain-pop" : "#vocab-ref-result");
+    if (surface === "reader") host.showPopover();
+    win.pbpInitDictDisclosures(host);
+    await new Promise(resolve => win.requestAnimationFrame(() => win.requestAnimationFrame(resolve)));
+    doc.documentElement.classList.add("motion-ready");
+    return { frame, doc, win, host, details: host.querySelector("details"), summary: host.querySelector("summary") };
+  }
+  function clickDisclosure(fx, detail) {
+    fx.summary.dispatchEvent(new fx.win.MouseEvent("click", { bubbles: true, cancelable: true, detail, button: 0 }));
+  }
+  await test("dictionary disclosures gate motion to pointer toggles and keep keyboard/reduced motion immediate", async () => {
+    const fx = await makeDisclosureFrame("reader");
+    try {
+      const { details, win, host } = fx;
+      win.pbpInitDictDisclosures(host); // repeated setup cannot add another toggle
+      clickDisclosure(fx, 0);
+      assert(details.open && !details.classList.contains("dict-motion"), "keyboard toggle should be native and immediate");
+      clickDisclosure(fx, 1);
+      assert(!details.open && details.classList.contains("dict-motion"), "pointer toggle should arm exactly one native close");
+      clickDisclosure(fx, 0);
+      assert(details.open && !details.classList.contains("dict-motion"), "keyboard interrupt should clear a running pointer transition");
+      const media = win.matchMedia;
+      win.matchMedia = () => ({ matches: true });
+      clickDisclosure(fx, 1);
+      assert(!details.open && !details.classList.contains("dict-motion"), "reduced motion should not arm transitions");
+      win.matchMedia = media;
+      details.open = true;
+      assert(!details.classList.contains("dict-motion"), "restored open state should not animate");
+      await new Promise(resolve => setTimeout(resolve, 0));
+      clickDisclosure(fx, 1);
+      await new Promise(resolve => setTimeout(resolve, 0));
+      assert(details.classList.contains("dict-motion"), "direct pointer close should keep its own motion gate");
+      details.open = true;
+      await new Promise(resolve => setTimeout(resolve, 0));
+      assert(!details.classList.contains("dict-motion"), "programmatic reopen must clear the prior pointer gate");
+      details.querySelector("input").focus();
+      details.open = false;
+      await new Promise(resolve => setTimeout(resolve, 0));
+      assert(fx.doc.activeElement === fx.summary, "programmatic close should hand content focus to its summary");
+    } finally { fx.frame.remove(); }
+  });
+  await test("reader disclosure fades at constant open height and library disclosure interpolates flow height", async () => {
+    for (const surface of ["reader", "library"]) {
+      const fx = await makeDisclosureFrame(surface);
+      try {
+        const { details, host, win } = fx;
+        const collapsed = details.getBoundingClientRect().height;
+        clickDisclosure(fx, 1);
+        const samples = [];
+        await new Promise(resolve => {
+          const start = win.performance.now();
+          function sample(now) {
+            samples.push({ height: details.getBoundingClientRect().height, shell: host.getBoundingClientRect().height,
+              opacity: Number(win.getComputedStyle(details, "::details-content").opacity) });
+            if (now - start < 260) win.requestAnimationFrame(sample); else resolve();
+          }
+          win.requestAnimationFrame(sample);
+        });
+        const full = details.getBoundingClientRect().height;
+        assert(full > collapsed + 20, surface + ": fixture did not expand");
+        if (surface === "reader") {
+          assert(samples.every(s => Math.abs(s.height - collapsed) < 1 || Math.abs(s.height - full) < 1),
+            "reader should use only collapsed/expanded endpoint heights: " + JSON.stringify(samples));
+          assert(samples.some(s => s.opacity > 0 && s.opacity < 1), "reader content should fade through an intermediate opacity");
+          assert(new Set(samples.map(s => Math.round(s.shell))).size <= 2, "reader shell should resize only once, not each frame");
+        } else {
+          assert(samples.some(s => s.height > collapsed + 1 && s.height < full - 1), "library should interpolate flow height");
+        }
+        clickDisclosure(fx, 1);
+        await new Promise(resolve => win.requestAnimationFrame(resolve));
+        if (surface === "reader") {
+          assert(Math.abs(details.getBoundingClientRect().height - full) < 1,
+            "reader close should retain layout while opacity fades");
+          fx.summary.focus();
+          details.querySelector("input").focus();
+          assert(fx.doc.activeElement === fx.summary, "closed disclosure input must not regain focus during its fade");
+        }
+        await new Promise(resolve => setTimeout(resolve, 260));
+        assert(Math.abs(details.getBoundingClientRect().height - collapsed) < 1, surface + ": close should settle to summary height");
+        assert(!details.open, surface + ": native open state should be closed");
+      } finally { fx.frame.remove(); }
+    }
+  });
+  await test("dictionary view expands the shell without changing explain or translate width", async () => {
+    const frame = await makeFrame(800);
+    try {
+      const pop = frame.contentDocument.getElementById("explain-pop");
+      for (const [action, width] of [["dict", 480], ["translate", 420], ["explain", 420]]) {
+        pop.dataset.action = action;
+        assert(Math.abs(pop.getBoundingClientRect().width - width) < 1, action + ": unexpected shell width");
+      }
+    } finally { frame.remove(); }
+  });
 })();
 </script></body></html>

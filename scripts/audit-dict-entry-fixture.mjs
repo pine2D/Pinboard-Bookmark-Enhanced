@@ -88,7 +88,14 @@ export async function openDictEntryState(page, state) {
   }
   if (state === 'details') {
     await page.locator('.xp-dict-ai-details > summary').first().click();
-    return page.locator('.xp-dict-ai-details[open] .xp-dict-rel').isVisible();
+    const details = page.locator('.xp-dict-ai-details[open]').first();
+    await details.locator('.xp-dict-rel').waitFor({ state: 'visible' });
+    // The scenario audits the opened state. User-triggered folds now animate;
+    // wait for their actual endpoint rather than sampling the first frame.
+    await details.evaluate(async node => {
+      await Promise.all(node.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
+    });
+    return details.locator('.xp-dict-rel').isVisible();
   }
   if (state === 'cached') {
     const before = await page.evaluate(() => ({ calls: window._auditDictEntry.calls, reads: window._auditDictEntry.reads }));

@@ -226,6 +226,7 @@ function pbpLibMeasureScrollbar() {
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!$id("lib-tab-vocab")) return;
+  pbpInitDictDisclosures($id("vocab-ref-result"));
   // Hydrate declarative icon slots (same contract as options.js/popup.js):
   // static PBP_ICONS constants only, never page content.
   document.querySelectorAll(".btn-ic[data-ic]").forEach(s => { s.innerHTML = PBP_ICONS[s.dataset.ic] || ""; });

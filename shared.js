@@ -3238,6 +3238,53 @@ function pbpScrollIntoView(el, opts) {
   el.scrollIntoView(pbpPrefersReducedMotion() ? { ...opts, behavior: "instant" } : opts);
 }
 
+// Arm dictionary disclosure transitions only for a direct pointer toggle.
+// Native <details> keeps its keyboard/focus semantics; initial restoration,
+// programmatic updates and keyboard activation remain immediate. CSS owns the
+// animation (library: flow height; reader: opacity with one endpoint layout),
+// so no per-frame measurement or style writes are needed here.
+const _pbpDictDisclosureRoots = new WeakSet();
+function pbpInitDictDisclosures(root) {
+  if (!root || _pbpDictDisclosureRoots.has(root)) return;
+  _pbpDictDisclosureRoots.add(root);
+  const timers = new WeakMap();
+  const pending = new WeakMap();
+  const clear = (details) => {
+    clearTimeout(timers.get(details));
+    timers.delete(details);
+    pending.delete(details);
+    details.classList.remove("dict-motion");
+  };
+  const releaseFocus = (details, summary) => {
+    const active = root.ownerDocument.activeElement;
+    if (details.contains(active) && !summary?.contains(active)) summary?.focus({ preventScroll: true });
+  };
+  root.addEventListener("click", (event) => {
+    const summary = event.target?.closest?.("summary");
+    const details = summary?.parentElement;
+    if (!details?.matches("details.xp-dict-ai-details") || !root.contains(details)
+      || event.defaultPrevented || event.button !== 0) return;
+    const control = event.target.closest("button, a, input, select, textarea");
+    if (control && summary.contains(control)) return;
+    clearTimeout(timers.get(details));
+    pending.set(details, !details.open);
+    if (details.open) releaseFocus(details, summary);
+    const animate = event.detail > 0 && !pbpPrefersReducedMotion()
+      && root.ownerDocument.documentElement.classList.contains("motion-ready");
+    details.classList.toggle("dict-motion", animate);
+    if (animate) timers.set(details, setTimeout(() => clear(details), 400));
+    else timers.delete(details);
+  }, true);
+  root.addEventListener("toggle", (event) => {
+    const details = event.target;
+    if (!details?.matches?.("details.xp-dict-ai-details") || !root.contains(details)) return;
+    if (!details.open) releaseFocus(details, details.querySelector(":scope > summary"));
+    // A programmatic update must not inherit a recent pointer animation gate.
+    if (pending.get(details) !== details.open) clear(details);
+    else pending.delete(details);
+  }, true);
+}
+
 // Pinboard token shape check, shared by the options field warning and the
 // popup login gate so the two ends of the same format contract cannot drift:
 // username:TOKEN, both parts non-empty, no whitespace, key >= 8 chars.

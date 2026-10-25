@@ -1528,7 +1528,9 @@ function _pbpDictEntryMount(host, opts) {
   else panel.appendChild(controls);
   panel.append(status, content); host.appendChild(panel);
   let settings = null, record = null, busy = false, active = null, epoch = 0, mode = "dictionary", viewRevision = 0;
-  let usageCategory = "collocations", usageTopic = "", usageOpen = false, lastAdded = "";
+  let usageCategory = "collocations", usageTopic = "";
+  let renderedBase = "", baseDetails = null, baseRetry = null, usageForm = null;
+  const supplementNodes = new Map();
   const preference = () => typeof pbpDictDefaultView === "function" ? pbpDictDefaultView(settings) :
     settings?.dictDefaultView || (settings?.dictAiAutoGenerate === true ? "ai-generate" : "ai-saved");
   const alive = () => !opts.signal?.aborted && panel.isConnected && opts.isCurrent();
@@ -1552,40 +1554,47 @@ function _pbpDictEntryMount(host, opts) {
     action(toggle, mode === "ai" ? "dictEntryShowDictionary" : "dictEntryShowAi", mode === "ai" ? "bookOpenText" : "sparkles");
     opts.onView?.(mode);
   };
-  const render = (value, answerLanguage, reveal = true) => {
+  const render = (value, answerLanguage, reveal = true, revealSupplement = "") => {
     record = value;
     const norm = pbpDictEntryNorm(record, answerLanguage);
-    _pbpDictRenderEntry(content, norm, opts.term, opts.lang, opts.term, "");
-    if (!record.entry.meanings.length) {
-      const empty = document.createElement("p"); empty.className = "xp-dict-msg";
-      empty.textContent = t("dictEntryNoEntry"); content.prepend(empty);
+    // Supplement receipts and additions do not change the paid base entry.
+    // Retaining these nodes also retains open disclosures and reading position.
+    const baseKey = JSON.stringify([record.entry, record.provider, record.model, record.generatedAt, answerLanguage]);
+    if (baseKey !== renderedBase) {
+      const wasOpen = baseDetails?.open || false;
+      _pbpDictRenderEntry(content, norm, opts.term, opts.lang, opts.term, "");
+      if (!record.entry.meanings.length) {
+        const empty = document.createElement("p"); empty.className = "xp-dict-msg";
+        empty.textContent = t("dictEntryNoEntry"); content.prepend(empty);
+      }
+      const details = document.createElement("details"); details.className = "xp-dict-ai-details";
+      const summary = document.createElement("summary");
+      summary.textContent = t(record.entry.etymology || record.entry.relatedWords.length ? "dictEntryDetails" : "dictEntrySource");
+      details.appendChild(summary);
+      if (record.entry.etymology) {
+        const p = document.createElement("p"); p.lang = answerLanguage.lang; p.dir = "auto";
+        p.textContent = record.entry.etymology; details.appendChild(p);
+      }
+      if (record.entry.relatedWords.length) {
+        const words = document.createElement("p"); words.className = "xp-dict-rel"; words.lang = opts.lang || "und"; words.dir = "auto";
+        const label = document.createElement("span"); label.lang = document.documentElement.lang || "und";
+        label.textContent = t("dictEntryRelated") + ": "; words.appendChild(label);
+        record.entry.relatedWords.forEach((word, index) => {
+          if (index) words.append(" · ");
+          if (typeof opts.onLookup !== "function") { words.append(word); return; }
+          const link = button("dictLookupSelection", "xp-dict-lemma-link");
+          link.className = "xp-dict-lemma-link"; link.textContent = word;
+          link.addEventListener("click", () => { if (alive()) opts.onLookup(word); }); words.appendChild(link);
+        });
+        details.appendChild(words);
+      }
+      const provenance = document.createElement("p"); provenance.className = "xp-dict-src";
+      provenance.textContent = [t("dictAiLabel"), record.provider, record.model,
+        new Date(record.generatedAt).toLocaleDateString()].join(" · ");
+      details.appendChild(provenance); content.appendChild(details);
+      details.open = wasOpen; baseDetails = details; renderedBase = baseKey;
     }
-    const details = document.createElement("details"); details.className = "xp-dict-ai-details";
-    const summary = document.createElement("summary");
-    summary.textContent = t(record.entry.etymology || record.entry.relatedWords.length ? "dictEntryDetails" : "dictEntrySource");
-    details.appendChild(summary);
-    if (record.entry.etymology) {
-      const p = document.createElement("p"); p.lang = answerLanguage.lang; p.dir = "auto";
-      p.textContent = record.entry.etymology; details.appendChild(p);
-    }
-    if (record.entry.relatedWords.length) {
-      const words = document.createElement("p"); words.className = "xp-dict-rel"; words.lang = opts.lang || "und"; words.dir = "auto";
-      const label = document.createElement("span"); label.lang = document.documentElement.lang || "und";
-      label.textContent = t("dictEntryRelated") + ": "; words.appendChild(label);
-      record.entry.relatedWords.forEach((word, index) => {
-        if (index) words.append(" · ");
-        if (typeof opts.onLookup !== "function") { words.append(word); return; }
-        const link = button("dictLookupSelection", "xp-dict-lemma-link");
-        link.className = "xp-dict-lemma-link"; link.textContent = word;
-        link.addEventListener("click", () => { if (alive()) opts.onLookup(word); }); words.appendChild(link);
-      });
-      details.appendChild(words);
-    }
-    const provenance = document.createElement("p"); provenance.className = "xp-dict-src";
-    provenance.textContent = [t("dictAiLabel"), record.provider, record.model,
-      new Date(record.generatedAt).toLocaleDateString()].join(" · ");
-    details.appendChild(provenance); content.appendChild(details);
-    renderSupplements(answerLanguage);
+    renderSupplements(answerLanguage, revealSupplement);
     opts.onEntry?.(norm, record, content);
     // Move focus off a disappearing action without scrolling the article.
     const hadFocus = document.activeElement === generate || document.activeElement === stop;
@@ -1595,75 +1604,120 @@ function _pbpDictEntryMount(host, opts) {
   };
   const input = (signal, isCurrent) => ({ term: opts.term, sourceLanguage: opts.lang || "und", target: target(),
     owner: opts.owner, settings, signal, isCurrent });
-  const renderSupplements = answerLanguage => {
+  const supplementId = addition => addition.id || String(addition.generatedAt);
+  const focusAddition = id => {
+    const section = supplementNodes.get(id)?.section;
+    const heading = section?.querySelector("summary");
+    if (!heading) return;
+    heading.focus({ preventScroll: true });
+    // Reveal only within the lookup's scroll owner. scrollIntoView would also
+    // move the article behind a reader bubble or scroll the whole library.
+    const scroller = content.closest(".xp-body, .vocab-detail-pane");
+    if (!scroller) return;
+    const view = scroller.getBoundingClientRect(), title = heading.getBoundingClientRect();
+    const inset = parseFloat(getComputedStyle(scroller).scrollPaddingTop) || 0;
+    const top = view.top + scroller.clientTop + inset;
+    const bottom = view.top + scroller.clientTop + scroller.clientHeight;
+    const previewBottom = Math.min(section.getBoundingClientRect().bottom, title.bottom + 32);
+    if (title.top < top) scroller.scrollTop += title.top - top;
+    else if (previewBottom > bottom) scroller.scrollTop += Math.min(previewBottom - bottom, title.top - top);
+  };
+  const renderSupplements = (answerLanguage, revealId) => {
     if (typeof pbpDictSupplementRun !== "function") return;
     if (record.archiveSaved === false) {
-      const retry = button("dictEntryRetrySave", "xp-dict-retry-save");
-      let saving = false;
-      content.appendChild(retry);
-      retry.addEventListener("click", async () => {
-        if (!alive() || busy || saving) return;
-        saving = true; retry.setAttribute("aria-disabled", "true");
-        try {
-          const saved = await pbpDictEntrySave(input(opts.signal, alive), record);
-          if (alive()) {
-            const hadFocus = document.activeElement === retry;
-            render(saved, answerLanguage, false);
-            if (hadFocus) toggle.focus({ preventScroll: true });
-          }
-        } catch (error) {
-          if (alive()) message(t("dictEntryNotCached"));
-          console.warn("[dict-entry] save retry failed:", error?.name);
-        } finally { saving = false; retry.removeAttribute("aria-disabled"); }
-      });
-    }
-    for (const addition of record.supplements || []) {
-      const section = document.createElement("details"); section.className = "xp-dict-ai-details";
-      section.dataset.supplementId = addition.id || String(addition.generatedAt);
-      section.open = section.dataset.supplementId === lastAdded;
-      const heading = document.createElement("summary");
-      heading.textContent = t("dictSupplement" + addition.category[0].toUpperCase() + addition.category.slice(1)) +
-        (addition.profile.topic ? " · " + addition.profile.topic : "");
-      const text = document.createElement("p"); text.className = "xp-dict-supplement-text";
-      text.textContent = addition.content; text.lang = answerLanguage.lang; text.dir = "auto";
-      section.append(heading, text);
-      for (const [index, source] of (addition.sources || []).entries()) {
-        const cite = document.createElement("p"); cite.className = "xp-dict-src";
-        const link = document.createElement("a"); link.textContent = `[${index + 1}] ${source.title}`;
-        link.href = source.url; link.target = "_blank"; link.rel = "noopener noreferrer";
-        cite.append(link); section.append(cite);
-        const excerpt = document.createElement("p"); excerpt.className = "xp-dict-example";
-        excerpt.textContent = source.excerpt; excerpt.lang = opts.lang || "und"; excerpt.dir = "auto";
-        section.append(excerpt);
-      }
-      const receipt = document.createElement("p"); receipt.className = "xp-dict-src";
-      receipt.textContent = [t(addition.archiveSaved === false ? "dictSupplementSaveFailed" : "dictSupplementSaved"),
-        addition.provider, addition.model, new Date(addition.generatedAt).toLocaleDateString()].join(" · ");
-      section.append(receipt);
-      if (addition.archiveSaved === false) {
-        const retry = button("dictEntryRetrySave", "xp-dict-retry-save"); section.append(retry);
+      if (!baseRetry) {
+        baseRetry = button("dictEntryRetrySave", "xp-dict-retry-save");
         let saving = false;
-        retry.addEventListener("click", async () => {
+        baseRetry.addEventListener("click", async () => {
           if (!alive() || busy || saving) return;
-          saving = true; retry.setAttribute("aria-disabled", "true");
+          saving = true; baseRetry.setAttribute("aria-disabled", "true");
           try {
-            const saved = await pbpDictSupplementSave(input(opts.signal, alive), addition);
-            if (!alive()) return;
-            const hadFocus = document.activeElement === retry;
-            record.supplements = record.supplements.map(item => item === addition ? saved : item);
-            lastAdded = saved.id; render(record, answerLanguage, false);
-            if (hadFocus) [...content.querySelectorAll("[data-supplement-id]")]
-              .find(item => item.dataset.supplementId === saved.id)?.querySelector("summary")?.focus({ preventScroll: true });
-          } catch (error) { console.warn("[dict-entry] usage save retry failed:", error?.name); }
-          finally { saving = false; retry.removeAttribute("aria-disabled"); }
+            const saved = await pbpDictEntrySave(input(opts.signal, alive), record);
+            if (alive()) {
+              const hadFocus = document.activeElement === baseRetry;
+              render(saved, answerLanguage, false);
+              if (hadFocus) toggle.focus({ preventScroll: true });
+            }
+          } catch (error) {
+            if (alive()) message(t("dictEntryNotCached"));
+            console.warn("[dict-entry] save retry failed:", error?.name);
+          } finally { saving = false; baseRetry.removeAttribute("aria-disabled"); }
         });
       }
-      content.append(section);
+      if (!baseRetry.isConnected) content.appendChild(baseRetry);
+    } else baseRetry?.remove();
+    const retained = new Set();
+    for (const addition of record.supplements || []) {
+      const id = supplementId(addition);
+      retained.add(id);
+      let item = supplementNodes.get(id);
+      if (!item) {
+        const section = document.createElement("details"); section.className = "xp-dict-ai-details";
+        section.dataset.supplementId = id;
+        const heading = document.createElement("summary");
+        const text = document.createElement("p"); text.className = "xp-dict-supplement-text"; text.dir = "auto";
+        const receipt = document.createElement("p"); receipt.className = "xp-dict-src";
+        section.append(heading, text, receipt);
+        item = { section, heading, text, receipt, sources: [], sourceKey: "", retry: null, addition };
+        supplementNodes.set(id, item);
+      }
+      item.addition = addition;
+      const { section, heading, text, receipt } = item;
+      const title = t("dictSupplement" + addition.category[0].toUpperCase() + addition.category.slice(1)) +
+        (addition.profile.topic ? " · " + addition.profile.topic : "");
+      if (heading.textContent !== title) heading.textContent = title;
+      if (text.textContent !== addition.content) text.textContent = addition.content;
+      text.lang = answerLanguage.lang;
+      const sourceKey = JSON.stringify(addition.sources || []);
+      if (sourceKey !== item.sourceKey) {
+        item.sources.forEach(node => node.remove()); item.sources = [];
+        for (const [index, source] of (addition.sources || []).entries()) {
+          const cite = document.createElement("p"); cite.className = "xp-dict-src";
+          const link = document.createElement("a"); link.textContent = `[${index + 1}] ${source.title}`;
+          link.href = source.url; link.target = "_blank"; link.rel = "noopener noreferrer";
+          cite.append(link);
+          const excerpt = document.createElement("p"); excerpt.className = "xp-dict-example";
+          excerpt.textContent = source.excerpt; excerpt.lang = opts.lang || "und"; excerpt.dir = "auto";
+          section.insertBefore(cite, receipt); section.insertBefore(excerpt, receipt);
+          item.sources.push(cite, excerpt);
+        }
+        item.sourceKey = sourceKey;
+      }
+      receipt.textContent = [t(addition.archiveSaved === false ? "dictSupplementSaveFailed" : "dictSupplementSaved"),
+        addition.provider, addition.model, new Date(addition.generatedAt).toLocaleDateString()].join(" · ");
+      if (addition.archiveSaved === false) {
+        if (!item.retry) {
+          item.retry = button("dictEntryRetrySave", "xp-dict-retry-save");
+          let saving = false;
+          item.retry.addEventListener("click", async () => {
+            if (!alive() || busy || saving) return;
+            saving = true; item.retry.setAttribute("aria-disabled", "true");
+            try {
+              const saved = await pbpDictSupplementSave(input(opts.signal, alive), item.addition);
+              if (!alive()) return;
+              const hadFocus = document.activeElement === item.retry;
+              record.supplements = record.supplements.map(value => supplementId(value) === id ? saved : value);
+              render(record, answerLanguage, false, section.open ? supplementId(saved) : "");
+              if (hadFocus) supplementNodes.get(supplementId(saved))?.heading.focus({ preventScroll: true });
+            } catch (error) { console.warn("[dict-entry] usage save retry failed:", error?.name); }
+            finally { saving = false; item.retry.removeAttribute("aria-disabled"); }
+          });
+        }
+        if (!item.retry.isConnected) section.appendChild(item.retry);
+      } else item.retry?.remove();
+      if (!section.isConnected) content.insertBefore(section, usageForm?.disclosure.isConnected ? usageForm.disclosure : null);
+      if (id === revealId) section.open = true;
     }
-    if (!configured() || !record.archiveId) return;
+    for (const [id, item] of supplementNodes) {
+      if (!retained.has(id)) { item.section.remove(); supplementNodes.delete(id); }
+    }
+    if (!configured() || !record.archiveId) { usageForm?.disclosure.remove(); return; }
+    if (usageForm) {
+      if (!usageForm.disclosure.isConnected) content.appendChild(usageForm.disclosure);
+      usageForm.refresh();
+      return;
+    }
     const disclosure = document.createElement("details"); disclosure.className = "xp-dict-ai-details xp-dict-supplement";
-    disclosure.open = usageOpen;
-    disclosure.addEventListener("toggle", () => { if (disclosure.isConnected) usageOpen = disclosure.open; });
     const summary = document.createElement("summary"); summary.textContent = t("dictEntrySupplement");
     const kind = document.createElement("select");
     kind.className = "xp-dict-supplement-kind";
@@ -1671,16 +1725,35 @@ function _pbpDictEntryMount(host, opts) {
     for (const category of PBP_DICT_SUPPLEMENT_CATEGORIES) kind.append(new Option(
       t("dictSupplement" + category[0].toUpperCase() + category.slice(1)), category));
     kind.value = usageCategory;
+    const topicLabel = document.createElement("label"); topicLabel.className = "xp-dict-supplement-label";
+    topicLabel.append(t("dictSupplementTopic"));
     const topic = document.createElement("input");
     topic.type = "text"; topic.className = "xp-dict-supplement-topic"; topic.maxLength = 120; topic.dir = "auto";
     topic.placeholder = t("dictSupplementTopicPlaceholder"); topic.setAttribute("aria-label", t("dictSupplementTopic"));
-    topic.value = usageTopic;
+    topic.value = usageTopic; topicLabel.appendChild(topic);
+    const hint = document.createElement("p"); hint.className = "xp-dict-src xp-dict-supplement-hint";
+    hint.textContent = t("dictSupplementTopicHint");
     const submit = button("dictSupplementGenerate", "xp-dict-supplement-generate");
-    const hint = document.createElement("p"); hint.className = "xp-dict-src";
-    hint.textContent = t("dictSupplementProfileHint");
+    const profile = document.createElement("p"); profile.className = "xp-dict-src xp-dict-supplement-profile";
+    const learner = pbpDictSupplementProfile(settings);
+    const values = [];
+    if (learner.nativeLanguage) values.push(t("dictSupplementNativeLanguage", learner.nativeLanguage));
+    if (learner.level) values.push(t("dictSupplementLevel", t("dictLearnerLevel" + learner.level[0].toUpperCase() + learner.level.slice(1))));
+    if (values.length) {
+      values.forEach((text, index) => {
+        if (index) profile.append(" · ");
+        const value = document.createElement("bdi"); value.textContent = text; profile.appendChild(value);
+      });
+      profile.append(" ");
+    }
+    const edit = document.createElement("a"); edit.className = "xp-dict-profile-link";
+    edit.href = "options.html#vocab-learning"; edit.target = "_blank"; edit.rel = "noopener noreferrer";
+    edit.textContent = t(values.length ? "dictSupplementProfileEdit" : "dictSupplementProfileSet");
+    edit.title = t("dictLearnerProfileHint");
+    profile.appendChild(edit);
     const sourceHint = document.createElement("p"); sourceHint.className = "xp-dict-src";
     sourceHint.textContent = t("dictSupplementSourceHint");
-    disclosure.append(summary, kind, topic, submit, hint, sourceHint); content.append(disclosure);
+    disclosure.append(summary, kind, topicLabel, hint, submit, profile, sourceHint); content.append(disclosure);
     if (typeof window.pbpEnhanceListbox === "function") {
       kind.id = "dict-supplement-kind"; kind.dataset.listbox = "float"; window.pbpEnhanceListbox(kind);
     } else kind.classList.add("xp-dict-lang");
@@ -1694,18 +1767,15 @@ function _pbpDictEntryMount(host, opts) {
       submit.textContent = t(existing() ? "dictSupplementShow" : "dictSupplementGenerate");
       sourceHint.hidden = !["culture", "literature"].includes(kind.value);
     };
-    const focusAddition = () => {
-      [...content.querySelectorAll("[data-supplement-id]")]
-        .find(section => section.dataset.supplementId === lastAdded)?.querySelector("summary")?.focus({ preventScroll: true });
-    };
+    usageForm = { disclosure, refresh };
     kind.addEventListener("change", refresh); topic.addEventListener("input", refresh); refresh();
     submit.addEventListener("click", async () => {
       if (!alive() || busy) return;
       const hit = existing();
       if (hit) {
         const hadFocus = document.activeElement === submit;
-        lastAdded = hit.id || String(hit.generatedAt); render(record, answerLanguage, false);
-        if (hadFocus) focusAddition();
+        const id = supplementId(hit); render(record, answerLanguage, false, id);
+        if (hadFocus) focusAddition(id);
         return;
       }
       const hadFocus = document.activeElement === submit;
@@ -1726,10 +1796,9 @@ function _pbpDictEntryMount(host, opts) {
         const addition = await pbpDictSupplementRun(request);
         if (!current()) return;
         record.supplements = [...(record.supplements || []).filter(item => !addition.id || item.id !== addition.id), addition];
-        lastAdded = addition.id || String(addition.generatedAt);
-        const focusStayed = document.activeElement === stop;
-        render(record, answerLanguage, false);
-        if (focusStayed) focusAddition();
+        const id = supplementId(addition), focusStayed = document.activeElement === stop;
+        render(record, answerLanguage, false, id);
+        if (focusStayed) focusAddition(id);
         message(t(addition.archiveSaved === false ? "dictSupplementSaveFailed" : "dictSupplementSaved"));
       } catch (error) {
         if (!current()) return;

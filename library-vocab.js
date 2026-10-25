@@ -1169,7 +1169,11 @@ function _pbpVocabSyncLookupSave(state) {
   const choice = state.choices.get(state.select.value);
   const id = choice && pbpDictVocabKey(state.owner, choice.language, choice.term);
   state.expectedExisting = !!id && _vocabRows.some(w => w.id === id);
-  setBtnIcon(state.button, "bookMarked", t(state.expectedExisting ? "dictUpdateVocab" : "dictSaveVocab"));
+  const saveLabel = t(state.expectedExisting ? "dictUpdateVocab" : "dictSaveVocab");
+  setBtnIcon(state.button, "bookMarked", saveLabel);
+  // Compact reference columns keep the meaning preview and show only the icon.
+  state.button.title = saveLabel;
+  state.button.setAttribute("aria-label", saveLabel);
   state.button.disabled = state.busy || !choice;
   state.select.disabled = state.busy;
   state.select.dataset.listboxHelp = t(choice ? state.manualChoice ? "dictMeaningManualHelp" : "dictMeaningDefaultHelp"

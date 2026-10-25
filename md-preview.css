@@ -2058,6 +2058,7 @@ html.motion-ready .msg-bar[data-state="busy"] { animation: msg-bar-busy-pulse 1.
   font-size: var(--panel-payload-fs);
 }
 #explain-pop:popover-open { display: flex; }
+#explain-pop[data-action="dict"] { width: min(480px, calc(100vw - 32px)); }
 html.motion-ready :is(#explain-pop, #typo-pop) {
   opacity: 0;
   translate: 0 -4px;
@@ -2387,14 +2388,31 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
   color: var(--fg-muted); transform: translateY(-1px) rotate(45deg);
 }
 .xp-dict-ai-details[open] > summary::after { transform: translateY(1px) rotate(225deg); }
+.xp-dict-ai-details[open] > summary { color: var(--fg); }
+/* A height transition here would also move the bottom-anchored popover every
+   frame. Settle layout once and fade the contents; library uses a flow fold. */
+@supports (interactivity: inert) and selector(::details-content) {
+  .xp-dict-ai-details:not([open]) > :not(summary) { interactivity: inert; }
+  .xp-dict-ai-details::details-content { opacity: 0; content-visibility: hidden; }
+  .xp-dict-ai-details[open]::details-content { opacity: 1; content-visibility: visible; }
+  .xp-dict-ai-details.dict-motion::details-content {
+    transition: opacity 180ms var(--ease-out), content-visibility 180ms allow-discrete;
+  }
+}
+.xp-dict-ai-details.dict-motion > summary::after { transition: transform 120ms var(--ease-in-out); }
+@media (prefers-reduced-motion: reduce) {
+  .xp-dict-ai-details.dict-motion::details-content,
+  .xp-dict-ai-details.dict-motion > summary::after { transition: none; }
+}
 .xp-dict-ai-details > summary:hover { color: var(--fg); background: var(--btn-hover); }
 .xp-dict-ai-details > summary:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .xp-dict-ai-details > p { margin: var(--sp-2) 0 0; }
 .xp-dict-full-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .xp-dict-ai-details > .xp-dict-src { font-size: 11px; }
 .xp-dict-supplement-text { white-space: pre-wrap; line-height: 1.55; }
-.xp-dict-supplement > .xp-dict-lang,
-.xp-dict-supplement-topic { display: block; width: 100%; box-sizing: border-box; margin-top: var(--sp-2); }
+.xp-dict-supplement > .xp-dict-lang { display: flex; align-items: center; width: 100%; min-width: 0; margin-top: var(--sp-2); font-family: inherit; line-height: 18px; }
+.xp-dict-supplement-label { display: block; margin-top: var(--sp-3); font-size: 12px; line-height: 18px; color: var(--fg-secondary); }
+.xp-dict-supplement-topic { display: block; width: 100%; box-sizing: border-box; margin-top: var(--sp-1); }
 .xp-dict-supplement-topic {
   height: 26px; padding: 0 var(--sp-2); font: inherit; font-size: 12px;
   border: 1px solid var(--border); border-radius: var(--radius-md);
@@ -2402,6 +2420,9 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 }
 .xp-dict-supplement-topic::placeholder { color: var(--fg-muted); }
 .xp-dict-supplement-topic:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.xp-dict-supplement > .xp-dict-supplement-hint { margin-top: var(--sp-1); }
+.xp-dict-supplement-profile { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); }
+.xp-dict-supplement-profile .xp-dict-profile-link { color: var(--link); }
 .xp-dict-supplement > .xp-dict-connect { margin-top: var(--sp-2); }
 .xp-dict-retry-save { margin-top: var(--sp-2); }
 .xp-foot > .xp-dict-save-meaning { flex: 1 1 100px; width: 100px; min-width: 0; max-width: 100%; white-space: nowrap; }
@@ -2411,7 +2432,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-dict-lang option { white-space: normal; overflow-wrap: anywhere; }
 /* A full-entry glossary can be much longer than a definition. Keep the menu
    near the lookup bubble, with a bounded preview and a visible source. */
-.xp-dict-save-meaning::picker(select) { width: min(420px, calc(100vw - 32px)); min-width: 0; box-sizing: border-box; scroll-padding-top: var(--xp-dict-help-height, 0px); }
+.xp-dict-save-meaning::picker(select) { width: min(480px, calc(100vw - 32px)); min-width: 0; box-sizing: border-box; scroll-padding-top: var(--xp-dict-help-height, 0px); }
 .xp-dict-choice-help { position: sticky; top: 0; z-index: 1; padding: var(--sp-2); background: var(--bg); color: var(--fg-secondary); font-size: 12px; line-height: 18px; white-space: normal; overflow-wrap: anywhere; }
 .xp-dict-save-meaning option { display: block; line-height: 18px; }
 .xp-dict-choice-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; white-space: normal; overflow-wrap: anywhere; }

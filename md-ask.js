@@ -3319,10 +3319,18 @@ const PBP_EXPLAIN_DIALOG_LABELS = Object.freeze({
 
 // Mirrors the live action onto both the action controls and dialog name.
 function _pbpExplainSyncActButtons(pop) {
+  pop.dataset.action = _pbpExplainAction;
   pop.querySelectorAll(".xp-act").forEach((btn) => {
     btn.setAttribute("aria-pressed", String(btn.dataset.action === _pbpExplainAction));
   });
   pop.setAttribute("aria-label", t(PBP_EXPLAIN_DIALOG_LABELS[_pbpExplainAction] || "explainSelection"));
+  // Dictionary has a wider reading measure. Re-clamp at the action change,
+  // including pinned cards at the right edge; no intermediate width tween.
+  if (pop.matches(":popover-open")) {
+    const rect = pop.getBoundingClientRect();
+    _pbpExplainPlace(pop, rect.left,
+      _pbpExplainAnchorBottom === null ? rect.top : _pbpExplainAnchorBottom - rect.height);
+  }
 }
 
 function _pbpExplainEnsurePop() {
@@ -3645,6 +3653,7 @@ function _pbpExplainEnsurePop() {
     _pbpExplainPlace(pop, rect.left, rect.top);
   });
   document.body.appendChild(pop);
+  pbpInitDictDisclosures(pop);
   if (typeof ResizeObserver === "function") {
     _pbpExplainResizeObserver = new ResizeObserver(() => {
       if (!pop.matches(":popover-open")) return;
