@@ -68,6 +68,18 @@ export function validateApproval(plan, approval) {
   return approval;
 }
 
+// Fixed public prices authorize only the UTC day on which they were checked.
+// A later live run needs reviewed prices, a new scope and new approval; never
+// roll an old ledger into a newly dated budget. Offline modes remain replayable.
+export function validatePriceFreshness(plan, now = Date.now()) {
+  let today;
+  try { if (Number.isFinite(now)) today = new Date(now).toISOString().slice(0, 10); } catch {}
+  const providers = Object.values(plan?.providers || {});
+  if (!today || plan?.scope !== "dictionary-four-provider-" + today || !providers.length ||
+      providers.some(provider => provider?.priceVerifiedAt !== today)) fail("price_verification_expired");
+  return true;
+}
+
 export function newLedger(plan) {
   return { schema: 1, scope: SCOPE, planHash: plan.planHash, providers: Object.fromEntries(Object.keys(plan.providers)
     .map(id => [id, { reservedMicros: 0, attempts: [], cases: {} }])) };
@@ -275,6 +287,7 @@ export async function main(argv = process.argv.slice(2)) {
       providers: Object.keys(plan.providers), cases: CASES, retryFailed: false, diagnosticOutputTokens: null } }, null, 2) + "\n");
     return;
   }
+  validatePriceFreshness(plan);
   const approvalPath = option("--approval", ""); if (!approvalPath) fail("approval_required_or_mismatched");
   const approval = validateApproval(plan, JSON.parse(readFileSync(resolve(approvalPath), "utf8")));
   mkdirSync(REPORT, { recursive: true, mode: 0o700 });

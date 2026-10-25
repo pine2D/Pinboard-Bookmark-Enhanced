@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { buildPlan, validateApproval, newLedger, validateLedger, reserveAttempt, redactText, completionMetadata } from "../scripts/dict-live-test.mjs";
+import { buildPlan, validateApproval, validatePriceFreshness, newLedger, validateLedger, reserveAttempt, redactText, completionMetadata } from "../scripts/dict-live-test.mjs";
 
 const PUBLIC = `DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-flash
@@ -43,6 +43,26 @@ test("approval binds public configuration, providers, cases and diagnostic outpu
     assert.throws(() => validateApproval(plan, { ...value, ...patch }), code("approval_required_or_mismatched"));
   }
   assert.equal(validateApproval(plan, { ...value, diagnosticOutputTokens: 8192 }).diagnosticOutputTokens, 8192);
+});
+test("fixed prices are usable only on the verification UTC day without changing the plan", () => {
+  const plan = buildPlan(PUBLIC), original = JSON.stringify(plan);
+  for (const time of ["2026-10-25T00:00:00.000Z", "2026-10-25T23:59:59.999Z"]) {
+    assert.equal(validatePriceFreshness(plan, Date.parse(time)), true);
+  }
+  for (const time of [Date.parse("2026-10-24T23:59:59.999Z"), Date.parse("2026-10-26T00:00:00.000Z"),
+    Date.parse("2027-01-01T00:00:00Z"), NaN, Infinity, 1e20]) {
+    assert.throws(() => validatePriceFreshness(plan, time), code("price_verification_expired"));
+  }
+  assert.equal(JSON.stringify(plan), original);
+});
+test("scope and every provider price must match the same verified day", () => {
+  const time = Date.parse("2026-10-25T12:00:00Z"), plan = buildPlan(PUBLIC);
+  assert.throws(() => validatePriceFreshness({ ...plan, scope: "dictionary-four-provider-2026-10-24" }, time), code("price_verification_expired"));
+  assert.throws(() => validatePriceFreshness({ ...plan, providers: {} }, time), code("price_verification_expired"));
+  for (const priceVerifiedAt of ["2026-10-24", "2026-10-26", "2026-10-25T00:00:00Z", undefined]) {
+    const changed = structuredClone(plan); changed.providers.gemini.priceVerifiedAt = priceVerifiedAt;
+    assert.throws(() => validatePriceFreshness(changed, time), code("price_verification_expired"));
+  }
 });
 test("HTTP requests and conservative money reservations persist across restart", () => {
   const dir = mkdtempSync(resolve(tmpdir(), "dict-live-ledger-test-"));
@@ -117,9 +137,10 @@ test("--plan and rejected approval never read or probe .env and never use networ
   try {
     writeFileSync(resolve(dir, "providers.env"), PUBLIC);
     const hook = resolve(dir, "guard.mjs");
-    writeFileSync(hook, `import fs from 'node:fs'; import {syncBuiltinESMExports} from 'node:module';
+    const guard = `import fs from 'node:fs'; import {syncBuiltinESMExports} from 'node:module';
       for (const name of ['readFileSync','statSync','existsSync','openSync']) { const original=fs[name]; fs[name]=function(path,...args){if(String(path).endsWith('/.env'))throw new Error('FORBIDDEN_SECRET_ACCESS');return original.call(this,path,...args);}; }
-      syncBuiltinESMExports(); globalThis.fetch=()=>{throw new Error('FORBIDDEN_NETWORK');};`);
+      syncBuiltinESMExports(); globalThis.fetch=()=>{throw new Error('FORBIDDEN_NETWORK');};`;
+    writeFileSync(hook, guard + `Date.now=()=>Date.parse('2026-10-25T12:00:00Z');`);
     const runner = resolve("scripts/dict-live-test.mjs"), args = ["--import", hook, runner, "--config-dir", dir];
     const dry = spawnSync(process.execPath, [...args, "--plan"], { encoding: "utf8" });
     assert.equal(dry.error?.code, undefined, "local subprocess could not start");
@@ -130,5 +151,15 @@ test("--plan and rejected approval never read or probe .env and never use networ
     assert.equal(denied.error?.code, undefined, "local subprocess could not start");
     assert.equal(denied.status, 1); assert.match(denied.stderr, /approval_required_or_mismatched/);
     assert.ok(!denied.stderr.includes("FORBIDDEN"));
+    // Price expiry must win even before approval validation, and before any
+    // secret access. This is an intentionally unapproved, network-blocked run.
+    writeFileSync(hook, guard + `Date.now=()=>Date.parse('2026-10-26T00:00:00Z');`);
+    const expired = spawnSync(process.execPath, [...args, "--live", "--approval", approval], { encoding: "utf8" });
+    assert.equal(expired.error?.code, undefined, "local subprocess could not start");
+    assert.equal(expired.status, 1); assert.match(expired.stderr, /price_verification_expired/);
+    assert.ok(!expired.stderr.includes("FORBIDDEN"));
+    const laterPlan = spawnSync(process.execPath, [...args, "--plan"], { encoding: "utf8" });
+    assert.equal(laterPlan.error?.code, undefined, "local subprocess could not start");
+    assert.equal(laterPlan.status, 0); assert.equal(JSON.parse(laterPlan.stdout).plan.planHash, report.plan.planHash);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
