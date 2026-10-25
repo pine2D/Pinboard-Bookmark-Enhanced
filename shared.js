@@ -50,6 +50,10 @@ function pbpVocabDriveOAuthActive(manifest) {
 // at the per-key width below (call-site CSS may override). The only exception is the
 // Obsidian brand gem. No <text> nodes ever (CJK glyphs would re-trigger the font stall).
 const PBP_ICONS = {
+  wandSparkles: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/> <path d="m14 7 3 3"/> <path d="M5 6v4"/> <path d="M19 14v4"/> <path d="M10 2v2"/> <path d="M7 8H3"/> <path d="M21 16h-4"/> <path d="M11 3H9"/></svg>',
+  sparkles: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/> <path d="M20 3v4"/> <path d="M22 5h-4"/> <path d="M4 17v2"/> <path d="M5 18H3"/></svg>',
+  bookOpenText: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/> <path d="M16 12h2"/> <path d="M16 8h2"/> <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/> <path d="M6 12h2"/> <path d="M6 8h2"/></svg>',
+  messageSquareText: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/> <path d="M13 8H7"/> <path d="M17 12H7"/></svg>',
   eye: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>',
   eyeOff: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>',
   robot: '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>',
@@ -558,7 +562,10 @@ const SETTINGS_DEFAULTS = {
   trHotkeyConfirm: true,    // reader t key asks first when the rail price is not visible / >= 5000 tokens
   dictEchoEnabled: true,    // md-vocab-echo: underline saved vocab words in the reader
   dictDefinitionLang: "",   // AI entry definitions; empty follows the interface language
-  dictAiAutoGenerate: false, // Reuse cached entries; paid generation is manual by default
+  dictAiAutoGenerate: false, // Legacy preference, read only for migration
+  dictDefaultView: "dictionary", // dictionary / ai-saved / ai-generate
+  dictLearnerNativeLanguage: "", // Optional learner profile, never inferred from interface language
+  dictLearnerLevel: "",
   dictAnkiFormat: "legacy", // Explicit opt-in uses a separate multilingual note type
   dictAnkiDeck: "Pinboard Vocab", // anki-connect: target deck for Send to Anki
   dictAnkiPort: "8765",         // anki-connect: AnkiConnect port (host stays loopback-only)
@@ -1852,7 +1859,15 @@ async function pbpDrainOfflineQueue(queueIds, { getItem, sendItem, removeItem, o
 //   tri-state whitelists, options.js's `|| 'merge'`, and loadSettings()'s
 //   object-form get against SETTINGS_DEFAULTS), so absence costs nothing but
 //   the boot-lag micro-optimization on one key.
-const PRIME_EXCLUDED_KEYS = ["bgSaveMode"];
+// Never seed the retired boolean: absence distinguishes a new installation.
+const PRIME_EXCLUDED_KEYS = ["bgSaveMode", "dictAiAutoGenerate"];
+
+function pbpDictDefaultView(settings = {}) {
+  if (["dictionary", "ai-saved", "ai-generate"].includes(settings.dictDefaultView)) return settings.dictDefaultView;
+  if (settings.dictAiAutoGenerate === true) return "ai-generate";
+  if (settings.dictAiAutoGenerate === false) return "ai-saved";
+  return "dictionary";
+}
 async function primeSettings() {
   try {
     await pbpWithSecretStorageLock(async () => {
@@ -1862,10 +1877,14 @@ async function primeSettings() {
       const keys = Object.keys(SETTINGS_DEFAULTS).filter((key) =>
         !PRIME_EXCLUDED_KEYS.includes(key)
         && (storage !== chrome.storage.sync || (key !== "exportTargets" && !API_KEY_FIELDS.includes(key))));
-      const existing = await storage.get(keys); // array form: returns only keys that are set
+      const existing = await storage.get([...keys, "dictAiAutoGenerate"]); // preserve legacy absence
       const missing = {};
       for (const k of keys) {
-        if (!(k in existing)) missing[k] = SETTINGS_DEFAULTS[k];
+        if (k in existing) continue;
+        // Sync may not have delivered an older device's preference yet. Do
+        // not manufacture a new explicit choice that would mask it later.
+        if (k === "dictDefaultView" && typeof existing.dictAiAutoGenerate !== "boolean") continue;
+        missing[k] = k === "dictDefaultView" ? pbpDictDefaultView(existing) : SETTINGS_DEFAULTS[k];
       }
       if (Object.keys(missing).length > 0) await storage.set(missing);
     });
@@ -2899,6 +2918,16 @@ async function pbpReadSettingsWithSecrets(query) {
     _settingsStorageCache = mainArea;
     try { localStorage.setItem("pp-sync-enabled", state.optSyncEnabled ? "1" : "0"); } catch (_) {}
     let settings = await mainArea.get(query);
+    // Object-form get inserts defaults, so resolve this migration from raw
+    // keys in the SAME locked storage area. Reads before startup prime and
+    // late-arriving synced legacy preferences retain their original behavior.
+    const wantsDictView = query == null || query === "dictDefaultView" ||
+      (Array.isArray(query) ? query.includes("dictDefaultView") :
+        typeof query === "object" && Object.prototype.hasOwnProperty.call(query, "dictDefaultView"));
+    if (wantsDictView) {
+      const rawView = await mainArea.get(["dictDefaultView", "dictAiAutoGenerate"]);
+      settings.dictDefaultView = pbpDictDefaultView(rawView);
+    }
     settings = await pbpResolveChunkedSettings(settings, mainArea, query);
     if (pbpSecretRoutingActive(state.optSyncEnabled, state.syncApiKeys)) {
       const requested = pbpRequestedSecretKeys(query, settings);

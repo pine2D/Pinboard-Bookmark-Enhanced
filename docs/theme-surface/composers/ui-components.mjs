@@ -811,6 +811,15 @@ export const FIELD_TARGETS = Object.freeze({
       passenger: null,
       chevron: null,
     }),
+    Object.freeze({
+      id: "lib-dict-supplement-topic",
+      rest: 'input.xp-dict-supplement-topic[type="text"]',
+      hover: 'input.xp-dict-supplement-topic[type="text"]:hover:where(:not(:focus, :disabled))',
+      focus: 'input.xp-dict-supplement-topic[type="text"]:focus:not(:disabled)',
+      placeholder: 'input.xp-dict-supplement-topic[type="text"]::placeholder',
+      passenger: null,
+      chevron: null,
+    }),
     // The fused group unit, batch bar + detail pane (COMPONENTS.md §8): the
     // shell is the value box; the text input and the two stepper cells are
     // passengers (transparent, borderless, --lib-field-fg ink). The trigger

@@ -1125,8 +1125,40 @@ function _pbpVocabSyncDictPronunciation() {
 // Choices retain the normalized source record, never dictionary DOM text.
 // A source may resolve a shorter headword (CC-CEDICT prefix matching), so
 // every option names the exact word whose definition it would save.
-function _pbpVocabLookupChoices(norm, lang) {
-  return pbpDictNormChoices(norm, lang, t("dictSource"));
+function _pbpVocabLookupChoices(norm, lang, sentence = "") {
+  const shown = norm && { ...norm, entries: pbpDictOrderForContext(norm.entries, sentence) };
+  return pbpDictNormChoices(shown, lang, t("dictSource"));
+}
+
+function _pbpVocabLookupChoiceIdentity(choice) {
+  return choice ? JSON.stringify([choice.term, choice.language, choice.gloss, choice.ipa,
+    choice.sourceUrl, choice.license, choice.definitionLang, choice.sourceLabel, choice.packId]) : "";
+}
+
+function _pbpVocabSelectLookupDefault(state) {
+  if (!state.select) return;
+  let selected = "";
+  if (state.manualChoice) {
+    selected = [...state.choices].find(([, choice]) => _pbpVocabLookupChoiceIdentity(choice) === state.manualChoice)?.[0] || "";
+    // A removed/replaced source must not silently turn the next Save click
+    // into collecting a different definition. A fresh query resets this guard.
+    if (!selected) { state.manualChoice = ""; state.choiceRevoked = true; }
+  } else if (!state.choiceRevoked) {
+    // Match the rendered order: multilingual packs, legacy local source,
+    // then online. Arrival timing must not decide a word's default definition.
+    const rank = source => source.startsWith("pack:") ? 0 : source === "local" ? 1 : 2;
+    const visible = [...state.sources].filter(([source]) => (source === "ai") === (state.view === "ai"))
+      .sort(([a], [b]) => rank(a) - rank(b));
+    const first = visible.flatMap(([, choices]) => choices)[0];
+    const savedId = first && pbpDictVocabKey(state.owner, first.language, first.term);
+    // Existing vocabulary keeps its own definition until an explicit choice.
+    if (first && !_vocabRows.some(row => row.id === savedId)) {
+      const identity = _pbpVocabLookupChoiceIdentity(first);
+      selected = [...state.choices].find(([, choice]) => _pbpVocabLookupChoiceIdentity(choice) === identity)?.[0] || "";
+    }
+  }
+  state.select.value = selected;
+  _pbpVocabSyncLookupSave(state);
 }
 
 function _pbpVocabSyncLookupSave(state) {
@@ -1147,9 +1179,11 @@ function _pbpVocabAcceptLookupResult(state, source, norm) {
     state.dictionaryTerm = norm.word;
     state.syncHeading?.();
   }
-  state.sources.set(source, _pbpVocabLookupChoices(norm, state.lang));
+  state.sources.set(source, _pbpVocabLookupChoices(norm, state.lang, source === "ai" ? "" : state.sentence));
   if (state.norms) { if (norm) state.norms.set(source, norm); else state.norms.delete(source); }
   if (![...state.sources.values()].some(rows => rows.length)) {
+    state.choices.clear();
+    _pbpVocabSelectLookupDefault(state);
     state.panel?.remove(); state.panel = null;
     return;
   }
@@ -1175,11 +1209,14 @@ function _pbpVocabAcceptLookupResult(state, source, norm) {
     panel.append(label, definition, button, feedback);
     Object.assign(state, { panel, select: definition, button, feedback });
     state.host.insertBefore(panel, state.host.querySelector(".vocab-ref-foot"));
-    definition.addEventListener("change", () => _pbpVocabSyncLookupSave(state));
+    definition.addEventListener("change", () => {
+      state.manualChoice = _pbpVocabLookupChoiceIdentity(state.choices.get(definition.value));
+      state.choiceRevoked = !state.manualChoice;
+      _pbpVocabSyncLookupSave(state);
+    });
     button.addEventListener("click", () => _pbpVocabSaveLookup(state));
     window.pbpEnhanceListbox?.(definition);
   }
-  const selected = state.select.value;
   state.choices.clear();
   state.select.replaceChildren(new Option(t("vocabSaveDefinitionLabel"), ""));
   for (const [kind, choices] of state.sources) {
@@ -1191,8 +1228,7 @@ function _pbpVocabAcceptLookupResult(state, source, norm) {
       state.select.appendChild(option);
     });
   }
-  state.select.value = state.choices.has(selected) ? selected : "";
-  _pbpVocabSyncLookupSave(state);
+  _pbpVocabSelectLookupDefault(state);
 }
 
 async function _pbpVocabSaveLookup(state) {
@@ -1300,7 +1336,7 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
   _pbpDictCurrent = cur;
   const host = $id("vocab-ref-result");
   host?.querySelector(".vocab-save-controls")?.remove();
-  const state = { owner: _vocabCurrentOwner, lang, host, intent, sources: new Map(), choices: new Map(), norms: new Map(), busy: false };
+  const state = { owner: _vocabCurrentOwner, lang, sentence, host, intent, sources: new Map(), choices: new Map(), norms: new Map(), busy: false };
   state.live = () => _pbpDictCurrent === cur && _pbpVocabDictChildCtrl === child && !signal.aborted &&
     _vocabCurrentOwner === state.owner && !!host?.contains(onlineEl);
   cur.isCurrent = state.live;
@@ -1329,13 +1365,13 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
       controlsHost.appendChild(lookup);
     }
   }
-  // AI is one source in the same lookup view. A late result adds choices,
-  // but never changes the definition already selected for saving.
+  // AI is one source in the same lookup view. Default collection follows
+  // that view; an explicit selection survives later results and view changes.
   const entryView = _pbpDictEntryMount(host, { term, lang, owner: state.owner, signal,
     dictionaryHost, controlsHost,
     isCurrent: state.live, settings: pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS),
     onSettingsChange: () => { if (state.live()) cur.rerun(); },
-    onView: mode => { state.view = mode; state.syncHeading(); },
+    onView: mode => { state.view = mode; state.syncHeading(); _pbpVocabSelectLookupDefault(state); },
     onEntry: norm => {
       if (!state.live()) return;
       _pbpVocabAcceptLookupResult(state, "ai", norm);

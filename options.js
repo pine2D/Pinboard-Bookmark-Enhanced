@@ -1933,7 +1933,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     vocab: {
       fields: {
         "dict-echo-enabled": true,
-        "dict-ai-auto-generate": false,
+        "dict-default-view": "dictionary",
+        "dict-learner-native-language": "", "dict-learner-level": "",
         "dict-definition-lang": "", "dict-definition-lang-custom": "",
         "dict-anki-format": "legacy",
         "dict-anki-deck": "Pinboard Vocab",
@@ -2823,12 +2824,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-preview-ai-enabled": s.previewAiEnabled !== false,
     "opt-preview-skim": s.previewSkimEnabled === true,
     "opt-tr-hotkey-confirm": s.trHotkeyConfirm !== false,
-    "dict-echo-enabled": s.dictEchoEnabled === true,
-    "dict-ai-auto-generate": s.dictAiAutoGenerate === true
+    "dict-echo-enabled": s.dictEchoEnabled === true
   };
   for (const [id, val] of Object.entries(checkMap)) {
     const el = $id(id);
     if (el) el.checked = val;
+  }
+  if ($id("dict-default-view")) $id("dict-default-view").value = pbpDictDefaultView(s);
+  if ($id("dict-learner-native-language")) $id("dict-learner-native-language").value = typeof s.dictLearnerNativeLanguage === "string" ? s.dictLearnerNativeLanguage.slice(0, 80) : "";
+  if ($id("dict-learner-level")) $id("dict-learner-level").value = ["beginner", "intermediate", "advanced"].includes(s.dictLearnerLevel) ? s.dictLearnerLevel : "";
+  // These values land after the generic field-map sync above.
+  for (const id of ["dict-default-view", "dict-learner-level"]) {
+    if ($id(id)) window.pbpListboxSync?.($id(id));
   }
   // ---- Preview AI: translation target language (select + custom free-text) ----
   // Stored value is either an option code or a free-text language name; map it
@@ -3664,7 +3671,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       trHotkeyConfirm: $id("opt-tr-hotkey-confirm").checked,
       dictEchoEnabled: $id("dict-echo-enabled").checked,
       dictDefinitionLang: resolveDictDefinitionLang(),
-      dictAiAutoGenerate: $id("dict-ai-auto-generate").checked,
+      dictDefaultView: pbpDictDefaultView({ dictDefaultView: $id("dict-default-view").value }),
+      dictLearnerNativeLanguage: $id("dict-learner-native-language").value.replace(/[\p{Cc}\p{Cf}]/gu, "").trim().slice(0, 80),
+      dictLearnerLevel: ["beginner", "intermediate", "advanced"].includes($id("dict-learner-level").value) ? $id("dict-learner-level").value : "",
       dictAnkiFormat: $id("dict-anki-format").value === "multilingual" ? "multilingual" : "legacy",
       dictAnkiDeck: $id("dict-anki-deck").value.trim(),
       dictAnkiPort: $id("dict-anki-port").value.trim(),

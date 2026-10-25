@@ -2,7 +2,9 @@
 // handwritten data; production request guards, parser, cache and UI run unchanged.
 // No request reaches a real provider and no permission prompt is opened.
 export async function installDictEntryFixture(page) {
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
+    await chrome.storage.local.set({ dictDefaultView: "ai-saved" });
+    if (typeof _pbpExplainSettings === "object" && _pbpExplainSettings) _pbpExplainSettings.dictDefaultView = "ai-saved";
     _pbpDictHasPerm = async () => true;
     _pbpDictCacheGet = async () => null;
     _pbpDictFetch = async (lang, term) => ({ status: 200, data: {
@@ -15,6 +17,15 @@ export async function installDictEntryFixture(page) {
     ensureAIHostPermissionWithGesture = async () => true;
     const cache = new Map();
     window._auditDictEntry = { entered: false, release: null, fail: false, calls: 0, reads: 0, cache };
+    // Exercise the production archive against a fresh, isolated database. A
+    // scenario reset discards only its fixture store, never the user's archive.
+    window._auditDictEntry.resetArchive = async () => {
+      if (_pbpDictArchiveStore) await _pbpDictArchiveStore.close();
+      _pbpDictArchiveStore = pbpCreateDictArchiveStore({ dbName: "dict-render-" + crypto.randomUUID(), readLegacy: async () => [] });
+      const read = _pbpDictArchiveStore.read;
+      _pbpDictArchiveStore.read = async input => { window._auditDictEntry.reads++; return read(input); };
+    };
+    await window._auditDictEntry.resetArchive();
     pbpAiCacheGet = async key => {
       window._auditDictEntry.reads++;
       return cache.has(key) ? structuredClone(cache.get(key)) : null;
@@ -76,7 +87,7 @@ export async function openDictEntryState(page, state) {
     return page.locator('.xp-dict-ai-switch:not([hidden])').isVisible();
   }
   if (state === 'details') {
-    await page.locator('.xp-dict-ai-details > summary').click();
+    await page.locator('.xp-dict-ai-details > summary').first().click();
     return page.locator('.xp-dict-ai-details[open] .xp-dict-rel').isVisible();
   }
   if (state === 'cached') {
@@ -89,8 +100,9 @@ export async function openDictEntryState(page, state) {
     return result.isVisible();
   }
   if (state === 'error') {
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       window._auditDictEntry.cache.clear();
+      await window._auditDictEntry.resetArchive();
       Object.assign(window._auditDictEntry, { fail: true, entered: false, release: null });
     });
     await rerunLookup(page);

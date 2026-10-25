@@ -3409,10 +3409,10 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "Une fois connecté, cet appareil synchronise avec Google Drive le vocabulaire, les surlignages et les notes du compte Pinboard actuel. La connexion ne concerne que cet appareil. Google Drive ne synchronise ni les paramètres ni les identifiants."
+      "message": "Une fois connecté, cet appareil synchronise le vocabulaire, les surlignages, les notes et les entrées IA complètes avec leurs compléments pour le compte Pinboard actuel. La connexion ne concerne que cet appareil. Google Drive ne synchronise ni les réglages ni les identifiants."
     },
     "vocabDriveDisclosure": {
-      "message": "Les copies dans le dossier appDataFolder de Google Drive sont en texte clair, sans chiffrement de bout en bout. Elles peuvent contenir des mots, des définitions, des extraits surlignés, des notes, des URL sources, des titres et des dates."
+      "message": "Les copies dans le dossier privé appDataFolder de Google Drive sont en texte clair, sans chiffrement de bout en bout. Elles peuvent contenir des mots, définitions, entrées IA et compléments, profils d’apprentissage utilisés, citations, notes, URL sources, titres et dates."
     },
     "vocabDriveLoading": {
       "message": "Chargement de l'état de la synchronisation Google Drive…"
@@ -4536,7 +4536,47 @@
   "dictEntryRelated": {"message": "Mots associés"},
   "dictEntryShowDictionary": {"message": "Voir le dictionnaire"},
   "dictEntryShowAi": {"message": "Voir l’entrée IA"},
-  "dictEntryNotCached": {"message": "Cette entrée n’a pas pu être mise en cache sur cet appareil."},
+  "dictEntryNotCached": {"message": "Impossible d’enregistrer cette entrée. Gardez cette recherche ouverte et réessayez l’enregistrement."},
   "dictAiAutoGenerateLabel": {"message": "Générer automatiquement les entrées IA"},
-  "dictAiAutoGenerateHint": {"message": "Si aucune entrée IA n’est en cache, le modèle IA de la page Lecture en génère une lors de la recherche. Cela consomme des jetons. Désactivé par défaut ; la génération manuelle reste disponible."}
+  "dictAiAutoGenerateHint": {"message": "Si aucune entrée IA n’est en cache, le modèle IA de la page Lecture en génère une lors de la recherche. Cela consomme des jetons. Désactivé par défaut ; la génération manuelle reste disponible."},
+  "dictDefaultViewLabel": {"message": "Affichage initial du dictionnaire"},
+  "dictDefaultViewHint": {"message": "Les entrées IA enregistrées sont réutilisées. Seul le mode « générer si nécessaire » lance automatiquement une requête consommant des jetons. Changer de source pendant une recherche ne modifie pas ce réglage."},
+  "dictDefaultDictionary": {"message": "Dictionnaire en priorité"},
+  "dictDefaultAiSaved": {"message": "IA en priorité, entrées enregistrées"},
+  "dictDefaultAiGenerate": {"message": "IA en priorité, générer si nécessaire"},
+  "dictLearnerNativeLanguageLabel": {"message": "Langue maternelle (facultatif)"},
+  "dictLearnerNativeLanguagePlaceholder": {"message": "Par exemple : espagnol"},
+  "dictLearnerProfileHint": {"message": "Utilisée uniquement pour adapter les comparaisons et les exemples lorsque vous demandez un complément. Ne change pas la langue des définitions et ne déclenche aucune génération automatique."},
+  "dictLearnerLevelLabel": {"message": "Niveau de langue (facultatif)"},
+  "dictLearnerLevelUnspecified": {"message": "Non précisé"},
+  "dictLearnerLevelBeginner": {"message": "Débutant"},
+  "dictLearnerLevelIntermediate": {"message": "Intermédiaire"},
+  "dictLearnerLevelAdvanced": {"message": "Avancé"},
+  "dictEntrySupplement": {"message": "Compléter les usages"},
+  "dictSupplementCategory": {"message": "Contenu à ajouter"},
+  "dictSupplementCollocations": {"message": "Associations de mots et expressions"},
+  "dictSupplementConfusables": {"message": "Mots à ne pas confondre"},
+  "dictSupplementRegister": {"message": "Registre et usages régionaux"},
+  "dictSupplementGrammar": {"message": "Points de grammaire"},
+  "dictSupplementScenarios": {"message": "Exemples en situation"},
+  "dictSupplementCulture": {"message": "Culture et usages sur Internet"},
+  "dictSupplementLiterature": {"message": "Exemples littéraires"},
+  "dictSupplementTopic": {"message": "Thème ou situation (facultatif)"},
+  "dictSupplementTopicPlaceholder": {"message": "Par exemple : travail, voyage ou jeux"},
+  "dictSupplementGenerate": {"message": "Générer le complément"},
+  "dictSupplementGenerating": {"message": "Génération du complément…"},
+  "dictSupplementSaved": {"message": "Enregistré sur cet appareil"},
+  "dictSupplementSaveFailed": {"message": "Impossible d’enregistrer le complément. Gardez cette recherche ouverte et réessayez l’enregistrement."},
+  "dictEntrySyncing": {"message": "Vérification des entrées IA synchronisées…"},
+  "dictEntrySyncFailed": {"message": "Impossible de vérifier les entrées synchronisées. Relancez la synchronisation avant de générer pour éviter de consommer deux fois des jetons."},
+  "dictSupplementNoSources": {"message": "Aucune source appropriée trouvée. Aucune requête IA n’a été envoyée."},
+  "dictSupplementSources": {"message": "Sources"},
+  "dictSupplementUnavailable": {"message": "Impossible de générer le complément. Réessayez."},
+  "dictSupplementSourceHint": {"message": "La littérature et la culture utilisent des sources publiques. Sans source, aucun contenu n’est généré. Les autres catégories utilisent des exemples pédagogiques rédigés par l’IA."},
+  "dictSupplementProfileHint": {"message": "Utilise la langue maternelle et le niveau indiqués dans les réglages du dictionnaire."},
+  "dictEntryRetrySave": {"message": "Réessayer l’enregistrement"},
+  "dictSupplementShow": {"message": "Voir les usages enregistrés"},
+  "driveDictionaryStatus": {"message": "Entrées IA : $STATUS$", "placeholders": {"status": {"content": "$1"}}},
+  "driveDictionaryErrorEntryTooLarge": {"message": "Une entrée IA est trop volumineuse pour être synchronisée. La copie locale est conservée. Cliquez sur « Synchroniser maintenant » pour réessayer."},
+  "dictSupplementUnsupported": {"message": "L’IA n’a pas pu fournir de complément étayé. Une requête IA a bien été effectuée."}
 }

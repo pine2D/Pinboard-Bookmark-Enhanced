@@ -38,7 +38,7 @@ A Chrome extension for [Pinboard](https://pinboard.in): AI tags and summaries, a
 - **Keep questions and answers with their citations**: export completed conversations on their own or alongside the article
 - **Look up words as you read**: see dictionary definitions and pronunciation; send saved words to Anki or Eudic in one click, or add offline Chinese-English and English-Chinese dictionaries. Choose the language for AI entry definitions independently of the interface, and filter saved words by language.
 - **Multilingual offline dictionaries**: look up words on this device with definitions and readings from Yomitan v3 ZIP files you import; dictionary packs are excluded from Drive sync and JSON backups. All offline dictionaries, including Chinese–English and English–Chinese, can be disabled without removing their data.
-- **AI dictionary entries**: generate definitions, pronunciation and examples in your preferred explanation language, then reuse the entry from the local cache. Word origins and related words are available in the details. Automatic generation is off by default.
+- **AI dictionary entries**: generate reusable definitions, pronunciation and examples in your preferred explanation language. Full entries and optional usage notes are saved; connecting Google Drive lets you reuse them on another device. Choose dictionary or AI as the initial view; automatic generation is optional.
 - **Explain selected text in context**: use Explain to understand a word or passage in the current article; dictionary entries describe its general meanings and usage.
 - **A full page for notes and vocabulary**: saved words and highlights in one place, with dictionary lookup and batch management. Save words straight from dictionary results, choose a definition, and link related word forms through an editable base form. Each word keeps its own notes and learning status.
 - **Vocabulary exports**: choose a separate multilingual Anki note type to distinguish the same spelling in different languages. Complete TSV keeps notes, base forms and every context with its source; the original six-field formats remain available
@@ -58,7 +58,7 @@ A Chrome extension for [Pinboard](https://pinboard.in): AI tags and summaries, a
 ### Make Pinboard yours
 - **13 themes for pinboard.in** (Dracula · Nord · Catppuccin · Solarized · …) plus your own custom CSS
 - **Auto-archive to the [Wayback Machine](https://web.archive.org)**: snapshot each page you save, so it stays readable after the original link dies
-- **Backup and sync**: Chrome Sync for settings, your own Google Drive for vocabulary and highlights, and a JSON file that backs up all of it
+- **Backup and sync**: Chrome Sync for settings, your own Google Drive for vocabulary, highlights, notes and AI dictionary entries; JSON backups cover settings, vocabulary, highlights and notes
 - **9 languages** · configurable shortcuts · local-first storage · zero tracking
 
 ![13 themes for pinboard.in](docs/screenshots/readme/themes.webp)
@@ -80,7 +80,7 @@ After installing, click the toolbar icon → paste your [Pinboard API token](htt
 
 No tracking, no analytics, no telemetry. For new users, settings and credentials stay on this device by default. Ordinary settings sync is enabled separately on each device. Credential sync is one Chrome-account-wide choice, but only devices with settings sync enabled participate; other devices continue using local credentials. New users start with credential sync off, while upgrades keep it on when non-empty credentials already exist in Chrome Sync to avoid data loss. When enabled, API keys, tokens, passwords, and export credentials are shared through Chrome Sync and are obfuscated, not encrypted. Saved bookmarks, page content, and the offline queue never enter Chrome Sync. AI requests come **only** from AI features you turn on or use, and go directly to the provider you configured. At install time, only Pinboard access is granted. Any other site the extension needs (an AI provider, an export or archive destination, a dictionary, Google Drive, video subtitles, or the sites in a Batch Save) is requested one exact site at a time, the first time you use that feature. Custom network endpoints must use HTTPS; HTTP is allowed only for `localhost`, `127.0.0.1`, and `[::1]`. Extension pages enforce a strict Content-Security-Policy (no remote code). Full policy: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
-Google Drive connects separately on each device and syncs the current Pinboard account's vocabulary, highlights, and notes. Drive copies are plaintext in the private appDataFolder and are not end-to-end encrypted.
+Google Drive connects separately on each device and syncs the current Pinboard account’s vocabulary, highlights, notes, and complete AI dictionary entries with their supplements. Drive copies are plaintext in the private appDataFolder and are not end-to-end encrypted. On request, literature and cultural usage supplements look up public sources on the word’s language edition of Wikisource or Wikipedia and send short excerpts to your chosen AI provider. Other usage supplements use AI-written teaching examples.
 
 Update the extension on every device that syncs vocabulary. This version reads existing vocabulary data, but older versions cannot receive vocabulary changes written by this version.
 

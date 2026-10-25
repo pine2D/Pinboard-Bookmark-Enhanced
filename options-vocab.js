@@ -184,6 +184,7 @@ function _pbpVocabDriveRenderUnavailable() {
 function _pbpVocabDriveErrorText(code, { retryAt = null, blocked = false, connected = false, scope = null } = {}) {
   let key = _pbpVocabDriveErrorKey(code);
   if (scope === "notes" && code === "entry_too_large") key = "driveNotesErrorEntryTooLarge";
+  if (scope === "dictionary" && code === "entry_too_large") key = "driveDictionaryErrorEntryTooLarge";
   // Connected, Connect is hidden and Sync now is the way on; the disconnected
   // sentence ("…then connect again") stays for the state that shows Connect.
   if (code === "pinboard_auth" && connected) key = "vocabDriveErrorPinboardAuthSync";
@@ -206,7 +207,7 @@ function _pbpVocabDriveErrorText(code, { retryAt = null, blocked = false, connec
   }
   const message = parts.join(" ");
   if (!scope) return message;
-  return t(scope === "notes" ? "driveNotesStatus" : "driveVocabularyStatus", message);
+  return t(scope === "notes" ? "driveNotesStatus" : scope === "dictionary" ? "driveDictionaryStatus" : "driveVocabularyStatus", message);
 }
 
 // The only writer of #vocab-drive-error. Identical sentences collapse to one,
@@ -250,7 +251,7 @@ function _pbpVocabDriveStatusLines(status) {
       retryAt: connection.retryAt, blocked: connection.blocked === true, connected: true
     }));
   }
-  for (const scope of ["vocabulary", "notes"]) {
+  for (const scope of ["vocabulary", "notes", "dictionary"]) {
     const row = status[scope];
     if (!row?.lastError || _PBP_DRIVE_UI_CONNECTION_CODES.has(row.lastError)) continue;
     lines.push(_pbpVocabDriveErrorText(row.lastError, {
@@ -344,9 +345,8 @@ function _pbpVocabDriveRender(status) {
     ? `${displayName} (${email})` : (displayName || email);
   const owner = $id("vocab-drive-owner");
   if (owner) owner.textContent = String(status.owner || "") || t("vocabOwnerNoAccount");
-  // One row for both datasets: the worker reports the EARLIER of the two
-  // lastSuccessAt values, null while either has never synced -- "both were in
-  // sync as of this time".
+  // One row for all datasets: the worker reports the earliest lastSuccessAt,
+  // null until every dataset has synced successfully.
   const lastSuccess = $id("vocab-drive-last-success");
   if (lastSuccess) lastSuccess.textContent = _pbpVocabDriveDate(status.lastSuccessAt) || t("vocabDriveNever");
   const noticeText = _pbpVocabDriveNoticeText(status);
@@ -379,7 +379,7 @@ function _pbpVocabDriveResponseLines(response, status) {
   const connected = status?.connected === true;
   const lines = [];
   const reported = new Set();
-  for (const scope of ["vocabulary", "notes"]) {
+  for (const scope of ["vocabulary", "notes", "dictionary"]) {
     const result = response?.results?.[scope];
     const code = result && result.ok !== true ? result.error : null;
     if (!code || _PBP_DRIVE_UI_SILENT_CODES.has(code) || _PBP_DRIVE_UI_CONNECTION_CODES.has(code)) continue;

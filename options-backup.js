@@ -37,6 +37,8 @@ const PBP_BACKUP_ENUMS = Object.freeze({
   aiContentSource: ["local", "jina"],
   mdExportImagePolicy: ["keep", "alt", "strip"],
   selectionTrigger: ["icon", "hotkey", "off"],
+  dictDefaultView: ["dictionary", "ai-saved", "ai-generate"],
+  dictLearnerLevel: ["", "beginner", "intermediate", "advanced"],
 });
 
 // Per-provider preview model overrides: keys must look like provider ids and
@@ -148,9 +150,15 @@ function pbpSanitizeBackupSettings(data, exportableKeys) {
       throw pbpBackupValueError(key);
     }
     if (PBP_BACKUP_ENUMS[key] && !PBP_BACKUP_ENUMS[key].includes(value)) throw pbpBackupValueError(key);
+    if (key === "dictLearnerNativeLanguage" && (value.length > 80 || /[\p{Cc}\p{Cf}]/u.test(value))) throw pbpBackupValueError(key);
     if (key === "popupWidth" && (value < 420 || value > 720)) throw pbpBackupValueError(key);
     if (key === "aiCacheDuration" && (value < 0 || value > 10080)) throw pbpBackupValueError(key);
     safe[key] = value;
+  }
+  // Old backups express the default view with only the boolean. Restore that
+  // intent even if this device has already saved the replacement preference.
+  if (exportableKeys.includes("dictDefaultView") && !("dictDefaultView" in safe) && typeof safe.dictAiAutoGenerate === "boolean") {
+    safe.dictDefaultView = pbpDictDefaultView(safe);
   }
   return safe;
 }

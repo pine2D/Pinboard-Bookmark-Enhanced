@@ -149,7 +149,7 @@ async function loadLocale(loc) {
   // Per-locale exemptions: a word that is genuinely the same in that one
   // language, so the key stays checked everywhere else.
   const LOCALE_SAME_OK = {
-    fr: new Set(["libraryCountPages", "libraryCountPagesOne", "readerBookmarkNotes", "askExportSources", "mdExportArticle", "mdExportSummaryArticle"]), // These words are also French
+    fr: new Set(["libraryCountPages", "libraryCountPagesOne", "readerBookmarkNotes", "askExportSources", "dictSupplementSources", "mdExportArticle", "mdExportSummaryArticle"]), // These words are also French
     pl: new Set(["askExportModel"]), // "Model" is also Polish
   };
   for (const loc of ["de","fr","pl","ru","zh_HK"]) {
@@ -903,7 +903,7 @@ async function loadLocale(loc) {
     const DRIVE_ZH_CN = {
       // 2026-10-19: one word for "this device" across the Drive copy (此设备,
       // the panel's own status lines), retiring the spec's 本机.
-      vocabDriveScope: "连接后，此设备与 Google Drive 同步当前 Pinboard 账号的生词、高亮与笔记。只对此设备生效；Google Drive 不同步设置和凭据。",
+      vocabDriveScope: "连接后，本设备会同步当前 Pinboard 账号的生词、高亮、笔记及完整 AI 词条和补充用法。连接仅对本设备生效，Google Drive 不同步设置或凭据。",
       vocabDriveWorking: "正在与 Google Drive 同步…",
       vocabDriveSynced: "已与 Google Drive 同步。",
       vocabDriveErrorNetwork: "无法连接 Google 服务，可能是网络中断或代理未覆盖 googleapis.com。",

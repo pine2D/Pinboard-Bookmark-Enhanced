@@ -3409,10 +3409,10 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "连接后，此设备与 Google Drive 同步当前 Pinboard 账号的生词、高亮与笔记。只对此设备生效；Google Drive 不同步设置和凭据。"
+      "message": "连接后，本设备会同步当前 Pinboard 账号的生词、高亮、笔记及完整 AI 词条和补充用法。连接仅对本设备生效，Google Drive 不同步设置或凭据。"
     },
     "vocabDriveDisclosure": {
-      "message": "Google Drive appDataFolder 中的副本以明文保存，未经端到端加密，可能包含生词、释义、高亮摘录、笔记、来源网址、标题和时间。"
+      "message": "Google Drive 私有 appDataFolder 中的副本是明文，未经端到端加密。内容可包括生词、释义、AI 词条及补充、生成补充时使用的学习者资料、引用摘录、笔记、来源网址、标题和时间。"
     },
     "vocabDriveLoading": {
       "message": "正在读取 Google Drive 同步状态…"
@@ -4530,7 +4530,47 @@
   "dictEntryRelated": {"message": "相关词"},
   "dictEntryShowDictionary": {"message": "查看词典"},
   "dictEntryShowAi": {"message": "查看 AI 词条"},
-  "dictEntryNotCached": {"message": "未能将此词条缓存到本机。"},
+  "dictEntryNotCached": {"message": "词条未能保存。请保留此查词窗口，重试保存。"},
   "dictAiAutoGenerateLabel": {"message": "自动生成 AI 词条"},
-  "dictAiAutoGenerateHint": {"message": "查词时若没有已缓存的 AI 词条，使用阅读器 AI 模型生成，会消耗 tokens。默认关闭，仍可手动生成。"}
+  "dictAiAutoGenerateHint": {"message": "查词时若没有已缓存的 AI 词条，使用阅读器 AI 模型生成，会消耗 tokens。默认关闭，仍可手动生成。"},
+  "dictDefaultViewLabel": {"message": "查词默认显示"},
+  "dictDefaultViewHint": {"message": "优先复用已保存的 AI 词条。只有“缺少时自动生成”会自动消耗 token。查词时切换来源不会改变此设置。"},
+  "dictDefaultDictionary": {"message": "优先显示词典"},
+  "dictDefaultAiSaved": {"message": "优先显示 AI，仅使用已有词条"},
+  "dictDefaultAiGenerate": {"message": "优先显示 AI，缺少时自动生成"},
+  "dictLearnerNativeLanguageLabel": {"message": "母语（可选）"},
+  "dictLearnerNativeLanguagePlaceholder": {"message": "例如：西班牙语"},
+  "dictLearnerProfileHint": {"message": "仅在手动补充用法时，用于调整对比说明和例句。不会改变释义语言，也不会自动生成内容。"},
+  "dictLearnerLevelLabel": {"message": "学习水平（可选）"},
+  "dictLearnerLevelUnspecified": {"message": "未指定"},
+  "dictLearnerLevelBeginner": {"message": "初级"},
+  "dictLearnerLevelIntermediate": {"message": "中级"},
+  "dictLearnerLevelAdvanced": {"message": "高级"},
+  "dictEntrySupplement": {"message": "补充用法"},
+  "dictSupplementCategory": {"message": "补充内容"},
+  "dictSupplementCollocations": {"message": "搭配与固定表达"},
+  "dictSupplementConfusables": {"message": "易混词辨析"},
+  "dictSupplementRegister": {"message": "语气与地区用法"},
+  "dictSupplementGrammar": {"message": "语法说明"},
+  "dictSupplementScenarios": {"message": "场景例句"},
+  "dictSupplementCulture": {"message": "文化与网络用法"},
+  "dictSupplementLiterature": {"message": "文学作品用例"},
+  "dictSupplementTopic": {"message": "主题或场景（可选）"},
+  "dictSupplementTopicPlaceholder": {"message": "例如：工作、旅行、游戏"},
+  "dictSupplementGenerate": {"message": "生成补充"},
+  "dictSupplementGenerating": {"message": "正在生成补充用法…"},
+  "dictSupplementSaved": {"message": "已保存到本机"},
+  "dictSupplementSaveFailed": {"message": "补充内容未能保存。请保留此查词窗口，重试保存。"},
+  "dictEntrySyncing": {"message": "正在检查已同步的 AI 词条…"},
+  "dictEntrySyncFailed": {"message": "未能检查已同步词条。请先重试同步，避免重复生成消耗 token。"},
+  "dictSupplementNoSources": {"message": "未找到合适的来源，未调用 AI。"},
+  "dictSupplementSources": {"message": "资料来源"},
+  "dictSupplementUnavailable": {"message": "补充用法生成失败，请重试。"},
+  "dictSupplementSourceHint": {"message": "文学与文化用法先查公开资料，未找到则不生成。其他类别使用 AI 原创教学例句。"},
+  "dictSupplementProfileHint": {"message": "使用词典设置中的母语和学习水平。"},
+  "dictEntryRetrySave": {"message": "重试保存"},
+  "dictSupplementShow": {"message": "查看已保存用法"},
+  "driveDictionaryStatus": {"message": "AI 词条：$STATUS$", "placeholders": {"status": {"content": "$1"}}},
+  "driveDictionaryErrorEntryTooLarge": {"message": "AI 词条过大，无法同步。本机内容已保留，请点击“立即同步”重试。"},
+  "dictSupplementUnsupported": {"message": "AI 未能给出有依据的补充内容。本次已调用 AI。"}
 }

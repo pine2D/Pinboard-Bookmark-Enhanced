@@ -26,6 +26,7 @@ const probe = vm.runInNewContext(`(${sourceOf(probeNode)})`);
 
 const icon = '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/></svg>';
 const bookmark = `<button class="reader-bookmark-ic" aria-label="Save">${icon}</button>`;
+const dictAction = `<button class="xp-dict-connect" aria-label="Dictionary source">${icon}</button>`;
 const ordinary = '<button>Save</button><button>Cancel</button>';
 const chips = '<button class="ask-chip">Summarize</button><button class="ask-chip">Key argument</button>';
 // Inputs and expected results are hand-written, independent of SWEEP_CFG.
@@ -52,17 +53,28 @@ const html = `<!doctype html><html><head><style>
   <div class="row" id="mixed-chips">${chips}<button>Send</button></div>
   <div class="row gap-5" id="chips-5">${chips}</div>
   <div class="row" id="ask-chips">${chips}<div class="row" id="nested-actions">${ordinary}</div></div>
+  <div class="row xp-dict-ai-controls" id="dict-icons-4">${dictAction}${dictAction}</div>
+  <div class="row xp-dict-ai-controls gap-8" id="dict-icons-8">${dictAction}${dictAction}</div>
+  <div class="row xp-dict-ai-controls" id="dict-mixed-label">${dictAction}<button class="xp-dict-connect">Generate entry</button></div>
+  <div class="row xp-dict-ai-controls" id="dict-hidden-label">${dictAction}${dictAction}<button hidden>Generate</button></div>
+  <div class="row" id="dict-outside-controls">${dictAction}${dictAction}</div>
+  <div class="row xp-dict-ai-controls" id="dict-with-nested-row">${dictAction}<div class="row" id="dict-nested-actions">${ordinary}</div></div>
 </body></html>`;
 
 let browser;
 let hits;
 const proseHits = new Map();
+const dictionaryHits = new Map();
 before(async () => {
   browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 800, height: 1000 } });
   await page.route('https://audit.test/md-preview.html', route => route.fulfill({ contentType: 'text/html', body: html }));
   await page.goto('https://audit.test/md-preview.html');
   hits = await page.evaluate(probe, cfg);
+  dictionaryHits.set('md-preview', hits);
+  await page.route('https://audit.test/library.html', route => route.fulfill({ contentType: 'text/html', body: html }));
+  await page.goto('https://audit.test/library.html');
+  dictionaryHits.set('library', await page.evaluate(probe, cfg));
   await collectProseHits();
 });
 after(async () => { await browser?.close(); });
@@ -85,6 +97,19 @@ test('chip-row exemption still leaves off-token rhythm to spacingScale', () => {
     .map(hit => [hit.prop, hit.value]).sort(), [['column-gap', 5], ['row-gap', 5]]);
   assert.ok(!hits.some(hit => hit.path === 'body > #chips-4' && hit.kind === 'spacingScale'), '4px chip-row gap is on scale');
 });
+for (const surface of ['library', 'md-preview']) {
+  for (const [id, expected] of [
+    ['dict-icons-4', []], ['dict-icons-8', ['clusterGap']],
+    ['dict-mixed-label', ['actionRowGap']], ['dict-hidden-label', []],
+    ['dict-outside-controls', ['actionRowGap']], ['dict-nested-actions', ['actionRowGap']],
+  ]) {
+    test(`dictionary icon-cluster classification: ${surface} ${id}`, () => {
+      assert.deepEqual(dictionaryHits.get(surface)
+        .filter(hit => hit.path === `#${id}` && ['actionRowGap', 'clusterGap'].includes(hit.kind))
+        .map(hit => hit.kind).sort(), expected);
+    });
+  }
+}
 
 // Reader prose uses em rhythm; the chrome spacing scale must not override it.
 // These are independent CSS fixtures, exercised at two actual font sizes.

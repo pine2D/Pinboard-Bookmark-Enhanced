@@ -2,7 +2,7 @@
 <div id="results"></div><div id="summary"></div>
 <script>
 let owner='acct_test',live=true,records=null,calls=[],saved=[],appended=[],sourceCalls=[],sourceResult=null,
-  syncResult={ok:true,connected:false},onSync=null,onAI=null,onRead=null,saveFailure=false,appendFailure=false,permission=true;
+  syncResult={ok:true,connected:false},onSync=null,onAI=null,onRead=null,saveFailure=false,appendFailure=false,permission=true,usageAnswer=' {"content":"A useful original example."} ';
 const MODEL={word:'faraway',language:'en',pronunciation:'',meanings:[{partOfSpeech:'adjective',definition:'distant',examples:[]}],etymology:'',relatedWords:[]};
 const ORIGINAL={entry:MODEL,provider:'old-provider',model:'old-model',generatedAt:100,archiveId:'a'.repeat(64),supplements:[],archiveSaved:true,cacheSaved:true,cached:true};
 const SOURCE={batchcomplete:'',query:{searchinfo:{totalhits:332},search:[{ns:0,title:'The Gardener (Tagore)/5',pageid:3645304,snippet:'I am restless. I am athirst for <span class="searchmatch">faraway</span> things.'}]}};
@@ -12,12 +12,12 @@ async function pbpVocabCurrentOwner(){return owner;}
 async function pbpDictArchiveRead(input){if(onRead)await onRead(input);return records;}
 async function pbpDictArchiveSave(input){if(saveFailure)throw new Error('write failed');saved.push(input);return records={...input.record,archiveId:'a'.repeat(64),archiveSaved:true,cacheSaved:true,supplements:records?.supplements||[]};}
 async function pbpDictArchiveAppend(input){if(appendFailure)throw new Error('write failed');appended.push(input);const row={...input,id:'b'.repeat(64),archiveSaved:true};records.supplements.push(row);return row;}
-async function callAI(settings,prompt,options){await options.beforeRequest();calls.push({settings,prompt,options});if(onAI)await onAI();return prompt.includes('language-learning supplement')?' {"content":"A useful original example."} ':JSON.stringify(MODEL);}
+async function callAI(settings,prompt,options){await options.beforeRequest();calls.push({settings,prompt,options});if(onAI)await onAI();return prompt.includes('language-learning supplement')?usageAnswer:JSON.stringify(MODEL);}
 function hasAIKey(){return true;}
 async function fetch(url,options){sourceCalls.push({url,options});return {ok:true,text:async()=>JSON.stringify(sourceResult)};}
 </script><script src="../dict-entry.js"></script><script>
 let pass=0,fail=0;
-function reset(){owner='acct_test';live=true;records=null;calls=[];saved=[];appended=[];sourceCalls=[];sourceResult=structuredClone(SOURCE);syncResult={ok:true,connected:false};onSync=null;onAI=null;onRead=null;saveFailure=false;appendFailure=false;permission=true;}
+function reset(){owner='acct_test';live=true;records=null;calls=[];saved=[];appended=[];sourceCalls=[];sourceResult=structuredClone(SOURCE);syncResult={ok:true,connected:false};onSync=null;onAI=null;onRead=null;saveFailure=false;appendFailure=false;permission=true;usageAnswer=JSON.stringify({content:"A useful original example."});}
 function request(extra={}){return {term:'faraway',sourceLanguage:'en',target:{name:'Chinese',lang:'zh-Hans'},owner:'acct_test',isCurrent:()=>live,signal:new AbortController().signal,settings:{aiProvider:'gemini',geminiModel:'new-model'},...extra};}
 function existing(){records=structuredClone(ORIGINAL);}
 async function rejects(fn,code){try{await fn();return false;}catch(e){return e.code===code||e.name===code;}}
@@ -56,6 +56,7 @@ await test('saved supplements remain readable while new generation is disabled',
 await test('two concurrent entry requests share one paid generation',async()=>{const result=await Promise.all([pbpDictEntryRun(request()),pbpDictEntryRun(request())]);return calls.length===1&&saved.length===1&&result.every(r=>r.archiveId);});
 await test('two concurrent matching supplements share one paid generation',async()=>{existing();const result=await Promise.all([pbpDictSupplementRun(request({category:'grammar'})),pbpDictSupplementRun(request({category:'grammar'}))]);return calls.length===1&&appended.length===1&&result.every(r=>r.archiveSaved);});
 await test('readonly restore downloads previously paid content without configured AI',async()=>{onSync=async()=>existing();const r=await pbpDictEntryRestore(request({settings:{previewAiEnabled:false}}));return r.archiveId&&calls.length===0;});
+await test('unsupported generated usage reports that AI was called, not a no-source miss',async()=>{existing();usageAnswer='{"content":""}';return await rejects(()=>pbpDictSupplementRun(request({category:'grammar'})),'unsupported_usage')&&calls.length===1&&appended.length===0;});
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();
 </script>

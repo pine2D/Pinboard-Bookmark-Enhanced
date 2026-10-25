@@ -734,7 +734,7 @@ function pbpLibDriveLine(status, currentOwner) {
   const owner = typeof status.owner === "string" && status.owner && typeof pbpDictOwnerScope === "function"
     ? pbpDictOwnerScope(status.owner) : "";
   if (!owner || owner !== currentOwner) return null;
-  const errors = [status.connection, status.vocabulary, status.notes]
+  const errors = [status.connection, status.vocabulary, status.notes, status.dictionary]
     .map((part) => part && part.lastError)
     .filter((code) => typeof code === "string" && code && code !== "not_connected");
   if (errors.length) return { kind: "problem", text: t("libraryDriveProblem") };

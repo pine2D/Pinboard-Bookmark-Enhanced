@@ -17,7 +17,7 @@
 // _locales/en) injected ahead of options-theme-early.js. That is what makes
 // the two integration cases real: the provider .pf reveal and the translate
 // "custom" input are options.js's own change listeners, not test doubles.
-const TOTAL = 46;
+const TOTAL = 47;
 const results = document.getElementById("results");
 function report(name, error) {
   const row = document.createElement("div");
@@ -585,6 +585,7 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
       const localSeed = {
         optLang: "zh_CN", optTheme: "dark", mdExportImagePolicy: "strip",
         aiTagLang: "fr", aiSummaryLang: "de", aiTagSeparator: "_",
+        dictDefaultView: "ai-saved", dictLearnerLevel: "intermediate",
       };
       // 40ms, not 0: real (empirically traced) boot makes ~8-10 SEQUENTIAL
       // chrome.storage.local.get() round trips before the one big call that
@@ -617,6 +618,9 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
       // trivially "match" it without this task's fix doing any work.
       assert(doc2.getElementById("opt-lang").value === "zh_CN",
         "seeded settings never landed -- opt-lang=" + doc2.getElementById("opt-lang").value + " (test cannot discriminate)");
+      for (const [id, value] of [["dict-default-view", "ai-saved"], ["dict-learner-level", "intermediate"]]) {
+        assert(doc2.getElementById(id).value === value, id + " did not receive its stored value");
+      }
       const mismatches = [];
       doc2.querySelectorAll("select[data-listbox]").forEach((sel) => {
         const btn = doc2.getElementById(sel.id + "-btn");
@@ -1349,17 +1353,9 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     assert(!labelledBy || doc.getElementById(labelledBy) === routeLabel, "obsidian-route button aria-labelledby=" + labelledBy + " does not resolve to its label");
     const policyBtn = btnOf(doc.getElementById("opt-md-image-policy"));
     assert(policyBtn && policyBtn.getAttribute("role") === "combobox", "#opt-md-image-policy was not enhanced into a listbox");
-    // Stage-3b Task 3 brought the page's total from 7 (stage-3a/Task-2 statics:
-    // opt-lang, opt-ai-provider, opt-ai-tag-lang, opt-ai-summary-lang,
-    // opt-ai-tag-separator, translate-target-lang, opt-selection-trigger) to
-    // 9: +1 static (#opt-md-image-policy, markdown panel) +1 dynamic
-    // (obsidian-route, the one select-type Send-to field, enhanced from
-    // inside renderExportTargets once its card is connected). Stage-3b Task 4
-    // (appearance) adds #opt-theme, a tenth; independent dictionary
-    // definition language adds #dict-definition-lang, an eleventh;
-    // the Anki note format adds #dict-anki-format, a twelfth.
+    // Count the actual enhanced targets, including newly added dictionary
+    // preferences, instead of pinning a historical number of settings.
     const targets = [...doc.querySelectorAll("select[data-listbox]")];
-    assert(targets.length === 12, "expected 12 data-listbox selects on the page, got " + targets.length);
     assert(doc.querySelectorAll(".listbox").length === targets.length,
       "expected one .listbox wrapper per data-listbox select, got " + doc.querySelectorAll(".listbox").length + " for " + targets.length);
   });

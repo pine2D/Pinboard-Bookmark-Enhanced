@@ -3409,10 +3409,10 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "連接後，這部裝置會與 Google Drive 同步目前 Pinboard 帳戶的生詞、標記與筆記。只適用於這部裝置；Google Drive 不會同步設定和憑證。"
+      "message": "連線後，此裝置會同步目前 Pinboard 帳戶的生詞、標記、筆記及完整 AI 詞條和補充用法。連線只對此裝置生效，Google Drive 不同步設定或憑證。"
     },
     "vocabDriveDisclosure": {
-      "message": "Google Drive appDataFolder 中的副本以明文儲存，未經端對端加密，可能包含生詞、釋義、標記摘錄、筆記、來源網址、標題和時間。"
+      "message": "Google Drive 私有 appDataFolder 中的副本是明文，未經端對端加密。內容可包括生詞、釋義、AI 詞條及補充、生成補充時使用的學習者資料、引用摘錄、筆記、來源網址、標題及時間。"
     },
     "vocabDriveLoading": {
       "message": "正在讀取 Google Drive 同步狀態…"
@@ -4536,7 +4536,47 @@
   "dictEntryRelated": {"message": "相關詞"},
   "dictEntryShowDictionary": {"message": "查看詞典"},
   "dictEntryShowAi": {"message": "查看 AI 詞條"},
-  "dictEntryNotCached": {"message": "未能將此詞條快取至本機。"},
+  "dictEntryNotCached": {"message": "無法儲存詞條。請保留查詞視窗，重試儲存。"},
   "dictAiAutoGenerateLabel": {"message": "自動生成 AI 詞條"},
-  "dictAiAutoGenerateHint": {"message": "查詞時若沒有已快取的 AI 詞條，會使用閱讀器 AI 模型生成，並消耗 tokens。預設關閉，仍可手動生成。"}
+  "dictAiAutoGenerateHint": {"message": "查詞時若沒有已快取的 AI 詞條，會使用閱讀器 AI 模型生成，並消耗 tokens。預設關閉，仍可手動生成。"},
+  "dictDefaultViewLabel": {"message": "查詞預設顯示"},
+  "dictDefaultViewHint": {"message": "優先重用已儲存的 AI 詞條。只有「缺少時自動生成」會自動消耗 token。查詞時切換來源不會改變這項設定。"},
+  "dictDefaultDictionary": {"message": "優先顯示詞典"},
+  "dictDefaultAiSaved": {"message": "優先顯示 AI，只使用現有詞條"},
+  "dictDefaultAiGenerate": {"message": "優先顯示 AI，缺少時自動生成"},
+  "dictLearnerNativeLanguageLabel": {"message": "母語（可選）"},
+  "dictLearnerNativeLanguagePlaceholder": {"message": "例如：西班牙語"},
+  "dictLearnerProfileHint": {"message": "只在手動補充用法時，用來調整比較說明及例句。不會改變釋義語言，也不會自動生成內容。"},
+  "dictLearnerLevelLabel": {"message": "學習程度（可選）"},
+  "dictLearnerLevelUnspecified": {"message": "未指定"},
+  "dictLearnerLevelBeginner": {"message": "初級"},
+  "dictLearnerLevelIntermediate": {"message": "中級"},
+  "dictLearnerLevelAdvanced": {"message": "高級"},
+  "dictEntrySupplement": {"message": "補充用法"},
+  "dictSupplementCategory": {"message": "補充內容"},
+  "dictSupplementCollocations": {"message": "搭配與固定表達"},
+  "dictSupplementConfusables": {"message": "易混淆詞辨析"},
+  "dictSupplementRegister": {"message": "語氣與地區用法"},
+  "dictSupplementGrammar": {"message": "語法說明"},
+  "dictSupplementScenarios": {"message": "情境例句"},
+  "dictSupplementCulture": {"message": "文化與網絡用法"},
+  "dictSupplementLiterature": {"message": "文學作品用例"},
+  "dictSupplementTopic": {"message": "主題或情境（可選）"},
+  "dictSupplementTopicPlaceholder": {"message": "例如：工作、旅行、遊戲"},
+  "dictSupplementGenerate": {"message": "生成補充"},
+  "dictSupplementGenerating": {"message": "正在生成補充用法…"},
+  "dictSupplementSaved": {"message": "已儲存到此裝置"},
+  "dictSupplementSaveFailed": {"message": "無法儲存補充內容。請保留查詞視窗，重試儲存。"},
+  "dictEntrySyncing": {"message": "正在檢查已同步的 AI 詞條…"},
+  "dictEntrySyncFailed": {"message": "無法檢查已同步詞條。請先重試同步，避免重複生成而消耗 token。"},
+  "dictSupplementNoSources": {"message": "找不到合適的來源，未呼叫 AI。"},
+  "dictSupplementSources": {"message": "資料來源"},
+  "dictSupplementUnavailable": {"message": "無法生成補充用法，請重試。"},
+  "dictSupplementSourceHint": {"message": "文學與文化用法會先查詢公開資料，找不到便不生成。其他類別使用 AI 原創教學例句。"},
+  "dictSupplementProfileHint": {"message": "使用詞典設定中的母語及學習程度。"},
+  "dictEntryRetrySave": {"message": "重試儲存"},
+  "dictSupplementShow": {"message": "查看已儲存用法"},
+  "driveDictionaryStatus": {"message": "AI 詞條：$STATUS$", "placeholders": {"status": {"content": "$1"}}},
+  "driveDictionaryErrorEntryTooLarge": {"message": "AI 詞條過大，無法同步。此裝置的內容已保留，請按「立即同步」重試。"},
+  "dictSupplementUnsupported": {"message": "AI 未能提供有依據的補充內容。本次已呼叫 AI。"}
 }

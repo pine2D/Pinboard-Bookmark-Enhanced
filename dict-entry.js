@@ -360,7 +360,7 @@ async function _pbpDictSupplementGenerate(input, request, category, profile) {
   let parsed; try { parsed = JSON.parse(response); } catch (_) {}
   if (typeof response !== "string" || response.length > 24576 || !_pbpDictEntryObject(parsed, ["content"]) ||
       !_pbpDictEntryText(parsed.content, 12000, true)) throw _pbpDictEntryError("invalid_response", "Invalid usage supplement");
-  if (!parsed.content.trim()) throw _pbpDictEntryError("no_sources", "No supported usage found");
+  if (!parsed.content.trim()) throw _pbpDictEntryError("unsupported_usage", "AI could not provide supported usage");
   const supplement = { archiveId: record.archiveId, category, profile, content: parsed.content.trim(), sources,
     provider: request.model.provider, model: request.model.model, generatedAt: Date.now() };
   try { return await pbpDictSupplementSave(input, supplement); }

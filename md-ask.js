@@ -2538,10 +2538,9 @@ let _pbpExplainAiOk = false; // live AI-availability snapshot; dict action works
 
 // Static inline SVG, consumed by the highlight selection bar's explain button
 // (md-highlight.js, _pbpHlEnsureBar) -- keep this the single source of the
-// explain glyph. `robot`, not help-circle (2026-10-19 reader critique):
-// explaining spends tokens, which the icon contract gives to robot, and a "?"
-// glyph read as the "?" shortcut-help key.
-const PBP_EXPLAIN_PILL_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.robot : "";
+// explain glyph: a text bubble describes the selected passage. Dictionary
+// generation uses the wand; the Ask conversation keeps its plain bubble.
+const PBP_EXPLAIN_PILL_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.messageSquareText : "";
 
 // Current selection if (and only if) it is explainable: non-collapsed, both
 // endpoints inside #rendered-view, and pbpExplainSelectionValid (>= 2 chars,
@@ -3086,13 +3085,8 @@ function _pbpExplainEnsurePop() {
   actGroup.className = "xp-act-group";
   actGroup.setAttribute("role", "group");
   const PBP_EXPLAIN_ACTION_LABELS = { explain: "explainActionExplain", translate: "explainActionTranslate", dict: "explainActionDict" };
-  // Icon-only segments (icon audit P0): robot / A-with-glyph / open book,
-  // the same trio the highlight card wears. Explain is the robot here too
-  // (critique 2026-10-19): it is the same paid call the selection bar's
-  // robot pill starts, and a speech bubble sat beside the footer's "ask"
-  // bubble with a different meaning. Labels ride title/aria; the selected
-  // segment is carried by the aria-pressed fill, not text weight.
-  const PBP_EXPLAIN_ACTION_ICONS = { explain: PBP_ICONS.robot, translate: PBP_ICONS.translate, dict: PBP_ICONS.book };
+  // Labels ride title/aria; the selected segment is carried by aria-pressed.
+  const PBP_EXPLAIN_ACTION_ICONS = { explain: PBP_ICONS.messageSquareText, translate: PBP_ICONS.translate, dict: PBP_ICONS.book };
   ["explain", "translate", "dict"].forEach((action) => {
     const actBtn = document.createElement("button");
     actBtn.type = "button";

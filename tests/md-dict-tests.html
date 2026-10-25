@@ -1966,7 +1966,7 @@ async function runMultiPackIntegrationTests() {
 
 async function runDictionaryEntryUiTests() {
   section("Reusable AI entries in the shared lookup view");
-  const names=["pbpDictEntryRead","pbpDictEntryRun","hasAIKey","ensureAIHostPermissionWithGesture","uiLangToBCP47","PBP_ICONS","pbpAiBumpCounter"];
+  const names=["chrome","pbpDictEntryRead","pbpDictEntryRun","pbpDictSupplementRun","hasAIKey","ensureAIHostPermissionWithGesture","uiLangToBCP47","PBP_ICONS","pbpAiBumpCounter"];
   const saved=new Map(names.map(name=>[name,window[name]]));
   const fixtures=[];let reads=[],calls=[],grants=0,view=[],selected=[],lookups=[],uiLanguage="en";
   const settings={aiProvider:"fixture",previewAiEnabled:true,dictDefinitionLang:"es",dictAiAutoGenerate:false};
@@ -1980,7 +1980,7 @@ async function runDictionaryEntryUiTests() {
     return {root,host,dict,ctrl,ui};
   };
   try {
-    Object.assign(window,{hasAIKey:()=>true,ensureAIHostPermissionWithGesture:async()=>{grants++;},uiLangToBCP47:()=>uiLanguage,PBP_ICONS:Object.fromEntries(["filePen","arrowRightLeft","stop","gear"].map(name=>[name,'<svg viewBox="0 0 24 24" aria-hidden="true"></svg>'])),pbpAiBumpCounter:()=>{},
+    Object.assign(window,{hasAIKey:()=>true,ensureAIHostPermissionWithGesture:async()=>{grants++;},uiLangToBCP47:()=>uiLanguage,PBP_ICONS:Object.fromEntries(["wandSparkles","bookOpenText","sparkles","stop","gear"].map(name=>[name,'<svg viewBox="0 0 24 24" aria-hidden="true"></svg>'])),pbpAiBumpCounter:()=>{},
       pbpDictEntryRead:async input=>{reads.push(input);return null;},pbpDictEntryRun:async input=>{calls.push(input);return record();}});
     const multi = record();
     multi.entry.meanings.push({partOfSpeech:"sustantivo",definition:"A second meaning",examples:[]});
@@ -2068,6 +2068,77 @@ async function runDictionaryEntryUiTests() {
     const external = document.createElement("div");
     const outsideControls = mount({controlsHost: external}); outsideControls.root.appendChild(external); await outsideControls.ui.ready;
     check("the shared entry can place its controls in the caller's toolbar without duplicating them in its content", external.querySelectorAll(".xp-dict-ai-controls").length === 1 && !outsideControls.host.querySelector(".xp-dict-ai-controls"));
+    window.pbpDictEntryRead=async()=>record({cached:true});
+    const dictionaryFirst=mount({settings:{...settings,dictDefaultView:"dictionary"}});await dictionaryFirst.ui.ready;
+    check("dictionary-first keeps a saved AI entry available without taking over",!dictionaryFirst.dict.hidden&&!dictionaryFirst.host.querySelector('.xp-dict-ai-switch').hidden);
+    const savedFirst=mount({settings:{...settings,dictDefaultView:"ai-saved"}});await savedFirst.ui.ready;
+    check("saved-AI-first opens an existing record without a paid call",savedFirst.dict.hidden);
+    window.pbpDictEntryRead=async()=>null;
+    const countBeforeMissing=calls.length;
+    const missingSaved=mount({settings:{...settings,dictDefaultView:"ai-saved"}});await missingSaved.ui.ready;
+    check("saved-AI-first falls back to dictionary without automatically generating",!missingSaved.dict.hidden&&calls.length===countBeforeMissing);
+    const pendingAutomatic=mount({settings:{...settings,dictDefaultView:"ai-generate"}});await settle();
+    check("automatic generation offers the dictionary switch while it is pending",!pendingAutomatic.host.querySelector('.xp-dict-ai-switch').hidden&&pendingAutomatic.dict.hidden);
+    pendingAutomatic.host.querySelector('.xp-dict-ai-switch').click();release(record());await pendingAutomatic.ui.ready;
+    check("late automatic completion respects the user's explicit dictionary view",!pendingAutomatic.dict.hidden&&pendingAutomatic.host.querySelector('.xp-dict-ai-content').hidden);
+    const normal=pbpDictEntryNorm(record(),{lang:"es"});normal.aiGenerated=false;normal.sourceLabel="ECDICT";
+    const firstBox=document.createElement('div'),lastBox=document.createElement('div');dictionaryFirst.root.append(firstBox,lastBox);
+    const choiceState={lang:"de",queryTerm:"Gift",entryView:"dictionary",meaningSources:new Map([["local",{norm:normal,choices:pbpDictNormChoices(normal,"de"),box:firstBox}]])};
+    _pbpDictApplyVisibleChoice(choiceState);
+    check("local-only dictionary hits provide a usable default meaning",choiceState.gloss.includes("veneno")&&choiceState.term==="Gift");
+    const earlier={...normal,sourceLabel:"First pack",entries:structuredClone(normal.entries)};earlier.entries[0].senses[0].definition="First visible source";
+    choiceState.meaningSources=new Map([["later",{norm:normal,choices:pbpDictNormChoices(normal,"de"),box:lastBox}],["earlier",{norm:earlier,choices:pbpDictNormChoices(earlier,"de"),box:firstBox}]]);
+    _pbpDictApplyVisibleChoice(choiceState);
+    check("default dictionary meaning follows visible source order rather than network arrival",choiceState.gloss==="First visible source");
+    choiceState.packChoice=pbpDictNormChoices(normal,"de")[0];_pbpDictApplyVisibleChoice(choiceState);
+    check("an explicitly chosen meaning survives subsequent source arrivals",choiceState.gloss.includes("veneno"));
+    choiceState.packChoice=null;choiceState.entryView="ai";choiceState.aiNorm=pbpDictEntryNorm(record(),{lang:"es"});_pbpDictApplyVisibleChoice(choiceState);
+    check("AI view defaults to the first AI definition",choiceState.license.startsWith("AI-generated"));
+    window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[]});
+    const usage=mount();await usage.ui.ready;
+    check("saved AI entry has one collapsed supplement entry",usage.host.querySelectorAll('.xp-dict-supplement').length===1&&!usage.host.querySelector('.xp-dict-supplement').open);
+    check("supplement categories cover the seven accepted learning uses",usage.host.querySelector('.xp-dict-supplement-kind').options.length===7);
+    check("supplement topic has an accessible optional field with a bounded length",usage.host.querySelector('.xp-dict-supplement-topic').getAttribute('aria-label')==='dictSupplementTopic'&&usage.host.querySelector('.xp-dict-supplement-topic').maxLength===120);
+    let resolveUsage;
+    window.pbpDictSupplementRun=()=>new Promise(resolve=>{resolveUsage=resolve;});
+    const addition={id:'b'.repeat(64),category:'collocations',profile:{nativeLanguage:'',level:'',topic:''},content:'An original example',sources:[],provider:'fixture',model:'fixture-model',generatedAt:1700000000000,archiveSaved:true};
+    usage.host.querySelector('.xp-dict-supplement').open=true;await settle();
+    let submit=usage.host.querySelector('.xp-dict-supplement-generate');submit.focus();submit.click();await settle();
+    check("supplement generation preserves a visible keyboard target on Stop",document.activeElement===usage.host.querySelector('.xp-dict-ai-stop'));
+    resolveUsage(addition);await settle();
+    check("completed supplement moves keyboard focus to its own summary",document.activeElement===usage.host.querySelector('[data-supplement-id] > summary'));
+    submit=usage.host.querySelector('.xp-dict-supplement-generate');submit.focus();submit.click();
+    check("viewing existing usage keeps keyboard focus on the opened result",document.activeElement===usage.host.querySelector('[data-supplement-id] > summary'));
+    const topicInput=usage.host.querySelector('.xp-dict-supplement-topic');topicInput.value='work';topicInput.dispatchEvent(new Event('input'));
+    submit=usage.host.querySelector('.xp-dict-supplement-generate');submit.focus();submit.click();await settle();
+    outside.focus();resolveUsage({...addition,id:'c'.repeat(64),profile:{...addition.profile,topic:'work'}});await settle();
+    check("supplement completion never steals focus after the user moves elsewhere",document.activeElement===outside);
+    window.pbpDictSupplementRun=async()=>{throw new Error('fixture failure');};
+    const nextTopic=usage.host.querySelector('.xp-dict-supplement-topic');nextTopic.value='travel';nextTopic.dispatchEvent(new Event('input'));
+    submit=usage.host.querySelector('.xp-dict-supplement-generate');submit.focus();submit.click();await settle();
+    check("failed supplement returns keyboard focus to its retryable action",document.activeElement===submit&&!submit.disabled);
+    window.pbpDictSupplementRun=()=>new Promise(resolve=>{resolveUsage=resolve;});submit.click();await settle();usage.host.querySelector('.xp-dict-ai-stop').focus();usage.host.querySelector('.xp-dict-ai-stop').click();resolveUsage(addition);await settle();
+    check("stopping a supplement leaves focus on a visible control",document.activeElement===usage.host.querySelector('.xp-dict-ai-switch')&&!document.activeElement.hidden);
+    const messageListeners=[];
+    window.chrome={runtime:{onMessage:{addListener:listener=>messageListeners.push(listener),removeListener:listener=>{const i=messageListeners.indexOf(listener);if(i>=0)messageListeners.splice(i,1);}}}};
+    let remoteReads=0,remoteRecord=record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[]});
+    window.pbpDictEntryRead=async()=>{remoteReads++;return structuredClone(remoteRecord);};
+    const remote=mount({settings:{...settings,dictDefaultView:"dictionary"}});await remote.ui.ready;
+    const notify=messageListeners.at(-1),beforeForeign=remoteReads;
+    notify({type:'PBP_DICT_ARCHIVE_SYNCED',owner:'acct_other'});await settle();
+    check("archive broadcasts from another account do not read or display its data",remoteReads===beforeForeign);
+    remoteRecord.supplements=[addition];notify({type:'PBP_DICT_ARCHIVE_SYNCED',owner:'ownerless'});await settle();
+    check("synced additions arrive without switching the user's dictionary view",!remote.dict.hidden&&remote.host.querySelectorAll('[data-supplement-id]').length===1);
+    remote.ui.show('ai');remote.host.querySelector('.xp-dict-supplement').open=true;await settle();
+    const editing=remote.host.querySelector('.xp-dict-supplement-topic');editing.focus();const beforeEditing=remoteReads;
+    notify({type:'PBP_DICT_ARCHIVE_SYNCED',owner:'ownerless'});await settle();
+    check("passive sync does not rebuild a supplement form while the user edits it",document.activeElement===editing&&remoteReads===beforeEditing);
+    remoteRecord=record({archiveSaved:false,cacheSaved:false,supplements:[]});
+    const unpaidWrite=mount();await unpaidWrite.ui.ready;const beforeFailedWrite=remoteReads;
+    messageListeners.at(-1)({type:'PBP_DICT_ARCHIVE_SYNCED',owner:'ownerless'});await settle();
+    check("a passive sync cannot overwrite paid output whose local save failed",remoteReads===beforeFailedWrite&&!!unpaidWrite.host.querySelector('.xp-dict-retry-save'));
+    const beforeClose=messageListeners.length;remote.ctrl.abort();
+    check("closing lookup removes its archive sync listener",messageListeners.length===beforeClose-1);
     outsideControls.ctrl.abort();
     check("aborting a lookup removes controls mounted in the external toolbar", external.childElementCount === 0 && !outsideControls.ui.controls.isConnected);
 

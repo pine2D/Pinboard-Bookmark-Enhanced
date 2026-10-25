@@ -1125,7 +1125,7 @@ delete document.documentElement.dataset.theme;
       check(`display matrix: ${name}`, misses.length === 0, misses.join(" | "));
     };
     const NO_INSTRUCTION = ["vocabDriveConnectRequired", "vocabDriveSyncNowRequired"];
-    const NO_SUBJECT = ["driveVocabularyStatus", "driveNotesStatus"];
+    const NO_SUBJECT = ["driveVocabularyStatus", "driveNotesStatus", "driveDictionaryStatus"];
     // Simplest miss: paint the kept connection record (Disconnect does not
     // clear driveConnState, spec §3.3) or a kept dataset block while disconnected.
     matrixRow("not connected shows nothing but Connect, even with kept failure records", [
@@ -1221,6 +1221,21 @@ delete document.documentElement.dataset.theme;
         state:"vocabDriveConnected", buttons:"-++", has:["driveNotesStatus:vocabDriveStatusFailed"],
         not:["vocabDriveSyncNowRequired", "vocabDriveErrorLocalStore", "driveVocabularyStatus"] }
     ]);
+
+    matrixRow("AI entry dataset errors keep their own subject and recovery", [
+      { label:"archive blocked", status:withDataset("dictionary", { lastError:"corrupt", blocked:true }),
+        state:"vocabDriveConnected", buttons:"-++", has:["driveDictionaryStatus:vocabDriveErrorCorrupt", "vocabDriveSyncNowRequired"],
+        not:["driveVocabularyStatus", "driveNotesStatus"] },
+      { label:"archive unreadable", status:withDataset("dictionary", { lastError:"status_unavailable" }),
+        state:"vocabDriveConnected", buttons:"-++", has:["driveDictionaryStatus:vocabDriveStatusFailed"],
+        not:["vocabDriveSyncNowRequired"] },
+      { label:"archive oversized", status:withDataset("dictionary", { lastError:"entry_too_large", blocked:true }),
+        state:"vocabDriveConnected", buttons:"-++", has:["driveDictionaryStatus:driveDictionaryErrorEntryTooLarge"],
+        not:["vocabDriveErrorEntryTooLarge", "driveNotesErrorEntryTooLarge"] }
+    ]);
+    check("AI entry response failures are reported independently of vocabulary and notes",
+      _pbpVocabDriveResponseLines({ ok:false, error:"corrupt", results:{ dictionary:{ ok:false, error:"corrupt" } } }, quiet)
+        .filter(line => line.includes("driveDictionaryStatus")).length === 1);
 
     _pbpVocabDriveShowError("auth", null, true, true);
     const connectedHint = errorText();

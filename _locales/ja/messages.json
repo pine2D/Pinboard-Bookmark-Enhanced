@@ -3409,10 +3409,10 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "接続すると、このデバイスと Google Drive の間で、現在の Pinboard アカウントの単語、ハイライト、メモが同期されます。接続はこのデバイスにのみ適用されます。Google Drive では設定や認証情報は同期されません。"
+      "message": "接続すると、この端末は現在の Pinboard アカウントの単語帳、ハイライト、ノート、AI 辞書項目と追加用法を同期します。接続は端末ごとに必要です。設定や認証情報は Google Drive で同期されません。"
     },
     "vocabDriveDisclosure": {
-      "message": "Google Driveの appDataFolder に保存するコピーは平文で、エンドツーエンド暗号化されません。単語、定義、ハイライトした引用、メモ、参照元 URL、タイトル、日時が含まれる場合があります。"
+      "message": "Google Drive の非公開 appDataFolder に保存されるコピーは平文で、エンドツーエンド暗号化はされません。単語、定義、AI 項目と追加用法、追加時の学習者情報、引用、ノート、出典 URL、タイトル、日時が含まれる場合があります。"
     },
     "vocabDriveLoading": {
       "message": "Google Drive の同期状態を読み込んでいます…"
@@ -4536,7 +4536,47 @@
   "dictEntryRelated": {"message": "関連語"},
   "dictEntryShowDictionary": {"message": "辞書を見る"},
   "dictEntryShowAi": {"message": "AI辞書を見る"},
-  "dictEntryNotCached": {"message": "この辞書項目をデバイスにキャッシュできませんでした。"},
+  "dictEntryNotCached": {"message": "項目を保存できませんでした。この検索を開いたまま、保存を再試行してください。"},
   "dictAiAutoGenerateLabel": {"message": "AI辞書項目を自動生成"},
-  "dictAiAutoGenerateHint": {"message": "キャッシュにAI辞書項目がない場合、検索時にリーダーのAIモデルで生成します。トークンを消費します。初期設定ではオフですが、手動でも生成できます。"}
+  "dictAiAutoGenerateHint": {"message": "キャッシュにAI辞書項目がない場合、検索時にリーダーのAIモデルで生成します。トークンを消費します。初期設定ではオフですが、手動でも生成できます。"},
+  "dictDefaultViewLabel": {"message": "辞書検索の初期表示"},
+  "dictDefaultViewHint": {"message": "保存済みの AI 項目を再利用します。「なければ生成」の場合のみ、自動でトークンを消費します。検索中に表示を切り替えても、この設定は変わりません。"},
+  "dictDefaultDictionary": {"message": "辞書を優先"},
+  "dictDefaultAiSaved": {"message": "AI を優先（保存済みのみ）"},
+  "dictDefaultAiGenerate": {"message": "AI を優先（なければ生成）"},
+  "dictLearnerNativeLanguageLabel": {"message": "母語（任意）"},
+  "dictLearnerNativeLanguagePlaceholder": {"message": "例：スペイン語"},
+  "dictLearnerProfileHint": {"message": "用法を追加するときだけ、比較説明や例文の調整に使います。定義の言語は変わらず、自動生成も行いません。"},
+  "dictLearnerLevelLabel": {"message": "学習レベル（任意）"},
+  "dictLearnerLevelUnspecified": {"message": "指定なし"},
+  "dictLearnerLevelBeginner": {"message": "初級"},
+  "dictLearnerLevelIntermediate": {"message": "中級"},
+  "dictLearnerLevelAdvanced": {"message": "上級"},
+  "dictEntrySupplement": {"message": "用法を追加"},
+  "dictSupplementCategory": {"message": "追加する内容"},
+  "dictSupplementCollocations": {"message": "連語・定型表現"},
+  "dictSupplementConfusables": {"message": "混同しやすい語"},
+  "dictSupplementRegister": {"message": "文体・地域による用法"},
+  "dictSupplementGrammar": {"message": "文法の説明"},
+  "dictSupplementScenarios": {"message": "場面別の例文"},
+  "dictSupplementCulture": {"message": "文化・ネットでの用法"},
+  "dictSupplementLiterature": {"message": "文学作品の用例"},
+  "dictSupplementTopic": {"message": "話題・場面（任意）"},
+  "dictSupplementTopicPlaceholder": {"message": "例：仕事、旅行、ゲーム"},
+  "dictSupplementGenerate": {"message": "追加内容を生成"},
+  "dictSupplementGenerating": {"message": "用法を生成中…"},
+  "dictSupplementSaved": {"message": "この端末に保存しました"},
+  "dictSupplementSaveFailed": {"message": "追加内容を保存できませんでした。この検索を開いたまま、保存を再試行してください。"},
+  "dictEntrySyncing": {"message": "同期済みの AI 項目を確認中…"},
+  "dictEntrySyncFailed": {"message": "同期済みの項目を確認できません。二重にトークンを使わないよう、生成前に同期を再試行してください。"},
+  "dictSupplementNoSources": {"message": "適切な出典が見つかりませんでした。AI は呼び出していません。"},
+  "dictSupplementSources": {"message": "出典"},
+  "dictSupplementUnavailable": {"message": "用法を生成できませんでした。もう一度お試しください。"},
+  "dictSupplementSourceHint": {"message": "文学・文化の用法は公開資料を検索し、見つからなければ生成しません。他の種類では AI 作成の学習用例文を使います。"},
+  "dictSupplementProfileHint": {"message": "辞書設定の母語と学習レベルを使います。"},
+  "dictEntryRetrySave": {"message": "保存を再試行"},
+  "dictSupplementShow": {"message": "保存済みの用法を見る"},
+  "driveDictionaryStatus": {"message": "AI 項目：$STATUS$", "placeholders": {"status": {"content": "$1"}}},
+  "driveDictionaryErrorEntryTooLarge": {"message": "AI 項目が大きすぎるため同期できません。端末のコピーは保持されています。「今すぐ同期」で再試行してください。"},
+  "dictSupplementUnsupported": {"message": "AI は根拠のある追加説明を生成できませんでした。AI へのリクエストは実行されています。"}
 }

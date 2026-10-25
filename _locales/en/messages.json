@@ -3419,10 +3419,10 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "Once connected, this device syncs vocabulary, highlights, and notes for the current Pinboard account with Google Drive. The connection applies to this device only. Google Drive does not sync settings or credentials."
+      "message": "Once connected, this device syncs vocabulary, highlights, notes, and complete AI dictionary entries with their supplements for the current Pinboard account. The connection applies to this device only. Google Drive does not sync settings or credentials."
     },
     "vocabDriveDisclosure": {
-      "message": "Copies in your Google Drive appDataFolder are plaintext, without end-to-end encryption. They can include saved words, definitions, highlighted excerpts, notes, source URLs, titles, and timestamps."
+      "message": "Copies in your Google Drive appDataFolder are plaintext, without end-to-end encryption. They can include saved words, definitions, AI entries and supplements, learner profiles used for supplements, cited excerpts, notes, source URLs, titles, and timestamps."
     },
     "vocabDriveLoading": {
       "message": "Loading Google Drive sync status…"
@@ -4543,7 +4543,47 @@
   "dictEntryRelated": {"message": "Related words"},
   "dictEntryShowDictionary": {"message": "View dictionary"},
   "dictEntryShowAi": {"message": "View AI entry"},
-  "dictEntryNotCached": {"message": "This entry could not be cached on this device."},
+  "dictEntryNotCached": {"message": "This entry could not be saved. Keep this lookup open and retry saving."},
   "dictAiAutoGenerateLabel": {"message": "Generate AI entries automatically"},
-  "dictAiAutoGenerateHint": {"message": "When no AI entry is cached, use the reader’s AI model to generate one during lookup. Uses tokens. Off by default; you can still generate entries manually."}
+  "dictAiAutoGenerateHint": {"message": "When no AI entry is cached, use the reader’s AI model to generate one during lookup. Uses tokens. Off by default; you can still generate entries manually."},
+  "dictDefaultViewLabel": {"message": "Default lookup view"},
+  "dictDefaultViewHint": {"message": "Saved AI entries are reused. Only “generate when missing” automatically uses tokens. Switching sources during a lookup does not change this preference."},
+  "dictDefaultDictionary": {"message": "Dictionary first"},
+  "dictDefaultAiSaved": {"message": "AI first, saved entries only"},
+  "dictDefaultAiGenerate": {"message": "AI first, generate when missing"},
+  "dictLearnerNativeLanguageLabel": {"message": "Native language (optional)"},
+  "dictLearnerNativeLanguagePlaceholder": {"message": "For example, Spanish"},
+  "dictLearnerProfileHint": {"message": "Used only when you request supplementary usage. Helps tailor comparisons and examples; it does not change the definition language or trigger generation."},
+  "dictLearnerLevelLabel": {"message": "Learning level (optional)"},
+  "dictLearnerLevelUnspecified": {"message": "Not specified"},
+  "dictLearnerLevelBeginner": {"message": "Beginner"},
+  "dictLearnerLevelIntermediate": {"message": "Intermediate"},
+  "dictLearnerLevelAdvanced": {"message": "Advanced"},
+  "dictEntrySupplement": {"message": "Supplement usage"},
+  "dictSupplementCategory": {"message": "What to add"},
+  "dictSupplementCollocations": {"message": "Collocations and expressions"},
+  "dictSupplementConfusables": {"message": "Confusing words"},
+  "dictSupplementRegister": {"message": "Register and regional usage"},
+  "dictSupplementGrammar": {"message": "Grammar notes"},
+  "dictSupplementScenarios": {"message": "Examples for a situation"},
+  "dictSupplementCulture": {"message": "Culture and internet usage"},
+  "dictSupplementLiterature": {"message": "Examples from literature"},
+  "dictSupplementTopic": {"message": "Topic or situation (optional)"},
+  "dictSupplementTopicPlaceholder": {"message": "For example, at work, travel, or games"},
+  "dictSupplementGenerate": {"message": "Generate supplement"},
+  "dictSupplementGenerating": {"message": "Generating supplementary usage…"},
+  "dictSupplementSaved": {"message": "Saved on this device"},
+  "dictSupplementSaveFailed": {"message": "Could not save this supplement. Keep this lookup open and retry saving."},
+  "dictEntrySyncing": {"message": "Checking synced AI entries…"},
+  "dictEntrySyncFailed": {"message": "Could not check synced entries. Retry sync before generating to avoid spending tokens again."},
+  "dictSupplementNoSources": {"message": "No suitable sources found. No AI request was made."},
+  "dictSupplementSources": {"message": "Sources"},
+  "dictSupplementUnavailable": {"message": "Could not generate supplementary usage. Try again."},
+  "dictSupplementSourceHint": {"message": "Literature and culture use public sources. No sources, no generation. Other categories use AI-written teaching examples."},
+  "dictSupplementProfileHint": {"message": "Uses the native language and learning level in Dictionary settings."},
+  "dictEntryRetrySave": {"message": "Retry saving"},
+  "dictSupplementShow": {"message": "View saved usage"},
+  "driveDictionaryStatus": {"message": "AI entries: $STATUS$", "placeholders": {"status": {"content": "$1"}}},
+  "driveDictionaryErrorEntryTooLarge": {"message": "An AI entry is too large to sync. The local copy is kept. Click Sync now to retry."},
+  "dictSupplementUnsupported": {"message": "AI could not provide a grounded explanation. An AI request was made."}
 }

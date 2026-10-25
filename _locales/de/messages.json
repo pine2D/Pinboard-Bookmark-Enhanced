@@ -3409,10 +3409,10 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "Nach dem Verbinden synchronisiert dieses Gerät die Vokabeln, Markierungen und Notizen des aktuellen Pinboard-Kontos mit Google Drive. Die Verbindung gilt nur für dieses Gerät. Google Drive synchronisiert keine Einstellungen oder Zugangsdaten."
+      "message": "Nach dem Verbinden synchronisiert dieses Gerät Vokabeln, Markierungen, Notizen und vollständige KI-Wörterbucheinträge samt Ergänzungen des aktuellen Pinboard-Kontos. Die Verbindung gilt nur für dieses Gerät. Google Drive synchronisiert keine Einstellungen oder Zugangsdaten."
     },
     "vocabDriveDisclosure": {
-      "message": "Kopien im appDataFolder von Google Drive werden im Klartext ohne Ende-zu-Ende-Verschlüsselung gespeichert. Sie können Wörter, Definitionen, markierte Auszüge, Notizen, Quell-URLs, Titel und Zeitangaben enthalten."
+      "message": "Kopien im privaten appDataFolder von Google Drive liegen im Klartext vor, ohne Ende-zu-Ende-Verschlüsselung. Sie können Wörter, Definitionen, KI-Einträge samt Ergänzungen, dafür verwendete Lernprofile, zitierte Auszüge, Notizen, Quell-URLs, Titel und Zeitangaben enthalten."
     },
     "vocabDriveLoading": {
       "message": "Google-Drive-Synchronisierungsstatus wird geladen…"
@@ -4536,7 +4536,47 @@
   "dictEntryRelated": {"message": "Verwandte Wörter"},
   "dictEntryShowDictionary": {"message": "Wörterbuch anzeigen"},
   "dictEntryShowAi": {"message": "KI-Eintrag anzeigen"},
-  "dictEntryNotCached": {"message": "Dieser Eintrag konnte auf diesem Gerät nicht zwischengespeichert werden."},
+  "dictEntryNotCached": {"message": "Dieser Eintrag konnte nicht gespeichert werden. Lass die Suche geöffnet und versuche das Speichern erneut."},
   "dictAiAutoGenerateLabel": {"message": "KI-Einträge automatisch erstellen"},
-  "dictAiAutoGenerateHint": {"message": "Wenn kein KI-Eintrag zwischengespeichert ist, erstellt das KI-Modell der Leseansicht beim Nachschlagen einen neuen. Das verbraucht Tokens. Standardmäßig aus; Einträge lassen sich auch manuell erstellen."}
+  "dictAiAutoGenerateHint": {"message": "Wenn kein KI-Eintrag zwischengespeichert ist, erstellt das KI-Modell der Leseansicht beim Nachschlagen einen neuen. Das verbraucht Tokens. Standardmäßig aus; Einträge lassen sich auch manuell erstellen."},
+  "dictDefaultViewLabel": {"message": "Standardansicht beim Nachschlagen"},
+  "dictDefaultViewHint": {"message": "Gespeicherte KI-Einträge werden wiederverwendet. Nur „bei Bedarf erstellen“ startet automatisch eine Anfrage, die Tokens verbraucht. Ein Ansichtswechsel beim Nachschlagen ändert diese Einstellung nicht."},
+  "dictDefaultDictionary": {"message": "Wörterbuch zuerst"},
+  "dictDefaultAiSaved": {"message": "KI zuerst, nur gespeicherte Einträge"},
+  "dictDefaultAiGenerate": {"message": "KI zuerst, bei Bedarf erstellen"},
+  "dictLearnerNativeLanguageLabel": {"message": "Muttersprache (optional)"},
+  "dictLearnerNativeLanguagePlaceholder": {"message": "Zum Beispiel Spanisch"},
+  "dictLearnerProfileHint": {"message": "Wird nur beim Anfordern ergänzender Verwendungshinweise genutzt, um Vergleiche und Beispiele anzupassen. Ändert weder die Erklärungssprache noch startet es eine automatische Erstellung."},
+  "dictLearnerLevelLabel": {"message": "Sprachniveau (optional)"},
+  "dictLearnerLevelUnspecified": {"message": "Nicht angegeben"},
+  "dictLearnerLevelBeginner": {"message": "Anfänger"},
+  "dictLearnerLevelIntermediate": {"message": "Mittelstufe"},
+  "dictLearnerLevelAdvanced": {"message": "Fortgeschritten"},
+  "dictEntrySupplement": {"message": "Verwendung ergänzen"},
+  "dictSupplementCategory": {"message": "Ergänzung auswählen"},
+  "dictSupplementCollocations": {"message": "Wortverbindungen und Wendungen"},
+  "dictSupplementConfusables": {"message": "Leicht verwechselbare Wörter"},
+  "dictSupplementRegister": {"message": "Stil und regionale Verwendung"},
+  "dictSupplementGrammar": {"message": "Grammatikhinweise"},
+  "dictSupplementScenarios": {"message": "Beispiele für eine Situation"},
+  "dictSupplementCulture": {"message": "Kultur und Netzsprache"},
+  "dictSupplementLiterature": {"message": "Beispiele aus der Literatur"},
+  "dictSupplementTopic": {"message": "Thema oder Situation (optional)"},
+  "dictSupplementTopicPlaceholder": {"message": "Zum Beispiel Arbeit, Reisen oder Spiele"},
+  "dictSupplementGenerate": {"message": "Ergänzung erstellen"},
+  "dictSupplementGenerating": {"message": "Verwendungshinweise werden erstellt…"},
+  "dictSupplementSaved": {"message": "Auf diesem Gerät gespeichert"},
+  "dictSupplementSaveFailed": {"message": "Die Ergänzung konnte nicht gespeichert werden. Lass die Suche geöffnet und versuche das Speichern erneut."},
+  "dictEntrySyncing": {"message": "Synchronisierte KI-Einträge werden geprüft…"},
+  "dictEntrySyncFailed": {"message": "Synchronisierte Einträge konnten nicht geprüft werden. Versuche zuerst die Synchronisierung erneut, um nicht doppelt Tokens zu verbrauchen."},
+  "dictSupplementNoSources": {"message": "Keine geeigneten Quellen gefunden. Es wurde keine KI-Anfrage gesendet."},
+  "dictSupplementSources": {"message": "Quellen"},
+  "dictSupplementUnavailable": {"message": "Die Ergänzung konnte nicht erstellt werden. Versuche es erneut."},
+  "dictSupplementSourceHint": {"message": "Literatur und Kultur verwenden öffentliche Quellen. Ohne Quellen erfolgt keine Erstellung. Andere Kategorien verwenden KI-verfasste Lernbeispiele."},
+  "dictSupplementProfileHint": {"message": "Verwendet Muttersprache und Sprachniveau aus den Wörterbucheinstellungen."},
+  "dictEntryRetrySave": {"message": "Speichern erneut versuchen"},
+  "dictSupplementShow": {"message": "Gespeicherte Verwendung anzeigen"},
+  "driveDictionaryStatus": {"message": "KI-Einträge: $STATUS$", "placeholders": {"status": {"content": "$1"}}},
+  "driveDictionaryErrorEntryTooLarge": {"message": "Ein KI-Eintrag ist zu groß zum Synchronisieren. Die lokale Kopie bleibt erhalten. Klicke zum Wiederholen auf „Jetzt synchronisieren“."},
+  "dictSupplementUnsupported": {"message": "Die KI konnte keine fundierte Ergänzung liefern. Eine KI-Anfrage wurde ausgeführt."}
 }

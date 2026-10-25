@@ -947,6 +947,64 @@ async function run() {
     _settingsStorageCache = prevPrimeCache;
   })();
 
+  // Dictionary display upgrades preserve the actual old preference, not
+  // the false default inserted by object-form storage.get.
+  await (async () => {
+    const savedChrome = globalThis.chrome, savedCache = _settingsStorageCache;
+    const area = data => ({
+      get: async query => {
+        if (query == null) return { ...data };
+        if (typeof query === "string") return query in data ? { [query]: data[query] } : {};
+        const out = Array.isArray(query) ? {} : { ...query };
+        for (const key of Array.isArray(query) ? query : Object.keys(query)) if (key in data) out[key] = data[key];
+        return out;
+      },
+      set: async values => Object.assign(data, values),
+      remove: async keys => { for (const key of [].concat(keys)) delete data[key]; }
+    });
+    try {
+      for (const sync of [false, true]) {
+        for (const [label, initial, expected] of [
+          ["new", {}, "dictionary"],
+          ["legacy manual", { dictAiAutoGenerate: false }, "ai-saved"],
+          ["legacy automatic", { dictAiAutoGenerate: true }, "ai-generate"],
+          ["explicit", { dictDefaultView: "dictionary", dictAiAutoGenerate: true }, "dictionary"]
+        ]) {
+          const local = { optSyncEnabled: sync }, cloud = { syncApiKeys: false };
+          const active = sync ? cloud : local, inactive = sync ? local : cloud;
+          Object.assign(active, initial); inactive.dictAiAutoGenerate = !initial.dictAiAutoGenerate;
+          globalThis.chrome = { storage: { local: area(local), sync: area(cloud) } };
+          const read = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
+          check(`dictionary view ${sync ? "sync" : "local"} ${label} reads actual routed preference`, read.dictDefaultView === expected);
+          await primeSettings(); await primeSettings();
+          check(`dictionary view ${sync ? "sync" : "local"} ${label} prime preserves preference absence`,
+            (label === "new" ? !("dictDefaultView" in active) : active.dictDefaultView === expected) &&
+            !("dictDefaultView" in inactive) && (label !== "new" || !("dictAiAutoGenerate" in active)));
+          if (sync && label === "new") {
+            active.dictAiAutoGenerate = true;
+            const arrived = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
+            check("dictionary view preserves legacy sync preference arriving after fresh prime", arrived.dictDefaultView === "ai-generate");
+          }
+        }
+      }
+      const read = await pbpReadSettingsWithSecrets(["dictDefaultView"]);
+      check("dictionary view array read does not leak the legacy key", read.dictDefaultView === "dictionary" && !("dictAiAutoGenerate" in read));
+      const unrelated = await pbpReadSettingsWithSecrets({ optTheme: "auto" });
+      check("unrelated setting reads do not inject dictionary preferences", !("dictDefaultView" in unrelated));
+      const keys = Object.keys(SETTINGS_DEFAULTS);
+      check("legacy dictionary preference backup restores the equivalent new setting",
+        pbpSanitizeBackupSettings({ dictAiAutoGenerate: false }, keys).dictDefaultView === "ai-saved" &&
+        pbpSanitizeBackupSettings({ dictAiAutoGenerate: true }, keys).dictDefaultView === "ai-generate");
+      check("explicit dictionary view in a backup wins over a legacy boolean",
+        pbpSanitizeBackupSettings({ dictAiAutoGenerate: true, dictDefaultView: "dictionary" }, keys).dictDefaultView === "dictionary");
+      let rejected = 0;
+      for (const bad of [{ dictDefaultView: "auto" }, { dictLearnerLevel: "expert" }, { dictLearnerNativeLanguage: "x".repeat(81) }, { dictLearnerNativeLanguage: "en\n" }]) {
+        try { pbpSanitizeBackupSettings(bad, keys); } catch (_) { rejected++; }
+      }
+      check("dictionary backup rejects unsupported modes and unbounded learner profile", rejected === 4);
+    } finally { globalThis.chrome = savedChrome; _settingsStorageCache = savedCache; }
+  })();
+
   // ---------- E4: syncApiKeys secret routing (pure helpers) ----------
 
   // -- pbpSecretRoutingActive --

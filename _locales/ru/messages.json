@@ -3409,10 +3409,10 @@
       "message": "Google Диск"
     },
     "vocabDriveScope": {
-      "message": "После подключения это устройство синхронизирует с Google Диском словарик, выделения и заметки текущего аккаунта Pinboard. Подключение действует только на этом устройстве. Google Диск не синхронизирует настройки и учётные данные."
+      "message": "После подключения это устройство синхронизирует словарь, выделения, заметки и полные статьи ИИ с дополнениями для текущего аккаунта Pinboard. Подключение действует только на этом устройстве. Google Drive не синхронизирует настройки и учётные данные."
     },
     "vocabDriveDisclosure": {
-      "message": "Копии в папке appDataFolder на Google Диске хранятся открытым текстом, без сквозного шифрования. Они могут содержать слова, определения, выделенные фрагменты, заметки, исходные URL, заголовки и даты."
+      "message": "Копии в закрытой папке appDataFolder на Google Drive хранятся открытым текстом без сквозного шифрования. Они могут включать слова, определения, статьи ИИ и дополнения, использованные учебные профили, цитаты, заметки, исходные URL, заголовки и даты."
     },
     "vocabDriveLoading": {
       "message": "Загрузка состояния синхронизации с Google Диском…"
@@ -4536,7 +4536,47 @@
   "dictEntryRelated": {"message": "Связанные слова"},
   "dictEntryShowDictionary": {"message": "Открыть словарь"},
   "dictEntryShowAi": {"message": "Открыть статью AI"},
-  "dictEntryNotCached": {"message": "Не удалось сохранить эту статью в кеше устройства."},
+  "dictEntryNotCached": {"message": "Не удалось сохранить статью. Оставьте окно поиска открытым и повторите сохранение."},
   "dictAiAutoGenerateLabel": {"message": "Создавать статьи AI автоматически"},
-  "dictAiAutoGenerateHint": {"message": "Если статьи AI нет в кеше, при поиске её создаст модель AI для чтения. Это расходует токены. По умолчанию выключено; статьи можно создавать вручную."}
+  "dictAiAutoGenerateHint": {"message": "Если статьи AI нет в кеше, при поиске её создаст модель AI для чтения. Это расходует токены. По умолчанию выключено; статьи можно создавать вручную."},
+  "dictDefaultViewLabel": {"message": "Вид словаря по умолчанию"},
+  "dictDefaultViewHint": {"message": "Сохранённые статьи ИИ используются повторно. Только вариант «создавать недостающие» автоматически расходует токены. Переключение источника при поиске не меняет эту настройку."},
+  "dictDefaultDictionary": {"message": "Сначала словарь"},
+  "dictDefaultAiSaved": {"message": "Сначала ИИ, только сохранённые статьи"},
+  "dictDefaultAiGenerate": {"message": "Сначала ИИ, создавать недостающие"},
+  "dictLearnerNativeLanguageLabel": {"message": "Родной язык (необязательно)"},
+  "dictLearnerNativeLanguagePlaceholder": {"message": "Например: испанский"},
+  "dictLearnerProfileHint": {"message": "Используется только по запросу дополнительных пояснений, чтобы подобрать сравнения и примеры. Не меняет язык определений и не запускает автоматическую генерацию."},
+  "dictLearnerLevelLabel": {"message": "Уровень языка (необязательно)"},
+  "dictLearnerLevelUnspecified": {"message": "Не указан"},
+  "dictLearnerLevelBeginner": {"message": "Начальный"},
+  "dictLearnerLevelIntermediate": {"message": "Средний"},
+  "dictLearnerLevelAdvanced": {"message": "Продвинутый"},
+  "dictEntrySupplement": {"message": "Дополнить употребление"},
+  "dictSupplementCategory": {"message": "Что добавить"},
+  "dictSupplementCollocations": {"message": "Сочетания и устойчивые выражения"},
+  "dictSupplementConfusables": {"message": "Слова, которые легко перепутать"},
+  "dictSupplementRegister": {"message": "Стиль и региональные особенности"},
+  "dictSupplementGrammar": {"message": "Грамматические пояснения"},
+  "dictSupplementScenarios": {"message": "Примеры для ситуации"},
+  "dictSupplementCulture": {"message": "Культура и интернет-сленг"},
+  "dictSupplementLiterature": {"message": "Примеры из литературы"},
+  "dictSupplementTopic": {"message": "Тема или ситуация (необязательно)"},
+  "dictSupplementTopicPlaceholder": {"message": "Например: работа, путешествия или игры"},
+  "dictSupplementGenerate": {"message": "Создать дополнение"},
+  "dictSupplementGenerating": {"message": "Создание дополнения…"},
+  "dictSupplementSaved": {"message": "Сохранено на этом устройстве"},
+  "dictSupplementSaveFailed": {"message": "Не удалось сохранить дополнение. Оставьте окно поиска открытым и повторите сохранение."},
+  "dictEntrySyncing": {"message": "Проверка синхронизированных статей ИИ…"},
+  "dictEntrySyncFailed": {"message": "Не удалось проверить синхронизированные статьи. Сначала повторите синхронизацию, чтобы не тратить токены дважды."},
+  "dictSupplementNoSources": {"message": "Подходящие источники не найдены. Запрос к ИИ не отправлялся."},
+  "dictSupplementSources": {"message": "Источники"},
+  "dictSupplementUnavailable": {"message": "Не удалось создать дополнение. Попробуйте ещё раз."},
+  "dictSupplementSourceHint": {"message": "Литературные и культурные примеры опираются на открытые источники. Нет источников — нет генерации. Для остальных категорий ИИ составляет учебные примеры."},
+  "dictSupplementProfileHint": {"message": "Использует родной язык и уровень из настроек словаря."},
+  "dictEntryRetrySave": {"message": "Повторить сохранение"},
+  "dictSupplementShow": {"message": "Показать сохранённое употребление"},
+  "driveDictionaryStatus": {"message": "Статьи ИИ: $STATUS$", "placeholders": {"status": {"content": "$1"}}},
+  "driveDictionaryErrorEntryTooLarge": {"message": "Статья ИИ слишком велика для синхронизации. Локальная копия сохранена. Нажмите «Синхронизировать сейчас», чтобы повторить попытку."},
+  "dictSupplementUnsupported": {"message": "ИИ не смог подготовить обоснованное дополнение. Запрос к ИИ был выполнен."}
 }

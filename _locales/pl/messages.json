@@ -3409,10 +3409,10 @@
       "message": "Dysk Google"
     },
     "vocabDriveScope": {
-      "message": "Po połączeniu to urządzenie synchronizuje z Dyskiem Google słówka, zaznaczenia i notatki bieżącego konta Pinboard. Połączenie dotyczy tylko tego urządzenia. Dysk Google nie synchronizuje ustawień ani danych uwierzytelniających."
+      "message": "Po połączeniu to urządzenie synchronizuje słownictwo, wyróżnienia, notatki i pełne hasła AI wraz z uzupełnieniami dla bieżącego konta Pinboard. Połączenie dotyczy tylko tego urządzenia. Google Drive nie synchronizuje ustawień ani danych logowania."
     },
     "vocabDriveDisclosure": {
-      "message": "Kopie w folderze appDataFolder na Dysku Google są zapisane jawnym tekstem, bez szyfrowania end-to-end. Mogą zawierać słowa, definicje, zaznaczone fragmenty, notatki, źródłowe adresy URL, tytuły i daty."
+      "message": "Kopie w prywatnym folderze appDataFolder na Google Drive są zapisane jawnym tekstem, bez szyfrowania end-to-end. Mogą zawierać słowa, definicje, hasła AI i uzupełnienia, użyte profile nauki, cytaty, notatki, źródłowe adresy URL, tytuły i daty."
     },
     "vocabDriveLoading": {
       "message": "Wczytywanie stanu synchronizacji z Dyskiem Google…"
@@ -4536,7 +4536,47 @@
   "dictEntryRelated": {"message": "Powiązane słowa"},
   "dictEntryShowDictionary": {"message": "Pokaż słownik"},
   "dictEntryShowAi": {"message": "Pokaż hasło AI"},
-  "dictEntryNotCached": {"message": "Nie udało się zapisać tego hasła w pamięci podręcznej urządzenia."},
+  "dictEntryNotCached": {"message": "Nie udało się zapisać hasła. Pozostaw wyszukiwanie otwarte i ponów zapis."},
   "dictAiAutoGenerateLabel": {"message": "Automatycznie generuj hasła AI"},
-  "dictAiAutoGenerateHint": {"message": "Jeśli nie ma hasła AI w pamięci podręcznej, podczas wyszukiwania utworzy je model AI czytnika. Zużywa to tokeny. Domyślnie wyłączone; hasła można też generować ręcznie."}
+  "dictAiAutoGenerateHint": {"message": "Jeśli nie ma hasła AI w pamięci podręcznej, podczas wyszukiwania utworzy je model AI czytnika. Zużywa to tokeny. Domyślnie wyłączone; hasła można też generować ręcznie."},
+  "dictDefaultViewLabel": {"message": "Domyślny widok wyszukiwania"},
+  "dictDefaultViewHint": {"message": "Zapisane hasła AI są używane ponownie. Tylko opcja „generuj brakujące” automatycznie zużywa tokeny. Zmiana źródła podczas wyszukiwania nie zmienia tego ustawienia."},
+  "dictDefaultDictionary": {"message": "Najpierw słownik"},
+  "dictDefaultAiSaved": {"message": "Najpierw AI, tylko zapisane hasła"},
+  "dictDefaultAiGenerate": {"message": "Najpierw AI, generuj brakujące"},
+  "dictLearnerNativeLanguageLabel": {"message": "Język ojczysty (opcjonalnie)"},
+  "dictLearnerNativeLanguagePlaceholder": {"message": "Na przykład: hiszpański"},
+  "dictLearnerProfileHint": {"message": "Używany tylko po wybraniu uzupełnienia, aby dopasować porównania i przykłady. Nie zmienia języka definicji ani nie uruchamia automatycznego generowania."},
+  "dictLearnerLevelLabel": {"message": "Poziom językowy (opcjonalnie)"},
+  "dictLearnerLevelUnspecified": {"message": "Nie określono"},
+  "dictLearnerLevelBeginner": {"message": "Początkujący"},
+  "dictLearnerLevelIntermediate": {"message": "Średnio zaawansowany"},
+  "dictLearnerLevelAdvanced": {"message": "Zaawansowany"},
+  "dictEntrySupplement": {"message": "Uzupełnij użycie"},
+  "dictSupplementCategory": {"message": "Co dodać"},
+  "dictSupplementCollocations": {"message": "Połączenia wyrazowe i zwroty"},
+  "dictSupplementConfusables": {"message": "Mylące się słowa"},
+  "dictSupplementRegister": {"message": "Styl i użycie regionalne"},
+  "dictSupplementGrammar": {"message": "Objaśnienia gramatyczne"},
+  "dictSupplementScenarios": {"message": "Przykłady w danej sytuacji"},
+  "dictSupplementCulture": {"message": "Kultura i język internetu"},
+  "dictSupplementLiterature": {"message": "Przykłady literackie"},
+  "dictSupplementTopic": {"message": "Temat lub sytuacja (opcjonalnie)"},
+  "dictSupplementTopicPlaceholder": {"message": "Na przykład: praca, podróże lub gry"},
+  "dictSupplementGenerate": {"message": "Wygeneruj uzupełnienie"},
+  "dictSupplementGenerating": {"message": "Generowanie uzupełnienia…"},
+  "dictSupplementSaved": {"message": "Zapisano na tym urządzeniu"},
+  "dictSupplementSaveFailed": {"message": "Nie udało się zapisać uzupełnienia. Pozostaw wyszukiwanie otwarte i ponów zapis."},
+  "dictEntrySyncing": {"message": "Sprawdzanie zsynchronizowanych haseł AI…"},
+  "dictEntrySyncFailed": {"message": "Nie udało się sprawdzić zsynchronizowanych haseł. Przed generowaniem ponów synchronizację, aby nie zużyć tokenów dwa razy."},
+  "dictSupplementNoSources": {"message": "Nie znaleziono odpowiednich źródeł. Nie wysłano zapytania do AI."},
+  "dictSupplementSources": {"message": "Źródła"},
+  "dictSupplementUnavailable": {"message": "Nie udało się wygenerować uzupełnienia. Spróbuj ponownie."},
+  "dictSupplementSourceHint": {"message": "Literatura i kultura korzystają ze źródeł publicznych. Bez źródeł nie powstaje uzupełnienie. Inne kategorie zawierają przykłady do nauki napisane przez AI."},
+  "dictSupplementProfileHint": {"message": "Korzysta z języka ojczystego i poziomu podanych w ustawieniach słownika."},
+  "dictEntryRetrySave": {"message": "Ponów zapis"},
+  "dictSupplementShow": {"message": "Pokaż zapisane użycie"},
+  "driveDictionaryStatus": {"message": "Hasła AI: $STATUS$", "placeholders": {"status": {"content": "$1"}}},
+  "driveDictionaryErrorEntryTooLarge": {"message": "Hasło AI jest za duże do synchronizacji. Lokalna kopia została zachowana. Kliknij „Synchronizuj teraz”, aby spróbować ponownie."},
+  "dictSupplementUnsupported": {"message": "AI nie zdołała przygotować wiarygodnego uzupełnienia. Zapytanie do AI zostało wysłane."}
 }

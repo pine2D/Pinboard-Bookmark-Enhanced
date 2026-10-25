@@ -829,14 +829,17 @@
             <button type="button" class="btn btn-sm" id="vocab-drive-pointer-open" data-i18n="vocabDriveManage">Manage in Data</button>
           </div>
         </div>
-        <div class="pref-group">
-          <div class="pref-row context-help-host" data-help-role="choice">
-            <label class="switch"><input type="checkbox" role="switch" id="dict-ai-auto-generate" aria-labelledby="dict-ai-auto-generate-label" /> <span class="switch-text" id="dict-ai-auto-generate-label" data-i18n="dictAiAutoGenerateLabel">Generate AI entries automatically</span>
-            <details class="context-help">
-              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-              <p class="hint context-help-body" data-i18n="dictAiAutoGenerateHint">When no AI entry is cached, use the reader’s AI model to generate one during lookup. Uses tokens. Off by default; you can still generate entries manually.</p>
-            </details><span class="switch-track" aria-hidden="true"></span></label>
-          </div>
+        <div class="fg entry-block context-help-host" data-help-role="field">
+          <label class="bl" for="dict-default-view" data-i18n="dictDefaultViewLabel">Default lookup view</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="dictDefaultViewHint">Existing AI entries are reused. Only “generate when missing” automatically uses tokens. Switching sources during a lookup does not change this preference.</p>
+          </details>
+          <select id="dict-default-view" data-listbox>
+            <option value="dictionary" data-i18n="dictDefaultDictionary">Dictionary first</option>
+            <option value="ai-saved" data-i18n="dictDefaultAiSaved">AI first, saved entries only</option>
+            <option value="ai-generate" data-i18n="dictDefaultAiGenerate">AI first, generate when missing</option>
+          </select>
         </div>
         <div class="fg entry-block context-help-host" data-help-role="field">
           <label class="bl" id="dict-definition-lang-label" for="dict-definition-lang" data-i18n="dictDefinitionLangLabel">AI entry definition language</label>
@@ -868,6 +871,23 @@
             <option value="custom" data-i18n="translateLangCustom">Custom…</option>
           </select>
           <input type="text" id="dict-definition-lang-custom" class="hidden" aria-labelledby="dict-definition-lang-label" placeholder="Any language name, e.g. Latin, Classical Chinese" data-i18n-placeholder="translateLangCustomPlaceholder" maxlength="80" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="fg entry-block context-help-host" data-help-role="field">
+          <label class="bl" for="dict-learner-native-language" data-i18n="dictLearnerNativeLanguageLabel">Native language (optional)</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="dictLearnerProfileHint">Used only when you request supplementary usage. Helps tailor comparisons and examples; it does not change the definition language or trigger generation.</p>
+          </details>
+          <input type="text" id="dict-learner-native-language" maxlength="80" autocomplete="off" spellcheck="false" placeholder="For example, Spanish" data-i18n-placeholder="dictLearnerNativeLanguagePlaceholder" />
+        </div>
+        <div class="fg">
+          <label class="bl" for="dict-learner-level" data-i18n="dictLearnerLevelLabel">Learning level (optional)</label>
+          <select id="dict-learner-level" data-listbox>
+            <option value="" data-i18n="dictLearnerLevelUnspecified">Not specified</option>
+            <option value="beginner" data-i18n="dictLearnerLevelBeginner">Beginner</option>
+            <option value="intermediate" data-i18n="dictLearnerLevelIntermediate">Intermediate</option>
+            <option value="advanced" data-i18n="dictLearnerLevelAdvanced">Advanced</option>
+          </select>
         </div>
         <details class="disclosure" data-acc-key="vocab-reading">
           <summary data-i18n="vocabReadingSection">Reading hints</summary>
@@ -1284,7 +1304,7 @@
                 <div class="bl subhead" role="heading" aria-level="3" id="sec-google-drive" data-i18n="vocabDriveSection">Google Drive</div>
                 <details class="context-help">
                   <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-                  <p class="hint context-help-body" data-i18n="vocabDriveScope">Once connected, this device syncs vocabulary, highlights, and notes for the current Pinboard account with Google Drive. The connection applies to this device only. Google Drive does not sync settings or credentials.</p>
+                  <p class="hint context-help-body" data-i18n="vocabDriveScope">Once connected, this device syncs vocabulary, highlights, notes, and complete AI dictionary entries with their supplements for the current Pinboard account. The connection applies to this device only. Google Drive does not sync settings or credentials.</p>
                   <p class="hint context-help-body" id="vocab-drive-disclosure" data-i18n="vocabDriveDisclosure">Copies in your Google Drive appDataFolder are plaintext, without end-to-end encryption. They can include saved words, definitions, highlighted excerpts, notes, source URLs, titles, and timestamps.</p>
                 </details>
               </div>

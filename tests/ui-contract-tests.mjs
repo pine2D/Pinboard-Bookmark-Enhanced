@@ -2302,8 +2302,15 @@ const LIBRARY_VALUE_BOX = (() => {
     ids.add(id);
   }
   const built = [];
-  for (const file of ["library-vocab.js", "library-notes.js", "library.js"]) {
-    for (const m of read(file).matchAll(/const (\w+) = document\.createElement\("(input|select|textarea)"\);([\s\S]{0,400})/g)) {
+  // The reusable AI entry renderer is also mounted by library-vocab.js.
+  // Harvest its entire body so another future field cannot escape coverage;
+  // reader-only selectors elsewhere in md-dict.js belong to another surface.
+  const sharedEntryStart = mdDictJs.indexOf("function _pbpDictEntryMount(");
+  const sharedEntry = sharedEntryStart < 0 ? "" : mdDictJs.slice(sharedEntryStart).split(/\n(?:async )?function /, 1)[0];
+  const builders = ["library-vocab.js", "library-notes.js", "library.js"].map(file => [file, read(file)]);
+  builders.push(["md-dict.js", sharedEntry]);
+  for (const [file, source] of builders) {
+    for (const m of source.matchAll(/const (\w+) = document\.createElement\("(input|select|textarea)"\);(?=([\s\S]{0,400}))/g)) {
       const [, v, tag, after] = m;
       const cls = (new RegExp(`\\b${v}\\.className = "([^"]+)"`).exec(after) || [])[1];
       const type = (new RegExp(`\\b${v}\\.type = "([^"]+)"`).exec(after) || [])[1];
@@ -2326,12 +2333,13 @@ check(JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort()) === JSON.strin
   ![...LIBRARY_VALUE_BOX.ghostTriggers].some((id) => LIBRARY_VALUE_BOX.ids.has(id)),
   `ui-contract-tests.mjs: the library ghost-trigger harvest drifted -- got ${JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort())}. ` +
   "A select with data-listbox-face=\"ghost\" renders a .btn trigger, not a value box: it must never also land in LIBRARY_VALUE_BOX.ids.");
-check(JSON.stringify(LIBRARY_VALUE_BOX.built) === JSON.stringify(['library-notes.js:textarea.vocab-note-input', 'library-vocab.js:input[type="text"]', 'library-vocab.js:input[type="text"].vocab-lemma-input', 'library-vocab.js:select.vocab-save-definition', "library-vocab.js:textarea.vocab-note-input"]) &&
+check(JSON.stringify(LIBRARY_VALUE_BOX.built) === JSON.stringify(['library-notes.js:textarea.vocab-note-input', 'library-vocab.js:input[type="text"]', 'library-vocab.js:input[type="text"].vocab-lemma-input', 'library-vocab.js:select.vocab-save-definition', "library-vocab.js:textarea.vocab-note-input", 'md-dict.js:input[type="text"].xp-dict-supplement-topic', 'md-dict.js:select.xp-dict-supplement-kind']) &&
   /groupUnit\.className = "vocab-group-unit";[\s\S]{0,400}groupUnit\.appendChild\(groupInput\);/.test(libraryVocabJs) &&
   /unit\.className = "vocab-group-unit vocab-lemma-control"/.test(libraryVocabJs) && /unit\.append\(lemmaInput, save\)/.test(libraryVocabJs) &&
-  /definition\.dataset\.listbox = "float"/.test(libraryVocabJs) && /window\.pbpEnhanceListbox\?\.\(definition\)/.test(libraryVocabJs),
+  /definition\.dataset\.listbox = "float"/.test(libraryVocabJs) && /window\.pbpEnhanceListbox\?\.\(definition\)/.test(libraryVocabJs) &&
+  /kind\.id = "dict-supplement-kind"; kind\.dataset\.listbox = "float"; window\.pbpEnhanceListbox\(kind\)/.test(mdDictJs),
   `ui-contract-tests.mjs: the runtime library value-box harvest drifted -- got ${JSON.stringify(LIBRARY_VALUE_BOX.built)} ` +
-  "(expected both note editors, group/base-form shell passengers, and the enhanced definition selector). " +
+  "(expected both note editors, group/base-form shell passengers, enhanced definition/category selectors, and the usage topic input). " +
   "A new runtime value box must join FIELD_TARGETS.lib and VALUE_BOX_LEGS.library; then update this list.");
 function isValueBoxCompound(compound) {
   const c = classifyCompound(compound);
@@ -8879,7 +8887,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   // These two runtime hooks do not paint themselves: the pinned builders
   // above put one in the fused shell and enhance the other to .listbox-btn.
   // Structural coverage below still requires exactly one actual paint owner.
-  const indirectRuntimeClasses = new Set(["vocab-lemma-input", "vocab-save-definition"]);
+  const indirectRuntimeClasses = new Set(["vocab-lemma-input", "vocab-save-definition", "xp-dict-supplement-kind"]);
   const uncoveredClasses = [...LIBRARY_VALUE_BOX.classes].filter((cl) => !coveredClasses.has(cl) && !indirectRuntimeClasses.has(cl));
   check(uncoveredClasses.length === 0, `ui-components.mjs FIELD_TARGETS.lib covers no rest selector for the library value box class(es) ${JSON.stringify(uncoveredClasses)}`);
 
@@ -8898,11 +8906,11 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     const m = /^[^:]+:(\w+)(?:\[type="([^"]+)"\])?(?:\.([\w-]+))?$/.exec(b);
     if (!m) return [];
     const [, tag, type, cls] = m;
-    const enhanced = cls === "vocab-save-definition";
-    const el = `<${tag}${type ? ` type="${type}"` : ""}${cls ? ` class="${cls}"` : ""}${enhanced ? ' id="vocab-save-definition" data-listbox="float" hidden' : ""}>${tag === "input" ? "" : `</${tag}>`}`;
+    const enhanced = cls === "vocab-save-definition" ? "vocab-save-definition" : cls === "xp-dict-supplement-kind" ? "dict-supplement-kind" : "";
+    const el = `<${tag}${type ? ` type="${type}"` : ""}${cls ? ` class="${cls}"` : ""}${enhanced ? ` id="${enhanced}" data-listbox="float" hidden` : ""}>${tag === "input" ? "" : `</${tag}>`}`;
     const inShell = !cls || cls === "vocab-lemma-input";
     const nodes = htmlNodes(inShell ? `<span class="${[...LIBRARY_VALUE_BOX.shells][0]}">${el}</span>` : el);
-    const parent = LIB_TREE.find(n => n.attrs.id === (b.startsWith("library-notes.js:") ? "notes-detail" : enhanced ? "vocab-ref-result" : "vocab-detail"));
+    const parent = LIB_TREE.find(n => n.attrs.id === (b.startsWith("library-notes.js:") ? "notes-detail" : enhanced || b.startsWith("md-dict.js:") ? "vocab-ref-result" : "vocab-detail"));
     check(!!parent, `runtime field has no detail host: ${b}`);
     for (const n of nodes) {
       if (n.parent?.tag === "#root") n.parent = parent;
@@ -8927,20 +8935,20 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   }
   const listboxBtnNodes = listboxGraftNodes.filter((n) => n.tag === "button");
   const LIB_NODES = [...LIB_TREE, ...runtimeNodes, ...listboxGraftNodes];
-  check(!!detailNode && runtimeNodes.length === 7,
-    `ui-contract-tests.mjs: the library tree model could not graft the runtime value boxes (${detailNode ? "found" : "no"} #vocab-detail, ${runtimeNodes.length} runtime node(s), expected 7)`);
+  check(!!detailNode && runtimeNodes.length === 9,
+    `ui-contract-tests.mjs: the library tree model could not graft the runtime value boxes (${detailNode ? "found" : "no"} #vocab-detail, ${runtimeNodes.length} runtime node(s), expected 9)`);
   const libCov = valueBoxCoverage(LIB_NODES, LIB);
-  check(libCov.entries === 8 && libCov.uncovered.length === 0,
-    `library.html + runtime boxes / FIELD_TARGETS.lib: every text-entry control must be painted by exactly one registry entry (as its box or as a shell's passenger) -- ${libCov.entries} controls (expected 8); ${libCov.uncovered.join(" | ") || "none uncovered"}`);
+  check(libCov.entries === 9 && libCov.uncovered.length === 0,
+    `library.html + runtime boxes / FIELD_TARGETS.lib: every text-entry control must be painted by exactly one registry entry (as its box or as a shell's passenger) -- ${libCov.entries} controls (expected 9); ${libCov.uncovered.join(" | ") || "none uncovered"}`);
   check(libCov.dead.length === 0, `ui-components.mjs: FIELD_TARGETS.lib entries whose rest selector reaches nothing in library.html + the runtime boxes: ${libCov.dead.map((t) => t.id).join(", ")}`);
   const libSelects = LIB_NODES.filter((n) => n.tag === "select" && !Object.hasOwn(n.attrs, "hidden") && !Object.hasOwn(n.attrs, "data-listbox"));
   const selectMiss = libSelects.filter((n) => LIB.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, n))).length !== 1);
   check(libSelects.length === 0 && selectMiss.length === 0,
     `library.html + runtime boxes / FIELD_TARGETS.lib: every rendered <select> must be the rest box of exactly one entry -- ${libSelects.length} select(s) (expected 0: every rendered select is a listbox carrier since T7), unpainted or doubly painted: ${selectMiss.map((n) => n.attrs.id ? `#${n.attrs.id}` : `select.${n.classes.join(".")}`).join(", ") || "none"}`);
   const listboxMiss = listboxBtnNodes.filter((n) => LIB.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, n))).length !== 1);
-  check(listboxBtnNodes.length === 4 && listboxMiss.length === 0,
+  check(listboxBtnNodes.length === 5 && listboxMiss.length === 0,
     `library.html + listbox.js / FIELD_TARGETS.lib: every listbox button must be the rest box of exactly one entry -- ${listboxBtnNodes.length} button(s) ` +
-    `(expected 4: language/group filters, lookup language, definition selector), unpainted or doubly painted: ${listboxMiss.map((n) => `#${n.attrs.id}`).join(", ") || "none"}`);
+    `(expected 5: language/group filters, lookup language, definition and usage category selectors), unpainted or doubly painted: ${listboxMiss.map((n) => `#${n.attrs.id}`).join(", ") || "none"}`);
   // The ghost trigger is a .btn: no registry entry may name it, in any role,
   // on any surface (spec §8.3) -- judged on each selector's subject compound.
   const triggerInRegistry = Object.entries(FIELD_TARGETS).flatMap(([ns, entries]) => entries.flatMap((t) =>

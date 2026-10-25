@@ -1481,10 +1481,10 @@ function _pbpDictEntryMount(host, opts) {
     el.title = t(key); el.setAttribute("aria-label", t(key));
   };
   const generate = button("dictEntryGenerate", "xp-dict-ai-generate");
-  action(generate, "dictEntryGenerate", "filePen");
+  action(generate, "dictEntryGenerate", "wandSparkles");
   generate.disabled = true;
   const toggle = button("dictEntryShowDictionary", "xp-dict-ai-switch"); toggle.hidden = true;
-  action(toggle, "dictEntryShowDictionary", "arrowRightLeft");
+  action(toggle, "dictEntryShowDictionary", "bookOpenText");
   const stop = button("askStop", "xp-dict-ai-stop"); stop.hidden = true;
   action(stop, "askStop", "stop");
   const configure = document.createElement("a"); configure.className = "xp-dict-connect xp-dict-ai-configure";
@@ -1497,7 +1497,10 @@ function _pbpDictEntryMount(host, opts) {
   if (opts.controlsHost) opts.controlsHost.appendChild(controls);
   else panel.appendChild(controls);
   panel.append(status, content); host.appendChild(panel);
-  let settings = null, record = null, busy = false, active = null, epoch = 0, mode = "dictionary";
+  let settings = null, record = null, busy = false, active = null, epoch = 0, mode = "dictionary", viewRevision = 0;
+  let usageCategory = "collocations", usageTopic = "", usageOpen = false, lastAdded = "";
+  const preference = () => typeof pbpDictDefaultView === "function" ? pbpDictDefaultView(settings) :
+    settings?.dictDefaultView || (settings?.dictAiAutoGenerate === true ? "ai-generate" : "ai-saved");
   const alive = () => !opts.signal?.aborted && panel.isConnected && opts.isCurrent();
   const configured = () => settings && settings.previewAiEnabled !== false && typeof hasAIKey === "function" && hasAIKey(settings);
   const target = () => pbpDictDefinitionLanguage(settings?.dictDefinitionLang,
@@ -1505,7 +1508,7 @@ function _pbpDictEntryMount(host, opts) {
   const message = text => { status.textContent = text; status.hidden = !text; };
   const sync = () => {
     generate.hidden = !!record || !configured() || busy; generate.disabled = busy || !settings;
-    toggle.hidden = !record; stop.hidden = !busy;
+    toggle.hidden = !record && !busy; stop.hidden = !busy;
     configure.hidden = !!record || !settings || settings.previewAiEnabled === false || configured();
     panel.hidden = !record && !!settings && settings.previewAiEnabled === false;
     controls.hidden = panel.hidden;
@@ -1516,10 +1519,10 @@ function _pbpDictEntryMount(host, opts) {
     mode = next;
     if (opts.dictionaryHost) opts.dictionaryHost.hidden = mode === "ai";
     content.hidden = mode !== "ai";
-    action(toggle, mode === "ai" ? "dictEntryShowDictionary" : "dictEntryShowAi", "arrowRightLeft");
+    action(toggle, mode === "ai" ? "dictEntryShowDictionary" : "dictEntryShowAi", mode === "ai" ? "bookOpenText" : "sparkles");
     opts.onView?.(mode);
   };
-  const render = (value, answerLanguage) => {
+  const render = (value, answerLanguage, reveal = true) => {
     record = value;
     const norm = pbpDictEntryNorm(record, answerLanguage);
     _pbpDictRenderEntry(content, norm, opts.term, opts.lang, opts.term, "");
@@ -1552,21 +1555,176 @@ function _pbpDictEntryMount(host, opts) {
     provenance.textContent = [t("dictAiLabel"), record.provider, record.model,
       new Date(record.generatedAt).toLocaleDateString()].join(" · ");
     details.appendChild(provenance); content.appendChild(details);
+    renderSupplements(answerLanguage);
     opts.onEntry?.(norm, record, content);
     // Move focus off a disappearing action without scrolling the article.
     const hadFocus = document.activeElement === generate || document.activeElement === stop;
-    show("ai"); sync();
+    show(reveal ? "ai" : mode); sync();
     if (hadFocus) toggle.focus({ preventScroll: true });
     message(record.cacheSaved === false ? t("dictEntryNotCached") : "");
   };
   const input = (signal, isCurrent) => ({ term: opts.term, sourceLanguage: opts.lang || "und", target: target(),
     owner: opts.owner, settings, signal, isCurrent });
+  const renderSupplements = answerLanguage => {
+    if (typeof pbpDictSupplementRun !== "function") return;
+    if (record.archiveSaved === false) {
+      const retry = button("dictEntryRetrySave", "xp-dict-retry-save");
+      let saving = false;
+      content.appendChild(retry);
+      retry.addEventListener("click", async () => {
+        if (!alive() || busy || saving) return;
+        saving = true; retry.setAttribute("aria-disabled", "true");
+        try {
+          const saved = await pbpDictEntrySave(input(opts.signal, alive), record);
+          if (alive()) {
+            const hadFocus = document.activeElement === retry;
+            render(saved, answerLanguage, false);
+            if (hadFocus) toggle.focus({ preventScroll: true });
+          }
+        } catch (error) {
+          if (alive()) message(t("dictEntryNotCached"));
+          console.warn("[dict-entry] save retry failed:", error?.name);
+        } finally { saving = false; retry.removeAttribute("aria-disabled"); }
+      });
+    }
+    for (const addition of record.supplements || []) {
+      const section = document.createElement("details"); section.className = "xp-dict-ai-details";
+      section.dataset.supplementId = addition.id || String(addition.generatedAt);
+      section.open = section.dataset.supplementId === lastAdded;
+      const heading = document.createElement("summary");
+      heading.textContent = t("dictSupplement" + addition.category[0].toUpperCase() + addition.category.slice(1)) +
+        (addition.profile.topic ? " · " + addition.profile.topic : "");
+      const text = document.createElement("p"); text.className = "xp-dict-supplement-text";
+      text.textContent = addition.content; text.lang = answerLanguage.lang; text.dir = "auto";
+      section.append(heading, text);
+      for (const [index, source] of (addition.sources || []).entries()) {
+        const cite = document.createElement("p"); cite.className = "xp-dict-src";
+        const link = document.createElement("a"); link.textContent = `[${index + 1}] ${source.title}`;
+        link.href = source.url; link.target = "_blank"; link.rel = "noopener noreferrer";
+        cite.append(link); section.append(cite);
+        const excerpt = document.createElement("p"); excerpt.className = "xp-dict-example";
+        excerpt.textContent = source.excerpt; excerpt.lang = opts.lang || "und"; excerpt.dir = "auto";
+        section.append(excerpt);
+      }
+      const receipt = document.createElement("p"); receipt.className = "xp-dict-src";
+      receipt.textContent = [t(addition.archiveSaved === false ? "dictSupplementSaveFailed" : "dictSupplementSaved"),
+        addition.provider, addition.model, new Date(addition.generatedAt).toLocaleDateString()].join(" · ");
+      section.append(receipt);
+      if (addition.archiveSaved === false) {
+        const retry = button("dictEntryRetrySave", "xp-dict-retry-save"); section.append(retry);
+        let saving = false;
+        retry.addEventListener("click", async () => {
+          if (!alive() || busy || saving) return;
+          saving = true; retry.setAttribute("aria-disabled", "true");
+          try {
+            const saved = await pbpDictSupplementSave(input(opts.signal, alive), addition);
+            if (!alive()) return;
+            const hadFocus = document.activeElement === retry;
+            record.supplements = record.supplements.map(item => item === addition ? saved : item);
+            lastAdded = saved.id; render(record, answerLanguage, false);
+            if (hadFocus) [...content.querySelectorAll("[data-supplement-id]")]
+              .find(item => item.dataset.supplementId === saved.id)?.querySelector("summary")?.focus({ preventScroll: true });
+          } catch (error) { console.warn("[dict-entry] usage save retry failed:", error?.name); }
+          finally { saving = false; retry.removeAttribute("aria-disabled"); }
+        });
+      }
+      content.append(section);
+    }
+    if (!configured() || !record.archiveId) return;
+    const disclosure = document.createElement("details"); disclosure.className = "xp-dict-ai-details xp-dict-supplement";
+    disclosure.open = usageOpen;
+    disclosure.addEventListener("toggle", () => { if (disclosure.isConnected) usageOpen = disclosure.open; });
+    const summary = document.createElement("summary"); summary.textContent = t("dictEntrySupplement");
+    const kind = document.createElement("select");
+    kind.className = "xp-dict-supplement-kind";
+    kind.setAttribute("aria-label", t("dictSupplementCategory"));
+    for (const category of PBP_DICT_SUPPLEMENT_CATEGORIES) kind.append(new Option(
+      t("dictSupplement" + category[0].toUpperCase() + category.slice(1)), category));
+    kind.value = usageCategory;
+    const topic = document.createElement("input");
+    topic.type = "text"; topic.className = "xp-dict-supplement-topic"; topic.maxLength = 120; topic.dir = "auto";
+    topic.placeholder = t("dictSupplementTopicPlaceholder"); topic.setAttribute("aria-label", t("dictSupplementTopic"));
+    topic.value = usageTopic;
+    const submit = button("dictSupplementGenerate", "xp-dict-supplement-generate");
+    const hint = document.createElement("p"); hint.className = "xp-dict-src";
+    hint.textContent = t("dictSupplementProfileHint");
+    const sourceHint = document.createElement("p"); sourceHint.className = "xp-dict-src";
+    sourceHint.textContent = t("dictSupplementSourceHint");
+    disclosure.append(summary, kind, topic, submit, hint, sourceHint); content.append(disclosure);
+    if (typeof window.pbpEnhanceListbox === "function") {
+      kind.id = "dict-supplement-kind"; kind.dataset.listbox = "float"; window.pbpEnhanceListbox(kind);
+    } else kind.classList.add("xp-dict-lang");
+    const existing = () => {
+      const profile = pbpDictSupplementProfile(settings, topic.value);
+      return record.supplements?.find(item => item.category === kind.value &&
+        item.profile.nativeLanguage === profile.nativeLanguage && item.profile.level === profile.level && item.profile.topic === profile.topic);
+    };
+    const refresh = () => {
+      usageCategory = kind.value; usageTopic = topic.value;
+      submit.textContent = t(existing() ? "dictSupplementShow" : "dictSupplementGenerate");
+      sourceHint.hidden = !["culture", "literature"].includes(kind.value);
+    };
+    const focusAddition = () => {
+      [...content.querySelectorAll("[data-supplement-id]")]
+        .find(section => section.dataset.supplementId === lastAdded)?.querySelector("summary")?.focus({ preventScroll: true });
+    };
+    kind.addEventListener("change", refresh); topic.addEventListener("input", refresh); refresh();
+    submit.addEventListener("click", async () => {
+      if (!alive() || busy) return;
+      const hit = existing();
+      if (hit) {
+        const hadFocus = document.activeElement === submit;
+        lastAdded = hit.id || String(hit.generatedAt); render(record, answerLanguage, false);
+        if (hadFocus) focusAddition();
+        return;
+      }
+      const hadFocus = document.activeElement === submit;
+      const version = ++epoch, controller = new AbortController(); active = controller; busy = true;
+      const current = () => alive() && epoch === version && !controller.signal.aborted;
+      const category = kind.value, request = { ...input(controller.signal, current), category, topic: topic.value };
+      const origin = pbpDictSupplementOrigin(category, opts.lang);
+      submit.disabled = true; kind.disabled = true; topic.disabled = true; window.pbpListboxSync?.(kind);
+      message(t("dictSupplementGenerating")); sync();
+      if (hadFocus) stop.focus({ preventScroll: true });
+      try {
+        // Request the model and one source origin together, directly from the
+        // click. All subsequent fetches independently check that grant.
+        if (origin) {
+          if (!(await requestAIHostPermissions(settings, [origin + "/*"]))) throw { code: "host_permission" };
+        } else await ensureAIHostPermissionWithGesture(settings);
+        if (!current()) return;
+        const addition = await pbpDictSupplementRun(request);
+        if (!current()) return;
+        record.supplements = [...(record.supplements || []).filter(item => !addition.id || item.id !== addition.id), addition];
+        lastAdded = addition.id || String(addition.generatedAt);
+        const focusStayed = document.activeElement === stop;
+        render(record, answerLanguage, false);
+        if (focusStayed) focusAddition();
+        message(t(addition.archiveSaved === false ? "dictSupplementSaveFailed" : "dictSupplementSaved"));
+      } catch (error) {
+        if (!current()) return;
+        console.warn("[dict-entry] usage generation failed:", error?.name, error?.code || "request_failed");
+        message(t(error?.code === "host_permission" ? "aiGrantRetry" : error?.code === "sync_failed" ? "dictEntrySyncFailed" :
+          error?.code === "no_sources" ? "dictSupplementNoSources" :
+          error?.code === "unsupported_usage" ? "dictSupplementUnsupported" : "dictSupplementUnavailable"));
+      } finally {
+        if (epoch === version) { busy = false; active = null; }
+        if (alive()) {
+          const focusStayed = document.activeElement === stop;
+          submit.disabled = false; kind.disabled = false; topic.disabled = false; window.pbpListboxSync?.(kind); sync();
+          if (focusStayed && submit.isConnected) submit.focus({ preventScroll: true });
+        }
+      }
+    });
+  };
   const run = async manual => {
     if (!alive() || busy || !configured()) return;
     const hadFocus = manual && document.activeElement === generate;
-    const version = ++epoch, controller = new AbortController(); active = controller; busy = true;
+    const version = ++epoch, viewAtStart = viewRevision, controller = new AbortController(); active = controller; busy = true;
     const current = () => alive() && epoch === version && !controller.signal.aborted;
-    message(t("dictEntryGenerating")); sync();
+    message(t("dictEntryGenerating"));
+    if (!manual) show("ai");
+    sync();
     if (hadFocus) stop.focus({ preventScroll: true });
     try {
       // The automatic path never requests permission. Only this direct click
@@ -1576,12 +1734,14 @@ function _pbpDictEntryMount(host, opts) {
       if (typeof pbpAiBumpCounter === "function") pbpAiBumpCounter("explain");
       const request = input(controller.signal, current);
       const result = await pbpDictEntryRun(request);
-      if (current()) render(result, request.target);
+      if (current()) render(result, request.target, viewRevision === viewAtStart);
     } catch (error) {
       if (!current()) return;
+      if (!record) show("dictionary");
       console.warn("[dict-entry] generation failed:", error?.name, error?.code || "request_failed");
       message(t(error?.code === "host_permission" ? "aiGrantRetry" :
-        error?.code === "owner_changed" ? "vocabAccountChanged" : "dictEntryUnavailable"));
+        error?.code === "owner_changed" || error?.code === "account_changed" ? "vocabAccountChanged" :
+        error?.code === "sync_failed" ? "dictEntrySyncFailed" : "dictEntryUnavailable"));
     } finally {
       if (epoch === version) {
         busy = false; active = null;
@@ -1594,13 +1754,16 @@ function _pbpDictEntryMount(host, opts) {
     }
   };
   generate.addEventListener("click", () => run(true));
-  toggle.addEventListener("click", () => show(mode === "ai" ? "dictionary" : "ai"));
+  toggle.addEventListener("click", () => { viewRevision++; show(mode === "ai" ? "dictionary" : "ai"); });
   stop.addEventListener("click", () => {
     epoch++; active?.abort(); active = null; busy = false; message(""); sync();
+    if (!record) show("dictionary");
     if (!generate.hidden) generate.focus({ preventScroll: true });
+    else if (!toggle.hidden) toggle.focus({ preventScroll: true });
   });
   opts.signal?.addEventListener("abort", () => {
     epoch++; active?.abort();
+    if (!record) { if (opts.dictionaryHost) opts.dictionaryHost.hidden = false; content.hidden = true; }
     if (opts.controlsHost) controls.remove();
   }, { once: true });
   const ready = Promise.resolve(opts.settings).then(async value => {
@@ -1608,16 +1771,40 @@ function _pbpDictEntryMount(host, opts) {
     settings = value || {}; sync();
     const version = epoch;
     const request = input(opts.signal, () => alive() && epoch === version);
-    const hit = await pbpDictEntryRead(request);
+    let hit = await pbpDictEntryRead(request);
+    if (!hit && alive() && epoch === version && typeof pbpDictArchiveRead === "function") {
+      message(t("dictEntrySyncing"));
+      hit = await pbpDictEntryRestore(request);
+      if (alive() && epoch === version) message("");
+    }
     if (!alive() || epoch !== version) return;
-    if (hit) render(hit, request.target);
-    else if (settings.dictAiAutoGenerate === true) await run(false);
+    if (hit) render(hit, request.target, !viewRevision && preference() !== "dictionary");
+    else if (preference() === "ai-generate") await run(false);
   }).catch(error => {
     if (!alive() || error?.name === "AbortError" || error?.code === "stale") return;
     console.warn("[dict-entry] initialization failed:", error?.name, error?.code || "settings_failed");
-    if (error?.code === "owner_changed") message(t("vocabAccountChanged"));
+    if (["owner_changed", "account_changed"].includes(error?.code)) message(t("vocabAccountChanged"));
+    else if (error?.code === "sync_failed") message(t("dictEntrySyncFailed"));
+    else message(t("dictEntryUnavailable"));
     sync();
   });
+  if (globalThis.chrome?.runtime?.onMessage) {
+    const refreshed = async message => {
+      if (message?.type !== "PBP_DICT_ARCHIVE_SYNCED" || message.owner !== opts.owner || !alive() || !settings || busy || record?.archiveSaved === false ||
+          content.contains(document.activeElement)) return;
+      const version = epoch;
+      try {
+        const next = await pbpDictEntryRead(input(opts.signal, () => alive() && epoch === version));
+        if (!next || !alive() || busy || epoch !== version || content.contains(document.activeElement)) return;
+        if (JSON.stringify(next) === JSON.stringify(record)) return;
+        next.supplements = [...(next.supplements || []), ...(record?.supplements || []).filter(item => item.archiveSaved === false)];
+        render(next, target(), false);
+      } catch (error) { console.warn("[dict-entry] synced entry refresh failed:", error?.name); }
+    };
+    const onMessage = message => { refreshed(message).catch(error => console.warn("[dict-entry] refresh failed:", error?.name)); };
+    chrome.runtime.onMessage.addListener(onMessage);
+    opts.signal?.addEventListener("abort", () => chrome.runtime.onMessage.removeListener(onMessage), { once: true });
+  }
   // Settings changed in another extension tab must invalidate the old action
   // before it can dispatch with a stale enabled flag or language pair.
   if (opts.onSettingsChange && typeof chrome !== "undefined" && chrome.storage?.onChanged) {
@@ -1625,7 +1812,7 @@ function _pbpDictEntryMount(host, opts) {
     const listener = async (changes, area) => {
       const keys = Object.keys(changes);
       if (!alive() || !["sync", "local"].includes(area) || !keys.some(key =>
-        ["dictAiAutoGenerate", "dictDefinitionLang", "previewAiEnabled", "aiProvider", "previewAiModelByProvider", "optSyncEnabled", "syncApiKeys"].includes(key) ||
+        ["dictDefaultView", "dictAiAutoGenerate", "dictLearnerNativeLanguage", "dictLearnerLevel", "dictDefinitionLang", "previewAiEnabled", "aiProvider", "previewAiModelByProvider", "optSyncEnabled", "syncApiKeys"].includes(key) ||
         /(?:Model|ApiKey|BaseUrl)$/.test(key))) return;
       const sequence = ++settingsSequence;
       if (!changes.optSyncEnabled && typeof pbpReadSecretSyncState === "function") {
@@ -1874,7 +2061,11 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
 
 function _pbpDictApplyVisibleChoice(cur) {
   if (cur.packChoice) { _pbpDictApplyPackChoice(cur, cur.packChoice); return; }
-  const norm = cur.entryView === "ai" ? cur.aiNorm : cur.dictionaryNorm;
+  if (cur.packInvalidated) return;
+  const sources = [...(cur.meaningSources?.values() || [])].filter(source => !source.norm.aiGenerated && source.choices.length);
+  sources.sort((a, b) => a.box?.isConnected && b.box?.isConnected && a.box !== b.box
+    ? (a.box.compareDocumentPosition(b.box) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1) : 0);
+  const norm = cur.entryView === "ai" ? cur.aiNorm : sources[0]?.norm || cur.dictionaryNorm;
   const choice = norm && pbpDictNormChoices({ ...norm,
     entries: pbpDictOrderForContext(norm.entries, cur.entryView === "ai" ? "" : cur.sentence) }, cur.lang, t("dictSource"))[0];
   if (choice) _pbpDictApplyPackChoice(cur, choice);
@@ -1911,7 +2102,7 @@ function _pbpDictReaderPackChoices(norm, box, cur, pop, signal) {
   const choices = pbpDictNormChoices(norm, cur.lang, t("dictSource"));
   if (!choices.length) return;
   const key = (norm.packId || norm.sourceLabel) + ":" + norm.word;
-  cur.meaningSources?.set(key, { norm, choices });
+  cur.meaningSources?.set(key, { norm, choices, box });
   if (!cur.meaningSelect) {
     const select = document.createElement("select");
     select.className = "xp-dict-lang xp-dict-save-meaning";
@@ -1928,7 +2119,9 @@ function _pbpDictReaderPackChoices(norm, box, cur, pop, signal) {
       _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name));
     });
   }
+  _pbpDictApplyVisibleChoice(cur);
   _pbpDictSyncMeaningSelect(cur);
+  _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name));
 }
 
 async function _pbpDictRefreshSave(pop, cur, signal) {

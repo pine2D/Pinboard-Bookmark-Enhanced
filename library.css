@@ -423,6 +423,22 @@ html[data-theme] { --lib-scrollbar-thumb: var(--lib-fg-muted); }
 .vocab-note-input::placeholder {
   color: var(--lib-field-placeholder);
 }
+input.xp-dict-supplement-topic[type="text"] {
+  background-color: var(--lib-field-bg);
+  border-color: var(--lib-field-border);
+  color: var(--lib-field-fg);
+}
+input.xp-dict-supplement-topic[type="text"]:hover:where(:not(:focus, :disabled)) {
+  background-color: var(--lib-field-bg-hover);
+  border-color: var(--lib-field-border-hover);
+}
+input.xp-dict-supplement-topic[type="text"]:focus:not(:disabled) {
+  background-color: var(--lib-field-bg-focus);
+  border-color: var(--lib-field-border-focus);
+}
+input.xp-dict-supplement-topic[type="text"]::placeholder {
+  color: var(--lib-field-placeholder);
+}
 .vocab-group-unit {
   background-color: var(--lib-field-bg);
   border-color: var(--lib-field-border);
@@ -2145,6 +2161,18 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-ai-details > summary:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
 #vocab-ref-result .xp-dict-ai-details p { margin: var(--lib-sp-2) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 #vocab-ref-result .xp-dict-ai-details .xp-dict-src { margin-top: var(--lib-sp-3); }
+#vocab-ref-result .xp-dict-supplement > .listbox {
+  display: block; width: 100%; min-width: 0; margin-top: var(--lib-sp-2);
+}
+#vocab-ref-result .xp-dict-supplement > .xp-dict-supplement-topic { margin-top: var(--lib-sp-2); }
+input.xp-dict-supplement-topic[type="text"] {
+  display: block; box-sizing: border-box; width: 100%; min-width: 0;
+  height: var(--lib-control-h); padding: 0 var(--lib-control-pad-x);
+  border-width: 1px; border-style: solid; border-radius: var(--lib-radius-md);
+  font: inherit; font-size: var(--lib-text-body); line-height: 20px;
+}
+input.xp-dict-supplement-topic[type="text"]:focus { outline: none; }
+input.xp-dict-supplement-topic[type="text"]:focus-visible:not(:disabled) { box-shadow: var(--lib-focus-ring); }
 /* md-dict's own Retry after a load failure: this page already has "Look up
    again" under the source line (.vocab-ref-foot), which re-runs the same
    query -- two buttons for one action, side by side (critique round 3).
@@ -3245,6 +3273,7 @@ select[data-listbox] { height: var(--lib-control-h); box-sizing: border-box; }
 @media (forced-colors: active) {
   .listbox-btn:focus-visible:not(:disabled),
   .vocab-note-input:focus-visible:not(:disabled),
+  input.xp-dict-supplement-topic[type="text"]:focus-visible:not(:disabled),
   .vocab-group-unit:has(> input[type="text"]:focus):not(:disabled) {
     outline: 1px solid Highlight;
     outline-offset: 2px;

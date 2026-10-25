@@ -7,7 +7,7 @@
 
 ## 项目概述
 
-Chrome Extension (Manifest V3)，一键将当前页面保存到 Pinboard，支持多 LLM 提供商的 AI 标签/摘要/全文翻译/Ask-the-page 问答与 opt-in 要点提炼（skim）。md-preview 阅读器支持直接保存/编辑/删除 Pinboard 书签，完整 Ask 问答可连同引用单独导出或附在正文后；带划词高亮/笔记/搜索/专注模式、YouTube / B 站视频页的播放器+多语种字幕面板、在线词典与可选离线词典（CC-CEDICT 汉英、用户自备 ECDICT 英汉与多语言 Yomitan v3 包）；高亮/笔记与生词集中在独立的「笔记与生词本」页（library.html，索引 + 详情平铺双栏）；生词按当前 Pinboard 账号隔离，可按语言筛选、从查词结果选义保存并关联原形；支持完整 TSV 与可选多语言 Anki 笔记类型，保留原六字段导出，也可发送到欧路词典；连接 Google Drive 即同步生词、高亮与笔记。导出可 Send-to Obsidian/Notion/NotebookLM/Gist/Webhook，另有 Wayback 自动归档、标签治理和 13 套 pinboard.in 站点主题。功能全貌见 README.md。
+Chrome Extension (Manifest V3)，一键将当前页面保存到 Pinboard，支持多 LLM 提供商的 AI 标签/摘要/全文翻译/Ask-the-page 问答与 opt-in 要点提炼（skim）。md-preview 阅读器支持直接保存/编辑/删除 Pinboard 书签，完整 Ask 问答可连同引用单独导出或附在正文后；带划词高亮/笔记/搜索/专注模式、YouTube / B 站视频页的播放器+多语种字幕面板、在线词典与可选离线词典（CC-CEDICT 汉英、用户自备 ECDICT 英汉与多语言 Yomitan v3 包）；高亮/笔记与生词集中在独立的「笔记与生词本」页（library.html，索引 + 详情平铺双栏）；生词按当前 Pinboard 账号隔离，可按语言筛选、从查词结果选义保存并关联原形；支持完整 TSV 与可选多语言 Anki 笔记类型，保留原六字段导出，也可发送到欧路词典；连接 Google Drive 即同步生词、高亮、笔记及完整 AI 词条和补充用法。导出可 Send-to Obsidian/Notion/NotebookLM/Gist/Webhook，另有 Wayback 自动归档、标签治理和 13 套 pinboard.in 站点主题。功能全貌见 README.md。
 
 ## 技术栈
 
@@ -37,7 +37,8 @@ md-*.js                      # 阅读器子模块：ai-core / translate / ask / 
 vocab-store.js               # pbp-vocab IndexedDB 唯一写边界（words + vector/outbox/tombstone/sync 状态）
 vocab-gdrive.js              # SW-only Google Drive appDataFolder 同步
 dict-pack.js                 # 离线词典包导入（CC-CEDICT / ECDICT / 多语言 Yomitan v3；词包仅本机）
-dict-assist.js               # 阅读器/生词页共用的显式义项 AI（来源授权、结构化回答、独立缓存）
+dict-entry.js                # 可复用 AI 词条与按需补充用法（词形/语言对、学习偏好与有来源短摘录）
+dict-archive.js / dict-archive-gdrive.js  # 完整 AI 词条持久归档与独立 Drive 数据集（不属于生词本、不随缓存淘汰）
 anki-connect.js / eudic-sync.js  # 生词外发（本机 AnkiConnect / 欧路 OpenAPI；纯层，测试页可载）
 ai.js / ai-cache.js          # AI 调用核心（popup/options/library/md-preview 共载）/ 结果 IDB 缓存
 export-targets.js            # Send-to 目标注册表（Obsidian / Notion / NotebookLM / Gist / Webhook；纯层）
@@ -76,7 +77,7 @@ docs/superpowers/ DESIGN-IS-2026-07-22/ release/  # gitignored 本地产物（.q
 | 机制 | 数据 | 边界 |
 |------|------|------|
 | Chrome Sync | 普通设置；另行启用时含凭据 | `optSyncEnabled` 是**每设备** local 开关，普通设置据此路由 sync/local；不含生词、高亮、缓存、任务状态 |
-| Google Drive | 当前 Pinboard owner 的生词、高亮与笔记 | 每设备单独连接；连接即同步两类、断开即停止，不设按类型开关；共享连接层状态 `driveConnState:<ownerHash>` 只存 local；只用 `drive.appdata`；不接管设置、凭据 |
+| Google Drive | 当前 Pinboard owner 的生词、高亮与笔记、完整 AI 词条及补充 | 每设备单独连接；连接即同步三类、断开即停止，不设按类型开关；共享连接层状态 `driveConnState:<ownerHash>` 只存 local；只用 `drive.appdata`；不接管设置、凭据 |
 | 手工 JSON schema v3 | 设置、主题 + 用户分项选择的高亮/生词/凭据 | 明文文件；导入先预览分项选择；凭据两端默认关、fail-closed（详见 rules/backup.md） |
 
 - 凭据（API key / token / password / 导出目标）不能硬编码。默认存 `chrome.storage.local`；仅当本机 `optSyncEnabled=true` 且账号级 `syncApiKeys=true` 时用 sync；旧云端已有非空 secret 时迁移保留 `syncApiKeys=true`，避免升级丢凭据。

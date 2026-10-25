@@ -4058,7 +4058,7 @@ await (async () => {
       // Opening a saved detail should not start unrelated dictionary work.
       _pbpVocabAutoLookup=async()=>"idle";
       await reload(); await run();
-      check("B successful lookup offers each definition and requires an explicit choice", !!select()&&select().options.length===3&&select().value===""&&save()?.disabled===true);
+      check("B a new lookup preselects the first displayed definition and can be saved immediately", !!select()&&select().options.length===3&&select().value==="online:0"&&save()?.disabled===false);
       choose("Operate");
       check("B choosing a definition enables collection", save()?.disabled===false&&save()?.textContent.includes("dictSaveVocab"));
       save()?.click(); await settle();
@@ -4566,7 +4566,7 @@ await (async () => {
       await settle(); releaseOwner?.(owner); await settle();
       pbpVocabCurrentOwner = async () => owner;
       check("legacy sources: disabling during the owner read cancels a pending save", writes.length === 0);
-      check("legacy sources: disabling removes stale local choices and the redundant separator", !host.querySelector(".xp-dict-legacy").textContent && host.querySelector(".vocab-save-definition")?.options.length === 2 && host.querySelector(".vocab-save-definition").value === "" && !host.querySelector("[data-source-break]"));
+      check("legacy sources: disabling removes stale local choices and selects the remaining displayed source", !host.querySelector(".xp-dict-legacy").textContent && host.querySelector(".vocab-save-definition")?.options.length === 2 && host.querySelector(".vocab-save-definition").value === "online:0" && !host.querySelector("[data-source-break]"));
       enabled = true; failOnline = true;
       _pbpVocabLookupOther("学习", "zh"); await settle();
       check("legacy sources: an online failure preserves the Chinese local answer and save choice", host.querySelector(".xp-dict-legacy")?.textContent.includes("to study") && host.querySelector(".vocab-save-definition")?.options.length === 2);
@@ -4579,6 +4579,70 @@ await (async () => {
       window.pbpDictPackList = old.list; _pbpDictSlotRun = old.remote; pbpReadSettingsWithSecrets = old.read;
       _pbpVocabAutoLookup = old.auto; pbpDictEntryRead = old.entryRead; pbpVocabCurrentOwner = old.owner;
       pbpVocabGet = old.get; pbpVocabSaveWord = old.save;
+    }
+  }
+
+  // Default collection follows the visible source; explicit choices retain
+  // their meaning through asynchronous arrivals, reordering and revocation.
+  {
+    const old = { mount: _pbpDictEntryMount, remote: _pbpDictSlotRun, local: _pbpDictEcdictSide,
+      cedict: _pbpDictCedictSide, packs: _pbpDictPackSide, auto: _pbpVocabAutoLookup,
+      settings: pbpReadSettingsWithSecrets, rows: _vocabRows, owner: _vocabCurrentOwner };
+    const owner = "acct_default_meaning", term = "surface";
+    const norm = (label, definitions, extra = {}) => ({ word: term, sourceLabel: label,
+      sourceUrl: "https://example.test/" + label, license: "fixture", definitionLang: "en",
+      entries: [{ ipas: [], forms: [], senses: definitions.map(definition => ({ definition })) }], ...extra });
+    const remote = norm("Wiktionary", ["outer layer", "become visible"]);
+    const local = norm("ECDICT", ["表面"], { definitionLang: "zh" });
+    const ai = norm("AI", ["the outermost part"], { aiGenerated: true });
+    let entryOptions, acceptLocal, acceptPack;
+    const host = $id("vocab-ref-result"), select = () => host.querySelector(".vocab-save-definition");
+    const save = () => host.querySelector(".vocab-lookup-save");
+    const selected = () => select()?.selectedOptions[0]?.textContent || "";
+    const choose = value => { select().value = value; select().dispatchEvent(new Event("change")); };
+    const run = async (sentence = "") => { _pbpVocabLookupOther(term, "en", sentence); await settle(); };
+    try {
+      _pbpVocabRenderDetail(null); _vocabCurrentOwner = owner; _vocabRows = [];
+      _pbpVocabAutoLookup = async () => {};
+      pbpReadSettingsWithSecrets = async () => ({ previewAiEnabled: false });
+      _pbpDictEntryMount = (_host, opts) => { entryOptions = opts; return null; };
+      _pbpDictSlotRun = async () => remote;
+      _pbpDictEcdictSide = async (_el, _term, _lang, _signal, _cur, callback) => { acceptLocal = callback; };
+      _pbpDictCedictSide = async () => {};
+      _pbpDictPackSide = async (_el, _term, _lang, _signal, _cur, callback) => { acceptPack = callback; };
+      await run();
+      check("default meaning: a new word is collectible without opening the meaning picker", selected().includes("outer layer") && save()?.disabled === false);
+      acceptLocal(local);
+      check("default meaning: late local source follows the displayed source order", selected().includes("表面"));
+      acceptPack(norm("Pack", ["pack first"], { packId: "fixture-pack" }));
+      check("default meaning: multilingual packs lead the dictionary view regardless of arrival", selected().includes("pack first"));
+      choose("local:0");
+      acceptLocal(norm("ECDICT", ["新释义", "表面"], { definitionLang: "zh" }));
+      check("default meaning: a manual choice follows its definition when the source reorders", select()?.value === "local:1" && selected().includes("表面"));
+      entryOptions.onEntry(ai); entryOptions.onView("ai");
+      check("default meaning: AI arrival and source switches preserve an explicit dictionary choice", select()?.value === "local:1");
+      acceptLocal(null);
+      check("default meaning: removing a chosen source clears its choice instead of replacing it silently", select()?.value === "" && save()?.disabled === true);
+      entryOptions.onView("dictionary");
+      check("default meaning: a view switch cannot revive a revoked manual choice", select()?.value === "" && save()?.disabled === true);
+      await run(); entryOptions.onEntry(ai);
+      check("default meaning: hidden AI data does not change the ordinary dictionary default", selected().includes("outer layer"));
+      entryOptions.onView("ai");
+      check("default meaning: the AI view defaults to its first definition", selected().includes("the outermost part") && save()?.disabled === false);
+      entryOptions.onView("dictionary");
+      check("default meaning: an unedited choice follows a deliberate view switch", selected().includes("outer layer"));
+      await run("The surface can become visible.");
+      check("default meaning: a derived lookup defaults to the same contextual first meaning as its displayed source", selected().includes("become visible"));
+      _vocabRows = [{ id: pbpDictVocabKey(owner, "en", term), owner, term, language: "en", gloss: "my saved meaning" }];
+      await run(); entryOptions.onEntry(ai); entryOptions.onView("ai");
+      check("default meaning: neither dictionary nor AI defaults overwrite an existing saved definition", select()?.value === "" && save()?.disabled === true && _vocabRows[0].gloss === "my saved meaning");
+      choose("ai:0");
+      check("default meaning: an existing word can still explicitly adopt a new definition", select()?.value === "ai:0" && save()?.disabled === false);
+    } finally {
+      _pbpVocabDictCtrl?.abort(); _pbpVocabDictChildCtrl?.abort(); _pbpVocabRenderDetail(null);
+      _pbpDictEntryMount = old.mount; _pbpDictSlotRun = old.remote; _pbpDictEcdictSide = old.local;
+      _pbpDictCedictSide = old.cedict; _pbpDictPackSide = old.packs; _pbpVocabAutoLookup = old.auto;
+      pbpReadSettingsWithSecrets = old.settings; _vocabRows = old.rows; _vocabCurrentOwner = old.owner;
     }
   }
 
