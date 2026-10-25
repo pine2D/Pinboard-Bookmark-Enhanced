@@ -1626,20 +1626,20 @@
     "message": "Extension pages follow the Pinboard theme preset"
   },
   "popupFollowHint": {
-    "message": "When on, the popup, this settings page and the notes & vocabulary page use the palette of the selected Pinboard preset; when off they use the default palette in the light/dark mode above. The reader always keeps its own reading palette."
+    "message": "When on, the popup, this settings page and the library use the palette of the selected Pinboard preset; when off they use the default palette in the light/dark mode above. The reader always keeps its own reading palette."
   },
   "optFollowNeedsPreset": {
     "message": "Pick a Pinboard preset below first. With No preset there is no palette to follow."
   },
   "optThemeOverridden": {
-    "message": "The popup, this settings page and the notes & vocabulary page follow $PRESET$, so its own light or dark scheme applies there.",
+    "message": "The popup, this settings page and the library follow $PRESET$, so its own light or dark scheme applies there.",
     "placeholders": {
       "preset": {
         "content": "$1"
       }
     }
   },
-  "optThemeHint": { "message": "Switches the popup, this settings page, the notes & vocabulary page and the reader between light and dark. Presets with a built-in scheme (Dracula, for example) override it on the pages that follow the preset; the reader can override it per device from its \"Aa\" panel." },
+  "optThemeHint": { "message": "Switches the popup, this settings page, the library and the reader between light and dark. Presets with a built-in scheme (Dracula, for example) override it on the pages that follow the preset; the reader can override it per device from its \"Aa\" panel." },
   "secPopupElements": {
     "message": "Popup Elements"
   },
@@ -3421,10 +3421,11 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "Once connected, this device syncs vocabulary, highlights, notes, and complete AI dictionary entries with their supplements for the current Pinboard account. The connection applies to this device only. Google Drive does not sync settings or credentials."
+      "message": "Once connected, this device syncs vocabulary, highlights and notes, complete AI dictionary entries and supplements, and saved conversations with their cited excerpts for the current Pinboard account."
     },
+    "vocabDriveConnectionHint": { "message": "Connect each device separately. Google Drive does not sync settings or credentials." },
     "vocabDriveDisclosure": {
-      "message": "Copies in your Google Drive appDataFolder are plaintext, without end-to-end encryption. They can include saved words, definitions, AI entries and supplements, learner profiles used for supplements, cited excerpts, notes, source URLs, titles, and timestamps."
+      "message": "Copies are stored as plaintext in the extension’s private Google Drive folder, without end-to-end encryption. Alongside saved content, they can include learning preferences used for supplements, cited excerpts, source URLs, titles and timestamps."
     },
     "vocabDriveLoading": {
       "message": "Loading Google Drive sync status…"
@@ -3475,7 +3476,7 @@
       "message": "Sync now"
     },
     "vocabDriveManage": {
-      "message": "Manage in Data"
+      "message": "Sync settings"
     },
     "vocabDriveDisconnect": {
       "message": "Disconnect this device"
@@ -4086,8 +4087,8 @@
   "skimStop": { "message": "Stop" },
   "skimGenerating": { "message": "Generating key points…" },
   "skimFailed": { "message": "Couldn't generate key points" },
-  "libraryTitle": { "message": "Notes & Vocabulary" },
-  "libraryOpen": { "message": "Open notes and vocabulary" },
+  "libraryTitle": { "message": "Library" },
+  "libraryOpen": { "message": "Open library" },
   "libraryDetailTitle": { "message": "Word details" },
   "libraryNotesDetailEmpty": { "message": "Pick a highlight from the list to read it in full." },
   "libraryPageCount": { "message": "$COUNT$ on this page", "placeholders": { "count": { "content": "$1" } } },

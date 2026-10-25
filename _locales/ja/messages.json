@@ -1620,20 +1620,20 @@
     "message": "拡張機能のページを Pinboard テーマプリセットに合わせる"
   },
   "popupFollowHint": {
-    "message": "オンにすると、ポップアップ、この設定ページ、メモと単語帳ページが選択した Pinboard プリセットの配色を使います。オフにすると上のライト／ダーク設定に従った既定の配色になります。リーダーは常に独自の読書配色を使います。"
+    "message": "オンにすると、ポップアップ、この設定ページ、ライブラリページが選択した Pinboard プリセットの配色を使います。オフにすると上のライト／ダーク設定に従った既定の配色になります。リーダーは常に独自の読書配色を使います。"
   },
   "optFollowNeedsPreset": {
     "message": "まず下で Pinboard プリセットを選んでください。「プリセットなし」では合わせる配色がありません。"
   },
   "optThemeOverridden": {
-    "message": "ポップアップ、この設定ページ、メモと単語帳ページは $PRESET$ に合わせているため、ライト／ダークはこのプリセットで決まります。",
+    "message": "ポップアップ、この設定ページ、ライブラリページは $PRESET$ に合わせているため、ライト／ダークはこのプリセットで決まります。",
     "placeholders": {
       "preset": {
         "content": "$1"
       }
     }
   },
-  "optThemeHint": { "message": "ポップアップ、この設定ページ、メモと単語帳ページ、リーダーのライト／ダークを切り替えます。固有の配色を持つプリセット（Dracula など）は、プリセットに合わせるページでこの設定より優先されます。リーダーは「Aa」パネルからデバイスごとに上書きできます。" },
+  "optThemeHint": { "message": "ポップアップ、この設定ページ、ライブラリページ、リーダーのライト／ダークを切り替えます。固有の配色を持つプリセット（Dracula など）は、プリセットに合わせるページでこの設定より優先されます。リーダーは「Aa」パネルからデバイスごとに上書きできます。" },
   "secPopupElements": {
     "message": "ポップアップの要素"
   },
@@ -3411,10 +3411,11 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "接続すると、この端末は現在の Pinboard アカウントの単語帳、ハイライト、ノート、AI 辞書項目と追加用法を同期します。接続は端末ごとに必要です。設定や認証情報は Google Drive で同期されません。"
+      "message": "接続すると、現在の Pinboard アカウントの単語帳、ハイライトとノート、AI 辞書項目の全文と追加用法、保存済みの会話と引用を同期します。"
     },
+    "vocabDriveConnectionHint": { "message": "端末ごとに接続が必要です。設定や認証情報は Google Drive で同期されません。" },
     "vocabDriveDisclosure": {
-      "message": "Google Drive の非公開 appDataFolder に保存されるコピーは平文で、エンドツーエンド暗号化はされません。単語、定義、AI 項目と追加用法、追加時の学習者情報、引用、ノート、出典 URL、タイトル、日時が含まれる場合があります。"
+      "message": "コピーは Google Drive の拡張機能専用の非公開フォルダーに平文で保存され、エンドツーエンド暗号化はされません。保存した内容のほか、追加用法に使用した学習設定、引用原文、出典 URL、タイトル、日時が含まれる場合があります。"
     },
     "vocabDriveLoading": {
       "message": "Google Drive の同期状態を読み込んでいます…"
@@ -3465,7 +3466,7 @@
       "message": "今すぐ同期"
     },
     "vocabDriveManage": {
-      "message": "「データ」で管理"
+      "message": "同期設定"
     },
     "vocabDriveDisconnect": {
       "message": "このデバイスの接続を解除"
@@ -4080,8 +4081,8 @@
   "skimStop": { "message": "停止" },
   "skimGenerating": { "message": "要点まとめを生成中…" },
   "skimFailed": { "message": "要点まとめを生成できませんでした" },
-  "libraryTitle": { "message": "メモと単語帳" },
-  "libraryOpen": { "message": "メモと単語帳を開く" },
+  "libraryTitle": { "message": "ライブラリ" },
+  "libraryOpen": { "message": "ライブラリを開く" },
   "libraryDetailTitle": { "message": "単語の詳細" },
   "libraryNotesDetailEmpty": { "message": "一覧からハイライトを選ぶと、全文が表示されます。" },
   "libraryPageCount": { "message": "このページ $COUNT$ 件", "placeholders": { "count": { "content": "$1" } } },

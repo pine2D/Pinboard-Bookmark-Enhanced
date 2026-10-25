@@ -1620,20 +1620,20 @@
     "message": "Erweiterungsseiten folgen dem Pinboard-Preset"
   },
   "popupFollowHint": {
-    "message": "Eingeschaltet verwenden Popup, diese Einstellungsseite und die Seite „Notizen & Vokabeln“ die Farben des gewählten Pinboard-Presets; ausgeschaltet die Standardpalette im oben gewählten Hell-/Dunkelmodus. Die Leseansicht behält immer ihre eigene Lesepalette."
+    "message": "Eingeschaltet verwenden Popup, diese Einstellungsseite und die Bibliothek die Farben des gewählten Pinboard-Presets; ausgeschaltet die Standardpalette im oben gewählten Hell-/Dunkelmodus. Die Leseansicht behält immer ihre eigene Lesepalette."
   },
   "optFollowNeedsPreset": {
     "message": "Wähle zuerst unten ein Pinboard-Preset. Bei „Kein Preset“ gibt es keine Palette zum Übernehmen."
   },
   "optThemeOverridden": {
-    "message": "Popup, diese Einstellungsseite und die Seite „Notizen & Vokabeln“ folgen $PRESET$, dort bestimmt also dieses Preset Hell oder Dunkel.",
+    "message": "Popup, diese Einstellungsseite und die Bibliothek folgen $PRESET$, dort bestimmt also dieses Preset Hell oder Dunkel.",
     "placeholders": {
       "preset": {
         "content": "$1"
       }
     }
   },
-  "optThemeHint": { "message": "Schaltet Popup, diese Einstellungsseite, die Seite „Notizen & Vokabeln“ und die Leseansicht zwischen Hell und Dunkel um. Presets mit eigenem Farbschema (z. B. Dracula) überschreiben dies auf den Seiten, die dem Preset folgen; die Leseansicht kann es im „Aa“-Fenster je Gerät überschreiben." },
+  "optThemeHint": { "message": "Schaltet Popup, diese Einstellungsseite, die Bibliothek und die Leseansicht zwischen Hell und Dunkel um. Presets mit eigenem Farbschema (z. B. Dracula) überschreiben dies auf den Seiten, die dem Preset folgen; die Leseansicht kann es im „Aa“-Fenster je Gerät überschreiben." },
   "secPopupElements": {
     "message": "Popup-Elemente"
   },
@@ -3411,10 +3411,11 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "Nach dem Verbinden synchronisiert dieses Gerät Vokabeln, Markierungen, Notizen und vollständige KI-Wörterbucheinträge samt Ergänzungen des aktuellen Pinboard-Kontos. Die Verbindung gilt nur für dieses Gerät. Google Drive synchronisiert keine Einstellungen oder Zugangsdaten."
+      "message": "Nach dem Verbinden synchronisiert dieses Gerät Vokabeln, Markierungen und Notizen, vollständige KI-Wörterbucheinträge samt Ergänzungen sowie gespeicherte Gespräche mit ihren Quellenauszügen für das aktuelle Pinboard-Konto."
     },
+    "vocabDriveConnectionHint": { "message": "Verbinde jedes Gerät einzeln. Google Drive synchronisiert keine Einstellungen oder Zugangsdaten." },
     "vocabDriveDisclosure": {
-      "message": "Kopien im privaten appDataFolder von Google Drive liegen im Klartext vor, ohne Ende-zu-Ende-Verschlüsselung. Sie können Wörter, Definitionen, KI-Einträge samt Ergänzungen, dafür verwendete Lernprofile, zitierte Auszüge, Notizen, Quell-URLs, Titel und Zeitangaben enthalten."
+      "message": "Kopien liegen im privaten Google-Drive-Ordner der Erweiterung als Klartext vor, ohne Ende-zu-Ende-Verschlüsselung. Neben den gespeicherten Inhalten können sie die für Ergänzungen verwendeten Lernpräferenzen, zitierte Auszüge, Quell-URLs, Titel und Zeitangaben enthalten."
     },
     "vocabDriveLoading": {
       "message": "Google-Drive-Synchronisierungsstatus wird geladen…"
@@ -3465,7 +3466,7 @@
       "message": "Jetzt synchronisieren"
     },
     "vocabDriveManage": {
-      "message": "Unter „Daten“ verwalten"
+      "message": "Sync-Einstellungen"
     },
     "vocabDriveDisconnect": {
       "message": "Dieses Gerät trennen"
@@ -4080,8 +4081,8 @@
   "skimStop": { "message": "Stopp" },
   "skimGenerating": { "message": "Kernpunkte werden erzeugt…" },
   "skimFailed": { "message": "Kernpunkte konnten nicht erzeugt werden" },
-  "libraryTitle": { "message": "Notizen & Vokabeln" },
-  "libraryOpen": { "message": "Notizen & Vokabeln öffnen" },
+  "libraryTitle": { "message": "Bibliothek" },
+  "libraryOpen": { "message": "Bibliothek öffnen" },
   "libraryDetailTitle": { "message": "Wortdetails" },
   "libraryNotesDetailEmpty": { "message": "Wähle eine Markierung aus der Liste, um sie ganz zu lesen." },
   "libraryPageCount": { "message": "$COUNT$ auf dieser Seite", "placeholders": { "count": { "content": "$1" } } },

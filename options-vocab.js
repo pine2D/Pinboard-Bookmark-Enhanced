@@ -684,7 +684,6 @@ async function _pbpVocabDrivePointer() {
   }
   el.textContent = "Google Drive · " + t(connected ? "connectionConnected" : "connectionNotConnected");
   el.classList.remove("ok", "pending");
-  el.classList.add(connected ? "ok" : "pending");
 }
 async function renderVocabPanel() {
   ++_vocabRenderGen;

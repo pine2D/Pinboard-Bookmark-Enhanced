@@ -1620,20 +1620,20 @@
     "message": "Les pages de l'extension suivent le thème Pinboard sélectionné"
   },
   "popupFollowHint": {
-    "message": "Lorsque l'option est activée, le popup, cette page de réglages et la page Bloc-notes et vocabulaire utilisent la palette du préréglage Pinboard sélectionné ; lorsqu'elle est désactivée, ils utilisent la palette par défaut dans le mode clair/sombre ci-dessus. La page Lecture conserve toujours sa propre palette de lecture."
+    "message": "Lorsque l'option est activée, le popup, cette page de réglages et la bibliothèque utilisent la palette du préréglage Pinboard sélectionné ; lorsqu'elle est désactivée, ils utilisent la palette par défaut dans le mode clair/sombre ci-dessus. La page Lecture conserve toujours sa propre palette de lecture."
   },
   "optFollowNeedsPreset": {
     "message": "Choisissez d’abord un préréglage Pinboard ci-dessous. Avec « Sans préréglage », il n’y a aucune palette à suivre."
   },
   "optThemeOverridden": {
-    "message": "Le popup, cette page de réglages et la page Bloc-notes et vocabulaire suivent $PRESET$ : c’est lui qui y décide du mode clair ou sombre.",
+    "message": "Le popup, cette page de réglages et la bibliothèque suivent $PRESET$ : c’est lui qui y décide du mode clair ou sombre.",
     "placeholders": {
       "preset": {
         "content": "$1"
       }
     }
   },
-  "optThemeHint": { "message": "Bascule le popup, cette page de réglages, la page Bloc-notes et vocabulaire et la page Lecture entre clair et sombre. Les préréglages dotés de leur propre schéma (Dracula, par exemple) remplacent ce réglage sur les pages qui suivent le préréglage ; la page Lecture permet de le redéfinir sur chaque appareil depuis son panneau « Aa »." },
+  "optThemeHint": { "message": "Bascule le popup, cette page de réglages, la bibliothèque et la page Lecture entre clair et sombre. Les préréglages dotés de leur propre schéma (Dracula, par exemple) remplacent ce réglage sur les pages qui suivent le préréglage ; la page Lecture permet de le redéfinir sur chaque appareil depuis son panneau « Aa »." },
   "secPopupElements": {
     "message": "Éléments du popup"
   },
@@ -3411,10 +3411,11 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "Une fois connecté, cet appareil synchronise le vocabulaire, les surlignages, les notes et les entrées IA complètes avec leurs compléments pour le compte Pinboard actuel. La connexion ne concerne que cet appareil. Google Drive ne synchronise ni les réglages ni les identifiants."
+      "message": "Une fois connecté, cet appareil synchronise le vocabulaire, les surlignages et notes, les entrées IA complètes et leurs compléments, ainsi que les conversations enregistrées avec leurs extraits sources pour le compte Pinboard actuel."
     },
+    "vocabDriveConnectionHint": { "message": "Connectez chaque appareil séparément. Google Drive ne synchronise ni les réglages ni les identifiants." },
     "vocabDriveDisclosure": {
-      "message": "Les copies dans le dossier privé appDataFolder de Google Drive sont en texte clair, sans chiffrement de bout en bout. Elles peuvent contenir des mots, définitions, entrées IA et compléments, profils d’apprentissage utilisés, citations, notes, URL sources, titres et dates."
+      "message": "Les copies sont stockées en texte clair dans le dossier privé de l’extension sur Google Drive, sans chiffrement de bout en bout. Outre les contenus enregistrés, elles peuvent inclure les préférences d’apprentissage utilisées pour les compléments, les extraits cités, les URL sources, les titres et les dates."
     },
     "vocabDriveLoading": {
       "message": "Chargement de l'état de la synchronisation Google Drive…"
@@ -3465,7 +3466,7 @@
       "message": "Synchroniser maintenant"
     },
     "vocabDriveManage": {
-      "message": "Gérer dans « Données »"
+      "message": "Réglages de synchronisation"
     },
     "vocabDriveDisconnect": {
       "message": "Déconnecter cet appareil"
@@ -4080,8 +4081,8 @@
   "skimStop": { "message": "Arrêter" },
   "skimGenerating": { "message": "Génération des points clés…" },
   "skimFailed": { "message": "Impossible de générer les points clés" },
-  "libraryTitle": { "message": "Bloc-notes et vocabulaire" },
-  "libraryOpen": { "message": "Ouvrir le bloc-notes et le vocabulaire" },
+  "libraryTitle": { "message": "Bibliothèque" },
+  "libraryOpen": { "message": "Ouvrir la bibliothèque" },
   "libraryDetailTitle": { "message": "Détails du mot" },
   "libraryNotesDetailEmpty": { "message": "Choisissez un surlignage dans la liste pour le lire en entier." },
   "libraryPageCount": { "message": "$COUNT$ sur cette page", "placeholders": { "count": { "content": "$1" } } },

@@ -3951,6 +3951,10 @@ html.motion-ready #tag-gov-progress:not([hidden]) {
    the per-class grep evidence. What remains below is genuinely still
    shipped on options.html. ---- */
 #sec-chrome-sync, #sec-google-drive { font-weight: 600; }
+.vocab-entry-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--opt-sp-4); }
+.vocab-entry-row > .fg-actions { margin: 0; min-width: 0; }
+.vocab-entry-row .save-status { margin: 0; overflow-wrap: anywhere; }
+.vocab-drive-pointer, html[data-theme] .vocab-drive-pointer { color: var(--opt-fg-muted); }
 #chrome-sync-section > .fg + .pref-group > .pref-row:first-child > label {
   padding-top: 0;
   min-height: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));

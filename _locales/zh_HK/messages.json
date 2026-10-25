@@ -1620,20 +1620,20 @@
     "message": "擴充功能頁面跟隨 Pinboard 主題預設"
   },
   "popupFollowHint": {
-    "message": "啟用後，彈出視窗、此設定頁和筆記與生詞本頁會使用所選 Pinboard 預設的配色；關閉則按上方的明暗模式使用預設配色。閱讀器一律使用自己的閱讀配色。"
+    "message": "啟用後，彈出視窗、此設定頁和資料庫頁會使用所選 Pinboard 預設的配色；關閉則按上方的明暗模式使用預設配色。閱讀器一律使用自己的閱讀配色。"
   },
   "optFollowNeedsPreset": {
     "message": "先在下方選一個 Pinboard 預設。選「不使用預設」時沒有可跟隨的配色。"
   },
   "optThemeOverridden": {
-    "message": "彈出視窗、此設定頁和筆記與生詞本頁正在跟隨 $PRESET$，這些頁面的明暗由它決定。",
+    "message": "彈出視窗、此設定頁和資料庫頁正在跟隨 $PRESET$，這些頁面的明暗由它決定。",
     "placeholders": {
       "preset": {
         "content": "$1"
       }
     }
   },
-  "optThemeHint": { "message": "切換彈出視窗、此設定頁、筆記與生詞本頁和閱讀器的明暗。自帶明暗的預設（例如 Dracula）會在跟隨預設的頁面上覆寫此項；閱讀器可在其「Aa」面板中按裝置單獨覆寫。" },
+  "optThemeHint": { "message": "切換彈出視窗、此設定頁、資料庫頁和閱讀器的明暗。自帶明暗的預設（例如 Dracula）會在跟隨預設的頁面上覆寫此項；閱讀器可在其「Aa」面板中按裝置單獨覆寫。" },
   "secPopupElements": {
     "message": "彈出視窗元素"
   },
@@ -3411,10 +3411,11 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "連線後，此裝置會同步目前 Pinboard 帳戶的生詞、標記、筆記及完整 AI 詞條和補充用法。連線只對此裝置生效，Google Drive 不同步設定或憑證。"
+      "message": "連線後，同步目前 Pinboard 帳戶的生詞、標記及筆記、完整 AI 詞條及補充，以及已儲存的問答和引用。"
     },
+    "vocabDriveConnectionHint": { "message": "每部裝置需分別連線。Google Drive 不同步設定或憑證。" },
     "vocabDriveDisclosure": {
-      "message": "Google Drive 私有 appDataFolder 中的副本是明文，未經端對端加密。內容可包括生詞、釋義、AI 詞條及補充、生成補充時使用的學習者資料、引用摘錄、筆記、來源網址、標題及時間。"
+      "message": "副本以明文儲存在 Google Drive 的擴充功能專用資料夾中，未經端對端加密。除已儲存的內容外，還可能包括生成補充時使用的學習偏好、引用原文、來源網址、標題及時間。"
     },
     "vocabDriveLoading": {
       "message": "正在讀取 Google Drive 同步狀態…"
@@ -3465,7 +3466,7 @@
       "message": "立即同步"
     },
     "vocabDriveManage": {
-      "message": "在「資料」中管理"
+      "message": "同步設定"
     },
     "vocabDriveDisconnect": {
       "message": "中斷這部裝置的連接"
@@ -4080,8 +4081,8 @@
   "skimStop": { "message": "停止" },
   "skimGenerating": { "message": "正在生成要點…" },
   "skimFailed": { "message": "要點生成失敗" },
-  "libraryTitle": { "message": "筆記與生詞本" },
-  "libraryOpen": { "message": "開啟筆記與生詞本" },
+  "libraryTitle": { "message": "資料庫" },
+  "libraryOpen": { "message": "開啟資料庫" },
   "libraryDetailTitle": { "message": "詞條詳情" },
   "libraryNotesDetailEmpty": { "message": "從清單中選一則標記，查看完整內容。" },
   "libraryPageCount": { "message": "此網頁共 $COUNT$ 項", "placeholders": { "count": { "content": "$1" } } },

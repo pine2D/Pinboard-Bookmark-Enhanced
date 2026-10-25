@@ -1620,20 +1620,20 @@
     "message": "Strony rozszerzenia zgodne z motywem Pinboard"
   },
   "popupFollowHint": {
-    "message": "Po włączeniu okienko, ta strona ustawień i strona „Notatki i słówka” używają palety wybranego motywu Pinboard; po wyłączeniu używają domyślnej palety w wybranym wyżej trybie jasnym/ciemnym. Czytnik zawsze zachowuje własną paletę czytania."
+    "message": "Po włączeniu okienko, ta strona ustawień i biblioteka używają palety wybranego motywu Pinboard; po wyłączeniu używają domyślnej palety w wybranym wyżej trybie jasnym/ciemnym. Czytnik zawsze zachowuje własną paletę czytania."
   },
   "optFollowNeedsPreset": {
     "message": "Najpierw wybierz poniżej motyw Pinboard. Przy „Bez motywu” nie ma palety do zastosowania."
   },
   "optThemeOverridden": {
-    "message": "Okienko, ta strona ustawień i strona „Notatki i słówka” korzystają z motywu $PRESET$, więc to on decyduje tam o trybie jasnym lub ciemnym.",
+    "message": "Okienko, ta strona ustawień i biblioteka korzystają z motywu $PRESET$, więc to on decyduje tam o trybie jasnym lub ciemnym.",
     "placeholders": {
       "preset": {
         "content": "$1"
       }
     }
   },
-  "optThemeHint": { "message": "Przełącza okienko, tę stronę ustawień, stronę „Notatki i słówka” i czytnik między trybem jasnym a ciemnym. Motywy z własnym schematem (np. Dracula) mają pierwszeństwo na stronach, które podążają za motywem; czytnik może to zmienić osobno na każdym urządzeniu w panelu „Aa”." },
+  "optThemeHint": { "message": "Przełącza okienko, tę stronę ustawień, bibliotekę i czytnik między trybem jasnym a ciemnym. Motywy z własnym schematem (np. Dracula) mają pierwszeństwo na stronach, które podążają za motywem; czytnik może to zmienić osobno na każdym urządzeniu w panelu „Aa”." },
   "secPopupElements": {
     "message": "Elementy okienka"
   },
@@ -3411,10 +3411,11 @@
       "message": "Dysk Google"
     },
     "vocabDriveScope": {
-      "message": "Po połączeniu to urządzenie synchronizuje słownictwo, wyróżnienia, notatki i pełne hasła AI wraz z uzupełnieniami dla bieżącego konta Pinboard. Połączenie dotyczy tylko tego urządzenia. Google Drive nie synchronizuje ustawień ani danych logowania."
+      "message": "Po połączeniu to urządzenie synchronizuje słownictwo, wyróżnienia i notatki, pełne hasła AI z uzupełnieniami oraz zapisane rozmowy z cytowanymi fragmentami dla bieżącego konta Pinboard."
     },
+    "vocabDriveConnectionHint": { "message": "Połącz każde urządzenie osobno. Google Drive nie synchronizuje ustawień ani danych logowania." },
     "vocabDriveDisclosure": {
-      "message": "Kopie w prywatnym folderze appDataFolder na Google Drive są zapisane jawnym tekstem, bez szyfrowania end-to-end. Mogą zawierać słowa, definicje, hasła AI i uzupełnienia, użyte profile nauki, cytaty, notatki, źródłowe adresy URL, tytuły i daty."
+      "message": "Kopie są zapisywane jawnym tekstem w prywatnym folderze rozszerzenia na Google Drive, bez szyfrowania end-to-end. Oprócz zapisanych treści mogą zawierać preferencje nauki użyte w uzupełnieniach, cytowane fragmenty, źródłowe adresy URL, tytuły i daty."
     },
     "vocabDriveLoading": {
       "message": "Wczytywanie stanu synchronizacji z Dyskiem Google…"
@@ -3465,7 +3466,7 @@
       "message": "Synchronizuj teraz"
     },
     "vocabDriveManage": {
-      "message": "Zarządzaj w ustawieniach „Dane”"
+      "message": "Ustawienia synchronizacji"
     },
     "vocabDriveDisconnect": {
       "message": "Odłącz to urządzenie"
@@ -4080,8 +4081,8 @@
   "skimStop": { "message": "Zatrzymaj" },
   "skimGenerating": { "message": "Generowanie kluczowych punktów…" },
   "skimFailed": { "message": "Nie udało się wygenerować kluczowych punktów" },
-  "libraryTitle": { "message": "Notatki i słówka" },
-  "libraryOpen": { "message": "Otwórz notatki i słówka" },
+  "libraryTitle": { "message": "Biblioteka" },
+  "libraryOpen": { "message": "Otwórz bibliotekę" },
   "libraryDetailTitle": { "message": "Szczegóły słówka" },
   "libraryNotesDetailEmpty": { "message": "Wybierz zaznaczenie z listy, aby przeczytać je w całości." },
   "libraryPageCount": { "message": "Na tej stronie: $COUNT$", "placeholders": { "count": { "content": "$1" } } },

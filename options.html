@@ -818,15 +818,13 @@
     <div id="panel-vocab" class="panel" role="tabpanel" aria-labelledby="tab-vocab">
       <section class="settings-section">
         <h2 class="section-title" data-i18n="dictVocabSection">Vocabulary</h2>
-        <div class="vocab-entry-row">
+        <div class="fg vocab-entry-row">
           <a class="btn btn-sm" id="vocab-open-library" href="library.html#vocab" target="_blank" rel="noopener">
-            <span class="btn-ic" data-ic="bookMarked"></span><span data-i18n="libraryOpen">Open notes and vocabulary</span>
+            <span class="btn-ic" data-ic="bookMarked"></span><span data-i18n="libraryOpen">Open library</span>
           </a>
-        </div>
-        <div class="fg">
           <div class="fg-actions">
-            <span class="save-status pending" id="vocab-drive-pointer" role="status" aria-live="polite"></span>
-            <button type="button" class="btn btn-sm" id="vocab-drive-pointer-open" data-i18n="vocabDriveManage">Manage in Data</button>
+            <span class="save-status vocab-drive-pointer" id="vocab-drive-pointer" role="status" aria-live="polite"></span>
+            <button type="button" class="btn btn-sm ghost" id="vocab-drive-pointer-open" data-i18n="vocabDriveManage">Sync settings</button>
           </div>
         </div>
         <div class="fg entry-block context-help-host" data-help-role="field">
@@ -1303,9 +1301,10 @@
                 <div class="bl subhead" role="heading" aria-level="3" id="sec-google-drive" data-i18n="vocabDriveSection">Google Drive</div>
                 <details class="context-help">
                   <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-                  <p class="hint context-help-body" data-i18n="vocabDriveScope">Once connected, this device syncs vocabulary, highlights, notes, and complete AI dictionary entries with their supplements for the current Pinboard account. The connection applies to this device only. Google Drive does not sync settings or credentials.</p>
-                  <p class="hint context-help-body" id="vocab-drive-disclosure" data-i18n="vocabDriveDisclosure">Copies in your Google Drive appDataFolder are plaintext, without end-to-end encryption. They can include saved words, definitions, highlighted excerpts, notes, source URLs, titles, and timestamps.</p>
+                  <p class="hint context-help-body" data-i18n="vocabDriveConnectionHint">Connect each device separately. Google Drive does not sync settings or credentials.</p>
+                  <p class="hint context-help-body" id="vocab-drive-disclosure" data-i18n="vocabDriveDisclosure">Copies in Google Drive are plaintext, without end-to-end encryption. They include the saved content above and associated learning preferences, cited excerpts, titles, URLs, and timestamps.</p>
                 </details>
+                <p class="hint" data-i18n="vocabDriveScope">Once connected, this device syncs vocabulary, highlights and notes, complete AI entries and supplements, and saved conversations with their cited excerpts for the current Pinboard account.</p>
               </div>
               <div id="vocab-drive-body">
                 <p id="vocab-drive-state" class="save-status vocab-drive-state" role="status" aria-live="polite" data-i18n="vocabDriveLoading">Loading Google Drive sync status…</p>

@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="color-scheme" content="light dark" />
-  <title>Notes &amp; Vocabulary</title>
+  <title>Library</title>
   <script src="options-theme-early.js"></script>
   <link rel="stylesheet" href="library.css">
 </head>
 <body>
   <header class="lib-header">
-    <h1 data-i18n="libraryTitle">Notes &amp; Vocabulary</h1>
-    <nav class="lib-tabs" role="tablist" data-i18n-aria="libraryTitle" aria-label="Notes &amp; Vocabulary">
-      <!-- Notes first, as the page's name reads (2026-10-16 ruling); with no
+    <h1 data-i18n="libraryTitle">Library</h1>
+    <nav class="lib-tabs" role="tablist" data-i18n-aria="libraryTitle" aria-label="Library">
+      <!-- Keep Notes first (2026-10-16 ordering); with no
            hash and no remembered view it is also the view that opens
            (library.js _pbpLibInitialView). Every entry point names its view in
            the hash, and the static state below stays on Vocabulary: the
@@ -20,7 +20,7 @@
       <button type="button" class="lib-tab" id="lib-tab-vocab" role="tab" aria-selected="true" aria-controls="view-vocab" data-i18n="dictVocabSection">Vocabulary</button>
       <button type="button" class="lib-tab" id="lib-tab-ask" role="tab" aria-selected="false" aria-controls="view-ask" data-i18n="askHistoryTab">Questions</button>
     </nav>
-    <!-- Google Drive status, one read-only line for both views (library.js
+    <!-- Google Drive status, one read-only line across all views (library.js
          pbpLibRefreshDriveLine): hidden unless this device is connected for
          the account on screen. Always a door into the Data settings tab, where the
          Drive panel explains any error and holds the buttons that fix it. -->

@@ -901,9 +901,10 @@ async function loadLocale(loc) {
       plainBroken.length === 0, `missing or malformed: ${plainBroken.slice(0, 12).join(", ")}`);
 
     const DRIVE_ZH_CN = {
-      // 2026-10-19: one word for "this device" across the Drive copy (此设备,
-      // the panel's own status lines), retiring the spec's 本机.
-      vocabDriveScope: "连接后，本设备会同步当前 Pinboard 账号的生词、高亮、笔记及完整 AI 词条和补充用法。连接仅对本设备生效，Google Drive 不同步设置或凭据。",
+      // Scope names all four datasets; device/credential boundaries live in
+      // the adjacent help. Status lines keep the shared wording 此设备.
+      vocabDriveScope: "连接后，同步当前 Pinboard 账号的生词、高亮与笔记、完整 AI 词条及补充，以及已保存的问答和引用。",
+      vocabDriveConnectionHint: "每台设备需单独连接。Google Drive 不同步设置或凭据。",
       vocabDriveWorking: "正在与 Google Drive 同步…",
       vocabDriveSynced: "已与 Google Drive 同步。",
       vocabDriveErrorNetwork: "无法连接 Google 服务，可能是网络中断或代理未覆盖 googleapis.com。",
