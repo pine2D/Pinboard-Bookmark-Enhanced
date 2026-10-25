@@ -218,7 +218,8 @@ function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
 // the message. Read off the SERVER's own answer, never off a model allowlist
 // (rules/ai-providers.md: the model field is free text), and consumed by the
 // body-dialect self-heal below.
-const _AI_HEALABLE_PARAMS = ["max_tokens", "max_completion_tokens", "temperature", "reasoning_effort", "response_format"];
+const _AI_HEALABLE_PARAMS = ["max_tokens", "max_completion_tokens", "temperature", "reasoning_effort", "response_format",
+  "thinking", "enable_thinking", "thinkingBudget", "thinkingConfig", "reasoning"];
 // "The server does not accept this parameter AT ALL", as opposed to "the value
 // you sent is out of range" — the distinction the whole self-heal turns on.
 const _AI_PARAM_REFUSED_RE = /unsupported|unrecognized|not\s+supported|does\s+not\s+support|unknown\s+(?:parameter|argument|field)|extra\s+inputs/;
@@ -230,6 +231,13 @@ function _aiRejectedParam(body, detail) {
   const formatNamed = /^response_format(?:\.type)?$/.test(param) || /\bresponse_format\b/.test(detail);
   if (formatNamed && /\bjson_(?:schema|object)\b/.test(detail) &&
       /unknown\s+variant|(?:must|should)\s+be\s+(?:one\s+of|either|["'`]*(?:text|json_object)\b)/.test(detail)) return "response_format";
+  if (_AI_PARAM_REFUSED_RE.test(detail) && _AI_HEALABLE_PARAMS.includes(param)) return param;
+  // Value refusals can identify a mandatory-thinking endpoint without guessing
+  // from every 400. Never interpret an unrelated schema/context error this way.
+  const thinkingParam = _AI_HEALABLE_PARAMS.slice(3).filter(p => p !== "response_format")
+    .find(p => param === p || param.startsWith(p + ".") || new RegExp("\\b" + p + "\\b", "i").test(detail));
+  if (thinkingParam && (!param || param === thinkingParam || param.startsWith(thinkingParam + ".")) &&
+      /not\s+(?:supported|allowed)|unsupported|cannot\s+(?:be\s+)?(?:disabled|zero)|must\s+be\s+(?:true|enabled)|only\s+(?:supports?|allows?)|restricted\s+to\s+true/.test(detail)) return thinkingParam;
   // The wording gate guards BOTH routes below, error.param included. That field
   // is filled for ANY parameter-level validation error, range errors among them
   // ("max_tokens is too large: this model supports at most 4096 completion
@@ -246,7 +254,7 @@ function _aiRejectedParam(body, detail) {
   // is not supported... Use 'max_completion_tokens' instead."), so first mention wins.
   let best = null, bestAt = Infinity;
   for (const p of _AI_HEALABLE_PARAMS) {
-    const at = detail.search(new RegExp("\\b" + p + "\\b"));
+    const at = detail.search(new RegExp("\\b" + p + "\\b", "i"));
     if (at !== -1 && at < bestAt) { best = p; bestAt = at; }
   }
   return best;
@@ -329,25 +337,44 @@ function _aiEffectiveExtraBody(cfg, thinkRejected, omitThinkingFallback = false)
     : (cfg && cfg.thinkingOff) || {};
   return { ...base, ...thinking };
 }
-function _aiShouldRetryNoThink(cfg, thinkRejected, errStatus) {
-  return !!(cfg && cfg.thinkingOff) && !thinkRejected && (errStatus === 400 || errStatus === 422);
+function _aiThinkingParamMatches(body, hint) {
+  return !!hint && !!body && (Object.hasOwn(body, hint) ||
+    (hint === "thinkingBudget" && Object.hasOwn(body, "thinkingConfig")));
+}
+function _aiShouldRetryNoThink(cfg, thinkRejected, error) {
+  return !thinkRejected && [400, 422].includes(error?.status) && _aiThinkingParamMatches(cfg?.thinkingOff, error?.paramHint);
 }
 
 const _PBP_THINK_REJECT_KEY = "pbpThinkReject";
+const _AI_CAPABILITY_TTL = 7 * 86400000;
+function _aiCapabilityKey(provider, model, cfg) {
+  // Versioned keys deliberately ignore old, unscoped decisions. Endpoint
+  // changes and upgrades must get a fresh chance to accept their own dialect.
+  const endpoint = String(cfg?.endpoint || cfg?.base || "").trim().replace(/\/+$/, "");
+  return JSON.stringify([2, provider, endpoint, model || ""]);
+}
+function _aiCapabilityFresh(record) {
+  return record && Number.isSafeInteger(record.expiresAt) && record.expiresAt > Date.now() &&
+    record.expiresAt <= Date.now() + _AI_CAPABILITY_TTL;
+}
+function _aiCapabilityRows(rows) {
+  return Object.fromEntries(Object.entries(rows || {}).filter(([, value]) => _aiCapabilityFresh(value))
+    .sort((a, b) => b[1].expiresAt - a[1].expiresAt).slice(0, 127));
+}
 async function _aiThinkRejected(memoKey) {
   try {
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return false;
     const o = await chrome.storage.local.get(_PBP_THINK_REJECT_KEY);
     const m = o && o[_PBP_THINK_REJECT_KEY];
-    return !!(m && m[memoKey]);
+    return _aiCapabilityFresh(m?.[memoKey]) && m[memoKey].rejected === true;
   } catch (_) { return false; }
 }
 async function _aiThinkReject(memoKey) {
   try {
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return;
     const o = await chrome.storage.local.get(_PBP_THINK_REJECT_KEY);
-    const m = (o && o[_PBP_THINK_REJECT_KEY]) || {};
-    m[memoKey] = true;
+    const m = _aiCapabilityRows(o?.[_PBP_THINK_REJECT_KEY]);
+    m[memoKey] = { rejected: true, expiresAt: Date.now() + _AI_CAPABILITY_TTL };
     await chrome.storage.local.set({ [_PBP_THINK_REJECT_KEY]: m });
   } catch (_) { /* storage unavailable: skip memo, fallback still works per-call */ }
 }
@@ -391,7 +418,7 @@ async function _aiParamFixGet(memoKey) {
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return null;
     const o = await chrome.storage.local.get(_PBP_PARAM_FIX_KEY);
     const rec = o && o[_PBP_PARAM_FIX_KEY] && o[_PBP_PARAM_FIX_KEY][memoKey];
-    return (rec && typeof rec === "object") ? rec : null;
+    return _aiCapabilityFresh(rec) ? rec : null;
   } catch (_) { return null; }
 }
 // Written the moment the server NAMES the field, not on retry success: the
@@ -402,8 +429,8 @@ async function _aiParamFixLearn(memoKey, repair) {
   try {
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) return;
     const o = await chrome.storage.local.get(_PBP_PARAM_FIX_KEY);
-    const m = (o && o[_PBP_PARAM_FIX_KEY]) || {};
-    m[memoKey] = { ...(m[memoKey] || {}), ...repair };
+    const m = _aiCapabilityRows(o?.[_PBP_PARAM_FIX_KEY]);
+    m[memoKey] = { ...(m[memoKey] || {}), ...repair, expiresAt: Date.now() + _AI_CAPABILITY_TTL };
     await chrome.storage.local.set({ [_PBP_PARAM_FIX_KEY]: m });
   } catch (_) { /* storage unavailable: skip memo, self-heal still works per-call */ }
 }
@@ -419,7 +446,7 @@ const _AI_DIALECT_MAX_ATTEMPTS = 4;
 // makeCall(extraBody, dialect) — dialect is null for bespoke bodies (Gemini),
 // which have no max_tokens/temperature of the OpenAI-compat spelling to repair.
 async function _aiWithDialectFallback(provider, model, cfg, makeCall) {
-  const memoKey = provider + ":" + (model || "");
+  const memoKey = _aiCapabilityKey(provider, model, cfg);
   const [thinkMemo, paramMemo] = await Promise.all([_aiThinkRejected(memoKey), _aiParamFixGet(memoKey)]);
   let thinkRejected = thinkMemo;
   let dialect = (cfg && cfg.bespokeBody) ? null : _aiBodyDialect(cfg, paramMemo);
@@ -449,12 +476,12 @@ async function _aiWithDialectFallback(provider, model, cfg, makeCall) {
         await _aiParamFixLearn(memoKey, repair);
         continue;
       }
-      if (_aiShouldRetryNoThink(cfg, thinkRejected, status)) {
+      if (_aiShouldRetryNoThink(cfg, thinkRejected, e)) {
         thinkRejected = true;                          // retry without thinkingOff
         healedThink = true;
         continue;
       }
-      if (fallbackActive && (status === 400 || status === 422)) {
+      if (fallbackActive && (status === 400 || status === 422) && _aiThinkingParamMatches(cfg.thinkingFallback, e.paramHint)) {
         dialect = { ...dialect, omitThinkingFallback: true };
         // Named refusal is evidence on its own. A generic 4xx only becomes a
         // lasting capability decision after the stripped request is accepted.
@@ -593,9 +620,15 @@ async function callAI(s, prompt, opts = {}) {
   // without knowing a model. Preserve declared native thinking controls;
   // unknown compatible endpoints negotiate the standard field via the same
   // bounded server-driven fallback, never a model-name list.
-  const cfg = { ...registered, jsonMode: opts.jsonMode === true, schemaMode: !!opts.responseSchema,
+  const endpoint = _openaiCompatBase(registered, s);
+  const cfg = { ...registered, endpoint, jsonMode: opts.jsonMode === true,
+    // Arbitrary compatible gateways do not promise constrained decoding. Use
+    // the common JSON mode there; strict local validation always still runs.
+    schemaMode: !!opts.responseSchema && p === "openai" && endpoint.replace(/\/+$/, "") === registered.base,
     ...(opts.totalOutputBudget === true ? { tokenField: "max_completion_tokens" } : {}),
-    ...(!registered.thinkingOff && opts.reasoningEffort === "low" ? { thinkingOff: { reasoning_effort: "low" } } : {})
+    ...(!registered.thinkingOff && opts.reasoningEffort === "low" ? { thinkingOff: { reasoning_effort: "low" } } : {}),
+    ...(!registered.thinkingOff && opts.reasoningEffort === "minimum"
+      ? { thinkingOff: { reasoning_effort: "none" }, thinkingFallback: { reasoning_effort: "low" } } : {})
   };
   const model = opts.model || s[cfg.modelField] || cfg.defaultModel;
   return _aiWithDialectFallback(p, model, cfg, (extraBody, dialect) =>
@@ -734,7 +767,8 @@ async function _aiReadCompletion(res, protocol, opts) {
 // because the model field is free text.
 // bespokeBody: generationConfig, not the OpenAI-compat body — the token-field /
 // temperature repairs below have nothing to rewrite here and must not be tried.
-const _GEMINI_THINKING_CFG = { thinkingOff: { thinkingConfig: { thinkingBudget: 0 } }, bespokeBody: true };
+const _GEMINI_THINKING_CFG = { thinkingOff: { thinkingConfig: { thinkingBudget: 0 } }, bespokeBody: true,
+  endpoint: "https://generativelanguage.googleapis.com/v1beta" };
 
 async function callGemini(s, prompt, opts = {}) {
   const model = opts.model || s.geminiModel || "gemini-3.5-flash-lite";
@@ -794,7 +828,7 @@ async function callOpenAICompat(baseUrl, apiKey, model, prompt, opts = {}) {
       model,
       messages: [{ role: "user", content: prompt }],
       ...(opts.omitTemperature ? {} : { temperature: 0.3 }),
-      ...(opts.jsonMode && !opts.omitResponseFormat ? { response_format: opts.responseSchema && !opts.omitJsonSchema
+      ...(opts.jsonMode && !opts.omitResponseFormat ? { response_format: opts.schemaMode && opts.responseSchema && !opts.omitJsonSchema
         ? { type: "json_schema", json_schema: { name: "response", strict: true, schema: opts.responseSchema } }
         : { type: "json_object" } } : {}),
       [opts.tokenField || "max_tokens"]: maxTokens,
@@ -1270,7 +1304,7 @@ async function callAIStream(s, prompt, opts = {}, onDelta) {
   const cfg = OPENAI_COMPAT_PROVIDERS[p];
   if (!cfg) throw new Error("Unknown provider: " + p);
   const model = opts.model || s[cfg.modelField] || cfg.defaultModel;
-  return _aiWithDialectFallback(p, model, cfg, (extraBody, dialect) =>
+  return _aiWithDialectFallback(p, model, { ...cfg, endpoint: _openaiCompatBase(cfg, s) }, (extraBody, dialect) =>
     _streamOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], model, prompt, { ...opts, extraBody, ...dialect }, cb));
 }
 

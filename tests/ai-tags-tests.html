@@ -1073,7 +1073,7 @@ suite("endpoint origin policy", () => {
       assertEq(bodies.length, 2, "one strip-and-retry");
       assertEq(bodies[0].generationConfig.thinkingConfig.thinkingBudget, 0, "first attempt disables thinking");
       assertEq("thinkingConfig" in bodies[1].generationConfig, false, "retry drops the rejected field");
-      assertEq(!!(stored.pbpThinkReject && stored.pbpThinkReject["gemini:gemini-2.5-pro"]), true, "rejection memoized per model");
+      assertEq(!!(stored.pbpThinkReject && stored.pbpThinkReject[JSON.stringify([2,"gemini","https://generativelanguage.googleapis.com/v1beta","gemini-2.5-pro"])]?.rejected), true, "rejection memoized per model");
     });
 
     await atest("gemini stream honours the reject memo and leaves the reader default untouched", async () => {
@@ -1087,7 +1087,7 @@ suite("endpoint origin policy", () => {
         i18n: { getMessage: () => "" },
         permissions: { contains: async () => true },
         storage: { local: {
-          get: async () => ({ pbpThinkReject: { "gemini:gemini-2.5-pro": true } }),
+          get: async () => ({ pbpThinkReject: { [JSON.stringify([2,"gemini","https://generativelanguage.googleapis.com/v1beta","gemini-2.5-pro"])]: {rejected:true,expiresAt:Date.now()+86400000} } }),
           set: async () => {}
         } }
       };
@@ -1172,7 +1172,7 @@ suite("endpoint origin policy", () => {
         let current = true, fetches = 0, calls = 0, caught;
         guardedChrome(); window.fetch = async () => {
           fetches++;
-          if (fetches === 1) { current = false; return new Response('{"error":{"message":"Unsupported thinking configuration"}}', { status: 400 }); }
+          if (fetches === 1) { current = false; return new Response(JSON.stringify({error:{message:provider==='gemini'?'thinkingBudget is not supported':'Unsupported parameter: reasoning_effort'}}), { status: 400 }); }
           return guardedReply(provider);
         };
         try { await callAI(settings, "fixture", { beforeRequest: async () => {
@@ -1185,7 +1185,7 @@ suite("endpoint origin policy", () => {
       await atest(provider + " revalidates and preserves an allowed dialect retry", async () => {
         let fetches = 0, calls = 0;
         guardedChrome(); window.fetch = async () => ++fetches === 1
-          ? new Response('{"error":{"message":"Unsupported thinking configuration"}}', { status: 422 }) : guardedReply(provider);
+          ? new Response(JSON.stringify({error:{message:provider==='gemini'?'thinkingBudget is not supported':'Unsupported parameter: reasoning_effort'}}), { status: 422 }) : guardedReply(provider);
         const result = await callAI(settings, "fixture", { beforeRequest: async () => { calls++; } });
         assertEq(calls, 2, "both dispatches require validation");
         assertEq(fetches, 2, "allowed retry count");

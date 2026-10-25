@@ -57,7 +57,8 @@ const PROTOCOLS=[
     thinking:{message:{content:'',thinking:'PRIVATE_THOUGHT_SENTINEL'},done:true,done_reason:'stop'}}
 ];
 let stored={},responses=[],calls=[],checks=0,pass=0,fail=0;
-const model='arbitrary-future-user-model',key='minimax:'+model;
+const model='arbitrary-future-user-model',key=JSON.stringify([2,'minimax','https://api.minimaxi.com/v1',model]);
+const fresh=()=>({rejected:true,expiresAt:Date.now()+6*86400000});
 const settings={aiProvider:'minimax',minimaxApiKey:'nonsecret-fixture',minimaxModel:model};
 const reply=(body,status=200)=>({body,status});
 function reset(queue,seed={}){
@@ -105,27 +106,27 @@ await test('MiniMax rejection falls back to low effort at unchanged budget',asyn
   reset([reply(OFF_REFUSED,400),reply(OK)]);assert(await run()==='ready');
   assert(calls.length===2&&checks===2&&calls[0].thinking.type==='disabled'&&!('reasoning_effort'in calls[0]));
   assert(calls[1].reasoning_effort==='low'&&!('thinking'in calls[1])&&calls.every(body=>body.max_tokens===2048));
-  assert(stored.pbpThinkReject[key]===true);
+  assert(stored.pbpThinkReject[key].rejected===true);
 });
 await test('a previous thinking rejection uses low immediately for freely entered models',async()=>{
-  reset([reply(OK)],{pbpThinkReject:{[key]:true}});await run();
+  reset([reply(OK)],{pbpThinkReject:{[key]:fresh()}});await run();
   assert(calls.length===1&&calls[0].model===model&&calls[0].reasoning_effort==='low'&&!('thinking'in calls[0]));
 });
 await test('explicit low refusal is remembered even when an unrelated later request fails',async()=>{
-  reset([reply(LOW_REFUSED,400),reply({error:{message:'unavailable'}},500)],{pbpThinkReject:{[key]:true}});
+  reset([reply(LOW_REFUSED,400),reply({error:{message:'unavailable'}},500)],{pbpThinkReject:{[key]:fresh()}});
   let error;try{await run();}catch(e){error=e;}assert(error.status===500&&calls.length===2);
   assert(calls[0].reasoning_effort==='low'&&!('reasoning_effort'in calls[1])&&stored.pbpAiParamFix[key].omitThinkingFallback===true);
 });
-await test('generic low refusal is remembered only after stripped request succeeds',async()=>{
-  reset([reply({error:{message:'bad request'}},400),reply(OK)],{pbpThinkReject:{[key]:true}});await run();
-  assert(calls.length===2&&!('reasoning_effort'in calls[1])&&stored.pbpAiParamFix[key].omitThinkingFallback===true);
+await test('generic low errors do not cause speculative retries or persist capability decisions',async()=>{
+  reset([reply({error:{message:'bad request'}},400),reply(OK)],{pbpThinkReject:{[key]:fresh()}});let error;try{await run();}catch(e){error=e;}
+  assert(error?.status===400&&calls.length===1&&!stored.pbpAiParamFix);
 });
-await test('generic low refusal followed by server error does not poison the memo',async()=>{
-  reset([reply({error:{message:'bad request'}},400),reply({error:{message:'unavailable'}},500)],{pbpThinkReject:{[key]:true}});
-  try{await run();}catch(error){assert(error.status===500);}assert(calls.length===2&&!stored.pbpAiParamFix?.[key]?.omitThinkingFallback);
+await test('generic low errors do not consume a queued follow-up response',async()=>{
+  reset([reply({error:{message:'bad request'}},400),reply({error:{message:'unavailable'}},500)],{pbpThinkReject:{[key]:fresh()}});
+  try{await run();}catch(error){assert(error.status===400);}assert(calls.length===1&&!stored.pbpAiParamFix?.[key]?.omitThinkingFallback);
 });
 await test('401, 402, 429 and 500 never trigger extra low-effort attempts',async()=>{
-  for(const status of [401,402,429,500]){reset([reply({error:{message:'refused'}},status)],{pbpThinkReject:{[key]:true}});
+  for(const status of [401,402,429,500]){reset([reply({error:{message:'refused'}},status)],{pbpThinkReject:{[key]:fresh()}});
     let error;try{await run();}catch(e){error=e;}assert(error.status===status&&calls.length===1&&!stored.pbpAiParamFix);}
 });
 await test('caller abort never triggers another request or capability memo',async()=>{
@@ -143,7 +144,7 @@ await test('mixed parameter and thinking repairs never exceed four actual reques
 });
 await test('HTTP200 length after low fallback proves acceptance but never pays a third request',async()=>{
   reset([reply(OFF_REFUSED,400),reply(LENGTH_EMPTY)]);await rejected(()=>run(),'output_truncated');
-  assert(calls.length===2&&stored.pbpThinkReject[key]===true&&calls[1].reasoning_effort==='low');
+  assert(calls.length===2&&stored.pbpThinkReject[key].rejected===true&&calls[1].reasoning_effort==='low');
 });
 await test('non-HTTP failure after fallback is not mistaken for accepted parameters',async()=>{
   reset([reply(OFF_REFUSED,400),{error:new TypeError('synthetic transport failure')}]);
@@ -154,7 +155,7 @@ await test('other providers keep their existing strip-only fallback',async()=>{
   assert(calls.length===2&&!('reasoning_effort'in calls[1])&&!('thinking'in calls[1]));
 });
 await test('previously rejected low effort remains omitted on future requests',async()=>{
-  reset([reply(OK)],{pbpThinkReject:{[key]:true},pbpAiParamFix:{[key]:{omitThinkingFallback:true}}});await run();
+  reset([reply(OK)],{pbpThinkReject:{[key]:fresh()},pbpAiParamFix:{[key]:{omitThinkingFallback:true,expiresAt:Date.now()+6*86400000}}});await run();
   assert(calls.length===1&&!('thinking'in calls[0])&&!('reasoning_effort'in calls[0]));
 });
 await test('the dispatch guard can cancel the fallback before it reaches HTTP',async()=>{
@@ -303,6 +304,41 @@ await test('malformed boolean metadata cannot expose thoughts or confirm complet
   ];
   for(const [index,body]of cases){reset([reply(body)]);const error=await rejected(()=>run({requireComplete:true},PROTOCOLS[index].settings),'invalid_response');assert(error.reason==='response_shape'&&calls.length===1&&!error.message.includes('PRIVATE'));}
 });
+await test('unrelated 400 and 422 errors never remove thinking controls or retry',async()=>{
+  for(const status of [400,422]){
+    reset([reply({error:{message:'Invalid JSON schema: required must be an array',param:'response_format'}},status)]);
+    let error;try{await run({jsonMode:true,reasoningEffort:'low'},PROTOCOLS[0].settings);}catch(e){error=e;}
+    assert(error?.status===status&&calls.length===1,'Unrelated error was retried');
+    assert(!stored.pbpThinkReject&&!stored.pbpAiParamFix,'Unrelated error changed capability memory');
+  }
+});
+await test('capability decisions cannot leak between endpoints sharing a model alias',async()=>{
+  const a={...PROTOCOLS[0].settings,customBaseUrl:'https://one.example/v1'},b={...a,customBaseUrl:'https://two.example/v1'};
+  reset([reply({error:{message:'Unsupported parameter: response_format',param:'response_format'}},400),reply(OK)]);
+  await run({jsonMode:true},a);
+  calls=[];responses=[reply(OK)];await run({jsonMode:true},b);
+  assert(calls.length===1&&calls[0].response_format?.type==='json_object','Second endpoint inherited first endpoint refusal');
+});
+await test('expired capabilities are checked again after the endpoint can upgrade',async()=>{
+  const s=PROTOCOLS[0].settings;
+  reset([reply({error:{message:'Unsupported parameter: response_format',param:'response_format'}},400),reply(OK)]);
+  await run({jsonMode:true},s);
+  const original=Date.now;
+  try{Date.now=()=>original()+8*86400000;calls=[];responses=[reply(OK)];await run({jsonMode:true},s);
+    assert(calls[0].response_format?.type==='json_object','Expired refusal was retained');
+  }finally{Date.now=original;}
+});
+await test('unknown compatible endpoints start with JSON object instead of an unverified schema',async()=>{
+  reset([reply(OK)]);await run({jsonMode:true,responseSchema:{type:'object'}},PROTOCOLS[0].settings);
+  assert(calls.length===1&&calls[0].response_format?.type==='json_object');
+});
+await test('minimum reasoning prefers none then low only after an explicit value refusal',async()=>{
+  reset([reply({error:{param:'reasoning_effort',message:"reasoning_effort 'none' is not supported; use low"}},400),reply(OK)]);
+  await run({reasoningEffort:'minimum'},PROTOCOLS[0].settings);
+  assert(calls.length===2&&calls[0].reasoning_effort==='none'&&calls[1].reasoning_effort==='low');
+  calls=[];responses=[reply(OK)];await run({reasoningEffort:'minimum'},PROTOCOLS[0].settings);
+  assert(calls.length===1&&calls[0].reasoning_effort==='low');
+});
 await test('structured requests use total output budgets and low effort for arbitrary compatible models',async()=>{
   const s={aiProvider:'custom',customBaseUrl:'https://gateway.example/v1',customApiKey:'fixture',customModel:'unlisted-model'};
   reset([reply(OK)]);await run({maxTokens:8192,totalOutputBudget:true,reasoningEffort:'low'},s);
@@ -363,7 +399,7 @@ await test('JSON mode does not retry malformed successful output or unrelated fa
 await test('a shared response schema maps to compatible Gemini and Ollama fields',async()=>{
   const schema={type:'object',properties:{text:{type:'string'}},required:['text'],additionalProperties:false};
   for(const index of [0,1,3]){
-    const protocol=PROTOCOLS[index];reset([reply(protocol.complete)]);
+    const protocol=index===0?{...PROTOCOLS[0],settings:{aiProvider:'openai',openaiApiKey:'fixture',openaiModel:'free-model'}}:PROTOCOLS[index];reset([reply(protocol.complete)]);
     await run({jsonMode:true,responseSchema:schema},protocol.settings);
     const value=index===0?calls[0].response_format?.json_schema?.schema:index===1?calls[0].generationConfig.responseJsonSchema:calls[0].format;
     assert(JSON.stringify(value)===JSON.stringify(schema));
@@ -373,8 +409,8 @@ await test('a shared response schema maps to compatible Gemini and Ollama fields
 await test('response format enum refusals negotiate by capability without changing reasoning',async()=>{
   for(const message of ["response_format: unknown variant 'json_schema', expected 'text' or 'json_object'", "response_format.type must be one of text or json_object", "response_format.type should be json_object"]){
     reset([reply({error:{message,param:'response_format.type'}},400),reply(OK)]);
-    await run({jsonMode:true,responseSchema:{type:'object'},reasoningEffort:'low'},PROTOCOLS[0].settings);
-    assert(calls.length===2&&checks===2&&calls[1].response_format.type==='json_object'&&calls[1].reasoning_effort==='low');
+    await run({jsonMode:true,responseSchema:{type:'object'},reasoningEffort:'low'},{aiProvider:'openai',openaiApiKey:'fixture',openaiModel:'enum-model'});
+    assert(calls.length===2&&checks===2&&calls[1].response_format.type==='json_object'&&calls[1].reasoning_effort==='none');
   }
 });
 await test('malformed schema content and numeric budget bounds are not format capability refusals',async()=>{
@@ -385,7 +421,7 @@ await test('malformed schema content and numeric budget bounds are not format ca
   }
 });
 await test('unsupported schema negotiates JSON object before plain text within the existing attempt cap',async()=>{
-  const s={aiProvider:'custom',customBaseUrl:'https://gateway.example/v1',customApiKey:'fixture',customModel:'schema-optional'};
+  const s={aiProvider:'openai',openaiApiKey:'fixture',openaiModel:'schema-optional'};
   const denied=reply({error:{message:'Unsupported response_format type',param:'response_format'}},400);
   reset([denied,denied,reply(OK)]);await run({jsonMode:true,responseSchema:{type:'object'}},s);
   assert(calls.length===3&&checks===3&&calls[0].response_format.type==='json_schema'&&calls[1].response_format.type==='json_object'&&!('response_format'in calls[2]));

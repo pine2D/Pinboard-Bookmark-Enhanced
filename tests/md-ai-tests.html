@@ -3845,21 +3845,21 @@ suite("effectiveExtraBody: empty when rejected or no thinkingOff", () => {
     assertEq(JSON.stringify(_aiEffectiveExtraBody(OPENAI_COMPAT_PROVIDERS.custom, false)), "{}", "custom untouched");
   });
 });
-suite("shouldRetryNoThink: only 400/422 with thinkingOff and not rejected", () => {
+suite("shouldRetryNoThink: only named thinking refusals on 400/422", () => {
   test("zhipu 400 -> retry", () => {
-    assertEq(_aiShouldRetryNoThink(OPENAI_COMPAT_PROVIDERS.zhipu, false, 400), true, "400");
+    assertEq(_aiShouldRetryNoThink(OPENAI_COMPAT_PROVIDERS.zhipu, false, {status:400,paramHint:"thinking"}), true, "400");
   });
   test("zhipu 422 -> retry", () => {
-    assertEq(_aiShouldRetryNoThink(OPENAI_COMPAT_PROVIDERS.zhipu, false, 422), true, "422");
+    assertEq(_aiShouldRetryNoThink(OPENAI_COMPAT_PROVIDERS.zhipu, false, {status:422,paramHint:"thinking"}), true, "422");
   });
   test("zhipu 429 -> no retry", () => {
-    assertEq(_aiShouldRetryNoThink(OPENAI_COMPAT_PROVIDERS.zhipu, false, 429), false, "429 no");
+    assertEq(_aiShouldRetryNoThink(OPENAI_COMPAT_PROVIDERS.zhipu, false, {status:429,paramHint:"thinking"}), false, "429 no");
   });
   test("already rejected -> no retry", () => {
-    assertEq(_aiShouldRetryNoThink(OPENAI_COMPAT_PROVIDERS.zhipu, true, 400), false, "already rejected");
+    assertEq(_aiShouldRetryNoThink(OPENAI_COMPAT_PROVIDERS.zhipu, true, {status:400,paramHint:"thinking"}), false, "already rejected");
   });
   test("groq no thinkingOff -> no retry", () => {
-    assertEq(_aiShouldRetryNoThink(OPENAI_COMPAT_PROVIDERS.groq, false, 400), false, "no thinkingOff");
+    assertEq(_aiShouldRetryNoThink(OPENAI_COMPAT_PROVIDERS.groq, false, {status:400,paramHint:"thinking"}), false, "no thinkingOff");
   });
 });
 
