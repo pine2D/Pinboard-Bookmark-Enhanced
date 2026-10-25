@@ -218,7 +218,7 @@ function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
 // the message. Read off the SERVER's own answer, never off a model allowlist
 // (rules/ai-providers.md: the model field is free text), and consumed by the
 // body-dialect self-heal below.
-const _AI_HEALABLE_PARAMS = ["max_tokens", "max_completion_tokens", "temperature"];
+const _AI_HEALABLE_PARAMS = ["max_tokens", "max_completion_tokens", "temperature", "reasoning_effort"];
 // "The server does not accept this parameter AT ALL", as opposed to "the value
 // you sent is out of range" — the distinction the whole self-heal turns on.
 const _AI_PARAM_REFUSED_RE = /unsupported|unrecognized|not\s+supported|does\s+not\s+support|unknown\s+(?:parameter|argument|field)|extra\s+inputs/;
@@ -295,7 +295,7 @@ const OPENAI_COMPAT_PROVIDERS = {
   openai:      { keyField: "openaiApiKey",      base: "https://api.openai.com/v1",                         baseField: "openaiBaseUrl", modelField: "openaiModel",      defaultModel: "gpt-5.4-nano",                thinkingOff: { reasoning_effort: "none" }, tokenField: "max_completion_tokens" },
   deepseek:    { keyField: "deepseekApiKey",    base: "https://api.deepseek.com/v1",                                            modelField: "deepseekModel",    defaultModel: "deepseek-v4-flash",               thinkingOff: { thinking: { type: "disabled" } } },  // v4-flash defaults thinking ON; 4xx self-heal (deepseek-reasoner rejects it)
   qwen:        { keyField: "qwenApiKey",        base: "https://dashscope.aliyuncs.com/compatible-mode/v1",                      modelField: "qwenModel",        defaultModel: "qwen-flash",                      thinkingOff: { enable_thinking: false } },
-  minimax:     { keyField: "minimaxApiKey",     base: "https://api.minimaxi.com/v1",                                            modelField: "minimaxModel",     defaultModel: "MiniMax-M2",                      thinkingOff: { thinking: { type: "disabled" } } },  // M2 no-op but harmless; M3-ready
+  minimax:     { keyField: "minimaxApiKey",     base: "https://api.minimaxi.com/v1",                                            modelField: "minimaxModel",     defaultModel: "MiniMax-M2",                      thinkingOff: { thinking: { type: "disabled" } }, thinkingFallback: { reasoning_effort: "low" } },  // Servers requiring thinking use the documented low effort after refusing disabled.
   openrouter:  { keyField: "openrouterApiKey",  base: "https://openrouter.ai/api/v1",                                           modelField: "openrouterModel",  defaultModel: "openai/gpt-oss-20b",              thinkingOff: { reasoning: { enabled: false } } },  // paid slug: the :free twin lost every serving endpoint
   groq:        { keyField: "groqApiKey",        base: "https://api.groq.com/openai/v1",                                         modelField: "groqModel",        defaultModel: "openai/gpt-oss-20b" },               // no thinkingOff: groq's disable dialect is per-model (gpt-oss takes reasoning_effort low|medium|high; other families take "none"), unverified on a live key
   mistral:     { keyField: "mistralApiKey",     base: "https://api.mistral.ai/v1",                                              modelField: "mistralModel",     defaultModel: "mistral-small-latest",            thinkingOff: { reasoning_effort: "none" } },
@@ -313,13 +313,15 @@ function _openaiCompatBase(cfg, s) {
 
 // ---- Thinking-disable: dialect param + 4xx self-healing fallback + memo (spec T0-c) ----
 // thinkingOff is the per-provider "turn reasoning off" body field. It is sent on every
-// request EXCEPT when memoized as rejected for this (provider, model). On a 400/422 we
-// strip it, retry once, and remember the rejection (open model space: free-text model
-// fields + custom providers mean a static allowlist can't be trusted).
-function _aiEffectiveExtraBody(cfg, thinkRejected) {
+// request EXCEPT when memoized as rejected for this (provider, model). A 400/422
+// switches to the provider's documented low-effort fallback, if any, or strips it.
+// Further field repairs share the bounded retry ladder below; no model allowlist.
+function _aiEffectiveExtraBody(cfg, thinkRejected, omitThinkingFallback = false) {
   const base = (cfg && cfg.extraBody) || {};
-  const off = (cfg && cfg.thinkingOff && !thinkRejected) ? cfg.thinkingOff : {};
-  return { ...base, ...off };
+  const thinking = thinkRejected
+    ? (!omitThinkingFallback && cfg && cfg.thinkingFallback) || {}
+    : (cfg && cfg.thinkingOff) || {};
+  return { ...base, ...thinking };
 }
 function _aiShouldRetryNoThink(cfg, thinkRejected, errStatus) {
   return !!(cfg && cfg.thinkingOff) && !thinkRejected && (errStatus === 400 || errStatus === 422);
@@ -354,7 +356,8 @@ async function _aiThinkReject(memoKey) {
 function _aiBodyDialect(cfg, memo) {
   return {
     tokenField: (memo && memo.tokenField) || (cfg && cfg.tokenField) || "max_tokens",
-    omitTemperature: !!(memo && memo.omitTemperature)
+    omitTemperature: !!(memo && memo.omitTemperature),
+    omitThinkingFallback: !!(memo && memo.omitThinkingFallback)
   };
 }
 
@@ -393,7 +396,8 @@ async function _aiParamFixLearn(memoKey, repair) {
 }
 
 // One initial attempt plus at most one retry per distinct repair (token field,
-// temperature, thinkingOff). A well-behaved server converges well inside this:
+// temperature, thinkingOff, optional low effort), still at most four in total.
+// A well-behaved server converges well inside this:
 // each repair stops being offered once applied. The cap is what bounds the one
 // pathological case — a server that refuses BOTH spellings of the budget field
 // and would otherwise be flipped back and forth forever.
@@ -406,14 +410,25 @@ async function _aiWithDialectFallback(provider, model, cfg, makeCall) {
   const [thinkMemo, paramMemo] = await Promise.all([_aiThinkRejected(memoKey), _aiParamFixGet(memoKey)]);
   let thinkRejected = thinkMemo;
   let dialect = (cfg && cfg.bespokeBody) ? null : _aiBodyDialect(cfg, paramMemo);
-  let healedThink = false;
+  let healedThink = false, healedFallback = false;
+  const rememberAccepted = async () => {
+    if (healedThink) await _aiThinkReject(memoKey);
+    if (healedFallback) await _aiParamFixLearn(memoKey, { omitThinkingFallback: true });
+  };
   for (let attempt = 1; ; attempt++) {
+    const fallbackActive = thinkRejected && !!cfg?.thinkingFallback && !dialect?.omitThinkingFallback;
     try {
-      const out = await makeCall(_aiEffectiveExtraBody(cfg, thinkRejected), dialect);
-      if (healedThink) await _aiThinkReject(memoKey);   // memo only on retry success
+      const out = await makeCall(_aiEffectiveExtraBody(cfg, thinkRejected, dialect?.omitThinkingFallback), dialect);
+      await rememberAccepted();
       return out;
     } catch (e) {
       const status = e && e.status;
+      // A parsed 2xx envelope proves parameter acceptance even when reasoning
+      // exhausted the response budget. These paid outcomes NEVER trigger retry.
+      if (status >= 200 && status < 300 && ["output_truncated", "empty_response"].includes(e.code)) {
+        await rememberAccepted();
+        throw e;
+      }
       if (attempt >= _AI_DIALECT_MAX_ATTEMPTS) throw e;
       const repair = (status === 400 || status === 422) ? _aiParamRepair(e, dialect) : null;
       if (repair) {
@@ -424,6 +439,14 @@ async function _aiWithDialectFallback(provider, model, cfg, makeCall) {
       if (_aiShouldRetryNoThink(cfg, thinkRejected, status)) {
         thinkRejected = true;                          // retry without thinkingOff
         healedThink = true;
+        continue;
+      }
+      if (fallbackActive && (status === 400 || status === 422)) {
+        dialect = { ...dialect, omitThinkingFallback: true };
+        // Named refusal is evidence on its own. A generic 4xx only becomes a
+        // lasting capability decision after the stripped request is accepted.
+        if (e.paramHint === "reasoning_effort") await _aiParamFixLearn(memoKey, { omitThinkingFallback: true });
+        else healedFallback = true;
         continue;
       }
       throw e;
@@ -634,8 +657,12 @@ async function callOpenAICompat(baseUrl, apiKey, model, prompt, opts = {}) {
     })
   });
   if (!res.ok) await handleAIError(res, "API");
-  const text = (await res.json()).choices?.[0]?.message?.content?.trim();
-  if (!text) throw new Error("API returned empty response");
+  const choice = (await res.json()).choices?.[0];
+  const text = typeof choice?.message?.content === "string" ? choice.message.content.trim() : "";
+  if (choice?.finish_reason === "length" && (opts.requireComplete === true || !text)) {
+    throw Object.assign(new Error("API output reached its token limit"), { code: "output_truncated", status: res.status });
+  }
+  if (!text) throw Object.assign(new Error("API returned no answer text"), { code: "empty_response", status: res.status });
   return text;
 }
 
@@ -794,7 +821,8 @@ function _pbpChainAbort(signal) {
 // through `consume(buf, isFinal) -> rest`: consume extracts complete
 // payloads from the accumulated text and returns the unconsumed tail
 // (must return "" when isFinal).
-// Idle timeout: one resettable 30s timer, armed before fetch and re-armed
+// Idle timeout: one resettable 30s timer, armed after the dispatch guard,
+// immediately before fetch, and re-armed
 // on every received network chunk — covers time-to-first-byte AND
 // mid-stream stalls. (Byte-level, not delta-level: an SSE keep-alive
 // comment also resets it, which is the desired liveness semantics.)
@@ -810,6 +838,10 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
     idleTimer = setTimeout(() => { timedOut = true; ctrl.abort(); }, PBP_STREAM_IDLE_MS);
   };
   let reader = null;
+  // Every provider and dialect retry reaches this boundary. A guard failure is
+  // not a network failure, and its wait must not consume the network idle budget.
+  if (typeof opts.beforeRequest === "function") await opts.beforeRequest();
+  ctrl.signal.throwIfAborted();
   try {
     resetIdle();
     const res = await fetch(url, { ...init, redirect: "error", signal: ctrl.signal });

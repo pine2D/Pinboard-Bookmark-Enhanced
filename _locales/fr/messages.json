@@ -4662,5 +4662,9 @@
   "dictPanelEmpty": {"message": "Sélectionnez un mot dans l’article ou saisissez-en un ci-dessus pour le rechercher."},
   "dictLookupInPanel": {"message": "Rechercher dans le panneau latéral"},
   "dictSupplementScope": {"message": "Préciser le contexte"},
-  "dictSupplementSaving": {"message": "Enregistrement du complément…"}
+  "dictSupplementSaving": {"message": "Enregistrement du complément…"},
+  "dictGenerationTruncated": {"message": "Le modèle a atteint sa limite de sortie avant de terminer la réponse. Ce résultat n’a pas été enregistré. Choisissez un autre modèle IA pour le lecteur dans les paramètres, puis réessayez."},
+  "dictGenerationEmpty": {"message": "Le modèle n’a renvoyé aucun texte de réponse. Ce résultat n’a pas été enregistré. Réessayez ou choisissez un autre modèle IA pour le lecteur dans les paramètres."},
+  "dictGenerationModelUnavailable": {"message": "Le fournisseur n’a pas pu trouver ou utiliser le modèle choisi. Vérifiez son nom et sa disponibilité, puis modifiez le modèle IA du lecteur dans les paramètres."},
+  "dictGenerationBilling": {"message": "Le fournisseur a refusé cette requête (HTTP 402). Vérifiez auprès de lui votre quota, la facturation et les droits d’accès de votre compte avant de réessayer."}
 }

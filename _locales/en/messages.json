@@ -4669,5 +4669,9 @@
   "dictPanelEmpty": {"message": "Select a word in the article, or enter one above to look it up."},
   "dictLookupInPanel": {"message": "Look up in side panel"},
   "dictSupplementScope": {"message": "Limit to a situation"},
-  "dictSupplementSaving": {"message": "Saving supplement…"}
+  "dictSupplementSaving": {"message": "Saving supplement…"},
+  "dictGenerationTruncated": {"message": "The model reached its output limit before completing the response. This result was not saved. Choose another reader AI model in Settings, then try again."},
+  "dictGenerationEmpty": {"message": "The model returned no response text. This result was not saved. Try again or choose another reader AI model in Settings."},
+  "dictGenerationModelUnavailable": {"message": "The provider could not find or use the selected model. Check its name and availability, then update the reader AI model in Settings."},
+  "dictGenerationBilling": {"message": "The provider rejected this request (HTTP 402). Check your quota, billing status, and account access with the provider before trying again."}
 }

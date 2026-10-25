@@ -8,7 +8,7 @@ globalThis.chrome = { i18n: { detectLanguage: async text => {languageChecks.push
 async function pbpDictEvidenceFetch(input){await input.beforeRequest();if(evidenceFailure)throw Object.assign(new Error('Evidence fixture failure'),{code:evidenceFailure});return structuredClone(evidence);}
 async function pbpAiCacheGet(key){reads.push(key);if(beforeGet)await beforeGet();if(getFailure)throw new Error('Fixture read failure');return cache.has(key)?{result:cache.get(key),ts:1}:null;}
 async function pbpAiCacheSet(key,result){if(beforeSet)await beforeSet();if(setFailure)throw new Error('Fixture write failure');writes.push({key,result});if(setReceipt!==false)cache.set(key,structuredClone(result));return setReceipt;}
-async function callAI(settings,prompt,options){calls.push({settings,prompt,options});if(beforeDispatch)await beforeDispatch();await options.beforeRequest?.();if(beforeAI)await beforeAI();return answer;}
+async function callAI(settings,prompt,options){if(options.requireComplete!==true)throw new Error('Dictionary requests must require a complete response');calls.push({settings,prompt,options});if(beforeDispatch)await beforeDispatch();await options.beforeRequest?.();if(beforeAI)await beforeAI();return answer;}
 </script><script src="../dict-entry.js"></script><script>
 let pass=0,fail=0;const root=document.getElementById('results');
 async function test(name,fn){let ok=false,detail='';try{ok=await fn();}catch(e){detail=e.name+': '+e.message;}ok?pass++:fail++;const el=document.createElement('div');el.className='case '+(ok?'pass':'fail');el.textContent=(ok?'PASS ':'FAIL ')+name+(detail?' '+detail:'');root.append(el);}

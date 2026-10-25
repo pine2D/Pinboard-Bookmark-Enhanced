@@ -4662,5 +4662,9 @@
   "dictPanelEmpty": {"message": "本文中の語句を選択するか、上の欄に入力して調べられます。"},
   "dictLookupInPanel": {"message": "サイドパネルで調べる"},
   "dictSupplementScope": {"message": "場面を指定"},
-  "dictSupplementSaving": {"message": "補足を保存中…"}
+  "dictSupplementSaving": {"message": "補足を保存中…"},
+  "dictGenerationTruncated": {"message": "回答を書き終える前にモデルの出力上限に達しました。今回の結果は保存されていません。設定でリーダーの AI モデルを変更してから再試行してください。"},
+  "dictGenerationEmpty": {"message": "モデルから回答の本文が返されませんでした。今回の結果は保存されていません。再試行するか、設定でリーダーの AI モデルを変更してください。"},
+  "dictGenerationModelUnavailable": {"message": "プロバイダーは選択されたモデルを見つけられないか、利用できません。モデル名と提供状況を確認し、設定でリーダーの AI モデルを変更してください。"},
+  "dictGenerationBilling": {"message": "プロバイダーがリクエストを拒否しました（HTTP 402）。利用枠、請求状況、アカウントのアクセス権をプロバイダー側で確認してから再試行してください。"}
 }

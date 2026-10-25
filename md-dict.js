@@ -1519,11 +1519,37 @@ function _pbpDictFailureReason(error) {
   const allowed = ["response_size", "response_json", "entry_fields", "entry_identity", "entry_pronunciation",
     "entry_meanings", "entry_meaning", "entry_example", "entry_learning", "entry_related", "entry_version",
     "entry_sources", "entry_legacy", "entry_unknown", "explanation_metadata", "explanation_script",
-    "explanation_language", "supplement_fields", "supplement_item", "supplement_source", "supplement_quote",
+    "explanation_language", "supplement_fields", "supplement_item", "supplement_item_shape", "supplement_item_sense",
+    "supplement_item_text", "supplement_source_index", "supplement_duplicate", "supplement_source", "supplement_quote",
     "supplement_example", "supplement_size"];
   if (allowed.includes(error?.reason)) return error.reason;
   const status = error?.status;
   return Number.isInteger(status) && status >= 400 && status <= 599 ? "http_" + status : "";
+}
+
+const PBP_DICT_GENERATION_ERROR_KEYS = Object.freeze({
+  host_permission: "aiGrantRetry",
+  owner_changed: "vocabAccountChanged",
+  account_changed: "vocabAccountChanged",
+  sync_failed: "dictEntrySyncFailed",
+  no_sources: "dictSupplementNoSources",
+  unsupported_usage: "dictSupplementUnsupported",
+  wrong_language: "dictSupplementWrongLanguage",
+  invalid_response: "dictSupplementInvalid",
+  output_truncated: "dictGenerationTruncated",
+  empty_response: "dictGenerationEmpty",
+  model_not_found: "dictGenerationModelUnavailable"
+});
+function _pbpDictGenerationErrorKey(error, supplement = false) {
+  if (typeof error?.code === "string" && Object.hasOwn(PBP_DICT_GENERATION_ERROR_KEYS, error.code)) return PBP_DICT_GENERATION_ERROR_KEYS[error.code];
+  if (error?.status === 402) return "dictGenerationBilling";
+  return supplement ? "dictSupplementUnavailable" : "dictEntryUnavailable";
+}
+function _pbpDictFailureCode(error) {
+  const code = error?.code;
+  return typeof code === "string" && (Object.hasOwn(PBP_DICT_GENERATION_ERROR_KEYS, code) ||
+    ["ai_disabled", "ai_not_configured", "invalid_request", "not_saved", "source_failed", "stale", "network", "endpoint_invalid"].includes(code)
+    ) ? code : "request_failed";
 }
 
 function _pbpDictEntryMount(host, opts) {
@@ -2022,11 +2048,8 @@ function _pbpDictEntryMount(host, opts) {
         }
       } catch (error) {
         if (!current()) return;
-        console.warn("[dict-entry] usage generation failed:", error?.name, error?.code || "request_failed", _pbpDictFailureReason(error));
-        const text = t(error?.code === "host_permission" ? "aiGrantRetry" : error?.code === "sync_failed" ? "dictEntrySyncFailed" :
-          error?.code === "no_sources" ? "dictSupplementNoSources" :
-          error?.code === "unsupported_usage" ? "dictSupplementUnsupported" : error?.code === "wrong_language" ? "dictSupplementWrongLanguage" :
-          error?.code === "invalid_response" ? "dictSupplementInvalid" : "dictSupplementUnavailable");
+        console.warn("[dict-entry] usage generation failed:", error?.name, _pbpDictFailureCode(error), _pbpDictFailureReason(error));
+        const text = t(_pbpDictGenerationErrorKey(error, true));
         if (document.activeElement === feedback.cancel) restoreFocus = origin;
         usageMessage(feedback, text, "error");
       } finally {
@@ -2070,11 +2093,8 @@ function _pbpDictEntryMount(host, opts) {
     } catch (error) {
       if (!current()) return;
       if (!record) show("dictionary");
-      console.warn("[dict-entry] generation failed:", error?.name, error?.code || "request_failed", _pbpDictFailureReason(error));
-      const text = t(error?.code === "host_permission" ? "aiGrantRetry" :
-        error?.code === "owner_changed" || error?.code === "account_changed" ? "vocabAccountChanged" :
-        error?.code === "sync_failed" ? "dictEntrySyncFailed" : error?.code === "wrong_language" ? "dictSupplementWrongLanguage" :
-        error?.code === "invalid_response" ? "dictSupplementInvalid" : "dictEntryUnavailable");
+      console.warn("[dict-entry] generation failed:", error?.name, _pbpDictFailureCode(error), _pbpDictFailureReason(error));
+      const text = t(_pbpDictGenerationErrorKey(error));
       if (updateId) inlineError(origin, text); else message(text);
     } finally {
       if (epoch === version) {

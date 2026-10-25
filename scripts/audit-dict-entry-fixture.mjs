@@ -50,7 +50,7 @@ export async function installDictEntryFixture(page) {
         state.usageEntered = true; state.calls++;
         await new Promise(resolve => { state.usageRelease = resolve; });
         opts.signal?.throwIfAborted();
-        if (state.usageFail) return '{"language":"zh-Hans","summary":"","items":[{}]}';
+        if (state.usageFail) throw Object.assign(new Error('Synthetic truncated completion'), { code: 'output_truncated', status: 200 });
         return JSON.stringify({ language: 'zh-Hans', summary: '先选定要表达的含义，再选择与情境相符的搭配。以下为独立编写的例句。', items: [
           { sense: 1, title: 'a practical example', explanation: '用于把抽象的说明落实到可操作的例子中，适合讨论工作方法或学习步骤。', example: 'Please give us a practical example.', translation: '请给我们一个实际的例子。', sourceIndex: -1 },
           { sense: 2, title: 'a clear expression of an idea', explanation: '强调想法表达得明确，读者能够据此区分不同含义；可根据需要替换后面的名词。', example: 'This is a clear expression of the main idea.', translation: '这清楚地表达了中心思想。', sourceIndex: -1 }

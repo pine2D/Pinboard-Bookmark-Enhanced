@@ -1,0 +1,85 @@
+{
+  "provenance": "Captured successful DeepSeek collocations response from the explicitly authorized 2026-10-25 synthetic provider lookup. No user article or credentials. The earlier failed response was not retained; this fixture does not explain that failure.",
+  "category": "collocations",
+  "target": {
+    "name": "Simplified Chinese",
+    "lang": "zh-Hans"
+  },
+  "baseEntry": {
+    "word": "provider",
+    "language": "en",
+    "pronunciation": "/prəˈvaɪ.dər/",
+    "meanings": [
+      {
+        "partOfSpeech": "noun",
+        "definition": "提供者；供应者。指提供某物（如服务、商品、信息或机会）的人或机构。",
+        "examples": [
+          {
+            "text": "She is the main provider of care for her elderly parents.",
+            "translation": "她是照顾年迈父母的主要承担者。"
+          },
+          {
+            "text": "The company is a leading provider of cloud services.",
+            "translation": "这家公司是领先的云服务提供商。"
+          }
+        ]
+      },
+      {
+        "partOfSpeech": "noun",
+        "definition": "（家庭中）养家糊口的人，负担家庭生计者。",
+        "examples": [
+          {
+            "text": "He became the sole provider for his family.",
+            "translation": "他成了家里唯一养家糊口的人。"
+          }
+        ]
+      },
+      {
+        "partOfSpeech": "noun",
+        "definition": "由动词 provide 加后缀 -er 构成的施事名词，表示“提供……的人或物”；在医疗、网络等领域常与 service、care、healthcare 等搭配，指服务提供方。",
+        "examples": [
+          {
+            "text": "Contact your internet provider if the connection fails.",
+            "translation": "如果网络连接出问题，请联系你的网络服务提供商。"
+          }
+        ]
+      }
+    ],
+    "etymology": "由动词 provide（提供）加施事后缀 -er 构成，表示执行该动作的人或机构；属规则派生，无拼写变化。",
+    "relatedWords": [
+      "provide",
+      "supplier",
+      "vendor",
+      "caregiver"
+    ],
+    "learning": {
+      "version": 2,
+      "formation": "由动词 provide（提供）加施事后缀 -er 构成，表示执行该动作的人或机构；属规则派生，无拼写变化。",
+      "history": "",
+      "related": [
+        {
+          "word": "provide",
+          "relation": "family",
+          "note": "动词，意为“提供、供应”；provider 是其施事名词形式，注意词性区别。"
+        },
+        {
+          "word": "supplier",
+          "relation": "synonym",
+          "note": "常指商业供应链中提供货物的一方，偏重货物供应；provider 更常用于服务、信息、照护等。"
+        },
+        {
+          "word": "vendor",
+          "relation": "topic",
+          "note": "指销售商品或服务的卖方，强调交易中的售卖角色，与 provider 的“提供方”视角不同。"
+        },
+        {
+          "word": "caregiver",
+          "relation": "topic",
+          "note": "指照护者，侧重照料行为；provider 在 care provider 搭配中可指照护服务提供方，范围更宽。"
+        }
+      ],
+      "sources": []
+    }
+  },
+  "response": "{\"language\":\"zh-Hans\",\"summary\":\"本补充围绕 provider 的三种含义，提供可替换槽位的常用搭配与句型，帮助在服务、家庭生计和派生构词语境中准确使用。重点区分 provider 与 supplier、vendor 的视角差异，并注意 service、care、healthcare 等常见搭配。\",\"items\":[{\"sense\":1,\"title\":\"a provider of + 服务/商品/信息\",\"explanation\":\"用于说明某人或机构提供某类事物，of 后接名词或名词短语，可加 leading、main、major 等修饰语描述地位。适合介绍机构业务或角色，比单独说 provider 更具体。\",\"example\":\"The hospital is a major provider of emergency care in the region.\",\"translation\":\"这家医院是该地区急诊服务的主要提供方。\",\"sourceIndex\":-1},{\"sense\":1,\"title\":\"service provider / healthcare provider / care provider\",\"explanation\":\"名词作前置修饰，指特定领域的服务提供方。service 可搭配 internet、cloud 等具体化；healthcare provider 指医疗服务提供者；care provider 指照护服务提供方。使用时注意修饰语与 provider 之间不加 of。\",\"example\":\"Contact your service provider if the connection keeps dropping.\",\"translation\":\"如果连接反复中断，请联系你的服务提供商。\",\"sourceIndex\":-1},{\"sense\":2,\"title\":\"the sole/primary provider for + 家庭成员\",\"explanation\":\"表示家庭中承担生计的人，for 后接被抚养的家人，sole 强调唯一，primary 强调主要。常用于描述家庭经济角色，也可与 breadwinner 对比理解。\",\"example\":\"After the accident, she became the primary provider for her two children.\",\"translation\":\"事故之后，她成了两个孩子的首要养家者。\",\"sourceIndex\":-1},{\"sense\":3,\"title\":\"动词 provide + 宾语 + 后缀 -er 构成施事名词\",\"explanation\":\"provider 由 provide 加 -er 规则派生，表示执行提供动作的人或物。遇到不熟悉的 provider 搭配时，可先还原为 provide 理解其“提供方”核心义，再结合上下文判断具体领域。\",\"example\":\"A fund provider supplies the money, while a service provider supplies the service.\",\"translation\":\"资金提供方提供资金，而服务提供方提供服务。\",\"sourceIndex\":-1},{\"sense\":0,\"title\":\"provider 与 supplier、vendor 的视角差异\",\"explanation\":\"provider 侧重“提供方”角色，常用于服务、信息、照护；supplier 偏供应链中提供货物的一方；vendor 强调交易中的卖方。选择时看语境强调的是提供服务、供应货物还是售卖行为，而非简单互换。\",\"example\":\"The software vendor sells the license, but the cloud provider operates the service.\",\"translation\":\"软件卖方出售许可证，而云服务提供方运营该服务。\",\"sourceIndex\":-1}]}"
+}

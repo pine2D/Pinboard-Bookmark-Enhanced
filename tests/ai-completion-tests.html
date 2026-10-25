@@ -1,0 +1,166 @@
+<!doctype html><meta charset="utf-8"><title>AI completion and required-thinking tests</title>
+<div id="results"></div><div id="summary"></div>
+<script src="../i18n.js"></script><script src="../shared.js"></script><script src="../ai.js"></script>
+<script>
+// HTTP-shaped fixtures, independent of the response reader. The first fixture
+// reproduces observed MiniMax metadata; private reasoning text is never retained.
+const LENGTH_EMPTY={choices:[{finish_reason:'length',message:{role:'assistant',content:''}}],usage:{prompt_tokens:940,completion_tokens:2048,total_tokens:2988,completion_tokens_details:{reasoning_tokens:2047}}};
+const OK={choices:[{finish_reason:'stop',message:{role:'assistant',content:' ready '}}]};
+const OFF_REFUSED={error:{message:'thinking.type disabled is not supported',type:'invalid_request_error'}};
+const LOW_REFUSED={error:{message:'Unsupported parameter: reasoning_effort',param:'reasoning_effort',type:'invalid_request_error'}};
+const TOKEN_REFUSED={error:{message:'Unsupported parameter: max_tokens. Use max_completion_tokens instead.',param:'max_tokens'}};
+const TEMP_REFUSED={error:{message:'Unsupported parameter: temperature',param:'temperature'}};
+const STREAM_OK={raw:'data: {"choices":[{"delta":{"content":"ready"}}]}\n\ndata: [DONE]\n\n',status:200};
+let stored={},responses=[],calls=[],checks=0,pass=0,fail=0;
+const model='arbitrary-future-user-model',key='minimax:'+model;
+const settings={aiProvider:'minimax',minimaxApiKey:'nonsecret-fixture',minimaxModel:model};
+const reply=(body,status=200)=>({body,status});
+function reset(queue,seed={}){
+  stored=structuredClone(seed);responses=queue.slice();calls=[];checks=0;
+  globalThis.chrome={runtime:{id:'isolated-fixture'},permissions:{contains:async()=>true},storage:{local:{
+    get:async name=>({[name]:structuredClone(stored[name])}),set:async value=>Object.assign(stored,structuredClone(value))
+  }}};
+  globalThis.fetch=async(_url,init)=>{
+    calls.push(JSON.parse(init.body));const next=responses.shift();
+    if(!next)throw new Error('Unexpected extra fixture request');
+    if(next.error)throw next.error;
+    return new Response(next.raw===undefined?JSON.stringify(next.body):next.raw,{status:next.status,headers:{'Content-Type':next.raw===undefined?'application/json':'text/event-stream'}});
+  };
+}
+const run=(opts={},s=settings)=>callAI(s,'Synthetic provider learning request',{maxTokens:2048,beforeRequest:async()=>{checks++;},...opts});
+const stream=(opts={},s=settings)=>callAIStream(s,'Synthetic provider learning request',{maxTokens:2048,beforeRequest:async()=>{checks++;},...opts},()=>{});
+function assert(value,message){if(!value)throw new Error(message||'Assertion failed');}
+async function rejected(fn,code){try{await fn();}catch(error){assert(error.code===code,'Unexpected code: '+error.code);return error;}throw new Error('Expected rejection');}
+async function test(name,fn){try{await fn();pass++;const p=document.createElement('p');p.className='pass';p.textContent='PASS '+name;document.getElementById('results').append(p);}catch(error){fail++;const p=document.createElement('p');p.className='fail';p.textContent='FAIL '+name+': '+error.message;document.getElementById('results').append(p);}}
+(async()=>{
+await test('observed reasoning-only length response is explicit and never retried',async()=>{
+  reset([reply(LENGTH_EMPTY)]);const error=await rejected(()=>run(),'output_truncated');
+  assert(error.status===200&&calls.length===1&&!stored.pbpThinkReject,'Wrong accepted-response evidence or retry');
+});
+await test('length with even valid-looking JSON is not accepted as complete',async()=>{
+  reset([reply({choices:[{finish_reason:'length',message:{content:'{"complete":true}'}}]})]);
+  await rejected(()=>run({requireComplete:true}),'output_truncated');assert(calls.length===1);
+});
+await test('other callers retain their existing nonempty partial-text behavior',async()=>{
+  for(const requireComplete of [undefined,false]){
+    reset([reply({choices:[{finish_reason:'length',message:{content:' partial answer '}}]})]);
+    assert(await run({requireComplete})==='partial answer'&&calls.length===1);
+  }
+});
+await test('empty or non-text completion is classified without retrying',async()=>{
+  for(const content of ['',null,[],undefined]){reset([reply({choices:[{finish_reason:'stop',message:{content}}]})]);
+    const error=await rejected(()=>run(),'empty_response');assert(error.status===200&&calls.length===1);}
+});
+await test('compatible servers may omit finish_reason and still return text',async()=>{
+  reset([reply({choices:[{message:{content:' ready '}}]})]);assert(await run()==='ready'&&calls.length===1);
+});
+await test('MiniMax rejection falls back to low effort at unchanged budget',async()=>{
+  reset([reply(OFF_REFUSED,400),reply(OK)]);assert(await run()==='ready');
+  assert(calls.length===2&&checks===2&&calls[0].thinking.type==='disabled'&&!('reasoning_effort'in calls[0]));
+  assert(calls[1].reasoning_effort==='low'&&!('thinking'in calls[1])&&calls.every(body=>body.max_tokens===2048));
+  assert(stored.pbpThinkReject[key]===true);
+});
+await test('a previous thinking rejection uses low immediately for freely entered models',async()=>{
+  reset([reply(OK)],{pbpThinkReject:{[key]:true}});await run();
+  assert(calls.length===1&&calls[0].model===model&&calls[0].reasoning_effort==='low'&&!('thinking'in calls[0]));
+});
+await test('explicit low refusal is remembered even when an unrelated later request fails',async()=>{
+  reset([reply(LOW_REFUSED,400),reply({error:{message:'unavailable'}},500)],{pbpThinkReject:{[key]:true}});
+  let error;try{await run();}catch(e){error=e;}assert(error.status===500&&calls.length===2);
+  assert(calls[0].reasoning_effort==='low'&&!('reasoning_effort'in calls[1])&&stored.pbpAiParamFix[key].omitThinkingFallback===true);
+});
+await test('generic low refusal is remembered only after stripped request succeeds',async()=>{
+  reset([reply({error:{message:'bad request'}},400),reply(OK)],{pbpThinkReject:{[key]:true}});await run();
+  assert(calls.length===2&&!('reasoning_effort'in calls[1])&&stored.pbpAiParamFix[key].omitThinkingFallback===true);
+});
+await test('generic low refusal followed by server error does not poison the memo',async()=>{
+  reset([reply({error:{message:'bad request'}},400),reply({error:{message:'unavailable'}},500)],{pbpThinkReject:{[key]:true}});
+  try{await run();}catch(error){assert(error.status===500);}assert(calls.length===2&&!stored.pbpAiParamFix?.[key]?.omitThinkingFallback);
+});
+await test('401, 402, 429 and 500 never trigger extra low-effort attempts',async()=>{
+  for(const status of [401,402,429,500]){reset([reply({error:{message:'refused'}},status)],{pbpThinkReject:{[key]:true}});
+    let error;try{await run();}catch(e){error=e;}assert(error.status===status&&calls.length===1&&!stored.pbpAiParamFix);}
+});
+await test('caller abort never triggers another request or capability memo',async()=>{
+  reset([{error:new DOMException('Cancelled','AbortError')}]);let error;try{await run();}catch(e){error=e;}
+  assert(error.name==='AbortError'&&calls.length===1&&!stored.pbpThinkReject);
+});
+await test('named token-field repair remains ahead of thinking fallback',async()=>{
+  reset([reply(TOKEN_REFUSED,400),reply(OFF_REFUSED,400),reply(OK)]);await run();
+  assert(calls.length===3&&calls[1].max_completion_tokens===2048&&calls[1].thinking.type==='disabled');
+  assert(calls[2].max_completion_tokens===2048&&calls[2].reasoning_effort==='low'&&checks===3);
+});
+await test('mixed parameter and thinking repairs never exceed four actual requests',async()=>{
+  reset([reply(OFF_REFUSED,400),reply(LOW_REFUSED,422),reply(TOKEN_REFUSED,400),reply(TEMP_REFUSED,400)]);
+  let error;try{await run();}catch(e){error=e;}assert(error.status===400&&calls.length===4&&checks===4&&responses.length===0);
+});
+await test('HTTP200 length after low fallback proves acceptance but never pays a third request',async()=>{
+  reset([reply(OFF_REFUSED,400),reply(LENGTH_EMPTY)]);await rejected(()=>run(),'output_truncated');
+  assert(calls.length===2&&stored.pbpThinkReject[key]===true&&calls[1].reasoning_effort==='low');
+});
+await test('non-HTTP failure after fallback is not mistaken for accepted parameters',async()=>{
+  reset([reply(OFF_REFUSED,400),{error:new TypeError('synthetic transport failure')}]);
+  try{await run();}catch(error){assert(error.name==='TypeError');}assert(calls.length===2&&!stored.pbpThinkReject);
+});
+await test('other providers keep their existing strip-only fallback',async()=>{
+  reset([reply(OFF_REFUSED,400),reply(OK)]);await run({},{aiProvider:'deepseek',deepseekApiKey:'fixture',deepseekModel:model});
+  assert(calls.length===2&&!('reasoning_effort'in calls[1])&&!('thinking'in calls[1]));
+});
+await test('previously rejected low effort remains omitted on future requests',async()=>{
+  reset([reply(OK)],{pbpThinkReject:{[key]:true},pbpAiParamFix:{[key]:{omitThinkingFallback:true}}});await run();
+  assert(calls.length===1&&!('thinking'in calls[0])&&!('reasoning_effort'in calls[0]));
+});
+await test('the dispatch guard can cancel the fallback before it reaches HTTP',async()=>{
+  reset([reply(OFF_REFUSED,400),reply(OK)]);let count=0,error;
+  try{await run({beforeRequest:async()=>{if(++count===2)throw new DOMException('Cancelled','AbortError');}});}catch(e){error=e;}
+  assert(error.name==='AbortError'&&calls.length===1&&count===2&&!stored.pbpThinkReject);
+});
+await test('streaming guard refusal prevents the first HTTP request',async()=>{
+  reset([STREAM_OK]);const refusal=Object.assign(new Error('Fixture owner changed'),{code:'owner_changed'});
+  const error=await rejected(()=>stream({beforeRequest:async()=>{throw refusal;}}),'owner_changed');
+  assert(error===refusal&&calls.length===0);
+});
+await test('streaming thinking fallback rechecks the guard before a second HTTP request',async()=>{
+  reset([reply(OFF_REFUSED,400),STREAM_OK]);let count=0;
+  await rejected(()=>stream({beforeRequest:async()=>{if(++count===2)throw Object.assign(new Error('Fixture owner changed'),{code:'owner_changed'});}}),'owner_changed');
+  assert(count===2&&calls.length===1&&!stored.pbpThinkReject);
+});
+await test('abort while a streaming guard is pending prevents dispatch',async()=>{
+  reset([STREAM_OK]);const controller=new AbortController();let entered,release;
+  const started=new Promise(resolve=>{entered=resolve;}),blocked=new Promise(resolve=>{release=resolve;});
+  const result=stream({signal:controller.signal,beforeRequest:async()=>{entered('guard');await blocked;}});
+  try{
+    assert(await Promise.race([started,result.then(()=>'finished',()=>'failed')])==='guard','Guard was skipped');
+    controller.abort();release();let error;try{await result;}catch(e){error=e;}
+    assert(error?.name==='AbortError'&&calls.length===0);
+  }finally{release();await result.catch(()=>{});}
+});
+await test('an already aborted streaming caller never invokes fetch',async()=>{
+  reset([STREAM_OK]);const controller=new AbortController();controller.abort();let error;
+  try{await stream({signal:controller.signal});}catch(e){error=e;}
+  assert(error?.name==='AbortError'&&calls.length===0);
+});
+await test('all streaming provider adapters honor the shared dispatch guard',async()=>{
+  const providers=[{aiProvider:'gemini',geminiApiKey:'fixture',geminiModel:model},
+    {aiProvider:'claude',claudeApiKey:'fixture',claudeModel:model},
+    {aiProvider:'ollama',ollamaBaseUrl:'http://127.0.0.1:11434',ollamaModel:model},
+    {aiProvider:'openai',openaiApiKey:'fixture',openaiModel:model},
+    {aiProvider:'custom',customBaseUrl:'https://example.test/v1',customApiKey:'fixture',customModel:model}];
+  for(const s of providers){reset([STREAM_OK]);
+    await rejected(()=>stream({beforeRequest:async()=>{throw Object.assign(new Error('Fixture guard'),{code:'owner_changed'});}},s),'owner_changed');
+    assert(calls.length===0,'Provider dispatched before guard: '+s.aiProvider);}
+});
+await test('network idle timeout starts only after the streaming guard completes',async()=>{
+  reset([STREAM_OK]);const original=globalThis.setTimeout;let armed=0,entered,release;
+  const started=new Promise(resolve=>{entered=resolve;}),blocked=new Promise(resolve=>{release=resolve;});
+  globalThis.setTimeout=(fn,ms,...args)=>{if(ms===PBP_STREAM_IDLE_MS)armed++;return original(fn,ms,...args);};
+  const result=stream({beforeRequest:async()=>{entered('guard');await blocked;}});
+  try{
+    assert(await Promise.race([started,result.then(()=>'finished',()=>'failed')])==='guard','Guard was skipped');
+    assert(armed===0&&calls.length===0,'Network timeout started while guard was pending');
+    release();assert(await result==='ready'&&armed>0&&calls.length===1);
+  }finally{release();await result.catch(()=>{});globalThis.setTimeout=original;}
+});
+document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
+})();
+</script>

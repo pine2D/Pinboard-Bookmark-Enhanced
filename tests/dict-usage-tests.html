@@ -21,7 +21,7 @@ async function pbpVocabCurrentOwner(){return owner;}
 async function pbpDictArchiveRead(input){if(onRead)await onRead(input);return records;}
 async function pbpDictArchiveSave(input){if(saveFailure)throw new Error('write failed');saved.push(structuredClone({...input,isCurrent:undefined,signal:undefined}));const previous=records;return records={...input.record,archiveId:saved.length.toString(16).padStart(64,'0'),archiveSaved:true,cacheSaved:true,supplements:previous?.supplements||[],previousEntries:previous?[previous,...(previous.previousEntries||[])]:[]};}
 async function pbpDictArchiveAppend(input){if(appendFailure)throw new Error('write failed');appended.push({...input});const row={...input,id:appended.length.toString(16).padStart(64,'0'),archiveSaved:true};records.supplements.push(row);return row;}
-async function callAI(settings,prompt,options){await options.beforeRequest();calls.push({settings,prompt,options});if(onAI)await onAI();return prompt.includes('language-learning supplement')?usageAnswer:JSON.stringify(MODEL);}
+async function callAI(settings,prompt,options){if(options.requireComplete!==true)throw new Error('Dictionary requests must require a complete response');await options.beforeRequest();calls.push({settings,prompt,options});if(onAI)await onAI();return prompt.includes('language-learning supplement')?usageAnswer:JSON.stringify(MODEL);}
 function hasAIKey(){return true;}
 async function pbpDictEvidenceFetch(input){await input.beforeRequest();if(input.kind==='etymology')return [];
   if(!permission)throw Object.assign(new Error('Missing fixture grant'),{code:'host_permission'});
@@ -114,6 +114,89 @@ await test('foreign comparison phrases are assessed with the whole Chinese expla
 await test('quoted wrong-language explanation still fails before supplement storage',async()=>{existing();usageResponse(d=>{d.summary='';d.items[0].explanation='“This entire explanation is written in English although the user requested a Chinese explanation for the meaning and usage.”';d.items[0].translation='';d.items[0].sourceIndex=0;d.items[0].example='';});try{await pbpDictSupplementRun(request({category:'culture'}));return false;}catch(e){return e.code==='wrong_language'&&e.reason==='explanation_script'&&appended.length===0;}});
 await test('fabricated quotations report an evidence reason without leaking their text',async()=>{existing();usageResponse(d=>{d.items[0].sourceIndex=0;d.items[0].example='PRIVATE_FABRICATED_QUOTE';});try{await pbpDictSupplementRun(request({category:'literature'}));return false;}catch(e){return e.code==='invalid_response'&&e.reason==='supplement_quote'&&!JSON.stringify(e).includes('PRIVATE_FABRICATED_QUOTE')&&appended.length===0;}});
 await test('a recognized custom language name with legacy und identity accepts equivalent metadata',async()=>{for(const language of ['English','en','en-GB']){reset();existing();usageResponse(d=>{d.language=language;d.summary='Describe places at a great distance.';d.items[0].explanation='Use this expression for places that are far from the speaker and may be difficult to reach, or to suggest a desire to travel.';d.items[0].translation='She imagines visiting distant places.';});const r=await pbpDictSupplementRun(request({category:'grammar',target:{name:'English',lang:'und'}}));if(!r.archiveSaved||r.learning.language.lang!=='und'||r.learning.language.name!=='English')return false;}return true;});
+
+await test('the prompt defines the actual base-meaning count and permits repeated references',async()=>{
+  for(const count of [1,2,4]){
+    reset();existing();
+    records.entry.meanings=Array.from({length:count},(_,i)=>({partOfSpeech:'形容词',definition:'第'+(i+1)+'种词义。',examples:[]}));
+    await pbpDictSupplementRun(request({category:'collocations'}));
+    const prompt=calls[0].prompt,data=JSON.parse(prompt.split('\n').at(-1));
+    if(!prompt.includes('Here N='+count+',')||!prompt.includes('1-based array index')||
+      !prompt.includes("not the output item's position")||!prompt.includes('Several items may reference the same sense')||
+      data.baseEntry.meanings.length!==count)return false;
+  }
+  return true;
+});
+await test('three distinct collocations may all reference one existing meaning',async()=>{
+  existing();usageResponse(d=>{d.items=['faraway places','a faraway land','faraway memories'].map(title=>({...d.items[0],sense:1,title}));});
+  const result=await pbpDictSupplementRun(request({category:'collocations'}));
+  return result.archiveSaved&&result.learning.items.length===3&&result.learning.items.every(item=>item.sense===1)&&calls.length===1;
+});
+await test('output item numbers cannot create base meanings and fail without a paid retry',async()=>{
+  existing();usageResponse(d=>{d.items=[1,2,3].map(sense=>({...d.items[0],sense,title:'PRIVATE_PATTERN_'+sense}));});
+  try{await pbpDictSupplementRun(request({category:'collocations'}));return false;}
+  catch(e){return e.code==='invalid_response'&&e.reason==='supplement_item_sense'&&!JSON.stringify(e).includes('PRIVATE_PATTERN_')&&calls.length===1&&appended.length===0;}
+});
+await test('noninteger and out-of-range meaning references remain invalid',async()=>{
+  for(const sense of [-1,1.5,'1',null,2]){
+    reset();existing();usageResponse(d=>{d.items[0].sense=sense;});
+    try{await pbpDictSupplementRun(request({category:'grammar'}));return false;}
+    catch(e){if(e.reason!=='supplement_item_sense'||calls.length!==1||appended.length)return false;}
+  }
+  return true;
+});
+await test('item shapes reject missing fields, extra fields and nonobjects with value-free reasons',async()=>{
+  const mutations=[d=>{delete d.items[0].translation;},d=>{d.items[0].PRIVATE_EXTRA_FIELD='PRIVATE_MODEL_VALUE';},d=>{d.items[0]=null;},d=>{d.items[0]=[];}];
+  for(const mutate of mutations){
+    reset();existing();usageResponse(mutate);
+    try{await pbpDictSupplementRun(request({category:'register'}));return false;}
+    catch(e){if(e.reason!=='supplement_item_shape'||JSON.stringify(e).includes('PRIVATE_')||appended.length)return false;}
+  }
+  return true;
+});
+await test('empty required text, oversized text and nonstring text retain strict rejection',async()=>{
+  const mutations=[d=>{d.items[0].title='';},d=>{d.items[0].explanation='x'.repeat(1401);},d=>{d.items[0].example=9;},d=>{d.items[0].translation={private:'PRIVATE_MODEL_VALUE'};}];
+  for(const mutate of mutations){
+    reset();existing();usageResponse(mutate);
+    try{await pbpDictSupplementRun(request({category:'scenarios'}));return false;}
+    catch(e){if(e.reason!=='supplement_item_text'||JSON.stringify(e).includes('PRIVATE_')||appended.length)return false;}
+  }
+  return true;
+});
+await test('source indices retain integer and retrieved-source bounds',async()=>{
+  for(const sourceIndex of [-2,-0.5,'-1',null,0]){
+    reset();existing();usageResponse(d=>{d.items[0].sourceIndex=sourceIndex;});
+    try{await pbpDictSupplementRun(request({category:'collocations'}));return false;}
+    catch(e){if(e.reason!=='supplement_source_index'||calls.length!==1||appended.length)return false;}
+  }
+  return true;
+});
+await test('identical supplement items are rejected while repeated senses alone are valid',async()=>{
+  existing();usageResponse(d=>{d.items.push({...d.items[0]});});
+  try{await pbpDictSupplementRun(request({category:'collocations'}));return false;}
+  catch(e){return e.reason==='supplement_duplicate'&&calls.length===1&&appended.length===0;}
+});
+await test('clearer meaning diagnostics do not weaken source, quote or translation checks',async()=>{
+  const cases=[
+    ['culture','supplement_source',d=>{d.items[0].sourceIndex=-1;}],
+    ['literature','supplement_quote',d=>{d.items[0].sourceIndex=0;d.items[0].example='PRIVATE_FABRICATED_QUOTE';}],
+    ['grammar','supplement_example',d=>{d.items[0].translation='';}],
+    ['literature','supplement_item_shape',d=>{d.items=[1,2,3].map(i=>({...d.items[0],title:'Passage '+i,example:'',sourceIndex:0}));}]
+  ];
+  for(const [category,reason,mutate] of cases){
+    reset();existing();usageResponse(mutate);
+    try{await pbpDictSupplementRun(request({category}));return false;}
+    catch(e){if(e.reason!==reason||JSON.stringify(e).includes('PRIVATE_')||appended.length)return false;}
+  }
+  return true;
+});
+await test('captured successful DeepSeek collocations preserve repeated and cross-sense references',async()=>{
+  const fixture=await(await fetch('fixtures/dict-deepseek-collocations.json')).json();
+  existing();records.entry=fixture.baseEntry;usageAnswer=fixture.response;
+  const result=await pbpDictSupplementRun(request({term:fixture.baseEntry.word,sourceLanguage:fixture.baseEntry.language,target:fixture.target,category:fixture.category}));
+  return result.archiveSaved&&result.learning.items.length===5&&result.learning.items.map(item=>item.sense).join(',')==='1,1,2,3,0'&&
+    result.learning.items.every(item=>item.sourceIndex===-1)&&calls.length===1&&appended.length===1;
+});
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();
 </script>

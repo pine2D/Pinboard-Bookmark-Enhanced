@@ -13,13 +13,16 @@ paths:
 
 | provider | 关思考字段 |
 |---|---|
-| zhipu / moonshot(kimi) / minimax | `{"thinking":{"type":"disabled"}}`（minimax M2 接受但忽略，M3 才真生效） |
+| zhipu / moonshot(kimi) | `{"thinking":{"type":"disabled"}}` |
+| minimax | 先传 `{"thinking":{"type":"disabled"}}`；服务端拒绝后才尝试 `{"reasoning_effort":"low"}`，避免强制思考模型退回默认的最高强度。是否回退由服务端响应与能力记忆决定，不按模型名写名单 |
 | siliconflow / qwen | `{"enable_thinking":false}` |
 | openai / mistral / cohere | `{"reasoning_effort":"none"}`（flat，非 Responses 的 nested；cohere compat 端点仅 none/high） |
 | openrouter | `{"reasoning":{"enabled":false}}`（勿用 exclude，仍计费） |
 | gemini | bespoke：`thinkingConfig.thinkingBudget:0` |
 | deepseek | thinkingOff（deepseek-reasoner 会拒收，靠 4xx 回退兜住） |
 | groq / custom / ollama | **不加 thinkingOff**（groq 逐模型枚举互斥；custom/ollama 方言未知） |
+
+MiniMax 的说明于 2026-10-25 按[官方 OpenAI 兼容接口文档](https://platform.minimax.cn/docs/api-reference/text-openai-api)复核：M3 支持关闭思考，M3.1-Flash 强制开启，默认思考强度为 `max`。这些型号用于说明能力差异，运行时仍只依据服务端拒绝决定方言。若 `low` 也被 400/422 拒绝，再剥离该字段；明确点名 `reasoning_effort` 不支持时立即记入现有按 provider/model 隔离的 `pbpAiParamFix`，泛 4xx 只在剥离后的请求被接受时记忆。参数名修复仍优先，思考、强度及参数修复合计最多四次实际请求，每次重过 `beforeRequest`；401/402/429/5xx、取消、空正文或输出截断不得触发额外请求。已解析的 HTTP 2xx 配合固定的空正文/截断错误码可证明方言被接受，普通无状态异常不可以。
 
 同一个包装器还管请求体参数方言（K133）：输出上限字段名是 per-provider 列 `tokenField`（openai = `max_completion_tokens`，其余留空即 `max_tokens`），`temperature` 则**不声明**——它在单一 provider 内逐模型变化（gpt-5 家族只接受默认值 1），只在服务端 400 点名后剥掉。两种修复都从服务端自己的 `error.param` / 报文里读（`handleAIError` 挂 `err.paramHint`），按 (provider, model) 记在 `storage.local` 的 `pbpAiParamFix`，**绝不做按 model id 的静态 allowlist**。Anthropic 的 `callClaude` / `_streamClaude` 用的 `max_tokens` 是 Messages API 必填字段，语义不同，永远不参与改名。
 

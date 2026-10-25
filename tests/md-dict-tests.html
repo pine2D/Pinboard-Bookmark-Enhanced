@@ -2005,6 +2005,12 @@ async function runDictionaryEntryUiTests() {
       check(label+" retains bounded HTTP statuses through the actual failure catch",statuses.every(Boolean));
       const known=await attempt(Object.assign(new Error(secret),{status:503,reason:"response_json"}));
       check(label+" preserves a known validation reason ahead of HTTP status",known.length===4&&known[3]==="response_json");
+      const details=[];
+      for(const reason of ["supplement_item","supplement_item_shape","supplement_item_sense","supplement_item_text","supplement_source_index","supplement_duplicate"]) {
+        const args=await attempt(Object.assign(new Error(secret),{code:"invalid_response",reason}));
+        details.push(args.length===4&&args[2]==="invalid_response"&&args[3]===reason);
+      }
+      check(label+" retains fixed supplement validation reasons and the legacy item code",details.every(Boolean));
       const untrusted=await attempt(Object.assign(new Error(secret),{status:429,reason:secret}));
       check(label+" falls back to HTTP status without printing an arbitrary reason",untrusted.length===4&&untrusted[3]==="http_429");
       const invalid=[];
@@ -2015,8 +2021,38 @@ async function runDictionaryEntryUiTests() {
       check(label+" rejects nonnumeric, fractional and out-of-range HTTP status diagnostics",invalid.every(Boolean));
       const generic=await attempt(new TypeError(secret));
       check(label+" leaves a generic TypeError unclassified instead of calling it a network failure",generic.length===4&&generic[1]==="TypeError"&&generic[2]==="request_failed"&&generic[3]==="");
+      const untrustedCode=await attempt(Object.assign(new Error(secret),{code:secret,status:402}));
+      check(label+" never logs provider-supplied arbitrary error codes",untrustedCode[2]==="request_failed"&&untrustedCode[3]==="http_402");
       check(label+" never logs the error message, raw reason or exception object",warnings.length>0&&warnings.every(args=>args.every(value=>typeof value==="string"))&&!JSON.stringify(warnings).includes(secret));
     } finally {console.warn=originalWarn;window[runName]=originalRun;}
+  };
+  const checkGenerationFeedback=async(label,runName,trigger,getMessage,fallback)=>{
+    const originalRun=window[runName],secret="PRIVATE_MODEL_RESPONSE_AND_SECRET";
+    const attempt=async properties=>{
+      window[runName]=async()=>{throw Object.assign(new Error(secret),properties);};
+      trigger();await settle();return getMessage()?.textContent;
+    };
+    try {
+      for(const [properties,key] of [
+        [{code:"output_truncated"},"dictGenerationTruncated"],
+        [{code:"empty_response"},"dictGenerationEmpty"],
+        [{code:"model_not_found"},"dictGenerationModelUnavailable"],
+        [{status:402},"dictGenerationBilling"]
+      ]) check(label+" gives specific recovery guidance through the mounted UI: "+key,await attempt(properties)===key);
+      const retained=[];
+      for(const [code,key] of [
+        ["owner_changed","vocabAccountChanged"],["account_changed","vocabAccountChanged"],
+        ["host_permission","aiGrantRetry"],["sync_failed","dictEntrySyncFailed"],
+        ["wrong_language","dictSupplementWrongLanguage"],["invalid_response","dictSupplementInvalid"],
+        ["no_sources","dictSupplementNoSources"],["unsupported_usage","dictSupplementUnsupported"],
+        ["source_failed",fallback]
+      ]) retained.push(await attempt({code})===key);
+      retained.push(await attempt({code:"owner_changed",status:402})==="vocabAccountChanged");
+      check(label+" preserves owner, permission, sync, language, validation and source recovery branches",retained.every(Boolean));
+      const ambiguous=[];
+      for(const properties of [{status:"402"},{code:secret},{code:{},status:401}]) ambiguous.push(await attempt(properties)===fallback);
+      check(label+" does not infer billing or expose raw text from malformed or unrelated errors",ambiguous.every(Boolean)&&!getMessage().textContent.includes(secret));
+    } finally {window[runName]=originalRun;}
   };
   try {
     Object.assign(window,{hasAIKey:()=>true,ensureAIHostPermissionWithGesture:async()=>{grants++;},uiLangToBCP47:()=>uiLanguage,PBP_ICONS:Object.fromEntries(["wandSparkles","bookOpenText","sparkles","stop","gear"].map(name=>[name,'<svg viewBox="0 0 24 24" aria-hidden="true"></svg>'])),pbpAiBumpCounter:()=>{},
@@ -2091,6 +2127,7 @@ async function runDictionaryEntryUiTests() {
     check("failed generation restores the retry action when focus is still on Stop",document.activeElement===failed.host.querySelector('.xp-dict-ai-generate'));
     check("a generation error leaves the dictionary readable and retry possible",!failed.dict.hidden&&!failed.host.querySelector('.xp-dict-ai-generate').disabled&&failed.host.textContent.includes("dictSupplementInvalid"));
     await checkFailureDiagnostics("base generation", "pbpDictEntryRun", ()=>failed.host.querySelector('.xp-dict-ai-generate').click(), "[dict-entry] generation failed:");
+    await checkGenerationFeedback("base generation","pbpDictEntryRun",()=>failed.host.querySelector('.xp-dict-ai-generate').click(),()=>failed.host.querySelector('.xp-dict-ai-status'),"dictEntryUnavailable");
     const requestsBeforePermission=calls.length;window.ensureAIHostPermissionWithGesture=async()=>{throw Object.assign(new Error("Permission needed"),{code:"host_permission"});};
     failed.host.querySelector('.xp-dict-ai-generate').click();await settle();
     check("permission denial shows actionable recovery without generating",calls.length===requestsBeforePermission&&failed.host.textContent.includes("aiGrantRetry"));
@@ -2211,6 +2248,7 @@ async function runDictionaryEntryUiTests() {
     check("failed supplement returns keyboard focus to its retryable action",document.activeElement===submit&&!submit.disabled);
     check("failed supplement leaves a visible local message next to its retryable action",submit.closest('.xp-dict-usage-actions').querySelector('.xp-dict-usage-status').textContent==='dictSupplementUnavailable'&&usage.host.querySelector('.xp-dict-ai-status').hidden);
     await checkFailureDiagnostics("supplement generation", "pbpDictSupplementRun", ()=>submit.click(), "[dict-entry] usage generation failed:");
+    await checkGenerationFeedback("supplement generation","pbpDictSupplementRun",()=>submit.click(),()=>submit.closest('.xp-dict-usage-actions').querySelector('.xp-dict-usage-status'),"dictSupplementUnavailable");
     window.pbpDictSupplementRun=()=>new Promise(resolve=>{resolveUsage=resolve;});submit.click();await settle();
     const finishStopped=resolveUsage;usage.host.querySelector('.xp-dict-usage-stop').focus();usage.host.querySelector('.xp-dict-usage-stop').click();
     check("stopping a supplement immediately restores its visible action before the aborted request settles",document.activeElement===submit&&!document.activeElement.hidden&&!submit.disabled);

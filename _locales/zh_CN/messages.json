@@ -4656,5 +4656,9 @@
   "dictPanelEmpty": {"message": "选择正文中的词语，或在上方输入单词查词。"},
   "dictLookupInPanel": {"message": "在侧栏查词"},
   "dictSupplementScope": {"message": "限定场景"},
-  "dictSupplementSaving": {"message": "正在保存补充…"}
+  "dictSupplementSaving": {"message": "正在保存补充…"},
+  "dictGenerationTruncated": {"message": "模型在完成正文前已用尽本次输出额度。本次结果未保存；请在设置中更换阅读器 AI 模型后重试。"},
+  "dictGenerationEmpty": {"message": "模型未返回正文。本次结果未保存；请重试，或在设置中更换阅读器 AI 模型。"},
+  "dictGenerationModelUnavailable": {"message": "供应商无法找到或使用所选模型。请检查模型名称及供应商支持情况，并在设置中更新阅读器 AI 模型。"},
+  "dictGenerationBilling": {"message": "供应商拒绝了本次请求（HTTP 402）。请检查该供应商的额度、账单状态和账户访问权限后再试。"}
 }
