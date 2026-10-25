@@ -8774,6 +8774,14 @@ async function openReaderSurface(name) {
       act.click(); await wait(700);
       return shown(pop) && shown(pop.querySelector(".xp-dict-head"));
     }
+    case "dict-resize-menu": {
+      // Dependencies are scanned and closed independently; reopen through
+      // the same product actions before testing this separate top-layer menu.
+      if (!await openReaderSurface("explain-pop") || !await openReaderSurface("explain-dict")) return false;
+      document.querySelector('#explain-pop[data-action="dict"] .xp-resize-grip')?.click();
+      await wait(150);
+      return shown(document.getElementById("dict-resize-pop"));
+    }
     case "ask-panel":
     case "ask-clear-confirm": {
       const btn = document.getElementById("ask-open");
@@ -8829,6 +8837,13 @@ function closeReaderSurface(name) {
     }
     case "explain-pop": return; // stays open for explain-dict
     case "explain-dict": { const pop = document.getElementById("explain-pop"); if (pop && typeof _pbpExplainClose === "function") _pbpExplainClose(pop); return; }
+    case "dict-resize-menu": {
+      const menu = document.getElementById("dict-resize-pop");
+      if (menu?.matches(":popover-open")) menu.hidePopover();
+      const pop = document.getElementById("explain-pop");
+      if (pop && typeof _pbpExplainClose === "function") _pbpExplainClose(pop);
+      return;
+    }
     case "ask-panel": { const btn = document.getElementById("ask-open"); const panel = document.getElementById("ask-panel"); if (btn && panel && !panel.hidden) btn.click(); return; }
     case "ask-clear-confirm": { document.querySelector(".ask-clear-no")?.click(); const btn = document.getElementById("ask-open"); const panel = document.getElementById("ask-panel"); if (btn && panel && !panel.hidden) btn.click(); return; }
     case "send-menu": { const c = document.getElementById("send-caret"); const m = document.getElementById("send-menu"); if (c && m && !m.hidden) c.click(); return; }

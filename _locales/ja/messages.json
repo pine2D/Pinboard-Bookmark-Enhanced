@@ -4646,5 +4646,12 @@
   "dictSupplementInvalid": {"message": "必要な内容が不足しているか、引用を確認できませんでした。保存していないため、再試行できます。"},
   "dictSupplementSourceVerified": {"message": "原文と照合済み"},
   "dictEntryUpdate": {"message": "この辞書項目を更新"},
-  "dictEntryUpdateHint": {"message": "辞書項目を再生成し、トークンを消費します。以前の結果も保持されます。"}
+  "dictEntryUpdateHint": {"message": "辞書項目を再生成し、トークンを消費します。以前の結果も保持されます。"},
+  "dictResize": {"message": "辞書ウィンドウのサイズを変更"},
+  "dictResizeWidth": {"message": "幅"},
+  "dictResizeHeight": {"message": "高さ"},
+  "dictResizeReset": {"message": "既定のサイズに戻す"},
+  "dictResizeHint": {"message": "端をドラッグしてサイズを変更できます。矢印キーで微調整し、Shift キーを押しながら操作すると調整幅が大きくなります。"},
+  "dictResizeSmaller": {"message": "小さくする"},
+  "dictResizeLarger": {"message": "大きくする"}
 }

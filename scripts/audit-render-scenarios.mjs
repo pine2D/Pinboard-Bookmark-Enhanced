@@ -21,7 +21,7 @@ export const RENDER_OPTIONS_TABS = Object.freeze([
 ]);
 export const RENDER_READER_CONTEXTS = Object.freeze([
   'reader-source-details', 'export-more', 'reader-bookmark-footer', 'reader-bookmark-editor', 'reader-bookmark-delete-confirm',
-  'explain-pop', 'explain-dict', 'dict-entry-idle', 'dict-entry-busy', 'dict-entry-result', 'dict-entry-details', 'dict-entry-cached', 'dict-entry-error', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
+  'explain-pop', 'explain-dict', 'dict-resize-menu', 'dict-entry-idle', 'dict-entry-busy', 'dict-entry-result', 'dict-entry-details', 'dict-entry-cached', 'dict-entry-error', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
   'pb-hl-card', 'send-menu', 'confirm-popover', 'tr-ask',
 ]);
 const context = (name, dependencies = [], extra = {}) => ({ name, dependencies, ...extra });
@@ -55,7 +55,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('notes-batch-bar', ['notes-detail'], { target: '#notes-batch-toolbar.selecting' }),
   ],
   'md-preview': [context('reader', [], { target: '#rendered-view' }), ...RENDER_READER_CONTEXTS.map((name) => context(name,
-    name === 'explain-dict' ? ['explain-pop'] : name === 'dict-entry-busy' ? ['dict-entry-idle'] : name === 'dict-entry-result' ? ['dict-entry-busy'] : ['dict-entry-details', 'dict-entry-cached'].includes(name) ? ['dict-entry-result'] : name === 'dict-entry-error' ? ['dict-entry-idle'] : [])), context('video', [], { target: '.pbv-bar' })],
+    name === 'explain-dict' ? ['explain-pop'] : name === 'dict-resize-menu' ? ['explain-dict'] : name === 'dict-entry-busy' ? ['dict-entry-idle'] : name === 'dict-entry-result' ? ['dict-entry-busy'] : ['dict-entry-details', 'dict-entry-cached'].includes(name) ? ['dict-entry-result'] : name === 'dict-entry-error' ? ['dict-entry-idle'] : [])), context('video', [], { target: '.pbv-bar' })],
   popup: [context('light', [], { target: '#main-section' }), context('states', [], { target: '.offline-queue-item' }),
     context('form', [], { target: '#url-input' }), context('dpi', [], { dpr: [1.5, 2] }),
     context('dark', [], { theme: 'flexoki-dark', scheme: 'dark', target: '#main-section' }),

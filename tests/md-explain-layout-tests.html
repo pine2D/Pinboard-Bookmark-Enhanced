@@ -590,5 +590,151 @@ function assertLayout(frame, locale) {
       }
     } finally { frame.remove(); }
   });
+
+  async function makeResizableFrame(width = 960, height = 720, locale = "en") {
+    const frame = document.createElement("iframe");
+    frame.style.cssText = `width:${width}px;height:${height}px;border:0`;
+    frame.srcdoc = '<!doctype html><html><head><link rel="stylesheet" href="../md-preview.css"></head><body><main id="rendered-view"><p>Reading context</p></main></body></html>';
+    document.body.appendChild(frame);
+    await new Promise(resolve => frame.addEventListener("load", resolve, { once: true }));
+    const win = frame.contentWindow, doc = frame.contentDocument;
+    win.t = key => messages[locale][key]?.message || key;
+    win.pbpAiProviderName = () => "";
+    win.pbpAiEffectiveModel = () => "";
+    for (const name of ["shared.js", "md-ask.js"]) {
+      const script = doc.createElement("script"); script.src = "../" + name;
+      const ready = new Promise((resolve, reject) => {
+        script.onload = resolve; script.onerror = () => reject(new Error("script load failed: " + name));
+      });
+      doc.body.appendChild(script); await ready;
+    }
+    const pop = win._pbpExplainEnsurePop();
+    // Use the production action control. There is no cap/ctx here, so it
+    // changes presentation without starting an AI request.
+    pop.querySelector('[data-action="dict"]').click();
+    pop.querySelector(".xp-term").textContent = "characteristically";
+    pop.querySelector(".xp-body").textContent = "A realistic longer dictionary entry. ".repeat(160);
+    pop.style.left = "80px"; pop.style.top = "48px";
+    pop.showPopover();
+    await nextFrame(win);
+    return { frame, win, doc, pop };
+  }
+  async function nextFrame(win) {
+    await new Promise(resolve => win.requestAnimationFrame(() => win.requestAnimationFrame(resolve)));
+  }
+  function resizePointer(fx, handle, type, x, y) {
+    handle.dispatchEvent(new fx.win.PointerEvent(type, { bubbles: true, cancelable: true,
+      isPrimary: true, pointerId: 19, button: 0, clientX: x, clientY: y }));
+  }
+  await test("dictionary resize bounds fit narrow visual viewports and keep the opposite drag edge anchored", async () => {
+    const fx = await makeResizableFrame();
+    try {
+      const viewport = { left: 20, top: 40, width: 320, height: 220 };
+      const fitted = fx.win.pbpDictWindowRect({ left: 0, top: 0, width: 720, height: 800 }, "", 0, 0, viewport);
+      assert(fitted.left === 36 && fitted.top === 56 && fitted.width === 288 && fitted.height === 188,
+        "the preferred minimum must yield to the visible viewport: " + JSON.stringify(fitted));
+      const west = fx.win.pbpDictWindowRect({ left: 100, top: 80, width: 480, height: 300 }, "nw", 80, 30,
+        { left: 0, top: 0, width: 1000, height: 800 });
+      assert(west.left + west.width === 580 && west.top + west.height === 380,
+        "west/north drags must not move the opposite edges");
+      const max = fx.win.pbpDictWindowRect({ left: 16, top: 16, width: 2000, height: 2000 }, "", 0, 0,
+        { width: 3000, height: 2000 });
+      assert(max.width === 720 && max.height === 800, "large screens must keep the readable maximum");
+    } finally { fx.frame.remove(); }
+  });
+  await test("dictionary pointer resize commits only after movement and preserves a fixed body viewport", async () => {
+    const fx = await makeResizableFrame();
+    try {
+      const grip = fx.pop.querySelector('[data-edge="se"]');
+      const before = fx.pop.getBoundingClientRect();
+      const east = fx.pop.querySelector('[data-edge="e"]');
+      resizePointer(fx, east, "pointerdown", before.right - 4, before.top + 60);
+      resizePointer(fx, east, "pointermove", before.right - 4, before.top + 90);
+      await nextFrame(fx.win);
+      assert(fx.pop.dataset.pinned !== "true", "moving along an edge without changing its size must not pin");
+      resizePointer(fx, east, "pointercancel", before.right - 4, before.top + 90);
+      resizePointer(fx, grip, "pointerdown", before.right - 5, before.bottom - 5);
+      resizePointer(fx, grip, "pointermove", before.right - 3, before.bottom - 3);
+      await nextFrame(fx.win);
+      assert(fx.pop.dataset.pinned !== "true" && !fx.pop.dataset.resized, "press/jitter must not pin or set a size");
+      resizePointer(fx, grip, "pointermove", before.right + 91, before.bottom + 43);
+      await nextFrame(fx.win);
+      const changed = fx.pop.getBoundingClientRect();
+      assert(changed.width > before.width + 90 && changed.height > before.height + 40, "pointer resize did not grow the shell");
+      assert(fx.pop.dataset.pinned === "true", "a deliberate resize should pin the window");
+      resizePointer(fx, grip, "pointerup", before.right + 91, before.bottom + 43);
+      fx.pop.querySelector(".xp-body").textContent += " Additional generated usage. ".repeat(100);
+      await nextFrame(fx.win);
+      assert(Math.abs(fx.pop.getBoundingClientRect().height - changed.height) < 1, "streaming content must not grow a manually sized window");
+      assert(fx.pop.querySelector(".xp-body").scrollHeight > fx.pop.querySelector(".xp-body").clientHeight, "the body should remain its scrolling surface");
+      assert(!fx.pop.classList.contains("xp-resizing"), "pointerup left drag state behind");
+    } finally { fx.frame.remove(); }
+  });
+  await test("dictionary size supports keyboard and click controls, reset, and keeps other actions unchanged", async () => {
+    const fx = await makeResizableFrame();
+    try {
+      const grip = fx.pop.querySelector(".xp-resize-grip");
+      grip.focus();
+      const original = fx.pop.getBoundingClientRect();
+      grip.dispatchEvent(new fx.win.KeyboardEvent("keydown", { key: "ArrowRight", shiftKey: true, bubbles: true, cancelable: true }));
+      assert(Math.abs(fx.pop.getBoundingClientRect().width - original.width - 32) < 1, "keyboard resize did not apply the larger step");
+      grip.click(); await nextFrame(fx.win);
+      const menu = fx.doc.getElementById("dict-resize-pop");
+      assert(menu.matches(":popover-open") && menu.contains(fx.doc.activeElement), "click should open the size controls and hand off focus");
+      menu.querySelector('button[data-axis="Height"][data-amount="32"]').click();
+      const preferred = fx.pop.getBoundingClientRect();
+      assert(preferred.height > original.height + 30, "click-only height control did not resize");
+      fx.pop.querySelector('[data-action="explain"]').click();
+      assert(Math.abs(fx.pop.getBoundingClientRect().width - 420) < 1 && !fx.pop.style.height, "explain inherited dictionary geometry");
+      assert(!menu.matches(":popover-open") && fx.win.getComputedStyle(grip).display === "none", "size UI must only be visible in dictionary mode");
+      fx.pop.querySelector('[data-action="dict"]').click();
+      assert(Math.abs(fx.pop.getBoundingClientRect().width - preferred.width) < 1, "dictionary size was lost after switching actions");
+      grip.click(); await nextFrame(fx.win); menu.querySelector(".xp-resize-reset").click();
+      assert(!fx.pop.dataset.resized && !fx.pop.style.height && Math.abs(fx.pop.getBoundingClientRect().width - 480) < 1,
+        "reset should restore the default width and natural height");
+      assert(fx.doc.activeElement === grip && !menu.matches(":popover-open"), "reset should close the controls and restore focus");
+    } finally { fx.frame.remove(); }
+    for (const locale of ["de", "ru", "zh_CN"]) {
+      const narrow = await makeResizableFrame(320, 620, locale);
+      try {
+        narrow.pop.querySelector(".xp-resize-grip").click(); await nextFrame(narrow.win);
+        const menu = narrow.doc.getElementById("dict-resize-pop"), rect = menu.getBoundingClientRect();
+        assert(rect.left >= 16 && rect.right <= 304 && menu.scrollWidth <= menu.clientWidth,
+          locale + ": narrow size controls overflow");
+        for (const button of menu.querySelectorAll("button")) {
+          assert(button.getBoundingClientRect().height >= 24 && button.scrollWidth <= button.clientWidth,
+            locale + ": size control clipped or undersized");
+        }
+      } finally { narrow.frame.remove(); }
+    }
+  });
+  await test("dictionary resizing cancels queued work and temporarily fits a smaller window without losing preferred size", async () => {
+    const fx = await makeResizableFrame();
+    try {
+      const grip = fx.pop.querySelector(".xp-resize-grip");
+      fx.win._pbpExplainAdjustDictSize(fx.pop, 160, 80);
+      const preferred = fx.pop.getBoundingClientRect();
+      resizePointer(fx, grip, "pointerdown", preferred.right - 5, preferred.bottom - 5);
+      resizePointer(fx, grip, "pointermove", preferred.right + 45, preferred.bottom + 45);
+      resizePointer(fx, grip, "pointercancel", preferred.right + 45, preferred.bottom + 45);
+      await nextFrame(fx.win);
+      assert(!fx.pop.classList.contains("xp-resizing") && Math.abs(fx.pop.getBoundingClientRect().width - preferred.width) < 1,
+        "cancellation should drop a queued resize frame");
+      fx.frame.style.width = "320px"; fx.frame.style.height = "220px";
+      await nextFrame(fx.win);
+      const fitted = fx.pop.getBoundingClientRect();
+      assert(fitted.width <= 288 && fitted.height <= 188 && fitted.left >= 16 && fitted.top >= 16 && fitted.right <= 304 && fitted.bottom <= 204,
+        "a reduced viewport must contain the entire dictionary: " + JSON.stringify(fitted.toJSON()));
+      fx.frame.style.width = "960px"; fx.frame.style.height = "720px";
+      await nextFrame(fx.win);
+      assert(Math.abs(fx.pop.getBoundingClientRect().width - preferred.width) < 1 && Math.abs(fx.pop.getBoundingClientRect().height - preferred.height) < 1,
+        "re-expanding the viewport should recover the preferred size");
+      fx.win._pbpExplainClose(fx.pop);
+      assert(parseFloat(fx.pop.style.maxHeight) === preferred.height,
+        "closing a tall resized window must not snap back to the default cap during its exit fade");
+      fx.pop.showPopover(); await nextFrame(fx.win);
+      assert(fx.pop.dataset.resized === "true", "closing and reopening should keep the reader-session size");
+    } finally { fx.frame.remove(); }
+  });
 })();
 </script></body></html>

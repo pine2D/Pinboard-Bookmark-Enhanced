@@ -4646,5 +4646,12 @@
   "dictSupplementInvalid": {"message": "Не хватает нужных сведений или не удалось проверить цитату. Результат не сохранён; можно повторить попытку."},
   "dictSupplementSourceVerified": {"message": "Сверено с исходным текстом"},
   "dictEntryUpdate": {"message": "Обновить статью"},
-  "dictEntryUpdateHint": {"message": "Создаёт статью заново с расходом токенов. Прежние результаты сохраняются."}
+  "dictEntryUpdateHint": {"message": "Создаёт статью заново с расходом токенов. Прежние результаты сохраняются."},
+  "dictResize": {"message": "Изменить размер окна словаря"},
+  "dictResizeWidth": {"message": "Ширина"},
+  "dictResizeHeight": {"message": "Высота"},
+  "dictResizeReset": {"message": "Восстановить размер по умолчанию"},
+  "dictResizeHint": {"message": "Перетаскивайте края, чтобы изменить размер. Клавиши со стрелками меняют его небольшими шагами; удерживайте Shift для большего шага."},
+  "dictResizeSmaller": {"message": "Уменьшить"},
+  "dictResizeLarger": {"message": "Увеличить"}
 }

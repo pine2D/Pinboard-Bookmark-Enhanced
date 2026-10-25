@@ -4646,5 +4646,12 @@
   "dictSupplementInvalid": {"message": "Il manque des informations requises ou une citation n’a pas pu être vérifiée. Le résultat n’a pas été enregistré ; vous pouvez réessayer."},
   "dictSupplementSourceVerified": {"message": "Vérifié dans le texte source"},
   "dictEntryUpdate": {"message": "Actualiser cette entrée"},
-  "dictEntryUpdateHint": {"message": "Génère une nouvelle entrée et consomme des jetons. Les résultats précédents sont conservés."}
+  "dictEntryUpdateHint": {"message": "Génère une nouvelle entrée et consomme des jetons. Les résultats précédents sont conservés."},
+  "dictResize": {"message": "Redimensionner la fenêtre du dictionnaire"},
+  "dictResizeWidth": {"message": "Largeur"},
+  "dictResizeHeight": {"message": "Hauteur"},
+  "dictResizeReset": {"message": "Rétablir la taille par défaut"},
+  "dictResizeHint": {"message": "Faites glisser un bord pour redimensionner. Les touches fléchées ajustent la taille par petits pas ; maintenez Maj pour de plus grands pas."},
+  "dictResizeSmaller": {"message": "Réduire"},
+  "dictResizeLarger": {"message": "Agrandir"}
 }

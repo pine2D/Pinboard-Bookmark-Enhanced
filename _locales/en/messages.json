@@ -4653,5 +4653,12 @@
   "dictSupplementInvalid": {"message": "Required content is missing or a quotation could not be verified. The result was not saved; you can try again."},
   "dictSupplementSourceVerified": {"message": "Checked against the source text"},
   "dictEntryUpdate": {"message": "Update this entry"},
-  "dictEntryUpdateHint": {"message": "Generates a new entry and uses tokens. Earlier results are kept."}
+  "dictEntryUpdateHint": {"message": "Generates a new entry and uses tokens. Earlier results are kept."},
+  "dictResize": {"message": "Resize dictionary window"},
+  "dictResizeWidth": {"message": "Width"},
+  "dictResizeHeight": {"message": "Height"},
+  "dictResizeReset": {"message": "Reset to default size"},
+  "dictResizeHint": {"message": "Drag an edge to resize. Use arrow keys for small adjustments; hold Shift for larger steps."},
+  "dictResizeSmaller": {"message": "Decrease"},
+  "dictResizeLarger": {"message": "Increase"}
 }

@@ -4646,5 +4646,12 @@
   "dictSupplementInvalid": {"message": "結果缺少必要內容，或引文未通過核對。尚未儲存；可重試。"},
   "dictSupplementSourceVerified": {"message": "已核對原文"},
   "dictEntryUpdate": {"message": "更新此詞條"},
-  "dictEntryUpdateHint": {"message": "重新生成詞條會消耗 token；舊結果仍會保留。"}
+  "dictEntryUpdateHint": {"message": "重新生成詞條會消耗 token；舊結果仍會保留。"},
+  "dictResize": {"message": "調整查詞視窗大小"},
+  "dictResizeWidth": {"message": "闊度"},
+  "dictResizeHeight": {"message": "高度"},
+  "dictResizeReset": {"message": "恢復預設大小"},
+  "dictResizeHint": {"message": "拖曳邊緣調整大小；方向鍵微調，按住 Shift 加大調整幅度。"},
+  "dictResizeSmaller": {"message": "縮小"},
+  "dictResizeLarger": {"message": "放大"}
 }

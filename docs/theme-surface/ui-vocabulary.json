@@ -500,6 +500,7 @@
         "xp-dict-packs",
         "xp-dict-legacy",
         "xp-dict-query-tools",
+        "xp-resize-hit",
         "confirm-actions"
       ],
       "regions": [

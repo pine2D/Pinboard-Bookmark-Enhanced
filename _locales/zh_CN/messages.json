@@ -4640,5 +4640,12 @@
   "dictSupplementInvalid": {"message": "结果缺少必要内容或引用未通过核对。尚未保存；可重试。"},
   "dictSupplementSourceVerified": {"message": "原文已核对"},
   "dictEntryUpdate": {"message": "更新此词条"},
-  "dictEntryUpdateHint": {"message": "重新生成词条会消耗 token；旧结果仍会保留。"}
+  "dictEntryUpdateHint": {"message": "重新生成词条会消耗 token；旧结果仍会保留。"},
+  "dictResize": {"message": "调整查词窗口大小"},
+  "dictResizeWidth": {"message": "宽度"},
+  "dictResizeHeight": {"message": "高度"},
+  "dictResizeReset": {"message": "恢复默认大小"},
+  "dictResizeHint": {"message": "拖动边缘调整大小；方向键微调，按住 Shift 加大调整幅度。"},
+  "dictResizeSmaller": {"message": "减小"},
+  "dictResizeLarger": {"message": "增大"}
 }

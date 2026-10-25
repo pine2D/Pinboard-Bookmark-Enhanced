@@ -3043,6 +3043,12 @@ let _pbpExplainDrag = null;
 // than down over it. null means top-anchored (the normal, downward case).
 let _pbpExplainAnchorBottom = null;
 let _pbpExplainResizeObserver = null;
+// Window geometry is reader-session state, independent of any AI request.
+// Keep the preferred size when a small viewport temporarily constrains it.
+let _pbpDictWindowSize = null;
+let _pbpExplainResize = null;
+let _pbpExplainResizeFrame = 0;
+let _pbpDictResizePop = null;
 // Focus handoff is scoped to one real open/close cycle. Pinned re-entry and
 // action switches reuse the already-open shell and must not replace the
 // element that launched it; the next open after a real close records afresh.
@@ -3070,6 +3076,243 @@ function pbpExplainOpensDown(below, above) {
 }
 const PBP_EXPLAIN_NUDGE = 8;
 
+function _pbpExplainViewport() {
+  const view = window.visualViewport;
+  return { left: view?.offsetLeft || 0, top: view?.offsetTop || 0,
+    width: view?.width || window.innerWidth, height: view?.height || window.innerHeight };
+}
+
+function pbpDictWindowBounds(viewport) {
+  const width = Math.max(1, Number(viewport.width) - 32);
+  const height = Math.max(1, Number(viewport.height) - 32);
+  return { left: (Number(viewport.left) || 0) + 16, top: (Number(viewport.top) || 0) + 16,
+    right: (Number(viewport.left) || 0) + 16 + width, bottom: (Number(viewport.top) || 0) + 16 + height,
+    minWidth: Math.min(320, width), minHeight: Math.min(240, height),
+    maxWidth: Math.min(720, width), maxHeight: Math.min(800, height) };
+}
+
+// Opposite edges stay anchored during a drag. A viewport change can instead
+// fit the whole rectangle, without discarding the user's preferred size.
+function pbpDictWindowRect(rect, edge, dx, dy, viewport) {
+  const b = pbpDictWindowBounds(viewport);
+  const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+  let width = clamp(rect.width, b.minWidth, b.maxWidth);
+  let height = clamp(rect.height, b.minHeight, b.maxHeight);
+  let left = clamp(rect.left, b.left, b.right - width);
+  let top = clamp(rect.top, b.top, b.bottom - height);
+  if (edge.includes("w")) {
+    const right = clamp(rect.left + rect.width, b.left + b.minWidth, b.right);
+    width = clamp(rect.width - dx, b.minWidth, Math.min(b.maxWidth, right - b.left));
+    left = right - width;
+  } else if (edge.includes("e")) {
+    width = clamp(rect.width + dx, b.minWidth, Math.min(b.maxWidth, b.right - left));
+  }
+  if (edge.includes("n")) {
+    const bottom = clamp(rect.top + rect.height, b.top + b.minHeight, b.bottom);
+    height = clamp(rect.height - dy, b.minHeight, Math.min(b.maxHeight, bottom - b.top));
+    top = bottom - height;
+  } else if (edge.includes("s")) {
+    height = clamp(rect.height + dy, b.minHeight, Math.min(b.maxHeight, b.bottom - top));
+  }
+  return { left, top, width, height };
+}
+
+function _pbpExplainWriteDictRect(pop, rect, remember = false) {
+  if (remember) {
+    _pbpDictWindowSize = { width: rect.width, height: rect.height };
+    _pbpExplainAnchorBottom = null;
+    _pbpExplainSetPinned(pop, true);
+  }
+  pop.dataset.resized = "true";
+  pop.style.width = rect.width + "px";
+  pop.style.height = rect.height + "px";
+  pop.style.maxHeight = rect.height + "px";
+  pop.style.left = rect.left + "px";
+  pop.style.top = rect.top + "px";
+}
+
+function _pbpExplainFitDictSize(pop) {
+  if (_pbpExplainAction !== "dict") {
+    // Explain/translate keep their original selection-side height budget.
+    // Only dictionary geometry owns max-width and may clear that budget.
+    if (pop.style.maxWidth) pop.style.removeProperty("max-height");
+    for (const name of ["width", "height", "max-width"]) pop.style.removeProperty(name);
+    delete pop.dataset.resized;
+    if (_pbpDictResizePop?.matches(":popover-open")) _pbpDictResizePop.hidePopover();
+    return;
+  }
+  const bounds = pbpDictWindowBounds(_pbpExplainViewport());
+  pop.style.maxWidth = bounds.maxWidth + "px";
+  if (!_pbpDictWindowSize) {
+    pop.style.removeProperty("width");
+    pop.style.removeProperty("height");
+    delete pop.dataset.resized;
+    const cap = parseFloat(pop.style.maxHeight);
+    pop.style.maxHeight = Math.min(480, Number.isFinite(cap) ? cap : 480, bounds.maxHeight) + "px";
+    return;
+  }
+  const r = pop.getBoundingClientRect();
+  _pbpExplainWriteDictRect(pop, pbpDictWindowRect({ left: parseFloat(pop.style.left) || r.left,
+    top: parseFloat(pop.style.top) || r.top, ..._pbpDictWindowSize }, "", 0, 0, _pbpExplainViewport()));
+}
+
+function _pbpExplainResizeEnd() {
+  const drag = _pbpExplainResize;
+  if (_pbpExplainResizeFrame) cancelAnimationFrame(_pbpExplainResizeFrame);
+  _pbpExplainResizeFrame = 0;
+  _pbpExplainResize = null;
+  if (!drag) return;
+  drag.pop.classList.remove("xp-resizing");
+  try { if (drag.handle.hasPointerCapture(drag.pointerId)) drag.handle.releasePointerCapture(drag.pointerId); } catch (_) {}
+}
+
+function _pbpExplainResizeFlush() {
+  _pbpExplainResizeFrame = 0;
+  const drag = _pbpExplainResize;
+  if (!drag?.moved || _pbpExplainAction !== "dict") return;
+  _pbpExplainWriteDictRect(drag.pop, pbpDictWindowRect(drag.rect, drag.edge,
+    drag.dx, drag.dy, _pbpExplainViewport()), true);
+}
+
+function _pbpExplainAdjustDictSize(pop, dx, dy) {
+  const r = pop.getBoundingClientRect();
+  const rect = pbpDictWindowRect({ left: r.left, top: r.top, width: r.width + dx, height: r.height + dy },
+    "", 0, 0, _pbpExplainViewport());
+  _pbpExplainWriteDictRect(pop, rect, true);
+}
+
+function _pbpExplainDictResizeMenu(pop, handle) {
+  function sync() {
+    const menu = _pbpDictResizePop;
+    const r = pop.getBoundingClientRect(), b = pbpDictWindowBounds(_pbpExplainViewport());
+    for (const axis of ["Width", "Height"]) {
+      const size = r[axis.toLowerCase()];
+      menu.querySelector('output[data-axis="' + axis + '"]').textContent = Math.round(size) + " px";
+      for (const button of menu.querySelectorAll('button[data-axis="' + axis + '"]')) {
+        button.setAttribute("aria-disabled", String(Number(button.dataset.amount) < 0
+          ? size <= b["min" + axis] + 1 : size >= b["max" + axis] - 1));
+      }
+    }
+    const mr = menu.getBoundingClientRect(), vr = _pbpExplainViewport();
+    menu.style.left = Math.max(vr.left + 16, Math.min(r.right - mr.width, vr.left + vr.width - mr.width - 16)) + "px";
+    menu.style.top = Math.max(vr.top + 16, Math.min(r.bottom - mr.height - 28, vr.top + vr.height - mr.height - 16)) + "px";
+  }
+  if (!_pbpDictResizePop) {
+    const menu = document.createElement("div");
+    menu.id = "dict-resize-pop";
+    menu.className = "pop-panel";
+    menu.setAttribute("popover", "auto");
+    menu.setAttribute("role", "dialog");
+    menu.setAttribute("aria-label", t("dictResize"));
+    for (const axis of ["Width", "Height"]) {
+      const row = document.createElement("div"); row.className = "row";
+      const label = document.createElement("span"); label.textContent = t("dictResize" + axis);
+      const value = document.createElement("output"); value.dataset.axis = axis;
+      value.setAttribute("aria-live", "polite");
+      row.appendChild(label);
+      for (const amount of [-32, 32]) {
+        const button = document.createElement("button"); button.type = "button";
+        button.className = "typo-step";
+        const name = t("dictResize" + axis) + ": " + t(amount < 0 ? "dictResizeSmaller" : "dictResizeLarger");
+        button.title = name; button.setAttribute("aria-label", name);
+        button.dataset.axis = axis; button.dataset.amount = String(amount);
+        button.innerHTML = amount < 0 ? PBP_ICONS.minus : PBP_ICONS.plus;
+        button.addEventListener("click", () => {
+          if (button.getAttribute("aria-disabled") === "true") return;
+          _pbpExplainAdjustDictSize(pop, axis === "Width" ? amount : 0, axis === "Height" ? amount : 0);
+          sync();
+        });
+        row.appendChild(button);
+        if (amount < 0) row.appendChild(value);
+      }
+      menu.appendChild(row);
+    }
+    const reset = document.createElement("button"); reset.type = "button";
+    reset.className = "typo-seg-btn xp-resize-reset"; reset.textContent = t("dictResizeReset");
+    reset.addEventListener("click", () => {
+      _pbpDictWindowSize = null;
+      pop.style.removeProperty("max-height");
+      _pbpExplainFitDictSize(pop);
+      const r = pop.getBoundingClientRect(); _pbpExplainPlace(pop, r.left, r.top);
+      handle.focus({ preventScroll: true }); menu.hidePopover();
+    });
+    menu.appendChild(reset);
+    menu.addEventListener("beforetoggle", e => {
+      handle.setAttribute("aria-expanded", String(e.newState === "open"));
+      // Never leave focus in a hidden popup, or pull it back from an outside click.
+      if (e.newState === "closed" && menu.contains(document.activeElement) && pop.matches(":popover-open")) handle.focus({ preventScroll: true });
+    });
+    menu.addEventListener("toggle", e => { if (e.newState === "open") sync(); });
+    pop.appendChild(menu);
+    _pbpDictResizePop = menu;
+  }
+  const menu = _pbpDictResizePop;
+  if (menu.matches(":popover-open")) menu.hidePopover();
+  else { menu.showPopover(); sync(); menu.querySelector("button").focus({ preventScroll: true }); }
+}
+
+function _pbpExplainInitResize(pop) {
+  const handles = document.createElement("div"); handles.className = "xp-resize-hit";
+  pop.appendChild(handles);
+  const hint = document.createElement("span"); hint.id = "xp-resize-hint";
+  hint.className = "sr-only"; hint.textContent = t("dictResizeHint");
+  pop.appendChild(hint);
+  for (const edge of ["n", "e", "s", "w", "nw", "ne", "sw", "se"]) {
+    const handle = document.createElement(edge === "se" ? "button" : "span");
+    handle.className = "xp-resize"; handle.dataset.edge = edge;
+    let suppressClick = false;
+    if (edge === "se") {
+      handle.type = "button"; handle.classList.add("xp-resize-grip");
+      handle.title = t("dictResize"); handle.setAttribute("aria-label", t("dictResize"));
+      handle.setAttribute("aria-describedby", hint.id);
+      handle.setAttribute("aria-haspopup", "dialog"); handle.setAttribute("aria-expanded", "false");
+      handle.setAttribute("aria-controls", "dict-resize-pop");
+      handle.innerHTML = PBP_ICONS.moveDiagonal || PBP_ICONS.zen;
+      handle.addEventListener("click", e => {
+        if (suppressClick) { suppressClick = false; e.preventDefault(); return; }
+        _pbpExplainDictResizeMenu(pop, handle);
+      });
+      handle.addEventListener("keydown", e => {
+        if (e.altKey || e.ctrlKey || e.metaKey || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+        e.preventDefault(); e.stopPropagation();
+        const step = e.shiftKey ? 32 : 8;
+        _pbpExplainAdjustDictSize(pop, e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0,
+          e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0);
+      });
+    } else handle.setAttribute("aria-hidden", "true");
+    handle.addEventListener("pointerdown", e => {
+      if (_pbpExplainAction !== "dict" || !e.isPrimary || e.button !== 0) return;
+      _pbpExplainResizeEnd(); suppressClick = false;
+      if (_pbpDictResizePop?.matches(":popover-open")) _pbpDictResizePop.hidePopover();
+      _pbpExplainResize = { pop, handle, edge, pointerId: e.pointerId, rect: pop.getBoundingClientRect(),
+        x: e.clientX, y: e.clientY, dx: 0, dy: 0, moved: false };
+      try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+      e.preventDefault(); e.stopPropagation();
+    });
+    handle.addEventListener("pointermove", e => {
+      const drag = _pbpExplainResize;
+      if (!drag || drag.pointerId !== e.pointerId) return;
+      drag.dx = e.clientX - drag.x; drag.dy = e.clientY - drag.y;
+      if (!drag.moved && !(/[ew]/.test(edge) && Math.abs(drag.dx) >= 4)
+          && !(/[ns]/.test(edge) && Math.abs(drag.dy) >= 4)) return;
+      drag.moved = true; suppressClick = true; pop.classList.add("xp-resizing");
+      if (!_pbpExplainResizeFrame) _pbpExplainResizeFrame = requestAnimationFrame(_pbpExplainResizeFlush);
+      e.preventDefault();
+    });
+    handle.addEventListener("pointerup", e => {
+      if (_pbpExplainResize?.pointerId !== e.pointerId) return;
+      if (_pbpExplainResizeFrame) { cancelAnimationFrame(_pbpExplainResizeFrame); _pbpExplainResizeFlush(); }
+      _pbpExplainResizeEnd();
+      setTimeout(() => { suppressClick = false; }, 0);
+    });
+    for (const name of ["pointercancel", "lostpointercapture"]) handle.addEventListener(name, e => {
+      if (_pbpExplainResize?.pointerId === e.pointerId) _pbpExplainResizeEnd();
+    });
+    handles.appendChild(handle);
+  }
+  window.addEventListener("blur", _pbpExplainResizeEnd);
+}
+
 function pbpExplainClampPosition(left, top, width, height, viewportWidth, viewportHeight) {
   const maxLeft = Math.max(PBP_EXPLAIN_EDGE, Number(viewportWidth) - Number(width) - PBP_EXPLAIN_EDGE);
   const maxTop = Math.max(PBP_EXPLAIN_EDGE, Number(viewportHeight) - Number(height) - PBP_EXPLAIN_EDGE);
@@ -3080,8 +3323,12 @@ function pbpExplainClampPosition(left, top, width, height, viewportWidth, viewpo
 }
 
 function _pbpExplainPlace(pop, left, top) {
-  const pos = pbpExplainClampPosition(left, top, pop.offsetWidth, pop.offsetHeight,
-    window.innerWidth, window.innerHeight);
+  const viewport = _pbpExplainViewport();
+  const b = pbpDictWindowBounds(viewport);
+  const pos = _pbpExplainAction === "dict" ? {
+    left: Math.max(b.left, Math.min(left, b.right - pop.offsetWidth)),
+    top: Math.max(b.top, Math.min(top, b.bottom - pop.offsetHeight))
+  } : pbpExplainClampPosition(left, top, pop.offsetWidth, pop.offsetHeight, window.innerWidth, window.innerHeight);
   const nextLeft = pos.left + "px";
   const nextTop = pos.top + "px";
   if (pop.style.left !== nextLeft) pop.style.left = nextLeft;
@@ -3152,11 +3399,12 @@ function _pbpExplainSetPinned(pop, pinned) {
 function _pbpExplainClose(pop, restoreFocus = false) {
   if (!pop || !pop.matches(":popover-open")) return;
   if (restoreFocus) _pbpExplainRestoreFocus(pop);
-  // Both are per-open state: the next open measures its own space, and leaving
-  // the inline budget behind would also make getComputedStyle read it back
-  // instead of the stylesheet's cap.
+  // Selection anchors and natural height budgets are per-open. Manual dictionary
+  // geometry survives the exit transition and is fitted again on the next open.
   _pbpExplainAnchorBottom = null;
-  pop.style.removeProperty("max-height");
+  _pbpExplainResizeEnd();
+  if (_pbpDictResizePop?.matches(":popover-open")) _pbpDictResizePop.hidePopover();
+  if (!(_pbpExplainAction === "dict" && _pbpDictWindowSize)) pop.style.removeProperty("max-height");
   try { pop.hidePopover(); } catch (_) {}
 }
 
@@ -3320,6 +3568,8 @@ const PBP_EXPLAIN_DIALOG_LABELS = Object.freeze({
 // Mirrors the live action onto both the action controls and dialog name.
 function _pbpExplainSyncActButtons(pop) {
   pop.dataset.action = _pbpExplainAction;
+  _pbpExplainResizeEnd();
+  _pbpExplainFitDictSize(pop);
   pop.querySelectorAll(".xp-act").forEach((btn) => {
     btn.setAttribute("aria-pressed", String(btn.dataset.action === _pbpExplainAction));
   });
@@ -3617,6 +3867,7 @@ function _pbpExplainEnsurePop() {
   pop.appendChild(head);
   pop.appendChild(body);
   pop.appendChild(foot);
+  _pbpExplainInitResize(pop);
   _pbpExplainSetPinned(pop, false);
   // Only a real close aborts the active stream and resets session-only state.
   // Pin toggles and pinned re-entry never hide/show, so they cannot land here.
@@ -3629,6 +3880,8 @@ function _pbpExplainEnsurePop() {
       try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (_) {}
       _pbpExplainSetPinned(pop, false);
       _pbpExplainDrag = null;
+      _pbpExplainResizeEnd();
+      if (_pbpDictResizePop?.matches(":popover-open")) _pbpDictResizePop.hidePopover();
       pop.classList.remove("xp-dragging");
       _pbpExplainFocusSource = null;
     }
@@ -3647,16 +3900,22 @@ function _pbpExplainEnsurePop() {
     e.stopImmediatePropagation();
     _pbpExplainClose(pop, true);
   }, true);
-  window.addEventListener("resize", () => {
+  const fitViewport = () => {
     if (!pop.matches(":popover-open")) return;
+    _pbpExplainResizeEnd();
+    if (_pbpExplainAction === "dict") _pbpExplainFitDictSize(pop);
+    if (_pbpDictResizePop?.matches(":popover-open")) _pbpDictResizePop.hidePopover();
     const rect = pop.getBoundingClientRect();
     _pbpExplainPlace(pop, rect.left, rect.top);
-  });
+  };
+  window.addEventListener("resize", fitViewport);
+  window.visualViewport?.addEventListener("resize", fitViewport);
+  window.visualViewport?.addEventListener("scroll", fitViewport);
   document.body.appendChild(pop);
   pbpInitDictDisclosures(pop);
   if (typeof ResizeObserver === "function") {
     _pbpExplainResizeObserver = new ResizeObserver(() => {
-      if (!pop.matches(":popover-open")) return;
+      if (!pop.matches(":popover-open") || _pbpExplainResize) return;
       const r = pop.getBoundingClientRect();
       // Bottom-anchored cards recompute their top from the height that just
       // changed; top-anchored ones only need the viewport clamp re-applied.
@@ -4072,7 +4331,11 @@ function _pbpExplainOpenPop(cap, initialAction) {
     // short to budget for, so the stylesheet cap and the clamp handle it.
     const cssCap = parseFloat(getComputedStyle(pop).maxHeight);
     const room = openDown ? below : above;
-    if (room >= PBP_EXPLAIN_MIN_CARD) {
+    if (_pbpExplainAction === "dict" && _pbpDictWindowSize) {
+      // A deliberate window size survives reopening; placement still follows
+      // the new selection, with the visible viewport as its final boundary.
+      _pbpExplainFitDictSize(pop);
+    } else if (room >= PBP_EXPLAIN_MIN_CARD) {
       pop.style.maxHeight = Math.floor(Math.min(Number.isFinite(cssCap) ? cssCap : room, room)) + "px";
     } else {
       pop.style.removeProperty("max-height");

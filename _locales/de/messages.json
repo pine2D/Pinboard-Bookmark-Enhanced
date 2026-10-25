@@ -4646,5 +4646,12 @@
   "dictSupplementInvalid": {"message": "Erforderliche Inhalte fehlen oder ein Zitat ließ sich nicht überprüfen. Das Ergebnis wurde nicht gespeichert; versuche es erneut."},
   "dictSupplementSourceVerified": {"message": "Mit dem Originaltext abgeglichen"},
   "dictEntryUpdate": {"message": "Eintrag aktualisieren"},
-  "dictEntryUpdateHint": {"message": "Erzeugt den Eintrag neu und verbraucht Tokens. Frühere Ergebnisse bleiben erhalten."}
+  "dictEntryUpdateHint": {"message": "Erzeugt den Eintrag neu und verbraucht Tokens. Frühere Ergebnisse bleiben erhalten."},
+  "dictResize": {"message": "Größe des Wörterbuchfensters ändern"},
+  "dictResizeWidth": {"message": "Breite"},
+  "dictResizeHeight": {"message": "Höhe"},
+  "dictResizeReset": {"message": "Standardgröße wiederherstellen"},
+  "dictResizeHint": {"message": "Zum Ändern der Größe an einem Rand ziehen. Pfeiltasten passen die Größe in kleinen Schritten an; mit Umschalt werden die Schritte größer."},
+  "dictResizeSmaller": {"message": "Verkleinern"},
+  "dictResizeLarger": {"message": "Vergrößern"}
 }

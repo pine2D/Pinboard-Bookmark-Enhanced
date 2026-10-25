@@ -4646,5 +4646,12 @@
   "dictSupplementInvalid": {"message": "Brakuje wymaganych informacji lub nie udało się zweryfikować cytatu. Wynik nie został zapisany; można spróbować ponownie."},
   "dictSupplementSourceVerified": {"message": "Sprawdzono w tekście źródłowym"},
   "dictEntryUpdate": {"message": "Zaktualizuj hasło"},
-  "dictEntryUpdateHint": {"message": "Generuje hasło ponownie i zużywa tokeny. Poprzednie wyniki zostają zachowane."}
+  "dictEntryUpdateHint": {"message": "Generuje hasło ponownie i zużywa tokeny. Poprzednie wyniki zostają zachowane."},
+  "dictResize": {"message": "Zmień rozmiar okna słownika"},
+  "dictResizeWidth": {"message": "Szerokość"},
+  "dictResizeHeight": {"message": "Wysokość"},
+  "dictResizeReset": {"message": "Przywróć domyślny rozmiar"},
+  "dictResizeHint": {"message": "Przeciągnij krawędź, aby zmienić rozmiar. Klawisze strzałek zmieniają go małymi krokami; przytrzymaj Shift, aby je zwiększyć."},
+  "dictResizeSmaller": {"message": "Zmniejsz"},
+  "dictResizeLarger": {"message": "Zwiększ"}
 }

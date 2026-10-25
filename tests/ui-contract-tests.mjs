@@ -6296,10 +6296,12 @@ check(mdCss.includes("text-autospace: normal") && /#rendered-view :is\(pre, code
   check(/_pbpExplainAnchorBottom = rect\.top - edge;/.test(mdAskJs) &&
     /_pbpExplainAnchorBottom === null \? r\.top : _pbpExplainAnchorBottom - r\.height/.test(mdAskJs),
     "md-ask.js: an upward-opening explain popover is no longer bottom-anchored, so streamed content grows back over the selection");
-  // Both are per-open state; leaking the inline budget would also make the next
-  // open read it back instead of the stylesheet cap.
-  check(/_pbpExplainAnchorBottom = null;\s*\n\s*pop\.style\.removeProperty\("max-height"\);/.test(mdAskJs),
-    "md-ask.js: closing the explain popover leaves its anchor or its inline height budget behind for the next open");
+  // Natural-height budgets are per-open; a deliberately resized dictionary
+  // keeps its geometry through exit (behavior covered by md-explain-layout).
+  const closeExplain = (mdAskJs.split("function _pbpExplainClose(pop, restoreFocus = false) {")[1] || "").split("\n}\n")[0];
+  check(closeExplain.includes("_pbpExplainAnchorBottom = null;") && closeExplain.includes("_pbpExplainResizeEnd();") &&
+    closeExplain.includes('if (!(_pbpExplainAction === "dict" && _pbpDictWindowSize)) pop.style.removeProperty("max-height");'),
+    "md-ask.js: closing Explain must clear the selection anchor and natural height budget, while retaining explicit dictionary size through exit");
   check(/#explain-pop \{[\s\S]{0,400}max-height: min\(480px, calc\(100vh - 32px\)\);/.test(mdCss),
     "md-preview.css: #explain-pop lost the max-height that md-ask.js reads back for placement");
   // The value must be derived from the skeleton and expressed in em, so it tracks
