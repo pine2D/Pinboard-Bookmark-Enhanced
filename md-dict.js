@@ -1513,6 +1513,17 @@ function pbpDictEntryNorm(record, target) {
     entries };
 }
 
+// Only fixed validation labels may enter diagnostics; never log model output,
+// lookup text, or a provider-supplied arbitrary reason string.
+function _pbpDictFailureReason(error) {
+  const allowed = ["response_size", "response_json", "entry_fields", "entry_identity", "entry_pronunciation",
+    "entry_meanings", "entry_meaning", "entry_example", "entry_learning", "entry_related", "entry_version",
+    "entry_sources", "entry_legacy", "entry_unknown", "explanation_metadata", "explanation_script",
+    "explanation_language", "supplement_fields", "supplement_item", "supplement_source", "supplement_quote",
+    "supplement_example", "supplement_size"];
+  return allowed.includes(error?.reason) ? error.reason : "";
+}
+
 function _pbpDictEntryMount(host, opts) {
   if (typeof pbpDictEntryRead !== "function" || typeof pbpDictEntryRun !== "function") return null;
   const panel = document.createElement("div"); panel.className = "xp-dict-ai";
@@ -1948,7 +1959,7 @@ function _pbpDictEntryMount(host, opts) {
         message(t(addition.archiveSaved === false ? "dictSupplementSaveFailed" : "dictSupplementSaved"));
       } catch (error) {
         if (!current()) return;
-        console.warn("[dict-entry] usage generation failed:", error?.name, error?.code || "request_failed");
+        console.warn("[dict-entry] usage generation failed:", error?.name, error?.code || "request_failed", _pbpDictFailureReason(error));
         const text = t(error?.code === "host_permission" ? "aiGrantRetry" : error?.code === "sync_failed" ? "dictEntrySyncFailed" :
           error?.code === "no_sources" ? "dictSupplementNoSources" :
           error?.code === "unsupported_usage" ? "dictSupplementUnsupported" : error?.code === "wrong_language" ? "dictSupplementWrongLanguage" :
@@ -1992,7 +2003,7 @@ function _pbpDictEntryMount(host, opts) {
     } catch (error) {
       if (!current()) return;
       if (!record) show("dictionary");
-      console.warn("[dict-entry] generation failed:", error?.name, error?.code || "request_failed");
+      console.warn("[dict-entry] generation failed:", error?.name, error?.code || "request_failed", _pbpDictFailureReason(error));
       const text = t(error?.code === "host_permission" ? "aiGrantRetry" :
         error?.code === "owner_changed" || error?.code === "account_changed" ? "vocabAccountChanged" :
         error?.code === "sync_failed" ? "dictEntrySyncFailed" : error?.code === "wrong_language" ? "dictSupplementWrongLanguage" :

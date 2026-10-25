@@ -3,7 +3,7 @@
 const PBP_DICT_ENTRY_VERSION = 1;
 const PBP_DICT_ENTRY_MAX_RESPONSE = 24576;
 
-function _pbpDictEntryError(code, message) { return Object.assign(new Error(message), { code }); }
+function _pbpDictEntryError(code, message, reason) { return Object.assign(new Error(message), { code }, reason ? { reason } : {}); }
 function _pbpDictEntryObject(value, keys) {
   return !!value && typeof value === "object" && !Array.isArray(value) &&
     Object.keys(value).length === keys.length && keys.every(key => Object.prototype.hasOwnProperty.call(value, key));
@@ -103,87 +103,153 @@ function _pbpDictEntryPrompt(request, sources = []) {
     "Use targetLanguage.name for definitions, grammatical labels, example translations and etymology. " +
     "Keep example text and related words in sourceLanguage. " +
     "Return exactly one JSON object with these fields: " +
-    '{"word":string,"language":string,"pronunciation":string,"meanings":[{"partOfSpeech":string,"definition":string,"examples":[{"text":string,"translation":string}]}],"etymology":string,"relatedWords":string[],"learning":{"version":2,"formation":string,"history":string,"related":[{"word":string,"relation":"family|cognate|synonym|topic","note":string}]}}. ' +
+    '{"word":string,"language":string,"pronunciation":string,"meanings":[{"partOfSpeech":string,"definition":string,"examples":[{"text":string,"translation":string}]}],"learning":{"version":2,"formation":string,"history":string,"related":[{"word":string,"relation":"family|cognate|synonym|topic","note":string}]}}. ' +
     "Copy word exactly from term and language exactly from sourceLanguage, preserving case; do not substitute a different headword. " +
     "For an inflected form, explain its relation to the base form in the definition. " +
     "Give up to four meanings with up to two short, original examples each, and up to five useful related words. " +
     "Pronunciation can be IPA or a conventional reading, but leave it empty when uncertain. " +
     "Separate modern formation from historical etymology. Formation explains productive word formation only; no invented character stories. " +
     "History may ONLY summarize the supplied etymology evidence; with no evidence it MUST be empty. Never invent dates, roots, semantic transitions or URLs. " +
-    "Etymology is a short plain-text summary of formation/history (maximum 1200 characters). " +
     "For each related word explain its relationship and useful distinction in targetLanguage. The word itself stays in sourceLanguage. " +
     "Do not confuse word family, historical cognates, synonyms and same-topic concepts. Omit uncertain relationships. " +
-    "learning.formation/history each max 1200 characters, related notes max 400. relatedWords must list the same words as learning.related. " +
-    "For an unknown expression use meanings:[], pronunciation:\"\", etymology:\"\", relatedWords:[] and empty formation/history/related in learning. " +
+    "learning.formation/history each max 1200 characters, related notes max 400. Leave unavailable learning fields empty. " +
+    "For an unknown expression use meanings:[], pronunciation:\"\" and empty formation/history/related in learning. " +
     "Use plain-text strings only, without HTML or Markdown. No extra fields, code fences or surrounding prose.\n" +
     JSON.stringify({ term: request.term, sourceLanguage: request.sourceLanguage, targetLanguage: request.target, etymologyEvidence: sources });
 }
 
+// Accept formatting around one complete response, never search arbitrary prose
+// for braces or repair a truncated payload. Unknown sibling fields stay invalid.
+function _pbpDictResponseJson(text, max, wrapper) {
+  const fail = reason => { throw _pbpDictEntryError("invalid_response", "Invalid dictionary response", reason); };
+  if (typeof text !== "string" || text.length > max) return fail("response_size");
+  let raw = text.trim();
+  const fence = raw.match(/^```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n```$/i);
+  if (fence) raw = fence[1].trim();
+  let value;
+  try { value = JSON.parse(raw); } catch (_) { return fail("response_json"); }
+  if (value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 1) {
+    const key = Object.keys(value)[0];
+    if ((key === wrapper || key === "result") && value[key] && typeof value[key] === "object" && !Array.isArray(value[key])) value = value[key];
+  }
+  return value;
+}
 function pbpDictEntryParse(text, request) {
-  const invalid = () => { throw _pbpDictEntryError("invalid_response", "AI returned an invalid dictionary entry"); };
-  if (typeof text !== "string" || text.length > PBP_DICT_ENTRY_MAX_RESPONSE) return invalid();
-  let value; try { value = JSON.parse(text); } catch (_) { return invalid(); }
-  const keys = ["word", "language", "pronunciation", "meanings", "etymology", "relatedWords"];
-  if (!_pbpDictEntryObject(value, value?.learning ? [...keys, "learning"] : keys) ||
-    !_pbpDictEntryText(value.word, 256) || _pbpDictEntryTerm(value.word) !== request.term ||
-    value.language !== request.sourceLanguage || !_pbpDictEntryText(value.pronunciation, 256, true) ||
-    !_pbpDictEntryText(value.etymology, 1200, true) || !Array.isArray(value.meanings) || value.meanings.length > 4 ||
-    !Array.isArray(value.relatedWords) || value.relatedWords.length > 8 ||
-    value.relatedWords.some(word => !_pbpDictEntryText(word, 128) || /[\r\n\t]/.test(word))) return invalid();
+  const invalid = reason => { throw _pbpDictEntryError("invalid_response", "AI returned an invalid dictionary entry", reason); };
+  const value = _pbpDictResponseJson(text, PBP_DICT_ENTRY_MAX_RESPONSE, "entry");
+  const legacyKeys = ["word", "language", "pronunciation", "meanings", "etymology", "relatedWords"];
+  const structured = value && typeof value === "object" && Object.hasOwn(value, "learning");
+  if (!value || typeof value !== "object" || Array.isArray(value) ||
+      Object.keys(value).some(key => ![...legacyKeys, "learning"].includes(key))) return invalid("entry_fields");
+  if (!_pbpDictEntryText(value.word, 256) || _pbpDictEntryTerm(value.word) !== request.term || value.language !== request.sourceLanguage) return invalid("entry_identity");
+  const pronunciation = structured && value.pronunciation === undefined ? "" : value.pronunciation;
+  if (!_pbpDictEntryText(pronunciation, 256, true)) return invalid("entry_pronunciation");
+  if (!Array.isArray(value.meanings) || value.meanings.length > 4) return invalid("entry_meanings");
   const meanings = [];
   for (const meaning of value.meanings) {
     if (!_pbpDictEntryObject(meaning, ["partOfSpeech", "definition", "examples"]) ||
-      !_pbpDictEntryText(meaning.partOfSpeech, 128, true) || !_pbpDictEntryText(meaning.definition, 1200) ||
-      !Array.isArray(meaning.examples) || meaning.examples.length > 2) return invalid();
+        !_pbpDictEntryText(meaning.partOfSpeech, 128, true) || !_pbpDictEntryText(meaning.definition, 1200) ||
+        !Array.isArray(meaning.examples) || meaning.examples.length > 2) return invalid("entry_meaning");
     const examples = [];
     for (const example of meaning.examples) {
-      if (!_pbpDictEntryObject(example, ["text", "translation"]) ||
-        !_pbpDictEntryText(example.text, 600) || !_pbpDictEntryText(example.translation, 600, true)) return invalid();
+      if (!_pbpDictEntryObject(example, ["text", "translation"]) || !_pbpDictEntryText(example.text, 600) ||
+          !_pbpDictEntryText(example.translation, 600, true)) return invalid("entry_example");
       examples.push({ text: example.text.trim(), translation: example.translation.trim() });
     }
     meanings.push({ partOfSpeech: meaning.partOfSpeech.trim(), definition: meaning.definition.trim(), examples });
   }
-  if (!meanings.length && (value.pronunciation.trim() || value.etymology.trim() || value.relatedWords.length)) return invalid();
-  const result = { word: request.term, language: request.sourceLanguage, pronunciation: value.pronunciation.trim(), meanings,
-    etymology: value.etymology.trim(), relatedWords: [...new Set(value.relatedWords.map(_pbpDictEntryTerm))] };
-  if (value.learning) {
-    const l = value.learning, learningKeys = ["version", "formation", "history", "related"];
-    if (Object.hasOwn(l, "replacesId")) learningKeys.push("replacesId");
-    if (!_pbpDictEntryObject(l, Object.hasOwn(l, "sources") ? [...learningKeys, "sources"] : learningKeys) || l.version !== 2 ||
-        !_pbpDictEntryText(l.formation, 1200, true) || !_pbpDictEntryText(l.history, 1200, true) ||
-        !Array.isArray(l.related) || l.related.length > 5 || l.related.some(r =>
-          !_pbpDictEntryObject(r, ["word", "relation", "note"]) || !_pbpDictEntryText(r.word, 128) ||
-          !["family", "cognate", "synonym", "topic"].includes(r.relation) || !_pbpDictEntryText(r.note, 400)) ||
-        JSON.stringify(l.related.map(r => r.word)) !== JSON.stringify(value.relatedWords) ||
-        (Object.hasOwn(l, "replacesId") && !/^[a-f0-9]{64}$/.test(l.replacesId)) ||
-        (!meanings.length && (l.formation || l.history || l.related.length))) return invalid();
-    if (l.sources && (!Array.isArray(l.sources) || l.sources.length > 5 || (l.sources.length &&
-        (typeof _pbpDictArchiveSource !== "function" || !l.sources.every(_pbpDictArchiveSource))))) return invalid();
-    result.learning = { version: 2, formation: l.formation.trim(), history: l.history.trim(), related: l.related, sources: l.sources || [] };
+  const result = { word: request.term, language: request.sourceLanguage, pronunciation: pronunciation.trim(), meanings,
+    etymology: "", relatedWords: [] };
+  if (structured) {
+    const l = value.learning;
+    if (!l || typeof l !== "object" || Array.isArray(l) ||
+        Object.keys(l).some(key => !["version", "formation", "history", "related", "sources", "replacesId"].includes(key)) ||
+        (l.version !== undefined && l.version !== 2)) return invalid("entry_learning");
+    const formation = l.formation === undefined ? "" : l.formation, history = l.history === undefined ? "" : l.history,
+      related = l.related === undefined ? [] : l.related;
+    if (!_pbpDictEntryText(formation, 1200, true) || !_pbpDictEntryText(history, 1200, true) ||
+        !Array.isArray(related) || related.length > 5) return invalid("entry_learning");
+    if (related.some(r => !_pbpDictEntryObject(r, ["word", "relation", "note"]) || !_pbpDictEntryText(r.word, 128) || /[\r\n\t]/.test(r.word) ||
+        !["family", "cognate", "synonym", "topic"].includes(r.relation) || !_pbpDictEntryText(r.note, 400))) return invalid("entry_related");
+    if (Object.hasOwn(l, "replacesId") && !/^[a-f0-9]{64}$/.test(l.replacesId)) return invalid("entry_version");
+    if (Object.hasOwn(l, "sources") && (!Array.isArray(l.sources) || l.sources.length > 5 || (l.sources.length &&
+        (typeof _pbpDictArchiveSource !== "function" || !l.sources.every(_pbpDictArchiveSource))))) return invalid("entry_sources");
+    // Legacy repeated fields are derived from one validated structure. Their
+    // omission or different ordering must not discard already paid definitions.
+    result.etymology = [formation.trim(), history.trim()].filter(Boolean).join("\n\n").slice(0, 1200);
+    result.relatedWords = [...new Set(related.map(r => _pbpDictEntryTerm(r.word)))];
+    result.learning = { version: 2, formation: formation.trim(), history: history.trim(), related, sources: l.sources || [] };
     if (l.replacesId) result.learning.replacesId = l.replacesId;
+  } else {
+    const etymology = value.etymology === undefined ? "" : value.etymology,
+      relatedWords = value.relatedWords === undefined ? [] : value.relatedWords;
+    if (!_pbpDictEntryText(etymology, 1200, true) || !Array.isArray(relatedWords) || relatedWords.length > 8 ||
+        relatedWords.some(word => !_pbpDictEntryText(word, 128) || /[\r\n\t]/.test(word))) return invalid("entry_legacy");
+    result.etymology = etymology.trim(); result.relatedWords = [...new Set(relatedWords.map(_pbpDictEntryTerm))];
   }
+  if (!meanings.length && (result.pronunciation || result.etymology || result.relatedWords.length)) return invalid("entry_unknown");
   return result;
 }
 
-// Check explanatory fields, never original quotations or example sentences.
-// Script checks catch obvious failures; Chrome's detector handles confident
-// same-script mismatches. Short or uncertain text is not treated as proof.
+function _pbpDictExplanationLanguage(value, target) {
+  if (typeof value !== "string" || value.length > 80) return false;
+  const clean = s => s.trim().toLocaleLowerCase().replace(/_/g, "-");
+  const code = s => {
+    if (/^(?:chinese|中文)$/i.test(s)) return "zh";
+    if (/^(?:simplified chinese|chinese \(simplified\))$/i.test(s)) return "zh-Hans";
+    if (/^(?:traditional chinese|chinese \(traditional\))$/i.test(s)) return "zh-Hant";
+    return pbpDictKnownLanguageName(s) || _pbpDictEntryLang(s.replace(/_/g, "-"));
+  };
+  if (target.lang === "und") {
+    if (clean(value) === "und" || clean(value) === clean(target.name)) return true;
+    const known = pbpDictKnownLanguageName(target.name);
+    if (!known) return false;
+    return _pbpDictExplanationLanguage(value, { ...target, lang: known });
+  }
+  const declared = code(value.trim()), wanted = code(target.lang);
+  if (!declared || !wanted || declared.split("-")[0] !== wanted.split("-")[0]) return false;
+  const explicitScript = tag => {
+    const script = tag.match(/-(Hans|Hant)(?:-|$)/i)?.[1]?.toLowerCase();
+    if (script) return script;
+    if (/^zh-(?:TW|HK|MO)(?:-|$)/i.test(tag)) return "hant";
+    if (/^zh-(?:CN|SG)(?:-|$)/i.test(tag)) return "hans";
+    return "";
+  };
+  const a = explicitScript(declared), b = explicitScript(wanted);
+  return !a || !b || a === b;
+}
+
+// Evaluate explanatory prose together. A word root, grammatical label or short
+// foreign-language contrast is not a standalone explanation-language failure.
+// Original example sentences and retrieved quotations never enter this check.
 async function _pbpDictCheckExplanation(text, target) {
-  const base = (target.lang === "und" ? pbpDictKnownLanguageName(target.name) || "und" : target.lang).split("-")[0], letters = (text.match(/\p{L}/gu) || []).length;
-  if (letters < 24 || base === "und") return;
+  const base = (target.lang === "und" ? pbpDictKnownLanguageName(target.name) || "und" : target.lang).split("-")[0];
+  if (base === "und") return;
+  const originalLetters = (text.match(/\p{L}/gu) || []).length;
+  if (originalLetters < 24) return;
+  const withoutMentions = text.replace(/"[^"\n]{1,100}"|“[^”\n]{1,100}”|‘[^’\n]{1,100}’|「[^」\n]{1,100}」|『[^』\n]{1,100}』|（[^）\n]{1,100}）|\([^\)\n]{1,100}\)/gu, " ");
+  // Never erase the body of a response just because it is quoted. Use this
+  // limited cleanup only when enough explanatory context remains outside it.
+  const prose = (withoutMentions.match(/\p{L}/gu) || []).length >= 80 ? withoutMentions : text;
+  const letters = (prose.match(/\p{L}/gu) || []).length;
   const expectedScript = { zh: /\p{Script=Han}/gu, ja: /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu,
     ko: /\p{Script=Hangul}/gu, ru: /\p{Script=Cyrillic}/gu, uk: /\p{Script=Cyrillic}/gu, ar: /\p{Script=Arabic}/gu }[base] ||
     (["en", "es", "de", "fr", "it", "pt", "pl", "nl", "cs", "vi", "tr"].includes(base) ? /\p{Script=Latin}/gu : null);
-  if (expectedScript && (text.match(expectedScript) || []).length / letters < 0.12) {
-    throw _pbpDictEntryError("wrong_language", "Explanation language does not match the requested language");
+  const scriptLetters = expectedScript ? (prose.match(expectedScript) || []).length : 0;
+  // Even a short explanation can be clearly wrong when it contains no target
+  // script at all. Keep short mixed prose permissive; statistical detection
+  // still needs the longer sample below.
+  if (expectedScript && (scriptLetters === 0 || (letters >= 80 && scriptLetters < 12 && scriptLetters / letters < 0.08))) {
+    throw _pbpDictEntryError("wrong_language", "Explanation language does not match the requested language", "explanation_script");
   }
   if (letters < 80 || typeof globalThis.chrome?.i18n?.detectLanguage !== "function") return;
   let detected;
-  try { detected = await chrome.i18n.detectLanguage(text); }
+  try { detected = await chrome.i18n.detectLanguage(prose); }
   catch (error) { console.warn("[dict-entry] language check unavailable:", error?.name); return; }
   const first = detected?.languages?.[0];
-  if (detected?.isReliable && first?.percentage >= 85 && first.language !== "und" && first.language.split("-")[0] !== base) {
-    throw _pbpDictEntryError("wrong_language", "Explanation language does not match the requested language");
+  if (detected?.isReliable && first?.percentage >= 95 && first.language !== "und" &&
+      !_pbpDictExplanationLanguage(first.language, { ...target, lang: base })) {
+    throw _pbpDictEntryError("wrong_language", "Explanation language does not match the requested language", "explanation_language");
   }
 }
 
@@ -267,17 +333,22 @@ async function _pbpDictEntryGenerate(request, updateId = "") {
   });
   await _pbpDictEntryGuard(request);
   const entry = pbpDictEntryParse(response, request), generatedAt = Date.now();
-  if (!entry.learning || (entry.learning.history && !sources.length)) throw _pbpDictEntryError("invalid_response", "Missing learning structure or historical evidence");
+  if (!entry.learning) {
+    // Keep a valid paid basic entry when the model omitted optional enrichment.
+    // Do not reclassify unstructured legacy claims as verified history.
+    entry.learning = { version: 2, formation: "", history: "", related: [], sources: [] };
+    entry.relatedWords = [];
+  }
+  if (!sources.length) entry.learning.history = "";
+  entry.etymology = [entry.learning.formation, entry.learning.history].filter(Boolean).join("\n\n").slice(0, 1200);
   // A source match alone must not turn an unrecognized expression into a
   // supported entry or make its otherwise valid empty result unsaveable.
   entry.learning.sources = entry.meanings.length ? sources : [];
   // Model output cannot nominate a paid version to supersede.
   delete entry.learning.replacesId;
   if (updateId) entry.learning.replacesId = updateId;
-  for (const text of [...entry.meanings.flatMap(m => [m.partOfSpeech, m.definition, ...m.examples.map(e => e.translation)]),
-    entry.learning.formation, entry.learning.history, ...entry.learning.related.map(r => r.note)]) {
-    await _pbpDictCheckExplanation(text, request.target);
-  }
+  await _pbpDictCheckExplanation([...entry.meanings.flatMap(m => [m.definition, ...m.examples.map(e => e.translation)]),
+    entry.learning.formation, entry.learning.history, ...entry.learning.related.map(r => r.note)].filter(Boolean).join("\n\n"), request.target);
   await _pbpDictEntryGuard(request);
   const { term, sourceLanguage, target, owner } = request;
   const { provider, model } = request.model;
@@ -383,12 +454,12 @@ function _pbpDictSupplementPrompt(request, category, profile, sources, entry) {
     JSON.stringify({ term: request.term, sourceLanguage: request.sourceLanguage, targetLanguage: request.target, profile, baseEntry: entry, sources });
 }
 function pbpDictSupplementParse(response, request, category, sources, entry, replacesId = "") {
-  const invalid = () => { throw _pbpDictEntryError("invalid_response", "Incomplete or unverified learning content"); };
-  let value; try { value = JSON.parse(response); } catch (_) { return invalid(); }
+  const invalid = (reason = "supplement_item") => { throw _pbpDictEntryError("invalid_response", "Incomplete or unverified learning content", reason); };
+  const value = _pbpDictResponseJson(response, 24576, "supplement");
   if (typeof response !== "string" || response.length > 24576 ||
       !_pbpDictEntryObject(value, ["language", "summary", "items"]) ||
-      !_pbpDictEntryText(value.summary, 800, true) || !Array.isArray(value.items) || value.items.length > 5) return invalid();
-  if (value.language !== request.target.lang) throw _pbpDictEntryError("wrong_language", "Unexpected explanation language");
+      !_pbpDictEntryText(value.summary, 800, true) || !Array.isArray(value.items) || value.items.length > 5) return invalid("supplement_fields");
+  if (!_pbpDictExplanationLanguage(value.language, request.target)) throw _pbpDictEntryError("wrong_language", "Unexpected explanation language", "explanation_metadata");
   if (!value.items.length) throw _pbpDictEntryError("unsupported_usage", "No useful supported supplement");
   if (category === "literature" && value.items.length > 2) return invalid();
   const items = value.items.map(item => {
@@ -398,13 +469,13 @@ function pbpDictSupplementParse(response, request, category, sources, entry, rep
         !_pbpDictEntryText(item.example, 600, true) || !_pbpDictEntryText(item.translation, 600, true) ||
         !Number.isInteger(item.sourceIndex) || item.sourceIndex < -1 || item.sourceIndex >= sources.length) return invalid();
     const source = sources[item.sourceIndex];
-    if (["literature", "culture"].includes(category) && !source) return invalid();
+    if (["literature", "culture"].includes(category) && !source) return invalid("supplement_source");
     if (category === "literature") {
-      if (item.example && item.example !== source.excerpt || !item.translation.trim()) return invalid();
+      if (item.example && item.example !== source.excerpt || !item.translation.trim()) return invalid("supplement_quote");
       return { ...item, example: source.excerpt };
     }
-    if (source && item.example && item.example !== source.excerpt) return invalid();
-    if (!source && (!item.example.trim() || !item.translation.trim())) return invalid();
+    if (source && item.example && item.example !== source.excerpt) return invalid("supplement_quote");
+    if (!source && (!item.example.trim() || !item.translation.trim())) return invalid("supplement_example");
     return item;
   });
   if (new Set(items.map(item => JSON.stringify(item))).size !== items.length) return invalid();
@@ -448,12 +519,10 @@ async function _pbpDictSupplementGenerate(input, request, category, profile) {
   });
   await _pbpDictEntryGuard(request);
   const learning = pbpDictSupplementParse(response, request, category, sources, record.entry, input.updateId || "");
-  for (const text of [learning.summary, ...learning.items.flatMap(item => [item.explanation, item.translation])]) {
-    await _pbpDictCheckExplanation(text, request.target);
-  }
+  await _pbpDictCheckExplanation([learning.summary, ...learning.items.flatMap(item => [item.explanation, item.translation])].filter(Boolean).join("\n\n"), request.target);
   await _pbpDictEntryGuard(request);
   const content = [learning.summary, ...learning.items.map(item => [item.title, item.explanation, item.example, item.translation].filter(Boolean).join("\n"))].filter(Boolean).join("\n\n");
-  if (content.length > 12000) throw _pbpDictEntryError("invalid_response", "Learning content is too long");
+  if (content.length > 12000) throw _pbpDictEntryError("invalid_response", "Learning content is too long", "supplement_size");
   const supplement = { archiveId: record.archiveId, category, profile, content, sources, learning,
     provider: request.model.provider, model: request.model.model, generatedAt: Date.now() };
   try { return await pbpDictSupplementSave(input, supplement); }
