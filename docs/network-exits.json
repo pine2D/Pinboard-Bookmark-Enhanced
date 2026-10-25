@@ -1,6 +1,10 @@
 {
   "_comment": "Hand-written network-exit oracle (roadmap #38). Every host the runtime can SEND a request to (fetch, script injection target, iframe/img subresource) must be listed under exits with its trigger surface and privacy.md coverage; hosts that appear in code only as outbound links / site-rule matchers / attribution URLs go under nonExitHosts. scripts/network-exits-check.mjs cross-checks: (1) every literal https host in runtime scripts is classified here, (2) every exit host (or its user-facing disclosedAs name) is mentioned in docs/privacy.md, (3) every manifest static host is a listed exit. Deliberately NOT generated from source — that would only prove the code agrees with itself. Update this file in the same commit as any new data exit, and privacy.md with it (release docs gate).",
   "exits": {
+    "en.wiktionary.org": {
+      "purpose": "Verified etymology evidence on an exact-origin grant; other supported language subdomains are derived from the queried language",
+      "disclosedAs": "Wiktionary"
+    },
     "api.pinboard.in": {
       "purpose": "Pinboard v1 API — every bookmark read/write (required host)"
     },
@@ -96,7 +100,7 @@
       "disclosedAs": "Moonshot"
     }
   },
-  "userConfiguredExits": "custom OpenAI-compatible endpoint, non-loopback Ollama, webhook export target and batch-save tab origins are user-supplied at runtime; the endpoint validator enforces HTTPS (loopback-literal HTTP only) and runtime grants are exact origins — see CLAUDE.md 跨领域安全铁律 and privacy.md.",
+  "userConfiguredExits": "Language-derived Wikisource/Wikipedia/Wiktionary subdomains require the current exact origin (no wildcard grant). Custom OpenAI-compatible endpoint, non-loopback Ollama, webhook export target and batch-save tab origins are user-supplied at runtime; the endpoint validator enforces HTTPS (loopback-literal HTTP only) and runtime grants are exact origins — see CLAUDE.md 跨领域安全铁律 and privacy.md.",
   "nonExitHosts": {
     "github.com": "discussion sample URL and source permalinks; DOM-only extraction, no background fetch",
     "math.stackexchange.com": "site-rule sample URL only; no background fetch",
@@ -111,7 +115,6 @@
     "unpkg.com": "comment/documentation reference",
     "lucide.dev": "icon-set attribution comment",
     "www.mdbg.net": "dictionary attribution link the user opens",
-    "en.wiktionary.org": "dictionary attribution link the user opens",
     "cc-cedict.org": "license attribution link the user opens",
     "status.openai.com": "outbound link the user opens (AI provider status page on a service-side failure, ai.js PBP_AI_STATUS_PAGES)",
     "status.claude.com": "outbound link the user opens (AI provider status page on a service-side failure, ai.js PBP_AI_STATUS_PAGES)",

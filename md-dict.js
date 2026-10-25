@@ -97,6 +97,21 @@ function pbpDictDefinitionLanguage(preference, uiLanguage) {
   return { name: requested, lang: "und" };
 }
 
+// Keep explicit free-form language identities stable for paid legacy records.
+// Only the new native-language default resolves names to known language codes.
+function pbpDictLearningTarget(settings, uiLanguage) {
+  const clean = value => typeof value === "string" ? value.replace(/[\p{Cc}\p{Cf}]/gu, "").trim() : "";
+  const explicit = clean(settings?.dictDefinitionLang);
+  if (explicit) return pbpDictDefinitionLanguage(explicit, uiLanguage);
+  const native = clean(settings?.dictLearnerNativeLanguage);
+  if (!native) return pbpDictDefinitionLanguage("", uiLanguage);
+  const code = pbpDictKnownLanguageName(native) || pbpDictDefinitionLanguage(native, uiLanguage).lang;
+  const current = pbpDictDefinitionLanguage("", uiLanguage);
+  const generic = !/[-_]/.test(native) && !/简体|繁体|繁體/.test(native);
+  if (generic && code !== "und" && code.split("-")[0] === current.lang.split("-")[0]) return current;
+  return pbpDictDefinitionLanguage(code === "und" ? native : code, uiLanguage);
+}
+
 // Language routing (spec §3): manual override wins; then a reliable
 // detection; then the article-level fallback; "" = unknown. "und" never routes.
 function pbpDictRouteLang(detected, isReliable, articleLang, manual) {
@@ -1529,15 +1544,30 @@ function _pbpDictEntryMount(host, opts) {
   panel.append(status, content); host.appendChild(panel);
   let settings = null, record = null, busy = false, active = null, epoch = 0, mode = "dictionary", viewRevision = 0;
   let usageCategory = "collocations", usageTopic = "";
-  let renderedBase = "", baseDetails = null, baseRetry = null, usageForm = null;
+  let renderedBase = "", baseDetails = null, baseRetry = null, usageForm = null, previousSupplements = null;
   const supplementNodes = new Map();
   const preference = () => typeof pbpDictDefaultView === "function" ? pbpDictDefaultView(settings) :
     settings?.dictDefaultView || (settings?.dictAiAutoGenerate === true ? "ai-generate" : "ai-saved");
   const alive = () => !opts.signal?.aborted && panel.isConnected && opts.isCurrent();
   const configured = () => settings && settings.previewAiEnabled !== false && typeof hasAIKey === "function" && hasAIKey(settings);
-  const target = () => pbpDictDefinitionLanguage(settings?.dictDefinitionLang,
+  const target = () => pbpDictLearningTarget(settings,
     typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : document.documentElement.lang || "en");
+  const languageName = language => {
+    const code = language.lang === "und" ? pbpDictKnownLanguageName(language.name) : language.lang;
+    try { return code ? new Intl.DisplayNames([document.documentElement.lang || "en"], { type: "language" }).of(code) : language.name; }
+    catch (_) { return language.name; }
+  };
   const message = text => { status.textContent = text; status.hidden = !text; };
+  const inlineError = (anchor, text) => {
+    if (!anchor?.isConnected) { message(text); return; }
+    let error = anchor.previousElementSibling;
+    if (!error?.classList.contains("xp-dict-action-error")) {
+      error = document.createElement("p"); error.className = "xp-dict-msg xp-dict-action-error";
+      error.setAttribute("role", "alert"); anchor.before(error);
+    }
+    error.textContent = text; error.hidden = !text;
+    if (text) message("");
+  };
   const sync = () => {
     generate.hidden = !!record || !configured() || busy; generate.disabled = busy || !settings;
     toggle.hidden = !record && !busy; stop.hidden = !busy;
@@ -1559,7 +1589,7 @@ function _pbpDictEntryMount(host, opts) {
     const norm = pbpDictEntryNorm(record, answerLanguage);
     // Supplement receipts and additions do not change the paid base entry.
     // Retaining these nodes also retains open disclosures and reading position.
-    const baseKey = JSON.stringify([record.entry, record.provider, record.model, record.generatedAt, answerLanguage]);
+    const baseKey = JSON.stringify([record.entry, record.provider, record.model, record.generatedAt, answerLanguage, record.previousEntries?.map(v => v.archiveId)]);
     if (baseKey !== renderedBase) {
       const wasOpen = baseDetails?.open || false;
       _pbpDictRenderEntry(content, norm, opts.term, opts.lang, opts.term, "");
@@ -1571,11 +1601,38 @@ function _pbpDictEntryMount(host, opts) {
       const summary = document.createElement("summary");
       summary.textContent = t(record.entry.etymology || record.entry.relatedWords.length ? "dictEntryDetails" : "dictEntrySource");
       details.appendChild(summary);
-      if (record.entry.etymology) {
+      if (record.entry.learning) {
+        const learning = record.entry.learning;
+        for (const [label, value] of [["dictEntryFormation", learning.formation], ["dictEntryHistory", learning.history]]) {
+          if (!value) continue;
+          const p = document.createElement("p"); p.lang = answerLanguage.lang; p.dir = "auto";
+          const strong = document.createElement("strong"); strong.textContent = t(label) + ": ";
+          p.append(strong, value); details.appendChild(p);
+        }
+        if (!learning.history) {
+          const p = document.createElement("p"); p.className = "xp-dict-src"; p.textContent = t("dictEntryNoHistory"); details.appendChild(p);
+        }
+        for (const relation of learning.related) {
+          const p = document.createElement("p"); p.dir = "auto"; p.lang = answerLanguage.lang;
+          const word = document.createElement(typeof opts.onLookup === "function" ? "button" : "bdi");
+          word.lang = opts.lang || "und"; word.textContent = relation.word;
+          if (word.tagName === "BUTTON") {
+            word.type = "button"; word.className = "xp-dict-lemma-link"; word.title = t("dictLookupSelection");
+            word.addEventListener("click", () => { if (alive()) opts.onLookup(relation.word); });
+          }
+          const label = t("dictEntryRelation" + relation.relation[0].toUpperCase() + relation.relation.slice(1));
+          p.append(word, " · " + label + " — " + relation.note); details.appendChild(p);
+        }
+        for (const source of learning.sources || []) {
+          const p = document.createElement("p"); p.className = "xp-dict-src";
+          const link = document.createElement("a"); link.href = source.url; link.textContent = source.title;
+          link.target = "_blank"; link.rel = "noopener noreferrer"; p.appendChild(link); details.appendChild(p);
+        }
+      } else if (record.entry.etymology) {
         const p = document.createElement("p"); p.lang = answerLanguage.lang; p.dir = "auto";
         p.textContent = record.entry.etymology; details.appendChild(p);
       }
-      if (record.entry.relatedWords.length) {
+      if (!record.entry.learning && record.entry.relatedWords.length) {
         const words = document.createElement("p"); words.className = "xp-dict-rel"; words.lang = opts.lang || "und"; words.dir = "auto";
         const label = document.createElement("span"); label.lang = document.documentElement.lang || "und";
         label.textContent = t("dictEntryRelated") + ": "; words.appendChild(label);
@@ -1591,7 +1648,34 @@ function _pbpDictEntryMount(host, opts) {
       const provenance = document.createElement("p"); provenance.className = "xp-dict-src";
       provenance.textContent = [t("dictAiLabel"), record.provider, record.model,
         new Date(record.generatedAt).toLocaleDateString()].join(" · ");
-      details.appendChild(provenance); content.appendChild(details);
+      details.appendChild(provenance);
+      const language = document.createElement("p"); language.className = "xp-dict-src";
+      language.textContent = t("dictSupplementLanguage", languageName(answerLanguage)); details.appendChild(language);
+      if (configured() && record.archiveId) {
+        const update = button("dictEntryUpdate", "xp-dict-update-entry"); update.title = t("dictEntryUpdateHint"); update.setAttribute("aria-description", update.title);
+        update.addEventListener("click", () => run(true, record.archiveId, update)); details.appendChild(update);
+      }
+      if (record.previousEntries?.length) {
+        const previous = document.createElement("details"); previous.className = "xp-dict-ai-details";
+        const heading = document.createElement("summary"); heading.textContent = t("dictSupplementPrevious"); previous.appendChild(heading);
+        previous.addEventListener("toggle", () => {
+          if (!previous.open || previous.childElementCount > 1) return;
+          for (const old of record.previousEntries) {
+            const version = document.createElement("details"); version.className = "xp-dict-ai-details";
+            const title = document.createElement("summary"); title.textContent = [new Date(old.generatedAt).toLocaleString(), old.model].join(" · ");
+            const text = document.createElement("p"); text.dir = "auto"; text.lang = answerLanguage.lang;
+            text.textContent = [old.entry.pronunciation, old.entry.meanings.map(m => [m.partOfSpeech, m.definition, ...m.examples.map(e => e.text + "\n" + e.translation)].filter(Boolean).join("\n")).join("\n\n"),
+              old.entry.learning ? [old.entry.learning.formation, old.entry.learning.history, ...old.entry.learning.related.map(r => r.word + " — " + r.note)].filter(Boolean).join("\n\n") : old.entry.etymology + "\n" + old.entry.relatedWords.join(" · ")].filter(Boolean).join("\n\n");
+            version.append(title, text);
+            for (const source of old.entry.learning?.sources || []) {
+              const p = document.createElement("p"); p.className = "xp-dict-src";
+              const link = document.createElement("a"); link.href = source.url; link.textContent = source.title; link.target = "_blank"; link.rel = "noopener noreferrer";
+              p.appendChild(link); version.appendChild(p);
+            } previous.appendChild(version);
+          }
+        }); details.appendChild(previous);
+      }
+      content.appendChild(details);
       details.open = wasOpen; baseDetails = details; renderedBase = baseKey;
     }
     renderSupplements(answerLanguage, revealSupplement);
@@ -1647,6 +1731,12 @@ function _pbpDictEntryMount(host, opts) {
       if (!baseRetry.isConnected) content.appendChild(baseRetry);
     } else baseRetry?.remove();
     const retained = new Set();
+    const replaced = new Set((record.supplements || []).map(item => item.learning?.replacesId).filter(Boolean));
+    if (replaced.size && !previousSupplements) {
+      previousSupplements = document.createElement("details"); previousSupplements.className = "xp-dict-ai-details";
+      const summary = document.createElement("summary"); summary.textContent = t("dictSupplementPrevious"); previousSupplements.appendChild(summary);
+    }
+    if (replaced.size && !previousSupplements.isConnected) content.appendChild(previousSupplements);
     for (const addition of record.supplements || []) {
       const id = supplementId(addition);
       retained.add(id);
@@ -1655,10 +1745,10 @@ function _pbpDictEntryMount(host, opts) {
         const section = document.createElement("details"); section.className = "xp-dict-ai-details";
         section.dataset.supplementId = id;
         const heading = document.createElement("summary");
-        const text = document.createElement("p"); text.className = "xp-dict-supplement-text"; text.dir = "auto";
+        const text = document.createElement("div"); text.className = "xp-dict-supplement-text"; text.dir = "auto";
         const receipt = document.createElement("p"); receipt.className = "xp-dict-src";
         section.append(heading, text, receipt);
-        item = { section, heading, text, receipt, sources: [], sourceKey: "", retry: null, addition };
+        item = { section, heading, text, receipt, sources: [], sourceKey: "", retry: null, addition, contentKey: "", update: null };
         supplementNodes.set(id, item);
       }
       item.addition = addition;
@@ -1666,12 +1756,48 @@ function _pbpDictEntryMount(host, opts) {
       const title = t("dictSupplement" + addition.category[0].toUpperCase() + addition.category.slice(1)) +
         (addition.profile.topic ? " · " + addition.profile.topic : "");
       if (heading.textContent !== title) heading.textContent = title;
-      if (text.textContent !== addition.content) text.textContent = addition.content;
-      text.lang = answerLanguage.lang;
+      const contentKey = JSON.stringify(addition.learning || addition.content);
+      if (item.contentKey !== contentKey) {
+        text.replaceChildren();
+        if (addition.learning?.version === 2) {
+          const learning = addition.learning;
+          if (learning.summary) { const p = document.createElement("p"); p.textContent = learning.summary; text.appendChild(p); }
+          for (const point of learning.items) {
+            const unit = document.createElement("div"); unit.className = "xp-dict-learning-item";
+            const title = document.createElement("p"); const strong = document.createElement("strong"); strong.textContent = point.title; title.appendChild(strong);
+            const explanation = document.createElement("p"); explanation.textContent = point.explanation; unit.append(title, explanation);
+            const parent = addition.archiveId === record.archiveId ? record : record.previousEntries?.find(entry => entry.archiveId === addition.archiveId);
+            const meaning = parent?.entry.meanings[point.sense - 1]?.definition;
+            if (meaning) {
+              const sense = document.createElement("p"); sense.className = "xp-dict-src";
+              sense.textContent = t("dictSupplementMeaning", meaning); unit.insertBefore(sense, explanation);
+            }
+            if (point.example) {
+              const example = document.createElement("p"); example.className = "xp-dict-example";
+              example.textContent = point.example; example.lang = opts.lang || "und"; example.dir = "auto";
+              const translation = document.createElement("p"); translation.className = "xp-dict-example-translation"; translation.textContent = point.translation;
+              unit.append(example, translation);
+            }
+            const note = document.createElement("p"); note.className = "xp-dict-src";
+            const source = addition.sources?.[point.sourceIndex];
+            if (source) {
+              const link = document.createElement("a"); link.href = source.url; link.target = "_blank"; link.rel = "noopener noreferrer";
+              link.textContent = [source.author, source.work || source.title, source.location].filter(Boolean).join(" · ");
+              note.append(link, " · " + t("dictSupplementSourceVerified"));
+            } else note.textContent = t("dictSupplementOriginal");
+            unit.appendChild(note); text.appendChild(unit);
+          }
+        } else {
+          const p = document.createElement("p"); p.textContent = addition.content;
+          const legacy = document.createElement("p"); legacy.className = "xp-dict-src"; legacy.textContent = t("dictSupplementLegacy"); text.append(p, legacy);
+        }
+        item.contentKey = contentKey;
+      }
+      text.lang = addition.learning?.language?.lang || answerLanguage.lang;
       const sourceKey = JSON.stringify(addition.sources || []);
       if (sourceKey !== item.sourceKey) {
         item.sources.forEach(node => node.remove()); item.sources = [];
-        for (const [index, source] of (addition.sources || []).entries()) {
+        for (const [index, source] of (addition.learning ? [] : addition.sources || []).entries()) {
           const cite = document.createElement("p"); cite.className = "xp-dict-src";
           const link = document.createElement("a"); link.textContent = `[${index + 1}] ${source.title}`;
           link.href = source.url; link.target = "_blank"; link.rel = "noopener noreferrer";
@@ -1684,7 +1810,15 @@ function _pbpDictEntryMount(host, opts) {
         item.sourceKey = sourceKey;
       }
       receipt.textContent = [t(addition.archiveSaved === false ? "dictSupplementSaveFailed" : "dictSupplementSaved"),
-        addition.provider, addition.model, new Date(addition.generatedAt).toLocaleDateString()].join(" · ");
+        addition.provider, addition.model, new Date(addition.generatedAt).toLocaleDateString(),
+        t("dictSupplementLanguage", languageName(addition.learning?.language || answerLanguage))].join(" · ");
+      if (configured() && addition.id && addition.archiveSaved !== false && !replaced.has(id)) {
+        if (!item.update) {
+          item.update = button("dictSupplementUpdate", "xp-dict-update-supplement"); item.update.title = t("dictSupplementUpdateHint"); item.update.setAttribute("aria-description", item.update.title);
+          item.update.addEventListener("click", () => usageForm?.update(item.addition));
+        }
+        if (!item.update.isConnected) section.appendChild(item.update);
+      } else item.update?.remove();
       if (addition.archiveSaved === false) {
         if (!item.retry) {
           item.retry = button("dictEntryRetrySave", "xp-dict-retry-save");
@@ -1705,7 +1839,10 @@ function _pbpDictEntryMount(host, opts) {
         }
         if (!item.retry.isConnected) section.appendChild(item.retry);
       } else item.retry?.remove();
-      if (!section.isConnected) content.insertBefore(section, usageForm?.disclosure.isConnected ? usageForm.disclosure : null);
+      if (replaced.has(id)) {
+        if (section.parentElement !== previousSupplements) previousSupplements.appendChild(section);
+      } else if (section.parentElement !== content) content.insertBefore(section,
+        previousSupplements?.isConnected ? previousSupplements : usageForm?.disclosure.isConnected ? usageForm.disclosure : null);
       if (id === revealId) section.open = true;
     }
     for (const [id, item] of supplementNodes) {
@@ -1753,49 +1890,58 @@ function _pbpDictEntryMount(host, opts) {
     profile.appendChild(edit);
     const sourceHint = document.createElement("p"); sourceHint.className = "xp-dict-src";
     sourceHint.textContent = t("dictSupplementSourceHint");
-    disclosure.append(summary, kind, topicLabel, hint, submit, profile, sourceHint); content.append(disclosure);
+    const languageHint = document.createElement("p"); languageHint.className = "xp-dict-src";
+    languageHint.textContent = t("dictSupplementLanguage", languageName(target()));
+    disclosure.append(summary, kind, topicLabel, hint, submit, languageHint, profile, sourceHint); content.append(disclosure);
     if (typeof window.pbpEnhanceListbox === "function") {
       kind.id = "dict-supplement-kind"; kind.dataset.listbox = "float"; window.pbpEnhanceListbox(kind);
     } else kind.classList.add("xp-dict-lang");
     const existing = () => {
       const profile = pbpDictSupplementProfile(settings, topic.value);
-      return record.supplements?.find(item => item.category === kind.value &&
+      const matches = (record.supplements || []).filter(item => item.category === kind.value &&
         item.profile.nativeLanguage === profile.nativeLanguage && item.profile.level === profile.level && item.profile.topic === profile.topic);
+      const replaced = new Set(matches.map(item => item.learning?.replacesId).filter(Boolean));
+      return matches.filter(item => !replaced.has(item.id)).sort((a, b) => b.generatedAt - a.generatedAt || String(b.id).localeCompare(String(a.id)))[0];
     };
     const refresh = () => {
       usageCategory = kind.value; usageTopic = topic.value;
       submit.textContent = t(existing() ? "dictSupplementShow" : "dictSupplementGenerate");
       sourceHint.hidden = !["culture", "literature"].includes(kind.value);
     };
-    usageForm = { disclosure, refresh };
+    usageForm = { disclosure, refresh, update: addition => generateSupplement(addition) };
     kind.addEventListener("change", refresh); topic.addEventListener("input", refresh); refresh();
-    submit.addEventListener("click", async () => {
+    const generateSupplement = async (updating = null) => {
       if (!alive() || busy) return;
-      const hit = existing();
+      const origin = updating ? supplementNodes.get(supplementId(updating))?.update : submit;
+      if (updating) inlineError(origin, "");
+      const hit = updating ? null : existing();
       if (hit) {
         const hadFocus = document.activeElement === submit;
         const id = supplementId(hit); render(record, answerLanguage, false, id);
         if (hadFocus) focusAddition(id);
         return;
       }
-      const hadFocus = document.activeElement === submit;
+      const hadFocus = document.activeElement === submit || (updating && content.contains(document.activeElement));
       const version = ++epoch, controller = new AbortController(); active = controller; busy = true;
       const current = () => alive() && epoch === version && !controller.signal.aborted;
-      const category = kind.value, request = { ...input(controller.signal, current), category, topic: topic.value };
-      const origin = pbpDictSupplementOrigin(category, opts.lang);
+      const category = updating?.category || kind.value;
+      const request = { ...input(controller.signal, current), category, topic: updating?.profile.topic ?? topic.value,
+        updateId: updating?.id || "" };
+      if (updating) request.settings = { ...settings, dictLearnerNativeLanguage: updating.profile.nativeLanguage, dictLearnerLevel: updating.profile.level };
+      const sourceOrigin = pbpDictSupplementOrigin(category, opts.lang);
       submit.disabled = true; kind.disabled = true; topic.disabled = true; window.pbpListboxSync?.(kind);
       message(t("dictSupplementGenerating")); sync();
       if (hadFocus) stop.focus({ preventScroll: true });
       try {
         // Request the model and one source origin together, directly from the
         // click. All subsequent fetches independently check that grant.
-        if (origin) {
-          if (!(await requestAIHostPermissions(settings, [origin + "/*"]))) throw { code: "host_permission" };
+        if (sourceOrigin) {
+          if (!(await requestAIHostPermissions(settings, [sourceOrigin + "/*"]))) throw { code: "host_permission" };
         } else await ensureAIHostPermissionWithGesture(settings);
         if (!current()) return;
         const addition = await pbpDictSupplementRun(request);
         if (!current()) return;
-        record.supplements = [...(record.supplements || []).filter(item => !addition.id || item.id !== addition.id), addition];
+        record.supplements = [addition, ...(record.supplements || []).filter(item => !addition.id || item.id !== addition.id)];
         const id = supplementId(addition), focusStayed = document.activeElement === stop;
         render(record, answerLanguage, false, id);
         if (focusStayed) focusAddition(id);
@@ -1803,22 +1949,26 @@ function _pbpDictEntryMount(host, opts) {
       } catch (error) {
         if (!current()) return;
         console.warn("[dict-entry] usage generation failed:", error?.name, error?.code || "request_failed");
-        message(t(error?.code === "host_permission" ? "aiGrantRetry" : error?.code === "sync_failed" ? "dictEntrySyncFailed" :
+        const text = t(error?.code === "host_permission" ? "aiGrantRetry" : error?.code === "sync_failed" ? "dictEntrySyncFailed" :
           error?.code === "no_sources" ? "dictSupplementNoSources" :
-          error?.code === "unsupported_usage" ? "dictSupplementUnsupported" : "dictSupplementUnavailable"));
+          error?.code === "unsupported_usage" ? "dictSupplementUnsupported" : error?.code === "wrong_language" ? "dictSupplementWrongLanguage" :
+          error?.code === "invalid_response" ? "dictSupplementInvalid" : "dictSupplementUnavailable");
+        if (updating) inlineError(origin, text); else message(text);
       } finally {
         if (epoch === version) { busy = false; active = null; }
         if (alive()) {
           const focusStayed = document.activeElement === stop;
           submit.disabled = false; kind.disabled = false; topic.disabled = false; window.pbpListboxSync?.(kind); sync();
-          if (focusStayed && submit.isConnected) submit.focus({ preventScroll: true });
+          if (focusStayed && origin?.isConnected) origin.focus({ preventScroll: true });
         }
       }
-    });
+    };
+    submit.addEventListener("click", () => generateSupplement());
   };
-  const run = async manual => {
+  const run = async (manual, updateId = "", origin = null) => {
     if (!alive() || busy || !configured()) return;
-    const hadFocus = manual && document.activeElement === generate;
+    if (updateId) inlineError(origin, "");
+    const hadFocus = manual && (document.activeElement === generate || content.contains(document.activeElement));
     const version = ++epoch, viewAtStart = viewRevision, controller = new AbortController(); active = controller; busy = true;
     const current = () => alive() && epoch === version && !controller.signal.aborted;
     message(t("dictEntryGenerating"));
@@ -1828,26 +1978,37 @@ function _pbpDictEntryMount(host, opts) {
     try {
       // The automatic path never requests permission. Only this direct click
       // can open Chrome's exact-origin permission prompt, before any other await.
-      if (manual) await ensureAIHostPermissionWithGesture(settings);
+      if (manual) {
+        const origin = typeof pbpDictEvidenceOrigin === "function" ? pbpDictEvidenceOrigin("etymology", opts.lang) : "";
+        if (origin) {
+          if (!(await requestAIHostPermissions(settings, [origin + "/*"]))) throw { code: "host_permission" };
+        } else await ensureAIHostPermissionWithGesture(settings);
+      }
       if (!current()) return;
       if (typeof pbpAiBumpCounter === "function") pbpAiBumpCounter("explain");
       const request = input(controller.signal, current);
-      const result = await pbpDictEntryRun(request);
+      const result = await pbpDictEntryRun({ ...request, updateId });
       if (current()) render(result, request.target, viewRevision === viewAtStart);
     } catch (error) {
       if (!current()) return;
       if (!record) show("dictionary");
       console.warn("[dict-entry] generation failed:", error?.name, error?.code || "request_failed");
-      message(t(error?.code === "host_permission" ? "aiGrantRetry" :
+      const text = t(error?.code === "host_permission" ? "aiGrantRetry" :
         error?.code === "owner_changed" || error?.code === "account_changed" ? "vocabAccountChanged" :
-        error?.code === "sync_failed" ? "dictEntrySyncFailed" : "dictEntryUnavailable"));
+        error?.code === "sync_failed" ? "dictEntrySyncFailed" : error?.code === "wrong_language" ? "dictSupplementWrongLanguage" :
+        error?.code === "invalid_response" ? "dictSupplementInvalid" : "dictEntryUnavailable");
+      if (updateId) inlineError(origin, text); else message(text);
     } finally {
       if (epoch === version) {
         busy = false; active = null;
         if (alive()) {
           const stopFocused = document.activeElement === stop;
           sync();
-          if (stopFocused && !generate.hidden) generate.focus({ preventScroll: true });
+          if (stopFocused) {
+            if (origin?.isConnected) origin.focus({ preventScroll: true });
+            else if (!generate.hidden) generate.focus({ preventScroll: true });
+            else if (!toggle.hidden) toggle.focus({ preventScroll: true });
+          }
         }
       }
     }

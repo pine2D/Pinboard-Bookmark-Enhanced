@@ -2272,6 +2272,15 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-ai-details > summary:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
 #vocab-ref-result .xp-dict-ai-details p { margin: var(--lib-sp-2) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 #vocab-ref-result .xp-dict-ai-details .xp-dict-src { margin-top: var(--lib-sp-3); }
+#vocab-ref-result .xp-dict-learning-item { max-inline-size: 72ch; margin-top: var(--lib-sp-4); }
+#vocab-ref-result .xp-dict-learning-item:first-child { margin-top: var(--lib-sp-2); }
+#vocab-ref-result .xp-dict-learning-item > .xp-dict-example-translation { margin-top: var(--lib-sp-1); }
+#vocab-ref-result :is(.xp-dict-update-entry, .xp-dict-update-supplement) { margin-top: var(--lib-sp-3); }
+/* Text actions may wrap with enlarged text; icon actions keep their fixed rung. */
+#vocab-ref-result :is(.xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement) {
+  max-inline-size: 100%; height: auto; min-height: calc(var(--lib-control-h) - 4px);
+  line-height: var(--lib-lh-secondary); white-space: normal; overflow-wrap: anywhere;
+}
 #vocab-ref-result .xp-dict-supplement > .listbox {
   display: block; width: 100%; min-width: 0; margin-top: var(--lib-sp-2);
 }

@@ -9,6 +9,7 @@ import { HELP_SCENARIOS } from './audit-help-scenarios.mjs';
 export const AUDIT_SURFACES = Object.freeze(['popup', 'options', 'library', 'md-preview', 'pinboard', 'background', 'tooling']);
 const ui = ['popup', 'options', 'library', 'md-preview'];
 function ownership(name) {
+  if (/^dict-(?:entry|usage|evidence|archive)$/.test(name)) return ['library', 'md-preview'];
   if (name === 'ask-history') return ['md-preview'];
   if (/^ask-archive(?:-|$)/.test(name)) return ['background', 'library', 'md-preview'];
   if (name === 'tag-gov-layout') return ['options'];
@@ -49,7 +50,7 @@ export const TEST_SCENARIOS = testFiles.filter(name => name !== 'pinboard-theme-
     id: 'test.' + base, runner: name.endsWith('.html') ? 'html' : 'node', file,
     surfaces, features: features(base), kinds: ['popup-label-fit', 'confirm-layout'].includes(base) ? ['layout', 'i18n'] : [name.endsWith('.html') || ['ask-history', 'library-ask-history'].includes(base) ? 'logic' : 'contract'],
     browser: ['popup-label-fit', 'confirm-layout', 'ask-history', 'library-ask-history'].includes(base),
-    files: [file, base + '.js', ...surfaces.flatMap(s => sourcePatterns[s] || []), ...(base === 'confirm-layout' ? ['shared.js'] : []), ...(base.startsWith('theme-') ? ['docs/theme-surface/**'] : [])],
+    files: [file, base + '.js', ...surfaces.flatMap(s => sourcePatterns[s] || []), ...(/^dict-(?:entry|usage|evidence|archive)$/.test(base) ? ['dict-entry.js', 'dict-evidence.js', 'dict-archive.js'] : []), ...(base === 'confirm-layout' ? ['shared.js'] : []), ...(base.startsWith('theme-') ? ['docs/theme-surface/**'] : [])],
     dependencies: [], axes: {},
   };
 });

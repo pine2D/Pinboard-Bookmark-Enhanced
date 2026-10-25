@@ -20,9 +20,11 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const abs = resolve(file);
 const rel = relative(ROOT, abs).split("\\").join("/");
 // These larger suites include real asynchronous DOM/IDB work. Library's
-// complete run takes about 32s here, beyond the 24s inner wait left
-// by the normal 30s deadline after reserving diagnostics and cleanup.
-const TEST_TIMEOUT_MS = ["tests/md-convert-tests.html", "tests/library-vocab-tests.html"].includes(rel) ? 45000 : 30000;
+// 561-row suite measured 38.89s wall time under load; a 45s outer deadline
+// leaves less than 39s for rows after launch/navigation and the 6s diagnostic
+// reserve below. Give only this suite 60s; conversion retains its 45s budget.
+const TEST_TIMEOUT_MS = rel === "tests/library-vocab-tests.html" ? 60000
+  : rel === "tests/md-convert-tests.html" ? 45000 : 30000;
 const CLEANUP_TIMEOUT_MS = 5000;
 // Cushion between "the wait-for-rows deadline + the diagnostic sample's own
 // bound" and the outer bounded("test", TEST_TIMEOUT_MS) deadline (started
@@ -52,8 +54,9 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/contrast-tests.html": 6,
   "tests/confirm-layout-tests.html": 142,
   "tests/dict-pack-tests.html": 333,
-  "tests/dict-entry-tests.html": 54,
-  "tests/dict-usage-tests.html": 34,
+  "tests/dict-evidence-tests.html": 59,
+  "tests/dict-entry-tests.html": 65,
+  "tests/dict-usage-tests.html": 48,
   "tests/dict-archive-tests.html": 52,
   "tests/ask-archive-tests.html": 36,
   "tests/ask-archive-client-tests.html": 6,
@@ -73,7 +76,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/reader-bookmark-tests.html": 46,
   "tests/md-ai-setup-tests.html": 18,
   "tests/md-convert-tests.html": 827,
-  "tests/md-dict-tests.html": 655,
+  "tests/md-dict-tests.html": 671,
   "tests/md-embed-tests.html": 54,
   "tests/md-explain-layout-tests.html": 13,
   "tests/md-highlight-commit-tests.html": 259,

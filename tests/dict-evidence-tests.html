@@ -1,0 +1,101 @@
+<!doctype html><meta charset="utf-8"><title>Verified dictionary evidence</title>
+<div id="results"></div><div id="summary"></div>
+<script>
+// Independent MediaWiki formatversion=2 fixtures, preserving the API's actual
+// parse/categories/text shape and Wikisource's real header/parent hierarchy.
+const CHAPTER = {parse:{title:'The Works of Charles Dickens/Volume 1/Chapter 14',pageid:4399301,revid:13788016,
+ categories:[{category:'Subpages',sortkey:'',hidden:true}],text:`<div class="mw-parser-output" lang="en">
+ <div class="wst-header ws-noexport"><span class="wst-header-title-text"><a href="/wiki/The_Works_of_Charles_Dickens/Volume_1">The Pickwick Papers</a></span><span class="contributor-text"><span class="fn"><a href="/wiki/Author:Charles_Dickens">Charles Dickens</a></span></span><div class="header-section-text">Chapter XIV</div></div>
+ <div class="prp-pages-output"><p>“There's a very nice ham,” said the widow, “and a beautiful cold larded fowl.”</p>
+ <p>These words roused Tom from his reflections. His admiration of the widow increased as she spoke. Thoughtful creature! Comfortable provider!</p>
+ <p>“Who is that gentleman in the bar, ma'am?” inquired Tom.</p></div></div>`}};
+const VOLUME = {parse:{title:'The Works of Charles Dickens/Volume 1',pageid:2976673,revid:123456,
+ categories:[{category:'Subpages',sortkey:'',hidden:true}],text:'<div class="mw-parser-output"><div class="similar"><a href="/wiki/The_Pickwick_Papers">The Pickwick Papers</a></div><span id="ws-author">Charles Dickens</span></div>'}};
+const WORK = {parse:{title:'The Pickwick Papers',pageid:1234,revid:1234567,categories:[{category:'British_novels',sortkey:''}],text:'<div class="mw-parser-output"><span id="ws-author">Charles Dickens</span><span id="ws-title">The Pickwick Papers</span></div>'}};
+const WORD = {parse:{title:'provider',pageid:15,revid:1515,categories:[{category:'English_lemmas',sortkey:''}],text:`<div class="mw-parser-output"><div class="mw-heading mw-heading2"><h2 id="English">English</h2></div><div class="mw-heading mw-heading3"><h3 id="Etymology">Etymology</h3></div><p>From <i class="mention" lang="en"><a href="/wiki/provide#English">provide</a></i> + <i lang="en"><a href="/wiki/-er#English">-er</a></i>.</p><div class="mw-heading mw-heading3"><h3>Noun</h3></div><p>Definition must not enter the etymology.</p><div class="mw-heading mw-heading2"><h2>Dutch</h2></div><div class="mw-heading mw-heading3"><h3>Etymology</h3></div><p>Wrong language history.</p></div>`}};
+const ROOT = {parse:{title:'provide',pageid:16,revid:1616,categories:[],text:'<div class="mw-parser-output"><h2>English</h2><h3>Etymology</h3><p>From Latin providere, to foresee and provide.</p><h3>Verb</h3><p>Unrelated definition.</p></div>'}};
+let calls,grant,guardCalls,onGuard,afterFetch,responses;
+const chrome={runtime:{id:'fixture'},permissions:{contains:async()=>grant}};
+globalThis.chrome=chrome;
+async function fetch(raw,options){
+ const url=new URL(raw);calls.push({url,options});
+ let value;
+ if(url.searchParams.get('action')==='query')value=responses.search;
+ else value=responses.pages[url.searchParams.get('page')];
+ if(afterFetch)await afterFetch();
+ if(value instanceof Error)throw value;
+ if(value?.response)return value.response;
+ return {ok:true,status:200,headers:{get:()=>null},text:async()=>typeof value==='string'?value:JSON.stringify(value??{error:{code:'missingtitle'}})};
+}
+function reset(){calls=[];grant=true;guardCalls=0;onGuard=null;afterFetch=null;responses={search:{batchcomplete:true,query:{search:[{ns:0,pageid:75597,title:'United States Code/Title 17/Chapter 5/Section 512'},{ns:0,pageid:4399301,title:CHAPTER.parse.title}]}},pages:{[CHAPTER.parse.title]:structuredClone(CHAPTER),[VOLUME.parse.title]:structuredClone(VOLUME),[WORK.parse.title]:structuredClone(WORK),provider:structuredClone(WORD),provide:structuredClone(ROOT)}};}
+function request(extra={}){return {term:'provider',sourceLanguage:'en',kind:'literature',beforeRequest:async()=>{guardCalls++;if(onGuard)await onGuard();},...extra};}
+function pageOnly(html,category='British_novels',title='Fixture Novel'){
+ responses.search.query.search=[{ns:0,pageid:1,title}];responses.pages[title]={parse:{title,pageid:1,revid:100,categories:category?[{category,sortkey:''}]:[],text:html}};
+}
+async function rejects(run,code){try{await run();return false;}catch(e){return e.code===code||e.name===code;}}
+let passed=0,failed=0;
+async function test(name,run){reset();let ok=false,detail='';try{ok=await run();}catch(e){detail=e.stack;}ok?passed++:failed++;const p=document.createElement('p');p.className=ok?'pass':'fail';p.textContent=(ok?'PASS ':'FAIL ')+name+' '+detail;document.getElementById('results').append(p);}
+</script><script src="../dict-evidence.js"></script><script>
+(async()=>{
+await test('source origins use the queried language and precise dataset',()=>pbpDictEvidenceOrigin('literature','zh-Hant')==='https://zh.wikisource.org'&&pbpDictEvidenceOrigin('culture','es')==='https://es.wikipedia.org'&&pbpDictEvidenceOrigin('etymology','de')==='https://de.wiktionary.org');
+await test('unknown source languages and categories do not silently use English',()=>!pbpDictEvidenceOrigin('literature','und')&&!pbpDictEvidenceOrigin('etymology','zz')&&!pbpDictEvidenceOrigin('unknown','en'));
+await test('unsupported literary editions stop before network',async()=>!(await pbpDictEvidenceFetch(request({sourceLanguage:'zz'}))).length&&!calls.length);
+await test('an exact word in a sentence is recognized',()=>_pbpDictEvidenceMatch('He is a provider for his family.','provider','en')===8);
+await test('word boundaries exclude derivatives and embedded substrings',()=>['providers','microprovider','provider2','provider_name'].every(s=>_pbpDictEvidenceMatch(s,'provider','en')<0));
+await test('Unicode word boundaries handle non-Latin scripts',()=>_pbpDictEvidenceMatch('Это дом.','дом','ru')>=0&&_pbpDictEvidenceMatch('дома','дом','ru')<0);
+await test('CJK words do not require inserted spaces',()=>_pbpDictEvidenceMatch('他是這家人的供養者。','供養者','zh-Hant')>=0);
+await test('Latin terms on a CJK edition still require lexical boundaries',()=>_pbpDictEvidenceMatch('providers','provider','zh')<0);
+await test('canonical accents and capitalization preserve a match',()=>_pbpDictEvidenceMatch('Un café.','CAFE\u0301','fr')>=0);
+await test('multiword expressions use boundaries around the whole phrase',()=>_pbpDictEvidenceMatch('a service provider.','service provider','en')>=0&&_pbpDictEvidenceMatch('service providers','service provider','en')<0);
+await test('genre classification is backed by visible literary categories',()=>_pbpDictEvidenceGenre([{category:'British_novels'}])==='novel'&&_pbpDictEvidenceGenre([{category:'短篇小說'}])==='short-story'&&_pbpDictEvidenceGenre([{category:'Gedichte'}])==='poetry');
+await test('French and Spanish genre metadata is recognized',()=>_pbpDictEvidenceGenre([{category:'Romans_français'}])==='novel'&&_pbpDictEvidenceGenre([{category:'Poesía'}])==='poetry'&&_pbpDictEvidenceGenre([{category:'Teatro'}])==='drama');
+await test('hidden maintenance and generic literature categories do not prove genre',()=>!_pbpDictEvidenceGenre([{category:'Novels',hidden:true}])&&!_pbpDictEvidenceGenre([{category:'Literature'}]));
+await test('legal or catalog categories cannot masquerade as literature',()=>!_pbpDictEvidenceGenre([{category:'Novels'},{category:'Government_reports'}])&&!_pbpDictEvidenceGenre([{category:'Lists_of_novels'}]));
+await test('verified chapter uses actual paragraphs and two-hop book metadata',async()=>{const r=await pbpDictEvidenceFetch(request());return r.length===1&&r[0].author==='Charles Dickens'&&r[0].work==='The Pickwick Papers'&&r[0].genre==='novel'&&r[0].location.startsWith('Chapter XIV')&&r[0].excerpt.includes('Comfortable provider!')&&r[0].excerpt.includes('ham');});
+await test('sources keep revision-specific URLs and collection time',async()=>{const r=(await pbpDictEvidenceFetch(request()))[0];return r.url==='https://en.wikisource.org/w/index.php?oldid=13788016'&&r.revision==='13788016'&&Number.isSafeInteger(r.retrievedAt)&&r.language==='en';});
+await test('evidence carries only the declared bounded metadata fields',async()=>{const r=(await pbpDictEvidenceFetch(request()))[0];return Object.keys(r).sort().join(',')==='author,excerpt,genre,language,location,retrievedAt,revision,title,url,work'&&r.excerpt.length<=600;});
+await test('search snippets are never used as source text',async()=>{responses.search.query.search[1].snippet='FAKE provider quote';const r=await pbpDictEvidenceFetch(request());return r.length===1&&!r[0].excerpt.includes('FAKE');});
+await test('provider lookup refines candidates with a second chapter query',async()=>{await pbpDictEvidenceFetch(request());return calls.filter(c=>c.url.searchParams.get('action')==='query').length===2&&calls.some(c=>c.url.searchParams.get('srsearch')?.includes('intitle:chapter'));});
+await test('legal search hits are rejected before fetching their body',async()=>{await pbpDictEvidenceFetch(request());return !calls.some(c=>c.url.searchParams.get('page')?.startsWith('United States Code'));});
+await test('unknown genre yields no literary result even with a matching term',async()=>{responses.pages[WORK.parse.title].parse.categories=[];return !(await pbpDictEvidenceFetch(request())).length;});
+await test('missing authors are not invented from a title',async()=>{pageOnly('<p>A provider supplies things needed by someone.</p>');return !(await pbpDictEvidenceFetch(request())).length;});
+await test('header and navigation word hits cannot become quotations',async()=>{pageOnly('<span id="ws-author">Author</span><div class="wst-header">provider</div><p>This narrative does not contain the required word.</p>');return !(await pbpDictEvidenceFetch(request())).length;});
+await test('related forms in the real body are not exact-word quotations',async()=>{pageOnly('<span id="ws-author">Author</span><p>These providers prepare their provisions carefully.</p>');return !(await pbpDictEvidenceFetch(request())).length;});
+await test('malformed and non-main namespace search hits are excluded',async()=>{responses.search.query.search=[{ns:102,pageid:1,title:'provider'},{ns:0,pageid:-2,title:'provider'},{ns:0,pageid:3,title:'Author:provider'}];return !(await pbpDictEvidenceFetch(request())).length&&calls.length===2;});
+await test('no source permission prevents all network requests',async()=>{grant=false;return await rejects(()=>pbpDictEvidenceFetch(request()),'host_permission')&&calls.length===0;});
+await test('permissions are checked again after the first response',async()=>{afterFetch=async()=>{grant=false;};return await rejects(()=>pbpDictEvidenceFetch(request()),'host_permission')&&calls.length===1;});
+await test('the caller account guard runs before and after each await',async()=>{await pbpDictEvidenceFetch(request());return guardCalls>=calls.length*4;});
+await test('account change after a response prevents another dispatch',async()=>{let valid=true;afterFetch=async()=>{valid=false;};onGuard=async()=>{if(!valid)throw Object.assign(new Error('changed'),{code:'owner_changed'});};return await rejects(()=>pbpDictEvidenceFetch(request()),'owner_changed')&&calls.length===1;});
+await test('already cancelled queries perform no network access',async()=>{const c=new AbortController();c.abort();return await rejects(()=>pbpDictEvidenceFetch(request({signal:c.signal})),'AbortError')&&!calls.length;});
+await test('cancel after fetch stops parsing and further requests',async()=>{const c=new AbortController();afterFetch=async()=>c.abort();return await rejects(()=>pbpDictEvidenceFetch(request({signal:c.signal})),'AbortError')&&calls.length===1;});
+await test('external requests omit credentials and reject redirects',async()=>{await pbpDictEvidenceFetch(request());return calls.every(c=>c.options.credentials==='omit'&&c.options.redirect==='error'&&c.options.signal instanceof AbortSignal);});
+await test('API errors remain failures rather than no matches',async()=>{responses.search={error:{code:'ratelimited'}};return await rejects(()=>pbpDictEvidenceFetch(request()),'source_failed');});
+await test('HTTP failures remain failures rather than no matches',async()=>{responses.search={response:{ok:false,status:503}};return await rejects(()=>pbpDictEvidenceFetch(request()),'source_failed');});
+await test('invalid JSON is not silently treated as empty evidence',async()=>{responses.search='not JSON';return await rejects(()=>pbpDictEvidenceFetch(request()),'source_failed');});
+await test('transport failure is reported as source failure',async()=>{responses.search=new TypeError('network');return await rejects(()=>pbpDictEvidenceFetch(request()),'source_failed');});
+await test('oversized advertised response is refused before reading',async()=>{let read=false;responses.search={response:{ok:true,headers:{get:()=>1800001},text:async()=>{read=true;return '{}';}}};return await rejects(()=>pbpDictEvidenceFetch(request()),'source_failed')&&!read;});
+await test('oversized streamed response is cancelled',async()=>{let cancelled=false;responses.search={response:{ok:true,body:{getReader:()=>({read:async()=>({done:false,value:new Uint8Array(1800001)}),cancel:async()=>{cancelled=true;}})}}};return await rejects(()=>pbpDictEvidenceFetch(request()),'source_failed')&&cancelled;});
+await test('a deleted candidate is skipped rather than fabricated',async()=>{responses.pages[CHAPTER.parse.title]={error:{code:'missingtitle'}};return !(await pbpDictEvidenceFetch(request())).length;});
+await test('invalid parse metadata cannot generate a source URL',async()=>{responses.pages[CHAPTER.parse.title].parse.revid='13788016';return await rejects(()=>pbpDictEvidenceFetch(request()),'source_failed');});
+await test('culture uses article body from the source-language edition',async()=>{const r=await pbpDictEvidenceFetch(request({kind:'culture',sourceLanguage:'de'}));return r.length===1&&r[0].genre==='culture'&&calls.every(c=>c.url.origin==='https://de.wikipedia.org')&&calls.filter(c=>c.url.searchParams.get('action')==='query').length===1;});
+await test('culture retrieval does not label the passage as a verified meme',async()=>{const r=(await pbpDictEvidenceFetch(request({kind:'culture'})))[0];return r.genre==='culture'&&!Object.hasOwn(r,'popular')&&!Object.hasOwn(r,'originDate');});
+await test('etymology is restricted to the requested language and section',async()=>{const r=await pbpDictEvidenceFetch(request({kind:'etymology'}));return r[0].excerpt==='From provide + -er.'&&!JSON.stringify(r).includes('Wrong language')&&!JSON.stringify(r).includes('Unrelated definition');});
+await test('etymology follows one explicit formation link on the same origin',async()=>{const r=await pbpDictEvidenceFetch(request({kind:'etymology'}));return r.length===2&&r[1].title==='provide'&&r[1].excerpt.includes('Latin')&&calls.length===2&&calls.every(c=>c.url.origin==='https://en.wiktionary.org');});
+await test('external etymology links never expand the granted origin',async()=>{responses.pages.provider.parse.text=responses.pages.provider.parse.text.replace('/wiki/provide#English','https://evil.example/wiki/provide');return (await pbpDictEvidenceFetch(request({kind:'etymology'}))).length===1&&calls.length===1;});
+await test('etymology of a different headword is not attributed to the query',async()=>{responses.pages.provider.parse.title='provide';return !(await pbpDictEvidenceFetch(request({kind:'etymology'}))).length;});
+await test('an unrecognized language section produces no etymology',async()=>{responses.pages.provider.parse.text=responses.pages.provider.parse.text.replace('>English<','>Dutch<');return !(await pbpDictEvidenceFetch(request({kind:'etymology'}))).length;});
+await test('Chinese etymology headings retain the queried source language',async()=>{responses.pages['提供']={parse:{title:'提供',pageid:50,revid:500,categories:[],text:'<h2>漢語</h2><h3>詞源</h3><p>由兩個語素構成的詞語，保留來源的原文說明。</p><h3>讀音</h3><p>不應混入讀音。</p>'}};const r=await pbpDictEvidenceFetch(request({term:'提供',sourceLanguage:'zh-Hant',kind:'etymology'}));return r.length===1&&r[0].language==='zh-Hant'&&!r[0].excerpt.includes('讀音');});
+await test('French and Spanish etymology headings are recognized',()=>{const a=_pbpDictEvidenceEtymology({title:'mot'},_pbpDictEvidenceDocument('<h2>Français</h2><h3>Étymologie</h3><p>Texte historique vérifiable.</p>'),'fr');const b=_pbpDictEvidenceEtymology({title:'palabra'},_pbpDictEvidenceDocument('<h2>Español</h2><h3>Etimología</h3><p>Historia documentada de la palabra.</p>'),'es');return a?.text&&b?.text;});
+await test('HTML scripts, forms and remote resources are never rendered',()=>{window.evidenceExecuted=false;const doc=_pbpDictEvidenceDocument('<script>window.evidenceExecuted=true;<\/script><img src="https://evil.example/x"><iframe src="https://evil.example"></iframe><form><input></form><p>Safe provider text remains.</p>');return !doc.querySelector('script,img,iframe,form,input')&&!window.evidenceExecuted&&doc.textContent.includes('provider');});
+await test('long paragraphs yield whole bounded sentences around the word',()=>{const r=_pbpDictEvidenceExcerpt(['Before. '.repeat(100)+'A provider supplies a family. '+'After. '.repeat(100)],'provider','en');return r?.text.includes('A provider supplies a family.')&&r.text.length<=600;});
+await test('one overlong sentence is not silently cut into a quotation',()=>!_pbpDictEvidenceExcerpt(['A provider '+ 'long '.repeat(180)+'sentence.'],'provider','en'));
+await test('a no-hit response never returns search text as fallback',async()=>{responses.search.query.search=[];return !(await pbpDictEvidenceFetch(request())).length;});
+await test('metadata link extraction rejects external and non-work namespaces',()=>{const d=_pbpDictEvidenceDocument('<a href="https://evil.example/wiki/Book">x</a><a href="/wiki/Author:Somebody">a</a>');return [...d.querySelectorAll('a')].every(a=>!_pbpDictEvidenceTitleLink(a,'https://en.wikisource.org'));});
+await test('evidence functions require the live caller guard',async()=>await rejects(()=>pbpDictEvidenceFetch({term:'provider',sourceLanguage:'en',kind:'literature'}),'invalid_request')&&!calls.length);
+await test('explicit legal metadata cannot inherit a literary parent genre',async()=>{responses.pages[CHAPTER.parse.title].parse.categories=[{category:'Government_reports'}];return !(await pbpDictEvidenceFetch(request())).length&&!calls.some(c=>c.url.searchParams.get('page')===VOLUME.parse.title);});
+await test('a dramatic Act title is not excluded as a legislative act',async()=>{pageOnly('<span id="ws-author">Playwright</span><p>A provider appears at the door of the house.</p>','Plays','A Play/Act II');return (await pbpDictEvidenceFetch(request())).length===1;});
+await test('German paragraph-style Herkunft stops before neighbouring fields',()=>{const result=_pbpDictEvidenceEtymology({title:'Anbieter'},_pbpDictEvidenceDocument('<h2>Anbieter (Deutsch)</h2><h3>Substantiv, m</h3><p title="Etymologie und Morphologie">Herkunft:</p><dl><dd>Ableitung vom Stamm von anbieten mit -er.</dd></dl><p title="Sinnverwandte Wörter">Sinnverwandte Wörter:</p><dl><dd>Must not enter.</dd></dl>'),'de');return result?.text==='Ableitung vom Stamm von anbieten mit -er.';});
+await test('Cyrillic genre and legal categories use Unicode boundaries',()=>_pbpDictEvidenceGenre([{category:'Русские_романы'}])==='novel'&&_pbpDictEvidenceGenre([{category:'Поэзия'}])==='poetry'&&!_pbpDictEvidenceGenre([{category:'Законы'},{category:'Романы'}]));
+document.getElementById('summary').textContent=passed+' passed, '+failed+' failed';
+})();
+</script>

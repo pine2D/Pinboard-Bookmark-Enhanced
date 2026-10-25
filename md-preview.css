@@ -2410,6 +2410,16 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-dict-full-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .xp-dict-ai-details > .xp-dict-src { font-size: 11px; }
 .xp-dict-supplement-text { white-space: pre-wrap; line-height: 1.55; }
+.xp-dict-learning-item { margin-top: var(--sp-3); overflow-wrap: anywhere; }
+.xp-dict-learning-item:first-child { margin-top: var(--sp-2); }
+.xp-dict-learning-item > p { margin: var(--sp-1) 0 0; }
+.xp-dict-learning-item > .xp-dict-example { margin-top: var(--sp-2); }
+.xp-dict-learning-item > .xp-dict-src { font-size: 11px; line-height: 1.45; }
+.xp-dict-update-entry, .xp-dict-update-supplement { margin-top: var(--sp-2); }
+/* Keep long translated text actions inside the lookup's scroll column. */
+.xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement {
+  max-inline-size: 100%; line-height: 18px; white-space: normal; overflow-wrap: anywhere;
+}
 .xp-dict-supplement > .xp-dict-lang { display: flex; align-items: center; width: 100%; min-width: 0; margin-top: var(--sp-2); font-family: inherit; line-height: 18px; }
 .xp-dict-supplement-label { display: block; margin-top: var(--sp-3); font-size: 12px; line-height: 18px; color: var(--fg-secondary); }
 .xp-dict-supplement-topic { display: block; width: 100%; box-sizing: border-box; margin-top: var(--sp-1); }

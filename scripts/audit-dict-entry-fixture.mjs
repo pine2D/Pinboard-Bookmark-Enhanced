@@ -3,8 +3,13 @@
 // No request reaches a real provider and no permission prompt is opened.
 export async function installDictEntryFixture(page) {
   await page.evaluate(async () => {
-    await chrome.storage.local.set({ dictDefaultView: "ai-saved" });
-    if (typeof _pbpExplainSettings === "object" && _pbpExplainSettings) _pbpExplainSettings.dictDefaultView = "ai-saved";
+    // Explanations intentionally remain Chinese while the surrounding controls
+    // exercise every UI locale. This is an explicit language preference, not an
+    // inference about the learner's native language.
+    await chrome.storage.local.set({ dictDefaultView: "ai-saved", dictDefinitionLang: "zh-Hans" });
+    if (typeof _pbpExplainSettings === "object" && _pbpExplainSettings) {
+      Object.assign(_pbpExplainSettings, { dictDefaultView: "ai-saved", dictDefinitionLang: "zh-Hans" });
+    }
     _pbpDictHasPerm = async () => true;
     _pbpDictCacheGet = async () => null;
     _pbpDictFetch = async (lang, term) => ({ status: 200, data: {
@@ -15,6 +20,8 @@ export async function installDictEntryFixture(page) {
         ] }], source: { url: 'https://en.wiktionary.org/wiki/fixture', license: { name: 'CC BY-SA 4.0', url: 'https://creativecommons.org/licenses/by-sa/4.0/' } }
     } });
     ensureAIHostPermissionWithGesture = async () => true;
+    requestAIHostPermissions = async () => true;
+    pbpDictEvidenceFetch = async () => [];
     const cache = new Map();
     window._auditDictEntry = { entered: false, release: null, fail: false, calls: 0, reads: 0, cache };
     // Exercise the production archive against a fresh, isolated database. A
@@ -37,8 +44,9 @@ export async function installDictEntryFixture(page) {
       await opts.beforeRequest?.(); opts.signal?.throwIfAborted();
       let lookup;
       try { lookup = JSON.parse(prompt.slice(prompt.lastIndexOf('\n') + 1)); } catch (_) {}
-      if (!lookup || Object.keys(lookup).sort().join(',') !== 'sourceLanguage,targetLanguage,term' ||
-        !lookup.term || !lookup.sourceLanguage || !lookup.targetLanguage?.name) {
+      if (!lookup || Object.keys(lookup).sort().join(',') !== 'etymologyEvidence,sourceLanguage,targetLanguage,term' ||
+        !lookup.term || !lookup.sourceLanguage || lookup.targetLanguage?.lang !== 'zh-Hans' ||
+        !Array.isArray(lookup.etymologyEvidence) || lookup.etymologyEvidence.length) {
         throw new Error('SETUP: expected a reusable dictionary entry request without article or dictionary content');
       }
       const state = window._auditDictEntry;
@@ -54,7 +62,12 @@ export async function installDictEntryFixture(page) {
             examples: [{ text: 'This is an original example sentence.', translation: '这是一句独立编写的例句。' }] },
           { partOfSpeech: '名词', definition: '另一种常见含义，便于区分不同用法。',
             examples: [{ text: 'The second example illustrates another use.', translation: '第二句例句展示另一种用法。' }] }
-        ], etymology: '此处展示词源说明的布局，不依赖当前文章。', relatedWords: ['example', 'expression', 'meaning'] });
+        ], etymology: '', relatedWords: ['example', 'expression', 'meaning'],
+        learning: { version: 2, formation: '构词说明按这个词本身展开，不依赖当前文章。', history: '', related: [
+          { word: 'example', relation: 'topic', note: '用于展示词语在句子中的实际用法。' },
+          { word: 'expression', relation: 'topic', note: '强调表达形式，可用于对照词汇和短语。' },
+          { word: 'meaning', relation: 'topic', note: '表示词语在特定语境中表达的含义。' }
+        ] } });
     };
   });
 }
@@ -89,13 +102,13 @@ export async function openDictEntryState(page, state) {
   if (state === 'details') {
     await page.locator('.xp-dict-ai-details > summary').first().click();
     const details = page.locator('.xp-dict-ai-details[open]').first();
-    await details.locator('.xp-dict-rel').waitFor({ state: 'visible' });
+    await details.locator('.xp-dict-lemma-link, bdi').first().waitFor({ state: 'visible' });
     // The scenario audits the opened state. User-triggered folds now animate;
     // wait for their actual endpoint rather than sampling the first frame.
     await details.evaluate(async node => {
       await Promise.all(node.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
     });
-    return details.locator('.xp-dict-rel').isVisible();
+    return details.locator('.xp-dict-lemma-link, bdi').first().isVisible();
   }
   if (state === 'cached') {
     const before = await page.evaluate(() => ({ calls: window._auditDictEntry.calls, reads: window._auditDictEntry.reads }));
@@ -118,7 +131,7 @@ export async function openDictEntryState(page, state) {
     await page.waitForFunction(() => window._auditDictEntry?.entered);
     await page.evaluate(() => window._auditDictEntry.release());
     await page.waitForFunction(() => document.querySelector('.xp-dict-ai')?.getAttribute('aria-busy') === 'false' &&
-      document.querySelector('.xp-dict-ai-status')?.textContent === t('dictEntryUnavailable'));
+      document.querySelector('.xp-dict-ai-status')?.textContent === t('dictSupplementInvalid'));
     return page.locator('.xp-dict-ai-status:not([hidden])').isVisible();
   }
   throw new Error('SETUP: unknown dictionary entry state ' + state);

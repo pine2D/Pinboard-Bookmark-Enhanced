@@ -845,10 +845,10 @@
           <label class="bl" id="dict-definition-lang-label" for="dict-definition-lang" data-i18n="dictDefinitionLangLabel">AI entry definition language</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="dictDefinitionLangHint">Choose the language used to explain words in AI entries, independently of the word’s language. Original dictionary definitions keep their own language.</p>
+            <p class="hint context-help-body" data-i18n="dictDefinitionLangHint">AI entries and supplements use your native language by default, or the interface language if no native language is set. Choose another language here to override this. Original dictionary definitions and quotations keep their own language.</p>
           </details>
           <select id="dict-definition-lang" data-listbox>
-            <option value="" data-i18n="dictDefinitionLangUi">Follow interface language</option>
+            <option value="" data-i18n="dictDefinitionLangUi">Follow native language</option>
             <option value="en">English</option>
             <option value="zh-Hans">简体中文</option>
             <option value="zh-Hant">繁體中文</option>
@@ -876,7 +876,7 @@
           <label class="bl" for="dict-learner-native-language" data-i18n="dictLearnerNativeLanguageLabel">Native language (optional)</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="dictLearnerProfileHint">Used only when you request supplementary usage. Helps tailor comparisons and examples; it does not change the definition language or trigger generation.</p>
+            <p class="hint context-help-body" data-i18n="dictLearnerProfileHint">Your native language sets the default AI explanation language and helps tailor comparisons. Learning level adjusts explanation difficulty and examples. These preferences do not trigger generation.</p>
           </details>
           <input type="text" id="dict-learner-native-language" maxlength="80" autocomplete="off" spellcheck="false" placeholder="For example, Spanish" data-i18n-placeholder="dictLearnerNativeLanguagePlaceholder" />
         </div>

@@ -104,7 +104,7 @@ export const RENDER_SCENARIOS = Object.freeze([
     return row(sweepScenarioId(surface, item.name), surface, themes, {
       type: 'sweep', context: item.name,
       ...(item.name.startsWith('vocab-pack-') ? { files: [...files(surface), 'options-vocab.js', 'dict-pack.js', 'scripts/audit-vocab-pack-fixture.mjs'] } : {}),
-      ...(/^dict-entry-/.test(item.name) ? { files: [...files(surface), 'md-dict.js', 'dict-entry.js', 'ai.js', 'ai-cache.js', 'library-vocab.js', 'scripts/audit-dict-entry-fixture.mjs'] } : {}),
+      ...(/^dict-entry-/.test(item.name) ? { files: [...files(surface), 'md-dict.js', 'dict-entry.js', 'dict-evidence.js', 'dict-archive.js', 'ai.js', 'ai-cache.js', 'library-vocab.js', 'scripts/audit-dict-entry-fixture.mjs'] } : {}),
       features: [...new Set([item.name, item.name.replace(/^tab-/, ''), surface, ...(/^dict-entry-/.test(item.name) ? ['dictionary', 'dictionary-entry'] : [])])], kinds: ['layout'], axes: { ...axes, state: [item.name] },
       defaults: surface === 'md-preview' ? { scheme: ['light'] } : {},
       dependencies: item.dependencies.map((name) => sweepScenarioId(surface, name)),
