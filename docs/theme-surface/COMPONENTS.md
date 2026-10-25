@@ -1577,6 +1577,12 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 
 ### 10.2 各表面原语与契约
 
+共享确认弹层按问题、可选对象与后果、操作组纵向排列；`.confirm-content` 承载说明，`.confirm-subject` 用纯文本显示真实对象，`.confirm-actions` 承载操作，三者都是 `showConfirmPopover` 的内部原语。普通正文用前景色，仅危险执行钮用 solid danger；`tone: "action"` 由生成配方换成普通按钮颜色，适用于恢复隐藏分组等非破坏性决定。内距与说明到操作间距均为 12px，复杂决策内距 16px；options/library 字号及按钮高度沿用密度 token，popup/reader 使用 26px 控件阶梯。
+
+双操作末行靠右，DOM 与视觉顺序均为取消、执行；三选决策按取消、替代选项、执行纵向等宽排列，长按钮文字可换行。默认焦点保持取消，正向 Tab 可到其余选项。弹层高度不超过视口减 8px，长说明在 `.confirm-content` 内滚动，操作始终可见；仅溢出说明获得键盘焦点，内部滚动不关闭弹层，外部滚动仍关闭。保持 Escape、外部点击及恢复焦点行为，不引入遮罩或额外图标。
+
+阅读器 Ask 清空保持就地确认，复用 `.confirm-actions` 的独立末行与取消在前顺序；归档删除将短问题与同步后果分开，正文不用危险色，危险执行钮与阅读器确认弹层一致。
+
 | 表面 | 原语 | 契约（拥有的几何） |
 |---|---|---|
 | library / md-preview | `.xp-dict-ai` / `.xp-dict-ai-controls` / `.xp-dict-ai-content` / `.xp-dict-ai-details` | AI 词条与普通词典共用主视图；动作挂在既有标题/查询栏，固定单排纯图标、gap sp-1、title 与 aria-label 同步。生成用 wandSparkles，查看已有 AI 词条用 sparkles，普通词典用 bookOpenText；停止 stop，配置 gear。reader 26px、library md 阶，与相邻按钮共用底色/边框，隐藏整组须明确 display:none。详情使用右侧细 chevron、整行 hover/focus，保持原生 details 键盘语义；无面板底色、边框或阴影。 |

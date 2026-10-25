@@ -499,6 +499,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // window.confirm is a browser-modal that freezes the whole popup.
     showConfirmPopover($id("logout-link"), {
       msg: t("confirmLogout"),
+      detail: t("confirmLogoutDetail"),
       yesText: t("logout"),
       noText: t("cancel"),
       onConfirm: async () => {

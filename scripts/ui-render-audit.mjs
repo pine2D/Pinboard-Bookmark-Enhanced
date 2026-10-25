@@ -8774,10 +8774,16 @@ async function openReaderSurface(name) {
       act.click(); await wait(700);
       return shown(pop) && shown(pop.querySelector(".xp-dict-head"));
     }
-    case "ask-panel": {
+    case "ask-panel":
+    case "ask-clear-confirm": {
       const btn = document.getElementById("ask-open");
       if (btn) btn.click(); else if (typeof _pbpExplainOpenAsk === "function") _pbpExplainOpenAsk("quick"); else return false;
       await wait(500);
+      if (name === "ask-clear-confirm") {
+        if (typeof _pbpAskShowClearConfirm !== "function") return false;
+        _pbpAskShowClearConfirm(); await wait(150);
+        return shown(document.getElementById("ask-clear-confirm"));
+      }
       return shown(document.getElementById("ask-panel"));
     }
     case "search-pop": { if (typeof _pbpSearchOpen !== "function") return false; _pbpSearchOpen(); await wait(300); return shown(document.getElementById("search-pop")); }
@@ -8824,6 +8830,7 @@ function closeReaderSurface(name) {
     case "explain-pop": return; // stays open for explain-dict
     case "explain-dict": { const pop = document.getElementById("explain-pop"); if (pop && typeof _pbpExplainClose === "function") _pbpExplainClose(pop); return; }
     case "ask-panel": { const btn = document.getElementById("ask-open"); const panel = document.getElementById("ask-panel"); if (btn && panel && !panel.hidden) btn.click(); return; }
+    case "ask-clear-confirm": { document.querySelector(".ask-clear-no")?.click(); const btn = document.getElementById("ask-open"); const panel = document.getElementById("ask-panel"); if (btn && panel && !panel.hidden) btn.click(); return; }
     case "send-menu": { const c = document.getElementById("send-caret"); const m = document.getElementById("send-menu"); if (c && m && !m.hidden) c.click(); return; }
     case "confirm-popover": { document.querySelector(".confirm-popover .confirm-no")?.click(); return; }
     case "tr-ask": { if (typeof _pbpTrAskClose === "function") _pbpTrAskClose(); return; }
@@ -8939,6 +8946,14 @@ async function runSweep(page, sw, extBase) {
       if (wants("options", "vocab-pack-installed")) {
         await installVocabPackFixture(page);
         await scan("options", "vocab-pack-installed");
+        if (wants("options", "vocab-pack-delete-confirm")) {
+          await scan("options", "vocab-pack-delete-confirm", async () => {
+            await page.locator('#multi-pack-list button[data-pack-action="delete"]').first().click();
+            await page.waitForSelector(".confirm-popover .confirm-subject");
+            return true;
+          });
+          await page.locator(".confirm-popover .confirm-no").click();
+        }
       }
     }
 

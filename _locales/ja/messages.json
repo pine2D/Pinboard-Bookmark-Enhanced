@@ -204,8 +204,9 @@
     "message": "このブックマークを削除しますか？"
   },
   "confirmLogout": {
-    "message": "ログアウトしますか？API トークンが削除されます。"
+    "message": "ログアウトしますか？"
   },
+  "confirmLogoutDetail": {"message": "API トークンが削除されます。未保存のブックマークの下書きは破棄されます。"},
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
   },
@@ -1141,6 +1142,7 @@
   "backupIncludeSecretsHint": {
     "message": "すべての認証情報が平文でファイルに書き込まれます。Pinboard の API トークン、各 AI プロバイダーの API キー、Jina、Wayback、Anki、Eudic、Notion、Gist、Webhook の認証情報が対象です。ファイルを開いた人は誰でもそのまま使用できます。パスワードと同じ扱いで保管してください。"
   },
+  "backupSecretsExportTitle": {"message": "認証情報を含むバックアップをエクスポートしますか？"},
   "backupSecretsExportConfirm": {
     "message": "このバックアップには API キーとトークンが平文で保存されます。信頼できない経路で送信せず、復元が終わったらすぐに削除してください。"
   },
@@ -3790,6 +3792,7 @@
   "dictPackDeleteConfirm": {
     "message": "インポート済みの辞書パックを削除しますか？"
   },
+  "dictPackDeleteDetail": {"message": "このデバイスからインポート済みの辞書データを削除します。保存した単語は残ります。辞書は再度インポートできます。"},
   "dictEudicSend": {
     "message": "対応するすべての単語を Eudic に送信"
   },
@@ -4401,8 +4404,9 @@
     "message": "ブックマークを削除"
   },
   "readerBookmarkDeleteConfirm": {
-    "message": "このブックマークをPinboardから削除しますか？リーダーのハイライトとメモは残ります。"
+    "message": "このブックマークをPinboardから削除しますか？"
   },
+  "readerBookmarkDeleteDetail": {"message": "リーダーのハイライトとメモは残ります。"},
   "readerBookmarkDeleting": {
     "message": "ブックマークを削除中…"
   },
@@ -4473,7 +4477,8 @@
   "multiPackInspecting": {"message": "辞書の情報を読み込んでいます…"},
   "multiPackPreview": {"message": "辞書を確認"},
   "multiPackInstall": {"message": "辞書をインポート"},
-  "multiPackReplacing": {"message": "このファイルでインストール済みの辞書を置き換えますか？インポートが完了するまで、現在の版を引き続き利用できます。"},
+  "multiPackReplacing": {"message": "このファイルでインストール済みの辞書を置き換えますか？"},
+  "multiPackReplacingDetail": {"message": "インポートが完了するまで、現在の版を引き続き利用できます。"},
   "multiPackEnable": {"message": "有効にする"},
   "multiPackDisable": {"message": "無効にする"},
   "multiPackAllowAi": {"message": "AI での利用を許可"},
@@ -4594,6 +4599,8 @@
   "askVersions": {"message": "以前の回答"},
   "askDeleteConversation": {"message": "会話を削除"},
   "askDeleteConversationConfirm": {"message": "この会話とすべての回答を削除しますか？接続済みのデバイスにも削除が同期されます。"},
+  "askDeleteConversationTitle": {"message": "この会話を削除しますか？"},
+  "askDeleteConversationDetail": {"message": "この会話のすべての回答を削除します。接続済みのデバイスにも削除が同期されます。"},
   "askHistoryTab": {"message": "質問と回答"},
   "askHistorySearch": {"message": "記事・質問・回答を検索"},
   "askHistoryEmpty": {"message": "完了した回答はここに自動保存されます。一時的な会話は保存されません。"},

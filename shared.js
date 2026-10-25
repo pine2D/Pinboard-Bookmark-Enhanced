@@ -3273,7 +3273,8 @@ function pbpDismissActiveConfirm(anchor) {
 // Render a .confirm-popover beside `anchor`, portaled to <body> so buttons are
 // never nested inside an interactive anchor.
 // Caller supplies pre-translated strings via { msg, yesText, noText }.
-// Optional: `detail` (plain-weight text under the bold question) and a third
+// Optional: `subject` (the exact affected item), `detail` (consequences under
+// the question), `tone: "action"` for a non-destructive decision, and a third
 // choice `altText` + `onAlt`, rendered before the solid-danger Confirm for a
 // decision that has two real outcomes besides Cancel (options' Chrome Sync
 // conflict: use the cloud copy / overwrite it / keep sync off).
@@ -3289,17 +3290,33 @@ function pbpDismissActiveConfirm(anchor) {
 function showConfirmPopover(anchor, opts) {
   if (!anchor) return false;
   if (_activeConfirmPopover?.anchor === anchor && _activeConfirmPopover.pop.isConnected) return false;
-  const { msg, detail, yesText, noText, altText, onConfirm, onCancel, onAlt, onDismiss } = opts || {};
+  const { msg, subject, detail, yesText, noText, altText, onConfirm, onCancel, onAlt, onDismiss } = opts || {};
   const opener = document.activeElement;
   _activeConfirmPopover?.dismiss({ restoreFocus: false, animate: false });
   const pop = document.createElement("div");
   pop.className = opts?.variant === "decision" ? "confirm-popover is-decision" : "confirm-popover";
+  pop.classList.toggle("is-action", opts?.tone === "action");
+  pop.classList.toggle("has-choices", !!altText);
   pop.setAttribute("role", "dialog");
   pop.setAttribute("aria-modal", "false");
   pop.setAttribute("aria-label", msg || "Confirm");
   const m = document.createElement("span");
   m.className = "confirm-msg";
   m.textContent = msg || "";
+  const content = document.createElement("div");
+  content.className = "confirm-content";
+  content.append(m);
+  pop.append(content);
+  const descriptions = [];
+  if (subject) {
+    const item = document.createElement("span");
+    item.className = "confirm-subject";
+    item.id = `confirm-subject-${++_confirmDetailSeq}`;
+    item.dir = "auto";
+    item.textContent = subject;
+    descriptions.push(item.id);
+    content.append(item);
+  }
   const yes = document.createElement("button");
   yes.type = "button";
   yes.className = "confirm-yes";
@@ -3308,24 +3325,30 @@ function showConfirmPopover(anchor, opts) {
   no.type = "button";
   no.className = "confirm-no";
   no.textContent = noText || "Cancel";
-  pop.append(m);
   if (detail) {
     const d = document.createElement("span");
     d.className = "confirm-detail";
     d.id = `confirm-detail-${++_confirmDetailSeq}`;
     d.textContent = detail;
-    pop.setAttribute("aria-describedby", d.id);
-    pop.append(d);
+    descriptions.push(d.id);
+    content.append(d);
   }
+  if (descriptions.length) pop.setAttribute("aria-describedby", descriptions.join(" "));
+  // Keep all choices in one group below the question and optional detail.
+  // Wrapping prose must never send just Cancel onto an unrelated new row.
+  const actions = document.createElement("div");
+  actions.className = "confirm-actions";
+  actions.append(no);
   let alt = null;
   if (altText) {
     alt = document.createElement("button");
     alt.type = "button";
     alt.className = "confirm-alt";
     alt.textContent = altText;
-    pop.append(alt);
+    actions.append(alt);
   }
-  pop.append(yes, no);
+  actions.append(yes);
+  pop.append(actions);
   (opts?.container || document.body).appendChild(pop);
   // Anchors living in the top layer (native [popover] hosts, e.g. the
   // reader's highlight card) would paint OVER a plain body child; promote
@@ -3368,6 +3391,7 @@ function showConfirmPopover(anchor, opts) {
       : document.documentElement.clientHeight;
     const viewportRight = viewportLeft + viewportWidth;
     const viewportBottom = viewportTop + viewportHeight;
+    pop.style.maxHeight = `${Math.max(0, Math.floor(viewportHeight - gap * 2))}px`;
     const surfaceRect = surfaceEl?.getBoundingClientRect?.();
     const hasSurface = surfaceRect && surfaceRect.width > gap * 2;
     let leftBound = Math.max(viewportLeft + gap, hasSurface ? surfaceRect.left + gap : viewportLeft + gap);
@@ -3409,15 +3433,22 @@ function showConfirmPopover(anchor, opts) {
       bottom: "auto",
     });
 
-    // A final rect read catches sub-pixel rounding and late intrinsic sizing
-    // (notably translated button text) before the popover reaches the edge.
+    // Recheck intrinsic size after fixed positioning, but use the authored
+    // coordinates: getBoundingClientRect also includes the enter transition's
+    // translate. Compensating for that offset moves the panel out of bounds
+    // again when the animation settles.
     const settledRect = pop.getBoundingClientRect();
+    const settledLeft = parseFloat(pop.style.left);
+    const settledTop = parseFloat(pop.style.top);
+    // A long explanation is keyboard-scrollable without putting an extra
+    // stop into every short confirmation. Actions stay outside this region.
+    content.tabIndex = content.scrollHeight > content.clientHeight + 1 ? 0 : -1;
     let correctedLeft = left;
     let correctedTop = top;
-    if (settledRect.right > rightBound) correctedLeft -= settledRect.right - rightBound;
-    if (settledRect.left < leftBound) correctedLeft += leftBound - settledRect.left;
-    if (settledRect.bottom > bottomBound) correctedTop -= settledRect.bottom - bottomBound;
-    if (settledRect.top < topBound) correctedTop += topBound - settledRect.top;
+    if (settledLeft + settledRect.width > rightBound) correctedLeft -= settledLeft + settledRect.width - rightBound;
+    if (settledLeft < leftBound) correctedLeft += leftBound - settledLeft;
+    if (settledTop + settledRect.height > bottomBound) correctedTop -= settledTop + settledRect.height - bottomBound;
+    if (settledTop < topBound) correctedTop += topBound - settledTop;
     if (Math.abs(correctedLeft - left) >= 0.5) pop.style.left = `${Math.round(correctedLeft)}px`;
     if (Math.abs(correctedTop - top) >= 0.5) pop.style.top = `${Math.round(correctedTop)}px`;
   }
@@ -3432,7 +3463,7 @@ function showConfirmPopover(anchor, opts) {
     document.removeEventListener("keydown", onKey, true);
     document.removeEventListener("pointerdown", onDocPointerDown, true);
     window.removeEventListener("resize", schedulePosition);
-    window.removeEventListener("scroll", dismiss, true);
+    window.removeEventListener("scroll", onScroll, true);
     visualViewport?.removeEventListener("resize", schedulePosition);
     visualViewport?.removeEventListener("scroll", schedulePosition);
     surfaceObserver?.disconnect();
@@ -3463,6 +3494,10 @@ function showConfirmPopover(anchor, opts) {
       if (onCancel) onCancel();
     }
   }
+  function onScroll(ev) {
+    if (ev.target instanceof Node && pop.contains(ev.target)) return;
+    dismiss();
+  }
   // Light dismiss: pointerdown (not click -- the opening click's own bubble
   // would fire a click listener attached synchronously) anywhere outside the
   // popover cancels, same as Escape. The anchor is excluded so re-clicking
@@ -3481,9 +3516,9 @@ function showConfirmPopover(anchor, opts) {
     return pop.contains(node) || (typeof anchor.contains === "function" && anchor.contains(node));
   }
   // Keyboard light dismiss: Tab produces no pointerdown, and the popover is
-  // portaled to the END of <body>, so a forward Tab off Cancel leaves it for
-  // <body> (no visible focus) while the popover stays open and Confirm is only
-  // reachable backwards. Same recipe as md-preview.js's #send-menu, including
+  // portaled to the END of <body>, so Tab after the final action must not
+  // leave a stale confirmation open behind the new focus. Same recipe as
+  // md-preview.js's #send-menu, including
   // its null guard: relatedTarget is reliable for focus()/Tab moves inside the
   // document but is null when the window itself loses focus, so that case
   // re-checks activeElement once the change has settled instead of cancelling
@@ -3526,7 +3561,7 @@ function showConfirmPopover(anchor, opts) {
   document.addEventListener("keydown", onKey, true);
   document.addEventListener("pointerdown", onDocPointerDown, true);
   window.addEventListener("resize", schedulePosition);
-  window.addEventListener("scroll", dismiss, true);
+  window.addEventListener("scroll", onScroll, true);
   visualViewport?.addEventListener("resize", schedulePosition);
   visualViewport?.addEventListener("scroll", schedulePosition);
   if (typeof ResizeObserver === "function") {

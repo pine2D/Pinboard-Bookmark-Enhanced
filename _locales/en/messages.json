@@ -204,8 +204,9 @@
     "message": "Delete this bookmark?"
   },
   "confirmLogout": {
-    "message": "Log out? Your API token will be removed."
+    "message": "Log out?"
   },
+  "confirmLogoutDetail": {"message": "Your API token will be removed. Unsaved bookmark drafts will be discarded."},
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
   },
@@ -1146,6 +1147,7 @@
   "backupIncludeSecretsHint": {
     "message": "Writes every credential to the file in plain text: your Pinboard token, all AI provider keys, and the Jina, Wayback, Anki, Eudic, Notion, Gist and Webhook credentials. Anyone who opens the file can use them. Keep it where you would keep a password."
   },
+  "backupSecretsExportTitle": {"message": "Export a backup with credentials?"},
   "backupSecretsExportConfirm": {
     "message": "This backup will hold your API keys and tokens in plain text. Don't send it over channels you don't trust, and delete it once you have restored."
   },
@@ -3801,6 +3803,7 @@
   "dictPackDeleteConfirm": {
     "message": "Delete the imported dictionary pack?"
   },
+  "dictPackDeleteDetail": {"message": "The imported dictionary data will be removed from this device. Saved words will be kept. You can import the dictionary again."},
   "dictEudicSend": {
     "message": "Send all supported words to Eudic"
   },
@@ -4408,8 +4411,9 @@
     "message": "Delete bookmark"
   },
   "readerBookmarkDeleteConfirm": {
-    "message": "Delete this bookmark from Pinboard? Reader highlights and notes will be kept."
+    "message": "Delete this bookmark from Pinboard?"
   },
+  "readerBookmarkDeleteDetail": {"message": "Reader highlights and notes will be kept."},
   "readerBookmarkDeleting": {
     "message": "Deleting bookmark…"
   },
@@ -4480,7 +4484,8 @@
   "multiPackInspecting": {"message": "Reading dictionary details…"},
   "multiPackPreview": {"message": "Review dictionary"},
   "multiPackInstall": {"message": "Import dictionary"},
-  "multiPackReplacing": {"message": "Replace the installed dictionary with this file? The current version remains available until the import finishes."},
+  "multiPackReplacing": {"message": "Replace the installed dictionary with this file?"},
+  "multiPackReplacingDetail": {"message": "The current version remains available until the import finishes."},
   "multiPackEnable": {"message": "Enable"},
   "multiPackDisable": {"message": "Disable"},
   "multiPackAllowAi": {"message": "Allow AI use"},
@@ -4601,6 +4606,8 @@
   "askVersions": {"message": "Earlier answers"},
   "askDeleteConversation": {"message": "Delete conversation"},
   "askDeleteConversationConfirm": {"message": "Delete this conversation and all its answers? Deletion syncs to connected devices."},
+  "askDeleteConversationTitle": {"message": "Delete this conversation?"},
+  "askDeleteConversationDetail": {"message": "All answers in this conversation will be deleted. Deletion syncs to connected devices."},
   "askHistoryTab": {"message": "Questions"},
   "askHistorySearch": {"message": "Search articles, questions and answers"},
   "askHistoryEmpty": {"message": "Completed answers appear here automatically. Temporary conversations are not saved."},

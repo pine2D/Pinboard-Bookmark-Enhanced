@@ -241,7 +241,8 @@ async function _pbpLibAskDownload(session) {
 }
 function _pbpLibAskDelete(session, anchor) {
   const owner = _libAskOwner, revision = _libAskRevision;
-  showConfirmPopover(anchor, { msg: t("askDeleteConversationConfirm"), yesText: t("delete"), noText: t("askClearNo"),
+  showConfirmPopover(anchor, { msg: t("askDeleteConversationTitle"), subject: session.records[0]?.q || session.title || session.url,
+    detail: t("askDeleteConversationDetail"), yesText: t("delete"), noText: t("askClearNo"),
     onConfirm: async () => {
       try {
         if (!await _pbpLibAskCurrent(owner, revision)) return;

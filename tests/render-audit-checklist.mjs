@@ -1640,8 +1640,8 @@ export const CHECKS = [
   // readable on the card it lands on, in this theme" is only answerable
   // after a real cascade + real composite. .confirm-msg is the one that has
   // never had any gate at all -- it inherits the popover's own `color`,
-  // which is --pp-danger by default and --pp-fg under a preset, over
-  // --pp-bg; neither pair is in contrast-audit's COMPONENT_PAIR_SPEC.
+  // now --pp-fg in both default and preset themes, over --pp-bg; this
+  // composed pair is checked here on the rendered confirmation itself.
   // The runner opens the real popover via #logout-link and never confirms
   // (see runSimpleTheme's popup setup). ----
   { surface: "popup", page: "popup.html", selector: ".confirm-popover .confirm-msg", state: "default",
@@ -1650,13 +1650,12 @@ export const CHECKS = [
     expect: { textContrast: 4.5 } },
   { surface: "popup", page: "popup.html", selector: ".confirm-popover .confirm-no", state: "default",
     expect: { textContrast: 4.5 } },
-  // The two answers sit on the 24px target-size floor (WCAG 2.5.8; library
-  // critique 2026-10-16): every surface's hand-written .confirm-popover button
-  // rule carries min-height 24px, and popup's is the confirm the runner opens.
+  // Confirmation actions use the popup's 26px control tier (2026-10-25
+  // critique), with a hit target above the WCAG 2.5.8 24px floor.
   { surface: "popup", page: "popup.html", selector: ".confirm-popover .confirm-yes", state: "default",
-    expect: { minHeightPx: { comfortable: 24, compact: 24 }, hitRectMin: { height: 24 } } },
+    expect: { minHeightPx: { comfortable: 26, compact: 26 }, hitRectMin: { height: 24 } } },
   { surface: "popup", page: "popup.html", selector: ".confirm-popover .confirm-no", state: "default",
-    expect: { minHeightPx: { comfortable: 24, compact: 24 }, hitRectMin: { height: 24 } } },
+    expect: { minHeightPx: { comfortable: 26, compact: 26 }, hitRectMin: { height: 24 } } },
 
   // ---- popup's submit bar, the first two buttons to carry `class="btn"`
   // (campaign C4a). Both had ZERO render coverage before -- scoping found no

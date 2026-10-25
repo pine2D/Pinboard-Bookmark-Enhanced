@@ -1126,7 +1126,9 @@ function _pbpPackWire() {
     if (metaUnreadable || (meta && meta.state === "ready")) {
       pbpDismissActiveConfirm(imp);
       showConfirmPopover(imp, {
-        msg: t("dictPackReplaceConfirm"),
+        msg: t("multiPackReplacing"),
+        subject: t("dictPackSection"),
+        detail: t("dictPackReplaceConfirm"),
         yesText: t("dictPackImport"),
         noText: t("cancel"),
         onConfirm: () => runPackImport(f)
@@ -1138,6 +1140,8 @@ function _pbpPackWire() {
   if (del) del.addEventListener("click", () => {
     showConfirmPopover(del, {
       msg: t("dictPackDeleteConfirm"),
+      subject: t("dictPackSection"),
+      detail: t("dictPackDeleteDetail"),
       yesText: t("delete"),
       noText: t("cancel"),
       onConfirm: async () => {
@@ -1253,6 +1257,8 @@ function _pbpEcdictWire() {
   if (del) del.addEventListener("click", () => {
     showConfirmPopover(del, {
       msg: t("dictPackDeleteConfirm"),
+      subject: t("ecdictSection"),
+      detail: t("dictPackDeleteDetail"),
       yesText: t("delete"),
       noText: t("cancel"),
       onConfirm: async () => {
@@ -1395,7 +1401,7 @@ async function _pbpMultiPackRefresh() {
             };
             const cleanup=()=>document.removeEventListener("pointerdown",pointer,true);
             document.addEventListener("pointerdown",pointer,true);
-            const shown=showConfirmPopover(button, {msg:t("dictPackDeleteConfirm"), yesText:t(key), noText:t("cancel"),
+            const shown=showConfirmPopover(button, {msg:t("dictPackDeleteConfirm"), subject:pack.title, detail:t("dictPackDeleteDetail"), yesText:t(key), noText:t("cancel"),
               onDismiss:cleanup, onConfirm:()=>{cleanup();return run(true);}, onCancel:()=>{
                 cleanup();
                 // Tab's focusout runs before its destination receives focus.
@@ -1491,7 +1497,7 @@ async function _pbpMultiPackInstall() {
       if(!_pbpMultiPackPending)$id("multi-pack-choose").focus({preventScroll:true});
     }
   };
-  if(installed.some(pack=>pack.id===meta.id)) showConfirmPopover($id("multi-pack-install"), {msg:t("multiPackReplacing"),yesText:t("multiPackInstall"),noText:t("cancel"),onConfirm:run});
+  if(installed.some(pack=>pack.id===meta.id)) showConfirmPopover($id("multi-pack-install"), {msg:t("multiPackReplacing"),subject:meta.title,detail:t("multiPackReplacingDetail"),yesText:t("multiPackInstall"),noText:t("cancel"),onConfirm:run});
   else await run();
 }
 function _pbpMultiPackWire() {

@@ -204,8 +204,9 @@
     "message": "Удалить эту закладку?"
   },
   "confirmLogout": {
-    "message": "Выйти? Ваш API-токен будет удалён."
+    "message": "Выйти?"
   },
+  "confirmLogoutDetail": {"message": "Ваш API-токен будет удалён. Несохранённые черновики закладок будут удалены."},
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
   },
@@ -1141,6 +1142,7 @@
   "backupIncludeSecretsHint": {
     "message": "Записывает все учётные данные в файл открытым текстом: API-токен Pinboard, API-ключи всех AI-провайдеров, а также учётные данные Jina, Wayback, Anki, Eudic, Notion, Gist и Webhook. Любой, кто откроет файл, сможет ими воспользоваться. Храните его так же, как пароль."
   },
+  "backupSecretsExportTitle": {"message": "Экспортировать резервную копию с учётными данными?"},
   "backupSecretsExportConfirm": {
     "message": "Эта резервная копия будет содержать ваши ключи API и токены открытым текстом. Не отправляйте её по каналам, которым не доверяете, и удалите после восстановления."
   },
@@ -3790,6 +3792,7 @@
   "dictPackDeleteConfirm": {
     "message": "Удалить импортированный пакет словаря?"
   },
+  "dictPackDeleteDetail": {"message": "Данные импортированного словаря будут удалены с этого устройства. Сохранённые слова останутся. Словарь можно импортировать заново."},
   "dictEudicSend": {
     "message": "Отправить в Eudic все поддерживаемые слова"
   },
@@ -4401,8 +4404,9 @@
     "message": "Удалить закладку"
   },
   "readerBookmarkDeleteConfirm": {
-    "message": "Удалить эту закладку из Pinboard? Выделения и заметки в режиме чтения сохранятся."
+    "message": "Удалить эту закладку из Pinboard?"
   },
+  "readerBookmarkDeleteDetail": {"message": "Выделения и заметки в режиме чтения сохранятся."},
   "readerBookmarkDeleting": {
     "message": "Удаление закладки…"
   },
@@ -4473,7 +4477,8 @@
   "multiPackInspecting": {"message": "Чтение сведений о словаре…"},
   "multiPackPreview": {"message": "Проверить словарь"},
   "multiPackInstall": {"message": "Импортировать словарь"},
-  "multiPackReplacing": {"message": "Заменить установленный словарь этим файлом? Текущая версия останется доступной до завершения импорта."},
+  "multiPackReplacing": {"message": "Заменить установленный словарь этим файлом?"},
+  "multiPackReplacingDetail": {"message": "Текущая версия останется доступной до завершения импорта."},
   "multiPackEnable": {"message": "Включить"},
   "multiPackDisable": {"message": "Отключить"},
   "multiPackAllowAi": {"message": "Разрешить использование ИИ"},
@@ -4594,6 +4599,8 @@
   "askVersions": {"message": "Предыдущие ответы"},
   "askDeleteConversation": {"message": "Удалить разговор"},
   "askDeleteConversationConfirm": {"message": "Удалить этот разговор и все ответы? Удаление синхронизируется с подключёнными устройствами."},
+  "askDeleteConversationTitle": {"message": "Удалить этот разговор?"},
+  "askDeleteConversationDetail": {"message": "Все ответы в этом разговоре будут удалены. Удаление синхронизируется с подключёнными устройствами."},
   "askHistoryTab": {"message": "Вопросы"},
   "askHistorySearch": {"message": "Поиск статей, вопросов и ответов"},
   "askHistoryEmpty": {"message": "Готовые ответы сохраняются здесь автоматически. Временные разговоры не сохраняются."},

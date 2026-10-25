@@ -204,8 +204,9 @@
     "message": "Supprimer ce signet ?"
   },
   "confirmLogout": {
-    "message": "Se déconnecter ? Votre jeton API sera supprimé."
+    "message": "Se déconnecter ?"
   },
+  "confirmLogoutDetail": {"message": "Votre jeton API sera supprimé. Les brouillons de signets non enregistrés seront abandonnés."},
   "hintCtrlEnter": {
     "message": "Ctrl+Entrée"
   },
@@ -1141,6 +1142,7 @@
   "backupIncludeSecretsHint": {
     "message": "Écrit tous les identifiants en clair dans le fichier : jeton API Pinboard, clés de tous les fournisseurs d'IA, ainsi que les identifiants Jina, Wayback, Anki, Eudic, Notion, Gist et Webhook. Quiconque ouvre le fichier peut les utiliser. Conservez-le comme un mot de passe."
   },
+  "backupSecretsExportTitle": {"message": "Exporter une sauvegarde avec les identifiants ?"},
   "backupSecretsExportConfirm": {
     "message": "Cette sauvegarde contiendra vos clés API et vos jetons en clair. Ne l'envoyez pas par des canaux auxquels vous ne faites pas confiance et supprimez-la une fois la restauration terminée."
   },
@@ -3790,6 +3792,7 @@
   "dictPackDeleteConfirm": {
     "message": "Supprimer le pack de dictionnaire importé ?"
   },
+  "dictPackDeleteDetail": {"message": "Les données du dictionnaire importé seront supprimées de cet appareil. Les mots enregistrés seront conservés. Vous pourrez importer à nouveau le dictionnaire."},
   "dictEudicSend": {
     "message": "Envoyer tous les mots compatibles vers Eudic"
   },
@@ -4401,8 +4404,9 @@
     "message": "Supprimer le signet"
   },
   "readerBookmarkDeleteConfirm": {
-    "message": "Supprimer ce signet de Pinboard ? Les surlignages et les notes du lecteur seront conservés."
+    "message": "Supprimer ce signet de Pinboard ?"
   },
+  "readerBookmarkDeleteDetail": {"message": "Les surlignages et les notes du lecteur seront conservés."},
   "readerBookmarkDeleting": {
     "message": "Suppression du signet…"
   },
@@ -4473,7 +4477,8 @@
   "multiPackInspecting": {"message": "Lecture des informations du dictionnaire…"},
   "multiPackPreview": {"message": "Vérifier le dictionnaire"},
   "multiPackInstall": {"message": "Importer le dictionnaire"},
-  "multiPackReplacing": {"message": "Remplacer le dictionnaire installé par ce fichier ? La version actuelle reste disponible jusqu’à la fin de l’importation."},
+  "multiPackReplacing": {"message": "Remplacer le dictionnaire installé par ce fichier ?"},
+  "multiPackReplacingDetail": {"message": "La version actuelle reste disponible jusqu’à la fin de l’importation."},
   "multiPackEnable": {"message": "Activer"},
   "multiPackDisable": {"message": "Désactiver"},
   "multiPackAllowAi": {"message": "Autoriser l’utilisation par l’IA"},
@@ -4594,6 +4599,8 @@
   "askVersions": {"message": "Réponses précédentes"},
   "askDeleteConversation": {"message": "Supprimer la conversation"},
   "askDeleteConversationConfirm": {"message": "Supprimer cette conversation et toutes ses réponses ? La suppression sera synchronisée sur les appareils connectés."},
+  "askDeleteConversationTitle": {"message": "Supprimer cette conversation ?"},
+  "askDeleteConversationDetail": {"message": "Toutes les réponses de cette conversation seront supprimées. La suppression sera synchronisée sur les appareils connectés."},
   "askHistoryTab": {"message": "Questions"},
   "askHistorySearch": {"message": "Rechercher dans les articles, questions et réponses"},
   "askHistoryEmpty": {"message": "Les réponses terminées sont enregistrées ici automatiquement, sauf celles des conversations temporaires."},

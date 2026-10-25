@@ -2513,29 +2513,41 @@ function _pbpAskShowClearConfirm() {
   // Markup produced here:
   // <div id="ask-clear-confirm" class="ask-clear-confirm" role="alertdialog"
   //      aria-label="{askClearConfirm}">
-  //   <span class="ask-clear-msg">{askClearConfirm}</span>
-  //   <button type="button" class="action-btn ask-clear-yes">{askClearYes}</button>
-  //   <button type="button" class="action-btn ask-clear-no">{askClearNo}</button>
+  //   <span class="ask-clear-msg">{question}</span>
+  //   <span class="confirm-detail">{optional consequences}</span>
+  //   <div class="confirm-actions">{Cancel}{Delete}</div>
   // </div>
   const strip = document.createElement("div");
   strip.id = "ask-clear-confirm";
   strip.className = "ask-clear-confirm";
   strip.setAttribute("role", "alertdialog");
-  strip.setAttribute("aria-label", t(_pbpAskArchiveEnabled() ? "askDeleteConversationConfirm" : "askClearConfirm"));
+  const archived = _pbpAskArchiveEnabled();
+  const question = t(archived ? "askDeleteConversationTitle" : "askClearConfirm");
+  strip.setAttribute("aria-label", question);
   const msg = document.createElement("span");
   msg.className = "ask-clear-msg";
-  msg.textContent = t(_pbpAskArchiveEnabled() ? "askDeleteConversationConfirm" : "askClearConfirm");
+  msg.textContent = question;
   const yes = document.createElement("button");
   yes.type = "button";
   yes.className = "action-btn ask-clear-yes";
-  yes.textContent = t("askClearYes");
+  yes.textContent = t(archived ? "delete" : "askClearYes");
   const no = document.createElement("button");
   no.type = "button";
   no.className = "action-btn ask-clear-no";
   no.textContent = t("askClearNo");
   strip.appendChild(msg);
-  strip.appendChild(yes);
-  strip.appendChild(no);
+  if (archived) {
+    const detail = document.createElement("span");
+    detail.className = "confirm-detail";
+    detail.id = "ask-clear-detail";
+    detail.textContent = t("askDeleteConversationDetail");
+    strip.setAttribute("aria-describedby", detail.id);
+    strip.append(detail);
+  }
+  const actions = document.createElement("div");
+  actions.className = "confirm-actions";
+  actions.append(no, yes);
+  strip.append(actions);
   thread.parentNode.insertBefore(strip, thread);
   const clearBtn = document.getElementById("ask-clear");
   const input = document.getElementById("ask-input");

@@ -914,7 +914,8 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
   $id("export-settings").addEventListener("click", () => {
     if ($id("opt-backup-include-secrets")?.checked !== true) { runExport(); return; }
     showConfirmPopover($id("export-settings"), {
-      msg: t("backupSecretsExportConfirm"),
+      msg: t("backupSecretsExportTitle"),
+      detail: t("backupSecretsExportConfirm"),
       yesText: t("backupSecretsExportYes"),
       noText: t("cancel"),
       onConfirm: runExport,

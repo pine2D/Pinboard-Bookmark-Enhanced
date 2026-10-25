@@ -204,8 +204,9 @@
     "message": "確定刪除此書籤？"
   },
   "confirmLogout": {
-    "message": "確定登出？API Token 將被移除。"
+    "message": "要登出嗎？"
   },
+  "confirmLogoutDetail": {"message": "API Token 將被移除，尚未儲存的書籤草稿將會捨棄。"},
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
   },
@@ -1141,6 +1142,7 @@
   "backupIncludeSecretsHint": {
     "message": "會把全部憑證以明文寫進檔案：Pinboard API Token、所有 AI 服務商的 API Key，以及 Jina、Wayback、Anki、歐路詞典、Notion、Gist 和 Webhook 的憑證。任何人開啟檔案都能直接使用。請按保管密碼的方式保管這個檔案。"
   },
+  "backupSecretsExportTitle": {"message": "要匯出包含憑證的備份嗎？"},
   "backupSecretsExportConfirm": {
     "message": "此備份將以明文儲存你的 API Key 和 Token。不要經由你不信任的管道傳輸，還原完成後請立即刪除。"
   },
@@ -3790,6 +3792,7 @@
   "dictPackDeleteConfirm": {
     "message": "刪除已匯入的詞典包？"
   },
+  "dictPackDeleteDetail": {"message": "移除此裝置中已匯入的詞典資料。已儲存的生詞會保留，詞典可重新匯入。"},
   "dictEudicSend": {
     "message": "將所有支援的生詞傳送到歐路詞典"
   },
@@ -4401,8 +4404,9 @@
     "message": "刪除書籤"
   },
   "readerBookmarkDeleteConfirm": {
-    "message": "要從 Pinboard 刪除此書籤嗎？標記和閱讀筆記會保留。"
+    "message": "要從 Pinboard 刪除此書籤嗎？"
   },
+  "readerBookmarkDeleteDetail": {"message": "標記和閱讀筆記會保留。"},
   "readerBookmarkDeleting": {
     "message": "正在刪除書籤…"
   },
@@ -4473,7 +4477,8 @@
   "multiPackInspecting": {"message": "正在讀取詞典資訊…"},
   "multiPackPreview": {"message": "確認詞典"},
   "multiPackInstall": {"message": "匯入詞典"},
-  "multiPackReplacing": {"message": "要用此檔案取代已安裝的詞典嗎？匯入完成前，目前版本仍可使用。"},
+  "multiPackReplacing": {"message": "要用此檔案取代已安裝的詞典嗎？"},
+  "multiPackReplacingDetail": {"message": "匯入完成前，目前版本仍可使用。"},
   "multiPackEnable": {"message": "啟用"},
   "multiPackDisable": {"message": "停用"},
   "multiPackAllowAi": {"message": "允許 AI 使用"},
@@ -4594,6 +4599,8 @@
   "askVersions": {"message": "查看先前回答"},
   "askDeleteConversation": {"message": "刪除對話"},
   "askDeleteConversationConfirm": {"message": "刪除此對話及所有回答？刪除操作會同步至已連線的裝置。"},
+  "askDeleteConversationTitle": {"message": "要刪除此對話嗎？"},
+  "askDeleteConversationDetail": {"message": "此對話的所有回答都會刪除。刪除操作會同步至已連線的裝置。"},
   "askHistoryTab": {"message": "問答"},
   "askHistorySearch": {"message": "搜尋文章、問題和回答"},
   "askHistoryEmpty": {"message": "已完成的回答會自動儲存在這裡，臨時對話不會儲存。"},

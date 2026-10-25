@@ -432,6 +432,15 @@ html[data-theme] { --lib-scrollbar-thumb: var(--lib-fg-muted); }
 .confirm-popover .confirm-yes:hover {
   box-shadow: inset 0 0 0 1px var(--lib-on-danger);
 }
+.confirm-popover.is-action .confirm-yes {
+  background: var(--lib-btn-bg);
+  color: var(--lib-btn-fg);
+  border-color: var(--lib-btn-border);
+}
+.confirm-popover.is-action .confirm-yes:hover {
+  background: var(--lib-btn-hover);
+  box-shadow: inset 0 0 0 1px var(--lib-btn-fg);
+}
 
 .vocab-group-chip {
   display: inline-flex;
@@ -583,13 +592,11 @@ input[type="checkbox"], input[type="radio"] {
 .confirm-popover {
   position: absolute; left: 0; right: auto; top: auto; bottom: calc(100% + 4px); z-index: var(--lib-z-menu, 10);
   box-sizing: border-box;
-  width: max-content;   /* the anchor is typically a narrow column; without this the
-                           popover shrink-to-fits to that width and its row of buttons cramps */
-  display: flex; align-items: center; gap: var(--lib-sp-2);
-  flex-wrap: wrap;       /* long tag lists: buttons drop to their own row */
-  max-width: min(60ch, 78vw); white-space: normal;
-  padding: var(--lib-sp-1) var(--lib-sp-2); font-size: 11px; color: var(--lib-danger);
-  background: var(--lib-panel, #fff); border: 1px solid var(--lib-border, #ccc); border-radius: var(--lib-radius-sm);
+  width: 360px;
+  display: flex; flex-direction: column; gap: var(--lib-sp-3);
+  max-width: calc(100vw - 8px); white-space: normal;
+  padding: var(--lib-sp-3); font-size: var(--lib-text-body); line-height: var(--lib-lh-body); color: var(--lib-fg);
+  background: var(--lib-panel, #fff); border: 1px solid var(--lib-border, #ccc); border-radius: var(--lib-radius-lg);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--lib-fg) 22%, transparent), 0 2px 4px color-mix(in srgb, var(--lib-fg) 12%, transparent);
 }
 html.motion-ready .confirm-popover {
@@ -607,14 +614,19 @@ html.motion-ready .confirm-popover.is-closing {
 }
 /* pre-line: messages may embed a real newline (summary line + time estimate);
    under nowrap it collapses to one ever-wider unwrappable line. */
-.confirm-popover .confirm-msg { flex: 1 1 16ch; min-width: 0; font-weight: bold; color: inherit; white-space: pre-line; overflow-wrap: anywhere; }
+.confirm-popover .confirm-content { display: flex; flex-direction: column; gap: var(--lib-sp-2); min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.confirm-popover .confirm-content:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
+.confirm-popover .confirm-msg { flex: none; min-width: 0; font-weight: 600; color: inherit; white-space: pre-line; overflow-wrap: anywhere; }
+.confirm-popover .confirm-subject { flex: none; font-weight: 600; overflow-wrap: anywhere; }
+.confirm-popover .confirm-actions { flex: none; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--lib-sp-2); min-width: 0; }
+.confirm-popover.has-choices .confirm-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
 /* The consequence line under a delete question (pbpLibDeleteDetail: what else
    goes, that it is final, other Drive devices): its own row between the
-   question and the buttons, in plain ink so the warning colour stays on the
-   question itself. */
-.confirm-popover .confirm-detail { flex: 1 1 100%; min-width: 0; font-weight: normal; color: var(--lib-fg); white-space: pre-line; overflow-wrap: anywhere; }
+   question and the buttons, in plain ink so only Delete uses danger colour. */
+.confirm-popover .confirm-detail { flex: none; min-width: 0; font-size: var(--lib-text-secondary); line-height: var(--lib-lh-secondary); font-weight: normal; color: var(--lib-fg); white-space: pre-line; overflow-wrap: anywhere; }
 .confirm-popover button {
-  flex: none; min-height: 24px; padding: 2px var(--lib-sp-2); font-size: 11px; cursor: pointer; border-radius: var(--lib-radius-sm); border: 1px solid;
+  flex: 0 1 auto; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere;
+  min-height: var(--lib-control-h); padding: var(--lib-sp-0) var(--lib-control-pad-x); font-size: var(--lib-text-body); line-height: var(--lib-lh-body); cursor: pointer; border-radius: var(--lib-radius-md); border: 1px solid;
 }
 /* .confirm-yes (solid danger tier, default light state) now comes from
    @generated:ui-components above (COMPONENTS.md §4.2) — only .confirm-no

@@ -204,8 +204,9 @@
     "message": "确定删除此书签？"
   },
   "confirmLogout": {
-    "message": "确定退出登录？API Token 将被移除。"
+    "message": "退出登录？"
   },
+  "confirmLogoutDetail": {"message": "API Token 将被移除，未保存的书签草稿将被丢弃。"},
   "hintCtrlEnter": {
     "message": "Ctrl+Enter"
   },
@@ -1141,6 +1142,7 @@
   "backupIncludeSecretsHint": {
     "message": "会把全部凭据以明文写进文件：Pinboard API Token、所有 AI 服务商的 API Key，以及 Jina、Wayback、Anki、欧路词典、Notion、Gist 和 Webhook 的凭据。任何人打开文件都能直接使用。请按保管密码的方式保管这个文件。"
   },
+  "backupSecretsExportTitle": {"message": "导出含凭据的备份？"},
   "backupSecretsExportConfirm": {
     "message": "此备份将以明文保存你的 API Key 和 Token。不要经由你不信任的渠道传输，恢复完成后请立即删除。"
   },
@@ -3790,6 +3792,7 @@
   "dictPackDeleteConfirm": {
     "message": "删除已导入的词典包？"
   },
+  "dictPackDeleteDetail": {"message": "移除此设备中已导入的词典数据。已保存的生词不变，词典可重新导入。"},
   "dictEudicSend": {
     "message": "将所有支持的生词发送到欧路词典"
   },
@@ -4395,8 +4398,9 @@
     "message": "删除书签"
   },
   "readerBookmarkDeleteConfirm": {
-    "message": "从 Pinboard 删除此书签？高亮和阅读笔记会保留。"
+    "message": "从 Pinboard 删除此书签？"
   },
+  "readerBookmarkDeleteDetail": {"message": "高亮和阅读笔记会保留。"},
   "readerBookmarkDeleting": {
     "message": "正在删除书签…"
   },
@@ -4467,7 +4471,8 @@
   "multiPackInspecting": {"message": "正在读取词典信息…"},
   "multiPackPreview": {"message": "核对词典"},
   "multiPackInstall": {"message": "导入词典"},
-  "multiPackReplacing": {"message": "用此文件替换已安装的词典？导入完成前，当前版本仍可使用。"},
+  "multiPackReplacing": {"message": "用此文件替换已安装的词典？"},
+  "multiPackReplacingDetail": {"message": "导入完成前，当前版本仍可使用。"},
   "multiPackEnable": {"message": "启用"},
   "multiPackDisable": {"message": "停用"},
   "multiPackAllowAi": {"message": "允许 AI 使用"},
@@ -4588,6 +4593,8 @@
   "askVersions": {"message": "查看此前回答"},
   "askDeleteConversation": {"message": "删除对话"},
   "askDeleteConversationConfirm": {"message": "删除此对话及全部回答？删除将同步到已连接的设备。"},
+  "askDeleteConversationTitle": {"message": "删除此对话？"},
+  "askDeleteConversationDetail": {"message": "此对话的全部回答将被删除。删除将同步到已连接的设备。"},
   "askHistoryTab": {"message": "问答"},
   "askHistorySearch": {"message": "搜索文章、问题和回答"},
   "askHistoryEmpty": {"message": "已完成的回答会自动保存在这里，临时对话不保存。"},

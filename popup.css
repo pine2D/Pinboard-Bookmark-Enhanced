@@ -406,6 +406,15 @@ button.action-link {
 .confirm-popover .confirm-yes:hover {
   box-shadow: inset 0 0 0 1px var(--pp-on-danger);
 }
+.confirm-popover.is-action .confirm-yes {
+  background: var(--pp-btn-bg);
+  color: var(--pp-btn-fg);
+  border-color: var(--pp-btn-bd);
+}
+.confirm-popover.is-action .confirm-yes:hover {
+  background: var(--pp-btn-hover);
+  box-shadow: inset 0 0 0 1px var(--pp-btn-fg);
+}
 
 .stag {
   display: inline-flex;
@@ -3173,16 +3182,23 @@ html[data-theme="terminal"] .field > textarea { font-family: "Courier New", Cons
 .confirm-popover {
   position: absolute; right: 0; top: calc(100% + 4px); z-index: var(--pp-z-menu);
   box-sizing: border-box;
-  width: max-content; max-width: min(60ch, calc(100vw - 8px));
-  display: flex; align-items: center; gap: var(--pp-sp-3); flex-wrap: wrap;
-  padding: var(--pp-sp-2) var(--pp-sp-4); font-size: 11px; color: var(--pp-danger-quiet-fg); white-space: normal;
-  background: var(--pp-bg); border: 1px solid var(--pp-border); border-radius: var(--pp-radius-sm);
+  width: 300px; max-width: calc(100vw - 8px);
+  display: flex; flex-direction: column; gap: var(--pp-sp-5);
+  padding: var(--pp-sp-5); font-size: 13px; line-height: 18px; color: var(--pp-fg); white-space: normal;
+  background: var(--pp-bg); border: 1px solid var(--pp-border); border-radius: var(--pp-radius-lg);
   box-shadow: var(--pp-shadow-md);
   animation: confirmFadeIn 0.12s var(--ease-out);
 }
-.confirm-popover .confirm-msg { flex: 1 1 16ch; min-width: 0; font-weight: bold; color: inherit; white-space: pre-line; overflow-wrap: anywhere; }
+.confirm-popover .confirm-content { display: flex; flex-direction: column; gap: var(--pp-sp-4); min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.confirm-popover .confirm-content:focus-visible { outline: 1px solid var(--pp-accent); outline-offset: 2px; box-shadow: var(--pp-focus-ring); }
+.confirm-popover .confirm-msg { flex: none; min-width: 0; font-weight: 600; color: inherit; white-space: pre-line; overflow-wrap: anywhere; }
+.confirm-popover .confirm-subject { flex: none; font-weight: 600; overflow-wrap: anywhere; }
+.confirm-popover .confirm-detail { flex: none; min-width: 0; font-size: 12px; font-weight: normal; white-space: pre-line; overflow-wrap: anywhere; }
+.confirm-popover .confirm-actions { flex: none; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--pp-sp-4); min-width: 0; }
+.confirm-popover.has-choices .confirm-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
 .confirm-popover button {
-  flex: none; min-height: 24px; padding: var(--pp-sp-1) var(--pp-sp-4); font-size: 11px; cursor: pointer; border-radius: var(--pp-radius-sm); border: 1px solid;
+  flex: 0 1 auto; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere;
+  min-height: var(--pp-control-h); padding: var(--pp-sp-1) var(--pp-sp-4); font-size: var(--pp-text-body); line-height: 18px; cursor: pointer; border-radius: var(--pp-radius-md); border: 1px solid;
 }
 /* .confirm-yes (solid danger tier) now comes from @generated:ui-components
    above (COMPONENTS.md §4.2), on all three layers -- same shape options.css

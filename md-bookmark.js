@@ -234,6 +234,8 @@
     showConfirmPopover(id("delete"), {
       container: editor,
       msg: text("readerBookmarkDeleteConfirm"), yesText: text("delete"), noText: text("readerBookmarkCancel"),
+      subject: state.bookmark?.title || context.title || context.url,
+      detail: text("readerBookmarkDeleteDetail"),
       onConfirm: () => {
         if (gen === generation && editor?.matches(":popover-open")) return deleteBookmark();
       },

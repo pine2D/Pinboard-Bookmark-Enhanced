@@ -1240,7 +1240,8 @@ check(/id="vocab-no-account"[^>]*role="region"[^>]*aria-labelledby="vocab-no-acc
 // export must stay one click.
 check(/checked !== true\) \{ runExport\(\); return; \}/.test(optionsBackupJs) &&
   optionsBackupJs.includes('showConfirmPopover($id("export-settings")') &&
-  optionsBackupJs.includes('msg: t("backupSecretsExportConfirm")'),
+  optionsBackupJs.includes('msg: t("backupSecretsExportTitle")') &&
+  optionsBackupJs.includes('detail: t("backupSecretsExportConfirm")'),
   "options-backup.js: the credential export lost its plaintext-risk confirmation");
 
 check(!existsSync(resolve(root, "webdav.js")), "webdav.js still exists");
@@ -1802,7 +1803,9 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     ["library.css", libraryCss], ["md-preview.css", mdCss]]) {
     const popoverRule = css.match(/\.confirm-popover\s*\{([\s\S]*?)\}/)?.[1] || "";
     const messageRule = css.match(/\.confirm-popover \.confirm-msg\s*\{([\s\S]*?)\}/)?.[1] || "";
-    check(/box-sizing:\s*border-box/.test(popoverRule) && /flex-wrap:\s*wrap/.test(popoverRule) &&
+    const actionsRule = css.match(/\.confirm-popover \.confirm-actions\s*\{([\s\S]*?)\}/)?.[1] || "";
+    check(/box-sizing:\s*border-box/.test(popoverRule) && /flex-direction:\s*column/.test(popoverRule) &&
+      /flex-wrap:\s*wrap/.test(actionsRule) && /min-width:\s*0/.test(actionsRule) &&
       !/white-space:\s*nowrap/.test(popoverRule) && /min-width:\s*0/.test(messageRule) &&
       /overflow-wrap:\s*anywhere/.test(messageRule),
     `${file}: confirm popover can overflow a narrow content surface`);

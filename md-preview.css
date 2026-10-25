@@ -2737,32 +2737,41 @@ body.tr-only #rendered-view [data-pb-hl-mirror] > blockquote:only-child { border
   margin: 0;
   inset: auto;
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  width: max-content;
-  max-width: min(60ch, calc(100vw - 8px));
-  padding: var(--sp-2) var(--sp-3);
-  font-size: 12px;
+  flex-direction: column;
+  gap: var(--sp-3);
+  width: 320px;
+  max-width: calc(100vw - 8px);
+  padding: var(--sp-3);
+  font-size: 14px;
+  line-height: 20px;
   white-space: normal;
-  color: var(--danger);
+  color: var(--fg);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
-.confirm-popover .confirm-msg { flex: 1 1 16ch; min-width: 0; font-weight: 600; color: inherit; white-space: pre-line; overflow-wrap: anywhere; }
+.confirm-popover .confirm-content { display: flex; flex-direction: column; gap: var(--sp-2); min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.confirm-popover .confirm-content:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.confirm-popover .confirm-msg { flex: none; min-width: 0; font-weight: 600; color: inherit; white-space: pre-line; overflow-wrap: anywhere; }
+.confirm-popover .confirm-subject { flex: none; font-weight: 600; overflow-wrap: anywhere; }
+.confirm-popover .confirm-detail { flex: none; min-width: 0; font-size: 13px; font-weight: normal; white-space: pre-line; overflow-wrap: anywhere; }
+.confirm-popover .confirm-actions { flex: none; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); min-width: 0; }
+.confirm-popover.has-choices .confirm-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
 .confirm-popover button {
-  flex: none;
-  display: inline-flex; align-items: center; justify-content: center; /* centres the 11px glyph box in the 14px line box: 1.67px each side, the sm rung's structural inset */
-  padding: var(--sp-0) var(--sp-2);
-  line-height: 14px; /* 2+14+2+2 = 20, the sm rung (was normal line-height = 21.3) */
-  font-size: 11px; /* the sm rung's face (.btn-sm): a 12px glyph box overflows a 14px line box */
+  flex: 0 1 auto; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 26px;
+  padding: var(--sp-1) var(--sp-2);
+  line-height: 16px;
+  font-size: 12px;
   cursor: pointer;
   border-radius: var(--radius-md);
   border: 1px solid;
 }
 .confirm-popover .confirm-yes { background: var(--danger); color: var(--on-danger); border-color: var(--danger); }
+.confirm-popover.is-action .confirm-yes { background: var(--btn-bg); color: var(--fg); border-color: var(--btn-border); }
+.confirm-popover.is-action .confirm-yes:hover { background: var(--btn-hover); }
 .confirm-popover .confirm-no { background: none; color: var(--fg-secondary); border-color: var(--border); }
 .confirm-popover button:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 /* Same enter/exit recipe as options.css/popup.css: shared.js dismiss() adds
@@ -3455,24 +3464,27 @@ body.ask-open main { margin-right: calc(380px + var(--sp-4)); }
 }
 .ask-clear-btn:hover { color: var(--danger); border-color: var(--danger); }
 .ask-clear-btn:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
-/* Danger reads from the left edge strip, not a full-perimeter danger box --
-   a full ring in --danger looked like an alert frame in dark mode. */
+/* Inline confirmation keeps Ask in context and uses the same hierarchy as
+   anchored confirmations: plain explanation, then Cancel and Delete. */
 .ask-clear-confirm {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-3);
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
   margin: 0 0 var(--sp-2);
-  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
-  border-left: 3px solid color-mix(in srgb, var(--danger) 75%, transparent);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--danger) 6%, var(--surface));
-  font-size: 0.85em;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  font-size: 13px;
+  line-height: 20px;
   color: var(--fg);
 }
-.ask-clear-confirm .ask-clear-msg { flex: 1 1 100%; }
-.ask-clear-confirm .ask-clear-yes { color: var(--danger); border-color: var(--danger); }
+.ask-clear-confirm .ask-clear-msg { font-weight: 600; overflow-wrap: anywhere; }
+.ask-clear-confirm .confirm-detail { overflow-wrap: anywhere; }
+.ask-clear-confirm .confirm-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); }
+.ask-clear-confirm .action-btn { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.ask-clear-confirm .ask-clear-yes { background: var(--danger); color: var(--on-danger); border-color: var(--danger); }
+.ask-clear-confirm .ask-clear-yes:hover { background: var(--danger); box-shadow: inset 0 0 0 1px var(--on-danger); }
 .ask-copy-btn, .ask-regenerate {
   margin-top: var(--sp-2);
   margin-right: var(--sp-2);

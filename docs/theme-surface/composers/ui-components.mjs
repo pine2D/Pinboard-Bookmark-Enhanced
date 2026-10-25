@@ -346,6 +346,17 @@ function dangerRules(ns) {
     rule(".confirm-popover .confirm-yes:hover", [
       ["box-shadow", `inset 0 0 0 1px var(--${ns}-on-danger)`],
     ]),
+    // Restoring a hidden view is a decision, not data destruction. Callers
+    // opt into ordinary button paint; destructive confirmations stay red.
+    rule(".confirm-popover.is-action .confirm-yes", [
+      ["background", `var(--${ns}-btn-bg)`],
+      ["color", `var(--${ns}-btn-fg)`],
+      ["border-color", v(ns, "btn-border")],
+    ]),
+    rule(".confirm-popover.is-action .confirm-yes:hover", [
+      ["background", `var(--${ns}-btn-hover)`],
+      ["box-shadow", `inset 0 0 0 1px var(--${ns}-btn-fg)`],
+    ], { pairColorWith: ".confirm-popover.is-action .confirm-yes" }),
   ];
   return [
     rule(".btn.danger", [

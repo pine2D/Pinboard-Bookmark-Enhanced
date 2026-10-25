@@ -2424,7 +2424,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       // that truthiness test lied in both directions -- silent on the one
       // panel that was wiping credentials, and promising "(keys kept)" on a
       // panel that has none.
-      msg: t("resetConfirm", activeBtn.textContent) + (def.keepsSecrets ? t("resetKeysKept") : "") + (panelHasAuthoredText ? t("resetClearsAuthored") : ""),
+      msg: t("resetConfirm", activeBtn.textContent),
+      detail: (def.keepsSecrets ? t("resetKeysKept") : "") + (panelHasAuthoredText ? t("resetClearsAuthored") : ""),
       yesText: t("reset"),
       noText: t("cancel"),
       onConfirm: async () => {
@@ -4539,6 +4540,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // confirming OR cancelling navigated to "#" and scroll-jumped the page to top.
     showConfirmPopover($id("tag-gov-reset-ignored")?.closest(".tag-gov-reset-link"), {
       msg: t("tagGovResetIgnoredConfirm"),
+      tone: "action",
       yesText: t("reset"),
       noText: t("cancel"),
       onConfirm: async () => {
@@ -4561,10 +4563,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const btn = $id("tag-gov-delete-selected");
     const shown = selected.slice(0, 10).join(", ")
       + (selected.length > 10 ? ", " + t("tagGovMoreCount", String(selected.length - 10)) : "");
-    const msg = t("tagGovConfirmDelete", String(selected.length))
-      + "\n" + shown;
     showConfirmPopover(btn, {
-      msg,
+      msg: t("tagGovConfirmDelete", String(selected.length)),
+      subject: shown,
       yesText: t("tagGovDeleteSelected"),
       noText: t("cancel"),
       onConfirm: async () => {
@@ -4994,16 +4995,11 @@ async function confirmMergeGroup(group, canonical, anchorEl, expectedAccount) {
     (m && m.tag && m.tag.toLowerCase() !== canonLower) ? sum + (m.count || 0) : sum, 0);
   const estSec = Math.ceil((renames.length + bookmarkCount) * 3.2);
   const estStr = formatTagGovEst(estSec);
-  // The question ends in its own "?", so the rename list goes on a line of
-  // its own (.confirm-msg is white-space: pre-line) -- "...into X?: a -> X"
-  // read as broken punctuation in every locale.
-  const msg = t("tagGovConfirmMerge", String(renames.length), canonical)
-    + (summary ? "\n" + summary : "")
-    + "\n" + t("tagGovMergeEstimate", estStr);
   const anchor = anchorEl;
   if (!anchor) return;
   showConfirmPopover(anchor, {
-    msg,
+    msg: t("tagGovConfirmMerge", String(renames.length), canonical),
+    detail: [summary, t("tagGovMergeEstimate", estStr)].filter(Boolean).join("\n"),
     yesText: t("tagGovMerge"),
     noText: t("cancel"),
     onConfirm: async () => {

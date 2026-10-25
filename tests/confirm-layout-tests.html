@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Confirm Layout Tests</title>
+<style>.case.pass{color:#080}.case.fail{color:#b00;font-weight:bold}iframe{position:fixed;inset:0 auto auto 0;border:0;z-index:-1}</style>
+</head><body><div id="results"></div>
+<script>
+// Every frame loads the shipped stylesheet and shared helper. Only the opener
+// is positioned by this fixture; no confirmation geometry is reproduced here.
+const results = document.getElementById("results");
+let passed = 0, failed = 0;
+function check(name, condition, detail = "") {
+  const row = document.createElement("div"); row.className = "case " + (condition ? "pass" : "fail");
+  row.textContent = (condition ? "OK " : "FAIL ") + name + (condition ? "" : " :: " + detail);
+  results.appendChild(row); condition ? passed++ : failed++;
+}
+const surfaces = ["options", "popup", "library", "md-preview"];
+const cases = [
+  { name: "Chinese narrow deletion", width: 320, height: 600, lang: "zh-CN", theme: "paper-ink", compact: true,
+    msg: "删除已导入的词典包？", yesText: "删除", noText: "取消" },
+  { name: "Chinese wide deletion", width: 900, height: 600, lang: "zh-TW", compact: true,
+    msg: "刪除已匯入的詞典包？", yesText: "刪除", noText: "取消" },
+  { name: "Russian detailed deletion", width: 320, height: 600, lang: "ru", theme: "dracula",
+    msg: "Удалить все выбранные слова и заметки?", detail: "Слова будут удалены без возможности восстановления. Изменения также появятся на других подключённых устройствах.",
+    yesText: "Удалить выбранное", noText: "Отмена" },
+  { name: "German three-way decision", width: 320, height: 600, lang: "de", variant: "decision",
+    msg: "Welche Einstellungen sollen übernommen werden?", detail: "In der Cloud sind bereits Einstellungen gespeichert. Wählen Sie aus, welche Version Sie weiterhin verwenden möchten.",
+    altText: "Cloud-Einstellungen verwenden", yesText: "Mit lokalen Einstellungen überschreiben", noText: "Synchronisierung ausgeschaltet lassen" },
+  { name: "Unbroken imported label", width: 320, height: 600, lang: "en",
+    msg: "Delete " + "dictionary-name-".repeat(12) + "?", yesText: "PermanentlyDelete".repeat(8), noText: "Cancel" }
+];
+const frameReady = frame => new Promise((resolve, reject) => {
+  frame.onload = () => resolve(); frame.onerror = () => reject(new Error("frame failed to load"));
+});
+async function settle(win) {
+  await win.document.fonts.ready;
+  await new Promise(resolve => win.requestAnimationFrame(() => win.requestAnimationFrame(resolve)));
+  // popup's existing entrance animation runs without motion-ready. Measure
+  // the resting layout rather than compare positions at two animation frames.
+  await Promise.allSettled(win.document.getAnimations().filter(animation => Number.isFinite(animation.effect?.getComputedTiming().endTime)).map(animation => animation.finished));
+}
+async function waitForRemoval(pop) {
+  // Dismissal may finish on transitionend or its bounded timer fallback.
+  // Animation.finished alone can precede actual DOM removal.
+  const deadline = performance.now() + 1500;
+  while (pop.isConnected && performance.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 16));
+  }
+  if (pop.isConnected) throw new Error("Dismissed confirmation remained connected after 1500ms");
+}
+function rect(el) { return el.getBoundingClientRect(); }
+function inside(a, b, tolerance = 1) {
+  return a.left >= b.left - tolerance && a.right <= b.right + tolerance && a.top >= b.top - tolerance && a.bottom <= b.bottom + tolerance;
+}
+function separated(a, b) { return a.right <= b.left + 0.5 || b.right <= a.left + 0.5 || a.bottom <= b.top + 0.5 || b.bottom <= a.top + 0.5; }
+function lastCharacterRect(node) {
+  const range = node.ownerDocument.createRange(), text = node.firstChild;
+  range.setStart(text, Math.max(0, text.length - 1)); range.setEnd(text, text.length);
+  return range.getBoundingClientRect();
+}
+(async () => {
+  // As in i18n-parity-tests, sibling locale JSON requires the local HTTP
+  // runner in Chrome. These cases read the actual shipped decision copy.
+  const decisionLocales = await Promise.all(["de", "ru"].map(async lang => {
+    const response = await fetch("../_locales/" + lang + "/messages.json");
+    return [lang, await response.json()];
+  }));
+  for (const surface of surfaces) {
+    const frame = document.createElement("iframe"); frame.width = "320"; frame.height = "600";
+    const ready = frameReady(frame);
+    frame.srcdoc = '<!DOCTYPE html><html><head><meta charset="UTF-8"><link rel="stylesheet" href="' + new URL("../" + surface + ".css", location.href).href + '"></head><body><button id="opener" style="position:fixed;left:24px;top:40px">Open</button><script src="' + new URL("../shared.js", location.href).href + '"><\/script></body></html>';
+    document.body.appendChild(frame); await ready;
+    const win = frame.contentWindow, doc = win.document, opener = doc.getElementById("opener");
+    for (const sample of cases) {
+      frame.width = String(sample.width); frame.height = String(sample.height);
+      doc.documentElement.lang = sample.lang;
+      if (sample.theme) doc.documentElement.dataset.theme = sample.theme; else delete doc.documentElement.dataset.theme;
+      let cancelled = 0;
+      opener.focus(); win.showConfirmPopover(opener, { ...sample, onCancel: () => cancelled++ });
+      await settle(win);
+      const pop = doc.querySelector(".confirm-popover:not(.is-closing)"), message = pop.querySelector(".confirm-msg"), detail = pop.querySelector(".confirm-detail"), buttons = [...pop.querySelectorAll("button")];
+      const box = rect(pop), messageBox = rect(message), buttonBoxes = buttons.map(rect), firstActionTop = Math.min(...buttonBoxes.map(r => r.top));
+      const label = surface + " / " + sample.name;
+      check(label + ": text stays above the action group", firstActionTop >= (detail ? rect(detail).bottom : messageBox.bottom) - 0.5 && (!detail || rect(detail).top >= messageBox.bottom - 0.5), JSON.stringify({ message: messageBox, detail: detail && rect(detail), buttons: buttonBoxes }));
+      check(label + ": popup and all controls stay inside the viewport", inside(box, { left: 0, right: win.innerWidth, top: 0, bottom: win.innerHeight }) && buttonBoxes.every(r => inside(r, box)), JSON.stringify({ viewport: [win.innerWidth, win.innerHeight], pop: box, buttons: buttonBoxes }));
+      check(label + ": labels remain readable without horizontal clipping", pop.scrollWidth <= pop.clientWidth + 1 && buttons.every(button => button.scrollWidth <= button.clientWidth + 1), JSON.stringify({ pop: [pop.scrollWidth, pop.clientWidth], buttons: buttons.map(b => [b.textContent, b.scrollWidth, b.clientWidth]) }));
+      check(label + ": buttons form one coherent non-overlapping group", buttonBoxes.every((a, i) => buttonBoxes.every((b, j) => i === j || separated(a, b))) && (!sample.compact || buttonBoxes.every(r => Math.abs(r.top - buttonBoxes[0].top) < 1)), JSON.stringify(buttonBoxes));
+      const focusedCancel = doc.activeElement === pop.querySelector(".confirm-no");
+      doc.dispatchEvent(new win.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      await waitForRemoval(pop);
+      check(label + ": Cancel keeps initial focus and Escape restores the opener", focusedCancel && !pop.isConnected && cancelled === 1 && doc.activeElement === opener);
+    }
+    if (surface === "options") {
+      doc.documentElement.classList.add("motion-ready");
+      for (const [lang, messages] of decisionLocales) {
+        frame.width = "320"; frame.height = "400"; doc.documentElement.lang = lang;
+        let cancelled = 0;
+        opener.focus(); win.showConfirmPopover(opener, { variant: "decision", msg: messages.syncConflictPrompt.message,
+          detail: messages.syncConflictDetail.message, altText: messages.syncConflictUseCloudBtn.message,
+          yesText: messages.syncConflictOverwriteBtn.message, noText: messages.cancel.message, onCancel: () => cancelled++ });
+        await settle(win);
+        const pop = doc.querySelector(".confirm-popover:not(.is-closing)"), cancel = pop.querySelector(".confirm-no");
+        const scroller = [pop, ...pop.querySelectorAll("*")].find(el => el.scrollHeight > el.clientHeight + 1 && /^(auto|scroll)$/.test(win.getComputedStyle(el).overflowY)) || pop;
+        const label = "options / actual " + lang + " sync conflict at 320x400";
+        check(label + ": dialog retains edge clearance after its enter animation", inside(rect(pop), { left: 4, right: win.innerWidth - 4, top: 4, bottom: win.innerHeight - 4 }), JSON.stringify(rect(pop)));
+        check(label + ": complete localized details retain their accessible relationship", doc.getElementById(pop.getAttribute("aria-describedby"))?.textContent === messages.syncConflictDetail.message);
+        check(label + ": Cancel receives initial focus and remains visible", doc.activeElement === cancel && inside(rect(cancel), rect(pop)));
+        scroller.scrollTop = 0; scroller.dispatchEvent(new win.Event("scroll")); await settle(win);
+        check(label + ": scrolling the dialog preserves it and makes the heading readable", pop.isConnected && cancelled === 0 && inside(rect(pop.querySelector(".confirm-msg")), rect(scroller)));
+        scroller.scrollTop = scroller.scrollHeight; scroller.dispatchEvent(new win.Event("scroll")); await settle(win);
+        check(label + ": final detail text and actions remain reachable by internal scrolling", pop.isConnected && cancelled === 0 && inside(lastCharacterRect(pop.querySelector(".confirm-detail")), rect(scroller)) && inside(rect(cancel), rect(pop)));
+        check(label + ": scrolling never introduces horizontal overflow", pop.scrollWidth <= pop.clientWidth + 1);
+        doc.dispatchEvent(new win.Event("scroll"));
+        await waitForRemoval(pop);
+        check(label + ": moving the underlying page still closes the dialog", !pop.isConnected);
+      }
+      doc.documentElement.classList.remove("motion-ready");
+    }
+    // Choices follow a safe keyboard sequence: Cancel, optional alternative,
+    // Confirm. Three outcomes are deliberate full rows, never random wraps.
+    const actions = [];
+    opener.focus(); win.showConfirmPopover(opener, { msg: "Choose", yesText: "Confirm", altText: "Alternative", noText: "Cancel", onConfirm: () => actions.push("yes"), onAlt: () => actions.push("alt") });
+    let pop = doc.querySelector(".confirm-popover");
+    const order = [...pop.querySelectorAll("button")].map(b => b.textContent).join("|");
+    const actionBox = rect(pop.querySelector(".confirm-actions")), choiceBoxes = [...pop.querySelectorAll("button")].map(rect);
+    pop.querySelector(".confirm-alt").click();
+    await waitForRemoval(pop);
+    check(surface + ": safe action order, full choice rows and alternative callback", order === "Cancel|Alternative|Confirm" && choiceBoxes.every((r, i) => Math.abs(r.width - actionBox.width) < 1 && (i === 0 || r.top >= choiceBoxes[i - 1].bottom)) && actions.join() === "alt" && !pop.isConnected);
+    opener.focus(); win.showConfirmPopover(opener, { msg: "Choose", onConfirm: () => actions.push("yes") });
+    pop = doc.querySelector(".confirm-popover"); pop.querySelector(".confirm-yes").click();
+    await waitForRemoval(pop);
+    check(surface + ": confirmation callback remains intact", actions.join() === "alt,yes" && !pop.isConnected && doc.activeElement === opener);
+
+    // Real dictionary copy plus user-controlled imported names. The caller
+    // supplies text, never markup; it can be far longer than the question.
+    const messages = decisionLocales[0][1];
+    const subject = "词典名稱".repeat(24) + " https://example.invalid/" + "long-dictionary-name".repeat(18) + " <img src=x>";
+    frame.width = "320"; frame.height = "400"; doc.documentElement.lang = "de";
+    opener.focus(); win.showConfirmPopover(opener, { msg: messages.dictPackDeleteConfirm.message, subject,
+      detail: messages.dictPackDeleteDetail.message, yesText: messages.delete.message, noText: messages.cancel.message });
+    await settle(win);
+    pop = doc.querySelector(".confirm-popover");
+    const scroller = pop.querySelector(".confirm-content"), subjectNode = pop.querySelector(".confirm-subject"), actionStart = rect(pop.querySelector(".confirm-actions"));
+    const descriptions = (pop.getAttribute("aria-describedby") || "").split(/\s+/).map(id => doc.getElementById(id)?.textContent);
+    check(surface + ": long subject stays literal and participates in accessible description", subjectNode.textContent === subject && subjectNode.dir === "auto" && !subjectNode.querySelector("img") && descriptions.includes(subject) && descriptions.includes(messages.dictPackDeleteDetail.message));
+    check(surface + ": long subject cannot displace or clip the actions", inside(rect(pop), { left: 0, right: win.innerWidth, top: 0, bottom: win.innerHeight }) && [...pop.querySelectorAll("button")].every(b => inside(rect(b), rect(pop))) && pop.scrollWidth <= pop.clientWidth + 1 && scroller.scrollWidth <= scroller.clientWidth + 1);
+    scroller.scrollTop = 0; scroller.dispatchEvent(new win.Event("scroll")); await settle(win);
+    check(surface + ": long content is keyboard-scrollable and its heading is initially readable", scroller.tabIndex === 0 && inside(rect(pop.querySelector(".confirm-msg")), rect(scroller)));
+    scroller.scrollTop = scroller.scrollHeight; scroller.dispatchEvent(new win.Event("scroll")); await settle(win);
+    check(surface + ": scrolling long subject reaches the final consequence without moving actions", pop.isConnected && inside(lastCharacterRect(pop.querySelector(".confirm-detail")), rect(scroller)) && Math.abs(rect(pop.querySelector(".confirm-actions")).top - actionStart.top) < 1, JSON.stringify({ scroller: rect(scroller), last: lastCharacterRect(pop.querySelector(".confirm-detail")), actionsBefore: actionStart, actionsAfter: rect(pop.querySelector(".confirm-actions")) }));
+    const dangerFill = win.getComputedStyle(pop.querySelector(".confirm-yes")).backgroundColor;
+    win.pbpDismissActiveConfirm(); await waitForRemoval(pop);
+    opener.focus(); win.showConfirmPopover(opener, { msg: "Update this dictionary?", tone: "action" });
+    pop = doc.querySelector(".confirm-popover");
+    check(surface + ": ordinary confirmation uses an action tone instead of destructive fill", pop.classList.contains("is-action") && win.getComputedStyle(pop.querySelector(".confirm-yes")).backgroundColor !== dangerFill);
+    win.pbpDismissActiveConfirm();
+    await waitForRemoval(pop);
+    frame.remove();
+  }
+  document.title = (failed ? "FAIL " : "PASS ") + "Confirm Layout Tests";
+})().catch(error => { check("suite setup", false, error.stack || error.message); document.title = "FAIL Confirm Layout Tests"; });
+</script></body></html>

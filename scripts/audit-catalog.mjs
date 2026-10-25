@@ -21,7 +21,7 @@ function ownership(name) {
   if (/^md-|^reader-|^bili-|^frame-|^dict-/.test(name)) return ['md-preview'];
   if (/^pinboard-/.test(name)) return ['pinboard'];
   if (/^theme-/.test(name)) return ['popup', 'options', 'library', 'pinboard'];
-  if (/^ui-|^i18n-|^a11y|^contrast|^escape-html/.test(name)) return ui;
+  if (/^ui-|^i18n-|^a11y|^contrast|^confirm-layout|^escape-html/.test(name)) return ui;
   if (/^vocab-|^notes-|^drive-|^anki-|^eudic-/.test(name)) return ['background', 'library', 'options', 'md-preview'];
   if (/^ai-|^export-|^jina-/.test(name)) return ['background', 'popup', 'options', 'md-preview'];
   if (/^background-/.test(name)) return ['background'];
@@ -47,9 +47,9 @@ export const TEST_SCENARIOS = testFiles.filter(name => name !== 'pinboard-theme-
   const file = 'tests/' + name;
   return {
     id: 'test.' + base, runner: name.endsWith('.html') ? 'html' : 'node', file,
-    surfaces, features: features(base), kinds: base === 'popup-label-fit' ? ['layout', 'i18n'] : [name.endsWith('.html') || ['ask-history', 'library-ask-history'].includes(base) ? 'logic' : 'contract'],
-    browser: ['popup-label-fit', 'ask-history', 'library-ask-history'].includes(base),
-    files: [file, base + '.js', ...surfaces.flatMap(s => sourcePatterns[s] || []), ...(base.startsWith('theme-') ? ['docs/theme-surface/**'] : [])],
+    surfaces, features: features(base), kinds: ['popup-label-fit', 'confirm-layout'].includes(base) ? ['layout', 'i18n'] : [name.endsWith('.html') || ['ask-history', 'library-ask-history'].includes(base) ? 'logic' : 'contract'],
+    browser: ['popup-label-fit', 'confirm-layout', 'ask-history', 'library-ask-history'].includes(base),
+    files: [file, base + '.js', ...surfaces.flatMap(s => sourcePatterns[s] || []), ...(base === 'confirm-layout' ? ['shared.js'] : []), ...(base.startsWith('theme-') ? ['docs/theme-surface/**'] : [])],
     dependencies: [], axes: {},
   };
 });

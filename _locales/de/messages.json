@@ -204,8 +204,9 @@
     "message": "Dieses Lesezeichen löschen?"
   },
   "confirmLogout": {
-    "message": "Abmelden? Dein API-Token wird entfernt."
+    "message": "Abmelden?"
   },
+  "confirmLogoutDetail": {"message": "Dein API-Token wird entfernt. Nicht gespeicherte Lesezeichenentwürfe werden verworfen."},
   "hintCtrlEnter": {
     "message": "Strg+Eingabe"
   },
@@ -1141,6 +1142,7 @@
   "backupIncludeSecretsHint": {
     "message": "Schreibt sämtliche Zugangsdaten im Klartext in die Datei: deinen Pinboard-API-Token, alle API-Schlüssel der KI-Anbieter sowie die Zugangsdaten für Jina, Wayback, Anki, Eudic, Notion, Gist und Webhook. Wer die Datei öffnet, kann sie direkt verwenden. Bewahre die Datei wie ein Passwort auf."
   },
+  "backupSecretsExportTitle": {"message": "Sicherung mit Zugangsdaten exportieren?"},
   "backupSecretsExportConfirm": {
     "message": "Diese Sicherung enthält deine API-Schlüssel und Tokens im Klartext. Sende sie nicht über Kanäle, denen du nicht vertraust, und lösche sie nach der Wiederherstellung."
   },
@@ -3790,6 +3792,7 @@
   "dictPackDeleteConfirm": {
     "message": "Importiertes Wörterbuchpaket löschen?"
   },
+  "dictPackDeleteDetail": {"message": "Die importierten Wörterbuchdaten werden von diesem Gerät entfernt. Gespeicherte Vokabeln bleiben erhalten. Das Wörterbuch kann erneut importiert werden."},
   "dictEudicSend": {
     "message": "Alle unterstützten Wörter an Eudic senden"
   },
@@ -4401,8 +4404,9 @@
     "message": "Lesezeichen löschen"
   },
   "readerBookmarkDeleteConfirm": {
-    "message": "Dieses Lesezeichen aus Pinboard löschen? Markierungen und Notizen im Reader bleiben erhalten."
+    "message": "Dieses Lesezeichen aus Pinboard löschen?"
   },
+  "readerBookmarkDeleteDetail": {"message": "Markierungen und Notizen im Reader bleiben erhalten."},
   "readerBookmarkDeleting": {
     "message": "Lesezeichen wird gelöscht…"
   },
@@ -4473,7 +4477,8 @@
   "multiPackInspecting": {"message": "Wörterbuchangaben werden gelesen…"},
   "multiPackPreview": {"message": "Wörterbuch prüfen"},
   "multiPackInstall": {"message": "Wörterbuch importieren"},
-  "multiPackReplacing": {"message": "Das installierte Wörterbuch durch diese Datei ersetzen? Die aktuelle Version bleibt bis zum Abschluss des Imports verfügbar."},
+  "multiPackReplacing": {"message": "Das installierte Wörterbuch durch diese Datei ersetzen?"},
+  "multiPackReplacingDetail": {"message": "Die aktuelle Version bleibt bis zum Abschluss des Imports verfügbar."},
   "multiPackEnable": {"message": "Aktivieren"},
   "multiPackDisable": {"message": "Deaktivieren"},
   "multiPackAllowAi": {"message": "KI-Nutzung erlauben"},
@@ -4594,6 +4599,8 @@
   "askVersions": {"message": "Frühere Antworten"},
   "askDeleteConversation": {"message": "Gespräch löschen"},
   "askDeleteConversationConfirm": {"message": "Dieses Gespräch mit allen Antworten löschen? Die Löschung wird auf verbundenen Geräten synchronisiert."},
+  "askDeleteConversationTitle": {"message": "Dieses Gespräch löschen?"},
+  "askDeleteConversationDetail": {"message": "Alle Antworten in diesem Gespräch werden gelöscht. Die Löschung wird auf verbundenen Geräten synchronisiert."},
   "askHistoryTab": {"message": "Fragen"},
   "askHistorySearch": {"message": "Artikel, Fragen und Antworten suchen"},
   "askHistoryEmpty": {"message": "Fertige Antworten werden hier automatisch gespeichert. Temporäre Gespräche werden nicht gespeichert."},

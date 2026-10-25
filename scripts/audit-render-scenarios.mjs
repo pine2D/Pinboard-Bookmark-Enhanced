@@ -21,7 +21,7 @@ export const RENDER_OPTIONS_TABS = Object.freeze([
 ]);
 export const RENDER_READER_CONTEXTS = Object.freeze([
   'reader-source-details', 'export-more', 'reader-bookmark-footer', 'reader-bookmark-editor', 'reader-bookmark-delete-confirm',
-  'explain-pop', 'explain-dict', 'dict-entry-idle', 'dict-entry-busy', 'dict-entry-result', 'dict-entry-details', 'dict-entry-cached', 'dict-entry-error', 'ask-panel', 'search-pop', 'kbd-help-pop', 'typo-pop',
+  'explain-pop', 'explain-dict', 'dict-entry-idle', 'dict-entry-busy', 'dict-entry-result', 'dict-entry-details', 'dict-entry-cached', 'dict-entry-error', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
   'pb-hl-card', 'send-menu', 'confirm-popover', 'tr-ask',
 ]);
 const context = (name, dependencies = [], extra = {}) => ({ name, dependencies, ...extra });
@@ -29,6 +29,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
   options: [...RENDER_OPTIONS_TABS.map((name) => context(name, [], { target: `#panel-${name.slice(4)}.active` })),
     context('vocab-pack-preview', [], { target: '#multi-pack-preview:not([hidden])' }),
     context('vocab-pack-installed', ['vocab-pack-preview'], { target: '#multi-pack-list button[data-pack-action]' }),
+    context('vocab-pack-delete-confirm', ['vocab-pack-installed'], { target: '.confirm-popover .confirm-subject' }),
     context('save-failure', [], { target: '#auto-save-retry' })],
   library: [
     context('vocab-list', [], { target: '#vocab-list .vocab-card' }),

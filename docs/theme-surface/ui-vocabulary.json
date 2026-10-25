@@ -496,7 +496,8 @@
         "xp-dict-example-pair",
         "xp-dict-packs",
         "xp-dict-legacy",
-        "xp-dict-query-tools"
+        "xp-dict-query-tools",
+        "confirm-actions"
       ],
       "regions": [
         "ask-a",
@@ -667,7 +668,7 @@
         "shared.js"
       ],
       "exactStructural": [],
-      "primitives": [],
+      "primitives": ["confirm-content", "confirm-subject", "confirm-actions"],
       "regions": [],
       "components": []
     }
