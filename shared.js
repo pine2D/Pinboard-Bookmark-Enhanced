@@ -3469,7 +3469,17 @@ function showConfirmPopover(anchor, opts) {
     surfaceObserver?.disconnect();
     if (positionFrame) cancelAnimationFrame(positionFrame);
     positionFrame = 0;
-    if (restoreFocus && opener && opener.isConnected && typeof opener.focus === "function") opener.focus();
+    if (restoreFocus) {
+      if (opener?.isConnected && typeof opener.focus === "function") opener.focus({ preventScroll: true });
+      // A refreshed list may have replaced the opener, or it may no longer
+      // accept focus. Try the anchor when it is still a usable destination.
+      if (pop.contains(document.activeElement) && anchor !== opener && anchor.isConnected
+          && !pop.contains(anchor) && typeof anchor.focus === "function") anchor.focus({ preventScroll: true });
+    }
+    // inert does not synchronously release focus in every Chrome path.
+    // Never hide a focused descendant during the exit animation, including
+    // when both the original opener and the anchor have disappeared.
+    if (pop.contains(document.activeElement)) document.activeElement.blur();
 
     const animateOut = animate
       && document.documentElement.classList.contains("motion-ready")

@@ -278,6 +278,85 @@ function assert(cond,msg){if(!cond)throw new Error(msg||"assertion failed");}
   });
 })();
 
+// G6a: an animated exit must move focus out before hiding its subtree. The
+// original trigger can disappear or stop accepting focus while a confirm is
+// open (dictionary refreshes replace those controls without closing it).
+(function(){
+  function withAnimatedConfirm(run) {
+    const host = document.createElement("div");
+    const anchor = document.createElement("button");
+    anchor.type = "button"; anchor.textContent = "Delete dictionary";
+    host.append(anchor); document.body.append(host);
+    const hadMotion = document.documentElement.classList.contains("motion-ready");
+    document.documentElement.classList.add("motion-ready");
+    const pops = [];
+    function capture(pop) {
+      pops.push(pop);
+      const hiddenWithFocus = [];
+      const setAttribute = pop.setAttribute;
+      // MutationObserver runs after focus may already have changed. Observe
+      // the actual hide boundary synchronously, then call the native setter.
+      pop.setAttribute = function(name, value) {
+        if (name === "aria-hidden" && value === "true") hiddenWithFocus.push(pop.contains(document.activeElement));
+        return setAttribute.call(this, name, value);
+      };
+      return () => {
+        assert(!hiddenWithFocus.some(Boolean), "aria-hidden was applied while the confirm still contained focus");
+        assert(!pop.contains(document.activeElement), "focus remains inside the exiting confirm");
+      };
+    }
+    try { run({ host, anchor, capture }); }
+    finally {
+      pbpDismissActiveConfirm();
+      pops.forEach(pop => pop.remove()); host.remove();
+      document.documentElement.classList.toggle("motion-ready", hadMotion);
+    }
+  }
+  for (const unavailable of ["removed", "disabled", "hidden"]) {
+    test("G6a: animated exit releases focus when its opener is " + unavailable, () => withAnimatedConfirm(({ anchor, capture }) => {
+      anchor.focus(); showConfirmPopover(anchor, { msg: "Delete dictionary?" });
+      const pop = document.querySelector(".confirm-popover:not(.is-closing)");
+      const checkFocus = capture(pop);
+      if (unavailable === "removed") anchor.remove();
+      else if (unavailable === "disabled") anchor.disabled = true;
+      else anchor.hidden = true;
+      const yes = pop.querySelector(".confirm-yes"); yes.focus(); yes.click();
+      assert(pop.inert && pop.classList.contains("is-closing"), "animated exit was not exercised");
+      checkFocus();
+    }));
+  }
+  test("G6a: an unfocusable body opener falls back to the confirm anchor", () => withAnimatedConfirm(({ anchor, capture }) => {
+    document.activeElement?.blur();
+    assert(document.activeElement === document.body, "fixture did not start with body focus");
+    showConfirmPopover(anchor, { msg: "Delete dictionary?" });
+    const pop = document.querySelector(".confirm-popover:not(.is-closing)");
+    const checkFocus = capture(pop);
+    pop.querySelector(".confirm-no").click();
+    checkFocus();
+    assert(document.activeElement === anchor, "usable anchor did not receive focus");
+  }));
+  test("G6a: replacing a confirm cannot restore focus into the removed confirm", () => withAnimatedConfirm(({ host, anchor, capture }) => {
+    const second = document.createElement("button"); second.textContent = "Archive"; host.append(second);
+    anchor.focus(); showConfirmPopover(anchor, { msg: "First" });
+    const old = document.querySelector(".confirm-popover:not(.is-closing)"); capture(old);
+    old.querySelector(".confirm-yes").focus();
+    showConfirmPopover(second, { msg: "Second" });
+    const next = document.querySelector(".confirm-popover:not(.is-closing)");
+    const checkFocus = capture(next);
+    assert(!old.isConnected && document.activeElement === next.querySelector(".confirm-no"), "replacement did not transfer focus to the new confirm");
+    next.querySelector(".confirm-no").click(); checkFocus();
+    assert(document.activeElement === second, "replacement restored focus to an unusable old control");
+  }));
+  test("G6a: animated focus-out dismissal preserves the new outside target", () => withAnimatedConfirm(({ host, anchor, capture }) => {
+    const away = document.createElement("button"); away.textContent = "Elsewhere"; host.append(away);
+    anchor.focus(); showConfirmPopover(anchor, { msg: "Delete dictionary?" });
+    const pop = document.querySelector(".confirm-popover:not(.is-closing)");
+    const checkFocus = capture(pop);
+    away.focus(); checkFocus();
+    assert(pop.inert && document.activeElement === away, "exit stole focus from the outside target");
+  }));
+})();
+
 // G6b: a browser-action popup can become narrower while Chrome resolves its
 // final size. The confirm must stay inside the actual content surface and
 // reposition on resize instead of flashing and disappearing.
