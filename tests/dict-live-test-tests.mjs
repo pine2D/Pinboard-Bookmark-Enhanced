@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { buildPlan, validateApproval, validatePriceFreshness, newLedger, validateLedger, reserveAttempt, redactText, completionMetadata } from "../scripts/dict-live-test.mjs";
+import { buildPlan, validateApproval, validatePriceFreshness, validateMinimaxLowFollowup, newLedger, validateLedger, reserveAttempt, redactText, completionMetadata, completionReport } from "../scripts/dict-live-test.mjs";
 
 const PUBLIC = `DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-flash
@@ -19,6 +19,60 @@ OPENROUTER_MODEL=openai/gpt-6.1-sol
 const approved = plan => ({ authorized: true, planHash: plan.planHash, authorizationReference: "synthetic-unit-fixture",
   providers: ["deepseek"], cases: ["entry", "collocations"], retryFailed: false, diagnosticOutputTokens: null });
 const code = expected => error => error.safeCode === expected;
+const lowApproval = plan => ({ ...approved(plan), providers: ["minimax"], cases: ["collocations"], retryFailed: true, minimaxLowFollowup: true });
+function exhaustedMinimax(plan) {
+  const ledger = newLedger(plan);
+  for (const caseId of ["entry", "entry", "collocations", "collocations"]) {
+    const item = reserveAttempt(plan, ledger, "minimax", caseId, 2000, 2048);
+    Object.assign(item, { state: "received", httpStatus: 200, finishReason: "length", contentEmpty: true });
+  }
+  ledger.providers.minimax.cases = { entry: { ok: true }, collocations: { ok: false } };
+  return ledger;
+}
+
+test("a low-effort followup needs separate authorization for exactly one MiniMax supplement", () => {
+  const plan = buildPlan(PUBLIC), value = lowApproval(plan), ledger = exhaustedMinimax(plan);
+  assert.equal(validateMinimaxLowFollowup(plan, ledger, value), true);
+  for (const patch of [{ authorized: false }, { minimaxLowFollowup: "true" }, { planHash: "other" }]) {
+    assert.throws(() => validateApproval(plan, { ...value, ...patch }), code("approval_required_or_mismatched"));
+  }
+  for (const patch of [{ providers: ["deepseek"] }, { cases: ["entry"] }, { cases: ["entry", "collocations"] },
+    { providers: ["minimax", "deepseek"] }, { retryFailed: false }, { diagnosticOutputTokens: 8192 }]) {
+    assert.throws(() => validateApproval(plan, { ...value, ...patch }), code("followup_approval_invalid"));
+  }
+  assert.throws(() => validateMinimaxLowFollowup(plan, ledger, { ...value, minimaxLowFollowup: false }), code("followup_approval_invalid"));
+});
+test("the followup cannot replace the baseline ledger or reuse a successful case", () => {
+  const plan = buildPlan(PUBLIC), value = lowApproval(plan);
+  assert.throws(() => validateMinimaxLowFollowup(plan, newLedger(plan), value), code("followup_ledger_ineligible"));
+  for (const change of [row => { row.cases.entry.ok = false; }, row => { row.cases.collocations.ok = true; },
+    row => { row.attempts.forEach(item => { item.contentEmpty = false; }); }]) {
+    const ledger = exhaustedMinimax(plan); change(ledger.providers.minimax);
+    assert.throws(() => validateMinimaxLowFollowup(plan, ledger, value), code("followup_ledger_ineligible"));
+  }
+});
+test("one followup persists in the original cost ledger and blocks a second HTTP dispatch", () => {
+  const plan = buildPlan(PUBLIC), ledger = exhaustedMinimax(plan), approval = lowApproval(plan);
+  const previous = ledger.providers.minimax.reservedMicros;
+  assert.throws(() => reserveAttempt(plan, ledger, "minimax", "collocations", 2000, 2048), code("request_budget_exhausted"));
+  const item = reserveAttempt(plan, ledger, "minimax", "collocations", 24576, 2048, approval);
+  item.state = "failed_or_uncertain";
+  assert.equal(item.authorizationScope, "minimax-low-followup");
+  assert.ok(item.reservedMicros <= 40000);
+  assert.equal(ledger.providers.minimax.reservedMicros, previous + item.reservedMicros);
+  const restarted = validateLedger(plan, JSON.parse(JSON.stringify(ledger)));
+  assert.throws(() => reserveAttempt(plan, restarted, "minimax", "collocations", 2000, 2048, approval), code("followup_ledger_ineligible"));
+  assert.equal(restarted.providers.minimax.attempts.length, 5);
+});
+test("followup keeps the original money cap and refuses other providers, cases or output budgets", () => {
+  const plan = buildPlan(PUBLIC), ledger = exhaustedMinimax(plan), approval = lowApproval(plan);
+  for (const [id, caseId, tokens] of [["deepseek", "collocations", 2048], ["minimax", "entry", 2048], ["minimax", "collocations", 8192]]) {
+    assert.throws(() => reserveAttempt(plan, ledger, id, caseId, 2000, tokens, approval), code("followup_request_bounds"));
+  }
+  plan.providers.minimax.maximumCost = ledger.providers.minimax.reservedMicros / 1e6;
+  assert.throws(() => reserveAttempt(plan, ledger, "minimax", "collocations", 2000, 2048, approval), code("cost_budget_exhausted"));
+  assert.equal(ledger.providers.minimax.attempts.length, 4);
+});
 
 test("public plan keeps the four exact approved models and states the Gemini protocol limitation", () => {
   const plan = buildPlan(PUBLIC);
@@ -131,6 +185,16 @@ test("reports redact full selected credentials and bearer-shaped content without
   const secret = "synthetic-key-value-only", text = redactText(secret + " / Bearer other-sensitive-value / sk-example_fixture_value", [secret]);
   assert.ok(!text.includes(secret)); assert.ok(!text.includes("other-sensitive-value"));
   assert.ok(!text.includes("example_fixture_value")); assert.match(text, /REDACTED/);
+});
+test("diagnostic answer reports exclude reasoning and provider error fields while redacting content", () => {
+  const secret = "synthetic-fixture-key-value";
+  const body = { error: { message: "PRIVATE_ERROR" }, choices: [{ finish_reason: "stop", message: {
+    content: "Generated example " + secret, reasoning_content: "PRIVATE_REASONING"
+  } }] };
+  const report = completionReport(body, [secret]), serialized = JSON.stringify(report);
+  assert.match(report.content, /Generated example \[REDACTED\]/);
+  assert.ok(!serialized.includes(secret)); assert.ok(!serialized.includes("PRIVATE_"));
+  assert.equal(completionReport({ error: { message: "PRIVATE_ERROR" } }), null);
 });
 test("--plan and rejected approval never read or probe .env and never use network", () => {
   const dir = mkdtempSync(resolve(tmpdir(), "dict-live-plan-test-"));

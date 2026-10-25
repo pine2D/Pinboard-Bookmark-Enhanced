@@ -64,8 +64,26 @@ export function validateApproval(plan, approval) {
       !Array.isArray(approval.cases) || !approval.cases.length || new Set(approval.cases).size !== approval.cases.length ||
       approval.cases.some(id => !CASES.includes(id)) ||
       ![false, true].includes(approval.retryFailed) ||
-      ![null, 8192].includes(approval.diagnosticOutputTokens)) fail("approval_required_or_mismatched");
+      ![null, 8192].includes(approval.diagnosticOutputTokens) ||
+      ![undefined, false, true].includes(approval.minimaxLowFollowup)) fail("approval_required_or_mismatched");
+  if (approval.minimaxLowFollowup && (approval.providers.length !== 1 || approval.providers[0] !== "minimax" ||
+      approval.cases.length !== 1 || approval.cases[0] !== "collocations" || !approval.retryFailed ||
+      approval.diagnosticOutputTokens !== null)) fail("followup_approval_invalid");
   return approval;
+}
+
+// A separate, explicit approval can add exactly one low-effort MiniMax check
+// to the exhausted original ledger. It cannot reset that ledger or its money cap.
+export function validateMinimaxLowFollowup(plan, ledger, approval) {
+  validateApproval(plan, approval); validateLedger(plan, ledger);
+  if (approval.minimaxLowFollowup !== true) fail("followup_approval_invalid");
+  const row = ledger.providers.minimax, attempts = row.attempts;
+  if (attempts.length !== 4 || attempts.filter(item => item.caseId === "collocations").length !== 2 ||
+      attempts.some(item => item.authorizationScope === "minimax-low-followup") ||
+      row.cases.entry?.ok !== true || row.cases.collocations?.ok !== false ||
+      !attempts.some(item => item.caseId === "collocations" && item.httpStatus === 200 &&
+        item.finishReason === "length" && item.contentEmpty === true)) fail("followup_ledger_ineligible");
+  return true;
 }
 
 // Fixed public prices authorize only the UTC day on which they were checked.
@@ -97,15 +115,21 @@ export function validateLedger(plan, ledger) {
 
 // Reserve before dispatch, never release a reservation on errors or crashes.
 // Money is in each provider's currency; do not mix CNY with USD or assume FX.
-export function reserveAttempt(plan, ledger, id, caseId, inputBytes, outputTokens) {
+export function reserveAttempt(plan, ledger, id, caseId, inputBytes, outputTokens, approval = null) {
   validateLedger(plan, ledger);
   const provider = plan.providers[id], limits = plan.limits, row = ledger.providers[id];
   if (!provider || !CASES.includes(caseId) || !Number.isSafeInteger(inputBytes) || inputBytes < 1 || inputBytes > limits.inputUtf8Bytes ||
       !Number.isSafeInteger(outputTokens) || outputTokens < 1 || outputTokens > limits.diagnosticOutputTokens) fail("request_bounds");
-  if (row.attempts.length >= limits.requestsPerProvider || row.attempts.filter(a => a.caseId === caseId).length >= limits.requestsPerCase) fail("request_budget_exhausted");
+  const followup = approval?.minimaxLowFollowup === true;
+  if (followup) {
+    validateMinimaxLowFollowup(plan, ledger, approval);
+    if (id !== "minimax" || caseId !== "collocations" || outputTokens !== 2048) fail("followup_request_bounds");
+  } else if (row.attempts.length >= limits.requestsPerProvider || row.attempts.filter(a => a.caseId === caseId).length >= limits.requestsPerCase) fail("request_budget_exhausted");
   const reservedMicros = Math.ceil((inputBytes + limits.framingTokenAllowance) * provider.pricePerMillionInput + outputTokens * provider.pricePerMillionOutput);
+  if (followup && reservedMicros > 40000) fail("cost_budget_exhausted");
   if (row.reservedMicros + reservedMicros > Math.floor(provider.maximumCost * 1e6)) fail("cost_budget_exhausted");
   const attempt = { caseId, inputBytes, outputTokens, reservedMicros, state: "reserved", at: new Date().toISOString() };
+  if (followup) attempt.authorizationScope = "minimax-low-followup";
   row.attempts.push(attempt); row.reservedMicros += reservedMicros;
   return attempt;
 }
@@ -127,6 +151,10 @@ export function completionMetadata(body) {
   return { finishReason, usage, contentLength: typeof message?.content === "string" ? message.content.length : 0,
     contentEmpty: typeof message?.content !== "string" || !message.content.trim(),
     reasoningContentLength: typeof message?.reasoning_content === "string" ? message.reasoning_content.length : 0 };
+}
+export function completionReport(body, keys = []) {
+  const content = body?.choices?.[0]?.message?.content;
+  return typeof content === "string" ? { ...completionMetadata(body), content: redactText(content, keys) } : null;
 }
 
 function writeJson(path, value) {
@@ -174,20 +202,28 @@ async function executeProvider(plan, approval, ledger, id, key, saveLedger, { re
         const baseline = activeCase === "entry" ? plan.limits.entryOutputTokens : plan.limits.supplementOutputTokens;
         const tokenField = own(body, "max_completion_tokens") ? "max_completion_tokens" : "max_tokens";
         if (body[tokenField] !== baseline || (own(body, "max_completion_tokens") && own(body, "max_tokens"))) fail("unexpected_output_budget");
+        if (approval.minimaxLowFollowup && (body.reasoning_effort !== "low" || own(body, "thinking"))) fail("followup_request_bounds");
         if (approval.diagnosticOutputTokens !== null) body[tokenField] = approval.diagnosticOutputTokens;
         if (id === "openrouter") body.provider = structuredClone(plan.boundaries.openrouterCostDifference.provider);
-        attempt = reserveAttempt(plan, ledger, id, activeCase, Buffer.byteLength(body.messages[0].content, "utf8"), body[tokenField]);
+        attempt = reserveAttempt(plan, ledger, id, activeCase, Buffer.byteLength(body.messages[0].content, "utf8"), body[tokenField], approval);
         saveLedger(); // Crash after this line consumes the reservation; never refund or reset it.
         const response = await dispatch(config.baseUrl + "/chat/completions", { method: "POST", redirect: "error",
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + key }, body: JSON.stringify(body), signal: AbortSignal.timeout(plan.limits.timeoutMs) });
         attempt.httpStatus = response.status;
         const safeBody = redactText(await boundedBody(response, plan.limits.responseBytes), [key]);
         let parsed; try { parsed = JSON.parse(safeBody); } catch { parsed = null; }
+        // Only successful synthetic-case answer text is retained for parser
+        // diagnosis. Never persist reasoning, raw provider errors or headers.
+        const answer = response.ok ? completionReport(parsed, [key]) : null;
+        if (answer) {
+          attempt.responseReport = id + "-" + activeCase + "-http-" + row.attempts.length + ".json";
+          writeJson(resolve(reportDir, attempt.responseReport), { provider: id, caseId: activeCase, ...answer });
+        }
         Object.assign(attempt, completionMetadata(parsed), { state: "received" }); saveLedger();
         await route.fulfill({ status: response.status, contentType: "application/json", body: safeBody });
       } catch (error) {
-        const known = ["request_bounds", "request_budget_exhausted", "cost_budget_exhausted", "unapproved_network_request", "unexpected_production_request", "unexpected_output_budget", "response_body_missing", "response_too_large"];
-        const code = known.includes(error?.safeCode) ? error.safeCode : "transport_or_harness_failed";
+        const known = ["request_bounds", "request_budget_exhausted", "cost_budget_exhausted", "unapproved_network_request", "unexpected_production_request", "unexpected_output_budget", "response_body_missing", "response_too_large", "followup_approval_invalid", "followup_ledger_ineligible", "followup_request_bounds"];
+        const code = known.includes(error?.safeCode) ? error.safeCode : error?.name === "TimeoutError" ? "transport_timeout" : "transport_or_harness_failed";
         if (activeCase) blockedReason = code;
         if (attempt) { attempt.state = "failed_or_uncertain"; attempt.failure = code; saveLedger(); }
         await route.abort().catch(() => {});
@@ -294,6 +330,7 @@ export async function main(argv = process.argv.slice(2)) {
   const unlock = acquireLock(resolve(REPORT, "ledger.lock"));
   try {
     const ledgerPath = resolve(REPORT, "ledger.json"), ledger = existsSync(ledgerPath) ? validateLedger(plan, JSON.parse(readFileSync(ledgerPath, "utf8"))) : newLedger(plan);
+    if (approval.minimaxLowFollowup) validateMinimaxLowFollowup(plan, ledger, approval);
     const saveLedger = () => writeJson(ledgerPath, ledger); saveLedger();
     // This is the only credential read. It is unreachable from --plan or an
     // unapproved invocation. Do not import values into process.env or Chromium.
