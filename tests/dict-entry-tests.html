@@ -101,6 +101,77 @@ await test('legacy enrichment fields are independently optional and remain bound
 await test('basic responses still require meanings instead of being accepted as empty entries',async()=>{reset();response(d=>{delete d.learning;delete d.etymology;delete d.relatedWords;delete d.meanings;});try{await pbpDictEntryRun(request());return false;}catch(e){return e.code==='invalid_response'&&e.reason==='entry_meanings'&&writes.length===0&&calls.length===1;}});
 await test('short all-English explanatory prose cannot pass a Chinese request below detector length',async()=>{reset();const definition='A person or company that provides a service.',translation='The main provider of internet services.';response(d=>{d.word='provider';d.language='en';d.meanings=[{partOfSpeech:'noun',definition,examples:[{text:'The company provides internet access.',translation}]}];d.learning={};});const letters=((definition+translation).match(/\p{L}/gu)||[]).length;try{await pbpDictEntryRun(request({term:'provider',sourceLanguage:'en',target:{name:'Chinese',lang:'zh-Hans'}}));return false;}catch(e){return letters===69&&e.code==='wrong_language'&&e.reason==='explanation_script'&&writes.length===0&&calls.length===1&&languageChecks.length===0;}});
 await test('short Chinese explanations can include English technical terms without a detector verdict',async()=>{reset();const definition='提供者，即 service provider；也常见于 internet service provider。',translation='服务供应商。';response(d=>{d.word='provider';d.language='en';d.meanings=[{partOfSpeech:'noun',definition,examples:[{text:'The company provides internet access.',translation}]}];d.learning={};});const r=await pbpDictEntryRun(request({term:'provider',sourceLanguage:'en',target:{name:'Chinese',lang:'zh-Hans'}}));return ((definition+translation).match(/\p{L}/gu)||[]).length<80&&r.cacheSaved&&languageChecks.length===0&&calls.length===1;});
+
+await test('new generation normalizes missing and null optional basic fields without adding facts',async()=>{
+  for(const missing of [true,false]){reset();response(d=>{
+    delete d.etymology;delete d.relatedWords;d.learning={};
+    for(const key of ['pronunciation']){if(missing)delete d[key];else d[key]=null;}
+    for(const key of ['partOfSpeech','examples']){if(missing)delete d.meanings[0][key];else d.meanings[0][key]=null;}
+    for(const key of ['formation','history','related'])if(!missing)d.learning[key]=null;
+  });const r=await pbpDictEntryRun(request());
+  if(!r.cacheSaved||r.entry.pronunciation!==''||r.entry.meanings[0].partOfSpeech!==''||r.entry.meanings[0].examples.length||
+     r.entry.learning.formation!==''||r.entry.learning.history!==''||r.entry.learning.related.length||calls.length!==1)return false;}
+  return true;
+});
+await test('missing and null optional example translations keep the actual original text',async()=>{
+  for(const missing of [true,false]){reset();response(d=>{if(missing)delete d.meanings[0].examples[0].translation;else d.meanings[0].examples[0].translation=null;});
+    const r=await pbpDictEntryRun(request());if(r.entry.meanings[0].examples[0].text!=='Die Bank ist heute geschlossen.'||r.entry.meanings[0].examples[0].translation!==''||calls.length!==1)return false;}
+  return true;
+});
+await test('unavailable learning and legacy optional fields preserve paid basic meanings',async()=>{
+  for(const missing of [true,false]){reset();response(d=>{if(missing)delete d.learning;else d.learning=null;d.pronunciation=null;d.etymology=null;d.relatedWords=null;});
+    const r=await pbpDictEntryRun(request());if(!r.cacheSaved||!r.entry.meanings[0].definition||r.entry.learning.formation!==''||r.entry.learning.related.length||calls.length!==1)return false;}
+  return true;
+});
+await test('complete singleton objects become lists only at known generation list positions',async()=>{
+  reset();response(d=>{d.meanings=d.meanings[0];d.meanings.examples=d.meanings.examples[0];d.learning.related=d.learning.related[0];});
+  const r=await pbpDictEntryRun(request());return r.cacheSaved&&r.entry.meanings.length===1&&r.entry.meanings[0].examples.length===1&&
+    r.entry.learning.related.length===1&&r.entry.learning.related[0].word==='Bankkonto'&&calls.length===1;
+});
+await test('normalization never guesses absent or null entry identity and core meanings',async()=>{
+  const mutations=[d=>{delete d.word;},d=>{d.word=null;},d=>{delete d.language;},d=>{d.language=null;},d=>{delete d.meanings;},d=>{d.meanings=null;},
+    d=>{delete d.meanings[0].definition;},d=>{d.meanings[0].definition=null;}];
+  for(const mutate of mutations){reset();response(d=>{d.pronunciation=null;mutate(d);});if(!await rejects(()=>pbpDictEntryRun(request()),'invalid_response')||writes.length||calls.length!==1)return false;}
+  return true;
+});
+await test('normalization keeps malformed lists text and learning versions invalid',async()=>{
+  const mutations=[d=>{d.pronunciation=9;},d=>{d.meanings[0].examples='';},d=>{d.meanings[0].definition=['A definition'];},
+    d=>{d.meanings[0].examples={translation:'Missing actual example'};},d=>{d.meanings[0].examples.push(null);},
+    d=>{d.learning=false;},d=>{d.learning.version=null;},d=>{d.learning.related={word:'Bankkonto',relation:'family'};},d=>{d.learning.sources=null;}];
+  for(const mutate of mutations){reset();response(mutate);if(!await rejects(()=>pbpDictEntryRun(request()),'invalid_response')||writes.length||calls.length!==1)return false;}
+  return true;
+});
+await test('extra metadata is still rejected alongside otherwise normalizable entry fields',async()=>{
+  const mutations=[d=>{d.confidence=0.9;},d=>{d.meanings[0].note='extra';},d=>{d.meanings[0].examples[0].url='https://example.test/';},d=>{d.learning.extra='extra';}];
+  for(const mutate of mutations){reset();response(d=>{d.pronunciation=null;mutate(d);});if(!await rejects(()=>pbpDictEntryRun(request()),'invalid_response')||writes.length)return false;}
+  return true;
+});
+await test('raw response bounds and complete JSON are checked before generation normalization',async()=>{
+  const payloads=[' '.repeat(24577)+MODEL_RESPONSE,MODEL_RESPONSE.slice(0,-1),JSON.stringify({entry:JSON.parse(MODEL_RESPONSE),extra:'metadata'})];
+  for(const payload of payloads){reset();answer=payload;if(!await rejects(()=>pbpDictEntryRun(request()),'invalid_response')||writes.length||calls.length!==1)return false;}
+  return true;
+});
+await test('cache reads never apply the more tolerant generation normalization',async()=>{
+  for(const mutate of [d=>{d.meanings[0].examples=null;},d=>{d.meanings=d.meanings[0];},d=>{d.pronunciation=null;},d=>{d.learning=null;}]){
+    reset();await pbpDictEntryRun(request());mutate(cache.get(writes[0].key).entry);
+    if(await pbpDictEntryRead(request())!==null||calls.length!==1)return false;
+  }
+  return true;
+});
+await test('basic prompt publishes actual field bounds without increasing token budget',async()=>{
+  reset();await pbpDictEntryRun(request());const p=calls[0].prompt;
+  return ['pronunciation<=256','partOfSpeech<=128','definition<=1200','text/translation<=600','related word<=128'].every(s=>p.includes(s))&&calls[0].options.maxTokens===3072;
+});
+await test('normalized generated entry round-trips the strict real archive without a schema change',async()=>{
+  reset();response(d=>{d.pronunciation=null;d.meanings=d.meanings[0];d.meanings.partOfSpeech=null;d.meanings.examples=null;d.learning=null;});
+  const raw=JSON.parse(answer);await pbpDictEntryRun(request());
+  const frame=document.createElement('iframe');frame.hidden=true;const ready=new Promise(resolve=>frame.onload=resolve);frame.src='fixtures/dict-normalization-archive.html';document.body.append(frame);
+  try{await ready;const api=frame.contentWindow,record=writes[0].result;
+    if(api._pbpDictArchiveEntry(raw,record))return false;
+    const read=await api.roundTripNormalized(record);
+    return read.archiveSaved&&JSON.stringify(read.entry)===JSON.stringify(record.entry)&&calls.length===1;
+  }finally{frame.remove();}
+});
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();
 </script></body></html>

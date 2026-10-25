@@ -581,6 +581,127 @@ async function callAI(s, prompt, opts = {}) {
     callOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], model, prompt, { ...opts, extraBody, ...dialect }));
 }
 
+// Non-streaming protocols have different envelopes, but the same answer
+// contract. Keep their adapters limited to visible text and completion state;
+// dictionary validation must not depend on a provider or a user-entered model.
+// Protocol references are recorded in the dictionary research memo and fixtures.
+function _aiCompletionError(code, reason, status) {
+  const messages = {
+    invalid_response: "API returned an invalid response envelope",
+    output_refused: "API declined to return an answer",
+    output_truncated: "API did not finish its answer",
+    empty_response: "API returned no answer text"
+  };
+  const error = Object.assign(new Error(messages[code]), { code });
+  if (reason) error.reason = reason;
+  if (status !== undefined) error.status = status;
+  return error;
+}
+
+function _aiCompletionEnvelope(data, protocol) {
+  const record = value => value !== null && typeof value === "object" && !Array.isArray(value);
+  const invalid = () => { throw _aiCompletionError("invalid_response", "response_shape"); };
+  const text = value => {
+    if (value == null) return "";
+    if (typeof value !== "string") invalid();
+    return value;
+  };
+  const state = (reason, complete, truncated, blocked = []) => {
+    if (reason == null || reason === "") return "unknown";
+    if (typeof reason !== "string") invalid();
+    if (blocked.includes(reason)) return "blocked";
+    if (truncated.includes(reason)) return "truncated";
+    return complete.includes(reason) ? "complete" : "incomplete";
+  };
+  if (!record(data)) invalid();
+  if (protocol === "openai") {
+    // ChatCompletionMessage.content is string|null; content-part arrays are an
+    // INPUT-message shape, not this response schema. Reasoning/refusal are separate.
+    if (!Array.isArray(data.choices)) invalid();
+    if (!data.choices.length) return { text: "", state: "unknown" };
+    const choice = data.choices[0];
+    if (!record(choice) || !record(choice.message)) invalid();
+    const message = choice.message;
+    let status = state(choice.finish_reason, ["stop"], ["length"], ["content_filter"]);
+    if (text(message.refusal).trim()) status = "blocked";
+    if (status === "blocked") return { text: "", state: status };
+    if ((Array.isArray(message.tool_calls) && message.tool_calls.length) || record(message.function_call)) status = "incomplete";
+    return { text: text(message.content), state: status };
+  }
+  if (protocol === "gemini") {
+    // Gemini Candidate, Part and FinishReason.
+    const blocked = data.promptFeedback?.blockReason;
+    if (typeof blocked === "string" && blocked && blocked !== "BLOCK_REASON_UNSPECIFIED") return { text: "", state: "blocked" };
+    if (!Array.isArray(data.candidates)) invalid();
+    if (!data.candidates.length) return { text: "", state: "unknown" };
+    const candidate = data.candidates[0];
+    if (!record(candidate)) invalid();
+    let status = state(candidate.finishReason, ["STOP"], ["MAX_TOKENS", "CONTINUATION"],
+      ["SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII", "IMAGE_SAFETY", "IMAGE_PROHIBITED_CONTENT", "IMAGE_RECITATION", "ESCALATION", "PUP_LIMITED_DISABLED"]);
+    if (status === "blocked") return { text: "", state: status };
+    if (candidate.content == null) return { text: "", state: status };
+    if (!record(candidate.content) || !Array.isArray(candidate.content.parts)) invalid();
+    let answer = "";
+    for (const part of candidate.content.parts) {
+      if (!record(part)) invalid();
+      if (part.thought != null && typeof part.thought !== "boolean") invalid();
+      if (part.thought === true) continue;
+      if (part.functionCall != null) status = "incomplete";
+      // Parts are a union; tool payloads and inline data are not answer text.
+      if (part.functionCall == null && part.functionResponse == null) answer += text(part.text);
+    }
+    return { text: answer, state: status };
+  }
+  if (protocol === "claude") {
+    // Claude Messages content blocks and stop reasons.
+    let status = state(data.stop_reason, ["end_turn", "stop_sequence"], ["max_tokens", "model_context_window_exceeded"], ["refusal"]);
+    if (status === "blocked") return { text: "", state: status };
+    if (!Array.isArray(data.content)) invalid();
+    let answer = "";
+    for (const block of data.content) {
+      if (!record(block)) invalid();
+      if (block.type === "text") answer += text(block.text);
+      if (block.type === "tool_use") status = "incomplete";
+    }
+    return { text: answer, state: status };
+  }
+  if (protocol === "ollama") {
+    // Ollama chat separates thinking and answer content.
+    // message.thinking is intentionally never read as the answer.
+    if (!record(data.message)) invalid();
+    if (data.done != null && typeof data.done !== "boolean") invalid();
+    let status = state(data.done_reason, ["stop"], ["length"]);
+    if (data.done === false || (Array.isArray(data.message.tool_calls) && data.message.tool_calls.length)) status = "incomplete";
+    else if (data.done === true && status === "unknown") status = "complete";
+    return { text: text(data.message.content), state: status };
+  }
+  invalid();
+}
+
+async function _aiReadCompletion(res, protocol, opts) {
+  let data;
+  try { data = await res.json(); }
+  catch (error) {
+    // Never include provider bodies in diagnostics, and do not disguise aborts
+    // or transport failures during body reading as malformed JSON.
+    if (error?.name === "SyntaxError") throw _aiCompletionError("invalid_response", "response_json", res.status);
+    throw error;
+  }
+  let completion;
+  try { completion = _aiCompletionEnvelope(data, protocol); }
+  catch (error) { error.status = res.status; throw error; }
+  const text = completion.text.trim();
+  if (completion.state === "blocked") throw _aiCompletionError("output_refused", null, res.status);
+  if ((completion.state === "truncated" || completion.state === "incomplete") && (opts.requireComplete === true || !text)) {
+    throw _aiCompletionError("output_truncated", null, res.status);
+  }
+  if (!text) throw _aiCompletionError("empty_response", null, res.status);
+  // Missing completion metadata is compatible with existing proxy endpoints;
+  // it is not evidence of confirmed completion. Non-dictionary callers retain
+  // their historical ability to consume nonempty partial text.
+  return text;
+}
+
 // Non-streaming Gemini rides the same thinking-off self-heal as the OpenAI-
 // compat table. Every OTHER default-thinking provider already disables
 // reasoning on the tags/summary path, but the bespoke Gemini caller sent no
@@ -616,9 +737,7 @@ async function _callGeminiOnce(s, model, prompt, opts, extraBody) {
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig })
   });
   if (!res.ok) await handleAIError(res, "Gemini");
-  const text = (await res.json()).candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  if (!text) throw new Error("Gemini returned empty response");
-  return text;
+  return _aiReadCompletion(res, "gemini", opts);
 }
 
 async function callClaude(s, prompt, opts = {}) {
@@ -633,9 +752,7 @@ async function callClaude(s, prompt, opts = {}) {
     body: JSON.stringify({ model: opts.model || s.claudeModel || "claude-haiku-4-5", max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] })
   });
   if (!res.ok) await handleAIError(res, "Claude");
-  const text = (await res.json()).content?.[0]?.text?.trim();
-  if (!text) throw new Error("Claude returned empty response");
-  return text;
+  return _aiReadCompletion(res, "claude", opts);
 }
 
 async function callOpenAICompat(baseUrl, apiKey, model, prompt, opts = {}) {
@@ -657,13 +774,7 @@ async function callOpenAICompat(baseUrl, apiKey, model, prompt, opts = {}) {
     })
   });
   if (!res.ok) await handleAIError(res, "API");
-  const choice = (await res.json()).choices?.[0];
-  const text = typeof choice?.message?.content === "string" ? choice.message.content.trim() : "";
-  if (choice?.finish_reason === "length" && (opts.requireComplete === true || !text)) {
-    throw Object.assign(new Error("API output reached its token limit"), { code: "output_truncated", status: res.status });
-  }
-  if (!text) throw Object.assign(new Error("API returned no answer text"), { code: "empty_response", status: res.status });
-  return text;
+  return _aiReadCompletion(res, "openai", opts);
 }
 
 async function callOllama(s, prompt, opts = {}) {
@@ -684,9 +795,7 @@ async function callOllama(s, prompt, opts = {}) {
     })
   });
   if (!res.ok) await handleAIError(res, "Ollama");
-  const text = (await res.json()).message?.content?.trim();
-  if (!text) throw new Error("Ollama returned empty response");
-  return text;
+  return _aiReadCompletion(res, "ollama", opts);
 }
 
 // ============================================================

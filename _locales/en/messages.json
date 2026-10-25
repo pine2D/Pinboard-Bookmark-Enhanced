@@ -4670,7 +4670,8 @@
   "dictLookupInPanel": {"message": "Look up in side panel"},
   "dictSupplementScope": {"message": "Limit to a situation"},
   "dictSupplementSaving": {"message": "Saving supplement…"},
-  "dictGenerationTruncated": {"message": "The model reached its output limit before completing the response. This result was not saved. Choose another reader AI model in Settings, then try again."},
+  "dictGenerationTruncated": {"message": "The model stopped before completing the response. This result was not saved. Try again or choose another reader AI model in Settings."},
+  "dictGenerationRefused": {"message": "The model declined this request or blocked the output. This result was not saved."},
   "dictGenerationEmpty": {"message": "The model returned no response text. This result was not saved. Try again or choose another reader AI model in Settings."},
   "dictGenerationModelUnavailable": {"message": "The provider could not find or use the selected model. Check its name and availability, then update the reader AI model in Settings."},
   "dictGenerationBilling": {"message": "The provider rejected this request (HTTP 402). Check your quota, billing status, and account access with the provider before trying again."}

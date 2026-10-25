@@ -1,0 +1,22 @@
+<!doctype html><meta charset="utf-8"><title>Dictionary normalization archive fixture</title>
+<script src="../../vocab-store.js"></script><script src="../../dict-archive.js"></script>
+<script>
+// Keep the real archive writer separate from generation suites' call stubs.
+async function roundTripNormalized(record, supplement) {
+  const dbName = 'dict-normalization-' + crypto.randomUUID(), owner = 'acct_fixture';
+  const store = pbpCreateDictArchiveStore({ dbName, getCurrentOwner: async () => owner, readLegacy: async () => [] });
+  const input = { term: record.term, sourceLanguage: record.sourceLanguage, target: record.target,
+    owner, isCurrent: () => true, record };
+  try {
+    const saved = await store.save(input);
+    if (supplement) await store.append({ ...supplement, archiveId: saved.archiveId, owner, isCurrent: () => true });
+    return await store.read(input);
+  } finally {
+    await store.close();
+    await new Promise((resolve, reject) => {
+      const request = indexedDB.deleteDatabase(dbName);
+      request.onsuccess = resolve; request.onerror = () => reject(request.error);
+    });
+  }
+}
+</script>

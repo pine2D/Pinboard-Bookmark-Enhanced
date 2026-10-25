@@ -1,0 +1,148 @@
+<!doctype html><meta charset="utf-8"><title>Dictionary language validation</title>
+<div id="results"></div><div id="summary"></div>
+<script>
+let detection=null, detected=[], answer='', record=null, calls=0, saved=0, appended=0;
+globalThis.chrome={i18n:{detectLanguage:async text=>{detected.push(text);if(detection instanceof Error)throw detection;return detection;},getUILanguage:()=>document.documentElement.lang||'en'}};
+async function pbpVocabCurrentOwner(){return 'acct_language_fixture';}
+function hasAIKey(){return true;}
+async function callAI(settings,prompt,opts){await opts.beforeRequest();calls++;return answer;}
+async function pbpDictArchiveRead(){return record;}
+async function pbpDictArchiveSave(input){saved++;return record={...input.record,archiveId:'a'.repeat(64),archiveSaved:true,supplements:[]};}
+async function pbpDictArchiveAppend(input){appended++;const item={...input,id:'b'.repeat(64),archiveSaved:true};record.supplements.push(item);return item;}
+</script><script src="../dict-entry.js"></script><script>
+let pass=0,fail=0;
+const target={name:'Chinese',lang:'zh-Hans'};
+const mixed='以 “higher-order function”、“immutable data structure”、“referential transparency”、“partial application” 等构造程序。';
+const wrong='This entire explanation is written in English although the learner requested a Chinese explanation of the meaning and its typical usage.';
+function reset(){detection=null;detected=[];answer='';record=null;calls=0;saved=0;appended=0;document.documentElement.lang='en';}
+function assert(value,message='Assertion failed'){if(!value)throw new Error(message);}
+async function rejects(fn,reason){try{await fn();}catch(e){assert(e.code==='wrong_language'&&e.reason===reason,e.code+':'+e.reason);return;}throw new Error('Expected wrong_language');}
+async function test(name,fn){reset();try{await fn();pass++;const p=document.createElement('p');p.className='pass';p.textContent='PASS '+name;document.getElementById('results').append(p);}catch(e){fail++;const p=document.createElement('p');p.className='fail';p.textContent='FAIL '+name+': '+e.message;document.getElementById('results').append(p);}}
+function request(extra={}){return {term:'functional programming',sourceLanguage:'en',target,owner:'acct_language_fixture',settings:{aiProvider:'gemini'},isCurrent:()=>true,...extra};}
+function entry(definition=mixed){return {word:'functional programming',language:'en',pronunciation:'',meanings:[{partOfSpeech:'名词',definition,examples:[]}],learning:{version:2,formation:'',history:'',related:[]}};}
+function supplement(language='zh-Hans'){return {language,summary:'',items:[{sense:1,title:'service provider',explanation:'表示提供服务的个人或机构。',example:'We need a service provider.',translation:'我们需要服务提供商。',sourceIndex:-1}]};}
+function parentEntry(){record={archiveId:'a'.repeat(64),entry:entry(),supplements:[],archiveSaved:true};}
+(async()=>{
+await test('Portuguese metadata accepts English and native platform names',async()=>{
+  for(const language of ['Portuguese','Português','pt','pt-BR'])assert(_pbpDictExplanationLanguage(language,{name:'Portuguese',lang:'pt'}),language);
+});
+await test('Italian metadata accepts its native name without a hand-written alias',async()=>{
+  assert(_pbpDictExplanationLanguage('Italiano',{name:'Italian',lang:'it'}));
+});
+await test('a language outside the old alias list resolves from its native display name',async()=>{
+  assert(_pbpDictExplanationLanguage('Suomi',{name:'Finnish',lang:'fi'}));
+  assert(_pbpDictExplanationLanguage('Nederlands',{name:'Dutch',lang:'nl'}));
+  // Chromium's bundled CLDR may omit a native locale (for example Welsh).
+  // Its available English name remains usable without inventing a translation.
+  assert(_pbpDictExplanationLanguage('Welsh',{name:'Welsh',lang:'cy'}));
+});
+await test('the current UI locale supplies localized language names',async()=>{
+  document.documentElement.lang='fr';assert(_pbpDictExplanationLanguage('finnois',{name:'Finnish',lang:'fi'}));
+});
+await test('legacy und identities use the declared code to verify the stored language name',async()=>{
+  for(const [name,language] of [['Portuguese','pt'],['Italian','it'],['Finnish','fi'],['Filipino','fil']]){
+    const requested={name,lang:'und'},before=JSON.stringify(requested);
+    assert(_pbpDictExplanationLanguage(language,requested),name);assert(JSON.stringify(requested)===before);
+  }
+});
+await test('unknown code display-name fallbacks cannot invent a language-name match',async()=>{
+  assert(_pbpDictLanguageDisplayName('zz','zz')==='');
+  assert(!_pbpDictExplanationLanguage('zz',{name:'Portuguese',lang:'und'}));
+  assert(!_pbpDictExplanationLanguage('pt',{name:'An invented language label',lang:'und'}));
+});
+await test('custom legacy names and explicit und remain readable without guessing a language',async()=>{
+  for(const language of ['Esperanto','und'])assert(_pbpDictExplanationLanguage(language,{name:'Esperanto',lang:'und'}));
+  assert(!_pbpDictExplanationLanguage('en',{name:'Esperanto',lang:'und'}));
+});
+await test('language-name compatibility never accepts a different base language',async()=>{
+  for(const language of ['Italiano','it','fr'])assert(!_pbpDictExplanationLanguage(language,{name:'Portuguese',lang:'pt'}));
+});
+await test('Serbian explicitly different scripts are incompatible in either direction',async()=>{
+  assert(!_pbpDictExplanationLanguage('sr-Latn',{name:'Serbian',lang:'sr-Cyrl'}));
+  assert(!_pbpDictExplanationLanguage('sr-Cyrl',{name:'Serbian',lang:'sr-Latn'}));
+  assert(_pbpDictExplanationLanguage('sr_latn',{name:'Serbian',lang:'sr-Latn'}));
+});
+await test('generic Serbian names and codes do not imply the default script',async()=>{
+  for(const lang of ['sr-Cyrl','sr-Latn'])for(const language of ['sr','Serbian'])assert(_pbpDictExplanationLanguage(language,{name:'Serbian',lang}));
+});
+await test('explicit-script checking extends to other multi-script languages',async()=>{
+  assert(!_pbpDictExplanationLanguage('az-Arab',{name:'Azerbaijani',lang:'az-Latn'}));
+  assert(_pbpDictExplanationLanguage('az',{name:'Azerbaijani',lang:'az-Arab'}));
+});
+await test('Chinese generic names and regional scripts retain their existing compatibility',async()=>{
+  for(const language of ['zh','Chinese','中文','zh-TW','zh-HK'])assert(_pbpDictExplanationLanguage(language,{name:'繁體中文',lang:'zh-Hant'}));
+  for(const language of ['zh-CN','zh-SG','zh-Hans'])assert(!_pbpDictExplanationLanguage(language,{name:'繁體中文',lang:'zh-Hant'}));
+  detection={isReliable:true,languages:[{language:'zh-CN',percentage:100}]};
+  await _pbpDictCheckExplanation('這部分說明描述了這個詞在上下文中的具體作用，幫助學習者理解含義及其和其他表達的區別。'.repeat(3),{name:'繁體中文',lang:'zh-Hant'});
+});
+await test('numbers units and very short glosses remain inconclusive without a detector call',async()=>{
+  detection={isReliable:true,languages:[{language:'en',percentage:100}]};
+  for(const text of ['2026','42 km/h','HTML','提供者'])await _pbpDictCheckExplanation(text,target);
+  assert(detected.length===0);
+});
+await test('long quoted technical forms do not outweigh a short native-language frame',async()=>{
+  detection={isReliable:true,languages:[{language:'en',percentage:100}]};
+  await _pbpDictCheckExplanation(mixed,target);assert(detected.length===0);
+});
+await test('foreign mentions are removed from a substantial explanatory sample',async()=>{
+  const native='这部分解释描述了这个词在语境中的具体作用，帮助学习者理解含义及其和其他表达的区别。'.repeat(3);
+  await _pbpDictCheckExplanation(native+' “the English root phrase” （a foreign word form）',target);
+  assert(detected.length===1&&!detected[0].includes('English root')&&detected[0].includes('这部分'));
+});
+await test('entirely wrong-language prose is rejected before statistical detection',async()=>{
+  await rejects(()=>_pbpDictCheckExplanation(wrong,target),'explanation_script');assert(detected.length===0);
+});
+await test('wrapping an untranslated answer in quotes does not bypass validation',async()=>{
+  for(const text of ['“'+wrong+'”','“international network service provider”'])await rejects(()=>_pbpDictCheckExplanation(text,target),'explanation_script');
+});
+await test('a tiny native label cannot disguise a quoted foreign-language paragraph',async()=>{
+  await rejects(()=>_pbpDictCheckExplanation('说明：“'+wrong+'”',target),'explanation_script');
+});
+await test('a complete quoted sentence is retained even with a short native frame',async()=>{
+  const sentence='This entire answer describes how an internet service provider offers access to international networks.';
+  await rejects(()=>_pbpDictCheckExplanation('意思如下：“'+sentence+'”',target),'explanation_script');
+});
+await test('multiple unpunctuated quoted explanations are not treated as short terms',async()=>{
+  await rejects(()=>_pbpDictCheckExplanation('意思如下：“A person or company providing regular services” “The person providing financial support for families”',target),'explanation_script');
+});
+await test('confident same-script language mismatches still reject',async()=>{
+  detection={isReliable:true,languages:[{language:'en',percentage:99}]};
+  await rejects(()=>_pbpDictCheckExplanation(wrong,{name:'German',lang:'de'}),'explanation_language');assert(detected.length===1);
+});
+await test('uncertain same-script detector results do not reject paid content',async()=>{
+  for(const result of [{isReliable:false,languages:[{language:'en',percentage:99}]},{isReliable:true,languages:[{language:'en',percentage:94}]}]){
+    detection=result;await _pbpDictCheckExplanation(wrong,{name:'German',lang:'de'});
+  }
+});
+await test('an explicitly requested script checks the prose without maximizing generic languages',async()=>{
+  await rejects(()=>_pbpDictCheckExplanation('Ovo je objašnjenje upotrebe reči u svakodnevnom razgovoru.',{name:'Serbian',lang:'sr-Cyrl'}),'explanation_script');
+  await _pbpDictCheckExplanation('Ovo je objašnjenje upotrebe reči u svakodnevnom razgovoru.',{name:'Serbian',lang:'sr'});
+});
+await test('the entry generation path saves mixed explanations with the requested identity',async()=>{
+  answer=JSON.stringify(entry());const result=await pbpDictEntryRun(request());
+  assert(result.archiveSaved&&saved===1&&calls===1&&record.target.lang==='zh-Hans'&&result.entry.meanings[0].definition===mixed);
+});
+await test('the supplement generation path accepts native metadata while retaining legacy identity',async()=>{
+  parentEntry();const value=supplement('pt');value.summary='Uso no contexto de serviços.';
+  value.items[0].explanation='Use esta expressão para uma pessoa ou empresa que presta um serviço.';
+  value.items[0].translation='Precisamos de um prestador de serviços.';answer=JSON.stringify(value);
+  detection={isReliable:true,languages:[{language:'pt',percentage:99}]};
+  const requested={name:'Portuguese',lang:'und'},result=await pbpDictSupplementRun(request({target:requested,category:'collocations'}));
+  assert(result.archiveSaved&&appended===1&&calls===1&&detected.length===1&&result.learning.language.lang==='und'&&result.learning.language.name==='Portuguese');
+});
+await test('validated supplement metadata checks prose for legacy und without changing its identity',async()=>{
+  parentEntry();const value=supplement('pt');value.summary=wrong;value.items[0].explanation=wrong;value.items[0].translation='The company supplies a service.';answer=JSON.stringify(value);
+  detection={isReliable:true,languages:[{language:'en',percentage:100}]};const requested={name:'Portuguese',lang:'und'};
+  await rejects(()=>pbpDictSupplementRun(request({target:requested,category:'collocations'})),'explanation_language');
+  assert(calls===1&&appended===0&&detected.length===1&&requested.lang==='und');
+});
+await test('wrong-language entries never reach storage or trigger an automatic paid retry',async()=>{
+  answer=JSON.stringify(entry(wrong));await rejects(()=>pbpDictEntryRun(request()),'explanation_script');assert(calls===1&&saved===0);
+});
+await test('wrong-language supplements never reach storage or trigger an automatic paid retry',async()=>{
+  parentEntry();const value=supplement();value.summary=wrong;value.items[0].explanation=wrong;value.items[0].translation='This is a service provider.';answer=JSON.stringify(value);
+  await rejects(()=>pbpDictSupplementRun(request({category:'collocations'})),'explanation_script');assert(calls===1&&appended===0);
+});
+document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
+})();
+</script>

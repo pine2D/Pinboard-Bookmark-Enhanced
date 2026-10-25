@@ -138,7 +138,7 @@ await test('output item numbers cannot create base meanings and fail without a p
   catch(e){return e.code==='invalid_response'&&e.reason==='supplement_item_sense'&&!JSON.stringify(e).includes('PRIVATE_PATTERN_')&&calls.length===1&&appended.length===0;}
 });
 await test('noninteger and out-of-range meaning references remain invalid',async()=>{
-  for(const sense of [-1,1.5,'1',null,2]){
+  for(const sense of [-1,1.5,'01',null,2]){
     reset();existing();usageResponse(d=>{d.items[0].sense=sense;});
     try{await pbpDictSupplementRun(request({category:'grammar'}));return false;}
     catch(e){if(e.reason!=='supplement_item_sense'||calls.length!==1||appended.length)return false;}
@@ -164,7 +164,7 @@ await test('empty required text, oversized text and nonstring text retain strict
   return true;
 });
 await test('source indices retain integer and retrieved-source bounds',async()=>{
-  for(const sourceIndex of [-2,-0.5,'-1',null,0]){
+  for(const sourceIndex of [-2,-0.5,'-01',null,0]){
     reset();existing();usageResponse(d=>{d.items[0].sourceIndex=sourceIndex;});
     try{await pbpDictSupplementRun(request({category:'collocations'}));return false;}
     catch(e){if(e.reason!=='supplement_source_index'||calls.length!==1||appended.length)return false;}
@@ -196,6 +196,75 @@ await test('captured successful DeepSeek collocations preserve repeated and cros
   const result=await pbpDictSupplementRun(request({term:fixture.baseEntry.word,sourceLanguage:fixture.baseEntry.language,target:fixture.target,category:fixture.category}));
   return result.archiveSaved&&result.learning.items.length===5&&result.learning.items.map(item=>item.sense).join(',')==='1,1,2,3,0'&&
     result.learning.items.every(item=>item.sourceIndex===-1)&&calls.length===1&&appended.length===1;
+});
+
+await test('missing and null supplement summaries preserve useful generated items',async()=>{
+  for(const missing of [true,false]){reset();existing();usageResponse(d=>{if(missing)delete d.summary;else d.summary=null;});
+    const r=await pbpDictSupplementRun(request({category:'grammar'}));if(!r.archiveSaved||r.learning.summary!==''||r.learning.items.length!==1||calls.length!==1)return false;}
+  return true;
+});
+await test('complete singleton supplement items and canonical integer strings become archive shapes',async()=>{
+  existing();usageResponse(d=>{d.items=d.items[0];d.items.sense='1';d.items.sourceIndex='-1';});
+  const r=await pbpDictSupplementRun(request({category:'collocations'}));return r.archiveSaved&&r.learning.items.length===1&&r.learning.items[0].sense===1&&r.learning.items[0].sourceIndex===-1&&calls.length===1;
+});
+await test('only canonical safe decimal integer strings are accepted for supplement references',async()=>{
+  for(const key of ['sense','sourceIndex'])for(const value of ['01','-0','+1','1.0','1e0',' 1','1 ','','9007199254740993',true,{}]){
+    reset();existing();usageResponse(d=>{d.items[0][key]=value;});
+    if(!await rejects(()=>pbpDictSupplementRun(request({category:'grammar'})),'invalid_response')||appended.length||calls.length!==1)return false;
+  }
+  return true;
+});
+await test('literary missing and null placeholders use exact evidence with explicit numeric references',async()=>{
+  for(const missing of [true,false]){reset();existing();usageResponse(d=>{d.items[0].sense='0';d.items[0].sourceIndex='0';if(missing)delete d.items[0].example;else d.items[0].example=null;});
+    const r=await pbpDictSupplementRun(request({category:'literature'}));if(!r.archiveSaved||r.learning.items[0].example!==SOURCE.excerpt||r.learning.items[0].sense!==0||r.learning.items[0].sourceIndex!==0||calls.length!==1)return false;}
+  return true;
+});
+await test('literary normalization never supplies missing translations or fixes rewritten evidence',async()=>{
+  for(const mutate of [d=>{delete d.items[0].translation;},d=>{d.items[0].translation=null;},d=>{d.items[0].example='An invented passage.';}]){
+    reset();existing();usageResponse(d=>{d.items[0].sourceIndex='0';d.items[0].example=null;mutate(d);});
+    if(!await rejects(()=>pbpDictSupplementRun(request({category:'literature'})),'invalid_response')||appended.length||calls.length!==1)return false;
+  }
+  return true;
+});
+await test('supplement identity core prose items and references cannot be defaulted',async()=>{
+  const mutations=[d=>{delete d.language;},d=>{d.language=null;},d=>{delete d.items;},d=>{d.items=null;},
+    ...['sense','sourceIndex','title','explanation'].flatMap(key=>[d=>{delete d.items[0][key];},d=>{d.items[0][key]=null;}])];
+  for(const mutate of mutations){reset();existing();usageResponse(d=>{d.summary=null;mutate(d);});
+    try{await pbpDictSupplementRun(request({category:'grammar'}));return false;}catch(e){if(!['invalid_response','wrong_language'].includes(e.code)||appended.length||calls.length!==1)return false;}}
+  return true;
+});
+await test('malformed supplement arrays are not split flattened or partially discarded',async()=>{
+  for(const mutate of [d=>{d.items='A paragraph';},d=>{d.items[0].explanation=['First rule','Second rule'];},d=>{d.items.push(null);},d=>{d.items={title:'Missing core fields'};}]){
+    reset();existing();usageResponse(mutate);if(!await rejects(()=>pbpDictSupplementRun(request({category:'register'})),'invalid_response')||appended.length)return false;
+  }
+  return true;
+});
+await test('unknown supplement metadata stays invalid after otherwise safe normalization',async()=>{
+  for(const mutate of [d=>{d.confidence=0.9;},d=>{d.items[0].url='https://example.test/';}]){
+    reset();existing();usageResponse(d=>{d.summary=null;d.items[0].sense='1';mutate(d);});
+    if(!await rejects(()=>pbpDictSupplementRun(request({category:'grammar'})),'invalid_response')||appended.length)return false;
+  }
+  return true;
+});
+await test('supplement normalization cannot bypass raw response size or repair truncated JSON',async()=>{
+  for(const payload of [' '.repeat(24577)+JSON.stringify(USAGE),JSON.stringify(USAGE).slice(0,-1)]){
+    reset();existing();usageAnswer=payload;if(!await rejects(()=>pbpDictSupplementRun(request({category:'grammar'})),'invalid_response')||appended.length||calls.length!==1)return false;
+  }
+  return true;
+});
+await test('supplement prompt states the existing aggregate limit and retains its token budget',async()=>{
+  existing();await pbpDictSupplementRun(request({category:'collocations'}));
+  return calls[0].prompt.includes('12000')&&calls[0].prompt.includes('including separators')&&calls[0].options.maxTokens===2048;
+});
+await test('normalized supplement round-trips the real archive while its raw variants remain invalid',async()=>{
+  existing();usageResponse(d=>{d.summary=null;d.items=d.items[0];d.items.sense='1';d.items.sourceIndex='-1';});
+  const raw=JSON.parse(usageAnswer),supplement=await pbpDictSupplementRun(request({category:'grammar'}));
+  const frame=document.createElement('iframe');frame.hidden=true;const ready=new Promise(resolve=>frame.onload=resolve);frame.src='fixtures/dict-normalization-archive.html';document.body.append(frame);
+  try{await ready;const api=frame.contentWindow,req=request();
+    if(api._pbpDictArchiveSupplementLearning({...supplement.learning,summary:raw.summary,items:raw.items},supplement))return false;
+    const read=await api.roundTripNormalized({...ORIGINAL,term:req.term,sourceLanguage:req.sourceLanguage,target:req.target},supplement);
+    return read.supplements.length===1&&JSON.stringify(read.supplements[0].learning)===JSON.stringify(supplement.learning)&&calls.length===1;
+  }finally{frame.remove();}
 });
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();

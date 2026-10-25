@@ -29,3 +29,9 @@ MiniMax 的说明于 2026-10-25 按[官方 OpenAI 兼容接口文档](https://pl
 改动后用 options 页联通性测试（options-connectivity.js）逐家验证；出现 400 先怀疑 thinking 字段与当前模型不兼容。
 
 新增 provider、改默认端点或新增任何数据出口 → privacy.md 的 Network Requests / Permissions / Third-Party 三处必须同步披露（release.sh 文档硬门会拦，host 权限铁律见根文件）。
+
+## 公共非流式响应契约
+
+OpenAI 兼容、Gemini、Claude、Ollama 只在协议适配层读取正文块与完成状态，再走同一完整性检查。排除思考、工具和拒答内容；区分空正文、未完成、拒答、坏 JSON 与坏响应结构。`requireComplete:true` 的词典生成不接受明确未完成的输出，即使其中 JSON 恰好闭合；其他消费者仍可使用非空部分文本。兼容端点缺少终止元数据时保留 unknown，不伪称确认完成，也不凭此拒绝有效正文。
+
+新增模型不应要求词典业务层添加供应商或模型分支。通用响应修复用四协议独立手写 HTTP 夹具和生成→归档→重读链路验证；响应失败不自动增加付费重试。真实 API 测试仍须按 CLAUDE.md 逐轮取得明确授权，历史授权不续用。

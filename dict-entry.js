@@ -18,14 +18,44 @@ function _pbpDictEntryLang(value) {
   try { return Intl.getCanonicalLocales(value || "und")[0] || ""; } catch (_) { return ""; }
 }
 
-function pbpDictKnownLanguageName(name) {
+function _pbpDictLanguageNameKey(value) {
+  return typeof value === "string" ? value.normalize("NFC").trim().toLowerCase() : "";
+}
+function _pbpDictLanguageDisplayName(name, candidate) {
+  const code = _pbpDictEntryLang(candidate), key = _pbpDictLanguageNameKey(name);
+  if (!code || !key || ["und", "mul", "zxx"].includes(code)) return "";
+  const base = new Intl.Locale(code).language;
+  const locales = ["en", code, base, globalThis.document?.documentElement?.lang,
+    ...(globalThis.navigator?.languages || [])].filter(Boolean);
+  try { locales.push(globalThis.chrome?.i18n?.getUILanguage?.()); } catch (_) { /* Optional UI hint. */ }
+  // Compare exact names supplied by the platform, never the fallback echo of
+  // an unknown code. Generic names keep their generic script/region identity.
+  for (const tag of [...new Set([code, base])]) {
+    for (const locale of [...new Set(locales.filter(Boolean))]) {
+      try {
+        const label = new Intl.DisplayNames([locale], { type: "language", fallback: "none" }).of(tag);
+        if (label && _pbpDictLanguageNameKey(label) !== _pbpDictLanguageNameKey(tag) &&
+            _pbpDictLanguageNameKey(label) === key) return tag;
+      } catch (_) { /* A custom language or UI locale may be unsupported. */ }
+    }
+  }
+  return "";
+}
+function pbpDictKnownLanguageName(name, candidates = []) {
+  // Preserve established setting aliases. New equivalents are resolved from
+  // the requested/declared code, rather than growing a translated-name table.
   const names = { "中文": "zh-Hans", "简体中文": "zh-Hans", "繁體中文": "zh-Hant", "繁体中文": "zh-Hant",
     "chinese": "zh-Hans", "english": "en", "英语": "en", "英文": "en", "deutsch": "de", "german": "de", "德语": "de",
     "español": "es", "spanish": "es", "西班牙语": "es", "français": "fr", "french": "fr", "法语": "fr",
     "日本語": "ja", "japanese": "ja", "日语": "ja", "русский": "ru", "russian": "ru", "俄语": "ru",
     "polski": "pl", "polish": "pl", "한국어": "ko", "korean": "ko", "العربية": "ar", "arabic": "ar" };
-  const key = String(name || "").trim().toLocaleLowerCase();
-  return Object.hasOwn(names, key) ? names[key] : "";
+  const key = _pbpDictLanguageNameKey(name);
+  if (Object.hasOwn(names, key)) return names[key];
+  for (const candidate of candidates) {
+    const matched = _pbpDictLanguageDisplayName(name, candidate);
+    if (matched) return matched;
+  }
+  return "";
 }
 
 function _pbpDictEntryModel(settings) {
@@ -107,6 +137,8 @@ function _pbpDictEntryPrompt(request, sources = []) {
     "Copy word exactly from term and language exactly from sourceLanguage, preserving case; do not substitute a different headword. " +
     "For an inflected form, explain its relation to the base form in the definition. " +
     "Give up to four meanings with up to two short, original examples each, and up to five useful related words. " +
+    "Character limits: pronunciation<=256, partOfSpeech<=128, definition<=1200, example text/translation<=600 each, related word<=128. " +
+    "Every meaning needs a nonempty definition; use examples:[] when none are useful and empty strings for unavailable pronunciation or grammatical labels. " +
     "Pronunciation can be IPA or a conventional reading, but leave it empty when uncertain. " +
     "Separate modern formation from historical etymology. Formation explains productive word formation only; no invented character stories. " +
     "History may ONLY summarize the supplied etymology evidence; with no evidence it MUST be empty. Never invent dates, roots, semantic transitions or URLs. " +
@@ -133,6 +165,56 @@ function _pbpDictResponseJson(text, max, wrapper) {
     if ((key === wrapper || key === "result") && value[key] && typeof value[key] === "object" && !Array.isArray(value[key])) value = value[key];
   }
   return value;
+}
+
+// Only new model output reaches this adapter. Cache and archive readers retain
+// their strict schemas. Parse the bounded, complete response before normalizing
+// unambiguous representations; preserve unknown fields and malformed values so
+// the existing validators reject them instead of silently losing paid content.
+function _pbpDictGeneratedResponse(text, kind, category = "") {
+  const value = _pbpDictResponseJson(text, PBP_DICT_ENTRY_MAX_RESPONSE, kind);
+  const object = item => !!item && typeof item === "object" && !Array.isArray(item);
+  const list = item => object(item) ? [item] : item;
+  const integer = item => {
+    if (typeof item !== "string" || !/^(?:0|-?[1-9]\d*)$/.test(item)) return item;
+    const number = Number(item);
+    return Number.isSafeInteger(number) ? number : item;
+  };
+  if (!object(value)) return JSON.stringify(value);
+  if (kind === "entry") {
+    value.pronunciation ??= "";
+    value.etymology ??= "";
+    value.relatedWords ??= [];
+    // Missing/null meanings must never become an unknown-word result.
+    value.meanings = list(value.meanings);
+    if (Array.isArray(value.meanings)) for (const meaning of value.meanings) {
+      if (!object(meaning)) continue;
+      meaning.partOfSpeech ??= "";
+      meaning.examples = list(meaning.examples ?? []);
+      if (Array.isArray(meaning.examples)) for (const example of meaning.examples) {
+        if (object(example)) example.translation ??= "";
+      }
+    }
+    if (value.learning === null) value.learning = {};
+    if (object(value.learning)) {
+      value.learning.formation ??= "";
+      value.learning.history ??= "";
+      value.learning.related = list(value.learning.related ?? []);
+      // Model-supplied version/source/replacement fields are not defaults.
+    }
+  } else if (kind === "supplement") {
+    value.summary ??= "";
+    value.items = list(value.items);
+    if (Array.isArray(value.items)) for (const item of value.items) {
+      if (!object(item)) continue;
+      item.sense = integer(item.sense);
+      item.sourceIndex = integer(item.sourceIndex);
+      // Literature's verified original is inserted after source validation.
+      // Its translation and all other categories' examples remain required.
+      if (category === "literature") item.example ??= "";
+    }
+  }
+  return JSON.stringify(value);
 }
 function pbpDictEntryParse(text, request) {
   const invalid = reason => { throw _pbpDictEntryError("invalid_response", "AI returned an invalid dictionary entry", reason); };
@@ -191,50 +273,69 @@ function pbpDictEntryParse(text, request) {
   return result;
 }
 
+function _pbpDictExplicitLanguageScript(tag) {
+  try {
+    const locale = new Intl.Locale(tag);
+    if (locale.script) return locale.script;
+    if (locale.language === "zh") {
+      if (["TW", "HK", "MO"].includes(locale.region)) return "Hant";
+      if (["CN", "SG"].includes(locale.region)) return "Hans";
+    }
+  } catch (_) { /* Invalid tags cannot establish a script. */ }
+  return "";
+}
 function _pbpDictExplanationLanguage(value, target) {
   if (typeof value !== "string" || value.length > 80) return false;
   const clean = s => s.trim().toLocaleLowerCase().replace(/_/g, "-");
-  const code = s => {
+  const code = (s, candidates = []) => {
     if (/^(?:chinese|中文)$/i.test(s)) return "zh";
     if (/^(?:simplified chinese|chinese \(simplified\))$/i.test(s)) return "zh-Hans";
     if (/^(?:traditional chinese|chinese \(traditional\))$/i.test(s)) return "zh-Hant";
-    return pbpDictKnownLanguageName(s) || _pbpDictEntryLang(s.replace(/_/g, "-"));
+    return pbpDictKnownLanguageName(s, candidates) || _pbpDictEntryLang(s.replace(/_/g, "-"));
   };
   if (target.lang === "und") {
     if (clean(value) === "und" || clean(value) === clean(target.name)) return true;
-    const known = pbpDictKnownLanguageName(target.name);
+    const declared = code(value.trim());
+    const known = pbpDictKnownLanguageName(target.name, declared ? [declared] : []);
     if (!known) return false;
     return _pbpDictExplanationLanguage(value, { ...target, lang: known });
   }
-  const declared = code(value.trim()), wanted = code(target.lang);
+  const wanted = code(target.lang), declared = code(value.trim(), wanted ? [wanted] : []);
   if (!declared || !wanted || declared.split("-")[0] !== wanted.split("-")[0]) return false;
-  const explicitScript = tag => {
-    const script = tag.match(/-(Hans|Hant)(?:-|$)/i)?.[1]?.toLowerCase();
-    if (script) return script;
-    if (/^zh-(?:TW|HK|MO)(?:-|$)/i.test(tag)) return "hant";
-    if (/^zh-(?:CN|SG)(?:-|$)/i.test(tag)) return "hans";
-    return "";
-  };
-  const a = explicitScript(declared), b = explicitScript(wanted);
+  const a = _pbpDictExplicitLanguageScript(declared), b = _pbpDictExplicitLanguageScript(wanted);
   return !a || !b || a === b;
 }
 
 // Evaluate explanatory prose together. A word root, grammatical label or short
 // foreign-language contrast is not a standalone explanation-language failure.
 // Original example sentences and retrieved quotations never enter this check.
-async function _pbpDictCheckExplanation(text, target) {
-  const base = (target.lang === "und" ? pbpDictKnownLanguageName(target.name) || "und" : target.lang).split("-")[0];
+async function _pbpDictCheckExplanation(text, target, declaredLanguage = "") {
+  // A supplement's already validated metadata can identify a legacy custom
+  // target for this check only. The saved target and archive key stay intact.
+  const candidate = typeof declaredLanguage === "string" ? _pbpDictEntryLang(declaredLanguage.replace(/_/g, "-")) : "";
+  const wanted = target.lang === "und" ? pbpDictKnownLanguageName(target.name, candidate ? [candidate] : []) || "und" : target.lang;
+  const base = wanted.split("-")[0];
   if (base === "und") return;
   const originalLetters = (text.match(/\p{L}/gu) || []).length;
   if (originalLetters < 24) return;
-  const withoutMentions = text.replace(/"[^"\n]{1,100}"|“[^”\n]{1,100}”|‘[^’\n]{1,100}’|「[^」\n]{1,100}」|『[^』\n]{1,100}』|（[^）\n]{1,100}）|\([^\)\n]{1,100}\)/gu, " ");
-  // Never erase the body of a response just because it is quoted. Use this
-  // limited cleanup only when enough explanatory context remains outside it.
-  const prose = (withoutMentions.match(/\p{L}/gu) || []).length >= 80 ? withoutMentions : text;
-  const letters = (prose.match(/\p{L}/gu) || []).length;
-  const expectedScript = { zh: /\p{Script=Han}/gu, ja: /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu,
+  let expectedScript = { zh: /\p{Script=Han}/gu, ja: /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu,
     ko: /\p{Script=Hangul}/gu, ru: /\p{Script=Cyrillic}/gu, uk: /\p{Script=Cyrillic}/gu, ar: /\p{Script=Arabic}/gu }[base] ||
     (["en", "es", "de", "fr", "it", "pt", "pl", "nl", "cs", "vi", "tr"].includes(base) ? /\p{Script=Latin}/gu : null);
+  const explicitScript = _pbpDictExplicitLanguageScript(wanted);
+  if (explicitScript && !["Hans", "Hant", "Jpan", "Kore"].includes(explicitScript)) {
+    try { expectedScript = new RegExp("\\p{Script=" + explicitScript + "}", "gu"); } catch (_) { /* Composite/unknown script. */ }
+  }
+  const withoutMentions = text.replace(/"[^"\n]{1,100}"|“[^”\n]{1,100}”|‘[^’\n]{1,100}’|「[^」\n]{1,100}」|『[^』\n]{1,100}』|（[^）\n]{1,100}）|\([^\)\n]{1,100}\)/gu,
+    mention => /[.!?。！？]/u.test(mention) || (mention.match(/[\p{L}\p{M}]+/gu) || []).length > 4 ? mention : " ");
+  const frameLetters = (withoutMentions.match(/\p{L}/gu) || []).length;
+  const frameScript = expectedScript ? (withoutMentions.match(expectedScript) || []).length : 0;
+  // A short native-language frame around quoted word forms is inconclusive,
+  // not wrong-language prose. Whole sentences and quote-only answers stay in
+  // the sample; a tiny native label cannot hide an untranslated paragraph.
+  const nativeFrame = frameScript >= 4 && frameScript / frameLetters >= 0.5;
+  const prose = frameLetters >= 80 || nativeFrame ? withoutMentions : text;
+  const letters = (prose.match(/\p{L}/gu) || []).length;
+  if (letters < 24) return;
   const scriptLetters = expectedScript ? (prose.match(expectedScript) || []).length : 0;
   // Even a short explanation can be clearly wrong when it contains no target
   // script at all. Keep short mixed prose permissive; statistical detection
@@ -247,6 +348,8 @@ async function _pbpDictCheckExplanation(text, target) {
   try { detected = await chrome.i18n.detectLanguage(prose); }
   catch (error) { console.warn("[dict-entry] language check unavailable:", error?.name); return; }
   const first = detected?.languages?.[0];
+  // Detector regions are language guesses, not evidence about an explicitly
+  // requested script (especially shared Hans/Hant characters).
   if (detected?.isReliable && first?.percentage >= 95 && first.language !== "und" &&
       !_pbpDictExplanationLanguage(first.language, { ...target, lang: base })) {
     throw _pbpDictEntryError("wrong_language", "Explanation language does not match the requested language", "explanation_language");
@@ -332,7 +435,7 @@ async function _pbpDictEntryGenerate(request, updateId = "") {
     beforeRequest: () => _pbpDictEntryGuard(request)
   });
   await _pbpDictEntryGuard(request);
-  const entry = pbpDictEntryParse(response, request), generatedAt = Date.now();
+  const entry = pbpDictEntryParse(_pbpDictGeneratedResponse(response, "entry"), request), generatedAt = Date.now();
   if (!entry.learning) {
     // Keep a valid paid basic entry when the model omitted optional enrichment.
     // Do not reclassify unstructured legacy claims as verified history.
@@ -450,6 +553,7 @@ function _pbpDictSupplementPrompt(request, category, profile, sources, entry) {
     "Add useful information instead of repeating base definitions. Native language and level guide comparisons and complexity; never infer native language from UI. " +
     'Return exactly {"language":string,"summary":string,"items":[{"sense":integer,"title":string,"explanation":string,"example":string,"translation":string,"sourceIndex":integer}]}. ' +
     "Copy language exactly from targetLanguage.lang. Summary <=800 characters, at most5 items, title<=240, explanation<=1400, example/translation<=600 each. " +
+    "The combined summary, titles, explanations, examples and translations must fit within 12000 characters including separators. " +
     "Use sourceIndex=-1 for original learning examples, otherwise an existing zero-based source index. Titles may contain source-language forms; explanations may not switch language. " +
     "Plain text, no Markdown/HTML/URLs. Uncertain or unsupported claims must be omitted; items:[] means no useful supported result.\n" +
     JSON.stringify({ term: request.term, sourceLanguage: request.sourceLanguage, targetLanguage: request.target,
@@ -521,8 +625,10 @@ async function _pbpDictSupplementGenerate(input, request, category, profile) {
     maxTokens: 2048, requireComplete: true, model: request.model.override, signal: request.signal, beforeRequest: () => _pbpDictEntryGuard(request)
   });
   await _pbpDictEntryGuard(request);
-  const learning = pbpDictSupplementParse(response, request, category, sources, record.entry, input.updateId || "");
-  await _pbpDictCheckExplanation([learning.summary, ...learning.items.flatMap(item => [item.explanation, item.translation])].filter(Boolean).join("\n\n"), request.target);
+  const generated = _pbpDictGeneratedResponse(response, "supplement", category);
+  const learning = pbpDictSupplementParse(generated, request, category, sources, record.entry, input.updateId || "");
+  await _pbpDictCheckExplanation([learning.summary, ...learning.items.flatMap(item => [item.explanation, item.translation])].filter(Boolean).join("\n\n"),
+    request.target, JSON.parse(generated).language);
   await _pbpDictEntryGuard(request);
   const content = [learning.summary, ...learning.items.map(item => [item.title, item.explanation, item.example, item.translation].filter(Boolean).join("\n"))].filter(Boolean).join("\n\n");
   if (content.length > 12000) throw _pbpDictEntryError("invalid_response", "Learning content is too long", "supplement_size");

@@ -1,0 +1,135 @@
+<!doctype html><meta charset="utf-8"><title>Dictionary protocol integration tests</title>
+<div id="results"></div><div id="summary"></div>
+<script src="../i18n.js"></script><script src="../shared.js"></script><script src="../ai.js"></script>
+<script src="../vocab-store.js"></script><script src="../dict-archive.js"></script><script src="../dict-entry.js"></script>
+<script>
+// Synthetic learner content, independent of the production parser/serializer.
+// Deliberately includes the supported nullable/singleton/index-string variants.
+const ENTRY = { word: 'provider', language: 'en', pronunciation: null,
+  meanings: { partOfSpeech: null, definition: '提供者；供应商，指向个人或机构提供所需商品、服务或资源的人或组织。',
+    examples: { text: 'Choose a reliable service provider.', translation: '选择一家可靠的服务提供商。' } }, learning: null };
+const USAGE = { language: 'zh-Hans', summary: null, items: { sense: '1', title: 'service provider',
+  explanation: '指提供某项服务的个人或机构，可在前面增加具体的服务领域，说明对方提供什么服务。',
+  example: 'The school chose a new internet service provider.', translation: '学校选择了一家新的互联网服务提供商。', sourceIndex: '-1' } };
+// HTTP envelopes are handwritten from the four public schemas. No production
+// encoder or response reader constructs a fixture. Model names are arbitrary.
+// developers.openai.com/api/reference/resources/chat
+// ai.google.dev/api/generate-content
+// platform.claude.com/docs/en/build-with-claude/handling-stop-reasons
+// docs.ollama.com/api/chat
+const PROTOCOLS = [
+  { name: 'OpenAI-compatible', model: 'arbitrary-protocol-model-a',
+    settings: { aiProvider: 'custom', customBaseUrl: 'https://example.test/v1', customApiKey: 'fixture', customModel: 'arbitrary-protocol-model-a' },
+    envelope: (text, truncated) => ({ choices: [{ message: { role: 'assistant', content: text }, finish_reason: truncated ? 'length' : 'stop' }] }) },
+  { name: 'Gemini', model: 'arbitrary-protocol-model-b',
+    settings: { aiProvider: 'gemini', geminiApiKey: 'fixture', geminiModel: 'arbitrary-protocol-model-b' },
+    envelope: (text, truncated) => ({ candidates: [{ content: { role: 'model', parts: [
+      { thought: true, text: 'Not an answer or a dictionary field.' }, { text: text.slice(0, 15) }, { text: text.slice(15) }
+    ] }, finishReason: truncated ? 'MAX_TOKENS' : 'STOP' }] }) },
+  { name: 'Claude', model: 'arbitrary-protocol-model-c',
+    settings: { aiProvider: 'claude', claudeApiKey: 'fixture', claudeModel: 'arbitrary-protocol-model-c' },
+    envelope: (text, truncated) => ({ type: 'message', role: 'assistant', content: [
+      { type: 'thinking', thinking: 'Not an answer or a dictionary field.', signature: 'synthetic' },
+      { type: 'text', text: text.slice(0, 15) }, { type: 'text', text: text.slice(15) }
+    ], stop_reason: truncated ? 'max_tokens' : 'end_turn' }) },
+  { name: 'Ollama', model: 'arbitrary-protocol-model-d',
+    settings: { aiProvider: 'ollama', ollamaBaseUrl: 'http://127.0.0.1:11434', ollamaModel: 'arbitrary-protocol-model-d' },
+    envelope: (text, truncated) => ({ message: { role: 'assistant', content: text, thinking: 'Not an answer or a dictionary field.' },
+      done: true, done_reason: truncated ? 'length' : 'stop' }) }
+];
+const OWNER = 'acct_protocol_fixture';
+let pass = 0, fail = 0, responses = [], calls = [], ownerReads = 0;
+function assert(value, message = 'Assertion failed') { if (!value) throw new Error(message); }
+async function reject(fn, code) {
+  try { await fn(); } catch (error) { assert(error.code === code, 'Unexpected code: ' + error.code); return error; }
+  throw new Error('Expected ' + code);
+}
+const request = (protocol, extra = {}) => ({ term: 'provider', sourceLanguage: 'en', target: { name: '简体中文', lang: 'zh-Hans' },
+  owner: OWNER, settings: { ...protocol.settings, previewAiEnabled: true }, signal: new AbortController().signal, isCurrent: () => true, ...extra });
+function queue(protocol, content, truncated = false) { responses.push(protocol.envelope(JSON.stringify(content), truncated)); }
+// This evidence boundary is fixed, public and empty. No external lookup occurs.
+async function pbpDictEvidenceFetch(input) { await input.beforeRequest(); return []; }
+async function isolated(protocol, run) {
+  const dbName = 'dict-protocol-' + crypto.randomUUID(), originalFetch = globalThis.fetch, originalOwner = pbpVocabCurrentOwner;
+  let stored = {}; responses = []; calls = []; ownerReads = 0;
+  globalThis.chrome = { runtime: { id: 'isolated-fixture', sendMessage: async () => ({ ok: true, connected: false }) },
+    permissions: { contains: async () => true }, storage: { local: {
+      get: async key => ({ [key]: structuredClone(stored[key]) }), set: async value => Object.assign(stored, structuredClone(value))
+    } } };
+  pbpVocabCurrentOwner = async () => { ownerReads++; return OWNER; };
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), body: JSON.parse(init.body) });
+    const body = responses.shift();
+    if (!body) throw new Error('Unexpected extra HTTP attempt');
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  // Fresh isolated installation: there is no previous cache to migrate. The
+  // real archive read/write/validation paths remain intact.
+  _pbpDictArchiveStore = pbpCreateDictArchiveStore({ dbName, readLegacy: async () => [] });
+  try { await run(request(protocol)); assert(responses.length === 0, 'Unused HTTP fixture'); }
+  finally {
+    await _pbpDictArchiveStore.close(); _pbpDictArchiveStore = null;
+    pbpVocabCurrentOwner = originalOwner; globalThis.fetch = originalFetch;
+    await new Promise((resolve, rejectDelete) => {
+      const deletion = indexedDB.deleteDatabase(dbName);
+      deletion.onsuccess = resolve; deletion.onerror = () => rejectDelete(deletion.error);
+    });
+  }
+}
+async function test(name, protocol, run) {
+  const row = document.createElement('p');
+  try { await isolated(protocol, run); pass++; row.className = 'pass'; row.textContent = 'PASS ' + name; }
+  catch (error) { fail++; row.className = 'fail'; row.textContent = 'FAIL ' + name + ': ' + error.message; }
+  document.getElementById('results').append(row);
+}
+(async () => {
+  for (const protocol of PROTOCOLS) {
+    await test(protocol.name + ': complete entry and supplement persist and reuse without HTTP', protocol, async req => {
+      queue(protocol, ENTRY); const entry = await pbpDictEntryRun(req);
+      assert(entry.archiveSaved && entry.entry.meanings.length === 1 && entry.entry.pronunciation === '', 'Entry not normalized and saved');
+      assert(entry.entry.meanings[0].examples[0].text === ENTRY.meanings.examples.text, 'Example lost in the protocol adapter');
+      queue(protocol, USAGE); const addition = await pbpDictSupplementRun({ ...req, category: 'collocations' });
+      assert(addition.archiveSaved && addition.learning.items.length === 1 && addition.learning.items[0].sense === 1 &&
+        addition.learning.items[0].sourceIndex === -1, 'Supplement not normalized and saved');
+      const reread = await pbpDictEntryRun(req), cachedAddition = await pbpDictSupplementRun({ ...req, category: 'collocations' });
+      assert(reread.archiveId === entry.archiveId && reread.supplements[0].id === addition.id && cachedAddition.id === addition.id, 'Archive identity changed');
+      assert(calls.length === 2 && ownerReads > 0, 'Reread issued HTTP or skipped owner verification');
+      assert(calls.every(call => call.body.model === protocol.model || call.url.includes('/models/' + protocol.model + ':')), 'User model was replaced');
+    });
+    await test(protocol.name + ': truncated entries never save or retry and failed updates preserve the old version', protocol, async req => {
+      queue(protocol, ENTRY, true); await reject(() => pbpDictEntryRun(req), 'output_truncated');
+      assert(calls.length === 1 && await pbpDictEntryRead(req) === null, 'Truncated entry saved or retried');
+      queue(protocol, ENTRY); const old = await pbpDictEntryRun(req);
+      queue(protocol, { ...ENTRY, pronunciation: '/new/' }, true);
+      await reject(() => pbpDictEntryRun({ ...req, updateId: old.archiveId }), 'output_truncated');
+      const kept = await pbpDictEntryRead(req);
+      assert(calls.length === 3 && kept.archiveId === old.archiveId && kept.previousEntries.length === 0 && kept.entry.pronunciation === '', 'Failed update changed the archive');
+    });
+    await test(protocol.name + ': truncated supplements never save or retry and failed updates retain old learning', protocol, async req => {
+      queue(protocol, ENTRY); await pbpDictEntryRun(req);
+      queue(protocol, USAGE, true); await reject(() => pbpDictSupplementRun({ ...req, category: 'collocations' }), 'output_truncated');
+      assert(calls.length === 2 && (await pbpDictEntryRead(req)).supplements.length === 0, 'Truncated supplement saved or retried');
+      queue(protocol, USAGE); const old = await pbpDictSupplementRun({ ...req, category: 'collocations' });
+      queue(protocol, { ...USAGE, summary: '这段新的内容不能覆盖已保存版本。' }, true);
+      await reject(() => pbpDictSupplementRun({ ...req, category: 'collocations', updateId: old.id }), 'output_truncated');
+      const kept = await pbpDictSupplementRun({ ...req, category: 'collocations' });
+      assert(calls.length === 4 && kept.id === old.id && (await pbpDictEntryRead(req)).supplements.length === 1, 'Failed supplement update changed paid learning');
+    });
+    await test(protocol.name + ': wrong identity and missing core content are rejected before persistence', protocol, async req => {
+      for (const payload of [{ ...ENTRY, word: 'provision' }, { ...ENTRY, language: 'de' },
+        { ...ENTRY, meanings: { ...ENTRY.meanings, definition: null } }]) {
+        const before = calls.length; queue(protocol, payload);
+        await reject(() => pbpDictEntryRun(req), 'invalid_response');
+        assert(calls.length === before + 1 && await pbpDictEntryRead(req) === null, 'Invalid entry saved or retried');
+      }
+      queue(protocol, ENTRY); await pbpDictEntryRun(req);
+      for (const items of [{ ...USAGE.items, explanation: null }, { ...USAGE.items, sense: '9' }]) {
+        const before = calls.length; queue(protocol, { ...USAGE, items });
+        await reject(() => pbpDictSupplementRun({ ...req, category: 'collocations' }), 'invalid_response');
+        assert(calls.length === before + 1 && (await pbpDictEntryRead(req)).supplements.length === 0, 'Invalid supplement saved or retried');
+      }
+    });
+  }
+  document.getElementById('summary').textContent = pass + ' passed, ' + fail + ' failed';
+})();
+</script>

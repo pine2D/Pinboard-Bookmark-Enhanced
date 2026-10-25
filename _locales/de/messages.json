@@ -4663,7 +4663,8 @@
   "dictLookupInPanel": {"message": "In der Seitenleiste nachschlagen"},
   "dictSupplementScope": {"message": "Situation eingrenzen"},
   "dictSupplementSaving": {"message": "Ergänzung wird gespeichert…"},
-  "dictGenerationTruncated": {"message": "Das Modell hat sein Ausgabelimit erreicht, bevor die Antwort vollständig war. Dieses Ergebnis wurde nicht gespeichert. Wähle in den Einstellungen ein anderes KI-Modell für die Leseansicht und versuche es erneut."},
+  "dictGenerationTruncated": {"message": "Das Modell hat die Antwort nicht abgeschlossen. Das Ergebnis wurde nicht gespeichert. Versuche es erneut oder wähle in den Einstellungen ein anderes KI-Modell für den Reader."},
+  "dictGenerationRefused": {"message": "Das Modell hat die Anfrage abgelehnt oder die Ausgabe blockiert. Das Ergebnis wurde nicht gespeichert."},
   "dictGenerationEmpty": {"message": "Das Modell hat keinen Antworttext geliefert. Dieses Ergebnis wurde nicht gespeichert. Versuche es erneut oder wähle in den Einstellungen ein anderes KI-Modell für die Leseansicht."},
   "dictGenerationModelUnavailable": {"message": "Der Anbieter konnte das gewählte Modell nicht finden oder verwenden. Prüfe den Modellnamen und die Verfügbarkeit und passe das KI-Modell für die Leseansicht in den Einstellungen an."},
   "dictGenerationBilling": {"message": "Der Anbieter hat diese Anfrage abgelehnt (HTTP 402). Prüfe dort dein Kontingent, den Abrechnungsstatus und die Zugriffsrechte deines Kontos, bevor du es erneut versuchst."}

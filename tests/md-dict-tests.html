@@ -2006,7 +2006,7 @@ async function runDictionaryEntryUiTests() {
       const known=await attempt(Object.assign(new Error(secret),{status:503,reason:"response_json"}));
       check(label+" preserves a known validation reason ahead of HTTP status",known.length===4&&known[3]==="response_json");
       const details=[];
-      for(const reason of ["supplement_item","supplement_item_shape","supplement_item_sense","supplement_item_text","supplement_source_index","supplement_duplicate"]) {
+      for(const reason of ["response_shape","supplement_item","supplement_item_shape","supplement_item_sense","supplement_item_text","supplement_source_index","supplement_duplicate"]) {
         const args=await attempt(Object.assign(new Error(secret),{code:"invalid_response",reason}));
         details.push(args.length===4&&args[2]==="invalid_response"&&args[3]===reason);
       }
@@ -2035,6 +2035,7 @@ async function runDictionaryEntryUiTests() {
     try {
       for(const [properties,key] of [
         [{code:"output_truncated"},"dictGenerationTruncated"],
+        [{code:"output_refused"},"dictGenerationRefused"],
         [{code:"empty_response"},"dictGenerationEmpty"],
         [{code:"model_not_found"},"dictGenerationModelUnavailable"],
         [{status:402},"dictGenerationBilling"]

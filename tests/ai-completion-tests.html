@@ -11,6 +11,51 @@ const LOW_REFUSED={error:{message:'Unsupported parameter: reasoning_effort',para
 const TOKEN_REFUSED={error:{message:'Unsupported parameter: max_tokens. Use max_completion_tokens instead.',param:'max_tokens'}};
 const TEMP_REFUSED={error:{message:'Unsupported parameter: temperature',param:'temperature'}};
 const STREAM_OK={raw:'data: {"choices":[{"delta":{"content":"ready"}}]}\n\ndata: [DONE]\n\n',status:200};
+// Handwritten protocol responses from the official schemas, not constructed by
+// the production response reader. All fields are synthetic; no live calls.
+// developers.openai.com/api/reference/resources/chat
+// ai.google.dev/api/generate-content
+// platform.claude.com/docs/en/build-with-claude/handling-stop-reasons
+// platform.claude.com/docs/en/build-with-claude/thinking
+// docs.ollama.com/api/chat and /capabilities/thinking
+const PROTOCOLS=[
+  {name:'OpenAI-compatible',settings:{aiProvider:'custom',customBaseUrl:'https://example.test/v1',customApiKey:'fixture',customModel:'free-model'},
+    complete:{choices:[{message:{role:'assistant',content:' ready '},finish_reason:'stop'}]},
+    truncated:{choices:[{message:{content:'{"complete":true}'},finish_reason:'length'}]},
+    empty:{choices:[{message:{content:null},finish_reason:'stop'}]},
+    unknown:{choices:[{message:{content:' ready '}}]},
+    future:{choices:[{message:{content:' partial '},finish_reason:'future_nonterminal'}]},
+    unfinished:{choices:[{message:{content:' partial ',tool_calls:[{id:'t',type:'function',function:{name:'lookup',arguments:'{}'}}]},finish_reason:'tool_calls'}]},
+    malformed:{choices:[{message:{content:{text:'PRIVATE_RESPONSE_SENTINEL'}},finish_reason:'stop'}]},
+    thinking:{choices:[{message:{content:'',reasoning_content:'PRIVATE_THOUGHT_SENTINEL'},finish_reason:'stop'}]}},
+  {name:'Gemini',settings:{aiProvider:'gemini',geminiApiKey:'fixture',geminiModel:'free-model'},
+    complete:{candidates:[{content:{role:'model',parts:[{text:' ready '}]},finishReason:'STOP'}]},
+    truncated:{candidates:[{content:{parts:[{text:'{"complete":true}'}]},finishReason:'MAX_TOKENS'}]},
+    empty:{candidates:[{content:{parts:[]},finishReason:'STOP'}]},
+    unknown:{candidates:[{content:{parts:[{text:' ready '}]}}]},
+    future:{candidates:[{content:{parts:[{text:' partial '}]},finishReason:'FUTURE_NONTERMINAL'}]},
+    unfinished:{candidates:[{content:{parts:[{text:' partial '}]},finishReason:'CONTINUATION',continuationToken:'not-used'}]},
+    malformed:{candidates:[{content:{parts:[{text:{private:'PRIVATE_RESPONSE_SENTINEL'}}]},finishReason:'STOP'}]},
+    thinking:{candidates:[{content:{parts:[{thought:true,text:'PRIVATE_THOUGHT_SENTINEL'}]},finishReason:'STOP'}]}},
+  {name:'Claude',settings:{aiProvider:'claude',claudeApiKey:'fixture',claudeModel:'free-model'},
+    complete:{type:'message',role:'assistant',content:[{type:'text',text:' ready '}],stop_reason:'end_turn'},
+    truncated:{content:[{type:'text',text:'{"complete":true}'}],stop_reason:'max_tokens'},
+    empty:{content:[],stop_reason:'end_turn'},
+    unknown:{content:[{type:'text',text:' ready '}]},
+    future:{content:[{type:'text',text:' partial '}],stop_reason:'future_nonterminal'},
+    unfinished:{content:[{type:'text',text:' partial '},{type:'tool_use',id:'t',name:'lookup',input:{}}],stop_reason:'tool_use'},
+    malformed:{content:[{type:'text',text:{private:'PRIVATE_RESPONSE_SENTINEL'}}],stop_reason:'end_turn'},
+    thinking:{content:[{type:'thinking',thinking:'PRIVATE_THOUGHT_SENTINEL',signature:'synthetic'}],stop_reason:'end_turn'}},
+  {name:'Ollama',settings:{aiProvider:'ollama',ollamaBaseUrl:'http://127.0.0.1:11434',ollamaModel:'free-model'},
+    complete:{message:{role:'assistant',content:' ready '},done:true,done_reason:'stop'},
+    truncated:{message:{content:'{"complete":true}'},done:true,done_reason:'length'},
+    empty:{message:{content:''},done:true,done_reason:'stop'},
+    unknown:{message:{content:' ready '}},
+    future:{message:{content:' partial '},done:true,done_reason:'future_nonterminal'},
+    unfinished:{message:{content:' partial '},done:false},
+    malformed:{message:{content:{private:'PRIVATE_RESPONSE_SENTINEL'}},done:true,done_reason:'stop'},
+    thinking:{message:{content:'',thinking:'PRIVATE_THOUGHT_SENTINEL'},done:true,done_reason:'stop'}}
+];
 let stored={},responses=[],calls=[],checks=0,pass=0,fail=0;
 const model='arbitrary-future-user-model',key='minimax:'+model;
 const settings={aiProvider:'minimax',minimaxApiKey:'nonsecret-fixture',minimaxModel:model};
@@ -24,7 +69,9 @@ function reset(queue,seed={}){
     calls.push(JSON.parse(init.body));const next=responses.shift();
     if(!next)throw new Error('Unexpected extra fixture request');
     if(next.error)throw next.error;
-    return new Response(next.raw===undefined?JSON.stringify(next.body):next.raw,{status:next.status,headers:{'Content-Type':next.raw===undefined?'application/json':'text/event-stream'}});
+    const response=new Response(next.raw===undefined?JSON.stringify(next.body):next.raw,{status:next.status,headers:{'Content-Type':next.raw===undefined?'application/json':'text/event-stream'}});
+    if(next.jsonError)response.json=async()=>{throw next.jsonError;};
+    return response;
   };
 }
 const run=(opts={},s=settings)=>callAI(s,'Synthetic provider learning request',{maxTokens:2048,beforeRequest:async()=>{checks++;},...opts});
@@ -48,7 +95,7 @@ await test('other callers retain their existing nonempty partial-text behavior',
   }
 });
 await test('empty or non-text completion is classified without retrying',async()=>{
-  for(const content of ['',null,[],undefined]){reset([reply({choices:[{finish_reason:'stop',message:{content}}]})]);
+  for(const content of ['',null,undefined]){reset([reply({choices:[{finish_reason:'stop',message:{content}}]})]);
     const error=await rejected(()=>run(),'empty_response');assert(error.status===200&&calls.length===1);}
 });
 await test('compatible servers may omit finish_reason and still return text',async()=>{
@@ -160,6 +207,101 @@ await test('network idle timeout starts only after the streaming guard completes
     assert(armed===0&&calls.length===0,'Network timeout started while guard was pending');
     release();assert(await result==='ready'&&armed>0&&calls.length===1);
   }finally{release();await result.catch(()=>{});globalThis.setTimeout=original;}
+});
+await test('all non-streaming protocols return their visible complete text',async()=>{
+  for(const p of PROTOCOLS){reset([reply(p.complete)]);assert(await run({requireComplete:true},p.settings)==='ready',p.name);assert(calls.length===1&&checks===1,p.name);}
+});
+await test('all protocols reject explicit truncation even when JSON looks complete',async()=>{
+  for(const p of PROTOCOLS){reset([reply(p.truncated)]);const error=await rejected(()=>run({requireComplete:true},p.settings),'output_truncated');assert(error.status===200&&calls.length===1,p.name);}
+});
+await test('all protocols preserve non-dictionary partial-text behavior',async()=>{
+  for(const p of PROTOCOLS){reset([reply(p.truncated)]);assert(await run({},p.settings)==='{"complete":true}'&&calls.length===1,p.name);}
+});
+await test('all protocols classify empty answer text consistently without retrying',async()=>{
+  for(const p of PROTOCOLS){reset([reply(p.empty)]);const error=await rejected(()=>run({requireComplete:true},p.settings),'empty_response');assert(error.status===200&&calls.length===1,p.name);}
+});
+await test('omitted completion metadata remains compatible for all protocols',async()=>{
+  for(const p of PROTOCOLS){reset([reply(p.unknown)]);assert(await run({requireComplete:true},p.settings)==='ready'&&calls.length===1,p.name);}
+});
+await test('explicit unknown stop reasons cannot confirm a complete dictionary result',async()=>{
+  for(const p of PROTOCOLS){reset([reply(p.future)]);await rejected(()=>run({requireComplete:true},p.settings),'output_truncated');assert(calls.length===1,p.name);}
+});
+await test('non-dictionary callers may still consume text with unknown stop reasons',async()=>{
+  for(const p of PROTOCOLS){reset([reply(p.future)]);assert(await run({},p.settings)==='partial'&&calls.length===1,p.name);}
+});
+await test('tool turns and continuation states cannot masquerade as complete dictionary answers',async()=>{
+  for(const p of PROTOCOLS){reset([reply(p.unfinished)]);await rejected(()=>run({requireComplete:true},p.settings),'output_truncated');assert(calls.length===1,p.name);}
+});
+await test('non-dictionary consumers retain text from incomplete turns',async()=>{
+  for(const p of PROTOCOLS){reset([reply(p.unfinished)]);assert(await run({},p.settings)==='partial'&&calls.length===1,p.name);}
+});
+await test('wrong answer field types have a fixed safe shape diagnostic in every protocol',async()=>{
+  for(const p of PROTOCOLS){reset([reply(p.malformed)]);const error=await rejected(()=>run({requireComplete:true},p.settings),'invalid_response');
+    assert(error.reason==='response_shape'&&error.status===200&&calls.length===1&&!error.message.includes('PRIVATE'),p.name);}
+});
+await test('invalid HTTP JSON has a fixed safe diagnostic in every protocol',async()=>{
+  for(const p of PROTOCOLS){reset([{raw:'PRIVATE_RESPONSE_SENTINEL {',status:200}]);const error=await rejected(()=>run({requireComplete:true},p.settings),'invalid_response');
+    assert(error.reason==='response_json'&&error.status===200&&calls.length===1&&!error.message.includes('PRIVATE'),p.name);}
+});
+await test('HTTP body read aborts retain cancellation identity in every protocol',async()=>{
+  for(const p of PROTOCOLS){const aborted=new DOMException('Synthetic cancellation','AbortError');reset([{...reply(p.complete),jsonError:aborted}]);
+    let error;try{await run({requireComplete:true},p.settings);}catch(e){error=e;}assert(error===aborted&&calls.length===1,p.name);}
+});
+await test('reasoning-only responses are never returned as answer text',async()=>{
+  for(const p of PROTOCOLS){reset([reply(p.thinking)]);await rejected(()=>run({requireComplete:true},p.settings),'empty_response');assert(calls.length===1,p.name);}
+});
+await test('all non-streaming adapters retain the pre-dispatch guard',async()=>{
+  for(const p of PROTOCOLS){reset([reply(p.complete)]);await rejected(()=>run({beforeRequest:async()=>{throw Object.assign(new Error('Synthetic guard'),{code:'owner_changed'});}},p.settings),'owner_changed');assert(calls.length===0,p.name);}
+});
+await test('Gemini concatenates every answer text part in order and excludes thoughts',async()=>{
+  reset([reply({candidates:[{content:{parts:[{thought:true,text:'PRIVATE_THOUGHT_SENTINEL'},{text:' {"answer":'},{thought:true,text:'HIDDEN'},{text:'"ready"} '}]},finishReason:'STOP'}]})]);
+  assert(await run({requireComplete:true},PROTOCOLS[1].settings)==='{"answer":"ready"}'&&calls.length===1);
+});
+await test('Claude concatenates text blocks and excludes thinking and tool result payloads',async()=>{
+  reset([reply({content:[{type:'thinking',thinking:'PRIVATE_THOUGHT_SENTINEL',signature:'synthetic'},
+    {type:'redacted_thinking',data:'synthetic-hidden'},
+    {type:'text',text:' {"answer":'},
+    {type:'web_search_tool_result',tool_use_id:'t',content:[],text:'NOT_AN_ANSWER'},
+    {type:'text',text:'"ready"} '}],stop_reason:'end_turn'})]);
+  assert(await run({requireComplete:true},PROTOCOLS[2].settings)==='{"answer":"ready"}'&&calls.length===1);
+});
+await test('explicit refusals and safety blocks override any accompanying answer text',async()=>{
+  const cases=[
+    [0,{choices:[{message:{content:'{"looks":"valid"}',refusal:'PRIVATE_REFUSAL_SENTINEL'},finish_reason:'stop'}]}],
+    [0,{choices:[{message:{content:'partial'},finish_reason:'content_filter'}]}],
+    [1,{candidates:[{content:{parts:[{text:'partial'}]},finishReason:'SAFETY'}]}],
+    [2,{content:[{type:'text',text:'PRIVATE_REFUSAL_SENTINEL'}],stop_reason:'refusal'}]
+  ];
+  for(const [index,body]of cases){for(const requireComplete of[true,false]){reset([reply(body)]);const error=await rejected(()=>run({requireComplete},PROTOCOLS[index].settings),'output_refused');assert(error.status===200&&calls.length===1&&!error.message.includes('PRIVATE'));}}
+});
+await test('Gemini prompt blocking is recognized when there is no candidate',async()=>{
+  reset([reply({promptFeedback:{blockReason:'SAFETY',blockReasonMessage:'PRIVATE_RESPONSE_SENTINEL'}})]);
+  const error=await rejected(()=>run({requireComplete:true},PROTOCOLS[1].settings),'output_refused');assert(error.status===200&&calls.length===1&&!error.message.includes('PRIVATE'));
+});
+await test('Claude context exhaustion and paused turns reject complete-result requests',async()=>{
+  for(const stop_reason of['model_context_window_exceeded','pause_turn']){reset([reply({content:[{type:'text',text:'{"looks":"valid"}'}],stop_reason})]);await rejected(()=>run({requireComplete:true},PROTOCOLS[2].settings),'output_truncated');assert(calls.length===1);}
+});
+await test('Ollama done false cannot be overridden by a stop reason',async()=>{
+  reset([reply({message:{content:'{"looks":"valid"}'},done:false,done_reason:'stop'})]);await rejected(()=>run({requireComplete:true},PROTOCOLS[3].settings),'output_truncated');assert(calls.length===1);
+});
+await test('malformed envelopes are rejected consistently instead of being confused with empty answers',async()=>{
+  for(const p of PROTOCOLS){for(const body of[null,[],{}, {unexpected:'PRIVATE_RESPONSE_SENTINEL'}]){reset([reply(body)]);const error=await rejected(()=>run({requireComplete:true},p.settings),'invalid_response');assert(error.reason==='response_shape'&&calls.length===1&&!error.message.includes('PRIVATE'),p.name);}}
+});
+await test('tool payloads remain incomplete even alongside a nominal stop marker',async()=>{
+  const cases=[
+    [0,{choices:[{message:{content:'ready',function_call:{name:'lookup',arguments:'{}'}},finish_reason:'stop'}]}],
+    [1,{candidates:[{content:{parts:[{text:'ready'},{functionCall:{name:'lookup',args:{}}}]},finishReason:'STOP'}]}],
+    [2,{content:[{type:'text',text:'ready'},{type:'tool_use',id:'t',name:'lookup',input:{}}],stop_reason:'end_turn'}],
+    [3,{message:{content:'ready',tool_calls:[{function:{name:'lookup',arguments:{}}}]},done:true,done_reason:'stop'}]
+  ];
+  for(const [index,body]of cases){reset([reply(body)]);await rejected(()=>run({requireComplete:true},PROTOCOLS[index].settings),'output_truncated');assert(calls.length===1);}
+});
+await test('malformed boolean metadata cannot expose thoughts or confirm completion',async()=>{
+  const cases=[
+    [1,{candidates:[{content:{parts:[{thought:'true',text:'PRIVATE_THOUGHT_SENTINEL'}]},finishReason:'STOP'}]}],
+    [3,{message:{content:'ready'},done:'false',done_reason:'stop'}]
+  ];
+  for(const [index,body]of cases){reset([reply(body)]);const error=await rejected(()=>run({requireComplete:true},PROTOCOLS[index].settings),'invalid_response');assert(error.reason==='response_shape'&&calls.length===1&&!error.message.includes('PRIVATE'));}
 });
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();

@@ -1516,7 +1516,7 @@ function pbpDictEntryNorm(record, target) {
 // Only fixed validation labels and HTTP status may enter diagnostics; never log model output,
 // lookup text, or a provider-supplied arbitrary reason string.
 function _pbpDictFailureReason(error) {
-  const allowed = ["response_size", "response_json", "entry_fields", "entry_identity", "entry_pronunciation",
+  const allowed = ["response_size", "response_json", "response_shape", "entry_fields", "entry_identity", "entry_pronunciation",
     "entry_meanings", "entry_meaning", "entry_example", "entry_learning", "entry_related", "entry_version",
     "entry_sources", "entry_legacy", "entry_unknown", "explanation_metadata", "explanation_script",
     "explanation_language", "supplement_fields", "supplement_item", "supplement_item_shape", "supplement_item_sense",
@@ -1537,6 +1537,7 @@ const PBP_DICT_GENERATION_ERROR_KEYS = Object.freeze({
   wrong_language: "dictSupplementWrongLanguage",
   invalid_response: "dictSupplementInvalid",
   output_truncated: "dictGenerationTruncated",
+  output_refused: "dictGenerationRefused",
   empty_response: "dictGenerationEmpty",
   model_not_found: "dictGenerationModelUnavailable"
 });
