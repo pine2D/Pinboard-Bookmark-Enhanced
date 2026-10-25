@@ -1,0 +1,325 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Dictionary Archive Tests</title></head>
+<body><h1>Dictionary Archive Tests</h1><div id="summary"></div><div id="results"></div>
+<script src="../vocab-store.js"></script><script src="../vocab-gdrive.js"></script>
+<script src="../dict-archive.js"></script><script src="../dict-archive-gdrive.js"></script>
+<script>
+const cases = [], databases = [], stores = [];
+const test = (name, run) => cases.push({ name, run });
+const assert = (ok, message = "assertion failed") => { if (!ok) throw new Error(message); };
+const clone = value => structuredClone(value);
+const OWNER = "acct_alice", OTHER = "acct_bob";
+const HASH = "dc44c294755b665b89960e445fe48d98d7ff67fd3b1fb92b2c420b78a52fe4e1";
+// Handwritten wire fixture, independently hashed with Python's sorted-key JSON.
+// No production writer constructs this remote record or its server metadata.
+const REMOTE = { recordKey: "346c52a911f6006b324ad42c81cf52a9f0a353b66a5e922432c99a8096f0309a",
+  value: { kind: "entry", term: "May", sourceLanguage: "en", target: { name: "Chinese", lang: "zh-CN" },
+    provider: "peer-provider", model: "peer-model", generatedAt: 100,
+    entry: { word: "May", language: "en", pronunciation: "/meɪ/",
+      meanings: [{ partOfSpeech: "noun", definition: "五月", examples: [{ text: "May comes after April.", translation: "四月之后是五月。" }] }],
+      etymology: "", relatedWords: [] } } };
+const request = (patch = {}) => ({ owner: OWNER, term: "May", sourceLanguage: "en",
+  target: { name: "Chinese", lang: "zh-CN" }, ...patch });
+const input = (patch = {}) => ({ ...request(), record: { entry: clone(REMOTE.value.entry), provider: "local-provider",
+  model: "local-model", generatedAt: 200 }, ...patch });
+const supplement = (archiveId, patch = {}) => ({ owner: OWNER, archiveId, category: "collocations",
+  profile: { nativeLanguage: "Chinese", level: "beginner", topic: "" }, content: "in May: 在五月。",
+  sources: [], provider: "local-provider", model: "local-model", generatedAt: 201, ...patch });
+const batch = (entries = [clone(REMOTE)]) => ({ schema: 1, ownerHash: HASH, deviceId: "peer-a", createdAt: 123, entries });
+const state = (patch = {}) => ({ key: "account:google-a:" + HASH, ownerHash: HASH, drivePermissionId: "google-a", ...patch });
+function fixture(options = {}) {
+  let owner = options.owner === undefined ? OWNER : options.owner;
+  const dbName = "pbp-test-dict-archive-" + crypto.randomUUID(); databases.push(dbName);
+  const settings = { dbName, readLegacy: options.readLegacy || (async () => []),
+    getWriteGuard: options.getWriteGuard || (() => () => true),
+    getCurrentOwner: options.getCurrentOwner || (async () => owner) };
+  const store = pbpCreateDictArchiveStore(settings); stores.push(store);
+  return { store, settings, owner: value => { owner = value; },
+    reopen: async () => { await store.close(); const next = pbpCreateDictArchiveStore(settings); stores.push(next); return next; } };
+}
+async function rejects(run, code) { let failure; try { await run(); } catch (error) { failure = error; }
+  assert(failure && (!code || failure.code === code), "expected " + code + ", got " + failure?.code); }
+
+test("complete entry survives reopen independently of model and localized target label", async () => {
+  const f = fixture(), saved = await f.store.save(input()), reopened = await f.reopen();
+  const value = await reopened.read(request({ target: { name: "简体中文", lang: "zh-CN" } }));
+  assert(value.archiveId === saved.archiveId && value.entry.meanings[0].examples[0].translation === "四月之后是五月。");
+  assert(value.provider === "local-provider" && value.model === "local-model" && value.archiveSaved);
+});
+test("case, source language and target language remain distinct identities", async () => {
+  const f = fixture(); await f.store.save(input());
+  for (const patch of [{ term: "may" }, { sourceLanguage: "de" }, { target: { name: "Spanish", lang: "es" } }]) {
+    assert(await f.store.read(request(patch)) === null);
+  }
+});
+test("custom und targets retain their distinguishing names", async () => {
+  const f = fixture(); await f.store.save(input({ target: { name: "Simple German", lang: "und" } }));
+  assert(await f.store.read(request({ target: { name: "Simple Spanish", lang: "und" } })) === null);
+});
+test("owner changes block both archive reads and writes", async () => {
+  const f = fixture(); await f.store.save(input()); f.owner(OTHER);
+  await rejects(() => f.store.read(request()), "account_changed");
+  await rejects(() => f.store.save(input()), "account_changed");
+  assert(await f.store.read(request({ owner: OTHER })) === null);
+});
+test("query cancellation before commit atomically rolls back paid record and outbox", async () => {
+  const f = fixture(); let live = true; const original = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (...args) { const value = original.apply(this, args); if (this.name === "records") live = false; return value; };
+  try { await rejects(() => f.store.save({ ...input(), isCurrent: () => live }), "account_changed"); }
+  finally { IDBObjectStore.prototype.put = original; }
+  assert((await f.store.listOutbox(OWNER)).length === 0 && await f.store.read(request()) === null);
+});
+test("connection epoch changing inside IDB work rolls back both remote rows and cursor", async () => {
+  let epoch = 0; const f = fixture({ getWriteGuard: () => { const start = epoch; return () => epoch === start; } });
+  const original = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (...args) { const result = original.apply(this, args); if (this.name === "records") epoch++; return result; };
+  try { await rejects(() => f.store.applyRemotePage(OWNER, HASH, [batch()], state({ pageToken: "unsafe" })), "account_changed"); }
+  finally { IDBObjectStore.prototype.put = original; }
+  assert(!await f.store.getAccountState("google-a", HASH) && await f.store.read(request()) === null);
+});
+test("anonymous output stays local and is not adopted by a signed-in account", async () => {
+  const f = fixture({ owner: "" }); await f.store.save(input({ owner: "" }));
+  assert((await f.store.listOutbox("")).length === 0);
+  assert((await f.store.read(request({ owner: "" }))).entry.word === "May");
+  f.owner(OWNER); assert(await f.store.read(request()) === null);
+});
+test("identical save retries create one durable record and one upload intent", async () => {
+  const f = fixture(), a = await f.store.save(input()), b = await f.store.save(input());
+  assert(a.archiveId === b.archiveId && (await f.store.listOutbox(OWNER)).length === 1);
+});
+test("archive retains paid entries beyond the previous 500-entry LRU limit", async () => {
+  const f = fixture();
+  for (let i = 0; i < 501; i++) { const value = input({ term: "word" + i }); value.record.entry.word = value.term; await f.store.save(value); }
+  assert((await f.store.read(request({ term: "word0" }))).entry.word === "word0");
+  assert((await f.store.listOutbox(OWNER)).length === 501);
+});
+test("concurrent supplements commit independently without lost additions", async () => {
+  const f = fixture(), saved = await f.store.save(input());
+  const another = pbpCreateDictArchiveStore(f.settings); stores.push(another);
+  await Promise.all([f.store.append(supplement(saved.archiveId)),
+    another.append(supplement(saved.archiveId, { category: "grammar", content: "Use in before a month." }))]);
+  const read = await f.store.read(request()); assert(read.supplements.length === 2);
+});
+test("retrying entry persistence never erases supplements", async () => {
+  const f = fixture(), saved = await f.store.save(input()); await f.store.append(supplement(saved.archiveId));
+  await f.store.save(input()); assert((await f.store.read(request())).supplements.length === 1);
+});
+test("supplements from concurrent entry versions remain visible together", async () => {
+  const f = fixture(), first = await f.store.save(input()); await f.store.append(supplement(first.archiveId));
+  const newer = input(); newer.record.generatedAt = 300; newer.record.model = "other-model";
+  const second = await f.store.save(newer); await f.store.append(supplement(second.archiveId, { content: "Another paid explanation." }));
+  const read = await f.store.read(request());
+  assert(read.archiveId === second.archiveId && read.supplements.length === 2);
+  assert(new Set(read.supplements.map(row => row.archiveId)).size === 2);
+});
+test("supplement retries are idempotent and keep source provenance", async () => {
+  const f = fixture(), saved = await f.store.save(input());
+  const value = supplement(saved.archiveId, { sources: [{ title: "Public source", url: "https://example.test/source", excerpt: "A short excerpt." }] });
+  const a = await f.store.append(value), b = await f.store.append(value);
+  assert(a.id === b.id && (await f.store.read(request())).supplements[0].sources[0].excerpt === "A short excerpt.");
+});
+test("supplements reject foreign parents and unsafe or oversized sources", async () => {
+  const f = fixture(), saved = await f.store.save(input());
+  await rejects(() => f.store.append(supplement("a".repeat(64))), "invalid_request");
+  for (const url of ["http://example.test", "https://user:secret@example.test", "javascript:alert(1)"]) {
+    await rejects(() => f.store.append(supplement(saved.archiveId, { sources: [{ title: "source", url, excerpt: "" }] })), "invalid_response");
+  }
+  await rejects(() => f.store.append(supplement(saved.archiveId, { content: "a".repeat(12001) })), "invalid_response");
+});
+test("wire validation rejects extra owner or credential fields recursively", () => {
+  for (const location of [value => value, value => value.entry, value => value.entry.meanings[0], value => value.target]) {
+    const event = clone(REMOTE); location(event.value).token = "must not escape";
+    assert(!pbpDictArchiveValidateEvent(event));
+  }
+});
+test("remote identity is checked against complete content before any cursor write", async () => {
+  const f = fixture(), altered = clone(REMOTE); altered.value.entry.meanings[0].definition = "altered";
+  const result = await f.store.applyRemotePage(OWNER, HASH, [batch([altered])], state({ pageToken: "after" }));
+  assert(result.error === "invalid_remote_page" && !await f.store.getAccountState("google-a", HASH));
+  assert(await f.store.read(request()) === null);
+});
+test("remote page replays idempotently and does not requeue downloaded data", async () => {
+  const f = fixture(), first = await f.store.applyRemotePage(OWNER, HASH, [batch()], state({ pageToken: "after" }));
+  const second = await f.store.applyRemotePage(OWNER, HASH, [batch()], state({ pageToken: "after" }));
+  assert(first.applied === 1 && second.ignored === 1 && (await f.store.listOutbox(OWNER)).length === 0);
+  assert((await f.store.read(request())).model === "peer-model");
+});
+test("malformed peer data cannot partially advance the archive cursor", async () => {
+  const f = fixture(), invalid = clone(REMOTE); invalid.value.entry.meanings[0].definition = "";
+  const result = await f.store.applyRemotePage(OWNER, HASH, [batch([REMOTE, invalid])], state({ pageToken: "bad" }));
+  assert(result.error === "invalid_remote_page" && await f.store.read(request()) === null);
+});
+test("remote batches and state writes cannot cross an owner boundary", async () => {
+  const f = fixture({ owner: OTHER });
+  await rejects(() => f.store.applyRemotePage(OWNER, HASH, [batch()], state()), "account_changed");
+  await rejects(() => f.store.putAccountState(state()), "account_changed");
+  await rejects(() => f.store.putPreflightState({ key: "preflight:" + HASH, ownerHash: HASH }), "account_changed");
+});
+test("legacy migration preserves every valid model variant and its original timestamp", async () => {
+  const legacy = ["old-a", "old-b"].map((model, i) => ({ result: { ...request(), version: 1,
+    entry: clone(REMOTE.value.entry), provider: "old-provider", model, generatedAt: 100 + i } }));
+  const f = fixture({ readLegacy: async () => clone(legacy) }); const value = await f.store.read(request());
+  assert(value.model === "old-b" && value.generatedAt === 101 && (await f.store.listOutbox(OWNER)).length === 2);
+  assert((await f.store.migrate(OWNER)).processed === 0);
+});
+test("legacy migration rejects corrupt entries and never imports another owner", async () => {
+  const good = { ...request(), version: 1, ...input().record };
+  const foreign = { ...good, owner: OTHER }, invalid = clone(good); invalid.entry.meanings[0].definition = "";
+  const f = fixture({ readLegacy: async () => [foreign, invalid].map(result => ({ result })) });
+  assert(await f.store.read(request()) === null && (await f.store.listOutbox(OWNER)).length === 0);
+});
+test("failed migration does not mark the old paid cache as migrated", async () => {
+  let fail = true; const f = fixture({ readLegacy: async () => {
+    if (fail) throw new Error("disk unavailable"); return [{ result: { ...request(), version: 1, ...input().record } }];
+  } });
+  await rejects(() => f.store.read(request())); fail = false;
+  assert((await f.store.read(request())).entry.word === "May");
+});
+test("freezing upload body removes intent only in the same committed transaction", async () => {
+  const f = fixture(); await f.store.save(input()); const rows = await f.store.listOutbox(OWNER);
+  const split = pbpVocabSplitDriveEntries(rows.map(row => row.event), { ownerHash: HASH, deviceId: "local-a", createdAt: 100 }, PBP_DICT_ARCHIVE_DRIVE_PROTOCOL);
+  const frozen = await f.store.freezeOutbox(OWNER, "google-a", HASH, "file-a", split.batches[0]);
+  assert(frozen.body === split.batches[0].body && !(await f.store.listOutbox(OWNER)).length);
+  const reopened = await f.reopen(); assert((await reopened.listPendingBatches("google-a", HASH))[0].body === frozen.body);
+});
+test("a second Google account and returning account get a full checkpoint", async () => {
+  const f = fixture(); await f.store.activateAccount("google-a", HASH); await f.store.putAccountState(state({ bootstrapComplete: true }));
+  await f.store.activateAccount("google-b", HASH); await f.store.activateAccount("google-a", HASH);
+  assert((await f.store.getAccountState("google-a", HASH)).needsCheckpoint === true);
+});
+test("snapshot counts pending bodies without exposing their content", async () => {
+  const f = fixture(); await f.store.save(input());
+  const split = pbpVocabSplitDriveEntries((await f.store.listOutbox(OWNER)).map(row => row.event), { ownerHash: HASH, deviceId: "local-a", createdAt: 100 }, PBP_DICT_ARCHIVE_DRIVE_PROTOCOL);
+  await f.store.freezeOutbox(OWNER, "google-a", HASH, "file-a", split.batches[0]);
+  const snapshot = await f.store.snapshot(OWNER, HASH);
+  assert(snapshot.batches.length === 1 && !Object.hasOwn(snapshot.batches[0], "body") && !snapshot.outbox.length);
+});
+
+function driveFixture(options = {}) {
+  pbpVocabDriveForgetIdentity();
+  let owner = OWNER, enabled = true, permissionId = "google-a", sessionPermissionId = "", failUpload = !!options.failUpload;
+  const calls = [], uploads = [], connectionPuts = [];
+  let connectionState = null;
+  const metadata = { id: "peer-file", name: "pbp-dict-entry-peer-file.json", parents: ["1opaque-appdata-folder"],
+    mimeType: "application/json", appProperties: { pbpKind: "dict-entry-batch", schema: "1", owner: HASH, device: "peer-a" } };
+  const body = JSON.stringify(batch());
+  const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
+  const client = pbpCreateVocabDriveClient({ protocol: PBP_DICT_ARCHIVE_DRIVE_PROTOCOL,
+    identity: { getAuthToken: async () => ({ token: "token:" + permissionId }), removeCachedAuthToken: async () => {} },
+    beforeRequest: async () => enabled,
+    fetchImpl: async (input, init) => {
+      const url = new URL(input); calls.push(url.pathname + url.search);
+      if (url.pathname === "/drive/v3/about") return json({ user: { permissionId, emailAddress: "test@example.test" } });
+      if (url.pathname === "/drive/v3/changes/startPageToken") return json({ startPageToken: "before" });
+      if (url.pathname === "/drive/v3/files") return json({ files: options.remote ? [metadata] : [] });
+      if (url.pathname === "/drive/v3/changes") return json({ changes: [], newStartPageToken: "after" });
+      if (url.pathname === "/drive/v3/files/peer-file") {
+        options.afterDownload?.({ owner: () => { owner = OTHER; }, google: () => { permissionId = "google-b"; }, disable: () => { enabled = false; } });
+        return new Response(options.corrupt ? "{bad json" : body);
+      }
+      if (url.pathname === "/drive/v3/files/generateIds") return json({ ids: ["upload-" + (uploads.length + 1)] });
+      if (url.pathname === "/upload/drive/v3/files") {
+        const parts = init.body.split("\r\n\r\n");
+        uploads.push({ metadata: JSON.parse(parts[1].split("\r\n--")[0]),
+          body: parts[2].slice(0, parts[2].lastIndexOf("\r\n--")) });
+        return json({}, failUpload ? 503 : 201);
+      }
+      throw new Error("unexpected request " + url.pathname);
+    } });
+  const f = fixture({ getCurrentOwner: async ({ requireDriveAccount = true } = {}) => {
+    if (!enabled) return null;
+    if (requireDriveAccount && sessionPermissionId) {
+      const identity = await client.about(); if (!identity.ok) throw Object.assign(new Error("identity unavailable"), { code: identity.error });
+      if (identity.permissionId !== sessionPermissionId) return null;
+    }
+    return owner;
+  } });
+  const connection = { get: async () => clone(connectionState), put: async (_hash, value) => {
+    connectionState = clone(value); connectionPuts.push(clone(value)); return true;
+  } };
+  const run = args => pbpCreateDictArchiveDriveSyncRunner({ client, store: f.store, connection,
+    getCurrentPinboardAuth: async () => ({ account: owner === OWNER ? "alice" : "bob" }),
+    pinboardAuthIsCurrent: auth => auth.account === (owner === OWNER ? "alice" : "bob"),
+    getCurrentPermissionId: () => client.about(), isEnabled: async () => enabled,
+    onSession: value => { sessionPermissionId = value; }, now: () => 100000, random: () => .5 })(args);
+  return { ...f, client, run, metadata, body, calls, uploads, connectionPuts,
+    connection: () => connectionState, failUpload: value => { failUpload = value; } };
+}
+test("archive transport accepts actual Drive metadata and rejects other datasets", () => {
+  const f = driveFixture(); assert(pbpVocabValidateDriveBatch(f.metadata, f.body, HASH, PBP_DICT_ARCHIVE_DRIVE_PROTOCOL));
+  assert(!pbpVocabValidateDriveBatch(f.metadata, f.body, HASH));
+});
+test("archive file listing queries only its own owner-scoped appData dataset", async () => {
+  const f = driveFixture(); await f.client.listFiles(HASH);
+  const url = new URL("https://www.googleapis.com" + f.calls[0]);
+  assert(url.searchParams.get("q").includes("value='dict-entry-batch'") && url.searchParams.get("spaces") === "appDataFolder");
+});
+test("real runner bootstraps an empty device and reuses a peer's complete entry", async () => {
+  const f = driveFixture({ remote: true }), result = await f.run();
+  const read = await f.store.read(request());
+  assert(result.ok && result.changed && result.status.bootstrapComplete && read.model === "peer-model");
+  assert((await f.store.getAccountState("google-a", HASH)).pageToken === "after" && f.uploads.length === 1);
+  assert(!f.uploads[0].body.includes(OWNER) && f.uploads[0].metadata.appProperties.pbpKind === "dict-entry-batch");
+});
+test("complete entry and supplements transfer between independent devices", async () => {
+  const a = fixture(), b = fixture(); const saved = await a.store.save(input());
+  await a.store.append(supplement(saved.archiveId));
+  const events = (await a.store.listOutbox(OWNER)).map(row => row.event);
+  await b.store.applyRemotePage(OWNER, HASH, [batch(events)], state());
+  const restored = await b.store.read(request());
+  assert(restored.entry.pronunciation === "/meɪ/" && restored.supplements[0].content === "in May: 在五月。");
+  // Supplement-before-parent arrival is legal and must not lose paid content.
+  const c = fixture(); await c.store.applyRemotePage(OWNER, HASH, [batch(events.filter(event => event.value.kind === "supplement"))], state());
+  assert(await c.store.read(request()) === null);
+  await c.store.applyRemotePage(OWNER, HASH, [batch(events.filter(event => event.value.kind === "entry"))], state());
+  assert((await c.store.read(request())).supplements.length === 1);
+});
+test("frozen uploads retry identical file ID and body after a worker restart", async () => {
+  const f = driveFixture({ failUpload: true }); await f.store.save(input());
+  const first = await f.run(); const pending = await f.store.listPendingBatches("google-a", HASH);
+  await f.store.close(); f.failUpload(false); const second = await f.run({ force: true });
+  assert(first.error === "server" && pending.length === 1 && second.ok && f.uploads.length === 2);
+  assert(f.uploads[0].metadata.id === f.uploads[1].metadata.id && f.uploads[0].body === f.uploads[1].body);
+  assert(!(await f.store.listPendingBatches("google-a", HASH)).length && f.connection() === null);
+});
+for (const change of ["owner", "google", "disable"]) test(change + " changes during download prevent archive and cursor commits", async () => {
+  const f = driveFixture({ remote: true, afterDownload: context => context[change]() }), result = await f.run();
+  assert(!result.ok && f.uploads.length === 0);
+  const state = await f.store.getAccountState("google-a", HASH); assert(state?.bootstrapListComplete !== true);
+});
+test("corrupt remote archive blocks only this dataset", async () => {
+  const f = driveFixture({ remote: true, corrupt: true }), result = await f.run();
+  const preflight = await f.store.getPreflightState(HASH);
+  assert(result.error === "corrupt" && preflight.blocked && !f.connectionPuts.length);
+});
+test("record storage failure keeps cursor before unapplied remote data", async () => {
+  const f = driveFixture({ remote: true }), original = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (...args) { if (this.name === "records") throw new DOMException("quota", "QuotaExceededError"); return original.apply(this, args); };
+  let result; try { result = await f.run(); } finally { IDBObjectStore.prototype.put = original; }
+  const state = await f.store.getAccountState("google-a", HASH);
+  assert(result.error === "local_store" && state?.bootstrapListComplete !== true && f.uploads.length === 0);
+});
+test("frozen-body storage failure preserves the entire outbox", async () => {
+  const f = driveFixture(); await f.store.save(input()); const original = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (value, ...args) { if (String(value?.key).startsWith("batch:")) throw new DOMException("quota", "QuotaExceededError"); return original.call(this, value, ...args); };
+  let result; try { result = await f.run(); } finally { IDBObjectStore.prototype.put = original; }
+  assert(result.error === "local_store" && f.uploads.length === 0 && (await f.store.listOutbox(OWNER)).length === 1);
+});
+test("device metadata write failure is reported without an unhandled IDB rejection", async () => {
+  const f = driveFixture(), original = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (value, ...args) { if (value?.key === "meta") throw new DOMException("quota", "QuotaExceededError"); return original.call(this, value, ...args); };
+  let result; try { result = await f.run(); } finally { IDBObjectStore.prototype.put = original; }
+  assert(result.error === "local_store" && f.uploads.length === 0);
+});
+(async () => {
+  let pass = 0, fail = 0;
+  for (const item of cases) {
+    const row = document.createElement("div");
+    try { await item.run(); row.className = "pass"; row.textContent = item.name; pass++; }
+    catch (error) { row.className = "fail"; row.textContent = item.name + ": " + error.message; fail++; console.error(item.name, error); }
+    document.getElementById("results").append(row);
+  }
+  for (const store of stores) await store.close();
+  for (const name of databases) indexedDB.deleteDatabase(name);
+  document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
+})();
+</script></body></html>

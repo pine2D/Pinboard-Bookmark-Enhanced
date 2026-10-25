@@ -52,6 +52,8 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/contrast-tests.html": 6,
   "tests/dict-pack-tests.html": 316,
   "tests/dict-entry-tests.html": 54,
+  "tests/dict-usage-tests.html": 33,
+  "tests/dict-archive-tests.html": 37,
   "tests/escape-html-tests.html": 8,
   "tests/eudic-sync-tests.html": 39,
   "tests/export-targets-tests.html": 153,
@@ -102,7 +104,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/notes-sync-tests.html": 53,
   "tests/notes-gdrive-tests.html": 14,
   "tests/options-drive-sync-tests.html": 27,
-  "tests/drive-scopes-tests.html": 88,
+  "tests/drive-scopes-tests.html": 97,
   "tests/drive-migration-tests.html": 20,
   "tests/wayback-tests.html": 44,
 });
