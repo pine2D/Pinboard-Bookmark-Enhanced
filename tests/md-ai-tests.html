@@ -13529,4 +13529,176 @@ suite("t key confirms before spending tokens the reader cannot see", () => {
   });
 });
 </script>
+<script>
+// Search lifecycle regressions use the real observer and real rendered DOM.
+// Only scrolling is recorded: a passive rescan must never request a jump.
+(async function () {
+  const host = document.createElement("div"); host.className = "suite";
+  const heading = document.createElement("h2"); heading.textContent = "Search observer and input lifecycle";
+  host.appendChild(heading); document.getElementById("results").appendChild(host);
+  function report(name, error) {
+    const row = document.createElement("div"); row.className = "case " + (error ? "fail" : "pass");
+    row.textContent = (error ? "FAIL " : "PASS ") + name + (error ? "\n  " + error.message : "");
+    if (error) FAIL++; else PASS++;
+    host.appendChild(row);
+  }
+  const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const atest = (name, fn) => atestNetSerial(name, fn, report);
+  async function setup() {
+    _pbpSearchTeardown();
+    if (_pbpSearchPopEl?.matches(":popover-open")) _pbpSearchPopEl.hidePopover();
+    await pause(0);
+    const view = document.createElement("div"); view.id = "rendered-view";
+    view.innerHTML = "<p>impeccable first</p><p>impeccable second</p><p>impeccable third</p>";
+    document.body.prepend(view);
+    const bodyClass = document.body.className, regex = _pbpSearchRegexOn, oldScroll = window.pbpScrollIntoView;
+    const focus = document.activeElement, jumps = [], extra = [];
+    document.body.classList.remove("tr-only", "tr-bilingual");
+    window.pbpScrollIntoView = el => jumps.push(el);
+    _pbpSearchLastQuery = ""; _pbpSearchLastIdx = 0;
+    return { view, jumps, extra,
+      start(query = "impeccable", pattern = false) {
+        _pbpSearchOpen(); _pbpSearchRegexOn = pattern;
+        document.getElementById("search-input").value = query; _pbpSearchRun(query);
+      },
+      async done() {
+        _pbpSearchTeardown();
+        if (_pbpSearchPopEl?.matches(":popover-open")) _pbpSearchPopEl.hidePopover();
+        clearTimeout(_pbpSearchInputTimer); _pbpSearchInputTimer = null;
+        await pause(0);
+        view.remove(); extra.forEach(el => el.remove());
+        document.body.className = bodyClass; _pbpSearchRegexOn = regex;
+        window.pbpScrollIntoView = oldScroll; _pbpSearchLastQuery = ""; _pbpSearchLastIdx = 0;
+        if (focus?.isConnected) focus.focus({ preventScroll: true });
+      }
+    };
+  }
+  for (const regex of [false, true]) await atest((regex ? "regex" : "literal") + " navigation does not rescan its own content-visibility calibration", async () => {
+    const f = await setup();
+    try {
+      f.start(regex ? "imp.*?ble" : "impeccable", regex); _pbpSearchStep(1);
+      await pause(420);
+      assertEq(_pbpSearchState.idx, 1, "observer reset the selected match");
+      assertEq(f.jumps.length, 2, "observer requested another scroll after navigation");
+    } finally { await f.done(); }
+  });
+  await atest("passive article changes retain the same surviving hit without scrolling", async () => {
+    const f = await setup();
+    try {
+      f.start(); _pbpSearchStep(1); const current = _pbpSearchState.matches[1].el;
+      const p = document.createElement("p"); p.textContent = "impeccable inserted"; f.view.prepend(p);
+      await pause(420);
+      assertEq(_pbpSearchState.matches.length, 4, "new text was not indexed");
+      assertEq(_pbpSearchState.matches[_pbpSearchState.idx].el, current, "a preceding insertion changed the current hit");
+      assertEq(f.jumps.length, 2, "passive indexing scrolled");
+    } finally { await f.done(); }
+  });
+  await atest("body translation modes rebuild only the visible matches without scrolling", async () => {
+    const f = await setup();
+    try {
+      for (const p of f.view.children) p.setAttribute("data-pb-tr-done", "1");
+      const translated = document.createElement("p"); translated.className = "pb-tr"; translated.textContent = "impeccable translation"; f.view.appendChild(translated);
+      f.start(); document.body.classList.add("tr-bilingual"); await pause(420);
+      assertEq(_pbpSearchState.matches.length, 4, "bilingual translation stayed missing");
+      document.body.classList.replace("tr-bilingual", "tr-only"); await pause(420);
+      assertEq(_pbpSearchState.matches.length, 1, "hidden originals stayed searchable");
+      assertEq(f.jumps.length, 1, "view mode rescan stole the reading position");
+    } finally { await f.done(); }
+  });
+  await atest("hidden blocks and original-text peeks update search visibility", async () => {
+    const f = await setup();
+    try {
+      f.start(); f.view.firstElementChild.hidden = true; await pause(420);
+      assertEq(_pbpSearchState.matches.length, 2, "hidden match remained");
+      for (const p of f.view.children) p.setAttribute("data-pb-tr-done", "1");
+      document.body.classList.add("tr-only"); f.view.lastElementChild.classList.add("pb-show-orig"); await pause(420);
+      assertEq(_pbpSearchState.matches.length, 1, "peeked original was not the only visible hit");
+      assertEq(f.jumps.length, 1, "visibility updates scrolled");
+    } finally { await f.done(); }
+  });
+  await atest("video description opening and closing refreshes its searchable content", async () => {
+    const f = await setup();
+    try {
+      const desc = document.createElement("details"); desc.id = "video-description";
+      desc.innerHTML = "<summary>Description</summary><div class='desc-body'><p>impeccable description</p></div>";
+      document.body.appendChild(desc); f.extra.push(desc); f.start();
+      desc.open = true; await pause(420); assertEq(_pbpSearchState.matches.length, 4, "opened description was not indexed");
+      desc.open = false; await pause(420); assertEq(_pbpSearchState.matches.length, 3, "closed description remained searchable");
+      assertEq(f.jumps.length, 1, "description rescan scrolled");
+    } finally { await f.done(); }
+  });
+  await atest("timeline playback classes leave navigation alone while rebuilt rows refresh matches", async () => {
+    const f = await setup();
+    try {
+      const col = document.createElement("div"); col.className = "pbv-col-study";
+      col.innerHTML = "<div class='pbv-list'><div class='pbv-row'><span class='pbv-text'>impeccable cue one</span></div><div class='pbv-row'><span class='pbv-text'>impeccable cue two</span></div></div>";
+      document.body.appendChild(col); f.extra.push(col); f.view.hidden = true; f.start(); _pbpSearchStep(1);
+      col.querySelectorAll('.pbv-row')[1].classList.add('pbv-row--active'); await pause(420);
+      assertEq(_pbpSearchState.idx, 1, "playback marker reset navigation");
+      col.querySelector('.pbv-list').innerHTML = "<div class='pbv-row'><span class='pbv-text'>impeccable replacement</span></div>"; await pause(420);
+      assertEq(_pbpSearchState.matches.length, 1, "replaced timeline was not rescanned");
+      assert(_pbpSearchState.matches[0].el.isConnected, "range still points to an old row");
+      assertEq(f.jumps.length, 2, "timeline indexing scrolled");
+    } finally { await f.done(); }
+  });
+  await atest("next flushes a pending input query once instead of stepping the old query", async () => {
+    const f = await setup();
+    try {
+      f.start(); const input = document.getElementById("search-input"); input.value = "second";
+      input.dispatchEvent(new Event("input")); document.getElementById("search-next").click();
+      assertEq(_pbpSearchState.query, "second", "next used the old query");
+      await pause(220); assertEq(_pbpSearchState.idx, 0, "debounce changed the new match");
+      assertEq(f.jumps.length, 2, "pending input dispatched twice");
+    } finally { await f.done(); }
+  });
+  await atest("regex toggling consumes pending input and cancels its old delayed scan", async () => {
+    const f = await setup();
+    try {
+      f.start(); const input = document.getElementById("search-input"); input.value = "imp.*?ble";
+      input.dispatchEvent(new Event("input")); document.getElementById("search-regex").click();
+      assertEq(_pbpSearchState.matches.length, 3, "toggle did not index the current pattern");
+      _pbpSearchStep(1); await pause(220);
+      assertEq(_pbpSearchState.idx, 1, "stale input timer reset the stepped match");
+      assertEq(f.jumps.length, 3, "regex input ran more than once");
+    } finally { await f.done(); }
+  });
+  for (const manual of [false, true]) await atest(manual ? "late regex preference cannot overwrite the user's new choice" : "late regex preference refreshes a typed query without scrolling", async () => {
+    const f = await setup();
+    const oldPop = _pbpSearchPopEl, oldGet = chrome.storage.local.get;
+    let release;
+    oldPop?.remove(); _pbpSearchPopEl = null;
+    chrome.storage.local.get = function(defaults, callback) {
+      if (defaults?.pbp_srch_regex !== undefined) { release = callback; return; }
+      return oldGet.apply(this, arguments);
+    };
+    try {
+      f.start("imp.*?ble");
+      if (manual) document.getElementById("search-regex").click();
+      const before = f.jumps.length;
+      release({ pbp_srch_regex: !manual });
+      assertEq(_pbpSearchRegexOn, true, "stored preference replaced or failed to hydrate the chosen mode");
+      assertEq(_pbpSearchState.matches.length, 3, "matches do not agree with the effective regex mode");
+      assertEq(document.getElementById("search-regex").getAttribute("aria-pressed"), "true", "mode button is stale");
+      assertEq(f.jumps.length, before, "async preference read scrolled the article");
+    } finally {
+      chrome.storage.local.get = oldGet;
+      await f.done(); _pbpSearchPopEl?.remove(); _pbpSearchPopEl = oldPop;
+      if (oldPop) document.body.appendChild(oldPop);
+    }
+  });
+  await atest("closing during input debounce prevents hidden highlights and delayed scrolling", async () => {
+    const f = await setup();
+    try {
+      f.start(); const input = document.getElementById("search-input"); input.value = "third";
+      input.dispatchEvent(new Event("input")); _pbpSearchPopEl.hidePopover(); await pause(240);
+      assertEq(_pbpSearchState.query, "", "closed search was repopulated by its timer");
+      assertEq(CSS.highlights.has("pbp-search"), false, "closed search repainted highlights");
+      assertEq(f.jumps.length, 1, "closed search scrolled after dismissal");
+      _pbpSearchOpen(); assertEq(input.value, "third", "uncommitted input was lost on reopen");
+      assertEq(f.jumps.length, 1, "reopen should repaint without scrolling");
+    } finally { await f.done(); }
+  });
+})();
+</script>
+
 </body></html>

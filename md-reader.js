@@ -645,6 +645,9 @@ function _pbpSearchRemember() {
 // to hit 1 would defeat the memory it exists for.
 function _pbpSearchRun(query, opts) {
   const st = _pbpSearchState;
+  const previous = opts?.preserveCurrent ? st.matches[st.idx] : null;
+  const previousRange = previous ? st.ranges[st.idx] : null;
+  const previousIdx = st.idx;
   st.query = query;
   st.matches = [];
   st.ranges = [];
@@ -707,6 +710,21 @@ function _pbpSearchRun(query, opts) {
     if (inputEl) inputEl.classList.toggle("srch-bad", bad);
   }
   st.idx = st.matches.length ? 0 : -1;
+  if (previous && st.matches.length) {
+    // Prefer the surviving DOM range: insertions before the current block (or
+    // inside its text node) can change its match index/offset without changing
+    // what the reader selected. A replaced or hidden hit falls back to the
+    // nearest remaining index, with no automatic scroll.
+    const same = st.matches.findIndex((match, i) => {
+      if (previous.noteId) return match.noteId === previous.noteId;
+      const range = st.ranges[i];
+      if (previousRange?.startContainer.isConnected && range &&
+        previousRange.compareBoundaryPoints(Range.START_TO_START, range) === 0 &&
+        previousRange.compareBoundaryPoints(Range.END_TO_END, range) === 0) return true;
+      return match.el === previous.el && match.start === previous.start && match.end === previous.end;
+    });
+    st.idx = same >= 0 ? same : Math.min(Math.max(previousIdx, 0), st.matches.length - 1);
+  }
   _pbpSearchRemember();
   _pbpSearchPaintAll();
   _pbpSearchPaintCurrent(!(opts && opts.jump === false));
@@ -715,6 +733,12 @@ function _pbpSearchRun(query, opts) {
 
 function _pbpSearchStep(dir) {
   const st = _pbpSearchState;
+  // Clicks on either arrow obey the same fresh-input contract as Enter.
+  if (_pbpSearchInputTimer !== null) {
+    clearTimeout(_pbpSearchInputTimer); _pbpSearchInputTimer = null;
+    const input = _pbpSearchPopEl?.querySelector("#search-input");
+    if (input && input.value !== st.query) { _pbpSearchRun(input.value); return; }
+  }
   if (!st.matches.length) return;
   st.idx = (st.idx + dir + st.matches.length) % st.matches.length;
   _pbpSearchRemember();
@@ -731,39 +755,60 @@ function _pbpSearchOnInput(e) {
     const counter = _pbpSearchPopEl.querySelector("#search-count");
     if (counter) counter.setAttribute("aria-busy", "true");
   }
-  _pbpSearchInputTimer = setTimeout(() => _pbpSearchRun(val), 150);
+  _pbpSearchInputTimer = setTimeout(() => {
+    _pbpSearchInputTimer = null;
+    _pbpSearchRun(val);
+  }, 150);
 }
 
 // Rescan trigger (spec sec.4: "view change / lang change"): a single
-// MutationObserver on #rendered-view (attributes+childList+subtree+
-// characterData) covers BOTH without touching md-translate.js. Debounced
-// 300ms past the last mutation; no-ops while the popover is closed.
+// Observe content and the attributes that determine searchable visibility.
+// In particular, search's own content-visibility calibration writes `style`;
+// observing it would rescan, jump, write style, and repeat every 300ms.
+// Passive rescans repaint without moving the viewport or resetting a live hit.
 function _pbpSearchArmObserver() {
   _pbpSearchDisarmObserver();
   const view = document.getElementById("rendered-view");
   if (!view) return;
-  _pbpSearchMo = new MutationObserver(() => {
+  _pbpSearchMo = new MutationObserver(records => {
     // Condition checked BEFORE scheduling so aria-busy below is only ever
     // set when a rescan is actually going to run.
     if (!(_pbpSearchPopEl && _pbpSearchPopEl.matches(":popover-open") && _pbpSearchState.query)) return;
+    const relevant = records.some(record => {
+      if (record.type !== "attributes" || record.attributeName !== "class") return true;
+      const before = new Set((record.oldValue || "").split(/\s+/));
+      const classes = record.target === document.body ? ["tr-bilingual", "tr-only"] :
+        ["pb-tr", "pb-show-orig", "pbv-row--tr", "pbv-row--aux"];
+      return classes.some(name => before.has(name) !== record.target.classList.contains(name));
+    });
+    if (!relevant) return;
     clearTimeout(_pbpSearchMoTimer);
     const counter = _pbpSearchPopEl.querySelector("#search-count");
     if (counter) counter.setAttribute("aria-busy", "true");
     _pbpSearchMoTimer = setTimeout(() => {
-      _pbpSearchRun(_pbpSearchState.query);
+      _pbpSearchMoTimer = null;
+      // A keystroke owns its pending scan; do not index its previous query.
+      if (_pbpSearchInputTimer !== null) return;
+      _pbpSearchRun(_pbpSearchState.query, { jump: false, preserveCurrent: true });
     }, 300);
   });
-  _pbpSearchMo.observe(view, { childList: true, subtree: true, attributes: true, characterData: true });
+  const content = { childList: true, subtree: true, characterData: true,
+    attributes: true, attributeOldValue: true,
+    attributeFilter: ["hidden", "class", "data-pb-tr-done", "open"] };
+  _pbpSearchMo.observe(view, content);
+  _pbpSearchMo.observe(document.body, { attributes: true, attributeOldValue: true, attributeFilter: ["class"] });
   // The timeline list is a search candidate source too (video pages); a
   // density switch or track change rebuilds it wholesale, which must
   // rescan rather than leave counts pointing at detached rows (retro
   // VID-R1-02/SRCH-1). One observer, two targets -- the echo module's idiom.
   const list = document.querySelector(".pbv-col-study .pbv-list");
-  if (list) _pbpSearchMo.observe(list, { childList: true, subtree: true, characterData: true });
+  if (list) _pbpSearchMo.observe(list, content);
+  const description = document.getElementById("video-description");
+  if (description) _pbpSearchMo.observe(description, content);
 }
 
 function _pbpSearchDisarmObserver() {
-  clearTimeout(_pbpSearchMoTimer);
+  clearTimeout(_pbpSearchMoTimer); _pbpSearchMoTimer = null;
   if (_pbpSearchMo) { _pbpSearchMo.disconnect(); _pbpSearchMo = null; }
 }
 
@@ -772,6 +817,13 @@ function _pbpSearchDisarmObserver() {
 // click-outside, explicit hidePopover) via the popover's own "toggle"
 // event registered once in _pbpSearchEnsurePop.
 function _pbpSearchTeardown() {
+  if (_pbpSearchInputTimer !== null) {
+    // Closing during the debounce remembers what was typed, but must not let
+    // its timer repaint highlights or scroll after the popover disappears.
+    _pbpSearchLastQuery = _pbpSearchPopEl?.querySelector("#search-input")?.value || "";
+    _pbpSearchLastIdx = 0;
+    clearTimeout(_pbpSearchInputTimer); _pbpSearchInputTimer = null;
+  }
   if (typeof Highlight === "function" && typeof CSS !== "undefined" && "highlights" in CSS) {
     CSS.highlights.delete("pbp-search");
     CSS.highlights.delete("pbp-search-current");
@@ -803,6 +855,7 @@ function _pbpSearchEnsurePop() {
     // _pbpSearchRun fired yet" without introspecting the timer.
     if (input.value !== _pbpSearchState.query) {
       clearTimeout(_pbpSearchInputTimer);
+      _pbpSearchInputTimer = null;
       _pbpSearchRun(input.value);
       return; // _pbpSearchRun already lands on match 1; don't also step past it
     }
@@ -813,8 +866,9 @@ function _pbpSearchEnsurePop() {
   // Regex-mode toggle (spec: regex search). ".*" is plain ASCII text, not
   // an icon -- the label itself already communicates the mode; aria-pressed
   // carries the on/off state for AT. State is persisted across popover
-  // sessions in chrome.storage.local; read here (async is fine, the pop is
-  // fresh and the query is empty) and written back on every click.
+  // sessions in chrome.storage.local. A delayed read may arrive after typing
+  // or a toggle click: hydrate the query without scrolling, but never replace
+  // a newer choice made in this popover.
   const regexBtn = document.createElement("button");
   regexBtn.type = "button";
   regexBtn.id = "search-regex";
@@ -823,15 +877,23 @@ function _pbpSearchEnsurePop() {
   regexBtn.setAttribute("aria-pressed", "false");
   regexBtn.setAttribute("aria-label", t("srchRegexAria"));
   regexBtn.title = t("srchRegexAria");
+  let regexTouched = false;
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
     try {
       chrome.storage.local.get({ pbp_srch_regex: false }, (res) => {
+        if (regexTouched) return;
+        const before = _pbpSearchRegexOn;
         _pbpSearchRegexOn = !!(res && res.pbp_srch_regex);
         regexBtn.setAttribute("aria-pressed", _pbpSearchRegexOn ? "true" : "false");
+        if (before !== _pbpSearchRegexOn && pop.matches(":popover-open") &&
+          _pbpSearchState.query && _pbpSearchInputTimer === null) {
+          _pbpSearchRun(_pbpSearchState.query, { jump: false, preserveCurrent: true });
+        }
       });
     } catch (_) {}
   }
   regexBtn.addEventListener("click", () => {
+    regexTouched = true;
     _pbpSearchRegexOn = !_pbpSearchRegexOn;
     regexBtn.setAttribute("aria-pressed", _pbpSearchRegexOn ? "true" : "false");
     if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
@@ -844,6 +906,7 @@ function _pbpSearchEnsurePop() {
       try { chrome.storage.local.set({ pbp_srch_regex: _pbpSearchRegexOn }).catch(() => {}); } catch (_) {}
     }
     clearTimeout(_pbpSearchInputTimer);
+    _pbpSearchInputTimer = null;
     _pbpSearchRun(input.value);
     input.focus();
   });
