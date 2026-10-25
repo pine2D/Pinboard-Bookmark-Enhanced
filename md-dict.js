@@ -1677,7 +1677,7 @@ function _pbpDictEntryMount(host, opts) {
           const strong = document.createElement("strong"); strong.textContent = t(label) + ": ";
           p.append(strong, value); details.appendChild(p);
         }
-        if (!learning.history) {
+        if (!learning.history && (learning.formation || learning.related.length)) {
           const p = document.createElement("p"); p.className = "xp-dict-src"; p.textContent = t("dictEntryNoHistory"); details.appendChild(p);
         }
         for (const relation of learning.related) {
@@ -1833,6 +1833,12 @@ function _pbpDictEntryMount(host, opts) {
           for (const point of learning.items) {
             const unit = document.createElement("div"); unit.className = "xp-dict-learning-item";
             const title = document.createElement("p"); const strong = document.createElement("strong"); strong.textContent = point.title; title.appendChild(strong);
+            if (addition.category === "etymology" && point.kind) {
+              const key = ["formation", "history"].includes(point.kind) ? "dictEntry" : "dictEntryRelation";
+              const label = document.createElement("span"); label.className = "xp-dict-src";
+              label.textContent = t(key + point.kind[0].toUpperCase() + point.kind.slice(1)); label.lang = document.documentElement.lang || "und";
+              title.append(" · ", label);
+            }
             const explanation = document.createElement("p"); explanation.textContent = point.explanation; unit.append(title, explanation);
             const parent = addition.archiveId === record.archiveId ? record : record.previousEntries?.find(entry => entry.archiveId === addition.archiveId);
             const meaning = parent?.entry.meanings[point.sense - 1]?.definition;
@@ -1852,8 +1858,14 @@ function _pbpDictEntryMount(host, opts) {
               const link = document.createElement("a"); link.href = source.url; link.target = "_blank"; link.rel = "noopener noreferrer";
               link.textContent = [source.author, source.work || source.title, source.location].filter(Boolean).join(" · ");
               note.append(link, " · " + t("dictSupplementSourceVerified"));
-            } else note.textContent = t("dictSupplementOriginal");
+            } else note.textContent = t(addition.category === "etymology" ? "dictAiLabel" : "dictSupplementOriginal");
             unit.appendChild(note); text.appendChild(unit);
+          }
+          if (learning.omittedItems) {
+            const partial = document.createElement("p"); partial.className = "xp-dict-msg";
+            partial.dataset.partialResult = "true"; partial.lang = document.documentElement.lang || "und"; partial.dir = "auto";
+            partial.textContent = t("dictSupplementPartial", String(learning.items.length), String(learning.omittedItems));
+            text.appendChild(partial);
           }
         } else {
           const p = document.createElement("p"); p.textContent = addition.content;
@@ -1882,9 +1894,12 @@ function _pbpDictEntryMount(host, opts) {
         t("dictSupplementLanguage", languageName(addition.learning?.language || answerLanguage))].join(" · ");
       if (configured() && addition.id && addition.archiveSaved !== false && !replaced.has(id)) {
         if (!item.update) {
-          item.update = button("dictSupplementUpdate", "xp-dict-update-supplement"); item.update.title = t("dictSupplementUpdateHint"); item.update.setAttribute("aria-description", item.update.title);
+          item.update = button("dictSupplementUpdate", "xp-dict-update-supplement");
           item.update.addEventListener("click", () => usageForm?.update(item.addition));
         }
+        item.update.textContent = t(addition.learning?.omittedItems ? "dictSupplementRepair" : "dictSupplementUpdate");
+        item.update.title = t(addition.learning?.omittedItems ? "dictSupplementRepairHint" : "dictSupplementUpdateHint");
+        item.update.setAttribute("aria-description", item.update.title);
         if (!item.update.isConnected) section.appendChild(item.update);
       } else item.update?.remove();
       if (addition.archiveSaved === false) {
@@ -1933,7 +1948,7 @@ function _pbpDictEntryMount(host, opts) {
     const kind = document.createElement("select");
     kind.className = "xp-dict-supplement-kind";
     kind.setAttribute("aria-label", t("dictSupplementCategory"));
-    for (const category of PBP_DICT_SUPPLEMENT_CATEGORIES) kind.append(new Option(
+    for (const category of PBP_DICT_SUPPLEMENT_CATEGORIES.filter(category => category !== "etymology")) kind.append(new Option(
       t("dictSupplement" + category[0].toUpperCase() + category.slice(1)), category));
     kind.value = usageCategory;
     const topicLabel = document.createElement("label"); topicLabel.className = "xp-dict-supplement-label";
@@ -1971,6 +1986,12 @@ function _pbpDictEntryMount(host, opts) {
     const languageHint = document.createElement("p"); languageHint.className = "xp-dict-src";
     languageHint.textContent = t("dictSupplementLanguage", languageName(target()));
     disclosure.append(summary, kind, context, submit, languageHint, profile, sourceHint); content.append(disclosure);
+    const etymology = document.createElement("details"); etymology.className = "xp-dict-ai-details";
+    const etymologyTitle = document.createElement("summary"); etymologyTitle.textContent = t("dictSupplementEtymology");
+    const etymologyHint = document.createElement("p"); etymologyHint.className = "xp-dict-src"; etymologyHint.textContent = t("dictEtymologyHint");
+    const etymologyGenerate = button("dictEtymologyGenerate", "xp-dict-etymology-generate");
+    etymology.append(etymologyTitle, etymologyHint, etymologyGenerate);
+    content.insertBefore(etymology, disclosure);
     const formFeedback = usageFeedback(submit);
     if (typeof window.pbpEnhanceListbox === "function") {
       kind.id = "dict-supplement-kind"; kind.dataset.listbox = "float"; window.pbpEnhanceListbox(kind);
@@ -1986,6 +2007,9 @@ function _pbpDictEntryMount(host, opts) {
       return matches.filter(item => !replaced.has(item.id)).sort((a, b) => b.generatedAt - a.generatedAt || String(b.id).localeCompare(String(a.id)))[0];
     };
     const refresh = () => {
+      const hasEtymology = (record.supplements || []).some(item => item.category === "etymology");
+      etymology.hidden = hasEtymology;
+      if (!etymology.isConnected) content.insertBefore(etymology, disclosure);
       usageDrafts.set(usageCategory, topic.value);
       if (usageCategory !== kind.value) {
         usageExpanded.set(usageCategory, scope.open);
@@ -2001,35 +2025,35 @@ function _pbpDictEntryMount(host, opts) {
       sourceHint.hidden = !["culture", "literature"].includes(kind.value);
     };
     const enableForm = () => {
-      submit.disabled = false; kind.disabled = false; topic.disabled = false; window.pbpListboxSync?.(kind);
+      submit.disabled = false; etymologyGenerate.disabled = false; kind.disabled = false; topic.disabled = false; window.pbpListboxSync?.(kind);
     };
     usageForm = { disclosure, refresh, enable: enableForm, update: addition => generateSupplement(addition) };
     kind.addEventListener("change", refresh); topic.addEventListener("input", refresh); refresh();
-    const generateSupplement = async (updating = null) => {
+    const generateSupplement = async (updating = null, explicitCategory = "") => {
       if (!alive() || busy) return;
-      const origin = updating ? supplementNodes.get(supplementId(updating))?.update : submit;
+      const origin = updating ? supplementNodes.get(supplementId(updating))?.update : explicitCategory === "etymology" ? etymologyGenerate : submit;
       if (!origin?.isConnected) return;
       const feedback = usageFeedback(origin);
       usageMessage(feedback, "");
       let restoreFocus = null;
-      const hit = updating ? null : existing();
+      const hit = updating || explicitCategory ? null : existing();
       if (hit) {
         const hadFocus = document.activeElement === submit;
         const id = supplementId(hit); render(record, answerLanguage, false, id);
         if (hadFocus) focusAddition(id);
         return;
       }
-      const hadFocus = document.activeElement === submit || (updating && content.contains(document.activeElement));
+      const hadFocus = document.activeElement === origin || (updating && content.contains(document.activeElement));
       const version = ++epoch, controller = new AbortController(); active = controller; busy = true;
       usageActivity = { feedback, origin, version };
       const current = () => alive() && epoch === version && !controller.signal.aborted;
-      const category = updating?.category || kind.value;
-      const request = { ...input(controller.signal, current), category, topic: updating?.profile.topic ?? effectiveTopic(),
-        updateId: updating?.id || "" };
+      const category = updating?.category || explicitCategory || kind.value;
+      const request = { ...input(controller.signal, current), category, topic: updating?.profile.topic ?? (explicitCategory ? "" : effectiveTopic()),
+        updateId: updating?.id || "", repair: !!updating?.learning?.omittedItems };
       if (updating) request.settings = { ...settings, dictLearnerNativeLanguage: updating.profile.nativeLanguage, dictLearnerLevel: updating.profile.level };
       const sourceOrigin = pbpDictSupplementOrigin(category, opts.lang);
-      submit.disabled = true; kind.disabled = true; topic.disabled = true; window.pbpListboxSync?.(kind);
-      usageMessage(feedback, t("dictSupplementGenerating"), "busy"); sync();
+      submit.disabled = true; etymologyGenerate.disabled = true; kind.disabled = true; topic.disabled = true; window.pbpListboxSync?.(kind);
+      usageMessage(feedback, t(category === "etymology" ? "dictEtymologyGenerating" : "dictSupplementGenerating"), "busy"); sync();
       if (hadFocus) feedback.cancel.focus({ preventScroll: true });
       try {
         // Request the model and one source origin together, directly from the
@@ -2043,12 +2067,13 @@ function _pbpDictEntryMount(host, opts) {
         record.supplements = [addition, ...(record.supplements || []).filter(item => !addition.id || item.id !== addition.id)];
         const id = supplementId(addition), focusStayed = document.activeElement === feedback.cancel;
         render(record, answerLanguage, false, id);
-        usageMessage(feedback, t(addition.archiveSaved === false ? "dictSupplementSaveFailed" : "dictSupplementSaved"),
+        usageMessage(feedback, addition.archiveSaved === false ? t("dictSupplementSaveFailed") : addition.learning?.omittedItems
+          ? t("dictSupplementPartial", String(addition.learning.items.length), String(addition.learning.omittedItems)) : t("dictSupplementSaved"),
           addition.archiveSaved === false ? "error" : "saved");
         // Appending a result must not pull the reader away from where they
         // scrolled while waiting. Explicit "View saved usage" still reveals it.
         if (focusStayed) {
-          restoreFocus = updating ? supplementNodes.get(id)?.heading : origin;
+          restoreFocus = updating || explicitCategory ? supplementNodes.get(id)?.heading : origin;
         }
       } catch (error) {
         if (!current()) return;
@@ -2069,6 +2094,7 @@ function _pbpDictEntryMount(host, opts) {
       }
     };
     submit.addEventListener("click", () => generateSupplement());
+    etymologyGenerate.addEventListener("click", () => generateSupplement(null, "etymology"));
   };
   const run = async (manual, updateId = "", origin = null) => {
     if (!alive() || busy || !configured()) return;
@@ -2083,12 +2109,7 @@ function _pbpDictEntryMount(host, opts) {
     try {
       // The automatic path never requests permission. Only this direct click
       // can open Chrome's exact-origin permission prompt, before any other await.
-      if (manual) {
-        const origin = typeof pbpDictEvidenceOrigin === "function" ? pbpDictEvidenceOrigin("etymology", opts.lang) : "";
-        if (origin) {
-          if (!(await requestAIHostPermissions(settings, [origin + "/*"]))) throw { code: "host_permission" };
-        } else await ensureAIHostPermissionWithGesture(settings);
-      }
+      if (manual) await ensureAIHostPermissionWithGesture(settings);
       if (!current()) return;
       if (typeof pbpAiBumpCounter === "function") pbpAiBumpCounter("explain");
       const request = input(controller.signal, current);

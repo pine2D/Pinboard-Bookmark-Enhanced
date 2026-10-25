@@ -3,7 +3,7 @@
 // by set union without overwriting another device's paid work.
 const PBP_DICT_ARCHIVE_DB = "pbp-dict-archive";
 const PBP_DICT_ARCHIVE_CATEGORIES = Object.freeze([
-  "collocations", "confusables", "register", "grammar", "scenarios", "culture", "literature"
+  "collocations", "confusables", "register", "grammar", "scenarios", "culture", "literature", "etymology"
 ]);
 
 function _pbpDictArchiveError(code) { return Object.assign(new Error(code), { code }); }
@@ -77,19 +77,29 @@ function _pbpDictArchiveEntryLearning(learning, entry) {
     (entry.meanings.length > 0 || (!learning.formation && !learning.history && !learning.related.length && !learning.sources.length));
 }
 function _pbpDictArchiveSupplementLearning(learning, value) {
-  if (!_pbpDictArchiveObject(learning, ["version", "language", "summary", "items", "replacesId"]) ||
+  const keys = ["version", "language", "summary", "items", "replacesId"];
+  const partial = Object.hasOwn(learning || {}, "omittedItems");
+  if (partial) keys.push("omittedItems");
+  if (!_pbpDictArchiveObject(learning, keys) ||
       learning.version !== 2 || !_pbpDictArchiveObject(learning.language, ["name", "lang"]) ||
       !_pbpDictArchiveText(learning.language.name, 80) || !_pbpDictArchiveLang(learning.language.lang) ||
       !_pbpDictArchiveText(learning.summary, 800, true) ||
       typeof learning.replacesId !== "string" || (learning.replacesId !== "" && !/^[0-9a-f]{64}$/.test(learning.replacesId)) ||
-      !Array.isArray(learning.items) || !learning.items.length || learning.items.length > 5) return false;
+      !Array.isArray(learning.items) || !learning.items.length || learning.items.length > 5 ||
+      (partial && (!Number.isSafeInteger(learning.omittedItems) || learning.omittedItems <= 0 ||
+        learning.items.length + learning.omittedItems > (value.category === "literature" ? 2 : 5)))) return false;
   return learning.items.every(item => {
-    if (!_pbpDictArchiveObject(item, ["sense", "title", "explanation", "example", "translation", "sourceIndex"]) ||
+    const keys = ["sense", "title", "explanation", "example", "translation", "sourceIndex"];
+    if (value.category === "etymology") keys.push("kind");
+    if (!_pbpDictArchiveObject(item, keys) ||
         !Number.isSafeInteger(item.sense) || item.sense < 0 || item.sense > 4 ||
         !_pbpDictArchiveText(item.title, 240) || !_pbpDictArchiveText(item.explanation, 1400) ||
         !_pbpDictArchiveText(item.example, 600, true) || !_pbpDictArchiveText(item.translation, 600, true) ||
         !Number.isSafeInteger(item.sourceIndex) || item.sourceIndex < -1 || item.sourceIndex >= value.sources.length) return false;
     const source = value.sources[item.sourceIndex];
+    if (value.category === "etymology" &&
+        (!["formation", "history", "family", "cognate", "synonym", "topic"].includes(item.kind) ||
+        (source && source.genre !== "etymology") || (["history", "cognate"].includes(item.kind) && !source))) return false;
     if (["culture", "literature"].includes(value.category) &&
         (!source || !Object.hasOwn(source, "retrievedAt"))) return false;
     if (value.category !== "literature") return true;
@@ -126,10 +136,11 @@ function pbpDictArchiveValidateEvent(event) {
 }
 function pbpDictArchiveValidBatchBody(body, ownerHash) {
   return _pbpDictArchiveObject(body, ["schema", "ownerHash", "deviceId", "createdAt", "entries"]) &&
-    [1, 2].includes(body.schema) && /^[0-9a-f]{64}$/.test(ownerHash) && body.ownerHash === ownerHash &&
+    [1, 2, 3].includes(body.schema) && /^[0-9a-f]{64}$/.test(ownerHash) && body.ownerHash === ownerHash &&
     _pbpVocabDeviceId(body.deviceId) && Number.isFinite(body.createdAt) &&
     Array.isArray(body.entries) && body.entries.every(event => pbpDictArchiveValidateEvent(event) &&
-      (body.schema === 2 || (!Object.hasOwn(event.value, "learning") &&
+      (body.schema === 3 || (event.value.category !== "etymology" && !Object.hasOwn(event.value.learning || {}, "omittedItems"))) &&
+      (body.schema >= 2 || (!Object.hasOwn(event.value, "learning") &&
         !Object.hasOwn(event.value.entry || {}, "learning") &&
         (event.value.sources || []).every(source => !Object.hasOwn(source, "retrievedAt")))));
 }

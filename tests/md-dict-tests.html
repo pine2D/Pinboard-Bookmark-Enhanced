@@ -1973,9 +1973,9 @@ async function runMultiPackIntegrationTests() {
 
 async function runDictionaryEntryUiTests() {
   section("Reusable AI entries in the shared lookup view");
-  const names=["chrome","pbpDictEntryRead","pbpDictEntryRun","pbpDictSupplementRun","pbpDictSupplementSave","hasAIKey","ensureAIHostPermissionWithGesture","uiLangToBCP47","PBP_ICONS","pbpAiBumpCounter"];
+  const names=["chrome","pbpDictEntryRead","pbpDictEntryRun","pbpDictSupplementRun","pbpDictSupplementSave","hasAIKey","ensureAIHostPermissionWithGesture","requestAIHostPermissions","uiLangToBCP47","PBP_ICONS","pbpAiBumpCounter"];
   const saved=new Map(names.map(name=>[name,window[name]]));
-  const fixtures=[];let reads=[],calls=[],grants=0,view=[],selected=[],lookups=[],uiLanguage="en";
+  const fixtures=[];let reads=[],calls=[],evidenceGrants=[],grants=0,view=[],selected=[],lookups=[],uiLanguage="en";
   const settings={aiProvider:"fixture",previewAiEnabled:true,dictDefinitionLang:"es",dictAiAutoGenerate:false};
   const record=(extra={})=>({entry:{word:"Gift",language:"de",pronunciation:"/ɡɪft/",meanings:[{partOfSpeech:"sustantivo",definition:"<img src=x onerror=alert(1)> veneno",examples:[{text:"Das Gift wirkt.",translation:"El veneno hace efecto."}]}],etymology:"Origen de prueba.",relatedWords:["giftig"]},provider:"fixture",model:"fixture-model",generatedAt:1700000000000,cached:false,cacheSaved:true,...extra});
   const settle=async()=>{for(let i=0;i<8;i++)await new Promise(r=>setTimeout(r,0));};
@@ -2058,7 +2058,7 @@ async function runDictionaryEntryUiTests() {
     } finally {window[runName]=originalRun;}
   };
   try {
-    Object.assign(window,{hasAIKey:()=>true,ensureAIHostPermissionWithGesture:async()=>{grants++;},uiLangToBCP47:()=>uiLanguage,PBP_ICONS:Object.fromEntries(["wandSparkles","bookOpenText","sparkles","stop","gear"].map(name=>[name,'<svg viewBox="0 0 24 24" aria-hidden="true"></svg>'])),pbpAiBumpCounter:()=>{},
+    Object.assign(window,{hasAIKey:()=>true,ensureAIHostPermissionWithGesture:async()=>{grants++;},requestAIHostPermissions:async(_settings,origins)=>{evidenceGrants.push(origins);return true;},uiLangToBCP47:()=>uiLanguage,PBP_ICONS:Object.fromEntries(["wandSparkles","bookOpenText","sparkles","stop","gear"].map(name=>[name,'<svg viewBox="0 0 24 24" aria-hidden="true"></svg>'])),pbpAiBumpCounter:()=>{},
       pbpDictEntryRead:async input=>{reads.push(input);return null;},pbpDictEntryRun:async input=>{calls.push(input);return record();}});
     const multi = record();
     multi.entry.meanings.push({partOfSpeech:"sustantivo",definition:"A second meaning",examples:[]});
@@ -2259,6 +2259,29 @@ async function runDictionaryEntryUiTests() {
     check("a stopped request settling late cannot unlock or replace the newer supplement request",submit.disabled&&usage.host.querySelector('.xp-dict-usage-status').textContent==='dictSupplementGenerating'&&!usage.host.querySelector('.xp-dict-usage-stop').hidden);
     finishNew({...addition,id:'9'.repeat(64),profile:{...addition.profile,topic:'travel'}});await settle();
 
+    let etymologyRequest;
+    window.pbpDictSupplementRun=input=>{etymologyRequest=input;return new Promise(resolve=>{resolveUsage=resolve;});};
+    const separateOrigin=mount();await separateOrigin.ui.ready;
+    const originAction=separateOrigin.host.querySelector('.xp-dict-etymology-generate');originAction.closest('details').open=true;
+    originAction.focus();originAction.click();await settle();
+    check("etymology uses its own category and progress beside the action",etymologyRequest.category==='etymology'&&etymologyRequest.topic===''&&evidenceGrants.length===1&&evidenceGrants[0][0]==='https://de.wiktionary.org/*'&&
+      originAction.parentElement.querySelector('.xp-dict-usage-status').textContent==='dictEtymologyGenerating');
+    resolveUsage({...addition,id:'5'.repeat(64),category:'etymology'});await settle();
+    check("completed etymology replaces its generation prompt with a focusable saved result",originAction.closest('details').hidden&&
+      document.activeElement===separateOrigin.host.querySelector('[data-supplement-id] > summary')&&
+      separateOrigin.host.querySelector('[data-supplement-id]').textContent.includes('dictSupplementEtymology'));
+    const partial={...addition,id:'6'.repeat(64),learning:{version:2,language:{name:'Spanish',lang:'es'},summary:'',replacesId:'',omittedItems:1,
+      items:[{sense:1,title:'A valid pattern',explanation:'Una explicación útil.',example:'Ein Beispiel.',translation:'Un ejemplo.',sourceIndex:-1}]}};
+    window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[partial]});
+    const incomplete=mount();await incomplete.ui.ready;
+    const partialSection=incomplete.host.querySelector('[data-supplement-id]');partialSection.open=true;
+    const repairAction=partialSection.querySelector('.xp-dict-update-supplement');
+    check("a reopened partial supplement retains a visible incomplete notice and a specific repair action",
+      partialSection.querySelector('[data-partial-result]')?.textContent.startsWith('dictSupplementPartial')&&repairAction.textContent==='dictSupplementRepair');
+    repairAction.click();await settle();
+    check("repair passes the exact saved version and explicit missing-content mode",etymologyRequest.repair===true&&etymologyRequest.updateId===partial.id&&etymologyRequest.category==='collocations');
+    incomplete.ctrl.abort();resolveUsage(partial);await settle();
+
     // The supplement's sense index belongs to its original paid base. Use
     // interleaved parts of speech and a reordered replacement to expose both
     // grouped-list numbering and cross-version mistakes through rendered text.
@@ -2414,7 +2437,7 @@ async function runDictionaryEntrySettingsTests() {
 async function runDictionaryEntryReaderTests() {
   section("Reader dictionary sources, save identity and related-word navigation");
   const saved={resolve:_pbpDictResolveLang,online:_pbpDictSlotRun,local:_pbpDictEcdictSide,load:_pbpDictLoadPack,get:pbpVocabGet,owner:_pbpDictOwner,current:_pbpDictCurrent};
-  const names=["pbpDictEntryRead","pbpDictEntryRun","hasAIKey","ensureAIHostPermissionWithGesture","uiLangToBCP47","pbpVocabCurrentOwner","pbpVocabSaveWord","PBP_ICONS","pbpAiBumpCounter"];
+  const names=["pbpDictEntryRead","pbpDictEntryRun","hasAIKey","ensureAIHostPermissionWithGesture","requestAIHostPermissions","uiLangToBCP47","pbpVocabCurrentOwner","pbpVocabSaveWord","PBP_ICONS","pbpAiBumpCounter"];
   const globals=new Map(names.map(name=>[name,window[name]]));
   const pop=document.createElement("div");pop.innerHTML='<span class="xp-term"></span><div class="xp-body"></div><div class="xp-foot"><button class="xp-vocab"></button></div>';document.body.appendChild(pop);
   const ctrl=new AbortController(),settings={previewAiEnabled:true,dictDefinitionLang:"en",dictAiAutoGenerate:false};let calls=[],finishOnline;

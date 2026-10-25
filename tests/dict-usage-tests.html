@@ -63,12 +63,57 @@ await test('category topic policy changes model input without renaming an existi
   return true;
 });
 await test('collocations use original examples with no external lookup',async()=>{existing();const r=await pbpDictSupplementRun(request({category:'collocations'}));return r.archiveSaved&&sourceCalls.length===0&&calls.length===1;});
+await test('basic lookup does not wait for or request etymology evidence',async()=>{
+  let lookups=0;const original=pbpDictEvidenceFetch;pbpDictEvidenceFetch=async()=>{lookups++;throw new Error('Evidence unavailable');};
+  try{const r=await pbpDictEntryRun(request());return r.archiveSaved&&lookups===0&&calls.length===1&&
+    !Object.hasOwn(calls[0].options.responseSchema.properties,'learning');}finally{pbpDictEvidenceFetch=original;}
+});
+await test('etymology is generated separately and cannot replace basic meanings',async()=>{
+  existing();const before=JSON.stringify(records.entry);usageResponse(d=>{d.items[0].kind='formation';d.items[0].example='';d.items[0].translation='';});
+  const r=await pbpDictSupplementRun(request({category:'etymology'}));
+  return r.archiveSaved&&r.category==='etymology'&&calls.length===1&&saved.length===0&&JSON.stringify(records.entry)===before;
+});
+await test('unsupported history cannot pass as an unverified formation point',async()=>{
+  existing();usageResponse(d=>{d.items[0].kind='history';d.items[0].example='';d.items[0].translation='';});
+  return await rejects(()=>pbpDictSupplementRun(request({category:'etymology'})),'invalid_response')&&appended.length===0;
+});
+await test('independent valid supplement items survive one malformed item with a persistent incomplete count',async()=>{
+  existing();usageResponse(d=>d.items.push({...d.items[0],title:'Incomplete point',example:'',translation:''}));
+  const r=await pbpDictSupplementRun(request({category:'grammar'}));
+  return r.archiveSaved&&r.learning.items.length===1&&r.learning.omittedItems===1&&calls.length===1&&appended.length===1;
+});
+await test('partial repair retains accepted items and only requests the missing content',async()=>{
+  existing();usageResponse(d=>d.items.push({...d.items[0],title:'Incomplete point',example:'',translation:''}));
+  const first=await pbpDictSupplementRun(request({category:'grammar'}));
+  usageResponse(d=>{d.items[0].title='A different pattern';d.items[0].explanation='这是另一个有用的语法用法。';});
+  const second=await pbpDictSupplementRun(request({category:'grammar',updateId:first.id,repair:true}));
+  const data=JSON.parse(calls[1].prompt.split('\n').at(-1));
+  return data.acceptedItems?.length===1&&second.learning.items.length===2&&!second.learning.omittedItems&&
+    second.learning.items[0].title===first.learning.items[0].title&&second.learning.replacesId===first.id&&calls.length===2;
+});
 await test('a matching saved supplement needs no model or sync request',async()=>{existing();await pbpDictSupplementRun(request({category:'grammar'}));onSync=async()=>{throw new Error('should reuse');};await pbpDictSupplementRun(request({category:'grammar'}));return calls.length===1;});
 await test('a remotely saved supplement is reused after synchronization',async()=>{existing();onSync=async()=>{records.supplements=[{category:'grammar',profile:{nativeLanguage:'',level:'',topic:''},content:'Existing',id:'b'.repeat(64),archiveSaved:true}];};return (await pbpDictSupplementRun(request({category:'grammar'}))).content==='Existing'&&calls.length===0;});
 await test('different learner topics preserve distinct paid additions',async()=>{existing();await pbpDictSupplementRun(request({category:'scenarios',topic:'travel'}));await pbpDictSupplementRun(request({category:'scenarios',topic:'work'}));return calls.length===2&&appended[0].profile.topic==='travel'&&appended[1].profile.topic==='work';});
 await test('supplement save failure can be retried without a second model call',async()=>{existing();appendFailure=true;const r=await pbpDictSupplementRun(request({category:'register'}));appendFailure=false;const s=await pbpDictSupplementSave(request(),r);return !r.archiveSaved&&s.archiveSaved&&calls.length===1;});
 await test('supplements require a saved parent entry',async()=>await rejects(()=>pbpDictSupplementRun(request({category:'grammar'})),'not_saved')&&calls.length===0);
 await test('invalid categories fail before external access',async()=>{existing();return await rejects(()=>pbpDictSupplementRun(request({category:'run_commands'})),'invalid_request')&&calls.length===0;});
+await test('repair keeps original meaning references after the base entry changes',async()=>{
+  existing();usageResponse(d=>d.items.push({...d.items[0],title:'Missing',translation:''}));
+  const first=await pbpDictSupplementRun(request({category:'grammar'}));
+  const old={archiveId:records.archiveId,entry:structuredClone(records.entry)};records.archiveId='f'.repeat(64);records.entry=structuredClone(LEGACY_MODEL);
+  records.entry.meanings=[{partOfSpeech:'名词',definition:'不相关的新释义。',examples:[]}];records.previousEntries=[old];
+  usageResponse(d=>{d.items[0].title='New rule';});
+  const repaired=await pbpDictSupplementRun(request({category:'grammar',updateId:first.id,repair:true}));
+  const data=JSON.parse(calls[1].prompt.split('\n').at(-1));
+  return repaired.archiveId===first.archiveId&&data.baseEntry.meanings[0].definition===old.entry.meanings[0].definition&&
+    repaired.learning.items[0].explanation===first.learning.items[0].explanation;
+});
+await test('repair cannot count a paraphrase of an accepted point as new content',async()=>{
+  existing();usageResponse(d=>d.items.push({...d.items[0],title:'Missing',translation:''}));
+  const first=await pbpDictSupplementRun(request({category:'grammar'}));
+  usageResponse(d=>{d.items[0].explanation='重复原有搭配的另一种说法。';});
+  return await rejects(()=>pbpDictSupplementRun(request({category:'grammar',updateId:first.id,repair:true})),'unsupported_usage')&&appended.length===1;
+});
 await test('literature inserts the qualified original passage and retains its provenance',async()=>{existing();usageResponse(d=>{d.items[0].sourceIndex=0;d.items[0].example='';});const r=await pbpDictSupplementRun(request({category:'literature'}));return r.learning.items[0].example===SOURCE.excerpt&&r.sources[0].revision==='12345'&&r.sources[0].url===SOURCE.url&&calls[0].prompt.includes('The Gardener');});
 await test('culture passes the word language to the evidence reader rather than the explanation language',async()=>{existing();records.entry.language='de';usageResponse(d=>{d.items[0].sourceIndex=0;d.items[0].example='';});await pbpDictSupplementRun(request({sourceLanguage:'de',category:'culture'}));return sourceCalls[0].sourceLanguage==='de'&&sourceCalls[0].kind==='culture';});
 await test('unknown source languages never silently query English',async()=>{existing();return await rejects(()=>pbpDictSupplementRun(request({sourceLanguage:'und',category:'literature'})),'no_sources')&&sourceCalls.length===0&&calls.length===0;});
@@ -132,10 +177,10 @@ await test('three distinct collocations may all reference one existing meaning',
   const result=await pbpDictSupplementRun(request({category:'collocations'}));
   return result.archiveSaved&&result.learning.items.length===3&&result.learning.items.every(item=>item.sense===1)&&calls.length===1;
 });
-await test('output item numbers cannot create base meanings and fail without a paid retry',async()=>{
+await test('out-of-range meaning references are omitted with an explicit partial result',async()=>{
   existing();usageResponse(d=>{d.items=[1,2,3].map(sense=>({...d.items[0],sense,title:'PRIVATE_PATTERN_'+sense}));});
-  try{await pbpDictSupplementRun(request({category:'collocations'}));return false;}
-  catch(e){return e.code==='invalid_response'&&e.reason==='supplement_item_sense'&&!JSON.stringify(e).includes('PRIVATE_PATTERN_')&&calls.length===1&&appended.length===0;}
+  const r=await pbpDictSupplementRun(request({category:'collocations'}));
+  return r.learning.items.length===1&&r.learning.items[0].sense===1&&r.learning.omittedItems===2&&calls.length===1&&appended.length===1;
 });
 await test('noninteger and out-of-range meaning references remain invalid',async()=>{
   for(const sense of [-1,1.5,'01',null,2]){
@@ -171,10 +216,10 @@ await test('source indices retain integer and retrieved-source bounds',async()=>
   }
   return true;
 });
-await test('identical supplement items are rejected while repeated senses alone are valid',async()=>{
+await test('duplicate supplement points are counted as incomplete without losing the first point',async()=>{
   existing();usageResponse(d=>{d.items.push({...d.items[0]});});
-  try{await pbpDictSupplementRun(request({category:'collocations'}));return false;}
-  catch(e){return e.reason==='supplement_duplicate'&&calls.length===1&&appended.length===0;}
+  const r=await pbpDictSupplementRun(request({category:'collocations'}));
+  return r.learning.items.length===1&&r.learning.omittedItems===1&&calls.length===1&&appended.length===1;
 });
 await test('clearer meaning diagnostics do not weaken source, quote or translation checks',async()=>{
   const cases=[
@@ -233,8 +278,8 @@ await test('supplement identity core prose and sense references cannot be defaul
     try{await pbpDictSupplementRun(request({category:'grammar'}));return false;}catch(e){if(!['invalid_response','wrong_language'].includes(e.code)||appended.length||calls.length!==1)return false;}}
   return true;
 });
-await test('malformed supplement arrays are not split flattened or partially discarded',async()=>{
-  for(const mutate of [d=>{d.items='A paragraph';},d=>{d.items[0].explanation=['First rule','Second rule'];},d=>{d.items.push(null);},d=>{d.items={title:'Missing core fields'};}]){
+await test('malformed supplement roots and invalid-only items are not split or flattened',async()=>{
+  for(const mutate of [d=>{d.items='A paragraph';},d=>{d.items[0].explanation=['First rule','Second rule'];},d=>{d.items=[null];},d=>{d.items={title:'Missing core fields'};}]){
     reset();existing();usageResponse(mutate);if(!await rejects(()=>pbpDictSupplementRun(request({category:'register'})),'invalid_response')||appended.length)return false;
   }
   return true;
@@ -254,7 +299,7 @@ await test('supplement normalization cannot bypass raw response size or repair t
 });
 await test('supplement retains content bounds with the same bounded complete-answer policy as entries',async()=>{
   existing();await pbpDictSupplementRun(request({category:'collocations'}));
-  return calls[0].prompt.includes('12000')&&calls[0].prompt.includes('including separators')&&calls[0].options.maxTokens===8192&&calls[0].options.timeoutMs===60000&&calls[0].options.totalOutputBudget===true&&calls[0].options.reasoningEffort==='low';
+  return calls[0].prompt.includes('12000')&&calls[0].prompt.includes('including separators')&&calls[0].options.maxTokens===8192&&calls[0].options.timeoutMs===60000&&calls[0].options.totalOutputBudget===true&&calls[0].options.reasoningEffort==='minimum';
 });
 await test('original learning categories derive only the missing no-source marker',async()=>{
   for(const category of ['collocations','confusables','register','grammar','scenarios']){
