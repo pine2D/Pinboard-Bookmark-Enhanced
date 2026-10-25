@@ -1103,70 +1103,98 @@ async function runDictLookupChainTests() {
 }
 
 async function runDictPackRoutingTests() {
-  section("ready CC-CEDICT routing");
-  const realLoad = _pbpDictLoadPack;
-  const realPerm = _pbpDictHasPerm;
-  const realFetch = _pbpDictFetch;
-  const realCacheGet = window.pbpAiCacheGet;
-  const realCacheSet = window.pbpAiCacheSet;
-  const realLookup = window.pbpPackLookup;
-  const realKeys = window.pbpCedictLookupKeys;
-  const realToNorm = window.pbpCedictEntryToNorm;
-  const onlineData = { ...FDA_SAMPLE, word: "在线词" };
-  const packNorm = { ...pbpDictNormalizeEntry(FDA_SAMPLE), word: "词", sourceLabel: "CC-CEDICT", sourceUrl: "https://cc-cedict.org/wiki/" };
-  let permCalls = 0, fetchCalls = [];
+  section("Independent CC-CEDICT and online sources");
+  const saved = { load: _pbpDictLoadPack, perm: _pbpDictHasPerm, fetch: _pbpDictFetch,
+    current: _pbpDictCurrent, resolve: _pbpDictResolveLang, entry: _pbpDictEntryMount,
+    packs: _pbpDictPackSide, get: pbpVocabGet, owner: _pbpDictOwner };
+  const names = ["pbpAiCacheGet", "pbpAiCacheSet", "pbpPackLookup", "pbpCedictLookupKeys", "pbpCedictEntryToNorm", "pbpDictPackList"];
+  const globals = new Map(names.map(name => [name, window[name]]));
+  const onlineData = { ...FDA_SAMPLE, word: "词" };
+  const packNorm = { word: "词", sourceLabel: "CC-CEDICT", sourceUrl: "https://cc-cedict.org/wiki/", license: "CC BY-SA 4.0",
+    entries: [{ pos: "noun", ipas: [], forms: [], senses: [{ definition: "local word definition", examples: [], subsenses: [] }] }] };
+  const containers = [], controller = new AbortController();
+  const fresh = () => { const el = document.createElement("div"); document.body.appendChild(el); containers.push(el); return el; };
+  const tick = async () => { for (let i = 0; i < 8; i++) await new Promise(resolve => setTimeout(resolve, 0)); };
+  let permCalls = 0, fetchCalls = [], deliveries = [];
   _pbpDictLoadPack = async () => true;
   _pbpDictHasPerm = async () => { permCalls++; return true; };
   _pbpDictFetch = async (_lang, candidate) => { fetchCalls.push(candidate); return { status: 200, data: onlineData }; };
   window.pbpAiCacheGet = async () => null;
   window.pbpAiCacheSet = async () => {};
-  window.pbpCedictLookupKeys = (term) => [term];
+  window.pbpCedictLookupKeys = term => [term];
   window.pbpCedictEntryToNorm = () => packNorm;
+  window.pbpDictPackList = async () => [];
   try {
+    const cur = {}; _pbpDictCurrent = cur;
     window.pbpPackLookup = async () => ({ state: "hit", matched: "词", rows: [{}] });
-    let slot = document.createElement("div");
-    let result = await _pbpDictSlotRun(slot, "词", "zh", null, Promise.resolve("-"), null);
-    assert(result && result.word === "词", "ready CC-CEDICT hit renders the local entry");
-    assert(!slot.querySelector(".xp-dict-match"), "exact CC-CEDICT hit adds no redundant matched-headword label");
-    assert(permCalls === 0 && fetchCalls.length === 0, "ready hit needs no permission or network");
+    let local = fresh();
+    await _pbpDictCedictSide(local, "词", "zh", controller.signal, cur, norm => deliveries.push(norm));
+    check("CC-CEDICT delivers a usable local entry without waiting for permission or network", deliveries[0] === packNorm && local.textContent.includes("local word definition") && permCalls === 0 && fetchCalls.length === 0);
+    check("exact CC-CEDICT lookup omits a redundant matched-headword label", !local.querySelector(".xp-dict-match"));
+    local = fresh();
+    await _pbpDictCedictSide(local, "词语", "zh", controller.signal, cur);
+    check("CC-CEDICT longest-prefix results disclose their actual matched headword", local.querySelector(".xp-dict-match")?.textContent === "dictMatchedHeadword:词");
+    const outsideLanguage = fresh();
+    await _pbpDictCedictSide(outsideLanguage, "word", "en", controller.signal, cur, norm => deliveries.push(norm));
+    check("CC-CEDICT never contributes Chinese results to another source language", outsideLanguage.childElementCount === 0 && deliveries.length === 1);
 
-    slot = document.createElement("div");
-    result = await _pbpDictSlotRun(slot, "词语", "zh", null, Promise.resolve("-"), null);
-    assert(slot.querySelector(".xp-dict-match")?.textContent === "dictMatchedHeadword:词",
-      "real CC-CEDICT longest-prefix hit discloses the shorter matched headword");
+    for (const state of ["ready-miss", "unavailable", "error"]) {
+      window.pbpPackLookup = async () => ({ state });
+      permCalls = 0; fetchCalls = []; local = fresh(); const online = fresh();
+      const [, result] = await Promise.all([
+        _pbpDictCedictSide(local, "词", "zh", controller.signal, cur),
+        _pbpDictSlotRun(online, "词", "zh", controller.signal, Promise.resolve(""), null)
+      ]);
+      check("CC-CEDICT " + state + " leaves the authorized online source available", local.childElementCount === 0 && result?.word === "词" && permCalls === 1 && fetchCalls.join() === "词");
+    }
+    window.pbpPackLookup = async () => ({ state: "hit", matched: "词", rows: [{}] });
+    _pbpDictHasPerm = async () => false; fetchCalls = []; local = fresh(); const ungranted = fresh();
+    await Promise.all([_pbpDictCedictSide(local, "词", "zh", controller.signal, cur),
+      _pbpDictSlotRun(ungranted, "词", "zh", controller.signal, Promise.resolve(""), null)]);
+    check("an ungranted online source cannot send network requests and leaves CC-CEDICT readable", fetchCalls.length === 0 && !!ungranted.querySelector(".xp-dict-connect") && local.textContent.includes("local word definition"));
+    for (const mode of ["aborted", "superseded"]) {
+      const pendingCtrl = new AbortController(); _pbpDictCurrent = cur;
+      window.pbpPackLookup = async () => {
+        if (mode === "aborted") pendingCtrl.abort(); else _pbpDictCurrent = {};
+        return { state: "hit", matched: "词", rows: [{}] };
+      };
+      local = fresh(); let delivered = false;
+      await _pbpDictCedictSide(local, "词", "zh", pendingCtrl.signal, cur, () => { delivered = true; });
+      check(mode + " CC-CEDICT results cannot render or expose stale save choices", !delivered && local.childElementCount === 0);
+    }
 
-    window.pbpPackLookup = async () => ({ state: "ready-miss" });
-    permCalls = 0; fetchCalls = [];
-    slot = document.createElement("div");
-    result = await _pbpDictSlotRun(slot, "缺词", "zh", null, Promise.resolve("-"), null);
-    assertEq(result, null, "ready CC-CEDICT miss ends locally");
-    assert(slot.textContent.includes("dictNoEntry") && slot.querySelector("a").href === "https://en.wiktionary.org/wiki/%E7%BC%BA%E8%AF%8D",
-      "ready miss uses the unified encoded Wiktionary fallback");
-    assert(permCalls === 0 && fetchCalls.length === 0, "ready miss skips FDA permission/network without a second meta read");
-
+    // Exercise the actual reader orchestration: local data arrives while the
+    // authorized remote request is still pending, and both survive completion.
+    _pbpDictResolveLang = async () => "zh"; _pbpDictEntryMount = () => null;
+    _pbpDictPackSide = async () => {}; pbpVocabGet = async () => null; _pbpDictOwner = "acct_cedict";
+    _pbpDictHasPerm = async () => true;
+    window.pbpPackLookup = async () => ({ state: "hit", matched: "词", rows: [{}] });
+    let finishOnline;
+    _pbpDictFetch = () => new Promise(resolve => { finishOnline = resolve; });
+    const pop = fresh(); pop.innerHTML = '<div class="xp-body"></div><div class="xp-foot"><button class="xp-vocab"></button></div>';
+    const running = pbpDictRun({ text: "词" }, { sentence: "这个词很常见。" }, pop, controller, {});
+    await tick();
+    check("reader makes CC-CEDICT visible and collectible before the online request settles", !!pop.querySelector(".xp-dict-legacy .xp-dict-local-box") && _pbpDictCurrent.gloss === "local word definition" && !pop.querySelector(".xp-vocab").disabled);
+    finishOnline({ status: 200, data: onlineData }); await running;
+    check("reader displays CC-CEDICT and the authorized online entry together", pop.querySelectorAll(".xp-dict-src a").length === 2 && !!pop.querySelector(".xp-dict-online .xp-dict-entry") && !!pop.querySelector(".xp-dict-legacy .xp-dict-entry"));
+    check("source divider follows DOM order even when local results arrive first", !pop.querySelector(".xp-dict-local-box").hasAttribute("data-source-break") && pop.querySelector(".xp-dict-online").hasAttribute("data-source-break"));
+    const selected = pop.querySelector(".xp-dict-save-meaning");
+    selected.value = String(_pbpDictCurrent.meaningChoices.findIndex(choice => choice.sourceUrl === packNorm.sourceUrl));
+    selected.dispatchEvent(new Event("change")); await tick();
+    check("local and online definitions remain independently selectable for saving", _pbpDictCurrent.gloss === "local word definition" && _pbpDictCurrent.meaningChoices.some(choice => choice.sourceUrl.includes("wiktionary")));
     window.pbpPackLookup = async () => ({ state: "unavailable" });
-    permCalls = 0; fetchCalls = [];
-    slot = document.createElement("div");
-    result = await _pbpDictSlotRun(slot, "在线词", "zh", null, Promise.resolve("-"), null);
-    assert(result && result.word === "在线词", "missing pack may still use the online dictionary path");
-    assert(permCalls === 1 && fetchCalls.join() === "在线词", "missing pack continues through permission and exact FDA request");
-
-    window.pbpPackLookup = async () => ({ state: "error" });
-    permCalls = 0; fetchCalls = [];
-    slot = document.createElement("div");
-    result = await _pbpDictSlotRun(slot, "故障词", "zh", null, Promise.resolve("-"), null);
-    assert(result === null && slot.textContent.includes("dictLoadFailed") && slot.querySelector("a"),
-      "pack lookup error stays a load failure with Wiktionary fallback");
-    assert(permCalls === 0 && fetchCalls.length === 0, "pack lookup error is never disguised by an FDA retry");
+    _pbpDictFetch = async () => ({ status: 200, data: onlineData });
+    const oldRun = _pbpDictCurrent;
+    window.dispatchEvent(new CustomEvent("pbp-dict-packs-changed", { detail: { type: "changed", id: "cedict", action: "enabled", kind: "legacy" } }));
+    await tick();
+    check("disabling CC-CEDICT reruns an open reader and removes its displayed and savable definitions", _pbpDictCurrent !== oldRun && !pop.querySelector(".xp-dict-legacy .xp-dict-local-box") && !_pbpDictCurrent.meaningChoices.some(choice => choice.sourceUrl === packNorm.sourceUrl) && _pbpDictCurrent.gloss !== "local word definition");
+    check("after the disabled source disappears the remaining online section has no leading divider", !!pop.querySelector(".xp-dict-online .xp-dict-entry") && !pop.querySelector(".xp-dict-online").hasAttribute("data-source-break"));
   } finally {
-    _pbpDictLoadPack = realLoad;
-    _pbpDictHasPerm = realPerm;
-    _pbpDictFetch = realFetch;
-    if (realCacheGet === undefined) delete window.pbpAiCacheGet; else window.pbpAiCacheGet = realCacheGet;
-    if (realCacheSet === undefined) delete window.pbpAiCacheSet; else window.pbpAiCacheSet = realCacheSet;
-    if (realLookup === undefined) delete window.pbpPackLookup; else window.pbpPackLookup = realLookup;
-    if (realKeys === undefined) delete window.pbpCedictLookupKeys; else window.pbpCedictLookupKeys = realKeys;
-    if (realToNorm === undefined) delete window.pbpCedictEntryToNorm; else window.pbpCedictEntryToNorm = realToNorm;
+    controller.abort(); containers.forEach(el => el.remove());
+    _pbpDictLoadPack = saved.load; _pbpDictHasPerm = saved.perm; _pbpDictFetch = saved.fetch;
+    _pbpDictCurrent = saved.current; _pbpDictResolveLang = saved.resolve; _pbpDictEntryMount = saved.entry;
+    _pbpDictPackSide = saved.packs; pbpVocabGet = saved.get; _pbpDictOwner = saved.owner;
+    for (const [name, value] of globals) { if (value === undefined) delete window[name]; else window[name] = value; }
   }
 }
 
@@ -1952,19 +1980,27 @@ async function runDictionaryEntryUiTests() {
     return {root,host,dict,ctrl,ui};
   };
   try {
-    Object.assign(window,{hasAIKey:()=>true,ensureAIHostPermissionWithGesture:async()=>{grants++;},uiLangToBCP47:()=>uiLanguage,PBP_ICONS:{robot:""},pbpAiBumpCounter:()=>{},
+    Object.assign(window,{hasAIKey:()=>true,ensureAIHostPermissionWithGesture:async()=>{grants++;},uiLangToBCP47:()=>uiLanguage,PBP_ICONS:Object.fromEntries(["filePen","arrowRightLeft","stop","gear"].map(name=>[name,'<svg viewBox="0 0 24 24" aria-hidden="true"></svg>'])),pbpAiBumpCounter:()=>{},
       pbpDictEntryRead:async input=>{reads.push(input);return null;},pbpDictEntryRun:async input=>{calls.push(input);return record();}});
     const multi = record();
     multi.entry.meanings.push({partOfSpeech:"sustantivo",definition:"A second meaning",examples:[]});
     check("every AI meaning retains the word's pronunciation when saved",pbpDictNormChoices(pbpDictEntryNorm(multi,{lang:"es"}),"de").every(choice=>choice.ipa==="/ɡɪft/"));
+    multi.entry.meanings.splice(1, 0, {partOfSpeech:"verbo",definition:"A verb meaning",examples:[]});
+    const grouped = pbpDictEntryNorm(multi, {lang:"es"});
+    check("AI definitions share one heading per part of speech while retaining source order within each group", grouped.entries.length === 2 && grouped.entries[0].pos === "sustantivo" && grouped.entries[0].senses.map(sense => sense.definition).join("|") === "<img src=x onerror=alert(1)> veneno|A second meaning" && grouped.entries[1].pos === "verbo");
+    check("AI pronunciation renders once across part-of-speech groups but survives every save choice", grouped.entries.reduce((total, entry) => total + entry.ipas.length, 0) === 1 && pbpDictNormChoices(grouped, "de").every(choice => choice.ipa === "/ɡɪft/"));
     const a=mount();await a.ui.ready;
-    const rtl=_pbpDictSenseLi({definition:'قصر يُسمى Schloss (2).',tags:['formal'],subsenses:['A Latin clarification (3).'],examples:[{text:'Das Schloss ist groß.',translation:'القصر كبير (4).'}]},false,'de','ar');
+    const rtl=_pbpDictSenseLi({definition:'قصر يُسمى Schloss (2).',tags:['formal'],subsenses:['A Latin clarification (3).'],examples:[{text:'Das Schloss ist groß.',translation:'القصر كبير (4).'},{text:'Ein zweites Beispiel.',translation:''}]},false,'de','ar');
     a.root.appendChild(rtl);
     check("RTL definitions follow their text even when a Latin usage tag precedes them",getComputedStyle(rtl).direction==="rtl");
     check("examples and subsidiary definitions resolve their own writing direction",getComputedStyle(rtl.querySelector('.xp-dict-subsense')).direction==="ltr"&&getComputedStyle(rtl.querySelectorAll('.xp-dict-example')[0]).direction==="ltr"&&getComputedStyle(rtl.querySelectorAll('.xp-dict-example')[1]).direction==="rtl");
+    const pairs = rtl.querySelectorAll(".xp-dict-example-pair");
+    check("each original example stays grouped with only its own optional translation", pairs.length === 2 && pairs[0].children.length === 2 && pairs[1].children.length === 1 && pairs[0].children[0].lang === "de" && pairs[0].children[1].lang === "ar");
     check("opening lookup reads existing AI data without generating by default",reads.length===1&&calls.length===0&&grants===0);
     check("one generation entry replaces all three former AI operations",a.host.querySelectorAll('.xp-dict-ai-generate').length===1&&!a.host.querySelector('.dict-assist-recommend,.dict-assist-explain,.dict-assist-analyze'));
     check("default lookup keeps the dictionary visible with no AI answer panel",!a.dict.hidden&&a.host.querySelector('.xp-dict-ai-content').hidden);
+    check("every icon-only entry action has a localized tooltip and matching accessible name", [...a.ui.controls.children].every(button => !!button.querySelector("svg") && button.textContent === "" && !!button.title && button.getAttribute("aria-label") === button.title));
+
     a.host.querySelector('.xp-dict-ai-generate').focus();a.host.querySelector('.xp-dict-ai-generate').click();await settle();
     check("keyboard generation finishes on the replacement source action",document.activeElement===a.host.querySelector('.xp-dict-ai-switch'));
     check("manual generation obtains permission before issuing one request",calls.length===1&&grants===1);
@@ -1976,6 +2012,8 @@ async function runDictionaryEntryUiTests() {
     check("entry details start collapsed and include generation provenance",!a.host.querySelector('details').open&&a.host.querySelector('details').textContent.includes("fixture-model"));
     a.host.querySelector('.xp-dict-ai-switch').click();
     check("switching back reveals the untouched original dictionary",!a.dict.hidden&&a.dict.textContent==="Original dictionary definition"&&a.host.querySelector('.xp-dict-ai-content').hidden);
+    check("the source-switch icon announces the view it will open next", a.host.querySelector(".xp-dict-ai-switch").title === "dictEntryShowAi" && a.host.querySelector(".xp-dict-ai-switch").getAttribute("aria-label") === "dictEntryShowAi");
+
     a.host.querySelector('.xp-dict-ai-switch').click();
     check("switching back to the generated entry never calls AI again",a.dict.hidden&&calls.length===1&&grants===1);
     a.host.querySelector('.xp-dict-lemma-link').click();
@@ -2027,6 +2065,12 @@ async function runDictionaryEntryUiTests() {
     const outside=document.createElement('button');snapshot.root.appendChild(outside);outside.focus();uiLanguage="en";release(record());await settle();
     check("late completion never steals focus after the user has moved elsewhere",document.activeElement===outside);
     check("a pending entry keeps the requested definition language when interface language changes",calls.at(-1).target.lang==="de"&&snapshot.host.querySelector('.xp-dict-senses > li')?.lang==="de");
+    const external = document.createElement("div");
+    const outsideControls = mount({controlsHost: external}); outsideControls.root.appendChild(external); await outsideControls.ui.ready;
+    check("the shared entry can place its controls in the caller's toolbar without duplicating them in its content", external.querySelectorAll(".xp-dict-ai-controls").length === 1 && !outsideControls.host.querySelector(".xp-dict-ai-controls"));
+    outsideControls.ctrl.abort();
+    check("aborting a lookup removes controls mounted in the external toolbar", external.childElementCount === 0 && !outsideControls.ui.controls.isConnected);
+
   } finally {
     for(const fixture of fixtures){fixture.ctrl.abort();fixture.root.remove();}
     for(const[name,value]of saved){if(value===undefined)delete window[name];else window[name]=value;}

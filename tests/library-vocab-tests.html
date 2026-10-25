@@ -2408,17 +2408,29 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       _pbpVocabRenderDetail(null);
       rows.pop();
 
-      pbpEcdictLookup = async (t) => (t === "ephemeral"
-        ? { state: "hit", matched: "ephemeral", rows: [{ word: "ephemeral", translation: "a. 朝生暮死的, 短命的, 短暂的\\n[医] 暂时的" }] }
+      pbpEcdictLookup = async (t) => (["ephemeral", "constraint"].includes(t)
+        ? { state: "hit", matched: t, rows: [{ word: t, translation: "a. 朝生暮死的, 短命的, 短暂的\\n[医] 暂时的" }] }
         : { state: "ready-miss" });
+      granted = false;
       reset();
       open("a8");
       await until(() => !!result.querySelector(".xp-dict-local .xp-dict-local-box"));
       await dwell();
-      check("T7 an installed offline dictionary answers first: the local block and zero requests, grant or not",
+      check("T7 an installed offline dictionary answers without a grant and sends zero requests",
         calls.fetch.length === 0 && !!result.querySelector(".xp-dict-local .xp-dict-local-box") &&
         !result.querySelector(".xp-dict-online .xp-dict-entry") && !!result.querySelector(".vocab-ref-foot .vocab-ref-relookup"),
         JSON.stringify(calls));
+      granted = true;
+      open("a1"); await until(() => !!result.querySelector(".xp-dict-online .xp-dict-entry"), 200);
+      check("T7 a complete online cache supplements a local hit immediately without a request", calls.fetch.length === 0 && !!result.querySelector(".xp-dict-online .xp-dict-entry") && !!result.querySelector(".xp-dict-local .xp-dict-local-box"), JSON.stringify(calls));
+      reset();
+      open("a8"); await new Promise(resolve => setTimeout(resolve, 60));
+      check("T7 a local hit also waits for the automatic online dwell", calls.fetch.length === 0, JSON.stringify(calls));
+      open("a1"); await dwell();
+      check("T7 leaving a local hit during the dwell sends no online request", calls.fetch.length === 0, JSON.stringify(calls));
+      open("a8"); await dwell(); await until(() => !!online());
+      check("T7 an authorized local hit includes the online result after the dwell", calls.fetch.join(",") === "ephemeral" && !!result.querySelector(".xp-dict-local .xp-dict-local-box") && !!online(), JSON.stringify(calls));
+      reset();
       result.querySelector(".vocab-ref-relookup").click();
       await until(() => calls.fetch.length > 0 && !!online());
       check("T7 Look up again after a local-only answer runs the full chain: the local block plus one request",
@@ -4423,18 +4435,18 @@ await (async () => {
       pbpVocabSaveWord=async(owner,data,opts)=>{writes.push({owner,data,opts});return {...word,...data};};_pbpVocabReloadAfterMutation=async()=>false;
       _pbpVocabRenderDetail(word);_pbpVocabRelookup(word);await settle();
       const host=$id("vocab-ref-result");
-      check("AI entry: ordinary lookup makes no paid request by default",calls.length===0&&!!host.querySelector('.xp-dict-ai-generate')&&getComputedStyle(host.querySelector('.xp-dict-ai-switch')).display==="none"&&getComputedStyle(host.querySelector('.xp-dict-ai-stop')).display==="none");
+      check("AI entry: ordinary lookup makes no paid request by default",calls.length===0&&!!$id('vocab-ref').querySelector('.xp-dict-ai-generate')&&getComputedStyle($id('vocab-ref').querySelector('.xp-dict-ai-switch')).display==="none"&&getComputedStyle($id('vocab-ref').querySelector('.xp-dict-ai-stop')).display==="none");
       check("AI entry: obsolete matching, explanation and analysis actions are absent",!host.querySelector('.dict-assist-recommend,.dict-assist-explain,.dict-assist-analyze'));
       const choice=host.querySelector('.vocab-save-definition');choice.value="online:0";choice.dispatchEvent(new Event("change"));
-      host.querySelector('.xp-dict-ai-generate').click();await settle();
+      $id('vocab-ref').querySelector('.xp-dict-ai-generate').click();await settle();
       check("AI entry: manual generation requests exact endpoint permission before dispatch",events.join("|")==="permission|request");
       check("AI entry: the request has independent source and definition languages",calls[0]?.sourceLanguage==="de"&&calls[0]?.target.lang==="es");
       check("AI entry: neither article context nor original dictionary data enters generation",!!calls[0]&&!["sentence","title","choices","candidates","norms"].some(key=>key in calls[0])&&!JSON.stringify(calls[0]).includes("private-article"));
       check("AI entry: a complete entry displays its meaning and bilingual example",host.querySelector('.xp-dict-ai-content')?.textContent.includes("veneno")&&host.querySelector('.xp-dict-ai-content')?.textContent.includes("Das Gift ist gefährlich.")&&host.querySelector('.xp-dict-ai-content')?.textContent.includes("El veneno es peligroso."));
-      check("AI entry: only one source occupies the result view",host.querySelector('.xp-dict-slot').hidden&&!host.querySelector('.xp-dict-ai-content').hidden&&getComputedStyle(host.querySelector('.xp-dict-ai-generate')).display==="none");
+      check("AI entry: only one source occupies the result view",host.querySelector('.xp-dict-slot').hidden&&!host.querySelector('.xp-dict-ai-content').hidden&&getComputedStyle($id('vocab-ref').querySelector('.xp-dict-ai-generate')).display==="none");
       check("AI entry: generation leaves existing vocabulary and the selected original definition untouched",writes.length===0&&_vocabRows[0].gloss==="old saved gloss"&&choice.value==="online:0");
       check("AI entry: the AI source is available as an explicit save choice",[...choice.options].some(option=>option.value==="ai:0"&&option.textContent.includes("veneno")&&option.textContent.includes("AI")));
-      host.querySelector('.xp-dict-ai-switch').click();await settle();
+      $id('vocab-ref').querySelector('.xp-dict-ai-switch').click();await settle();
       check("AI entry: switching back restores the original source without another request",!host.querySelector('.xp-dict-slot').hidden&&host.querySelector('.xp-dict-ai-content').hidden&&calls.length===1&&choice.value==="online:0");
       host.querySelector('.vocab-lookup-save').click();await settle();
       check("AI entry: explicit Update keeps the selected original meaning and attribution",writes.length===1&&writes[0].data.gloss==="poison"&&writes[0].data.sourceUrl===norm.sourceUrl);
@@ -4445,7 +4457,7 @@ await (async () => {
       check("AI entry: cached data never silently chooses a definition to overwrite",host.querySelector('.vocab-save-definition').value===""&&writes.length===2);
       cached=null;let resolveSettings;pbpReadSettingsWithSecrets=()=>new Promise(resolve=>{resolveSettings=resolve;});
       _pbpVocabLookupOther("Gift","de");await settle();
-      check("AI entry: generation stays disabled until its settings snapshot is ready",host.querySelector('.xp-dict-ai-generate').disabled);
+      check("AI entry: generation stays disabled until its settings snapshot is ready",$id('vocab-ref').querySelector('.xp-dict-ai-generate').disabled);
       resolveSettings?.({aiProvider:"ollama",previewAiEnabled:false,dictAiAutoGenerate:true});await settle();
       check("AI entry: the reader master switch blocks paid generation despite automatic mode",calls.length===1&&host.querySelector('.xp-dict-ai').hidden&&!host.querySelector('.xp-dict-slot').hidden);
       pbpReadSettingsWithSecrets=async()=>({aiProvider:"ollama",previewAiEnabled:true,dictDefinitionLang:"es",dictAiAutoGenerate:true});
@@ -4460,9 +4472,9 @@ await (async () => {
       _pbpDictSlotRun=async()=>prefix;pbpDictEntryRun=async()=>chinese;
       _pbpVocabLookupOther("中国人","zh");await settle();
       check("AI entry: a native prefix result displays its actual shorter headword",host.dataset.refTerm==="中国"&&host.querySelector('.vocab-ref-term').textContent==="中国");
-      host.querySelector('.xp-dict-ai-generate').click();await settle();
+      $id('vocab-ref').querySelector('.xp-dict-ai-generate').click();await settle();
       check("AI entry: source switching restores the full AI word for heading and pronunciation",host.dataset.refTerm==="中国人"&&host.querySelector('.vocab-ref-term').textContent==="中国人"&&host.querySelector('.xp-dict-ai-content').textContent.includes("Chinese person"));
-      host.querySelector('.xp-dict-ai-switch').click();await settle();
+      $id('vocab-ref').querySelector('.xp-dict-ai-switch').click();await settle();
       check("AI entry: returning to a prefix dictionary restores its shorter headword",host.dataset.refTerm==="中国"&&host.querySelector('.vocab-ref-term').textContent==="中国");
       let resolveNative;_pbpDictSlotRun=()=>new Promise(resolve=>{resolveNative=resolve;});cached={...chinese,cached:true};
       _pbpVocabLookupOther("中国人","zh");await settle();resolveNative?.(prefix);await settle();
@@ -4509,6 +4521,64 @@ await (async () => {
       _pbpVocabDictCtrl?.abort();_pbpVocabDictChildCtrl?.abort();_pbpVocabRenderDetail(null);
       _pbpDictSlotRun=old.remote;_pbpDictEcdictSide=old.local;_pbpDictLoadPack=old.load;window.pbpDictPackLookup=old.lookup;window.pbpDictPackList=old.list;
       pbpReadSettingsWithSecrets=old.read;_pbpVocabAutoLookup=old.auto;pbpDictEntryRead=old.entryRead;pbpVocabCurrentOwner=old.owner;pbpVocabGet=old.get;pbpVocabSaveWord=old.save;
+    }
+  }
+
+  // The built-in Chinese source is an independent leg, so an available
+  // online answer can appear beside it and disabling it invalidates saves.
+  {
+    const old = { load: _pbpDictLoadPack, cedict: pbpPackLookup, lookup: window.pbpDictPackLookup,
+      list: window.pbpDictPackList, remote: _pbpDictSlotRun, read: pbpReadSettingsWithSecrets,
+      auto: _pbpVocabAutoLookup, entryRead: pbpDictEntryRead, owner: pbpVocabCurrentOwner,
+      get: pbpVocabGet, save: pbpVocabSaveWord };
+    const owner = "acct_legacy_sources", writes = [];
+    const onlineNorm = { word: "学习", sourceLabel: "Wiktionary", sourceUrl: "https://en.wiktionary.org/wiki/学习",
+      license: "CC BY-SA 4.0", entries: [{ pos: "verb", ipas: [], forms: [], senses: [{ definition: "to acquire knowledge", examples: [] }] }] };
+    let enabled = true, onlineCalls = 0, failOnline = false, releaseOwner;
+    try {
+      _pbpVocabRenderDetail(null); _vocabCurrentOwner = owner; _vocabRows = [];
+      _pbpDictLoadPack = async () => true;
+      pbpPackLookup = async () => enabled ? { state: "hit", matched: "学习",
+        rows: [{ trad: "學習", simp: "学习", pinyin: "xue2 xi2", defs: ["to study"] }] } : { state: "unavailable" };
+      window.pbpDictPackLookup = async () => ({ state: "unavailable", hits: [] });
+      window.pbpDictPackList = async () => [];
+      _pbpDictSlotRun = async (el, term, lang) => {
+        onlineCalls++;
+        if (failOnline) throw new Error("fixture online failure");
+        _pbpDictRenderEntry(el, onlineNorm, term, lang, term, "");
+        return onlineNorm;
+      };
+      pbpReadSettingsWithSecrets = async () => ({ previewAiEnabled: false });
+      pbpDictEntryRead = async () => null; _pbpVocabAutoLookup = async () => {};
+      pbpVocabCurrentOwner = async () => owner; pbpVocabGet = async () => null;
+      pbpVocabSaveWord = async (...args) => { writes.push(args); return null; };
+      _pbpVocabLookupOther("学习", "zh"); await settle();
+      const host = $id("vocab-ref-result");
+      check("legacy sources: Chinese local and online answers both render", host.querySelector(".xp-dict-legacy")?.textContent.includes("to study") && host.querySelector(".xp-dict-online")?.textContent.includes("to acquire knowledge") && onlineCalls === 1);
+      check("legacy sources: both Chinese sources offer their own definitions", host.querySelector(".vocab-save-definition")?.options.length === 3);
+      check("legacy sources: only the second actual source receives a separator", host.querySelectorAll("[data-source-break]").length === 1 && host.querySelector(".xp-dict-online").hasAttribute("data-source-break"));
+      const select = host.querySelector(".vocab-save-definition");
+      select.value = "local:0"; select.dispatchEvent(new Event("change"));
+      pbpVocabCurrentOwner = () => new Promise(resolve => { releaseOwner = resolve; });
+      host.querySelector(".vocab-lookup-save").click(); await settle();
+      enabled = false;
+      window.dispatchEvent(new CustomEvent("pbp-dict-packs-changed", { detail: { type: "changed", id: "cedict", action: "disable", kind: "legacy" } }));
+      await settle(); releaseOwner?.(owner); await settle();
+      pbpVocabCurrentOwner = async () => owner;
+      check("legacy sources: disabling during the owner read cancels a pending save", writes.length === 0);
+      check("legacy sources: disabling removes stale local choices and the redundant separator", !host.querySelector(".xp-dict-legacy").textContent && host.querySelector(".vocab-save-definition")?.options.length === 2 && host.querySelector(".vocab-save-definition").value === "" && !host.querySelector("[data-source-break]"));
+      enabled = true; failOnline = true;
+      _pbpVocabLookupOther("学习", "zh"); await settle();
+      check("legacy sources: an online failure preserves the Chinese local answer and save choice", host.querySelector(".xp-dict-legacy")?.textContent.includes("to study") && host.querySelector(".vocab-save-definition")?.options.length === 2);
+      const before = onlineCalls, els = _pbpVocabRefSlot();
+      _pbpVocabDictRun("学习", "zh", els, "", () => {}, { online: false }); await settle();
+      check("legacy sources: local-only open renders Chinese without starting online", onlineCalls === before && host.querySelector(".xp-dict-legacy")?.textContent.includes("to study"));
+    } finally {
+      _pbpVocabDictCtrl?.abort(); _pbpVocabDictChildCtrl?.abort(); _pbpVocabRenderDetail(null);
+      _pbpDictLoadPack = old.load; pbpPackLookup = old.cedict; window.pbpDictPackLookup = old.lookup;
+      window.pbpDictPackList = old.list; _pbpDictSlotRun = old.remote; pbpReadSettingsWithSecrets = old.read;
+      _pbpVocabAutoLookup = old.auto; pbpDictEntryRead = old.entryRead; pbpVocabCurrentOwner = old.owner;
+      pbpVocabGet = old.get; pbpVocabSaveWord = old.save;
     }
   }
 

@@ -774,18 +774,21 @@ function _pbpDictSenseLi(s, formOf, termLang, definitionLang) {
     li.appendChild(sub);
   }
   for (const x of s.examples || []) {
+    const pair = document.createElement("div");
+    pair.className = "xp-dict-example-pair";
     const ex = document.createElement("div");
     ex.className = "xp-dict-example";
     ex.lang = termLang || "und";
     ex.dir = "auto";
     ex.textContent = typeof x === "string" ? x : x.text;
-    li.appendChild(ex);
+    pair.appendChild(ex);
     if (typeof x === "object" && x.translation) {
       const translation = document.createElement("div");
-      translation.className = "xp-dict-example";
+      translation.className = "xp-dict-example xp-dict-example-translation";
       translation.lang = definitionLang || "und"; translation.dir = "auto";
-      translation.textContent = x.translation; li.appendChild(translation);
+      translation.textContent = x.translation; pair.appendChild(translation);
     }
+    li.appendChild(pair);
   }
   for (const [key, words] of [["dictSynonyms", s.synonyms], ["dictAntonyms", s.antonyms]]) {
     if (!words || !words.length) continue;
@@ -896,6 +899,20 @@ function _pbpDictRenderEntry(slot, norm, term, lang, selectedTerm, sentence) {
   src.appendChild(label);
   src.appendChild(a);
   slot.appendChild(src);
+  _pbpDictSyncSourceDividers(slot);
+}
+
+// Count populated sources in DOM order, not asynchronous arrival order. Empty
+// local hosts are always mounted, so :not(:empty) on that host is misleading.
+function _pbpDictSyncSourceDividers(node) {
+  const slot = node.closest?.(".xp-dict-slot");
+  if (!slot) return;
+  let count = 0;
+  for (const source of slot.querySelectorAll(".xp-dict-local-box, .xp-dict-online")) {
+    const populated = !!source.childElementCount;
+    source.toggleAttribute("data-source-break", populated && count > 0);
+    if (populated) count++;
+  }
 }
 
 function _pbpDictSlotMsg(slot, text) {
@@ -904,6 +921,7 @@ function _pbpDictSlotMsg(slot, text) {
   p.className = "xp-dict-msg";
   p.textContent = text;
   slot.appendChild(p);
+  _pbpDictSyncSourceDividers(slot);
 }
 
 function _pbpDictSlotFallback(slot, text, term) {
@@ -919,11 +937,9 @@ function _pbpDictSlotFallback(slot, text, term) {
   slot.appendChild(src);
 }
 
-// The ECDICT block is an ADDITIONAL Chinese section above the online entry, not
-// a short circuit like the zh path: freedictionaryapi's English coverage is
-// excellent, so replacing it would throw away senses, examples, forms and IPA.
-//
-// Six contracts, and the first five are the opposite of what the zh branch does:
+// ECDICT contributes an independent local section, alongside online results.
+// CC-CEDICT follows the same independent-source pattern for Chinese queries.
+// Six contracts:
 //  1. English only.
 //  2. Never awaited by the online chain -- the network request must not wait on
 //     an IDB read. Launched fire-and-forget for that reason.
@@ -969,11 +985,35 @@ async function _pbpDictEcdictSide(localEl, term, lang, parentSignal, cur, onResu
     // first and silently drop the other.
     for (const e of norm.entries) _pbpDictRenderSenses(box, e.senses, false, lang, "zh");
     localEl.replaceChildren(box);
+    _pbpDictSyncSourceDividers(localEl);
     if (typeof onResult === "function" && alive()) onResult(norm);
   } catch (e) {
     // Swallowing without a trace is what turns a platform fault into a silent
     // "no Chinese for this word" that nobody can diagnose.
     console.warn("[dict] local ECDICT lookup failed:", e && e.name, e && e.message);
+  }
+}
+
+// Chinese local data is independent of the online source, just like ECDICT.
+// A miss or an unavailable pack must never prevent an authorized online lookup.
+async function _pbpDictCedictSide(localEl, term, lang, parentSignal, cur, onResult) {
+  if (lang !== "zh") return;
+  const alive = () => !parentSignal?.aborted && _pbpDictCurrent === cur && localEl.isConnected &&
+    (!cur.isCurrent || cur.isCurrent());
+  try {
+    if (!(await _pbpDictLoadPack()) || !alive() || typeof pbpPackLookup !== "function") return;
+    const exact = pbpDictNormalizeTerm(term);
+    const local = await pbpPackLookup(pbpCedictLookupKeys(pbpDictCleanCandidate(exact, lang) || exact));
+    if (!alive() || local?.state !== "hit") return;
+    const norm = pbpCedictEntryToNorm(local.rows, local.matched);
+    if (!norm.entries.length) return;
+    const box = document.createElement("div"); box.className = "xp-dict-local-box";
+    _pbpDictRenderEntry(box, norm, local.matched, lang, term, cur.sentence);
+    localEl.replaceChildren(box);
+    _pbpDictSyncSourceDividers(localEl);
+    if (typeof onResult === "function" && alive()) onResult(norm);
+  } catch (error) {
+    console.warn("[dict] local CC-CEDICT lookup failed:", error?.name, error?.message);
   }
 }
 
@@ -1034,15 +1074,32 @@ async function _pbpDictPackSide(el, term, lang, signal, cur, onResult, preferenc
       const hint = document.createElement("div"); hint.className = "xp-dict-msg";
       hint.textContent = t("dictPackResultsLimited"); el.appendChild(hint);
     }
+    _pbpDictSyncSourceDividers(el);
   } catch (error) {
     console.warn("[dict] multilingual pack lookup failed:", error?.name, error?.message);
     failed();
+  } finally {
+    if (alive()) _pbpDictSyncSourceDividers(el);
   }
 }
 
 // Reading metadata is local-only. Keep both the shipped languages and the
 // user's current choice; a stale page/run must never rebuild a newer select.
 const _pbpDictLangRefresh = new WeakMap();
+function _pbpDictSyncSelectFace(select) {
+  // Only the reader uses customizable native selects; library has its listbox.
+  if (!select.classList.contains("xp-dict-lang")) return;
+  let face = select.querySelector("selectedcontent");
+  if (!face) {
+    const button = document.createElement("button"); button.type = "button";
+    face = document.createElement("selectedcontent"); button.appendChild(face);
+    select.prepend(button);
+  }
+  // Chromium does not always clone the initial option after a dynamic rebuild.
+  // Explicit text also covers programmatic selection before the first paint.
+  face.textContent = select.selectedOptions[0]?.textContent || "";
+}
+
 async function _pbpDictRefreshPackLangs(sel, locale, includeAuto, isCurrent = () => true) {
   const token = {}; _pbpDictLangRefresh.set(sel, token);
   try {
@@ -1059,6 +1116,7 @@ async function _pbpDictRefreshPackLangs(sel, locale, includeAuto, isCurrent = ()
     if (includeAuto) sel.appendChild(new Option(oldAuto || t("dictLangAuto"), ""));
     for (const code of codes) sel.appendChild(new Option(pbpDictLanguageLabel(code, locale) || code, code));
     if (keep === "" && includeAuto || codes.has(keep)) sel.value = keep;
+    _pbpDictSyncSelectFace(sel);
     if (typeof pbpListboxSync === "function") pbpListboxSync(sel);
     return [...codes];
   } catch (error) {
@@ -1076,14 +1134,19 @@ function _pbpDictSlotSkeleton(slot) {
   sr.className = "sr-only";
   sr.textContent = t("dictLoading");
   slot.appendChild(sr);
+  _pbpDictSyncSourceDividers(slot);
 }
 
 let _pbpDictPackNoticeTimer = 0;
-function _pbpDictPacksChanged() {
+let _pbpDictLegacyNotice = false;
+function _pbpDictPacksChanged(event) {
+  if (event?.detail?.kind === "legacy" || event?.kind === "legacy") _pbpDictLegacyNotice = true;
   if (_pbpDictPackNoticeTimer) return;
   _pbpDictPackNoticeTimer = setTimeout(() => {
     _pbpDictPackNoticeTimer = 0;
-    _pbpDictCurrent?.refreshPacks?.();
+    const legacy = _pbpDictLegacyNotice; _pbpDictLegacyNotice = false;
+    if (legacy && _pbpDictCurrent?.refreshLegacy) _pbpDictCurrent.refreshLegacy();
+    else _pbpDictCurrent?.refreshPacks?.();
     _pbpDictCurrent?.refreshLanguages?.();
     const select = document.getElementById("vocab-lookup-lang");
     if (select) _pbpDictRefreshPackLangs(select,
@@ -1093,7 +1156,7 @@ function _pbpDictPacksChanged() {
 window.addEventListener("pbp-dict-packs-changed", _pbpDictPacksChanged);
 try {
   const channel = new BroadcastChannel("pbp-dict-packs");
-  channel.addEventListener("message", event => { if (event.data?.type === "changed") _pbpDictPacksChanged(); });
+  channel.addEventListener("message", event => { if (event.data?.type === "changed") _pbpDictPacksChanged(event.data); });
   window.addEventListener("pagehide", () => channel.close(), { once: true });
 } catch (_) { /* Same-page notifications still work without BroadcastChannel. */ }
 
@@ -1152,36 +1215,6 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
   if (!lang) { _pbpDictSlotFallback(slot, t("dictLangUnknown"), term); return null; }
   if (!PBP_DICT_QUERY_LANGS.includes(pbpDictPrimaryLang(lang))) {
     _pbpDictSlotMsg(slot, t("dictOnlineLanguageUnavailable")); return null;
-  }
-  if (lang === "zh") {
-    const loaded = await _pbpDictLoadPack();
-    if (parentSignal && parentSignal.aborted) return null;
-    if (loaded && typeof pbpPackLookup === "function" && typeof pbpCedictLookupKeys === "function") {
-      // Leading quotes/brackets break EVERY prefix key (they all start at code
-      // point 0), while trailing junk falls off on its own as the prefix
-      // shortens. Hanzi headwords never carry edge punctuation, so cleaning
-      // up front is safe here, unlike the English exact-first ladder.
-      const zhTerm = pbpDictCleanCandidate(exact, lang) || exact;
-      let local;
-      try { local = await pbpPackLookup(pbpCedictLookupKeys(zhTerm)); }
-      catch (_) { local = { state: "error" }; }
-      if (parentSignal && parentSignal.aborted) return null;
-      if (local && local.state === "hit") {
-        const norm = pbpCedictEntryToNorm(local.rows, local.matched);
-        _pbpDictRenderEntry(slot, norm, local.matched, lang, term, sentence);
-        // Prefix hits render norm.word, which may be SHORTER than the raw
-        // selection; the run-level .then() re-syncs cur.term when this settles.
-        return norm;
-      }
-      if (local && local.state === "ready-miss") {
-        _pbpDictSlotFallback(slot, t("dictNoEntry"), term);
-        return null;
-      }
-      if (local && local.state === "error") {
-        _pbpDictSlotFallback(slot, t("dictLoadFailed"), term);
-        return null;
-      }
-    }
   }
   const exactHit = await _pbpDictCacheGet(lang, exact);
   if (parentSignal && parentSignal.aborted) return null;
@@ -1418,12 +1451,21 @@ async function _pbpDictResolveLang(cap, ctx, manual, installedLanguages) {
 // mounted in their stable host while the user switches between sources.
 function pbpDictEntryNorm(record, target) {
   const entry = record.entry;
+  const entries = [];
+  for (const meaning of entry.meanings) {
+    let group = entries.find(item => item.pos === meaning.partOfSpeech);
+    if (!group) {
+      group = { pos: meaning.partOfSpeech,
+        ipas: !entries.length && entry.pronunciation ? [{ text: entry.pronunciation, tags: [] }] : [],
+        ipaMore: 0, forms: [], senses: [] };
+      entries.push(group);
+    }
+    group.senses.push({ definition: meaning.definition, tags: [], subsenses: [],
+      examples: meaning.examples, synonyms: [], antonyms: [] });
+  }
   return { word: entry.word, pronunciation: entry.pronunciation, definitionLang: target.lang, sourceLabel: "AI", sourceUrl: "",
     license: "AI-generated · " + record.provider + " / " + record.model, aiGenerated: true,
-    entries: entry.meanings.map((meaning, index) => ({ pos: meaning.partOfSpeech,
-      ipas: index === 0 && entry.pronunciation ? [{ text: entry.pronunciation, tags: [] }] : [],
-      ipaMore: 0, forms: [], senses: [{ definition: meaning.definition, tags: [], subsenses: [],
-        examples: meaning.examples, synonyms: [], antonyms: [] }] })) };
+    entries };
 }
 
 function _pbpDictEntryMount(host, opts) {
@@ -1434,21 +1476,27 @@ function _pbpDictEntryMount(host, opts) {
     const el = document.createElement("button"); el.type = "button";
     el.className = "xp-dict-connect " + name; el.textContent = t(key); return el;
   };
+  const action = (el, key, icon) => {
+    el.innerHTML = typeof PBP_ICONS === "object" ? PBP_ICONS[icon] || "" : "";
+    el.title = t(key); el.setAttribute("aria-label", t(key));
+  };
   const generate = button("dictEntryGenerate", "xp-dict-ai-generate");
-  if (typeof PBP_ICONS === "object" && PBP_ICONS.robot) {
-    generate.innerHTML = PBP_ICONS.robot; generate.append(t("dictEntryGenerate"));
-  }
+  action(generate, "dictEntryGenerate", "filePen");
   generate.disabled = true;
   const toggle = button("dictEntryShowDictionary", "xp-dict-ai-switch"); toggle.hidden = true;
+  action(toggle, "dictEntryShowDictionary", "arrowRightLeft");
   const stop = button("askStop", "xp-dict-ai-stop"); stop.hidden = true;
-  const configure = document.createElement("a"); configure.className = "xp-dict-ai-configure";
+  action(stop, "askStop", "stop");
+  const configure = document.createElement("a"); configure.className = "xp-dict-connect xp-dict-ai-configure";
   configure.href = "options.html#ai"; configure.target = "_blank"; configure.rel = "noopener noreferrer";
-  configure.textContent = t("aiConfigure"); configure.hidden = true;
+  action(configure, "aiConfigure", "gear"); configure.hidden = true;
   controls.append(generate, toggle, stop, configure);
   const status = document.createElement("div"); status.className = "xp-dict-msg xp-dict-ai-status";
   status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite"); status.hidden = true;
   const content = document.createElement("div"); content.className = "xp-dict-ai-content"; content.hidden = true;
-  panel.append(controls, status, content); host.appendChild(panel);
+  if (opts.controlsHost) opts.controlsHost.appendChild(controls);
+  else panel.appendChild(controls);
+  panel.append(status, content); host.appendChild(panel);
   let settings = null, record = null, busy = false, active = null, epoch = 0, mode = "dictionary";
   const alive = () => !opts.signal?.aborted && panel.isConnected && opts.isCurrent();
   const configured = () => settings && settings.previewAiEnabled !== false && typeof hasAIKey === "function" && hasAIKey(settings);
@@ -1456,10 +1504,11 @@ function _pbpDictEntryMount(host, opts) {
     typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : document.documentElement.lang || "en");
   const message = text => { status.textContent = text; status.hidden = !text; };
   const sync = () => {
-    generate.hidden = !!record || !configured(); generate.disabled = busy || !settings;
+    generate.hidden = !!record || !configured() || busy; generate.disabled = busy || !settings;
     toggle.hidden = !record; stop.hidden = !busy;
     configure.hidden = !!record || !settings || settings.previewAiEnabled === false || configured();
     panel.hidden = !record && !!settings && settings.previewAiEnabled === false;
+    controls.hidden = panel.hidden;
     panel.setAttribute("aria-busy", busy ? "true" : "false");
   };
   const show = next => {
@@ -1467,7 +1516,7 @@ function _pbpDictEntryMount(host, opts) {
     mode = next;
     if (opts.dictionaryHost) opts.dictionaryHost.hidden = mode === "ai";
     content.hidden = mode !== "ai";
-    toggle.textContent = t(mode === "ai" ? "dictEntryShowDictionary" : "dictEntryShowAi");
+    action(toggle, mode === "ai" ? "dictEntryShowDictionary" : "dictEntryShowAi", "arrowRightLeft");
     opts.onView?.(mode);
   };
   const render = (value, answerLanguage) => {
@@ -1550,7 +1599,10 @@ function _pbpDictEntryMount(host, opts) {
     epoch++; active?.abort(); active = null; busy = false; message(""); sync();
     if (!generate.hidden) generate.focus({ preventScroll: true });
   });
-  opts.signal?.addEventListener("abort", () => { epoch++; active?.abort(); }, { once: true });
+  opts.signal?.addEventListener("abort", () => {
+    epoch++; active?.abort();
+    if (opts.controlsHost) controls.remove();
+  }, { once: true });
   const ready = Promise.resolve(opts.settings).then(async value => {
     if (!alive()) return;
     settings = value || {}; sync();
@@ -1598,7 +1650,7 @@ function _pbpDictEntryMount(host, opts) {
     chrome.storage.onChanged.addListener(changed);
     opts.signal?.addEventListener("abort", () => chrome.storage.onChanged.removeListener(changed), { once: true });
   }
-  return { element: panel, ready, show };
+  return { element: panel, controls, ready, show };
 }
 
 const PBP_DICT_LANGS = ["auto", ...PBP_DICT_QUERY_LANGS];
@@ -1673,6 +1725,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   wrap.className = "xp-dict";
   const head = document.createElement("div");
   head.className = "panel-head xp-dict-head";
+  const queryTools = document.createElement("div"); queryTools.className = "xp-dict-query-tools";
   const sel = document.createElement("select");
   sel.className = "xp-dict-lang";
   sel.setAttribute("aria-label", t("dictLangAria"));
@@ -1689,7 +1742,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   speak.setAttribute("aria-label", t("dictSpeak"));
   speak.title = t("dictSpeak");
   speak.innerHTML = PBP_DICT_SPEAKER_SVG; // static constant, never model text
-  head.append(sel, speak);
+  queryTools.append(sel, speak); head.appendChild(queryTools);
   const slot = document.createElement("div");
   slot.className = "xp-dict-slot";
   // Two stable children. Every online path -- skeleton, permission prompt,
@@ -1742,6 +1795,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
     const detectedLabel = pbpDictLanguageLabel(lang, languageLocale);
     sel.options[0].textContent = t("dictLangAuto") + (detectedLabel ? " (" + detectedLabel + ")" : "");
   }
+  _pbpDictSyncSelectFace(sel);
   sel.addEventListener("change", () => {
     _pbpDictManualLang = sel.value; // per-document only; never persisted
     cur.rerun(); // abort old requests NOW
@@ -1758,7 +1812,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   const aiHost = document.createElement("div"); slot.before(aiHost);
   const originalTerm = wrap.querySelector(".xp-dict-origin-term"); if (originalTerm) originalTerm.lang = lang || "und";
   cur.ai = _pbpDictEntryMount(aiHost, { term: cap.text, lang, owner: cur.owner,
-    signal, isCurrent: cur.isCurrent, settings: s, dictionaryHost: slot,
+    signal, isCurrent: cur.isCurrent, settings: s, dictionaryHost: slot, controlsHost: head,
     onSettingsChange: next => { if (cur.isCurrent()) pbpDictRun(cap, ctx, pop, ctrl, next, origin); },
     onLookup: term => cur.rerunWith(term),
     onEntry: (norm, record, content) => {
@@ -1774,9 +1828,17 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
 
   // Local dictionaries load independently of the online request and AI entry.
   const ecdictEl = document.createElement("div"), packsEl = document.createElement("div");
+  ecdictEl.className = "xp-dict-legacy"; packsEl.className = "xp-dict-packs";
   localEl.append(packsEl, ecdictEl);
   _pbpDictEcdictSide(ecdictEl, cap.text, lang, signal, cur,
     norm => _pbpDictReaderPackChoices(norm, ecdictEl, cur, pop, signal));
+  _pbpDictCedictSide(ecdictEl, cap.text, lang, signal, cur, norm => {
+    cur.localNorm = norm;
+    if (!cur.dictionaryNorm) cur.dictionaryNorm = norm;
+    _pbpDictReaderPackChoices(norm, ecdictEl, cur, pop, signal);
+    _pbpDictApplyVisibleChoice(cur); _pbpDictSyncMeaningSelect(cur);
+    _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name));
+  });
   const showPacks = () => _pbpDictPackSide(packsEl, cap.text, lang, signal, cur,
     (norm, box) => _pbpDictReaderPackChoices(norm, box, cur, pop, signal), s.dictDefinitionLang);
   cur.refreshPacks = () => {
@@ -1797,11 +1859,12 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
     }
     packsEl.replaceChildren(); showPacks();
   };
+  cur.refreshLegacy = cur.rerun;
   showPacks();
 
   const norm = await _pbpDictSlotRun(onlineEl, cap.text, lang, signal, Promise.resolve(""), cur.rerun, ctx.sentence);
   if (signal.aborted || _pbpDictCurrent !== cur) return;
-  cur.dictionaryNorm = norm;
+  cur.dictionaryNorm = norm || cur.localNorm;
   if (norm) _pbpDictReaderPackChoices(norm, onlineEl, cur, pop, signal);
   if (cur.packInvalidated && !cur.packChoice) return;
   _pbpDictApplyVisibleChoice(cur);
@@ -1823,6 +1886,9 @@ function _pbpDictSyncMeaningSelect(cur) {
   if (!select) return;
   const rows = [...cur.meaningSources.values()].flatMap(source => source.choices);
   cur.meaningChoices = rows;
+  // base-select's anonymous selected-value box can wrap outside a fixed-height
+  // control. An explicit selectedcontent gives the closed face its own clipping
+  // boundary while the top-layer options retain their complete text.
   select.replaceChildren(new Option(t("vocabSaveDefinitionLabel"), ""));
   rows.forEach((choice, index) => {
     const option = new Option(choice.term + " · " + choice.gloss + " (" + choice.sourceLabel + ")", String(index));
@@ -1831,6 +1897,7 @@ function _pbpDictSyncMeaningSelect(cur) {
   const selected = rows.findIndex(choice => choice.term === cur.term && choice.gloss === cur.gloss &&
     choice.sourceUrl === cur.sourceUrl && choice.license === cur.license);
   select.value = selected >= 0 ? String(selected) : "";
+  _pbpDictSyncSelectFace(select);
   select.hidden = !rows.length || (rows.length === 1 && selected === 0 && !cur.packChoice);
   select.title = selected >= 0 ? rows[selected].gloss + " (" + rows[selected].sourceLabel + ")" : t("vocabSaveDefinitionLabel");
 }

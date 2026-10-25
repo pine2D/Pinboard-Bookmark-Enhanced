@@ -7925,6 +7925,7 @@ const SWEEP_CFG = {
       "summary", ".rail-sec-head", ".notes-hit-btn", ".notes-card-head", ".notes-card-top", ".notes-excerpt-jump", ".connection-health-row", ".hl-item-main", ".send-mi", ".pbv-poster", // row rung: whole-row clickables / section headers / status cards / menu rows / the video poster card
       ".theme-preset-btn", ".saved-theme-btn",       // borderless swatch pills (user-selected variant A, d57cdcf): the sm rung minus the collapsed frame
       ".tags-input-wrap > input", ".vocab-group-unit > input", ".source-badge > .src-seg", ".view-toggle > .toggle-btn", // fused-shell inners: the shell is measured instead
+      "select > button",                           // customizable select's inert face; measure the parent select
     ],
     // fused shells measured as the control they are (COMPONENTS.md §8)
     shells: ".tags-input-wrap, .source-badge, .view-toggle, .vocab-group-unit",
@@ -9050,7 +9051,7 @@ async function runSweep(page, sw, extBase) {
             if (name.endsWith("-idle")) {
               await installDictEntryFixture(page);
               if (await page.evaluate(openReaderSurface, "explain-pop") !== true || await page.evaluate(openReaderSurface, "explain-dict") !== true) throw new Error("SETUP: dictionary entry opener failed");
-              await page.selectOption(".xp-dict-head > .xp-dict-lang", "en");
+              await page.selectOption(".xp-dict-query-tools > .xp-dict-lang", "en");
             }
             await scan("md-preview", name, () => openDictEntryState(page, name.replace(/^dict-entry-/, "")));
             const following = READER_SURFACES.slice(READER_SURFACES.indexOf(name) + 1).find(next => wants("md-preview", next));

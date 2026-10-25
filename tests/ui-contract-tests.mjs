@@ -7635,7 +7635,6 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
     // library.css has none since the redesign's dictionary column (T7a):
     // its part-of-speech and sense tags are upright muted text there.
     "md-preview.css": {
-      ".xp-dict-pos": 'part-of-speech tags are English-normalised by the API across query languages (sampled ja/ko); local packs write pos:"" (dict-pack.js:75,388)',
       ".xp-dict-sense-tag": "sense tags are English-normalised by the API across query languages (sampled ja/ko); local packs write them empty (dict-pack.js:75,388)",
       "#rendered-view em": "author's own emphasis in article/translation content (D5, user ruling), not synthesized UI chrome",
     },

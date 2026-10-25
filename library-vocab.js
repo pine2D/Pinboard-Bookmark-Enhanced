@@ -1083,9 +1083,9 @@ function _pbpVocabRenderDetail(w, enterNarrow, reconcileOnly = false) {
 }
 
 // Dictionary reference column (library redesign T7, spec §4.8-§4.10). Reuses md-dict's
-// pure query seams (_pbpDictSlotRun online chain + _pbpDictEcdictSide local
-// pack) with NO AI leg: the lemma promise resolves empty immediately (ai.js
-// is not loaded on this page). Participates in md-dict's staleness token so
+// pure query seams (online lookup and independent local dictionary legs).
+// Reusable AI entries are optional; lookup never asks AI for a lemma.
+// Participates in md-dict's staleness token so
 // a second click or a word switch invalidates the previous run exactly like
 // explain-pop does.
 let _pbpVocabDictCtrl = null;
@@ -1247,7 +1247,7 @@ async function _pbpVocabSaveLookup(state) {
 
 // Shared dictionary run core, extracted from _pbpVocabRelookup so free lookup
 // (a later task) can reuse it verbatim. Reuses md-dict's pure query seams
-// (_pbpDictSlotRun online chain + _pbpDictEcdictSide local pack). Reusable AI
+// (online lookup plus the English and Chinese local dictionary legs). Reusable AI
 // entries share the result view; they never consume article context or pack
 // contents. Participates in md-dict's staleness token so a second run or a
 // word switch invalidates the previous one exactly like explain-pop does.
@@ -1255,7 +1255,7 @@ async function _pbpVocabSaveLookup(state) {
 // slot-invariant comment at each call site). `rerun` is the caller's "run
 // this exact query again" callback (e.g. re-read a language <select> and
 // call its own startRun); it only fires if this run is still the live one.
-// `online: false` runs the local ECDICT block alone (open-to-look-up, T7).
+// `online: false` runs only the local dictionaries (open-to-look-up, T7).
 // #vocab-ref-result is aria-busy while the live run fills it; only the run
 // still live when its legs settle takes the flag down.
 function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, packResult, derived = false } = {}) {
@@ -1283,6 +1283,7 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
   const intent = ++_vocabLookupIntent;
   const cur = { term, lang, sentence, derived };
   cur.rerun = () => { if (_pbpDictCurrent === cur) rerun(); };
+  cur.refreshLegacy = () => cur.rerun();
   // Form-of pointer jump (md-dict's .xp-dict-lemma-link): its click handler
   // only fires when the LIVE run carries a rerunWith, so without this the
   // lemma read as a link, was a real button, and did nothing at all on this
@@ -1310,16 +1311,29 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
     const shown = state.view === "ai" ? term : state.dictionaryTerm;
     host.dataset.refTerm = shown;
     const heading = host.querySelector(".vocab-ref-term");
-    if (heading) heading.textContent = shown;
+    if (heading) { heading.textContent = shown; heading.title = shown; }
   };
   state.syncHeading();
+  $id("vocab-ref")?.querySelectorAll(".xp-dict-ai-controls").forEach(el => el.remove());
   host?.querySelector(".xp-dict-ai")?.remove();
   const dictionaryHost = onlineEl.closest(".xp-dict-slot");
   if (dictionaryHost) dictionaryHost.hidden = false;
+  let controlsHost = host.querySelector(".vocab-ref-head");
+  if (!controlsHost) {
+    const lookup = $id("vocab-lookup-go");
+    controlsHost = lookup?.closest(".vocab-lookup-actions");
+    if (!controlsHost && lookup) {
+      controlsHost = document.createElement("div");
+      controlsHost.className = "vocab-lookup-actions";
+      lookup.before(controlsHost);
+      controlsHost.appendChild(lookup);
+    }
+  }
   // AI is one source in the same lookup view. A late result adds choices,
   // but never changes the definition already selected for saving.
   const entryView = _pbpDictEntryMount(host, { term, lang, owner: state.owner, signal,
-    dictionaryHost, isCurrent: state.live, settings: pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS),
+    dictionaryHost, controlsHost,
+    isCurrent: state.live, settings: pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS),
     onSettingsChange: () => { if (state.live()) cur.rerun(); },
     onView: mode => { state.view = mode; state.syncHeading(); },
     onEntry: norm => {
@@ -1331,8 +1345,10 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
   });
   if (entryView && dictionaryHost) dictionaryHost.before(entryView.element);
   const acceptLocal = norm => _pbpVocabAcceptLookupResult(state, "local", norm);
-  const ecdictEl = document.createElement("div"), packsEl = document.createElement("div");
-  localEl.replaceChildren(packsEl, ecdictEl);
+  const legacyEl = document.createElement("div"), packsEl = document.createElement("div");
+  legacyEl.className = "xp-dict-legacy";
+  packsEl.className = "xp-dict-packs";
+  localEl.replaceChildren(packsEl, legacyEl);
   const showPacks = result => _pbpDictPackSide(packsEl, term, lang, signal, cur,
     norm => _pbpVocabAcceptLookupResult(state, "pack:" + norm.packId + ":" + norm.word, norm), undefined, result);
   cur.refreshPacks = () => {
@@ -1344,6 +1360,10 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
     packsEl.replaceChildren(); showPacks();
   };
   const packs = showPacks(packResult);
+  const local = Promise.allSettled([
+    _pbpDictEcdictSide(legacyEl, term, lang, signal, cur, acceptLocal),
+    _pbpDictCedictSide(legacyEl, term, lang, signal, cur, acceptLocal)
+  ]);
   if (host && host.contains(onlineEl)) host.setAttribute("aria-busy", "true");
   const settled = () => {
     if (host && _pbpVocabDictChildCtrl === child && !child.signal.aborted) {
@@ -1355,11 +1375,10 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
     // Open-to-look-up after an offline-pack hit: the local block only. The
     // online chain does not start, so it neither renders nor sends anything;
     // "Look up again" runs the full chain.
-    Promise.allSettled([_pbpDictEcdictSide(ecdictEl, term, lang, signal, cur, acceptLocal), packs]).then(settled);
+    Promise.allSettled([local, packs]).then(settled);
     return;
   }
   _pbpDictSlotSkeleton(onlineEl);
-  const local = _pbpDictEcdictSide(ecdictEl, term, lang, signal, cur, acceptLocal);
   const remote = _pbpDictSlotRun(onlineEl, term, lang, signal, Promise.resolve(""), cur.rerun, cur.sentence)
     .then(norm => _pbpVocabAcceptLookupResult(state, "online", norm))
     .catch((err) => console.warn("library relookup failed:", err.name, err.message));
@@ -1379,11 +1398,12 @@ let _pbpVocabRefOwner;
 
 // Open-to-look-up (spec §4.8, user ruling 10-03). Opening a saved word looks
 // it up on its own, local first: an installed offline dictionary (ECDICT for
-// en, CC-CEDICT for zh), then a complete dict2_ result -- both zero network,
-// and either one answering ends it. A cached form-of pointer may need an
-// uncached candidate, so it follows the same dwell as a miss. Only when no
-// complete local answer exists AND the freedictionaryapi grant already
-// exists (permissions.contains -- this path
+// en, CC-CEDICT for zh), then a complete dict2_ result -- both zero network.
+// Complete online cache hits display at once. Local hits can be supplemented
+// by online results after the same dwell and existing-permission gate as misses.
+// A cached form-of pointer may need an uncached candidate, so it follows the
+// same dwell as a miss. Only when the freedictionaryapi grant already exists
+// (permissions.contains -- this path
 // never calls permissions.request) does it go online, and only after the word
 // has stayed open for PBP_VOCAB_AUTO_ONLINE_DELAY_MS, so arrowing through the
 // list never sends the words it passes. Without the grant the column shows
@@ -1500,19 +1520,21 @@ async function _pbpVocabAutoLookup(w) {
   let hit = null;
   try {
     hit = await _pbpVocabLocalProbe(w.term, lang, signal);
+    if (hit && hit.source !== "cache" && !signal.aborted) {
+      const cached = await _pbpDictCacheGet(lang, pbpDictNormalizeTerm(w.term));
+      if (cached && !cached.formOfOnly) hit = { source: "cache", norm: cached, packResult: hit.packResult };
+    }
   } catch (err) {
     console.warn("library auto lookup: probe failed:", err.name, err.message);
   }
   await ownerBack();
   if (stale()) return "stale";
-  if (hit && !(hit.source === "cache" && hit.norm.formOfOnly)) {
-    // An ECDICT hit shows its block alone (online: false). A CC-CEDICT or a
-    // complete cache hit goes through the normal chain, which answers it
-    // before the grant check -- still zero network. A grammar pointer is
-    // excluded because that chain can fetch another candidate.
+  if (hit?.source === "cache" && !hit.norm.formOfOnly) {
+    // A complete online cache answer never dispatches a request. Grammar
+    // pointers still use the dwell because their candidate can be uncached.
     const { els, again } = begin();
-    _pbpVocabDictRun(w.term, lang, els, sentence, again, { online: hit.source !== "ecdict" && hit.source !== "packs", packResult: hit.packResult });
-    return hit.source === "cache" ? "cache" : "local";
+    _pbpVocabDictRun(w.term, lang, els, sentence, again, { packResult: hit.packResult });
+    return "cache";
   }
   let granted = false;
   try {
@@ -1525,7 +1547,14 @@ async function _pbpVocabAutoLookup(w) {
   }
   await ownerBack();
   if (stale()) return "stale";
-  if (!granted) { _pbpVocabRenderRefIdle("word"); return "idle"; }
+  if (!granted) {
+    if (hit && hit.source !== "cache") {
+      const { els, again } = begin();
+      _pbpVocabDictRun(w.term, lang, els, sentence, again, { online: false, packResult: hit.packResult });
+      return "local";
+    }
+    _pbpVocabRenderRefIdle("word"); return "idle";
+  }
   const { els, again } = begin();
   _pbpDictSlotSkeleton(els.onlineEl);
   await new Promise((resolve) => {
@@ -1535,7 +1564,7 @@ async function _pbpVocabAutoLookup(w) {
   });
   await ownerBack();
   if (stale()) return "stale";
-  _pbpVocabDictRun(w.term, lang, els, sentence, again);
+  _pbpVocabDictRun(w.term, lang, els, sentence, again, { packResult: hit?.packResult });
   return "online";
 }
 
@@ -1744,6 +1773,7 @@ function _pbpVocabLookupOther(term, lang, sentence = "", { derived = false } = {
   termEl.className = "vocab-ref-term";
   termEl.lang = lang;
   termEl.textContent = term;
+  termEl.title = term;
   head.appendChild(termEl);
   const speak = document.createElement("button");
   speak.type = "button";

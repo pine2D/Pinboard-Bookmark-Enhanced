@@ -1579,7 +1579,10 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 
 | 表面 | 原语 | 契约（拥有的几何） |
 |---|---|---|
-| library / md-preview | `.xp-dict-ai` / `.xp-dict-ai-controls` / `.xp-dict-ai-content` / `.xp-dict-ai-details` | AI 词条与普通词典共用主视图，控件行仅生成、停止或来源切换；无面板底色、边框或阴影。行 gap 与行后距 sp-2，结果和可展开词源/相关词前距 sp-2；summary 为次级文字控件，沿用表面字体及高度阶。library 保持平铺，reader 保存含义选择位于 footer。 |
+| library / md-preview | `.xp-dict-ai` / `.xp-dict-ai-controls` / `.xp-dict-ai-content` / `.xp-dict-ai-details` | AI 词条与普通词典共用主视图；动作挂在既有标题/查询栏，固定单排纯图标、gap sp-1、title 与 aria-label 同步。生成用 filePen，与解释 robot 区分；来源切换 arrowRightLeft，停止 stop，配置 gear。reader 26px、library sm 阶，隐藏整组须明确 display:none。无面板底色、边框或阴影；详情前距 sp-4。 |
+| md-preview | `.xp-dict-query-tools` | 语言与朗读同排、gap sp-2，随可用宽度收缩；语言闭合面 selectedcontent 单行省略，展开选项完整换行。AI 图标组不收缩、不换行。保存含义选择位于 footer，闭合面沿用同一裁切规则。 |
+| library | `.vocab-lookup-actions` | 既有查词按钮与 AI 图标保持一个不可拆的单排组，gap sp-2；不另起短按钮行。自由查词的词头行固定单排，词头可省略；保存词条模式复用查询栏，不重复词头。 |
+| library / md-preview | `.xp-dict-example-pair` / `.xp-dict-packs` / `.xp-dict-legacy` | 例句与译句成组，组间 sp-2、译句前距最小间距档；来源按包、本地旧包、在线排序，非首个非空来源以短虚点线和留白分隔。library 正文 15/25px、例句 14/22px、译句 13/21px、行宽最多 64ch；reader 正文随阅读字号缩放，行高 1.55，例句/译句分别为正文的 .88/.82。 |
 | md-preview | `.xp-dict-origin` | 派生词查询的原选词来源与返回操作，flex-wrap、gap sp-2、下距 sp-2，原选词可断长词。查询标题显示当前词头，解释 / 翻译仍使用原始选区；返回保留原选区 |
 | options | `.fg` | 表单组；`margin-bottom: var(--opt-rhythm)`（12px）= 组间节律的唯一主人 |
 | options | `.theme-preset-groups` | 共享 `max-content` 标签列与按钮列；分组沿用 subgrid，按钮复用 `.fg-actions` 独立换行；列间 sp-6、组间 sp-5，≤600px 改标签在上并以 sp-6 分组 |

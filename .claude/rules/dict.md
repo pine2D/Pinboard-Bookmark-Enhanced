@@ -19,7 +19,7 @@ paths:
 ## 多语言 Yomitan 包不变量（dict-pack.js）
 
 - 用户自备 Yomitan v3 ZIP，安装在独立的本机 `pbp-multidict` IndexedDB；不进入 Drive 或手工 JSON 备份。用户显式选义保存后，该释义才按普通生词规则同步、导出。
-- 导入先逐 bank 校验并写暂存代际，全部成功后原子切换 `activeGeneration`；失败或取消保留旧版。安装、启停、AI 开关、删除走同一 Web Lock；重启清理无主代际，不能删正在导入的数据。
+- 导入先逐 bank 校验并写暂存代际，全部成功后原子切换 `activeGeneration`；失败或取消保留旧版。安装、启停、删除走同一 Web Lock；重启清理无主代际，不能删正在导入的数据。
 - 文件只作为数据读取，校验 ZIP 路径、大小、CRC 与本地/中央目录一致性；仅提取结构化文本，不加载词包 HTML、CSS、图片、音频或字体。上限以 `PBP_YOMITAN_LIMITS` 为准，超限拒绝而非静默截断安装。
 - 包身份与词条语言、释义语言分开记录；查询按词条语言隔离，精确词形优先，读音命中的不同词头分别返回。每个命中保留实际词头、包来源与许可声明，不得把同音词或不同包的义项混为一条。
 - 包的来源和许可只是文件/用户声明，不作授权保证。legacy `aiAllowed` 每次导入或替换仍为 false，当前产品不消费该字段、不发送词包内容。
@@ -42,5 +42,6 @@ paths:
 - 查词槽拆 `.xp-dict-local` / `.xp-dict-online` 两个稳定子容器，**任何路径都不得 `replaceChildren()` slot 本身**；本地支线只在 `en` 启动、不被在线链 await、失败一律 UI 静默但须 `console.warn`，且不写 `cur.*`。
 - 生词本可通过显式「保存／更新」动作保存用户选择的本地释义；这是普通 owner-scoped 生词写入，可随现有连接同步到 Drive。仅导入／显示本地条目不自动保存，阅读器本地支线仍不写 `cur.*`，不得把自备数据标成已确认许可。
 - 导出侧的中文是**设备级现算**：compute-only，不回写 `pbp-vocab`、不进 Drive；原六字段 Anki/TSV 保持兼容，可选多语言 Anki 与完整 TSV 将补充释义及来源独立存列。性能验收走 `scripts/ecdict-import-perf.mjs`（不进 pre-commit / verify.sh）。
-- CC-CEDICT 汉英包（.txt/.txt.gz/.zip）命中中文查词时短路在线链；dict-pack 在 options 静载、md-preview 懒加载。
+- CC-CEDICT 汉英包（.txt/.txt.gz/.zip）与 ECDICT 一样独立渲染，中文本地命中也继续展示已授权的在线结果；本地失败不阻断在线，在线失败不移除本地。library 自动驻留保留 250ms 门，完整在线缓存可立即展示；自动路径不申请权限。dict-pack 在 options 静载、md-preview 懒加载。
+- 两个旧包的 `enabled` 存在本机包元数据，旧版缺字段视为启用。启停复用各自的导入/删除锁，停用不删词条，替换保留启停状态；查询与导出补充释义都检查该状态。`kind: "legacy"` 广播使当前查词完整重跑，清除已停用来源与待保存释义。
 - CC-CEDICT 导入**刻意非原子**（先 clear 后流式写），因为该数据集从 MDBG 一键可再下载，丢了只赔一次下载；ECDICT 是用户自备文件、可能不可恢复，才值得为原子性付全量缓冲。取而代之的是 clear 之前的**前置探针门**：取前 `PBP_PACK_PROBE_LINES` 行试解析，候选行数达 `PBP_PACK_PROBE_MIN_CANDIDATES` 且命中率低于 `PBP_PACK_PROBE_MIN_RATIO` 时抛 `code="implausible_pack"`，此时 store 未被动过（探针行必须缓冲后回放，不得吞掉）。截断流与配额耗尽仍会丢旧包，但**只有 clear 事务提交之后**的失败才算：该 try 块内逃逸的错误才补 `code="pack_cleared"`（且 clear 前确实有 ready 包，首次导入无包可失）。**本仓的 code 契约是字符串**——原生 `DOMException` 自带 legacy **数字** `code`（QuotaExceededError 22 / NotFoundError 8 / InvalidStateError 11），而 `_pbpPackTx` 正是以 `tx.error`（DOMException）拒绝，所以判「有没有 code」必须用 `typeof code === "string"`，否则真实的配额失败会被漏判；又因 `DOMException.prototype.code` 是只读 getter，只能用 `Object.defineProperty` 影子覆盖（保留原对象的 name/message/stack），冻结对象才退化为包一层并把原错误挂 `cause`。三条文案按 code 分流，不可互换也不可合并——`implausible_pack` → `dictPackImplausible`（旧包未动）、`pack_cleared` → `dictPackFailedCleared`（旧包已没了，需重新导入）、其余（zip 结构损坏、读文件失败、UTF-8 非法、行过长、开库失败、clear 事务自身 abort、以及从未装过包的首次导入）→ 中性的 `dictPackFailed`，**不得声称旧包被移除**。

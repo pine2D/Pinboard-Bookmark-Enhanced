@@ -250,7 +250,11 @@
         "xp-dict-ai",
         "xp-dict-ai-controls",
         "xp-dict-ai-content",
-        "xp-dict-ai-details"
+        "xp-dict-ai-details",
+        "xp-dict-example-pair",
+        "xp-dict-packs",
+        "xp-dict-legacy",
+        "vocab-lookup-actions"
       ],
       "regions": [
         "lib-header",
@@ -394,7 +398,11 @@
         "xp-dict-ai",
         "xp-dict-ai-controls",
         "xp-dict-ai-content",
-        "xp-dict-ai-details"
+        "xp-dict-ai-details",
+        "xp-dict-example-pair",
+        "xp-dict-packs",
+        "xp-dict-legacy",
+        "vocab-lookup-actions"
       ]
     },
     "listbox": {
@@ -453,7 +461,11 @@
         "xp-dict-ai",
         "xp-dict-ai-controls",
         "xp-dict-ai-content",
-        "xp-dict-ai-details"
+        "xp-dict-ai-details",
+        "xp-dict-example-pair",
+        "xp-dict-packs",
+        "xp-dict-legacy",
+        "xp-dict-query-tools"
       ],
       "regions": [
         "ask-a",

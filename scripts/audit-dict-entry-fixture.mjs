@@ -50,7 +50,7 @@ export async function installDictEntryFixture(page) {
 
 async function rerunLookup(page) {
   if (await page.locator('#vocab-lookup-go').count()) await page.locator('#vocab-lookup-go').click();
-  else await page.locator('.xp-dict-head > .xp-dict-lang').selectOption('en');
+  else await page.locator('.xp-dict-query-tools > .xp-dict-lang').selectOption('en');
 }
 
 export async function openDictEntryState(page, state) {
