@@ -1958,17 +1958,16 @@ function _pbpDictEntryMount(host, opts) {
       t("dictSupplement" + category[0].toUpperCase() + category.slice(1)), category));
     kind.value = usageCategory;
     const topicLabel = document.createElement("label"); topicLabel.className = "xp-dict-supplement-label";
-    topicLabel.append(t("dictSupplementTopic"));
+    const topicCaption = document.createElement("span"); topicCaption.textContent = t("dictSupplementTopic");
+    topicLabel.append(topicCaption);
     const topic = document.createElement("input");
     topic.type = "text"; topic.className = "xp-dict-supplement-topic"; topic.maxLength = 120; topic.dir = "auto";
     topic.placeholder = t("dictSupplementTopicPlaceholder"); topic.setAttribute("aria-label", t("dictSupplementTopic"));
     topic.value = usageDrafts.get(usageCategory) || ""; topicLabel.appendChild(topic);
-    const hint = document.createElement("p"); hint.className = "xp-dict-src xp-dict-supplement-hint";
-    hint.textContent = t("dictSupplementTopicHint");
     const context = document.createElement("div");
     const scope = document.createElement("details"); scope.className = "xp-dict-ai-details xp-dict-topic-scope";
-    const scopeLabel = document.createElement("summary"); scopeLabel.textContent = t("dictSupplementScope"); scope.appendChild(scopeLabel);
-    context.append(scope, topicLabel, hint);
+    const scopeLabel = document.createElement("summary"); scopeLabel.textContent = t("dictSupplementTopic"); scope.appendChild(scopeLabel);
+    context.append(scope, topicLabel);
     const submit = button("dictSupplementGenerate", "xp-dict-supplement-generate");
     const profile = document.createElement("p"); profile.className = "xp-dict-src xp-dict-supplement-profile";
     const learner = pbpDictSupplementProfile(settings);
@@ -1989,9 +1988,10 @@ function _pbpDictEntryMount(host, opts) {
     profile.appendChild(edit);
     const sourceHint = document.createElement("p"); sourceHint.className = "xp-dict-src";
     sourceHint.textContent = t("dictSupplementSourceHint");
-    const languageHint = document.createElement("p"); languageHint.className = "xp-dict-src";
+    const languageHint = document.createElement("span"); languageHint.className = "xp-dict-src";
     languageHint.textContent = t("dictSupplementLanguage", languageName(target()));
-    disclosure.append(summary, kind, context, submit, languageHint, profile, sourceHint); content.append(disclosure);
+    profile.prepend(languageHint);
+    disclosure.append(summary, kind, context, submit, profile, sourceHint); content.append(disclosure);
     const etymology = document.createElement("details"); etymology.className = "xp-dict-ai-details";
     const etymologyTitle = document.createElement("summary"); etymologyTitle.textContent = t("dictSupplementEtymology");
     const etymologyHint = document.createElement("p"); etymologyHint.className = "xp-dict-src"; etymologyHint.textContent = t("dictEtymologyHint");
@@ -2026,8 +2026,9 @@ function _pbpDictEntryMount(host, opts) {
       }
       context.hidden = !acceptsTopic(kind.value);
       scope.hidden = kind.value === "scenarios";
+      topicCaption.hidden = !scope.hidden;
       const parent = scope.hidden ? context : scope;
-      if (topicLabel.parentElement !== parent) parent.append(topicLabel, hint);
+      if (topicLabel.parentElement !== parent) parent.append(topicLabel);
       submit.textContent = t(existing() ? "dictSupplementShow" : "dictSupplementGenerate");
       sourceHint.hidden = !["culture", "literature"].includes(kind.value);
     };
@@ -2344,6 +2345,11 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   speak.title = t("dictSpeak");
   speak.innerHTML = PBP_DICT_SPEAKER_SVG; // static constant, never model text
   queryTools.append(sel, speak); head.appendChild(queryTools);
+  // The docked reader already identifies the word in its search field. Keep
+  // its return action with the dictionary tools, including across reruns.
+  const sessionHead = pop.classList.contains("reader-dict-session") ? pop.querySelector(":scope > .panel-head") : null;
+  const returnToBubble = sessionHead && pop.querySelector(".reader-dict-return");
+  if (returnToBubble) { head.appendChild(returnToBubble); sessionHead.hidden = true; }
   const slot = document.createElement("div");
   slot.className = "xp-dict-slot";
   // Two stable children. Every online path -- skeleton, permission prompt,
@@ -2438,6 +2444,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
       _pbpDictSyncMeaningSelect(cur);
       _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name));
     } });
+  if (returnToBubble) head.appendChild(returnToBubble);
 
   // Local dictionaries load independently of the online request and AI entry.
   const ecdictEl = document.createElement("div"), packsEl = document.createElement("div");

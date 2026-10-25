@@ -2179,7 +2179,7 @@ async function runDictionaryEntryUiTests() {
     check("saved AI entry has one collapsed supplement entry",usage.host.querySelectorAll('.xp-dict-supplement').length===1&&!usage.host.querySelector('.xp-dict-supplement').open);
     check("supplement categories cover the seven accepted learning uses",usage.host.querySelector('.xp-dict-supplement-kind').options.length===7);
     check("supplement topic has an accessible optional field with a bounded length",usage.host.querySelector('.xp-dict-supplement-topic').getAttribute('aria-label')==='dictSupplementTopic'&&usage.host.querySelector('.xp-dict-supplement-topic').maxLength===120);
-    check("supplement topic has a visible label and explains the empty-field behavior",usage.host.querySelector('.xp-dict-supplement-topic').closest('label')?.textContent.includes('dictSupplementTopic')&&usage.host.querySelector('.xp-dict-supplement-hint')?.textContent==='dictSupplementTopicHint');
+    check("optional scene uses one disclosure label instead of duplicate labels and help",usage.host.querySelector('.xp-dict-topic-scope > summary')?.textContent==='dictSupplementTopic'&&usage.host.querySelector('.xp-dict-supplement-label > span')?.hidden&&!usage.host.querySelector('.xp-dict-supplement-hint'));
     check("an unspecified learner profile makes no claim about a native language or level",!usage.host.querySelector('.xp-dict-supplement-profile bdi')&&usage.host.querySelector('.xp-dict-profile-link')?.textContent==='dictSupplementProfileSet'&&usage.host.querySelector('.xp-dict-profile-link')?.getAttribute('href')==='options.html#vocab-learning');
     const configuredProfile=mount({settings:{...settings,dictLearnerNativeLanguage:'English',dictLearnerLevel:'beginner'}});await configuredProfile.ui.ready;
     check("learner summary shows the explicit profile independently of UI and definition languages",configuredProfile.host.querySelector('.xp-dict-supplement-profile')?.textContent.includes('dictSupplementNativeLanguage:English')&&configuredProfile.host.querySelector('.xp-dict-supplement-profile')?.textContent.includes('dictSupplementLevel:dictLearnerLevelBeginner')&&reads.at(-1).target.lang==='es');
@@ -2189,7 +2189,7 @@ async function runDictionaryEntryUiTests() {
     const typeTopic=value=>{categoryTopic.value=value;categoryTopic.dispatchEvent(new Event('input'));};
     check("collocations offer an optional scene inside a collapsed disclosure",!categoryScope.open&&!categoryScope.hidden&&categoryTopic.closest('details')===categoryScope&&!categoryTopic.checkVisibility());
     categoryScope.open=true;typeTopic('conference');chooseCategory('scenarios');
-    check("scenario practice exposes its optional scene directly and starts its own draft",categoryScope.hidden&&categoryTopic.checkVisibility()&&categoryTopic.value==='');
+    check("scenario practice exposes its labeled optional scene directly and starts its own draft",categoryScope.hidden&&categoryTopic.checkVisibility()&&categoryTopic.value===''&&!categoryTopic.closest('label').querySelector('span').hidden);
     typeTopic('at the airport');chooseCategory('register');
     check("register starts with its own collapsed optional scene",!categoryScope.open&&!categoryScope.hidden&&categoryTopic.value==='');
     categoryScope.open=true;typeTopic('academic writing');chooseCategory('collocations');
@@ -2449,7 +2449,8 @@ async function runDictionaryEntryReaderTests() {
   const saved={resolve:_pbpDictResolveLang,online:_pbpDictSlotRun,local:_pbpDictEcdictSide,load:_pbpDictLoadPack,get:pbpVocabGet,owner:_pbpDictOwner,current:_pbpDictCurrent};
   const names=["pbpDictEntryRead","pbpDictEntryRun","hasAIKey","ensureAIHostPermissionWithGesture","requestAIHostPermissions","uiLangToBCP47","pbpVocabCurrentOwner","pbpVocabSaveWord","PBP_ICONS","pbpAiBumpCounter"];
   const globals=new Map(names.map(name=>[name,window[name]]));
-  const pop=document.createElement("div");pop.innerHTML='<span class="xp-term"></span><div class="xp-body"></div><div class="xp-foot"><button class="xp-vocab"></button></div>';document.body.appendChild(pop);
+  const pop=document.createElement("div");pop.className='reader-dict-session';pop.dataset.host='panel';pop.innerHTML='<header class="panel-head"><span class="xp-term"></span><button class="reader-dict-return" type="button">Return</button></header><div class="xp-body"></div><div class="xp-foot"><button class="xp-vocab"></button></div>';document.body.appendChild(pop);
+  const returnButton=pop.querySelector('.reader-dict-return');let returnClicks=0;returnButton.addEventListener('click',()=>returnClicks++);
   const ctrl=new AbortController(),settings={previewAiEnabled:true,dictDefinitionLang:"en",dictAiAutoGenerate:false};let calls=[],finishOnline;
   const norm={word:"Gift",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/Gift",license:"CC BY-SA 4.0",entries:[{pos:"noun",ipas:[],forms:[],senses:[{definition:"original poison",examples:[],subsenses:[]},{definition:"original second meaning",examples:[],subsenses:[]}]}]};
   const record=(word="Gift")=>({entry:{word,language:"de",pronunciation:"/ɡɪft/",meanings:[{partOfSpeech:"noun",definition:"generated poison",examples:[]}],etymology:"",relatedWords:["giftig"]},provider:"fixture",model:"fixture",generatedAt:1700000000000,cacheSaved:true,cached:false});
@@ -2460,6 +2461,7 @@ async function runDictionaryEntryReaderTests() {
     _pbpDictSlotRun=async(_el,term)=>({...norm,word:term});
     await pbpDictRun({text:"Gift"},{sentence:"Das Gift wirkt."},pop,ctrl,settings);await _pbpDictCurrent.ai.ready;
     check("ordinary lookup finishes without waiting for or calling automatic AI",calls.length===0&&_pbpDictCurrent.gloss==="original poison"&&!pop.querySelector('.xp-vocab').disabled);
+    check("docked lookup groups its return action with dictionary tools without a duplicate word row",pop.querySelector(':scope > header').hidden&&returnButton.parentElement===pop.querySelector('.xp-dict-head')&&returnButton===pop.querySelector('.xp-dict-head > :last-child'));
     check("lookup no longer mounts a second contextual explanation or three AI actions",!pop.querySelector('.xp-dict-ctx,.xp-dict-assist,.dict-assist-actions'));
     check("one save-definition picker lives with the save action",pop.querySelectorAll('.xp-dict-save-meaning').length===1&&!!pop.querySelector('.xp-foot .xp-dict-save-meaning'));
     pop.querySelector('.xp-dict-ai-generate').click();await settle();
@@ -2470,6 +2472,7 @@ async function runDictionaryEntryReaderTests() {
     pop.querySelector('.xp-dict-ai-switch').click();await settle();
     check("switching sources never silently replaces an explicitly chosen save definition",_pbpDictCurrent.gloss==="original second meaning"&&_pbpDictCurrent.packChoice?.gloss==="original second meaning");
     const countBeforeRelated=calls.length;pop.querySelector('.xp-dict-lemma-link').click();await settle();
+    returnButton.click();check("related-word rerender retains the same working return-to-bubble action",returnClicks===1&&returnButton===pop.querySelector('.reader-dict-return')&&returnButton.parentElement===pop.querySelector('.xp-dict-head'));
     check("a related-word lookup retains the original sentence and provides a return path",_pbpDictCurrent.term==="giftig"&&_pbpDictCurrent.sentence==="Das Gift wirkt."&&!!pop.querySelector('.xp-dict-return')&&pop.querySelector('.xp-term').textContent==="giftig");
     check("following a related word does not automatically request a second generated entry",calls.length===countBeforeRelated);
     pop.querySelector('.xp-dict-return').click();await settle();

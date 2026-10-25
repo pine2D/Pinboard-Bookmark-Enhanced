@@ -82,6 +82,15 @@ async function withFixture(fn, ...args) { const f=await fixture(...args);try{awa
     assert(f.state.calls===2&&old.ctrl.signal.aborted&&!f.state.runs[1].ctrl.signal.aborted,'lookup cancellation wrong');
     assert(f.doc.querySelector('#reader-dict-view .xp-term').textContent==='example','new term missing');
   }));
+  await test('submitting another word keeps the focused query visible without replacing later typing',()=>withFixture(async f=>{
+    await f.open();f.doc.querySelector('.xp-dock').click();const old=f.state.runs[0];
+    const query=f.doc.querySelector('#reader-dict-query');query.focus();query.value='reliable';
+    query.form.requestSubmit();await tick(f.win);
+    assert(old.ctrl.signal.aborted&&f.state.runs[1].cap.text==='reliable','new query did not replace the old word');
+    assert(query.value==='reliable'&&f.doc.activeElement===query,'submitted word disappeared while search stayed focused');
+    query.value='another draft';f.state.runs[1].root.querySelector('.xp-term').textContent='reliable';await tick(f.win);
+    assert(query.value==='another draft','late title update erased unsubmitted typing');
+  }));
   await test('same word reuses its session and refreshes the selected article context',()=>withFixture(async f=>{
     await f.open();const root=f.state.runs[0].root;f.doc.querySelector('.xp-dock').click();await f.open();
     assert(f.state.calls===1&&f.state.runs[0].root===root,'same word recreated');

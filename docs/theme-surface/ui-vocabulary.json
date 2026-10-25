@@ -507,6 +507,7 @@
         "reader-panel-view",
         "reader-dict-session",
         "reader-dict-search",
+        "reader-check",
         "xp-dict-usage-actions",
         "xp-dict-usage-feedback",
         "confirm-actions"

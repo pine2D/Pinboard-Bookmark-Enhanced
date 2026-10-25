@@ -1654,8 +1654,10 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 | md-preview | `.row` | 控件行（flex wrap，align center，gap sp-2）：导出开关行、翻译按钮行、字号步进行、高亮色板行、侧栏底部图标行；placement 归父级或 id |
 | md-preview | `.panel-head` | 面板标题行（flex，align center，gap sp-2；`> h2` flex:1、1.05em/600）：ask 面板、要点面板、词典卡头 |
 | md-preview | `.reader-panel-tabs` / `.reader-panel-view` | 共享阅读侧栏顶部的文字标签与独立视图；标签复用既有切换按钮，采用 tablist/tab/tabpanel 语义及方向键导航。视图 flex column、min-height:0，隐藏保留 DOM 与生成任务；不添加入场动画或第二份查词数据。 |
-| md-preview | `.reader-dict-session` / `.reader-dict-search` | 唯一可迁移的查词词头、正文与保存栏；在气泡和侧栏间移动节点，正文为唯一内容滚动区，保留选义、表单、展开状态。查其他词复用 `.row`，单行且输入 min-width:0；窄窗口沿用底部面板。 |
+| md-preview | `.reader-dict-session` / `.reader-dict-search` | 唯一可迁移的查词词头、正文与保存栏；在气泡和侧栏间移动节点，正文为唯一内容滚动区，保留选义、表单、展开状态。侧栏保留搜索行，将返回气泡与语言/发音/来源归入同一词典工具行；已有查询输入时隐藏重复词头行。气泡仍用原窗口词头并隐藏返回按钮。查其他词复用 `.row`，单行且输入 min-width:0；窄窗口沿用底部面板。 |
+| md-preview | `.reader-check` | 阅读器复选框共用原语：16px 值框与 14px Lucide 勾重叠，颜色/圆角沿用按钮与 link token；标签提供至少 26px 行高。保留原生 input 键盘/选中/禁用语义与 focus-visible，强制色使用原生外观。用于书签选项和 Ask 临时对话。 |
 | md-preview / library | `.xp-dict-usage-actions` / `.xp-dict-usage-feedback` | 补充用法就地动作与 aria-live 反馈，组内使用本表面 8px 间距 token 并允许换行；生成、停止、失败与保存提示靠近触发位置，完成不抢焦点或滚动。不增加面板底纹、边框或独立卡片。 |
+| md-preview / library | `.xp-dict-topic-scope` | 补充表单的可选场景使用紧凑次级 disclosure，summary 仅内容宽、沿用父级水平内距与本表面控件阶，箭头跟随标签；展开后不重复字段标题或空值说明。场景练习直接展示带标签字段，其余适用类别按需展开，类别草稿与展开状态分别保留。 |
 
 清点（2026-09-05 工作流，四表面 138/97/134/273 个 token）同时给出了**候选**原语——popup 的 `actions`/`field-foot`/`banner`/`card`/`list-row`、library 的 `lib-row`/`lib-cluster`/`lib-section`/`lib-block`/`lib-quote`、md-preview 的 `rail-row`/`panel-head`/`panel-actions`/`seg-row`/`stack`/`pop-body`/`scroll-list`——每个都能吸收 5～15 个遗留类。它们**尚未登记**：登记的时机是把对应遗留类真正迁过去的那次施工，不提前占名。（2026-10 现状，library 部分：`lib-cluster` 已登记为原语；`lib-section` / `lib-block` 登记过，详情重写后无生产者，T9c 退役；`lib-quote` 已随平铺画布退役，C56。）
 

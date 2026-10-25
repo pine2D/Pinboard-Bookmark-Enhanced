@@ -174,7 +174,7 @@
       if (type !== "textarea") input.type = type;
       if (type === "checkbox") {
         field.className = "row";
-        const mark = document.createElement("span"); mark.className = "reader-bookmark-check";
+        const mark = document.createElement("span"); mark.className = "reader-check";
         mark.innerHTML = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.check : "";
         mark.prepend(input); field.append(mark, caption); options.appendChild(field);
       } else {

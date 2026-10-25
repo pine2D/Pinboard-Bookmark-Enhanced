@@ -423,7 +423,12 @@ async function _pbpReaderLookup(cap, ctx, host) {
   }
   _pbpReaderForgetDict();
   session = _pbpReaderNewDict({ ...cap, text }, ctx); _pbpReaderDictSession = session;
-  if (host === "panel") _pbpReaderMoveDict(session, host);
+  if (host === "panel") {
+    // Forgetting the previous session clears the field. A submitted lookup
+    // must restore its word even when Enter leaves focus in that same input.
+    const query = document.getElementById("reader-dict-query"); if (query) query.value = text;
+    _pbpReaderMoveDict(session, host);
+  }
   else {
     session.root.dataset.host = "bubble";
     const pop = _pbpExplainEnsurePop();
@@ -467,7 +472,7 @@ function _pbpAskBuildPanel() {
     '  <button type="button" id="ask-clear" class="ask-ic" data-i18n-title="askDeleteConversation" data-i18n-aria="askDeleteConversation">' + PBP_ASK_CLEAR_SVG + '</button>',
     '</header>',
     '<div id="ask-storage" role="status" aria-live="polite"></div>',
-    '<label id="ask-temporary-label"><input type="checkbox" id="ask-temporary"><span data-i18n="askTemporary"></span></label>',
+    '<label id="ask-temporary-label"><span class="reader-check"><input type="checkbox" id="ask-temporary">' + (typeof PBP_ICONS !== "undefined" ? PBP_ICONS.check : "") + '</span><span data-i18n="askTemporary"></span></label>',
     '<div id="ask-thread" role="log" aria-live="polite">',
     '  <p id="ask-empty" class="ask-empty" data-i18n="askEmptyHint"></p>',
     '</div>',
@@ -801,7 +806,7 @@ function _pbpAskArchiveStatus() {
   _pbpAskSyncRegenerate();
   const pending = _pbpAskUnpersisted.filter(item => item.account === st.account && item.sessionId === st.sessionId);
   const key = st.archiveLoading ? "askHistoryLoading" : st.archiveError ? "askHistoryLoadFailed"
-    : st.archiveMissing ? "askHistoryUnavailable" : st.temporary ? "askTemporaryHint" : pending.length ? "askSaveFailed"
+    : st.archiveMissing ? "askHistoryUnavailable" : st.temporary ? "" : pending.length ? "askSaveFailed"
       : st.records?.length ? "askSavedLocal" : "";
   host.replaceChildren();
   if (key) host.textContent = t(key);
@@ -838,7 +843,7 @@ function _pbpAskArchiveStatus() {
   }
   const temporary = document.getElementById("ask-temporary"), label = document.getElementById("ask-temporary-label");
   if (temporary) { temporary.checked = !!st.temporary; temporary.disabled = st.running || st.archiveLoading || !!st.records?.length; }
-  if (label) { label.hidden = !!st.records?.length; label.title = t("askTemporaryHint"); }
+  if (label) label.hidden = !!st.records?.length;
   const create = document.getElementById("ask-new");
   if (create) create.disabled = st.running || st.archiveLoading || !!pending.length;
   const input = document.getElementById("ask-input"), send = document.getElementById("ask-send");

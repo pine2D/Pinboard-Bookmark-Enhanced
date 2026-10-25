@@ -2286,10 +2286,13 @@ html.motion-ready .vocab-note-save {
 }
 #vocab-ref-result .xp-dict-supplement-label { display: block; margin-top: var(--lib-sp-3); font-size: var(--lib-text-secondary); line-height: var(--lib-lh-secondary); color: var(--lib-fg); }
 #vocab-ref-result .xp-dict-supplement-label > .xp-dict-supplement-topic { margin-top: var(--lib-sp-1); }
-#vocab-ref-result .xp-dict-supplement .xp-dict-supplement-hint { margin-top: var(--lib-sp-1); }
 #vocab-ref-result .xp-dict-supplement-profile { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--lib-sp-1) var(--lib-sp-2); }
+#vocab-ref-result .xp-dict-supplement-profile > .xp-dict-src { margin: 0; }
 #vocab-ref-result .xp-dict-supplement-profile .xp-dict-profile-link { color: var(--lib-link); }
-#vocab-ref-result .xp-dict-topic-scope > summary { font-size: var(--lib-text-secondary); }
+#vocab-ref-result .xp-dict-topic-scope { margin-top: var(--lib-sp-2); }
+#vocab-ref-result .xp-dict-topic-scope > summary { width: fit-content; max-width: 100%; min-height: calc(var(--lib-control-h) - 4px); font-size: var(--lib-text-secondary); }
+#vocab-ref-result .xp-dict-topic-scope > summary::after { margin-inline-start: var(--lib-sp-1); }
+#vocab-ref-result .xp-dict-topic-scope .xp-dict-supplement-label { margin-top: 0; }
 #vocab-ref-result .xp-dict-usage-actions,
 #vocab-ref-result .xp-dict-usage-feedback { display: flex; align-items: center; flex-wrap: wrap; gap: var(--lib-sp-2); min-width: 0; }
 #vocab-ref-result .xp-dict-usage-actions { margin-top: var(--lib-sp-3); }

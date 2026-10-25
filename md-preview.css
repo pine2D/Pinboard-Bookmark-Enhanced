@@ -2459,13 +2459,14 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
 }
 .xp-dict-supplement-topic::placeholder { color: var(--fg-muted); }
 .xp-dict-supplement-topic:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-.xp-dict-supplement > .xp-dict-supplement-hint { margin-top: var(--sp-1); }
 .xp-dict-supplement-profile { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); }
+.xp-dict-supplement-profile > .xp-dict-src { margin: 0; }
 .xp-dict-supplement-profile .xp-dict-profile-link { color: var(--link); }
 .xp-dict-supplement > .xp-dict-connect { margin-top: var(--sp-2); }
 .xp-dict-topic-scope { margin-top: var(--sp-1); }
-.xp-dict-topic-scope > summary { padding-inline: 0; font-size: 11px; }
-.xp-dict-topic-scope .xp-dict-supplement-label { margin-top: var(--sp-1); }
+.xp-dict-topic-scope > summary { width: fit-content; max-width: 100%; box-sizing: border-box; }
+.xp-dict-topic-scope > summary::after { margin-inline-start: var(--sp-1); }
+.xp-dict-topic-scope .xp-dict-supplement-label { margin-top: 0; }
 .xp-dict-usage-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }
 .xp-dict-usage-actions > .xp-dict-update-supplement { margin-top: 0; }
 .xp-dict-usage-feedback { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); flex: 1; min-width: 0; }
@@ -3277,8 +3278,11 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 #reader-dict-query:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .reader-dict-session { display: flex; flex-direction: column; min-width: 0; min-height: 0; flex: 1 1 auto; overflow: hidden; }
 .reader-dict-session > .panel-head { flex: none; gap: var(--sp-2); padding-bottom: var(--sp-2); }
-.reader-dict-session[data-host="bubble"] > .panel-head { display: none; }
-.reader-dict-session > .xp-body { min-height: 0; flex: 1 1 auto; }
+.reader-dict-session[data-host="bubble"] > .panel-head,
+.reader-dict-session > .panel-head[hidden],
+.reader-dict-session[data-host="bubble"] .reader-dict-return { display: none; }
+.reader-dict-session .xp-dict-head > .reader-dict-return { flex: none; }
+.reader-dict-session > .xp-body { min-height: 0; flex: 1 1 auto; scroll-padding-block: var(--sp-2); }
 .reader-dict-session > .xp-foot { flex: none; }
 #reader-dict-view .reader-dict-session > .xp-body { padding: 0 var(--sp-1) var(--sp-3) 0; }
 #reader-dict-view .reader-dict-session > .xp-foot { padding: var(--sp-2) 0 0; }
@@ -3350,10 +3354,9 @@ body.ask-open main { margin-right: calc(480px + var(--sp-4)); }
 #ask-storage:empty { display: none; }
 #ask-storage .action-btn { font-size: 12px; }
 #ask-temporary-label {
-  display: flex; align-items: center; gap: var(--sp-1);
-  font-size: 12px; line-height: 18px; min-height: 26px; color: var(--fg-muted);
+  display: flex; align-items: center; gap: var(--sp-2); cursor: pointer;
+  font-size: 12px; line-height: 18px; min-height: 26px; color: var(--fg-secondary);
 }
-#ask-temporary { margin: 0; accent-color: var(--link); }
 #ask-panel .ask-versions { font-size: 12px; }
 /* Shared hover fade for the 26px icon-button family: these reuse .ask-ic's
    look (see .skim-ic note) but half the family lacked .action-btn's 150ms
@@ -4847,16 +4850,19 @@ body.raw-active #reader-bookmark-footer { display: none; }
 }
 #reader-bookmark-editor input[type="text"] { height: 26px; }
 #reader-bookmark-editor textarea { min-height: calc(4 * var(--sp-5)); resize: vertical; }
-.reader-bookmark-check { display: grid; flex: none; width: 16px; height: 16px; }
-.reader-bookmark-check > input,
-.reader-bookmark-check > svg { grid-area: 1 / 1; }
-#reader-bookmark-editor input[type="checkbox"] {
+.reader-check { display: grid; flex: none; width: 16px; height: 16px; }
+.reader-check > input,
+.reader-check > svg { grid-area: 1 / 1; }
+.reader-check > input[type="checkbox"] {
   appearance: none; width: 16px; height: 16px; margin: 0; cursor: pointer;
   border: 1px solid var(--fg-muted); border-radius: var(--radius-sm); background: var(--btn-bg);
 }
-#reader-bookmark-editor input[type="checkbox"]:checked { border-color: var(--link); background: var(--btn-hover); color: var(--link-on-raised); }
-.reader-bookmark-check > svg { width: 14px; height: 14px; place-self: center; color: var(--link-on-raised); pointer-events: none; visibility: hidden; }
-.reader-bookmark-check > input:checked + svg { visibility: visible; }
+.reader-check > input[type="checkbox"]:checked { border-color: var(--link); background: var(--btn-hover); color: var(--link-on-raised); }
+.reader-check > input:disabled { cursor: default; opacity: 0.6; }
+.reader-check > svg { width: 14px; height: 14px; place-self: center; color: var(--link-on-raised); pointer-events: none; visibility: hidden; }
+.reader-check > input:checked + svg { visibility: visible; }
+.reader-check > input:disabled + svg { opacity: 0.6; }
+.reader-check > input:focus-visible,
 #reader-bookmark-editor input:focus-visible,
 #reader-bookmark-editor textarea:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 #reader-bookmark-actions { justify-content: space-between; gap: var(--sp-2); }
@@ -4869,8 +4875,9 @@ body.raw-active #reader-bookmark-footer { display: none; }
 @media print { #reader-bookmark-footer, #reader-bookmark-editor { display: none; } }
 @media (forced-colors: active) {
   #ask-form:focus-within { outline-color: Highlight; }
-  #reader-bookmark-editor input[type="checkbox"] { appearance: auto; }
-  .reader-bookmark-check > svg { display: none; }
+  .reader-check > input[type="checkbox"] { appearance: auto; }
+  .reader-check > svg { display: none; }
+  .reader-check > input:focus-visible,
   #reader-bookmark-editor input:focus-visible,
   #reader-bookmark-editor textarea:focus-visible { outline-color: Highlight; }
 }
