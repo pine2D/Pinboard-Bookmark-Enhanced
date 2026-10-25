@@ -13,28 +13,32 @@ import { completionMetadata, completionReport, redactText } from "./dict-live-te
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CONFIG = resolve(homedir(), ".config/ai-dev");
-const REPORT = resolve(REPO, ".qa-scan/report/dict-litellm");
+// A new authorization uses a new fixed ledger. The earlier 84-call ledger is
+// immutable evidence; never reset it to obtain more requests.
+const REPORT = resolve(REPO, ".qa-scan/report/dict-litellm-reliability-2026-10-26");
 const AI_DEV = resolve(homedir(), "projects/scripts/ai-dev.sh");
 const DUMMY = "dict-litellm-browser-placeholder";
 const OWNER = "acct_dict_litellm_fixture";
 const BASE = "http://127.0.0.1:48096/v1"; // Public ai-dev README, not .env.
 export const MODELS = Object.freeze([
-  { alias: "deepseek-flash", provider: "deepseek", model: "deepseek-flash", cap: .25 },
-  { alias: "deepseek-v4-pro", provider: "deepseek", model: "deepseek-v4-pro", cap: .85 },
-  { alias: "gemini/gemini-4-argon", provider: "gemini", model: "gemini-4-argon", cap: 1.65 },
-  { alias: "gemini/gemini-3.8-flash", provider: "gemini", model: "gemini-3.8-flash", cap: .65 },
-  { alias: "gemini/gemini-3.5-flash-lite", provider: "gemini", model: "gemini-3.5-flash-lite", cap: .40 },
-  { alias: "dashscope/qwen3.8-max", provider: "dashscope", model: "qwen3.8-max", cap: 1.25 },
-  { alias: "dashscope/qwen3.8-flash", provider: "dashscope", model: "qwen3.8-flash", cap: .10 }
+  { alias: "deepseek-flash", provider: "deepseek", model: "deepseek-flash", cap: .40 },
+  { alias: "deepseek-v4-pro", provider: "deepseek", model: "deepseek-v4-pro", cap: 1.20 },
+  { alias: "gemini/gemini-4-argon", provider: "gemini", model: "gemini-4-argon", cap: 2.30 },
+  { alias: "gemini/gemini-3.8-flash", provider: "gemini", model: "gemini-3.8-flash", cap: 1.00 },
+  { alias: "gemini/gemini-3.5-flash-lite", provider: "gemini", model: "gemini-3.5-flash-lite", cap: .60 },
+  { alias: "dashscope/qwen3.8-max", provider: "dashscope", model: "qwen3.8-max", cap: 1.80 },
+  { alias: "dashscope/qwen3.8-flash", provider: "dashscope", model: "qwen3.8-flash", cap: .20 }
 ]);
 export const CASES = Object.freeze([
   { id: "provider-entry", term: "provider", kind: "entry", surface: "library" },
   { id: "based-entry", term: "based", kind: "entry", surface: "reader" },
-  ...["collocations", "confusables", "register", "grammar", "scenarios", "literature"].map(kind =>
+  { id: "bank-entry", term: "bank", kind: "entry", surface: "library" },
+  { id: "charge-entry", term: "charge", kind: "entry", surface: "reader" },
+  ...["collocations", "confusables", "register", "grammar", "scenarios", "literature", "etymology"].map(kind =>
     ({ id: "provider-" + kind, term: "provider", kind, surface: "library" })),
   { id: "based-culture", term: "based", kind: "culture", surface: "reader" }
 ]);
-const LIMITS = Object.freeze({ requestsPerModel: 12, requestsPerCase: 2, inputBytes: 24576,
+const LIMITS = Object.freeze({ requestsPerModel: 14, requestsPerCase: 2, inputBytes: 24576,
   framingTokens: 1024, outputTokens: 8192, responseBytes: 262144, timeoutMs: 60000,
   transportRetries: 0, gatewayRetries: 0, gatewayFallbacks: false });
 const fail = code => { throw Object.assign(new Error(code), { safeCode: code }); };
@@ -64,7 +68,7 @@ export function makePlan(estimates, createdAt = new Date().toISOString()) {
     if (![input, output].every(rate => Number.isFinite(rate) && rate > 0)) fail("price_invalid");
     return { ...model, input, output, quote };
   });
-  const plan = { schema: 1, scope: "dictionary-litellm-seven-models-2026-10-25", createdAt, baseUrl: BASE,
+  const plan = { schema: 1, scope: "dictionary-litellm-reliability-2026-10-26", createdAt, baseUrl: BASE,
     keyVariable: "LITELLM_API_KEY", models, cases: CASES, limits: LIMITS, estimates,
     data: { sourceLanguage: "en", target: { lang: "zh-Hans", name: "简体中文" },
       nativeLanguage: "简体中文", level: "intermediate", topic: "工作沟通" },
@@ -73,7 +77,7 @@ export function makePlan(estimates, createdAt = new Date().toISOString()) {
       credentials: "Only the authorized Node live process reads LITELLM_API_KEY from .env. Same-named inherited environment is ignored. Chromium gets a nonsecret placeholder.",
       evidence: "Production public-evidence retrieval is captured once before testing and replayed identically for every model; retrieval failures are reported separately.",
       accounting: "Every HTTP dispatch, including product parameter compatibility retries, consumes the persistent model/case/cost limits. Gateway retry header=0; disable_fallbacks=true. No transport retries.",
-      output: "Baseline retains production output limit; explicitly selected diagnostic rechecks may use at most 8192 tokens including reasoning.",
+      output: "Production output limit, at most 8192 tokens including reasoning. Four synthetic English words, seven usage categories and independent etymology; all explanations in Simplified Chinese.",
       prices: "Only ai-dev.sh estimate. USD reference prices; not a billing guarantee. Stop on stale/unknown prices or unverified routing/pricing. No paid tools, search, media, cache creation or parallel requests.",
       review: "Inspect native-language explanations, meaning alignment, usefulness, source support, latency and token usage; transport success alone is not a quality pass."
     } };
@@ -215,7 +219,7 @@ async function setupPage(page, surface, extensionId, evidence) {
       if (!row?.ok) throw Object.assign(new Error("source_failed"), { code: "source_failed" });
       return structuredClone(row.sources);
     };
-    window.dictTestState = { calls: 0, pending: 0, actions: 0, actionPending: 0, error: "", reason: "" };
+    window.dictTestState = { calls: 0, pending: 0, actions: 0, actionPending: 0, error: "", reason: "", stages: [] };
     const mount = _pbpDictEntryMount;
     _pbpDictEntryMount = (...args) => { const result = mount(...args); window.dictTestMount = result; return result; };
     const warn = console.warn;
@@ -235,6 +239,10 @@ async function setupPage(page, surface, extensionId, evidence) {
     };
     const wrap = original => async (...args) => {
       const state = dictTestState; state.actions++; state.actionPending++;
+      const onStage = args[0].onStage;
+      args[0] = { ...args[0], onStage: stage => {
+        state.stages.push({ stage, at: Date.now() }); onStage?.(stage);
+      } };
       try { return await original(...args); } finally { state.actionPending--; }
     };
     pbpDictEntryRun = wrap(pbpDictEntryRun); pbpDictSupplementRun = wrap(pbpDictSupplementRun);
@@ -242,7 +250,7 @@ async function setupPage(page, surface, extensionId, evidence) {
 }
 async function mountCase(page, testCase) {
   await page.evaluate(async ({ testCase, owner }) => {
-    window.dictTestState = { calls: 0, pending: 0, actions: 0, actionPending: 0, error: "", reason: "" };
+    window.dictTestState = { calls: 0, pending: 0, actions: 0, actionPending: 0, error: "", reason: "", stages: [] };
     if (testCase.surface === "library") {
       _vocabCurrentOwner = owner;
       _pbpVocabDictCtrl?.abort(); _pbpVocabDictCtrl = new AbortController();
@@ -273,6 +281,10 @@ async function mountCase(page, testCase) {
 async function runModel(plan, ledger, model, key, approval, options) {
   const { reportDir, dispatch, recheck, diagnosticTokens, selectedCases, reuseEntryFrom } = options;
   const modelSlug = slug(model.alias), row = ledger.models[model.alias];
+  const productHash = hash(["ai.js", "dict-entry.js", "dict-evidence.js", "dict-archive.js", "md-dict.js", "library-vocab.js", "shared.js"]
+    .map(file => [file, readFileSync(resolve(REPO, file), "utf8")]));
+  if (!recheck && ledger.baselineProductHash && ledger.baselineProductHash !== productHash) fail("baseline_product_changed");
+  ledger.baselineProductHash ||= productHash;
   const context = await launch(resolve(reportDir, "profiles", modelSlug));
   let active = null, bridgeError = "";
   const pendingBridges = new Set();
@@ -302,6 +314,7 @@ async function runModel(plan, ledger, model, key, approval, options) {
         // docs.litellm.ai/docs/routing and /docs/proxy/reliability.
         body.disable_fallbacks = true; body.num_retries = 0;
         attempt = reserve(plan, ledger, model.alias, requestCase.id, inputBytes, body[tokenField]);
+        attempt.productHash = productHash;
         const responseReport = modelSlug + "-" + requestCase.id + "-" + row.attempts.length + ".json";
         save(); const start = performance.now();
         const response = await dispatch(BASE + "/chat/completions", { method: "POST", redirect: "error",
@@ -396,6 +409,14 @@ async function runModel(plan, ledger, model, key, approval, options) {
           const button = dictTestHost.querySelector(".xp-dict-update-entry") || dictTestHost.querySelector(".xp-dict-ai-generate");
           button.click(); return true;
         }
+        if (testCase.kind === "etymology") {
+          const previous = dictTestRecord?.supplements.find(item => item.category === "etymology" &&
+            !(dictTestRecord.supplements || []).some(next => next.learning?.replacesId === item.id));
+          const button = previous ? dictTestHost.querySelector('[data-supplement-id="' + CSS.escape(previous.id) + '"] .xp-dict-update-supplement')
+            : dictTestHost.querySelector('.xp-dict-etymology-generate');
+          if (!button) return false;
+          button.closest('details').open = true; button.click(); return true;
+        }
         const kind = dictTestHost.querySelector(".xp-dict-supplement-kind"); if (!kind) return false;
         const disclosure = kind.closest("details"); disclosure.open = true;
         kind.value = testCase.kind; kind.dispatchEvent(new Event("change", { bubbles: true }));
@@ -425,9 +446,10 @@ async function runModel(plan, ledger, model, key, approval, options) {
         const changed = testCase.kind === "entry" ? record?.generatedAt !== dictTestPrevious : value?.id !== dictTestPrevious;
         return { ok: !!expected && visible && text.includes(expected) && changed && dictTestState.calls > 0 && !dictTestState.error,
           archived: !!value, changed, rendered: !!expected && visible && text.includes(expected),
+          partial: !!value?.learning?.omittedItems,
           ...dictTestState, status: [...dictTestHost.querySelectorAll("[role='status'], .xp-dict-action-error")].map(node => node.textContent).filter(Boolean), value };
       }, { testCase, owner: OWNER });
-      row.cases[testCase.id] = { ...result, bridgeError, at: new Date().toISOString() };
+      row.cases[testCase.id] = { ...result, productHash, bridgeError, at: new Date().toISOString() };
       const reused = row.reusedEntries?.find(item => item.term === testCase.term);
       if (reused && testCase.kind !== "entry") row.cases[testCase.id].baseEntryModel = reused.model;
       save(); process.stdout.write(JSON.stringify({ model: model.alias, case: testCase.id, ok: result.ok, error: bridgeError || result.error, calls: result.calls }) + "\n");

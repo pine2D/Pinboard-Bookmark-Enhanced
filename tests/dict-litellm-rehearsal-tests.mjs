@@ -21,20 +21,20 @@ const reportDir = fs.mkdtempSync(join(tmpdir(), "dict-litellm-rehearsal-"));
 const estimates = Object.fromEntries(MODELS.map(model => [model.alias, {
   snapshot: { fetched_at: Math.floor(Date.now() / 1000), stale: false, currency: "USD" },
   result: { status: "estimated", model: model.provider + "/" + model.model, provider: model.provider,
-    requests: 12, input_tokens: 25600, output_tokens: 8192, total_usd: "0.08",
+    requests: 14, input_tokens: 25600, output_tokens: 8192, total_usd: "0.08",
     rates_usd_per_million_tokens: { input_cost_per_token: "0.10", output_cost_per_token: "0.20" } }
 }]));
 fs.writeFileSync(join(reportDir, "plan.json"), JSON.stringify(makePlan(estimates)));
 try {
   await main(["--rehearse", "--report-dir", reportDir, "--model", "dashscope/qwen3.8-max", "--reuse-entry-from", "deepseek-flash",
-    "--cases", "provider-collocations,provider-confusables,provider-register,provider-grammar,provider-scenarios,provider-literature,based-culture"]);
+    "--cases", "provider-collocations,provider-confusables,provider-register,provider-grammar,provider-scenarios,provider-literature,provider-etymology,based-culture"]);
   const run = fs.readdirSync(reportDir).find(name => name.startsWith("rehearsal-"));
   const ledger = JSON.parse(fs.readFileSync(join(reportDir, run, "ledger.json"), "utf8"));
   const donor = ledger.models["deepseek-flash"], target = ledger.models["dashscope/qwen3.8-max"];
-  assert.equal(donor.attempts.length, 2); assert.equal(target.attempts.length, 7);
+  assert.equal(donor.attempts.length, 2); assert.equal(target.attempts.length, 8);
   assert(Object.values(donor.cases).every(result => result.ok));
   assert(Object.values(target.cases).every(result => result.ok && result.baseEntryModel === "deepseek-flash"));
   assert(!Object.hasOwn(target.cases, "provider-entry"));
   assert.equal(secretAttempts, 0); assert.equal(networkAttempts, 0);
-  process.stdout.write(JSON.stringify({ offlineRehearsal: "9/9 passed", secretAttempts, networkAttempts }) + "\n");
+  process.stdout.write(JSON.stringify({ offlineRehearsal: "10/10 passed", secretAttempts, networkAttempts }) + "\n");
 } finally { fs.rmSync(reportDir, { recursive: true, force: true }); }

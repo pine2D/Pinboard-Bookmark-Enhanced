@@ -22,6 +22,15 @@ export async function dispatch(_url, init) {
       word: "based", language: "en", pronunciation: "", meanings: [{ partOfSpeech: "形容词", definition: "在网络交流中表示赞同某人的观点或行为。", examples: [] }],
       learning: { version: 2, formation: "", history: "", related: [] }
     });
+    if (["bank", "charge"].includes(input.term)) response.choices[0].message.content = JSON.stringify({
+      word: input.term, language: "en", pronunciation: "", meanings: [{ partOfSpeech: "名词",
+        definition: input.term === "bank" ? "银行；办理存款、贷款等业务的机构。" : "费用；为服务支付的金额。", examples: [] }]
+    });
+  } else if (input.category === "etymology") {
+    response = { choices: [{ finish_reason: "stop", message: { role: "assistant", content: JSON.stringify({
+      language: "zh-Hans", summary: "从构词理解提供者的含义。", items: [{ sense: 0, kind: "formation", title: "provide + -er",
+        explanation: "provide 表示提供，-er 在这里表示做这一动作的人或机构。", sourceIndex: -1 }]
+    }) } }], usage: { prompt_tokens: 650, completion_tokens: 140, total_tokens: 790 } };
   } else if (input.category === "literature") {
     response = { choices: [{ finish_reason: "stop", message: { role: "assistant", content: JSON.stringify({
       language: "zh-Hans", summary: "这段文字强调人物承担家庭生计的责任。", items: [{ sense: 1, title: "家庭供养者",

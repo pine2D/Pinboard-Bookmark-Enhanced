@@ -6,7 +6,7 @@ import { makePlan, MODELS, CASES, validateApproval, newLedger, reserve, boundedB
 const estimates = Object.fromEntries(MODELS.map(model => [model.alias, {
   snapshot: { fetched_at: 1792930375, stale: false, currency: "USD" },
   result: { status: "estimated", model: model.provider + "/" + model.model, provider: model.provider,
-    requests: 12, input_tokens: 25600, output_tokens: 8192, total_usd: "0.08",
+    requests: 14, input_tokens: 25600, output_tokens: 8192, total_usd: "0.08",
     rates_usd_per_million_tokens: { input_cost_per_token: "0.10", output_cost_per_token: "0.20" } }
 }]));
 const plan = makePlan(estimates, "2026-10-25T15:00:00.000Z"), alias = MODELS[0].alias;
@@ -29,11 +29,14 @@ test("schema and framing bytes count against the same approved input budget", ()
   body.response_format.json_schema.strict = false;
   assert.throws(() => requestInputBytes(body), /request_shape/);
 });
-test("all aliases share nine cases, with no decision model or provider business policy", () => {
-  assert.equal(plan.models.length, 7); assert.equal(plan.cases.length, 9);
+test("all aliases share twelve cases, with no decision model or provider business policy", () => {
+  assert.equal(plan.models.length, 7); assert.equal(plan.cases.length, 12);
   assert(!plan.models.some(row => /decision/.test(row.alias)));
+  assert.equal(plan.limits.requestsPerModel * plan.models.length, 98);
+  assert(plan.models.reduce((sum, model) => sum + model.cap, 0) <= 10);
+  assert.deepEqual(CASES.filter(row => row.kind === "entry").map(row => row.term), ["provider", "based", "bank", "charge"]);
   assert.deepEqual(new Set(CASES.filter(row => row.kind !== "entry").map(row => row.kind)),
-    new Set(["collocations", "confusables", "register", "grammar", "scenarios", "literature", "culture"]));
+    new Set(["collocations", "confusables", "register", "grammar", "scenarios", "literature", "culture", "etymology"]));
 });
 test("unknown, expired or mismatched ai-dev quotes stop preparation", () => {
   for (const edit of [row => row.result.status = "unknown", row => row.snapshot.stale = true,
@@ -99,9 +102,9 @@ test("saved synthetic entries can seed supplements but never replace a failed en
   ledger.models[alias].cases['provider-entry'].ok = false;
   assert.throws(() => reusableEntries(ledger, alias, ['provider-grammar']), /reused_entry_unverified/);
 });
-test("the twelve-call model cap includes compatibility attempts across cases", () => {
+test("the fourteen-call model cap includes compatibility attempts across cases", () => {
   const ledger = newLedger(plan);
-  for (let i = 0; i < 12; i++) reserve(plan, ledger, alias, CASES[i % CASES.length].id, 50, 50);
+  for (let i = 0; i < 14; i++) reserve(plan, ledger, alias, CASES[i % CASES.length].id, 50, 50);
   assert.throws(() => reserve(plan, ledger, alias, CASES[4].id, 50, 50), /request_limit/);
 });
 test("bounds cannot be bypassed with fractional, negative, infinite or oversized inputs", () => {
