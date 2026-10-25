@@ -630,10 +630,14 @@ async function pbpPackImport(lineIter, onProgress, stats) {
     // something the user HAD is now gone, and a first-ever import has nothing
     // to lose no matter how it fails.
     let hadPack = false;
+    let enabled = true;
     await _pbpPackTx(db, "readwrite", (tx) => {
       const metaStore = tx.objectStore(_PBP_PACK_META);
       const prior = metaStore.get("cedict");
-      prior.onsuccess = () => { hadPack = !!(prior.result && prior.result.state === "ready"); };
+      prior.onsuccess = () => {
+        hadPack = !!(prior.result && prior.result.state === "ready");
+        enabled = prior.result?.enabled !== false;
+      };
       metaStore.delete("cedict");
       tx.objectStore(_PBP_PACK_STORE).clear();
     });
@@ -662,7 +666,7 @@ async function pbpPackImport(lineIter, onProgress, stats) {
       if (!entries || malformed > entries) throw new Error("import parsed no plausible data");
       await _pbpPackTx(db, "readwrite", (tx) => {
         tx.objectStore(_PBP_PACK_META).put({
-          id: "cedict", state: "ready", entries, importedAt: Date.now(),
+          id: "cedict", state: "ready", enabled, entries, importedAt: Date.now(),
           bytes: (stats && stats.bytes) || 0
         });
       });
@@ -673,6 +677,9 @@ async function pbpPackImport(lineIter, onProgress, stats) {
       // nothing to lose, so its errors stay as they are and get the neutral
       // copy.
       throw hadPack ? _pbpPackMarkCleared(error) : error;
+    } finally {
+      // Also invalidate an old result when a replacement failed after clear.
+      _pbpMultiNotify("cedict", "import", "legacy");
     }
   });
 }
@@ -698,7 +705,7 @@ async function pbpPackLookup(keys) {
       const metaReq = tx.objectStore(_PBP_PACK_META).get("cedict");
       metaReq.onsuccess = () => {
         const meta = metaReq.result;
-        if (!meta || meta.state !== "ready") { finish({ state: "unavailable" }); return; }
+        if (!meta || meta.state !== "ready" || meta.enabled === false) { finish({ state: "unavailable" }); return; }
         const store = tx.objectStore(_PBP_PACK_STORE);
         const lookupKeys = Array.isArray(keys) ? keys : [];
         const tryKey = (i) => {
@@ -752,8 +759,39 @@ async function pbpPackDelete() {
       tx.objectStore(_PBP_PACK_META).delete("cedict");
       tx.objectStore(_PBP_PACK_STORE).clear();
     });
+    _pbpMultiNotify("cedict", "delete", "legacy");
     return true;
   });
+}
+
+// Keep package data and installation metadata when disabled. Legacy metadata
+// has no enabled field and remains enabled until the user changes it. Sharing
+// the import/delete lock prevents a stale toggle from resurrecting a package.
+async function _pbpLegacyPackSetEnabled(id, lock, enabled) {
+  return navigator.locks.request(lock, async () => {
+    const db = await _pbpPackOpenDB();
+    let changed = false;
+    await _pbpPackTx(db, "readwrite", (tx) => {
+      const store = tx.objectStore(_PBP_PACK_META);
+      const req = store.get(id);
+      req.onsuccess = () => {
+        if (!req.result || req.result.state !== "ready") return;
+        if ((req.result.enabled !== false) === (enabled === true)) return;
+        try {
+          store.put({ ...req.result, enabled: enabled === true });
+          changed = true;
+        } catch (error) {
+          console.warn("[pack] enable switch write failed:", error?.name, error?.message);
+          tx.abort();
+        }
+      };
+    }, [_PBP_PACK_META]);
+    if (changed) _pbpMultiNotify(id, "enabled", "legacy");
+    return changed;
+  });
+}
+function pbpPackSetEnabled(enabled) {
+  return _pbpLegacyPackSetEnabled("cedict", "pbp-cedict-import", enabled);
 }
 
 // File import entry (options page): .gz sniffed by magic bytes 1f 8b, not
@@ -908,8 +946,13 @@ async function pbpEcdictImport(lineIter, stats, opts) {
     if (o.onPhase) { try { o.onPhase("parsed"); } catch (_) {} }
     const db = await _pbpPackOpenDB();
     await _pbpPackTx(db, "readwrite", (tx) => {
+      // Read before clear in the same transaction: replacements retain the
+      // user's switch, while a first import starts enabled.
+      const prior = tx.objectStore(_PBP_PACK_META).get(_PBP_ECDICT_META_ID);
+      prior.onsuccess = () => { metaRecord.enabled = prior.result?.enabled !== false; };
       _pbpEcdictCommit(tx, records, metaRecord, o.onProgress);
     }, [_PBP_ECDICT_STORE, _PBP_PACK_META]);
+    _pbpMultiNotify(_PBP_ECDICT_META_ID, "import", "legacy");
     return { entries: records.length, malformed, rows, payloadBytes, rung };
   });
 }
@@ -931,7 +974,7 @@ async function pbpEcdictLookup(term) {
       const metaReq = tx.objectStore(_PBP_PACK_META).get(_PBP_ECDICT_META_ID);
       metaReq.onsuccess = () => {
         const meta = metaReq.result;
-        if (!meta || meta.state !== "ready") { finish({ state: "unavailable" }); return; }
+        if (!meta || meta.state !== "ready" || meta.enabled === false) { finish({ state: "unavailable" }); return; }
         let rowsReq;
         try { rowsReq = tx.objectStore(_PBP_ECDICT_STORE).index("key").getAll(key); }
         catch (error) { console.warn("[pack] ecdict index read failed:", error?.name, error?.message); finish({ state: "error" }); return; }
@@ -967,7 +1010,7 @@ async function pbpEcdictLookupMany(keys) {
       const metaReq = tx.objectStore(_PBP_PACK_META).get(_PBP_ECDICT_META_ID);
       metaReq.onsuccess = () => {
         const meta = metaReq.result;
-        if (!meta || meta.state !== "ready") return;   // tx.oncomplete resolves
+        if (!meta || meta.state !== "ready" || meta.enabled === false) return;   // tx.oncomplete resolves
         const index = tx.objectStore(_PBP_ECDICT_STORE).index("key");
         for (const k of wanted) {
           const req = index.getAll(k);
@@ -996,8 +1039,12 @@ async function pbpEcdictDelete() {
       tx.objectStore(_PBP_PACK_META).delete(_PBP_ECDICT_META_ID);
       tx.objectStore(_PBP_ECDICT_STORE).clear();
     }, [_PBP_ECDICT_STORE, _PBP_PACK_META]);
+    _pbpMultiNotify(_PBP_ECDICT_META_ID, "delete", "legacy");
     return true;
   });
+}
+function pbpEcdictSetEnabled(enabled) {
+  return _pbpLegacyPackSetEnabled(_PBP_ECDICT_META_ID, _PBP_ECDICT_LOCK, enabled);
 }
 
 // File import entry (options page). Sniffs gzip/zip by magic bytes, not by
@@ -1288,8 +1335,9 @@ async function _pbpMultiCleanup(db) {
     };
   }, ["packs", "generations", "terms"]);
 }
-function _pbpMultiNotify(id, action) {
+function _pbpMultiNotify(id, action, kind) {
   const detail = { type: "changed", id, action };
+  if (kind) detail.kind = kind;
   try { const channel = new BroadcastChannel("pbp-dict-packs"); channel.postMessage(detail); channel.close(); } catch (_) {}
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("pbp-dict-packs-changed", { detail }));
 }

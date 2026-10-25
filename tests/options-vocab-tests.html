@@ -81,6 +81,7 @@ body{font-family:monospace;padding:16px}.case{padding:5px;border-bottom:1px soli
       <p class="save-status" id="ecdict-pack-status" role="status" aria-live="polite"></p>
       <div class="vocab-toolbar">
         <button type="button" class="btn btn-sm" id="ecdict-pack-import">Import file</button>
+        <button type="button" class="btn btn-sm" id="ecdict-pack-toggle" hidden></button>
         <button type="button" class="btn btn-sm" id="ecdict-pack-delete" hidden>Delete</button>
         <span class="save-status" id="ecdict-pack-action-status" role="status" aria-live="polite"></span>
       </div>
@@ -96,6 +97,7 @@ body{font-family:monospace;padding:16px}.case{padding:5px;border-bottom:1px soli
       <div class="vocab-toolbar">
         <button type="button" class="btn btn-sm" id="dict-pack-open"></button>
         <button type="button" class="btn btn-sm" id="dict-pack-import"></button>
+        <button type="button" class="btn btn-sm" id="dict-pack-toggle" hidden></button>
         <button type="button" class="btn btn-sm" id="dict-pack-delete" hidden></button>
         <span class="save-status" id="dict-pack-action-status" role="status" aria-live="polite"></span>
       </div>
@@ -405,6 +407,54 @@ delete document.documentElement.dataset.theme;
   } finally {
     pbpPackMeta = realPackMeta;
     pbpPackDelete = realPackDelete;
+  }
+
+  for (const pack of [
+    { prefix: "dict-pack", metaName: "pbpPackMeta", setName: "pbpPackSetEnabled", refresh: _pbpPackRefreshStatus },
+    { prefix: "ecdict-pack", metaName: "pbpEcdictMeta", setName: "pbpEcdictSetEnabled", refresh: _pbpEcdictRefreshStatus }
+  ]) {
+    const savedMeta = window[pack.metaName], savedSet = window[pack.setName];
+    const button = $id(pack.prefix + "-toggle"), section = button.closest("details");
+    const wasOpen = section.open; section.open = true;
+    let meta = { state: "ready", entries: 4, importedAt: 1 }, targets = [], settle;
+    window[pack.metaName] = async () => meta;
+    window[pack.setName] = async enabled => { targets.push(enabled); await new Promise(resolve => { settle = resolve; }); meta = { ...meta, enabled }; };
+    try {
+      await pack.refresh();
+      check(pack.prefix + " old installed packs expose the disable action", !button.hidden && button.textContent === "multiPackDisable");
+      button.focus(); button.click(); button.click();
+      check(pack.prefix + " pending toggle blocks repeats and keeps keyboard focus", targets.length === 1 && targets[0] === false && button.getAttribute("aria-disabled") === "true" && document.activeElement === button);
+      settle(); await task(); await task();
+      check(pack.prefix + " disabled dictionary stays installed with enable and delete available", !button.hidden && button.textContent === "multiPackEnable" && !$id(pack.prefix + "-delete").hidden && $id(pack.prefix + "-status").textContent === "dictPackDisabled" && $id(pack.prefix + "-status").classList.contains("pending"));
+      check(pack.prefix + " settled toggle restores controls without moving focus", button.getAttribute("aria-disabled") === "false" && !$id(pack.prefix + "-import").disabled && document.activeElement === button);
+      button.click(); settle(); await task(); await task();
+      check(pack.prefix + " enable returns to the installed ready state", targets[1] === true && button.textContent === "multiPackDisable" && $id(pack.prefix + "-status").classList.contains("ok"));
+      window[pack.setName] = async () => { throw new Error("switch fixture failed"); };
+      button.click(); await task(); await task();
+      check(pack.prefix + " failed toggle keeps the real state and exposes its failure", button.textContent === "multiPackDisable" && !$id(pack.prefix + "-import").disabled && $id(pack.prefix + "-action-status").textContent.includes("multiPackActionFailed"));
+      let release;
+      window[pack.metaName] = () => new Promise(resolve => { release = resolve; });
+      const stale = pack.refresh();
+      window[pack.metaName] = async () => ({ ...meta, enabled: false });
+      await pack.refresh(); release(meta); await stale;
+      check(pack.prefix + " late metadata reads cannot restore an outdated switch", button.textContent === "multiPackEnable");
+      const originalT = window.t;
+      try {
+        window.t = (key, ...values) => "localized:" + originalT(key, ...values);
+        document.dispatchEvent(new Event("pbp:i18n-applied")); await task(); await task();
+        check(pack.prefix + " late locale hydration refreshes the dynamic switch and status", button.textContent === "localized:multiPackEnable" && $id(pack.prefix + "-status").textContent === "localized:dictPackDisabled");
+      } finally { window.t = originalT; }
+      window[pack.metaName] = async () => null;
+      window.dispatchEvent(new CustomEvent("pbp-dict-packs-changed", { detail: { type: "changed", kind: "legacy", id: pack.prefix } }));
+      await task(); await task();
+      check(pack.prefix + " pack changes refresh settings and hide absent switches", button.hidden && $id(pack.prefix + "-delete").hidden);
+      check(pack.prefix + " removing the focused switch restores the import fallback", document.activeElement === $id(pack.prefix + "-import"));
+      window[pack.metaName] = async () => ({ state: "error" }); await pack.refresh();
+      check(pack.prefix + " unreadable metadata never exposes an enable action", button.hidden && $id(pack.prefix + "-status").classList.contains("bad"));
+    } finally {
+      window[pack.metaName] = savedMeta; window[pack.setName] = savedSet; section.open = wasOpen;
+      await pack.refresh();
+    }
   }
 
   // Importing REPLACES: dict-pack.js clears the store before it writes, so a

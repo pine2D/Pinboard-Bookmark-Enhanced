@@ -2032,12 +2032,18 @@ html.motion-ready .pf:not([hidden]) {
   transition: color var(--motion-state), background-color var(--motion-state);
 }
 .disclosure > summary:hover { color: var(--opt-accent-hover); background: var(--opt-panel); }
+.disclosure > summary > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 /* A live readout inside a disclosure header ("Not imported", "On", "Needs
    attention: 2"): body weight at the helper size so it reads as state, not as
    part of the section name, and it keeps its own ink when the header hovers.
    The summary's flex gap spaces it; the chevron's margin-left:auto still
    parks on the right edge. */
 .disclosure > summary > .summary-state {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-weight: 400;
   font-size: var(--opt-text-helper);
   line-height: var(--opt-lh-helper);

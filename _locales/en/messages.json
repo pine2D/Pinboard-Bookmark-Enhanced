@@ -3785,6 +3785,8 @@
       }
     }
   },
+  "packSummaryDisabled": {"message": "Disabled"},
+  "dictPackDisabled": {"message": "Disabled. The dictionary stays on this device. Enable it to use it again."},
   "packSummaryEmpty": {
     "message": "Not imported"
   },

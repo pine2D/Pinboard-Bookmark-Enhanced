@@ -3774,6 +3774,8 @@
       }
     }
   },
+  "packSummaryDisabled": {"message": "Deaktiviert"},
+  "dictPackDisabled": {"message": "Deaktiviert. Das Wörterbuch bleibt auf diesem Gerät gespeichert. Aktiviere es, um es wieder zu nutzen."},
   "packSummaryEmpty": {
     "message": "Nicht importiert"
   },

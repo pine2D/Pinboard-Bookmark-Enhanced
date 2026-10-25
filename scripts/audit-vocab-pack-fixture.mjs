@@ -41,11 +41,16 @@ export async function openVocabPackPreview(page) {
   await page.locator('#multi-pack-target-language').fill('en');
   await page.locator('#multi-pack-source-url').fill('https://dictionary.example.test/synthetic-source');
   await page.locator('#multi-pack-license').fill('Synthetic QA dictionary; no third-party content.');
+  // Upload/fill do not move the pointer off the disclosure we clicked. Its
+  // temporary hover color is not the resting section-heading face to audit.
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(200);
 }
 
 export async function installVocabPackFixture(page) {
   await page.locator('#multi-pack-install').click();
   await page.locator('#multi-pack-list .dict-pack-name').filter({ hasText: VOCAB_PACK_FIXTURE_TITLE }).waitFor();
   await page.locator('#multi-pack-preview').waitFor({ state: 'hidden' });
-  if (await page.locator('#multi-pack-list button[data-pack-action]').count() !== 3) throw new Error('SETUP: dictionary installed actions are incomplete');
+  const actions = await page.locator('#multi-pack-list button[data-pack-action]').evaluateAll(buttons => buttons.map(button => button.dataset.packAction).sort());
+  if (actions.join(',') !== 'delete,enabled') throw new Error('SETUP: dictionary installed actions are incomplete');
 }

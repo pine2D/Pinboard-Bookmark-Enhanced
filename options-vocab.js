@@ -977,10 +977,11 @@ if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.onMessage)
 // The pack's disclosure header repeats the gist -- "Not imported" or the entry
 // count -- so the closed section answers "is it set up?" without opening it.
 // A read failure leaves it blank: the status line inside says what went wrong.
+const _pbpLegacyPackStatusSeq = { "dict-pack": 0, "ecdict-pack": 0 };
 function _pbpPackSummary(id, meta) {
   const el = $id(id);
   if (!el) return;
-  el.textContent = meta && meta.state === "ready" ? t("packSummaryReady", String(meta.entries))
+  el.textContent = meta && meta.state === "ready" ? meta.enabled === false ? t("packSummaryDisabled") : t("packSummaryReady", String(meta.entries))
     : meta && meta.state === "error" ? "" : t("packSummaryEmpty");
 }
 function _pbpPackSetStatus(el, text, tone) {
@@ -989,21 +990,60 @@ function _pbpPackSetStatus(el, text, tone) {
   el.classList.remove("ok", "bad", "pending", "warn");
   el.classList.add(tone);
 }
+function _pbpLegacyPackToggleStatus(prefix, meta) {
+  const button = $id(prefix + "-toggle");
+  if (!button) return;
+  const focused = document.activeElement === button;
+  button.hidden = meta?.state !== "ready";
+  button.dataset.enabled = String(meta?.enabled !== false);
+  button.textContent = t(meta?.enabled === false ? "multiPackEnable" : "multiPackDisable");
+  if (button.hidden && focused) $id(prefix + "-import")?.focus({ preventScroll: true });
+}
+function _pbpLegacyPackBusy(prefix, busy) {
+  ++_pbpLegacyPackStatusSeq[prefix];
+  for (const action of ["import", "delete"]) {
+    const button = $id(prefix + "-" + action);
+    if (button) button.disabled = busy;
+  }
+  // Keep the switch focused while its write is pending, including keyboard
+  // activation; aria-disabled plus the click guard prevents repeated writes.
+  $id(prefix + "-toggle")?.setAttribute("aria-disabled", String(busy));
+}
+function _pbpLegacyPackWireToggle(prefix, setEnabled, refresh) {
+  const button = $id(prefix + "-toggle");
+  button?.addEventListener("click", async () => {
+    if (button.hidden || $id(prefix + "-import")?.disabled) return;
+    _pbpLegacyPackBusy(prefix, true);
+    try {
+      await setEnabled(button.dataset.enabled !== "true");
+    } catch (error) {
+      console.warn("[dict-pack] enable switch failed:", error?.name, error?.message);
+      _pbpVocabFlashLocalStatus(prefix + "-action-status", false, t("multiPackActionFailed"));
+    } finally {
+      _pbpLegacyPackBusy(prefix, false);
+      await refresh();
+    }
+  });
+}
 async function _pbpPackRefreshStatus() {
   const el = $id("dict-pack-status");
   const del = $id("dict-pack-delete");
-  if (!el) return;
+  if (!el || $id("dict-pack-import")?.disabled) return;
+  const seq = ++_pbpLegacyPackStatusSeq["dict-pack"];
   let meta;
   try {
     meta = (typeof pbpPackMeta === "function") ? await pbpPackMeta() : { state:"error" };
-  } catch (_) {
+  } catch (error) {
+    console.warn("[dict-pack] status read failed:", error?.name, error?.message);
     meta = { state:"error" };
   }
+  if (seq !== _pbpLegacyPackStatusSeq["dict-pack"]) return;
   _pbpPackSummary("dict-pack-summary", meta);
+  _pbpLegacyPackToggleStatus("dict-pack", meta);
   if (meta && meta.state === "ready") {
     const d = new Date(meta.importedAt);
-    _pbpPackSetStatus(el, t("dictPackStatus", String(meta.entries),
-      d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0")), "ok");
+    _pbpPackSetStatus(el, meta.enabled === false ? t("dictPackDisabled") : t("dictPackStatus", String(meta.entries),
+      d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0")), meta.enabled === false ? "pending" : "ok");
     if (del) del.hidden = false;
   } else if (meta && meta.state === "error") {
     _pbpPackSetStatus(el, t("dictPackReadFailed"), "bad");
@@ -1026,7 +1066,7 @@ function _pbpPackWire() {
   imp.addEventListener("click", () => file.click());
   const runPackImport = async (f) => {
     if (imp.disabled) return;
-    imp.disabled = true;
+    _pbpLegacyPackBusy("dict-pack", true);
     const el = $id("dict-pack-status");
     let lastShown = 0;
     try {
@@ -1053,7 +1093,7 @@ function _pbpPackWire() {
           : code === "pack_cleared" ? "dictPackFailedCleared"
           : "dictPackFailed"));
     } finally {
-      imp.disabled = false;
+      _pbpLegacyPackBusy("dict-pack", false);
       _pbpPackRefreshStatus();
     }
   };
@@ -1110,6 +1150,7 @@ function _pbpPackWire() {
       }
     });
   });
+  _pbpLegacyPackWireToggle("dict-pack", enabled => pbpPackSetEnabled(enabled), _pbpPackRefreshStatus);
   _pbpPackRefreshStatus();
 }
 _pbpPackWire();
@@ -1122,25 +1163,30 @@ $id("vocab-drive-pointer-open")?.addEventListener("click", () => pbpOpenOptionsT
 async function _pbpEcdictRefreshStatus() {
   const el = $id("ecdict-pack-status");
   const del = $id("ecdict-pack-delete");
-  if (!el) return;
+  if (!el || $id("ecdict-pack-import")?.disabled) return;
+  const seq = ++_pbpLegacyPackStatusSeq["ecdict-pack"];
   let meta;
   try {
     meta = (typeof pbpEcdictMeta === "function") ? await pbpEcdictMeta() : { state: "error" };
-  } catch (_) {
+  } catch (error) {
+    console.warn("[ecdict] status read failed:", error?.name, error?.message);
     meta = { state: "error" };
   }
+  if (seq !== _pbpLegacyPackStatusSeq["ecdict-pack"]) return;
   _pbpPackSummary("ecdict-pack-summary", meta);
+  _pbpLegacyPackToggleStatus("ecdict-pack", meta);
   // A database newer than this page cannot be recovered from by retrying; only
   // a reload can. Say so instead of showing a generic read failure.
   if (typeof pbpPackIsStale === "function" && pbpPackIsStale()) {
     _pbpPackSetStatus(el, t("ecdictStaleReload"), "warn");
     if (del) del.hidden = true;
+    _pbpLegacyPackToggleStatus("ecdict-pack", null);
     return;
   }
   if (meta && meta.state === "ready") {
     const d = new Date(meta.importedAt);
-    _pbpPackSetStatus(el, t("ecdictReady", String(meta.entries),
-      d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0")), "ok");
+    _pbpPackSetStatus(el, meta.enabled === false ? t("dictPackDisabled") : t("ecdictReady", String(meta.entries),
+      d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0")), meta.enabled === false ? "pending" : "ok");
     if (del) del.hidden = false;
   } else if (meta && meta.state === "error") {
     _pbpPackSetStatus(el, t("dictPackReadFailed"), "bad");
@@ -1163,7 +1209,7 @@ function _pbpEcdictWire() {
     const f = file.files && file.files[0];
     file.value = "";
     if (!f || imp.disabled) return;
-    imp.disabled = true;
+    _pbpLegacyPackBusy("ecdict-pack", true);
     const el = $id("ecdict-pack-status");
     let lastShown = 0;
     const tick = (n) => {
@@ -1199,7 +1245,7 @@ function _pbpEcdictWire() {
       const expected = key !== "ecdictParseFailed";
       (expected ? console.info : console.warn)("[ecdict] import rejected:", e && e.name, msg);
     } finally {
-      imp.disabled = false;
+      _pbpLegacyPackBusy("ecdict-pack", false);
       _pbpEcdictRefreshStatus();
     }
   });
@@ -1219,6 +1265,7 @@ function _pbpEcdictWire() {
       }
     });
   });
+  _pbpLegacyPackWireToggle("ecdict-pack", enabled => pbpEcdictSetEnabled(enabled), _pbpEcdictRefreshStatus);
   _pbpEcdictRefreshStatus();
 }
 _pbpEcdictWire();
@@ -1458,8 +1505,16 @@ function _pbpMultiPackWire() {
   if(languages) for(const code of ["ar","bg","bn","cs","da","de","el","en","es","fa","fi","fr","he","hi","hu","id","it","ja","ko","lt","nl","no","pl","pt","ro","ru","sk","sv","sw","ta","th","tr","uk","ur","vi","zh","zh-Hant"]) {
     const option=document.createElement("option"); option.value=code;option.label=_pbpMultiPackLanguage(code);languages.appendChild(option);
   }
-  window.addEventListener("pbp-dict-packs-changed", _pbpMultiPackRefresh);
-  window.addEventListener("focus", _pbpMultiPackRefresh);
+  const refresh = () => {
+    _pbpPackRefreshStatus();
+    _pbpEcdictRefreshStatus();
+    _pbpMultiPackRefresh();
+  };
+  window.addEventListener("pbp-dict-packs-changed", refresh);
+  window.addEventListener("focus", refresh);
+  // This script wires before options.js initializes i18n at DOMContentLoaded.
+  // Repaint dynamic labels after the real locale replaces the startup mirror.
+  document.addEventListener("pbp:i18n-applied", refresh);
   document.addEventListener("focusin", event=>{
     const next=_pbpMultiPackFocusAt(event.target);
     if (!next || next.id!==_pbpMultiPackFocus?.id || next.action!==_pbpMultiPackFocus?.action) _pbpMultiPackFocus=null;
@@ -1470,7 +1525,7 @@ function _pbpMultiPackWire() {
   });
   try {
     const channel=new BroadcastChannel("pbp-dict-packs");
-    channel.onmessage=_pbpMultiPackRefresh;
+    channel.onmessage=refresh;
     window.addEventListener("pagehide", ()=>channel.close(), {once:true});
   } catch (_) { /* Focus refresh remains available without BroadcastChannel. */ }
   _pbpMultiPackRefresh();

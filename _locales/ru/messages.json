@@ -3774,6 +3774,8 @@
       }
     }
   },
+  "packSummaryDisabled": {"message": "Отключён"},
+  "dictPackDisabled": {"message": "Словарь отключён, но остаётся на этом устройстве. Включите его, чтобы снова пользоваться им."},
   "packSummaryEmpty": {
     "message": "Не импортировано"
   },

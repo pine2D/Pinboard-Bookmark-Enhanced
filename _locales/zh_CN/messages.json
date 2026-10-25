@@ -3774,6 +3774,8 @@
       }
     }
   },
+  "packSummaryDisabled": {"message": "已停用"},
+  "dictPackDisabled": {"message": "已停用，词典仍保留在本机，启用后可继续使用。"},
   "packSummaryEmpty": {
     "message": "未导入"
   },

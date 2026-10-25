@@ -1041,6 +1041,78 @@ section("pbpCedictLines");
   check("a web-only gloss stays out even at the widest rung", (await pbpEcdictLookup("abhuman")).state === "ready-miss");
   check("re-import replaces instead of duplicating", (await pbpEcdictLookup("ephemeral")).rows.length === 1);
 
+  section("Legacy offline dictionary enable switches");
+  for (const pack of [
+    { id: "cedict", store: "cedict", meta: pbpPackMeta, set: pbpPackSetEnabled, remove: pbpPackDelete,
+      lookup: () => pbpPackLookup(["沙丁鱼"]), import: lines => pbpPackImport(lines),
+      lines: ["沙丁魚 沙丁鱼 [sha1 ding1 yu2] /sardine/"] },
+    { id: "ecdict", store: "ecdict", meta: pbpEcdictMeta, set: pbpEcdictSetEnabled, remove: pbpEcdictDelete,
+      lookup: () => pbpEcdictLookup("ephemeral"), import: lines => pbpEcdictImport(lines, E_STATS(), { rung: "R1" }),
+      lines: [E_HDR, E_EPHEMERAL, E_AARDVARK] }
+  ]) {
+    const label = pack.id + " switch: ";
+    // Hand-write pre-feature metadata, without an enabled property.
+    const original = await pack.meta();
+    delete original.enabled;
+    await _pbpPackTx(await _pbpPackOpenDB(), "readwrite", tx => tx.objectStore("packs").put(original), ["packs"]);
+    check(label + "old metadata defaults to enabled", (await pack.lookup()).state === "hit");
+    const events = [], snapshots = [];
+    const changed = event => {
+      if (event.detail?.kind !== "legacy" || event.detail.id !== pack.id) return;
+      events.push(event.detail);
+      snapshots.push(pack.meta());
+    };
+    window.addEventListener("pbp-dict-packs-changed", changed);
+    try {
+      check(label + "disable writes a persistent switch", await pack.set(false) && (await pack.meta()).enabled === false);
+      check(label + "disabled dictionary no longer supplies results", (await pack.lookup()).state === "unavailable");
+      if (pack.id === "ecdict") check(label + "disabled dictionary cannot enrich vocabulary exports", (await pbpEcdictLookupMany(["ephemeral", "aardvark"])).size === 0);
+      check(label + "switch does not affect the other dictionary", (await (pack.id === "cedict" ? pbpEcdictLookup("ephemeral") : pbpPackLookup(["沙丁鱼"]))).state === "hit");
+      const disabled = await pack.meta();
+      const stored = await _pbpPackTx(await _pbpPackOpenDB(), "readonly", tx => {
+        const req = tx.objectStore(pack.store).count(); return { value: () => req.result };
+      }, [pack.store]);
+      check(label + "disable retains all records and installation metadata", stored === original.entries &&
+        Object.entries(original).every(([key,value]) => disabled[key] === value));
+      (await _pbpPackOpenDB()).close(); _pbpPackDbPromise = null;
+      check(label + "switch survives database reopen", (await pack.meta()).enabled === false && (await pack.lookup()).state === "unavailable");
+      check(label + "change event is emitted after committed metadata", events.length === 1 && events[0].action === "enabled" && (await snapshots[0]).enabled === false);
+      await pack.import(arrLines(pack.lines));
+      check(label + "replacement preserves disabled state", (await pack.meta()).enabled === false && (await pack.lookup()).state === "unavailable");
+      check(label + "reenable immediately restores retained entries", await pack.set(true) && (await pack.lookup()).state === "hit");
+      if (pack.id === "ecdict") check(label + "reenable restores batch export enrichment", (await pbpEcdictLookupMany(["ephemeral", "aardvark"])).size === 2);
+      const eventCount = events.length;
+      check(label + "same-state request is a no-op without notifications", await pack.set(true) === false && events.length === eventCount);
+      const realPut = IDBObjectStore.prototype.put;
+      let rejected = false;
+      IDBObjectStore.prototype.put = function (value, ...args) {
+        if (this.name === "packs" && value.id === pack.id) throw new DOMException("switch quota fixture", "QuotaExceededError");
+        return realPut.call(this, value, ...args);
+      };
+      try { await pack.set(false); } catch (_) { rejected = true; }
+      finally { IDBObjectStore.prototype.put = realPut; }
+      check(label + "failed switch write preserves the prior state and sends no change", rejected &&
+        (await pack.meta()).enabled === true && (await pack.lookup()).state === "hit" && events.length === eventCount);
+      let reached, release;
+      const entered = new Promise(resolve => { reached = resolve; });
+      const blocked = new Promise(resolve => { release = resolve; });
+      async function* pendingLines() { reached(); await blocked; yield* pack.lines; }
+      const importing = pack.import(pendingLines());
+      await entered;
+      const stopping = pack.set(false);
+      release(); await importing; await stopping;
+      check(label + "toggle serializes after an in-flight import", (await pack.meta()).enabled === false && (await pack.lookup()).state === "unavailable");
+      const deleting = pack.remove(), lateEnable = pack.set(true);
+      await deleting;
+      check(label + "queued toggle never resurrects a deleted dictionary", await lateEnable === false && await pack.meta() === null);
+      await pack.import(arrLines(pack.lines));
+      check(label + "first import after deletion starts enabled", (await pack.meta()).enabled === true && (await pack.lookup()).state === "hit");
+    } finally {
+      window.removeEventListener("pbp-dict-packs-changed", changed);
+      await Promise.all(snapshots);
+    }
+  }
+
   // The two packs share a database and a meta store but never each other's state.
   await pbpEcdictDelete();
   check("deleting the ECDICT pack makes it unavailable", (await pbpEcdictLookup("ephemeral")).state === "unavailable");

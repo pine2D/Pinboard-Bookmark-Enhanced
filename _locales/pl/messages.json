@@ -3774,6 +3774,8 @@
       }
     }
   },
+  "packSummaryDisabled": {"message": "Wyłączony"},
+  "dictPackDisabled": {"message": "Słownik jest wyłączony, ale pozostaje na tym urządzeniu. Włącz go, aby znów z niego korzystać."},
   "packSummaryEmpty": {
     "message": "Nie zaimportowano"
   },

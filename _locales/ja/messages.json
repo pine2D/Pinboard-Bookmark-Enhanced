@@ -3774,6 +3774,8 @@
       }
     }
   },
+  "packSummaryDisabled": {"message": "無効"},
+  "dictPackDisabled": {"message": "無効になっています。辞書はこのデバイスに保存されたままです。有効にすると再び使えます。"},
   "packSummaryEmpty": {
     "message": "未インポート"
   },
