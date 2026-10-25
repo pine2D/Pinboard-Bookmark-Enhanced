@@ -257,6 +257,21 @@ async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, before
   const make = (page, excerpt, fields) => ({ title: page.title, url: origin + "/w/index.php?oldid=" + page.revid,
     excerpt, author: fields.author || "", work: fields.work || page.title, location: fields.location || "",
     language, genre: fields.genre || kind, revision: String(page.revid), retrievedAt: Date.now() });
+  let sourceFailed = false;
+  const optionalRead = async read => {
+    try { return await read(); }
+    catch (error) {
+      // Independent candidates may fail without invalidating a verified
+      // passage. Account, permission and cancellation errors still abort all.
+      if (error?.code !== "source_failed") throw error;
+      sourceFailed = true; return null;
+    }
+  };
+  const candidate = async title => {
+    const result = await optionalRead(() => load(title));
+    if (!result) pages.set(title, null);
+    return result;
+  };
   try {
     await check();
     if (kind === "etymology") {
@@ -266,7 +281,7 @@ async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, before
       // Follow just one explicitly marked same-language formation component.
       // No model invents this link and it never expands the granted origin.
       if (found.related[0]) {
-        const related = await load(found.related[0]);
+        const related = await candidate(found.related[0]);
         const part = related && _pbpDictEvidenceEtymology(related.page, related.root, language);
         if (part) result.push(make(related.page, part.text, part));
       }
@@ -287,8 +302,8 @@ async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, before
     // be buried under incidental mentions). Still verify the retrieved body.
     const candidates = kind === "culture" && term.length <= 200 && !term.includes(":") ? [term] : [], pools = [];
     for (const query of searches) {
-      const json = await fetchJson({ action: "query", list: "search", srnamespace: "0", srsearch: query, srlimit: kind === "literature" ? "8" : "5", srprop: "" });
-      if (!Array.isArray(json?.query?.search)) throw _pbpDictEvidenceError("source_failed");
+      const json = await optionalRead(() => fetchJson({ action: "query", list: "search", srnamespace: "0", srsearch: query, srlimit: kind === "literature" ? "8" : "5", srprop: "" }));
+      if (!Array.isArray(json?.query?.search)) { sourceFailed = true; continue; }
       pools.push(json.query.search.filter(row => row?.ns === 0 && Number.isSafeInteger(row.pageid) && row.pageid > 0 && typeof row.title === "string" && row.title.length <= 200 &&
         !row.title.includes(":")).map(row => row.title));
     }
@@ -300,7 +315,7 @@ async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, before
     for (const title of candidates) {
       if (kind === "literature" && /(?:\b(?:United States Code|Copyright|Government Report|Report of (?:the|a) Commission|Agreement relating|Implementation Rules|Traffic Signs Manual|Treaty|Encyclopædia|Encyclopedia)\b|法律|法令|报告|報告|條約|条约)/i.test(title)) continue;
       if (++examined > 10 || result.length >= (kind === "literature" ? 1 : 3) || requests >= 22) break;
-      const loaded = await load(title); if (!loaded) continue;
+      const loaded = await candidate(title); if (!loaded) continue;
       const { page, root } = loaded;
       if (kind === "culture") {
         for (const excerpt of _pbpDictCultureExcerpts(root, page.title, term, language)) {
@@ -315,16 +330,16 @@ async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, before
       const metadata = _pbpDictEvidenceMetadata(page, root, origin);
       if (metadata.forbidden) continue;
       let frontier = metadata.links;
-      for (let depth = 0; !metadata.genre && !metadata.forbidden && depth < 2; depth++) {
+      for (let depth = 0; (!metadata.genre || !metadata.author) && !metadata.forbidden && depth < 2; depth++) {
         const next = [];
         for (const parentTitle of frontier.slice(0, 2)) {
-          const parent = await load(parentTitle); if (!parent) continue;
+          const parent = await candidate(parentTitle); if (!parent) continue;
           const parentMeta = _pbpDictEvidenceMetadata(parent.page, parent.root, origin);
           if (parentMeta.forbidden) { metadata.forbidden = true; break; }
           if (!metadata.author) metadata.author = parentMeta.author;
           if (!metadata.work || metadata.work === page.title.split("/")[0]) metadata.work = parentMeta.work;
-          metadata.genre = parentMeta.genre; next.push(...parentMeta.links);
-          if (metadata.genre) break;
+          metadata.genre ||= parentMeta.genre; next.push(...parentMeta.links);
+          if (metadata.genre && metadata.author) break;
         }
         frontier = next;
       }
@@ -333,6 +348,8 @@ async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, before
       metadata.location = metadata.location.slice(0, 200);
       result.push(make(page, excerpt.text, metadata)); works.add(metadata.work);
     }
-    await check(); return result;
+    await check();
+    if (!result.length && sourceFailed) throw _pbpDictEvidenceError("source_failed");
+    return result;
   } finally { clearTimeout(timeout); signal?.removeEventListener("abort", abort); }
 }

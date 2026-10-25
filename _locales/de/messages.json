@@ -4669,6 +4669,8 @@
   "dictPanelEmpty": {"message": "Wähle ein Wort im Artikel aus oder gib oben ein Wort zum Nachschlagen ein."},
   "dictLookupInPanel": {"message": "In der Seitenleiste nachschlagen"},
   "dictSupplementScope": {"message": "Situation eingrenzen"},
+  "dictSupplementRetrieving": {"message": "Quellen werden gesucht …"},
+  "dictSupplementChecking": {"message": "Generierte Inhalte werden geprüft …"},
   "dictSupplementSaving": {"message": "Ergänzung wird gespeichert…"},
   "dictGenerationTruncated": {"message": "Das Modell hat die Antwort nicht abgeschlossen. Das Ergebnis wurde nicht gespeichert. Versuche es erneut oder wähle in den Einstellungen ein anderes KI-Modell für den Reader."},
   "dictGenerationRefused": {"message": "Das Modell hat die Anfrage abgelehnt oder die Ausgabe blockiert. Das Ergebnis wurde nicht gespeichert."},

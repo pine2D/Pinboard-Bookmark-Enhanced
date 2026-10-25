@@ -4669,6 +4669,8 @@
   "dictPanelEmpty": {"message": "Выделите слово в статье или введите его выше, чтобы узнать значение."},
   "dictLookupInPanel": {"message": "Найти на боковой панели"},
   "dictSupplementScope": {"message": "Уточнить ситуацию"},
+  "dictSupplementRetrieving": {"message": "Поиск источников…"},
+  "dictSupplementChecking": {"message": "Проверка созданного материала…"},
   "dictSupplementSaving": {"message": "Сохранение дополнения…"},
   "dictGenerationTruncated": {"message": "Модель не завершила ответ. Результат не сохранён. Повторите попытку или выберите другую модель ИИ для читалки в настройках."},
   "dictGenerationRefused": {"message": "Модель отклонила запрос или заблокировала ответ. Результат не сохранён."},

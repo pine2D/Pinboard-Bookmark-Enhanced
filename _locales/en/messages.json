@@ -4676,6 +4676,8 @@
   "dictPanelEmpty": {"message": "Select a word in the article, or enter one above to look it up."},
   "dictLookupInPanel": {"message": "Look up in side panel"},
   "dictSupplementScope": {"message": "Limit to a situation"},
+  "dictSupplementRetrieving": {"message": "Retrieving sources…"},
+  "dictSupplementChecking": {"message": "Checking generated content…"},
   "dictSupplementSaving": {"message": "Saving supplement…"},
   "dictGenerationTruncated": {"message": "The model stopped before completing the response. This result was not saved. Try again or choose another reader AI model in Settings."},
   "dictGenerationRefused": {"message": "The model declined this request or blocked the output. This result was not saved."},

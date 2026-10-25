@@ -4669,6 +4669,8 @@
   "dictPanelEmpty": {"message": "Zaznacz słowo w artykule lub wpisz je powyżej, aby sprawdzić znaczenie."},
   "dictLookupInPanel": {"message": "Sprawdź w panelu bocznym"},
   "dictSupplementScope": {"message": "Zawęź kontekst"},
+  "dictSupplementRetrieving": {"message": "Wyszukiwanie źródeł…"},
+  "dictSupplementChecking": {"message": "Sprawdzanie wygenerowanej treści…"},
   "dictSupplementSaving": {"message": "Zapisywanie uzupełnienia…"},
   "dictGenerationTruncated": {"message": "Model nie ukończył odpowiedzi. Wynik nie został zapisany. Spróbuj ponownie lub wybierz inny model AI czytnika w ustawieniach."},
   "dictGenerationRefused": {"message": "Model odrzucił żądanie lub zablokował odpowiedź. Wynik nie został zapisany."},

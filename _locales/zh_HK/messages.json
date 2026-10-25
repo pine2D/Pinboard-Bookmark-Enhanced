@@ -4669,6 +4669,8 @@
   "dictPanelEmpty": {"message": "選取內文中的詞語，或在上方輸入詞語查詢。"},
   "dictLookupInPanel": {"message": "在側欄查詞"},
   "dictSupplementScope": {"message": "限定情境"},
+  "dictSupplementRetrieving": {"message": "正在搜尋資料…"},
+  "dictSupplementChecking": {"message": "正在檢查產生的內容…"},
   "dictSupplementSaving": {"message": "正在儲存補充…"},
   "dictGenerationTruncated": {"message": "模型尚未完成這次回答。結果未儲存；可重試，或在設定中更換閱讀器 AI 模型。"},
   "dictGenerationRefused": {"message": "模型拒絕了這次請求或封鎖了輸出。結果未儲存。"},

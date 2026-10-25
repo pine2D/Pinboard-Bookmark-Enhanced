@@ -4663,6 +4663,8 @@
   "dictPanelEmpty": {"message": "选择正文中的词语，或在上方输入单词查词。"},
   "dictLookupInPanel": {"message": "在侧栏查词"},
   "dictSupplementScope": {"message": "限定场景"},
+  "dictSupplementRetrieving": {"message": "正在检索资料…"},
+  "dictSupplementChecking": {"message": "正在检查生成内容…"},
   "dictSupplementSaving": {"message": "正在保存补充…"},
   "dictGenerationTruncated": {"message": "模型未完成本次回答。本次结果未保存；可重试，或在设置中更换阅读器 AI 模型。"},
   "dictGenerationRefused": {"message": "模型拒绝了本次请求或拦截了输出。本次结果未保存。"},

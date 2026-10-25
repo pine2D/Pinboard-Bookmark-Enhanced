@@ -563,14 +563,14 @@ async function _pbpDictSupplementSources(request, category) {
 }
 function _pbpDictSupplementPrompt(request, category, profile, sources, entry, repair = null) {
   const task = {
-    collocations: "Give 3-5 useful patterns grouped by meaning. Title is the complete collocation/pattern; explanation says when/how to use it, including variable slots. Give an original example and translation. Never assert frequency without corpus evidence.",
+    collocations: "Give 2-3 useful patterns grouped by meaning. Title is the complete collocation/pattern; explanation says when/how to use it, including variable slots. Give an original example and translation. Never assert frequency without corpus evidence.",
     confusables: "Compare 2-3 genuinely confusable alternatives in the same situation. Title names the contrast; explanation gives a choice rule and how substitution changes meaning or tone; give a contrasting original example and translation. Avoid absolute boundaries where usages overlap. False friends require an explicit nativeLanguage.",
     register: "Separate domain, formality, politeness, region and connotation. Only discuss meaningful distinctions, qualify regional claims and provide a neutral alternative with original example/translation. Do not stereotype speakers or invent a distinction to fill space.",
     grammar: "Give 1-3 expression-specific syntax/grammar points with pattern, explanation and original example/translation. Prioritize sentence structure, complements, agreement and countability, not word formation. Adapt to sourceLanguage (e.g. case and prepositions in German, gender/agreement in Spanish, classifiers or separability in Chinese). Do not impose an English grammar template or dump conjugation tables.",
     scenarios: "Give 2-3 original examples or short dialogues, each with a distinct communicative goal, suited to topic and level. Title names the situation, explanation says how to use it; give the original utterance and translation. These are AI-written, not corpus quotations.",
-    culture: "Explain a specific supported cultural/internet sense. Name the expression, community/platform, dated scope, literal versus implied meaning and tone. Cite sourceIndex. Do not turn ordinary definitions into memes; an attestation does not prove origin or present popularity. Do not fill gaps from memory. Use empty items if the sources do not support a distinctive use. Do not include example or translation fields: explain the cited use in the learner's language; the application displays the original evidence separately.",
+    culture: "Explain 1-2 distinctive cultural/internet uses directly supported by the supplied excerpts. Each item teaches the expression's implied meaning, tone and when a learner could use or misunderstand it. Mention community/platform or dated scope only when supplied. Cite sourceIndex. Do not turn ordinary definitions into memes; an attestation does not prove origin or present popularity. Do not fill gaps from memory. Use empty items if the sources do not support a distinctive use. Do not include example or translation fields: explain the cited use in the learner's language; the application displays the original evidence separately.",
     literature: "Explain the supplied literary passages. Summary introduces what the word does in these passages, not its general dictionary definition. For each passage explain its supported scene, particular sense and expressive effect in the learner's language. Do not infer a character's occupation, identity or plot facts beyond the excerpt and metadata. Clearly mark interpretation. Do not include an example field: the application inserts the exact verified source excerpt. Translation translates that entire excerpt. Distinguish older usage from modern patterns; no invented authors, titles, quotations or frequency claims.",
-    etymology: "Give 2-4 useful points. Classify each kind as formation, history, family, cognate, synonym or topic. History, dates, roots, cognates and semantic transitions MUST be supported by a cited sourceIndex; omit them if no evidence supports them. Explain productive formation as formation, not history. For related words title is just the related word, explanation gives the relationship and a useful distinction. Do not invent character stories or equate synonyms with cognates. Without evidence give only well-established modern formation/usage relationships with sourceIndex:-1. No example or translation fields."
+    etymology: "Give 2-3 useful points. Classify each kind as formation, history, family, cognate, synonym or topic. History, dates, roots, cognates and semantic transitions MUST be supported by a cited sourceIndex; omit them if no evidence supports them. Explain productive formation as formation, not history. For related words title is just the related word, explanation gives the relationship and a useful distinction. Do not invent character stories or equate synonyms with cognates. Without evidence give only well-established modern formation/usage relationships with sourceIndex:-1. No example or translation fields."
   }[category];
   const sourceBacked = ["culture", "literature"].includes(category), etymology = category === "etymology";
   const itemLimit = repair ? repair.omittedItems : category === "literature" ? Math.min(2, sources.length) : 5;
@@ -593,6 +593,7 @@ function _pbpDictSupplementPrompt(request, category, profile, sources, entry, re
     sourceRule + (repair ? "This is a partial repair. Return only the missing points, at most missingItems. Do not repeat or rewrite acceptedItems; they will be kept verbatim. Use an empty summary. " : "") +
     "Keep compared words and patterns in sourceLanguage inside target-language explanations; do not translate away the labels being taught. The terms do not need quotation marks. The surrounding explanation must stay in targetLanguage. " +
     "Every explanation must finish its thought; do not leave an introductory clause or a comparison without its conclusion. Prefer fewer complete points over more partial ones. " +
+    "Use one short sentence for the summary and 1-3 sentences per explanation. These are concise learning notes, not essays: select the most useful distinctions instead of filling every allowed item or character. " +
     "Distinguish tendencies from grammatical rules. Do not call a spelling variant or alternative expression impossible merely because another form is more natural; avoid unsupported frequency and exclusivity claims. " +
     "Write concise, practical learning guidance; do not spend the summary describing this task, validation rules or AI provenance (the application labels that separately). " +
     "Plain text, no Markdown/HTML/URLs. Within prose values use single quotation marks for quoted words and dialogue; reserve double quotes for JSON delimiters. Uncertain or unsupported claims must be omitted; items:[] means no useful supported result.\n" +
@@ -669,6 +670,11 @@ async function pbpDictSupplementRun(input = {}) {
     () => _pbpDictSupplementGenerate(input, request, category, profile));
 }
 async function _pbpDictSupplementGenerate(input, request, category, profile) {
+  const stage = async name => {
+    await _pbpDictEntryGuard(request);
+    if (typeof input.onStage === "function") input.onStage(name);
+    await _pbpDictEntryGuard(request);
+  };
   await _pbpDictEntryGuard(request);
   const find = record => {
     const matches = (record?.supplements || []).filter(item => item.category === category &&
@@ -690,13 +696,14 @@ async function _pbpDictSupplementGenerate(input, request, category, profile) {
   const parent = repair && hit.archiveId !== record.archiveId
     ? record.previousEntries?.find(item => item.archiveId === hit.archiveId) : record;
   if (!parent?.entry) throw _pbpDictEntryError("invalid_request", "Original meanings for this supplement are unavailable");
+  if (!repair && ["literature", "culture", "etymology"].includes(category)) await stage("sources");
   const sources = repair ? hit.sources : await _pbpDictSupplementSources(request, category);
-  await _pbpDictEntryGuard(request);
+  await stage("generating");
   const response = await callAI(request.settings, _pbpDictSupplementPrompt(request, category, profile, sources, parent.entry, repair), {
     ...PBP_DICT_GENERATION_OPTIONS, model: request.model.override, signal: request.signal,
     responseSchema: _pbpDictSupplementSchema(request, category, sources, parent.entry), beforeRequest: () => _pbpDictEntryGuard(request)
   });
-  await _pbpDictEntryGuard(request);
+  await stage("checking");
   const generated = _pbpDictGeneratedResponse(response, "supplement", category);
   const learning = pbpDictSupplementParse(generated, request, category, sources, parent.entry, input.updateId || "");
   await _pbpDictCheckExplanation([learning.summary, ...learning.items.flatMap(item => [item.explanation, item.translation])].filter(Boolean).join("\n\n"),
@@ -715,6 +722,7 @@ async function _pbpDictSupplementGenerate(input, request, category, profile) {
   if (content.length > 12000) throw _pbpDictEntryError("invalid_response", "Learning content is too long", "supplement_size");
   const supplement = { archiveId: parent.archiveId, category, profile, content, sources, learning,
     provider: request.model.provider, model: request.model.model, generatedAt: Date.now() };
+  await stage("saving");
   try { return await pbpDictSupplementSave(input, supplement); }
   catch (error) {
     await _pbpDictEntryGuard(request);

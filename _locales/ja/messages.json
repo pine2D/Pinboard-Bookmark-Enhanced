@@ -4669,6 +4669,8 @@
   "dictPanelEmpty": {"message": "本文中の語句を選択するか、上の欄に入力して調べられます。"},
   "dictLookupInPanel": {"message": "サイドパネルで調べる"},
   "dictSupplementScope": {"message": "場面を指定"},
+  "dictSupplementRetrieving": {"message": "資料を検索中…"},
+  "dictSupplementChecking": {"message": "生成した内容を確認中…"},
   "dictSupplementSaving": {"message": "補足を保存中…"},
   "dictGenerationTruncated": {"message": "モデルが回答を完了する前に停止しました。結果は保存されていません。再試行するか、設定でリーダーの AI モデルを変更してください。"},
   "dictGenerationRefused": {"message": "モデルがリクエストを拒否したか、出力をブロックしました。結果は保存されていません。"},

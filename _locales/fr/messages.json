@@ -4669,6 +4669,8 @@
   "dictPanelEmpty": {"message": "Sélectionnez un mot dans l’article ou saisissez-en un ci-dessus pour le rechercher."},
   "dictLookupInPanel": {"message": "Rechercher dans le panneau latéral"},
   "dictSupplementScope": {"message": "Préciser le contexte"},
+  "dictSupplementRetrieving": {"message": "Recherche de sources…"},
+  "dictSupplementChecking": {"message": "Vérification du contenu généré…"},
   "dictSupplementSaving": {"message": "Enregistrement du complément…"},
   "dictGenerationTruncated": {"message": "Le modèle n’a pas terminé sa réponse. Le résultat n’a pas été enregistré. Réessayez ou choisissez un autre modèle d’IA pour le lecteur dans les paramètres."},
   "dictGenerationRefused": {"message": "Le modèle a refusé la demande ou bloqué la réponse. Le résultat n’a pas été enregistré."},

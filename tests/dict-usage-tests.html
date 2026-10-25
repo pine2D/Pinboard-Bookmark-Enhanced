@@ -63,6 +63,17 @@ await test('category topic policy changes model input without renaming an existi
   return true;
 });
 await test('collocations use original examples with no external lookup',async()=>{existing();const r=await pbpDictSupplementRun(request({category:'collocations'}));return r.archiveSaved&&sourceCalls.length===0&&calls.length===1;});
+await test('source-backed progress follows retrieval, generation, checking and saving without persisting callbacks',async()=>{
+  existing();const stages=[];usageResponse(d=>{d.items[0].sourceIndex=0;d.items[0].example='';});
+  const result=await pbpDictSupplementRun(request({category:'literature',onStage:stage=>stages.push(stage)}));
+  return result.archiveSaved&&stages.join(',')==='sources,generating,checking,saving'&&
+    !Object.hasOwn(appended[0],'onStage')&&!calls[0].prompt.includes('onStage');
+});
+await test('original examples skip retrieval progress and cancellation during a stage prevents a paid call',async()=>{
+  existing();const stages=[];await pbpDictSupplementRun(request({category:'grammar',onStage:stage=>stages.push(stage)}));
+  if(stages.join(',')!=='generating,checking,saving')return false;
+  reset();existing();return await rejects(()=>pbpDictSupplementRun(request({category:'grammar',onStage:()=>{live=false;}})),'stale')&&calls.length===0;
+});
 await test('basic lookup does not wait for or request etymology evidence',async()=>{
   let lookups=0;const original=pbpDictEvidenceFetch;pbpDictEvidenceFetch=async()=>{lookups++;throw new Error('Evidence unavailable');};
   try{const r=await pbpDictEntryRun(request());return r.archiveSaved&&lookups===0&&calls.length===1&&

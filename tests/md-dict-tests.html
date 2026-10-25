@@ -2266,6 +2266,11 @@ async function runDictionaryEntryUiTests() {
     originAction.focus();originAction.click();await settle();
     check("etymology uses its own category and progress beside the action",etymologyRequest.category==='etymology'&&etymologyRequest.topic===''&&evidenceGrants.length===1&&evidenceGrants[0][0]==='https://de.wiktionary.org/*'&&
       originAction.parentElement.querySelector('.xp-dict-usage-status').textContent==='dictEtymologyGenerating');
+    etymologyRequest.onStage('sources');
+    check("source retrieval progress stays at the etymology action",originAction.parentElement.querySelector('.xp-dict-usage-status').textContent==='dictSupplementRetrieving');
+    etymologyRequest.onStage('checking');
+    check("content checking keeps the same cancellation action and focus",originAction.parentElement.querySelector('.xp-dict-usage-status').textContent==='dictSupplementChecking'&&
+      document.activeElement===originAction.parentElement.querySelector('.xp-dict-usage-stop'));
     resolveUsage({...addition,id:'5'.repeat(64),category:'etymology'});await settle();
     check("completed etymology replaces its generation prompt with a focusable saved result",originAction.closest('details').hidden&&
       document.activeElement===separateOrigin.host.querySelector('[data-supplement-id] > summary')&&
@@ -2280,7 +2285,9 @@ async function runDictionaryEntryUiTests() {
       partialSection.querySelector('[data-partial-result]')?.textContent.startsWith('dictSupplementPartial')&&repairAction.textContent==='dictSupplementRepair');
     repairAction.click();await settle();
     check("repair passes the exact saved version and explicit missing-content mode",etymologyRequest.repair===true&&etymologyRequest.updateId===partial.id&&etymologyRequest.category==='collocations');
-    incomplete.ctrl.abort();resolveUsage(partial);await settle();
+    incomplete.ctrl.abort();const stoppedStatus=partialSection.textContent;etymologyRequest.onStage('saving');
+    check("stale progress callbacks cannot change an aborted view",partialSection.textContent===stoppedStatus);
+    resolveUsage(partial);await settle();
 
     // The supplement's sense index belongs to its original paid base. Use
     // interleaved parts of speech and a reordered replacement to expose both

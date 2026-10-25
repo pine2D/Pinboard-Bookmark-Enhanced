@@ -2049,7 +2049,13 @@ function _pbpDictEntryMount(host, opts) {
       const current = () => alive() && epoch === version && !controller.signal.aborted;
       const category = updating?.category || explicitCategory || kind.value;
       const request = { ...input(controller.signal, current), category, topic: updating?.profile.topic ?? (explicitCategory ? "" : effectiveTopic()),
-        updateId: updating?.id || "", repair: !!updating?.learning?.omittedItems };
+        updateId: updating?.id || "", repair: !!updating?.learning?.omittedItems,
+        onStage: stage => {
+          if (!current()) return;
+          const key = { sources: "dictSupplementRetrieving", checking: "dictSupplementChecking", saving: "dictSupplementSaving",
+            generating: category === "etymology" ? "dictEtymologyGenerating" : "dictSupplementGenerating" }[stage];
+          if (key) usageMessage(feedback, t(key), "busy");
+        } };
       if (updating) request.settings = { ...settings, dictLearnerNativeLanguage: updating.profile.nativeLanguage, dictLearnerLevel: updating.profile.level };
       const sourceOrigin = pbpDictSupplementOrigin(category, opts.lang);
       submit.disabled = true; etymologyGenerate.disabled = true; kind.disabled = true; topic.disabled = true; window.pbpListboxSync?.(kind);

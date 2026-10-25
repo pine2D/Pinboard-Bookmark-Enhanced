@@ -52,6 +52,26 @@ await test('French and Spanish genre metadata is recognized',()=>_pbpDictEvidenc
 await test('hidden maintenance and generic literature categories do not prove genre',()=>!_pbpDictEvidenceGenre([{category:'Novels',hidden:true}])&&!_pbpDictEvidenceGenre([{category:'Literature'}]));
 await test('legal or catalog categories cannot masquerade as literature',()=>!_pbpDictEvidenceGenre([{category:'Novels'},{category:'Government_reports'}])&&!_pbpDictEvidenceGenre([{category:'Lists_of_novels'}]));
 await test('verified chapter uses actual paragraphs and two-hop book metadata',async()=>{const r=await pbpDictEvidenceFetch(request());return r.length===1&&r[0].author==='Charles Dickens'&&r[0].work==='The Pickwick Papers'&&r[0].genre==='novel'&&r[0].location.startsWith('Chapter XIV')&&r[0].excerpt.includes('Comfortable provider!')&&r[0].excerpt.includes('ham');});
+await test('a chapter with its own genre still follows its parent for a missing author',async()=>{
+  const chapter=responses.pages[CHAPTER.parse.title].parse;
+  chapter.categories=[{category:'British_novels'}];chapter.text=chapter.text.replace(/<span class="contributor-text">[\s\S]*?<\/span><\/span>/,'');
+  const result=await pbpDictEvidenceFetch(request());
+  return result.length===1&&result[0].author==='Charles Dickens'&&calls.some(c=>c.url.searchParams.get('page')===VOLUME.parse.title);
+});
+await test('one unavailable search strategy does not discard a working independent search',async()=>{
+  const valid=responses.search;responses.search=query=>query.includes('intitle:')?new TypeError('fixture search unavailable'):valid;
+  const result=await pbpDictEvidenceFetch(request());return result.length===1&&result[0].genre==='novel';
+});
+await test('one unavailable candidate does not discard a later verified chapter',async()=>{
+  responses.search.query.search.unshift({ns:0,pageid:17,title:'Unavailable novel'});
+  responses.pages['Unavailable novel']=new TypeError('fixture unavailable');
+  return (await pbpDictEvidenceFetch(request())).length===1;
+});
+await test('a later retrieval failure retains already verified culture evidence',async()=>{
+  responses.pages.provider={parse:{title:'Provider',pageid:18,revid:180,categories:[],text:'<p>The expression <b>provider</b> describes a documented cultural role in this community.</p>'}};
+  responses.pages[CHAPTER.parse.title]=new TypeError('later fixture failure');
+  const result=await pbpDictEvidenceFetch(request({kind:'culture'}));return result.length===1&&result[0].revision==='180';
+});
 await test('sources keep revision-specific URLs and collection time',async()=>{const r=(await pbpDictEvidenceFetch(request()))[0];return r.url==='https://en.wikisource.org/w/index.php?oldid=13788016'&&r.revision==='13788016'&&Number.isSafeInteger(r.retrievedAt)&&r.language==='en';});
 await test('evidence carries only the declared bounded metadata fields',async()=>{const r=(await pbpDictEvidenceFetch(request()))[0];return Object.keys(r).sort().join(',')==='author,excerpt,genre,language,location,retrievedAt,revision,title,url,work'&&r.excerpt.length<=600;});
 await test('search snippets are never used as source text',async()=>{responses.search.query.search[1].snippet='FAKE provider quote';const r=await pbpDictEvidenceFetch(request());return r.length===1&&!r[0].excerpt.includes('FAKE');});
