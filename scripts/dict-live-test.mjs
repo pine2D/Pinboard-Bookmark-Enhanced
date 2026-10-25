@@ -301,6 +301,12 @@ export async function main(argv = process.argv.slice(2)) {
   const plan = buildPlan(readFileSync(resolve(configDir, "providers.env"), "utf8"));
   if (argv.includes("--rehearse")) {
     if (argv.includes("--live")) fail("conflicting_modes");
+    // Offline response replay follows today's product budget. The historical
+    // live plan and its approval limits remain unchanged and cannot be reused
+    // to authorize the larger request.
+    plan.limits = { ...plan.limits, entryOutputTokens: 8192, supplementOutputTokens: 8192 };
+    const syntheticPlan = { ...plan }; delete syntheticPlan.planHash;
+    plan.planHash = digest(syntheticPlan);
     const { entryResponse, supplementResponse } = await import("../tests/fixtures/dict-live-responses.mjs");
     const approval = { providers: Object.keys(plan.providers), cases: CASES, retryFailed: false, diagnosticOutputTokens: null };
     mkdirSync(REPORT, { recursive: true, mode: 0o700 });
