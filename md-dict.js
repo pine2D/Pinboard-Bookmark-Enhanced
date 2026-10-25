@@ -1543,6 +1543,7 @@ const PBP_DICT_GENERATION_ERROR_KEYS = Object.freeze({
 });
 function _pbpDictGenerationErrorKey(error, supplement = false) {
   if (typeof error?.code === "string" && Object.hasOwn(PBP_DICT_GENERATION_ERROR_KEYS, error.code)) return PBP_DICT_GENERATION_ERROR_KEYS[error.code];
+  if (error?.status === 401) return "trErrKey";
   if (error?.status === 402) return "dictGenerationBilling";
   return supplement ? "dictSupplementUnavailable" : "dictEntryUnavailable";
 }
@@ -2190,7 +2191,7 @@ function _pbpDictEntryMount(host, opts) {
       lastRelevant = sequence;
       const revision = ++epoch; active?.abort(); active = null; busy = false; generate.disabled = true;
       try {
-        const next = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
+        const next = deobfuscateSettings(await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS));
         if (alive() && epoch === revision) opts.onSettingsChange(next);
       } catch (error) {
         console.warn("[dict-entry] settings refresh failed:", error?.name);

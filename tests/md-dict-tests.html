@@ -2038,7 +2038,8 @@ async function runDictionaryEntryUiTests() {
         [{code:"output_refused"},"dictGenerationRefused"],
         [{code:"empty_response"},"dictGenerationEmpty"],
         [{code:"model_not_found"},"dictGenerationModelUnavailable"],
-        [{status:402},"dictGenerationBilling"]
+        [{status:402},"dictGenerationBilling"],
+        [{status:401},"trErrKey"]
       ]) check(label+" gives specific recovery guidance through the mounted UI: "+key,await attempt(properties)===key);
       const retained=[];
       for(const [code,key] of [
@@ -2051,7 +2052,7 @@ async function runDictionaryEntryUiTests() {
       retained.push(await attempt({code:"owner_changed",status:402})==="vocabAccountChanged");
       check(label+" preserves owner, permission, sync, language, validation and source recovery branches",retained.every(Boolean));
       const ambiguous=[];
-      for(const properties of [{status:"402"},{code:secret},{code:{},status:401}]) ambiguous.push(await attempt(properties)===fallback);
+      for(const properties of [{status:"402"},{status:"401"},{code:secret},{code:{}}]) ambiguous.push(await attempt(properties)===fallback);
       check(label+" does not infer billing or expose raw text from malformed or unrelated errors",ambiguous.every(Boolean)&&!getMessage().textContent.includes(secret));
     } finally {window[runName]=originalRun;}
   };
@@ -2360,7 +2361,7 @@ async function runDictionaryEntryUiTests() {
 
 async function runDictionaryEntrySettingsTests() {
   section("Dictionary entry settings routing and concurrent updates");
-  const names=["chrome","pbpSettingsAreaName","pbpReadSecretSyncState","pbpSecretRoutingActive","API_KEY_FIELDS","pbpReadSettingsWithSecrets","SETTINGS_DEFAULTS","hasAIKey","pbpDictEntryRead"];
+  const names=["chrome","pbpSettingsAreaName","deobfuscateSettings","pbpReadSecretSyncState","pbpSecretRoutingActive","API_KEY_FIELDS","pbpReadSettingsWithSecrets","SETTINGS_DEFAULTS","hasAIKey","pbpDictEntryRead"];
   const saved=new Map(names.map(name=>[name,window[name]]));
   const listeners=[],fixtures=[];
   const settle=async()=>{for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout(resolve,0));};
@@ -2372,6 +2373,7 @@ async function runDictionaryEntrySettingsTests() {
   try {
     window.chrome={storage:{onChanged:{addListener:listener=>listeners.push(listener),removeListener:()=>{}}}};
     window.pbpSettingsAreaName=async()=>"sync";
+    window.deobfuscateSettings=settings=>settings; // This suite uses decoded fixtures; dict-settings tests the real storage boundary.
     window.pbpReadSecretSyncState=async()=>({optSyncEnabled:true,syncApiKeys:false});
     window.pbpSecretRoutingActive=(enabled,keys)=>!!enabled&&!keys;
     window.API_KEY_FIELDS=["openaiApiKey"];
