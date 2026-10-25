@@ -137,8 +137,9 @@
     // shrink-to-fit the width being measured.
     s.left = "0px";
     s.top = "0px";
-    s.minWidth = `${Math.round(a.width)}px`;
-    s.maxWidth = `${Math.max(0, vw - 2 * PLACE_EDGE)}px`;
+    const maxWidth = Math.max(0, Math.min(vw - 2 * PLACE_EDGE, pop.dataset.layout === "meaning" ? 640 : Infinity));
+    s.minWidth = `${Math.min(Math.round(a.width), maxWidth)}px`;
+    s.maxWidth = `${maxWidth}px`;
     s.removeProperty("--listbox-room");
     const natural = pop.getBoundingClientRect().height;
     const below = Math.max(0, vh - a.bottom - PLACE_OFFSET - PLACE_EDGE);
@@ -260,7 +261,22 @@
       li.id = `${select.id}-opt-${i}`;
       li.dataset.value = opts[i].value;
       const text = optionText(opts[i]);
-      if (li.textContent !== text) li.textContent = text;
+      if (state.meaning && opts[i].dataset.meaningText) {
+        // Keep the full accessible name/value; only the visual preview is
+        // clamped. Source names remain visible even for book-length entries.
+        const meaning = opts[i].dataset.meaningText, source = opts[i].dataset.meaningSource || "";
+        if (li.dataset.preview !== meaning || li.dataset.source !== source) {
+          const body = document.createElement("span"); body.className = "listbox-option-text"; body.textContent = meaning;
+          const meta = document.createElement("span"); meta.className = "listbox-option-meta"; meta.textContent = source;
+          li.replaceChildren(body, meta); li.dataset.preview = meaning; li.dataset.source = source;
+        }
+        li.setAttribute("aria-label", text); li.title = text;
+      } else {
+        if (li.textContent !== text) li.textContent = text;
+        li.removeAttribute("aria-label"); li.removeAttribute("title");
+        delete li.dataset.preview; delete li.dataset.source;
+      }
+      if (opts[i].lang) li.lang = opts[i].lang; else li.removeAttribute("lang");
       li.setAttribute("aria-selected", i === select.selectedIndex ? "true" : "false");
       if (opts[i].disabled) li.setAttribute("aria-disabled", "true");
       else li.removeAttribute("aria-disabled");
@@ -271,7 +287,8 @@
       state.value.textContent = optionText(select.selectedOptions[0]);
       let longest = "";
       for (const opt of opts) { const text = optionText(opt); if (text.length > longest.length) longest = text; }
-      if (state.sizer.textContent !== longest) state.sizer.textContent = longest;
+      if (state.sizer.textContent !== longest) state.sizer.textContent = state.meaning ? "" : longest;
+      if (state.meaning) state.btn.title = optionText(select.selectedOptions[0]);
     }
     state.btn.disabled = select.disabled;
     if (!state.pop.hidden) setActive(state, Math.min(state.active, opts.length - 1));
@@ -439,6 +456,7 @@
     const id = select.id;
     const float = select.getAttribute("data-listbox") === "float";
     const ghost = select.getAttribute("data-listbox-face") === "ghost";
+    const meaning = select.getAttribute("data-listbox-layout") === "meaning";
 
     const root = document.createElement("div");
     root.className = "listbox";
@@ -469,6 +487,7 @@
     }
     const pop = document.createElement("div");
     pop.className = "listbox-pop";
+    if (meaning) pop.dataset.layout = "meaning";
     pop.hidden = true;
     if (float) pop.setAttribute("popover", "manual");
     const list = document.createElement("ul");
@@ -499,7 +518,7 @@
     if (label) label.htmlFor = btn.id;
 
     const state = {
-      select, root, btn, pop, list, value, sizer, float, ghost, face: "", items: [], groups: [], shape: null,
+      select, root, btn, pop, list, value, sizer, float, ghost, meaning, face: "", items: [], groups: [], shape: null,
       active: -1, typed: "", typedTimer: 0, outside: null, onResize: null, onScroll: null, anchorRect: null,
     };
     state.outside = (ev) => onOutside(state, ev);

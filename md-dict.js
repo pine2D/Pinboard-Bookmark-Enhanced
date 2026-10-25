@@ -2083,6 +2083,11 @@ function _pbpDictSyncMeaningSelect(cur) {
   select.replaceChildren(new Option(t("vocabSaveDefinitionLabel"), ""));
   rows.forEach((choice, index) => {
     const option = new Option(choice.term + " · " + choice.gloss + " (" + choice.sourceLabel + ")", String(index));
+    const label = option.textContent;
+    const body = document.createElement("span"); body.className = "xp-dict-choice-text"; body.textContent = choice.term + " · " + choice.gloss;
+    const source = document.createElement("span"); source.className = "xp-dict-choice-source"; source.textContent = " (" + choice.sourceLabel + ")";
+    option.replaceChildren(body, source);
+    option.title = label; option.setAttribute("aria-label", label);
     option.lang = choice.definitionLang; select.appendChild(option);
   });
   const selected = rows.findIndex(choice => choice.term === cur.term && choice.gloss === cur.gloss &&

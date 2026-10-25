@@ -2368,14 +2368,26 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-dict-ai { min-width: 0; overflow-wrap: anywhere; }
 .xp-dict-ai-controls { flex: none; flex-wrap: nowrap; gap: var(--sp-1); margin-inline-start: auto; }
 .xp-dict-ai-controls[hidden] { display: none; }
-.xp-dict-ai-controls .xp-dict-connect { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 26px; box-sizing: border-box; padding: 0; border-color: transparent; background: none; color: var(--link); }
+.xp-dict-ai-controls .xp-dict-connect { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 26px; box-sizing: border-box; padding: 0; border-color: var(--btn-border); background: var(--btn-bg); color: var(--btn-fg); }
 .xp-dict-ai-controls .xp-dict-connect:hover { background: var(--btn-hover); color: var(--link-on-raised); }
 .xp-dict-ai-controls .xp-dict-connect:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .xp-dict-ai-controls .xp-dict-connect svg { width: 14px; height: 14px; flex: none; }
 .xp-dict-ai-status, .xp-dict-ai-configure { font-size: 12px; line-height: 18px; }
 .xp-dict-ai-status { margin-bottom: var(--sp-2); }
 .xp-dict-ai-details { margin-top: var(--sp-2); }
-.xp-dict-ai-details > summary { cursor: pointer; color: var(--link); font-size: 12px; line-height: 18px; min-height: 26px; padding: var(--sp-1) 0; box-sizing: border-box; }
+.xp-dict-ai-details > summary {
+  display: flex; align-items: center; gap: var(--sp-2); list-style: none; cursor: pointer;
+  color: var(--fg-secondary); font-size: 12px; line-height: 18px; min-height: 26px;
+  padding: var(--sp-1) var(--sp-2); border-radius: var(--radius-md); box-sizing: border-box;
+}
+.xp-dict-ai-details > summary::-webkit-details-marker { display: none; }
+.xp-dict-ai-details > summary::after {
+  content: ""; width: 5px; height: 5px; flex: none; margin-inline-start: auto;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  color: var(--fg-muted); transform: translateY(-1px) rotate(45deg);
+}
+.xp-dict-ai-details[open] > summary::after { transform: translateY(1px) rotate(225deg); }
+.xp-dict-ai-details > summary:hover { color: var(--fg); background: var(--btn-hover); }
 .xp-dict-ai-details > summary:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .xp-dict-ai-details > p { margin: var(--sp-2) 0 0; }
 .xp-dict-ai-details > .xp-dict-src { font-size: 11px; }
@@ -2396,6 +2408,15 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-dict-lang selectedcontent { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .xp-dict-lang::picker(select) { max-width: calc(100vw - 32px); white-space: normal; }
 .xp-dict-lang option { white-space: normal; overflow-wrap: anywhere; }
+/* A full-entry glossary can be much longer than a definition. Keep the menu
+   near the lookup bubble, with a bounded preview and a visible source. */
+.xp-dict-save-meaning::picker(select) { width: min(420px, calc(100vw - 32px)); min-width: 0; box-sizing: border-box; }
+.xp-dict-save-meaning option { display: block; line-height: 18px; }
+.xp-dict-choice-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; white-space: normal; overflow-wrap: anywhere; }
+.xp-dict-choice-source { display: block; margin-top: var(--sp-1); font-size: 11px; color: var(--fg-muted); }
+.xp-dict-save-meaning option:checked .xp-dict-choice-source { color: inherit; }
+.xp-dict-save-meaning selectedcontent .xp-dict-choice-text { display: inline; white-space: nowrap; }
+.xp-dict-save-meaning selectedcontent .xp-dict-choice-source { display: none; }
 .xp-dict-origin { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); font-size: 12px; line-height: 18px; margin-bottom: var(--sp-2); color: var(--fg-muted); }
 .xp-dict-origin-term { min-width: 0; overflow-wrap: anywhere; }
 

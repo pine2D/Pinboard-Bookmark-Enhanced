@@ -375,7 +375,9 @@
         "xp-dict-ai-switch",
         "xp-dict-ai-stop",
         "xp-dict-ai-configure",
-        "xp-dict-ai-status"
+        "xp-dict-ai-status",
+        "listbox-option-text",
+        "listbox-option-meta"
       ],
       "canvasStructures": [
         "lib-header",
@@ -421,7 +423,9 @@
         "listbox-pop",
         "listbox-sizer",
         "listbox-trigger",
-        "listbox-value"
+        "listbox-value",
+        "listbox-option-text",
+        "listbox-option-meta"
       ]
     },
     "md-preview": {
@@ -624,7 +628,9 @@
         "xp-dict-ai-switch",
         "xp-dict-ai-stop",
         "xp-dict-ai-configure",
-        "xp-dict-ai-status"
+        "xp-dict-ai-status",
+        "xp-dict-choice-text",
+        "xp-dict-choice-source"
       ]
     },
     "shared": {

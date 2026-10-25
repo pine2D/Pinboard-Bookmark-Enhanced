@@ -2004,10 +2004,12 @@ html.motion-ready .vocab-note-save {
 .vocab-ref-term { min-width: 0; font-size: 20px; line-height: 28px; font-weight: 700; color: var(--lib-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vocab-ref-speak { flex: none; }
 .vocab-ref-head > .vocab-lookup-saved { margin-inline-start: auto; }
-.vocab-ref-foot { margin-top: var(--lib-sp-1); }
-.vocab-save-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--lib-sp-2); margin-top: var(--lib-sp-3); }
-.vocab-save-controls > .listbox { flex: 1 1 240px; min-width: 0; max-width: 100%; }
-.vocab-save-controls > .save-status { flex-basis: 100%; }
+.vocab-ref-foot { display: flex; align-items: flex-start; gap: var(--lib-sp-2); margin-top: var(--lib-sp-3); }
+.vocab-save-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; flex: 1 1 0; min-width: 0; align-items: center; gap: var(--lib-sp-2); }
+.vocab-save-controls > .listbox { min-width: 0; max-width: 100%; }
+.vocab-save-controls > .save-status { grid-column: 1 / -1; }
+.vocab-save-controls > .save-status:empty { display: none; }
+.vocab-ref-relookup { flex: none; width: var(--lib-control-h); padding: 0; }
 .vocab-lemma-hint, .vocab-hidden-word { margin-top: var(--lib-sp-2); }
 .vocab-word-family { display: flex; flex-wrap: wrap; gap: var(--lib-sp-1); margin-top: var(--lib-sp-2); }
 /* The library has a longer reading column than the lookup bubble: definitions
@@ -2141,8 +2143,9 @@ html.motion-ready .vocab-note-save {
 #vocab-ref .xp-dict-ai-controls .xp-dict-connect {
   display: inline-flex; flex: none; align-items: center; justify-content: center;
   margin: 0; padding: 0;
-  width: calc(var(--lib-control-h) - 4px); height: calc(var(--lib-control-h) - 4px);
-  border-color: transparent; background: transparent;
+  width: var(--lib-control-h); height: var(--lib-control-h);
+  border: 1px solid var(--lib-btn-border); border-radius: var(--lib-radius-md);
+  background: var(--lib-btn-bg); color: var(--lib-btn-fg);
 }
 #vocab-ref .xp-dict-ai-controls .xp-dict-connect:hover:not(:disabled) { background: var(--lib-btn-hover); }
 #vocab-ref .xp-dict-ai-controls .xp-dict-connect:focus-visible { border-color: var(--lib-focus-bd); box-shadow: var(--lib-focus-ring); }
@@ -2155,9 +2158,19 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-ai-status:not(:empty) { margin-bottom: var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-ai-details { max-inline-size: 64ch; margin-top: var(--lib-sp-4); font-size: 14px; line-height: 23px; }
 #vocab-ref-result .xp-dict-ai-details > summary {
-  min-height: calc(var(--lib-control-h) - 4px); font-size: calc(var(--lib-text-body) - 1px);
-  line-height: calc(var(--lib-control-h) - 4px); cursor: pointer; color: var(--lib-link);
+  display: flex; align-items: center; gap: var(--lib-sp-2); list-style: none;
+  min-height: var(--lib-control-h); font-size: calc(var(--lib-text-body) - 1px);
+  line-height: 20px; cursor: pointer; color: var(--lib-fg-muted);
+  padding: var(--lib-sp-1) var(--lib-sp-2); box-sizing: border-box; border-radius: var(--lib-radius-md);
 }
+#vocab-ref-result .xp-dict-ai-details > summary::-webkit-details-marker { display: none; }
+#vocab-ref-result .xp-dict-ai-details > summary::after {
+  content: ""; width: 7px; height: 7px; flex: none; margin-inline-start: auto;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+#vocab-ref-result .xp-dict-ai-details[open] > summary::after { transform: translateY(1px) rotate(225deg); }
+#vocab-ref-result .xp-dict-ai-details > summary:hover { color: var(--lib-fg); background: var(--lib-btn-hover); }
 #vocab-ref-result .xp-dict-ai-details > summary:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
 #vocab-ref-result .xp-dict-ai-details p { margin: var(--lib-sp-2) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 #vocab-ref-result .xp-dict-ai-details .xp-dict-src { margin-top: var(--lib-sp-3); }
@@ -3173,6 +3186,17 @@ select[data-listbox] { height: var(--lib-control-h); box-sizing: border-box; }
 .listbox-opt[data-active] { background: var(--lib-btn-hover); color: var(--lib-btn-fg); }
 .listbox-opt[aria-selected="true"] { background: var(--lib-accent); color: var(--lib-on-accent); }
 .listbox-opt[aria-disabled="true"] { color: var(--lib-fg-hint); cursor: default; }
+/* Only the saved-meaning picker uses prose-sized options. Regular settings,
+   languages and group menus retain their compact single-line geometry. */
+.listbox-pop[data-layout="meaning"] { box-sizing: border-box; }
+.listbox-pop[data-layout="meaning"] .listbox-opt {
+  height: auto; min-height: var(--lib-control-h); line-height: 20px;
+  padding: var(--lib-sp-2) var(--lib-sp-3); white-space: normal; overflow-wrap: anywhere;
+}
+.listbox-option-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+.listbox-option-meta { display: block; margin-top: var(--lib-sp-1); font-size: var(--lib-text-meta); color: var(--lib-fg-muted); }
+.listbox-opt[aria-selected="true"] > .listbox-option-meta,
+.listbox-opt[data-active] > .listbox-option-meta { color: inherit; }
 /* <optgroup> (listbox.js): same shape as options.css's group label. */
 .listbox-optgroup > ul { margin: 0; padding: 0; list-style: none; }
 .listbox-optgroup-label { padding: var(--lib-sp-2) var(--lib-sp-3) var(--lib-sp-1); font-size: var(--lib-text-meta); line-height: var(--lib-lh-meta); font-weight: 600; color: var(--lib-fg-hint); cursor: default; }

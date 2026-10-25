@@ -527,8 +527,8 @@ window.__pbpEn = ${JSON.stringify(en).replace(/</g, "\\u003c")};
     });
   };
   window.chrome = {
-    runtime: { id: "library-listbox-tests", lastError: undefined, getURL: (p) => new URL(p, document.baseURI).href, getManifest: () => ({ version: "0.0.0" }), sendMessage: () => Promise.resolve(undefined), onMessage: { addListener() {} } },
-    storage: { local: area, sync: area, session: area, onChanged: { addListener() {} } },
+    runtime: { id: "library-listbox-tests", lastError: undefined, getURL: (p) => new URL(p, document.baseURI).href, getManifest: () => ({ version: "0.0.0" }), sendMessage: () => Promise.resolve(undefined), onMessage: { addListener() {}, removeListener() {} } },
+    storage: { local: area, sync: area, session: area, onChanged: { addListener() {}, removeListener() {} } },
     permissions: { contains: () => Promise.resolve(false), request: () => Promise.resolve(false) },
     i18n: { getMessage, getUILanguage: () => "en" },
   };
@@ -1140,6 +1140,37 @@ async function libraryPageAutoLookupLangCases() {
   }
 }
 
+// Long dictionary entries exercise the real library CSS and generic listbox
+// consumer contract. The fixture text is deliberately not a normal short
+// definition: imported dictionaries can include a whole structured article.
+async function libraryPageMeaningCases() {
+  const { frame, win, doc } = await loadLibraryFrame({ width: 1800, height: 900 });
+  try {
+    const booted = await libWaitFor(win, () => win.eval("_vocabCurrentOwner") === "acct_listboxtest");
+    check("meaning picker: actual library scripts and CSS load", booted && win.__bootErrors.length === 0, win.__bootErrors.join(" | "));
+    const select = doc.createElement("select"); select.id = "meaning-probe"; select.dataset.listbox = "float"; select.dataset.listboxLayout = "meaning";
+    select.setAttribute("aria-label", "Meaning to save");
+    const long = "詞源 · στρατηγικός — ".repeat(160) + "最後一段 / final segment";
+    const opt = new win.Option(long + " (Wiktionary | Kaikki)", "long");
+    opt.dataset.meaningText = long; opt.dataset.meaningSource = "Wiktionary | Kaikki"; opt.lang = "zh-Hant";
+    select.append(new win.Option("A short definition", "short"), opt, new win.Option("Another meaning", "last"));
+    doc.body.appendChild(select); win.pbpEnhanceListbox(select);
+    const wrapper = select.nextElementSibling, button = wrapper.querySelector("button"), pop = wrapper.querySelector(".listbox-pop");
+    wrapper.style.cssText = "position:fixed;left:16px;top:80px;width:900px;max-width:calc(100vw - 32px)";
+    for (const width of [1800, 360]) {
+      frame.style.width = width + "px"; await libFrames(win); button.click(); await libFrames(win);
+      const bounds = pop.getBoundingClientRect(), item = pop.querySelector('[data-value="long"]'), text = item.querySelector(".listbox-option-text");
+      check(`meaning picker ${width}: content cannot expand the menu beyond 640px or the viewport`, bounds.width <= Math.min(640, width - 16) + 1 && bounds.left >= 7 && bounds.right <= width - 7, JSON.stringify(bounds));
+      check(`meaning picker ${width}: preview wraps at four lines while preserving the full accessible text`, text.getBoundingClientRect().height <= 81 && text.scrollHeight > text.clientHeight && item.getAttribute("aria-label") === opt.textContent && item.title.includes("final segment"));
+      check(`meaning picker ${width}: source remains visible below the long preview`, item.querySelector(".listbox-option-meta").textContent === "Wiktionary | Kaikki" && item.lang === "zh-Hant" && item.scrollWidth <= item.clientWidth + 1);
+      button.dispatchEvent(new win.KeyboardEvent("keydown", {key:"Escape",bubbles:true}));
+    }
+    button.click(); button.dispatchEvent(new win.KeyboardEvent("keydown", {key:"ArrowDown",bubbles:true}));
+    button.dispatchEvent(new win.KeyboardEvent("keydown", {key:"Enter",bubbles:true}));
+    check("meaning picker: keyboard selection retains the complete value and closes normally", select.value === "long" && select.selectedOptions[0].textContent.includes("final segment") && button.getAttribute("aria-expanded") === "false" && button.title === opt.textContent);
+  } finally { frame.remove(); }
+}
+
 // ---- Main flow (last thing in this script). A setup error that escapes a
 // suite becomes one failed row; the row count then falls short and
 // run-test.mjs reports the stall, which is the red it should be.
@@ -1157,6 +1188,7 @@ async function libraryPageAutoLookupLangCases() {
     await libraryPageDetailLocaleCases();
     await libraryPageRefTierCases();
     await libraryPageAutoLookupLangCases();
+    await libraryPageMeaningCases();
   } catch (error) {
     report("suite setup", error);
   }

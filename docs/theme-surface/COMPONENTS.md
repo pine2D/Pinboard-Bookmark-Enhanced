@@ -1579,7 +1579,8 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 
 | 表面 | 原语 | 契约（拥有的几何） |
 |---|---|---|
-| library / md-preview | `.xp-dict-ai` / `.xp-dict-ai-controls` / `.xp-dict-ai-content` / `.xp-dict-ai-details` | AI 词条与普通词典共用主视图；动作挂在既有标题/查询栏，固定单排纯图标、gap sp-1、title 与 aria-label 同步。生成用 filePen，与解释 robot 区分；来源切换 arrowRightLeft，停止 stop，配置 gear。reader 26px、library sm 阶，隐藏整组须明确 display:none。无面板底色、边框或阴影；详情前距 sp-4。 |
+| library / md-preview | `.xp-dict-ai` / `.xp-dict-ai-controls` / `.xp-dict-ai-content` / `.xp-dict-ai-details` | AI 词条与普通词典共用主视图；动作挂在既有标题/查询栏，固定单排纯图标、gap sp-1、title 与 aria-label 同步。生成用 wandSparkles，查看已有 AI 词条用 sparkles，普通词典用 bookOpenText；停止 stop，配置 gear。reader 26px、library md 阶，与相邻按钮共用底色/边框，隐藏整组须明确 display:none。详情使用右侧细 chevron、整行 hover/focus，保持原生 details 键盘语义；无面板底色、边框或阴影。 |
+| library / md-preview | `.listbox-option-text` / `.listbox-option-meta`、`.xp-dict-choice-text` / `.xp-dict-choice-source` | 保存释义菜单专用预览：正文最多 4 行，来源独占次级文字一行；完整文本保留为可访问名称及 title，保存数据不截断。library `data-listbox-layout="meaning"` 才启用多行，浮层最大 640px 并受视口约束；reader picker 最大 420px。闭合字段单行省略，普通设置/语言菜单不受影响。 |
 | md-preview | `.xp-dict-query-tools` | 语言与朗读同排、gap sp-2，随可用宽度收缩；语言闭合面 selectedcontent 单行省略，展开选项完整换行。AI 图标组不收缩、不换行。保存含义选择位于 footer，闭合面沿用同一裁切规则。 |
 | library | `.vocab-lookup-actions` | 既有查词按钮与 AI 图标保持一个不可拆的单排组，gap sp-2；不另起短按钮行。自由查词的词头行固定单排，词头可省略；保存词条模式复用查询栏，不重复词头。 |
 | library / md-preview | `.xp-dict-example-pair` / `.xp-dict-packs` / `.xp-dict-legacy` | 例句与译句成组，组间 sp-2、译句前距最小间距档；来源按包、本地旧包、在线排序，非首个非空来源以短虚点线和留白分隔。reader 线色为 fg-muted 70% 与 border 的暖灰混色，浅深两色均须在 surface 上达到 3:1；library 使用主题生成的 lib-border。library 正文 15/25px、例句 14/22px、译句 13/21px、行宽最多 64ch；reader 正文随阅读字号缩放，行高 1.55，例句/译句分别为正文的 .88/.82。 |

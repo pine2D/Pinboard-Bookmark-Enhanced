@@ -1198,17 +1198,19 @@ function _pbpVocabAcceptLookupResult(state, source, norm) {
     definition.className = "vocab-save-definition";
     definition.id = "vocab-save-definition";
     definition.dataset.listbox = "float";
+    definition.dataset.listboxLayout = "meaning";
     definition.setAttribute("aria-label", t("vocabSaveDefinitionLabel"));
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "btn btn-sm vocab-lookup-save";
+    button.className = "btn vocab-lookup-save";
     const feedback = document.createElement("span");
     feedback.className = "save-status";
     feedback.setAttribute("role", "status");
     feedback.setAttribute("aria-live", "polite");
     panel.append(label, definition, button, feedback);
     Object.assign(state, { panel, select: definition, button, feedback });
-    state.host.insertBefore(panel, state.host.querySelector(".vocab-ref-foot"));
+    const foot = state.host.querySelector(".vocab-ref-foot");
+    if (foot) foot.prepend(panel); else state.host.appendChild(panel);
     definition.addEventListener("change", () => {
       state.manualChoice = _pbpVocabLookupChoiceIdentity(state.choices.get(definition.value));
       state.choiceRevoked = !state.manualChoice;
@@ -1224,6 +1226,8 @@ function _pbpVocabAcceptLookupResult(state, source, norm) {
       const key = `${kind}:${index}`;
       state.choices.set(key, choice);
       const option = new Option(`${choice.term} · ${choice.gloss} (${choice.sourceLabel})`, key);
+      option.dataset.meaningText = `${choice.term} · ${choice.gloss}`;
+      option.dataset.meaningSource = choice.sourceLabel;
       option.lang = choice.definitionLang;
       state.select.appendChild(option);
     });
@@ -1639,15 +1643,15 @@ function _pbpVocabRefSlot() {
   onlineEl.className = "xp-dict-online";
   slot.append(localEl, onlineEl);
   wrap.appendChild(slot);
-  // "Look up again" gets its own line under md-dict's source line (spec §4.9,
-  // V18): the source line is md-dict's node, and this file never inserts into
-  // md-dict's nodes. `refresh` = re-run the same action (icon contract).
+  // Save controls join this footer when a result arrives. Retry stays at the
+  // end of that same row, including empty/error results without a save choice.
   const foot = document.createElement("div");
   foot.className = "vocab-ref-foot";
   const again = document.createElement("button");
   again.type = "button";
-  again.className = "btn btn-sm ghost vocab-ref-relookup lib-hang-start";
-  setBtnIcon(again, "refresh", t("libraryRelookup"));
+  again.className = "btn vocab-ref-relookup";
+  setBtnIcon(again, "refresh", "");
+  again.title = t("libraryRelookup"); again.setAttribute("aria-label", t("libraryRelookup"));
   again.addEventListener("click", () => {
     if (host && host.dataset.refState === "other") {
       const cur = _pbpDictCurrent;
