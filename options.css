@@ -1040,15 +1040,17 @@ html[data-theme] .panel-foot a { color: var(--opt-fg-hint, var(--opt-fg-muted));
   font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace;
   font-size: 11px;
 }
-/* An unbound command: the kbd chip's footprint in --opt-warn ink (AA on the
-   panel in every preset) with a currentColor outline, no fill. */
+/* An unbound shortcut is a quiet status, not a key cap or warning. Use the
+   existing AA-audited neutral fill/text pair across presets and density tiers. */
 .shortcut-current .shortcut-unset {
-  display: inline-block;
-  padding: 1px var(--opt-sp-3);
-  border: 1px solid currentColor;
-  border-radius: var(--opt-radius-sm);
-  color: var(--opt-warn);
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  padding: var(--opt-sp-1) var(--opt-sp-4);
+  border-radius: var(--opt-radius-md);
+  background: var(--opt-btn-bg);
+  color: var(--opt-btn-fg);
+  font-size: var(--opt-text-helper);
+  line-height: var(--opt-lh-helper);
 }
 .hint-warn::before {
   content: "";

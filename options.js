@@ -1648,11 +1648,30 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Deep-link: options.html#<panel> activates that tab on load and when a
   // reused options tab is retargeted to a different hash.
+  let _learnerProfilePending = false;
+  function _focusLearnerProfile() {
+    if (!_learnerProfilePending || document.documentElement.dataset.optionsReady !== "1") return;
+    _learnerProfilePending = false;
+    requestAnimationFrame(() => {
+      if (location.hash !== "#vocab-learning") return;
+      const nativeLanguage = $id("dict-learner-native-language");
+      if (!nativeLanguage || !$id("panel-vocab")?.classList.contains("active")) return;
+      nativeLanguage.closest(".fg").scrollIntoView({ block: "center", behavior: "instant" });
+      nativeLanguage.focus({ preventScroll: true });
+    });
+  }
   function _activateHashPanel() {
     const _hashPanel = (location.hash || "").replace(/^#/, "");
     if (!_hashPanel) return;
-    const _dlBtn = document.querySelector(`.tab-btn[data-panel="${_hashPanel}"]`);
-    if (_dlBtn) _dlBtn.click();
+    const learningProfile = _hashPanel === "vocab-learning";
+    const _dlBtn = [..._tabBtns].find(btn => btn.dataset.panel === (learningProfile ? "vocab" : _hashPanel));
+    if (!_dlBtn) return;
+    _dlBtn.click();
+    if (learningProfile) {
+      history.replaceState(null, "", "#vocab-learning");
+      _learnerProfilePending = true;
+      _focusLearnerProfile();
+    }
   }
   _activateHashPanel();
   window.addEventListener("hashchange", _activateHashPanel);
@@ -3296,6 +3315,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   applyOptionsPageTheme(currentPresetKey, s.optTheme);
   pbpStoreOptionsThemeMirror(s.optTheme, currentPresetKey, s.optPopupFollowTheme !== false);
   document.documentElement.dataset.optionsReady = "1";
+  _focusLearnerProfile();
   $id("opt-popup-follow-theme").addEventListener("change", () => {
     applyOptionsPageTheme(currentPresetKey, $id("opt-theme").value);
   });
@@ -4499,9 +4519,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         kbd.textContent = sc;
         slot.appendChild(kbd);
       } else {
-        // Same chip footprint as a bound key, in warning ink: an unbound
-        // command was plain grey text next to its neighbours' key chips and
-        // read as a caption rather than as "this does nothing yet".
+        // Keep a missing binding as neutral status text. Only actual keyboard
+        // input belongs in <kbd>; configuring it remains the adjacent action.
         const unset = document.createElement("span");
         unset.className = "shortcut-unset";
         unset.textContent = t("mdShortcutUnset");
