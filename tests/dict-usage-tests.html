@@ -164,7 +164,7 @@ await test('empty required text, oversized text and nonstring text retain strict
   return true;
 });
 await test('source indices retain integer and retrieved-source bounds',async()=>{
-  for(const sourceIndex of [-2,-0.5,'-01',null,0]){
+  for(const sourceIndex of [-2,-0.5,'-01',false,0]){
     reset();existing();usageResponse(d=>{d.items[0].sourceIndex=sourceIndex;});
     try{await pbpDictSupplementRun(request({category:'collocations'}));return false;}
     catch(e){if(e.reason!=='supplement_source_index'||calls.length!==1||appended.length)return false;}
@@ -226,9 +226,9 @@ await test('literary normalization never supplies missing translations or fixes 
   }
   return true;
 });
-await test('supplement identity core prose items and references cannot be defaulted',async()=>{
+await test('supplement identity core prose and sense references cannot be defaulted',async()=>{
   const mutations=[d=>{delete d.language;},d=>{d.language=null;},d=>{delete d.items;},d=>{d.items=null;},
-    ...['sense','sourceIndex','title','explanation'].flatMap(key=>[d=>{delete d.items[0][key];},d=>{d.items[0][key]=null;}])];
+    ...['sense','title','explanation'].flatMap(key=>[d=>{delete d.items[0][key];},d=>{d.items[0][key]=null;}])];
   for(const mutate of mutations){reset();existing();usageResponse(d=>{d.summary=null;mutate(d);});
     try{await pbpDictSupplementRun(request({category:'grammar'}));return false;}catch(e){if(!['invalid_response','wrong_language'].includes(e.code)||appended.length||calls.length!==1)return false;}}
   return true;
@@ -252,9 +252,32 @@ await test('supplement normalization cannot bypass raw response size or repair t
   }
   return true;
 });
-await test('supplement prompt states the existing aggregate limit and retains its token budget',async()=>{
+await test('supplement retains content bounds with the same bounded complete-answer policy as entries',async()=>{
   existing();await pbpDictSupplementRun(request({category:'collocations'}));
-  return calls[0].prompt.includes('12000')&&calls[0].prompt.includes('including separators')&&calls[0].options.maxTokens===2048;
+  return calls[0].prompt.includes('12000')&&calls[0].prompt.includes('including separators')&&calls[0].options.maxTokens===8192&&calls[0].options.timeoutMs===60000&&calls[0].options.totalOutputBudget===true&&calls[0].options.reasoningEffort==='low';
+});
+await test('original learning categories derive only the missing no-source marker',async()=>{
+  for(const category of ['collocations','confusables','register','grammar','scenarios']){
+    for(const missing of [undefined,null]){
+      reset();existing();usageResponse(d=>{d.items[0].sourceIndex=missing;});
+      const result=await pbpDictSupplementRun(request({category}));
+      const prompt=calls[0].prompt,input=JSON.parse(prompt.split('\n').at(-1));
+      if(result.learning.items[0].sourceIndex!==-1||!result.archiveSaved||input.category!==category||input.sources.length||prompt.includes('"sourceIndex":integer'))return false;
+    }
+  }
+  return true;
+});
+await test('omitting a source index never permits a fabricated citation or an ungrounded source task',async()=>{
+  for(const [category,index]of [['grammar',0],['grammar',1],['culture',undefined],['literature',null]]){
+    reset();existing();usageResponse(d=>{d.items[0].sourceIndex=index;});
+    if(!await rejects(()=>pbpDictSupplementRun(request({category})),'invalid_response')||appended.length)return false;
+  }
+  return true;
+});
+await test('literature prompt has one category and a source-bounded item limit without original examples',async()=>{
+  existing();usageResponse(d=>{d.items[0].sourceIndex=0;d.items[0].example='';});
+  await pbpDictSupplementRun(request({category:'literature'}));const prompt=calls[0].prompt;
+  return JSON.parse(prompt.split('\n').at(-1)).category==='literature'&&prompt.includes('at most 1 items')&&!prompt.includes('at most5')&&!prompt.includes('sourceIndex=-1')&&prompt.includes('Do not add other supplement categories');
 });
 await test('source-backed tasks label each source index explicitly without mutating stored evidence',async()=>{
  for(const category of ['culture','literature']){
@@ -264,6 +287,17 @@ await test('source-backed tasks label each source index explicitly without mutat
   if(input.sources[0].sourceIndex!==0||Object.hasOwn(result.sources[0],'sourceIndex')||calls.length!==1)return false;
  }
  return true;
+});
+await test('supplement schemas separate original examples from bounded evidence indices',async()=>{
+  for(const category of ['grammar','culture','literature']){
+    reset();existing();if(category!=='grammar')usageResponse(d=>{d.items[0].sourceIndex=0;d.items[0].example='';});
+    await pbpDictSupplementRun(request({category}));const schema=calls[0].options.responseSchema,item=schema?.properties?.items?.items;
+    if(!item||item.additionalProperties!==false||item.properties.sense.maximum!==1)return false;
+    if(category==='grammar'){if(item.properties.sourceIndex||item.properties.example.type!=='string')return false;}
+    else if(item.properties.example||item.properties.sourceIndex.maximum!==0)return false;
+    if(category==='literature'&&(schema.properties.items.maxItems!==1||item.properties.translation.type!=='string'))return false;
+  }
+  return true;
 });
 await test('culture does not require an unused quotation or translation placeholder',async()=>{
  for(const missing of [true,false]){

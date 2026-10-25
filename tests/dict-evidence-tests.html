@@ -83,7 +83,7 @@ await test('culture gives focused usage sources priority over incidental word hi
  const broad=Array.from({length:5},(_,i)=>({ns:0,pageid:100+i,title:'General subject '+i}));
  const focused={ns:0,pageid:200,title:'Community expression'};
  responses.search=query=>({query:{search:query.includes(' OR ')?[focused]:broad}});
- for(const item of [...broad,focused])responses.pages[item.title]={parse:{title:item.title,pageid:item.pageid,revid:99,categories:[],text:'<p>The word provider occurs in this original public passage.</p>'}};
+ for(const item of [...broad,focused])responses.pages[item.title]={parse:{title:item.title,pageid:item.pageid,revid:99,categories:[],text:'<p>The word <b>provider</b> occurs in this original public passage.</p>'}};
  const result=await pbpDictEvidenceFetch(request({kind:'culture'}));
  return result[0]?.title===focused.title&&result.length<=3&&calls.length<=26;
 });
@@ -92,6 +92,22 @@ await test('culture refinement uses the source language rather than English keyw
  await pbpDictEvidenceFetch(request({kind:'culture',term:'遠い',sourceLanguage:'ja'}));
  const queries=calls.map(call=>call.url.searchParams.get('srsearch')).filter(Boolean);
  return queries.some(query=>query.includes('スラング'))&&!queries.some(query=>query.includes('slang'))&&queries.includes('"遠い"');
+});
+await test('culture rejects incidental ordinary word mentions on unrelated articles',async()=>{
+ responses.pages.provider={error:{code:'missingtitle'}};
+ pageOnly('<p>A service provider operates this music club in the city.</p>','Internet_culture','A music club');
+ return (await pbpDictEvidenceFetch(request({kind:'culture'}))).length===0;
+});
+await test('culture reads distinct attested paragraphs of the exact expression before unrelated pages',async()=>{
+ responses.pages.provider={parse:{title:'Provider',pageid:18,revid:180,categories:[],text:'<p>The expression provider has an earlier use in this community.</p><p>Today, provider is used with a different tone in this documented context.</p><p>The expression provider can also carry a contrasting meaning in the same community.</p>'}};
+ const result=await pbpDictEvidenceFetch(request({kind:'culture'}));
+ return result.length===3&&result.every(s=>s.title==='Provider'&&s.excerpt.length<=600)&&new Set(result.map(s=>s.location)).size===3&&!calls.some(c=>c.url.searchParams.get('page')===CHAPTER.parse.title);
+});
+await test('quoted expression evidence supports multilingual non-title articles',async()=>{
+ responses.pages['遠い']={error:{code:'missingtitle'}};
+ pageOnly('<p>この共同体では「遠い」という表現に独自の意味があります。</p>','','共同体の表現');
+ const result=await pbpDictEvidenceFetch(request({kind:'culture',term:'遠い',sourceLanguage:'ja'}));
+ return result.length===1&&result[0].excerpt.includes('「遠い」');
 });
 await test('legal search hits are rejected before fetching their body',async()=>{await pbpDictEvidenceFetch(request());return !calls.some(c=>c.url.searchParams.get('page')?.startsWith('United States Code'));});
 await test('unknown genre yields no literary result even with a matching term',async()=>{responses.pages[WORK.parse.title].parse.categories=[];return !(await pbpDictEvidenceFetch(request())).length;});
@@ -114,8 +130,8 @@ await test('oversized advertised response is refused before reading',async()=>{l
 await test('oversized streamed response is cancelled',async()=>{let cancelled=false;responses.search={response:{ok:true,body:{getReader:()=>({read:async()=>({done:false,value:new Uint8Array(1800001)}),cancel:async()=>{cancelled=true;}})}}};return await rejects(()=>pbpDictEvidenceFetch(request()),'source_failed')&&cancelled;});
 await test('a deleted candidate is skipped rather than fabricated',async()=>{responses.pages[CHAPTER.parse.title]={error:{code:'missingtitle'}};return !(await pbpDictEvidenceFetch(request())).length;});
 await test('invalid parse metadata cannot generate a source URL',async()=>{responses.pages[CHAPTER.parse.title].parse.revid='13788016';return await rejects(()=>pbpDictEvidenceFetch(request()),'source_failed');});
-await test('culture uses article body from the source-language edition',async()=>{const r=await pbpDictEvidenceFetch(request({kind:'culture',sourceLanguage:'de'}));return r.length>0&&r.every(s=>s.genre==='culture')&&calls.every(c=>c.url.origin==='https://de.wikipedia.org')&&calls.filter(c=>c.url.searchParams.get('action')==='query').length===2;});
-await test('culture retrieval does not label the passage as a verified meme',async()=>{const r=(await pbpDictEvidenceFetch(request({kind:'culture'})))[0];return r.genre==='culture'&&!Object.hasOwn(r,'popular')&&!Object.hasOwn(r,'originDate');});
+await test('culture uses article body from the source-language edition',async()=>{responses.pages.provider.parse.text='<p>Provider wird in dieser Gemeinschaft als Ausdruck verwendet.</p>';const r=await pbpDictEvidenceFetch(request({kind:'culture',sourceLanguage:'de'}));return r.length>0&&r.every(s=>s.genre==='culture')&&calls.every(c=>c.url.origin==='https://de.wikipedia.org')&&calls.filter(c=>c.url.searchParams.get('action')==='query').length===2;});
+await test('culture retrieval does not label the passage as a verified meme',async()=>{responses.pages.provider.parse.text='<p>Provider is an expression used in this community.</p>';const r=(await pbpDictEvidenceFetch(request({kind:'culture'})))[0];return r.genre==='culture'&&!Object.hasOwn(r,'popular')&&!Object.hasOwn(r,'originDate');});
 await test('etymology is restricted to the requested language and section',async()=>{const r=await pbpDictEvidenceFetch(request({kind:'etymology'}));return r[0].excerpt==='From provide + -er.'&&!JSON.stringify(r).includes('Wrong language')&&!JSON.stringify(r).includes('Unrelated definition');});
 await test('etymology follows one explicit formation link on the same origin',async()=>{const r=await pbpDictEvidenceFetch(request({kind:'etymology'}));return r.length===2&&r[1].title==='provide'&&r[1].excerpt.includes('Latin')&&calls.length===2&&calls.every(c=>c.url.origin==='https://en.wiktionary.org');});
 await test('external etymology links never expand the granted origin',async()=>{responses.pages.provider.parse.text=responses.pages.provider.parse.text.replace('/wiki/provide#English','https://evil.example/wiki/provide');return (await pbpDictEvidenceFetch(request({kind:'etymology'}))).length===1&&calls.length===1;});

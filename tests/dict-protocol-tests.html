@@ -2,6 +2,7 @@
 <div id="results"></div><div id="summary"></div>
 <script src="../i18n.js"></script><script src="../shared.js"></script><script src="../ai.js"></script>
 <script src="../vocab-store.js"></script><script src="../dict-archive.js"></script><script src="../dict-entry.js"></script>
+<script src="fixtures/dict-live-malformed-responses.js"></script>
 <script>
 // Synthetic learner content, independent of the production parser/serializer.
 // Deliberately includes the supported nullable/singleton/index-string variants.
@@ -83,6 +84,15 @@ async function test(name, protocol, run) {
   document.getElementById('results').append(row);
 }
 (async () => {
+  for (const fixture of PBP_DICT_LIVE_MALFORMED) {
+    await test('captured complete HTTP output does not authorize guessing missing prose: ' + fixture.reason, PROTOCOLS[0], async req => {
+      responses.push(fixture.body);
+      const input = { ...req, term: fixture.term };
+      const error = await reject(() => pbpDictEntryRun(input), 'invalid_response');
+      assert(error.reason === fixture.reason && calls.length === 1 && await pbpDictEntryRead(input) === null,
+        'Malformed captured prose was repaired, saved or retried');
+    });
+  }
   for (const protocol of PROTOCOLS) {
     await test(protocol.name + ': complete entry and supplement persist and reuse without HTTP', protocol, async req => {
       queue(protocol, ENTRY); const entry = await pbpDictEntryRun(req);

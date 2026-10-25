@@ -303,6 +303,95 @@ await test('malformed boolean metadata cannot expose thoughts or confirm complet
   ];
   for(const [index,body]of cases){reset([reply(body)]);const error=await rejected(()=>run({requireComplete:true},PROTOCOLS[index].settings),'invalid_response');assert(error.reason==='response_shape'&&calls.length===1&&!error.message.includes('PRIVATE'));}
 });
+await test('structured requests use total output budgets and low effort for arbitrary compatible models',async()=>{
+  const s={aiProvider:'custom',customBaseUrl:'https://gateway.example/v1',customApiKey:'fixture',customModel:'unlisted-model'};
+  reset([reply(OK)]);await run({maxTokens:8192,totalOutputBudget:true,reasoningEffort:'low'},s);
+  assert(calls[0].max_completion_tokens===8192&&!('max_tokens'in calls[0])&&calls[0].reasoning_effort==='low');
+  reset([reply(OK)]);await run({},s);
+  assert(calls[0].max_tokens===2048&&!('reasoning_effort'in calls[0]),'Unrelated callers changed');
+});
+await test('unsupported task effort is removed and remembered without changing the model or budget',async()=>{
+  const s={aiProvider:'custom',customBaseUrl:'https://gateway.example/v1',customApiKey:'fixture',customModel:'future-model'};
+  reset([reply({error:{message:'Unsupported parameter: reasoning_effort',param:'reasoning_effort'}},400),reply(OK)]);
+  await run({maxTokens:8192,totalOutputBudget:true,reasoningEffort:'low'},s);
+  assert(calls.length===2&&checks===2&&calls[0].reasoning_effort==='low'&&!('reasoning_effort'in calls[1]));
+  assert(calls.every(body=>body.model==='future-model'&&body.max_completion_tokens===8192));
+  calls=[];responses=[reply(OK)];await run({reasoningEffort:'low'},s);
+  assert(calls.length===1&&!('reasoning_effort'in calls[0]));
+});
+await test('task token field retains server-driven compatibility repair',async()=>{
+  const s={aiProvider:'custom',customBaseUrl:'https://gateway.example/v1',customApiKey:'fixture',customModel:'old-compatible'};
+  reset([reply({error:{message:'Unsupported parameter: max_completion_tokens',param:'max_completion_tokens'}},400),reply(OK)]);
+  await run({maxTokens:8192,totalOutputBudget:true},s);
+  assert(calls.length===2&&checks===2&&calls[0].max_completion_tokens===8192&&calls[1].max_tokens===8192);
+});
+await test('every nonstream protocol uses the requested deadline and keeps the default for other callers',async()=>{
+  const original=fetchWithTimeout, deadlines=[];
+  fetchWithTimeout=async(url,init,ms)=>{deadlines.push(ms===undefined?30000:ms);return fetch(url,init);};
+  try{for(const protocol of PROTOCOLS){
+    reset([reply(protocol.complete),reply(protocol.complete)]);
+    await run({timeoutMs:60000},protocol.settings);await run({},protocol.settings);
+  }}finally{fetchWithTimeout=original;}
+  assert(JSON.stringify(deadlines)===JSON.stringify(PROTOCOLS.flatMap(()=>[60000,30000])));
+});
+await test('JSON tasks request native structured output only on protocols that expose it',async()=>{
+  for(const [index,protocol]of PROTOCOLS.entries()){
+    reset([reply(protocol.complete),reply(protocol.complete)]);
+    await run({jsonMode:true},protocol.settings);await run({},protocol.settings);
+    const body=calls[0],plain=calls[1];
+    if(index===0)assert(body.response_format?.type==='json_object'&&!('response_format'in plain));
+    if(index===1)assert(body.generationConfig.responseMimeType==='application/json'&&!('responseMimeType'in plain.generationConfig));
+    if(index===2)assert(!('response_format'in body)&&!('format'in body),'No invented Messages API parameter');
+    if(index===3)assert(body.format==='json'&&!('format'in plain));
+  }
+});
+await test('a named unsupported JSON mode falls back once and remembers the capability',async()=>{
+  const s={aiProvider:'custom',customBaseUrl:'https://gateway.example/v1',customApiKey:'fixture',customModel:'json-optional'};
+  reset([reply({error:{message:'Unsupported parameter: response_format',param:'response_format'}},400),reply(OK)]);
+  await run({jsonMode:true},s);
+  assert(calls.length===2&&checks===2&&calls[0].response_format.type==='json_object'&&!('response_format'in calls[1]));
+  calls=[];responses=[reply(OK)];await run({jsonMode:true},s);
+  assert(calls.length===1&&!('response_format'in calls[0]));
+});
+await test('JSON mode does not retry malformed successful output or unrelated failures',async()=>{
+  const s={aiProvider:'custom',customBaseUrl:'https://gateway.example/v1',customApiKey:'fixture',customModel:'any-json-model'};
+  reset([reply({choices:[{finish_reason:'stop',message:{content:'{"text":"a "quote" inside"}'}}]})]);
+  assert(await run({jsonMode:true,requireComplete:true},s)==='{"text":"a "quote" inside"}'&&calls.length===1);
+  for(const status of [401,402,429,503]){reset([reply({error:{message:'Unsupported parameter: response_format',param:'response_format'}},status)]);
+    try{await run({jsonMode:true},s);throw new Error('Unexpected success');}catch(error){assert(error.status===status&&calls.length===1);}}
+});
+await test('a shared response schema maps to compatible Gemini and Ollama fields',async()=>{
+  const schema={type:'object',properties:{text:{type:'string'}},required:['text'],additionalProperties:false};
+  for(const index of [0,1,3]){
+    const protocol=PROTOCOLS[index];reset([reply(protocol.complete)]);
+    await run({jsonMode:true,responseSchema:schema},protocol.settings);
+    const value=index===0?calls[0].response_format?.json_schema?.schema:index===1?calls[0].generationConfig.responseJsonSchema:calls[0].format;
+    assert(JSON.stringify(value)===JSON.stringify(schema));
+    if(index===0)assert(calls[0].response_format.type==='json_schema'&&calls[0].response_format.json_schema.strict===true);
+  }
+});
+await test('response format enum refusals negotiate by capability without changing reasoning',async()=>{
+  for(const message of ["response_format: unknown variant 'json_schema', expected 'text' or 'json_object'", "response_format.type must be one of text or json_object", "response_format.type should be json_object"]){
+    reset([reply({error:{message,param:'response_format.type'}},400),reply(OK)]);
+    await run({jsonMode:true,responseSchema:{type:'object'},reasoningEffort:'low'},PROTOCOLS[0].settings);
+    assert(calls.length===2&&checks===2&&calls[1].response_format.type==='json_object'&&calls[1].reasoning_effort==='low');
+  }
+});
+await test('malformed schema content and numeric budget bounds are not format capability refusals',async()=>{
+  for(const [param,message]of [['response_format','Invalid JSON schema: required must be an array'],['max_tokens','max_tokens must be one of the values 1 to 8192']]){
+    reset([reply({error:{message,param}},400)]);
+    try{await run({jsonMode:true,responseSchema:{type:'object'}},PROTOCOLS[0].settings);throw new Error('Unexpected success');}
+    catch(error){assert(error.status===400&&calls.length===1);}
+  }
+});
+await test('unsupported schema negotiates JSON object before plain text within the existing attempt cap',async()=>{
+  const s={aiProvider:'custom',customBaseUrl:'https://gateway.example/v1',customApiKey:'fixture',customModel:'schema-optional'};
+  const denied=reply({error:{message:'Unsupported response_format type',param:'response_format'}},400);
+  reset([denied,denied,reply(OK)]);await run({jsonMode:true,responseSchema:{type:'object'}},s);
+  assert(calls.length===3&&checks===3&&calls[0].response_format.type==='json_schema'&&calls[1].response_format.type==='json_object'&&!('response_format'in calls[2]));
+  calls=[];responses=[reply(OK)];await run({jsonMode:true,responseSchema:{type:'object'}},s);
+  assert(calls.length===1&&!('response_format'in calls[0]));
+});
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();
 </script>

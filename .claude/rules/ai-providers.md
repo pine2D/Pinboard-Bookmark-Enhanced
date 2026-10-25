@@ -20,7 +20,7 @@ paths:
 | openrouter | `{"reasoning":{"enabled":false}}`（勿用 exclude，仍计费） |
 | gemini | bespoke：`thinkingConfig.thinkingBudget:0` |
 | deepseek | thinkingOff（deepseek-reasoner 会拒收，靠 4xx 回退兜住） |
-| groq / custom / ollama | **不加 thinkingOff**（groq 逐模型枚举互斥；custom/ollama 方言未知） |
+| groq / custom / ollama | 默认不加 thinkingOff；兼容协议的任务级低思考偏好见后文，Ollama 不发送该字段 |
 
 MiniMax 的说明于 2026-10-25 按[官方 OpenAI 兼容接口文档](https://platform.minimax.cn/docs/api-reference/text-openai-api)复核：M3 支持关闭思考，M3.1-Flash 强制开启，默认思考强度为 `max`。这些型号用于说明能力差异，运行时仍只依据服务端拒绝决定方言。若 `low` 也被 400/422 拒绝，再剥离该字段；明确点名 `reasoning_effort` 不支持时立即记入现有按 provider/model 隔离的 `pbpAiParamFix`，泛 4xx 只在剥离后的请求被接受时记忆。参数名修复仍优先，思考、强度及参数修复合计最多四次实际请求，每次重过 `beforeRequest`；401/402/429/5xx、取消、空正文或输出截断不得触发额外请求。已解析的 HTTP 2xx 配合固定的空正文/截断错误码可证明方言被接受，普通无状态异常不可以。
 
@@ -35,3 +35,14 @@ MiniMax 的说明于 2026-10-25 按[官方 OpenAI 兼容接口文档](https://pl
 OpenAI 兼容、Gemini、Claude、Ollama 只在协议适配层读取正文块与完成状态，再走同一完整性检查。排除思考、工具和拒答内容；区分空正文、未完成、拒答、坏 JSON 与坏响应结构。`requireComplete:true` 的词典生成不接受明确未完成的输出，即使其中 JSON 恰好闭合；其他消费者仍可使用非空部分文本。兼容端点缺少终止元数据时保留 unknown，不伪称确认完成，也不凭此拒绝有效正文。
 
 新增模型不应要求词典业务层添加供应商或模型分支。通用响应修复用四协议独立手写 HTTP 夹具和生成→归档→重读链路验证；响应失败不自动增加付费重试。真实 API 测试仍须按 CLAUDE.md 逐轮取得明确授权，历史授权不续用。
+
+## 按任务声明输出要求（2026-10-26）
+
+词典生成统一声明 `requireComplete`、60 秒超时、8192 总输出额度、低思考偏好及闭合字段 JSON Schema，不按模型名选择业务策略。8192 是上限，不要求模型用满；每类提示词仍限制条数和长度。其他消费者保留原有默认额度与超时。支持取消与派发前账号守卫，不因超时、空正文、截断或坏 JSON 自动重生成。
+
+- `totalOutputBudget` 在 OpenAI 兼容协议优先发送 `max_completion_tokens`，只有服务端明确拒绝字段时按既有机制回退。`max_tokens` 在部分接口只限制最终答案，不能普遍当作含思考总量保证；真实测试必须另核对回传用量并停机。
+- 已声明的原生思考字段不变；未知兼容端点收到任务的低思考偏好才尝试标准 `reasoning_effort:low`，不修改 provider 注册表或创建模型名单。
+- 结构要求由适配器转换：兼容协议 `response_format.json_schema`；Gemini `generationConfig.responseJsonSchema` 配合 JSON MIME；Ollama `format` 对象。Claude 保持提示词及严格解析，不发送其他协议的字段。
+- 兼容服务端明确以 400/422 拒绝 `response_format` 时，依次降到 JSON object、无格式字段，记忆能力；包括明确点名格式的 unknown variant / 类型枚举拒绝，不把 schema 内容错误或数值越界当成能力拒绝。与 token、temperature 和思考字段修复共用四次总上限，每次执行 `beforeRequest`。成功 HTTP 的坏内容不触发回退。结构约束只是生成引导，解析、语言、引用及归档校验不能跳过；有效 JSON 也不等于完整、正确的解释。
+
+依据：[LiteLLM JSON schema](https://docs.litellm.ai/docs/completion/json_mode)、[Qwen 结构化输出](https://help.aliyun.com/zh/model-studio/qwen-structured-output)、[Qwen 思考与输出上限](https://help.aliyun.com/zh/model-studio/deep-thinking/)、[Gemini GenerateContent](https://ai.google.dev/api/generate-content)、[Ollama structured outputs](https://docs.ollama.com/capabilities/structured-outputs)。

@@ -1543,11 +1543,13 @@ const PBP_DICT_GENERATION_ERROR_KEYS = Object.freeze({
 });
 function _pbpDictGenerationErrorKey(error, supplement = false) {
   if (typeof error?.code === "string" && Object.hasOwn(PBP_DICT_GENERATION_ERROR_KEYS, error.code)) return PBP_DICT_GENERATION_ERROR_KEYS[error.code];
+  if (error?.name === "TimeoutError") return "trErrTimeout";
   if (error?.status === 401) return "trErrKey";
   if (error?.status === 402) return "dictGenerationBilling";
   return supplement ? "dictSupplementUnavailable" : "dictEntryUnavailable";
 }
 function _pbpDictFailureCode(error) {
+  if (error?.name === "TimeoutError") return "request_timeout";
   const code = error?.code;
   return typeof code === "string" && (Object.hasOwn(PBP_DICT_GENERATION_ERROR_KEYS, code) ||
     ["ai_disabled", "ai_not_configured", "invalid_request", "not_saved", "source_failed", "stale", "network", "endpoint_invalid"].includes(code)

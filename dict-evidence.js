@@ -106,13 +106,36 @@ function _pbpDictEvidenceMetadata(page, root, origin) {
   if (parent && parent.length <= 200) links.push(parent);
   return { author, work, location, links: [...new Set(links.filter(title => title && title !== page.title))], genre: _pbpDictEvidenceGenre(page.categories), forbidden: _pbpDictEvidenceForbidden(page.categories) };
 }
-function _pbpDictEvidenceParagraphs(root) {
+function _pbpDictEvidenceParagraphNodes(root) {
   const copy = root.cloneNode(true);
   copy.querySelectorAll(".ws-noexport,.wst-header,.headertemplate,.header,.toc,.mw-editsection,.references,.reflist,.navbox,.hatnote,.metadata,.catlinks,.pagenum,sup.reference,table,nav,header,footer").forEach(node => node.remove());
   const body = copy.querySelector(".prp-pages-output, .mw-parser-output") || copy;
   return [...body.querySelectorAll("p, .poem, .poem-stanza, .verse")].filter(node =>
     !node.parentElement?.closest("p, .poem, .poem-stanza, .verse"))
-    .map(node => _pbpDictEvidenceText(node.textContent)).filter(text => text.length >= 15);
+    .filter(node => _pbpDictEvidenceText(node.textContent).length >= 15);
+}
+function _pbpDictEvidenceParagraphs(root) {
+  return _pbpDictEvidenceParagraphNodes(root).map(node => _pbpDictEvidenceText(node.textContent));
+}
+function _pbpDictCultureExcerpts(root, title, term, language) {
+  const normalize = text => _pbpDictEvidenceText(text).normalize("NFC").toLocaleLowerCase();
+  const name = normalize(term);
+  const exactTitle = normalize(title.replace(/\s*[（(][^()（）]*[)）]\s*$/u, "")) === name;
+  const result = [];
+  const nodes = _pbpDictEvidenceParagraphNodes(root);
+  for (let index = 0; index < nodes.length && result.length < 3; index++) {
+    const node = nodes[index], text = _pbpDictEvidenceText(node.textContent);
+    if (_pbpDictEvidenceMatch(text, term, language) < 0) continue;
+    // A word occurring in an unrelated article is not evidence about its
+    // cultural meaning. Prefer a dedicated entry or an explicitly mentioned
+    // expression; the model still has to establish a distinctive use from it.
+    const mentioned = exactTitle || [...node.querySelectorAll("b,strong,i,em,dfn")].some(el => normalize(el.textContent) === name) ||
+      [...text.matchAll(/["'“‘«「『]([^"'“”‘’«»「」『』]{1,120})["'”’»」』]/gu)].some(match => normalize(match[1]) === name);
+    if (!mentioned) continue;
+    const excerpt = _pbpDictEvidenceExcerpt([text], term, language);
+    if (excerpt && !result.some(item => item.text === excerpt.text)) result.push({ ...excerpt, paragraph: index + 1 });
+  }
+  return result;
 }
 function _pbpDictEvidenceExcerpt(paragraphs, term, language) {
   for (let i = 0; i < paragraphs.length; i++) {
@@ -279,11 +302,16 @@ async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, before
       if (++examined > 10 || result.length >= (kind === "literature" ? 1 : 3) || requests >= 22) break;
       const loaded = await load(title); if (!loaded) continue;
       const { page, root } = loaded;
-      const excerpt = _pbpDictEvidenceExcerpt(_pbpDictEvidenceParagraphs(root), term, language); if (!excerpt) continue;
       if (kind === "culture") {
-        if (!result.some(source => source.revision === String(page.revid))) result.push(make(page, excerpt.text, { location: "¶ " + excerpt.paragraph }));
+        for (const excerpt of _pbpDictCultureExcerpts(root, page.title, term, language)) {
+          const location = "¶ " + excerpt.paragraph;
+          if (result.length < 3 && !result.some(source => source.revision === String(page.revid) && source.location === location)) {
+            result.push(make(page, excerpt.text, { location }));
+          }
+        }
         continue;
       }
+      const excerpt = _pbpDictEvidenceExcerpt(_pbpDictEvidenceParagraphs(root), term, language); if (!excerpt) continue;
       const metadata = _pbpDictEvidenceMetadata(page, root, origin);
       if (metadata.forbidden) continue;
       let frontier = metadata.links;

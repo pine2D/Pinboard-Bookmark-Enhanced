@@ -218,11 +218,18 @@ function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
 // the message. Read off the SERVER's own answer, never off a model allowlist
 // (rules/ai-providers.md: the model field is free text), and consumed by the
 // body-dialect self-heal below.
-const _AI_HEALABLE_PARAMS = ["max_tokens", "max_completion_tokens", "temperature", "reasoning_effort"];
+const _AI_HEALABLE_PARAMS = ["max_tokens", "max_completion_tokens", "temperature", "reasoning_effort", "response_format"];
 // "The server does not accept this parameter AT ALL", as opposed to "the value
 // you sent is out of range" — the distinction the whole self-heal turns on.
 const _AI_PARAM_REFUSED_RE = /unsupported|unrecognized|not\s+supported|does\s+not\s+support|unknown\s+(?:parameter|argument|field)|extra\s+inputs/;
 function _aiRejectedParam(body, detail) {
+  const param = String((body && body.error && body.error.param) || "").trim();
+  // Some compatible APIs enumerate only text/json_object and reject the
+  // schema variant without saying "unsupported". This is a format capability
+  // refusal, unlike an invalid schema definition or an out-of-range budget.
+  const formatNamed = /^response_format(?:\.type)?$/.test(param) || /\bresponse_format\b/.test(detail);
+  if (formatNamed && /\bjson_(?:schema|object)\b/.test(detail) &&
+      /unknown\s+variant|(?:must|should)\s+be\s+(?:one\s+of|either|["'`]*(?:text|json_object)\b)/.test(detail)) return "response_format";
   // The wording gate guards BOTH routes below, error.param included. That field
   // is filled for ANY parameter-level validation error, range errors among them
   // ("max_tokens is too large: this model supports at most 4096 completion
@@ -233,7 +240,6 @@ function _aiRejectedParam(body, detail) {
   // mention ("128000 in the max_tokens" inside a context-length error) must
   // never rewrite the request body.
   if (!_AI_PARAM_REFUSED_RE.test(detail)) return null;
-  const param = String((body && body.error && body.error.param) || "").trim();
   if (_AI_HEALABLE_PARAMS.indexOf(param) !== -1) return param;
   // Message-only servers (some compat proxies leave error.param null): the
   // refused field is named BEFORE the suggested replacement ("...'max_tokens'
@@ -357,7 +363,11 @@ function _aiBodyDialect(cfg, memo) {
   return {
     tokenField: (memo && memo.tokenField) || (cfg && cfg.tokenField) || "max_tokens",
     omitTemperature: !!(memo && memo.omitTemperature),
-    omitThinkingFallback: !!(memo && memo.omitThinkingFallback)
+    omitThinkingFallback: !!(memo && memo.omitThinkingFallback),
+    jsonMode: cfg?.jsonMode === true,
+    schemaMode: cfg?.schemaMode === true,
+    omitJsonSchema: !!memo?.omitJsonSchema,
+    omitResponseFormat: !!memo?.omitResponseFormat
   };
 }
 
@@ -368,6 +378,9 @@ function _aiParamRepair(err, dialect) {
   const hint = err && err.paramHint;
   if (!hint || !dialect) return null;
   if (hint === "temperature") return dialect.omitTemperature ? null : { omitTemperature: true };
+  if (hint === "response_format" && dialect.jsonMode && !dialect.omitResponseFormat) {
+    return dialect.schemaMode && !dialect.omitJsonSchema ? { omitJsonSchema: true } : { omitResponseFormat: true };
+  }
   if (hint !== dialect.tokenField) return null;
   return { tokenField: hint === "max_tokens" ? "max_completion_tokens" : "max_tokens" };
 }
@@ -574,8 +587,16 @@ async function callAI(s, prompt, opts = {}) {
   if (p === "gemini") return callGemini(s, prompt, opts);
   if (p === "claude") return callClaude(s, prompt, opts);
   if (p === "ollama") return callOllama(s, prompt, opts);
-  const cfg = OPENAI_COMPAT_PROVIDERS[p];
-  if (!cfg) throw new Error("Unknown provider: " + p);
+  const registered = OPENAI_COMPAT_PROVIDERS[p];
+  if (!registered) throw new Error("Unknown provider: " + p);
+  // Complete-answer tasks can request a total budget and concise reasoning
+  // without knowing a model. Preserve declared native thinking controls;
+  // unknown compatible endpoints negotiate the standard field via the same
+  // bounded server-driven fallback, never a model-name list.
+  const cfg = { ...registered, jsonMode: opts.jsonMode === true, schemaMode: !!opts.responseSchema,
+    ...(opts.totalOutputBudget === true ? { tokenField: "max_completion_tokens" } : {}),
+    ...(!registered.thinkingOff && opts.reasoningEffort === "low" ? { thinkingOff: { reasoning_effort: "low" } } : {})
+  };
   const model = opts.model || s[cfg.modelField] || cfg.defaultModel;
   return _aiWithDialectFallback(p, model, cfg, (extraBody, dialect) =>
     callOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], model, prompt, { ...opts, extraBody, ...dialect }));
@@ -724,6 +745,10 @@ async function callGemini(s, prompt, opts = {}) {
 async function _callGeminiOnce(s, model, prompt, opts, extraBody) {
   const maxTokens = opts.maxTokens || 1024;
   const generationConfig = { temperature: 0.3, maxOutputTokens: maxTokens };
+  if (opts.jsonMode) {
+    generationConfig.responseMimeType = "application/json";
+    if (opts.responseSchema) generationConfig.responseJsonSchema = opts.responseSchema;
+  }
   // Gemini's dialect nests under generationConfig, unlike the top-level merge
   // the OpenAI-compat callers use — apply the one relevant key explicitly.
   if (extraBody && extraBody.thinkingConfig) generationConfig.thinkingConfig = extraBody.thinkingConfig;
@@ -735,7 +760,7 @@ async function _callGeminiOnce(s, model, prompt, opts, extraBody) {
   const res = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${s.geminiApiKey}`, {
     method: "POST", headers: { "Content-Type": "application/json" }, signal: opts.signal,
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig })
-  });
+  }, _aiCompletionTimeout(opts));
   if (!res.ok) await handleAIError(res, "Gemini");
   return _aiReadCompletion(res, "gemini", opts);
 }
@@ -750,7 +775,7 @@ async function callClaude(s, prompt, opts = {}) {
     method: "POST", signal: opts.signal,
     headers: { "Content-Type": "application/json", "x-api-key": s.claudeApiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
     body: JSON.stringify({ model: opts.model || s.claudeModel || "claude-haiku-4-5", max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] })
-  });
+  }, _aiCompletionTimeout(opts));
   if (!res.ok) await handleAIError(res, "Claude");
   return _aiReadCompletion(res, "claude", opts);
 }
@@ -769,10 +794,13 @@ async function callOpenAICompat(baseUrl, apiKey, model, prompt, opts = {}) {
       model,
       messages: [{ role: "user", content: prompt }],
       ...(opts.omitTemperature ? {} : { temperature: 0.3 }),
+      ...(opts.jsonMode && !opts.omitResponseFormat ? { response_format: opts.responseSchema && !opts.omitJsonSchema
+        ? { type: "json_schema", json_schema: { name: "response", strict: true, schema: opts.responseSchema } }
+        : { type: "json_object" } } : {}),
       [opts.tokenField || "max_tokens"]: maxTokens,
       ...(opts.extraBody || {})
     })
-  });
+  }, _aiCompletionTimeout(opts));
   if (!res.ok) await handleAIError(res, "API");
   return _aiReadCompletion(res, "openai", opts);
 }
@@ -791,11 +819,16 @@ async function callOllama(s, prompt, opts = {}) {
     // the server default and truncated long outputs.
     body: JSON.stringify({
       model: opts.model || s.ollamaModel || "llama3.2", messages: [{ role: "user", content: prompt }], stream: false,
+      ...(opts.jsonMode ? { format: opts.responseSchema || "json" } : {}),
       options: { num_predict: opts.maxTokens || 1024 }
     })
-  });
+  }, _aiCompletionTimeout(opts));
   if (!res.ok) await handleAIError(res, "Ollama");
   return _aiReadCompletion(res, "ollama", opts);
+}
+
+function _aiCompletionTimeout(opts) {
+  return Number.isSafeInteger(opts.timeoutMs) && opts.timeoutMs >= 1000 && opts.timeoutMs <= 120000 ? opts.timeoutMs : 30000;
 }
 
 // ============================================================
