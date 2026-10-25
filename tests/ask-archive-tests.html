@@ -1,0 +1,295 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ask Archive Tests</title></head>
+<body><h1>Ask Archive Tests</h1><div id="summary"></div><div id="results"></div>
+<script src="../shared.js"></script><script src="../vocab-store.js"></script><script src="../vocab-gdrive.js"></script><script src="../ai-cache.js"></script>
+<script src="../ask-archive.js"></script><script src="../ask-archive-gdrive.js"></script>
+<script>
+const cases = [], databases = [], stores = [];
+const test = (name, run) => cases.push({ name, run });
+const assert = (ok, message = "assertion failed") => { if (!ok) throw new Error(message); };
+const clone = value => structuredClone(value);
+const OWNER = "acct_alice", OTHER = "acct_bob";
+const HASH = "dc44c294755b665b89960e445fe48d98d7ff67fd3b1fb92b2c420b78a52fe4e1";
+// Independent hand-written wire event, hash computed using Python sorted-key JSON.
+const REMOTE = {"recordKey": "99e078a080df1145c1b74aca80a399c6cfb21d233ab0d489111093f4bdf86a09", "value": {"kind": "round", "sessionId": "peer-session-a", "url": "https://example.test/article", "title": "A multilingual article", "replacesId": "", "record": {"q": "What is the main idea?", "a": "它说明了一种策略。[P1]", "cites": [{"p": 1, "quote": "The strategy works."}], "ts": 100, "model": "peer-model", "blocksHash": "abc123", "evidence": [{"p": 1, "quote": "The strategy works.", "state": "matched", "sourceUrl": "https://example.test/article"}]}}};
+const request = (patch = {}) => ({ owner: OWNER, url: REMOTE.value.url, ...patch });
+const input = (patch = {}) => ({ ...request(), title: REMOTE.value.title, sessionId: "local-session-a",
+  record: { ...clone(REMOTE.value.record), model: "local-model", ts: 200 }, ...patch });
+const batch = (entries = [clone(REMOTE)]) => ({ schema: 1, ownerHash: HASH, deviceId: "peer-a", createdAt: 123, entries });
+const state = (patch = {}) => ({ key: "account:google-a:" + HASH, ownerHash: HASH, drivePermissionId: "google-a", ...patch });
+function fixture(options = {}) {
+  let owner = options.owner === undefined ? OWNER : options.owner;
+  const dbName = "pbp-test-ask-archive-" + crypto.randomUUID(); databases.push(dbName);
+  const settings = { dbName, getWriteGuard: options.getWriteGuard || (() => () => true),
+    getCurrentOwner: options.getCurrentOwner || (async () => owner) };
+  const store = pbpCreateAskArchiveStore(settings); stores.push(store);
+  return { store, settings, owner: value => { owner = value; },
+    reopen: async () => { await store.close(); const next = pbpCreateAskArchiveStore(settings); stores.push(next); return next; } };
+}
+async function rejects(run, code) { let failure; try { await run(); } catch (error) { failure = error; }
+  assert(failure && (!code || failure.code === code), "expected " + code + ", got " + failure?.code); }
+
+test("complete answers and frozen citations survive reopen", async () => {
+  const f = fixture(), saved = await f.store.append(input()), reopened = await f.reopen();
+  const row = (await reopened.read(request()))[0];
+  assert(row.records[0].id === saved.id && row.hasPending && row.records[0].a === REMOTE.value.record.a);
+  assert(row.records[0].evidence[0].quote === "The strategy works.");
+});
+test("fragment and tracker variants share article history", async () => {
+  const f = fixture(); await f.store.append(input({ url: REMOTE.value.url + "?utm_source=reader#section" }));
+  assert((await f.store.read(request())).length === 1);
+});
+test("hash routes remain different articles in library and worker contexts", async () => {
+  const f = fixture(); await f.store.append(input({ url: REMOTE.value.url + "#/one" }));
+  assert(!(await f.store.read(request({ url: REMOTE.value.url + "#/two" }))).length);
+  assert((await f.store.read(request({ url: REMOTE.value.url + "#/one" }))).length === 1);
+});
+test("pending state includes frozen uploads and clears only after confirmed upload", async () => {
+  const f = fixture(); await f.store.append(input());
+  const split = pbpVocabSplitDriveEntries((await f.store.listOutbox(OWNER)).map(row => row.event),
+    { ownerHash: HASH, deviceId: "local-a", createdAt: 100 }, PBP_ASK_ARCHIVE_DRIVE_PROTOCOL);
+  await f.store.freezeOutbox(OWNER, "google-a", HASH, "file-a", split.batches[0]);
+  assert((await f.store.read(request()))[0].hasPending);
+  await f.store.deletePendingBatch("google-a", HASH, "file-a");
+  assert(!(await f.store.read(request()))[0].hasPending);
+});
+test("owner switch blocks reads and writes without leaking another account", async () => {
+  const f = fixture(); await f.store.append(input()); f.owner(OTHER);
+  await rejects(() => f.store.read(request()), "account_changed");
+  await rejects(() => f.store.append(input()), "account_changed");
+  assert(!(await f.store.read(request({ owner: OTHER }))).length);
+});
+test("anonymous sessions remain local and are not adopted after login", async () => {
+  const f = fixture({ owner: "" }); await f.store.append(input({ owner: "" }));
+  assert(!(await f.store.listOutbox("")).length && (await f.store.read(request({ owner: "" }))).length === 1);
+  f.owner(OWNER); assert(!(await f.store.read(request())).length);
+});
+test("identical persistence retries create one record and intent", async () => {
+  const f = fixture(), a = await f.store.append(input()), b = await f.store.append(input());
+  assert(a.id === b.id && (await f.store.listOutbox(OWNER)).length === 1);
+});
+test("all completed rounds survive beyond the former twenty-round limit", async () => {
+  const f = fixture(); for (let i = 0; i < 25; i++) await f.store.append(input({ record: { ...input().record, ts: 200 + i } }));
+  assert((await f.store.read(request()))[0].records.length === 25);
+});
+test("new sessions retain earlier history and regeneration preserves versions", async () => {
+  const f = fixture(), original = await f.store.append(input());
+  await f.store.append(input({ record: { ...input().record, a: "A better answer.", ts: 201 }, replacesId: original.id }));
+  await f.store.append(input({ sessionId: "new-session-b", record: { ...input().record, ts: 300 } }));
+  const sessions = await f.store.read(request());
+  assert(sessions.length === 2 && sessions[1].records.length === 2 && sessions[1].records[1].replacesId === original.id);
+});
+test("concurrent writers preserve both completed answers", async () => {
+  const f = fixture(), other = pbpCreateAskArchiveStore(f.settings); stores.push(other);
+  await Promise.all([f.store.append(input()), other.append(input({ record: { ...input().record, q: "Another question?", ts: 201 } }))]);
+  assert((await f.store.read(request()))[0].records.length === 2);
+});
+test("sessions cannot change article or replace a foreign session record", async () => {
+  const f = fixture(), original = await f.store.append(input());
+  await rejects(() => f.store.append(input({ url: "https://example.test/different" })), "invalid_request");
+  await rejects(() => f.store.append(input({ sessionId: "new-session-b", replacesId: original.id })), "invalid_request");
+});
+test("explicit deletion survives reopen and rejects late completion", async () => {
+  const f = fixture(); await f.store.append(input()); await f.store.remove({ owner: OWNER, sessionId: "local-session-a" });
+  const reopened = await f.reopen(); assert(!(await reopened.read(request())).length);
+  await rejects(() => reopened.append(input({ record: { ...input().record, ts: 300 } })), "session_deleted");
+});
+test("delete and round events converge regardless of arrival order", async () => {
+  const a = fixture(), b = fixture(), c = fixture(); await a.store.append(input());
+  await a.store.remove({ owner: OWNER, sessionId: "local-session-a" });
+  const events = (await a.store.listOutbox(OWNER)).map(row => row.event);
+  for (const event of events) await b.store.applyRemotePage(OWNER, HASH, [batch([event])], state());
+  for (const event of events.reverse()) await c.store.applyRemotePage(OWNER, HASH, [batch([event])], state());
+  assert(!(await b.store.read(request())).length && !(await c.store.read(request())).length);
+});
+test("deleting one session preserves another session", async () => {
+  const f = fixture(); await f.store.append(input()); await f.store.append(input({ sessionId: "new-session-b" }));
+  await f.store.remove({ owner: OWNER, sessionId: "local-session-a" });
+  const sessions = await f.store.read({ owner: OWNER }); assert(sessions.length === 1 && sessions[0].id === "new-session-b");
+});
+test("cancelled owner guard atomically rolls back record and outbox", async () => {
+  const f = fixture(); let live = true; const original = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (...args) { const result = original.apply(this, args); if (this.name === "records") live = false; return result; };
+  try { await rejects(() => f.store.append({ ...input(), isCurrent: () => live }), "account_changed"); }
+  finally { IDBObjectStore.prototype.put = original; }
+  assert(!(await f.store.listOutbox(OWNER)).length && !(await f.store.read(request())).length);
+});
+test("connection epoch change rolls back remote record and cursor", async () => {
+  let epoch = 0; const f = fixture({ getWriteGuard: () => { const captured = epoch; return () => epoch === captured; } });
+  const original = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (...args) { const result = original.apply(this, args); if (this.name === "records") epoch++; return result; };
+  try { await rejects(() => f.store.applyRemotePage(OWNER, HASH, [batch()], state({ pageToken: "unsafe" })), "account_changed"); }
+  finally { IDBObjectStore.prototype.put = original; }
+  assert(!await f.store.getAccountState("google-a", HASH) && !(await f.store.read(request())).length);
+});
+test("legacy migration is idempotent and keeps its completion time", async () => {
+  const f = fixture(), args = { ...request(), records: [clone(REMOTE.value.record)] };
+  const first = await f.store.migrate(args), again = await f.store.migrate(args), rows = await f.store.read(request());
+  assert(first.processed === 1 && again.processed === 0 && rows[0].records[0].ts === 100);
+});
+test("old records without frozen evidence remain unverified and partials are skipped", async () => {
+  const f = fixture(), old = { q: "Question", a: "Answer", ts: 50 };
+  await f.store.migrate({ ...request(), records: [old, { ...old, ts: 51, partial: true }, { ...old, ts: 52, status: "failed" }] });
+  const records = (await f.store.read(request()))[0].records;
+  assert(records.length === 1 && !records[0].evidence.length && records[0].model === "");
+});
+test("legacy cache cannot resurrect a deleted migrated session", async () => {
+  const f = fixture(), args = { ...request(), records: [clone(REMOTE.value.record)] };
+  const first = await f.store.migrate(args); await f.store.remove({ owner: OWNER, sessionId: first.sessionId });
+  await f.store.migrate(args); assert(!(await f.store.read(request())).length);
+});
+test("malformed answers, unsafe URLs and extra private fields are rejected", async () => {
+  const f = fixture();
+  for (const patch of [{ url: "https://user:secret@example.test/" }, { record: { ...input().record, token: "private" } },
+    { record: { ...input().record, a: "" } }, { record: { ...input().record, evidence: [{ ...input().record.evidence[0], deepUrl: "javascript:alert(1)", time: 1 }] } }]) {
+    await rejects(() => f.store.append(input(patch)));
+  }
+  for (const target of [value => value, value => value.record, value => value.record.evidence[0]]) {
+    const event = clone(REMOTE); target(event.value).token = "private"; assert(!pbpAskArchiveValidateEvent(event));
+  }
+});
+test("content hash mismatch cannot advance the remote cursor", async () => {
+  const f = fixture(), bad = clone(REMOTE); bad.value.record.a = "modified";
+  const result = await f.store.applyRemotePage(OWNER, HASH, [batch([bad])], state({ pageToken: "unsafe" }));
+  assert(result.error === "invalid_remote_page" && !await f.store.getAccountState("google-a", HASH));
+});
+test("remote replays are idempotent and do not create upload intent", async () => {
+  const f = fixture(); await f.store.applyRemotePage(OWNER, HASH, [batch()], state());
+  const repeated = await f.store.applyRemotePage(OWNER, HASH, [batch()], state());
+  assert(repeated.ignored === 1 && !(await f.store.listOutbox(OWNER)).length);
+});
+test("freezing upload body removes intent only in the same committed transaction", async () => {
+  const f = fixture(); await f.store.append(input()); const rows = await f.store.listOutbox(OWNER);
+  const split = pbpVocabSplitDriveEntries(rows.map(row => row.event), { ownerHash: HASH, deviceId: "local-a", createdAt: 100 }, PBP_ASK_ARCHIVE_DRIVE_PROTOCOL);
+  const frozen = await f.store.freezeOutbox(OWNER, "google-a", HASH, "file-a", split.batches[0]);
+  assert(frozen.body === split.batches[0].body && !(await f.store.listOutbox(OWNER)).length);
+  const reopened = await f.reopen(); assert((await reopened.listPendingBatches("google-a", HASH))[0].body === frozen.body);
+});
+test("a second Google account and returning account get a full checkpoint", async () => {
+  const f = fixture(); await f.store.activateAccount("google-a", HASH); await f.store.putAccountState(state({ bootstrapComplete: true }));
+  await f.store.activateAccount("google-b", HASH); await f.store.activateAccount("google-a", HASH);
+  assert((await f.store.getAccountState("google-a", HASH)).needsCheckpoint === true);
+});
+test("snapshot counts pending bodies without exposing their content", async () => {
+  const f = fixture(); await f.store.append(input());
+  const split = pbpVocabSplitDriveEntries((await f.store.listOutbox(OWNER)).map(row => row.event), { ownerHash: HASH, deviceId: "local-a", createdAt: 100 }, PBP_ASK_ARCHIVE_DRIVE_PROTOCOL);
+  await f.store.freezeOutbox(OWNER, "google-a", HASH, "file-a", split.batches[0]);
+  const snapshot = await f.store.snapshot(OWNER, HASH);
+  assert(snapshot.batches.length === 1 && !Object.hasOwn(snapshot.batches[0], "body") && !snapshot.outbox.length);
+});
+
+function driveFixture(options = {}) {
+  pbpVocabDriveForgetIdentity();
+  let owner = OWNER, enabled = true, permissionId = "google-a", sessionPermissionId = "", failUpload = !!options.failUpload;
+  const calls = [], uploads = [], connectionPuts = [];
+  let connectionState = null;
+  const metadata = { id: "peer-file", name: "pbp-ask-history-peer-file.json", parents: ["1opaque-appdata-folder"],
+    mimeType: "application/json", appProperties: { pbpKind: "ask-history-batch", schema: "1", owner: HASH, device: "peer-a" } };
+  const body = JSON.stringify(batch());
+  const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
+  const client = pbpCreateVocabDriveClient({ protocol: PBP_ASK_ARCHIVE_DRIVE_PROTOCOL,
+    identity: { getAuthToken: async () => ({ token: "token:" + permissionId }), removeCachedAuthToken: async () => {} },
+    beforeRequest: async () => enabled,
+    fetchImpl: async (input, init) => {
+      const url = new URL(input); calls.push(url.pathname + url.search);
+      if (url.pathname === "/drive/v3/about") return json({ user: { permissionId, emailAddress: "test@example.test" } });
+      if (url.pathname === "/drive/v3/changes/startPageToken") return json({ startPageToken: "before" });
+      if (url.pathname === "/drive/v3/files") return json({ files: options.remote ? [metadata] : [] });
+      if (url.pathname === "/drive/v3/changes") return json({ changes: [], newStartPageToken: "after" });
+      if (url.pathname === "/drive/v3/files/peer-file") {
+        options.afterDownload?.({ owner: () => { owner = OTHER; }, google: () => { permissionId = "google-b"; }, disable: () => { enabled = false; } });
+        return new Response(options.corrupt ? "{bad json" : body);
+      }
+      if (url.pathname === "/drive/v3/files/generateIds") return json({ ids: ["upload-" + (uploads.length + 1)] });
+      if (url.pathname === "/upload/drive/v3/files") {
+        const parts = init.body.split("\r\n\r\n");
+        uploads.push({ metadata: JSON.parse(parts[1].split("\r\n--")[0]),
+          body: parts[2].slice(0, parts[2].lastIndexOf("\r\n--")) });
+        return json({}, failUpload ? 503 : 201);
+      }
+      throw new Error("unexpected request " + url.pathname);
+    } });
+  const f = fixture({ getCurrentOwner: async ({ requireDriveAccount = true } = {}) => {
+    if (!enabled) return null;
+    if (requireDriveAccount && sessionPermissionId) {
+      const identity = await client.about(); if (!identity.ok) throw Object.assign(new Error("identity unavailable"), { code: identity.error });
+      if (identity.permissionId !== sessionPermissionId) return null;
+    }
+    return owner;
+  } });
+  const connection = { get: async () => clone(connectionState), put: async (_hash, value) => {
+    connectionState = clone(value); connectionPuts.push(clone(value)); return true;
+  } };
+  const run = args => pbpCreateAskArchiveDriveSyncRunner({ client, store: f.store, connection,
+    getCurrentPinboardAuth: async () => ({ account: owner === OWNER ? "alice" : "bob" }),
+    pinboardAuthIsCurrent: auth => auth.account === (owner === OWNER ? "alice" : "bob"),
+    getCurrentPermissionId: () => client.about(), isEnabled: async () => enabled,
+    onSession: value => { sessionPermissionId = value; }, now: () => 100000, random: () => .5 })(args);
+  return { ...f, client, run, metadata, body, calls, uploads, connectionPuts,
+    connection: () => connectionState, failUpload: value => { failUpload = value; } };
+}
+test("archive transport accepts actual Drive metadata and rejects other datasets", () => {
+  const f = driveFixture(); assert(pbpVocabValidateDriveBatch(f.metadata, f.body, HASH, PBP_ASK_ARCHIVE_DRIVE_PROTOCOL));
+  assert(!pbpVocabValidateDriveBatch(f.metadata, f.body, HASH));
+});
+test("archive file listing queries only its own owner-scoped appData dataset", async () => {
+  const f = driveFixture(); await f.client.listFiles(HASH);
+  const url = new URL("https://www.googleapis.com" + f.calls[0]);
+  assert(url.searchParams.get("q").includes("value='ask-history-batch'") && url.searchParams.get("spaces") === "appDataFolder");
+});
+test("real runner bootstraps an empty device and reuses a peer's complete entry", async () => {
+  const f = driveFixture({ remote: true }), result = await f.run();
+  const read = await f.store.read(request());
+  assert(result.ok && result.changed && result.status.bootstrapComplete && read[0].records[0].model === "peer-model");
+  assert((await f.store.getAccountState("google-a", HASH)).pageToken === "after" && f.uploads.length === 1);
+  assert(!f.uploads[0].body.includes(OWNER) && f.uploads[0].metadata.appProperties.pbpKind === "ask-history-batch");
+});
+test("frozen uploads retry identical file ID and body after a worker restart", async () => {
+  const f = driveFixture({ failUpload: true }); await f.store.append(input());
+  const first = await f.run(); const pending = await f.store.listPendingBatches("google-a", HASH);
+  await f.store.close(); f.failUpload(false); const second = await f.run({ force: true });
+  assert(first.error === "server" && pending.length === 1 && second.ok && f.uploads.length === 2);
+  assert(f.uploads[0].metadata.id === f.uploads[1].metadata.id && f.uploads[0].body === f.uploads[1].body);
+  assert(!(await f.store.listPendingBatches("google-a", HASH)).length && f.connection() === null);
+});
+for (const change of ["owner", "google", "disable"]) test(change + " changes during download prevent archive and cursor commits", async () => {
+  const f = driveFixture({ remote: true, afterDownload: context => context[change]() }), result = await f.run();
+  assert(!result.ok && f.uploads.length === 0);
+  const state = await f.store.getAccountState("google-a", HASH); assert(state?.bootstrapListComplete !== true);
+});
+test("corrupt remote archive blocks only this dataset", async () => {
+  const f = driveFixture({ remote: true, corrupt: true }), result = await f.run();
+  const preflight = await f.store.getPreflightState(HASH);
+  assert(result.error === "corrupt" && preflight.blocked && !f.connectionPuts.length);
+});
+test("record storage failure keeps cursor before unapplied remote data", async () => {
+  const f = driveFixture({ remote: true }), original = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (...args) { if (this.name === "records") throw new DOMException("quota", "QuotaExceededError"); return original.apply(this, args); };
+  let result; try { result = await f.run(); } finally { IDBObjectStore.prototype.put = original; }
+  const state = await f.store.getAccountState("google-a", HASH);
+  assert(result.error === "local_store" && state?.bootstrapListComplete !== true && f.uploads.length === 0);
+});
+test("frozen-body storage failure preserves the entire outbox", async () => {
+  const f = driveFixture(); await f.store.append(input()); const original = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (value, ...args) { if (String(value?.key).startsWith("batch:")) throw new DOMException("quota", "QuotaExceededError"); return original.call(this, value, ...args); };
+  let result; try { result = await f.run(); } finally { IDBObjectStore.prototype.put = original; }
+  assert(result.error === "local_store" && f.uploads.length === 0 && (await f.store.listOutbox(OWNER)).length === 1);
+});
+test("device metadata write failure is reported without an unhandled IDB rejection", async () => {
+  const f = driveFixture(), original = IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put = function (value, ...args) { if (value?.key === "meta") throw new DOMException("quota", "QuotaExceededError"); return original.call(this, value, ...args); };
+  let result; try { result = await f.run(); } finally { IDBObjectStore.prototype.put = original; }
+  assert(result.error === "local_store" && f.uploads.length === 0);
+});
+(async () => {
+  let pass = 0, fail = 0;
+  for (const item of cases) {
+    const row = document.createElement("div");
+    try { await item.run(); row.className = "pass"; row.textContent = item.name; pass++; }
+    catch (error) { row.className = "fail"; row.textContent = item.name + ": " + error.message; fail++; console.error(item.name, error); }
+    document.getElementById("results").append(row);
+  }
+  for (const store of stores) await store.close();
+  for (const name of databases) indexedDB.deleteDatabase(name);
+  document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
+})();
+</script></body></html>

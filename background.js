@@ -4,7 +4,7 @@
 
 importScripts(
   "i18n.js", "shared.js", "vocab-store.js", "vocab-gdrive.js", "notes-sync.js", "notes-gdrive.js",
-  "ai-cache.js", "dict-archive.js", "dict-archive-gdrive.js", "ai.js", "jina.js", "wayback.js"
+  "ai-cache.js", "dict-archive.js", "dict-archive-gdrive.js", "ask-archive.js", "ask-archive-gdrive.js", "ai.js", "jina.js", "wayback.js"
 );
 
 // Load manual language setting (async, t() falls back to browser locale until ready)
@@ -2239,7 +2239,7 @@ const PBP_DRIVE_CONNECTION_ACCOUNT_KEY = "driveConnectionAccount";
 const PBP_GOOGLE_API_ORIGIN = "https://www.googleapis.com/*";
 const PBP_VOCAB_DRIVE_CAPABLE =
   pbpVocabDriveOAuthActive(chrome.runtime.getManifest());
-// One queue runs every Drive round: vocabulary, notes, then paid dictionary output.
+// One queue runs every Drive round: vocabulary, notes, dictionary output and Ask history.
 const queueDriveSync = pbpCreateRecoveringTail();
 // One epoch for the whole Drive connection. It invalidates only jobs in this
 // worker generation; the durable connected flag remains in local storage and
@@ -2297,6 +2297,9 @@ const notesDriveClient = PBP_VOCAB_DRIVE_CAPABLE
 const dictArchiveDriveClient = PBP_VOCAB_DRIVE_CAPABLE
   ? pbpCreateVocabDriveClient({ protocol: PBP_DICT_ARCHIVE_DRIVE_PROTOCOL,
       beforeRequest: pbpDriveEnabled }) : null;
+const askArchiveDriveClient = PBP_VOCAB_DRIVE_CAPABLE
+  ? pbpCreateVocabDriveClient({ protocol: PBP_ASK_ARCHIVE_DRIVE_PROTOCOL,
+      beforeRequest: pbpDriveEnabled }) : null;
 // Used only by the explicit Connect action, which authorizes before any round.
 const driveConnectClient = PBP_VOCAB_DRIVE_CAPABLE ? pbpCreateVocabDriveClient() : null;
 async function pbpNotesDriveCurrentOwner({ requireDriveAccount = true, dataset = "notes" } = {}) {
@@ -2307,7 +2310,7 @@ async function pbpNotesDriveCurrentOwner({ requireDriveAccount = true, dataset =
       (session?.auth && (!pbpPinboardAuthIsCurrent(session.auth) ||
         auth.account !== session.auth.account))) return "";
   if (requireDriveAccount && session?.permissionId) {
-    const current = await (dataset === "dictionary" ? dictArchiveDriveClient : notesDriveClient).about();
+    const current = await (dataset === "ask" ? askArchiveDriveClient : dataset === "dictionary" ? dictArchiveDriveClient : notesDriveClient).about();
     if (!current.ok) {
       const error = new Error("Drive identity verification unavailable");
       error.code = current.error || "remote";
@@ -2395,6 +2398,14 @@ const dictArchiveDriveStore = PBP_VOCAB_DRIVE_CAPABLE
         return () => driveScopeEpoch === epoch && (!auth || pbpPinboardAuthIsCurrent(auth));
       }
     }) : null;
+const askArchiveDriveStore = PBP_VOCAB_DRIVE_CAPABLE
+  ? pbpCreateAskArchiveStore({
+      getCurrentOwner: options => pbpNotesDriveCurrentOwner({ ...options, dataset: "ask" }),
+      getWriteGuard: () => {
+        const epoch = driveScopeEpoch, auth = driveSession.auth;
+        return () => driveScopeEpoch === epoch && (!auth || pbpPinboardAuthIsCurrent(auth));
+      }
+    }) : null;
 const runVocabDriveSync = PBP_VOCAB_DRIVE_CAPABLE
   ? pbpCreateVocabDriveSyncRunner({
       client: vocabDriveClient,
@@ -2431,10 +2442,19 @@ const runDictArchiveDriveSync = PBP_VOCAB_DRIVE_CAPABLE
       getCurrentPermissionId: () => dictArchiveDriveClient.about()
     }) : null;
 
+const runAskArchiveDriveSync = PBP_VOCAB_DRIVE_CAPABLE
+  ? pbpCreateAskArchiveDriveSyncRunner({
+      client: askArchiveDriveClient, store: askArchiveDriveStore,
+      getCurrentPinboardAuth, pinboardAuthIsCurrent: pbpPinboardAuthIsCurrent,
+      isEnabled: pbpDriveEnabled, getScopeEpoch: () => driveScopeEpoch,
+      onSession: pbpDriveSessionOpened, connection: driveConnectionStore,
+      getCurrentPermissionId: () => askArchiveDriveClient.about()
+    }) : null;
+
 // One notification per round, on a false -> true edge only. showNotification
 // suffixes its id with a timestamp, so the edge is the only dedupe there is.
 async function pbpAnnounceDriveBlocked(before, after) {
-  const rose = ["connection", "vocabulary", "notes", "dictionary"].some((name) =>
+  const rose = ["connection", "vocabulary", "notes", "dictionary", "ask"].some((name) =>
     before?.[name]?.known === true && before[name].blocked === false &&
     after?.[name]?.known === true && after[name].blocked === true);
   if (!rose) return false;
@@ -2445,7 +2465,7 @@ async function pbpAnnounceDriveBlocked(before, after) {
 function pbpBroadcastVocabSynced(owner, type = "vocabulary") {
   try {
     const pending = chrome.runtime.sendMessage({
-      type: type === "notes" ? "PBP_NOTES_SYNCED" : type === "dictionary" ? "PBP_DICT_ARCHIVE_SYNCED" : "PBP_VOCAB_SYNCED", owner
+      type: type === "ask" ? "PBP_ASK_ARCHIVE_SYNCED" : type === "notes" ? "PBP_NOTES_SYNCED" : type === "dictionary" ? "PBP_DICT_ARCHIVE_SYNCED" : "PBP_VOCAB_SYNCED", owner
     });
     if (pending && typeof pending.catch === "function") pending.catch(() => {});
   } catch (_) {}
@@ -2455,7 +2475,7 @@ async function pbpRefreshDriveConnectionAccount(type, auth, confirmedState) {
   if (typeof confirmedState?.drivePermissionId !== "string" || !confirmedState.drivePermissionId) return { ok: true };
   const scopeEpoch = driveScopeEpoch;
   if (!await pbpDriveEnabled()) return { ok: false, error: "account_changed" };
-  const verified = await (type === "notes" ? notesDriveClient : type === "dictionary" ? dictArchiveDriveClient : vocabDriveClient).about();
+  const verified = await (type === "ask" ? askArchiveDriveClient : type === "notes" ? notesDriveClient : type === "dictionary" ? dictArchiveDriveClient : vocabDriveClient).about();
   if (!verified.ok) return verified;
   if (verified.permissionId !== confirmedState.drivePermissionId) return { ok: false, error: "account_changed" };
   if (!await pbpDriveEnabled()) return { ok: false, error: "account_changed" };
@@ -2492,7 +2512,8 @@ async function pbpDriveReadRoundState(ownerHash) {
     pbpDriveReadConnState(ownerHash),
     pbpVocabGetPreflightState(ownerHash),
     notesDriveStore.getPreflightState(ownerHash),
-    dictArchiveDriveStore.getPreflightState(ownerHash)
+    dictArchiveDriveStore.getPreflightState(ownerHash),
+    askArchiveDriveStore.getPreflightState(ownerHash)
   ]);
   const shape = (read, label, toState) => {
     if (read.status === "rejected") {
@@ -2508,7 +2529,8 @@ async function pbpDriveReadRoundState(ownerHash) {
     })),
     vocabulary: shape(reads[1], "vocabulary", pbpDriveDataLayerState),
     notes: shape(reads[2], "notes", pbpDriveDataLayerState),
-    dictionary: shape(reads[3], "dictionary", pbpDriveDataLayerState)
+    dictionary: shape(reads[3], "dictionary", pbpDriveDataLayerState),
+    ask: shape(reads[4], "ask", pbpDriveDataLayerState)
   };
 }
 
@@ -2544,10 +2566,11 @@ async function pbpReconcileDriveAlarms() {
   }
   const state = await pbpDriveReadRoundState(ownerHash);
   if (!await pbpDriveEnabled()) { await pbpClearDriveAlarms(); return null; }
-  const rows = [state.connection, state.vocabulary, state.notes, state.dictionary];
+  const rows = [state.connection, state.vocabulary, state.notes, state.dictionary, state.ask];
   const connectionBlocked = state.connection.known && state.connection.blocked;
   const datasetsBlocked = state.vocabulary.known && state.vocabulary.blocked &&
-    state.notes.known && state.notes.blocked && state.dictionary.known && state.dictionary.blocked;
+    state.notes.known && state.notes.blocked && state.dictionary.known && state.dictionary.blocked &&
+    state.ask.known && state.ask.blocked;
   if (connectionBlocked || datasetsBlocked) await chrome.alarms.clear(PBP_DRIVE_PERIODIC_ALARM);
   else await pbpDriveEnsurePeriodic(chrome.alarms);
   const now = Date.now();
@@ -2591,7 +2614,7 @@ async function pbpRunDriveDataset(type, auth, ownerScope, runOptions) {
   try {
     let result;
     try {
-      result = await (type === "notes" ? runNotesDriveSync : type === "dictionary" ? runDictArchiveDriveSync : runVocabDriveSync)(runOptions);
+      result = await (type === "ask" ? runAskArchiveDriveSync : type === "notes" ? runNotesDriveSync : type === "dictionary" ? runDictArchiveDriveSync : runVocabDriveSync)(runOptions);
     } catch (error) {
       console.warn("[drive-sync] dataset run failed:", type, error?.name, error?.message);
       result = null;
@@ -2636,7 +2659,7 @@ function pbpDriveRoundSkip(vocabulary, roundEpoch) {
   return null;
 }
 function pbpDriveRoundOutcome(results) {
-  const rows = [results.vocabulary, results.notes, results.dictionary].filter(Boolean);
+  const rows = [results.vocabulary, results.notes, results.dictionary, results.ask].filter(Boolean);
   const failed = rows.find((row) => !row.ok && PBP_DRIVE_CONNECTION_ERRORS.has(row.error)) ||
     rows.find((row) => !row.ok && PBP_DRIVE_CONTROL_ERRORS.has(row.error)) ||
     rows.find((row) => !row.ok);
@@ -2672,6 +2695,11 @@ async function pbpDriveClearAccountRowErrors(ownerScope, ownerHash) {
       const snapshot = await dictArchiveDriveStore.snapshot(ownerScope, ownerHash);
       return Promise.all((snapshot?.states || []).filter(stale)
         .map((row) => dictArchiveDriveStore.putAccountState(cleared(row))));
+    })(),
+    (async () => {
+      const snapshot = await askArchiveDriveStore.snapshot(ownerScope, ownerHash);
+      return Promise.all((snapshot?.states || []).filter(stale)
+        .map((row) => askArchiveDriveStore.putAccountState(cleared(row))));
     })()
   ]);
   let complete = true;
@@ -2679,7 +2707,7 @@ async function pbpDriveClearAccountRowErrors(ownerScope, ownerHash) {
     if (side.status === "fulfilled" && side.value.every((value) => value === true)) return;
     complete = false;
     if (side.status === "rejected") {
-      console.warn("[drive-sync] account row clear failed:", ["vocabulary", "notes", "dictionary"][index],
+      console.warn("[drive-sync] account row clear failed:", ["vocabulary", "notes", "dictionary", "ask"][index],
         side.reason?.name, side.reason?.message);
     }
   });
@@ -2695,11 +2723,12 @@ async function pbpDriveForceClear(auth, ownerHash, roundEpoch) {
     pbpVocabDeletePreflightState(ownerHash),
     notesDriveStore.deletePreflightState(ownerHash),
     dictArchiveDriveStore.deletePreflightState(ownerHash),
+    askArchiveDriveStore.deletePreflightState(ownerHash),
     pbpDriveClearAccountRowErrors(pbpDictOwnerScope(auth.account), ownerHash)
   ]);
   cleared.forEach((row, index) => {
     if (row.status === "fulfilled" && row.value === true) return;
-    console.warn("[drive-sync] force clear incomplete:", ["connection", "vocabulary", "notes", "dictionary", "account rows"][index],
+    console.warn("[drive-sync] force clear incomplete:", ["connection", "vocabulary", "notes", "dictionary", "ask", "account rows"][index],
       row.reason?.name, row.reason?.message);
   });
 }
@@ -2731,13 +2760,19 @@ async function pbpQueueDriveRound(options = {}) {
     try {
       if (force && ownerHash) await pbpDriveForceClear(auth, ownerHash, roundEpoch);
       if (ownerHash) before = await pbpDriveReadRoundState(ownerHash);
-      if (options.dictionaryOnly !== true) {
+      if (options.dictionaryOnly !== true && options.askOnly !== true) {
         results.vocabulary = await pbpRunDriveDataset("vocabulary", auth, ownerScope, runOptions);
         results.notes = pbpDriveRoundSkip(results.vocabulary, roundEpoch) ||
           await pbpRunDriveDataset("notes", auth, ownerScope, runOptions);
       }
-      results.dictionary = (results.notes && pbpDriveRoundSkip(results.notes, roundEpoch)) ||
-        await pbpRunDriveDataset("dictionary", auth, ownerScope, runOptions);
+      if (options.askOnly !== true) {
+        results.dictionary = (results.notes && pbpDriveRoundSkip(results.notes, roundEpoch)) ||
+          await pbpRunDriveDataset("dictionary", auth, ownerScope, runOptions);
+      }
+      if (options.dictionaryOnly !== true) {
+        results.ask = (results.dictionary && pbpDriveRoundSkip(results.dictionary, roundEpoch)) ||
+          await pbpRunDriveDataset("ask", auth, ownerScope, runOptions);
+      }
     } finally {
       driveRoundContext = null;
     }
@@ -2871,7 +2906,7 @@ async function pbpGetVocabDriveStatus() {
     blocked: false, hasPending: false, notices: 0 });
   const neutralConnection = { lastError: null, retryAt: null, blocked: false };
   const base = { connected, owner: "", connection: neutralConnection, vocabulary: neutralDataset(),
-    notes: neutralDataset(), dictionary: neutralDataset(), noticeTerms: [], lastSuccessAt: null, hasPending: false };
+    notes: neutralDataset(), dictionary: neutralDataset(), ask: neutralDataset(), noticeTerms: [], lastSuccessAt: null, hasPending: false };
   if (!auth?.account || !pbpPinboardAuthIsCurrent(auth)) return base;
   const ownerScope = pbpDictOwnerScope(auth.account);
   const ownerHash = await pbpVocabOwnerHash(ownerScope);
@@ -2883,7 +2918,8 @@ async function pbpGetVocabDriveStatus() {
     pbpNotesSyncSnapshot(ownerScope, ownerHash), notesDriveStore.getPreflightState(ownerHash),
     // The throwing read: an unreadable record must not look like "no error".
     pbpDriveReadConnState(ownerHash),
-    dictArchiveDriveStore.snapshot(ownerScope, ownerHash), dictArchiveDriveStore.getPreflightState(ownerHash)
+    dictArchiveDriveStore.snapshot(ownerScope, ownerHash), dictArchiveDriveStore.getPreflightState(ownerHash),
+    askArchiveDriveStore.snapshot(ownerScope, ownerHash), askArchiveDriveStore.getPreflightState(ownerHash)
   ]);
   if (!pbpPinboardAuthIsCurrent(auth)) return base;
   const emptySnapshot = { states: [], outbox: [], batches: [], notices: [] };
@@ -2919,6 +2955,7 @@ async function pbpGetVocabDriveStatus() {
   const vocabulary = dataset(0, "vocabulary");
   const notes = dataset(2, "notes");
   const dictionary = dataset(5, "dictionary");
+  const ask = dataset(7, "ask");
   const record = connected && connectionRead.status === "fulfilled" ? connectionRead.value : null;
   const connectionError = typeof record?.lastError === "string" && PBP_DRIVE_CONNECTION_ERRORS.has(record.lastError)
     ? record.lastError : null;
@@ -2930,9 +2967,9 @@ async function pbpGetVocabDriveStatus() {
   const account = currentAccount
     ? { drivePermissionId: currentAccount.permissionId, emailAddress: currentAccount.emailAddress,
         displayName: currentAccount.displayName }
-    : [vocabulary.account, notes.account, dictionary.account].filter(Boolean)
+    : [vocabulary.account, notes.account, dictionary.account, ask.account].filter(Boolean)
         .sort((a, b) => (b.lastSuccessAt || 0) - (a.lastSuccessAt || 0))[0] || null;
-  const times = [vocabulary.status.lastSuccessAt, notes.status.lastSuccessAt, dictionary.status.lastSuccessAt];
+  const times = [vocabulary.status.lastSuccessAt, notes.status.lastSuccessAt, dictionary.status.lastSuccessAt, ask.status.lastSuccessAt];
   return {
     connected, owner: auth.account,
     ...(account ? {
@@ -2944,6 +2981,7 @@ async function pbpGetVocabDriveStatus() {
     vocabulary: vocabulary.status,
     notes: notes.status,
     dictionary: dictionary.status,
+    ask: ask.status,
     // Only vocabulary notices name a term; a notes notice key is an article id.
     noticeTerms: vocabulary.snapshot.notices.slice(0, 20).map((row) => {
       const key = String(row.recordKey || ""); const separator = key.indexOf("|");
@@ -2951,7 +2989,7 @@ async function pbpGetVocabDriveStatus() {
     }).filter(Boolean),
     // All datasets are synced as of this moment: the earliest time, or never.
     lastSuccessAt: times.every(Number.isFinite) ? Math.min(...times) : null,
-    hasPending: vocabulary.status.hasPending || notes.status.hasPending || dictionary.status.hasPending
+    hasPending: vocabulary.status.hasPending || notes.status.hasPending || dictionary.status.hasPending || ask.status.hasPending
   };
 }
 
@@ -2967,7 +3005,7 @@ async function pbpVocabDriveResponse(result) {
   }
   if (entries) {
     response.results = {};
-    for (const type of ["vocabulary", "notes", "dictionary"]) {
+    for (const type of ["vocabulary", "notes", "dictionary", "ask"]) {
       const value = entries[type];
       if (!value) continue;
       response.results[type] = { ok: value.ok === true,
@@ -3710,12 +3748,12 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     return true;
   }
 
-  if (message.type === "PBP_VOCAB_DIRTY" || message.type === "PBP_NOTES_DIRTY" || message.type === "PBP_DICT_ARCHIVE_DIRTY") {
+  if (message.type === "PBP_VOCAB_DIRTY" || message.type === "PBP_NOTES_DIRTY" || message.type === "PBP_DICT_ARCHIVE_DIRTY" || message.type === "PBP_ASK_ARCHIVE_DIRTY") {
     if (!PBP_VOCAB_DRIVE_CAPABLE) {
       sendResponse({ ok: false, error: "unavailable" });
       return true;
     }
-    // Any dataset dirties the one shared alarm; the round syncs all three.
+    // Any dataset dirties the one shared alarm; the round syncs every dataset.
     pbpDriveEnabled()
       .then((enabled) => enabled ? pbpDriveScheduleDirty(chrome.alarms) : false)
       .then(() => sendResponse({ ok: true }))
@@ -3741,6 +3779,26 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         connected: true, code: result.ok && dataset?.status?.bootstrapComplete === true ? null : result.error || "unexpected" };
     })().then(sendResponse).catch(error => {
       console.warn("[dict-archive] lookup sync failed:", error?.name, error?.code);
+      sendResponse({ ok: false, code: typeof error?.code === "string" ? error.code : "unexpected" });
+    });
+    return true;
+  }
+
+  if (message.type === "PBP_ASK_ARCHIVE_RESTORE") {
+    (async () => {
+      const auth = await getCurrentPinboardAuth();
+      if (!auth?.account && (!message.owner || message.owner === "ownerless")) return { ok: true, connected: false };
+      if (!auth?.account || !pbpPinboardAuthIsCurrent(auth) || pbpDictOwnerScope(auth.account) !== message.owner) {
+        return { ok: false, code: "account_changed" };
+      }
+      if (!await pbpVocabDriveIsConnected()) return { ok: true, connected: false };
+      const result = await pbpQueueDriveRound({ askOnly: true, manual: true });
+      if (!pbpPinboardAuthIsCurrent(auth)) return { ok: false, code: "account_changed" };
+      const dataset = result.results?.ask;
+      return { ok: result.ok === true && dataset?.status?.bootstrapComplete === true,
+        connected: true, code: result.ok && dataset?.status?.bootstrapComplete === true ? null : result.error || "unexpected" };
+    })().then(sendResponse).catch(error => {
+      console.warn("[ask-archive] history sync failed:", error?.name, error?.code);
       sendResponse({ ok: false, code: typeof error?.code === "string" ? error.code : "unexpected" });
     });
     return true;

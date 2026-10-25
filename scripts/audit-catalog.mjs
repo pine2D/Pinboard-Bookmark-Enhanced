@@ -9,6 +9,7 @@ import { HELP_SCENARIOS } from './audit-help-scenarios.mjs';
 export const AUDIT_SURFACES = Object.freeze(['popup', 'options', 'library', 'md-preview', 'pinboard', 'background', 'tooling']);
 const ui = ['popup', 'options', 'library', 'md-preview'];
 function ownership(name) {
+  if (/^ask-archive(?:-|$)/.test(name)) return ['background', 'library', 'md-preview'];
   if (name === 'tag-gov-layout') return ['options'];
   if (name === 'save-pipeline') return ['background', 'popup', 'md-preview'];
   if (['icon-state', 'wayback', 'url-strip'].includes(name)) return ['background'];

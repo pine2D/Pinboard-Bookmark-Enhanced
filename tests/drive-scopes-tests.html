@@ -41,17 +41,24 @@ function harness(source, seed = {}, results = {}) {
       async create(name, info) { alarmMap.set(name, structuredClone(info)); },
       async clear(name) { alarms.push(name); return alarmMap.delete(name); }
     } },
-    PBP_NOTES_DRIVE_PROTOCOL: {}, PBP_DICT_ARCHIVE_DRIVE_PROTOCOL: {},
+    PBP_NOTES_DRIVE_PROTOCOL: {}, PBP_DICT_ARCHIVE_DRIVE_PROTOCOL: {}, PBP_ASK_ARCHIVE_DRIVE_PROTOCOL: {},
     pbpVocabDriveOAuthActive: () => true, pbpCreateRecoveringTail: results.createTail || (() => async (fn) => fn()),
     pbpCreateVocabDriveClient: results.createClient || (() => client),
     pbpCreateVocabDriveSyncRunner: results.createVocabRunner || stubRunner("vocabulary"),
     pbpCreateNotesDriveSyncRunner: stubRunner("notes"),
     pbpCreateDictArchiveDriveSyncRunner: stubRunner("dictionary"),
+    pbpCreateAskArchiveDriveSyncRunner: stubRunner("ask"),
     pbpCreateDictArchiveStore: () => ({
       getPreflightState: async () => results.dictionaryPreflight || null,
       async deletePreflightState(hash) { deletes.push("dictionary:" + hash); results.dictionaryPreflight = null; return true; },
       async putAccountState(row) { accountPuts.push({ type: "dictionary", row: structuredClone(row), runsBefore: runs.length }); return true; },
       snapshot: async () => results.dictionarySnapshot || empty
+    }),
+    pbpCreateAskArchiveStore: () => ({
+      getPreflightState: async () => results.askPreflight || null,
+      async deletePreflightState(hash) { deletes.push("ask:" + hash); results.askPreflight = null; return true; },
+      async putAccountState(row) { accountPuts.push({ type: "ask", row: structuredClone(row), runsBefore: runs.length }); return true; },
+      snapshot: async () => results.askSnapshot || empty
     }),
     pbpCreateNotesSyncStore: () => ({
       getPreflightState: async () => results.notesPreflight || null,
@@ -103,7 +110,7 @@ async function connectDuringSync(source, sessionPermissionId, { pinIdentity = fa
         // identity cache is keyed on it: the switch has to surface here.
         identity: {
           async getAuthToken() {
-            if (number === 3) currentPermissionId = "google-a";
+            if (number === 4) currentPermissionId = "google-a";
             const id = pinIdentity && number === 0 && runNumber === 1 ? sessionPermissionId : currentPermissionId;
             return { token: "token-" + id };
           },
@@ -226,6 +233,10 @@ function statusHarness(source, opts = {}) {
       getPreflightState: async () => opts.dictionaryPreflight,
       snapshot: async () => { if (opts.dictionarySnapshotError) throw new Error("dictionary storage unavailable"); return opts.dictionarySnapshot || snapshotOf(); }
     },
+    askArchiveDriveStore: {
+      getPreflightState: async () => opts.askPreflight,
+      snapshot: async () => { if (opts.askSnapshotError) throw new Error("ask storage unavailable"); return opts.askSnapshot || snapshotOf(); }
+    },
     // The throwing read (Task 3): status must tell "no record" from "unreadable".
     pbpDriveReadConnState: async (hash) => { if (opts.connectionError) throw new Error("connection state unavailable"); return hash === OWNER_HASH ? (opts.connectionState || null) : null; },
     console: spyConsole(warnings)
@@ -323,6 +334,7 @@ function refreshHarness(source, opts = {}) {
     driveScopeEpoch: 0,
     pbpDriveEnabled: async () => true,
     vocabDriveClient: { about: about("vocabulary") }, notesDriveClient: { about: about("notes") },
+    dictArchiveDriveClient: { about: about("dictionary") }, askArchiveDriveClient: { about: about("ask") },
     getCurrentPinboardAuth: async () => ({ account: "alice", epoch: 1 }),
     pbpPinboardAuthIsCurrent: () => true,
     pbpObserveDriveIdentity: (...args) => { observed.push(args); },
@@ -339,15 +351,15 @@ function refreshHarness(source, opts = {}) {
   let h = harness(source);
   const round = await h.queue({});
   // Simplest miss: running vocabulary alone (the old default) or notes first.
-  check("a connected device runs vocabulary then notes in one round", round.ok && h.calls.join() === "vocabulary,notes,dictionary");
+  check("a connected device runs vocabulary then notes in one round", round.ok && h.calls.join() === "vocabulary,notes,dictionary,ask");
   h = harness(source, { driveSyncVocabulary: false, driveSyncNotes: false });
   const staleKeys = await h.queue({});
   // Simplest miss: still honouring a scope key left on disk before the migration.
-  check("stale scope keys on disk no longer gate either dataset", staleKeys.ok && h.calls.join() === "vocabulary,notes,dictionary");
+  check("stale scope keys on disk no longer gate either dataset", staleKeys.ok && h.calls.join() === "vocabulary,notes,dictionary,ask");
   h = harness(source, {}, { vocabulary: { ok: false, error: "corrupt" } });
   const partial = await h.queue({});
   // Simplest miss: treating any vocabulary failure as a reason to skip notes.
-  check("a vocabulary data-layer failure still runs notes and fails the round", partial.ok === false && partial.error === "corrupt" && h.calls.join() === "vocabulary,notes,dictionary");
+  check("a vocabulary data-layer failure still runs notes and fails the round", partial.ok === false && partial.error === "corrupt" && h.calls.join() === "vocabulary,notes,dictionary,ask");
   const connectionSkips = [];
   for (const code of PBP_DRIVE_CONNECTION_ERRORS) {
     const c = harness(source, {}, { vocabulary: { ok: false, error: code, retryable: code !== "permission" } });
@@ -364,7 +376,7 @@ function refreshHarness(source, opts = {}) {
   h = harness(source, {}, { vocabulary: { ok: true, status: { waitingForRetry: true } } });
   const dataWait = await h.queue({});
   // Simplest miss: keying the skip on waitingForRetry alone, which also skips notes for a vocabulary-only backoff.
-  check("a vocabulary data-layer backoff still runs notes", h.calls.join() === "vocabulary,notes,dictionary" && dataWait.waitingForRetry === true);
+  check("a vocabulary data-layer backoff still runs notes", h.calls.join() === "vocabulary,notes,dictionary,ask" && dataWait.waitingForRetry === true);
   h = harness(source, {}, { notes: { ok: true, status: { waitingForRetry: true } } });
   const waiting = await h.queue({});
   // Simplest miss: reporting ok because the first dataset finished.
@@ -500,7 +512,7 @@ function refreshHarness(source, opts = {}) {
   await h.queue({});
   // Simplest miss: the old runner behaviour of clearing periodic whenever any dataset blocks.
   check("vocabulary success plus a notes data-layer block keeps the periodic alarm untouched", h.alarmMap.get("drive-sync-periodic")?.scheduledTime === 777 && !h.alarms.includes("drive-sync-periodic"));
-  h = harness(source, {}, { alarmSeed: { "drive-sync-periodic": { periodInMinutes: 15 } }, vocabPreflight: blockedRow("corrupt"), notesPreflight: blockedRow("remote"), dictionaryPreflight: blockedRow("local_store"), vocabulary: { ok: false, error: "corrupt" }, notes: { ok: false, error: "remote" }, dictionary: { ok: false, error: "local_store" } });
+  h = harness(source, {}, { alarmSeed: { "drive-sync-periodic": { periodInMinutes: 15 } }, vocabPreflight: blockedRow("corrupt"), notesPreflight: blockedRow("remote"), dictionaryPreflight: blockedRow("local_store"), askPreflight: blockedRow("local_store"), vocabulary: { ok: false, error: "corrupt" }, notes: { ok: false, error: "remote" }, dictionary: { ok: false, error: "local_store" }, ask: { ok: false, error: "local_store" } });
   await h.queue({});
   // Simplest miss: never clearing periodic, so two dead datasets wake the worker every 15 minutes.
   check("all datasets blocked clears the periodic alarm", !h.alarmMap.has("drive-sync-periodic"));
@@ -596,7 +608,7 @@ function refreshHarness(source, opts = {}) {
   const connected = await h.connect();
   // Simplest miss: Connect queueing a non-forced round, or one that notifies about the blocks it just hit
   // (both datasets go false -> true here, so a round without manual:true would notify).
-  check("Connect authorizes, then runs one forced manual round of both datasets", connected.ok === false && connected.error === "corrupt" && h.calls.join() === "authorize,vocabulary,notes,dictionary" && h.runs.length === 3 && h.runs.every((run) => run.force === true && run.interactive === false) && h.notifications.length === 0);
+  check("Connect authorizes, then runs one forced manual round of both datasets", connected.ok === false && connected.error === "corrupt" && h.calls.join() === "authorize,vocabulary,notes,dictionary,ask" && h.runs.length === 4 && h.runs.every((run) => run.force === true && run.interactive === false) && h.notifications.length === 0);
   h = harness(source, {}, { permissionGranted: false });
   const deniedConnect = await h.connect();
   check("Connect checks optional permissions before token mint or HTTP", deniedConnect.error === "permission" && h.calls.length === 0);
@@ -612,7 +624,7 @@ function refreshHarness(source, opts = {}) {
   h = harness(source, { driveConnectionAccount: previousConnection }, { vocabulary: confirmedNotes, notes: confirmedNotes, googleIdentity: { ok: true, permissionId: "google-new", emailAddress: "new@example.test", displayName: "New" } });
   const sameIdentity = await h.queue({}), nextIdentity = await h.queue({});
   // Simplest miss: the refresh of the session that just finished bumping the epoch and cancelling notes or the next round.
-  check("consecutive rounds on the same Google account do not cancel each other", sameIdentity.ok && nextIdentity.ok && h.local.driveConnectionAccount.permissionId === "google-new" && h.calls.length === 6);
+  check("consecutive rounds on the same Google account do not cancel each other", sameIdentity.ok && nextIdentity.ok && h.local.driveConnectionAccount.permissionId === "google-new" && h.calls.length === 8);
   const sameGoogle = await connectDuringSync(source, "google-a");
   check("Connect preserves a healthy same-Google round despite older connection metadata", sameGoogle.first.ok && sameGoogle.reconnect.ok && sameGoogle.account.permissionId === "google-a" && sameGoogle.mutations.some((row) => row.run === 1 && row.kind === "cursor" && row.pageToken === "after-connect") && sameGoogle.notesRuns === 2);
   const olderGoogle = await connectDuringSync(source, "google-old");
@@ -654,6 +666,7 @@ function refreshHarness(source, opts = {}) {
   const datasetKeys = JSON.stringify(["blocked", "hasPending", "lastError", "lastSuccessAt", "notices", "retryAt"]);
   let sh = statusHarness(source, {
     dictionarySnapshot: snapshotOf({ states: [accountRow("google-a", { lastSuccessAt: 250 })] }),
+    askSnapshot: snapshotOf({ states: [accountRow("google-a", { lastSuccessAt: 275 })] }),
     local: { driveConnectionAccount: { permissionId: "google-a", emailAddress: "a@example.test", displayName: "A" } },
     vocabSnapshot: snapshotOf({ states: [accountRow("google-a", { lastSuccessAt: 300 })], outbox: [vocabOutbox("word")],
       notices: [{ key: "notice:acct_alice:en|apple", owner: "acct_alice", recordKey: "en|apple" }] }),
@@ -661,17 +674,17 @@ function refreshHarness(source, opts = {}) {
       notices: [{ owner: "acct_alice", recordKey: "pbp_hl_abcd|n2", kind: "delete" }] })
   });
   const merged = await sh.status();
-  check("status reports one connection block and three dataset rows with nothing flattened at the top", probe(() =>
+  check("status reports one connection block and four dataset rows with nothing flattened at the top", probe(() =>
     merged.connected === true && merged.owner === "alice" &&
     JSON.stringify(merged.connection) === JSON.stringify({ lastError: null, retryAt: null, blocked: false }) &&
-    JSON.stringify(Object.keys(merged.vocabulary || {}).sort()) === datasetKeys && JSON.stringify(Object.keys(merged.notes || {}).sort()) === datasetKeys && JSON.stringify(Object.keys(merged.dictionary || {}).sort()) === datasetKeys &&
+    JSON.stringify(Object.keys(merged.vocabulary || {}).sort()) === datasetKeys && JSON.stringify(Object.keys(merged.notes || {}).sort()) === datasetKeys && JSON.stringify(Object.keys(merged.dictionary || {}).sort()) === datasetKeys && JSON.stringify(Object.keys(merged.ask || {}).sort()) === datasetKeys &&
     merged.vocabulary.hasPending === true && merged.notes.hasPending === true && merged.hasPending === true &&
     ["pendingWords", "pendingBatches", "vocabularyEnabled", "notesEnabled", "retryAttempt", "lastError", "blocked"].every((key) => !Object.hasOwn(merged, key))));
   // Simplest miss: add connection/vocabulary/notes but keep the old flattened pendingWords/lastError at the top level.
   check("noticeTerms lists vocabulary notice terms only while both rows count their notices", probe(() =>
     JSON.stringify(merged.noticeTerms) === JSON.stringify(["apple"]) && merged.vocabulary.notices === 1 && merged.notes.notices === 1));
   // Simplest miss: build noticeTerms from both snapshots, which leaks the note id "n2" as a "term".
-  check("last successful sync is the earliest of all three datasets", probe(() => merged.lastSuccessAt === 200 && merged.vocabulary.lastSuccessAt === 300));
+  check("last successful sync is the earliest of all four datasets", probe(() => merged.lastSuccessAt === 200 && merged.vocabulary.lastSuccessAt === 300));
   // Simplest miss: Math.max, or reading the vocabulary row alone -- both report 300.
   sh = statusHarness(source, { vocabSnapshot: snapshotOf({ states: [accountRow("google-a", { lastSuccessAt: 300 })] }) });
   let st = await sh.status();
@@ -950,7 +963,7 @@ function refreshHarness(source, opts = {}) {
       pbpQueueDriveRound: async () => { requests++; return opts.result; }, console
     };
     const handler = new Function(...Object.keys(deps), 'return function(message, sendResponse) {' + source.slice(archiveMessageStart, archiveMessageEnd) + '}')(...Object.values(deps));
-    const answer = await new Promise(resolve => handler({ type: "PBP_DICT_ARCHIVE_SYNC", owner: opts.owner === undefined ? "acct_alice" : opts.owner }, resolve));
+    const answer = await new Promise(resolve => handler({ type: opts.type || "PBP_DICT_ARCHIVE_SYNC", owner: opts.owner === undefined ? "acct_alice" : opts.owner }, resolve));
     return { answer, requests };
   };
   const detached = await archiveMessage(), anonymous = await archiveMessage({ account: "", owner: "" });
@@ -961,6 +974,30 @@ function refreshHarness(source, opts = {}) {
   const unfinishedLookup = await archiveMessage({ connected: true, result: { ok: true, results: { dictionary: { status: { bootstrapComplete: false } } } } });
   const readyLookup = await archiveMessage({ connected: true, result: { ok: true, results: { dictionary: { status: { bootstrapComplete: true } } } } });
   check("paid generation gate opens only after a completed successful archive pull", !failedLookup.answer.ok && failedLookup.answer.code === "network" && !unfinishedLookup.answer.ok && readyLookup.answer.ok && readyLookup.answer.connected);
+  h = harness(source, {}, { dictionary: { ok: false, error: "network" } });
+  const dictionaryConnection = await h.queue();
+  check("dictionary connection failure skips Ask without another session", h.calls.join() === "vocabulary,notes,dictionary" && dictionaryConnection.results.ask.skipped);
+  h = harness(source, {}, { dictionary: { ok: false, error: "corrupt" } });
+  const dictionaryData = await h.queue();
+  check("dictionary data failure does not starve Ask paid history", h.calls.join() === "vocabulary,notes,dictionary,ask" && dictionaryData.results.ask.ok);
+  h = harness(source); const askPull = await h.queue({ askOnly: true, manual: true });
+  check("Ask restore uses the shared queue and pulls only Ask history", askPull.ok && h.calls.join() === "ask" && !h.notifications.length);
+  const askStatus = await statusHarness(source, {
+    askSnapshot: snapshotOf({ states: [accountRow("google-a", { lastSuccessAt: 50 })], outbox: ["paid-answer"] }),
+    askPreflight: preflightRow("local_store", { blocked: true })
+  }).status();
+  check("Ask has its own pending and recoverable error row", askStatus.ask.hasPending && askStatus.hasPending && askStatus.ask.blocked && askStatus.ask.lastError === "local_store");
+  const askUnreadable = await statusHarness(source, { askSnapshotError: true }).status();
+  check("unreadable Ask storage does not mark other datasets unavailable", askUnreadable.ask.lastError === "status_unavailable" && askUnreadable.dictionary.lastError === null && askUnreadable.notes.lastError === null);
+  const askAnonymous = await archiveMessage({ type: "PBP_ASK_ARCHIVE_RESTORE", account: "", owner: "ownerless" });
+  check("anonymous Ask restore remains local and opens no Drive session", askAnonymous.answer.ok && !askAnonymous.answer.connected && !askAnonymous.requests);
+  const askStale = await archiveMessage({ type: "PBP_ASK_ARCHIVE_RESTORE", owner: "acct_bob", connected: true });
+  check("Ask restore rejects a stale owner before dispatch", askStale.answer.code === "account_changed" && !askStale.requests);
+  const askReady = await archiveMessage({ type: "PBP_ASK_ARCHIVE_RESTORE", connected: true,
+    result: { ok: true, results: { ask: { status: { bootstrapComplete: true } } } } });
+  const askPartial = await archiveMessage({ type: "PBP_ASK_ARCHIVE_RESTORE", connected: true,
+    result: { ok: true, results: { ask: { status: { bootstrapComplete: false } } } } });
+  check("Ask restore success requires a complete cloud bootstrap", askReady.answer.ok && askReady.answer.connected && !askPartial.answer.ok);
   document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
 })();
 </script></body></html>

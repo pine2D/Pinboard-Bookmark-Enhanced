@@ -1,0 +1,60 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Ask Archive Client Tests</title></head>
+<body><h1>Ask Archive Client Tests</h1><div id="summary"></div><div id="results"></div>
+<!-- Match reader/library dependencies: Drive transport exists only in the worker. -->
+<script src="../shared.js"></script><script src="../vocab-store.js"></script><script src="../ask-archive.js"></script>
+<script>
+const cases = [], databases = [], stores = [];
+const test = (name, run) => cases.push({ name, run });
+const assert = (value, message = "assertion failed") => { if (!value) throw new Error(message); };
+const OWNER = "acct_alice", HASH = "dc44c294755b665b89960e445fe48d98d7ff67fd3b1fb92b2c420b78a52fe4e1";
+const URL_VALUE = "https://example.test/article", SESSION = "client-session-a";
+const record = () => ({ q: "What is the idea?", a: "A complete answer.", ts: 100, model: "test-model", blocksHash: "abc", cites: [], evidence: [] });
+function fixture() {
+  const dbName = "pbp-test-ask-client-" + crypto.randomUUID(); databases.push(dbName);
+  const store = pbpCreateAskArchiveStore({ dbName, getCurrentOwner: async () => OWNER }); stores.push(store);
+  return store;
+}
+const input = () => ({ owner: OWNER, url: URL_VALUE, title: "Article", sessionId: SESSION, record: record() });
+test("client fixture excludes every Drive transport dependency", () => {
+  assert(typeof pbpVocabOwnerHash === "undefined" && typeof pbpCreateVocabDriveClient === "undefined" &&
+    typeof pbpCreateVocabDriveSyncRunner === "undefined");
+});
+test("signed-in empty archive reads successfully without worker scripts", async () => {
+  const store = fixture(); assert((await store.read({ owner: OWNER, url: URL_VALUE })).length === 0);
+});
+test("signed-in completed answer is readable and pending without worker scripts", async () => {
+  const store = fixture(); await store.append(input());
+  const sessions = await store.read({ owner: OWNER, url: URL_VALUE });
+  assert(sessions.length === 1 && sessions[0].records[0].a === "A complete answer." && sessions[0].hasPending);
+});
+test("client reads frozen pending uploads using the raw UTF-8 owner hash", async () => {
+  const store = fixture(); await store.append(input());
+  const entries = (await store.listOutbox(OWNER)).map(row => row.event);
+  // Handwritten envelope using an independently computed SHA-256 owner fixture.
+  const body = JSON.stringify({ schema: 1, ownerHash: HASH, deviceId: "client-a", createdAt: 100, entries });
+  await store.freezeOutbox(OWNER, "google-a", HASH, "file-a", { body, bytes: new TextEncoder().encode(body).length });
+  assert((await store.read({ owner: OWNER, sessionId: SESSION }))[0].hasPending);
+  await store.deletePendingBatch("google-a", HASH, "file-a");
+  assert(!(await store.read({ owner: OWNER, sessionId: SESSION }))[0].hasPending);
+});
+test("client migrates old completed answers without loading transport", async () => {
+  const store = fixture(); await store.migrate({ owner: OWNER, url: URL_VALUE, records: [record()] });
+  assert((await store.read({ owner: OWNER, url: URL_VALUE }))[0].records[0].ts === 100);
+});
+test("client deletion removes the visible session without loading transport", async () => {
+  const store = fixture(); await store.append(input()); await store.remove({ owner: OWNER, sessionId: SESSION });
+  assert(!(await store.read({ owner: OWNER, sessionId: SESSION })).length);
+});
+(async () => {
+  let pass = 0, fail = 0;
+  for (const item of cases) {
+    const row = document.createElement("div");
+    try { await item.run(); row.className = "pass"; row.textContent = item.name; pass++; }
+    catch (error) { row.className = "fail"; row.textContent = item.name + ": " + error.message; fail++; console.error(item.name, error); }
+    document.getElementById("results").append(row);
+  }
+  for (const store of stores) await store.close();
+  for (const name of databases) indexedDB.deleteDatabase(name);
+  document.getElementById("summary").textContent = `pass=${pass} fail=${fail}`;
+})();
+</script></body></html>
