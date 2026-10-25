@@ -2351,7 +2351,9 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
    online path writes the second. Empty until something lands in them. */
 .xp-dict-slot [data-source-break]::before {
   content: ""; display: block; width: calc(var(--sp-5) * 2); max-width: 100%;
-  border-top: 1px dotted var(--border); margin: var(--sp-4) 0;
+  /* Short dotted rules need more ink than full-width panel edges. Mixing the
+     existing warm neutrals keeps both reader schemes above 3:1 on --surface. */
+  border-top: 1px dotted color-mix(in srgb, var(--fg-muted) 70%, var(--border)); margin: var(--sp-4) 0;
 }
 .xp-dict-local-title { font-size: 0.8em; color: var(--fg-muted); }   /* upright: CJK has no true italic (dictZhBlockTitle renders "中文 · ECDICT") */
 .xp-dict-subsense { font-size: 0.95em; margin-top: var(--sp-1); padding-inline-start: var(--sp-4); }
