@@ -136,6 +136,16 @@ popup / options / library 三个扩展表面是短命单次渲染、无暖 shape
 - 断言要泛化到类别而不是枚举实例；新增或审查断言先问「这条检查漏判的最简单反例长什么样」，别只问「现在能不能过」。
 - 「这个东西有没有被处理」的判定，要从程序真实消费的数据结构（注册表、Set、导出清单）拿答案，别退回源码文本 grep——注释与字符串字面量会击穿它（实例见 rules/theme-factory.md）。
 
+### 真实 AI API 测试（必须明确授权）
+
+- **任何真实 AI API 测试都必须事先取得用户明确授权。** 开发、修复、模拟测试的授权，或本机已有 Key，均不代表允许真实调用。调用前说明供应商、模型、发送内容、请求次数、重试次数、单次输出上限及各供应商费用上限；在已明确授权的范围内继续执行，超出任一边界必须重新确认。
+- 测试前先读 `~/.config/ai-dev/README.md`，遵循其中的配置维护与真实测试约定。地址、模型及协议以公开的 `providers.env` 和官方资料为准；保留用户自定义值，不擅自换模型或端点。
+- 维护与准备期间禁止直接或间接读取、探测、复制或修改 `.env`，包括读取后脱敏、检查已配置平台或计算指纹。取得具体测试授权后，仅测试进程用 dotenv 解析器读取所需平台的 Key；禁止 shell source、导入智能体或全局环境。忽略 `.env` 中旧地址和模型参数，并明确同名环境变量的优先级或拒绝冲突。
+- 优先使用合成词条、例句和公开资料，不发送用户文章、生词库或问答记录。词典对照测试可覆盖 DeepSeek、MiniMax、Gemini、OpenRouter，但此名单不是长期调用许可；每轮以用户授权的实际供应商与模型为准。
+- 每个平台分别设置请求、重试、输入与输出、费用硬上限；重跑与重试累计计入同一轮预算，达到上限即停止。无法确认价格或约束费用时先说明并确认，不把 token 上限冒充金额保证，不自动扩大样本或切换付费服务。
+- 不向对话、日志或提交内容输出 Key、片段、指纹、认证头、完整环境及含凭据的异常；缺项只报告变量名。真实返回先检查敏感内容，再保存必要的本地测试证据；测试配置、凭据及未清理的原始返回不得入库或对外同步。
+- 用真实产品的请求、解析、展示与保存路径验证 AI 词条及补充，分别记录接口失败、空输出、截断、结构校验、语言校验与保存失败。模拟响应通过不等同于真实模型通过；可公开的回归夹具须经检查并移除敏感内容。
+
 ## Theme Factory（改主题源 / 三份 UI CSS / pinboard-themes.js 前必读 rules/theme-factory.md）
 
 13 套站点主题与扩展三表面（popup/options/library）主题均由 `docs/theme-surface/` token-driven 生成。**唯一工作流**：改 `composers/*.mjs` 或 `pilots/*.tokens.json` → `node docs/theme-surface/tools/sync-all.mjs` → commit。**禁止手工编辑** `pinboard-themes.js` 与三份 CSS 里的六个 `@generated:*` 区——pre-commit（含 css-region-audit / handedit-audit 的 8 道门）会拦截，但 `ui-token-coverage` 与 `contrast-audit` 只在 sync-all / verify.sh 里，改生成区前必须手动跑一次。组件原语 generated，页面级布局与间距 token 的 `:root` 定义手写。规范：COMPONENTS.md；新主题：NEW_THEME.md。
