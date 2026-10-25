@@ -29,19 +29,24 @@
 
 # Read
 - Any page becomes a clean reader: a Markdown view with table of contents, search, and footnote peek; math, diagrams, and tables render properly
-- Save from the reader: bookmark the article or edit its bookmark without returning to the popup
+- GitHub Discussions (pilot): keeps the loaded main post, comments, reply structure, and which reply was accepted; shows how much was loaded
+- Manage bookmarks as you read: save, edit, or delete the article’s Pinboard bookmark without returning to the popup
 - Five-color highlights with notes: they stay in place through translation and even later edits to the page
 - Translate the page or ask it questions: full-page translation with a bilingual view; answers cite the source and jump straight to it
-- Keep questions and answers with their citations: export completed conversations on their own or alongside the article
-- Look up words as you read: definitions open on the sense that fits your sentence; send saved words to Anki or Eudic in one click, or add offline Chinese-English and English-Chinese dictionaries
-- A full page for notes and vocabulary: saved words and highlights in one place, with dictionary lookup and batch management
+- Keep questions and answers with their citations: completed answers save automatically and sync through Google Drive. Browse conversations in the library, continue in the reader, or export them alone or with the article. Temporary conversations stay unsaved.
+- Look up words as you read: see dictionary definitions and pronunciation; send saved words to Anki or Eudic in one click, or add offline Chinese-English and English-Chinese dictionaries. Choose the language for AI entry definitions independently of the interface, and filter saved words by language. Resize the lookup window by dragging its edges, or move it into the side panel while keeping the current results, selected definition, and generation progress.
+- Multilingual offline dictionaries: look up words on this device with definitions and readings from Yomitan v3 ZIP files you import; dictionary packs are excluded from Drive sync and JSON backups. All offline dictionaries, including Chinese–English and English–Chinese, can be disabled without removing their data. Recognized structure keeps individual definitions separate from examples and word origins; other content remains readable as full entries. Reimport older packs to reprocess their structure without changing saved vocabulary or whether the dictionary is enabled.
+- AI dictionary entries: generate definitions, pronunciation and examples in your native or chosen explanation language. Request word origins, related words, focused usage notes and sourced literary examples separately. Valid parts of an incomplete supplement remain available, with an option to complete the missing content. Full results sync through connected Google Drive; updates keep earlier versions. Choose dictionary or AI as the initial view; automatic basic-entry generation is optional.
+- Explain selected text in context: use Explain to understand a word or passage in the current article; dictionary entries describe its general meanings and usage.
+- Your reading library: find highlights, notes, saved words and conversations in one place, with dictionary lookup and batch vocabulary management. Save words straight from dictionary results, choose a definition, and link related word forms through an editable base form. Each word keeps its own notes and learning status.
+- Vocabulary exports: choose a separate multilingual Anki note type to distinguish the same spelling in different languages. Complete TSV keeps notes, base forms and every context with its source; the original six-field formats remain available
 - Send or download: send articles to your notes app or your own webhook, or save them as e-books for your e-reader
 - Watch while you read: YouTube and bilibili videos sit beside a transcript that follows playback; AI tags and summaries can read the subtitles
 
 # Make Pinboard yours
 - 13 themes for pinboard.in: light and dark looks for the site itself, plus room for your own custom CSS
 - Auto-archive to the Wayback Machine: snapshot each page you save, so it stays readable after the original link dies
-- Backup and sync: Chrome Sync for settings, your own Google Drive for vocabulary and highlights, and a JSON file that backs up all of it
+- Backup and sync: Chrome Sync for settings, your own Google Drive for vocabulary, highlights, notes, AI dictionary entries and conversations; JSON backups cover settings, vocabulary, highlights and notes
 - Private by default: your data stays in your browser with zero tracking; the interface comes in 9 languages and every shortcut is configurable
 ```
 
@@ -65,19 +70,24 @@
 
 # 阅读
 - 网页变成清爽的阅读器：Markdown 视图，带目录、搜索和脚注速览；公式、图表、表格都正常显示
-- 阅读时直接收藏：在阅读器里保存文章或编辑书签，不用切回弹窗
+- GitHub Discussions（试点）：保留已加载的主帖、评论、回复关系和采纳标记，并说明提取范围
+- 阅读时管理书签：在阅读器里保存、编辑或删除 Pinboard 书签，不用切回弹窗
 - 五色高亮与笔记：切换翻译、原文改动后仍留在原处
 - 整页翻译，或向文章提问：双语对照；回答附引用，点击直达原文出处
-- 问答连同引用一起留存：完整问答可单独导出，也可附在正文后
-- 边读边查词：先显示贴合当前句子的释义；生词一键发到 Anki 和欧路词典，还可以选择离线汉英、英汉词典包
-- 笔记和生词独立成页：生词和高亮集中一处，随手查词、批量管理
+- 问答连同引用一起留存：完成后自动保存，连接 Google Drive 后同步；可在问答页查看历史、回阅读器继续提问，或单独导出、附在正文后。临时对话不保存。
+- 边读边查词：查看词典释义和发音；生词一键发到 Anki 和欧路词典，还可以选择离线汉英、英汉词典包。AI 词条释义可单独选择语言，生词本支持按语言筛选。 查词气泡可拖动边缘调整大小，也可移入右侧面板；切换位置时保留当前结果、选定释义和生成进度。
+- 多语言离线词典：导入 Yomitan v3 ZIP 文件，即可在本机查阅释义和读音；词典包不参与 Drive 同步，也不包含在 JSON 备份中。 所有离线词典（包括汉英和英汉词典）均可停用，数据继续保留在本机。 可识别的释义会与例句、词源分开呈现，其他内容保留为完整词条供阅读。旧词包需重新导入以重新识别结构，已有生词和词包启用状态保持不变。
+- AI 词条：先用母语或指定语言生成词义、发音和例句，再按需生成词源与相关词、具体用法及有出处的文学用例。补充内容部分有效时会保留并说明，可单独补全缺失内容。完整结果随已连接的 Google Drive 同步，更新保留旧版。可选择查词默认显示词典或 AI，基础词条的自动生成需另行开启。
+- 结合文章理解选中文本：使用“解释”了解词语或段落在当前文章中的含义；查词提供词语的常见含义和用法。
+- 资料库：集中查看高亮、笔记、生词和已保存的问答，随手查词、批量管理生词。可直接保存查词结果并选择释义，通过可编辑的原形关联词形；各词保留独立笔记和学习状态。
+- 生词完整导出：可选择独立的多语言 Anki 笔记类型，区分不同语言的同形词；完整 TSV 保留笔记、原形及每段语境的来源，原有六字段格式仍可使用
 - 发送或下载：把文章发到常用的笔记应用或你自己的 webhook，或者存成电子书放进阅读器
 - 边读边看：YouTube 和 B 站视频旁边配上随播放滚动的字幕，AI 标签和摘要可以直接读字幕
 
 # 个性化
 - 13 套 pinboard.in 主题：给网站本身换上浅色或深色外观，还能叠加自定义 CSS
 - 自动存档到 Wayback Machine：每次保存都留一份快照，原链接失效也能找回
-- 备份与同步：设置走 Chrome Sync，生词和高亮走自己的 Google Drive，JSON 备份文件一次存下全部
+- 备份与同步：设置走 Chrome Sync，生词、高亮、笔记、AI 词条和问答记录走自己的 Google Drive；JSON 备份包含设置、生词、高亮与笔记
 - 隐私优先：数据留在你自己的浏览器里，零追踪；界面支持 9 种语言，快捷键可自定义
 ```
 
@@ -101,19 +111,24 @@
 
 # 閱讀
 - 網頁變成清爽的閱讀器：Markdown 檢視，內建目錄、搜尋與註腳速覽；數學式、圖表與表格都正確呈現
-- 閱讀時直接收藏：在閱讀器裡儲存文章或編輯書籤，不用切回彈出視窗
+- GitHub Discussions（試行）：保留已載入的主文、留言、回覆層級與採納標記，並註明擷取範圍
+- 閱讀時管理書籤：在閱讀器裡儲存、編輯或刪除 Pinboard 書籤，不用切回彈出視窗
 - 五色劃重點與筆記：切換翻譯、原文改動後仍留在原處
 - 整頁翻譯，或向文章提問：雙語對照；回答附引用，一按即跳回原文出處
-- 問答與引用一起留存：完整問答可單獨匯出，也可附在正文後
-- 邊讀邊查詞：先顯示最貼近句子的釋義；生詞一鍵傳送到 Anki 與歐路詞典，也可以選用離線中英、英中詞典包
-- 筆記與生詞獨立成頁：生詞與劃重點集中在同一頁，隨手查詞、批次管理
+- 問答與引用一起留存：完成後自動儲存，連線 Google Drive 後同步；可在問答頁查看歷史、回閱讀器繼續提問，或單獨匯出、附在正文後。臨時對話不儲存。
+- 邊讀邊查詞：查看詞典釋義與發音；生詞一鍵傳送到 Anki 與歐路詞典，也可以選用離線中英、英中詞典包。AI 詞條釋義可獨立選擇語言，生詞本也能依語言篩選。 查詞浮動視窗可拖曳邊緣調整大小，也可移至右側面板；切換位置時保留目前結果、選取的釋義及生成進度。
+- 多語言離線詞典：匯入 Yomitan v3 ZIP 檔案，即可在本機查閱釋義與讀音；詞典包不會納入 Drive 同步或 JSON 備份。 所有離線詞典（包括漢英及英漢詞典）都可停用，資料仍保留在此裝置。 可辨識的釋義會與例句、詞源分開呈現，其他內容保留為完整詞條供閱讀。舊詞包需重新匯入以重新辨識結構，既有生詞與詞包的啟用狀態維持不變。
+- AI 詞條：先以母語或指定語言產生詞義、發音與例句，再按需產生詞源與相關詞、具體用法及有出處的文學用例。補充內容部分有效時會保留並說明，可另行補全缺少的內容。完整結果透過已連線的 Google Drive 同步，更新保留舊版。可選擇查詞預設顯示詞典或 AI，基礎詞條的自動產生需另行開啟。
+- 結合文章理解選取文字：使用「解釋」了解詞語或段落在目前文章中的含義；查詞提供詞語的常見含義與用法。
+- 資料庫：集中查看標記、筆記、生詞和已儲存的問答，隨手查詞、批次管理生詞。可直接儲存查詞結果並選擇釋義，透過可編輯的原形關聯詞形；各詞保留自己的筆記與學習狀態。
+- 完整匯出生詞：可選用獨立的多語言 Anki 筆記類型，區分不同語言中拼寫相同的詞；完整 TSV 保留筆記、原形與各段語境的來源，原有六欄位格式仍可使用
 - 傳送或下載：把文章傳到常用的筆記應用程式或你自己的 webhook，或存成電子書放進閱讀器
 - 邊讀邊看：YouTube 與 B 站影片旁邊配上隨播放捲動的字幕，AI 標籤與摘要也能直接讀字幕
 
 # 個人化
 - 13 套 pinboard.in 佈景主題：替網站本身換上淺色或深色外觀，還可疊加自訂 CSS
 - 自動存檔到 Wayback Machine：每次儲存都留一份快照，原連結失效也能找回
-- 備份與同步：設定透過 Chrome Sync，生詞與劃重點透過自己的 Google Drive，JSON 備份檔一次存下全部
+- 備份與同步：設定透過 Chrome Sync，生詞、標記、筆記、AI 詞條與問答記錄透過自己的 Google Drive；JSON 備份包含設定、生詞、標記與筆記
 - 隱私優先：資料留在你自己的瀏覽器裡，零追蹤；介面支援 9 種語言，快捷鍵可自訂
 ```
 
@@ -137,19 +152,24 @@
 
 # 閱讀
 - 網頁變成清爽的閱讀器：Markdown 檢視，附目錄、搜尋與註腳速覽；數學公式、圖表與表格都正常顯示
-- 閱讀時直接收藏：在閱讀器內儲存文章或編輯書籤，不用切回彈出視窗
+- GitHub Discussions（試行）：保留已載入的主帖、留言、回覆關係及獲採納的答案，並說明擷取範圍
+- 閱讀時管理書籤：在閱讀器內儲存、編輯或刪除 Pinboard 書籤，不用切回彈出視窗
 - 五色高亮與筆記：切換翻譯、原文改動後仍留在原處
 - 整頁翻譯，或向文章提問：雙語對照；答案附引註，一按即跳回原文出處
-- 問答連同引用一併保留：完整問答可獨立匯出，亦可附在正文後
-- 邊讀邊查詞：先顯示切合該句的釋義；生詞一鍵傳送到 Anki 及歐路詞典，亦可選用離線中英、英中詞典包
-- 筆記與生詞獨立成頁：生詞與高亮集中在同一頁，隨手查詞、批量管理
+- 問答連同引用一併保留：完成後自動儲存，連線 Google Drive 後同步；可在問答頁查看記錄、返回閱讀器繼續提問，或獨立匯出、附在正文後。臨時對話不儲存。
+- 邊讀邊查詞：查看詞典釋義及發音；生詞一鍵傳送到 Anki 及歐路詞典，亦可選用離線中英、英中詞典包。AI 詞條釋義可獨立選擇語言，生詞本亦可按語言篩選。 查詞浮動視窗可拖曳邊緣調整大小，亦可移至右側面板；切換位置時保留目前結果、所選釋義及生成進度。
+- 多語言離線詞典：匯入 Yomitan v3 ZIP 檔案，即可在本機查閱釋義和讀音；詞典包不會納入 Drive 同步或 JSON 備份。 所有離線詞典（包括漢英及英漢詞典）均可停用，資料仍保留在此裝置。 可識別的釋義會與例句、詞源分開呈現，其他內容保留為完整詞條供閱讀。舊詞包需重新匯入以重新識別結構，已有生詞及詞包的啟用狀態維持不變。
+- AI 詞條：先以母語或指定語言生成詞義、發音和例句，再按需要生成詞源與相關詞、具體用法及有出處的文學用例。補充內容部分有效時會保留並說明，可另行補全缺少的內容。完整結果透過已連線的 Google Drive 同步，更新保留舊版。可選擇查詞預設顯示詞典或 AI，基本詞條的自動生成需另行開啟。
+- 結合文章理解所選文字：使用「解釋」了解詞語或段落在目前文章中的含義；查詞提供詞語的常見含義及用法。
+- 資料庫：集中查看標記、筆記、生詞和已儲存的問答，隨手查詞、批量管理生詞。可直接儲存查詞結果並選擇釋義，透過可編輯的原形關聯詞形；每個詞保留自己的筆記及學習狀態。
+- 完整匯出生詞：可選用獨立的多語言 Anki 筆記類型，區分不同語言中拼寫相同的詞；完整 TSV 保留筆記、原形及每段語境的來源，原有六欄位格式仍可使用
 - 傳送或下載：把文章傳到常用的筆記應用程式或你自己的 webhook，或存成電子書放進閱讀器
 - 邊讀邊看：YouTube 與 B 站影片旁邊配上跟着播放捲動的字幕，AI 標籤與摘要亦能直接讀字幕
 
 # 個人化
 - 13 套 pinboard.in 佈景主題：為網站本身換上淺色或深色外觀，更可疊加自訂 CSS
 - 自動存檔至 Wayback Machine：每次儲存都留一份快照，原連結失效也能找回
-- 備份與同步：設定透過 Chrome Sync，生詞和標記透過自己的 Google Drive，一個 JSON 備份檔案就能存下全部
+- 備份與同步：設定透過 Chrome Sync，生詞、標記、筆記、AI 詞條及問答記錄透過自己的 Google Drive；JSON 備份包含設定、生詞、標記及筆記
 - 私隱優先：資料留在你自己的瀏覽器內，零追蹤；介面支援 9 種語言，快捷鍵可自訂
 ```
 
@@ -173,19 +193,24 @@
 
 # Lesen
 - Jede Seite wird zur Leseansicht: Markdown-Ansicht mit Inhaltsverzeichnis, Suche und Fußnoten-Vorschau; Formeln, Diagramme und Tabellen werden sauber dargestellt
-- Direkt im Reader speichern: Artikel als Lesezeichen speichern oder das Lesezeichen bearbeiten, ohne zum Popup zurückzukehren
+- GitHub Discussions (Pilot): übernimmt den geladenen Ausgangsbeitrag und die Kommentare, erhält die Antwortstruktur und markiert die akzeptierte Antwort; zeigt den Umfang der erfassten Inhalte
+- Lesezeichen beim Lesen verwalten: Pinboard-Lesezeichen direkt im Reader speichern, bearbeiten oder löschen, ohne zum Popup zurückzukehren
 - Markieren in fünf Farben, mit Notizen: beide bleiben an ihrer Stelle, auch nach der Übersetzung und späteren Änderungen an der Seite
 - Seite übersetzen oder befragen: Ganzseiten-Übersetzung mit zweisprachiger Ansicht; Antworten zitieren die Quelle, ein Klick führt direkt zur Fundstelle
-- Fragen und Antworten mit Quellen behalten: abgeschlossene Gespräche einzeln oder zusammen mit dem Artikel exportieren
-- Wörter beim Lesen nachschlagen: Definitionen zeigen zuerst die zum Satz passende Bedeutung; gespeicherte Vokabeln gehen mit einem Klick an Anki oder Eudic, dazu auf Wunsch Offline-Wörterbücher für Chinesisch–Englisch und Englisch–Chinesisch
-- Eine eigene Seite für Notizen und Vokabeln: gespeicherte Wörter und Markierungen an einem Ort, mit Wörterbuchsuche und Stapelbearbeitung
+- Fragen und Antworten mit Quellen behalten: fertige Antworten werden automatisch gespeichert und über Google Drive synchronisiert. Gespräche in der Bibliothek lesen, im Lesemodus fortsetzen oder einzeln bzw. mit dem Artikel exportieren. Temporäre Gespräche bleiben ungespeichert.
+- Wörter beim Lesen nachschlagen: Definitionen und Aussprache im Wörterbuch anzeigen; gespeicherte Vokabeln gehen mit einem Klick an Anki oder Eudic, dazu auf Wunsch Offline-Wörterbücher für Chinesisch–Englisch und Englisch–Chinesisch. Wähle die Definitionssprache der KI-Einträge unabhängig von der Oberfläche und filtere gespeicherte Wörter nach Sprache. Ziehe an den Rändern, um das Nachschlagefenster zu vergrößern oder zu verkleinern, oder verschiebe es in die Seitenleiste; Ergebnisse, ausgewählte Definition und laufende Generierung bleiben dabei erhalten.
+- Mehrsprachige Offline-Wörterbücher: schlage Wörter mit Definitionen und Ausspracheangaben aus selbst importierten Yomitan-v3-ZIP-Dateien auf diesem Gerät nach; Wörterbuchpakete sind von der Drive-Synchronisierung und JSON-Sicherungen ausgeschlossen. Alle Offline-Wörterbücher, auch Chinesisch–Englisch und Englisch–Chinesisch, lassen sich deaktivieren, ohne ihre Daten zu löschen. Bei erkannter Struktur werden einzelne Definitionen getrennt von Beispielen und Wortherkunft angezeigt; andere Inhalte bleiben als vollständige Einträge lesbar. Importiere ältere Pakete erneut, um ihre Struktur neu auszuwerten. Gespeicherte Vokabeln und der Aktivierungsstatus bleiben dabei unverändert.
+- KI-Wörterbucheinträge: Erhalte zunächst Definitionen, Aussprache und Beispiele in deiner Muttersprache oder einer gewählten Erklärungssprache. Wortherkunft, verwandte Wörter, Verwendungshinweise und belegte Literaturbeispiele kannst du separat anfordern. Gültige Teile einer unvollständigen Ergänzung bleiben erhalten; fehlende Inhalte lassen sich gezielt ergänzen. Vollständige Ergebnisse werden bei verbundenem Google Drive synchronisiert, frühere Versionen bleiben bei Aktualisierungen erhalten. Wähle Wörterbuch oder KI als Startansicht; die automatische Erstellung von Basiseinträgen ist optional.
+- Ausgewählten Text im Zusammenhang verstehen: Nutze „Erklären“, um ein Wort oder einen Abschnitt im aktuellen Artikel zu verstehen; Wörterbucheinträge beschreiben allgemeine Bedeutungen und Verwendung.
+- Deine Bibliothek: Markierungen, Notizen, gespeicherte Wörter und Gespräche an einem Ort, mit Wörterbuchsuche und Stapelbearbeitung von Vokabeln. Wörter direkt aus Wörterbucheinträgen speichern, eine Definition auswählen und Wortformen über eine bearbeitbare Grundform verknüpfen. Jedes Wort behält eigene Notizen und seinen Lernstatus.
+- Vokabeln vollständig exportieren: Ein eigener mehrsprachiger Anki-Notiztyp unterscheidet gleich geschriebene Wörter verschiedener Sprachen. Die vollständige TSV bewahrt Notizen, Grundformen und alle Kontexte mit ihren Quellen; die bisherigen Formate mit sechs Feldern bleiben verfügbar
 - Senden oder herunterladen: Artikel an deine Notiz-App oder deinen eigenen Webhook senden oder als E-Book für den E-Reader speichern
 - Sehen beim Lesen: YouTube- und Bilibili-Videos laufen neben einem Transkript, das der Wiedergabe folgt; KI-Tags und -Zusammenfassungen lesen auf Wunsch die Untertitel
 
 # Pinboard nach deinem Geschmack
 - 13 Themes für pinboard.in: helle und dunkle Looks für die Seite selbst, dazu dein eigenes CSS
 - Automatisch in die Wayback Machine archivieren: von jeder gespeicherten Seite ein Snapshot, damit sie lesbar bleibt, auch wenn der Originallink tot ist
-- Sichern und synchronisieren: Einstellungen über Chrome Sync, Vokabeln und Markierungen über dein eigenes Google Drive, dazu eine JSON-Datei, die alles zusammen sichert
+- Sichern und synchronisieren: Einstellungen über Chrome Sync, Vokabeln, Markierungen, Notizen, KI-Wörterbucheinträge und Gespräche über dein eigenes Google Drive; JSON-Backups enthalten Einstellungen, Vokabeln, Markierungen und Notizen
 - Privat von Anfang an: deine Daten bleiben im Browser, ohne Tracking; die Oberfläche gibt es in 9 Sprachen, alle Tastenkürzel sind anpassbar
 ```
 
@@ -209,19 +234,24 @@
 
 # Lecture
 - Chaque page passe en mode lecture épuré : vue Markdown avec table des matières, recherche et aperçu des notes de bas de page ; formules, diagrammes et tableaux s'affichent correctement
-- Enregistrez depuis le lecteur : ajoutez l’article aux signets ou modifiez son signet sans revenir au popup
+- GitHub Discussions (phase pilote) : conserve le message initial et les commentaires chargés, la structure des réponses et la réponse acceptée ; précise le contenu récupéré
+- Gérez vos signets pendant la lecture : enregistrez, modifiez ou supprimez le signet Pinboard de l’article sans revenir au popup
 - Surlignage en cinq couleurs, avec notes : les deux restent à leur place après une traduction, et même si la page change ensuite
 - Traduisez la page ou posez-lui vos questions : traduction intégrale avec vue bilingue ; les réponses citent la source et y renvoient d'un clic
-- Conservez les questions et réponses avec leurs citations : exportez les conversations terminées seules ou avec l’article
-- Cherchez les mots au fil de la lecture : le dictionnaire affiche d'abord le sens qui correspond à votre phrase ; envoyez les mots enregistrés vers Anki ou Eudic en un clic, et ajoutez si vous le souhaitez des dictionnaires hors connexion chinois-anglais et anglais-chinois
-- Une page entière pour les notes et le vocabulaire : mots enregistrés et surlignages réunis au même endroit, avec recherche dans le dictionnaire et gestion par lots
+- Conservez les questions et réponses avec leurs citations : les réponses terminées sont enregistrées automatiquement et synchronisées via Google Drive. Retrouvez les conversations dans la bibliothèque, poursuivez-les dans le lecteur ou exportez-les seules ou avec l’article. Les conversations temporaires ne sont pas enregistrées.
+- Cherchez les mots au fil de la lecture : consultez les définitions et la prononciation ; envoyez les mots enregistrés vers Anki ou Eudic en un clic, et ajoutez si vous le souhaitez des dictionnaires hors connexion chinois-anglais et anglais-chinois. Choisissez la langue des définitions des entrées IA indépendamment de l’interface et filtrez les mots enregistrés par langue. Redimensionnez la fenêtre de recherche en faisant glisser ses bords ou déplacez-la dans le panneau latéral : les résultats, la définition sélectionnée et la génération en cours sont conservés.
+- Dictionnaires multilingues hors connexion : consultez les définitions et les prononciations sur cet appareil grâce aux fichiers ZIP Yomitan v3 que vous importez ; les dictionnaires sont exclus de la synchronisation Drive et des sauvegardes JSON. Tous les dictionnaires hors connexion, y compris chinois–anglais et anglais–chinois, peuvent être désactivés sans supprimer leurs données. Lorsque la structure est reconnue, les définitions sont séparées des exemples et de l’origine du mot ; les autres contenus restent lisibles sous forme d’entrées complètes. Réimporter les anciens dictionnaires permet de réanalyser leur structure sans modifier le vocabulaire enregistré ni leur état activé ou désactivé.
+- Entrées de dictionnaire IA: obtenez d’abord les définitions, la prononciation et des exemples dans votre langue maternelle ou la langue choisie. Demandez séparément l’étymologie, les mots associés, des conseils d’usage et des exemples littéraires sourcés. Si un complément est incomplet, ses éléments valides restent disponibles et vous pouvez demander uniquement les éléments manquants. Google Drive synchronise les résultats complets une fois connecté ; les mises à jour conservent les versions précédentes. Choisissez le dictionnaire ou l’IA à l’ouverture ; la génération automatique des entrées de base reste facultative.
+- Comprenez la sélection dans son contexte : utilisez Expliquer pour comprendre un mot ou un passage de l’article en cours ; le dictionnaire présente ses sens et usages généraux.
+- Votre bibliothèque : retrouvez surlignages, notes, mots et conversations enregistrées au même endroit, avec consultation du dictionnaire et gestion du vocabulaire par lots. Enregistrez des mots directement depuis les résultats, choisissez une définition et reliez les formes d’un mot grâce à une forme de base modifiable. Chaque mot conserve ses notes et son état d’apprentissage.
+- Exporter le vocabulaire complet : choisissez un type de note Anki multilingue distinct pour différencier les mots de même orthographe dans plusieurs langues. Le TSV complet conserve les notes, les formes de base et chaque contexte avec sa source ; les formats d’origine à six champs restent disponibles
 - Envoyer ou télécharger : envoyez vos articles vers votre application de notes ou votre propre webhook, ou enregistrez-les en livre numérique pour votre liseuse
 - Regarder en lisant : les vidéos YouTube et Bilibili s'affichent à côté d'une transcription qui suit la lecture ; les tags et résumés IA peuvent lire les sous-titres
 
 # Personnalisation
 - 13 thèmes pour pinboard.in : des apparences claires et sombres pour le site lui-même, plus votre CSS personnalisé
 - Archivage automatique dans la Wayback Machine : chaque page enregistrée est capturée et reste lisible même quand le lien d'origine disparaît
-- Sauvegarde et synchronisation : Chrome Sync pour les paramètres, votre propre Google Drive pour le vocabulaire et les surlignages, et un fichier JSON qui sauvegarde le tout
+- Sauvegarde et synchronisation: Chrome Sync pour les réglages, votre Google Drive pour le vocabulaire, les surlignages, les notes, les entrées IA et les conversations ; les sauvegardes JSON couvrent les réglages, le vocabulaire, les surlignages et les notes
 - Confidentiel par défaut : vos données restent dans votre navigateur, sans aucun pistage ; l'interface existe en 9 langues et tous les raccourcis sont configurables
 ```
 
@@ -245,19 +275,24 @@
 
 # リーダー
 - どんなページもすっきりしたリーダーに：目次・検索・脚注プレビュー付きの Markdown 表示。数式・図・表もきちんと表示されます
-- リーダーからそのまま保存：ポップアップに戻らず、記事の保存やブックマークの編集ができます
+- GitHub Discussions（試験対応）：読み込み済みの本文とコメント、返信の階層、採用された回答を保持し、取得した範囲も表示
+- 読みながらブックマークを管理：ポップアップに戻らず、Pinboardのブックマークを保存・編集・削除できます
 - 5 色のハイライトとメモ：翻訳しても、あとでページが書き換わっても、元の位置に残ります
 - ページ全体の翻訳とページへの質問：対訳表示に対応し、回答には出典への引用が付き、クリックで該当箇所へジャンプします
-- 質問と回答を引用付きで残す：完了した会話を単独でエクスポートすることも、記事に添えることもできます
-- 読みながら単語を調べる：読んでいる文に合った語義がまず表示されます。保存した単語はワンクリックで Anki や Eudic に送れ、中英・英中のオフライン辞書パックも選べます
-- メモと単語帳に専用ページ：保存した単語とハイライトが一か所に集まり、辞書検索も一括管理もできます
+- 質問と回答を引用付きで残す：完了した回答を自動保存し、Google ドライブで同期します。ライブラリで履歴を確認し、リーダーで質問を続けたり、単独または記事と一緒にエクスポートしたりできます。一時的な会話は保存しません。
+- 読みながら単語を調べる：辞書の語義と発音を確認できます。保存した単語はワンクリックで Anki や Eudic に送れ、中英・英中のオフライン辞書パックも選べます。AI辞書の説明言語は表示言語と別に設定でき、単語帳は言語で絞り込めます。 辞書のポップアップは端をドラッグしてサイズを変えたり、サイドパネルへ移したりできます。表示場所を切り替えても、検索結果・選択した語義・生成中の処理はそのまま引き継がれます。
+- 多言語オフライン辞書：Yomitan v3 の ZIP ファイルをインポートすると、このデバイスで語義と読みを調べられ、辞書パックは Drive 同期や JSON バックアップには含まれません。 漢英・英漢辞書を含むすべてのオフライン辞書は、データを削除せずに無効にできます。 構造を認識できる語義は例文や語源と分けて表示し、その他の内容は項目の全文として読めます。旧形式で取り込んだ辞書は再インポートすると構造を再解析でき、保存済みの単語や辞書の有効・無効の設定は変わりません。
+- AI辞書：まず母語または指定した言語で意味・発音・例文を確認し、必要に応じて語源・関連語、用法の補足、出典付きの文学用例を個別に生成できます。補足の一部だけが有効な場合は、その部分を残して不足を表示し、残りだけを追加生成できます。結果全体は接続済みの Google ドライブで同期され、更新前の版も保持されます。初期表示は辞書と AI から選べ、基本項目の自動生成は別途有効にします。
+- 選択した文章を文脈から理解：「解説」で今の記事における単語や段落の意味を確認できます。辞書では一般的な意味と使い方を調べられます。
+- ライブラリ：ハイライト、ノート、保存した単語と会話を一か所で確認できます。辞書検索や単語の一括管理にも対応しています。辞書の検索結果から語義を選んで単語を保存し、編集可能な基本形で関連する語形をまとめられます。メモと学習状態は単語ごとに保持されます。
+- 単語の情報をまとめてエクスポート：専用の多言語Ankiノートタイプを選ぶと、つづりが同じでも言語が違う単語を区別できます。完全なTSVにはメモ、基本形、各文脈とその出典を保存でき、従来の6フィールド形式も引き続き使えます
 - 送信もダウンロードも：記事を普段使いのノートアプリや自分の webhook に送ったり、電子書籍として保存してリーダーで読んだりできます
 - 読みながら観る：YouTube と Bilibili の動画の横に、再生に合わせて流れる字幕を表示。AI タグと要約も字幕を直接読めます
 
 # カスタマイズ
 - pinboard.in 用テーマ 13 種：サイト自体をライトにもダークにも着せ替えられ、自分のカスタム CSS も重ねられます
 - Wayback Machine へ自動アーカイブ：保存したページごとにスナップショットを残すので、元のリンクが切れても読めます
-- バックアップと同期：設定は Chrome Sync、単語とハイライトは自分の Google ドライブで同期し、JSON ファイルにはそのすべてをバックアップできます
+- バックアップと同期：設定は Chrome Sync、単語帳・ハイライト・メモ・AI 辞書項目・会話履歴は自分の Google ドライブ で同期。JSON バックアップには設定・単語帳・ハイライト・メモを含められます
 - プライバシー重視：データはブラウザー内に保存され、トラッキングは一切なし。9 言語に対応し、ショートカットも自由に変更できます
 ```
 
@@ -281,19 +316,24 @@
 
 # Czytanie
 - Każda strona staje się czytelna — widok Markdown ze spisem treści, wyszukiwaniem i podglądem przypisów; wzory, diagramy i tabele wyświetlają się poprawnie
-- Zapisuj prosto z czytnika — dodawaj artykuł do zakładek lub edytuj jego zakładkę bez wracania do okienka
+- GitHub Discussions (pilotaż) — zachowuje wczytany wpis główny, komentarze, strukturę odpowiedzi i oznaczenie zaakceptowanej odpowiedzi; pokazuje zakres pobranej treści
+- Zarządzaj zakładkami podczas czytania — zapisuj, edytuj lub usuwaj zakładkę artykułu w Pinboard bez wracania do okienka
 - Zaznaczenia w pięciu kolorach, z notatkami — zostają na swoim miejscu mimo tłumaczenia, a nawet późniejszych zmian na stronie
 - Przetłumacz stronę albo zadaj jej pytanie — tłumaczenie całości z widokiem dwujęzycznym; odpowiedzi cytują źródło i prowadzą prosto do niego
-- Zachowaj pytania i odpowiedzi z cytatami — eksportuj ukończone rozmowy osobno lub wraz z artykułem
-- Sprawdzaj słownictwo podczas czytania — słownik pokazuje najpierw znaczenie pasujące do bieżącego zdania; zapisane słówka wyślesz jednym kliknięciem do Anki lub Eudic, a do wyboru masz też słowniki offline chińsko-angielski i angielsko-chiński
-- Notatki i słówka mają własną stronę — zapisane słówka i zaznaczenia w jednym miejscu, z wyszukiwaniem w słowniku i zarządzaniem partiami
+- Zachowaj pytania i odpowiedzi z cytatami — gotowe odpowiedzi zapisują się automatycznie i synchronizują przez Google Drive. Przeglądaj rozmowy w bibliotece, kontynuuj w czytniku lub eksportuj osobno albo wraz z artykułem. Rozmowy tymczasowe nie są zapisywane.
+- Sprawdzaj słownictwo podczas czytania — przeglądaj definicje i wymowę w słowniku; zapisane słówka wyślesz jednym kliknięciem do Anki lub Eudic, a do wyboru masz też słowniki offline chińsko-angielski i angielsko-chiński. Wybierz język definicji w hasłach AI niezależnie od języka interfejsu i filtruj zapisane słowa według języka. Zmieniaj rozmiar okna słownika, przeciągając jego krawędzie, lub przenieś je do panelu bocznego — wyniki, wybrana definicja i trwające generowanie zostaną zachowane.
+- Wielojęzyczne słowniki offline — sprawdzaj definicje i zapis wymowy na tym urządzeniu w samodzielnie zaimportowanych plikach ZIP Yomitan v3; pakiety słowników nie są synchronizowane z Dyskiem Google ani uwzględniane w kopiach JSON. Każdy słownik offline, także chińsko-angielski i angielsko-chiński, można wyłączyć bez usuwania danych. Rozpoznane definicje są wyświetlane osobno od przykładów i pochodzenia słowa; pozostałą treść można przeczytać jako pełne hasło. Ponowny import starszych pakietów pozwala ponownie rozpoznać ich strukturę bez zmiany zapisanego słownictwa ani ustawienia włączenia lub wyłączenia słownika.
+- Hasła słownikowe AI — najpierw definicje, wymowa i przykłady w języku ojczystym lub wybranym języku objaśnień. Etymologię, powiązane wyrazy, wskazówki użycia i przykłady literackie ze źródłami można wygenerować osobno. Jeśli uzupełnienie jest niepełne, poprawne elementy pozostają dostępne, a brakujące można dodać oddzielnie. Pełne wyniki synchronizują się po połączeniu z Google Drive; aktualizacje zachowują wcześniejsze wersje. Wybierz słownik lub AI jako widok początkowy; automatyczne generowanie podstawowych haseł jest opcjonalne.
+- Zrozum zaznaczony tekst w kontekście — użyj funkcji Wyjaśnij, by zrozumieć słowo lub fragment bieżącego artykułu; słownik opisuje ogólne znaczenia i zastosowania.
+- Twoja biblioteka — wyróżnienia, notatki, zapisane słówka i rozmowy w jednym miejscu, z wyszukiwaniem w słowniku i zbiorczym zarządzaniem słownictwem. Zapisuj słowa bezpośrednio z wyników słownika, wybieraj definicje i łącz formy słów przez edytowalną formę podstawową. Każde słowo zachowuje własne notatki i stan nauki.
+- Pełny eksport słownictwa: osobny wielojęzyczny typ notatek Anki rozróżnia słowa o tej samej pisowni w różnych językach. Pełny TSV zachowuje notatki, formy podstawowe i wszystkie konteksty ze źródłami; dotychczasowe formaty z sześcioma polami nadal są dostępne
 - Wyślij albo pobierz — wyślij artykuł do swojej aplikacji z notatkami lub własnego webhooka albo zapisz go jako e-book na czytnik
 - Oglądaj podczas czytania — filmy z YouTube i Bilibili wyświetlają się obok transkrypcji, która podąża za odtwarzaniem; tagi i podsumowania AI mogą czytać napisy
 
 # Personalizacja
 - 13 motywów dla pinboard.in — jasne i ciemne wersje samej witryny oraz miejsce na własny CSS
 - Automatyczna archiwizacja w Wayback Machine — każda zapisana strona dostaje migawkę, więc przeczytasz ją nawet wtedy, gdy oryginalny link przestanie działać
-- Kopie zapasowe i synchronizacja — ustawienia przez Chrome Sync, słówka i zaznaczenia przez własny Dysk Google, a jeden plik JSON zabezpiecza to wszystko naraz
+- Kopie zapasowe i synchronizacja — Chrome Sync dla ustawień, własny Google Drive dla słownictwa, wyróżnień, notatek, haseł AI i rozmów; kopie JSON obejmują ustawienia, słownictwo, wyróżnienia i notatki
 - Prywatność przede wszystkim — dane zostają w przeglądarce, zero śledzenia; interfejs w 9 językach, a skróty można dowolnie zmieniać
 ```
 
@@ -317,18 +357,23 @@
 
 # Чтение
 - Любая страница превращается в режим чтения — Markdown-просмотр с оглавлением, поиском и предпросмотром сносок; формулы, диаграммы и таблицы отображаются правильно
-- Сохраняйте прямо из режима чтения — добавляйте статью в закладки или редактируйте её закладку, не возвращаясь к окну расширения
+- GitHub Discussions (пилотная поддержка) — сохраняет загруженный исходный пост, комментарии, связи между ответами и отметку принятого ответа; показывает объём извлечённого обсуждения
+- Управляйте закладками во время чтения — сохраняйте, изменяйте или удаляйте закладку статьи в Pinboard, не возвращаясь к окну расширения
 - Выделения пяти цветов с заметками — остаются на своих местах и после перевода, и после правок на самой странице
 - Переведите страницу или задайте ей вопрос — полный перевод с двуязычным режимом; ответы ссылаются на источник, и клик ведёт прямо к нему
-- Сохраняйте вопросы и ответы вместе с цитатами — экспортируйте завершённые беседы отдельно или вместе со статьёй
-- Ищите слова во время чтения — словарь сразу показывает значение, подходящее к предложению; сохранённые слова отправляются в Anki или Eudic в один клик, а офлайн-словари (китайско-английский и англо-китайский) подключаются по желанию
-- У заметок и словарика своя страница — сохранённые слова и выделения в одном месте, с поиском по словарю и пакетными действиями
+- Сохраняйте вопросы и ответы вместе с цитатами — готовые ответы сохраняются автоматически и синхронизируются через Google Диск. Просматривайте разговоры в библиотеке, продолжайте в режиме чтения или экспортируйте отдельно либо вместе со статьёй. Временные разговоры не сохраняются.
+- Ищите слова во время чтения — просматривайте определения и произношение; сохранённые слова отправляются в Anki или Eudic в один клик, а офлайн-словари (китайско-английский и англо-китайский) подключаются по желанию. Выбирайте язык определений в статьях AI независимо от языка интерфейса и фильтруйте сохранённые слова по языку. Меняйте размер окна словаря за края или переносите его на боковую панель — результаты, выбранное определение и текущая генерация сохранятся.
+- Многоязычные офлайн-словари — ищите определения и чтения слов на этом устройстве в импортированных ZIP-файлах Yomitan v3; пакеты словарей не входят в синхронизацию с Google Диском и резервные копии JSON. Любой офлайн-словарь, включая китайско-английский и англо-китайский, можно отключить без удаления данных. Если структура распознана, отдельные определения показываются отдельно от примеров и происхождения слова; остальное можно прочитать как полную статью. Повторный импорт старых пакетов заново обрабатывает их структуру, не меняя сохранённые слова и состояние словаря (включён или отключён).
+- Словарные статьи AI — сначала значения, произношение и примеры на родном или выбранном языке объяснений. Этимологию, связанную лексику, рекомендации по употреблению и литературные примеры с источниками можно запросить отдельно. Если дополнение получено не полностью, проверенные пункты сохраняются, а недостающие можно сгенерировать отдельно. Полные результаты синхронизируются через подключённый Google Диск; при обновлении прежние версии сохраняются. Начальный вид можно выбрать: словарь или ИИ; автоматическая генерация базовых статей включается отдельно.
+- Понимайте выделенный текст в контексте — используйте «Объяснить», чтобы понять слово или отрывок в текущей статье; словарь описывает общие значения и употребление.
+- Ваша библиотека — выделения, заметки, сохранённые слова и разговоры в одном месте, с поиском по словарю и пакетными действиями со словами. Сохраняйте слова прямо из словаря, выбирайте определение и связывайте формы слов через редактируемую начальную форму. У каждого слова остаются свои заметки и статус изучения.
+- Полный экспорт словаря: отдельный многоязычный тип заметок Anki различает одинаково написанные слова разных языков. Полный TSV сохраняет заметки, начальные формы и все контексты с источниками; прежние форматы с шестью полями остаются доступны
 - Отправить или скачать — отправляйте статьи в своё приложение для заметок или на собственный вебхук либо сохраняйте их как электронные книги для читалки
 - Смотрите, пока читаете — видео с YouTube и Bilibili показываются рядом с расшифровкой, которая следует за воспроизведением; AI-теги и резюме могут читать субтитры
 
 # Персонализация
 - 13 тем для pinboard.in — светлое и тёмное оформление самого сайта плюс место для своего CSS
 - Автоархив в Wayback Machine — снимок каждой сохранённой страницы, чтобы её можно было прочитать, даже когда исходная ссылка перестанет работать
-- Резервное копирование и синхронизация — настройки через Chrome Sync, словарик и выделения через ваш Google Диск, а файл JSON сохраняет всё это разом
+- Резервное копирование и синхронизация — Chrome Sync для настроек, ваш Google Диск для словарика, выделений, заметок, статей ИИ и разговоров; резервная копия JSON включает настройки, словарик, выделения и заметки
 - Конфиденциальность по умолчанию — данные остаются в браузере, никакого трекинга; интерфейс на 9 языках, все горячие клавиши настраиваются
 ```
