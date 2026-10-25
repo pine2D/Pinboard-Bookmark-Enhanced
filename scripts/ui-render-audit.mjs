@@ -9043,7 +9043,7 @@ async function runSweep(page, sw, extBase) {
       await installDictEntryFixture(page);
       await vocabHead.click();
       await page.locator("#vocab-lookup-go").click();
-      for (const state of ["idle", "busy", "result", "details", "cached", "error"]) {
+      for (const state of ["idle", "busy", "result", "details", "usage-scope", "usage-busy", "usage-error", "usage-result", "cached", "error"]) {
         if (wants("library", "dict-entry-" + state)) await scan("library", "dict-entry-" + state, () => openDictEntryState(page, state));
       }
     }
@@ -9149,6 +9149,7 @@ async function runSweep(page, sw, extBase) {
               await page.selectOption(".xp-dict-query-tools > .xp-dict-lang", "en");
             }
             await scan("md-preview", name, () => openDictEntryState(page, name.replace(/^dict-entry-/, "")));
+            if (name === "dict-entry-panel") await page.locator("#reader-dict-view .reader-dict-return").click();
             const following = READER_SURFACES.slice(READER_SURFACES.indexOf(name) + 1).find(next => wants("md-preview", next));
             if (!following?.startsWith("dict-entry-")) await page.evaluate(closeReaderSurface, "explain-dict");
             continue;

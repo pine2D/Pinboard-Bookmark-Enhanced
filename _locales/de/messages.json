@@ -4651,7 +4651,16 @@
   "dictResizeWidth": {"message": "Breite"},
   "dictResizeHeight": {"message": "Höhe"},
   "dictResizeReset": {"message": "Standardgröße wiederherstellen"},
-  "dictResizeHint": {"message": "Zum Ändern der Größe an einem Rand ziehen. Pfeiltasten passen die Größe in kleinen Schritten an; mit Umschalt werden die Schritte größer."},
+  "dictResizeHint": {"message": "Ziehe einen Rand, um die Größe zu ändern. Mit der Größentaste in der Titelleiste im Fokus kannst du die Pfeiltasten zur Feinabstimmung nutzen; mit Shift werden die Schritte größer."},
   "dictResizeSmaller": {"message": "Verkleinern"},
-  "dictResizeLarger": {"message": "Vergrößern"}
+  "dictResizeLarger": {"message": "Vergrößern"},
+  "readerPanelLabel": {"message": "Lesehilfen"},
+  "readerAskTab": {"message": "Fragen"},
+  "readerDictTab": {"message": "Wörterbuch"},
+  "dictOpenInPanel": {"message": "In der Seitenleiste öffnen"},
+  "dictReturnToBubble": {"message": "Zurück zum schwebenden Fenster"},
+  "dictPanelEmpty": {"message": "Wähle ein Wort im Artikel aus oder gib oben ein Wort zum Nachschlagen ein."},
+  "dictLookupInPanel": {"message": "In der Seitenleiste nachschlagen"},
+  "dictSupplementScope": {"message": "Situation eingrenzen"},
+  "dictSupplementSaving": {"message": "Ergänzung wird gespeichert…"}
 }

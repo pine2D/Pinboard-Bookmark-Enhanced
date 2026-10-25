@@ -7859,7 +7859,7 @@ suite("skim status line", () => {
       window.pbpDictRun = () => new Promise((resolve) => { resolveDict = resolve; });
       _pbpExplainAction = "dict";
       const pendingDict = _pbpExplainRun(cap, ctx, pop);
-      assertEq(pop.querySelector(".xp-body .sr-only").textContent, "dictLoading", "dictionary loading announcement");
+      assertEq(pop.querySelector(".reader-dict-session .xp-body [role=status]").textContent, "dictLoading", "dictionary loading announcement");
       resolveDict();
       await pendingDict;
     } finally {

@@ -257,6 +257,8 @@
         "xp-dict-packs",
         "xp-dict-legacy",
         "vocab-lookup-actions",
+        "xp-dict-usage-actions",
+        "xp-dict-usage-feedback",
         "ask-library-workbench",
         "ask-library-index",
         "ask-library-scroll",
@@ -501,6 +503,12 @@
         "xp-dict-legacy",
         "xp-dict-query-tools",
         "xp-resize-hit",
+        "reader-panel-tabs",
+        "reader-panel-view",
+        "reader-dict-session",
+        "reader-dict-search",
+        "xp-dict-usage-actions",
+        "xp-dict-usage-feedback",
         "confirm-actions"
       ],
       "regions": [

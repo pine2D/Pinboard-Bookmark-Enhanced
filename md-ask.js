@@ -30,6 +30,13 @@ function pbpAskIsTypingTarget(el) {
 
 let _pbpAskState = null;
 let _pbpAskRailHandle = null; // rail accordion (spec 2026-07-04): headless handle, see _pbpAskBuildRailEntry
+let _pbpReaderPanel = null;
+let _pbpReaderPanelView = "ask";
+let _pbpReaderPanelOpener = null;
+let _pbpReaderDictSession = null;
+let _pbpReaderDictDocked = false;
+let _pbpReaderLookupRevision = 0;
+let _pbpReaderPanelRevision = 0;
 // Article revision (in-place transcript replacement, md-preview.js
 // _applyArticleCommit). Module-level rather than a field of _pbpAskState: the
 // history restore and the explain popover both need the fence and neither can
@@ -81,9 +88,11 @@ async function pbpAskInit(detail) {
   // [popover] (explain, top layer) closes itself first - we yield to both.
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
+      if (e.defaultPrevented) return;
       if (!_pbpAskIsOpen()) return;
       if (document.body.classList.contains("rail-open")) return;
       try { if (document.querySelector(":popover-open")) return; } catch (_) {}
+      e.preventDefault();
       _pbpAskSetOpen(false);
       return;
     }
@@ -91,7 +100,7 @@ async function pbpAskInit(detail) {
     if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
     if (pbpAskIsTypingTarget(e.target)) return;
     e.preventDefault();
-    _pbpAskSetOpen(!_pbpAskIsOpen());
+    _pbpAskSetOpen(!_pbpAskIsOpen() || _pbpReaderPanelView !== "ask");
   });
 
   // Bridge for the explain popover's "ask a follow-up" footer button:
@@ -182,7 +191,257 @@ function _pbpAskBuildRailEntry() {
   if (translation) translation.insertAdjacentElement("afterend", sec);
   else if (primaryAnchor) rail.insertBefore(sec, primaryAnchor);
   else anchor.insertAdjacentElement("afterend", sec);
-  btn.addEventListener("click", () => _pbpAskSetOpen(!_pbpAskIsOpen()));
+  btn.addEventListener("click", () => _pbpAskSetOpen(!_pbpAskIsOpen() || _pbpReaderPanelView !== "ask"));
+}
+
+// The non-modal shell exists independently of Ask setup. Offline dictionary
+// lookup remains available even when AI is disabled or Ask has not initialized.
+function _pbpReaderEnsurePanel() {
+  if (_pbpReaderPanel) return _pbpReaderPanel;
+  const panel = document.createElement("aside"); panel.id = "ask-panel";
+  panel.hidden = true; panel.setAttribute("aria-label", t("readerPanelLabel"));
+  const head = document.createElement("header"); head.className = "panel-head";
+  const tabs = document.createElement("div"); tabs.className = "view-toggle reader-panel-tabs";
+  tabs.setAttribute("role", "tablist"); tabs.setAttribute("aria-label", t("readerPanelLabel"));
+  for (const view of ["ask", "dict"]) {
+    const tab = document.createElement("button"); tab.type = "button"; tab.id = "reader-tab-" + view;
+    tab.className = "toggle-btn"; tab.setAttribute("role", "tab"); tab.dataset.view = view;
+    tab.textContent = t(view === "ask" ? "readerAskTab" : "readerDictTab");
+    tab.setAttribute("aria-controls", "reader-" + view + "-view");
+    tab.addEventListener("click", () => _pbpReaderSelectView(view));
+    tab.addEventListener("keydown", e => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+      e.preventDefault();
+      const next = e.key === "Home" ? "ask" : e.key === "End" ? "dict" : view === "ask" ? "dict" : "ask";
+      _pbpReaderSelectView(next); document.getElementById("reader-tab-" + next).focus();
+    });
+    tabs.appendChild(tab);
+  }
+  const close = document.createElement("button"); close.type = "button"; close.id = "ask-close";
+  close.className = "ask-ic"; close.innerHTML = PBP_ASK_CLOSE_SVG;
+  close.title = t("askClose"); close.setAttribute("aria-label", t("askClose"));
+  close.addEventListener("click", () => _pbpAskSetOpen(false));
+  head.append(tabs, close); panel.appendChild(head);
+  for (const view of ["ask", "dict"]) {
+    const content = document.createElement("section"); content.id = "reader-" + view + "-view";
+    content.className = "reader-panel-view"; content.setAttribute("role", "tabpanel");
+    content.setAttribute("aria-labelledby", "reader-tab-" + view); content.hidden = view !== "ask";
+    panel.appendChild(content);
+  }
+  const ask = panel.querySelector("#reader-ask-view");
+  const unavailable = document.createElement("p"); unavailable.className = "ask-empty";
+  unavailable.textContent = t("explainAiNotConfigured"); ask.appendChild(unavailable);
+  const dict = panel.querySelector("#reader-dict-view");
+  const form = document.createElement("form"); form.className = "row reader-dict-search";
+  const query = document.createElement("input"); query.type = "search"; query.id = "reader-dict-query";
+  query.maxLength = 200; query.placeholder = t("libraryLookupPlaceholder");
+  query.setAttribute("aria-label", t("libraryLookupAria"));
+  const lookup = document.createElement("button"); lookup.type = "submit"; lookup.className = "action-btn";
+  lookup.textContent = t("libraryLookupGo");
+  form.append(query, lookup);
+  form.addEventListener("submit", e => {
+    e.preventDefault(); const term = query.value.trim(); if (!term) { query.focus(); return; }
+    _pbpReaderLookup({ text: term, n: 0 }, { sentence: "", blockText: "", prevText: "", nextText: "" }, "panel");
+  });
+  const empty = document.createElement("p"); empty.id = "reader-dict-empty"; empty.className = "ask-empty";
+  empty.textContent = t("dictPanelEmpty"); dict.append(form, empty);
+  document.body.appendChild(panel); _pbpReaderPanel = panel;
+  if (typeof ResizeObserver === "function") new ResizeObserver(() => {
+    document.body.style.setProperty("--pbp-ask-sheet-h", Math.ceil(panel.getBoundingClientRect().height) + "px");
+  }).observe(panel);
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Escape" || e.defaultPrevented || !_pbpAskIsOpen() || document.body.classList.contains("rail-open")) return;
+    if (document.querySelector(":popover-open")) return;
+    e.preventDefault(); _pbpAskSetOpen(false);
+  });
+  for (const tab of tabs.children) {
+    const active = tab.dataset.view === _pbpReaderPanelView;
+    tab.setAttribute("aria-selected", String(active)); tab.setAttribute("aria-pressed", String(active));
+    tab.tabIndex = active ? 0 : -1;
+  }
+  return panel;
+}
+
+function _pbpReaderSelectView(view) {
+  const panel = _pbpReaderPanel;
+  if (!panel) return;
+  _pbpReaderPanelRevision++;
+  _pbpReaderPanelView = view === "dict" ? "dict" : "ask";
+  if (_pbpReaderPanelView === "ask") _pbpAskBuildPanel();
+  else {
+    _pbpReaderDictDocked = true;
+    if (_pbpReaderDictSession?.host === "bubble") _pbpReaderMoveDict(_pbpReaderDictSession, "panel");
+  }
+  panel.dataset.view = _pbpReaderPanelView;
+  for (const tab of panel.querySelectorAll('[role="tab"]')) {
+    const active = tab.dataset.view === _pbpReaderPanelView;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active)); tab.setAttribute("aria-pressed", String(active));
+    tab.tabIndex = active ? 0 : -1;
+    panel.querySelector("#reader-" + tab.dataset.view + "-view").hidden = !active;
+  }
+}
+
+function _pbpReaderDictOwner() {
+  const account = _pbpExplainPage.account ?? _pbpAskState?.account ?? "";
+  return typeof pbpDictOwnerScope === "function" ? pbpDictOwnerScope(account) : account;
+}
+
+function _pbpReaderForgetDict(keepExitContent = false) {
+  _pbpReaderLookupRevision++;
+  if (!keepExitContent) _pbpExplainPopEl?.querySelectorAll(':scope > .reader-dict-session[data-retired]').forEach(node => node.remove());
+  const session = _pbpReaderDictSession;
+  if (!session) return;
+  _pbpReaderDictSession = null;
+  session.ctrl.abort(); session.titleObserver?.disconnect();
+  // A genuine bubble dismissal retains its inert contents for the existing
+  // fade-out. The next open removes this retired subtree before rendering.
+  if (!keepExitContent) session.root.remove();
+  else {
+    session.root.dataset.retired = "true";
+    requestAnimationFrame(() => {
+      const animations = session.root.parentElement?.getAnimations() || [];
+      Promise.allSettled(animations.map(animation => animation.finished)).then(() => session.root.remove());
+    });
+  }
+  if (typeof window.pbpDictOnActionSwitch === "function") window.pbpDictOnActionSwitch();
+  const empty = document.getElementById("reader-dict-empty"); if (empty) empty.hidden = false;
+  const query = document.getElementById("reader-dict-query"); if (query) query.value = "";
+}
+
+function _pbpReaderDictAnchor(session) {
+  const body = session.root.querySelector(".xp-body"), box = body.getBoundingClientRect();
+  if (!box.height) return null;
+  const node = [...body.querySelectorAll(".xp-dict-entry, .xp-dict-sense, .xp-dict-ai-details, p, li")]
+    .find(el => { const r = el.getBoundingClientRect(); return r.height && r.bottom > box.top && r.top < box.bottom; });
+  return node ? { node, offset: node.getBoundingClientRect().top - box.top } : null;
+}
+
+function _pbpReaderMoveDict(session, host) {
+  const anchor = _pbpReaderDictAnchor(session), focused = session.root.contains(document.activeElement) ? document.activeElement : null;
+  const pop = _pbpExplainEnsurePop();
+  session.root.dataset.host = host;
+  if (host === "panel") {
+    if (session.host === "bubble" && pop.matches(":popover-open")) {
+      const r = pop.getBoundingClientRect();
+      session.bubble = { left: r.left, top: r.top, pinned: _pbpExplainPinned, focus: _pbpExplainFocusSource };
+    }
+    session.host = "panel"; _pbpReaderDictDocked = true;
+    const panel = _pbpReaderEnsurePanel();
+    panel.querySelector("#reader-dict-view").appendChild(session.root);
+    panel.querySelector("#reader-dict-empty").hidden = true;
+    const query = panel.querySelector("#reader-dict-query");
+    if (document.activeElement !== query) query.value = session.root.querySelector(".xp-term").textContent;
+    // The session has already left the popover, so closing that shell cannot
+    // cancel its controller or remove its DOM. No duplicate renderer exists.
+    if (_pbpExplainAction === "dict") { pop.dataset.transferring = "true"; _pbpExplainClose(pop); }
+    _pbpAskSetOpen(true, "dict");
+    if (_pbpExplainVisibleFocusTarget(session.bubble?.focus)) _pbpReaderPanelOpener = session.bubble.focus;
+  } else {
+    delete pop.dataset.transferring;
+    if (_pbpExplainAbort) { _pbpExplainAbort.abort(); _pbpExplainAbort = null; }
+    session.host = "bubble"; _pbpReaderDictDocked = false;
+    _pbpExplainAction = "dict"; _pbpExplainCap = session.cap; _pbpExplainCtx = session.ctx;
+    _pbpExplainSyncActButtons(pop); pop.appendChild(session.root);
+    pop.querySelector(":scope > .xp-head .xp-term").textContent = session.root.querySelector(".xp-term").textContent;
+    if (!pop.matches(":popover-open")) pop.showPopover();
+    _pbpExplainAnchorBottom = null;
+    _pbpExplainFitDictSize(pop);
+    const rect = session.bubble || session.cap.rect || { left: 16, top: 16 };
+    _pbpExplainPlace(pop, rect.left, rect.top);
+    _pbpExplainSetPinned(pop, session.bubble?.pinned || false);
+    _pbpExplainFocusSource = session.bubble?.focus || _pbpExplainFocusSource;
+    if (_pbpAskIsOpen() && _pbpReaderPanelView === "dict") _pbpAskSetOpen(false);
+    pop.querySelector(".xp-dock").focus({ preventScroll: true });
+  }
+  if (anchor?.node.isConnected) {
+    const body = session.root.querySelector(".xp-body");
+    body.scrollTop += anchor.node.getBoundingClientRect().top - body.getBoundingClientRect().top - anchor.offset;
+  }
+  if (focused?.isConnected && focused.getClientRects().length) focused.focus({ preventScroll: true });
+}
+
+function _pbpReaderNewDict(cap, ctx) {
+  const root = document.createElement("div"); root.className = "reader-dict-session";
+  const head = document.createElement("header"); head.className = "panel-head";
+  const term = document.createElement("h2"); term.className = "xp-term"; term.textContent = cap.text;
+  const back = document.createElement("button"); back.type = "button"; back.className = "ask-ic reader-dict-return";
+  back.title = t("dictReturnToBubble"); back.setAttribute("aria-label", t("dictReturnToBubble"));
+  back.innerHTML = PBP_ICONS.panelRightClose || PBP_ICONS.viewMode;
+  head.append(term, back);
+  const body = document.createElement("div"); body.className = "xp-body"; body.setAttribute("aria-busy", "true");
+  const loading = document.createElement("p"); loading.className = "xp-dict-msg"; loading.setAttribute("role", "status"); loading.textContent = t("dictLoading");
+  body.appendChild(loading);
+  const foot = _pbpExplainBuildFoot(root); foot.querySelector(".xp-model").hidden = true;
+  root.append(head, body, foot);
+  pbpInitDictDisclosures(root);
+  const session = { root, cap, ctx, ctrl: new AbortController(), owner: _pbpReaderDictOwner(), revision: _pbpAskArticleRev,
+    host: "bubble", bubble: null };
+  back.addEventListener("click", () => { if (_pbpReaderDictSession === session) _pbpReaderMoveDict(session, "bubble"); });
+  if (typeof MutationObserver === "function") {
+    session.titleObserver = new MutationObserver(() => {
+      if (_pbpReaderDictSession !== session) return;
+      if (session.host === "bubble" && _pbpExplainAction === "dict") {
+        const title = _pbpExplainPopEl?.querySelector(":scope > .xp-head .xp-term");
+        if (title) { title.textContent = term.textContent; title.title = term.textContent; }
+      }
+      const query = document.getElementById("reader-dict-query");
+      if (query && document.activeElement !== query) query.value = term.textContent;
+    });
+    session.titleObserver.observe(term, { childList: true, characterData: true, subtree: true });
+  }
+  return session;
+}
+
+async function _pbpReaderLookup(cap, ctx, host) {
+  const requestRevision = ++_pbpReaderLookupRevision;
+  const panelRevision = _pbpReaderPanelRevision;
+  const text = typeof pbpDictNormalizeTerm === "function" ? pbpDictNormalizeTerm(cap.text) : String(cap.text || "").trim();
+  if (!text) return;
+  const identity = typeof window.pbpDictCurrentIdentity === "function" ? window.pbpDictCurrentIdentity() : null;
+  let session = _pbpReaderDictSession;
+  let same = session && !session.ctrl.signal.aborted && session.owner === _pbpReaderDictOwner()
+    && session.revision === _pbpAskArticleRev && (identity?.term || session.cap.text) === text;
+  const fromArticle = !!(cap.range || cap.itemId);
+  if (same && fromArticle && typeof window.pbpDictResolveContextLanguage === "function") {
+    const language = await window.pbpDictResolveContextLanguage(cap, ctx);
+    if (requestRevision !== _pbpReaderLookupRevision || panelRevision !== _pbpReaderPanelRevision
+        || _pbpReaderDictSession !== session
+        || session.ctrl.signal.aborted || session.owner !== _pbpReaderDictOwner()
+        || session.revision !== _pbpAskArticleRev) return;
+    const current = window.pbpDictCurrentIdentity?.();
+    same = !!language && !!current && current.term === identity?.term
+      && current.owner === identity?.owner && current.language === language;
+  } else if (same && fromArticle) {
+    same = !ctx.selLang || !identity?.language || identity.language === ctx.selLang;
+  }
+  if (same) {
+    if (fromArticle && typeof window.pbpDictUpdateContext === "function"
+        && window.pbpDictUpdateContext(cap, ctx)) { session.cap = cap; session.ctx = ctx; }
+    if (session.host !== host || host === "panel") _pbpReaderMoveDict(session, host);
+    return;
+  }
+  _pbpReaderForgetDict();
+  session = _pbpReaderNewDict({ ...cap, text }, ctx); _pbpReaderDictSession = session;
+  if (host === "panel") _pbpReaderMoveDict(session, host);
+  else {
+    session.root.dataset.host = "bubble";
+    const pop = _pbpExplainEnsurePop();
+    pop.querySelectorAll(':scope > .reader-dict-session[data-retired]').forEach(node => node.remove());
+    pop.appendChild(session.root); _pbpExplainSyncActButtons(pop);
+  }
+  try {
+    const settings = _pbpExplainSettings || await pbpAiGetSettings();
+    if (_pbpReaderDictSession !== session || session.ctrl.signal.aborted) return;
+    window.pbpDictSetSaveTarget?.(cap.itemId ? { itemId: cap.itemId } : { range: cap.range });
+    await window.pbpDictRun(session.cap, session.ctx, session.root, session.ctrl, settings);
+  } catch (error) {
+    if (session.ctrl.signal.aborted || _pbpReaderDictSession !== session) return;
+    console.warn("[dict-panel] lookup failed:", error?.name);
+    session.root.querySelector(".xp-body").textContent = t("dictLoadFailed");
+  } finally {
+    if (_pbpReaderDictSession === session) session.root.querySelector(".xp-body").removeAttribute("aria-busy");
+  }
 }
 
 // Lazy panel mount (first open pays the cost; spec 3.1 lazy-UI rule).
@@ -192,11 +451,9 @@ function _pbpAskBuildRailEntry() {
 function _pbpAskBuildPanel() {
   if (!_pbpAskState) return null;
   if (_pbpAskState.panel) return _pbpAskState.panel;
-  const panel = document.createElement("aside");
-  panel.id = "ask-panel";
-  panel.hidden = true;
-  panel.setAttribute("aria-labelledby", "ask-title");
-  panel.innerHTML = [
+  const panel = _pbpReaderEnsurePanel();
+  const content = panel.querySelector("#reader-ask-view");
+  content.innerHTML = [
     '<header class="panel-head">',
     '  <h2 id="ask-title" data-i18n="askTitle" data-i18n-title="askTitle">Ask the page</h2>',
     '  <button type="button" id="ask-new" class="ask-ic" data-i18n-title="askNewConversation" data-i18n-aria="askNewConversation">' + (typeof PBP_ICONS !== "undefined" ? PBP_ICONS.plus : "") + '</button>',
@@ -208,7 +465,6 @@ function _pbpAskBuildPanel() {
     '  <button type="button" id="ask-export" class="ask-ic" data-i18n-title="askCopyThread" data-i18n-aria="askCopyThread">' + PBP_ASK_COPY_SVG + '</button>',
     '  <button type="button" id="ask-export-conversation" class="ask-ic" data-i18n-title="askExportConversation" data-i18n-aria="askExportConversation">' + (typeof PBP_ICONS !== "undefined" ? PBP_ICONS.download : "") + '</button>',
     '  <button type="button" id="ask-clear" class="ask-ic" data-i18n-title="askDeleteConversation" data-i18n-aria="askDeleteConversation">' + PBP_ASK_CLEAR_SVG + '</button>',
-    '  <button type="button" id="ask-close" class="ask-ic" data-i18n-title="askClose" data-i18n-aria="askClose">' + PBP_ASK_CLOSE_SVG + '</button>',
     '</header>',
     '<div id="ask-storage" role="status" aria-live="polite"></div>',
     '<label id="ask-temporary-label"><input type="checkbox" id="ask-temporary"><span data-i18n="askTemporary"></span></label>',
@@ -235,8 +491,7 @@ function _pbpAskBuildPanel() {
   // message is a complete, natural question. (A JS pass used to append
   // ": <topic>" on top, which glued a title onto an already-finished
   // question in every locale - "What is the main argument?: Setup".)
-  applyI18n(panel);
-  document.body.appendChild(panel);
+  applyI18n(content);
   _pbpAskState.panel = panel;
   panel.querySelector("#ask-new").addEventListener("click", () => _pbpAskNewConversation());
   panel.querySelector("#ask-history").addEventListener("click", () => {
@@ -248,19 +503,6 @@ function _pbpAskBuildPanel() {
     st.temporary = event.target.checked;
     _pbpAskArchiveStatus();
   });
-  // The bottom sheet's real height, for the article's scroll room under it
-  // (md-preview.css `body.ask-open main { margin-bottom }`, <=1200px). A
-  // fixed 70vh (the sheet's max-height) left most of a blank screen after
-  // the last paragraph whenever the sheet was shorter, e.g. before the first
-  // answer. Side-column mode never reads the variable.
-  if (typeof ResizeObserver === "function") {
-    new ResizeObserver((entries) => {
-      const box = entries[entries.length - 1];
-      const size = box && box.borderBoxSize && box.borderBoxSize[0];
-      const h = size ? size.blockSize : panel.getBoundingClientRect().height;
-      document.body.style.setProperty("--pbp-ask-sheet-h", `${Math.ceil(h || 0)}px`);
-    }).observe(panel);
-  }
   // #ask-thread now exists in the live document — restore history straight
   // away instead of polling for it via MutationObserver (audit #28).
   // _pbpAskHistRestore is idempotent (_pbpAskHistRestored guard) and a no-op
@@ -270,7 +512,6 @@ function _pbpAskBuildPanel() {
   // the panel.
   _pbpAskHistRestore().catch(() => {});
 
-  panel.querySelector("#ask-close").addEventListener("click", () => _pbpAskSetOpen(false));
   // Scope toggle (research T1.5): session-only state, no storage; the
   // context is rebuilt on the next meta/send pass.
   panel.querySelector("#ask-scope-near").addEventListener("click", (ev) => {
@@ -365,7 +606,7 @@ function _pbpAskSettleClear() {
 }
 
 // The same breakpoint md-preview.css uses to turn the panel into a bottom
-// sheet: `@media (max-width: 1200px) { body.ask-open main { margin-right: 0 } }`
+// sheet: `@media (max-width: 1280px) { body.ask-open main { margin-right: 0 } }`
 // (md-preview.css:2983-2984). At or below it, opening Ask changes NOTHING
 // about the article's layout, so capturing an anchor and arming a document
 // listener would buy exactly nothing. Video mode is NOT special-cased in
@@ -378,7 +619,7 @@ function _pbpAskSettleClear() {
 function _pbpAskLayoutShifts() {
   if (typeof window.matchMedia !== "function") return true;
   try {
-    return !window.matchMedia("(max-width: 1200px)").matches;
+    return !window.matchMedia("(max-width: 1280px)").matches;
   } catch (_) {
     return true; // no media support: behave like the wide tier rather than silently skip
   }
@@ -427,10 +668,11 @@ function _pbpAskSettleAnchor(anchor) {
 // while the panel is open. Therefore: no focus trap, no scrim, no
 // aria-modal (deliberately UNLIKE setupDrawer's modal rail drawer, which
 // overlays the page). Esc and the close button dismiss it.
-function _pbpAskSetOpen(open) {
-  const panel = _pbpAskBuildPanel();
-  if (!panel) return;
+function _pbpAskSetOpen(open, view = "ask") {
+  const panel = _pbpReaderEnsurePanel();
+  if (!open) _pbpReaderPanelRevision++;
   if (open) {
+    _pbpReaderSelectView(view);
     const drawerWasOpen = document.body.classList.contains("rail-open");
     const ae = document.activeElement;
     if (drawerWasOpen) pbpRailDrawerClose();
@@ -439,9 +681,10 @@ function _pbpAskSetOpen(open) {
     // so this is focus-RETURN only, not a trap). Skip if focus is already
     // inside the panel (e.g. re-open while open).
     const opener = drawerWasOpen ? document.getElementById("rail-toggle") : ae;
-    if (opener && opener !== document.body && !panel.contains(opener)) _pbpAskState.opener = opener;
+    if (opener && opener !== document.body && !panel.contains(opener)) _pbpReaderPanelOpener = opener;
   }
   const anchor = _pbpAskCaptureAnchor(); // K84: before the layout change, both directions
+  const focusInPanel = panel.contains(document.activeElement);
   document.body.classList.toggle("ask-open", open);
   // First-ever open: _pbpAskBuildPanel just appendChild'd the panel in this
   // same synchronous task, so without a style flush between mount and the
@@ -451,25 +694,30 @@ function _pbpAskSetOpen(open) {
   // like every later one -- same void-offsetWidth trick _pbpAskFlash below
   // already uses to restart its fallback animation.
   if (open && panel.hidden) void panel.offsetWidth;
-  panel.hidden = !open;
+  if (open) { panel.hidden = false; panel.inert = false; }
   const btn = document.getElementById("ask-open");
   if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
   if (open) {
     // Transparency-line seam: implemented by the send-flow task.
-    if (typeof _pbpAskUpdateMeta === "function") _pbpAskUpdateMeta();
-    const ta = document.getElementById("ask-input");
+    if (_pbpReaderPanelView === "ask" && typeof _pbpAskUpdateMeta === "function") _pbpAskUpdateMeta();
+    const ta = document.getElementById(_pbpReaderPanelView === "dict" ? "reader-dict-query" : "ask-input");
     (ta && !ta.disabled ? ta : document.getElementById("ask-history"))?.focus({ preventScroll: true });
   } else {
-    const op = _pbpAskState.opener;
+    const op = _pbpReaderPanelOpener;
     const isVisible = (el) => {
-      if (!el || typeof el.focus !== "function" || !document.contains(el)) return false;
+      if (!_pbpExplainVisibleFocusTarget(el)) return false;
       const rect = el.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.right > 0 &&
         rect.top < window.innerHeight && rect.left < window.innerWidth;
     };
     const focusTarget = [op, document.getElementById("ask-open"), document.getElementById("rail-toggle")].find(isVisible);
-    if (focusTarget) focusTarget.focus();
-    _pbpAskState.opener = null;
+    if (focusInPanel) {
+      if (focusTarget) focusTarget.focus({ preventScroll: true });
+      else _pbpExplainFocusReadingFallback(_pbpReaderDictSession?.cap);
+    }
+    panel.inert = true;
+    panel.hidden = true;
+    _pbpReaderPanelOpener = null;
   }
   // K84, last on purpose: the focus handoffs above are the only other thing
   // in this function that can move the viewport, so settling after them means
@@ -2866,7 +3114,7 @@ function pbpExplainRefreshSettings(s) {
 }
 
 function pbpExplainInit(detail) {
-  _pbpExplainPage = { url: (detail && detail.url) || "", title: (detail && detail.title) || "" };
+  _pbpExplainPage = { url: (detail && detail.url) || "", title: (detail && detail.title) || "", account: detail?.account || "" };
   pbpAiGetSettings().then((s) => {
     // dict P1: the surface exists for everyone; only the trigger ladder gates
     // it. AI-less runs of explain/translate render their own not-configured
@@ -3193,9 +3441,11 @@ function _pbpExplainDictResizeMenu(pop, handle) {
           ? size <= b["min" + axis] + 1 : size >= b["max" + axis] - 1));
       }
     }
-    const mr = menu.getBoundingClientRect(), vr = _pbpExplainViewport();
-    menu.style.left = Math.max(vr.left + 16, Math.min(r.right - mr.width, vr.left + vr.width - mr.width - 16)) + "px";
-    menu.style.top = Math.max(vr.top + 16, Math.min(r.bottom - mr.height - 28, vr.top + vr.height - mr.height - 16)) + "px";
+    const mr = menu.getBoundingClientRect(), vr = _pbpExplainViewport(), hr = handle.getBoundingClientRect();
+    const below = hr.bottom + 8, above = hr.top - mr.height - 8;
+    const top = below + mr.height <= vr.top + vr.height - 16 ? below : above;
+    menu.style.left = Math.max(vr.left + 16, Math.min(hr.right - mr.width, vr.left + vr.width - mr.width - 16)) + "px";
+    menu.style.top = Math.max(vr.top + 16, Math.min(top, vr.top + vr.height - mr.height - 16)) + "px";
   }
   if (!_pbpDictResizePop) {
     const menu = document.createElement("div");
@@ -3257,32 +3507,28 @@ function _pbpExplainInitResize(pop) {
   const hint = document.createElement("span"); hint.id = "xp-resize-hint";
   hint.className = "sr-only"; hint.textContent = t("dictResizeHint");
   pop.appendChild(hint);
+  const control = document.createElement("button"); control.type = "button";
+  control.className = "xp-resize-grip"; control.title = t("dictResize");
+  control.setAttribute("aria-label", t("dictResize")); control.setAttribute("aria-describedby", hint.id);
+  control.setAttribute("aria-haspopup", "dialog"); control.setAttribute("aria-expanded", "false");
+  control.setAttribute("aria-controls", "dict-resize-pop");
+  control.innerHTML = PBP_ICONS.moveDiagonal || PBP_ICONS.zen;
+  control.addEventListener("click", () => _pbpExplainDictResizeMenu(pop, control));
+  control.addEventListener("keydown", e => {
+    if (e.altKey || e.ctrlKey || e.metaKey || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+    e.preventDefault(); e.stopPropagation();
+    const step = e.shiftKey ? 32 : 8;
+    _pbpExplainAdjustDictSize(pop, e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0,
+      e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0);
+  });
+  pop.querySelector(".xp-window-actions").prepend(control);
   for (const edge of ["n", "e", "s", "w", "nw", "ne", "sw", "se"]) {
-    const handle = document.createElement(edge === "se" ? "button" : "span");
+    const handle = document.createElement("span");
     handle.className = "xp-resize"; handle.dataset.edge = edge;
-    let suppressClick = false;
-    if (edge === "se") {
-      handle.type = "button"; handle.classList.add("xp-resize-grip");
-      handle.title = t("dictResize"); handle.setAttribute("aria-label", t("dictResize"));
-      handle.setAttribute("aria-describedby", hint.id);
-      handle.setAttribute("aria-haspopup", "dialog"); handle.setAttribute("aria-expanded", "false");
-      handle.setAttribute("aria-controls", "dict-resize-pop");
-      handle.innerHTML = PBP_ICONS.moveDiagonal || PBP_ICONS.zen;
-      handle.addEventListener("click", e => {
-        if (suppressClick) { suppressClick = false; e.preventDefault(); return; }
-        _pbpExplainDictResizeMenu(pop, handle);
-      });
-      handle.addEventListener("keydown", e => {
-        if (e.altKey || e.ctrlKey || e.metaKey || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
-        e.preventDefault(); e.stopPropagation();
-        const step = e.shiftKey ? 32 : 8;
-        _pbpExplainAdjustDictSize(pop, e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0,
-          e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0);
-      });
-    } else handle.setAttribute("aria-hidden", "true");
+    handle.setAttribute("aria-hidden", "true");
     handle.addEventListener("pointerdown", e => {
       if (_pbpExplainAction !== "dict" || !e.isPrimary || e.button !== 0) return;
-      _pbpExplainResizeEnd(); suppressClick = false;
+      _pbpExplainResizeEnd();
       if (_pbpDictResizePop?.matches(":popover-open")) _pbpDictResizePop.hidePopover();
       _pbpExplainResize = { pop, handle, edge, pointerId: e.pointerId, rect: pop.getBoundingClientRect(),
         x: e.clientX, y: e.clientY, dx: 0, dy: 0, moved: false };
@@ -3295,7 +3541,7 @@ function _pbpExplainInitResize(pop) {
       drag.dx = e.clientX - drag.x; drag.dy = e.clientY - drag.y;
       if (!drag.moved && !(/[ew]/.test(edge) && Math.abs(drag.dx) >= 4)
           && !(/[ns]/.test(edge) && Math.abs(drag.dy) >= 4)) return;
-      drag.moved = true; suppressClick = true; pop.classList.add("xp-resizing");
+      drag.moved = true; pop.classList.add("xp-resizing");
       if (!_pbpExplainResizeFrame) _pbpExplainResizeFrame = requestAnimationFrame(_pbpExplainResizeFlush);
       e.preventDefault();
     });
@@ -3303,7 +3549,6 @@ function _pbpExplainInitResize(pop) {
       if (_pbpExplainResize?.pointerId !== e.pointerId) return;
       if (_pbpExplainResizeFrame) { cancelAnimationFrame(_pbpExplainResizeFrame); _pbpExplainResizeFlush(); }
       _pbpExplainResizeEnd();
-      setTimeout(() => { suppressClick = false; }, 0);
     });
     for (const name of ["pointercancel", "lostpointercapture"]) handle.addEventListener(name, e => {
       if (_pbpExplainResize?.pointerId === e.pointerId) _pbpExplainResizeEnd();
@@ -3356,10 +3601,10 @@ function _pbpExplainFocusPreventScroll(el) {
 // target programmatically focusable only while it owns focus, then restore
 // the DOM contract on blur. Prefer the invocation's logical block/side before
 // falling back to the rendered reading surface itself.
-function _pbpExplainFocusReadingFallback() {
+function _pbpExplainFocusReadingFallback(cap = _pbpExplainCap) {
   const view = document.getElementById("rendered-view");
   if (!view) return false;
-  const n = Number(_pbpExplainCap && _pbpExplainCap.n);
+  const n = Number(cap && cap.n);
   const original = n > 0 && typeof pbpAiBlockEl === "function" ? pbpAiBlockEl(n) : null;
   const translated = n > 0 ? view.querySelector('.pb-tr[data-pb-tr="' + n + '"]') : null;
   const target = [original, translated, view.querySelector("[data-pb]"), view.querySelector("[data-pb-tr]"), view]
@@ -3568,10 +3813,16 @@ const PBP_EXPLAIN_DIALOG_LABELS = Object.freeze({
 // Mirrors the live action onto both the action controls and dialog name.
 function _pbpExplainSyncActButtons(pop) {
   pop.dataset.action = _pbpExplainAction;
+  const dictHere = _pbpExplainAction === "dict" && _pbpReaderDictSession?.host === "bubble";
+  pop.querySelectorAll(":scope > .xp-body, :scope > .xp-foot").forEach(el => { el.hidden = dictHere; });
   _pbpExplainResizeEnd();
   _pbpExplainFitDictSize(pop);
   pop.querySelectorAll(".xp-act").forEach((btn) => {
     btn.setAttribute("aria-pressed", String(btn.dataset.action === _pbpExplainAction));
+    if (btn.dataset.action === "dict") {
+      const label = t(_pbpReaderDictDocked ? "dictLookupInPanel" : "explainActionDict");
+      btn.title = label; btn.setAttribute("aria-label", label);
+    }
   });
   pop.setAttribute("aria-label", t(PBP_EXPLAIN_DIALOG_LABELS[_pbpExplainAction] || "explainSelection"));
   // Dictionary has a wider reading measure. Re-clamp at the action change,
@@ -3583,131 +3834,7 @@ function _pbpExplainSyncActButtons(pop) {
   }
 }
 
-function _pbpExplainEnsurePop() {
-  if (_pbpExplainPopEl) return _pbpExplainPopEl;
-  const pop = document.createElement("div");
-  pop.id = "explain-pop";
-  pop.setAttribute("popover", "manual");
-  pop.setAttribute("role", "dialog");
-  pop.setAttribute("aria-modal", "false");
-  pop.setAttribute("aria-label", t("explainSelection"));
-  const head = document.createElement("div");
-  head.className = "xp-head";
-  const term = document.createElement("span");
-  term.className = "xp-term";
-  head.appendChild(term);
-  // Keep a real blank drag target between the title and controls. On narrow
-  // screens the action group wraps below, while this zone stays on the first
-  // row so dragging never depends on hitting truncated text.
-  const dragZone = document.createElement("span");
-  dragZone.className = "xp-drag-zone";
-  dragZone.setAttribute("aria-hidden", "true");
-  head.appendChild(dragZone);
-  const actGroup = document.createElement("div");
-  actGroup.className = "xp-act-group";
-  actGroup.setAttribute("role", "group");
-  const PBP_EXPLAIN_ACTION_LABELS = { explain: "explainActionExplain", translate: "explainActionTranslate", dict: "explainActionDict" };
-  // Labels ride title/aria; the selected segment is carried by aria-pressed.
-  const PBP_EXPLAIN_ACTION_ICONS = { explain: PBP_ICONS.messageSquareText, translate: PBP_ICONS.translate, dict: PBP_ICONS.book };
-  ["explain", "translate", "dict"].forEach((action) => {
-    const actBtn = document.createElement("button");
-    actBtn.type = "button";
-    actBtn.className = "xp-act";
-    actBtn.dataset.action = action;
-    actBtn.innerHTML = PBP_EXPLAIN_ACTION_ICONS[action]; // static shared constants
-    actBtn.title = t(PBP_EXPLAIN_ACTION_LABELS[action]);
-    actBtn.setAttribute("aria-label", t(PBP_EXPLAIN_ACTION_LABELS[action]));
-    actBtn.setAttribute("aria-pressed", String(action === _pbpExplainAction));
-    actBtn.addEventListener("click", () => {
-      // Click on the already-active action: no-op (spec 2.1 only defines
-      // behavior for clicking the INACTIVE action).
-      if (_pbpExplainAction === action) return;
-      _pbpExplainAction = action;
-      if (action !== "dict" && typeof window.pbpDictOnActionSwitch === "function") window.pbpDictOnActionSwitch();
-      _pbpExplainSyncActButtons(pop);
-      _pbpExplainRenderMeta(pop);
-      // Re-run with the SAME cap/ctx: existing abort-previous-stream in
-      // _pbpExplainRun handles the concurrency, no extra dedup needed.
-      if (_pbpExplainCap && _pbpExplainCtx) _pbpExplainRun(_pbpExplainCap, _pbpExplainCtx, pop);
-    });
-    actGroup.appendChild(actBtn);
-  });
-  head.appendChild(actGroup);
-  const windowActions = document.createElement("div");
-  windowActions.className = "xp-window-actions";
-  const moveHint = document.createElement("span");
-  moveHint.id = "xp-move-hint";
-  moveHint.className = "sr-only";
-  moveHint.textContent = t("explainMoveHint");
-  const pin = document.createElement("button");
-  pin.type = "button";
-  pin.className = "xp-pin";
-  pin.setAttribute("aria-describedby", moveHint.id);
-  pin.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight");
-  pin.innerHTML = PBP_EXPLAIN_PIN_SVG;
-  pin.addEventListener("click", () => _pbpExplainSetPinned(pop, !_pbpExplainPinned));
-  pin.addEventListener("keydown", (e) => {
-    if (!e.altKey || e.ctrlKey || e.metaKey || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
-    e.preventDefault();
-    _pbpExplainSetPinned(pop, true);
-    const rect = pop.getBoundingClientRect();
-    const left = parseFloat(pop.style.left) || rect.left;
-    const top = parseFloat(pop.style.top) || rect.top;
-    const dx = e.key === "ArrowLeft" ? -PBP_EXPLAIN_NUDGE : e.key === "ArrowRight" ? PBP_EXPLAIN_NUDGE : 0;
-    const dy = e.key === "ArrowUp" ? -PBP_EXPLAIN_NUDGE : e.key === "ArrowDown" ? PBP_EXPLAIN_NUDGE : 0;
-    _pbpExplainPlace(pop, left + dx, top + dy);
-  });
-  const close = document.createElement("button");
-  close.type = "button";
-  close.className = "xp-close";
-  close.title = t("explainClose");
-  close.setAttribute("aria-label", t("explainClose"));
-  close.innerHTML = PBP_EXPLAIN_CLOSE_SVG;
-  close.addEventListener("click", () => _pbpExplainClose(pop, true));
-  windowActions.appendChild(moveHint);
-  windowActions.appendChild(pin);
-  windowActions.appendChild(close);
-  head.appendChild(windowActions);
-
-  head.addEventListener("pointerdown", (e) => {
-    if (!e.isPrimary || e.button !== 0 || e.target.closest("button,a,input,select,textarea,label,[contenteditable]")) return;
-    const rect = pop.getBoundingClientRect();
-    // `moved` gates the commit. Pinning here, on pointerdown, meant a plain
-    // press on the header silently took the card out of light-dismiss (the
-    // outside-pointerdown handler bails while pinned) -- so a click that only
-    // meant to grab attention changed how the card closes, with nothing on
-    // screen saying so. Nothing is committed until the pointer actually travels.
-    _pbpExplainDrag = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, left: rect.left, top: rect.top, moved: false };
-    try { head.setPointerCapture(e.pointerId); } catch (_) {}
-    e.preventDefault();
-  });
-  head.addEventListener("pointermove", (e) => {
-    const drag = _pbpExplainDrag;
-    if (!drag || drag.pointerId !== e.pointerId) return;
-    if (!drag.moved) {
-      // 4px of hysteresis: below this it is a press, not a drag. Small because
-      // this is repositioning, not a directional swipe that needs to commit.
-      if (Math.abs(e.clientX - drag.x) < 4 && Math.abs(e.clientY - drag.y) < 4) return;
-      drag.moved = true;
-      _pbpExplainAnchorBottom = null; // the user owns the position from here on
-      _pbpExplainSetPinned(pop, true);
-      pop.classList.add("xp-dragging");
-    }
-    // Anchored to the original grab point, so total travel matches the pointer
-    // exactly; the first placed frame simply catches up the 4px already spent.
-    _pbpExplainPlace(pop, drag.left + e.clientX - drag.x, drag.top + e.clientY - drag.y);
-    e.preventDefault();
-  });
-  const endDrag = (e) => {
-    if (!_pbpExplainDrag || _pbpExplainDrag.pointerId !== e.pointerId) return;
-    _pbpExplainDrag = null;
-    pop.classList.remove("xp-dragging");
-    try { if (head.hasPointerCapture(e.pointerId)) head.releasePointerCapture(e.pointerId); } catch (_) {}
-  };
-  head.addEventListener("pointerup", endDrag);
-  head.addEventListener("pointercancel", endDrag);
-  const body = document.createElement("div");
-  body.className = "xp-body";
+function _pbpExplainBuildFoot(pop) {
   const foot = document.createElement("div");
   foot.className = "xp-foot";
   // The AI end of the footer: pre-request price + "provider · model"
@@ -3790,8 +3917,11 @@ function _pbpExplainEnsurePop() {
     const hadFocus = vocab.contains(document.activeElement);
     vocab.disabled = true;
     const myRunId = vocab.dataset.runId; // the run this click belongs to
+    const myContextRevision = vocab.dataset.contextRevision;
+    const myPackRevision = vocab.dataset.packRevision;
     const ok = await window.pbpDictSaveCurrent().catch(() => false);
-    if (vocab.dataset.runId !== myRunId) return; // a newer dict run owns the button now
+    if (vocab.dataset.runId !== myRunId || vocab.dataset.contextRevision !== myContextRevision ||
+        vocab.dataset.packRevision !== myPackRevision) return;
     if (ok) {
       // The word is in the book now, so the footer takes the saved-word face:
       // the save (or update) button steps aside and the Learning | Known
@@ -3864,6 +3994,149 @@ function _pbpExplainEnsurePop() {
   foot.appendChild(openVocab);
   model.appendChild(ask);
   foot.appendChild(model);
+  return foot;
+}
+
+function _pbpExplainEnsurePop() {
+  if (_pbpExplainPopEl) return _pbpExplainPopEl;
+  const pop = document.createElement("div");
+  pop.id = "explain-pop";
+  pop.setAttribute("popover", "manual");
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-modal", "false");
+  pop.setAttribute("aria-label", t("explainSelection"));
+  const head = document.createElement("div");
+  head.className = "xp-head";
+  const term = document.createElement("span");
+  term.className = "xp-term";
+  head.appendChild(term);
+  // Keep a real blank drag target between the title and controls. On narrow
+  // screens the action group wraps below, while this zone stays on the first
+  // row so dragging never depends on hitting truncated text.
+  const dragZone = document.createElement("span");
+  dragZone.className = "xp-drag-zone";
+  dragZone.setAttribute("aria-hidden", "true");
+  head.appendChild(dragZone);
+  const actGroup = document.createElement("div");
+  actGroup.className = "xp-act-group";
+  actGroup.setAttribute("role", "group");
+  const PBP_EXPLAIN_ACTION_LABELS = { explain: "explainActionExplain", translate: "explainActionTranslate", dict: "explainActionDict" };
+  // Labels ride title/aria; the selected segment is carried by aria-pressed.
+  const PBP_EXPLAIN_ACTION_ICONS = { explain: PBP_ICONS.messageSquareText, translate: PBP_ICONS.translate, dict: PBP_ICONS.book };
+  ["explain", "translate", "dict"].forEach((action) => {
+    const actBtn = document.createElement("button");
+    actBtn.type = "button";
+    actBtn.className = "xp-act";
+    actBtn.dataset.action = action;
+    actBtn.innerHTML = PBP_EXPLAIN_ACTION_ICONS[action]; // static shared constants
+    actBtn.title = t(PBP_EXPLAIN_ACTION_LABELS[action]);
+    actBtn.setAttribute("aria-label", t(PBP_EXPLAIN_ACTION_LABELS[action]));
+    actBtn.setAttribute("aria-pressed", String(action === _pbpExplainAction));
+    actBtn.addEventListener("click", () => {
+      if (action === "dict" && _pbpReaderDictDocked && _pbpExplainCap && _pbpExplainCtx) {
+        _pbpReaderLookup(_pbpExplainCap, _pbpExplainCtx, "panel");
+        _pbpExplainClose(pop); return;
+      }
+      // Click on the already-active action: no-op (spec 2.1 only defines
+      // behavior for clicking the INACTIVE action).
+      if (_pbpExplainAction === action) return;
+      _pbpExplainAction = action;
+      if (action !== "dict" && _pbpReaderDictSession?.host !== "panel") {
+        if (_pbpReaderDictSession) _pbpReaderForgetDict();
+        else window.pbpDictOnActionSwitch?.();
+      }
+      _pbpExplainSyncActButtons(pop);
+      _pbpExplainRenderMeta(pop);
+      // Re-run with the SAME cap/ctx: existing abort-previous-stream in
+      // _pbpExplainRun handles the concurrency, no extra dedup needed.
+      if (_pbpExplainCap && _pbpExplainCtx) _pbpExplainRun(_pbpExplainCap, _pbpExplainCtx, pop);
+    });
+    actGroup.appendChild(actBtn);
+  });
+  head.appendChild(actGroup);
+  const windowActions = document.createElement("div");
+  windowActions.className = "xp-window-actions";
+  const moveHint = document.createElement("span");
+  moveHint.id = "xp-move-hint";
+  moveHint.className = "sr-only";
+  moveHint.textContent = t("explainMoveHint");
+  const pin = document.createElement("button");
+  pin.type = "button";
+  pin.className = "xp-pin";
+  pin.setAttribute("aria-describedby", moveHint.id);
+  pin.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight");
+  pin.innerHTML = PBP_EXPLAIN_PIN_SVG;
+  pin.addEventListener("click", () => _pbpExplainSetPinned(pop, !_pbpExplainPinned));
+  pin.addEventListener("keydown", (e) => {
+    if (!e.altKey || e.ctrlKey || e.metaKey || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+    e.preventDefault();
+    _pbpExplainSetPinned(pop, true);
+    const rect = pop.getBoundingClientRect();
+    const left = parseFloat(pop.style.left) || rect.left;
+    const top = parseFloat(pop.style.top) || rect.top;
+    const dx = e.key === "ArrowLeft" ? -PBP_EXPLAIN_NUDGE : e.key === "ArrowRight" ? PBP_EXPLAIN_NUDGE : 0;
+    const dy = e.key === "ArrowUp" ? -PBP_EXPLAIN_NUDGE : e.key === "ArrowDown" ? PBP_EXPLAIN_NUDGE : 0;
+    _pbpExplainPlace(pop, left + dx, top + dy);
+  });
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "xp-close";
+  close.title = t("explainClose");
+  close.setAttribute("aria-label", t("explainClose"));
+  close.innerHTML = PBP_EXPLAIN_CLOSE_SVG;
+  close.addEventListener("click", () => _pbpExplainClose(pop, true));
+  windowActions.appendChild(moveHint);
+  const dock = document.createElement("button"); dock.type = "button"; dock.className = "xp-dock";
+  dock.innerHTML = PBP_ICONS.panelRightOpen || PBP_ICONS.viewMode;
+  dock.title = t("dictOpenInPanel"); dock.setAttribute("aria-label", t("dictOpenInPanel"));
+  dock.addEventListener("click", () => {
+    if (_pbpReaderDictSession?.host === "bubble") _pbpReaderMoveDict(_pbpReaderDictSession, "panel");
+  });
+  windowActions.appendChild(dock);
+  windowActions.appendChild(pin);
+  windowActions.appendChild(close);
+  head.appendChild(windowActions);
+
+  head.addEventListener("pointerdown", (e) => {
+    if (!e.isPrimary || e.button !== 0 || e.target.closest("button,a,input,select,textarea,label,[contenteditable]")) return;
+    const rect = pop.getBoundingClientRect();
+    // `moved` gates the commit. Pinning here, on pointerdown, meant a plain
+    // press on the header silently took the card out of light-dismiss (the
+    // outside-pointerdown handler bails while pinned) -- so a click that only
+    // meant to grab attention changed how the card closes, with nothing on
+    // screen saying so. Nothing is committed until the pointer actually travels.
+    _pbpExplainDrag = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, left: rect.left, top: rect.top, moved: false };
+    try { head.setPointerCapture(e.pointerId); } catch (_) {}
+    e.preventDefault();
+  });
+  head.addEventListener("pointermove", (e) => {
+    const drag = _pbpExplainDrag;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    if (!drag.moved) {
+      // 4px of hysteresis: below this it is a press, not a drag. Small because
+      // this is repositioning, not a directional swipe that needs to commit.
+      if (Math.abs(e.clientX - drag.x) < 4 && Math.abs(e.clientY - drag.y) < 4) return;
+      drag.moved = true;
+      _pbpExplainAnchorBottom = null; // the user owns the position from here on
+      _pbpExplainSetPinned(pop, true);
+      pop.classList.add("xp-dragging");
+    }
+    // Anchored to the original grab point, so total travel matches the pointer
+    // exactly; the first placed frame simply catches up the 4px already spent.
+    _pbpExplainPlace(pop, drag.left + e.clientX - drag.x, drag.top + e.clientY - drag.y);
+    e.preventDefault();
+  });
+  const endDrag = (e) => {
+    if (!_pbpExplainDrag || _pbpExplainDrag.pointerId !== e.pointerId) return;
+    _pbpExplainDrag = null;
+    pop.classList.remove("xp-dragging");
+    try { if (head.hasPointerCapture(e.pointerId)) head.releasePointerCapture(e.pointerId); } catch (_) {}
+  };
+  head.addEventListener("pointerup", endDrag);
+  head.addEventListener("pointercancel", endDrag);
+  const body = document.createElement("div");
+  body.className = "xp-body";
+  const foot = _pbpExplainBuildFoot(pop);
   pop.appendChild(head);
   pop.appendChild(body);
   pop.appendChild(foot);
@@ -3873,6 +4146,7 @@ function _pbpExplainEnsurePop() {
   // Pin toggles and pinned re-entry never hide/show, so they cannot land here.
   pop.addEventListener("beforetoggle", (e) => {
     if (e.newState === "closed") {
+      if (_pbpReaderDictSession?.host === "bubble" && _pbpReaderDictSession.root.parentElement === pop) _pbpReaderForgetDict(true);
       if (_pbpExplainAbort) _pbpExplainAbort.abort();
       // speechSynthesis is page-level, not popover-level: without this a
       // pronunciation started from the dictionary view keeps talking after
@@ -3888,6 +4162,9 @@ function _pbpExplainEnsurePop() {
   });
   document.addEventListener("pointerdown", (e) => {
     if (!pop.matches(":popover-open") || _pbpExplainPinned || pop.contains(e.target)) return;
+    // This particular outside control transfers the live dictionary. Its
+    // pointerdown precedes click; dismissing here would abort before transfer.
+    if (_pbpReaderDictSession?.host === "bubble" && e.target.closest?.("#reader-tab-dict")) return;
     _pbpExplainClose(pop);
   }, true);
   document.addEventListener("keydown", (e) => {
@@ -3912,7 +4189,6 @@ function _pbpExplainEnsurePop() {
   window.visualViewport?.addEventListener("resize", fitViewport);
   window.visualViewport?.addEventListener("scroll", fitViewport);
   document.body.appendChild(pop);
-  pbpInitDictDisclosures(pop);
   if (typeof ResizeObserver === "function") {
     _pbpExplainResizeObserver = new ResizeObserver(() => {
       if (!pop.matches(":popover-open") || _pbpExplainResize) return;
@@ -4111,6 +4387,11 @@ function _pbpExplainPackContext(cap) {
 
 // ---- Explain: streamed request into the popover body ----
 async function _pbpExplainRun(cap, ctx, pop) {
+  if (_pbpExplainAction === "dict" && typeof window.pbpDictRun === "function") {
+    if (_pbpExplainAbort) { _pbpExplainAbort.abort(); _pbpExplainAbort = null; }
+    await _pbpReaderLookup(cap, ctx, "bubble");
+    return;
+  }
   // Dictionary suggestion navigation has its own query identity. Explain and
   // Translate still act on the original native selection and captured context.
   const heading = pop.querySelector(".xp-term");
@@ -4170,24 +4451,6 @@ async function _pbpExplainRun(cap, ctx, pop) {
   if (_pbpExplainAbort) _pbpExplainAbort.abort();
   const ctrl = new AbortController();
   _pbpExplainAbort = ctrl;
-  // dict P1: delegate entirely to md-dict.js, which owns its own body
-  // rendering/streaming/error states. saveTarget shape matches explain's
-  // above so a later highlight cross-reference (spec decision #4) can reuse
-  // it; aria-busy is only cleared here if this run is still the active one
-  // (a newer run may already have taken over the same pop).
-  if (_pbpExplainAction === "dict" && typeof window.pbpDictRun === "function") {
-    // The jump to the vocabulary page stays hidden until there is a word to
-    // find there: md-dict.js reveals it for an already-saved word, the vocab
-    // button's save reveals it on success (critique 2026-10-19).
-    if (typeof window.pbpDictSetSaveTarget === "function") {
-      window.pbpDictSetSaveTarget(cap.itemId ? { itemId: cap.itemId } : { range: cap.range });
-    }
-    try {
-      await window.pbpDictRun(cap, ctx, pop, ctrl, s);
-    } catch (_) { /* md-dict degrades internally */ }
-    finally { if (_pbpExplainAbort === ctrl) body.removeAttribute("aria-busy"); }
-    return;
-  }
   // dict P1: explain/translate need AI; render a not-configured message
   // instead of attempting a request when the master switch/key gate fails.
   if (!_pbpExplainAiOk) {
@@ -4284,7 +4547,14 @@ async function _pbpExplainRun(cap, ctx, pop) {
 // touches the live range. The block lookup below reads cap.range.startContainer
 // synchronously (before any await), so the DOM node is still valid here.
 function _pbpExplainOpenPop(cap, initialAction) {
+  if (initialAction === "dict" && _pbpReaderDictDocked) {
+    _pbpReaderLookup(cap, _pbpExplainPackContext(cap), "panel");
+    return;
+  }
+  if (initialAction !== "dict" && _pbpReaderDictSession?.host === "bubble") _pbpReaderForgetDict();
   const pop = _pbpExplainEnsurePop();
+  delete pop.dataset.transferring;
+  pop.querySelectorAll(':scope > .reader-dict-session[data-retired]').forEach(node => node.remove());
   const wasOpen = pop.matches(":popover-open");
   if (!wasOpen) _pbpExplainFocusSource = document.activeElement;
   pop.querySelector(".xp-term").textContent = cap.text; // ellipsized via CSS
@@ -4410,6 +4680,7 @@ function _pbpAskOnArticleWillReplace(detail) {
   _pbpAskArticleRev = (Number.isFinite(claimed) && claimed > _pbpAskArticleRev)
     ? claimed : _pbpAskArticleRev + 1;
   const st = _pbpAskState;
+  _pbpReaderForgetDict();
   if (st) {
     // Abort now; the revision captured by _pbpAskRun is what tells its catch
     // that this was a replacement and not the Stop button, so the partial
@@ -4494,6 +4765,13 @@ function _pbpAskOnArticleReplaced(detail) {
 // their own transcript; only which one this page displays changes.
 function _pbpAskOnAccountChanged(account) {
   const acct = String(account || "");
+  _pbpExplainPage.account = acct;
+  _pbpExplainPopEl?.querySelectorAll(':scope > .reader-dict-session[data-retired]').forEach(node => node.remove());
+  if (_pbpReaderDictSession && _pbpReaderDictSession.owner !== _pbpReaderDictOwner()) {
+    const wasBubble = _pbpReaderDictSession.host === "bubble";
+    _pbpReaderForgetDict();
+    if (wasBubble && _pbpExplainPopEl?.matches(":popover-open")) _pbpExplainClose(_pbpExplainPopEl);
+  }
   if (acct === _pbpAskHistAccount && (!_pbpAskState || _pbpAskState.account === acct)) return;
   // Re-point BEFORE the wipe: the restore re-armed at the bottom must read the
   // new partition, and an older restore still parked on its IDB read/rAF loop
@@ -4538,6 +4816,7 @@ if (typeof document !== "undefined") {
   document.addEventListener("pbp:article-will-replace", (e) => _pbpAskOnArticleWillReplace((e && e.detail) || {}));
   document.addEventListener("pbp:article-replaced", (e) => _pbpAskOnArticleReplaced((e && e.detail) || {}));
   document.addEventListener("pbp:account-changed", (e) => _pbpAskOnAccountChanged((e && e.detail && e.detail.account) || ""));
+  window.addEventListener("pagehide", () => _pbpReaderDictSession?.ctrl.abort());
 }
 
 if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {

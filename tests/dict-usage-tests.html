@@ -49,6 +49,19 @@ await test('failed entry writes retain output and can be retried without paying'
 await test('account changes while waiting for sync prevent generation',async()=>{onSync=async()=>{owner='acct_other';};return await rejects(()=>pbpDictEntryRun(request()),'owner_changed')&&calls.length===0;});
 await test('profile never treats the definition/UI language as the native language',async()=>{const p=pbpDictSupplementProfile({dictDefinitionLang:'Chinese'});return p.nativeLanguage===''&&p.level==='';});
 await test('native language and level are explicitly supplied and bounded',async()=>{const p=pbpDictSupplementProfile({dictLearnerNativeLanguage:' German ',dictLearnerLevel:'advanced'},'x'.repeat(200));return p.nativeLanguage==='German'&&p.level==='advanced'&&p.topic.length===120;});
+await test('category topic policy changes model input without renaming an existing paid supplement',async()=>{
+  for(const category of ['collocations','confusables','register','grammar','scenarios','culture','literature']){
+    reset();existing();
+    const priorId='b'.repeat(64);
+    records.supplements=[{id:priorId,category,profile:{nativeLanguage:'',level:'',topic:'work'},content:'Previously paid content.',archiveSaved:true,generatedAt:100}];
+    if(['culture','literature'].includes(category))usageResponse(value=>{value.items[0].sourceIndex=0;value.items[0].example='';});
+    const fresh=await pbpDictSupplementRun(request({category,topic:'work',updateId:priorId}));
+    const data=JSON.parse(calls[0].prompt.split('\n').at(-1));
+    const expected=['collocations','register','scenarios'].includes(category)?'work':'';
+    if(data.profile.topic!==expected||fresh.profile.topic!=='work'||fresh.learning.replacesId!==priorId||records.supplements.length!==2||records.supplements[0].content!=='Previously paid content.')return false;
+  }
+  return true;
+});
 await test('collocations use original examples with no external lookup',async()=>{existing();const r=await pbpDictSupplementRun(request({category:'collocations'}));return r.archiveSaved&&sourceCalls.length===0&&calls.length===1;});
 await test('a matching saved supplement needs no model or sync request',async()=>{existing();await pbpDictSupplementRun(request({category:'grammar'}));onSync=async()=>{throw new Error('should reuse');};await pbpDictSupplementRun(request({category:'grammar'}));return calls.length===1;});
 await test('a remotely saved supplement is reused after synchronization',async()=>{existing();onSync=async()=>{records.supplements=[{category:'grammar',profile:{nativeLanguage:'',level:'',topic:''},content:'Existing',id:'b'.repeat(64),archiveSaved:true}];};return (await pbpDictSupplementRun(request({category:'grammar'}))).content==='Existing'&&calls.length===0;});

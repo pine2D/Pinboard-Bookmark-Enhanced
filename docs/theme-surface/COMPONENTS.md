@@ -1653,6 +1653,9 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 | md-preview | `.pop-panel` | 浮层面板 chrome：`--surface` 底、`--border` 1px 边、`--radius-lg`、统一阴影、13px、内距 sp-3；高亮卡 / 脚注 / 字号面板 / 快捷键帮助 / 搜索条五个 popover 共用，id 规则只留各自的定位与尺寸（帮助对话框内距 sp-4、搜索条 sp-2 sp-3 属有意覆盖） |
 | md-preview | `.row` | 控件行（flex wrap，align center，gap sp-2）：导出开关行、翻译按钮行、字号步进行、高亮色板行、侧栏底部图标行；placement 归父级或 id |
 | md-preview | `.panel-head` | 面板标题行（flex，align center，gap sp-2；`> h2` flex:1、1.05em/600）：ask 面板、要点面板、词典卡头 |
+| md-preview | `.reader-panel-tabs` / `.reader-panel-view` | 共享阅读侧栏顶部的文字标签与独立视图；标签复用既有切换按钮，采用 tablist/tab/tabpanel 语义及方向键导航。视图 flex column、min-height:0，隐藏保留 DOM 与生成任务；不添加入场动画或第二份查词数据。 |
+| md-preview | `.reader-dict-session` / `.reader-dict-search` | 唯一可迁移的查词词头、正文与保存栏；在气泡和侧栏间移动节点，正文为唯一内容滚动区，保留选义、表单、展开状态。查其他词复用 `.row`，单行且输入 min-width:0；窄窗口沿用底部面板。 |
+| md-preview / library | `.xp-dict-usage-actions` / `.xp-dict-usage-feedback` | 补充用法就地动作与 aria-live 反馈，组内使用本表面 8px 间距 token 并允许换行；生成、停止、失败与保存提示靠近触发位置，完成不抢焦点或滚动。不增加面板底纹、边框或独立卡片。 |
 
 清点（2026-09-05 工作流，四表面 138/97/134/273 个 token）同时给出了**候选**原语——popup 的 `actions`/`field-foot`/`banner`/`card`/`list-row`、library 的 `lib-row`/`lib-cluster`/`lib-section`/`lib-block`/`lib-quote`、md-preview 的 `rail-row`/`panel-head`/`panel-actions`/`seg-row`/`stack`/`pop-body`/`scroll-list`——每个都能吸收 5～15 个遗留类。它们**尚未登记**：登记的时机是把对应遗留类真正迁过去的那次施工，不提前占名。（2026-10 现状，library 部分：`lib-cluster` 已登记为原语；`lib-section` / `lib-block` 登记过，详情重写后无生产者，T9c 退役；`lib-quote` 已随平铺画布退役，C56。）
 

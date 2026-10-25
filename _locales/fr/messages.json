@@ -4651,7 +4651,16 @@
   "dictResizeWidth": {"message": "Largeur"},
   "dictResizeHeight": {"message": "Hauteur"},
   "dictResizeReset": {"message": "Rétablir la taille par défaut"},
-  "dictResizeHint": {"message": "Faites glisser un bord pour redimensionner. Les touches fléchées ajustent la taille par petits pas ; maintenez Maj pour de plus grands pas."},
+  "dictResizeHint": {"message": "Faites glisser un bord pour redimensionner. Lorsque le bouton de taille de la barre de titre a le focus, utilisez les flèches pour ajuster la taille ; maintenez Maj pour de plus grands pas."},
   "dictResizeSmaller": {"message": "Réduire"},
-  "dictResizeLarger": {"message": "Agrandir"}
+  "dictResizeLarger": {"message": "Agrandir"},
+  "readerPanelLabel": {"message": "Outils de lecture"},
+  "readerAskTab": {"message": "Questions"},
+  "readerDictTab": {"message": "Dictionnaire"},
+  "dictOpenInPanel": {"message": "Ouvrir dans le panneau latéral"},
+  "dictReturnToBubble": {"message": "Revenir à la fenêtre flottante"},
+  "dictPanelEmpty": {"message": "Sélectionnez un mot dans l’article ou saisissez-en un ci-dessus pour le rechercher."},
+  "dictLookupInPanel": {"message": "Rechercher dans le panneau latéral"},
+  "dictSupplementScope": {"message": "Préciser le contexte"},
+  "dictSupplementSaving": {"message": "Enregistrement du complément…"}
 }

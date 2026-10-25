@@ -1556,7 +1556,8 @@ function _pbpDictEntryMount(host, opts) {
   else panel.appendChild(controls);
   panel.append(status, content); host.appendChild(panel);
   let settings = null, record = null, busy = false, active = null, epoch = 0, mode = "dictionary", viewRevision = 0;
-  let usageCategory = "collocations", usageTopic = "";
+  let usageCategory = "collocations", usageActivity = null;
+  const usageDrafts = new Map(), usageExpanded = new Map(), usageFeedbacks = new WeakMap();
   let renderedBase = "", baseDetails = null, baseRetry = null, usageForm = null, previousSupplements = null;
   const supplementNodes = new Map();
   const preference = () => typeof pbpDictDefaultView === "function" ? pbpDictDefaultView(settings) :
@@ -1581,13 +1582,37 @@ function _pbpDictEntryMount(host, opts) {
     error.textContent = text; error.hidden = !text;
     if (text) message("");
   };
+  const usageFeedback = anchor => {
+    if (usageFeedbacks.has(anchor)) return usageFeedbacks.get(anchor);
+    const hadFocus = document.activeElement === anchor;
+    const row = document.createElement("div"); row.className = "xp-dict-usage-actions";
+    anchor.before(row); row.appendChild(anchor);
+    const box = document.createElement("div"); box.className = "xp-dict-usage-feedback"; box.hidden = true;
+    const text = document.createElement("p"); text.className = "xp-dict-msg xp-dict-usage-status";
+    text.setAttribute("role", "status"); text.setAttribute("aria-live", "polite"); text.setAttribute("aria-atomic", "true");
+    const cancel = button("askStop", "xp-dict-usage-stop"); action(cancel, "askStop", "stop"); cancel.hidden = true;
+    cancel.addEventListener("click", () => stop.click());
+    box.append(text, cancel); row.appendChild(box);
+    const feedback = { box, text, cancel, anchor };
+    usageFeedbacks.set(anchor, feedback);
+    if (hadFocus) anchor.focus({ preventScroll: true });
+    return feedback;
+  };
+  const usageMessage = (feedback, text, state = "") => {
+    feedback.text.textContent = text; feedback.box.hidden = !text;
+    feedback.box.dataset.state = state;
+    feedback.cancel.hidden = state !== "busy";
+    feedback.anchor.hidden = state === "busy";
+  };
   const sync = () => {
     generate.hidden = !!record || !configured() || busy; generate.disabled = busy || !settings;
-    toggle.hidden = !record && !busy; stop.hidden = !busy;
+    toggle.hidden = !record && !busy; stop.hidden = !busy || !!usageActivity;
     configure.hidden = !!record || !settings || settings.previewAiEnabled === false || configured();
     panel.hidden = !record && !!settings && settings.previewAiEnabled === false;
     controls.hidden = panel.hidden;
-    panel.setAttribute("aria-busy", busy ? "true" : "false");
+    // A busy ancestor delays live-region announcements. Supplement progress
+    // speaks beside its action while the already rendered entry stays readable.
+    panel.setAttribute("aria-busy", busy && !usageActivity ? "true" : "false");
   };
   const show = next => {
     if (!alive()) return;
@@ -1838,15 +1863,21 @@ function _pbpDictEntryMount(host, opts) {
           let saving = false;
           item.retry.addEventListener("click", async () => {
             if (!alive() || busy || saving) return;
+            const feedback = usageFeedback(item.retry);
             saving = true; item.retry.setAttribute("aria-disabled", "true");
+            usageMessage(feedback, t("dictSupplementSaving"), "saving");
             try {
               const saved = await pbpDictSupplementSave(input(opts.signal, alive), item.addition);
               if (!alive()) return;
               const hadFocus = document.activeElement === item.retry;
               record.supplements = record.supplements.map(value => supplementId(value) === id ? saved : value);
               render(record, answerLanguage, false, section.open ? supplementId(saved) : "");
+              usageMessage(feedback, t("dictSupplementSaved"), "saved");
               if (hadFocus) supplementNodes.get(supplementId(saved))?.heading.focus({ preventScroll: true });
-            } catch (error) { console.warn("[dict-entry] usage save retry failed:", error?.name); }
+            } catch (error) {
+              if (alive()) usageMessage(feedback, t("dictSupplementSaveFailed"), "error");
+              console.warn("[dict-entry] usage save retry failed:", error?.name);
+            }
             finally { saving = false; item.retry.removeAttribute("aria-disabled"); }
           });
         }
@@ -1880,9 +1911,13 @@ function _pbpDictEntryMount(host, opts) {
     const topic = document.createElement("input");
     topic.type = "text"; topic.className = "xp-dict-supplement-topic"; topic.maxLength = 120; topic.dir = "auto";
     topic.placeholder = t("dictSupplementTopicPlaceholder"); topic.setAttribute("aria-label", t("dictSupplementTopic"));
-    topic.value = usageTopic; topicLabel.appendChild(topic);
+    topic.value = usageDrafts.get(usageCategory) || ""; topicLabel.appendChild(topic);
     const hint = document.createElement("p"); hint.className = "xp-dict-src xp-dict-supplement-hint";
     hint.textContent = t("dictSupplementTopicHint");
+    const context = document.createElement("div");
+    const scope = document.createElement("details"); scope.className = "xp-dict-ai-details xp-dict-topic-scope";
+    const scopeLabel = document.createElement("summary"); scopeLabel.textContent = t("dictSupplementScope"); scope.appendChild(scopeLabel);
+    context.append(scope, topicLabel, hint);
     const submit = button("dictSupplementGenerate", "xp-dict-supplement-generate");
     const profile = document.createElement("p"); profile.className = "xp-dict-src xp-dict-supplement-profile";
     const learner = pbpDictSupplementProfile(settings);
@@ -1905,28 +1940,48 @@ function _pbpDictEntryMount(host, opts) {
     sourceHint.textContent = t("dictSupplementSourceHint");
     const languageHint = document.createElement("p"); languageHint.className = "xp-dict-src";
     languageHint.textContent = t("dictSupplementLanguage", languageName(target()));
-    disclosure.append(summary, kind, topicLabel, hint, submit, languageHint, profile, sourceHint); content.append(disclosure);
+    disclosure.append(summary, kind, context, submit, languageHint, profile, sourceHint); content.append(disclosure);
+    const formFeedback = usageFeedback(submit);
     if (typeof window.pbpEnhanceListbox === "function") {
       kind.id = "dict-supplement-kind"; kind.dataset.listbox = "float"; window.pbpEnhanceListbox(kind);
     } else kind.classList.add("xp-dict-lang");
+    const acceptsTopic = category => ["scenarios", "collocations", "register"].includes(category);
+    const effectiveTopic = () => acceptsTopic(kind.value) ? topic.value : "";
     const existing = () => {
-      const profile = pbpDictSupplementProfile(settings, topic.value);
+      const profile = pbpDictSupplementProfile(settings, effectiveTopic());
       const matches = (record.supplements || []).filter(item => item.category === kind.value &&
-        item.profile.nativeLanguage === profile.nativeLanguage && item.profile.level === profile.level && item.profile.topic === profile.topic);
+        item.profile.nativeLanguage === profile.nativeLanguage && item.profile.level === profile.level &&
+        (!acceptsTopic(kind.value) || item.profile.topic === profile.topic));
       const replaced = new Set(matches.map(item => item.learning?.replacesId).filter(Boolean));
       return matches.filter(item => !replaced.has(item.id)).sort((a, b) => b.generatedAt - a.generatedAt || String(b.id).localeCompare(String(a.id)))[0];
     };
     const refresh = () => {
-      usageCategory = kind.value; usageTopic = topic.value;
+      usageDrafts.set(usageCategory, topic.value);
+      if (usageCategory !== kind.value) {
+        usageExpanded.set(usageCategory, scope.open);
+        usageCategory = kind.value; topic.value = usageDrafts.get(usageCategory) || "";
+        scope.open = usageExpanded.get(usageCategory) || false;
+        usageMessage(formFeedback, "");
+      }
+      context.hidden = !acceptsTopic(kind.value);
+      scope.hidden = kind.value === "scenarios";
+      const parent = scope.hidden ? context : scope;
+      if (topicLabel.parentElement !== parent) parent.append(topicLabel, hint);
       submit.textContent = t(existing() ? "dictSupplementShow" : "dictSupplementGenerate");
       sourceHint.hidden = !["culture", "literature"].includes(kind.value);
     };
-    usageForm = { disclosure, refresh, update: addition => generateSupplement(addition) };
+    const enableForm = () => {
+      submit.disabled = false; kind.disabled = false; topic.disabled = false; window.pbpListboxSync?.(kind);
+    };
+    usageForm = { disclosure, refresh, enable: enableForm, update: addition => generateSupplement(addition) };
     kind.addEventListener("change", refresh); topic.addEventListener("input", refresh); refresh();
     const generateSupplement = async (updating = null) => {
       if (!alive() || busy) return;
       const origin = updating ? supplementNodes.get(supplementId(updating))?.update : submit;
-      if (updating) inlineError(origin, "");
+      if (!origin?.isConnected) return;
+      const feedback = usageFeedback(origin);
+      usageMessage(feedback, "");
+      let restoreFocus = null;
       const hit = updating ? null : existing();
       if (hit) {
         const hadFocus = document.activeElement === submit;
@@ -1936,15 +1991,16 @@ function _pbpDictEntryMount(host, opts) {
       }
       const hadFocus = document.activeElement === submit || (updating && content.contains(document.activeElement));
       const version = ++epoch, controller = new AbortController(); active = controller; busy = true;
+      usageActivity = { feedback, origin, version };
       const current = () => alive() && epoch === version && !controller.signal.aborted;
       const category = updating?.category || kind.value;
-      const request = { ...input(controller.signal, current), category, topic: updating?.profile.topic ?? topic.value,
+      const request = { ...input(controller.signal, current), category, topic: updating?.profile.topic ?? effectiveTopic(),
         updateId: updating?.id || "" };
       if (updating) request.settings = { ...settings, dictLearnerNativeLanguage: updating.profile.nativeLanguage, dictLearnerLevel: updating.profile.level };
       const sourceOrigin = pbpDictSupplementOrigin(category, opts.lang);
       submit.disabled = true; kind.disabled = true; topic.disabled = true; window.pbpListboxSync?.(kind);
-      message(t("dictSupplementGenerating")); sync();
-      if (hadFocus) stop.focus({ preventScroll: true });
+      usageMessage(feedback, t("dictSupplementGenerating"), "busy"); sync();
+      if (hadFocus) feedback.cancel.focus({ preventScroll: true });
       try {
         // Request the model and one source origin together, directly from the
         // click. All subsequent fetches independently check that grant.
@@ -1955,10 +2011,15 @@ function _pbpDictEntryMount(host, opts) {
         const addition = await pbpDictSupplementRun(request);
         if (!current()) return;
         record.supplements = [addition, ...(record.supplements || []).filter(item => !addition.id || item.id !== addition.id)];
-        const id = supplementId(addition), focusStayed = document.activeElement === stop;
+        const id = supplementId(addition), focusStayed = document.activeElement === feedback.cancel;
         render(record, answerLanguage, false, id);
-        if (focusStayed) focusAddition(id);
-        message(t(addition.archiveSaved === false ? "dictSupplementSaveFailed" : "dictSupplementSaved"));
+        usageMessage(feedback, t(addition.archiveSaved === false ? "dictSupplementSaveFailed" : "dictSupplementSaved"),
+          addition.archiveSaved === false ? "error" : "saved");
+        // Appending a result must not pull the reader away from where they
+        // scrolled while waiting. Explicit "View saved usage" still reveals it.
+        if (focusStayed) {
+          restoreFocus = updating ? supplementNodes.get(id)?.heading : origin;
+        }
       } catch (error) {
         if (!current()) return;
         console.warn("[dict-entry] usage generation failed:", error?.name, error?.code || "request_failed", _pbpDictFailureReason(error));
@@ -1966,13 +2027,17 @@ function _pbpDictEntryMount(host, opts) {
           error?.code === "no_sources" ? "dictSupplementNoSources" :
           error?.code === "unsupported_usage" ? "dictSupplementUnsupported" : error?.code === "wrong_language" ? "dictSupplementWrongLanguage" :
           error?.code === "invalid_response" ? "dictSupplementInvalid" : "dictSupplementUnavailable");
-        if (updating) inlineError(origin, text); else message(text);
+        if (document.activeElement === feedback.cancel) restoreFocus = origin;
+        usageMessage(feedback, text, "error");
       } finally {
-        if (epoch === version) { busy = false; active = null; }
-        if (alive()) {
-          const focusStayed = document.activeElement === stop;
-          submit.disabled = false; kind.disabled = false; topic.disabled = false; window.pbpListboxSync?.(kind); sync();
-          if (focusStayed && origin?.isConnected) origin.focus({ preventScroll: true });
+        if (epoch === version) {
+          busy = false; active = null; usageActivity = null;
+          if (alive()) {
+            const focusStayed = document.activeElement === feedback.cancel;
+            enableForm(); sync();
+            const next = restoreFocus || (focusStayed ? origin : null);
+            if (next?.isConnected) next.focus({ preventScroll: true });
+          }
         }
       }
     };
@@ -2029,7 +2094,13 @@ function _pbpDictEntryMount(host, opts) {
   generate.addEventListener("click", () => run(true));
   toggle.addEventListener("click", () => { viewRevision++; show(mode === "ai" ? "dictionary" : "ai"); });
   stop.addEventListener("click", () => {
-    epoch++; active?.abort(); active = null; busy = false; message(""); sync();
+    const usage = usageActivity;
+    epoch++; active?.abort(); active = null; busy = false; usageActivity = null;
+    if (usage) {
+      usageMessage(usage.feedback, t("askStopped")); usageForm?.enable(); usageForm?.refresh();
+      sync(); if (usage.origin.isConnected) usage.origin.focus({ preventScroll: true }); return;
+    }
+    message(""); sync();
     if (!record) show("dictionary");
     if (!generate.hidden) generate.focus({ preventScroll: true });
     else if (!toggle.hidden) toggle.focus({ preventScroll: true });
@@ -2131,7 +2202,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   const signal = child.signal;
 
   const runId = ++_pbpDictRunSeq;
-  const origin = navigation && navigation.owner === _pbpDictOwner ? navigation :
+  let origin = navigation && navigation.owner === _pbpDictOwner ? navigation :
     { cap, owner: _pbpDictOwner };
   const derived = cap.text !== origin.cap.text;
   const title = pop.querySelector(".xp-term");
@@ -2151,6 +2222,18 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   };
   _pbpDictCurrent = cur;
   cur.isCurrent = () => _pbpDictCurrent === cur && _pbpDictOwner === cur.owner;
+  cur.updateContext = (nextCap, nextContext) => {
+    if (!cur.isCurrent() || signal.aborted) return false;
+    cap = nextCap; ctx = nextContext || {}; origin = { cap, owner: cur.owner };
+    cur.sentence = ctx.sentence || "";
+    cur.contextRevision = (cur.contextRevision || 0) + 1;
+    const priorOrigin = pop.querySelector(".xp-dict-origin");
+    priorOrigin?.remove();
+    if (cur.meaningChoices?.length || cur.saved) {
+      _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name));
+    }
+    return true;
+  };
 
   // Vocab button is reset before language detection so a stale lookup cannot save
   // (Codex HIGH 3). dataset.runId guards stale promise writes. Set the
@@ -2237,8 +2320,20 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   _pbpDictSlotSkeleton(onlineEl);
 
   const manual = _pbpDictManualLang;
-  const installedLanguages = _pbpDictRefreshPackLangs(sel, languageLocale, true,
+  let installedLanguages = _pbpDictRefreshPackLangs(sel, languageLocale, true,
     () => !signal.aborted && _pbpDictCurrent === cur);
+  cur.resolveContextLanguage = async (nextCap, nextContext) => {
+    const manual = _pbpDictManualLang, languages = installedLanguages;
+    const current = () => cur.isCurrent() && !signal.aborted && manual === _pbpDictManualLang && languages === installedLanguages;
+    if (!current()) return null;
+    try {
+      const resolved = await _pbpDictResolveLang(nextCap, nextContext || {}, manual, languages);
+      return current() ? resolved : null;
+    } catch (error) {
+      console.warn("[dict] context language read failed:", error?.name);
+      return null;
+    }
+  };
   const lang = await _pbpDictResolveLang(cap, ctx, manual, installedLanguages);
   if (signal.aborted || _pbpDictCurrent !== cur) return;
   cur.lang = lang;
@@ -2264,8 +2359,8 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
     const visible = cur.entryView === "ai" ? cur.aiNorm : cur.dictionaryNorm;
     pbpDictSpeak(visible?.word || cap.text, lang);
   });
-  cur.refreshLanguages = () => _pbpDictRefreshPackLangs(sel, languageLocale, true,
-    () => !signal.aborted && _pbpDictCurrent === cur).then(codes => {
+  cur.refreshLanguages = () => (installedLanguages = _pbpDictRefreshPackLangs(sel, languageLocale, true,
+    () => !signal.aborted && _pbpDictCurrent === cur)).then(codes => {
       if (!signal.aborted && _pbpDictCurrent === cur && _pbpDictManualLang && !codes.includes(_pbpDictManualLang)) _pbpDictManualLang = "";
     });
   cur.meaningSources = new Map();
@@ -2430,9 +2525,12 @@ function _pbpDictReaderPackChoices(norm, box, cur, pop, signal) {
 
 async function _pbpDictRefreshSave(pop, cur, signal) {
   const vocabBtn = pop.querySelector(".xp-vocab"), runId = cur.runId, choice = cur.packChoice;
+  const contextRevision = cur.contextRevision || 0;
   if (signal.aborted || _pbpDictCurrent !== cur) return;
   cur.saved = false; cur.savedRecord = null;
   if (vocabBtn) {
+    vocabBtn.dataset.contextRevision = String(contextRevision);
+    vocabBtn.dataset.packRevision = String(cur.packRevision || 0);
     vocabBtn.hidden = false; vocabBtn.disabled = !!cur.fullEntryOnly || !!cur.packInvalidated;
     delete vocabBtn.dataset.face;
     if (typeof _pbpExplainIconBtn === "function") {
@@ -2455,7 +2553,8 @@ async function _pbpDictRefreshSave(pop, cur, signal) {
     // page has not seen yet.
     if (cur.owner !== _pbpDictOwner) { vocabBtn.disabled = false; return; }
     const hit = await pbpVocabGet(pbpDictVocabKey(cur.owner, cur.lang || "und", cur.term));
-    if (signal.aborted || _pbpDictCurrent !== cur || cur.packChoice !== choice || vocabBtn.dataset.runId !== String(runId)) return;
+    if (signal.aborted || _pbpDictCurrent !== cur || cur.packChoice !== choice ||
+        (cur.contextRevision || 0) !== contextRevision || vocabBtn.dataset.runId !== String(runId)) return;
     if (cur.owner !== _pbpDictOwner) { vocabBtn.disabled = false; return; } // switch landed during the read
     if (hit) {
       cur.saved = true;
@@ -2583,6 +2682,7 @@ window.pbpDictRun = pbpDictRun;
 async function pbpDictSaveCurrent() {
   const cur = _pbpDictCurrent;
   const packRevision = cur?.packRevision || 0;
+  const contextRevision = cur?.contextRevision || 0;
   if (!cur || !cur.term || cur.fullEntryOnly) return false;
   if (cur.owner !== _pbpDictOwner) return false; // owner re-check at commit time (invariant)
   const urlEl = document.getElementById("preview-url");
@@ -2629,7 +2729,10 @@ async function pbpDictSaveCurrent() {
     const live = await pbpVocabCurrentOwner().catch(() => null);
     if (live !== cur.owner) return false;
   }
-  if (cur.fullEntryOnly || cur.packInvalidated || (cur.packRevision || 0) !== packRevision) return false;
+  // A reused lookup can acquire another selection during the owner read.
+  // Never pair the earlier highlight target with the later sentence.
+  if (cur.fullEntryOnly || cur.packInvalidated || (cur.packRevision || 0) !== packRevision ||
+      (cur.contextRevision || 0) !== contextRevision) return false;
   const entry = await pbpVocabSaveWord(cur.owner, {
     term: cur.term, lemma: cur.lemma, language: cur.lang || "und",
     gloss: cur.gloss, ipa: cur.ipa, sourceUrl: cur.sourceUrl, license: cur.license,
@@ -2644,7 +2747,10 @@ async function pbpDictSaveCurrent() {
     // own state when it is still the live one. The vocabulary list itself
     // lives in the options tab now (options-vocab.js); it rescans on its own
     // next activation, same as every other options panel.
-    if (_pbpDictCurrent === cur) { cur.saved = true; cur.savedRecord = entry; }
+    if (_pbpDictCurrent === cur && (cur.contextRevision || 0) === contextRevision &&
+        (cur.packRevision || 0) === packRevision) {
+      cur.saved = true; cur.savedRecord = entry;
+    }
     try {
       document.dispatchEvent(new CustomEvent("pbp:vocab-changed", { detail: { owner: cur.owner } }));
     } catch (_) {}
@@ -2654,6 +2760,25 @@ async function pbpDictSaveCurrent() {
 }
 window.pbpDictSaveCurrent = pbpDictSaveCurrent;
 window.pbpDictSetSaveTarget = (tgt) => { _pbpDictSaveTarget = tgt || null; };
+window.pbpDictCurrentIdentity = () => {
+  const cur = _pbpDictCurrent;
+  return cur?.isCurrent?.() && !_pbpDictChildCtrl?.signal.aborted
+    ? { term: cur.queryTerm || cur.term, language: cur.lang, owner: cur.owner } : null;
+};
+window.pbpDictResolveContextLanguage = async (cap, ctx) => {
+  const cur = _pbpDictCurrent;
+  if (!cur?.isCurrent?.() || _pbpDictChildCtrl?.signal.aborted || !cap ||
+      pbpDictNormalizeTerm(cap.text) !== pbpDictNormalizeTerm(cur.queryTerm || cur.term)) return null;
+  return typeof cur.resolveContextLanguage === "function" ? cur.resolveContextLanguage(cap, ctx) : null;
+};
+window.pbpDictUpdateContext = (cap, ctx) => {
+  const cur = _pbpDictCurrent;
+  if (!cur?.isCurrent?.() || _pbpDictChildCtrl?.signal.aborted || cur.owner !== _pbpDictOwner ||
+      !cap || pbpDictNormalizeTerm(cap.text) !== pbpDictNormalizeTerm(cur.queryTerm || cur.term)) return false;
+  if (!cur.updateContext?.(cap, ctx)) return false;
+  _pbpDictSaveTarget = cap.itemId ? { itemId: cap.itemId } : cap.range ? { range: cap.range } : null;
+  return true;
+};
 window.pbpDictOnActionSwitch = () => {
   _pbpDictSaveTarget = null;
   if (_pbpDictChildCtrl) _pbpDictChildCtrl.abort(); // invalidate the run, not just the range

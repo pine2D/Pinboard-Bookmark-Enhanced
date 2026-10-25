@@ -4651,7 +4651,16 @@
   "dictResizeWidth": {"message": "闊度"},
   "dictResizeHeight": {"message": "高度"},
   "dictResizeReset": {"message": "恢復預設大小"},
-  "dictResizeHint": {"message": "拖曳邊緣調整大小；方向鍵微調，按住 Shift 加大調整幅度。"},
+  "dictResizeHint": {"message": "拖曳邊緣調整大小。將焦點移至標題列的尺寸按鈕後，可用方向鍵微調，按住 Shift 加快。"},
   "dictResizeSmaller": {"message": "縮小"},
-  "dictResizeLarger": {"message": "放大"}
+  "dictResizeLarger": {"message": "放大"},
+  "readerPanelLabel": {"message": "閱讀輔助"},
+  "readerAskTab": {"message": "提問"},
+  "readerDictTab": {"message": "查詞"},
+  "dictOpenInPanel": {"message": "在側欄開啟"},
+  "dictReturnToBubble": {"message": "返回浮動視窗"},
+  "dictPanelEmpty": {"message": "選取內文中的詞語，或在上方輸入詞語查詢。"},
+  "dictLookupInPanel": {"message": "在側欄查詞"},
+  "dictSupplementScope": {"message": "限定情境"},
+  "dictSupplementSaving": {"message": "正在儲存補充…"}
 }

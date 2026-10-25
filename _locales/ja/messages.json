@@ -4651,7 +4651,16 @@
   "dictResizeWidth": {"message": "幅"},
   "dictResizeHeight": {"message": "高さ"},
   "dictResizeReset": {"message": "既定のサイズに戻す"},
-  "dictResizeHint": {"message": "端をドラッグしてサイズを変更できます。矢印キーで微調整し、Shift キーを押しながら操作すると調整幅が大きくなります。"},
+  "dictResizeHint": {"message": "端をドラッグするとサイズを変更できます。タイトルバーのサイズボタンにフォーカスを移し、矢印キーで微調整できます。Shift を押すと大きく調整できます。"},
   "dictResizeSmaller": {"message": "小さくする"},
-  "dictResizeLarger": {"message": "大きくする"}
+  "dictResizeLarger": {"message": "大きくする"},
+  "readerPanelLabel": {"message": "読書サポート"},
+  "readerAskTab": {"message": "質問"},
+  "readerDictTab": {"message": "辞書"},
+  "dictOpenInPanel": {"message": "サイドパネルで開く"},
+  "dictReturnToBubble": {"message": "ポップアップに戻す"},
+  "dictPanelEmpty": {"message": "本文中の語句を選択するか、上の欄に入力して調べられます。"},
+  "dictLookupInPanel": {"message": "サイドパネルで調べる"},
+  "dictSupplementScope": {"message": "場面を指定"},
+  "dictSupplementSaving": {"message": "補足を保存中…"}
 }

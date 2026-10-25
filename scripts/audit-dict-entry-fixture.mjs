@@ -44,6 +44,18 @@ export async function installDictEntryFixture(page) {
       await opts.beforeRequest?.(); opts.signal?.throwIfAborted();
       let lookup;
       try { lookup = JSON.parse(prompt.slice(prompt.lastIndexOf('\n') + 1)); } catch (_) {}
+      if (lookup?.profile && lookup?.baseEntry) {
+        if (lookup.targetLanguage?.lang !== 'zh-Hans' || lookup.sources?.length) throw new Error('SETUP: unexpected supplement request');
+        const state = window._auditDictEntry;
+        state.usageEntered = true; state.calls++;
+        await new Promise(resolve => { state.usageRelease = resolve; });
+        opts.signal?.throwIfAborted();
+        if (state.usageFail) return '{"language":"zh-Hans","summary":"","items":[{}]}';
+        return JSON.stringify({ language: 'zh-Hans', summary: '先选定要表达的含义，再选择与情境相符的搭配。以下为独立编写的例句。', items: [
+          { sense: 1, title: 'a practical example', explanation: '用于把抽象的说明落实到可操作的例子中，适合讨论工作方法或学习步骤。', example: 'Please give us a practical example.', translation: '请给我们一个实际的例子。', sourceIndex: -1 },
+          { sense: 2, title: 'a clear expression of an idea', explanation: '强调想法表达得明确，读者能够据此区分不同含义；可根据需要替换后面的名词。', example: 'This is a clear expression of the main idea.', translation: '这清楚地表达了中心思想。', sourceIndex: -1 }
+        ] });
+      }
       if (!lookup || Object.keys(lookup).sort().join(',') !== 'etymologyEvidence,sourceLanguage,targetLanguage,term' ||
         !lookup.term || !lookup.sourceLanguage || lookup.targetLanguage?.lang !== 'zh-Hans' ||
         !Array.isArray(lookup.etymologyEvidence) || lookup.etymologyEvidence.length) {
@@ -109,6 +121,47 @@ export async function openDictEntryState(page, state) {
       await Promise.all(node.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
     });
     return details.locator('.xp-dict-lemma-link, bdi').first().isVisible();
+  }
+  if (state === 'usage-scope') {
+    const form = page.locator('.xp-dict-supplement');
+    if (!await form.evaluate(node => node.open)) await form.locator(':scope > summary').click();
+    await form.locator('.xp-dict-supplement-kind').selectOption('scenarios', { force: true });
+    await form.locator('.xp-dict-supplement-topic').fill('工作中的客户沟通');
+    await form.locator('.xp-dict-supplement-kind').selectOption('collocations', { force: true });
+    await form.locator('.xp-dict-topic-scope > summary').click();
+    await form.locator('.xp-dict-supplement-topic').fill('讨论项目计划、对比服务方案与明确下一步行动');
+    await form.evaluate(async node => {
+      await Promise.all(node.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
+    });
+    return form.locator('.xp-dict-supplement-topic').isVisible();
+  }
+  if (state === 'usage-busy') {
+    await page.evaluate(() => Object.assign(window._auditDictEntry, { usageEntered: false, usageRelease: null, usageFail: true }));
+    await page.locator('.xp-dict-supplement-generate').click();
+    await page.waitForFunction(() => window._auditDictEntry.usageEntered);
+    return page.locator('.xp-dict-supplement .xp-dict-usage-stop:not([hidden])').isVisible();
+  }
+  if (state === 'usage-error') {
+    await page.evaluate(() => window._auditDictEntry.usageRelease());
+    await page.locator('.xp-dict-supplement .xp-dict-usage-feedback[data-state="error"]').waitFor();
+    return page.locator('.xp-dict-supplement-generate').isVisible();
+  }
+  if (state === 'usage-result') {
+    await page.evaluate(() => Object.assign(window._auditDictEntry, { usageEntered: false, usageRelease: null, usageFail: false }));
+    await page.locator('.xp-dict-supplement-generate').click();
+    await page.waitForFunction(() => window._auditDictEntry.usageEntered);
+    await page.evaluate(() => window._auditDictEntry.usageRelease());
+    await page.locator('.xp-dict-supplement .xp-dict-usage-feedback[data-state="saved"]').waitFor();
+    return page.locator('.xp-dict-supplement-generate').isVisible();
+  }
+  if (state === 'panel') {
+    await page.locator('#explain-pop .xp-dock').click();
+    const session = page.locator('#ask-panel:not([hidden])[data-view="dict"] .reader-dict-session');
+    await session.waitFor();
+    await page.locator('#ask-panel').evaluate(async node => {
+      await Promise.all(node.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
+    });
+    return session.isVisible();
   }
   if (state === 'cached') {
     const before = await page.evaluate(() => ({ calls: window._auditDictEntry.calls, reads: window._auditDictEntry.reads }));

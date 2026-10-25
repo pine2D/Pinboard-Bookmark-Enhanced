@@ -681,6 +681,8 @@ function assertLayout(frame, locale) {
       grip.click(); await nextFrame(fx.win);
       const menu = fx.doc.getElementById("dict-resize-pop");
       assert(menu.matches(":popover-open") && menu.contains(fx.doc.activeElement), "click should open the size controls and hand off focus");
+      const anchorRect = grip.getBoundingClientRect(), menuRect = menu.getBoundingClientRect();
+      assert(Math.abs(menuRect.top - anchorRect.bottom - 8) < 1 && menuRect.right <= anchorRect.right + 1, "size menu is not anchored below the title control");
       menu.querySelector('button[data-axis="Height"][data-amount="32"]').click();
       const preferred = fx.pop.getBoundingClientRect();
       assert(preferred.height > original.height + 30, "click-only height control did not resize");

@@ -451,7 +451,9 @@ function _pbpDictSupplementPrompt(request, category, profile, sources, entry) {
     "Copy language exactly from targetLanguage.lang. Summary <=800 characters, at most5 items, title<=240, explanation<=1400, example/translation<=600 each. " +
     "Use sourceIndex=-1 for original learning examples, otherwise an existing zero-based source index. Titles may contain source-language forms; explanations may not switch language. " +
     "Plain text, no Markdown/HTML/URLs. Uncertain or unsupported claims must be omitted; items:[] means no useful supported result.\n" +
-    JSON.stringify({ term: request.term, sourceLanguage: request.sourceLanguage, targetLanguage: request.target, profile, baseEntry: entry, sources });
+    JSON.stringify({ term: request.term, sourceLanguage: request.sourceLanguage, targetLanguage: request.target,
+      profile: { ...profile, topic: ["scenarios", "collocations", "register"].includes(category) ? profile.topic : "" },
+      baseEntry: entry, sources });
 }
 function pbpDictSupplementParse(response, request, category, sources, entry, replacesId = "") {
   const invalid = (reason = "supplement_item") => { throw _pbpDictEntryError("invalid_response", "Incomplete or unverified learning content", reason); };

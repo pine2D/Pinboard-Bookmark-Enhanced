@@ -4651,7 +4651,16 @@
   "dictResizeWidth": {"message": "Ширина"},
   "dictResizeHeight": {"message": "Высота"},
   "dictResizeReset": {"message": "Восстановить размер по умолчанию"},
-  "dictResizeHint": {"message": "Перетаскивайте края, чтобы изменить размер. Клавиши со стрелками меняют его небольшими шагами; удерживайте Shift для большего шага."},
+  "dictResizeHint": {"message": "Перетащите край, чтобы изменить размер. Выберите кнопкой Tab настройку размера в заголовке и используйте стрелки для точной подстройки; удерживайте Shift для больших шагов."},
   "dictResizeSmaller": {"message": "Уменьшить"},
-  "dictResizeLarger": {"message": "Увеличить"}
+  "dictResizeLarger": {"message": "Увеличить"},
+  "readerPanelLabel": {"message": "Инструменты чтения"},
+  "readerAskTab": {"message": "Вопросы"},
+  "readerDictTab": {"message": "Словарь"},
+  "dictOpenInPanel": {"message": "Открыть на боковой панели"},
+  "dictReturnToBubble": {"message": "Вернуть во всплывающее окно"},
+  "dictPanelEmpty": {"message": "Выделите слово в статье или введите его выше, чтобы узнать значение."},
+  "dictLookupInPanel": {"message": "Найти на боковой панели"},
+  "dictSupplementScope": {"message": "Уточнить ситуацию"},
+  "dictSupplementSaving": {"message": "Сохранение дополнения…"}
 }

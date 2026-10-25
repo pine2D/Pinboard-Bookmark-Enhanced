@@ -4645,7 +4645,16 @@
   "dictResizeWidth": {"message": "宽度"},
   "dictResizeHeight": {"message": "高度"},
   "dictResizeReset": {"message": "恢复默认大小"},
-  "dictResizeHint": {"message": "拖动边缘调整大小；方向键微调，按住 Shift 加大调整幅度。"},
+  "dictResizeHint": {"message": "拖动边缘调整大小。聚焦标题栏的尺寸按钮后可用方向键微调，按住 Shift 加快。"},
   "dictResizeSmaller": {"message": "减小"},
-  "dictResizeLarger": {"message": "增大"}
+  "dictResizeLarger": {"message": "增大"},
+  "readerPanelLabel": {"message": "阅读辅助"},
+  "readerAskTab": {"message": "提问"},
+  "readerDictTab": {"message": "查词"},
+  "dictOpenInPanel": {"message": "在侧栏打开"},
+  "dictReturnToBubble": {"message": "返回气泡"},
+  "dictPanelEmpty": {"message": "选择正文中的词语，或在上方输入单词查词。"},
+  "dictLookupInPanel": {"message": "在侧栏查词"},
+  "dictSupplementScope": {"message": "限定场景"},
+  "dictSupplementSaving": {"message": "正在保存补充…"}
 }

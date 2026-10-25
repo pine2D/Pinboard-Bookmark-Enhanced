@@ -1,0 +1,168 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Reader Dictionary Panel Tests</title>
+<style>.pass{color:#176}.fail{color:#b00} iframe{display:block;border:0}</style></head>
+<body><div id="results"></div><script>
+const results = document.getElementById('results');
+function assert(ok, message) { if (!ok) throw new Error(message); }
+async function test(name, fn) {
+  const row = document.createElement('p');
+  try { await fn(); row.className='pass'; row.textContent='PASS '+name; }
+  catch(e) { row.className='fail'; row.textContent='FAIL '+name+' — '+e.message; }
+  results.appendChild(row);
+}
+const tick = win => new Promise(resolve => win.requestAnimationFrame(() => win.requestAnimationFrame(resolve)));
+async function fixture(width=1440,height=800,locale='en') {
+  const messages = await (await fetch('../_locales/'+locale+'/messages.json')).json();
+  const frame=document.createElement('iframe'); frame.style.width=width+'px'; frame.style.height=height+'px';
+  frame.srcdoc='<!doctype html><html><head><link rel="stylesheet" href="../md-preview.css"></head><body><button id="outside">Outside</button><main><div id="rendered-view"><p>Our provider offers an example.</p></div></main></body></html>';
+  document.body.appendChild(frame); await new Promise(resolve=>frame.addEventListener('load',resolve,{once:true}));
+  const win=frame.contentWindow, doc=frame.contentDocument;
+  win.t=key=>messages[key]?.message||key; win.pbpAiProviderName=()=>''; win.pbpAiEffectiveModel=()=>'';
+  win.pbpAiGetSettings=async()=>({}); win.pbpAiBlocks=()=>[{n:1,el:doc.querySelector("#rendered-view p"),tag:"P"}]; win.pbpAiIndexBlocks=()=>{};
+  for(const file of ['shared.js','md-ask.js']) {
+    const script=doc.createElement('script');script.src='../'+file;
+    const ready=new Promise((resolve,reject)=>{script.onload=resolve;script.onerror=reject;});doc.body.append(script);await ready;
+  }
+  const state={calls:0,runs:[],identity:null,contexts:[]};
+  win.pbpDictRun=async(cap,ctx,root,ctrl)=>{
+    state.calls++; state.identity={term:cap.text,language:'en',owner:''};
+    const body=root.querySelector('.xp-body');
+    body.innerHTML='<details class="xp-dict-ai-details" open><summary>Usage</summary><input value="work"><p>'+('A reusable explanation with context. '.repeat(28))+'</p></details>';
+    const select=doc.createElement('select');select.className='xp-dict-lang xp-dict-save-meaning';select.innerHTML='<option>First sense</option><option selected>Second sense</option>';
+    root.querySelector('.xp-foot').prepend(select);
+    const run={root,ctrl,cap,ctx,resolve:null};state.runs.push(run);
+    await new Promise(resolve=>{run.resolve=resolve;});
+    if(ctrl.signal.aborted)return;
+    const done=doc.createElement('p');done.className='done';done.textContent='Saved supplement';body.append(done);
+  };
+  win.pbpDictCurrentIdentity=()=>state.identity;
+  win.pbpDictUpdateContext=(cap,ctx)=>{state.contexts.push({cap,ctx});return true;};
+  win.pbpDictOnActionSwitch=()=>{state.identity=null;};
+  const cap=(word='provider')=>({text:word,range:doc.createRange(),rect:{left:60,top:30,bottom:50,right:130,width:70,height:20},n:1});
+  const open=async(word='provider')=>{win._pbpExplainOpenPop(cap(word),'dict');await tick(win);};
+  return {frame,win,doc,state,cap,open,close:()=>frame.remove()};
+}
+async function withFixture(fn, ...args) { const f=await fixture(...args);try{await fn(f);}finally{f.close();} }
+(async()=>{
+  await test('dictionary sidebar exists when Ask AI is unavailable',()=>withFixture(async f=>{
+    await f.open();f.doc.querySelector('.xp-dock').click();await tick(f.win);
+    assert(!f.doc.querySelector('#ask-panel').hidden,'panel hidden');
+    assert(f.doc.querySelector('#reader-dict-view .reader-dict-session'),'dictionary missing');
+    f.doc.querySelector('#reader-tab-ask').click();
+    assert(!f.doc.querySelector('#reader-ask-view').hidden,'Ask empty view inaccessible');
+  }));
+  await test('docking moves the one live subtree and retains selection, input and disclosure',()=>withFixture(async f=>{
+    await f.open();const run=f.state.runs[0],root=run.root,details=root.querySelector('details'),input=root.querySelector('input');
+    input.value='travel';details.open=true;f.doc.querySelector('.xp-dock').click();await tick(f.win);
+    assert(f.doc.querySelectorAll('.reader-dict-session').length===1,'duplicate session');
+    assert(root.parentElement.id==='reader-dict-view'&&!run.ctrl.signal.aborted,'docking replaced or aborted session');
+    assert(input.value==='travel'&&details.open&&root.querySelector('select').selectedIndex===1,'state lost');
+  }));
+  await test('a pending result completes after docking without another request',()=>withFixture(async f=>{
+    await f.open();const run=f.state.runs[0];f.doc.querySelector('.xp-dock').click();run.resolve();await tick(f.win);
+    assert(f.state.calls===1&&run.root.querySelector('.done'),'result lost or regenerated');
+    assert(!run.ctrl.signal.aborted,'docking aborted request');
+  }));
+  await test('closing the panel retains pending work and completion does not reopen or steal focus',()=>withFixture(async f=>{
+    f.doc.querySelector('#outside').focus();await f.open();const run=f.state.runs[0];f.doc.querySelector('.xp-dock').click();
+    let releaseLanguage;f.win.pbpDictResolveContextLanguage=()=>new Promise(resolve=>{releaseLanguage=resolve;});
+    const pendingLookup=f.win._pbpReaderLookup(f.cap(),{},'panel');
+    f.doc.querySelector('#ask-close').focus();f.doc.querySelector('#ask-close').click();
+    releaseLanguage('en');await pendingLookup;
+    assert(f.doc.querySelector('#ask-panel').hidden,'late same-word language check reopened closed panel');
+    assert(f.doc.activeElement.id==='outside','closing panel did not restore the original reader opener');
+    f.doc.querySelector('#outside').focus();run.resolve();await tick(f.win);
+    assert(f.doc.querySelector('#ask-panel').hidden&&run.root.querySelector('.done'),'hidden completion changed visibility');
+    assert(f.doc.activeElement.id==='outside'&&!run.ctrl.signal.aborted,'hidden completion stole focus or aborted');
+  }));
+  await test('new lookup from Ask tab activates Dictionary and cancels only the superseded word',()=>withFixture(async f=>{
+    await f.open();const old=f.state.runs[0];f.doc.querySelector('.xp-dock').click();f.doc.querySelector('#reader-tab-ask').click();
+    await f.open('example');
+    assert(f.doc.querySelector('#ask-panel').dataset.view==='dict','new lookup stayed on Ask');
+    assert(f.state.calls===2&&old.ctrl.signal.aborted&&!f.state.runs[1].ctrl.signal.aborted,'lookup cancellation wrong');
+    assert(f.doc.querySelector('#reader-dict-view .xp-term').textContent==='example','new term missing');
+  }));
+  await test('same word reuses its session and refreshes the selected article context',()=>withFixture(async f=>{
+    await f.open();const root=f.state.runs[0].root;f.doc.querySelector('.xp-dock').click();await f.open();
+    assert(f.state.calls===1&&f.state.runs[0].root===root,'same word recreated');
+    assert(f.state.contexts.length===1,'fresh selection context not bridged');
+    root.querySelector('.reader-dict-return').click();
+    f.win._pbpAskSetOpen(true,'ask');
+    const tab=f.doc.querySelector('#reader-tab-dict');
+    tab.dispatchEvent(new f.win.PointerEvent('pointerdown',{bubbles:true,cancelable:true,isPrimary:true,button:0}));
+    tab.click();
+    assert(!f.state.runs[0].ctrl.signal.aborted&&root.parentElement.id==='reader-dict-view','pointerdown dismissed session before tab migration');
+    f.win.pbpDictResolveContextLanguage=async()=> 'de';
+    await f.open();
+    assert(f.state.calls===2&&f.state.runs[0].ctrl.signal.aborted,'same spelling in different detected language reused old entry');
+    let releaseLanguage;f.win.pbpDictResolveContextLanguage=()=>new Promise(resolve=>{releaseLanguage=resolve;});
+    const stale=f.win._pbpReaderLookup(f.cap(),{},'panel');
+    f.win._pbpReaderLookup(f.cap('example'),{},'panel');await tick(f.win);
+    releaseLanguage('en');await stale;
+    assert(f.state.calls===3&&f.doc.querySelector('#reader-dict-view .xp-term').textContent==='example','late language resolution replaced newer word');
+    const hiddenLookup=f.win._pbpReaderLookup(f.cap('example'),{},'panel');
+    f.doc.querySelector('#reader-tab-ask').click();releaseLanguage('en');await hiddenLookup;
+    assert(f.doc.querySelector('#ask-panel').dataset.view==='ask','late language resolution stole Ask selection');
+  }));
+  await test('return to bubble keeps task and form state; a real bubble close cancels it',()=>withFixture(async f=>{
+    await f.open();const run=f.state.runs[0];f.doc.querySelector('.xp-dock').click();
+    run.root.querySelector('.reader-dict-return').click();await tick(f.win);
+    assert(run.root.parentElement.id==='explain-pop'&&!run.ctrl.signal.aborted,'return lost session');
+    assert(f.doc.querySelector('#ask-panel').hidden,'dictionary sidebar remains open');
+    assert(run.root.querySelector('select').selectedIndex===1,'return lost sense');
+    f.doc.querySelector('.xp-close').click();assert(run.ctrl.signal.aborted,'real close failed to cancel');
+  }));
+  await test('Explain stays independent from a docked dictionary request',()=>withFixture(async f=>{
+    await f.open();const run=f.state.runs[0];f.doc.querySelector('.xp-dock').click();
+    f.win._pbpExplainOpenPop(f.cap('example'),'explain');await tick(f.win);
+    assert(!run.ctrl.signal.aborted&&run.root.parentElement.id==='reader-dict-view','Explain disrupted dictionary');
+    assert(f.doc.querySelector('#explain-pop').dataset.action==='explain','Explain bubble missing');
+    f.doc.querySelector('.xp-close').click();assert(!run.ctrl.signal.aborted,'closing Explain canceled dictionary');
+  }));
+  await test('tab keyboard navigation has one tab stop and selected panel relation',()=>withFixture(async f=>{
+    await f.open();f.doc.querySelector('.xp-dock').click();
+    const dict=f.doc.querySelector('#reader-tab-dict');dict.focus();dict.dispatchEvent(new f.win.KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true}));
+    assert(f.doc.activeElement.id==='reader-tab-ask','ArrowLeft focus wrong');
+    assert(f.doc.querySelector('#reader-tab-ask').getAttribute('aria-selected')==='true'&&dict.tabIndex===-1,'tab ARIA wrong');
+    assert(f.doc.querySelector('#reader-dict-view').hidden,'inactive panel remains visible');
+  }));
+  await test('account changes and article replacement invalidate docked sessions',()=>withFixture(async f=>{
+    await f.open();f.doc.querySelector('.xp-dock').click();const first=f.state.runs[0];f.win._pbpAskOnAccountChanged('other');
+    assert(first.ctrl.signal.aborted&&!f.doc.querySelector('.reader-dict-session'),'owner change retained data');
+    await f.open('example');const second=f.state.runs[1];f.win._pbpAskOnArticleWillReplace({revision:7});
+    assert(second.ctrl.signal.aborted&&!f.doc.querySelector('.reader-dict-session'),'article replacement retained selection');
+  }));
+  await test('mobile sheet and wide column keep body scrolling and footer inside bounds in Russian',async()=>{
+    for(const width of [390,1100,1440])await withFixture(async f=>{
+      await f.open();f.doc.querySelector('.xp-dock').click();await tick(f.win);
+      const panel=f.doc.querySelector('#ask-panel'),body=f.doc.querySelector('.reader-dict-session .xp-body'),foot=f.doc.querySelector('.reader-dict-session .xp-foot');
+      const p=panel.getBoundingClientRect(),b=body.getBoundingClientRect(),r=foot.getBoundingClientRect();
+      assert(p.width<=width&&p.height<=800&&b.height>80,'panel/body bounds wrong at '+width);
+      assert(r.bottom<=p.bottom+1&&r.left>=p.left&&r.right<=p.right+1,'footer escapes at '+width);
+      assert(body.scrollHeight>body.clientHeight,'body not scrollable at '+width);
+    },width,800,'ru');
+  });
+  await test('a pending save cannot repaint a newer context or selected meaning',async()=>{
+    for(const revision of ['contextRevision','packRevision'])await withFixture(async f=>{
+      await f.open();const button=f.state.runs[0].root.querySelector('.xp-vocab');
+      button.hidden=false;button.disabled=false;
+      Object.assign(button.dataset,{runId:'1',contextRevision:'0',packRevision:'0'});
+      let finish,paints=0;
+      f.win.pbpDictSaveCurrent=()=>new Promise(resolve=>{finish=resolve;});
+      f.win.pbpDictShowSavedFace=()=>{paints++;return true;};
+      button.click();assert(button.disabled,'save did not enter pending state');
+      button.dataset[revision]='1';button.disabled=false;
+      finish(true);await tick(f.win);
+      assert(paints===0&&!button.hidden&&!button.disabled,'old save repainted newer '+revision);
+    });
+  });
+  await test('resize controls share the title row and reserve no footer whitespace',()=>withFixture(async f=>{
+    await f.open();const pop=f.doc.querySelector('#explain-pop'),grip=pop.querySelector('.xp-resize-grip'),foot=pop.querySelector('.reader-dict-session .xp-foot');
+    assert(grip.closest('.xp-window-actions'),'resize alternative is outside title controls');
+    assert(pop.querySelectorAll('.xp-resize').length===8,'missing resize direction');
+    assert(f.win.getComputedStyle(foot).paddingRight==='12px','footer retains grip reserve');
+    const g=grip.getBoundingClientRect(),h=pop.querySelector('.xp-head').getBoundingClientRect();
+    assert(g.top>=h.top&&g.bottom<=h.bottom,'resize control below header');
+  }));
+})();
+</script></body></html>

@@ -4658,7 +4658,16 @@
   "dictResizeWidth": {"message": "Width"},
   "dictResizeHeight": {"message": "Height"},
   "dictResizeReset": {"message": "Reset to default size"},
-  "dictResizeHint": {"message": "Drag an edge to resize. Use arrow keys for small adjustments; hold Shift for larger steps."},
+  "dictResizeHint": {"message": "Drag an edge to resize. Focus the size button in the title bar and use arrow keys for small adjustments; hold Shift for larger steps."},
   "dictResizeSmaller": {"message": "Decrease"},
-  "dictResizeLarger": {"message": "Increase"}
+  "dictResizeLarger": {"message": "Increase"},
+  "readerPanelLabel": {"message": "Reading tools"},
+  "readerAskTab": {"message": "Ask"},
+  "readerDictTab": {"message": "Dictionary"},
+  "dictOpenInPanel": {"message": "Open in side panel"},
+  "dictReturnToBubble": {"message": "Return to popover"},
+  "dictPanelEmpty": {"message": "Select a word in the article, or enter one above to look it up."},
+  "dictLookupInPanel": {"message": "Look up in side panel"},
+  "dictSupplementScope": {"message": "Limit to a situation"},
+  "dictSupplementSaving": {"message": "Saving supplement…"}
 }

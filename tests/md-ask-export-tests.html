@@ -1,10 +1,14 @@
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Ask export tests</title></head><body>
 <div id="results"></div><div id="summary"></div>
+<script src="../shared.js"></script>
 <script src="../vendor/marked.min.js"></script><script src="../vendor/purify.min.js"></script>
 <script src="../md-convert.js"></script><script src="../export-targets.js"></script><script src="../md-export-send.js"></script><script src="../ai-cache.js"></script><script src="../md-ai-core.js"></script><script src="../md-ask.js"></script><script src="../md-epub.js"></script>
 <script>
 let pass=0,fail=0;
+// Runner tests replace the AI transport below; availability is a fixture
+// boundary, while citation parsing comes from the real shared module.
+function hasAIKey(){return true;}
 function assert(x,msg){if(!x)throw Error(msg||'assertion failed');}
 async function test(name,fn){const row=document.createElement('div');try{await fn();row.className='pass';row.textContent='PASS '+name;pass++;}catch(e){row.className='fail';row.textContent='FAIL '+name+': '+e.message;fail++;}document.getElementById('results').appendChild(row);}
 const url='https://example.com/article';
