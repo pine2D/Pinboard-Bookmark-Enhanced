@@ -321,7 +321,9 @@ function _pbpVocabBuildRow(w) {
   if (w.gloss) {
     const glossLine = document.createElement("span");
     glossLine.className = "vocab-row-gloss";
-    glossLine.textContent = (w.gloss || "").split("\n")[0];
+    // Keep a readable preview across paragraph boundaries; the first line
+    // of an older imported entry can be only a heading. Stored text is intact.
+    glossLine.textContent = (w.gloss || "").replace(/\s+/gu, " ").trim();
     main.appendChild(glossLine);
   }
   // Groups as plain text on line two's right end (spec §3.6); the " · "
@@ -1138,6 +1140,7 @@ function _pbpVocabLookupChoiceIdentity(choice) {
 function _pbpVocabSelectLookupDefault(state) {
   if (!state.select) return;
   let selected = "";
+  state.keptSavedDefinition = false;
   if (state.manualChoice) {
     selected = [...state.choices].find(([, choice]) => _pbpVocabLookupChoiceIdentity(choice) === state.manualChoice)?.[0] || "";
     // A removed/replaced source must not silently turn the next Save click
@@ -1152,7 +1155,8 @@ function _pbpVocabSelectLookupDefault(state) {
     const first = visible.flatMap(([, choices]) => choices)[0];
     const savedId = first && pbpDictVocabKey(state.owner, first.language, first.term);
     // Existing vocabulary keeps its own definition until an explicit choice.
-    if (first && !_vocabRows.some(row => row.id === savedId)) {
+    state.keptSavedDefinition = !!first && _vocabRows.some(row => row.id === savedId);
+    if (first && !state.keptSavedDefinition) {
       const identity = _pbpVocabLookupChoiceIdentity(first);
       selected = [...state.choices].find(([, choice]) => _pbpVocabLookupChoiceIdentity(choice) === identity)?.[0] || "";
     }
@@ -1168,6 +1172,8 @@ function _pbpVocabSyncLookupSave(state) {
   setBtnIcon(state.button, "bookMarked", t(state.expectedExisting ? "dictUpdateVocab" : "dictSaveVocab"));
   state.button.disabled = state.busy || !choice;
   state.select.disabled = state.busy;
+  state.select.dataset.listboxHelp = t(choice ? state.manualChoice ? "dictMeaningManualHelp" : "dictMeaningDefaultHelp"
+    : !state.choiceRevoked && state.keptSavedDefinition ? "dictMeaningSavedHelp" : "dictMeaningChooseHelp");
   window.pbpListboxSync?.(state.select);
   const value = state.select.nextElementSibling?.querySelector(".listbox-value");
   if (value) value.lang = choice?.definitionLang || document.documentElement.lang || "und";

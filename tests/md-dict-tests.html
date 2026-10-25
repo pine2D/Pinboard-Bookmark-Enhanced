@@ -2253,7 +2253,79 @@ async function runDictionaryEntryReaderTests() {
 }
 
 
+async function runDictionaryStructureUiTests() {
+  section("Structured dictionary meaning and full entry separation");
+  const entry = { pos: "adjective", ipas: [], forms: [], contentKind: "senses",
+    fullText: "詞源\nστρατηγός\n與策略規劃有關的\nA strategic decision.", etymology: ["來自希臘語 στρατηγός。"],
+    senses: [{ definition: "與策略規劃有關的", examples: [{ text: "A strategic decision.", translation: "Eine strategische Entscheidung.", lang: "en", translationLang: "de" }], tags: [], subsenses: [] },
+      { definition: "有策略的", examples: [], tags: [], subsenses: [] }] };
+  const norm = { word: "strategic", packId: "structured", sourceLabel: "Multilingual source", definitionLang: "zh-Hant", sourceUrl: "https://example.test/terms", license: "fixture", entries: [entry], hasFullEntry: false };
+  const before = JSON.stringify(norm), choices = pbpDictNormChoices(norm, "en");
+  check("structure: selectable meanings contain definitions only, without origins or examples", choices.length === 2 && choices[0].gloss === "與策略規劃有關的" && !choices.some(c => /στρατηγός|decision/.test(c.gloss)));
+  const slot = document.createElement("div"); document.body.appendChild(slot);
+  _pbpDictRenderEntry(slot, norm, "strategic", "en", "strategic", "");
+  check("structure: definitions lead, origins and complete entry remain collapsed", slot.querySelector(".xp-dict-senses").textContent.includes("與策略規劃有關的") && slot.querySelectorAll("details").length === 2 && ![...slot.querySelectorAll("details")].some(d => d.open));
+  check("structure: example and translation keep the dictionary's own language metadata", slot.querySelector(".xp-dict-example").lang === "en" && slot.querySelector(".xp-dict-example-translation").lang === "de");
+  check("structure: object examples contribute real text to context ranking", _pbpDictSenseTokens(entry.senses[0]).has("decision"));
+  const unknown = { ...norm, hasFullEntry: true, needsReimport: true, entries: [{ pos: "", ipas: [], forms: [], contentKind: "legacy", fullText: "詞源\n古希臘語 <img src=bad>\n有策略的", etymology: [], senses: [] }] };
+  check("structure: old flattened and unknown entries are not definition choices", pbpDictNormChoices(unknown, "en").length === 0 && pbpDictNormChoices({ ...unknown, entries: [{ ...unknown.entries[0], contentKind: "full-entry" }] }, "en").length === 0);
+  _pbpDictRenderEntry(slot, unknown, "strategic", "en", "strategic", "");
+  check("structure: unknown full text remains readable and cannot inject markup", slot.querySelector("details").open && slot.querySelector(".xp-dict-full-text").textContent.includes("<img src=bad>") && !slot.querySelector("img"));
+  check("structure: old packs show a reimport explanation without claiming an automatic repair", slot.textContent.includes("multiPackReimportHint") && slot.textContent.includes("dictFullEntryOnlyHint"));
+  check("structure: rendering and choice projection leave source data unchanged", JSON.stringify(norm) === before);
+  const previous = { current: _pbpDictCurrent, owner: _pbpDictOwner, get: pbpVocabGet, liveOwner: window.pbpVocabCurrentOwner, save: window.pbpVocabSaveWord };
+  const pop = document.createElement("div"); pop.innerHTML = '<div class="xp-foot"><button class="xp-vocab" data-run-id="1"></button></div>';
+  document.body.appendChild(pop); const controller = new AbortController();
+  try {
+    _pbpDictOwner = "acct_structure"; pbpVocabGet = async () => null;
+    const cur = { owner: _pbpDictOwner, lang: "en", term: "strategic", queryTerm: "strategic", runId: 1, entryView: "dictionary", sentence: "", meaningSources: new Map() };
+    _pbpDictCurrent = cur;
+    _pbpDictReaderPackChoices(unknown, slot, cur, pop, controller.signal);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    check("structure: an unresolved full article never defaults to its heading or enables Save", cur.fullEntryOnly && !cur.gloss && pop.querySelector(".xp-vocab").disabled);
+    check("structure: direct Save also refuses full-entry-only lookup", await pbpDictSaveCurrent() === false);
+    const known = { ...norm, packId: "reliable" };
+    _pbpDictReaderPackChoices(known, slot, cur, pop, controller.signal);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const select = pop.querySelector(".xp-dict-save-meaning");
+    check("structure: a later reliable source supplies a real default without selecting unknown full text", !cur.fullEntryOnly && cur.gloss === "與策略規劃有關的" && !pop.querySelector(".xp-vocab").disabled);
+    check("meaning help: explanation is descriptive content outside the options", select.options.length === 3 && select.querySelector(".xp-dict-choice-help").textContent === "dictMeaningDefaultHelp" && select.getAttribute("aria-describedby") === select.querySelector(".xp-dict-choice-help").id);
+    select.value = "1"; select.dispatchEvent(new Event("change"));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    check("meaning help: explicit selection remains intact and changes the explanation", cur.gloss === "有策略的" && select.value === "1" && select.querySelector(".xp-dict-choice-help").textContent === "dictMeaningManualHelp");
+    select.value = ""; select.dispatchEvent(new Event("change"));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    check("meaning help: clearing the choice clears its payload and disables Save", !cur.gloss && !cur.packChoice && cur.packInvalidated && pop.querySelector(".xp-vocab").disabled && select.querySelector(".xp-dict-choice-help").textContent === "dictMeaningChooseHelp");
+    _pbpDictReaderPackChoices(known, slot, cur, pop, controller.signal);
+    check("meaning help: later sources cannot undo an explicit empty selection", !cur.gloss && select.value === "");
+    select.value = "0"; select.dispatchEvent(new Event("change"));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    check("meaning help: choosing a definition again restores its exact payload and save action", cur.gloss === "與策略規劃有關的" && !cur.packInvalidated && !pop.querySelector(".xp-vocab").disabled);
+    cur.packChoice = null; cur.meaningSources.delete("reliable:strategic");
+    const ai = { ...norm, packId: "ai", aiGenerated: true };
+    _pbpDictReaderPackChoices(ai, slot, cur, pop, controller.signal);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    check("structure: hidden AI choices do not supply an ordinary full-entry-only default", cur.fullEntryOnly && !cur.gloss && pop.querySelector(".xp-vocab").disabled);
+    select.value = "0"; select.dispatchEvent(new Event("change"));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    check("structure: explicitly choosing a reliable hidden source clears full-entry-only gating", !cur.fullEntryOnly && cur.gloss === "與策略規劃有關的" && !pop.querySelector(".xp-vocab").disabled);
+    let releaseOwner, writes = 0;
+    window.pbpVocabCurrentOwner = () => new Promise(resolve => { releaseOwner = resolve; });
+    window.pbpVocabSaveWord = async () => { writes++; return {}; };
+    const saving = pbpDictSaveCurrent();
+    cur.packChoice = null; cur.meaningSources.delete("ai:strategic"); _pbpDictApplyVisibleChoice(cur);
+    releaseOwner(cur.owner);
+    check("structure: a source becoming full-entry-only during the owner check cannot write a guessed definition", await saving === false && writes === 0);
+  } finally {
+    controller.abort(); pop.remove(); slot.remove(); _pbpDictCurrent = previous.current; _pbpDictOwner = previous.owner; pbpVocabGet = previous.get;
+    if (previous.liveOwner) window.pbpVocabCurrentOwner = previous.liveOwner; else delete window.pbpVocabCurrentOwner;
+    window.pbpVocabSaveWord = previous.save;
+  }
+}
+
+
 (async function () {
+  await runDictionaryStructureUiTests();
   await runDictReviewRegressionTests();
   await runDictDefinitionLanguageTests();
   await runEchoLanguageAndInlineTests();

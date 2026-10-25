@@ -4608,5 +4608,12 @@
   "driveAskStatus": {"message": "会話履歴：$STATUS$", "placeholders": {"status": {"content": "$1"}}},
   "driveAskErrorEntryTooLarge": {"message": "同期できるサイズを超えた回答があります。このデバイスには保存されています。"},
   "askHistoryUnavailable": {"message": "この会話は削除されたか、このデバイスでは利用できません。新しい会話を開始して続けてください。"},
-  "askHistoryKeysMove": {"message": "前または次の会話"}
+  "askHistoryKeysMove": {"message": "前または次の会話"},
+  "dictMeaningDefaultHelp": {"message": "表示中の出典の最初の意味が選択されており、そのまま保存できます。別の意味を選ぶと、今回の検索中はその選択が維持されます。"},
+  "dictMeaningManualHelp": {"message": "選択した意味を保存します。今回の検索中はこの選択が維持されます。"},
+  "dictMeaningSavedHelp": {"message": "保存済みの意味は自動では変わりません。意味を選ぶと、この単語を更新できます。"},
+  "dictMeaningChooseHelp": {"message": "保存する意味を選んでください。今回の検索中はその選択が維持されます。"},
+  "dictFullEntry": {"message": "項目の全文"},
+  "dictFullEntryOnlyHint": {"message": "この項目は個別の意味に分けられていません。全文を読むか、別の辞書の意味を選んで保存できます。"},
+  "multiPackReimportHint": {"message": "同じ辞書ファイルを再インポートすると、語義の構造を再解析します。保存済みの単語と辞書の有効・無効の設定は変わりません。"}
 }

@@ -67,6 +67,9 @@ function pbpDictNormChoices(norm, lang, sourcePrefix = "Source:") {
     norm.license, norm.attribution
   ].filter(Boolean).join("\n\n") : norm.license || "";
   for (const entry of norm.entries || []) {
+    // Imported full articles (including old flattened rows) are readable,
+    // but must never become an automatically selected vocabulary definition.
+    if (entry.contentKind === "full-entry" || entry.contentKind === "legacy") continue;
     const visit = (sense) => {
       const gloss = typeof sense === "string" ? sense : sense?.definition;
       if (gloss) choices.push({ term, language: lang, gloss,
@@ -390,7 +393,8 @@ function pbpDictContentTokens(text) {
 // are where a sentence's wording most often shows up.
 function _pbpDictSenseTokens(s) {
   return pbpDictContentTokens([
-    s.definition, (s.examples || []).join(" "), (s.tags || []).join(" "),
+    s.definition, (s.examples || []).map(example => typeof example === "string" ? example
+      : [example?.text, example?.translation].filter(Boolean).join(" ")).join(" "), (s.tags || []).join(" "),
     (s.synonyms || []).join(" "), (s.subsenses || []).join(" ")
   ].join(" "));
 }
@@ -778,14 +782,14 @@ function _pbpDictSenseLi(s, formOf, termLang, definitionLang) {
     pair.className = "xp-dict-example-pair";
     const ex = document.createElement("div");
     ex.className = "xp-dict-example";
-    ex.lang = termLang || "und";
+    ex.lang = (typeof x === "object" && x.lang) || termLang || "und";
     ex.dir = "auto";
     ex.textContent = typeof x === "string" ? x : x.text;
     pair.appendChild(ex);
     if (typeof x === "object" && x.translation) {
       const translation = document.createElement("div");
       translation.className = "xp-dict-example xp-dict-example-translation";
-      translation.lang = definitionLang || "und"; translation.dir = "auto";
+      translation.lang = x.translationLang || definitionLang || "und"; translation.dir = "auto";
       translation.textContent = x.translation; pair.appendChild(translation);
     }
     li.appendChild(pair);
@@ -880,7 +884,25 @@ function _pbpDictRenderEntry(slot, norm, term, lang, selectedTerm, sentence) {
       ent.appendChild(forms);
     }
     if (e.senses.length) _pbpDictRenderSenses(ent, e.senses, !!norm.formOfOnly, lang, definitionLang);
+    if (e.etymology?.length) {
+      _pbpDictEntryDisclosure(ent, t("dictEntryEtymology"), e.etymology.join("\n\n"), definitionLang);
+    }
+    if (e.fullText) {
+      const full = e.fullText.replace(/\s+/gu, " ").trim();
+      const definitions = e.senses.map(sense => sense.definition).join(" ").replace(/\s+/gu, " ").trim();
+      if (!e.senses.length || full !== definitions) {
+        _pbpDictEntryDisclosure(ent, t("dictFullEntry"), e.fullText, definitionLang, !e.senses.length);
+      }
+    }
     slot.appendChild(ent);
+  }
+  if (norm.hasFullEntry && !pbpDictNormChoices(norm, lang).length) {
+    const hint = document.createElement("p"); hint.className = "xp-dict-msg";
+    hint.textContent = t("dictFullEntryOnlyHint"); slot.appendChild(hint);
+  }
+  if (norm.needsReimport) {
+    const hint = document.createElement("p"); hint.className = "xp-dict-msg";
+    hint.textContent = t("multiPackReimportHint"); slot.appendChild(hint);
   }
   const src = document.createElement("div");
   src.className = "xp-dict-src";
@@ -900,6 +922,14 @@ function _pbpDictRenderEntry(slot, norm, term, lang, selectedTerm, sentence) {
   src.appendChild(a);
   slot.appendChild(src);
   _pbpDictSyncSourceDividers(slot);
+}
+
+function _pbpDictEntryDisclosure(parent, label, text, lang, open = false) {
+  const details = document.createElement("details"); details.className = "xp-dict-ai-details"; details.open = open;
+  const summary = document.createElement("summary"); summary.textContent = label;
+  const content = document.createElement("p"); content.className = "xp-dict-full-text";
+  content.lang = lang || "und"; content.dir = "auto"; content.textContent = text;
+  details.append(summary, content); parent.appendChild(details);
 }
 
 // Count populated sources in DOM order, not asynchronous arrival order. Empty
@@ -2060,6 +2090,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
 }
 
 function _pbpDictApplyVisibleChoice(cur) {
+  cur.fullEntryOnly = false;
   if (cur.packChoice) { _pbpDictApplyPackChoice(cur, cur.packChoice); return; }
   if (cur.packInvalidated) return;
   const sources = [...(cur.meaningSources?.values() || [])].filter(source => !source.norm.aiGenerated && source.choices.length);
@@ -2069,7 +2100,10 @@ function _pbpDictApplyVisibleChoice(cur) {
   const choice = norm && pbpDictNormChoices({ ...norm,
     entries: pbpDictOrderForContext(norm.entries, cur.entryView === "ai" ? "" : cur.sentence) }, cur.lang, t("dictSource"))[0];
   if (choice) _pbpDictApplyPackChoice(cur, choice);
-  else Object.assign(cur, { term: cur.queryTerm || cur.term, gloss: "", ipa: "", sourceUrl: "", license: "", lemma: "" });
+  else {
+    cur.fullEntryOnly = cur.entryView !== "ai" && [...(cur.meaningSources?.values() || [])].some(source => source.norm.hasFullEntry);
+    Object.assign(cur, { term: cur.queryTerm || cur.term, gloss: "", ipa: "", sourceUrl: "", license: "", lemma: "" });
+  }
 }
 
 function _pbpDictSyncMeaningSelect(cur) {
@@ -2093,34 +2127,56 @@ function _pbpDictSyncMeaningSelect(cur) {
   const selected = rows.findIndex(choice => choice.term === cur.term && choice.gloss === cur.gloss &&
     choice.sourceUrl === cur.sourceUrl && choice.license === cur.license);
   select.value = selected >= 0 ? String(selected) : "";
+  const help = document.createElement("div"); help.className = "xp-dict-choice-help"; help.id = "xp-dict-choice-help";
+  help.textContent = t(selected < 0 ? "dictMeaningChooseHelp" : cur.packChoice ? "dictMeaningManualHelp" : "dictMeaningDefaultHelp");
+  select.prepend(help); select.setAttribute("aria-describedby", help.id);
   _pbpDictSyncSelectFace(select);
+  cur.meaningHelpObserver?.disconnect();
+  if (typeof ResizeObserver === "function") {
+    cur.meaningHelpObserver = new ResizeObserver(() => {
+      const height = Math.ceil(help.getBoundingClientRect().height);
+      if (height > 0) select.style.setProperty("--xp-dict-help-height", height + "px");
+    });
+    cur.meaningHelpObserver.observe(help);
+  }
   select.hidden = !rows.length || (rows.length === 1 && selected === 0 && !cur.packChoice);
   select.title = selected >= 0 ? rows[selected].gloss + " (" + rows[selected].sourceLabel + ")" : t("vocabSaveDefinitionLabel");
 }
 
 function _pbpDictApplyPackChoice(cur, choice) {
-  Object.assign(cur, { term: choice.term, lang: choice.language, gloss: choice.gloss,
+  Object.assign(cur, { fullEntryOnly: false, term: choice.term, lang: choice.language, gloss: choice.gloss,
     ipa: choice.ipa, sourceUrl: choice.sourceUrl, license: choice.license, lemma: "" });
 }
 
 function _pbpDictReaderPackChoices(norm, box, cur, pop, signal) {
   const choices = pbpDictNormChoices(norm, cur.lang, t("dictSource"));
-  if (!choices.length) return;
   const key = (norm.packId || norm.sourceLabel) + ":" + norm.word;
   cur.meaningSources?.set(key, { norm, choices, box });
+  if (!choices.length) {
+    _pbpDictApplyVisibleChoice(cur); _pbpDictSyncMeaningSelect(cur);
+    _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name));
+    return;
+  }
   if (!cur.meaningSelect) {
     const select = document.createElement("select");
     select.className = "xp-dict-lang xp-dict-save-meaning";
     select.setAttribute("aria-label", t("vocabSaveDefinitionLabel"));
     cur.meaningSelect = select;
     (pop.querySelector(".xp-foot") || box).prepend(select);
-    signal.addEventListener("abort", () => select.remove(), { once: true });
+    signal.addEventListener("abort", () => { cur.meaningHelpObserver?.disconnect(); select.remove(); }, { once: true });
     select.addEventListener("change", () => {
       const choice = cur.meaningChoices[Number(select.value)];
-      if (select.value === "" || !choice || signal.aborted || _pbpDictCurrent !== cur) return;
-      cur.packChoice = choice; cur.packInvalidated = false;
+      if (signal.aborted || _pbpDictCurrent !== cur) return;
+      if (select.value === "") {
+        cur.packChoice = null; cur.packInvalidated = true;
+        Object.assign(cur, { gloss: "", ipa: "", sourceUrl: "", license: "", lemma: "" });
+      } else {
+        if (!choice) return;
+        cur.packChoice = choice; cur.packInvalidated = false;
+        _pbpDictApplyPackChoice(cur, choice);
+      }
       cur.packRevision = (cur.packRevision || 0) + 1;
-      _pbpDictApplyPackChoice(cur, choice); _pbpDictSyncMeaningSelect(cur);
+      _pbpDictSyncMeaningSelect(cur);
       _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name));
     });
   }
@@ -2134,7 +2190,7 @@ async function _pbpDictRefreshSave(pop, cur, signal) {
   if (signal.aborted || _pbpDictCurrent !== cur) return;
   cur.saved = false; cur.savedRecord = null;
   if (vocabBtn) {
-    vocabBtn.hidden = false; vocabBtn.disabled = false;
+    vocabBtn.hidden = false; vocabBtn.disabled = !!cur.fullEntryOnly || !!cur.packInvalidated;
     delete vocabBtn.dataset.face;
     if (typeof _pbpExplainIconBtn === "function") {
       _pbpExplainIconBtn(vocabBtn, PBP_EXPLAIN_VOCAB_ADD_SVG, t("dictSaveVocab"));
@@ -2178,7 +2234,7 @@ async function _pbpDictRefreshSave(pop, cur, signal) {
         vocabBtn.textContent = t("dictUpdateVocab");
       }
     }
-    vocabBtn.disabled = false;
+    vocabBtn.disabled = !!cur.fullEntryOnly || !!cur.packInvalidated;
   }
 }
 
@@ -2284,7 +2340,7 @@ window.pbpDictRun = pbpDictRun;
 async function pbpDictSaveCurrent() {
   const cur = _pbpDictCurrent;
   const packRevision = cur?.packRevision || 0;
-  if (!cur || !cur.term) return false;
+  if (!cur || !cur.term || cur.fullEntryOnly) return false;
   if (cur.owner !== _pbpDictOwner) return false; // owner re-check at commit time (invariant)
   const urlEl = document.getElementById("preview-url");
   const titleEl = document.getElementById("preview-title");
@@ -2330,7 +2386,7 @@ async function pbpDictSaveCurrent() {
     const live = await pbpVocabCurrentOwner().catch(() => null);
     if (live !== cur.owner) return false;
   }
-  if (cur.packInvalidated || (cur.packRevision || 0) !== packRevision) return false;
+  if (cur.fullEntryOnly || cur.packInvalidated || (cur.packRevision || 0) !== packRevision) return false;
   const entry = await pbpVocabSaveWord(cur.owner, {
     term: cur.term, lemma: cur.lemma, language: cur.lang || "und",
     gloss: cur.gloss, ipa: cur.ipa, sourceUrl: cur.sourceUrl, license: cur.license,

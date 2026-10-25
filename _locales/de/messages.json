@@ -4608,5 +4608,12 @@
   "driveAskStatus": {"message": "Gesprächsverlauf: $STATUS$", "placeholders": {"status": {"content": "$1"}}},
   "driveAskErrorEntryTooLarge": {"message": "Eine Antwort überschreitet die Größenbegrenzung für die Synchronisierung. Sie bleibt auf diesem Gerät gespeichert."},
   "askHistoryUnavailable": {"message": "Dieses Gespräch wurde gelöscht oder ist auf diesem Gerät nicht verfügbar. Ein neues Gespräch starten, um fortzufahren."},
-  "askHistoryKeysMove": {"message": "Vorheriges oder nächstes Gespräch"}
+  "askHistoryKeysMove": {"message": "Vorheriges oder nächstes Gespräch"},
+  "dictMeaningDefaultHelp": {"message": "Die erste Definition der angezeigten Quelle ist ausgewählt und kann direkt gespeichert werden. Wählst du eine andere, bleibt deine Auswahl während dieser Suche erhalten."},
+  "dictMeaningManualHelp": {"message": "Die ausgewählte Definition wird gespeichert. Deine Auswahl bleibt während dieser Suche erhalten."},
+  "dictMeaningSavedHelp": {"message": "Die gespeicherte Definition wird nicht automatisch geändert. Wähle eine Definition aus, um dieses gespeicherte Wort zu aktualisieren."},
+  "dictMeaningChooseHelp": {"message": "Wähle eine Definition zum Speichern aus. Deine Auswahl bleibt während dieser Suche erhalten."},
+  "dictFullEntry": {"message": "Vollständiger Eintrag"},
+  "dictFullEntryOnlyHint": {"message": "Dieser Eintrag wurde noch nicht in einzelne Definitionen aufgeteilt. Du kannst den vollständigen Eintrag lesen oder eine Definition aus einem anderen Wörterbuch zum Speichern auswählen."},
+  "multiPackReimportHint": {"message": "Importiere dasselbe Wörterbuch erneut, um seine Bedeutungsstruktur neu auszuwerten. Gespeicherte Vokabeln und der Aktivierungsstatus des Wörterbuchs bleiben unverändert."}
 }

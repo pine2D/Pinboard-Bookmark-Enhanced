@@ -4608,5 +4608,12 @@
   "driveAskStatus": {"message": "Historia rozmów: $STATUS$", "placeholders": {"status": {"content": "$1"}}},
   "driveAskErrorEntryTooLarge": {"message": "Jedna z odpowiedzi przekracza limit rozmiaru synchronizacji. Pozostaje zapisana na tym urządzeniu."},
   "askHistoryUnavailable": {"message": "Ta rozmowa została usunięta lub nie jest dostępna na tym urządzeniu. Rozpocznij nową rozmowę, aby kontynuować."},
-  "askHistoryKeysMove": {"message": "Poprzednia lub następna rozmowa"}
+  "askHistoryKeysMove": {"message": "Poprzednia lub następna rozmowa"},
+  "dictMeaningDefaultHelp": {"message": "Pierwsza definicja z wyświetlanego źródła jest wybrana i gotowa do zapisania. Jeśli wybierzesz inną, wybór pozostanie zachowany podczas tego wyszukiwania."},
+  "dictMeaningManualHelp": {"message": "Zapisana zostanie wybrana definicja. Wybór pozostanie zachowany podczas tego wyszukiwania."},
+  "dictMeaningSavedHelp": {"message": "Zapisana definicja nie zmieni się automatycznie. Wybierz definicję, aby zaktualizować zapisane słowo."},
+  "dictMeaningChooseHelp": {"message": "Wybierz definicję do zapisania. Wybór pozostanie zachowany podczas tego wyszukiwania."},
+  "dictFullEntry": {"message": "Pełne hasło"},
+  "dictFullEntryOnlyHint": {"message": "To hasło nie zostało jeszcze podzielone na osobne definicje. Możesz przeczytać je w całości lub wybrać do zapisania definicję z innego słownika."},
+  "multiPackReimportHint": {"message": "Zaimportuj ponownie ten sam słownik, aby ponownie rozpoznać strukturę definicji. Zapisane słownictwo i ustawienie włączenia lub wyłączenia słownika pozostaną bez zmian."}
 }

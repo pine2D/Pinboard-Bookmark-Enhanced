@@ -1262,6 +1262,110 @@ function _pbpYomitanGloss(value) {
   }
   return result.replace(/[ \t]+\n/g, "\n").replace(/\n[ \t]+/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
+// Semantic adapters use exporter data roles, never a dictionary's title or
+// translated section headings. The complete validated text remains available
+// even when a role/shape is unknown. No markup or imported style is returned.
+function _pbpYomitanStructuredParts(value) {
+  const role = node => _pbpYomitanPlain(node?.data) && typeof node.data.content === "string" ? node.data.content : "";
+  // The validator intentionally treats br/img as leaves. Never inspect a
+  // content property beneath them: it is neither validated nor visible text.
+  const children = node => Array.isArray(node) ? node : ["br", "img"].includes(node?.tag) || node?.content === undefined ? [] : Array.isArray(node.content) ? node.content : [node.content];
+  const clean = text => text.replace(/[ \t]+\n/g, "\n").replace(/\n[ \t]+/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  const excluded = new Set(["preamble", "backlink", "attribution", "attribution-footnote", "extra-info", "forms", "xref", "xref-glossary"]);
+  function find(node, test, stop = () => false) {
+    if (typeof node !== "object" || !node || stop(node)) return [];
+    if (test(node)) return [node];
+    return children(node).flatMap(child => find(child, test, stop));
+  }
+  function text(node, omit = () => false) {
+    if (typeof node === "string") return node;
+    if (!node || omit(node)) return "";
+    if (node.tag === "br") return "\n";
+    if (node.tag === "img") return typeof node.alt === "string" ? node.alt : "";
+    const body = children(node).map(child => text(child, omit)).join("");
+    return ["div", "ol", "ul", "li", "details", "summary", "table", "tr"].includes(node.tag) ? "\n" + body + "\n" : body;
+  }
+  const proseOmit = node => ["rt", "rp", "img"].includes(node.tag) || role(node) === "attribution-footnote";
+  const prose = node => clean(text(node, proseOmit));
+  function language(node) {
+    const languages = new Set(find(node, n => typeof n.lang === "string" && /^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$/.test(n.lang), proseOmit).map(n => n.lang));
+    return languages.size === 1 ? [...languages][0] : "";
+  }
+  function examples(node) {
+    return find(node, n => role(n) === "example-sentence", n => ["xref", "attribution"].includes(role(n))).flatMap(example => {
+      const a = find(example, n => role(n) === "example-sentence-a"), b = find(example, n => role(n) === "example-sentence-b");
+      if (a.length !== 1 || b.length > 1) return [];
+      const original = prose(a[0]); if (!original) return [];
+      const result = { text: original, translation: b.length ? prose(b[0]) : "" };
+      const lang = language(a[0]), translationLang = b.length ? language(b[0]) : "";
+      if (lang) result.lang = lang;
+      if (translationLang) result.translationLang = translationLang;
+      return [result];
+    });
+  }
+  function tags(node, jitendex = false) {
+    return [...new Set(find(node, n => jitendex ? ["part-of-speech-info", "misc-info", "field-info", "dialect-info"].includes(role(n)) : role(n) === "tag",
+      n => ["sense", "example-sentence", "extra-info", "attribution"].includes(role(n))).map(prose).filter(Boolean))];
+  }
+  const makeSense = (definition, sample, labels) => ({ definition, examples: sample, tags: labels, synonyms: [], antonyms: [], subsenses: [] });
+  const senses = [], etymology = [];
+  let projectionUnits = 0;
+  function addSense(sense) {
+    projectionUnits += JSON.stringify(sense).length;
+    _pbpYomitanCheck(projectionUnits <= PBP_YOMITAN_LIMITS.rowUnits * 3, "Structured term projection exceeds import limit", "too_large");
+    senses.push(sense);
+  }
+  let recognized = false, partial = false;
+  const tree = value.content;
+  const glosses = find(tree, n => n.tag === "ol" && role(n) === "glosses", n => excluded.has(role(n)) || n.tag === "details");
+  if (glosses.length) {
+    recognized = true;
+    for (const list of glosses) {
+      const items = children(list).filter(n => typeof n !== "string" || n.trim());
+      if (!items.length || items.some(n => n?.tag !== "li")) { partial = true; continue; }
+      for (const item of items) {
+        let unknown = false;
+        const definition = clean(text(item.content, node => {
+          const r = role(node);
+          if (proseOmit(node) || ["details", "summary", "ol", "ul"].includes(node.tag) || excluded.has(r) || ["tags", "tag", "example-sentence", "example-sentence-a", "example-sentence-b"].includes(r)) return true;
+          if (r && !["bold-text", "italic-text"].includes(r)) { unknown = true; return true; }
+          return false;
+        }));
+        if (!definition || unknown) { partial = true; continue; }
+        addSense(makeSense(definition, examples(item), tags(item)));
+      }
+    }
+    for (const preamble of find(tree, n => role(n) === "preamble")) {
+      for (const node of find(preamble, n => role(n) === "Etymology-content")) { const value = prose(node); if (value) etymology.push(value); }
+    }
+  } else {
+    const groups = find(tree, n => ["div", "li"].includes(n.tag) && role(n) === "sense-group", n => excluded.has(role(n)));
+    if (groups.length) {
+      recognized = true;
+      for (const group of groups) {
+        const labels = tags(group, true);
+        const declared = find(group.content, n => ["div", "li"].includes(n.tag) && role(n) === "sense", n => excluded.has(role(n)));
+        if (!declared.length) partial = true;
+        for (const item of declared) {
+          const lists = find(item.content, n => n.tag === "ul" && role(n) === "glossary", n => excluded.has(role(n)) || role(n) === "sense");
+          if (lists.length !== 1) { partial = true; continue; }
+          const parts = children(lists[0]).filter(n => typeof n !== "string" || n.trim());
+          if (!parts.length || parts.some(n => n?.tag !== "li")) { partial = true; continue; }
+          let unknown = false;
+          const definitions = parts.map(part => clean(text(part, node => {
+            const r = role(node);
+            if (proseOmit(node) || excluded.has(r) || ["details", "summary", "ol", "ul"].includes(node.tag)) return true;
+            if (r && !["bold-text", "italic-text"].includes(r)) { unknown = true; return true; }
+            return false;
+          })));
+          if (unknown || definitions.some(part => !part)) { partial = true; continue; }
+          addSense(makeSense(definitions.join("\n"), examples(item), [...new Set([...labels, ...tags(item.content, true)])]));
+        }
+      }
+    }
+  }
+  return { senses, etymology: [...new Set(etymology)], partial: partial || !recognized };
+}
 function _pbpYomitanRow(raw) {
   _pbpYomitanCheck(Array.isArray(raw) && raw.length === 8 && typeof raw[0] === "string" && typeof raw[1] === "string" &&
     (raw[2] === null || typeof raw[2] === "string") && typeof raw[3] === "string" && Number.isFinite(raw[4]) && Array.isArray(raw[5]) &&
@@ -1269,30 +1373,57 @@ function _pbpYomitanRow(raw) {
   const term = _pbpYomitanKey(_pbpYomitanText(raw[0], 256, true)), reading = _pbpYomitanKey(_pbpYomitanText(raw[1], 256));
   _pbpYomitanText(raw[2] ?? "", 2048); _pbpYomitanText(raw[3], 2048); _pbpYomitanText(raw[7], 2048);
   _pbpYomitanCheck(raw[5].length <= 256, "Too many definitions in one row", "too_large");
-  const definitions = [], lemmas = [];
+  const definitions = [], lemmas = [], senses = [], etymology = [];
+  let partial = false, contentUnits = 0;
   for (const item of raw[5]) {
     if (Array.isArray(item)) {
       _pbpYomitanCheck(item.length === 2 && typeof item[0] === "string" && Array.isArray(item[1]) && item[1].length <= 64 && item[1].every(rule => typeof rule === "string" && rule.length <= 128), "Invalid deinflection tuple");
-      lemmas.push({ term: _pbpYomitanText(item[0], 256, true), rules: item[1].slice() });
-    } else { const definition = _pbpYomitanGloss(item); if (definition) definitions.push(definition); }
+      const lemma = { term: _pbpYomitanText(item[0], 256, true), rules: item[1].slice() };
+      contentUnits += JSON.stringify(lemma).length; lemmas.push(lemma);
+      _pbpYomitanCheck(contentUnits <= PBP_YOMITAN_LIMITS.rowUnits, "Term row exceeds import limit", "too_large");
+    } else {
+      const definition = _pbpYomitanGloss(item);
+      if (!definition) continue;
+      definitions.push(definition);
+      contentUnits += JSON.stringify(definition).length;
+      _pbpYomitanCheck(contentUnits <= PBP_YOMITAN_LIMITS.rowUnits, "Term row exceeds import limit", "too_large");
+      if (typeof item === "string" || item.type === "text") {
+        senses.push({ definition, examples: [], tags: [], synonyms: [], antonyms: [], subsenses: [] });
+      } else if (item.type === "structured-content") {
+        const parsed = _pbpYomitanStructuredParts(item);
+        senses.push(...parsed.senses); etymology.push(...parsed.etymology); partial ||= parsed.partial;
+      } else partial = true;
+    }
   }
   _pbpYomitanCheck(definitions.length || lemmas.length, "Term contains no supported text definitions");
   const row = { term, reading, folded: term.toLowerCase(), definitions, lemmas, definitionTags: raw[2] || "", rules: raw[3], score: raw[4], sequence: raw[6], termTags: raw[7] };
+  // Count the validated complete text exactly once, using the same projection
+  // as old imports. Keeping its semantic view must not halve the source limit.
   _pbpYomitanCheck(JSON.stringify(row).length <= PBP_YOMITAN_LIMITS.rowUnits, "Term row exceeds import limit", "too_large");
+  Object.assign(row, { contentVersion: 1, senses, etymology: [...new Set(etymology)], partial });
+  // The independent storage bound also catches pathological repeated group
+  // labels across thousands of senses; it never silently drops source text.
+  _pbpYomitanCheck(JSON.stringify(row).length <= PBP_YOMITAN_LIMITS.rowUnits * 4, "Structured term projection exceeds import limit", "too_large");
   return row;
 }
 function _pbpYomitanNorm(rows, pack) {
   let remaining = PBP_YOMITAN_LIMITS.sensesPerHit;
   const entries = rows.map(row => {
-    const definitions = row.definitions.length ? row.definitions : row.lemmas.map(item => item.term);
-    const senses = definitions.slice(0, remaining).map(definition => ({ definition, examples: [], tags: row.definitions.length ? [] : ["form-of"], synonyms: [], antonyms: [], subsenses: [] }));
+    const legacy = row.contentVersion !== 1;
+    const fullText = row.definitions.join("\n\n");
+    // A form pointer is a relation, not a definition to put in the vocabulary.
+    const candidates = legacy ? [] : row.senses;
+    const senses = candidates.slice(0, remaining);
     remaining -= senses.length;
-    return { pos: row.definitionTags, ipas: row.reading ? [{ text: row.reading, tags: ["Reading"] }] : [], forms: row.lemmas.map(item => ({ word: item.term, tags: ["lemma"] })), senses };
-  }).filter(entry => entry.senses.length);
+    return { pos: row.definitionTags, ipas: row.reading ? [{ text: row.reading, tags: ["Reading"] }] : [], forms: row.lemmas.map(item => ({ word: item.term, tags: ["lemma"] })), senses,
+      contentKind: legacy ? "legacy" : candidates.length ? "senses" : "full-entry", fullText, etymology: legacy ? [] : row.etymology };
+  }).filter(entry => entry.senses.length || entry.fullText || entry.forms.length);
   return { word: rows[0].term, entries, sourceLabel: pack.title, sourceUrl: pack.sourceUrl, license: pack.license,
     attribution: pack.attribution, definitionLang: pack.targetLanguage, sourceLanguage: pack.sourceLanguage,
     targetLanguage: pack.targetLanguage, packId: pack.id, aiAllowed: pack.aiAllowed === true,
     generation: pack.activeGeneration, revision: pack.revision,
+    needsReimport: rows.some(row => row.contentVersion !== 1),
+    hasFullEntry: rows.some(row => row.contentVersion !== 1 || row.partial),
     formOfOnly: rows.every(row => !row.definitions.length) };
 }
 
@@ -1423,7 +1554,7 @@ function pbpYomitanImportFile(file, options = {}) {
       }
       _pbpYomitanCheck(count > 0, "Dictionary contains no terms");
       _pbpYomitanAbort(options.signal);
-      const meta = { ...manifest, state: "ready", activeGeneration: generation, entries: count, payloadBytes,
+      const meta = { ...manifest, contentVersion: 1, state: "ready", activeGeneration: generation, entries: count, payloadBytes,
         decodedBytes: zip.decodedBytes, importedAt: Date.now(), enabled: previous ? previous.enabled : true,
         aiAllowed: false, tags, ignoredFiles: zip.entries.filter(entry => entry.kind === "ignored" && !entry.name.endsWith("/")).length };
       await _pbpPackTx(db, "readwrite", tx => {
@@ -1472,7 +1603,7 @@ async function pbpDictPackLookup(term, options = {}) {
                 if (group.length < PBP_YOMITAN_LIMITS.rowsPerHit) group.push(row); else truncated.add(pack.id);
               }
               perPack.push([...groups.values()].map(group => {
-                if (group.reduce((n, row) => n + (row.definitions.length || row.lemmas.length), 0) > PBP_YOMITAN_LIMITS.sensesPerHit) truncated.add(pack.id);
+                if (group.reduce((n, row) => n + (row.contentVersion === 1 ? row.senses.length : 0), 0) > PBP_YOMITAN_LIMITS.sensesPerHit) truncated.add(pack.id);
                 return { pack, rows: group, norm: _pbpYomitanNorm(group, pack) };
               }));
             };

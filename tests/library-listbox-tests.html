@@ -1168,6 +1168,36 @@ async function libraryPageMeaningCases() {
     button.click(); button.dispatchEvent(new win.KeyboardEvent("keydown", {key:"ArrowDown",bubbles:true}));
     button.dispatchEvent(new win.KeyboardEvent("keydown", {key:"Enter",bubbles:true}));
     check("meaning picker: keyboard selection retains the complete value and closes normally", select.value === "long" && select.selectedOptions[0].textContent.includes("final segment") && button.getAttribute("aria-expanded") === "false" && button.title === opt.textContent);
+
+    const context = doc.createElement("p"); context.id = "meaning-context"; context.textContent = "Existing description"; doc.body.appendChild(context);
+    select.setAttribute("aria-describedby", context.id);
+    select.dataset.listboxHelp = "A definition is already selected. Save it directly, or choose another for this lookup.";
+    win.pbpListboxSync(select);
+    const help = pop.querySelector(".listbox-help"), list = pop.querySelector(".listbox-list");
+    check("meaning help: prose stays outside the listbox and describes both the control and list",
+      help && help.parentElement === pop && !list.contains(help) && !help.hasAttribute("role") && !help.hasAttribute("tabindex") &&
+      button.getAttribute("aria-describedby") === context.id + " " + help.id && list.getAttribute("aria-describedby") === button.getAttribute("aria-describedby") && list.querySelectorAll('[role="option"]').length === select.options.length);
+    check("meaning help: the closed field gains no visible help row", help.getClientRects().length === 0 && wrapper.getBoundingClientRect().height === button.getBoundingClientRect().height);
+    button.click(); await libFrames(win);
+    const before = select.value; help.click();
+    check("meaning help: clicking the description neither selects it nor dismisses the picker", select.value === before && pop.matches(":popover-open"));
+    select.dataset.listboxHelp = "Your manual choice remains selected during this lookup.";
+    win.pbpListboxSync(select);
+    check("meaning help: a state change updates one description without changing the chosen value", pop.querySelectorAll(".listbox-help").length === 1 && help.textContent === select.dataset.listboxHelp && select.value === before);
+    button.dispatchEvent(new win.KeyboardEvent("keydown", {key:"Escape",bubbles:true}));
+    frame.style.height = "320px";
+    select.dataset.listboxHelp = "Определение уже выбрано. Его можно сразу сохранить или выбрать другое для текущего поиска. ".repeat(4);
+    for (let i = 0; i < 24; i++) select.append(new win.Option("Definition " + i, "tail-" + i));
+    win.pbpListboxSync(select); await libFrames(win); button.click();
+    button.dispatchEvent(new win.KeyboardEvent("keydown", {key:"End",bubbles:true})); await libFrames(win);
+    const last = list.querySelector('[data-value="tail-23"]'), bottom = last.getBoundingClientRect(), edge = pop.getBoundingClientRect();
+    check("meaning help: long translated prose stays above a bounded option scroller and End reveals the last option",
+      list.scrollTop > 0 && edge.top >= 7 && edge.bottom <= 313 && help.getBoundingClientRect().top >= edge.top && bottom.top >= help.getBoundingClientRect().bottom && bottom.bottom <= edge.bottom + 1 && pop.matches(":popover-open"), JSON.stringify({ edge: edge.toJSON(), bottom: bottom.toJSON(), scroll: list.scrollTop }));
+    button.dispatchEvent(new win.KeyboardEvent("keydown", {key:"Home",bubbles:true}));
+    button.dispatchEvent(new win.KeyboardEvent("keydown", {key:"Enter",bubbles:true}));
+    check("meaning help: Home and Enter still choose the first actual option", select.value === "short" && button.getAttribute("aria-expanded") === "false");
+    delete select.dataset.listboxHelp; win.pbpListboxSync(select);
+    check("meaning help: removing guidance drops only its own accessible description", !pop.querySelector(".listbox-help") && !pop.hasAttribute("data-help") && button.getAttribute("aria-describedby") === context.id && list.getAttribute("aria-describedby") === context.id);
   } finally { frame.remove(); }
 }
 

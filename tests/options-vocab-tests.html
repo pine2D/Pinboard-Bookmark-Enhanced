@@ -211,6 +211,19 @@ delete document.documentElement.dataset.theme;
       showConfirmPopover = (_button, spec) => { confirmed = spec; };
       await _pbpMultiPackRefresh();
       check("pack names are rendered as text, never dictionary HTML", !$id("multi-pack-list").querySelector("img") && $id("multi-pack-list").textContent.includes(pack.title));
+      check("legacy packs show a reimport hint using the existing import workflow", $id("multi-pack-list").textContent.includes("multiPackReimportHint") && Array.from($id("multi-pack-list").querySelectorAll("button")).map(button=>button.dataset.packAction).join(",")==="enabled,delete");
+      const contentCases = [[undefined,true], [0,false], ["1",true], [2,false], [1,false], [1,true]];
+      let versionHints = true;
+      for (const [version, enabled] of contentCases) {
+        if (version === undefined) delete pack.contentVersion; else pack.contentVersion=version;
+        pack.enabled=enabled;
+        await _pbpMultiPackRefresh();
+        versionHints &&= $id("multi-pack-list").textContent.includes("multiPackReimportHint") === (version !== 1)
+          && $id("multi-pack-list").querySelector('[data-pack-action="enabled"]').textContent === (enabled ? "multiPackDisable" : "multiPackEnable")
+          && pack.enabled === enabled && writes.length === 0;
+      }
+      check("reimport guidance follows the stored content version without changing enablement", versionHints);
+      delete pack.contentVersion; pack.enabled=true; await _pbpMultiPackRefresh();
       check("installed pack provenance remains visible", $id("multi-pack-list").textContent.includes(pack.license) && $id("multi-pack-list").querySelector('a[href="https://example.org/dictionary"]'));
       const source = $id("multi-pack-list").querySelector("a");
       check("source links prevent opener access", source.rel.includes("noopener") && source.target==="_blank");
@@ -235,7 +248,7 @@ delete document.documentElement.dataset.theme;
       rows=[pack]; confirmed=null;
       window.pbpYomitanInspectFile=async (_file, options={})=>({...pack,...options});
       let imports=[];
-      window.pbpYomitanImportFile=async (file,options)=>{imports.push({file,options});return {...pack,entries:7};};
+      window.pbpYomitanImportFile=async (file,options)=>{imports.push({file,options});pack.contentVersion=1;return {...pack,entries:7};};
       await _pbpMultiPackPrepare({name:"replacement.zip"});
       $id("multi-pack-source-language").value="es";
       $id("multi-pack-target-language").value="de";
@@ -250,6 +263,7 @@ delete document.documentElement.dataset.theme;
       await confirmed.onConfirm();
       check("install carries the reviewed language pair without enabling AI", imports.length===1 && imports[0].options.sourceLanguage==="es" && imports[0].options.targetLanguage==="de" && imports[0].options.aiAllowed!==true);
       check("successful install settles the preview and controls", $id("multi-pack-preview").hidden && !$id("multi-pack-choose").disabled && $id("multi-pack-status").classList.contains("ok"));
+      check("completed structured reimport removes obsolete guidance on refresh", !$id("multi-pack-list").textContent.includes("multiPackReimportHint") && $id("multi-pack-list").querySelector('[data-pack-action="enabled"]').textContent === "multiPackEnable");
       await _pbpMultiPackPrepare({name:"bad.zip"});
       window.pbpYomitanInspectFile=async()=>{throw Object.assign(new Error("language required"),{code:"invalid_language"});};
       await _pbpMultiPackInstall();

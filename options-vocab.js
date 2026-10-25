@@ -1360,6 +1360,10 @@ async function _pbpMultiPackRefresh() {
       if (pack.attribution) {
         const credits=document.createElement("p"); credits.className="hint dict-pack-copy"; credits.dir="auto"; credits.textContent=pack.attribution; row.appendChild(credits);
       }
+      if (pack.contentVersion !== 1) {
+        const reimport=document.createElement("p"); reimport.className="hint dict-pack-copy";
+        reimport.textContent=t("multiPackReimportHint"); row.appendChild(reimport);
+      }
       const actions=document.createElement("div"); actions.className="fg-actions";
       for (const [action, key] of [["enabled",pack.enabled ? "multiPackDisable":"multiPackEnable"], ["delete","delete"]]) {
         const button=document.createElement("button"); button.type="button"; button.className="btn btn-sm"+(action==="delete" ? " danger":"");

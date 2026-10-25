@@ -2390,6 +2390,7 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-dict-ai-details > summary:hover { color: var(--fg); background: var(--btn-hover); }
 .xp-dict-ai-details > summary:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .xp-dict-ai-details > p { margin: var(--sp-2) 0 0; }
+.xp-dict-full-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .xp-dict-ai-details > .xp-dict-src { font-size: 11px; }
 .xp-dict-supplement-text { white-space: pre-wrap; line-height: 1.55; }
 .xp-dict-supplement > .xp-dict-lang,
@@ -2410,7 +2411,8 @@ html.motion-ready :is(#explain-pop, #typo-pop):popover-open {
 .xp-dict-lang option { white-space: normal; overflow-wrap: anywhere; }
 /* A full-entry glossary can be much longer than a definition. Keep the menu
    near the lookup bubble, with a bounded preview and a visible source. */
-.xp-dict-save-meaning::picker(select) { width: min(420px, calc(100vw - 32px)); min-width: 0; box-sizing: border-box; }
+.xp-dict-save-meaning::picker(select) { width: min(420px, calc(100vw - 32px)); min-width: 0; box-sizing: border-box; scroll-padding-top: var(--xp-dict-help-height, 0px); }
+.xp-dict-choice-help { position: sticky; top: 0; z-index: 1; padding: var(--sp-2); background: var(--bg); color: var(--fg-secondary); font-size: 12px; line-height: 18px; white-space: normal; overflow-wrap: anywhere; }
 .xp-dict-save-meaning option { display: block; line-height: 18px; }
 .xp-dict-choice-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; white-space: normal; overflow-wrap: anywhere; }
 .xp-dict-choice-source { display: block; margin-top: var(--sp-1); font-size: 11px; color: var(--fg-muted); }

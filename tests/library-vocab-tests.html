@@ -922,8 +922,8 @@ check("row builds the collapsed structure only, and claims no expansion state",
   !notedRow.querySelector(".vocab-note-input") &&
   fullGlossRow.querySelectorAll("button, a, textarea, select").length === 1 &&
   !fullGlossRow.querySelector("[aria-expanded]"));
-check("collapsed card clamps the gloss to its first line, outside the chip row",
-  fullGlossRow.querySelector(".vocab-row-gloss").textContent === "contextual sense line" &&
+check("collapsed card previews all definition paragraphs in one visual line, outside the chip row",
+  fullGlossRow.querySelector(".vocab-row-gloss").textContent === "contextual sense line general sense line" &&
   !fullGlossRow.querySelector(".notes-row-meta .vocab-row-gloss"));
 $id("vocab-list").append(fullGlossRow, notedRow);
 fullGlossRow.querySelector(".notes-card-head").click();
@@ -4612,17 +4612,20 @@ await (async () => {
       _pbpDictPackSide = async (_el, _term, _lang, _signal, _cur, callback) => { acceptPack = callback; };
       await run();
       check("default meaning: a new word is collectible without opening the meaning picker", selected().includes("outer layer") && save()?.disabled === false);
+      check("meaning help: a fresh lookup explains the usable default", select().dataset.listboxHelp === "dictMeaningDefaultHelp");
       acceptLocal(local);
       check("default meaning: late local source follows the displayed source order", selected().includes("表面"));
       acceptPack(norm("Pack", ["pack first"], { packId: "fixture-pack" }));
       check("default meaning: multilingual packs lead the dictionary view regardless of arrival", selected().includes("pack first"));
       choose("local:0");
+      check("meaning help: a manual choice is described without claiming it is the first definition", select().dataset.listboxHelp === "dictMeaningManualHelp");
       acceptLocal(norm("ECDICT", ["新释义", "表面"], { definitionLang: "zh" }));
       check("default meaning: a manual choice follows its definition when the source reorders", select()?.value === "local:1" && selected().includes("表面"));
       entryOptions.onEntry(ai); entryOptions.onView("ai");
       check("default meaning: AI arrival and source switches preserve an explicit dictionary choice", select()?.value === "local:1");
       acceptLocal(null);
       check("default meaning: removing a chosen source clears its choice instead of replacing it silently", select()?.value === "" && save()?.disabled === true);
+      check("meaning help: revoked selection asks for an explicit replacement", select().dataset.listboxHelp === "dictMeaningChooseHelp");
       entryOptions.onView("dictionary");
       check("default meaning: a view switch cannot revive a revoked manual choice", select()?.value === "" && save()?.disabled === true);
       await run(); entryOptions.onEntry(ai);
@@ -4636,8 +4639,17 @@ await (async () => {
       _vocabRows = [{ id: pbpDictVocabKey(owner, "en", term), owner, term, language: "en", gloss: "my saved meaning" }];
       await run(); entryOptions.onEntry(ai); entryOptions.onView("ai");
       check("default meaning: neither dictionary nor AI defaults overwrite an existing saved definition", select()?.value === "" && save()?.disabled === true && _vocabRows[0].gloss === "my saved meaning");
+      check("meaning help: existing words explain that their saved definition stays unchanged", select().dataset.listboxHelp === "dictMeaningSavedHelp");
       choose("ai:0");
       check("default meaning: an existing word can still explicitly adopt a new definition", select()?.value === "ai:0" && save()?.disabled === false);
+      _vocabRows = [];
+      const full = { ...remote, packId: "unknown-structure", hasFullEntry: true, entries: [{ pos: "", ipas: [], forms: [], contentKind: "full-entry", fullText: "Origin\nA complete article\nOuter layer", senses: [] }] };
+      acceptPack(full);
+      check("structure: an unknown full article never joins the meaning options", ![...select().options].some(option => option.textContent.includes("complete article")));
+      _pbpDictSlotRun = async () => full; await run();
+      check("structure: an unknown-only library lookup has no enabled definition-save action", !select() && !save());
+      entryOptions.onEntry(ai);
+      check("meaning help: an unknown-only dictionary with hidden AI choices does not claim the word was saved", select()?.value === "" && save()?.disabled === true && select().dataset.listboxHelp === "dictMeaningChooseHelp");
     } finally {
       _pbpVocabDictCtrl?.abort(); _pbpVocabDictChildCtrl?.abort(); _pbpVocabRenderDetail(null);
       _pbpDictEntryMount = old.mount; _pbpDictSlotRun = old.remote; _pbpDictEcdictSide = old.local;

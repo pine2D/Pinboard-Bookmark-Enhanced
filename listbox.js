@@ -244,8 +244,38 @@
     }
   }
 
+  // Guidance is prose above the option list, never an option or a keyboard
+  // stop. The consumer owns its wording; sync absorbs default/manual changes
+  // and locale refreshes without changing the selected value.
+  function syncHelp(state) {
+    const text = state.meaning ? (state.select.dataset.listboxHelp || "").trim() : "";
+    const changed = text !== (state.help?.textContent || "");
+    if (text) {
+      if (!state.help) {
+        state.help = document.createElement("p");
+        state.help.className = "listbox-help";
+        state.help.id = `${state.select.id}-help`;
+        state.pop.prepend(state.help);
+      }
+      state.help.textContent = text;
+      state.pop.setAttribute("data-help", "");
+    } else {
+      state.help?.remove(); state.help = null;
+      state.pop.removeAttribute("data-help");
+    }
+    const ids = (state.select.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean);
+    if (state.help) ids.push(state.help.id);
+    const description = [...new Set(ids)].join(" ");
+    for (const target of [state.btn, state.list]) {
+      if (description) target.setAttribute("aria-describedby", description);
+      else target.removeAttribute("aria-describedby");
+    }
+    return changed;
+  }
+
   function sync(state) {
     const { select } = state;
+    const helpChanged = syncHelp(state);
     const opts = select.options;
     // Reuse the <li> nodes while the shape holds: ids stay stable, no listener
     // lives on them (the list owns one delegated handler), so repeated syncs
@@ -291,6 +321,7 @@
       if (state.meaning) state.btn.title = optionText(select.selectedOptions[0]);
     }
     state.btn.disabled = select.disabled;
+    if (helpChanged && state.float && !state.pop.hidden) place(state.pop, state.btn);
     if (!state.pop.hidden) setActive(state, Math.min(state.active, opts.length - 1));
   }
 
@@ -518,7 +549,7 @@
     if (label) label.htmlFor = btn.id;
 
     const state = {
-      select, root, btn, pop, list, value, sizer, float, ghost, meaning, face: "", items: [], groups: [], shape: null,
+      select, root, btn, pop, list, value, sizer, float, ghost, meaning, help: null, face: "", items: [], groups: [], shape: null,
       active: -1, typed: "", typedTimer: 0, outside: null, onResize: null, onScroll: null, anchorRect: null,
     };
     state.outside = (ev) => onOutside(state, ev);

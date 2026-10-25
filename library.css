@@ -3254,6 +3254,10 @@ select[data-listbox] { height: var(--lib-control-h); box-sizing: border-box; }
 /* Only the saved-meaning picker uses prose-sized options. Regular settings,
    languages and group menus retain their compact single-line geometry. */
 .listbox-pop[data-layout="meaning"] { box-sizing: border-box; }
+.listbox-pop[data-layout="meaning"][data-help] { max-height: min(330px, var(--listbox-room, 330px)); overflow: hidden; }
+.listbox-pop[data-layout="meaning"][data-help]:not([hidden]) { display: flex; flex-direction: column; }
+.listbox-pop[data-layout="meaning"][data-help] > .listbox-list { flex: 1 1 auto; min-height: 0; }
+.listbox-help { flex: none; box-sizing: border-box; max-height: calc(var(--listbox-room, 330px) / 2); overflow-y: auto; margin: 0; padding: var(--lib-sp-2) var(--lib-sp-3); font-size: var(--lib-text-meta); line-height: var(--lib-lh-secondary); color: var(--lib-fg-muted); white-space: normal; overflow-wrap: anywhere; }
 .listbox-pop[data-layout="meaning"] .listbox-opt {
   height: auto; min-height: var(--lib-control-h); line-height: 20px;
   padding: var(--lib-sp-2) var(--lib-sp-3); white-space: normal; overflow-wrap: anywhere;

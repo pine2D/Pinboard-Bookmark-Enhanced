@@ -4602,5 +4602,12 @@
   "driveAskStatus": {"message": "问答记录：$STATUS$", "placeholders": {"status": {"content": "$1"}}},
   "driveAskErrorEntryTooLarge": {"message": "有一条回答超出同步大小限制，仍保存在本机。"},
   "askHistoryUnavailable": {"message": "此对话已删除或在本机不可用。可以开始新对话继续提问。"},
-  "askHistoryKeysMove": {"message": "上一个或下一个对话"}
+  "askHistoryKeysMove": {"message": "上一个或下一个对话"},
+  "dictMeaningDefaultHelp": {"message": "已选好当前显示来源的第一条解释，可直接保存。手动更换后，本次查词会保留你的选择。"},
+  "dictMeaningManualHelp": {"message": "将保存你选中的解释。本次查词会保留这个选择。"},
+  "dictMeaningSavedHelp": {"message": "已保存的解释不会自动更改。选择一条解释后，可更新这个生词。"},
+  "dictMeaningChooseHelp": {"message": "请选择要保存的解释；本次查词会保留你的选择。"},
+  "dictFullEntry": {"message": "完整词条"},
+  "dictFullEntryOnlyHint": {"message": "此词条尚未拆分出独立解释，可以阅读全文，或选择其他词典来源的解释保存。"},
+  "multiPackReimportHint": {"message": "重新导入同一词包以重新识别释义结构。已有生词和词包启用状态保持不变。"}
 }
