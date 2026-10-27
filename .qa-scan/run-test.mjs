@@ -55,7 +55,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/contrast-tests.html": 6,
   "tests/confirm-layout-tests.html": 142,
   "tests/dict-pack-tests.html": 333,
-  "tests/dict-evidence-tests.html": 71,
+  "tests/dict-evidence-tests.html": 82,
   "tests/dict-entry-tests.html": 108,
   "tests/dict-language-tests.html": 33,
   "tests/dict-ledger-tests.html": 17,

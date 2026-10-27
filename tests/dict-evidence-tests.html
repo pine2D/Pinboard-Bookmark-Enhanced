@@ -14,6 +14,27 @@ const VOLUME = {parse:{title:'The Works of Charles Dickens/Volume 1',pageid:2976
 const WORK = {parse:{title:'The Pickwick Papers',pageid:1234,revid:1234567,categories:[{category:'British_novels',sortkey:''}],text:'<div class="mw-parser-output"><span id="ws-author">Charles Dickens</span><span id="ws-title">The Pickwick Papers</span></div>'}};
 const WORD = {parse:{title:'provider',pageid:15,revid:1515,categories:[{category:'English_lemmas',sortkey:''}],text:`<div class="mw-parser-output"><div class="mw-heading mw-heading2"><h2 id="English">English</h2></div><div class="mw-heading mw-heading3"><h3 id="Etymology">Etymology</h3></div><p>From <i class="mention" lang="en"><a href="/wiki/provide#English">provide</a></i> + <i lang="en"><a href="/wiki/-er#English">-er</a></i>.</p><div class="mw-heading mw-heading3"><h3>Noun</h3></div><p>Definition must not enter the etymology.</p><div class="mw-heading mw-heading2"><h2>Dutch</h2></div><div class="mw-heading mw-heading3"><h3>Etymology</h3></div><p>Wrong language history.</p></div>`}};
 const ROOT = {parse:{title:'provide',pageid:16,revid:1616,categories:[],text:'<div class="mw-parser-output"><h2>English</h2><h3>Etymology</h3><p>From Latin providere, to foresee and provide.</p><h3>Verb</h3><p>Unrelated definition.</p></div>'}};
+// Poem extension output as the parse API returns it: one div.poem, one <p>
+// per stanza, <br /> plus a source newline after each line, indented lines as
+// mw-poem-indented spans.
+const POEM = {parse:{title:'Because I could not stop for Death',pageid:1730452,revid:12050197,
+ categories:[{category:'Poems',sortkey:''}],text:`<div class="mw-parser-output"><div class="wst-header ws-noexport"><span class="wst-header-title-text">Because I could not stop for Death</span><span class="contributor-text"><span class="fn"><a href="/wiki/Author:Emily_Dickinson">Emily Dickinson</a></span></span></div>
+<div class="poem">
+<p>Because I could not stop for Death –<br />
+He kindly stopped for me –<br />
+The Carriage held but just Ourselves –<br />
+And Immortality.
+</p>
+<p>We slowly drove – He knew no haste<br />
+<span class="mw-poem-indented" style="display: inline-block; margin-inline-start: 1em;">And I had put away</span><br />
+My labor and my leisure too,<br />
+For His Civility –
+</p>
+</div></div>`}};
+const ZH_CHAPTER = {parse:{title:'狂人日記',pageid:20113,revid:2196512,categories:[{category:'短篇小說',sortkey:''}],
+ text:'<div class="mw-parser-output"><p>今天晚上，很好的月光。</p>\n<p>我不見他，已是三十多年；今天見了，精神分外爽快。才知道以前的三十多年，全是發昏；然而須十分小心。不然，那趙家的狗，何以看我兩眼呢？</p>\n<p>我怕得有理。</p></div>'}};
+const JA_CHAPTER = {parse:{title:'吾輩は猫である',pageid:4127,revid:205881,categories:[{category:'小説',sortkey:''}],
+ text:'<div class="mw-parser-output"><p>吾輩は猫である。名前はまだ無い。どこで生れたかとんと見当がつかぬ。何でも薄暗いじめじめした所でニャーニャー泣いていた事だけは記憶している。</p></div>'}};
 let calls,grant,guardCalls,onGuard,afterFetch,responses;
 const chrome={runtime:{id:'fixture'},permissions:{contains:async()=>grant}};
 globalThis.chrome=chrome;
@@ -39,7 +60,7 @@ async function test(name,run){reset();let ok=false,detail='';try{ok=await run();
 (async()=>{
 await test('source origins use the queried language and precise dataset',()=>pbpDictEvidenceOrigin('literature','zh-Hant')==='https://zh.wikisource.org'&&pbpDictEvidenceOrigin('culture','es')==='https://es.wikipedia.org'&&pbpDictEvidenceOrigin('etymology','de')==='https://de.wiktionary.org');
 await test('unknown source languages and categories do not silently use English',()=>!pbpDictEvidenceOrigin('literature','und')&&!pbpDictEvidenceOrigin('etymology','zz')&&!pbpDictEvidenceOrigin('unknown','en'));
-await test('unsupported literary editions stop before network',async()=>!(await pbpDictEvidenceFetch(request({sourceLanguage:'zz'}))).length&&!calls.length);
+await test('unsupported literary editions stop before network and say so',async()=>{const r=await pbpDictEvidenceFetch(request({sourceLanguage:'zz'}));return r.unsupported===true&&!Array.isArray(r)&&!calls.length;});
 await test('an exact word in a sentence is recognized',()=>_pbpDictEvidenceMatch('He is a provider for his family.','provider','en')===8);
 await test('word boundaries exclude derivatives and embedded substrings',()=>['providers','microprovider','provider2','provider_name'].every(s=>_pbpDictEvidenceMatch(s,'provider','en')<0));
 await test('Unicode word boundaries handle non-Latin scripts',()=>_pbpDictEvidenceMatch('Это дом.','дом','ru')>=0&&_pbpDictEvidenceMatch('дома','дом','ru')<0);
@@ -51,7 +72,19 @@ await test('genre classification is backed by visible literary categories',()=>_
 await test('French and Spanish genre metadata is recognized',()=>_pbpDictEvidenceGenre([{category:'Romans_français'}])==='novel'&&_pbpDictEvidenceGenre([{category:'Poesía'}])==='poetry'&&_pbpDictEvidenceGenre([{category:'Teatro'}])==='drama');
 await test('hidden maintenance and generic literature categories do not prove genre',()=>!_pbpDictEvidenceGenre([{category:'Novels',hidden:true}])&&!_pbpDictEvidenceGenre([{category:'Literature'}]));
 await test('legal or catalog categories cannot masquerade as literature',()=>!_pbpDictEvidenceGenre([{category:'Novels'},{category:'Government_reports'}])&&!_pbpDictEvidenceGenre([{category:'Lists_of_novels'}]));
-await test('verified chapter uses actual paragraphs and two-hop book metadata',async()=>{const r=await pbpDictEvidenceFetch(request());return r.length===1&&r[0].author==='Charles Dickens'&&r[0].work==='The Pickwick Papers'&&r[0].genre==='novel'&&r[0].location.startsWith('Chapter XIV')&&r[0].excerpt.includes('Comfortable provider!')&&r[0].excerpt.includes('ham');});
+await test('verified chapter uses actual paragraphs and two-hop book metadata',async()=>{const r=await pbpDictEvidenceFetch(request());return r.length===1&&r[0].author==='Charles Dickens'&&r[0].work==='The Pickwick Papers'&&r[0].genre==='novel'&&r[0].location==='Chapter XIV · ¶ 2'&&r[0].excerpt==='Comfortable provider!'&&r[0].truncated===false;});
+await test('a multi-sentence paragraph yields only the sentence with the word',()=>{const r=pbpDictEvidenceSentences(CHAPTER.parse.text,'provider','en');return Array.isArray(r)&&r.length===1&&r[0].text==='Comfortable provider!'&&r[0].paragraph===2&&!r[0].text.includes('Thoughtful')&&!r[0].text.includes('ham');});
+await test('Chinese prose splits on ideographic full stops and question marks',()=>{const doc=_pbpDictEvidenceDocument(ZH_CHAPTER.parse.text);const a=pbpDictEvidenceSentences(doc,'趙家的狗','zh-Hant'),b=pbpDictEvidenceSentences(doc,'精神','zh-Hant');return a.length===1&&a[0].text==='不然，那趙家的狗，何以看我兩眼呢？'&&b.length===1&&b[0].text==='我不見他，已是三十多年；今天見了，精神分外爽快。';});
+await test('Japanese prose splits on the ideographic full stop',()=>{const r=pbpDictEvidenceSentences(JA_CHAPTER.parse.text,'名前','ja');return r.length===1&&r[0].text==='名前はまだ無い。'&&pbpDictEvidenceSentences(JA_CHAPTER.parse.text,'見当','ja')[0]?.text==='どこで生れたかとんと見当がつかぬ。';});
+await test('a poem yields only the matching line, never the sentence across lines',()=>{const doc=_pbpDictEvidenceDocument(POEM.parse.text);const a=pbpDictEvidenceSentences(doc,'stopped','en'),b=pbpDictEvidenceSentences(doc,'away','en'),c=pbpDictEvidenceSentences(doc,'Death','en');return a.length===1&&a[0].text==='He kindly stopped for me –'&&a[0].truncated===false&&b[0]?.text==='And I had put away'&&c.length===1&&c[0].text==='Because I could not stop for Death –';});
+await test('a poem chapter reaches the reader as one verified line',async()=>{pageOnly(POEM.parse.text,'Poems',POEM.parse.title);const r=await pbpDictEvidenceFetch(request({term:'Immortality'}));return r.length===1&&r[0].excerpt==='And Immortality.'&&r[0].genre==='poetry'&&r[0].author==='Emily Dickinson'&&r[0].location==='¶ 1';});
+await test('line breaks in prose are taken before whitespace is normalized',()=>{const r=pbpDictEvidenceSentences('<p>First line without the word<br>A provider waits here at the gate</p>','provider','en'),s=pbpDictEvidenceSentences('<p>A provider\nwaits at the gate of the house.</p>','provider','en');return r.length===1&&r[0].text==='A provider waits here at the gate'&&s[0]?.text==='A provider waits at the gate of the house.';});
+await test('an overlong sentence becomes a bounded window around the word, marked as cut',()=>{
+ const long='long '.repeat(90),r=pbpDictEvidenceSentences('<p>Before it. '+long+'provider '+long+'sentence. After it.</p>','provider','en')[0],head=pbpDictEvidenceSentences('<p>A provider '+'long '.repeat(180)+'sentence.</p>','provider','en')[0];
+ return r?.truncated===true&&r.text.length<=300&&r.text.includes('provider')&&/^long /.test(r.text)&&/ long$/.test(r.text)&&!/[…]|\.\.\./.test(r.text)&&head?.truncated===true&&head.text.startsWith('A provider')&&head.text.length<=300;});
+await test('a sentence at the bound is kept whole and unmarked',()=>{const text='A provider '+'x'.repeat(288)+'.';const r=pbpDictEvidenceSentences('<p>'+text+'</p>','provider','en')[0];return text.length===300&&r?.text===text&&r.truncated===false;});
+await test('a cut example keeps its truncated flag through retrieval',async()=>{pageOnly('<span id="ws-author">Author</span><p>A provider '+'long '.repeat(180)+'sentence.</p>');const r=await pbpDictEvidenceFetch(request());return r.length===1&&r[0].truncated===true&&r[0].excerpt.length<=300;});
+await test('an unsupported language is distinguishable from a clean miss',()=>{const u=pbpDictEvidenceSentences(CHAPTER.parse.text,'provider','zz'),m=pbpDictEvidenceSentences(CHAPTER.parse.text,'absent','en');return u.unsupported===true&&!Array.isArray(u)&&Array.isArray(m)&&m.length===0&&pbpDictEvidenceSentences(CHAPTER.parse.text,'provider','und').unsupported===true;});
 await test('a chapter with its own genre still follows its parent for a missing author',async()=>{
   const chapter=responses.pages[CHAPTER.parse.title].parse;
   chapter.categories=[{category:'British_novels'}];chapter.text=chapter.text.replace(/<span class="contributor-text">[\s\S]*?<\/span><\/span>/,'');
@@ -73,7 +106,7 @@ await test('a later retrieval failure retains already verified culture evidence'
   const result=await pbpDictEvidenceFetch(request({kind:'culture'}));return result.length===1&&result[0].revision==='180';
 });
 await test('sources keep revision-specific URLs and collection time',async()=>{const r=(await pbpDictEvidenceFetch(request()))[0];return r.url==='https://en.wikisource.org/w/index.php?oldid=13788016'&&r.revision==='13788016'&&Number.isSafeInteger(r.retrievedAt)&&r.language==='en';});
-await test('evidence carries only the declared bounded metadata fields',async()=>{const r=(await pbpDictEvidenceFetch(request()))[0];return Object.keys(r).sort().join(',')==='author,excerpt,genre,language,location,retrievedAt,revision,title,url,work'&&r.excerpt.length<=600;});
+await test('evidence carries only the declared bounded metadata fields',async()=>{const r=(await pbpDictEvidenceFetch(request()))[0];return Object.keys(r).sort().join(',')==='author,excerpt,genre,language,location,retrievedAt,revision,title,truncated,url,work'&&r.excerpt.length<=300;});
 await test('search snippets are never used as source text',async()=>{responses.search.query.search[1].snippet='FAKE provider quote';const r=await pbpDictEvidenceFetch(request());return r.length===1&&!r[0].excerpt.includes('FAKE');});
 await test('provider lookup refines candidates with a second chapter query',async()=>{await pbpDictEvidenceFetch(request());return calls.filter(c=>c.url.searchParams.get('action')==='query').length===2&&calls.some(c=>c.url.searchParams.get('srsearch')?.includes('intitle:chapter'));});
 await test('broad nonliterary hits cannot exhaust the candidate budget before a focused chapter',async()=>{
@@ -152,7 +185,7 @@ await test('a deleted candidate is skipped rather than fabricated',async()=>{res
 await test('invalid parse metadata cannot generate a source URL',async()=>{responses.pages[CHAPTER.parse.title].parse.revid='13788016';return await rejects(()=>pbpDictEvidenceFetch(request()),'source_failed');});
 await test('culture uses article body from the source-language edition',async()=>{responses.pages.provider.parse.text='<p>Provider wird in dieser Gemeinschaft als Ausdruck verwendet.</p>';const r=await pbpDictEvidenceFetch(request({kind:'culture',sourceLanguage:'de'}));return r.length>0&&r.every(s=>s.genre==='culture')&&calls.every(c=>c.url.origin==='https://de.wikipedia.org')&&calls.filter(c=>c.url.searchParams.get('action')==='query').length===2;});
 await test('culture retrieval does not label the passage as a verified meme',async()=>{responses.pages.provider.parse.text='<p>Provider is an expression used in this community.</p>';const r=(await pbpDictEvidenceFetch(request({kind:'culture'})))[0];return r.genre==='culture'&&!Object.hasOwn(r,'popular')&&!Object.hasOwn(r,'originDate');});
-await test('etymology is restricted to the requested language and section',async()=>{const r=await pbpDictEvidenceFetch(request({kind:'etymology'}));return r[0].excerpt==='From provide + -er.'&&!JSON.stringify(r).includes('Wrong language')&&!JSON.stringify(r).includes('Unrelated definition');});
+await test('etymology is restricted to the requested language and section',async()=>{const r=await pbpDictEvidenceFetch(request({kind:'etymology'}));return r[0].excerpt==='From provide + -er.'&&!Object.hasOwn(r[0],'truncated')&&!JSON.stringify(r).includes('Wrong language')&&!JSON.stringify(r).includes('Unrelated definition');});
 await test('etymology follows one explicit formation link on the same origin',async()=>{const r=await pbpDictEvidenceFetch(request({kind:'etymology'}));return r.length===2&&r[1].title==='provide'&&r[1].excerpt.includes('Latin')&&calls.length===2&&calls.every(c=>c.url.origin==='https://en.wiktionary.org');});
 await test('external etymology links never expand the granted origin',async()=>{responses.pages.provider.parse.text=responses.pages.provider.parse.text.replace('/wiki/provide#English','https://evil.example/wiki/provide');return (await pbpDictEvidenceFetch(request({kind:'etymology'}))).length===1&&calls.length===1;});
 await test('etymology of a different headword is not attributed to the query',async()=>{responses.pages.provider.parse.title='provide';return !(await pbpDictEvidenceFetch(request({kind:'etymology'}))).length;});
@@ -162,7 +195,8 @@ await test('French and Spanish etymology headings are recognized',()=>{const a=_
 await test('HTML scripts, forms and remote resources are never rendered',()=>{window.evidenceExecuted=false;const doc=_pbpDictEvidenceDocument('<script>window.evidenceExecuted=true;<\/script><img src="https://evil.example/x"><iframe src="https://evil.example"></iframe><form><input></form><p>Safe provider text remains.</p>');return !doc.querySelector('script,img,iframe,form,input')&&!window.evidenceExecuted&&doc.textContent.includes('provider');});
 await test('long paragraphs yield whole bounded sentences around the word',()=>{const r=_pbpDictEvidenceExcerpt(['Before. '.repeat(100)+'A provider supplies a family. '+'After. '.repeat(100)],'provider','en');return r?.text.includes('A provider supplies a family.')&&r.text.length<=600;});
 await test('one overlong sentence is not silently cut into a quotation',()=>!_pbpDictEvidenceExcerpt(['A provider '+ 'long '.repeat(180)+'sentence.'],'provider','en'));
-await test('a no-hit response never returns search text as fallback',async()=>{responses.search.query.search=[];return !(await pbpDictEvidenceFetch(request())).length;});
+await test('a no-hit response never returns search text as fallback',async()=>{responses.search.query.search=[];const r=await pbpDictEvidenceFetch(request());return Array.isArray(r)&&!r.length;});
+await test('etymology keeps its whole 600-character excerpt rather than one sentence',async()=>{const text='First documented formation sentence about the noun. '.repeat(10).trim();responses.pages.provider.parse.text='<h2>English</h2><h3>Etymology</h3><p>'+text+'</p>';const r=await pbpDictEvidenceFetch(request({kind:'etymology'}));return text.length>300&&r[0]?.excerpt===text;});
 await test('metadata link extraction rejects external and non-work namespaces',()=>{const d=_pbpDictEvidenceDocument('<a href="https://evil.example/wiki/Book">x</a><a href="/wiki/Author:Somebody">a</a>');return [...d.querySelectorAll('a')].every(a=>!_pbpDictEvidenceTitleLink(a,'https://en.wikisource.org'));});
 await test('evidence functions require the live caller guard',async()=>await rejects(()=>pbpDictEvidenceFetch({term:'provider',sourceLanguage:'en',kind:'literature'}),'invalid_request')&&!calls.length);
 await test('explicit legal metadata cannot inherit a literary parent genre',async()=>{responses.pages[CHAPTER.parse.title].parse.categories=[{category:'Government_reports'}];return !(await pbpDictEvidenceFetch(request())).length&&!calls.some(c=>c.url.searchParams.get('page')===VOLUME.parse.title);});

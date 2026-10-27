@@ -114,8 +114,80 @@ function _pbpDictEvidenceParagraphNodes(root) {
     !node.parentElement?.closest("p, .poem, .poem-stanza, .verse"))
     .filter(node => _pbpDictEvidenceText(node.textContent).length >= 15);
 }
-function _pbpDictEvidenceParagraphs(root) {
-  return _pbpDictEvidenceParagraphNodes(root).map(node => _pbpDictEvidenceText(node.textContent));
+// Original-text examples show one retrieved sentence (prose) or one line
+// (verse), never a neighbouring sentence and never a translation (R1-8, Q10=A).
+// _pbpDictEvidenceText flattens every break into a space, so line and block
+// boundaries are read from the DOM first: <br> and block children become hard
+// breaks, while newlines inside text nodes stay ordinary HTML whitespace.
+const PBP_DICT_EVIDENCE_SENTENCE_MAX = 300;
+const PBP_DICT_EVIDENCE_UNSUPPORTED = Object.freeze({ unsupported: true });
+const _PBP_DICT_EVIDENCE_BLOCK_TAGS = new Set(["P", "DIV", "LI", "DD", "DT", "BLOCKQUOTE", "TR", "TD", "TH", "UL", "OL", "DL", "TABLE", "H1", "H2", "H3", "H4", "H5", "H6"]);
+function _pbpDictEvidenceLines(node) {
+  let out = "";
+  const walk = parent => {
+    for (const child of parent.childNodes) {
+      if (child.nodeType === 3) out += child.data.replace(/[\r\n\t\f\v]+/g, " ");
+      else if (child.nodeType === 1) {
+        if (child.tagName === "BR") { out += "\n"; continue; }
+        const block = _PBP_DICT_EVIDENCE_BLOCK_TAGS.has(child.tagName);
+        if (block) out += "\n";
+        walk(child);
+        if (block) out += "\n";
+      }
+    }
+  };
+  walk(node);
+  return out.split("\n").filter(line => line.trim());
+}
+function _pbpDictEvidenceSplitSentences(text, language) {
+  let parts;
+  try { parts = [...new Intl.Segmenter(language, { granularity: "sentence" }).segment(text)].map(row => row.segment); }
+  catch (_) { parts = text.match(/[^.!?。！？]+[.!?。！？]+["'”’»」』]?|[^.!?。！？]+$/gu) || [text]; }
+  // Ideographic full stops end a sentence whatever the segmenter's locale data
+  // says; closing quotes and brackets stay with the sentence they close.
+  return parts.flatMap(part => part.match(/[^。！？]+(?:[。！？]+[」』”’）)]*)?|[。！？]+[」』”’）)]*/gu) || []);
+}
+// A sentence over the bound becomes a window around the hit, marked as cut so
+// the reader can say so; no ellipsis is written into the source text itself.
+function _pbpDictEvidenceWindow(text, term, language) {
+  const at = _pbpDictEvidenceMatch(text, term, language);
+  if (at < 0) return "";
+  const size = _pbpDictEvidenceText(term).length, limit = PBP_DICT_EVIDENCE_SENTENCE_MAX;
+  if (size >= limit) return "";
+  let start = Math.max(0, at - Math.floor((limit - size) / 2)), end = Math.min(text.length, start + limit);
+  start = Math.max(0, end - limit);
+  // Prefer whole words where the script separates them; CJK simply cuts.
+  if (start > 0) { const space = text.indexOf(" ", start); if (space >= 0 && space < at) start = space + 1; }
+  if (end < text.length) { const space = text.lastIndexOf(" ", end); if (space > at + size) end = space; }
+  const excerpt = text.slice(start, end).trim();
+  // Case folding can shift offsets; an excerpt that lost the word is no example.
+  return excerpt.length <= limit && _pbpDictEvidenceMatch(excerpt, term, language) >= 0 ? excerpt : "";
+}
+// source: a parse fragment from _pbpDictEvidenceDocument, or MediaWiki parse
+// HTML. Returns hit sentences in document order, [] for a clean miss, or
+// {unsupported: true} for a language without a supported edition, so a local
+// negative cache can tell "nothing found" from "never searched" (1C.4).
+function pbpDictEvidenceSentences(source, term, lang) {
+  const language = _pbpDictEvidenceLang(lang);
+  if (!Object.hasOwn(PBP_DICT_EVIDENCE_LANGUAGES, language.split("-")[0])) return PBP_DICT_EVIDENCE_UNSUPPORTED;
+  if (typeof term !== "string" || !_pbpDictEvidenceText(term)) return [];
+  const root = typeof source === "string" ? _pbpDictEvidenceDocument(source) : source;
+  if (!root?.querySelectorAll) return [];
+  const result = [], nodes = _pbpDictEvidenceParagraphNodes(root);
+  for (let index = 0; index < nodes.length && result.length < 10; index++) {
+    const node = nodes[index], verse = !node.matches("p");
+    for (const line of _pbpDictEvidenceLines(node)) {
+      // A verse line is the unit (Q10=A); prose is split into sentences.
+      for (const raw of verse ? [line] : _pbpDictEvidenceSplitSentences(line, language)) {
+        const text = _pbpDictEvidenceText(raw);
+        if (!text || _pbpDictEvidenceMatch(text, term, language) < 0) continue;
+        const truncated = text.length > PBP_DICT_EVIDENCE_SENTENCE_MAX;
+        const excerpt = truncated ? _pbpDictEvidenceWindow(text, term, language) : text;
+        if (excerpt && result.length < 10) result.push({ text: excerpt, paragraph: index + 1, truncated });
+      }
+    }
+  }
+  return result;
 }
 function _pbpDictCultureExcerpts(root, title, term, language) {
   const normalize = text => _pbpDictEvidenceText(text).normalize("NFC").toLocaleLowerCase();
@@ -190,7 +262,9 @@ function _pbpDictEvidenceEtymology(page, root, language) {
 async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, beforeRequest } = {}) {
   const language = _pbpDictEvidenceLang(sourceLanguage), origin = pbpDictEvidenceOrigin(kind, language);
   if (typeof term !== "string" || !term.trim() || term.length > 256 || typeof beforeRequest !== "function") throw _pbpDictEvidenceError("invalid_request");
-  if (!origin) return [];
+  // An unsupported example language is reported as such, never as a clean
+  // miss; etymology keeps its array contract for the generation prompt.
+  if (!origin) return kind === "literature" ? PBP_DICT_EVIDENCE_UNSUPPORTED : [];
   const controller = new AbortController(), abort = () => controller.abort();
   let timedOut = false, requests = 0;
   const check = async () => {
@@ -326,7 +400,8 @@ async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, before
         }
         continue;
       }
-      const excerpt = _pbpDictEvidenceExcerpt(_pbpDictEvidenceParagraphs(root), term, language); if (!excerpt) continue;
+      // One sentence or verse line, not the old surrounding passage (R1-8).
+      const hit = pbpDictEvidenceSentences(root, term, language)[0]; if (!hit) continue;
       const metadata = _pbpDictEvidenceMetadata(page, root, origin);
       if (metadata.forbidden) continue;
       let frontier = metadata.links;
@@ -344,9 +419,9 @@ async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, before
         frontier = next;
       }
       if (metadata.forbidden || !metadata.genre || !metadata.author || !metadata.work || works.has(metadata.work)) continue;
-      metadata.location = (metadata.location ? metadata.location + " · " : "") + "¶ " + excerpt.paragraph;
+      metadata.location = (metadata.location ? metadata.location + " · " : "") + "¶ " + hit.paragraph;
       metadata.location = metadata.location.slice(0, 200);
-      result.push(make(page, excerpt.text, metadata)); works.add(metadata.work);
+      result.push({ ...make(page, hit.text, metadata), truncated: hit.truncated }); works.add(metadata.work);
     }
     await check();
     if (!result.length && sourceFailed) throw _pbpDictEvidenceError("source_failed");
