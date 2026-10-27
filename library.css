@@ -2320,10 +2320,15 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-usage-actions,
 #vocab-ref-result .xp-dict-usage-feedback { display: flex; align-items: center; flex-wrap: wrap; gap: var(--lib-sp-2); min-width: 0; }
 #vocab-ref-result .xp-dict-usage-actions { margin-top: var(--lib-sp-3); }
-#vocab-ref-result .xp-dict-usage-actions > .xp-dict-update-supplement,
+#vocab-ref-result .xp-dict-usage-actions > :is(.xp-dict-update-entry, .xp-dict-update-supplement),
 #vocab-ref-result .xp-dict-usage-feedback > .xp-dict-usage-status { margin: 0; }
 #vocab-ref-result .xp-dict-usage-feedback { flex: 1; }
 #vocab-ref-result .xp-dict-usage-status { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* Generation progress (plan 2.6): seconds waited, plain text beside the
+   phase line, in fixed-width digits so the cancel beside it does not jitter.
+   The first entry generation reports at the top of the panel. */
+#vocab-ref-result .xp-dict-usage-elapsed { flex: none; font-size: 13px; line-height: 18px; color: var(--lib-fg-muted); font-variant-numeric: tabular-nums; }
+#vocab-ref-result .xp-dict-ai > .xp-dict-usage-feedback { margin-bottom: var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-usage-stop { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 24px; padding: var(--lib-sp-1); }
 #vocab-ref-result .xp-dict-usage-stop svg { width: 14px; height: 14px; }
 #vocab-ref-result :is(.xp-dict-usage-feedback, .xp-dict-usage-actions > *, .xp-dict-usage-stop)[hidden] { display: none; }

@@ -4680,5 +4680,8 @@
   "dictGenerationEmpty": {"message": "Model nie zwrócił tekstu odpowiedzi. Ten wynik nie został zapisany. Spróbuj ponownie lub wybierz w ustawieniach inny model AI dla czytnika."},
   "dictGenerationModelUnavailable": {"message": "Dostawca nie mógł znaleźć lub użyć wybranego modelu. Sprawdź jego nazwę i dostępność, a następnie zmień model AI czytnika w ustawieniach."},
   "dictGenerationBilling": {"message": "Dostawca odrzucił to żądanie (HTTP 402). Przed kolejną próbą sprawdź u niego limit wykorzystania, stan rozliczeń i uprawnienia dostępu swojego konta."},
-  "dictGenerationServiceUnavailable": {"message": "Usługa dostawcy jest chwilowo niedostępna. Spróbuj ponownie później."}
+  "dictGenerationServiceUnavailable": {"message": "Usługa dostawcy jest chwilowo niedostępna. Spróbuj ponownie później."},
+  "dictProgressThinking": {"message": "Model analizuje…"},
+  "dictProgressStreaming": {"message": "Odbieranie odpowiedzi…"},
+  "dictProgressElapsed": {"message": "Upłynęło $SECONDS$ s", "placeholders": {"seconds": {"content": "$1"}}}
 }

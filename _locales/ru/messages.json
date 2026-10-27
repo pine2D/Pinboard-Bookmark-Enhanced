@@ -4680,5 +4680,8 @@
   "dictGenerationEmpty": {"message": "Модель не вернула текст ответа. Этот результат не сохранён. Повторите попытку или выберите другую модель ИИ для режима чтения в настройках."},
   "dictGenerationModelUnavailable": {"message": "Провайдер не смог найти или использовать выбранную модель. Проверьте её название и доступность, затем измените модель ИИ для режима чтения в настройках."},
   "dictGenerationBilling": {"message": "Провайдер отклонил запрос (HTTP 402). Перед повторной попыткой проверьте у него квоту, состояние платежей и права доступа вашей учётной записи."},
-  "dictGenerationServiceUnavailable": {"message": "Сервис провайдера временно недоступен. Повторите попытку позже."}
+  "dictGenerationServiceUnavailable": {"message": "Сервис провайдера временно недоступен. Повторите попытку позже."},
+  "dictProgressThinking": {"message": "Модель обдумывает ответ…"},
+  "dictProgressStreaming": {"message": "Получение ответа…"},
+  "dictProgressElapsed": {"message": "Прошло $SECONDS$ с", "placeholders": {"seconds": {"content": "$1"}}}
 }

@@ -139,6 +139,9 @@ export async function installDictEntryFixture(page) {
         throw new Error('SETUP: expected a reusable dictionary entry request without article or dictionary content');
       }
       const state = window._auditDictEntry;
+      // The stream's phase reporter (plan 2.6): the progress state calls it
+      // the way ai.js does, synchronously and with the phase alone.
+      state.progress = opts.onProgress || null;
       state.entered = true; state.calls++;
       await new Promise(resolve => { state.release = resolve; });
       opts.signal?.throwIfAborted();
@@ -161,6 +164,7 @@ export async function installDictEntryFixture(page) {
 
 const USAGE_ACTION = '[data-learning-block="usage"] .xp-dict-supplement-generate[data-category="confusables"]';
 const USAGE_ROW = '[data-learning-block="usage"] .xp-dict-usage-actions:has(> [data-category="confusables"])';
+const ENTRY_PROGRESS = '.xp-dict-ai > .xp-dict-usage-feedback[data-state="busy"]';
 
 async function rerunLookup(page) {
   if (await page.locator('#vocab-lookup-go').count()) await page.locator('#vocab-lookup-go').click();
@@ -179,7 +183,24 @@ export async function openDictEntryState(page, state) {
   if (state === 'busy') {
     await action.click();
     await page.waitForFunction(() => window._auditDictEntry?.entered);
-    return page.locator('.xp-dict-ai-stop:not([hidden])').isVisible();
+    return page.locator(ENTRY_PROGRESS + ' .xp-dict-usage-stop').isVisible();
+  }
+  if (state === 'progress') {
+    // The pending generation moves through thinking to streaming; the line
+    // shows the streaming phase and, once a real second has passed since the
+    // click, a nonzero count of seconds waited.
+    await page.evaluate(() => {
+      const report = window._auditDictEntry?.progress;
+      if (typeof report !== 'function') throw new Error('SETUP: the pending entry generation has no phase reporter');
+      report({ phase: 'thinking' }); report({ phase: 'streaming' });
+    });
+    await page.waitForFunction(selector => {
+      const line = document.querySelector(selector);
+      const elapsed = line?.querySelector('.xp-dict-usage-elapsed:not([hidden])')?.textContent || '';
+      return !!line && line.querySelector('.xp-dict-usage-status')?.textContent === t('dictProgressStreaming') &&
+        !!elapsed && elapsed !== t('dictProgressElapsed', '0');
+    }, ENTRY_PROGRESS, { timeout: 5000 });
+    return page.locator(ENTRY_PROGRESS + ' .xp-dict-usage-elapsed').isVisible();
   }
   if (state === 'result') {
     await page.evaluate(() => {

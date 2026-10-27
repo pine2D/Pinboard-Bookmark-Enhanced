@@ -1821,20 +1821,26 @@ function _pbpDictEntryMount(host, opts) {
   generate.disabled = true;
   const toggle = button("dictEntryHideAi", "xp-dict-ai-switch"); toggle.hidden = true;
   action(toggle, "dictEntryHideAi", "cross");
-  const stop = button("askStop", "xp-dict-ai-stop"); stop.hidden = true;
-  action(stop, "askStop", "stop");
   const configure = document.createElement("a"); configure.className = "xp-dict-connect xp-dict-ai-configure";
   configure.href = "options.html#ai"; configure.target = "_blank"; configure.rel = "noopener noreferrer";
   action(configure, "aiConfigure", "gear"); configure.hidden = true;
-  controls.append(generate, toggle, stop, configure);
+  controls.append(generate, toggle, configure);
   const status = document.createElement("div"); status.className = "xp-dict-msg xp-dict-ai-status";
   status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite"); status.hidden = true;
   const content = document.createElement("div"); content.className = "xp-dict-ai-content"; content.hidden = true;
   if (opts.controlsHost) opts.controlsHost.appendChild(controls);
   else panel.appendChild(controls);
-  panel.append(status, content); host.appendChild(panel);
+  // Every generation reports its progress in place inside this panel (plan
+  // 2.6). A busy ancestor delays live-region announcements, so the panel
+  // never claims aria-busy while a phase line is speaking.
+  panel.setAttribute("aria-busy", "false");
   let settings = null, record = null, busy = false, active = null, epoch = 0, mode = "dictionary", viewRevision = 0;
-  let usageActivity = null, renderedLanguage = null;
+  // The one running generation: { kind: "entry" | "usage", feedback, origin,
+  // version, startedAt, timer, key }. Its elapsed-seconds timer is cleared on
+  // every way the run can end (complete, fail, cancel, settings change,
+  // closing or replacing the query), not only in a finally that a pending
+  // permission await could hold back.
+  let activity = null, renderedLanguage = null;
   const usageFeedbacks = new WeakMap();
   // Local empty-result memory of the learning blocks (plan 1C.4): which
   // category this account's last attempt found nothing for. Read once the
@@ -1865,18 +1871,32 @@ function _pbpDictEntryMount(host, opts) {
     _pbpDictToneText(error, text, tone); error.hidden = !text;
     if (text) message("");
   };
+  // One feedback box: the phase line (the only live region), the elapsed
+  // seconds as plain text beside it -- never inside an aria-live or
+  // role=status node, so a screen reader is not interrupted every second --
+  // and the in-place cancel. Phase changes speak; the seconds do not.
+  const feedbackBox = anchor => {
+    const box = document.createElement("div"); box.className = "xp-dict-usage-feedback"; box.hidden = true;
+    const text = document.createElement("p"); text.className = "xp-dict-msg xp-dict-usage-status";
+    text.setAttribute("role", "status"); text.setAttribute("aria-live", "polite"); text.setAttribute("aria-atomic", "true");
+    const elapsed = document.createElement("span"); elapsed.className = "xp-dict-usage-elapsed"; elapsed.hidden = true;
+    const cancel = button("askStop", "xp-dict-usage-stop"); action(cancel, "askStop", "stop"); cancel.hidden = true;
+    cancel.addEventListener("click", () => cancelActive());
+    box.append(text, elapsed, cancel);
+    return { box, text, elapsed, cancel, anchor, activity: null };
+  };
+  // The base entry's first generation has no button in the body to sit
+  // beside (its action is an icon in the lookup toolbar), so its progress
+  // takes the status line's place at the top of the panel.
+  const entryProgress = feedbackBox(null);
+  panel.append(status, entryProgress.box, content); host.appendChild(panel);
   const usageFeedback = anchor => {
     if (usageFeedbacks.has(anchor)) return usageFeedbacks.get(anchor);
     const hadFocus = document.activeElement === anchor;
     const row = document.createElement("div"); row.className = "xp-dict-usage-actions";
     anchor.before(row); row.appendChild(anchor);
-    const box = document.createElement("div"); box.className = "xp-dict-usage-feedback"; box.hidden = true;
-    const text = document.createElement("p"); text.className = "xp-dict-msg xp-dict-usage-status";
-    text.setAttribute("role", "status"); text.setAttribute("aria-live", "polite"); text.setAttribute("aria-atomic", "true");
-    const cancel = button("askStop", "xp-dict-usage-stop"); action(cancel, "askStop", "stop"); cancel.hidden = true;
-    cancel.addEventListener("click", () => stop.click());
-    box.append(text, cancel); row.appendChild(box);
-    const feedback = { box, text, cancel, anchor };
+    const feedback = feedbackBox(anchor);
+    row.appendChild(feedback.box);
     usageFeedbacks.set(anchor, feedback);
     if (hadFocus) anchor.focus({ preventScroll: true });
     return feedback;
@@ -1886,17 +1906,46 @@ function _pbpDictEntryMount(host, opts) {
     feedback.box.hidden = !text;
     feedback.box.dataset.state = state;
     feedback.cancel.hidden = state !== "busy";
-    feedback.anchor.hidden = state === "busy";
+    feedback.elapsed.hidden = state !== "busy" || !feedback.elapsed.textContent;
+    if (feedback.anchor) feedback.anchor.hidden = state === "busy";
   };
+  const elapsedText = act => t("dictProgressElapsed", String(Math.max(0, Math.floor((Date.now() - act.startedAt) / 1000))));
+  const endProgress = act => {
+    if (!act) return;
+    clearInterval(act.timer); act.timer = 0;
+    // A newer run may already own this box (cancel, then click again).
+    if (act.feedback.activity === act) {
+      act.feedback.activity = null; act.feedback.elapsed.textContent = ""; act.feedback.elapsed.hidden = true;
+    }
+    if (activity === act) activity = null;
+  };
+  // Starts counting at the click, so the seconds include the permission
+  // prompt and any Drive pre-sync: they are not the transport's 180 s
+  // deadline, which starts later in ai.js.
+  const startProgress = (kind, feedback, origin, version) => {
+    endProgress(activity);
+    const act = { kind, feedback, origin, version, startedAt: Date.now(), timer: 0, key: "" };
+    activity = act; feedback.activity = act;
+    feedback.elapsed.textContent = elapsedText(act);
+    act.timer = setInterval(() => {
+      if (activity !== act || epoch !== version || !alive()) { endProgress(act); return; }
+      feedback.elapsed.textContent = elapsedText(act);
+    }, 1000);
+    return act;
+  };
+  // The phase line changes only when the phase does: a repeated phase is not
+  // re-announced. Stale runs never touch it.
+  const progressPhase = (act, key) => {
+    if (!key || activity !== act || act.key === key) return;
+    act.key = key; usageMessage(act.feedback, t(key), "busy");
+  };
+  const PHASE_KEYS = { thinking: "dictProgressThinking", streaming: "dictProgressStreaming" };
   const sync = () => {
     generate.hidden = !!record || !configured() || busy; generate.disabled = busy || !settings;
-    toggle.hidden = !record && !busy; stop.hidden = !busy || !!usageActivity;
+    toggle.hidden = !record && !busy;
     configure.hidden = !!record || !settings || settings.previewAiEnabled === false || configured();
     panel.hidden = !record && !!settings && settings.previewAiEnabled === false;
     controls.hidden = panel.hidden;
-    // A busy ancestor delays live-region announcements. Supplement progress
-    // speaks beside its action while the already rendered entry stays readable.
-    panel.setAttribute("aria-busy", busy && !usageActivity ? "true" : "false");
   };
   const show = next => {
     if (!alive()) return;
@@ -1909,6 +1958,10 @@ function _pbpDictEntryMount(host, opts) {
     opts.onView?.(mode);
   };
   const render = (value, answerLanguage, reveal = true, revealSupplement = "") => {
+    // Read before the base re-renders: an update's cancel sits inside the
+    // content that is about to be replaced.
+    const hadFocus = document.activeElement === generate ||
+      (activity?.kind === "entry" && document.activeElement === activity.feedback.cancel);
     record = value; renderedLanguage = answerLanguage;
     const norm = pbpDictEntryNorm(record, answerLanguage);
     // Supplement receipts and additions do not change the paid base entry.
@@ -2005,7 +2058,6 @@ function _pbpDictEntryMount(host, opts) {
     renderSupplements(answerLanguage, revealSupplement);
     opts.onEntry?.(norm, record, content);
     // Move focus off a disappearing action without scrolling the article.
-    const hadFocus = document.activeElement === generate || document.activeElement === stop;
     show(reveal ? "ai" : mode); sync();
     if (hadFocus) toggle.focus({ preventScroll: true });
     message(record.cacheSaved === false ? t("dictEntryNotCached") : "", "error");
@@ -2333,7 +2385,7 @@ function _pbpDictEntryMount(host, opts) {
       let restoreFocus = null;
       const hadFocus = document.activeElement === origin || (updating && content.contains(document.activeElement));
       const version = ++epoch, controller = new AbortController(); active = controller; busy = true;
-      usageActivity = { feedback, origin, version };
+      const act = startProgress("usage", feedback, origin, version);
       const current = () => alive() && epoch === version && !controller.signal.aborted;
       let ledgerStage = "permission";
       const request = { ...input(controller.signal, current), target: answerLanguage, category,
@@ -2348,17 +2400,19 @@ function _pbpDictEntryMount(host, opts) {
           if (!current() || category !== "etymology" || !sourceOrigin) return;
           if (count) pbpDictNegForget(opts.owner, negParts(category)); else pbpDictNegRecord(opts.owner, negParts(category));
         },
+        // Called synchronously from the stream (thinking / streaming) as
+        // well as between the awaited stages. The two stream phases change
+        // the words only; the ledger keeps filing them under "generating".
         onStage: stage => {
           if (!current()) return;
           if (PBP_DICT_LEDGER_STAGES.includes(stage)) ledgerStage = stage;
-          const key = { sources: "dictSupplementRetrieving", checking: "dictSupplementChecking", saving: "dictSupplementSaving",
-            generating: category === "etymology" ? "dictEtymologyGenerating" : "dictSupplementGenerating" }[stage];
-          if (key) usageMessage(feedback, t(key), "busy");
+          progressPhase(act, PHASE_KEYS[stage] || { sources: "dictSupplementRetrieving", checking: "dictSupplementChecking", saving: "dictSupplementSaving",
+            generating: category === "etymology" ? "dictEtymologyGenerating" : "dictSupplementGenerating" }[stage]);
         } };
       if (updating) request.settings = { ...settings, dictLearnerNativeLanguage: updating.profile.nativeLanguage, dictLearnerLevel: updating.profile.level };
       const sourceOrigin = pbpDictSupplementOrigin(category, opts.lang);
       for (const el of Object.values(buttons)) el.disabled = true;
-      usageMessage(feedback, t(category === "etymology" ? "dictEtymologyGenerating" : "dictSupplementGenerating"), "busy"); sync();
+      progressPhase(act, category === "etymology" ? "dictEtymologyGenerating" : "dictSupplementGenerating"); sync();
       if (hadFocus) feedback.cancel.focus({ preventScroll: true });
       try {
         // Request the model and one source origin together, directly from the
@@ -2393,8 +2447,9 @@ function _pbpDictEntryMount(host, opts) {
         if (document.activeElement === feedback.cancel) restoreFocus = origin;
         usageMessage(feedback, text, _pbpDictFailureTone(error));
       } finally {
+        endProgress(act);
         if (epoch === version) {
-          busy = false; active = null; usageActivity = null;
+          busy = false; active = null;
           if (alive()) {
             const focusStayed = document.activeElement === feedback.cancel;
             enableForm(); refresh(); sync();
@@ -2410,14 +2465,20 @@ function _pbpDictEntryMount(host, opts) {
   };
   const run = async (manual, updateId = "", origin = null) => {
     if (!alive() || busy || !configured()) return;
-    if (updateId) inlineError(origin, "");
     const hadFocus = manual && (document.activeElement === generate || content.contains(document.activeElement));
+    // An update reports beside its own button; the first generation in the
+    // panel's progress line. An update's error goes above its action row.
+    const feedback = updateId && origin?.isConnected ? usageFeedback(origin) : entryProgress;
+    const errorAnchor = feedback.anchor ? feedback.box.parentElement : origin;
+    if (updateId) inlineError(errorAnchor, "");
     const version = ++epoch, viewAtStart = viewRevision, controller = new AbortController(); active = controller; busy = true;
     const current = () => alive() && epoch === version && !controller.signal.aborted;
-    message(t("dictEntryGenerating"));
+    const act = startProgress("entry", feedback, feedback.anchor || generate, version);
+    message(""); progressPhase(act, "dictEntryGenerating");
     if (!manual) show("ai");
     sync();
-    if (hadFocus) stop.focus({ preventScroll: true });
+    // Only a click moves focus, and only to this run's own cancel.
+    if (hadFocus) feedback.cancel.focus({ preventScroll: true });
     let ledgerStage = manual ? "permission" : "generating";
     try {
       // The automatic path never requests permission. Only this direct click
@@ -2430,7 +2491,10 @@ function _pbpDictEntryMount(host, opts) {
       // A dropped sense (Q6=B) is a partial failure of this paid answer: file
       // its fixed code at the checking stage; the entry itself still saves.
       const onDrop = error => { if (current()) _pbpDictLedgerFail(opts.owner, error, "checking", "entry"); };
-      const result = await pbpDictEntryRun({ ...request, updateId, onDrop });
+      // The stream's phases, synchronously from ai.js; the ledger stage
+      // stays "generating".
+      const onStage = phase => { if (current()) progressPhase(act, PHASE_KEYS[phase]); };
+      const result = await pbpDictEntryRun({ ...request, updateId, onDrop, onStage });
       if (current()) render(result, request.target, viewRevision === viewAtStart);
     } catch (error) {
       if (!current()) return;
@@ -2438,15 +2502,16 @@ function _pbpDictEntryMount(host, opts) {
       console.warn("[dict-entry] generation failed:", error?.name, _pbpDictFailureCode(error), _pbpDictFailureReason(error));
       _pbpDictLedgerFail(opts.owner, error, ledgerStage, "entry");
       const text = t(_pbpDictGenerationErrorKey(error)), tone = _pbpDictFailureTone(error);
-      if (updateId) inlineError(origin, text, tone); else message(text, tone);
+      if (updateId) inlineError(errorAnchor, text, tone); else message(text, tone);
     } finally {
+      endProgress(act);
       if (epoch === version) {
         busy = false; active = null;
         if (alive()) {
-          const stopFocused = document.activeElement === stop;
-          sync();
-          if (stopFocused) {
-            if (origin?.isConnected) origin.focus({ preventScroll: true });
+          const cancelFocused = document.activeElement === feedback.cancel;
+          usageMessage(feedback, ""); sync();
+          if (cancelFocused) {
+            if (origin?.isConnected && !origin.hidden) origin.focus({ preventScroll: true });
             else if (!generate.hidden) generate.focus({ preventScroll: true });
             else if (!toggle.hidden) toggle.focus({ preventScroll: true });
           }
@@ -2456,19 +2521,25 @@ function _pbpDictEntryMount(host, opts) {
   };
   generate.addEventListener("click", () => run(true));
   toggle.addEventListener("click", () => { viewRevision++; show(mode === "ai" ? "dictionary" : "ai"); });
-  stop.addEventListener("click", () => {
-    const usage = usageActivity;
-    epoch++; active?.abort(); active = null; busy = false; usageActivity = null;
-    if (usage) {
-      usageMessage(usage.feedback, t("askStopped")); usageForm?.enable(); usageForm?.refresh();
-      sync(); if (usage.origin.isConnected) usage.origin.focus({ preventScroll: true }); return;
+  // The in-place cancel. Focus returns to the action that started the run --
+  // the generate icon, the entry's update button or the supplement's button.
+  const cancelActive = () => {
+    const act = activity;
+    if (!act) return;
+    epoch++; active?.abort(); active = null; busy = false; endProgress(act);
+    if (act.kind === "usage") {
+      usageMessage(act.feedback, t("askStopped")); usageForm?.enable(); usageForm?.refresh();
+      sync(); if (act.origin.isConnected) act.origin.focus({ preventScroll: true }); return;
     }
-    message(""); sync();
+    usageMessage(act.feedback, ""); message(""); sync();
     if (!record) show("dictionary");
-    if (!generate.hidden) generate.focus({ preventScroll: true });
+    const origin = act.origin?.isConnected && !act.origin.hidden ? act.origin : null;
+    if (origin) origin.focus({ preventScroll: true });
+    else if (!generate.hidden) generate.focus({ preventScroll: true });
     else if (!toggle.hidden) toggle.focus({ preventScroll: true });
-  });
+  };
   opts.signal?.addEventListener("abort", () => {
+    endProgress(activity);
     epoch++; active?.abort();
     if (!record) content.hidden = true;
     if (opts.controlsHost) controls.remove();
@@ -2536,6 +2607,9 @@ function _pbpDictEntryMount(host, opts) {
       if (!alive() || sequence < lastRelevant) return;
       lastRelevant = sequence;
       const revision = ++epoch; active?.abort(); active = null; busy = false; generate.disabled = true;
+      // The run is void: stop its clock and take its busy line down now, before
+      // the settings read below can keep a stale cancel on screen.
+      const stale = activity; endProgress(stale); if (stale && alive()) usageMessage(stale.feedback, "");
       try {
         const next = deobfuscateSettings(await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS));
         if (alive() && epoch === revision) opts.onSettingsChange(next);

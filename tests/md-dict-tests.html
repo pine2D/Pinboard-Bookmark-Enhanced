@@ -1980,6 +1980,17 @@ async function runDictionaryEntryUiTests() {
   const settings={aiProvider:"fixture",previewAiEnabled:true,dictDefinitionLang:"es",dictAiAutoGenerate:false};
   const record=(extra={})=>({entry:{word:"Gift",language:"de",pronunciation:"/ɡɪft/",meanings:[{partOfSpeech:"sustantivo",definition:"<img src=x onerror=alert(1)> veneno",examples:[{text:"Das Gift wirkt.",translation:"El veneno hace efecto."}]}],etymology:"Origen de prueba.",relatedWords:["giftig"]},provider:"fixture",model:"fixture-model",generatedAt:1700000000000,cached:false,cacheSaved:true,...extra});
   const settle=async()=>{for(let i=0;i<8;i++)await new Promise(r=>setTimeout(r,0));};
+  // A controllable second hand for the progress line: md-dict looks up
+  // setInterval / clearInterval / Date.now at call time.
+  const fakeClock=()=>{
+    const real={setInterval:window.setInterval,clearInterval:window.clearInterval,now:Date.now};let now=1700000000000,next=1;const timers=new Map();
+    window.setInterval=(fn,ms)=>{const id=next++;timers.set(id,{fn,ms});return id;};
+    window.clearInterval=id=>{timers.delete(id);};Date.now=()=>now;
+    return {timers,advance:ms=>{now+=ms;for(const[id,timer]of[...timers])if(timers.has(id))timer.fn();},
+      restore:()=>{window.setInterval=real.setInterval;window.clearInterval=real.clearInterval;Date.now=real.now;}};
+  };
+  const progressOf=scope=>{const box=scope?.querySelector('.xp-dict-usage-feedback');
+    return {box,text:box?.querySelector('.xp-dict-usage-status'),elapsed:box?.querySelector('.xp-dict-usage-elapsed'),cancel:box?.querySelector('.xp-dict-usage-stop')};};
   const mount=(extra={})=>{
     const root=document.createElement("div"),host=document.createElement("div"),ctrl=new AbortController();
     // The mount owns only its host. Dictionary visibility beside the AI entry is
@@ -2161,12 +2172,77 @@ async function runDictionaryEntryUiTests() {
     check("automatic generation never opens a permission request",grants===beforeAuto.grants);
 
     let release;window.pbpDictEntryRun=input=>{calls.push(input);return new Promise(resolve=>{release=resolve;});};
-    const cancelled=mount();await cancelled.ui.ready;cancelled.host.querySelector('.xp-dict-ai-generate').focus();cancelled.host.querySelector('.xp-dict-ai-generate').click();await settle();
-    check("keyboard generation keeps a visible focus target while waiting",document.activeElement===cancelled.host.querySelector('.xp-dict-ai-stop'));
-    const pending=calls.at(-1).signal;cancelled.host.querySelector('.xp-dict-ai-stop').click();release(record());await settle();
-    check("cancelling generation returns focus to the available generation action",document.activeElement===cancelled.host.querySelector('.xp-dict-ai-generate'));
-    check("Stop aborts the pending entry and discards late completion",pending.aborted&&cancelled.host.querySelector('.xp-dict-ai-content').hidden);
-    check("Stop leaves a usable generation entry and clears busy feedback",!cancelled.host.querySelector('.xp-dict-ai-generate').disabled&&cancelled.host.querySelector('.xp-dict-ai-stop').hidden&&cancelled.host.querySelector('.xp-dict-ai-status').hidden);
+    // Plan 2.6: the base entry reports in place -- the phase line, the
+    // seconds waited as plain text, and its own cancel. A fake interval and
+    // clock drive the seconds; the timer must be gone on every way out.
+    const clock=fakeClock();
+    try {
+      const cancelled=mount();await cancelled.ui.ready;cancelled.host.querySelector('.xp-dict-ai-generate').focus();cancelled.host.querySelector('.xp-dict-ai-generate').click();await settle();
+      const progress=progressOf(cancelled.host.querySelector('.xp-dict-ai'));
+      check("the lookup toolbar no longer carries a separate stop icon",!cancelled.host.querySelector('.xp-dict-ai-stop')&&[...cancelled.ui.controls.children].every(el=>!el.classList.contains('xp-dict-usage-stop')));
+      check("base generation shows its phase, the seconds waited and a cancel in the panel's progress line",progress.box?.checkVisibility()&&progress.box.dataset.state==='busy'&&
+        progress.text.textContent==='dictEntryGenerating'&&progress.elapsed.checkVisibility()&&progress.elapsed.textContent==='dictProgressElapsed:0'&&progress.cancel.checkVisibility()&&
+        cancelled.host.querySelector('.xp-dict-ai-status').hidden&&cancelled.host.querySelector('.xp-dict-ai-generate').hidden);
+      check("keyboard generation keeps a visible focus target while waiting: the in-place cancel",document.activeElement===progress.cancel);
+      check("the seconds sit outside every live region and the busy panel never delays the phase line",
+        !progress.elapsed.closest('[aria-live],[role="status"],[role="alert"]')&&progress.text.getAttribute('aria-live')==='polite'&&
+        cancelled.host.querySelector('.xp-dict-ai').getAttribute('aria-busy')==='false');
+      clock.advance(1000);clock.advance(1000);clock.advance(1000);
+      check("the seconds waited count up once a second",progress.elapsed.textContent==='dictProgressElapsed:3'&&clock.timers.size===1);
+      const onStage=calls.at(-1).onStage;
+      check("the entry run receives an onStage callback beside its request",typeof onStage==='function');
+      let changes=0;const observer=new MutationObserver(list=>{changes+=list.length;});observer.observe(progress.text,{subtree:true,childList:true,characterData:true});
+      onStage('thinking');const thinking=progress.text.textContent;await settle();const afterFirst=changes;
+      onStage('thinking');await settle();const repeated=changes-afterFirst;
+      onStage('streaming');const streaming=progress.text.textContent;
+      onStage('mystery');onStage(undefined);await settle();observer.disconnect();
+      check("the phase line follows thinking, then streaming",thinking==='dictProgressThinking'&&streaming==='dictProgressStreaming');
+      check("a repeated phase is not announced again and an unknown phase changes nothing",repeated===0&&progress.text.textContent==='dictProgressStreaming');
+      check("phase changes never move focus or the seconds",document.activeElement===progress.cancel&&progress.elapsed.textContent==='dictProgressElapsed:3');
+      const pending=calls.at(-1).signal;progress.cancel.click();release(record());await settle();
+      check("cancelling generation returns focus to the available generation action",document.activeElement===cancelled.host.querySelector('.xp-dict-ai-generate'));
+      check("Stop aborts the pending entry and discards late completion",pending.aborted&&cancelled.host.querySelector('.xp-dict-ai-content').hidden);
+      check("Stop leaves a usable generation entry and clears busy feedback and its clock",!cancelled.host.querySelector('.xp-dict-ai-generate').disabled&&progress.box.hidden&&
+        !progress.elapsed.textContent&&cancelled.host.querySelector('.xp-dict-ai-status').hidden&&clock.timers.size===0);
+      onStage('streaming');
+      check("a phase arriving after cancel does not revive the progress line",progress.box.hidden&&progress.cancel.hidden);
+      {
+        // The user's cancel wins over a budget stop settling right after it:
+        // no truncation text and no failure row.
+        const realLedger=window.pbpDictLedgerRecord,rows=[];window.pbpDictLedgerRecord=async(owner,row)=>{rows.push(row);return true;};
+        let rejectBudget;window.pbpDictEntryRun=input=>{calls.push(input);return new Promise((_resolve,reject)=>{rejectBudget=reject;});};
+        try {
+          const racing=mount();await racing.ui.ready;racing.host.querySelector('.xp-dict-ai-generate').click();await settle();
+          progressOf(racing.host.querySelector('.xp-dict-ai')).cancel.click();
+          rejectBudget(Object.assign(new Error('fixture'),{code:'output_budget_exceeded',status:200}));await settle();
+          check("a budget stop settling after the user's cancel shows no truncation and files nothing",rows.length===0&&
+            racing.host.querySelector('.xp-dict-ai-status').hidden&&!racing.host.textContent.includes('dictGenerationTruncated')&&clock.timers.size===0);
+        } finally {window.pbpDictLedgerRecord=realLedger;window.pbpDictEntryRun=input=>{calls.push(input);return new Promise(resolve=>{release=resolve;});};}
+      }
+      // Every other way out also stops the clock.
+      const done=mount();await done.ui.ready;done.host.querySelector('.xp-dict-ai-generate').click();await settle();
+      const doneTimers=clock.timers.size;release(record());await settle();
+      check("a completed generation stops its clock and takes the progress line down",doneTimers===1&&clock.timers.size===0&&progressOf(done.host.querySelector('.xp-dict-ai')).box.hidden&&
+        !done.host.querySelector('.xp-dict-ai-content').hidden);
+      let rejectRun;window.pbpDictEntryRun=input=>{calls.push(input);return new Promise((_resolve,reject)=>{rejectRun=reject;});};
+      const broken=mount();await broken.ui.ready;broken.host.querySelector('.xp-dict-ai-generate').click();await settle();
+      rejectRun(Object.assign(new Error('fixture'),{name:'TimeoutError'}));await settle();
+      check("a failed generation stops its clock and shows its error in the status line",clock.timers.size===0&&progressOf(broken.host.querySelector('.xp-dict-ai')).box.hidden&&
+        broken.host.querySelector('.xp-dict-ai-status').textContent==='trErrTimeout');
+      const closing=mount();await closing.ui.ready;closing.host.querySelector('.xp-dict-ai-generate').click();await settle();
+      const closingTimers=clock.timers.size;closing.ctrl.abort();
+      check("closing the lookup stops the clock at once",closingTimers===1&&clock.timers.size===0);
+      let live=true;const replacedQuery=mount({isCurrent:()=>live});await replacedQuery.ui.ready;replacedQuery.host.querySelector('.xp-dict-ai-generate').click();await settle();
+      const replacedTimers=clock.timers.size;live=false;clock.advance(1000);
+      check("a replaced query stops its clock on the next tick",replacedTimers===1&&clock.timers.size===0);
+      window.pbpDictEntryRun=input=>{calls.push(input);return new Promise(resolve=>{release=resolve;});};
+      const beforeAutoFocus=document.activeElement;
+      const autoProgress=mount({settings:{...settings,dictAiAutoGenerate:true}});await settle(); // ready waits for the automatic run
+      const autoLine=progressOf(autoProgress.host.querySelector('.xp-dict-ai'));
+      check("automatic generation shows the same progress and cancel without taking focus",autoLine.box.checkVisibility()&&autoLine.cancel.checkVisibility()&&
+        document.activeElement===beforeAutoFocus&&clock.timers.size===1);
+      autoProgress.ctrl.abort();release(record());await autoProgress.ui.ready;await settle();
+    } finally {clock.restore();window.pbpDictEntryRun=input=>{calls.push(input);return new Promise(resolve=>{release=resolve;});};}
     const aborted=mount();await aborted.ui.ready;aborted.host.querySelector('.xp-dict-ai-generate').click();await settle();
     const pendingAbort=calls.at(-1).signal;aborted.ctrl.abort();release(record());await settle();
     check("closing lookup aborts generation and discards the late entry",pendingAbort.aborted&&aborted.host.querySelector('.xp-dict-ai-content').hidden);
@@ -2348,9 +2424,18 @@ async function runDictionaryEntryUiTests() {
     let resolveUsage;
     window.pbpDictSupplementRun=()=>new Promise(resolve=>{resolveUsage=resolve;});
     const addition={id:'b'.repeat(64),category:'patterns',profile:{nativeLanguage:'',level:'',topic:''},content:'An original example',sources:[],provider:'fixture',model:'fixture-model',generatedAt:1700000000000,archiveSaved:true};
-    let submit=paid(usage.host,'patterns');submit.focus();submit.click();await settle();
-    check("supplement generation preserves a visible keyboard target on Stop",document.activeElement===usage.host.querySelector('.xp-dict-usage-stop'));
-    check("supplement generation announces progress beside its own button and keeps the base toolbar quiet",submit.closest('.xp-dict-usage-actions').querySelector('.xp-dict-usage-status')?.textContent==='dictSupplementGenerating'&&usage.host.querySelector('.xp-dict-ai-stop').hidden&&usage.host.querySelector('.xp-dict-ai-status').hidden&&usage.host.querySelector('.xp-dict-ai').getAttribute('aria-busy')==='false');
+    const usageClock=fakeClock();
+    let submit;
+    try {
+      submit=paid(usage.host,'patterns');submit.focus();submit.click();await settle();
+      const line=progressOf(submit.closest('.xp-dict-usage-actions'));
+      check("supplement generation preserves a visible keyboard target on Stop",document.activeElement===line.cancel&&line.cancel.checkVisibility());
+      check("supplement generation announces progress beside its own button and keeps the base progress line quiet",line.text?.textContent==='dictSupplementGenerating'&&
+        progressOf(usage.host.querySelector('.xp-dict-ai')).box.hidden&&usage.host.querySelector('.xp-dict-ai-status').hidden&&usage.host.querySelector('.xp-dict-ai').getAttribute('aria-busy')==='false');
+      usageClock.advance(1000);usageClock.advance(1000);
+      check("a supplement shows its seconds waited as plain text outside the live region",line.elapsed.checkVisibility()&&line.elapsed.textContent==='dictProgressElapsed:2'&&
+        !line.elapsed.closest('[aria-live],[role="status"],[role="alert"]')&&usageClock.timers.size===1);
+    } finally {usageClock.restore();}
     check("one usage point in progress leaves the other's button in place but locked",paid(usage.host,'confusables').checkVisibility()&&paid(usage.host,'confusables').disabled);
     resolveUsage(addition);await settle();
     const patternsSection=usage.host.querySelector('[data-supplement-id="'+addition.id+'"]');
@@ -2451,8 +2536,11 @@ async function runDictionaryEntryUiTests() {
     etymologyRequest.onStage('checking');
     check("content checking keeps the same cancellation action and focus",originAction.parentElement.querySelector('.xp-dict-usage-status').textContent==='dictSupplementChecking'&&
       document.activeElement===originAction.parentElement.querySelector('.xp-dict-usage-stop'));
-    etymologyRequest.onStage('thinking');etymologyRequest.onStage('streaming');
-    check("stream phases leave the supplement progress copy and focus unchanged",originAction.parentElement.querySelector('.xp-dict-usage-status').textContent==='dictSupplementChecking'&&
+    etymologyRequest.onStage('thinking');
+    const thinkingCopy=originAction.parentElement.querySelector('.xp-dict-usage-status').textContent;
+    etymologyRequest.onStage('streaming');
+    check("stream phases change the supplement's phase line, never its focus",thinkingCopy==='dictProgressThinking'&&
+      originAction.parentElement.querySelector('.xp-dict-usage-status').textContent==='dictProgressStreaming'&&
       document.activeElement===originAction.parentElement.querySelector('.xp-dict-usage-stop'));
     resolveUsage({...addition,id:'5'.repeat(64),category:'etymology',learning:{version:2,language:{name:'Spanish',lang:'es'},summary:'Una palabra relacionada.',replacesId:'',
       items:[{sense:1,kind:'family',title:'giftig',explanation:'Significa venenoso.',example:'',translation:'',sourceIndex:-1}]}});await settle();
@@ -2537,13 +2625,28 @@ async function runDictionaryEntryUiTests() {
     updateButton.focus();updateButton.click();await settle();outside.focus();
     rejectUpdate(Object.assign(new Error('late fixture failure'),{code:'invalid_response'}));await settle();
     check("a late failed update does not reclaim focus after the user moves away",document.activeElement===outside);
+    // A base update reports beside its own button (plan 2.6) and its cancel
+    // gives focus back to that button, not to the toolbar.
+    let releaseBase;window.pbpDictEntryRun=input=>new Promise(resolve=>{releaseBase=resolve;});
+    baseUpdate=reloadedMeaning.host.querySelector('.xp-dict-update-entry');baseUpdate.closest('details').open=true;
+    baseUpdate.focus();baseUpdate.click();await settle();
+    const updateLine=progressOf(baseUpdate.closest('.xp-dict-usage-actions'));
+    check("a base update shows its phase, seconds and cancel beside the update button and focuses that cancel",
+      !!updateLine.box&&updateLine.box.checkVisibility()&&updateLine.text.textContent==='dictEntryGenerating'&&updateLine.elapsed.checkVisibility()&&
+      !updateLine.elapsed.closest('[aria-live],[role="status"],[role="alert"]')&&!baseUpdate.checkVisibility()&&document.activeElement===updateLine.cancel&&
+      progressOf(reloadedMeaning.host.querySelector('.xp-dict-ai')).box!==updateLine.box);
+    updateLine.cancel.click();releaseBase(structuredClone(replacementBase));await settle();
+    check("cancelling a base update restores focus to the update button and keeps the paid entry",document.activeElement===baseUpdate&&baseUpdate.checkVisibility()&&
+      updateLine.box.hidden&&JSON.stringify(meaningLabels(reloadedMeaning.host))===JSON.stringify(expectedMeanings));
     window.pbpDictEntryRun=async()=>{throw Object.assign(new Error('fixture base update failure'),{code:'invalid_response'});};
     baseUpdate=reloadedMeaning.host.querySelector('.xp-dict-update-entry');baseUpdate.closest('details').open=true;
     baseUpdate.focus();baseUpdate.click();await settle();
+    // The explanation sits right above the update's action row.
+    const baseUpdateError=()=>baseUpdate.closest('.xp-dict-usage-actions')?.previousElementSibling;
     check("failed base updates also retain paid content and return focus to a visible origin with an inline explanation",
       document.activeElement===baseUpdate&&baseUpdate.checkVisibility()
-      &&baseUpdate.previousElementSibling?.getAttribute('role')==='alert'
-      &&baseUpdate.previousElementSibling.checkVisibility()&&baseUpdate.previousElementSibling.textContent==='dictSupplementInvalid'
+      &&baseUpdateError()?.getAttribute('role')==='alert'
+      &&baseUpdateError().checkVisibility()&&baseUpdateError().textContent==='dictSupplementInvalid'
       &&JSON.stringify(meaningLabels(reloadedMeaning.host))===JSON.stringify(expectedMeanings));
     // The inline update error takes the same tone as the status line: a
     // failure is the error state behind a warning icon, a "no source" answer
@@ -2553,7 +2656,7 @@ async function runDictionaryEntryUiTests() {
       window.pbpDictEntryRun=async()=>{throw Object.assign(new Error('fixture base update failure'),{code});};
       baseUpdate=reloadedMeaning.host.querySelector('.xp-dict-update-entry');baseUpdate.closest('details').open=true;
       baseUpdate.click();await settle();
-      const inline=baseUpdate.previousElementSibling;
+      const inline=baseUpdateError();
       inlineTones.push(inline?.classList.contains('xp-dict-action-error')&&inline.dataset.state===tone&&inline.querySelectorAll('svg').length===1
         &&inline.querySelector(':scope > .xp-dict-msg-ic > svg')?.dataset.icon===icon&&inline.textContent===key);
     }
@@ -2598,7 +2701,7 @@ async function runDictionaryEntryUiTests() {
 
 async function runDictionaryEntrySettingsTests() {
   section("Dictionary entry settings routing and concurrent updates");
-  const names=["chrome","pbpSettingsAreaName","deobfuscateSettings","pbpReadSecretSyncState","pbpSecretRoutingActive","API_KEY_FIELDS","pbpReadSettingsWithSecrets","SETTINGS_DEFAULTS","hasAIKey","pbpDictEntryRead"];
+  const names=["chrome","pbpSettingsAreaName","deobfuscateSettings","pbpReadSecretSyncState","pbpSecretRoutingActive","API_KEY_FIELDS","pbpReadSettingsWithSecrets","SETTINGS_DEFAULTS","hasAIKey","pbpDictEntryRead","pbpDictEntryRun","ensureAIHostPermissionWithGesture"];
   const saved=new Map(names.map(name=>[name,window[name]]));
   const listeners=[],fixtures=[];
   const settle=async()=>{for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout(resolve,0));};
@@ -2641,6 +2744,25 @@ async function runDictionaryEntrySettingsTests() {
     flags[1]({optSyncEnabled:true,syncApiKeys:false});await newFlags;
     flags[0]({optSyncEnabled:true,syncApiKeys:false});await oldFlags;
     check("out-of-order storage-routing reads cannot revive an older setting event",reads===1&&applied.join("|")==="de");
+
+    // A settings change voids a running generation: its seconds stop and its
+    // busy line with the cancel goes at once (plan 2.6), before the settings
+    // read resolves.
+    const realInterval=window.setInterval,realClear=window.clearInterval,timers=new Set();let nextTimer=1;
+    try {
+      window.setInterval=()=>{const id=nextTimer++;timers.add(id);return id;};window.clearInterval=id=>{timers.delete(id);};
+      window.pbpReadSecretSyncState=async()=>({optSyncEnabled:true,syncApiKeys:false});
+      window.ensureAIHostPermissionWithGesture=async()=>{};
+      let signal;window.pbpDictEntryRun=input=>{signal=input.signal;return new Promise(()=>{});};
+      window.pbpReadSettingsWithSecrets=()=>new Promise(()=>{});
+      const generating=await mount(()=>{});
+      generating.host.querySelector('.xp-dict-ai-generate').click();await settle();
+      const line=generating.host.querySelector('.xp-dict-ai > .xp-dict-usage-feedback');
+      const before={timers:timers.size,busy:line?.dataset.state};
+      generating.listener({dictDefinitionLang:{newValue:"fr"}},"sync");await settle();
+      check("a settings change aborts a running generation, stops its clock and takes its progress line down",
+        before.timers===1&&before.busy==="busy"&&timers.size===0&&signal?.aborted&&line.hidden&&line.querySelector('.xp-dict-usage-stop').hidden);
+    } finally {window.setInterval=realInterval;window.clearInterval=realClear;}
   } finally {
     for(const{host,ctrl}of fixtures){ctrl.abort();host.remove();}
     for(const[name,value]of saved){if(value===undefined)delete window[name];else window[name]=value;}

@@ -4680,5 +4680,8 @@
   "dictGenerationEmpty": {"message": "Le modèle n’a renvoyé aucun texte de réponse. Ce résultat n’a pas été enregistré. Réessayez ou choisissez un autre modèle IA pour le lecteur dans les paramètres."},
   "dictGenerationModelUnavailable": {"message": "Le fournisseur n’a pas pu trouver ou utiliser le modèle choisi. Vérifiez son nom et sa disponibilité, puis modifiez le modèle IA du lecteur dans les paramètres."},
   "dictGenerationBilling": {"message": "Le fournisseur a refusé cette requête (HTTP 402). Vérifiez auprès de lui votre quota, la facturation et les droits d’accès de votre compte avant de réessayer."},
-  "dictGenerationServiceUnavailable": {"message": "Le service du fournisseur est temporairement indisponible. Réessayez plus tard."}
+  "dictGenerationServiceUnavailable": {"message": "Le service du fournisseur est temporairement indisponible. Réessayez plus tard."},
+  "dictProgressThinking": {"message": "Le modèle réfléchit…"},
+  "dictProgressStreaming": {"message": "Réception de la réponse…"},
+  "dictProgressElapsed": {"message": "Depuis $SECONDS$ s", "placeholders": {"seconds": {"content": "$1"}}}
 }

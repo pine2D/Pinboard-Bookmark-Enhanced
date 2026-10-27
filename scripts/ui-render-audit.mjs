@@ -9185,7 +9185,7 @@ async function runSweep(page, sw, extBase) {
       await installDictEntryFixture(page);
       await vocabHead.click();
       await page.locator("#vocab-lookup-go").click();
-      for (const state of ["idle", "busy", "result", "details", "usage-busy", "usage-error", "usage-result", "cached", "error"]) {
+      for (const state of ["idle", "busy", "progress", "result", "details", "usage-busy", "usage-error", "usage-result", "cached", "error"]) {
         if (wants("library", "dict-entry-" + state)) await scan("library", "dict-entry-" + state, () => openDictEntryState(page, state));
       }
     }

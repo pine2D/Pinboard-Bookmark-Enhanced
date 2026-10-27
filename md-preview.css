@@ -2482,10 +2482,16 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
 .xp-dict-examples > .xp-dict-learning-title + .xp-dict-learning-item { margin-top: var(--sp-2); }
 .xp-dict-examples .xp-dict-learning-item > .xp-dict-example { margin-top: 0; }
 .xp-dict-usage-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }
-.xp-dict-usage-actions > .xp-dict-update-supplement { margin-top: 0; }
+.xp-dict-usage-actions > :is(.xp-dict-update-entry, .xp-dict-update-supplement) { margin-top: 0; }
 .xp-dict-usage-feedback { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); flex: 1; min-width: 0; }
 .xp-dict-usage-status { flex: 1; min-width: 0; font-size: 12px; line-height: 18px; }
-.xp-dict-usage-feedback[hidden] { display: none; }
+/* Generation progress (plan 2.6): seconds waited, plain text beside the
+   phase line, in fixed-width digits so the cancel beside it does not jitter. */
+.xp-dict-usage-elapsed { flex: none; font-size: 12px; line-height: 18px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+.xp-dict-usage-feedback[hidden], .xp-dict-usage-elapsed[hidden] { display: none; }
+/* The first entry generation reports at the top of the panel, where the
+   status line sits. */
+.xp-dict-ai > .xp-dict-usage-feedback { margin-bottom: var(--sp-2); }
 .xp-dict-retry-save { margin-top: var(--sp-2); }
 .xp-foot > .xp-dict-save-meaning { flex: 1 1 100px; width: 100px; min-width: 0; max-width: 100%; white-space: nowrap; }
 .xp-dict-lang > button { display: block; width: 100%; min-width: 0; padding: 0; border: none; background: none; color: inherit; font: inherit; text-align: start; }

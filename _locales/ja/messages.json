@@ -4680,5 +4680,8 @@
   "dictGenerationEmpty": {"message": "モデルから回答の本文が返されませんでした。今回の結果は保存されていません。再試行するか、設定でリーダーの AI モデルを変更してください。"},
   "dictGenerationModelUnavailable": {"message": "プロバイダーは選択されたモデルを見つけられないか、利用できません。モデル名と提供状況を確認し、設定でリーダーの AI モデルを変更してください。"},
   "dictGenerationBilling": {"message": "プロバイダーがリクエストを拒否しました（HTTP 402）。利用枠、請求状況、アカウントのアクセス権をプロバイダー側で確認してから再試行してください。"},
-  "dictGenerationServiceUnavailable": {"message": "プロバイダーのサービスが一時的に利用できません。しばらくしてからもう一度お試しください。"}
+  "dictGenerationServiceUnavailable": {"message": "プロバイダーのサービスが一時的に利用できません。しばらくしてからもう一度お試しください。"},
+  "dictProgressThinking": {"message": "モデルが考えています…"},
+  "dictProgressStreaming": {"message": "回答を受信中…"},
+  "dictProgressElapsed": {"message": "$SECONDS$ 秒経過", "placeholders": {"seconds": {"content": "$1"}}}
 }

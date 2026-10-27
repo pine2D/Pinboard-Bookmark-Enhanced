@@ -37,12 +37,13 @@ const ACCOUNT = "dict_redesign_r2_fixture";
 export const OWNER = "acct_" + ACCOUNT;
 
 // sha256 over every runtime file the extension can load (productFiles()).
-// Pinned at the end of batch 1B, then moved on purpose to batch 2.5, the
-// commit that switched dictionary generation to streams (plan 2.7) and taught
-// this driver to admit stream:true and replay SSE. Any later product change
-// refuses --plan and --live (product_changed) until the pin is reviewed and
-// moved on purpose.
-export const PRODUCT_FINGERPRINT = "f2eb2062bb69a03d26e2f9b497d4bee36ba5477dacfe9545f72abbae61a67cac";
+// Pinned at the end of batch 1B, moved on purpose to batch 2.5, the commit
+// that switched dictionary generation to streams (plan 2.7) and taught this
+// driver to admit stream:true and replay SSE, then to batch 2.6, whose entry
+// progress line replaced the toolbar stop icon this driver read to tell that
+// an entry click started. Any later product change refuses --plan and --live
+// (product_changed) until the pin is reviewed and moved on purpose.
+export const PRODUCT_FINGERPRINT = "2c170596d50c93b9181bd050c7e2e2b61210613bdbfc7d8295cd4b859e234644";
 
 export const SCOPE = "dictionary-redesign-r2";
 export const ARMS = Object.freeze(["entry", "patterns", "confusables", "etymology"]);
@@ -54,7 +55,7 @@ export const SELECTORS = Object.freeze({
   content: ".xp-dict-ai-content", senses: ".xp-dict-senses > li", entryGenerate: ".xp-dict-ai-generate",
   block: "[data-learning-block]", generate: ".xp-dict-supplement-generate", section: "[data-supplement-category]",
   text: ".xp-dict-supplement-text", actions: ".xp-dict-usage-actions", feedback: ".xp-dict-usage-feedback",
-  errors: ".xp-dict-ai-status, .xp-dict-action-error", status: ".xp-dict-ai-status", stop: ".xp-dict-ai-stop"
+  errors: ".xp-dict-ai-status, .xp-dict-action-error", status: ".xp-dict-ai-status", progress: ".xp-dict-ai > .xp-dict-usage-feedback"
 });
 // Each product prompt's opening, so a message can be tied to its arm.
 const OPENINGS = Object.freeze({ entry: "Create a concise reusable dictionary entry", patterns: "Create one compact usage card",
@@ -511,7 +512,8 @@ async function runCase(page, word, arm, swallow = false) {
     const feedbackOf = () => arm === "entry" ? host.querySelector(sel.status) : button.closest(sel.actions)?.querySelector(sel.feedback);
     button.click();
     // Both click handlers show their busy state before their first await.
-    const started = r2State.actions > 0 || (arm === "entry" ? !host.querySelector(sel.stop)?.hidden : feedbackOf()?.dataset.state === "busy");
+    // The entry reports in the panel's progress line (plan 2.6), a supplement beside its button.
+    const started = r2State.actions > 0 || (arm === "entry" ? host.querySelector(sel.progress)?.dataset.state === "busy" : feedbackOf()?.dataset.state === "busy");
     if (!started) return { error: "click_ignored" };
     window.r2Refused = () => {
       const line = feedbackOf();

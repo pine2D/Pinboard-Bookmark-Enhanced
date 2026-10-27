@@ -21,7 +21,7 @@ export const RENDER_OPTIONS_TABS = Object.freeze([
 ]);
 export const RENDER_READER_CONTEXTS = Object.freeze([
   'reader-source-details', 'export-more', 'reader-bookmark-footer', 'reader-bookmark-editor', 'reader-bookmark-delete-confirm',
-  'explain-pop', 'explain-dict', 'dict-resize-menu', 'dict-entry-idle', 'dict-entry-busy', 'dict-entry-result', 'dict-entry-details',
+  'explain-pop', 'explain-dict', 'dict-resize-menu', 'dict-entry-idle', 'dict-entry-busy', 'dict-entry-progress', 'dict-entry-result', 'dict-entry-details',
   'dict-entry-usage-busy', 'dict-entry-usage-error', 'dict-entry-usage-result',
   'dict-entry-panel', 'dict-entry-cached', 'dict-entry-error', 'dict-entry-examples', 'dict-entry-negative', 'dict-entry-legacy', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
   'pb-hl-card', 'send-menu', 'confirm-popover', 'tr-ask',
@@ -40,7 +40,11 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('vocab-export-menu', [], { target: '.vocab-export-menu:popover-open' }),
     context('vocab-detail', [], { target: '#vocab-detail:not([hidden])' }),
     context('dict-entry-idle', [], { target: '.xp-dict-ai-generate:not([disabled])' }),
-    context('dict-entry-busy', ['dict-entry-idle'], { target: '.xp-dict-ai-stop:not([hidden])' }),
+    // The first entry generation reports in the panel's progress line with
+    // its own cancel (plan 2.6); progress then drives the stream phases and
+    // waits for the seconds waited.
+    context('dict-entry-busy', ['dict-entry-idle'], { target: '.xp-dict-ai > .xp-dict-usage-feedback[data-state="busy"] .xp-dict-usage-stop' }),
+    context('dict-entry-progress', ['dict-entry-busy'], { target: '.xp-dict-ai > .xp-dict-usage-feedback[data-state="busy"] .xp-dict-usage-elapsed:not([hidden])' }),
     context('dict-entry-result', ['dict-entry-busy'], { target: '.xp-dict-ai-content:not([hidden])' }),
     context('dict-entry-details', ['dict-entry-result'], { target: '.xp-dict-ai-details[data-supplement-id][open]' }),
     context('dict-entry-usage-busy', ['dict-entry-result'], { target: '.xp-dict-usage-feedback[data-state="busy"]' }),
@@ -69,7 +73,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('notes-batch-bar', ['notes-detail'], { target: '#notes-batch-toolbar.selecting' }),
   ],
   'md-preview': [context('reader', [], { target: '#rendered-view' }), ...RENDER_READER_CONTEXTS.map((name) => context(name,
-    name === 'explain-dict' ? ['explain-pop'] : name === 'dict-resize-menu' ? ['explain-dict'] : name === 'dict-entry-busy' ? ['dict-entry-idle'] : name === 'dict-entry-result' ? ['dict-entry-busy'] : ['dict-entry-details', 'dict-entry-cached', 'dict-entry-usage-busy', 'dict-entry-panel'].includes(name) ? ['dict-entry-result'] : name === 'dict-entry-usage-error' ? ['dict-entry-usage-busy'] : name === 'dict-entry-usage-result' ? ['dict-entry-usage-error'] : name === 'dict-entry-error' ? ['dict-entry-idle'] : [])), context('video', [], { target: '.pbv-bar' })],
+    name === 'explain-dict' ? ['explain-pop'] : name === 'dict-resize-menu' ? ['explain-dict'] : name === 'dict-entry-busy' ? ['dict-entry-idle'] : name === 'dict-entry-progress' ? ['dict-entry-busy'] : name === 'dict-entry-result' ? ['dict-entry-busy'] : ['dict-entry-details', 'dict-entry-cached', 'dict-entry-usage-busy', 'dict-entry-panel'].includes(name) ? ['dict-entry-result'] : name === 'dict-entry-usage-error' ? ['dict-entry-usage-busy'] : name === 'dict-entry-usage-result' ? ['dict-entry-usage-error'] : name === 'dict-entry-error' ? ['dict-entry-idle'] : [])), context('video', [], { target: '.pbv-bar' })],
   popup: [context('light', [], { target: '#main-section' }), context('states', [], { target: '.offline-queue-item' }),
     context('form', [], { target: '#url-input' }), context('dpi', [], { dpr: [1.5, 2] }),
     context('dark', [], { theme: 'flexoki-dark', scheme: 'dark', target: '#main-section' }),
