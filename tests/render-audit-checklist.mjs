@@ -668,6 +668,142 @@ export function evaluateMediaProbe(probe, check) {
   return failures;
 }
 
+// Dictionary lookup geometry (dict redesign plan 2026-10-27, batch 0.1; the
+// rulings are docs/research/dictionary-content-value-2026-10-25.md "复盘与重设计
+// 裁决": two left edges only, a lone sense stays indented, the source sentence
+// uses the body text colour and its translation the secondary colour, nothing
+// leaves the viewport). Hand-written like CHECKS: the selectors name the
+// lookup's text blocks as md-dict.js renders them today, never read back
+// from md-preview.css / library.css, so a stylesheet cannot redefine what it
+// is measured against. The runner (scripts/ui-render-audit.mjs,
+// probeDictLookupGeometry) only collects positions and colours inside the
+// listed sweep contexts; evaluateDictLookupGeometry below decides.
+//
+// Rows are keyed per (surface, context, check), not per element, so a fix
+// retires exactly one known-failures entry whatever the fixture renders.
+// `requires` lists the checks a context must actually measure something for:
+// an assertion that found no sense / example in a context that is supposed to
+// show one is a SETUP row (the fixture or the opener broke), never a pass.
+// Contexts:
+//   explain-dict        reader's dictionary view before any dictionary origin
+//                       is granted -- the connect state, so only overflow.
+//   dict-entry-idle     the dictionary result (fixture: one two-sense entry
+//                       and one single-sense entry) with the generate button.
+//   dict-entry-result   the AI entry (two senses with bilingual examples).
+//   dict-entry-details  the AI entry plus an opened etymology supplement.
+//   dict-entry-usage-result  a saved usage supplement whose items carry an
+//                       example sentence and its translation.
+// library has no explain popover; its dictionary result is dict-entry-idle.
+export const DICT_LOOKUP_GEOMETRY = {
+  edgeTolerancePx: 1,
+  maxLeftEdges: 2,
+  viewports: [320, 360],
+  blocks: [
+    { role: "sense", selector: "ol.xp-dict-senses > li" },
+    { role: "summary", selector: ".xp-dict-ai-details > summary" },
+    { role: "body", selector: ".xp-dict-supplement-text > p, .xp-dict-learning-item > p" },
+  ],
+  examples: [
+    { role: "original", selector: ".xp-dict-example:not(.xp-dict-example-translation)", token: "text" },
+    { role: "translation", selector: ".xp-dict-example-translation", token: "secondary" },
+  ],
+  surfaces: {
+    "md-preview": {
+      // .xp-dict is the lookup column; the whole popover (its foot holds the
+      // save-meaning dropdown) is what must stay inside the viewport.
+      root: "#explain-pop .xp-dict",
+      overflowRoot: "#explain-pop",
+      tokens: { text: "--fg", secondary: "--fg-secondary" },
+      contexts: {
+        "explain-dict": { requires: ["overflow"] },
+        "dict-entry-idle": { requires: ["edges", "senseIndent", "overflow"] },
+        "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow"] },
+        "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow"] },
+        "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow"] },
+      },
+    },
+    library: {
+      // library has no --lib-fg-secondary: --lib-fg-muted is its secondary text role.
+      root: "#vocab-ref-result",
+      overflowRoot: "#vocab-ref",
+      tokens: { text: "--lib-fg", secondary: "--lib-fg-muted" },
+      contexts: {
+        "dict-entry-idle": { requires: ["edges", "senseIndent", "overflow"] },
+        "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow"] },
+        "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow"] },
+        "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow"] },
+      },
+    },
+  },
+};
+
+// probe = { blocks: [{ role, left, path }], examples: [{ role, color, expected, path }],
+//           viewports: [{ width, rootVisible, offenders: [{ path, left, right }] }] }
+// where `left` is the inline start of the block's first line of text, in px
+// from the lookup column's content edge. Returns one row per check:
+// { check, status: "OK" | "FAIL" | "SETUP", actual, expected, note }.
+export function evaluateDictLookupGeometry(probe, { surface, context }) {
+  const spec = DICT_LOOKUP_GEOMETRY;
+  const contextSpec = spec.surfaces[surface]?.contexts?.[context];
+  if (!contextSpec) throw new Error(`no dictionary geometry spec for ${surface}/${context}`);
+  const tol = spec.edgeTolerancePx;
+  const rows = [];
+  const row = (check, ok, actual, expected, note) => rows.push({ check, status: ok ? "OK" : "FAIL", actual, expected, note: note || null });
+  const setup = (check, need) => rows.push({ check, status: "SETUP", setup: "dictFixture", actual: "nothing measured", expected: need,
+    note: `${surface}/${context} is expected to render ${need}; the fixture or the opener no longer does` });
+  const requires = new Set(contextSpec.requires);
+  const blocks = probe?.blocks || [];
+  const round = (v) => Math.round(v * 10) / 10;
+
+  // At most two distinct left edges (cluster within the tolerance). The
+  // column's own content edge always counts as one: the head row, labels and
+  // metadata start there, so a block set that never touches 0px (a title
+  // pushed 8px in, senses at 1.4em) is already three edges.
+  if (blocks.length) {
+    const points = [{ left: 0, role: "column" }, ...blocks].sort((a, b) => a.left - b.left);
+    const edges = [];
+    for (const p of points) {
+      const last = edges[edges.length - 1];
+      if (!last || p.left - last.from > tol) edges.push({ from: p.left, roles: new Set([p.role]) });
+      else last.roles.add(p.role);
+    }
+    const actual = edges.map((e) => `${round(e.from)}px(${[...e.roles].sort().join("+")})`).join(" ");
+    row("dictLeftEdges", edges.length <= spec.maxLeftEdges, actual, `<=${spec.maxLeftEdges} edges within ${tol}px`,
+      "inline start of senses, disclosure titles and supplement text, from the lookup column's content edge");
+  } else if (requires.has("edges")) setup("dictLeftEdges", "sense / summary / supplement text blocks");
+
+  // Every sense, a lone one included, sits on one indented edge.
+  const senses = blocks.filter((b) => b.role === "sense");
+  if (senses.length) {
+    const lefts = senses.map((b) => b.left);
+    const lo = Math.min(...lefts), hi = Math.max(...lefts);
+    const flat = senses.filter((b) => b.left <= tol);
+    row("dictSenseIndent", hi - lo <= tol && !flat.length, `${senses.length} sense(s) at ${[...new Set(lefts.map(round))].join("|")}px`,
+      `one edge, indented past 0px (±${tol}px)`, flat.length ? `not indented: ${flat.map((b) => b.path).join(", ")}` : null);
+  } else if (requires.has("senseIndent")) setup("dictSenseIndent", "dictionary or AI senses");
+
+  // Source sentence = body text colour; translation = secondary colour.
+  for (const { role } of spec.examples) {
+    const found = (probe?.examples || []).filter((e) => e.role === role);
+    const check = role === "original" ? "dictExampleColor" : "dictTranslationColor";
+    if (!found.length) { if (requires.has(role)) setup(check, `${role} example sentences`); continue; }
+    const wrong = found.filter((e) => e.color !== e.expected);
+    row(check, !wrong.length, wrong.length ? `${wrong.length}/${found.length} ${wrong[0].color} at ${wrong[0].path}` : `${found.length} ok`,
+      `${spec.surfaces[surface].tokens[spec.examples.find((e) => e.role === role).token]} = ${found[0].expected}`);
+  }
+
+  // Nothing inside the lookup leaves the viewport at the narrow widths.
+  for (const width of spec.viewports) {
+    const view = (probe?.viewports || []).find((v) => v.width === width);
+    const check = `dictViewport${width}`;
+    if (!view || !view.rootVisible) { if (requires.has("overflow")) setup(check, `a visible ${spec.surfaces[surface].overflowRoot} at ${width}px`); continue; }
+    const off = view.offenders || [];
+    row(check, !off.length, off.length ? `${off.length} element(s) outside, e.g. ${off.slice(0, 3).map((o) => `${o.path} [${round(o.left)}, ${round(o.right)}]`).join("; ")}` : `inside (${spec.surfaces[surface].overflowRoot} at [${round(view.rootLeft)}, ${round(view.rootRight)}] of ${view.viewport}px)`,
+      `every visible descendant within [0, ${width}]px`);
+  }
+  return rows;
+}
+
 // Selectors below are written against the CURRENT shipped markup (pre-Task
 // 9/10 uplift). Task 9/10/12/13 migrate one selector's underlying CSS at a
 // time and delete the matching known-failures key as they land -- this file

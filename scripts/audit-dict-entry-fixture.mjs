@@ -17,7 +17,13 @@ export async function installDictEntryFixture(page) {
         pronunciations: [], forms: [], synonyms: [], antonyms: [], senses: [
           { definition: 'An original dictionary definition. Its wording remains available when you switch sources.', tags: [], examples: [], quotes: [], synonyms: [], antonyms: [], subsenses: [] },
           { definition: 'Another common meaning from the original dictionary.', tags: [], examples: [], quotes: [], synonyms: [], antonyms: [], subsenses: [] }
-        ] }], source: { url: 'https://en.wiktionary.org/wiki/fixture', license: { name: 'CC BY-SA 4.0', url: 'https://creativecommons.org/licenses/by-sa/4.0/' } }
+        ] },
+        // A one-sense entry: the lone-sense list is its own layout case
+        // (render-audit DICT_LOOKUP_GEOMETRY: a lone sense stays indented).
+        { language: { code: lang, name: 'English' }, partOfSpeech: 'verb',
+          pronunciations: [], forms: [], synonyms: [], antonyms: [], senses: [
+            { definition: 'The only verb sense in the original dictionary.', tags: [], examples: [], quotes: [], synonyms: [], antonyms: [], subsenses: [] }
+          ] }], source: { url: 'https://en.wiktionary.org/wiki/fixture', license: { name: 'CC BY-SA 4.0', url: 'https://creativecommons.org/licenses/by-sa/4.0/' } }
     } });
     ensureAIHostPermissionWithGesture = async () => true;
     requestAIHostPermissions = async () => true;

@@ -51,7 +51,7 @@ icons/  _locales/（9 locale）  vendor/（Defuddle，由 update-vendor.sh 同�
 README*.md ×9 / privacy-policy.md / LICENSE
 tests/                       # file:// 直开的 HTML 测试页 40+ 套（不入 release ZIP）
                              # + render-audit-checklist.mjs（手写渲染 oracle，禁止从配方源生成）
-                             # + render-audit-known-failures.json（迁移期基线，当前为空）+ render-audit-spacing-baseline.json（spacingScale 只减不增账本）+ ui-contract-tests.mjs
+                             # + render-audit-known-failures.json（迁移期基线；查词重设计批 0 登记查词几何门的已知失败及 74a343bf 起的三条 library 既有失败，批 0 收尾回到空；登记项一旦通过即报 RESOLVED 失败）+ render-audit-spacing-baseline.json（spacingScale 只减不增账本）+ ui-contract-tests.mjs
 scripts/                     # 发布链：bump-version.sh / release.sh / zip-install-smoke.mjs
                              # 质量门：verify.sh（门的权威清单以其自身的阶段 echo 为准）/ pre-commit-hook.sh / commit-msg-hook.sh / ui-consumer-lint.mjs（编辑期）
                              # 工具：setup-hooks.sh / update-vendor.sh / sync-runtime.sh / qa-drive.mjs / perf 与截图辅助若干

@@ -70,7 +70,7 @@ export const STATIC_SCENARIOS = [
 ];
 export function getAuditCatalog() {
   const inputs = {
-    render: ['scripts/ui-render-audit.mjs', 'scripts/audit-render-scenarios.mjs', 'tests/render-audit-checklist.mjs'],
+    render: ['scripts/ui-render-audit.mjs', 'scripts/audit-render-scenarios.mjs', 'scripts/render-audit-ledger.mjs', 'tests/render-audit-checklist.mjs', 'tests/render-audit-known-failures.json'],
     qa: ['scripts/qa-drive.mjs', 'scripts/audit-qa-scenarios.mjs'],
     site: ['tests/pinboard-theme-render-tests.mjs', 'scripts/audit-site-scenarios.mjs'],
     help: ['scripts/options-help-render-audit.mjs', 'scripts/audit-help-scenarios.mjs'],

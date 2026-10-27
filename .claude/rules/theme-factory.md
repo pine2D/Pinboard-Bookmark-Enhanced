@@ -41,7 +41,7 @@ Pre-commit 有两组触发。主题组使用**同一组触发条件**（theme-su
 
 **verify.sh [theme] 段**还执行 `tests/theme-contract-tests.mjs`、`tests/theme-tooling-tests.mjs`、`tests/theme-css-syntax-tests.mjs`、`tests/theme-ui-derive-tests.mjs`、`tests/theme-override-debt-tests.mjs` 与 `tests/theme-sync-check-tests.mjs`；最后一项同时快照内容与 mtime，证明 `--check` 全程零写入。
 
-**verify.sh [render-audit] 段**：`scripts/ui-render-audit.mjs` 用 playwright 装未打包扩展，逐主题量 `getComputedStyle` 与几何；断言清单来自**手写**的 `tests/render-audit-checklist.mjs`——**禁止从配方源生成**（同源会让「组件漏注册」类缺陷在生成器与审计器两侧同时消失）。`render-audit-known-failures.json` 是迁移期基线，**当前为空**（命中区债战役已清零，2026-08）。`hitAreaMin` 族不手工枚举选择器，由 runner 的 sweepProbe（family 4）类扫描全部无文字子节点的 `<button>`，一次通过覆盖全部主题。
+**verify.sh [render-audit] 段**：`scripts/ui-render-audit.mjs` 用 playwright 装未打包扩展，逐主题量 `getComputedStyle` 与几何；断言清单来自**手写**的 `tests/render-audit-checklist.mjs`——**禁止从配方源生成**（同源会让「组件漏注册」类缺陷在生成器与审计器两侧同时消失）。`render-audit-known-failures.json` 是迁移期基线（命中区债战役 2026-08 已清零；查词重设计批 0 先立门，登记阅读器与 library 查词几何的已知失败，另有 74a343bf 引入的 library `noPageScroll` / `hangOrder` 三条既有失败，批 0 收尾回到空）。登记项在本次运行中被实测且通过即报 RESOLVED 并失败（分片与局部运行同样生效，`scripts/render-audit-ledger.mjs`），修复提交必须同时删掉对应登记；查词几何断言见 checklist 的 `DICT_LOOKUP_GEOMETRY`。`hitAreaMin` 族不手工枚举选择器，由 runner 的 sweepProbe（family 4）类扫描全部无文字子节点的 `<button>`，一次通过覆盖全部主题。
 
 ### 开发时按场景选择审计
 

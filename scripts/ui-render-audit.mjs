@@ -63,8 +63,10 @@
 // EXIT
 //   0 → pass (all failures already in known-failures and no SETUP row), or
 //       --update-known-failures rewrote the ledger
-//   1 → at least one NEW violation not covered by known-failures (wins over 2
-//       when a run has both)
+//   1 → at least one NEW violation not covered by known-failures, or a
+//       registered known failure whose row was measured and now passes (it
+//       must leave the ledger with its fix; scripts/render-audit-ledger.mjs)
+//       -- wins over 2 when a run has both
 //   2 → tooling/env error (no playwright, no display, seed failed, bad JSON,
 //       etc.), OR at least one per-row harness precondition failed: a SETUP
 //       row (the real pointer's hover or rest state did not hold through the
@@ -95,6 +97,8 @@ import {
   MEDIA_SCENARIOS,
   MEDIA_THEMES,
   evaluateMediaProbe,
+  DICT_LOOKUP_GEOMETRY,
+  evaluateDictLookupGeometry,
 } from "../tests/render-audit-checklist.mjs";
 // Reused, not re-implemented, so this audit and contrast-audit.mjs's static
 // CSS-source audit can never quietly disagree on what a passing ratio is.
@@ -105,6 +109,7 @@ import { CHIP_TARGETS } from "../docs/theme-surface/composers/ui-components.mjs"
 // Options density per theme, from the pilots (docs/theme-surface/tools/options-density.mjs).
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
 import { installDictEntryFixture, openDictEntryState } from "./audit-dict-entry-fixture.mjs";
+import { ledgerKey, reconcileKnownFailures } from "./render-audit-ledger.mjs";
 import { installAskHistoryFixture, openAskHistoryState } from "./audit-ask-history-fixture.mjs";
 import { openVocabPackPreview, installVocabPackFixture } from "./audit-vocab-pack-fixture.mjs";
 // Family 14's fill-separation floor (spec 2026-09-30-ui-fields-stage4-design
@@ -6213,7 +6218,12 @@ const VALUE_BOX_LEGS = Object.freeze({
           await page.evaluate(() => document.activeElement?.blur?.());
           await page.mouse.move(0, 0);
           await settleAnimations(page);
-          return null;
+          // The record outlives this page (IndexedDB): left in place, the next
+          // theme's opened seed word renders it at once instead of its idle
+          // look-up button, and the library default rows lose their target.
+          return async () => {
+            await page.evaluate((term) => pbpAiCacheDelete(pbpDictQueryCacheKey("en", term)), LIB_SEED.richTerm);
+          };
         },
       },
       {
@@ -6282,6 +6292,10 @@ const VALUE_BOX_LEGS = Object.freeze({
           });
           await page.locator(".xp-dict-supplement > summary").click();
           await page.waitForSelector("#dict-supplement-kind-btn", { state: "visible", timeout: TIMEOUT_MS });
+          // Since 6a51a1b1 the topic field shows inline only for the scenarios
+          // category (the others fold it into a closed scope disclosure); pick
+          // it through the hidden select, as the dict-entry-usage-scope opener does.
+          await page.locator(".xp-dict-supplement-kind").selectOption("scenarios", { force: true });
           await page.waitForSelector("input.xp-dict-supplement-topic", { state: "visible", timeout: TIMEOUT_MS });
           await page.evaluate(() => document.activeElement?.blur?.());
           await page.mouse.move(0, 0);
@@ -8869,6 +8883,125 @@ async function runFamilySweep(page) {
   return page.evaluate(sweepProbe, SWEEP_CFG);
 }
 
+// ---- Dictionary lookup geometry (tests/render-audit-checklist.mjs
+// DICT_LOOKUP_GEOMETRY, plan 2026-10-27 batch 0.1). The two page functions
+// below only COLLECT: each block's first-line inline start, each example's
+// colour beside its token resolved in place, and the elements outside the
+// viewport at the narrow widths. evaluateDictLookupGeometry in the checklist
+// decides; its rows join `results` as ordinary OK / FAIL / SETUP rows, so
+// they go through known-failures like every hand-written check -- and,
+// unlike the FAIL-only sweep families, an OK row is what lets report() see a
+// registered failure that no longer reproduces.
+const dictLookupRows = [];
+// Page-side (serialized by Playwright): self-contained, no outer references.
+function probeDictLookupGeometry(cfg) {
+  const visible = (el) => !!el && el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) && el.getClientRects().length > 0;
+  const pathOf = (el) => {
+    const parts = [];
+    for (let n = el; n && n !== document.body && parts.length < 4; n = n.parentElement) {
+      const cls = typeof n.className === "string" ? n.className.trim().split(/\s+/).filter(Boolean).join(".") : "";
+      parts.unshift(n.id ? "#" + n.id : n.tagName.toLowerCase() + (cls ? "." + cls : ""));
+      if (n.id) break;
+    }
+    return parts.join(" > ");
+  };
+  const out = { blocks: [], examples: [] };
+  const root = document.querySelector(cfg.root);
+  if (!visible(root)) return out;
+  const rect = root.getBoundingClientRect();
+  const cs = getComputedStyle(root);
+  const startX = rect.left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft);
+  const endX = rect.right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight);
+  for (const { role, selector } of cfg.blocks) {
+    for (const el of root.querySelectorAll(selector)) {
+      if (!visible(el)) continue;
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+        acceptNode: (n) => (/\S/.test(n.data) && visible(n.parentElement) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP),
+      });
+      const text = walker.nextNode();
+      if (!text) continue;
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      const first = [...range.getClientRects()].find((r) => r.width > 0);
+      if (!first) continue;
+      const rtl = getComputedStyle(el).direction === "rtl";
+      out.blocks.push({ role, left: rtl ? endX - first.right : first.left - startX, path: pathOf(el) });
+    }
+  }
+  for (const { role, selector, token } of cfg.examples) {
+    for (const el of root.querySelectorAll(selector)) {
+      if (!visible(el)) continue;
+      // Resolve the token in the element's own cascade (light-dark() follows
+      // its color-scheme), then compare computed colour strings.
+      const probe = document.createElement("span");
+      probe.style.color = `var(${cfg.tokens[token]})`;
+      el.appendChild(probe);
+      const expected = getComputedStyle(probe).color;
+      probe.remove();
+      out.examples.push({ role, color: getComputedStyle(el).color, expected, path: pathOf(el) });
+    }
+  }
+  return out;
+}
+function probeDictLookupOverflow(rootSel) {
+  const visible = (el) => !!el && el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) && el.getClientRects().length > 0;
+  const pathOf = (el) => {
+    const parts = [];
+    for (let n = el; n && n !== document.body && parts.length < 4; n = n.parentElement) {
+      const cls = typeof n.className === "string" ? n.className.trim().split(/\s+/).filter(Boolean).join(".") : "";
+      parts.unshift(n.id ? "#" + n.id : n.tagName.toLowerCase() + (cls ? "." + cls : ""));
+      if (n.id) break;
+    }
+    return parts.join(" > ");
+  };
+  const root = document.querySelector(rootSel);
+  if (!visible(root)) return { rootVisible: false, offenders: [] };
+  const viewport = document.documentElement.clientWidth;
+  const offenders = [];
+  const seen = new Set();
+  for (const el of [root, ...root.querySelectorAll("*")]) {
+    if (!visible(el)) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width <= 0 && r.height <= 0) continue;
+    if (r.right <= viewport + 0.5 && r.left >= -0.5) continue;
+    const path = pathOf(el);
+    if (seen.has(path)) continue;
+    seen.add(path);
+    offenders.push({ path, left: r.left, right: r.right });
+  }
+  const box = root.getBoundingClientRect();
+  return { rootVisible: true, viewport, rootLeft: box.left, rootRight: box.right, offenders };
+}
+async function measureDictLookupGeometry(page, surface, context, theme) {
+  const spec = DICT_LOOKUP_GEOMETRY.surfaces[surface];
+  if (!spec?.contexts[context]) return;
+  const probe = await page.evaluate(probeDictLookupGeometry, {
+    root: spec.root, blocks: DICT_LOOKUP_GEOMETRY.blocks, examples: DICT_LOOKUP_GEOMETRY.examples, tokens: spec.tokens,
+  });
+  probe.viewports = [];
+  const restore = page.viewportSize();
+  // Below 860px library shows one pane; the lookup lives in the detail one.
+  const wasNarrow = surface === "library"
+    ? await page.evaluate(() => { const was = document.body.classList.contains("lib-narrow-detail"); document.body.classList.add("lib-narrow-detail"); return was; })
+    : null;
+  try {
+    for (const width of DICT_LOOKUP_GEOMETRY.viewports) {
+      await page.setViewportSize({ width, height: restore ? restore.height : 900 });
+      await page.waitForTimeout(250);
+      await settleAnimations(page);
+      probe.viewports.push({ width, ...(await page.evaluate(probeDictLookupOverflow, spec.overflowRoot)) });
+    }
+  } finally {
+    if (restore) await page.setViewportSize(restore);
+    if (surface === "library" && !wasNarrow) await page.evaluate(() => document.body.classList.remove("lib-narrow-detail"));
+    await page.waitForTimeout(250);
+    await settleAnimations(page);
+  }
+  for (const row of evaluateDictLookupGeometry(probe, { surface, context })) {
+    dictLookupRows.push({ surface, theme, selector: spec.root, state: context, ...row });
+  }
+}
+
 async function runSweep(page, sw, extBase) {
   const hits = [];
   const contexts = Object.fromEntries(Object.keys(RENDER_SWEEP_CONTEXTS).map((surface) => [surface, new Set(selectedSweep(surface))]));
@@ -8888,6 +9021,7 @@ async function runSweep(page, sw, extBase) {
       return true;
     }, async () => {
       add(await runFamilySweep(page), surface, name);
+      if (!SWEEP && !WRITE_SPACING) await measureDictLookupGeometry(page, surface, name, surface === "md-preview" && readerScheme === "dark" ? "dark" : "");
     });
   };
   if (Object.values(contexts).some(names => [...names].some(name => /^dict-entry-/.test(name)))) {
@@ -9401,7 +9535,7 @@ function reportSweep(hits) {
   process.exit(0);
 }
 
-function keyOf(r) { return `${r.surface}|${r.theme}|${r.selector}|${r.state}|${r.check}`; }
+const keyOf = ledgerKey;
 
 function report(results) {
   const fails = results.filter((r) => r.status === "FAIL");
@@ -9456,30 +9590,13 @@ function report(results) {
     }
   }
 
-  const violations = [];
-  const warnings = [];
-  for (const r of fails) {
-    if (Object.prototype.hasOwnProperty.call(known, keyOf(r))) warnings.push(r);
-    else violations.push(r);
-  }
-  const seenKeys = new Set(fails.map(keyOf));
-  // A shard ran a SLICE of THEMES, so its seenKeys cannot answer "which
-  // known-failure keys no longer reproduce" -- every key belonging to another
-  // shard's theme would be reported STALE. That reconciliation is advisory
-  // (a console.log, never an exit code), so a shard declines to guess rather
-  // than the whole gate growing a cross-process seenKeys merge protocol; a
-  // full run (no --shard: verify.sh's single-shard path and every manual
-  // invocation) still does it exactly as before.
-  //
-  // A key whose row came back SETUP this run was never measured, so its
-  // absence from seenKeys says nothing (round 2, gates/F3): every known key
-  // under a SETUP row's surface|theme|selector|state| prefix is held out of
-  // STALE -- a checklist SETUP row renames its check (hoverApplied /
-  // hoverUnfocused), so the prefix, not the full key, is what matches the
-  // ledger's bgEqVar / borderSidesEqVar / ... entries for that row.
-  const setupPrefixes = [...new Set(setupRows.map((r) => `${r.surface}|${r.theme}|${r.selector}|${r.state}|`))];
-  const unmeasuredKnown = Object.keys(known).filter((k) => !seenKeys.has(k) && setupPrefixes.some((p) => k.startsWith(p)));
-  const stale = SHARD || audit.partial ? [] : Object.keys(known).filter((k) => !seenKeys.has(k) && !unmeasuredKnown.includes(k));
+  // A shard ran a SLICE of THEMES and a scoped run a slice of scenarios, so
+  // neither can say which registered keys no longer reproduce at all (every
+  // key of another shard's theme would look stale) -- that advisory STALE
+  // list is a whole-matrix verdict. A key this run measured and passed is
+  // exact in any slice, and fails the gate: see scripts/render-audit-ledger.mjs.
+  const { warnings, violations, resolved, stale, unmeasuredKnown } =
+    reconcileKnownFailures(results, known, { sliced: !!(SHARD || audit.partial) });
 
   console.log(`[render-audit] ${okCount} OK, ${skipCount} SKIP, ${warnings.length} WARN (known), ${violations.length} FAIL (new), ${setupRows.length} SETUP (harness)${SHARD_TAG}`);
   if (skipCount) console.log(`[render-audit] SKIP = disabled controls exempted from contrast checks (WCAG 1.4.3), not a failure`);
@@ -9499,11 +9616,15 @@ function report(results) {
     for (const k of stale) console.log(`  STALE  ${k}`);
   }
   printSetup();
+  if (resolved.length) {
+    console.log(`[render-audit] === FAIL -- ${resolved.length} registered known failure(s) now pass; delete them from ${KNOWN_FAILURES_PATH} in the commit that fixed them ===`);
+    for (const k of resolved) console.log(`  RESOLVED  ${k}`);
+  }
   if (violations.length) {
     console.log(`[render-audit] === FAIL -- ${violations.length} new violation(s) not covered by known-failures ===`);
     for (const r of violations) console.log(`  FAIL  ${keyOf(r)}  actual=${r.actual}  expected=${r.expected}${r.note ? "  (" + r.note + ")" : ""}${harnessOf(r)}`);
-    process.exit(1);
   }
+  if (violations.length || resolved.length) process.exit(1);
   if (setupRows.length) process.exit(2);
   console.log("[render-audit] === PASS ===");
   process.exit(0);
@@ -9966,6 +10087,9 @@ async function main() {
     // pay the sweep N times and report each hit N times. The other shards
     // get an empty hit list, so all six family loops below are no-ops there.
     const sweepHits = RUNS_SWEEP && audit.selected.some((row) => row.type === "sweep") ? await runSweep(page, sw, extBase) : [];
+    // Dictionary lookup geometry rows (OK / FAIL / SETUP), collected by the
+    // sweep's dict contexts -- see measureDictLookupGeometry.
+    results.push(...dictLookupRows);
     const hitAreaHits = sweepHits.filter((h) => h.kind === "hitAreaMin");
     for (const h of hitAreaHits) {
       results.push({
