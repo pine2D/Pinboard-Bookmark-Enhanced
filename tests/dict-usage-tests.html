@@ -1,7 +1,7 @@
 <!doctype html><meta charset="utf-8"><title>Dictionary archive and usage flow</title>
 <div id="results"></div><div id="summary"></div>
 <script>
-let owner='acct_test',live=true,records=null,calls=[],saved=[],appended=[],sourceCalls=[],sourceResult=null,
+let owner='acct_test',live=true,records=null,calls=[],saved=[],appended=[],sourceCalls=[],
   syncResult={ok:true,connected:false},onSync=null,onAI=null,onRead=null,onEvidence=null,
   saveFailure=false,appendFailure=false,permission=true,sourceFailure='',usageAnswer='',etymologySources=[];
 const MODEL={word:'faraway',language:'en',pronunciation:'',meanings:[{partOfSpeech:'形容词',definition:'遥远的，距离很远的。',examples:[]}],etymology:'由 far 和 away 组成。',relatedWords:[],learning:{version:2,formation:'由 far 和 away 组成。',history:'',related:[]}};
@@ -23,17 +23,16 @@ async function pbpDictArchiveSave(input){if(saveFailure)throw new Error('write f
 async function pbpDictArchiveAppend(input){if(appendFailure)throw new Error('write failed');appended.push({...input});const row={...input,id:appended.length.toString(16).padStart(64,'0'),archiveSaved:true};records.supplements.push(row);return row;}
 async function callAI(settings,prompt,options){if(options.requireComplete!==true)throw new Error('Dictionary requests must require a complete response');await options.beforeRequest();calls.push({settings,prompt,options});if(onAI)await onAI();return prompt.includes('language-learning supplement')||prompt.includes('usage card')?usageAnswer:JSON.stringify(MODEL);}
 function hasAIKey(){return true;}
-async function pbpDictEvidenceFetch(input){await input.beforeRequest();if(input.kind==='etymology'){if(!permission)throw Object.assign(new Error('Missing fixture grant'),{code:'host_permission'});sourceCalls.push(input);if(onEvidence)await onEvidence(input);await input.beforeRequest();
-  if(sourceFailure)throw Object.assign(new Error('Fixture source failure'),{code:sourceFailure});return structuredClone(etymologySources);}
-  if(!permission)throw Object.assign(new Error('Missing fixture grant'),{code:'host_permission'});
-  if(!pbpDictSupplementOrigin(input.kind,input.sourceLanguage))throw Object.assign(new Error('Unsupported source language'),{code:'no_sources'});
-  sourceCalls.push(input);if(onEvidence)await onEvidence(input);
-  if(sourceFailure)throw Object.assign(new Error('Fixture source failure'),{code:sourceFailure});
-  return structuredClone(sourceResult);
+// Only etymology retrieves evidence for a paid supplement (1C.3): the
+// literature and culture readers are gone, so any other kind is a failure.
+async function pbpDictEvidenceFetch(input){
+  if(input.kind!=='etymology'){sourceCalls.push(input);throw new Error('Only etymology retrieves supplement evidence');}
+  await input.beforeRequest();if(!permission)throw Object.assign(new Error('Missing fixture grant'),{code:'host_permission'});sourceCalls.push(input);if(onEvidence)await onEvidence(input);await input.beforeRequest();
+  if(sourceFailure)throw Object.assign(new Error('Fixture source failure'),{code:sourceFailure});return structuredClone(etymologySources);
 }
 </script><script src="../dict-entry.js"></script><script>
 let pass=0,fail=0;
-function reset(){owner='acct_test';live=true;records=null;calls=[];saved=[];appended=[];sourceCalls=[];sourceResult=[structuredClone(SOURCE)];syncResult={ok:true,connected:false};onSync=null;onAI=null;onRead=null;onEvidence=null;saveFailure=false;appendFailure=false;permission=true;sourceFailure='';usageAnswer=JSON.stringify(USAGE);etymologySources=[];}
+function reset(){owner='acct_test';live=true;records=null;calls=[];saved=[];appended=[];sourceCalls=[];syncResult={ok:true,connected:false};onSync=null;onAI=null;onRead=null;onEvidence=null;saveFailure=false;appendFailure=false;permission=true;sourceFailure='';usageAnswer=JSON.stringify(USAGE);etymologySources=[];}
 function request(extra={}){return {term:'faraway',sourceLanguage:'en',target:{name:'Chinese',lang:'zh-Hans'},owner:'acct_test',isCurrent:()=>live,signal:new AbortController().signal,settings:{aiProvider:'gemini',geminiModel:'new-model'},...extra};}
 function existing(){records=structuredClone(ORIGINAL);}
 function usageResponse(change){const value=structuredClone(USAGE);change(value);usageAnswer=JSON.stringify(value);}
@@ -82,6 +81,36 @@ await test('an old collocations record saved with topic "work" stays in the arch
   const read=await rejects(()=>pbpDictSupplementRun(request({category:'collocations'})),'invalid_request');
   const refused=await rejects(()=>pbpDictSupplementRun(request({category:'collocations',updateId:priorId})),'invalid_request');
   return read&&refused&&calls.length===0&&appended.length===0&&records.supplements.length===1&&records.supplements[0].profile.topic==='work';
+});
+// 1C.3: literature and culture generation and their retrieval are gone. Old
+// paid records -- a literature quotation with its AI translation, a culture
+// explanation citing Wikipedia -- are read from the archive as they were saved,
+// without retrieval or a model call, and are never generated or updated again.
+const OLD_LITERATURE={id:'d'.repeat(64),archiveId:'a'.repeat(64),category:'literature',profile:{nativeLanguage:'',level:'',topic:''},content:'',
+  sources:[structuredClone(SOURCE)],provider:'old-provider',model:'old-model',generatedAt:100,archiveSaved:true,
+  learning:{version:2,language:{name:'Chinese',lang:'zh-Hans'},summary:'',replacesId:'',items:[{sense:1,title:'faraway things',
+    explanation:'诗人用它表达对远方事物的渴望。',example:SOURCE.excerpt,translation:'我心神不宁，渴望遥远的事物。',sourceIndex:0}]}};
+const OLD_CULTURE={id:'e'.repeat(64),archiveId:'a'.repeat(64),category:'culture',profile:{nativeLanguage:'',level:'',topic:''},content:'',
+  sources:[{title:'Faraway',url:'https://en.wikipedia.org/w/index.php?oldid=601',excerpt:'Faraway is used in this community for a distant ideal.',author:'',work:'Faraway',
+    location:'¶ 1',language:'en',genre:'culture',revision:'601',retrievedAt:1700000000000}],provider:'old-provider',model:'old-model',generatedAt:100,archiveSaved:true,
+  learning:{version:2,language:{name:'Chinese',lang:'zh-Hans'},summary:'',replacesId:'',items:[{sense:1,title:'a distant ideal',
+    explanation:'在该社群中指遥不可及的理想。',example:'',translation:'',sourceIndex:0}]}};
+await test('an old literature record with its AI translation and an old culture record stay readable without retrieval or a model call',async()=>{
+  existing();records.supplements=[structuredClone(OLD_LITERATURE),structuredClone(OLD_CULTURE)];
+  const r=await pbpDictEntryRun(request());
+  const literature=r.supplements.find(s=>s.category==='literature'),culture=r.supplements.find(s=>s.category==='culture');
+  return calls.length===0&&sourceCalls.length===0&&appended.length===0&&
+    literature?.learning.items[0].example===SOURCE.excerpt&&literature.learning.items[0].translation==='我心神不宁，渴望遥远的事物。'&&literature.sources[0].url===SOURCE.url&&
+    culture?.learning.items[0].explanation==='在该社群中指遥不可及的理想。'&&culture.sources[0].url.startsWith('https://en.wikipedia.org/');
+});
+await test('old literature and culture records are never regenerated or updated, and their archive rows stay untouched',async()=>{
+  for(const old of [OLD_LITERATURE,OLD_CULTURE]){
+    reset();existing();records.supplements=[structuredClone(old)];const before=JSON.stringify(records.supplements);
+    if(!await rejects(()=>pbpDictSupplementRun(request({category:old.category})),'invalid_request'))return false;
+    if(!await rejects(()=>pbpDictSupplementRun(request({category:old.category,updateId:old.id})),'invalid_request'))return false;
+    if(calls.length||sourceCalls.length||appended.length||JSON.stringify(records.supplements)!==before)return false;
+  }
+  return true;
 });
 await test('confusables use original examples with no external lookup',async()=>{existing();const r=await pbpDictSupplementRun(request({category:'confusables'}));return r.archiveSaved&&sourceCalls.length===0&&calls.length===1;});
 await test('etymology progress follows retrieval, generation, checking and saving without persisting callbacks',async()=>{

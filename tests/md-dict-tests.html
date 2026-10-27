@@ -2302,6 +2302,33 @@ async function runDictionaryEntryUiTests() {
     const legacyUsage=mount();await legacyUsage.ui.ready;
     check("an old collocations record saved with topic \"work\" is still read and its heading shows \"· work\" and the old-category label",legacyUsage.host.querySelector('[data-supplement-id] > summary').textContent==='dictSupplementCollocations · work · dictSupplementLegacyCategory'&&legacyUsage.host.textContent.includes('Earlier paid guidance'));
     check("an old paid record saved with a topic offers no update and leaves every current button in place",!legacyUsage.host.querySelector('.xp-dict-update-supplement')&&['patterns','confusables','etymology'].every(category=>paid(legacyUsage.host,category)?.checkVisibility()));
+    // 1C.3: structured old literature (a source quotation with its AI
+    // translation) and culture (a Wikipedia-cited explanation) records render
+    // from the record alone, with the old-category label and no update.
+    const oldStructured={
+      literature:{id:'6'.repeat(64),archiveId:'a'.repeat(64),category:'literature',profile:{nativeLanguage:'',level:'',topic:''},content:'',
+        sources:[{title:'Märchen/Kapitel 3',url:'https://de.wikisource.org/w/index.php?oldid=4242',excerpt:'Das Gift stand im Schrank.',author:'Fixture Autor',work:'Märchen',location:'Kapitel 3 · ¶ 2',language:'de',genre:'novel',revision:'4242',retrievedAt:1700000000000}],
+        provider:'fixture',model:'fixture-model',generatedAt:1700000000000,archiveSaved:true,
+        learning:{version:2,language:{name:'Spanish',lang:'es'},summary:'',replacesId:'',items:[{sense:1,title:'Gift im Schrank',explanation:'Uso literario del sustantivo.',example:'Das Gift stand im Schrank.',translation:'El veneno estaba en el armario.',sourceIndex:0}]}},
+      culture:{id:'7'.repeat(64),archiveId:'a'.repeat(64),category:'culture',profile:{nativeLanguage:'',level:'',topic:''},content:'',
+        sources:[{title:'Gift',url:'https://de.wikipedia.org/w/index.php?oldid=5151',excerpt:'Gift wird in dieser Gemeinschaft als Ausdruck verwendet.',author:'',work:'Gift',location:'¶ 1',language:'de',genre:'culture',revision:'5151',retrievedAt:1700000000000}],
+        provider:'fixture',model:'fixture-model',generatedAt:1700000000000,archiveSaved:true,
+        learning:{version:2,language:{name:'Spanish',lang:'es'},summary:'',replacesId:'',items:[{sense:1,title:'Gift como expresión',explanation:'Expresión documentada en una comunidad.',example:'',translation:'',sourceIndex:0}]}}
+    };
+    for(const [category,old] of Object.entries(oldStructured)){
+      window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[old]});
+      const oldUi=mount();await oldUi.ui.ready;
+      const section=oldUi.host.querySelector('[data-supplement-id="'+old.id+'"]');
+      const link=section?.querySelector('.xp-dict-learning-item a');
+      const shown=category==='literature'
+        ?section?.querySelector('.xp-dict-example')?.textContent==='Das Gift stand im Schrank.'&&section.querySelector('.xp-dict-example-translation')?.textContent==='El veneno estaba en el armario.'&&link?.textContent==='Fixture Autor · Märchen · Kapitel 3 · ¶ 2'
+        :!section?.querySelector('.xp-dict-example')&&section?.textContent.includes('Expresión documentada en una comunidad.')&&link?.textContent==='Gift · ¶ 1';
+      check("an old structured "+category+" record renders its saved content and source link with the old-category label and no update",
+        !!shown&&link.href===old.sources[0].url&&link.parentElement.textContent.includes('dictSupplementSourceVerified')&&
+        section.querySelector(':scope > summary').textContent==='dictSupplement'+category[0].toUpperCase()+category.slice(1)+' · dictSupplementLegacyCategory'&&
+        !section.closest('[data-learning-block]')&&!oldUi.host.querySelector('.xp-dict-update-supplement'));
+      oldUi.ctrl.abort();
+    }
     for(const category of ['patterns','confusables','etymology']){
       const current={id:'4'.repeat(64),category,profile:{nativeLanguage:'',level:'',topic:''},content:'Current paid guidance',sources:[],provider:'fixture',model:'fixture-model',generatedAt:1700000000000,archiveSaved:true};
       window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[current]});

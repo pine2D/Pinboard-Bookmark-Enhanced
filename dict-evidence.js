@@ -12,30 +12,20 @@ const PBP_DICT_EVIDENCE_LANGUAGES = Object.freeze({
   ja: { name: /^日本語$/, etymology: /^語源(?:\s*\d+)?$/, chapter: "第" },
   ko: { name: /^한국어$/, etymology: /^어원(?:\s*\d+)?$/, chapter: "장" }
 });
-// Refine by the queried language, never by UI language or a particular word.
-// General search remains a fallback: not all cultural uses are internet slang.
-const PBP_DICT_CULTURE_SEARCH = Object.freeze({
-  en: 'slang OR meme OR "internet culture"',
-  zh: '俚语 OR 俚語 OR 网络用语 OR 網路用語 OR 迷因',
-  es: 'jerga OR meme OR "cultura de internet"',
-  de: 'Slang OR Meme OR Netzkultur',
-  fr: 'argot OR mème OR "culture Internet"',
-  it: 'gergo OR meme OR "cultura di Internet"',
-  pt: 'gíria OR meme OR "cultura da internet"',
-  ru: 'сленг OR мем OR "интернет-культура"',
-  ja: 'スラング OR ネット用語 OR ミーム',
-  ko: '은어 OR 신조어 OR "인터넷 밈"'
-});
 function _pbpDictEvidenceError(code) { return Object.assign(new Error(code), { code }); }
 function _pbpDictEvidenceLang(language) {
   try { return Intl.getCanonicalLocales(language || "und")[0]; } catch (_) { return "und"; }
 }
+// Two retrieval kinds remain: "literature" reads one source sentence or verse
+// line from Wikisource for the free original-text examples (1C.1/1C.2), and
+// "etymology" reads Wiktionary. Cultural usage is no longer generated (1C.3),
+// so no kind derives a Wikipedia origin; old culture records are only read
+// from the archive and never retrieve again.
 function pbpDictEvidenceOrigin(kind, language) {
-  if (!["literature", "culture", "etymology"].includes(kind)) return "";
+  if (kind !== "literature" && kind !== "etymology") return "";
   const base = _pbpDictEvidenceLang(language).split("-")[0];
-  if (!/^[a-z]{2,3}$/.test(base) || base === "und" ||
-      (kind !== "culture" && !Object.hasOwn(PBP_DICT_EVIDENCE_LANGUAGES, base))) return "";
-  return `https://${base}.${kind === "literature" ? "wikisource" : kind === "culture" ? "wikipedia" : "wiktionary"}.org`;
+  if (!/^[a-z]{2,3}$/.test(base) || base === "und" || !Object.hasOwn(PBP_DICT_EVIDENCE_LANGUAGES, base)) return "";
+  return `https://${base}.${kind === "literature" ? "wikisource" : "wiktionary"}.org`;
 }
 function _pbpDictEvidenceText(value) {
   return String(value || "").normalize("NFC").replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2060\ufeff]/g, " ").replace(/\s+/g, " ").trim();
@@ -210,49 +200,6 @@ function pbpDictEvidenceSentences(source, term, lang) {
   }
   return result;
 }
-function _pbpDictCultureExcerpts(root, title, term, language) {
-  const normalize = text => _pbpDictEvidenceText(text).normalize("NFC").toLocaleLowerCase();
-  const name = normalize(term);
-  const exactTitle = normalize(title.replace(/\s*[（(][^()（）]*[)）]\s*$/u, "")) === name;
-  const result = [];
-  const nodes = _pbpDictEvidenceParagraphNodes(root);
-  for (let index = 0; index < nodes.length && result.length < 3; index++) {
-    const node = nodes[index], text = _pbpDictEvidenceText(node.textContent);
-    if (_pbpDictEvidenceMatch(text, term, language) < 0) continue;
-    // A word occurring in an unrelated article is not evidence about its
-    // cultural meaning. Prefer a dedicated entry or an explicitly mentioned
-    // expression; the model still has to establish a distinctive use from it.
-    const mentioned = exactTitle || [...node.querySelectorAll("b,strong,i,em,dfn")].some(el => normalize(el.textContent) === name) ||
-      [...text.matchAll(/["'“‘«「『]([^"'“”‘’«»「」『』]{1,120})["'”’»」』]/gu)].some(match => normalize(match[1]) === name);
-    if (!mentioned) continue;
-    const excerpt = _pbpDictEvidenceExcerpt([text], term, language);
-    if (excerpt && !result.some(item => item.text === excerpt.text)) result.push({ ...excerpt, paragraph: index + 1 });
-  }
-  return result;
-}
-function _pbpDictEvidenceExcerpt(paragraphs, term, language) {
-  for (let i = 0; i < paragraphs.length; i++) {
-    const paragraph = paragraphs[i], match = _pbpDictEvidenceMatch(paragraph, term, language);
-    if (match < 0) continue;
-    let excerpt = paragraph;
-    if (excerpt.length > 600) {
-      // Take complete sentences surrounding the hit; do not manufacture an
-      // ellipsis or truncate a quotation into an apparently complete sentence.
-      const sentences = [...paragraph.matchAll(/[^.!?。！？]+[.!?。！？]+["'”’»」』]?|[^.!?。！？]+$/gu)];
-      const at = sentences.findIndex(value => _pbpDictEvidenceMatch(value[0], term, language) >= 0);
-      if (at < 0 || sentences[at][0].trim().length > 600) continue;
-      let start = sentences[at].index, end = start + sentences[at][0].length;
-      if (at > 0 && end - sentences[at - 1].index < 500) start = sentences[at - 1].index;
-      if (at + 1 < sentences.length && sentences[at + 1].index + sentences[at + 1][0].length - start <= 600) end = sentences[at + 1].index + sentences[at + 1][0].length;
-      excerpt = paragraph.slice(start, end).trim();
-    } else if (excerpt.length < 240) {
-      if (i > 0 && paragraphs[i - 1].length + excerpt.length + 2 <= 500) excerpt = paragraphs[i - 1] + "\n\n" + excerpt;
-      if (i + 1 < paragraphs.length && excerpt.length + paragraphs[i + 1].length + 2 <= 600) excerpt += "\n\n" + paragraphs[i + 1];
-    }
-    if (excerpt.length <= 600) return { text: excerpt, paragraph: i + 1 };
-  }
-  return null;
-}
 function _pbpDictEvidenceEtymology(page, root, language) {
   const config = PBP_DICT_EVIDENCE_LANGUAGES[language.split("-")[0]];
   if (!config) return null;
@@ -382,22 +329,16 @@ async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, before
       }
       await check(); return result;
     }
+    // Only the literature kind reaches here: one focused chapter search, then
+    // the plain exact-phrase search as a fallback.
     const escaped = term.replace(/["\\]/g, " ");
-    const exact = '"' + escaped + '"', searches = [];
-    if (kind === "literature") {
-      const chapter = PBP_DICT_EVIDENCE_LANGUAGES[language.split("-")[0]].chapter;
-      searches.push(exact + ' intitle:' + chapter +
-        (language.startsWith("en") ? " -intitle:Code -intitle:Title -intitle:Manual -intitle:Report -intitle:Copyright" : ""));
-    } else {
-      const scope = PBP_DICT_CULTURE_SEARCH[language.split("-")[0]];
-      searches.push(exact + (scope ? " (" + scope + ")" : " articletopic:internet-culture"));
-    }
-    searches.push(exact);
-    // Direct page lookup is independent of full-text ranking (common words can
-    // be buried under incidental mentions). Still verify the retrieved body.
-    const candidates = kind === "culture" && term.length <= 200 && !term.includes(":") ? [term] : [], pools = [];
+    const exact = '"' + escaped + '"';
+    const chapter = PBP_DICT_EVIDENCE_LANGUAGES[language.split("-")[0]].chapter;
+    const searches = [exact + ' intitle:' + chapter +
+      (language.startsWith("en") ? " -intitle:Code -intitle:Title -intitle:Manual -intitle:Report -intitle:Copyright" : ""), exact];
+    const candidates = [], pools = [];
     for (const query of searches) {
-      const json = await optionalRead(() => fetchJson({ action: "query", list: "search", srnamespace: "0", srsearch: query, srlimit: kind === "literature" ? "8" : "5", srprop: "" }));
+      const json = await optionalRead(() => fetchJson({ action: "query", list: "search", srnamespace: "0", srsearch: query, srlimit: "8", srprop: "" }));
       if (!Array.isArray(json?.query?.search)) { sourceFailed = true; continue; }
       pools.push(json.query.search.filter(row => row?.ns === 0 && Number.isSafeInteger(row.pageid) && row.pageid > 0 && typeof row.title === "string" && row.title.length <= 200 &&
         !row.title.includes(":")).map(row => row.title));
@@ -408,19 +349,11 @@ async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, before
     }
     const result = [], works = new Set(); let examined = 0;
     for (const title of candidates) {
-      if (kind === "literature" && /(?:\b(?:United States Code|Copyright|Government Report|Report of (?:the|a) Commission|Agreement relating|Implementation Rules|Traffic Signs Manual|Treaty|Encyclopædia|Encyclopedia)\b|法律|法令|报告|報告|條約|条约)/i.test(title)) continue;
-      if (++examined > 10 || result.length >= (kind === "literature" ? 1 : 3) || requests >= 22) break;
+      if (/(?:\b(?:United States Code|Copyright|Government Report|Report of (?:the|a) Commission|Agreement relating|Implementation Rules|Traffic Signs Manual|Treaty|Encyclopædia|Encyclopedia)\b|法律|法令|报告|報告|條約|条约)/i.test(title)) continue;
+      // One example (Q9=A) within the unchanged 22-request budget.
+      if (++examined > 10 || result.length >= 1 || requests >= 22) break;
       const loaded = await candidate(title); if (!loaded) continue;
       const { page, root } = loaded;
-      if (kind === "culture") {
-        for (const excerpt of _pbpDictCultureExcerpts(root, page.title, term, language)) {
-          const location = "¶ " + excerpt.paragraph;
-          if (result.length < 3 && !result.some(source => source.revision === String(page.revid) && source.location === location)) {
-            result.push(make(page, excerpt.text, { location }));
-          }
-        }
-        continue;
-      }
       // One sentence or verse line, not the old surrounding passage (R1-8).
       const hit = pbpDictEvidenceSentences(root, term, language)[0]; if (!hit) continue;
       const metadata = _pbpDictEvidenceMetadata(page, root, origin);

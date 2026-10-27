@@ -759,8 +759,9 @@ function pbpDictSupplementProfile(settings = {}, category = "") {
     level: !patterns && ["beginner", "intermediate", "advanced"].includes(settings.dictLearnerLevel) ? settings.dictLearnerLevel : "",
     topic: "" };
 }
-// Only etymology retrieves evidence now; the literature and culture readers in
-// dict-evidence.js are rewritten or removed in 1C.
+// Only etymology retrieves evidence for a paid supplement. The free
+// original-text examples use their own entry in dict-evidence.js, outside this
+// path (1C.2), and cultural usage retrieval is gone (1C.3).
 function pbpDictSupplementOrigin(category, language) {
   if (category !== "etymology") return "";
   if (typeof pbpDictEvidenceOrigin === "function") return pbpDictEvidenceOrigin(category, language);
