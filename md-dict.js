@@ -2005,7 +2005,12 @@ function _pbpDictEntryMount(host, opts) {
   };
   const input = (signal, isCurrent) => ({ term: opts.term, sourceLanguage: opts.lang || "und", target: target(),
     owner: opts.owner, settings, signal, isCurrent });
-  const negParts = category => ({ term: opts.term, sourceLanguage: opts.lang || "und", target: target(), category });
+  // The learning blocks belong to the entry on screen: once rendered, its
+  // language (not a setting or interface language changed since) is what a
+  // supplement request asks for, and what the AI-judgement memory is keyed by
+  // (plan Q12=A), so the record and the lookup always name the same language.
+  const learningLanguage = () => renderedLanguage || target();
+  const negParts = category => ({ term: opts.term, sourceLanguage: opts.lang || "und", target: learningLanguage(), category });
   const negForget = category => { negState[category] = false; pbpDictNegForget(opts.owner, negParts(category)); };
   const loadNeg = async () => {
     if (!_pbpDictNegOwner(opts.owner)) return;
@@ -2312,7 +2317,7 @@ function _pbpDictEntryMount(host, opts) {
       const category = updating?.category || explicitCategory;
       const origin = updating ? supplementNodes.get(supplementId(updating))?.update : buttons[category];
       if (!origin?.isConnected || !_pbpDictGeneratableCategory(category)) return;
-      const answerLanguage = renderedLanguage || target();
+      const answerLanguage = learningLanguage();
       const feedback = usageFeedback(origin);
       // Retrying is this ordinary click: this attempt's own outcome replaces
       // the remembered "last time" state.
@@ -2324,7 +2329,7 @@ function _pbpDictEntryMount(host, opts) {
       usageActivity = { feedback, origin, version };
       const current = () => alive() && epoch === version && !controller.signal.aborted;
       let ledgerStage = "permission";
-      const request = { ...input(controller.signal, current), category,
+      const request = { ...input(controller.signal, current), target: answerLanguage, category,
         updateId: updating?.id || "",
         // A blanked leaking summary (Q6=B) is a partial failure of this paid
         // answer: file its fixed code at the checking stage; the items save.

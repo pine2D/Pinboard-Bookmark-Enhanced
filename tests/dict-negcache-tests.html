@@ -211,6 +211,51 @@ await test("retrieval and AI-judgement memories read differently, both neutral w
   return hiddenUntilRead && examplesOk && patternsOk && etymologyOk && paidOk && plainOk &&
     t("dictSupplementNoSources") !== t("dictUsagePointsNone");
 });
+await test("an AI-judgement memory is keyed by the language of the entry on screen, the one its request asks for", async () => {
+  // The interface language changes in another tab after the saved entry
+  // rendered: the learning blocks still belong to the rendered entry.
+  reset();
+  const definition = settings.dictDefinitionLang, ui0 = window.uiLangToBCP47;
+  settings.dictDefinitionLang = "";
+  const parts = (category, ui) => ({ term: "Gift", sourceLanguage: "de", target: pbpDictLearningTarget(settings, ui), category });
+  try {
+    await pbpDictNegRecord("acct_alice", parts("patterns", "en"));
+    window.uiLangToBCP47 = () => "en";
+    const ui = await entryView();
+    const rememberedOnScreen = ui.paid("patterns")?.dataset.remembered === "true";
+    window.uiLangToBCP47 = () => "fr";
+    const asked = [];
+    supplementRun = async input => { asked.push(input.target.lang); return addition("patterns"); };
+    ui.paid("patterns").click(); await settle();
+    const forgotten = !(await pbpDictNegHas("acct_alice", parts("patterns", "en")));
+    supplementRun = async input => { asked.push(input.target.lang); throw Object.assign(new Error("x"), { code: "unsupported_usage" }); };
+    ui.paid("confusables").click(); await settle();
+    const recorded = await pbpDictNegHas("acct_alice", parts("confusables", "en")) && !(await pbpDictNegHas("acct_alice", parts("confusables", "fr")));
+    ui.close();
+    return rememberedOnScreen && asked.join() === "en,en" && forgotten && recorded;
+  } finally { settings.dictDefinitionLang = definition; window.uiLangToBCP47 = ui0; }
+});
+await test("the learning block shows no paid action until the memory read before its first render resolves", async () => {
+  reset(); await pbpDictNegRecord("acct_alice", usage("patterns"));
+  const read = window.pbpDictNegHas;
+  let release; const gate = new Promise(resolve => { release = resolve; });
+  window.pbpDictNegHas = async (...args) => { await gate; return read(...args); };
+  const host = document.createElement("div"), controller = new AbortController();
+  document.body.appendChild(host);
+  try {
+    const ui = _pbpDictEntryMount(host, { term: "Gift", lang: "de", owner: "acct_alice", settings, signal: controller.signal, isCurrent: () => true });
+    await settle();
+    const paid = () => host.querySelector('.xp-dict-supplement-generate[data-category="patterns"]');
+    // Held read: no paid button may exist in its normal (not remembered)
+    // state. The button's own state counts: the entry content itself starts
+    // folded in the dictionary view, so an ancestor's [hidden] proves nothing.
+    const held = paid();
+    const waited = !held || held.hidden || held.dataset.remembered === "true";
+    release(); await ui.ready; await settle();
+    const shown = paid();
+    return waited && !!shown && !shown.hidden && shown.dataset.remembered === "true";
+  } finally { window.pbpDictNegHas = read; release(); controller.abort(); host.remove(); }
+});
 await test("registry: the memory is reclaimable, never a setting, never a never-clear key, never in a backup", async () => {
   reset(); await pbpDictNegRecord("acct_alice", examples());
   const key = negKeys()[0];
