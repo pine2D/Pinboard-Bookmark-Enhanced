@@ -9621,11 +9621,11 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "library.css: md-dict's Retry shows beside the page's own Look up again -- two buttons for the same action");
   // A message is the dictionary section's whole answer (critique round 4,
   // 2026-10-20): body ink, and its Wiktionary exit close under it rather than
-  // the sp-5 that parts a source line from an entry.
+  // the block gap (sp-4) that parts a source line from an entry.
   check(declarationValueMap(hand, "#vocab-ref-result .xp-dict-msg").get("color") === "var(--lib-fg)" &&
     declarationValueMap(hand, "#vocab-ref-result .xp-dict-msg + .xp-dict-src").get("margin-top") === "var(--lib-sp-1)" &&
-    declarationValueMap(hand, "#vocab-ref-result .xp-dict-src").get("margin-top") === "var(--lib-sp-5)",
-    "library.css: a dictionary message went back to muted ink, or its Wiktionary exit to the entry's sp-5 gap (a failure read as three unrelated pieces)");
+    declarationValueMap(hand, "#vocab-ref-result .xp-dict-src").get("margin-top") === "var(--lib-sp-4)",
+    "library.css: a dictionary message went back to muted ink, or its Wiktionary exit to the block gap (sp-4) that parts a source line from an entry (a failure read as three unrelated pieces)");
 }
 
 // ---- Library redesign T7b (spec §4.2-§4.7, §4.11, §6.5): the word's main
@@ -9913,6 +9913,92 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     `popup.css: a rule on the rung tokens still writes its control font as a literal 11 / 12px instead of var(--pp-text-body-sm) / var(--pp-text-body): ${literalType.join("; ")}`);
   check(rungRules >= 4,
     `popup.css: only ${rungRules} hand-written rule(s) read var(--pp-control-h / -sm); .qbtn, .offline-clear, .offline-toggle and .md-strip-btn all should (vacuity guard)`);
+}
+
+// ---- Dict redesign 3.5: the lookup's type and spacing scale. The reader's
+// dictionary rules (every selector of the rule names an .xp-dict class) use
+// four font-size steps plus one metadata step -- prose in em (body 1em,
+// inherited; secondary 0.88em), interface text in px (titles 13, labels and
+// controls 12, metadata 11) -- and vertical rhythm from three --sp-N levels:
+// sp-1 inside one item, sp-2 between siblings and under a title, sp-4
+// between blocks (entries, sources, the AI entry, learning blocks). The
+// library's hand-written column follows the same three levels on its own
+// tokens and keeps its px type scale (15 body, 14 secondary, 13 label, 12
+// metadata; control text from the density token). Research ruling
+// 2026-10-26: "eight em steps plus three px steps, three layers all 16px"
+// was the defect this closes.
+{
+  const SPACING_PROPS = /^(?:margin|padding|gap|row-gap|column-gap)(?:-|$)/;
+  const scan = (fileName, css, { sizes, base, spacing, spacingExempt, lines = true }) => {
+    const at = (rule) => lines ? `${fileName}:${rule.lineNum}` : `${fileName}, hand-written region`;
+    const usedSizes = new Set();
+    const usedSpacing = new Set();
+    const offenders = [];
+    for (const rule of parseStyleRules(css)) {
+      if (!rule.selectors.length || !rule.selectors.every((sel) => sel.includes("xp-dict") || sel.includes("[data-source-break]"))) continue;
+      for (const d of parseDeclarations(rule.body)) {
+        if (d.property === "font-size") {
+          if (base && rule.selectors.length === 1 && rule.selectors[0] === base.selector) {
+            if (d.value !== base.value) offenders.push(`${rule.selectorText} { ${d.raw} } (the column base is ${base.value})`);
+            continue;
+          }
+          if (sizes.includes(d.value)) usedSizes.add(d.value);
+          else offenders.push(`${rule.selectorText} { ${d.raw} } (${at(rule)}; sizes: ${sizes.join(" / ")})`);
+        } else if (SPACING_PROPS.test(d.property)) {
+          if (rule.selectors.some((sel) => spacingExempt[`${sel}|${d.property}`])) continue;
+          let rest = d.value;
+          for (const token of spacing) {
+            if (rest.includes(token)) usedSpacing.add(token);
+            rest = rest.split(token).join(" ");
+          }
+          if (!/^(?:\s|\b0\b|\bauto\b)*$/.test(rest)) offenders.push(`${rule.selectorText} { ${d.raw} } (${at(rule)}; spacing: ${spacing.join(" / ")})`);
+        }
+      }
+    }
+    check(offenders.length === 0,
+      `${fileName}: a dictionary rule leaves the lookup's type / spacing scale (dict redesign 3.5): ${offenders.join("; ")}`);
+    const levels = spacing.filter((token) => /^var\(--(?:lib-)?sp-\d\)$/.test(token));
+    check(sizes.every((size) => usedSizes.has(size)) && levels.every((token) => usedSpacing.has(token)),
+      `${fileName}: the dictionary scale check matched no rule for ${[...sizes.filter((size) => !usedSizes.has(size)), ...levels.filter((token) => !usedSpacing.has(token))].join(", ")} -- the selectors moved and the gate went vacuous`);
+  };
+  scan("md-preview.css", mdCss, {
+    sizes: ["0.88em", "13px", "12px", "11px"],
+    base: { selector: ".xp-dict", value: "0.92em" },
+    // calc(-1 * sp-2) is the disclosure title's hover fill hung outside the column.
+    spacing: ["calc(-1 * var(--sp-2))", "var(--sp-1)", "var(--sp-2)", "var(--sp-4)"],
+    // The select's inline end inset is its chevron's room (control geometry);
+    // the senses' 1.4em indent is an em of the text it hangs (the geometry
+    // gate's senseIndent), not rhythm.
+    spacingExempt: { ".xp-dict-lang|padding": true, ".xp-dict-senses li|margin-inline-start": true },
+  });
+  scan("library.css", stripGeneratedRegions(libraryCss), {
+    sizes: ["15px", "14px", "13px", "12px", "calc(var(--lib-text-body) - 1px)"],
+    spacing: ["calc(-1 * var(--lib-sp-2))", "calc(-1 * var(--lib-control-pad-x-sm))", "var(--lib-control-pad-x-sm)",
+      "var(--lib-sp-1)", "var(--lib-sp-2)", "var(--lib-sp-4)"],
+    // The numbered senses' 24px number column is a column width, not rhythm.
+    spacingExempt: { "#vocab-ref-result .xp-dict-senses > li|padding-inline-start": true },
+    lines: false,
+  });
+  // The three levels by role, the same on both surfaces: a sentence under its
+  // definition is inside one item, senses and items are siblings, entries,
+  // sources and learning blocks are blocks.
+  const hand = stripGeneratedRegions(libraryCss);
+  const roles = [
+    ["inside", ".xp-dict-example-pair", "margin-top", 1],
+    ["sibling", ".xp-dict-senses li + li", "margin-top", 2],
+    ["sibling", ".xp-dict-learning-item", "margin-top", 2],
+    ["block", ".xp-dict-entry + .xp-dict-entry", "margin-top", 4],
+    ["block", ".xp-dict-learning-section", "margin-top", 4],
+    ["block", ".xp-dict-ai-provenance", "margin-top", 4],
+  ];
+  for (const [role, sel, prop, level] of roles) {
+    const libSel = "#vocab-ref-result " + sel.replace("li + li", "> li + li");
+    check(declarationValueMap(mdCss, sel).get(prop) === `var(--sp-${level})` && declarationValueMap(hand, libSel).get(prop) === `var(--lib-sp-${level})`,
+      `md-preview.css / library.css: ${sel} must sit at the ${role} level (sp-${level}) on both surfaces (dict redesign 3.5)`);
+  }
+  check(declarationValueMap(hand, "#vocab-ref-result [data-source-break]::before").get("margin-block") === "var(--lib-sp-4)" &&
+    declarationValueMap(mdCss, ".xp-dict-slot [data-source-break]::before").get("margin") === "var(--sp-4) 0",
+    "md-preview.css / library.css: the break between dictionary sources must be the block level (sp-4) on both surfaces (dict redesign 3.5)");
 }
 
 if (timingEnabled) {

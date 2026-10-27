@@ -2102,7 +2102,12 @@ html.motion-ready .vocab-note-save {
 .vocab-word-family { display: flex; flex-wrap: wrap; gap: var(--lib-sp-1); margin-top: var(--lib-sp-2); }
 /* The library has a longer reading column than the lookup bubble: definitions
    use a steady 15/25 rhythm, with quieter metadata and grouped examples.
-   md-preview.css owns the bubble's separate type scale. */
+   md-preview.css owns the bubble's separate type scale; this column keeps
+   its own px steps (15 body, 14 secondary, 13 labels and titles, 12
+   metadata; control text from the density token) and the bubble's three
+   spacing levels (dict redesign 3.5, pinned by ui-contract): sp-1 inside one
+   item, sp-2 between siblings and under a title, sp-4 between blocks
+   (entries, sources, the AI entry, learning blocks). */
 #vocab-ref-result .xp-dict-slot { min-height: 20px; }
 #vocab-ref-result .xp-dict-match { margin: 0 0 var(--lib-sp-2); font-size: 13px; line-height: 18px; color: var(--lib-fg-muted); }
 /* Keep disclosure rails aligned with the query and save controls. Only prose
@@ -2112,10 +2117,10 @@ html.motion-ready .vocab-note-save {
   content: "";
   display: block;
   inline-size: var(--lib-sp-8);
-  margin-block: var(--lib-sp-5);
+  margin-block: var(--lib-sp-4);
   border-block-start: 1px dotted var(--lib-border);
 }
-#vocab-ref-result .xp-dict-entry + .xp-dict-entry { margin-top: var(--lib-sp-5); }
+#vocab-ref-result .xp-dict-entry + .xp-dict-entry { margin-top: var(--lib-sp-4); }
 #vocab-ref-result .xp-dict-ipa-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--lib-sp-1) var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-pos { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--lib-fg-muted); }
 #vocab-ref-result .xp-dict-ipa { font-size: 13px; line-height: 18px; color: var(--lib-fg-muted); }
@@ -2141,7 +2146,7 @@ html.motion-ready .vocab-note-save {
   color: var(--lib-fg);
   text-wrap: pretty;
 }
-#vocab-ref-result .xp-dict-senses > li + li { margin-top: var(--lib-sp-4); }
+#vocab-ref-result .xp-dict-senses > li + li { margin-top: var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-senses > li::before {
   content: counter(xp-sense);
   position: absolute;
@@ -2157,9 +2162,9 @@ html.motion-ready .vocab-note-save {
 /* Source sentence in body ink, its translation the muted aid (library has no
    separate secondary text role; --lib-fg-muted is it). */
 #vocab-ref-result .xp-dict-example { font-size: 14px; line-height: 22px; color: var(--lib-fg); }
-#vocab-ref-result .xp-dict-example-pair { margin-top: var(--lib-sp-2); }
-#vocab-ref-result .xp-dict-example-translation { margin-top: var(--lib-sp-0); font-size: 13px; line-height: 21px; color: var(--lib-fg-muted); }
-#vocab-ref-result .xp-dict-subsense { margin-top: var(--lib-sp-2); padding-inline-start: var(--lib-sp-4); font-size: 14px; line-height: 23px; }
+#vocab-ref-result .xp-dict-example-pair { margin-top: var(--lib-sp-1); }
+#vocab-ref-result .xp-dict-example-translation { font-size: 13px; line-height: 21px; color: var(--lib-fg-muted); }
+#vocab-ref-result .xp-dict-subsense { margin-top: var(--lib-sp-1); padding-inline-start: var(--lib-sp-4); font-size: 14px; line-height: 23px; }
 #vocab-ref-result .xp-dict-rel { margin-top: var(--lib-sp-4); font-size: 14px; line-height: 22px; color: var(--lib-fg); }
 #vocab-ref-result .xp-dict-rel + .xp-dict-rel { margin-top: var(--lib-sp-1); }
 #vocab-ref-result .xp-dict-rel-label { display: inline-block; min-width: 40px; font-size: 13px; color: var(--lib-fg-muted); }
@@ -2185,12 +2190,12 @@ html.motion-ready .vocab-note-save {
 }
 #vocab-ref-result .xp-dict-more:hover { background: var(--lib-btn-hover); }
 #vocab-ref-result .xp-dict-more:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
-#vocab-ref-result .xp-dict-src { margin-top: var(--lib-sp-5); font-size: 12px; line-height: 18px; color: var(--lib-fg-muted); }
+#vocab-ref-result .xp-dict-src { margin-top: var(--lib-sp-4); font-size: 12px; line-height: 18px; color: var(--lib-fg-muted); }
 #vocab-ref-result .xp-dict-src a { color: inherit; text-decoration: underline; }
 /* A message (no entry, cooling down, a failure and why) is the section's
    whole answer, so it is in body ink; its Wiktionary exit follows at sp-2
-   (the message's own sp-1 inset plus sp-1) instead of the sp-5 that parts a
-   source line from an entry -- message, exit and "Look up again" read as one
+   (the message's own sp-1 inset plus sp-1) instead of the block gap (sp-4)
+   that parts a source line from an entry -- message, exit and "Look up again" read as one
    group (critique round 4, 2026-10-20). */
 #vocab-ref-result .xp-dict-msg { padding: var(--lib-sp-1) 0; font-size: 13px; line-height: 18px; color: var(--lib-fg); }
 #vocab-ref-result .xp-dict-msg + .xp-dict-src { margin-top: var(--lib-sp-1); }
@@ -2255,7 +2260,7 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-ai[hidden],
 #vocab-ref-result .xp-dict-ai [hidden] { display: none; }
 /* The card's metadata line, once, after every AI block. */
-#vocab-ref-result .xp-dict-ai-provenance { margin-top: var(--lib-sp-3); }
+#vocab-ref-result .xp-dict-ai-provenance { margin-top: var(--lib-sp-4); }
 #vocab-ref-result .xp-dict-ai-content { min-width: 0; }
 #vocab-ref-result .xp-dict-ai-status:empty { display: none; }
 #vocab-ref-result .xp-dict-ai-status:not(:empty),
@@ -2295,11 +2300,10 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-ai-details > summary:hover { color: var(--lib-fg); background: var(--lib-btn-hover); }
 #vocab-ref-result .xp-dict-ai-details > summary:focus-visible { outline: 1px solid var(--lib-accent); outline-offset: 2px; box-shadow: var(--lib-focus-ring); }
 #vocab-ref-result .xp-dict-ai-details p { margin: var(--lib-sp-2) 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-#vocab-ref-result .xp-dict-ai-details .xp-dict-src { margin-top: var(--lib-sp-3); }
-#vocab-ref-result .xp-dict-learning-item { max-inline-size: 72ch; margin-top: var(--lib-sp-4); }
-#vocab-ref-result .xp-dict-learning-item:first-child { margin-top: var(--lib-sp-2); }
+#vocab-ref-result .xp-dict-ai-details .xp-dict-src { margin-top: var(--lib-sp-2); }
+#vocab-ref-result .xp-dict-learning-item { max-inline-size: 72ch; margin-top: var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-learning-item > .xp-dict-example-translation { margin-top: var(--lib-sp-1); }
-#vocab-ref-result :is(.xp-dict-update-entry, .xp-dict-update-supplement) { margin-top: var(--lib-sp-3); }
+#vocab-ref-result :is(.xp-dict-update-entry, .xp-dict-update-supplement) { margin-top: var(--lib-sp-2); }
 /* Text actions may wrap with enlarged text; icon actions keep their fixed rung. */
 #vocab-ref-result :is(.xp-dict-supplement-generate, .xp-dict-examples-find, .xp-dict-update-entry, .xp-dict-update-supplement) {
   max-inline-size: 100%; height: auto; min-height: calc(var(--lib-control-h) - 4px);
@@ -2328,7 +2332,7 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-supplement-profile .xp-dict-profile-link { color: var(--lib-link); }
 #vocab-ref-result .xp-dict-usage-actions,
 #vocab-ref-result .xp-dict-usage-feedback { display: flex; align-items: center; flex-wrap: wrap; gap: var(--lib-sp-2); min-width: 0; }
-#vocab-ref-result .xp-dict-usage-actions { margin-top: var(--lib-sp-3); }
+#vocab-ref-result .xp-dict-usage-actions { margin-top: var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-usage-actions > :is(.xp-dict-update-entry, .xp-dict-update-supplement),
 #vocab-ref-result .xp-dict-usage-feedback > .xp-dict-usage-status { margin: 0; }
 #vocab-ref-result .xp-dict-usage-feedback { flex: 1; }
