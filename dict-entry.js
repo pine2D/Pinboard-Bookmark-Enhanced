@@ -642,9 +642,16 @@ function pbpDictSupplementParse(response, request, category, sources, entry, rep
   const invalid = reason => { throw _pbpDictEntryError("invalid_response", "Incomplete or unverified learning content", reason); };
   const value = _pbpDictResponseJson(response, 24576, "supplement");
   if (typeof response !== "string" || response.length > 24576 ||
-      !_pbpDictEntryObject(value, ["language", "summary", "items"]) ||
+      !_pbpDictEntryObject(value, ["language", "summary", "items"]) || typeof value.language !== "string" ||
       !_pbpDictEntryText(value.summary, 800, true) || !Array.isArray(value.items) || value.items.length > 5) return invalid("supplement_fields");
-  if (!_pbpDictExplanationLanguage(value.language, request.target)) throw _pbpDictEntryError("wrong_language", "Unexpected explanation language", "explanation_metadata");
+  // With a known target the echoed language is only a hint: models often echo
+  // the word's language or a sibling tag while writing the requested prose.
+  // The caller's prose check decides; an unknown custom target still relies on
+  // the echo as its only candidate. The archive keeps the requested target.
+  if (!_pbpDictExplanationLanguage(value.language, request.target)) {
+    if (request.target.lang === "und") throw _pbpDictEntryError("wrong_language", "Unexpected explanation language", "explanation_metadata");
+    console.warn("[dict-entry] language echo mismatch");
+  }
   if (!value.items.length) throw _pbpDictEntryError("unsupported_usage", "No useful supported supplement");
   if (category === "literature" && value.items.length > 2) return invalid("supplement_item_shape");
   const validate = item => {
