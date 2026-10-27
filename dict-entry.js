@@ -9,6 +9,31 @@ const PBP_DICT_ENTRY_MAX_RESPONSE = 24576;
 // progress (2026-10-26 comparison; user ruling: 180 s for all).
 const PBP_DICT_GENERATION_OPTIONS = Object.freeze({ maxTokens: 8192, totalOutputBudget: true,
   reasoningEffort: "minimum", timeoutMs: 180000, jsonMode: true, requireComplete: true });
+// Generation streams (plan 2.7): callAIStream with these options plus one
+// absolute 180 s deadline for the whole call (dialect negotiation included)
+// and the client-side 8192 budget that totalOutputBudget turns on; the 30 s
+// idle cut-off is off while the deadline runs. The answer is still read only
+// once the stream has ended and passed the completeness check; nothing is
+// rendered or saved from partial text, so no delta callback is passed.
+const PBP_DICT_STREAM_DEADLINE_MS = 180000;
+
+// The stream's phase side channel ({phase: "thinking"|"streaming"}) forwarded
+// to the caller's onStage. Synchronous on purpose: never the async stage()
+// with its guard awaits, whose rejection would go unhandled here. ai.js
+// swallows a throwing callback (or a rejected promise it returns) with a
+// warning; the phase carries no text, and the caller drops stale phases.
+function _pbpDictStreamProgress(onStage) {
+  return ({ phase } = {}) => (typeof onStage === "function" ? onStage(phase) : undefined);
+}
+// The one generation call shared by the entry and every supplement category.
+function _pbpDictGenerateStream(request, prompt, responseSchema, onStage) {
+  return callAIStream(request.settings, prompt, {
+    ...PBP_DICT_GENERATION_OPTIONS, deadlineMs: PBP_DICT_STREAM_DEADLINE_MS,
+    model: request.model.override, signal: request.signal, responseSchema,
+    beforeRequest: () => _pbpDictEntryGuard(request),
+    onProgress: _pbpDictStreamProgress(onStage)
+  }, null);
+}
 
 function _pbpDictEntryError(code, message, reason) { return Object.assign(new Error(message), { code }, reason ? { reason } : {}); }
 function _pbpDictEntryObject(value, keys) {
@@ -614,7 +639,9 @@ async function pbpDictEntryRead(input = {}) {
 
 async function pbpDictEntryRun(input = {}) {
   const request = _pbpDictEntryRequest(input);
-  return _pbpDictEntryWithLock(request, "entry", () => _pbpDictEntryGenerate(request, input.updateId, input.onDrop));
+  // onStage travels as its own argument: it is not part of the request, the
+  // cache identity or the saved record.
+  return _pbpDictEntryWithLock(request, "entry", () => _pbpDictEntryGenerate(request, input.updateId, input.onDrop, input.onStage));
 }
 
 async function _pbpDictEntryWithLock(request, purpose, run) {
@@ -629,8 +656,9 @@ async function _pbpDictEntryWithLock(request, purpose, run) {
 }
 
 // onDrop(error) hears about each dropped sense or learning piece with a fixed
-// code/reason (the reader files it in the local failure ledger).
-async function _pbpDictEntryGenerate(request, updateId = "", onDrop = null) {
+// code/reason (the reader files it in the local failure ledger). onStage(phase)
+// hears the stream's thinking/streaming phases only.
+async function _pbpDictEntryGenerate(request, updateId = "", onDrop = null, onStage = null) {
   await _pbpDictEntryGuard(request);
   const key = await _pbpDictEntryKey(request);
   let cached = await _pbpDictEntryRead(request, key);
@@ -644,11 +672,7 @@ async function _pbpDictEntryGenerate(request, updateId = "", onDrop = null) {
     throw _pbpDictEntryError("ai_not_configured", "AI is not configured");
   }
   await _pbpDictEntryGuard(request);
-  const response = await callAI(request.settings, _pbpDictEntryPrompt(request), {
-    ...PBP_DICT_GENERATION_OPTIONS, model: request.model.override, signal: request.signal,
-    responseSchema: _pbpDictEntrySchema(request),
-    beforeRequest: () => _pbpDictEntryGuard(request)
-  });
+  const response = await _pbpDictGenerateStream(request, _pbpDictEntryPrompt(request), _pbpDictEntrySchema(request), onStage);
   await _pbpDictEntryGuard(request);
   const entry = pbpDictEntryParse(_pbpDictGeneratedResponse(response, "entry"), request, { lenient: true, onDrop }),
     generatedAt = Date.now();
@@ -1102,12 +1126,11 @@ async function _pbpDictSupplementGenerate(input, request, category, profile) {
   // The only branch here is by category: patterns has its own card schema,
   // prompt and parser; lock, guards, sync gate, checks and saving are shared.
   const patterns = category === "patterns";
-  const response = await callAI(request.settings, patterns ? _pbpDictPatternsPrompt(request, profile, record.entry)
-    : _pbpDictSupplementPrompt(request, category, profile, sources, record.entry), {
-    ...PBP_DICT_GENERATION_OPTIONS, model: request.model.override, signal: request.signal,
-    responseSchema: patterns ? _pbpDictPatternsSchema(request, record.entry) : _pbpDictSupplementSchema(request, category, sources, record.entry),
-    beforeRequest: () => _pbpDictEntryGuard(request)
-  });
+  // The stream's thinking/streaming phases arrive between "generating" and
+  // "checking"; the caller files neither as a ledger stage.
+  const response = await _pbpDictGenerateStream(request, patterns ? _pbpDictPatternsPrompt(request, profile, record.entry)
+    : _pbpDictSupplementPrompt(request, category, profile, sources, record.entry),
+  patterns ? _pbpDictPatternsSchema(request, record.entry) : _pbpDictSupplementSchema(request, category, sources, record.entry), input.onStage);
   await stage("checking");
   let learning, declared;
   if (patterns) {

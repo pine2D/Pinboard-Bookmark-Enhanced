@@ -8,13 +8,18 @@ globalThis.chrome = { i18n: { detectLanguage: async text => {languageChecks.push
 async function pbpDictEvidenceFetch(input){await input.beforeRequest();if(evidenceFailure)throw Object.assign(new Error('Evidence fixture failure'),{code:evidenceFailure});return structuredClone(evidence);}
 async function pbpAiCacheGet(key){reads.push(key);if(beforeGet)await beforeGet();if(getFailure)throw new Error('Fixture read failure');return cache.has(key)?{result:cache.get(key),ts:1}:null;}
 async function pbpAiCacheSet(key,result){if(beforeSet)await beforeSet();if(setFailure)throw new Error('Fixture write failure');writes.push({key,result});if(setReceipt!==false)cache.set(key,structuredClone(result));return setReceipt;}
-async function callAI(settings,prompt,options){if(options.requireComplete!==true)throw new Error('Dictionary requests must require a complete response');calls.push({settings,prompt,options});if(beforeDispatch)await beforeDispatch();await options.beforeRequest?.();if(beforeAI)await beforeAI();return answer;}
+// Generation streams (plan 2.7): this stands in for callAIStream at its public
+// boundary. It hands back the whole answer only after the stream has ended, as
+// callAIStream resolves; streamPhases are the phase side channel's reports and
+// streamFailure an error the transport ends the stream with.
+let streamPhases=[],streamFailure=null;
+async function callAIStream(settings,prompt,options,onDelta){if(options.requireComplete!==true)throw new Error('Dictionary requests must require a complete response');calls.push({settings,prompt,options,onDelta});if(beforeDispatch)await beforeDispatch();await options.beforeRequest?.();for(const phase of streamPhases)options.onProgress?.({phase});if(beforeAI)await beforeAI();if(streamFailure)throw streamFailure;return answer;}
 </script><script src="../dict-entry.js"></script><script>
 let pass=0,fail=0;const root=document.getElementById('results');
 async function test(name,fn){let ok=false,detail='';try{ok=await fn();}catch(e){detail=e.name+': '+e.message;}ok?pass++:fail++;const el=document.createElement('div');el.className='case '+(ok?'pass':'fail');el.textContent=(ok?'PASS ':'FAIL ')+name+(detail?' '+detail:'');root.append(el);}
 // Model-shaped fixture written independently of the parser and cache writer.
 const MODEL_RESPONSE='{"word":"Bank","language":"de","pronunciation":"/baŋk/","meanings":[{"partOfSpeech":"noun, feminine","definition":"A financial institution; also a bench in a different meaning.","examples":[{"text":"Die Bank ist heute geschlossen.","translation":"The bank is closed today."}]}],"etymology":"","relatedWords":["Bankkonto","Sitzbank"],"learning":{"version":2,"formation":"A simple noun with distinct meanings.","history":"","related":[{"word":"Bankkonto","relation":"family","note":"A compound referring to a bank account."},{"word":"Sitzbank","relation":"family","note":"A compound specifying a bench to sit on."}]}}';
-function reset(){owner='acct_test';calls=[];writes=[];reads=[];cache=new Map();answer=MODEL_RESPONSE;beforeGet=null;beforeAI=null;beforeDispatch=null;beforeOwner=null;beforeSet=null;live=true;keyAvailable=true;setReceipt=true;getFailure=false;setFailure=false;evidence=[];evidenceFailure=null;detectedLanguage=null;languageChecks=[];}
+function reset(){streamPhases=[];streamFailure=null;owner='acct_test';calls=[];writes=[];reads=[];cache=new Map();answer=MODEL_RESPONSE;beforeGet=null;beforeAI=null;beforeDispatch=null;beforeOwner=null;beforeSet=null;live=true;keyAvailable=true;setReceipt=true;getFailure=false;setFailure=false;evidence=[];evidenceFailure=null;detectedLanguage=null;languageChecks=[];}
 function request(extra={}){return {term:'Bank',sourceLanguage:'de',target:{name:'English',lang:'en'},owner:'acct_test',settings:{aiProvider:'openai',openaiModel:'configured',openaiApiKey:'PRIVATE_FIXTURE_SECRET',previewAiEnabled:true},signal:new AbortController().signal,isCurrent:()=>live,...extra};}
 function response(change){const data=JSON.parse(MODEL_RESPONSE);change(data);answer=JSON.stringify(data);}
 async function rejects(fn,code){try{await fn();return false;}catch(e){return e.code===code||e.name===code;}}
@@ -160,6 +165,34 @@ await test('cache reads never apply the more tolerant generation normalization',
 await test('basic prompt retains field bounds with a bounded complete-answer request policy',async()=>{
   reset();await pbpDictEntryRun(request());const p=calls[0].prompt;
   return ['pronunciation<=256','partOfSpeech<=128','definition<=1200','text/translation<=600'].every(s=>p.includes(s))&&calls[0].options.maxTokens===8192&&calls[0].options.timeoutMs===180000&&calls[0].options.totalOutputBudget===true&&calls[0].options.reasoningEffort==='minimum';
+});
+await test('generation streams with the dictionary policy, one deadline and no delta callback',async()=>{
+  reset();const req=request();await pbpDictEntryRun(req);const o=calls[0].options;
+  return calls.length===1&&calls[0].onDelta===null&&o.requireComplete===true&&o.jsonMode===true&&o.maxTokens===8192&&o.totalOutputBudget===true&&
+    o.reasoningEffort==='minimum'&&o.deadlineMs===180000&&o.signal===req.signal&&typeof o.beforeRequest==='function'&&typeof o.onProgress==='function'&&
+    !!o.responseSchema&&!Object.hasOwn(o,'onStage')&&!Object.hasOwn(o,'onDelta');
+});
+await test('stream phases reach onStage only, never the prompt, cache identity or saved record',async()=>{
+  reset();streamPhases=['thinking','streaming'];const seen=[];
+  const r=await pbpDictEntryRun(request({onStage:phase=>seen.push(phase)}));
+  const plain=await pbpDictEntryRun(request());
+  return seen.join()==='thinking,streaming'&&calls.length===1&&plain.cached===true&&!calls[0].prompt.includes('onStage')&&
+    writes.length===1&&!JSON.stringify(writes[0].result).includes('onStage')&&!Object.hasOwn(r,'onStage')&&r.cached===false;
+});
+await test('the phase bridge forwards synchronously and tolerates a missing callback',async()=>{
+  let got='';const out=_pbpDictStreamProgress(phase=>{got=phase;return 'returned';})({phase:'thinking'});
+  return got==='thinking'&&out==='returned'&&_pbpDictStreamProgress(null)({phase:'streaming'})===undefined&&_pbpDictStreamProgress(undefined)()===undefined;
+});
+await test('a stream that ends in a transport error saves and caches nothing',async()=>{
+  const failures=[Object.assign(new Error('AI output exceeded the dictionary budget'),{code:'output_budget_exceeded',status:200}),
+    Object.assign(new Error('AI response was cut off'),{code:'output_truncated',status:200}),
+    Object.assign(new Error('AI stream reported an error'),{code:'stream_error',status:200}),
+    new DOMException('The AI request exceeded its deadline','TimeoutError'),new DOMException('The operation was aborted.','AbortError')];
+  for(const failure of failures){
+    reset();streamFailure=failure;
+    if(!(await rejects(()=>pbpDictEntryRun(request()),failure.code||failure.name))||writes.length!==0||cache.size!==0)return false;
+  }
+  return true;
 });
 await test('entry and supplement prompts share the curly double-quote mention convention',async()=>{
   reset();await pbpDictEntryRun(request());

@@ -107,9 +107,12 @@ export async function installDictEntryFixture(page) {
       return cache.has(key) ? structuredClone(cache.get(key)) : null;
     };
     pbpAiCacheSet = async (key, result, ts) => { cache.set(key, structuredClone({ result, ts })); return true; };
-    // The ordinary Explain opener is also used by other reader sweep states.
-    callAIStream = async () => 'A short article-specific explanation for this render fixture.';
-    callAI = async (_settings, prompt, opts) => {
+    // Dictionary generation streams (plan 2.7), so one callAIStream stub
+    // serves both callers: the dictionary is the only one that declares
+    // requireComplete with jsonMode and gets the whole answer at the end; the
+    // ordinary Explain opener (also used by other reader sweep states) keeps
+    // its article explanation. callAI is no longer a dictionary path at all.
+    const dictionaryAnswer = async (_settings, prompt, opts) => {
       await opts.beforeRequest?.(); opts.signal?.throwIfAborted();
       let lookup;
       try { lookup = JSON.parse(prompt.slice(prompt.lastIndexOf('\n') + 1)); } catch (_) {}
@@ -150,6 +153,9 @@ export async function installDictEntryFixture(page) {
             examples: [{ text: 'The second example illustrates another use.', translation: '第二句例句展示另一种用法。' }] }
         ] });
     };
+    callAIStream = async (settings, prompt, opts = {}) => (opts?.requireComplete === true && opts?.jsonMode === true
+      ? dictionaryAnswer(settings, prompt, opts) : 'A short article-specific explanation for this render fixture.');
+    callAI = async () => { throw new Error('SETUP: dictionary generation must stream through callAIStream'); };
   });
 }
 

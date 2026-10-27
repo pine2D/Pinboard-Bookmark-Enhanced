@@ -12,31 +12,64 @@ const ENTRY = { word: 'provider', language: 'en', pronunciation: null,
 const USAGE = { language: 'zh-Hans', summary: null, items: { sense: '1', title: 'service provider',
   explanation: '指提供某项服务的个人或机构，可在前面增加具体的服务领域，说明对方提供什么服务。',
   example: 'The school chose a new internet service provider.', translation: '学校选择了一家新的互联网服务提供商。', sourceIndex: '-1' } };
-// HTTP envelopes are handwritten from the four public schemas. No production
-// encoder or response reader constructs a fixture. Model names are arbitrary.
-// developers.openai.com/api/reference/resources/chat
-// ai.google.dev/api/generate-content
-// platform.claude.com/docs/en/build-with-claude/handling-stop-reasons
-// docs.ollama.com/api/chat
+// Dictionary generation streams (plan 2.7), so each fixture is the wire body
+// of a streamed answer, handwritten from the four public streaming formats.
+// No production encoder or stream reader constructs a fixture. The answer text
+// is split across events (a split inside a JSON string included); a thinking
+// part rides along where the protocol has one and must never become answer
+// text. Model names are arbitrary.
+// developers.openai.com/api/reference/resources/chat (chat.completion.chunk)
+// ai.google.dev/api/generate-content (streamGenerateContent, alt=sse)
+// platform.claude.com/docs/en/build-with-claude/streaming
+// docs.ollama.com/api/chat (streamed NDJSON)
+const sse = events => events.map(event => (event.event ? 'event: ' + event.event + '\n' : '') + 'data: ' +
+  (typeof event.data === 'string' ? event.data : JSON.stringify(event.data)) + '\n\n').join('');
+const split = text => [text.slice(0, 15), text.slice(15)];
+const openAiChunk = (model, delta, finish) => ({ id: 'chatcmpl-fixture', object: 'chat.completion.chunk', created: 0, model,
+  choices: [{ index: 0, delta, finish_reason: finish }] });
+// An OpenAI-compatible stream: role chunk, content chunks, a separate finish
+// chunk with an empty delta, then [DONE]. finish is the finish_reason.
+const openAiStream = (model, text, finish) => sse([
+  { data: openAiChunk(model, { role: 'assistant', content: '' }, null) },
+  ...split(text).map(part => ({ data: openAiChunk(model, { content: part }, null) })),
+  { data: openAiChunk(model, {}, finish) }, { data: '[DONE]' }]);
 const PROTOCOLS = [
-  { name: 'OpenAI-compatible', model: 'arbitrary-protocol-model-a',
+  { name: 'OpenAI-compatible', model: 'arbitrary-protocol-model-a', contentType: 'text/event-stream',
     settings: { aiProvider: 'custom', customBaseUrl: 'https://example.test/v1', customApiKey: 'fixture', customModel: 'arbitrary-protocol-model-a' },
-    envelope: (text, truncated) => ({ choices: [{ message: { role: 'assistant', content: text }, finish_reason: truncated ? 'length' : 'stop' }] }) },
-  { name: 'Gemini', model: 'arbitrary-protocol-model-b',
+    envelope: (text, truncated) => openAiStream('arbitrary-protocol-model-a', text, truncated ? 'length' : 'stop') },
+  { name: 'Gemini', model: 'arbitrary-protocol-model-b', contentType: 'text/event-stream',
     settings: { aiProvider: 'gemini', geminiApiKey: 'fixture', geminiModel: 'arbitrary-protocol-model-b' },
-    envelope: (text, truncated) => ({ candidates: [{ content: { role: 'model', parts: [
-      { thought: true, text: 'Not an answer or a dictionary field.' }, { text: text.slice(0, 15) }, { text: text.slice(15) }
-    ] }, finishReason: truncated ? 'MAX_TOKENS' : 'STOP' }] }) },
-  { name: 'Claude', model: 'arbitrary-protocol-model-c',
+    envelope: (text, truncated) => sse([
+      { data: { candidates: [{ content: { role: 'model', parts: [{ text: 'Not an answer or a dictionary field.', thought: true }] }, index: 0 }],
+        modelVersion: 'arbitrary-protocol-model-b' } },
+      ...split(text).map(part => ({ data: { candidates: [{ content: { role: 'model', parts: [{ text: part }] }, index: 0 }],
+        modelVersion: 'arbitrary-protocol-model-b' } })),
+      { data: { candidates: [{ content: { role: 'model', parts: [{ text: '' }] }, finishReason: truncated ? 'MAX_TOKENS' : 'STOP', index: 0 }],
+        usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 5, totalTokenCount: 6 }, modelVersion: 'arbitrary-protocol-model-b' } }]) },
+  { name: 'Claude', model: 'arbitrary-protocol-model-c', contentType: 'text/event-stream',
     settings: { aiProvider: 'claude', claudeApiKey: 'fixture', claudeModel: 'arbitrary-protocol-model-c' },
-    envelope: (text, truncated) => ({ type: 'message', role: 'assistant', content: [
-      { type: 'thinking', thinking: 'Not an answer or a dictionary field.', signature: 'synthetic' },
-      { type: 'text', text: text.slice(0, 15) }, { type: 'text', text: text.slice(15) }
-    ], stop_reason: truncated ? 'max_tokens' : 'end_turn' }) },
-  { name: 'Ollama', model: 'arbitrary-protocol-model-d',
+    envelope: (text, truncated) => sse([
+      { event: 'message_start', data: { type: 'message_start', message: { id: 'msg_fixture', type: 'message', role: 'assistant',
+        model: 'arbitrary-protocol-model-c', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 0 } } } },
+      { event: 'content_block_start', data: { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '', signature: '' } } },
+      { event: 'content_block_delta', data: { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'Not an answer or a dictionary field.' } } },
+      { event: 'content_block_delta', data: { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 'synthetic' } } },
+      { event: 'content_block_stop', data: { type: 'content_block_stop', index: 0 } },
+      { event: 'content_block_start', data: { type: 'content_block_start', index: 1, content_block: { type: 'text', text: '' } } },
+      { event: 'ping', data: { type: 'ping' } },
+      ...split(text).map(part => ({ event: 'content_block_delta', data: { type: 'content_block_delta', index: 1, delta: { type: 'text_delta', text: part } } })),
+      { event: 'content_block_stop', data: { type: 'content_block_stop', index: 1 } },
+      { event: 'message_delta', data: { type: 'message_delta', delta: { stop_reason: truncated ? 'max_tokens' : 'end_turn', stop_sequence: null },
+        usage: { output_tokens: 5 } } },
+      { event: 'message_stop', data: { type: 'message_stop' } }]) },
+  { name: 'Ollama', model: 'arbitrary-protocol-model-d', contentType: 'application/x-ndjson',
     settings: { aiProvider: 'ollama', ollamaBaseUrl: 'http://127.0.0.1:11434', ollamaModel: 'arbitrary-protocol-model-d' },
-    envelope: (text, truncated) => ({ message: { role: 'assistant', content: text, thinking: 'Not an answer or a dictionary field.' },
-      done: true, done_reason: truncated ? 'length' : 'stop' }) }
+    envelope: (text, truncated) => [
+      { model: 'arbitrary-protocol-model-d', created_at: '2026-01-01T00:00:00Z', message: { role: 'assistant', content: '', thinking: 'Not an answer or a dictionary field.' }, done: false },
+      ...split(text).map(part => ({ model: 'arbitrary-protocol-model-d', created_at: '2026-01-01T00:00:00Z', message: { role: 'assistant', content: part }, done: false })),
+      { model: 'arbitrary-protocol-model-d', created_at: '2026-01-01T00:00:00Z', message: { role: 'assistant', content: '' }, done: true,
+        done_reason: truncated ? 'length' : 'stop', total_duration: 1, load_duration: 1, prompt_eval_count: 1, prompt_eval_duration: 1, eval_count: 5, eval_duration: 1 }
+    ].map(line => JSON.stringify(line) + '\n').join('') }
 ];
 const OWNER = 'acct_protocol_fixture';
 let pass = 0, fail = 0, responses = [], calls = [], ownerReads = 0;
@@ -47,7 +80,13 @@ async function reject(fn, code) {
 }
 const request = (protocol, extra = {}) => ({ term: 'provider', sourceLanguage: 'en', target: { name: '简体中文', lang: 'zh-Hans' },
   owner: OWNER, settings: { ...protocol.settings, previewAiEnabled: true }, signal: new AbortController().signal, isCurrent: () => true, ...extra });
-function queue(protocol, content, truncated = false) { responses.push(protocol.envelope(JSON.stringify(content), truncated)); }
+function queue(protocol, content, truncated = false) { responses.push({ body: protocol.envelope(JSON.stringify(content), truncated), contentType: protocol.contentType }); }
+// A captured complete answer (verbatim text and observed finish_reason),
+// replayed as the OpenAI-compatible stream that carried it.
+function queueCaptured(fixture) {
+  const choice = fixture.body.choices[0];
+  responses.push({ body: openAiStream(PROTOCOLS[0].model, choice.message.content, choice.finish_reason), contentType: PROTOCOLS[0].contentType });
+}
 // This evidence boundary is fixed, public and empty. No external lookup occurs.
 async function pbpDictEvidenceFetch(input) { await input.beforeRequest(); return []; }
 async function isolated(protocol, run) {
@@ -60,9 +99,9 @@ async function isolated(protocol, run) {
   pbpVocabCurrentOwner = async () => { ownerReads++; return OWNER; };
   globalThis.fetch = async (url, init) => {
     calls.push({ url: String(url), body: JSON.parse(init.body) });
-    const body = responses.shift();
-    if (!body) throw new Error('Unexpected extra HTTP attempt');
-    return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const next = responses.shift();
+    if (!next) throw new Error('Unexpected extra HTTP attempt');
+    return new Response(next.body, { status: 200, headers: { 'Content-Type': next.contentType } });
   };
   // Fresh isolated installation: there is no previous cache to migrate. The
   // real archive read/write/validation paths remain intact.
@@ -95,7 +134,7 @@ async function test(name, protocol, run) {
         const input = { ...req, term: fixture.term }, drops = [];
         const content = JSON.parse(fixture.body.choices[0].message.content), raw = content.meanings;
         const wellFormed = raw.filter(m => Object.keys(m).sort().join() === 'definition,examples,partOfSpeech');
-        responses.push(fixture.body);
+        queueCaptured(fixture);
         const entry = await pbpDictEntryRun({ ...input, onDrop: e => drops.push(e.reason) });
         const reread = await pbpDictEntryRead(input);
         const expectedDrops = [...raw.filter(m => !wellFormed.includes(m)).map(() => 'entry_meaning'), 'entry_learning'];
@@ -109,7 +148,7 @@ async function test(name, protocol, run) {
       continue;
     }
     await test('captured complete HTTP output does not authorize guessing missing prose: ' + fixture.reason, PROTOCOLS[0], async req => {
-      responses.push(fixture.body);
+      queueCaptured(fixture);
       const input = { ...req, term: fixture.term };
       const error = await reject(() => pbpDictEntryRun(input), 'invalid_response');
       assert(error.reason === fixture.reason && calls.length === 1 && await pbpDictEntryRead(input) === null,
@@ -128,6 +167,10 @@ async function test(name, protocol, run) {
       assert(reread.archiveId === entry.archiveId && reread.supplements[0].id === addition.id && cachedAddition.id === addition.id, 'Archive identity changed');
       assert(calls.length === 2 && ownerReads > 0, 'Reread issued HTTP or skipped owner verification');
       assert(calls.every(call => call.body.model === protocol.model || call.url.includes('/models/' + protocol.model + ':')), 'User model was replaced');
+      // Every generation is one streamed request: the stream flag, or Gemini's
+      // streaming method with SSE framing.
+      assert(calls.every(call => call.body.stream === true || /:streamGenerateContent\?alt=sse/.test(call.url)), 'Generation was not streamed');
+      assert(JSON.stringify(await pbpDictEntryRead(req)).indexOf('Not an answer') < 0, 'Thinking text entered the archive');
     });
     await test(protocol.name + ': truncated entries never save or retry and failed updates preserve the old version', protocol, async req => {
       queue(protocol, ENTRY, true); await reject(() => pbpDictEntryRun(req), 'output_truncated');

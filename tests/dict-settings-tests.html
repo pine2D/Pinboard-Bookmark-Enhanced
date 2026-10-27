@@ -34,7 +34,11 @@ _pbpVocabAcceptLookupResult=()=>{};
 globalThis.fetch=async(_url,init)=>{
   headers.push(new Headers(init.headers).get('Authorization'));
   if(headers.at(-1)!=='Bearer '+expectedKey)return new Response('{"error":{"message":"Invalid fixture credentials"}}',{status:401});
-  return new Response(JSON.stringify({choices:[{finish_reason:'stop',message:{content:'{"word":"provider","language":"en","pronunciation":"","meanings":[{"partOfSpeech":"noun","definition":"One who provides.","examples":[]}],"learning":{"version":2,"formation":"","history":"","related":[]}}'}}]}),{status:200});
+  // Dictionary generation streams (plan 2.7): a handwritten OpenAI-compatible
+  // chat.completion.chunk stream (content chunk, separate finish chunk, [DONE]).
+  const chunk=(delta,finish)=>'data: '+JSON.stringify({id:'chatcmpl-fixture',object:'chat.completion.chunk',created:0,model:'arbitrary-model',choices:[{index:0,delta,finish_reason:finish}]})+'\n\n';
+  return new Response(chunk({role:'assistant',content:'{"word":"provider","language":"en","pronunciation":"","meanings":[{"partOfSpeech":"noun","definition":"One who provides.","examples":[]}],"learning":{"version":2,"formation":"","history":"","related":[]}}'},null)+
+    chunk({},'stop')+'data: [DONE]\n\n',{status:200,headers:{'Content-Type':'text/event-stream'}});
 };
 function reset(mode){
   controllers.forEach(ctrl=>ctrl.abort());controllers=[];listeners=new Set(baselineListeners);

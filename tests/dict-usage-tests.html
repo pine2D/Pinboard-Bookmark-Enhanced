@@ -21,7 +21,12 @@ async function pbpVocabCurrentOwner(){return owner;}
 async function pbpDictArchiveRead(input){if(onRead)await onRead(input);return records;}
 async function pbpDictArchiveSave(input){if(saveFailure)throw new Error('write failed');saved.push(structuredClone({...input,isCurrent:undefined,signal:undefined}));const previous=records;return records={...input.record,archiveId:saved.length.toString(16).padStart(64,'0'),archiveSaved:true,cacheSaved:true,supplements:previous?.supplements||[],previousEntries:previous?[previous,...(previous.previousEntries||[])]:[]};}
 async function pbpDictArchiveAppend(input){if(appendFailure)throw new Error('write failed');appended.push({...input});const row={...input,id:appended.length.toString(16).padStart(64,'0'),archiveSaved:true};records.supplements.push(row);return row;}
-async function callAI(settings,prompt,options){if(options.requireComplete!==true)throw new Error('Dictionary requests must require a complete response');await options.beforeRequest();calls.push({settings,prompt,options});if(onAI)await onAI();return prompt.includes('language-learning supplement')||prompt.includes('usage card')?usageAnswer:JSON.stringify(MODEL);}
+// Generation streams (plan 2.7): this stands in for callAIStream at its public
+// boundary and resolves with the whole answer once the stream has ended.
+// streamPhases are the phase side channel's reports; streamFailure ends the
+// stream with a transport error instead of an answer.
+let streamPhases=[],streamFailure=null;
+async function callAIStream(settings,prompt,options,onDelta){if(options.requireComplete!==true)throw new Error('Dictionary requests must require a complete response');await options.beforeRequest();calls.push({settings,prompt,options,onDelta});for(const phase of streamPhases)options.onProgress?.({phase});if(onAI)await onAI();if(streamFailure)throw streamFailure;return prompt.includes('language-learning supplement')||prompt.includes('usage card')?usageAnswer:JSON.stringify(MODEL);}
 function hasAIKey(){return true;}
 // Only etymology retrieves evidence for a paid supplement (1C.3): the
 // literature and culture readers are gone, so any other kind is a failure.
@@ -32,7 +37,7 @@ async function pbpDictEvidenceFetch(input){
 }
 </script><script src="../dict-entry.js"></script><script>
 let pass=0,fail=0;
-function reset(){owner='acct_test';live=true;records=null;calls=[];saved=[];appended=[];sourceCalls=[];syncResult={ok:true,connected:false};onSync=null;onAI=null;onRead=null;onEvidence=null;saveFailure=false;appendFailure=false;permission=true;sourceFailure='';usageAnswer=JSON.stringify(USAGE);etymologySources=[];}
+function reset(){streamPhases=[];streamFailure=null;owner='acct_test';live=true;records=null;calls=[];saved=[];appended=[];sourceCalls=[];syncResult={ok:true,connected:false};onSync=null;onAI=null;onRead=null;onEvidence=null;saveFailure=false;appendFailure=false;permission=true;sourceFailure='';usageAnswer=JSON.stringify(USAGE);etymologySources=[];}
 function request(extra={}){return {term:'faraway',sourceLanguage:'en',target:{name:'Chinese',lang:'zh-Hans'},owner:'acct_test',isCurrent:()=>live,signal:new AbortController().signal,settings:{aiProvider:'gemini',geminiModel:'new-model'},...extra};}
 function existing(){records=structuredClone(ORIGINAL);}
 function usageResponse(change){const value=structuredClone(USAGE);change(value);usageAnswer=JSON.stringify(value);}
@@ -135,6 +140,44 @@ await test('original examples skip retrieval progress and cancellation during a 
   existing();const stages=[];await pbpDictSupplementRun(request({category:'confusables',onStage:stage=>stages.push(stage)}));
   if(stages.join(',')!=='generating,checking,saving')return false;
   reset();existing();return await rejects(()=>pbpDictSupplementRun(request({category:'confusables',onStage:()=>{live=false;}})),'stale')&&calls.length===0;
+});
+await test('every supplement category streams with the dictionary policy, one deadline and no delta callback',async()=>{
+  for(const category of ['patterns','confusables','etymology']){
+    reset();existing();
+    if(category==='patterns')usageAnswer=JSON.stringify({language:'zh-Hans',patterns:[{sense:1,head:'faraway places',note:'用来描述离说话者很远的地点，常带有向往的意味。',example:'She dreams of faraway places.',translation:'她向往遥远的地方。'}]});
+    if(category==='etymology')usageResponse(d=>{d.items=[{sense:1,kind:'formation',title:'far + away',explanation:'由 “far” 与 “away” 组合而成。',sourceIndex:-1}];});
+    const req=request({category}),r=await pbpDictSupplementRun(req),o=calls[0]?.options;
+    if(!r.archiveSaved||calls.length!==1||calls[0].onDelta!==null||o.requireComplete!==true||o.jsonMode!==true||o.maxTokens!==8192||
+      o.totalOutputBudget!==true||o.reasoningEffort!=='minimum'||o.deadlineMs!==180000||o.signal!==req.signal||typeof o.beforeRequest!=='function'||
+      typeof o.onProgress!=='function'||!o.responseSchema||Object.hasOwn(o,'onStage'))return false;
+    // patterns keeps its own card schema (and so its own parser).
+    if((category==='patterns')!==Object.hasOwn(o.responseSchema.properties,'patterns'))return false;
+  }
+  return true;
+});
+await test('stream phases arrive synchronously between generating and checking without the async stage guard',async()=>{
+  existing();const stages=[];streamPhases=['thinking','streaming'];
+  await pbpDictSupplementRun(request({category:'confusables',onStage:stage=>stages.push(stage)}));
+  if(stages.join(',')!=='generating,thinking,streaming,checking,saving')return false;
+  reset();existing();const seen=[];let sync=true;
+  const original=callAIStream;callAIStream=async(settings,prompt,options)=>{await options.beforeRequest();calls.push({settings,prompt,options});
+    // No await between the report and the check: the async stage() would only
+    // deliver after a guard round-trip.
+    options.onProgress({phase:'thinking'});sync=seen.at(-1)==='thinking';return usageAnswer;};
+  try{await pbpDictSupplementRun(request({category:'confusables',onStage:stage=>seen.push(stage)}));return sync&&seen.join(',')==='generating,thinking,checking,saving';}
+  finally{callAIStream=original;}
+});
+await test('a stream that ends in a transport error saves nothing, is not a neutral answer and is never retried',async()=>{
+  const failures=[Object.assign(new Error('AI output exceeded the dictionary budget'),{code:'output_budget_exceeded',status:200}),
+    Object.assign(new Error('AI stream reported an error'),{code:'stream_error',status:200}),
+    Object.assign(new Error('AI response was cut off'),{code:'output_truncated',status:200}),
+    new DOMException('The AI request exceeded its deadline','TimeoutError')];
+  for(const category of ['patterns','confusables'])for(const failure of failures){
+    reset();existing();streamFailure=failure;const stages=[];let error=null;
+    try{await pbpDictSupplementRun(request({category,onStage:stage=>stages.push(stage)}));}catch(e){error=e;}
+    if(!error||(error.code||error.name)!==(failure.code||failure.name)||error.code==='unsupported_usage'||appended.length||calls.length!==1||stages.includes('checking'))return false;
+  }
+  return true;
 });
 await test('basic lookup does not wait for or request etymology evidence',async()=>{
   let lookups=0;const original=pbpDictEvidenceFetch;pbpDictEvidenceFetch=async()=>{lookups++;throw new Error('Evidence unavailable');};
@@ -493,7 +536,7 @@ await test('a leaking summary with no valid item still fails and reports no summ
     appended.length===0&&drops.length===0&&calls.length===1;
 });
 await test('a German-to-Chinese base entry drops only the sense that leaks a field word',async()=>{
-  const original=callAI;callAI=async(settings,prompt,options)=>{await options.beforeRequest();calls.push({settings,prompt,options});
+  const original=callAIStream;callAIStream=async(settings,prompt,options)=>{await options.beforeRequest();calls.push({settings,prompt,options});
     return JSON.stringify({word:'Fernweh',language:'de',pronunciation:'',meanings:[
       {partOfSpeech:'名词',definition:'对远方的向往，渴望离开熟悉的地方去远行。',examples:[]},
       {partOfSpeech:'名词',definition:'sense：一种想去陌生地方旅行的心情，与思乡相对。',examples:[]}]});};
@@ -501,7 +544,7 @@ await test('a German-to-Chinese base entry drops only the sense that leaks a fie
   try{const r=await pbpDictEntryRun({...request(DE_ZH),onDrop:error=>drops.push([error.code,error.reason])});
     return r.archiveSaved&&saved.length===1&&saved[0].record.entry.meanings.length===1&&saved[0].record.entry.meanings[0].definition.startsWith('对远方')&&
       JSON.stringify(drops)==='[["invalid_response","internal_term"]]'&&calls.length===1;}
-  finally{callAI=original;}
+  finally{callAIStream=original;}
 });
 await test('English explanations may use field words as ordinary prose',async()=>{
   existing();usageResponse(d=>{d.language='en';d.summary='Expresses a longing for distant places.';
@@ -578,11 +621,11 @@ await test('a supplement item that leaks only in its translation is dropped',asy
   return r.archiveSaved&&r.learning.items.length===1&&r.learning.items[0].title==='Fernweh haben'&&r.learning.omittedItems===1;
 });
 await test('a base entry whose only sense leaks in an example translation fails with every sense invalid',async()=>{
-  const original=callAI;callAI=async(settings,prompt,options)=>{await options.beforeRequest();calls.push({settings,prompt,options});
+  const original=callAIStream;callAIStream=async(settings,prompt,options)=>{await options.beforeRequest();calls.push({settings,prompt,options});
     return JSON.stringify({word:'Fernweh',language:'de',pronunciation:'',meanings:[
       {partOfSpeech:'名词',definition:'对远方的向往，渴望离开熟悉的地方去远行。',examples:[{text:'Sie hat Fernweh.',translation:'她有一种 note 意义上的远方渴望。'}]}]});};
   try{return await rejectsReason(()=>pbpDictEntryRun(request(DE_ZH)),'invalid_response','entry_meanings_all_invalid')&&saved.length===0&&calls.length===1;}
-  finally{callAI=original;}
+  finally{callAIStream=original;}
 });
 await test('field words and identifiers written flush against Chinese characters still leak, while Latin compounds do not',async()=>{
   for(const explanation of ['这是interpretation：作者对远方的看法，带有怀旧色彩。','根据sourceIndex判断，这个例句由 AI 编写，适合口语。']){

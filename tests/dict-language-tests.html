@@ -5,7 +5,8 @@ let detection=null, detected=[], answer='', record=null, calls=0, saved=0, appen
 globalThis.chrome={i18n:{detectLanguage:async text=>{detected.push(text);if(detection instanceof Error)throw detection;return typeof detection==='function'?detection(text):detection;},getUILanguage:()=>document.documentElement.lang||'en'}};
 async function pbpVocabCurrentOwner(){return 'acct_language_fixture';}
 function hasAIKey(){return true;}
-async function callAI(settings,prompt,opts){await opts.beforeRequest();calls++;return answer;}
+// Stands in for callAIStream (plan 2.7), which resolves with the whole answer.
+async function callAIStream(settings,prompt,opts){await opts.beforeRequest();calls++;return answer;}
 async function pbpDictArchiveRead(){return record;}
 async function pbpDictArchiveSave(input){saved++;return record={...input.record,archiveId:'a'.repeat(64),archiveSaved:true,supplements:[]};}
 async function pbpDictArchiveAppend(input){appended++;const item={...input,id:'b'.repeat(64),archiveSaved:true};record.supplements.push(item);return item;}

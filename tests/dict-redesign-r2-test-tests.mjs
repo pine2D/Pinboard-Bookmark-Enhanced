@@ -22,9 +22,10 @@ const plan = makePlan(config(), fingerprints);
 const caseOf = (arm, wordId = "charge", model = "vendor/model-one") => ({ caseId: [model, wordId, arm].join(":"), model, wordId, arm });
 const target = lang => ({ lang, name: lang === "en" ? "English" : "Simplified Chinese" });
 const baseEntry = { word: "charge", language: "en", meanings: [{ partOfSpeech: "名词", definition: "费用。" }] };
-// Handwritten in the product's request shape: prompt text, then the JSON payload line.
+// Handwritten in the product's request shape: prompt text, then the JSON
+// payload line. Generation streams (plan 2.7), so the body carries stream:true.
 const body = (opening, payload, patch = {}) => ({ model: "vendor/model-one", messages: [{ role: "user", content: opening + " Instructions.\n" + JSON.stringify(payload) }],
-  max_tokens: 8192, temperature: 0.2, response_format: { type: "json_object" }, ...patch });
+  temperature: 0.2, response_format: { type: "json_object" }, max_tokens: 8192, stream: true, ...patch });
 const entryBody = (patch, payloadPatch = {}) => body("Create a concise reusable dictionary entry for a language learner.",
   { term: "charge", sourceLanguage: "en", targetLanguage: target("zh-Hans"), ...payloadPatch }, patch);
 const patternsBody = (payloadPatch = {}) => body("Create one compact usage card for a language learner.",
@@ -80,7 +81,7 @@ test("the plan drives the redesigned arms in order and binds configuration and c
   assert.doesNotMatch(JSON.stringify(plan.sent), /article|vocabulary|Ask/i);
 });
 
-test("the product pin is one end-of-1B fingerprint and any other product refuses", () => {
+test("the product pin is one reviewed fingerprint and any other product refuses", () => {
   assert.match(PRODUCT_FINGERPRINT, /^[a-f0-9]{64}$/);
   assert.equal(verifyProduct(PRODUCT_FINGERPRINT), true);
   for (const value of ["0".repeat(64), "", undefined]) assert.throws(() => verifyProduct(value), code("product_changed"));
@@ -164,7 +165,10 @@ test("only the product's own request for the active word and arm is admitted", (
   assert.equal(authorizeRequest(plan, caseOf("etymology"), supplementBody("etymology", { sources: [source] })).tokens, 8192);
   const refused = [
     [caseOf("entry"), entryBody({ model: "vendor/model-two" }), "request_shape"],
-    [caseOf("entry"), entryBody({ stream: true }), "request_shape"],
+    [caseOf("entry"), entryBody({ stream: undefined }), "request_shape"],
+    [caseOf("entry"), entryBody({ stream: false }), "request_shape"],
+    [caseOf("entry"), entryBody({ stream: "true" }), "request_shape"],
+    [caseOf("entry"), entryBody({ stream_options: { include_usage: true } }), "request_shape"],
     [caseOf("entry"), entryBody({ tools: [] }), "request_shape"],
     [caseOf("entry"), entryBody({ max_completion_tokens: 10 }), "request_shape"],
     [caseOf("entry"), { ...entryBody(), messages: [...entryBody().messages, { role: "user", content: "x" }] }, "request_shape"],

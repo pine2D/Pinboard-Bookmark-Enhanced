@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { buildPlan, validateApproval, validatePriceFreshness, validateMinimaxLowFollowup, newLedger, validateLedger, reserveAttempt, redactText, completionMetadata, completionReport } from "../scripts/dict-live-test.mjs";
+import { buildPlan, validateApproval, validatePriceFreshness, validateMinimaxLowFollowup, newLedger, validateLedger, reserveAttempt, redactText, completionMetadata, completionReport, streamCompletion, readAnswerBody, isProductRequest } from "../scripts/dict-live-test.mjs";
 
 const PUBLIC = `DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-flash
@@ -208,6 +208,57 @@ test("diagnostic answer reports exclude reasoning and provider error fields whil
   assert.match(report.content, /Generated example \[REDACTED\]/);
   assert.ok(!serialized.includes(secret)); assert.ok(!serialized.includes("PRIVATE_"));
   assert.equal(completionReport({ error: { message: "PRIVATE_ERROR" } }), null);
+});
+// Handwritten chat.completion.chunk wire bodies (OpenAI streaming reference),
+// written here as literal text, not by the rehearsal fixture's writer.
+const SSE_ANSWER = ': OPENROUTER PROCESSING\r\n\r\n' +
+  'data: {"id":"c","object":"chat.completion.chunk","created":0,"model":"m","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}\n\n' +
+  'data: {"id":"c","object":"chat.completion.chunk","created":0,"model":"m","choices":[{"index":0,"delta":{"reasoning_content":"PRIVATE_REASONING","reasoning":"PRIVATE_REASONING"},"finish_reason":null}]}\n\n' +
+  'event: message\nid: 7\ndata: {"id":"c","object":"chat.completion.chunk","created":0,"model":"m","choices":[{"index":0,"delta":{"content":"{\\"word\\":\\"pro"},"finish_reason":null}]}\n\n' +
+  'data: {"id":"c","object":"chat.completion.chunk","created":0,"model":"m","choices":[{"index":0,"delta":{"content":"vider\\"}"},"finish_reason":null}]}\n\n' +
+  'data: {"id":"c","object":"chat.completion.chunk","created":0,"model":"m","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\n' +
+  'data: {"id":"c","object":"chat.completion.chunk","created":0,"model":"m","choices":[],"usage":{"prompt_tokens":100,"completion_tokens":40,"total_tokens":140,"completion_tokens_details":{"reasoning_tokens":12}}}\n\n' +
+  'data: [DONE]\n\n';
+test("a streamed answer is folded into the same diagnostics without keeping reasoning text", () => {
+  const body = streamCompletion(SSE_ANSWER), info = completionMetadata(body);
+  assert.equal(body.choices[0].message.content, '{"word":"provider"}');
+  assert.equal(info.finishReason, "stop"); assert.equal(info.contentEmpty, false); assert.equal(info.contentLength, 19);
+  // reasoning_content and its alias reasoning arrive together: counted once.
+  assert.equal(info.reasoningContentLength, 17);
+  assert.equal(info.usage.completion_tokens, 40); assert.equal(info.usage["completion_tokens_details.reasoning_tokens"], 12);
+  assert.ok(!JSON.stringify(info).includes("PRIVATE"));
+  const report = completionReport(body, []);
+  assert.equal(report.content, '{"word":"provider"}'); assert.ok(!JSON.stringify(report).includes("PRIVATE"));
+});
+test("streamed truncation, in-stream errors and broken framing stay visible as such", () => {
+  const cut = streamCompletion('data: {"choices":[{"index":0,"delta":{"content":"{\\"word"},"finish_reason":null}]}\n\n' +
+    'data: {"choices":[{"index":0,"delta":{},"finish_reason":"length"}]}\n\ndata: [DONE]\n\n');
+  assert.equal(completionMetadata(cut).finishReason, "length");
+  const thinkingOnly = streamCompletion('data: {"choices":[{"index":0,"delta":{"reasoning":"PRIVATE_REASONING"},"finish_reason":null}]}\n\n' +
+    'data: {"choices":[{"index":0,"delta":{},"finish_reason":"length"}]}\n\n');
+  assert.equal(completionMetadata(thinkingOnly).contentEmpty, true); assert.equal(completionReport(thinkingOnly), null);
+  const failed = streamCompletion('data: {"error":{"message":"PRIVATE_ERROR","code":500}}\n\n');
+  assert.ok(failed.error); assert.ok(!JSON.stringify(failed).includes("PRIVATE_ERROR"));
+  assert.equal(completionMetadata(failed).finishReason, "other_or_missing");
+  assert.equal(streamCompletion('data: {"choices":[{"delta":{"content":"x"}\n\n'), null);
+  assert.equal(streamCompletion(": keep-alive\n\ndata: [DONE]\n\n"), null);
+  assert.equal(streamCompletion(""), null);
+});
+test("the replayed content type follows the answer: SSE for a streamed 2xx, JSON for an HTTP error", () => {
+  assert.deepEqual(readAnswerBody(SSE_ANSWER, true, "text/event-stream; charset=utf-8").contentType, "text/event-stream");
+  assert.equal(readAnswerBody(SSE_ANSWER, true, "").streamed, true);
+  const error = readAnswerBody('{"error":{"message":"bad request"}}', false, "application/json");
+  assert.equal(error.streamed, false); assert.equal(error.contentType, "application/json"); assert.equal(error.parsed.error.message, "bad request");
+  // A 4xx/5xx is never parsed as a stream, whatever it claims to be.
+  assert.equal(readAnswerBody("data: {}\n\n", false, "text/event-stream").streamed, false);
+});
+test("only the product's own streamed request is admitted", () => {
+  const body = patch => ({ model: "m", stream: true, messages: [{ role: "user", content: "Create a concise reusable dictionary entry\n{}" }],
+    max_completion_tokens: 8192, ...patch });
+  assert.equal(isProductRequest(body(), "m"), true);
+  for (const value of [body({ stream: undefined }), body({ stream: false }), body({ stream: "true" }), body({ stream_options: { include_usage: true } }),
+    body({ model: "other" }), body({ tools: [] }), body({ tool_choice: "auto" }), body({ messages: [] }),
+    body({ messages: [{ role: "system", content: "x" }] }), null]) assert.equal(isProductRequest(value, "m"), false, JSON.stringify(value));
 });
 test("--plan and rejected approval never read or probe .env and never use network", () => {
   const dir = mkdtempSync(resolve(tmpdir(), "dict-live-plan-test-"));

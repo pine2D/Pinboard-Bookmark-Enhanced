@@ -51,7 +51,7 @@ export function buildPlan(publicText) {
       gemini: "production custom provider, OpenAI-compatible protocol only; does not test the native Gemini adapter",
       endpoints: "isolated browser registry base override from providers.env; product files unchanged",
       optionalEvidence: "not granted; production entry skips optional Wiktionary retrieval; no literature/source-fetch coverage",
-      paidPath: "production prompt -> callAI -> parser -> IndexedDB archive -> reread -> production entry mount and visible meanings/supplements",
+      paidPath: "production prompt -> callAIStream (stream:true, SSE) -> parser -> IndexedDB archive -> reread -> production entry mount and visible meanings/supplements",
       account: "synthetic Pinboard owner in an isolated profile; Drive disconnected; no user account or browser profile",
       retryAccounting: "production dialect fallback is counted; bridge never retries; case/provider caps persist across restarts",
       money: "conservative input-byte/output-token reservations; provider billing and current prices remain external assumptions",
@@ -157,6 +157,47 @@ export function completionMetadata(body) {
     contentEmpty: typeof message?.content !== "string" || !message.content.trim(),
     reasoningContentLength: typeof message?.reasoning_content === "string" ? message.reasoning_content.length : 0 };
 }
+// Dictionary generation streams (plan 2.7). An OpenAI-compatible SSE body
+// (chat.completion.chunk events) is folded into the completion shape that
+// completionMetadata/completionReport read, so stream and non-stream answers
+// are diagnosed alike. Comment lines, event/id/retry fields and [DONE] are
+// framing; reasoning_content (or its alias reasoning, counted once per chunk)
+// stays in memory only for its length, as the non-stream body does. An
+// in-stream error member is noted as present, never with the provider's text.
+// Returns null when there is no data event or one does not parse as JSON.
+export function streamCompletion(text) {
+  let content = "", reasoning = "", finish = null, usage, events = 0, error = false, sawContent = false;
+  for (const block of String(text).replace(/\r\n?/g, "\n").split("\n\n")) {
+    const lines = block.split("\n").filter(line => line.startsWith("data:"));
+    if (!lines.length) continue;
+    const data = lines.map(line => line.slice(5).replace(/^ /, "")).join("\n");
+    if (data === "[DONE]") continue;
+    let chunk; try { chunk = JSON.parse(data); } catch { return null; }
+    events++;
+    if (!chunk || typeof chunk !== "object") return null;
+    if (chunk.error) error = true;
+    if (chunk.usage && typeof chunk.usage === "object") usage = chunk.usage;
+    const choice = Array.isArray(chunk.choices) ? chunk.choices[0] : null;
+    if (!choice) continue;
+    const delta = choice.delta && typeof choice.delta === "object" ? choice.delta : {};
+    if (typeof delta.content === "string") { content += delta.content; sawContent = true; }
+    reasoning += typeof delta.reasoning_content === "string" ? delta.reasoning_content : typeof delta.reasoning === "string" ? delta.reasoning : "";
+    if (typeof choice.finish_reason === "string") finish = choice.finish_reason;
+  }
+  if (!events) return null;
+  return { ...(error ? { error: { inStream: true } } : {}), choices: [{ finish_reason: finish,
+    message: { role: "assistant", content: sawContent ? content : null, ...(reasoning ? { reasoning_content: reasoning } : {}) } }],
+    ...(usage ? { usage } : {}) };
+}
+// The product streams, so a 2xx answer is an SSE body; anything else (an
+// HTTP error) is read as JSON. The format decides the replayed content type.
+export function readAnswerBody(text, ok, contentType = "") {
+  const streamed = ok && (/^text\/event-stream\b/i.test(contentType) || /^\s*(?:data:|event:|:)/.test(text));
+  let parsed = null;
+  if (streamed) parsed = streamCompletion(text);
+  else { try { parsed = JSON.parse(text); } catch { parsed = null; } }
+  return { streamed, parsed, contentType: streamed ? "text/event-stream" : "application/json" };
+}
 export function completionReport(body, keys = []) {
   const content = body?.choices?.[0]?.message?.content;
   return typeof content === "string" ? { ...completionMetadata(body), content: redactText(content, keys) } : null;
@@ -188,6 +229,15 @@ async function boundedBody(response, maxBytes) {
   } finally { await reader.cancel().catch(() => {}); }
 }
 
+// The product's own generation request: the configured model, one user
+// message, no tools. Generation streams (plan 2.7), so stream must be exactly
+// true and stream_options absent (the product never asks for include_usage).
+export function isProductRequest(body, model) {
+  return !!body && typeof body === "object" && body.model === model && body.stream === true && !own(body, "stream_options") &&
+    Array.isArray(body.messages) && body.messages.length === 1 && body.messages[0]?.role === "user" &&
+    typeof body.messages[0].content === "string" && !body.tools && !body.tool_choice;
+}
+
 async function executeProvider(plan, approval, ledger, id, key, saveLedger, { reportDir = REPORT, dispatch = fetch } = {}) {
   const config = plan.providers[id], def = DEFINITIONS[id], row = ledger.providers[id];
   const { chromium } = createRequire(resolve(REPO, ".qa-scan/package.json"))("playwright");
@@ -202,8 +252,7 @@ async function executeProvider(plan, approval, ledger, id, key, saveLedger, { re
       try {
         if (!activeCase || request.method() !== "POST" || request.url() !== config.baseUrl + "/chat/completions") fail("unapproved_network_request");
         const body = request.postDataJSON();
-        if (!body || body.model !== config.model || body.stream || !Array.isArray(body.messages) || body.messages.length !== 1 ||
-            body.messages[0].role !== "user" || typeof body.messages[0].content !== "string" || body.tools || body.tool_choice) fail("unexpected_production_request");
+        if (!isProductRequest(body, config.model)) fail("unexpected_production_request");
         const baseline = activeCase === "entry" ? plan.limits.entryOutputTokens : plan.limits.supplementOutputTokens;
         const tokenField = own(body, "max_completion_tokens") ? "max_completion_tokens" : "max_tokens";
         if (body[tokenField] !== baseline || (own(body, "max_completion_tokens") && own(body, "max_tokens"))) fail("unexpected_output_budget");
@@ -216,7 +265,7 @@ async function executeProvider(plan, approval, ledger, id, key, saveLedger, { re
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + key }, body: JSON.stringify(body), signal: AbortSignal.timeout(plan.limits.timeoutMs) });
         attempt.httpStatus = response.status;
         const safeBody = redactText(await boundedBody(response, plan.limits.responseBytes), [key]);
-        let parsed; try { parsed = JSON.parse(safeBody); } catch { parsed = null; }
+        const { parsed, contentType } = readAnswerBody(safeBody, response.ok, response.headers.get("content-type") || "");
         // Only successful synthetic-case answer text is retained for parser
         // diagnosis. Never persist reasoning, raw provider errors or headers.
         const answer = response.ok ? completionReport(parsed, [key]) : null;
@@ -225,7 +274,7 @@ async function executeProvider(plan, approval, ledger, id, key, saveLedger, { re
           writeJson(resolve(reportDir, attempt.responseReport), { provider: id, caseId: activeCase, ...answer });
         }
         Object.assign(attempt, completionMetadata(parsed), { state: "received" }); saveLedger();
-        await route.fulfill({ status: response.status, contentType: "application/json", body: safeBody });
+        await route.fulfill({ status: response.status, contentType, body: safeBody });
       } catch (error) {
         const known = ["request_bounds", "request_budget_exhausted", "cost_budget_exhausted", "unapproved_network_request", "unexpected_production_request", "unexpected_output_budget", "response_body_missing", "response_too_large", "followup_approval_invalid", "followup_ledger_ineligible", "followup_request_bounds"];
         const code = known.includes(error?.safeCode) ? error.safeCode : error?.name === "TimeoutError" ? "transport_timeout" : "transport_or_harness_failed";
@@ -321,6 +370,7 @@ export async function main(argv = process.argv.slice(2)) {
     const syntheticPlan = { ...plan }; delete syntheticPlan.planHash;
     plan.planHash = digest(syntheticPlan);
     const { entryResponse, patternsResponse, confusablesResponse } = await import("../tests/fixtures/dict-live-responses.mjs");
+    const { chatCompletionStream } = await import("../tests/fixtures/dict-chat-stream.mjs");
     const approval = { providers: Object.keys(plan.providers), cases: CASES, retryFailed: false, diagnosticOutputTokens: null };
     mkdirSync(REPORT, { recursive: true, mode: 0o700 });
     const reportDir = mkdtempSync(resolve(REPORT, "rehearsal-")), ledger = newLedger(plan);
@@ -330,7 +380,9 @@ export async function main(argv = process.argv.slice(2)) {
       const content = JSON.parse(options.body).messages[0].content;
       const body = content.startsWith("Create one compact usage card") ? patternsResponse
         : content.startsWith("Create a concise language-learning supplement") ? confusablesResponse : entryResponse;
-      return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+      // The product streams, so the handwritten answer goes back as the
+      // chat.completion.chunk SSE body a compatible endpoint sends.
+      return new Response(chatCompletionStream(body), { status: 200, headers: { "Content-Type": "text/event-stream" } });
     };
     // In-memory synthetic keys and responses only. This mode never reads .env,
     // invokes Node fetch, or shares the live ledger or browser profile.
