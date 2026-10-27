@@ -717,7 +717,7 @@ function pbpDictSupplementParse(response, request, category, sources, entry, rep
   const value = _pbpDictResponseJson(response, 24576, "supplement");
   if (typeof response !== "string" || response.length > 24576 ||
       !_pbpDictEntryObject(value, ["language", "summary", "items"]) || typeof value.language !== "string" ||
-      !_pbpDictEntryText(value.summary, 800, true) || !Array.isArray(value.items) || value.items.length > 5) return invalid("supplement_fields");
+      !_pbpDictEntryText(value.summary, 800, true) || !Array.isArray(value.items)) return invalid("supplement_fields");
   // With a known target the echoed language is only a hint: models often echo
   // the word's language or a sibling tag while writing the requested prose.
   // The caller's prose check decides; an unknown custom target still relies on
@@ -727,7 +727,11 @@ function pbpDictSupplementParse(response, request, category, sources, entry, rep
     console.warn("[dict-entry] language echo mismatch");
   }
   if (!value.items.length) throw _pbpDictEntryError("unsupported_usage", "No useful supported supplement");
-  if (category === "literature" && value.items.length > 2) return invalid("supplement_item_shape");
+  // Over-long output keeps its first N items (the archive's per-category cap)
+  // instead of failing a paid run. The slice comes before per-item validation,
+  // so omittedItems counts only bad members inside the kept window. The schema
+  // maxItems still guides generation; the base entry is not truncated (Q5=B).
+  const kept = value.items.slice(0, category === "literature" ? 2 : 5);
   const validateItem = item => {
     const keys = ["sense", "title", "explanation", "example", "translation", "sourceIndex"];
     if (category === "etymology") keys.push("kind");
@@ -765,7 +769,7 @@ function pbpDictSupplementParse(response, request, category, sources, entry, rep
   };
   const items = [], seen = new Set();
   let firstError;
-  for (const item of value.items) {
+  for (const item of kept) {
     try {
       const valid = validate(item), key = _pbpDictSupplementItemKey(valid);
       if (seen.has(key)) invalid("supplement_duplicate");
@@ -781,7 +785,7 @@ function pbpDictSupplementParse(response, request, category, sources, entry, rep
   // The summary is not an item that can be omitted and marked, so a leak there
   // fails the whole supplement.
   if (_pbpDictInternalTermLeak(value.summary, leakContext)) return invalid("internal_term");
-  const omittedItems = value.items.length - items.length;
+  const omittedItems = kept.length - items.length;
   return { version: 2, language: request.target, summary: value.summary.trim(), items, replacesId,
     ...(omittedItems ? { omittedItems } : {}) };
 }

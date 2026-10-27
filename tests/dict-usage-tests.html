@@ -226,13 +226,43 @@ await test('clearer meaning diagnostics do not weaken source, quote or translati
   const cases=[
     ['culture','supplement_source',d=>{d.items[0].sourceIndex=-1;}],
     ['literature','supplement_quote',d=>{d.items[0].sourceIndex=0;d.items[0].example='PRIVATE_FABRICATED_QUOTE';}],
-    ['grammar','supplement_example',d=>{d.items[0].translation='';}],
-    ['literature','supplement_item_shape',d=>{d.items=[1,2,3].map(i=>({...d.items[0],title:'Passage '+i,example:'',sourceIndex:0}));}]
+    ['grammar','supplement_example',d=>{d.items[0].translation='';}]
   ];
   for(const [category,reason,mutate] of cases){
     reset();existing();usageResponse(mutate);
     try{await pbpDictSupplementRun(request({category}));return false;}
     catch(e){if(e.reason!==reason||JSON.stringify(e).includes('PRIVATE_')||appended.length)return false;}
+  }
+  return true;
+});
+// Q5=B: an over-long supplement keeps its first N items. The slice happens
+// before per-item validation, so only bad members inside the kept window count
+// as omitted; items past the cap are discarded unseen and never fail the run.
+const overCap=(d,bad=[])=>{d.items=[0,1,2,3,4,5,6].map(i=>bad.includes(i)?{...d.items[0],title:'Point '+i,example:'',translation:''}:{...d.items[0],title:'Point '+i});};
+await test('seven valid supplement items keep the first five without an incomplete count',async()=>{
+  existing();usageResponse(d=>overCap(d));
+  const r=await pbpDictSupplementRun(request({category:'grammar'}));
+  return r.archiveSaved&&r.learning.items.map(i=>i.title).join()==='Point 0,Point 1,Point 2,Point 3,Point 4'&&
+    !('omittedItems' in r.learning)&&calls.length===1&&appended.length===1;
+});
+await test('a bad item inside the first five is omitted and counted against the kept window only',async()=>{
+  existing();usageResponse(d=>overCap(d,[2]));
+  const r=await pbpDictSupplementRun(request({category:'grammar'}));
+  return r.archiveSaved&&r.learning.items.map(i=>i.title).join()==='Point 0,Point 1,Point 3,Point 4'&&
+    r.learning.omittedItems===1&&calls.length===1&&appended.length===1;
+});
+await test('bad items beyond the cap are discarded without affecting the result',async()=>{
+  existing();usageResponse(d=>overCap(d,[5,6]));
+  const r=await pbpDictSupplementRun(request({category:'grammar'}));
+  return r.archiveSaved&&r.learning.items.length===5&&!('omittedItems' in r.learning)&&appended.length===1;
+});
+await test('three cited passages keep the first two and a bad third passage is never inspected',async()=>{
+  for(const third of [{},{sourceIndex:-1}]){
+    reset();existing();
+    usageResponse(d=>{d.items=[1,2,3].map(i=>({...d.items[0],title:'Passage '+i,example:'',sourceIndex:0,...(i===3?third:{})}));});
+    const r=await pbpDictSupplementRun(request({category:'literature'}));
+    if(!r.archiveSaved||r.learning.items.map(i=>i.title).join()!=='Passage 1,Passage 2'||'omittedItems' in r.learning||
+       r.learning.items.some(i=>i.example!==SOURCE.excerpt)||appended.length!==1)return false;
   }
   return true;
 });
