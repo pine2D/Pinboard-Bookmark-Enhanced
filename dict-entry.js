@@ -179,12 +179,16 @@ function _pbpDictEntryPrompt(request) {
     '{"word":string,"language":string,"pronunciation":string,"meanings":[{"partOfSpeech":string,"definition":string,"examples":[{"text":string,"translation":string}]}]}. ' +
     "Copy word exactly from term and language exactly from sourceLanguage, preserving case; do not substitute a different headword. " +
     "For an inflected form, explain its relation to the base form in the definition. " +
-    "Give 1-3 common meanings, at most four, with one short original example each (at most two). Finish every definition and translation. " +
+    // One meaning per object (Q28=A): supplements reference a sense by its
+    // index, so meanings merged into one definition cannot be referenced
+    // apart. This is a prompt and example rule only, with no heuristic validator.
+    "Write exactly one meaning per meanings object: give each distinct meaning its own object, including different meanings under the same partOfSpeech, and never join several meanings in one definition with semicolons. " +
+    "Give the 1-3 most common meanings as separate objects, at most four objects, with one short original example each (at most two). Finish every definition and translation. " +
     "Character limits: pronunciation<=256, partOfSpeech<=128, definition<=1200, example text/translation<=600 each. " +
     "Every meaning needs a nonempty definition; use examples:[] when none are useful and empty strings for unavailable pronunciation or grammatical labels. " +
     "Pronunciation can be IPA or a conventional reading, but leave it empty when uncertain. " +
     "Do not include etymology or related words; these are separate optional tasks. For an unknown expression use meanings:[] and pronunciation:\"\". " +
-    'Example shape for a different lookup: {"word":"book","language":"en","pronunciation":"","meanings":[{"partOfSpeech":"名词","definition":"书；书籍。","examples":[{"text":"I borrowed a book.","translation":"我借了一本书。"}]}]}. Adapt all explanation text to targetLanguage. ' +
+    'Example shape for a different lookup: {"word":"book","language":"en","pronunciation":"","meanings":[{"partOfSpeech":"名词","definition":"书，装订成册的著作。","examples":[{"text":"I borrowed a book.","translation":"我借了一本书。"}]},{"partOfSpeech":"动词","definition":"预订（座位、房间或票）。","examples":[{"text":"We booked a table for two.","translation":"我们订了一张两人桌。"}]}]}. Adapt all explanation text to targetLanguage. ' +
     "Use plain-text strings only, without HTML or Markdown. When prose mentions a sourceLanguage word or pattern, wrap it in curly double quotes “…”; never use ASCII quotes inside values. No extra fields, code fences or surrounding prose.\n" +
     JSON.stringify(_pbpDictEntryPromptData(request));
 }

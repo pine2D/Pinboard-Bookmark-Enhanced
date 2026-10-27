@@ -253,6 +253,43 @@ await test('1A.3 a related note may name its own related word, while a leaking r
   return r.cacheSaved&&r.entry.meanings.length===1&&r.entry.learning.related.length===1&&r.entry.learning.related[0].word==='Note'&&
     r.entry.relatedWords.join(',')==='Note'&&JSON.stringify(drops)==='[["invalid_response","internal_term"]]';
 });
+// Batch 1A.4 (Q28=A): one meaning per meanings object is a prompt and example
+// rule locked here; whether a real model follows it is a sampled live check.
+await test('1A.4 the entry prompt asks for one meaning per object and its example shows separate senses',async()=>{
+  reset();await pbpDictEntryRun(request());const p=calls[0].prompt;
+  const shape=p.match(/Example shape for a different lookup: (\{[\s\S]*?\})\. Adapt/);const example=shape&&JSON.parse(shape[1]);
+  return p.includes('exactly one meaning per meanings object')&&p.includes('including different meanings under the same partOfSpeech')&&
+    p.includes('never join several meanings in one definition with semicolons')&&p.includes('at most four objects')&&
+    !p.includes('Give 1-3 common meanings, at most four,')&&example?.meanings?.length>=2&&
+    example.meanings.every(m=>m.definition&&!/[;；]/.test(m.definition)&&m.examples.length===1)&&
+    new Set(example.meanings.map(m=>m.definition)).size===example.meanings.length;
+});
+// Model-shaped polysemy fixture: charge returned as four separate senses, two
+// sharing a part of speech. Written by hand, not by the parser or the archive.
+const CHARGE_RESPONSE=JSON.stringify({word:'charge',language:'en',pronunciation:'/tʃɑːrdʒ/',meanings:[
+  {partOfSpeech:'名词',definition:'（商品或服务的）收费，费用。',examples:[{text:'There is no charge for delivery.',translation:'送货不收费。'}]},
+  {partOfSpeech:'名词',definition:'（正式的）指控，控告。',examples:[{text:'He denied the charge.',translation:'他否认了这项指控。'}]},
+  {partOfSpeech:'动词',definition:'收取（费用），要价。',examples:[{text:'They charge ten dollars an hour.',translation:'他们每小时收费十美元。'}]},
+  {partOfSpeech:'动词',definition:'给（电池或设备）充电。',examples:[{text:'I need to charge my phone.',translation:'我得给手机充电了。'}]}]});
+const CHARGE_USAGE=sense=>JSON.stringify({language:'zh-Hans',summary:'“charge”在充电义上的常见搭配。',items:[
+  {sense,title:'charge a phone',explanation:'指给手机充电，常与 “phone”“battery” 连用。',example:'Charge your phone overnight.',translation:'晚上给手机充好电。',sourceIndex:-1}]});
+await test('1A.4 a four-sense charge entry survives parse, save and re-read, and a supplement can reference its fourth sense',async()=>{
+  reset();answer=CHARGE_RESPONSE;const req=request({term:'charge',sourceLanguage:'en',target:{name:'Chinese',lang:'zh-Hans'}});
+  const r=await pbpDictEntryRun(req),again=await pbpDictEntryRead(req);
+  const defs=e=>e.meanings.map(m=>m.definition).join('|'),expected=JSON.parse(CHARGE_RESPONSE).meanings.map(m=>m.definition).join('|');
+  if(!r.cacheSaved||defs(r.entry)!==expected||defs(writes[0].result.entry)!==expected||defs(again.entry)!==expected||calls.length!==1)return false;
+  const outOfRange=await (async()=>{try{pbpDictSupplementParse(CHARGE_USAGE(5),req,'collocations',[],again.entry);return false;}catch(e){return e.reason==='supplement_item_sense';}})();
+  const frame=document.createElement('iframe');frame.hidden=true;const ready=new Promise(resolve=>frame.onload=resolve);frame.src='fixtures/dict-normalization-archive.html';document.body.append(frame);
+  try{await ready;const api=frame.contentWindow,record=writes[0].result;
+    const stored=await api.roundTripNormalized(record);
+    if(!stored?.archiveSaved||defs(stored.entry)!==expected)return false;
+    const learning=pbpDictSupplementParse(CHARGE_USAGE(4),req,'collocations',[],stored.entry);
+    const supplement={category:'collocations',profile:{nativeLanguage:'',level:'',topic:''},content:learning.items[0].explanation,sources:[],learning,
+      provider:'openai',model:'configured',generatedAt:Date.now()};
+    const read=await api.roundTripNormalized(record,supplement),item=read.supplements?.[0]?.learning?.items?.[0];
+    return outOfRange&&read.entry.meanings.length===4&&item?.sense===4&&read.entry.meanings[item.sense-1].definition.includes('充电');
+  }finally{frame.remove();}
+});
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();
 </script></body></html>
