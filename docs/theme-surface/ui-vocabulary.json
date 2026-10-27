@@ -256,10 +256,11 @@
         "xp-dict-example-pair",
         "xp-dict-packs",
         "xp-dict-legacy",
-        "vocab-lookup-actions",
         "xp-dict-usage-actions",
         "xp-dict-usage-feedback",
         "xp-dict-learning-section",
+        "xp-dict-examples",
+        "vocab-save-controls",
         "ask-library-workbench",
         "ask-library-index",
         "ask-library-scroll",
@@ -401,7 +402,18 @@
         "listbox-option-text",
         "listbox-option-meta",
         "listbox-help",
-        "xp-dict-full-text"
+        "xp-dict-full-text",
+        "xp-dict-local-title",
+        "xp-dict-learning-title",
+        "xp-dict-usage-status",
+        "xp-dict-usage-elapsed",
+        "xp-dict-usage-stop",
+        "xp-dict-model",
+        "xp-dict-action-error",
+        "xp-dict-examples-hint",
+        "xp-dict-examples-find",
+        "vocab-save-definition",
+        "vocab-lookup-save"
       ],
       "canvasStructures": [
         "lib-header",
@@ -430,7 +442,7 @@
         "xp-dict-packs",
         "xp-dict-legacy",
         "xp-dict-learning-section",
-        "vocab-lookup-actions",
+        "xp-dict-examples",
         "ask-library-workbench",
         "ask-library-index",
         "ask-library-scroll",
@@ -514,6 +526,7 @@
         "xp-dict-usage-actions",
         "xp-dict-usage-feedback",
         "xp-dict-learning-section",
+        "xp-dict-examples",
         "xp-dict-save-preview",
         "xp-dict-save-menu",
         "confirm-actions"
@@ -684,7 +697,16 @@
         "xp-dict-save-meaning",
         "xp-dict-save-change",
         "xp-dict-save-options",
-        "xp-dict-save-option"
+        "xp-dict-save-option",
+        "xp-dict-local-title",
+        "xp-dict-learning-title",
+        "xp-dict-usage-status",
+        "xp-dict-usage-elapsed",
+        "xp-dict-usage-stop",
+        "xp-dict-model",
+        "xp-dict-action-error",
+        "xp-dict-examples-hint",
+        "xp-dict-examples-find"
       ]
     },
     "shared": {

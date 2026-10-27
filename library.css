@@ -2074,7 +2074,6 @@ html.motion-ready .vocab-note-save {
 #vocab-lookup-bar > select[data-listbox],
 #vocab-lookup-bar > .listbox { flex: none; width: max-content; }
 #vocab-lookup-go { flex: none; }
-.vocab-lookup-actions { display: flex; flex: none; flex-wrap: nowrap; align-items: center; gap: var(--lib-sp-2); }
 /* Result host (spec §4.8 table): 12 above the idle line / button, 24 above a
    run or a result. */
 #vocab-ref-result { margin-top: var(--lib-sp-5); font-size: 15px; line-height: 25px; }

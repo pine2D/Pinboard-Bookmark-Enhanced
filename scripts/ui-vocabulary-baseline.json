@@ -866,11 +866,6 @@
     },
     {
       "surface": "md-preview",
-      "token": "xp-dict-local-title",
-      "structural": false
-    },
-    {
-      "surface": "md-preview",
       "token": "xp-dict-match",
       "structural": false
     },

@@ -748,6 +748,10 @@ export const DICT_LOOKUP_GEOMETRY = {
       contexts: {
         "explain-dict": { requires: ["overflow"] },
         "dict-entry-idle": { requires: ["edges", "senseIndent", "overflow", "clip"] },
+        // The first generation in flight (plan 2.6): the phase line, the
+        // seconds waited and Cancel take the generate button's place in the
+        // AI block, under the dictionary result.
+        "dict-entry-progress": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip"] },
@@ -786,6 +790,7 @@ export const DICT_LOOKUP_GEOMETRY = {
       tokens: { text: "--lib-fg", secondary: "--lib-fg-muted" },
       contexts: {
         "dict-entry-idle": { requires: ["edges", "senseIndent", "overflow", "clip"] },
+        "dict-entry-progress": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip"] },
