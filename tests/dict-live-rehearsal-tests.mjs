@@ -41,7 +41,10 @@ const report = JSON.parse(output);
 assert.equal(secretAttempts, 0); assert.equal(networkAttempts, 0); assert.equal(report.liveRequests, 0);
 assert.equal(report.ok, true);
 for (const row of Object.values(report.ledger.providers)) {
-  assert.equal(row.attempts.length, 2);
-  assert.equal(row.cases.entry.ok, true); assert.equal(row.cases.collocations.ok, true);
+  // One HTTP request per case: the base entry, the patterns card and the
+  // separate confusables request, each saved, reread and rendered.
+  assert.equal(row.attempts.length, 3);
+  assert.deepEqual(row.attempts.map(item => item.caseId), ["entry", "patterns", "confusables"]);
+  for (const id of ["entry", "patterns", "confusables"]) assert.equal(row.cases[id].ok, true, id);
 }
-write(JSON.stringify({ offlineRehearsal: "8/8 passed", secretAttempts, networkAttempts, reportDir: report.reportDir }) + "\n");
+write(JSON.stringify({ offlineRehearsal: "12/12 passed", secretAttempts, networkAttempts, reportDir: report.reportDir }) + "\n");

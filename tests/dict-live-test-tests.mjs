@@ -17,16 +17,16 @@ OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 OPENROUTER_MODEL=openai/gpt-6.1-sol
 `;
 const approved = plan => ({ authorized: true, planHash: plan.planHash, authorizationReference: "synthetic-unit-fixture",
-  providers: ["deepseek"], cases: ["entry", "collocations"], retryFailed: false, diagnosticOutputTokens: null });
+  providers: ["deepseek"], cases: ["entry", "patterns", "confusables"], retryFailed: false, diagnosticOutputTokens: null });
 const code = expected => error => error.safeCode === expected;
-const lowApproval = plan => ({ ...approved(plan), providers: ["minimax"], cases: ["collocations"], retryFailed: true, minimaxLowFollowup: true });
+const lowApproval = plan => ({ ...approved(plan), providers: ["minimax"], cases: ["patterns"], retryFailed: true, minimaxLowFollowup: true });
 function exhaustedMinimax(plan) {
   const ledger = newLedger(plan);
-  for (const caseId of ["entry", "entry", "collocations", "collocations"]) {
+  for (const caseId of ["entry", "entry", "patterns", "patterns"]) {
     const item = reserveAttempt(plan, ledger, "minimax", caseId, 2000, 2048);
     Object.assign(item, { state: "received", httpStatus: 200, finishReason: "length", contentEmpty: true });
   }
-  ledger.providers.minimax.cases = { entry: { ok: true }, collocations: { ok: false } };
+  ledger.providers.minimax.cases = { entry: { ok: true }, patterns: { ok: false } };
   return ledger;
 }
 
@@ -36,7 +36,7 @@ test("a low-effort followup needs separate authorization for exactly one MiniMax
   for (const patch of [{ authorized: false }, { minimaxLowFollowup: "true" }, { planHash: "other" }]) {
     assert.throws(() => validateApproval(plan, { ...value, ...patch }), code("approval_required_or_mismatched"));
   }
-  for (const patch of [{ providers: ["deepseek"] }, { cases: ["entry"] }, { cases: ["entry", "collocations"] },
+  for (const patch of [{ providers: ["deepseek"] }, { cases: ["entry"] }, { cases: ["entry", "patterns"] }, { cases: ["confusables"] },
     { providers: ["minimax", "deepseek"] }, { retryFailed: false }, { diagnosticOutputTokens: 8192 }]) {
     assert.throws(() => validateApproval(plan, { ...value, ...patch }), code("followup_approval_invalid"));
   }
@@ -45,7 +45,7 @@ test("a low-effort followup needs separate authorization for exactly one MiniMax
 test("the followup cannot replace the baseline ledger or reuse a successful case", () => {
   const plan = buildPlan(PUBLIC), value = lowApproval(plan);
   assert.throws(() => validateMinimaxLowFollowup(plan, newLedger(plan), value), code("followup_ledger_ineligible"));
-  for (const change of [row => { row.cases.entry.ok = false; }, row => { row.cases.collocations.ok = true; },
+  for (const change of [row => { row.cases.entry.ok = false; }, row => { row.cases.patterns.ok = true; },
     row => { row.attempts.forEach(item => { item.contentEmpty = false; }); }]) {
     const ledger = exhaustedMinimax(plan); change(ledger.providers.minimax);
     assert.throws(() => validateMinimaxLowFollowup(plan, ledger, value), code("followup_ledger_ineligible"));
@@ -54,26 +54,38 @@ test("the followup cannot replace the baseline ledger or reuse a successful case
 test("one followup persists in the original cost ledger and blocks a second HTTP dispatch", () => {
   const plan = buildPlan(PUBLIC), ledger = exhaustedMinimax(plan), approval = lowApproval(plan);
   const previous = ledger.providers.minimax.reservedMicros;
-  assert.throws(() => reserveAttempt(plan, ledger, "minimax", "collocations", 2000, 2048), code("request_budget_exhausted"));
-  const item = reserveAttempt(plan, ledger, "minimax", "collocations", 24576, 2048, approval);
+  assert.throws(() => reserveAttempt(plan, ledger, "minimax", "patterns", 2000, 2048), code("request_budget_exhausted"));
+  const item = reserveAttempt(plan, ledger, "minimax", "patterns", 24576, 2048, approval);
   item.state = "failed_or_uncertain";
   assert.equal(item.authorizationScope, "minimax-low-followup");
   assert.ok(item.reservedMicros <= 40000);
   assert.equal(ledger.providers.minimax.reservedMicros, previous + item.reservedMicros);
   const restarted = validateLedger(plan, JSON.parse(JSON.stringify(ledger)));
-  assert.throws(() => reserveAttempt(plan, restarted, "minimax", "collocations", 2000, 2048, approval), code("followup_ledger_ineligible"));
+  assert.throws(() => reserveAttempt(plan, restarted, "minimax", "patterns", 2000, 2048, approval), code("followup_ledger_ineligible"));
   assert.equal(restarted.providers.minimax.attempts.length, 5);
 });
 test("followup keeps the original money cap and refuses other providers, cases or output budgets", () => {
   const plan = buildPlan(PUBLIC), ledger = exhaustedMinimax(plan), approval = lowApproval(plan);
-  for (const [id, caseId, tokens] of [["deepseek", "collocations", 2048], ["minimax", "entry", 2048], ["minimax", "collocations", 8192]]) {
+  for (const [id, caseId, tokens] of [["deepseek", "patterns", 2048], ["minimax", "entry", 2048], ["minimax", "confusables", 2048], ["minimax", "patterns", 8192]]) {
     assert.throws(() => reserveAttempt(plan, ledger, id, caseId, 2000, tokens, approval), code("followup_request_bounds"));
   }
   plan.providers.minimax.maximumCost = ledger.providers.minimax.reservedMicros / 1e6;
-  assert.throws(() => reserveAttempt(plan, ledger, "minimax", "collocations", 2000, 2048, approval), code("cost_budget_exhausted"));
+  assert.throws(() => reserveAttempt(plan, ledger, "minimax", "patterns", 2000, 2048, approval), code("cost_budget_exhausted"));
   assert.equal(ledger.providers.minimax.attempts.length, 4);
 });
 
+test("the plan runs the redesigned usage points and no longer the collocations-with-topic step", () => {
+  const plan = buildPlan(PUBLIC);
+  assert.deepEqual(plan.cases, ["entry", "patterns", "confusables"]);
+  assert.equal(Object.hasOwn(plan.data, "topic"), false);
+  for (const cases of [["collocations"], ["entry", "collocations"]]) {
+    assert.throws(() => validateApproval(plan, { ...approved(plan), cases }), code("approval_required_or_mismatched"));
+  }
+  const ledger = newLedger(plan);
+  assert.throws(() => reserveAttempt(plan, ledger, "deepseek", "collocations", 2000, 2048), code("request_bounds"));
+  ledger.providers.deepseek.attempts.push({ caseId: "collocations", reservedMicros: 0 });
+  assert.throws(() => validateLedger(plan, ledger), code("ledger_invalid"));
+});
 test("public plan keeps the four exact approved models and states the Gemini protocol limitation", () => {
   const plan = buildPlan(PUBLIC);
   assert.equal(plan.providers.gemini.productionProvider, "custom");
@@ -129,10 +141,11 @@ test("HTTP requests and conservative money reservations persist across restart",
     const restarted = validateLedger(plan, JSON.parse(readFileSync(file, "utf8")));
     assert.equal(restarted.providers.deepseek.reservedMicros, spent);
     assert.throws(() => reserveAttempt(plan, restarted, "deepseek", "entry", 2000, 3072), code("request_budget_exhausted"));
-    reserveAttempt(plan, restarted, "deepseek", "collocations", 3000, 2048);
-    reserveAttempt(plan, restarted, "deepseek", "collocations", 3000, 2048);
+    reserveAttempt(plan, restarted, "deepseek", "patterns", 3000, 2048);
+    reserveAttempt(plan, restarted, "deepseek", "confusables", 3000, 2048);
     assert.equal(restarted.providers.deepseek.attempts.length, 4);
-    assert.throws(() => reserveAttempt(plan, restarted, "deepseek", "collocations", 3000, 2048), code("request_budget_exhausted"));
+    // The provider cap holds even though confusables has one per-case request left.
+    assert.throws(() => reserveAttempt(plan, restarted, "deepseek", "confusables", 3000, 2048), code("request_budget_exhausted"));
     assert.ok(restarted.providers.deepseek.reservedMicros > spent);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
@@ -167,7 +180,7 @@ test("ledger corruption or changed plan cannot reset accounting", () => {
 test("bounded reservations keep all four providers below their separate currency caps", () => {
   const plan = buildPlan(PUBLIC), ledger = newLedger(plan);
   for (const [id, config] of Object.entries(plan.providers)) {
-    for (const caseId of ["entry", "entry", "collocations", "collocations"]) reserveAttempt(plan, ledger, id, caseId, 24576, 8192);
+    for (const caseId of ["entry", "patterns", "confusables", "patterns"]) reserveAttempt(plan, ledger, id, caseId, 24576, 8192);
     assert.ok(ledger.providers[id].reservedMicros <= config.maximumCost * 1e6);
   }
   assert.equal(plan.providers.minimax.currency, "CNY");

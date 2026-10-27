@@ -15,7 +15,11 @@ const REPORT = resolve(REPO, ".qa-scan/report/dict-live");
 const CONFIG = resolve(homedir(), ".config/ai-dev");
 const SCOPE = "dictionary-four-provider-2026-10-25";
 const DUMMY_KEY = "dict-live-nonsecret-browser-placeholder";
-const CASES = ["entry", "collocations"];
+// The usage-point cases follow the 2026-10-27 redesign (plan 1B.9): the old
+// collocations-with-topic step became the patterns card and the separate
+// confusables request. The plan hash changes with them, so no ledger or
+// approval of the earlier case list can be continued under this one.
+const CASES = ["entry", "patterns", "confusables"];
 const DEFINITIONS = {
   deepseek: { prefix: "DEEPSEEK", provider: "deepseek", keyField: "deepseekApiKey", modelField: "deepseekModel", model: "deepseek-flash", currency: "USD", cap: .10, input: .30, output: 1.20, priceSource: "https://api-docs.deepseek.com/quick_start/pricing/" },
   minimax: { prefix: "MINIMAX", provider: "minimax", keyField: "minimaxApiKey", modelField: "minimaxModel", model: "MiniMax-M3.1-Flash", currency: "CNY", cap: .30, input: 1, output: 4, priceSource: "https://platform.minimax.cn/docs/pricing/overview" },
@@ -40,7 +44,7 @@ export function buildPlan(publicText) {
       priceVerifiedAt: "2026-10-25", priceSource: def.priceSource };
   }
   const plan = { schema: 1, scope: SCOPE, providers, cases: CASES,
-    data: { term: "provider", sourceLanguage: "en", explanationLanguage: "zh-Hans", nativeLanguage: "简体中文", level: "intermediate", topic: "" },
+    data: { term: "provider", sourceLanguage: "en", explanationLanguage: "zh-Hans", nativeLanguage: "简体中文", level: "intermediate" },
     limits: { requestsPerProvider: 4, requestsPerCase: 2, inputUtf8Bytes: 24576, framingTokenAllowance: 1024,
       entryOutputTokens: 3072, supplementOutputTokens: 2048, diagnosticOutputTokens: 8192, transportRetries: 0, responseBytes: 262144, timeoutMs: 28000 },
     boundaries: { inheritedProviderEnvironment: "ignored; file fields are authoritative", secrets: "only the authorized Node test process reads selected .env keys",
@@ -67,21 +71,22 @@ export function validateApproval(plan, approval) {
       ![null, 8192].includes(approval.diagnosticOutputTokens) ||
       ![undefined, false, true].includes(approval.minimaxLowFollowup)) fail("approval_required_or_mismatched");
   if (approval.minimaxLowFollowup && (approval.providers.length !== 1 || approval.providers[0] !== "minimax" ||
-      approval.cases.length !== 1 || approval.cases[0] !== "collocations" || !approval.retryFailed ||
+      approval.cases.length !== 1 || approval.cases[0] !== "patterns" || !approval.retryFailed ||
       approval.diagnosticOutputTokens !== null)) fail("followup_approval_invalid");
   return approval;
 }
 
 // A separate, explicit approval can add exactly one low-effort MiniMax check
 // to the exhausted original ledger. It cannot reset that ledger or its money cap.
+// It targets the patterns card, the supplement case that replaced collocations.
 export function validateMinimaxLowFollowup(plan, ledger, approval) {
   validateApproval(plan, approval); validateLedger(plan, ledger);
   if (approval.minimaxLowFollowup !== true) fail("followup_approval_invalid");
   const row = ledger.providers.minimax, attempts = row.attempts;
-  if (attempts.length !== 4 || attempts.filter(item => item.caseId === "collocations").length !== 2 ||
+  if (attempts.length !== 4 || attempts.filter(item => item.caseId === "patterns").length !== 2 ||
       attempts.some(item => item.authorizationScope === "minimax-low-followup") ||
-      row.cases.entry?.ok !== true || row.cases.collocations?.ok !== false ||
-      !attempts.some(item => item.caseId === "collocations" && item.httpStatus === 200 &&
+      row.cases.entry?.ok !== true || row.cases.patterns?.ok !== false ||
+      !attempts.some(item => item.caseId === "patterns" && item.httpStatus === 200 &&
         item.finishReason === "length" && item.contentEmpty === true)) fail("followup_ledger_ineligible");
   return true;
 }
@@ -123,7 +128,7 @@ export function reserveAttempt(plan, ledger, id, caseId, inputBytes, outputToken
   const followup = approval?.minimaxLowFollowup === true;
   if (followup) {
     validateMinimaxLowFollowup(plan, ledger, approval);
-    if (id !== "minimax" || caseId !== "collocations" || outputTokens !== 2048) fail("followup_request_bounds");
+    if (id !== "minimax" || caseId !== "patterns" || outputTokens !== 2048) fail("followup_request_bounds");
   } else if (row.attempts.length >= limits.requestsPerProvider || row.attempts.filter(a => a.caseId === caseId).length >= limits.requestsPerCase) fail("request_budget_exhausted");
   const reservedMicros = Math.ceil((inputBytes + limits.framingTokenAllowance) * provider.pricePerMillionInput + outputTokens * provider.pricePerMillionOutput);
   if (followup && reservedMicros > 40000) fail("cost_budget_exhausted");
@@ -263,7 +268,9 @@ async function executeProvider(plan, approval, ledger, id, key, saveLedger, { re
             owner, settings: learner, isCurrent: () => true };
           if (request.target.lang !== data.explanationLanguage) return { ok: false, code: "target_preflight_failed" };
           if (caseId !== "entry" && !(await pbpDictArchiveRead(request))?.archiveId) return { ok: false, code: "parent_entry_unavailable" };
-          const value = caseId === "entry" ? await pbpDictEntryRun(request) : await pbpDictSupplementRun({ ...request, category: "collocations", topic: data.topic });
+          // The category is the case: patterns and confusables are separate
+          // paid requests, each saved on its own (Q8=A).
+          const value = caseId === "entry" ? await pbpDictEntryRun(request) : await pbpDictSupplementRun({ ...request, category: caseId });
           const reread = await pbpDictArchiveRead(request);
           const durable = caseId === "entry" ? !!value.archiveId && reread?.archiveId === value.archiveId : !!value.id && reread?.supplements.some(item => item.id === value.id);
           const host = document.createElement("section"); host.className = "library-dict"; document.body.replaceChildren(host);
@@ -274,14 +281,20 @@ async function executeProvider(plan, approval, ledger, id, key, saveLedger, { re
           const visible = node => node.checkVisibility({ checkVisibilityCSS: true }) && node.getBoundingClientRect().height > 0;
           const content = host.querySelector(".xp-dict-ai-content");
           const meanings = [...host.querySelectorAll(".xp-dict-senses > li")].filter(visible).length;
-          const supplementCount = (reread?.supplements || []).filter(item => item.learning?.summary && content?.textContent.includes(item.learning.summary)).length;
+          // The saved supplement is its own section inside the "usage points"
+          // block, showing its items directly (a patterns card has no summary,
+          // so the first item's explanation is what must be visible).
+          const saved = caseId === "entry" ? null : reread?.supplements.find(item => item.id === value.id);
+          const section = saved && host.querySelector('[data-learning-block="usage"] > [data-supplement-category="' + caseId + '"][data-supplement-id="' + CSS.escape(saved.id) + '"]');
+          const shown = saved?.learning?.items?.[0]?.explanation;
+          const supplementRendered = !!section && visible(section) && !!shown && !!section.querySelector(".xp-dict-supplement-text")?.textContent.includes(shown);
           const errors = [...host.querySelectorAll(".xp-dict-ai-status, .xp-dict-action-error")].filter(node => visible(node) && node.textContent.trim()).length;
           const rendered = !!content && visible(content) && meanings === reread?.entry.meanings.length && meanings > 0 && !errors &&
-            (caseId === "entry" || supplementCount > 0);
+            (caseId === "entry" || supplementRendered);
           return { ok: durable && rendered, code: !durable ? "archive_not_confirmed" : !rendered ? "render_not_confirmed" : "saved_reread_and_rendered",
-            preflight: { ownerMatches: owner === "acct_dict_live_fixture" }, render: { meanings, supplementCount, errors }, value };
+            preflight: { ownerMatches: owner === "acct_dict_live_fixture" }, render: { meanings, supplementRendered, errors }, value };
         } catch (error) {
-          const code = ["invalid_response", "wrong_language", "host_permission", "endpoint_invalid", "model_not_found", "ai_disabled", "ai_not_configured", "sync_failed", "owner_changed", "not_saved"].includes(error?.code) ? error.code : "request_failed";
+          const code = ["invalid_response", "wrong_language", "unsupported_usage", "invalid_request", "host_permission", "endpoint_invalid", "model_not_found", "ai_disabled", "ai_not_configured", "sync_failed", "owner_changed", "not_saved"].includes(error?.code) ? error.code : "request_failed";
           return { ok: false, code, reason: typeof _pbpDictFailureReason === "function" ? _pbpDictFailureReason(error) : "" };
         }
       }, { caseId, data: plan.data }).catch(() => ({ ok: false, code: "browser_case_failed" }));
@@ -307,14 +320,17 @@ export async function main(argv = process.argv.slice(2)) {
     plan.limits = { ...plan.limits, entryOutputTokens: 8192, supplementOutputTokens: 8192 };
     const syntheticPlan = { ...plan }; delete syntheticPlan.planHash;
     plan.planHash = digest(syntheticPlan);
-    const { entryResponse, supplementResponse } = await import("../tests/fixtures/dict-live-responses.mjs");
+    const { entryResponse, patternsResponse, confusablesResponse } = await import("../tests/fixtures/dict-live-responses.mjs");
     const approval = { providers: Object.keys(plan.providers), cases: CASES, retryFailed: false, diagnosticOutputTokens: null };
     mkdirSync(REPORT, { recursive: true, mode: 0o700 });
     const reportDir = mkdtempSync(resolve(REPORT, "rehearsal-")), ledger = newLedger(plan);
     const saveLedger = () => writeJson(resolve(reportDir, "ledger.json"), ledger);
     const dispatch = async (_url, options) => {
-      const request = JSON.parse(options.body), supplement = request.messages[0].content.includes("language-learning supplement");
-      return new Response(JSON.stringify(supplement ? supplementResponse : entryResponse), { status: 200, headers: { "Content-Type": "application/json" } });
+      // Chosen by the production prompt's opening line, never by provider.
+      const content = JSON.parse(options.body).messages[0].content;
+      const body = content.startsWith("Create one compact usage card") ? patternsResponse
+        : content.startsWith("Create a concise language-learning supplement") ? confusablesResponse : entryResponse;
+      return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
     };
     // In-memory synthetic keys and responses only. This mode never reads .env,
     // invokes Node fetch, or shares the live ledger or browser profile.
