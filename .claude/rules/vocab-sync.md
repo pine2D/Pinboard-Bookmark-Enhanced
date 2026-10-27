@@ -29,8 +29,8 @@ paths:
 
 ## AI 词条归档同步不变量
 
-- `dict-archive.js` 维护独立的 `pbp-dict-archive` IndexedDB；`dict-archive-gdrive.js` 用 `dict-entry-batch` schema 3 写入、持续读取 schema 1/2/3，复用 Drive transport/runner，不把生成词条自动加入生词本。
-- 完整词条与追加用法是不可变的内容哈希记录；追加用法通过 `archiveId` 关联原词条，新版词条和补充可通过 `replacesId` 关联主动更新前的结果。远端按集合合并，保留不同设备独立生成的内容与以前版本，不能用最后写入覆盖并发追加。独立词源及部分结果的 `omittedItems` 从 schema 3 起写入；schema 1/2 保持原契约。协议升级重建 bootstrap/checkpoint，已冻结的 schema 1/2 pending 保持原文件 ID、原内容和原 schema 重试；旧端不读取 schema 3，所有设备须升级才能读取新增内容。
+- `dict-archive.js` 维护独立的 `pbp-dict-archive` IndexedDB；`dict-archive-gdrive.js` 用 `dict-entry-batch` schema 4 写入、持续读取 schema 1/2/3/4，复用 Drive transport/runner，不把生成词条自动加入生词本。归档类别白名单 `PBP_DICT_ARCHIVE_CATEGORIES` 只增不减：停止生成的旧类别（collocations、register、grammar、scenarios、culture、literature）仍按原校验读取与同步；界面可生成的类别在 dict-entry.js 另行维护，不从白名单推导。
+- 完整词条与追加用法是不可变的内容哈希记录；追加用法通过 `archiveId` 关联原词条，新版词条和补充可通过 `replacesId` 关联主动更新前的结果。远端按集合合并，保留不同设备独立生成的内容与以前版本，不能用最后写入覆盖并发追加。独立词源及部分结果的 `omittedItems` 从 schema 3 起写入，`patterns`（搭配与句型）记录从 schema 4 起写入；每一版新增的内容在之后各版继续合法，批次校验逐版用 `>=` 判定（例如 schema 4 批次里的词源与 `omittedItems` 照常合法），不得写成只认某一版的精确判等；schema 1/2/3 保持原契约，schema 3 及更早的批次含 `patterns` 即整批非法。协议升级重建 bootstrap/checkpoint，已冻结的 schema 1/2/3 pending 保持原文件 ID、原内容和原 schema 重试；旧端只按自己的 `readSchemas` 列文件，读不到 schema 4，而升级后新写入的**全部**批次（含基础词条、辨析、词源，不只 patterns）都是 schema 4，所以另一台设备在更新前读不到升级设备之后的任何新增内容，已有数据不受影响。
 - 复用身份按 owner、保留大小写的词形和语言对匹配，提供商与模型只作溯源；补充另按类别和用户选定的学习资料匹配。已有 `dictctx2_entry_v1_` 缓存按 owner 幂等迁入归档，归档不随缓存 LRU 淘汰。
 - 云端仅含 owner hash 与生成数据，不含明文 owner、凭据或 AI 端点。新版 `learning.version: 2` 保存构词/历史来源/相关词关系，或补充的解释语言、摘要及分项内容；公开资料保留标题、URL、精确短摘录及可核实的作者、作品、位置、语言、体裁、修订和取得时间。该次补充的母语、水平、主题也随补充保存并同步；旧字段结构继续可读，不能迁移时猜补来源；词典包不进入归档。
 - 已连接设备在本机查无词条时可通过共享串行队列预取 dictionary 数据集；预取失败时不得自动调用 AI 重新付费。预取只检查已有 Drive 权限，不申请新权限；仍受 owner、Drive 身份、连接 epoch 和退避约束。

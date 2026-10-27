@@ -2,8 +2,11 @@
 // is immutable and content-addressed; independent additions therefore converge
 // by set union without overwriting another device's paid work.
 const PBP_DICT_ARCHIVE_DB = "pbp-dict-archive";
+// Every category ever written stays readable: this list only grows. What the
+// UI may still generate is maintained separately in dict-entry.js.
 const PBP_DICT_ARCHIVE_CATEGORIES = Object.freeze([
-  "collocations", "confusables", "register", "grammar", "scenarios", "culture", "literature", "etymology"
+  "collocations", "confusables", "register", "grammar", "scenarios", "culture", "literature", "etymology",
+  "patterns"
 ]);
 
 function _pbpDictArchiveError(code) { return Object.assign(new Error(code), { code }); }
@@ -136,10 +139,13 @@ function pbpDictArchiveValidateEvent(event) {
 }
 function pbpDictArchiveValidBatchBody(body, ownerHash) {
   return _pbpDictArchiveObject(body, ["schema", "ownerHash", "deviceId", "createdAt", "entries"]) &&
-    [1, 2, 3].includes(body.schema) && /^[0-9a-f]{64}$/.test(ownerHash) && body.ownerHash === ownerHash &&
+    [1, 2, 3, 4].includes(body.schema) && /^[0-9a-f]{64}$/.test(ownerHash) && body.ownerHash === ownerHash &&
     _pbpVocabDeviceId(body.deviceId) && Number.isFinite(body.createdAt) &&
     Array.isArray(body.entries) && body.entries.every(event => pbpDictArchiveValidateEvent(event) &&
-      (body.schema === 3 || (event.value.category !== "etymology" && !Object.hasOwn(event.value.learning || {}, "omittedItems"))) &&
+      // Each schema's additions stay legal in every later schema: independent
+      // etymology and partial counts from 3, patterns cards from 4.
+      (body.schema >= 3 || (event.value.category !== "etymology" && !Object.hasOwn(event.value.learning || {}, "omittedItems"))) &&
+      (body.schema >= 4 || event.value.category !== "patterns") &&
       (body.schema >= 2 || (!Object.hasOwn(event.value, "learning") &&
         !Object.hasOwn(event.value.entry || {}, "learning") &&
         (event.value.sources || []).every(source => !Object.hasOwn(source, "retrievedAt")))));

@@ -89,7 +89,40 @@ const REMOTE_V3_SUPPLEMENT = {
     }
   }
 };
-const request = (patch = {}) => ({ owner: OWNER, term: "May", sourceLanguage: "en",
+// Independently authored schema 4 peer data: a patterns card already mapped to
+// v2 items (head -> title, note -> explanation). Hash computed with Python
+// json.dumps(sort_keys=True, separators=(",", ":"), ensure_ascii=False).
+const REMOTE_V4_PATTERNS = {
+  "recordKey": "8b7c17210d584653d731e169207ecbc5ce84779aa64f267f081fdc9ba0e769da",
+  "value": {
+    "kind": "supplement",
+    "term": "provider",
+    "sourceLanguage": "en",
+    "target": { "name": "Chinese", "lang": "zh-CN" },
+    "provider": "peer-provider",
+    "model": "peer-model",
+    "generatedAt": 303,
+    "archiveId": "4edec14099bf10bdeb792197e931ad70fed7375b48163691af8ed89807a0b298",
+    "category": "patterns",
+    "profile": { "nativeLanguage": "Chinese", "level": "", "topic": "" },
+    "content": "a provider of something：表示提供某物的一方。\nthe sole provider for someone：指负担某人生活的人。",
+    "sources": [],
+    "learning": {
+      "version": 2,
+      "language": { "name": "Chinese", "lang": "zh-CN" },
+      "summary": "",
+      "items": [
+        { "sense": 0, "title": "a provider of something", "explanation": "表示提供某物的一方，of 后面接所提供的东西。",
+          "example": "The company is a leading provider of cloud services.", "translation": "这家公司是云服务的主要提供商。", "sourceIndex": -1 },
+        { "sense": 0, "title": "the sole provider for someone", "explanation": "指独自负担某人生活所需的人，常说养家的人。",
+          "example": "She was the sole provider for her family.", "translation": "她是家里唯一的经济支柱。", "sourceIndex": -1 }
+      ],
+      "replacesId": "",
+      "omittedItems": 1
+    }
+  }
+};
+const request =(patch = {}) => ({ owner: OWNER, term: "May", sourceLanguage: "en",
   target: { name: "Chinese", lang: "zh-CN" }, ...patch });
 const input = (patch = {}) => ({ ...request(), record: { entry: clone(REMOTE.value.entry), provider: "local-provider",
   model: "local-model", generatedAt: 200 }, ...patch });
@@ -247,7 +280,39 @@ test("schema 2 accepts both generations while schema 1 remains a frozen legacy c
   assert(pbpDictArchiveValidBatchBody(batchV2([clone(REMOTE)]), HASH));
   assert(!pbpDictArchiveValidBatchBody(batch([clone(REMOTE_V2_ENTRY)]), HASH));
   assert(!pbpDictArchiveValidBatchBody(batch([clone(REMOTE_V2_SUPPLEMENT)]), HASH));
-  assert(!pbpDictArchiveValidBatchBody({ ...batchV2(), schema: 4 }, HASH));
+});
+test("schema 4 is a readable wire schema and schema 5 is not", () => {
+  assert(pbpDictArchiveValidBatchBody({ ...batchV2(), schema: 4 }, HASH));
+  for (const schema of [0, 5, "4", 3.5]) assert(!pbpDictArchiveValidBatchBody({ ...batchV2(), schema }, HASH), "schema " + schema);
+});
+test("patterns records are legal only from schema 4", () => {
+  assert(pbpDictArchiveValidateEvent(clone(REMOTE_V4_PATTERNS)));
+  const entries = () => [clone(REMOTE_V2_ENTRY), clone(REMOTE_V4_PATTERNS)];
+  assert(pbpDictArchiveValidBatchBody({ ...batchV2(entries()), schema: 4 }, HASH));
+  for (const schema of [1, 2, 3]) assert(!pbpDictArchiveValidBatchBody({ ...batchV2(entries()), schema }, HASH), "schema " + schema);
+  // Not only the partial count: a complete patterns card is still schema 4 only.
+  const complete = clone(REMOTE_V4_PATTERNS); delete complete.value.learning.omittedItems;
+  assert(!pbpDictArchiveValidBatchBody({ ...batchV2([complete]), schema: 3 }, HASH));
+});
+test("schema 4 keeps the schema 3 etymology and partial-count allowances", () => {
+  assert(pbpDictArchiveValidBatchBody({ ...batchV2([clone(REMOTE_V2_ENTRY), clone(REMOTE_V3_SUPPLEMENT)]), schema: 4 }, HASH));
+  const partialLiterature = clone(REMOTE_V2_SUPPLEMENT); partialLiterature.value.learning.omittedItems = 1;
+  assert(pbpDictArchiveValidBatchBody({ ...batchV2([partialLiterature]), schema: 4 }, HASH));
+  assert(!pbpDictArchiveValidBatchBody({ ...batchV2([partialLiterature]), schema: 2 }, HASH));
+});
+test("schema 4 batches still carry records of every older category", () => {
+  const legacy = ["scenarios", "culture", "literature", "collocations", "register", "grammar"].map(category => {
+    const event = clone(REMOTE_V2_SUPPLEMENT); event.value.category = category;
+    if (category !== "literature") event.value.profile.topic = "work";
+    return event;
+  });
+  assert(legacy.every(event => pbpDictArchiveValidateEvent(event)));
+  assert(pbpDictArchiveValidBatchBody({ ...batchV2([clone(REMOTE_V2_ENTRY), ...legacy]), schema: 4 }, HASH));
+  for (const category of ["collocations", "confusables", "register", "grammar", "scenarios", "culture", "literature", "etymology", "patterns"]) {
+    assert(PBP_DICT_ARCHIVE_CATEGORIES.includes(category), category + " left the archive whitelist");
+  }
+  const unknown = clone(REMOTE_V4_PATTERNS); unknown.value.category = "contrasts";
+  assert(!pbpDictArchiveValidateEvent(unknown));
 });
 test("schema 3 retains partial etymology across devices without extending old wire schemas", async () => {
   const body = { ...batchV2([clone(REMOTE_V2_ENTRY), clone(REMOTE_V3_SUPPLEMENT)]), schema: 3 };
@@ -410,12 +475,15 @@ function driveFixture(options = {}) {
   let owner = OWNER, enabled = true, permissionId = "google-a", sessionPermissionId = "", failUpload = !!options.failUpload;
   const calls = [], uploads = [], connectionPuts = [];
   let connectionState = null;
-  const metadata = options.version2
-    ? { id: "peer-file", name: "pbp-dict-entry-peer-file.json", parents: ["1opaque-appdata-folder"],
-      mimeType: "application/json", appProperties: { pbpKind: "dict-entry-batch", schema: "2", owner: HASH, device: "peer-a" } }
-    : { id: "peer-file", name: "pbp-dict-entry-peer-file.json", parents: ["1opaque-appdata-folder"],
-      mimeType: "application/json", appProperties: { pbpKind: "dict-entry-batch", schema: "1", owner: HASH, device: "peer-a" } };
-  const body = JSON.stringify(options.version2 ? batchV2() : batch());
+  // files.list / files.get metadata as Drive returns it: an opaque folder ID
+  // in parents and every appProperties value as a string.
+  const remoteSchema = options.version4 ? "4" : options.version2 ? "2" : "1";
+  const metadata = { id: "peer-file", name: "pbp-dict-entry-peer-file.json", parents: ["1opaque-appdata-folder"],
+    mimeType: "application/json", appProperties: { pbpKind: "dict-entry-batch", schema: remoteSchema, owner: HASH, device: "peer-a" } };
+  const body = options.version4
+    ? JSON.stringify({ schema: 4, ownerHash: HASH, deviceId: "peer-a", createdAt: 124,
+      entries: [REMOTE_V2_ENTRY, REMOTE_V3_SUPPLEMENT, REMOTE_V4_PATTERNS] })
+    : JSON.stringify(options.version2 ? batchV2() : batch());
   const json = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
   const client = pbpCreateVocabDriveClient({ protocol: PBP_DICT_ARCHIVE_DRIVE_PROTOCOL,
     identity: { getAuthToken: async () => ({ token: "token:" + permissionId }), removeCachedAuthToken: async () => {} },
@@ -474,15 +542,16 @@ test("real runner bootstraps an empty device and reuses a peer's complete entry"
   assert((await f.store.getAccountState("google-a", HASH)).pageToken === "after" && f.uploads.length === 1);
   assert(!f.uploads[0].body.includes(OWNER) && f.uploads[0].metadata.appProperties.pbpKind === "dict-entry-batch");
 });
-test("real runner downloads independently authored schema 2 literary evidence and emits schema 3", async () => {
+test("real runner downloads independently authored schema 2 literary evidence and emits schema 4", async () => {
   const f = driveFixture({ remote: true, version2: true }), result = await f.run();
   const read = await f.store.read(request({ term: "provider" }));
   assert(result.ok && read.archiveId === REMOTE_V2_ENTRY.recordKey && read.supplements.length === 1);
   assert(read.supplements[0].learning.language.lang === "zh-CN");
   assert(read.supplements[0].sources[0].work === "The Pickwick Papers");
-  assert(f.uploads.length === 1 && f.uploads[0].metadata.appProperties.schema === "3");
+  assert(f.uploads.length === 1 && f.uploads[0].metadata.appProperties.schema === "4");
+  assert(JSON.parse(f.uploads[0].body).schema === 4);
   assert(JSON.parse(f.uploads[0].body).entries.some(event => event.recordKey === REMOTE_V2_SUPPLEMENT.recordKey));
-  assert((await f.store.getAccountState("google-a", HASH)).protocolSchema === 3);
+  assert((await f.store.getAccountState("google-a", HASH)).protocolSchema === 4);
 });
 test("protocol upgrade rediscovers schema 2 files beyond an old completed cursor", async () => {
   const f = driveFixture({ remote: true, version2: true });
@@ -491,11 +560,11 @@ test("protocol upgrade rediscovers schema 2 files beyond an old completed cursor
   assert(f.calls.some(call => call.startsWith("/drive/v3/changes/startPageToken")));
   const listing = f.calls.find(call => call.startsWith("/drive/v3/files?"));
   const query = new URL("https://www.googleapis.com" + listing).searchParams.get("q");
-  assert(query.includes("value='1'") && query.includes("value='2'"));
+  assert(["1", "2", "3", "4"].every(schema => query.includes("value='" + schema + "'")) && !query.includes("value='5'"));
   assert((await f.store.read(request({ term: "provider" }))).supplements[0].id === REMOTE_V2_SUPPLEMENT.recordKey);
   assert((await f.store.getAccountState("google-a", HASH)).pageToken === "after");
 });
-test("upgrading preserves a frozen schema 1 file ID and body before writing new schema 3 checkpoints", async () => {
+test("upgrading preserves a frozen schema 1 file ID and body before writing new schema 4 checkpoints", async () => {
   const f = driveFixture();
   await f.store.applyRemotePage(OWNER, HASH, [batch()], state({ protocolSchema: 1, bootstrapComplete: true, pageToken: "old" }));
   await f.store.checkpointOwner(OWNER);
@@ -503,10 +572,10 @@ test("upgrading preserves a frozen schema 1 file ID and body before writing new 
   await f.store.freezeOutbox(OWNER, "google-a", HASH, "frozen-v1-id", { body: oldBody, bytes });
   assert((await f.run()).ok && f.uploads.length === 2);
   assert(f.uploads[0].metadata.id === "frozen-v1-id" && f.uploads[0].metadata.appProperties.schema === "1");
-  assert(f.uploads[0].body === oldBody && f.uploads[1].metadata.appProperties.schema === "3");
+  assert(f.uploads[0].body === oldBody && f.uploads[1].metadata.appProperties.schema === "4");
   assert(!(await f.store.listPendingBatches("google-a", HASH)).length);
 });
-test("protocol 3 preserves an already frozen schema 2 upload byte for byte", async () => {
+test("protocol 4 preserves an already frozen schema 2 upload byte for byte", async () => {
   const f = driveFixture();
   await f.store.applyRemotePage(OWNER, HASH, [batchV2()], state({ protocolSchema: 2, bootstrapComplete: true, pageToken: "old-v2" }));
   await f.store.checkpointOwner(OWNER);
@@ -514,8 +583,37 @@ test("protocol 3 preserves an already frozen schema 2 upload byte for byte", asy
   await f.store.freezeOutbox(OWNER, "google-a", HASH, "frozen-v2-id", { body: oldBody, bytes });
   assert((await f.run()).ok && f.uploads.length === 2);
   assert(f.uploads[0].metadata.id === "frozen-v2-id" && f.uploads[0].metadata.appProperties.schema === "2");
-  assert(f.uploads[0].body === oldBody && f.uploads[1].metadata.appProperties.schema === "3");
+  assert(f.uploads[0].body === oldBody && f.uploads[1].metadata.appProperties.schema === "4");
   assert(!(await f.store.listPendingBatches("google-a", HASH)).length);
+});
+test("protocol 4 retries an already frozen schema 3 upload with its file ID, body and schema", async () => {
+  const f = driveFixture();
+  const v3 = { ...batchV2([clone(REMOTE_V2_ENTRY), clone(REMOTE_V3_SUPPLEMENT)]), schema: 3 };
+  await f.store.applyRemotePage(OWNER, HASH, [v3], state({ protocolSchema: 3, bootstrapComplete: true, pageToken: "old-v3" }));
+  await f.store.checkpointOwner(OWNER);
+  const oldBody = JSON.stringify(v3), bytes = new TextEncoder().encode(oldBody).length;
+  await f.store.freezeOutbox(OWNER, "google-a", HASH, "frozen-v3-id", { body: oldBody, bytes });
+  assert((await f.run()).ok && f.uploads.length === 2);
+  assert(f.uploads[0].metadata.id === "frozen-v3-id" && f.uploads[0].metadata.appProperties.schema === "3");
+  assert(f.uploads[0].body === oldBody && JSON.parse(f.uploads[0].body).schema === 3);
+  assert(f.uploads[1].metadata.appProperties.schema === "4" && JSON.parse(f.uploads[1].body).schema === 4);
+  assert(!(await f.store.listPendingBatches("google-a", HASH)).length);
+  assert((await f.store.getAccountState("google-a", HASH)).protocolSchema === 4);
+});
+test("real runner reads a peer's schema 4 patterns and partial etymology without blocking the dataset", async () => {
+  const f = driveFixture({ remote: true, version4: true }), result = await f.run();
+  const preflight = await f.store.getPreflightState(HASH);
+  assert(result.ok && result.changed && !preflight?.blocked, "dataset blocked: " + result.error);
+  const listing = f.calls.find(call => call.startsWith("/drive/v3/files?"));
+  assert(new URL("https://www.googleapis.com" + listing).searchParams.get("q").includes("value='4'"));
+  const reopened = await f.reopen(), read = await reopened.read(request({ term: "provider" }));
+  assert(read.archiveId === REMOTE_V2_ENTRY.recordKey && read.supplements.length === 2);
+  const patterns = read.supplements.find(item => item.category === "patterns");
+  const etymology = read.supplements.find(item => item.category === "etymology");
+  assert(patterns.id === REMOTE_V4_PATTERNS.recordKey && patterns.learning.items[1].title === "the sole provider for someone");
+  assert(patterns.profile.level === "" && patterns.learning.omittedItems === 1 && patterns.learning.summary === "");
+  assert(etymology.id === REMOTE_V3_SUPPLEMENT.recordKey && etymology.learning.omittedItems === 1);
+  assert((await reopened.getAccountState("google-a", HASH)).pageToken === "after");
 });
 test("complete entry and supplements transfer between independent devices", async () => {
   const a = fixture(), b = fixture(); const saved = await a.store.save(input());
