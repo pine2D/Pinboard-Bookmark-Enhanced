@@ -5,6 +5,9 @@
 //  1. Every literal https host in a runtime script is classified in the
 //     oracle (exit or non-exit) — a brand-new host fails loudly instead of
 //     shipping undisclosed.
+//  1b. Every language-derived Wikimedia evidence host (pbpDictEvidenceOrigin,
+//     evaluated, not text-scanned) shares its parent domain with a listed
+//     exit, and that representative exit is not flagged as stale.
 //  2. Every oracle exit host appears in docs/privacy.md.
 //  3. Every manifest static host is a listed exit.
 //  4. Every host in the AI provider registry (ai.js) is a disclosed exit —
@@ -80,10 +83,46 @@ for (const host of [...seen].sort()) {
   }
 }
 
+// 1b. STRUCTURAL layer for language-derived hosts (same approach as step 4):
+// the dictionary's Wikimedia evidence origins are built from a template
+// (`https://${base}.wikisource.org` / `.wiktionary.org`), which the literal
+// scan above cannot see. Evaluate the function the runtime actually calls,
+// pbpDictEvidenceOrigin (dict-evidence.js), over every supported language and
+// kind. The oracle lists one representative exit per derived family (the en
+// subdomain, see userConfiguredExits): every derived host needs an exit that
+// shares its parent domain, and that exit counts as mentioned below.
+const derivedHosts = new Set();
+try {
+  const src = readFileSync(join(ROOT, "dict-evidence.js"), "utf8");
+  const start = src.indexOf("const PBP_DICT_EVIDENCE_LANGUAGES = Object.freeze({");
+  const fnStart = src.indexOf("function pbpDictEvidenceOrigin(");
+  const end = src.indexOf("\n}", fnStart);
+  if (start < 0 || fnStart < start || end < 0) throw new Error("pbpDictEvidenceOrigin not found in dict-evidence.js");
+  const { languages, origin } = new Function(src.slice(start, end + 2) +
+    "\nreturn { languages: PBP_DICT_EVIDENCE_LANGUAGES, origin: pbpDictEvidenceOrigin };")();
+  for (const kind of ["literature", "etymology"]) {
+    for (const language of Object.keys(languages)) {
+      const url = origin(kind, language);
+      if (!url) fail(`pbpDictEvidenceOrigin(${kind}, ${language}) derived no origin for a supported language`);
+      else derivedHosts.add(new URL(url).hostname);
+    }
+  }
+  if (!derivedHosts.size) throw new Error("no derived evidence host");
+} catch (e) {
+  fail(`derived evidence-origin structural check failed to run: ${e.message}`);
+}
+const parentDomain = (host) => host.slice(host.indexOf(".") + 1);
+const representedBy = new Set();
+for (const host of derivedHosts) {
+  const exit = [...exits].find((name) => parentDomain(name) === parentDomain(host));
+  if (!exit) fail(`${host}: derived by pbpDictEvidenceOrigin but no exit in docs/network-exits.json shares its parent domain`);
+  else representedBy.add(exit);
+}
+
 // Reverse direction: a classified host that no script mentions any more is a
 // stale oracle row — prune it so the list stays honest.
 for (const host of [...exits, ...nonExits]) {
-  if (!seen.has(host)) fail(`${host}: in the oracle but no runtime script mentions it — stale entry?`);
+  if (!seen.has(host) && !representedBy.has(host)) fail(`${host}: in the oracle but no runtime script mentions it — stale entry?`);
 }
 
 // 2. Every exit is disclosed in privacy.md — by host, or by the user-facing

@@ -5,6 +5,10 @@
       "purpose": "Verified etymology evidence on an exact-origin grant; other supported language subdomains are derived from the queried language",
       "disclosedAs": "Wiktionary"
     },
+    "en.wikisource.org": {
+      "purpose": "Free original-text examples on an exact-origin grant from the Find examples click; other supported language subdomains are derived from the queried language",
+      "disclosedAs": "Wikisource"
+    },
     "api.pinboard.in": {
       "purpose": "Pinboard v1 API — every bookmark read/write (required host)"
     },
