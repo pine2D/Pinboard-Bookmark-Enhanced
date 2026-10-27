@@ -37,7 +37,7 @@ md-*.js                      # 阅读器子模块：ai-core / translate / ask / 
 vocab-store.js               # pbp-vocab IndexedDB 唯一写边界（words + vector/outbox/tombstone/sync 状态）
 vocab-gdrive.js              # SW-only Google Drive appDataFolder 同步
 dict-pack.js                 # 离线词典包导入（CC-CEDICT / ECDICT / 多语言 Yomitan v3；词包仅本机）
-dict-entry.js                # 可复用 AI 词条与按需补充（2026-10-26 裁决收为用法要点／原文用例／词源三块，施工中）
+dict-entry.js                # 可复用 AI 词条与按需补充（2026-10-26/27 裁决收为用法要点／原文用例／词源三块，原文用例不调 AI，流式生成，施工中）
 dict-archive.js / dict-archive-gdrive.js  # 完整 AI 词条持久归档与独立 Drive 数据集（不属于生词本、不随缓存淘汰）
 ask-archive.js / ask-archive-gdrive.js  # Ask 完整问答、证据与版本持久归档及 Drive 同步
 library-ask.js              # 按文章与会话浏览、继续提问和删除 Ask 历史
