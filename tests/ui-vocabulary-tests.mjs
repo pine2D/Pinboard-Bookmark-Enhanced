@@ -3,7 +3,7 @@
 // (surface, class token) identities, so the contract to pin is "removals pass,
 // additions block, only --write-baseline writes", plus the extraction paths
 // (HTML class attributes AND JS class literals) and the wiring.
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -135,6 +135,16 @@ for (const [name, s] of Object.entries(reg.surfaces)) {
 check(Object.values(reg.surfaces).some((s) => s.files.includes("listbox.js")),
   "ui-vocabulary.json: no surface lists listbox.js (the shared listbox primitive mints the listbox-* classes)");
 check(uiHtmlRe.test("listbox.js"), "pre-commit UI_HTML_RE must trigger on listbox.js (layout-lint + ui-contract), as the options-prefixed file did");
+// ui-contract pins the dictionary lookup's builders (md-dict.js and the
+// dict-*.js modules it renders from) and the Library lookup (library-vocab.js),
+// so a commit touching only one of them must reach it too (plan Q27=A). The
+// file list is read from the repository, so a new dict-*.js module is covered.
+const dictFiles = readdirSync(root).filter((name) => /^dict-.+\.js$/.test(name));
+check(dictFiles.length > 0, "no dict-*.js module found at the repository root");
+for (const f of ["md-dict.js", "library-vocab.js", ...dictFiles]) {
+  check(uiHtmlRe.test(f), `pre-commit UI_HTML_RE does not trigger on ${f}; ui-contract would meet it only in verify/CI`);
+}
+check(!uiHtmlRe.test("md-dict.json") && !uiHtmlRe.test("tests/dict-entry.js"), "pre-commit UI_HTML_RE must stay anchored to root .js files");
 
 if (fail.length) { console.error(fail.map((m) => `FAIL ${m}`).join("\n")); process.exit(1); }
 console.log("ui vocabulary tests ok");

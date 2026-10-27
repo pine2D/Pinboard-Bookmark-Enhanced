@@ -16,13 +16,15 @@
 #               plus ui-contract when HTML / md-preview.css / a surface's own
 #               JS changed (ui-contract pins JS-side builders too -- e.g. the
 #               Send-to .switch builder in options.js -- which a JS-only commit
-#               used to reach only in verify/CI). Before
+#               used to reach only in verify/CI). The dictionary lookup's
+#               builders (md-dict.js, dict-*.js) are pinned there as well and
+#               ride the same arm (plan Q27=A). Before
 #               2026-09-05 an HTML-only commit ran ZERO gates -- 70 such commits
 #               since July are how 23 inline styles and 27 ad-hoc wrapper
 #               classes reached the settings page.
 STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
 THEME_RE='^(docs/theme-surface/(pilots/[^/]+\.tokens\.json|composers/[^/]+\.mjs|tools/[^/]+\.mjs|tools/override-debt-baseline\.json|manifest\.json|tokens\.schema\.json)|pinboard-themes\.js|popup\.css|options\.css|library\.css)$'
-UI_HTML_RE='^((popup|options|library|md-preview)\.html|md-preview\.css|(popup|options|library)(-[a-z-]+)?\.js|listbox\.js)$'
+UI_HTML_RE='^((popup|options|library|md-preview)\.html|md-preview\.css|(popup|options|library)(-[a-z-]+)?\.js|listbox\.js|md-dict\.js|dict-[a-z-]+\.js)$'
 UI_VOCAB_RE='^((popup|options|library|md-preview)\.html|(popup|options|library)(-[a-z-]+)?\.js|listbox\.js|md-[a-z-]+\.js|shared\.js|docs/theme-surface/ui-vocabulary\.json|scripts/ui-vocabulary-baseline\.json|scripts/ui-vocabulary-lint\.mjs)$'
 CHANGED=$(printf '%s
 ' "$STAGED" | grep -E "$THEME_RE")
