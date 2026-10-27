@@ -50,9 +50,15 @@ async function pbpAskInit(detail) {
   if (!view || _pbpAskState) return;
   const s = await pbpAiGetSettings();
   if (_pbpAskState) return; // another lifecycle initializer finished this await
-  if (!pbpAiAvailable(s) && typeof pbpAskArchiveRead !== "function") return;
+  const aiOn = pbpAiAvailable(s);
+  if (!aiOn && typeof pbpAskArchiveRead !== "function") return;
   if (typeof pbpAiResolveInitDetail === "function") detail = await pbpAiResolveInitDetail(detail);
   if (!detail || _pbpAskState) return; // owner/lifecycle changed during the read
+  // With AI off the entry exists only to read this article's saved history
+  // (user ruling 2026-10-27): no saved conversation, no entry. Local reads
+  // only; turning AI on later initializes through pbpAiRefreshSetup.
+  if (!aiOn && !(await _pbpAskHasLocalHistory(detail))) return;
+  if (_pbpAskState) return;
   // Idempotent index guard: md-translate may have indexed already; an
   // unconditional re-index would reset its md/text caches mid-flight.
   if (!pbpAiBlocks().length) pbpAiIndexBlocks(view);
@@ -119,6 +125,19 @@ async function pbpAskInit(detail) {
   window.addEventListener("pagehide", () => {
     if (_pbpAskState && _pbpAskState.ctrl) _pbpAskState.ctrl.abort();
   });
+}
+
+async function _pbpAskHasLocalHistory(detail) {
+  const url = String((detail && detail.url) || ""), account = String((detail && detail.account) || "");
+  if (!url) return false;
+  try {
+    const sessions = await pbpAskArchiveRead({ owner: _pbpAskArchiveOwnerOf(account), url });
+    if (sessions.length) return true;
+    return (await pbpAskHistGet(url, account)).length > 0;
+  } catch (error) {
+    console.warn("[pbp-ask] history probe failed:", error?.name, error?.code || error?.message);
+    return false;
+  }
 }
 
 // Settings changes affect new requests, while saved history stays readable.
