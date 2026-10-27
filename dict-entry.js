@@ -4,8 +4,11 @@ const PBP_DICT_ENTRY_VERSION = 1;
 const PBP_DICT_ENTRY_MAX_RESPONSE = 24576;
 // Complete JSON needs room for both reasoning and visible text. Schema bounds
 // remain independent; paid content failures never trigger automatic retries.
+// One deadline for every model (no per-model branches): slow endpoints spend
+// thousands of hidden reasoning tokens, so 60 s cut off answers still in
+// progress (2026-10-26 comparison; user ruling: 180 s for all).
 const PBP_DICT_GENERATION_OPTIONS = Object.freeze({ maxTokens: 8192, totalOutputBudget: true,
-  reasoningEffort: "minimum", timeoutMs: 60000, jsonMode: true, requireComplete: true });
+  reasoningEffort: "minimum", timeoutMs: 180000, jsonMode: true, requireComplete: true });
 
 function _pbpDictEntryError(code, message, reason) { return Object.assign(new Error(message), { code }, reason ? { reason } : {}); }
 function _pbpDictEntryObject(value, keys) {

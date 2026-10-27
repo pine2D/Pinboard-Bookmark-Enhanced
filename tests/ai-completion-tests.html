@@ -339,6 +339,32 @@ await test('minimum reasoning prefers none then low only after an explicit value
   calls=[];responses=[reply(OK)];await run({reasoningEffort:'minimum'},PROTOCOLS[0].settings);
   assert(calls.length===1&&calls[0].reasoning_effort==='low');
 });
+await test('an enumeration of accepted effort values also moves minimum reasoning to low',async()=>{
+  const s={aiProvider:'custom',customBaseUrl:'https://enum-gateway.example/v1',customApiKey:'fixture',customModel:'enum-model'};
+  reset([reply({error:{message:'Invalid option: expected one of "off"|"low"|"medium"|"high"|"xhigh"|"max"',type:'invalid_request_error',param:'reasoning_effort'}},400),reply(OK)]);
+  await run({reasoningEffort:'minimum'},s);
+  assert(calls.length===2&&calls[0].reasoning_effort==='none'&&calls[1].reasoning_effort==='low','Enumeration refusal was not negotiated');
+  reset([reply({error:{message:'Invalid option: expected one of "auto"|"none"',param:'tool_choice'}},400)]);
+  let error;try{await run({reasoningEffort:'minimum'},{...s,customModel:'enum-other'});}catch(e){error=e;}
+  assert(error?.status===400&&calls.length===1,'Enumeration naming another field was retried');
+});
+await test('a refused structured-outputs feature drops the format field and is remembered',async()=>{
+  const s={aiProvider:'custom',customBaseUrl:'https://feature-gateway.example/v1',customApiKey:'fixture',customModel:'no-structured'};
+  reset([reply({error:{message:'{"code":400,"reason":"INVALID_REQUEST_BODY","message":"model: vendor/no-structured-1.0 does not support feature: structured-outputs","metadata":{}}',type:'invalid_request_error'}},400),reply(OK)]);
+  await run({jsonMode:true},s);
+  assert(calls.length===2&&calls[0].response_format?.type==='json_object'&&!('response_format'in calls[1]),'Feature refusal was not negotiated');
+  calls=[];responses=[reply(OK)];await run({jsonMode:true},s);
+  assert(calls.length===1&&!('response_format'in calls[0]),'Feature refusal was not remembered');
+  reset([reply({error:{message:'Structured outputs are temporarily overloaded',type:'server_error'}},400)]);
+  let error;try{await run({jsonMode:true},{...s,customModel:'busy-structured'});}catch(e){error=e;}
+  assert(error?.status===400&&calls.length===1,'A mention without a refusal was retried');
+});
+await test('a parameter deprecated for the model is dropped like an unsupported one',async()=>{
+  const s={aiProvider:'custom',customBaseUrl:'https://messages-gateway.example/v1',customApiKey:'fixture',customModel:'no-temperature'};
+  reset([reply({event_id:null,error:{type:'invalid_request_error',message:'{"type":"error","error":{"type":"invalid_request_error","message":"`temperature` is deprecated for this model."},"request_id":"req_fixture"}'}},400),reply(OK)]);
+  await run({},s);
+  assert(calls.length===2&&calls[0].temperature===0.3&&!('temperature'in calls[1]),'Deprecated temperature was not dropped');
+});
 await test('structured requests use total output budgets and low effort for arbitrary compatible models',async()=>{
   const s={aiProvider:'custom',customBaseUrl:'https://gateway.example/v1',customApiKey:'fixture',customModel:'unlisted-model'};
   reset([reply(OK)]);await run({maxTokens:8192,totalOutputBudget:true,reasoningEffort:'low'},s);
@@ -369,6 +395,10 @@ await test('every nonstream protocol uses the requested deadline and keeps the d
     await run({timeoutMs:60000},protocol.settings);await run({},protocol.settings);
   }}finally{fetchWithTimeout=original;}
   assert(JSON.stringify(deadlines)===JSON.stringify(PROTOCOLS.flatMap(()=>[60000,30000])));
+});
+await test('the deadline range admits the dictionary 180 s and refuses anything longer',async()=>{
+  assert(_aiCompletionTimeout({timeoutMs:180000})===180000,'180 s was not admitted');
+  for(const ms of [180001,600000,999,Infinity,'180000',undefined])assert(_aiCompletionTimeout({timeoutMs:ms})===30000,'Out-of-range deadline admitted: '+ms);
 });
 await test('JSON tasks request native structured output only on protocols that expose it',async()=>{
   for(const [index,protocol]of PROTOCOLS.entries()){

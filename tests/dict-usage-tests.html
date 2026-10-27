@@ -310,7 +310,7 @@ await test('supplement normalization cannot bypass raw response size or repair t
 });
 await test('supplement retains content bounds with the same bounded complete-answer policy as entries',async()=>{
   existing();await pbpDictSupplementRun(request({category:'collocations'}));
-  return calls[0].prompt.includes('12000')&&calls[0].prompt.includes('including separators')&&calls[0].options.maxTokens===8192&&calls[0].options.timeoutMs===60000&&calls[0].options.totalOutputBudget===true&&calls[0].options.reasoningEffort==='minimum';
+  return calls[0].prompt.includes('12000')&&calls[0].prompt.includes('including separators')&&calls[0].options.maxTokens===8192&&calls[0].options.timeoutMs===180000&&calls[0].options.totalOutputBudget===true&&calls[0].options.reasoningEffort==='minimum';
 });
 await test('original learning categories derive only the missing no-source marker',async()=>{
   for(const category of ['collocations','confusables','register','grammar','scenarios']){

@@ -222,7 +222,9 @@ const _AI_HEALABLE_PARAMS = ["max_tokens", "max_completion_tokens", "temperature
   "thinking", "enable_thinking", "thinkingBudget", "thinkingConfig", "reasoning"];
 // "The server does not accept this parameter AT ALL", as opposed to "the value
 // you sent is out of range" — the distinction the whole self-heal turns on.
-const _AI_PARAM_REFUSED_RE = /unsupported|unrecognized|not\s+supported|does\s+not\s+support|unknown\s+(?:parameter|argument|field)|extra\s+inputs/;
+// "Deprecated for this model" is the same refusal ("`temperature` is deprecated
+// for this model." from a Messages API behind a compatible gateway).
+const _AI_PARAM_REFUSED_RE = /unsupported|unrecognized|not\s+supported|does\s+not\s+support|unknown\s+(?:parameter|argument|field)|extra\s+inputs|\bdeprecated\b/;
 function _aiRejectedParam(body, detail) {
   const param = String((body && body.error && body.error.param) || "").trim();
   // Some compatible APIs enumerate only text/json_object and reject the
@@ -231,13 +233,19 @@ function _aiRejectedParam(body, detail) {
   const formatNamed = /^response_format(?:\.type)?$/.test(param) || /\bresponse_format\b/.test(detail);
   if (formatNamed && /\bjson_(?:schema|object)\b/.test(detail) &&
       /unknown\s+variant|(?:must|should)\s+be\s+(?:one\s+of|either|["'`]*(?:text|json_object)\b)/.test(detail)) return "response_format";
+  // Servers that name the capability instead of the field ("model: x does not
+  // support feature: structured-outputs") refuse the same request member.
+  if (!param && /\bstructured[\s_-]?outputs?\b|\bjson[\s_-]?mode\b/.test(detail) &&
+      /does\s+not\s+support|not\s+supported|unsupported/.test(detail)) return "response_format";
   if (_AI_PARAM_REFUSED_RE.test(detail) && _AI_HEALABLE_PARAMS.includes(param)) return param;
   // Value refusals can identify a mandatory-thinking endpoint without guessing
   // from every 400. Never interpret an unrelated schema/context error this way.
+  // An enumeration of the accepted values ("Invalid option: expected one of
+  // "off"|"low"|...", a gateway's schema validator) refuses the value we sent.
   const thinkingParam = _AI_HEALABLE_PARAMS.slice(3).filter(p => p !== "response_format")
     .find(p => param === p || param.startsWith(p + ".") || new RegExp("\\b" + p + "\\b", "i").test(detail));
   if (thinkingParam && (!param || param === thinkingParam || param.startsWith(thinkingParam + ".")) &&
-      /not\s+(?:supported|allowed)|unsupported|cannot\s+(?:be\s+)?(?:disabled|zero)|must\s+be\s+(?:true|enabled)|only\s+(?:supports?|allows?)|restricted\s+to\s+true/.test(detail)) return thinkingParam;
+      /not\s+(?:supported|allowed)|unsupported|cannot\s+(?:be\s+)?(?:disabled|zero)|must\s+be\s+(?:true|enabled)|only\s+(?:supports?|allows?)|restricted\s+to\s+true|(?:expected|must\s+be|should\s+be)\s+one\s+of/.test(detail)) return thinkingParam;
   // The wording gate guards BOTH routes below, error.param included. That field
   // is filled for ANY parameter-level validation error, range errors among them
   // ("max_tokens is too large: this model supports at most 4096 completion
@@ -861,8 +869,10 @@ async function callOllama(s, prompt, opts = {}) {
   return _aiReadCompletion(res, "ollama", opts);
 }
 
+// The ceiling admits the dictionary's 180 s deadline; anything outside the
+// range falls back to the 30 s default rather than waiting without bound.
 function _aiCompletionTimeout(opts) {
-  return Number.isSafeInteger(opts.timeoutMs) && opts.timeoutMs >= 1000 && opts.timeoutMs <= 120000 ? opts.timeoutMs : 30000;
+  return Number.isSafeInteger(opts.timeoutMs) && opts.timeoutMs >= 1000 && opts.timeoutMs <= 180000 ? opts.timeoutMs : 30000;
 }
 
 // ============================================================
