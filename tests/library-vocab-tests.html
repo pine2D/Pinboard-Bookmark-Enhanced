@@ -4443,11 +4443,11 @@ await (async () => {
       check("AI entry: the request has independent source and definition languages",calls[0]?.sourceLanguage==="de"&&calls[0]?.target.lang==="es");
       check("AI entry: neither article context nor original dictionary data enters generation",!!calls[0]&&!["sentence","title","choices","candidates","norms"].some(key=>key in calls[0])&&!JSON.stringify(calls[0]).includes("private-article"));
       check("AI entry: a complete entry displays its meaning and bilingual example",host.querySelector('.xp-dict-ai-content')?.textContent.includes("veneno")&&host.querySelector('.xp-dict-ai-content')?.textContent.includes("Das Gift ist gefährlich.")&&host.querySelector('.xp-dict-ai-content')?.textContent.includes("El veneno es peligroso."));
-      check("AI entry: only one source occupies the result view",host.querySelector('.xp-dict-slot').hidden&&!host.querySelector('.xp-dict-ai-content').hidden&&getComputedStyle($id('vocab-ref').querySelector('.xp-dict-ai-generate')).display==="none");
+      check("AI entry: the dictionary result stays visible beside the AI entry",!host.querySelector('.xp-dict-slot').hidden&&getComputedStyle(host.querySelector('.xp-dict-slot')).display!=="none"&&!host.querySelector('.xp-dict-ai-content').hidden&&getComputedStyle($id('vocab-ref').querySelector('.xp-dict-ai-generate')).display==="none");
       check("AI entry: generation leaves existing vocabulary and the selected original definition untouched",writes.length===0&&_vocabRows[0].gloss==="old saved gloss"&&choice.value==="online:0");
       check("AI entry: the AI source is available as an explicit save choice",[...choice.options].some(option=>option.value==="ai:0"&&option.textContent.includes("veneno")&&option.textContent.includes("AI")));
       $id('vocab-ref').querySelector('.xp-dict-ai-switch').click();await settle();
-      check("AI entry: switching back restores the original source without another request",!host.querySelector('.xp-dict-slot').hidden&&host.querySelector('.xp-dict-ai-content').hidden&&calls.length===1&&choice.value==="online:0");
+      check("AI entry: hiding the AI entry keeps the original source without another request",!host.querySelector('.xp-dict-slot').hidden&&host.querySelector('.xp-dict-ai-content').hidden&&calls.length===1&&choice.value==="online:0");
       host.querySelector('.vocab-lookup-save').click();await settle();
       check("AI entry: explicit Update keeps the selected original meaning and attribution",writes.length===1&&writes[0].data.gloss==="poison"&&writes[0].data.sourceUrl===norm.sourceUrl);
       choice.value="ai:0";choice.dispatchEvent(new Event("change"));host.querySelector('.vocab-lookup-save').click();await settle();

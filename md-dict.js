@@ -939,6 +939,21 @@ function _pbpDictRenderEntry(slot, norm, term, lang, selectedTerm, sentence) {
   _pbpDictSyncSourceDividers(slot);
 }
 
+// "Label: value" fields take their colon from the UI language's dictFieldLabel
+// template (zh "$1：", fr "$1 :"), as dictSource does; a label ending in
+// full-width punctuation carries its own spacing, a half-width one gets a space.
+function _pbpDictFieldLabel(key) {
+  const text = t("dictFieldLabel", t(key));
+  return /[\u3000-\u303f\uff00-\uffef]$/.test(text) ? text : text + " ";
+}
+
+// Dates in lookup provenance follow the extension's UI language, not the
+// browser's default locale.
+function _pbpDictUiLocale() {
+  try { return (typeof uiLangToBCP47 === "function" && uiLangToBCP47()) || document.documentElement.lang || undefined; }
+  catch (_) { return undefined; }
+}
+
 function _pbpDictEntryDisclosure(parent, label, text, lang, open = false) {
   const details = document.createElement("details"); details.className = "xp-dict-ai-details"; details.open = open;
   const summary = document.createElement("summary"); summary.textContent = label;
@@ -1689,8 +1704,8 @@ function _pbpDictEntryMount(host, opts) {
   const generate = button("dictEntryGenerate", "xp-dict-ai-generate");
   action(generate, "dictEntryGenerate", "wandSparkles");
   generate.disabled = true;
-  const toggle = button("dictEntryShowDictionary", "xp-dict-ai-switch"); toggle.hidden = true;
-  action(toggle, "dictEntryShowDictionary", "bookOpenText");
+  const toggle = button("dictEntryHideAi", "xp-dict-ai-switch"); toggle.hidden = true;
+  action(toggle, "dictEntryHideAi", "cross");
   const stop = button("askStop", "xp-dict-ai-stop"); stop.hidden = true;
   action(stop, "askStop", "stop");
   const configure = document.createElement("a"); configure.className = "xp-dict-connect xp-dict-ai-configure";
@@ -1766,9 +1781,11 @@ function _pbpDictEntryMount(host, opts) {
   const show = next => {
     if (!alive()) return;
     mode = next;
-    if (opts.dictionaryHost) opts.dictionaryHost.hidden = mode === "ai";
+    // The dictionary result stays visible in every mode; the toggle only shows
+    // or hides the AI entry beside it (ruling 2026-10-26: AI-first never hides
+    // the dictionary). The toggle itself goes when the lookup becomes one column.
     content.hidden = mode !== "ai";
-    action(toggle, mode === "ai" ? "dictEntryShowDictionary" : "dictEntryShowAi", mode === "ai" ? "bookOpenText" : "sparkles");
+    action(toggle, mode === "ai" ? "dictEntryHideAi" : "dictEntryShowAi", mode === "ai" ? "cross" : "sparkles");
     opts.onView?.(mode);
   };
   const render = (value, answerLanguage, reveal = true, revealSupplement = "") => {
@@ -1793,7 +1810,7 @@ function _pbpDictEntryMount(host, opts) {
         for (const [label, value] of [["dictEntryFormation", learning.formation], ["dictEntryHistory", learning.history]]) {
           if (!value) continue;
           const p = document.createElement("p"); p.lang = answerLanguage.lang; p.dir = "auto";
-          const strong = document.createElement("strong"); strong.textContent = t(label) + ": ";
+          const strong = document.createElement("strong"); strong.textContent = _pbpDictFieldLabel(label);
           p.append(strong, value); details.appendChild(p);
         }
         if (!learning.history && (learning.formation || learning.related.length)) {
@@ -1822,7 +1839,7 @@ function _pbpDictEntryMount(host, opts) {
       if (!record.entry.learning && record.entry.relatedWords.length) {
         const words = document.createElement("p"); words.className = "xp-dict-rel"; words.lang = opts.lang || "und"; words.dir = "auto";
         const label = document.createElement("span"); label.lang = document.documentElement.lang || "und";
-        label.textContent = t("dictEntryRelated") + ": "; words.appendChild(label);
+        label.textContent = _pbpDictFieldLabel("dictEntryRelated"); words.appendChild(label);
         record.entry.relatedWords.forEach((word, index) => {
           if (index) words.append(" · ");
           if (typeof opts.onLookup !== "function") { words.append(word); return; }
@@ -1834,7 +1851,7 @@ function _pbpDictEntryMount(host, opts) {
       }
       const provenance = document.createElement("p"); provenance.className = "xp-dict-src";
       provenance.textContent = [t("dictAiLabel"), record.provider, record.model,
-        new Date(record.generatedAt).toLocaleDateString()].join(" · ");
+        new Date(record.generatedAt).toLocaleDateString(_pbpDictUiLocale())].join(" · ");
       details.appendChild(provenance);
       const language = document.createElement("p"); language.className = "xp-dict-src";
       language.textContent = t("dictSupplementLanguage", languageName(answerLanguage)); details.appendChild(language);
@@ -1849,7 +1866,7 @@ function _pbpDictEntryMount(host, opts) {
           if (!previous.open || previous.childElementCount > 1) return;
           for (const old of record.previousEntries) {
             const version = document.createElement("details"); version.className = "xp-dict-ai-details";
-            const title = document.createElement("summary"); title.textContent = [new Date(old.generatedAt).toLocaleString(), old.model].join(" · ");
+            const title = document.createElement("summary"); title.textContent = [new Date(old.generatedAt).toLocaleString(_pbpDictUiLocale()), old.model].join(" · ");
             const text = document.createElement("p"); text.dir = "auto"; text.lang = answerLanguage.lang;
             text.textContent = [old.entry.pronunciation, old.entry.meanings.map(m => [m.partOfSpeech, m.definition, ...m.examples.map(e => e.text + "\n" + e.translation)].filter(Boolean).join("\n")).join("\n\n"),
               old.entry.learning ? [old.entry.learning.formation, old.entry.learning.history, ...old.entry.learning.related.map(r => r.word + " — " + r.note)].filter(Boolean).join("\n\n") : old.entry.etymology + "\n" + old.entry.relatedWords.join(" · ")].filter(Boolean).join("\n\n");
@@ -2015,7 +2032,7 @@ function _pbpDictEntryMount(host, opts) {
         item.sourceKey = sourceKey;
       }
       receipt.textContent = [t(addition.archiveSaved === false ? "dictSupplementSaveFailed" : "dictSupplementSaved"),
-        addition.provider, addition.model, new Date(addition.generatedAt).toLocaleDateString(),
+        addition.provider, addition.model, new Date(addition.generatedAt).toLocaleDateString(_pbpDictUiLocale()),
         t("dictSupplementLanguage", languageName(addition.learning?.language || answerLanguage))].join(" · ");
       if (configured() && addition.id && addition.archiveSaved !== false && !replaced.has(id)) {
         if (!item.update) {
@@ -2292,7 +2309,7 @@ function _pbpDictEntryMount(host, opts) {
   });
   opts.signal?.addEventListener("abort", () => {
     epoch++; active?.abort();
-    if (!record) { if (opts.dictionaryHost) opts.dictionaryHost.hidden = false; content.hidden = true; }
+    if (!record) content.hidden = true;
     if (opts.controlsHost) controls.remove();
   }, { once: true });
   const ready = Promise.resolve(opts.settings).then(async value => {
@@ -2558,7 +2575,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   const aiHost = document.createElement("div"); slot.before(aiHost);
   const originalTerm = wrap.querySelector(".xp-dict-origin-term"); if (originalTerm) originalTerm.lang = lang || "und";
   cur.ai = _pbpDictEntryMount(aiHost, { term: cap.text, lang, owner: cur.owner,
-    signal, isCurrent: cur.isCurrent, settings: s, dictionaryHost: slot, controlsHost: head,
+    signal, isCurrent: cur.isCurrent, settings: s, controlsHost: head,
     onSettingsChange: next => { if (cur.isCurrent()) pbpDictRun(cap, ctx, pop, ctrl, next, origin); },
     onLookup: term => cur.rerunWith(term),
     onEntry: (norm, record, content) => {

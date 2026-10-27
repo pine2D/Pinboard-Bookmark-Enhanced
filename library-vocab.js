@@ -1382,7 +1382,7 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
   // AI is one source in the same lookup view. Default collection follows
   // that view; an explicit selection survives later results and view changes.
   const entryView = _pbpDictEntryMount(host, { term, lang, owner: state.owner, signal,
-    dictionaryHost, controlsHost,
+    controlsHost,
     isCurrent: state.live, settings: pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS).then(deobfuscateSettings),
     onSettingsChange: () => { if (state.live()) cur.rerun(); },
     onView: mode => { state.view = mode; state.syncHeading(); _pbpVocabSelectLookupDefault(state); },
