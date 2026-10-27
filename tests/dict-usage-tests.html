@@ -3,7 +3,7 @@
 <script>
 let owner='acct_test',live=true,records=null,calls=[],saved=[],appended=[],sourceCalls=[],sourceResult=null,
   syncResult={ok:true,connected:false},onSync=null,onAI=null,onRead=null,onEvidence=null,
-  saveFailure=false,appendFailure=false,permission=true,sourceFailure='',usageAnswer='';
+  saveFailure=false,appendFailure=false,permission=true,sourceFailure='',usageAnswer='',etymologySources=[];
 const MODEL={word:'faraway',language:'en',pronunciation:'',meanings:[{partOfSpeech:'形容词',definition:'遥远的，距离很远的。',examples:[]}],etymology:'由 far 和 away 组成。',relatedWords:[],learning:{version:2,formation:'由 far 和 away 组成。',history:'',related:[]}};
 const LEGACY_MODEL={word:'faraway',language:'en',pronunciation:'',meanings:[{partOfSpeech:'形容词',definition:'遥远的，距离很远的。',examples:[]}],etymology:'',relatedWords:[]};
 const ORIGINAL={entry:LEGACY_MODEL,provider:'old-provider',model:'old-model',generatedAt:100,archiveId:'a'.repeat(64),supplements:[],archiveSaved:true,cacheSaved:true,cached:true};
@@ -23,7 +23,7 @@ async function pbpDictArchiveSave(input){if(saveFailure)throw new Error('write f
 async function pbpDictArchiveAppend(input){if(appendFailure)throw new Error('write failed');appended.push({...input});const row={...input,id:appended.length.toString(16).padStart(64,'0'),archiveSaved:true};records.supplements.push(row);return row;}
 async function callAI(settings,prompt,options){if(options.requireComplete!==true)throw new Error('Dictionary requests must require a complete response');await options.beforeRequest();calls.push({settings,prompt,options});if(onAI)await onAI();return prompt.includes('language-learning supplement')||prompt.includes('usage card')?usageAnswer:JSON.stringify(MODEL);}
 function hasAIKey(){return true;}
-async function pbpDictEvidenceFetch(input){await input.beforeRequest();if(input.kind==='etymology')return [];
+async function pbpDictEvidenceFetch(input){await input.beforeRequest();if(input.kind==='etymology')return structuredClone(etymologySources);
   if(!permission)throw Object.assign(new Error('Missing fixture grant'),{code:'host_permission'});
   if(!pbpDictSupplementOrigin(input.kind,input.sourceLanguage))throw Object.assign(new Error('Unsupported source language'),{code:'no_sources'});
   sourceCalls.push(input);if(onEvidence)await onEvidence(input);
@@ -32,7 +32,7 @@ async function pbpDictEvidenceFetch(input){await input.beforeRequest();if(input.
 }
 </script><script src="../dict-entry.js"></script><script>
 let pass=0,fail=0;
-function reset(){owner='acct_test';live=true;records=null;calls=[];saved=[];appended=[];sourceCalls=[];sourceResult=[structuredClone(SOURCE)];syncResult={ok:true,connected:false};onSync=null;onAI=null;onRead=null;onEvidence=null;saveFailure=false;appendFailure=false;permission=true;sourceFailure='';usageAnswer=JSON.stringify(USAGE);}
+function reset(){owner='acct_test';live=true;records=null;calls=[];saved=[];appended=[];sourceCalls=[];sourceResult=[structuredClone(SOURCE)];syncResult={ok:true,connected:false};onSync=null;onAI=null;onRead=null;onEvidence=null;saveFailure=false;appendFailure=false;permission=true;sourceFailure='';usageAnswer=JSON.stringify(USAGE);etymologySources=[];}
 function request(extra={}){return {term:'faraway',sourceLanguage:'en',target:{name:'Chinese',lang:'zh-Hans'},owner:'acct_test',isCurrent:()=>live,signal:new AbortController().signal,settings:{aiProvider:'gemini',geminiModel:'new-model'},...extra};}
 function existing(){records=structuredClone(ORIGINAL);}
 function usageResponse(change){const value=structuredClone(USAGE);change(value);usageAnswer=JSON.stringify(value);}
@@ -714,9 +714,46 @@ await test('every confusables item in the wrong script fails as wrong_language, 
 });
 await test('an etymology point in the wrong script is dropped alone like any other supplement item',async()=>{
   existing();usageResponse(d=>{d.items=[{sense:1,kind:'formation',title:'far + away',explanation:'由 “far” 与 “away” 合成，表示距离很远，常作定语。',example:'',translation:'',sourceIndex:-1},
-    {sense:1,kind:'synonym',title:'distant',explanation:'Distant is a close synonym that sounds more neutral and formal in writing.',example:'',translation:'',sourceIndex:-1}];});
+    {sense:1,kind:'formation',title:'-away',explanation:'The adverb away adds the sense of distance from the speaker to the compound.',example:'',translation:'',sourceIndex:-1}];});
+  const {value:r,warns}=await captureWarnings(()=>pbpDictSupplementRun(request({category:'etymology'})));
+  return r.archiveSaved&&r.learning.omittedItems===1&&r.learning.items.map(item=>item.title).join('|')==='far + away'&&
+    warns.some(w=>w.includes('explanation_script'));
+});
+// Etymology without sources (plan 1B.4, R1-3, Q4=A). The fixtures below are
+// json_object answers: the endpoint does not enforce the schema, so a model
+// can still return a kind outside the narrowed enum.
+const ETYMOLOGY_SOURCE={title:'faraway',url:'https://en.wiktionary.org/wiki/faraway',excerpt:'From far + away.',author:'',work:'Wiktionary',
+  location:'Etymology',language:'en',genre:'etymology',revision:'777',retrievedAt:1700000000000};
+const FORMATION_POINT={sense:1,kind:'formation',title:'far + away',explanation:'由 “far” 与 “away” 合成，表示距离很远，常作定语。',example:'',translation:'',sourceIndex:-1};
+const FAMILY_POINT={sense:1,kind:'family',title:'far',explanation:'“far” 是构成该词的形容词，表示距离远。',example:'',translation:'',sourceIndex:-1};
+await test('without etymology sources the schema offers formation only, still in one request',async()=>{
+  existing();usageResponse(d=>{d.items=[FORMATION_POINT];});
   const r=await pbpDictSupplementRun(request({category:'etymology'}));
-  return r.archiveSaved&&r.learning.omittedItems===1&&r.learning.items.map(item=>item.title).join('|')==='far + away';
+  const item=calls[0].options.responseSchema.properties.items.items.properties,prompt=calls[0].prompt;
+  return r.archiveSaved&&calls.length===1&&JSON.stringify(item.kind.enum)===JSON.stringify(['formation'])&&
+    item.sourceIndex.minimum===-1&&item.sourceIndex.maximum===-1&&prompt.includes('"kind":"formation"}')&&
+    prompt.includes('give only modern word formation')&&!prompt.includes('Classify each kind')&&
+    !prompt.includes('family/cognate/synonym/topic')&&!prompt.includes('formation|history')&&!prompt.includes('evidence-backed history');
+});
+await test('without etymology sources a related-word point is dropped and counted, the formation point is saved',async()=>{
+  existing();usageResponse(d=>{d.items=[FORMATION_POINT,FAMILY_POINT];});
+  const {value:r,warns}=await captureWarnings(()=>pbpDictSupplementRun(request({category:'etymology'})));
+  return r.archiveSaved&&appended.length===1&&r.learning.omittedItems===1&&r.learning.items.length===1&&
+    r.learning.items[0].kind==='formation'&&warns.some(w=>w.includes('supplement_source'));
+});
+await test('without etymology sources an answer with only related-word points fails and saves nothing',async()=>{
+  existing();usageResponse(d=>{d.items=[FAMILY_POINT,{...FAMILY_POINT,kind:'synonym',title:'distant',explanation:'“distant” 与该词意思相近，语气更中性。'}];});
+  return await rejectsReason(()=>pbpDictSupplementRun(request({category:'etymology'})),'invalid_response','supplement_source')&&
+    appended.length===0&&calls.length===1;
+});
+await test('with etymology sources the full kind set stays available and a family point is valid',async()=>{
+  existing();etymologySources=[ETYMOLOGY_SOURCE];
+  usageResponse(d=>{d.items=[{sense:1,kind:'history',title:'faraway',explanation:'词源资料说明该词由 “far” 和 “away” 组合而来。',example:'',translation:'',sourceIndex:0},FAMILY_POINT];});
+  const r=await pbpDictSupplementRun(request({category:'etymology'}));
+  const item=calls[0].options.responseSchema.properties.items.items.properties;
+  return r.archiveSaved&&!r.learning.omittedItems&&r.learning.items.map(i=>i.kind).join(',')==='history,family'&&
+    JSON.stringify(item.kind.enum)===JSON.stringify(['formation','history','family','cognate','synonym','topic'])&&
+    item.sourceIndex.maximum===0&&calls[0].prompt.includes('formation|history|family|cognate|synonym|topic');
 });
 await test('an old confusables record is current: reused without paying and updatable as a new version',async()=>{
   existing();const oldId='c'.repeat(64),settings={aiProvider:'gemini',geminiModel:'new-model',dictLearnerLevel:'advanced'};

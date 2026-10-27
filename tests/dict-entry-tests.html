@@ -76,7 +76,7 @@ await test('provider retry guard remains live after the first attempt',async()=>
 await test('settings and preview override snapshots cannot drift during cache lookup',async()=>{reset();const req=request();req.settings.previewAiModelByProvider={openai:'captured'};beforeGet=async()=>{req.settings.previewAiModelByProvider.openai='mutated';req.settings.openaiModel='changed';};const r=await pbpDictEntryRun(req);return r.model==='captured'&&calls[0].options.model==='captured'&&calls[0].settings.previewAiModelByProvider.openai==='captured';});
 
 await test('missing enrichment preserves paid basic definitions without inventing verified history',async()=>{reset();response(d=>{delete d.learning;d.etymology='Unverified history from model memory.';});const saved=await pbpDictEntryRun(request());const basic=saved.cacheSaved&&saved.entry.meanings[0].definition.includes('financial')&&saved.entry.etymology===''&&saved.entry.learning.history===''&&saved.entry.learning.related.length===0;delete cache.get(writes[0].key).entry.learning;return basic&&(await pbpDictEntryRead(request())).entry.word==='Bank'&&calls.length===1;});
-await test('related navigation is derived from valid relationships despite redundant field differences',async()=>{reset();response(d=>d.learning.related[0].relation='looks-similar');const invalid=await rejects(()=>pbpDictEntryRun(request()),'invalid_response');response(d=>{d.relatedWords=['Sitzbank','Bankkonto','unrelated'];});const r=await pbpDictEntryRun(request());return invalid&&r.entry.relatedWords.join(',')==='Bankkonto,Sitzbank'&&writes.length===1;});
+await test('related navigation is derived from valid relationships despite redundant field differences',async()=>{reset();response(d=>d.learning.related[0].relation='looks-similar');const dropped=await pbpDictEntryRun(request());const invalid=dropped.entry.relatedWords.length===0&&dropped.entry.learning.related.length===0&&dropped.entry.meanings.length===1;reset();response(d=>{d.relatedWords=['Sitzbank','Bankkonto','unrelated'];});const r=await pbpDictEntryRun(request());return invalid&&r.entry.relatedWords.join(',')==='Bankkonto,Sitzbank'&&writes.length===1;});
 await test('unsupported history is removed while paid meanings and modern formation are saved',async()=>{reset();response(d=>{d.learning.history='An invented historical development.';d.etymology=d.learning.history;});const r=await pbpDictEntryRun(request());return r.cacheSaved&&r.entry.meanings.length===1&&r.entry.learning.history===''&&r.entry.etymology===r.entry.learning.formation&&!JSON.stringify(writes[0]).includes('invented historical');});
 await test('unavailable optional etymology evidence still permits useful modern formation',async()=>{reset();evidenceFailure='host_permission';const r=await pbpDictEntryRun(request());return r.entry.learning.history===''&&r.entry.learning.formation&&r.cacheSaved;});
 await test('basic lookup ignores optional historical evidence and does not request it',async()=>{reset();evidence=[{title:'Bank',url:'https://de.wiktionary.org/wiki/Bank',excerpt:'History'}];const r=await pbpDictEntryRun(request());return !calls[0].prompt.includes('etymologyEvidence')&&r.entry.learning.sources.length===0;});
@@ -97,7 +97,7 @@ await test('short word roots and foreign phrases do not reject otherwise Chinese
 await test('short foreign mentions are excluded only when substantial explanatory prose remains',async()=>{reset();const note='这部分解释描述了这个词在语境中的具体作用，帮助学习者理解含义及其和其他表达的区别。'.repeat(3);await _pbpDictCheckExplanation(note+' “the English root phrase” （a foreign word form）',{name:'Chinese',lang:'zh-Hans'});return languageChecks.length===1&&languageChecks[0].includes('这部分')&&!languageChecks[0].includes('English root');});
 await test('quoting all wrong-language prose cannot bypass explanation checks',async()=>{reset();return rejects(()=>_pbpDictCheckExplanation('“This entire explanation is written in English although the user requested a Chinese explanation for the meaning and usage.”',{name:'Chinese',lang:'zh-Hans'}),'wrong_language');});
 await test('new prompt basic fields survive omitted learning and omitted legacy duplicates',async()=>{reset();response(d=>{delete d.learning;delete d.etymology;delete d.relatedWords;});const r=await pbpDictEntryRun(request());return r.cacheSaved&&r.entry.meanings[0].definition.includes('financial')&&r.entry.learning.formation===''&&r.entry.learning.history===''&&r.entry.relatedWords.length===0&&calls.length===1;});
-await test('legacy enrichment fields are independently optional and remain bounded when present',async()=>{for(const key of ['etymology','relatedWords']){reset();response(d=>{delete d.learning;delete d[key];});const r=await pbpDictEntryRun(request());if(!r.cacheSaved||r.entry.meanings.length!==1)return false;}reset();response(d=>{delete d.learning;delete d.relatedWords;d.etymology='x'.repeat(1201);});return await rejects(()=>pbpDictEntryRun(request()),'invalid_response')&&writes.length===0;});
+await test('legacy enrichment fields are independently optional and remain bounded when present',async()=>{for(const key of ['etymology','relatedWords']){reset();response(d=>{delete d.learning;delete d[key];});const r=await pbpDictEntryRun(request());if(!r.cacheSaved||r.entry.meanings.length!==1)return false;}reset();response(d=>{delete d.learning;delete d.relatedWords;d.etymology='x'.repeat(1201);});const r=await pbpDictEntryRun(request());return r.cacheSaved&&r.entry.etymology===''&&r.entry.meanings.length===1&&!JSON.stringify(writes[0].result).includes('xxxx');});
 await test('basic responses still require meanings instead of being accepted as empty entries',async()=>{reset();response(d=>{delete d.learning;delete d.etymology;delete d.relatedWords;delete d.meanings;});try{await pbpDictEntryRun(request());return false;}catch(e){return e.code==='invalid_response'&&e.reason==='entry_meanings'&&writes.length===0&&calls.length===1;}});
 await test('short all-English explanatory prose cannot pass a Chinese request below detector length',async()=>{reset();const definition='A person or company that provides a service.',translation='The main provider of internet services.';response(d=>{d.word='provider';d.language='en';d.meanings=[{partOfSpeech:'noun',definition,examples:[{text:'The company provides internet access.',translation}]}];d.learning={};});const letters=((definition+translation).match(/\p{L}/gu)||[]).length;try{await pbpDictEntryRun(request({term:'provider',sourceLanguage:'en',target:{name:'Chinese',lang:'zh-Hans'}}));return false;}catch(e){return letters===69&&e.code==='wrong_language'&&e.reason==='explanation_script'&&writes.length===0&&calls.length===1&&languageChecks.length===0;}});
 await test('short Chinese explanations can include English technical terms without a detector verdict',async()=>{reset();const definition='提供者，即 service provider；也常见于 internet service provider。',translation='服务供应商。';response(d=>{d.word='provider';d.language='en';d.meanings=[{partOfSpeech:'noun',definition,examples:[{text:'The company provides internet access.',translation}]}];d.learning={};});const r=await pbpDictEntryRun(request({term:'provider',sourceLanguage:'en',target:{name:'Chinese',lang:'zh-Hans'}}));return ((definition+translation).match(/\p{L}/gu)||[]).length<80&&r.cacheSaved&&languageChecks.length===0&&calls.length===1;});
@@ -134,15 +134,14 @@ await test('normalization never guesses absent or null entry identity and core m
   for(const mutate of mutations){reset();response(d=>{d.pronunciation=null;mutate(d);});if(!await rejects(()=>pbpDictEntryRun(request()),'invalid_response')||writes.length||calls.length!==1)return false;}
   return true;
 });
-await test('normalization keeps malformed lists text and learning versions invalid',async()=>{
+await test('normalization keeps malformed lists and text invalid',async()=>{
   const mutations=[d=>{d.pronunciation=9;},d=>{d.meanings[0].examples='';},d=>{d.meanings[0].definition=['A definition'];},
-    d=>{d.meanings[0].examples={translation:'Missing actual example'};},d=>{d.meanings[0].examples.push(null);},
-    d=>{d.learning=false;},d=>{d.learning.version=null;},d=>{d.learning.related={word:'Bankkonto',relation:'family'};},d=>{d.learning.sources=null;}];
+    d=>{d.meanings[0].examples={translation:'Missing actual example'};},d=>{d.meanings[0].examples.push(null);}];
   for(const mutate of mutations){reset();response(mutate);if(!await rejects(()=>pbpDictEntryRun(request()),'invalid_response')||writes.length||calls.length!==1)return false;}
   return true;
 });
 await test('extra metadata is still rejected alongside otherwise normalizable entry fields',async()=>{
-  const mutations=[d=>{d.confidence=0.9;},d=>{d.meanings[0].note='extra';},d=>{d.meanings[0].examples[0].url='https://example.test/';},d=>{d.learning.extra='extra';}];
+  const mutations=[d=>{d.confidence=0.9;},d=>{d.meanings[0].note='extra';},d=>{d.meanings[0].examples[0].url='https://example.test/';}];
   for(const mutate of mutations){reset();response(d=>{d.pronunciation=null;mutate(d);});if(!await rejects(()=>pbpDictEntryRun(request()),'invalid_response')||writes.length)return false;}
   return true;
 });
@@ -252,6 +251,45 @@ await test('1A.3 a related note may name its own related word, while a leaking r
   const {result:r,drops}=await withDrops(onDrop=>pbpDictEntryRun({...request(ZH()),onDrop}));
   return r.cacheSaved&&r.entry.meanings.length===1&&r.entry.learning.related.length===1&&r.entry.learning.related[0].word==='Note'&&
     r.entry.relatedWords.join(',')==='Note'&&JSON.stringify(drops)==='[["invalid_response","internal_term"]]';
+});
+// Leftover from 1A.3 (Q6=B extended to the learning block): a new generation
+// whose unrequested learning block is structurally malformed keeps its paid
+// senses and drops the whole block, reported with that block's own reason.
+// Cached and archived entries are still read strictly.
+const LEARNING_BREAKS=[[d=>{d.learning=false;},'entry_learning'],[d=>{d.learning.version=null;},'entry_learning'],
+  [d=>{d.learning.extra='extra';},'entry_learning'],[d=>{d.learning.formation=7;},'entry_learning'],
+  [d=>{d.learning.related={word:'Bankkonto',relation:'family'};},'entry_related'],[d=>{d.learning.related[0].relation='looks-similar';},'entry_related'],
+  [d=>{d.learning.sources=null;},'entry_sources'],[d=>{d.learning.replacesId='not-an-id';},'entry_version']];
+await test('a malformed learning block is dropped whole and the paid senses are saved',async()=>{
+  for(const [mutate,reason] of LEARNING_BREAKS){
+    reset();response(d=>{d.meanings=FOUR_SENSES();mutate(d);});
+    const {result:r,drops,warns}=await withDrops(onDrop=>pbpDictEntryRun({...request(),onDrop}));
+    const saved=writes[0]?.result.entry;
+    if(!r.cacheSaved||calls.length!==1||r.entry.meanings.length!==4||!saved||saved.meanings.length!==4||
+       JSON.stringify(saved.learning)!==JSON.stringify({version:2,formation:'',history:'',related:[],sources:[]})||
+       saved.relatedWords.length||saved.etymology!==''||JSON.stringify(drops)!==JSON.stringify([['invalid_response',reason]])||
+       warns.length!==1||warns[0]!=='[dict-entry] learning dropped: '+reason||/Bankkonto|simple noun/.test(warns[0]))return false;
+  }
+  return true;
+});
+await test('a dropped learning block and a dropped sense are each reported once',async()=>{
+  reset();response(d=>{d.meanings=FOUR_SENSES();d.meanings[1].confidence=0.4;d.learning.extra='extra';});
+  const {result:r,drops}=await withDrops(onDrop=>pbpDictEntryRun({...request(),onDrop}));
+  return r.cacheSaved&&r.entry.meanings.length===3&&r.entry.learning.related.length===0&&
+    JSON.stringify(drops)==='[["invalid_response","entry_meaning"],["invalid_response","entry_learning"]]';
+});
+await test('an unknown word whose learning block is malformed stays an unknown word',async()=>{
+  reset();response(d=>{d.meanings=[];d.pronunciation='';d.etymology='';d.relatedWords=[];d.learning={version:2,formation:'',history:'',related:[],stray:''};});
+  const {result:r,drops}=await withDrops(onDrop=>pbpDictEntryRun({...request(),onDrop}));
+  return r.cacheSaved&&r.entry.meanings.length===0&&JSON.stringify(drops)==='[["invalid_response","entry_learning"]]';
+});
+await test('a cached entry with a malformed learning block is still rejected as a whole on read',async()=>{
+  for(const [mutate] of LEARNING_BREAKS){
+    reset();await pbpDictEntryRun(request());const stored=cache.get(writes[0].key);
+    stored.entry.learning.related=[{word:'Bankkonto',relation:'family',note:'A compound referring to a bank account.'}];mutate(stored.entry);
+    if(await pbpDictEntryRead(request())!==null||calls.length!==1)return false;
+  }
+  return true;
 });
 // Batch 1A.4 (Q28=A): one meaning per meanings object is a prompt and example
 // rule locked here; whether a real model follows it is a sampled live check.

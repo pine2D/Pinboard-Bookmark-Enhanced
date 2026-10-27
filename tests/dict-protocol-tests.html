@@ -86,27 +86,25 @@ async function test(name, protocol, run) {
 (async () => {
   for (const fixture of PBP_DICT_LIVE_MALFORMED) {
     // A broken sense (1A.3, Q6=B) is dropped, never repaired. This capture also
-    // carries an unrequested learning block with the same stray keys, and
-    // learning stays strict, so the answer as captured still saves nothing; the
-    // same answer without that block keeps its one well-formed sense.
+    // carries an unrequested learning block with the same stray keys; that
+    // block is dropped whole (Q6=B extended to learning), so the answer as
+    // captured saves its one well-formed sense with empty learning, in one
+    // request, and reports each drop with its fixed reason.
     if (fixture.reason === 'entry_meaning') {
-      await test('captured complete HTTP output drops malformed senses without repairing them: ' + fixture.reason, PROTOCOLS[0], async req => {
+      await test('captured complete HTTP output drops malformed senses and learning without repairing them: ' + fixture.reason, PROTOCOLS[0], async req => {
         const input = { ...req, term: fixture.term }, drops = [];
         const content = JSON.parse(fixture.body.choices[0].message.content), raw = content.meanings;
         const wellFormed = raw.filter(m => Object.keys(m).sort().join() === 'definition,examples,partOfSpeech');
         responses.push(fixture.body);
-        const error = await reject(() => pbpDictEntryRun({ ...input, onDrop: e => drops.push(e.reason) }), 'invalid_response');
-        assert(error.reason === 'entry_learning' && calls.length === 1 && await pbpDictEntryRead(input) === null &&
-          JSON.stringify(drops) === JSON.stringify(raw.filter(m => !wellFormed.includes(m)).map(() => 'entry_meaning')), 'Captured malformed learning was repaired or saved');
-        delete content.learning; drops.length = 0;
-        const body = structuredClone(fixture.body); body.choices[0].message.content = JSON.stringify(content);
-        responses.push(body);
         const entry = await pbpDictEntryRun({ ...input, onDrop: e => drops.push(e.reason) });
         const reread = await pbpDictEntryRead(input);
-        assert(wellFormed.length > 0 && wellFormed.length < raw.length && entry.archiveSaved && calls.length === 2 &&
+        const expectedDrops = [...raw.filter(m => !wellFormed.includes(m)).map(() => 'entry_meaning'), 'entry_learning'];
+        assert(wellFormed.length > 0 && wellFormed.length < raw.length && entry.archiveSaved && calls.length === 1 &&
           JSON.stringify(entry.entry.meanings.map(m => m.definition)) === JSON.stringify(wellFormed.map(m => m.definition)) &&
-          drops.length === raw.length - wellFormed.length && drops.every(reason => reason === 'entry_meaning') &&
-          reread?.entry.meanings.length === wellFormed.length, 'Malformed captured senses were repaired, kept or retried');
+          JSON.stringify(drops) === JSON.stringify(expectedDrops) &&
+          JSON.stringify(reread?.entry.learning) === JSON.stringify({ version: 2, formation: '', history: '', related: [], sources: [] }) &&
+          reread.entry.relatedWords.length === 0 && reread.entry.meanings.length === wellFormed.length,
+          'Malformed captured senses or learning were repaired, kept or retried');
       });
       continue;
     }

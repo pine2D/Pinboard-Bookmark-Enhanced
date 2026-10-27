@@ -90,6 +90,35 @@ const REMOTE_V3_SUPPLEMENT = {
     }
   }
 };
+// Independently authored schema 3 peer data from before plan 1B.4: an
+// etymology card with a source-backed history point and a related-word point.
+// Generation without sources now offers formation only; the archive still
+// reads every older kind. Hash computed with Python sorted-key JSON.
+const REMOTE_V3_ETYMOLOGY_HISTORY = {
+  "recordKey": "6d71ce3b11c07a40e7cfb492a6ae8d3d6b8fe9ff455c2086017d3b4f2cbae6cd",
+  "value": {
+    "kind": "supplement", "term": "provider", "sourceLanguage": "en",
+    "target": { "name": "Chinese", "lang": "zh-CN" },
+    "provider": "peer-provider", "model": "peer-model", "generatedAt": 304,
+    "archiveId": "4edec14099bf10bdeb792197e931ad70fed7375b48163691af8ed89807a0b298",
+    "category": "etymology",
+    "profile": { "nativeLanguage": "Chinese", "level": "intermediate", "topic": "" },
+    "content": "provider：词源资料说明它来自动词 provide 加 -er。\nprovide：与 provider 同属一个词族。",
+    "sources": [{ "title": "provider", "url": "https://en.wiktionary.org/wiki/provider", "excerpt": "From provide + -er.",
+      "author": "", "work": "Wiktionary", "location": "Etymology", "language": "en", "genre": "etymology",
+      "revision": "888", "retrievedAt": 1700000000000 }],
+    "learning": {
+      "version": 2, "language": { "name": "Chinese", "lang": "zh-CN" }, "summary": "",
+      "items": [
+        { "sense": 0, "title": "provider", "explanation": "词源资料说明它来自动词 provide 加 -er。",
+          "example": "", "translation": "", "sourceIndex": 0, "kind": "history" },
+        { "sense": 0, "title": "provide", "explanation": "与 provider 同属一个词族。",
+          "example": "", "translation": "", "sourceIndex": -1, "kind": "family" }
+      ],
+      "replacesId": ""
+    }
+  }
+};
 // Independently authored schema 4 peer data: a patterns card already mapped to
 // v2 items (head -> title, note -> explanation). Hash computed with Python
 // json.dumps(sort_keys=True, separators=(",", ":"), ensure_ascii=False).
@@ -343,6 +372,17 @@ test("schema 3 retains partial etymology across devices without extending old wi
   const etymology = read.supplements.find(item => item.category === "etymology");
   assert(etymology.learning.omittedItems === 1 && etymology.learning.items[0].explanation.includes("provide"));
   assert(read.supplements.length === 2 && read.entry.meanings[0].definition.includes("提供"));
+});
+test("an older etymology card with sourced history and a related word stays readable", async () => {
+  const event = clone(REMOTE_V3_ETYMOLOGY_HISTORY);
+  assert(pbpDictArchiveValidateEvent(event), "older etymology kinds left the archive validator");
+  for (const schema of [3, 4]) assert(pbpDictArchiveValidBatchBody({ ...batchV2([clone(REMOTE_V2_ENTRY), clone(event)]), schema }, HASH), "schema " + schema);
+  const body = { ...batchV2([clone(REMOTE_V2_ENTRY), event]), schema: 3 };
+  const f = fixture(); await f.store.applyRemotePage(OWNER, HASH, [batch(), batchV2(), body], state());
+  const reopened = await f.reopen(), read = await reopened.read(request({ term: "provider" }));
+  const etymology = read.supplements.find(item => item.id === REMOTE_V3_ETYMOLOGY_HISTORY.recordKey);
+  assert(etymology && etymology.learning.items.map(item => item.kind).join(",") === "history,family" &&
+    etymology.sources[0].genre === "etymology", "older etymology card was not read back intact");
 });
 test("partial counts reject zero fractional and overflowing values", () => {
   for (const count of [0, -1, 0.5, 5, "1"]) {
