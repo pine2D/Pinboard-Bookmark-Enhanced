@@ -57,7 +57,7 @@ paths:
 - **删除补全动作**，只保留用户主动的重新生成；部分结果照常保存并注明。
 - 协议保持 JSON + 现有 schema 协商，不改 JSON Lines，不与基础词条合并请求；截断仍不得保存。语言检查逐条脚本检查 + 剔除源语言字段后合并做一次统计检测；提及剥离与提示词引号约定一致。无来源时词源只给构词：schema 的 kind 只有 formation、sourceIndex 固定 -1，仍是一次请求；生成解析把非 formation 条目按 `supplement_source` 逐条丢弃并计入 `omittedItems`，归档读取对旧记录的六种 kind 不变。
 - **空结果本机负缓存**（1C.4 已落地，md-dict.js `pbpDictNegRecord` / `pbpDictNegForget` / `pbpDictNegHas`）：无来源或 AI 判定无此类内容时按 owner + 词形 + 语言对记在本机，不进 Drive、不进备份；文案写「本次检索未找到可核实原文」，不断言该词没有此类用法；再试须用户主动。每 owner 一个 local 聚合键 `pbpDictNeg:<ownerHash>`（`{entryKey: at}`，上限 500 淘汰最旧，读写在与账本同前缀的 Web Lock 里），`entryKey` = SHA-256(`[term, sourceLanguage, target 或 "", category]`)，检索类（examples、etymology 来源）不带目标语言，AI 类（patterns、confusables）带——取屏幕上已渲染词条的解释语言，补充请求也用这同一语言（界面或设置语言事后变了也不跟着漂），记录与读取因而对得上，不区分模型；30 天过期（读时判、写时清）。只在受支持语言的干净未命中（原文用例 `[]`、词源检索 0 条，后者经 `pbpDictSupplementRun` 的 `onSources` 计数回调得知）与 patterns/confusables 的 `unsupported_usage` 时写入；不支持的语言、`source_failed`、`host_permission`、超时与取消一律不写。检索到结果、生成成功或 Drive 带来该类别的正记录（词源须带来源）即删除。读取先于按钮选择：原文用例块读完才显示动作行，学习块在首次渲染前读完；记住的状态显示「原按钮文字 · 上次未找到 · 再试」与中性 info 文案（检索类 `dictSupplementNoSources`，AI 类 `dictUsagePointsNone`），付费块仍是 `wandSparkles` + 模型名，再试即普通点击、重新付费。写入前后重核当前 owner，ownerless 不写不读；已登记 `PBP_RECLAIM_CATEGORIES.misc`。
-- 本机失败账本只记错误码／阶段／类别／时间，不记词形与内容，owner 隔离。
+- 本机失败账本只记错误码／阶段／类别／时间，不记词形与内容，owner 隔离。流内错误 `stream_error` 显示“服务暂不可用”，客户端额度截停 `output_budget_exceeded` 显示截断文案 `dictGenerationTruncated`，二者都按固定码入账；用户取消（含与截停同时发生）不入账。
 - **界面单列堆叠**：词头 → 词典结果（逐来源小标题）→ AI 词条 → 学习补充（固定顺序）→ 全卡一次元数据 → 吸底保存条（文字预览 + 更换，单条也显示）。不加「词典 | AI 词条」分段。付费按钮保留 `wandSparkles` + 文字 + 仅模型名（不显示 token 估算或金额）；同一控件不在免费／付费间换义；`ai-generate` 生成期间词典结果保持可见、不自动跳转。
 
 ## ECDICT 英汉包不变量（dict-pack.js）

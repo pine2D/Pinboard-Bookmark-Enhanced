@@ -823,6 +823,299 @@ await test('a throwing or rejecting onProgress callback never breaks the answer'
   assert(unhandled.length===0,'Unhandled rejection from onProgress');
   assert(warnings.length===2&&warnings[0].join(' ')==='[ai] onProgress callback failed: TypeError'&&warnings[1].join(' ')==='[ai] onProgress callback failed: RangeError','Warnings: '+JSON.stringify(warnings));
 });
+// ---- Client-side output budget (totalOutputBudget, the dictionary) ----
+// Estimate = ceil(total reasoning UTF-8 bytes / 4) + ceil(total answer JS
+// length / 4); the stream stops only when it is strictly above maxTokens.
+// Byte counts below come from TextEncoder, independent of ai.js.
+// reasoning_content is a compatible-gateway extension field (see above).
+const utf8=text=>new TextEncoder().encode(text).length;
+const oaThink=text=>sse({choices:[{index:0,delta:{reasoning_content:text},finish_reason:null}]});
+const oaText=text=>sse({choices:[{index:0,delta:{content:text},finish_reason:null}]});
+const OA_STOP=oa({},'stop')+'data: [DONE]\n\n';
+const BUDGET_OPTS={...DICT_OPTS};
+// Runs one fixture with a delta recorder and a usage spy; returns the outcome.
+async function budgetRun(raw,s=COMPAT.settings,opts=BUDGET_OPTS){
+  reset([S(raw)]);const deltas=[],usage=[];let out,error;
+  try{out=await callAIStream(s,'Synthetic provider learning request',{...opts,onUsage:u=>usage.push(u)},d=>deltas.push(d));}catch(e){error=e;}
+  return {out,error,deltas,usage,requests:calls.length};
+}
+const stopped=(r,label)=>{
+  assert(r.error?.code==='output_budget_exceeded',label+': expected output_budget_exceeded, got '+(r.error?.code||r.error?.name||'success'));
+  assert(r.error.status===200&&r.requests===1,label+': wrong status or a retry ('+r.error.status+', '+r.requests+')');
+  assert(r.error.message==='API answer exceeded the output budget'&&!r.error.message.includes(PRIVATE),label+': not the fixed message');
+};
+const finished=(r,label,want='ready')=>assert(!r.error&&r.out===want,label+': '+(r.error?.code||r.error?.message||r.out?.slice(0,20)));
+await test('a reasoning stream past the budget stops before any answer text, never retried and without usage',async()=>{
+  // ~9000 estimated reasoning tokens, then answer text in the SAME network read.
+  const usageChunk=sse({id:'chatcmpl-fixture',object:'chat.completion.chunk',created:0,model:'fixture',choices:[{index:0,delta:{role:'assistant'},finish_reason:null}],usage:{prompt_tokens:3,completion_tokens:0,total_tokens:3}});
+  const r=await budgetRun(usageChunk+oaThink('r'.repeat(36004))+oaText('ready')+OA_STOP);
+  stopped(r,'reasoning 9001');
+  assert(r.deltas.length===0,'Answer text reached onDelta after the stop');
+  assert(r.usage.length===0,'Usage flushed after the stop');
+  // The same stream with a small reasoning part completes and flushes usage once.
+  const ok=await budgetRun(usageChunk+oaThink('r'.repeat(400))+oaText('ready')+OA_STOP);
+  finished(ok,'small reasoning');assert(ok.usage.length===1&&ok.deltas.join('')==='ready','Normal end did not flush usage once');
+});
+await test('3000 reasoning tokens plus 3000 answer tokens complete normally',async()=>{
+  const answer='a'.repeat(12000);
+  const r=await budgetRun(oaThink('r'.repeat(12000))+oaText(answer)+OA_STOP);
+  finished(r,'3000+3000',answer);
+});
+await test('the budget stops strictly above 8192 estimated tokens',async()=>{
+  finished(await budgetRun(oaText('a'.repeat(32768))+OA_STOP),'answer 8192',  'a'.repeat(32768));
+  stopped(await budgetRun(oaText('a'.repeat(32769))+OA_STOP),'answer 8193');
+  finished(await budgetRun(oaThink('r'.repeat(32760))+oaText('ready')+OA_STOP),'8190 + 2');
+  stopped(await budgetRun(oaThink('r'.repeat(32761))+oaText('ready')+OA_STOP),'8191 + 2');
+  // An answer delta that crosses the budget is never forwarded.
+  const r=await budgetRun(oaText('a'.repeat(32760))+oaText('b'.repeat(40))+OA_STOP);
+  stopped(r,'second delta crosses');assert(r.deltas.length===1&&r.deltas[0]==='a'.repeat(32760),'The crossing delta was forwarded');
+});
+await test('the estimate rounds cumulative totals, so chunking cannot change it',async()=>{
+  // 10920 three-byte reasoning deltas: per-delta rounding would count 10920 tokens.
+  const many=n=>Array.from({length:n},()=>oaThink('rrr')).join('');
+  finished(await budgetRun(many(10920)+oaText('ready')+OA_STOP),'chunked 8190 + 2');
+  stopped(await budgetRun(many(10920)+oaThink('r')+oaText('ready')+OA_STOP),'chunked 8191 + 2');
+  // Answer text in single characters: per-delta rounding would count one token each.
+  // 8190 + ceil(8/4) = 8192 completes; rounding each delta would make it 8198.
+  const chars=Array.from({length:8},()=>oaText('a')).join('');
+  finished(await budgetRun(oaThink('r'.repeat(32760))+chars+OA_STOP),'answer in 1-char deltas','a'.repeat(8));
+  stopped(await budgetRun(oaThink('r'.repeat(32760))+chars+oaText('a')+OA_STOP),'answer in 1-char deltas, one over');
+  // The same bytes split across network reads at arbitrary byte offsets.
+  const raw=oaThink('中'.repeat(10920))+oaText('ready')+OA_STOP;
+  reset([]);globalThis.fetch=async(_url,init)=>{calls.push(JSON.parse(init.body));const bytes=new TextEncoder().encode(raw);let at=0;
+    return new Response(new ReadableStream({pull(c){if(at>=bytes.length){c.close();return;}c.enqueue(bytes.slice(at,at+7));at+=7;}}),{status:200});};
+  assert(await callAIStream(COMPAT.settings,'x',BUDGET_OPTS,()=>{})==='ready','7-byte network reads changed the estimate');
+});
+await test('Chinese, Japanese and split surrogate-pair reasoning is counted in UTF-8 bytes',async()=>{
+  // Largest n whose estimate is still <= 8192 with the 2-token answer "ready",
+  // computed from TextEncoder: n completes and n + 1 stops.
+  const edge=unit=>{let n=0;while(Math.ceil(utf8(unit.repeat(n+1))/4)+2<=8192)n++;return n;};
+  for(const [label,unit] of [['Chinese','中文'],['Japanese','日本語のテキストｶﾅa'],['Latin accents','é']]){
+    const n=edge(unit);
+    finished(await budgetRun(oaThink(unit.repeat(n))+oaText('ready')+OA_STOP),label+' at the edge');
+    stopped(await budgetRun(oaThink(unit.repeat(n+1))+oaText('ready')+OA_STOP),label+' one unit over');
+  }
+  // U+20BB7 is four UTF-8 bytes. Split every pair across two deltas: counting
+  // each lone half would charge six bytes per character.
+  const pair='\u{20BB7}',hi=pair[0],lo=pair[1];
+  assert(utf8(pair)===4&&pair.length===2,'Fixture character changed');
+  const split=n=>oaThink(hi)+Array.from({length:n-1},()=>oaThink(lo+hi)).join('')+oaThink(lo);
+  finished(await budgetRun(split(8190)+oaText('ready')+OA_STOP),'8190 split pairs');
+  stopped(await budgetRun(split(8191)+oaText('ready')+OA_STOP),'8191 split pairs');
+  finished(await budgetRun(oaThink(pair.repeat(8190))+oaText('ready')+OA_STOP),'8190 whole pairs');
+  // Japanese reasoning from Ollama's message.thinking counts the same way.
+  const unit='日本語のテキストｶﾅa',n=edge(unit);
+  finished(await budgetRun(ol('',{message:{thinking:unit.repeat(n)}})+ol('ready')+olDone(),OLLAMA.settings),'Ollama Japanese at the edge');
+  stopped(await budgetRun(ol('',{message:{thinking:unit.repeat(n+1)}})+ol('ready')+olDone(),OLLAMA.settings),'Ollama Japanese one unit over');
+});
+await test('each protocol counts its visible reasoning once and never as answer text',async()=>{
+  // reasoning_content and reasoning are aliases: a chunk carrying both counts once.
+  finished(await budgetRun(sse({choices:[{index:0,delta:{reasoning_content:'r'.repeat(32760),reasoning:'r'.repeat(32760)},finish_reason:null}]})+oaText('ready')+OA_STOP),'aliases once');
+  stopped(await budgetRun(oaThink('r'.repeat(16384))+sse({choices:[{index:0,delta:{reasoning:'r'.repeat(16384)},finish_reason:null}]})+oaText('ready')+OA_STOP),'aliases across chunks add up');
+  const big='r'.repeat(36004);
+  const claude=await budgetRun(CL_START+clBlock(0,'thinking',[{type:'thinking_delta',thinking:big}])+CL_TEXT+clEnd('end_turn'),CLAUDE.settings);
+  stopped(claude,'Claude thinking_delta');assert(claude.deltas.length===0,'Claude thinking reached onDelta');
+  const gemini=await budgetRun(gm([{thought:true,text:big},{text:'ready'}],'STOP'),GEMINI.settings);
+  stopped(gemini,'Gemini thought part');assert(gemini.deltas.length===0,'Gemini answer passed the stop');
+  stopped(await budgetRun(ol('',{message:{thinking:big}})+ol('ready')+olDone(),OLLAMA.settings),'Ollama thinking');
+});
+await test('consumers without totalOutputBudget are never stopped by the estimate',async()=>{
+  const raw=oaThink('r'.repeat(40000))+oaText('ready')+oaText('!'.repeat(40000))+OA_STOP;
+  for(const [name,opts] of CONSUMERS){reset([S(raw)]);
+    const out=await callAIStream(COMPAT.settings,'Synthetic provider learning request',opts,()=>{});
+    assert(out==='ready'+'!'.repeat(40000)&&calls.length===1,name+' was stopped');}
+});
+await test('a budget stop after a refused thinkingOff remembers the accepted dialect',async()=>{
+  reset([reply(OFF_REFUSED,400),S(oaThink('r'.repeat(36004))+oaText('ready')+OA_STOP)]);let error;
+  try{await stream(BUDGET_OPTS);}catch(e){error=e;}
+  assert(error?.code==='output_budget_exceeded'&&error.status===200&&calls.length===2,'Budget stop was retried or misreported: '+(error?.code)+' '+calls.length);
+  assert('thinking'in calls[0]&&!('thinking'in calls[1]),'Second request still sent thinkingOff');
+  assert(stored.pbpThinkReject?.[key]?.rejected===true,'Budget stop did not remember the accepted dialect');
+  calls=[];raw=[];responses=[S(STREAM_DONE.compatible.raw)];
+  assert(await stream(BUDGET_OPTS)==='ready'&&calls.length===1&&!('thinking'in calls[0]),'Next call paid another refused round trip');
+});
+
+// ---- Call deadline (deadlineMs) and abort priority, on a fake clock ----
+// The clock replaces setTimeout/clearTimeout/Date.now only inside each test;
+// this page runs its cases strictly one after another, so nothing else can
+// schedule onto it. Bodies are ReadableStreams the test feeds by hand, and the
+// fetch stub errors them when the request signal aborts, as fetch does.
+function fakeClock(){
+  const realSet=globalThis.setTimeout,realClear=globalThis.clearTimeout,realNow=Date.now;
+  let now=realNow(),seq=0;const timers=new Map();
+  globalThis.setTimeout=(fn,ms=0)=>{const id=++seq;timers.set(id,{fn,at:now+Math.max(0,Number(ms)||0),ms});return id;};
+  globalThis.clearTimeout=id=>{timers.delete(id);};
+  Date.now=()=>now;
+  const flush=async()=>{for(let i=0;i<12;i++)await new Promise(r=>realSet(r,0));};
+  return {
+    timers,flush,elapsed:start=>now-start,get now(){return now;},
+    delays:()=>[...timers.values()].map(t=>t.ms),
+    async advance(ms){
+      const end=now+ms;
+      for(;;){
+        const due=[...timers.entries()].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];
+        if(!due)break;
+        now=Math.max(now,due[1].at);timers.delete(due[0]);due[1].fn();await flush();
+      }
+      now=end;await flush();
+    },
+    // Runs every due-or-not timer synchronously (a "same tick" firing).
+    fireAll(){for(const [id,t] of [...timers.entries()]){timers.delete(id);t.fn();}},
+    restore(){globalThis.setTimeout=realSet;globalThis.clearTimeout=realClear;Date.now=realNow;}
+  };
+}
+function liveBody(signal){
+  let controller;const enc=new TextEncoder();
+  const body=new ReadableStream({start(c){controller=c;}});
+  signal?.addEventListener('abort',()=>{try{controller.error(new DOMException('The operation was aborted.','AbortError'));}catch(_){}},{once:true});
+  return {body,push:text=>controller.enqueue(enc.encode(text)),close:()=>controller.close()};
+}
+// fetch stub: each queued entry receives the request init and returns a Response.
+function liveFetch(queue){
+  const live={signals:[],bodies:[]};
+  globalThis.fetch=async(_url,init)=>{
+    calls.push(JSON.parse(init.body));live.signals.push(init.signal);
+    const next=queue.shift();if(!next)throw new Error('Unexpected extra fixture request');
+    return next(init,live);
+  };
+  return live;
+}
+const silent=(init,live)=>{const b=liveBody(init.signal);live.bodies.push(b);return new Response(b.body,{status:200,headers:{'Content-Type':'text/event-stream'}});};
+const DEADLINE_OPTS={...DICT_OPTS,deadlineMs:180000};
+// Tracks a pending call without awaiting it.
+function track(promise){const st={settled:false};promise.then(v=>{st.settled=true;st.value=v;},e=>{st.settled=true;st.error=e;});return st;}
+async function withClock(fn){const clock=fakeClock();try{await fn(clock);}finally{clock.restore();}}
+await test('the deadline starts after the first dispatch guard and ends the call at 180 s with TimeoutError',async()=>{
+  await withClock(async clock=>{
+    reset([]);const live=liveFetch([silent]);let release;const blocked=new Promise(r=>{release=r;});
+    const caller=new AbortController();let guards=0;
+    const st=track(callAIStream(COMPAT.settings,'x',{...DEADLINE_OPTS,signal:caller.signal,beforeRequest:async()=>{if(++guards===1)await blocked;}},()=>{}));
+    await clock.flush();
+    await clock.advance(500000);
+    assert(!st.settled&&calls.length===0&&clock.timers.size===0,'The first guard wait started the clock or dispatched');
+    release();await clock.flush();
+    assert(calls.length===1&&JSON.stringify(clock.delays())==='[180000]','Expected exactly one 180 s deadline timer: '+clock.delays());
+    await clock.advance(35000);
+    assert(!st.settled,'35 s of silence killed a stream with a deadline');
+    await clock.advance(144999);
+    assert(!st.settled,'Deadline fired early');
+    await clock.advance(1);
+    assert(st.settled&&st.error?.name==='TimeoutError','Expected TimeoutError, got '+(st.error?.name||st.error?.message||st.value));
+    assert(live.signals[0].aborted&&!caller.signal.aborted,'The child request was not aborted, or the caller signal was touched');
+    assert(clock.timers.size===0&&calls.length===1,'Timers left behind or an extra request');
+  });
+});
+await test('data after 35 s of silence keeps a deadline stream alive, and keep-alives never extend the deadline',async()=>{
+  await withClock(async clock=>{
+    reset([]);const live=liveFetch([silent]);
+    const st=track(callAIStream(COMPAT.settings,'x',DEADLINE_OPTS,()=>{}));
+    await clock.flush();
+    await clock.advance(35000);live.bodies[0].push(oa({role:'assistant',content:'rea'}));await clock.flush();
+    await clock.advance(60000);live.bodies[0].push(oa({content:'dy'})+OA_STOP);live.bodies[0].close();await clock.flush();
+    assert(st.settled&&st.value==='ready','A slow stream under a deadline did not finish: '+(st.error?.message));
+    assert(clock.timers.size===0,'The deadline timer was not cleared');
+    reset([]);const live2=liveFetch([silent]);
+    const st2=track(callAIStream(COMPAT.settings,'x',DEADLINE_OPTS,()=>{}));
+    await clock.flush();
+    for(let i=0;i<8;i++){await clock.advance(20000);live2.bodies[0].push(': keep-alive\n\n');await clock.flush();}
+    assert(!st2.settled,'Settled before the deadline');
+    await clock.advance(20000);
+    assert(st2.settled&&st2.error?.name==='TimeoutError','Keep-alives extended the deadline');
+  });
+});
+await test('a second attempt only has the time the first one left (100 s + 80 s)',async()=>{
+  await withClock(async clock=>{
+    reset([]);let answerFirst;
+    const live=liveFetch([()=>new Promise(r=>{answerFirst=()=>r(new Response(JSON.stringify(OFF_REFUSED),{status:400}));}),silent]);
+    const st=track(callAIStream(settings,'x',DEADLINE_OPTS,()=>{}));
+    await clock.flush();
+    await clock.advance(100000);answerFirst();await clock.flush();
+    assert(calls.length===2&&!st.settled,'The refused first attempt was not retried');
+    assert(clock.timers.size===1,'The retry armed another timer');
+    await clock.advance(79999);
+    assert(!st.settled,'Second attempt ended early');
+    await clock.advance(1);
+    assert(st.error?.name==='TimeoutError'&&live.signals[1].aborted,'Second attempt did not end at 180 s total');
+  });
+});
+await test('a later dispatch guard consumes the deadline and a late guard never dispatches',async()=>{
+  await withClock(async clock=>{
+    reset([]);let answerFirst,release;const blocked=new Promise(r=>{release=r;});let guards=0;
+    liveFetch([()=>new Promise(r=>{answerFirst=()=>r(new Response(JSON.stringify(OFF_REFUSED),{status:400}));}),silent]);
+    const st=track(callAIStream(settings,'x',{...DEADLINE_OPTS,beforeRequest:async()=>{if(++guards===2)await blocked;}},()=>{}));
+    await clock.flush();await clock.advance(10000);answerFirst();await clock.flush();
+    assert(guards===2&&calls.length===1,'Second guard not reached');
+    await clock.advance(170000);
+    assert(st.error?.name==='TimeoutError','The pending guard outlived the deadline: '+(st.error?.name||st.settled));
+    release();await clock.flush();
+    assert(calls.length===1,'A guard that finished after the deadline still dispatched');
+  });
+});
+await test('the deadline ends the call during a capability write and during an error-body read',async()=>{
+  await withClock(async clock=>{
+    const s={aiProvider:'custom',customBaseUrl:'https://deadline.example/v1',customApiKey:'fixture',customModel:'deadline-model'};
+    reset([]);let answerFirst,releaseSet;
+    liveFetch([()=>new Promise(r=>{answerFirst=()=>r(new Response(JSON.stringify({error:{message:'Unsupported parameter: max_completion_tokens',param:'max_completion_tokens'}}),{status:400}));}),silent]);
+    const realSet=chrome.storage.local.set;
+    chrome.storage.local.set=value=>new Promise(r=>{releaseSet=()=>{Object.assign(stored,structuredClone(value));r();};});
+    const st=track(callAIStream(s,'x',DEADLINE_OPTS,()=>{}));
+    await clock.flush();await clock.advance(5000);answerFirst();await clock.flush();
+    assert(typeof releaseSet==='function'&&!st.settled,'Repair write not pending');
+    await clock.advance(175000);
+    assert(st.error?.name==='TimeoutError','Pending storage outlived the deadline');
+    releaseSet();chrome.storage.local.set=realSet;await clock.flush();
+    assert(calls.length===1,'A late storage continuation dispatched another request');
+    reset([]);let releaseJson;
+    liveFetch([()=>({ok:false,status:400,json:()=>new Promise(r=>{releaseJson=()=>r(OFF_REFUSED);})})]);
+    const st2=track(callAIStream(settings,'x',DEADLINE_OPTS,()=>{}));
+    await clock.flush();await clock.advance(180000);
+    assert(st2.error?.name==='TimeoutError','A pending error body outlived the deadline');
+    releaseJson();await clock.flush();
+    assert(calls.length===1,'A late error body triggered a retry');
+  });
+});
+await test('without a deadline the 30 s idle timeout is unchanged',async()=>{
+  await withClock(async clock=>{
+    reset([]);const live=liveFetch([silent]);
+    const st=track(callAIStream(COMPAT.settings,'x',SNAP_ASK,()=>{}));
+    await clock.flush();
+    assert(clock.delays().every(ms=>ms===30000),'Unexpected timer: '+clock.delays());
+    await clock.advance(20000);live.bodies[0].push(': keep-alive\n\n');await clock.flush();
+    await clock.advance(29999);
+    assert(!st.settled,'Keep-alive did not reset the idle timer');
+    await clock.advance(1);
+    assert(st.error?.message==='AI stream timeout'&&st.error.name==='Error'&&!('code'in st.error)&&!('status'in st.error),'Idle error shape changed: '+st.error?.name+' '+st.error?.message);
+    // A deadline outside 1-180 s is ignored: the idle timer still applies.
+    reset([]);liveFetch([silent]);
+    const st2=track(callAIStream(COMPAT.settings,'x',{...SNAP_ASK,deadlineMs:600000},()=>{}));
+    await clock.flush();await clock.advance(30000);
+    assert(st2.error?.message==='AI stream timeout','An out-of-range deadline disabled the idle timer');
+  });
+});
+await test('abort priority: caller abort > budget stop > deadline',async()=>{
+  const over=oaThink('r'.repeat(36004))+oaText('ready')+OA_STOP;
+  // Caller cancels in the same tick as the budget stop (from the phase callback).
+  reset([S(over)]);const caller=new AbortController();const deltas=[];let error;
+  try{await callAIStream(COMPAT.settings,'x',{...DEADLINE_OPTS,signal:caller.signal,onProgress:e=>{if(e.phase==='thinking')caller.abort();}},d=>deltas.push(d));}catch(e){error=e;}
+  assert(error?.name==='AbortError'&&typeof error.code!=='string'&&deltas.length===0,'Caller abort lost to the budget stop: '+(error?.name)+' '+(error?.code));
+  await withClock(async clock=>{
+    // The deadline fires in the same tick as the budget stop: the budget wins.
+    reset([S(over)]);let error;
+    try{await callAIStream(COMPAT.settings,'x',{...DEADLINE_OPTS,onProgress:e=>{if(e.phase==='thinking')clock.fireAll();}},()=>{});}catch(e){error=e;}
+    assert(error?.code==='output_budget_exceeded'&&error.status===200,'Deadline beat the budget stop: '+(error?.name)+' '+(error?.code));
+    // The deadline and the caller in the same tick: the caller wins.
+    reset([]);liveFetch([silent]);const caller=new AbortController();
+    const st=track(callAIStream(COMPAT.settings,'x',{...DEADLINE_OPTS,signal:caller.signal},()=>{}));
+    await clock.flush();clock.fireAll();caller.abort();await clock.flush();
+    assert(st.error?.name==='AbortError','Deadline beat the caller abort: '+st.error?.name);
+    // Caller abort during a pending later guard is still the caller's AbortError.
+    reset([]);let answerFirst;liveFetch([()=>new Promise(r=>{answerFirst=()=>r(new Response(JSON.stringify(OFF_REFUSED),{status:400}));}),silent]);
+    const caller2=new AbortController();let guards=0;
+    const st2=track(callAIStream(settings,'x',{...DEADLINE_OPTS,signal:caller2.signal,beforeRequest:async()=>{if(++guards===2)await new Promise(()=>{});}},()=>{}));
+    await clock.flush();answerFirst();await clock.flush();caller2.abort();clock.fireAll();await clock.flush();
+    assert(st2.error?.name==='AbortError'&&calls.length===1,'Caller abort during a guard lost to the deadline');
+  });
+});
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();
 </script>

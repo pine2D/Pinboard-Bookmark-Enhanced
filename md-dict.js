@@ -1557,6 +1557,10 @@ const PBP_DICT_GENERATION_ERROR_KEYS = Object.freeze({
   // A provider error event inside a 200 stream (ai.js requireComplete path):
   // the service failed mid-answer, so say it is unavailable, as for a 5xx.
   stream_error: "dictGenerationServiceUnavailable",
+  // The client stopped a 2xx stream past its output budget (ai.js
+  // _pbpOutputBudget): the answer was cut short, exactly like a truncation,
+  // and nothing was saved.
+  output_budget_exceeded: "dictGenerationTruncated",
   model_not_found: "dictGenerationModelUnavailable"
 });
 function _pbpDictGenerationErrorKey(error, supplement = false) {

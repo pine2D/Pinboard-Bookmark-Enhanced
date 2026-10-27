@@ -2042,6 +2042,7 @@ async function runDictionaryEntryUiTests() {
         [{code:"empty_response"},"dictGenerationEmpty"],
         [{code:"model_not_found"},"dictGenerationModelUnavailable"],
         [{code:"stream_error",status:200},"dictGenerationServiceUnavailable"],
+        [{code:"output_budget_exceeded",status:200},"dictGenerationTruncated"],
         [{status:402},"dictGenerationBilling"],
         [{status:524},"dictGenerationServiceUnavailable"],
         [{status:503},"dictGenerationServiceUnavailable"],

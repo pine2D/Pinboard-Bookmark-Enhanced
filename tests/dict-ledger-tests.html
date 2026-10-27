@@ -229,6 +229,24 @@ await test("a stream error event is stored and read back under its fixed code an
     rows.length === 1 && rows[0].code === "stream_error" && rows[0].stage === "generating" && rows[0].category === "patterns" &&
     _pbpDictGenerationErrorKey(error) === "dictGenerationServiceUnavailable" && _pbpDictGenerationErrorKey(error, true) === "dictGenerationServiceUnavailable";
 });
+await test("a client-side budget stop is stored and read back under its fixed code and shown as truncated", async () => {
+  reset();
+  // The shape ai.js throws when it stops a 2xx stream past the output budget.
+  const error = Object.assign(new Error("API answer exceeded the output budget"), { code: "output_budget_exceeded", status: 200 });
+  _pbpDictLedgerFail("acct_alice", error, "generating", "entry");
+  for (let i = 0; i < 5; i++) await tick();
+  const rows = await pbpDictLedgerRead("acct_alice");
+  return PBP_DICT_LEDGER_CODES.has("output_budget_exceeded") && pbpDictLedgerCode(error) === "output_budget_exceeded" &&
+    rows.length === 1 && rows[0].code === "output_budget_exceeded" && rows[0].stage === "generating" && rows[0].category === "entry" &&
+    _pbpDictGenerationErrorKey(error) === "dictGenerationTruncated" && _pbpDictGenerationErrorKey(error, true) === "dictGenerationTruncated";
+});
+await test("a caller cancel that beat a budget stop is not recorded", async () => {
+  reset();
+  // ai.js reports the caller's AbortError, never the budget code, when both apply.
+  _pbpDictLedgerFail("acct_alice", new DOMException("The operation was aborted.", "AbortError"), "generating", "entry");
+  for (let i = 0; i < 5; i++) await tick();
+  return Object.keys(store).length === 0 && (await pbpDictLedgerRead("acct_alice")).length === 0;
+});
 document.getElementById("summary").textContent = pass + " passed, " + fail + " failed";
 })();
 </script></body></html>

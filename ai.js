@@ -457,9 +457,18 @@ const _AI_DIALECT_MAX_ATTEMPTS = 4;
 
 // makeCall(extraBody, dialect) — dialect is null for bespoke bodies (Gemini),
 // which have no max_tokens/temperature of the OpenAI-compat spelling to repair.
-async function _aiWithDialectFallback(provider, model, cfg, makeCall) {
+// control — optional call-level stream deadline (_pbpStreamControl, streams
+// declaring deadlineMs only). Once the first dispatch guard has started it,
+// every capability read or write between attempts consumes the same remaining
+// time: the deadline ends the call while storage is still pending, and a late
+// storage continuation can no longer dispatch another request. A write that
+// only records an outcome already decided (rememberAccepted) never turns that
+// outcome into a timeout. Callers that pass no control keep their exact path.
+async function _aiWithDialectFallback(provider, model, cfg, makeCall, control = null) {
+  const wait = control ? promise => control.race(promise) : promise => promise;
+  const keep = control ? promise => control.settle(promise) : promise => promise;
   const memoKey = _aiCapabilityKey(provider, model, cfg);
-  const [thinkMemo, paramMemo] = await Promise.all([_aiThinkRejected(memoKey), _aiParamFixGet(memoKey)]);
+  const [thinkMemo, paramMemo] = await wait(Promise.all([_aiThinkRejected(memoKey), _aiParamFixGet(memoKey)]));
   let thinkRejected = thinkMemo;
   let dialect = (cfg && cfg.bespokeBody) ? null : _aiBodyDialect(cfg, paramMemo);
   let healedThink = false, healedFallback = false;
@@ -471,21 +480,24 @@ async function _aiWithDialectFallback(provider, model, cfg, makeCall) {
     const fallbackActive = thinkRejected && !!cfg?.thinkingFallback && !dialect?.omitThinkingFallback;
     try {
       const out = await makeCall(_aiEffectiveExtraBody(cfg, thinkRejected, dialect?.omitThinkingFallback), dialect);
-      await rememberAccepted();
+      await keep(rememberAccepted());
       return out;
     } catch (e) {
       const status = e && e.status;
       // A parsed 2xx envelope proves parameter acceptance even when reasoning
       // exhausted the response budget. These paid outcomes NEVER trigger retry.
-      if (status >= 200 && status < 300 && ["output_truncated", "empty_response"].includes(e.code)) {
-        await rememberAccepted();
+      // output_budget_exceeded is the client-side stop of a 2xx stream (see
+      // _pbpOutputBudget): the server accepted the request body before the
+      // stop, so it is remembered the same way and never retried.
+      if (status >= 200 && status < 300 && ["output_truncated", "empty_response", "output_budget_exceeded"].includes(e.code)) {
+        await keep(rememberAccepted());
         throw e;
       }
       if (attempt >= _AI_DIALECT_MAX_ATTEMPTS) throw e;
       const repair = (status === 400 || status === 422) ? _aiParamRepair(e, dialect) : null;
       if (repair) {
         dialect = { ...dialect, ...repair };
-        await _aiParamFixLearn(memoKey, repair);
+        await wait(_aiParamFixLearn(memoKey, repair));
         continue;
       }
       if (_aiShouldRetryNoThink(cfg, thinkRejected, e)) {
@@ -497,7 +509,7 @@ async function _aiWithDialectFallback(provider, model, cfg, makeCall) {
         dialect = { ...dialect, omitThinkingFallback: true };
         // Named refusal is evidence on its own. A generic 4xx only becomes a
         // lasting capability decision after the stripped request is accepted.
-        if (e.paramHint === "reasoning_effort") await _aiParamFixLearn(memoKey, { omitThinkingFallback: true });
+        if (e.paramHint === "reasoning_effort") await wait(_aiParamFixLearn(memoKey, { omitThinkingFallback: true }));
         else healedFallback = true;
         continue;
       }
@@ -667,7 +679,9 @@ function _aiCompletionError(code, reason, status) {
     output_truncated: "API did not finish its answer",
     empty_response: "API returned no answer text",
     // Fixed text: a provider's own error event body never reaches the message.
-    stream_error: "API reported an error during the answer stream"
+    stream_error: "API reported an error during the answer stream",
+    // Client-side stop of a stream past its declared output budget.
+    output_budget_exceeded: "API answer exceeded the output budget"
   };
   const error = Object.assign(new Error(messages[code]), { code });
   if (reason) error.reason = reason;
@@ -1077,9 +1091,61 @@ function _pbpStreamProgress(onProgress) {
   };
 }
 
+// ---- Client-side output budget (totalOutputBudget streams: the dictionary) ----
+// An approximation, not a tokenizer: visible reasoning counts
+// ceil(UTF-8 bytes / 4) and answer text ceil(JS string length / 4), each over
+// the attempt's cumulative totals and rounded once, so how a stream happens to
+// be chunked cannot change the estimate (a surrogate pair split across two
+// deltas still counts its four bytes once). The stream stops only when the sum
+// is strictly greater than the declared maxTokens (8192 for the dictionary);
+// it may err either way against a real tokenizer.
+// Coverage is honest, not total: the visible thinking that can be counted
+// comes mainly from compatible gateways' reasoning_content / reasoning (one
+// alias per chunk, counted once) and Ollama's message.thinking, plus any
+// Gemini thought part or Claude thinking_delta that does arrive. Hidden
+// reasoning is never streamed and cannot be counted; the call deadline and
+// the server-side output limit bound it.
+// The stop throws a marked output_budget_exceeded error out of the consumer,
+// so _pbpStreamRead leaves its read loop at once and no later buffered event
+// reaches onDelta. Only counts are kept, never the reasoning text itself.
+const _PBP_BUDGET_STOP = Symbol("pbpBudgetStop");
+function _pbpOutputBudget(opts) {
+  const limit = opts?.totalOutputBudget !== true ? 0
+    : Number.isSafeInteger(opts.maxTokens) && opts.maxTokens > 0 ? opts.maxTokens : 1024;
+  let thinkBytes = 0, answerChars = 0, highSurrogate = false;
+  const check = () => {
+    if (Math.ceil(thinkBytes / 4) + Math.ceil(answerChars / 4) <= limit) return;
+    throw Object.assign(_aiCompletionError("output_budget_exceeded", null, 200), { [_PBP_BUDGET_STOP]: true });
+  };
+  return {
+    thinking(text) {
+      if (!limit || typeof text !== "string" || !text) return;
+      for (let i = 0; i < text.length; i++) {
+        const unit = text.charCodeAt(i);
+        if (highSurrogate) {
+          highSurrogate = false;
+          if (unit >= 0xDC00 && unit <= 0xDFFF) { thinkBytes += 4; continue; }
+          thinkBytes += 3;                    // lone high surrogate: U+FFFD
+        }
+        if (unit < 0x80) thinkBytes += 1;
+        else if (unit < 0x800) thinkBytes += 2;
+        else if (unit >= 0xD800 && unit <= 0xDBFF) highSurrogate = true;   // wait for its pair
+        else thinkBytes += 3;
+      }
+      check();
+    },
+    answer(text) {
+      if (!limit || typeof text !== "string" || !text) return;
+      answerChars += text.length;
+      check();
+    }
+  };
+}
+
 // Per-attempt terminal-state side channel for one stream. onRaw(obj) sees every
-// parsed chunk BEFORE the delta extractor, onText() marks visible answer text,
-// onParseError() marks an undecodable event. Delta extractors keep returning
+// parsed chunk BEFORE the delta extractor, onText(text) marks visible answer
+// text, onParseError() marks an undecodable event. Both onRaw and onText also
+// feed the output budget and throw its stop (outside their own try/catch). Delta extractors keep returning
 // string|null; terminal metadata never travels through them.
 //
 // finish(full, status) only judges a requireComplete stream (the dictionary),
@@ -1179,14 +1245,20 @@ function _pbpStreamContract(protocol, opts) {
       finishReason(obj.done_reason);
     }
   };
+  const budget = _pbpOutputBudget(opts);
   return {
     onRaw(obj) {
+      let thought = "";
       try {
-        if (_pbpStreamThinking(protocol, obj)) phase("thinking");
+        thought = _pbpStreamThinking(protocol, obj);
+        if (thought) phase("thinking");
         if (strict) collect(obj);
       } catch (_) { if (strict) badShape(); }
+      budget.thinking(thought);        // may throw the budget stop
     },
-    onText() { phase("streaming"); },
+    // Counted before the text is forwarded: a delta that crosses the budget
+    // never reaches onDelta.
+    onText(text) { budget.answer(text); phase("streaming"); },
     onParseError() { if (strict && !invalid) invalid = "response_json"; },
     // Throws the contract error, or returns normally when the stream may be used.
     finish(full, status) {
@@ -1222,41 +1294,119 @@ function _pbpChainAbort(signal) {
   return ctrl;
 }
 
+function _pbpAbortError() {
+  return new DOMException("The operation was aborted.", "AbortError");
+}
+
+// Call-level absolute deadline for a stream that declares deadlineMs (1-180 s;
+// the dictionary passes 180000). callAIStream creates it, but deadlineAt is
+// set only once the FIRST transport dispatch guard has passed: permission
+// checks, the first capability read and the first guard wait are not counted.
+// From then on every attempt, guard, capability read/write and error-body read
+// consumes the same remaining time; nothing ever adds the full period again.
+// Its internal controller aborts the attempt in flight when time runs out and
+// is never handed to anyone as the caller's signal, so an internal stop can
+// never be mistaken for the user cancelling. failure() applies the caller-first
+// priority: the caller's AbortError if the caller has aborted, otherwise
+// TimeoutError (the name md-dict.js maps to its timeout text).
+const _PBP_STREAM_CONTROL = Symbol("pbpStreamControl");
+function _pbpStreamDeadlineMs(opts) {
+  const ms = opts?.deadlineMs;
+  return Number.isSafeInteger(ms) && ms >= 1000 && ms <= 180000 ? ms : 0;
+}
+function _pbpStreamControl(deadlineMs, callerSignal) {
+  const internal = new AbortController();
+  let deadlineAt = 0, timer = null, expired = false, rejectExpiry = null;
+  const expiry = new Promise((_, reject) => { rejectExpiry = reject; });
+  expiry.catch(() => {});
+  const fire = () => {
+    if (expired) return;
+    expired = true;
+    clearTimeout(timer);
+    internal.abort();
+    rejectExpiry(new DOMException("The AI request exceeded its deadline", "TimeoutError"));
+  };
+  // A throttled timer may run late; the clock still decides.
+  const overdue = () => { if (deadlineAt && !expired && Date.now() >= deadlineAt) fire(); };
+  const failure = () => (callerSignal && callerSignal.aborted ? _pbpAbortError()
+    : new DOMException("The AI request exceeded its deadline", "TimeoutError"));
+  return {
+    signal: internal.signal,
+    get expired() { overdue(); return expired; },
+    failure,
+    start() {
+      if (deadlineAt) return;
+      deadlineAt = Date.now() + deadlineMs;
+      timer = setTimeout(fire, deadlineMs);
+    },
+    // Throws failure() once the deadline has passed; a no-op before start().
+    check() { overdue(); if (expired) throw failure(); },
+    // Settles like `promise`, or rejects with failure() when the deadline
+    // passes first. Before start() it is `promise` itself.
+    race(promise) {
+      if (!deadlineAt) return promise;
+      overdue();
+      return Promise.race([expiry, promise]).catch(error => { throw expired ? failure() : error; });
+    },
+    // For a wait whose outcome is already decided: stop waiting at the
+    // deadline, but never turn that outcome into a failure.
+    settle(promise) {
+      if (!deadlineAt) return promise;
+      overdue();
+      return Promise.race([expiry, promise]).catch(() => {});
+    },
+    dispose() { clearTimeout(timer); }
+  };
+}
+
 // Shared streaming driver. POSTs `url` and pipes the response body
 // through `consume(buf, isFinal) -> rest`: consume extracts complete
 // payloads from the accumulated text and returns the unconsumed tail
 // (must return "" when isFinal).
-// Idle timeout: one resettable 30s timer, armed after the dispatch guard,
-// immediately before fetch, and re-armed
+// Idle timeout (calls without a deadline): one resettable 30s timer, armed
+// after the dispatch guard, immediately before fetch, and re-armed
 // on every received network chunk — covers time-to-first-byte AND
 // mid-stream stalls. (Byte-level, not delta-level: an SSE keep-alive
 // comment also resets it, which is the desired liveness semantics.)
-// Rejections: handleAIError(res, providerName) on non-ok; DOMException
-// AbortError when the CALLER aborts; Error("AI stream timeout") when the
-// idle timer fires. Resolves with the HTTP status, which a requireComplete
-// stream's contract errors carry.
+// With a call deadline (opts[_PBP_STREAM_CONTROL]) the idle timer is off: a
+// slow model may stay silent for longer than 30 s, and the guard, fetch,
+// error-body read and every read are raced against the shared deadline.
+// Rejections, in priority order when several apply: the CALLER's AbortError >
+// output_budget_exceeded (status = this 2xx response) > TimeoutError (call
+// deadline) > Error("AI stream timeout") (idle timer); handleAIError(res,
+// providerName) on non-ok. Resolves with the HTTP status, which a
+// requireComplete stream's contract errors carry.
 async function _pbpStreamRead(url, init, opts, providerName, consume) {
   const ctrl = _pbpChainAbort(opts.signal);
+  const control = opts[_PBP_STREAM_CONTROL] || null;
+  const wait = control ? promise => control.race(promise) : promise => promise;
   let timedOut = false;
   let idleTimer = null;
-  const resetIdle = () => {
+  let status = 0;
+  const resetIdle = control ? () => {} : () => {
     clearTimeout(idleTimer);
     idleTimer = setTimeout(() => { timedOut = true; ctrl.abort(); }, PBP_STREAM_IDLE_MS);
   };
+  const followDeadline = () => ctrl.abort();
   let reader = null;
   // Every provider and dialect retry reaches this boundary. A guard failure is
   // not a network failure, and its wait must not consume the network idle budget.
-  if (typeof opts.beforeRequest === "function") await opts.beforeRequest();
+  // A later attempt's guard does consume the call deadline (wait() is the
+  // identity until the first guard has started it).
+  if (typeof opts.beforeRequest === "function") await wait(opts.beforeRequest());
+  if (control) { control.check(); control.start(); }
   ctrl.signal.throwIfAborted();
+  if (control) control.signal.addEventListener("abort", followDeadline, { once: true });
   try {
     resetIdle();
-    const res = await fetch(url, { ...init, redirect: "error", signal: ctrl.signal });
+    const res = await wait(fetch(url, { ...init, redirect: "error", signal: ctrl.signal }));
+    status = res.status;
     // Headers received: start a fresh idle window for time-to-first-byte.
     resetIdle();
     if (!res.ok) {
       clearTimeout(idleTimer);
       // always throws (same semantics as the non-streaming callers)
-      await handleAIError(res, providerName);
+      await wait(handleAIError(res, providerName));
     }
     if (!res.body) {
       clearTimeout(idleTimer);
@@ -1267,7 +1417,7 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
     const decoder = new TextDecoder();
     let buf = "";
     while (true) {
-      const { done, value } = await reader.read();
+      const { done, value } = await wait(reader.read());
       if (done) break;
       resetIdle();
       buf += decoder.decode(value, { stream: true });
@@ -1277,10 +1427,21 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
     consume(buf, true);
     return res.status;
   } catch (e) {
+    const callerAborted = !!(opts.signal && opts.signal.aborted);
+    // Budget stop: thrown out of consume() by the stream contract. The caller
+    // cancelling in the same tick still wins; otherwise stop the transfer and
+    // report the paid 2xx this was.
+    if (e && e[_PBP_BUDGET_STOP] === true) {
+      ctrl.abort();
+      if (callerAborted) throw _pbpAbortError();
+      e.status = status;
+      throw e;
+    }
+    if (control && control.expired) throw control.failure();
     // Caller abort takes precedence over an idle timeout that fired in the
     // same tick, so the rejection surfaces as the caller's AbortError, not
     // "AI stream timeout".
-    if (timedOut && !(opts.signal && opts.signal.aborted)) {
+    if (timedOut && !callerAborted) {
       throw new Error("AI stream timeout");
     }
     // Network disconnection: fetch() rejects with a bare TypeError ("Failed to
@@ -1305,6 +1466,7 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
     throw e;
   } finally {
     clearTimeout(idleTimer);
+    if (control) control.signal.removeEventListener("abort", followDeadline);
     // reader.cancel() returns a PROMISE that rejects with AbortError when
     // the stream is already aborted -- the sync try/catch alone left an
     // orphaned rejection ("Uncaught (in promise) AbortError:
@@ -1390,7 +1552,7 @@ async function _streamOpenAICompat(baseUrl, apiKey, model, prompt, opts, onDelta
       })
     },
     opts, "API",
-    _pbpSseConsumer(_pbpOpenAIDelta, (d) => { contract.onText(); full += d; onDelta(d, full); },
+    _pbpSseConsumer(_pbpOpenAIDelta, (d) => { contract.onText(d); full += d; onDelta(d, full); },
       (obj) => { usage.onRaw(obj); contract.onRaw(obj); }, contract.onParseError)
   );
   contract.finish(full, status);
@@ -1428,7 +1590,7 @@ async function _streamGemini(s, prompt, opts, onDelta) {
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${s.geminiApiKey}`,
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
     opts, "Gemini",
-    _pbpSseConsumer(_pbpGeminiDelta, (d) => { contract.onText(); full += d; onDelta(d, full); },
+    _pbpSseConsumer(_pbpGeminiDelta, (d) => { contract.onText(d); full += d; onDelta(d, full); },
       (obj) => { usage.onRaw(obj); contract.onRaw(obj); }, contract.onParseError)
   );
   contract.finish(full, status);
@@ -1472,7 +1634,7 @@ async function _streamClaude(s, prompt, opts, onDelta) {
       body: JSON.stringify(body)
     },
     opts, "Claude",
-    _pbpSseConsumer(_pbpClaudeDelta, (d) => { contract.onText(); full += d; onDelta(d, full); },
+    _pbpSseConsumer(_pbpClaudeDelta, (d) => { contract.onText(d); full += d; onDelta(d, full); },
       (obj) => { usage.onRaw(obj); contract.onRaw(obj); }, contract.onParseError)
   );
   contract.finish(full, status);
@@ -1512,7 +1674,7 @@ async function _streamOllama(s, prompt, opts, onDelta) {
       usage.onRaw(obj);                 // T4: final done:true chunk carries the counts
       contract.onRaw(obj);
       const d = _pbpOllamaDelta(obj);
-      if (d) { contract.onText(); full += d; onDelta(d, full); }
+      if (d) { contract.onText(d); full += d; onDelta(d, full); }
     }
     return rest;
   };
@@ -1547,12 +1709,20 @@ async function _streamOllama(s, prompt, opts, onDelta) {
 //           requireComplete? — judge the stream end like the non-stream
 //             envelope (see _pbpStreamContract); only the dictionary sets it.
 //           onProgress?({phase: "thinking"|"streaming"}) — synchronous phase
-//             changes, once each across all attempts, never with text. }
+//             changes, once each across all attempts, never with text.
+//           deadlineMs? (1000-180000) — one absolute deadline for the whole
+//             call, set when the first dispatch guard passes and shared by
+//             every later attempt, guard and capability read/write (see
+//             _pbpStreamControl); the 30 s idle timer is off while it is set.
+//           With totalOutputBudget, the client also stops the stream once its
+//             estimated output passes maxTokens (see _pbpOutputBudget). }
 //   onDelta(deltaText, accumulatedText) fires once per text chunk.
 //   Resolves with the full accumulated text (identical to the last
 //   accumulatedText passed to onDelta). Rejects with handleAIError
 //   semantics on non-ok / AbortError on caller abort /
-//   Error("AI stream timeout") on 30s idle / with requireComplete, the
+//   Error("AI stream timeout") on 30s idle (no deadline) / TimeoutError at
+//   the deadline / output_budget_exceeded (status 200, never retried, no
+//   usage flush) at the budget / with requireComplete, the
 //   contract's coded errors (stream_error, invalid_response, output_refused,
 //   output_truncated, empty_response, each with the HTTP status).
 async function callAIStream(s, prompt, opts = {}, onDelta) {
@@ -1560,6 +1730,18 @@ async function callAIStream(s, prompt, opts = {}, onDelta) {
   // One phase reporter for the whole call, so a dialect retry cannot report a
   // phase twice. Never serialized: request bodies list their fields explicitly.
   if (typeof opts.onProgress === "function") opts = { ...opts, [_PBP_STREAM_PHASE]: _pbpStreamProgress(opts.onProgress) };
+  // The call-level deadline travels like the phase reporter, on a private key.
+  const deadlineMs = _pbpStreamDeadlineMs(opts);
+  const control = deadlineMs ? _pbpStreamControl(deadlineMs, opts.signal) : null;
+  if (control) opts = { ...opts, [_PBP_STREAM_CONTROL]: control };
+  try {
+    return await _aiStreamDispatch(s, prompt, opts, cb, control);
+  } finally {
+    if (control) control.dispose();
+  }
+}
+
+async function _aiStreamDispatch(s, prompt, opts, cb, control) {
   await _ensureAIHostPermission(s);
   const p = s.aiProvider || "gemini";
   if (p === "gemini") {
@@ -1577,7 +1759,7 @@ async function callAIStream(s, prompt, opts = {}, onDelta) {
     if (!opts.noThinking && !lowEffort) return _streamGemini(s, prompt, opts, cb);
     const gModel = opts.model || s.geminiModel || "gemini-3.5-flash-lite";
     return _aiWithDialectFallback("gemini", gModel, _GEMINI_THINKING_CFG, (extraBody) =>
-      _streamGemini(s, prompt, { ...opts, model: gModel, extraBody }, cb));
+      _streamGemini(s, prompt, { ...opts, model: gModel, extraBody }, cb), control);
   }
   if (p === "claude") return _streamClaude(s, prompt, opts, cb);
   if (p === "ollama") return _streamOllama(s, prompt, opts, cb);
@@ -1587,7 +1769,7 @@ async function callAIStream(s, prompt, opts = {}, onDelta) {
   const cfg = _aiCompatCfg(s, p, opts);
   const model = opts.model || s[cfg.modelField] || cfg.defaultModel;
   return _aiWithDialectFallback(p, model, cfg, (extraBody, dialect) =>
-    _streamOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], model, prompt, { ...opts, extraBody, ...dialect }, cb));
+    _streamOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], model, prompt, { ...opts, extraBody, ...dialect }, cb), control);
 }
 
 // ---- Shared prompt fragments (used by tag, summary, and combined builders) ----
