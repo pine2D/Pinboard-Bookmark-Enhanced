@@ -622,6 +622,193 @@ await test('consumers without jsonMode never receive structure fields on any str
     }
   }
 });
+// ---- Required stream completion (requireComplete, the dictionary) ----
+// Hand-written stream fixtures in each protocol's documented wire shape:
+// OpenAI chat.completion.chunk SSE, Gemini streamGenerateContent?alt=sse,
+// Claude Messages SSE events, Ollama /api/chat NDJSON. sse()/nd() only frame
+// a literal event object; nothing is produced by ai.js request or response code.
+// developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events
+// ai.google.dev/api/generate-content#method:-models.streamgeneratecontent
+// platform.claude.com/docs/en/build-with-claude/streaming
+// docs.ollama.com/api/chat
+// The reasoning_content / reasoning fields are compatible-gateway extensions
+// (DeepSeek, OpenRouter style), not OpenAI standard fields.
+const PRIVATE='PRIVATE_STREAM_SENTINEL';
+const sse=(obj,event)=>(event?'event: '+event+'\n':'')+'data: '+JSON.stringify(obj)+'\n\n';
+const nd=obj=>JSON.stringify(obj)+'\n';
+const S=raw=>({status:200,raw});
+const oa=(delta,finish=null)=>sse({id:'chatcmpl-fixture',object:'chat.completion.chunk',created:0,model:'fixture',choices:[{index:0,delta,finish_reason:finish}]});
+const gm=(parts,finishReason)=>sse({candidates:[{index:0,content:{role:'model',parts},...(finishReason?{finishReason}:{})}]});
+const CL_START=sse({type:'message_start',message:{id:'msg_fixture',type:'message',role:'assistant',model:'fixture',content:[],stop_reason:null,stop_sequence:null,usage:{input_tokens:1,output_tokens:0}}},'message_start');
+const clBlock=(index,type,deltas)=>sse({type:'content_block_start',index,content_block:type==='text'?{type:'text',text:''}:type==='thinking'?{type:'thinking',thinking:''}:{type:'tool_use',id:'toolu_fixture',name:'lookup',input:{}}},'content_block_start')+
+  deltas.map(delta=>sse({type:'content_block_delta',index,delta},'content_block_delta')).join('')+sse({type:'content_block_stop',index},'content_block_stop');
+const clEnd=stop=>sse({type:'message_delta',delta:{stop_reason:stop,stop_sequence:null},usage:{output_tokens:5}},'message_delta')+sse({type:'message_stop'},'message_stop');
+const CL_TEXT=clBlock(0,'text',[{type:'text_delta',text:'ready'}]);
+const ol=(content,extra={})=>nd({model:'fixture',created_at:'2026-01-01T00:00:00Z',message:{role:'assistant',content,...(extra.message||{})},done:false,...(extra.top||{})});
+const olDone=(reason='stop')=>nd({model:'fixture',created_at:'2026-01-01T00:00:00Z',message:{role:'assistant',content:''},done:true,done_reason:reason,total_duration:1,load_duration:1,prompt_eval_count:1,prompt_eval_duration:1,eval_count:5,eval_duration:1});
+const [COMPAT,GEMINI,CLAUDE,OLLAMA]=PROTOCOLS;
+const REQ={...DICT_OPTS};
+async function strictFails(s,raw,code,label,opts=REQ){
+  reset([S(raw)]);let error;
+  try{await stream(opts,s);}catch(e){error=e;}
+  assert(error&&error.code===code,label+': expected '+code+', got '+(error?.code||error?.message||'success'));
+  assert(error.status===200&&calls.length===1,label+': wrong status or a retry ('+error.status+', '+calls.length+')');
+  assert(!error.message.includes(PRIVATE)&&!JSON.stringify({...error,message:error.message}).includes(PRIVATE),label+': provider text leaked');
+  return error;
+}
+await test('required streams accept complete answers and missing terminal metadata on every protocol',async()=>{
+  const cases=[[COMPAT,STREAM_DONE.compatible.raw],[GEMINI,STREAM_DONE.gemini.raw],[CLAUDE,STREAM_DONE.claude.raw],[OLLAMA,STREAM_DONE.ollama.raw],
+    [COMPAT,oa({role:'assistant',content:'ready'})+'data: [DONE]\n\n'],
+    [GEMINI,gm([{text:'ready'}])+sse({candidates:[{index:0,content:{role:'model',parts:[{text:''}]},finishReason:'STOP'}],usageMetadata:{promptTokenCount:1,candidatesTokenCount:1}})],
+    [GEMINI,gm([{text:'ready'}])],
+    [CLAUDE,CL_START+CL_TEXT],
+    [OLLAMA,ol('ready')+olDone().trimEnd()],
+    [OLLAMA,nd({model:'fixture',message:{role:'assistant',content:'ready'}})]];
+  for(const [p,raw] of cases){reset([S(raw)]);assert(await stream(REQ,p.settings)==='ready'&&calls.length===1,p.name+': '+raw.slice(0,60));}
+});
+await test('required streams reject explicit truncation even when the JSON looks complete',async()=>{
+  const json='{"complete":true}';
+  await strictFails(COMPAT.settings,oa({role:'assistant',content:json})+oa({},'length')+'data: [DONE]\n\n','output_truncated','compatible length');
+  await strictFails(GEMINI.settings,gm([{text:json}],'MAX_TOKENS'),'output_truncated','Gemini MAX_TOKENS');
+  await strictFails(CLAUDE.settings,CL_START+clBlock(0,'text',[{type:'text_delta',text:json}])+clEnd('max_tokens'),'output_truncated','Claude max_tokens');
+  await strictFails(OLLAMA.settings,ol(json)+olDone('length'),'output_truncated','Ollama length');
+});
+await test('required streams reject tool turns, unknown terminal reasons and an Ollama stream left at done false',async()=>{
+  await strictFails(COMPAT.settings,oa({role:'assistant',content:'ready'})+oa({tool_calls:[{index:0,id:'call_fixture',type:'function',function:{name:'lookup',arguments:'{}'}}]})+oa({},'tool_calls'),'output_truncated','compatible tool call');
+  await strictFails(COMPAT.settings,oa({role:'assistant',content:'ready'})+oa({},'future_nonterminal'),'output_truncated','compatible unknown reason');
+  await strictFails(GEMINI.settings,gm([{text:'ready'},{functionCall:{name:'lookup',args:{}}}],'STOP'),'output_truncated','Gemini function call');
+  await strictFails(GEMINI.settings,gm([{text:'ready'}],'FUTURE_NONTERMINAL'),'output_truncated','Gemini unknown reason');
+  await strictFails(CLAUDE.settings,CL_START+CL_TEXT+clBlock(1,'tool_use',[{type:'input_json_delta',partial_json:'{}'}])+clEnd('tool_use'),'output_truncated','Claude tool use');
+  await strictFails(CLAUDE.settings,CL_START+CL_TEXT+clEnd('pause_turn'),'output_truncated','Claude paused turn');
+  await strictFails(OLLAMA.settings,ol('rea')+ol('dy'),'output_truncated','Ollama ends at done false');
+  await strictFails(OLLAMA.settings,ol('ready',{message:{tool_calls:[{function:{name:'lookup',arguments:{}}}]}})+olDone(),'output_truncated','Ollama tool call');
+});
+await test('required streams map refusals and safety blocks to output_refused over any answer text',async()=>{
+  await strictFails(COMPAT.settings,oa({role:'assistant',content:'ready'})+oa({refusal:PRIVATE})+oa({},'stop'),'output_refused','compatible refusal');
+  await strictFails(COMPAT.settings,oa({role:'assistant',content:'ready'})+oa({},'content_filter'),'output_refused','compatible content filter');
+  await strictFails(GEMINI.settings,sse({promptFeedback:{blockReason:'SAFETY'}}),'output_refused','Gemini prompt block');
+  await strictFails(GEMINI.settings,gm([{text:'ready'}])+gm([],'SAFETY'),'output_refused','Gemini safety stop');
+  await strictFails(CLAUDE.settings,CL_START+CL_TEXT+clEnd('refusal'),'output_refused','Claude refusal');
+});
+await test('required empty streams carry empty_response with the HTTP status and never retry',async()=>{
+  await strictFails(COMPAT.settings,oa({role:'assistant',content:''})+oa({},'stop')+'data: [DONE]\n\n','empty_response','compatible empty');
+  await strictFails(COMPAT.settings,oa({role:'assistant',reasoning_content:PRIVATE})+oa({},'stop'),'empty_response','compatible reasoning only');
+  await strictFails(GEMINI.settings,gm([{thought:true,text:PRIVATE}],'STOP'),'empty_response','Gemini thought only');
+  await strictFails(CLAUDE.settings,CL_START+clBlock(0,'thinking',[{type:'thinking_delta',thinking:PRIVATE}])+clEnd('end_turn'),'empty_response','Claude thinking only');
+  await strictFails(OLLAMA.settings,ol('',{message:{thinking:PRIVATE}})+olDone(),'empty_response','Ollama thinking only');
+  // The 2xx accepted branch: a thinking-field retry that ends empty still
+  // proves the stripped dialect was accepted, and pays no third request.
+  reset([reply(OFF_REFUSED,400),S(oa({role:'assistant',content:''})+oa({},'stop'))]);let error;
+  try{await stream(REQ);}catch(e){error=e;}
+  assert(error?.code==='empty_response'&&error.status===200&&calls.length===2&&stored.pbpThinkReject?.[key]?.rejected===true,'Empty 2xx did not take the accepted branch');
+});
+await test('required streams turn in-stream error events into stream_error without provider text',async()=>{
+  await strictFails(COMPAT.settings,oa({role:'assistant',content:'re'})+sse({error:{message:PRIVATE,type:'server_error'}}),'stream_error','compatible error member');
+  await strictFails(COMPAT.settings,oa({role:'assistant',content:'re'})+oa({},'error'),'stream_error','compatible finish error');
+  await strictFails(GEMINI.settings,gm([{text:'re'}])+sse({error:{code:503,message:PRIVATE,status:'UNAVAILABLE'}}),'stream_error','Gemini error member');
+  await strictFails(CLAUDE.settings,CL_START+clBlock(0,'text',[{type:'text_delta',text:'re'}])+sse({type:'error',error:{type:'overloaded_error',message:PRIVATE}},'error'),'stream_error','Claude error event');
+  await strictFails(OLLAMA.settings,ol('re')+nd({error:PRIVATE}),'stream_error','Ollama error line');
+  const error=await strictFails(CLAUDE.settings,CL_START+sse({type:'error',error:{type:'overloaded_error',message:PRIVATE}},'error'),'stream_error','Claude error before text');
+  assert(error.message==='API reported an error during the answer stream'&&error.reason===undefined,'Not the fixed safe message');
+});
+await test('required streams classify wrong field types and undecodable events as invalid_response',async()=>{
+  const shape=[[COMPAT,oa({role:'assistant',content:{text:PRIVATE}})+oa({},'stop')],[COMPAT,sse({choices:{index:0}})],[COMPAT,oa({role:'assistant',content:'ready'},7)],
+    [GEMINI,gm([{text:{private:PRIVATE}}],'STOP')],[GEMINI,gm([{thought:'yes',text:'ready'}],'STOP')],
+    [CLAUDE,CL_START+clBlock(0,'text',[{type:'text_delta',text:7}])+clEnd('end_turn')],
+    [OLLAMA,ol({private:PRIVATE})+olDone()],[OLLAMA,ol('ready')+nd({message:{content:''},done:'yes'})]];
+  for(const [p,raw] of shape){const error=await strictFails(p.settings,raw,'invalid_response',p.name+' shape');assert(error.reason==='response_shape',p.name+': '+error.reason);}
+  const json=[[COMPAT,oa({role:'assistant',content:'ready'})+'data: {"choices":[\n\n'+oa({},'stop')],[GEMINI,'data: {"candidates":\n\n'+gm([{text:'ready'}],'STOP')],
+    [CLAUDE,CL_START+'event: content_block_delta\ndata: {"type":"content_block_delta"\n\n'+CL_TEXT+clEnd('end_turn')],[OLLAMA,ol('ready')+'{"message":\n'+olDone()]];
+  for(const [p,raw] of json){const error=await strictFails(p.settings,raw,'invalid_response',p.name+' json');assert(error.reason==='response_json',p.name+': '+error.reason);}
+  reset([]);globalThis.fetch=async(_url,init)=>{calls.push(JSON.parse(init.body));return {ok:true,status:200,body:null};};
+  let error;try{await stream(REQ,COMPAT.settings);}catch(e){error=e;}
+  assert(error?.code==='invalid_response'&&error.reason==='response_shape'&&error.status===200&&calls.length===1,'Missing body was not invalid_response');
+});
+await test('required streams ignore comments, pings, role-only and usage-only chunks',async()=>{
+  reset([S(': keep-alive\n\n'+oa({role:'assistant'})+oa({content:'ready'})+oa({},'stop')+sse({id:'chatcmpl-fixture',object:'chat.completion.chunk',created:0,model:'fixture',choices:[],usage:{prompt_tokens:1,completion_tokens:1,total_tokens:2}})+'data: [DONE]\n\n')]);
+  assert(await stream(REQ,COMPAT.settings)==='ready','Compatible keep-alive or usage chunk was rejected');
+  reset([S(CL_START+sse({type:'ping'},'ping')+CL_TEXT+clEnd('end_turn'))]);
+  assert(await stream(REQ,CLAUDE.settings)==='ready','Claude ping was rejected');
+  reset([S(CL_START+CL_TEXT+clEnd('end_turn')+sse({type:'message_delta',delta:{stop_reason:null,stop_sequence:null},usage:{output_tokens:6}},'message_delta'))]);
+  assert(await stream(REQ,CLAUDE.settings)==='ready','A null stop_reason erased the known terminal state');
+});
+// Ask, translation and skim never set requireComplete: the same streams keep
+// their historical results, including nonempty partial text.
+const CONSUMERS=[['Ask',SNAP_ASK],['translate',SNAP_TRANSLATE],['skim',SNAP_SKIM]];
+await test('other stream consumers keep partial text across error events, refusals and terminal states',async()=>{
+  const cases=[[COMPAT,oa({role:'assistant',content:'re'})+sse({error:{message:PRIVATE}})+oa({content:'ady'})],[COMPAT,oa({role:'assistant',content:'ready'})+oa({},'length')],
+    [COMPAT,oa({role:'assistant',content:'ready'})+oa({},'error')],[COMPAT,oa({role:'assistant',content:'ready'})+oa({refusal:PRIVATE})],
+    [COMPAT,oa({role:'assistant',content:'ready'})+'data: {"choices":[\n\n'],
+    [GEMINI,gm([{text:'ready'}],'MAX_TOKENS')],[GEMINI,gm([{text:'ready'}])+sse({error:{code:503,message:PRIVATE}})],
+    [CLAUDE,CL_START+CL_TEXT+sse({type:'error',error:{type:'overloaded_error',message:PRIVATE}},'error')],[CLAUDE,CL_START+CL_TEXT+clEnd('max_tokens')],
+    [OLLAMA,ol('ready')],[OLLAMA,ol('ready')+nd({error:PRIVATE})],[OLLAMA,ol('ready')+olDone('length')]];
+  for(const [name,opts] of CONSUMERS)for(const [p,raw] of cases){
+    reset([S(raw)]);const deltas=[];
+    const out=await callAIStream(p.settings,'Synthetic provider learning request',opts,d=>deltas.push(d));
+    assert(out==='ready'&&deltas.join('')==='ready'&&calls.length===1,name+' '+p.name+' changed: '+raw.slice(0,80));
+  }
+});
+await test('other stream consumers keep their exact empty-stream error shape',async()=>{
+  const shape=e=>JSON.stringify({ctor:e?.constructor?.name,name:e?.name,message:e?.message,code:'code'in(e||{}),status:'status'in(e||{}),reason:'reason'in(e||{}),paramHint:'paramHint'in(e||{})});
+  const expect=label=>JSON.stringify({ctor:'Error',name:'Error',message:label+' returned empty response',code:false,status:false,reason:false,paramHint:false});
+  const cases=[[COMPAT,'API',oa({role:'assistant',content:''})+oa({},'stop')],[COMPAT,'API',sse({error:{message:PRIVATE}})],
+    [GEMINI,'Gemini',gm([{thought:true,text:PRIVATE}],'STOP')],[GEMINI,'Gemini',gm([],'MAX_TOKENS')],
+    [CLAUDE,'Claude',CL_START+clEnd('end_turn')],[CLAUDE,'Claude',CL_START+sse({type:'error',error:{type:'overloaded_error',message:PRIVATE}},'error')],
+    [OLLAMA,'Ollama',olDone()],[OLLAMA,'Ollama',nd({error:PRIVATE})]];
+  for(const [name,opts] of CONSUMERS)for(const [p,label,raw] of cases){
+    reset([S(raw)]);let error;try{await callAIStream(p.settings,'Synthetic provider learning request',opts,()=>{});}catch(e){error=e;}
+    assert(shape(error)===expect(label),name+' '+p.name+': '+shape(error));
+    assert(calls.length===1,name+' '+p.name+' retried');
+  }
+  reset([]);globalThis.fetch=async()=>({ok:true,status:200,body:null});let error;
+  try{await callAIStream(COMPAT.settings,'x',SNAP_ASK,()=>{});}catch(e){error=e;}
+  assert(error?.message==='API response has no stream body'&&!('code'in error)&&!('status'in error),'Missing-body error changed for Ask');
+});
+await test('Gemini thoughts, compatible reasoning and Claude thinking never reach answer text',async()=>{
+  const cases=[[COMPAT,oa({role:'assistant',reasoning_content:PRIVATE})+oa({reasoning:PRIVATE})+oa({content:'ready'})+oa({},'stop')],
+    [GEMINI,gm([{thought:true,text:PRIVATE},{text:'ready'}],'STOP')],
+    [CLAUDE,CL_START+clBlock(0,'thinking',[{type:'thinking_delta',thinking:PRIVATE},{type:'signature_delta',signature:'synthetic'}])+clBlock(1,'text',[{type:'text_delta',text:'ready'}])+clEnd('end_turn')],
+    [OLLAMA,ol('',{message:{thinking:PRIVATE}})+ol('ready')+olDone()]];
+  for(const opts of [REQ,SNAP_ASK])for(const [p,raw] of cases){
+    reset([S(raw)]);const deltas=[];
+    const out=await callAIStream(p.settings,'Synthetic provider learning request',opts,(d,acc)=>deltas.push(d,acc));
+    assert(out==='ready'&&!deltas.join('').includes(PRIVATE),p.name+' exposed reasoning text');
+  }
+});
+await test('onProgress reports thinking then streaming once each, synchronously and without text',async()=>{
+  const phases=[],order=[];
+  const onProgress=event=>{phases.push(JSON.stringify(event));order.push('phase:'+event.phase);};
+  reset([S(oa({role:'assistant',reasoning_content:PRIVATE})+oa({reasoning_content:PRIVATE})+oa({content:'rea'})+oa({reasoning_content:PRIVATE})+oa({content:'dy'})+oa({},'stop'))]);
+  await callAIStream(COMPAT.settings,'x',{...REQ,onProgress},d=>order.push('delta'));
+  assert(JSON.stringify(phases)===JSON.stringify(['{"phase":"thinking"}','{"phase":"streaming"}']),'Phases: '+phases);
+  assert(order.join()==='phase:thinking,phase:streaming,delta,delta','Phase was not synchronous before text: '+order);
+  // Each protocol's own thinking field reports the phase; a stream without
+  // visible reasoning goes straight to streaming.
+  for(const [p,raw,want] of [[GEMINI,gm([{thought:true,text:PRIVATE}])+gm([{text:'ready'}],'STOP'),'thinking,streaming'],
+    [CLAUDE,CL_START+clBlock(0,'thinking',[{type:'thinking_delta',thinking:PRIVATE}])+CL_TEXT+clEnd('end_turn'),'thinking,streaming'],
+    [OLLAMA,ol('',{message:{thinking:PRIVATE}})+ol('ready')+olDone(),'thinking,streaming'],[COMPAT,STREAM_DONE.compatible.raw,'streaming']]){
+    const seen=[];reset([S(raw)]);await stream({...REQ,onProgress:e=>seen.push(e.phase)},p.settings);
+    assert(seen.join()===want,p.name+': '+seen);
+  }
+  // One reporter per call: a dialect retry does not report a phase twice.
+  const seen=[];reset([reply(OFF_REFUSED,400),S(oa({role:'assistant',content:'ready'})+oa({},'stop'))]);
+  await stream({...REQ,onProgress:e=>seen.push(e.phase)});
+  assert(seen.join()==='streaming'&&calls.length===2,'Retry repeated a phase: '+seen);
+});
+await test('a throwing or rejecting onProgress callback never breaks the answer',async()=>{
+  const warnings=[],originalWarn=console.warn,unhandled=[];
+  const onUnhandled=event=>{unhandled.push(event);event.preventDefault();};
+  console.warn=(...args)=>warnings.push(args);window.addEventListener('unhandledrejection',onUnhandled);
+  try{
+    reset([S(STREAM_DONE.compatible.raw)]);
+    assert(await stream({...REQ,onProgress:()=>{throw new TypeError(PRIVATE);}},COMPAT.settings)==='ready','A throwing callback broke the answer');
+    reset([S(STREAM_DONE.compatible.raw)]);
+    assert(await stream({...REQ,onProgress:async()=>{throw new RangeError(PRIVATE);}},COMPAT.settings)==='ready','A rejecting callback broke the answer');
+    await new Promise(resolve=>setTimeout(resolve,20));
+  }finally{console.warn=originalWarn;window.removeEventListener('unhandledrejection',onUnhandled);}
+  assert(unhandled.length===0,'Unhandled rejection from onProgress');
+  assert(warnings.length===2&&warnings[0].join(' ')==='[ai] onProgress callback failed: TypeError'&&warnings[1].join(' ')==='[ai] onProgress callback failed: RangeError','Warnings: '+JSON.stringify(warnings));
+});
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();
 </script>

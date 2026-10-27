@@ -221,6 +221,11 @@ suite("_pbpOpenAIDelta", () => {
   test("empty content string -> null", () => {
     assertEq(_pbpOpenAIDelta({ choices: [{ delta: { content: "" } }] }), null, "empty string");
   });
+  test("gateway reasoning_content / reasoning deltas are never answer text", () => {
+    assertEq(_pbpOpenAIDelta({ choices: [{ delta: { reasoning_content: "PRIVATE" } }] }), null, "reasoning_content");
+    assertEq(_pbpOpenAIDelta({ choices: [{ delta: { reasoning: "PRIVATE" } }] }), null, "reasoning");
+    assertEq(_pbpOpenAIDelta({ choices: [{ delta: { reasoning_content: "PRIVATE", content: "Hi" } }] }), "Hi", "content alongside");
+  });
   test("garbage object -> null, no throw", () => {
     assertEq(_pbpOpenAIDelta({}), null, "empty obj");
     assertEq(_pbpOpenAIDelta(null), null, "null");
@@ -241,6 +246,12 @@ suite("_pbpGeminiDelta", () => {
     assertEq(_pbpGeminiDelta({ promptFeedback: {} }), null, "feedback chunk");
     assertEq(_pbpGeminiDelta(null), null, "null");
   });
+  // Accepted behaviour fix (2026-10-27): the non-stream envelope already skipped
+  // thought parts; streams now match, so a thought-only chunk carries no text.
+  test("thought:true parts are excluded; thought-only chunk -> null", () => {
+    assertEq(_pbpGeminiDelta({ candidates: [{ content: { parts: [{ thought: true, text: "PRIVATE" }, { text: "Hi" }] } }] }), "Hi", "mixed");
+    assertEq(_pbpGeminiDelta({ candidates: [{ content: { parts: [{ thought: true, text: "PRIVATE" }] } }] }), null, "thought only");
+  });
 });
 
 suite("_pbpClaudeDelta", () => {
@@ -252,6 +263,11 @@ suite("_pbpClaudeDelta", () => {
   });
   test("thinking_delta -> null (not user-visible text)", () => {
     assertEq(_pbpClaudeDelta({ type: "content_block_delta", delta: { type: "thinking_delta", thinking: "x" } }), null, "thinking");
+  });
+  test("non-text deltas never become text, even with a text field", () => {
+    assertEq(_pbpClaudeDelta({ type: "content_block_delta", delta: { type: "thinking_delta", thinking: "x", text: "PRIVATE" } }), null, "thinking with text");
+    assertEq(_pbpClaudeDelta({ type: "content_block_delta", delta: { type: "signature_delta", signature: "s" } }), null, "signature");
+    assertEq(_pbpClaudeDelta({ type: "content_block_delta", delta: { type: "input_json_delta", partial_json: "{}" } }), null, "tool input");
   });
   test("message_stop / ping -> null", () => {
     assertEq(_pbpClaudeDelta({ type: "message_stop" }), null, "stop");
@@ -8495,7 +8511,7 @@ suiteIf("pbpAiStatusPageUrl: status link only when the service may be down", "pb
       { status: 503, message: "x" }, { status: 500, message: "x" }, { status: 529, message: "overloaded" },
       { status: 408, message: "x" }, { status: 429, message: "Rate limit reached for requests" },
       { message: "AI stream timeout" }, { name: "TimeoutError", message: "signal timed out" },
-      { message: "API returned empty response" }, new TypeError("Failed to fetch"),
+      new TypeError("Failed to fetch"),
       { code: "network", message: "offline text" },
     ]) assertEq(pbpAiStatusPageUrl(ds, err), page, JSON.stringify(err));
   });
@@ -8517,6 +8533,75 @@ suiteIf("pbpAiStatusPageUrl: status link only when the service may be down", "pb
   });
 });
 
+</script>
+<script>
+// ============ Real empty streams -> status page (Ask, translate) ============
+// The empty-reply case used to be a hand-written {message} object. Here the
+// error comes from callAIStream itself, fed a hand-written empty stream in
+// each protocol's wire shape, with the options Ask (md-ask.js) and translate
+// (md-translate.js) really pass. Neither sets requireComplete, so the error
+// keeps its historical shape (no status) and still earns the status page.
+(async function () {
+  const host = document.createElement("div");
+  host.className = "suite";
+  const h = document.createElement("h2");
+  h.textContent = "pbpAiStatusPageUrl: real empty streams (async)";
+  host.appendChild(h);
+  document.getElementById("results").appendChild(host);
+  function report(name, err) {
+    const div = document.createElement("div");
+    if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+    else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + err.message; }
+    host.appendChild(div);
+  }
+  async function atest(name, fn) { return atestNetSerial(name, fn, report); } // shares the network-stub queue (see atestNetSerial)
+  function ok(cond, msg) { if (!cond) throw new Error(msg || "assert"); }
+  if (typeof callAIStream !== "function" || typeof pbpAiStatusPageUrl !== "function") { report("SKIP real empty stream suite (ai.js not loaded)"); return; }
+  const sse = obj => "data: " + JSON.stringify(obj) + "\n\n";
+  const EMPTY = {
+    deepseek: sse({ id: "chatcmpl-fixture", object: "chat.completion.chunk", created: 0, model: "fixture", choices: [{ index: 0, delta: { role: "assistant", content: "" }, finish_reason: null }] }) +
+      sse({ id: "chatcmpl-fixture", object: "chat.completion.chunk", created: 0, model: "fixture", choices: [{ index: 0, delta: {}, finish_reason: "stop" }] }) + "data: [DONE]\n\n",
+    gemini: sse({ candidates: [{ index: 0, content: { role: "model", parts: [{ text: "" }] }, finishReason: "STOP" }] }),
+    claude: "event: message_start\n" + sse({ type: "message_start", message: { id: "msg_fixture", type: "message", role: "assistant", model: "fixture", content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 0 } } }) +
+      "event: message_delta\n" + sse({ type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 0 } }) +
+      "event: message_stop\n" + sse({ type: "message_stop" })
+  };
+  const SETTINGS = {
+    deepseek: { aiProvider: "deepseek", deepseekApiKey: "fixture" },
+    gemini: { aiProvider: "gemini", geminiApiKey: "fixture" },
+    claude: { aiProvider: "claude", claudeApiKey: "fixture" }
+  };
+  const CALLERS = {
+    Ask: () => ({ maxTokens: 4096, model: "fixture-model", system: "Synthetic system", signal: new AbortController().signal, beforeRequest: async () => {} }),
+    translate: () => ({ temperature: 0.1, noThinking: true, maxTokens: 4000 })
+  };
+  const realFetch = window.fetch, realChrome = window.chrome;
+  for (const [caller, optsFor] of Object.entries(CALLERS)) {
+    await atest(caller + ": a real empty stream on each provider offers that provider's status page", async () => {
+      let requests = 0;
+      window.chrome = undefined;   // no extension context: the host-permission gate is skipped
+      window.fetch = async (_url, init) => {
+        requests++;
+        const provider = /generativelanguage/.test(_url) ? "gemini" : /anthropic/.test(_url) ? "claude" : "deepseek";
+        return new Response(EMPTY[provider], { status: 200, headers: { "Content-Type": "text/event-stream" } });
+      };
+      try {
+        for (const provider of Object.keys(SETTINGS)) {
+          requests = 0;
+          let error = null;
+          try { await callAIStream(SETTINGS[provider], "Synthetic question", optsFor(), () => {}); }
+          catch (e) { error = e; }
+          ok(error && /returned empty response$/.test(error.message), provider + ": expected the empty-response error, got " + (error && error.message));
+          ok(!("status" in error) && !("code" in error), provider + ": the error gained a status or code");
+          ok(requests === 1, provider + ": an empty reply was retried");
+          ok(pbpAiStatusPageUrl(SETTINGS[provider], error) === PBP_AI_STATUS_PAGES[provider].url, provider + ": no status page for an empty reply");
+        }
+      } finally { window.fetch = realFetch; window.chrome = realChrome; }
+    });
+  }
+})();
+</script>
+<script>
 suiteIf("pbpAiStatusLink", "pbpAiStatusLink", () => {
   test("a new-tab link to the page, or null", () => {
     const a = pbpAiStatusLink({ aiProvider: "claude" }, { status: 529, message: "overloaded" });

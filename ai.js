@@ -665,12 +665,36 @@ function _aiCompletionError(code, reason, status) {
     invalid_response: "API returned an invalid response envelope",
     output_refused: "API declined to return an answer",
     output_truncated: "API did not finish its answer",
-    empty_response: "API returned no answer text"
+    empty_response: "API returned no answer text",
+    // Fixed text: a provider's own error event body never reaches the message.
+    stream_error: "API reported an error during the answer stream"
   };
   const error = Object.assign(new Error(messages[code]), { code });
   if (reason) error.reason = reason;
   if (status !== undefined) error.status = status;
   return error;
+}
+
+// Terminal reasons per protocol, shared by the non-stream envelope and the
+// stream contract so both read a stop reason the same way. Any other explicit
+// reason is "incomplete": a future or unknown terminal state never confirms
+// a complete answer.
+const _AI_FINISH_REASONS = Object.freeze({
+  openai: { complete: ["stop"], truncated: ["length"], blocked: ["content_filter"] },
+  gemini: { complete: ["STOP"], truncated: ["MAX_TOKENS", "CONTINUATION"],
+    blocked: ["SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII", "IMAGE_SAFETY", "IMAGE_PROHIBITED_CONTENT", "IMAGE_RECITATION", "ESCALATION", "PUP_LIMITED_DISABLED"] },
+  claude: { complete: ["end_turn", "stop_sequence"], truncated: ["max_tokens", "model_context_window_exceeded"], blocked: ["refusal"] },
+  ollama: { complete: ["stop"], truncated: ["length"], blocked: [] }
+});
+// reason -> "unknown" | "complete" | "truncated" | "blocked" | "incomplete",
+// or null when the reason is not a string (a malformed envelope).
+function _aiFinishState(protocol, reason) {
+  if (reason == null || reason === "") return "unknown";
+  if (typeof reason !== "string") return null;
+  const table = _AI_FINISH_REASONS[protocol];
+  if (table.blocked.includes(reason)) return "blocked";
+  if (table.truncated.includes(reason)) return "truncated";
+  return table.complete.includes(reason) ? "complete" : "incomplete";
 }
 
 function _aiCompletionEnvelope(data, protocol) {
@@ -681,12 +705,10 @@ function _aiCompletionEnvelope(data, protocol) {
     if (typeof value !== "string") invalid();
     return value;
   };
-  const state = (reason, complete, truncated, blocked = []) => {
-    if (reason == null || reason === "") return "unknown";
-    if (typeof reason !== "string") invalid();
-    if (blocked.includes(reason)) return "blocked";
-    if (truncated.includes(reason)) return "truncated";
-    return complete.includes(reason) ? "complete" : "incomplete";
+  const state = reason => {
+    const value = _aiFinishState(protocol, reason);
+    if (value === null) invalid();
+    return value;
   };
   if (!record(data)) invalid();
   if (protocol === "openai") {
@@ -697,7 +719,7 @@ function _aiCompletionEnvelope(data, protocol) {
     const choice = data.choices[0];
     if (!record(choice) || !record(choice.message)) invalid();
     const message = choice.message;
-    let status = state(choice.finish_reason, ["stop"], ["length"], ["content_filter"]);
+    let status = state(choice.finish_reason);
     if (text(message.refusal).trim()) status = "blocked";
     if (status === "blocked") return { text: "", state: status };
     if ((Array.isArray(message.tool_calls) && message.tool_calls.length) || record(message.function_call)) status = "incomplete";
@@ -711,8 +733,7 @@ function _aiCompletionEnvelope(data, protocol) {
     if (!data.candidates.length) return { text: "", state: "unknown" };
     const candidate = data.candidates[0];
     if (!record(candidate)) invalid();
-    let status = state(candidate.finishReason, ["STOP"], ["MAX_TOKENS", "CONTINUATION"],
-      ["SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII", "IMAGE_SAFETY", "IMAGE_PROHIBITED_CONTENT", "IMAGE_RECITATION", "ESCALATION", "PUP_LIMITED_DISABLED"]);
+    let status = state(candidate.finishReason);
     if (status === "blocked") return { text: "", state: status };
     if (candidate.content == null) return { text: "", state: status };
     if (!record(candidate.content) || !Array.isArray(candidate.content.parts)) invalid();
@@ -729,7 +750,7 @@ function _aiCompletionEnvelope(data, protocol) {
   }
   if (protocol === "claude") {
     // Claude Messages content blocks and stop reasons.
-    let status = state(data.stop_reason, ["end_turn", "stop_sequence"], ["max_tokens", "model_context_window_exceeded"], ["refusal"]);
+    let status = state(data.stop_reason);
     if (status === "blocked") return { text: "", state: status };
     if (!Array.isArray(data.content)) invalid();
     let answer = "";
@@ -745,7 +766,7 @@ function _aiCompletionEnvelope(data, protocol) {
     // message.thinking is intentionally never read as the answer.
     if (!record(data.message)) invalid();
     if (data.done != null && typeof data.done !== "boolean") invalid();
-    let status = state(data.done_reason, ["stop"], ["length"]);
+    let status = state(data.done_reason);
     if (data.done === false || (Array.isArray(data.message.tool_calls) && data.message.tool_calls.length)) status = "incomplete";
     else if (data.done === true && status === "unknown") status = "complete";
     return { text: text(data.message.content), state: status };
@@ -924,16 +945,24 @@ function _pbpOpenAIDelta(obj) {
   return (typeof t === "string" && t.length) ? t : null;
 }
 
+// thought:true parts are the model's reasoning summary, never the answer: the
+// non-stream envelope already skips them. A stream that carries only thoughts
+// therefore ends as each adapter's existing empty-response error.
 function _pbpGeminiDelta(obj) {
   const parts = obj?.candidates?.[0]?.content?.parts;
   if (!Array.isArray(parts)) return null;
   let out = "";
-  for (const p of parts) { if (typeof p?.text === "string") out += p.text; }
+  for (const p of parts) { if (p?.thought !== true && typeof p?.text === "string") out += p.text; }
   return out.length ? out : null;
 }
 
+// Only text deltas are answer text. The product never requests extended
+// thinking, but a thinking (or signature) delta that arrives anyway is never
+// read as text, even if it carried a `text` field.
 function _pbpClaudeDelta(obj) {
   if (obj?.type !== "content_block_delta") return null;
+  const type = obj.delta?.type;
+  if (typeof type === "string" && type !== "text_delta") return null;
   const t = obj.delta?.text;
   return (typeof t === "string" && t.length) ? t : null;
 }
@@ -999,6 +1028,178 @@ function _pbpOllamaUsage(obj) {
   return (inTok === null && outTok === null) ? null : { inTok, outTok };
 }
 
+// ---- Stream completion contract ----
+// Visible reasoning text a chunk carries, or "" (compatible gateways'
+// reasoning_content / reasoning aliases -- one per chunk, never both --
+// Gemini thought parts, Claude thinking deltas, Ollama message.thinking).
+// Used only to report the "thinking" phase; the text is never kept, logged or
+// passed on.
+function _pbpStreamThinking(protocol, obj) {
+  const str = value => (typeof value === "string" ? value : "");
+  if (protocol === "openai") {
+    const delta = obj?.choices?.[0]?.delta;
+    return str(delta?.reasoning_content) || str(delta?.reasoning);
+  }
+  if (protocol === "gemini") {
+    const parts = obj?.candidates?.[0]?.content?.parts;
+    if (!Array.isArray(parts)) return "";
+    let out = "";
+    for (const part of parts) if (part?.thought === true) out += str(part.text);
+    return out;
+  }
+  if (protocol === "claude") {
+    return obj?.type === "content_block_delta" && obj.delta?.type === "thinking_delta" ? str(obj.delta.thinking) : "";
+  }
+  return protocol === "ollama" ? str(obj?.message?.thinking) : "";
+}
+
+// onProgress({phase}) side channel: synchronous, deduplicated, never carries
+// text. "thinking" is reported only when reasoning text actually arrives; the
+// first visible answer text reports "streaming", which then sticks so mixed
+// chunks cannot make the caller's display flicker. A throwing callback (or a
+// rejected promise it returns) is swallowed with a warning naming only the
+// error class, so the side channel can never break the answer.
+function _pbpStreamProgress(onProgress) {
+  let phase = "";
+  return next => {
+    if (typeof onProgress !== "function" || phase === next || phase === "streaming") return;
+    phase = next;
+    const warn = error => console.warn("[ai] onProgress callback failed:", error?.name || "Error");
+    try {
+      const out = onProgress({ phase: next });
+      if (out && typeof out.then === "function") out.then(null, warn);
+    } catch (error) { warn(error); }
+  };
+}
+
+// Per-attempt terminal-state side channel for one stream. onRaw(obj) sees every
+// parsed chunk BEFORE the delta extractor, onText() marks visible answer text,
+// onParseError() marks an undecodable event. Delta extractors keep returning
+// string|null; terminal metadata never travels through them.
+//
+// finish(full, status) only judges a requireComplete stream (the dictionary),
+// with the same state meaning as _aiCompletionEnvelope and the same error
+// codes, each carrying the HTTP status:
+//   error event / finish_reason "error"  -> stream_error
+//   wrong field types, undecodable event -> invalid_response
+//   refusal / safety block               -> output_refused
+//   truncated, tool turn, explicit unknown or Ollama still at done:false
+//                                        -> output_truncated
+//   no answer text                       -> empty_response
+// Missing terminal metadata with nonempty text stays "unknown" and is accepted;
+// strict JSON and schema checks downstream still catch a cut-off answer.
+// Every other consumer gets no new rejection: finish() is a no-op for it, error
+// events stay skipped and nonempty partial text is still returned.
+function _pbpStreamContract(protocol, opts) {
+  const strict = opts?.requireComplete === true;
+  const phase = typeof opts?.onPhase === "function" ? opts.onPhase : _pbpStreamProgress(opts?.onProgress);
+  const record = value => value !== null && typeof value === "object" && !Array.isArray(value);
+  let state = "unknown", blocked = false, tool = false, streamError = false, invalid = "", refusal = "", done;
+  const badShape = () => { if (!invalid) invalid = "response_shape"; };
+  const textField = value => { if (value != null && typeof value !== "string") badShape(); };
+  // Only an explicit reason replaces the last one: usage-only or role-only
+  // chunks, and Claude's stop_reason:null, never erase a known terminal state.
+  const finishReason = reason => {
+    if (reason == null || reason === "") return;
+    const next = _aiFinishState(protocol, reason);
+    if (next === null) { badShape(); return; }
+    if (next === "blocked") blocked = true;
+    state = next;
+  };
+  const collect = obj => {
+    if (!record(obj)) { badShape(); return; }
+    // Gateways and Ollama report a mid-stream failure as an `error` member;
+    // Claude sends a typed error event. Its text is never read.
+    if (obj.error != null || obj.type === "error") { streamError = true; return; }
+    if (protocol === "openai") {
+      if (obj.choices === undefined) return;
+      if (!Array.isArray(obj.choices)) { badShape(); return; }
+      if (!obj.choices.length) return;
+      const choice = obj.choices[0];
+      if (!record(choice)) { badShape(); return; }
+      if (choice.finish_reason === "error") streamError = true;
+      else finishReason(choice.finish_reason);
+      const delta = choice.delta;
+      if (delta == null) return;
+      if (!record(delta)) { badShape(); return; }
+      textField(delta.content);
+      textField(delta.refusal);
+      if (typeof delta.refusal === "string") refusal += delta.refusal;
+      if ((Array.isArray(delta.tool_calls) && delta.tool_calls.length) || record(delta.function_call)) tool = true;
+      return;
+    }
+    if (protocol === "gemini") {
+      const reason = obj.promptFeedback?.blockReason;
+      if (typeof reason === "string" && reason && reason !== "BLOCK_REASON_UNSPECIFIED") blocked = true;
+      if (obj.candidates === undefined) return;
+      if (!Array.isArray(obj.candidates)) { badShape(); return; }
+      if (!obj.candidates.length) return;
+      const candidate = obj.candidates[0];
+      if (!record(candidate)) { badShape(); return; }
+      finishReason(candidate.finishReason);
+      if (candidate.content == null) return;
+      if (!record(candidate.content) || !Array.isArray(candidate.content.parts)) { badShape(); return; }
+      for (const part of candidate.content.parts) {
+        if (!record(part)) { badShape(); continue; }
+        if (part.thought != null && typeof part.thought !== "boolean") badShape();
+        if (part.thought === true) continue;
+        if (part.functionCall != null) tool = true;
+        else if (part.functionResponse == null) textField(part.text);
+      }
+      return;
+    }
+    if (protocol === "claude") {
+      if (obj.type === "content_block_start" && obj.content_block?.type === "tool_use") tool = true;
+      if (obj.type === "content_block_delta") {
+        if (!record(obj.delta)) { badShape(); return; }
+        if (obj.delta.type === "text_delta") textField(obj.delta.text);
+      }
+      if (obj.type === "message_delta") {
+        if (!record(obj.delta)) { badShape(); return; }
+        finishReason(obj.delta.stop_reason);
+      }
+      return;
+    }
+    if (protocol === "ollama") {
+      if (obj.message != null) {
+        if (!record(obj.message)) badShape();
+        else {
+          textField(obj.message.content);
+          if (Array.isArray(obj.message.tool_calls) && obj.message.tool_calls.length) tool = true;
+        }
+      }
+      // done:false is every ordinary increment; only the LAST value counts.
+      if (obj.done != null && typeof obj.done !== "boolean") badShape();
+      else if (typeof obj.done === "boolean") done = obj.done;
+      finishReason(obj.done_reason);
+    }
+  };
+  return {
+    onRaw(obj) {
+      try {
+        if (_pbpStreamThinking(protocol, obj)) phase("thinking");
+        if (strict) collect(obj);
+      } catch (_) { if (strict) badShape(); }
+    },
+    onText() { phase("streaming"); },
+    onParseError() { if (strict && !invalid) invalid = "response_json"; },
+    // Throws the contract error, or returns normally when the stream may be used.
+    finish(full, status) {
+      if (!strict) return;
+      if (streamError) throw _aiCompletionError("stream_error", null, status);
+      if (invalid) throw _aiCompletionError("invalid_response", invalid, status);
+      if (blocked || refusal.trim()) throw _aiCompletionError("output_refused", null, status);
+      let final = state;
+      if (protocol === "ollama") {
+        if (done === false) final = "incomplete";
+        else if (done === true && final === "unknown") final = "complete";
+      }
+      if (tool || final === "truncated" || final === "incomplete") throw _aiCompletionError("output_truncated", null, status);
+      if (!String(full).trim()) throw _aiCompletionError("empty_response", null, status);
+    }
+  };
+}
+
 // ---- Stream plumbing ----
 
 const PBP_STREAM_IDLE_MS = 30000;
@@ -1027,7 +1228,8 @@ function _pbpChainAbort(signal) {
 // comment also resets it, which is the desired liveness semantics.)
 // Rejections: handleAIError(res, providerName) on non-ok; DOMException
 // AbortError when the CALLER aborts; Error("AI stream timeout") when the
-// idle timer fires.
+// idle timer fires. Resolves with the HTTP status, which a requireComplete
+// stream's contract errors carry.
 async function _pbpStreamRead(url, init, opts, providerName, consume) {
   const ctrl = _pbpChainAbort(opts.signal);
   let timedOut = false;
@@ -1053,6 +1255,7 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
     }
     if (!res.body) {
       clearTimeout(idleTimer);
+      if (opts.requireComplete === true) throw _aiCompletionError("invalid_response", "response_shape", res.status);
       throw new Error(providerName + " response has no stream body");
     }
     reader = res.body.getReader();
@@ -1067,6 +1270,7 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
     }
     buf += decoder.decode();
     consume(buf, true);
+    return res.status;
   } catch (e) {
     // Caller abort takes precedence over an idle timeout that fired in the
     // same tick, so the rejection surfaces as the caller's AbortError, not
@@ -1107,14 +1311,15 @@ async function _pbpStreamRead(url, init, opts, providerName, consume) {
 // Build a consume() for SSE bodies: split complete events, JSON-parse each,
 // run the provider delta extractor, forward text via onText(delta).
 // "[DONE]" (OpenAI terminator) and unparseable keep-alives are skipped;
-// stream end is signaled by the reader, not by the terminator.
-function _pbpSseConsumer(extractDelta, onText, onRaw) {
+// stream end is signaled by the reader, not by the terminator. onParseError()
+// hears each skipped undecodable event (the stream contract's strict path).
+function _pbpSseConsumer(extractDelta, onText, onRaw, onParseError) {
   return (buf, isFinal) => {
     const { events, rest } = _pbpSseChunks(isFinal ? buf + "\n\n" : buf);
     for (const ev of events) {
       if (ev === "[DONE]") continue;
       let obj;
-      try { obj = JSON.parse(ev); } catch (_) { continue; }
+      try { obj = JSON.parse(ev); } catch (_) { if (onParseError) onParseError(); continue; }
       if (onRaw) onRaw(obj);            // T4: opportunistic usage side-channel (per parsed chunk)
       const d = extractDelta(obj);
       if (d) onText(d);
@@ -1158,7 +1363,8 @@ async function _streamOpenAICompat(baseUrl, apiKey, model, prompt, opts, onDelta
   messages.push({ role: "user", content: prompt });
   let full = "";
   const usage = _pbpUsageSink(_pbpOpenAIUsage, opts);
-  await _pbpStreamRead(
+  const contract = _pbpStreamContract("openai", opts);
+  const status = await _pbpStreamRead(
     `${baseUrl.replace(/\/+$/, "")}/chat/completions`,
     {
       method: "POST", headers,
@@ -1179,8 +1385,10 @@ async function _streamOpenAICompat(baseUrl, apiKey, model, prompt, opts, onDelta
       })
     },
     opts, "API",
-    _pbpSseConsumer(_pbpOpenAIDelta, (d) => { full += d; onDelta(d, full); }, usage.onRaw)
+    _pbpSseConsumer(_pbpOpenAIDelta, (d) => { contract.onText(); full += d; onDelta(d, full); },
+      (obj) => { usage.onRaw(obj); contract.onRaw(obj); }, contract.onParseError)
   );
+  contract.finish(full, status);
   if (!full.trim()) throw new Error("API returned empty response");
   usage.flush();
   return full;
@@ -1209,13 +1417,16 @@ async function _streamGemini(s, prompt, opts, onDelta) {
   if (opts.system) body.systemInstruction = { parts: [{ text: opts.system }] };
   let full = "";
   const usage = _pbpUsageSink(_pbpGeminiUsage, opts);
+  const contract = _pbpStreamContract("gemini", opts);
   // Gemini requires the key as a URL param (same limitation as callGemini)
-  await _pbpStreamRead(
+  const status = await _pbpStreamRead(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${s.geminiApiKey}`,
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
     opts, "Gemini",
-    _pbpSseConsumer(_pbpGeminiDelta, (d) => { full += d; onDelta(d, full); }, usage.onRaw)
+    _pbpSseConsumer(_pbpGeminiDelta, (d) => { contract.onText(); full += d; onDelta(d, full); },
+      (obj) => { usage.onRaw(obj); contract.onRaw(obj); }, contract.onParseError)
   );
+  contract.finish(full, status);
   if (!full.trim()) throw new Error("Gemini returned empty response");
   usage.flush();
   return full;
@@ -1242,7 +1453,8 @@ async function _streamClaude(s, prompt, opts, onDelta) {
   if (opts.system) body.system = opts.system;
   let full = "";
   const usage = _pbpUsageSink(_pbpClaudeUsage, opts);
-  await _pbpStreamRead(
+  const contract = _pbpStreamContract("claude", opts);
+  const status = await _pbpStreamRead(
     "https://api.anthropic.com/v1/messages",
     {
       method: "POST",
@@ -1255,8 +1467,10 @@ async function _streamClaude(s, prompt, opts, onDelta) {
       body: JSON.stringify(body)
     },
     opts, "Claude",
-    _pbpSseConsumer(_pbpClaudeDelta, (d) => { full += d; onDelta(d, full); }, usage.onRaw)
+    _pbpSseConsumer(_pbpClaudeDelta, (d) => { contract.onText(); full += d; onDelta(d, full); },
+      (obj) => { usage.onRaw(obj); contract.onRaw(obj); }, contract.onParseError)
   );
+  contract.finish(full, status);
   if (!full.trim()) throw new Error("Claude returned empty response");
   usage.flush();
   return full;
@@ -1280,6 +1494,7 @@ async function _streamOllama(s, prompt, opts, onDelta) {
   };
   let full = "";
   const usage = _pbpUsageSink(_pbpOllamaUsage, opts);
+  const contract = _pbpStreamContract("ollama", opts);
   // Ollama streams NDJSON (one JSON object per line), not SSE.
   const consume = (buf, isFinal) => {
     const lines = buf.split("\n");
@@ -1288,18 +1503,20 @@ async function _streamOllama(s, prompt, opts, onDelta) {
       const trimmed = line.trim();
       if (!trimmed) continue;
       let obj;
-      try { obj = JSON.parse(trimmed); } catch (_) { continue; }
+      try { obj = JSON.parse(trimmed); } catch (_) { contract.onParseError(); continue; }
       usage.onRaw(obj);                 // T4: final done:true chunk carries the counts
+      contract.onRaw(obj);
       const d = _pbpOllamaDelta(obj);
-      if (d) { full += d; onDelta(d, full); }
+      if (d) { contract.onText(); full += d; onDelta(d, full); }
     }
     return rest;
   };
-  await _pbpStreamRead(
+  const status = await _pbpStreamRead(
     `${base}/api/chat`,
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
     opts, "Ollama", consume
   );
+  contract.finish(full, status);
   if (!full.trim()) throw new Error("Ollama returned empty response");
   usage.flush();
   return full;
@@ -1321,14 +1538,23 @@ async function _streamOllama(s, prompt, opts, onDelta) {
 //             Claude sends none),
 //           onUsage?({inTok,outTok}) — T4: fired at most once after a NORMAL
 //             stream end IFF the provider opportunistically emitted usage in the
-//             stream (ZERO request mutation). Callers omitting it are unaffected. }
+//             stream (ZERO request mutation). Callers omitting it are unaffected.
+//           requireComplete? — judge the stream end like the non-stream
+//             envelope (see _pbpStreamContract); only the dictionary sets it.
+//           onProgress?({phase: "thinking"|"streaming"}) — synchronous phase
+//             changes, once each across all attempts, never with text. }
 //   onDelta(deltaText, accumulatedText) fires once per text chunk.
 //   Resolves with the full accumulated text (identical to the last
 //   accumulatedText passed to onDelta). Rejects with handleAIError
 //   semantics on non-ok / AbortError on caller abort /
-//   Error("AI stream timeout") on 30s idle.
+//   Error("AI stream timeout") on 30s idle / with requireComplete, the
+//   contract's coded errors (stream_error, invalid_response, output_refused,
+//   output_truncated, empty_response, each with the HTTP status).
 async function callAIStream(s, prompt, opts = {}, onDelta) {
   const cb = (typeof onDelta === "function") ? onDelta : () => {};
+  // One phase reporter for the whole call, so a dialect retry cannot report a
+  // phase twice. Never serialized: request bodies list their fields explicitly.
+  if (typeof opts.onProgress === "function") opts = { ...opts, onPhase: _pbpStreamProgress(opts.onProgress) };
   await _ensureAIHostPermission(s);
   const p = s.aiProvider || "gemini";
   if (p === "gemini") {

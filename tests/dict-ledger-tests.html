@@ -218,6 +218,17 @@ await test("cancellation and superseded queries are not recorded", async () => {
   const rows = await pbpDictLedgerRead("acct_alice");
   return skipped && rows.length === 1 && rows[0].code === "invalid_response.response_json" && rows[0].stage === "checking" && rows[0].category === "collocations";
 });
+await test("a stream error event is stored and read back under its fixed code and shown as service unavailable", async () => {
+  reset();
+  // The shape ai.js throws for an error event inside a 200 requireComplete stream.
+  const error = Object.assign(new Error("API reported an error during the answer stream"), { code: "stream_error", status: 200 });
+  _pbpDictLedgerFail("acct_alice", error, "generating", "patterns");
+  for (let i = 0; i < 5; i++) await tick();
+  const rows = await pbpDictLedgerRead("acct_alice");
+  return PBP_DICT_LEDGER_CODES.has("stream_error") && pbpDictLedgerCode(error) === "stream_error" &&
+    rows.length === 1 && rows[0].code === "stream_error" && rows[0].stage === "generating" && rows[0].category === "patterns" &&
+    _pbpDictGenerationErrorKey(error) === "dictGenerationServiceUnavailable" && _pbpDictGenerationErrorKey(error, true) === "dictGenerationServiceUnavailable";
+});
 document.getElementById("summary").textContent = pass + " passed, " + fail + " failed";
 })();
 </script></body></html>
