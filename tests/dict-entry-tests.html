@@ -162,6 +162,11 @@ await test('basic prompt retains field bounds with a bounded complete-answer req
   reset();await pbpDictEntryRun(request());const p=calls[0].prompt;
   return ['pronunciation<=256','partOfSpeech<=128','definition<=1200','text/translation<=600'].every(s=>p.includes(s))&&calls[0].options.maxTokens===8192&&calls[0].options.timeoutMs===180000&&calls[0].options.totalOutputBudget===true&&calls[0].options.reasoningEffort==='minimum';
 });
+await test('entry and supplement prompts share the curly double-quote mention convention',async()=>{
+  reset();await pbpDictEntryRun(request());
+  const prompts=[calls[0].prompt,_pbpDictSupplementPrompt(request(),'collocations',{nativeLanguage:'',level:'',topic:''},[],JSON.parse(MODEL_RESPONSE))];
+  return prompts.every(p=>p.includes('“…”')&&!p.includes('single quotation marks')&&!p.includes('do not need quotation marks'));
+});
 await test('generated entry requests closed nested fields while keeping quoted prose inside strings',async()=>{
   await pbpDictEntryRun(request());const schema=calls[0].options.responseSchema;
   const meaning=schema?.properties?.meanings?.items;

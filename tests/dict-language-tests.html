@@ -2,7 +2,7 @@
 <div id="results"></div><div id="summary"></div>
 <script>
 let detection=null, detected=[], answer='', record=null, calls=0, saved=0, appended=0;
-globalThis.chrome={i18n:{detectLanguage:async text=>{detected.push(text);if(detection instanceof Error)throw detection;return detection;},getUILanguage:()=>document.documentElement.lang||'en'}};
+globalThis.chrome={i18n:{detectLanguage:async text=>{detected.push(text);if(detection instanceof Error)throw detection;return typeof detection==='function'?detection(text):detection;},getUILanguage:()=>document.documentElement.lang||'en'}};
 async function pbpVocabCurrentOwner(){return 'acct_language_fixture';}
 function hasAIKey(){return true;}
 async function callAI(settings,prompt,opts){await opts.beforeRequest();calls++;return answer;}
@@ -104,6 +104,40 @@ await test('a complete quoted sentence is retained even with a short native fram
 });
 await test('multiple unpunctuated quoted explanations are not treated as short terms',async()=>{
   await rejects(()=>_pbpDictCheckExplanation('意思如下：“A person or company providing regular services” “The person providing financial support for families”',target),'explanation_script');
+});
+// Detector stand-in shaped like the observed misjudgement: any kana in the
+// sample tips a Chinese explanation over to Japanese.
+const kanaAware=text=>({isReliable:true,languages:[{language:/[\p{Script=Hiragana}\p{Script=Katakana}]/u.test(text)?'ja':'zh',percentage:99}]});
+const zhNote='这部分解释描述了这个词在语境中的具体作用，帮助学习者理解含义及其和其他表达的区别。'.repeat(3);
+const deNote='Dieses Wort beschreibt im Alltag eine Handlung, die man im Gespräch häufig bemerkt und mit anderen Ausdrücken vergleicht. ';
+await test('a curly-quoted Japanese mention inside a Chinese explanation passes',async()=>{
+  detection=kanaAware;await _pbpDictCheckExplanation(zhNote+'日语里说“ありがとう”表示感谢。',target,'','ja');
+  assert(detected.length===1&&!detected[0].includes('ありがとう'),'mention stayed in the sample');
+});
+await test('unquoted source-only kana leave the detection sample but stay in saved content',async()=>{
+  detection=kanaAware;const text=zhNote+'日语里说ありがとう或すみません都可以表示感谢。';
+  // Without the source language nothing identifies the kana, so the old misjudgement remains.
+  await rejects(()=>_pbpDictCheckExplanation(text,target),'explanation_language');
+  detected=[];await _pbpDictCheckExplanation(text,target,'','ja');
+  assert(detected.length===1&&!/[ぁ-んァ-ン]/u.test(detected[0])&&detected[0].includes('这部分'),'kana reached the detector');
+  answer=JSON.stringify({...entry(text),word:'ありがとう',language:'ja'});
+  const result=await pbpDictEntryRun(request({term:'ありがとう',sourceLanguage:'ja'}));
+  assert(saved===1&&record.entry.meanings[0].definition===text&&result.entry.meanings[0].definition.includes('すみません'),'saved content changed');
+});
+await test('ASCII single-quoted words are not mention-stripped',async()=>{
+  detection={isReliable:true,languages:[{language:'de',percentage:99}]};
+  await _pbpDictCheckExplanation(deNote+"Man sagt dazu auch 'mention' oder “remark”.",{name:'German',lang:'de'},'','en');
+  assert(detected.length===1&&detected[0].includes("'mention'")&&!detected[0].includes('remark'));
+});
+await test('scripts shared by source and target are not stripped, so English prose in German still fails',async()=>{
+  detection=text=>({isReliable:true,languages:[{language:/\bentire\b/.test(text)?'en':'de',percentage:99}]});
+  await rejects(()=>_pbpDictCheckExplanation('Kurz gesagt: '+wrong,{name:'German',lang:'de'},'','en'),'explanation_language');
+  assert(detected.length===1&&detected[0].includes('This entire explanation'));
+});
+await test('a whole source-language paragraph is not reduced to its shared characters',async()=>{
+  detection=kanaAware;const ja='この言葉は日常会話でよく使われ、相手に感謝の気持ちを伝えるときに使います。丁寧に言いたいときは別の表現を選びます。'.repeat(2);
+  await rejects(()=>_pbpDictCheckExplanation(ja,target,'','ja'),'explanation_language');
+  assert(detected.length===1&&/[ぁ-ん]/u.test(detected[0]));
 });
 await test('confident same-script language mismatches still reject',async()=>{
   detection={isReliable:true,languages:[{language:'en',percentage:99}]};

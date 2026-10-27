@@ -182,7 +182,7 @@ function _pbpDictEntryPrompt(request) {
     "Pronunciation can be IPA or a conventional reading, but leave it empty when uncertain. " +
     "Do not include etymology or related words; these are separate optional tasks. For an unknown expression use meanings:[] and pronunciation:\"\". " +
     'Example shape for a different lookup: {"word":"book","language":"en","pronunciation":"","meanings":[{"partOfSpeech":"名词","definition":"书；书籍。","examples":[{"text":"I borrowed a book.","translation":"我借了一本书。"}]}]}. Adapt all explanation text to targetLanguage. ' +
-    "Use plain-text strings only, without HTML or Markdown. Within prose values use single quotation marks for quoted words and dialogue; reserve double quotes for JSON delimiters. No extra fields, code fences or surrounding prose.\n" +
+    "Use plain-text strings only, without HTML or Markdown. When prose mentions a sourceLanguage word or pattern, wrap it in curly double quotes “…”; never use ASCII quotes inside values. No extra fields, code fences or surrounding prose.\n" +
     JSON.stringify({ term: request.term, sourceLanguage: request.sourceLanguage, targetLanguage: request.target });
 }
 
@@ -324,6 +324,33 @@ function _pbpDictExplicitLanguageScript(tag) {
   } catch (_) { /* Invalid tags cannot establish a script. */ }
   return "";
 }
+// ISO 15924 codes a language is normally written in. Composite CJK codes
+// expand to their member scripts so Japanese and Chinese share only Han.
+function _pbpDictLanguageScripts(tag) {
+  if (typeof tag !== "string" || !tag) return [];
+  let locale;
+  try { locale = new Intl.Locale(tag.replace(/_/g, "-")); } catch (_) { return []; }
+  if (locale.language === "und") return [];
+  let script = _pbpDictExplicitLanguageScript(locale.toString());
+  if (!script) { try { script = locale.maximize().script || ""; } catch (_) { script = ""; } }
+  const composite = { Hans: ["Hani"], Hant: ["Hani"], Jpan: ["Hani", "Hira", "Kana"], Kore: ["Hang", "Hani"], Hrkt: ["Hira", "Kana"] }[script];
+  if (composite) return composite;
+  if (!script) return [];
+  try { new RegExp("\\p{Script=" + script + "}", "u"); return [script]; } catch (_) { return []; }
+}
+// Detection sample only: unquoted source words in a script the target never
+// uses (kana inside Chinese) tip the statistical detector to the source
+// language. Shared scripts stay (en->de, ja->zh Han), and a sample dominated
+// by the source script is a source-language answer, not a mention.
+function _pbpDictStripSourceScripts(sample, sourceLanguage, targetLanguage) {
+  const target = new Set(_pbpDictLanguageScripts(targetLanguage));
+  const unique = target.size ? _pbpDictLanguageScripts(sourceLanguage).filter(script => !target.has(script)) : [];
+  if (!unique.length) return sample;
+  const pattern = new RegExp("[" + unique.map(script => "\\p{Script=" + script + "}").join("") + "]", "gu");
+  const letters = (sample.match(/\p{L}/gu) || []).length, sourceLetters = (sample.match(pattern) || []).length;
+  if (!sourceLetters || sourceLetters / letters >= 0.3) return sample;
+  return sample.replace(new RegExp(pattern.source + "+", "gu"), " ");
+}
 function _pbpDictExplanationLanguage(value, target) {
   if (typeof value !== "string" || value.length > 80) return false;
   const clean = s => s.trim().toLocaleLowerCase().replace(/_/g, "-");
@@ -349,7 +376,7 @@ function _pbpDictExplanationLanguage(value, target) {
 // Evaluate explanatory prose together. A word root, grammatical label or short
 // foreign-language contrast is not a standalone explanation-language failure.
 // Original example sentences and retrieved quotations never enter this check.
-async function _pbpDictCheckExplanation(text, target, declaredLanguage = "") {
+async function _pbpDictCheckExplanation(text, target, declaredLanguage = "", sourceLanguage = "") {
   // A supplement's already validated metadata can identify a legacy custom
   // target for this check only. The saved target and archive key stay intact.
   const candidate = typeof declaredLanguage === "string" ? _pbpDictEntryLang(declaredLanguage.replace(/_/g, "-")) : "";
@@ -384,8 +411,10 @@ async function _pbpDictCheckExplanation(text, target, declaredLanguage = "") {
     throw _pbpDictEntryError("wrong_language", "Explanation language does not match the requested language", "explanation_script");
   }
   if (letters < 80 || typeof globalThis.chrome?.i18n?.detectLanguage !== "function") return;
+  // Only the statistical sample is stripped; the caller saves the original text.
+  const sample = _pbpDictStripSourceScripts(prose, sourceLanguage, wanted);
   let detected;
-  try { detected = await chrome.i18n.detectLanguage(prose); }
+  try { detected = await chrome.i18n.detectLanguage(sample); }
   catch (error) { console.warn("[dict-entry] language check unavailable:", error?.name); return; }
   const first = detected?.languages?.[0];
   // Detector regions are language guesses, not evidence about an explicitly
@@ -479,7 +508,7 @@ async function _pbpDictEntryGenerate(request, updateId = "") {
   delete entry.learning.replacesId;
   if (updateId) entry.learning.replacesId = updateId;
   await _pbpDictCheckExplanation([...entry.meanings.flatMap(m => [m.definition, ...m.examples.map(e => e.translation)]),
-    entry.learning.formation, entry.learning.history, ...entry.learning.related.map(r => r.note)].filter(Boolean).join("\n\n"), request.target);
+    entry.learning.formation, entry.learning.history, ...entry.learning.related.map(r => r.note)].filter(Boolean).join("\n\n"), request.target, "", request.sourceLanguage);
   await _pbpDictEntryGuard(request);
   const { term, sourceLanguage, target, owner } = request;
   const { provider, model } = request.model;
@@ -594,12 +623,12 @@ function _pbpDictSupplementPrompt(request, category, profile, sources, entry, re
     "Copy language exactly from targetLanguage.lang. Summary <=800 characters, at most " + itemLimit + " items, title<=240, explanation<=1400, example/translation<=600 each. " +
     "The combined summary, titles, explanations, examples and translations must fit within 12000 characters including separators. " +
     sourceRule + (repair ? "This is a partial repair. Return only the missing points, at most missingItems. Do not repeat or rewrite acceptedItems; they will be kept verbatim. Use an empty summary. " : "") +
-    "Keep compared words and patterns in sourceLanguage inside target-language explanations; do not translate away the labels being taught. The terms do not need quotation marks. The surrounding explanation must stay in targetLanguage. " +
+    "Keep compared words and patterns in sourceLanguage inside target-language explanations; do not translate away the labels being taught. The surrounding explanation must stay in targetLanguage. " +
     "Every explanation must finish its thought; do not leave an introductory clause or a comparison without its conclusion. Prefer fewer complete points over more partial ones. " +
     "Use one short sentence for the summary and 1-3 sentences per explanation. These are concise learning notes, not essays: select the most useful distinctions instead of filling every allowed item or character. " +
     "Distinguish tendencies from grammatical rules. Do not call a spelling variant or alternative expression impossible merely because another form is more natural; avoid unsupported frequency and exclusivity claims. " +
     "Write concise, practical learning guidance; do not spend the summary describing this task, validation rules or AI provenance (the application labels that separately). " +
-    "Plain text, no Markdown/HTML/URLs. Within prose values use single quotation marks for quoted words and dialogue; reserve double quotes for JSON delimiters. Uncertain or unsupported claims must be omitted; items:[] means no useful supported result.\n" +
+    "Plain text, no Markdown/HTML/URLs. When prose mentions a sourceLanguage word or pattern, wrap it in curly double quotes “…”; never use ASCII quotes inside values. Uncertain or unsupported claims must be omitted; items:[] means no useful supported result.\n" +
     JSON.stringify({ category, term: request.term, sourceLanguage: request.sourceLanguage, targetLanguage: request.target,
       profile: { ...profile, topic: ["scenarios", "collocations", "register"].includes(category) ? profile.topic : "" },
       baseEntry: { word: entry.word, language: entry.language, meanings: entry.meanings.map(m => ({ partOfSpeech: m.partOfSpeech, definition: m.definition })) },
@@ -710,7 +739,7 @@ async function _pbpDictSupplementGenerate(input, request, category, profile) {
   const generated = _pbpDictGeneratedResponse(response, "supplement", category);
   const learning = pbpDictSupplementParse(generated, request, category, sources, parent.entry, input.updateId || "");
   await _pbpDictCheckExplanation([learning.summary, ...learning.items.flatMap(item => [item.explanation, item.translation])].filter(Boolean).join("\n\n"),
-    request.target, JSON.parse(generated).language);
+    request.target, JSON.parse(generated).language, request.sourceLanguage);
   if (repair) {
     const accepted = new Set(repair.items.map(_pbpDictSupplementItemKey));
     const fresh = learning.items.filter(item => !accepted.has(_pbpDictSupplementItemKey(item))).slice(0, repair.omittedItems);
