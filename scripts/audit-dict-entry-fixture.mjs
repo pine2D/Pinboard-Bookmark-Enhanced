@@ -250,7 +250,10 @@ export async function openDictEntryState(page, state) {
       window._auditDictEntry.release();
     });
     await result.waitFor();
-    return page.locator('.xp-dict-ai-switch:not([hidden])').isVisible();
+    // One column (3.1): the generated entry opens under its own source title;
+    // there is no dictionary | AI switch to find.
+    if (await page.locator('.xp-dict-ai-switch').count()) throw new Error('SETUP: the retired dictionary | AI switch is still mounted');
+    return page.locator('.xp-dict-ai-title:not([hidden])').isVisible();
   }
   if (state === 'details') {
     // The etymology block's own paid button (redesign 1B.8): no disclosure

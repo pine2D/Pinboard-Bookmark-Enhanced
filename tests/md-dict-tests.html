@@ -2090,7 +2090,7 @@ async function runDictionaryEntryUiTests() {
     } finally {window[runName]=originalRun;}
   };
   try {
-    Object.assign(window,{hasAIKey:()=>true,ensureAIHostPermissionWithGesture:async()=>{grants++;},requestAIHostPermissions:async(_settings,origins)=>{evidenceGrants.push(origins);return true;},uiLangToBCP47:()=>uiLanguage,PBP_ICONS:Object.fromEntries(["wandSparkles","bookOpenText","sparkles","cross","stop","gear","warning","info"].map(name=>[name,'<svg data-icon="'+name+'" viewBox="0 0 24 24" aria-hidden="true"></svg>'])),pbpAiBumpCounter:()=>{},
+    Object.assign(window,{hasAIKey:()=>true,ensureAIHostPermissionWithGesture:async()=>{grants++;},requestAIHostPermissions:async(_settings,origins)=>{evidenceGrants.push(origins);return true;},uiLangToBCP47:()=>uiLanguage,PBP_ICONS:Object.fromEntries(["wandSparkles","chevronDown","stop","gear","warning","info"].map(name=>[name,'<svg data-icon="'+name+'" viewBox="0 0 24 24" aria-hidden="true"></svg>'])),pbpAiBumpCounter:()=>{},
       pbpDictEntryRead:async input=>{reads.push(input);return null;},pbpDictEntryRun:async input=>{calls.push(input);return record();}});
     const multi = record();
     multi.entry.meanings.push({partOfSpeech:"sustantivo",definition:"A second meaning",examples:[]});
@@ -2109,24 +2109,32 @@ async function runDictionaryEntryUiTests() {
     check("opening lookup reads existing AI data without generating by default",reads.length===1&&calls.length===0&&grants===0);
     check("one generation entry replaces all three former AI operations",a.host.querySelectorAll('.xp-dict-ai-generate').length===1&&!a.host.querySelector('.dict-assist-recommend,.dict-assist-explain,.dict-assist-analyze'));
     check("default lookup shows no AI answer panel",a.host.querySelector('.xp-dict-ai-content').hidden);
-    check("every icon-only entry action has a localized tooltip and matching accessible name", [...a.ui.controls.children].every(button => !!button.querySelector("svg") && button.textContent === "" && !!button.title && button.getAttribute("aria-label") === button.title));
+    check("every AI entry action in its row shows its icon and its text, no icon-only action (3.1)", [...a.ui.controls.children].every(button => !!button.querySelector("svg") && button.textContent.trim() !== ""));
+    check("an ungenerated entry shows one generate row and no source title or switch",!a.ui.controls.hidden&&[...a.ui.controls.children].filter(el=>!el.hidden).length===1&&
+      !a.host.querySelector('.xp-dict-ai-generate').hidden&&a.host.querySelector('.xp-dict-ai-title').hidden&&!a.host.querySelector('.xp-dict-ai-switch'));
 
     a.host.querySelector('.xp-dict-ai-generate').focus();a.host.querySelector('.xp-dict-ai-generate').click();await settle();
-    check("keyboard generation finishes on the replacement source action",document.activeElement===a.host.querySelector('.xp-dict-ai-switch'));
+    check("keyboard generation finishes on the AI entry's title once its action has gone",document.activeElement===a.host.querySelector('.xp-dict-ai-title')&&a.host.querySelector('.xp-dict-ai-title').textContent==="dictEntrySource");
     check("manual generation obtains permission before issuing one request",calls.length===1&&grants===1);
     check("entry generation carries only the query and independently chosen language",calls[0].term==="Gift"&&calls[0].sourceLanguage==="de"&&calls[0].target.lang==="es"&&!("sentence" in calls[0])&&!("choices" in calls[0]));
-    check("generated AI content appears and the view reports the AI entry",!a.host.querySelector('.xp-dict-ai-content').hidden&&view.at(-1)==="ai");
-    check("while AI content shows, the toggle names hiding it, not opening a dictionary that is already visible",a.host.querySelector(".xp-dict-ai-switch").title==="dictEntryHideAi"&&a.host.querySelector(".xp-dict-ai-switch").getAttribute("aria-label")==="dictEntryHideAi"&&!!a.host.querySelector('.xp-dict-ai-switch svg[data-icon="cross"]'));
+    check("generated AI content appears expanded and the block reports its expanded state",!a.host.querySelector('.xp-dict-ai-content').hidden&&view.at(-1)===true);
+    check("the one-column lookup has no dictionary | AI switch: no toggle and no reveal line once expanded",!a.host.querySelector('.xp-dict-ai-switch')&&a.host.querySelector('.xp-dict-ai-reveal').hidden&&a.ui.controls.hidden);
     check("AI text is inert even when a model returns markup-shaped text",!a.host.querySelector('img')&&a.host.textContent.includes("<img src=x"));
     check("generated definitions carry their explanation language and examples retain source language",a.host.querySelector('.xp-dict-senses > li')?.lang==="es"&&a.host.querySelector('.xp-dict-example')?.lang==="de");
     check("the AI entry is attributed without a fabricated Wiktionary link or license",selected[0].norm.aiGenerated===true&&selected[0].norm.sourceUrl===""&&!a.host.querySelector('a[href*="wiktionary"]')&&!a.host.textContent.includes("CC BY-SA"));
-    check("entry details start collapsed and include generation provenance",!a.host.querySelector('details').open&&a.host.querySelector('details').textContent.includes("fixture-model"));
-    a.host.querySelector('.xp-dict-ai-switch').click();
-    check("hiding the AI entry hides only the AI content and reports the dictionary view",a.host.querySelector('.xp-dict-ai-content').hidden&&view.at(-1)==="dictionary");
-    check("the source-switch icon announces the view it will open next", a.host.querySelector(".xp-dict-ai-switch").title === "dictEntryShowAi" && a.host.querySelector(".xp-dict-ai-switch").getAttribute("aria-label") === "dictEntryShowAi");
-
-    a.host.querySelector('.xp-dict-ai-switch').click();
-    check("showing the generated entry again never calls AI again",!a.host.querySelector('.xp-dict-ai-content').hidden&&calls.length===1&&grants===1);
+    {
+      const provenance=a.host.querySelector('.xp-dict-ai-provenance');
+      check("older etymology details start collapsed and hold no provenance",!a.host.querySelector('details').open&&!a.host.querySelector('details').textContent.includes("fixture-model"));
+      check("the card's metadata line appears once, last, with model, date and explanation language only",a.host.querySelectorAll('.xp-dict-ai-provenance').length===1&&
+        !provenance.hidden&&provenance===a.ui.element.lastElementChild&&provenance.textContent.split(" · ")[0]==="fixture-model"&&
+        provenance.textContent.includes(new Date(1700000000000).toLocaleDateString("en"))&&provenance.textContent.split(" · ").length===3&&provenance.textContent.split(" · ")[2].startsWith("dictSupplementLanguage:")&&
+        !provenance.textContent.split(" · ").includes("fixture")&&!provenance.textContent.includes("dictAiLabel"));
+      const order=[...a.ui.element.children].map(el=>el.classList.contains('xp-dict-ai-title')?'title':el.classList.contains('xp-dict-ai-controls')?'controls':
+        el.classList.contains('xp-dict-ai-content')?'content':el.dataset.learningBlock||(el.classList.contains('xp-dict-ai-provenance')?'meta':''));
+      const at=name=>order.indexOf(name);
+      check("the AI part stacks title, actions, entry, usage points, etymology and metadata in that order",at('title')===0&&at('title')<at('controls')&&at('controls')<at('content')&&
+        at('content')<at('usage')&&at('usage')<at('etymology')&&at('etymology')<at('meta')&&at('meta')===order.length-1,order.join(">"));
+    }
     a.host.querySelector('.xp-dict-lemma-link').click();
     check("related words navigate only when explicitly selected",lookups.join("|")==="giftig");
     {
@@ -2142,7 +2150,7 @@ async function runDictionaryEntryUiTests() {
           const m=mount();await m.ui.ready;m.host.querySelector('.xp-dict-ai-generate').click();await settle();
           const details=m.host.querySelector('.xp-dict-ai-details');
           return {formation:details.querySelector('strong')?.textContent,related:details.querySelector('.xp-dict-rel > span')?.textContent,
-            provenance:[...details.querySelectorAll('.xp-dict-src')].find(p=>p.textContent.includes("fixture-model"))?.textContent||""};
+            provenance:m.host.querySelector('.xp-dict-ai-provenance')?.textContent||""};
         } finally {window.t=realT;window.pbpDictEntryRun=realRun;uiLanguage=realUi;}
       };
       const zhLearned=await render("$1：",learned),enLearned=await render("$1:",learned);
@@ -2294,25 +2302,36 @@ async function runDictionaryEntryUiTests() {
     const outside=document.createElement('button');snapshot.root.appendChild(outside);outside.focus();uiLanguage="en";release(record());await settle();
     check("late completion never steals focus after the user has moved elsewhere",document.activeElement===outside);
     check("a pending entry keeps the requested definition language when interface language changes",calls.at(-1).target.lang==="de"&&snapshot.host.querySelector('.xp-dict-senses > li')?.lang==="de");
-    const external = document.createElement("div");
-    const outsideControls = mount({controlsHost: external}); outsideControls.root.appendChild(external); await outsideControls.ui.ready;
-    check("the shared entry can place its controls in the caller's toolbar without duplicating them in its content", external.querySelectorAll(".xp-dict-ai-controls").length === 1 && !outsideControls.host.querySelector(".xp-dict-ai-controls"));
+    const ownRow = mount(); await ownRow.ui.ready;
+    check("the AI entry's actions live in its own block, never in a caller's toolbar", ownRow.ui.controls.parentElement === ownRow.ui.element && ownRow.host.querySelectorAll(".xp-dict-ai-controls").length === 1);
     window.pbpDictEntryRead=async()=>record({cached:true});
+    const viewsBefore=view.length,callsBeforeFolded=calls.length;
     const dictionaryFirst=mount({settings:{...settings,dictDefaultView:"dictionary"}});await dictionaryFirst.ui.ready;
-    check("dictionary-first keeps a saved AI entry available without showing it",dictionaryFirst.host.querySelector('.xp-dict-ai-content').hidden&&!dictionaryFirst.host.querySelector('.xp-dict-ai-switch').hidden);
+    const fold=dictionaryFirst.host.querySelector('.xp-dict-ai-reveal');
+    check("dictionary-first folds a saved AI entry into one free reveal line (Q14=A)",dictionaryFirst.host.querySelector('.xp-dict-ai-content').hidden&&!fold.hidden&&
+      [...dictionaryFirst.ui.controls.children].filter(el=>!el.hidden).length===1&&fold.textContent==="dictEntryShowAi"&&!fold.querySelector('[data-icon="wandSparkles"]')&&
+      fold.getAttribute('aria-expanded')==="false"&&fold.getAttribute('aria-controls')===dictionaryFirst.host.querySelector('.xp-dict-ai-content').id&&
+      dictionaryFirst.host.querySelector('.xp-dict-ai-title').hidden&&dictionaryFirst.host.querySelector('.xp-dict-ai-provenance').hidden&&
+      [...dictionaryFirst.host.querySelectorAll('[data-learning-block]')].every(el=>el.hidden)&&view.slice(viewsBefore).every(value=>value===false));
+    fold.focus();fold.click();await settle();
+    check("the reveal line opens the saved entry without any request and reports the expanded block",!dictionaryFirst.host.querySelector('.xp-dict-ai-content').hidden&&fold.hidden&&
+      fold.getAttribute('aria-expanded')==="true"&&calls.length===callsBeforeFolded&&view.at(-1)===true&&document.activeElement===dictionaryFirst.host.querySelector('.xp-dict-ai-title')&&
+      !dictionaryFirst.host.querySelector('.xp-dict-ai-provenance').hidden);
     const savedFirst=mount({settings:{...settings,dictDefaultView:"ai-saved"}});await savedFirst.ui.ready;
-    check("saved-AI-first opens an existing record without a paid call",!savedFirst.host.querySelector('.xp-dict-ai-content').hidden);
+    check("saved-AI-first opens an existing record without a paid call",!savedFirst.host.querySelector('.xp-dict-ai-content').hidden&&savedFirst.host.querySelector('.xp-dict-ai-reveal').hidden);
     window.pbpDictEntryRead=async()=>null;
     const countBeforeMissing=calls.length;
     const missingSaved=mount({settings:{...settings,dictDefaultView:"ai-saved"}});await missingSaved.ui.ready;
     check("saved-AI-first falls back to the dictionary view without automatically generating",missingSaved.host.querySelector('.xp-dict-ai-content').hidden&&calls.length===countBeforeMissing);
+    const autoViews=view.length;
     const pendingAutomatic=mount({settings:{...settings,dictDefaultView:"ai-generate"}});await settle();
-    check("automatic generation offers the AI toggle while pending",!pendingAutomatic.host.querySelector('.xp-dict-ai-switch').hidden);
-    pendingAutomatic.host.querySelector('.xp-dict-ai-switch').click();release(record());await pendingAutomatic.ui.ready;
-    check("late automatic completion respects the user's explicit dictionary view",pendingAutomatic.host.querySelector('.xp-dict-ai-content').hidden);
+    check("automatic generation keeps the block unexpanded while pending, so the dictionary stays the save default",view.slice(autoViews).every(value=>value===false)&&
+      !pendingAutomatic.host.querySelector('.xp-dict-ai-switch'));
+    release(record());await pendingAutomatic.ui.ready;await settle();
+    check("automatic completion opens the generated entry in place",!pendingAutomatic.host.querySelector('.xp-dict-ai-content').hidden&&view.at(-1)===true);
     const normal=pbpDictEntryNorm(record(),{lang:"es"});normal.aiGenerated=false;normal.sourceLabel="ECDICT";
     const firstBox=document.createElement('div'),lastBox=document.createElement('div');dictionaryFirst.root.append(firstBox,lastBox);
-    const choiceState={lang:"de",queryTerm:"Gift",entryView:"dictionary",meaningSources:new Map([["local",{norm:normal,choices:pbpDictNormChoices(normal,"de"),box:firstBox}]])};
+    const choiceState={lang:"de",queryTerm:"Gift",aiExpanded:false,meaningSources:new Map([["local",{norm:normal,choices:pbpDictNormChoices(normal,"de"),box:firstBox}]])};
     _pbpDictApplyVisibleChoice(choiceState);
     check("local-only dictionary hits provide a usable default meaning",choiceState.gloss.includes("veneno")&&choiceState.term==="Gift");
     const earlier={...normal,sourceLabel:"First pack",entries:structuredClone(normal.entries)};earlier.entries[0].senses[0].definition="First visible source";
@@ -2321,8 +2340,8 @@ async function runDictionaryEntryUiTests() {
     check("default dictionary meaning follows visible source order rather than network arrival",choiceState.gloss==="First visible source");
     choiceState.packChoice=pbpDictNormChoices(normal,"de")[0];_pbpDictApplyVisibleChoice(choiceState);
     check("an explicitly chosen meaning survives subsequent source arrivals",choiceState.gloss.includes("veneno"));
-    choiceState.packChoice=null;choiceState.entryView="ai";choiceState.aiNorm=pbpDictEntryNorm(record(),{lang:"es"});_pbpDictApplyVisibleChoice(choiceState);
-    check("AI view defaults to the first AI definition",choiceState.license.startsWith("AI-generated"));
+    choiceState.packChoice=null;choiceState.aiExpanded=true;choiceState.aiNorm=pbpDictEntryNorm(record(),{lang:"es"});_pbpDictApplyVisibleChoice(choiceState);
+    check("an expanded AI block defaults to the first AI definition (Q14=A)",choiceState.license.startsWith("AI-generated"));
     window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[]});
     const usage=mount();await usage.ui.ready;
     const block=(host,name)=>host.querySelector('[data-learning-block="'+name+'"]');
@@ -2596,7 +2615,7 @@ async function runDictionaryEntryUiTests() {
       previousEntries:[structuredClone(learningBase)]};
     replacementBase.entry.meanings=[...replacementBase.entry.meanings].reverse().map(meaning=>({...meaning,definition:'Updated '+meaning.definition}));
     window.pbpDictEntryRun=async()=>structuredClone(replacementBase);
-    let baseUpdate=meaningUi.host.querySelector('.xp-dict-update-entry');baseUpdate.closest('details').open=true;baseUpdate.click();await settle();
+    let baseUpdate=meaningUi.host.querySelector('.xp-dict-update-entry');baseUpdate.click();await settle();
     check("updating the base does not relabel a retained supplement with reordered or rewritten meanings",
       meaningUi.host.querySelector('.xp-dict-senses').textContent.includes('Updated ')
       &&JSON.stringify(meaningLabels(meaningUi.host))===JSON.stringify(expectedMeanings));
@@ -2628,7 +2647,7 @@ async function runDictionaryEntryUiTests() {
     // A base update reports beside its own button (plan 2.6) and its cancel
     // gives focus back to that button, not to the toolbar.
     let releaseBase;window.pbpDictEntryRun=input=>new Promise(resolve=>{releaseBase=resolve;});
-    baseUpdate=reloadedMeaning.host.querySelector('.xp-dict-update-entry');baseUpdate.closest('details').open=true;
+    baseUpdate=reloadedMeaning.host.querySelector('.xp-dict-update-entry');
     baseUpdate.focus();baseUpdate.click();await settle();
     const updateLine=progressOf(baseUpdate.closest('.xp-dict-usage-actions'));
     check("a base update shows its phase, seconds and cancel beside the update button and focuses that cancel",
@@ -2639,7 +2658,7 @@ async function runDictionaryEntryUiTests() {
     check("cancelling a base update restores focus to the update button and keeps the paid entry",document.activeElement===baseUpdate&&baseUpdate.checkVisibility()&&
       updateLine.box.hidden&&JSON.stringify(meaningLabels(reloadedMeaning.host))===JSON.stringify(expectedMeanings));
     window.pbpDictEntryRun=async()=>{throw Object.assign(new Error('fixture base update failure'),{code:'invalid_response'});};
-    baseUpdate=reloadedMeaning.host.querySelector('.xp-dict-update-entry');baseUpdate.closest('details').open=true;
+    baseUpdate=reloadedMeaning.host.querySelector('.xp-dict-update-entry');
     baseUpdate.focus();baseUpdate.click();await settle();
     // The explanation sits right above the update's action row.
     const baseUpdateError=()=>baseUpdate.closest('.xp-dict-usage-actions')?.previousElementSibling;
@@ -2654,7 +2673,7 @@ async function runDictionaryEntryUiTests() {
     const inlineTones=[];
     for(const [code,tone,icon,key] of [['invalid_response','error','warning','dictSupplementInvalid'],['no_sources','neutral','info','dictSupplementNoSources']]) {
       window.pbpDictEntryRun=async()=>{throw Object.assign(new Error('fixture base update failure'),{code});};
-      baseUpdate=reloadedMeaning.host.querySelector('.xp-dict-update-entry');baseUpdate.closest('details').open=true;
+      baseUpdate=reloadedMeaning.host.querySelector('.xp-dict-update-entry');
       baseUpdate.click();await settle();
       const inline=baseUpdateError();
       inlineTones.push(inline?.classList.contains('xp-dict-action-error')&&inline.dataset.state===tone&&inline.querySelectorAll('svg').length===1
@@ -2671,7 +2690,7 @@ async function runDictionaryEntryUiTests() {
     check("archive broadcasts from another account do not read or display its data",remoteReads===beforeForeign);
     remoteRecord.supplements=[addition];notify({type:'PBP_DICT_ARCHIVE_SYNCED',owner:'ownerless'});await settle();
     check("synced additions arrive without switching the user's dictionary view",remote.host.querySelector('.xp-dict-ai-content').hidden&&remote.host.querySelectorAll('[data-supplement-id]').length===1);
-    remote.ui.show('ai');await settle();
+    remote.ui.show();await settle();
     const editing=remote.host.querySelector('.xp-dict-supplement-generate[data-category="confusables"]');editing.focus();const beforeEditing=remoteReads;
     notify({type:'PBP_DICT_ARCHIVE_SYNCED',owner:'ownerless'});await settle();
     check("passive sync does not rebuild the learning blocks while the user is on one of their buttons",document.activeElement===editing&&remoteReads===beforeEditing);
@@ -2698,7 +2717,7 @@ async function runDictionaryEntryUiTests() {
           saveLanguages.join()==="entry:en,supplement:en"&&drift.host.querySelector('.xp-dict-senses > li')?.lang==="en");
         uiLanguage="en";remoteRecord=record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[]});
         window.pbpDictEntryRead=async input=>{syncReads.push(input.target.lang);return structuredClone(remoteRecord);};
-        const synced=mount({settings:followUi});await synced.ui.ready;synced.ui.show('ai');
+        const synced=mount({settings:followUi});await synced.ui.ready;synced.ui.show();
         uiLanguage="fr";remoteRecord.supplements=[addition];document.activeElement?.blur?.();syncReads.length=0;
         messageListeners.at(-1)({type:'PBP_DICT_ARCHIVE_SYNCED',owner:'ownerless'});await settle();
         check("a passive sync refresh reads and renders the entry in the language on screen, not the changed target",
@@ -2716,8 +2735,6 @@ async function runDictionaryEntryUiTests() {
       document.activeElement===localScroll.host.querySelector('[data-supplement-id="'+'3'.repeat(64)+'"] > summary')&&localScroll.root.scrollTop===0&&document.scrollingElement.scrollTop===pageScrollBefore);
     const beforeClose=messageListeners.length;remote.ctrl.abort();
     check("closing lookup removes its archive sync listener",messageListeners.length===beforeClose-1);
-    outsideControls.ctrl.abort();
-    check("aborting a lookup removes controls mounted in the external toolbar", external.childElementCount === 0 && !outsideControls.ui.controls.isConnected);
 
   } finally {
     for(const fixture of fixtures){fixture.ctrl.abort();fixture.root.remove();}
@@ -2823,11 +2840,25 @@ async function runDictionaryEntryReaderTests() {
     pop.querySelector('.xp-dict-ai-generate').click();await settle();
     check("a generated AI entry in the reader appears beside the still visible dictionary slot",aiShown()&&slotShown());
     check("generated entry becomes the default save source when no meaning was explicitly chosen",_pbpDictCurrent.gloss==="generated poison"&&_pbpDictCurrent.license.includes("AI-generated")&&_pbpDictCurrent.sourceUrl==="");
-    pop.querySelector('.xp-dict-ai-switch').click();await settle();
-    check("returning to the original dictionary restores its default save source",_pbpDictCurrent.gloss==="original poison"&&_pbpDictCurrent.sourceUrl.includes("wiktionary"));
+    {
+      // One column (3.1): head, dictionary slot, then the AI part; no switch.
+      const head=pop.querySelector('.xp-dict-head'),slot=pop.querySelector('.xp-dict-slot'),ai=pop.querySelector('.xp-dict-ai');
+      const follows=(a,b)=>!!a&&!!b&&!!(a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING);
+      check("the reader lookup stacks head, dictionary results and the AI part in one column",follows(head,slot)&&follows(slot,ai)&&!pop.querySelector('.xp-dict-ai-switch')&&
+        !head.querySelector('.xp-dict-ai-controls,.xp-dict-ai-generate')&&ai.contains(pop.querySelector('.xp-dict-ai-controls')));
+      // One title per dictionary source: the online result and CC-CEDICT
+      // render their own; packs carry theirs outside, the AI entry its block's.
+      const titled=extra=>{const box=document.createElement('div');_pbpDictRenderEntry(box,{...norm,...extra},"Gift","de","Gift","");return box;};
+      const online=titled({}),cedict=titled({sourceLabel:"CC-CEDICT",definitionLang:"en"}),pack=titled({packId:"fixture-pack"}),generated=titled({aiGenerated:true});
+      check("the online result and CC-CEDICT each open with their own source title before the senses",
+        online.firstElementChild?.classList.contains('xp-dict-local-title')&&online.firstElementChild.textContent.startsWith("Wiktionary")&&follows(online.firstElementChild,online.querySelector('.xp-dict-senses'))&&
+        cedict.firstElementChild?.classList.contains('xp-dict-local-title')&&cedict.firstElementChild.textContent.startsWith("CC-CEDICT · ")&&
+        !pack.querySelector('.xp-dict-local-title')&&!generated.querySelector('.xp-dict-local-title'));
+      check("the AI entry's own block is titled once and the dictionary slot is never hidden",pop.querySelectorAll('.xp-dict-ai-title:not([hidden])').length===1&&!slot.hidden&&slotShown());
+    }
     const choose=pop.querySelector('.xp-dict-save-meaning');choose.value=String(_pbpDictCurrent.meaningChoices.findIndex(c=>c.gloss==="original second meaning"));choose.dispatchEvent(new Event("change"));
-    pop.querySelector('.xp-dict-ai-switch').click();await settle();
-    check("switching sources never silently replaces an explicitly chosen save definition",_pbpDictCurrent.gloss==="original second meaning"&&_pbpDictCurrent.packChoice?.gloss==="original second meaning");
+    _pbpDictCurrent.ai.show();await settle();
+    check("the AI block's state never silently replaces an explicitly chosen save definition",_pbpDictCurrent.gloss==="original second meaning"&&_pbpDictCurrent.packChoice?.gloss==="original second meaning");
     const countBeforeRelated=calls.length;pop.querySelector('.xp-dict-lemma-link').click();await settle();
     returnButton.click();check("related-word rerender retains the same working return-to-bubble action",returnClicks===1&&returnButton===pop.querySelector('.reader-dict-return')&&returnButton.parentElement===pop.querySelector('.xp-dict-head'));
     check("a related-word lookup retains the original sentence and provides a return path",_pbpDictCurrent.term==="giftig"&&_pbpDictCurrent.sentence==="Das Gift wirkt."&&!!pop.querySelector('.xp-dict-return')&&pop.querySelector('.xp-term').textContent==="giftig");
@@ -2894,14 +2925,25 @@ async function runDictionaryEntryReaderTests() {
     pbpDictUpdateContext({text:'Gift',itemId:'pending-highlight'},{sentence:'Noch kein Ergebnis.'});
     check("context reuse while dictionary sources are pending cannot prematurely enable Save",pop.querySelector('.xp-vocab').disabled);
     pop.querySelector('.xp-dict-ai-generate').click();await settle();finishOnline(norm);await pending;
-    check("late ordinary dictionary results cannot replace the currently displayed AI save definition",_pbpDictCurrent.entryView==="ai"&&_pbpDictCurrent.gloss==="generated poison"&&_pbpDictCurrent.sourceUrl==="");
-
-    _pbpDictSlotRun=async()=>null;
-    await pbpDictRun({text:"Gift"},{sentence:"Das Gift wirkt."},pop,ctrl,settings);await _pbpDictCurrent.ai.ready;
-    pop.querySelector('.xp-dict-ai-generate').click();await settle();pop.querySelector('.xp-dict-ai-switch').click();await settle();
-    check("switching to an empty dictionary view clears an implicit AI save definition",_pbpDictCurrent.entryView==="dictionary"&&_pbpDictCurrent.gloss==="");
+    check("late ordinary dictionary results cannot replace the expanded AI entry's save definition",_pbpDictCurrent.aiExpanded===true&&_pbpDictCurrent.gloss==="generated poison"&&_pbpDictCurrent.sourceUrl==="");
 
     _pbpDictSlotRun=async(_el,term)=>({...norm,word:term});
+    {
+      // Q14=A on the real reader path: dictionary-first folds a saved entry
+      // into the free reveal line; the dictionary stays the save default until
+      // the AI block is expanded.
+      const readBefore=window.pbpDictEntryRead,callsBefore=calls.length;
+      window.pbpDictEntryRead=async()=>({...record(),cached:true});
+      try {
+        await pbpDictRun({text:"Gift"},{sentence:"Das Gift wirkt."},pop,ctrl,{...settings,dictDefaultView:"dictionary"});await _pbpDictCurrent.ai.ready;await settle();
+        const reveal=pop.querySelector('.xp-dict-ai-reveal');
+        check("reader dictionary-first folds the saved AI entry into one line and keeps the dictionary default",!aiShown()&&slotShown()&&!reveal.hidden&&
+          _pbpDictCurrent.aiExpanded===false&&_pbpDictCurrent.gloss==="original poison");
+        reveal.click();await settle();
+        check("opening the folded entry costs nothing and makes its first sense the save default",aiShown()&&slotShown()&&calls.length===callsBefore&&
+          _pbpDictCurrent.aiExpanded===true&&_pbpDictCurrent.gloss==="generated poison");
+      } finally {window.pbpDictEntryRead=readBefore;}
+    }
     {
       // AI-first and saved-AI-first on the real reader path (ruling 2026-10-26:
       // ai-generate keeps the dictionary visible and never switches away).
@@ -3042,7 +3084,9 @@ async function runDictionaryExamplesTests() {
 
     await run({previewAiEnabled:true});
     check("with no AI key the examples block is visible and clickable",slotShown(block())&&slotShown(button())&&!button().disabled&&!!pop.querySelector(".xp-dict-ai-configure:not([hidden])"));
-    check("the examples block sits after the dictionary slot, outside the AI panel",!block().closest(".xp-dict-ai")&&!!(pop.querySelector(".xp-dict-slot").compareDocumentPosition(block())&Node.DOCUMENT_POSITION_FOLLOWING)&&block().previousElementSibling===pop.querySelector(".xp-dict-slot"));
+    check("the examples block follows the dictionary slot as one of the AI part's learning blocks, outside the AI entry's content",
+      block().parentElement===pop.querySelector(".xp-dict-ai")&&!block().closest(".xp-dict-ai-content")&&!!(pop.querySelector(".xp-dict-slot").compareDocumentPosition(block())&Node.DOCUMENT_POSITION_FOLLOWING)&&
+      block().querySelector(":scope > .xp-dict-learning-title")?.textContent==="dictExamplesTitle");
     check("the free action uses the quote icon and plain text, never wandSparkles or a model name",!!button().querySelector('svg[data-icon="quote"]')&&!button().querySelector('svg[data-icon="wand"]')&&button().textContent==="dictExamplesFind"&&!button().querySelector(".xp-dict-model"));
     log=[];button().click();
     check("the click asks for the Wikisource origin before any await (owner read, AI permission or fetch)",log.length===1&&log[0][0]==="request"&&!fetched.length);
@@ -3058,7 +3102,8 @@ async function runDictionaryExamplesTests() {
     check("a shown result replaces its action",button().hidden&&block().querySelector(".xp-dict-examples-hint").hidden);
 
     log=[];fetched=[];await run({previewAiEnabled:false});
-    check("with the reader AI switch off the examples block is still visible and clickable",slotShown(block())&&slotShown(button())&&pop.querySelector(".xp-dict-ai").hidden);
+    check("with the reader AI switch off the examples block is still visible and clickable while every AI control is gone",slotShown(block())&&slotShown(button())&&
+      pop.querySelector(".xp-dict-ai-controls").hidden&&pop.querySelector(".xp-dict-ai-title").hidden&&!pop.querySelector(".xp-dict-ai-content:not([hidden])"));
     button().click();await settle();await settle();
     check("with AI off a click still retrieves the example with no AI call",log[0]?.[0]==="request"&&block().querySelector(".xp-dict-example")?.textContent==="Comfortable provider!"&&aiCalls===0);
 
@@ -3066,6 +3111,18 @@ async function runDictionaryExamplesTests() {
     check("with AI configured but no AI entry the examples block is visible beside the generate action",slotShown(block())&&slotShown(button())&&!!pop.querySelector(".xp-dict-ai-generate:not([hidden])")&&!pop.querySelector(".xp-dict-ai-content:not([hidden])"));
     button().click();await settle();await settle();
     check("with no AI entry a click still retrieves the example with no AI call",block().querySelector(".xp-dict-example")?.textContent==="Comfortable provider!"&&aiCalls===0&&!log.some(([kind])=>kind==="ai-permission"));
+    {
+      // Fixed learning order under a saved entry: usage points, original-text
+      // examples, etymology, then the card's one metadata line.
+      const readBefore=window.pbpDictEntryRead;
+      window.pbpDictEntryRead=async()=>({entry:{word:"provider",language:"en",pronunciation:"",meanings:[{partOfSpeech:"noun",definition:"supplier",examples:[]}],etymology:"",relatedWords:[]},
+        provider:"fixture",model:"fixture-model",generatedAt:1700000000000,cacheSaved:true,cached:true,archiveId:"a".repeat(64),archiveSaved:true,supplements:[]});
+      try {
+        await run({previewAiEnabled:true,dictDefaultView:"ai-saved"});
+        const ai=pop.querySelector(".xp-dict-ai"),names=[...ai.children].filter(el=>!el.hidden).map(el=>el.dataset.learningBlock||(el.classList.contains("xp-dict-ai-provenance")?"meta":el.classList.contains("xp-dict-ai-content")?"entry":"")).filter(Boolean);
+        check("under a saved entry the blocks run entry, usage points, examples, etymology, metadata",JSON.stringify(names)==='["entry","usage","examples","etymology","meta"]',names.join(">"));
+      } finally {window.pbpDictEntryRead=readBefore;}
+    }
     window.hasAIKey=()=>false;
 
     grant=false;log=[];fetched=[];await run({previewAiEnabled:true});button().click();await settle();

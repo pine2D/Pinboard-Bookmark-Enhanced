@@ -851,6 +851,15 @@ function _pbpDictRenderSenses(parent, senses, formOf, termLang, definitionLang) 
 function _pbpDictRenderEntry(slot, norm, term, lang, selectedTerm, sentence) {
   slot.replaceChildren();
   const definitionLang = pbpDictDefinitionLang(norm);
+  // One title per dictionary source (dict redesign 3.1): the online result and
+  // CC-CEDICT name themselves like the packs and ECDICT do. Packs carry their
+  // own title outside this entry; the AI entry has its block's title.
+  if (!norm.packId && !norm.aiGenerated) {
+    const locale = typeof uiLangToBCP47 === "function" ? uiLangToBCP47() : document.documentElement.lang || "en";
+    const title = document.createElement("div"); title.className = "xp-dict-local-title";
+    title.textContent = [norm.sourceLabel || "Wiktionary", pbpDictLanguageLabel(definitionLang, locale)].filter(Boolean).join(" · ");
+    slot.appendChild(title);
+  }
   const actual = pbpDictNormalizeTerm(norm.word || term);
   const selected = pbpDictNormalizeTerm(selectedTerm);
   if (selected && actual && actual !== selected) {
@@ -1807,9 +1816,24 @@ async function pbpDictNegHas(owner, parts) {
   }
 }
 
+// The AI part of the one-column lookup (dict redesign 3.1, Q14=A). It sits
+// after the dictionary results and holds, in this fixed order: the AI entry
+// (its source title, its one action row, status, progress and content), the
+// learning blocks -- usage points, the caller's free original-text examples
+// block (opts.examples), etymology -- then readable old categories and earlier
+// versions, and last the card's one metadata line (model, date, explanation
+// language). There is no "dictionary | AI" switch: the dictionary stays where
+// it is and the AI entry is either expanded or, for dictDefaultView
+// "dictionary", folded into one free "view AI entry" line. opts.onView(expanded)
+// reports that state; expanded means a rendered entry is on screen.
+let _pbpDictEntryMountSeq = 0;
 function _pbpDictEntryMount(host, opts) {
   if (typeof pbpDictEntryRead !== "function" || typeof pbpDictEntryRun !== "function") return null;
   const panel = document.createElement("div"); panel.className = "xp-dict-ai";
+  // The AI entry's source title, styled like each dictionary source's. It
+  // takes focus (programmatically only) when its own action disappears.
+  const title = document.createElement("div"); title.className = "xp-dict-local-title xp-dict-ai-title";
+  title.textContent = t("dictEntrySource"); title.tabIndex = -1; title.hidden = true;
   const controls = document.createElement("div"); controls.className = "row xp-dict-ai-controls";
   const button = (key, name) => {
     const el = document.createElement("button"); el.type = "button";
@@ -1819,25 +1843,37 @@ function _pbpDictEntryMount(host, opts) {
     el.innerHTML = typeof PBP_ICONS === "object" ? PBP_ICONS[icon] || "" : "";
     el.title = t(key); el.setAttribute("aria-label", t(key));
   };
-  const generate = button("dictEntryGenerate", "xp-dict-ai-generate");
-  action(generate, "dictEntryGenerate", "wandSparkles");
+  // An action row button: its icon and its text (no icon-only actions in the
+  // body of the lookup).
+  const labelled = (el, key, icon) => {
+    const svg = document.createElement("span");
+    svg.innerHTML = typeof PBP_ICONS === "object" ? PBP_ICONS[icon] || "" : ""; // static shared icon
+    const text = document.createElement("span"); text.textContent = t(key);
+    el.replaceChildren(...svg.childNodes, text);
+    return el;
+  };
+  // Paid: wandSparkles, its text and the model name beside it.
+  const generate = labelled(button("dictEntryGenerate", "xp-dict-ai-generate"), "dictEntryGenerate", "wandSparkles");
+  const generateModel = document.createElement("span"); generateModel.className = "xp-dict-model"; generate.appendChild(generateModel);
   generate.disabled = true;
-  const toggle = button("dictEntryHideAi", "xp-dict-ai-switch"); toggle.hidden = true;
-  action(toggle, "dictEntryHideAi", "cross");
-  const configure = document.createElement("a"); configure.className = "xp-dict-connect xp-dict-ai-configure";
-  configure.href = "options.html#ai"; configure.target = "_blank"; configure.rel = "noopener noreferrer";
-  action(configure, "aiConfigure", "gear"); configure.hidden = true;
-  controls.append(generate, toggle, configure);
+  // Free: shows the saved entry this lookup already has; it never generates.
+  const reveal = labelled(button("dictEntryShowAi", "xp-dict-ai-reveal"), "dictEntryShowAi", "chevronDown");
+  reveal.setAttribute("aria-expanded", "false"); reveal.hidden = true;
+  const configure = labelled(document.createElement("a"), "aiConfigure", "gear"); configure.className = "xp-dict-connect xp-dict-ai-configure";
+  configure.href = "options.html#ai"; configure.target = "_blank"; configure.rel = "noopener noreferrer"; configure.hidden = true;
+  controls.append(generate, reveal, configure);
   const status = document.createElement("div"); status.className = "xp-dict-msg xp-dict-ai-status";
   status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite"); status.hidden = true;
   const content = document.createElement("div"); content.className = "xp-dict-ai-content"; content.hidden = true;
-  if (opts.controlsHost) opts.controlsHost.appendChild(controls);
-  else panel.appendChild(controls);
+  reveal.setAttribute("aria-controls", content.id = "xp-dict-ai-content-" + (++_pbpDictEntryMountSeq));
+  // The card's one metadata line, after every AI block.
+  const meta = document.createElement("p"); meta.className = "xp-dict-src xp-dict-ai-provenance"; meta.hidden = true;
+  panel.append(title, controls);
   // Every generation reports its progress in place inside this panel (plan
   // 2.6). A busy ancestor delays live-region announcements, so the panel
   // never claims aria-busy while a phase line is speaking.
   panel.setAttribute("aria-busy", "false");
-  let settings = null, record = null, busy = false, active = null, epoch = 0, mode = "dictionary", viewRevision = 0;
+  let settings = null, record = null, busy = false, active = null, epoch = 0, expanded = false;
   // The one running generation: { kind: "entry" | "usage", feedback, origin,
   // version, startedAt, timer, key }. Its elapsed-seconds timer is cleared on
   // every way the run can end (complete, fail, cancel, settings change,
@@ -1891,11 +1927,12 @@ function _pbpDictEntryMount(host, opts) {
     box.append(text, elapsed, cancel);
     return { box, text, elapsed, cancel, anchor, activity: null };
   };
-  // The base entry's first generation has no button in the body to sit
-  // beside (its action is an icon in the lookup toolbar), so its progress
-  // takes the status line's place at the top of the panel.
+  // The base entry's first generation reports in its own row, just below the
+  // action it replaces while running (the generate button hides when busy).
   const entryProgress = feedbackBox(null);
-  panel.append(status, entryProgress.box, content); host.appendChild(panel);
+  panel.append(status, entryProgress.box, content);
+  if (opts.examples) panel.appendChild(opts.examples);
+  panel.appendChild(meta); host.appendChild(panel);
   const usageFeedback = anchor => {
     if (usageFeedbacks.has(anchor)) return usageFeedbacks.get(anchor);
     const hadFocus = document.activeElement === anchor;
@@ -1947,26 +1984,33 @@ function _pbpDictEntryMount(host, opts) {
   };
   const PHASE_KEYS = { thinking: "dictProgressThinking", streaming: "dictProgressStreaming" };
   const sync = () => {
+    const off = !record && !!settings && settings.previewAiEnabled === false;
     generate.hidden = !!record || !configured() || busy; generate.disabled = busy || !settings;
-    toggle.hidden = !record && !busy;
+    generateModel.textContent = !generate.hidden && typeof pbpDictEntryModelName === "function" && pbpDictEntryModelName(settings)
+      ? "· " + pbpDictEntryModelName(settings) : "";
+    reveal.hidden = !record || expanded;
     configure.hidden = !!record || !settings || settings.previewAiEnabled === false || configured();
-    panel.hidden = !record && !!settings && settings.previewAiEnabled === false;
-    controls.hidden = panel.hidden;
+    controls.hidden = off || (generate.hidden && reveal.hidden && configure.hidden);
+    title.hidden = !record || !expanded;
+    content.hidden = !expanded;
+    // With AI off and nothing saved, only the free examples block remains.
+    panel.hidden = off && !opts.examples;
+    if (!record || !expanded) meta.hidden = true;
+    for (const node of panel.querySelectorAll(":scope > [data-ai-block]")) node.hidden = !expanded || node.dataset.aiBlockEmpty === "true";
   };
-  const show = next => {
+  // Expanding is one-way within a lookup: the saved entry stays shown once a
+  // click, a generation or the preference has opened it.
+  const show = open => {
     if (!alive()) return;
-    mode = next;
-    // The dictionary result stays visible in every mode; the toggle only shows
-    // or hides the AI entry beside it (ruling 2026-10-26: AI-first never hides
-    // the dictionary). The toggle itself goes when the lookup becomes one column.
-    content.hidden = mode !== "ai";
-    action(toggle, mode === "ai" ? "dictEntryHideAi" : "dictEntryShowAi", mode === "ai" ? "cross" : "sparkles");
-    opts.onView?.(mode);
+    if (open) expanded = true;
+    reveal.setAttribute("aria-expanded", String(expanded));
+    sync(); usageForm?.refresh(); syncMeta();
+    opts.onView?.(expanded && !!record);
   };
-  const render = (value, answerLanguage, reveal = true, revealSupplement = "") => {
+  const render = (value, answerLanguage, open = true, revealSupplement = "") => {
     // Read before the base re-renders: an update's cancel sits inside the
     // content that is about to be replaced.
-    const hadFocus = document.activeElement === generate ||
+    const hadFocus = document.activeElement === generate || document.activeElement === reveal ||
       (activity?.kind === "entry" && document.activeElement === activity.feedback.cancel);
     record = value; renderedLanguage = answerLanguage;
     if (negLanguage !== null && _pbpDictLanguageKey(answerLanguage) !== negLanguage) {
@@ -1985,9 +2029,11 @@ function _pbpDictEntryMount(host, opts) {
         const empty = document.createElement("p"); empty.className = "xp-dict-msg";
         empty.textContent = t("dictEntryNoEntry"); content.prepend(empty);
       }
+      // Etymology and related words of an older entry shape stay folded under
+      // their own title; the entry's provenance is the card's metadata line.
       const details = document.createElement("details"); details.className = "xp-dict-ai-details";
       const summary = document.createElement("summary");
-      summary.textContent = t(record.entry.etymology || record.entry.relatedWords.length ? "dictEntryDetails" : "dictEntrySource");
+      summary.textContent = t("dictEntryDetails");
       details.appendChild(summary);
       if (record.entry.learning) {
         const learning = record.entry.learning;
@@ -2033,15 +2079,10 @@ function _pbpDictEntryMount(host, opts) {
         });
         details.appendChild(words);
       }
-      const provenance = document.createElement("p"); provenance.className = "xp-dict-src";
-      provenance.textContent = [t("dictAiLabel"), record.provider, record.model,
-        new Date(record.generatedAt).toLocaleDateString(_pbpDictUiLocale())].join(" · ");
-      details.appendChild(provenance);
-      const language = document.createElement("p"); language.className = "xp-dict-src";
-      language.textContent = t("dictSupplementLanguage", languageName(answerLanguage)); details.appendChild(language);
+      if (details.childElementCount > 1) content.appendChild(details);
       if (configured() && record.archiveId) {
         const update = button("dictEntryUpdate", "xp-dict-update-entry"); update.title = t("dictEntryUpdateHint"); update.setAttribute("aria-description", update.title);
-        update.addEventListener("click", () => run(true, record.archiveId, update)); details.appendChild(update);
+        update.addEventListener("click", () => run(true, record.archiveId, update)); content.appendChild(update);
       }
       if (record.previousEntries?.length) {
         const previous = document.createElement("details"); previous.className = "xp-dict-ai-details";
@@ -2061,17 +2102,35 @@ function _pbpDictEntryMount(host, opts) {
               p.appendChild(link); version.appendChild(p);
             } previous.appendChild(version);
           }
-        }); details.appendChild(previous);
+        }); content.appendChild(previous);
       }
-      content.appendChild(details);
       details.open = wasOpen; baseDetails = details; renderedBase = baseKey;
     }
     renderSupplements(answerLanguage, revealSupplement);
     opts.onEntry?.(norm, record, content);
+    show(open);
     // Move focus off a disappearing action without scrolling the article.
-    show(reveal ? "ai" : mode); sync();
-    if (hadFocus) toggle.focus({ preventScroll: true });
+    if (hadFocus) focusEntry();
     message(record.cacheSaved === false ? t("dictEntryNotCached") : "", "error");
+  };
+  // Focus lands on the AI entry's title when its action has gone; while the
+  // entry is folded, the free reveal line is what remains.
+  const focusEntry = () => {
+    const next = !title.hidden ? title : !reveal.hidden ? reveal : !generate.hidden ? generate : null;
+    next?.focus({ preventScroll: true });
+  };
+  // The card's one metadata line (ruling 3.1): model, date and explanation
+  // language, once, after every AI block -- not a receipt per block. The models
+  // of the entry and its shown learning blocks are named once each; the date
+  // is the latest generation among them.
+  const syncMeta = () => {
+    if (!record || !expanded) { meta.hidden = true; return; }
+    const shown = [record, ...(record.supplements || []).filter(item => supplementNodes.get(supplementId(item))?.section.isConnected)];
+    const models = [...new Set(shown.map(item => item.model).filter(Boolean))];
+    const latest = Math.max(...shown.map(item => Number(item.generatedAt) || 0));
+    meta.textContent = [...models, latest > 0 ? new Date(latest).toLocaleDateString(_pbpDictUiLocale()) : "",
+      t("dictSupplementLanguage", languageName(renderedLanguage || target()))].filter(Boolean).join(" · ");
+    meta.hidden = false;
   };
   const input = (signal, isCurrent) => ({ term: opts.term, sourceLanguage: opts.lang || "und", target: target(),
     owner: opts.owner, settings, signal, isCurrent });
@@ -2112,7 +2171,7 @@ function _pbpDictEntryMount(host, opts) {
             if (alive()) {
               const hadFocus = document.activeElement === baseRetry;
               render(saved, answerLanguage, false);
-              if (hadFocus) toggle.focus({ preventScroll: true });
+              if (hadFocus) focusEntry();
             }
           } catch (error) {
             if (alive()) message(t("dictEntryNotCached"), "error");
@@ -2120,7 +2179,7 @@ function _pbpDictEntryMount(host, opts) {
           } finally { saving = false; baseRetry.removeAttribute("aria-disabled"); }
         });
       }
-      if (!baseRetry.isConnected) baseDetails.after(baseRetry);
+      if (!baseRetry.isConnected) content.appendChild(baseRetry);
     } else baseRetry?.remove();
     const retained = new Set(), legacySections = [];
     const replaced = new Set((record.supplements || []).map(item => item.learning?.replacesId).filter(Boolean));
@@ -2229,9 +2288,10 @@ function _pbpDictEntryMount(host, opts) {
         }
         item.sourceKey = sourceKey;
       }
-      receipt.textContent = [t(addition.archiveSaved === false ? "dictSupplementSaveFailed" : "dictSupplementSaved"),
-        addition.provider, addition.model, new Date(addition.generatedAt).toLocaleDateString(_pbpDictUiLocale()),
-        t("dictSupplementLanguage", languageName(addition.learning?.language || answerLanguage))].join(" · ");
+      // Model, date and language are the card's one metadata line; a block's
+      // own line only says that its save failed.
+      receipt.textContent = addition.archiveSaved === false ? t("dictSupplementSaveFailed") : "";
+      receipt.hidden = !receipt.textContent;
       // Old categories (and every record saved with a topic, which only they
       // took) are read-only (1B.5, 1B.7).
       if (configured() && addition.id && addition.archiveSaved !== false && !replaced.has(id) && !legacyCategory && !addition.profile?.topic) {
@@ -2285,12 +2345,16 @@ function _pbpDictEntryMount(host, opts) {
     for (const [id, item] of supplementNodes) {
       if (!retained.has(id)) { item.section.remove(); supplementNodes.delete(id); }
     }
-    // Fixed order after the paid base entry: usage points, etymology, then
-    // readable old categories and earlier versions. A node moves only when it
-    // is out of order, so open folds and keyboard focus survive re-renders.
-    let previous = baseRetry?.isConnected ? baseRetry : baseDetails;
-    for (const node of [form.usage, form.etymology, ...legacySections, ...(replaced.size ? [previousSupplements] : [])]) {
-      if (node.parentElement !== content || !(previous.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING)) previous.after(node);
+    // Fixed order after the AI entry: usage points, the free examples block,
+    // etymology, then readable old categories and earlier versions, then the
+    // metadata line. A node moves only when it is out of order, so open folds
+    // and keyboard focus survive re-renders.
+    for (const node of legacySections) node.dataset.aiBlock = "legacy";
+    if (previousSupplements) previousSupplements.dataset.aiBlock = "previous";
+    let previous = content;
+    for (const node of [form.usage, ...(opts.examples ? [opts.examples] : []), form.etymology, ...legacySections,
+      ...(replaced.size ? [previousSupplements] : []), meta]) {
+      if (node.parentElement !== panel || !(previous.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING)) previous.after(node);
       previous = node;
     }
     form.refresh();
@@ -2305,6 +2369,7 @@ function _pbpDictEntryMount(host, opts) {
     if (usageForm) return usageForm;
     const block = (name, key) => {
       const el = document.createElement("section"); el.className = "xp-dict-learning-section"; el.dataset.learningBlock = name;
+      el.dataset.aiBlock = name;
       el.setAttribute("role", "group"); el.setAttribute("aria-label", t(key));
       const heading = document.createElement("p"); heading.className = "xp-dict-learning-title"; heading.textContent = t(key);
       el.appendChild(heading); return el;
@@ -2371,7 +2436,15 @@ function _pbpDictEntryMount(host, opts) {
         // since a formation-only answer is itself a source miss.
         if (saved && negState[category] && (category !== "etymology" || saved.sources?.length)) negForget(category);
         const remembered = !el.hidden && negState[category] === true;
-        labels[category].textContent = remembered ? t(labelKeys[category]) + " · " + t("dictNegRetry") : t(labelKeys[category]);
+        // Ruling 2026-10-28: under its block's own heading the remembered
+        // button drops the category name ("Not found last time · Try again"),
+        // so it fits one line in the reader's popover. The usage block holds two
+        // buttons, so there the name stays to tell them apart. The accessible
+        // name always says what would be generated.
+        const named = category !== "etymology";
+        labels[category].textContent = remembered ? (named ? t(labelKeys[category]) + " · " : "") + t("dictNegRetry") : t(labelKeys[category]);
+        if (remembered && !named) el.setAttribute("aria-label", [t(labelKeys[category]), t("dictNegRetry"), modelName].filter(Boolean).join(" · "));
+        else el.removeAttribute("aria-label");
         if (remembered) el.dataset.remembered = "true"; else delete el.dataset.remembered;
         // Retrieval and AI judgement read differently; both are neutral answers
         // with the info icon, never errors, and never claim the usage is absent.
@@ -2385,7 +2458,13 @@ function _pbpDictEntryMount(host, opts) {
       }
       profile.hidden = buttons.patterns.hidden && buttons.confusables.hidden;
       etymologyHint.hidden = buttons.etymology.hidden;
-      for (const el of [usage, etymology]) el.hidden = ![...el.children].slice(1).some(node => !node.hidden);
+      // A block shows only while the AI entry is expanded and has something
+      // in it besides its title.
+      for (const el of [usage, etymology]) {
+        el.dataset.aiBlockEmpty = String(![...el.children].slice(1).some(node => !node.hidden));
+        el.hidden = !expanded || el.dataset.aiBlockEmpty === "true";
+      }
+      syncMeta();
     };
     const enableForm = () => { for (const el of Object.values(buttons)) el.disabled = false; };
     const generateSupplement = async (updating = null, explicitCategory = "") => {
@@ -2400,7 +2479,7 @@ function _pbpDictEntryMount(host, opts) {
       negTouched.add(category); negState[category] = false; feedback.remembered = false;
       usageMessage(feedback, "");
       let restoreFocus = null;
-      const hadFocus = document.activeElement === origin || (updating && content.contains(document.activeElement));
+      const hadFocus = document.activeElement === origin || (updating && panel.contains(document.activeElement));
       const version = ++epoch, controller = new AbortController(); active = controller; busy = true;
       const act = startProgress("usage", feedback, origin, version);
       const current = () => alive() && epoch === version && !controller.signal.aborted;
@@ -2488,11 +2567,10 @@ function _pbpDictEntryMount(host, opts) {
     const feedback = updateId && origin?.isConnected ? usageFeedback(origin) : entryProgress;
     const errorAnchor = feedback.anchor ? feedback.box.parentElement : origin;
     if (updateId) inlineError(errorAnchor, "");
-    const version = ++epoch, viewAtStart = viewRevision, controller = new AbortController(); active = controller; busy = true;
+    const version = ++epoch, controller = new AbortController(); active = controller; busy = true;
     const current = () => alive() && epoch === version && !controller.signal.aborted;
     const act = startProgress("entry", feedback, feedback.anchor || generate, version);
     message(""); progressPhase(act, "dictEntryGenerating");
-    if (!manual) show("ai");
     sync();
     // Only a click moves focus, and only to this run's own cancel.
     if (hadFocus) feedback.cancel.focus({ preventScroll: true });
@@ -2512,10 +2590,10 @@ function _pbpDictEntryMount(host, opts) {
       // stays "generating".
       const onStage = phase => { if (current()) progressPhase(act, PHASE_KEYS[phase]); };
       const result = await pbpDictEntryRun({ ...request, updateId, onDrop, onStage });
-      if (current()) render(result, request.target, viewRevision === viewAtStart);
+      // A generated entry is what the click asked to see: it opens expanded.
+      if (current()) render(result, request.target, true);
     } catch (error) {
       if (!current()) return;
-      if (!record) show("dictionary");
       console.warn("[dict-entry] generation failed:", error?.name, _pbpDictFailureCode(error), _pbpDictFailureReason(error));
       _pbpDictLedgerFail(opts.owner, error, ledgerStage, "entry");
       const text = t(_pbpDictGenerationErrorKey(error)), tone = _pbpDictFailureTone(error);
@@ -2529,15 +2607,20 @@ function _pbpDictEntryMount(host, opts) {
           usageMessage(feedback, ""); sync();
           if (cancelFocused) {
             if (origin?.isConnected && !origin.hidden) origin.focus({ preventScroll: true });
-            else if (!generate.hidden) generate.focus({ preventScroll: true });
-            else if (!toggle.hidden) toggle.focus({ preventScroll: true });
+            else focusEntry();
           }
         }
       }
     }
   };
   generate.addEventListener("click", () => run(true));
-  toggle.addEventListener("click", () => { viewRevision++; show(mode === "ai" ? "dictionary" : "ai"); });
+  // Free: shows what this lookup already holds; no request of any kind.
+  reveal.addEventListener("click", () => {
+    if (!alive() || !record) return;
+    const hadFocus = document.activeElement === reveal;
+    show(true);
+    if (hadFocus) focusEntry();
+  });
   // The in-place cancel. Focus returns to the action that started the run --
   // the generate icon, the entry's update button or the supplement's button.
   const cancelActive = () => {
@@ -2549,17 +2632,14 @@ function _pbpDictEntryMount(host, opts) {
       sync(); if (act.origin.isConnected) act.origin.focus({ preventScroll: true }); return;
     }
     usageMessage(act.feedback, ""); message(""); sync();
-    if (!record) show("dictionary");
     const origin = act.origin?.isConnected && !act.origin.hidden ? act.origin : null;
     if (origin) origin.focus({ preventScroll: true });
-    else if (!generate.hidden) generate.focus({ preventScroll: true });
-    else if (!toggle.hidden) toggle.focus({ preventScroll: true });
+    else focusEntry();
   };
   opts.signal?.addEventListener("abort", () => {
     endProgress(activity);
     epoch++; active?.abort();
     if (!record) content.hidden = true;
-    if (opts.controlsHost) controls.remove();
   }, { once: true });
   const ready = Promise.resolve(opts.settings).then(async value => {
     if (!alive()) return;
@@ -2577,7 +2657,9 @@ function _pbpDictEntryMount(host, opts) {
     // The memory is read before the first render picks each block's button.
     await negLoaded;
     if (!alive() || epoch !== version) return;
-    if (hit) render(hit, request.target, !viewRevision && preference() !== "dictionary");
+    // dictDefaultView (Q14=A): "dictionary" folds a saved entry into the free
+    // reveal line; "ai-saved" and "ai-generate" open it.
+    if (hit) render(hit, request.target, expanded || preference() !== "dictionary");
     else if (preference() === "ai-generate") await run(false);
   }).catch(error => {
     if (!alive() || error?.name === "AbortError" || error?.code === "stale") return;
@@ -2591,12 +2673,12 @@ function _pbpDictEntryMount(host, opts) {
   if (globalThis.chrome?.runtime?.onMessage) {
     const refreshed = async message => {
       if (message?.type !== "PBP_DICT_ARCHIVE_SYNCED" || message.owner !== opts.owner || !alive() || !settings || busy || record?.archiveSaved === false ||
-          content.contains(document.activeElement)) return;
+          panel.contains(document.activeElement)) return;
       const version = epoch;
       try {
         const request = entryInput(opts.signal, () => alive() && epoch === version);
         const next = await pbpDictEntryRead(request);
-        if (!next || !alive() || busy || epoch !== version || content.contains(document.activeElement)) return;
+        if (!next || !alive() || busy || epoch !== version || panel.contains(document.activeElement)) return;
         if (JSON.stringify(next) === JSON.stringify(record)) return;
         next.supplements = [...(next.supplements || []), ...(record?.supplements || []).filter(item => item.archiveSaved === false)];
         render(next, request.target, false);
@@ -2641,7 +2723,7 @@ function _pbpDictEntryMount(host, opts) {
     chrome.storage.onChanged.addListener(changed);
     opts.signal?.addEventListener("abort", () => chrome.storage.onChanged.removeListener(changed), { once: true });
   }
-  return { element: panel, controls, ready, show };
+  return { element: panel, controls, ready, show: () => show(true), isExpanded: () => expanded && !!record };
 }
 
 // The free original-text examples action asks for one exact Wikisource origin.
@@ -2718,7 +2800,11 @@ function pbpDictExamplesView(opts) {
   // retry" with the retrieval copy -- never one replaced by the other.
   const setRemembered = value => {
     remembered = value;
-    label.textContent = value ? t("dictExamplesFind") + " · " + t("dictNegRetry") : t("dictExamplesFind");
+    // Under the block's own heading the remembered action drops its name
+    // (ruling 2026-10-28); the accessible name keeps it.
+    label.textContent = value ? t("dictNegRetry") : t("dictExamplesFind");
+    if (value) find.setAttribute("aria-label", t("dictExamplesFind") + " · " + t("dictNegRetry"));
+    else find.removeAttribute("aria-label");
     if (value) find.dataset.remembered = "true"; else delete find.dataset.remembered;
     if (value) say(t("dictSupplementNoSources"), "neutral");
   };
@@ -2794,7 +2880,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   if (title) { title.textContent = cap.text; title.title = cap.text; }
   const cur = {
     runId, term: cap.text, queryTerm: cap.text, lang: "", gloss: "", lemma: "", ipa: "",
-    sourceUrl: "", license: "", sentence: ctx.sentence || "", saved: false, entryView: "dictionary",
+    sourceUrl: "", license: "", sentence: ctx.sentence || "", saved: false, aiExpanded: false,
     owner: _pbpDictOwner,
     rerun: () => { if (cur.isCurrent() && !signal.aborted) pbpDictRun(cap, ctx, pop, ctrl, s, origin); },
     // Lemma click-through (form-of pointers): a fresh full run on the base
@@ -2872,7 +2958,9 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
   speak.innerHTML = PBP_DICT_SPEAKER_SVG; // static constant, never model text
   queryTools.append(sel, speak); head.appendChild(queryTools);
   // The docked reader already identifies the word in its search field. Keep
-  // its return action with the dictionary tools, including across reruns.
+  // its return action with the dictionary tools, including across reruns. The
+  // head row holds only the query tools and this action; the AI entry keeps
+  // its own actions in its block.
   const sessionHead = pop.classList.contains("reader-dict-session") ? pop.querySelector(":scope > .panel-head") : null;
   const returnToBubble = sessionHead && pop.querySelector(".reader-dict-return");
   if (returnToBubble) { head.appendChild(returnToBubble); sessionHead.hidden = true; }
@@ -2946,7 +3034,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
     cur.rerun(); // abort old requests NOW
   });
   speak.addEventListener("click", () => {
-    const visible = cur.entryView === "ai" ? cur.aiNorm : cur.dictionaryNorm;
+    const visible = cur.aiExpanded ? cur.aiNorm : cur.dictionaryNorm;
     pbpDictSpeak(visible?.word || cap.text, lang);
   });
   cur.refreshLanguages = () => (installedLanguages = _pbpDictRefreshPackLangs(sel, languageLocale, true,
@@ -2954,27 +3042,32 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
       if (!signal.aborted && _pbpDictCurrent === cur && _pbpDictManualLang && !codes.includes(_pbpDictManualLang)) _pbpDictManualLang = "";
     });
   cur.meaningSources = new Map();
-  const aiHost = document.createElement("div"); slot.before(aiHost);
+  // One column (dict redesign 3.1): head, dictionary results, then the AI
+  // entry with its learning blocks and the card's metadata line.
+  const aiHost = document.createElement("div"); slot.after(aiHost);
   const originalTerm = wrap.querySelector(".xp-dict-origin-term"); if (originalTerm) originalTerm.lang = lang || "und";
+  // Free original-text examples sit between the usage points and the
+  // etymology blocks, independent of the AI entry (plan 1C.2): no AI setting
+  // gates them.
+  cur.examples = pbpDictExamplesView({ term: cap.text, lang, owner: cur.owner, signal, isCurrent: cur.isCurrent });
   cur.ai = _pbpDictEntryMount(aiHost, { term: cap.text, lang, owner: cur.owner,
-    signal, isCurrent: cur.isCurrent, settings: s, controlsHost: head,
+    signal, isCurrent: cur.isCurrent, settings: s, examples: cur.examples?.element,
     onSettingsChange: next => { if (cur.isCurrent()) pbpDictRun(cap, ctx, pop, ctrl, next, origin); },
     onLookup: term => cur.rerunWith(term),
     onEntry: (norm, record, content) => {
       cur.aiNorm = norm;
       _pbpDictReaderPackChoices(norm, content, cur, pop, signal);
     },
-    onView: mode => {
-      cur.entryView = mode;
+    // The AI block's state changed: expanded means its entry is on screen,
+    // and only then does the save default come from it (Q14=A).
+    onView: expanded => {
+      if (cur.aiExpanded === expanded) return;
+      cur.aiExpanded = expanded;
       _pbpDictApplyVisibleChoice(cur);
       _pbpDictSyncMeaningSelect(cur);
       _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name));
     } });
-  if (returnToBubble) head.appendChild(returnToBubble);
-  // Free original-text examples sit after the dictionary slot and the AI
-  // panel, independent of both (plan 1C.2): no AI setting gates them.
-  cur.examples = pbpDictExamplesView({ term: cap.text, lang, owner: cur.owner, signal, isCurrent: cur.isCurrent });
-  if (cur.examples) slot.after(cur.examples.element);
+  if (!cur.ai && cur.examples) aiHost.appendChild(cur.examples.element);
 
   // Local dictionaries load independently of the online request and AI entry.
   const ecdictEl = document.createElement("div"), packsEl = document.createElement("div");
@@ -3029,12 +3122,14 @@ function _pbpDictApplyVisibleChoice(cur) {
   const sources = [...(cur.meaningSources?.values() || [])].filter(source => !source.norm.aiGenerated && source.choices.length);
   sources.sort((a, b) => a.box?.isConnected && b.box?.isConnected && a.box !== b.box
     ? (a.box.compareDocumentPosition(b.box) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1) : 0);
-  const norm = cur.entryView === "ai" ? cur.aiNorm : sources[0]?.norm || cur.dictionaryNorm;
+  // Q14=A: the expanded AI entry's first sense, otherwise the first
+  // dictionary sense in display order.
+  const norm = cur.aiExpanded ? cur.aiNorm : sources[0]?.norm || cur.dictionaryNorm;
   const choice = norm && pbpDictNormChoices({ ...norm,
-    entries: pbpDictOrderForContext(norm.entries, cur.entryView === "ai" ? "" : cur.sentence) }, cur.lang, t("dictSource"))[0];
+    entries: pbpDictOrderForContext(norm.entries, cur.aiExpanded ? "" : cur.sentence) }, cur.lang, t("dictSource"))[0];
   if (choice) _pbpDictApplyPackChoice(cur, choice);
   else {
-    cur.fullEntryOnly = cur.entryView !== "ai" && [...(cur.meaningSources?.values() || [])].some(source => source.norm.hasFullEntry);
+    cur.fullEntryOnly = !cur.aiExpanded && [...(cur.meaningSources?.values() || [])].some(source => source.norm.hasFullEntry);
     Object.assign(cur, { term: cur.queryTerm || cur.term, gloss: "", ipa: "", sourceUrl: "", license: "", lemma: "" });
   }
 }

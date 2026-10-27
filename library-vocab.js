@@ -1150,7 +1150,9 @@ function _pbpVocabSelectLookupDefault(state) {
     // Match the rendered order: multilingual packs, legacy local source,
     // then online. Arrival timing must not decide a word's default definition.
     const rank = source => source.startsWith("pack:") ? 0 : source === "local" ? 1 : 2;
-    const visible = [...state.sources].filter(([source]) => (source === "ai") === (state.view === "ai"))
+    // Q14=A: the AI entry's first sense while its block is expanded,
+    // otherwise the first dictionary sense.
+    const visible = [...state.sources].filter(([source]) => (source === "ai") === !!state.aiExpanded)
       .sort(([a], [b]) => rank(a) - rank(b));
     const first = visible.flatMap(([, choices]) => choices)[0];
     const savedId = first && pbpDictVocabKey(state.owner, first.language, first.term);
@@ -1355,38 +1357,33 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
     _vocabCurrentOwner === state.owner && !!host?.contains(onlineEl);
   cur.isCurrent = state.live;
   state.dictionaryTerm = term;
-  state.view = "dictionary";
+  state.aiExpanded = false;
+  // One column (dict redesign 3.1): the heading names the dictionary's actual
+  // headword; the AI entry below it no longer swaps the view.
   state.syncHeading = () => {
     if (!state.live() || host.dataset.refState !== "other") return;
-    const shown = state.view === "ai" ? term : state.dictionaryTerm;
+    const shown = state.dictionaryTerm;
     host.dataset.refTerm = shown;
     const heading = host.querySelector(".vocab-ref-term");
     if (heading) { heading.textContent = shown; heading.title = shown; }
   };
   state.syncHeading();
-  $id("vocab-ref")?.querySelectorAll(".xp-dict-ai-controls").forEach(el => el.remove());
   host?.querySelector(".xp-dict-ai")?.remove();
   host?.querySelector(".xp-dict-examples")?.remove();
   const dictionaryHost = onlineEl.closest(".xp-dict-slot");
   if (dictionaryHost) dictionaryHost.hidden = false;
-  let controlsHost = host.querySelector(".vocab-ref-head");
-  if (!controlsHost) {
-    const lookup = $id("vocab-lookup-go");
-    controlsHost = lookup?.closest(".vocab-lookup-actions");
-    if (!controlsHost && lookup) {
-      controlsHost = document.createElement("div");
-      controlsHost.className = "vocab-lookup-actions";
-      lookup.before(controlsHost);
-      controlsHost.appendChild(lookup);
-    }
-  }
-  // AI is one source in the same lookup view. Default collection follows
-  // that view; an explicit selection survives later results and view changes.
+  // Free original-text examples (plan 1C.2): the same block as the reader's,
+  // bound to this query's signal and owner and shown whatever the AI settings
+  // are. The AI part places it between its usage points and etymology.
+  const examples = dictionaryHost && pbpDictExamplesView({ term, lang, owner: state.owner, signal, isCurrent: state.live });
+  // One column (dict redesign 3.1): dictionary results, then the AI entry with
+  // its learning blocks and metadata line. An explicit save selection
+  // survives later results and the AI block opening.
   const entryView = _pbpDictEntryMount(host, { term, lang, owner: state.owner, signal,
-    controlsHost,
+    examples: examples?.element,
     isCurrent: state.live, settings: pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS).then(deobfuscateSettings),
     onSettingsChange: () => { if (state.live()) cur.rerun(); },
-    onView: mode => { state.view = mode; state.syncHeading(); _pbpVocabSelectLookupDefault(state); },
+    onView: expanded => { state.aiExpanded = expanded; _pbpVocabSelectLookupDefault(state); },
     onEntry: norm => {
       if (!state.live()) return;
       _pbpVocabAcceptLookupResult(state, "ai", norm);
@@ -1394,12 +1391,8 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
     },
     onLookup: headword => { if (state.live()) _pbpVocabLookupOther(headword, lang); }
   });
-  if (entryView && dictionaryHost) dictionaryHost.before(entryView.element);
-  // Free original-text examples (plan 1C.2): the same block as the reader's,
-  // after the dictionary slot, bound to this query's signal and owner and
-  // shown whatever the AI settings are.
-  const examples = dictionaryHost && pbpDictExamplesView({ term, lang, owner: state.owner, signal, isCurrent: state.live });
-  if (examples) dictionaryHost.after(examples.element);
+  if (entryView && dictionaryHost) dictionaryHost.after(entryView.element);
+  else if (examples) dictionaryHost.after(examples.element);
   const acceptLocal = norm => _pbpVocabAcceptLookupResult(state, "local", norm);
   const legacyEl = document.createElement("div"), packsEl = document.createElement("div");
   legacyEl.className = "xp-dict-legacy";

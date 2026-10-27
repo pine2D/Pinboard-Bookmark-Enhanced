@@ -4436,7 +4436,17 @@ await (async () => {
       pbpVocabSaveWord=async(owner,data,opts)=>{writes.push({owner,data,opts});return {...word,...data};};_pbpVocabReloadAfterMutation=async()=>false;
       _pbpVocabRenderDetail(word);_pbpVocabRelookup(word);await settle();
       const host=$id("vocab-ref-result");
-      check("AI entry: ordinary lookup makes no paid request by default",calls.length===0&&!!$id('vocab-ref').querySelector('.xp-dict-ai-generate')&&getComputedStyle($id('vocab-ref').querySelector('.xp-dict-ai-switch')).display==="none"&&!$id('vocab-ref').querySelector('.xp-dict-ai-stop')&&getComputedStyle(host.querySelector('.xp-dict-ai > .xp-dict-usage-feedback')).display==="none");
+      check("AI entry: ordinary lookup makes no paid request by default",calls.length===0&&!!$id('vocab-ref').querySelector('.xp-dict-ai-generate')&&!$id('vocab-ref').querySelector('.xp-dict-ai-switch')&&!$id('vocab-ref').querySelector('.xp-dict-ai-stop')&&getComputedStyle(host.querySelector('.xp-dict-ai > .xp-dict-usage-feedback')).display==="none");
+      {
+        // One column (3.1): heading, dictionary results, then the AI part
+        // with its own action row; the heading row carries no AI control.
+        const slot=host.querySelector('.xp-dict-slot'),ai=host.querySelector('.xp-dict-ai');
+        const follows=(a,b)=>!!a&&!!b&&!!(a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING);
+        check("AI entry: the lookup stacks dictionary results, then the AI part, in one column",follows(slot,ai)&&ai.previousElementSibling===slot&&
+          !$id('vocab-detail')?.querySelector('.xp-dict-ai-controls')&&!$id('vocab-lookup-bar')?.querySelector('.xp-dict-ai-controls')&&ai.contains($id('vocab-ref').querySelector('.xp-dict-ai-generate'))&&
+          $id('vocab-ref').querySelectorAll('.xp-dict-ai-controls').length===1&&!slot.hidden&&getComputedStyle(slot).display!=="none");
+        check("AI entry: the free examples block sits inside the AI part, after the dictionary results",!!host.querySelector('.xp-dict-ai > .xp-dict-examples')&&follows(slot,host.querySelector('.xp-dict-examples')));
+      }
       check("AI entry: obsolete matching, explanation and analysis actions are absent",!host.querySelector('.dict-assist-recommend,.dict-assist-explain,.dict-assist-analyze'));
       const choice=host.querySelector('.vocab-save-definition');choice.value="online:0";choice.dispatchEvent(new Event("change"));
       $id('vocab-ref').querySelector('.xp-dict-ai-generate').click();await settle();
@@ -4447,8 +4457,7 @@ await (async () => {
       check("AI entry: the dictionary result stays visible beside the AI entry",!host.querySelector('.xp-dict-slot').hidden&&getComputedStyle(host.querySelector('.xp-dict-slot')).display!=="none"&&!host.querySelector('.xp-dict-ai-content').hidden&&getComputedStyle($id('vocab-ref').querySelector('.xp-dict-ai-generate')).display==="none");
       check("AI entry: generation leaves existing vocabulary and the selected original definition untouched",writes.length===0&&_vocabRows[0].gloss==="old saved gloss"&&choice.value==="online:0");
       check("AI entry: the AI source is available as an explicit save choice",[...choice.options].some(option=>option.value==="ai:0"&&option.textContent.includes("veneno")&&option.textContent.includes("AI")));
-      $id('vocab-ref').querySelector('.xp-dict-ai-switch').click();await settle();
-      check("AI entry: hiding the AI entry keeps the original source without another request",!host.querySelector('.xp-dict-slot').hidden&&host.querySelector('.xp-dict-ai-content').hidden&&calls.length===1&&choice.value==="online:0");
+      check("AI entry: the expanded AI entry keeps the original source and the explicit choice without another request",!host.querySelector('.xp-dict-slot').hidden&&!host.querySelector('.xp-dict-ai-content').hidden&&calls.length===1&&choice.value==="online:0");
       host.querySelector('.vocab-lookup-save').click();await settle();
       check("AI entry: explicit Update keeps the selected original meaning and attribution",writes.length===1&&writes[0].data.gloss==="poison"&&writes[0].data.sourceUrl===norm.sourceUrl);
       choice.value="ai:0";choice.dispatchEvent(new Event("change"));host.querySelector('.vocab-lookup-save').click();await settle();
@@ -4460,7 +4469,8 @@ await (async () => {
       _pbpVocabLookupOther("Gift","de");await settle();
       check("AI entry: generation stays disabled until its settings snapshot is ready",$id('vocab-ref').querySelector('.xp-dict-ai-generate').disabled);
       resolveSettings?.({aiProvider:"ollama",previewAiEnabled:false,dictAiAutoGenerate:true});await settle();
-      check("AI entry: the reader master switch blocks paid generation despite automatic mode",calls.length===1&&host.querySelector('.xp-dict-ai').hidden&&!host.querySelector('.xp-dict-slot').hidden);
+      check("AI entry: the reader master switch blocks paid generation despite automatic mode",calls.length===1&&!host.querySelector('.xp-dict-ai-generate:not([hidden])')&&
+        host.querySelector('.xp-dict-ai-controls').hidden&&!host.querySelector('.xp-dict-slot').hidden);
       pbpReadSettingsWithSecrets=async()=>({aiProvider:"ollama",previewAiEnabled:true,dictDefinitionLang:"es",dictAiAutoGenerate:true});
       events.length=0;_pbpVocabLookupOther("Gift","de");await settle();
       check("AI entry: opted-in automatic generation never requests browser permission",calls.length===2&&events.join("|")==="request");
@@ -4474,14 +4484,9 @@ await (async () => {
       _pbpVocabLookupOther("中国人","zh");await settle();
       check("AI entry: a native prefix result displays its actual shorter headword",host.dataset.refTerm==="中国"&&host.querySelector('.vocab-ref-term').textContent==="中国");
       $id('vocab-ref').querySelector('.xp-dict-ai-generate').click();await settle();
-      check("AI entry: source switching restores the full AI word for heading and pronunciation",host.dataset.refTerm==="中国人"&&host.querySelector('.vocab-ref-term').textContent==="中国人"&&host.querySelector('.xp-dict-ai-content').textContent.includes("Chinese person"));
-      $id('vocab-ref').querySelector('.xp-dict-ai-switch').click();await settle();
-      check("AI entry: returning to a prefix dictionary restores its shorter headword",host.dataset.refTerm==="中国"&&host.querySelector('.vocab-ref-term').textContent==="中国");
-      let resolveNative;_pbpDictSlotRun=()=>new Promise(resolve=>{resolveNative=resolve;});cached={...chinese,cached:true};
-      _pbpVocabLookupOther("中国人","zh");await settle();resolveNative?.(prefix);await settle();
-      check("AI entry: a late prefix dictionary cannot rename the visible full AI entry",host.dataset.refTerm==="中国人"&&host.querySelector('.vocab-ref-term').textContent==="中国人");
+      check("AI entry: the heading no longer follows an AI view; it keeps the dictionary's actual headword beside the full AI entry",host.dataset.refTerm==="中国"&&host.querySelector('.vocab-ref-term').textContent==="中国"&&host.querySelector('.xp-dict-ai-content').textContent.includes("Chinese person"));
       cached=null;_pbpDictSlotRun=async()=>null;_pbpDictCurrent.rerun();await settle();
-      check("AI entry: restarting a cached-AI view restores normal dictionary visibility on a cache miss",!host.querySelector('.xp-dict-slot').hidden&&host.querySelector('.xp-dict-ai-content').hidden);
+      check("AI entry: restarting after a cache miss shows the dictionary and no AI content",!host.querySelector('.xp-dict-slot').hidden&&host.querySelector('.xp-dict-ai-content').hidden);
       let resolveCache;pbpDictEntryRead=()=>new Promise(resolve=>{resolveCache=resolve;});
       _pbpVocabLookupOther("Gift","de");await settle();_vocabCurrentOwner="acct_other";resolveCache?.({...record,cached:true});await settle();
       check("AI entry: late cache completion after account change cannot populate this view",!host.querySelector('.xp-dict-ai-content')?.textContent.includes("veneno"));
@@ -4520,7 +4525,8 @@ await (async () => {
       const shown=el=>!!el&&!el.closest("[hidden]")&&getComputedStyle(el).display!=="none"&&el.getClientRects().length>0;
       check("examples: the Library lookup shows the free examples block with no AI key",shown(block)&&shown(find)&&!find.disabled);
       check("examples: the Library action carries the shared Lucide quote icon",find?.querySelector("svg")?.outerHTML===new DOMParser().parseFromString(PBP_ICONS.quote,"text/html").body.firstElementChild.outerHTML&&find.querySelectorAll("svg path").length===2);
-      check("examples: the block follows the dictionary slot, outside the AI panel",block?.previousElementSibling===host.querySelector(".xp-dict-slot")&&!block.closest(".xp-dict-ai"));
+      check("examples: the block follows the dictionary slot as a learning block of the AI part, outside the AI entry's content",
+        block?.parentElement===host.querySelector(".xp-dict-ai")&&host.querySelector(".xp-dict-ai")?.previousElementSibling===host.querySelector(".xp-dict-slot")&&!block.closest(".xp-dict-ai-content"));
       requests.length=0;find?.click();
       check("examples: the Library click asks first and only for the exact German Wikisource origin",requests.length===1&&JSON.stringify(requests[0])==='{"origins":["https://de.wikisource.org/*"]}'&&!fetched.length);
       await settle();await settle();
@@ -4670,23 +4676,23 @@ await (async () => {
       check("meaning help: a manual choice is described without claiming it is the first definition", select().dataset.listboxHelp === "dictMeaningManualHelp");
       acceptLocal(norm("ECDICT", ["新释义", "表面"], { definitionLang: "zh" }));
       check("default meaning: a manual choice follows its definition when the source reorders", select()?.value === "local:1" && selected().includes("表面"));
-      entryOptions.onEntry(ai); entryOptions.onView("ai");
-      check("default meaning: AI arrival and source switches preserve an explicit dictionary choice", select()?.value === "local:1");
+      entryOptions.onEntry(ai); entryOptions.onView(true);
+      check("default meaning: AI arrival and the AI block opening preserve an explicit dictionary choice", select()?.value === "local:1");
       acceptLocal(null);
       check("default meaning: removing a chosen source clears its choice instead of replacing it silently", select()?.value === "" && save()?.disabled === true);
       check("meaning help: revoked selection asks for an explicit replacement", select().dataset.listboxHelp === "dictMeaningChooseHelp");
-      entryOptions.onView("dictionary");
-      check("default meaning: a view switch cannot revive a revoked manual choice", select()?.value === "" && save()?.disabled === true);
+      entryOptions.onView(false);
+      check("default meaning: an AI block state change cannot revive a revoked manual choice", select()?.value === "" && save()?.disabled === true);
       await run(); entryOptions.onEntry(ai);
-      check("default meaning: hidden AI data does not change the ordinary dictionary default", selected().includes("outer layer"));
-      entryOptions.onView("ai");
-      check("default meaning: the AI view defaults to its first definition", selected().includes("the outermost part") && save()?.disabled === false);
-      entryOptions.onView("dictionary");
-      check("default meaning: an unedited choice follows a deliberate view switch", selected().includes("outer layer"));
+      check("default meaning: a folded AI entry does not change the ordinary dictionary default (Q14=A)", selected().includes("outer layer"));
+      entryOptions.onView(true);
+      check("default meaning: an expanded AI block defaults to its first definition (Q14=A)", selected().includes("the outermost part") && save()?.disabled === false);
+      entryOptions.onView(false);
+      check("default meaning: an unedited choice follows the AI block state", selected().includes("outer layer"));
       await run("The surface can become visible.");
       check("default meaning: a derived lookup defaults to the same contextual first meaning as its displayed source", selected().includes("become visible"));
       _vocabRows = [{ id: pbpDictVocabKey(owner, "en", term), owner, term, language: "en", gloss: "my saved meaning" }];
-      await run(); entryOptions.onEntry(ai); entryOptions.onView("ai");
+      await run(); entryOptions.onEntry(ai); entryOptions.onView(true);
       check("default meaning: neither dictionary nor AI defaults overwrite an existing saved definition", select()?.value === "" && save()?.disabled === true && _vocabRows[0].gloss === "my saved meaning");
       check("meaning help: existing words explain that their saved definition stays unchanged", select().dataset.listboxHelp === "dictMeaningSavedHelp");
       choose("ai:0");

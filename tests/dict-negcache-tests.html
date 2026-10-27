@@ -195,14 +195,22 @@ await test("retrieval and AI-judgement memories read differently, both neutral w
   const view = examplesView();
   const hiddenUntilRead = view.button.closest(".xp-dict-usage-actions").hidden === true;
   await view.ready;
-  const examplesOk = label(view.button) === "dictExamplesFind · dictNegRetry" && view.status().textContent === "dictSupplementNoSources" &&
+  // Under its block's own heading the remembered action drops its name
+  // (ruling 2026-10-28); its accessible name still says what it finds.
+  const examplesOk = label(view.button) === "dictNegRetry" && view.button.getAttribute("aria-label") === "dictExamplesFind · dictNegRetry" &&
+    view.status().textContent === "dictSupplementNoSources" &&
     view.status().dataset.state === "neutral" && infoIcon(view.status()) && !view.button.closest("[hidden]") && view.button.querySelector("svg")?.outerHTML === svgOf(PBP_ICONS.quote);
   view.element.remove();
   const ui = await entryView();
   const patterns = ui.paid("patterns"), etymology = ui.paid("etymology"), confusables = ui.paid("confusables");
   const patternsOk = label(patterns) === "dictSupplementPatterns · dictNegRetry" && ui.status("patterns").textContent === "dictUsagePointsNone" &&
     infoIcon(ui.status("patterns")) && ui.status("patterns").dataset.state === "neutral";
-  const etymologyOk = label(etymology) === "dictSupplementEtymology · dictNegRetry" && ui.status("etymology").textContent === "dictSupplementNoSources" && infoIcon(ui.status("etymology"));
+  // The etymology block has one button under its heading: it drops the
+  // category name too, the accessible name keeps it and the model. The usage
+  // block holds two buttons, so patterns keeps its name to stay distinct.
+  const etymologyOk = label(etymology) === "dictNegRetry" && etymology.getAttribute("aria-label") === "dictSupplementEtymology · dictNegRetry · fixture-model" &&
+    etymology.querySelector(".xp-dict-model").textContent === "· fixture-model" && !patterns.hasAttribute("aria-label") &&
+    ui.status("etymology").textContent === "dictSupplementNoSources" && infoIcon(ui.status("etymology"));
   // Retrying stays the paid action: wandSparkles, its text and the model name.
   const paidOk = patterns.querySelector("svg")?.outerHTML === svgOf(PBP_ICONS.wandSparkles) && patterns.querySelector(".xp-dict-model").textContent === "· fixture-model" &&
     !patterns.disabled && !patterns.hidden;

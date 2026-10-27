@@ -2406,14 +2406,21 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
 .xp-dict-msg[data-state="neutral"] { color: var(--fg-secondary); }
 .xp-dict-msg-ic { display: inline-flex; vertical-align: -2px; margin-inline-end: var(--sp-1); }
 .xp-dict-msg-ic svg { display: block; }
-.xp-dict-ai { min-width: 0; overflow-wrap: anywhere; }
-.xp-dict-ai-controls { flex: none; flex-wrap: nowrap; gap: var(--sp-1); margin-inline-start: auto; }
-.xp-dict-ai-controls[hidden] { display: none; }
-.xp-dict-ai-controls .xp-dict-connect { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 26px; height: 26px; box-sizing: border-box; padding: 0; border-color: var(--btn-border); background: var(--btn-bg); color: var(--btn-fg); }
-.xp-dict-ai-controls .xp-dict-connect:hover { background: var(--btn-hover); color: var(--link-on-raised); }
-.xp-dict-ai-controls .xp-dict-connect:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
-.xp-dict-ai-controls .xp-dict-connect svg { width: 14px; height: 14px; flex: none; }
+/* One column (dict redesign 3.1): the AI part follows the dictionary results,
+   separated by whitespace and its own source title -- no rule, fill or card. */
+.xp-dict-ai { min-width: 0; margin-top: var(--sp-4); overflow-wrap: anywhere; }
+.xp-dict-ai[hidden], .xp-dict-ai [hidden] { display: none; }
+.xp-dict-ai-title:focus { outline: none; }
+.xp-dict-ai-title:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
+.xp-dict-ai-title + .xp-dict-ai-controls { margin-top: var(--sp-2); }
+/* The AI entry's one action row: icon and text buttons on the md rung. */
+.xp-dict-ai-controls .xp-dict-connect { gap: var(--sp-1); max-inline-size: 100%; line-height: 18px; white-space: normal; overflow-wrap: anywhere; }
+.xp-dict-ai-controls .xp-dict-connect > svg { width: 14px; height: 14px; flex: none; }
+.xp-dict-ai-controls + .xp-dict-ai-status, .xp-dict-ai-controls ~ .xp-dict-usage-feedback { margin-top: var(--sp-2); }
 .xp-dict-ai-status, .xp-dict-ai-configure { font-size: 12px; line-height: 18px; }
+.xp-dict-ai-configure { text-decoration: none; }
+/* The card's metadata line, once, after every AI block. */
+.xp-dict-ai-provenance { margin-top: var(--sp-3); }
 .xp-dict-ai-status { margin-bottom: var(--sp-2); }
 .xp-dict-ai-details { margin-top: var(--sp-2); }
 /* The title's text sits on the column edge like the text it discloses; the
