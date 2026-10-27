@@ -119,6 +119,18 @@ await test('etymology progress follows retrieval, generation, checking and savin
   return result.archiveSaved&&stages.join(',')==='sources,generating,checking,saving'&&
     !Object.hasOwn(appended[0],'onStage')&&!calls[0].prompt.includes('onStage');
 });
+// The local empty-result memory (plan 1C.4) learns how many etymology sources
+// a clean retrieval found: a count only, before the paid request, and never
+// for another category or after a broken retrieval.
+await test('etymology reports its clean source count before the model call; failures and other categories report nothing',async()=>{
+  existing();const counts=[];let callsAtCount=-1;usageResponse(d=>{d.items=[{sense:1,kind:'formation',title:'far + away',explanation:'由 “far” 与 “away” 组合而成。',sourceIndex:-1}];});
+  await pbpDictSupplementRun(request({category:'etymology',onSources:count=>{counts.push(count);callsAtCount=calls.length;}}));
+  if(JSON.stringify(counts)!=='[0]'||callsAtCount!==0)return false;
+  reset();existing();sourceFailure='source_failed';
+  await rejects(()=>pbpDictSupplementRun(request({category:'etymology',onSources:count=>counts.push(count)})),'source_failed');
+  reset();existing();await pbpDictSupplementRun(request({category:'confusables',onSources:count=>counts.push(count)}));
+  return JSON.stringify(counts)==='[0]';
+});
 await test('original examples skip retrieval progress and cancellation during a stage prevents a paid call',async()=>{
   existing();const stages=[];await pbpDictSupplementRun(request({category:'confusables',onStage:stage=>stages.push(stage)}));
   if(stages.join(',')!=='generating,checking,saving')return false;

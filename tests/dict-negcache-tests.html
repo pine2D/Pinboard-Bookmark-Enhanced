@@ -1,0 +1,224 @@
+<!doctype html><html><head><meta charset="UTF-8"><title>dict-negcache Tests</title>
+<style>body{font-family:monospace;padding:16px}.pass{color:green}.fail{color:red}.case{white-space:pre-wrap;padding:4px}</style></head>
+<body><h1>Local dictionary empty-result memory</h1><div id="summary"></div><div id="results"></div>
+<script>
+// chrome.storage.local stand-in: afterGet runs between the read and the write
+// so a test can interleave a second writer or an account switch exactly there.
+let store = {}, afterGet = null, grant = true, requests = [];
+globalThis.chrome = {
+  storage: { local: {
+    get: async key => {
+      const value = key === null ? structuredClone(store) : store[key] === undefined ? {} : { [key]: structuredClone(store[key]) };
+      if (afterGet) await afterGet();
+      return value;
+    },
+    set: async items => { for (const [key, value] of Object.entries(items)) store[key] = structuredClone(value); }
+  } },
+  permissions: { request: async origins => { requests.push(origins); return grant; }, contains: async () => grant }
+};
+</script>
+<!-- Same order as md-preview.html / library.html. -->
+<script src="../shared.js"></script><script src="../vocab-store.js"></script><script src="../dict-archive.js"></script>
+<script src="../dict-evidence.js"></script><script src="../dict-entry.js"></script><script src="../md-dict.js"></script>
+<script>
+window.t = (key, ...args) => key + (args.length ? ":" + args.join(",") : "");
+let owner = "acct_alice";
+globalThis.pbpVocabCurrentOwner = async () => owner;
+let pass = 0, fail = 0;
+const root = document.getElementById("results");
+async function test(name, fn) {
+  let ok = false, detail = "";
+  try { ok = await fn(); } catch (e) { detail = e.name + ": " + e.message; }
+  ok ? pass++ : fail++;
+  const el = document.createElement("div"); el.className = "case " + (ok ? "pass" : "fail");
+  el.textContent = (ok ? "PASS " : "FAIL ") + name + (detail ? " " + detail : ""); root.append(el);
+}
+const DAY = 24 * 60 * 60 * 1000;
+const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+const settle = async () => { for (let i = 0; i < 12; i++) await tick(); };
+const negKeys = () => Object.keys(store).filter(key => key.startsWith("pbpDictNeg:"));
+const examples = (term = "Zauberwort") => ({ term, sourceLanguage: "de", target: "", category: "examples" });
+const usage = (category = "patterns", term = "Gift") => ({ term, sourceLanguage: "de", target: pbpDictLearningTarget(settings, "en"), category });
+function reset() { store = {}; afterGet = null; grant = true; requests = []; owner = "acct_alice"; }
+
+// The examples block as the reader builds it, with the retrieval entry stubbed:
+// what the stub returns or throws is what pbpDictUsageExamplesFetch would.
+const FOUND = [{ sentence: "Das Gift wirkt.", author: "Autor", work: "Werk", location: "Kapitel 1", url: "https://de.wikisource.org/w/index.php?oldid=1", revision: "1", truncated: false }];
+let examplesAnswer = async () => [];
+globalThis.pbpDictUsageExamplesFetch = input => examplesAnswer(input);
+function examplesView(term = "Zauberwort", lang = "de", controller = new AbortController()) {
+  const view = pbpDictExamplesView({ term, lang, owner: "acct_alice", signal: controller.signal, isCurrent: () => true });
+  document.body.appendChild(view.element);
+  return { ...view, controller, button: view.element.querySelector(".xp-dict-examples-find"),
+    status: () => view.element.querySelector(".xp-dict-usage-status") };
+}
+
+// The learning blocks of the AI entry, mounted as the reader mounts them.
+const settings = { aiProvider: "claude", claudeModel: "fixture-model", previewAiEnabled: true, dictDefinitionLang: "es" };
+const record = (supplements = []) => ({ entry: { word: "Gift", language: "de", pronunciation: "", meanings: [{ partOfSpeech: "noun", definition: "veneno", examples: [] }],
+  etymology: "", relatedWords: [] }, provider: "claude", model: "fixture-model", generatedAt: 1700000000000, cached: false, cacheSaved: true,
+  archiveId: "a".repeat(64), archiveSaved: true, supplements });
+const addition = (category, sources = []) => ({ id: "b".repeat(64), category, profile: { nativeLanguage: "", level: "", topic: "" }, content: "A point",
+  sources, learning: { items: [] }, provider: "claude", model: "fixture-model", generatedAt: 1700000000001, archiveSaved: true });
+let supplementRun = async () => { throw new Error("unset"); }, savedRecord = record();
+Object.assign(window, { hasAIKey: () => true, uiLangToBCP47: () => "en", pbpAiBumpCounter: () => {},
+  ensureAIHostPermissionWithGesture: async () => true, requestAIHostPermissions: async () => true,
+  pbpDictEntryRead: async () => structuredClone(savedRecord), pbpDictSupplementRun: input => supplementRun(input) });
+async function entryView() {
+  const host = document.createElement("div"), controller = new AbortController();
+  document.body.appendChild(host);
+  const ui = _pbpDictEntryMount(host, { term: "Gift", lang: "de", owner: "acct_alice", settings, signal: controller.signal, isCurrent: () => true });
+  await ui.ready; await settle();
+  const paid = category => host.querySelector('.xp-dict-supplement-generate[data-category="' + category + '"]');
+  const status = category => paid(category)?.closest(".xp-dict-usage-actions")?.querySelector(".xp-dict-usage-status");
+  return { host, controller, paid, status, close: () => { controller.abort(); host.remove(); } };
+}
+// [icon, label] for the free action, [icon, label, model] for a paid one.
+const label = button => (button.querySelector(".xp-dict-model") ? button.lastElementChild.previousElementSibling : button.lastElementChild).textContent;
+const svgOf = markup => { const box = document.createElement("span"); box.innerHTML = markup; return box.firstElementChild.outerHTML; };
+const infoIcon = node => node?.querySelector(".xp-dict-msg-ic svg")?.outerHTML === svgOf(PBP_ICONS.info);
+
+(async () => {
+await test("the stored memory holds hashes and times only, never the word or the plaintext username", async () => {
+  reset(); owner = "acct_alice%40example";
+  const ok = await pbpDictNegRecord(owner, examples("Zauberwort"));
+  const text = JSON.stringify(store), key = negKeys()[0], value = store[key];
+  return ok === true && negKeys().length === 1 && /^pbpDictNeg:[0-9a-f]{64}$/.test(key) && !text.includes("Zauberwort") &&
+    !text.toLowerCase().includes("alice") && Object.keys(value).length === 1 && /^[0-9a-f]{64}$/.test(Object.keys(value)[0]) &&
+    Number.isSafeInteger(Object.values(value)[0]) && await pbpDictNegHas(owner, examples("Zauberwort")) === true;
+});
+await test("another owner reads nothing, and an account switch around the write stores nothing", async () => {
+  reset(); await pbpDictNegRecord("acct_alice", examples());
+  const bobBefore = await pbpDictNegHas("acct_bob", examples());
+  owner = "acct_bob";
+  const notLive = await pbpDictNegRecord("acct_alice", examples("Andere"));
+  owner = "acct_alice"; afterGet = async () => { owner = "acct_bob"; };
+  const switched = await pbpDictNegRecord("acct_alice", examples("Dritte"));
+  owner = "acct_alice"; afterGet = null;
+  const signedOut = await pbpDictNegRecord("ownerless", examples());
+  return bobBefore === false && notLive === false && switched === false && signedOut === false && negKeys().length === 1 &&
+    await pbpDictNegHas("acct_alice", examples()) && !(await pbpDictNegHas("acct_alice", examples("Dritte")));
+});
+await test("a row older than 30 days reads as absent and the next write prunes it", async () => {
+  reset(); await pbpDictNegRecord("acct_alice", examples("Alt"));
+  const key = negKeys()[0], [entry] = Object.keys(store[key]);
+  store[key][entry] = Date.now() - 31 * DAY;
+  const expired = await pbpDictNegHas("acct_alice", examples("Alt"));
+  await pbpDictNegRecord("acct_alice", examples("Neu"));
+  const fresh = Date.now() - 29 * DAY; store[key][entry] = fresh;
+  return expired === false && Object.keys(store[key]).length === 2 && await pbpDictNegHas("acct_alice", examples("Alt")) &&
+    PBP_DICT_NEG_TTL === 30 * DAY && (await (async () => { store[key][entry] = Date.now() - 31 * DAY; await pbpDictNegRecord("acct_alice", examples("Neu")); return !Object.hasOwn(store[key], entry); })());
+});
+await test("source_failed, a refused grant, an unsupported language, a timeout or a cancel never write; a clean miss does", async () => {
+  reset();
+  const outcomes = [];
+  for (const answer of [async () => { throw Object.assign(new Error("x"), { code: "source_failed" }); },
+    async () => { throw Object.assign(new Error("x"), { code: "host_permission" }); },
+    async () => { throw new DOMException("timed out", "TimeoutError"); },
+    async () => ({ unsupported: true })]) {
+    examplesAnswer = answer; const view = examplesView(); await view.ready; view.button.click(); await settle();
+    outcomes.push(negKeys().length); view.element.remove();
+  }
+  grant = false; examplesAnswer = async () => [];
+  let view = examplesView(); await view.ready; view.button.click(); await settle(); outcomes.push(negKeys().length); view.element.remove();
+  grant = true;
+  const controller = new AbortController();
+  examplesAnswer = async () => { controller.abort(); throw new DOMException("cancelled", "AbortError"); };
+  view = examplesView("Zauberwort", "de", controller); await view.ready; view.button.click(); await settle(); outcomes.push(negKeys().length); view.element.remove();
+  const unsupported = examplesView("aanbieder", "nl"); await unsupported.ready; outcomes.push(negKeys().length); unsupported.element.remove();
+  // The paid learning blocks: failures are not answers; unsupported_usage is.
+  const ui = await entryView();
+  for (const error of [Object.assign(new Error("x"), { code: "source_failed" }), Object.assign(new Error("x"), { code: "host_permission" }),
+    new DOMException("timed out", "TimeoutError"), new DOMException("cancelled", "AbortError"), Object.assign(new Error("x"), { code: "invalid_response" })]) {
+    supplementRun = async () => { throw error; }; ui.paid("patterns").click(); await settle(); outcomes.push(negKeys().length);
+  }
+  examplesAnswer = async () => [];
+  view = examplesView(); await view.ready; view.button.click(); await settle();
+  const missWritten = await pbpDictNegHas("acct_alice", examples());
+  supplementRun = async () => { throw Object.assign(new Error("x"), { code: "unsupported_usage" }); };
+  ui.paid("confusables").click(); await settle();
+  const judged = await pbpDictNegHas("acct_alice", usage("confusables"));
+  ui.close(); view.element.remove();
+  return outcomes.every(count => count === 0) && missWritten && judged && view.status().textContent === "dictExamplesNone";
+});
+await test("a retry that succeeds forgets the row, and a positive record from Drive forgets it too", async () => {
+  reset();
+  await pbpDictNegRecord("acct_alice", examples()); await pbpDictNegRecord("acct_alice", usage("patterns"));
+  await pbpDictNegRecord("acct_alice", usage("confusables")); await pbpDictNegRecord("acct_alice", usage("etymology"));
+  examplesAnswer = async () => FOUND;
+  const view = examplesView(); await view.ready;
+  const rememberedBefore = view.button.dataset.remembered === "true";
+  view.button.click(); await settle();
+  const examplesGone = !(await pbpDictNegHas("acct_alice", examples())) && !!view.element.querySelector(".xp-dict-learning-item");
+  view.element.remove();
+  let ui = await entryView();
+  supplementRun = async () => addition("patterns");
+  ui.paid("patterns").click(); await settle();
+  const patternsGone = !(await pbpDictNegHas("acct_alice", usage("patterns")));
+  // Etymology: a formation-only answer is still a source miss; found sources forget it.
+  supplementRun = async input => { input.onSources(0); return addition("etymology"); };
+  ui.paid("etymology").click(); await settle();
+  const missKept = await pbpDictNegHas("acct_alice", usage("etymology"));
+  ui.close();
+  savedRecord = record(); ui = await entryView();
+  supplementRun = async input => { input.onSources(2); return addition("etymology", [{ text: "a" }, { text: "b" }]); };
+  ui.paid("etymology").click(); await settle();
+  const etymologyGone = !(await pbpDictNegHas("acct_alice", usage("etymology")));
+  ui.close();
+  // Drive brings a confusables record: the archive wins and the memory goes.
+  savedRecord = record([addition("confusables")]); ui = await entryView();
+  const driveWins = !ui.paid("confusables") || ui.paid("confusables").hidden;
+  await settle();
+  const confusablesGone = !(await pbpDictNegHas("acct_alice", usage("confusables")));
+  ui.close(); savedRecord = record();
+  return rememberedBefore && examplesGone && patternsGone && missKept && etymologyGone && driveWins && confusablesGone;
+});
+await test("past 500 rows the oldest are evicted", async () => {
+  reset(); await pbpDictNegRecord("acct_alice", examples("seed"));
+  const key = negKeys()[0], base = Date.now() - DAY;
+  store[key] = Object.fromEntries(Array.from({ length: 500 }, (_, i) => [i.toString(16).padStart(64, "0"), base + i]));
+  await pbpDictNegRecord("acct_alice", examples("newest"));
+  const rows = store[key];
+  return PBP_DICT_NEG_CAP === 500 && Object.keys(rows).length === 500 && !Object.hasOwn(rows, "0".repeat(64)) &&
+    Object.hasOwn(rows, (1).toString(16).padStart(64, "0")) && await pbpDictNegHas("acct_alice", examples("newest"));
+});
+await test("two concurrent writes both land under the Web Lock", async () => {
+  reset(); afterGet = tick;
+  const results = await Promise.all([pbpDictNegRecord("acct_alice", examples("eins")), pbpDictNegRecord("acct_alice", usage("patterns", "zwei"))]);
+  afterGet = null;
+  return !!navigator.locks && results.every(Boolean) && Object.keys(store[negKeys()[0]]).length === 2 &&
+    await pbpDictNegHas("acct_alice", examples("eins")) && await pbpDictNegHas("acct_alice", usage("patterns", "zwei"));
+});
+await test("retrieval and AI-judgement memories read differently, both neutral with the info icon, read before the action shows", async () => {
+  reset();
+  await pbpDictNegRecord("acct_alice", examples()); await pbpDictNegRecord("acct_alice", usage("patterns")); await pbpDictNegRecord("acct_alice", usage("etymology"));
+  const view = examplesView();
+  const hiddenUntilRead = view.button.closest(".xp-dict-usage-actions").hidden === true;
+  await view.ready;
+  const examplesOk = label(view.button) === "dictExamplesFind · dictNegRetry" && view.status().textContent === "dictSupplementNoSources" &&
+    view.status().dataset.state === "neutral" && infoIcon(view.status()) && !view.button.closest("[hidden]") && view.button.querySelector("svg")?.outerHTML === svgOf(PBP_ICONS.quote);
+  view.element.remove();
+  const ui = await entryView();
+  const patterns = ui.paid("patterns"), etymology = ui.paid("etymology"), confusables = ui.paid("confusables");
+  const patternsOk = label(patterns) === "dictSupplementPatterns · dictNegRetry" && ui.status("patterns").textContent === "dictUsagePointsNone" &&
+    infoIcon(ui.status("patterns")) && ui.status("patterns").dataset.state === "neutral";
+  const etymologyOk = label(etymology) === "dictSupplementEtymology · dictNegRetry" && ui.status("etymology").textContent === "dictSupplementNoSources" && infoIcon(ui.status("etymology"));
+  // Retrying stays the paid action: wandSparkles, its text and the model name.
+  const paidOk = patterns.querySelector("svg")?.outerHTML === svgOf(PBP_ICONS.wandSparkles) && patterns.querySelector(".xp-dict-model").textContent === "· fixture-model" &&
+    !patterns.disabled && !patterns.hidden;
+  const plainOk = label(confusables) === "dictSupplementConfusables" && !confusables.dataset.remembered && ui.status("confusables").textContent === "";
+  ui.close();
+  return hiddenUntilRead && examplesOk && patternsOk && etymologyOk && paidOk && plainOk &&
+    t("dictSupplementNoSources") !== t("dictUsagePointsNone");
+});
+await test("registry: the memory is reclaimable, never a setting, never a never-clear key, never in a backup", async () => {
+  reset(); await pbpDictNegRecord("acct_alice", examples());
+  const key = negKeys()[0];
+  const measured = await pbpMeasureLocalStorage();
+  return PBP_DICT_NEG_PREFIX === "pbpDictNeg:" && Object.values(PBP_RECLAIM_CATEGORIES).some(def => def.prefixes.includes("pbpDictNeg:")) &&
+    !Object.keys(SETTINGS_DEFAULTS).some(name => name.startsWith("pbpDictNeg:")) && !pbpIsNeverClearKey(key) &&
+    measured.misc.keys.includes(key) && !pbpIsHighlightBackupKey(key);
+});
+document.getElementById("summary").textContent = pass + " passed, " + fail + " failed";
+})();
+</script></body></html>

@@ -9028,9 +9028,9 @@ async function runSweep(page, sw, extBase) {
       if (!SWEEP && !WRITE_SPACING) await measureDictLookupGeometry(page, surface, name, surface === "md-preview" && readerScheme === "dark" ? "dark" : "");
     });
   };
-  // The free examples state runs without an AI key (plan 1C.2); its opener
-  // removes the key itself when it runs after the AI states.
-  if (Object.values(contexts).some(names => [...names].some(name => /^dict-entry-(?!examples$)/.test(name)))) {
+  // The free examples states run without an AI key (plan 1C.2, 1C.4); their
+  // openers remove the key themselves when they run after the AI states.
+  if (Object.values(contexts).some(names => [...names].some(name => /^dict-entry-(?!(?:examples|negative)$)/.test(name)))) {
     await sw.evaluate(() => chrome.storage.local.set({ aiProvider: "openai", openaiApiKey: obfuscateKey("render-fixture-key"), previewAiEnabled: true, dictAiAutoGenerate: false, dictDefinitionLang: "zh-Hans" }));
   }
   // family 9 liveness (stage 4): sweepProbe reports every value box whose
@@ -9195,6 +9195,14 @@ async function runSweep(page, sw, extBase) {
       }
       await scan("library", "dict-entry-examples", () => openDictEntryState(page, "examples"));
     }
+    if (wants("library", "dict-entry-negative")) {
+      if (!wants("library", "dict-entry-idle") && !wants("library", "dict-entry-examples")) {
+        await installDictEntryFixture(page);
+        await vocabHead.click();
+        await page.locator("#vocab-lookup-go").click();
+      }
+      await scan("library", "dict-entry-negative", () => openDictEntryState(page, "negative"));
+    }
     // Ctrl+click on the row head, not a checkbox click: the per-row checkbox was
     // removed 2026-08-06 and selection is now a modified click on the row itself.
     if (wants("library", "vocab-batch-bar")) {
@@ -9291,9 +9299,9 @@ async function runSweep(page, sw, extBase) {
         // is printed, never skipped silently -- the gate's coverage is the point.
         for (const name of READER_SURFACES.filter((name) => wants("md-preview", name))) {
           if (/^dict-entry-/.test(name)) {
-            // The examples state needs no earlier AI state: open the lookup
-            // for it when it runs on its own.
-            if (name.endsWith("-idle") || (name === "dict-entry-examples" &&
+            // The examples states need no earlier AI state: open the lookup
+            // for them when they run on their own.
+            if (name.endsWith("-idle") || (["dict-entry-examples", "dict-entry-negative"].includes(name) &&
                 !(await page.locator("#explain-pop .xp-dict-query-tools > .xp-dict-lang").isVisible().catch(() => false)))) {
               await installDictEntryFixture(page);
               if (await page.evaluate(openReaderSurface, "explain-pop") !== true || await page.evaluate(openReaderSurface, "explain-dict") !== true) throw new Error("SETUP: dictionary entry opener failed");

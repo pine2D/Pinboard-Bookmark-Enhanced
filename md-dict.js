@@ -1694,6 +1694,109 @@ function _pbpDictLedgerFail(owner, error, stage, category) {
   pbpDictLedgerRecord(owner, { code: pbpDictLedgerCode(error), stage, category });
 }
 
+// Local empty-result memory (plan 1C.4, Q11=A, Q12=A): "the last search found
+// no verifiable source text" (examples, etymology sources) and "the model
+// judged there is nothing usable" (patterns, confusables) are remembered per
+// account so the next lookup can say so beside its button. Nothing is retried
+// automatically: retrying is the user's ordinary click, paid blocks pay again.
+// One bounded chrome.storage.local key per owner, pbpDictNeg:<owner SHA-256>,
+// holding { entryKey: at }. entryKey is the SHA-256 of [term, sourceLanguage,
+// target or "", category], so no word is stored in plaintext (a small word
+// space can still be guessed back, which is why privacy.md says "not stored
+// in plaintext" rather than "not recorded"). Retrieval categories ignore the
+// target language; AI categories keep it. The model never takes part. Rows
+// older than 30 days read as absent and are pruned on the next write; past
+// 500 rows the oldest go. Like the ledger it is outside SETTINGS_DEFAULTS
+// (no backup, no sync routing), outside pbp-dict-archive (no Drive), and the
+// options storage panel reclaims it with the "misc" category.
+const PBP_DICT_NEG_PREFIX = "pbpDictNeg:";
+const PBP_DICT_NEG_CAP = 500;
+const PBP_DICT_NEG_TTL = 30 * 24 * 60 * 60 * 1000;
+const PBP_DICT_NEG_RETRIEVAL = Object.freeze(["examples", "etymology"]);
+const PBP_DICT_NEG_CATEGORIES = Object.freeze([...PBP_DICT_NEG_RETRIEVAL, "patterns", "confusables"]);
+async function _pbpDictSha256Hex(text) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+function _pbpDictNegOwner(owner) { return typeof owner === "string" && owner.startsWith("acct_"); }
+// null when the parts cannot name one entry (unknown category, no word).
+async function _pbpDictNegEntryKey(parts = {}) {
+  const category = parts?.category;
+  if (!PBP_DICT_NEG_CATEGORIES.includes(category) || typeof parts.term !== "string" || !parts.term.trim()) return null;
+  // An answer language is {lang, name}; a custom one ("und") is told apart by name.
+  const answer = parts.target, target = PBP_DICT_NEG_RETRIEVAL.includes(category) ? ""
+    : answer && typeof answer === "object" ? (answer.lang === "und" ? "und:" + String(answer.name || "") : String(answer.lang || ""))
+    : String(answer || "");
+  return _pbpDictSha256Hex(JSON.stringify([parts.term, String(parts.sourceLanguage || "und"), target, category]));
+}
+function _pbpDictNegRows(stored, now) {
+  const rows = {};
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) return rows;
+  for (const [key, at] of Object.entries(stored)) {
+    if (/^[0-9a-f]{64}$/.test(key) && Number.isSafeInteger(at) && at > 0 && now - at < PBP_DICT_NEG_TTL) rows[key] = at;
+  }
+  return rows;
+}
+function _pbpDictNegStorage() {
+  return typeof chrome !== "undefined" && typeof chrome.storage?.local?.get === "function" && typeof chrome.storage.local.set === "function";
+}
+// Same lock-name prefix as the ledger: both are small per-owner diagnostics.
+function _pbpDictNegLock(task) {
+  if (globalThis.navigator?.locks?.request) return navigator.locks.request("pbp-dict-ledger:neg", task);
+  return _pbpDictLedgerLock(task);
+}
+// Read-modify-write under the lock, with the live owner checked before the
+// read and again before the write; resolves true only when it was stored.
+async function _pbpDictNegUpdate(owner, parts, change) {
+  if (!_pbpDictNegOwner(owner) || !_pbpDictNegStorage()) return false;
+  const live = async () => typeof pbpVocabCurrentOwner === "function" && await pbpVocabCurrentOwner() === owner;
+  try {
+    const entry = await _pbpDictNegEntryKey(parts);
+    if (!entry) return false;
+    return await _pbpDictNegLock(async () => {
+      if (!(await live())) return false;
+      const key = PBP_DICT_NEG_PREFIX + await _pbpDictSha256Hex(owner);
+      const now = Date.now();
+      const rows = _pbpDictNegRows((await chrome.storage.local.get(key))?.[key], now);
+      if (!change(rows, entry, now)) return false;
+      const kept = Object.entries(rows).sort((a, b) => b[1] - a[1]).slice(0, PBP_DICT_NEG_CAP);
+      // The account can switch while the read is in flight: this memory
+      // belongs to the account that searched, so drop it after a switch.
+      if (!(await live())) return false;
+      await chrome.storage.local.set({ [key]: Object.fromEntries(kept) });
+      return true;
+    });
+  } catch (error) {
+    console.warn("[dict-neg] write failed:", error?.name);
+    return false;
+  }
+}
+function pbpDictNegRecord(owner, parts) {
+  return _pbpDictNegUpdate(owner, parts, (rows, entry, now) => { rows[entry] = now; return true; });
+}
+// A success, a found source or a positive record from Drive forgets the row.
+function pbpDictNegForget(owner, parts) {
+  return _pbpDictNegUpdate(owner, parts, (rows, entry) => {
+    if (!Object.hasOwn(rows, entry)) return false;
+    delete rows[entry]; return true;
+  });
+}
+// true when this account's last attempt for these parts found nothing within
+// 30 days. Never throws: an unreadable memory is simply no memory.
+async function pbpDictNegHas(owner, parts) {
+  if (!_pbpDictNegOwner(owner) || !_pbpDictNegStorage()) return false;
+  try {
+    const entry = await _pbpDictNegEntryKey(parts);
+    if (!entry) return false;
+    const key = PBP_DICT_NEG_PREFIX + await _pbpDictSha256Hex(owner);
+    const rows = _pbpDictNegRows((await chrome.storage.local.get(key))?.[key], Date.now());
+    return Object.hasOwn(rows, entry);
+  } catch (error) {
+    console.warn("[dict-neg] read failed:", error?.name);
+    return false;
+  }
+}
+
 function _pbpDictEntryMount(host, opts) {
   if (typeof pbpDictEntryRead !== "function" || typeof pbpDictEntryRun !== "function") return null;
   const panel = document.createElement("div"); panel.className = "xp-dict-ai";
@@ -1726,6 +1829,11 @@ function _pbpDictEntryMount(host, opts) {
   let settings = null, record = null, busy = false, active = null, epoch = 0, mode = "dictionary", viewRevision = 0;
   let usageActivity = null, renderedLanguage = null;
   const usageFeedbacks = new WeakMap();
+  // Local empty-result memory of the learning blocks (plan 1C.4): which
+  // category this account's last attempt found nothing for. Read once the
+  // settings (and so the answer language) are known, before the first render
+  // chooses between the ordinary button and "last time not found · retry".
+  const negState = {}, negTouched = new Set();
   let renderedBase = "", baseDetails = null, baseRetry = null, usageForm = null, previousSupplements = null;
   const supplementNodes = new Map();
   const preference = () => typeof pbpDictDefaultView === "function" ? pbpDictDefaultView(settings) :
@@ -1897,6 +2005,17 @@ function _pbpDictEntryMount(host, opts) {
   };
   const input = (signal, isCurrent) => ({ term: opts.term, sourceLanguage: opts.lang || "und", target: target(),
     owner: opts.owner, settings, signal, isCurrent });
+  const negParts = category => ({ term: opts.term, sourceLanguage: opts.lang || "und", target: target(), category });
+  const negForget = category => { negState[category] = false; pbpDictNegForget(opts.owner, negParts(category)); };
+  const loadNeg = async () => {
+    if (!_pbpDictNegOwner(opts.owner)) return;
+    const categories = ["patterns", "confusables", "etymology"];
+    const found = await Promise.all(categories.map(category => pbpDictNegHas(opts.owner, negParts(category))));
+    if (!alive()) return;
+    // A click made while this read was in flight already answered this view.
+    categories.forEach((category, index) => { if (found[index] && !negTouched.has(category)) negState[category] = true; });
+    usageForm?.refresh();
+  };
   const supplementId = addition => addition.id || String(addition.generatedAt);
   const renderSupplements = (answerLanguage, revealId) => {
     if (typeof pbpDictSupplementRun !== "function") return;
@@ -2119,8 +2238,10 @@ function _pbpDictEntryMount(host, opts) {
       return el;
     };
     const usage = block("usage", "dictLearningUsagePoints"), etymology = block("etymology", "dictLearningEtymology");
-    const buttons = { patterns: paid("patterns", "dictSupplementPatterns"), confusables: paid("confusables", "dictSupplementConfusables"),
-      etymology: paid("etymology", "dictSupplementEtymology") };
+    const labelKeys = { patterns: "dictSupplementPatterns", confusables: "dictSupplementConfusables", etymology: "dictSupplementEtymology" };
+    const buttons = Object.fromEntries(Object.entries(labelKeys).map(([category, key]) => [category, paid(category, key)]));
+    // [icon..., label, model]: the label is the model span's previous sibling.
+    const labels = Object.fromEntries(Object.entries(buttons).map(([category, el]) => [category, el.lastElementChild.previousElementSibling]));
     const etymologyHint = document.createElement("p"); etymologyHint.className = "xp-dict-src"; etymologyHint.textContent = t("dictEtymologyHint");
     usage.append(buttons.patterns, buttons.confusables); etymology.append(etymologyHint, buttons.etymology);
     const feedbacks = Object.fromEntries(Object.entries(buttons).map(([category, el]) => [category, usageFeedback(el)]));
@@ -2161,8 +2282,24 @@ function _pbpDictEntryMount(host, opts) {
       const modelName = canGenerate && typeof pbpDictEntryModelName === "function" ? pbpDictEntryModelName(settings) : "";
       for (const [category, el] of Object.entries(buttons)) {
         const feedback = feedbacks[category];
-        el.hidden = feedback.box.dataset.state === "busy" || !canGenerate || !!existing(category);
+        const saved = existing(category);
+        el.hidden = feedback.box.dataset.state === "busy" || !canGenerate || !!saved;
         el.lastElementChild.textContent = modelName ? "· " + modelName : "";
+        // A positive record (generated here or brought by Drive) wins over the
+        // memory and forgets it; for etymology only one with sources does,
+        // since a formation-only answer is itself a source miss.
+        if (saved && negState[category] && (category !== "etymology" || saved.sources?.length)) negForget(category);
+        const remembered = !el.hidden && negState[category] === true;
+        labels[category].textContent = remembered ? t(labelKeys[category]) + " · " + t("dictNegRetry") : t(labelKeys[category]);
+        if (remembered) el.dataset.remembered = "true"; else delete el.dataset.remembered;
+        // Retrieval and AI judgement read differently; both are neutral answers
+        // with the info icon, never errors, and never claim the usage is absent.
+        if (remembered && feedback.box.hidden) {
+          usageMessage(feedback, t(PBP_DICT_NEG_RETRIEVAL.includes(category) ? "dictSupplementNoSources" : "dictUsagePointsNone"), "neutral");
+          feedback.remembered = true;
+        } else if (!remembered && feedback.remembered) {
+          usageMessage(feedback, ""); feedback.remembered = false;
+        }
         feedback.box.parentElement.hidden = el.hidden && feedback.box.hidden;
       }
       profile.hidden = buttons.patterns.hidden && buttons.confusables.hidden;
@@ -2177,6 +2314,9 @@ function _pbpDictEntryMount(host, opts) {
       if (!origin?.isConnected || !_pbpDictGeneratableCategory(category)) return;
       const answerLanguage = renderedLanguage || target();
       const feedback = usageFeedback(origin);
+      // Retrying is this ordinary click: this attempt's own outcome replaces
+      // the remembered "last time" state.
+      negTouched.add(category); negState[category] = false; feedback.remembered = false;
       usageMessage(feedback, "");
       let restoreFocus = null;
       const hadFocus = document.activeElement === origin || (updating && content.contains(document.activeElement));
@@ -2189,6 +2329,13 @@ function _pbpDictEntryMount(host, opts) {
         // A blanked leaking summary (Q6=B) is a partial failure of this paid
         // answer: file its fixed code at the checking stage; the items save.
         onDrop: error => { if (current()) _pbpDictLedgerFail(opts.owner, error, "checking", category); },
+        // An etymology retrieval that found nothing in a supported language is
+        // remembered; one that found sources forgets the memory. Unsupported
+        // languages have no source origin and never reach this.
+        onSources: count => {
+          if (!current() || category !== "etymology" || !sourceOrigin) return;
+          if (count) pbpDictNegForget(opts.owner, negParts(category)); else pbpDictNegRecord(opts.owner, negParts(category));
+        },
         onStage: stage => {
           if (!current()) return;
           if (PBP_DICT_LEDGER_STAGES.includes(stage)) ledgerStage = stage;
@@ -2212,6 +2359,7 @@ function _pbpDictEntryMount(host, opts) {
         const addition = await pbpDictSupplementRun(request);
         if (!current()) return;
         record.supplements = [addition, ...(record.supplements || []).filter(item => !addition.id || item.id !== addition.id)];
+        if (category !== "etymology") pbpDictNegForget(opts.owner, negParts(category));
         const id = supplementId(addition), focusStayed = document.activeElement === feedback.cancel;
         render(record, answerLanguage, false, id);
         usageMessage(feedback, addition.archiveSaved === false ? t("dictSupplementSaveFailed") : addition.learning?.omittedItems
@@ -2224,6 +2372,9 @@ function _pbpDictEntryMount(host, opts) {
         if (!current()) return;
         console.warn("[dict-entry] usage generation failed:", error?.name, _pbpDictFailureCode(error), _pbpDictFailureReason(error));
         _pbpDictLedgerFail(opts.owner, error, ledgerStage, category);
+        // The model judged there is nothing usable: remember it for this
+        // account (plan 1C.4). Failures, cancels and timeouts are not answers.
+        if (error?.code === "unsupported_usage" && category !== "etymology") pbpDictNegRecord(opts.owner, negParts(category));
         // "Nothing usable" for a usage point is an answer, not a retrieval
         // miss: it has its own neutral copy, apart from the no-sources one.
         const text = t(error?.code === "unsupported_usage" && category !== "etymology" ? "dictUsagePointsEmpty" : _pbpDictGenerationErrorKey(error, true));
@@ -2314,6 +2465,7 @@ function _pbpDictEntryMount(host, opts) {
     if (!alive()) return;
     settings = value || {}; sync();
     const version = epoch;
+    const negLoaded = loadNeg().catch(error => console.warn("[dict-neg] state read failed:", error?.name));
     const request = input(opts.signal, () => alive() && epoch === version);
     let hit = await pbpDictEntryRead(request);
     if (!hit && alive() && epoch === version && typeof pbpDictArchiveRead === "function") {
@@ -2321,6 +2473,9 @@ function _pbpDictEntryMount(host, opts) {
       hit = await pbpDictEntryRestore(request);
       if (alive() && epoch === version) message("");
     }
+    if (!alive() || epoch !== version) return;
+    // The memory is read before the first render picks each block's button.
+    await negLoaded;
     if (!alive() || epoch !== version) return;
     if (hit) render(hit, request.target, !viewRevision && preference() !== "dictionary");
     else if (preference() === "ai-generate") await run(false);
@@ -2422,7 +2577,8 @@ function pbpDictExamplesView(opts) {
   box.appendChild(status); row.append(find, box);
   block.append(heading, hint, row);
   const origin = pbpDictEvidenceOrigin("literature", language);
-  let busy = false;
+  const negParts = { term: opts.term, sourceLanguage: language, target: "", category: "examples" };
+  let busy = false, remembered = false;
   const alive = () => !opts.signal?.aborted && block.isConnected && opts.isCurrent() === true;
   const say = (text, state = "") => {
     _pbpDictToneText(status, text, state === "error" || state === "neutral" ? state : "");
@@ -2448,10 +2604,26 @@ function pbpDictExamplesView(opts) {
     }
   };
   if (!origin) {
+    // An unsupported language is said up front and never remembered.
     hint.hidden = true; find.hidden = true;
     say(t("dictExamplesUnsupported"), "neutral");
-    return { element: block };
+    return { element: block, ready: Promise.resolve() };
   }
+  // Plan 1C.4: the local memory is read before the action is shown, so the
+  // block opens either on its ordinary action or on "last time not found ·
+  // retry" with the retrieval copy -- never one replaced by the other.
+  const setRemembered = value => {
+    remembered = value;
+    label.textContent = value ? t("dictExamplesFind") + " · " + t("dictNegRetry") : t("dictExamplesFind");
+    if (value) find.dataset.remembered = "true"; else delete find.dataset.remembered;
+    if (value) say(t("dictSupplementNoSources"), "neutral");
+  };
+  row.hidden = true;
+  const ready = pbpDictNegHas(opts.owner, negParts).then(found => {
+    if (!alive()) return;
+    if (found && !busy && !results.length) setRemembered(true);
+    row.hidden = false;
+  });
   const run = async permission => {
     let granted = false;
     try { granted = await permission === true; }
@@ -2464,7 +2636,10 @@ function pbpDictExamplesView(opts) {
         signal: opts.signal, isCurrent: alive, beforeRequest: async () => { if (!alive()) throw Object.assign(new Error("stale"), { code: "stale" }); } });
       if (!alive()) return;
       if (found?.unsupported === true) { find.hidden = true; hint.hidden = true; say(t("dictExamplesUnsupported"), "neutral"); return; }
-      if (!found.length) { say(t("dictExamplesNone"), "neutral"); return; }
+      // A clean miss in a supported language is remembered for this account;
+      // a found sentence forgets it. Failures, refusals and cancels never write.
+      if (!found.length) { pbpDictNegRecord(opts.owner, negParts); say(t("dictExamplesNone"), "neutral"); return; }
+      pbpDictNegForget(opts.owner, negParts);
       show(found); say("");
       // A shown result replaces its action: finding again is not needed.
       find.hidden = true; hint.hidden = true;
@@ -2480,12 +2655,14 @@ function pbpDictExamplesView(opts) {
     busy = true; find.disabled = true;
     // No await before this call (see _pbpDictExamplesRequestOrigin).
     const permission = _pbpDictExamplesRequestOrigin(origin);
+    // Retrying is this ordinary click; its own outcome replaces "last time".
+    if (remembered) { setRemembered(false); say(""); }
     run(permission).finally(() => {
       busy = false;
       if (block.isConnected) find.disabled = false;
     });
   });
-  return { element: block };
+  return { element: block, ready };
 }
 
 const PBP_DICT_LANGS = ["auto", ...PBP_DICT_QUERY_LANGS];

@@ -33,6 +33,8 @@ export async function installDictEntryFixture(page) {
     pbpDictEvidenceFetch = async input => {
       if (input.kind !== "literature") return [];
       await input.beforeRequest();
+      // The negative state's first search is a clean miss (plan 1C.4).
+      if (window._auditDictEntry?.examplesMiss) return [];
       return [{ title: 'The Works of Charles Dickens/Volume 1/Chapter 14', url: 'https://en.wikisource.org/w/index.php?oldid=13788016',
         excerpt: 'It was a long sentence of the kind a lookup column has to wrap, with the queried word in the middle of its original context and a clause after it.',
         author: 'Charles Dickens', work: 'The Pickwick Papers', location: 'Chapter XIV · ¶ 2', language: 'en', genre: 'novel',
@@ -228,6 +230,42 @@ export async function openDictEntryState(page, state) {
     await item.waitFor();
     if (await page.evaluate(() => window._auditDictEntry.calls) !== before) throw new Error('SETUP: free examples issued an AI request');
     return item.isVisible();
+  }
+  if (state === 'negative') {
+    // Plan 1C.4: a real clean miss in a supported language writes the local
+    // empty-result memory; the next lookup opens on "last time not found ·
+    // retry" with the retrieval note. No AI key, no AI entry, no AI call.
+    await page.evaluate(async () => {
+      await chrome.storage.local.remove(['openaiApiKey']);
+      if (typeof _pbpExplainSettings === 'object' && _pbpExplainSettings) delete _pbpExplainSettings.openaiApiKey;
+      window._auditDictEntry.cache.clear();
+      await window._auditDictEntry.resetArchive();
+      window._auditDictEntry.examplesMiss = true;
+    });
+    await page.waitForTimeout(300);
+    await rerunLookup(page);
+    await page.locator('.xp-dict-ai-configure:not([hidden])').waitFor();
+    const before = await page.evaluate(() => window._auditDictEntry.calls);
+    const find = page.locator('.xp-dict-examples .xp-dict-examples-find');
+    await find.waitFor();
+    if (await find.getAttribute('data-remembered') !== 'true') {
+      await find.click();
+      await page.locator('.xp-dict-examples .xp-dict-usage-feedback[data-state="neutral"]').waitFor();
+      const stored = await page.evaluate(async () => {
+        for (let i = 0; i < 40; i++) {
+          if (Object.keys(await chrome.storage.local.get(null)).some(key => key.startsWith('pbpDictNeg:'))) return true;
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        return false;
+      });
+      if (!stored) throw new Error('SETUP: the clean miss left no local empty-result memory (is the fixture signed in?)');
+      await rerunLookup(page);
+    }
+    const remembered = page.locator('.xp-dict-examples .xp-dict-examples-find[data-remembered="true"]');
+    await remembered.waitFor();
+    await page.evaluate(() => { window._auditDictEntry.examplesMiss = false; });
+    if (await page.evaluate(() => window._auditDictEntry.calls) !== before) throw new Error('SETUP: free examples issued an AI request');
+    return remembered.isVisible();
   }
   throw new Error('SETUP: unknown dictionary entry state ' + state);
 }

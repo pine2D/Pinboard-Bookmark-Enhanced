@@ -1091,6 +1091,13 @@ async function _pbpDictSupplementGenerate(input, request, category, profile) {
   if (!record.entry) throw _pbpDictEntryError("invalid_request", "Original meanings for this supplement are unavailable");
   if (category === "etymology") await stage("sources");
   const sources = await _pbpDictSupplementSources(request, category);
+  // How many etymology sources a clean retrieval found (0 is a clean miss;
+  // a broken retrieval threw above), for the caller's local empty-result
+  // memory (plan 1C.4). It carries a count only, never source text.
+  if (category === "etymology" && typeof input.onSources === "function") {
+    await _pbpDictEntryGuard(request);
+    input.onSources(sources.length);
+  }
   await stage("generating");
   // The only branch here is by category: patterns has its own card schema,
   // prompt and parser; lock, guards, sync gate, checks and saving are shared.

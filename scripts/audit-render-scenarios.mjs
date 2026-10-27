@@ -23,7 +23,7 @@ export const RENDER_READER_CONTEXTS = Object.freeze([
   'reader-source-details', 'export-more', 'reader-bookmark-footer', 'reader-bookmark-editor', 'reader-bookmark-delete-confirm',
   'explain-pop', 'explain-dict', 'dict-resize-menu', 'dict-entry-idle', 'dict-entry-busy', 'dict-entry-result', 'dict-entry-details',
   'dict-entry-usage-busy', 'dict-entry-usage-error', 'dict-entry-usage-result',
-  'dict-entry-panel', 'dict-entry-cached', 'dict-entry-error', 'dict-entry-examples', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
+  'dict-entry-panel', 'dict-entry-cached', 'dict-entry-error', 'dict-entry-examples', 'dict-entry-negative', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
   'pb-hl-card', 'send-menu', 'confirm-popover', 'tr-ask',
 ]);
 const context = (name, dependencies = [], extra = {}) => ({ name, dependencies, ...extra });
@@ -51,6 +51,9 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     // Free original-text examples (plan 1C.2): its fixture has no AI key and
     // no AI entry, so it depends on no AI state.
     context('dict-entry-examples', [], { target: '.xp-dict-examples .xp-dict-learning-item' }),
+    // The remembered empty result (plan 1C.4) of the same free block: a real
+    // clean miss writes the local memory, the next lookup reads it back.
+    context('dict-entry-negative', [], { target: '.xp-dict-examples .xp-dict-examples-find[data-remembered="true"]' }),
     context('vocab-batch-bar', ['vocab-detail'], { target: '#vocab-batch-toolbar.selecting' }),
     context('ask-history-list', [], { target: '#ask-library-list .ask-library-hit' }),
     context('ask-history-detail', ['ask-history-list'], { target: '#ask-library-detail:not([hidden])' }),
