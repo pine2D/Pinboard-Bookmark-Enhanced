@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
-import { makePlan, MODELS, CASES, validateApproval, newLedger, reserve, boundedBody, verifyGatewayMetadata, verifyReturnedUsage, reusableEntries, requestInputBytes, httpErrorMetadata } from "../scripts/dict-litellm-test.mjs";
+import { main, makePlan, MODELS, CASES, validateApproval, newLedger, reserve, boundedBody, verifyGatewayMetadata, verifyReturnedUsage, reusableEntries, requestInputBytes, httpErrorMetadata } from "../scripts/dict-litellm-test.mjs";
 // Handwritten ai-dev command output schema, independent of production pricing.
 const estimates = Object.fromEntries(MODELS.map(model => [model.alias, {
   snapshot: { fetched_at: 1792930375, stale: false, currency: "USD" },
@@ -17,6 +17,7 @@ test("non-success diagnostics contain only fixed capability labels, never echoed
   assert.deepEqual(value, { mentionedParameters: ["response_format", "json_schema", "json_object"], formatEnumRefusal: true });
   assert(!JSON.stringify(value).includes("PRIVATE"));
   assert.equal(httpErrorMetadata({ error: { message: "response_format: Invalid schema, required must be an array" } }).formatEnumRefusal, false);
+  assert.deepEqual(httpErrorMetadata({ error: { message: '{"code":400,"message":"model: PRIVATE/m-1.0 does not support feature: structured-outputs"}', type: "invalid_request_error" } }).mentionedParameters, ["structured_outputs"]);
 });
 test("schema and framing bytes count against the same approved input budget", () => {
   const body = { messages: [{ role: "user", content: "合成资料" }] };
@@ -120,4 +121,7 @@ test("tampered totals and monetary overruns fail before dispatch", () => {
 test("a chunked response has a byte bound, not just a content-length check", async () => {
   assert.equal(await boundedBody(new Response("short"), 5), "short");
   await assert.rejects(boundedBody(new Response("sixsix"), 5), /response_too_large/);
+});
+test("the retired LiteLLM driver refuses live runs before reading any plan, credential or network", async () => {
+  await assert.rejects(main(["--live", "--approval", "/nonexistent"]), /litellm_gateway_retired/);
 });

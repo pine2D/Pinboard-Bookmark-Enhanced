@@ -156,7 +156,10 @@ export function httpErrorMetadata(body) {
   // Only fixed labels leave this classifier. Provider errors can contain
   // credentials or echoed input; never retain their arbitrary text or fields.
   return { mentionedParameters: ["response_format", "json_schema", "json_object", "max_tokens", "max_completion_tokens", "reasoning_effort", "temperature"]
-    .filter(name => new RegExp("\\b" + name + "\\b").test(detail)),
+    .filter(name => new RegExp("\\b" + name + "\\b").test(detail))
+    // Servers that name the capability, not the field ("does not support
+    // feature: structured-outputs"), refer to the same request member.
+    .concat(/\bstructured[\s_-]?outputs?\b|\bjson[\s_-]?mode\b/.test(detail) ? ["structured_outputs"] : []),
     formatEnumRefusal: /\bresponse_format\b/.test(detail) && /\bjson_(?:schema|object)\b/.test(detail) &&
       /unknown\s+variant|(?:must|should)\s+be\s+(?:one\s+of|either|["'`]*(?:text|json_object)\b)/.test(detail) };
 }
@@ -480,6 +483,10 @@ export function verifyGatewayMetadata(plan, data, selected) {
 }
 
 export async function main(args = process.argv.slice(2)) {
+  // The LiteLLM gateway (127.0.0.1:48096) was retired on 2026-10-26 and its
+  // two ledgers are frozen evidence. New live rounds use agentgateway through
+  // scripts/dict-redesign-test.mjs; refuse before any plan, .env or network.
+  if (args.includes("--live")) fail("litellm_gateway_retired");
   const arg = name => args[args.indexOf(name) + 1];
   const reportDir = args.includes("--report-dir") ? resolve(arg("--report-dir")) : REPORT;
   if (args.includes("--evidence")) { textOutput(await collectEvidence(reportDir)); return; }
