@@ -2088,10 +2088,20 @@ async function driveReaderExport(context, worker, extId, rep) {
     await page.waitForSelector("#rendered-view p");
     await page.waitForSelector("#exp-include-ask", { state: "attached", timeout: 5000 });
     await page.evaluate(async ({ url }) => {
-      await pbpAskHistSet(url, [
+      const rounds = [
         { q: "What does serendipity mean here?", a: "A portable answer.[P2]\n\nCITES:\nP2: The word serendipity appears here", ts: 1700000000000, model: "qa-export-model" },
         { q: "Keep the code example?", a: "Keep `[P2]` literal. Another answer.[P2]\n\nCITES:\nP2: The word serendipity appears here", ts: 1700000001000, model: "qa-export-model" }
-      ], "qa");
+      ];
+      // Since d433eabb the export reads the persistent Ask archive, and the
+      // legacy cache is imported only once per article (on the first render,
+      // before this seed). Write the rounds where the reader reads them, in
+      // the shape that one-time import produces.
+      if (typeof pbpAskArchiveAppend === "function") {
+        for (const round of rounds) {
+          await pbpAskArchiveAppend({ owner: pbpDictOwnerScope("qa"), url, title: document.title, sessionId: "qa_export_session",
+            record: { ...round, blocksHash: "", cites: [], evidence: [] } });
+        }
+      } else await pbpAskHistSet(url, rounds, "qa");
       document.dispatchEvent(new CustomEvent("pbp:ask-history-changed"));
       window.pbpReaderOpenExport();
       document.getElementById("export-more").open = true;
@@ -2136,6 +2146,9 @@ async function driveReaderExport(context, worker, extId, rep) {
     await page.locator("#btn-dl-html").click();
     await page.waitForFunction(() => window._qaExportWaiting);
     await peer.evaluate(async ({ url }) => {
+      // Clearing a conversation deletes its archive session (d433eabb); the
+      // legacy cache is cleared as well for builds without the archive.
+      if (typeof pbpAskArchiveDelete === "function") await pbpAskArchiveDelete({ owner: pbpDictOwnerScope("qa"), sessionId: "qa_export_session" });
       await pbpAskHistSet(url, [], "qa");
       _pbpAskHistoryChanged({ type: "clear", url, account: "qa" });
     }, { url: ARTICLE_URL });
