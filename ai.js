@@ -1059,6 +1059,11 @@ function _pbpStreamThinking(protocol, obj) {
 // chunks cannot make the caller's display flicker. A throwing callback (or a
 // rejected promise it returns) is swallowed with a warning naming only the
 // error class, so the side channel can never break the answer.
+// The per-call reporter travels on opts under this private key, never under a
+// public option name: a caller's own onPhase (md-translate.js already has one
+// with a different signature) must neither be called with a bare phase string
+// nor bypass deduplication and the try/catch above.
+const _PBP_STREAM_PHASE = Symbol("pbpStreamPhase");
 function _pbpStreamProgress(onProgress) {
   let phase = "";
   return next => {
@@ -1092,7 +1097,7 @@ function _pbpStreamProgress(onProgress) {
 // events stay skipped and nonempty partial text is still returned.
 function _pbpStreamContract(protocol, opts) {
   const strict = opts?.requireComplete === true;
-  const phase = typeof opts?.onPhase === "function" ? opts.onPhase : _pbpStreamProgress(opts?.onProgress);
+  const phase = typeof opts?.[_PBP_STREAM_PHASE] === "function" ? opts[_PBP_STREAM_PHASE] : _pbpStreamProgress(opts?.onProgress);
   const record = value => value !== null && typeof value === "object" && !Array.isArray(value);
   let state = "unknown", blocked = false, tool = false, streamError = false, invalid = "", refusal = "", done;
   const badShape = () => { if (!invalid) invalid = "response_shape"; };
@@ -1554,7 +1559,7 @@ async function callAIStream(s, prompt, opts = {}, onDelta) {
   const cb = (typeof onDelta === "function") ? onDelta : () => {};
   // One phase reporter for the whole call, so a dialect retry cannot report a
   // phase twice. Never serialized: request bodies list their fields explicitly.
-  if (typeof opts.onProgress === "function") opts = { ...opts, onPhase: _pbpStreamProgress(opts.onProgress) };
+  if (typeof opts.onProgress === "function") opts = { ...opts, [_PBP_STREAM_PHASE]: _pbpStreamProgress(opts.onProgress) };
   await _ensureAIHostPermission(s);
   const p = s.aiProvider || "gemini";
   if (p === "gemini") {

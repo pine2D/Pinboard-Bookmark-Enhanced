@@ -672,6 +672,11 @@ await test('required streams reject explicit truncation even when the JSON looks
   await strictFails(GEMINI.settings,gm([{text:json}],'MAX_TOKENS'),'output_truncated','Gemini MAX_TOKENS');
   await strictFails(CLAUDE.settings,CL_START+clBlock(0,'text',[{type:'text_delta',text:json}])+clEnd('max_tokens'),'output_truncated','Claude max_tokens');
   await strictFails(OLLAMA.settings,ol(json)+olDone('length'),'output_truncated','Ollama length');
+  // Only an explicit reason replaces the last one: a later null reason must not
+  // reset a known truncation back to unknown (which would be accepted).
+  await strictFails(COMPAT.settings,oa({role:'assistant',content:'ready'})+oa({},'length')+oa({},null),'output_truncated','compatible length then null');
+  await strictFails(CLAUDE.settings,CL_START+CL_TEXT+clEnd('max_tokens')+sse({type:'message_delta',delta:{stop_reason:null,stop_sequence:null},usage:{output_tokens:6}},'message_delta'),'output_truncated','Claude max_tokens then null');
+  await strictFails(GEMINI.settings,gm([{text:'ready'}],'MAX_TOKENS')+gm([{text:''}]),'output_truncated','Gemini MAX_TOKENS then no reason');
 });
 await test('required streams reject tool turns, unknown terminal reasons and an Ollama stream left at done false',async()=>{
   await strictFails(COMPAT.settings,oa({role:'assistant',content:'ready'})+oa({tool_calls:[{index:0,id:'call_fixture',type:'function',function:{name:'lookup',arguments:'{}'}}]})+oa({},'tool_calls'),'output_truncated','compatible tool call');
@@ -689,6 +694,9 @@ await test('required streams map refusals and safety blocks to output_refused ov
   await strictFails(GEMINI.settings,sse({promptFeedback:{blockReason:'SAFETY'}}),'output_refused','Gemini prompt block');
   await strictFails(GEMINI.settings,gm([{text:'ready'}])+gm([],'SAFETY'),'output_refused','Gemini safety stop');
   await strictFails(CLAUDE.settings,CL_START+CL_TEXT+clEnd('refusal'),'output_refused','Claude refusal');
+  // A refusal or safety stop sticks: a later explicit ordinary reason does not revoke it.
+  await strictFails(COMPAT.settings,oa({role:'assistant',content:'ready'})+oa({},'content_filter')+oa({},'stop'),'output_refused','compatible content filter then stop');
+  await strictFails(GEMINI.settings,gm([{text:'ready'}])+gm([],'SAFETY')+gm([{text:''}],'STOP'),'output_refused','Gemini safety then STOP');
 });
 await test('required empty streams carry empty_response with the HTTP status and never retry',async()=>{
   await strictFails(COMPAT.settings,oa({role:'assistant',content:''})+oa({},'stop')+'data: [DONE]\n\n','empty_response','compatible empty');
@@ -794,6 +802,12 @@ await test('onProgress reports thinking then streaming once each, synchronously 
   const seen=[];reset([reply(OFF_REFUSED,400),S(oa({role:'assistant',content:'ready'})+oa({},'stop'))]);
   await stream({...REQ,onProgress:e=>seen.push(e.phase)});
   assert(seen.join()==='streaming'&&calls.length===2,'Retry repeated a phase: '+seen);
+  // A caller's own onPhase option is not the internal reporter: it is never called.
+  const foreign=[];reset([S(oa({role:'assistant',reasoning_content:PRIVATE})+oa({content:'ready'})+oa({},'stop'))]);
+  assert(await stream({...REQ,onPhase:(...args)=>foreign.push(args)},COMPAT.settings)==='ready'&&foreign.length===0,'Caller onPhase was called: '+JSON.stringify(foreign));
+  const both=[];reset([S(oa({role:'assistant',reasoning_content:PRIVATE})+oa({content:'ready'})+oa({},'stop'))]);
+  await stream({...REQ,onPhase:(...args)=>foreign.push(args),onProgress:e=>both.push(e.phase)},COMPAT.settings);
+  assert(foreign.length===0&&both.join()==='thinking,streaming','Caller onPhase shadowed onProgress: '+both+' / '+foreign.length);
 });
 await test('a throwing or rejecting onProgress callback never breaks the answer',async()=>{
   const warnings=[],originalWarn=console.warn,unhandled=[];
