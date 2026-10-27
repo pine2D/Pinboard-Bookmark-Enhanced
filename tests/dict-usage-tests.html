@@ -675,6 +675,17 @@ await test('a confusables item explained in English for a Chinese target is drop
     r.learning.items[0].title===GOOD_CONTRAST.title&&!r.content.includes('hard to reach')&&
     warns.some(w=>w.includes('explanation_script'))&&!warns.some(w=>w.includes('remote'));
 });
+// The explanation alone is a short Chinese frame, too short to judge, so only
+// the long English translation can fail the per-item script check: a check
+// that looks at explanation alone keeps this item and the test goes red.
+const ENGLISH_TRANSLATION_CONTRAST=contrast('“distant” 与 “far away”','“distant” 更书面。','The old farm lies distant from every town, road and river across the whole quiet northern valley today.');
+await test('a confusables item whose translation alone is in the wrong script is dropped alone',async()=>{
+  existing();usageResponse(d=>{d.items=[GOOD_CONTRAST,ENGLISH_TRANSLATION_CONTRAST];});
+  const {value:r,warns}=await captureWarnings(()=>pbpDictSupplementRun(request({category:'confusables'})));
+  return r.archiveSaved&&appended.length===1&&r.learning.omittedItems===1&&r.learning.items.length===1&&
+    r.learning.items[0].title===GOOD_CONTRAST.title&&!r.content.includes('every town')&&
+    warns.some(w=>w.includes('explanation_script'));
+});
 await test('every confusables item in the wrong script fails as wrong_language, and a structural drop reports its own reason',async()=>{
   existing();usageResponse(d=>{d.summary='';d.items=[ENGLISH_CONTRAST];});
   if(!await rejectsReason(()=>pbpDictSupplementRun(request({category:'confusables'})),'wrong_language','explanation_script')||appended.length)return false;
