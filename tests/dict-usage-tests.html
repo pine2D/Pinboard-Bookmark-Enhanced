@@ -417,6 +417,84 @@ await test('both source-backed formats round-trip the unchanged archive schema',
   return true;
  }finally{frame.remove();}
 });
+// Internal-term leak check (plan 0.5, Q16=A, Q6=B). Batch 0 drops a leaking
+// supplement item; a leaking base entry still fails whole until per-sense
+// dropping (1A.3). Prose fixtures are synthetic.
+async function rejectsReason(fn,code,reason){try{await fn();return false;}catch(e){return e.code===code&&e.reason===reason;}}
+async function captureWarnings(fn){const warn=console.warn,warns=[];console.warn=(...a)=>warns.push(a.map(String).join(' '));try{return {value:await fn(),warns};}finally{console.warn=warn;}}
+const DE_ZH={term:'Fernweh',sourceLanguage:'de'};
+function usageItem(title,explanation,translation='她向往遥远的地方。'){return {sense:1,title,explanation,example:'Sie hat Fernweh.',translation,sourceIndex:-1};}
+await test('a German-to-Chinese supplement item that leaks a field word is dropped and logged while the other item is saved',async()=>{
+  existing();const leak='这个词带有怀旧色彩，interpretation 上更偏向一种对远方的渴望而非具体的旅行计划。';
+  usageResponse(d=>{d.items=[usageItem('Fernweh haben','用来表达对远方的强烈向往，常见于口语和文学描写中。'),usageItem('Fernweh bekommen',leak)];});
+  const {value:r,warns}=await captureWarnings(()=>pbpDictSupplementRun(request({...DE_ZH,category:'grammar'})));
+  return r.archiveSaved&&r.learning.items.length===1&&r.learning.items[0].title==='Fernweh haben'&&r.learning.omittedItems===1&&
+    appended.length===1&&!r.content.includes('interpretation')&&warns.some(w=>w.includes('internal_term'))&&!warns.some(w=>w.includes(leak));
+});
+await test('a supplement whose every item leaks an internal term fails with internal_term and is not stored',async()=>{
+  existing();usageResponse(d=>{d.items=[usageItem('Fernweh haben','这个说法在 summary 里常被理解为一种渴望远行而又无法出发的心情。')];});
+  return await rejectsReason(()=>pbpDictSupplementRun(request({...DE_ZH,category:'grammar'})),'invalid_response','internal_term')&&appended.length===0&&calls.length===1;
+});
+await test('a leaking summary fails the supplement because it is not an item that can be dropped',async()=>{
+  existing();usageResponse(d=>{d.summary='note：表达对远方的向往。';d.items=[usageItem('Fernweh haben','用来表达对远方的强烈向往，常见于口语和文学描写中。')];});
+  return await rejectsReason(()=>pbpDictSupplementRun(request({...DE_ZH,category:'grammar'})),'invalid_response','internal_term')&&appended.length===0;
+});
+await test('a German-to-Chinese base entry that leaks a field word still fails as a whole until per-sense dropping lands',async()=>{
+  const original=callAI;callAI=async(settings,prompt,options)=>{await options.beforeRequest();calls.push({settings,prompt,options});
+    return JSON.stringify({word:'Fernweh',language:'de',pronunciation:'',meanings:[
+      {partOfSpeech:'名词',definition:'对远方的向往，渴望离开熟悉的地方去远行。',examples:[]},
+      {partOfSpeech:'名词',definition:'sense：一种想去陌生地方旅行的心情，与思乡相对。',examples:[]}]});};
+  try{return await rejectsReason(()=>pbpDictEntryRun(request(DE_ZH)),'invalid_response','internal_term')&&saved.length===0&&calls.length===1;}
+  finally{callAI=original;}
+});
+await test('English explanations may use field words as ordinary prose',async()=>{
+  existing();usageResponse(d=>{d.language='en';d.summary='Expresses a longing for distant places.';
+    d.items=[usageItem('Fernweh haben','A common interpretation is a longing for travel; note that it contrasts with homesickness.','She longs for faraway places.')];});
+  const r=await pbpDictSupplementRun(request({...DE_ZH,category:'grammar',target:{name:'English',lang:'en'}}));
+  return r.archiveSaved&&r.learning.items.length===1&&!r.learning.omittedItems;
+});
+await test('field words are not leaks when the source language is English',async()=>{
+  existing();usageResponse(d=>{d.items=[usageItem('take a note','note 在这里表示简短的记录，常和 take、make 搭配，强调随手写下要点。')];});
+  const r=await pbpDictSupplementRun(request({term:'note',category:'grammar'}));
+  return r.archiveSaved&&r.learning.items.length===1&&!r.learning.omittedItems;
+});
+await test('the query term, the item title and base-entry word forms are exempt from the field-word check',async()=>{
+  existing();records.entry={word:'Note',language:'de',pronunciation:'',meanings:[{partOfSpeech:'名词',definition:'分数，成绩；音符。',
+    examples:[{text:'Im Head-Bereich steht die Note.',translation:'分数写在页眉处。'}]}],etymology:'',relatedWords:[]};
+  usageResponse(d=>{d.items=[
+    usageItem('eine gute Note','德语 Note 在学校语境里指分数，不是笔记，常与 gut、schlecht 搭配使用。'),
+    usageItem('die Sense schwingen','Sense 在这里指收割用的长柄镰刀，属于农业词汇，和成绩无关。'),
+    usageItem('im Head-Bereich','Head 在这个复合词里只是借用的构词成分，表示页面的顶部区域。')];});
+  const r=await pbpDictSupplementRun(request({term:'Note',sourceLanguage:'de',category:'grammar'}));
+  return r.archiveSaved&&r.learning.items.length===3&&!r.learning.omittedItems;
+});
+await test('mixed-case product names are not internal identifiers',async()=>{
+  existing();usageResponse(d=>{d.items=[usageItem('Fernweh haben','在 iPhone 或 eBay 的广告里也能看到这个词，用来唤起对远方旅行的向往。')];});
+  const r=await pbpDictSupplementRun(request({...DE_ZH,category:'grammar'}));
+  return r.archiveSaved&&r.learning.items.length===1&&!r.learning.omittedItems;
+});
+await test('schema and prompt identifiers leak in every explanation language and are derived from the real schema and prompt data',async()=>{
+  const ids=_pbpDictInternalIdentifiers();
+  if(!['sourceIndex','partOfSpeech','baseEntry','targetLanguage','sourceLanguage','nativeLanguage','missingItems','acceptedItems'].every(id=>ids.includes(id))||
+     ['word','title','sense','summary','language'].some(id=>ids.includes(id)))return false;
+  for(const [extra,explanation] of [[{category:'grammar'},'这个搭配的 sourceIndex 是 -1，表示例句由 AI 编写，适合在口语中使用。'],
+    [{category:'grammar',target:{name:'English',lang:'en'}},'Use this pattern for distant places; its partOfSpeech is an adjective in every context.']]){
+    reset();existing();usageResponse(d=>{d.language=extra.target?'en':'zh-Hans';d.summary='';d.items=[usageItem('faraway places',explanation)];});
+    if(!await rejectsReason(()=>pbpDictSupplementRun(request(extra)),'invalid_response','internal_term')||appended.length)return false;
+  }
+  return true;
+});
+await test('a field word inside curly quotes is a mention, while the same word outside quotes is dropped',async()=>{
+  existing();usageResponse(d=>{d.items=[usageItem('Fernweh haben','不要把它和英语“note”混淆，它表达的是对远方的强烈向往。'),
+    usageItem('Fernweh bekommen','不要把它和英语 note 混淆，它表达的是对远方突然产生的向往。')];});
+  const r=await pbpDictSupplementRun(request({...DE_ZH,category:'grammar'}));
+  return r.archiveSaved&&r.learning.items.length===1&&r.learning.items[0].title==='Fernweh haben'&&r.learning.omittedItems===1;
+});
+await test('the literature task no longer asks the model to label its reading with an English field word',async()=>{
+  existing();usageResponse(d=>{d.items[0].sourceIndex=0;d.items[0].example='';});
+  await pbpDictSupplementRun(request({category:'literature'}));
+  return calls.length===1&&!/interpretation/i.test(calls[0].prompt);
+});
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();
 </script>

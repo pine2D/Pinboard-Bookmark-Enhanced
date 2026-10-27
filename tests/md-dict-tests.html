@@ -2006,11 +2006,11 @@ async function runDictionaryEntryUiTests() {
       const known=await attempt(Object.assign(new Error(secret),{status:503,reason:"response_json"}));
       check(label+" preserves a known validation reason ahead of HTTP status",known.length===4&&known[3]==="response_json");
       const details=[];
-      for(const reason of ["response_shape","supplement_item","supplement_item_shape","supplement_item_sense","supplement_item_text","supplement_source_index","supplement_duplicate"]) {
+      for(const reason of ["response_shape","supplement_item","supplement_item_shape","supplement_item_sense","supplement_item_text","supplement_source_index","supplement_duplicate","internal_term"]) {
         const args=await attempt(Object.assign(new Error(secret),{code:"invalid_response",reason}));
         details.push(args.length===4&&args[2]==="invalid_response"&&args[3]===reason);
       }
-      check(label+" retains fixed supplement validation reasons and the legacy item code",details.every(Boolean));
+      check(label+" retains fixed supplement validation reasons, the internal-term reason and the legacy item code",details.every(Boolean));
       const untrusted=await attempt(Object.assign(new Error(secret),{status:429,reason:secret}));
       check(label+" falls back to HTTP status without printing an arbitrary reason",untrusted.length===4&&untrusted[3]==="http_429");
       const invalid=[];

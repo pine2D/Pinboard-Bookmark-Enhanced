@@ -1521,7 +1521,7 @@ function _pbpDictFailureReason(error) {
     "entry_sources", "entry_legacy", "entry_unknown", "explanation_metadata", "explanation_script",
     "explanation_language", "supplement_fields", "supplement_item", "supplement_item_shape", "supplement_item_sense",
     "supplement_item_text", "supplement_source_index", "supplement_duplicate", "supplement_source", "supplement_quote",
-    "supplement_example", "supplement_size"];
+    "supplement_example", "supplement_size", "internal_term"];
   if (allowed.includes(error?.reason)) return error.reason;
   const status = error?.status;
   return Number.isInteger(status) && status >= 400 && status <= 599 ? "http_" + status : "";
