@@ -2905,11 +2905,13 @@ async function runDictionaryExamplesTests() {
     check("a new query discards the old examples block and its pending click sends nothing",!oldBlock.isConnected&&block()!==oldBlock&&!fetched.length&&!block().querySelector(".xp-dict-learning-item"));
     request=opts=>{log.push(["request",opts]);return Promise.resolve(grant);};
 
-    fetched=[];search={batchcomplete:true,query:{searchinfo:{totalhits:0},search:[]}};await run({previewAiEnabled:true});
-    let releaseFetch;const realFetch=window.fetch;window.fetch=(...args)=>new Promise(resolve=>{releaseFetch=()=>resolve(realFetch(...args));});
+    // A real hit, so the old block would otherwise show the found sentence:
+    // only the first request is held, later ones go straight through.
+    fetched=[];await run({previewAiEnabled:true});
+    let releaseFetch,held=false;const realFetch=window.fetch;window.fetch=(...args)=>held?realFetch(...args):(held=true,new Promise(resolve=>{releaseFetch=()=>resolve(realFetch(...args));}));
     button().click();await settle();_pbpDictOwner="acct_switched";releaseFetch?.();await settle();await settle();
-    check("an account switch during retrieval lands nothing in the old block",!block().querySelector(".xp-dict-learning-item")&&block().querySelector(".xp-dict-usage-status")?.textContent!=="dictExamplesNone");
-    window.fetch=realFetch;_pbpDictOwner="acct_examples";search=SEARCH;
+    check("an account switch during retrieval lands nothing in the old block",held&&!block().querySelector(".xp-dict-learning-item")&&!block().textContent.includes("Comfortable provider!"));
+    window.fetch=realFetch;_pbpDictOwner="acct_examples";
   } finally {
     ctrl.abort();pop.remove();_pbpDictResolveLang=saved.resolve;_pbpDictSlotRun=saved.online;_pbpDictEcdictSide=saved.local;_pbpDictLoadPack=saved.load;pbpVocabGet=saved.get;_pbpDictOwner=saved.owner;_pbpDictCurrent=saved.current;
     window.fetch=saved.fetch;indexedDB.open=saved.open;

@@ -456,8 +456,11 @@ async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, before
 // setting, so it works with AI off, with no key and with no AI entry. Nothing
 // is archived, synced or cached: retrieval is free and simply runs again.
 // Before every request it re-checks the query's signal and isCurrent, the live
-// Pinboard owner against the query's owner (an empty or unreadable owner fails
-// closed), then the caller's own beforeRequest, which is required.
+// Pinboard owner against the query's owner, then the caller's own
+// beforeRequest, which is required. A failed owner read or an empty live owner
+// fails closed. Signed out ("ownerless") compares equal to a query owner of
+// "": the examples are public data, so they stay available without an
+// account; any change between two accounts still cancels.
 // Returns [{sentence, author, work, location, url, revision, truncated}], []
 // for a clean miss, or {unsupported: true} for a language without a supported
 // Wikisource edition.

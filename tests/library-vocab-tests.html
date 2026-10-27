@@ -4528,6 +4528,11 @@ await (async () => {
       check("examples: the Library retrieval stays on Wikisource and never calls AI",fetched.length>0&&fetched.every(c=>c.url.origin==="https://de.wikisource.org")&&paid===0);
       _pbpVocabLookupOther("Gift","de");await settle();
       check("examples: a new Library query replaces the block instead of keeping the old result",host.querySelectorAll(".xp-dict-examples").length===1&&!host.querySelector(".xp-dict-examples .xp-dict-learning-item"));
+      // A rerun (settings change, legacy refresh, retry) reuses the same slot
+      // instead of rebuilding the host, so only the run's own removal keeps
+      // the block single.
+      _pbpDictCurrent?.rerun();await settle();
+      check("examples: a rerun on the same slot keeps exactly one examples block",host.querySelectorAll(".xp-dict-examples").length===1);
     } finally {
       _pbpVocabDictCtrl?.abort();_pbpVocabDictChildCtrl?.abort();_pbpVocabRenderDetail(null);
       _pbpDictSlotRun=old.remote;_pbpDictEcdictSide=old.local;_pbpDictLoadPack=old.load;window.pbpDictPackLookup=old.lookup;window.pbpDictPackList=old.list;
