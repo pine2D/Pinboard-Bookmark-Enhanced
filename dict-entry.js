@@ -427,9 +427,10 @@ function _pbpDictExplanationLanguage(value, target) {
 // Evaluate explanatory prose together. A word root, grammatical label or short
 // foreign-language contrast is not a standalone explanation-language failure.
 // Original example sentences and retrieved quotations never enter this check.
-// The script half is synchronous so the lenient entry parser can apply it to a
-// single sense (Q6=B); it returns the prose sample for the statistical half,
-// or null when the text is too short or the target is unknown.
+// The script half is synchronous so the lenient entry parser and the
+// supplement parsers can apply it to a single sense or item (Q6=B); it
+// returns the prose sample for the statistical half, or null when the text is
+// too short or the target is unknown.
 function _pbpDictExplanationScriptCheck(text, target, declaredLanguage = "") {
   // A supplement's already validated metadata can identify a legacy custom
   // target for this check only. The saved target and archive key stay intact.
@@ -831,33 +832,42 @@ function pbpDictSupplementParse(response, request, category, sources, entry, rep
     if (category !== "etymology" && !source && (!item.example.trim() || !item.translation.trim())) return invalid("supplement_example");
     return source && item.example ? { ...item, example: source.excerpt } : item;
   };
-  // Q6=B: a leaking item is dropped and counted in omittedItems like any other
-  // invalid member; the remaining items are kept. Examples are source-language
-  // text and are not scanned.
+  // Q6=B: an item whose target-language prose fails the script check or leaks
+  // an internal term is dropped and counted in omittedItems like any other
+  // invalid member; the remaining items are kept and the caller still runs one
+  // combined script and statistical check over them and the summary. The
+  // checks themselves are unchanged. Titles and examples are not scanned for
+  // script: titles name the compared sourceLanguage forms and examples are
+  // sourceLanguage text (or a verified excerpt).
   const leakContext = { term: request.term, sourceLanguage: request.sourceLanguage, target: request.target,
     forms: [entry.word, ...entry.meanings.flatMap(m => [m.definition, ...(m.examples || []).map(e => e.text)])] };
   const validate = item => {
     const valid = validateItem(item);
+    _pbpDictExplanationScriptCheck([valid.explanation, valid.translation].filter(Boolean).join("\n\n"), request.target, value.language);
     if ([valid.explanation, valid.translation].some(text => _pbpDictInternalTermLeak(text, { ...leakContext, title: valid.title }))) {
       return invalid("internal_term");
     }
     return valid;
   };
-  const items = [], seen = new Set();
-  let firstError;
+  const items = [], seen = new Set(), dropped = [];
   for (const item of kept) {
     try {
       const valid = validate(item), key = _pbpDictSupplementItemKey(valid);
       if (seen.has(key)) invalid("supplement_duplicate");
       seen.add(key); items.push(valid);
     } catch (error) {
-      if (error?.code !== "invalid_response") throw error;
+      if (!["invalid_response", "wrong_language"].includes(error?.code)) throw error;
       // Fixed validation label only, never the model's text.
-      console.warn("[dict-entry] supplement item dropped:", error.reason || "invalid_response");
-      firstError ||= error;
+      console.warn("[dict-entry] supplement item dropped:", error.reason || error.code);
+      dropped.push(error);
     }
   }
-  if (!items.length) throw firstError;
+  // Every item in the wrong script is the same wrong-language answer as a
+  // whole-card script failure, so the reader keeps its specific message (as
+  // for patterns and base senses); otherwise the first structural reason is
+  // reported. kept is non-empty here, so dropped is too.
+  if (!items.length) throw dropped.every(error => error.code === "wrong_language") ? dropped[0] :
+    dropped.find(error => error.code === "invalid_response");
   // Q6=B extended to the summary: a leaking summary is blanked alone (the
   // archive and the reader both accept an empty summary) while the valid items
   // are kept. It is not an item, so omittedItems does not count it; the drop is

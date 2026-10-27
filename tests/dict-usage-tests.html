@@ -684,6 +684,52 @@ await test('patterns ignore the level setting, so the second click reuses the sa
   const second=await pbpDictSupplementRun(request({category:'patterns',settings}));
   return first.profile.level===''&&second.id===first.id&&calls.length===1&&appended.length===1;
 });
+// Confusables as its own request (plan 1B.3, Q3=A, Q6=B). The task wording,
+// item shape and schema are frozen; only the generic fixes apply.
+const CONFUSABLES_TASK='Compare 2-3 genuinely confusable alternatives in the same situation. Title names the contrast; explanation gives a choice rule and how substitution changes meaning or tone; give a contrasting original example and translation. Avoid absolute boundaries where usages overlap. False friends require an explicit nativeLanguage.';
+function contrast(title,explanation,translation='她住得很远。'){return {sense:1,title,explanation,example:'She lives far away.',translation,sourceIndex:-1};}
+const GOOD_CONTRAST=contrast('“faraway” 与 “far away”','“faraway” 只放在名词前作定语，“far away” 多作表语或状语，换用后句子就不通顺。');
+const ENGLISH_CONTRAST=contrast('“remote” 与 “faraway”','Use remote for places that are hard to reach, and faraway for places that feel distant.','The village is remote and hard to reach.');
+await test('the confusables task wording, item shape and schema stay frozen',async()=>{
+  existing();await pbpDictSupplementRun(request({category:'confusables',topic:'work'}));
+  const prompt=calls[0].prompt,schema=calls[0].options.responseSchema,item=schema.properties.items.items;
+  const task=prompt.split('Do not add other supplement categories or pad the result. ')[1].split(' All summary, explanations')[0];
+  return task===CONFUSABLES_TASK&&schema.properties.items.maxItems===5&&Object.keys(item.properties).join()==='sense,title,explanation,example,translation'&&
+    prompt.includes('"items":[{"sense":integer,"title":string,"explanation":string,"example":string,"translation":string}]')&&
+    prompt.includes('wrap it in curly double quotes “…”')&&!/quotation marks/i.test(prompt)&&
+    JSON.parse(prompt.split('\n').at(-1)).profile.topic==='';
+});
+await test('a confusables item explained in English for a Chinese target is dropped alone and the contrast card is saved',async()=>{
+  existing();usageResponse(d=>{d.items=[GOOD_CONTRAST,ENGLISH_CONTRAST];});
+  const {value:r,warns}=await captureWarnings(()=>pbpDictSupplementRun(request({category:'confusables'})));
+  return r.archiveSaved&&appended.length===1&&r.learning.omittedItems===1&&r.learning.items.length===1&&
+    r.learning.items[0].title===GOOD_CONTRAST.title&&!r.content.includes('hard to reach')&&
+    warns.some(w=>w.includes('explanation_script'))&&!warns.some(w=>w.includes('remote'));
+});
+await test('every confusables item in the wrong script fails as wrong_language, and a structural drop reports its own reason',async()=>{
+  existing();usageResponse(d=>{d.summary='';d.items=[ENGLISH_CONTRAST];});
+  if(!await rejectsReason(()=>pbpDictSupplementRun(request({category:'confusables'})),'wrong_language','explanation_script')||appended.length)return false;
+  reset();existing();usageResponse(d=>{d.summary='';d.items=[ENGLISH_CONTRAST,{...GOOD_CONTRAST,sense:9}];});
+  return await rejectsReason(()=>pbpDictSupplementRun(request({category:'confusables'})),'invalid_response','supplement_item_sense')&&appended.length===0&&calls.length===1;
+});
+await test('an etymology point in the wrong script is dropped alone like any other supplement item',async()=>{
+  existing();usageResponse(d=>{d.items=[{sense:1,kind:'formation',title:'far + away',explanation:'由 “far” 与 “away” 合成，表示距离很远，常作定语。',example:'',translation:'',sourceIndex:-1},
+    {sense:1,kind:'synonym',title:'distant',explanation:'Distant is a close synonym that sounds more neutral and formal in writing.',example:'',translation:'',sourceIndex:-1}];});
+  const r=await pbpDictSupplementRun(request({category:'etymology'}));
+  return r.archiveSaved&&r.learning.omittedItems===1&&r.learning.items.map(item=>item.title).join('|')==='far + away';
+});
+await test('an old confusables record is current: reused without paying and updatable as a new version',async()=>{
+  existing();const oldId='c'.repeat(64),settings={aiProvider:'gemini',geminiModel:'new-model',dictLearnerLevel:'advanced'};
+  records.supplements=[{id:oldId,archiveId:records.archiveId,category:'confusables',profile:{nativeLanguage:'',level:'advanced',topic:''},
+    content:'Previously paid contrast.',sources:[],provider:'old-provider',model:'old-model',archiveSaved:true,generatedAt:100}];
+  const reused=await pbpDictSupplementRun(request({category:'confusables',settings}));
+  if(reused.id!==oldId||calls.length!==0)return false;
+  usageResponse(d=>{d.items=[GOOD_CONTRAST];});
+  const fresh=await pbpDictSupplementRun(request({category:'confusables',settings,updateId:oldId}));
+  const again=await pbpDictSupplementRun(request({category:'confusables',settings}));
+  return fresh.learning.replacesId===oldId&&fresh.profile.level==='advanced'&&fresh.profile.topic===''&&calls.length===1&&
+    records.supplements.length===2&&records.supplements[0].content==='Previously paid contrast.'&&again.id===fresh.id;
+});
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();
 </script>
