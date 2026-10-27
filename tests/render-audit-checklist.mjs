@@ -711,7 +711,11 @@ export function evaluateMediaProbe(probe, check) {
 // on the line below that action (2026-10-28 ruling), never in a column next
 // to it: in a 480px popover a long locale squeezed such a column to a few
 // words a line, and in the usage block that note is what tells the two
-// same-looking buttons apart.
+// same-looking buttons apart. An action's failure (plan 3.4) is a note of the
+// same kind: the role=alert line right after the button that failed, in its
+// own row -- a learning or update row, or the AI entry's action row for
+// generate -- also on the line below it (dict-entry-error,
+// dict-entry-usage-error).
 //
 // dictScrollClip (requires "clip"): every lookup scroll container keeps its
 // content inside it (scrollWidth <= clientWidth), and every measured text
@@ -733,7 +737,7 @@ export const DICT_LOOKUP_GEOMETRY = {
     { role: "translation", selector: ".xp-dict-example-translation", token: "secondary" },
   ],
   // dictActionNoteBelow: the row of one learning action and its note.
-  notes: { row: ".xp-dict-usage-actions", note: ".xp-dict-usage-feedback" },
+  notes: { row: ".xp-dict-usage-actions, .xp-dict-ai-controls", note: ".xp-dict-usage-feedback, .xp-dict-action-error" },
   surfaces: {
     "md-preview": {
       // .xp-dict is the lookup column; the whole popover (its foot holds the
@@ -751,6 +755,10 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-entry-examples": { requires: ["edges", "senseIndent", "original", "overflow", "clip"] },
         // A remembered empty result: the action and its neutral note, no sentence.
         "dict-entry-negative": { requires: ["edges", "senseIndent", "overflow", "clip", "notes"] },
+        // A failed first generation and a failed usage point (plan 3.4): each
+        // error is the line below the button that failed.
+        "dict-entry-error": { requires: ["edges", "senseIndent", "overflow", "clip", "notes"] },
+        "dict-entry-usage-error": { requires: ["edges", "original", "translation", "overflow", "clip", "notes"] },
         // dictDefaultView "dictionary": the dictionary result with the saved
         // AI entry folded into its free reveal line, then opened in place.
         "dict-entry-folded": { requires: ["edges", "senseIndent", "overflow", "clip"] },
@@ -783,6 +791,8 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip"] },
         "dict-entry-examples": { requires: ["edges", "senseIndent", "original", "overflow", "clip"] },
         "dict-entry-negative": { requires: ["edges", "senseIndent", "overflow", "clip", "notes"] },
+        "dict-entry-error": { requires: ["edges", "senseIndent", "overflow", "clip", "notes"] },
+        "dict-entry-usage-error": { requires: ["edges", "original", "translation", "overflow", "clip", "notes"] },
         "dict-entry-folded": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-entry-revealed": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-legacy": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },

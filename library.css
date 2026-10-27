@@ -2250,14 +2250,16 @@ html.motion-ready .vocab-note-save {
 /* The settings link is a link, not a control: its inset stays on the scale. */
 #vocab-ref-result .xp-dict-ai-controls a.xp-dict-connect { padding-inline: var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-ai-controls + .xp-dict-ai-status:not(:empty),
-#vocab-ref-result .xp-dict-ai-controls ~ .xp-dict-usage-feedback { margin-top: var(--lib-sp-2); }
+#vocab-ref-result .xp-dict-ai-controls ~ .xp-dict-usage-feedback,
+#vocab-ref-result .xp-dict-ai-controls ~ .xp-dict-action-error { margin-top: var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-ai[hidden],
 #vocab-ref-result .xp-dict-ai [hidden] { display: none; }
 /* The card's metadata line, once, after every AI block. */
 #vocab-ref-result .xp-dict-ai-provenance { margin-top: var(--lib-sp-3); }
 #vocab-ref-result .xp-dict-ai-content { min-width: 0; }
 #vocab-ref-result .xp-dict-ai-status:empty { display: none; }
-#vocab-ref-result .xp-dict-ai-status:not(:empty) { margin-bottom: var(--lib-sp-2); }
+#vocab-ref-result .xp-dict-ai-status:not(:empty),
+#vocab-ref-result .xp-dict-ai > .xp-dict-action-error { margin-bottom: var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-ai-details { margin-top: var(--lib-sp-4); font-size: 14px; line-height: 23px; }
 #vocab-ref-result .xp-dict-ai-details > summary {
   display: flex; align-items: center; gap: var(--lib-sp-2); list-style: none;
@@ -2333,6 +2335,10 @@ html.motion-ready .vocab-note-save {
 /* An action's note is the line below it (2026-10-28 ruling), never a column
    beside it; while busy the button hides and the progress keeps one row. */
 #vocab-ref-result .xp-dict-usage-actions > .xp-dict-usage-feedback { flex: 1 1 100%; }
+/* An action's failure (plan 3.4) is the alert line right after the button
+   that failed, in the same row; like a note it wraps to the line below. */
+#vocab-ref-result .xp-dict-action-error { margin: 0; }
+#vocab-ref-result :is(.xp-dict-usage-actions, .xp-dict-ai-controls) > .xp-dict-action-error { flex: 1 1 100%; min-width: 0; }
 #vocab-ref-result .xp-dict-usage-status { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 /* Generation progress (plan 2.6): seconds waited, plain text beside the
    phase line, in fixed-width digits so the cancel beside it does not jitter.

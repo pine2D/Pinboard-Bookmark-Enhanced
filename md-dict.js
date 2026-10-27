@@ -1604,6 +1604,22 @@ function _pbpDictToneText(el, text, tone = "") {
   } else el.textContent = text;
   if (text && tone) el.dataset.state = tone; else delete el.dataset.state;
 }
+// An action's failure (plan 3.4) is its own role=alert line placed right
+// after the button that failed -- in the same action row, so it reads where
+// the retry is -- with the warning icon. It is removed and, for a new failure,
+// inserted afresh, so each failure is announced once and never also spoken by
+// a status line. Neutral answers and progress never use it: they stay in the
+// polite status lines with the info icon (or none). Empty text clears it.
+function _pbpDictActionError(trigger, text) {
+  const old = trigger?.nextElementSibling;
+  if (old?.classList.contains("xp-dict-action-error")) old.remove();
+  if (!text || !trigger?.parentElement) return null;
+  const error = document.createElement("p"); error.className = "xp-dict-msg xp-dict-action-error";
+  error.setAttribute("role", "alert");
+  _pbpDictToneText(error, text, "error");
+  trigger.after(error);
+  return error;
+}
 const PBP_DICT_FAILURE_EXTRA_CODES = Object.freeze(["ai_disabled", "ai_not_configured", "invalid_request", "not_saved",
   "source_failed", "stale", "network", "endpoint_invalid"]);
 function _pbpDictFailureCode(error) {
@@ -1910,16 +1926,14 @@ function _pbpDictEntryMount(host, opts) {
     try { return code ? new Intl.DisplayNames([document.documentElement.lang || "en"], { type: "language" }).of(code) : language.name; }
     catch (_) { return language.name; }
   };
-  const message = (text, tone = "") => { _pbpDictToneText(status, text, tone); status.hidden = !text; };
-  const inlineError = (anchor, text, tone = "error") => {
-    if (!anchor?.isConnected) { message(text, tone); return; }
-    let error = anchor.previousElementSibling;
-    if (!error?.classList.contains("xp-dict-action-error")) {
-      error = document.createElement("p"); error.className = "xp-dict-msg xp-dict-action-error";
-      error.setAttribute("role", "alert"); anchor.before(error);
-    }
-    _pbpDictToneText(error, text, tone); error.hidden = !text;
-    if (text) message("");
+  // The panel's own line, for what belongs to no action (syncing, a settings
+  // or account failure, a cache write that failed). The status node speaks
+  // plain and neutral text politely; an error there is an alert line in its
+  // place instead (plan 3.4), so only an error interrupts.
+  const message = (text, tone = "") => {
+    const error = tone === "error";
+    _pbpDictToneText(status, error ? "" : text, error ? "" : tone); status.hidden = error || !text;
+    _pbpDictActionError(status, error ? text : "");
   };
   // One feedback box: the phase line (the only live region), the elapsed
   // seconds as plain text beside it -- never inside an aria-live or
@@ -1952,8 +1966,16 @@ function _pbpDictEntryMount(host, opts) {
     if (hadFocus) anchor.focus({ preventScroll: true });
     return feedback;
   };
-  const usageMessage = (feedback, text, state = "") => {
-    _pbpDictToneText(feedback.text, text, state === "error" || state === "neutral" ? state : "");
+  // An action's note. Progress, saved and neutral answers stay in its polite
+  // status line; an error goes to an alert line right after the button that
+  // failed (trigger: the feedback's own action, or the generate button for
+  // the first entry), or to the panel's line when that button is gone.
+  const usageMessage = (feedback, text, state = "", trigger = feedback.anchor) => {
+    const error = state === "error" && !!text;
+    if (error && !trigger?.isConnected) message(text, "error");
+    else if (trigger) _pbpDictActionError(trigger, error ? text : "");
+    if (error) { text = ""; state = ""; }
+    _pbpDictToneText(feedback.text, text, state === "neutral" ? state : "");
     feedback.box.hidden = !text;
     feedback.box.dataset.state = state;
     feedback.cancel.hidden = state !== "busy";
@@ -2121,6 +2143,9 @@ function _pbpDictEntryMount(host, opts) {
       }
       details.open = wasOpen; baseDetails = details; renderedBase = baseKey;
     }
+    // An entry is on screen now: a neutral note left by an earlier first
+    // generation no longer answers anything (a running one keeps its line).
+    if (entryProgress.box.dataset.state !== "busy") usageMessage(entryProgress, "", "", null);
     renderSupplements(answerLanguage, revealSupplement);
     opts.onEntry?.(norm, record, content);
     show(open);
@@ -2181,6 +2206,7 @@ function _pbpDictEntryMount(host, opts) {
         baseRetry.addEventListener("click", async () => {
           if (!alive() || busy || saving) return;
           saving = true; baseRetry.setAttribute("aria-disabled", "true");
+          _pbpDictActionError(baseRetry, "");
           try {
             const saved = await pbpDictEntrySave(entryInput(opts.signal, alive), record);
             if (alive()) {
@@ -2189,7 +2215,7 @@ function _pbpDictEntryMount(host, opts) {
               if (hadFocus) focusEntry();
             }
           } catch (error) {
-            if (alive()) message(t("dictEntryNotCached"), "error");
+            if (alive()) _pbpDictActionError(baseRetry, t("dictEntryNotCached"));
             console.warn("[dict-entry] save retry failed:", error?.name);
           } finally { saving = false; baseRetry.removeAttribute("aria-disabled"); }
         });
@@ -2228,10 +2254,19 @@ function _pbpDictEntryMount(host, opts) {
       // a failed save can still be retried. dictSupplementLegacy is a
       // different note: old content without the v2 structure.
       const legacyCategory = !_pbpDictGeneratableCategory(addition.category);
-      const title = t("dictSupplement" + addition.category[0].toUpperCase() + addition.category.slice(1)) +
-        (addition.profile.topic ? " · " + addition.profile.topic : "") +
-        (legacyCategory ? " · " + t("dictSupplementLegacyCategory") : "");
-      if (heading.textContent !== title) heading.textContent = title;
+      const name = t("dictSupplement" + addition.category[0].toUpperCase() + addition.category.slice(1)) +
+        (addition.profile.topic ? " · " + addition.profile.topic : "");
+      const title = name + (legacyCategory ? " · " + t("dictSupplementLegacyCategory") : "");
+      if (heading.textContent !== title) {
+        heading.textContent = legacyCategory ? name + " · " : name;
+        // "Old category" is a neutral state (plan 3.4): the info icon leads
+        // it, aria-hidden and outside the text.
+        if (legacyCategory) {
+          const note = document.createElement("span");
+          _pbpDictToneText(note, t("dictSupplementLegacyCategory"), "neutral");
+          heading.append(...note.childNodes);
+        }
+      }
       const contentKey = JSON.stringify(addition.learning || addition.content);
       if (item.contentKey !== contentKey) {
         text.replaceChildren();
@@ -2278,6 +2313,8 @@ function _pbpDictEntryMount(host, opts) {
           if (learning.omittedItems) {
             const partial = document.createElement("p"); partial.className = "xp-dict-msg";
             partial.dataset.partialResult = "true"; partial.lang = document.documentElement.lang || "und"; partial.dir = "auto";
+            // Part of the record's text, so it keeps the text column's edge:
+            // no leading icon (the action row's partial status carries it).
             partial.textContent = t("dictSupplementPartial", String(learning.items.length), String(learning.omittedItems));
             text.appendChild(partial);
           }
@@ -2462,7 +2499,10 @@ function _pbpDictEntryMount(host, opts) {
         } else if (!remembered && feedback.remembered) {
           usageMessage(feedback, ""); feedback.remembered = false;
         }
-        feedback.box.parentElement.hidden = el.hidden && feedback.box.hidden;
+        // The row stays while it holds this button's error (a failed save
+        // hides the button but must still be read beside it).
+        feedback.box.parentElement.hidden = el.hidden && feedback.box.hidden &&
+          !el.nextElementSibling?.classList.contains("xp-dict-action-error");
       }
       profile.hidden = buttons.patterns.hidden && buttons.confusables.hidden;
       etymologyHint.hidden = buttons.etymology.hidden;
@@ -2532,9 +2572,11 @@ function _pbpDictEntryMount(host, opts) {
         if (category !== "etymology") pbpDictNegForget(opts.owner, negParts(category));
         const id = supplementId(addition), focusStayed = document.activeElement === feedback.cancel;
         render(record, answerLanguage, false, id);
+        // A failed save is an error; a partial result is a neutral answer
+        // (info icon, no alert); a full one is a plain "saved".
         usageMessage(feedback, addition.archiveSaved === false ? t("dictSupplementSaveFailed") : addition.learning?.omittedItems
           ? t("dictSupplementPartial", String(addition.learning.items.length), String(addition.learning.omittedItems)) : t("dictSupplementSaved"),
-          addition.archiveSaved === false ? "error" : "saved");
+          addition.archiveSaved === false ? "error" : addition.learning?.omittedItems ? "neutral" : "saved");
         // The result replaces its button; focus moves to its heading without
         // scrolling, so the reader stays where they were while waiting.
         if (focusStayed) restoreFocus = supplementNodes.get(id)?.heading;
@@ -2571,10 +2613,11 @@ function _pbpDictEntryMount(host, opts) {
     if (!alive() || busy || !configured()) return;
     const hadFocus = manual && (document.activeElement === generate || content.contains(document.activeElement));
     // An update reports beside its own button; the first generation in the
-    // panel's progress line. An update's error goes above its action row.
+    // panel's progress line. Either one's error is the line right after the
+    // button that was clicked (plan 3.4), never the panel's top line.
     const feedback = updateId && origin?.isConnected ? usageFeedback(origin) : entryProgress;
-    const errorAnchor = feedback.anchor ? feedback.box.parentElement : origin;
-    if (updateId) inlineError(errorAnchor, "");
+    const trigger = updateId ? origin : generate;
+    _pbpDictActionError(trigger, "");
     const version = ++epoch, controller = new AbortController(); active = controller; busy = true;
     const current = () => alive() && epoch === version && !controller.signal.aborted;
     const act = startProgress("entry", feedback, feedback.anchor || generate, version);
@@ -2582,7 +2625,7 @@ function _pbpDictEntryMount(host, opts) {
     sync();
     // Only a click moves focus, and only to this run's own cancel.
     if (hadFocus) feedback.cancel.focus({ preventScroll: true });
-    let ledgerStage = manual ? "permission" : "generating";
+    let ledgerStage = manual ? "permission" : "generating", cancelFocused = false;
     try {
       // The automatic path never requests permission. Only this direct click
       // can open Chrome's exact-origin permission prompt, before any other await.
@@ -2604,15 +2647,20 @@ function _pbpDictEntryMount(host, opts) {
       if (!current()) return;
       console.warn("[dict-entry] generation failed:", error?.name, _pbpDictFailureCode(error), _pbpDictFailureReason(error));
       _pbpDictLedgerFail(opts.owner, error, ledgerStage, "entry");
-      const text = t(_pbpDictGenerationErrorKey(error)), tone = _pbpDictFailureTone(error);
-      if (updateId) inlineError(errorAnchor, text, tone); else message(text, tone);
+      // A failure is an alert beside the button; a neutral answer stays in
+      // this run's own polite line with the info icon. Writing it hides the
+      // cancel, so note first whether focus was there.
+      cancelFocused = document.activeElement === feedback.cancel;
+      usageMessage(feedback, t(_pbpDictGenerationErrorKey(error)), _pbpDictFailureTone(error), trigger);
     } finally {
       endProgress(act);
       if (epoch === version) {
         busy = false; active = null;
         if (alive()) {
-          const cancelFocused = document.activeElement === feedback.cancel;
-          usageMessage(feedback, ""); sync();
+          cancelFocused ||= document.activeElement === feedback.cancel;
+          // Take down the progress, not the answer the catch just wrote.
+          if (feedback.box.dataset.state === "busy") usageMessage(feedback, "", "", null);
+          sync();
           if (cancelFocused) {
             if (origin?.isConnected && !origin.hidden) origin.focus({ preventScroll: true });
             else focusEntry();
@@ -2774,8 +2822,13 @@ function pbpDictExamplesView(opts) {
   const negParts = { term: opts.term, sourceLanguage: language, target: "", category: "examples" };
   let busy = false, remembered = false;
   const alive = () => !opts.signal?.aborted && block.isConnected && opts.isCurrent() === true;
+  // Neutral answers and progress speak politely in the status line; a
+  // failure is an alert line right after the find button (plan 3.4).
   const say = (text, state = "") => {
-    _pbpDictToneText(status, text, state === "error" || state === "neutral" ? state : "");
+    const error = state === "error" && !!text;
+    _pbpDictActionError(find, error ? text : "");
+    if (error) { text = ""; state = ""; }
+    _pbpDictToneText(status, text, state === "neutral" ? state : "");
     box.hidden = !text; box.dataset.state = state;
   };
   const results = [];

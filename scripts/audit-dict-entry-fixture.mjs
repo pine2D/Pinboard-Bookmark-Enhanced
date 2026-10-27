@@ -298,7 +298,8 @@ export async function openDictEntryState(page, state) {
   }
   if (state === 'usage-error') {
     await page.evaluate(() => window._auditDictEntry.usageRelease());
-    await page.locator(USAGE_ROW + ' .xp-dict-usage-feedback[data-state="error"]').waitFor();
+    // Plan 3.4: the failure is the alert line right after the button.
+    await page.locator(USAGE_ROW + ' > .xp-dict-action-error[role="alert"]').waitFor();
     return page.locator(USAGE_ACTION).isVisible();
   }
   if (state === 'usage-result') {
@@ -383,9 +384,11 @@ export async function openDictEntryState(page, state) {
     await action.click();
     await page.waitForFunction(() => window._auditDictEntry?.entered);
     await page.evaluate(() => window._auditDictEntry.release());
+    // Plan 3.4: the failure is the alert line right after the generate
+    // button, not the panel's top status line.
     await page.waitForFunction(() => document.querySelector('.xp-dict-ai')?.getAttribute('aria-busy') === 'false' &&
-      document.querySelector('.xp-dict-ai-status')?.textContent === t('dictSupplementInvalid'));
-    return page.locator('.xp-dict-ai-status:not([hidden])').isVisible();
+      document.querySelector('.xp-dict-ai-generate + .xp-dict-action-error')?.textContent === t('dictSupplementInvalid'));
+    return page.locator('.xp-dict-ai-generate + .xp-dict-action-error[role="alert"]').isVisible();
   }
   if (state === 'examples') {
     // Free original-text examples (plan 1C.2): no AI key and no AI entry.

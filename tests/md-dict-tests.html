@@ -1997,6 +1997,9 @@ async function runDictionaryEntryUiTests() {
   };
   const progressOf=scope=>{const box=scope?.querySelector('.xp-dict-usage-feedback');
     return {box,text:box?.querySelector('.xp-dict-usage-status'),elapsed:box?.querySelector('.xp-dict-usage-elapsed'),cancel:box?.querySelector('.xp-dict-usage-stop')};};
+  // Plan 3.4: an action's failure is the alert line right after its button;
+  // anything else (progress, saved, a neutral answer) is the status line.
+  const noteOf=(button,status)=>{const next=button?.nextElementSibling;return next?.classList.contains('xp-dict-action-error')?next:status?.();};
   const mount=(extra={})=>{
     const root=document.createElement("div"),host=document.createElement("div"),ctrl=new AbortController();
     // The mount owns only its host. Dictionary visibility beside the AI entry is
@@ -2090,6 +2093,26 @@ async function runDictionaryEntryUiTests() {
         tones.push(el?.dataset.state===tone&&el.querySelectorAll("svg").length===1&&el.querySelector(":scope > .xp-dict-msg-ic > svg")?.dataset.icon===icon&&el.textContent===text&&!!text);
       }
       check(label+" shows failures in the error tone with a warning icon and no-source / unsupported answers in the neutral tone with an info icon",tones.every(Boolean));
+      // Plan 3.4: a failure is announced once -- one fresh role=alert line
+      // right after the button that failed, and no polite region saying the
+      // same words; a neutral answer adds no alert at all.
+      {
+        const panel=getMessage()?.closest('.xp-dict-ai');
+        const speakers=text=>[...panel.querySelectorAll('[role="alert"],[role="status"],[aria-live]')].filter(el=>el.checkVisibility()&&el.textContent.includes(text));
+        let alerts=0;const seen=new MutationObserver(list=>{for(const change of list)for(const node of change.addedNodes)
+          if(node.nodeType===1&&(node.matches('[role="alert"]')||node.querySelector('[role="alert"]')))alerts++;});
+        seen.observe(panel,{subtree:true,childList:true,attributes:true,attributeFilter:["role"]});
+        const failure=await attempt({code:"invalid_response"});await settle();const failureAlerts=alerts,failureSpeakers=speakers(failure),failed=getMessage();
+        const failedBeside=!!failed?.previousElementSibling?.matches('button')&&!failed.querySelector('[role],[aria-live]');
+        alerts=0;
+        const answer=await attempt({code:"no_sources"});await settle();const answerAlerts=alerts,answerSpeakers=speakers(answer);
+        seen.disconnect();
+        check(label+" announces a failure once: one new alert right after its button, never also in a status line",!!failure&&failureAlerts===1&&
+          failureSpeakers.length===1&&failureSpeakers[0]===failed&&failed.getAttribute('role')==='alert'&&failedBeside);
+        check(label+" gives a neutral answer no alert: it stays in the polite status line with the info icon",!!answer&&answerAlerts===0&&
+          answerSpeakers.length===1&&answerSpeakers[0].getAttribute('role')==='status'&&!panel.querySelector('.xp-dict-action-error')&&
+          answerSpeakers[0].querySelector(':scope > .xp-dict-msg-ic > svg')?.dataset.icon==='info');
+      }
       const ambiguous=[];
       for(const properties of [{status:"402"},{status:"401"},{status:"524"},{status:499},{code:secret},{code:{}}]) ambiguous.push(await attempt(properties)===fallback);
       check(label+" does not infer billing or expose raw text from malformed or unrelated errors",ambiguous.every(Boolean)&&!getMessage().textContent.includes(secret));
@@ -2244,8 +2267,10 @@ async function runDictionaryEntryUiTests() {
       let rejectRun;window.pbpDictEntryRun=input=>{calls.push(input);return new Promise((_resolve,reject)=>{rejectRun=reject;});};
       const broken=mount();await broken.ui.ready;broken.host.querySelector('.xp-dict-ai-generate').click();await settle();
       rejectRun(Object.assign(new Error('fixture'),{name:'TimeoutError'}));await settle();
-      check("a failed generation stops its clock and shows its error in the status line",clock.timers.size===0&&progressOf(broken.host.querySelector('.xp-dict-ai')).box.hidden&&
-        broken.host.querySelector('.xp-dict-ai-status').textContent==='trErrTimeout');
+      const brokenError=broken.host.querySelector('.xp-dict-ai-generate').nextElementSibling;
+      check("a failed generation stops its clock and shows its error as an alert right after the generate button, not in the top status line",clock.timers.size===0&&progressOf(broken.host.querySelector('.xp-dict-ai')).box.hidden&&
+        brokenError?.classList.contains('xp-dict-action-error')&&brokenError.getAttribute('role')==='alert'&&brokenError.textContent==='trErrTimeout'&&
+        broken.host.querySelector('.xp-dict-ai-status').hidden&&!broken.host.querySelector('.xp-dict-ai-status').textContent);
       const closing=mount();await closing.ui.ready;closing.host.querySelector('.xp-dict-ai-generate').click();await settle();
       const closingTimers=clock.timers.size;closing.ctrl.abort();
       check("closing the lookup stops the clock at once",closingTimers===1&&clock.timers.size===0);
@@ -2296,7 +2321,10 @@ async function runDictionaryEntryUiTests() {
       } finally {window.pbpDictLedgerRecord=realLedger;window.ensureAIHostPermissionWithGesture=realGrant;}
     }
     await checkFailureDiagnostics("base generation", "pbpDictEntryRun", ()=>failed.host.querySelector('.xp-dict-ai-generate').click(), "[dict-entry] generation failed:");
-    await checkGenerationFeedback("base generation","pbpDictEntryRun",()=>failed.host.querySelector('.xp-dict-ai-generate').click(),()=>failed.host.querySelector('.xp-dict-ai-status'),"dictEntryUnavailable");
+    // A lookup with no entry yet, where the generate button is the one on
+    // screen (the mount above already holds a generated entry).
+    const feedbackUi=mount();await feedbackUi.ui.ready;
+    await checkGenerationFeedback("base generation","pbpDictEntryRun",()=>feedbackUi.host.querySelector('.xp-dict-ai-generate').click(),()=>noteOf(feedbackUi.host.querySelector('.xp-dict-ai-generate'),()=>progressOf(feedbackUi.host.querySelector('.xp-dict-ai')).text),"dictEntryUnavailable");
     const requestsBeforePermission=calls.length;window.ensureAIHostPermissionWithGesture=async()=>{throw Object.assign(new Error("Permission needed"),{code:"host_permission"});};
     failed.host.querySelector('.xp-dict-ai-generate').click();await settle();
     check("permission denial shows actionable recovery without generating",calls.length===requestsBeforePermission&&failed.host.textContent.includes("aiGrantRetry"));
@@ -2421,6 +2449,9 @@ async function runDictionaryEntryUiTests() {
       window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[old]});
       const legacyUi=mount();await legacyUi.ui.ready;
       const section=legacyUi.host.querySelector('[data-supplement-id]');
+      const legacyMark=section?.querySelector(':scope > summary > svg, :scope > summary > .xp-dict-msg-ic');
+      check("the old-category label is a neutral state: an info icon outside the text and no alert",(!window.PBP_ICONS?.info||!!legacyMark)&&
+        !section?.querySelector(':scope > summary')?.closest('[role="alert"]')&&!section?.querySelector('[role="alert"]'));
       check("an old "+category+" supplement is read with its title and the old-category label, no update, its save retry kept",
         section?.querySelector(':scope > summary')?.textContent==='dictSupplement'+category[0].toUpperCase()+category.slice(1)+' · dictSupplementLegacyCategory'&&
         !section.closest('[data-learning-block]')&&!section.open&&!section.querySelector('.xp-dict-update-supplement')&&!!section.querySelector('.xp-dict-retry-save')&&section.textContent.includes('Earlier paid guidance'));
@@ -2522,7 +2553,7 @@ async function runDictionaryEntryUiTests() {
     const retryButton=retrySection.querySelector('.xp-dict-retry-save');
     const beforeRetryCalls=calls.length;
     window.pbpDictSupplementSave=async()=>{throw new Error('fixture storage failure');};retryButton.focus();retryButton.click();await settle();
-    check("failed supplement persistence reports beside its local retry without losing paid content",retrySection.querySelector('.xp-dict-usage-status')?.textContent==='dictSupplementSaveFailed'&&retryButton.checkVisibility()&&retryUsage.host.querySelector('.xp-dict-ai-status').hidden&&retrySection.textContent.includes(addition.content));
+    check("failed supplement persistence reports beside its local retry without losing paid content",noteOf(retryButton)?.textContent==='dictSupplementSaveFailed'&&noteOf(retryButton).getAttribute('role')==='alert'&&retryButton.checkVisibility()&&retryUsage.host.querySelector('.xp-dict-ai-status').hidden&&retrySection.textContent.includes(addition.content));
     window.pbpDictSupplementSave=async(_input,value)=>({...value,archiveSaved:true});
     retryButton.focus();retryButton.click();await settle();
     check("retry saving a supplement updates its receipt without recreating open content or calling AI",retryUsage.host.querySelector('[data-supplement-id]')===retrySection&&retrySection.open&&retryOrigin.open&&!retrySection.querySelector('.xp-dict-retry-save')&&document.activeElement===retrySection.querySelector('summary')&&calls.length===beforeRetryCalls);
@@ -2531,7 +2562,7 @@ async function runDictionaryEntryUiTests() {
     window.pbpDictSupplementRun=async()=>{throw new Error('fixture failure');};
     submit=paid(failUi.host,'confusables');submit.focus();submit.click();await settle();
     check("failed supplement returns keyboard focus to its retryable action",document.activeElement===submit&&!submit.disabled);
-    check("failed supplement leaves a visible local message next to its retryable action",submit.closest('.xp-dict-usage-actions').querySelector('.xp-dict-usage-status').textContent==='dictSupplementUnavailable'&&failUi.host.querySelector('.xp-dict-ai-status').hidden);
+    check("failed supplement leaves a visible local message next to its retryable action",noteOf(submit)?.textContent==='dictSupplementUnavailable'&&noteOf(submit).checkVisibility()&&noteOf(submit).parentElement===submit.closest('.xp-dict-usage-actions')&&failUi.host.querySelector('.xp-dict-ai-status').hidden);
     check("one usage point failing leaves the other usable and quiet",!paid(failUi.host,'patterns').disabled&&paid(failUi.host,'patterns').checkVisibility()&&
       paid(failUi.host,'patterns').closest('.xp-dict-usage-actions').querySelector('.xp-dict-usage-feedback').hidden);
     // "Nothing usable" for a usage point has its own neutral copy, apart
@@ -2576,7 +2607,7 @@ async function runDictionaryEntryUiTests() {
       } finally {window.pbpDictLedgerRecord=realLedger;window.pbpDictSupplementRun=realRun;}
     }
     await checkFailureDiagnostics("supplement generation", "pbpDictSupplementRun", ()=>submit.click(), "[dict-entry] usage generation failed:");
-    await checkGenerationFeedback("supplement generation","pbpDictSupplementRun",()=>submit.click(),()=>submit.closest('.xp-dict-usage-actions').querySelector('.xp-dict-usage-status'),"dictSupplementUnavailable","dictUsagePointsEmpty");
+    await checkGenerationFeedback("supplement generation","pbpDictSupplementRun",()=>submit.click(),()=>noteOf(submit,()=>submit.closest('.xp-dict-usage-actions').querySelector('.xp-dict-usage-status')),"dictSupplementUnavailable","dictUsagePointsEmpty");
     window.pbpDictSupplementRun=()=>new Promise(resolve=>{resolveUsage=resolve;});submit.click();await settle();
     const finishStopped=resolveUsage;failUi.host.querySelector('.xp-dict-usage-stop:not([hidden])').focus();failUi.host.querySelector('.xp-dict-usage-stop:not([hidden])').click();
     check("stopping a supplement immediately restores its visible action before the aborted request settles",document.activeElement===submit&&!document.activeElement.hidden&&!submit.disabled);
@@ -2620,6 +2651,7 @@ async function runDictionaryEntryUiTests() {
     const updateAction=partialSection.querySelector('.xp-dict-update-supplement');
     check("a reopened partial supplement keeps a neutral partial note and offers only the regenerate action",
       partialSection.querySelector('[data-partial-result]')?.textContent.startsWith('dictSupplementPartial')&&
+      !partialSection.querySelector('[role="alert"]')&&
       updateAction.children[1]?.textContent==='dictSupplementUpdate'&&updateAction.title==='dictSupplementUpdateHint'&&
       partialSection.querySelectorAll('.xp-dict-update-supplement').length===1);
     updateAction.click();await settle();
@@ -2675,7 +2707,7 @@ async function runDictionaryEntryUiTests() {
     for(const [code,label] of [['wrong_language','dictSupplementWrongLanguage'],['no_sources','dictSupplementNoSources'],['invalid_response','dictSupplementInvalid']]) {
       window.pbpDictSupplementRun=async()=>{throw Object.assign(new Error('fixture update failure'),{code});};
       updateButton.focus();updateButton.click();await settle();
-      const error=updateSection.querySelector('.xp-dict-usage-status');
+      const error=noteOf(updateButton,()=>updateSection.querySelector('.xp-dict-usage-status'));
       check("failed supplement update restores its visible origin and nearby recovery message: "+code,
         document.activeElement===updateButton&&updateButton.checkVisibility()
         &&error?.checkVisibility()&&error.textContent===label&&error.closest(".xp-dict-usage-actions")===updateButton.parentElement
@@ -2702,8 +2734,8 @@ async function runDictionaryEntryUiTests() {
     window.pbpDictEntryRun=async()=>{throw Object.assign(new Error('fixture base update failure'),{code:'invalid_response'});};
     baseUpdate=reloadedMeaning.host.querySelector('.xp-dict-update-entry');
     baseUpdate.focus();baseUpdate.click();await settle();
-    // The explanation sits right above the update's action row.
-    const baseUpdateError=()=>baseUpdate.closest('.xp-dict-usage-actions')?.previousElementSibling;
+    // The explanation is the line right after the update button, in its row.
+    const baseUpdateError=()=>noteOf(baseUpdate,()=>progressOf(baseUpdate.closest('.xp-dict-usage-actions')).text);
     check("failed base updates also retain paid content and return focus to a visible origin with an inline explanation",
       document.activeElement===baseUpdate&&baseUpdate.checkVisibility()
       &&baseUpdateError()?.getAttribute('role')==='alert'
@@ -2718,7 +2750,9 @@ async function runDictionaryEntryUiTests() {
       baseUpdate=reloadedMeaning.host.querySelector('.xp-dict-update-entry');
       baseUpdate.click();await settle();
       const inline=baseUpdateError();
-      inlineTones.push(inline?.classList.contains('xp-dict-action-error')&&inline.dataset.state===tone&&inline.querySelectorAll('svg').length===1
+      inlineTones.push((tone==='error'?inline?.classList.contains('xp-dict-action-error')&&inline.getAttribute('role')==='alert'
+          :inline?.classList.contains('xp-dict-usage-status')&&!inline.closest('[role="alert"]')&&!baseUpdate.nextElementSibling?.classList.contains('xp-dict-action-error'))
+        &&inline.dataset.state===tone&&inline.querySelectorAll('svg').length===1
         &&inline.querySelector(':scope > .xp-dict-msg-ic > svg')?.dataset.icon===icon&&inline.textContent===key);
     }
     check("the inline update error carries the failure / answer tone and its icon outside the announced text",inlineTones.every(Boolean));
@@ -3208,6 +3242,11 @@ async function runDictionaryExamplesTests() {
   const slotShown=el=>!!el&&el.isConnected&&!el.closest("[hidden]")&&getComputedStyle(el).display!=="none"&&el.getClientRects().length>0;
   const block=()=>pop.querySelector(".xp-dict-examples");
   const button=()=>block()?.querySelector(".xp-dict-examples-find");
+  // Plan 3.4: a failure is the alert line right after the find button, in its
+  // row, with the warning icon; the polite status line stays empty.
+  const exampleError=()=>{const el=button()?.nextElementSibling;
+    return el?.classList.contains("xp-dict-action-error")&&el.getAttribute("role")==="alert"&&el.dataset.state==="error"&&
+      el.parentElement===button().parentElement&&block().querySelector(".xp-dict-usage-feedback").hidden?el:null;};
   const run=async(settings,lang="en",term="provider")=>{_pbpDictResolveLang=async()=>lang;await pbpDictRun({text:term},{sentence:"A provider waits."},pop,ctrl,settings);await _pbpDictCurrent.ai?.ready;await settle();};
   try {
     _pbpDictLoadPack=async()=>false;_pbpDictEcdictSide=async()=>{};pbpVocabGet=async()=>null;_pbpDictOwner="acct_examples";
@@ -3267,7 +3306,7 @@ async function runDictionaryExamplesTests() {
     window.hasAIKey=()=>false;
 
     grant=false;log=[];fetched=[];await run({previewAiEnabled:true});button().click();await settle();
-    check("a refused grant sends nothing and keeps the action for a later click",!fetched.length&&!log.some(([kind])=>kind==="owner")&&block().querySelector(".xp-dict-usage-status")?.textContent==="dictExamplesGrantNeeded"&&slotShown(button())&&!button().disabled);
+    check("a refused grant sends nothing and keeps the action for a later click",!fetched.length&&!log.some(([kind])=>kind==="owner")&&exampleError()?.textContent==="dictExamplesGrantNeeded"&&slotShown(button())&&!button().disabled);
     grant=true;
 
     search={batchcomplete:true,query:{searchinfo:{totalhits:0},search:[]}};fetched=[];await run({previewAiEnabled:true});button().click();await settle();await settle();
@@ -3279,7 +3318,7 @@ async function runDictionaryExamplesTests() {
     check("a language without a Wikisource edition says so up front and offers no action",block()?.querySelector(".xp-dict-usage-status")?.textContent==="dictExamplesUnsupported"&&!slotShown(button())&&!fetched.length);
 
     fetched=[];liveOwner="acct_someone_else";await run({previewAiEnabled:true});button().click();await settle();
-    check("a different live owner stops retrieval before any request",!fetched.length&&block().querySelector(".xp-dict-usage-status")?.textContent==="vocabAccountChanged");
+    check("a different live owner stops retrieval before any request",!fetched.length&&exampleError()?.textContent==="vocabAccountChanged");
     liveOwner="acct_examples";
 
     fetched=[];await run({previewAiEnabled:true});

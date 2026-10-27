@@ -53,7 +53,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('dict-entry-result', ['dict-entry-busy'], { target: '.xp-dict-ai-content:not([hidden])' }),
     context('dict-entry-details', ['dict-entry-result'], { target: '.xp-dict-ai-details[data-supplement-id][open]' }),
     context('dict-entry-usage-busy', ['dict-entry-result'], { target: '.xp-dict-usage-feedback[data-state="busy"]' }),
-    context('dict-entry-usage-error', ['dict-entry-usage-busy'], { target: '.xp-dict-usage-feedback[data-state="error"]' }),
+    context('dict-entry-usage-error', ['dict-entry-usage-busy'], { target: '.xp-dict-usage-actions > .xp-dict-action-error' }),
     context('dict-entry-usage-result', ['dict-entry-usage-error'], { target: '[data-learning-block="usage"] .xp-dict-usage-feedback[data-state="saved"]' }),
     context('dict-entry-cached', ['dict-entry-result'], { target: '.xp-dict-ai-content:not([hidden])' }),
     // dictDefaultView "dictionary" (Q14=A, plan 3.1): the saved entry the
@@ -61,7 +61,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     // the entry and focuses its title.
     context('dict-entry-folded', ['dict-entry-result'], { target: '.xp-dict-ai-reveal:not([hidden])' }),
     context('dict-entry-revealed', ['dict-entry-folded'], { target: '.xp-dict-ai-title:not([hidden])' }),
-    context('dict-entry-error', ['dict-entry-idle'], { target: '.xp-dict-ai-status:not([hidden])' }),
+    context('dict-entry-error', ['dict-entry-idle'], { target: '.xp-dict-ai-controls > .xp-dict-ai-generate + .xp-dict-action-error' }),
     // Free original-text examples (plan 1C.2): its fixture has no AI key and
     // no AI entry, so it depends on no AI state.
     context('dict-entry-examples', [], { target: '.xp-dict-examples .xp-dict-learning-item' }),

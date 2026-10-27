@@ -199,7 +199,8 @@ await test("retrieval and AI-judgement memories read differently, both neutral w
   // (ruling 2026-10-28); its accessible name still says what it finds.
   const examplesOk = label(view.button) === "dictNegRetry" && view.button.getAttribute("aria-label") === "dictExamplesFind · dictNegRetry" &&
     view.status().textContent === "dictSupplementNoSources" &&
-    view.status().dataset.state === "neutral" && infoIcon(view.status()) && !view.button.closest("[hidden]") && view.button.querySelector("svg")?.outerHTML === svgOf(PBP_ICONS.quote);
+    view.status().dataset.state === "neutral" && infoIcon(view.status()) && view.status().getAttribute("role") === "status" &&
+    !view.element.querySelector('[role="alert"]') && !view.button.closest("[hidden]") && view.button.querySelector("svg")?.outerHTML === svgOf(PBP_ICONS.quote);
   view.element.remove();
   const ui = await entryView();
   const patterns = ui.paid("patterns"), etymology = ui.paid("etymology"), confusables = ui.paid("confusables");
@@ -218,8 +219,11 @@ await test("retrieval and AI-judgement memories read differently, both neutral w
     !patterns.disabled && !patterns.hidden;
   const plainOk = label(confusables) === "dictSupplementConfusables" && !confusables.dataset.remembered && ui.status("confusables").textContent === "" &&
     !confusables.hasAttribute("aria-label");
+  // A remembered miss is a neutral answer (plan 3.4): polite, never an alert.
+  const politeOk = ["patterns", "etymology"].every(category => ui.status(category).getAttribute("role") === "status" &&
+    !ui.status(category).closest('[role="alert"]')) && !ui.host.querySelector('[role="alert"], .xp-dict-action-error');
   ui.close();
-  return hiddenUntilRead && examplesOk && patternsOk && etymologyOk && paidOk && plainOk &&
+  return hiddenUntilRead && examplesOk && patternsOk && etymologyOk && paidOk && plainOk && politeOk &&
     new Set(["dictSupplementNoSources", "dictPatternsNone", "dictConfusablesNone"].map(key => t(key))).size === 3;
 });
 await test("two remembered usage buttons read alike and the note beside each names its own category", async () => {

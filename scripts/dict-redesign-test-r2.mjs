@@ -55,7 +55,8 @@ export const SELECTORS = Object.freeze({
   content: ".xp-dict-ai-content", senses: ".xp-dict-senses > li", entryGenerate: ".xp-dict-ai-generate",
   block: "[data-learning-block]", generate: ".xp-dict-supplement-generate", section: "[data-supplement-category]",
   text: ".xp-dict-supplement-text", actions: ".xp-dict-usage-actions", feedback: ".xp-dict-usage-feedback",
-  errors: ".xp-dict-ai-status, .xp-dict-action-error", status: ".xp-dict-ai-status", progress: ".xp-dict-ai > .xp-dict-usage-feedback"
+  errors: ".xp-dict-ai-status, .xp-dict-action-error", status: ".xp-dict-ai-status", progress: ".xp-dict-ai > .xp-dict-usage-feedback",
+  actionError: ".xp-dict-action-error"
 });
 // Each product prompt's opening, so a message can be tied to its arm.
 const OPENINGS = Object.freeze({ entry: "Create a concise reusable dictionary entry", patterns: "Create one compact usage card",
@@ -507,9 +508,11 @@ async function runCase(page, word, arm, swallow = false) {
     if (!button || button.hidden || button.disabled || !button.checkVisibility()) return { error: "control_missing" };
     if (swallow) { const inert = button.cloneNode(true); button.replaceWith(inert); button = inert; }
     Object.assign(r2State, { calls: 0, pending: 0, actions: 0, actionPending: 0, error: "", reason: "" });
-    // The feedback line beside a supplement button, or the entry status line:
-    // where the product reports a click it refused.
-    const feedbackOf = () => arm === "entry" ? host.querySelector(sel.status) : button.closest(sel.actions)?.querySelector(sel.feedback);
+    // Where the product reports a click it refused (plan 3.4): a failure is
+    // the alert line right after the button; a neutral answer is the feedback
+    // line beside a supplement button, or the entry's own progress line.
+    const feedbackOf = () => button.nextElementSibling?.matches(sel.actionError) ? button.nextElementSibling
+      : arm === "entry" ? host.querySelector(sel.progress) : button.closest(sel.actions)?.querySelector(sel.feedback);
     button.click();
     // Both click handlers show their busy state before their first await.
     // The entry reports in the panel's progress line (plan 2.6), a supplement beside its button.
