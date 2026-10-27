@@ -27,7 +27,20 @@ export async function installDictEntryFixture(page) {
     } });
     ensureAIHostPermissionWithGesture = async () => true;
     requestAIHostPermissions = async () => true;
-    pbpDictEvidenceFetch = async () => [];
+    // Etymology finds no source. The free examples entry runs unchanged on top
+    // of this hand-written evidence record (MediaWiki-derived fields as
+    // pbpDictEvidenceFetch returns them); the guard still runs per request.
+    pbpDictEvidenceFetch = async input => {
+      if (input.kind !== "literature") return [];
+      await input.beforeRequest();
+      return [{ title: 'The Works of Charles Dickens/Volume 1/Chapter 14', url: 'https://en.wikisource.org/w/index.php?oldid=13788016',
+        excerpt: 'It was a long sentence of the kind a lookup column has to wrap, with the queried word in the middle of its original context and a clause after it.',
+        author: 'Charles Dickens', work: 'The Pickwick Papers', location: 'Chapter XIV · ¶ 2', language: 'en', genre: 'novel',
+        revision: '13788016', retrievedAt: 1792800000000, truncated: true }];
+    };
+    // The examples action asks Chrome for one exact Wikisource origin; the
+    // render fixture answers for Chrome so no permission prompt opens.
+    _pbpDictExamplesRequestOrigin = async () => true;
     const cache = new Map();
     window._auditDictEntry = { entered: false, release: null, fail: false, calls: 0, reads: 0, cache };
     // Exercise the production archive against a fresh, isolated database. A
@@ -194,6 +207,27 @@ export async function openDictEntryState(page, state) {
     await page.waitForFunction(() => document.querySelector('.xp-dict-ai')?.getAttribute('aria-busy') === 'false' &&
       document.querySelector('.xp-dict-ai-status')?.textContent === t('dictSupplementInvalid'));
     return page.locator('.xp-dict-ai-status:not([hidden])').isVisible();
+  }
+  if (state === 'examples') {
+    // Free original-text examples (plan 1C.2): no AI key and no AI entry.
+    await page.evaluate(async () => {
+      await chrome.storage.local.remove(['openaiApiKey']);
+      if (typeof _pbpExplainSettings === 'object' && _pbpExplainSettings) delete _pbpExplainSettings.openaiApiKey;
+      window._auditDictEntry.cache.clear();
+      await window._auditDictEntry.resetArchive();
+    });
+    // The open lookup reruns on the settings change; rerun once more so the
+    // checked view is the one built without a key.
+    await page.waitForTimeout(300);
+    await rerunLookup(page);
+    await page.locator('.xp-dict-ai-configure:not([hidden])').waitFor();
+    const before = await page.evaluate(() => window._auditDictEntry.calls);
+    const find = page.locator('.xp-dict-examples .xp-dict-examples-find');
+    await find.click();
+    const item = page.locator('.xp-dict-examples .xp-dict-learning-item');
+    await item.waitFor();
+    if (await page.evaluate(() => window._auditDictEntry.calls) !== before) throw new Error('SETUP: free examples issued an AI request');
+    return item.isVisible();
   }
   throw new Error('SETUP: unknown dictionary entry state ' + state);
 }

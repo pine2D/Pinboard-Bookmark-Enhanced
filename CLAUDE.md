@@ -37,7 +37,7 @@ md-*.js                      # 阅读器子模块：ai-core / translate / ask / 
 vocab-store.js               # pbp-vocab IndexedDB 唯一写边界（words + vector/outbox/tombstone/sync 状态）
 vocab-gdrive.js              # SW-only Google Drive appDataFolder 同步
 dict-pack.js                 # 离线词典包导入（CC-CEDICT / ECDICT / 多语言 Yomitan v3；词包仅本机）
-dict-entry.js                # 可复用 AI 词条与按需补充（2026-10-26/27 裁决收为用法要点／原文用例／词源三块，原文用例不调 AI，流式生成，施工中）
+dict-entry.js                # 可复用 AI 词条与按需补充（2026-10-26/27 裁决收为用法要点／原文用例／词源三块；原文用例是免费检索，不经 dict-entry.js：dict-evidence.js 的 pbpDictUsageExamplesFetch 取原句，md-dict.js 的 pbpDictExamplesView 在阅读器与资料库独立于 AI 面板显示，不调 AI、不翻译、不归档；流式生成，施工中）
 dict-archive.js / dict-archive-gdrive.js  # 完整 AI 词条持久归档与独立 Drive 数据集（不属于生词本、不随缓存淘汰）
 ask-archive.js / ask-archive-gdrive.js  # Ask 完整问答、证据与版本持久归档及 Drive 同步
 library-ask.js              # 按文章与会话浏览、继续提问和删除 Ask 历史
@@ -118,7 +118,7 @@ popup / options / library 三个扩展表面是短命单次渲染、无暖 shape
 | 等宽里的 CJK（最隐蔽） | monospace 栈在 `monospace` 之前必须再列快 CJK 字体，否则中文 placeholder 穿过 Latin 栈踩中 Fixed-width CJK |
 
 - 表单控件（button/input/select）默认**不继承** font-family → 必须 `button, input, select { font-family: inherit; }`（`.fg textarea` 凭更高 specificity 保 monospace）。
-- 图标契约：只从 Lucide v0.525.0（ISC）取 path（24-box、stroke 2，唯一例外 obsidian 品牌钻石；版本基准钉在 shared.js 顶部注释，勿从其他版本拷 path），新图标不手绘、SVG 内禁 `<text>` 节点；`eye/eyeOff` 独占密钥显隐、`refresh` 限定重跑同一动作、`cross` 是删除/移除/关闭家族、`extOpen` 限定真外链、`robot` 限定花 token 的 AI 动作（例外：查词的 AI 词条与补充生成沿用 `wandSparkles`，须带文字与模型名，2026-10-26 用户裁决）；icon-only 按钮必须 `title` + `aria-label` + ≥24px 命中区。**唯一字面字符例外**：`×`（U+00D7）属 Latin-1 Supplement、无 emoji presentation，四处使用点（popup.html `#ai-error-dismiss`、popup.js `.edit-cancel`、shared.js `.fc-dismiss`、options.js `.saved-theme-del`）继承的 body 栈首个可解析家族即覆盖它、不触发回退，是安全字符、**勿迁 SVG**（2026-06-17 round-2 审计裁决，`80e3fe3` 已界定迁移范围；已两度重提，别再提第四次）。
+- 图标契约：只从 Lucide v0.525.0（ISC）取 path（24-box、stroke 2，唯一例外 obsidian 品牌钻石；版本基准钉在 shared.js 顶部注释，勿从其他版本拷 path），新图标不手绘、SVG 内禁 `<text>` 节点；`eye/eyeOff` 独占密钥显隐、`refresh` 限定重跑同一动作、`cross` 是删除/移除/关闭家族、`extOpen` 限定真外链、`robot` 限定花 token 的 AI 动作（例外：查词的 AI 词条与补充生成沿用 `wandSparkles`，须带文字与模型名，2026-10-26 用户裁决；原文用例是免费动作，不用 `wandSparkles`，用 `quote` 加文字、不带模型名）；icon-only 按钮必须 `title` + `aria-label` + ≥24px 命中区。**唯一字面字符例外**：`×`（U+00D7）属 Latin-1 Supplement、无 emoji presentation，四处使用点（popup.html `#ai-error-dismiss`、popup.js `.edit-cancel`、shared.js `.fc-dismiss`、options.js `.saved-theme-del`）继承的 body 栈首个可解析家族即覆盖它、不触发回退，是安全字符、**勿迁 SVG**（2026-06-17 round-2 审计裁决，`80e3fe3` 已界定迁移范围；已两度重提，别再提第四次）。
 - 测量陷阱：暖态（chrome-dbg / 已打开页面）测不到冷首屏，只能在用户真实机器冷启动验证；卡顿计入 Rendering / Recalc+Layout 而 Paint 很小，第二次操作就快 = 一次性冷成本；idle 预热会阻塞主线程，不可取——根治慢字体回退本身。判断字体存在用 `document.fonts.check('16px "字体名"', '中')` 或 DevTools Rendered Fonts / `CSS.getPlatformFontsForNode`，别用测 ASCII 宽度的探针（对 CJK 字体误报）。
 - 热路径避免 `:has()` 等慢选择器；超长面板可考虑 `content-visibility:auto`。
 

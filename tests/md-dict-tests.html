@@ -12,6 +12,7 @@ h2 { margin-top: 24px; }
 <div id="results"></div>
 <script src="../vocab-store.js"></script>
 <script src="../md-dict.js"></script>
+<script src="../dict-evidence.js"></script>
 <script src="../dict-entry.js"></script>
 <script src="../md-vocab-echo.js"></script>
 <script>
@@ -2815,6 +2816,107 @@ async function runDictionaryStructureUiTests() {
 }
 
 
+// Free original-text examples (plan 1C.2, Q20=A): an independent block that a
+// lookup creates beside the AI panel. It never reads AI settings, never calls
+// AI and never archives; its click asks for one exact Wikisource origin first.
+async function runDictionaryExamplesTests() {
+  section("Original-text examples: free, independent of AI, exact Wikisource origin");
+  const saved={resolve:_pbpDictResolveLang,online:_pbpDictSlotRun,local:_pbpDictEcdictSide,load:_pbpDictLoadPack,get:pbpVocabGet,owner:_pbpDictOwner,current:_pbpDictCurrent,fetch:window.fetch,open:indexedDB.open};
+  const names=["pbpDictEntryRead","pbpDictEntryRun","pbpDictSupplementRun","pbpDictSupplementSave","callAI","callAIStream","hasAIKey","ensureAIHostPermissionWithGesture","requestAIHostPermissions","uiLangToBCP47","pbpVocabCurrentOwner","PBP_ICONS","pbpAiBumpCounter","chrome"];
+  const globals=new Map(names.map(name=>[name,Object.hasOwn(window,name)?window[name]:undefined]));
+  const pop=document.createElement("div");pop.dataset.host="panel";pop.innerHTML='<header class="panel-head"><span class="xp-term"></span></header><div class="xp-body"></div><div class="xp-foot"><button class="xp-vocab"></button></div>';document.body.appendChild(pop);
+  const settle=async()=>{for(let i=0;i<12;i++)await new Promise(r=>setTimeout(r,0));};
+  const ctrl=new AbortController();
+  // MediaWiki formatversion=2 responses as the Action API returns them:
+  // list=search rows and an action=parse page with categories and revid.
+  const TITLE="The Works of Charles Dickens/Volume 1/Chapter 14";
+  const SEARCH={batchcomplete:true,query:{searchinfo:{totalhits:1},search:[{ns:0,title:TITLE,pageid:4399301}]}};
+  const PAGE={parse:{title:TITLE,pageid:4399301,revid:13788016,categories:[{category:"British_novels",sortkey:""}],
+    text:'<div class="mw-parser-output" lang="en"><div class="wst-header ws-noexport"><span class="wst-header-title-text">The Pickwick Papers</span><span class="contributor-text"><span class="fn"><a href="/wiki/Author:Charles_Dickens">Charles Dickens</a></span></span><div class="header-section-text">Chapter XIV</div></div><div class="prp-pages-output"><p>These words roused Tom from his reflections. His admiration of the widow increased as she spoke. Thoughtful creature! Comfortable provider!</p><p>“Who is that gentleman in the bar, ma’am?” inquired Tom.</p></div></div>'}};
+  let log=[],fetched=[],grant=true,liveOwner="acct_examples",search=SEARCH,aiCalls=0,opened=[];
+  const permissionGate=()=>new Promise(resolve=>{log.release=resolve;});
+  let request=opts=>{log.push(["request",opts]);return Promise.resolve(grant);};
+  const slotShown=el=>!!el&&el.isConnected&&!el.closest("[hidden]")&&getComputedStyle(el).display!=="none"&&el.getClientRects().length>0;
+  const block=()=>pop.querySelector(".xp-dict-examples");
+  const button=()=>block()?.querySelector(".xp-dict-examples-find");
+  const run=async(settings,lang="en",term="provider")=>{_pbpDictResolveLang=async()=>lang;await pbpDictRun({text:term},{sentence:"A provider waits."},pop,ctrl,settings);await _pbpDictCurrent.ai?.ready;await settle();};
+  try {
+    _pbpDictLoadPack=async()=>false;_pbpDictEcdictSide=async()=>{};pbpVocabGet=async()=>null;_pbpDictOwner="acct_examples";
+    _pbpDictSlotRun=async(_el,term)=>({word:term,sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/provider",license:"CC BY-SA 4.0",entries:[{pos:"noun",ipas:[],forms:[],senses:[{definition:"one who provides",examples:[],subsenses:[]}]}]});
+    const paid=()=>{aiCalls++;throw new Error("examples must not call AI");};
+    Object.assign(window,{hasAIKey:()=>false,ensureAIHostPermissionWithGesture:async()=>{log.push(["ai-permission"]);},requestAIHostPermissions:async()=>{log.push(["ai-permission"]);return true;},
+      uiLangToBCP47:()=>"en",PBP_ICONS:{quote:'<svg data-icon="quote"></svg>',wandSparkles:'<svg data-icon="wand"></svg>',info:"",warning:""},pbpAiBumpCounter:()=>{},
+      pbpDictEntryRead:async()=>null,pbpDictEntryRun:paid,pbpDictSupplementRun:paid,pbpDictSupplementSave:paid,callAI:paid,callAIStream:paid,
+      pbpVocabCurrentOwner:async()=>{log.push(["owner"]);return liveOwner;},
+      chrome:{runtime:{id:"fixture"},permissions:{request:opts=>request(opts),contains:async()=>grant}}});
+    window.fetch=async(raw,options)=>{const url=new URL(raw);fetched.push({url,options});
+      const body=url.searchParams.get("action")==="query"?search:url.searchParams.get("page")===TITLE?PAGE:{error:{code:"missingtitle",info:"The page you specified doesn't exist."}};
+      return new Response(JSON.stringify(body),{status:200,headers:{"content-type":"application/json; charset=utf-8"}});};
+    indexedDB.open=function(name,...rest){opened.push(String(name));return saved.open.call(indexedDB,name,...rest);};
+
+    await run({previewAiEnabled:true});
+    check("with no AI key the examples block is visible and clickable",slotShown(block())&&slotShown(button())&&!button().disabled&&!!pop.querySelector(".xp-dict-ai-configure:not([hidden])"));
+    check("the examples block sits after the dictionary slot, outside the AI panel",!block().closest(".xp-dict-ai")&&!!(pop.querySelector(".xp-dict-slot").compareDocumentPosition(block())&Node.DOCUMENT_POSITION_FOLLOWING)&&block().previousElementSibling===pop.querySelector(".xp-dict-slot"));
+    check("the free action uses the quote icon and plain text, never wandSparkles or a model name",!!button().querySelector('svg[data-icon="quote"]')&&!button().querySelector('svg[data-icon="wand"]')&&button().textContent==="dictExamplesFind"&&!button().querySelector(".xp-dict-model"));
+    log=[];button().click();
+    check("the click asks for the Wikisource origin before any await (owner read, AI permission or fetch)",log.length===1&&log[0][0]==="request"&&!fetched.length);
+    check("the click asks for only that language's exact Wikisource origin",JSON.stringify(log[0][1])==='{"origins":["https://en.wikisource.org/*"]}');
+    await settle();await settle();
+    const item=block().querySelector(".xp-dict-learning-item");
+    check("a found example shows the one source sentence, never its neighbours or a translation",item?.querySelector(".xp-dict-example")?.textContent==="Comfortable provider!"&&!block().textContent.includes("Thoughtful creature")&&!block().querySelector(".xp-dict-example-translation"));
+    const link=item?.querySelector(".xp-dict-src a");
+    check("the source line is author · work · location, then the revision link and verified mark",link?.textContent==="Charles Dickens · The Pickwick Papers · Chapter XIV · ¶ 1"&&link.href==="https://en.wikisource.org/w/index.php?oldid=13788016"&&link.rel==="noopener noreferrer"&&item.querySelector(".xp-dict-src").textContent.endsWith(" · dictSupplementSourceVerified"));
+    check("every retrieval request went to the exact Wikisource origin without credentials",fetched.length>0&&fetched.every(c=>c.url.origin==="https://en.wikisource.org"&&c.options.credentials==="omit"));
+    check("the owner is re-checked before each retrieval request",log.filter(([kind])=>kind==="owner").length>=fetched.length);
+    check("examples never call AI, never ask for an AI origin and never open the dictionary archive",aiCalls===0&&!log.some(([kind])=>kind==="ai-permission")&&!opened.some(name=>/dict-archive/.test(name)));
+    check("a shown result replaces its action",button().hidden&&block().querySelector(".xp-dict-examples-hint").hidden);
+
+    log=[];fetched=[];await run({previewAiEnabled:false});
+    check("with the reader AI switch off the examples block is still visible and clickable",slotShown(block())&&slotShown(button())&&pop.querySelector(".xp-dict-ai").hidden);
+    button().click();await settle();await settle();
+    check("with AI off a click still retrieves the example with no AI call",log[0]?.[0]==="request"&&block().querySelector(".xp-dict-example")?.textContent==="Comfortable provider!"&&aiCalls===0);
+
+    window.hasAIKey=()=>true;log=[];fetched=[];await run({previewAiEnabled:true});
+    check("with AI configured but no AI entry the examples block is visible beside the generate action",slotShown(block())&&slotShown(button())&&!!pop.querySelector(".xp-dict-ai-generate:not([hidden])")&&!pop.querySelector(".xp-dict-ai-content:not([hidden])"));
+    button().click();await settle();await settle();
+    check("with no AI entry a click still retrieves the example with no AI call",block().querySelector(".xp-dict-example")?.textContent==="Comfortable provider!"&&aiCalls===0&&!log.some(([kind])=>kind==="ai-permission"));
+    window.hasAIKey=()=>false;
+
+    grant=false;log=[];fetched=[];await run({previewAiEnabled:true});button().click();await settle();
+    check("a refused grant sends nothing and keeps the action for a later click",!fetched.length&&!log.some(([kind])=>kind==="owner")&&block().querySelector(".xp-dict-usage-status")?.textContent==="dictExamplesGrantNeeded"&&slotShown(button())&&!button().disabled);
+    grant=true;
+
+    search={batchcomplete:true,query:{searchinfo:{totalhits:0},search:[]}};fetched=[];await run({previewAiEnabled:true});button().click();await settle();await settle();
+    const miss=block().querySelector(".xp-dict-usage-status");
+    check("a clean miss says this search found nothing, in the neutral tone, and keeps the action",miss?.textContent==="dictExamplesNone"&&miss.dataset.state==="neutral"&&slotShown(button())&&!block().querySelector(".xp-dict-learning-item"));
+    search=SEARCH;
+
+    fetched=[];await run({previewAiEnabled:true},"nl","aanbieder");
+    check("a language without a Wikisource edition says so up front and offers no action",block()?.querySelector(".xp-dict-usage-status")?.textContent==="dictExamplesUnsupported"&&!slotShown(button())&&!fetched.length);
+
+    fetched=[];liveOwner="acct_someone_else";await run({previewAiEnabled:true});button().click();await settle();
+    check("a different live owner stops retrieval before any request",!fetched.length&&block().querySelector(".xp-dict-usage-status")?.textContent==="vocabAccountChanged");
+    liveOwner="acct_examples";
+
+    fetched=[];await run({previewAiEnabled:true});
+    request=opts=>{log.push(["request",opts]);return permissionGate();};
+    const oldBlock=block();oldBlock.querySelector(".xp-dict-examples-find").click();
+    await run({previewAiEnabled:true},"en","bar");log.release(true);await settle();await settle();
+    check("a new query discards the old examples block and its pending click sends nothing",!oldBlock.isConnected&&block()!==oldBlock&&!fetched.length&&!block().querySelector(".xp-dict-learning-item"));
+    request=opts=>{log.push(["request",opts]);return Promise.resolve(grant);};
+
+    fetched=[];search={batchcomplete:true,query:{searchinfo:{totalhits:0},search:[]}};await run({previewAiEnabled:true});
+    let releaseFetch;const realFetch=window.fetch;window.fetch=(...args)=>new Promise(resolve=>{releaseFetch=()=>resolve(realFetch(...args));});
+    button().click();await settle();_pbpDictOwner="acct_switched";releaseFetch?.();await settle();await settle();
+    check("an account switch during retrieval lands nothing in the old block",!block().querySelector(".xp-dict-learning-item")&&block().querySelector(".xp-dict-usage-status")?.textContent!=="dictExamplesNone");
+    window.fetch=realFetch;_pbpDictOwner="acct_examples";search=SEARCH;
+  } finally {
+    ctrl.abort();pop.remove();_pbpDictResolveLang=saved.resolve;_pbpDictSlotRun=saved.online;_pbpDictEcdictSide=saved.local;_pbpDictLoadPack=saved.load;pbpVocabGet=saved.get;_pbpDictOwner=saved.owner;_pbpDictCurrent=saved.current;
+    window.fetch=saved.fetch;indexedDB.open=saved.open;
+    for(const[name,value]of globals){if(value===undefined)delete window[name];else window[name]=value;}
+  }
+}
+
 (async function () {
   await runDictionaryStructureUiTests();
   await runDictReviewRegressionTests();
@@ -2832,6 +2934,7 @@ async function runDictionaryStructureUiTests() {
   await runDictionaryEntryUiTests();
   await runDictionaryEntryReaderTests();
   await runDictionaryEntrySettingsTests();
+  await runDictionaryExamplesTests();
   document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 })();
 </script>

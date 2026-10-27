@@ -23,7 +23,7 @@ export const RENDER_READER_CONTEXTS = Object.freeze([
   'reader-source-details', 'export-more', 'reader-bookmark-footer', 'reader-bookmark-editor', 'reader-bookmark-delete-confirm',
   'explain-pop', 'explain-dict', 'dict-resize-menu', 'dict-entry-idle', 'dict-entry-busy', 'dict-entry-result', 'dict-entry-details',
   'dict-entry-usage-busy', 'dict-entry-usage-error', 'dict-entry-usage-result',
-  'dict-entry-panel', 'dict-entry-cached', 'dict-entry-error', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
+  'dict-entry-panel', 'dict-entry-cached', 'dict-entry-error', 'dict-entry-examples', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
   'pb-hl-card', 'send-menu', 'confirm-popover', 'tr-ask',
 ]);
 const context = (name, dependencies = [], extra = {}) => ({ name, dependencies, ...extra });
@@ -48,6 +48,9 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('dict-entry-usage-result', ['dict-entry-usage-error'], { target: '[data-learning-block="usage"] .xp-dict-usage-feedback[data-state="saved"]' }),
     context('dict-entry-cached', ['dict-entry-result'], { target: '.xp-dict-ai-content:not([hidden])' }),
     context('dict-entry-error', ['dict-entry-idle'], { target: '.xp-dict-ai-status:not([hidden])' }),
+    // Free original-text examples (plan 1C.2): its fixture has no AI key and
+    // no AI entry, so it depends on no AI state.
+    context('dict-entry-examples', [], { target: '.xp-dict-examples .xp-dict-learning-item' }),
     context('vocab-batch-bar', ['vocab-detail'], { target: '#vocab-batch-toolbar.selecting' }),
     context('ask-history-list', [], { target: '#ask-library-list .ask-library-hit' }),
     context('ask-history-detail', ['ask-history-list'], { target: '#ask-library-detail:not([hidden])' }),

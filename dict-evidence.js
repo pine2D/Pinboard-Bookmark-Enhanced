@@ -449,3 +449,45 @@ async function pbpDictEvidenceFetch({ term, sourceLanguage, kind, signal, before
     return result;
   } finally { clearTimeout(timeout); signal?.removeEventListener("abort", abort); }
 }
+
+// Free original-text examples (plan 1C.2, ruling 2026-10-27): the retrieved
+// sentence and its metadata only -- no AI, no translation. This entry stays
+// outside the paid dictionary path and the Drive pre-sync gate and reads no AI
+// setting, so it works with AI off, with no key and with no AI entry. Nothing
+// is archived, synced or cached: retrieval is free and simply runs again.
+// Before every request it re-checks the query's signal and isCurrent, the live
+// Pinboard owner against the query's owner (an empty or unreadable owner fails
+// closed), then the caller's own beforeRequest, which is required.
+// Returns [{sentence, author, work, location, url, revision, truncated}], []
+// for a clean miss, or {unsupported: true} for a language without a supported
+// Wikisource edition.
+async function pbpDictUsageExamplesFetch(input = {}) {
+  const { term, sourceLanguage, owner, signal, isCurrent, beforeRequest } = input || {};
+  if (typeof isCurrent !== "function" || typeof beforeRequest !== "function" || typeof owner !== "string") throw _pbpDictEvidenceError("invalid_request");
+  const scope = value => value === "ownerless" ? "" : value;
+  const active = () => {
+    if (signal?.aborted) throw new DOMException("Examples cancelled", "AbortError");
+    if (isCurrent() !== true) throw _pbpDictEvidenceError("stale");
+  };
+  const guard = async () => {
+    active();
+    let live;
+    try {
+      if (typeof pbpVocabCurrentOwner !== "function") throw new Error("Owner reader unavailable");
+      live = await pbpVocabCurrentOwner();
+    } catch (error) {
+      console.warn("[dict-evidence] owner read failed:", error?.name);
+      throw _pbpDictEvidenceError("owner_changed");
+    }
+    active();
+    if (!live || typeof live !== "string" || scope(live) !== scope(owner)) throw _pbpDictEvidenceError("owner_changed");
+    await beforeRequest();
+    active();
+  };
+  active();
+  const found = await pbpDictEvidenceFetch({ term, sourceLanguage, kind: "literature", signal, beforeRequest: guard });
+  active();
+  if (!Array.isArray(found)) return found?.unsupported === true ? PBP_DICT_EVIDENCE_UNSUPPORTED : [];
+  return found.map(source => ({ sentence: source.excerpt, author: source.author || "", work: source.work || "",
+    location: source.location || "", url: source.url, revision: source.revision, truncated: source.truncated === true }));
+}

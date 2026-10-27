@@ -136,6 +136,7 @@ document.documentElement.setAttribute("data-listbox-ready", "");
 <script src="../shared.js"></script>
 <script src="../vocab-store.js"></script>
 <script src="../md-dict.js"></script>
+<script src="../dict-evidence.js"></script>
 <script src="../dict-entry.js"></script>
 <script src="../dict-pack.js"></script>
 <!-- pbpVocabCurrentOwner (shared.js) routes through pbpReadSettingsWithSecrets,
@@ -4489,6 +4490,49 @@ await (async () => {
       _pbpDictSlotRun=old.remote;_pbpDictEcdictSide=old.local;_pbpDictLoadPack=old.load;window.pbpDictPackLookup=old.lookup;window.pbpDictPackList=old.list;
       pbpReadSettingsWithSecrets=old.read;_pbpVocabAutoLookup=old.auto;pbpDictEntryRead=old.entryRead;pbpDictEntryRun=old.run;pbpVocabCurrentOwner=old.owner;pbpVocabGet=old.get;pbpVocabSaveWord=old.save;_pbpVocabReloadAfterMutation=old.reload;
       for(const [key,value] of [["hasAIKey",old.key],["ensureAIHostPermissionWithGesture",old.grant]]){if(value===undefined)delete window[key];else window[key]=value;}
+    }
+  }
+
+  // Free original-text examples (plan 1C.2): the Library lookup builds the same
+  // independent block as the reader, after the dictionary slot, with no AI key.
+  {
+    const old={remote:_pbpDictSlotRun,local:_pbpDictEcdictSide,load:_pbpDictLoadPack,lookup:window.pbpDictPackLookup,list:window.pbpDictPackList,
+      read:pbpReadSettingsWithSecrets,auto:_pbpVocabAutoLookup,entryRead:pbpDictEntryRead,run:pbpDictEntryRun,owner:pbpVocabCurrentOwner,get:pbpVocabGet,fetch:window.fetch};
+    const keep=["hasAIKey","chrome"].map(name=>[name,Object.hasOwn(window,name),window[name]]);
+    const owner="acct_examples_library",requests=[],fetched=[];let paid=0;
+    const TITLE="Faust/Erster Teil";
+    const SEARCH={batchcomplete:true,query:{searchinfo:{totalhits:1},search:[{ns:0,title:TITLE,pageid:73881}]}};
+    const PAGE={parse:{title:TITLE,pageid:73881,revid:4207390,categories:[{category:"Drama",sortkey:""}],
+      text:'<div class="mw-parser-output"><span id="ws-author">Johann Wolfgang von Goethe</span><span id="ws-title">Faust. Eine Tragödie</span><div class="poem"><p>Habe nun, ach! Philosophie,<br />\nJuristerei und Medizin,<br />\nUnd leider auch Theologie<br />\nDurchaus studiert, mit heißem Bemühn.\n</p></div></div>'}};
+    try {
+      _vocabCurrentOwner=owner;_vocabRows=[];_pbpVocabAutoLookup=async()=>{};
+      _pbpDictLoadPack=async()=>true;window.pbpDictPackLookup=async()=>({state:"unavailable",hits:[]});window.pbpDictPackList=async()=>[];_pbpDictEcdictSide=async()=>{};
+      _pbpDictSlotRun=async()=>({word:"Theologie",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/Theologie",license:"CC BY-SA 4.0",definitionLang:"en",entries:[{ipas:[],forms:[],senses:[{definition:"theology"}]}]});
+      window.hasAIKey=()=>false;pbpReadSettingsWithSecrets=async()=>({aiProvider:"openai",previewAiEnabled:true,dictAiAutoGenerate:false});
+      pbpDictEntryRead=async()=>null;pbpDictEntryRun=async()=>{paid++;throw new Error("examples must not call AI");};
+      pbpVocabCurrentOwner=async()=>{requests.push("owner");return owner;};pbpVocabGet=async()=>null;
+      window.chrome={runtime:{id:"fixture"},permissions:{request:opts=>{requests.push(opts);return Promise.resolve(true);},contains:async()=>true}};
+      window.fetch=async(raw,options)=>{const url=new URL(raw);fetched.push({url,options});
+        const body=url.searchParams.get("action")==="query"?SEARCH:url.searchParams.get("page")===TITLE?PAGE:{error:{code:"missingtitle",info:"The page you specified doesn't exist."}};
+        return new Response(JSON.stringify(body),{status:200,headers:{"content-type":"application/json; charset=utf-8"}});};
+      _pbpVocabLookupOther("Theologie","de");await settle();
+      const host=$id("vocab-ref-result"),block=host.querySelector(".xp-dict-examples"),find=block?.querySelector(".xp-dict-examples-find");
+      const shown=el=>!!el&&!el.closest("[hidden]")&&getComputedStyle(el).display!=="none"&&el.getClientRects().length>0;
+      check("examples: the Library lookup shows the free examples block with no AI key",shown(block)&&shown(find)&&!find.disabled);
+      check("examples: the Library action carries the shared Lucide quote icon",find?.querySelector("svg")?.outerHTML===new DOMParser().parseFromString(PBP_ICONS.quote,"text/html").body.firstElementChild.outerHTML&&find.querySelectorAll("svg path").length===2);
+      check("examples: the block follows the dictionary slot, outside the AI panel",block?.previousElementSibling===host.querySelector(".xp-dict-slot")&&!block.closest(".xp-dict-ai"));
+      requests.length=0;find?.click();
+      check("examples: the Library click asks first and only for the exact German Wikisource origin",requests.length===1&&JSON.stringify(requests[0])==='{"origins":["https://de.wikisource.org/*"]}'&&!fetched.length);
+      await settle();await settle();
+      check("examples: the Library shows one verse line with its source and no translation",block.querySelector(".xp-dict-example")?.textContent==="Und leider auch Theologie"&&block.querySelector(".xp-dict-src a")?.href==="https://de.wikisource.org/w/index.php?oldid=4207390"&&!block.querySelector(".xp-dict-example-translation"));
+      check("examples: the Library retrieval stays on Wikisource and never calls AI",fetched.length>0&&fetched.every(c=>c.url.origin==="https://de.wikisource.org")&&paid===0);
+      _pbpVocabLookupOther("Gift","de");await settle();
+      check("examples: a new Library query replaces the block instead of keeping the old result",host.querySelectorAll(".xp-dict-examples").length===1&&!host.querySelector(".xp-dict-examples .xp-dict-learning-item"));
+    } finally {
+      _pbpVocabDictCtrl?.abort();_pbpVocabDictChildCtrl?.abort();_pbpVocabRenderDetail(null);
+      _pbpDictSlotRun=old.remote;_pbpDictEcdictSide=old.local;_pbpDictLoadPack=old.load;window.pbpDictPackLookup=old.lookup;window.pbpDictPackList=old.list;
+      pbpReadSettingsWithSecrets=old.read;_pbpVocabAutoLookup=old.auto;pbpDictEntryRead=old.entryRead;pbpDictEntryRun=old.run;pbpVocabCurrentOwner=old.owner;pbpVocabGet=old.get;window.fetch=old.fetch;
+      for(const[name,had,value]of keep){if(had)window[name]=value;else delete window[name];}
     }
   }
 

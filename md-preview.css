@@ -2460,7 +2460,7 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
 .xp-dict-learning-item > .xp-dict-src { font-size: 11px; line-height: 1.45; }
 .xp-dict-update-entry, .xp-dict-update-supplement { margin-top: var(--sp-2); }
 /* Keep long translated text actions inside the lookup's scroll column. */
-.xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement {
+.xp-dict-supplement-generate, .xp-dict-examples-find, .xp-dict-update-entry, .xp-dict-update-supplement {
   max-inline-size: 100%; line-height: 18px; white-space: normal; overflow-wrap: anywhere;
 }
 .xp-dict-supplement-profile { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); }
@@ -2475,6 +2475,12 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
 /* A paid action: wandSparkles, its text and the model name. */
 .xp-dict-supplement-generate { gap: var(--sp-1); }
 .xp-dict-supplement-generate > svg { width: 14px; height: 14px; flex: none; }
+/* The free original-text examples action (1C.2): the quote icon and its text,
+   no model name -- it never calls AI. */
+.xp-dict-examples-find { gap: var(--sp-1); }
+.xp-dict-examples-find > svg { width: 14px; height: 14px; flex: none; }
+.xp-dict-examples > .xp-dict-learning-title + .xp-dict-learning-item { margin-top: var(--sp-2); }
+.xp-dict-examples .xp-dict-learning-item > .xp-dict-example { margin-top: 0; }
 .xp-dict-usage-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }
 .xp-dict-usage-actions > .xp-dict-update-supplement { margin-top: 0; }
 .xp-dict-usage-feedback { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); flex: 1; min-width: 0; }

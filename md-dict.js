@@ -2385,6 +2385,109 @@ function _pbpDictEntryMount(host, opts) {
   return { element: panel, controls, ready, show };
 }
 
+// The free original-text examples action asks for one exact Wikisource origin.
+// Called synchronously from the click, so Chrome sees the live user gesture:
+// this request is the first await after the click (never the AI origin, never
+// requestAIHostPermissions, which always adds the AI endpoint).
+function _pbpDictExamplesRequestOrigin(origin) {
+  if (typeof chrome === "undefined" || typeof chrome.permissions?.request !== "function") return Promise.resolve(false);
+  return chrome.permissions.request({ origins: [origin + "/*"] });
+}
+
+// Original-text examples (plan 1C.2, Q20=A): a block of its own beside the
+// AI panel, created by the lookup in the reader and on the Library page. It
+// shows retrieved source sentences with their metadata and never calls AI or
+// translates (ruling 2026-10-27), so it is there with AI off, with no key and
+// with no AI entry. Its life is the query's: opts.signal and opts.isCurrent
+// (which carries the owner) end it, and a new query builds a new block.
+// Results are not archived, synced or cached; finding again is a fresh click.
+function pbpDictExamplesView(opts) {
+  if (typeof pbpDictUsageExamplesFetch !== "function" || typeof pbpDictEvidenceOrigin !== "function") return null;
+  const language = String(opts.lang || "");
+  if (!language || language === "und") return null;
+  const block = document.createElement("section");
+  block.className = "xp-dict-learning-section xp-dict-examples"; block.dataset.learningBlock = "examples";
+  block.setAttribute("role", "group"); block.setAttribute("aria-label", t("dictExamplesTitle"));
+  const heading = document.createElement("p"); heading.className = "xp-dict-learning-title"; heading.textContent = t("dictExamplesTitle");
+  const hint = document.createElement("p"); hint.className = "xp-dict-src xp-dict-examples-hint"; hint.textContent = t("dictExamplesHint");
+  const row = document.createElement("div"); row.className = "xp-dict-usage-actions";
+  const find = document.createElement("button"); find.type = "button"; find.className = "xp-dict-connect xp-dict-examples-find";
+  const icon = document.createElement("span");
+  icon.innerHTML = typeof PBP_ICONS === "object" ? PBP_ICONS.quote || "" : ""; // static shared icon
+  const label = document.createElement("span"); label.textContent = t("dictExamplesFind");
+  find.replaceChildren(...icon.childNodes, label);
+  const box = document.createElement("div"); box.className = "xp-dict-usage-feedback"; box.hidden = true;
+  const status = document.createElement("p"); status.className = "xp-dict-msg xp-dict-usage-status";
+  status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite"); status.setAttribute("aria-atomic", "true");
+  box.appendChild(status); row.append(find, box);
+  block.append(heading, hint, row);
+  const origin = pbpDictEvidenceOrigin("literature", language);
+  let busy = false;
+  const alive = () => !opts.signal?.aborted && block.isConnected && opts.isCurrent() === true;
+  const say = (text, state = "") => {
+    _pbpDictToneText(status, text, state === "error" || state === "neutral" ? state : "");
+    box.hidden = !text; box.dataset.state = state;
+  };
+  const results = [];
+  const show = examples => {
+    results.forEach(node => node.remove()); results.length = 0;
+    for (const example of examples) {
+      const unit = document.createElement("div"); unit.className = "xp-dict-learning-item";
+      const sentence = document.createElement("p"); sentence.className = "xp-dict-example";
+      sentence.textContent = example.sentence; sentence.lang = language; sentence.dir = "auto";
+      const note = document.createElement("p"); note.className = "xp-dict-src";
+      const cite = [example.author, example.work, example.location].filter(Boolean).join(" · ");
+      // Only a revision link on the language's own Wikisource becomes a link.
+      if (typeof example.url === "string" && example.url.startsWith(origin + "/w/index.php?oldid=")) {
+        const link = document.createElement("a"); link.href = example.url; link.target = "_blank"; link.rel = "noopener noreferrer";
+        link.textContent = cite || example.url; note.appendChild(link);
+      } else note.textContent = cite;
+      if (example.truncated) note.append(" · " + t("dictExamplesTruncated"));
+      note.append(" · " + t("dictSupplementSourceVerified"));
+      unit.append(sentence, note); hint.before(unit); results.push(unit);
+    }
+  };
+  if (!origin) {
+    hint.hidden = true; find.hidden = true;
+    say(t("dictExamplesUnsupported"), "neutral");
+    return { element: block };
+  }
+  const run = async permission => {
+    let granted = false;
+    try { granted = await permission === true; }
+    catch (error) { console.warn("[dict] examples permission request failed:", error?.name); }
+    if (!alive()) return;
+    if (!granted) { say(t("dictExamplesGrantNeeded"), "error"); return; }
+    say(t("dictSupplementRetrieving"), "busy");
+    try {
+      const found = await pbpDictUsageExamplesFetch({ term: opts.term, sourceLanguage: language, owner: opts.owner,
+        signal: opts.signal, isCurrent: alive, beforeRequest: async () => { if (!alive()) throw Object.assign(new Error("stale"), { code: "stale" }); } });
+      if (!alive()) return;
+      if (found?.unsupported === true) { find.hidden = true; hint.hidden = true; say(t("dictExamplesUnsupported"), "neutral"); return; }
+      if (!found.length) { say(t("dictExamplesNone"), "neutral"); return; }
+      show(found); say("");
+      // A shown result replaces its action: finding again is not needed.
+      find.hidden = true; hint.hidden = true;
+    } catch (error) {
+      if (!alive() || error?.name === "AbortError" || error?.code === "stale") return;
+      console.warn("[dict] original-text examples failed:", error?.name, typeof error?.code === "string" ? error.code : "request_failed");
+      say(t(["owner_changed", "account_changed"].includes(error?.code) ? "vocabAccountChanged"
+        : error?.code === "host_permission" ? "dictExamplesGrantNeeded" : "dictExamplesFailed"), "error");
+    }
+  };
+  find.addEventListener("click", () => {
+    if (busy || !alive()) return;
+    busy = true; find.disabled = true;
+    // No await before this call (see _pbpDictExamplesRequestOrigin).
+    const permission = _pbpDictExamplesRequestOrigin(origin);
+    run(permission).finally(() => {
+      busy = false;
+      if (block.isConnected) find.disabled = false;
+    });
+  });
+  return { element: block };
+}
+
 const PBP_DICT_LANGS = ["auto", ...PBP_DICT_QUERY_LANGS];
 
 async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
@@ -2587,6 +2690,10 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
       _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name));
     } });
   if (returnToBubble) head.appendChild(returnToBubble);
+  // Free original-text examples sit after the dictionary slot and the AI
+  // panel, independent of both (plan 1C.2): no AI setting gates them.
+  cur.examples = pbpDictExamplesView({ term: cap.text, lang, owner: cur.owner, signal, isCurrent: cur.isCurrent });
+  if (cur.examples) slot.after(cur.examples.element);
 
   // Local dictionaries load independently of the online request and AI entry.
   const ecdictEl = document.createElement("div"), packsEl = document.createElement("div");

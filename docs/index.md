@@ -12,6 +12,7 @@ A Chrome extension for [Pinboard](https://pinboard.in) with AI tags and summarie
 - Save the article to Pinboard or edit its bookmark directly in the reader.
 - Choose the definition language for AI entries independently of the interface or the word’s language, and filter saved vocabulary by language. Original dictionary definitions retain their own language.
 - Import Yomitan v3 ZIP dictionaries for offline definitions and readings on this device. Dictionary packs are excluded from Drive sync and JSON backups.
+- See a word in real sentences from Wikisource texts, with author, work and a revision link. The search never calls AI and never translates.
 - Generate basic AI definitions and examples, then add usage points and word origins separately, each as its own request. Incomplete supplements keep their valid parts and are marked as partial. Reuse saved results across devices with Google Drive. Choose the dictionary or AI as the initial lookup view; automatic generation is optional.
 - Use Explain for a word or passage in the current article. Dictionary lookup provides general meanings and usage; AI entries do not include article context or imported dictionary text.
 - Save a word directly from its dictionary result and choose the definition to keep. Link related forms through an editable base form; notes and learning status remain separate for each word.

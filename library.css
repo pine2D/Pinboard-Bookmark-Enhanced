@@ -2294,7 +2294,7 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-learning-item > .xp-dict-example-translation { margin-top: var(--lib-sp-1); }
 #vocab-ref-result :is(.xp-dict-update-entry, .xp-dict-update-supplement) { margin-top: var(--lib-sp-3); }
 /* Text actions may wrap with enlarged text; icon actions keep their fixed rung. */
-#vocab-ref-result :is(.xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement) {
+#vocab-ref-result :is(.xp-dict-supplement-generate, .xp-dict-examples-find, .xp-dict-update-entry, .xp-dict-update-supplement) {
   max-inline-size: 100%; height: auto; min-height: calc(var(--lib-control-h) - 4px);
   line-height: var(--lib-lh-secondary); white-space: normal; overflow-wrap: anywhere;
 }
@@ -2307,6 +2307,13 @@ html.motion-ready .vocab-note-save {
 /* A paid action: wandSparkles, its text and the model name. */
 #vocab-ref-result .xp-dict-supplement-generate { display: inline-flex; align-items: center; gap: var(--lib-sp-1); }
 #vocab-ref-result .xp-dict-supplement-generate > svg { width: 14px; height: 14px; flex: none; }
+/* The free original-text examples action (1C.2): quote icon and text only. */
+#vocab-ref-result .xp-dict-examples-find { display: inline-flex; align-items: center; gap: var(--lib-sp-1); }
+#vocab-ref-result .xp-dict-examples-find > svg { width: 14px; height: 14px; flex: none; }
+/* Each example: the source sentence, then its source line. */
+#vocab-ref-result .xp-dict-examples > .xp-dict-learning-title + .xp-dict-learning-item { margin-top: var(--lib-sp-2); }
+#vocab-ref-result .xp-dict-examples .xp-dict-learning-item > p { margin: var(--lib-sp-1) 0 0; }
+#vocab-ref-result .xp-dict-examples .xp-dict-learning-item > .xp-dict-example { margin-top: 0; }
 #vocab-ref-result .xp-dict-supplement-profile { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--lib-sp-1) var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-supplement-profile > .xp-dict-src { margin: 0; }
 #vocab-ref-result .xp-dict-supplement-profile .xp-dict-profile-link { color: var(--lib-link); }

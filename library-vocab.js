@@ -1366,6 +1366,7 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
   state.syncHeading();
   $id("vocab-ref")?.querySelectorAll(".xp-dict-ai-controls").forEach(el => el.remove());
   host?.querySelector(".xp-dict-ai")?.remove();
+  host?.querySelector(".xp-dict-examples")?.remove();
   const dictionaryHost = onlineEl.closest(".xp-dict-slot");
   if (dictionaryHost) dictionaryHost.hidden = false;
   let controlsHost = host.querySelector(".vocab-ref-head");
@@ -1394,6 +1395,11 @@ function _pbpVocabDictRun(term, lang, els, sentence, rerun, { online = true, pac
     onLookup: headword => { if (state.live()) _pbpVocabLookupOther(headword, lang); }
   });
   if (entryView && dictionaryHost) dictionaryHost.before(entryView.element);
+  // Free original-text examples (plan 1C.2): the same block as the reader's,
+  // after the dictionary slot, bound to this query's signal and owner and
+  // shown whatever the AI settings are.
+  const examples = dictionaryHost && pbpDictExamplesView({ term, lang, owner: state.owner, signal, isCurrent: state.live });
+  if (examples) dictionaryHost.after(examples.element);
   const acceptLocal = norm => _pbpVocabAcceptLookupResult(state, "local", norm);
   const legacyEl = document.createElement("div"), packsEl = document.createElement("div");
   legacyEl.className = "xp-dict-legacy";

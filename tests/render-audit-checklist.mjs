@@ -732,6 +732,8 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip"] },
+        // Free original-text examples: source sentences, never a translation.
+        "dict-entry-examples": { requires: ["edges", "senseIndent", "original", "overflow", "clip"] },
         "dict-entry-panel": { root: "#reader-dict-view .xp-dict", overflowRoot: "#reader-dict-view",
           requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
       },
@@ -746,6 +748,7 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip"] },
+        "dict-entry-examples": { requires: ["edges", "senseIndent", "original", "overflow", "clip"] },
       },
     },
   },
