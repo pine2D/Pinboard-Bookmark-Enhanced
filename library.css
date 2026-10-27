@@ -3277,6 +3277,8 @@ body { display: flex; flex-direction: column; }
   #vocab-ref-result .vocab-ref-foot, #vocab-ref-result .vocab-ref-idle, .vocab-edit-groups, .vocab-group-editor,
   .vocab-detail-status, .vocab-detail-speak, #vocab-detail-tail { display: none; }
   #vocab-detail-pane, #notes-detail-pane { display: block; overflow: visible; margin: 0; padding: 0; }
+  /* The narrow-mode band under the back button hides with the button. */
+  #vocab-detail-pane::before { content: none; }
 }
 /* ---- Listbox (library redesign T6, spec §8.2 / §8.4): listbox.js draws
    select[data-listbox] as a button + a popover list. Geometry only: the

@@ -693,7 +693,19 @@ export function evaluateMediaProbe(probe, check) {
 //   dict-entry-details  the AI entry plus an opened etymology supplement.
 //   dict-entry-usage-result  a saved usage supplement whose items carry an
 //                       example sentence and its translation.
+//   dict-entry-panel    the AI entry docked into the reader side panel
+//                       (#reader-dict-view): a context may name its own
+//                       root / overflowRoot, and this one does, because the
+//                       docked session pads its scroll body differently from
+//                       the popover (dictLookupRoots).
 // library has no explain popover; its dictionary result is dict-entry-idle.
+//
+// dictScrollClip (requires "clip"): every lookup scroll container keeps its
+// content inside it (scrollWidth <= clientWidth), and every measured text
+// block's border box -- disclosure titles hang their hover fill outside the
+// column with a negative inline margin -- stays inside the padding box of its
+// nearest clipping ancestor. A box that sticks out of a scroller adds a
+// sideways scroll; one that sticks out of an overflow:hidden box is cut.
 export const DICT_LOOKUP_GEOMETRY = {
   edgeTolerancePx: 1,
   maxLeftEdges: 2,
@@ -716,10 +728,12 @@ export const DICT_LOOKUP_GEOMETRY = {
       tokens: { text: "--fg", secondary: "--fg-secondary" },
       contexts: {
         "explain-dict": { requires: ["overflow"] },
-        "dict-entry-idle": { requires: ["edges", "senseIndent", "overflow"] },
-        "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow"] },
-        "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow"] },
-        "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow"] },
+        "dict-entry-idle": { requires: ["edges", "senseIndent", "overflow", "clip"] },
+        "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
+        "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
+        "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip"] },
+        "dict-entry-panel": { root: "#reader-dict-view .xp-dict", overflowRoot: "#reader-dict-view",
+          requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
       },
     },
     library: {
@@ -728,16 +742,26 @@ export const DICT_LOOKUP_GEOMETRY = {
       overflowRoot: "#vocab-ref",
       tokens: { text: "--lib-fg", secondary: "--lib-fg-muted" },
       contexts: {
-        "dict-entry-idle": { requires: ["edges", "senseIndent", "overflow"] },
-        "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow"] },
-        "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow"] },
-        "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow"] },
+        "dict-entry-idle": { requires: ["edges", "senseIndent", "overflow", "clip"] },
+        "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
+        "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
+        "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip"] },
       },
     },
   },
 };
 
+// The lookup column and the box that must stay inside the viewport for one
+// (surface, context): the context's own, else the surface's.
+export function dictLookupRoots(surface, context) {
+  const spec = DICT_LOOKUP_GEOMETRY.surfaces[surface];
+  const ctx = spec?.contexts?.[context];
+  if (!ctx) throw new Error(`no dictionary geometry spec for ${surface}/${context}`);
+  return { root: ctx.root || spec.root, overflowRoot: ctx.overflowRoot || spec.overflowRoot };
+}
+
 // probe = { blocks: [{ role, left, path }], examples: [{ role, color, expected, path }],
+//           clip: { measured, offenders: [{ path, kind: "scroll" | "box", detail }] },
 //           viewports: [{ width, rootVisible, offenders: [{ path, left, right }] }] }
 // where `left` is the inline start of the block's first line of text, in px
 // from the lookup column's content edge. Returns one row per check:
@@ -792,13 +816,23 @@ export function evaluateDictLookupGeometry(probe, { surface, context }) {
       `${spec.surfaces[surface].tokens[spec.examples.find((e) => e.role === role).token]} = ${found[0].expected}`);
   }
 
+  // Nothing inside the lookup sticks out of a scroller or a clipping box.
+  const clip = probe?.clip;
+  if (clip && clip.measured > 0) {
+    const off = clip.offenders || [];
+    row("dictScrollClip", !off.length, off.length ? `${off.length} offender(s), e.g. ${off.slice(0, 3).map((o) => `${o.kind} ${o.path} ${o.detail}`).join("; ")}` : `${clip.measured} box(es) inside`,
+      "scrollWidth <= clientWidth; text blocks inside their clipping ancestor's padding box",
+      "a negative inline margin needs that much padding in every scroller the lookup is shown in");
+  } else if (requires.has("clip")) setup("dictScrollClip", "lookup text blocks inside a scroll container");
+
   // Nothing inside the lookup leaves the viewport at the narrow widths.
+  const { overflowRoot } = dictLookupRoots(surface, context);
   for (const width of spec.viewports) {
     const view = (probe?.viewports || []).find((v) => v.width === width);
     const check = `dictViewport${width}`;
-    if (!view || !view.rootVisible) { if (requires.has("overflow")) setup(check, `a visible ${spec.surfaces[surface].overflowRoot} at ${width}px`); continue; }
+    if (!view || !view.rootVisible) { if (requires.has("overflow")) setup(check, `a visible ${overflowRoot} at ${width}px`); continue; }
     const off = view.offenders || [];
-    row(check, !off.length, off.length ? `${off.length} element(s) outside, e.g. ${off.slice(0, 3).map((o) => `${o.path} [${round(o.left)}, ${round(o.right)}]`).join("; ")}` : `inside (${spec.surfaces[surface].overflowRoot} at [${round(view.rootLeft)}, ${round(view.rootRight)}] of ${view.viewport}px)`,
+    row(check, !off.length, off.length ? `${off.length} element(s) outside, e.g. ${off.slice(0, 3).map((o) => `${o.path} [${round(o.left)}, ${round(o.right)}]`).join("; ")}` : `inside (${overflowRoot} at [${round(view.rootLeft)}, ${round(view.rootRight)}] of ${view.viewport}px)`,
       `every visible descendant within [0, ${width}]px`);
   }
   return rows;

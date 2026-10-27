@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { ledgerKey, reconcileKnownFailures } from '../scripts/render-audit-ledger.mjs';
-import { DICT_LOOKUP_GEOMETRY, evaluateDictLookupGeometry } from './render-audit-checklist.mjs';
+import { DICT_LOOKUP_GEOMETRY, dictLookupRoots, evaluateDictLookupGeometry } from './render-audit-checklist.mjs';
 import { RENDER_SWEEP_CONTEXTS } from '../scripts/audit-render-scenarios.mjs';
 
 const row = (status, check, extra = {}) => ({ surface: 'md-preview', theme: '', selector: '#explain-pop .xp-dict', state: 'dict-entry-result', check, status, ...extra });
@@ -54,14 +54,14 @@ test('every registered known failure names a check its runner still emits', () =
     if (!entry.check.startsWith('dict')) continue;
     const spec = DICT_LOOKUP_GEOMETRY.surfaces[entry.surface];
     assert.ok(spec?.contexts[entry.state], `${key}: no DICT_LOOKUP_GEOMETRY context`);
-    assert.equal(entry.selector, spec.root, `${key}: selector is not the surface root`);
+    assert.equal(entry.selector, dictLookupRoots(entry.surface, entry.state).root, `${key}: selector is not the context's lookup root`);
     assert.ok(['', 'dark'].includes(entry.theme), `${key}: theme label`);
   }
 });
 
 // ---- the dictionary geometry oracle itself ----
-const probe = (blocks, examples = [], viewports = DICT_LOOKUP_GEOMETRY.viewports.map((width) => ({ width, rootVisible: true, viewport: width - 10, rootLeft: 16, rootRight: width - 26, offenders: [] }))) =>
-  ({ blocks, examples, viewports });
+const probe = (blocks, examples = [], viewports = DICT_LOOKUP_GEOMETRY.viewports.map((width) => ({ width, rootVisible: true, viewport: width - 10, rootLeft: 16, rootRight: width - 26, offenders: [] })), clip = { measured: blocks.length, offenders: [] }) =>
+  ({ blocks, examples, viewports, clip });
 const verdicts = (p, context = 'dict-entry-details', surface = 'md-preview') =>
   Object.fromEntries(evaluateDictLookupGeometry(p, { surface, context }).map((r) => [r.check, r.status]));
 
@@ -118,4 +118,23 @@ test('a context that should render a block but measured none is SETUP, never a v
   assert.equal(hidden.dictViewport320, 'SETUP');
   // explain-dict (connect state) is not required to render senses.
   assert.equal(hidden.dictSenseIndent, undefined);
+});
+
+test('scroll clip: a disclosure title hanging out of its scroller fails; nothing measured is SETUP', () => {
+  const blocks = [{ role: 'sense', left: 24 }, { role: 'summary', left: 0 }];
+  assert.equal(verdicts(probe(blocks), 'dict-entry-panel').dictScrollClip, 'OK');
+  const views = DICT_LOOKUP_GEOMETRY.viewports.map((width) => ({ width, rootVisible: true, viewport: width, rootLeft: 0, rootRight: width, offenders: [] }));
+  const hanging = { measured: 3, offenders: [{ path: 'details.xp-dict-ai-details > summary', kind: 'box', detail: '[1354.2, 1720] outside .xp-body [1362.2, 1716]' }] };
+  assert.equal(verdicts(probe(blocks, [], views, hanging), 'dict-entry-panel').dictScrollClip, 'FAIL');
+  const sideways = { measured: 3, offenders: [{ path: '.xp-body', kind: 'scroll', detail: 'scrollWidth 451 > clientWidth 447' }] };
+  assert.equal(verdicts(probe(blocks, [], views, sideways), 'dict-entry-result').dictScrollClip, 'FAIL');
+  assert.equal(verdicts(probe(blocks, [], views, { measured: 0, offenders: [] }), 'dict-entry-panel').dictScrollClip, 'SETUP');
+  // The connect state has no text blocks and does not require the check.
+  assert.equal(verdicts(probe([], [], views, { measured: 0, offenders: [] }), 'explain-dict').dictScrollClip, undefined);
+});
+
+test('a context can name its own lookup root; the docked panel is measured in the side panel', () => {
+  assert.deepEqual(dictLookupRoots('md-preview', 'dict-entry-panel'), { root: '#reader-dict-view .xp-dict', overflowRoot: '#reader-dict-view' });
+  assert.deepEqual(dictLookupRoots('md-preview', 'dict-entry-result'), { root: '#explain-pop .xp-dict', overflowRoot: '#explain-pop' });
+  assert.throws(() => dictLookupRoots('md-preview', 'reader'));
 });

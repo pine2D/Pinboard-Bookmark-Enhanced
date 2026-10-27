@@ -3305,7 +3305,16 @@ body.tr-only #rendered-view .pb-tr { cursor: pointer; }
 .reader-dict-session .xp-dict-head > .reader-dict-return { flex: none; }
 .reader-dict-session > .xp-body { min-height: 0; flex: 1 1 auto; scroll-padding-block: var(--sp-2); }
 .reader-dict-session > .xp-foot { flex: none; }
-#reader-dict-view .reader-dict-session > .xp-body { padding: 0 var(--sp-1) var(--sp-3) 0; }
+/* Disclosure titles hang their sp-2 hover fill outside the text column
+   (negative inline margin, see .xp-dict-ai-details > summary), so the docked
+   scroll body needs that much inline padding or the fill is cut on the start
+   side and adds a sideways scroll on the end side. The session and the body
+   each take sp-2 back with an equal negative margin, so the text column, the
+   panel head and the foot keep the edges they had; the body's end padding is
+   that sp-2 plus the sp-1 gap the text kept from the scrollbar before. The
+   session pads too because its overflow:hidden would clip the body there. */
+#reader-dict-view .reader-dict-session { margin-inline: calc(-1 * var(--sp-2)); padding-inline: var(--sp-2); }
+#reader-dict-view .reader-dict-session > .xp-body { padding: 0 var(--sp-3) var(--sp-3) var(--sp-2); margin-inline: calc(-1 * var(--sp-2)); }
 #reader-dict-view .reader-dict-session > .xp-foot { padding: var(--sp-2) 0 0; }
 #reader-dict-view .xp-term { font-size: 1em; line-height: 1.35; padding: 0; border: 0; }
 #reader-dict-view .xp-term::after { content: none; }

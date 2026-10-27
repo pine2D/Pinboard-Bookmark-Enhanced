@@ -98,6 +98,7 @@ import {
   MEDIA_THEMES,
   evaluateMediaProbe,
   DICT_LOOKUP_GEOMETRY,
+  dictLookupRoots,
   evaluateDictLookupGeometry,
 } from "../tests/render-audit-checklist.mjs";
 // Reused, not re-implemented, so this audit and contrast-audit.mjs's static
@@ -8907,9 +8908,38 @@ function probeDictLookupGeometry(cfg) {
     }
     return parts.join(" > ");
   };
-  const out = { blocks: [], examples: [] };
+  const out = { blocks: [], examples: [], clip: { measured: 0, offenders: [] } };
   const root = document.querySelector(cfg.root);
   if (!visible(root)) return out;
+  // dictScrollClip: a box that sticks out of its nearest clipping ancestor's
+  // padding box (client box: scrollbars excluded) is either cut off or, in a
+  // scroller, adds a sideways scroll.
+  const clipper = (el) => {
+    for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+      if (getComputedStyle(n).overflowX !== "visible") return n;
+    }
+    return null;
+  };
+  const checkClip = (el) => {
+    const box = clipper(el);
+    if (!box) return;
+    out.clip.measured++;
+    const r = el.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    const lo = b.left + box.clientLeft, hi = lo + box.clientWidth;
+    if (r.left < lo - 0.5 || r.right > hi + 0.5) {
+      out.clip.offenders.push({ path: pathOf(el), kind: "box",
+        detail: `[${Math.round(r.left * 10) / 10}, ${Math.round(r.right * 10) / 10}] outside ${pathOf(box)} [${Math.round(lo * 10) / 10}, ${Math.round(hi * 10) / 10}]` });
+    }
+  };
+  const scope = document.querySelector(cfg.overflowRoot) || root;
+  for (const el of [scope, ...scope.querySelectorAll("*")]) {
+    if (!visible(el) || !/^(auto|scroll)$/.test(getComputedStyle(el).overflowX)) continue;
+    out.clip.measured++;
+    if (el.scrollWidth > el.clientWidth) {
+      out.clip.offenders.push({ path: pathOf(el), kind: "scroll", detail: `scrollWidth ${el.scrollWidth} > clientWidth ${el.clientWidth}` });
+    }
+  }
   const rect = root.getBoundingClientRect();
   const cs = getComputedStyle(root);
   const startX = rect.left + parseFloat(cs.borderLeftWidth) + parseFloat(cs.paddingLeft);
@@ -8928,6 +8958,7 @@ function probeDictLookupGeometry(cfg) {
       if (!first) continue;
       const rtl = getComputedStyle(el).direction === "rtl";
       out.blocks.push({ role, left: rtl ? endX - first.right : first.left - startX, path: pathOf(el) });
+      checkClip(el);
     }
   }
   for (const { role, selector, token } of cfg.examples) {
@@ -8961,10 +8992,28 @@ function probeDictLookupOverflow(rootSel) {
   const viewport = document.documentElement.clientWidth;
   const offenders = [];
   const seen = new Set();
+  // Text inside a box that truncates on purpose (overflow clipped +
+  // text-overflow: ellipsis, e.g. the save-meaning select's selectedcontent)
+  // keeps its full inline width in getBoundingClientRect but paints only
+  // inside that box; measure what is painted. Any other clipping ancestor is
+  // not trusted: a control cut off by an overflow:hidden popover is a defect.
+  const truncated = (el, r) => {
+    let left = r.left, right = r.right;
+    for (let n = el.parentElement; n && n !== root.parentElement; n = n.parentElement) {
+      const ncs = getComputedStyle(n);
+      if (ncs.overflowX === "visible" || ncs.textOverflow !== "ellipsis") continue;
+      const b = n.getBoundingClientRect();
+      left = Math.max(left, b.left + n.clientLeft);
+      right = Math.min(right, b.left + n.clientLeft + n.clientWidth);
+    }
+    return { left, right };
+  };
   for (const el of [root, ...root.querySelectorAll("*")]) {
     if (!visible(el)) continue;
-    const r = el.getBoundingClientRect();
-    if (r.width <= 0 && r.height <= 0) continue;
+    const box = el.getBoundingClientRect();
+    if (box.width <= 0 && box.height <= 0) continue;
+    const r = truncated(el, box);
+    if (r.right <= r.left) continue;
     if (r.right <= viewport + 0.5 && r.left >= -0.5) continue;
     const path = pathOf(el);
     if (seen.has(path)) continue;
@@ -8977,8 +9026,9 @@ function probeDictLookupOverflow(rootSel) {
 async function measureDictLookupGeometry(page, surface, context, theme) {
   const spec = DICT_LOOKUP_GEOMETRY.surfaces[surface];
   if (!spec?.contexts[context]) return;
+  const { root, overflowRoot } = dictLookupRoots(surface, context);
   const probe = await page.evaluate(probeDictLookupGeometry, {
-    root: spec.root, blocks: DICT_LOOKUP_GEOMETRY.blocks, examples: DICT_LOOKUP_GEOMETRY.examples, tokens: spec.tokens,
+    root, overflowRoot, blocks: DICT_LOOKUP_GEOMETRY.blocks, examples: DICT_LOOKUP_GEOMETRY.examples, tokens: spec.tokens,
   });
   probe.viewports = [];
   const restore = page.viewportSize();
@@ -8991,7 +9041,7 @@ async function measureDictLookupGeometry(page, surface, context, theme) {
       await page.setViewportSize({ width, height: restore ? restore.height : 900 });
       await page.waitForTimeout(250);
       await settleAnimations(page);
-      probe.viewports.push({ width, ...(await page.evaluate(probeDictLookupOverflow, spec.overflowRoot)) });
+      probe.viewports.push({ width, ...(await page.evaluate(probeDictLookupOverflow, overflowRoot)) });
     }
   } finally {
     if (restore) await page.setViewportSize(restore);
@@ -9000,7 +9050,7 @@ async function measureDictLookupGeometry(page, surface, context, theme) {
     await settleAnimations(page);
   }
   for (const row of evaluateDictLookupGeometry(probe, { surface, context })) {
-    dictLookupRows.push({ surface, theme, selector: spec.root, state: context, ...row });
+    dictLookupRows.push({ surface, theme, selector: root, state: context, ...row });
   }
 }
 

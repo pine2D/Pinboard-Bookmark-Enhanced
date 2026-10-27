@@ -2404,6 +2404,19 @@ async function runDictionaryEntryUiTests() {
       &&baseUpdate.previousElementSibling?.getAttribute('role')==='alert'
       &&baseUpdate.previousElementSibling.checkVisibility()&&baseUpdate.previousElementSibling.textContent==='dictSupplementInvalid'
       &&JSON.stringify(meaningLabels(reloadedMeaning.host))===JSON.stringify(expectedMeanings));
+    // The inline update error takes the same tone as the status line: a
+    // failure is the error state behind a warning icon, a "no source" answer
+    // is neutral behind an info icon, and the icon never enters the text.
+    const inlineTones=[];
+    for(const [code,tone,icon,key] of [['invalid_response','error','warning','dictSupplementInvalid'],['no_sources','neutral','info','dictSupplementNoSources']]) {
+      window.pbpDictEntryRun=async()=>{throw Object.assign(new Error('fixture base update failure'),{code});};
+      baseUpdate=reloadedMeaning.host.querySelector('.xp-dict-update-entry');baseUpdate.closest('details').open=true;
+      baseUpdate.click();await settle();
+      const inline=baseUpdate.previousElementSibling;
+      inlineTones.push(inline?.classList.contains('xp-dict-action-error')&&inline.dataset.state===tone&&inline.querySelectorAll('svg').length===1
+        &&inline.querySelector(':scope > .xp-dict-msg-ic > svg')?.dataset.icon===icon&&inline.textContent===key);
+    }
+    check("the inline update error carries the failure / answer tone and its icon outside the announced text",inlineTones.every(Boolean));
     const messageListeners=[];
     window.chrome={runtime:{onMessage:{addListener:listener=>messageListeners.push(listener),removeListener:listener=>{const i=messageListeners.indexOf(listener);if(i>=0)messageListeners.splice(i,1);}}}};
     let remoteReads=0,remoteRecord=record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[]});
