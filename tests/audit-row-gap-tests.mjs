@@ -121,7 +121,7 @@ async function collectProseHits() {
       .xp-md p { margin: .5em 0; }
       ol.xp-dict-senses { padding: 0; margin: 8px 0; }
       ol.xp-dict-senses > li { margin: 4px 0; margin-inline-start: 1.4em; }
-      ol.xp-dict-senses > li:only-child { margin-inline-start: 0; }
+      ol.xp-dict-senses > li:only-child { list-style: none; }
       button { height: 31px; margin: 5px; padding: 0 8px; font: 12px sans-serif; }
     </style></head><body>
       <div class="xp-md">
@@ -136,7 +136,7 @@ async function collectProseHits() {
       <ol class="xp-dict-senses"><li id="senses-rtl-relative" dir="auto">قصر (Schloss)</li><li dir="rtl">معنى آخر</li></ol>
       <ol class="xp-dict-senses"><li id="senses-rtl-fixed" dir="rtl" style="margin-inline-start:26.6px">قصر (Schloss)</li><li dir="rtl">معنى آخر</li></ol>
       <ol class="xp-dict-senses"><li id="senses-rtl-token" dir="rtl" style="margin-inline-start:24px">قصر (Schloss)</li><li dir="rtl">معنى آخر</li></ol>
-      <ol class="xp-dict-senses"><li id="senses-single">A single meaning has no marker indent</li></ol>
+      <ol class="xp-dict-senses"><li id="senses-single">A single meaning keeps the indent</li></ol>
       <ol class="xp-dict-senses"><li id="senses-rtl-single" dir="rtl">معنى وحيد</li></ol>
       <ol class="xp-dict-senses"><li id="senses-single-invalid" style="margin-inline-start:5px">Off-scale single meaning</li></ol>
       <ol class="xp-dict-senses"><li id="senses-rtl-single-invalid" dir="rtl" style="margin-inline-start:5px">معنى وحيد</li></ol>
@@ -166,7 +166,10 @@ for (const size of [19, 27]) {
       assert.equal(spacingAt(size, prefix + '-token', prop), true, 'fixed 24px must not replace 1.4em');
     }
   });
-  test(`single dictionary meanings use the ordinary spacing scale in either direction at ${size}px`, () => {
+  // A lone sense keeps the 1.4em indent (dict redesign ruling 2026-10-26), so
+  // it is held to the same em rhythm as a numbered one: the relative indent
+  // passes at both sizes, an off-rhythm one does not.
+  test(`single dictionary meanings keep the em indent in either direction at ${size}px`, () => {
     for (const id of ['senses-single', 'senses-rtl-single']) {
       for (const prop of ['margin-left', 'margin-right']) assert.equal(spacingAt(size, id, prop), false);
     }

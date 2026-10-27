@@ -1551,6 +1551,28 @@ function _pbpDictGenerationErrorKey(error, supplement = false) {
   if (Number.isInteger(error?.status) && error.status >= 500 && error.status < 600) return "dictGenerationServiceUnavailable";
   return supplement ? "dictSupplementUnavailable" : "dictEntryUnavailable";
 }
+// Failure tone (dict redesign ruling 2026-10-26): a failure is an error --
+// danger ink and a warning icon. "Nothing verifiable was found" and "this word
+// has no such usage" are answers, not failures, so they read neutral with an
+// info icon. source_failed stays an error: the retrieval itself broke.
+const PBP_DICT_NEUTRAL_CODES = Object.freeze(["no_sources", "unsupported_usage"]);
+function _pbpDictFailureTone(error) {
+  return PBP_DICT_NEUTRAL_CODES.includes(error?.code) ? "neutral" : "error";
+}
+// Writes a status line with its tone: data-state carries it to the stylesheet
+// and an error / neutral line leads with the shared warning / info icon. The
+// icon is a static shared constant, never message text, and is aria-hidden,
+// so textContent and what a screen reader hears stay the message alone.
+function _pbpDictToneText(el, text, tone = "") {
+  const icon = text && (tone === "error" ? "warning" : tone === "neutral" ? "info" : "");
+  const svg = icon && typeof PBP_ICONS === "object" ? PBP_ICONS[icon] || "" : "";
+  if (svg) {
+    const mark = document.createElement("span"); mark.className = "xp-dict-msg-ic";
+    mark.innerHTML = svg; // static shared icon, never model or page text
+    el.replaceChildren(mark, document.createTextNode(text));
+  } else el.textContent = text;
+  if (text && tone) el.dataset.state = tone; else delete el.dataset.state;
+}
 const PBP_DICT_FAILURE_EXTRA_CODES = Object.freeze(["ai_disabled", "ai_not_configured", "invalid_request", "not_saved",
   "source_failed", "stale", "network", "endpoint_invalid"]);
 function _pbpDictFailureCode(error) {
@@ -1697,15 +1719,15 @@ function _pbpDictEntryMount(host, opts) {
     try { return code ? new Intl.DisplayNames([document.documentElement.lang || "en"], { type: "language" }).of(code) : language.name; }
     catch (_) { return language.name; }
   };
-  const message = text => { status.textContent = text; status.hidden = !text; };
-  const inlineError = (anchor, text) => {
-    if (!anchor?.isConnected) { message(text); return; }
+  const message = (text, tone = "") => { _pbpDictToneText(status, text, tone); status.hidden = !text; };
+  const inlineError = (anchor, text, tone = "error") => {
+    if (!anchor?.isConnected) { message(text, tone); return; }
     let error = anchor.previousElementSibling;
     if (!error?.classList.contains("xp-dict-action-error")) {
       error = document.createElement("p"); error.className = "xp-dict-msg xp-dict-action-error";
       error.setAttribute("role", "alert"); anchor.before(error);
     }
-    error.textContent = text; error.hidden = !text;
+    _pbpDictToneText(error, text, tone); error.hidden = !text;
     if (text) message("");
   };
   const usageFeedback = anchor => {
@@ -1725,7 +1747,8 @@ function _pbpDictEntryMount(host, opts) {
     return feedback;
   };
   const usageMessage = (feedback, text, state = "") => {
-    feedback.text.textContent = text; feedback.box.hidden = !text;
+    _pbpDictToneText(feedback.text, text, state === "error" || state === "neutral" ? state : "");
+    feedback.box.hidden = !text;
     feedback.box.dataset.state = state;
     feedback.cancel.hidden = state !== "busy";
     feedback.anchor.hidden = state === "busy";
@@ -1848,7 +1871,7 @@ function _pbpDictEntryMount(host, opts) {
     const hadFocus = document.activeElement === generate || document.activeElement === stop;
     show(reveal ? "ai" : mode); sync();
     if (hadFocus) toggle.focus({ preventScroll: true });
-    message(record.cacheSaved === false ? t("dictEntryNotCached") : "");
+    message(record.cacheSaved === false ? t("dictEntryNotCached") : "", "error");
   };
   const input = (signal, isCurrent) => ({ term: opts.term, sourceLanguage: opts.lang || "und", target: target(),
     owner: opts.owner, settings, signal, isCurrent });
@@ -1887,7 +1910,7 @@ function _pbpDictEntryMount(host, opts) {
               if (hadFocus) toggle.focus({ preventScroll: true });
             }
           } catch (error) {
-            if (alive()) message(t("dictEntryNotCached"));
+            if (alive()) message(t("dictEntryNotCached"), "error");
             console.warn("[dict-entry] save retry failed:", error?.name);
           } finally { saving = false; baseRetry.removeAttribute("aria-disabled"); }
         });
@@ -2194,7 +2217,7 @@ function _pbpDictEntryMount(host, opts) {
         _pbpDictLedgerFail(opts.owner, error, ledgerStage, category);
         const text = t(_pbpDictGenerationErrorKey(error, true));
         if (document.activeElement === feedback.cancel) restoreFocus = origin;
-        usageMessage(feedback, text, "error");
+        usageMessage(feedback, text, _pbpDictFailureTone(error));
       } finally {
         if (epoch === version) {
           busy = false; active = null; usageActivity = null;
@@ -2236,8 +2259,8 @@ function _pbpDictEntryMount(host, opts) {
       if (!record) show("dictionary");
       console.warn("[dict-entry] generation failed:", error?.name, _pbpDictFailureCode(error), _pbpDictFailureReason(error));
       _pbpDictLedgerFail(opts.owner, error, ledgerStage, "entry");
-      const text = t(_pbpDictGenerationErrorKey(error));
-      if (updateId) inlineError(origin, text); else message(text);
+      const text = t(_pbpDictGenerationErrorKey(error)), tone = _pbpDictFailureTone(error);
+      if (updateId) inlineError(origin, text, tone); else message(text, tone);
     } finally {
       if (epoch === version) {
         busy = false; active = null;
@@ -2290,9 +2313,9 @@ function _pbpDictEntryMount(host, opts) {
     if (!alive() || error?.name === "AbortError" || error?.code === "stale") return;
     console.warn("[dict-entry] initialization failed:", error?.name, error?.code || "settings_failed");
     _pbpDictLedgerFail(opts.owner, typeof error?.code === "string" ? error : { code: "settings_failed" }, "init", "entry");
-    if (["owner_changed", "account_changed"].includes(error?.code)) message(t("vocabAccountChanged"));
-    else if (error?.code === "sync_failed") message(t("dictEntrySyncFailed"));
-    else message(t("dictEntryUnavailable"));
+    if (["owner_changed", "account_changed"].includes(error?.code)) message(t("vocabAccountChanged"), "error");
+    else if (error?.code === "sync_failed") message(t("dictEntrySyncFailed"), "error");
+    else message(t("dictEntryUnavailable"), "error");
     sync();
   });
   if (globalThis.chrome?.runtime?.onMessage) {
@@ -2336,7 +2359,7 @@ function _pbpDictEntryMount(host, opts) {
         if (alive() && epoch === revision) opts.onSettingsChange(next);
       } catch (error) {
         console.warn("[dict-entry] settings refresh failed:", error?.name);
-        if (alive() && epoch === revision) { settings = null; message(t("dictEntryUnavailable")); sync(); }
+        if (alive() && epoch === revision) { settings = null; message(t("dictEntryUnavailable"), "error"); sync(); }
       }
     };
     const changed = (changes, area) => listener(changes, area).catch(error =>

@@ -1648,7 +1648,20 @@ html.motion-ready .notes-excerpt-jump { transition: background-color var(--motio
   /* Narrow mode is list OR detail, driven by a body class */
   body.lib-narrow-detail .vocab-list-pane { display: none; }
   body:not(.lib-narrow-detail) .vocab-detail-pane { display: none; }
-  .vocab-detail-back { display: inline-flex; position: sticky; top: 0; z-index: var(--lib-z-sticky); }
+  .vocab-detail-back { display: inline-flex; position: sticky; top: 0; z-index: var(--lib-z-sticky); grid-area: 1 / 1; }
+  /* The stuck back button only masks its own box, so the word, chips and
+     look-up text scrolled under it showed beside and around it and read as
+     overlapping it. A page-fill band in the same cell sticks with it, one
+     layer below, across the pane's full width (its inline padding included)
+     and sp-2 under the button -- the clearance scroll-padding-top already
+     keeps for focus. Behind the button, so its hover fill still shows. */
+  body.lib-narrow-detail .vocab-detail-pane::before {
+    content: ""; grid-area: 1 / 1; align-self: start;
+    position: sticky; top: 0; z-index: calc(var(--lib-z-sticky) - 1);
+    block-size: calc(var(--lib-control-h) - 4px + var(--lib-sp-2));
+    margin-inline: calc(-1 * var(--lib-sp-4)) calc(-1 * var(--lib-page-pad));
+    background: var(--lib-bg);
+  }
   /* The lookup row lives in the detail pane, which is display:none here
      until the body class flips -- so the list needs one door to it. */
   .vocab-filter-row > .vocab-lookup-narrow { display: inline-flex; }
@@ -2049,7 +2062,14 @@ html.motion-ready .vocab-note-save {
    spec §4.1, §4.8, §4.9). T7b adds the container tiers; until then the sheet
    is one column. Flat canvas: no fill, frame, rule or radius on any of these
    (the ui-contract canvas gate reads canvasStructures). ---- */
-.vocab-sheet { display: grid; grid-template-columns: minmax(0, var(--lib-main-max)); justify-content: start; align-items: start; }
+/* position: relative makes the sheet the containing block of the .sr-only
+   labels inside it (the lookup's language and definition-to-save labels).
+   With none between them and the root they resolved against the initial
+   containing block at their static position deep in the pane's scroller and
+   stretched the PAGE: 957px at 420x900 with a detail open, 1496px at 360x720
+   after a look-up (render oracle noPageScroll). The pane itself stays
+   unpositioned (ui-contract); no z-index here, so no stacking context. */
+.vocab-sheet { display: grid; grid-template-columns: minmax(0, var(--lib-main-max)); justify-content: start; align-items: start; position: relative; }
 /* Author `display` would out-rank the UA [hidden] rule. */
 .vocab-sheet > [hidden] { display: none; }
 .vocab-ref { min-width: 0; margin-top: var(--lib-sp-6); }
@@ -2120,7 +2140,9 @@ html.motion-ready .vocab-note-save {
 /* Numbered senses: a 24px number column drawn by a counter, the text in the
    rest. Absolute ::before, not a grid: md-dict writes each sense as mixed
    inline content (tag span, text, lemma button), which a grid would split
-   into separate cells. A single sense is not numbered. */
+   into separate cells. A single sense is not numbered, but it keeps the
+   24px indent: senses sit on one edge however many there are, so the
+   column has two left edges, not three (dict redesign ruling 2026-10-26). */
 #vocab-ref-result .xp-dict-senses { counter-reset: xp-sense; margin: var(--lib-sp-2) 0 0; padding: 0; list-style: none; }
 #vocab-ref-result .xp-dict-senses > li {
   counter-increment: xp-sense;
@@ -2143,12 +2165,13 @@ html.motion-ready .vocab-note-save {
   color: var(--lib-fg-muted);
   font-variant-numeric: tabular-nums;
 }
-#vocab-ref-result .xp-dict-senses > li:only-child { padding-inline-start: 0; }
 #vocab-ref-result .xp-dict-senses > li:only-child::before { content: none; }
 #vocab-ref-result .xp-dict-sense-tag { margin-inline-end: var(--lib-sp-1); font-size: 12px; line-height: 18px; color: var(--lib-fg-muted); }
-#vocab-ref-result .xp-dict-example { font-size: 14px; line-height: 22px; color: var(--lib-fg-muted); }
+/* Source sentence in body ink, its translation the muted aid (library has no
+   separate secondary text role; --lib-fg-muted is it). */
+#vocab-ref-result .xp-dict-example { font-size: 14px; line-height: 22px; color: var(--lib-fg); }
 #vocab-ref-result .xp-dict-example-pair { margin-top: var(--lib-sp-2); }
-#vocab-ref-result .xp-dict-example-translation { margin-top: var(--lib-sp-0); font-size: 13px; line-height: 21px; }
+#vocab-ref-result .xp-dict-example-translation { margin-top: var(--lib-sp-0); font-size: 13px; line-height: 21px; color: var(--lib-fg-muted); }
 #vocab-ref-result .xp-dict-subsense { margin-top: var(--lib-sp-2); padding-inline-start: var(--lib-sp-4); font-size: 14px; line-height: 23px; }
 #vocab-ref-result .xp-dict-rel { margin-top: var(--lib-sp-4); font-size: 14px; line-height: 22px; color: var(--lib-fg); }
 #vocab-ref-result .xp-dict-rel + .xp-dict-rel { margin-top: var(--lib-sp-1); }
@@ -2184,6 +2207,13 @@ html.motion-ready .vocab-note-save {
    group (critique round 4, 2026-10-20). */
 #vocab-ref-result .xp-dict-msg { padding: var(--lib-sp-1) 0; font-size: 13px; line-height: 18px; color: var(--lib-fg); }
 #vocab-ref-result .xp-dict-msg + .xp-dict-src { margin-top: var(--lib-sp-1); }
+/* Tone (md-dict.js _pbpDictToneText): a failure in danger ink behind a
+   warning icon; "nothing found / no such usage" is an answer, muted ink
+   behind an info icon. */
+#vocab-ref-result .xp-dict-msg[data-state="error"] { color: var(--lib-danger); }
+#vocab-ref-result .xp-dict-msg[data-state="neutral"] { color: var(--lib-fg-muted); }
+#vocab-ref-result .xp-dict-msg-ic { display: inline-flex; vertical-align: -2px; margin-inline-end: var(--lib-sp-1); }
+#vocab-ref-result .xp-dict-msg-ic svg { display: block; }
 /* The local pack's block: no fill, no frame -- a small bold title and its senses. */
 #vocab-ref-result .xp-dict-local-title { margin-bottom: var(--lib-sp-2); font-size: 13px; line-height: 18px; font-weight: 700; color: var(--lib-fg-muted); }
 #vocab-ref-result .xp-skel {
@@ -2245,6 +2275,9 @@ html.motion-ready .vocab-note-save {
   min-height: var(--lib-control-h); font-size: calc(var(--lib-text-body) - 1px);
   line-height: 20px; cursor: pointer; color: var(--lib-fg-muted);
   padding: var(--lib-sp-1) var(--lib-sp-2); box-sizing: border-box; border-radius: var(--lib-radius-md);
+  /* Text on the column edge like the text it discloses; the sp-2 inset goes
+     to the hover fill, which hangs outside the column. */
+  margin-inline: calc(-1 * var(--lib-sp-2));
 }
 #vocab-ref-result .xp-dict-ai-details > summary::-webkit-details-marker { display: none; }
 #vocab-ref-result .xp-dict-ai-details > summary::after {

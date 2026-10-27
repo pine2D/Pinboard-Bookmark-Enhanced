@@ -2369,13 +2369,17 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
 .xp-dict-senses li { margin: 0; margin-inline-start: 1.4em; }
 .xp-dict-senses li + li { margin-top: var(--sp-4); }
 /* A lone sense needs no "1." -- the number only means something when it
-   distinguishes one sense from another. Each item owns its logical indent so
-   RTL markers stay inside the panel too. Uses :only-child rather
-   than :has() to stay off the slow-selector list. */
-.xp-dict-senses li:only-child { list-style: none; margin-inline-start: 0; }
+   distinguishes one sense from another. It keeps the 1.4em indent all the
+   same: senses sit on one edge however many there are, so the lookup has
+   two left edges, not three (dict redesign ruling 2026-10-26). Each item owns
+   its logical indent so RTL markers stay inside the panel too. Uses
+   :only-child rather than :has() to stay off the slow-selector list. */
+.xp-dict-senses li:only-child { list-style: none; }
 .xp-dict-example-pair { margin-top: var(--sp-2); }
-.xp-dict-example { font-size: 0.88em; line-height: 1.5; color: var(--fg-muted); }
-.xp-dict-example-translation { margin-top: var(--sp-0); font-size: 0.82em; }
+/* The source sentence is what the reader studies, so it takes body ink; its
+   translation is the aid and steps back to the secondary colour. */
+.xp-dict-example { font-size: 0.88em; line-height: 1.5; color: var(--fg); }
+.xp-dict-example-translation { margin-top: var(--sp-0); font-size: 0.82em; color: var(--fg-secondary); }
 .xp-dict-sense-tag { font-size: 0.85em; color: var(--fg-muted); font-style: italic; }   /* italic kept: sense tags are English-normalised by the API across query languages (sampled ja/ko); local packs write them empty (dict-pack.js:75,388) */
 /* Stable containers inside .xp-dict-slot: the local pack writes the first, every
    online path writes the second. Empty until something lands in them. */
@@ -2395,6 +2399,13 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
 .xp-dict-src a { color: inherit; }
 .xp-dict-ailabel { font-size: 12px; color: var(--fg-muted); margin-top: var(--sp-1); }
 .xp-dict-msg { color: var(--fg-muted); padding: var(--sp-1) 0; }
+/* Tone (md-dict.js _pbpDictToneText): a failure is danger ink behind a
+   warning icon; "nothing found / no such usage" is an answer, so it reads in
+   body-secondary ink behind an info icon. */
+.xp-dict-msg[data-state="error"] { color: var(--danger); }
+.xp-dict-msg[data-state="neutral"] { color: var(--fg-secondary); }
+.xp-dict-msg-ic { display: inline-flex; vertical-align: -2px; margin-inline-end: var(--sp-1); }
+.xp-dict-msg-ic svg { display: block; }
 .xp-dict-ai { min-width: 0; overflow-wrap: anywhere; }
 .xp-dict-ai-controls { flex: none; flex-wrap: nowrap; gap: var(--sp-1); margin-inline-start: auto; }
 .xp-dict-ai-controls[hidden] { display: none; }
@@ -2405,10 +2416,13 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
 .xp-dict-ai-status, .xp-dict-ai-configure { font-size: 12px; line-height: 18px; }
 .xp-dict-ai-status { margin-bottom: var(--sp-2); }
 .xp-dict-ai-details { margin-top: var(--sp-2); }
+/* The title's text sits on the column edge like the text it discloses; the
+   negative inline margin hands its sp-2 inset to the hover fill instead, so
+   the fill hangs outside the column rather than pushing the words 8px in. */
 .xp-dict-ai-details > summary {
   display: flex; align-items: center; gap: var(--sp-2); list-style: none; cursor: pointer;
   color: var(--fg-secondary); font-size: 12px; line-height: 18px; min-height: 26px;
-  padding: var(--sp-1) var(--sp-2); border-radius: var(--radius-md); box-sizing: border-box;
+  padding: var(--sp-1) var(--sp-2); margin-inline: calc(-1 * var(--sp-2)); border-radius: var(--radius-md); box-sizing: border-box;
 }
 .xp-dict-ai-details > summary::-webkit-details-marker { display: none; }
 .xp-dict-ai-details > summary::after {
@@ -2476,7 +2490,14 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
 .xp-foot > .xp-dict-save-meaning { flex: 1 1 100px; width: 100px; min-width: 0; max-width: 100%; white-space: nowrap; }
 .xp-dict-lang > button { display: block; width: 100%; min-width: 0; padding: 0; border: none; background: none; color: inherit; font: inherit; text-align: start; }
 .xp-dict-lang selectedcontent { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.xp-dict-lang::picker(select) { max-width: calc(100vw - 32px); white-space: normal; }
+/* The picker is anchored with position-area (UA: end span-end, flipping to
+   start span-end above the select). Capped only by the viewport, a picker
+   wider than the room right of its select fitted none of the try positions,
+   so Chrome shifted it back onto the viewport -- over the select itself and
+   past the bottom edge. 100% here is the inset-modified containing block of
+   the chosen position, so every position fits and the menu opens above or
+   below its select instead of covering it. */
+.xp-dict-lang::picker(select) { max-inline-size: min(100%, calc(100vw - 32px)); white-space: normal; }
 .xp-dict-lang option { white-space: normal; overflow-wrap: anywhere; }
 /* A full-entry glossary can be much longer than a definition. Keep the menu
    near the lookup bubble, with a bounded preview and a visible source. */

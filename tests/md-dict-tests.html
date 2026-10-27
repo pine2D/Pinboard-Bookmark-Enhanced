@@ -2055,13 +2055,26 @@ async function runDictionaryEntryUiTests() {
       ]) retained.push(await attempt({code})===key);
       retained.push(await attempt({code:"owner_changed",status:402})==="vocabAccountChanged");
       check(label+" preserves owner, permission, sync, language, validation and source recovery branches",retained.every(Boolean));
+      // Tone by code, not by message: every failure is the danger state with
+      // a warning icon; only "no verifiable source" and "no such usage" are
+      // answers, neutral with an info icon. The icon stays out of the text.
+      const tones=[];
+      for(const [properties,tone,icon] of [
+        [{code:"no_sources"},"neutral","info"],[{code:"unsupported_usage"},"neutral","info"],
+        [{code:"source_failed"},"error","warning"],[{code:"invalid_response"},"error","warning"],
+        [{code:"wrong_language"},"error","warning"],[{status:503},"error","warning"],[{name:"TimeoutError"},"error","warning"]
+      ]) {
+        const text=await attempt(properties),el=getMessage();
+        tones.push(el?.dataset.state===tone&&el.querySelectorAll("svg").length===1&&el.querySelector(":scope > .xp-dict-msg-ic > svg")?.dataset.icon===icon&&el.textContent===text&&!!text);
+      }
+      check(label+" shows failures in the error tone with a warning icon and no-source / unsupported answers in the neutral tone with an info icon",tones.every(Boolean));
       const ambiguous=[];
       for(const properties of [{status:"402"},{status:"401"},{status:"524"},{status:499},{code:secret},{code:{}}]) ambiguous.push(await attempt(properties)===fallback);
       check(label+" does not infer billing or expose raw text from malformed or unrelated errors",ambiguous.every(Boolean)&&!getMessage().textContent.includes(secret));
     } finally {window[runName]=originalRun;}
   };
   try {
-    Object.assign(window,{hasAIKey:()=>true,ensureAIHostPermissionWithGesture:async()=>{grants++;},requestAIHostPermissions:async(_settings,origins)=>{evidenceGrants.push(origins);return true;},uiLangToBCP47:()=>uiLanguage,PBP_ICONS:Object.fromEntries(["wandSparkles","bookOpenText","sparkles","stop","gear"].map(name=>[name,'<svg viewBox="0 0 24 24" aria-hidden="true"></svg>'])),pbpAiBumpCounter:()=>{},
+    Object.assign(window,{hasAIKey:()=>true,ensureAIHostPermissionWithGesture:async()=>{grants++;},requestAIHostPermissions:async(_settings,origins)=>{evidenceGrants.push(origins);return true;},uiLangToBCP47:()=>uiLanguage,PBP_ICONS:Object.fromEntries(["wandSparkles","bookOpenText","sparkles","stop","gear","warning","info"].map(name=>[name,'<svg data-icon="'+name+'" viewBox="0 0 24 24" aria-hidden="true"></svg>'])),pbpAiBumpCounter:()=>{},
       pbpDictEntryRead:async input=>{reads.push(input);return null;},pbpDictEntryRun:async input=>{calls.push(input);return record();}});
     const multi = record();
     multi.entry.meanings.push({partOfSpeech:"sustantivo",definition:"A second meaning",examples:[]});
