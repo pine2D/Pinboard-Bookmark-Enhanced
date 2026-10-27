@@ -539,6 +539,89 @@ await test('unsupported schema negotiates JSON object before plain text within t
   calls=[];responses=[reply(OK)];await run({jsonMode:true,responseSchema:{type:'object'}},s);
   assert(calls.length===1&&!('response_format'in calls[0]));
 });
+// Dictionary-shaped task options (PBP_DICT_GENERATION_OPTIONS plus a schema).
+// The stream and non-stream bodies are compared from the same capability-record
+// seed; only `stream` differs (Ollama: also the stream-only options.temperature).
+const DICT_SCHEMA={type:'object',properties:{text:{type:'string'}},required:['text'],additionalProperties:false};
+const DICT_OPTS={maxTokens:8192,totalOutputBudget:true,reasoningEffort:'minimum',timeoutMs:180000,jsonMode:true,requireComplete:true,responseSchema:DICT_SCHEMA};
+const GEMINI_BASE='https://generativelanguage.googleapis.com/v1beta';
+// Gemini's documented error envelope; the message names the refused field.
+const GEMINI_BUDGET_REFUSED={error:{code:400,message:'thinkingBudget is not supported for this model.',status:'INVALID_ARGUMENT'}};
+const FORMAT_DENIED=reply({error:{message:'Unsupported response_format type',param:'response_format'}},400);
+function bodyWithout(body,paths){const copy=structuredClone(body);
+  for(const path of paths){const keys=path.split('.'),last=keys.pop();let at=copy;for(const k of keys)at=at?.[k];if(at&&typeof at==='object')delete at[last];}
+  return JSON.stringify(copy);}
+await test('dictionary stream bodies equal their non-stream bodies apart from stream on every protocol',async()=>{
+  const openai={aiProvider:'openai',openaiApiKey:'fixture',openaiModel:'dict-model'};
+  const openaiKey=JSON.stringify([2,'openai','https://api.openai.com/v1','dict-model']);
+  const customKey=JSON.stringify([2,'custom','https://example.test/v1','free-model']);
+  const geminiKey=JSON.stringify([2,'gemini',GEMINI_BASE,'free-model']);
+  const memo=extra=>({...extra,expiresAt:Date.now()+6*86400000});
+  const cases=[
+    ['compatible gateway',PROTOCOLS[0],STREAM_DONE.compatible,{},b=>b.response_format?.type==='json_object'&&b.max_completion_tokens===8192&&b.reasoning_effort==='none'],
+    ['compatible gateway without format',PROTOCOLS[0],STREAM_DONE.compatible,{pbpAiParamFix:{[customKey]:memo({omitResponseFormat:true})}},b=>!('response_format'in b)],
+    ['OpenAI official',{...PROTOCOLS[0],settings:openai},STREAM_DONE.compatible,{},b=>b.response_format?.type==='json_schema'&&JSON.stringify(b.response_format.json_schema.schema)===JSON.stringify(DICT_SCHEMA)],
+    ['OpenAI official after schema refusal',{...PROTOCOLS[0],settings:openai},STREAM_DONE.compatible,{pbpAiParamFix:{[openaiKey]:memo({omitJsonSchema:true})}},b=>b.response_format?.type==='json_object'],
+    ['Gemini',PROTOCOLS[1],STREAM_DONE.gemini,{},b=>b.generationConfig.responseMimeType==='application/json'&&JSON.stringify(b.generationConfig.responseJsonSchema)===JSON.stringify(DICT_SCHEMA)&&b.generationConfig.thinkingConfig?.thinkingBudget===0],
+    ['Gemini after budget refusal',PROTOCOLS[1],STREAM_DONE.gemini,{pbpThinkReject:{[geminiKey]:fresh()}},b=>b.generationConfig.responseMimeType==='application/json'&&!('thinkingConfig'in b.generationConfig)],
+    ['Claude',PROTOCOLS[2],STREAM_DONE.claude,{},b=>!('response_format'in b)&&!('format'in b)&&!('thinking'in b)&&b.max_tokens===8192],
+    ['Ollama',PROTOCOLS[3],STREAM_DONE.ollama,{},b=>JSON.stringify(b.format)===JSON.stringify(DICT_SCHEMA)&&!('think'in b)&&b.options.num_predict===8192]];
+  for(const [label,protocol,streamReply,seed,shape] of cases){
+    reset([reply(protocol.complete)],seed);await run(DICT_OPTS,protocol.settings);const plain=calls[0];
+    reset([streamReply],seed);assert(await stream(DICT_OPTS,protocol.settings)==='ready'&&calls.length===1,label+': stream failed');const streamed=calls[0];
+    // Gemini selects streaming by URL (streamGenerateContent), not a body field.
+    const gemini=protocol===PROTOCOLS[1];
+    assert(gemini?!('stream'in streamed)&&!('stream'in plain):streamed.stream===true,label+': wrong stream marker');
+    assert(shape(plain)&&shape(streamed),label+': missing structure fields');
+    const ollama=protocol===PROTOCOLS[3],strip=ollama?['stream','options.temperature']:['stream'];
+    if(ollama)assert(streamed.options.temperature===0.3&&!('temperature'in plain.options),'Ollama temperature difference changed');
+    assert(bodyWithout(plain,strip)===bodyWithout(streamed,strip),label+' bodies differ: '+bodyWithout(plain,strip)+' vs '+bodyWithout(streamed,strip));
+  }
+});
+await test('dictionary streams negotiate the response format through the shared repair ladder',async()=>{
+  const s={aiProvider:'openai',openaiApiKey:'fixture',openaiModel:'stream-schema-optional'};
+  reset([FORMAT_DENIED,FORMAT_DENIED,STREAM_DONE.compatible]);assert(await stream(DICT_OPTS,s)==='ready');
+  assert(calls.length===3&&checks===3,'Every format attempt must pass the dispatch guard');
+  assert(calls[0].response_format.type==='json_schema'&&calls[1].response_format.type==='json_object'&&!('response_format'in calls[2]));
+  assert(calls.every(body=>body.stream===true&&body.max_completion_tokens===8192&&body.reasoning_effort==='none'),'Format repair changed other fields');
+  calls=[];responses=[STREAM_DONE.compatible];await stream(DICT_OPTS,s);
+  assert(calls.length===1&&!('response_format'in calls[0]),'Stream did not remember the format capability');
+  calls=[];responses=[reply(OK)];await run(DICT_OPTS,s);
+  assert(calls.length===1&&!('response_format'in calls[0]),'Nonstream ignored the stream format capability');
+});
+await test('dictionary stream repairs share the four-attempt cap and recheck the guard each time',async()=>{
+  const s={aiProvider:'openai',openaiApiKey:'fixture',openaiModel:'stream-capped'};
+  reset([FORMAT_DENIED,FORMAT_DENIED,reply({error:{message:'Unsupported parameter: max_completion_tokens',param:'max_completion_tokens'}},400),reply(TEMP_REFUSED,400),STREAM_DONE.compatible]);
+  let error;try{await stream(DICT_OPTS,s);}catch(e){error=e;}
+  assert(error?.status===400&&calls.length===4&&checks===4&&responses.length===1,'Attempt cap exceeded or guard skipped');
+  assert(calls[2].max_completion_tokens===8192&&calls[3].max_tokens===8192&&!('response_format'in calls[3])&&calls[3].temperature===0.3);
+  reset([FORMAT_DENIED,STREAM_DONE.compatible]);let count=0;
+  await rejected(()=>stream({...DICT_OPTS,beforeRequest:async()=>{if(++count===2)throw Object.assign(new Error('Fixture owner changed'),{code:'owner_changed'});}},{...s,openaiModel:'stream-guarded'}),'owner_changed');
+  assert(count===2&&calls.length===1,'A format retry dispatched without its guard');
+});
+await test('Gemini streams declaring minimum or low reasoning negotiate the zero thinking budget',async()=>{
+  for(const effort of ['minimum','low']){
+    const gModel='stream-thinking-only-'+effort,s={aiProvider:'gemini',geminiApiKey:'fixture',geminiModel:gModel};
+    const gKey=JSON.stringify([2,'gemini',GEMINI_BASE,gModel]);
+    reset([reply(GEMINI_BUDGET_REFUSED,400),STREAM_DONE.gemini]);
+    assert(await stream({...DICT_OPTS,reasoningEffort:effort},s)==='ready');
+    assert(calls.length===2&&checks===2&&calls[0].generationConfig.thinkingConfig?.thinkingBudget===0&&!('thinkingConfig'in calls[1].generationConfig),effort+': budget was not negotiated');
+    assert(calls.every(body=>body.generationConfig.responseMimeType==='application/json'),effort+': retry lost the JSON fields');
+    assert(stored.pbpThinkReject?.[gKey]?.rejected===true,effort+': refusal not remembered');
+    calls=[];responses=[STREAM_DONE.gemini];await stream({...DICT_OPTS,reasoningEffort:effort},s);
+    assert(calls.length===1&&!('thinkingConfig'in calls[0].generationConfig),effort+': memo ignored');
+  }
+  reset([STREAM_DONE.gemini]);await stream({jsonMode:true},PROTOCOLS[1].settings);
+  assert(calls.length===1&&!('thinkingConfig'in calls[0].generationConfig)&&calls[0].generationConfig.responseMimeType==='application/json','A task without an effort entered the negotiation');
+});
+await test('consumers without jsonMode never receive structure fields on any stream protocol',async()=>{
+  for(const [protocol,streamReply] of [[PROTOCOLS[0],STREAM_DONE.compatible],[PROTOCOLS[1],STREAM_DONE.gemini],[PROTOCOLS[2],STREAM_DONE.claude],[PROTOCOLS[3],STREAM_DONE.ollama]]){
+    for(const opts of [SNAP_ASK,SNAP_TRANSLATE,SNAP_SKIM,{responseSchema:DICT_SCHEMA}]){
+      reset([streamReply]);await stream(opts,protocol.settings);
+      assert(!/response_format|responseMimeType|responseJsonSchema|"format"/.test(raw[0]),protocol.name+' gained a structure field: '+raw[0]);
+    }
+  }
+});
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();
 </script>

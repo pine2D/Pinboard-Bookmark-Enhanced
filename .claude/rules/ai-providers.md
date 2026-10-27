@@ -42,7 +42,7 @@ OpenAI 兼容、Gemini、Claude、Ollama 只在协议适配层读取正文块与
 
 - `totalOutputBudget` 在 OpenAI 兼容协议优先发送 `max_completion_tokens`，只有服务端明确拒绝字段时按既有机制回退。`max_tokens` 在部分接口只限制最终答案，不能普遍当作含思考总量保证；真实测试必须另核对回传用量并停机。
 - 已声明的原生思考字段不变；未知兼容端点收到任务的 `minimum` 偏好时先尝试 `reasoning_effort:none`，仅在明确拒绝后降为 `low`；旧 `low` 请求保持兼容，不修改 provider 注册表或创建模型名单。
-- 结构要求由适配器转换：OpenAI 原生端点使用 `response_format.json_schema`；未知兼容端点先用通用 JSON object，不假设支持 Schema；Gemini `generationConfig.responseJsonSchema` 配合 JSON MIME；Ollama `format` 对象。Claude 保持提示词及严格解析，不发送其他协议的字段。
+- 结构要求由适配器转换：OpenAI 原生端点使用 `response_format.json_schema`；未知兼容端点先用通用 JSON object，不假设支持 Schema；Gemini `generationConfig.responseJsonSchema` 配合 JSON MIME；Ollama `format` 对象。Claude 保持提示词及严格解析，不发送其他协议的字段。`callAIStream` 只在 `jsonMode` 下按同一表达式加同样的字段（兼容协议的 `response_format` 位于 temperature 之后、输出上限字段之前，Ollama 不发 `think`），因此带词典选项的流式与非流式请求体除 `stream` 外相同（Ollama 另有流式独有的 `options.temperature`，保持不变）；Gemini 流式除 `noThinking` 外，任务声明 `reasoningEffort` 为 `minimum`/`low` 时也进入 `_GEMINI_THINKING_CFG` 的零思考预算协商，与 `callGemini` 共用记忆。未传 `jsonMode` 的流式消费者不会得到任何结构字段。
 - 兼容服务端明确以 400/422 拒绝 `response_format` 时，依次降到 JSON object、无格式字段，记忆能力；包括明确点名格式的 unknown variant / 类型枚举拒绝，不把 schema 内容错误或数值越界当成能力拒绝。与 token、temperature 和思考字段修复共用四次总上限，每次执行 `beforeRequest`。成功 HTTP 的坏内容不触发回退。结构约束只是生成引导，解析、语言、引用及归档校验不能跳过；有效 JSON 也不等于完整、正确的解释。
 
 依据：[LiteLLM JSON schema](https://docs.litellm.ai/docs/completion/json_mode)、[Qwen 结构化输出](https://help.aliyun.com/zh/model-studio/qwen-structured-output)、[Qwen 思考与输出上限](https://help.aliyun.com/zh/model-studio/deep-thinking/)、[Gemini GenerateContent](https://ai.google.dev/api/generate-content)、[Ollama structured outputs](https://docs.ollama.com/capabilities/structured-outputs)。

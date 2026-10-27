@@ -1166,6 +1166,13 @@ async function _streamOpenAICompat(baseUrl, apiKey, model, prompt, opts, onDelta
         model,
         messages,
         ...(opts.omitTemperature ? {} : { temperature: opts.temperature !== undefined ? opts.temperature : 0.3 }),
+        // Same expression and position as callOpenAICompat, so a JSON task's
+        // stream body equals its non-stream body apart from `stream`, and the
+        // shared _aiParamRepair ladder (schema -> json_object -> none) applies.
+        // Absent jsonMode the spread is empty: other consumers' bytes are unchanged.
+        ...(opts.jsonMode && !opts.omitResponseFormat ? { response_format: opts.schemaMode && opts.responseSchema && !opts.omitJsonSchema
+          ? { type: "json_schema", json_schema: { name: "response", strict: true, schema: opts.responseSchema } }
+          : { type: "json_object" } } : {}),
         [opts.tokenField || "max_tokens"]: opts.maxTokens || 1024,
         stream: true,
         ...(opts.extraBody || {})
@@ -1185,6 +1192,11 @@ async function _streamGemini(s, prompt, opts, onDelta) {
     temperature: opts.temperature !== undefined ? opts.temperature : 0.3,
     maxOutputTokens: opts.maxTokens || 1024
   };
+  // JSON tasks: same fields and order as _callGeminiOnce (before thinkingConfig).
+  if (opts.jsonMode) {
+    generationConfig.responseMimeType = "application/json";
+    if (opts.responseSchema) generationConfig.responseJsonSchema = opts.responseSchema;
+  }
   // Translate path: hard-disable thinking so the output budget is all payload.
   // The field arrives through extraBody from the shared self-heal wrapper (same
   // read as _callGeminiOnce), so a model that rejects a zero budget gets it
@@ -1259,6 +1271,8 @@ async function _streamOllama(s, prompt, opts, onDelta) {
     model: opts.model || s.ollamaModel || "llama3.2",
     messages,
     stream: true,
+    // Same format field as callOllama; no `think` field on either path.
+    ...(opts.jsonMode ? { format: opts.responseSchema || "json" } : {}),
     options: {
       temperature: opts.temperature !== undefined ? opts.temperature : 0.3,
       num_predict: opts.maxTokens || 1024
@@ -1297,9 +1311,14 @@ async function _streamOllama(s, prompt, opts, onDelta) {
 //           signal? (AbortSignal), temperature? (default 0.3; dropped entirely
 //             once a model refuses it — see the body dialect above),
 //           noThinking? (Gemini only — rides the shared 400/422 self-heal),
-//           totalOutputBudget?, reasoningEffort? (OpenAI-compatible only:
-//             the same _aiCompatCfg policy and capability record as callAI;
-//             existing stream consumers pass neither),
+//           totalOutputBudget?, reasoningEffort? (OpenAI-compatible: the
+//             same _aiCompatCfg policy and capability record as callAI;
+//             Gemini: "minimum"/"low" enter the zero-budget negotiation like
+//             noThinking; existing stream consumers pass neither),
+//           jsonMode?, responseSchema? (the non-stream structure fields:
+//             compatible response_format with the shared format repair,
+//             Gemini responseMimeType/responseJsonSchema, Ollama format;
+//             Claude sends none),
 //           onUsage?({inTok,outTok}) — T4: fired at most once after a NORMAL
 //             stream end IFF the provider opportunistically emitted usage in the
 //             stream (ZERO request mutation). Callers omitting it are unaffected. }
@@ -1320,7 +1339,11 @@ async function callAIStream(s, prompt, opts = {}, onDelta) {
     // without it a model that rejects thinkingBudget:0 (e.g. gemini-2.5-pro)
     // 400s on every batch of a full-text translation, retry ladder included,
     // even after callGemini already memoized the rejection for that model.
-    if (!opts.noThinking) return _streamGemini(s, prompt, opts, cb);
+    // A task declaring minimum/low reasoning (the dictionary) negotiates the
+    // same zero budget callGemini sends, through the same wrapper and memo;
+    // Ask and skim declare neither and keep the direct, thinking-on request.
+    const lowEffort = opts.reasoningEffort === "minimum" || opts.reasoningEffort === "low";
+    if (!opts.noThinking && !lowEffort) return _streamGemini(s, prompt, opts, cb);
     const gModel = opts.model || s.geminiModel || "gemini-3.5-flash-lite";
     return _aiWithDialectFallback("gemini", gModel, _GEMINI_THINKING_CFG, (extraBody) =>
       _streamGemini(s, prompt, { ...opts, model: gModel, extraBody }, cb));
