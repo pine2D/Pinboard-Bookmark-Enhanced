@@ -259,8 +259,22 @@ function _pbpDictGeneratedResponse(text, kind, category = "") {
   }
   return JSON.stringify(value);
 }
-function pbpDictEntryParse(text, request) {
+// options.lenient (new generations only, Q6=B / Q7=A): a sense that fails its
+// own structure (including one bad example), the internal-term check or the
+// per-sense script check is dropped alone and reported through
+// options.onDrop(error) with a fixed reason; every other check stays strict.
+// Cache and archive reads never pass it. Entry-level fields, the 4-sense cap
+// (Q5=B: no truncation) and learning stay whole-entry failures.
+function pbpDictEntryParse(text, request, options = {}) {
   const invalid = reason => { throw _pbpDictEntryError("invalid_response", "AI returned an invalid dictionary entry", reason); };
+  const lenient = options.lenient === true, dropped = [];
+  const drop = error => {
+    // Fixed validation label only, never the model's text.
+    console.warn("[dict-entry] meaning dropped:", error.reason || error.code);
+    dropped.push(error);
+    try { if (typeof options.onDrop === "function") options.onDrop(error); }
+    catch (reportError) { console.warn("[dict-entry] drop report failed:", reportError?.name); }
+  };
   const value = _pbpDictResponseJson(text, PBP_DICT_ENTRY_MAX_RESPONSE, "entry");
   const legacyKeys = ["word", "language", "pronunciation", "meanings", "etymology", "relatedWords"];
   const structured = value && typeof value === "object" && Object.hasOwn(value, "learning");
@@ -270,8 +284,7 @@ function pbpDictEntryParse(text, request) {
   const pronunciation = structured && value.pronunciation === undefined ? "" : value.pronunciation;
   if (!_pbpDictEntryText(pronunciation, 256, true)) return invalid("entry_pronunciation");
   if (!Array.isArray(value.meanings) || value.meanings.length > 4) return invalid("entry_meanings");
-  const meanings = [];
-  for (const meaning of value.meanings) {
+  const parseMeaning = meaning => {
     if (!_pbpDictEntryObject(meaning, ["partOfSpeech", "definition", "examples"]) ||
         !_pbpDictEntryText(meaning.partOfSpeech, 128, true) || !_pbpDictEntryText(meaning.definition, 1200) ||
         !Array.isArray(meaning.examples) || meaning.examples.length > 2) return invalid("entry_meaning");
@@ -281,7 +294,38 @@ function pbpDictEntryParse(text, request) {
           !_pbpDictEntryText(example.translation, 600, true)) return invalid("entry_example");
       examples.push({ text: example.text.trim(), translation: example.translation.trim() });
     }
-    meanings.push({ partOfSpeech: meaning.partOfSpeech.trim(), definition: meaning.definition.trim(), examples });
+    return { partOfSpeech: meaning.partOfSpeech.trim(), definition: meaning.definition.trim(), examples };
+  };
+  let meanings = [];
+  for (const meaning of value.meanings) {
+    if (!lenient) { meanings.push(parseMeaning(meaning)); continue; }
+    try { meanings.push(parseMeaning(meaning)); }
+    catch (error) { if (error?.code !== "invalid_response") throw error; drop(error); }
+  }
+  if (lenient) {
+    // Only target-language prose is checked; examples are source-language text
+    // and exempt their own word forms from the field-word rule.
+    const leakContext = { term: request.term, sourceLanguage: request.sourceLanguage, target: request.target,
+      forms: [request.term, ...meanings.flatMap(m => m.examples.map(e => e.text))] };
+    meanings = meanings.filter(meaning => {
+      const prose = [meaning.definition, ...meaning.examples.map(e => e.translation)];
+      try {
+        if (prose.some(text => _pbpDictInternalTermLeak(text, leakContext))) invalid("internal_term");
+        _pbpDictExplanationScriptCheck(prose.filter(Boolean).join("\n\n"), request.target);
+        return true;
+      } catch (error) {
+        if (!["invalid_response", "wrong_language"].includes(error?.code)) throw error;
+        drop(error); return false;
+      }
+    });
+    // A model that answered "unknown word" (meanings:[]) keeps that meaning;
+    // senses that were all dropped are a failed paid answer, never unknown.
+    if (value.meanings.length && !meanings.length) {
+      // Every sense in the wrong script is the same wrong-language answer as
+      // before per-sense dropping, so the reader keeps its specific message.
+      if (dropped.every(error => error.code === "wrong_language")) throw dropped[0];
+      return invalid("entry_meanings_all_invalid");
+    }
   }
   const result = { word: request.term, language: request.sourceLanguage, pronunciation: pronunciation.trim(), meanings,
     etymology: "", relatedWords: [] };
@@ -379,15 +423,18 @@ function _pbpDictExplanationLanguage(value, target) {
 // Evaluate explanatory prose together. A word root, grammatical label or short
 // foreign-language contrast is not a standalone explanation-language failure.
 // Original example sentences and retrieved quotations never enter this check.
-async function _pbpDictCheckExplanation(text, target, declaredLanguage = "", sourceLanguage = "") {
+// The script half is synchronous so the lenient entry parser can apply it to a
+// single sense (Q6=B); it returns the prose sample for the statistical half,
+// or null when the text is too short or the target is unknown.
+function _pbpDictExplanationScriptCheck(text, target, declaredLanguage = "") {
   // A supplement's already validated metadata can identify a legacy custom
   // target for this check only. The saved target and archive key stay intact.
   const candidate = typeof declaredLanguage === "string" ? _pbpDictEntryLang(declaredLanguage.replace(/_/g, "-")) : "";
   const wanted = target.lang === "und" ? pbpDictKnownLanguageName(target.name, candidate ? [candidate] : []) || "und" : target.lang;
   const base = wanted.split("-")[0];
-  if (base === "und") return;
+  if (base === "und") return null;
   const originalLetters = (text.match(/\p{L}/gu) || []).length;
-  if (originalLetters < 24) return;
+  if (originalLetters < 24) return null;
   let expectedScript = { zh: /\p{Script=Han}/gu, ja: /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/gu,
     ko: /\p{Script=Hangul}/gu, ru: /\p{Script=Cyrillic}/gu, uk: /\p{Script=Cyrillic}/gu, ar: /\p{Script=Arabic}/gu }[base] ||
     (["en", "es", "de", "fr", "it", "pt", "pl", "nl", "cs", "vi", "tr"].includes(base) ? /\p{Script=Latin}/gu : null);
@@ -405,7 +452,7 @@ async function _pbpDictCheckExplanation(text, target, declaredLanguage = "", sou
   const nativeFrame = frameScript >= 4 && frameScript / frameLetters >= 0.5;
   const prose = frameLetters >= 80 || nativeFrame ? withoutMentions : text;
   const letters = (prose.match(/\p{L}/gu) || []).length;
-  if (letters < 24) return;
+  if (letters < 24) return null;
   const scriptLetters = expectedScript ? (prose.match(expectedScript) || []).length : 0;
   // Even a short explanation can be clearly wrong when it contains no target
   // script at all. Keep short mixed prose permissive; statistical detection
@@ -413,7 +460,12 @@ async function _pbpDictCheckExplanation(text, target, declaredLanguage = "", sou
   if (expectedScript && (scriptLetters === 0 || (letters >= 80 && scriptLetters < 12 && scriptLetters / letters < 0.08))) {
     throw _pbpDictEntryError("wrong_language", "Explanation language does not match the requested language", "explanation_script");
   }
-  if (letters < 80 || typeof globalThis.chrome?.i18n?.detectLanguage !== "function") return;
+  return letters < 80 ? null : { prose, wanted, base };
+}
+async function _pbpDictCheckExplanation(text, target, declaredLanguage = "", sourceLanguage = "") {
+  const checked = _pbpDictExplanationScriptCheck(text, target, declaredLanguage);
+  if (!checked || typeof globalThis.chrome?.i18n?.detectLanguage !== "function") return;
+  const { prose, wanted, base } = checked;
   // Only the statistical sample is stripped; the caller saves the original text.
   const sample = _pbpDictStripSourceScripts(prose, sourceLanguage, wanted);
   let detected;
@@ -519,7 +571,7 @@ async function pbpDictEntryRead(input = {}) {
 
 async function pbpDictEntryRun(input = {}) {
   const request = _pbpDictEntryRequest(input);
-  return _pbpDictEntryWithLock(request, "entry", () => _pbpDictEntryGenerate(request, input.updateId));
+  return _pbpDictEntryWithLock(request, "entry", () => _pbpDictEntryGenerate(request, input.updateId, input.onDrop));
 }
 
 async function _pbpDictEntryWithLock(request, purpose, run) {
@@ -533,7 +585,9 @@ async function _pbpDictEntryWithLock(request, purpose, run) {
     request.signal ? { signal: request.signal } : {}, async () => { await _pbpDictEntryGuard(request); return run(); });
 }
 
-async function _pbpDictEntryGenerate(request, updateId = "") {
+// onDrop(error) hears about each dropped sense or learning piece with a fixed
+// code/reason (the reader files it in the local failure ledger).
+async function _pbpDictEntryGenerate(request, updateId = "", onDrop = null) {
   await _pbpDictEntryGuard(request);
   const key = await _pbpDictEntryKey(request);
   let cached = await _pbpDictEntryRead(request, key);
@@ -553,7 +607,8 @@ async function _pbpDictEntryGenerate(request, updateId = "") {
     beforeRequest: () => _pbpDictEntryGuard(request)
   });
   await _pbpDictEntryGuard(request);
-  const entry = pbpDictEntryParse(_pbpDictGeneratedResponse(response, "entry"), request), generatedAt = Date.now();
+  const entry = pbpDictEntryParse(_pbpDictGeneratedResponse(response, "entry"), request, { lenient: true, onDrop }),
+    generatedAt = Date.now();
   if (!entry.learning) {
     // Keep a valid paid basic entry when the model omitted optional enrichment.
     // Do not reclassify unstructured legacy claims as verified history.
@@ -561,24 +616,32 @@ async function _pbpDictEntryGenerate(request, updateId = "") {
     entry.relatedWords = [];
   }
   entry.learning.history = "";
-  entry.etymology = [entry.learning.formation, entry.learning.history].filter(Boolean).join("\n\n").slice(0, 1200);
   // Basic lookup never fetches history; old cached enrichments remain readable.
   entry.learning.sources = [];
   // Model output cannot nominate a paid version to supersede.
   delete entry.learning.replacesId;
   if (updateId) entry.learning.replacesId = updateId;
-  // Internal-term leaks (plan 0.5, Q6=B). Until batch 1A.3 adds per-sense
-  // dropping, one leaking field still fails the whole paid entry, the same
-  // outcome as a wrong-language answer. 1A.3 moves this check into per-sense
-  // validation: a leaking meaning is dropped and recorded, and only an entry
-  // whose every meaning fails is rejected. Cached and archived entries are
-  // never re-checked here.
-  const entryForms = [request.term, ...entry.meanings.flatMap(m => m.examples.map(e => e.text))];
-  if ([...entry.meanings.flatMap(m => [m.definition, ...m.examples.map(e => e.translation)]),
-    entry.learning.formation, ...entry.learning.related.map(r => r.note)].some(text => _pbpDictInternalTermLeak(text, {
-    term: request.term, sourceLanguage: request.sourceLanguage, target: request.target, forms: entryForms }))) {
-    throw _pbpDictEntryError("invalid_response", "AI returned an invalid dictionary entry", "internal_term");
-  }
+  // Internal-term leaks (plan 0.5, Q6=B): the lenient parse already dropped
+  // each leaking sense. Unrequested enrichment follows the same rule: a leaking
+  // formation is cleared and a leaking related item removed, alone. Cached and
+  // archived entries are never re-checked here.
+  const leakContext = { term: request.term, sourceLanguage: request.sourceLanguage, target: request.target,
+    forms: [request.term, ...entry.meanings.flatMap(m => m.examples.map(e => e.text))] };
+  const dropLearning = () => {
+    const error = _pbpDictEntryError("invalid_response", "AI returned an invalid dictionary entry", "internal_term");
+    console.warn("[dict-entry] learning item dropped:", error.reason);
+    try { if (typeof onDrop === "function") onDrop(error); }
+    catch (reportError) { console.warn("[dict-entry] drop report failed:", reportError?.name); }
+  };
+  if (_pbpDictInternalTermLeak(entry.learning.formation, leakContext)) { entry.learning.formation = ""; dropLearning(); }
+  // A related note may name its own related word (a "Note…" compound, say).
+  entry.learning.related = entry.learning.related.filter(r => {
+    if (!_pbpDictInternalTermLeak(r.note, { ...leakContext, title: r.word })) return true;
+    dropLearning(); return false;
+  });
+  entry.relatedWords = [...new Set(entry.learning.related.map(r => _pbpDictEntryTerm(r.word)))];
+  entry.etymology = [entry.learning.formation, entry.learning.history].filter(Boolean).join("\n\n").slice(0, 1200);
+  // One statistical detection over the remaining senses and enrichment.
   await _pbpDictCheckExplanation([...entry.meanings.flatMap(m => [m.definition, ...m.examples.map(e => e.translation)]),
     entry.learning.formation, entry.learning.history, ...entry.learning.related.map(r => r.note)].filter(Boolean).join("\n\n"), request.target, "", request.sourceLanguage);
   await _pbpDictEntryGuard(request);

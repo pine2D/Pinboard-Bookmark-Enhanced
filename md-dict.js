@@ -1531,7 +1531,7 @@ function pbpDictEntryNorm(record, target) {
 // Only fixed validation labels and HTTP status may enter diagnostics; never log model output,
 // lookup text, or a provider-supplied arbitrary reason string.
 const PBP_DICT_FAILURE_REASONS = Object.freeze(["response_size", "response_json", "response_shape", "entry_fields", "entry_identity",
-  "entry_pronunciation", "entry_meanings", "entry_meaning", "entry_example", "entry_learning", "entry_related", "entry_version",
+  "entry_pronunciation", "entry_meanings", "entry_meanings_all_invalid", "entry_meaning", "entry_example", "entry_learning", "entry_related", "entry_version",
   "entry_sources", "entry_legacy", "entry_unknown", "explanation_metadata", "explanation_script",
   "explanation_language", "supplement_fields", "supplement_item", "supplement_item_shape", "supplement_item_sense",
   "supplement_item_text", "supplement_source_index", "supplement_duplicate", "supplement_source", "supplement_quote",
@@ -2269,7 +2269,10 @@ function _pbpDictEntryMount(host, opts) {
       ledgerStage = "generating";
       if (typeof pbpAiBumpCounter === "function") pbpAiBumpCounter("explain");
       const request = input(controller.signal, current);
-      const result = await pbpDictEntryRun({ ...request, updateId });
+      // A dropped sense (Q6=B) is a partial failure of this paid answer: file
+      // its fixed code at the checking stage; the entry itself still saves.
+      const onDrop = error => { if (current()) _pbpDictLedgerFail(opts.owner, error, "checking", "entry"); };
+      const result = await pbpDictEntryRun({ ...request, updateId, onDrop });
       if (current()) render(result, request.target, viewRevision === viewAtStart);
     } catch (error) {
       if (!current()) return;

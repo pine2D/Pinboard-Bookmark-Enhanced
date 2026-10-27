@@ -182,6 +182,77 @@ await test('normalized generated entry round-trips the strict real archive witho
     return read.archiveSaved&&JSON.stringify(read.entry)===JSON.stringify(record.entry)&&calls.length===1;
   }finally{frame.remove();}
 });
+// Batch 1A.3 (Q6=B, Q7=A): a new generation drops a bad sense alone and keeps
+// the rest; only an answer whose every sense is bad fails. Cache reads stay strict.
+const SENSE=(definition,examples=[])=>({partOfSpeech:'noun',definition,examples});
+const FOUR_SENSES=()=>[SENSE('A financial institution that keeps money.',[{text:'Die Bank ist zu.',translation:'The bank is closed.'}]),
+  SENSE('A bench for several people.',[{text:'Wir sitzen auf der Bank.',translation:'We sit on the bench.'}]),
+  SENSE('A bank of a river.'),SENSE('A reserve held for a game.')];
+async function withDrops(fn){const drops=[],warns=[],warn=console.warn;console.warn=(...args)=>warns.push(args.join(' '));
+  try{const result=await fn(error=>drops.push([error.code,error.reason]));return {result,drops,warns};}finally{console.warn=warn;}}
+await test('1A.3 a sense with an extra field is dropped alone, the rest saved in order and the drop reported',async()=>{
+  reset();response(d=>{d.meanings=FOUR_SENSES();d.meanings[1].confidence=0.4;});
+  const {result:r,drops,warns}=await withDrops(onDrop=>pbpDictEntryRun({...request(),onDrop}));
+  const defs=r.entry.meanings.map(m=>m.definition);
+  return r.cacheSaved&&calls.length===1&&defs.length===3&&defs[0].startsWith('A financial')&&defs[1].startsWith('A bank of')&&defs[2].startsWith('A reserve')&&
+    writes[0].result.entry.meanings.length===3&&JSON.stringify(drops)==='[["invalid_response","entry_meaning"]]'&&
+    warns.length===1&&warns[0]==='[dict-entry] meaning dropped: entry_meaning'&&!warns[0].includes('bench');
+});
+await test('1A.3 a structurally bad example drops its whole sense (Q7=A)',async()=>{
+  for(const breakExample of [e=>{delete e.text;},e=>{e.url='https://example.test/';},e=>{e.translation=7;}]){
+    reset();response(d=>{d.meanings=FOUR_SENSES();breakExample(d.meanings[1].examples[0]);});
+    const {result:r,drops}=await withDrops(onDrop=>pbpDictEntryRun({...request(),onDrop}));
+    if(!r.cacheSaved||r.entry.meanings.length!==3||r.entry.meanings.some(m=>m.definition.includes('bench'))||
+       JSON.stringify(drops)!=='[["invalid_response","entry_example"]]')return false;
+  }
+  return true;
+});
+await test('1A.3 an answer whose every sense is bad fails with entry_meanings_all_invalid and saves nothing',async()=>{
+  reset();response(d=>{d.meanings=FOUR_SENSES().map(m=>({...m,note:'extra'}));});
+  const {result:outcome,drops}=await withDrops(async onDrop=>{try{await pbpDictEntryRun({...request(),onDrop});return null;}catch(e){return e;}});
+  return outcome?.code==='invalid_response'&&outcome.reason==='entry_meanings_all_invalid'&&drops.length===4&&writes.length===0&&calls.length===1&&
+    await pbpDictEntryRead(request())===null;
+});
+await test('1A.3 a model that returns meanings:[] is still an unknown word, with nothing dropped',async()=>{
+  reset();response(d=>{d.meanings=[];d.pronunciation='';d.etymology='';d.relatedWords=[];d.learning={version:2,formation:'',history:'',related:[]};});
+  const {result:r,drops}=await withDrops(onDrop=>pbpDictEntryRun({...request(),onDrop}));
+  return r.cacheSaved&&r.entry.meanings.length===0&&drops.length===0;
+});
+await test('1A.3 the same bad sense in a cached entry is still rejected as a whole on read',async()=>{
+  reset();response(d=>{d.meanings=FOUR_SENSES();});await pbpDictEntryRun(request());
+  const stored=cache.get(writes[0].key);stored.entry.meanings[1].confidence=0.4;
+  const broken=await pbpDictEntryRead(request())===null;
+  delete stored.entry.meanings[1].confidence;stored.entry.meanings[1].examples[0].url='https://example.test/';
+  return broken&&await pbpDictEntryRead(request())===null&&calls.length===1;
+});
+const ZH=()=>({target:{name:'Chinese',lang:'zh-Hans'}});
+const ZH_SENSES=()=>[SENSE('银行，为个人和企业提供存款、贷款以及各种金融服务的机构。'.repeat(3),[{text:'Die Bank ist zu.',translation:'银行今天不营业。'}]),
+  SENSE('A long seat for several people, usually made of wood.',[{text:'Wir sitzen auf der Bank.',translation:'We are sitting on the bench.'}]),
+  SENSE('长凳，可供几个人同时坐下的长条座椅。')];
+await test('1A.3 an English-definition sense in a Chinese entry is dropped and the Chinese senses saved (Q6=B)',async()=>{
+  reset();response(d=>{d.meanings=ZH_SENSES();d.learning={};});
+  const {result:r,drops}=await withDrops(onDrop=>pbpDictEntryRun({...request(ZH()),onDrop}));
+  return r.cacheSaved&&r.entry.meanings.length===2&&r.entry.meanings.every(m=>/\p{Script=Han}/u.test(m.definition))&&
+    JSON.stringify(drops)==='[["wrong_language","explanation_script"]]'&&
+    languageChecks.length===1&&!languageChecks[0].includes('long seat')&&!languageChecks[0].includes('bench');
+});
+await test('1A.3 the combined detection still fails the entry when the remaining senses read as another language',async()=>{
+  reset();response(d=>{d.meanings=ZH_SENSES();d.learning={};});detectedLanguage={isReliable:true,languages:[{language:'ja',percentage:99}]};
+  return await rejects(()=>pbpDictEntryRun(request(ZH())),'wrong_language')&&writes.length===0&&languageChecks.length===1;
+});
+await test('1A.3 a sense that leaks an internal term is dropped alone',async()=>{
+  reset();response(d=>{d.meanings=[ZH_SENSES()[0],SENSE('interpretation：可供几个人同时坐下的长条座椅。'),ZH_SENSES()[2]];d.learning={};});
+  const {result:r,drops,warns}=await withDrops(onDrop=>pbpDictEntryRun({...request(ZH()),onDrop}));
+  return r.cacheSaved&&r.entry.meanings.length===2&&!JSON.stringify(writes[0].result).includes('interpretation')&&
+    JSON.stringify(drops)==='[["invalid_response","internal_term"]]'&&warns.some(w=>w==='[dict-entry] meaning dropped: internal_term');
+});
+await test('1A.3 a related note may name its own related word, while a leaking related note is dropped alone',async()=>{
+  reset();response(d=>{d.meanings=[ZH_SENSES()[0]];d.learning={version:2,formation:'',history:'',related:[
+    {word:'Note',relation:'topic',note:'Note 指学校里的成绩，和银行无关。'},{word:'Bankkonto',relation:'family',note:'summary：银行账户。'}]};});
+  const {result:r,drops}=await withDrops(onDrop=>pbpDictEntryRun({...request(ZH()),onDrop}));
+  return r.cacheSaved&&r.entry.meanings.length===1&&r.entry.learning.related.length===1&&r.entry.learning.related[0].word==='Note'&&
+    r.entry.relatedWords.join(',')==='Note'&&JSON.stringify(drops)==='[["invalid_response","internal_term"]]';
+});
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();
 </script></body></html>

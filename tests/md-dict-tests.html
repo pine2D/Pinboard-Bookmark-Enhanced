@@ -2188,6 +2188,15 @@ async function runDictionaryEntryUiTests() {
         check("a failed base generation files one ledger row with its fine code, stage, entry category and the mount's owner",
           generated.length===1&&generated[0][0]==="ownerless"&&JSON.stringify(generated[0][1])==='{"code":"invalid_response.entry_meaning","stage":"generating","category":"entry"}');
         check("a denied AI permission is filed at the permission stage",denied.length===1&&denied[0][1].code==="host_permission"&&denied[0][1].stage==="permission");
+        // 1A.3: each sense dropped from a saved entry is one checking-stage row.
+        window.ensureAIHostPermissionWithGesture=realGrant;
+        window.pbpDictEntryRun=async request=>{request.onDrop(Object.assign(new Error("Gift"),{code:"wrong_language",reason:"explanation_script"}));
+          request.onDrop(Object.assign(new Error("Gift"),{code:"invalid_response",reason:"internal_term"}));return record();};
+        failed.host.querySelector('.xp-dict-ai-generate').click();await settle();
+        const drops=rows.splice(0);
+        check("each sense dropped from a saved base entry files its fine code at the checking stage",
+          JSON.stringify(drops)==='[["ownerless",{"code":"wrong_language.explanation_script","stage":"checking","category":"entry"}],["ownerless",{"code":"invalid_response.internal_term","stage":"checking","category":"entry"}]]'&&
+          !failed.host.querySelector('.xp-dict-ai-content').hidden);
       } finally {window.pbpDictLedgerRecord=realLedger;window.ensureAIHostPermissionWithGesture=realGrant;}
     }
     await checkFailureDiagnostics("base generation", "pbpDictEntryRun", ()=>failed.host.querySelector('.xp-dict-ai-generate').click(), "[dict-entry] generation failed:");

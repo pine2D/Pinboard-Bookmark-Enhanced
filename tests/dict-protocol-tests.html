@@ -85,6 +85,31 @@ async function test(name, protocol, run) {
 }
 (async () => {
   for (const fixture of PBP_DICT_LIVE_MALFORMED) {
+    // A broken sense (1A.3, Q6=B) is dropped, never repaired. This capture also
+    // carries an unrequested learning block with the same stray keys, and
+    // learning stays strict, so the answer as captured still saves nothing; the
+    // same answer without that block keeps its one well-formed sense.
+    if (fixture.reason === 'entry_meaning') {
+      await test('captured complete HTTP output drops malformed senses without repairing them: ' + fixture.reason, PROTOCOLS[0], async req => {
+        const input = { ...req, term: fixture.term }, drops = [];
+        const content = JSON.parse(fixture.body.choices[0].message.content), raw = content.meanings;
+        const wellFormed = raw.filter(m => Object.keys(m).sort().join() === 'definition,examples,partOfSpeech');
+        responses.push(fixture.body);
+        const error = await reject(() => pbpDictEntryRun({ ...input, onDrop: e => drops.push(e.reason) }), 'invalid_response');
+        assert(error.reason === 'entry_learning' && calls.length === 1 && await pbpDictEntryRead(input) === null &&
+          JSON.stringify(drops) === JSON.stringify(raw.filter(m => !wellFormed.includes(m)).map(() => 'entry_meaning')), 'Captured malformed learning was repaired or saved');
+        delete content.learning; drops.length = 0;
+        const body = structuredClone(fixture.body); body.choices[0].message.content = JSON.stringify(content);
+        responses.push(body);
+        const entry = await pbpDictEntryRun({ ...input, onDrop: e => drops.push(e.reason) });
+        const reread = await pbpDictEntryRead(input);
+        assert(wellFormed.length > 0 && wellFormed.length < raw.length && entry.archiveSaved && calls.length === 2 &&
+          JSON.stringify(entry.entry.meanings.map(m => m.definition)) === JSON.stringify(wellFormed.map(m => m.definition)) &&
+          drops.length === raw.length - wellFormed.length && drops.every(reason => reason === 'entry_meaning') &&
+          reread?.entry.meanings.length === wellFormed.length, 'Malformed captured senses were repaired, kept or retried');
+      });
+      continue;
+    }
     await test('captured complete HTTP output does not authorize guessing missing prose: ' + fixture.reason, PROTOCOLS[0], async req => {
       responses.push(fixture.body);
       const input = { ...req, term: fixture.term };
