@@ -455,12 +455,12 @@ function _pbpDictInternalIdentifiers() {
   };
   const request = { term: "x", sourceLanguage: "en", target: { name: "English", lang: "en" } };
   const entry = { word: "x", language: "en", meanings: [{ partOfSpeech: "", definition: "x", examples: [] }] };
-  const profile = pbpDictSupplementProfile({}, ""), repair = { items: [], omittedItems: 1 };
+  const profile = pbpDictSupplementProfile({}, "");
   schemaKeys(_pbpDictEntrySchema(request));
   dataKeys(_pbpDictEntryPromptData(request));
   for (const category of PBP_DICT_SUPPLEMENT_CATEGORIES) {
     schemaKeys(_pbpDictSupplementSchema(request, category, [{}], entry));
-    dataKeys(_pbpDictSupplementPromptData(request, category, profile, [{}], entry, repair));
+    dataKeys(_pbpDictSupplementPromptData(request, category, profile, [{}], entry));
   }
   return _pbpDictInternalIdentifierList = Object.freeze([...keys].filter(key => /^[a-z]+(?:[A-Z][a-z]+)+$/.test(key)).sort());
 }
@@ -665,14 +665,13 @@ async function _pbpDictSupplementSources(request, category) {
   if (!sources.length && category !== "etymology") throw _pbpDictEntryError("no_sources", "No qualified original passages found");
   return sources;
 }
-function _pbpDictSupplementPromptData(request, category, profile, sources, entry, repair = null) {
+function _pbpDictSupplementPromptData(request, category, profile, sources, entry) {
   return { category, term: request.term, sourceLanguage: request.sourceLanguage, targetLanguage: request.target,
     profile: { ...profile, topic: ["scenarios", "collocations", "register"].includes(category) ? profile.topic : "" },
     baseEntry: { word: entry.word, language: entry.language, meanings: entry.meanings.map(m => ({ partOfSpeech: m.partOfSpeech, definition: m.definition })) },
-    ...(repair ? { acceptedItems: repair.items, missingItems: repair.omittedItems } : {}),
     sources: sources.map((source, sourceIndex) => ({ ...source, sourceIndex })) };
 }
-function _pbpDictSupplementPrompt(request, category, profile, sources, entry, repair = null) {
+function _pbpDictSupplementPrompt(request, category, profile, sources, entry) {
   const task = {
     collocations: "Give 2-3 useful patterns grouped by meaning. Title is the complete collocation/pattern; explanation says when/how to use it, including variable slots. Give an original example and translation. Never assert frequency without corpus evidence.",
     confusables: "Compare 2-3 genuinely confusable alternatives in the same situation. Title names the contrast; explanation gives a choice rule and how substitution changes meaning or tone; give a contrasting original example and translation. Avoid absolute boundaries where usages overlap. False friends require an explicit nativeLanguage.",
@@ -684,7 +683,7 @@ function _pbpDictSupplementPrompt(request, category, profile, sources, entry, re
     etymology: "Give 2-3 useful points. Classify each kind as formation, history, family, cognate, synonym or topic. For a source-backed point, paraphrase only what that specific excerpt explicitly states. A short source calls for a short explanation: do not reconstruct unmentioned root components, intermediary languages, dates or semantic transitions from memory. State whether a source describes the queried word or its component; do not transfer the component's history to the derived word. Explain productive formation as formation, not history. For family/cognate/synonym/topic items, title is only the actual related word in sourceLanguage (a lookup label), and explanation gives the relationship or distinction. Do not equate synonyms with cognates or invent character stories. History and cognates require a cited sourceIndex. Without evidence, give only well-established modern formation/usage relationships with sourceIndex:-1. No example or translation fields."
   }[category];
   const sourceBacked = ["culture", "literature"].includes(category), etymology = category === "etymology";
-  const itemLimit = repair ? repair.omittedItems : category === "literature" ? Math.min(2, sources.length) : 5;
+  const itemLimit = category === "literature" ? Math.min(2, sources.length) : 5;
   const textFields = (sourceBacked || etymology ? "" : ',"example":string') + (category === "culture" || etymology ? "" : ',"translation":string');
   const sourceFields = sourceBacked || etymology ? ',"sourceIndex":integer' : "";
   const kindField = etymology ? ',"kind":"formation|history|family|cognate|synonym|topic"' : "";
@@ -701,14 +700,14 @@ function _pbpDictSupplementPrompt(request, category, profile, sources, entry, re
     'Return exactly {"language":string,"summary":string,"items":[{"sense":integer,"title":string,"explanation":string' + textFields + sourceFields + kindField + '}]}. ' +
     "Copy language exactly from targetLanguage.lang. Summary <=800 characters, at most " + itemLimit + " items, title<=240, explanation<=1400, example/translation<=600 each. " +
     "The combined summary, titles, explanations, examples and translations must fit within 12000 characters including separators. " +
-    sourceRule + (repair ? "This is a partial repair. Return only the missing points, at most missingItems. Do not repeat or rewrite acceptedItems; they will be kept verbatim. Use an empty summary. " : "") +
+    sourceRule +
     "Keep compared words and patterns in sourceLanguage inside target-language explanations; do not translate away the labels being taught. The surrounding explanation must stay in targetLanguage. " +
     "Every explanation must finish its thought; do not leave an introductory clause or a comparison without its conclusion. Prefer fewer complete points over more partial ones. " +
     "Use one short sentence for the summary and 1-3 sentences per explanation. These are concise learning notes, not essays: select the most useful distinctions instead of filling every allowed item or character. " +
     "Distinguish tendencies from grammatical rules. Do not call a spelling variant or alternative expression impossible merely because another form is more natural; avoid unsupported frequency and exclusivity claims. " +
     "Write concise, practical learning guidance; do not spend the summary describing this task, validation rules or AI provenance (the application labels that separately). " +
     "Plain text, no Markdown/HTML/URLs. When prose mentions a sourceLanguage word or pattern, wrap it in curly double quotes “…”; never use ASCII quotes inside values. Uncertain or unsupported claims must be omitted; items:[] means no useful supported result.\n" +
-    JSON.stringify(_pbpDictSupplementPromptData(request, category, profile, sources, entry, repair));
+    JSON.stringify(_pbpDictSupplementPromptData(request, category, profile, sources, entry));
 }
 function _pbpDictSupplementItemKey(item) {
   return JSON.stringify([item.kind || "", item.sense, item.title.normalize("NFC").trim().replace(/\s+/g, " "), item.sourceIndex]);
@@ -822,36 +821,23 @@ async function _pbpDictSupplementGenerate(input, request, category, profile) {
   if (!record?.archiveId) throw _pbpDictEntryError("not_saved", "Save the dictionary entry before adding usage");
   if (request.settings.previewAiEnabled === false) throw _pbpDictEntryError("ai_disabled", "Reader AI is disabled");
   if (typeof hasAIKey !== "function" || !hasAIKey(request.settings)) throw _pbpDictEntryError("ai_not_configured", "AI is not configured");
-  const repair = input.repair && hit?.learning?.omittedItems ? hit.learning : null;
-  if (input.repair && !repair) throw _pbpDictEntryError("invalid_request", "No incomplete supplement to repair");
-  const parent = repair && hit.archiveId !== record.archiveId
-    ? record.previousEntries?.find(item => item.archiveId === hit.archiveId) : record;
-  if (!parent?.entry) throw _pbpDictEntryError("invalid_request", "Original meanings for this supplement are unavailable");
-  if (!repair && ["literature", "culture", "etymology"].includes(category)) await stage("sources");
-  const sources = repair ? hit.sources : await _pbpDictSupplementSources(request, category);
+  if (!record.entry) throw _pbpDictEntryError("invalid_request", "Original meanings for this supplement are unavailable");
+  if (["literature", "culture", "etymology"].includes(category)) await stage("sources");
+  const sources = await _pbpDictSupplementSources(request, category);
   await stage("generating");
-  const response = await callAI(request.settings, _pbpDictSupplementPrompt(request, category, profile, sources, parent.entry, repair), {
+  const response = await callAI(request.settings, _pbpDictSupplementPrompt(request, category, profile, sources, record.entry), {
     ...PBP_DICT_GENERATION_OPTIONS, model: request.model.override, signal: request.signal,
-    responseSchema: _pbpDictSupplementSchema(request, category, sources, parent.entry), beforeRequest: () => _pbpDictEntryGuard(request)
+    responseSchema: _pbpDictSupplementSchema(request, category, sources, record.entry), beforeRequest: () => _pbpDictEntryGuard(request)
   });
   await stage("checking");
   const generated = _pbpDictGeneratedResponse(response, "supplement", category);
-  const learning = pbpDictSupplementParse(generated, request, category, sources, parent.entry, input.updateId || "");
+  const learning = pbpDictSupplementParse(generated, request, category, sources, record.entry, input.updateId || "");
   await _pbpDictCheckExplanation([learning.summary, ...learning.items.flatMap(item => [item.explanation, item.translation])].filter(Boolean).join("\n\n"),
     request.target, JSON.parse(generated).language, request.sourceLanguage);
-  if (repair) {
-    const accepted = new Set(repair.items.map(_pbpDictSupplementItemKey));
-    const fresh = learning.items.filter(item => !accepted.has(_pbpDictSupplementItemKey(item))).slice(0, repair.omittedItems);
-    if (!fresh.length) throw _pbpDictEntryError("unsupported_usage", "Repair added no new valid content");
-    learning.summary = repair.summary;
-    learning.items = [...repair.items, ...fresh];
-    delete learning.omittedItems;
-    if (fresh.length < repair.omittedItems) learning.omittedItems = repair.omittedItems - fresh.length;
-  }
   await _pbpDictEntryGuard(request);
   const content = [learning.summary, ...learning.items.map(item => [item.title, item.explanation, item.example, item.translation].filter(Boolean).join("\n"))].filter(Boolean).join("\n\n");
   if (content.length > 12000) throw _pbpDictEntryError("invalid_response", "Learning content is too long", "supplement_size");
-  const supplement = { archiveId: parent.archiveId, category, profile, content, sources, learning,
+  const supplement = { archiveId: record.archiveId, category, profile, content, sources, learning,
     provider: request.model.provider, model: request.model.model, generatedAt: Date.now() };
   await stage("saving");
   try { return await pbpDictSupplementSave(input, supplement); }

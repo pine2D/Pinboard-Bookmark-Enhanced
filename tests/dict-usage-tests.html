@@ -93,14 +93,18 @@ await test('independent valid supplement items survive one malformed item with a
   const r=await pbpDictSupplementRun(request({category:'grammar'}));
   return r.archiveSaved&&r.learning.items.length===1&&r.learning.omittedItems===1&&calls.length===1&&appended.length===1;
 });
-await test('partial repair retains accepted items and only requests the missing content',async()=>{
+await test('updating a partial supplement regenerates it in full against the current entry without repair data',async()=>{
   existing();usageResponse(d=>d.items.push({...d.items[0],title:'Incomplete point',example:'',translation:''}));
   const first=await pbpDictSupplementRun(request({category:'grammar'}));
+  const old={archiveId:records.archiveId,entry:structuredClone(records.entry)};records.archiveId='f'.repeat(64);records.entry=structuredClone(LEGACY_MODEL);
+  records.entry.meanings=[{partOfSpeech:'名词',definition:'新的当前释义。',examples:[]}];records.previousEntries=[old];
   usageResponse(d=>{d.items[0].title='A different pattern';d.items[0].explanation='这是另一个有用的语法用法。';});
   const second=await pbpDictSupplementRun(request({category:'grammar',updateId:first.id,repair:true}));
-  const data=JSON.parse(calls[1].prompt.split('\n').at(-1));
-  return data.acceptedItems?.length===1&&second.learning.items.length===2&&!second.learning.omittedItems&&
-    second.learning.items[0].title===first.learning.items[0].title&&second.learning.replacesId===first.id&&calls.length===2;
+  const prompt=calls[1].prompt,data=JSON.parse(prompt.split('\n').at(-1));
+  return !('acceptedItems' in data)&&!('missingItems' in data)&&!/repair|acceptedItems|missingItems/i.test(prompt)&&
+    prompt.includes('at most 5 items')&&data.baseEntry.meanings[0].definition==='新的当前释义。'&&second.archiveId==='f'.repeat(64)&&
+    second.learning.items.length===1&&second.learning.items[0].title==='A different pattern'&&!second.learning.omittedItems&&
+    second.learning.replacesId===first.id&&calls.length===2&&appended.length===2;
 });
 await test('a matching saved supplement needs no model or sync request',async()=>{existing();await pbpDictSupplementRun(request({category:'grammar'}));onSync=async()=>{throw new Error('should reuse');};await pbpDictSupplementRun(request({category:'grammar'}));return calls.length===1;});
 await test('a remotely saved supplement is reused after synchronization',async()=>{existing();onSync=async()=>{records.supplements=[{category:'grammar',profile:{nativeLanguage:'',level:'',topic:''},content:'Existing',id:'b'.repeat(64),archiveSaved:true}];};return (await pbpDictSupplementRun(request({category:'grammar'}))).content==='Existing'&&calls.length===0;});
@@ -108,23 +112,6 @@ await test('different learner topics preserve distinct paid additions',async()=>
 await test('supplement save failure can be retried without a second model call',async()=>{existing();appendFailure=true;const r=await pbpDictSupplementRun(request({category:'register'}));appendFailure=false;const s=await pbpDictSupplementSave(request(),r);return !r.archiveSaved&&s.archiveSaved&&calls.length===1;});
 await test('supplements require a saved parent entry',async()=>await rejects(()=>pbpDictSupplementRun(request({category:'grammar'})),'not_saved')&&calls.length===0);
 await test('invalid categories fail before external access',async()=>{existing();return await rejects(()=>pbpDictSupplementRun(request({category:'run_commands'})),'invalid_request')&&calls.length===0;});
-await test('repair keeps original meaning references after the base entry changes',async()=>{
-  existing();usageResponse(d=>d.items.push({...d.items[0],title:'Missing',translation:''}));
-  const first=await pbpDictSupplementRun(request({category:'grammar'}));
-  const old={archiveId:records.archiveId,entry:structuredClone(records.entry)};records.archiveId='f'.repeat(64);records.entry=structuredClone(LEGACY_MODEL);
-  records.entry.meanings=[{partOfSpeech:'名词',definition:'不相关的新释义。',examples:[]}];records.previousEntries=[old];
-  usageResponse(d=>{d.items[0].title='New rule';});
-  const repaired=await pbpDictSupplementRun(request({category:'grammar',updateId:first.id,repair:true}));
-  const data=JSON.parse(calls[1].prompt.split('\n').at(-1));
-  return repaired.archiveId===first.archiveId&&data.baseEntry.meanings[0].definition===old.entry.meanings[0].definition&&
-    repaired.learning.items[0].explanation===first.learning.items[0].explanation;
-});
-await test('repair cannot count a paraphrase of an accepted point as new content',async()=>{
-  existing();usageResponse(d=>d.items.push({...d.items[0],title:'Missing',translation:''}));
-  const first=await pbpDictSupplementRun(request({category:'grammar'}));
-  usageResponse(d=>{d.items[0].explanation='重复原有搭配的另一种说法。';});
-  return await rejects(()=>pbpDictSupplementRun(request({category:'grammar',updateId:first.id,repair:true})),'unsupported_usage')&&appended.length===1;
-});
 await test('literature inserts the qualified original passage and retains its provenance',async()=>{existing();usageResponse(d=>{d.items[0].sourceIndex=0;d.items[0].example='';});const r=await pbpDictSupplementRun(request({category:'literature'}));return r.learning.items[0].example===SOURCE.excerpt&&r.sources[0].revision==='12345'&&r.sources[0].url===SOURCE.url&&calls[0].prompt.includes('The Gardener');});
 await test('culture passes the word language to the evidence reader rather than the explanation language',async()=>{existing();records.entry.language='de';usageResponse(d=>{d.items[0].sourceIndex=0;d.items[0].example='';});await pbpDictSupplementRun(request({sourceLanguage:'de',category:'culture'}));return sourceCalls[0].sourceLanguage==='de'&&sourceCalls[0].kind==='culture';});
 await test('unknown source languages never silently query English',async()=>{existing();return await rejects(()=>pbpDictSupplementRun(request({sourceLanguage:'und',category:'literature'})),'no_sources')&&sourceCalls.length===0&&calls.length===0;});
@@ -475,8 +462,8 @@ await test('mixed-case product names are not internal identifiers',async()=>{
 });
 await test('schema and prompt identifiers leak in every explanation language and are derived from the real schema and prompt data',async()=>{
   const ids=_pbpDictInternalIdentifiers();
-  if(!['sourceIndex','partOfSpeech','baseEntry','targetLanguage','sourceLanguage','nativeLanguage','missingItems','acceptedItems'].every(id=>ids.includes(id))||
-     ['word','title','sense','summary','language'].some(id=>ids.includes(id)))return false;
+  if(!['sourceIndex','partOfSpeech','baseEntry','targetLanguage','sourceLanguage','nativeLanguage'].every(id=>ids.includes(id))||
+     ['word','title','sense','summary','language','missingItems','acceptedItems'].some(id=>ids.includes(id)))return false;
   for(const [extra,explanation] of [[{category:'grammar'},'这个搭配的 sourceIndex 是 -1，表示例句由 AI 编写，适合在口语中使用。'],
     [{category:'grammar',target:{name:'English',lang:'en'}},'Use this pattern for distant places; its partOfSpeech is an adjective in every context.']]){
     reset();existing();usageResponse(d=>{d.language=extra.target?'en':'zh-Hans';d.summary='';d.items=[usageItem('faraway places',explanation)];});

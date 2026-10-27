@@ -2360,11 +2360,13 @@ async function runDictionaryEntryUiTests() {
     window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[partial]});
     const incomplete=mount();await incomplete.ui.ready;
     const partialSection=incomplete.host.querySelector('[data-supplement-id]');partialSection.open=true;
-    const repairAction=partialSection.querySelector('.xp-dict-update-supplement');
-    check("a reopened partial supplement retains a visible incomplete notice and a specific repair action",
-      partialSection.querySelector('[data-partial-result]')?.textContent.startsWith('dictSupplementPartial')&&repairAction.textContent==='dictSupplementRepair');
-    repairAction.click();await settle();
-    check("repair passes the exact saved version and explicit missing-content mode",etymologyRequest.repair===true&&etymologyRequest.updateId===partial.id&&etymologyRequest.category==='collocations');
+    const updateAction=partialSection.querySelector('.xp-dict-update-supplement');
+    check("a reopened partial supplement keeps a neutral partial note and offers only the regenerate action",
+      partialSection.querySelector('[data-partial-result]')?.textContent.startsWith('dictSupplementPartial')&&
+      updateAction.textContent==='dictSupplementUpdate'&&updateAction.title==='dictSupplementUpdateHint'&&
+      partialSection.querySelectorAll('.xp-dict-update-supplement').length===1);
+    updateAction.click();await settle();
+    check("updating a partial supplement regenerates the exact saved version with no repair mode",!('repair' in etymologyRequest)&&etymologyRequest.updateId===partial.id&&etymologyRequest.category==='collocations');
     incomplete.ctrl.abort();const stoppedStatus=partialSection.textContent;etymologyRequest.onStage('saving');
     check("stale progress callbacks cannot change an aborted view",partialSection.textContent===stoppedStatus);
     resolveUsage(partial);await settle();

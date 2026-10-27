@@ -2039,8 +2039,8 @@ function _pbpDictEntryMount(host, opts) {
           item.update = button("dictSupplementUpdate", "xp-dict-update-supplement");
           item.update.addEventListener("click", () => usageForm?.update(item.addition));
         }
-        item.update.textContent = t(addition.learning?.omittedItems ? "dictSupplementRepair" : "dictSupplementUpdate");
-        item.update.title = t(addition.learning?.omittedItems ? "dictSupplementRepairHint" : "dictSupplementUpdateHint");
+        item.update.textContent = t("dictSupplementUpdate");
+        item.update.title = t("dictSupplementUpdateHint");
         item.update.setAttribute("aria-description", item.update.title);
         if (!item.update.isConnected) section.appendChild(item.update);
       } else item.update?.remove();
@@ -2194,7 +2194,7 @@ function _pbpDictEntryMount(host, opts) {
       const category = updating?.category || explicitCategory || kind.value;
       let ledgerStage = "permission";
       const request = { ...input(controller.signal, current), category, topic: updating?.profile.topic ?? (explicitCategory ? "" : effectiveTopic()),
-        updateId: updating?.id || "", repair: !!updating?.learning?.omittedItems,
+        updateId: updating?.id || "",
         onStage: stage => {
           if (!current()) return;
           if (PBP_DICT_LEDGER_STAGES.includes(stage)) ledgerStage = stage;
