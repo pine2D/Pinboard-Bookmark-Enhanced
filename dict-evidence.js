@@ -1,14 +1,14 @@
 // Public evidence for dictionary learning. HTML stays in an inert template;
 // only bounded text and same-origin bibliographic links leave this module.
 const PBP_DICT_EVIDENCE_LANGUAGES = Object.freeze({
-  en: { name: /^(?:English)$/i, etymology: /^Etymology(?:\s+\d+)?$/i, chapter: "chapter" },
+  en: { name: /^(?:English)$/i, etymology: /^Etymology(?:\s+\d+)?$/i, chapter: "chapter", abbreviations: ["mr.", "mrs.", "ms.", "messrs.", "dr.", "st.", "jr.", "sr.", "mt.", "prof.", "rev.", "hon.", "capt.", "col.", "gen.", "lt.", "sgt.", "gov.", "esq.", "vs.", "cf."] },
   zh: { name: /^(?:漢語|汉语|中文)$/, etymology: /^(?:詞源|词源|語源|语源)(?:\s*\d+)?$/, chapter: "第" },
-  es: { name: /^Español$/i, etymology: /^Etimología(?:\s+\d+)?$/i, chapter: "capítulo" },
-  de: { name: /(?:^Deutsch$|\(Deutsch\)$)/i, etymology: /^Herkunft:?$/i, chapter: "kapitel" },
-  fr: { name: /^Français$/i, etymology: /^Étymologie(?:\s+\d+)?$/i, chapter: "chapitre" },
-  it: { name: /^Italiano$/i, etymology: /^Etimologia(?:\s+\d+)?$/i, chapter: "capitolo" },
-  pt: { name: /^Português$/i, etymology: /^Etimologia(?:\s+\d+)?$/i, chapter: "capítulo" },
-  ru: { name: /^Русский$/i, etymology: /^Этимология(?:\s+\d+)?$/i, chapter: "глава" },
+  es: { name: /^Español$/i, etymology: /^Etimología(?:\s+\d+)?$/i, chapter: "capítulo", abbreviations: ["sr.", "sra.", "srta.", "sres.", "dña.", "dr.", "dra.", "ud.", "uds.", "vd.", "vds.", "sto.", "sta."] },
+  de: { name: /(?:^Deutsch$|\(Deutsch\)$)/i, etymology: /^Herkunft:?$/i, chapter: "kapitel", abbreviations: ["z.", "d.", "u.", "dr.", "hr.", "hrn.", "fr.", "prof.", "st.", "nr.", "bzw.", "vgl.", "ca."] },
+  fr: { name: /^Français$/i, etymology: /^Étymologie(?:\s+\d+)?$/i, chapter: "chapitre", abbreviations: ["m.", "mm.", "mgr.", "dr.", "st.", "ste.", "cf."] },
+  it: { name: /^Italiano$/i, etymology: /^Etimologia(?:\s+\d+)?$/i, chapter: "capitolo", abbreviations: ["sig.", "sigg.", "dott.", "prof.", "avv.", "ing.", "on.", "mons."] },
+  pt: { name: /^Português$/i, etymology: /^Etimologia(?:\s+\d+)?$/i, chapter: "capítulo", abbreviations: ["sr.", "sra.", "srta.", "dr.", "dra.", "prof.", "exmo.", "exma."] },
+  ru: { name: /^Русский$/i, etymology: /^Этимология(?:\s+\d+)?$/i, chapter: "глава", abbreviations: ["т.", "им.", "проф.", "акад.", "ул.", "св."] },
   ja: { name: /^日本語$/, etymology: /^語源(?:\s*\d+)?$/, chapter: "第" },
   ko: { name: /^한국어$/, etymology: /^어원(?:\s*\d+)?$/, chapter: "장" }
 });
@@ -139,13 +139,34 @@ function _pbpDictEvidenceLines(node) {
   walk(node);
   return out.split("\n").filter(line => line.trim());
 }
+// Segmenters break after "Mr." or a lone initial, and between `?”` and a
+// lowercase speaker tag such as "inquired Tom." Rejoin by script features and
+// the language's abbreviation list only, never by the queried word. Lists omit
+// abbreviations that often close a sentence (etc., usw., г.): a split there is
+// usually right, and joining would glue two unrelated sentences into one.
+function _pbpDictEvidenceContinues(previous, next, abbreviations) {
+  if (/^[\s\p{Ps}\p{Pi}\p{Pd}"']*\p{Ll}/u.test(next)) return true;
+  const tokens = previous.trim().split(/\s+/).map(token => token.replace(/^[\p{Ps}\p{Pi}"']+/u, ""));
+  const last = tokens.at(-1) || "", before = tokens.at(-2);
+  if (abbreviations.includes(last.toLocaleLowerCase())) return true;
+  // "J. R. R. Tolkien", "Thomas J. Smith"; but "It was I." still ends.
+  return /^\p{Lu}\.$/u.test(last) && (before === undefined || /^\p{Lu}/u.test(before));
+}
+function _pbpDictEvidenceJoinSentences(parts, language) {
+  const abbreviations = PBP_DICT_EVIDENCE_LANGUAGES[language.split("-")[0]]?.abbreviations || [], out = [];
+  for (const part of parts) {
+    if (out.length && _pbpDictEvidenceContinues(out[out.length - 1], part, abbreviations)) out[out.length - 1] += part;
+    else out.push(part);
+  }
+  return out;
+}
 function _pbpDictEvidenceSplitSentences(text, language) {
   let parts;
   try { parts = [...new Intl.Segmenter(language, { granularity: "sentence" }).segment(text)].map(row => row.segment); }
   catch (_) { parts = text.match(/[^.!?。！？]+[.!?。！？]+["'”’»」』]?|[^.!?。！？]+$/gu) || [text]; }
   // Ideographic full stops end a sentence whatever the segmenter's locale data
   // says; closing quotes and brackets stay with the sentence they close.
-  return parts.flatMap(part => part.match(/[^。！？]+(?:[。！？]+[」』”’）)]*)?|[。！？]+[」』”’）)]*/gu) || []);
+  return _pbpDictEvidenceJoinSentences(parts, language).flatMap(part => part.match(/[^。！？]+(?:[。！？]+[」』”’）)]*)?|[。！？]+[」』”’）)]*/gu) || []);
 }
 // A sentence over the bound becomes a window around the hit, marked as cut so
 // the reader can say so; no ellipsis is written into the source text itself.
