@@ -345,6 +345,10 @@ function pbpDictEntryParse(text, request, options = {}) {
   try { _pbpDictEntryParseLearning(value, structured, result, invalid); }
   catch (error) {
     if (!lenient || error?.code !== "invalid_response") throw error;
+    // An "unknown word" answer that still carries learning text contradicts
+    // itself whether or not its block is well formed; dropping the block must
+    // not turn that rejection into a paid save.
+    if (!meanings.length && _pbpDictEntryRawLearningText(value)) return invalid("entry_unknown");
     // Nothing of a malformed block is kept; the generator then stores the
     // empty v2 learning it uses when the model omitted the block.
     result.etymology = ""; result.relatedWords = []; delete result.learning;
@@ -352,6 +356,14 @@ function pbpDictEntryParse(text, request, options = {}) {
   }
   if (!meanings.length && (result.pronunciation || result.etymology || result.relatedWords.length)) return invalid("entry_unknown");
   return result;
+}
+// Whether the raw answer carries any learning text, judged by string or array
+// length alone so it never depends on the block passing validation.
+function _pbpDictEntryRawLearningText(value) {
+  const filled = v => (typeof v === "string" && v.trim().length > 0) || (Array.isArray(v) && v.length > 0);
+  const l = value.learning;
+  return filled(l) || (!!l && typeof l === "object" && !Array.isArray(l) && [l.formation, l.history, l.related].some(filled)) ||
+    filled(value.etymology) || filled(value.relatedWords);
 }
 // Validates the enrichment beside the senses and writes it into result. The
 // structured v2 block and the legacy duplicated fields are alternatives.

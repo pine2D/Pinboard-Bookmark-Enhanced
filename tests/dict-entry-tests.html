@@ -283,6 +283,22 @@ await test('an unknown word whose learning block is malformed stays an unknown w
   const {result:r,drops}=await withDrops(onDrop=>pbpDictEntryRun({...request(),onDrop}));
   return r.cacheSaved&&r.entry.meanings.length===0&&JSON.stringify(drops)==='[["invalid_response","entry_learning"]]';
 });
+// Dropping a malformed block must not turn an "unknown word" answer that still
+// carries learning text into a paid save; the same text in a well-formed block
+// is rejected as entry_unknown, so a broken one is too (Q6=B, never loosened).
+await test('an unknown word with a malformed but non-empty learning block is still rejected as entry_unknown',async()=>{
+  const cases=[
+    l=>{l.formation='由 x 构成';l.stray='';},
+    l=>{l.history='Borrowed in the 1600s.';l.version=3;},
+    l=>{l.related=[{word:'Bankkonto',relation:'antonym',note:'Not a valid relation.'}];}];
+  for(const mutate of cases){
+    reset();response(d=>{d.meanings=[];d.pronunciation='';d.etymology='';d.relatedWords=[];d.learning={version:2,formation:'',history:'',related:[]};mutate(d.learning);});
+    const drops=[];let error=null;
+    try{await pbpDictEntryRun({...request(),onDrop:e=>drops.push(e)});}catch(e){error=e;}
+    if(error?.code!=='invalid_response'||error?.reason!=='entry_unknown'||writes.length!==0||drops.length!==0)return false;
+  }
+  return true;
+});
 await test('a cached entry with a malformed learning block is still rejected as a whole on read',async()=>{
   for(const [mutate] of LEARNING_BREAKS){
     reset();await pbpDictEntryRun(request());const stored=cache.get(writes[0].key);
