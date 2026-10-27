@@ -2583,8 +2583,11 @@ async function driveDiscovery(context, worker, extId, rep) {
     await reader.waitForSelector('#ask-open');
     await reader.evaluate(async()=>{await qaReleaseOwnerRead();qaRestoreReaderRead();});
     await reader.waitForFunction(()=>_pbpExplainAiOk&&_pbpExplainSettings.customModel==='qa-second');
+    // Ask and translate initialize asynchronously after the settings read;
+    // wait for both states to exist (not for their account) before judging.
+    await reader.waitForFunction(()=>!!_pbpAskState&&!!_pbpTrState,null,{timeout:TIMEOUT_MS}).catch(()=>{});
     const account=FAKE_OTHER_TOKEN.split(':')[0];
-    requireState(await reader.evaluate(account=>_pbpAskState.account===account&&_pbpTrState.account===account,account),"live AI controls carry stale account");
+    requireState(await reader.evaluate(account=>_pbpAskState?.account===account&&_pbpTrState?.account===account,account),"live AI controls carry stale account");
     requireState(await reader.locator('#ask-open').count()===1&&await reader.locator('#btn-translate').count()===1,"split settings write duplicated AI controls");
     requireState(await reader.locator('#reader-ai-configure').count()===0,"configured reader still promotes setup");
     await rep.shot(reader,s,'reader-primary-controls');
