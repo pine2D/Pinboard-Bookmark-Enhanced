@@ -691,6 +691,8 @@ export function evaluateMediaProbe(probe, check) {
 //                       and one single-sense entry) with the generate button.
 //   dict-entry-result   the AI entry (two senses with bilingual examples).
 //   dict-entry-details  the AI entry plus an opened etymology supplement.
+//   dict-entry-usage-busy  a usage supplement in flight: the phase line, the
+//                       seconds waited and Cancel in its action row.
 //   dict-entry-usage-result  a saved usage supplement whose items carry an
 //                       example sentence and its translation.
 //   dict-entry-folded   dictDefaultView "dictionary": the dictionary result
@@ -754,6 +756,9 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-entry-progress": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
+        // A usage supplement in flight (plan 2.6): its phase line, the
+        // seconds waited and Cancel take the button's place in its row.
+        "dict-entry-usage-busy": { requires: ["edges", "original", "translation", "overflow", "clip"] },
         "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip"] },
         // Free original-text examples: source sentences, never a translation.
         "dict-entry-examples": { requires: ["edges", "senseIndent", "original", "overflow", "clip"] },
@@ -793,6 +798,7 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-entry-progress": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
+        "dict-entry-usage-busy": { requires: ["edges", "original", "translation", "overflow", "clip"] },
         "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip"] },
         "dict-entry-examples": { requires: ["edges", "senseIndent", "original", "overflow", "clip"] },
         "dict-entry-negative": { requires: ["edges", "senseIndent", "overflow", "clip", "notes"] },

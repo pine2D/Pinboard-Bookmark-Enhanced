@@ -75,10 +75,10 @@ test('every geometry context is a registered sweep context of its surface', () =
 // Every lookup state the reader and the library register (dict redesign 3.6)
 // is held to the batch-0 geometry, so a new one cannot slip in unmeasured.
 // The exemptions are transitional states whose layout a measured successor
-// already covers: busy -> progress (adds the seconds), usage-busy ->
-// usage-error (the same row plus its note), cached -> result (the same DOM
-// read back from the cache).
-const DICT_GEOMETRY_EXEMPT = new Set(['dict-entry-busy', 'dict-entry-usage-busy', 'dict-entry-cached']);
+// already covers: busy -> progress (adds the seconds), cached -> result (the
+// same DOM read back from the cache). A usage supplement in flight is not
+// exempt: its progress row replaces the button, a layout no later state shows.
+const DICT_GEOMETRY_EXEMPT = new Set(['dict-entry-busy', 'dict-entry-cached']);
 test('every lookup sweep state on the reader and the library has a geometry context', () => {
   for (const surface of ['md-preview', 'library']) {
     const spec = DICT_LOOKUP_GEOMETRY.surfaces[surface];
@@ -91,7 +91,7 @@ test('every lookup sweep state on the reader and the library has a geometry cont
     for (const name of DICT_GEOMETRY_EXEMPT) assert.ok(names.includes(name), `${surface}/${name}: stale exemption`);
   }
   // The redesign's own states (plan 3.6) are registered on both surfaces.
-  for (const name of ['dict-entry-negative', 'dict-entry-legacy', 'dict-entry-examples', 'dict-entry-progress',
+  for (const name of ['dict-entry-negative', 'dict-entry-legacy', 'dict-entry-examples', 'dict-entry-progress', 'dict-entry-usage-busy',
     'dict-save-bar', 'dict-save-change-menu', 'dict-entry-paid-negative']) {
     for (const surface of ['md-preview', 'library']) {
       assert.ok(RENDER_SWEEP_CONTEXTS[surface].some((c) => c.name === name), `${surface}/${name} is not a sweep state`);

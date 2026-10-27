@@ -294,7 +294,13 @@ export async function openDictEntryState(page, state) {
     await page.evaluate(() => Object.assign(window._auditDictEntry, { usageEntered: false, usageRelease: null, usageFail: true }));
     await page.locator(USAGE_ACTION).click();
     await page.waitForFunction(() => window._auditDictEntry.usageEntered);
-    return page.locator(USAGE_ROW + ' .xp-dict-usage-stop:not([hidden])').isVisible();
+    // Plan 2.6: the progress takes the button's place in its own row -- the
+    // phase line, the seconds waited and Cancel all showing, so the geometry
+    // context measures the full busy row, not a half-built one.
+    const busy = USAGE_ROW + ' .xp-dict-usage-feedback[data-state="busy"]';
+    await page.locator(busy + ' .xp-dict-usage-elapsed:not([hidden])').waitFor();
+    if (await page.locator(USAGE_ACTION).isVisible()) throw new Error('SETUP: the busy usage action still shows its button');
+    return page.locator(busy + ' .xp-dict-usage-stop:not([hidden])').isVisible();
   }
   if (state === 'usage-error') {
     await page.evaluate(() => window._auditDictEntry.usageRelease());
