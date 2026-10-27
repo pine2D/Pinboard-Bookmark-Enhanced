@@ -495,6 +495,53 @@ await test('the literature task no longer asks the model to label its reading wi
   await pbpDictSupplementRun(request({category:'literature'}));
   return calls.length===1&&!/interpretation/i.test(calls[0].prompt);
 });
+// Single-rule cases: each fixture keeps the field word out of the query term,
+// the item title and the base entry unless that is the one rule under test.
+const FIELD_PROSE='这个说法的 interpretation 偏向空间上的距离，head 部分通常不能省略。';
+await test('an English source language alone exempts field words, while the same prose from German is dropped',async()=>{
+  existing();usageResponse(d=>{d.items=[usageItem('faraway places',FIELD_PROSE,'她向往遥远的地方。')];});
+  const en=await pbpDictSupplementRun(request({category:'grammar'}));
+  if(!en.archiveSaved||en.learning.items.length!==1||en.learning.omittedItems)return false;
+  reset();existing();usageResponse(d=>{d.items=[usageItem('Fernweh haben','用来表达对远方的强烈向往，常见于口语和文学描写中。'),usageItem('Fernweh bekommen',FIELD_PROSE)];});
+  const de=await pbpDictSupplementRun(request({...DE_ZH,category:'grammar'}));
+  return de.archiveSaved&&de.learning.items.length===1&&de.learning.items[0].title==='Fernweh haben'&&de.learning.omittedItems===1;
+});
+await test('an unresolved source language may be English, so field words pass while identifiers still leak',async()=>{
+  existing();usageResponse(d=>{d.items=[usageItem('Fernweh haben',FIELD_PROSE)];});
+  const und=await pbpDictSupplementRun(request({term:'Fernweh',sourceLanguage:'und',category:'grammar'}));
+  if(!und.archiveSaved||und.learning.items.length!==1||und.learning.omittedItems)return false;
+  reset();existing();usageResponse(d=>{d.items=[usageItem('Fernweh haben','这个搭配的 sourceIndex 是 -1，表示例句由 AI 编写。')];});
+  return await rejectsReason(()=>pbpDictSupplementRun(request({term:'Fernweh',sourceLanguage:'und',category:'grammar'})),'invalid_response','internal_term')&&appended.length===0;
+});
+await test('a field word that appears only in a base-entry example sentence is exempt',async()=>{
+  existing();records.entry={word:'Fernweh',language:'de',pronunciation:'',meanings:[{partOfSpeech:'名词',definition:'对远方的向往。',
+    examples:[{text:'Sie schrieb eine Note über ihr Fernweh.',translation:'她写了一张便条，说起自己对远方的向往。'}]}],etymology:'',relatedWords:[]};
+  usageResponse(d=>{d.items=[usageItem('Fernweh haben','常和 Note 这类书面词一起出现，表示把对远方的向往写下来。')];});
+  const r=await pbpDictSupplementRun(request({...DE_ZH,category:'grammar'}));
+  return r.archiveSaved&&r.learning.items.length===1&&!r.learning.omittedItems;
+});
+await test('a supplement item that leaks only in its translation is dropped',async()=>{
+  existing();usageResponse(d=>{d.items=[usageItem('Fernweh haben','用来表达对远方的强烈向往，常见于口语和文学描写中。'),
+    usageItem('Fernweh bekommen','表示突然产生想去远方的念头，多用于描写一时的心情。','她忽然有了 interpretation 上的远行念头。')];});
+  const r=await pbpDictSupplementRun(request({...DE_ZH,category:'grammar'}));
+  return r.archiveSaved&&r.learning.items.length===1&&r.learning.items[0].title==='Fernweh haben'&&r.learning.omittedItems===1;
+});
+await test('a base entry that leaks only in an example translation fails as a whole',async()=>{
+  const original=callAI;callAI=async(settings,prompt,options)=>{await options.beforeRequest();calls.push({settings,prompt,options});
+    return JSON.stringify({word:'Fernweh',language:'de',pronunciation:'',meanings:[
+      {partOfSpeech:'名词',definition:'对远方的向往，渴望离开熟悉的地方去远行。',examples:[{text:'Sie hat Fernweh.',translation:'她有一种 note 意义上的远方渴望。'}]}]});};
+  try{return await rejectsReason(()=>pbpDictEntryRun(request(DE_ZH)),'invalid_response','internal_term')&&saved.length===0&&calls.length===1;}
+  finally{callAI=original;}
+});
+await test('field words and identifiers written flush against Chinese characters still leak, while Latin compounds do not',async()=>{
+  for(const explanation of ['这是interpretation：作者对远方的看法，带有怀旧色彩。','根据sourceIndex判断，这个例句由 AI 编写，适合口语。']){
+    reset();existing();usageResponse(d=>{d.items=[usageItem('Fernweh haben',explanation)];});
+    if(!await rejectsReason(()=>pbpDictSupplementRun(request({...DE_ZH,category:'grammar'})),'invalid_response','internal_term'))return false;
+  }
+  reset();existing();usageResponse(d=>{d.items=[usageItem('Fernweh haben','常和 Notenheft、Headset 这类复合词无关，单独表达对远方的向往。')];});
+  const r=await pbpDictSupplementRun(request({...DE_ZH,category:'grammar'}));
+  return r.archiveSaved&&r.learning.items.length===1&&!r.learning.omittedItems;
+});
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();
 </script>

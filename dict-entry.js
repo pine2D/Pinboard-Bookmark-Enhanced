@@ -455,7 +455,7 @@ function _pbpDictInternalIdentifiers() {
   };
   const request = { term: "x", sourceLanguage: "en", target: { name: "English", lang: "en" } };
   const entry = { word: "x", language: "en", meanings: [{ partOfSpeech: "", definition: "x", examples: [] }] };
-  const profile = { nativeLanguage: "", level: "", topic: "" }, repair = { items: [], omittedItems: 1 };
+  const profile = pbpDictSupplementProfile({}, ""), repair = { items: [], omittedItems: 1 };
   schemaKeys(_pbpDictEntrySchema(request));
   dataKeys(_pbpDictEntryPromptData(request));
   for (const category of PBP_DICT_SUPPLEMENT_CATEGORIES) {
@@ -471,13 +471,15 @@ function _pbpDictLanguageBase(tag) {
 // whose word forms are exempt (base-entry headword, definitions, examples).
 function _pbpDictInternalTermLeak(text, ctx = {}) {
   if (typeof text !== "string" || !text) return false;
-  const whole = words => new RegExp("(?<![\\p{L}\\p{N}_])(?:" + words.join("|") + ")(?![\\p{L}\\p{N}_])", "gu" + (words === PBP_DICT_FIELD_WORDS ? "i" : ""));
+  // Only Latin letters, marks and digits join a word: Chinese and Japanese
+  // prose often writes an English label flush against its own characters.
+  const whole = words => new RegExp("(?<![\\p{Script=Latin}\\p{M}\\p{N}_])(?:" + words.join("|") + ")(?![\\p{Script=Latin}\\p{M}\\p{N}_])", "gu" + (words === PBP_DICT_FIELD_WORDS ? "i" : ""));
   if (whole(_pbpDictInternalIdentifiers()).test(text)) return true;
   const target = ctx.target?.lang === "und" ? pbpDictKnownLanguageName(ctx.target.name) : ctx.target?.lang;
   const targetBase = _pbpDictLanguageBase(target), sourceBase = _pbpDictLanguageBase(ctx.sourceLanguage);
   // An unresolved language may be English, so only identifiers apply there.
   if ([targetBase, sourceBase].some(base => base === "en" || base === "und")) return false;
-  const forms = value => typeof value === "string" ? value.normalize("NFC").toLocaleLowerCase().match(/[\p{L}\p{M}]+/gu) || [] : [];
+  const forms = value => typeof value === "string" ? value.normalize("NFC").toLocaleLowerCase().match(/[\p{Script=Latin}\p{M}]+/gu) || [] : [];
   const exempt = new Set([ctx.term, ctx.title, ...(ctx.forms || [])].flatMap(forms));
   const prose = text.normalize("NFC").replace(/“[^”\n]*”/gu, " ");
   return (prose.match(whole(PBP_DICT_FIELD_WORDS)) || []).some(word => !exempt.has(word.toLocaleLowerCase()));
