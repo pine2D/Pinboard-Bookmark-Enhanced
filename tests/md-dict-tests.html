@@ -2774,6 +2774,40 @@ async function runDictionaryEntryUiTests() {
     const unpaidWrite=mount();await unpaidWrite.ui.ready;const beforeFailedWrite=remoteReads;
     messageListeners.at(-1)({type:'PBP_DICT_ARCHIVE_SYNCED',owner:'ownerless'});await settle();
     check("a passive sync cannot overwrite paid output whose local save failed",remoteReads===beforeFailedWrite&&!!unpaidWrite.host.querySelector('.xp-dict-retry-save'));
+    // Plan 3.4: the base entry's save failure is said once, beside its own
+    // retry -- on arrival and again when the retry fails -- never also in the
+    // panel's top line.
+    {
+      const visibleAlerts=host=>[...host.querySelectorAll('[role="alert"]')].filter(el=>!el.closest('[hidden]'));
+      const baseRetry=unpaidWrite.host.querySelector('.xp-dict-retry-save:not([data-supplement-id] .xp-dict-retry-save)');
+      const arrived=visibleAlerts(unpaidWrite.host),arrivedBeside=arrived.length===1&&arrived[0]===baseRetry.nextElementSibling;
+      const realSave=window.pbpDictEntrySave;window.pbpDictEntrySave=async()=>{throw Object.assign(new Error("Quota"),{name:"QuotaExceededError"});};
+      try {
+        baseRetry.click();await settle();
+        const after=visibleAlerts(unpaidWrite.host);
+        check("a failed save retry of the base entry leaves exactly one alert, right after the retry button",
+          arrivedBeside&&
+          after.length===1&&after[0]===baseRetry.nextElementSibling&&after[0].textContent.includes("dictEntryNotCached")&&
+          unpaidWrite.host.querySelector('.xp-dict-ai-status').hidden);
+      } finally {window.pbpDictEntrySave=realSave;}
+    }
+    // A first generation fails, then a synced copy of the entry arrives: the
+    // generate button is gone and its failure no longer answers anything.
+    {
+      const realRun=window.pbpDictEntryRun,realRead=window.pbpDictEntryRead;let syncedCopy=null;
+      window.pbpDictEntryRead=async()=>syncedCopy&&structuredClone(syncedCopy);
+      window.pbpDictEntryRun=async()=>{throw Object.assign(new Error("Bad response"),{code:"invalid_response"});};
+      try {
+        const stale=mount({settings:{...settings,dictDefaultView:"dictionary"}});await stale.ui.ready;
+        stale.host.querySelector('.xp-dict-ai-generate').click();await settle();
+        const failedFirst=!!stale.host.querySelector('.xp-dict-ai-generate + .xp-dict-action-error');
+        syncedCopy=record({archiveId:'b'.repeat(64),archiveSaved:true,supplements:[]});document.activeElement?.blur?.();
+        messageListeners.at(-1)({type:'PBP_DICT_ARCHIVE_SYNCED',owner:'ownerless'});await settle();
+        check("a synced entry clears the stale alert its failed first generation left beside the generate button",
+          failedFirst&&stale.host.querySelector('.xp-dict-ai-generate').hidden&&!stale.host.querySelector('.xp-dict-ai-reveal').hidden&&
+          !stale.host.querySelector('.xp-dict-action-error'));
+      } finally {window.pbpDictEntryRun=realRun;window.pbpDictEntryRead=realRead;}
+    }
     // The interface language changes after the entry rendered (the
     // explanation language follows it): a save retry and a passive sync
     // refresh still belong to the entry on screen, never to the new target.

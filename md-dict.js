@@ -2143,15 +2143,23 @@ function _pbpDictEntryMount(host, opts) {
       }
       details.open = wasOpen; baseDetails = details; renderedBase = baseKey;
     }
-    // An entry is on screen now: a neutral note left by an earlier first
-    // generation no longer answers anything (a running one keeps its line).
+    // An entry is on screen now: a neutral note or a failure left by an
+    // earlier first generation no longer answers anything (a running one
+    // keeps its line), even when the entry came in a passive sync.
     if (entryProgress.box.dataset.state !== "busy") usageMessage(entryProgress, "", "", null);
+    _pbpDictActionError(generate, "");
     renderSupplements(answerLanguage, revealSupplement);
     opts.onEntry?.(norm, record, content);
     show(open);
     // Move focus off a disappearing action without scrolling the article.
     if (hadFocus) focusEntry();
-    message(record.cacheSaved === false ? t("dictEntryNotCached") : "", "error");
+    // A failed local write: when the archive copy failed too, the retry
+    // button is what answers it, so the alert sits beside that button (plan
+    // 3.4) and a failed retry replaces it there -- one alert, never also in
+    // the top line. A cache-only failure has no button: the top line.
+    const notCached = record.cacheSaved === false ? t("dictEntryNotCached") : "";
+    if (notCached && baseRetry?.isConnected) { message(""); _pbpDictActionError(baseRetry, notCached); }
+    else message(notCached, "error");
   };
   // Focus lands on the AI entry's title when its action has gone; while the
   // entry is folded, the free reveal line is what remains.
@@ -2221,7 +2229,7 @@ function _pbpDictEntryMount(host, opts) {
         });
       }
       if (!baseRetry.isConnected) content.appendChild(baseRetry);
-    } else baseRetry?.remove();
+    } else if (baseRetry) { _pbpDictActionError(baseRetry, ""); baseRetry.remove(); }
     const retained = new Set(), legacySections = [];
     const replaced = new Set((record.supplements || []).map(item => item.learning?.replacesId).filter(Boolean));
     if (replaced.size && !previousSupplements) {
@@ -2493,7 +2501,8 @@ function _pbpDictEntryMount(host, opts) {
         if (remembered) el.dataset.remembered = "true"; else delete el.dataset.remembered;
         // Retrieval and AI judgement read differently; both are neutral answers
         // with the info icon, never errors, and never claim the usage is absent.
-        if (remembered && feedback.box.hidden) {
+        // A remembered miss never covers a failure still shown beside the button.
+        if (remembered && feedback.box.hidden && !el.nextElementSibling?.classList.contains("xp-dict-action-error")) {
           usageMessage(feedback, t(PBP_DICT_NEG_RETRIEVAL.includes(category) ? "dictSupplementNoSources" : PBP_DICT_NEG_NONE_KEYS[category]), "neutral");
           feedback.remembered = true;
         } else if (!remembered && feedback.remembered) {
