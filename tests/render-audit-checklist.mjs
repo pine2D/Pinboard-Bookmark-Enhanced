@@ -693,6 +693,9 @@ export function evaluateMediaProbe(probe, check) {
 //   dict-entry-details  the AI entry plus an opened etymology supplement.
 //   dict-entry-usage-result  a saved usage supplement whose items carry an
 //                       example sentence and its translation.
+//   dict-entry-folded   dictDefaultView "dictionary": the dictionary result
+//                       with the saved AI entry folded into its reveal line.
+//   dict-entry-revealed the same saved entry opened from that line.
 //   dict-entry-panel    the AI entry docked into the reader side panel
 //                       (#reader-dict-view): a context may name its own
 //                       root / overflowRoot, and this one does, because the
@@ -736,6 +739,10 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-entry-examples": { requires: ["edges", "senseIndent", "original", "overflow", "clip"] },
         // A remembered empty result: the action and its neutral note, no sentence.
         "dict-entry-negative": { requires: ["edges", "senseIndent", "overflow", "clip"] },
+        // dictDefaultView "dictionary": the dictionary result with the saved
+        // AI entry folded into its free reveal line, then opened in place.
+        "dict-entry-folded": { requires: ["edges", "senseIndent", "overflow", "clip"] },
+        "dict-entry-revealed": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         // Old-category records opened: a literature quotation with its saved
         // AI translation, a culture explanation and a plain-text record.
         "dict-entry-legacy": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
@@ -755,6 +762,8 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip"] },
         "dict-entry-examples": { requires: ["edges", "senseIndent", "original", "overflow", "clip"] },
         "dict-entry-negative": { requires: ["edges", "senseIndent", "overflow", "clip"] },
+        "dict-entry-folded": { requires: ["edges", "senseIndent", "overflow", "clip"] },
+        "dict-entry-revealed": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-legacy": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
       },
     },

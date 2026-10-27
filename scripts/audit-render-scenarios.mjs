@@ -23,7 +23,7 @@ export const RENDER_READER_CONTEXTS = Object.freeze([
   'reader-source-details', 'export-more', 'reader-bookmark-footer', 'reader-bookmark-editor', 'reader-bookmark-delete-confirm',
   'explain-pop', 'explain-dict', 'dict-resize-menu', 'dict-entry-idle', 'dict-entry-busy', 'dict-entry-progress', 'dict-entry-result', 'dict-entry-details',
   'dict-entry-usage-busy', 'dict-entry-usage-error', 'dict-entry-usage-result',
-  'dict-entry-panel', 'dict-entry-cached', 'dict-entry-error', 'dict-entry-examples', 'dict-entry-negative', 'dict-entry-legacy', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
+  'dict-entry-panel', 'dict-entry-cached', 'dict-entry-folded', 'dict-entry-revealed', 'dict-entry-error', 'dict-entry-examples', 'dict-entry-negative', 'dict-entry-legacy', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
   'pb-hl-card', 'send-menu', 'confirm-popover', 'tr-ask',
 ]);
 const context = (name, dependencies = [], extra = {}) => ({ name, dependencies, ...extra });
@@ -51,6 +51,11 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('dict-entry-usage-error', ['dict-entry-usage-busy'], { target: '.xp-dict-usage-feedback[data-state="error"]' }),
     context('dict-entry-usage-result', ['dict-entry-usage-error'], { target: '[data-learning-block="usage"] .xp-dict-usage-feedback[data-state="saved"]' }),
     context('dict-entry-cached', ['dict-entry-result'], { target: '.xp-dict-ai-content:not([hidden])' }),
+    // dictDefaultView "dictionary" (Q14=A, plan 3.1): the saved entry the
+    // result state archived folds into one free reveal line; opening it shows
+    // the entry and focuses its title.
+    context('dict-entry-folded', ['dict-entry-result'], { target: '.xp-dict-ai-reveal:not([hidden])' }),
+    context('dict-entry-revealed', ['dict-entry-folded'], { target: '.xp-dict-ai-title:not([hidden])' }),
     context('dict-entry-error', ['dict-entry-idle'], { target: '.xp-dict-ai-status:not([hidden])' }),
     // Free original-text examples (plan 1C.2): its fixture has no AI key and
     // no AI entry, so it depends on no AI state.
@@ -73,7 +78,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('notes-batch-bar', ['notes-detail'], { target: '#notes-batch-toolbar.selecting' }),
   ],
   'md-preview': [context('reader', [], { target: '#rendered-view' }), ...RENDER_READER_CONTEXTS.map((name) => context(name,
-    name === 'explain-dict' ? ['explain-pop'] : name === 'dict-resize-menu' ? ['explain-dict'] : name === 'dict-entry-busy' ? ['dict-entry-idle'] : name === 'dict-entry-progress' ? ['dict-entry-busy'] : name === 'dict-entry-result' ? ['dict-entry-busy'] : ['dict-entry-details', 'dict-entry-cached', 'dict-entry-usage-busy', 'dict-entry-panel'].includes(name) ? ['dict-entry-result'] : name === 'dict-entry-usage-error' ? ['dict-entry-usage-busy'] : name === 'dict-entry-usage-result' ? ['dict-entry-usage-error'] : name === 'dict-entry-error' ? ['dict-entry-idle'] : [])), context('video', [], { target: '.pbv-bar' })],
+    name === 'explain-dict' ? ['explain-pop'] : name === 'dict-resize-menu' ? ['explain-dict'] : name === 'dict-entry-busy' ? ['dict-entry-idle'] : name === 'dict-entry-progress' ? ['dict-entry-busy'] : name === 'dict-entry-result' ? ['dict-entry-busy'] : ['dict-entry-details', 'dict-entry-cached', 'dict-entry-usage-busy', 'dict-entry-panel', 'dict-entry-folded'].includes(name) ? ['dict-entry-result'] : name === 'dict-entry-revealed' ? ['dict-entry-folded'] : name === 'dict-entry-usage-error' ? ['dict-entry-usage-busy'] : name === 'dict-entry-usage-result' ? ['dict-entry-usage-error'] : name === 'dict-entry-error' ? ['dict-entry-idle'] : [])), context('video', [], { target: '.pbv-bar' })],
   popup: [context('light', [], { target: '#main-section' }), context('states', [], { target: '.offline-queue-item' }),
     context('form', [], { target: '#url-input' }), context('dpi', [], { dpr: [1.5, 2] }),
     context('dark', [], { theme: 'flexoki-dark', scheme: 'dark', target: '#main-section' }),

@@ -208,6 +208,18 @@ async function settingsChangeSettled(page) {
   }
 }
 
+// The folded states change dictDefaultView; the driver puts the fixture's
+// "ai-saved" back once they are scanned, so the states after them open the
+// saved entry as before.
+export async function restoreDictEntryView(page) {
+  await armSettingsChange(page, ['dictDefaultView']);
+  await page.evaluate(async () => {
+    await chrome.storage.local.set({ dictDefaultView: 'ai-saved' });
+    if (typeof _pbpExplainSettings === 'object' && _pbpExplainSettings) _pbpExplainSettings.dictDefaultView = 'ai-saved';
+  });
+  await settingsChangeSettled(page);
+}
+
 async function rerunLookup(page) {
   if (await page.locator('#vocab-lookup-go').count()) await page.locator('#vocab-lookup-go').click();
   else await page.locator('.xp-dict-query-tools > .xp-dict-lang').selectOption('en');
@@ -314,6 +326,46 @@ export async function openDictEntryState(page, state) {
     const calls = await page.evaluate(() => window._auditDictEntry.calls);
     if (calls !== before.calls) throw new Error('SETUP: cached lookup issued another AI request');
     return result.isVisible();
+  }
+  if (state === 'folded') {
+    // Q14=A: with dictDefaultView "dictionary" the saved entry the result
+    // state left in the archive is not expanded; one free reveal line stands
+    // in for it under the dictionary result. Folding reads, never generates.
+    await armSettingsChange(page, ['dictDefaultView']);
+    await page.evaluate(async () => {
+      await chrome.storage.local.set({ dictDefaultView: 'dictionary' });
+      if (typeof _pbpExplainSettings === 'object' && _pbpExplainSettings) _pbpExplainSettings.dictDefaultView = 'dictionary';
+    });
+    await settingsChangeSettled(page);
+    const before = await page.evaluate(() => ({ calls: window._auditDictEntry.calls, reads: window._auditDictEntry.reads }));
+    await rerunLookup(page);
+    await page.waitForFunction(previous => window._auditDictEntry.reads > previous.reads, before);
+    const reveal = page.locator('.xp-dict-ai-reveal:not([hidden])');
+    await reveal.waitFor();
+    const folded = await page.evaluate(() => ({
+      content: !!document.querySelector('.xp-dict-ai-content:not([hidden])'),
+      title: !!document.querySelector('.xp-dict-ai-title:not([hidden])'),
+      blocks: document.querySelectorAll('.xp-dict-ai > [data-ai-block]:not([hidden])').length,
+      expanded: document.querySelector('.xp-dict-ai-reveal')?.getAttribute('aria-expanded'),
+      calls: window._auditDictEntry.calls }));
+    if (folded.content || folded.title || folded.blocks) throw new Error('SETUP: dictDefaultView "dictionary" left the saved AI entry expanded');
+    if (folded.expanded !== 'false') throw new Error('SETUP: the folded reveal line does not report aria-expanded="false"');
+    if (folded.calls !== before.calls) throw new Error('SETUP: the folded lookup issued an AI request');
+    return reveal.isVisible();
+  }
+  if (state === 'revealed') {
+    // The free reveal line opens the saved entry in place and hands keyboard
+    // focus to its title; no request is made.
+    const before = await page.evaluate(() => window._auditDictEntry.calls);
+    const reveal = page.locator('.xp-dict-ai-reveal:not([hidden])');
+    await reveal.focus();
+    await page.keyboard.press('Enter');
+    await result.waitFor();
+    await page.waitForFunction(() => document.activeElement?.matches('.xp-dict-ai-title'), null, { timeout: 5000 })
+      .catch(() => { throw new Error('SETUP: revealing the saved entry did not move focus to its title'); });
+    if (await page.locator('.xp-dict-ai-reveal:not([hidden])').count()) throw new Error('SETUP: the reveal line stayed after opening the entry');
+    if (await page.evaluate(() => window._auditDictEntry.calls) !== before) throw new Error('SETUP: revealing the saved entry issued an AI request');
+    return page.locator('.xp-dict-ai-title:not([hidden])').isVisible();
   }
   if (state === 'error') {
     await page.evaluate(async () => {

@@ -109,7 +109,7 @@ import { cr, hexRgb, parseRgba, composite } from "../docs/theme-surface/tools/co
 import { CHIP_TARGETS } from "../docs/theme-surface/composers/ui-components.mjs";
 // Options density per theme, from the pilots (docs/theme-surface/tools/options-density.mjs).
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
-import { installDictEntryFixture, openDictEntryState } from "./audit-dict-entry-fixture.mjs";
+import { installDictEntryFixture, openDictEntryState, restoreDictEntryView } from "./audit-dict-entry-fixture.mjs";
 import { ledgerKey, reconcileKnownFailures } from "./render-audit-ledger.mjs";
 import { installAskHistoryFixture, openAskHistoryState } from "./audit-ask-history-fixture.mjs";
 import { openVocabPackPreview, installVocabPackFixture } from "./audit-vocab-pack-fixture.mjs";
@@ -9185,8 +9185,12 @@ async function runSweep(page, sw, extBase) {
       await installDictEntryFixture(page);
       await vocabHead.click();
       await page.locator("#vocab-lookup-go").click();
-      for (const state of ["idle", "busy", "progress", "result", "details", "usage-busy", "usage-error", "usage-result", "cached", "error"]) {
+      for (const state of ["idle", "busy", "progress", "result", "details", "usage-busy", "usage-error", "usage-result", "cached", "folded", "revealed", "error"]) {
         if (wants("library", "dict-entry-" + state)) await scan("library", "dict-entry-" + state, () => openDictEntryState(page, state));
+        // The folded states switch dictDefaultView to "dictionary"; put the
+        // fixture's "ai-saved" back after the last of them.
+        if ((state === "folded" && wants("library", "dict-entry-folded") && !wants("library", "dict-entry-revealed")) ||
+            (state === "revealed" && wants("library", "dict-entry-revealed"))) await restoreDictEntryView(page);
       }
     }
     if (wants("library", "dict-entry-examples")) {
@@ -9319,6 +9323,9 @@ async function runSweep(page, sw, extBase) {
             }
             await scan("md-preview", name, () => openDictEntryState(page, name.replace(/^dict-entry-/, "")));
             if (name === "dict-entry-panel") await page.locator("#reader-dict-view .reader-dict-return").click();
+            // The folded states switch dictDefaultView to "dictionary"; put the
+            // fixture's "ai-saved" back after the last of them.
+            if ((name === "dict-entry-folded" && !wants("md-preview", "dict-entry-revealed")) || name === "dict-entry-revealed") await restoreDictEntryView(page);
             const following = READER_SURFACES.slice(READER_SURFACES.indexOf(name) + 1).find(next => wants("md-preview", next));
             if (!following?.startsWith("dict-entry-")) await page.evaluate(closeReaderSurface, "explain-dict");
             continue;
