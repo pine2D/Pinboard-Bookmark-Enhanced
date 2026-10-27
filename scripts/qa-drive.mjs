@@ -1017,10 +1017,15 @@ async function driveJourney(context, worker, extId, rep) {
       navigator.clipboard.writeText=async text=>{ if(window.qaClipboardFailure) throw new Error('QA_EXPECTED_CLIPBOARD_FAILURE'); window.qaCopiedHighlights=text; };
     });
     await reader.locator('#hl-rail-section .rail-sec-head').click();
+    // Copy reads committed items through the highlight write queue first
+    // (pbpHlExportItems, 326b57be), so the clipboard write and the status
+    // land after the click resolves: wait for the outcome, then judge it.
     await reader.locator('#hl-rail-copy').click();
-    requireState(await reader.evaluate(quotes=>quotes.every(q=>qaCopiedHighlights.includes(q)) && !!document.querySelector('#hl-rail-copy svg') && !document.querySelector('#hl-rail-copy').textContent.trim(),quotes), 'collapsed copy omitted highlights or replaced its icon');
+    await reader.waitForFunction(()=>typeof window.qaCopiedHighlights==='string' || !!document.getElementById('copy-status')?.textContent, null, { timeout: TIMEOUT_MS }).catch(()=>{});
+    requireState(await reader.evaluate(quotes=>typeof window.qaCopiedHighlights==='string' && quotes.every(q=>window.qaCopiedHighlights.includes(q)) && !!document.querySelector('#hl-rail-copy svg') && !document.querySelector('#hl-rail-copy').textContent.trim(),quotes), 'collapsed copy omitted highlights or replaced its icon');
     await reader.evaluate(()=>{window.qaClipboardFailure=true;});
     await reader.locator('#hl-rail-copy').click();
+    await reader.waitForFunction(()=>document.getElementById('copy-status')?.textContent===t('mdPreviewFailed'), null, { timeout: TIMEOUT_MS }).catch(()=>{});
     requireState(await reader.evaluate(()=>!!document.querySelector('#hl-rail-copy svg') && document.getElementById('copy-status').textContent===t('mdPreviewFailed')), 'copy failure destroyed icon or was not announced');
     await reader.evaluate(()=>{navigator.clipboard.writeText=qaOriginalClipboard;});
     await reader.waitForFunction(()=>document.querySelector('#hl-rail-copy').title===t('hlCopyMd'));
