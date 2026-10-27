@@ -2198,6 +2198,9 @@ async function runDictionaryEntryUiTests() {
         progress.text.textContent==='dictEntryGenerating'&&progress.elapsed.checkVisibility()&&progress.elapsed.textContent==='dictProgressElapsed:0'&&progress.cancel.checkVisibility()&&
         cancelled.host.querySelector('.xp-dict-ai-status').hidden&&cancelled.host.querySelector('.xp-dict-ai-generate').hidden);
       check("keyboard generation keeps a visible focus target while waiting: the in-place cancel",document.activeElement===progress.cancel);
+      check("the in-place cancel is its stop icon and its text, never icon-only or paid (3.3)",progress.cancel.querySelector(':scope > svg')?.dataset.icon==='stop'&&
+        progress.cancel.querySelectorAll('svg').length===1&&progress.cancel.lastElementChild?.textContent==='askStop'&&progress.cancel.textContent==='askStop'&&
+        !progress.cancel.hasAttribute('aria-label')&&!progress.cancel.querySelector('.xp-dict-model'));
       check("the seconds sit outside every live region and the busy panel never delays the phase line",
         !progress.elapsed.closest('[aria-live],[role="status"],[role="alert"]')&&progress.text.getAttribute('aria-live')==='polite'&&
         cancelled.host.querySelector('.xp-dict-ai').getAttribute('aria-busy')==='false');
@@ -2363,6 +2366,39 @@ async function runDictionaryEntryUiTests() {
         const el=paid(modelUi.host,category);
         return el?.firstElementChild?.dataset.icon==='wandSparkles'&&el.children[1]?.textContent===key&&el.querySelector('.xp-dict-model')?.textContent==='· fixture-model'&&el.textContent===key+'· fixture-model';
       }));
+    // Plan 3.3: every paid action -- generate, update entry, update
+    // supplement and the three learning buttons -- is wandSparkles, non-empty
+    // text and only the model name; the token cost is in its description,
+    // never in the note. Free actions never carry wandSparkles or a model.
+    {
+      const paidShape=(el,key,hint)=>!!el&&el.querySelectorAll('svg').length===1&&el.firstElementChild?.dataset.icon==='wandSparkles'&&
+        el.children[1]?.textContent===key&&!!key&&el.children[2]?.classList.contains('xp-dict-model')&&el.children.length===3&&
+        el.querySelector('.xp-dict-model').textContent==='· model-one'&&!/token/i.test(el.querySelector('.xp-dict-model').textContent)&&
+        el.title===hint&&el.getAttribute('aria-description')===hint&&!el.hasAttribute('aria-label');
+      window.pbpDictEntryRead=async()=>null;
+      const fresh=mount({settings:{...settings,previewAiModel:'model-one'}});await fresh.ui.ready;
+      const generateButton=fresh.host.querySelector('.xp-dict-ai-generate');
+      check("the generate action is wandSparkles, its text and only the model name, with its token cost in its description (3.3)",
+        paidShape(generateButton,'dictEntryGenerate','dictPaidActionHint')&&generateButton.checkVisibility());
+      const savedPatterns={id:'c'.repeat(64),category:'patterns',profile:{nativeLanguage:'',level:'',topic:''},content:'Saved guidance',sources:[],provider:'fixture',model:'fixture-model',generatedAt:1700000000000,archiveSaved:true};
+      window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[savedPatterns]});
+      const withSaved=mount({settings:{...settings,previewAiModel:'model-one'}});await withSaved.ui.ready;
+      check("updating the entry and updating a supplement are paid actions of the same shape (3.3)",
+        paidShape(withSaved.host.querySelector('.xp-dict-update-entry'),'dictEntryUpdate','dictEntryUpdateHint')&&
+        paidShape(withSaved.host.querySelector('.xp-dict-update-supplement'),'dictSupplementUpdate','dictSupplementUpdateHint'));
+      check("the remaining learning buttons are paid actions of the same shape (3.3)",
+        [['confusables','dictSupplementConfusables'],['etymology','dictSupplementEtymology']].every(([category,key])=>paidShape(paid(withSaved.host,category),key,'dictPaidActionHint')));
+      const paidButtons=withSaved.host.querySelectorAll('button:has(> svg[data-icon="wandSparkles"])');
+      check("every button carrying wandSparkles carries the model name and no token wording in its note",[...paidButtons].filter(el=>el.checkVisibility()).length===4&&
+        [...paidButtons].every(el=>el.querySelector(':scope > .xp-dict-model')?.textContent==='· model-one'&&!/token/i.test(el.querySelector('.xp-dict-model').textContent)));
+      check("no button without wandSparkles carries a model note",[...withSaved.host.querySelectorAll('.xp-dict-model'),...fresh.host.querySelectorAll('.xp-dict-model')]
+        .every(note=>note.parentElement.querySelector(':scope > svg[data-icon="wandSparkles"]')));
+      const free=[fresh.host.querySelector('.xp-dict-ai-reveal'),fresh.host.querySelector('.xp-dict-ai-configure'),...fresh.host.querySelectorAll('.xp-dict-usage-stop'),
+        ...withSaved.host.querySelectorAll('.xp-dict-usage-stop,.xp-dict-ai-reveal,.xp-dict-retry-save')];
+      check("free actions never carry wandSparkles or a model name (3.3)",free.length>=3&&free.every(el=>!el.querySelector('[data-icon="wandSparkles"],.xp-dict-model')));
+      fresh.ctrl.abort();withSaved.ctrl.abort();
+      window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[]});
+    }
     check("the learning blocks have no topic input or scene disclosure (1B.5)",!usage.host.querySelector('[data-learning-block] input, [data-learning-block] label, [data-learning-block] details'));
     check("an unspecified learner profile makes no claim about a native language or level",!usage.host.querySelector('.xp-dict-supplement-profile bdi')&&usage.host.querySelector('.xp-dict-profile-link')?.textContent==='dictSupplementProfileSet'&&usage.host.querySelector('.xp-dict-profile-link')?.getAttribute('href')==='options.html#vocab-learning');
     const configuredProfile=mount({settings:{...settings,dictLearnerNativeLanguage:'English',dictLearnerLevel:'beginner'}});await configuredProfile.ui.ready;
@@ -2584,7 +2620,7 @@ async function runDictionaryEntryUiTests() {
     const updateAction=partialSection.querySelector('.xp-dict-update-supplement');
     check("a reopened partial supplement keeps a neutral partial note and offers only the regenerate action",
       partialSection.querySelector('[data-partial-result]')?.textContent.startsWith('dictSupplementPartial')&&
-      updateAction.textContent==='dictSupplementUpdate'&&updateAction.title==='dictSupplementUpdateHint'&&
+      updateAction.children[1]?.textContent==='dictSupplementUpdate'&&updateAction.title==='dictSupplementUpdateHint'&&
       partialSection.querySelectorAll('.xp-dict-update-supplement').length===1);
     updateAction.click();await settle();
     check("updating a partial supplement regenerates the exact saved version with no repair mode",!('repair' in etymologyRequest)&&etymologyRequest.updateId===partial.id&&etymologyRequest.category==='patterns');
@@ -2754,9 +2790,9 @@ async function runDictionaryEntrySettingsTests() {
   const saved=new Map(names.map(name=>[name,window[name]]));
   const listeners=[],fixtures=[];
   const settle=async()=>{for(let i=0;i<8;i++)await new Promise(resolve=>setTimeout(resolve,0));};
-  const mount=async onSettingsChange=>{
+  const mount=async (onSettingsChange,settings={previewAiEnabled:true})=>{
     const host=document.createElement('div');document.body.append(host);const ctrl=new AbortController();fixtures.push({host,ctrl});
-    const ui=_pbpDictEntryMount(host,{term:'Bank',lang:'de',owner:'ownerless',settings:{previewAiEnabled:true},signal:ctrl.signal,isCurrent:()=>true,onSettingsChange});
+    const ui=_pbpDictEntryMount(host,{term:'Bank',lang:'de',owner:'ownerless',settings,signal:ctrl.signal,isCurrent:()=>true,onSettingsChange});
     await ui.ready;return {host,ctrl,listener:listeners.at(-1)};
   };
   try {
@@ -2793,6 +2829,21 @@ async function runDictionaryEntrySettingsTests() {
     flags[1]({optSyncEnabled:true,syncApiKeys:false});await newFlags;
     flags[0]({optSyncEnabled:true,syncApiKeys:false});await oldFlags;
     check("out-of-order storage-routing reads cannot revive an older setting event",reads===1&&applied.join("|")==="de");
+
+    // Plan 3.3: the model note follows the settings. A model change reruns
+    // the lookup (both callers rebuild it from the settings handed over) and
+    // the rebuilt paid action names the new model.
+    window.pbpReadSecretSyncState=async()=>({optSyncEnabled:true,syncApiKeys:false});
+    window.pbpReadSettingsWithSecrets=async()=>({previewAiEnabled:true,aiProvider:'openai',previewAiModelByProvider:{openai:'model-two'}});
+    let switched=null;
+    const modelNote=host=>host?.querySelector('.xp-dict-ai-generate > .xp-dict-model')?.textContent;
+    const oneModel=await mount(next=>{switched=next;},{previewAiEnabled:true,aiProvider:'openai',previewAiModelByProvider:{openai:'model-one'}});
+    const noteBefore=modelNote(oneModel.host);
+    await oneModel.listener({previewAiModelByProvider:{newValue:{openai:'model-two'}}},"sync");
+    oneModel.ctrl.abort();
+    const twoModel=switched&&await mount(()=>{},switched);
+    check("a model change reruns the lookup and the paid action names the new model",noteBefore==='· model-one'&&modelNote(twoModel?.host)==='· model-two'&&
+      twoModel.host.querySelector('.xp-dict-ai-generate').checkVisibility());
 
     // A settings change voids a running generation: its seconds stop and its
     // busy line with the cancel goes at once (plan 2.6), before the settings

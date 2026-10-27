@@ -2309,9 +2309,11 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-learning-section { margin-top: var(--lib-sp-4); }
 #vocab-ref-result .xp-dict-learning-section > p { margin: var(--lib-sp-2) 0 0; }
 #vocab-ref-result .xp-dict-learning-section > .xp-dict-learning-title { margin: 0; font-size: 13px; line-height: 18px; font-weight: 700; color: var(--lib-fg-muted); }
-/* A paid action: wandSparkles, its text and the model name. */
-#vocab-ref-result .xp-dict-supplement-generate { display: inline-flex; align-items: center; gap: var(--lib-sp-1); }
-#vocab-ref-result .xp-dict-supplement-generate > svg { width: 14px; height: 14px; flex: none; }
+/* A paid action (plan 3.3): wandSparkles, its text and the model name --
+   every supplement button and the update actions (generate sits in the AI
+   row above). */
+#vocab-ref-result :is(.xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement) { display: inline-flex; align-items: center; gap: var(--lib-sp-1); }
+#vocab-ref-result :is(.xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement) > svg { width: 14px; height: 14px; flex: none; }
 /* The free original-text examples action (1C.2): quote icon and text only. */
 #vocab-ref-result .xp-dict-examples-find { display: inline-flex; align-items: center; gap: var(--lib-sp-1); }
 #vocab-ref-result .xp-dict-examples-find > svg { width: 14px; height: 14px; flex: none; }
@@ -2334,8 +2336,10 @@ html.motion-ready .vocab-note-save {
    The first entry generation reports at the top of the panel. */
 #vocab-ref-result .xp-dict-usage-elapsed { flex: none; font-size: 13px; line-height: 18px; color: var(--lib-fg-muted); font-variant-numeric: tabular-nums; }
 #vocab-ref-result .xp-dict-ai > .xp-dict-usage-feedback { margin-bottom: var(--lib-sp-2); }
-#vocab-ref-result .xp-dict-usage-stop { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 24px; padding: var(--lib-sp-1); }
-#vocab-ref-result .xp-dict-usage-stop svg { width: 14px; height: 14px; }
+/* The in-place cancel: its stop icon and its text, an sm control like the
+   other lookup actions (no icon-only action in the lookup, plan 3.3). */
+#vocab-ref-result .xp-dict-usage-stop { display: inline-flex; align-items: center; gap: var(--lib-sp-1); margin: 0; }
+#vocab-ref-result .xp-dict-usage-stop > svg { width: 14px; height: 14px; flex: none; }
 #vocab-ref-result :is(.xp-dict-usage-feedback, .xp-dict-usage-actions > *, .xp-dict-usage-stop)[hidden] { display: none; }
 /* md-dict's own Retry after a load failure: this page already has "Look up
    again" under the source line (.vocab-ref-foot), which re-runs the same

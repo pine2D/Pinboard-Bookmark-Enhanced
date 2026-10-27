@@ -696,6 +696,9 @@ export function evaluateMediaProbe(probe, check) {
 //   dict-entry-folded   dictDefaultView "dictionary": the dictionary result
 //                       with the saved AI entry folded into its reveal line.
 //   dict-entry-revealed the same saved entry opened from that line.
+//   dict-entry-paid-negative  a saved AI entry whose three paid learning
+//                       actions are remembered as "not found last time", in
+//                       each UI locale the scenario lists.
 //   dict-entry-panel    the AI entry docked into the reader side panel
 //                       (#reader-dict-view): a context may name its own
 //                       root / overflowRoot, and this one does, because the
@@ -750,6 +753,10 @@ export const DICT_LOOKUP_GEOMETRY = {
         // its click-opened choice list, which must stay inside the viewport.
         "dict-save-bar": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-save-change-menu": { requires: ["overflow"] },
+        // A saved AI entry with its three paid learning actions in the
+        // remembered "Not found last time · Try again" state (plan 3.3), run in
+        // each listed UI locale; controlRung holds each action to one line.
+        "dict-entry-paid-negative": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-panel": { root: "#reader-dict-view .xp-dict", overflowRoot: "#reader-dict-view",
           requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
       },
@@ -771,6 +778,7 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-entry-legacy": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-save-bar": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-save-change-menu": { requires: ["overflow"] },
+        "dict-entry-paid-negative": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
       },
     },
   },

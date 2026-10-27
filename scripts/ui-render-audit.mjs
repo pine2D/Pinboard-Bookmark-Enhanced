@@ -88,7 +88,7 @@ import { isolatedFontconfigEnv, parityProbeEnv, parityReproduceCommand } from ".
 import { auditSelection } from "./audit-scope.mjs";
 import { RENDER_SCENARIOS, RENDER_SWEEP_CONTEXTS, RENDER_OPTIONS_TABS, RENDER_READER_CONTEXTS,
   RENDER_DARK_THEMES, checkScenarioId, sweepScenarioId, paintScenarioId, mediaScenarioId,
-  renderThemes, renderSweepPlan, runRenderScenario, popupCheckSetup } from "./audit-render-scenarios.mjs";
+  renderThemes, renderSweepPlan, runRenderScenario, popupCheckSetup, DICT_PAID_NEGATIVE_LOCALES } from "./audit-render-scenarios.mjs";
 
 import {
   CHECKS,
@@ -3592,6 +3592,49 @@ async function setLibraryLocale(p, extBase, locale) {
   }, { url: `${extBase}_locales/${locale}/messages.json`, lang: tag });
   if (got !== "ok") throw new Error(`SETUP: setLibraryLocale(${locale}): ${got}`);
   await settleAnimations(p);
+}
+
+// The reader's lookup in another UI language (the remembered paid state,
+// plan 3.3): md-dict reads t() and uiLangToBCP47() on every render, so swapping
+// i18n.js's table and <html lang> and then rerunning the lookup renders it in
+// that language. The reader chrome around the popover is not re-applied:
+// only the lookup is under test. The page's own table is kept to restore.
+async function setReaderLocale(p, extBase, locale) {
+  const tag = LIB_LOCALE_BCP47[locale];
+  if (!tag) throw new Error(`SETUP: setReaderLocale(${locale}): no BCP 47 tag in LIB_LOCALE_BCP47`);
+  await p.evaluate(async ({ url, lang }) => {
+    window._auditReaderI18n ??= { messages: _i18nMessages, lang: document.documentElement.lang, tag: window.uiLangToBCP47 };
+    _i18nMessages = await (await fetch(url)).json();
+    window.uiLangToBCP47 = () => lang;
+    document.documentElement.lang = lang;
+  }, { url: `${extBase}_locales/${locale}/messages.json`, lang: tag });
+}
+async function restoreDictLocale(p, extBase) {
+  if (await p.locator("#vocab-lookup-lang").count()) { await setLibraryLocale(p, extBase, "en"); return; }
+  await p.evaluate(() => {
+    const saved = window._auditReaderI18n;
+    if (!saved) return;
+    _i18nMessages = saved.messages; window.uiLangToBCP47 = saved.tag; document.documentElement.lang = saved.lang;
+    delete window._auditReaderI18n;
+  });
+}
+// Each listed locale of the remembered paid state is one scan of the same
+// scenario: switch the language, rerun the lookup on the remembered memory,
+// measure. The UI language goes back to English afterwards.
+async function scanDictPaidNegative(page, extBase, surface, scan) {
+  const id = sweepScenarioId(surface, "dict-entry-paid-negative");
+  try {
+    for (const locale of audit.values(id, "locale", DICT_PAID_NEGATIVE_LOCALES)) {
+      console.log(`[render-audit] ${surface}/dict-entry-paid-negative: ${locale}`);
+      await scan(surface, "dict-entry-paid-negative", async () => {
+        if (surface === "library") await setLibraryLocale(page, extBase, locale);
+        else await setReaderLocale(page, extBase, locale);
+        return openDictEntryState(page, "paid-negative");
+      });
+    }
+  } finally {
+    await restoreDictLocale(page, extBase);
+  }
 }
 
 // G3: how many whole rows a 900px-tall window shows, and at what pitch.
@@ -9231,6 +9274,16 @@ async function runSweep(page, sw, extBase) {
       await scan("library", "dict-save-change-menu", () => openDictEntryState(page, "save-change-menu"));
       await closeDictSaveMenu(page);
     }
+    // The remembered paid learning actions (plan 3.3), once per listed UI
+    // locale, with the AI key the opener seeds.
+    if (wants("library", "dict-entry-paid-negative")) {
+      if (!["dict-entry-idle", "dict-entry-examples", "dict-entry-negative", "dict-entry-legacy", "dict-save-bar"].some(name => wants("library", name))) {
+        await installDictEntryFixture(page);
+        await vocabHead.click();
+        await page.locator("#vocab-lookup-go").click();
+      }
+      await scanDictPaidNegative(page, extBase, "library", scan);
+    }
     // Ctrl+click on the row head, not a checkbox click: the per-row checkbox was
     // removed 2026-08-06 and selection is now a modified click on the row itself.
     if (wants("library", "vocab-batch-bar")) {
@@ -9329,13 +9382,14 @@ async function runSweep(page, sw, extBase) {
           if (/^dict-(entry|save)-/.test(name)) {
             // The examples and save-bar states need no earlier AI state: open
             // the lookup for them when they run on their own.
-            if (name.endsWith("-idle") || (["dict-entry-examples", "dict-entry-negative", "dict-entry-legacy", "dict-save-bar"].includes(name) &&
+            if (name.endsWith("-idle") || (["dict-entry-examples", "dict-entry-negative", "dict-entry-legacy", "dict-save-bar", "dict-entry-paid-negative"].includes(name) &&
                 !(await page.locator("#explain-pop .xp-dict-query-tools > .xp-dict-lang").isVisible().catch(() => false)))) {
               await installDictEntryFixture(page);
               if (await page.evaluate(openReaderSurface, "explain-pop") !== true || await page.evaluate(openReaderSurface, "explain-dict") !== true) throw new Error("SETUP: dictionary entry opener failed");
               await page.selectOption(".xp-dict-query-tools > .xp-dict-lang", "en");
             }
-            await scan("md-preview", name, () => openDictEntryState(page, name.replace(/^dict-(entry-)?/, "")));
+            if (name === "dict-entry-paid-negative") await scanDictPaidNegative(page, extBase, "md-preview", scan);
+            else await scan("md-preview", name, () => openDictEntryState(page, name.replace(/^dict-(entry-)?/, "")));
             if (name === "dict-save-change-menu") await closeDictSaveMenu(page);
             if (name === "dict-entry-panel") await page.locator("#reader-dict-view .reader-dict-return").click();
             // The folded states switch dictDefaultView to "dictionary"; put the

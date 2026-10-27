@@ -203,21 +203,36 @@ await test("retrieval and AI-judgement memories read differently, both neutral w
   view.element.remove();
   const ui = await entryView();
   const patterns = ui.paid("patterns"), etymology = ui.paid("etymology"), confusables = ui.paid("confusables");
-  const patternsOk = label(patterns) === "dictSupplementPatterns · dictNegRetry" && ui.status("patterns").textContent === "dictUsagePointsNone" &&
-    infoIcon(ui.status("patterns")) && ui.status("patterns").dataset.state === "neutral";
-  // The etymology block has one button under its heading: it drops the
-  // category name too, the accessible name keeps it and the model. The usage
-  // block holds two buttons, so patterns keeps its name to stay distinct.
+  // Every learning block has its own heading (ruling 2026-10-28): each
+  // remembered button drops its category name and reads only "Not found last
+  // time · Try again" plus the model note; its accessible name keeps the
+  // category and the model. In the usage block, which holds two buttons, the
+  // neutral note beside each names its category instead.
+  const patternsOk = label(patterns) === "dictNegRetry" && patterns.getAttribute("aria-label") === "dictSupplementPatterns · dictNegRetry · fixture-model" &&
+    ui.status("patterns").textContent === "dictPatternsNone" && infoIcon(ui.status("patterns")) && ui.status("patterns").dataset.state === "neutral";
   const etymologyOk = label(etymology) === "dictNegRetry" && etymology.getAttribute("aria-label") === "dictSupplementEtymology · dictNegRetry · fixture-model" &&
-    etymology.querySelector(".xp-dict-model").textContent === "· fixture-model" && !patterns.hasAttribute("aria-label") &&
+    etymology.querySelector(".xp-dict-model").textContent === "· fixture-model" &&
     ui.status("etymology").textContent === "dictSupplementNoSources" && infoIcon(ui.status("etymology"));
   // Retrying stays the paid action: wandSparkles, its text and the model name.
   const paidOk = patterns.querySelector("svg")?.outerHTML === svgOf(PBP_ICONS.wandSparkles) && patterns.querySelector(".xp-dict-model").textContent === "· fixture-model" &&
     !patterns.disabled && !patterns.hidden;
-  const plainOk = label(confusables) === "dictSupplementConfusables" && !confusables.dataset.remembered && ui.status("confusables").textContent === "";
+  const plainOk = label(confusables) === "dictSupplementConfusables" && !confusables.dataset.remembered && ui.status("confusables").textContent === "" &&
+    !confusables.hasAttribute("aria-label");
   ui.close();
   return hiddenUntilRead && examplesOk && patternsOk && etymologyOk && paidOk && plainOk &&
-    t("dictSupplementNoSources") !== t("dictUsagePointsNone");
+    new Set(["dictSupplementNoSources", "dictPatternsNone", "dictConfusablesNone"].map(key => t(key))).size === 3;
+});
+await test("two remembered usage buttons read alike and the note beside each names its own category", async () => {
+  reset();
+  await pbpDictNegRecord("acct_alice", usage("patterns")); await pbpDictNegRecord("acct_alice", usage("confusables"));
+  const ui = await entryView();
+  const rows = ["patterns", "confusables"].map(category => ({ category, button: ui.paid(category), status: ui.status(category) }));
+  const ok = rows.every(({ category, button, status }) => label(button) === "dictNegRetry" && button.dataset.remembered === "true" &&
+    button.getAttribute("aria-label") === (category === "patterns" ? "dictSupplementPatterns" : "dictSupplementConfusables") + " · dictNegRetry · fixture-model" &&
+    status.textContent === (category === "patterns" ? "dictPatternsNone" : "dictConfusablesNone") && status.dataset.state === "neutral" &&
+    button.closest(".xp-dict-usage-actions") === status.closest(".xp-dict-usage-actions"));
+  ui.close();
+  return ok;
 });
 await test("an AI-judgement memory is keyed by the language of the entry on screen, the one its request asks for", async () => {
   // The interface language changes in another tab after the saved entry
@@ -262,7 +277,7 @@ await test("a render that switches the entry's language re-reads the memory for 
     ui.host.querySelector(".xp-dict-ai-generate").click(); await settle();
     const switched = ui.host.querySelector(".xp-dict-senses > li")?.lang === "fr";
     const patterns = ui.paid("patterns"), confusables = ui.paid("confusables");
-    const ok = switched && patterns?.dataset.remembered === "true" && ui.status("patterns").textContent === "dictUsagePointsNone" &&
+    const ok = switched && patterns?.dataset.remembered === "true" && ui.status("patterns").textContent === "dictPatternsNone" &&
       !confusables?.dataset.remembered && ui.status("confusables").textContent === "";
     ui.close();
     return ok;

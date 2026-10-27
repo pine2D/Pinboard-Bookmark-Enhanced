@@ -1730,6 +1730,9 @@ const PBP_DICT_NEG_CAP = 500;
 const PBP_DICT_NEG_TTL = 30 * 24 * 60 * 60 * 1000;
 const PBP_DICT_NEG_RETRIEVAL = Object.freeze(["examples", "etymology"]);
 const PBP_DICT_NEG_CATEGORIES = Object.freeze([...PBP_DICT_NEG_RETRIEVAL, "patterns", "confusables"]);
+// The remembered AI judgement names its own category: the button above it
+// no longer does (ruling 2026-10-28).
+const PBP_DICT_NEG_NONE_KEYS = Object.freeze({ patterns: "dictPatternsNone", confusables: "dictConfusablesNone" });
 async function _pbpDictSha256Hex(text) {
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
   return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
@@ -1839,12 +1842,8 @@ function _pbpDictEntryMount(host, opts) {
     const el = document.createElement("button"); el.type = "button";
     el.className = "xp-dict-connect " + name; el.textContent = t(key); return el;
   };
-  const action = (el, key, icon) => {
-    el.innerHTML = typeof PBP_ICONS === "object" ? PBP_ICONS[icon] || "" : "";
-    el.title = t(key); el.setAttribute("aria-label", t(key));
-  };
-  // An action row button: its icon and its text (no icon-only actions in the
-  // body of the lookup).
+  // Every button in the lookup is its icon and its text: there is no
+  // icon-only action in the body of the lookup (plan 3.3).
   const labelled = (el, key, icon) => {
     const svg = document.createElement("span");
     svg.innerHTML = typeof PBP_ICONS === "object" ? PBP_ICONS[icon] || "" : ""; // static shared icon
@@ -1852,9 +1851,18 @@ function _pbpDictEntryMount(host, opts) {
     el.replaceChildren(...svg.childNodes, text);
     return el;
   };
-  // Paid: wandSparkles, its text and the model name beside it.
-  const generate = labelled(button("dictEntryGenerate", "xp-dict-ai-generate"), "dictEntryGenerate", "wandSparkles");
-  const generateModel = document.createElement("span"); generateModel.className = "xp-dict-model"; generate.appendChild(generateModel);
+  // A paid action (plan 3.3): wandSparkles, its text and only the model name
+  // beside it ([icon, label, .xp-dict-model]). That it calls AI and uses
+  // tokens is said in its description (title / aria-description), never in
+  // the note, and no token count or price is shown. The model note follows
+  // the current settings (modelNotes).
+  const paidButton = (key, name, hintKey) => {
+    const el = labelled(button(key, name), key, "wandSparkles");
+    const model = document.createElement("span"); model.className = "xp-dict-model"; el.appendChild(model);
+    el.title = t(hintKey); el.setAttribute("aria-description", el.title);
+    return el;
+  };
+  const generate = paidButton("dictEntryGenerate", "xp-dict-ai-generate", "dictPaidActionHint");
   generate.disabled = true;
   // Free: shows the saved entry this lookup already has; it never generates.
   const reveal = labelled(button("dictEntryShowAi", "xp-dict-ai-reveal"), "dictEntryShowAi", "chevronDown");
@@ -1922,7 +1930,7 @@ function _pbpDictEntryMount(host, opts) {
     const text = document.createElement("p"); text.className = "xp-dict-msg xp-dict-usage-status";
     text.setAttribute("role", "status"); text.setAttribute("aria-live", "polite"); text.setAttribute("aria-atomic", "true");
     const elapsed = document.createElement("span"); elapsed.className = "xp-dict-usage-elapsed"; elapsed.hidden = true;
-    const cancel = button("askStop", "xp-dict-usage-stop"); action(cancel, "askStop", "stop"); cancel.hidden = true;
+    const cancel = labelled(button("askStop", "xp-dict-usage-stop"), "askStop", "stop"); cancel.hidden = true;
     cancel.addEventListener("click", () => cancelActive());
     box.append(text, elapsed, cancel);
     return { box, text, elapsed, cancel, anchor, activity: null };
@@ -1983,11 +1991,18 @@ function _pbpDictEntryMount(host, opts) {
     act.key = key; usageMessage(act.feedback, t(key), "busy");
   };
   const PHASE_KEYS = { thinking: "dictProgressThinking", streaming: "dictProgressStreaming" };
+  // The one model note every paid action carries, read from the current
+  // settings on each sync: a settings change (another model) reaches the
+  // generate, update and supplement buttons alike.
+  const modelName = () => configured() && typeof pbpDictEntryModelName === "function" ? pbpDictEntryModelName(settings) || "" : "";
+  const modelNotes = () => {
+    const name = modelName();
+    for (const note of panel.querySelectorAll("button > .xp-dict-model")) note.textContent = name ? "· " + name : "";
+  };
   const sync = () => {
     const off = !record && !!settings && settings.previewAiEnabled === false;
     generate.hidden = !!record || !configured() || busy; generate.disabled = busy || !settings;
-    generateModel.textContent = !generate.hidden && typeof pbpDictEntryModelName === "function" && pbpDictEntryModelName(settings)
-      ? "· " + pbpDictEntryModelName(settings) : "";
+    modelNotes();
     reveal.hidden = !record || expanded;
     configure.hidden = !!record || !settings || settings.previewAiEnabled === false || configured();
     controls.hidden = off || (generate.hidden && reveal.hidden && configure.hidden);
@@ -2081,7 +2096,7 @@ function _pbpDictEntryMount(host, opts) {
       }
       if (details.childElementCount > 1) content.appendChild(details);
       if (configured() && record.archiveId) {
-        const update = button("dictEntryUpdate", "xp-dict-update-entry"); update.title = t("dictEntryUpdateHint"); update.setAttribute("aria-description", update.title);
+        const update = paidButton("dictEntryUpdate", "xp-dict-update-entry", "dictEntryUpdateHint");
         update.addEventListener("click", () => run(true, record.archiveId, update)); content.appendChild(update);
       }
       if (record.previousEntries?.length) {
@@ -2296,12 +2311,9 @@ function _pbpDictEntryMount(host, opts) {
       // took) are read-only (1B.5, 1B.7).
       if (configured() && addition.id && addition.archiveSaved !== false && !replaced.has(id) && !legacyCategory && !addition.profile?.topic) {
         if (!item.update) {
-          item.update = button("dictSupplementUpdate", "xp-dict-update-supplement");
+          item.update = paidButton("dictSupplementUpdate", "xp-dict-update-supplement", "dictSupplementUpdateHint");
           item.update.addEventListener("click", () => usageForm?.update(item.addition));
         }
-        item.update.textContent = t("dictSupplementUpdate");
-        item.update.title = t("dictSupplementUpdateHint");
-        item.update.setAttribute("aria-description", item.update.title);
         if (!item.update.isConnected) section.appendChild(item.update);
       } else item.update?.remove();
       if (addition.archiveSaved === false) {
@@ -2375,12 +2387,7 @@ function _pbpDictEntryMount(host, opts) {
       el.appendChild(heading); return el;
     };
     const paid = (category, key) => {
-      const el = button(key, "xp-dict-supplement-generate"); el.dataset.category = category;
-      const icon = document.createElement("span");
-      icon.innerHTML = typeof PBP_ICONS === "object" ? PBP_ICONS.wandSparkles || "" : ""; // static shared icon
-      const label = document.createElement("span"); label.textContent = t(key);
-      const model = document.createElement("span"); model.className = "xp-dict-model";
-      el.replaceChildren(...icon.childNodes, label, model);
+      const el = paidButton(key, "xp-dict-supplement-generate", "dictPaidActionHint"); el.dataset.category = category;
       return el;
     };
     const usage = block("usage", "dictLearningUsagePoints"), etymology = block("etymology", "dictLearningEtymology");
@@ -2425,31 +2432,32 @@ function _pbpDictEntryMount(host, opts) {
     };
     const refresh = () => {
       const canGenerate = configured() && !!record?.archiveId;
-      const modelName = canGenerate && typeof pbpDictEntryModelName === "function" ? pbpDictEntryModelName(settings) : "";
+      const model = canGenerate ? modelName() : "";
+      modelNotes();
       for (const [category, el] of Object.entries(buttons)) {
         const feedback = feedbacks[category];
         const saved = existing(category);
         el.hidden = feedback.box.dataset.state === "busy" || !canGenerate || !!saved;
-        el.lastElementChild.textContent = modelName ? "· " + modelName : "";
         // A positive record (generated here or brought by Drive) wins over the
         // memory and forgets it; for etymology only one with sources does,
         // since a formation-only answer is itself a source miss.
         if (saved && negState[category] && (category !== "etymology" || saved.sources?.length)) negForget(category);
         const remembered = !el.hidden && negState[category] === true;
-        // Ruling 2026-10-28: under its block's own heading the remembered
-        // button drops the category name ("Not found last time · Try again"),
-        // so it fits one line in the reader's popover. The usage block holds two
-        // buttons, so there the name stays to tell them apart. The accessible
-        // name always says what would be generated.
-        const named = category !== "etymology";
-        labels[category].textContent = remembered ? (named ? t(labelKeys[category]) + " · " : "") + t("dictNegRetry") : t(labelKeys[category]);
-        if (remembered && !named) el.setAttribute("aria-label", [t(labelKeys[category]), t("dictNegRetry"), modelName].filter(Boolean).join(" · "));
+        // Ruling 2026-10-28: every learning block has its own heading, so the
+        // remembered button drops the category name and reads only "Not found
+        // last time · Try again" plus the model note -- one line in the
+        // reader's 480px popover. Its accessible name still says what it
+        // generates (category, retry, model). In the usage block, which holds
+        // two such buttons, the neutral note beside each names its category,
+        // so the two rows stay apart on screen too.
+        labels[category].textContent = remembered ? t("dictNegRetry") : t(labelKeys[category]);
+        if (remembered) el.setAttribute("aria-label", [t(labelKeys[category]), t("dictNegRetry"), model].filter(Boolean).join(" · "));
         else el.removeAttribute("aria-label");
         if (remembered) el.dataset.remembered = "true"; else delete el.dataset.remembered;
         // Retrieval and AI judgement read differently; both are neutral answers
         // with the info icon, never errors, and never claim the usage is absent.
         if (remembered && feedback.box.hidden) {
-          usageMessage(feedback, t(PBP_DICT_NEG_RETRIEVAL.includes(category) ? "dictSupplementNoSources" : "dictUsagePointsNone"), "neutral");
+          usageMessage(feedback, t(PBP_DICT_NEG_RETRIEVAL.includes(category) ? "dictSupplementNoSources" : PBP_DICT_NEG_NONE_KEYS[category]), "neutral");
           feedback.remembered = true;
         } else if (!remembered && feedback.remembered) {
           usageMessage(feedback, ""); feedback.remembered = false;

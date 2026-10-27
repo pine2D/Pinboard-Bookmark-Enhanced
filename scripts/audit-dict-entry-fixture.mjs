@@ -51,6 +51,8 @@ export async function installDictEntryFixture(page) {
       if (_pbpDictArchiveStore) await _pbpDictArchiveStore.close();
       const dbName = "dict-render-" + crypto.randomUUID();
       _pbpDictArchiveStore = pbpCreateDictArchiveStore({ dbName, readLegacy: async () => [] });
+      // A fresh archive holds no entry for the remembered paid state.
+      window._auditDictEntry.paidNegative = false;
       const store = _pbpDictArchiveStore, read = store.read;
       store.read = async input => {
         window._auditDictEntry.reads++;
@@ -139,6 +141,9 @@ export async function installDictEntryFixture(page) {
         throw new Error('SETUP: expected a reusable dictionary entry request without article or dictionary content');
       }
       const state = window._auditDictEntry;
+      // The entry's identity as the request named it: the remembered paid
+      // state keys its local memory by exactly this word and language pair.
+      state.lookup = { term: lookup.term, sourceLanguage: lookup.sourceLanguage, targetLanguage: lookup.targetLanguage };
       // The stream's phase reporter (plan 2.6): the progress state calls it
       // the way ai.js does, synchronously and with the phase alone.
       state.progress = opts.onProgress || null;
@@ -440,6 +445,75 @@ export async function openDictEntryState(page, state) {
     await page.evaluate(() => { window._auditDictEntry.examplesMiss = false; });
     if (await page.evaluate(() => window._auditDictEntry.calls) !== before) throw new Error('SETUP: free examples issued an AI request');
     return remembered.isVisible();
+  }
+  if (state === 'paid-negative') {
+    // Plan 3.3 with the ruling of 2026-10-28: a saved AI entry whose three
+    // paid learning actions this account last found nothing for. Each reads
+    // only "Not found last time · Try again" with the model note under its
+    // block heading and must stay one control-rung line. The AI key is seeded
+    // here (the free states before it remove it). The entry is generated once
+    // through the production path; the empty-result memory is written by the
+    // production writer for that entry's own word and language pair, which
+    // is what a real miss stores. A later locale only reruns the lookup.
+    const seeded = await page.evaluate(() => window._auditDictEntry.paidNegative === true);
+    if (!seeded) {
+      await armSettingsChange(page, ['aiProvider', 'openaiApiKey', 'previewAiEnabled']);
+      await page.evaluate(async () => {
+        await chrome.storage.local.remove(Object.keys(await chrome.storage.local.get(null)).filter(key => key.startsWith('pbpDictNeg:')));
+        await chrome.storage.local.set({ aiProvider: 'openai', openaiApiKey: obfuscateKey('render-fixture-key'), previewAiEnabled: true });
+        if (typeof _pbpExplainSettings === 'object' && _pbpExplainSettings) {
+          Object.assign(_pbpExplainSettings, { aiProvider: 'openai', openaiApiKey: 'render-fixture-key', previewAiEnabled: true });
+        }
+        window._auditDictEntry.cache.clear();
+        await window._auditDictEntry.resetArchive();
+        Object.assign(window._auditDictEntry, { fail: false, entered: false, release: null, lookup: null });
+      });
+      await settingsChangeSettled(page);
+      await rerunLookup(page);
+      await page.locator('.xp-dict-ai-generate:not([disabled])').waitFor();
+      await action.click();
+      await page.waitForFunction(() => window._auditDictEntry?.entered);
+      await page.evaluate(() => window._auditDictEntry.release());
+      await result.waitFor();
+      const written = await page.evaluate(async () => {
+        const lookup = window._auditDictEntry.lookup;
+        const owner = typeof pbpVocabCurrentOwner === 'function' ? await pbpVocabCurrentOwner() : '';
+        if (!lookup) return 'the generated entry left no request identity';
+        if (!_pbpDictNegOwner(owner)) return 'the fixture is not signed in, so nothing can be remembered';
+        for (const category of ['patterns', 'confusables', 'etymology']) {
+          const parts = { term: lookup.term, sourceLanguage: lookup.sourceLanguage, target: lookup.targetLanguage, category };
+          if (!(await pbpDictNegRecord(owner, parts)) || !(await pbpDictNegHas(owner, parts))) return 'the memory refused ' + category;
+        }
+        window._auditDictEntry.paidNegative = true;
+        return 'ok';
+      });
+      if (written !== 'ok') throw new Error('SETUP: ' + written);
+    }
+    const before = await page.evaluate(() => window._auditDictEntry.calls);
+    await rerunLookup(page);
+    const remembered = page.locator('[data-learning-block] .xp-dict-supplement-generate[data-remembered="true"]');
+    await page.waitForFunction(() => document.querySelectorAll('[data-learning-block] .xp-dict-supplement-generate[data-remembered="true"]').length === 3 &&
+      !document.querySelector('.xp-dict-ai[data-audit-settings-stale]'), null, { timeout: 10000 })
+      .catch(() => { throw new Error('SETUP: the lookup did not reopen on three remembered paid actions'); });
+    // The face is part of the state, not of the geometry: wandSparkles, the
+    // short retry text, the model note, and an accessible name that still
+    // says what would be generated. A wrong face is a broken state.
+    const face = await page.evaluate(() => {
+      const keys = { patterns: 'dictSupplementPatterns', confusables: 'dictSupplementConfusables', etymology: 'dictSupplementEtymology' };
+      return [...document.querySelectorAll('[data-learning-block] .xp-dict-supplement-generate[data-remembered="true"]')].map(el => {
+        const model = el.querySelector(':scope > .xp-dict-model')?.textContent || '';
+        const label = el.querySelector(':scope > .xp-dict-model')?.previousElementSibling?.textContent;
+        const icon = el.querySelector(':scope > svg')?.outerHTML.replace(/\s+/g, ' ');
+        const wand = new DOMParser().parseFromString(PBP_ICONS.wandSparkles, 'text/html').body.firstElementChild.outerHTML.replace(/\s+/g, ' ');
+        const aria = el.getAttribute('aria-label') || '';
+        const ok = icon === wand && label === t('dictNegRetry') && /^· \S/.test(model) && !/token/i.test(model) &&
+          aria.startsWith(t(keys[el.dataset.category]) + ' · ') && aria.includes(t('dictNegRetry')) && aria.endsWith(model.slice(2));
+        return ok ? '' : `${el.dataset.category}: label=${label} model=${model} aria=${aria}`;
+      }).filter(Boolean);
+    });
+    if (face.length) throw new Error('SETUP: a remembered paid action lost its face: ' + face.join('; '));
+    if (await page.evaluate(() => window._auditDictEntry.calls) !== before) throw new Error('SETUP: reopening the remembered state issued an AI request');
+    return remembered.first().isVisible();
   }
   if (state === 'legacy') {
     // Old literature, culture and topic collocations records stay readable

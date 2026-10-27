@@ -4456,6 +4456,15 @@ await (async () => {
           $id('vocab-ref').querySelectorAll('.xp-dict-ai-controls').length===1&&!slot.hidden&&getComputedStyle(slot).display!=="none");
         check("AI entry: the free examples block sits inside the AI part, after the dictionary results",!!host.querySelector('.xp-dict-ai > .xp-dict-examples')&&follows(slot,host.querySelector('.xp-dict-examples')));
       }
+      {
+        // Plan 3.3: the library's paid action is the same shape as the reader's.
+        const generate=$id('vocab-ref').querySelector('.xp-dict-ai-generate'),note=generate?.querySelector(':scope > .xp-dict-model');
+        check("AI entry: the library's generate is wandSparkles, its text and only the model name",generate?.querySelectorAll('svg').length===1&&
+          generate.firstElementChild?.outerHTML===new DOMParser().parseFromString(PBP_ICONS.wandSparkles,"text/html").body.firstElementChild.outerHTML&&
+          generate.children[1]?.textContent===t("dictEntryGenerate")&&!!t("dictEntryGenerate")&&note?.textContent==="· llama3.2"&&!/token/i.test(note.textContent)&&
+          generate.title===t("dictPaidActionHint")&&!!host.querySelector('.xp-dict-examples-find > svg')&&
+          host.querySelector('.xp-dict-examples-find > svg').outerHTML!==generate.firstElementChild.outerHTML&&!host.querySelector('.xp-dict-examples-find .xp-dict-model'));
+      }
       check("AI entry: obsolete matching, explanation and analysis actions are absent",!host.querySelector('.dict-assist-recommend,.dict-assist-explain,.dict-assist-analyze'));
       const choice=host.querySelector('.vocab-save-definition');choice.value="online:0";choice.dispatchEvent(new Event("change"));
       $id('vocab-ref').querySelector('.xp-dict-ai-generate').click();await settle();
