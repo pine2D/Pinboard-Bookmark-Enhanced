@@ -452,9 +452,30 @@ await test('a supplement whose every item leaks an internal term fails with inte
   existing();usageResponse(d=>{d.items=[usageItem('Fernweh haben','这个说法在 summary 里常被理解为一种渴望远行而又无法出发的心情。')];});
   return await rejectsReason(()=>pbpDictSupplementRun(request({...DE_ZH,category:'grammar'})),'invalid_response','internal_term')&&appended.length===0&&calls.length===1;
 });
-await test('a leaking summary fails the supplement because it is not an item that can be dropped',async()=>{
-  existing();usageResponse(d=>{d.summary='note：表达对远方的向往。';d.items=[usageItem('Fernweh haben','用来表达对远方的强烈向往，常见于口语和文学描写中。')];});
-  return await rejectsReason(()=>pbpDictSupplementRun(request({...DE_ZH,category:'grammar'})),'invalid_response','internal_term')&&appended.length===0;
+await test('a leaking summary is blanked and reported while both valid items are saved',async()=>{
+  existing();const leak='note：表达对远方的向往。';
+  usageResponse(d=>{d.summary=leak;d.items=[usageItem('Fernweh haben','用来表达对远方的强烈向往，常见于口语和文学描写中。'),
+    usageItem('Fernweh bekommen','表示突然产生想去远方的念头，多用于描写一时的心情。')];});
+  const drops=[];
+  const {value:r,warns}=await captureWarnings(()=>pbpDictSupplementRun({...request({...DE_ZH,category:'grammar'}),onDrop:error=>drops.push([error.code,error.reason])}));
+  return r.archiveSaved&&appended.length===1&&r.learning.summary===''&&r.learning.items.length===2&&!('omittedItems' in r.learning)&&
+    !r.content.includes('note')&&JSON.stringify(drops)==='[["invalid_response","supplement_summary_term"]]'&&
+    warns.some(w=>w.includes('supplement_summary_term'))&&!warns.some(w=>w.includes(leak))&&calls.length===1&&await (async()=>{
+      // The real archive validator and a stored round trip accept the empty summary.
+      const frame=document.createElement('iframe');frame.hidden=true;const ready=new Promise(resolve=>frame.onload=resolve);frame.src='fixtures/dict-normalization-archive.html';document.body.append(frame);
+      try{await ready;const api=frame.contentWindow,req=request();
+        // Clone into the archive's realm: its plain-object check is per realm.
+        if(!api._pbpDictArchiveSupplementLearning(api.structuredClone(r.learning),api.structuredClone({category:r.category,sources:r.sources})))return false;
+        const read=await api.roundTripNormalized({...ORIGINAL,term:req.term,sourceLanguage:req.sourceLanguage,target:req.target},r);
+        return read.supplements.length===1&&read.supplements[0].learning.summary===''&&read.supplements[0].learning.items.length===2;
+      }finally{frame.remove();}
+    })();
+});
+await test('a leaking summary with no valid item still fails and reports no summary drop',async()=>{
+  existing();usageResponse(d=>{d.summary='note：表达对远方的向往。';d.items=[usageItem('Fernweh haben','这个说法在 summary 里常被理解为一种渴望远行而又无法出发的心情。')];});
+  const drops=[];
+  return await rejectsReason(()=>pbpDictSupplementRun({...request({...DE_ZH,category:'grammar'}),onDrop:error=>drops.push(error.reason)}),'invalid_response','internal_term')&&
+    appended.length===0&&drops.length===0&&calls.length===1;
 });
 await test('a German-to-Chinese base entry drops only the sense that leaks a field word',async()=>{
   const original=callAI;callAI=async(settings,prompt,options)=>{await options.beforeRequest();calls.push({settings,prompt,options});

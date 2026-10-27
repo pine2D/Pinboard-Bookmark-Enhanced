@@ -779,7 +779,9 @@ function _pbpDictSupplementPrompt(request, category, profile, sources, entry) {
 function _pbpDictSupplementItemKey(item) {
   return JSON.stringify([item.kind || "", item.sense, item.title.normalize("NFC").trim().replace(/\s+/g, " "), item.sourceIndex]);
 }
-function pbpDictSupplementParse(response, request, category, sources, entry, replacesId = "") {
+// options.onDrop(error) hears about a leaking summary that was blanked, with a
+// fixed code/reason (the reader files it in the local failure ledger).
+function pbpDictSupplementParse(response, request, category, sources, entry, replacesId = "", options = {}) {
   const invalid = reason => { throw _pbpDictEntryError("invalid_response", "Incomplete or unverified learning content", reason); };
   const value = _pbpDictResponseJson(response, 24576, "supplement");
   if (typeof response !== "string" || response.length > 24576 ||
@@ -849,11 +851,20 @@ function pbpDictSupplementParse(response, request, category, sources, entry, rep
     }
   }
   if (!items.length) throw firstError;
-  // The summary is not an item that can be omitted and marked, so a leak there
-  // fails the whole supplement.
-  if (_pbpDictInternalTermLeak(value.summary, leakContext)) return invalid("internal_term");
+  // Q6=B extended to the summary: a leaking summary is blanked alone (the
+  // archive and the reader both accept an empty summary) while the valid items
+  // are kept. It is not an item, so omittedItems does not count it; the drop is
+  // logged with a fixed label and reported through onDrop for the ledger.
+  let summary = value.summary.trim();
+  if (_pbpDictInternalTermLeak(summary, leakContext)) {
+    summary = "";
+    const error = _pbpDictEntryError("invalid_response", "Incomplete or unverified learning content", "supplement_summary_term");
+    console.warn("[dict-entry] supplement summary dropped:", error.reason);
+    try { if (typeof options.onDrop === "function") options.onDrop(error); }
+    catch (reportError) { console.warn("[dict-entry] drop report failed:", reportError?.name); }
+  }
   const omittedItems = kept.length - items.length;
-  return { version: 2, language: request.target, summary: value.summary.trim(), items, replacesId,
+  return { version: 2, language: request.target, summary, items, replacesId,
     ...(omittedItems ? { omittedItems } : {}) };
 }
 async function pbpDictSupplementSave(input, supplement) {
@@ -902,7 +913,7 @@ async function _pbpDictSupplementGenerate(input, request, category, profile) {
   });
   await stage("checking");
   const generated = _pbpDictGeneratedResponse(response, "supplement", category);
-  const learning = pbpDictSupplementParse(generated, request, category, sources, record.entry, input.updateId || "");
+  const learning = pbpDictSupplementParse(generated, request, category, sources, record.entry, input.updateId || "", { onDrop: input.onDrop });
   await _pbpDictCheckExplanation([learning.summary, ...learning.items.flatMap(item => [item.explanation, item.translation])].filter(Boolean).join("\n\n"),
     request.target, JSON.parse(generated).language, request.sourceLanguage);
   await _pbpDictEntryGuard(request);

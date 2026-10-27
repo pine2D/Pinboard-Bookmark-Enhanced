@@ -1535,7 +1535,7 @@ const PBP_DICT_FAILURE_REASONS = Object.freeze(["response_size", "response_json"
   "entry_sources", "entry_legacy", "entry_unknown", "explanation_metadata", "explanation_script",
   "explanation_language", "supplement_fields", "supplement_item", "supplement_item_shape", "supplement_item_sense",
   "supplement_item_text", "supplement_source_index", "supplement_duplicate", "supplement_source", "supplement_quote",
-  "supplement_example", "supplement_size", "internal_term"]);
+  "supplement_example", "supplement_size", "supplement_summary_term", "internal_term"]);
 function _pbpDictFailureReason(error) {
   if (PBP_DICT_FAILURE_REASONS.includes(error?.reason)) return error.reason;
   const status = error?.status;
@@ -2195,6 +2195,9 @@ function _pbpDictEntryMount(host, opts) {
       let ledgerStage = "permission";
       const request = { ...input(controller.signal, current), category, topic: updating?.profile.topic ?? (explicitCategory ? "" : effectiveTopic()),
         updateId: updating?.id || "",
+        // A blanked leaking summary (Q6=B) is a partial failure of this paid
+        // answer: file its fixed code at the checking stage; the items save.
+        onDrop: error => { if (current()) _pbpDictLedgerFail(opts.owner, error, "checking", category); },
         onStage: stage => {
           if (!current()) return;
           if (PBP_DICT_LEDGER_STAGES.includes(stage)) ledgerStage = stage;

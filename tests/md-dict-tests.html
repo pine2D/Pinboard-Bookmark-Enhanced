@@ -2334,6 +2334,15 @@ async function runDictionaryEntryUiTests() {
           early.length===1&&early[0][0]==="ownerless"&&!!category&&JSON.stringify(early[0][1])===JSON.stringify({code:"invalid_response.supplement_item_text",stage:"preparing",category}));
         check("a supplement failure after a reported stage is filed at that stage",late.length===1&&late[0][1].stage==="checking"&&late[0][1].code==="wrong_language.explanation_script");
         check("ledger rows carry no lookup text",!JSON.stringify([early,late]).includes("Gift"));
+        // 1A.5: a leaking summary blanked from a saved supplement is one checking-stage row.
+        window.pbpDictSupplementRun=async input=>{input.onDrop(Object.assign(new Error("Gift"),{code:"invalid_response",reason:"supplement_summary_term"}));
+          return {...addition,id:'7'.repeat(64),category:input.category,profile:{...addition.profile,topic:input.topic}};};
+        // A fresh mount, so this success does not turn the shared form's action into "show".
+        const dropUi=mount();await dropUi.ui.ready;
+        dropUi.host.querySelector('.xp-dict-supplement-generate').click();await settle();
+        const summaryDrop=rows.splice(0),dropCategory=dropUi.host.querySelector('.xp-dict-supplement-kind').value;dropUi.ctrl.abort();
+        check("a blanked supplement summary files its fine code and category at the checking stage",
+          JSON.stringify(summaryDrop)===JSON.stringify([["ownerless",{code:"invalid_response.supplement_summary_term",stage:"checking",category:dropCategory}]]));
       } finally {window.pbpDictLedgerRecord=realLedger;window.pbpDictSupplementRun=realRun;}
     }
     await checkFailureDiagnostics("supplement generation", "pbpDictSupplementRun", ()=>submit.click(), "[dict-entry] usage generation failed:");
@@ -2399,6 +2408,10 @@ async function runDictionaryEntryUiTests() {
     const expectedMeanings=learningBase.entry.meanings.map(meaning=>'dictSupplementMeaning:'+meaning.definition);
     window.pbpDictEntryRead=async()=>structuredClone(learningBase);
     const meaningUi=mount();await meaningUi.ui.ready;
+    const emptySummaryText=meaningUi.host.querySelector('[data-supplement-id="'+learningAddition.id+'"] .xp-dict-supplement-text');
+    check("a supplement with an empty summary starts directly with its first item, with no blank paragraph",
+      !!emptySummaryText&&emptySummaryText.firstElementChild?.classList.contains('xp-dict-learning-item')&&
+      [...emptySummaryText.children].every(node=>node.classList.contains('xp-dict-learning-item'))&&emptySummaryText.firstChild===emptySummaryText.firstElementChild);
     check("supplements identify each original meaning across interleaved part-of-speech groups without ambiguous ordinals",
       JSON.stringify(meaningLabels(meaningUi.host))===JSON.stringify(expectedMeanings)&&!meaningUi.host.textContent.includes('dictSupplementSense:'));
     const replacementBase={...structuredClone(learningBase),archiveId:'f'.repeat(64),generatedAt:1700000001000,
