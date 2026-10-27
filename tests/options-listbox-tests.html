@@ -1519,8 +1519,13 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     try {
       assert(!btn.disabled, "Delete selected stayed disabled with 12 tags picked");
       btn.click();
-      const msgs = doc.querySelectorAll(".confirm-popover .confirm-msg");
-      const text = msgs[msgs.length - 1]?.textContent || "";
+      // Since the confirmation hierarchy redesign (8dc7582c) the question is
+      // .confirm-msg and the tag list is the popover's .confirm-subject.
+      const pops = doc.querySelectorAll(".confirm-popover");
+      const pop = pops[pops.length - 1];
+      assert(pop?.querySelector(".confirm-msg")?.textContent === enMessages.tagGovConfirmDelete.message,
+        "question line is not the bare delete question");
+      const text = pop?.querySelector(".confirm-subject")?.textContent || "";
       // The fixture's getMessage stub returns the raw message (no $COUNT$
       // substitution, same as the "$N$" in the question line), so the tail is
       // compared as such -- still distinct from the old hardcoded "+2 more".
@@ -1544,14 +1549,18 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     await win.confirmMergeGroup({ members: [
       { tag: "js", count: 2 }, { tag: "JS-lang", count: 1 }, { tag: "javascript", count: 5 },
     ] }, "javascript", anchor, "alice");
-    const msgs = doc.querySelectorAll(".confirm-popover .confirm-msg");
-    const text = msgs[msgs.length - 1]?.textContent || "";
+    // Since 8dc7582c the question is .confirm-msg on its own and the rename
+    // list and estimate are the .confirm-detail below it (pre-line).
+    const pops = doc.querySelectorAll(".confirm-popover");
+    const pop = pops[pops.length - 1];
+    const question = pop?.querySelector(".confirm-msg")?.textContent || "";
+    const detail = pop?.querySelector(".confirm-detail")?.textContent || "";
     try {
-      const lines = text.split("\n");
-      assert(lines.length >= 3, "expected question / rename list / estimate lines, got " + JSON.stringify(text));
+      const lines = [question, ...detail.split("\n")];
+      assert(lines.length >= 3, "expected question / rename list / estimate lines, got " + JSON.stringify(lines));
       assert(lines[0] === enMessages.tagGovConfirmMerge.message, "first line is not the bare question: " + JSON.stringify(lines[0]));
       assert(lines[1].includes("js -> javascript") && !/^[:：]/.test(lines[1].trim()), "rename list line: " + JSON.stringify(lines[1]));
-      assert(!/[?？]\s*[:：]/.test(text), "question mark still followed by a colon: " + JSON.stringify(text));
+      assert(!/[?？]\s*[:：]/.test(lines.join("\n")), "question mark still followed by a colon: " + JSON.stringify(lines));
     } finally {
       const no = doc.querySelectorAll(".confirm-popover .confirm-no");
       no[no.length - 1]?.click();

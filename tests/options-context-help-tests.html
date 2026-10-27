@@ -1004,13 +1004,17 @@ function test(name, fn) {
       assert(copy?.closest("details.disclosure"), key + " left its feature disclosure");
     });
     // Data Sync stopped being a disclosure (2026-10-15, the Data tab's only
-    // collapsible block); the Drive scope note stays the answer behind the
-    // Google Drive heading's own help toggle, with the plaintext disclosure.
-    ["vocabDriveScope", "vocabDriveDisclosure"].forEach((key) => {
+    // collapsible block); the per-device and plaintext notes stay the answer
+    // behind the Google Drive heading's own help toggle. What gets synced is
+    // a visible hint under that heading (1fdd7006 moved it out of the help).
+    ["vocabDriveConnectionHint", "vocabDriveDisclosure"].forEach((key) => {
       const copy = doc.querySelector(`[data-i18n="${key}"]`);
       assert(copy?.closest("details.context-help")?.parentElement?.querySelector("#sec-google-drive"),
         key + " left the Google Drive heading's help");
     });
+    const scope = doc.querySelector('[data-i18n="vocabDriveScope"]');
+    assert(scope && !scope.closest("details") && scope.parentElement?.querySelector("#sec-google-drive"),
+      "vocabDriveScope is not the visible hint under the Google Drive heading");
     const legacy = doc.querySelector('[data-i18n="batchRevokeHint"]');
     assert(legacy && !legacy.closest("details.context-help"), "conditional legacy guidance is hidden twice");
   });
