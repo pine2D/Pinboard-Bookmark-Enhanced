@@ -2285,6 +2285,16 @@ async function runDictionaryEntryUiTests() {
         section?.querySelector(':scope > summary')?.textContent==='dictSupplement'+category[0].toUpperCase()+category.slice(1)+' · dictSupplementLegacyCategory'&&
         !section.closest('[data-learning-block]')&&!section.open&&!section.querySelector('.xp-dict-update-supplement')&&!!section.querySelector('.xp-dict-retry-save')&&section.textContent.includes('Earlier paid guidance'));
       legacyUi.ctrl.abort();
+      // A saved old record with no topic: only the old-category rule can
+      // keep the update off (archiveSaved and topic gates both pass).
+      const savedOld={...old,archiveSaved:true};
+      window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[savedOld]});
+      const savedUi=mount();await savedUi.ui.ready;
+      const savedSection=savedUi.host.querySelector('[data-supplement-id]');
+      check("a saved old "+category+" supplement with no topic is labelled as an old category and offers no update",
+        savedSection?.querySelector(':scope > summary')?.textContent==='dictSupplement'+category[0].toUpperCase()+category.slice(1)+' · dictSupplementLegacyCategory'&&
+        !savedSection.closest('[data-learning-block]')&&!savedSection.querySelector('.xp-dict-update-supplement')&&!savedUi.host.querySelector('.xp-dict-update-supplement')&&savedSection.textContent.includes('Earlier paid guidance'));
+      savedUi.ctrl.abort();
     }
     const legacyAddition={id:'8'.repeat(64),category:'collocations',profile:{nativeLanguage:'',level:'',topic:'work'},content:'Earlier paid guidance',sources:[],provider:'fixture',model:'fixture-model',generatedAt:1700000000000,archiveSaved:true};
     window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[legacyAddition]});
