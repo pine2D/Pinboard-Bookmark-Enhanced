@@ -320,11 +320,26 @@ export async function openDictEntryState(page, state) {
     // with the old-category label and no update (plan 1B.7, 1C.3); reading
     // them needs no AI key and makes no request. Each fold is opened the way
     // a reader would, so its content is what the geometry checks measure.
+    // The fixture key is configured here (the free states before this one
+    // remove it, and the sweep seeds none when only free states run): without
+    // it no record offers an update at all, and the no-update guard below
+    // would pass on any code. Reading still issues no AI request.
+    // The empty-result memory an earlier state left (an etymology retrieval
+    // that found no source) is cleared too: this state is about old-category
+    // records, not about a remembered paid action.
     await page.evaluate(async () => {
+      await chrome.storage.local.remove(Object.keys(await chrome.storage.local.get(null)).filter(key => key.startsWith('pbpDictNeg:')));
+      await chrome.storage.local.set({ aiProvider: 'openai', openaiApiKey: obfuscateKey('render-fixture-key'), previewAiEnabled: true });
+      if (typeof _pbpExplainSettings === 'object' && _pbpExplainSettings) {
+        Object.assign(_pbpExplainSettings, { aiProvider: 'openai', openaiApiKey: 'render-fixture-key', previewAiEnabled: true });
+      }
       window._auditDictEntry.cache.clear();
       await window._auditDictEntry.resetArchive();
       Object.assign(window._auditDictEntry, { legacySeed: true, legacySeeded: false, legacySeedError: '' });
     });
+    // The open lookup reruns on the settings change; rerun once more so the
+    // checked view is the one built with the key.
+    await page.waitForTimeout(300);
     const before = await page.evaluate(() => window._auditDictEntry.calls);
     await rerunLookup(page);
     await page.waitForFunction(() => window._auditDictEntry.legacySeeded || window._auditDictEntry.legacySeedError);
@@ -343,7 +358,10 @@ export async function openDictEntryState(page, state) {
       labelled: ['literature', 'culture', 'collocations'].every(category =>
         document.querySelector(`.xp-dict-ai-details[data-supplement-category="${category}"] > summary`)?.textContent.endsWith(t('dictSupplementLegacyCategory'))),
       updates: document.querySelectorAll('.xp-dict-ai-details[data-supplement-category] .xp-dict-update-supplement').length,
+      // A paid action on screen proves the key reached this view.
+      paid: document.querySelectorAll('.xp-dict-supplement-generate:not([hidden])').length,
       calls: window._auditDictEntry.calls }));
+    if (!legacy.paid) throw new Error('SETUP: the legacy view has no configured AI key, so its no-update check cannot fail');
     if (!legacy.labelled) throw new Error('SETUP: an old-category record lost its old-category label');
     if (legacy.updates) throw new Error('SETUP: an old-category record offers an update');
     if (legacy.calls !== before) throw new Error('SETUP: reading old-category records issued an AI request');

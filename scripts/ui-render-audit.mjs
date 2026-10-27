@@ -9029,7 +9029,9 @@ async function runSweep(page, sw, extBase) {
     });
   };
   // The free examples states run without an AI key (plan 1C.2, 1C.4); their
-  // openers remove the key themselves when they run after the AI states.
+  // openers remove the key themselves when they run after the AI states. The
+  // legacy state's opener seeds the key itself, so its no-update check is
+  // live whether it runs alone or after the free states.
   if (Object.values(contexts).some(names => [...names].some(name => /^dict-entry-(?!(?:examples|negative|legacy)$)/.test(name)))) {
     await sw.evaluate(() => chrome.storage.local.set({ aiProvider: "openai", openaiApiKey: obfuscateKey("render-fixture-key"), previewAiEnabled: true, dictAiAutoGenerate: false, dictDefinitionLang: "zh-Hans" }));
   }
