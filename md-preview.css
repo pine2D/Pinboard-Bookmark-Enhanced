@@ -2494,6 +2494,11 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
 .xp-dict-usage-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }
 .xp-dict-usage-actions > :is(.xp-dict-update-entry, .xp-dict-update-supplement) { margin-top: 0; }
 .xp-dict-usage-feedback { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); flex: 1; min-width: 0; }
+/* The note of an action is the line below it (2026-10-28 ruling): a full-row
+   basis wraps it under the button instead of squeezing a column beside it.
+   While busy the button hides, so the phase line, seconds and cancel still
+   share the one row. */
+.xp-dict-usage-actions > .xp-dict-usage-feedback { flex: 1 1 100%; }
 .xp-dict-usage-status { flex: 1; min-width: 0; font-size: 12px; line-height: 18px; }
 /* Generation progress (plan 2.6): seconds waited, plain text beside the
    phase line, in fixed-width digits so the cancel beside it does not jitter. */

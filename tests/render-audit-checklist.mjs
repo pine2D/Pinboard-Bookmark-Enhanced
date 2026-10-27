@@ -706,6 +706,13 @@ export function evaluateMediaProbe(probe, check) {
 //                       the popover (dictLookupRoots).
 // library has no explain popover; its dictionary result is dict-entry-idle.
 //
+// dictActionNoteBelow (requires "notes"): in each learning action row, the
+// note beside a visible action -- the remembered "not found" line -- starts
+// on the line below that action (2026-10-28 ruling), never in a column next
+// to it: in a 480px popover a long locale squeezed such a column to a few
+// words a line, and in the usage block that note is what tells the two
+// same-looking buttons apart.
+//
 // dictScrollClip (requires "clip"): every lookup scroll container keeps its
 // content inside it (scrollWidth <= clientWidth), and every measured text
 // block's border box -- disclosure titles hang their hover fill outside the
@@ -725,6 +732,8 @@ export const DICT_LOOKUP_GEOMETRY = {
     { role: "original", selector: ".xp-dict-example:not(.xp-dict-example-translation)", token: "text" },
     { role: "translation", selector: ".xp-dict-example-translation", token: "secondary" },
   ],
+  // dictActionNoteBelow: the row of one learning action and its note.
+  notes: { row: ".xp-dict-usage-actions", note: ".xp-dict-usage-feedback" },
   surfaces: {
     "md-preview": {
       // .xp-dict is the lookup column; the whole popover (its foot holds the
@@ -741,7 +750,7 @@ export const DICT_LOOKUP_GEOMETRY = {
         // Free original-text examples: source sentences, never a translation.
         "dict-entry-examples": { requires: ["edges", "senseIndent", "original", "overflow", "clip"] },
         // A remembered empty result: the action and its neutral note, no sentence.
-        "dict-entry-negative": { requires: ["edges", "senseIndent", "overflow", "clip"] },
+        "dict-entry-negative": { requires: ["edges", "senseIndent", "overflow", "clip", "notes"] },
         // dictDefaultView "dictionary": the dictionary result with the saved
         // AI entry folded into its free reveal line, then opened in place.
         "dict-entry-folded": { requires: ["edges", "senseIndent", "overflow", "clip"] },
@@ -755,8 +764,9 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-save-change-menu": { requires: ["overflow"] },
         // A saved AI entry with its three paid learning actions in the
         // remembered "Not found last time · Try again" state (plan 3.3), run in
-        // each listed UI locale; controlRung holds each action to one line.
-        "dict-entry-paid-negative": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
+        // each listed UI locale; controlRung holds each action to one line,
+        // dictActionNoteBelow puts each note on the line below its action.
+        "dict-entry-paid-negative": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "notes"] },
         "dict-entry-panel": { root: "#reader-dict-view .xp-dict", overflowRoot: "#reader-dict-view",
           requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
       },
@@ -772,13 +782,13 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip"] },
         "dict-entry-examples": { requires: ["edges", "senseIndent", "original", "overflow", "clip"] },
-        "dict-entry-negative": { requires: ["edges", "senseIndent", "overflow", "clip"] },
+        "dict-entry-negative": { requires: ["edges", "senseIndent", "overflow", "clip", "notes"] },
         "dict-entry-folded": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-entry-revealed": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-legacy": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-save-bar": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-save-change-menu": { requires: ["overflow"] },
-        "dict-entry-paid-negative": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
+        "dict-entry-paid-negative": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "notes"] },
       },
     },
   },
@@ -794,6 +804,7 @@ export function dictLookupRoots(surface, context) {
 }
 
 // probe = { blocks: [{ role, left, path }], examples: [{ role, color, expected, path }],
+//           notes: [{ path, top, buttonBottom }],
 //           clip: { measured, offenders: [{ path, kind: "scroll" | "box", detail }] },
 //           viewports: [{ width, rootVisible, offenders: [{ path, left, right }] }] }
 // where `left` is the inline start of the block's first line of text, in px
@@ -848,6 +859,15 @@ export function evaluateDictLookupGeometry(probe, { surface, context }) {
     row(check, !wrong.length, wrong.length ? `${wrong.length}/${found.length} ${wrong[0].color} at ${wrong[0].path}` : `${found.length} ok`,
       `${spec.surfaces[surface].tokens[spec.examples.find((e) => e.role === role).token]} = ${found[0].expected}`);
   }
+
+  // Each action's note starts below the action, not beside it.
+  const notes = probe?.notes || [];
+  if (notes.length) {
+    const beside = notes.filter((n) => n.top < n.buttonBottom - tol);
+    row("dictActionNoteBelow", !beside.length,
+      beside.length ? `${beside.length}/${notes.length} beside the action, e.g. ${beside.slice(0, 3).map((n) => `${n.path} top ${round(n.top)} < ${round(n.buttonBottom)}`).join("; ")}` : `${notes.length} note(s) below`,
+      `note top >= action bottom (±${tol}px)`);
+  } else if (requires.has("notes")) setup("dictActionNoteBelow", "a learning action with its note");
 
   // Nothing inside the lookup sticks out of a scroller or a clipping box.
   const clip = probe?.clip;

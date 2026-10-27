@@ -2330,6 +2330,9 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-usage-actions > :is(.xp-dict-update-entry, .xp-dict-update-supplement),
 #vocab-ref-result .xp-dict-usage-feedback > .xp-dict-usage-status { margin: 0; }
 #vocab-ref-result .xp-dict-usage-feedback { flex: 1; }
+/* An action's note is the line below it (2026-10-28 ruling), never a column
+   beside it; while busy the button hides and the progress keeps one row. */
+#vocab-ref-result .xp-dict-usage-actions > .xp-dict-usage-feedback { flex: 1 1 100%; }
 #vocab-ref-result .xp-dict-usage-status { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 /* Generation progress (plan 2.6): seconds waited, plain text beside the
    phase line, in fixed-width digits so the cancel beside it does not jitter.

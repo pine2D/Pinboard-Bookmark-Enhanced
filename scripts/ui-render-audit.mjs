@@ -8970,6 +8970,17 @@ function probeDictLookupGeometry(cfg) {
       out.examples.push({ role, color: getComputedStyle(el).color, expected, path: pathOf(el) });
     }
   }
+  // dictActionNoteBelow: each learning action row with a visible action and
+  // a visible, non-empty note; the note's top against the action's bottom.
+  out.notes = [];
+  for (const rowEl of root.querySelectorAll(cfg.noteRow)) {
+    if (!visible(rowEl)) continue;
+    const note = [...rowEl.children].find((c) => c.matches(cfg.note) && visible(c) && /\S/.test(c.textContent));
+    const actions = [...rowEl.children].filter((c) => !c.matches(cfg.note) && visible(c));
+    if (!note || !actions.length) continue;
+    out.notes.push({ path: pathOf(note), top: note.getBoundingClientRect().top,
+      buttonBottom: Math.max(...actions.map((a) => a.getBoundingClientRect().bottom)) });
+  }
   return out;
 }
 function probeDictLookupOverflow(rootSel) {
@@ -9025,6 +9036,7 @@ async function measureDictLookupGeometry(page, surface, context, theme) {
   const { root, overflowRoot } = dictLookupRoots(surface, context);
   const probe = await page.evaluate(probeDictLookupGeometry, {
     root, overflowRoot, blocks: DICT_LOOKUP_GEOMETRY.blocks, examples: DICT_LOOKUP_GEOMETRY.examples, tokens: spec.tokens,
+    noteRow: DICT_LOOKUP_GEOMETRY.notes.row, note: DICT_LOOKUP_GEOMETRY.notes.note,
   });
   probe.viewports = [];
   const restore = page.viewportSize();

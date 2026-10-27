@@ -138,3 +138,22 @@ test('a context can name its own lookup root; the docked panel is measured in th
   assert.deepEqual(dictLookupRoots('md-preview', 'dict-entry-result'), { root: '#explain-pop .xp-dict', overflowRoot: '#explain-pop' });
   assert.throws(() => dictLookupRoots('md-preview', 'reader'));
 });
+
+test('action notes: a note beside its button (a narrow column) fails; the line below passes; none measured is SETUP', () => {
+  const blocks = [{ role: 'sense', left: 24 }];
+  const withNotes = (notes) => ({ ...probe(blocks), notes });
+  // The 2026-10-28 ruling: the remembered state's note is the line below the button.
+  const below = [{ path: 'a', buttonBottom: 126, top: 134 }, { path: 'b', buttonBottom: 180, top: 188 }];
+  for (const surface of ['md-preview', 'library']) {
+    for (const context of ['dict-entry-paid-negative', 'dict-entry-negative']) {
+      assert.equal(verdicts(withNotes(below), context, surface).dictActionNoteBelow, 'OK', `${surface}/${context}`);
+      // de in the reader before the fix: a 92px-wide note beside a 344px button.
+      assert.equal(verdicts(withNotes([...below, { path: 'c', buttonBottom: 226, top: 200 }]), context, surface).dictActionNoteBelow, 'FAIL', `${surface}/${context}`);
+      assert.equal(verdicts(withNotes([]), context, surface).dictActionNoteBelow, 'SETUP', `${surface}/${context}`);
+    }
+  }
+  // Within the edge tolerance is still below (sub-pixel rounding).
+  assert.equal(verdicts(withNotes([{ path: 'a', buttonBottom: 126.6, top: 126 }]), 'dict-entry-paid-negative').dictActionNoteBelow, 'OK');
+  // A context that renders no remembered note does not require the check.
+  assert.equal(verdicts(withNotes([]), 'dict-entry-result').dictActionNoteBelow, undefined);
+});
