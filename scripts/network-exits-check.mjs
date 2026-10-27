@@ -7,7 +7,7 @@
 //     shipping undisclosed.
 //  1b. Every language-derived Wikimedia evidence host (pbpDictEvidenceOrigin,
 //     evaluated, not text-scanned) shares its parent domain with a listed
-//     exit, and that representative exit is not flagged as stale.
+//     exit, and every exit of that family counts as mentioned (not stale).
 //  2. Every oracle exit host appears in docs/privacy.md.
 //  3. Every manifest static host is a listed exit.
 //  4. Every host in the AI provider registry (ai.js) is a disclosed exit —
@@ -90,7 +90,7 @@ for (const host of [...seen].sort()) {
 // pbpDictEvidenceOrigin (dict-evidence.js), over every supported language and
 // kind. The oracle lists one representative exit per derived family (the en
 // subdomain, see userConfiguredExits): every derived host needs an exit that
-// shares its parent domain, and that exit counts as mentioned below.
+// shares its parent domain, and each such exit counts as mentioned below.
 const derivedHosts = new Set();
 try {
   const src = readFileSync(join(ROOT, "dict-evidence.js"), "utf8");
@@ -112,11 +112,28 @@ try {
   fail(`derived evidence-origin structural check failed to run: ${e.message}`);
 }
 const parentDomain = (host) => host.slice(host.indexOf(".") + 1);
+// Every listed exit that shares a derived host's parent domain represents it,
+// not only the first one found: when the oracle lists several subdomains of
+// one family (say en. and de.wikisource.org), all of them are reached through
+// the template, so none of them may read as a stale row below.
+const representativesOf = (host, exitNames) =>
+  [...exitNames].filter((name) => parentDomain(name) === parentDomain(host));
+{
+  // Self-check, as for hostFromOrigin: no oracle lists two subdomains of one
+  // family today, so the multi-representative case is fixed here.
+  const fixtureExits = ["en.wikisource.org", "de.wikisource.org", "en.wiktionary.org", "api.openai.com"];
+  const got = new Set(["fr.wikisource.org", "ja.wiktionary.org"].flatMap((host) => representativesOf(host, fixtureExits)));
+  const expected = ["de.wikisource.org", "en.wikisource.org", "en.wiktionary.org"];
+  if ([...got].sort().join() !== expected.join()) {
+    fail(`internal error: derived-host representatives = ${[...got].sort().join()}, expected ${expected.join()} — every exit of a derived family must count as mentioned`);
+  }
+  if (representativesOf("fr.wikisource.org", ["api.openai.com"]).length) fail("internal error: an unrelated exit represented a derived host");
+}
 const representedBy = new Set();
 for (const host of derivedHosts) {
-  const exit = [...exits].find((name) => parentDomain(name) === parentDomain(host));
-  if (!exit) fail(`${host}: derived by pbpDictEvidenceOrigin but no exit in docs/network-exits.json shares its parent domain`);
-  else representedBy.add(exit);
+  const represented = representativesOf(host, exits);
+  if (!represented.length) fail(`${host}: derived by pbpDictEvidenceOrigin but no exit in docs/network-exits.json shares its parent domain`);
+  for (const exit of represented) representedBy.add(exit);
 }
 
 // Reverse direction: a classified host that no script mentions any more is a

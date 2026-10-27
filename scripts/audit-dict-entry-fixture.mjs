@@ -166,6 +166,48 @@ const USAGE_ACTION = '[data-learning-block="usage"] .xp-dict-supplement-generate
 const USAGE_ROW = '[data-learning-block="usage"] .xp-dict-usage-actions:has(> [data-category="confusables"])';
 const ENTRY_PROGRESS = '.xp-dict-ai > .xp-dict-usage-feedback[data-state="busy"]';
 
+// A state that changes AI settings has to let the lookup's own rerun on that
+// change land before it reruns the lookup again, or the settings rerun can
+// replace the view the state is checking. The readiness is observed, not
+// timed: armSettingsChange snapshots the given storage keys and marks the
+// open view; settingsChangeSettled then returns at once when the write left
+// those keys unchanged (Chrome fires no change event, so no rerun is coming),
+// and otherwise waits for the change event and for the marked view to be
+// replaced by the rerun's own view.
+async function armSettingsChange(page, keys) {
+  await page.evaluate(async keys => {
+    const before = await chrome.storage.local.get(keys);
+    const probe = { keys, before: JSON.stringify(keys.map(key => before[key])), events: 0 };
+    probe.listener = (changes, area) => { if (area === 'local' && keys.some(key => key in changes)) probe.events++; };
+    chrome.storage.onChanged.addListener(probe.listener);
+    for (const view of document.querySelectorAll('.xp-dict-ai')) view.dataset.auditSettingsStale = 'true';
+    window._auditDictEntry.settingsProbe = probe;
+  }, keys);
+}
+async function settingsChangeSettled(page) {
+  const changed = await page.evaluate(async () => {
+    const probe = window._auditDictEntry.settingsProbe;
+    const after = await chrome.storage.local.get(probe.keys);
+    return JSON.stringify(probe.keys.map(key => after[key])) !== probe.before;
+  });
+  try {
+    if (changed) {
+      await page.waitForFunction(() => window._auditDictEntry.settingsProbe.events > 0 &&
+        !document.querySelector('.xp-dict-ai[data-audit-settings-stale]') && !!document.querySelector('.xp-dict-ai'),
+        null, { timeout: 10000 });
+    }
+  } catch (error) {
+    throw new Error('SETUP: the settings change did not rerun the open lookup: ' + error.message);
+  } finally {
+    await page.evaluate(() => {
+      const probe = window._auditDictEntry.settingsProbe;
+      chrome.storage.onChanged.removeListener(probe.listener);
+      for (const view of document.querySelectorAll('.xp-dict-ai[data-audit-settings-stale]')) delete view.dataset.auditSettingsStale;
+      window._auditDictEntry.settingsProbe = null;
+    });
+  }
+}
+
 async function rerunLookup(page) {
   if (await page.locator('#vocab-lookup-go').count()) await page.locator('#vocab-lookup-go').click();
   else await page.locator('.xp-dict-query-tools > .xp-dict-lang').selectOption('en');
@@ -287,6 +329,7 @@ export async function openDictEntryState(page, state) {
   }
   if (state === 'examples') {
     // Free original-text examples (plan 1C.2): no AI key and no AI entry.
+    await armSettingsChange(page, ['openaiApiKey']);
     await page.evaluate(async () => {
       await chrome.storage.local.remove(['openaiApiKey']);
       if (typeof _pbpExplainSettings === 'object' && _pbpExplainSettings) delete _pbpExplainSettings.openaiApiKey;
@@ -295,7 +338,7 @@ export async function openDictEntryState(page, state) {
     });
     // The open lookup reruns on the settings change; rerun once more so the
     // checked view is the one built without a key.
-    await page.waitForTimeout(300);
+    await settingsChangeSettled(page);
     await rerunLookup(page);
     await page.locator('.xp-dict-ai-configure:not([hidden])').waitFor();
     const before = await page.evaluate(() => window._auditDictEntry.calls);
@@ -310,6 +353,7 @@ export async function openDictEntryState(page, state) {
     // Plan 1C.4: a real clean miss in a supported language writes the local
     // empty-result memory; the next lookup opens on "last time not found ·
     // retry" with the retrieval note. No AI key, no AI entry, no AI call.
+    await armSettingsChange(page, ['openaiApiKey']);
     await page.evaluate(async () => {
       await chrome.storage.local.remove(['openaiApiKey']);
       if (typeof _pbpExplainSettings === 'object' && _pbpExplainSettings) delete _pbpExplainSettings.openaiApiKey;
@@ -317,7 +361,7 @@ export async function openDictEntryState(page, state) {
       await window._auditDictEntry.resetArchive();
       window._auditDictEntry.examplesMiss = true;
     });
-    await page.waitForTimeout(300);
+    await settingsChangeSettled(page);
     await rerunLookup(page);
     await page.locator('.xp-dict-ai-configure:not([hidden])').waitFor();
     const before = await page.evaluate(() => window._auditDictEntry.calls);
@@ -354,6 +398,7 @@ export async function openDictEntryState(page, state) {
     // The empty-result memory an earlier state left (an etymology retrieval
     // that found no source) is cleared too: this state is about old-category
     // records, not about a remembered paid action.
+    await armSettingsChange(page, ['aiProvider', 'openaiApiKey', 'previewAiEnabled']);
     await page.evaluate(async () => {
       await chrome.storage.local.remove(Object.keys(await chrome.storage.local.get(null)).filter(key => key.startsWith('pbpDictNeg:')));
       await chrome.storage.local.set({ aiProvider: 'openai', openaiApiKey: obfuscateKey('render-fixture-key'), previewAiEnabled: true });
@@ -366,7 +411,7 @@ export async function openDictEntryState(page, state) {
     });
     // The open lookup reruns on the settings change; rerun once more so the
     // checked view is the one built with the key.
-    await page.waitForTimeout(300);
+    await settingsChangeSettled(page);
     const before = await page.evaluate(() => window._auditDictEntry.calls);
     await rerunLookup(page);
     await page.waitForFunction(() => window._auditDictEntry.legacySeeded || window._auditDictEntry.legacySeedError);
