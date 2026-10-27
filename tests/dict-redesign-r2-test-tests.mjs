@@ -185,6 +185,26 @@ test("only the product's own request for the active word and arm is admitted", (
   for (const [testCase, value, expected] of refused) assert.throws(() => authorizeRequest(plan, testCase, value), code(expected), JSON.stringify(value).slice(0, 160));
 });
 
+// Each body below is legal for its arm in every field except the prompt
+// opening, so only the opening check can refuse it: deleting
+// content.startsWith(OPENINGS[...]) from authorizeRequest turns this red.
+test("a legal payload under another arm's prompt opening is refused", () => {
+  const supplementOpening = "Create a concise language-learning supplement.", cardOpening = "Create one compact usage card for a language learner.";
+  const reopen = (value, opening) => ({ ...value, messages: [{ role: "user", content: opening + " Instructions.\n" + value.messages[0].content.split("\n").at(-1) }] });
+  const swapped = [
+    [caseOf("patterns"), reopen(patternsBody(), supplementOpening)],
+    [caseOf("confusables"), reopen(supplementBody("confusables"), cardOpening)],
+    [caseOf("etymology"), reopen(supplementBody("etymology"), cardOpening)],
+    [caseOf("entry"), reopen(entryBody(), supplementOpening)]
+  ];
+  for (const [testCase, value] of swapped) {
+    assert.throws(() => authorizeRequest(plan, testCase, value), code("unauthorized_payload"), testCase.arm);
+    // The same payload under its own opening is admitted, so the refusal above is the opening's alone.
+    const own = testCase.arm === "patterns" ? cardOpening : testCase.arm === "entry" ? "Create a concise reusable dictionary entry for a language learner." : supplementOpening;
+    assert.equal(authorizeRequest(plan, testCase, reopen(value, own)).tokens, 8192, testCase.arm);
+  }
+});
+
 test("Wiktionary reads are the word language's exact API path only", () => {
   const charge = WORDS.find(word => word.id === "charge"), davat = WORDS.find(word => word.id === "davat");
   assert.equal(wikimediaAllowed("https://en.wiktionary.org/w/api.php?action=parse&page=charge&format=json", charge), true);

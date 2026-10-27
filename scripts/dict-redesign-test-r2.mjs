@@ -51,7 +51,7 @@ export const SELECTORS = Object.freeze({
   content: ".xp-dict-ai-content", senses: ".xp-dict-senses > li", entryGenerate: ".xp-dict-ai-generate",
   block: "[data-learning-block]", generate: ".xp-dict-supplement-generate", section: "[data-supplement-category]",
   text: ".xp-dict-supplement-text", actions: ".xp-dict-usage-actions", feedback: ".xp-dict-usage-feedback",
-  errors: ".xp-dict-ai-status, .xp-dict-action-error"
+  errors: ".xp-dict-ai-status, .xp-dict-action-error", status: ".xp-dict-ai-status", stop: ".xp-dict-ai-stop"
 });
 // Each product prompt's opening, so a message can be tied to its arm.
 const OPENINGS = Object.freeze({ entry: "Create a concise reusable dictionary entry", patterns: "Create one compact usage card",
@@ -78,7 +78,12 @@ export const LIMITS = Object.freeze({ outputTokens: 8192, inputBytes: 24576, fra
 // Neutral answers: the model said there is nothing useful to add.
 export const NEUTRAL = Object.freeze(["unsupported_usage"]);
 // Harness states: test-tool failures, not product behaviour.
-export const HARNESS = Object.freeze(["control_missing", "stale", "entry_unavailable", "target_preflight_failed", "owner_changed", "interrupted", "browser_case_failed"]);
+// click_ignored: the click never started the action (a guard returned without
+// a busy state); click_rejected: the product refused it with its own error or
+// neutral line before calling the run function (permission denied, say).
+// Neither sent a request, and neither waits out the long per-case timeout.
+export const HARNESS = Object.freeze(["control_missing", "stale", "entry_unavailable", "target_preflight_failed", "owner_changed", "interrupted",
+  "browser_case_failed", "click_ignored", "click_rejected"]);
 // Bridge errors that halt the whole ledger, and those that stop one model.
 const HALT_LEDGER = Object.freeze(["unauthorized_payload", "credential_routing_failed", "request_shape", "request_bounds", "ledger_invalid",
   "cost_limit_total", "usage_exceeds_reservation", "product_changed", "driver_changed"]);
@@ -321,7 +326,7 @@ function acquireLock(path) {
 }
 
 async function runModel(ctx, model) {
-  const { plan, ledger, save, dispatch, wikimedia, key, outDir, verifyCode } = ctx;
+  const { plan, ledger, save, dispatch, wikimedia, key, outDir, verifyCode, rehearsal = {} } = ctx;
   const row = ledger.models[model.id];
   const cases = plannedCases(plan).filter(item => item.model === model.id && !row.cases[item.caseId]);
   if (!cases.length || ledger.halted || row.halted) return;
@@ -409,7 +414,7 @@ async function runModel(ctx, model) {
           finally { r2State.actionPending--; }
         };
         pbpDictEntryRun = wrap(pbpDictEntryRun); pbpDictSupplementRun = wrap(pbpDictSupplementRun);
-      }, { allowed: [new URL(plan.endpoint).origin, ...plan.words.map(wiktionaryOrigin)] });
+      }, { allowed: [new URL(plan.endpoint).origin, ...plan.words.map(wiktionaryOrigin)].filter(origin => !(rehearsal.deny || []).includes(origin)) });
       verifyCode();
       const preflight = await page.evaluate(async () => {
         const owner = await pbpVocabCurrentOwner();
@@ -430,7 +435,7 @@ async function runModel(ctx, model) {
         const started = performance.now();
         let result;
         try {
-          result = await runCase(page, word, testCase.arm);
+          result = await runCase(page, word, testCase.arm, (rehearsal.swallow || []).includes(testCase.arm));
           await Promise.allSettled([...pending]);
         } catch (error) {
           // The click is over for this run: record it so a resume never re-sends it.
@@ -460,8 +465,12 @@ async function runModel(ctx, model) {
 
 // Mount the production entry panel, click the arm's control exactly as a user
 // does, wait for the product to settle, then read the archive and the DOM.
-async function runCase(page, word, arm) {
-  const mounted = await page.evaluate(async ({ word, arm, owner, sel, block }) => {
+// A click the product refuses before calling the run function ends the wait
+// at once: it never started (no busy state right after the click) or it
+// showed its own error/neutral line with no run call. swallow (offline
+// rehearsal only) detaches the button's listeners to stand in for a guard.
+async function runCase(page, word, arm, swallow = false) {
+  const mounted = await page.evaluate(async ({ word, arm, owner, sel, block, swallow }) => {
     // The same settings object the library hands the panel (library-vocab.js).
     const settings = deobfuscateSettings(await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS));
     if (await pbpVocabCurrentOwner() !== owner) return { error: "owner_changed" };
@@ -482,16 +491,29 @@ async function runCase(page, word, arm) {
     for (let tries = 0; tries < 50 && !(control() && !control().hidden && !control().disabled && control().checkVisibility()); tries++) {
       await new Promise(done => setTimeout(done, 100));
     }
-    const button = control();
+    let button = control();
     if (!button || button.hidden || button.disabled || !button.checkVisibility()) return { error: "control_missing" };
+    if (swallow) { const inert = button.cloneNode(true); button.replaceWith(inert); button = inert; }
     Object.assign(r2State, { calls: 0, pending: 0, actions: 0, actionPending: 0, error: "", reason: "" });
+    // The feedback line beside a supplement button, or the entry status line:
+    // where the product reports a click it refused.
+    const feedbackOf = () => arm === "entry" ? host.querySelector(sel.status) : button.closest(sel.actions)?.querySelector(sel.feedback);
     button.click();
+    // Both click handlers show their busy state before their first await.
+    const started = r2State.actions > 0 || (arm === "entry" ? !host.querySelector(sel.stop)?.hidden : feedbackOf()?.dataset.state === "busy");
+    if (!started) return { error: "click_ignored" };
+    window.r2Refused = () => {
+      const line = feedbackOf();
+      return r2State.actions === 0 && !!line && !line.hidden && ["error", "neutral"].includes(line.dataset.state) ? line.dataset.state : "";
+    };
     return { clicked: true };
-  }, { word, arm, owner: OWNER, sel: SELECTORS, block: BLOCK_OF[arm] || "" });
+  }, { word, arm, owner: OWNER, sel: SELECTORS, block: BLOCK_OF[arm] || "", swallow });
   if (!mounted.clicked) return { ok: false, error: mounted.error || "control_missing" };
-  await page.waitForFunction(() => (r2State.actions > 0 || r2State.error) && r2State.actionPending === 0 && r2State.pending === 0,
+  await page.waitForFunction(() => ((r2State.actions > 0 || r2State.error) && r2State.actionPending === 0 && r2State.pending === 0) || !!r2Refused(),
     null, { timeout: LIMITS.timeoutMs * LIMITS.httpPerCase + 30000, polling: 250 });
   return page.evaluate(async ({ arm, sel, block }) => {
+    const refused = r2Refused();
+    if (refused) return { ok: false, error: "click_rejected", feedback: refused, calls: r2State.calls };
     await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
     const host = r2Host, record = await pbpDictArchiveRead(r2Request);
     const visible = node => !!node && node.checkVisibility({ checkVisibilityCSS: true }) && node.getBoundingClientRect().height > 0;
@@ -519,7 +541,7 @@ async function runCase(page, word, arm) {
   }, { arm, sel: SELECTORS, block: BLOCK_OF[arm] || "" }).catch(() => ({ ok: false, error: "browser_case_failed" }));
 }
 
-async function runPlan(plan, { outDir, key, dispatch, wikimedia, approvedModels, fingerprints }) {
+async function runPlan(plan, { outDir, key, dispatch, wikimedia, approvedModels, fingerprints, rehearsal }) {
   mkdirSync(outDir, { recursive: true, mode: 0o700 });
   const ledgerPath = resolve(outDir, "ledger.json");
   const ledger = existsSync(ledgerPath) ? validateLedger(plan, JSON.parse(readFileSync(ledgerPath, "utf8"))) : newLedger(plan);
@@ -531,7 +553,7 @@ async function runPlan(plan, { outDir, key, dispatch, wikimedia, approvedModels,
     if (changed) { ledger.halted ||= changed; save(); fail(changed); }
   };
   for (const model of plan.models.filter(item => approvedModels.includes(item.id))) {
-    await runModel({ plan, ledger, save, dispatch, wikimedia, key, outDir, verifyCode }, model);
+    await runModel({ plan, ledger, save, dispatch, wikimedia, key, outDir, verifyCode, rehearsal }, model);
     if (ledger.halted) break;
   }
   const report = summarize(plan, ledger);
@@ -558,8 +580,11 @@ export async function main(argv = process.argv.slice(2), inject = {}) {
     const dispatch = async (_url, options) => new Response(JSON.stringify(responseFor(JSON.parse(options.body))),
       { status: 200, headers: { "Content-Type": "application/json" } });
     const wikimedia = async url => new Response(JSON.stringify(wikimediaResponse(url)), { status: 200, headers: { "Content-Type": "application/json" } });
+    // inject.rehearsal (offline only): { deny: origins the permission stub
+    // refuses, swallow: arms whose click the product ignores }.
+    const rehearsal = inject.rehearsal || {};
     const { ledger, report } = await runPlan(plan, { outDir, key: "synthetic-rehearsal-key", dispatch, wikimedia,
-      approvedModels: plan.models.map(model => model.id), fingerprints });
+      approvedModels: plan.models.map(model => model.id), fingerprints, rehearsal });
     const ok = plannedCases(plan).every(item => ledger.models[item.model].cases[item.caseId]?.outcome === "success");
     print({ rehearsal: true, liveRequests: 0, productPinned: current.product === PRODUCT_FINGERPRINT, outDir, ok, report, ledger });
     if (!ok) process.exitCode = 1;

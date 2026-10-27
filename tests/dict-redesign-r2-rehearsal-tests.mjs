@@ -83,5 +83,22 @@ const etymology = JSON.parse(fs.readFileSync(join(report.outDir, "content", "reh
 assert.deepEqual(etymology.content.learning.items.map(item => item.kind), ["formation"]);
 assert.deepEqual(etymology.content.sources, []);
 results++;
+// A click the product refuses before its run function is a harness result,
+// recorded at once instead of waiting out the per-case timeout: the
+// Wiktionary grant is denied (etymology shows its own error line) and the
+// confusables click is swallowed (no busy state, as a guard that returns).
+const refusedRun = await capture(["--rehearse"], { rehearsal: { deny: ["https://en.wiktionary.org"], swallow: ["confusables"] } });
+process.exitCode = 0;
+assert.equal(refusedRun.error, undefined, refusedRun.error);
+const refused = JSON.parse(refusedRun.output.slice(refusedRun.output.indexOf("{\n")));
+assert.equal(refused.liveRequests, 0); assert.equal(refused.ok, false);
+const refusedRow = refused.ledger.models["rehearsal/model-a"], refusedCase = arm => refusedRow.cases["rehearsal/model-a:charge:" + arm];
+assert.deepEqual(refusedRow.attempts.map(item => item.caseId.split(":").at(-1)), ["entry", "patterns"]);
+assert.equal(refusedCase("entry").outcome, "success"); assert.equal(refusedCase("patterns").outcome, "success");
+assert.deepEqual([refusedCase("confusables").outcome, refusedCase("confusables").code], ["harness", "click_ignored"]);
+assert.deepEqual([refusedCase("etymology").outcome, refusedCase("etymology").code, refusedCase("etymology").feedback], ["harness", "click_rejected", "error"]);
+assert.equal(refusedCase("etymology").wikimediaRequests, 0);
+for (const arm of ["confusables", "etymology"]) assert.ok(refusedCase(arm).wallMs < 30000, arm + " waited " + refusedCase(arm).wallMs + " ms");
+results++;
 assert.equal(secretAttempts, 0); assert.equal(networkAttempts, 0);
 write(JSON.stringify({ offlineRehearsal: results + "/" + results + " passed", secretAttempts, networkAttempts, outDir: report.outDir }) + "\n");
