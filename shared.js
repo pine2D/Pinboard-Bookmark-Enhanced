@@ -983,7 +983,12 @@ const PBP_RECLAIM_CATEGORIES = {
   jina: { keys: [], prefixes: ["jina_md_"] },                       // Jina page extract cache (usually the largest)
   urls: { keys: ["cached_existing_urls"], prefixes: [] },           // legacy bookmark URL set residue
   tags: { keys: ["cached_user_tags"], prefixes: ["cached_suggest_"] }, // tag autocomplete caches
-  misc: { keys: ["pbp_ai_usage", "pbpThinkReject", "pbpAiParamFix"], prefixes: [] }, // AI usage counter + think-reject memo + param-fix memo (archive log/dedup map stay with the archive panel's own owner-scoped Clear button)
+  // AI usage counter + think-reject memo + param-fix memo, plus the dictionary's
+  // per-owner local failure ledger (md-dict.js) and its empty-result memory
+  // (pbpDictNeg:, batch 1C). Both are local-only diagnostics/memos: outside
+  // SETTINGS_DEFAULTS, backups and Drive. The archive log/dedup map stay with
+  // the archive panel's own owner-scoped Clear button.
+  misc: { keys: ["pbp_ai_usage", "pbpThinkReject", "pbpAiParamFix"], prefixes: ["pbpDictFailures:", "pbpDictNeg:"] },
 };
 
 // Second line of defense (belt-and-suspenders): even if a caller passes a bogus

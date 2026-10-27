@@ -754,7 +754,7 @@
     "message": "Cache des tags"
   },
   "storageCatMisc": {
-    "message": "Usage de l'IA et notes de compatibilité"
+    "message": "Usage de l'IA, notes de compatibilité et du dictionnaire"
   },
   "storageReclaimable": {
     "message": "La sélection libère $AMOUNT$",

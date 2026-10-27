@@ -1,0 +1,212 @@
+<!doctype html><html><head><meta charset="UTF-8"><title>dict-ledger Tests</title>
+<style>body{font-family:monospace;padding:16px}.pass{color:green}.fail{color:red}.case{white-space:pre-wrap;padding:4px}</style></head>
+<body><h1>Local dictionary failure ledger</h1><div id="summary"></div><div id="results"></div>
+<script>
+// chrome.storage.local stand-in: hooks run between the read and the write so a
+// test can interleave a second writer or an account switch exactly there.
+let store = {}, afterGet = null, getFailure = null, setFailure = null;
+globalThis.chrome = { storage: { local: {
+  get: async key => {
+    if (getFailure) throw getFailure;
+    const value = store[key] === undefined ? {} : { [key]: structuredClone(store[key]) };
+    if (afterGet) await afterGet();
+    return value;
+  },
+  set: async items => { if (setFailure) throw setFailure; for (const [key, value] of Object.entries(items)) store[key] = structuredClone(value); }
+} } };
+</script>
+<!-- Same order as md-preview.html / library.html. -->
+<script src="../shared.js"></script><script src="../vocab-store.js"></script><script src="../dict-archive.js"></script>
+<script src="../dict-entry.js"></script><script src="../md-dict.js"></script>
+<script>
+let owner = "acct_alice";
+globalThis.pbpVocabCurrentOwner = async () => owner;
+let pass = 0, fail = 0;
+const root = document.getElementById("results");
+async function test(name, fn) {
+  let ok = false, detail = "";
+  try { ok = await fn(); } catch (e) { detail = e.name + ": " + e.message; }
+  ok ? pass++ : fail++;
+  const el = document.createElement("div"); el.className = "case " + (ok ? "pass" : "fail");
+  el.textContent = (ok ? "PASS " : "FAIL ") + name + (detail ? " " + detail : ""); root.append(el);
+}
+function reset() { store = {}; afterGet = null; getFailure = null; setFailure = null; owner = "acct_alice"; }
+const ledgerKeys = () => Object.keys(store).filter(key => key.startsWith("pbpDictFailures:"));
+const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+const failure = { code: "invalid_response.entry_meaning", stage: "generating", category: "entry" };
+(async () => {
+await test("a stored row has exactly the keys code, stage, category and at", async () => {
+  reset();
+  const ok = await pbpDictLedgerRecord("acct_alice", { ...failure, term: "Bank", content: "x", reason: "entry_meaning" });
+  const rows = await pbpDictLedgerRead("acct_alice");
+  return ok === true && rows.length === 1 && JSON.stringify(Object.keys(rows[0]).sort()) === '["at","category","code","stage"]' &&
+    rows[0].code === "invalid_response.entry_meaning" && rows[0].stage === "generating" && rows[0].category === "entry" &&
+    Number.isSafeInteger(rows[0].at) && Math.abs(rows[0].at - Date.now()) < 5000;
+});
+await test("the serialized ledger contains neither the term, the error text nor the plaintext username", async () => {
+  reset(); owner = "acct_alice%40example";
+  const error = Object.assign(new Error("Bank failed: Bank"), { code: "invalid_response", reason: "Bank", term: "Bank", detail: "Bank" });
+  await pbpDictLedgerRecord(owner, { code: pbpDictLedgerCode(error), stage: "generating", category: "entry", term: "Bank" });
+  const text = JSON.stringify(store);
+  return ledgerKeys().length === 1 && /^pbpDictFailures:[0-9a-f]{64}$/.test(ledgerKeys()[0]) &&
+    !text.includes("Bank") && !text.toLowerCase().includes("alice") && text.includes('"code":"invalid_response"');
+});
+await test("the ledger key is the raw UTF-8 SHA-256 of the owner, as in ask-archive.js", async () => {
+  reset(); await pbpDictLedgerRecord("acct_alice", failure);
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("acct_alice"));
+  const hex = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+  return ledgerKeys()[0] === "pbpDictFailures:" + hex;
+});
+await test("two owners never see each other's rows", async () => {
+  reset();
+  await pbpDictLedgerRecord("acct_alice", failure);
+  owner = "acct_bob"; await pbpDictLedgerRecord("acct_bob", { code: "network", stage: "sources", category: "etymology" });
+  const alice = await pbpDictLedgerRead("acct_alice"), bob = await pbpDictLedgerRead("acct_bob");
+  return ledgerKeys().length === 2 && alice.length === 1 && alice[0].code === failure.code &&
+    bob.length === 1 && bob[0].code === "network" && bob[0].category === "etymology";
+});
+await test("signed-out, empty and unknown owners write nothing", async () => {
+  reset();
+  const results = [];
+  for (const value of ["ownerless", "", null, undefined, 42, "alice"]) { owner = value; results.push(await pbpDictLedgerRecord(value, failure)); }
+  const realOwner = globalThis.pbpVocabCurrentOwner; globalThis.pbpVocabCurrentOwner = undefined;
+  try { owner = "acct_alice"; results.push(await pbpDictLedgerRecord("acct_alice", failure)); }
+  finally { globalThis.pbpVocabCurrentOwner = realOwner; }
+  return results.every(value => value === false) && Object.keys(store).length === 0 &&
+    (await pbpDictLedgerRead("ownerless")).length === 0;
+});
+await test("the 201st row pushes out the oldest", async () => {
+  reset(); await pbpDictLedgerRecord("acct_alice", failure);
+  const key = ledgerKeys()[0];
+  store[key] = Array.from({ length: 200 }, (_, i) => ({ code: "network", stage: "generating", category: "entry", at: i + 1 }));
+  await pbpDictLedgerRecord("acct_alice", { code: "request_timeout", stage: "generating", category: "entry" });
+  const rows = store[key];
+  return rows.length === 200 && rows[0].at === 2 && rows[199].code === "request_timeout" && PBP_DICT_LEDGER_CAP === 200;
+});
+await test("two concurrent writes both land under the Web Lock", async () => {
+  reset(); afterGet = tick;
+  const results = await Promise.all([pbpDictLedgerRecord("acct_alice", failure), pbpDictLedgerRecord("acct_alice", { code: "network", stage: "sources", category: "etymology" })]);
+  const rows = await pbpDictLedgerRead("acct_alice");
+  return !!navigator.locks && results.every(Boolean) && rows.length === 2 && rows.some(row => row.code === "network") && rows.some(row => row.code === failure.code);
+});
+await test("without navigator.locks the in-page queue still keeps both concurrent writes", async () => {
+  reset(); afterGet = tick;
+  Object.defineProperty(navigator, "locks", { value: undefined, configurable: true });
+  try {
+    await Promise.all([pbpDictLedgerRecord("acct_alice", failure), pbpDictLedgerRecord("acct_alice", { code: "network", stage: "sources", category: "etymology" }),
+      pbpDictLedgerRecord("acct_alice", { code: "request_timeout", stage: "generating", category: "entry" })]);
+  } finally { delete navigator.locks; }
+  return !!navigator.locks && (await pbpDictLedgerRead("acct_alice")).length === 3;
+});
+await test("an account switch before or during the write discards the row", async () => {
+  reset();
+  owner = "acct_bob";
+  const before = await pbpDictLedgerRecord("acct_alice", failure);
+  owner = "acct_alice"; afterGet = async () => { owner = "acct_bob"; };
+  const during = await pbpDictLedgerRecord("acct_alice", failure);
+  owner = "acct_alice"; afterGet = null;
+  return before === false && during === false && Object.keys(store).length === 0;
+});
+await test("registry: the ledger and empty-result prefixes are reclaimable, never settings or never-clear keys", async () => {
+  const prefixes = ["pbpDictFailures:", "pbpDictNeg:"];
+  const reclaim = Object.values(PBP_RECLAIM_CATEGORIES).flatMap(def => def.prefixes);
+  const sample = prefix => prefix + "0".repeat(64);
+  return prefixes.every(prefix => reclaim.includes(prefix)) &&
+    prefixes.every(prefix => !Object.keys(SETTINGS_DEFAULTS).some(key => key.startsWith(prefix)) && !pbpIsNeverClearKey(sample(prefix))) &&
+    prefixes.every(prefix => Object.keys(PBP_RECLAIM_CATEGORIES).some(cat => pbpKeyMatchesCategory(sample(prefix), PBP_RECLAIM_CATEGORIES[cat]))) &&
+    PBP_DICT_LEDGER_PREFIX === "pbpDictFailures:";
+});
+await test("the options storage panel can reclaim a stored ledger", async () => {
+  reset(); await pbpDictLedgerRecord("acct_alice", failure);
+  const key = ledgerKeys()[0];
+  const measured = await (async () => {
+    const original = chrome.storage.local;
+    chrome.storage.local = { ...original, get: async key => key === null ? structuredClone(store) : original.get(key) };
+    try { return await pbpMeasureLocalStorage(); } finally { chrome.storage.local = original; }
+  })();
+  return measured.misc.keys.includes(key);
+});
+await test("every whitelisted code is stored verbatim; anything else is filed as request_failed", async () => {
+  reset();
+  const codes = [...PBP_DICT_LEDGER_CODES];
+  for (const code of codes) await pbpDictLedgerRecord("acct_alice", { code, stage: "generating", category: "entry" });
+  const stored = store[ledgerKeys()[0]].map(row => row.code);
+  const kept = codes.slice(-PBP_DICT_LEDGER_CAP).every((code, i) => stored[i] === code);
+  store = {};
+  const bogus = ["Bank", "invalid_response.Bank", "wrong_language.entry_meaning", "request_failed.http_418", "", null, 7, "__proto__"];
+  for (const code of bogus) await pbpDictLedgerRecord("acct_alice", { code, stage: "generating", category: "entry" });
+  const filed = store[ledgerKeys()[0]].map(row => row.code);
+  return codes.length > 40 && kept && filed.length === bogus.length && filed.every(code => code === "request_failed");
+});
+await test("errors map to fine codes only through the fixed code-detail pairs", async () => {
+  const map = properties => pbpDictLedgerCode(Object.assign(new Error("Bank"), properties));
+  const cases = [
+    [{ code: "invalid_response", reason: "entry_meaning" }, "invalid_response.entry_meaning"],
+    [{ code: "invalid_response", reason: "internal_term" }, "invalid_response.internal_term"],
+    [{ code: "invalid_response", reason: "supplement_item_text" }, "invalid_response.supplement_item_text"],
+    [{ code: "wrong_language", reason: "explanation_script" }, "wrong_language.explanation_script"],
+    [{ code: "invalid_response", reason: "Bank" }, "invalid_response"],
+    [{ code: "wrong_language", reason: "entry_meaning" }, "wrong_language"],
+    [{ status: 503 }, "request_failed.http_503"],
+    [{ status: 524 }, "request_failed.http_524"],
+    [{ status: 418 }, "request_failed"],
+    [{ code: "model_not_found", status: 404 }, "model_not_found"],
+    [{ name: "TimeoutError" }, "request_timeout"],
+    [{ code: "Bank", status: 402 }, "request_failed.http_402"],
+    [{ code: "settings_failed" }, "settings_failed"],
+    [{ code: "host_permission" }, "host_permission"],
+    [{}, "request_failed"]
+  ];
+  return cases.every(([properties, expected]) => map(properties) === expected) && pbpDictLedgerCode(null) === "request_failed";
+});
+await test("stage and category accept only the fixed vocabularies", async () => {
+  reset();
+  await pbpDictLedgerRecord("acct_alice", { code: "network", stage: "Bank", category: "Bank" });
+  for (const stage of PBP_DICT_LEDGER_STAGES) await pbpDictLedgerRecord("acct_alice", { code: "network", stage, category: "etymology" });
+  for (const category of ["entry", ...PBP_DICT_ARCHIVE_CATEGORIES]) await pbpDictLedgerRecord("acct_alice", { code: "network", stage: "init", category });
+  const rows = await pbpDictLedgerRead("acct_alice");
+  return rows[0].stage === "" && rows[0].category === "" &&
+    PBP_DICT_LEDGER_STAGES.every((stage, i) => rows[1 + i].stage === stage) &&
+    ["entry", ...PBP_DICT_ARCHIVE_CATEGORIES].every((category, i) => rows[1 + PBP_DICT_LEDGER_STAGES.length + i].category === category);
+});
+await test("a storage failure resolves false and warns with the error name only", async () => {
+  reset();
+  const warnings = [], originalWarn = console.warn;
+  console.warn = (...args) => warnings.push(args);
+  let results;
+  try {
+    setFailure = Object.assign(new Error("quota for Bank"), { name: "QuotaExceededError" });
+    results = [await pbpDictLedgerRecord("acct_alice", failure)];
+    setFailure = null; getFailure = new TypeError("read Bank");
+    results.push(await pbpDictLedgerRecord("acct_alice", failure));
+  } finally { console.warn = originalWarn; getFailure = null; }
+  return results.every(value => value === false) && warnings.length === 2 &&
+    warnings[0].join(" ") === "[dict-ledger] write failed: QuotaExceededError" && warnings[1].join(" ") === "[dict-ledger] write failed: TypeError" &&
+    !JSON.stringify(warnings).includes("Bank");
+});
+await test("a corrupted or tampered stored value keeps only well-formed rows", async () => {
+  reset(); await pbpDictLedgerRecord("acct_alice", failure);
+  const key = ledgerKeys()[0];
+  store[key] = [{ code: "network", stage: "init", category: "entry", at: 5 }, { code: "network", stage: "init", category: "entry", at: 5, term: "Bank" },
+    { code: "Bank", stage: "init", category: "entry", at: 5 }, { code: "network", stage: "init", category: "Bank", at: 5 },
+    { code: "network", stage: "init", category: "entry", at: "5" }, null, "Bank", [1]];
+  await pbpDictLedgerRecord("acct_alice", failure);
+  const afterRows = store[key];
+  store[key] = { not: "an array" };
+  await pbpDictLedgerRecord("acct_alice", failure);
+  return afterRows.length === 2 && afterRows[0].at === 5 && !JSON.stringify(afterRows).includes("Bank") && store[key].length === 1;
+});
+await test("cancellation and superseded queries are not recorded", async () => {
+  reset();
+  _pbpDictLedgerFail("acct_alice", new DOMException("stop", "AbortError"), "generating", "entry");
+  _pbpDictLedgerFail("acct_alice", Object.assign(new Error("old"), { code: "stale" }), "generating", "entry");
+  for (let i = 0; i < 5; i++) await tick();
+  const skipped = Object.keys(store).length === 0;
+  _pbpDictLedgerFail("acct_alice", Object.assign(new Error("Bank"), { code: "invalid_response", reason: "response_json" }), "checking", "collocations");
+  for (let i = 0; i < 5; i++) await tick();
+  const rows = await pbpDictLedgerRead("acct_alice");
+  return skipped && rows.length === 1 && rows[0].code === "invalid_response.response_json" && rows[0].stage === "checking" && rows[0].category === "collocations";
+});
+document.getElementById("summary").textContent = pass + " passed, " + fail + " failed";
+})();
+</script></body></html>

@@ -1515,14 +1515,14 @@ function pbpDictEntryNorm(record, target) {
 
 // Only fixed validation labels and HTTP status may enter diagnostics; never log model output,
 // lookup text, or a provider-supplied arbitrary reason string.
+const PBP_DICT_FAILURE_REASONS = Object.freeze(["response_size", "response_json", "response_shape", "entry_fields", "entry_identity",
+  "entry_pronunciation", "entry_meanings", "entry_meaning", "entry_example", "entry_learning", "entry_related", "entry_version",
+  "entry_sources", "entry_legacy", "entry_unknown", "explanation_metadata", "explanation_script",
+  "explanation_language", "supplement_fields", "supplement_item", "supplement_item_shape", "supplement_item_sense",
+  "supplement_item_text", "supplement_source_index", "supplement_duplicate", "supplement_source", "supplement_quote",
+  "supplement_example", "supplement_size", "internal_term"]);
 function _pbpDictFailureReason(error) {
-  const allowed = ["response_size", "response_json", "response_shape", "entry_fields", "entry_identity", "entry_pronunciation",
-    "entry_meanings", "entry_meaning", "entry_example", "entry_learning", "entry_related", "entry_version",
-    "entry_sources", "entry_legacy", "entry_unknown", "explanation_metadata", "explanation_script",
-    "explanation_language", "supplement_fields", "supplement_item", "supplement_item_shape", "supplement_item_sense",
-    "supplement_item_text", "supplement_source_index", "supplement_duplicate", "supplement_source", "supplement_quote",
-    "supplement_example", "supplement_size", "internal_term"];
-  if (allowed.includes(error?.reason)) return error.reason;
+  if (PBP_DICT_FAILURE_REASONS.includes(error?.reason)) return error.reason;
   const status = error?.status;
   return Number.isInteger(status) && status >= 400 && status <= 599 ? "http_" + status : "";
 }
@@ -1551,12 +1551,105 @@ function _pbpDictGenerationErrorKey(error, supplement = false) {
   if (Number.isInteger(error?.status) && error.status >= 500 && error.status < 600) return "dictGenerationServiceUnavailable";
   return supplement ? "dictSupplementUnavailable" : "dictEntryUnavailable";
 }
+const PBP_DICT_FAILURE_EXTRA_CODES = Object.freeze(["ai_disabled", "ai_not_configured", "invalid_request", "not_saved",
+  "source_failed", "stale", "network", "endpoint_invalid"]);
 function _pbpDictFailureCode(error) {
   if (error?.name === "TimeoutError") return "request_timeout";
   const code = error?.code;
   return typeof code === "string" && (Object.hasOwn(PBP_DICT_GENERATION_ERROR_KEYS, code) ||
-    ["ai_disabled", "ai_not_configured", "invalid_request", "not_saved", "source_failed", "stale", "network", "endpoint_invalid"].includes(code)
-    ) ? code : "request_failed";
+    PBP_DICT_FAILURE_EXTRA_CODES.includes(code)) ? code : "request_failed";
+}
+
+// Local failure ledger (2026-10-26 ruling): each row is exactly an error code,
+// a stage, a category and a time -- never the term, a definition, model output
+// or an arbitrary provider string. One chrome.storage.local key per owner,
+// named by the owner's SHA-256 because the owner string carries the plaintext
+// Pinboard username. It is neither a setting (outside SETTINGS_DEFAULTS, so no
+// backup and no sync routing) nor archive data (outside pbp-dict-archive, so no
+// Drive), and the options storage panel reclaims it with the "misc" category.
+const PBP_DICT_LEDGER_PREFIX = "pbpDictFailures:";
+const PBP_DICT_LEDGER_CAP = 200;
+const PBP_DICT_LEDGER_STAGES = Object.freeze(["init", "permission", "preparing", "sources", "generating", "checking", "saving"]);
+// Statuses worth telling apart in the ledger; any other status keeps only the
+// top-level code so the set of strings that can ever be stored stays closed.
+const PBP_DICT_LEDGER_HTTP = Object.freeze([400, 401, 402, 403, 404, 408, 409, 413, 422, 429, 500, 502, 503, 504, 524, 529]);
+// The whitelist (Q13 = A): top-level codes plus fixed "code.detail" pairs. A
+// detail joins only the code that really throws it -- explanation_* comes with
+// wrong_language, every other validation label with invalid_response, and a
+// bare HTTP status with request_failed. Anything else is filed as request_failed.
+const PBP_DICT_LEDGER_CODES = Object.freeze(new Set([
+  ...Object.keys(PBP_DICT_GENERATION_ERROR_KEYS), ...PBP_DICT_FAILURE_EXTRA_CODES,
+  "request_timeout", "request_failed", "settings_failed",
+  ...PBP_DICT_FAILURE_REASONS.map(reason => (reason.startsWith("explanation_") ? "wrong_language." : "invalid_response.") + reason),
+  ...PBP_DICT_LEDGER_HTTP.map(status => "request_failed.http_" + status)
+]));
+function pbpDictLedgerCode(error) {
+  const code = error?.code === "settings_failed" ? "settings_failed" : _pbpDictFailureCode(error);
+  const detail = _pbpDictFailureReason(error), fine = detail ? code + "." + detail : "";
+  return PBP_DICT_LEDGER_CODES.has(fine) ? fine : PBP_DICT_LEDGER_CODES.has(code) ? code : "request_failed";
+}
+function _pbpDictLedgerCategory(category) {
+  if (category === "entry") return category;
+  const known = typeof PBP_DICT_ARCHIVE_CATEGORIES !== "undefined" ? PBP_DICT_ARCHIVE_CATEGORIES
+    : typeof PBP_DICT_SUPPLEMENT_CATEGORIES !== "undefined" ? PBP_DICT_SUPPLEMENT_CATEGORIES : [];
+  return known.includes(category) ? category : "";
+}
+function _pbpDictLedgerRow(row) {
+  return !!row && typeof row === "object" && !Array.isArray(row) && Object.keys(row).length === 4 &&
+    PBP_DICT_LEDGER_CODES.has(row.code) && (row.stage === "" || PBP_DICT_LEDGER_STAGES.includes(row.stage)) &&
+    typeof row.category === "string" && row.category === _pbpDictLedgerCategory(row.category) &&
+    Number.isSafeInteger(row.at) && row.at > 0;
+}
+// Same raw-UTF-8 SHA-256 as ask-archive.js's _pbpAskArchiveOwnerHash; repeated
+// here because md-dict.js loads before ask-archive.js on the reader page.
+async function _pbpDictLedgerKey(owner) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(owner));
+  return PBP_DICT_LEDGER_PREFIX + Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+let _pbpDictLedgerQueue = Promise.resolve();
+function _pbpDictLedgerLock(task) {
+  if (globalThis.navigator?.locks?.request) return navigator.locks.request("pbp-dict-ledger", task);
+  const run = _pbpDictLedgerQueue.then(task, task);
+  _pbpDictLedgerQueue = run.catch(() => {});
+  return run;
+}
+// Resolves true only when the row was stored. Never throws: a ledger failure is
+// a console.warn with the error name, never a broken lookup.
+async function pbpDictLedgerRecord(owner, failure = {}) {
+  // Signed out ("ownerless") or unknown owner: fail closed, write nothing.
+  if (typeof owner !== "string" || !owner.startsWith("acct_")) return false;
+  const row = { code: PBP_DICT_LEDGER_CODES.has(failure.code) ? failure.code : "request_failed",
+    stage: PBP_DICT_LEDGER_STAGES.includes(failure.stage) ? failure.stage : "",
+    category: _pbpDictLedgerCategory(failure.category), at: Date.now() };
+  const live = async () => typeof pbpVocabCurrentOwner === "function" && await pbpVocabCurrentOwner() === owner;
+  try {
+    return await _pbpDictLedgerLock(async () => {
+      if (!(await live())) return false;
+      const key = await _pbpDictLedgerKey(owner);
+      const stored = (await chrome.storage.local.get(key))?.[key];
+      const rows = Array.isArray(stored) ? stored.filter(_pbpDictLedgerRow) : [];
+      rows.push(row);
+      // The account can switch while the read is in flight; this row belongs to
+      // the account that failed, so drop it rather than file it after a switch.
+      if (!(await live())) return false;
+      await chrome.storage.local.set({ [key]: rows.slice(-PBP_DICT_LEDGER_CAP) });
+      return true;
+    });
+  } catch (error) {
+    console.warn("[dict-ledger] write failed:", error?.name);
+    return false;
+  }
+}
+async function pbpDictLedgerRead(owner) {
+  if (typeof owner !== "string" || !owner.startsWith("acct_")) return [];
+  const key = await _pbpDictLedgerKey(owner);
+  const stored = (await chrome.storage.local.get(key))?.[key];
+  return Array.isArray(stored) ? stored.filter(_pbpDictLedgerRow) : [];
+}
+// Cancellation and a superseded query are not failures.
+function _pbpDictLedgerFail(owner, error, stage, category) {
+  if (error?.name === "AbortError" || error?.code === "stale") return;
+  pbpDictLedgerRecord(owner, { code: pbpDictLedgerCode(error), stage, category });
 }
 
 function _pbpDictEntryMount(host, opts) {
@@ -2059,10 +2152,12 @@ function _pbpDictEntryMount(host, opts) {
       usageActivity = { feedback, origin, version };
       const current = () => alive() && epoch === version && !controller.signal.aborted;
       const category = updating?.category || explicitCategory || kind.value;
+      let ledgerStage = "permission";
       const request = { ...input(controller.signal, current), category, topic: updating?.profile.topic ?? (explicitCategory ? "" : effectiveTopic()),
         updateId: updating?.id || "", repair: !!updating?.learning?.omittedItems,
         onStage: stage => {
           if (!current()) return;
+          if (PBP_DICT_LEDGER_STAGES.includes(stage)) ledgerStage = stage;
           const key = { sources: "dictSupplementRetrieving", checking: "dictSupplementChecking", saving: "dictSupplementSaving",
             generating: category === "etymology" ? "dictEtymologyGenerating" : "dictSupplementGenerating" }[stage];
           if (key) usageMessage(feedback, t(key), "busy");
@@ -2079,6 +2174,7 @@ function _pbpDictEntryMount(host, opts) {
           if (!(await requestAIHostPermissions(settings, [sourceOrigin + "/*"]))) throw { code: "host_permission" };
         } else await ensureAIHostPermissionWithGesture(settings);
         if (!current()) return;
+        ledgerStage = "preparing";
         const addition = await pbpDictSupplementRun(request);
         if (!current()) return;
         record.supplements = [addition, ...(record.supplements || []).filter(item => !addition.id || item.id !== addition.id)];
@@ -2095,6 +2191,7 @@ function _pbpDictEntryMount(host, opts) {
       } catch (error) {
         if (!current()) return;
         console.warn("[dict-entry] usage generation failed:", error?.name, _pbpDictFailureCode(error), _pbpDictFailureReason(error));
+        _pbpDictLedgerFail(opts.owner, error, ledgerStage, category);
         const text = t(_pbpDictGenerationErrorKey(error, true));
         if (document.activeElement === feedback.cancel) restoreFocus = origin;
         usageMessage(feedback, text, "error");
@@ -2123,11 +2220,13 @@ function _pbpDictEntryMount(host, opts) {
     if (!manual) show("ai");
     sync();
     if (hadFocus) stop.focus({ preventScroll: true });
+    let ledgerStage = manual ? "permission" : "generating";
     try {
       // The automatic path never requests permission. Only this direct click
       // can open Chrome's exact-origin permission prompt, before any other await.
       if (manual) await ensureAIHostPermissionWithGesture(settings);
       if (!current()) return;
+      ledgerStage = "generating";
       if (typeof pbpAiBumpCounter === "function") pbpAiBumpCounter("explain");
       const request = input(controller.signal, current);
       const result = await pbpDictEntryRun({ ...request, updateId });
@@ -2136,6 +2235,7 @@ function _pbpDictEntryMount(host, opts) {
       if (!current()) return;
       if (!record) show("dictionary");
       console.warn("[dict-entry] generation failed:", error?.name, _pbpDictFailureCode(error), _pbpDictFailureReason(error));
+      _pbpDictLedgerFail(opts.owner, error, ledgerStage, "entry");
       const text = t(_pbpDictGenerationErrorKey(error));
       if (updateId) inlineError(origin, text); else message(text);
     } finally {
@@ -2189,6 +2289,7 @@ function _pbpDictEntryMount(host, opts) {
   }).catch(error => {
     if (!alive() || error?.name === "AbortError" || error?.code === "stale") return;
     console.warn("[dict-entry] initialization failed:", error?.name, error?.code || "settings_failed");
+    _pbpDictLedgerFail(opts.owner, typeof error?.code === "string" ? error : { code: "settings_failed" }, "init", "entry");
     if (["owner_changed", "account_changed"].includes(error?.code)) message(t("vocabAccountChanged"));
     else if (error?.code === "sync_failed") message(t("dictEntrySyncFailed"));
     else message(t("dictEntryUnavailable"));

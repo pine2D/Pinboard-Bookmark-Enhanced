@@ -754,7 +754,7 @@
     "message": "Кэш тегов"
   },
   "storageCatMisc": {
-    "message": "Использование AI и заметки о совместимости"
+    "message": "Использование AI, заметки о совместимости и словаре"
   },
   "storageReclaimable": {
     "message": "Выбранное освободит: $AMOUNT$",

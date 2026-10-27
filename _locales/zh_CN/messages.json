@@ -754,7 +754,7 @@
     "message": "标签缓存"
   },
   "storageCatMisc": {
-    "message": "AI 用量计数与兼容性记录"
+    "message": "AI 用量、兼容性与查词记录"
   },
   "storageReclaimable": {
     "message": "已选可释放：$AMOUNT$",

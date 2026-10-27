@@ -754,7 +754,7 @@
     "message": "タグキャッシュ"
   },
   "storageCatMisc": {
-    "message": "AI使用量と互換性メモ"
+    "message": "AI使用量・互換性・辞書のメモ"
   },
   "storageReclaimable": {
     "message": "選択分の解放量: $AMOUNT$",

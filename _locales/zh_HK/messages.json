@@ -754,7 +754,7 @@
     "message": "標籤快取"
   },
   "storageCatMisc": {
-    "message": "AI 用量計數與相容性記錄"
+    "message": "AI 用量、相容性與查詞記錄"
   },
   "storageReclaimable": {
     "message": "已選可釋放：$AMOUNT$",

@@ -2132,6 +2132,23 @@ async function runDictionaryEntryUiTests() {
     const failed=mount();await failed.ui.ready;failed.host.querySelector('.xp-dict-ai-generate').focus();failed.host.querySelector('.xp-dict-ai-generate').click();await settle();
     check("failed generation restores the retry action when focus is still on Stop",document.activeElement===failed.host.querySelector('.xp-dict-ai-generate'));
     check("a generation error leaves the dictionary readable and retry possible",!failed.dict.hidden&&!failed.host.querySelector('.xp-dict-ai-generate').disabled&&failed.host.textContent.includes("dictSupplementInvalid"));
+    {
+      // Ledger wiring: the real writer is covered by dict-ledger-tests.html; here
+      // only the mount's catch must hand it the owner, fine code, stage and category.
+      const realLedger=window.pbpDictLedgerRecord,realGrant=window.ensureAIHostPermissionWithGesture,rows=[];
+      window.pbpDictLedgerRecord=async(owner,row)=>{rows.push([owner,row]);return true;};
+      try {
+        window.pbpDictEntryRun=async()=>{throw Object.assign(new Error("Gift"),{code:"invalid_response",reason:"entry_meaning"});};
+        failed.host.querySelector('.xp-dict-ai-generate').click();await settle();
+        const generated=rows.splice(0);
+        window.ensureAIHostPermissionWithGesture=async()=>{throw Object.assign(new Error("Permission needed"),{code:"host_permission"});};
+        failed.host.querySelector('.xp-dict-ai-generate').click();await settle();
+        const denied=rows.splice(0);
+        check("a failed base generation files one ledger row with its fine code, stage, entry category and the mount's owner",
+          generated.length===1&&generated[0][0]==="ownerless"&&JSON.stringify(generated[0][1])==='{"code":"invalid_response.entry_meaning","stage":"generating","category":"entry"}');
+        check("a denied AI permission is filed at the permission stage",denied.length===1&&denied[0][1].code==="host_permission"&&denied[0][1].stage==="permission");
+      } finally {window.pbpDictLedgerRecord=realLedger;window.ensureAIHostPermissionWithGesture=realGrant;}
+    }
     await checkFailureDiagnostics("base generation", "pbpDictEntryRun", ()=>failed.host.querySelector('.xp-dict-ai-generate').click(), "[dict-entry] generation failed:");
     await checkGenerationFeedback("base generation","pbpDictEntryRun",()=>failed.host.querySelector('.xp-dict-ai-generate').click(),()=>failed.host.querySelector('.xp-dict-ai-status'),"dictEntryUnavailable");
     const requestsBeforePermission=calls.length;window.ensureAIHostPermissionWithGesture=async()=>{throw Object.assign(new Error("Permission needed"),{code:"host_permission"});};
@@ -2253,6 +2270,22 @@ async function runDictionaryEntryUiTests() {
     submit=usage.host.querySelector('.xp-dict-supplement-generate');submit.focus();submit.click();await settle();
     check("failed supplement returns keyboard focus to its retryable action",document.activeElement===submit&&!submit.disabled);
     check("failed supplement leaves a visible local message next to its retryable action",submit.closest('.xp-dict-usage-actions').querySelector('.xp-dict-usage-status').textContent==='dictSupplementUnavailable'&&usage.host.querySelector('.xp-dict-ai-status').hidden);
+    {
+      const realLedger=window.pbpDictLedgerRecord,realRun=window.pbpDictSupplementRun,rows=[];
+      window.pbpDictLedgerRecord=async(owner,row)=>{rows.push([owner,row]);return true;};
+      try {
+        window.pbpDictSupplementRun=async()=>{throw Object.assign(new Error("Gift"),{code:"invalid_response",reason:"supplement_item_text"});};
+        submit.click();await settle();
+        const early=rows.splice(0);
+        window.pbpDictSupplementRun=async input=>{input.onStage("checking");throw Object.assign(new Error("Gift"),{code:"wrong_language",reason:"explanation_script"});};
+        submit.click();await settle();
+        const late=rows.splice(0),category=usage.host.querySelector('.xp-dict-supplement-kind').value;
+        check("a failed supplement files its fine code and category at the step before any reported stage",
+          early.length===1&&early[0][0]==="ownerless"&&!!category&&JSON.stringify(early[0][1])===JSON.stringify({code:"invalid_response.supplement_item_text",stage:"preparing",category}));
+        check("a supplement failure after a reported stage is filed at that stage",late.length===1&&late[0][1].stage==="checking"&&late[0][1].code==="wrong_language.explanation_script");
+        check("ledger rows carry no lookup text",!JSON.stringify([early,late]).includes("Gift"));
+      } finally {window.pbpDictLedgerRecord=realLedger;window.pbpDictSupplementRun=realRun;}
+    }
     await checkFailureDiagnostics("supplement generation", "pbpDictSupplementRun", ()=>submit.click(), "[dict-entry] usage generation failed:");
     await checkGenerationFeedback("supplement generation","pbpDictSupplementRun",()=>submit.click(),()=>submit.closest('.xp-dict-usage-actions').querySelector('.xp-dict-usage-status'),"dictSupplementUnavailable");
     window.pbpDictSupplementRun=()=>new Promise(resolve=>{resolveUsage=resolve;});submit.click();await settle();

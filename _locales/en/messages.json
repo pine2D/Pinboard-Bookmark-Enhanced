@@ -759,7 +759,7 @@
     "message": "Tag cache"
   },
   "storageCatMisc": {
-    "message": "AI usage & compatibility memos"
+    "message": "AI usage, compatibility & dictionary memos"
   },
   "storageReclaimable": {
     "message": "Selected: $AMOUNT$ to free up",
