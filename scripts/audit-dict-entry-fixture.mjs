@@ -90,6 +90,9 @@ export async function installDictEntryFixture(page) {
   });
 }
 
+const USAGE_ACTION = '[data-learning-block="usage"] .xp-dict-supplement-generate[data-category="confusables"]';
+const USAGE_ROW = '[data-learning-block="usage"] .xp-dict-usage-actions:has(> [data-category="confusables"])';
+
 async function rerunLookup(page) {
   if (await page.locator('#vocab-lookup-go').count()) await page.locator('#vocab-lookup-go').click();
   else await page.locator('.xp-dict-query-tools > .xp-dict-lang').selectOption('en');
@@ -118,8 +121,9 @@ export async function openDictEntryState(page, state) {
     return page.locator('.xp-dict-ai-switch:not([hidden])').isVisible();
   }
   if (state === 'details') {
-    const action = page.locator('.xp-dict-etymology-generate');
-    await action.locator('xpath=ancestor::details[1]').locator(':scope > summary').click();
+    // The etymology block's own paid button (redesign 1B.8): no disclosure
+    // to open, and its saved result is shown open in the block.
+    const action = page.locator('.xp-dict-supplement-generate[data-category="etymology"]');
     await action.click();
     await page.waitForFunction(() => window._auditDictEntry?.usageEntered);
     await page.evaluate(() => window._auditDictEntry.usageRelease());
@@ -133,29 +137,30 @@ export async function openDictEntryState(page, state) {
     return details.locator('.xp-dict-supplement-text').isVisible();
   }
   if (state === 'usage-busy') {
-    // The supplement form opens here now that the topic-scope state is gone (1B.5).
-    const form = page.locator('.xp-dict-supplement');
-    if (!await form.evaluate(node => node.open)) await form.locator(':scope > summary').click();
-    await form.evaluate(async node => {
-      await Promise.all(node.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
-    });
+    // The usage-points block's "confusables" button; its answer is the v2
+    // items shape above. Each paid category fails and saves on its own row.
     await page.evaluate(() => Object.assign(window._auditDictEntry, { usageEntered: false, usageRelease: null, usageFail: true }));
-    await page.locator('.xp-dict-supplement-generate').click();
+    await page.locator(USAGE_ACTION).click();
     await page.waitForFunction(() => window._auditDictEntry.usageEntered);
-    return page.locator('.xp-dict-supplement .xp-dict-usage-stop:not([hidden])').isVisible();
+    return page.locator(USAGE_ROW + ' .xp-dict-usage-stop:not([hidden])').isVisible();
   }
   if (state === 'usage-error') {
     await page.evaluate(() => window._auditDictEntry.usageRelease());
-    await page.locator('.xp-dict-supplement .xp-dict-usage-feedback[data-state="error"]').waitFor();
-    return page.locator('.xp-dict-supplement-generate').isVisible();
+    await page.locator(USAGE_ROW + ' .xp-dict-usage-feedback[data-state="error"]').waitFor();
+    return page.locator(USAGE_ACTION).isVisible();
   }
   if (state === 'usage-result') {
     await page.evaluate(() => Object.assign(window._auditDictEntry, { usageEntered: false, usageRelease: null, usageFail: false }));
-    await page.locator('.xp-dict-supplement-generate').click();
+    await page.locator(USAGE_ACTION).click();
     await page.waitForFunction(() => window._auditDictEntry.usageEntered);
     await page.evaluate(() => window._auditDictEntry.usageRelease());
-    await page.locator('.xp-dict-supplement .xp-dict-usage-feedback[data-state="saved"]').waitFor();
-    return page.locator('.xp-dict-supplement-generate').isVisible();
+    await page.locator(USAGE_ROW + ' .xp-dict-usage-feedback[data-state="saved"]').waitFor();
+    // The saved result replaces its button and opens in the block.
+    const saved = page.locator('[data-learning-block="usage"] [data-supplement-category="confusables"][open]');
+    await saved.evaluate(async node => {
+      await Promise.all(node.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
+    });
+    return saved.locator('.xp-dict-supplement-text').isVisible();
   }
   if (state === 'panel') {
     await page.locator('#explain-pop .xp-dock').click();

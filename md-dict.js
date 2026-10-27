@@ -1625,10 +1625,15 @@ function pbpDictLedgerCode(error) {
   const detail = _pbpDictFailureReason(error), fine = detail ? code + "." + detail : "";
   return PBP_DICT_LEDGER_CODES.has(fine) ? fine : PBP_DICT_LEDGER_CODES.has(code) ? code : "request_failed";
 }
+// What a new supplement may be generated in (dict-entry.js); every other
+// archive category is read-only and labelled as old (1B.7).
+function _pbpDictGeneratableCategory(category) {
+  return typeof PBP_DICT_GENERATABLE_CATEGORIES !== "undefined" && PBP_DICT_GENERATABLE_CATEGORIES.includes(category);
+}
 function _pbpDictLedgerCategory(category) {
   if (category === "entry") return category;
   const known = typeof PBP_DICT_ARCHIVE_CATEGORIES !== "undefined" ? PBP_DICT_ARCHIVE_CATEGORIES
-    : typeof PBP_DICT_SUPPLEMENT_CATEGORIES !== "undefined" ? PBP_DICT_SUPPLEMENT_CATEGORIES : [];
+    : typeof PBP_DICT_GENERATABLE_CATEGORIES !== "undefined" ? PBP_DICT_GENERATABLE_CATEGORIES : [];
   return known.includes(category) ? category : "";
 }
 function _pbpDictLedgerRow(row) {
@@ -1719,7 +1724,7 @@ function _pbpDictEntryMount(host, opts) {
   else panel.appendChild(controls);
   panel.append(status, content); host.appendChild(panel);
   let settings = null, record = null, busy = false, active = null, epoch = 0, mode = "dictionary", viewRevision = 0;
-  let usageCategory = "collocations", usageActivity = null;
+  let usageActivity = null, renderedLanguage = null;
   const usageFeedbacks = new WeakMap();
   let renderedBase = "", baseDetails = null, baseRetry = null, usageForm = null, previousSupplements = null;
   const supplementNodes = new Map();
@@ -1789,7 +1794,7 @@ function _pbpDictEntryMount(host, opts) {
     opts.onView?.(mode);
   };
   const render = (value, answerLanguage, reveal = true, revealSupplement = "") => {
-    record = value;
+    record = value; renderedLanguage = answerLanguage;
     const norm = pbpDictEntryNorm(record, answerLanguage);
     // Supplement receipts and additions do not change the paid base entry.
     // Retaining these nodes also retains open disclosures and reading position.
@@ -1893,23 +1898,6 @@ function _pbpDictEntryMount(host, opts) {
   const input = (signal, isCurrent) => ({ term: opts.term, sourceLanguage: opts.lang || "und", target: target(),
     owner: opts.owner, settings, signal, isCurrent });
   const supplementId = addition => addition.id || String(addition.generatedAt);
-  const focusAddition = id => {
-    const section = supplementNodes.get(id)?.section;
-    const heading = section?.querySelector("summary");
-    if (!heading) return;
-    heading.focus({ preventScroll: true });
-    // Reveal only within the lookup's scroll owner. scrollIntoView would also
-    // move the article behind a reader bubble or scroll the whole library.
-    const scroller = content.closest(".xp-body, .vocab-detail-pane");
-    if (!scroller) return;
-    const view = scroller.getBoundingClientRect(), title = heading.getBoundingClientRect();
-    const inset = parseFloat(getComputedStyle(scroller).scrollPaddingTop) || 0;
-    const top = view.top + scroller.clientTop + inset;
-    const bottom = view.top + scroller.clientTop + scroller.clientHeight;
-    const previewBottom = Math.min(section.getBoundingClientRect().bottom, title.bottom + 32);
-    if (title.top < top) scroller.scrollTop += title.top - top;
-    else if (previewBottom > bottom) scroller.scrollTop += Math.min(previewBottom - bottom, title.top - top);
-  };
   const renderSupplements = (answerLanguage, revealId) => {
     if (typeof pbpDictSupplementRun !== "function") return;
     if (record.archiveSaved === false) {
@@ -1932,22 +1920,26 @@ function _pbpDictEntryMount(host, opts) {
           } finally { saving = false; baseRetry.removeAttribute("aria-disabled"); }
         });
       }
-      if (!baseRetry.isConnected) content.appendChild(baseRetry);
+      if (!baseRetry.isConnected) baseDetails.after(baseRetry);
     } else baseRetry?.remove();
-    const retained = new Set();
+    const retained = new Set(), legacySections = [];
     const replaced = new Set((record.supplements || []).map(item => item.learning?.replacesId).filter(Boolean));
     if (replaced.size && !previousSupplements) {
       previousSupplements = document.createElement("details"); previousSupplements.className = "xp-dict-ai-details";
       const summary = document.createElement("summary"); summary.textContent = t("dictSupplementPrevious"); previousSupplements.appendChild(summary);
     }
-    if (replaced.size && !previousSupplements.isConnected) content.appendChild(previousSupplements);
+    const form = learningForm();
     for (const addition of record.supplements || []) {
       const id = supplementId(addition);
       retained.add(id);
       let item = supplementNodes.get(id);
       if (!item) {
         const section = document.createElement("details"); section.className = "xp-dict-ai-details";
-        section.dataset.supplementId = id;
+        section.dataset.supplementId = id; section.dataset.supplementCategory = addition.category;
+        // A generated block shows its content directly (no "view saved" step):
+        // a current-category result opens where its button was. Older
+        // categories and superseded versions stay folded.
+        section.open = _pbpDictGeneratableCategory(addition.category) && !replaced.has(id);
         const heading = document.createElement("summary");
         const text = document.createElement("div"); text.className = "xp-dict-supplement-text"; text.dir = "auto";
         const receipt = document.createElement("p"); receipt.className = "xp-dict-src";
@@ -1957,8 +1949,14 @@ function _pbpDictEntryMount(host, opts) {
       }
       item.addition = addition;
       const { section, heading, text, receipt } = item;
+      // A category that can no longer be generated (1B.7) stays readable with
+      // a neutral "old category" note after its title and offers no update;
+      // a failed save can still be retried. dictSupplementLegacy is a
+      // different note: old content without the v2 structure.
+      const legacyCategory = !_pbpDictGeneratableCategory(addition.category);
       const title = t("dictSupplement" + addition.category[0].toUpperCase() + addition.category.slice(1)) +
-        (addition.profile.topic ? " · " + addition.profile.topic : "");
+        (addition.profile.topic ? " · " + addition.profile.topic : "") +
+        (legacyCategory ? " · " + t("dictSupplementLegacyCategory") : "");
       if (heading.textContent !== title) heading.textContent = title;
       const contentKey = JSON.stringify(addition.learning || addition.content);
       if (item.contentKey !== contentKey) {
@@ -2034,9 +2032,9 @@ function _pbpDictEntryMount(host, opts) {
       receipt.textContent = [t(addition.archiveSaved === false ? "dictSupplementSaveFailed" : "dictSupplementSaved"),
         addition.provider, addition.model, new Date(addition.generatedAt).toLocaleDateString(_pbpDictUiLocale()),
         t("dictSupplementLanguage", languageName(addition.learning?.language || answerLanguage))].join(" · ");
-      // A record saved with a topic belongs to an old category and stays
-      // read-only (1B.5): its replacement could not keep that profile.
-      if (configured() && addition.id && addition.archiveSaved !== false && !replaced.has(id) && !addition.profile?.topic) {
+      // Old categories (and every record saved with a topic, which only they
+      // took) are read-only (1B.5, 1B.7).
+      if (configured() && addition.id && addition.archiveSaved !== false && !replaced.has(id) && !legacyCategory && !addition.profile?.topic) {
         if (!item.update) {
           item.update = button("dictSupplementUpdate", "xp-dict-update-supplement");
           item.update.addEventListener("click", () => usageForm?.update(item.addition));
@@ -2074,28 +2072,58 @@ function _pbpDictEntryMount(host, opts) {
       } else item.retry?.remove();
       if (replaced.has(id)) {
         if (section.parentElement !== previousSupplements) previousSupplements.appendChild(section);
-      } else if (section.parentElement !== content) content.insertBefore(section,
-        previousSupplements?.isConnected ? previousSupplements : usageForm?.disclosure.isConnected ? usageForm.disclosure : null);
+      } else if (legacyCategory) legacySections.push(section);
+      else {
+        // Fixed order inside a block: patterns before confusables, results
+        // above the block's actions.
+        const block = addition.category === "etymology" ? form.etymology : form.usage;
+        if (section.parentElement !== block) (addition.category === "patterns" &&
+          block.querySelector(':scope > [data-supplement-category="confusables"]') || form.resultsEnd(block)).before(section);
+      }
       if (id === revealId) section.open = true;
     }
     for (const [id, item] of supplementNodes) {
       if (!retained.has(id)) { item.section.remove(); supplementNodes.delete(id); }
     }
-    if (!configured() || !record.archiveId) { usageForm?.disclosure.remove(); return; }
-    if (usageForm) {
-      if (!usageForm.disclosure.isConnected) content.appendChild(usageForm.disclosure);
-      usageForm.refresh();
-      return;
+    // Fixed order after the paid base entry: usage points, etymology, then
+    // readable old categories and earlier versions. A node moves only when it
+    // is out of order, so open folds and keyboard focus survive re-renders.
+    let previous = baseRetry?.isConnected ? baseRetry : baseDetails;
+    for (const node of [form.usage, form.etymology, ...legacySections, ...(replaced.size ? [previousSupplements] : [])]) {
+      if (node.parentElement !== content || !(previous.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING)) previous.after(node);
+      previous = node;
     }
-    const disclosure = document.createElement("details"); disclosure.className = "xp-dict-ai-details xp-dict-supplement";
-    const summary = document.createElement("summary"); summary.textContent = t("dictEntrySupplement");
-    const kind = document.createElement("select");
-    kind.className = "xp-dict-supplement-kind";
-    kind.setAttribute("aria-label", t("dictSupplementCategory"));
-    for (const category of PBP_DICT_SUPPLEMENT_CATEGORIES.filter(category => category !== "etymology")) kind.append(new Option(
-      t("dictSupplement" + category[0].toUpperCase() + category.slice(1)), category));
-    kind.value = usageCategory;
-    const submit = button("dictSupplementGenerate", "xp-dict-supplement-generate");
+    form.refresh();
+  };
+  // The learning blocks (redesign 1B.8, Q8=A): "usage points" holds two paid
+  // buttons -- collocations and patterns, confusables -- each generating,
+  // saving and failing on its own; "etymology" holds one. Each paid button is
+  // the wandSparkles icon, its text and the model name. A category that has a
+  // result shows it in the block instead of its button, so no control ever
+  // switches between a free "view saved" and a paid "generate".
+  const learningForm = () => {
+    if (usageForm) return usageForm;
+    const block = (name, key) => {
+      const el = document.createElement("section"); el.className = "xp-dict-learning-section"; el.dataset.learningBlock = name;
+      el.setAttribute("role", "group"); el.setAttribute("aria-label", t(key));
+      const heading = document.createElement("p"); heading.className = "xp-dict-learning-title"; heading.textContent = t(key);
+      el.appendChild(heading); return el;
+    };
+    const paid = (category, key) => {
+      const el = button(key, "xp-dict-supplement-generate"); el.dataset.category = category;
+      const icon = document.createElement("span");
+      icon.innerHTML = typeof PBP_ICONS === "object" ? PBP_ICONS.wandSparkles || "" : ""; // static shared icon
+      const label = document.createElement("span"); label.textContent = t(key);
+      const model = document.createElement("span"); model.className = "xp-dict-model";
+      el.replaceChildren(...icon.childNodes, label, model);
+      return el;
+    };
+    const usage = block("usage", "dictLearningUsagePoints"), etymology = block("etymology", "dictLearningEtymology");
+    const buttons = { patterns: paid("patterns", "dictSupplementPatterns"), confusables: paid("confusables", "dictSupplementConfusables"),
+      etymology: paid("etymology", "dictSupplementEtymology") };
+    const etymologyHint = document.createElement("p"); etymologyHint.className = "xp-dict-src"; etymologyHint.textContent = t("dictEtymologyHint");
+    usage.append(buttons.patterns, buttons.confusables); etymology.append(etymologyHint, buttons.etymology);
+    const feedbacks = Object.fromEntries(Object.entries(buttons).map(([category, el]) => [category, usageFeedback(el)]));
     const profile = document.createElement("p"); profile.className = "xp-dict-src xp-dict-supplement-profile";
     const learner = pbpDictSupplementProfile(settings);
     const values = [];
@@ -2113,66 +2141,48 @@ function _pbpDictEntryMount(host, opts) {
     edit.textContent = t(values.length ? "dictSupplementProfileEdit" : "dictSupplementProfileSet");
     edit.title = t("dictLearnerProfileHint");
     profile.appendChild(edit);
-    const sourceHint = document.createElement("p"); sourceHint.className = "xp-dict-src";
-    sourceHint.textContent = t("dictSupplementSourceHint");
     const languageHint = document.createElement("span"); languageHint.className = "xp-dict-src";
     languageHint.textContent = t("dictSupplementLanguage", languageName(target()));
     profile.prepend(languageHint);
-    disclosure.append(summary, kind, submit, profile, sourceHint); content.append(disclosure);
-    const etymology = document.createElement("details"); etymology.className = "xp-dict-ai-details";
-    const etymologyTitle = document.createElement("summary"); etymologyTitle.textContent = t("dictSupplementEtymology");
-    const etymologyHint = document.createElement("p"); etymologyHint.className = "xp-dict-src"; etymologyHint.textContent = t("dictEtymologyHint");
-    const etymologyGenerate = button("dictEtymologyGenerate", "xp-dict-etymology-generate");
-    etymology.append(etymologyTitle, etymologyHint, etymologyGenerate);
-    content.insertBefore(etymology, disclosure);
-    const formFeedback = usageFeedback(submit);
-    if (typeof window.pbpEnhanceListbox === "function") {
-      kind.id = "dict-supplement-kind"; kind.dataset.listbox = "float"; window.pbpEnhanceListbox(kind);
-    } else kind.classList.add("xp-dict-lang");
+    usage.appendChild(profile);
+    // Results sit above a block's actions: the first action row (usage) or
+    // the hint that introduces the etymology button.
+    const resultsEnd = el => el === usage ? feedbacks.patterns.box.parentElement : etymologyHint;
     // The topic no longer takes part in reuse (1B.5), as in dict-entry.js's find().
-    const existing = () => {
-      const profile = pbpDictSupplementProfile(settings, kind.value);
-      const matches = (record.supplements || []).filter(item => item.category === kind.value &&
+    const existing = category => {
+      const profile = pbpDictSupplementProfile(settings, category);
+      const matches = (record.supplements || []).filter(item => item.category === category &&
         item.profile.nativeLanguage === profile.nativeLanguage && item.profile.level === profile.level);
       const replaced = new Set(matches.map(item => item.learning?.replacesId).filter(Boolean));
       return matches.filter(item => !replaced.has(item.id)).sort((a, b) => b.generatedAt - a.generatedAt || String(b.id).localeCompare(String(a.id)))[0];
     };
     const refresh = () => {
-      const hasEtymology = (record.supplements || []).some(item => item.category === "etymology");
-      etymology.hidden = hasEtymology;
-      etymologyTitle.textContent = t(record.entry.etymology || record.entry.relatedWords.length ? "dictEtymologyGenerate" : "dictSupplementEtymology");
-      if (!etymology.isConnected) content.insertBefore(etymology, disclosure);
-      if (usageCategory !== kind.value) {
-        usageCategory = kind.value;
-        usageMessage(formFeedback, "");
+      const canGenerate = configured() && !!record?.archiveId;
+      const modelName = canGenerate && typeof pbpDictEntryModelName === "function" ? pbpDictEntryModelName(settings) : "";
+      for (const [category, el] of Object.entries(buttons)) {
+        const feedback = feedbacks[category];
+        el.hidden = feedback.box.dataset.state === "busy" || !canGenerate || !!existing(category);
+        el.lastElementChild.textContent = modelName ? "· " + modelName : "";
+        feedback.box.parentElement.hidden = el.hidden && feedback.box.hidden;
       }
-      submit.textContent = t(existing() ? "dictSupplementShow" : "dictSupplementGenerate");
-      sourceHint.hidden = !["culture", "literature"].includes(kind.value);
+      profile.hidden = buttons.patterns.hidden && buttons.confusables.hidden;
+      etymologyHint.hidden = buttons.etymology.hidden;
+      for (const el of [usage, etymology]) el.hidden = ![...el.children].slice(1).some(node => !node.hidden);
     };
-    const enableForm = () => {
-      submit.disabled = false; etymologyGenerate.disabled = false; kind.disabled = false; window.pbpListboxSync?.(kind);
-    };
-    usageForm = { disclosure, refresh, enable: enableForm, update: addition => generateSupplement(addition) };
-    kind.addEventListener("change", refresh); refresh();
+    const enableForm = () => { for (const el of Object.values(buttons)) el.disabled = false; };
     const generateSupplement = async (updating = null, explicitCategory = "") => {
       if (!alive() || busy) return;
-      const origin = updating ? supplementNodes.get(supplementId(updating))?.update : explicitCategory === "etymology" ? etymologyGenerate : submit;
-      if (!origin?.isConnected) return;
+      const category = updating?.category || explicitCategory;
+      const origin = updating ? supplementNodes.get(supplementId(updating))?.update : buttons[category];
+      if (!origin?.isConnected || !_pbpDictGeneratableCategory(category)) return;
+      const answerLanguage = renderedLanguage || target();
       const feedback = usageFeedback(origin);
       usageMessage(feedback, "");
       let restoreFocus = null;
-      const hit = updating || explicitCategory ? null : existing();
-      if (hit) {
-        const hadFocus = document.activeElement === submit;
-        const id = supplementId(hit); render(record, answerLanguage, false, id);
-        if (hadFocus) focusAddition(id);
-        return;
-      }
       const hadFocus = document.activeElement === origin || (updating && content.contains(document.activeElement));
       const version = ++epoch, controller = new AbortController(); active = controller; busy = true;
       usageActivity = { feedback, origin, version };
       const current = () => alive() && epoch === version && !controller.signal.aborted;
-      const category = updating?.category || explicitCategory || kind.value;
       let ledgerStage = "permission";
       const request = { ...input(controller.signal, current), category,
         updateId: updating?.id || "",
@@ -2188,7 +2198,7 @@ function _pbpDictEntryMount(host, opts) {
         } };
       if (updating) request.settings = { ...settings, dictLearnerNativeLanguage: updating.profile.nativeLanguage, dictLearnerLevel: updating.profile.level };
       const sourceOrigin = pbpDictSupplementOrigin(category, opts.lang);
-      submit.disabled = true; etymologyGenerate.disabled = true; kind.disabled = true; window.pbpListboxSync?.(kind);
+      for (const el of Object.values(buttons)) el.disabled = true;
       usageMessage(feedback, t(category === "etymology" ? "dictEtymologyGenerating" : "dictSupplementGenerating"), "busy"); sync();
       if (hadFocus) feedback.cancel.focus({ preventScroll: true });
       try {
@@ -2207,16 +2217,16 @@ function _pbpDictEntryMount(host, opts) {
         usageMessage(feedback, addition.archiveSaved === false ? t("dictSupplementSaveFailed") : addition.learning?.omittedItems
           ? t("dictSupplementPartial", String(addition.learning.items.length), String(addition.learning.omittedItems)) : t("dictSupplementSaved"),
           addition.archiveSaved === false ? "error" : "saved");
-        // Appending a result must not pull the reader away from where they
-        // scrolled while waiting. Explicit "View saved usage" still reveals it.
-        if (focusStayed) {
-          restoreFocus = updating || explicitCategory ? supplementNodes.get(id)?.heading : origin;
-        }
+        // The result replaces its button; focus moves to its heading without
+        // scrolling, so the reader stays where they were while waiting.
+        if (focusStayed) restoreFocus = supplementNodes.get(id)?.heading;
       } catch (error) {
         if (!current()) return;
         console.warn("[dict-entry] usage generation failed:", error?.name, _pbpDictFailureCode(error), _pbpDictFailureReason(error));
         _pbpDictLedgerFail(opts.owner, error, ledgerStage, category);
-        const text = t(_pbpDictGenerationErrorKey(error, true));
+        // "Nothing usable" for a usage point is an answer, not a retrieval
+        // miss: it has its own neutral copy, apart from the no-sources one.
+        const text = t(error?.code === "unsupported_usage" && category !== "etymology" ? "dictUsagePointsEmpty" : _pbpDictGenerationErrorKey(error, true));
         if (document.activeElement === feedback.cancel) restoreFocus = origin;
         usageMessage(feedback, text, _pbpDictFailureTone(error));
       } finally {
@@ -2224,15 +2234,16 @@ function _pbpDictEntryMount(host, opts) {
           busy = false; active = null; usageActivity = null;
           if (alive()) {
             const focusStayed = document.activeElement === feedback.cancel;
-            enableForm(); sync();
-            const next = restoreFocus || (focusStayed ? origin : null);
+            enableForm(); refresh(); sync();
+            const next = restoreFocus || (focusStayed && !origin.hidden ? origin : null);
             if (next?.isConnected) next.focus({ preventScroll: true });
           }
         }
       }
     };
-    submit.addEventListener("click", () => generateSupplement());
-    etymologyGenerate.addEventListener("click", () => generateSupplement(null, "etymology"));
+    for (const [category, el] of Object.entries(buttons)) el.addEventListener("click", () => generateSupplement(null, category));
+    usageForm = { usage, etymology, resultsEnd, refresh, enable: enableForm, update: addition => generateSupplement(addition) };
+    return usageForm;
   };
   const run = async (manual, updateId = "", origin = null) => {
     if (!alive() || busy || !configured()) return;

@@ -1590,7 +1590,7 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 | library / md-preview | `.listbox-help` / `.xp-dict-choice-help` | 释义菜单展开顶部的状态说明，次级字号与颜色、sp-2 内距；不新增常态行或焦点。普通 prose 通过 `aria-describedby` 关联控件，绝不作为 option。library `data-listbox-help` 动态更新说明，帮助固定在独立选项滚动区上方，极短窗最多占可用高度一半；reader 帮助 sticky，picker 以实际帮助高度设置 scroll-padding。方向键仅定位真实选项。 |
 | library / md-preview | `.xp-dict-learning-item` | 单条结构化学习内容，顺序为题目、对应释义（若有）、解释、原文/原创例句、译文、来源；只用留白分组，不画卡片底色、边框或阴影。library 正文 72ch，项间 sp-4；reader 项间 sp-3，例句前 sp-2。长词与来源允许换行，原文与解释分别标记语言。补充生成及词条/补充更新文字按钮保留各表面控件最小高度，长文案和放大字号可在可用宽度内换行增高；纯图标操作仍不换行。 |
 | library / md-preview | `.xp-dict-full-text` | 词包原文使用既有 `.xp-dict-ai-details` 折叠原语，保留换行并允许长词断行；与短释义、例句及词源分开呈现。有可靠短释义时原文默认折叠，仅有原文时默认展开；此原语同时供普通词典使用。 |
-| library / md-preview | `.xp-dict-supplement-profile` | 学习偏好只显示实际配置，内联链接直达设置 `#vocab-learning`。沿用各表面的正文/次级字号和间距，不增卡片。补充的话题输入及其标签与折叠容器已随场景类别删除（2026-10-26 裁决，1B.5 施工）。 |
+| library / md-preview | `.xp-dict-supplement-profile` | 学习偏好只显示实际配置，内联链接直达设置 `#vocab-learning`。沿用各表面的正文/次级字号和间距，不增卡片。补充的话题输入及其标签与折叠容器已随场景类别删除（2026-10-26 裁决，1B.5 施工）；类别下拉框随固定按钮组删除（1B.8），偏好行留在用法要点块内、两个用法按钮之后。 |
 | md-preview | `.xp-dict-query-tools` | 语言与朗读同排、gap sp-2，随可用宽度收缩；语言闭合面 selectedcontent 单行省略，展开选项完整换行。AI 图标组不收缩、不换行。查词气泡默认宽 480px（解释/翻译仍 420px），视口两侧留 16px。保存含义选择位于 footer，闭合面沿用同一裁切规则。 |
 | md-preview | `.xp-resize-hit` | 查词专用绝对定位命中层，inset:0、不占布局，本层 pointer-events:none、八向子握柄独立命中。边缘厚 8px，右下握柄 24px，footer 预留 sp-5；采用 Lucide moveDiagonal。实际拖动后固定位置，单次阅读器会话保留尺寸；范围 320×240 至 720×800 CSS px，可见视口不足时缩至视口减 32px。拖动用 Pointer Capture 与 rAF，不加过渡。握柄支持方向键 / Shift 大步调节；点击打开既有 pop-panel + row 调节菜单，提供增减、当前尺寸和恢复默认。解释 / 翻译不显示此层控件。 |
 | library | `.vocab-lookup-actions` | 既有查词按钮与 AI 图标保持一个不可拆的单排组，gap sp-2；不另起短按钮行。自由查词的词头行固定单排，词头可省略；保存词条模式复用查询栏，不重复词头。保存操作条宽度 ≤440px 时保存按钮只显示图标，保留完整 title/aria-label，为释义选择留出宽度；仍固定单排。 |
@@ -1657,6 +1657,7 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 | md-preview | `.reader-dict-session` / `.reader-dict-search` | 唯一可迁移的查词词头、正文与保存栏；在气泡和侧栏间移动节点，正文为唯一内容滚动区，保留选义、表单、展开状态。侧栏保留搜索行，将返回气泡与语言/发音/来源归入同一词典工具行；已有查询输入时隐藏重复词头行。气泡仍用原窗口词头并隐藏返回按钮。查其他词复用 `.row`，单行且输入 min-width:0；窄窗口沿用底部面板。 |
 | md-preview | `.reader-check` | 阅读器复选框共用原语：16px 值框与 14px Lucide 勾重叠，颜色/圆角沿用按钮与 link token；标签提供至少 26px 行高。保留原生 input 键盘/选中/禁用语义与 focus-visible，强制色使用原生外观。用于书签选项和 Ask 临时对话。 |
 | md-preview / library | `.xp-dict-usage-actions` / `.xp-dict-usage-feedback` | 补充用法就地动作与 aria-live 反馈，组内使用本表面 8px 间距 token 并允许换行；生成、停止、失败与保存提示靠近触发位置，完成不抢焦点或滚动。不增加面板底纹、边框或独立卡片。 |
+| md-preview / library | `.xp-dict-learning-section` | 学习补充的固定块（`data-learning-block="usage"` 用法要点 / `"etymology"` 词源，查词重设计 1B.8），在 AI 词条之后、旧类别与此前版本之前；块首 `.xp-dict-learning-title` 小标题（次级色、600/700 字重、18px 行高），随后是本块已生成结果（展开显示，搭配与句型在辨析之前）和每个付费类别各自一行 `.xp-dict-usage-actions`。块间距 md-preview sp-3 / library sp-4，块内段落上距 sp-2。付费按钮 = `wandSparkles` 14px + 文字 + `.xp-dict-model` 模型名，图文 gap sp-1；已有结果的类别不显示按钮，没有「查看已保存」。不画底色、边框或卡片，library 登记在 `canvasStructures`。 |
 
 清点（2026-09-05 工作流，四表面 138/97/134/273 个 token）同时给出了**候选**原语——popup 的 `actions`/`field-foot`/`banner`/`card`/`list-row`、library 的 `lib-row`/`lib-cluster`/`lib-section`/`lib-block`/`lib-quote`、md-preview 的 `rail-row`/`panel-head`/`panel-actions`/`seg-row`/`stack`/`pop-body`/`scroll-list`——每个都能吸收 5～15 个遗留类。它们**尚未登记**：登记的时机是把对应遗留类真正迁过去的那次施工，不提前占名。（2026-10 现状，library 部分：`lib-cluster` 已登记为原语；`lib-section` / `lib-block` 登记过，详情重写后无生产者，T9c 退役；`lib-quote` 已随平铺画布退役，C56。）
 

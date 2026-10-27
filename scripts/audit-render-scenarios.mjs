@@ -45,7 +45,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('dict-entry-details', ['dict-entry-result'], { target: '.xp-dict-ai-details[data-supplement-id][open]' }),
     context('dict-entry-usage-busy', ['dict-entry-result'], { target: '.xp-dict-usage-feedback[data-state="busy"]' }),
     context('dict-entry-usage-error', ['dict-entry-usage-busy'], { target: '.xp-dict-usage-feedback[data-state="error"]' }),
-    context('dict-entry-usage-result', ['dict-entry-usage-error'], { target: '.xp-dict-supplement .xp-dict-usage-feedback[data-state="saved"]' }),
+    context('dict-entry-usage-result', ['dict-entry-usage-error'], { target: '[data-learning-block="usage"] .xp-dict-usage-feedback[data-state="saved"]' }),
     context('dict-entry-cached', ['dict-entry-result'], { target: '.xp-dict-ai-content:not([hidden])' }),
     context('dict-entry-error', ['dict-entry-idle'], { target: '.xp-dict-ai-status:not([hidden])' }),
     context('vocab-batch-bar', ['vocab-detail'], { target: '#vocab-batch-toolbar.selecting' }),

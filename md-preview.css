@@ -2463,11 +2463,18 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
 .xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement {
   max-inline-size: 100%; line-height: 18px; white-space: normal; overflow-wrap: anywhere;
 }
-.xp-dict-supplement > .xp-dict-lang { display: flex; align-items: center; width: 100%; min-width: 0; margin-top: var(--sp-2); font-family: inherit; line-height: 18px; }
 .xp-dict-supplement-profile { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); }
 .xp-dict-supplement-profile > .xp-dict-src { margin: 0; }
 .xp-dict-supplement-profile .xp-dict-profile-link { color: var(--link); }
-.xp-dict-supplement > .xp-dict-connect { margin-top: var(--sp-2); }
+/* Learning blocks (dict redesign 1B.8): "usage points" and "etymology", each
+   a small title, its results, then one action row per paid category. No fill,
+   border or card -- spacing and the title separate them. */
+.xp-dict-learning-section { margin-top: var(--sp-3); }
+.xp-dict-learning-section > p { margin: var(--sp-2) 0 0; }
+.xp-dict-learning-section > .xp-dict-learning-title { margin: 0; font-size: 12px; line-height: 18px; font-weight: 600; color: var(--fg-secondary); }
+/* A paid action: wandSparkles, its text and the model name. */
+.xp-dict-supplement-generate { gap: var(--sp-1); }
+.xp-dict-supplement-generate > svg { width: 14px; height: 14px; flex: none; }
 .xp-dict-usage-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }
 .xp-dict-usage-actions > .xp-dict-update-supplement { margin-top: 0; }
 .xp-dict-usage-feedback { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); flex: 1; min-width: 0; }

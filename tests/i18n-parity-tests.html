@@ -6,6 +6,7 @@
 <script src="../i18n.js"></script>
 <script src="../shared.js"></script>
 <script src="../library.js"></script>
+<script src="../dict-archive.js"></script>
 <script>
 const root = document.getElementById("results");
 let pass = 0, fail = 0;
@@ -1045,6 +1046,28 @@ async function loadLocale(loc) {
     // compares locales with each other, so a deletion missed everywhere passes it.
     check("H22h retired Drive scope messages stay absent in every locale",
       lingering.length === 0, `still present: ${lingering.slice(0, 12).join(", ")}`);
+
+    // md-dict.js builds a saved supplement's title as
+    // t("dictSupplement" + Cap(category)) for every category the archive can
+    // hold -- a dynamic key no literal search finds. Read the list the
+    // archive itself consumes, so a category appended there without its
+    // title fails here. Simplest miss: a new category with a title in en only
+    // (H6 then fails too), or none anywhere (only this catches it).
+    const archiveCategories = typeof PBP_DICT_ARCHIVE_CATEGORIES !== "undefined" ? PBP_DICT_ARCHIVE_CATEGORIES : [];
+    const untitled = LOCALES.flatMap((loc) => archiveCategories
+      .map((category) => "dictSupplement" + category[0].toUpperCase() + category.slice(1))
+      .filter((key) => !(typeof msgs[loc][key]?.message === "string" && msgs[loc][key].message.trim()))
+      .map((key) => `${loc}.${key}`));
+    check("H22i every archive category has a non-empty supplement title in every locale",
+      archiveCategories.length >= 9 && untitled.length === 0, `missing: ${untitled.slice(0, 12).join(", ")}`);
+    const RETIRED_SUPPLEMENT_KEYS = ["dictSupplementCategory", "dictSupplementShow", "dictSupplementSourceHint",
+      "dictEntrySupplement", "dictSupplementGenerate", "dictEtymologyGenerate", "dictSupplementTopic"];
+    const retiredSupplement = LOCALES.flatMap((loc) =>
+      RETIRED_SUPPLEMENT_KEYS.filter((key) => key in msgs[loc]).map((key) => `${loc}.${key}`));
+    // The category select and its "view saved" / source-hint copy went with
+    // the fixed learning buttons (dict redesign 1B.8).
+    check("H22j retired supplement form messages stay absent in every locale",
+      retiredSupplement.length === 0, `still present: ${retiredSupplement.slice(0, 12).join(", ")}`);
   }
 
   // A slower refresh for the old language must not overwrite the mirror after

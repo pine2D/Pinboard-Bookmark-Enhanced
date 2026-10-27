@@ -6168,7 +6168,6 @@ const VALUE_BOX_LEGS = Object.freeze({
       ["#vocab-search", null], ["#vocab-language-filter-btn", null], ["#vocab-group-filter-btn", null], ["#vocab-lookup-input", null], ["#vocab-lookup-lang-btn", null],
       ["#vocab-detail .vocab-note-input", null],
       ["#vocab-detail .vocab-lemma-control", null], ["#vocab-save-definition-btn", null],
-      ["#dict-supplement-kind-btn", null],
       ["#vocab-batch-toolbar .vocab-group-unit", null], ["#vocab-detail .vocab-group-unit", null],
       ["#notes-filter", null], ["#notes-detail .vocab-note-input", null], ["#ask-library-search", null],
     ]),
@@ -6258,48 +6257,6 @@ const VALUE_BOX_LEGS = Object.freeze({
         },
       },
       {
-        context: "dictionary-supplement",
-        boxes: ["#dict-supplement-kind-btn"],
-        focus: ["#dict-supplement-kind-btn"],
-        async open(page, url, theme) {
-          await page.goto(`${url}?_ra=${encodeURIComponent(`fieldsupplement-${theme}`)}#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
-          await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS });
-          // Only the archive read is a fixture boundary. The shared entry
-          // renderer, disclosure and enhanced category listbox are production
-          // UI; this leg never generates or contacts a model.
-          await page.evaluate(async () => {
-            _pbpVocabDictChildCtrl?.abort();
-            const host = document.getElementById("vocab-ref-result");
-            host.replaceChildren();
-            const controller = new AbortController();
-            window._auditDictSupplementCtrl = controller;
-            const previousRead = pbpDictEntryRead;
-            try {
-              pbpDictEntryRead = async () => ({
-                entry: { word: "constraint", language: "en", pronunciation: "", meanings: [
-                  { partOfSpeech: "noun", definition: "Something that limits an action.", examples: [] },
-                ], etymology: "", relatedWords: [] },
-                archiveId: "fixture-constraint-entry", archiveSaved: true, supplements: [],
-                provider: "ollama", model: "fixture", generatedAt: 1792800000000, cached: true, cacheSaved: true,
-              });
-              const view = _pbpDictEntryMount(host, { term: "constraint", lang: "en", owner: _vocabCurrentOwner,
-                signal: controller.signal, isCurrent: () => !controller.signal.aborted,
-                controlsHost: document.getElementById("vocab-lookup-bar"),
-                settings: { previewAiEnabled: true, aiProvider: "ollama", dictDefaultView: "ai-saved", dictDefinitionLang: "en" },
-              });
-              if (!view) throw new Error("SETUP: shared dictionary entry view is unavailable");
-              await view.ready;
-            } finally { pbpDictEntryRead = previousRead; }
-          });
-          await page.locator(".xp-dict-supplement > summary").click();
-          await page.waitForSelector("#dict-supplement-kind-btn", { state: "visible", timeout: TIMEOUT_MS });
-          await page.evaluate(() => document.activeElement?.blur?.());
-          await page.mouse.move(0, 0);
-          await settleAnimations(page);
-          return async () => { await page.evaluate(() => { window._auditDictSupplementCtrl?.abort(); delete window._auditDictSupplementCtrl; }); };
-        },
-      },
-      {
         // Library redesign T4b / T6: the group filter's listbox button
         // (#vocab-group-filter-btn) sits in the "Filter" popover in the
         // narrow form (inline in the wide one). Its own leg on a fresh page,
@@ -6333,7 +6290,7 @@ const VALUE_BOX_LEGS = Object.freeze({
 // requires every entry here to be named by some leg's `focus` and measured on
 // every theme it ran.
 const VALUE_BOX_FOCUS_REQUIRED = Object.freeze({
-  library: Object.freeze(["#vocab-lookup-lang-btn", "#vocab-save-definition-btn", "#dict-supplement-kind-btn"]),
+  library: Object.freeze(["#vocab-lookup-lang-btn", "#vocab-save-definition-btn"]),
 });
 const valueBoxHoverLog = [];
 // One colour parser for every read of this leg (Task 7 fix round 1): a hex

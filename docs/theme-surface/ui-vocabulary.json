@@ -259,6 +259,7 @@
         "vocab-lookup-actions",
         "xp-dict-usage-actions",
         "xp-dict-usage-feedback",
+        "xp-dict-learning-section",
         "ask-library-workbench",
         "ask-library-index",
         "ask-library-scroll",
@@ -427,6 +428,7 @@
         "xp-dict-example-pair",
         "xp-dict-packs",
         "xp-dict-legacy",
+        "xp-dict-learning-section",
         "vocab-lookup-actions",
         "ask-library-workbench",
         "ask-library-index",
@@ -510,6 +512,7 @@
         "reader-check",
         "xp-dict-usage-actions",
         "xp-dict-usage-feedback",
+        "xp-dict-learning-section",
         "confirm-actions"
       ],
       "regions": [

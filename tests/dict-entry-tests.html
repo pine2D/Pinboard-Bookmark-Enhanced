@@ -163,7 +163,7 @@ await test('basic prompt retains field bounds with a bounded complete-answer req
 });
 await test('entry and supplement prompts share the curly double-quote mention convention',async()=>{
   reset();await pbpDictEntryRun(request());
-  const prompts=[calls[0].prompt,_pbpDictSupplementPrompt(request(),'collocations',{nativeLanguage:'',level:'',topic:''},[],JSON.parse(MODEL_RESPONSE))];
+  const prompts=[calls[0].prompt,_pbpDictSupplementPrompt(request(),'confusables',{nativeLanguage:'',level:'',topic:''},[],JSON.parse(MODEL_RESPONSE))];
   return prompts.every(p=>p.includes('“…”')&&!p.includes('single quotation marks')&&!p.includes('do not need quotation marks'));
 });
 await test('generated entry requests closed nested fields while keeping quoted prose inside strings',async()=>{
@@ -332,13 +332,13 @@ await test('1A.4 a four-sense charge entry survives parse, save and re-read, and
   const r=await pbpDictEntryRun(req),again=await pbpDictEntryRead(req);
   const defs=e=>e.meanings.map(m=>m.definition).join('|'),expected=JSON.parse(CHARGE_RESPONSE).meanings.map(m=>m.definition).join('|');
   if(!r.cacheSaved||defs(r.entry)!==expected||defs(writes[0].result.entry)!==expected||defs(again.entry)!==expected||calls.length!==1)return false;
-  const outOfRange=await (async()=>{try{pbpDictSupplementParse(CHARGE_USAGE(5),req,'collocations',[],again.entry);return false;}catch(e){return e.reason==='supplement_item_sense';}})();
+  const outOfRange=await (async()=>{try{pbpDictSupplementParse(CHARGE_USAGE(5),req,'confusables',[],again.entry);return false;}catch(e){return e.reason==='supplement_item_sense';}})();
   const frame=document.createElement('iframe');frame.hidden=true;const ready=new Promise(resolve=>frame.onload=resolve);frame.src='fixtures/dict-normalization-archive.html';document.body.append(frame);
   try{await ready;const api=frame.contentWindow,record=writes[0].result;
     const stored=await api.roundTripNormalized(record);
     if(!stored?.archiveSaved||defs(stored.entry)!==expected)return false;
-    const learning=pbpDictSupplementParse(CHARGE_USAGE(4),req,'collocations',[],stored.entry);
-    const supplement={category:'collocations',profile:{nativeLanguage:'',level:'',topic:''},content:learning.items[0].explanation,sources:[],learning,
+    const learning=pbpDictSupplementParse(CHARGE_USAGE(4),req,'confusables',[],stored.entry);
+    const supplement={category:'confusables',profile:{nativeLanguage:'',level:'',topic:''},content:learning.items[0].explanation,sources:[],learning,
       provider:'openai',model:'configured',generatedAt:Date.now()};
     const read=await api.roundTripNormalized(record,supplement),item=read.supplements?.[0]?.learning?.items?.[0];
     return outOfRange&&read.entry.meanings.length===4&&item?.sense===4&&read.entry.meanings[item.sense-1].definition.includes('充电');

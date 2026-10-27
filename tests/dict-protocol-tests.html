@@ -121,10 +121,10 @@ async function test(name, protocol, run) {
       queue(protocol, ENTRY); const entry = await pbpDictEntryRun(req);
       assert(entry.archiveSaved && entry.entry.meanings.length === 1 && entry.entry.pronunciation === '', 'Entry not normalized and saved');
       assert(entry.entry.meanings[0].examples[0].text === ENTRY.meanings.examples.text, 'Example lost in the protocol adapter');
-      queue(protocol, USAGE); const addition = await pbpDictSupplementRun({ ...req, category: 'collocations' });
+      queue(protocol, USAGE); const addition = await pbpDictSupplementRun({ ...req, category: 'confusables' });
       assert(addition.archiveSaved && addition.learning.items.length === 1 && addition.learning.items[0].sense === 1 &&
         addition.learning.items[0].sourceIndex === -1, 'Supplement not normalized and saved');
-      const reread = await pbpDictEntryRun(req), cachedAddition = await pbpDictSupplementRun({ ...req, category: 'collocations' });
+      const reread = await pbpDictEntryRun(req), cachedAddition = await pbpDictSupplementRun({ ...req, category: 'confusables' });
       assert(reread.archiveId === entry.archiveId && reread.supplements[0].id === addition.id && cachedAddition.id === addition.id, 'Archive identity changed');
       assert(calls.length === 2 && ownerReads > 0, 'Reread issued HTTP or skipped owner verification');
       assert(calls.every(call => call.body.model === protocol.model || call.url.includes('/models/' + protocol.model + ':')), 'User model was replaced');
@@ -140,12 +140,12 @@ async function test(name, protocol, run) {
     });
     await test(protocol.name + ': truncated supplements never save or retry and failed updates retain old learning', protocol, async req => {
       queue(protocol, ENTRY); await pbpDictEntryRun(req);
-      queue(protocol, USAGE, true); await reject(() => pbpDictSupplementRun({ ...req, category: 'collocations' }), 'output_truncated');
+      queue(protocol, USAGE, true); await reject(() => pbpDictSupplementRun({ ...req, category: 'confusables' }), 'output_truncated');
       assert(calls.length === 2 && (await pbpDictEntryRead(req)).supplements.length === 0, 'Truncated supplement saved or retried');
-      queue(protocol, USAGE); const old = await pbpDictSupplementRun({ ...req, category: 'collocations' });
+      queue(protocol, USAGE); const old = await pbpDictSupplementRun({ ...req, category: 'confusables' });
       queue(protocol, { ...USAGE, summary: '这段新的内容不能覆盖已保存版本。' }, true);
-      await reject(() => pbpDictSupplementRun({ ...req, category: 'collocations', updateId: old.id }), 'output_truncated');
-      const kept = await pbpDictSupplementRun({ ...req, category: 'collocations' });
+      await reject(() => pbpDictSupplementRun({ ...req, category: 'confusables', updateId: old.id }), 'output_truncated');
+      const kept = await pbpDictSupplementRun({ ...req, category: 'confusables' });
       assert(calls.length === 4 && kept.id === old.id && (await pbpDictEntryRead(req)).supplements.length === 1, 'Failed supplement update changed paid learning');
     });
     await test(protocol.name + ': wrong identity and missing core content are rejected before persistence', protocol, async req => {
@@ -158,7 +158,7 @@ async function test(name, protocol, run) {
       queue(protocol, ENTRY); await pbpDictEntryRun(req);
       for (const items of [{ ...USAGE.items, explanation: null }, { ...USAGE.items, sense: '9' }]) {
         const before = calls.length; queue(protocol, { ...USAGE, items });
-        await reject(() => pbpDictSupplementRun({ ...req, category: 'collocations' }), 'invalid_response');
+        await reject(() => pbpDictSupplementRun({ ...req, category: 'confusables' }), 'invalid_response');
         assert(calls.length === before + 1 && (await pbpDictEntryRead(req)).supplements.length === 0, 'Invalid supplement saved or retried');
       }
     });
