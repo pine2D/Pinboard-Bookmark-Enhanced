@@ -623,11 +623,15 @@ await test('patterns that differ only in case and punctuation under one sense ar
   return r.archiveSaved&&r.learning.items.length===2&&r.learning.omittedItems===1&&
     r.learning.items.map(item=>item.sense+':'+item.title).join('|')==='1:take off|0:take off';
 });
-await test('every pattern dropped fails as invalid_response, while an empty list is a neutral unsupported result',async()=>{
+await test('every pattern dropped fails with its first reason, all in the wrong script fails as wrong_language, and an empty list is neutral',async()=>{
   existing();patternsAnswer([pattern('x'.repeat(161)),pattern('faraway places',undefined,{sense:9})]);
   if(!await rejectsReason(()=>pbpDictSupplementRun(request({category:'patterns'})),'invalid_response','supplement_item_text')||appended.length)return false;
   reset();existing();patternsAnswer([pattern('faraway places','Used for places that are very far from the speaker, often with a sense of longing for them.',{translation:'She longs for places far away from home.'})]);
-  if(!await rejectsReason(()=>pbpDictSupplementRun(request({category:'patterns'})),'invalid_response','supplement_items_all_invalid')||appended.length)return false;
+  if(!await rejectsReason(()=>pbpDictSupplementRun(request({category:'patterns'})),'wrong_language','explanation_script')||appended.length)return false;
+  // Mixed reasons report the first structural one, not the script failure.
+  reset();existing();patternsAnswer([pattern('faraway places','Used for places that are very far from the speaker, often with a sense of longing for them.',{translation:'She longs for places far away from home.'}),
+    pattern('faraway places',undefined,{sense:9})]);
+  if(!await rejectsReason(()=>pbpDictSupplementRun(request({category:'patterns'})),'invalid_response','supplement_item_sense')||appended.length)return false;
   reset();existing();patternsAnswer([]);
   return await rejects(()=>pbpDictSupplementRun(request({category:'patterns'})),'unsupported_usage')&&appended.length===0&&calls.length===1;
 });
@@ -638,6 +642,22 @@ await test('a pattern explained in English for a Chinese target is dropped alone
     pattern('in a faraway land','多用于故事开头，指离现实很远的地方。')]);
   const r=await pbpDictSupplementRun(request({category:'patterns'}));
   return r.archiveSaved&&r.learning.omittedItems===1&&r.learning.items.map(item=>item.title).join('|')==='faraway places|in a faraway land';
+});
+await test('a pattern whose note leaks an internal identifier is dropped alone and the card is saved',async()=>{
+  existing();patternsAnswer([pattern('faraway places'),pattern('a faraway look','描述出神的表情，sourceLanguage 里常用来写人物在想远方的事。')]);
+  const {value:r,warns}=await captureWarnings(()=>pbpDictSupplementRun(request({category:'patterns'})));
+  return r.archiveSaved&&appended.length===1&&r.learning.omittedItems===1&&r.learning.items.map(item=>item.title).join('|')==='faraway places'&&
+    !r.content.includes('sourceLanguage')&&warns.some(w=>w.includes('internal_term'));
+});
+await test('a German-to-Chinese pattern may name a field word from its own head, but not one outside it',async()=>{
+  // Both languages are non-English, so the field-word rule applies; the head
+  // exemption is per pattern, so the second note cannot borrow the first head.
+  const own=pattern('eine persönliche Note','其中 Note 指个人特色，常用于评价风格、装饰或礼物。',{example:'Das Geschenk hat eine persönliche Note.',translation:'这份礼物带着个人特色。'});
+  const leak=pattern('etwas persönlich nehmen','这里的 Note 是：把别人的话当成针对自己。',{example:'Nimm es nicht persönlich.',translation:'别往心里去。'});
+  existing();patternsAnswer([own,leak]);
+  const {value:r,warns}=await captureWarnings(()=>pbpDictSupplementRun(request({...DE_ZH,term:'persönlich',category:'patterns'})));
+  return r.archiveSaved&&appended.length===1&&r.learning.omittedItems===1&&r.learning.items.length===1&&
+    r.learning.items[0].title==='eine persönliche Note'&&warns.some(w=>w.includes('internal_term'));
 });
 await test('a patterns card saves as ordinary v2 items with an empty summary',async()=>{
   existing();patternsAnswer([pattern('faraway places')]);

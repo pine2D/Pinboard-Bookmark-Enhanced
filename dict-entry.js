@@ -958,8 +958,7 @@ function _pbpDictPatternsParse(text, request, entry, replacesId = "") {
   };
   const leakContext = { term: request.term, sourceLanguage: request.sourceLanguage, target: request.target,
     forms: [entry.word, ...entry.meanings.flatMap(m => [m.definition, ...(m.examples || []).map(e => e.text)])] };
-  const items = [], seen = new Set();
-  let firstInvalid;
+  const items = [], seen = new Set(), dropped = [];
   for (const raw of kept) {
     try {
       const item = object(raw) ? { ...raw, sense: integer(raw.sense) } : raw;
@@ -981,12 +980,17 @@ function _pbpDictPatternsParse(text, request, entry, replacesId = "") {
       if (!["invalid_response", "wrong_language"].includes(error?.code)) throw error;
       // Fixed validation label only, never the model's text.
       console.warn("[dict-entry] pattern dropped:", error.reason || error.code);
-      if (error.code === "invalid_response") firstInvalid ||= error;
+      dropped.push(error);
     }
   }
   // Patterns were returned but none survived: a failed paid answer, never
-  // the neutral "nothing to say" of an explicit empty list.
-  if (!items.length) throw firstInvalid || _pbpDictEntryError("invalid_response", "Incomplete or unverified learning content", "supplement_items_all_invalid");
+  // the neutral "nothing to say" of an explicit empty list. Every pattern in
+  // the wrong script is the same wrong-language answer as a whole-card script
+  // failure, so the reader keeps its specific message (as for base senses);
+  // otherwise the first structural reason is reported. kept is non-empty, so
+  // dropped is too.
+  if (!items.length) throw dropped.every(error => error.code === "wrong_language") ? dropped[0] :
+    dropped.find(error => error.code === "invalid_response");
   const omittedItems = kept.length - items.length;
   return { version: 2, language: request.target, summary: "", items, replacesId, ...(omittedItems ? { omittedItems } : {}) };
 }
