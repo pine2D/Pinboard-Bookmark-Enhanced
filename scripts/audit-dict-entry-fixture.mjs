@@ -49,9 +49,57 @@ export async function installDictEntryFixture(page) {
     // scenario reset discards only its fixture store, never the user's archive.
     window._auditDictEntry.resetArchive = async () => {
       if (_pbpDictArchiveStore) await _pbpDictArchiveStore.close();
-      _pbpDictArchiveStore = pbpCreateDictArchiveStore({ dbName: "dict-render-" + crypto.randomUUID(), readLegacy: async () => [] });
-      const read = _pbpDictArchiveStore.read;
-      _pbpDictArchiveStore.read = async input => { window._auditDictEntry.reads++; return read(input); };
+      const dbName = "dict-render-" + crypto.randomUUID();
+      _pbpDictArchiveStore = pbpCreateDictArchiveStore({ dbName, readLegacy: async () => [] });
+      const store = _pbpDictArchiveStore, read = store.read;
+      store.read = async input => {
+        window._auditDictEntry.reads++;
+        if (window._auditDictEntry.legacySeed) {
+          window._auditDictEntry.legacySeed = false;
+          // A seed the archive refuses is a broken fixture, never a silent miss.
+          try { await seedLegacy(dbName, input); window._auditDictEntry.legacySeeded = true; }
+          catch (error) { window._auditDictEntry.legacySeedError = (error?.code || error?.name || 'error') + ': ' + error?.message; }
+        }
+        return read(input);
+      };
+    };
+    // The legacy state (plan 1B.7/1C.3): records an earlier version saved in
+    // categories that can no longer be generated -- a literature quotation
+    // with its AI translation, a culture explanation citing Wikipedia, and a
+    // plain-text collocations record requested for a topic. They are written
+    // through the production archive (its own validation runs) into the
+    // fixture database for the lookup's real identity, so the page reads them
+    // back as saved data. The seeding store answers the lookup's own owner,
+    // which also covers a signed-out reader fixture (owner ""), and is not
+    // bound to the reading query: the first read can belong to a lookup that
+    // a settings change is already replacing, and the next one reads the seed.
+    const seedLegacy = async (dbName, input) => {
+      const store = pbpCreateDictArchiveStore({ dbName, readLegacy: async () => [], getCurrentOwner: async () => input.owner });
+      const base = { owner: input.owner, term: input.term, sourceLanguage: input.sourceLanguage, target: input.target, isCurrent: () => true };
+      const saved = await store.save({ ...base, record: { provider: 'fixture-provider', model: 'fixture-model-2025', generatedAt: 1760000000000, entry: {
+        word: input.term, language: input.sourceLanguage, pronunciation: '/ˈwɜːd/', etymology: '', relatedWords: [], meanings: [
+          { partOfSpeech: '名词', definition: '早先保存的一条 AI 释义，用来承载旧类别的补充。',
+            examples: [{ text: 'An earlier saved example sentence.', translation: '一句早先保存的例句。' }] }
+        ] } } });
+      const language = { name: input.target.name, lang: input.target.lang };
+      const common = { owner: input.owner, archiveId: saved.archiveId, provider: 'fixture-provider', model: 'fixture-model-2025',
+        profile: { nativeLanguage: '', level: '', topic: '' }, isCurrent: () => true };
+      const quotation = 'It was the best of times, it was the worst of times, and the queried word sat in the middle of a long original sentence.';
+      await store.append({ ...common, generatedAt: 1760000001000, category: 'literature', content: '文学用例：原文引文与译文。',
+        sources: [{ title: 'A Tale of Two Cities/Book 1/Chapter 1', url: 'https://en.wikisource.org/w/index.php?oldid=11223344', excerpt: quotation,
+          author: 'Charles Dickens', work: 'A Tale of Two Cities', location: 'Book 1 · Chapter 1 · ¶ 1', language: 'en', genre: 'novel',
+          revision: '11223344', retrievedAt: 1760000000500 }],
+        learning: { version: 2, language, summary: '', replacesId: '', items: [{ sense: 1, title: 'the best of times',
+          explanation: '小说开篇用这个词铺陈对照，读者据此进入时代背景。', example: quotation,
+          translation: '那是最好的时代，也是最坏的时代，这个词就在一句很长的原文中间。', sourceIndex: 0 }] } });
+      await store.append({ ...common, generatedAt: 1760000002000, category: 'culture', content: '文化用法：社群中的引申义。',
+        sources: [{ title: 'Word (community usage)', url: 'https://en.wikipedia.org/w/index.php?oldid=55667788', excerpt: 'In this community the word is used for a distant ideal.',
+          author: '', work: 'Word (community usage)', location: '¶ 1', language: 'en', genre: 'culture', revision: '55667788', retrievedAt: 1760000001500 }],
+        learning: { version: 2, language, summary: '', replacesId: '', items: [{ sense: 1, title: 'a distant ideal',
+          explanation: '在该社群中引申为遥不可及的理想，多见于讨论帖。', example: '', translation: '', sourceIndex: 0 }] } });
+      await store.append({ ...common, generatedAt: 1760000003000, category: 'collocations', profile: { nativeLanguage: '', level: '', topic: 'work' },
+        content: '早先按话题“work”保存的搭配说明：make a word count、keep one’s word。这是没有结构化条目的旧式纯文本补充。', sources: [] });
+      await store.close();
     };
     await window._auditDictEntry.resetArchive();
     pbpAiCacheGet = async key => {
@@ -266,6 +314,40 @@ export async function openDictEntryState(page, state) {
     await page.evaluate(() => { window._auditDictEntry.examplesMiss = false; });
     if (await page.evaluate(() => window._auditDictEntry.calls) !== before) throw new Error('SETUP: free examples issued an AI request');
     return remembered.isVisible();
+  }
+  if (state === 'legacy') {
+    // Old literature, culture and topic collocations records stay readable
+    // with the old-category label and no update (plan 1B.7, 1C.3); reading
+    // them needs no AI key and makes no request. Each fold is opened the way
+    // a reader would, so its content is what the geometry checks measure.
+    await page.evaluate(async () => {
+      window._auditDictEntry.cache.clear();
+      await window._auditDictEntry.resetArchive();
+      Object.assign(window._auditDictEntry, { legacySeed: true, legacySeeded: false, legacySeedError: '' });
+    });
+    const before = await page.evaluate(() => window._auditDictEntry.calls);
+    await rerunLookup(page);
+    await page.waitForFunction(() => window._auditDictEntry.legacySeeded || window._auditDictEntry.legacySeedError);
+    const seedError = await page.evaluate(() => window._auditDictEntry.legacySeedError);
+    if (seedError) throw new Error('SETUP: the archive refused the old-category seed: ' + seedError);
+    for (const category of ['literature', 'culture', 'collocations']) {
+      const section = page.locator(`.xp-dict-ai-details[data-supplement-category="${category}"]`);
+      await section.waitFor();
+      if (!(await section.evaluate(node => node.open))) await section.locator(':scope > summary').click();
+      await section.locator('.xp-dict-supplement-text').waitFor({ state: 'visible' });
+      await section.evaluate(async node => {
+        await Promise.all(node.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
+      });
+    }
+    const legacy = await page.evaluate(() => ({
+      labelled: ['literature', 'culture', 'collocations'].every(category =>
+        document.querySelector(`.xp-dict-ai-details[data-supplement-category="${category}"] > summary`)?.textContent.endsWith(t('dictSupplementLegacyCategory'))),
+      updates: document.querySelectorAll('.xp-dict-ai-details[data-supplement-category] .xp-dict-update-supplement').length,
+      calls: window._auditDictEntry.calls }));
+    if (!legacy.labelled) throw new Error('SETUP: an old-category record lost its old-category label');
+    if (legacy.updates) throw new Error('SETUP: an old-category record offers an update');
+    if (legacy.calls !== before) throw new Error('SETUP: reading old-category records issued an AI request');
+    return page.locator('.xp-dict-ai-details[data-supplement-category="literature"][open] .xp-dict-example-translation').isVisible();
   }
   throw new Error('SETUP: unknown dictionary entry state ' + state);
 }

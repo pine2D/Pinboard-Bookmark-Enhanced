@@ -736,6 +736,9 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-entry-examples": { requires: ["edges", "senseIndent", "original", "overflow", "clip"] },
         // A remembered empty result: the action and its neutral note, no sentence.
         "dict-entry-negative": { requires: ["edges", "senseIndent", "overflow", "clip"] },
+        // Old-category records opened: a literature quotation with its saved
+        // AI translation, a culture explanation and a plain-text record.
+        "dict-entry-legacy": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-panel": { root: "#reader-dict-view .xp-dict", overflowRoot: "#reader-dict-view",
           requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
       },
@@ -752,6 +755,7 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip"] },
         "dict-entry-examples": { requires: ["edges", "senseIndent", "original", "overflow", "clip"] },
         "dict-entry-negative": { requires: ["edges", "senseIndent", "overflow", "clip"] },
+        "dict-entry-legacy": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
       },
     },
   },

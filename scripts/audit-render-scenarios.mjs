@@ -23,7 +23,7 @@ export const RENDER_READER_CONTEXTS = Object.freeze([
   'reader-source-details', 'export-more', 'reader-bookmark-footer', 'reader-bookmark-editor', 'reader-bookmark-delete-confirm',
   'explain-pop', 'explain-dict', 'dict-resize-menu', 'dict-entry-idle', 'dict-entry-busy', 'dict-entry-result', 'dict-entry-details',
   'dict-entry-usage-busy', 'dict-entry-usage-error', 'dict-entry-usage-result',
-  'dict-entry-panel', 'dict-entry-cached', 'dict-entry-error', 'dict-entry-examples', 'dict-entry-negative', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
+  'dict-entry-panel', 'dict-entry-cached', 'dict-entry-error', 'dict-entry-examples', 'dict-entry-negative', 'dict-entry-legacy', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
   'pb-hl-card', 'send-menu', 'confirm-popover', 'tr-ask',
 ]);
 const context = (name, dependencies = [], extra = {}) => ({ name, dependencies, ...extra });
@@ -54,6 +54,9 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     // The remembered empty result (plan 1C.4) of the same free block: a real
     // clean miss writes the local memory, the next lookup reads it back.
     context('dict-entry-negative', [], { target: '.xp-dict-examples .xp-dict-examples-find[data-remembered="true"]' }),
+    // Old literature, culture and topic collocations records (plan 1B.7,
+    // 1C.3), seeded into the production archive: no AI state is needed.
+    context('dict-entry-legacy', [], { target: '.xp-dict-ai-details[data-supplement-category="literature"][open]' }),
     context('vocab-batch-bar', ['vocab-detail'], { target: '#vocab-batch-toolbar.selecting' }),
     context('ask-history-list', [], { target: '#ask-library-list .ask-library-hit' }),
     context('ask-history-detail', ['ask-history-list'], { target: '#ask-library-detail:not([hidden])' }),
