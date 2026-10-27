@@ -4569,8 +4569,6 @@
   "dictSupplementScenarios": {"message": "情境例句"},
   "dictSupplementCulture": {"message": "文化與網絡用法"},
   "dictSupplementLiterature": {"message": "文學作品用例"},
-  "dictSupplementTopic": {"message": "使用情境（選填）"},
-  "dictSupplementTopicPlaceholder": {"message": "例如：工作電郵、旅行對話、遊戲聊天"},
   "dictSupplementGenerate": {"message": "生成補充"},
   "dictSupplementGenerating": {"message": "正在生成補充用法…"},
   "dictSupplementSaved": {"message": "已儲存到此裝置"},

@@ -57,9 +57,11 @@ export async function installDictEntryFixture(page) {
         await new Promise(resolve => { state.usageRelease = resolve; });
         opts.signal?.throwIfAborted();
         if (state.usageFail) throw Object.assign(new Error('Synthetic truncated completion'), { code: 'output_truncated', status: 200 });
-        if (lookup.category === 'etymology') return JSON.stringify({ language: 'zh-Hans', summary: '通过相关词区分表达形式与含义。', items: [
-          { sense: 0, kind: 'topic', title: 'expression', explanation: '强调表达形式，可用于对照词汇和短语。', sourceIndex: -1 },
-          { sense: 0, kind: 'topic', title: 'meaning', explanation: '表示词语在特定语境中表达的含义。', sourceIndex: -1 }
+        // No etymology source is fixtured, so production asks for modern
+        // formation only (plan 1B.4) and drops any other kind.
+        if (lookup.category === 'etymology') return JSON.stringify({ language: 'zh-Hans', summary: '从构词成分理解这个词的含义。', items: [
+          { sense: 0, kind: 'formation', title: 'word + -ing', explanation: '词根加上后缀，表示与该动作相关的过程或结果。', sourceIndex: -1 },
+          { sense: 0, kind: 'formation', title: 'word + -less', explanation: '词根加上表示缺少的后缀，构成形容词。', sourceIndex: -1 }
         ] });
         return JSON.stringify({ language: 'zh-Hans', summary: '先选定要表达的含义，再选择与情境相符的搭配。以下为独立编写的例句。', items: [
           { sense: 1, title: 'a practical example', explanation: '用于把抽象的说明落实到可操作的例子中，适合讨论工作方法或学习步骤。', example: 'Please give us a practical example.', translation: '请给我们一个实际的例子。', sourceIndex: -1 },
@@ -130,20 +132,13 @@ export async function openDictEntryState(page, state) {
     });
     return details.locator('.xp-dict-supplement-text').isVisible();
   }
-  if (state === 'usage-scope') {
+  if (state === 'usage-busy') {
+    // The supplement form opens here now that the topic-scope state is gone (1B.5).
     const form = page.locator('.xp-dict-supplement');
     if (!await form.evaluate(node => node.open)) await form.locator(':scope > summary').click();
-    await form.locator('.xp-dict-supplement-kind').selectOption('scenarios', { force: true });
-    await form.locator('.xp-dict-supplement-topic').fill('工作中的客户沟通');
-    await form.locator('.xp-dict-supplement-kind').selectOption('collocations', { force: true });
-    await form.locator('.xp-dict-topic-scope > summary').click();
-    await form.locator('.xp-dict-supplement-topic').fill('讨论项目计划、对比服务方案与明确下一步行动');
     await form.evaluate(async node => {
       await Promise.all(node.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
     });
-    return form.locator('.xp-dict-supplement-topic').isVisible();
-  }
-  if (state === 'usage-busy') {
     await page.evaluate(() => Object.assign(window._auditDictEntry, { usageEntered: false, usageRelease: null, usageFail: true }));
     await page.locator('.xp-dict-supplement-generate').click();
     await page.waitForFunction(() => window._auditDictEntry.usageEntered);

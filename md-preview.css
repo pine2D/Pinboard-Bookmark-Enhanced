@@ -2464,28 +2464,15 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
   max-inline-size: 100%; line-height: 18px; white-space: normal; overflow-wrap: anywhere;
 }
 .xp-dict-supplement > .xp-dict-lang { display: flex; align-items: center; width: 100%; min-width: 0; margin-top: var(--sp-2); font-family: inherit; line-height: 18px; }
-.xp-dict-supplement-label { display: block; margin-top: var(--sp-3); font-size: 12px; line-height: 18px; color: var(--fg-secondary); }
-.xp-dict-supplement-topic { display: block; width: 100%; box-sizing: border-box; margin-top: var(--sp-1); }
-.xp-dict-supplement-topic {
-  height: 26px; padding: 0 var(--sp-2); font: inherit; font-size: 12px;
-  border: 1px solid var(--border); border-radius: var(--radius-md);
-  background: var(--surface); color: var(--fg);
-}
-.xp-dict-supplement-topic::placeholder { color: var(--fg-muted); }
-.xp-dict-supplement-topic:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 .xp-dict-supplement-profile { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); }
 .xp-dict-supplement-profile > .xp-dict-src { margin: 0; }
 .xp-dict-supplement-profile .xp-dict-profile-link { color: var(--link); }
 .xp-dict-supplement > .xp-dict-connect { margin-top: var(--sp-2); }
-.xp-dict-topic-scope { margin-top: var(--sp-1); }
-.xp-dict-topic-scope > summary { width: fit-content; max-width: 100%; box-sizing: border-box; }
-.xp-dict-topic-scope > summary::after { margin-inline-start: var(--sp-1); }
-.xp-dict-topic-scope .xp-dict-supplement-label { margin-top: 0; }
 .xp-dict-usage-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-2); }
 .xp-dict-usage-actions > .xp-dict-update-supplement { margin-top: 0; }
 .xp-dict-usage-feedback { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2); flex: 1; min-width: 0; }
 .xp-dict-usage-status { flex: 1; min-width: 0; font-size: 12px; line-height: 18px; }
-.xp-dict-usage-feedback[hidden], .xp-dict-topic-scope[hidden] { display: none; }
+.xp-dict-usage-feedback[hidden] { display: none; }
 .xp-dict-retry-save { margin-top: var(--sp-2); }
 .xp-foot > .xp-dict-save-meaning { flex: 1 1 100px; width: 100px; min-width: 0; max-width: 100%; white-space: nowrap; }
 .xp-dict-lang > button { display: block; width: 100%; min-width: 0; padding: 0; border: none; background: none; color: inherit; font: inherit; text-align: start; }

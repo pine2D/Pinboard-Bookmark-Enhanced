@@ -4563,8 +4563,6 @@
   "dictSupplementScenarios": {"message": "场景例句"},
   "dictSupplementCulture": {"message": "文化与网络用法"},
   "dictSupplementLiterature": {"message": "文学作品用例"},
-  "dictSupplementTopic": {"message": "使用场景（可选）"},
-  "dictSupplementTopicPlaceholder": {"message": "例如：工作邮件、旅行对话、游戏聊天"},
   "dictSupplementGenerate": {"message": "生成补充"},
   "dictSupplementGenerating": {"message": "正在生成补充用法…"},
   "dictSupplementSaved": {"message": "已保存到本机"},

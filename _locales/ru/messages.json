@@ -4569,8 +4569,6 @@
   "dictSupplementScenarios": {"message": "Примеры для ситуации"},
   "dictSupplementCulture": {"message": "Культура и интернет-сленг"},
   "dictSupplementLiterature": {"message": "Примеры из литературы"},
-  "dictSupplementTopic": {"message": "Ситуация использования (необязательно)"},
-  "dictSupplementTopicPlaceholder": {"message": "Например: рабочая переписка, разговоры в поездке, игровой чат"},
   "dictSupplementGenerate": {"message": "Создать дополнение"},
   "dictSupplementGenerating": {"message": "Создание дополнения…"},
   "dictSupplementSaved": {"message": "Сохранено на этом устройстве"},

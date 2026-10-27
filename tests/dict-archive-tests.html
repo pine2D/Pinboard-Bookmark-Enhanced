@@ -246,7 +246,7 @@ test("a generated patterns card maps to v2 items the archive accepts, unchanged 
   const learning = _pbpDictPatternsParse(card, request(), clone(REMOTE.value.entry));
   assert(learning.items.length === 2 && learning.omittedItems === 1 && learning.summary === "");
   assert(_pbpDictArchiveSupplementLearning(learning, { category: "patterns", sources: [] }));
-  const profile = pbpDictSupplementProfile({ dictLearnerLevel: "advanced" }, "work", "patterns");
+  const profile = pbpDictSupplementProfile({ dictLearnerLevel: "advanced" }, "patterns");
   const content = learning.items.map(item => [item.title, item.explanation, item.example, item.translation].join("\n")).join("\n\n");
   await f.store.append(supplement(saved.archiveId, { category: "patterns", profile, content, learning: clone(learning) }));
   const reopened = await f.reopen(), row = (await reopened.read(request())).supplements.find(item => item.category === "patterns");

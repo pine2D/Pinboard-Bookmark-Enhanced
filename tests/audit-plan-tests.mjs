@@ -101,7 +101,7 @@ test('shared dictionary modules route by consumers rather than filename prefix',
 });
 test('dictionary feature plans retain the actual registered AI entry states on both surfaces', () => {
   const rows = catalog.filter(row => row.runner === 'render' && row.features?.includes('dictionary-entry'));
-  const states = ['idle', 'busy', 'result', 'details', 'usage-scope', 'usage-busy', 'usage-error', 'usage-result', 'cached', 'error'];
+  const states = ['idle', 'busy', 'result', 'details', 'usage-busy', 'usage-error', 'usage-result', 'cached', 'error'];
   for (const surface of ['library', 'md-preview']) for (const state of states) {
     assert.ok(rows.some(row => row.id === `render.${surface}.sweep.dict-entry-${state}`), `${surface}: ${state} must be registered`);
   }

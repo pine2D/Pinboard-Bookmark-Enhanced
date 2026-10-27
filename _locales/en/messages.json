@@ -4576,8 +4576,6 @@
   "dictSupplementScenarios": {"message": "Examples for a situation"},
   "dictSupplementCulture": {"message": "Culture and internet usage"},
   "dictSupplementLiterature": {"message": "Examples from literature"},
-  "dictSupplementTopic": {"message": "Usage situation (optional)"},
-  "dictSupplementTopicPlaceholder": {"message": "For example, work emails, travel conversations, or game chat"},
   "dictSupplementGenerate": {"message": "Generate supplement"},
   "dictSupplementGenerating": {"message": "Generating supplementary usage…"},
   "dictSupplementSaved": {"message": "Saved on this device"},

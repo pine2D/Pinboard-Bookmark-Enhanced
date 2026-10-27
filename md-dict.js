@@ -1720,7 +1720,7 @@ function _pbpDictEntryMount(host, opts) {
   panel.append(status, content); host.appendChild(panel);
   let settings = null, record = null, busy = false, active = null, epoch = 0, mode = "dictionary", viewRevision = 0;
   let usageCategory = "collocations", usageActivity = null;
-  const usageDrafts = new Map(), usageExpanded = new Map(), usageFeedbacks = new WeakMap();
+  const usageFeedbacks = new WeakMap();
   let renderedBase = "", baseDetails = null, baseRetry = null, usageForm = null, previousSupplements = null;
   const supplementNodes = new Map();
   const preference = () => typeof pbpDictDefaultView === "function" ? pbpDictDefaultView(settings) :
@@ -2034,7 +2034,9 @@ function _pbpDictEntryMount(host, opts) {
       receipt.textContent = [t(addition.archiveSaved === false ? "dictSupplementSaveFailed" : "dictSupplementSaved"),
         addition.provider, addition.model, new Date(addition.generatedAt).toLocaleDateString(_pbpDictUiLocale()),
         t("dictSupplementLanguage", languageName(addition.learning?.language || answerLanguage))].join(" · ");
-      if (configured() && addition.id && addition.archiveSaved !== false && !replaced.has(id)) {
+      // A record saved with a topic belongs to an old category and stays
+      // read-only (1B.5): its replacement could not keep that profile.
+      if (configured() && addition.id && addition.archiveSaved !== false && !replaced.has(id) && !addition.profile?.topic) {
         if (!item.update) {
           item.update = button("dictSupplementUpdate", "xp-dict-update-supplement");
           item.update.addEventListener("click", () => usageForm?.update(item.addition));
@@ -2093,17 +2095,6 @@ function _pbpDictEntryMount(host, opts) {
     for (const category of PBP_DICT_SUPPLEMENT_CATEGORIES.filter(category => category !== "etymology")) kind.append(new Option(
       t("dictSupplement" + category[0].toUpperCase() + category.slice(1)), category));
     kind.value = usageCategory;
-    const topicLabel = document.createElement("label"); topicLabel.className = "xp-dict-supplement-label";
-    const topicCaption = document.createElement("span"); topicCaption.textContent = t("dictSupplementTopic");
-    topicLabel.append(topicCaption);
-    const topic = document.createElement("input");
-    topic.type = "text"; topic.className = "xp-dict-supplement-topic"; topic.maxLength = 120; topic.dir = "auto";
-    topic.placeholder = t("dictSupplementTopicPlaceholder"); topic.setAttribute("aria-label", t("dictSupplementTopic"));
-    topic.value = usageDrafts.get(usageCategory) || ""; topicLabel.appendChild(topic);
-    const context = document.createElement("div");
-    const scope = document.createElement("details"); scope.className = "xp-dict-ai-details xp-dict-topic-scope";
-    const scopeLabel = document.createElement("summary"); scopeLabel.textContent = t("dictSupplementTopic"); scope.appendChild(scopeLabel);
-    context.append(scope, topicLabel);
     const submit = button("dictSupplementGenerate", "xp-dict-supplement-generate");
     const profile = document.createElement("p"); profile.className = "xp-dict-src xp-dict-supplement-profile";
     const learner = pbpDictSupplementProfile(settings);
@@ -2127,7 +2118,7 @@ function _pbpDictEntryMount(host, opts) {
     const languageHint = document.createElement("span"); languageHint.className = "xp-dict-src";
     languageHint.textContent = t("dictSupplementLanguage", languageName(target()));
     profile.prepend(languageHint);
-    disclosure.append(summary, kind, context, submit, profile, sourceHint); content.append(disclosure);
+    disclosure.append(summary, kind, submit, profile, sourceHint); content.append(disclosure);
     const etymology = document.createElement("details"); etymology.className = "xp-dict-ai-details";
     const etymologyTitle = document.createElement("summary"); etymologyTitle.textContent = t("dictSupplementEtymology");
     const etymologyHint = document.createElement("p"); etymologyHint.className = "xp-dict-src"; etymologyHint.textContent = t("dictEtymologyHint");
@@ -2138,13 +2129,11 @@ function _pbpDictEntryMount(host, opts) {
     if (typeof window.pbpEnhanceListbox === "function") {
       kind.id = "dict-supplement-kind"; kind.dataset.listbox = "float"; window.pbpEnhanceListbox(kind);
     } else kind.classList.add("xp-dict-lang");
-    const acceptsTopic = category => ["scenarios", "collocations", "register"].includes(category);
-    const effectiveTopic = () => acceptsTopic(kind.value) ? topic.value : "";
+    // The topic no longer takes part in reuse (1B.5), as in dict-entry.js's find().
     const existing = () => {
-      const profile = pbpDictSupplementProfile(settings, effectiveTopic());
+      const profile = pbpDictSupplementProfile(settings, kind.value);
       const matches = (record.supplements || []).filter(item => item.category === kind.value &&
-        item.profile.nativeLanguage === profile.nativeLanguage && item.profile.level === profile.level &&
-        (!acceptsTopic(kind.value) || item.profile.topic === profile.topic));
+        item.profile.nativeLanguage === profile.nativeLanguage && item.profile.level === profile.level);
       const replaced = new Set(matches.map(item => item.learning?.replacesId).filter(Boolean));
       return matches.filter(item => !replaced.has(item.id)).sort((a, b) => b.generatedAt - a.generatedAt || String(b.id).localeCompare(String(a.id)))[0];
     };
@@ -2153,26 +2142,18 @@ function _pbpDictEntryMount(host, opts) {
       etymology.hidden = hasEtymology;
       etymologyTitle.textContent = t(record.entry.etymology || record.entry.relatedWords.length ? "dictEtymologyGenerate" : "dictSupplementEtymology");
       if (!etymology.isConnected) content.insertBefore(etymology, disclosure);
-      usageDrafts.set(usageCategory, topic.value);
       if (usageCategory !== kind.value) {
-        usageExpanded.set(usageCategory, scope.open);
-        usageCategory = kind.value; topic.value = usageDrafts.get(usageCategory) || "";
-        scope.open = usageExpanded.get(usageCategory) || false;
+        usageCategory = kind.value;
         usageMessage(formFeedback, "");
       }
-      context.hidden = !acceptsTopic(kind.value);
-      scope.hidden = kind.value === "scenarios";
-      topicCaption.hidden = !scope.hidden;
-      const parent = scope.hidden ? context : scope;
-      if (topicLabel.parentElement !== parent) parent.append(topicLabel);
       submit.textContent = t(existing() ? "dictSupplementShow" : "dictSupplementGenerate");
       sourceHint.hidden = !["culture", "literature"].includes(kind.value);
     };
     const enableForm = () => {
-      submit.disabled = false; etymologyGenerate.disabled = false; kind.disabled = false; topic.disabled = false; window.pbpListboxSync?.(kind);
+      submit.disabled = false; etymologyGenerate.disabled = false; kind.disabled = false; window.pbpListboxSync?.(kind);
     };
     usageForm = { disclosure, refresh, enable: enableForm, update: addition => generateSupplement(addition) };
-    kind.addEventListener("change", refresh); topic.addEventListener("input", refresh); refresh();
+    kind.addEventListener("change", refresh); refresh();
     const generateSupplement = async (updating = null, explicitCategory = "") => {
       if (!alive() || busy) return;
       const origin = updating ? supplementNodes.get(supplementId(updating))?.update : explicitCategory === "etymology" ? etymologyGenerate : submit;
@@ -2193,7 +2174,7 @@ function _pbpDictEntryMount(host, opts) {
       const current = () => alive() && epoch === version && !controller.signal.aborted;
       const category = updating?.category || explicitCategory || kind.value;
       let ledgerStage = "permission";
-      const request = { ...input(controller.signal, current), category, topic: updating?.profile.topic ?? (explicitCategory ? "" : effectiveTopic()),
+      const request = { ...input(controller.signal, current), category,
         updateId: updating?.id || "",
         // A blanked leaking summary (Q6=B) is a partial failure of this paid
         // answer: file its fixed code at the checking stage; the items save.
@@ -2207,7 +2188,7 @@ function _pbpDictEntryMount(host, opts) {
         } };
       if (updating) request.settings = { ...settings, dictLearnerNativeLanguage: updating.profile.nativeLanguage, dictLearnerLevel: updating.profile.level };
       const sourceOrigin = pbpDictSupplementOrigin(category, opts.lang);
-      submit.disabled = true; etymologyGenerate.disabled = true; kind.disabled = true; topic.disabled = true; window.pbpListboxSync?.(kind);
+      submit.disabled = true; etymologyGenerate.disabled = true; kind.disabled = true; window.pbpListboxSync?.(kind);
       usageMessage(feedback, t(category === "etymology" ? "dictEtymologyGenerating" : "dictSupplementGenerating"), "busy"); sync();
       if (hadFocus) feedback.cancel.focus({ preventScroll: true });
       try {

@@ -4569,8 +4569,6 @@
   "dictSupplementScenarios": {"message": "Beispiele für eine Situation"},
   "dictSupplementCulture": {"message": "Kultur und Netzsprache"},
   "dictSupplementLiterature": {"message": "Beispiele aus der Literatur"},
-  "dictSupplementTopic": {"message": "Verwendungssituation (optional)"},
-  "dictSupplementTopicPlaceholder": {"message": "Zum Beispiel: berufliche E-Mails, Reisegespräche oder Spiele-Chats"},
   "dictSupplementGenerate": {"message": "Ergänzung erstellen"},
   "dictSupplementGenerating": {"message": "Verwendungshinweise werden erstellt…"},
   "dictSupplementSaved": {"message": "Auf diesem Gerät gespeichert"},

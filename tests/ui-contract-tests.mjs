@@ -2337,13 +2337,13 @@ check(JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort()) === JSON.strin
   ![...LIBRARY_VALUE_BOX.ghostTriggers].some((id) => LIBRARY_VALUE_BOX.ids.has(id)),
   `ui-contract-tests.mjs: the library ghost-trigger harvest drifted -- got ${JSON.stringify([...LIBRARY_VALUE_BOX.ghostTriggers].sort())}. ` +
   "A select with data-listbox-face=\"ghost\" renders a .btn trigger, not a value box: it must never also land in LIBRARY_VALUE_BOX.ids.");
-check(JSON.stringify(LIBRARY_VALUE_BOX.built) === JSON.stringify(['library-notes.js:textarea.vocab-note-input', 'library-vocab.js:input[type="text"]', 'library-vocab.js:input[type="text"].vocab-lemma-input', 'library-vocab.js:select.vocab-save-definition', "library-vocab.js:textarea.vocab-note-input", 'md-dict.js:input[type="text"].xp-dict-supplement-topic', 'md-dict.js:select.xp-dict-supplement-kind']) &&
+check(JSON.stringify(LIBRARY_VALUE_BOX.built) === JSON.stringify(['library-notes.js:textarea.vocab-note-input', 'library-vocab.js:input[type="text"]', 'library-vocab.js:input[type="text"].vocab-lemma-input', 'library-vocab.js:select.vocab-save-definition', "library-vocab.js:textarea.vocab-note-input", 'md-dict.js:select.xp-dict-supplement-kind']) &&
   /groupUnit\.className = "vocab-group-unit";[\s\S]{0,400}groupUnit\.appendChild\(groupInput\);/.test(libraryVocabJs) &&
   /unit\.className = "vocab-group-unit vocab-lemma-control"/.test(libraryVocabJs) && /unit\.append\(lemmaInput, save\)/.test(libraryVocabJs) &&
   /definition\.dataset\.listbox = "float"/.test(libraryVocabJs) && /window\.pbpEnhanceListbox\?\.\(definition\)/.test(libraryVocabJs) &&
   /kind\.id = "dict-supplement-kind"; kind\.dataset\.listbox = "float"; window\.pbpEnhanceListbox\(kind\)/.test(mdDictJs),
   `ui-contract-tests.mjs: the runtime library value-box harvest drifted -- got ${JSON.stringify(LIBRARY_VALUE_BOX.built)} ` +
-  "(expected both note editors, group/base-form shell passengers, enhanced definition/category selectors, and the usage topic input). " +
+  "(expected both note editors, group/base-form shell passengers, and enhanced definition/category selectors; the usage topic input was removed in 1B.5). " +
   "A new runtime value box must join FIELD_TARGETS.lib and VALUE_BOX_LEGS.library; then update this list.");
 function isValueBoxCompound(compound) {
   const c = classifyCompound(compound);
@@ -8941,11 +8941,12 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   }
   const listboxBtnNodes = listboxGraftNodes.filter((n) => n.tag === "button");
   const LIB_NODES = [...LIB_TREE, ...runtimeNodes, ...listboxGraftNodes];
-  check(!!detailNode && runtimeNodes.length === 9,
-    `ui-contract-tests.mjs: the library tree model could not graft the runtime value boxes (${detailNode ? "found" : "no"} #vocab-detail, ${runtimeNodes.length} runtime node(s), expected 9)`);
+  // 1B.5 removed the usage topic input: 8 runtime boxes and 9 text-entry controls.
+  check(!!detailNode && runtimeNodes.length === 8,
+    `ui-contract-tests.mjs: the library tree model could not graft the runtime value boxes (${detailNode ? "found" : "no"} #vocab-detail, ${runtimeNodes.length} runtime node(s), expected 8)`);
   const libCov = valueBoxCoverage(LIB_NODES, LIB);
-  check(libCov.entries === 10 && libCov.uncovered.length === 0,
-    `library.html + runtime boxes / FIELD_TARGETS.lib: every text-entry control must be painted by exactly one registry entry (as its box or as a shell's passenger) -- ${libCov.entries} controls (expected 10); ${libCov.uncovered.join(" | ") || "none uncovered"}`);
+  check(libCov.entries === 9 && libCov.uncovered.length === 0,
+    `library.html + runtime boxes / FIELD_TARGETS.lib: every text-entry control must be painted by exactly one registry entry (as its box or as a shell's passenger) -- ${libCov.entries} controls (expected 9); ${libCov.uncovered.join(" | ") || "none uncovered"}`);
   check(libCov.dead.length === 0, `ui-components.mjs: FIELD_TARGETS.lib entries whose rest selector reaches nothing in library.html + the runtime boxes: ${libCov.dead.map((t) => t.id).join(", ")}`);
   const libSelects = LIB_NODES.filter((n) => n.tag === "select" && !Object.hasOwn(n.attrs, "hidden") && !Object.hasOwn(n.attrs, "data-listbox"));
   const selectMiss = libSelects.filter((n) => LIB.filter((t) => selectorListOf(t.rest).some((sel) => selectorReaches(sel, n))).length !== 1);

@@ -497,22 +497,6 @@ html[data-theme] { --lib-scrollbar-thumb: var(--lib-fg-muted); }
 .vocab-note-input::placeholder {
   color: var(--lib-field-placeholder);
 }
-input.xp-dict-supplement-topic[type="text"] {
-  background-color: var(--lib-field-bg);
-  border-color: var(--lib-field-border);
-  color: var(--lib-field-fg);
-}
-input.xp-dict-supplement-topic[type="text"]:hover:where(:not(:focus, :disabled)) {
-  background-color: var(--lib-field-bg-hover);
-  border-color: var(--lib-field-border-hover);
-}
-input.xp-dict-supplement-topic[type="text"]:focus:not(:disabled) {
-  background-color: var(--lib-field-bg-focus);
-  border-color: var(--lib-field-border-focus);
-}
-input.xp-dict-supplement-topic[type="text"]::placeholder {
-  color: var(--lib-field-placeholder);
-}
 .vocab-group-unit {
   background-color: var(--lib-field-bg);
   border-color: var(--lib-field-border);
@@ -2317,15 +2301,9 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-supplement > .listbox {
   display: block; width: 100%; min-width: 0; margin-top: var(--lib-sp-2);
 }
-#vocab-ref-result .xp-dict-supplement-label { display: block; margin-top: var(--lib-sp-3); font-size: var(--lib-text-secondary); line-height: var(--lib-lh-secondary); color: var(--lib-fg); }
-#vocab-ref-result .xp-dict-supplement-label > .xp-dict-supplement-topic { margin-top: var(--lib-sp-1); }
 #vocab-ref-result .xp-dict-supplement-profile { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--lib-sp-1) var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-supplement-profile > .xp-dict-src { margin: 0; }
 #vocab-ref-result .xp-dict-supplement-profile .xp-dict-profile-link { color: var(--lib-link); }
-#vocab-ref-result .xp-dict-topic-scope { margin-top: var(--lib-sp-2); }
-#vocab-ref-result .xp-dict-topic-scope > summary { width: fit-content; max-width: 100%; min-height: calc(var(--lib-control-h) - 4px); font-size: var(--lib-text-secondary); }
-#vocab-ref-result .xp-dict-topic-scope > summary::after { margin-inline-start: var(--lib-sp-1); }
-#vocab-ref-result .xp-dict-topic-scope .xp-dict-supplement-label { margin-top: 0; }
 #vocab-ref-result .xp-dict-usage-actions,
 #vocab-ref-result .xp-dict-usage-feedback { display: flex; align-items: center; flex-wrap: wrap; gap: var(--lib-sp-2); min-width: 0; }
 #vocab-ref-result .xp-dict-usage-actions { margin-top: var(--lib-sp-3); }
@@ -2335,15 +2313,7 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-usage-status { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 #vocab-ref-result .xp-dict-usage-stop { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 24px; padding: var(--lib-sp-1); }
 #vocab-ref-result .xp-dict-usage-stop svg { width: 14px; height: 14px; }
-#vocab-ref-result :is(.xp-dict-topic-scope, .xp-dict-usage-feedback, .xp-dict-usage-actions > *, .xp-dict-usage-stop)[hidden] { display: none; }
-input.xp-dict-supplement-topic[type="text"] {
-  display: block; box-sizing: border-box; width: 100%; min-width: 0;
-  height: var(--lib-control-h); padding: 0 var(--lib-control-pad-x);
-  border-width: 1px; border-style: solid; border-radius: var(--lib-radius-md);
-  font: inherit; font-size: var(--lib-text-body); line-height: 20px;
-}
-input.xp-dict-supplement-topic[type="text"]:focus { outline: none; }
-input.xp-dict-supplement-topic[type="text"]:focus-visible:not(:disabled) { box-shadow: var(--lib-focus-ring); }
+#vocab-ref-result :is(.xp-dict-usage-feedback, .xp-dict-usage-actions > *, .xp-dict-usage-stop)[hidden] { display: none; }
 /* md-dict's own Retry after a load failure: this page already has "Look up
    again" under the source line (.vocab-ref-foot), which re-runs the same
    query -- two buttons for one action, side by side (critique round 3).
@@ -3461,7 +3431,6 @@ select[data-listbox] { height: var(--lib-control-h); box-sizing: border-box; }
 @media (forced-colors: active) {
   .listbox-btn:focus-visible:not(:disabled),
   .vocab-note-input:focus-visible:not(:disabled),
-  input.xp-dict-supplement-topic[type="text"]:focus-visible:not(:disabled),
   .vocab-group-unit:has(> input[type="text"]:focus):not(:disabled) {
     outline: 1px solid Highlight;
     outline-offset: 2px;

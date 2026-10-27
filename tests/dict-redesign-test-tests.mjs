@@ -387,11 +387,16 @@ test("public providers.env must name exactly the authorized endpoint", () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 test("every outgoing product message is compared with the prompt production builds from the authorized payload", () => {
+  // Plan 1B.5 took the topic out of production's prompt data. This driver is
+  // archived as it was (1B.9), so its whitelist still expects topic "" and it
+  // refuses every A-arm message current production builds.
+  const current = payload => ({ ...payload, profile: { nativeLanguage: payload.profile.nativeLanguage, level: payload.profile.level } });
   const p = productPayload("grammar"), prompt = productPrompt("A", p);
   assert(prompt.startsWith("Create a concise language-learning supplement."));
-  assert.deepEqual(JSON.parse(prompt.split("\n").at(-1)), p);
+  assert.deepEqual(JSON.parse(prompt.split("\n").at(-1)), current(p));
+  assert.throws(() => authorizeRequest(plan, "full", active("A", "grammar"), current(p), frozen), /unauthorized_payload/);
   const lit = productPayload("literature", [source]);
-  assert.deepEqual(JSON.parse(productPrompt("L-A", lit).split("\n").at(-1)), lit);
+  assert.deepEqual(JSON.parse(productPrompt("L-A", lit).split("\n").at(-1)), current(lit));
   const entryPrompt = productPrompt("entry", { term: "charge", sourceLanguage: "en", targetLanguage: target });
   assert(entryPrompt.startsWith("Create a concise reusable dictionary entry"));
   assert.notEqual(productPrompt("A", productPayload("register")), prompt, "category changes the instructions");

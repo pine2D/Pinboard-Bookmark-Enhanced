@@ -6168,7 +6168,7 @@ const VALUE_BOX_LEGS = Object.freeze({
       ["#vocab-search", null], ["#vocab-language-filter-btn", null], ["#vocab-group-filter-btn", null], ["#vocab-lookup-input", null], ["#vocab-lookup-lang-btn", null],
       ["#vocab-detail .vocab-note-input", null],
       ["#vocab-detail .vocab-lemma-control", null], ["#vocab-save-definition-btn", null],
-      ["#dict-supplement-kind-btn", null], ["input.xp-dict-supplement-topic", null],
+      ["#dict-supplement-kind-btn", null],
       ["#vocab-batch-toolbar .vocab-group-unit", null], ["#vocab-detail .vocab-group-unit", null],
       ["#notes-filter", null], ["#notes-detail .vocab-note-input", null], ["#ask-library-search", null],
     ]),
@@ -6259,14 +6259,14 @@ const VALUE_BOX_LEGS = Object.freeze({
       },
       {
         context: "dictionary-supplement",
-        boxes: ["#dict-supplement-kind-btn", "input.xp-dict-supplement-topic"],
-        focus: ["#dict-supplement-kind-btn", "input.xp-dict-supplement-topic"],
+        boxes: ["#dict-supplement-kind-btn"],
+        focus: ["#dict-supplement-kind-btn"],
         async open(page, url, theme) {
           await page.goto(`${url}?_ra=${encodeURIComponent(`fieldsupplement-${theme}`)}#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
           await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS });
           // Only the archive read is a fixture boundary. The shared entry
-          // renderer, disclosure, enhanced category listbox and topic field
-          // are production UI; this leg never generates or contacts a model.
+          // renderer, disclosure and enhanced category listbox are production
+          // UI; this leg never generates or contacts a model.
           await page.evaluate(async () => {
             _pbpVocabDictChildCtrl?.abort();
             const host = document.getElementById("vocab-ref-result");
@@ -6293,11 +6293,6 @@ const VALUE_BOX_LEGS = Object.freeze({
           });
           await page.locator(".xp-dict-supplement > summary").click();
           await page.waitForSelector("#dict-supplement-kind-btn", { state: "visible", timeout: TIMEOUT_MS });
-          // Since 6a51a1b1 the topic field shows inline only for the scenarios
-          // category (the others fold it into a closed scope disclosure); pick
-          // it through the hidden select, as the dict-entry-usage-scope opener does.
-          await page.locator(".xp-dict-supplement-kind").selectOption("scenarios", { force: true });
-          await page.waitForSelector("input.xp-dict-supplement-topic", { state: "visible", timeout: TIMEOUT_MS });
           await page.evaluate(() => document.activeElement?.blur?.());
           await page.mouse.move(0, 0);
           await settleAnimations(page);
@@ -6338,7 +6333,7 @@ const VALUE_BOX_LEGS = Object.freeze({
 // requires every entry here to be named by some leg's `focus` and measured on
 // every theme it ran.
 const VALUE_BOX_FOCUS_REQUIRED = Object.freeze({
-  library: Object.freeze(["#vocab-lookup-lang-btn", "#vocab-save-definition-btn", "#dict-supplement-kind-btn", "input.xp-dict-supplement-topic"]),
+  library: Object.freeze(["#vocab-lookup-lang-btn", "#vocab-save-definition-btn", "#dict-supplement-kind-btn"]),
 });
 const valueBoxHoverLog = [];
 // One colour parser for every read of this leg (Task 7 fix round 1): a hex
@@ -9229,7 +9224,7 @@ async function runSweep(page, sw, extBase) {
       await installDictEntryFixture(page);
       await vocabHead.click();
       await page.locator("#vocab-lookup-go").click();
-      for (const state of ["idle", "busy", "result", "details", "usage-scope", "usage-busy", "usage-error", "usage-result", "cached", "error"]) {
+      for (const state of ["idle", "busy", "result", "details", "usage-busy", "usage-error", "usage-result", "cached", "error"]) {
         if (wants("library", "dict-entry-" + state)) await scan("library", "dict-entry-" + state, () => openDictEntryState(page, state));
       }
     }

@@ -4569,8 +4569,6 @@
   "dictSupplementScenarios": {"message": "場面別の例文"},
   "dictSupplementCulture": {"message": "文化・ネットでの用法"},
   "dictSupplementLiterature": {"message": "文学作品の用例"},
-  "dictSupplementTopic": {"message": "使用場面（任意）"},
-  "dictSupplementTopicPlaceholder": {"message": "例：仕事のメール、旅行中の会話、ゲームのチャット"},
   "dictSupplementGenerate": {"message": "追加内容を生成"},
   "dictSupplementGenerating": {"message": "用法を生成中…"},
   "dictSupplementSaved": {"message": "この端末に保存しました"},

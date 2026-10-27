@@ -4569,8 +4569,6 @@
   "dictSupplementScenarios": {"message": "Exemples en situation"},
   "dictSupplementCulture": {"message": "Culture et usages sur Internet"},
   "dictSupplementLiterature": {"message": "Exemples littéraires"},
-  "dictSupplementTopic": {"message": "Situation d’utilisation (facultatif)"},
-  "dictSupplementTopicPlaceholder": {"message": "Par exemple : courriels professionnels, conversations en voyage, discussions en jeu"},
   "dictSupplementGenerate": {"message": "Générer le complément"},
   "dictSupplementGenerating": {"message": "Génération du complément…"},
   "dictSupplementSaved": {"message": "Enregistré sur cet appareil"},

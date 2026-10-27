@@ -4569,8 +4569,6 @@
   "dictSupplementScenarios": {"message": "Przykłady w danej sytuacji"},
   "dictSupplementCulture": {"message": "Kultura i język internetu"},
   "dictSupplementLiterature": {"message": "Przykłady literackie"},
-  "dictSupplementTopic": {"message": "Sytuacja użycia (opcjonalnie)"},
-  "dictSupplementTopicPlaceholder": {"message": "Np. e-maile służbowe, rozmowy w podróży lub czat w grze"},
   "dictSupplementGenerate": {"message": "Wygeneruj uzupełnienie"},
   "dictSupplementGenerating": {"message": "Generowanie uzupełnienia…"},
   "dictSupplementSaved": {"message": "Zapisano na tym urządzeniu"},

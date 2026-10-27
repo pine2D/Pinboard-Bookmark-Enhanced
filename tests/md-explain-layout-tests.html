@@ -489,7 +489,7 @@ function assertLayout(frame, locale) {
     frame.style.cssText = "width:800px;height:620px;border:0";
     frame.srcdoc = `<!doctype html><html><head><link rel="stylesheet" href="../${surface === "reader" ? "md-preview" : "library"}.css"></head>
       <body>${surface === "reader" ? '<div id="explain-pop" data-action="dict" popover="manual" style="left:8px;top:8px"><div class="xp-body">' : '<div id="vocab-ref-result">'}
-        <details class="xp-dict-ai-details"><summary>Word origin</summary><p>${"A flowing dictionary paragraph with actual words and spaces. ".repeat(8)}</p><input class="xp-dict-supplement-topic" aria-label="Scene"></details>
+        <details class="xp-dict-ai-details"><summary>Word origin</summary><p>${"A flowing dictionary paragraph with actual words and spaces. ".repeat(8)}</p><button type="button" class="xp-dict-update-supplement">Update</button></details>
       ${surface === "reader" ? '</div></div>' : '</div>'}</body></html>`;
     document.body.appendChild(frame);
     await new Promise(resolve => frame.addEventListener("load", resolve, { once: true }));
@@ -532,7 +532,7 @@ function assertLayout(frame, locale) {
       details.open = true;
       await new Promise(resolve => setTimeout(resolve, 0));
       assert(!details.classList.contains("dict-motion"), "programmatic reopen must clear the prior pointer gate");
-      details.querySelector("input").focus();
+      details.querySelector("button").focus();
       details.open = false;
       await new Promise(resolve => setTimeout(resolve, 0));
       assert(fx.doc.activeElement === fx.summary, "programmatic close should hand content focus to its summary");
@@ -571,8 +571,8 @@ function assertLayout(frame, locale) {
           assert(Math.abs(details.getBoundingClientRect().height - full) < 1,
             "reader close should retain layout while opacity fades");
           fx.summary.focus();
-          details.querySelector("input").focus();
-          assert(fx.doc.activeElement === fx.summary, "closed disclosure input must not regain focus during its fade");
+          details.querySelector("button").focus();
+          assert(fx.doc.activeElement === fx.summary, "closed disclosure content must not regain focus during its fade");
         }
         await new Promise(resolve => setTimeout(resolve, 260));
         assert(Math.abs(details.getBoundingClientRect().height - collapsed) < 1, surface + ": close should settle to summary height");
