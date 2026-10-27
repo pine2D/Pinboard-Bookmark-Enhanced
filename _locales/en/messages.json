@@ -4570,6 +4570,7 @@
   "dictSupplementCategory": {"message": "What to add"},
   "dictSupplementCollocations": {"message": "Collocations and expressions"},
   "dictSupplementConfusables": {"message": "Confusing words"},
+  "dictSupplementPatterns": {"message": "Collocations and sentence patterns"},
   "dictSupplementRegister": {"message": "Register and regional usage"},
   "dictSupplementGrammar": {"message": "Grammar notes"},
   "dictSupplementScenarios": {"message": "Examples for a situation"},

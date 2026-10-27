@@ -4563,6 +4563,7 @@
   "dictSupplementCategory": {"message": "Что добавить"},
   "dictSupplementCollocations": {"message": "Сочетания и устойчивые выражения"},
   "dictSupplementConfusables": {"message": "Слова, которые легко перепутать"},
+  "dictSupplementPatterns": {"message": "Сочетания и модели предложений"},
   "dictSupplementRegister": {"message": "Стиль и региональные особенности"},
   "dictSupplementGrammar": {"message": "Грамматические пояснения"},
   "dictSupplementScenarios": {"message": "Примеры для ситуации"},

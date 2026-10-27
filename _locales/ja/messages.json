@@ -4563,6 +4563,7 @@
   "dictSupplementCategory": {"message": "追加する内容"},
   "dictSupplementCollocations": {"message": "連語・定型表現"},
   "dictSupplementConfusables": {"message": "混同しやすい語"},
+  "dictSupplementPatterns": {"message": "連語と文型"},
   "dictSupplementRegister": {"message": "文体・地域による用法"},
   "dictSupplementGrammar": {"message": "文法の説明"},
   "dictSupplementScenarios": {"message": "場面別の例文"},

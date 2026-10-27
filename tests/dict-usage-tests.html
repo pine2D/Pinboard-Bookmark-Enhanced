@@ -21,7 +21,7 @@ async function pbpVocabCurrentOwner(){return owner;}
 async function pbpDictArchiveRead(input){if(onRead)await onRead(input);return records;}
 async function pbpDictArchiveSave(input){if(saveFailure)throw new Error('write failed');saved.push(structuredClone({...input,isCurrent:undefined,signal:undefined}));const previous=records;return records={...input.record,archiveId:saved.length.toString(16).padStart(64,'0'),archiveSaved:true,cacheSaved:true,supplements:previous?.supplements||[],previousEntries:previous?[previous,...(previous.previousEntries||[])]:[]};}
 async function pbpDictArchiveAppend(input){if(appendFailure)throw new Error('write failed');appended.push({...input});const row={...input,id:appended.length.toString(16).padStart(64,'0'),archiveSaved:true};records.supplements.push(row);return row;}
-async function callAI(settings,prompt,options){if(options.requireComplete!==true)throw new Error('Dictionary requests must require a complete response');await options.beforeRequest();calls.push({settings,prompt,options});if(onAI)await onAI();return prompt.includes('language-learning supplement')?usageAnswer:JSON.stringify(MODEL);}
+async function callAI(settings,prompt,options){if(options.requireComplete!==true)throw new Error('Dictionary requests must require a complete response');await options.beforeRequest();calls.push({settings,prompt,options});if(onAI)await onAI();return prompt.includes('language-learning supplement')||prompt.includes('usage card')?usageAnswer:JSON.stringify(MODEL);}
 function hasAIKey(){return true;}
 async function pbpDictEvidenceFetch(input){await input.beforeRequest();if(input.kind==='etymology')return [];
   if(!permission)throw Object.assign(new Error('Missing fixture grant'),{code:'host_permission'});
@@ -582,6 +582,87 @@ await test('field words and identifiers written flush against Chinese characters
   reset();existing();usageResponse(d=>{d.items=[usageItem('Fernweh haben','常和 Notenheft、Headset 这类复合词无关，单独表达对远方的向往。')];});
   const r=await pbpDictSupplementRun(request({...DE_ZH,category:'grammar'}));
   return r.archiveSaved&&r.learning.items.length===1&&!r.learning.omittedItems;
+});
+// Patterns card (plan 1B.2). Fixtures follow the shape the prototype card
+// returned in the 2026-10-27 comparison, hand-written with neutral content.
+const pattern=(head,note='用来描述离说话者很远的地点，常带有向往的意味。',patch={})=>({sense:1,head,note,
+  example:'She dreams of faraway places.',translation:'她向往遥远的地方。',...patch});
+const patternsAnswer=(list,language='zh-Hans')=>{usageAnswer=JSON.stringify({language,patterns:list});};
+const SIX_PATTERNS=['faraway places','a faraway look','faraway <something> calls','in a faraway land','feel faraway from <someone>','a faraway sound'];
+await test('patterns schema has exactly language and patterns, at most four patterns and no contrasts',async()=>{
+  existing();patternsAnswer([pattern('faraway places')]);
+  await pbpDictSupplementRun(request({category:'patterns'}));
+  const schema=calls[0].options.responseSchema,item=schema.properties.patterns.items;
+  return Object.keys(schema.properties).sort().join()==='language,patterns'&&schema.required.sort().join()==='language,patterns'&&
+    schema.additionalProperties===false&&schema.properties.patterns.maxItems===4&&!/contrast/i.test(JSON.stringify(schema))&&
+    Object.keys(item.properties).join()==='sense,head,note,example,translation'&&item.properties.head.maxLength===160&&
+    item.properties.note.maxLength===600&&item.properties.example.maxLength===300&&item.properties.translation.maxLength===300&&
+    item.properties.sense.maximum===records.entry.meanings.length;
+});
+await test('patterns prompt keeps the curly-quote rule and asks for neither contrasts nor a level',async()=>{
+  existing();patternsAnswer([pattern('faraway places')]);
+  await pbpDictSupplementRun(request({category:'patterns',settings:{aiProvider:'gemini',geminiModel:'new-model',dictLearnerLevel:'advanced',dictLearnerNativeLanguage:'German'}}));
+  const prompt=calls[0].prompt,data=JSON.parse(prompt.split('\n').at(-1));
+  return prompt.includes('wrap it in curly double quotes “…”')&&!/contrast/i.test(prompt)&&!/level|advanced/i.test(prompt)&&
+    !prompt.includes('two sections')&&data.task==='usage-card'&&data.nativeLanguage==='German'&&!Object.hasOwn(data,'profile');
+});
+await test('six valid patterns keep the first four with nothing omitted',async()=>{
+  existing();patternsAnswer(SIX_PATTERNS.map(head=>pattern(head)));
+  const r=await pbpDictSupplementRun(request({category:'patterns'}));
+  return r.archiveSaved&&r.learning.items.length===4&&!Object.hasOwn(r.learning,'omittedItems')&&
+    r.learning.items.map(item=>item.title).join('|')===SIX_PATTERNS.slice(0,4).join('|');
+});
+await test('a pattern whose head exceeds 160 characters is dropped alone and counted',async()=>{
+  existing();patternsAnswer([pattern('faraway places'),pattern('faraway '+'x'.repeat(160)),pattern('a faraway look')]);
+  const r=await pbpDictSupplementRun(request({category:'patterns'}));
+  return r.archiveSaved&&r.learning.items.length===2&&r.learning.omittedItems===1&&r.learning.items[1].title==='a faraway look';
+});
+await test('patterns that differ only in case and punctuation under one sense are one pattern',async()=>{
+  existing();patternsAnswer([pattern('take off'),pattern('Take off!'),pattern('take off',undefined,{sense:0})]);
+  const r=await pbpDictSupplementRun(request({category:'patterns'}));
+  return r.archiveSaved&&r.learning.items.length===2&&r.learning.omittedItems===1&&
+    r.learning.items.map(item=>item.sense+':'+item.title).join('|')==='1:take off|0:take off';
+});
+await test('every pattern dropped fails as invalid_response, while an empty list is a neutral unsupported result',async()=>{
+  existing();patternsAnswer([pattern('x'.repeat(161)),pattern('faraway places',undefined,{sense:9})]);
+  if(!await rejectsReason(()=>pbpDictSupplementRun(request({category:'patterns'})),'invalid_response','supplement_item_text')||appended.length)return false;
+  reset();existing();patternsAnswer([pattern('faraway places','Used for places that are very far from the speaker, often with a sense of longing for them.',{translation:'She longs for places far away from home.'})]);
+  if(!await rejectsReason(()=>pbpDictSupplementRun(request({category:'patterns'})),'invalid_response','supplement_items_all_invalid')||appended.length)return false;
+  reset();existing();patternsAnswer([]);
+  return await rejects(()=>pbpDictSupplementRun(request({category:'patterns'})),'unsupported_usage')&&appended.length===0&&calls.length===1;
+});
+await test('a pattern explained in English for a Chinese target is dropped alone',async()=>{
+  existing();patternsAnswer([pattern('faraway places'),
+    pattern('a faraway look','Describes an absent expression, as if the person were thinking about something distant and not paying attention.',
+      {example:'He had a faraway look in his eyes.',translation:'He looked as if his thoughts were somewhere far away.'}),
+    pattern('in a faraway land','多用于故事开头，指离现实很远的地方。')]);
+  const r=await pbpDictSupplementRun(request({category:'patterns'}));
+  return r.archiveSaved&&r.learning.omittedItems===1&&r.learning.items.map(item=>item.title).join('|')==='faraway places|in a faraway land';
+});
+await test('a patterns card saves as ordinary v2 items with an empty summary',async()=>{
+  existing();patternsAnswer([pattern('faraway places')]);
+  const r=await pbpDictSupplementRun(request({category:'patterns',updateId:''}));
+  const item=r.learning.items[0];
+  return r.category==='patterns'&&r.learning.version===2&&r.learning.summary===''&&r.learning.replacesId===''&&
+    r.learning.language.lang==='zh-Hans'&&Object.keys(item).sort().join()==='example,explanation,sense,sourceIndex,title,translation'&&
+    item.title==='faraway places'&&item.explanation.startsWith('用来描述')&&item.sourceIndex===-1&&r.sources.length===0&&
+    r.content.startsWith('faraway places\n');
+});
+await test('the old supplement shape is a structure failure for patterns',async()=>{
+  existing();
+  if(!await rejectsReason(()=>pbpDictSupplementRun(request({category:'patterns'})),'invalid_response','supplement_fields')||appended.length)return false;
+  reset();existing();usageAnswer=JSON.stringify({language:'zh-Hans',patterns:null});
+  if(!await rejectsReason(()=>pbpDictSupplementRun(request({category:'patterns'})),'invalid_response','supplement_fields'))return false;
+  reset();existing();usageAnswer=JSON.stringify({language:'zh-Hans',patterns:[pattern('faraway places')],contrasts:[]});
+  return await rejectsReason(()=>pbpDictSupplementRun(request({category:'patterns'})),'invalid_response','supplement_fields')&&appended.length===0;
+});
+await test('patterns ignore the level setting, so the second click reuses the saved card without paying',async()=>{
+  existing();patternsAnswer([pattern('faraway places')]);
+  const settings={aiProvider:'gemini',geminiModel:'new-model',dictLearnerLevel:'advanced'};
+  if(pbpDictSupplementProfile(settings,'work','patterns').level!==''||pbpDictSupplementProfile(settings,'work','patterns').topic!=='')return false;
+  const first=await pbpDictSupplementRun(request({category:'patterns',settings}));
+  const second=await pbpDictSupplementRun(request({category:'patterns',settings}));
+  return first.profile.level===''&&second.id===first.id&&calls.length===1&&appended.length===1;
 });
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();

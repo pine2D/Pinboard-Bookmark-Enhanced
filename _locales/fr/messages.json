@@ -4563,6 +4563,7 @@
   "dictSupplementCategory": {"message": "Contenu à ajouter"},
   "dictSupplementCollocations": {"message": "Associations de mots et expressions"},
   "dictSupplementConfusables": {"message": "Mots à ne pas confondre"},
+  "dictSupplementPatterns": {"message": "Associations de mots et structures de phrase"},
   "dictSupplementRegister": {"message": "Registre et usages régionaux"},
   "dictSupplementGrammar": {"message": "Points de grammaire"},
   "dictSupplementScenarios": {"message": "Exemples en situation"},

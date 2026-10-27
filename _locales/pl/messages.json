@@ -4563,6 +4563,7 @@
   "dictSupplementCategory": {"message": "Co dodać"},
   "dictSupplementCollocations": {"message": "Połączenia wyrazowe i zwroty"},
   "dictSupplementConfusables": {"message": "Mylące się słowa"},
+  "dictSupplementPatterns": {"message": "Połączenia wyrazowe i schematy zdań"},
   "dictSupplementRegister": {"message": "Styl i użycie regionalne"},
   "dictSupplementGrammar": {"message": "Objaśnienia gramatyczne"},
   "dictSupplementScenarios": {"message": "Przykłady w danej sytuacji"},

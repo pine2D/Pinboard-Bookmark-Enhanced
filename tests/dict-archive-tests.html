@@ -2,6 +2,7 @@
 <body><h1>Dictionary Archive Tests</h1><div id="summary"></div><div id="results"></div>
 <script src="../vocab-store.js"></script><script src="../vocab-gdrive.js"></script>
 <script src="../dict-archive.js"></script><script src="../dict-archive-gdrive.js"></script>
+<script src="../dict-entry.js"></script>
 <script>
 const cases = [], databases = [], stores = [];
 const test = (name, run) => cases.push({ name, run });
@@ -205,6 +206,25 @@ test("concurrent supplements commit independently without lost additions", async
   await Promise.all([f.store.append(supplement(saved.archiveId)),
     another.append(supplement(saved.archiveId, { category: "grammar", content: "Use in before a month." }))]);
   const read = await f.store.read(request()); assert(read.supplements.length === 2);
+});
+test("a generated patterns card maps to v2 items the archive accepts, unchanged by a round trip", async () => {
+  const f = fixture(), saved = await f.store.save(input());
+  // Hand-written in the shape the prototype card returned, not built by a writer.
+  const card = JSON.stringify({ language: "zh-CN", patterns: [
+    { sense: 1, head: "in May", note: "表示在五月这个月份里，介词用 “in”。", example: "We met in May.", translation: "我们是五月认识的。" },
+    { sense: "1", head: "early <someone>'s May", note: "x".repeat(601), example: "Early May is warm.", translation: "五月初很暖和。" },
+    { sense: 0, head: "May Day", note: "指五月一日的节日，也就是劳动节。", example: "The shops close on May Day.", translation: "劳动节那天商店关门。" }] });
+  const learning = _pbpDictPatternsParse(card, request(), clone(REMOTE.value.entry));
+  assert(learning.items.length === 2 && learning.omittedItems === 1 && learning.summary === "");
+  assert(_pbpDictArchiveSupplementLearning(learning, { category: "patterns", sources: [] }));
+  const profile = pbpDictSupplementProfile({ dictLearnerLevel: "advanced" }, "work", "patterns");
+  const content = learning.items.map(item => [item.title, item.explanation, item.example, item.translation].join("\n")).join("\n\n");
+  await f.store.append(supplement(saved.archiveId, { category: "patterns", profile, content, learning: clone(learning) }));
+  const reopened = await f.reopen(), row = (await reopened.read(request())).supplements.find(item => item.category === "patterns");
+  const canonical = value => JSON.stringify(value, (key, child) => child && typeof child === "object" && !Array.isArray(child)
+    ? Object.fromEntries(Object.keys(child).sort().map(name => [name, child[name]])) : child);
+  assert(row && canonical(row.learning) === canonical(learning) && row.content === content);
+  assert(row.profile.level === "" && row.profile.topic === "");
 });
 test("retrying entry persistence never erases supplements", async () => {
   const f = fixture(), saved = await f.store.save(input()); await f.store.append(supplement(saved.archiveId));

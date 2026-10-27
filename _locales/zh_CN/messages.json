@@ -4557,6 +4557,7 @@
   "dictSupplementCategory": {"message": "补充内容"},
   "dictSupplementCollocations": {"message": "搭配与固定表达"},
   "dictSupplementConfusables": {"message": "易混词辨析"},
+  "dictSupplementPatterns": {"message": "搭配与句型"},
   "dictSupplementRegister": {"message": "语气与地区用法"},
   "dictSupplementGrammar": {"message": "语法说明"},
   "dictSupplementScenarios": {"message": "场景例句"},

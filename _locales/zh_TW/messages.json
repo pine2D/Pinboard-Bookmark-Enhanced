@@ -4563,6 +4563,7 @@
   "dictSupplementCategory": {"message": "補充內容"},
   "dictSupplementCollocations": {"message": "搭配與固定表達"},
   "dictSupplementConfusables": {"message": "易混淆詞辨析"},
+  "dictSupplementPatterns": {"message": "搭配與句型"},
   "dictSupplementRegister": {"message": "語氣與地區用法"},
   "dictSupplementGrammar": {"message": "文法說明"},
   "dictSupplementScenarios": {"message": "情境例句"},

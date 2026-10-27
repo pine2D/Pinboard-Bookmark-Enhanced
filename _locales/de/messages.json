@@ -4563,6 +4563,7 @@
   "dictSupplementCategory": {"message": "Ergänzung auswählen"},
   "dictSupplementCollocations": {"message": "Wortverbindungen und Wendungen"},
   "dictSupplementConfusables": {"message": "Leicht verwechselbare Wörter"},
+  "dictSupplementPatterns": {"message": "Wortverbindungen und Satzmuster"},
   "dictSupplementRegister": {"message": "Stil und regionale Verwendung"},
   "dictSupplementGrammar": {"message": "Grammatikhinweise"},
   "dictSupplementScenarios": {"message": "Beispiele für eine Situation"},
