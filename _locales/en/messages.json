@@ -4638,6 +4638,7 @@
   "dictMeaningManualHelp": {"message": "The definition you selected will be saved. Your choice stays selected during this lookup."},
   "dictMeaningSavedHelp": {"message": "The saved definition will not change automatically. Choose a definition to update this saved word."},
   "dictMeaningChooseHelp": {"message": "Choose a definition to save. Your choice stays selected during this lookup."},
+  "dictMeaningChange": {"message": "Change"},
   "dictFullEntry": {"message": "Full entry"},
   "dictFullEntryOnlyHint": {"message": "This entry has not been split into individual definitions. You can read the full entry or choose a definition from another dictionary source to save."},
   "multiPackReimportHint": {"message": "Reimport the same dictionary to reprocess its definition structure. Saved vocabulary and the dictionary’s enabled or disabled state stay unchanged."},

@@ -1172,7 +1172,7 @@ function _pbpVocabSyncLookupSave(state) {
   const id = choice && pbpDictVocabKey(state.owner, choice.language, choice.term);
   state.expectedExisting = !!id && _vocabRows.some(w => w.id === id);
   const saveLabel = t(state.expectedExisting ? "dictUpdateVocab" : "dictSaveVocab");
-  setBtnIcon(state.button, "bookMarked", saveLabel);
+  setBtnIcon(state.button, "bookmarkPlus", saveLabel);
   // Compact reference columns keep the meaning preview and show only the icon.
   state.button.title = saveLabel;
   state.button.setAttribute("aria-label", saveLabel);
@@ -1838,6 +1838,7 @@ function _pbpVocabLookupOther(term, lang, sentence = "", { derived = false } = {
     const hint = document.createElement("button");
     hint.type = "button";
     hint.className = "btn btn-sm ghost vocab-lookup-saved";
+    // A state, not an action (Q26=A): saving uses bookmarkPlus, this keeps bookMarked.
     setBtnIcon(hint, "bookMarked", t("libraryLookupSaved"));
     hint.addEventListener("click", () => _pbpVocabOpenSavedWord(saved.id));
     head.appendChild(hint);

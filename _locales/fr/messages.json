@@ -4631,6 +4631,7 @@
   "dictMeaningManualHelp": {"message": "La définition sélectionnée sera enregistrée. Votre choix est conservé pendant cette recherche."},
   "dictMeaningSavedHelp": {"message": "La définition enregistrée ne change pas automatiquement. Choisissez une définition pour mettre à jour ce mot enregistré."},
   "dictMeaningChooseHelp": {"message": "Choisissez une définition à enregistrer. Votre choix est conservé pendant cette recherche."},
+  "dictMeaningChange": {"message": "Changer"},
   "dictFullEntry": {"message": "Entrée complète"},
   "dictFullEntryOnlyHint": {"message": "Cette entrée n’a pas encore été divisée en définitions distinctes. Vous pouvez la lire en entier ou choisir une définition d’un autre dictionnaire à enregistrer."},
   "multiPackReimportHint": {"message": "Importez à nouveau le même dictionnaire pour réanalyser la structure de ses définitions. Le vocabulaire enregistré et l’état activé ou désactivé du dictionnaire restent inchangés."},

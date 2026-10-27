@@ -25,6 +25,15 @@ function check(name, cond, detail) {
   div.textContent = `${ok ? "✓" : "✗"}  ${name}${ok ? "" : "\n   " + (detail || "")}`;
   root.appendChild(div);
 }
+// The save bar's meaning control (dict redesign 3.2): open "Change", then
+// click the listed definition. Returns false when no such option is listed.
+function pickMeaning(pop, index) {
+  if (index < 0) return false;
+  pop.querySelector(".xp-dict-save-change")?.click();
+  const option = pop.querySelector('.xp-dict-save-menu .xp-dict-save-option[data-index="' + index + '"]');
+  option?.click();
+  return !!option;
+}
 function section(name) { const h = document.createElement("h2"); h.textContent = name; root.appendChild(h); }
 function assert(cond, detail) { check(detail || String(cond), cond, detail); }
 function assertEq(a, e, label) {
@@ -1179,9 +1188,7 @@ async function runDictPackRoutingTests() {
     finishOnline({ status: 200, data: onlineData }); await running;
     check("reader displays CC-CEDICT and the authorized online entry together", pop.querySelectorAll(".xp-dict-src a").length === 2 && !!pop.querySelector(".xp-dict-online .xp-dict-entry") && !!pop.querySelector(".xp-dict-legacy .xp-dict-entry"));
     check("source divider follows DOM order even when local results arrive first", !pop.querySelector(".xp-dict-local-box").hasAttribute("data-source-break") && pop.querySelector(".xp-dict-online").hasAttribute("data-source-break"));
-    const selected = pop.querySelector(".xp-dict-save-meaning");
-    selected.value = String(_pbpDictCurrent.meaningChoices.findIndex(choice => choice.sourceUrl === packNorm.sourceUrl));
-    selected.dispatchEvent(new Event("change")); await tick();
+    pickMeaning(pop, _pbpDictCurrent.meaningChoices.findIndex(choice => choice.sourceUrl === packNorm.sourceUrl)); await tick();
     check("local and online definitions remain independently selectable for saving", _pbpDictCurrent.gloss === "local word definition" && _pbpDictCurrent.meaningChoices.some(choice => choice.sourceUrl.includes("wiktionary")));
     window.pbpPackLookup = async () => ({ state: "unavailable" });
     _pbpDictFetch = async () => ({ status: 200, data: onlineData });
@@ -1917,16 +1924,15 @@ async function runMultiPackIntegrationTests() {
     const pop=document.createElement("div");pop.innerHTML='<div class="xp-body"></div><div class="xp-foot"><button class="xp-vocab"></button></div>';document.body.appendChild(pop);
     const running=pbpDictRun({text:"Gift"},{sentence:"Gift wirkt."},pop,new AbortController(),{dictDefinitionLang:"zh-Hans"});await tick();
     const choose=pop.querySelector('.xp-dict-save-meaning');
-    check("reader exposes one save-definition picker before online completion",!!choose&&[...choose.options].filter(option=>option.value!=="").length===3&&pop.querySelectorAll('.xp-dict-save-meaning').length===1);
-    if(choose){choose.value=String(_pbpDictCurrent.meaningChoices.findIndex(c=>c.packId==='zh-pack'));choose.dispatchEvent(new Event("change"));await tick();}
+    check("reader exposes one save-definition picker before online completion",!!choose&&pop.querySelectorAll('.xp-dict-save-option').length===3&&pop.querySelectorAll('.xp-dict-save-meaning').length===1);
+    if(choose){pickMeaning(pop,_pbpDictCurrent.meaningChoices.findIndex(c=>c.packId==='zh-pack'));await tick();}
     check("choosing a local pack sense enables collection while other requests are pending",_pbpDictCurrent?.gloss==="zh-pack meaning"&&!pop.querySelector('.xp-vocab').disabled);
     finishOnline?.(null);await running;
     check("online failure preserves the chosen pack's original definition and identity",_pbpDictCurrent?.gloss==="zh-pack meaning"&&_pbpDictCurrent?.term==="Gift"&&_pbpDictCurrent?.sourceUrl==="https://example.test/zh-pack"&&_pbpDictCurrent?.lemma!=="other");
     pbpVocabGet=async()=>({id:"saved-gift",term:"Gift",language:"de",gloss:"old",contexts:[]});
     await _pbpDictRefreshSave(pop,_pbpDictCurrent,new AbortController().signal);
     pbpVocabGet=async()=>null;
-    const other=pop.querySelector('.xp-dict-save-meaning');
-    if(other){other.value=String(_pbpDictCurrent.meaningChoices.findIndex(c=>c.packId==='en-pack'));other.dispatchEvent(new Event("change"));await tick();}
+    if(pop.querySelector('.xp-dict-save-meaning')){pickMeaning(pop,_pbpDictCurrent.meaningChoices.findIndex(c=>c.packId==='en-pack'));await tick();}
     check("switching from a saved headword to an unsaved pack choice resets the save face",!_pbpDictCurrent.saved&&pop.querySelector('.xp-vocab').textContent==="dictSaveVocab");
     let releaseOwner,writes=0;window.pbpVocabCurrentOwner=()=>new Promise(resolve=>{releaseOwner=resolve;});
     pbpVocabSaveWord=async()=>{writes++;return {};};
@@ -2856,7 +2862,7 @@ async function runDictionaryEntryReaderTests() {
         !pack.querySelector('.xp-dict-local-title')&&!generated.querySelector('.xp-dict-local-title'));
       check("the AI entry's own block is titled once and the dictionary slot is never hidden",pop.querySelectorAll('.xp-dict-ai-title:not([hidden])').length===1&&!slot.hidden&&slotShown());
     }
-    const choose=pop.querySelector('.xp-dict-save-meaning');choose.value=String(_pbpDictCurrent.meaningChoices.findIndex(c=>c.gloss==="original second meaning"));choose.dispatchEvent(new Event("change"));
+    pickMeaning(pop,_pbpDictCurrent.meaningChoices.findIndex(c=>c.gloss==="original second meaning"));
     _pbpDictCurrent.ai.show();await settle();
     check("the AI block's state never silently replaces an explicitly chosen save definition",_pbpDictCurrent.gloss==="original second meaning"&&_pbpDictCurrent.packChoice?.gloss==="original second meaning");
     const countBeforeRelated=calls.length;pop.querySelector('.xp-dict-lemma-link').click();await settle();
@@ -2893,8 +2899,8 @@ async function runDictionaryEntryReaderTests() {
     let finishMeaningWrite,dispatchedGloss;
     window.pbpVocabSaveWord=async(_owner,value)=>{dispatchedGloss=value.gloss;return new Promise(resolve=>{finishMeaningWrite=resolve;});};
     const pendingMeaningWrite=pbpDictSaveCurrent();await settle();
-    const oldPackRevision=pop.querySelector('.xp-vocab').dataset.packRevision,meaningDuringSave=pop.querySelector('.xp-dict-save-meaning');
-    meaningDuringSave.value=String(_pbpDictCurrent.meaningChoices.findIndex(choice=>choice.gloss==='original second meaning'));meaningDuringSave.dispatchEvent(new Event('change'));await settle();
+    const oldPackRevision=pop.querySelector('.xp-vocab').dataset.packRevision;
+    pickMeaning(pop,_pbpDictCurrent.meaningChoices.findIndex(choice=>choice.gloss==='original second meaning'));await settle();
     finishMeaningWrite({id:'older-meaning-fixture',gloss:dispatchedGloss});
     check("an IDB write that completes after a manual meaning change succeeds without marking the new meaning saved",await pendingMeaningWrite===true&&dispatchedGloss==='original poison'&&_pbpDictCurrent.gloss==='original second meaning'&&!_pbpDictCurrent.saved&&!_pbpDictCurrent.savedRecord&&pop.querySelector('.xp-vocab').dataset.packRevision!==oldPackRevision&&pop.querySelector('.xp-vocab').dataset.packRevision===String(_pbpDictCurrent.packRevision));
     const activeOwner=_pbpDictOwner;_pbpDictOwner='acct_other';
@@ -3007,18 +3013,18 @@ async function runDictionaryStructureUiTests() {
     const known = { ...norm, packId: "reliable" };
     _pbpDictReaderPackChoices(known, slot, cur, pop, controller.signal);
     await new Promise(resolve => setTimeout(resolve, 0));
-    const select = pop.querySelector(".xp-dict-save-meaning");
+    const bar = pop.querySelector(".xp-dict-save-meaning"), menu = pop.querySelector(".xp-dict-save-menu");
+    const help = () => menu.querySelector(".xp-dict-choice-help"), list = () => menu.querySelector('[role="listbox"]');
     check("structure: a later reliable source supplies a real default without selecting unknown full text", !cur.fullEntryOnly && cur.gloss === "與策略規劃有關的" && !pop.querySelector(".xp-vocab").disabled);
-    check("meaning help: explanation is descriptive content outside the options", select.options.length === 3 && select.querySelector(".xp-dict-choice-help").textContent === "dictMeaningDefaultHelp" && select.getAttribute("aria-describedby") === select.querySelector(".xp-dict-choice-help").id);
-    select.value = "1"; select.dispatchEvent(new Event("change"));
+    check("meaning help: explanation is descriptive content outside the options", menu.querySelectorAll('[role="option"]').length === 2 && help().textContent === "dictMeaningDefaultHelp" && !list().contains(help()) && list().getAttribute("aria-describedby") === help().id);
+    check("save bar: the preview names the definition Save writes", !bar.hidden && bar.querySelector(".xp-dict-save-preview").textContent === "strategic · 與策略規劃有關的" && !bar.querySelector(".xp-dict-save-change").hidden);
+    pickMeaning(pop, 1);
     await new Promise(resolve => setTimeout(resolve, 0));
-    check("meaning help: explicit selection remains intact and changes the explanation", cur.gloss === "有策略的" && select.value === "1" && select.querySelector(".xp-dict-choice-help").textContent === "dictMeaningManualHelp");
-    select.value = ""; select.dispatchEvent(new Event("change"));
-    await new Promise(resolve => setTimeout(resolve, 0));
-    check("meaning help: clearing the choice clears its payload and disables Save", !cur.gloss && !cur.packChoice && cur.packInvalidated && pop.querySelector(".xp-vocab").disabled && select.querySelector(".xp-dict-choice-help").textContent === "dictMeaningChooseHelp");
+    check("meaning help: explicit selection remains intact and changes the explanation", cur.gloss === "有策略的" && menu.querySelector('[data-index="1"]').getAttribute("aria-selected") === "true" && help().textContent === "dictMeaningManualHelp" && bar.querySelector(".xp-dict-save-preview").textContent === "strategic · 有策略的");
     _pbpDictReaderPackChoices(known, slot, cur, pop, controller.signal);
-    check("meaning help: later sources cannot undo an explicit empty selection", !cur.gloss && select.value === "");
-    select.value = "0"; select.dispatchEvent(new Event("change"));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    check("meaning help: a later result for the same source keeps the explicit selection", cur.gloss === "有策略的" && cur.packChoice?.gloss === "有策略的");
+    pickMeaning(pop, 0);
     await new Promise(resolve => setTimeout(resolve, 0));
     check("meaning help: choosing a definition again restores its exact payload and save action", cur.gloss === "與策略規劃有關的" && !cur.packInvalidated && !pop.querySelector(".xp-vocab").disabled);
     cur.packChoice = null; cur.meaningSources.delete("reliable:strategic");
@@ -3026,7 +3032,8 @@ async function runDictionaryStructureUiTests() {
     _pbpDictReaderPackChoices(ai, slot, cur, pop, controller.signal);
     await new Promise(resolve => setTimeout(resolve, 0));
     check("structure: hidden AI choices do not supply an ordinary full-entry-only default", cur.fullEntryOnly && !cur.gloss && pop.querySelector(".xp-vocab").disabled);
-    select.value = "0"; select.dispatchEvent(new Event("change"));
+    check("save bar: with no applied definition the preview prompts for one", bar.querySelector(".xp-dict-save-preview").dataset.empty === "true" && bar.querySelector(".xp-dict-save-preview").textContent === "vocabSaveDefinitionLabel" && help().textContent === "dictMeaningChooseHelp");
+    pickMeaning(pop, 0);
     await new Promise(resolve => setTimeout(resolve, 0));
     check("structure: explicitly choosing a reliable hidden source clears full-entry-only gating", !cur.fullEntryOnly && cur.gloss === "與策略規劃有關的" && !pop.querySelector(".xp-vocab").disabled);
     let releaseOwner, writes = 0;
@@ -3043,6 +3050,89 @@ async function runDictionaryStructureUiTests() {
   }
 }
 
+
+// The sticky save bar (dict redesign 3.2): a text preview of what Save writes
+// plus a click-opened "Change" list; Q14=A defaults, a manual choice that
+// async AI results cannot overwrite, the snapshot + live owner gates, and
+// speech that reads the head word form.
+async function runDictSaveBarTests() {
+  section("Save bar: preview, Change list, defaults, owner gates (dict redesign 3.2)");
+  const saved={resolve:_pbpDictResolveLang,online:_pbpDictSlotRun,local:_pbpDictEcdictSide,load:_pbpDictLoadPack,get:pbpVocabGet,owner:_pbpDictOwner,current:_pbpDictCurrent,mount:_pbpDictEntryMount,speak:pbpDictSpeak};
+  const names=["pbpVocabCurrentOwner","pbpVocabSaveWord"];
+  const globals=new Map(names.map(name=>[name,Object.hasOwn(window,name)?window[name]:undefined]));
+  const settle=async()=>{for(let i=0;i<10;i++)await new Promise(r=>setTimeout(r,0));};
+  const pop=document.createElement("div");
+  pop.innerHTML='<span class="xp-term"></span><div class="xp-body"></div><div class="xp-foot"><button class="xp-vocab"></button></div>';
+  document.body.appendChild(pop);
+  let ctrl=new AbortController(),mounted=null,online=null,spoken=null;
+  const sense=definition=>({definition,examples:[],subsenses:[]});
+  const run=async(term,norm)=>{
+    ctrl.abort();ctrl=new AbortController();online=norm;
+    await pbpDictRun({text:term},{sentence:""},pop,ctrl,{});await settle();
+  };
+  const bar=()=>pop.querySelector(".xp-dict-save-meaning"),change=()=>pop.querySelector(".xp-dict-save-change");
+  const menu=()=>pop.querySelector(".xp-dict-save-menu"),preview=()=>pop.querySelector(".xp-dict-save-preview");
+  const open=()=>{try{return menu().matches(":popover-open");}catch(_){return false;}};
+  try {
+    _pbpDictResolveLang=async()=>"en";_pbpDictLoadPack=async()=>false;_pbpDictEcdictSide=async()=>{};pbpVocabGet=async()=>null;_pbpDictOwner="acct_bar";
+    _pbpDictSlotRun=async()=>online;
+    _pbpDictEntryMount=(host,opts)=>{mounted=opts;const element=document.createElement("div");host.appendChild(element);return {element,ready:Promise.resolve()};};
+    pbpDictSpeak=text=>{spoken=text;};
+
+    await run("lone",{word:"lone",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/lone",license:"CC BY-SA 4.0",entries:[{pos:"adjective",ipas:[],forms:[],senses:[sense("the only definition")]}]});
+    check("save bar: one savable definition still shows its text preview, with no Change to offer",!!bar()&&!bar().hidden&&preview().textContent==="lone · the only definition"&&change().hidden&&pop.querySelector(".xp-foot").firstElementChild===bar());
+
+    // A full entry and an etymology lead the online result; neither is a definition.
+    const rich={word:"gift",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/gift",license:"CC BY-SA 4.0",entries:[
+      {pos:"",ipas:[],forms:[],contentKind:"full-entry",fullText:"Etymology: from Old Norse gift.",etymology:["From Old Norse gift"],senses:[]},
+      {pos:"noun",ipas:[],forms:[],etymology:["From Old Norse gift"],senses:[sense("a present"),sense("a talent")]}]};
+    await run("gifts",rich);
+    check("save bar: the default is the first dictionary sense, never the full entry or the etymology",_pbpDictCurrent.gloss==="a present"&&!_pbpDictCurrent.packChoice&&preview().textContent==="gift · a present"&&!change().hidden);
+    check("save bar: Change names its list and its preview",change().getAttribute("aria-haspopup")==="listbox"&&change().getAttribute("aria-expanded")==="false"&&change().getAttribute("aria-controls")===menu().id&&change().getAttribute("aria-describedby")===preview().id&&change().textContent==="dictMeaningChange");
+    pop.querySelector(".xp-dict-speak").click();
+    check("speak reads the head word form, not the dictionary's headword",spoken==="gifts");
+
+    change().focus();change().click();
+    const options=()=>[...menu().querySelectorAll('[role="option"]')];
+    check("Change opens a click-triggered list on the selected definition",open()&&change().getAttribute("aria-expanded")==="true"&&document.activeElement===options()[0]&&options()[0].getAttribute("aria-selected")==="true"&&options().length===2);
+    const key=k=>document.activeElement.dispatchEvent(new KeyboardEvent("keydown",{key:k,bubbles:true,cancelable:true}));
+    key("ArrowDown");
+    check("arrow keys move through the listed definitions",document.activeElement===options()[1]);
+    key("Enter");await settle();
+    check("Enter chooses the definition, closes the list and returns focus to Change",_pbpDictCurrent.gloss==="a talent"&&_pbpDictCurrent.packChoice?.gloss==="a talent"&&!open()&&document.activeElement===change()&&preview().textContent==="gift · a talent");
+    change().click();key("End");key("Escape");
+    check("Escape closes the list and restores focus to Change without choosing",!open()&&document.activeElement===change()&&change().getAttribute("aria-expanded")==="false"&&_pbpDictCurrent.gloss==="a talent");
+    let escaped=0;const watch=e=>{if(e.key==="Escape")escaped++;};document.addEventListener("keydown",watch);
+    change().click();key("Escape");document.removeEventListener("keydown",watch);
+    check("the list's Escape does not reach the card's own Escape handlers",escaped===0&&!open());
+
+    // An AI entry that arrives later and opens must not replace the explicit choice.
+    const ai={word:"gift",aiGenerated:true,sourceLabel:"AI",sourceUrl:"",license:"AI-generated",entries:[{pos:"noun",ipas:[],forms:[],etymology:["AI etymology"],senses:[sense("an AI sense")]}]};
+    mounted.onEntry(ai,null,document.createElement("div"));mounted.onView(true);await settle();
+    check("an async AI result and its expanded block keep the manual choice",_pbpDictCurrent.gloss==="a talent"&&_pbpDictCurrent.packChoice?.gloss==="a talent"&&options().length===3);
+
+    await run("gifts",rich);
+    mounted.onEntry(ai,null,document.createElement("div"));await settle();
+    check("Q14=A: a folded AI block leaves the default on the dictionary",_pbpDictCurrent.gloss==="a present");
+    mounted.onView(true);await settle();
+    check("Q14=A: an expanded AI block supplies its first sense, not its etymology",_pbpDictCurrent.gloss==="an AI sense"&&preview().textContent==="gift · an AI sense");
+
+    // Owner gates at save: the snapshot first, then the live account.
+    let writes=0;window.pbpVocabSaveWord=async()=>{writes++;return {id:"w"};};
+    window.pbpVocabCurrentOwner=async()=>"acct_other";
+    check("save is refused when the live account changed before the write",await pbpDictSaveCurrent()===false&&writes===0);
+    window.pbpVocabCurrentOwner=async()=>"acct_bar";_pbpDictOwner="acct_other";
+    check("save is refused when the page already switched accounts",await pbpDictSaveCurrent()===false&&writes===0);
+    _pbpDictOwner="acct_bar";
+    check("save goes through with both gates passing",await pbpDictSaveCurrent()===true&&writes===1);
+    ctrl.abort();await settle();
+    check("an aborted lookup removes its save bar and list",!pop.querySelector(".xp-dict-save-meaning")&&!pop.querySelector(".xp-dict-save-menu"));
+  } finally {
+    ctrl.abort();pop.remove();
+    _pbpDictResolveLang=saved.resolve;_pbpDictSlotRun=saved.online;_pbpDictEcdictSide=saved.local;_pbpDictLoadPack=saved.load;pbpVocabGet=saved.get;_pbpDictOwner=saved.owner;_pbpDictCurrent=saved.current;_pbpDictEntryMount=saved.mount;pbpDictSpeak=saved.speak;
+    for(const [name,value] of globals){if(value===undefined)delete window[name];else window[name]=value;}
+  }
+}
 
 // Free original-text examples (plan 1C.2, Q20=A): an independent block that a
 // lookup creates beside the AI panel. It never reads AI settings, never calls
@@ -3180,6 +3270,7 @@ async function runDictionaryExamplesTests() {
   await runDictionaryEntryReaderTests();
   await runDictionaryEntrySettingsTests();
   await runDictionaryExamplesTests();
+  await runDictSaveBarTests();
   document.getElementById("summary").textContent = `${pass} passed, ${fail} failed`;
 })();
 </script>

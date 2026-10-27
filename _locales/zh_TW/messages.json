@@ -4631,6 +4631,7 @@
   "dictMeaningManualHelp": {"message": "將儲存你選取的解釋。這次查詞會保留這個選擇。"},
   "dictMeaningSavedHelp": {"message": "已儲存的解釋不會自動變更。選取一項解釋後，即可更新這個生詞。"},
   "dictMeaningChooseHelp": {"message": "請選取要儲存的解釋；這次查詞會保留你的選擇。"},
+  "dictMeaningChange": {"message": "更換"},
   "dictFullEntry": {"message": "完整詞條"},
   "dictFullEntryOnlyHint": {"message": "這個詞條尚未拆分出個別解釋。你可以閱讀全文，或選取其他詞典來源的解釋來儲存。"},
   "multiPackReimportHint": {"message": "重新匯入同一個詞包，便可重新辨識釋義結構。既有生詞與詞包的啟用狀態維持不變。"},

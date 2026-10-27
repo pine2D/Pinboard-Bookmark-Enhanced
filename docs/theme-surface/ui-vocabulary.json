@@ -514,6 +514,8 @@
         "xp-dict-usage-actions",
         "xp-dict-usage-feedback",
         "xp-dict-learning-section",
+        "xp-dict-save-preview",
+        "xp-dict-save-menu",
         "confirm-actions"
       ],
       "regions": [
@@ -678,7 +680,11 @@
         "xp-dict-choice-text",
         "xp-dict-choice-source",
         "xp-dict-choice-help",
-        "xp-dict-full-text"
+        "xp-dict-full-text",
+        "xp-dict-save-meaning",
+        "xp-dict-save-change",
+        "xp-dict-save-options",
+        "xp-dict-save-option"
       ]
     },
     "shared": {

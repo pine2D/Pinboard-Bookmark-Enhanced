@@ -4060,6 +4060,15 @@ await (async () => {
       _pbpVocabAutoLookup=async()=>"idle";
       await reload(); await run();
       check("B a new lookup preselects the first displayed definition and can be saved immediately", !!select()&&select().options.length===3&&select().value==="online:0"&&save()?.disabled===false);
+      {
+        const icon=document.createElement("div");icon.innerHTML=PBP_ICONS.bookmarkPlus;
+        check("B the save action uses the bookmarkPlus icon (Q26=A keeps bookMarked for the saved state only)", save()?.querySelector("svg")?.outerHTML===icon.innerHTML);
+        _pbpDictSlotRun=async()=>({...norm,entries:[{...norm.entries[0],senses:[norm.entries[0].senses[0]]}]});
+        await run();
+        check("B a lookup with one savable definition still shows the save bar with that definition", !!panel().querySelector(".vocab-save-controls")&&select()?.options.length===2&&select().value==="online:0"&&save()?.disabled===false);
+        _pbpDictSlotRun=async()=>norm;
+        await run();
+      }
       choose("Operate");
       check("B choosing a definition enables collection", save()?.disabled===false&&save()?.textContent.includes("dictSaveVocab"));
       save()?.click(); await settle();

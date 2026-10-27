@@ -105,6 +105,11 @@ test('dictionary feature plans retain the actual registered AI entry states on b
   for (const surface of ['library', 'md-preview']) for (const state of states) {
     assert.ok(rows.some(row => row.id === `render.${surface}.sweep.dict-entry-${state}`), `${surface}: ${state} must be registered`);
   }
+  for (const surface of ['library', 'md-preview']) for (const state of ['dict-save-bar', 'dict-save-change-menu']) {
+    assert.ok(rows.some(row => row.id === `render.${surface}.sweep.${state}`), `${surface}: ${state} must be registered`);
+  }
+  assert.ok(catalog.find(row => row.id === 'render.library.sweep.dict-save-change-menu')?.dependencies.includes('render.library.sweep.dict-save-bar'), 'the change list opens from the save bar');
+  assert.ok(catalog.find(row => row.id === 'render.md-preview.sweep.dict-save-change-menu')?.dependencies.includes('render.md-preview.sweep.dict-save-bar'), 'the reader change list opens from the save bar');
   assert.equal(catalog.some(row => /dict-(assist|analyze)-/.test(row.id)), false, 'retired AI action states must not remain registered');
   for (const surface of ['library', 'reader']) {
     assert.ok(rows.some(row => row.surfaces.some(value => value === surface || surface === 'reader' && value === 'md-preview')), surface);

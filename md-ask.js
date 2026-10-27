@@ -3689,7 +3689,7 @@ const PBP_EXPLAIN_PIN_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.pin : "
 // Inline SVG rather than glyphs, per CLAUDE.md's font-fallback rules.
 const PBP_EXPLAIN_NOTE_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.doc : "";
 const PBP_EXPLAIN_VOCAB_ADD_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.bookmarkPlus : "";
-const PBP_EXPLAIN_VOCAB_OPEN_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.bookMarked : "";
+const PBP_EXPLAIN_VOCAB_OPEN_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.library : "";
 const PBP_EXPLAIN_ASK_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.ask : "";
 // One tick for both "saved" states. They sit in different places under
 // different tooltips, so a shared check reads correctly and keeps the set small.

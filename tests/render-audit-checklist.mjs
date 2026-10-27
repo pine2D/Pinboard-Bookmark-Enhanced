@@ -746,6 +746,10 @@ export const DICT_LOOKUP_GEOMETRY = {
         // Old-category records opened: a literature quotation with its saved
         // AI translation, a culture explanation and a plain-text record.
         "dict-entry-legacy": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
+        // The save bar (dict redesign 3.2) under the dictionary result, then
+        // its click-opened choice list, which must stay inside the viewport.
+        "dict-save-bar": { requires: ["edges", "senseIndent", "overflow", "clip"] },
+        "dict-save-change-menu": { requires: ["overflow"] },
         "dict-entry-panel": { root: "#reader-dict-view .xp-dict", overflowRoot: "#reader-dict-view",
           requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
       },
@@ -765,6 +769,8 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-entry-folded": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-entry-revealed": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-legacy": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
+        "dict-save-bar": { requires: ["edges", "senseIndent", "overflow", "clip"] },
+        "dict-save-change-menu": { requires: ["overflow"] },
       },
     },
   },

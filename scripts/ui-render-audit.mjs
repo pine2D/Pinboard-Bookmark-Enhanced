@@ -109,7 +109,7 @@ import { cr, hexRgb, parseRgba, composite } from "../docs/theme-surface/tools/co
 import { CHIP_TARGETS } from "../docs/theme-surface/composers/ui-components.mjs";
 // Options density per theme, from the pilots (docs/theme-surface/tools/options-density.mjs).
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
-import { installDictEntryFixture, openDictEntryState, restoreDictEntryView } from "./audit-dict-entry-fixture.mjs";
+import { installDictEntryFixture, openDictEntryState, restoreDictEntryView, closeDictSaveMenu } from "./audit-dict-entry-fixture.mjs";
 import { ledgerKey, reconcileKnownFailures } from "./render-audit-ledger.mjs";
 import { installAskHistoryFixture, openAskHistoryState } from "./audit-ask-history-fixture.mjs";
 import { openVocabPackPreview, installVocabPackFixture } from "./audit-vocab-pack-fixture.mjs";
@@ -7945,6 +7945,7 @@ const SWEEP_CFG = {
       ".tr-link", ".xp-dict-more", ".xp-dict-lemma-link", ".pbp-img-fix-btn", ".pbv-time", // link-styled, no chrome (COMPONENTS.md §0); .pbv-time is the cue row's timestamp (24px hit floor)
       ".notes-excerpt-color",                       // inline semantic label action; 24px hit floor, can wrap in the hang column
       "summary", ".rail-sec-head", ".notes-hit-btn", ".ask-library-hit", ".notes-card-head", ".notes-card-top", ".notes-excerpt-jump", ".connection-health-row", ".hl-item-main", ".send-mi", ".pbv-poster", // row rung: whole-row clickables / section headers / status cards / menu rows / the video poster card
+      ".listbox-pop[data-layout='meaning'] .listbox-opt", // the save-meaning list (dict redesign 3.2): a definition row of up to four lines plus its source line (COMPONENTS.md choice-text), a menu row like .send-mi
       ".theme-preset-btn", ".saved-theme-btn",       // borderless swatch pills (user-selected variant A, d57cdcf): the sm rung minus the collapsed frame
       ".tags-input-wrap > input", ".vocab-group-unit > input", ".source-badge > .src-seg", ".view-toggle > .toggle-btn", // fused-shell inners: the shell is measured instead
       "select > button",                           // customizable select's inert face; measure the parent select
@@ -9217,6 +9218,19 @@ async function runSweep(page, sw, extBase) {
       }
       await scan("library", "dict-entry-legacy", () => openDictEntryState(page, "legacy"));
     }
+    // The sticky save bar (dict redesign 3.2) and its click-opened list.
+    if (wants("library", "dict-save-bar")) {
+      if (!["dict-entry-idle", "dict-entry-examples", "dict-entry-negative", "dict-entry-legacy"].some(name => wants("library", name))) {
+        await installDictEntryFixture(page);
+        await vocabHead.click();
+        await page.locator("#vocab-lookup-go").click();
+      }
+      await scan("library", "dict-save-bar", () => openDictEntryState(page, "save-bar"));
+    }
+    if (wants("library", "dict-save-change-menu")) {
+      await scan("library", "dict-save-change-menu", () => openDictEntryState(page, "save-change-menu"));
+      await closeDictSaveMenu(page);
+    }
     // Ctrl+click on the row head, not a checkbox click: the per-row checkbox was
     // removed 2026-08-06 and selection is now a modified click on the row itself.
     if (wants("library", "vocab-batch-bar")) {
@@ -9312,22 +9326,23 @@ async function runSweep(page, sw, extBase) {
         // probed as its own context, then closed. A surface that fails to render
         // is printed, never skipped silently -- the gate's coverage is the point.
         for (const name of READER_SURFACES.filter((name) => wants("md-preview", name))) {
-          if (/^dict-entry-/.test(name)) {
-            // The examples states need no earlier AI state: open the lookup
-            // for them when they run on their own.
-            if (name.endsWith("-idle") || (["dict-entry-examples", "dict-entry-negative", "dict-entry-legacy"].includes(name) &&
+          if (/^dict-(entry|save)-/.test(name)) {
+            // The examples and save-bar states need no earlier AI state: open
+            // the lookup for them when they run on their own.
+            if (name.endsWith("-idle") || (["dict-entry-examples", "dict-entry-negative", "dict-entry-legacy", "dict-save-bar"].includes(name) &&
                 !(await page.locator("#explain-pop .xp-dict-query-tools > .xp-dict-lang").isVisible().catch(() => false)))) {
               await installDictEntryFixture(page);
               if (await page.evaluate(openReaderSurface, "explain-pop") !== true || await page.evaluate(openReaderSurface, "explain-dict") !== true) throw new Error("SETUP: dictionary entry opener failed");
               await page.selectOption(".xp-dict-query-tools > .xp-dict-lang", "en");
             }
-            await scan("md-preview", name, () => openDictEntryState(page, name.replace(/^dict-entry-/, "")));
+            await scan("md-preview", name, () => openDictEntryState(page, name.replace(/^dict-(entry-)?/, "")));
+            if (name === "dict-save-change-menu") await closeDictSaveMenu(page);
             if (name === "dict-entry-panel") await page.locator("#reader-dict-view .reader-dict-return").click();
             // The folded states switch dictDefaultView to "dictionary"; put the
             // fixture's "ai-saved" back after the last of them.
             if ((name === "dict-entry-folded" && !wants("md-preview", "dict-entry-revealed")) || name === "dict-entry-revealed") await restoreDictEntryView(page);
             const following = READER_SURFACES.slice(READER_SURFACES.indexOf(name) + 1).find(next => wants("md-preview", next));
-            if (!following?.startsWith("dict-entry-")) await page.evaluate(closeReaderSurface, "explain-dict");
+            if (!/^dict-(entry|save)-/.test(following || "")) await page.evaluate(closeReaderSurface, "explain-dict");
             continue;
           }
           await scan("md-preview", name, async () => {

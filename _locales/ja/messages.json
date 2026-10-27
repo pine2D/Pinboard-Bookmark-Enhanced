@@ -4631,6 +4631,7 @@
   "dictMeaningManualHelp": {"message": "選択した意味を保存します。今回の検索中はこの選択が維持されます。"},
   "dictMeaningSavedHelp": {"message": "保存済みの意味は自動では変わりません。意味を選ぶと、この単語を更新できます。"},
   "dictMeaningChooseHelp": {"message": "保存する意味を選んでください。今回の検索中はその選択が維持されます。"},
+  "dictMeaningChange": {"message": "変更"},
   "dictFullEntry": {"message": "項目の全文"},
   "dictFullEntryOnlyHint": {"message": "この項目は個別の意味に分けられていません。全文を読むか、別の辞書の意味を選んで保存できます。"},
   "multiPackReimportHint": {"message": "同じ辞書ファイルを再インポートすると、語義の構造を再解析します。保存済みの単語と辞書の有効・無効の設定は変わりません。"},

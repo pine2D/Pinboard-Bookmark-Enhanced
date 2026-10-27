@@ -23,7 +23,7 @@ export const RENDER_READER_CONTEXTS = Object.freeze([
   'reader-source-details', 'export-more', 'reader-bookmark-footer', 'reader-bookmark-editor', 'reader-bookmark-delete-confirm',
   'explain-pop', 'explain-dict', 'dict-resize-menu', 'dict-entry-idle', 'dict-entry-busy', 'dict-entry-progress', 'dict-entry-result', 'dict-entry-details',
   'dict-entry-usage-busy', 'dict-entry-usage-error', 'dict-entry-usage-result',
-  'dict-entry-panel', 'dict-entry-cached', 'dict-entry-folded', 'dict-entry-revealed', 'dict-entry-error', 'dict-entry-examples', 'dict-entry-negative', 'dict-entry-legacy', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
+  'dict-entry-panel', 'dict-entry-cached', 'dict-entry-folded', 'dict-entry-revealed', 'dict-entry-error', 'dict-entry-examples', 'dict-entry-negative', 'dict-entry-legacy', 'dict-save-bar', 'dict-save-change-menu', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
   'pb-hl-card', 'send-menu', 'confirm-popover', 'tr-ask',
 ]);
 const context = (name, dependencies = [], extra = {}) => ({ name, dependencies, ...extra });
@@ -66,6 +66,10 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     // Old literature, culture and topic collocations records (plan 1B.7,
     // 1C.3), seeded into the production archive: no AI state is needed.
     context('dict-entry-legacy', [], { target: '.xp-dict-ai-details[data-supplement-category="literature"][open]' }),
+    // The sticky save bar (dict redesign 3.2): the meaning listbox beside
+    // Save, then its choice list opened by click.
+    context('dict-save-bar', [], { target: '.vocab-save-controls .listbox-btn' }),
+    context('dict-save-change-menu', ['dict-save-bar'], { target: '[id^="vocab-save-definition-opt-"]' }),
     context('vocab-batch-bar', ['vocab-detail'], { target: '#vocab-batch-toolbar.selecting' }),
     context('ask-history-list', [], { target: '#ask-library-list .ask-library-hit' }),
     context('ask-history-detail', ['ask-history-list'], { target: '#ask-library-detail:not([hidden])' }),
@@ -78,7 +82,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('notes-batch-bar', ['notes-detail'], { target: '#notes-batch-toolbar.selecting' }),
   ],
   'md-preview': [context('reader', [], { target: '#rendered-view' }), ...RENDER_READER_CONTEXTS.map((name) => context(name,
-    name === 'explain-dict' ? ['explain-pop'] : name === 'dict-resize-menu' ? ['explain-dict'] : name === 'dict-entry-busy' ? ['dict-entry-idle'] : name === 'dict-entry-progress' ? ['dict-entry-busy'] : name === 'dict-entry-result' ? ['dict-entry-busy'] : ['dict-entry-details', 'dict-entry-cached', 'dict-entry-usage-busy', 'dict-entry-panel', 'dict-entry-folded'].includes(name) ? ['dict-entry-result'] : name === 'dict-entry-revealed' ? ['dict-entry-folded'] : name === 'dict-entry-usage-error' ? ['dict-entry-usage-busy'] : name === 'dict-entry-usage-result' ? ['dict-entry-usage-error'] : name === 'dict-entry-error' ? ['dict-entry-idle'] : [])), context('video', [], { target: '.pbv-bar' })],
+    name === 'explain-dict' ? ['explain-pop'] : name === 'dict-resize-menu' ? ['explain-dict'] : name === 'dict-entry-busy' ? ['dict-entry-idle'] : name === 'dict-entry-progress' ? ['dict-entry-busy'] : name === 'dict-entry-result' ? ['dict-entry-busy'] : ['dict-entry-details', 'dict-entry-cached', 'dict-entry-usage-busy', 'dict-entry-panel', 'dict-entry-folded'].includes(name) ? ['dict-entry-result'] : name === 'dict-entry-revealed' ? ['dict-entry-folded'] : name === 'dict-entry-usage-error' ? ['dict-entry-usage-busy'] : name === 'dict-entry-usage-result' ? ['dict-entry-usage-error'] : name === 'dict-entry-error' ? ['dict-entry-idle'] : name === 'dict-save-change-menu' ? ['dict-save-bar'] : [])), context('video', [], { target: '.pbv-bar' })],
   popup: [context('light', [], { target: '#main-section' }), context('states', [], { target: '.offline-queue-item' }),
     context('form', [], { target: '#url-input' }), context('dpi', [], { dpr: [1.5, 2] }),
     context('dark', [], { theme: 'flexoki-dark', scheme: 'dark', target: '#main-section' }),
@@ -127,8 +131,8 @@ export const RENDER_SCENARIOS = Object.freeze([
     return row(sweepScenarioId(surface, item.name), surface, themes, {
       type: 'sweep', context: item.name,
       ...(item.name.startsWith('vocab-pack-') ? { files: [...files(surface), 'options-vocab.js', 'dict-pack.js', 'scripts/audit-vocab-pack-fixture.mjs'] } : {}),
-      ...(/^dict-entry-/.test(item.name) ? { files: [...files(surface), 'md-dict.js', 'dict-entry.js', 'dict-evidence.js', 'dict-archive.js', 'ai.js', 'ai-cache.js', 'library-vocab.js', 'scripts/audit-dict-entry-fixture.mjs'] } : {}),
-      features: [...new Set([item.name, item.name.replace(/^tab-/, ''), surface, ...(/^dict-entry-/.test(item.name) ? ['dictionary', 'dictionary-entry'] : [])])], kinds: ['layout'], axes: { ...axes, state: [item.name] },
+      ...(/^dict-(entry|save)-/.test(item.name) ? { files: [...files(surface), 'md-dict.js', 'dict-entry.js', 'dict-evidence.js', 'dict-archive.js', 'ai.js', 'ai-cache.js', 'library-vocab.js', 'scripts/audit-dict-entry-fixture.mjs'] } : {}),
+      features: [...new Set([item.name, item.name.replace(/^tab-/, ''), surface, ...(/^dict-(entry|save)-/.test(item.name) ? ['dictionary', 'dictionary-entry'] : [])])], kinds: ['layout'], axes: { ...axes, state: [item.name] },
       defaults: surface === 'md-preview' ? { scheme: ['light'] } : {},
       dependencies: item.dependencies.map((name) => sweepScenarioId(surface, name)),
     });

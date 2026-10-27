@@ -2085,7 +2085,10 @@ html.motion-ready .vocab-note-save {
 .vocab-ref-term { min-width: 0; font-size: 20px; line-height: 28px; font-weight: 700; color: var(--lib-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vocab-ref-speak { flex: none; }
 .vocab-ref-head > .vocab-lookup-saved { margin-inline-start: auto; }
-.vocab-ref-foot { display: flex; align-items: flex-start; gap: var(--lib-sp-2); margin-top: var(--lib-sp-3); container-type: inline-size; container-name: dict-save; }
+/* The save bar (dict redesign 3.2) stays at the bottom of the detail scroller
+   while the lookup above it is longer than the pane: the page's own ground,
+   no edge or shadow (flat canvas). margin + block inset = the sp-3 it had. */
+.vocab-ref-foot { position: sticky; bottom: 0; z-index: 1; display: flex; align-items: flex-start; gap: var(--lib-sp-2); margin-top: var(--lib-sp-1); padding-block: var(--lib-sp-2); background: var(--lib-bg); container-type: inline-size; container-name: dict-save; }
 .vocab-save-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; flex: 1 1 0; min-width: 0; align-items: center; gap: var(--lib-sp-2); }
 .vocab-save-controls > .listbox { min-width: 0; max-width: 100%; }
 .vocab-save-controls > .save-status { grid-column: 1 / -1; }

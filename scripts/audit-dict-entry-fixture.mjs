@@ -494,5 +494,52 @@ export async function openDictEntryState(page, state) {
     if (legacy.calls !== before) throw new Error('SETUP: reading old-category records issued an AI request');
     return page.locator('.xp-dict-ai-details[data-supplement-category="literature"][open] .xp-dict-example-translation').isVisible();
   }
+  if (state === 'save-bar') {
+    // The save bar (dict redesign 3.2): the reader's one-line preview of the
+    // definition Save writes, or the library's meaning listbox, beside Save.
+    // The fixture's dictionary result offers three definitions, so the
+    // reader's "Change" is on screen too.
+    const reader = await page.locator('#explain-pop').count() > 0;
+    if (reader) {
+      const bar = page.locator('#explain-pop .xp-dict-save-meaning:not([hidden])');
+      await bar.waitFor();
+      const face = await bar.evaluate(node => ({
+        text: node.querySelector('.xp-dict-save-preview')?.textContent || '',
+        change: !node.querySelector('.xp-dict-save-change')?.hidden }));
+      if (!face.text.includes(' · ')) throw new Error('SETUP: the save bar preview does not name a definition: ' + face.text);
+      if (!face.change) throw new Error('SETUP: the save bar offers no Change for a lookup with several definitions');
+      return bar.isVisible();
+    }
+    const control = page.locator('#vocab-ref-result .vocab-save-controls .listbox-btn');
+    await control.waitFor();
+    return control.isVisible();
+  }
+  if (state === 'save-change-menu') {
+    // "Change" opens the choice list on click (never on hover) with the
+    // selected definition focused; the driver closes it with Escape after the
+    // scan.
+    const reader = await page.locator('#explain-pop').count() > 0;
+    if (reader) {
+      await page.locator('#explain-pop .xp-dict-save-change').click();
+      const menu = page.locator('.xp-dict-save-menu:popover-open');
+      await menu.waitFor();
+      const focused = await page.evaluate(() => document.activeElement?.matches('.xp-dict-save-menu [role="option"][aria-selected="true"]'));
+      if (!focused) throw new Error('SETUP: opening the choice list did not focus the selected definition');
+      return menu.isVisible();
+    }
+    await page.locator('#vocab-ref-result .vocab-save-controls .listbox-btn').click();
+    const option = page.locator('[id^="vocab-save-definition-opt-"]').first();
+    await option.waitFor();
+    return option.isVisible();
+  }
   throw new Error('SETUP: unknown dictionary entry state ' + state);
+}
+
+// Close the choice list a save-change-menu scan left open, the way a
+// keyboard user does; focus must come back to the control that opened it.
+export async function closeDictSaveMenu(page) {
+  await page.keyboard.press('Escape');
+  const back = await page.evaluate(() => !document.querySelector('.xp-dict-save-menu:popover-open') &&
+    !!document.activeElement?.matches('.xp-dict-save-change, .vocab-save-controls .listbox-btn'));
+  if (!back) throw new Error('SETUP: Escape did not close the save choice list and return focus to its control');
 }

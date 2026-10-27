@@ -3033,10 +3033,9 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
     _pbpDictManualLang = sel.value; // per-document only; never persisted
     cur.rerun(); // abort old requests NOW
   });
-  speak.addEventListener("click", () => {
-    const visible = cur.aiExpanded ? cur.aiNorm : cur.dictionaryNorm;
-    pbpDictSpeak(visible?.word || cap.text, lang);
-  });
+  // The head names the looked-up word form; speech reads exactly that form,
+  // whichever source or saved meaning sits below it (dict redesign 3.2).
+  speak.addEventListener("click", () => pbpDictSpeak(cap.text, lang));
   cur.refreshLanguages = () => (installedLanguages = _pbpDictRefreshPackLangs(sel, languageLocale, true,
     () => !signal.aborted && _pbpDictCurrent === cur)).then(codes => {
       if (!signal.aborted && _pbpDictCurrent === cur && _pbpDictManualLang && !codes.includes(_pbpDictManualLang)) _pbpDictManualLang = "";
@@ -3134,41 +3133,163 @@ function _pbpDictApplyVisibleChoice(cur) {
   }
 }
 
+// The save bar's meaning control (dict redesign 3.2): a plain-text preview of
+// the definition Save would write, plus "Change" when there is another one to
+// pick. The preview shows even when only one definition can be saved, so the
+// user always sees what the button commits. The choice list is a click-opened
+// popover (the reader allows no hover-triggered overlays), operable by
+// keyboard; Escape or a choice returns focus to "Change".
 function _pbpDictSyncMeaningSelect(cur) {
-  const select = cur.meaningSelect;
-  if (!select) return;
+  const bar = cur.meaningBar;
+  if (!bar) return;
   const rows = [...cur.meaningSources.values()].flatMap(source => source.choices);
   cur.meaningChoices = rows;
-  // base-select's anonymous selected-value box can wrap outside a fixed-height
-  // control. An explicit selectedcontent gives the closed face its own clipping
-  // boundary while the top-layer options retain their complete text.
-  select.replaceChildren(new Option(t("vocabSaveDefinitionLabel"), ""));
-  rows.forEach((choice, index) => {
-    const option = new Option(choice.term + " · " + choice.gloss + " (" + choice.sourceLabel + ")", String(index));
-    const label = option.textContent;
-    const body = document.createElement("span"); body.className = "xp-dict-choice-text"; body.textContent = choice.term + " · " + choice.gloss;
-    const source = document.createElement("span"); source.className = "xp-dict-choice-source"; source.textContent = " (" + choice.sourceLabel + ")";
-    option.replaceChildren(body, source);
-    option.title = label; option.setAttribute("aria-label", label);
-    option.lang = choice.definitionLang; select.appendChild(option);
-  });
   const selected = rows.findIndex(choice => choice.term === cur.term && choice.gloss === cur.gloss &&
     choice.sourceUrl === cur.sourceUrl && choice.license === cur.license);
-  select.value = selected >= 0 ? String(selected) : "";
-  const help = document.createElement("div"); help.className = "xp-dict-choice-help"; help.id = "xp-dict-choice-help";
-  help.textContent = t(selected < 0 ? "dictMeaningChooseHelp" : cur.packChoice ? "dictMeaningManualHelp" : "dictMeaningDefaultHelp");
-  select.prepend(help); select.setAttribute("aria-describedby", help.id);
-  _pbpDictSyncSelectFace(select);
-  cur.meaningHelpObserver?.disconnect();
-  if (typeof ResizeObserver === "function") {
-    cur.meaningHelpObserver = new ResizeObserver(() => {
-      const height = Math.ceil(help.getBoundingClientRect().height);
-      if (height > 0) select.style.setProperty("--xp-dict-help-height", height + "px");
-    });
-    cur.meaningHelpObserver.observe(help);
+  const preview = bar.querySelector(".xp-dict-save-preview"), change = bar.querySelector(".xp-dict-save-change");
+  const shown = selected >= 0 ? rows[selected] : null;
+  // The face names what Save writes: the applied choice, or the prompt when
+  // there is none (a revoked source, a full entry only).
+  if (cur.gloss) {
+    preview.textContent = cur.term + " · " + cur.gloss;
+    preview.lang = shown?.definitionLang || "und";
+    preview.removeAttribute("data-empty");
+  } else {
+    preview.textContent = t("vocabSaveDefinitionLabel");
+    preview.removeAttribute("lang");
+    preview.dataset.empty = "true";
   }
-  select.hidden = !rows.length || (rows.length === 1 && selected === 0 && !cur.packChoice);
-  select.title = selected >= 0 ? rows[selected].gloss + " (" + rows[selected].sourceLabel + ")" : t("vocabSaveDefinitionLabel");
+  preview.title = shown ? shown.gloss + " (" + shown.sourceLabel + ")" : preview.textContent;
+  change.hidden = rows.length < 2 && selected >= 0;
+  bar.hidden = !rows.length;
+  const help = cur.meaningMenu.querySelector(".xp-dict-choice-help");
+  help.textContent = t(selected < 0 ? "dictMeaningChooseHelp" : cur.packChoice ? "dictMeaningManualHelp" : "dictMeaningDefaultHelp");
+  const list = cur.meaningMenu.querySelector(".xp-dict-save-options");
+  const focused = list.contains(document.activeElement) ? document.activeElement.dataset.index : null;
+  list.replaceChildren();
+  rows.forEach((choice, index) => {
+    const option = document.createElement("div");
+    option.className = "xp-dict-save-option";
+    option.setAttribute("role", "option");
+    option.tabIndex = -1;
+    option.dataset.index = String(index);
+    option.setAttribute("aria-selected", String(index === selected));
+    option.lang = choice.definitionLang;
+    const body = document.createElement("span"); body.className = "xp-dict-choice-text"; body.textContent = choice.term + " · " + choice.gloss;
+    const source = document.createElement("span"); source.className = "xp-dict-choice-source"; source.textContent = choice.sourceLabel;
+    option.append(body, source);
+    list.appendChild(option);
+  });
+  if (cur.meaningMenuOpen()) {
+    if (!rows.length || bar.hidden) cur.meaningMenuClose(false);
+    else if (focused !== null) (list.children[Math.min(Number(focused), rows.length - 1)] || list.firstElementChild)?.focus({ preventScroll: true });
+  }
+}
+
+// Fixed placement for the choice list: above "Change" (the bar sits at the
+// bottom of the card), below it when the room above is too small, and kept
+// 16px inside the viewport either way.
+function _pbpDictPlaceMeaningMenu(menu, anchor) {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const a = anchor.getBoundingClientRect(), m = menu.getBoundingClientRect();
+  const above = a.top - m.height - 8, below = a.bottom + 8;
+  const top = above >= 16 ? above : below + m.height <= vh - 16 ? below : Math.max(16, vh - 16 - m.height);
+  menu.style.left = Math.max(16, Math.min(a.right - m.width, vw - m.width - 16)) + "px";
+  menu.style.top = Math.max(16, top) + "px";
+}
+
+function _pbpDictMountMeaningBar(cur, pop, box, signal) {
+  const bar = document.createElement("div");
+  bar.className = "xp-dict-save-meaning";
+  bar.setAttribute("role", "group");
+  bar.setAttribute("aria-label", t("vocabSaveDefinitionLabel"));
+  const preview = document.createElement("span");
+  preview.className = "xp-dict-save-preview";
+  preview.id = "xp-dict-save-preview-" + cur.runId;
+  const change = document.createElement("button");
+  change.type = "button";
+  change.className = "xp-dict-connect xp-dict-save-change";
+  change.textContent = t("dictMeaningChange");
+  change.setAttribute("aria-haspopup", "listbox");
+  change.setAttribute("aria-expanded", "false");
+  change.setAttribute("aria-describedby", preview.id);
+  bar.append(preview, change);
+  const menu = document.createElement("div");
+  menu.className = "pop-panel xp-dict-save-menu";
+  menu.id = "xp-dict-save-menu-" + cur.runId;
+  menu.setAttribute("popover", "auto");
+  const help = document.createElement("div"); help.className = "xp-dict-choice-help"; help.id = menu.id + "-help";
+  const list = document.createElement("div");
+  list.className = "xp-dict-save-options";
+  list.setAttribute("role", "listbox");
+  list.setAttribute("aria-label", t("vocabSaveDefinitionLabel"));
+  list.setAttribute("aria-describedby", help.id);
+  menu.append(help, list);
+  change.setAttribute("aria-controls", menu.id);
+  cur.meaningBar = bar; cur.meaningMenu = menu;
+  const host = pop.querySelector(".xp-foot") || box;
+  host.prepend(bar); bar.after(menu);
+  const isOpen = () => { try { return menu.matches(":popover-open"); } catch (_) { return false; } };
+  const close = (restoreFocus) => {
+    if (isOpen()) { try { menu.hidePopover(); } catch (_) {} }
+    change.setAttribute("aria-expanded", "false");
+    if (restoreFocus && !change.hidden) change.focus({ preventScroll: true });
+  };
+  cur.meaningMenuOpen = isOpen;
+  cur.meaningMenuClose = close;
+  const place = () => { if (isOpen()) _pbpDictPlaceMeaningMenu(menu, change); };
+  window.addEventListener("resize", place);
+  signal.addEventListener("abort", () => {
+    window.removeEventListener("resize", place);
+    close(false); bar.remove(); menu.remove();
+  }, { once: true });
+  menu.addEventListener("beforetoggle", e => {
+    change.setAttribute("aria-expanded", String(e.newState === "open"));
+    // Never leave focus inside a closing list, whatever closed it.
+    if (e.newState === "closed" && menu.contains(document.activeElement) && !change.hidden) change.focus({ preventScroll: true });
+  });
+  change.addEventListener("click", () => {
+    if (signal.aborted || _pbpDictCurrent !== cur) return;
+    if (isOpen()) { close(true); return; }
+    _pbpDictSyncMeaningSelect(cur);
+    try { menu.showPopover(); } catch (_) { return; }
+    change.setAttribute("aria-expanded", "true");
+    _pbpDictPlaceMeaningMenu(menu, change);
+    (list.querySelector('[aria-selected="true"]') || list.firstElementChild)?.focus({ preventScroll: true });
+  });
+  const choose = (option) => {
+    const choice = cur.meaningChoices[Number(option.dataset.index)];
+    if (signal.aborted || _pbpDictCurrent !== cur || !choice) return;
+    cur.packChoice = choice; cur.packInvalidated = false;
+    _pbpDictApplyPackChoice(cur, choice);
+    cur.packRevision = (cur.packRevision || 0) + 1;
+    _pbpDictSyncMeaningSelect(cur);
+    close(true);
+    if (change.hidden) pop.querySelector(".xp-vocab:not([hidden])")?.focus({ preventScroll: true });
+    _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name));
+  };
+  list.addEventListener("click", e => {
+    const option = e.target?.closest?.(".xp-dict-save-option");
+    if (option && list.contains(option)) choose(option);
+  });
+  list.addEventListener("keydown", e => {
+    const options = [...list.querySelectorAll(".xp-dict-save-option")];
+    const at = options.indexOf(document.activeElement);
+    let next = -1;
+    if (e.key === "ArrowDown") next = Math.min(options.length - 1, at + 1);
+    else if (e.key === "ArrowUp") next = Math.max(0, at - 1);
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = options.length - 1;
+    else if ((e.key === "Enter" || e.key === " ") && at >= 0) { e.preventDefault(); choose(options[at]); return; }
+    else if (e.key === "Escape") {
+      // Handled here, not left to the popover's light dismiss: the reader's
+      // own Escape listeners would otherwise close the card or the panel.
+      e.preventDefault(); e.stopPropagation(); close(true); return;
+    } else if (e.key === "Tab") { close(false); return; }
+    if (next < 0) return;
+    e.preventDefault();
+    options[next]?.focus({ preventScroll: true });
+  });
 }
 
 function _pbpDictApplyPackChoice(cur, choice) {
@@ -3185,29 +3306,7 @@ function _pbpDictReaderPackChoices(norm, box, cur, pop, signal) {
     _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name));
     return;
   }
-  if (!cur.meaningSelect) {
-    const select = document.createElement("select");
-    select.className = "xp-dict-lang xp-dict-save-meaning";
-    select.setAttribute("aria-label", t("vocabSaveDefinitionLabel"));
-    cur.meaningSelect = select;
-    (pop.querySelector(".xp-foot") || box).prepend(select);
-    signal.addEventListener("abort", () => { cur.meaningHelpObserver?.disconnect(); select.remove(); }, { once: true });
-    select.addEventListener("change", () => {
-      const choice = cur.meaningChoices[Number(select.value)];
-      if (signal.aborted || _pbpDictCurrent !== cur) return;
-      if (select.value === "") {
-        cur.packChoice = null; cur.packInvalidated = true;
-        Object.assign(cur, { gloss: "", ipa: "", sourceUrl: "", license: "", lemma: "" });
-      } else {
-        if (!choice) return;
-        cur.packChoice = choice; cur.packInvalidated = false;
-        _pbpDictApplyPackChoice(cur, choice);
-      }
-      cur.packRevision = (cur.packRevision || 0) + 1;
-      _pbpDictSyncMeaningSelect(cur);
-      _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name));
-    });
-  }
+  if (!cur.meaningBar) _pbpDictMountMeaningBar(cur, pop, box, signal);
   _pbpDictApplyVisibleChoice(cur);
   _pbpDictSyncMeaningSelect(cur);
   _pbpDictRefreshSave(pop, cur, signal).catch(error => console.warn("[dict] saved state read failed:", error?.name));

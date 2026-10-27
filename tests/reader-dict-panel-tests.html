@@ -173,5 +173,11 @@ async function withFixture(fn, ...args) { const f=await fixture(...args);try{awa
     const g=grip.getBoundingClientRect(),h=pop.querySelector('.xp-head').getBoundingClientRect();
     assert(g.top>=h.top&&g.bottom<=h.bottom,'resize control below header');
   }));
+  await test('the save bar saves with bookmarkPlus and opens the library with its library icon',()=>withFixture(async f=>{
+    await f.open();
+    const same=(button,key)=>{const ref=f.doc.createElement('div');ref.innerHTML=new f.win.Function('return PBP_ICONS')()[key];return button?.querySelector('svg')?.outerHTML===ref.innerHTML;};
+    assert(same(f.doc.querySelector('.xp-foot .xp-vocab'),'bookmarkPlus'),'save to vocabulary is not bookmarkPlus');
+    assert(same(f.doc.querySelector('.xp-foot .xp-open-vocab'),'library'),'go to library is not the library icon');
+  }));
 })();
 </script></body></html>
