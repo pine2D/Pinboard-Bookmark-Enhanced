@@ -4673,5 +4673,6 @@
   "dictGenerationRefused": {"message": "模型拒絕了這次請求或封鎖了輸出。結果未儲存。"},
   "dictGenerationEmpty": {"message": "模型未傳回正文。本次結果未儲存；請重試，或在設定中更換閱讀器 AI 模型。"},
   "dictGenerationModelUnavailable": {"message": "供應商無法找到或使用所選模型。請檢查模型名稱及供應商支援情況，並在設定中更新閱讀器 AI 模型。"},
-  "dictGenerationBilling": {"message": "供應商拒絕了本次請求（HTTP 402）。請檢查該供應商的配額、帳單狀態和帳戶存取權限後再試。"}
+  "dictGenerationBilling": {"message": "供應商拒絕了本次請求（HTTP 402）。請檢查該供應商的配額、帳單狀態和帳戶存取權限後再試。"},
+  "dictGenerationServiceUnavailable": {"message": "供應商的服務暫時未能使用，請稍後再試。"}
 }

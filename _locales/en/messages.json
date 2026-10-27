@@ -4680,5 +4680,6 @@
   "dictGenerationRefused": {"message": "The model declined this request or blocked the output. This result was not saved."},
   "dictGenerationEmpty": {"message": "The model returned no response text. This result was not saved. Try again or choose another reader AI model in Settings."},
   "dictGenerationModelUnavailable": {"message": "The provider could not find or use the selected model. Check its name and availability, then update the reader AI model in Settings."},
-  "dictGenerationBilling": {"message": "The provider rejected this request (HTTP 402). Check your quota, billing status, and account access with the provider before trying again."}
+  "dictGenerationBilling": {"message": "The provider rejected this request (HTTP 402). Check your quota, billing status, and account access with the provider before trying again."},
+  "dictGenerationServiceUnavailable": {"message": "The provider's service is temporarily unavailable. Try again later."}
 }

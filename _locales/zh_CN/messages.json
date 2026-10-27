@@ -4667,5 +4667,6 @@
   "dictGenerationRefused": {"message": "模型拒绝了本次请求或拦截了输出。本次结果未保存。"},
   "dictGenerationEmpty": {"message": "模型未返回正文。本次结果未保存；请重试，或在设置中更换阅读器 AI 模型。"},
   "dictGenerationModelUnavailable": {"message": "供应商无法找到或使用所选模型。请检查模型名称及供应商支持情况，并在设置中更新阅读器 AI 模型。"},
-  "dictGenerationBilling": {"message": "供应商拒绝了本次请求（HTTP 402）。请检查该供应商的额度、账单状态和账户访问权限后再试。"}
+  "dictGenerationBilling": {"message": "供应商拒绝了本次请求（HTTP 402）。请检查该供应商的额度、账单状态和账户访问权限后再试。"},
+  "dictGenerationServiceUnavailable": {"message": "供应商的服务暂时不可用，请稍后再试。"}
 }

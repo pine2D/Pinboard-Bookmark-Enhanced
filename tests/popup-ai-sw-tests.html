@@ -609,6 +609,34 @@ function buildRouterHarness(source, opts) {
       r.error.code === "model_not_found" && r.error.status === 404 && r.error.paramHint === "max_tokens";
   });
 
+  // The REAL handleAIError (ai.js is loaded on this page) classifies the reply the
+  // worker relays. The 524 body is the upstream text recorded in the 2026-10-26
+  // comparison run: a provider outage must reach the popup as a bare 5xx, never as
+  // "change your model"; the same body on a 404 still says model_not_found.
+  const UPSTREAM_UNAVAILABLE = { error: { message: "Upstream model provider is temporarily unavailable" } };
+  await testCase("an upstream 5xx reaches the popup with its status and no model_not_found code", async () => {
+    const out = [];
+    for (const status of [524, 503]) {
+      const h = buildAiHarness(source, {
+        settings: {},
+        callAI: async () => handleAIError(jsonResponse(status, UPSTREAM_UNAVAILABLE), "API"),
+      });
+      const r = await h.pbpRunPopupAiCall(baseMessage());
+      out.push(r.ok === false && r.error.status === status && !("code" in r.error) &&
+        /temporarily unavailable/.test(r.error.message));
+    }
+    return out.every(Boolean);
+  });
+
+  await testCase("the same upstream body on a 404 still reaches the popup as model_not_found", async () => {
+    const h = buildAiHarness(source, {
+      settings: {},
+      callAI: async () => handleAIError(jsonResponse(404, UPSTREAM_UNAVAILABLE), "API"),
+    });
+    const r = await h.pbpRunPopupAiCall(baseMessage());
+    return r.ok === false && r.error.status === 404 && r.error.code === "model_not_found";
+  });
+
   await testCase("the envelope is a plain object and survives structuredClone intact", async () => {
     const h = buildAiHarness(source, {
       settings: {},

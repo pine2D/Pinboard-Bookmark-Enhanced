@@ -2039,9 +2039,12 @@ async function runDictionaryEntryUiTests() {
         [{code:"empty_response"},"dictGenerationEmpty"],
         [{code:"model_not_found"},"dictGenerationModelUnavailable"],
         [{status:402},"dictGenerationBilling"],
+        [{status:524},"dictGenerationServiceUnavailable"],
+        [{status:503},"dictGenerationServiceUnavailable"],
+        [{status:500},"dictGenerationServiceUnavailable"],
         [{status:401},"trErrKey"],
         [{name:"TimeoutError"},"trErrTimeout"]
-      ]) check(label+" gives specific recovery guidance through the mounted UI: "+key,await attempt(properties)===key);
+      ]) check(label+" gives specific recovery guidance through the mounted UI: "+key+(properties.status>=500?" (HTTP "+properties.status+")":""),await attempt(properties)===key);
       const retained=[];
       for(const [code,key] of [
         ["owner_changed","vocabAccountChanged"],["account_changed","vocabAccountChanged"],
@@ -2053,7 +2056,7 @@ async function runDictionaryEntryUiTests() {
       retained.push(await attempt({code:"owner_changed",status:402})==="vocabAccountChanged");
       check(label+" preserves owner, permission, sync, language, validation and source recovery branches",retained.every(Boolean));
       const ambiguous=[];
-      for(const properties of [{status:"402"},{status:"401"},{code:secret},{code:{}}]) ambiguous.push(await attempt(properties)===fallback);
+      for(const properties of [{status:"402"},{status:"401"},{status:"524"},{status:499},{code:secret},{code:{}}]) ambiguous.push(await attempt(properties)===fallback);
       check(label+" does not infer billing or expose raw text from malformed or unrelated errors",ambiguous.every(Boolean)&&!getMessage().textContent.includes(secret));
     } finally {window[runName]=originalRun;}
   };

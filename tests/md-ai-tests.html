@@ -12470,6 +12470,15 @@ suite("_aiBodyDialect / _aiParamRepair (K133)", () => {
   // several compat providers cap below that. A rename is the wrong answer.
   const OPENAI_400_BUDGET_TOO_LARGE = { error: { message: "max_tokens is too large: 8192. This model supports at most 4096 completion tokens, whereas you provided 8192.", type: "invalid_request_error", param: "max_tokens", code: null } };
   const OPENAI_401_BAD_KEY = { error: { message: "Incorrect API key provided: sk-***. You can find your API key at https://platform.openai.com/account/api-keys.", type: "invalid_request_error", param: null, code: "invalid_api_key" } };
+  // The upstream 524 body recorded in the 2026-10-26 comparison run (research doc,
+  // "新发现的通用缺陷"); that link also answered 503 now and then. A message-only
+  // envelope whose wording mentions "model ... unavailable".
+  // The provider is down, not the user's model id wrong, so it must never be filed
+  // as model_not_found; the SAME body on a 404 still is (the status itself says so).
+  const UPSTREAM_UNAVAILABLE = { error: { message: "Upstream model provider is temporarily unavailable" } };
+  // DeepSeek answers an unknown model id with HTTP 400, not 404.
+  const DEEPSEEK_400_MODEL_NOT_EXIST = { error: { message: "Model Not Exist", type: "invalid_request_error", param: null, code: "invalid_request_error" } };
+  const COMPAT_400_MODEL_DOES_NOT_EXIST = { error: { message: "The model `gpt-oops` does not exist or you do not have access to it.", type: "invalid_request_error", param: null, code: null } };
 
   async function hintOf(status, body) {
     try { await handleAIError({ ok: false, status, json: async () => body }, "API"); }
@@ -12559,6 +12568,27 @@ suite("_aiBodyDialect / _aiParamRepair (K133)", () => {
     ["an auth failure carries no paramHint", async () => {
       const e = await hintOf(401, OPENAI_401_BAD_KEY);
       ok(!e.paramHint, "got " + e.paramHint);
+    }],
+    ["a 524 whose message mentions an unavailable model is a service failure, not model_not_found", async () => {
+      const e = await hintOf(524, UPSTREAM_UNAVAILABLE);
+      ok(e.code !== "model_not_found", "5xx must not be filed as a model error, got code=" + e.code);
+      ok(e.code === undefined, "a 5xx carries only its status, got code=" + e.code);
+      ok(e.status === 524, "status " + e.status);
+      ok(pbpAiStatusPageUrl({ aiProvider: "openai" }, e) === "https://status.openai.com/", "a 5xx now points at the status page");
+    }],
+    ["a 503 with the same body is a service failure too", async () => {
+      const e = await hintOf(503, UPSTREAM_UNAVAILABLE);
+      ok(e.code !== "model_not_found" && e.status === 503, "code=" + e.code + " status=" + e.status);
+    }],
+    ["the same body on a 404 is still model_not_found", async () => {
+      const e = await hintOf(404, UPSTREAM_UNAVAILABLE);
+      ok(e.code === "model_not_found" && e.status === 404, "code=" + e.code + " status=" + e.status);
+    }],
+    ["a 400 whose message says the model does not exist is model_not_found", async () => {
+      const a = await hintOf(400, COMPAT_400_MODEL_DOES_NOT_EXIST);
+      ok(a.code === "model_not_found" && a.status === 400, "compat: code=" + a.code + " status=" + a.status);
+      const b = await hintOf(400, DEEPSEEK_400_MODEL_NOT_EXIST);
+      ok(b.code === "model_not_found" && b.status === 400, "deepseek: code=" + b.code + " status=" + b.status);
     }],
     ["error.param alone is not a refusal: a too-large budget is a VALUE error, not a rename request", async () => {
       const e = await hintOf(400, OPENAI_400_BUDGET_TOO_LARGE);

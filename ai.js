@@ -286,7 +286,11 @@ async function handleAIError(res, provider) {
       /model[_\s-]?not[_\s-]?(?:found|exist)/.test(detail) ||
       /\b(?:model|deployment)\b[^.]{0,40}\b(?:not\s+found|not\s+exist|does\s*not\s+exist|is\s+invalid|unavailable|unsupported|deprecated|decommissioned|no\s+longer\s+(?:available|supported))\b/.test(detail) ||
       /\b(?:unknown|invalid|unsupported|no\s+such|non[\s-]?existent)\s+model\b/.test(detail);
-    if (res.status === 404 || modelErr) {
+    // Only a 4xx can say the MODEL is wrong. A gateway 524/503 reads "Upstream model
+    // provider is temporarily unavailable" -- the phrasing above matches it, but the
+    // provider is down and telling the user to change the model points the wrong way.
+    // A 5xx keeps only its status (pbpAiStatusPageUrl then offers the status page).
+    if (res.status >= 400 && res.status < 500 && (res.status === 404 || modelErr)) {
       errorType = "model_not_found";
     }
     paramHint = _aiRejectedParam(body, detail);

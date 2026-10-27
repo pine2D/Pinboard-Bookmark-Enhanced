@@ -1546,6 +1546,9 @@ function _pbpDictGenerationErrorKey(error, supplement = false) {
   if (error?.name === "TimeoutError") return "trErrTimeout";
   if (error?.status === 401) return "trErrKey";
   if (error?.status === 402) return "dictGenerationBilling";
+  // ai.js never files a 5xx as model_not_found: the service is down, so say that
+  // instead of the generic retry text or a "change your model" hint.
+  if (Number.isInteger(error?.status) && error.status >= 500 && error.status < 600) return "dictGenerationServiceUnavailable";
   return supplement ? "dictSupplementUnavailable" : "dictEntryUnavailable";
 }
 function _pbpDictFailureCode(error) {
