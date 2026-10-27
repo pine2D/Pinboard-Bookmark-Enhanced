@@ -11,6 +11,21 @@ const LOW_REFUSED={error:{message:'Unsupported parameter: reasoning_effort',para
 const TOKEN_REFUSED={error:{message:'Unsupported parameter: max_tokens. Use max_completion_tokens instead.',param:'max_tokens'}};
 const TEMP_REFUSED={error:{message:'Unsupported parameter: temperature',param:'temperature'}};
 const STREAM_OK={raw:'data: {"choices":[{"delta":{"content":"ready"}}]}\n\ndata: [DONE]\n\n',status:200};
+// Complete synthetic streams in each protocol's documented wire shape, written
+// by hand (not by the stream readers). Each ends with its normal stop marker.
+const STREAM_DONE={
+  compatible:{status:200,raw:'data: {"id":"chatcmpl-fixture","object":"chat.completion.chunk","created":0,"model":"fixture","choices":[{"index":0,"delta":{"role":"assistant","content":"ready"},"finish_reason":null}]}\n\n'+
+    'data: {"id":"chatcmpl-fixture","object":"chat.completion.chunk","created":0,"model":"fixture","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n'},
+  gemini:{status:200,raw:'data: {"candidates":[{"index":0,"content":{"role":"model","parts":[{"text":"ready"}]},"finishReason":"STOP"}]}\n\n'},
+  claude:{status:200,raw:'event: message_start\ndata: {"type":"message_start","message":{"id":"msg_fixture","type":"message","role":"assistant","model":"fixture","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":1,"output_tokens":0}}}\n\n'+
+    'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n'+
+    'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ready"}}\n\n'+
+    'event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n'+
+    'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":1}}\n\n'+
+    'event: message_stop\ndata: {"type":"message_stop"}\n\n'},
+  ollama:{status:200,raw:'{"model":"fixture","created_at":"2026-01-01T00:00:00Z","message":{"role":"assistant","content":"ready"},"done":false}\n'+
+    '{"model":"fixture","created_at":"2026-01-01T00:00:00Z","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop","total_duration":1,"load_duration":1,"prompt_eval_count":1,"prompt_eval_duration":1,"eval_count":1,"eval_duration":1}\n'}
+};
 // Handwritten protocol responses from the official schemas, not constructed by
 // the production response reader. All fields are synthetic; no live calls.
 // developers.openai.com/api/reference/resources/chat
@@ -56,18 +71,18 @@ const PROTOCOLS=[
     malformed:{message:{content:{private:'PRIVATE_RESPONSE_SENTINEL'}},done:true,done_reason:'stop'},
     thinking:{message:{content:'',thinking:'PRIVATE_THOUGHT_SENTINEL'},done:true,done_reason:'stop'}}
 ];
-let stored={},responses=[],calls=[],checks=0,pass=0,fail=0;
+let stored={},responses=[],calls=[],raw=[],checks=0,pass=0,fail=0;
 const model='arbitrary-future-user-model',key=JSON.stringify([2,'minimax','https://api.minimaxi.com/v1',model]);
 const fresh=()=>({rejected:true,expiresAt:Date.now()+6*86400000});
 const settings={aiProvider:'minimax',minimaxApiKey:'nonsecret-fixture',minimaxModel:model};
 const reply=(body,status=200)=>({body,status});
 function reset(queue,seed={}){
-  stored=structuredClone(seed);responses=queue.slice();calls=[];checks=0;
+  stored=structuredClone(seed);responses=queue.slice();calls=[];raw=[];checks=0;
   globalThis.chrome={runtime:{id:'isolated-fixture'},permissions:{contains:async()=>true},storage:{local:{
     get:async name=>({[name]:structuredClone(stored[name])}),set:async value=>Object.assign(stored,structuredClone(value))
   }}};
   globalThis.fetch=async(_url,init)=>{
-    calls.push(JSON.parse(init.body));const next=responses.shift();
+    raw.push(init.body);calls.push(JSON.parse(init.body));const next=responses.shift();
     if(!next)throw new Error('Unexpected extra fixture request');
     if(next.error)throw next.error;
     const response=new Response(next.raw===undefined?JSON.stringify(next.body):next.raw,{status:next.status,headers:{'Content-Type':next.raw===undefined?'application/json':'text/event-stream'}});
@@ -208,6 +223,72 @@ await test('network idle timeout starts only after the streaming guard completes
     assert(armed===0&&calls.length===0,'Network timeout started while guard was pending');
     release();assert(await result==='ready'&&armed>0&&calls.length===1);
   }finally{release();await result.catch(()=>{});globalThis.setTimeout=original;}
+});
+// Byte-level snapshots of the request bodies existing stream consumers send
+// (Ask, translation, skim shapes). Literal strings, never JSON.parse-d copies:
+// key order and absent fields are part of what must not change.
+const SNAP_USER='{"role":"user","content":"Synthetic provider learning request"}',SNAP_SYSTEM='{"role":"system","content":"Synthetic system"}';
+const SNAP_ASK={maxTokens:2048,model:'fixture-model',system:'Synthetic system',signal:new AbortController().signal};
+const SNAP_TRANSLATE={temperature:0.1,noThinking:true,maxTokens:4000};
+const SNAP_SKIM={maxTokens:1024,model:'fixture-model',system:'Synthetic system',onUsage:()=>{}};
+await test('existing stream consumers send byte-identical compatible request bodies',async()=>{
+  const cases=[
+    [{aiProvider:'openai',openaiApiKey:'fixture',openaiModel:'free-model'},SNAP_ASK,
+      '{"model":"fixture-model","messages":['+SNAP_SYSTEM+','+SNAP_USER+'],"temperature":0.3,"max_completion_tokens":2048,"stream":true,"reasoning_effort":"none"}'],
+    [settings,SNAP_TRANSLATE,
+      '{"model":"arbitrary-future-user-model","messages":['+SNAP_USER+'],"temperature":0.1,"max_tokens":4000,"stream":true,"thinking":{"type":"disabled"}}'],
+    [PROTOCOLS[0].settings,SNAP_SKIM,
+      '{"model":"fixture-model","messages":['+SNAP_SYSTEM+','+SNAP_USER+'],"temperature":0.3,"max_tokens":1024,"stream":true}']];
+  for(const [s,opts,expected] of cases){reset([STREAM_DONE.compatible]);
+    assert(await stream(opts,s)==='ready'&&raw.length===1,s.aiProvider);assert(raw[0]===expected,s.aiProvider+' body changed: '+raw[0]);}
+});
+await test('existing stream consumers send byte-identical Gemini request bodies',async()=>{
+  const s=PROTOCOLS[1].settings,cases=[[SNAP_ASK,
+      '{"contents":[{"parts":[{"text":"Synthetic provider learning request"}]}],"generationConfig":{"temperature":0.3,"maxOutputTokens":2048},"systemInstruction":{"parts":[{"text":"Synthetic system"}]}}'],
+    [SNAP_TRANSLATE,'{"contents":[{"parts":[{"text":"Synthetic provider learning request"}]}],"generationConfig":{"temperature":0.1,"maxOutputTokens":4000,"thinkingConfig":{"thinkingBudget":0}}}']];
+  for(const [opts,expected] of cases){reset([STREAM_DONE.gemini]);
+    assert(await stream(opts,s)==='ready'&&raw.length===1);assert(raw[0]===expected,'Gemini body changed: '+raw[0]);}
+});
+await test('existing stream consumers send byte-identical Claude request bodies',async()=>{
+  const s=PROTOCOLS[2].settings,cases=[[SNAP_ASK,
+      '{"model":"fixture-model","max_tokens":2048,"messages":['+SNAP_USER+'],"stream":true,"system":"Synthetic system"}'],
+    [SNAP_TRANSLATE,'{"model":"free-model","max_tokens":4000,"messages":['+SNAP_USER+'],"stream":true}']];
+  for(const [opts,expected] of cases){reset([STREAM_DONE.claude]);
+    assert(await stream(opts,s)==='ready'&&raw.length===1);assert(raw[0]===expected,'Claude body changed: '+raw[0]);}
+});
+await test('existing stream consumers send byte-identical Ollama request bodies',async()=>{
+  const s=PROTOCOLS[3].settings,cases=[[SNAP_SKIM,
+      '{"model":"fixture-model","messages":['+SNAP_SYSTEM+','+SNAP_USER+'],"stream":true,"options":{"temperature":0.3,"num_predict":1024}}'],
+    [SNAP_TRANSLATE,'{"model":"free-model","messages":['+SNAP_USER+'],"stream":true,"options":{"temperature":0.1,"num_predict":4000}}']];
+  for(const [opts,expected] of cases){reset([STREAM_DONE.ollama]);
+    assert(await stream(opts,s)==='ready'&&raw.length===1);assert(raw[0]===expected,'Ollama body changed: '+raw[0]);}
+});
+await test('compatible configuration keeps the schema endpoint condition and old-option defaults',async()=>{
+  const openai={aiProvider:'openai',openaiApiKey:'fixture',openaiModel:'free-model'},task={jsonMode:true,responseSchema:{type:'object'}};
+  assert(_aiCompatCfg(openai,'openai',task).schemaMode===true,'Official OpenAI endpoint lost schema mode');
+  assert(_aiCompatCfg({...openai,openaiBaseUrl:'https://proxy.example/v1'},'openai',task).schemaMode===false,'Overridden endpoint promised schema mode');
+  assert(_aiCompatCfg(PROTOCOLS[0].settings,'custom',task).schemaMode===false,'Unknown gateway promised schema mode');
+  const old=_aiCompatCfg(settings,'minimax',SNAP_ASK);
+  assert(JSON.stringify(old)===JSON.stringify({...OPENAI_COMPAT_PROVIDERS.minimax,endpoint:'https://api.minimaxi.com/v1',jsonMode:false,schemaMode:false}),'Old options changed the configuration');
+  let error;try{_aiCompatCfg({},'unregistered',{});}catch(e){error=e;}assert(error?.message==='Unknown provider: unregistered');
+});
+await test('streaming compatible requests take task budget and effort from the shared configuration',async()=>{
+  const s={aiProvider:'custom',customBaseUrl:'https://stream-task.example/v1',customApiKey:'fixture',customModel:'stream-task-model'};
+  reset([STREAM_DONE.compatible]);assert(await stream({maxTokens:8192,totalOutputBudget:true,reasoningEffort:'minimum'},s)==='ready');
+  assert(calls.length===1&&calls[0].max_completion_tokens===8192&&!('max_tokens'in calls[0])&&calls[0].reasoning_effort==='none');
+});
+await test('stream and nonstream requests share one capability record per endpoint and model',async()=>{
+  const s={aiProvider:'custom',customBaseUrl:'https://shared-memo.example/v1',customApiKey:'fixture',customModel:'shared-model'};
+  reset([reply({error:{param:'reasoning_effort',message:"reasoning_effort 'none' is not supported; use low"}},400),reply(OK)]);
+  await run({reasoningEffort:'minimum'},s);assert(calls.length===2&&calls[1].reasoning_effort==='low');
+  calls=[];raw=[];responses=[STREAM_DONE.compatible];await stream({reasoningEffort:'minimum'},s);
+  assert(calls.length===1&&calls[0].reasoning_effort==='low','Stream ignored the nonstream capability record');
+  const t={...s,customModel:'shared-token-model'};
+  calls=[];responses=[reply({error:{message:'Unsupported parameter: max_completion_tokens',param:'max_completion_tokens'}},400),STREAM_DONE.compatible];
+  await stream({maxTokens:8192,totalOutputBudget:true},t);
+  assert(calls.length===2&&calls[0].max_completion_tokens===8192&&calls[1].max_tokens===8192,'Stream did not repair the token field');
+  calls=[];responses=[reply(OK)];await run({maxTokens:8192,totalOutputBudget:true},t);
+  assert(calls.length===1&&calls[0].max_tokens===8192,'Nonstream ignored the stream capability record');
 });
 await test('all non-streaming protocols return their visible complete text',async()=>{
   for(const p of PROTOCOLS){reset([reply(p.complete)]);assert(await run({requireComplete:true},p.settings)==='ready',p.name);assert(calls.length===1&&checks===1,p.name);}

@@ -614,6 +614,30 @@ async function _ensureAIHostPermission(s) {
   }
 }
 
+// OpenAI-compatible request configuration shared by callAI and callAIStream,
+// so a task's declared output policy and the capability record it negotiates
+// are the same whether or not the answer is streamed. Complete-answer tasks
+// can request a total budget and concise reasoning without knowing a model.
+// Preserve declared native thinking controls; unknown compatible endpoints
+// negotiate the standard field via the same bounded server-driven fallback,
+// never a model-name list. Callers that pass none of these options get the
+// registered provider entry plus its endpoint and two false flags, which the
+// body dialect already defaulted to — their requests stay byte-identical.
+function _aiCompatCfg(s, p, opts = {}) {
+  const registered = OPENAI_COMPAT_PROVIDERS[p];
+  if (!registered) throw new Error("Unknown provider: " + p);
+  const endpoint = _openaiCompatBase(registered, s);
+  return { ...registered, endpoint, jsonMode: opts.jsonMode === true,
+    // Arbitrary compatible gateways do not promise constrained decoding. Use
+    // the common JSON mode there; strict local validation always still runs.
+    schemaMode: !!opts.responseSchema && p === "openai" && endpoint.replace(/\/+$/, "") === registered.base,
+    ...(opts.totalOutputBudget === true ? { tokenField: "max_completion_tokens" } : {}),
+    ...(!registered.thinkingOff && opts.reasoningEffort === "low" ? { thinkingOff: { reasoning_effort: "low" } } : {}),
+    ...(!registered.thinkingOff && opts.reasoningEffort === "minimum"
+      ? { thinkingOff: { reasoning_effort: "none" }, thinkingFallback: { reasoning_effort: "low" } } : {})
+  };
+}
+
 // ---- AI dispatcher ----
 // Non-streaming callers may provide beforeRequest(): resolve to allow this
 // dispatch, throw to refuse it. Each provider awaits it immediately before
@@ -626,22 +650,7 @@ async function callAI(s, prompt, opts = {}) {
   if (p === "gemini") return callGemini(s, prompt, opts);
   if (p === "claude") return callClaude(s, prompt, opts);
   if (p === "ollama") return callOllama(s, prompt, opts);
-  const registered = OPENAI_COMPAT_PROVIDERS[p];
-  if (!registered) throw new Error("Unknown provider: " + p);
-  // Complete-answer tasks can request a total budget and concise reasoning
-  // without knowing a model. Preserve declared native thinking controls;
-  // unknown compatible endpoints negotiate the standard field via the same
-  // bounded server-driven fallback, never a model-name list.
-  const endpoint = _openaiCompatBase(registered, s);
-  const cfg = { ...registered, endpoint, jsonMode: opts.jsonMode === true,
-    // Arbitrary compatible gateways do not promise constrained decoding. Use
-    // the common JSON mode there; strict local validation always still runs.
-    schemaMode: !!opts.responseSchema && p === "openai" && endpoint.replace(/\/+$/, "") === registered.base,
-    ...(opts.totalOutputBudget === true ? { tokenField: "max_completion_tokens" } : {}),
-    ...(!registered.thinkingOff && opts.reasoningEffort === "low" ? { thinkingOff: { reasoning_effort: "low" } } : {}),
-    ...(!registered.thinkingOff && opts.reasoningEffort === "minimum"
-      ? { thinkingOff: { reasoning_effort: "none" }, thinkingFallback: { reasoning_effort: "low" } } : {})
-  };
+  const cfg = _aiCompatCfg(s, p, opts);
   const model = opts.model || s[cfg.modelField] || cfg.defaultModel;
   return _aiWithDialectFallback(p, model, cfg, (extraBody, dialect) =>
     callOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], model, prompt, { ...opts, extraBody, ...dialect }));
@@ -1288,6 +1297,9 @@ async function _streamOllama(s, prompt, opts, onDelta) {
 //           signal? (AbortSignal), temperature? (default 0.3; dropped entirely
 //             once a model refuses it — see the body dialect above),
 //           noThinking? (Gemini only — rides the shared 400/422 self-heal),
+//           totalOutputBudget?, reasoningEffort? (OpenAI-compatible only:
+//             the same _aiCompatCfg policy and capability record as callAI;
+//             existing stream consumers pass neither),
 //           onUsage?({inTok,outTok}) — T4: fired at most once after a NORMAL
 //             stream end IFF the provider opportunistically emitted usage in the
 //             stream (ZERO request mutation). Callers omitting it are unaffected. }
@@ -1315,10 +1327,12 @@ async function callAIStream(s, prompt, opts = {}, onDelta) {
   }
   if (p === "claude") return _streamClaude(s, prompt, opts, cb);
   if (p === "ollama") return _streamOllama(s, prompt, opts, cb);
-  const cfg = OPENAI_COMPAT_PROVIDERS[p];
-  if (!cfg) throw new Error("Unknown provider: " + p);
+  // Same task configuration and capability record as callAI. The dialect is
+  // spread after opts on purpose: its jsonMode/schemaMode come from this cfg,
+  // which read them from opts, so the two cannot disagree.
+  const cfg = _aiCompatCfg(s, p, opts);
   const model = opts.model || s[cfg.modelField] || cfg.defaultModel;
-  return _aiWithDialectFallback(p, model, { ...cfg, endpoint: _openaiCompatBase(cfg, s) }, (extraBody, dialect) =>
+  return _aiWithDialectFallback(p, model, cfg, (extraBody, dialect) =>
     _streamOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], model, prompt, { ...opts, extraBody, ...dialect }, cb));
 }
 
