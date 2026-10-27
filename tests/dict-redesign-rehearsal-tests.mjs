@@ -11,6 +11,18 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 
+// Archived (redesign plan Q21=A): the driver is kept unchanged as the record
+// of the 2026-10-26 round and drives the pre-1B product, whose old categories
+// (collocations, register, grammar, scenarios, literature, culture) the
+// reader refuses to generate since 75dfc83c. Replaying it against today's
+// product can only fail, so this file stops here; the code below is kept
+// intact for the record. The live comparison driver is
+// scripts/dict-redesign-test-r2.mjs (tests/dict-redesign-r2-*.mjs).
+// The frozen product files of each round sit in
+// .qa-scan/report/dict-redesign-2026-10-26-*/frozen-code/.
+process.stdout.write(JSON.stringify({ skipped: "archived driver: drives the pre-1B product; frozen evidence kept under frozen-code/" }) + "\n");
+process.exit(0);
+
 let secretAttempts = 0, configAttempts = 0, networkAttempts = 0, output = "";
 for (const name of ["readFileSync", "statSync", "existsSync", "openSync", "readFile", "createReadStream"]) {
   const original = fs[name];
