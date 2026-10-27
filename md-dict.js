@@ -1726,14 +1726,17 @@ async function _pbpDictSha256Hex(text) {
   return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
 }
 function _pbpDictNegOwner(owner) { return typeof owner === "string" && owner.startsWith("acct_"); }
+// One answer language as the memory keys it: {lang, name}, a custom one
+// ("und") told apart by name.
+function _pbpDictLanguageKey(answer) {
+  return answer && typeof answer === "object" ? (answer.lang === "und" ? "und:" + String(answer.name || "") : String(answer.lang || ""))
+    : String(answer || "");
+}
 // null when the parts cannot name one entry (unknown category, no word).
 async function _pbpDictNegEntryKey(parts = {}) {
   const category = parts?.category;
   if (!PBP_DICT_NEG_CATEGORIES.includes(category) || typeof parts.term !== "string" || !parts.term.trim()) return null;
-  // An answer language is {lang, name}; a custom one ("und") is told apart by name.
-  const answer = parts.target, target = PBP_DICT_NEG_RETRIEVAL.includes(category) ? ""
-    : answer && typeof answer === "object" ? (answer.lang === "und" ? "und:" + String(answer.name || "") : String(answer.lang || ""))
-    : String(answer || "");
+  const target = PBP_DICT_NEG_RETRIEVAL.includes(category) ? "" : _pbpDictLanguageKey(parts.target);
   return _pbpDictSha256Hex(JSON.stringify([parts.term, String(parts.sourceLanguage || "und"), target, category]));
 }
 function _pbpDictNegRows(stored, now) {
@@ -1847,6 +1850,9 @@ function _pbpDictEntryMount(host, opts) {
   // settings (and so the answer language) are known, before the first render
   // chooses between the ordinary button and "last time not found · retry".
   const negState = {}, negTouched = new Set();
+  // The language the memory above was read for; a render in another language
+  // re-reads it, so a block never shows another language's "not found".
+  let negLanguage = null;
   let renderedBase = "", baseDetails = null, baseRetry = null, usageForm = null, previousSupplements = null;
   const supplementNodes = new Map();
   const preference = () => typeof pbpDictDefaultView === "function" ? pbpDictDefaultView(settings) :
@@ -1963,6 +1969,11 @@ function _pbpDictEntryMount(host, opts) {
     const hadFocus = document.activeElement === generate ||
       (activity?.kind === "entry" && document.activeElement === activity.feedback.cancel);
     record = value; renderedLanguage = answerLanguage;
+    if (negLanguage !== null && _pbpDictLanguageKey(answerLanguage) !== negLanguage) {
+      for (const category of Object.keys(negState)) delete negState[category];
+      negTouched.clear();
+      loadNeg().catch(error => console.warn("[dict-neg] state read failed:", error?.name));
+    }
     const norm = pbpDictEntryNorm(record, answerLanguage);
     // Supplement receipts and additions do not change the paid base entry.
     // Retaining these nodes also retains open disclosures and reading position.
@@ -2069,13 +2080,19 @@ function _pbpDictEntryMount(host, opts) {
   // supplement request asks for, and what the AI-judgement memory is keyed by
   // (plan Q12=A), so the record and the lookup always name the same language.
   const learningLanguage = () => renderedLanguage || target();
-  const negParts = category => ({ term: opts.term, sourceLanguage: opts.lang || "und", target: learningLanguage(), category });
+  // Saving and refreshing the entry on screen ask for its language too: a
+  // retry or a synced copy must land on the record the user is looking at.
+  const entryInput = (signal, isCurrent) => ({ ...input(signal, isCurrent), target: learningLanguage() });
+  const negParts = (category, language = learningLanguage()) => ({ term: opts.term, sourceLanguage: opts.lang || "und", target: language, category });
   const negForget = category => { negState[category] = false; pbpDictNegForget(opts.owner, negParts(category)); };
   const loadNeg = async () => {
+    const language = learningLanguage(), key = _pbpDictLanguageKey(language);
+    negLanguage = key;
     if (!_pbpDictNegOwner(opts.owner)) return;
     const categories = ["patterns", "confusables", "etymology"];
-    const found = await Promise.all(categories.map(category => pbpDictNegHas(opts.owner, negParts(category))));
-    if (!alive()) return;
+    const found = await Promise.all(categories.map(category => pbpDictNegHas(opts.owner, negParts(category, language))));
+    // A later render switched the language: its own read answers that view.
+    if (!alive() || negLanguage !== key) return;
     // A click made while this read was in flight already answered this view.
     categories.forEach((category, index) => { if (found[index] && !negTouched.has(category)) negState[category] = true; });
     usageForm?.refresh();
@@ -2091,7 +2108,7 @@ function _pbpDictEntryMount(host, opts) {
           if (!alive() || busy || saving) return;
           saving = true; baseRetry.setAttribute("aria-disabled", "true");
           try {
-            const saved = await pbpDictEntrySave(input(opts.signal, alive), record);
+            const saved = await pbpDictEntrySave(entryInput(opts.signal, alive), record);
             if (alive()) {
               const hadFocus = document.activeElement === baseRetry;
               render(saved, answerLanguage, false);
@@ -2237,7 +2254,7 @@ function _pbpDictEntryMount(host, opts) {
             saving = true; item.retry.setAttribute("aria-disabled", "true");
             usageMessage(feedback, t("dictSupplementSaving"), "saving");
             try {
-              const saved = await pbpDictSupplementSave(input(opts.signal, alive), item.addition);
+              const saved = await pbpDictSupplementSave(entryInput(opts.signal, alive), item.addition);
               if (!alive()) return;
               const hadFocus = document.activeElement === item.retry;
               record.supplements = record.supplements.map(value => supplementId(value) === id ? saved : value);
@@ -2577,11 +2594,12 @@ function _pbpDictEntryMount(host, opts) {
           content.contains(document.activeElement)) return;
       const version = epoch;
       try {
-        const next = await pbpDictEntryRead(input(opts.signal, () => alive() && epoch === version));
+        const request = entryInput(opts.signal, () => alive() && epoch === version);
+        const next = await pbpDictEntryRead(request);
         if (!next || !alive() || busy || epoch !== version || content.contains(document.activeElement)) return;
         if (JSON.stringify(next) === JSON.stringify(record)) return;
         next.supplements = [...(next.supplements || []), ...(record?.supplements || []).filter(item => item.archiveSaved === false)];
-        render(next, target(), false);
+        render(next, request.target, false);
       } catch (error) { console.warn("[dict-entry] synced entry refresh failed:", error?.name); }
     };
     const onMessage = message => { refreshed(message).catch(error => console.warn("[dict-entry] refresh failed:", error?.name)); };

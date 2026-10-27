@@ -235,6 +235,34 @@ await test("an AI-judgement memory is keyed by the language of the entry on scre
     return rememberedOnScreen && asked.join() === "en,en" && forgotten && recorded;
   } finally { settings.dictDefinitionLang = definition; window.uiLangToBCP47 = ui0; }
 });
+await test("a render that switches the entry's language re-reads the memory for that language", async () => {
+  // The memory was read for the interface language at mount; the first
+  // generation runs after the interface language changed, so the entry and its
+  // learning blocks come in the new language, and their memory must follow.
+  reset();
+  const definition = settings.dictDefinitionLang, ui0 = window.uiLangToBCP47, read0 = window.pbpDictEntryRead, run0 = window.pbpDictEntryRun;
+  settings.dictDefinitionLang = "";
+  const parts = (category, ui) => ({ term: "Gift", sourceLanguage: "de", target: pbpDictLearningTarget(settings, ui), category });
+  try {
+    await pbpDictNegRecord("acct_alice", parts("patterns", "fr"));
+    await pbpDictNegRecord("acct_alice", parts("confusables", "en"));
+    window.uiLangToBCP47 = () => "en";
+    window.pbpDictEntryRead = async () => null;
+    window.pbpDictEntryRun = async () => record();
+    const ui = await entryView();
+    window.uiLangToBCP47 = () => "fr";
+    ui.host.querySelector(".xp-dict-ai-generate").click(); await settle();
+    const switched = ui.host.querySelector(".xp-dict-senses > li")?.lang === "fr";
+    const patterns = ui.paid("patterns"), confusables = ui.paid("confusables");
+    const ok = switched && patterns?.dataset.remembered === "true" && ui.status("patterns").textContent === "dictUsagePointsNone" &&
+      !confusables?.dataset.remembered && ui.status("confusables").textContent === "";
+    ui.close();
+    return ok;
+  } finally {
+    settings.dictDefinitionLang = definition; window.uiLangToBCP47 = ui0; window.pbpDictEntryRead = read0;
+    if (run0 === undefined) delete window.pbpDictEntryRun; else window.pbpDictEntryRun = run0;
+  }
+});
 await test("the learning block shows no paid action until the memory read before its first render resolves", async () => {
   reset(); await pbpDictNegRecord("acct_alice", usage("patterns"));
   const read = window.pbpDictNegHas;

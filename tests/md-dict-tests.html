@@ -2679,6 +2679,32 @@ async function runDictionaryEntryUiTests() {
     const unpaidWrite=mount();await unpaidWrite.ui.ready;const beforeFailedWrite=remoteReads;
     messageListeners.at(-1)({type:'PBP_DICT_ARCHIVE_SYNCED',owner:'ownerless'});await settle();
     check("a passive sync cannot overwrite paid output whose local save failed",remoteReads===beforeFailedWrite&&!!unpaidWrite.host.querySelector('.xp-dict-retry-save'));
+    // The interface language changes after the entry rendered (the
+    // explanation language follows it): a save retry and a passive sync
+    // refresh still belong to the entry on screen, never to the new target.
+    {
+      const followUi={...settings,dictDefinitionLang:""},entrySave0=window.pbpDictEntrySave,supplementSave0=window.pbpDictSupplementSave;
+      const saveLanguages=[],syncReads=[];
+      try {
+        uiLanguage="en";
+        window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:false,supplements:[{...addition,archiveSaved:false}]});
+        const drift=mount({settings:followUi});await drift.ui.ready;
+        uiLanguage="fr";
+        window.pbpDictEntrySave=async(input,value)=>{saveLanguages.push("entry:"+input.target.lang);return {...value,archiveSaved:true};};
+        window.pbpDictSupplementSave=async(input,value)=>{saveLanguages.push("supplement:"+input.target.lang);return {...value,archiveSaved:true};};
+        drift.host.querySelector('.xp-dict-retry-save:not([data-supplement-id] .xp-dict-retry-save)').click();await settle();
+        drift.host.querySelector('[data-supplement-id] .xp-dict-retry-save').click();await settle();
+        check("save retries keep the language of the rendered entry after the interface language changes",
+          saveLanguages.join()==="entry:en,supplement:en"&&drift.host.querySelector('.xp-dict-senses > li')?.lang==="en");
+        uiLanguage="en";remoteRecord=record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[]});
+        window.pbpDictEntryRead=async input=>{syncReads.push(input.target.lang);return structuredClone(remoteRecord);};
+        const synced=mount({settings:followUi});await synced.ui.ready;synced.ui.show('ai');
+        uiLanguage="fr";remoteRecord.supplements=[addition];document.activeElement?.blur?.();syncReads.length=0;
+        messageListeners.at(-1)({type:'PBP_DICT_ARCHIVE_SYNCED',owner:'ownerless'});await settle();
+        check("a passive sync refresh reads and renders the entry in the language on screen, not the changed target",
+          syncReads.join()==="en"&&synced.host.querySelectorAll('[data-supplement-id]').length===1&&synced.host.querySelector('.xp-dict-senses > li')?.lang==="en");
+      } finally { uiLanguage="en";window.pbpDictEntrySave=entrySave0;window.pbpDictSupplementSave=supplementSave0; }
+    }
     window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[addition]});
     const localScroll=mount();await localScroll.ui.ready;
     localScroll.root.className='xp-body';localScroll.root.style.cssText='position:fixed;top:0;left:0;width:400px;height:140px;overflow:auto';
