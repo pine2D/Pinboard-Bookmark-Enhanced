@@ -25,7 +25,7 @@ import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, renameSync, exists
 import { userInfo } from "node:os";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { completionMetadata, completionReport, readAnswerBody, redactText } from "./dict-live-test.mjs";
+import { completionMetadata, completionReport, readBridgeAnswer, STREAM_BODY_BYTES } from "./dict-live-test.mjs";
 import { boundedBody, requestInputBytes } from "./dict-litellm-test.mjs";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -76,8 +76,10 @@ export const WORDS = Object.freeze([
   w("suibian", "随便", "zh", "en", "CJK source, English explanations")
 ]);
 export const SYNTHETIC_PROFILE = Object.freeze({ "zh-Hans": "Simplified Chinese", en: "English" });
+// responseBytes bounds HTTP error bodies and the decoded answer text of a
+// stream; streamBodyBytes bounds the raw SSE body (see dict-live-test.mjs).
 export const LIMITS = Object.freeze({ outputTokens: 8192, inputBytes: 24576, framingTokens: 1024, responseBytes: 262144,
-  timeoutMs: 180000, httpPerCase: 4, retries: 0, wikimediaPerCase: 26, wikimediaBytes: 1800000 });
+  streamBodyBytes: STREAM_BODY_BYTES, timeoutMs: 180000, httpPerCase: 4, retries: 0, wikimediaPerCase: 26, wikimediaBytes: 1800000 });
 // Neutral answers: the model said there is nothing useful to add.
 export const NEUTRAL = Object.freeze(["unsupported_usage"]);
 // Harness states: test-tool failures, not product behaviour.
@@ -176,6 +178,8 @@ export function makePlan(config, fingerprints) {
       requests: "Only POST " + c.endpoint + "/chat/completions with the configured model, one user message whose opening and trailing JSON payload match the case's arm and word, and the placeholder bearer. Anything else halts the run. Product dialect negotiation stays (at most " + LIMITS.httpPerCase + " HTTP per click), each request reserved and counted; the driver itself never retries.",
       wikimedia: "Etymology clicks only: anonymous GETs to the word language's exact Wiktionary /w/api.php, at most " + LIMITS.wikimediaPerCase + " per click; no AI.",
       money: "Before each dispatch the request's worst case (input bytes + framing at the input rate, its max output tokens at the output rate) is reserved and never refunded; it must fit the model cap and the total cap (" + c.currency + "). Prices are configuration from the ai-dev catalog, valid only on their verification UTC day.",
+      usage: "The product streams without stream_options, so most endpoints send no usage; the usage_exceeds_reservation check and the ledger's actual token counts then have nothing to read. Reservations stay worst case and are never refunded, so the money caps are unchanged.",
+      responses: "A 2xx SSE body is read whole (at most " + LIMITS.streamBodyBytes + " bytes, about one token per event) before it is replayed; its decoded answer and reasoning text, and any HTTP error body, stay within " + LIMITS.responseBytes + " bytes. The product's " + LIMITS.timeoutMs / 1000 + " s deadline starts at its first dispatch guard, before this bridge, so an answer the upstream finishes near that limit can be paid for and still fail as a timeout.",
       credentials: "Only --live reads " + c.keyVariable + " from ~/.config/ai-dev/.env (fixed path) with a dotenv parser; an inherited variable of that name is refused; Chromium gets a placeholder.",
       code: "The product fingerprint must equal the pinned end-of-1B value, and product and driver fingerprints must stay unchanged during the run.",
       account: "Synthetic Pinboard owner " + OWNER + " in an isolated profile per model; Drive disconnected."
@@ -371,9 +375,8 @@ async function runModel(ctx, model) {
         const response = await dispatch(endpoint, { method: "POST", redirect: "error",
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + key, "Cache-Control": "no-store" },
           body: JSON.stringify(body), signal: AbortSignal.timeout(LIMITS.timeoutMs) });
-        const text = redactText(await boundedBody(response, LIMITS.responseBytes), [key]);
         // A 2xx answer is the stream's SSE body; an HTTP error stays JSON.
-        const { parsed, contentType } = readAnswerBody(text, response.ok, response.headers.get("content-type") || "");
+        const { text, parsed, contentType } = await readBridgeAnswer(response, LIMITS, [key]);
         const meta = completionMetadata(parsed);
         Object.assign(attempt, meta, { httpStatus: response.status, latencyMs: Math.round(performance.now() - started) });
         // Only a 2xx answer's text is kept, redacted, for review; never reasoning, headers or provider errors.

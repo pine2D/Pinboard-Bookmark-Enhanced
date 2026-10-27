@@ -5,7 +5,10 @@ import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { buildPlan, validateApproval, validatePriceFreshness, validateMinimaxLowFollowup, newLedger, validateLedger, reserveAttempt, redactText, completionMetadata, completionReport, streamCompletion, readAnswerBody, isProductRequest } from "../scripts/dict-live-test.mjs";
+import { buildPlan, validateApproval, validatePriceFreshness, validateMinimaxLowFollowup, newLedger, validateLedger, reserveAttempt, redactText, completionMetadata, completionReport, streamCompletion, readAnswerBody, isProductRequest,
+  readBridgeAnswer, STREAM_BODY_BYTES, STREAM_FRAME_BYTES } from "../scripts/dict-live-test.mjs";
+import { chatCompletionStream } from "./fixtures/dict-chat-stream.mjs";
+import { entryResponse } from "./fixtures/dict-live-responses.mjs";
 
 const PUBLIC = `DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEEPSEEK_MODEL=deepseek-flash
@@ -251,6 +254,55 @@ test("the replayed content type follows the answer: SSE for a streamed 2xx, JSON
   assert.equal(error.streamed, false); assert.equal(error.contentType, "application/json"); assert.equal(error.parsed.error.message, "bad request");
   // A 4xx/5xx is never parsed as a stream, whatever it claims to be.
   assert.equal(readAnswerBody("data: {}\n\n", false, "text/event-stream").streamed, false);
+});
+// Real streams carry about one token per event. These frames are written by
+// hand in the shapes DeepSeek (reasoning_content, then content) and OpenRouter
+// (reasoning repeated in reasoning_details) send, with every framing field.
+const DEEPSEEK_THINK = piece => 'data: {"id":"0198e2b4-6c1f-7c55-9a8e-3f0b2d1c4e5a","object":"chat.completion.chunk","created":1761576000,"model":"deepseek-reasoner","system_fingerprint":"fp_ffc7281d48_prod0820_fp8_kvcache","choices":[{"index":0,"delta":{"content":null,"reasoning_content":"' + piece + '"},"logprobs":null,"finish_reason":null}]}\n\n';
+const DEEPSEEK_TEXT = piece => 'data: {"id":"0198e2b4-6c1f-7c55-9a8e-3f0b2d1c4e5a","object":"chat.completion.chunk","created":1761576000,"model":"deepseek-reasoner","system_fingerprint":"fp_ffc7281d48_prod0820_fp8_kvcache","choices":[{"index":0,"delta":{"content":"' + piece + '","reasoning_content":null},"logprobs":null,"finish_reason":null}]}\n\n';
+const DEEPSEEK_END = 'data: {"id":"0198e2b4-6c1f-7c55-9a8e-3f0b2d1c4e5a","object":"chat.completion.chunk","created":1761576000,"model":"deepseek-reasoner","system_fingerprint":"fp_ffc7281d48_prod0820_fp8_kvcache","choices":[{"index":0,"delta":{"content":"","reasoning_content":null},"logprobs":null,"finish_reason":"stop"}],"usage":{"prompt_tokens":2400,"completion_tokens":8192,"total_tokens":10592,"completion_tokens_details":{"reasoning_tokens":4096}}}\n\ndata: [DONE]\n\n';
+const ROUTER_THINK = piece => 'data: {"id":"gen-1761576000-AbCdEfGhIjKlMnOpQrSt","provider":"OpenAI","model":"openai/gpt-6.1-sol","object":"chat.completion.chunk","created":1761576000,"choices":[{"index":0,"delta":{"role":"assistant","content":"","reasoning":"' + piece + '","reasoning_details":[{"type":"reasoning.text","text":"' + piece + '","format":"openai-responses-v1","index":0}]},"finish_reason":null,"native_finish_reason":null,"logprobs":null}],"system_fingerprint":null}\n\n';
+const ROUTER_TEXT = piece => 'data: {"id":"gen-1761576000-AbCdEfGhIjKlMnOpQrSt","provider":"OpenAI","model":"openai/gpt-6.1-sol","object":"chat.completion.chunk","created":1761576000,"choices":[{"index":0,"delta":{"role":"assistant","content":"' + piece + '"},"finish_reason":null,"native_finish_reason":null,"logprobs":null}],"system_fingerprint":null}\n\n';
+const ROUTER_END = ': OPENROUTER PROCESSING\n\n'.repeat(3) + 'data: {"id":"gen-1761576000-AbCdEfGhIjKlMnOpQrSt","provider":"OpenAI","model":"openai/gpt-6.1-sol","object":"chat.completion.chunk","created":1761576000,"choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":"stop","native_finish_reason":"completed","logprobs":null}],"system_fingerprint":null}\n\ndata: [DONE]\n\n';
+const stream = (body, status = 200) => new Response(body, { status, headers: { "Content-Type": status < 300 ? "text/event-stream" : "application/json" } });
+const LIMITS = buildPlan(PUBLIC).limits;
+test("a token-per-event stream at the product's 8192-token budget fits the bridge, past the old JSON-sized bound", async () => {
+  assert.equal(LIMITS.responseBytes, 262144); assert.equal(LIMITS.streamBodyBytes, STREAM_BODY_BYTES);
+  for (const frame of [DEEPSEEK_THINK("abc"), DEEPSEEK_TEXT("abc"), ROUTER_THINK("abc"), ROUTER_TEXT("abc")]) {
+    assert.ok(Buffer.byteLength(frame) <= STREAM_FRAME_BYTES, frame);
+  }
+  const thinking = Array(4096).fill("abc"), answer = Array(4096).fill("xyz");
+  for (const body of [thinking.map(DEEPSEEK_THINK).join("") + answer.map(DEEPSEEK_TEXT).join("") + DEEPSEEK_END,
+    Array(8192).fill("xyz").map(DEEPSEEK_TEXT).join("") + DEEPSEEK_END,
+    thinking.map(ROUTER_THINK).join("") + answer.map(ROUTER_TEXT).join("") + ROUTER_END]) {
+    const size = Buffer.byteLength(body);
+    assert.ok(size > LIMITS.responseBytes * 4 && size <= STREAM_BODY_BYTES, String(size));
+    const read = await readBridgeAnswer(stream(body), LIMITS);
+    assert.equal(read.streamed, true); assert.equal(read.contentType, "text/event-stream"); assert.equal(read.text, body);
+    assert.match(read.parsed.choices[0].message.content, /^(?:xyz)+$/); assert.equal(read.parsed.choices[0].finish_reason, "stop");
+  }
+  // The offline replays use the same framing, so they exercise this bound too.
+  const replay = chatCompletionStream(entryResponse);
+  assert.ok(replay.split("\n\n").every(event => Buffer.byteLength(event) + 2 <= STREAM_FRAME_BYTES));
+  assert.equal((await readBridgeAnswer(stream(replay), LIMITS)).parsed.choices[0].message.content, entryResponse.choices[0].message.content);
+});
+test("bodies past the stream bound, oversized decoded text and oversized error bodies are refused", async () => {
+  const base = Array(8192).fill("xyz").map(DEEPSEEK_TEXT).join("") + DEEPSEEK_END;
+  const padded = extra => base + ": " + "k".repeat(STREAM_BODY_BYTES - Buffer.byteLength(base) - 4 + extra) + "\n\n";
+  assert.equal(Buffer.byteLength(padded(0)), STREAM_BODY_BYTES);
+  assert.equal((await readBridgeAnswer(stream(padded(0)), LIMITS)).streamed, true);
+  await assert.rejects(readBridgeAnswer(stream(padded(1)), LIMITS), /response_too_large/);
+  // Within the raw bound, decoded answer plus reasoning text keeps the old bound.
+  const half = "a".repeat(LIMITS.responseBytes / 2);
+  await assert.rejects(readBridgeAnswer(stream(DEEPSEEK_THINK(half) + DEEPSEEK_TEXT(half + "a") + DEEPSEEK_END), LIMITS), /response_too_large/);
+  assert.ok(await readBridgeAnswer(stream(DEEPSEEK_THINK(half) + DEEPSEEK_TEXT(half) + DEEPSEEK_END), LIMITS));
+  // An HTTP error body, and a 2xx answer that is not a stream, keep the JSON bound.
+  const json = size => '{"error":{"message":"' + "e".repeat(size - 24) + '"}}';
+  assert.equal(Buffer.byteLength(json(LIMITS.responseBytes)), LIMITS.responseBytes);
+  assert.equal((await readBridgeAnswer(stream(json(LIMITS.responseBytes), 500), LIMITS)).streamed, false);
+  await assert.rejects(readBridgeAnswer(stream(json(LIMITS.responseBytes + 1), 500), LIMITS), /response_too_large/);
+  await assert.rejects(readBridgeAnswer(new Response(json(LIMITS.responseBytes + 1), { status: 200, headers: { "Content-Type": "application/json" } }), LIMITS), /response_too_large/);
+  await assert.rejects(readBridgeAnswer(stream(base), { responseBytes: 262144, streamBodyBytes: 1024 }), /response_bounds_invalid/);
 });
 test("only the product's own streamed request is admitted", () => {
   const body = patch => ({ model: "m", stream: true, messages: [{ role: "user", content: "Create a concise reusable dictionary entry\n{}" }],

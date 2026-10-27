@@ -172,12 +172,21 @@ await test('generation streams with the dictionary policy, one deadline and no d
     o.reasoningEffort==='minimum'&&o.deadlineMs===180000&&o.signal===req.signal&&typeof o.beforeRequest==='function'&&typeof o.onProgress==='function'&&
     !!o.responseSchema&&!Object.hasOwn(o,'onStage')&&!Object.hasOwn(o,'onDelta');
 });
+// JSON.stringify drops function members, so walk the saved record instead:
+// no onStage key and no function value at any depth.
+const carriesCallback=(value,seen=new Set())=>{
+  if(typeof value==='function')return true;
+  if(!value||typeof value!=='object'||seen.has(value))return false;
+  seen.add(value);
+  return Object.hasOwn(value,'onStage')||Object.values(value).some(item=>carriesCallback(item,seen));
+};
 await test('stream phases reach onStage only, never the prompt, cache identity or saved record',async()=>{
+  if(!carriesCallback({a:[{onStage:null}]})||!carriesCallback({a:{b:()=>{}}})||carriesCallback({a:[1,'onStage']}))return false;
   reset();streamPhases=['thinking','streaming'];const seen=[];
   const r=await pbpDictEntryRun(request({onStage:phase=>seen.push(phase)}));
   const plain=await pbpDictEntryRun(request());
   return seen.join()==='thinking,streaming'&&calls.length===1&&plain.cached===true&&!calls[0].prompt.includes('onStage')&&
-    writes.length===1&&!JSON.stringify(writes[0].result).includes('onStage')&&!Object.hasOwn(r,'onStage')&&r.cached===false;
+    writes.length===1&&!carriesCallback(writes[0].result)&&!Object.hasOwn(r,'onStage')&&r.cached===false;
 });
 await test('the phase bridge forwards synchronously and tolerates a missing callback',async()=>{
   let got='';const out=_pbpDictStreamProgress(phase=>{got=phase;return 'returned';})({phase:'thinking'});

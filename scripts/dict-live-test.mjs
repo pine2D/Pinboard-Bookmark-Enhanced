@@ -46,7 +46,8 @@ export function buildPlan(publicText) {
   const plan = { schema: 1, scope: SCOPE, providers, cases: CASES,
     data: { term: "provider", sourceLanguage: "en", explanationLanguage: "zh-Hans", nativeLanguage: "简体中文", level: "intermediate" },
     limits: { requestsPerProvider: 4, requestsPerCase: 2, inputUtf8Bytes: 24576, framingTokenAllowance: 1024,
-      entryOutputTokens: 3072, supplementOutputTokens: 2048, diagnosticOutputTokens: 8192, transportRetries: 0, responseBytes: 262144, timeoutMs: 28000 },
+      entryOutputTokens: 3072, supplementOutputTokens: 2048, diagnosticOutputTokens: 8192, transportRetries: 0, responseBytes: 262144,
+      streamBodyBytes: STREAM_BODY_BYTES, timeoutMs: 28000 },
     boundaries: { inheritedProviderEnvironment: "ignored; file fields are authoritative", secrets: "only the authorized Node test process reads selected .env keys",
       gemini: "production custom provider, OpenAI-compatible protocol only; does not test the native Gemini adapter",
       endpoints: "isolated browser registry base override from providers.env; product files unchanged",
@@ -55,6 +56,7 @@ export function buildPlan(publicText) {
       account: "synthetic Pinboard owner in an isolated profile; Drive disconnected; no user account or browser profile",
       retryAccounting: "production dialect fallback is counted; bridge never retries; case/provider caps persist across restarts",
       money: "conservative input-byte/output-token reservations; provider billing and current prices remain external assumptions",
+      responseSize: "raw 2xx SSE body <= streamBodyBytes (about one token per event over the product's 8192-token stream budget); decoded answer and reasoning text, any non-stream body and any HTTP error body <= responseBytes",
       openrouterCostDifference: { provider: { max_price: { prompt: 2, completion: 10, request: 0 } } },
       openrouterCostSource: "https://openrouter.ai/docs/guides/routing/provider-selection#max-price" } };
   return { ...plan, planHash: digest(plan) };
@@ -219,7 +221,7 @@ function acquireLock(path) {
   }
   return () => { try { unlinkSync(path); } catch {} };
 }
-async function boundedBody(response, maxBytes) {
+export async function boundedBody(response, maxBytes) {
   const reader = response.body?.getReader(); if (!reader) fail("response_body_missing");
   const parts = []; let size = 0;
   try {
@@ -227,6 +229,33 @@ async function boundedBody(response, maxBytes) {
       if (size > maxBytes) fail("response_too_large"); parts.push(value); }
     return Buffer.concat(parts).toString("utf8");
   } finally { await reader.cancel().catch(() => {}); }
+}
+
+// Bridge size bounds (plan 2.7). responseBytes keeps bounding what it bounded
+// when answers were one JSON body: an HTTP error body, a 2xx body that is not
+// a stream, and the decoded answer text plus reasoning of a 2xx stream. The raw
+// SSE body is much larger than that text: compatible endpoints send about one
+// token per chat.completion.chunk event, and every event repeats id, object,
+// created, model, system_fingerprint and logprobs (about 250 bytes; an
+// OpenRouter reasoning event repeats its text in reasoning_details, near 450).
+// STREAM_FRAME_BYTES bounds one such event, taken over the product's whole
+// stream output budget (8192 estimated tokens, thinking and answer together;
+// the product stops a longer stream and saves nothing, and this bound also
+// covers thinking that a provider does not count in max_tokens), plus a fixed
+// allowance for the role, keep-alive, final, usage and [DONE] events.
+export const STREAM_OUTPUT_TOKENS = 8192, STREAM_FRAME_BYTES = 640, STREAM_FIXED_BYTES = 262144;
+export const STREAM_BODY_BYTES = STREAM_OUTPUT_TOKENS * STREAM_FRAME_BYTES + STREAM_FIXED_BYTES;
+const utf8Bytes = value => typeof value === "string" ? Buffer.byteLength(value, "utf8") : 0;
+// Reads one upstream answer for the bridge under those bounds: redacted,
+// parsed, and with the content type the bridge replays.
+export async function readBridgeAnswer(response, { responseBytes, streamBodyBytes }, keys = []) {
+  if (!Number.isSafeInteger(responseBytes) || !Number.isSafeInteger(streamBodyBytes) || streamBodyBytes < responseBytes) fail("response_bounds_invalid");
+  const text = redactText(await boundedBody(response, response.ok ? streamBodyBytes : responseBytes), keys);
+  const answer = readAnswerBody(text, response.ok, response.headers.get("content-type") || "");
+  const message = answer.parsed?.choices?.[0]?.message;
+  const decoded = answer.streamed ? utf8Bytes(message?.content) + utf8Bytes(message?.reasoning_content) : utf8Bytes(text);
+  if (decoded > responseBytes) fail("response_too_large");
+  return { text, ...answer };
 }
 
 // The product's own generation request: the configured model, one user
@@ -264,8 +293,7 @@ async function executeProvider(plan, approval, ledger, id, key, saveLedger, { re
         const response = await dispatch(config.baseUrl + "/chat/completions", { method: "POST", redirect: "error",
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + key }, body: JSON.stringify(body), signal: AbortSignal.timeout(plan.limits.timeoutMs) });
         attempt.httpStatus = response.status;
-        const safeBody = redactText(await boundedBody(response, plan.limits.responseBytes), [key]);
-        const { parsed, contentType } = readAnswerBody(safeBody, response.ok, response.headers.get("content-type") || "");
+        const { text: safeBody, parsed, contentType } = await readBridgeAnswer(response, plan.limits, [key]);
         // Only successful synthetic-case answer text is retained for parser
         // diagnosis. Never persist reasoning, raw provider errors or headers.
         const answer = response.ok ? completionReport(parsed, [key]) : null;
@@ -276,7 +304,7 @@ async function executeProvider(plan, approval, ledger, id, key, saveLedger, { re
         Object.assign(attempt, completionMetadata(parsed), { state: "received" }); saveLedger();
         await route.fulfill({ status: response.status, contentType, body: safeBody });
       } catch (error) {
-        const known = ["request_bounds", "request_budget_exhausted", "cost_budget_exhausted", "unapproved_network_request", "unexpected_production_request", "unexpected_output_budget", "response_body_missing", "response_too_large", "followup_approval_invalid", "followup_ledger_ineligible", "followup_request_bounds"];
+        const known = ["request_bounds", "request_budget_exhausted", "cost_budget_exhausted", "unapproved_network_request", "unexpected_production_request", "unexpected_output_budget", "response_body_missing", "response_too_large", "response_bounds_invalid", "followup_approval_invalid", "followup_ledger_ineligible", "followup_request_bounds"];
         const code = known.includes(error?.safeCode) ? error.safeCode : error?.name === "TimeoutError" ? "transport_timeout" : "transport_or_harness_failed";
         if (activeCase) blockedReason = code;
         if (attempt) { attempt.state = "failed_or_uncertain"; attempt.failure = code; saveLedger(); }

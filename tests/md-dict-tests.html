@@ -2412,6 +2412,12 @@ async function runDictionaryEntryUiTests() {
           early.length===1&&early[0][0]==="ownerless"&&category==='confusables'&&JSON.stringify(early[0][1])===JSON.stringify({code:"invalid_response.supplement_item_text",stage:"preparing",category}));
         check("a supplement failure after a reported stage is filed at that stage",late.length===1&&late[0][1].stage==="checking"&&late[0][1].code==="wrong_language.explanation_script");
         check("ledger rows carry no lookup text",!JSON.stringify([early,late]).includes("Gift"));
+        // Stream phases (thinking/streaming) have no ledger stage or copy yet:
+        // a failure after them is filed at the last known stage.
+        window.pbpDictSupplementRun=async input=>{input.onStage("generating");input.onStage("thinking");input.onStage("streaming");throw Object.assign(new Error("Gift"),{code:"invalid_response",reason:"supplement_item_text"});};
+        submit.click();await settle();
+        const streamed=rows.splice(0);
+        check("stream phases leave a supplement failure filed at the generating stage",streamed.length===1&&streamed[0][1].stage==="generating"&&streamed[0][1].code==="invalid_response.supplement_item_text");
         // 1A.5: a leaking summary blanked from a saved supplement is one checking-stage row.
         window.pbpDictSupplementRun=async input=>{input.onDrop(Object.assign(new Error("Gift"),{code:"invalid_response",reason:"supplement_summary_term"}));
           return {...addition,id:'7'.repeat(64),category:input.category};};
@@ -2444,6 +2450,9 @@ async function runDictionaryEntryUiTests() {
     check("source retrieval progress stays at the etymology action",originAction.parentElement.querySelector('.xp-dict-usage-status').textContent==='dictSupplementRetrieving');
     etymologyRequest.onStage('checking');
     check("content checking keeps the same cancellation action and focus",originAction.parentElement.querySelector('.xp-dict-usage-status').textContent==='dictSupplementChecking'&&
+      document.activeElement===originAction.parentElement.querySelector('.xp-dict-usage-stop'));
+    etymologyRequest.onStage('thinking');etymologyRequest.onStage('streaming');
+    check("stream phases leave the supplement progress copy and focus unchanged",originAction.parentElement.querySelector('.xp-dict-usage-status').textContent==='dictSupplementChecking'&&
       document.activeElement===originAction.parentElement.querySelector('.xp-dict-usage-stop'));
     resolveUsage({...addition,id:'5'.repeat(64),category:'etymology',learning:{version:2,language:{name:'Spanish',lang:'es'},summary:'Una palabra relacionada.',replacesId:'',
       items:[{sense:1,kind:'family',title:'giftig',explanation:'Significa venenoso.',example:'',translation:'',sourceIndex:-1}]}});await settle();
