@@ -161,13 +161,13 @@ await test('the supplement generation path accepts native metadata while retaini
   value.items[0].explanation='Use esta expressão para uma pessoa ou empresa que presta um serviço.';
   value.items[0].translation='Precisamos de um prestador de serviços.';answer=JSON.stringify(value);
   detection={isReliable:true,languages:[{language:'pt',percentage:99}]};
-  const requested={name:'Portuguese',lang:'und'},result=await pbpDictSupplementRun(request({target:requested,category:'collocations'}));
+  const requested={name:'Portuguese',lang:'und'},result=await pbpDictSupplementRun(request({target:requested,category:'confusables'}));
   assert(result.archiveSaved&&appended===1&&calls===1&&detected.length===1&&result.learning.language.lang==='und'&&result.learning.language.name==='Portuguese');
 });
 await test('validated supplement metadata checks prose for legacy und without changing its identity',async()=>{
   parentEntry();const value=supplement('pt');value.summary=wrong;value.items[0].explanation=wrong;value.items[0].translation='The company supplies a service.';answer=JSON.stringify(value);
   detection={isReliable:true,languages:[{language:'en',percentage:100}]};const requested={name:'Portuguese',lang:'und'};
-  await rejects(()=>pbpDictSupplementRun(request({target:requested,category:'collocations'})),'explanation_language');
+  await rejects(()=>pbpDictSupplementRun(request({target:requested,category:'confusables'})),'explanation_language');
   assert(calls===1&&appended===0&&detected.length===1&&requested.lang==='und');
 });
 await test('wrong-language entries never reach storage or trigger an automatic paid retry',async()=>{
@@ -175,7 +175,7 @@ await test('wrong-language entries never reach storage or trigger an automatic p
 });
 await test('wrong-language supplements never reach storage or trigger an automatic paid retry',async()=>{
   parentEntry();const value=supplement();value.summary=wrong;value.items[0].explanation=wrong;value.items[0].translation='This is a service provider.';answer=JSON.stringify(value);
-  await rejects(()=>pbpDictSupplementRun(request({category:'collocations'})),'explanation_script');assert(calls===1&&appended===0);
+  await rejects(()=>pbpDictSupplementRun(request({category:'confusables'})),'explanation_script');assert(calls===1&&appended===0);
 });
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();
