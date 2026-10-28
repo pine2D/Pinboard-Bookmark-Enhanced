@@ -2415,6 +2415,12 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
 .xp-dict-msg[data-state="neutral"] { color: var(--fg-secondary); }
 .xp-dict-msg-ic { display: inline-flex; vertical-align: -2px; margin-inline-end: var(--sp-1); }
 .xp-dict-msg-ic svg { display: block; }
+/* Notes, hints and inline errors (the action error, the examples hint, a
+   receipt, the progress line, the choice list's help) wrap without leaving a
+   last word alone on its line. Each is a few lines at most, so the cost CSSWG
+   flags for text-wrap:pretty on long body text does not arise; AI-written
+   text and entry senses keep greedy wrapping, block titles stay one line. */
+.xp-dict-msg, .xp-dict-src, .xp-dict-choice-help { text-wrap: pretty; }
 /* One column (dict redesign 3.1): the AI part follows the dictionary results,
    separated by whitespace and its own source title -- no rule, fill or card. */
 .xp-dict-ai { min-width: 0; margin-top: var(--sp-4); overflow-wrap: anywhere; }

@@ -831,12 +831,12 @@
           <label class="bl" for="dict-default-view" data-i18n="dictDefaultViewLabel">Default lookup view</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="dictDefaultViewHint">Dictionary results always come first. “Dictionary first” folds a saved AI entry into one line you can open; the other two options show it right away. Only “generate when missing” uses tokens automatically.</p>
+            <p class="hint context-help-body" data-i18n="dictDefaultViewHint">Dictionary results always come first; this sets how the AI entry below them starts out. Folded, a saved entry is one line you can open; the other two options show it in full. Only “generate when missing” uses tokens automatically.</p>
           </details>
           <select id="dict-default-view" data-listbox>
-            <option value="dictionary" data-i18n="dictDefaultDictionary">Dictionary first</option>
-            <option value="ai-saved" data-i18n="dictDefaultAiSaved">AI first, saved entries only</option>
-            <option value="ai-generate" data-i18n="dictDefaultAiGenerate">AI first, generate when missing</option>
+            <option value="dictionary" data-i18n="dictDefaultDictionary">Fold saved AI entries into one line</option>
+            <option value="ai-saved" data-i18n="dictDefaultAiSaved">Show saved AI entries</option>
+            <option value="ai-generate" data-i18n="dictDefaultAiGenerate">Show AI entries, generate when missing</option>
           </select>
         </div>
         <div class="fg entry-block context-help-host" data-help-role="field">

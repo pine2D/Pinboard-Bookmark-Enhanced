@@ -2224,6 +2224,10 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-msg[data-state="neutral"] { color: var(--lib-fg-muted); }
 #vocab-ref-result .xp-dict-msg-ic { display: inline-flex; vertical-align: -2px; margin-inline-end: var(--lib-sp-1); }
 #vocab-ref-result .xp-dict-msg-ic svg { display: block; }
+/* Notes, hints and inline errors wrap without stranding a last word (as in
+   the reader, md-preview.css); a few lines each, so pretty costs nothing.
+   AI-written text and senses keep greedy wrapping. */
+#vocab-ref-result :is(.xp-dict-msg, .xp-dict-src) { text-wrap: pretty; }
 /* The local pack's block: no fill, no frame -- a small bold title and its senses. */
 #vocab-ref-result .xp-dict-local-title { margin-bottom: var(--lib-sp-2); font-size: 13px; line-height: 18px; font-weight: 700; color: var(--lib-fg-muted); }
 #vocab-ref-result .xp-skel {
