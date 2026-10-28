@@ -2267,8 +2267,11 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
     const cfg = target && target.cfg;
     // The bespoke trio keeps its stored key shape: the raw model setting with
     // a "default" placeholder (not the provider default), and for ollama the
-    // raw base URL without the built-in localhost fallback.
-    if (cfg && target.protocol !== "openai") {
+    // raw base URL without the built-in localhost fallback. A custom entry in
+    // the Anthropic format is not one of them: it keys like any custom entry,
+    // by its format-marked endpoint, so the two formats of one base never
+    // share punctuation results.
+    if (cfg && target.protocol !== "openai" && target.kind !== "custom") {
       const id = p + ":" + (override || sa[cfg.modelField] || "default");
       return cfg.baseField ? id + "@" + _pbpVideoNormBase(sa[cfg.baseField]) : id;
     }

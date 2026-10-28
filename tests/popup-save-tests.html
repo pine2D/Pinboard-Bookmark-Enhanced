@@ -2494,6 +2494,21 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(!/establish connection/i.test(shown), "the raw Chrome bus string reached the card: " + shown);
     });
 
+    // The worker's language may still be the browser's: a provider_missing
+    // envelope is re-localized by the popup from its own catalogue.
+    await testAsync("a worker provider_missing envelope renders the popup's own localized string", async () => {
+      const h = makePopupAi({
+        realErrorCard: true,
+        respond: async () => ({ ok: false, error: { message: "SW-TEXT", code: "provider_missing" } }),
+      });
+      await h.doAISummary(false);
+      const shown = h.el["ai-error-message"].textContent;
+      assert(!h.el["ai-error-card"].classList.contains("hidden"), "the error card was not shown");
+      assert(enMessages.aiErrorProviderMissing && shown.includes(enMessages.aiErrorProviderMissing.message),
+        "the card did not render the popup's aiErrorProviderMissing string, got: " + shown);
+      assert(!shown.includes("SW-TEXT"), "the worker's text reached the card: " + shown);
+    });
+
     // Critique 2026-10-21: "[Custom] Failed to fetch" named neither the cause
     // nor the fix. A transport failure says what it could not reach and what
     // to check; the browser's raw words stay under Details.

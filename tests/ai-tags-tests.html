@@ -652,6 +652,88 @@ suite("Model Studio regions and workspaces", () => {
     }
   });
 });
+
+// Custom provider entries (multi-custom-providers T5): the first entry's
+// format and display name, list entries by id, and dangling ids.
+const CP_E = { id: "custom-ab12cd", name: "Relay A", protocol: "openai", baseUrl: "https://gw.example/v1/", model: "m-1", slot: 3 };
+const CP_EA = { ...CP_E, protocol: "anthropic" };
+const cpS = (entry = CP_E, extra = {}) => ({ ...SETTINGS_DEFAULTS, aiCustomProviders: [entry],
+  customApiKey3: deobfuscateKey(pbpAiCustomKeySeal(entry, "sk-e")), ...extra });
+const CP_C = { ...SETTINGS_DEFAULTS, aiProvider: "custom", customBaseUrl: "https://proxy.example/v1", customModel: "m" };
+const cpFp = (s) => aiCacheFingerprint(s, "tags") + "‖" + aiCacheFingerprint(s, "summary");
+// The display-name fallback reads t(); pin it so the label is exact.
+function withStubT(fn) {
+  const realT = window.t;
+  window.t = (k) => "T:" + k;
+  try { return fn(); } finally { window.t = realT; }
+}
+suite("custom provider entries", () => {
+  test("R2 custom anthropic", () => {
+    const anth = pbpAiResolveTarget({ ...CP_C, customProtocol: "anthropic" });
+    assertEq(anth.protocol, "anthropic", "protocol");
+    assertEq(anth.fpEndpoint, "https://proxy.example/v1#anthropic", "fpEndpoint");
+    assert(cpFp({ ...CP_C, customProtocol: "anthropic" }) !== cpFp(CP_C), "the Anthropic format shares the OpenAI-format fingerprint");
+    withStubT(() => {
+      assertEq(pbpAiResolveTarget({ ...CP_C, customDisplayName: "Relay" }).label, "Relay", "display name");
+      assertEq(pbpAiResolveTarget({ ...CP_C, customDisplayName: "  " }).label, "T:provCustomShort", "blank display name");
+      assertEq(pbpAiResolveTarget(CP_C).label, "T:provCustomShort", "no display name");
+    });
+  });
+  test("R3 entry (openai) resolves from the list and its envelope", () => {
+    const target = withStubT(() => pbpAiResolveTarget({ ...cpS(), aiProvider: CP_E.id }));
+    const { cfg, ...rest } = target;
+    assertEq(JSON.stringify(rest), JSON.stringify({ provider: CP_E.id, kind: "custom", protocol: "openai",
+      endpoint: "https://gw.example/v1", fpEndpoint: "https://gw.example/v1", official: false, apiKey: "sk-e",
+      model: "m-1", label: "Relay A", error: null }), "target");
+    assert(cfg && cfg.endpoint === "https://gw.example/v1" && !("thinkingOff" in cfg), "cfg: " + JSON.stringify(cfg));
+  });
+  test("R4 entry (anthropic)", () => {
+    const target = pbpAiResolveTarget({ ...cpS(CP_EA), aiProvider: CP_EA.id });
+    assertEq(target.protocol, "anthropic", "protocol");
+    assertEq(target.apiKey, "sk-e", "apiKey");
+    assert(target.fpEndpoint.endsWith("#anthropic"), "fpEndpoint " + target.fpEndpoint);
+  });
+  test("R5 envelope mismatch means no key", () => {
+    const s = { ...cpS(), aiProvider: CP_E.id };
+    s.aiCustomProviders = [{ ...CP_E, baseUrl: "https://evil.example/v1" }];
+    assertEq(pbpAiResolveTarget(s).apiKey, "", "apiKey");
+    assertEq(hasAIKey(s), false, "hasAIKey");
+  });
+  test("R6 dangling and malformed ids", () => {
+    const cases = [
+      { ...cpS(), aiProvider: "custom-zz99zz" },
+      { ...cpS(), aiProvider: "custom-XYZ" },
+      { ...cpS(), aiProvider: "nope" },
+      { ...cpS(), aiProvider: CP_E.id, aiCustomProviders: "zzz" },
+    ];
+    for (const s of cases) {
+      assertEq(pbpAiResolveTarget(s).error, "provider_missing", s.aiProvider + " error");
+      assertEq(hasAIKey(s), false, s.aiProvider + " hasAIKey");
+      let caught = null, origin;
+      try { origin = _aiTargetOriginPattern(s); } catch (e) { caught = e; }
+      assert(caught && caught.code === "provider_missing", s.aiProvider + " origin resolved to " + JSON.stringify(origin));
+    }
+    withStubT(() => {
+      assertEq(pbpAiResolveTarget(cases[0]).label, "T:provCustomShort", "dangling label");
+      assertEq(pbpAiResolveTarget(cases[3]).label, "T:provCustomShort", "unreadable list label");
+    });
+  });
+  test("R7 fingerprint identity", () => {
+    const twin = { ...CP_E, id: "custom-ef34gh", slot: 4 };
+    const s = { ...cpS(), aiCustomProviders: [CP_E, twin] };
+    const a = cpFp({ ...s, aiProvider: CP_E.id });
+    const b = cpFp({ ...s, aiProvider: twin.id });
+    assert(a !== b, "two entries on one address and model share a fingerprint");
+    assert(a !== cpFp({ ...CP_C, customBaseUrl: "https://gw.example/v1", customModel: "m-1" }), "an entry shares custom's fingerprint");
+    assert(aiCacheFingerprint({ ...s, aiProvider: CP_E.id }, "tags").startsWith(CP_E.id + ":"), "entry id is not the fingerprint head");
+  });
+  test("R11 status page", () => {
+    assertEq(pbpAiStatusPageUrl({ ...cpS(), aiProvider: CP_E.id }, { status: 503, message: "x" }), "", "entry");
+    assertEq(pbpAiStatusPageUrl({ ...SETTINGS_DEFAULTS, aiProvider: "openai" }, { code: "provider_missing", status: 503, message: "x" }), "", "provider_missing");
+    assert(pbpAiStatusPageUrl({ ...SETTINGS_DEFAULTS, aiProvider: "openai" }, { status: 503, message: "x" }) !== "", "control: openai 503 offers its status page");
+  });
+});
+
 </script>
 
 <script>
@@ -1510,6 +1592,89 @@ suite("Model Studio regions and workspaces", () => {
       assert(run.status.includes("typo-model"), "status never named the broken override: " + run.status);
       assert(/(^| )warn( |$)/.test(run.tone) && !/(^| )bad( |$)/.test(run.tone),
         "the partial failure took the whole-provider error tone: " + run.tone);
+    });
+
+    // ---- Custom provider entries on the wire (multi-custom-providers T5) ----
+    await atest("R1 custom default protocol keeps the golden fingerprint", async () => {
+      // The literal pinned in the provider-resolution golden (md-ai-tests.html
+      // GOLDEN_FP "custom/base"), read from that page rather than copied.
+      const page = await (await realFetch("./md-ai-tests.html")).text();
+      const at = page.indexOf("const GOLDEN_FP = {");
+      const table = page.slice(at, page.indexOf("\n};", at));
+      const golden = (/"custom\/base": "([^"]+)"/.exec(table) || [])[1];
+      assert(golden && golden.startsWith("custom:m:"), "golden custom/base row not found");
+      const base = { ...SETTINGS_DEFAULTS, aiProvider: "custom", customBaseUrl: "https://gw.example/v1", customApiKey: "k", customModel: "m" };
+      const { customProtocol: _omit, ...unset } = base;
+      assertEq(cpFp(unset), golden, "customProtocol never saved");
+      assertEq(cpFp({ ...base, customProtocol: "openai" }), golden, "customProtocol openai");
+      assertEq(cpFp({ ...base, customDisplayName: "Relay" }), golden, "display name");
+    });
+
+    await atest("R8 callAI on a dangling id", async () => {
+      let fetches = 0, permissionCalls = 0;
+      window.fetch = async () => { fetches++; throw new Error("must not fetch"); };
+      window.chrome = {
+        runtime: { id: "test-extension" },
+        i18n: { getMessage: () => "" },
+        permissions: {
+          contains: async () => { permissionCalls++; return true; },
+          request: async () => { permissionCalls++; return true; },
+        },
+      };
+      let caught = null;
+      try { await callAI({ ...cpS(), aiProvider: "custom-zz99zz" }, "x"); } catch (e) { caught = e; }
+      assert(caught && caught.code === "provider_missing", "code " + (caught && caught.code));
+      assertEq(fetches, 0, "fetches");
+      assertEq(permissionCalls, 0, "permission calls");
+    });
+
+    const cpWire = () => {
+      const requests = [];
+      window.chrome = { runtime: { id: "test-extension" }, i18n: { getMessage: () => "" }, permissions: { contains: async () => true } };
+      return requests;
+    };
+
+    await atest("R9 entry openai request", async () => {
+      const requests = cpWire();
+      // Chat Completions envelope, same shape as popup-ai-sw's openaiChatReply.
+      window.fetch = async (url, init) => {
+        requests.push({ url: String(url), init });
+        return new Response(JSON.stringify({ id: "chatcmpl-9pbp01", object: "chat.completion", created: 1758000000, model: "m-1",
+          choices: [{ index: 0, message: { role: "assistant", content: "ok" }, logprobs: null, finish_reason: "stop" }],
+          usage: { prompt_tokens: 12, completion_tokens: 1, total_tokens: 13 } }), { status: 200, headers: { "Content-Type": "application/json" } });
+      };
+      const out = await callAI({ ...cpS(), aiProvider: CP_E.id }, "x");
+      assertEq(out, "ok", "answer");
+      assertEq(requests.length, 1, "requests");
+      assertEq(requests[0].url, "https://gw.example/v1/chat/completions", "url");
+      assertEq(requests[0].init.headers.Authorization, "Bearer sk-e", "Authorization");
+      assertEq(JSON.parse(requests[0].init.body).model, "m-1", "model");
+    });
+
+    await atest("R10 anthropic entry and custom anthropic request", async () => {
+      const requests = cpWire();
+      // Messages API response, per Anthropic's published schema.
+      window.fetch = async (url, init) => {
+        requests.push({ url: String(url), init });
+        return new Response(JSON.stringify({ id: "msg_01XFDUDYJgAACzvnptvVoYEL", type: "message", role: "assistant", model: "m-1",
+          content: [{ type: "text", text: "ok" }], stop_reason: "end_turn", stop_sequence: null,
+          usage: { input_tokens: 12, output_tokens: 3 } }), { status: 200, headers: { "Content-Type": "application/json" } });
+      };
+      const cases = [
+        [{ ...cpS(CP_EA), aiProvider: CP_EA.id }, "https://gw.example/v1/messages", "sk-e"],
+        [{ ...CP_C, customProtocol: "anthropic", customApiKey: "k" }, "https://proxy.example/v1/messages", "k"],
+      ];
+      for (const [s, url, key] of cases) {
+        requests.length = 0;
+        assertEq(await callAI(s, "x"), "ok", s.aiProvider + " answer");
+        assertEq(requests.length, 1, s.aiProvider + " requests");
+        const h = requests[0].init.headers;
+        assertEq(requests[0].url, url, s.aiProvider + " url");
+        assertEq(h["x-api-key"], key, s.aiProvider + " x-api-key");
+        assertEq(h["anthropic-version"], "2023-06-01", s.aiProvider + " version");
+        assertEq(h["anthropic-dangerous-direct-browser-access"], "true", s.aiProvider + " browser access");
+        assert(!("Authorization" in h) && !("authorization" in h), s.aiProvider + " sent a Bearer header");
+      }
     });
   } finally {
     window.fetch = realFetch;

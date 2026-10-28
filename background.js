@@ -3626,6 +3626,13 @@ async function pbpRunPopupAiCall(message) {
     const s = { ...(await loadSettings()), ...pbpSanitizeAiOverrides(message.aiOverrides) };
     const cacheDuration = message.cacheDuration ?? s.aiCacheDuration;
 
+    // A custom entry the popup picked may be gone here (deleted, or not synced
+    // to this device yet). Refuse before the inflight registry so nothing is
+    // dispatched or cached; the popup re-localizes the message.
+    if (pbpAiResolveTarget(s).error === "provider_missing") {
+      return { ok: false, error: { message: t("aiErrorProviderMissing"), code: "provider_missing" } };
+    }
+
     // Same dedup shape and the same key string the popup builds, on the
     // worker's single Map: a second click — or a reopened popup — rides the
     // call already running instead of paying for it twice. The key is opaque

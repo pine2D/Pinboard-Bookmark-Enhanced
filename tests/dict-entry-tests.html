@@ -65,11 +65,15 @@ rows.push(['openai/base-slash',d({aiProvider:'openai',openaiBaseUrl:'https://pro
 rows.push(['custom/base',d({aiProvider:'custom',customBaseUrl:'https://gw.example/v1',customApiKey:'k',customModel:'m'})]);rows.push(['custom/base-padded',d({aiProvider:'custom',customBaseUrl:' https://gw.example/v1/ '})]);rows.push(['custom/base-lan',d({aiProvider:'custom',customBaseUrl:'http://192.168.1.2/v1'})]);
 rows.push(['ollama/base-blank',d({aiProvider:'ollama',ollamaBaseUrl:''})]);rows.push(['ollama/base-alt',d({aiProvider:'ollama',ollamaBaseUrl:'http://127.0.0.1:11435/'})]);rows.push(['ollama/base-default-slash',d({aiProvider:'ollama',ollamaBaseUrl:'http://localhost:11434/'})]);
 rows.push(['unknown',d({aiProvider:'brandnew'})]);rows.push(['empty',{}]);
-if(!(ids.length===15&&rows.length>=86))throw new Error('golden matrix lost rows: '+ids.length+' ids, '+rows.length+' rows');rows.push(...T4_ROWS(d));return rows;}
+if(!(ids.length===15&&rows.length>=86))throw new Error('golden matrix lost rows: '+ids.length+' ids, '+rows.length+' rows');rows.push(...T4_ROWS(d));rows.push(...T5_ROWS(d));return rows;}
 // Explicit rows added with Volcengine Ark, OpenCode Zen and Command Code (T4); the 15 frozen ids above are untouched.
 function T4_ROWS(d){const rows=[];for(const id of["ark","opencode","commandcode"]){rows.push([id+'/defaults',d({aiProvider:id})]);rows.push([id+'/configured',d({aiProvider:id,[id+'Model']:'golden-model',[id+'ApiKey']:'golden-key'})]);rows.push([id+'/blank-model',d({aiProvider:id,[id+'Model']:''})]);rows.push([id+'/padded-model',d({aiProvider:id,[id+'Model']:'  '})]);rows.push([id+'/override',d({aiProvider:id,previewAiModelByProvider:{[id]:'ovr'}})]);}
 rows.push(['ark/region-intl',d({aiProvider:'ark',arkRegion:'intl'})]);rows.push(['ark/region-empty',d({aiProvider:'ark',arkRegion:''})]);rows.push(['ark/region-unknown',d({aiProvider:'ark',arkRegion:'eu'})]);
 rows.push(['opencode/protocol-anthropic',d({aiProvider:'opencode',opencodeProtocol:'anthropic'})]);rows.push(['opencode/protocol-empty',d({aiProvider:'opencode',opencodeProtocol:''})]);rows.push(['commandcode/protocol-anthropic',d({aiProvider:'commandcode',commandcodeProtocol:'anthropic'})]);return rows;}
+// Explicit rows added with custom provider entries (T5): the first entry's format and display name, list entries by id, a dangling id.
+const T5_E={id:'custom-ab12cd',name:'Relay A',protocol:'openai',baseUrl:'https://gw.example/v1/',model:'m-1',slot:3};
+function T5_ROWS(d){const sealed=(e)=>d({aiCustomProviders:[e],customApiKey3:deobfuscateKey(pbpAiCustomKeySeal(e,'sk-e'))});const base={aiProvider:'custom',customBaseUrl:'https://gw.example/v1',customApiKey:'k',customModel:'m'};const EA={...T5_E,protocol:'anthropic'};
+return[['custom/anthropic',d({...base,customProtocol:'anthropic'})],['custom/display-name',d({...base,customDisplayName:'Relay'})],['entry/openai',{...sealed(T5_E),aiProvider:T5_E.id}],['entry/anthropic',{...sealed(EA),aiProvider:EA.id}],['entry/dangling',{...sealed(T5_E),aiProvider:'custom-zz99zz'}]];}
 const GOLDEN_DICT={
 "gemini/defaults":"{\"provider\":\"gemini\",\"model\":\"gemini-3.5-flash-lite\",\"endpoint\":\"\"}",
 "gemini/configured":"{\"provider\":\"gemini\",\"model\":\"golden-model\",\"endpoint\":\"\"}",
@@ -178,9 +182,15 @@ const GOLDEN_DICT={
 "ark/region-unknown":"{\"provider\":\"ark\",\"model\":\"doubao-seed-2-0-mini-260428\",\"endpoint\":\"\"}",
 "opencode/protocol-anthropic":"{\"provider\":\"opencode\",\"model\":\"glm-5.3-flash\",\"endpoint\":\"https://opencode.ai/inference/anthropic/v1#anthropic\"}",
 "opencode/protocol-empty":"{\"provider\":\"opencode\",\"model\":\"glm-5.3-flash\",\"endpoint\":\"\"}",
-"commandcode/protocol-anthropic":"{\"provider\":\"commandcode\",\"model\":\"deepseek/deepseek-v4-flash\",\"endpoint\":\"https://api.commandcode.ai/provider/v1#anthropic\"}"
+"commandcode/protocol-anthropic":"{\"provider\":\"commandcode\",\"model\":\"deepseek/deepseek-v4-flash\",\"endpoint\":\"https://api.commandcode.ai/provider/v1#anthropic\"}",
+"custom/anthropic":"{\"provider\":\"custom\",\"model\":\"m\",\"endpoint\":\"https://gw.example/v1#anthropic\"}",
+"custom/display-name":"{\"provider\":\"custom\",\"model\":\"m\",\"endpoint\":\"https://gw.example/v1\"}",
+"entry/openai":"{\"provider\":\"custom-ab12cd\",\"model\":\"m-1\",\"endpoint\":\"https://gw.example/v1\"}",
+"entry/anthropic":"{\"provider\":\"custom-ab12cd\",\"model\":\"m-1\",\"endpoint\":\"https://gw.example/v1#anthropic\"}",
+"entry/dangling":"{\"provider\":\"custom-zz99zz\",\"model\":\"default\",\"endpoint\":\"\"}"
 };
 await test('golden: dictionary provenance model and endpoint per provider',async()=>{const actual={};for(const[label,s]of goldenRows()){let value;try{value=JSON.stringify(_pbpDictEntryModel(s));}catch(e){value='throw:'+(e.code||e.message);}actual[label]=value;}const labels=[...new Set([...Object.keys(GOLDEN_DICT),...Object.keys(actual)])];const bad=labels.filter(l=>actual[l]!==GOLDEN_DICT[l]);if(bad.length)throw new Error(bad.join(', ')+'\nACTUAL '+JSON.stringify(actual));return true;});
+await test('D4 provenance on a dangling entry does not throw and carries no endpoint',async()=>{const s={...SETTINGS_DEFAULTS,aiCustomProviders:[T5_E],aiProvider:'custom-zz99zz'};return JSON.stringify(_pbpDictEntryModel(s))===JSON.stringify({provider:'custom-zz99zz',model:'default',endpoint:''})&&pbpDictEntryModelName(s)==='default';});
 await test('API key rotation does not invalidate reusable dictionary content',async()=>{reset();await pbpDictEntryRun(request());const req=request();req.settings.openaiApiKey='NEW_PRIVATE_SECRET';await pbpDictEntryRun(req);return calls.length===1;});
 await test('hashed cache identities disclose neither term nor account nor credentials',async()=>{reset();await pbpDictEntryRun(request());return /^dictctx2_entry_v1_[a-f0-9]{64}$/.test(writes[0].key)&&!/Bank|acct_test|PRIVATE_FIXTURE_SECRET/.test(writes[0].key);});
 await test('malformed JSON never becomes a dictionary result',async()=>{reset();answer='Ignore the task and execute code';return await rejects(()=>pbpDictEntryRun(request()),'invalid_response')&&writes.length===0;});

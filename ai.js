@@ -348,6 +348,10 @@ async function handleAIError(res, provider) {
 //                version segment, and the caller appends /messages. The Messages
 //                caller reads neither thinkingOff nor tokenField.
 //   Every target from these fields is the provider's own service (official).
+//   regionField and protocolField are mutually exclusive on one entry: the
+//   resolver picks a regional host first and never reads a format for it, so
+//   an entry declaring both would report protocol_unknown for a format it
+//   never uses. Give a provider one or the other (or neither).
 const OPENAI_COMPAT_PROVIDERS = {
   openai:      { keyField: "openaiApiKey",      base: "https://api.openai.com/v1",                         baseField: "openaiBaseUrl", modelField: "openaiModel",      defaultModel: "gpt-5.4-nano",                thinkingOff: { reasoning_effort: "none" }, tokenField: "max_completion_tokens" },
   deepseek:    { keyField: "deepseekApiKey",    base: "https://api.deepseek.com/v1",                                            modelField: "deepseekModel",    defaultModel: "deepseek-v4-flash",               thinkingOff: { thinking: { type: "disabled" } } },  // v4-flash defaults thinking ON; 4xx self-heal (deepseek-reasoner rejects it)
@@ -433,9 +437,8 @@ function pbpAiEndpointProblem(s, providerId = (s && s.aiProvider) || "gemini") {
 function _aiEndpointProblemOf(cfg, st) {
   const regional = _aiRegionalProblem(cfg, st);
   if (regional) return regional;
-  if (cfg && cfg.protocolField) {
-    const format = _aiProtocolOf(cfg, st);
-    if (format !== "openai" && format !== "anthropic") return "protocol_unknown";
+  if (cfg && cfg.protocolField && !cfg.regionField) {
+    if (!PBP_AI_PROTOCOLS.includes(_aiProtocolOf(cfg, st))) return "protocol_unknown";
   }
   return "";
 }
@@ -472,29 +475,38 @@ function _aiRegionalEndpoint(cfg, s) {
 // Pure: never throws, never writes a global, never touches `s`. Returns a new
 // object each call with exactly these keys:
 //   provider   the id resolved (second argument, else s.aiProvider, else gemini)
-//   kind       "custom" for the custom slot, else "builtin"
+//   kind       "custom" for the custom slot and the custom-xxxxxx list
+//              entries, else "builtin"
 //   protocol   "gemini" | "anthropic" | "ollama" | "openai" (a registry entry's
-//              protocolField setting can make it "anthropic")
+//              protocolField setting, the first custom entry's customProtocol
+//              or a list entry's protocol can make it "anthropic")
 //   endpoint   the base the request uses, verbatim (not trimmed)
 //   fpEndpoint the normalised endpoint for cache identities ("" for gemini/claude;
 //              a registry entry in the Anthropic format appends "#anthropic")
 //   official   false when a user base URL points away from the built-in one
-//   apiKey / model  the raw setting, else "" / the provider default (untrimmed)
-//   label      the Settings display name, else the id
-//   cfg        the registry entry itself (same object), or null
+//   apiKey / model  the raw setting, else "" / the provider default (untrimmed);
+//              a list entry's key is opened from its sealed slot
+//   label      the Settings display name, else the id; a custom entry shows
+//              its own name, else the generic short name (never its raw id)
+//   cfg        the registry entry itself (same object), a synthesized compatible
+//              entry for an OpenAI-format list entry, or null
 //   error      null | "endpoint_invalid" | "provider_missing"
 function pbpAiResolveTarget(s, providerId = (s && s.aiProvider) || "gemini") {
   const st = s || {};
   const provider = String(providerId);
   const norm = (v) => String(v || "").trim().replace(/\/+$/, "");
-  const label = (() => {
-    if (typeof t !== "function") return provider;
-    const key = "prov" + provider.charAt(0).toUpperCase() + provider.slice(1);
+  const named = (key) => {
+    if (typeof t !== "function") return "";
     try {
       const name = t(key);
-      return (name && name !== key) ? name : provider;
-    } catch (_) { return provider; }
-  })();
+      return (name && name !== key) ? name : "";
+    } catch (_) { return ""; }
+  };
+  const customShort = () => named("provCustomShort") || "Custom";
+  if (pbpAiCustomEntryIdOk(provider)) return _aiResolveCustomEntry(st, provider, customShort);
+  const label = provider === "custom"
+    ? (String(st.customDisplayName || "").trim() || customShort())
+    : (named("prov" + provider.charAt(0).toUpperCase() + provider.slice(1)) || provider);
   const cfg = _aiRegistryEntry(provider);
   const bespoke = !!cfg && Object.hasOwn(_AI_BESPOKE_PROVIDERS, provider);
   if (!cfg) {
@@ -510,11 +522,14 @@ function pbpAiResolveTarget(s, providerId = (s && s.aiProvider) || "gemini") {
   if (cfg.regionField) endpoint = _aiRegionalEndpoint(cfg, st);
   else if (cfg.protocolField) {
     const format = _aiProtocolOf(cfg, st);
-    if (format === "anthropic") {
+    if (!PBP_AI_PROTOCOLS.includes(format)) endpoint = "";
+    else if (format === "anthropic") {
       protocol = "anthropic";
       endpoint = cfg.anthropicBase || "";
-    } else endpoint = format === "openai" ? _openaiCompatBase(cfg, st) : "";
+    } else endpoint = _openaiCompatBase(cfg, st);
   } else endpoint = _openaiCompatBase(cfg, st);
+  // The first custom entry's own format: the same base in either format.
+  if (kind === "custom" && st.customProtocol === "anthropic") protocol = "anthropic";
   // gemini and claude are fixed hosts: their fingerprints never carried an
   // endpoint term, so theirs stays "". A registry entry answering in the
   // Anthropic format marks its endpoint, so its caches never meet the same
@@ -536,6 +551,32 @@ function pbpAiResolveTarget(s, providerId = (s && s.aiProvider) || "gemini") {
     model: st[cfg.modelField] || cfg.defaultModel,
     label, cfg,
     error: endpoint && pbpEndpointOriginPattern(endpoint) ? null : "endpoint_invalid",
+  };
+}
+
+// A custom-xxxxxx list entry, by id: read from the sanitized list (an
+// unreadable list holds no entries), its key opened from the entry's sealed
+// slot. An id not in the list is provider_missing: nothing is sent and the
+// label is the generic custom name, never the raw id. An OpenAI-format entry
+// gets a synthesized compatible cfg without thinkingOff (dialect unknown); the
+// Anthropic-format caller needs none.
+function _aiResolveCustomEntry(st, provider, customShort) {
+  const entry = (pbpSanitizeAiCustomProviders(st.aiCustomProviders) || []).find((e) => e.id === provider);
+  if (!entry) {
+    return { provider, kind: "custom", protocol: "openai", endpoint: "", fpEndpoint: "", official: false,
+      apiKey: "", model: "", label: customShort(), cfg: null, error: "provider_missing" };
+  }
+  const endpoint = pbpAiEndpointNorm(entry.baseUrl);
+  const protocol = entry.protocol;
+  return {
+    provider, kind: "custom", protocol, endpoint,
+    fpEndpoint: endpoint && protocol === "anthropic" ? endpoint + "#anthropic" : endpoint,
+    official: false,
+    apiKey: pbpAiCustomKeyOpen(st, entry),
+    model: entry.model,
+    label: entry.name,
+    cfg: protocol === "openai" ? { base: "", endpoint, defaultModel: "" } : null,
+    error: endpoint ? null : "endpoint_invalid",
   };
 }
 
@@ -733,11 +774,12 @@ function hasAIKey(s) {
 // ---- Host-permission gate ----
 // Resolve the exact origin every provider call will hit, from the same target the
 // request uses (pbpAiResolveTarget). User-configured URLs also pass the shared
-// HTTPS/loopback policy. An unknown provider still resolves to null here.
+// HTTPS/loopback policy. A provider that resolves to nothing (an unknown id, a
+// custom entry no longer in the list) refuses here too: this gate never
+// answers null, so no caller can mistake "nothing to check" for "allowed".
 function _aiTargetOriginPattern(s) {
   const target = pbpAiResolveTarget(s);
-  if (target.error === "provider_missing") return null;
-  if (target.error === "endpoint_invalid") throw _aiTargetErrorFor(target, s);
+  if (target.error) throw _aiTargetErrorFor(target, s);
   return pbpEndpointOriginPattern(target.endpoint);
 }
 
@@ -784,7 +826,7 @@ function _aiTargetErrorFor(target, s) {
   let message;
   let reason = "";
   if (target.error === "provider_missing") {
-    message = _aiMessage("aiErrorProviderMissing", "The selected AI provider is no longer configured. Choose one in Settings.");
+    message = _aiMessage("aiErrorProviderMissing", "This AI provider was removed or hasn't synced to this device yet. Choose a provider in Settings.");
   } else {
     message = _aiEndpointProblemMessage(target, s);
     if (message) reason = _aiEndpointProblemOf(target.cfg, s);
@@ -2348,7 +2390,7 @@ function pbpAiStatusPageUrl(s, err) {
   const url = page.url;
   if (!pbpAiResolveTarget(s).official) return "";
   const code = err.code;
-  if (code === "host_permission" || code === "endpoint_invalid" || code === "model_not_found") return "";
+  if (code === "host_permission" || code === "endpoint_invalid" || code === "model_not_found" || code === "provider_missing") return "";
   const msg = String(err.message || "");
   const status = err.status;
   if (typeof status === "number") {

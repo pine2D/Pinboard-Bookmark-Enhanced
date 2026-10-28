@@ -367,6 +367,9 @@
       }
     }
   },
+  "aiErrorProviderMissing": {
+    "message": "Ten dostawca AI został usunięty albo nie zsynchronizował się jeszcze z tym urządzeniem. Wybierz dostawcę w ustawieniach."
+  },
   "aiGrantRetry": {
     "message": "Przyznaj dostęp i ponów"
   },

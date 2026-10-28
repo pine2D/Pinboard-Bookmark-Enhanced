@@ -367,6 +367,9 @@
       }
     }
   },
+  "aiErrorProviderMissing": {
+    "message": "这个 AI 服务商已被删除，或还没同步到本机。请在设置里重新选择。"
+  },
   "aiGrantRetry": {
     "message": "授权并重试"
   },

@@ -880,6 +880,10 @@ function finalizeAITags(rawTags, s) {
 // untranslated, and naming nothing the user can act on. The code survives for
 // the callers that branch on it; the text the card shows does not.
 const PBP_AI_WORKER_CODES = ["invalid", "account_changed"];
+// Worker codes whose text the popup writes itself, from its own catalogue: the
+// worker's t() may still answer in the browser language rather than the one
+// chosen in Settings.
+const PBP_AI_LOCALIZED_WORKER_CODES = Object.freeze({ provider_missing: "aiErrorProviderMissing" });
 
 // Rebuild an Error from the worker's wire envelope: structured clone drops the
 // Error prototype and every non-enumerable field, so the failure arrives as a
@@ -890,7 +894,8 @@ function pbpAiErrorFromEnvelope(envelope) {
   const wireMessage = (envelope && envelope.message) || "";
   // No envelope at all is the same class of thing: the bus answered nothing
   // (no receiver), which is not a sentence to put in front of anyone either.
-  const showable = (wireMessage && !PBP_AI_WORKER_CODES.includes(code)) ? wireMessage : t("aiUnknownError");
+  const localized = Object.hasOwn(PBP_AI_LOCALIZED_WORKER_CODES, code) ? t(PBP_AI_LOCALIZED_WORKER_CODES[code]) : "";
+  const showable = localized || ((wireMessage && !PBP_AI_WORKER_CODES.includes(code)) ? wireMessage : t("aiUnknownError"));
   const err = new Error(showable);
   if (code) err.code = code;
   if (envelope && typeof envelope.status === "number") err.status = envelope.status;

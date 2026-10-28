@@ -367,6 +367,9 @@
       }
     }
   },
+  "aiErrorProviderMissing": {
+    "message": "この AI プロバイダーは削除されたか、まだこのデバイスに同期されていません。設定でプロバイダーを選び直してください。"
+  },
   "aiGrantRetry": {
     "message": "許可して再試行"
   },

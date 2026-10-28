@@ -369,6 +369,9 @@
       }
     }
   },
+  "aiErrorProviderMissing": {
+    "message": "This AI provider was removed or hasn't synced to this device yet. Choose a provider in Settings."
+  },
   "aiGrantRetry": {
     "message": "Grant and retry"
   },

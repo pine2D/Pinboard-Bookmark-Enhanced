@@ -367,6 +367,9 @@
       }
     }
   },
+  "aiErrorProviderMissing": {
+    "message": "Ce fournisseur d'IA a été supprimé ou n'est pas encore synchronisé sur cet appareil. Choisissez un fournisseur dans les paramètres."
+  },
   "aiGrantRetry": {
     "message": "Autoriser et réessayer"
   },

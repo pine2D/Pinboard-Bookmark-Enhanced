@@ -367,6 +367,9 @@
       }
     }
   },
+  "aiErrorProviderMissing": {
+    "message": "Dieser KI-Anbieter wurde entfernt oder ist auf diesem Gerät noch nicht synchronisiert. Wähle in den Einstellungen einen Anbieter."
+  },
   "aiGrantRetry": {
     "message": "Erlauben und erneut versuchen"
   },

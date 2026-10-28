@@ -1526,7 +1526,10 @@ async function _pbpDictResolveLang(cap, ctx, manual, installedLanguages) {
 
 // One reusable entry view for reader and library. Ordinary dictionaries remain
 // mounted in their stable host while the user switches between sources.
-function pbpDictEntryNorm(record, target) {
+// With settings, a custom provider entry id in the provenance shows as that
+// entry's name (or the generic custom name once the entry is gone), never as
+// its internal id; without them the license reads exactly as stored.
+function pbpDictEntryNorm(record, target, settings) {
   const entry = record.entry;
   const entries = [];
   for (const meaning of entry.meanings) {
@@ -1540,8 +1543,11 @@ function pbpDictEntryNorm(record, target) {
     group.senses.push({ definition: meaning.definition, tags: [], subsenses: [],
       examples: meaning.examples, synonyms: [], antonyms: [] });
   }
+  let provider = record.provider;
+  if (settings && typeof pbpAiCustomEntryIdOk === "function" && pbpAiCustomEntryIdOk(provider) &&
+      typeof pbpAiResolveTarget === "function") provider = pbpAiResolveTarget(settings, provider).label;
   return { word: entry.word, pronunciation: entry.pronunciation, definitionLang: target.lang, sourceLabel: "AI", sourceUrl: "",
-    license: "AI-generated · " + record.provider + " / " + record.model, aiGenerated: true,
+    license: "AI-generated · " + provider + " / " + record.model, aiGenerated: true,
     entries };
 }
 
@@ -2122,7 +2128,7 @@ function _pbpDictEntryMount(host, opts) {
       negTouched.clear();
       loadNeg().catch(error => console.warn("[dict-neg] state read failed:", error?.name));
     }
-    const norm = pbpDictEntryNorm(record, answerLanguage);
+    const norm = pbpDictEntryNorm(record, answerLanguage, settings);
     // Supplement receipts and additions do not change the paid base entry.
     // Retaining these nodes also retains open disclosures and reading position.
     const baseKey = JSON.stringify([record.entry, record.provider, record.model, record.generatedAt, answerLanguage, record.previousEntries?.map(v => v.archiveId)]);

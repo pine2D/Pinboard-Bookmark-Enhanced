@@ -132,6 +132,8 @@ function buildAiHarness(source, opts) {
     parseAICombined, parseAITags, refineTags,
     buildTagCaseMap, resolveTagCase,
     AI_TAG_CAP, API_KEY_FIELDS, PBP_AI_OVERRIDE_FIELDS, pbpSanitizeAiOverrides,
+    // The real resolver; t is pinned so a localized message is exact.
+    pbpAiResolveTarget, t: (key) => "msg:" + key,
     setAICache: async (...args) => { calls.setAICache.push(args); if (o.setAICache) return o.setAICache(...args); },
     console: { warn: (...a) => calls.warn.push(a), log: () => {}, error: (...a) => calls.warn.push(a) },
   };
@@ -738,6 +740,50 @@ function buildRouterHarness(source, opts) {
   await testCase("W3 sealed slot keys never ride the overrides", async () => {
     const out = pbpSanitizeAiOverrides({ ...SETTINGS_DEFAULTS, aiProvider: CP_ENTRY.id, aiCustomProviders: [CP_ENTRY], customApiKey3: "sk-LIVE-slot" });
     return Array.isArray(out.aiCustomProviders) && out.aiCustomProviders.length === 1 && !JSON.stringify(out).includes("sk-LIVE");
+  });
+
+  // The SW's own slot key for an entry: sealed to the entry, read from storage.
+  const cpSw = (entry, extra) => ({ ...SETTINGS_DEFAULTS, aiTagSeparator: "-", aiProvider: entry.id, aiCustomProviders: [entry],
+    customApiKey3: deobfuscateKey(pbpAiCustomKeySeal(entry, "sk-e")), ...(extra || {}) });
+
+  await testCase("W4 entry and customProtocol fingerprint inputs are whitelisted", async () => {
+    if (!PBP_AI_OVERRIDE_FIELDS.includes("customProtocol") || !PBP_AI_OVERRIDE_FIELDS.includes("aiCustomProviders")) return false;
+    const pairs = [
+      [{ ...SETTINGS_DEFAULTS, aiTagSeparator: "-", aiProvider: "custom", customBaseUrl: "https://proxy.example/v1", customModel: "m" }, { customProtocol: "anthropic" }],
+      [cpSw(CP_ENTRY), { aiCustomProviders: [{ ...CP_ENTRY, baseUrl: "https://gw2.example/v1" }] }],
+      [cpSw(CP_ENTRY), { aiCustomProviders: [{ ...CP_ENTRY, model: "m-2" }] }],
+      [cpSw(CP_ENTRY), { aiCustomProviders: [{ ...CP_ENTRY, protocol: "anthropic" }],
+        customApiKey3: deobfuscateKey(pbpAiCustomKeySeal({ ...CP_ENTRY, protocol: "anthropic" }, "sk-e")) }],
+    ];
+    for (const [swStorage, change] of pairs) {
+      const popupSnapshot = { ...swStorage, ...change };
+      if (aiCacheFingerprint(popupSnapshot, "tags") === aiCacheFingerprint(swStorage, "tags")) return false;
+      const h = buildAiHarness(source, { settings: swStorage, reply: '["t"]' });
+      await h.pbpRunPopupAiCall(baseMessage({ mode: "single", kind: "tags", inflightKey: freshKey("tags"),
+        aiOverrides: pbpSanitizeAiOverrides(popupSnapshot) }));
+      const written = cacheWrite(h.calls, "tags");
+      if (!written || aiCacheFingerprint(written.settings, "tags") !== aiCacheFingerprint(popupSnapshot, "tags")) return false;
+    }
+    return true;
+  });
+
+  await testCase("W5 a dangling entry id answers a localized provider_missing", async () => {
+    const h = buildAiHarness(source, { settings: { ...SETTINGS_DEFAULTS, aiTagSeparator: "-", aiProvider: "custom-zz99zz", aiCustomProviders: [] } });
+    const res = await h.pbpRunPopupAiCall(baseMessage({ inflightKey: freshKey() }));
+    return res.ok === false && res.error.code === "provider_missing" && res.error.message === "msg:aiErrorProviderMissing" &&
+      h.calls.callAI.length === 0 && h.calls.setAICache.length === 0;
+  });
+
+  await testCase("W6 an entry call uses the worker's own slot key", async () => {
+    const stored = cpSw(CP_ENTRY);
+    const popupSnapshot = { ...SETTINGS_DEFAULTS, aiTagSeparator: "-", aiProvider: CP_ENTRY.id, aiCustomProviders: [CP_ENTRY], customApiKey3: "sk-LIVE-slot" };
+    const h = buildAiHarness(source, { settings: stored, reply: '["t"]' });
+    await h.pbpRunPopupAiCall(baseMessage({ mode: "single", kind: "tags", inflightKey: freshKey("tags"),
+      aiOverrides: pbpSanitizeAiOverrides(popupSnapshot) }));
+    const used = h.calls.callAI[0] && h.calls.callAI[0].s;
+    const written = cacheWrite(h.calls, "tags");
+    return !!used && used.customApiKey3 === stored.customApiKey3 && pbpAiResolveTarget(used).apiKey === "sk-e" &&
+      !!written && aiCacheFingerprint(written.settings, "tags") === aiCacheFingerprint(popupSnapshot, "tags");
   });
 
   await testCase("the settings handed to the provider hold the WORKER's stored key, not the message's", async () => {

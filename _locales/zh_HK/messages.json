@@ -367,6 +367,9 @@
       }
     }
   },
+  "aiErrorProviderMissing": {
+    "message": "這個 AI 服務商已被刪除，或尚未同步到這部裝置。請在設定中重新選擇。"
+  },
   "aiGrantRetry": {
     "message": "授權並重試"
   },
