@@ -26,3 +26,6 @@ docs/superpowers/
 .superpowers/
 DESIGN-IS-2026-07-22/
 .codex/
+
+# Local bookmark-service integration environment (never publish).
+/docs/2026-10-28-pinboard-bookmark-services-test-guide.md

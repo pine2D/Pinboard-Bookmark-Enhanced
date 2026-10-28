@@ -1602,7 +1602,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
   let switchResets = 0;
   _pbpNotesResetListScroll = () => { switchResets++; return realSwitchReset(); };
   try {
-    fireStorageChange({ pinboardToken: { oldValue: "one", newValue: "two" } }, "sync");
+    fireStorageChange({ personalLibraryAccount: { oldValue: "one", newValue: "two" } }, "sync");
   } finally { _pbpNotesResetListScroll = realSwitchReset; }
   check("an account switch empties the reading pane at once",
     detail().hidden === true && $id("notes-detail-empty").hidden === false &&
@@ -1646,7 +1646,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     visibleDelete().click();
     const staleYes = document.querySelector(".confirm-popover .confirm-yes");
     stubbedOwner = "acct_two";
-    fireStorageChange({ pinboardToken: { oldValue: "one", newValue: "two" } }, "sync");
+    fireStorageChange({ personalLibraryAccount: { oldValue: "one", newValue: "two" } }, "sync");
     staleYes.click();
     await settle(() => $id("notes-status").textContent.trim().length > 0);
     check("answering a confirm opened by the previous account deletes nothing",
@@ -1694,7 +1694,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
       await settle(() => !!releaseStale);
       chrome.storage.local.get = realGet;
       stubbedOwner = "acct_two";
-      fireStorageChange({ pinboardToken: { oldValue: "one", newValue: "two" } }, "sync");
+      fireStorageChange({ personalLibraryAccount: { oldValue: "one", newValue: "two" } }, "sync");
       await settle(() => rowKeys().includes("pbp_hl_race#r2"));
       releaseStale();
       await refresh;
@@ -1732,7 +1732,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
     try {
       _notesOwnerCache = null;
       const oldScan = renderNotesPanel();
-      fireStorageChange({ pinboardToken: { oldValue: "one", newValue: "two" } }, "local");
+      fireStorageChange({ personalLibraryAccount: { oldValue: "one", newValue: "two" } }, "local");
       await settle(() => rowKeys().includes(key + "#two"));
       release("acct_one");
       await oldScan;
@@ -1794,7 +1794,7 @@ const fireStorageChange = (changes, area) => { for (const fn of onChangedListene
         }
       } else await settle(() => !!releaseRead);
       owner = "acct_two";
-      if (scenario === "page-lock") fireStorageChange({ pinboardToken: { oldValue: "one", newValue: "two" } }, "local");
+      if (scenario === "page-lock") fireStorageChange({ personalLibraryAccount: { oldValue: "one", newValue: "two" } }, "local");
       if (releaseRead) releaseRead();
       if (releaseLock) releaseLock();
       await task;

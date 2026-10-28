@@ -3,13 +3,13 @@
     "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
-    "message": "Marque-pages Pinboard : tags et résumés IA, lecteur avec traduction et surlignages, export Markdown/EPUB et 13 thèmes pour le site."
+    "message": "Pour Pinboard, Karakeep et linkding : tags et résumés IA, lecteur avec traduction et surlignage, export Markdown/EPUB."
   },
   "cmdOpenPopup": {
     "message": "Ouvrir Pinboard Bookmark Enhanced"
   },
   "cmdQuickSave": {
-    "message": "Enregistrement rapide sur Pinboard (sans popup)"
+    "message": "Enregistrer dans le service choisi sans ouvrir le popup"
   },
   "cmdReadLater": {
     "message": "Enregistrement rapide comme À lire (sans popup)"
@@ -162,7 +162,7 @@
     "message": "Tags IA"
   },
   "urlWarning": {
-    "message": "Cette page ne peut pas être enregistrée sur Pinboard (URL non prise en charge). Les ensembles d’onglets et l’enregistrement groupé ci-dessous restent disponibles."
+    "message": "Cette URL n’est pas prise en charge et ne peut pas être enregistrée comme signet."
   },
   "urlCannotSave": {
     "message": "Impossible d'enregistrer : URL non prise en charge"
@@ -550,7 +550,7 @@
     }
   },
   "batchAccountChanged": {
-    "message": "Enregistrement groupé arrêté : le compte Pinboard a changé."
+    "message": "Enregistrement par lot arrêté : la connexion aux signets a changé."
   },
   "tabSetFailed": {
     "message": "Impossible d'enregistrer l'ensemble d'onglets : $ERROR$",
@@ -598,19 +598,19 @@
     }
   },
   "saveQueuedNetwork": {
-    "message": "Impossible de joindre Pinboard, vérifiez la connexion. Le signet attend dans la file et sera renvoyé automatiquement."
+    "message": "Serveur inaccessible. L’enregistrement est en attente et sera réessayé automatiquement."
   },
   "saveQueuedServer": {
-    "message": "Pinboard ne répond pas pour le moment. Le signet attend dans la file et sera renvoyé automatiquement."
+    "message": "Serveur indisponible. L’enregistrement est en attente et sera réessayé automatiquement."
   },
   "offlineRetry": {
     "message": "Réessayer maintenant"
   },
   "offlineRetryWrongAccount": {
-    "message": "Cet élément a été mis en file d'attente avec un autre compte Pinboard. Connectez-vous à ce compte pour l'envoyer."
+    "message": "Cet élément appartient à une autre connexion. Rétablissez-la ou vérifiez la page avant de l’enregistrer à nouveau."
   },
   "offlineRetryAccountChanged": {
-    "message": "Le compte Pinboard a changé pendant la nouvelle tentative : l'envoi a été interrompu."
+    "message": "La connexion aux signets a changé pendant la tentative, qui a été arrêtée."
   },
   "offlineRetryFailed": {
     "message": "Impossible d'envoyer ce signet. Réessayez.",
@@ -673,34 +673,34 @@
     "message": "Supprimer ce signet"
   },
   "bgNotLoggedIn": {
-    "message": "Pinboard : Non connecté"
+    "message": "Service de signets non connecté"
   },
   "bgSetToken": {
-    "message": "Définissez votre jeton API dans les paramètres de l'extension."
+    "message": "Choisissez et connectez un service de signets dans les paramètres de l’extension."
   },
   "bgUndone": {
-    "message": "Pinboard : Annulé"
+    "message": "Annulé"
   },
   "bgUndoFailed": {
-    "message": "Pinboard : Échec de l'annulation"
+    "message": "Échec de l'annulation"
   },
   "bgBookmarkRemoved": {
     "message": "Signet supprimé."
   },
   "bgQuickSaved": {
-    "message": "Pinboard : Enregistrement rapide"
+    "message": "Enregistrement rapide"
   },
   "bgReadLater": {
-    "message": "Pinboard : À lire"
+    "message": "À lire"
   },
   "bgCannotSave": {
-    "message": "Pinboard : Impossible d'enregistrer"
+    "message": "Impossible d'enregistrer"
   },
   "bgCannotBookmark": {
     "message": "Seules les pages http et https peuvent être enregistrées."
   },
   "bgMdPreviewFailed": {
-    "message": "Pinboard : échec de la conversion en Markdown"
+    "message": "échec de la conversion en Markdown"
   },
   "bgMdPreviewNoContent": {
     "message": "Aucun contenu lisible n'a été trouvé sur cette page."
@@ -831,19 +831,19 @@
     "message": "Connectez-vous à pinboard.in dans ce navigateur, puis réessayez."
   },
   "bgQuickSaveFailed": {
-    "message": "Pinboard : Échec de l'enregistrement rapide"
+    "message": "Échec de l'enregistrement rapide"
   },
   "bgReadLaterFailed": {
-    "message": "Pinboard : Échec de À lire"
+    "message": "Échec de À lire"
   },
   "bgSaveFailed": {
-    "message": "Pinboard : Échec de l'enregistrement"
+    "message": "Échec de l'enregistrement"
   },
   "bgNetworkError": {
-    "message": "Pinboard : Erreur réseau"
+    "message": "Erreur réseau"
   },
   "bgQueuedOffline": {
-    "message": "Pinboard : Mis en file d'attente hors ligne"
+    "message": "Mis en file d'attente hors ligne"
   },
   "bgTitleSaved": {
     "message": "« $TITLE$ » enregistré.",
@@ -870,10 +870,10 @@
     }
   },
   "bgBatchSaved": {
-    "message": "Pinboard : Enregistrement groupé terminé"
+    "message": "Enregistrement groupé terminé"
   },
   "bgBatchCancelled": {
-    "message": "Pinboard : Enregistrement groupé annulé"
+    "message": "Enregistrement groupé annulé"
   },
   "bgUndo": {
     "message": "Annuler"
@@ -930,7 +930,7 @@
     "message": "Aucune note ne correspond à ce filtre."
   },
   "notesHiddenByOwner": {
-    "message": "Certains surlignages présents sur cet appareil appartiennent à d'autres comptes Pinboard et restent invisibles avec ce compte."
+    "message": "Certains surlignages appartiennent à d’anciennes bibliothèques et n’ont pas été fusionnés avec cette bibliothèque personnelle."
   },
   "notesUnknownPage": {
     "message": "Page inconnue"
@@ -1095,7 +1095,7 @@
     "message": "Préchauffé (récupération en arrière-plan toutes les 15 min, popup instantané)"
   },
   "tagSyncHint": {
-    "message": "Contrôle comment votre nuage de tags Pinboard est chargé dans le popup pour l'autocomplétion. Lecture seule ; aucun tag n'est envoyé vers Pinboard."
+    "message": "Choisissez quand charger vos étiquettes pour l’autocomplétion. Leur chargement ne les modifie pas sur le serveur."
   },
   "labelTagPresets": {
     "message": "Préréglages de tags"
@@ -1134,13 +1134,13 @@
     "message": "Inclure le vocabulaire dans les sauvegardes"
   },
   "backupIncludeVocabularyHint": {
-    "message": "Inclut uniquement le vocabulaire du compte Pinboard actuel."
+    "message": "Inclut uniquement le vocabulaire du bibliothèque personnelle."
   },
   "backupIncludeSecretsLabel": {
     "message": "Inclure les clés API et les jetons dans les sauvegardes"
   },
   "backupIncludeSecretsHint": {
-    "message": "Écrit tous les identifiants en clair dans le fichier : jeton API Pinboard, clés de tous les fournisseurs d'IA, ainsi que les identifiants Jina, Wayback, Anki, Eudic, Notion, Gist et Webhook. Quiconque ouvre le fichier peut les utiliser. Conservez-le comme un mot de passe."
+    "message": "Écrit tous les identifiants en clair dans le fichier : jetons API Pinboard, Karakeep et linkding, clés de tous les fournisseurs d'IA, ainsi que les identifiants Jina, Wayback, Anki, Eudic, Notion, Gist et Webhook. Quiconque ouvre le fichier peut les utiliser. Conservez-le comme un mot de passe."
   },
   "backupSecretsExportTitle": {"message": "Exporter une sauvegarde avec les identifiants ?"},
   "backupSecretsExportConfirm": {
@@ -1162,13 +1162,13 @@
     "message": "Cette sauvegarde contient des identifiants en clair. Ne les importez que si vous avez confiance dans la provenance du fichier."
   },
   "backupVocabOwnerMissing": {
-    "message": "Le vocabulaire n’a pas été inclus, car aucun compte Pinboard n’est disponible. Les autres données sélectionnées ont été exportées."
+    "message": "Le vocabulaire n’a pas été inclus, car aucun bibliothèque personnelle n’est disponible. Les autres données sélectionnées ont été exportées."
   },
   "backupHighlightsOwnerMissing": {
-    "message": "Les surlignages et notes rattachés à un compte n’ont pas été inclus, car aucun compte Pinboard n’est disponible. Les autres données sélectionnées ont été exportées."
+    "message": "Les surlignages et notes rattachés à un compte n’ont pas été inclus, car aucun bibliothèque personnelle n’est disponible. Les autres données sélectionnées ont été exportées."
   },
   "backupHighlightsVocabOwnerMissing": {
-    "message": "Le vocabulaire ainsi que les surlignages et notes rattachés à un compte n’ont pas été inclus, car aucun compte Pinboard n’est disponible. Les autres données sélectionnées ont été exportées."
+    "message": "Le vocabulaire ainsi que les surlignages et notes rattachés à un compte n’ont pas été inclus, car aucun bibliothèque personnelle n’est disponible. Les autres données sélectionnées ont été exportées."
   },
   "backupPreviewTitle": {
     "message": "Aperçu de l’importation"
@@ -1200,7 +1200,7 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "backupPreviewHighlights": {
-    "message": "Pages : $PAGES$ ; entrées : $ITEMS$ ; compte Pinboard : $OWNER$",
+    "message": "Pages : $PAGES$ ; entrées : $ITEMS$ ; bibliothèque personnelle : $OWNER$",
     "placeholders": {
       "pages": { "content": "$1" },
       "items": { "content": "$2" },
@@ -1208,7 +1208,7 @@
     }
   },
   "backupPreviewVocabulary": {
-    "message": "Entrées de vocabulaire : $COUNT$ ; compte Pinboard : $OWNER$",
+    "message": "Entrées de vocabulaire : $COUNT$ ; bibliothèque personnelle : $OWNER$",
     "placeholders": {
       "count": { "content": "$1" },
       "owner": { "content": "$2" }
@@ -1224,10 +1224,10 @@
     "message": "Aucun"
   },
   "backupPreviewOwnerMismatch": {
-    "message": "Le vocabulaire ne peut pas être importé, car cette sauvegarde appartient à un autre compte Pinboard."
+    "message": "Le vocabulaire ne peut pas être importé, car cette sauvegarde appartient à un autre bibliothèque personnelle."
   },
   "backupPreviewHighlightOwnerMismatch": {
-    "message": "Les surlignages et les notes ne peuvent pas être importés, car cette sauvegarde appartient à un autre compte Pinboard."
+    "message": "Les surlignages et les notes ne peuvent pas être importés, car cette sauvegarde appartient à un autre bibliothèque personnelle."
   },
   "backupPreviewReady": {
     "message": "L’aperçu de l’importation est prêt."
@@ -3411,7 +3411,7 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "Une fois connecté, cet appareil synchronise le vocabulaire, les surlignages et notes, les entrées IA complètes et leurs compléments, ainsi que les conversations enregistrées avec leurs extraits sources pour le compte Pinboard actuel."
+      "message": "Une fois connecté, cet appareil synchronise le vocabulaire, les surlignages et notes, les entrées IA complètes et leurs compléments, ainsi que les conversations enregistrées avec leurs extraits sources pour le bibliothèque personnelle."
     },
     "vocabDriveConnectionHint": { "message": "Connectez chaque appareil séparément. Google Drive ne synchronise ni les réglages ni les identifiants." },
     "vocabDriveDisclosure": {
@@ -3448,7 +3448,7 @@
       "message": "Compte Google"
     },
     "vocabDriveOwnerLabel": {
-      "message": "Compte Pinboard"
+      "message": "Bibliothèque personnelle"
     },
     "vocabDriveNever": {
       "message": "Pas encore synchronisé"
@@ -3481,10 +3481,10 @@
       "message": "L'autorisation Google est temporairement indisponible."
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "Aucun compte Pinboard connecté. Saisissez votre jeton API dans « Compte → Compte Pinboard », puis reconnectez-vous."
+      "message": "La bibliothèque personnelle est indisponible. Rouvrez cette page et réessayez."
     },
     "vocabDriveErrorPinboardAuthSync": {
-      "message": "Aucun compte Pinboard connecté. Saisissez votre jeton API dans « Compte → Compte Pinboard », puis cliquez sur « Synchroniser maintenant »."
+      "message": "La bibliothèque personnelle est indisponible. Rouvrez cette page, puis cliquez sur « Synchroniser maintenant »."
     },
     "vocabDriveErrorPermission": {
       "message": "L'autorisation d'accès à Google Drive est manquante."
@@ -3508,7 +3508,7 @@
       "message": "Une erreur inattendue est survenue pendant la synchronisation."
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "Le compte Google ou Pinboard a changé pendant la synchronisation. Réessayez."
+      "message": "Le compte Google ou la bibliothèque personnelle a changé pendant la synchronisation. Réessayez."
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "Un mot enregistré ou son contexte est trop volumineux pour être synchronisé. Raccourcissez ou supprimez l'entrée, puis sélectionnez « Synchroniser maintenant »."
@@ -3531,16 +3531,16 @@
       "message": "Exportation et intégrations"
     },
     "vocabOwnerNoAccount": {
-      "message": "Aucun compte Pinboard"
+      "message": "La bibliothèque personnelle est indisponible. Rouvrez cette page et réessayez."
     },
     "vocabLoadFailed": {
-      "message": "Impossible de charger les mots du compte Pinboard actuel. Rouvrez l'onglet Vocabulaire et réessayez."
+      "message": "Impossible de charger les mots du bibliothèque personnelle. Rouvrez l'onglet Vocabulaire et réessayez."
     },
     "vocabExportFailed": {
       "message": "Impossible d'exporter les mots. Réessayez."
     },
     "vocabAccountChanged": {
-      "message": "Le compte Pinboard a changé avant la fin de l'opération. Réessayez."
+      "message": "Le bibliothèque personnelle a changé avant la fin de l'opération. Réessayez."
     },
     "vocabSettingsSaveFailed": {
       "message": "Impossible d'enregistrer les paramètres d'intégration modifiés. Vérifiez-les, puis réessayez."
@@ -3552,7 +3552,7 @@
       "message": "Cmd+clic pour sélectionner une entrée, Maj+clic pour sélectionner une plage"
     },
     "vocabResultCount": {
-      "message": "Compte Pinboard actuel ($OWNER$) : $RESULTS$ · $TOTAL$",
+      "message": "$OWNER$ : $RESULTS$ · $TOTAL$",
       "placeholders": {
         "results": {
           "content": "$1"
@@ -3863,7 +3863,7 @@
     "message": "Pour générer des entrées, configurez un fournisseur d’IA et activez l’IA de la page Lecture dans les paramètres."
   },
   "dictVocabEmpty": {
-    "message": "Aucun mot n'est enregistré pour le compte Pinboard actuel ($OWNER$). Enregistrez-en depuis la vue dictionnaire du lecteur.",
+    "message": "Aucun mot n'est enregistré pour le bibliothèque personnelle ($OWNER$). Enregistrez-en depuis la vue dictionnaire du lecteur.",
     "placeholders": {
       "owner": {
         "content": "$1"
@@ -4279,7 +4279,7 @@
   "diagnosticsCopied": { "message": "Diagnostic copié" },
   "diagnosticsCopyFailed": { "message": "Impossible de copier le diagnostic. Vérifiez l’accès au presse-papiers et réessayez." },
   "libraryVocabSignedOutTitle": { "message": "Connectez-vous pour utiliser le vocabulaire" },
-  "libraryVocabSignedOutHint": { "message": "Le vocabulaire est séparé pour chaque compte Pinboard. La recherche dans le dictionnaire reste disponible sans connexion." },
+  "libraryVocabSignedOutHint": { "message": "Le vocabulaire, les surlignages, les notes et l’historique Ask restent dans la même bibliothèque, quel que soit le service de favoris." },
   "libraryVocabOpenSettings": { "message": "Ouvrir les paramètres du compte" },
   "libraryLookupSignedOutHint": { "message": "Recherchez un mot dans la section « Dictionnaire ». Connectez-vous pour l’enregistrer dans votre vocabulaire." },
   "mdPreviewClose": { "message": "Fermer le lecteur" },
@@ -4383,7 +4383,7 @@
   "loginNeedsPaid": { "message": "Nécessite un compte Pinboard payant." },
   "popupDraftDiscard": { "message": "Supprimer le brouillon" },
   "readerBookmarkSection": {"message": "Enregistrer"},
-  "readerBookmarkSave": {"message": "Enregistrer dans Pinboard"},
+  "readerBookmarkSave": {"message": "Enregistrer le favori"},
   "readerBookmarkSaved": {"message": "Enregistré"},
   "readerBookmarkLater": {"message": "Lire plus tard"},
   "readerBookmarkMarkRead": {"message": "Marquer comme lu"},
@@ -4391,7 +4391,7 @@
   "readerBookmarkChecking": {"message": "Vérification du signet…"},
   "readerBookmarkSaving": {"message": "Enregistrement…"},
   "readerBookmarkUpdated": {"message": "Signet mis à jour"},
-  "readerBookmarkQueued": {"message": "En attente hors connexion ; pas encore enregistré dans Pinboard"},
+  "readerBookmarkQueued": {"message": "En attente hors ligne, pas encore enregistré"},
   "readerBookmarkLookupFailed": {"message": "Impossible de vérifier le signet. Réessayez avant de le modifier."},
   "readerBookmarkFailed": {"message": "Échec de l’enregistrement. Réessayez."},
   "readerBookmarkAccountChanged": {"message": "Le compte a changé. Rouvrez le lecteur pour enregistrer."},
@@ -4405,14 +4405,14 @@
     "message": "Supprimer le signet"
   },
   "readerBookmarkDeleteConfirm": {
-    "message": "Supprimer ce signet de Pinboard ?"
+    "message": "Supprimer ce favori ?"
   },
   "readerBookmarkDeleteDetail": {"message": "Les surlignages et les notes du lecteur seront conservés."},
   "readerBookmarkDeleting": {
     "message": "Suppression du signet…"
   },
   "readerBookmarkDeleted": {
-    "message": "Signet supprimé de Pinboard"
+    "message": "Favori supprimé"
   },
   "readerBookmarkDeleteFailed": {
     "message": "Impossible de confirmer la suppression. Réessayez."
@@ -4686,5 +4686,62 @@
   "dictGenerationServiceUnavailable": {"message": "Le service du fournisseur est temporairement indisponible. Réessayez plus tard."},
   "dictProgressThinking": {"message": "Le modèle réfléchit…"},
   "dictProgressStreaming": {"message": "Réception de la réponse…"},
-  "dictProgressElapsed": {"message": "Depuis $SECONDS$ s", "placeholders": {"seconds": {"content": "$1"}}}
+  "dictProgressElapsed": {"message": "Depuis $SECONDS$ s", "placeholders": {"seconds": {"content": "$1"}}},
+  "bookmarkServiceTitle": {
+    "message": "Service de favoris"
+  },
+  "bookmarkServiceChoose": {
+    "message": "Choisir où enregistrer les favoris"
+  },
+  "bookmarkServiceHint": {
+    "message": "La fenêtre de l’extension, le lecteur, les raccourcis et l’enregistrement par lot utilisent ce service."
+  },
+  "personalLibraryTitle": {
+    "message": "Bibliothèque personnelle"
+  },
+  "personalLibraryHint": {
+    "message": "Le vocabulaire, les surlignages, les notes et l’historique Ask restent dans la même bibliothèque, quel que soit le service de favoris."
+  },
+  "bookmarkServerUrl": {
+    "message": "URL du serveur"
+  },
+  "bookmarkServerHint": {
+    "message": "Indiquez l’URL du site, avec son sous-chemin éventuel. HTTPS est obligatoire, sauf sur localhost."
+  },
+  "bookmarkConnectHint": {
+    "message": "Les modifications de l’URL et du jeton prennent effet après connexion. Les jetons restent sur cet appareil, sauf si la synchronisation des identifiants est activée."
+  },
+  "bookmarkConnect": {
+    "message": "Connecter"
+  },
+  "bookmarkConnecting": {
+    "message": "Connexion en cours…"
+  },
+  "bookmarkConnected": {
+    "message": "Connecté"
+  },
+  "bookmarkConnectFailed": {
+    "message": "Échec de la connexion. Vérifiez l’URL du serveur, le jeton et l’autorisation d’accès au site."
+  },
+  "bookmarkInvalidConfig": {
+    "message": "Saisissez une URL de serveur valide et un jeton API."
+  },
+  "bookmarkPermissionDenied": {
+    "message": "Autorisez l’accès à ce serveur dans les paramètres, puis reconnectez-vous."
+  },
+  "bookmarkKarakeepHint": {
+    "message": "« Lire plus tard » utilise une liste privée dédiée. Marquer un favori comme lu le retire de cette liste sans modifier son état d’archivage dans le service."
+  },
+  "bookmarkReadLaterListName": {
+    "message": "Lire plus tard"
+  },
+  "bookmarkPartialSave": {
+    "message": "Le favori a peut-être été enregistré, mais certaines modifications ont échoué. Ouvrez la modification pour vérifier, puis enregistrez à nouveau."
+  },
+  "bookmarkServiceSettings": {
+    "message": "Choisir le service de favoris"
+  },
+  "backupAdoptLibrary": {
+    "message": "La bibliothèque personnelle est vide. Restaurer le vocabulaire ou les surlignages reprendra la bibliothèque de la sauvegarde pour conserver l’accès à ses données Drive."
+  }
 }

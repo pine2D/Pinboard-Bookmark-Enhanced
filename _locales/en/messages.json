@@ -3,13 +3,13 @@
     "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
-    "message": "Pinboard bookmarking with AI tags and summaries, a reader with translation and highlights, Markdown/EPUB export, and 13 site themes."
+    "message": "Save to Pinboard, Karakeep or linkding. AI tags and summaries, a reader with translation and highlights, and Markdown/EPUB export."
   },
   "cmdOpenPopup": {
     "message": "Open Pinboard Bookmark Enhanced"
   },
   "cmdQuickSave": {
-    "message": "Quick save to Pinboard (no popup)"
+    "message": "Quick save to the selected bookmark service (no popup)"
   },
   "cmdReadLater": {
     "message": "Quick save as Read Later (no popup)"
@@ -162,7 +162,7 @@
     "message": "AI Tags"
   },
   "urlWarning": {
-    "message": "This page cannot be saved to Pinboard (unsupported URL). Tab Sets and Batch Save below still work."
+    "message": "This page has an unsupported URL and cannot be bookmarked."
   },
   "urlCannotSave": {
     "message": "Cannot save: unsupported URL"
@@ -555,7 +555,7 @@
     }
   },
   "batchAccountChanged": {
-    "message": "Batch Save stopped: the Pinboard account changed."
+    "message": "Batch Save stopped: the bookmark connection changed."
   },
   "tabSetFailed": {
     "message": "Couldn't save the tab set: $ERROR$",
@@ -603,19 +603,19 @@
     }
   },
   "saveQueuedNetwork": {
-    "message": "Couldn't reach Pinboard. Check your connection. The bookmark is queued and will be retried automatically."
+    "message": "Couldn’t reach your bookmark server. The save is queued and will retry automatically."
   },
   "saveQueuedServer": {
-    "message": "Pinboard isn't responding right now. The bookmark is queued and will be retried automatically."
+    "message": "The bookmark server is unavailable. The save is queued and will retry automatically."
   },
   "offlineRetry": {
     "message": "Retry now"
   },
   "offlineRetryWrongAccount": {
-    "message": "This item was queued under a different Pinboard account. Sign in to that account to send it."
+    "message": "This item belongs to another bookmark connection. Restore that connection, or review and save the page again."
   },
   "offlineRetryAccountChanged": {
-    "message": "The Pinboard account changed during the retry, so it was stopped."
+    "message": "The bookmark connection changed during the retry, so it was stopped."
   },
   "offlineRetryFailed": {
     "message": "Couldn't send this bookmark. Try again.",
@@ -678,34 +678,34 @@
     "message": "Delete this bookmark"
   },
   "bgNotLoggedIn": {
-    "message": "Pinboard: Not logged in"
+    "message": "Bookmark service not connected"
   },
   "bgSetToken": {
-    "message": "Set your API token in extension settings."
+    "message": "Choose and connect a bookmark service in extension settings."
   },
   "bgUndone": {
-    "message": "Pinboard: Undone"
+    "message": "Undone"
   },
   "bgUndoFailed": {
-    "message": "Pinboard: Undo failed"
+    "message": "Undo failed"
   },
   "bgBookmarkRemoved": {
     "message": "Bookmark removed."
   },
   "bgQuickSaved": {
-    "message": "Pinboard: Quick Save"
+    "message": "Quick Save"
   },
   "bgReadLater": {
-    "message": "Pinboard: Read Later"
+    "message": "Read Later"
   },
   "bgCannotSave": {
-    "message": "Pinboard: Cannot save"
+    "message": "Cannot save"
   },
   "bgCannotBookmark": {
     "message": "Only http and https pages can be saved."
   },
   "bgMdPreviewFailed": {
-    "message": "Pinboard: Couldn't convert to Markdown"
+    "message": "Couldn't convert to Markdown"
   },
   "bgMdPreviewNoContent": {
     "message": "No readable content was found on this page."
@@ -836,19 +836,19 @@
     "message": "Log in to pinboard.in in this browser, then try again."
   },
   "bgQuickSaveFailed": {
-    "message": "Pinboard: Quick Save failed"
+    "message": "Quick Save failed"
   },
   "bgReadLaterFailed": {
-    "message": "Pinboard: Read Later failed"
+    "message": "Read Later failed"
   },
   "bgSaveFailed": {
-    "message": "Pinboard: Save failed"
+    "message": "Save failed"
   },
   "bgNetworkError": {
-    "message": "Pinboard: Network error"
+    "message": "Network error"
   },
   "bgQueuedOffline": {
-    "message": "Pinboard: Queued offline"
+    "message": "Queued offline"
   },
   "bgTitleSaved": {
     "message": "\"$TITLE$\" saved.",
@@ -875,10 +875,10 @@
     }
   },
   "bgBatchSaved": {
-    "message": "Pinboard: Batch Save finished"
+    "message": "Batch Save finished"
   },
   "bgBatchCancelled": {
-    "message": "Pinboard: Batch Save cancelled"
+    "message": "Batch Save cancelled"
   },
   "bgUndo": {
     "message": "Undo"
@@ -935,7 +935,7 @@
     "message": "No notes match this filter."
   },
   "notesHiddenByOwner": {
-    "message": "Some of the highlights on this device belong to other Pinboard accounts, and this account can't see them."
+    "message": "Some highlights belong to other historical libraries and have not been merged into this personal library."
   },
   "notesUnknownPage": {
     "message": "Unknown page"
@@ -1100,7 +1100,7 @@
     "message": "Prewarmed (background fetch every 15 min, instant popup)"
   },
   "tagSyncHint": {
-    "message": "Controls how your existing Pinboard tag cloud is pulled into the popup for autocomplete. Tags are read-only; nothing is uploaded back to Pinboard."
+    "message": "Choose when to load your existing tags for autocomplete. Loading tags does not change them on the server."
   },
   "labelTagPresets": {
     "message": "Tag Presets"
@@ -1139,13 +1139,13 @@
     "message": "Include vocabulary in backups"
   },
   "backupIncludeVocabularyHint": {
-    "message": "Includes vocabulary only for the current Pinboard account."
+    "message": "Includes vocabulary only for the personal library."
   },
   "backupIncludeSecretsLabel": {
     "message": "Include API keys and tokens in backups"
   },
   "backupIncludeSecretsHint": {
-    "message": "Writes every credential to the file in plain text: your Pinboard token, all AI provider keys, and the Jina, Wayback, Anki, Eudic, Notion, Gist and Webhook credentials. Anyone who opens the file can use them. Keep it where you would keep a password."
+    "message": "Writes every credential to the file in plain text: your bookmark service tokens, all AI provider keys, and the Jina, Wayback, Anki, Eudic, Notion, Gist and Webhook credentials. Anyone who opens the file can use them. Keep it where you would keep a password."
   },
   "backupSecretsExportTitle": {"message": "Export a backup with credentials?"},
   "backupSecretsExportConfirm": {
@@ -1167,13 +1167,13 @@
     "message": "This backup carries credentials in plain text. Import them only if you trust where the file has been."
   },
   "backupVocabOwnerMissing": {
-    "message": "Vocabulary was not included because no Pinboard account is available. The other selected data was exported."
+    "message": "Vocabulary was not included because no personal library is available. The other selected data was exported."
   },
   "backupHighlightsOwnerMissing": {
-    "message": "Account-owned highlights and notes were not included because no Pinboard account is available. The other selected data was exported."
+    "message": "Account-owned highlights and notes were not included because no personal library is available. The other selected data was exported."
   },
   "backupHighlightsVocabOwnerMissing": {
-    "message": "Vocabulary and account-owned highlights and notes were not included because no Pinboard account is available. The other selected data was exported."
+    "message": "Vocabulary and account-owned highlights and notes were not included because no personal library is available. The other selected data was exported."
   },
   "backupPreviewTitle": {
     "message": "Import preview"
@@ -1205,7 +1205,7 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "backupPreviewHighlights": {
-    "message": "Pages: $PAGES$; entries: $ITEMS$; Pinboard account: $OWNER$",
+    "message": "Pages: $PAGES$; entries: $ITEMS$; personal library: $OWNER$",
     "placeholders": {
       "pages": { "content": "$1" },
       "items": { "content": "$2" },
@@ -1213,7 +1213,7 @@
     }
   },
   "backupPreviewVocabulary": {
-    "message": "Vocabulary records: $COUNT$; Pinboard account: $OWNER$",
+    "message": "Vocabulary records: $COUNT$; personal library: $OWNER$",
     "placeholders": {
       "count": { "content": "$1" },
       "owner": { "content": "$2" }
@@ -1229,10 +1229,10 @@
     "message": "None"
   },
   "backupPreviewOwnerMismatch": {
-    "message": "Vocabulary cannot be imported because this backup belongs to another Pinboard account."
+    "message": "Vocabulary cannot be imported because this backup belongs to another personal library."
   },
   "backupPreviewHighlightOwnerMismatch": {
-    "message": "Highlights and notes cannot be imported because this backup belongs to another Pinboard account."
+    "message": "Highlights and notes cannot be imported because this backup belongs to another personal library."
   },
   "backupPreviewReady": {
     "message": "Import preview ready."
@@ -3421,7 +3421,7 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "Once connected, this device syncs vocabulary, highlights and notes, complete AI dictionary entries and supplements, and saved conversations with their cited excerpts for the current Pinboard account."
+      "message": "Once connected, this device syncs vocabulary, highlights and notes, complete AI dictionary entries and supplements, and saved conversations with their cited excerpts for the personal library."
     },
     "vocabDriveConnectionHint": { "message": "Connect each device separately. Google Drive does not sync settings or credentials." },
     "vocabDriveDisclosure": {
@@ -3458,7 +3458,7 @@
       "message": "Google account"
     },
     "vocabDriveOwnerLabel": {
-      "message": "Pinboard account"
+      "message": "Personal library"
     },
     "vocabDriveNever": {
       "message": "Not synced yet"
@@ -3491,10 +3491,10 @@
       "message": "Google authorization is temporarily unavailable."
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "No Pinboard account is signed in. Enter your API Token under Account → Pinboard Account, then connect again."
+      "message": "The personal library is unavailable. Reopen this page and try again."
     },
     "vocabDriveErrorPinboardAuthSync": {
-      "message": "No Pinboard account is signed in. Enter your API Token under Account → Pinboard Account, then click Sync now."
+      "message": "The personal library is unavailable. Reopen this page, then click “Sync now”."
     },
     "vocabDriveErrorPermission": {
       "message": "Google Drive permission is missing."
@@ -3518,7 +3518,7 @@
       "message": "An unexpected error occurred during sync."
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "The Google account or Pinboard account changed during sync. Try again."
+      "message": "The Google account or personal library changed during sync. Try again."
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "A saved word or its context is too large to sync. Shorten or remove it, then click Sync now."
@@ -3541,16 +3541,16 @@
       "message": "Export and integrations"
     },
     "vocabOwnerNoAccount": {
-      "message": "No Pinboard account"
+      "message": "The personal library is unavailable. Reopen this page and try again."
     },
     "vocabLoadFailed": {
-      "message": "Could not load saved words for the current Pinboard account. Reopen Vocabulary and try again."
+      "message": "Could not load saved words for the personal library. Reopen Vocabulary and try again."
     },
     "vocabExportFailed": {
       "message": "Could not export saved words. Try again."
     },
     "vocabAccountChanged": {
-      "message": "The Pinboard account changed before this finished. Try again."
+      "message": "The personal library changed before this finished. Try again."
     },
     "vocabSettingsSaveFailed": {
       "message": "Could not save the latest integration settings. Review them and try again."
@@ -3562,7 +3562,7 @@
       "message": "Cmd-click an entry to select it, Shift-click to select a range"
     },
     "vocabResultCount": {
-      "message": "$RESULTS$ found · $TOTAL$ saved for current Pinboard account: $OWNER$",
+      "message": "$OWNER$: $RESULTS$ found · $TOTAL$ saved",
       "placeholders": {
         "results": {
           "content": "$1"
@@ -3874,7 +3874,7 @@
     "message": "Set up an AI provider and enable reader AI in Settings to generate entries."
   },
   "dictVocabEmpty": {
-    "message": "No words saved for current Pinboard account: $OWNER$. Save words from the reader's dictionary view.",
+    "message": "No words saved for personal library: $OWNER$. Save words from the reader's dictionary view.",
     "placeholders": {
       "owner": {
         "content": "$1"
@@ -4285,7 +4285,7 @@
   "diagnosticsCopied": { "message": "Diagnostics copied" },
   "diagnosticsCopyFailed": { "message": "Could not copy diagnostics. Check clipboard access and try again." },
   "libraryVocabSignedOutTitle": { "message": "Sign in to use Vocabulary" },
-  "libraryVocabSignedOutHint": { "message": "Vocabulary is kept separate for each Pinboard account. Dictionary lookup remains available without signing in." },
+  "libraryVocabSignedOutHint": { "message": "Vocabulary, highlights, notes and Ask history share one personal library across all bookmark services." },
   "libraryVocabOpenSettings": { "message": "Open account settings" },
   "libraryLookupSignedOutHint": { "message": "Look up any word in the Dictionary section. Sign in to save words to your vocabulary." },
   "mdPreviewClose": { "message": "Close reader" },
@@ -4390,7 +4390,7 @@
   "loginNeedsPaid": { "message": "Requires a paid Pinboard account." },
   "popupDraftDiscard": { "message": "Discard draft" },
   "readerBookmarkSection": {"message": "Save"},
-  "readerBookmarkSave": {"message": "Save to Pinboard"},
+  "readerBookmarkSave": {"message": "Save bookmark"},
   "readerBookmarkSaved": {"message": "Saved"},
   "readerBookmarkLater": {"message": "Read later"},
   "readerBookmarkMarkRead": {"message": "Mark as read"},
@@ -4398,7 +4398,7 @@
   "readerBookmarkChecking": {"message": "Checking bookmark…"},
   "readerBookmarkSaving": {"message": "Saving…"},
   "readerBookmarkUpdated": {"message": "Bookmark updated"},
-  "readerBookmarkQueued": {"message": "Queued offline; not yet saved to Pinboard"},
+  "readerBookmarkQueued": {"message": "Queued offline; not saved yet"},
   "readerBookmarkLookupFailed": {"message": "Could not check bookmark. Retry before editing."},
   "readerBookmarkFailed": {"message": "Could not save. Please retry."},
   "readerBookmarkAccountChanged": {"message": "Account changed. Reopen this reader to save."},
@@ -4412,14 +4412,14 @@
     "message": "Delete bookmark"
   },
   "readerBookmarkDeleteConfirm": {
-    "message": "Delete this bookmark from Pinboard?"
+    "message": "Delete this bookmark?"
   },
   "readerBookmarkDeleteDetail": {"message": "Reader highlights and notes will be kept."},
   "readerBookmarkDeleting": {
     "message": "Deleting bookmark…"
   },
   "readerBookmarkDeleted": {
-    "message": "Bookmark deleted from Pinboard"
+    "message": "Bookmark deleted"
   },
   "readerBookmarkDeleteFailed": {
     "message": "Could not confirm deletion. Please retry."
@@ -4693,5 +4693,62 @@
   "dictGenerationServiceUnavailable": {"message": "The provider's service is temporarily unavailable. Try again later."},
   "dictProgressThinking": {"message": "The model is thinking…"},
   "dictProgressStreaming": {"message": "Receiving the answer…"},
-  "dictProgressElapsed": {"message": "$SECONDS$s elapsed", "placeholders": {"seconds": {"content": "$1"}}}
+  "dictProgressElapsed": {"message": "$SECONDS$s elapsed", "placeholders": {"seconds": {"content": "$1"}}},
+  "bookmarkServiceTitle": {
+    "message": "Bookmark service"
+  },
+  "bookmarkServiceChoose": {
+    "message": "Choose where to save bookmarks"
+  },
+  "bookmarkServiceHint": {
+    "message": "Saving from the popup, reader, shortcuts and batch actions uses this service."
+  },
+  "personalLibraryTitle": {
+    "message": "Personal library"
+  },
+  "personalLibraryHint": {
+    "message": "Vocabulary, highlights, notes and Ask history share one personal library across all bookmark services."
+  },
+  "bookmarkServerUrl": {
+    "message": "Server URL"
+  },
+  "bookmarkServerHint": {
+    "message": "Use the site URL, including any subpath. HTTPS is required except on localhost."
+  },
+  "bookmarkConnectHint": {
+    "message": "URL and token changes take effect after connecting. Tokens stay on this device unless credential sync is enabled."
+  },
+  "bookmarkConnect": {
+    "message": "Connect"
+  },
+  "bookmarkConnecting": {
+    "message": "Connecting…"
+  },
+  "bookmarkConnected": {
+    "message": "Connected"
+  },
+  "bookmarkConnectFailed": {
+    "message": "Connection failed. Check the server URL, token and site permission."
+  },
+  "bookmarkInvalidConfig": {
+    "message": "Enter a valid server URL and API token."
+  },
+  "bookmarkPermissionDenied": {
+    "message": "Allow access to this server in Settings, then reconnect."
+  },
+  "bookmarkKarakeepHint": {
+    "message": "Read Later uses a dedicated private list. Marking a bookmark as read removes it from that list. Archiving in the service is unchanged."
+  },
+  "bookmarkReadLaterListName": {
+    "message": "Read Later"
+  },
+  "bookmarkPartialSave": {
+    "message": "The bookmark may be saved, but some changes failed. Open Edit to check and save again."
+  },
+  "bookmarkServiceSettings": {
+    "message": "Choose bookmark service"
+  },
+  "backupAdoptLibrary": {
+    "message": "This personal library is empty. Restoring vocabulary or highlights will adopt the backup’s library so its existing Drive data remains available."
+  }
 }

@@ -13,7 +13,7 @@ function ownership(name) {
   if (name === 'ask-history') return ['md-preview'];
   if (/^ask-archive(?:-|$)/.test(name)) return ['background', 'library', 'md-preview'];
   if (name === 'tag-gov-layout') return ['options'];
-  if (name === 'save-pipeline') return ['background', 'popup', 'md-preview'];
+  if (name === 'save-pipeline' || name.startsWith('bookmark-service')) return ['background', 'popup', 'md-preview'];
   if (['icon-state', 'wayback', 'url-strip'].includes(name)) return ['background'];
   if (/^audit-|^ui-contract-scan/.test(name)) return ['tooling'];
   if (/^popup-|^ai-tags|^tag-gov|^union-tags|^offline-queue|^batch-/.test(name)) return ['popup'];

@@ -2,9 +2,9 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [繁體中文（香港）](README.zh-HK.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [日本語](README.ja.md) | **Polski** | [Русский](README.ru.md)
 
-Rozszerzenie Chrome dla [Pinboard](https://pinboard.in): tagi i streszczenia od AI, wbudowany czytnik z tłumaczeniem i zaznaczeniami oraz 13 motywów dla samej strony.
+Rozszerzenie Chrome dla [Pinboard](https://pinboard.in), Karakeep i linkding: tagi i streszczenia AI, czytnik z tłumaczeniem i wyróżnieniami oraz 13 motywów dla pinboard.in.
 
-> **Uwaga:** Wymaga konta Pinboard.in — [Pinboard](https://pinboard.in) to niezależna, **płatna** usługa zakładek. To rozszerzenie jest klientem innej firmy, który łączy się z Twoim istniejącym kontem Pinboard; potrzebny jest do tego Twój własny token API Pinboard. Nie jest powiązane z Pinboard, sponsorowane ani autoryzowane przez Pinboard. Aby korzystać z tego rozszerzenia, musisz już mieć (lub założyć) płatne konto Pinboard.in.
+> **Uwaga:** Wybierz usługę zakładek w ustawieniach. Karakeep i linkding działają bez konta Pinboard. Pinboard to niezależna, **płatna** usługa, która wymaga własnego konta i tokenu API. To rozszerzenie jest klientem zewnętrznym, niepowiązanym z Pinboard, niesponsorowanym ani nieautoryzowanym przez ten serwis.
 
 [![Chrome](https://img.shields.io/badge/Chrome-MV3-brightgreen?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/)
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
@@ -32,7 +32,7 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in): tagi i streszczenia od 
 ### Czytanie
 - **Każda strona staje się czytelna** — widok Markdown ze spisem treści, wyszukiwaniem i podglądem przypisów; wzory, diagramy i tabele wyświetlają się poprawnie
 - **GitHub Discussions (pilotaż)** — zachowuje wczytany wpis główny, komentarze, strukturę odpowiedzi i oznaczenie zaakceptowanej odpowiedzi; pokazuje zakres pobranej treści
-- **Zarządzaj zakładkami podczas czytania** — zapisuj, edytuj lub usuwaj zakładkę artykułu w Pinboard bez wracania do okienka
+- **Zarządzaj zakładkami podczas czytania** — zapisuj, edytuj lub usuwaj zakładkę artykułu w wybranej usłudze bez wracania do okienka
 - **Zaznaczenia w pięciu kolorach, z notatkami** — zostają na swoim miejscu mimo tłumaczenia, a nawet późniejszych zmian na stronie
 - **Przetłumacz stronę albo zadaj jej pytanie** — tłumaczenie całości z widokiem dwujęzycznym; odpowiedzi cytują źródło i prowadzą prosto do niego
 - **Zachowaj pytania i odpowiedzi z cytatami** — gotowe odpowiedzi zapisują się automatycznie i synchronizują przez Google Drive. Przeglądaj rozmowy w bibliotece, kontynuuj w czytniku lub eksportuj osobno albo wraz z artykułem. Rozmowy tymczasowe nie są zapisywane.
@@ -74,13 +74,17 @@ Lub załaduj rozpakowane z ZIP-a release:
 
 Katalog źródłowy ma osobny, stały identyfikator deweloperski, dlatego podczas testów może działać obok wersji z Chrome Web Store. ZIP z release używa identyfikatora Chrome Web Store i nie może działać jednocześnie z wersją sklepową w tym samym profilu Chrome. Ustawienia będą wspólne dzięki Chrome Sync, gdy na każdym urządzeniu włączysz ich synchronizację. Przed zastąpieniem starszego release wczytanego ręcznie kliknij w jego ustawieniach **Eksportuj kopię zapasową**, a po wczytaniu nowego release użyj **Importuj kopię zapasową**.
 
-Po instalacji: kliknij ikonę paska narzędzi → wklej swój [token API Pinboard](https://pinboard.in/settings/password) → **Zaloguj się**
+Po instalacji otwórz **Ustawienia → Konto** i wybierz usługę. Dla Karakeep lub linkding podaj adres witryny oraz token API, kliknij **Połącz** i zezwól na dostęp do serwera. Uwzględnij podścieżkę adresu, jeśli istnieje; poza localhost wymagany jest HTTPS. Dla Pinboard wklej [token API](https://pinboard.in/settings/password) w okienku i zaloguj się.
+
+Okienko, czytnik, skróty i zapis zbiorczy korzystają z wybranej usługi. Karakeep używa osobnej prywatnej listy „Przeczytaj później”; oznaczenie zakładki jako przeczytanej usuwa ją z listy bez zmiany stanu archiwizacji. linkding używa znacznika nieprzeczytanych. Podpowiedzi Pinboard, porządkowanie tagów, licznik nieprzeczytanych, wyszukiwanie w witrynie i zestawy kart pozostają funkcjami Pinboard.
+
+Słownictwo, wyróżnienia, notatki, zapisane hasła AI i historia Ask tworzą wspólną bibliotekę osobistą dla wszystkich trzech usług. Zmiana usługi ani wylogowanie nie przełącza biblioteki. Aktualizacja zachowuje obecną bibliotekę Pinboard bez łączenia dawnych kont. Pamięć podręczna zakładek, szkice i kolejki offline pozostają przypisane do pierwotnego połączenia. Ponowne połączenie z linkding tworzy nowe połączenie; wcześniejsze oczekujące zapisy wymagają sprawdzenia.
 
 ## Prywatność
 
 Bez śledzenia, bez analityki, bez telemetrii. W przypadku nowych użytkowników ustawienia i dane uwierzytelniające pozostają domyślnie na tym urządzeniu. Synchronizację zwykłych ustawień włącza się osobno na każdym urządzeniu. Synchronizacja danych uwierzytelniających jest jednym wyborem dla całego konta Chrome, ale uczestniczą w niej tylko urządzenia z włączoną synchronizacją ustawień; pozostałe nadal używają lokalnych danych uwierzytelniających. Dla nowych użytkowników jest domyślnie wyłączona. Jeśli podczas aktualizacji w Chrome Sync są już niepuste dane uwierzytelniające, pozostaje włączona, aby uniknąć utraty danych. Po włączeniu klucze API, tokeny, hasła i dane uwierzytelniające eksportu są udostępniane przez Chrome Sync; są jedynie zaciemnione, a nie zaszyfrowane. Zapisane zakładki, zawartość stron i kolejka offline nigdy nie trafiają do Chrome Sync. Zapytania AI wysyłają **tylko** te funkcje AI, które włączysz lub uruchomisz, i trafiają one bezpośrednio do skonfigurowanego dostawcy. Podczas instalacji przyznawany jest tylko dostęp do Pinboard. O dostęp do każdej innej witryny (dostawcy AI, miejsca docelowego eksportu lub archiwizacji, słownika, Dysku Google, napisów wideo albo witryn objętych zapisem zbiorczym) rozszerzenie prosi przy pierwszym użyciu danej funkcji, zawsze dla jednej konkretnej witryny. Niestandardowe punkty końcowe sieci muszą używać HTTPS; HTTP jest dozwolone tylko dla `localhost`, `127.0.0.1` i `[::1]`. Strony rozszerzenia egzekwują restrykcyjną politykę Content-Security-Policy (bez zdalnego kodu). Pełna polityka: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
-Google Drive łączy się oddzielnie na każdym urządzeniu i synchronizuje słownictwo, wyróżnienia, notatki, pełne hasła AI z uzupełnieniami oraz zapisane rozmowy z fragmentami źródłowymi dla bieżącego konta Pinboard. Kopie w prywatnym folderze appDataFolder są zapisane jawnym tekstem, bez szyfrowania end-to-end. Opcjonalne źródła etymologii pochodzą z Wikisłownika. Rozszerzenie sprawdza tekst źródłowy i przesyła krótkie fragmenty wraz z danymi źródła do wybranego dostawcy AI. Przykłady we wskazówkach użycia tworzy AI. Przykłady z tekstów są wyszukiwane w Wikisource i pokazywane bez zmian i bez tłumaczenia; nigdy nie trafiają do AI. Opłacone wyniki pozostają zapisane; nowa wersja powstaje tylko na żądanie.
+Google Drive łączy się oddzielnie na każdym urządzeniu i synchronizuje słownictwo, wyróżnienia, notatki, pełne hasła AI z uzupełnieniami oraz zapisane rozmowy z fragmentami źródłowymi z biblioteki osobistej. Kopie w prywatnym folderze appDataFolder są zapisane jawnym tekstem, bez szyfrowania end-to-end. Opcjonalne źródła etymologii pochodzą z Wikisłownika. Rozszerzenie sprawdza tekst źródłowy i przesyła krótkie fragmenty wraz z danymi źródła do wybranego dostawcy AI. Przykłady we wskazówkach użycia tworzy AI. Przykłady z tekstów są wyszukiwane w Wikisource i pokazywane bez zmian i bez tłumaczenia; nigdy nie trafiają do AI. Opłacone wyniki pozostają zapisane; nowa wersja powstaje tylko na żądanie.
 
 Zaktualizuj rozszerzenie na wszystkich urządzeniach synchronizujących słownictwo. Ta wersja odczytuje dotychczasowe dane, ale starsze wersje nie odbierają zmian słownictwa zapisanych przez tę wersję.
 

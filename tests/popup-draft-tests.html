@@ -13,7 +13,7 @@ async function test(name,fn){const d=document.createElement('div');d.className='
  const msg=(action,extra={})=>({account:'alice',action,pageUrl:'https://example.com/article',incognito:false,...extra});
  const draft={url:'https://example.com/article',title:'Edited title',notes:'Private note',tags:['One','Two'],tagInput:'unsubmitted',private:true,toread:true,archive:false,archiveTouched:true};
  const read=()=>run(msg('read'));
- await test('production draft handler can be loaded',()=>{assert(start>=0&&end>start,'draft handler is not implemented');run=new Function('chrome','getCurrentPinboardAuth','navigator',source.slice(start,end)+'\nreturn pbpRunPopupDraft;')({storage:{session}},async()=>({account:owner}),navigator);});
+ await test('production draft handler can be loaded',()=>{assert(start>=0&&end>start,'draft handler is not implemented');run=new Function('chrome','getCurrentBookmarkAuth','navigator',source.slice(start,end)+'\nreturn pbpRunPopupDraft;')({storage:{session}},async()=>({account:owner}),navigator);});
  await test('write and read preserve the complete form including pending tag text',async()=>{const w=await run(msg('write',{draft}));const r=await read();assert(w.ok&&r.ok&&r.account==='alice');assert(JSON.stringify(r.draft)===JSON.stringify(draft));});
  await test('stored draft contains no unrecognized fields or credentials',async()=>{await run(msg('write',{draft:{...draft,token:'FORBIDDEN',apiKey:'FORBIDDEN',content:'FORBIDDEN'}}));const row=Object.values(rows)[0];assert(!JSON.stringify(row).includes('FORBIDDEN'));});
  await test('another URL cannot restore the article draft',async()=>{assert((await run(msg('read',{pageUrl:'https://example.com/other'}))).draft===null);});
@@ -43,7 +43,7 @@ async function test(name,fn){const d=document.createElement('div');d.className='
    let resolveRead,rejectRead,resolveWrite,resolveClear;let delayWrite=false,delayClear=false;let currentOwner='alice';const sent=[],statuses=[];
    const deps={$id:id=>elements[id],currentTags:[],fieldDirtyFlags:flags,_tagsUserTouched:false,_archiveUserTouched:false,
      renderTags(){if(api)api.pbpRememberPopupDraft();},showStatus:(...args)=>statuses.push(args),t:k=>k,
-     existingBookmark:null,settings:{waybackArchiveEnabled:true},_waybackHostGranted:true,_pageInfoReady:true,
+     existingBookmark:null,settings:{waybackArchiveEnabled:true},pbpBookmarkServiceId:()=>"pinboard",pbpBookmarkConnection:()=>({account:currentOwner}),pbpReadBookmarkConnection:async()=>({account:currentOwner}),_waybackHostGranted:true,_pageInfoReady:true,
      buildPostsAddUri:()=>'',POSTS_ADD_URI_BUDGET:8192,pbpWaybackShouldArchive:({isPrivate})=>!isPrivate,
      _activeTabAtOpen:{url:'https://example.com/article'},invalidateBookmarkLookup(){},
      _aiSummaryValue:'',_aiSummaryRange:null,_aiLastLegacySummaryRange:()=>null,_pbpAiSummaryRangeValid:()=>false,

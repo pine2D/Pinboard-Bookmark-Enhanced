@@ -439,7 +439,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
     test("fresh bookmark lookup wires the submitted tag baseline into the rebase helper", () => {
       assert(lookupSource.includes("Array.isArray(submittedTags)"), "lookup does not detect the submitted tag baseline");
-      assert(lookupSource.includes("pbpRebasePopupTags(existingBookmark.tags || \"\", submittedTags, currentTags)"), "lookup bypasses the production rebase helper");
+      assert(lookupSource.includes("pbpRebasePopupTags(existingBookmark.tagNames || existingBookmark.tags || \"\", submittedTags, currentTags)"), "lookup bypasses the production rebase helper");
     });
 
     await testAsync("real submit callback keeps queued separate from saved side effects", async () => {
@@ -641,7 +641,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(snapshot.includes(`$id("${field}")`), `${field} is not in the final snapshot`);
       }
       assert(snapshot.includes("currentTags.slice()"), "tags are not copied into the final snapshot");
-      for (const field of ["mode: savePolicy.mode", "url: saveUrl", "title", "notes: extended", 'tags: tags.join(" ")', "private: isPrivate", "toread: isReadLater"]) {
+      for (const field of ["mode: savePolicy.mode", "url: saveUrl", "title", "notes: extended", 'tags: pbpBookmarkServiceId(settings) === "pinboard" ? tags.join(" ") : pbpBookmarkFormatTags(tags)', "private: isPrivate", "toread: isReadLater"]) {
         assert(intentBlock.includes(field), `intent is missing ${field}`);
       }
       assert(intentBlock.includes("archive: _archiveUserTouched ? archiveRequested : undefined"), "automatic archive choice is still sent as an override");
@@ -950,7 +950,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // back behind an await, or drops the fetch call into this synchronous
     // block, fails loudly here.
     await testAsync("K70: the showMain visibility switch unhides #suggest-row synchronously when optShowSuggestTags is on", async () => {
-      const switchStart = source.indexOf("if (!settings.optShowSearch) {");
+      const switchStart = source.indexOf('if (!settings.optShowSearch || pbpBookmarkServiceId(settings) !== "pinboard") {');
       const switchEnd = source.indexOf("if (settings.optShowQuickLinks === false) {", switchStart);
       assert(switchStart >= 0 && switchEnd > switchStart, "showMain's visibility-switch block not found");
       const switchBlock = source.slice(switchStart, switchEnd);
@@ -972,7 +972,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     });
 
     await testAsync("K70: with optShowSuggestTags off, the visibility switch leaves #suggest-row hidden", async () => {
-      const switchStart = source.indexOf("if (!settings.optShowSearch) {");
+      const switchStart = source.indexOf('if (!settings.optShowSearch || pbpBookmarkServiceId(settings) !== "pinboard") {');
       const switchEnd = source.indexOf("if (settings.optShowQuickLinks === false) {", switchStart);
       const switchBlock = source.slice(switchStart, switchEnd);
 
@@ -991,7 +991,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // ONLY "suggest-row" misses, so the rest of the block still resolves
     // real elements and the deref under test genuinely runs.
     await testAsync("finding 6: the showMain visibility switch does not throw when #suggest-row is missing and optShowSuggestTags is on", async () => {
-      const switchStart = source.indexOf("if (!settings.optShowSearch) {");
+      const switchStart = source.indexOf('if (!settings.optShowSearch || pbpBookmarkServiceId(settings) !== "pinboard") {');
       const switchEnd = source.indexOf("if (settings.optShowQuickLinks === false) {", switchStart);
       const switchBlock = source.slice(switchStart, switchEnd);
       const settingsStub = { optShowSearch: true, optShowAiSummary: true, optShowAiTags: true, optShowSuggestTags: true };
@@ -1016,7 +1016,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       await testAsync("AI setup visibility: " + name, async () => {
         const root = document.createElement("div");
         root.innerHTML = '<div id="ai-setup-row" class="row hidden"></div><div class="row"><div id="ai-suggest-tags"><button id="ai-tags-btn"></button></div></div><button id="ai-summary-btn"></button><span id="ai-summary-hint"></span><div id="suggest-row" class="hidden"></div>';
-        const switchStart = source.indexOf("if (!settings.optShowSearch) {");
+        const switchStart = source.indexOf('if (!settings.optShowSearch || pbpBookmarkServiceId(settings) !== "pinboard") {');
         const switchEnd = source.indexOf("if (settings.optShowQuickLinks === false) {", switchStart);
         const run = new Function("$id", "document", "settings", "hasAIKey", source.slice(switchStart, switchEnd));
         run(id => root.querySelector("#" + id), document,
@@ -1060,7 +1060,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
     test("queued refreshes the queue bar without saved side effects", () => {
       const queuedStart = submit.indexOf('if (result.status === "queued")');
-      const queuedEnd = submit.indexOf('if (result.status === "skipped"', queuedStart);
+      const queuedEnd = submit.indexOf('if (result.status === "failed" && result.reason === "partial")', queuedStart);
       const queued = submit.slice(queuedStart, queuedEnd);
       assert(queued.includes("showSaveQueued(result)") && queued.includes("window.PPOffline.refresh()"), "queued UI or queue refresh missing");
       assert(queued.includes('setSubmitState("idle")'), "queued submit does not leave loading state");
@@ -1079,7 +1079,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const dirtyResetIndex = submit.indexOf("Object.keys(fieldDirtyFlags).forEach", intentIndex);
       assert(saved.includes('if (savePolicy.mode === "update")'), "update/create result split missing");
       assert(dirtyResetIndex > intentIndex && dirtyResetIndex < sendIndex, "submitted dirty baseline is not reset before delivery");
-      assert(!submit.slice(sendIndex, savedEnd).includes("Object.keys(fieldDirtyFlags).forEach"), "a result path can erase edits made while delivery is pending");
+      assert(!submit.slice(sendIndex, savedEnd).includes("fieldDirtyFlags[id] = false"), "a result path can erase edits made while delivery is pending");
       assert(freshIndex > elseStart, "create/merge does not force a fresh lookup");
       assert(saved.includes("checkExistingBookmark(token, url, null, true, tags)"), "force-fresh does not carry the submitted tag baseline");
       assert(autoCloseGeneration > freshIndex, "auto-close captures the stale pre-refresh generation");
@@ -2702,7 +2702,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(fetch401.includes("resetPinboardSession(") && !fetch401.includes("showLogin()"), "pinboardFetch 401 still mutates the live view");
       assert(resetSource.includes('type: "PBP_RESET_PINBOARD_AUTH", expectedToken') && resetSource.includes("if (!result?.ok) return false"), "session reset bypasses or ignores conditional worker reset");
       assert(!resetSource.includes("pbpDiscardPopupDraft"), "automatic auth reset discards a later session's drafts");
-      assert(logoutSource.includes('persistSettings({ pinboardToken: "" })') && logoutSource.includes("if (!result.ok) return"), "logout bypasses or ignores unified persistence");
+      assert(logoutSource.includes('persistSettings({ [(pbpBookmarkServiceId(settings) || "pinboard") + "Token"]: "" })') && logoutSource.includes("if (!result.ok) return"), "logout bypasses or ignores unified persistence");
       assert(!resetSource.includes("storage.local") && !logoutSource.includes("storage.local"), "token clear still hand-routes a storage area");
       assert(loginSource.includes("const saved = await persistSettings") && loginSource.indexOf("if (!saved.ok)") < loginSource.indexOf("settings.pinboardToken = token"), "login enters memory before persistence succeeds");
       assert(resetSource.includes('settings.pinboardToken = ""') && resetSource.includes("window.location.reload()"), "session reset does not clear memory and reload");
@@ -3058,7 +3058,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         SETTINGS_DEFAULTS,
         stripTrackingParams: realStripTrackingParams,
         pbpPinboardAccountFromToken,
-        getCurrentPinboardAuth: async () => workerAuth,
+        getCurrentBookmarkAuth: async () => workerAuth,
         getSettingsStorage: async () => ({ get: async (defaults) => ({ ...defaults, optCheckBookmarkStatus: true, urlClean }) }),
         pinboardFetch: workerFetch,
         console: { warn: () => {} },
@@ -3935,12 +3935,12 @@ test("posts/add default remains replace=yes for existing callers", () => {
           status.className = "status-msg " + kind;
         };
         const setSubmitState = new Function("btn", "t", "$id", "bookmarkLookup", "updateCharCount",
-          "showStatus", "setTimeout", "clearTimeout",
+          "showStatus", "setTimeout", "clearTimeout", "settings", "pbpBookmarkServiceId",
           source.slice(fnStart, fnEnd) + "; return setSubmitState;")(
           btn, (k) => k, (id) => (id === "status-msg" ? status : { value: "" }), { status: "none" }, () => {},
           showStatus,
           (fn, ms) => { timers.push({ fn, ms, live: true }); return timers.length; },
-          (id) => { if (id && timers[id - 1]) timers[id - 1].live = false; });
+          (id) => { if (id && timers[id - 1]) timers[id - 1].live = false; }, {bookmarkService:"pinboard"}, s=>s.bookmarkService);
         return { btn, status, timers, shown, setSubmitState };
       };
       const a = make();

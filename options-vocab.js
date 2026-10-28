@@ -946,7 +946,7 @@ if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged)
     if (changes.dictEudicToken) {
       _pbpVocabRefreshEudicConfigured().then(_pbpVocabUpdateExternalActions);
     }
-    const accountChanged = changes.pinboardToken || changes.optSyncEnabled || changes.syncApiKeys;
+    const accountChanged = changes.personalLibraryAccount || changes.optSyncEnabled || changes.syncApiKeys;
     const active = document.querySelector(".tab-btn.active")?.dataset.panel;
     if (accountChanged) {
       invalidateDriveSyncPanel();

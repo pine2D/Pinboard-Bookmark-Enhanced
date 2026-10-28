@@ -818,7 +818,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "sync" && area !== "local") return;
-      if (changes.pinboardToken || changes.optSyncEnabled || changes.syncApiKeys
+      if (changes.personalLibraryAccount || changes.optSyncEnabled || changes.syncApiKeys
         || Object.keys(changes).some((key) => key.startsWith("driveConnState:"))) pbpLibRefreshDriveLine();
     });
   }

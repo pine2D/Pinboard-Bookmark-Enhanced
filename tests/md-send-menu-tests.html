@@ -30,12 +30,14 @@ async function fixture({ realRuntime = false } = {}) {
   };
   const params = {
     exportSettings: {},
-    previewAccount: "qa", _articleRevision: 0, exportAskRevision: 0,
+    previewAccount: "qa", bookmarkAccount: "qa", _articleRevision: 0, exportAskRevision: 0,
     exportScope: "article", expIncludeAsk: {}, expIncludeHl: null, pbpExpTglOn: () => state.includeAsk,
     url: "https://fixture.test/article", title: "Fixture",
     pbpAskExportSnapshot: async () => state.askReads.length ? state.askReads.shift().promise : structuredClone(state.askSnapshot),
     SETTINGS_DEFAULTS: { pinboardToken: "" },
     pbpPinboardAccountFromToken: token => String(token || "").split(":")[0],
+    pbpPersonalLibraryAccount: async () => state.ownerReads.length ? (await state.ownerReads.shift().promise).personalLibraryAccount : "qa",
+    pbpReadBookmarkConnection: async () => ({account: String(state.settings.pinboardToken || "qa:key").split(":")[0]}),
     PBP_EXPORT_TARGETS,
     pbpExportTargetIds,
     pbpReadSettingsWithSecrets: async defaults => {
@@ -325,7 +327,7 @@ async function test(name, fn, options) {
     precheck.resolve({ ok: true, status: 200 }); await settle();
     assert(f.state.ownerReads.length === 0, "owner read did not pause the output guard");
     f.state.settings = { exportTargets: {} }; await f.refresh();
-    owner.resolve({ pinboardToken: "qa:key" }); await settle();
+    owner.resolve({ personalLibraryAccount: "qa" }); await settle();
     assert(f.state.requests.length === 1 && f.state.copied.length === 0, "guard reused the target state from before its await");
   }, { realRuntime: true });
   await test("target invalidation during Q&A preparation leaves the new menu untouched", async f => {

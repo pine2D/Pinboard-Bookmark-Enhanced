@@ -1209,7 +1209,7 @@ function selectionRange(n, start, end) {
   // opaque to it (the account itself comes from a re-read, not from here).
   async function switchAccountTo(owner) {
     OWNER_NOW = owner;
-    CHANGE_LISTENERS.forEach((fn) => fn({ pinboardToken: { oldValue: "old", newValue: "new" } }, "local"));
+    CHANGE_LISTENERS.forEach((fn) => fn({ personalLibraryAccount: { oldValue: "old", newValue: "new" } }, AUTH_FLAGS.optSyncEnabled ? "sync" : "local"));
     await flush();
   }
 
@@ -1232,15 +1232,12 @@ function selectionRange(n, start, end) {
   check("the previous account's record is left byte-identical by the switch",
     JSON.stringify(record().items) === JSON.stringify(ownedRecord().items), JSON.stringify(record()));
 
-  // K30: a sync-to-sync token rotation can flip ONLY syncApiKeys (credential
-  // routing moves the live token from local to sync, or back -- shared.js:578
-  // tokenArea = syncApiKeys ? "sync" : "local"), and the sync change payload
-  // that reaches another device's listener can carry no pinboardToken at all.
-  // A two-key condition goes silent on exactly this change; the switch must
-  // land the same as the pinboardToken-only case above.
+  // A main settings-area change must re-read the library identity even when
+  // the event carries no personalLibraryAccount field. Secret routing alone
+  // does not change the shared library.
   async function switchAccountToViaSyncApiKeys(owner) {
     OWNER_NOW = owner;
-    CHANGE_LISTENERS.forEach((fn) => fn({ syncApiKeys: { oldValue: false, newValue: true } }, "sync"));
+    CHANGE_LISTENERS.forEach((fn) => fn({ optSyncEnabled: { newValue: AUTH_FLAGS.optSyncEnabled } }, "local"));
     await flush();
   }
 
@@ -1327,7 +1324,7 @@ function selectionRange(n, start, end) {
   _pbpHlEchoItems = structuredClone(record().items);
   CARD_HIDDEN = 0;
   const oldOwner = gatedRead(OWNER_READS);
-  authChanged({ syncApiKeys: { oldValue: true, newValue: false } }, "sync");
+  authChanged({ optSyncEnabled: { newValue: true } }, "local");
   check("owner refresh immediately tears down the previous account's card and selection",
     _pbpHlCardItemId === null && _pbpHlBarRange === null && CARD_HIDDEN === 1);
   check("owner refresh immediately removes all displayed items and painted ranges",
@@ -1342,7 +1339,7 @@ function selectionRange(n, start, end) {
   check("a record change cannot repopulate items while the owner read waits",
     memoryIds().length === 0 && !CSS.highlights.has("pbp-hl-1"));
   OWNER_NOW = BOB;
-  authChanged({ pinboardToken: { oldValue: "alice:fixture", newValue: "bob:fixture" } }, "local");
+  authChanged({ personalLibraryAccount: { oldValue: "alice:fixture", newValue: "bob:fixture" } }, "sync");
   await flush();
   check("the newer owner read displays only Bob and legacy items",
     _pbpHlOwner === BOB && sameSet(memoryIds(), ["h-his", "h-legacy"]), memoryIds());
@@ -1354,12 +1351,12 @@ function selectionRange(n, start, end) {
   await mountedAccount(ALICE);
   const oldFlags = gatedRead(FLAG_READS);
   OWNER_NOW = BOB;
-  authChanged({ pinboardToken: { newValue: "bob:fixture" } }, "local");
+  authChanged({ personalLibraryAccount: { newValue: "bob:fixture" } }, "sync");
   // The original listener does not read routing flags; do not block RED on a
   // collaborator the production path has yet to use.
   await flush();
   OWNER_NOW = ALICE;
-  authChanged({ pinboardToken: { newValue: "alice:fixture" } }, "local");
+  authChanged({ personalLibraryAccount: { newValue: "alice:fixture" } }, "sync");
   await flush();
   OWNER_NOW = BOB;
   oldFlags.release({ optSyncEnabled: true, syncApiKeys: false });
@@ -1371,13 +1368,13 @@ function selectionRange(n, start, end) {
   await mountedAccount(ALICE);
   const failedOwner = gatedRead(OWNER_READS);
   OWNER_NOW = BOB;
-  authChanged({ pinboardToken: { newValue: "bob:fixture" } }, "local");
+  authChanged({ personalLibraryAccount: { newValue: "bob:fixture" } }, "sync");
   await failedOwner.started;
   failedOwner.release(Promise.reject(new Error("simulated owner read failure")));
   await flush();
   check("a failed owner refresh keeps the account surfaces empty, including legacy items",
     memoryIds().length === 0 && _pbpHlOwner === "", memoryIds());
-  authChanged({ pinboardToken: { newValue: "bob:retry" } }, "local");
+  authChanged({ personalLibraryAccount: { newValue: "bob:retry" } }, "sync");
   await flush();
   check("a later successful owner read restores Bob and legacy items after failure",
     _pbpHlOwner === BOB && sameSet(memoryIds(), ["h-his", "h-legacy"]), memoryIds());
@@ -1391,7 +1388,7 @@ function selectionRange(n, start, end) {
   await saving;
   const pendingBob = gatedRead(OWNER_READS);
   OWNER_NOW = BOB;
-  authChanged({ pinboardToken: { newValue: "bob:fixture" } }, "local");
+  authChanged({ personalLibraryAccount: { newValue: "bob:fixture" } }, "sync");
   await pendingBob.started;
   finishSave();
   const made = await creating;
@@ -1405,10 +1402,10 @@ function selectionRange(n, start, end) {
   await mountedAccount(ALICE);
   FLAG_READS.push(() => Promise.reject(new Error("simulated routing read failure")));
   OWNER_NOW = BOB;
-  authChanged({ pinboardToken: { newValue: "bob:fixture" } }, "local");
+  authChanged({ personalLibraryAccount: { newValue: "bob:fixture" } }, "sync");
   await flush();
   const unknownFlags = gatedRead(FLAG_READS);
-  authChanged({ pinboardToken: { newValue: "foreign:fixture" } }, "sync");
+  authChanged({ personalLibraryAccount: { newValue: "foreign:fixture" } }, "local");
   check("unknown routing stays empty and re-reads even for a possibly foreign-area event",
     memoryIds().length === 0 && !document.getElementById("hl-list").children.length, memoryIds());
   // The baseline has no routing read; releasing a never-entered fixture is
@@ -1426,8 +1423,8 @@ function selectionRange(n, start, end) {
   ]) {
     await mountedAccount(ALICE, flags);
     OWNER_NOW = BOB;
-    const foreignArea = flags.optSyncEnabled && flags.syncApiKeys ? "local" : "sync";
-    authChanged({ pinboardToken: { newValue: "foreign:fixture" } }, foreignArea);
+    const foreignArea = flags.optSyncEnabled ? "local" : "sync";
+    authChanged({ personalLibraryAccount: { newValue: "foreign:fixture" } }, foreignArea);
     authChanged({ optSyncEnabled: { newValue: !flags.optSyncEnabled } }, "sync");
     authChanged({ syncApiKeys: { newValue: !flags.syncApiKeys } }, "local");
     if (!flags.optSyncEnabled) authChanged({ syncApiKeys: { newValue: true } }, "sync");
@@ -1443,7 +1440,7 @@ function selectionRange(n, start, end) {
   const mounting = pbpHlInit({ url: PAGE_URL, title: "Fixture article" });
   await initialOwner.started;
   OWNER_NOW = BOB;
-  authChanged({ pinboardToken: { newValue: "bob:fixture" } }, "local");
+  authChanged({ personalLibraryAccount: { newValue: "bob:fixture" } }, "sync");
   await flush();
   initialOwner.release(ALICE);
   await mounting;
@@ -1571,7 +1568,7 @@ function selectionRange(n, start, end) {
   const exportHelpers = previewSource.slice(previewSource.indexOf("  function captureExportJob()"),
     previewSource.indexOf("  function exportErrorText("));
   const readerExports = new Function("buildExportOpts", "pbpHlExportItems", `
-    const exportScope = "article", previewAccount = "", _articleRevision = 1, exportAskRevision = 1;
+    const exportScope = "article", previewAccount = "", bookmarkAccount = "", _articleRevision = 1, exportAskRevision = 1;
     const expIncludeAsk = false, expIncludeHl = true, exportSettings = {};
     const pbpExpTglOn = value => value;
     const getViewMarkdown = () => "Article", buildMeta = () => ({ title: "Fixture" });

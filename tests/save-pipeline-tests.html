@@ -122,7 +122,7 @@ async function createStatusCacheHarness(initialToken, initialFetch) {
     let currentToken = initialToken;
     let fetchHandler = initialFetch;
     const pinboardFetch = (...args) => fetchHandler(...args);
-    async function getCurrentPinboardAuth() {
+    async function getCurrentBookmarkAuth() {
       return { token: currentToken || "", account: pbpPinboardAccountFromToken(currentToken), epoch: _pinboardAuthEpoch };
     }
     ${source.slice(checkStart, checkEnd)}
@@ -165,7 +165,7 @@ async function createHarness(options) {
     token: Object.prototype.hasOwnProperty.call(opts, "currentToken") ? opts.currentToken : settings.pinboardToken,
     epoch: 0,
   };
-  const captureAuth = (token) => ({ account: pbpPinboardAccountFromToken(token), epoch: authState.epoch });
+  const captureAuth = (value) => ({...pbpBookmarkConnection(typeof value === "object" ? value : {pinboardToken:value}), epoch:authState.epoch});
   const authIsCurrent = (auth) => !!auth?.account && auth.epoch === authState.epoch;
   const statusCacheGet = (url, auth) => {
     if (!authIsCurrent(auth)) return null;
@@ -223,11 +223,11 @@ async function createHarness(options) {
     pbpResolveSavePlan,
     buildPostsAddUri,
     POSTS_ADD_URI_BUDGET,
-    pbpCapturePinboardAuth: captureAuth,
-    pbpPinboardAuthIsCurrent: authIsCurrent,
+    pbpCaptureBookmarkAuth: captureAuth,
+    pbpBookmarkAuthIsCurrent: authIsCurrent,
     pbpStatusCacheGet: statusCacheGet,
     pbpStatusCacheSet: statusCacheSet,
-    getCurrentPinboardAuth: async () => ({
+    getCurrentBookmarkAuth: async () => ({
       token: authState.token || "",
       account: pbpPinboardAccountFromToken(authState.token),
       epoch: authState.epoch,
@@ -235,8 +235,8 @@ async function createHarness(options) {
   };
   const source = await getCoreSource();
   const background = await getBackgroundSource();
-  const freshStart = background.indexOf("async function pbpReadFreshPinboardAuthForAccount("), freshEnd = background.indexOf("// An automatic auth reset", freshStart);
-  deps.pbpPinboardAuthEpoch = () => authState.epoch;
+  const freshStart = background.indexOf("async function pbpReadFreshBookmarkAuthForAccount("), freshEnd = background.indexOf("// An automatic auth reset", freshStart);
+  deps.pbpBookmarkAuthEpoch = () => authState.epoch;
   deps.pbpReadSettingsWithSecrets = async () => ({ pinboardToken: authState.token });
   deps.SETTINGS_DEFAULTS = SETTINGS_DEFAULTS;
   deps.deobfuscateKey = (value) => value;
@@ -301,7 +301,7 @@ async function createBackgroundSaveHarness(options) {
       return result;
     },
     processOfflineQueue: () => { drainCalls++; return Promise.resolve(); },
-    getCurrentPinboardAuth: async () => ({
+    getCurrentBookmarkAuth: async () => ({
       token: cachedSettings.pinboardToken,
       account: pbpPinboardAccountFromToken(cachedSettings.pinboardToken),
       epoch: 0,
@@ -353,7 +353,7 @@ async function createBatchSaveHarness(options) {
     _removeBatchRecordIfOwned: async () => true,
     _writeBatchProgress: async (value) => progress.push({ ...value }),
     loadSettings: opts.loadSettings || (async () => settings),
-    getCurrentPinboardAuth: async () => ({ token: settings.pinboardToken, account: "alice", epoch: 0 }),
+    getCurrentBookmarkAuth: async () => ({ token: settings.pinboardToken, account: "alice", epoch: 0 }),
     showNotification: (...args) => notifications.push(args),
     t: (key, ...args) => args.length ? `${key}:${args.join(":")}` : key,
     hasAIKey: () => false,
@@ -761,7 +761,7 @@ await suite("unified save pipeline", async () => {
     let current = authA;
     let checks = 0;
     const factory = new Function(
-      "getCurrentPinboardAuth", "pbpPinboardAuthIsCurrent", "checkBookmarked",
+      "getCurrentBookmarkAuth", "pbpBookmarkAuthIsCurrent", "checkBookmarked",
       "pbpStatusCacheGet", "pbpStatusCacheSet", "pinboardFetch", "chrome", `
         return function invoke(message, sendResponse) { ${source.slice(start, end)} };
       `
@@ -799,8 +799,8 @@ await suite("unified save pipeline", async () => {
     const popupPayload = popupSource.slice(popupSource.indexOf("const openPreview"), popupSource.indexOf("const downloadMd"));
     assert(popupPayload.includes("account: sessionAccount"), "popup preview payload has no owner");
     assert(popupPayload.includes('description: $id("description-input")?.value || ""'), "popup preview drops notes");
-    assert(previewSource.includes("account: previewAccount, tags, description, ts: Date.now()"), "restore record drops owner metadata");
-    assert(previewSource.includes("if (url && previewAccount)"), "ownerless preview still requests bookmark data");
+    assert(previewSource.includes("account: bookmarkAccount, tags, description, ts: Date.now()"), "restore record drops owner metadata");
+    assert(previewSource.includes("if (url && bookmarkAccount)"), "ownerless preview still requests bookmark data");
     const shortcut = source.slice(source.indexOf("async function openMarkdownPreviewFromShortcut"));
     assert(shortcut.includes('account: auth.account || ""'), "shortcut preview payload has no owner field");
   });
@@ -833,7 +833,7 @@ await suite("unified save pipeline", async () => {
     let releaseAuth;
     const auth = new Promise((resolve) => { releaseAuth = resolve; });
     let starts = 0;
-    const factory = new Function("getCurrentPinboardAuth", "handleBatchSave", `
+    const factory = new Function("getCurrentBookmarkAuth", "handleBatchSave", `
       let _batchRunning = false;
       return function invoke(message, sendResponse) { ${source.slice(start, end)} };
     `);
@@ -934,7 +934,7 @@ await suite("unified save pipeline", async () => {
     const readGate = new Promise((resolve) => { releaseRead = resolve; });
     const started = new Promise((resolve) => { readStarted = resolve; });
     const local = { get: async () => { readStarted(); await readGate; return { pinboardToken: token }; }, set: async (values) => { token = values.pinboardToken; } };
-    const reset = new Function("chrome", "pbpWithSecretStorageLock", "pbpReadSecretSyncStateUnlocked", "deobfuscateKey", "pbpPinboardAccountFromToken", "invalidatePinboardAuthState", source.slice(start, end) + "\nreturn pbpResetPinboardAuth;")(
+    const reset = new Function("chrome", "pbpWithSecretStorageLock", "pbpReadSecretSyncStateUnlocked", "deobfuscateKey", "pbpPinboardAccountFromToken", "invalidateBookmarkAuthState", source.slice(start, end) + "\nreturn pbpResetPinboardAuth;")(
       { storage: { local, session: { get: async () => ({}), remove: async () => {} } } }, pbpWithSecretStorageLock, async () => ({ optSyncEnabled: false, syncApiKeys: false }), (value) => value, pbpPinboardAccountFromToken, () => {}
     );
     const pending = reset("alice:failed-token");
@@ -965,14 +965,15 @@ await suite("unified save pipeline", async () => {
         const writes = [];
         const area = (name) => ({ get: async () => ({ ...data[name] }), set: async (values) => { Object.assign(data[name], values); writes.push(name); } });
         const session = { get: async () => ({ ...drafts }), remove: async (keys) => { keys.forEach((key) => delete drafts[key]); } };
-        const reset = new Function("chrome", "pbpWithSecretStorageLock", "pbpReadSecretSyncStateUnlocked", "deobfuscateKey", "pbpPinboardAccountFromToken", "invalidatePinboardAuthState", source.slice(start, end) + "\nreturn pbpResetPinboardAuth;")(
+        const reset = new Function("chrome", "pbpWithSecretStorageLock", "pbpReadSecretSyncStateUnlocked", "deobfuscateKey", "pbpPinboardAccountFromToken", "invalidateBookmarkAuthState", source.slice(start, end) + "\nreturn pbpResetPinboardAuth;")(
           { storage: { local: area("local"), sync: area("sync"), session } }, pbpWithSecretStorageLock, async () => state, (value) => value, pbpPinboardAccountFromToken, () => {}
         );
         const result = await reset("alice:failed-token");
         const matched = token === "alice:failed-token";
         equal(result.ok, matched, "conditional reset acknowledged a different token");
         equal(data[destination].pinboardToken, matched ? "" : token, "reset changed the wrong routed token");
-        equal(writes.length, matched ? 1 : 0, "mismatched reset wrote credentials");
+        equal(writes.length, matched ? 2 : 0, "reset writes only matched credentials and adopts its library");
+        if (matched) equal(data[state.optSyncEnabled ? "sync" : "local"].personalLibraryAccount,"alice","logout must retain the old library");
         equal(data[destination === "local" ? "sync" : "local"].pinboardToken, destination === "local" ? "bob:sync-token" : "bob:local-token", "reset touched the other storage area");
         equal(Object.hasOwn(drafts, "pbp-popup-draft:alice:normal:article"), !matched, "reset did not conditionally clear only the failed owner's drafts");
         assert(drafts["pbp-popup-draft:bob:normal:article"] && drafts.unrelated, "reset removed another owner's draft or unrelated session data");
@@ -992,7 +993,7 @@ await suite("unified save pipeline", async () => {
       const deps = { chrome: { storage: { local, session } }, pbpWithSecretStorageLock,
         pbpReadSecretSyncStateUnlocked: async () => { fail("routing"); return { optSyncEnabled: false, syncApiKeys: false }; },
         deobfuscateKey: (value) => value, pbpPinboardAccountFromToken,
-        invalidatePinboardAuthState: () => { invalidations++; }, console: { warn: (...args) => warnings.push(args) } };
+        invalidateBookmarkAuthState: () => { invalidations++; }, console: { warn: (...args) => warnings.push(args) } };
       const names = Object.keys(deps);
       const reset = new Function(...names, source.slice(start, end) + "\nreturn pbpResetPinboardAuth;")(...names.map((name) => deps[name]));
       const result = await reset("alice:failed-token");
@@ -1018,8 +1019,8 @@ await suite("unified save pipeline", async () => {
     };
     const deps = { chrome: { storage: { session, local: { get: async () => ({ pinboardToken: token }), set: async (values) => { token = values.pinboardToken; } } } },
       pbpWithSecretStorageLock, pbpReadSecretSyncStateUnlocked: async () => ({ optSyncEnabled: false, syncApiKeys: false }),
-      deobfuscateKey: (value) => value, pbpPinboardAccountFromToken, invalidatePinboardAuthState() {},
-      getCurrentPinboardAuth: async () => ({ account: pbpPinboardAccountFromToken(token) }), navigator };
+      deobfuscateKey: (value) => value, pbpPinboardAccountFromToken, invalidateBookmarkAuthState() {},
+      getCurrentBookmarkAuth: async () => ({ account: pbpPinboardAccountFromToken(token) }), navigator };
     const names = Object.keys(deps);
     const api = new Function(...names, source.slice(start, end) + source.slice(draftStart, draftEnd) + "\nreturn {pbpResetPinboardAuth,pbpRunPopupDraft};")(...names.map((name) => deps[name]));
     const draft = { url: BASE_INTENT.url, title: "Draft", notes: "Unsaved", tags: [], tagInput: "", private: false, toread: false, archive: false, archiveTouched: false };
@@ -1670,20 +1671,20 @@ await suite("unified save pipeline", async () => {
       deobfuscateKey,
       pbpResolveOfflineQueueToken,
       pbpPinboardAccountFromToken,
-      pbpPinboardAuthEpoch: () => authEpoch,
-      pbpPinboardAuthIsCurrent: (auth) => !!auth?.account && auth.epoch === authEpoch,
+      pbpBookmarkAuthEpoch: () => authEpoch,
+      pbpBookmarkAuthIsCurrent: (auth) => !!auth?.account && auth.epoch === authEpoch,
       pinboardFetch: async (url) => {
         const answer = deleteAnswer();
         deleteCalls.push(url);
         if (answer instanceof Error) throw answer;
         return answer;
       },
-      getCurrentPinboardAuth: async () => ({
+      getCurrentBookmarkAuth: async () => ({
         token: currentToken, account: pbpPinboardAccountFromToken(currentToken), epoch: authEpoch,
       }),
       getSettingsStorage: async () => ({ get: async (defaults) => defaults }),
       statusCache: new Map(),
-      pbpCapturePinboardAuth: (token) => ({ account: pbpPinboardAccountFromToken(token), epoch: authEpoch }),
+      pbpCaptureBookmarkAuth: (token) => ({ account: pbpPinboardAccountFromToken(token), epoch: authEpoch }),
       pbpStatusCacheSet: (url, auth, value) => {
         if (!auth?.account || auth.epoch !== authEpoch) return false;
         deps.statusCache.set(url, { ...value, account: auth.account });
@@ -1803,7 +1804,7 @@ await suite("unified save pipeline", async () => {
       equal(h.notifications[0][2], expectedMessage);
       equal(h.drainCalls, 0);
       // These all resolve through submitSaveIntent/notifySaveFailure, well after
-      // getCurrentPinboardAuth's storage read — K100's await only sits in
+      // getCurrentBookmarkAuth's storage read — K100's await only sits in
       // saveFromBackground's early not-logged-in branch, which none of these hit.
       equal(h.i18nReadyCalls, 0, "post-network failure notification should not await pbpI18nReady");
     }

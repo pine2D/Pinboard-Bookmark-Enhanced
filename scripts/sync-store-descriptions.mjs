@@ -7,8 +7,9 @@
 // pasted, keeping the store listing and the READMEs from drifting apart.
 //
 // The paid-account disclosure is NOT taken from the README: it is the wording a
-// CWS review already accepted (a missing paid disclosure got this extension
-// rejected once), plus the sentence stating AI is optional and BYO-key. It is
+// CWS review requires (a missing paid disclosure got this extension rejected
+// once), now conditional on choosing Pinboard, plus the optional BYO-key AI
+// sentence. The three-service disclosure is
 // carried over verbatim from the previous generated file.
 //
 // Store keyword policy (CWS rejection "Keyword Spam / Yellow Argon",
@@ -164,7 +165,7 @@ const parts = [
   ">",
   "> **Generated** by `node scripts/sync-store-descriptions.mjs` from the nine READMEs. Edit the",
   "> READMEs and regenerate; do not hand-edit the blocks below. The leading ⚠ paid-account",
-  "> disclosure is the wording a CWS review already accepted and is carried across regenerations",
+  "> disclosure states that Pinboard requires a paid account, while the other services do not; it is carried across regenerations",
   "> untouched.",
   "",
 ];

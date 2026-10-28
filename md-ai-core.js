@@ -571,14 +571,14 @@ async function pbpAiResolveInitDetail(fallback) {
   if (!detail) return fallback || {}; // standalone test pages have no lifecycle
   const revision = _pbpAiSetupRevision;
   let current;
-  try { current = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken }); }
+  try { current = await pbpPersonalLibraryAccount(); }
   catch (e) {
     // The one-time hooks/legacy retry fold init failures into a hidden entry.
     // Keep the platform failure observable before those callers handle it.
     console.warn("[reader] AI initializer owner read failed", e?.name, e?.message);
     throw e;
   }
-  const owner = pbpPinboardAccountFromToken(current.pinboardToken);
+  const owner = current;
   if (revision !== _pbpAiSetupRevision || detail !== _pbpAiSetupDetail
       || String(owner || "") !== String(detail.account || "")) return null;
   // Initial one-time hooks and delayed retries may still carry the first
@@ -598,8 +598,8 @@ async function pbpAiRefreshSetup() {
   // every subsequent refresh must still be able to initialize missing controls.
   if (!pbpAiAvailable(s) || !_pbpAiSetupDetail) return;
   const detail = _pbpAiSetupDetail;
-  const current = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
-  const owner = pbpPinboardAccountFromToken(current.pinboardToken);
+  const current = await pbpPersonalLibraryAccount();
+  const owner = current;
   if (revision !== _pbpAiSetupRevision || String(owner || "") !== String(detail.account || "")) return;
   // Initializers only build controls/restore local caches; generation still
   // requires their explicit action. Each retains its own idempotent guard.

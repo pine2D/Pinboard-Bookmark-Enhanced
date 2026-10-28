@@ -144,7 +144,9 @@ document.documentElement.setAttribute("data-listbox-ready", "");
      path -- absent here (no chrome mock on this page) it does not merely
      reject cleanly, it can leave that lock request unresolved. Same stub the
      pre-split options-vocab-tests.html used. -->
-<script>pbpReadSettingsWithSecrets = async () => ({ pinboardToken: "" });</script>
+<script>pbpReadSettingsWithSecrets = async () => ({ personalLibraryAccount: "fixture" });
+// Most list fixtures exercise legacy ownerless rows; identity routing has its own integration suite.
+pbpVocabCurrentOwner = async () => "ownerless";</script>
 <!-- library-vocab.js registers its runtime.onMessage listener at script-load
      time, and this page has no chrome mock -- stand one up for exactly that
      one script so the registration itself is observable, then put the page
@@ -189,8 +191,8 @@ const ownerNoImg = !$id("vocab-count").querySelector("img");
 _vocabRows = [];
 _pbpVocabApplyView(true);
 check("current-account total and empty state render the non-secret owner as text",
-  ownerFullText.includes("<img") && ownerTitle.includes("<img") && ownerNoImg &&
-  $id("vocab-empty").textContent.includes("<img") && !$id("vocab-empty").querySelector("img"),
+  ownerFullText.includes("personalLibraryTitle") && ownerTitle.includes("personalLibraryTitle") && ownerNoImg &&
+  $id("vocab-empty").textContent.includes("personalLibraryTitle") && !$id("vocab-empty").querySelector("img"),
   ownerFullText);
 _pbpVocabClearVisibleState();
 check("account-switch clearing removes the previous owner scope before the next read",
@@ -3821,7 +3823,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       const day = pbpLibFormatDay(TS);
       check("T8g en: one word reads word / group / language on the row and in the full sentence",
         items().slice(0, 2).join("|") === "1 word|1 group" &&
-        sr().startsWith("1 found · 1 saved for current Pinboard account: t8g"),
+        sr().startsWith("t8g: 1 found · 1 saved"),
         items().join("|") + " | " + sr());
       check("T8g en: the cover reads 1 word ... in 1 language, the four counts bold and the date plain",
         lead.textContent === `1 word, 1 learning and 0 known, in 1 language. Last added on ${day}.` && bold() === "1,1,0,1" && !!day,
@@ -3832,7 +3834,7 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       show(many);
       check("T8g en: two words keep the plural everywhere, word for word as before",
         items().slice(0, 2).join("|") === "2 words|2 groups" &&
-        sr().startsWith("2 found · 2 saved for current Pinboard account: t8g") &&
+        sr().startsWith("t8g: 2 found · 2 saved") &&
         lead.textContent === `2 words, 1 learning and 1 known, in 2 languages. Last added on ${day}.` && bold() === "2,1,1,2",
         items().join("|") + " | " + sr() + " | " + lead.textContent);
 
@@ -3848,12 +3850,12 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       show(one);
       check("T8g fr: one word reads mot / groupe / langue, and 1 résultat, 1 mot enregistré",
         items().slice(0, 2).join("|") === "1 mot|1 groupe" &&
-        sr().startsWith("Compte Pinboard actuel (t8g) : 1 résultat · 1 mot enregistré") &&
+        sr().startsWith("t8g : 1 résultat · 1 mot enregistré") &&
         lead.textContent === `1 mot, dont 1 en cours d’apprentissage et 0 acquis, dans 1 langue. Dernier ajout le ${pbpLibFormatDay(TS)}.`,
         items().join("|") + " | " + sr() + " | " + lead.textContent);
       show(one, "no such word");
       check("T8g fr: zero takes the singular in French (0 résultat, 0 / 1 mot)",
-        items()[0] === "0 / 1 mot" && sr().startsWith("Compte Pinboard actuel (t8g) : 0 résultat · 1 mot enregistré"),
+        items()[0] === "0 / 1 mot" && sr().startsWith("t8g : 0 résultat · 1 mot enregistré"),
         items()[0] + " | " + sr());
       show(one);
 
@@ -3862,14 +3864,14 @@ check("selection still covers all filtered results beyond rendered chunks", _voc
       document.dispatchEvent(new Event("pbp:i18n-applied"));
       check("T8g a language switch redraws the count row and its full sentence in the new language",
         items().slice(0, 2).join("|") === "1 word|1 group" &&
-        sr().startsWith("1 found · 1 saved for current Pinboard account: t8g"),
+        sr().startsWith("t8g: 1 found · 1 saved"),
         items().join("|") + " | " + sr());
       // Under a filter the redraw keeps the filtered reading.
       show(one, "no such word");
       useLang("fr");
       document.dispatchEvent(new Event("pbp:i18n-applied"));
       check("T8g a language switch under a filter keeps 0 / 1 and redraws it in the new language",
-        items()[0] === "0 / 1 mot" && sr().startsWith("Compte Pinboard actuel (t8g) : 0 résultat · 1 mot enregistré"),
+        items()[0] === "0 / 1 mot" && sr().startsWith("t8g : 0 résultat · 1 mot enregistré"),
         items()[0] + " | " + sr());
     } finally {
       if (!hadChrome) delete window.chrome;

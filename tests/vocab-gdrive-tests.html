@@ -311,8 +311,8 @@ function syncHarness(options = {}) {
     client,
     store,
     connection,
-    getCurrentPinboardAuth: async () => auth(),
-    pinboardAuthIsCurrent: (captured) =>
+    getCurrentLibraryAuth: async () => auth(),
+    libraryAuthIsCurrent: (captured) =>
       captured.account === authAccount && captured.epoch === authEpoch,
     hashOwner: async (value) => { hashInputs.push(value); return OWNER_HASH; },
     now: options.now || (() => 1_000_000),
@@ -2547,8 +2547,8 @@ function syncHarness(options = {}) {
     });
     const runner = pbpCreateVocabDriveSyncRunner({
       client,
-      getCurrentPinboardAuth: async () => ({ account: "alias-runner" }),
-      pinboardAuthIsCurrent: () => true,
+      getCurrentLibraryAuth: async () => ({ account: "alias-runner" }),
+      libraryAuthIsCurrent: () => true,
       hashOwner: async () => ownerHash
     });
     const first = await runner();
@@ -2688,7 +2688,7 @@ function syncHarness(options = {}) {
         upload:async(metadata,body)=>{uploads[bound].push(...JSON.parse(body).entries);return {ok:true};}};
     }};
     const runner = pbpCreateVocabDriveSyncRunner({client,hashOwner:async()=>ownerHash,
-      getCurrentPinboardAuth:async()=>({account:"drive-cycle"}),pinboardAuthIsCurrent:()=>true});
+      getCurrentLibraryAuth:async()=>({account:"drive-cycle"}),libraryAuthIsCurrent:()=>true});
     await pbpVocabSaveWord(owner,{term:"Haus",language:"de",gloss:"house"});
     if (!(await runner()).ok) return false;
     permissionId = "drive-cycle-B";
@@ -2755,8 +2755,8 @@ function syncHarness(options = {}) {
       if (path.endsWith("/original-v1-id")) return jsonResponse(oldMeta);
       throw new Error("unexpected legacy fixture request");
     }});
-    const runner = pbpCreateVocabDriveSyncRunner({client,getCurrentPinboardAuth:async()=>({account:"v1-pending"}),
-      pinboardAuthIsCurrent:()=>true,hashOwner:async()=>ownerHash});
+    const runner = pbpCreateVocabDriveSyncRunner({client,getCurrentLibraryAuth:async()=>({account:"v1-pending"}),
+      libraryAuthIsCurrent:()=>true,hashOwner:async()=>ownerHash});
     const result = await runner();
     return result.ok && sent.length === 1 && sent[0].includes(oldBody) &&
       sent[0].includes('"schema":"1"') && sent[0].includes('"id":"original-v1-id"') &&
@@ -2789,8 +2789,8 @@ function syncHarness(options = {}) {
         nextPageToken:null,newStartPageToken:"next"}),download:async id=>({ok:true,body:files.get(id)}),
       generateId:async()=>({ok:true,fileId:"frontier-upload"}),
       upload:async(meta,body)=>{uploads.push(JSON.parse(body));return {ok:true};}})};
-    const runner=pbpCreateVocabDriveSyncRunner({client,getCurrentPinboardAuth:async()=>({account:"frontier-runner"}),
-      pinboardAuthIsCurrent:()=>true,hashOwner:async()=>ownerHash});
+    const runner=pbpCreateVocabDriveSyncRunner({client,getCurrentLibraryAuth:async()=>({account:"frontier-runner"}),
+      libraryAuthIsCurrent:()=>true,hashOwner:async()=>ownerHash});
     const first=await runner(),second=await runner();
     const words=await pbpVocabAll(owner),preflight=await pbpVocabGetPreflightState(ownerHash);
     return first.ok && second.ok && !preflight && words[0]?.note==="new" && words[0].groups.length===0 &&

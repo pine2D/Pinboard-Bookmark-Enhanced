@@ -3,13 +3,13 @@
     "message": "Pinboard 书签增强"
   },
   "extDescription": {
-    "message": "一键保存到 Pinboard：AI 标签与摘要、内置阅读器（全文翻译、高亮）、Markdown/EPUB 导出、13 套站点主题。"
+    "message": "保存到 Pinboard、Karakeep 或 linkding，支持 AI 标签与摘要、翻译和高亮阅读器，以及 Markdown/EPUB 导出。"
   },
   "cmdOpenPopup": {
     "message": "打开 Pinboard 书签增强"
   },
   "cmdQuickSave": {
-    "message": "快速保存到 Pinboard（无弹窗）"
+    "message": "快捷保存到所选书签服务（不打开弹窗）"
   },
   "cmdReadLater": {
     "message": "快速保存为稍后阅读（无弹窗）"
@@ -162,7 +162,7 @@
     "message": "AI 标签"
   },
   "urlWarning": {
-    "message": "此页面无法保存到 Pinboard（不支持的网址类型）。下方的标签页集和批量保存仍可使用。"
+    "message": "此页面的 URL 类型不受支持，无法保存为书签。"
   },
   "urlCannotSave": {
     "message": "无法保存：不支持的网址类型"
@@ -550,7 +550,7 @@
     }
   },
   "batchAccountChanged": {
-    "message": "Pinboard 账号已切换，批量保存已停止。"
+    "message": "批量保存已停止：书签连接发生了变化。"
   },
   "tabSetFailed": {
     "message": "标签页集保存失败：$ERROR$",
@@ -598,19 +598,19 @@
     }
   },
   "saveQueuedNetwork": {
-    "message": "连不上 Pinboard，请检查网络。书签已排队，稍后会自动重试。"
+    "message": "无法连接书签服务器。已加入离线队列，稍后自动重试。"
   },
   "saveQueuedServer": {
-    "message": "Pinboard 暂时无法处理请求。书签已排队，稍后会自动重试。"
+    "message": "书签服务器暂不可用。已加入队列，稍后自动重试。"
   },
   "offlineRetry": {
     "message": "立即重试"
   },
   "offlineRetryWrongAccount": {
-    "message": "这条书签是在另一个 Pinboard 账号下加入队列的，登录该账号后才能发送。"
+    "message": "此任务属于另一个书签连接。请恢复原连接，或检查页面后重新保存。"
   },
   "offlineRetryAccountChanged": {
-    "message": "重试期间 Pinboard 账号已切换，已停止发送。"
+    "message": "重试期间书签连接发生了变化，操作已停止。"
   },
   "offlineRetryFailed": {
     "message": "这条书签没能发送，请重试。",
@@ -673,34 +673,34 @@
     "message": "删除此书签"
   },
   "bgNotLoggedIn": {
-    "message": "Pinboard：未登录"
+    "message": "尚未连接书签服务"
   },
   "bgSetToken": {
-    "message": "请先在扩展设置中配置 API Token。"
+    "message": "请在扩展设置中选择并连接书签服务。"
   },
   "bgUndone": {
-    "message": "Pinboard：已撤销"
+    "message": "已撤销"
   },
   "bgUndoFailed": {
-    "message": "Pinboard：撤销失败"
+    "message": "撤销失败"
   },
   "bgBookmarkRemoved": {
     "message": "书签已移除。"
   },
   "bgQuickSaved": {
-    "message": "Pinboard：快速保存"
+    "message": "快速保存"
   },
   "bgReadLater": {
-    "message": "Pinboard：稍后阅读"
+    "message": "稍后阅读"
   },
   "bgCannotSave": {
-    "message": "Pinboard：无法保存"
+    "message": "无法保存"
   },
   "bgCannotBookmark": {
     "message": "只能保存 http 或 https 网页。"
   },
   "bgMdPreviewFailed": {
-    "message": "Pinboard：无法转换为 Markdown"
+    "message": "无法转换为 Markdown"
   },
   "bgMdPreviewNoContent": {
     "message": "未能从该页面提取到可读内容。"
@@ -831,19 +831,19 @@
     "message": "请先在此浏览器中登录 pinboard.in，然后重试。"
   },
   "bgQuickSaveFailed": {
-    "message": "Pinboard：快速保存失败"
+    "message": "快速保存失败"
   },
   "bgReadLaterFailed": {
-    "message": "Pinboard：稍后阅读保存失败"
+    "message": "稍后阅读保存失败"
   },
   "bgSaveFailed": {
-    "message": "Pinboard：保存失败"
+    "message": "保存失败"
   },
   "bgNetworkError": {
-    "message": "Pinboard：网络错误"
+    "message": "网络错误"
   },
   "bgQueuedOffline": {
-    "message": "Pinboard：已加入离线队列"
+    "message": "已加入离线队列"
   },
   "bgTitleSaved": {
     "message": "“$TITLE$”已保存。",
@@ -870,10 +870,10 @@
     }
   },
   "bgBatchSaved": {
-    "message": "Pinboard：批量保存完成"
+    "message": "批量保存完成"
   },
   "bgBatchCancelled": {
-    "message": "Pinboard：批量保存已取消"
+    "message": "批量保存已取消"
   },
   "bgUndo": {
     "message": "撤销"
@@ -930,7 +930,7 @@
     "message": "没有符合筛选条件的笔记。"
   },
   "notesHiddenByOwner": {
-    "message": "这台设备上保存的部分高亮属于其他 Pinboard 账号，当前账号看不到。"
+    "message": "部分高亮属于其他历史资料库，尚未合并到当前个人资料库。"
   },
   "notesUnknownPage": {
     "message": "未知页面"
@@ -1095,7 +1095,7 @@
     "message": "预热（后台每 15 分钟刷新，打开即用）"
   },
   "tagSyncHint": {
-    "message": "控制如何从 Pinboard 拉取你已有的标签云用于自动补全。仅读取，不会向 Pinboard 上传任何标签。"
+    "message": "选择何时加载已有标签用于自动补全。加载标签不会修改服务器上的数据。"
   },
   "labelTagPresets": {
     "message": "标签预设"
@@ -1134,13 +1134,13 @@
     "message": "在备份中包含生词"
   },
   "backupIncludeVocabularyHint": {
-    "message": "只包含当前 Pinboard 账号的生词。"
+    "message": "只包含个人资料库的生词。"
   },
   "backupIncludeSecretsLabel": {
     "message": "在备份中包含 API Key 和 Token"
   },
   "backupIncludeSecretsHint": {
-    "message": "会把全部凭据以明文写进文件：Pinboard API Token、所有 AI 服务商的 API Key，以及 Jina、Wayback、Anki、欧路词典、Notion、Gist 和 Webhook 的凭据。任何人打开文件都能直接使用。请按保管密码的方式保管这个文件。"
+    "message": "会把全部凭据以明文写进文件：Pinboard/Karakeep/linkding API Token、所有 AI 服务商的 API Key，以及 Jina、Wayback、Anki、欧路词典、Notion、Gist 和 Webhook 的凭据。任何人打开文件都能直接使用。请按保管密码的方式保管这个文件。"
   },
   "backupSecretsExportTitle": {"message": "导出含凭据的备份？"},
   "backupSecretsExportConfirm": {
@@ -1162,13 +1162,13 @@
     "message": "此备份含明文凭据。只在你确认文件来源可靠时才导入。"
   },
   "backupVocabOwnerMissing": {
-    "message": "当前没有可用的 Pinboard 账号，因此未包含生词。其他已选数据仍已导出。"
+    "message": "当前没有可用的 个人资料库，因此未包含生词。其他已选数据仍已导出。"
   },
   "backupHighlightsOwnerMissing": {
-    "message": "当前没有可用的 Pinboard 账号，因此未包含归属账号的高亮和笔记。其他已选数据仍已导出。"
+    "message": "当前没有可用的 个人资料库，因此未包含归属账号的高亮和笔记。其他已选数据仍已导出。"
   },
   "backupHighlightsVocabOwnerMissing": {
-    "message": "当前没有可用的 Pinboard 账号，因此未包含生词和归属账号的高亮和笔记。其他已选数据仍已导出。"
+    "message": "当前没有可用的 个人资料库，因此未包含生词和归属账号的高亮和笔记。其他已选数据仍已导出。"
   },
   "backupPreviewTitle": {
     "message": "导入预览"
@@ -1200,7 +1200,7 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "backupPreviewHighlights": {
-    "message": "页面：$PAGES$；记录：$ITEMS$；Pinboard 账号：$OWNER$",
+    "message": "页面：$PAGES$；记录：$ITEMS$；个人资料库：$OWNER$",
     "placeholders": {
       "pages": { "content": "$1" },
       "items": { "content": "$2" },
@@ -1208,7 +1208,7 @@
     }
   },
   "backupPreviewVocabulary": {
-    "message": "生词记录：$COUNT$；Pinboard 账号：$OWNER$",
+    "message": "生词记录：$COUNT$；个人资料库：$OWNER$",
     "placeholders": {
       "count": { "content": "$1" },
       "owner": { "content": "$2" }
@@ -1224,10 +1224,10 @@
     "message": "无"
   },
   "backupPreviewOwnerMismatch": {
-    "message": "该备份属于另一个 Pinboard 账号，无法导入其中的生词。"
+    "message": "该备份属于另一个 个人资料库，无法导入其中的生词。"
   },
   "backupPreviewHighlightOwnerMismatch": {
-    "message": "该备份属于另一个 Pinboard 账号，无法导入其中的高亮和笔记。"
+    "message": "该备份属于另一个 个人资料库，无法导入其中的高亮和笔记。"
   },
   "backupPreviewReady": {
     "message": "导入预览已就绪。"
@@ -3411,7 +3411,7 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "连接后，同步当前 Pinboard 账号的生词、高亮与笔记、完整 AI 词条及补充，以及已保存的问答和引用。"
+      "message": "连接后，同步个人资料库的生词、高亮与笔记、完整 AI 词条及补充，以及已保存的问答和引用。"
     },
     "vocabDriveConnectionHint": { "message": "每台设备需单独连接。Google Drive 不同步设置或凭据。" },
     "vocabDriveDisclosure": {
@@ -3448,7 +3448,7 @@
       "message": "Google 账号"
     },
     "vocabDriveOwnerLabel": {
-      "message": "Pinboard 账号"
+      "message": "个人资料库"
     },
     "vocabDriveNever": {
       "message": "尚未同步"
@@ -3481,10 +3481,10 @@
       "message": "暂时无法取得 Google 授权。"
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "尚未登录 Pinboard 账号。请在「账号 → Pinboard 账号」中填写 API Token，然后重新连接。"
+      "message": "个人资料库暂不可用，请重新打开此页面后重试。"
     },
     "vocabDriveErrorPinboardAuthSync": {
-      "message": "尚未登录 Pinboard 账号。请在「账号 → Pinboard 账号」中填写 API Token，然后点击「立即同步」。"
+      "message": "个人资料库暂不可用，请重新打开此页面，然后点击「立即同步」。"
     },
     "vocabDriveErrorPermission": {
       "message": "缺少 Google Drive 权限。"
@@ -3508,7 +3508,7 @@
       "message": "同步时发生意外错误。"
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "同步期间 Google 账号或 Pinboard 账号发生了变化，请重试。"
+      "message": "同步期间 Google 账号或个人资料库发生了变化，请重试。"
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "有一条生词或其上下文内容过大，无法同步。请缩短或删除该条内容，然后点击「立即同步」。"
@@ -3531,16 +3531,16 @@
       "message": "导出与集成"
     },
     "vocabOwnerNoAccount": {
-      "message": "未登录 Pinboard"
+      "message": "个人资料库暂不可用，请重新打开此页面后重试。"
     },
     "vocabLoadFailed": {
-      "message": "无法加载当前 Pinboard 账号的生词。请重新打开「生词」后再试。"
+      "message": "无法加载个人资料库的生词。请重新打开「生词」后再试。"
     },
     "vocabExportFailed": {
       "message": "无法导出生词，请重试。"
     },
     "vocabAccountChanged": {
-      "message": "操作完成前 Pinboard 账号已切换，请重试。"
+      "message": "操作完成前个人资料库已切换，请重试。"
     },
     "vocabSettingsSaveFailed": {
       "message": "无法保存刚才修改的集成设置。请检查设置后再试。"
@@ -3552,7 +3552,7 @@
       "message": "Cmd+点击条目即可选中，Shift+点击可选中连续多条"
     },
     "vocabResultCount": {
-      "message": "找到 $RESULTS$ 条；当前 Pinboard 账号（$OWNER$）共保存 $TOTAL$ 条",
+      "message": "$OWNER$：找到 $RESULTS$ 条，共保存 $TOTAL$ 条",
       "placeholders": {
         "results": {
           "content": "$1"
@@ -3863,7 +3863,7 @@
     "message": "在设置中配置 AI 服务商并开启阅读器 AI 后，即可生成词条。"
   },
   "dictVocabEmpty": {
-    "message": "当前 Pinboard 账号（$OWNER$）还没有生词。可在阅读器的词典视图中保存单词。",
+    "message": "个人资料库（$OWNER$）还没有生词。可在阅读器的词典视图中保存单词。",
     "placeholders": {
       "owner": {
         "content": "$1"
@@ -4273,7 +4273,7 @@
   "diagnosticsCopied": { "message": "诊断信息已复制" },
   "diagnosticsCopyFailed": { "message": "无法复制诊断信息，请检查剪贴板权限后重试。" },
   "libraryVocabSignedOutTitle": { "message": "登录后使用生词本" },
-  "libraryVocabSignedOutHint": { "message": "生词按 Pinboard 账号分别保存；未登录时仍可使用词典查询。" },
+  "libraryVocabSignedOutHint": { "message": "所有书签服务共用个人资料库中的生词、高亮、笔记和 Ask 历史。" },
   "libraryVocabOpenSettings": { "message": "打开账号设置" },
   "libraryLookupSignedOutHint": { "message": "可在「词典」栏查询单词；登录后即可保存到生词本。" },
   "mdPreviewClose": { "message": "关闭阅读器" },
@@ -4377,7 +4377,7 @@
   "loginNeedsPaid": { "message": "需要付费的 Pinboard 账号。" },
   "popupDraftDiscard": { "message": "丢弃草稿" },
   "readerBookmarkSection": {"message": "保存"},
-  "readerBookmarkSave": {"message": "保存到 Pinboard"},
+  "readerBookmarkSave": {"message": "保存书签"},
   "readerBookmarkSaved": {"message": "已保存"},
   "readerBookmarkLater": {"message": "稍后阅读"},
   "readerBookmarkMarkRead": {"message": "标为已读"},
@@ -4385,7 +4385,7 @@
   "readerBookmarkChecking": {"message": "正在检查书签…"},
   "readerBookmarkSaving": {"message": "正在保存…"},
   "readerBookmarkUpdated": {"message": "书签已更新"},
-  "readerBookmarkQueued": {"message": "已加入离线队列，尚未保存到 Pinboard"},
+  "readerBookmarkQueued": {"message": "已加入离线队列，尚未保存到书签服务"},
   "readerBookmarkLookupFailed": {"message": "无法检查书签，请重试后再编辑。"},
   "readerBookmarkFailed": {"message": "保存失败，请重试。"},
   "readerBookmarkAccountChanged": {"message": "账号已切换，请重新打开阅读器后保存。"},
@@ -4399,14 +4399,14 @@
     "message": "删除书签"
   },
   "readerBookmarkDeleteConfirm": {
-    "message": "从 Pinboard 删除此书签？"
+    "message": "删除这条书签？"
   },
   "readerBookmarkDeleteDetail": {"message": "高亮和阅读笔记会保留。"},
   "readerBookmarkDeleting": {
     "message": "正在删除书签…"
   },
   "readerBookmarkDeleted": {
-    "message": "已从 Pinboard 删除书签"
+    "message": "书签已删除"
   },
   "readerBookmarkDeleteFailed": {
     "message": "无法确认删除结果，请重试。"
@@ -4680,5 +4680,62 @@
   "dictGenerationServiceUnavailable": {"message": "供应商的服务暂时不可用，请稍后再试。"},
   "dictProgressThinking": {"message": "模型正在思考…"},
   "dictProgressStreaming": {"message": "正在接收回答…"},
-  "dictProgressElapsed": {"message": "已等待 $SECONDS$ 秒", "placeholders": {"seconds": {"content": "$1"}}}
+  "dictProgressElapsed": {"message": "已等待 $SECONDS$ 秒", "placeholders": {"seconds": {"content": "$1"}}},
+  "bookmarkServiceTitle": {
+    "message": "书签服务"
+  },
+  "bookmarkServiceChoose": {
+    "message": "选择书签保存位置"
+  },
+  "bookmarkServiceHint": {
+    "message": "弹窗、阅读器、快捷键和批量保存均使用此服务。"
+  },
+  "personalLibraryTitle": {
+    "message": "个人资料库"
+  },
+  "personalLibraryHint": {
+    "message": "所有书签服务共用个人资料库中的生词、高亮、笔记和 Ask 历史。"
+  },
+  "bookmarkServerUrl": {
+    "message": "服务器地址"
+  },
+  "bookmarkServerHint": {
+    "message": "填写站点地址，包含部署子路径。除本机地址外，必须使用 HTTPS。"
+  },
+  "bookmarkConnectHint": {
+    "message": "地址和令牌在连接成功后生效。令牌默认保存在本机，只有开启凭据同步后才会同步。"
+  },
+  "bookmarkConnect": {
+    "message": "连接"
+  },
+  "bookmarkConnecting": {
+    "message": "正在连接…"
+  },
+  "bookmarkConnected": {
+    "message": "已连接"
+  },
+  "bookmarkConnectFailed": {
+    "message": "连接失败。请检查服务器地址、令牌和站点访问权限。"
+  },
+  "bookmarkInvalidConfig": {
+    "message": "请填写有效的服务器地址和 API 令牌。"
+  },
+  "bookmarkPermissionDenied": {
+    "message": "请在设置中允许访问此服务器，然后重新连接。"
+  },
+  "bookmarkKarakeepHint": {
+    "message": "“稍后阅读”使用专用私有列表。标记为已读时只从列表移除，不更改服务中的归档状态。"
+  },
+  "bookmarkReadLaterListName": {
+    "message": "稍后阅读"
+  },
+  "bookmarkPartialSave": {
+    "message": "书签可能已保存，但部分修改未完成。请打开编辑，核对后重新保存。"
+  },
+  "bookmarkServiceSettings": {
+    "message": "选择书签服务"
+  },
+  "backupAdoptLibrary": {
+    "message": "个人资料库为空。恢复生词或高亮时将采用备份所属资料库，以便继续读取原有 Drive 同步数据。"
+  }
 }

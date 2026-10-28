@@ -3,13 +3,13 @@
     "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
-    "message": "Закладки Pinboard: AI-метки и аннотации, ридер с переводом и выделениями, экспорт в Markdown/EPUB и 13 тем оформления сайта."
+    "message": "Pinboard, Karakeep и linkding: AI-теги и резюме, чтение с переводом и выделениями, экспорт Markdown/EPUB."
   },
   "cmdOpenPopup": {
     "message": "Открыть Pinboard Bookmark Enhanced"
   },
   "cmdQuickSave": {
-    "message": "Быстрое сохранение в Pinboard (без окна)"
+    "message": "Быстро сохранить в выбранный сервис (без окна расширения)"
   },
   "cmdReadLater": {
     "message": "Быстрое сохранение как Напочитать (без окна)"
@@ -162,7 +162,7 @@
     "message": "AI-метки"
   },
   "urlWarning": {
-    "message": "Эту страницу нельзя сохранить в Pinboard (неподдерживаемый URL). Наборы вкладок и пакетное сохранение ниже по-прежнему работают."
+    "message": "Этот тип URL не поддерживается, страницу нельзя сохранить в закладки."
   },
   "urlCannotSave": {
     "message": "Невозможно сохранить: неподдерживаемый URL"
@@ -550,7 +550,7 @@
     }
   },
   "batchAccountChanged": {
-    "message": "Пакетное сохранение остановлено: аккаунт Pinboard изменился."
+    "message": "Пакетное сохранение остановлено: подключение к закладкам изменилось."
   },
   "tabSetFailed": {
     "message": "Не удалось сохранить набор вкладок: $ERROR$",
@@ -598,19 +598,19 @@
     }
   },
   "saveQueuedNetwork": {
-    "message": "Не удаётся связаться с Pinboard, проверьте подключение. Закладка в очереди и будет отправлена повторно автоматически."
+    "message": "Сервер недоступен. Сохранение добавлено в очередь и будет повторено автоматически."
   },
   "saveQueuedServer": {
-    "message": "Pinboard сейчас не отвечает. Закладка в очереди и будет отправлена повторно автоматически."
+    "message": "Сервер не отвечает. Сохранение добавлено в очередь и будет повторено автоматически."
   },
   "offlineRetry": {
     "message": "Повторить сейчас"
   },
   "offlineRetryWrongAccount": {
-    "message": "Эта запись поставлена в очередь под другой учётной записью Pinboard. Войдите в неё, чтобы отправить запись."
+    "message": "Запись относится к другому подключению. Восстановите его или проверьте страницу и сохраните её заново."
   },
   "offlineRetryAccountChanged": {
-    "message": "Во время повторной отправки аккаунт Pinboard изменился, поэтому она остановлена."
+    "message": "Во время повтора подключение изменилось. Операция остановлена."
   },
   "offlineRetryFailed": {
     "message": "Не удалось отправить эту закладку. Повторите попытку.",
@@ -673,34 +673,34 @@
     "message": "Удалить эту закладку"
   },
   "bgNotLoggedIn": {
-    "message": "Pinboard: Вы не авторизованы"
+    "message": "Сервис закладок не подключён"
   },
   "bgSetToken": {
-    "message": "Укажите API-токен в настройках расширения."
+    "message": "Выберите и подключите сервис закладок в настройках расширения."
   },
   "bgUndone": {
-    "message": "Pinboard: Отменено"
+    "message": "Отменено"
   },
   "bgUndoFailed": {
-    "message": "Pinboard: Не удалось отменить"
+    "message": "Не удалось отменить"
   },
   "bgBookmarkRemoved": {
     "message": "Закладка удалена."
   },
   "bgQuickSaved": {
-    "message": "Pinboard: быстрое сохранение"
+    "message": "быстрое сохранение"
   },
   "bgReadLater": {
-    "message": "Pinboard: Напочитать"
+    "message": "Напочитать"
   },
   "bgCannotSave": {
-    "message": "Pinboard: Невозможно сохранить"
+    "message": "Невозможно сохранить"
   },
   "bgCannotBookmark": {
     "message": "Сохранять можно только страницы http и https."
   },
   "bgMdPreviewFailed": {
-    "message": "Pinboard: не удалось преобразовать в Markdown"
+    "message": "не удалось преобразовать в Markdown"
   },
   "bgMdPreviewNoContent": {
     "message": "На этой странице не найдено читаемого содержимого."
@@ -831,19 +831,19 @@
     "message": "Войдите в pinboard.in в этом браузере и повторите попытку."
   },
   "bgQuickSaveFailed": {
-    "message": "Pinboard: Ошибка быстрого сохранения"
+    "message": "Ошибка быстрого сохранения"
   },
   "bgReadLaterFailed": {
-    "message": "Pinboard: Ошибка сохранения «Напочитать»"
+    "message": "Ошибка сохранения «Напочитать»"
   },
   "bgSaveFailed": {
-    "message": "Pinboard: Ошибка сохранения"
+    "message": "Ошибка сохранения"
   },
   "bgNetworkError": {
-    "message": "Pinboard: Ошибка сети"
+    "message": "Ошибка сети"
   },
   "bgQueuedOffline": {
-    "message": "Pinboard: Добавлено в офлайн-очередь"
+    "message": "Добавлено в офлайн-очередь"
   },
   "bgTitleSaved": {
     "message": "«$TITLE$» сохранено.",
@@ -870,10 +870,10 @@
     }
   },
   "bgBatchSaved": {
-    "message": "Pinboard: пакетное сохранение завершено"
+    "message": "пакетное сохранение завершено"
   },
   "bgBatchCancelled": {
-    "message": "Pinboard: пакетное сохранение отменено"
+    "message": "пакетное сохранение отменено"
   },
   "bgUndo": {
     "message": "Отменить"
@@ -930,7 +930,7 @@
     "message": "Нет заметок, соответствующих фильтру."
   },
   "notesHiddenByOwner": {
-    "message": "Часть выделений, сохранённых на этом устройстве, принадлежит другим учётным записям Pinboard и не видна в текущей учётной записи."
+    "message": "Часть выделений относится к старым библиотекам и не объединена с этой личной библиотекой."
   },
   "notesUnknownPage": {
     "message": "Неизвестная страница"
@@ -1095,7 +1095,7 @@
     "message": "Предзагрузка (фон каждые 15 мин — мгновенно)"
   },
   "tagSyncHint": {
-    "message": "Управляет тем, как существующее облако тегов Pinboard загружается во всплывающее окно для автодополнения. Только чтение; теги не загружаются обратно в Pinboard."
+    "message": "Выберите, когда загружать теги для автодополнения. Это не меняет теги на сервере."
   },
   "labelTagPresets": {
     "message": "Предустановки меток"
@@ -1134,13 +1134,13 @@
     "message": "Включать сохранённые слова в резервные копии"
   },
   "backupIncludeVocabularyHint": {
-    "message": "Включает только сохранённые слова текущего аккаунта Pinboard."
+    "message": "Включает только сохранённые слова личной библиотеки."
   },
   "backupIncludeSecretsLabel": {
     "message": "Включать ключи API и токены в резервные копии"
   },
   "backupIncludeSecretsHint": {
-    "message": "Записывает все учётные данные в файл открытым текстом: API-токен Pinboard, API-ключи всех AI-провайдеров, а также учётные данные Jina, Wayback, Anki, Eudic, Notion, Gist и Webhook. Любой, кто откроет файл, сможет ими воспользоваться. Храните его так же, как пароль."
+    "message": "Записывает все учётные данные в файл открытым текстом: API-токены Pinboard/Karakeep/linkding, API-ключи всех AI-провайдеров, а также учётные данные Jina, Wayback, Anki, Eudic, Notion, Gist и Webhook. Любой, кто откроет файл, сможет ими воспользоваться. Храните его так же, как пароль."
   },
   "backupSecretsExportTitle": {"message": "Экспортировать резервную копию с учётными данными?"},
   "backupSecretsExportConfirm": {
@@ -1162,13 +1162,13 @@
     "message": "Эта резервная копия содержит учётные данные открытым текстом. Импортируйте их, только если доверяете источнику файла."
   },
   "backupVocabOwnerMissing": {
-    "message": "Сохранённые слова не включены, потому что аккаунт Pinboard недоступен. Остальные выбранные данные экспортированы."
+    "message": "Сохранённые слова не включены, потому что личная библиотека недоступен. Остальные выбранные данные экспортированы."
   },
   "backupHighlightsOwnerMissing": {
-    "message": "Выделения и заметки, привязанные к аккаунту, не включены, потому что аккаунт Pinboard недоступен. Остальные выбранные данные экспортированы."
+    "message": "Выделения и заметки, привязанные к аккаунту, не включены, потому что личная библиотека недоступен. Остальные выбранные данные экспортированы."
   },
   "backupHighlightsVocabOwnerMissing": {
-    "message": "Сохранённые слова, а также выделения и заметки, привязанные к аккаунту, не включены, потому что аккаунт Pinboard недоступен. Остальные выбранные данные экспортированы."
+    "message": "Сохранённые слова, а также выделения и заметки, привязанные к аккаунту, не включены, потому что личная библиотека недоступен. Остальные выбранные данные экспортированы."
   },
   "backupPreviewTitle": {
     "message": "Предварительный просмотр импорта"
@@ -1200,7 +1200,7 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "backupPreviewHighlights": {
-    "message": "Страниц: $PAGES$; записей: $ITEMS$; аккаунт Pinboard: $OWNER$",
+    "message": "Страниц: $PAGES$; записей: $ITEMS$; личная библиотека: $OWNER$",
     "placeholders": {
       "pages": { "content": "$1" },
       "items": { "content": "$2" },
@@ -1208,7 +1208,7 @@
     }
   },
   "backupPreviewVocabulary": {
-    "message": "Сохранённые слова: $COUNT$; аккаунт Pinboard: $OWNER$",
+    "message": "Сохранённые слова: $COUNT$; личная библиотека: $OWNER$",
     "placeholders": {
       "count": { "content": "$1" },
       "owner": { "content": "$2" }
@@ -1224,10 +1224,10 @@
     "message": "Нет"
   },
   "backupPreviewOwnerMismatch": {
-    "message": "Сохранённые слова нельзя импортировать, потому что эта резервная копия принадлежит другому аккаунту Pinboard."
+    "message": "Сохранённые слова нельзя импортировать, потому что эта резервная копия принадлежит другой личной библиотеке."
   },
   "backupPreviewHighlightOwnerMismatch": {
-    "message": "Выделения и заметки нельзя импортировать, потому что эта резервная копия принадлежит другому аккаунту Pinboard."
+    "message": "Выделения и заметки нельзя импортировать, потому что эта резервная копия принадлежит другой личной библиотеке."
   },
   "backupPreviewReady": {
     "message": "Предварительный просмотр импорта готов."
@@ -3411,7 +3411,7 @@
       "message": "Google Диск"
     },
     "vocabDriveScope": {
-      "message": "После подключения это устройство синхронизирует словарь, выделения и заметки, полные словарные статьи ИИ с дополнениями, а также сохранённые разговоры с цитатами для текущего аккаунта Pinboard."
+      "message": "После подключения это устройство синхронизирует словарь, выделения и заметки, полные словарные статьи ИИ с дополнениями, а также сохранённые разговоры с цитатами для личной библиотеки."
     },
     "vocabDriveConnectionHint": { "message": "Каждое устройство нужно подключить отдельно. Google Drive не синхронизирует настройки и учётные данные." },
     "vocabDriveDisclosure": {
@@ -3448,7 +3448,7 @@
       "message": "Аккаунт Google"
     },
     "vocabDriveOwnerLabel": {
-      "message": "Аккаунт Pinboard"
+      "message": "Личная библиотека"
     },
     "vocabDriveNever": {
       "message": "Синхронизация ещё не выполнялась"
@@ -3481,10 +3481,10 @@
       "message": "Авторизация Google временно недоступна."
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "Нет входа в аккаунт Pinboard. Введите API-токен в разделе «Аккаунт → Аккаунт Pinboard» и подключитесь снова."
+      "message": "Личная библиотека недоступна. Откройте эту страницу заново и повторите попытку."
     },
     "vocabDriveErrorPinboardAuthSync": {
-      "message": "Нет входа в аккаунт Pinboard. Введите API-токен в разделе «Аккаунт → Аккаунт Pinboard», затем нажмите «Синхронизировать сейчас»."
+      "message": "Личная библиотека недоступна. Откройте страницу заново и нажмите «Синхронизировать сейчас»."
     },
     "vocabDriveErrorPermission": {
       "message": "Нет разрешения на доступ к Google Диску."
@@ -3508,7 +3508,7 @@
       "message": "Во время синхронизации произошла непредвиденная ошибка."
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "Во время синхронизации изменился аккаунт Google или Pinboard. Повторите попытку."
+      "message": "Во время синхронизации изменился аккаунт Google или личная библиотека. Повторите попытку."
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "Размер сохранённого слова или его контекста превышает допустимый для синхронизации. Сократите или удалите эту запись, затем нажмите «Синхронизировать сейчас»."
@@ -3531,10 +3531,10 @@
       "message": "Экспорт и интеграции"
     },
     "vocabOwnerNoAccount": {
-      "message": "Нет аккаунта Pinboard"
+      "message": "Личная библиотека недоступна. Откройте эту страницу заново и повторите попытку."
     },
     "vocabLoadFailed": {
-      "message": "Не удалось загрузить слова текущего аккаунта Pinboard. Откройте раздел «Словарик» заново и повторите попытку."
+      "message": "Не удалось загрузить слова личной библиотеки. Откройте раздел «Словарик» заново и повторите попытку."
     },
     "vocabExportFailed": {
       "message": "Не удалось экспортировать слова. Повторите попытку."
@@ -3552,7 +3552,7 @@
       "message": "Cmd+щелчок выделяет запись, Shift+щелчок — диапазон"
     },
     "vocabResultCount": {
-      "message": "Текущий аккаунт Pinboard ($OWNER$): найдено $RESULTS$ · сохранено $TOTAL$",
+      "message": "$OWNER$: найдено $RESULTS$ · сохранено $TOTAL$",
       "placeholders": {
         "results": {
           "content": "$1"
@@ -4279,7 +4279,7 @@
   "diagnosticsCopied": { "message": "Диагностика скопирована" },
   "diagnosticsCopyFailed": { "message": "Не удалось скопировать диагностику. Проверьте доступ к буферу обмена и повторите попытку." },
   "libraryVocabSignedOutTitle": { "message": "Войдите, чтобы пользоваться словариком" },
-  "libraryVocabSignedOutHint": { "message": "Словарик хранится отдельно для каждого аккаунта Pinboard. Толкования слов доступны и без входа." },
+  "libraryVocabSignedOutHint": { "message": "Слова, выделения, заметки и история Ask хранятся в одной личной библиотеке независимо от сервиса закладок." },
   "libraryVocabOpenSettings": { "message": "Открыть настройки аккаунта" },
   "libraryLookupSignedOutHint": { "message": "Найдите слово в разделе «Толкования». Войдите, чтобы сохранить его в словарик." },
   "mdPreviewClose": { "message": "Закрыть режим чтения" },
@@ -4383,7 +4383,7 @@
   "loginNeedsPaid": { "message": "Нужна платная учётная запись Pinboard." },
   "popupDraftDiscard": { "message": "Удалить черновик" },
   "readerBookmarkSection": {"message": "Сохранение"},
-  "readerBookmarkSave": {"message": "Сохранить в Pinboard"},
+  "readerBookmarkSave": {"message": "Сохранить закладку"},
   "readerBookmarkSaved": {"message": "Сохранено"},
   "readerBookmarkLater": {"message": "Прочитать позже"},
   "readerBookmarkMarkRead": {"message": "Отметить как прочитанное"},
@@ -4391,7 +4391,7 @@
   "readerBookmarkChecking": {"message": "Проверка закладки…"},
   "readerBookmarkSaving": {"message": "Сохранение…"},
   "readerBookmarkUpdated": {"message": "Закладка обновлена"},
-  "readerBookmarkQueued": {"message": "Добавлено в офлайн-очередь; в Pinboard ещё не сохранено"},
+  "readerBookmarkQueued": {"message": "В очереди офлайн; ещё не сохранено"},
   "readerBookmarkLookupFailed": {"message": "Не удалось проверить закладку. Повторите проверку перед редактированием."},
   "readerBookmarkFailed": {"message": "Не удалось сохранить. Попробуйте ещё раз."},
   "readerBookmarkAccountChanged": {"message": "Аккаунт изменился. Для сохранения откройте режим чтения заново."},
@@ -4405,14 +4405,14 @@
     "message": "Удалить закладку"
   },
   "readerBookmarkDeleteConfirm": {
-    "message": "Удалить эту закладку из Pinboard?"
+    "message": "Удалить эту закладку?"
   },
   "readerBookmarkDeleteDetail": {"message": "Выделения и заметки в режиме чтения сохранятся."},
   "readerBookmarkDeleting": {
     "message": "Удаление закладки…"
   },
   "readerBookmarkDeleted": {
-    "message": "Закладка удалена из Pinboard"
+    "message": "Закладка удалена"
   },
   "readerBookmarkDeleteFailed": {
     "message": "Не удалось подтвердить удаление. Попробуйте ещё раз."
@@ -4686,5 +4686,62 @@
   "dictGenerationServiceUnavailable": {"message": "Сервис провайдера временно недоступен. Повторите попытку позже."},
   "dictProgressThinking": {"message": "Модель обдумывает ответ…"},
   "dictProgressStreaming": {"message": "Получение ответа…"},
-  "dictProgressElapsed": {"message": "Прошло $SECONDS$ с", "placeholders": {"seconds": {"content": "$1"}}}
+  "dictProgressElapsed": {"message": "Прошло $SECONDS$ с", "placeholders": {"seconds": {"content": "$1"}}},
+  "bookmarkServiceTitle": {
+    "message": "Сервис закладок"
+  },
+  "bookmarkServiceChoose": {
+    "message": "Выберите место сохранения закладок"
+  },
+  "bookmarkServiceHint": {
+    "message": "Окно расширения, режим чтения, сочетания клавиш и пакетное сохранение используют этот сервис."
+  },
+  "personalLibraryTitle": {
+    "message": "Личная библиотека"
+  },
+  "personalLibraryHint": {
+    "message": "Слова, выделения, заметки и история Ask хранятся в одной личной библиотеке независимо от сервиса закладок."
+  },
+  "bookmarkServerUrl": {
+    "message": "Адрес сервера"
+  },
+  "bookmarkServerHint": {
+    "message": "Укажите адрес сайта, включая вложенный путь. Требуется HTTPS, кроме localhost."
+  },
+  "bookmarkConnectHint": {
+    "message": "Изменения адреса и токена вступают в силу после подключения. Токены остаются на этом устройстве, если синхронизация учётных данных отключена."
+  },
+  "bookmarkConnect": {
+    "message": "Подключить"
+  },
+  "bookmarkConnecting": {
+    "message": "Подключение…"
+  },
+  "bookmarkConnected": {
+    "message": "Подключено"
+  },
+  "bookmarkConnectFailed": {
+    "message": "Не удалось подключиться. Проверьте адрес сервера, токен и разрешение доступа к сайту."
+  },
+  "bookmarkInvalidConfig": {
+    "message": "Введите допустимый адрес сервера и токен API."
+  },
+  "bookmarkPermissionDenied": {
+    "message": "Разрешите доступ к этому серверу в настройках и подключитесь снова."
+  },
+  "bookmarkKarakeepHint": {
+    "message": "Для «Прочитать позже» используется отдельный закрытый список. Отметка о прочтении удаляет закладку из списка, не меняя её состояние архивации в сервисе."
+  },
+  "bookmarkReadLaterListName": {
+    "message": "Прочитать позже"
+  },
+  "bookmarkPartialSave": {
+    "message": "Возможно, закладка сохранена, но часть изменений не выполнена. Откройте редактирование, проверьте данные и сохраните снова."
+  },
+  "bookmarkServiceSettings": {
+    "message": "Выбрать сервис закладок"
+  },
+  "backupAdoptLibrary": {
+    "message": "Личная библиотека пуста. Восстановление словарика или выделений перенесёт библиотеку из резервной копии и сохранит доступ к её данным на Google Диске."
+  }
 }

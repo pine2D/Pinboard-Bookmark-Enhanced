@@ -32,6 +32,7 @@ const PBP_BACKUP_TARGET_FIELDS = Object.freeze({
 // for files written by earlier releases.
 const PBP_BACKUP_ENUMS = Object.freeze({
   optTheme: ["auto", "light", "dark"],
+  bookmarkService: ["pinboard", "karakeep", "linkding"],
   bgSaveMode: ["merge", "skip", "overwrite"],
   tagSyncMode: ["fresh", "cached", "prewarmed"],
   aiContentSource: ["local", "jina"],
@@ -131,6 +132,7 @@ function pbpSanitizeBackupSettings(data, exportableKeys) {
   for (const key of exportableKeys) {
     if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
     const value = data[key];
+    if (key === "personalLibraryAccount") continue;
     if (key === "exportTargets") {
       safe[key] = pbpSanitizeBackupExportTargets(value);
       continue;
@@ -311,6 +313,59 @@ async function pbpBackupWriteHighlights(cleaned, ownerScope, verifyOwner) {
   await verifyOwner();
 }
 
+// No DB is created by this probe. Any existing reading record or active Drive
+// connection prevents adoption; restored data must never hide a populated library.
+async function pbpBackupPersonalLibraryEmpty() {
+  const local = await chrome.storage.local.get(null);
+  if (local.vocabDriveConnected || Object.entries(local).some(([key,row]) =>
+      key.startsWith("pbp_hl_") && Array.isArray(row?.items) && row.items.length)) return false;
+  if (typeof indexedDB.databases !== "function") return false;
+  const databases = await indexedDB.databases();
+  for (const [name, store] of [["pbp-vocab","words"],["pbp-dict-archive","records"],["pbp-ask-archive","records"]]) {
+    if (!databases.some(db=>db.name===name)) continue;
+    const empty = await new Promise((resolve,reject) => {
+      const request = indexedDB.open(name);
+      request.onupgradeneeded = () => request.transaction.abort();
+      request.onerror = () => reject(new Error("library_probe"));
+      request.onblocked = () => reject(new Error("library_probe_blocked"));
+      request.onsuccess = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(store)) { db.close(); resolve(false); return; }
+        const transaction = db.transaction(store,"readonly");
+        const count = transaction.objectStore(store).count();
+        transaction.oncomplete = () => { db.close(); resolve(count.result === 0); };
+        transaction.onabort = () => { db.close(); reject(new Error("library_probe")); };
+      };
+    });
+    if (!empty) return false;
+  }
+  return true;
+}
+
+// Preview is read-only. Applying explicit vocabulary/highlight sections may
+// adopt their owner only on an empty, unconnected fresh personal library.
+async function pbpBackupLibraryIdentity(prepared, selected, {
+  apply = false,
+  readOwner = async () => {
+    const s = await pbpReadSettingsWithSecrets({personalLibraryAccount:"",pinboardToken:""});
+    return s.personalLibraryAccount || pbpPinboardAccountFromToken(s.pinboardToken) || "personal:default";
+  },
+  isEmpty = pbpBackupPersonalLibraryEmpty,
+  persist = persistSettings,
+} = {}) {
+  const owners = [];
+  if (selected?.vocabulary && prepared.vocabulary) owners.push(pbpCanonicalBackupOwner(prepared.vocabulary.owner));
+  if (selected?.highlights && prepared.highlightsOwner) owners.push(pbpCanonicalBackupOwner(prepared.highlightsOwner));
+  const target = owners[0];
+  if (!target || owners.some(owner=>owner!==target)) return "";
+  const run = async () => {
+    if (await readOwner() !== "personal:default" || target === "personal:default" || !await isEmpty()) return "";
+    if (apply && !(await persist({personalLibraryAccount:target}))?.ok) throw new Error("personal_library_storage");
+    return target;
+  };
+  return globalThis.navigator?.locks?.request ? navigator.locks.request("pbp-personal-library",run) : run();
+}
+
 // Applies the selected sections of one already-preflighted backup. Each
 // section reports its own outcome so a later failure cannot hide earlier
 // committed writes.
@@ -345,8 +400,7 @@ async function pbpApplyBackupPayload(data, {
     vocabularyProcessed: 0,
   };
   const getOwner = readCurrentOwner || (async () => {
-    const secret = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
-    return pbpPinboardAccountFromToken(secret.pinboardToken);
+    return pbpPersonalLibraryAccount({initialize:false});
   });
 
   const hasSettings = Object.keys(safeData).length ||
@@ -447,6 +501,10 @@ async function pbpApplyBackupPayload(data, {
       result.themes = importThemesResult(error) === "importPartial" ? "local-only" : "failed";
     }
   }
+
+  try {
+    result.libraryAdopted = !!await pbpBackupLibraryIdentity(prepared, selected, {apply:true});
+  } catch (error) { console.warn("[backup] library adoption failed:", error?.name, error?.message); }
 
   let highlightsSkipped = false;
   if (selected.highlights && prepared.highlights !== undefined) {
@@ -581,7 +639,7 @@ function pbpTakeImportResult() {
 // display: highlights and vocabulary live outside this page's form.
 function pbpImportNeedsPageReload(result) {
   const landed = (v) => v === "applied" || v === "local-only";
-  return !!result && (landed(result.settings) || landed(result.themes));
+  return !!result && (result.libraryAdopted === true || landed(result.settings) || landed(result.themes));
 }
 
 // The preview's "created" value: _backup.createdAt is an ISO string (export
@@ -613,8 +671,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
   secretsToggle?.addEventListener("change", syncSecretsWarning);
   syncSecretsWarning();
   const readOwner = async () => {
-    const secret = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
-    return pbpPinboardAccountFromToken(secret.pinboardToken);
+    return pbpPersonalLibraryAccount({initialize:false});
   };
   const setPreviewText = (id, text) => {
     const element = $id(id);
@@ -671,6 +728,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     setPreviewText("backup-preview-languages", languages || t("backupPreviewNone"));
     const warnings = [];
     if (preview.secretCount) warnings.push(t("backupPreviewSecretsWarning"));
+    if (preview.libraryAdoption) warnings.push(t("backupAdoptLibrary"));
     if (preview.ownerMismatch) warnings.push(t("backupPreviewOwnerMismatch"));
     if (preview.highlightOwnerMismatch) warnings.push(t("backupPreviewHighlightOwnerMismatch"));
     if (preview.syncWarning) warnings.push(t("backupPreviewSyncWarning"));
@@ -943,10 +1001,14 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
       ]);
       if (token !== selectionToken) return;
       selectionText = text;
-      const warningCount = renderPreview(pbpBuildBackupPreview(prepared, currentOwner, {
+      const adoptOwner = await pbpBackupLibraryIdentity(prepared, {vocabulary:true,highlights:true});
+      if (token !== selectionToken) return;
+      const preview = pbpBuildBackupPreview(prepared, adoptOwner || currentOwner, {
         enabled: local.optSyncEnabled === true,
         localFallbackKeys: pbpDetectLargeLocalFallbacks(local),
-      }));
+      });
+      preview.libraryAdoption = !!adoptOwner;
+      const warningCount = renderPreview(preview);
       const status = $id("import-status");
       if (warningCount === 0) {
         setStatusIcon(status, true, t("backupPreviewReady"));

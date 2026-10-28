@@ -3,7 +3,7 @@
 // ============================================================
 
 function pbpPopupTagCacheEntry(entry, token) {
-  const account = pbpPinboardAccountFromToken(token);
+  const account = (typeof settings === "object" && pbpBookmarkServiceId(settings) !== "pinboard" ? pbpBookmarkConnection(settings).account : pbpPinboardAccountFromToken(token));
   return account && entry && typeof entry === "object" && !Array.isArray(entry)
     && entry.account === account
     ? entry
@@ -11,21 +11,22 @@ function pbpPopupTagCacheEntry(entry, token) {
 }
 
 function pbpPopupTagCacheEnvelope(token, payload) {
-  const account = pbpPinboardAccountFromToken(token);
+  const account = (typeof settings === "object" && pbpBookmarkServiceId(settings) !== "pinboard" ? pbpBookmarkConnection(settings).account : pbpPinboardAccountFromToken(token));
   return account ? { ...payload, account } : null;
 }
 
 function pbpPopupTagAccountIsCurrent(account) {
   const token = typeof settings === "object" && settings ? settings.pinboardToken : "";
-  return !!account && pbpPinboardAccountFromToken(token) === account;
+  return !!account && (typeof settings === "object" && pbpBookmarkServiceId(settings) !== "pinboard" ? pbpBookmarkConnection(settings).account : pbpPinboardAccountFromToken(token)) === account;
 }
 
 // ---- Suggest Tags (Pinboard API) ----
 async function fetchPinboardSuggestTags(token, url) {
+  if (pbpBookmarkServiceId(settings) !== "pinboard") return;
   const container = $id("pinboard-suggest-tags");
   const cacheKey = "cached_suggest_" + url;
   const SUGGEST_TTL = 10 * 60 * 1000; // 10 minutes
-  const account = pbpPinboardAccountFromToken(token);
+  const account = (typeof settings === "object" && pbpBookmarkServiceId(settings) !== "pinboard" ? pbpBookmarkConnection(settings).account : pbpPinboardAccountFromToken(token));
 
   if (!account || !pbpPopupTagAccountIsCurrent(account)) {
     // Nothing will be fetched, so take the markup's skeleton down here: this
@@ -205,7 +206,7 @@ let _popupUserTagAccount = "";
 
 async function fetchAllUserTags(token) {
   const cacheKey = "cached_user_tags";
-  const account = pbpPinboardAccountFromToken(token);
+  const account = (typeof settings === "object" && pbpBookmarkServiceId(settings) !== "pinboard" ? pbpBookmarkConnection(settings).account : pbpPinboardAccountFromToken(token));
   if (!account || !pbpPopupTagAccountIsCurrent(account)) return;
   if (_popupUserTagAccount !== account) {
     applyTagData({});
@@ -237,7 +238,7 @@ async function fetchAllUserTags(token) {
   if (!pbpPopupTagAccountIsCurrent(account)) return;
   // Fetch from Pinboard (fresh, or cached-expired, or prewarmed-stale/missing)
   try {
-    const resp = await pinboardFetch(`https://api.pinboard.in/v1/tags/get?auth_token=${token}&format=json`);
+    const resp = await (pbpBookmarkServiceId(settings) === "pinboard" ? pinboardFetch(`https://api.pinboard.in/v1/tags/get?auth_token=${token}&format=json`) : pbpPopupBookmarkApi("tags"));
     if (!pbpPopupTagAccountIsCurrent(account)) return;
     if (resp.status === 401) return; // pinboardFetch already redirected to login
     if (!resp.ok) {
@@ -507,7 +508,7 @@ let _lastUsedTagsCache = [];
 
 async function loadLastUsedTags() {
   const token = typeof settings === "object" && settings ? settings.pinboardToken : "";
-  const account = pbpPinboardAccountFromToken(token);
+  const account = (typeof settings === "object" && pbpBookmarkServiceId(settings) !== "pinboard" ? pbpBookmarkConnection(settings).account : pbpPinboardAccountFromToken(token));
   _lastUsedTagsCache = [];
   renderLastUsedHint();
   if (!account) return;
@@ -547,7 +548,7 @@ function renderLastUsedHint() {
 function saveLastUsedTags(tags, expectedAccount = "") {
   if (!Array.isArray(tags) || !tags.length) return;
   const token = typeof settings === "object" && settings ? settings.pinboardToken : "";
-  if (expectedAccount && pbpPinboardAccountFromToken(token) !== expectedAccount) return;
+  if (expectedAccount && (typeof settings === "object" && pbpBookmarkServiceId(settings) !== "pinboard" ? pbpBookmarkConnection(settings).account : pbpPinboardAccountFromToken(token)) !== expectedAccount) return;
   const snapshot = tags.slice();
   const entry = pbpPopupTagCacheEnvelope(token, { tags: snapshot });
   if (!entry) return;
@@ -574,7 +575,8 @@ let _dragReorderFromIdx = null;
 
 function addTag(tag) {
   if (typeof tag !== "string" || !tag) return;
-  tag = tag.trim().replace(/\s+/g, settings.aiTagSeparator || "-");
+  tag = tag.trim();
+  if (pbpBookmarkServiceId(settings) === "pinboard") tag = tag.replace(/\s+/g, settings.aiTagSeparator || "-");
   if (!tag) return;
   if (settings.optRespectTagCase && tagCaseMap) {
     tag = resolveTagCase(tag, tagCaseMap);

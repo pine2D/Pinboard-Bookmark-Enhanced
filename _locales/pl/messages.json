@@ -3,13 +3,13 @@
     "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
-    "message": "Zakładki Pinboard: tagi i podsumowania AI, czytnik z tłumaczeniem i zaznaczeniami, eksport do Markdown/EPUB i 13 motywów strony."
+    "message": "Pinboard, Karakeep i linkding: tagi i streszczenia AI, czytnik z tłumaczeniem i wyróżnieniami oraz eksport Markdown/EPUB."
   },
   "cmdOpenPopup": {
     "message": "Otwórz Pinboard Bookmark Enhanced"
   },
   "cmdQuickSave": {
-    "message": "Szybki zapis do Pinboard (bez okna)"
+    "message": "Szybki zapis w wybranej usłudze zakładek (bez okienka)"
   },
   "cmdReadLater": {
     "message": "Szybki zapis jako Przeczytaj później (bez okna)"
@@ -162,7 +162,7 @@
     "message": "Tagi AI"
   },
   "urlWarning": {
-    "message": "Tej strony nie można zapisać w Pinboard (nieobsługiwany URL). Zestawy kart i zapis zbiorczy poniżej nadal działają."
+    "message": "Ten adres URL nie jest obsługiwany i nie można go zapisać jako zakładki."
   },
   "urlCannotSave": {
     "message": "Nie można zapisać: nieobsługiwany URL"
@@ -550,7 +550,7 @@
     }
   },
   "batchAccountChanged": {
-    "message": "Zapis zbiorczy zatrzymany: konto Pinboard zmieniło się."
+    "message": "Zapis zbiorczy zatrzymany: zmieniło się połączenie z usługą zakładek."
   },
   "tabSetFailed": {
     "message": "Nie udało się zapisać zestawu kart: $ERROR$",
@@ -598,19 +598,19 @@
     }
   },
   "saveQueuedNetwork": {
-    "message": "Brak połączenia z Pinboard, sprawdź połączenie. Zakładka czeka w kolejce i zostanie automatycznie wysłana ponownie."
+    "message": "Serwer jest nieosiągalny. Zapis trafił do kolejki i zostanie automatycznie ponowiony."
   },
   "saveQueuedServer": {
-    "message": "Pinboard chwilowo nie odpowiada. Zakładka czeka w kolejce i zostanie automatycznie wysłana ponownie."
+    "message": "Serwer jest niedostępny. Zapis trafił do kolejki i zostanie automatycznie ponowiony."
   },
   "offlineRetry": {
     "message": "Spróbuj ponownie"
   },
   "offlineRetryWrongAccount": {
-    "message": "Ten element trafił do kolejki na innym koncie Pinboard. Zaloguj się na tamto konto, aby go wysłać."
+    "message": "Ten wpis należy do innego połączenia. Przywróć je lub sprawdź stronę i zapisz ją ponownie."
   },
   "offlineRetryAccountChanged": {
-    "message": "Konto Pinboard zmieniło się podczas ponawiania, więc je przerwano."
+    "message": "Połączenie zmieniło się podczas ponawiania. Operacja została zatrzymana."
   },
   "offlineRetryFailed": {
     "message": "Nie można wysłać tej zakładki. Spróbuj ponownie.",
@@ -673,34 +673,34 @@
     "message": "Usuń tę zakładkę"
   },
   "bgNotLoggedIn": {
-    "message": "Pinboard: Nie zalogowano"
+    "message": "Usługa zakładek nie jest połączona"
   },
   "bgSetToken": {
-    "message": "Ustaw swój token API w ustawieniach rozszerzenia."
+    "message": "Wybierz i połącz usługę zakładek w ustawieniach rozszerzenia."
   },
   "bgUndone": {
-    "message": "Pinboard: Cofnięto"
+    "message": "Cofnięto"
   },
   "bgUndoFailed": {
-    "message": "Pinboard: Cofnięcie nie powiodło się"
+    "message": "Cofnięcie nie powiodło się"
   },
   "bgBookmarkRemoved": {
     "message": "Zakładka usunięta."
   },
   "bgQuickSaved": {
-    "message": "Pinboard: Szybki zapis"
+    "message": "Szybki zapis"
   },
   "bgReadLater": {
-    "message": "Pinboard: Przeczytaj później"
+    "message": "Przeczytaj później"
   },
   "bgCannotSave": {
-    "message": "Pinboard: Nie można zapisać"
+    "message": "Nie można zapisać"
   },
   "bgCannotBookmark": {
     "message": "Zapisywać można tylko strony http i https."
   },
   "bgMdPreviewFailed": {
-    "message": "Pinboard: nie udało się przekonwertować na Markdown"
+    "message": "nie udało się przekonwertować na Markdown"
   },
   "bgMdPreviewNoContent": {
     "message": "Nie znaleziono czytelnej treści na tej stronie."
@@ -831,19 +831,19 @@
     "message": "Zaloguj się na pinboard.in w tej przeglądarce i spróbuj ponownie."
   },
   "bgQuickSaveFailed": {
-    "message": "Pinboard: Szybki zapis nie powiódł się"
+    "message": "Szybki zapis nie powiódł się"
   },
   "bgReadLaterFailed": {
-    "message": "Pinboard: Przeczytaj później nie powiodło się"
+    "message": "Przeczytaj później nie powiodło się"
   },
   "bgSaveFailed": {
-    "message": "Pinboard: Zapis nie powiódł się"
+    "message": "Zapis nie powiódł się"
   },
   "bgNetworkError": {
-    "message": "Pinboard: Błąd sieci"
+    "message": "Błąd sieci"
   },
   "bgQueuedOffline": {
-    "message": "Pinboard: Dodano do kolejki offline"
+    "message": "Dodano do kolejki offline"
   },
   "bgTitleSaved": {
     "message": "\"$TITLE$\" zapisano.",
@@ -870,10 +870,10 @@
     }
   },
   "bgBatchSaved": {
-    "message": "Pinboard: Zapis zbiorczy zakończony"
+    "message": "Zapis zbiorczy zakończony"
   },
   "bgBatchCancelled": {
-    "message": "Pinboard: Zapis zbiorczy anulowany"
+    "message": "Zapis zbiorczy anulowany"
   },
   "bgUndo": {
     "message": "Cofnij"
@@ -930,7 +930,7 @@
     "message": "Żadne notatki nie pasują do tego filtra."
   },
   "notesHiddenByOwner": {
-    "message": "Część zaznaczeń zapisanych na tym urządzeniu należy do innych kont Pinboard i nie jest widoczna na obecnym koncie."
+    "message": "Część wyróżnień należy do dawnych bibliotek i nie została połączona z tą biblioteką osobistą."
   },
   "notesUnknownPage": {
     "message": "Nieznana strona"
@@ -1095,7 +1095,7 @@
     "message": "Wstępnie załadowane (pobieranie w tle co 15 min — natychmiastowy popup)"
   },
   "tagSyncHint": {
-    "message": "Kontroluje, jak istniejąca chmura tagów z Pinboard jest pobierana do popup dla autouzupełniania. Tylko odczyt; nic nie jest wysyłane z powrotem do Pinboard."
+    "message": "Wybierz, kiedy pobierać tagi do autouzupełniania. Pobranie nie zmienia tagów na serwerze."
   },
   "labelTagPresets": {
     "message": "Predefiniowane tagi"
@@ -1134,7 +1134,7 @@
     "message": "Uwzględniaj zapisane słówka w kopiach zapasowych"
   },
   "backupIncludeVocabularyHint": {
-    "message": "Obejmuje tylko słówka z bieżącego konta Pinboard."
+    "message": "Obejmuje tylko słówka z biblioteki osobistej."
   },
   "backupIncludeSecretsLabel": {
     "message": "Uwzględniaj klucze API i tokeny w kopiach zapasowych"
@@ -1162,13 +1162,13 @@
     "message": "Ta kopia zapasowa zawiera poświadczenia jawnym tekstem. Importuj je tylko wtedy, gdy ufasz pochodzeniu pliku."
   },
   "backupVocabOwnerMissing": {
-    "message": "Zapisane słówka nie zostały uwzględnione, ponieważ nie jest dostępne konto Pinboard. Pozostałe wybrane dane zostały wyeksportowane."
+    "message": "Zapisane słówka nie zostały uwzględnione, ponieważ biblioteka osobista jest niedostępna. Pozostałe wybrane dane zostały wyeksportowane."
   },
   "backupHighlightsOwnerMissing": {
-    "message": "Zaznaczenia i notatki powiązane z kontem nie zostały uwzględnione, ponieważ nie jest dostępne konto Pinboard. Pozostałe wybrane dane zostały wyeksportowane."
+    "message": "Zaznaczenia i notatki powiązane z kontem nie zostały uwzględnione, ponieważ biblioteka osobista jest niedostępna. Pozostałe wybrane dane zostały wyeksportowane."
   },
   "backupHighlightsVocabOwnerMissing": {
-    "message": "Zapisane słówka oraz zaznaczenia i notatki powiązane z kontem nie zostały uwzględnione, ponieważ nie jest dostępne konto Pinboard. Pozostałe wybrane dane zostały wyeksportowane."
+    "message": "Zapisane słówka oraz zaznaczenia i notatki powiązane z kontem nie zostały uwzględnione, ponieważ biblioteka osobista jest niedostępna. Pozostałe wybrane dane zostały wyeksportowane."
   },
   "backupPreviewTitle": {
     "message": "Podgląd importu"
@@ -1200,7 +1200,7 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "backupPreviewHighlights": {
-    "message": "Strony: $PAGES$; wpisy: $ITEMS$; konto Pinboard: $OWNER$",
+    "message": "Strony: $PAGES$; wpisy: $ITEMS$; biblioteka osobista: $OWNER$",
     "placeholders": {
       "pages": { "content": "$1" },
       "items": { "content": "$2" },
@@ -1208,7 +1208,7 @@
     }
   },
   "backupPreviewVocabulary": {
-    "message": "Zapisane słówka: $COUNT$; konto Pinboard: $OWNER$",
+    "message": "Zapisane słówka: $COUNT$; biblioteka osobista: $OWNER$",
     "placeholders": {
       "count": { "content": "$1" },
       "owner": { "content": "$2" }
@@ -1224,10 +1224,10 @@
     "message": "Brak"
   },
   "backupPreviewOwnerMismatch": {
-    "message": "Nie można zaimportować zapisanych słówek, ponieważ ta kopia należy do innego konta Pinboard."
+    "message": "Nie można zaimportować zapisanych słówek, ponieważ ta kopia należy do innego biblioteki osobistej."
   },
   "backupPreviewHighlightOwnerMismatch": {
-    "message": "Nie można zaimportować zaznaczeń i notatek, ponieważ ta kopia należy do innego konta Pinboard."
+    "message": "Nie można zaimportować zaznaczeń i notatek, ponieważ ta kopia należy do innego biblioteki osobistej."
   },
   "backupPreviewReady": {
     "message": "Podgląd importu jest gotowy."
@@ -3411,7 +3411,7 @@
       "message": "Dysk Google"
     },
     "vocabDriveScope": {
-      "message": "Po połączeniu to urządzenie synchronizuje słownictwo, wyróżnienia i notatki, pełne hasła AI z uzupełnieniami oraz zapisane rozmowy z cytowanymi fragmentami dla bieżącego konta Pinboard."
+      "message": "Po połączeniu to urządzenie synchronizuje słownictwo, wyróżnienia i notatki, pełne hasła AI z uzupełnieniami oraz zapisane rozmowy z cytowanymi fragmentami dla biblioteki osobistej."
     },
     "vocabDriveConnectionHint": { "message": "Połącz każde urządzenie osobno. Google Drive nie synchronizuje ustawień ani danych logowania." },
     "vocabDriveDisclosure": {
@@ -3448,7 +3448,7 @@
       "message": "Konto Google"
     },
     "vocabDriveOwnerLabel": {
-      "message": "Konto Pinboard"
+      "message": "Biblioteka osobista"
     },
     "vocabDriveNever": {
       "message": "Jeszcze nie synchronizowano"
@@ -3481,10 +3481,10 @@
       "message": "Autoryzacja Google jest chwilowo niedostępna."
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "Nie zalogowano konta Pinboard. Wpisz token API w „Konto → Konto Pinboard”, a potem połącz ponownie."
+      "message": "Biblioteka osobista jest niedostępna. Otwórz tę stronę ponownie i spróbuj jeszcze raz."
     },
     "vocabDriveErrorPinboardAuthSync": {
-      "message": "Nie zalogowano konta Pinboard. Wpisz token API w „Konto → Konto Pinboard”, a potem kliknij „Synchronizuj teraz”."
+      "message": "Biblioteka osobista jest niedostępna. Otwórz tę stronę ponownie i kliknij „Synchronizuj teraz”."
     },
     "vocabDriveErrorPermission": {
       "message": "Brakuje uprawnienia do Dysku Google."
@@ -3531,10 +3531,10 @@
       "message": "Eksport i integracje"
     },
     "vocabOwnerNoAccount": {
-      "message": "Brak konta Pinboard"
+      "message": "Biblioteka osobista jest niedostępna. Otwórz tę stronę ponownie i spróbuj jeszcze raz."
     },
     "vocabLoadFailed": {
-      "message": "Nie udało się wczytać słówek z bieżącego konta Pinboard. Otwórz ponownie kartę Słówka i spróbuj jeszcze raz."
+      "message": "Nie udało się wczytać słówek z biblioteki osobistej. Otwórz ponownie kartę Słówka i spróbuj jeszcze raz."
     },
     "vocabExportFailed": {
       "message": "Nie udało się wyeksportować słówek. Spróbuj ponownie."
@@ -3552,7 +3552,7 @@
       "message": "Cmd+kliknięcie zaznacza wpis, Shift+kliknięcie zaznacza zakres"
     },
     "vocabResultCount": {
-      "message": "Bieżące konto Pinboard ($OWNER$): wyniki $RESULTS$ · zapisane $TOTAL$",
+      "message": "$OWNER$: wyniki $RESULTS$ · zapisane $TOTAL$",
       "placeholders": {
         "results": {
           "content": "$1"
@@ -4279,7 +4279,7 @@
   "diagnosticsCopied": { "message": "Skopiowano dane diagnostyczne" },
   "diagnosticsCopyFailed": { "message": "Nie udało się skopiować danych diagnostycznych. Sprawdź dostęp do schowka i spróbuj ponownie." },
   "libraryVocabSignedOutTitle": { "message": "Zaloguj się, aby korzystać ze słownictwa" },
-  "libraryVocabSignedOutHint": { "message": "Słownictwo jest przechowywane osobno dla każdego konta Pinboard. Wyszukiwanie w słowniku działa również bez logowania." },
+  "libraryVocabSignedOutHint": { "message": "Słówka, wyróżnienia, notatki i historia Ask pozostają w jednej bibliotece niezależnie od usługi zakładek." },
   "libraryVocabOpenSettings": { "message": "Otwórz ustawienia konta" },
   "libraryLookupSignedOutHint": { "message": "Wyszukaj słowo w sekcji „Słownik”. Zaloguj się, aby zapisać je w słówkach." },
   "mdPreviewClose": { "message": "Zamknij czytnik" },
@@ -4383,7 +4383,7 @@
   "loginNeedsPaid": { "message": "Wymaga płatnego konta Pinboard." },
   "popupDraftDiscard": { "message": "Odrzuć szkic" },
   "readerBookmarkSection": {"message": "Zapis"},
-  "readerBookmarkSave": {"message": "Zapisz w Pinboard"},
+  "readerBookmarkSave": {"message": "Zapisz zakładkę"},
   "readerBookmarkSaved": {"message": "Zapisano"},
   "readerBookmarkLater": {"message": "Przeczytaj później"},
   "readerBookmarkMarkRead": {"message": "Oznacz jako przeczytane"},
@@ -4391,7 +4391,7 @@
   "readerBookmarkChecking": {"message": "Sprawdzanie zakładki…"},
   "readerBookmarkSaving": {"message": "Zapisywanie…"},
   "readerBookmarkUpdated": {"message": "Zaktualizowano zakładkę"},
-  "readerBookmarkQueued": {"message": "Dodano do kolejki offline; jeszcze nie zapisano w Pinboard"},
+  "readerBookmarkQueued": {"message": "W kolejce offline; jeszcze nie zapisano"},
   "readerBookmarkLookupFailed": {"message": "Nie udało się sprawdzić zakładki. Ponów próbę przed edycją."},
   "readerBookmarkFailed": {"message": "Nie udało się zapisać. Spróbuj ponownie."},
   "readerBookmarkAccountChanged": {"message": "Konto się zmieniło. Aby zapisać, otwórz czytnik ponownie."},
@@ -4405,14 +4405,14 @@
     "message": "Usuń zakładkę"
   },
   "readerBookmarkDeleteConfirm": {
-    "message": "Usunąć tę zakładkę z Pinboard?"
+    "message": "Usunąć tę zakładkę?"
   },
   "readerBookmarkDeleteDetail": {"message": "Zaznaczenia i notatki w czytniku pozostaną."},
   "readerBookmarkDeleting": {
     "message": "Usuwanie zakładki…"
   },
   "readerBookmarkDeleted": {
-    "message": "Zakładka usunięta z Pinboard"
+    "message": "Usunięto zakładkę"
   },
   "readerBookmarkDeleteFailed": {
     "message": "Nie udało się potwierdzić usunięcia. Spróbuj ponownie."
@@ -4686,5 +4686,62 @@
   "dictGenerationServiceUnavailable": {"message": "Usługa dostawcy jest chwilowo niedostępna. Spróbuj ponownie później."},
   "dictProgressThinking": {"message": "Model analizuje…"},
   "dictProgressStreaming": {"message": "Odbieranie odpowiedzi…"},
-  "dictProgressElapsed": {"message": "Upłynęło $SECONDS$ s", "placeholders": {"seconds": {"content": "$1"}}}
+  "dictProgressElapsed": {"message": "Upłynęło $SECONDS$ s", "placeholders": {"seconds": {"content": "$1"}}},
+  "bookmarkServiceTitle": {
+    "message": "Usługa zakładek"
+  },
+  "bookmarkServiceChoose": {
+    "message": "Wybierz miejsce zapisu zakładek"
+  },
+  "bookmarkServiceHint": {
+    "message": "Okno rozszerzenia, czytnik, skróty klawiszowe i zapis zbiorczy korzystają z tej usługi."
+  },
+  "personalLibraryTitle": {
+    "message": "Biblioteka osobista"
+  },
+  "personalLibraryHint": {
+    "message": "Słówka, wyróżnienia, notatki i historia Ask pozostają w jednej bibliotece niezależnie od usługi zakładek."
+  },
+  "bookmarkServerUrl": {
+    "message": "Adres serwera"
+  },
+  "bookmarkServerHint": {
+    "message": "Podaj adres witryny wraz z podścieżką, jeśli jest używana. Poza localhost wymagany jest HTTPS."
+  },
+  "bookmarkConnectHint": {
+    "message": "Zmiany adresu i tokenu obowiązują po połączeniu. Tokeny pozostają na tym urządzeniu, chyba że włączono synchronizację danych uwierzytelniających."
+  },
+  "bookmarkConnect": {
+    "message": "Połącz"
+  },
+  "bookmarkConnecting": {
+    "message": "Łączenie…"
+  },
+  "bookmarkConnected": {
+    "message": "Połączono"
+  },
+  "bookmarkConnectFailed": {
+    "message": "Nie udało się połączyć. Sprawdź adres serwera, token i uprawnienia dostępu do witryny."
+  },
+  "bookmarkInvalidConfig": {
+    "message": "Podaj prawidłowy adres serwera i token API."
+  },
+  "bookmarkPermissionDenied": {
+    "message": "Zezwól na dostęp do tego serwera w ustawieniach, a następnie połącz ponownie."
+  },
+  "bookmarkKarakeepHint": {
+    "message": "„Do przeczytania” korzysta z osobnej listy prywatnej. Oznaczenie zakładki jako przeczytanej usuwa ją z listy, bez zmiany stanu archiwizacji w usłudze."
+  },
+  "bookmarkReadLaterListName": {
+    "message": "Do przeczytania"
+  },
+  "bookmarkPartialSave": {
+    "message": "Zakładka mogła zostać zapisana, ale część zmian się nie powiodła. Otwórz edycję, sprawdź dane i zapisz ponownie."
+  },
+  "bookmarkServiceSettings": {
+    "message": "Wybierz usługę zakładek"
+  },
+  "backupAdoptLibrary": {
+    "message": "Biblioteka osobista jest pusta. Przywrócenie słownictwa lub wyróżnień przejmie bibliotekę z kopii zapasowej, zachowując dostęp do jej danych na Dysku."
+  }
 }

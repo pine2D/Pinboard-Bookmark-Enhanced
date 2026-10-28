@@ -6205,8 +6205,18 @@ const VALUE_BOX_LEGS = Object.freeze({
         context: "login",
         boxes: ["#token-input"],
         async open(page, url, theme, sw) {
+          // Leave the live popup before clearing auth; its storage listener
+          // reloads on connection changes. Restoration must settle that reload
+          // before the following media probe reads the document.
+          await page.goto("about:blank");
           await sw.evaluate(() => chrome.storage.local.set({ pinboardToken: "" }));
-          const restore = () => sw.evaluate((tok) => chrome.storage.local.set({ pinboardToken: tok }), SEED_TOKEN_OBF);
+          const restore = async () => {
+            await Promise.all([
+              page.waitForEvent("domcontentloaded", { timeout: TIMEOUT_MS }),
+              sw.evaluate((tok) => chrome.storage.local.set({ pinboardToken: tok }), SEED_TOKEN_OBF),
+            ]);
+            await page.waitForSelector("#main-section:not(.hidden)", { timeout: TIMEOUT_MS });
+          };
           try {
             await page.goto(`${url}?_ra=fieldlogin`, { waitUntil: "load", timeout: TIMEOUT_MS });
             await page.waitForSelector("#login-section:not(.hidden)", { timeout: TIMEOUT_MS });
@@ -8782,8 +8792,7 @@ async function openReaderSurface(name) {
       try {
         // Cancel any real initial lookup still pending in the save module,
         // then replay this same fixture owner/article with the stub active.
-        document.dispatchEvent(new CustomEvent("pbp:account-changed", { detail: { account: row.account } }));
-        document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { account: row.account, url: row.url, title: row.title, bookmark: { tags: row.tags || [], notes: row.description || "" } } }));
+        document.dispatchEvent(new CustomEvent("pbp:bookmark-account-changed", { detail: { account: row.account, url: row.url, title: row.title } }));
         await wait(50);
         await window.pbpReaderBookmarkAction("edit");
       }
@@ -9979,6 +9988,7 @@ async function runSweep(page, sw, extBase) {
   // setup; restore it immediately afterwards so this stays the last popup
   // leg regardless of who calls runSweep.
   if (wants("popup", "login")) {
+    await page.goto("about:blank");
     await sw.evaluate(() => chrome.storage.local.set({ pinboardToken: "" }));
     await setTheme(sw, "", "light");
     await page.goto(`${extBase}popup.html?_ra=sweeplogin`, { waitUntil: "load", timeout: TIMEOUT_MS });
@@ -10236,7 +10246,11 @@ async function main() {
   // (pbpVocabSaveWord / pbpVocabBatchAddGroup) instead of touching the
   // "words" object store directly keeps the single-writer invariant intact
   // (CLAUDE.md: "vocab-store.js 是 pbp-vocab 的唯一写入口"). ----
-  await sw.evaluate((tok) => chrome.storage.local.set({ pinboardToken: tok }), SEED_TOKEN_OBF);
+  await sw.evaluate(async ({token, account}) => {
+    await primeSettings();
+    await pbpPersonalLibraryAccount();
+    await chrome.storage.local.set({pinboardToken:token, personalLibraryAccount:account});
+  }, {token:SEED_TOKEN_OBF, account:SEED_TOKEN_ACCOUNT});
 
   // Library redesign fixture (plan T2), written BEFORE renderAuditFixture so
   // the fixture word stays the newest row of the latest-first list. Same

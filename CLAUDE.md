@@ -7,7 +7,7 @@
 
 ## 项目概述
 
-Chrome Extension (Manifest V3)，一键将当前页面保存到 Pinboard，支持多 LLM 提供商的 AI 标签/摘要/全文翻译/Ask-the-page 问答与 opt-in 要点提炼（skim）。md-preview 阅读器支持直接保存/编辑/删除 Pinboard 书签，完整 Ask 问答可连同引用单独导出或附在正文后；带划词高亮/笔记/搜索/专注模式、YouTube / B 站视频页的播放器+多语种字幕面板、在线词典与可选离线词典（CC-CEDICT 汉英、用户自备 ECDICT 英汉与多语言 Yomitan v3 包）；高亮、笔记、生词与已保存的问答集中在独立的「资料库」页（library.html，索引 + 详情平铺双栏）；生词按当前 Pinboard 账号隔离，可按语言筛选、从查词结果选义保存并关联原形；支持完整 TSV 与可选多语言 Anki 笔记类型，保留原六字段导出，也可发送到欧路词典；连接 Google Drive 即同步生词、高亮、笔记及完整 AI 词条、补充用法和 Ask 问答记录。导出可 Send-to Obsidian/Notion/NotebookLM/Gist/Webhook，另有 Wayback 自动归档、标签治理和 13 套 pinboard.in 站点主题。功能全貌见 README.md。
+Chrome Extension (Manifest V3)，将当前页面保存到可选主服务 Pinboard、Karakeep 或 linkding（后两者无需 Pinboard 账号），支持多 LLM 提供商的 AI 标签/摘要/全文翻译/Ask-the-page 问答与 opt-in 要点提炼（skim）。md-preview 阅读器支持直接保存/编辑/删除所选服务的书签，完整 Ask 问答可连同引用单独导出或附在正文后；带划词高亮/笔记/搜索/专注模式、YouTube / B 站视频页的播放器+多语种字幕面板、在线词典与可选离线词典（CC-CEDICT 汉英、用户自备 ECDICT 英汉与多语言 Yomitan v3 包）；高亮、笔记、生词与已保存的问答集中在独立的「资料库」页（library.html，索引 + 详情平铺双栏）；生词、高亮、笔记、AI 词条归档与 Ask 历史由所有书签服务共用一个个人资料库，可按语言筛选、从查词结果选义保存并关联原形；支持完整 TSV 与可选多语言 Anki 笔记类型，保留原六字段导出，也可发送到欧路词典；连接 Google Drive 即同步生词、高亮、笔记及完整 AI 词条、补充用法和 Ask 问答记录。导出可 Send-to Obsidian/Notion/NotebookLM/Gist/Webhook，另有 Wayback 自动归档、标签治理和 13 套 pinboard.in 站点主题。功能全貌见 README.md。
 
 ## 技术栈
 
@@ -43,6 +43,7 @@ ask-archive.js / ask-archive-gdrive.js  # Ask 完整问答、证据与版本持�
 library-ask.js              # 按文章与会话浏览、继续提问和删除 Ask 历史
 anki-connect.js / eudic-sync.js  # 生词外发（本机 AnkiConnect / 欧路 OpenAPI；纯层，测试页可载）
 ai.js / ai-cache.js          # AI 调用核心（popup/options/library/md-preview 共载）/ 结果 IDB 缓存
+bookmark-services.js        # Karakeep/linkding API 适配器；统一保存入口在 background.js
 export-targets.js            # Send-to 目标注册表（Obsidian / Notion / NotebookLM / Gist / Webhook；纯层）
 shared.js                    # 跨文件常量 + $id 记忆化 DOM 缓存
 jina.js / i18n.js / tag-gov.js / wayback.js / site-rules.js  # 兜底抽取 / 多语言 / 标签治理 / 归档队列 / 站点适配器
@@ -79,18 +80,21 @@ docs/superpowers/ DESIGN-IS-2026-07-22/ release/  # gitignored 本地产物（.q
 | 机制 | 数据 | 边界 |
 |------|------|------|
 | Chrome Sync | 普通设置；另行启用时含凭据 | `optSyncEnabled` 是**每设备** local 开关，普通设置据此路由 sync/local；不含生词、高亮、缓存、任务状态 |
-| Google Drive | 当前 Pinboard owner 的生词、高亮与笔记、完整 AI 词条及补充、Ask 问答记录 | 每设备单独连接；连接即同步四类、断开即停止，不设按类型开关；共享连接层状态 `driveConnState:<ownerHash>` 只存 local；只用 `drive.appdata`；不接管设置、凭据 |
+| Google Drive | 固定个人资料库 owner 的生词、高亮与笔记、完整 AI 词条及补充、Ask 问答记录 | 每设备单独连接；连接即同步四类、断开即停止，不设按类型开关；共享连接层状态 `driveConnState:<ownerHash>` 只存 local；只用 `drive.appdata`；不接管设置、凭据 |
 | 手工 JSON schema v3 | 设置、主题 + 用户分项选择的高亮/生词/凭据 | 明文文件；导入先预览分项选择；凭据两端默认关、fail-closed（详见 rules/backup.md） |
 
 - 凭据（API key / token / password / 导出目标）不能硬编码。默认存 `chrome.storage.local`；仅当本机 `optSyncEnabled=true` 且账号级 `syncApiKeys=true` 时用 sync；旧云端已有非空 secret 时迁移保留 `syncApiKeys=true`，避免升级丢凭据。
 - sync 配额：单 item ≤8KB、总约 100KB、写入限流；写后检查 `lastError`。缓存、大对象、瞬态状态一律 local。
 - 生词及其 Drive 协议状态在 IndexedDB（vocab-store.js 是生词唯一写入口）；高亮与笔记及其 Drive 协议状态走 notes-sync.js 的统一写边界；逐设备连接标记与共享连接层状态（`driveConnState:<ownerHash>`）在 local。
-- **离线队列**只存 local：新记录**仅**保存保存模式、URL、标题、备注、标签、私密/稍后读/归档标志、书签时间、队列 ID/入队时间与非秘密 Pinboard 用户名绑定——此外一律不存，禁止保存 token；legacy token 记录读取时改写为账号绑定并删除 token。重放必须用当前登录 token 且用户名与队列绑定精确一致，否则保留队列并 fail-closed。
+- **离线队列**只存 local：新记录**仅**保存保存模式、URL、标题、备注、标签、私密/稍后读/归档标志、书签时间、队列 ID/入队时间与非秘密书签连接身份绑定——此外一律不存，禁止保存 token；legacy token 记录读取时改写为账号绑定并删除 token。重放必须用当前登录 token 且服务和连接身份与队列绑定精确一致，否则保留队列并 fail-closed。
+
+- **个人资料库**：`personalLibraryAccount` 首次采用当前 Pinboard 用户名，无账号时为 `personal:default`，随后不随书签服务/凭据切换；保留旧 owner 与 Drive hash，不自动合并其他历史账号。普通设置同步可携带此非秘密身份；普通 JSON 设置导入忽略它，资料分项仍核对所属资料库。阅读器的 library `account` 与 `bookmarkAccount` 分开，storage handoff 的 `account` 仍表示书签连接。
+- **自托管书签连接**：设置三选一；Connect 点击申请精确 origin 并只读验证，成功后才保存地址与绑定该地址的凭据封套。Karakeep owner 含服务、地址与验证后的用户 ID；linkding 无用户 ID，显式重连生成新连接 ID，旧队列不跨连接重放。Karakeep 稍后阅读只用本人独占的私有普通列表，不映射 archived。Pinboard 建议/标签治理/未读计数/站点搜索/Tab Set 保留专用。
 
 ## 跨领域安全铁律
 
 - **Pinboard 账号隔离**：所有 Pinboard v1 请求（`auth_token` 认证）在实际 dispatch 前原子重读有效凭据；同用户名 token 轮换时用新 token 重写请求，登出或跨用户名切换时取消且不得发网。账号数据派生的 cache / message / preview payload / 持久任务必须携带非秘密 owner，并在读取、异步回写、UI 提交时逐次校验 owner。
-- **网络端点与 host 权限**：required host 仅 Pinboard；AI / Jina / Wayback / Gist / Webhook / Notion / Free Dictionary / 欧路、AnkiConnect 精确回环 origin（`127.0.0.1:8765`）、YouTube/B 站字幕（www.youtube.com / api.bilibili.com；**首次**由视频页预览内的「启用字幕并加载视频」点击申请精确 origin；授权后打开视频页预览即自动抓取——字幕即正文的产品语义，自动路径仅 `permissions.contains` 判定绝不 request。YouTube 优先注入用户已开的 www.youtube.com 标签页 same-origin 取数——页内自带登录与 PO Token 语境，扩展页跨站 fetch 被 LOGIN_REQUIRED 常态拦截；无标签页时回退扩展页 fetch，仅该回退受 `mdVideoUseLogin` 控制，默认开；B 站三个字幕 API 以登录态 credentials:include 调用；**B 站播放进度**走 `player.bilibili.com` 精确 origin——与 api.bilibili.com 同一次点击申请，授权后 md-video.js 用 `scripting.registerContentScripts` 注册 `bili-player-bridge.js` 到该 origin 的所有 frame，脚本在预览页以扩展 origin 握手前完全静默，只回传 currentTime/状态/时长并执行 seek/play/pause/rate；caption 的 `contains` 门只看 api origin，早期只授过 api 的用户由工具条「启用播放跟随」按钮补授）与 Batch 所选站点，以及**内嵌框架抽取**（顶层文档无正文而存在单个占视口 ≥40% 的跨源 https iframe 时，阅读器错误态给「授权并重试」按钮，点击才请求该帧精确 origin，随后以 `allFrames` 重抽取；`sandbox` 无 `allow-same-origin` 的帧不作候选）——**首次授权**一律只能来自直接用户动作请求当前精确 origin。**YouTube 播放器经本项目自有 Pages 中继页内嵌**（扩展页不发 Referer，YouTube 播放器因此拒载；中继页是 iframe，与封面图 `i.ytimg.com` 同属子资源，均不需 host 权限）。后台/自动路径只做 `permissions.contains`，禁止运行时申请 wildcard。可配置端点必须 HTTPS，HTTP 仅允许字面 `localhost` / `127.0.0.1` / `[::1]`；LAN/public HTTP、凭据 URL 与无权限请求一律阻断并保留配置。升级时一次性清理 legacy all-sites grant。
+- **网络端点与 host 权限**：required host 仅 Pinboard；Karakeep / linkding / AI / Jina / Wayback / Gist / Webhook / Notion / Free Dictionary / 欧路、AnkiConnect 精确回环 origin（`127.0.0.1:8765`）、YouTube/B 站字幕（www.youtube.com / api.bilibili.com；**首次**由视频页预览内的「启用字幕并加载视频」点击申请精确 origin；授权后打开视频页预览即自动抓取——字幕即正文的产品语义，自动路径仅 `permissions.contains` 判定绝不 request。YouTube 优先注入用户已开的 www.youtube.com 标签页 same-origin 取数——页内自带登录与 PO Token 语境，扩展页跨站 fetch 被 LOGIN_REQUIRED 常态拦截；无标签页时回退扩展页 fetch，仅该回退受 `mdVideoUseLogin` 控制，默认开；B 站三个字幕 API 以登录态 credentials:include 调用；**B 站播放进度**走 `player.bilibili.com` 精确 origin——与 api.bilibili.com 同一次点击申请，授权后 md-video.js 用 `scripting.registerContentScripts` 注册 `bili-player-bridge.js` 到该 origin 的所有 frame，脚本在预览页以扩展 origin 握手前完全静默，只回传 currentTime/状态/时长并执行 seek/play/pause/rate；caption 的 `contains` 门只看 api origin，早期只授过 api 的用户由工具条「启用播放跟随」按钮补授）与 Batch 所选站点，以及**内嵌框架抽取**（顶层文档无正文而存在单个占视口 ≥40% 的跨源 https iframe 时，阅读器错误态给「授权并重试」按钮，点击才请求该帧精确 origin，随后以 `allFrames` 重抽取；`sandbox` 无 `allow-same-origin` 的帧不作候选）——**首次授权**一律只能来自直接用户动作请求当前精确 origin。**YouTube 播放器经本项目自有 Pages 中继页内嵌**（扩展页不发 Referer，YouTube 播放器因此拒载；中继页是 iframe，与封面图 `i.ytimg.com` 同属子资源，均不需 host 权限）。后台/自动路径只做 `permissions.contains`，禁止运行时申请 wildcard。可配置端点必须 HTTPS，HTTP 仅允许字面 `localhost` / `127.0.0.1` / `[::1]`；LAN/public HTTP、凭据 URL 与无权限请求一律阻断并保留配置。升级时一次性清理 legacy all-sites grant。
 - AI 请求统一走各 provider 的 chat completion 接口（关思考方言勿凭记忆改，见 rules/ai-providers.md）。
 - Defuddle 在 popup 打开时**懒注入**；site-rules.js 与其成对注入且**先于** Defuddle 运行（命中站点规则即短路）。
 

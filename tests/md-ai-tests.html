@@ -12390,11 +12390,12 @@ window._t5AsyncDone = (async function () {
     const prevSave = _pbpHlSave, prevRender = _pbpHlNotebookRender, prevState = _pbpHlState;
     const prevCard = _pbpHlCard, prevId = _pbpHlCardItemId, prevBase = _pbpHlCardBaseNote;
     const prevDirty = _pbpHlNoteDirty, prevQueue = _pbpHlWriteQueue;
-    const prevLoadStrict = _pbpHlLoadStrict;
+    const prevLoadStrict = _pbpHlLoadStrict, prevLiveOwner = _pbpHlLiveOwner;
     const card = document.createElement("div");
     card.setAttribute("popover", "auto");
     try {
       _pbpHlSave = async () => true;
+      _pbpHlLiveOwner = async () => "";
       // Same reason as the dirty-card commit test above: the commit re-reads
       // storage strictly and patches by item.id, so the fixture has to be
       // reachable from that read, not only from memory.
@@ -12431,6 +12432,7 @@ window._t5AsyncDone = (async function () {
       _pbpHlCard = prevCard; _pbpHlCardItemId = prevId; _pbpHlCardBaseNote = prevBase;
       _pbpHlNoteDirty = prevDirty; _pbpHlWriteQueue = prevQueue;
       _pbpHlLoadStrict = prevLoadStrict;
+      _pbpHlLiveOwner = prevLiveOwner;
       card.remove();
     }
   });

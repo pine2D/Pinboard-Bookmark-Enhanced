@@ -275,12 +275,12 @@ async function run() {
       let secretLocalWrites = 0;
       globalThis.__pbpTestStorage = {
         set: () => { secretOnlySets++; return Promise.resolve(); },
-        get: () => Promise.resolve({}),
+        get: () => Promise.resolve({personalLibraryAccount:"alice"}),
       };
       globalThis.chrome = {
         storage: {
           local: {
-            get: async (keys) => ({ ...(keys || {}), optSyncEnabled: true, syncApiKeys: false }),
+            get: async (keys) => ({ ...(keys || {}), optSyncEnabled: true, syncApiKeys: false, personalLibraryAccount:"alice" }),
             set: async () => { secretLocalWrites++; },
           },
           onChanged: { addListener() {} },
@@ -1926,7 +1926,7 @@ async function run() {
     check("E4 background settings cache: pending invalidation causes exactly one fresh reread for every caller",
       reads === 2 && freshA.pinboardToken === "alice:new" && freshB === freshA && cached === freshA &&
       invalidatedCache.cached() === freshA && backgroundSource.includes("changes.optSyncEnabled") &&
-      backgroundSource.includes("invalidatePinboardAuthState()"));
+      backgroundSource.includes("invalidateBookmarkAuthState()"));
 
     reads = 0;
     const firstError = new Error("settings unavailable");
@@ -2081,7 +2081,7 @@ async function run() {
       );
 
       // Warm cache: loadSettings() has already populated _settingsCache (the
-      // same way this callback's own next step -- getCurrentPinboardAuth ->
+      // same way this callback's own next step -- getCurrentBookmarkAuth ->
       // getCachedToken -- warms it) -- no storage.get for optCheckBookmarkStatus.
       {
         let getCalls = 0, checkCalls = 0;
@@ -3069,6 +3069,7 @@ async function run() {
     const prevCache = _settingsStorageCache;
     const prevVocabAll = globalThis.pbpVocabAll;
     let exportedBlob = null;
+    let personalOwnerUnavailable = false;
     let beforeExportCalls = 0;
     const localArea = Object.assign({}, SETTINGS_DEFAULTS, {
       optSyncEnabled: false,
@@ -3099,6 +3100,7 @@ async function run() {
       pbp_hl_last_color: 4,
     });
     function storageGet(keys) {
+      if (personalOwnerUnavailable && keys && typeof keys === "object" && Object.hasOwn(keys,"personalLibraryAccount")) return Promise.reject(new Error("personal library unavailable"));
       const asksForToken = keys === "pinboardToken" ||
         (Array.isArray(keys) && keys.includes("pinboardToken")) ||
         (keys && typeof keys === "object" && !Array.isArray(keys) &&
@@ -3216,7 +3218,7 @@ async function run() {
       let noteHighlightsOnly = "";
       let noteBothSections = "";
       let noteVocabOnly = "";
-      let noteIconRendered = false;
+      let highlightsRejected = false;
       const runOwnerlessExport = async () => {
         exportedBlob = null;
         document.getElementById("export-settings").click();
@@ -3226,23 +3228,23 @@ async function run() {
         return note.textContent.trim();
       };
       try {
-        localArea.pinboardToken = "";
+        personalOwnerUnavailable = true;
         _settingsStorageCache = null;
         document.getElementById("opt-backup-include-highlights").checked = true;
         document.getElementById("opt-backup-include-vocabulary").checked = false;
         noteHighlightsOnly = await runOwnerlessExport();
-        noteIconRendered = !!note.querySelector("svg");
+        highlightsRejected = !exportedBlob && !!document.getElementById("import-status").textContent;
         document.getElementById("opt-backup-include-vocabulary").checked = true;
         noteBothSections = await runOwnerlessExport();
         document.getElementById("opt-backup-include-highlights").checked = false;
         noteVocabOnly = await runOwnerlessExport();
       } finally {
+        personalOwnerUnavailable = false;
         if (previousExportT === undefined) delete globalThis.t;
         else globalThis.t = previousExportT;
       }
-      check("E7 manual export: an unreadable account announces the highlights left out of the file",
-        noteHighlightsOnly === "backupHighlightsOwnerMissing" && noteIconRendered &&
-        noteBothSections === "backupHighlightsVocabOwnerMissing");
+      check("E7 manual export: an unreadable personal library refuses an ambiguous highlights export",
+        highlightsRejected && noteHighlightsOnly === "" && noteBothSections === "");
       check("E7 manual export: the vocabulary-only owner warning is unchanged",
         noteVocabOnly === "backupVocabOwnerMissing");
 
@@ -3265,6 +3267,7 @@ async function run() {
           document.getElementById("opt-backup-include-highlights").checked = false;
           document.getElementById("opt-backup-include-vocabulary").checked = false;
           localArea.pinboardToken = obfuscateKey("backup-owner:token");
+          localArea.personalLibraryAccount = "backup-owner";
           _settingsStorageCache = null;
           localArea.savedThemes = [{ name: "Broken" }];
           exportedBlob = null;
@@ -3279,7 +3282,7 @@ async function run() {
           delete localArea.savedThemes;
           document.getElementById("opt-backup-include-vocabulary").checked = true;
           globalThis.pbpVocabAll = async () => {
-            localArea.pinboardToken = obfuscateKey("other-owner:token");
+            localArea.personalLibraryAccount = "other-owner";
             _settingsStorageCache = null;
             return [];
           };
@@ -3295,6 +3298,7 @@ async function run() {
           // field rejection carries no pbpBackupField, so it must not be
           // dressed up as one.
           localArea.pinboardToken = obfuscateKey("backup-owner:token");
+          localArea.personalLibraryAccount = "backup-owner";
           _settingsStorageCache = null;
           globalThis.pbpVocabAll = async () => {
             throw new TypeError("invalid backup field: x");
@@ -3312,6 +3316,7 @@ async function run() {
           if (previousExportFailT === undefined) delete globalThis.t;
           else globalThis.t = previousExportFailT;
           localArea.pinboardToken = obfuscateKey("backup-owner:token");
+          localArea.personalLibraryAccount = "backup-owner";
           _settingsStorageCache = null;
           failStatus.textContent = "";
         }
@@ -4870,7 +4875,7 @@ async function run() {
       globalThis.chrome = {
         storage: {
           local: {
-            get: async (keys) => (typeof keys === "string" && keys in hlStore ? { [keys]: hlStore[keys] } : {}),
+            get: async (keys) => (typeof keys === "string" && keys in hlStore ? { [keys]: hlStore[keys] } : {personalLibraryAccount:backupOwner}),
             set: async (data) => {
               Object.entries(data).forEach(([key, value]) => {
                 if (!key.startsWith("pbp_hl_")) return;
@@ -4993,7 +4998,8 @@ async function run() {
         globalThis.chrome = {
           storage: {
             local: {
-              async get() {
+              async get(keys) {
+                if (typeof keys !== "string") return {personalLibraryAccount:currentOwner};
                 if (phase === "read") { signalBoundary(); await gate; }
                 return {};
               },

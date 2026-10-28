@@ -109,8 +109,8 @@ function fixture(ownerHash, options = {}) {
     };
   }
   const run = (runOptions) => pbpCreateNotesDriveSyncRunner({ client, store, connection,
-    getCurrentPinboardAuth: async () => ({ account: owner === OWNER ? "alice" : "bob" }),
-    pinboardAuthIsCurrent: (auth) => auth.account === (owner === OWNER ? "alice" : "bob"),
+    getCurrentLibraryAuth: async () => ({ account: owner === OWNER ? "alice" : "bob" }),
+    libraryAuthIsCurrent: (auth) => auth.account === (owner === OWNER ? "alice" : "bob"),
     isEnabled: async () => enabled, getCurrentPermissionId: () => client.about(),
     onSession: (permissionId) => { activePermissionId = permissionId; },
     now: () => 100000, random: () => .5

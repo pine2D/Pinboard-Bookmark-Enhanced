@@ -521,6 +521,11 @@ function isStaleCacheEntry(entry, now, ttlMs) {
 
 const SETTINGS_DEFAULTS = {
   pinboardToken: "",
+  bookmarkService: "pinboard",
+  karakeepUrl: "", karakeepToken: "",
+  karakeepReadLaterListId: "", karakeepReadLaterListOwner: "",
+  linkdingUrl: "", linkdingToken: "",
+  personalLibraryAccount: "",
   aiProvider: "gemini",
   geminiApiKey: "", geminiModel: "gemini-3.5-flash-lite",
   openaiApiKey: "", openaiModel: "gpt-5.4-nano", openaiBaseUrl: "https://api.openai.com/v1",
@@ -776,8 +781,8 @@ function pinboardFetchImmediate(url, options) {
 }
 
 async function _authorizeFreshPinboardUrl(url) {
-  const raw = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
-  const authorizedUrl = pbpAuthorizePinboardApiUrl(url, deobfuscateKey(raw.pinboardToken) || "");
+  const raw = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken, bookmarkService: "pinboard" });
+  const authorizedUrl = pbpBookmarkServiceId(raw) === "pinboard" && pbpAuthorizePinboardApiUrl(url, deobfuscateKey(raw.pinboardToken) || "");
   if (authorizedUrl) return authorizedUrl;
   const error = new Error("account_changed");
   error.code = "account_changed";
@@ -1810,6 +1815,108 @@ function pbpCreateRecoveringTail() {
   };
 }
 
+function pbpBookmarkServiceId(settings) {
+  const id = settings?.bookmarkService === undefined ? "pinboard" : settings.bookmarkService;
+  return ["pinboard", "karakeep", "linkding"].includes(id) ? id : "";
+}
+
+function pbpBookmarkEndpoint(raw) {
+  if (!pbpEndpointOriginPattern(raw)) return "";
+  try {
+    const url = new URL(String(raw).trim());
+    if (url.search || url.hash || /[\\\u0000-\u0020]/.test(String(raw).trim())) return "";
+    return url.href.replace(/\/+$/, "") + "/";
+  } catch (_) { return ""; }
+}
+
+// A connection's non-secret identity scopes bookmark caches and pending work.
+// Tokens never become cache keys. linkding has no account ID endpoint, so each
+// verified reconnection receives a new opaque ID.
+const PBP_BOOKMARK_SETTING_KEYS = ["bookmarkService", "pinboardToken", "karakeepUrl", "karakeepToken",
+  "karakeepReadLaterListId", "karakeepReadLaterListOwner",
+  "linkdingUrl", "linkdingToken"];
+function pbpBookmarkConnection(settings) {
+  const service = pbpBookmarkServiceId(settings);
+  if (service === "pinboard") {
+    const token = deobfuscateKey(settings?.pinboardToken) || "";
+    return {service, token, account:pbpPinboardAccountFromToken(token), baseUrl:"https://pinboard.in/"};
+  }
+  const baseUrl = pbpBookmarkEndpoint(settings?.[service + "Url"]);
+  let credential = null;
+  try { credential = JSON.parse(deobfuscateKey(settings?.[service + "Token"])); } catch (_) { /* unverified credentials stay inactive */ }
+  const token = typeof credential?.token === "string" ? credential.token : "";
+  const connectionId = credential?.connectionId;
+  const userId = service === "karakeep" ? credential?.userId : connectionId;
+  const ready = service && baseUrl && credential?.v === 1 && credential.baseUrl === baseUrl && token &&
+    typeof connectionId === "string" && connectionId && typeof userId === "string" && userId;
+  const account = ready ? service + ":" + baseUrl + ":" + userId : "";
+  return {service, baseUrl, token:ready ? token : "", account,
+    readLaterListId:service === "karakeep" && settings?.karakeepReadLaterListOwner === account ? settings?.karakeepReadLaterListId || "" : ""};
+}
+async function pbpReadBookmarkConnection() {
+  const query = Object.fromEntries(PBP_BOOKMARK_SETTING_KEYS.map(key => [key, SETTINGS_DEFAULTS[key]]));
+  return pbpBookmarkConnection(await pbpReadSettingsWithSecrets(query));
+}
+function pbpBookmarkSettingsChanged(changes) {
+  return !!changes && PBP_BOOKMARK_SETTING_KEYS.some(key => !key.startsWith("karakeepReadLaterList") && changes[key]);
+}
+function pbpSelfHostedAuth(auth) { return auth?.service === "karakeep" || auth?.service === "linkding"; }
+function pbpBookmarkDeliverySettings(settings, auth) {
+  return pbpSelfHostedAuth(auth) ? {...settings} : {...settings, pinboardToken:auth.token};
+}
+function pbpBookmarkServiceLabel(settings) {
+  return {pinboard:"Pinboard", karakeep:"Karakeep", linkding:"linkding"}[pbpBookmarkServiceId(settings)] || "";
+}
+// Quoted names keep self-hosted tags containing spaces intact in the reader's
+// text editor and offline intents. Pinboard keeps its existing whitespace format.
+function pbpBookmarkFormatTags(names) {
+  return names.map(name => /[\s"\\]/.test(name) ? JSON.stringify(name) : name).join(" ");
+}
+function pbpBookmarkParseTags(text) {
+  const source = String(text || "").trim();
+  const names = [];
+  let rest = source;
+  while (rest) {
+    const match = /^("(?:[^"\\]|\\.)*"|[^\s"]+)(?:\s+|$)/.exec(rest);
+    if (!match) throw Object.assign(new Error("invalid_tags"), {code:"invalid_request"});
+    const name = match[1].startsWith('"') ? JSON.parse(match[1]) : match[1];
+    if (!name.trim()) throw Object.assign(new Error("invalid_tags"), {code:"invalid_request"});
+    if (!names.includes(name)) names.push(name);
+    rest = rest.slice(match[0].length);
+  }
+  return names;
+}
+
+function pbpBookmarkHome(settings, unread = false) {
+  const connection = pbpBookmarkConnection(settings);
+  if (connection.service === "pinboard") return "https://pinboard.in/u:" + encodeURIComponent(connection.account) + (unread ? "/unread/" : "/");
+  // Navigation never carries credentials; the service owns its web filters.
+  if (connection.service === "karakeep" && unread && connection.readLaterListId) {
+    return connection.baseUrl + "dashboard/lists/" + encodeURIComponent(connection.readLaterListId);
+  }
+  return connection.baseUrl || "";
+}
+
+// Adopt the active legacy library once; switching bookmark credentials never
+// changes this setting. Keeping the existing scope also preserves Drive hashes.
+// Settings sync carries this identity; explicit data restore can adopt it on an empty library.
+async function pbpPersonalLibraryAccount({initialize = true} = {}) {
+  const readOrInit = async () => {
+    const s = await pbpReadSettingsWithSecrets({personalLibraryAccount:"", pinboardToken:""});
+    if (s.personalLibraryAccount) {
+      if (typeof s.personalLibraryAccount !== "string" || encodeURIComponent(s.personalLibraryAccount).length > 200 || /[\p{Cc}\p{Cf}]/u.test(s.personalLibraryAccount)) throw new Error("personal_library_identity");
+      return s.personalLibraryAccount;
+    }
+    const account = pbpPinboardAccountFromToken(s.pinboardToken) || "personal:default";
+    if (!initialize) return account;
+    const saved = await persistSettings({personalLibraryAccount:account});
+    if (!saved?.ok) throw new Error("personal_library_storage");
+    return account;
+  };
+  if (globalThis.navigator?.locks?.request) return navigator.locks.request("pbp-personal-library", readOrInit);
+  return readOrInit();
+}
+
 function pbpPinboardAccountFromToken(token) {
   const decoded = deobfuscateKey(token);
   if (typeof decoded !== "string") return "";
@@ -1818,30 +1925,16 @@ function pbpPinboardAccountFromToken(token) {
   return decoded.slice(0, separator);
 }
 
-// Owner derivation: the ONLY correct path is the same atomic secret-aware
-// read every other account-scoped consumer uses (pbpReadSettingsWithSecrets
-// picks the right storage area and overlays the local secret when sync is
-// routed) -- never split/decode opt-pinboard-token's raw form field value
-// here. pbpPinboardAccountFromToken deobfuscates internally, so the raw
-// (still-obfuscated) token read from storage is passed through as-is.
-// Vocabulary owner scope, shared by the options settings tab and the library
-// page. Call-time deps: pbpReadSettingsWithSecrets (this file) and
-// pbpDictOwnerScope (vocab-store.js — loaded by every page that calls this).
+// Personal reading data has an identity independent of the bookmark connection.
 async function pbpVocabCurrentOwner() {
-  const s = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
-  // Without vocab-store.js there is no scope to speak of. "" — not the
-  // "ownerless" bucket pbpDictOwnerScope returns for a signed-out account —
-  // is the fail-closed degrade: it matches no stored record at all, and every
-  // consumer already reads a non-"acct_" scope as "no account".
   if (typeof pbpDictOwnerScope !== "function") return "";
-  return pbpDictOwnerScope(pbpPinboardAccountFromToken(s.pinboardToken));
+  return pbpDictOwnerScope(await pbpPersonalLibraryAccount());
 }
 
 function pbpVocabOwnerLabel(owner) {
   const scope = String(owner || "");
   if (!scope.startsWith("acct_")) return t("vocabOwnerNoAccount");
-  const encoded = scope.slice(5);
-  try { return decodeURIComponent(encoded); } catch (_) { return encoded; }
+  return t("personalLibraryTitle");
 }
 
 function pbpAccountStorageKey(base, account) {
@@ -2520,6 +2613,17 @@ async function persistSettings(data) {
         : await getSettingsStorage());
       if (!testStorage && flags) _settingsStorageCache = storage;
       const routingActive = !!flags && pbpSecretRoutingActive(flags.optSyncEnabled, flags.syncApiKeys);
+      // Preserve the upgrade user's existing library BEFORE any token write,
+      // including logout and backup credential restore. This shares the secret
+      // lock with readers, so an empty library setting cannot race the change.
+      if (Object.hasOwn(batch, "pinboardToken")) {
+        const prior = await storage.get({personalLibraryAccount:""});
+        if (!prior.personalLibraryAccount) {
+          const tokenArea = routingActive ? chrome.storage.local : storage;
+          const old = await tokenArea.get({pinboardToken:""});
+          await storage.set({personalLibraryAccount:pbpPinboardAccountFromToken(old.pinboardToken) || "personal:default"});
+        }
+      }
       if (routingActive) {
         const { main, secrets } = pbpSplitSecretBatch(batch);
         batch = main;
@@ -2554,7 +2658,7 @@ async function persistSettings(data) {
   }
 }
 
-const API_KEY_FIELDS = ["pinboardToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","customApiKey","jinaApiKey","waybackS3Key","waybackS3Secret","dictAnkiKey","dictEudicToken"];
+const API_KEY_FIELDS = ["pinboardToken","karakeepToken","linkdingToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","customApiKey","jinaApiKey","waybackS3Key","waybackS3Secret","dictAnkiKey","dictEudicToken"];
 
 // ---- PBP_AI_CALL override whitelist (K44) ----------------------------------
 // Non-secret settings a popup PBP_AI_CALL message may override for one call: the

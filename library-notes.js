@@ -225,7 +225,7 @@ async function _pbpNotesOwner() {
 if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local" && area !== "sync") return;
-    if (changes.pinboardToken || changes.optSyncEnabled || changes.syncApiKeys) {
+    if (changes.personalLibraryAccount || changes.optSyncEnabled || changes.syncApiKeys) {
       _notesAuthRevision++;
       _notesEditSessions.clear();
       _pbpNotesCloseColorMenu(false);

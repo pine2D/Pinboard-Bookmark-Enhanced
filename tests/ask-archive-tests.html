@@ -220,8 +220,8 @@ function driveFixture(options = {}) {
     connectionState = clone(value); connectionPuts.push(clone(value)); return true;
   } };
   const run = args => pbpCreateAskArchiveDriveSyncRunner({ client, store: f.store, connection,
-    getCurrentPinboardAuth: async () => ({ account: owner === OWNER ? "alice" : "bob" }),
-    pinboardAuthIsCurrent: auth => auth.account === (owner === OWNER ? "alice" : "bob"),
+    getCurrentLibraryAuth: async () => ({ account: owner === OWNER ? "alice" : "bob" }),
+    libraryAuthIsCurrent: auth => auth.account === (owner === OWNER ? "alice" : "bob"),
     getCurrentPermissionId: () => client.about(), isEnabled: async () => enabled,
     onSession: value => { sessionPermissionId = value; }, now: () => 100000, random: () => .5 })(args);
   return { ...f, client, run, metadata, body, calls, uploads, connectionPuts,

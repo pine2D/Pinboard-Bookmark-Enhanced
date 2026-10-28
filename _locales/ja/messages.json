@@ -3,13 +3,13 @@
     "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
-    "message": "ワンクリックで Pinboard に保存。AI タグ・要約、翻訳とハイライト対応の内蔵リーダー、Markdown/EPUB エクスポート、13 種のサイトテーマ。"
+    "message": "Pinboard、Karakeep、linkding に保存。AI タグと要約、翻訳・ハイライト付きリーダー、Markdown/EPUB 出力に対応。"
   },
   "cmdOpenPopup": {
     "message": "Pinboard Bookmark Enhanced を開く"
   },
   "cmdQuickSave": {
-    "message": "Pinboard にクイック保存（ポップアップなし）"
+    "message": "選択したサービスにクイック保存（ポップアップなし）"
   },
   "cmdReadLater": {
     "message": "あとで読むとしてクイック保存（ポップアップなし）"
@@ -162,7 +162,7 @@
     "message": "AI タグ"
   },
   "urlWarning": {
-    "message": "このページは Pinboard に保存できません（非対応の URL）。下のタブセットと一括保存は引き続き使えます。"
+    "message": "このページの URL は対応していないため、保存できません。"
   },
   "urlCannotSave": {
     "message": "保存できません：非対応の URL"
@@ -550,7 +550,7 @@
     }
   },
   "batchAccountChanged": {
-    "message": "Pinboard アカウントが切り替わったため、一括保存を停止しました。"
+    "message": "ブックマーク接続が変わったため、一括保存を停止しました。"
   },
   "tabSetFailed": {
     "message": "タブセットを保存できませんでした：$ERROR$",
@@ -598,19 +598,19 @@
     }
   },
   "saveQueuedNetwork": {
-    "message": "Pinboard に接続できません。接続を確認してください。ブックマークはキューに入り、あとで自動的に再送されます。"
+    "message": "サーバーに接続できません。保存をキューに追加し、後で自動再試行します。"
   },
   "saveQueuedServer": {
-    "message": "Pinboard が一時的に応答していません。ブックマークはキューに入り、あとで自動的に再送されます。"
+    "message": "サーバーが応答しません。保存をキューに追加し、後で自動再試行します。"
   },
   "offlineRetry": {
     "message": "今すぐ再試行"
   },
   "offlineRetryWrongAccount": {
-    "message": "この項目は別の Pinboard アカウントで保存待ちになっています。そのアカウントでログインすると送信できます。"
+    "message": "別の接続で追加された項目です。元の接続に戻すか、ページを確認して保存し直してください。"
   },
   "offlineRetryAccountChanged": {
-    "message": "再試行中に Pinboard アカウントが切り替わったため、送信を停止しました。"
+    "message": "再試行中にブックマーク接続が変わったため、停止しました。"
   },
   "offlineRetryFailed": {
     "message": "このブックマークを送信できませんでした。もう一度お試しください。",
@@ -673,34 +673,34 @@
     "message": "このブックマークを削除"
   },
   "bgNotLoggedIn": {
-    "message": "Pinboard：未ログイン"
+    "message": "ブックマークサービスが未接続です"
   },
   "bgSetToken": {
-    "message": "拡張機能の設定で API トークンを設定してください。"
+    "message": "拡張機能の設定でサービスを選び、接続してください。"
   },
   "bgUndone": {
-    "message": "Pinboard：取り消しました"
+    "message": "取り消しました"
   },
   "bgUndoFailed": {
-    "message": "Pinboard：取り消しに失敗"
+    "message": "取り消しに失敗"
   },
   "bgBookmarkRemoved": {
     "message": "ブックマークを削除しました。"
   },
   "bgQuickSaved": {
-    "message": "Pinboard：クイック保存"
+    "message": "クイック保存"
   },
   "bgReadLater": {
-    "message": "Pinboard：あとで読む"
+    "message": "あとで読む"
   },
   "bgCannotSave": {
-    "message": "Pinboard：保存できません"
+    "message": "保存できません"
   },
   "bgCannotBookmark": {
     "message": "保存できるのは http と https のページだけです。"
   },
   "bgMdPreviewFailed": {
-    "message": "Pinboard：Markdown への変換に失敗しました"
+    "message": "Markdown への変換に失敗しました"
   },
   "bgMdPreviewNoContent": {
     "message": "このページから読み取れるコンテンツが見つかりませんでした。"
@@ -831,19 +831,19 @@
     "message": "このブラウザーで pinboard.in にログインしてから、もう一度お試しください。"
   },
   "bgQuickSaveFailed": {
-    "message": "Pinboard：クイック保存に失敗"
+    "message": "クイック保存に失敗"
   },
   "bgReadLaterFailed": {
-    "message": "Pinboard：あとで読むの保存に失敗"
+    "message": "あとで読むの保存に失敗"
   },
   "bgSaveFailed": {
-    "message": "Pinboard：保存に失敗"
+    "message": "保存に失敗"
   },
   "bgNetworkError": {
-    "message": "Pinboard：ネットワークエラー"
+    "message": "ネットワークエラー"
   },
   "bgQueuedOffline": {
-    "message": "Pinboard：オフラインキューに追加"
+    "message": "オフラインキューに追加"
   },
   "bgTitleSaved": {
     "message": "\"$TITLE$\" を保存しました。",
@@ -870,10 +870,10 @@
     }
   },
   "bgBatchSaved": {
-    "message": "Pinboard：一括保存が完了"
+    "message": "一括保存が完了"
   },
   "bgBatchCancelled": {
-    "message": "Pinboard：一括保存をキャンセルしました"
+    "message": "一括保存をキャンセルしました"
   },
   "bgUndo": {
     "message": "取り消し"
@@ -930,7 +930,7 @@
     "message": "この条件に一致するメモはありません。"
   },
   "notesHiddenByOwner": {
-    "message": "この端末に保存されているハイライトの一部は別の Pinboard アカウントのものです。現在のアカウントでは表示できません。"
+    "message": "過去の別ライブラリのハイライトは、この個人ライブラリには統合されていません。"
   },
   "notesUnknownPage": {
     "message": "不明なページ"
@@ -1095,7 +1095,7 @@
     "message": "プリウォーム（バックグラウンドで 15 分ごとに取得、即表示）"
   },
   "tagSyncHint": {
-    "message": "Pinboard 上の既存タグクラウドをポップアップの自動補完にどう取り込むかを制御します。読み取り専用で、Pinboard へのアップロードは一切行いません。"
+    "message": "タグ補完用に既存のタグを読み込むタイミングを選びます。サーバー上のタグは変更しません。"
   },
   "labelTagPresets": {
     "message": "タグプリセット"
@@ -1134,7 +1134,7 @@
     "message": "バックアップに単語を含める"
   },
   "backupIncludeVocabularyHint": {
-    "message": "現在の Pinboard アカウントの単語だけが含まれます。"
+    "message": "個人ライブラリの単語だけが含まれます。"
   },
   "backupIncludeSecretsLabel": {
     "message": "バックアップに API キーとトークンを含める"
@@ -1162,13 +1162,13 @@
     "message": "このバックアップには平文の認証情報が含まれています。ファイルの出所が信頼できる場合のみインポートしてください。"
   },
   "backupVocabOwnerMissing": {
-    "message": "利用できる Pinboard アカウントがないため、単語は含まれませんでした。ほかに選択したデータはエクスポートされています。"
+    "message": "利用できる 個人ライブラリがないため、単語は含まれませんでした。ほかに選択したデータはエクスポートされています。"
   },
   "backupHighlightsOwnerMissing": {
-    "message": "利用できる Pinboard アカウントがないため、アカウントに紐づくハイライトとメモは含まれませんでした。ほかに選択したデータはエクスポートされています。"
+    "message": "利用できる 個人ライブラリがないため、アカウントに紐づくハイライトとメモは含まれませんでした。ほかに選択したデータはエクスポートされています。"
   },
   "backupHighlightsVocabOwnerMissing": {
-    "message": "利用できる Pinboard アカウントがないため、単語とアカウントに紐づくハイライトとメモは含まれませんでした。ほかに選択したデータはエクスポートされています。"
+    "message": "利用できる 個人ライブラリがないため、単語とアカウントに紐づくハイライトとメモは含まれませんでした。ほかに選択したデータはエクスポートされています。"
   },
   "backupPreviewTitle": {
     "message": "インポートのプレビュー"
@@ -1200,7 +1200,7 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "backupPreviewHighlights": {
-    "message": "ページ：$PAGES$、項目：$ITEMS$、Pinboard アカウント：$OWNER$",
+    "message": "ページ：$PAGES$、項目：$ITEMS$、個人ライブラリ：$OWNER$",
     "placeholders": {
       "pages": { "content": "$1" },
       "items": { "content": "$2" },
@@ -1208,7 +1208,7 @@
     }
   },
   "backupPreviewVocabulary": {
-    "message": "単語レコード：$COUNT$、Pinboard アカウント：$OWNER$",
+    "message": "単語レコード：$COUNT$、個人ライブラリ：$OWNER$",
     "placeholders": {
       "count": { "content": "$1" },
       "owner": { "content": "$2" }
@@ -1224,10 +1224,10 @@
     "message": "なし"
   },
   "backupPreviewOwnerMismatch": {
-    "message": "このバックアップは別の Pinboard アカウントに属しているため、単語をインポートできません。"
+    "message": "このバックアップは別の 個人ライブラリに属しているため、単語をインポートできません。"
   },
   "backupPreviewHighlightOwnerMismatch": {
-    "message": "このバックアップは別の Pinboard アカウントに属しているため、ハイライトとメモをインポートできません。"
+    "message": "このバックアップは別の 個人ライブラリに属しているため、ハイライトとメモをインポートできません。"
   },
   "backupPreviewReady": {
     "message": "インポートのプレビューを表示しました。"
@@ -3411,7 +3411,7 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "接続すると、現在の Pinboard アカウントの単語帳、ハイライトとノート、AI 辞書項目の全文と追加用法、保存済みの会話と引用を同期します。"
+      "message": "接続すると、個人ライブラリの単語帳、ハイライトとノート、AI 辞書項目の全文と追加用法、保存済みの会話と引用を同期します。"
     },
     "vocabDriveConnectionHint": { "message": "端末ごとに接続が必要です。設定や認証情報は Google Drive で同期されません。" },
     "vocabDriveDisclosure": {
@@ -3448,7 +3448,7 @@
       "message": "Google アカウント"
     },
     "vocabDriveOwnerLabel": {
-      "message": "Pinboard アカウント"
+      "message": "個人ライブラリ"
     },
     "vocabDriveNever": {
       "message": "まだ同期されていません"
@@ -3481,10 +3481,10 @@
       "message": "Google の認可を一時的に取得できません。"
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "Pinboard にログインしていません。「アカウント → Pinboard アカウント」で API トークンを入力してから、接続し直してください。"
+      "message": "個人ライブラリを利用できません。このページを開き直して、もう一度お試しください。"
     },
     "vocabDriveErrorPinboardAuthSync": {
-      "message": "Pinboard にログインしていません。「アカウント → Pinboard アカウント」で API トークンを入力してから、「今すぐ同期」をクリックしてください。"
+      "message": "個人ライブラリを利用できません。このページを開き直して「今すぐ同期」を押してください。"
     },
     "vocabDriveErrorPermission": {
       "message": "Google Drive の権限がありません。"
@@ -3508,7 +3508,7 @@
       "message": "同期中に予期しないエラーが発生しました。"
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "同期中に Google アカウントまたは Pinboard アカウントが変わりました。もう一度お試しください。"
+      "message": "同期中に Google アカウントまたは 個人ライブラリが変わりました。もう一度お試しください。"
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "保存した単語またはその文脈が大きすぎるため同期できません。内容を短くするか削除してから、「今すぐ同期」をクリックしてください。"
@@ -3531,16 +3531,16 @@
       "message": "エクスポートと連携"
     },
     "vocabOwnerNoAccount": {
-      "message": "Pinboard アカウントなし"
+      "message": "個人ライブラリを利用できません。このページを開き直して、もう一度お試しください。"
     },
     "vocabLoadFailed": {
-      "message": "現在の Pinboard アカウントの単語を読み込めませんでした。「単語帳」を開き直して、もう一度お試しください。"
+      "message": "個人ライブラリの単語を読み込めませんでした。「単語帳」を開き直して、もう一度お試しください。"
     },
     "vocabExportFailed": {
       "message": "単語を書き出せませんでした。もう一度お試しください。"
     },
     "vocabAccountChanged": {
-      "message": "処理が完了する前に Pinboard アカウントが切り替わりました。もう一度お試しください。"
+      "message": "処理が完了する前に 個人ライブラリが切り替わりました。もう一度お試しください。"
     },
     "vocabSettingsSaveFailed": {
       "message": "変更した連携設定を保存できませんでした。設定を確認して、もう一度お試しください。"
@@ -3552,7 +3552,7 @@
       "message": "Command キーを押しながらクリックで選択、Shift キーを押しながらクリックで範囲選択します"
     },
     "vocabResultCount": {
-      "message": "現在の Pinboard アカウント（$OWNER$）：$RESULTS$ 件一致・$TOTAL$ 件保存済み",
+      "message": "$OWNER$：$RESULTS$ 件一致・$TOTAL$ 件保存済み",
       "placeholders": {
         "results": {
           "content": "$1"
@@ -3863,7 +3863,7 @@
     "message": "設定でAIプロバイダーを設定し、リーダーのAI機能を有効にすると辞書項目を生成できます。"
   },
   "dictVocabEmpty": {
-    "message": "現在の Pinboard アカウント（$OWNER$）には単語が保存されていません。リーダーの辞書ビューから保存できます。",
+    "message": "個人ライブラリ（$OWNER$）には単語が保存されていません。リーダーの辞書ビューから保存できます。",
     "placeholders": {
       "owner": {
         "content": "$1"
@@ -4279,7 +4279,7 @@
   "diagnosticsCopied": { "message": "診断情報をコピーしました" },
   "diagnosticsCopyFailed": { "message": "診断情報をコピーできませんでした。クリップボードへのアクセスを確認して、もう一度お試しください。" },
   "libraryVocabSignedOutTitle": { "message": "単語帳を使うにはログインしてください" },
-  "libraryVocabSignedOutHint": { "message": "単語帳は Pinboard アカウントごとに分けて保存されます。ログインしなくても辞書検索は利用できます。" },
+  "libraryVocabSignedOutHint": { "message": "単語帳、ハイライト、メモ、Askの履歴は、どのブックマークサービスでも同じ個人ライブラリを使います。" },
   "libraryVocabOpenSettings": { "message": "アカウント設定を開く" },
   "libraryLookupSignedOutHint": { "message": "「辞書」欄で単語を調べられます。単語帳に保存するにはログインしてください。" },
   "mdPreviewClose": { "message": "リーダーを閉じる" },
@@ -4383,7 +4383,7 @@
   "loginNeedsPaid": { "message": "有料の Pinboard アカウントが必要です。" },
   "popupDraftDiscard": { "message": "下書きを破棄" },
   "readerBookmarkSection": {"message": "保存"},
-  "readerBookmarkSave": {"message": "Pinboard に保存"},
+  "readerBookmarkSave": {"message": "ブックマークを保存"},
   "readerBookmarkSaved": {"message": "保存済み"},
   "readerBookmarkLater": {"message": "あとで読む"},
   "readerBookmarkMarkRead": {"message": "既読にする"},
@@ -4391,7 +4391,7 @@
   "readerBookmarkChecking": {"message": "ブックマークを確認中…"},
   "readerBookmarkSaving": {"message": "保存中…"},
   "readerBookmarkUpdated": {"message": "ブックマークを更新しました"},
-  "readerBookmarkQueued": {"message": "オフラインキューに追加しました。Pinboard にはまだ保存されていません"},
+  "readerBookmarkQueued": {"message": "オフラインキューに追加済み・まだ保存されていません"},
   "readerBookmarkLookupFailed": {"message": "ブックマークを確認できませんでした。再試行してから編集してください。"},
   "readerBookmarkFailed": {"message": "保存できませんでした。もう一度お試しください。"},
   "readerBookmarkAccountChanged": {"message": "アカウントが変わりました。保存するにはリーダーを開き直してください。"},
@@ -4405,14 +4405,14 @@
     "message": "ブックマークを削除"
   },
   "readerBookmarkDeleteConfirm": {
-    "message": "このブックマークをPinboardから削除しますか？"
+    "message": "このブックマークを削除しますか？"
   },
   "readerBookmarkDeleteDetail": {"message": "リーダーのハイライトとメモは残ります。"},
   "readerBookmarkDeleting": {
     "message": "ブックマークを削除中…"
   },
   "readerBookmarkDeleted": {
-    "message": "Pinboardからブックマークを削除しました"
+    "message": "ブックマークを削除しました"
   },
   "readerBookmarkDeleteFailed": {
     "message": "削除を確認できませんでした。もう一度お試しください。"
@@ -4686,5 +4686,62 @@
   "dictGenerationServiceUnavailable": {"message": "プロバイダーのサービスが一時的に利用できません。しばらくしてからもう一度お試しください。"},
   "dictProgressThinking": {"message": "モデルが考えています…"},
   "dictProgressStreaming": {"message": "回答を受信中…"},
-  "dictProgressElapsed": {"message": "$SECONDS$ 秒経過", "placeholders": {"seconds": {"content": "$1"}}}
+  "dictProgressElapsed": {"message": "$SECONDS$ 秒経過", "placeholders": {"seconds": {"content": "$1"}}},
+  "bookmarkServiceTitle": {
+    "message": "ブックマークサービス"
+  },
+  "bookmarkServiceChoose": {
+    "message": "ブックマークの保存先を選択"
+  },
+  "bookmarkServiceHint": {
+    "message": "ポップアップ、リーダー、ショートカット、一括保存でこのサービスを使います。"
+  },
+  "personalLibraryTitle": {
+    "message": "個人ライブラリ"
+  },
+  "personalLibraryHint": {
+    "message": "単語帳、ハイライト、メモ、Askの履歴は、どのブックマークサービスでも同じ個人ライブラリを使います。"
+  },
+  "bookmarkServerUrl": {
+    "message": "サーバーURL"
+  },
+  "bookmarkServerHint": {
+    "message": "サブパスを含むサイトのURLを入力してください。ローカルホスト以外はHTTPSが必要です。"
+  },
+  "bookmarkConnectHint": {
+    "message": "URLとトークンの変更は接続後に反映されます。認証情報の同期を有効にしない限り、トークンはこの端末に保存されます。"
+  },
+  "bookmarkConnect": {
+    "message": "接続"
+  },
+  "bookmarkConnecting": {
+    "message": "接続中…"
+  },
+  "bookmarkConnected": {
+    "message": "接続済み"
+  },
+  "bookmarkConnectFailed": {
+    "message": "接続できませんでした。サーバーURL、トークン、サイトへのアクセス権限を確認してください。"
+  },
+  "bookmarkInvalidConfig": {
+    "message": "有効なサーバーURLとAPIトークンを入力してください。"
+  },
+  "bookmarkPermissionDenied": {
+    "message": "設定でこのサーバーへのアクセスを許可してから、再接続してください。"
+  },
+  "bookmarkKarakeepHint": {
+    "message": "「後で読む」には専用の非公開リストを使います。既読にするとリストから外れます。サービス内のアーカイブ状態は変わりません。"
+  },
+  "bookmarkReadLaterListName": {
+    "message": "後で読む"
+  },
+  "bookmarkPartialSave": {
+    "message": "ブックマークは保存されている可能性がありますが、一部の変更に失敗しました。編集画面で確認し、もう一度保存してください。"
+  },
+  "bookmarkServiceSettings": {
+    "message": "ブックマークサービスを選択"
+  },
+  "backupAdoptLibrary": {
+    "message": "個人ライブラリは空です。単語帳またはハイライトを復元すると、バックアップのライブラリを引き継ぎ、既存の Drive データも引き続き利用できます。"
+  }
 }

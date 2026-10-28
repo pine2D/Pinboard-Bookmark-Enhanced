@@ -59,7 +59,7 @@ function buildHarness(source, queryTabs, bookmarkResult = true) {
   const writeMirror = async (...args) => { calls.mirrors.push(args); };
   // _scheduleCurrentTabRefresh re-derives auth + cache to compute the tri-state icon
   // (Task 2); iconStateFor itself is a real global via the shared.js <script> tag above.
-  const getCurrentPinboardAuth = async () => ({ token: "t", account: "alice", epoch: 1 });
+  const getCurrentBookmarkAuth = async () => ({ token: "t", account: "alice", epoch: 1 });
   const pbpStatusCacheGet = (url, auth) => {
     calls.cacheReads.push(url);
     return { bookmarked: bookmarkResult === true };
@@ -67,11 +67,11 @@ function buildHarness(source, queryTabs, bookmarkResult = true) {
 
   const make = new Function(
     "chrome", "_scheduleTabCheck", "noteActivity", "debouncedCheck", "setIcon", "_writeCurrentTabMirror",
-    "getCurrentPinboardAuth", "pbpStatusCacheGet",
+    "getCurrentBookmarkAuth", "pbpStatusCacheGet",
     source.slice(start, end) + "; return { _getFocusedActiveTab, _scheduleCurrentTabRefresh };"
   );
   const api = make(chrome, schedule, noteActivity, debouncedCheck, setIcon, writeMirror,
-    getCurrentPinboardAuth, pbpStatusCacheGet);
+    getCurrentBookmarkAuth, pbpStatusCacheGet);
   return { api, calls, wait: () => scheduledWork };
 }
 
@@ -107,7 +107,7 @@ function buildStatusChainHarness(source, { urlClean, warm = true, posts = [], ho
     stripTrackingParams,
     pbpPinboardAccountFromToken,
     _warmSettings: warm ? { ...stored } : null,
-    getCurrentPinboardAuth: async () => auth,
+    getCurrentBookmarkAuth: async () => auth,
     getSettingsStorage: async () => ({
       get: async (defaults) => {
         storageReads.push(Object.keys(defaults));
@@ -170,8 +170,8 @@ function buildProxyHarness(source) {
   const branch = source.slice(start, end);
   const runBranch = new Function(
     "message", "sendResponse", "pinboardFetch", "pinboardFetchImmediate",
-    "pbpIsAllowedPinboardApiUrl", "getCurrentPinboardAuth",
-    "pbpAuthorizePinboardApiUrl", "pbpPinboardAuthIsCurrent", branch
+    "pbpIsAllowedPinboardApiUrl", "getCurrentBookmarkAuth",
+    "pbpAuthorizePinboardApiUrl", "pbpBookmarkAuthIsCurrent", branch
   );
   return {
     branch,
@@ -221,7 +221,7 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
   const extractionCalls = [];
   const i18nReadyCalls = { count: 0 };
   const dependencies = {
-    getCurrentPinboardAuth: async () => ({ token: "alice:token", account: "alice", epoch: 1 }),
+    getCurrentBookmarkAuth: async () => ({ token: "alice:token", account: "alice", epoch: 1 }),
     loadSettings: async () => settings,
     pbpEffectivePrivate: () => false,
     showNotification: (...args) => notifications.push(args),
@@ -422,7 +422,7 @@ async function run() {
     let readyLanded = false;
     ready.then(() => { readyLanded = true; });
     const h = buildBackgroundSaveHarness(source, async () => "unused", {}, {}, true, {
-      getCurrentPinboardAuth: async () => ({ token: "", account: null, epoch: 1 }),
+      getCurrentBookmarkAuth: async () => ({ token: "", account: null, epoch: 1 }),
       pbpI18nReady: () => ready,
       t: (key) => (readyLanded ? "NEW:" + key : "OLD:" + key),
     });
@@ -557,6 +557,8 @@ async function run() {
     const notifications = [];
     const deps = {
       chrome: { tabs: { create: () => {} } },
+      loadSettings: async () => ({bookmarkService:"pinboard"}),
+      pbpBookmarkServiceId: settings => settings.bookmarkService,
       fetch: async (requestUrl, init) => {
         calls.push({ url: requestUrl, init });
         throw Object.assign(new Error("signal timed out"), { name: "TimeoutError" });

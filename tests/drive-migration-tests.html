@@ -67,12 +67,12 @@ function migrationHarness(source, opts = {}) {
   const deps = {
     chrome, console: { warn: (...args) => warns.push(args), info() {} },
     PBP_VOCAB_DRIVE_CAPABLE: true, PBP_VOCAB_DRIVE_CONNECTED_KEY: "vocabDriveConnected",
-    getCurrentPinboardAuth: async () => {
+    getCurrentLibraryAuth: async () => {
       authReads++;
       if (opts.switchAfterAuthReads !== undefined && authReads > opts.switchAfterAuthReads) return { account: "bob", epoch: 1 };
       return { account: opts.account === undefined ? "alice" : opts.account, epoch: 1 };
     },
-    pbpPinboardAuthIsCurrent: () => true,
+    pbpLibraryAuthIsCurrent: () => true,
     queueDriveSync: opts.queue === undefined ? pbpCreateRecoveringTail() : opts.queue,
     // Real notes store over the fake area: the owner-checked write boundary under test is the shipped one.
     pbpCreateNotesSyncStore: (options = {}) => window.pbpCreateNotesSyncStore({ storage: chrome.storage.local, locks, ...options }),

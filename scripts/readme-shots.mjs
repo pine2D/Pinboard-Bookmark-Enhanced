@@ -210,7 +210,7 @@ async function startSession({ scheme, video }) {
     if (typeof primeSettings === "function") await primeSettings();
     await chrome.storage.local.set({
       optSyncEnabled: false, syncApiKeys: false, _hlOwnerClaimDone: true,
-      pinboardToken: obfuscateKey(token), optLang: "en", optTheme: scheme, themePresetKey: "", optPopupFollowTheme: true,
+      pinboardToken: obfuscateKey(token), personalLibraryAccount: token.split(":")[0], optLang: "en", optTheme: scheme, themePresetKey: "", optPopupFollowTheme: true,
       aiProvider: "openai", openaiApiKey: obfuscateKey("sk-mock"), openaiModel: "gpt-5.4-mini",
       previewAiEnabled: true, previewSkimEnabled: false, optAiAutoTags: false, dictEchoEnabled: true,
       translateTargetLang: "zh-Hans", optShowSuggestTags: true,
@@ -280,7 +280,7 @@ const PREVIEW_KEY = "readme-shot";
 const shot = async (S, page, name, opts = {}) => { await page.screenshot({ path: join(S.out, name + ".png"), ...opts }); console.log("shot", S.scheme + "/" + name); };
 async function openReader(S, page) {
   await S.sw.evaluate(async ({ k, md, title, url }) => {
-    const auth = await getCurrentPinboardAuth();
+    const auth = await getCurrentBookmarkAuth();
     await chrome.storage.local.set({ [`md_preview_data_${k}`]: { markdown: md, contentHtml: "", title, url, baseUrl: url,
       tags: ["reading", "essay"], tokens: 0, hasApiKey: true, source: "local", math: false, forum: false, lang: "en", account: auth.account || "", ts: Date.now() } });
   }, { k: PREVIEW_KEY, md: F.ARTICLE_MARKDOWN, title: F.ARTICLE_TITLE, url: F.ARTICLE_URL });
@@ -431,7 +431,7 @@ async function themes(S) {
 // YouTube tab -> extension-page fetch of the stubbed watch page -> timedtext).
 async function video(S) {
   await S.sw.evaluate(async ({ k, title, url, desc }) => {
-    const auth = await getCurrentPinboardAuth();
+    const auth = await getCurrentBookmarkAuth();
     await chrome.storage.local.set({ [`md_preview_data_${k}`]: { markdown: desc, contentHtml: "", title, url, baseUrl: url,
       tags: ["reading", "talk"], tokens: 0, hasApiKey: true, source: "local", math: false, forum: false, lang: "en", account: auth.account || "", ts: Date.now() } });
   }, { k: "readme-video", title: F.TITLE, url: F.WATCH_URL, desc: F.PLAYER_RESPONSE.videoDetails.shortDescription });

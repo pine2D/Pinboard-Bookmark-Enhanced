@@ -361,9 +361,9 @@ async function loadLocale(loc) {
     LOCALES.every((loc) => OPTIONS_HONESTY_KEYS.every((key) => msgs[loc][key]?.message)),
     "one or more Options scope/error messages are missing");
   check("H12 English Options copy states account scope, all-row actions, language support, and pack formats",
-    /current Pinboard account/i.test(msgs.en.vocabResultCount?.message || "") &&
+    /personal library/i.test(msgs.en.personalLibraryTitle?.message || "") &&
       /\$OWNER\$/.test(msgs.en.vocabResultCount?.message || "") &&
-      /current Pinboard account/i.test(msgs.en.dictVocabEmpty?.message || "") &&
+      /personal library/i.test(msgs.en.dictVocabEmpty?.message || "") &&
       /\.tsv/i.test(msgs.en.dictExportTsv?.message || "") &&
       /^Send all\b/i.test(msgs.en.dictAnkiSend?.message || "") &&
       /all supported words/i.test(msgs.en.dictEudicSend?.message || "") &&
@@ -809,6 +809,10 @@ async function loadLocale(loc) {
     pl: { notesResult: { many: "Wyświetlono: 5 · wszystkich zaznaczeń: 10", one: "Wyświetlono: 1 · wszystkich zaznaczeń: 1" } },
     ru: { notesResult: { many: "Показано: 5 · всего выделений: 10", one: "Показано: 1 · всего выделений: 1" } },
   };
+  const LIBRARY_RESULT_COPY = {"en": ["alice: 5 found · 16 saved", "alice: 1 found · 1 saved"], "de": ["alice: 5 Treffer · 16 gespeichert", "alice: 1 Treffer · 1 gespeichert"], "fr": ["alice : 5 résultats · 16 mots enregistrés", "alice : 1 résultat · 1 mot enregistré"], "pl": ["alice: wyniki 5 · zapisane 16", "alice: wyniki 1 · zapisane 1"], "ru": ["alice: найдено 5 · сохранено 16", "alice: найдено 1 · сохранено 1"], "ja": ["alice：5 件一致・16 件保存済み", "alice：1 件一致・1 件保存済み"], "zh_CN": ["alice：找到 5 条，共保存 16 条", "alice：找到 1 条，共保存 1 条"], "zh_TW": ["alice：找到 5 筆，共儲存 16 筆", "alice：找到 1 筆，共儲存 1 筆"], "zh_HK": ["alice：找到 5 項，共儲存 16 項", "alice：找到 1 項，共儲存 1 項"]};
+  for (const [loc, [many, one]] of Object.entries(LIBRARY_RESULT_COPY)) {
+    (T8G_REWRITTEN[loc] ||= {}).vocabResult = {many,one};
+  }
   for (const loc of LOCALES) {
     withLang(loc, () => {
       const s = t8gSentences(loc);
@@ -905,7 +909,7 @@ async function loadLocale(loc) {
     const DRIVE_ZH_CN = {
       // Scope names all four datasets; device/credential boundaries live in
       // the adjacent help. Status lines keep the shared wording 此设备.
-      vocabDriveScope: "连接后，同步当前 Pinboard 账号的生词、高亮与笔记、完整 AI 词条及补充，以及已保存的问答和引用。",
+      vocabDriveScope: "连接后，同步个人资料库的生词、高亮与笔记、完整 AI 词条及补充，以及已保存的问答和引用。",
       vocabDriveConnectionHint: "每台设备需单独连接。Google Drive 不同步设置或凭据。",
       vocabDriveWorking: "正在与 Google Drive 同步…",
       vocabDriveSynced: "已与 Google Drive 同步。",
@@ -917,7 +921,7 @@ async function loadLocale(loc) {
       vocabDriveAuthorizingSlow: "如果没有出现授权窗口，可能是网络连不上 Google。",
       driveLastSuccess: "最近成功同步",
       drivePendingChanges: "此设备还有尚未上传的更改。",
-      vocabDriveErrorPinboardAuthSync: "尚未登录 Pinboard 账号。请在「账号 → Pinboard 账号」中填写 API Token，然后点击「立即同步」。",
+      vocabDriveErrorPinboardAuthSync: "个人资料库暂不可用，请重新打开此页面，然后点击「立即同步」。",
     };
     const zhDrift = Object.entries(DRIVE_ZH_CN)
       .filter(([key, text]) => msgs.zh_CN[key]?.message !== text).map(([key]) => key);
@@ -992,26 +996,14 @@ async function loadLocale(loc) {
     check("H22e the network error names googleapis.com in every locale",
       noDomain.length === 0, `no domain: ${noDomain.join(", ")}`);
 
-    // The path is read off the two strings the settings page actually shows --
-    // the sidebar tab (tabGeneral) and the section heading inside it
-    // (secPinboardAccount) -- so renaming either one without the error copy
-    // goes red here instead of leaving a path to a tab that no longer exists.
-    const pathIn = (text, loc) => {
-      const tab = msgs[loc].tabGeneral?.message || "\u0000";
-      const sec = msgs[loc].secPinboardAccount?.message || "\u0000";
-      const at = text.indexOf(tab + " → " + sec);
-      return at >= 0;
-    };
+    // Library recovery no longer asks for a Pinboard login. Connected devices
+    // keep the visible Sync now action, with its locale's exact button label.
     const pathBroken = LOCALES.filter((loc) => {
-      const signedOut = msgs[loc].vocabDriveErrorPinboardAuth?.message || "";
+      const unavailable = msgs[loc].vocabDriveErrorPinboardAuth?.message || "";
       const connected = msgs[loc].vocabDriveErrorPinboardAuthSync?.message || "";
-      const syncNow = msgs[loc].vocabDriveSyncNow?.message || "\u0000";
-      return !pathIn(signedOut, loc) || !pathIn(connected, loc) ||
-        !connected.includes(syncNow) || connected === signedOut;
+      return /Pinboard/i.test(unavailable + connected) || !connected.includes(msgs[loc].vocabDriveSyncNow?.message) || connected === unavailable;
     });
-    // Simplest miss: fr writes « Synchroniser » (not the button's own label
-    // « Synchroniser maintenant ») or renames the settings path.
-    check("H22f the connected pinboard_auth error reuses the settings path and names this locale's Sync now button",
+    check("H22f unavailable personal library recovery names Sync now and never requires Pinboard",
       pathBroken.length === 0, `broken: ${pathBroken.join(", ")}`);
 
     const MERGED_NOTICES = { driveNotices: ["count", "$COUNT$"], driveNoticeTerms: ["terms", "$TERMS$"] };

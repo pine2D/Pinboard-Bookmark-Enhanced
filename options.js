@@ -283,9 +283,16 @@ async function renderConnectionOverview() {
       providerNote.querySelector("p").textContent = t(aiConfigured ? "aiProviderAccessMissing" : "aiProviderKeyMissing");
     }
   }
+  const selectedService = document.querySelector('input[name="bookmark-service"]:checked')?.value || "pinboard";
+  const bookmarkSettings = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
+  const bookmarkConnection = pbpBookmarkConnection({...bookmarkSettings,bookmarkService:selectedService});
+  const selfHosted = selectedService !== "pinboard";
   const items = [
-    { id: "pinboard", name: "Pinboard", panel: "general", target: "test-pinboard-token",
-      configured: pbpIsValidTokenFormat($id("opt-pinboard-token")?.value.trim() || "") === true, permission: true },
+    { id: selectedService, name: pbpBookmarkServiceLabel({bookmarkService:selectedService}), panel: "general",
+      target: selfHosted ? "connect-" + selectedService : "test-pinboard-token",
+      configured: selfHosted ? !!bookmarkConnection.account : pbpIsValidTokenFormat($id("opt-pinboard-token")?.value.trim() || "") === true,
+      connected: selfHosted && !!bookmarkConnection.account,
+      permission: selfHosted ? await permissionFor(bookmarkConnection.baseUrl ? {origins:[pbpEndpointOriginPattern(bookmarkConnection.baseUrl)]} : null) : true },
     { id: `ai:${provider}`, name: $id("opt-ai-provider")?.selectedOptions?.[0]?.textContent?.trim() || provider,
       panel: "ai", target: `test-${provider}`, configured: aiConfigured, permission: aiPermission },
     { id: "drive", name: "Google Drive", panel: "storage", target: "vocab-drive-connect",
@@ -323,7 +330,7 @@ async function renderConnectionOverview() {
       // in the warning tier instead of the optional services' neutral
       // "Not configured" -- on a fresh install it was the only row the red
       // header count referred to, and it looked exactly like the rest.
-      if (item.id === "pinboard") {
+      if (["pinboard", "karakeep", "linkding"].includes(item.id)) {
         stateKey = "connectionTokenNeeded";
         stateClass = "warn";
       } else {
@@ -332,6 +339,9 @@ async function renderConnectionOverview() {
     } else if (item.permission === false) {
       stateKey = "connectionPermissionMissing";
       stateClass = "bad";
+    } else if (item.connected) {
+      stateKey = "connectionConnected";
+      stateClass = "ok";
     } else if (record) {
       // A provider that answered while its Reader model override did not
       // (options-connectivity.js records ok:true + "override_bad") is not down:
@@ -2708,6 +2718,59 @@ document.addEventListener("DOMContentLoaded", async () => {
     _previewModelMap[_previewModelProvider] = s.previewAiModel.trim();
   }
 
+  // Initialize the library before a bookmark-credential change can hide legacy data.
+  await pbpPersonalLibraryAccount();
+  function refreshBookmarkServiceFields() {
+    const service = document.querySelector('input[name="bookmark-service"]:checked')?.value || "pinboard";
+    for (const name of ["pinboard", "karakeep", "linkding"]) $id("bookmark-" + name + "-fields").hidden = name !== service;
+    const tab = $id("tab-tags");
+    if (tab) tab.hidden = service !== "pinboard";
+    for (const id of ["opt-show-search", "opt-show-badge", "opt-show-suggest-tags"]) {
+      const row = $id(id)?.closest(".pref-row");
+      if (row) row.hidden = service !== "pinboard";
+    }
+  }
+  for (const radio of document.querySelectorAll('input[name="bookmark-service"]')) {
+    radio.checked = radio.value === pbpBookmarkServiceId(s);
+    radio.addEventListener("change", refreshBookmarkServiceFields);
+  }
+  refreshBookmarkServiceFields();
+  for (const service of ["karakeep", "linkding"]) {
+    $id("opt-" + service + "-url").value = s[service + "Url"] || "";
+    $id("opt-" + service + "-token").value = pbpBookmarkConnection({...s,bookmarkService:service}).token;
+    $id("connect-" + service).addEventListener("click", async () => {
+      const baseUrl = pbpBookmarkEndpoint($id("opt-" + service + "-url").value);
+      const token = $id("opt-" + service + "-token").value.trim();
+      const status = $id("connect-" + service + "-status");
+      const button = $id("connect-" + service);
+      if (!baseUrl || !token) { status.textContent = t("bookmarkInvalidConfig"); return; }
+      button.disabled = true;
+      status.textContent = t("bookmarkConnecting");
+      try {
+        // Called directly in the click handler to preserve Chrome's user gesture.
+        const granted = await chrome.permissions.request({origins:[pbpEndpointOriginPattern(baseUrl)]});
+        if (!granted) { status.textContent = t("bookmarkPermissionDenied"); return; }
+        const result = await chrome.runtime.sendMessage({type:"bookmark_connect",service,baseUrl,token});
+        if (pbpBookmarkEndpoint($id("opt-" + service + "-url").value) !== baseUrl || $id("opt-" + service + "-token").value.trim() !== token) return;
+        if (!result?.ok) { status.textContent = t("bookmarkConnectFailed"); return; }
+        const fresh = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
+        const credential = {v:1, baseUrl, token, connectionId:crypto.randomUUID(), userId:result.identity.id};
+        const patch = {[service + "Url"]:baseUrl, [service + "Token"]:obfuscateKey(JSON.stringify(credential))};
+        if (document.querySelector('input[name="bookmark-service"]:checked')?.value === service) patch.bookmarkService = service;
+        if (service === "karakeep" && pbpBookmarkConnection({...fresh,bookmarkService:service}).account !== "karakeep:" + baseUrl + ":" + result.identity.id) {
+          patch.karakeepReadLaterListId = "";
+          patch.karakeepReadLaterListOwner = "";
+        }
+        const saved = await persistSettings(patch);
+        status.textContent = t(saved.ok ? "bookmarkConnected" : "bookmarkConnectFailed");
+        void renderConnectionOverview();
+      } catch (error) {
+        console.warn("[bookmark-connect] failed:", error?.name);
+        status.textContent = t("bookmarkConnectFailed");
+      } finally { button.disabled = false; }
+    });
+  }
+
   // ---- Fill text/password/select fields ----
   const fieldMap = {
     "opt-pinboard-token": s.pinboardToken,
@@ -3580,6 +3643,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const _ets = collectExportTargets();
     return {
       // Bookmarks
+      bookmarkService: document.querySelector('input[name="bookmark-service"]:checked')?.value || "pinboard",
       pinboardToken: obfuscateKey($id("opt-pinboard-token").value.trim()),
       optPrivateDefault: $id("opt-private-default").checked,
       optPrivateIncognito: $id("opt-private-incognito").checked,
@@ -4807,7 +4871,7 @@ function _tagGovShowLoadFailed(reason = "failed") {
 async function getTagGovToken() {
   try {
     let s = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
-    const token = deobfuscateKey(s.pinboardToken) || "";
+    const token = pbpBookmarkServiceId(s) === "pinboard" ? deobfuscateKey(s.pinboardToken) || "" : "";
     _tagGovUser = token ? token.split(":")[0] || "" : "";
     return token;
   } catch (e) {
@@ -5863,8 +5927,7 @@ function waybackErrorKey(detail) {
 // the signed-out "" bucket, which would take the logged-out rows with it.
 async function pbpWaybackLogAccount() {
   try {
-    const sNow = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
-    return pbpPinboardAccountFromToken(sNow.pinboardToken);
+    return (await pbpReadBookmarkConnection()).account;
   } catch (e) {
     // Never token/account text -- only the platform error's shape.
     console.warn("[wayback] owner read failed:", e && e.name, e && e.message);

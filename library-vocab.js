@@ -3821,7 +3821,7 @@ function _pbpVocabOnSyncedMessage(message) {
 if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "sync" && area !== "local") return;
-    const relevant = [changes.pinboardToken, changes.optSyncEnabled, changes.syncApiKeys].filter(Boolean);
+    const relevant = [changes.personalLibraryAccount, changes.optSyncEnabled, changes.syncApiKeys].filter(Boolean);
     // An identical rewrite (settings saved with the same token, a toggle set
     // to the value it already had) names no new account. Tearing the whole
     // view down for it would drop selection, render depth and the open

@@ -2,9 +2,9 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | **繁體中文（香港）** | [Deutsch](README.de.md) | [Français](README.fr.md) | [日本語](README.ja.md) | [Polski](README.pl.md) | [Русский](README.ru.md)
 
-為 [Pinboard](https://pinboard.in) 而設的 Chrome 擴充功能：AI 標籤與摘要、支援翻譯與高亮的內置閱讀器，以及 13 套網站主題。
+支援 [Pinboard](https://pinboard.in)、Karakeep 和 linkding 的 Chrome 擴充功能：AI 標籤與摘要、支援翻譯與高亮的閱讀器，以及 13 套 pinboard.in 網站主題。
 
-> **說明：** 需要 Pinboard.in 帳號 —— [Pinboard](https://pinboard.in) 是一項獨立、**付費**的書籤服務。本擴充功能是第三方客戶端，以你自己的 Pinboard API Token 連接你現有的 Pinboard 帳號。本專案與 Pinboard 沒有任何隸屬、贊助或認可關係。你必須已經擁有（或註冊）一個付費 Pinboard.in 帳號，方可使用本擴充功能。
+> **說明：** 在設定選擇一種書籤服務。使用 Karakeep 或 linkding 無需 Pinboard 帳號。Pinboard 是獨立的**付費**服務，使用時需自備帳號及 API Token。本擴充功能是第三方客戶端，與 Pinboard 沒有隸屬、贊助或認可關係。
 
 [![Chrome](https://img.shields.io/badge/Chrome-MV3-brightgreen?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/)
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
@@ -32,7 +32,7 @@
 ### 閱讀
 - **網頁變成清爽的閱讀器**：Markdown 檢視，附目錄、搜尋與註腳速覽；數學公式、圖表與表格都正常顯示
 - **GitHub Discussions（試行）**：保留已載入的主帖、留言、回覆關係及獲採納的答案，並說明擷取範圍
-- **閱讀時管理書籤**：在閱讀器內儲存、編輯或刪除 Pinboard 書籤，不用切回彈出視窗
+- **閱讀時管理書籤**：在閱讀器內儲存、編輯或刪除書籤，不用切回彈出視窗
 - **五色高亮與筆記**：切換翻譯、原文改動後仍留在原處
 - **整頁翻譯，或向文章提問**：雙語對照；答案附引註，一按即跳回原文出處
 - **問答連同引用一併保留**：完成後自動儲存，連線 Google Drive 後同步；可在問答頁查看記錄、返回閱讀器繼續提問，或獨立匯出、附在正文後。臨時對話不儲存。
@@ -74,13 +74,17 @@
 
 原始碼目錄使用獨立而固定的開發版本 ID，可與 Chrome Web Store 版本並存以便測試。release ZIP 使用 Chrome Web Store ID，不能與商店版本同時安裝在同一個 Chrome 個人檔案。在每部裝置開啟設定同步後，Chrome Sync 便可共享設定。如要取代較舊的解壓安裝版本，先在舊版設定頁按「匯出備份」，載入新版本後再按「匯入備份」。
 
-安裝完成後：按一下工具列圖示 → 貼上你的 [Pinboard API Token](https://pinboard.in/settings/password) → 登入
+安裝後開啟**設定 → 帳號**，選擇書籤服務。使用 Karakeep 或 linkding 時，填入網站網址及 API Token，按**連線**並允許存取該伺服器。網址須包含部署子路徑；除本機 localhost 外，必須使用 HTTPS。使用 Pinboard 時，在彈出視窗貼上 [API Token](https://pinboard.in/settings/password) 後登入。
+
+彈出視窗、閱讀器、快捷鍵及批次儲存均使用所選服務。Karakeep 的「稍後閱讀」使用專用私人清單；標為已讀會從清單移除，不改變封存狀態。linkding 使用未讀標記。Pinboard 建議、標籤治理、未讀數量、網站搜尋及分頁集只適用於 Pinboard。
+
+三種服務共用一個個人資料庫，包含生詞、標記、筆記、AI 詞條封存及 Ask 歷史。切換服務或登出書籤帳號不會切換資料庫。升級時保留目前的 Pinboard 資料庫，不自動合併其他歷史帳號。書籤快取、草稿及離線佇列仍綁定原連線；重新連線 linkding 會建立新連線，舊的待儲存工作需另行確認。
 
 ## 私隱
 
 零追蹤、零分析、零遙測。新用戶的設定與憑證預設儲存在本機。一般設定同步需在每部裝置分別開啟。憑證同步是 Chrome 帳戶層級的選項，但只有開啟了一般設定同步的裝置才會參與；關閉一般設定同步的裝置會繼續使用本機憑證。新用戶預設關閉憑證同步；如升級時 Chrome Sync 已有非空憑證，為免資料遺失會保持開啟。開啟後，API Key、Token、密碼與匯出憑證會透過 Chrome Sync 共享，只經混淆處理，並未加密。書籤內容、頁面內容與離線佇列不會透過 Chrome Sync 同步。AI 請求**只**來自你開啟或使用的 AI 功能，並直接傳送至你設定的服務商。安裝時只會授予 Pinboard 的存取權限。其他網站（AI 服務商、匯出或存檔目標、詞典、Google Drive、影片字幕，以及批量儲存涉及的網站）都會在你首次使用相應功能時逐一申請，而且只申請確切網站。自訂網絡端點必須使用 HTTPS；HTTP 只可用於 `localhost`、`127.0.0.1` 與 `[::1]`。擴充功能頁面實施嚴格的 Content-Security-Policy（不會執行遠端程式碼）。完整政策：<https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
-Google Drive 需在每部裝置分別連線，連線後同步目前 Pinboard 帳戶的生詞、標記、筆記、完整 AI 詞條和補充用法，以及儲存的問答與原文依據。Drive 私有 appDataFolder 中的副本是明文，未經端對端加密。可選的詞源資料來自維基詞典。擴充功能會核對原文，將短摘錄及相關來源資料傳送給所選 AI 服務商；用法要點中的例句由 AI 編寫。原文用例從 Wikisource 搜尋，原樣顯示、不翻譯，亦不傳送給 AI。已有付費結果繼續保留，只有主動更新才生成新版。
+Google Drive 需在每部裝置分別連線，連線後同步個人資料庫的生詞、標記、筆記、完整 AI 詞條和補充用法，以及儲存的問答與原文依據。Drive 私有 appDataFolder 中的副本是明文，未經端對端加密。可選的詞源資料來自維基詞典。擴充功能會核對原文，將短摘錄及相關來源資料傳送給所選 AI 服務商；用法要點中的例句由 AI 編寫。原文用例從 Wikisource 搜尋，原樣顯示、不翻譯，亦不傳送給 AI。已有付費結果繼續保留，只有主動更新才生成新版。
 
 使用生詞同步的裝置都需要更新擴充功能。新版可讀取現有生詞資料，但舊版無法接收新版寫入的生詞變更。
 

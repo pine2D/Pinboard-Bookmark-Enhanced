@@ -49,6 +49,9 @@ if [ "$browser_failures" -ne 0 ]; then
   exit 1
 fi
 
+echo "[bookmark-services] isolated primary-service UI and personal-library restore"
+node tests/bookmark-service-runtime-tests.mjs
+
 echo "[selection] real pointer selection with native popover light-dismiss"
 node scripts/qa-drive.mjs --headless --surfaces selection --check --label selection-default-contract
 node scripts/qa-drive.mjs --headless --surfaces selection --click-dismiss --check --label selection-click-contract

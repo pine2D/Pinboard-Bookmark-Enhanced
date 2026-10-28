@@ -2938,11 +2938,12 @@ function _pbpHlNotebookJump(item) {
 // of them from the new items -- which is why absorbing needs no help from the record.
 if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, area) => {
-    // Known routing ignores the other token area. Unknown routing must take
+    // Library identity follows ordinary settings, never the token area. Unknown routing must take
     // the surfaces down and re-read; event values never establish an owner.
     if ((area === "local" || area === "sync") &&
-        (changes.pinboardToken || changes.optSyncEnabled || changes.syncApiKeys) &&
-        (!_pbpHlAuthFlags || pbpAuthStorageChangeIsRelevant(changes, area, _pbpHlAuthFlags))) {
+        (changes.personalLibraryAccount || changes.optSyncEnabled) &&
+        (!_pbpHlAuthFlags || (area === "local" && changes.optSyncEnabled) ||
+          (area === (_pbpHlAuthFlags.optSyncEnabled ? "sync" : "local") && changes.personalLibraryAccount))) {
       _pbpHlRefreshOwner();
     }
     if (area !== "local" || !_pbpHlState) return;

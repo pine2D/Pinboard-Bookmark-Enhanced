@@ -56,3 +56,5 @@ block 切分 → `pbpAiShield` 占位符 `⟦C/L/I/M/T\d+⟧` 屏蔽代码/链�
 ## Ask 持久历史
 
 完成回答自动写 Ask 归档，保存失败只重试写入，不能再付费重跑；临时会话跳过持久化。新对话保留旧会话，删除单独确认并写同步墓碑。指定 askSession 已删除或不可用时，必须先开始新对话，不向旧 sessionId 发送新问题。模型上下文窗口与历史保留分离。
+
+- 阅读器双身份：`pbp:rendered.account` / `pbp:account-changed` 属固定个人资料库（Ask/高亮/词典）；`bookmarkAccount` / `pbp:bookmark-account-changed` 属当前书签连接。持久 handoff 的 `account` 与 tags/description/draft 同属书签连接，打开前及运行中切换服务均须清理旧私有元数据；导出同时校验两种身份。

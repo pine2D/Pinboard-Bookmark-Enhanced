@@ -794,8 +794,8 @@ function _pbpVocabDriveDefaultStore() {
 function pbpCreateVocabDriveSyncRunner({
   client = pbpCreateVocabDriveClient(),
   store = _pbpVocabDriveDefaultStore(),
-  getCurrentPinboardAuth,
-  pinboardAuthIsCurrent,
+  getCurrentLibraryAuth,
+  libraryAuthIsCurrent,
   hashOwner = pbpVocabOwnerHash,
   now = Date.now,
   random = Math.random,
@@ -916,9 +916,9 @@ function pbpCreateVocabDriveSyncRunner({
         if (permissionId !== session.permissionId) return false;
       }
       if (!await isEnabled()) return false;
-      const current = await getCurrentPinboardAuth();
+      const current = await getCurrentLibraryAuth();
       return !!startAuth?.account && current?.account === startAuth.account &&
-        pinboardAuthIsCurrent(startAuth) && pinboardAuthIsCurrent(current) && scopeIsCurrent();
+        libraryAuthIsCurrent(startAuth) && libraryAuthIsCurrent(current) && scopeIsCurrent();
     };
     // A connection failure says nothing about this dataset, so it goes to the
     // shared record only: the preflight and the account row keep whatever
@@ -1073,12 +1073,12 @@ function pbpCreateVocabDriveSyncRunner({
       // Disconnected, or the optional permission removed, after the caller
       // checked: a control-flow exit, never an error to persist or render.
       if (!await isEnabled()) return { ok: false, error: "not_connected", retryable: false };
-      startAuth = await getCurrentPinboardAuth();
+      startAuth = await getCurrentLibraryAuth();
       // Distinct from "auth": there is no Pinboard account to scope the
       // vocabulary to, so no Google call has been made and reconnecting Drive
       // cannot help. Reported before ownerHash exists, so it is never persisted
       // to a preflight row.
-      if (!startAuth?.account || !pinboardAuthIsCurrent(startAuth)) {
+      if (!startAuth?.account || !libraryAuthIsCurrent(startAuth)) {
         return { ok: false, error: "pinboard_auth", retryable: false };
       }
       owner = pbpDictOwnerScope(startAuth.account);
@@ -1122,10 +1122,10 @@ function pbpCreateVocabDriveSyncRunner({
 
       session = await client.openSession(interactive, { beforeRequest: async () => {
         if (!await isEnabled()) return false;
-        const current = await getCurrentPinboardAuth();
-        return current?.account === startAuth.account && pinboardAuthIsCurrent(startAuth) &&
-          pinboardAuthIsCurrent(current) && scopeIsCurrent();
-      }, isCurrent: () => pinboardAuthIsCurrent(startAuth) && scopeIsCurrent() });
+        const current = await getCurrentLibraryAuth();
+        return current?.account === startAuth.account && libraryAuthIsCurrent(startAuth) &&
+          libraryAuthIsCurrent(current) && scopeIsCurrent();
+      }, isCurrent: () => libraryAuthIsCurrent(startAuth) && scopeIsCurrent() });
       if (!session.ok) return finishFailure(session);
       if (onSession) onSession(session.permissionId);
       if (!await stillCurrent()) return normalizedFailure({ error: "account_changed" });

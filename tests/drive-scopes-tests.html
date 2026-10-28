@@ -73,8 +73,8 @@ function harness(source, seed = {}, results = {}) {
     pbpVocabListAccountStates: async () => structuredClone(results.vocabAccountRows || []),
     pbpVocabPutAccountState: async (row) => { accountPuts.push({ type: "vocabulary", row: structuredClone(row), runsBefore: runs.length }); return true; },
     pbpVocabDriveForgetIdentity: () => { forgets.push(true); },
-    getCurrentPinboardAuth: async () => ({ account: results.account || "alice", epoch: 1 }),
-    pbpPinboardAuthIsCurrent: () => true, pbpDictOwnerScope: (account) => "acct_" + account,
+    getCurrentLibraryAuth: async () => ({ account: results.account || "alice", epoch: 1 }),
+    pbpLibraryAuthIsCurrent: () => true, pbpDictOwnerScope: (account) => "acct_" + account,
     pbpVocabOwnerHash: async () => HASH,
     showNotification: async (...args) => { notifications.push(args); }, t: (key) => key, console
   };
@@ -221,8 +221,8 @@ function statusHarness(source, opts = {}) {
     } } } },
     PBP_DRIVE_CONNECTION_ACCOUNT_KEY: "driveConnectionAccount",
     pbpVocabDriveIsConnected: async () => local.vocabDriveConnected === true,
-    getCurrentPinboardAuth: async () => ({ account: "alice", epoch: 1 }),
-    pbpPinboardAuthIsCurrent: () => true, pbpDictOwnerScope: (account) => "acct_" + account,
+    getCurrentLibraryAuth: async () => ({ account: "alice", epoch: 1 }),
+    pbpLibraryAuthIsCurrent: () => true, pbpDictOwnerScope: (account) => "acct_" + account,
     pbpVocabOwnerHash: async () => OWNER_HASH,
     pbpVocabSyncSnapshot: async () => { if (opts.vocabSnapshotError) throw new Error("vocabulary storage unavailable"); return opts.vocabSnapshot || snapshotOf(); },
     pbpVocabGetPreflightState: async () => { if (opts.vocabPreflightError) throw new Error("vocabulary preflight unavailable"); return opts.vocabPreflight === undefined ? null : opts.vocabPreflight; }, // vocab-store returns null when absent
@@ -260,8 +260,8 @@ function connectHarness(source, opts = {}) {
     },
     PBP_GOOGLE_API_ORIGIN: "https://www.googleapis.com/*",
     PBP_VOCAB_DRIVE_CONNECTED_KEY: "vocabDriveConnected", PBP_DRIVE_CONNECTION_ACCOUNT_KEY: "driveConnectionAccount",
-    getCurrentPinboardAuth: async () => ({ account: "alice", epoch: 1 }),
-    pbpPinboardAuthIsCurrent: () => true, pbpDictOwnerScope: (account) => "acct_" + account,
+    getCurrentLibraryAuth: async () => ({ account: "alice", epoch: 1 }),
+    pbpLibraryAuthIsCurrent: () => true, pbpDictOwnerScope: (account) => "acct_" + account,
     pbpVocabDriveIsConnected: async () => local.vocabDriveConnected === true,
     pbpVocabOwnerHash: async () => OWNER_HASH,
     // Task 3's forgiving read: never rejects. connectionState is the shared record as Task 2 writes it.
@@ -335,8 +335,8 @@ function refreshHarness(source, opts = {}) {
     pbpDriveEnabled: async () => true,
     vocabDriveClient: { about: about("vocabulary") }, notesDriveClient: { about: about("notes") },
     dictArchiveDriveClient: { about: about("dictionary") }, askArchiveDriveClient: { about: about("ask") },
-    getCurrentPinboardAuth: async () => ({ account: "alice", epoch: 1 }),
-    pbpPinboardAuthIsCurrent: () => true,
+    getCurrentLibraryAuth: async () => ({ account: "alice", epoch: 1 }),
+    pbpLibraryAuthIsCurrent: () => true,
     pbpObserveDriveIdentity: (...args) => { observed.push(args); },
     console: spyConsole([])
   };
@@ -956,8 +956,8 @@ function refreshHarness(source, opts = {}) {
   const archiveMessage = async (opts = {}) => {
     let requests = 0;
     const deps = {
-      getCurrentPinboardAuth: async () => ({ account: opts.account === undefined ? "alice" : opts.account }),
-      pbpPinboardAuthIsCurrent: () => opts.current !== false,
+      getCurrentLibraryAuth: async () => ({ account: opts.account === undefined ? "alice" : opts.account }),
+      pbpLibraryAuthIsCurrent: () => opts.current !== false,
       pbpDictOwnerScope: account => "acct_" + account,
       pbpVocabDriveIsConnected: async () => opts.connected === true,
       pbpQueueDriveRound: async () => { requests++; return opts.result; }, console

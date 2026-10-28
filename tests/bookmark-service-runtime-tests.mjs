@@ -1,0 +1,153 @@
+// Isolated Chromium smoke: real settings/popup/reader/worker against a loopback
+// API fixture. No credentials, profiles or remote services from the user.
+import {createRequire} from 'node:module';
+import {createServer} from 'node:http';
+import {mkdtempSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join,resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import assert from 'node:assert/strict';
+const root=fileURLToPath(new URL('../',import.meta.url));
+const {chromium}=createRequire(resolve(root,'.qa-scan/package.json'))('playwright');
+const profile=mkdtempSync(join(tmpdir(),'pbp-bookmark-runtime-'));
+const records={linkding:new Map(),karakeep:new Map()}, requests=[], membership=new Set();
+const list={id:'later1',name:'Read Later',description:'Pinboard Bookmark Enhanced: Read Later',icon:'bookmark',type:'manual',public:false,hasCollaborators:false,userRole:'owner'};
+let listCreated=false;
+const server=createServer(async(req,res)=>{
+  const url=new URL(req.url,'http://localhost');
+  if(url.pathname.startsWith('/article')) {res.setHeader('Content-Type','text/html');res.end('<html><head><title>Runtime article</title></head><body><article><h1>Runtime article</h1><p>'+('Public synthetic article for a local extension test. '.repeat(80))+'</p></article></body></html>');return;}
+  const service=url.pathname.startsWith('/linkding/')?'linkding':'karakeep';
+  const path=url.pathname.replace(/^\/(?:linkding|karakeep)\/api(?:\/v1)?\//,'');
+  let body='';for await(const chunk of req)body+=chunk;
+  let data;try{data=body?JSON.parse(body):{};}catch{res.writeHead(400).end();return;}
+  requests.push({service,path,method:req.method,data});
+  const reply=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(status===204?'':JSON.stringify(value));};
+  if(req.headers.authorization!==(service==='linkding'?'Token ':'Bearer ')+'fixture-key'){reply(401,{});return;}
+  const store=records[service];
+  if(path==='user/profile/')return reply(200,{theme:'auto',version:'1.44.0'});
+  if(path==='users/me')return reply(200,{id:'u1',name:'Fixture',email:null,localUser:true});
+  if(path.startsWith('bookmarks/check')){
+    const row=[...store.values()].find(b=>(b.url||b.content?.url)===url.searchParams.get('url'));
+    return reply(200,service==='linkding'?{bookmark:row||null,metadata:{},auto_tags:[]}:{bookmarkId:row?.id||null});
+  }
+  if(path==='tags/'||path==='tags')return reply(200,service==='linkding'?{count:0,next:null,results:[]}:{tags:[]});
+  if(path==='lists'&&req.method==='GET')return reply(200,{lists:listCreated?[list]:[]});
+  if(path==='lists'&&req.method==='POST'){listCreated=true;return reply(201,list);}
+  if(path==='lists/later1')return reply(200,list);
+  if(path.startsWith('lists/later1/bookmarks/')){
+    if(req.method==='PUT')membership.add(path.split('/').pop());else membership.delete(path.split('/').pop());return reply(204);
+  }
+  if(/^bookmarks\/?$/.test(path)){
+    if(req.method==='GET')return reply(200,service==='linkding'?{count:store.size,next:null,results:[...store.values()]}:{bookmarks:[...store.values()],nextCursor:null});
+    const id=service==='linkding'?store.size+1:'b'+(store.size+1);
+    // Hand-authored API record schemas, independently filled from HTTP input.
+    const row=service==='linkding'?{id,url:data.url,title:data.title,description:'Site summary',notes:data.notes,tag_names:data.tag_names||[],unread:data.unread||false,shared:data.shared||false,is_archived:false,date_added:'2026-10-01T00:00:00Z'}:
+      {id,title:data.title,note:data.note,summary:null,archived:false,favourited:false,createdAt:'2026-10-01T00:00:00Z',userId:'u1',tags:[],content:{type:'link',url:data.url,title:'Site title'},assets:[]};
+    store.set(String(id),row);return reply(201,row);
+  }
+  const id=path.split('/')[1],row=store.get(id);
+  if(!row)return reply(404,{});
+  if(path.endsWith('/lists'))return reply(200,{lists:membership.has(id)?[list]:[]});
+  if(path.endsWith('/tags')){
+    if(req.method==='POST'){for(const tag of data.tags)row.tags.push({id:'tag'+row.tags.length,name:tag.tagName,attachedBy:'human'});return reply(200,{attached:row.tags.map(t=>t.id)});}
+    row.tags=row.tags.filter(t=>!data.tags.some(x=>x.tagId===t.id));return reply(200,{detached:data.tags.map(t=>t.tagId)});
+  }
+  if(req.method==='DELETE'){store.delete(id);return reply(204);}
+  if(req.method==='PATCH')Object.assign(row,data);
+  return reply(200,row);
+});
+await new Promise(r=>server.listen(0,'127.0.0.1',r));
+const origin='http://127.0.0.1:'+server.address().port;
+const launch=()=>chromium.launchPersistentContext(profile,{headless:true,executablePath:chromium.executablePath(),viewport:{width:1280,height:900},args:[`--disable-extensions-except=${root}`,`--load-extension=${root}`,'--no-first-run','--disable-background-networking','--disable-component-update','--disable-sync','--no-pings','--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']});
+const getWorker=async ctx=>ctx.serviceWorkers().find(w=>w.url().startsWith('chrome-extension://'))||ctx.waitForEvent('serviceworker');
+let ctx;
+const errors=[];
+async function until(read, label) {
+  const deadline=Date.now()+15000;
+  while(Date.now()<deadline){if(await read())return;await new Promise(r=>setTimeout(r,100));}
+  throw new Error('Timed out: '+label+'; page errors: '+errors.join('; '));
+}
+try{
+  ctx=await launch();let worker=await getWorker(ctx);const extId=new URL(worker.url()).hostname;
+  await worker.evaluate(async()=>{await primeSettings();await chrome.storage.local.set({optSyncEnabled:false,optAiAutoTags:false,previewAiEnabled:false,optAutoCloseAfterSave:false,optLang:'en',optCheckBookmarkStatus:false});});
+  await ctx.close();ctx=null;
+  // Same isolated-profile grant technique as qa-drive; no user profile changes.
+  const prefsPath=join(profile,'Default','Preferences'),prefs=JSON.parse(readFileSync(prefsPath,'utf8'));
+  for(const key of ['granted_permissions','active_permissions']){
+    const bucket=prefs.extensions.settings[extId][key] ||= {};
+    const hosts=bucket.explicit_host ||= [];if(!hosts.includes(origin+'/*'))hosts.push(origin+'/*');
+  }
+  writeFileSync(prefsPath,JSON.stringify(prefs));ctx=await launch();worker=await getWorker(ctx);await worker.evaluate(()=>primeSettings());
+  ctx.on('page',page=>page.on('pageerror',error=>errors.push(error.message)));
+  await ctx.route(/^https:\/\//,route=>route.abort());
+  assert(await worker.evaluate(origin=>chrome.permissions.contains({origins:[origin+'/*']}),origin));
+  const article=await ctx.newPage();await article.goto(origin+'/article');
+  const pageUrl='chrome-extension://'+extId+'/';
+  const backupPage=await ctx.newPage();await backupPage.goto(pageUrl+'options.html');
+  const restored=await backupPage.evaluate(async()=>{
+    const before=(await indexedDB.databases()).map(db=>db.name).filter(name=>['pbp-vocab','pbp-dict-archive','pbp-ask-archive'].includes(name)).sort();
+    const empty=await pbpBackupPersonalLibraryEmpty();
+    const after=(await indexedDB.databases()).map(db=>db.name).filter(name=>['pbp-vocab','pbp-dict-archive','pbp-ask-archive'].includes(name)).sort();
+    const payload={_schemaVersion:3,_backup:{createdAt:'2026-10-01T00:00:00.000Z',extensionVersion:'2.0.0',source:'manual'},_highlightsOwner:'restored-personal',_highlights:{pbp_hl_restore_fixture:{v:1,url:'https://fixture.test/restore',title:'Restore',items:[{id:'fixture-hl',n:1,quote:'restored quote',color:1,ts:1}]}}};
+    const result=await pbpApplyBackupPayload(payload,{exportableKeys:[],sections:{settings:false,themes:false,secrets:false,highlights:true,vocabulary:false}});
+    const owner=await pbpPersonalLibraryAccount();
+    const populated=await pbpBackupPersonalLibraryEmpty();
+    const denied=await pbpBackupLibraryIdentity({highlightsOwner:'another-library'},{highlights:true},{apply:true});
+    return {before,after,empty,populated,result,owner,denied};
+  });
+  assert(restored.empty);assert.deepEqual(restored.before,restored.after,'emptiness probe created a database');
+  assert.equal(restored.result.highlights,'applied');assert(restored.result.libraryAdopted);
+  assert.equal(restored.owner,'restored-personal');assert.equal(restored.populated,false);assert.equal(restored.denied,'');
+  await backupPage.close();
+  console.log('empty-library JSON restore adopted its owner; a populated library refused another owner');
+  let personalOwner;
+  for(const service of ['linkding','karakeep']){
+    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    await options.locator(`input[name="bookmark-service"][value="${service}"]`).check();
+    await options.locator('#opt-'+service+'-url').fill(origin+'/'+service+'/');
+    await options.locator('#opt-'+service+'-token').fill('fixture-key');
+    console.log(service+' permission:',await options.evaluate(origin=>chrome.permissions.contains({origins:[origin+'/*']}),origin));
+    await options.locator('#connect-'+service).click();
+    await options.locator('#connect-'+service+'-status').filter({hasText:'Connected'}).waitFor({timeout:10000}).catch(async error=>{console.error({status:await options.locator('#connect-'+service+'-status').textContent(),requests:requests.map(r=>({path:r.path,method:r.method})),errors});throw error;});
+    await until(()=>options.evaluate(async service=>{const c=await pbpReadBookmarkConnection();return c.service===service&&!!c.account;},service),'selected service persisted');
+    await options.setViewportSize({width:400,height:900});
+    assert(await options.evaluate(service=>document.getElementById('opt-'+service+'-url').getBoundingClientRect().width>=document.getElementById('opt-'+service+'-token').parentElement.getBoundingClientRect().width-1,service),'server URL field does not fill its form column');
+    await options.locator('#panel-general .settings-section').first().screenshot({path:join(tmpdir(),'pbp-'+service+'-settings.png')});
+    assert(await options.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'settings horizontal overflow');
+    const owner=await worker.evaluate(()=>pbpVocabCurrentOwner());
+    if(!personalOwner){personalOwner=owner;assert(await worker.evaluate(owner=>pbpVocabSaveWord(owner,{term:'shared',language:'en',gloss:'fixture',contexts:[]}),owner));}
+    assert.equal(owner,personalOwner);
+    assert.equal(await worker.evaluate(async owner=>(await pbpVocabAll(owner)).length,owner),1);
+    assert.equal((await worker.evaluate(()=>pbpReadBookmarkConnection())).service,service);
+    await options.close();await article.bringToFront();
+    const popupPromise=ctx.waitForEvent('page');
+    await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');
+    const popup=await popupPromise;await popup.waitForLoadState();
+    await popup.locator('#main-section:not(.hidden)').waitFor({timeout:10000}).catch(async error=>{console.error({errors,popupUrl:popup.url(),body:(await popup.locator('body').innerText()).slice(0,1200),connection:await popup.evaluate(async()=>{const c=await pbpReadBookmarkConnection();return {service:c.service,connected:!!c.account};})});throw error;});
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').disabled);
+    await popup.locator('#title-input').fill(service+' title');await popup.locator('#description-input').fill('My note');
+    await popup.locator('#tags-input').fill('reading');await popup.locator('#tags-input').press('Enter');
+    await popup.locator('#submit-btn').click();
+    await until(()=>popup.evaluate(()=>document.getElementById('submit-btn').classList.contains('saved-success')),'popup save success').catch(async error=>{console.error({requests:requests.map(r=>({path:r.path,method:r.method})),status:await popup.locator('body').innerText()});throw error;});
+    assert.equal(records[service].size,1,service+' popup did not save');await popup.close();
+    const account=(await worker.evaluate(()=>getCurrentBookmarkAuth())).account;
+    await worker.evaluate(async data=>chrome.storage.local.set({md_preview_data_services:{markdown:'# Runtime article\n\nA synthetic article for the reader.',title:'Runtime article',url:data.url,baseUrl:data.url,account:data.account,tags:[],description:'',source:'local',ts:Date.now()}}),{url:origin+'/article',account});
+    const reader=await ctx.newPage();await reader.goto(pageUrl+'md-preview.html?k=services');
+    await reader.waitForFunction(()=>document.getElementById('reader-bookmark-later')?.getAttribute('aria-busy')==='false');
+    await reader.locator('#reader-bookmark-later').click();
+    await reader.waitForFunction(()=>document.getElementById('reader-bookmark-later')?.getAttribute('aria-pressed')==='true');
+    assert(service==='linkding'?[...records.linkding.values()][0].unread:membership.size===1);
+    await reader.locator('#reader-bookmark-edit').click();
+    if(service==='karakeep')assert(await reader.locator('#reader-bookmark-private').isHidden());
+    await reader.locator('#reader-bookmark-delete').click();await reader.locator('.confirm-yes').click();
+    await reader.waitForFunction(()=>document.getElementById('reader-bookmark-status')?.textContent==='Bookmark deleted');
+    assert.equal(records[service].size,0);await reader.close();
+    assert.equal(await worker.evaluate(()=>pbpVocabCurrentOwner()),personalOwner);
+    console.log(service+': settings, popup save, reader Read Later/delete, shared vocabulary passed');
+  }
+  assert.equal(errors.length,0,errors.join('\n'));
+  assert(requests.every(r=>r.service==='linkding'||r.service==='karakeep'));
+  console.log('bookmark service runtime smoke passed; synthetic loopback APIs only');
+}finally{
+  if(ctx)await ctx.close();await new Promise(r=>server.close(r));rmSync(profile,{recursive:true,force:true});
+}

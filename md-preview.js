@@ -1178,11 +1178,20 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   // account's tags/note would launder A's private bookmark data into a record
   // that every later owner gate reads as B's -- and buildMeta() puts exactly
   // those two fields into the export frontmatter Send-to ships out.
-  let previewAccount = typeof info.account === "string" ? info.account : "";
+  let previewAccount = await pbpPersonalLibraryAccount();
+  let bookmarkAccount = typeof info.account === "string" ? info.account : "";
   let tags = Array.isArray(info.tags) ? info.tags : [];
   let description = info.description || "";
   const sourceIncognito = info.sourceIncognito === true;
   let bookmarkDraft = info.bookmarkDraft && typeof info.bookmarkDraft === "object" ? info.bookmarkDraft : null;
+  // A handoff may outlive a service switch before this page opens. Retire its
+  // private metadata before any reader module or export can consume it.
+  const initialConnection = await pbpReadBookmarkConnection();
+  if (bookmarkAccount !== initialConnection.account) {
+    bookmarkAccount = initialConnection.account;
+    tags = []; description = ""; bookmarkDraft = null;
+    await chrome.storage.local.set({[MP_KEY]:{...info,account:bookmarkAccount,tags,description,bookmarkDraft}});
+  }
   // X4: raw metadata transported by popup.js/background.js's widened
   // extraction payload. Gated by buildMeta()'s exportSettings.mdExportExtendedMeta
   // check (design spec 4.2) -- this file only reads them here; T4's buildMeta()
@@ -1207,75 +1216,43 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     // Ownerless previews never ask: background.js answers {bookmarked:false}
     // without a lookup, and asking anyway would spend a Pinboard call on a
     // signed-out page.
-    if (url && previewAccount) {
-      chrome.runtime.sendMessage({ type: "mdPreviewBookmarkInfo", url, account: previewAccount })
+    if (url && bookmarkAccount) {
+      chrome.runtime.sendMessage({ type: "mdPreviewBookmarkInfo", url, account: bookmarkAccount })
         .then((resp) => {
           // Compared against the LIVE account, not the one this call was sent
           // with: a second switch while it was in flight must not paint a
           // stale answer.
-          if (resp?.account === previewAccount) renderBookmarkBadge(resp, url);
+          if (resp?.account === bookmarkAccount) renderBookmarkBadge(resp, url);
         })
         .catch(() => {});
     }
   }
 
-  // Live Pinboard account switch. Relevance test is library-vocab.js's: only
-  // the credential key and the two routing toggles that decide which area
-  // holds the effective token name a new account, and an identical rewrite
-  // (settings saved with the same token) names none. The account itself is
-  // re-derived through the one correct path -- pbpReadSettingsWithSecrets
-  // picks the routed area and overlays the local secret -- never from a
-  // single area's newValue.
+  // Reading data and bookmark metadata have independent live identities.
   if (chrome.storage.onChanged) {
     let accountGen = 0;
     chrome.storage.onChanged.addListener(async (changes, area) => {
       if (area !== "sync" && area !== "local") return;
-      const relevant = [changes.pinboardToken, changes.optSyncEnabled, changes.syncApiKeys].filter(Boolean);
-      if (!relevant.length || relevant.every((c) => c.oldValue === c.newValue)) return;
+      if (!(changes.personalLibraryAccount || pbpBookmarkSettingsChanged(changes) || changes.optSyncEnabled || changes.syncApiKeys)) return;
       const gen = ++accountGen;
-      let account = "";
       try {
-        const s = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
-        account = pbpPinboardAccountFromToken(s.pinboardToken) || "";
-      } catch (e) {
-        // Leave the snapshot in place rather than guessing: md-dict.js and
-        // md-vocab-echo.js each re-check the live owner themselves and fail
-        // closed, so a failed read costs underlines, never a cross-account write.
-        console.warn("[preview] account re-read failed", e && e.name, e && e.message);
-        return;
-      }
-      if (gen !== accountGen || account === previewAccount) return; // a newer event already carried fresher state
-      previewAccount = account;
-      // The rest of the owner stamp retires with it. This page has no bookmark
-      // metadata for the new account (it never re-reads the popup's save form),
-      // so empty is the only honest value: every later slot write now carries a
-      // consistent triple, and exports drop the tags/description block instead
-      // of attributing the previous account's to this one.
-      tags = [];
-      description = "";
-      bookmarkDraft = null;
-      // Same reason, for the account-derived UI already on screen.
-      if (_badgeArmed) refreshBookmarkBadge();
-      else pbpClearBookmarkBadge();
-      // Same frozen {account} detail the article lifecycle events carry, so the
-      // owner-scoped modules re-derive their scope exactly as a fresh render
-      // makes them -- without claiming the article itself was replaced.
-      //
-      // CONTRACT for subscribers (md-dict.js, md-vocab-echo.js, and the ask /
-      // translate / video owner scopes):
-      //   * detail.account is the NEW account, "" when signed out; there is no
-      //     `previous` field on purpose -- every subscriber already holds the
-      //     account it scoped itself with, so `detail.account !== mine` is the
-      //     test, and the shape stays identical to pbp:rendered /
-      //     pbp:article-replaced so one handler can serve all three.
-      //   * fires only on a real change, after previewAccount has been
-      //     re-pointed, and never for a same-account settings rewrite.
-      //   * dispatch is synchronous and the handler list is unordered, so a
-      //     subscriber must not rely on another having run first.
-      //   * silence is NOT a guarantee of no change: the re-read above can
-      //     throw, so anything that persists under an owner still has to
-      //     re-check the live owner immediately before it writes.
-      document.dispatchEvent(new CustomEvent("pbp:account-changed", { detail: Object.freeze({ account }) }));
+        const [account, connection] = await Promise.all([pbpPersonalLibraryAccount(), pbpReadBookmarkConnection()]);
+        if (gen !== accountGen) return;
+        if (account !== previewAccount) {
+          previewAccount = account;
+          document.dispatchEvent(new CustomEvent("pbp:account-changed", {detail:Object.freeze({account})}));
+        }
+        if (connection.account !== bookmarkAccount) {
+          bookmarkAccount = connection.account;
+          tags = []; description = ""; bookmarkDraft = null;
+          const key = k ? "md_preview_data_" + k : "md_preview_data";
+          const stored = (await chrome.storage.local.get(key))[key];
+          if (gen !== accountGen) return;
+          if (stored) await chrome.storage.local.set({[key]:{...stored,account:bookmarkAccount,tags:[],description:"",bookmarkDraft:null}});
+          if (_badgeArmed) refreshBookmarkBadge(); else pbpClearBookmarkBadge();
+          document.dispatchEvent(new CustomEvent("pbp:bookmark-account-changed", {detail:{url,title,account:bookmarkAccount}}));
+        }
+      } catch (error) { console.warn("[preview] identity refresh failed:", error?.name, error?.message); }
     });
   }
 
@@ -1444,7 +1421,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
             videoDescriptionMd: descMd,
             url, baseUrl, sourceTabUrl, tabId: srcTabId,
             source: source === "jina" ? "jina" : "local",
-            sourceIncognito, bookmarkDraft, account: previewAccount, tags, description, ts: Date.now(),
+            sourceIncognito, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
             nonce: _pageNonce
           }
         });
@@ -1555,7 +1532,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       try {
         pr = await chrome.runtime.sendMessage({
           type: "reextractMarkdown", tabId: srcTabId, url, engine, sourceTabUrl,
-          account: previewAccount, tags, description, k,
+          account: bookmarkAccount, tags, description, k,
           frame: !!(opts && opts.frame), // embedded-frame pass, only from grantFrameAndRetry
           frameOrigin: (opts && typeof opts.frameOrigin === "string") ? opts.frameOrigin : ""
         });
@@ -1675,7 +1652,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
             await chrome.storage.local.set({ [MP_KEY]: {
               markdown: "", title: title || "", url, baseUrl, sourceTabUrl, tabId: srcTabId,
               source: attemptedEngine === "jina" ? "jina" : "local",
-              sourceIncognito, bookmarkDraft, account: previewAccount, tags, description, ts: Date.now(), nonce: _pageNonce
+              sourceIncognito, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(), nonce: _pageNonce
             } });
           }
           location.reload();
@@ -1907,7 +1884,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         videoDescriptionMd: (window.pbpVideoDoc && window.pbpVideoDoc.descriptionMarkdown) || "",
         title: title || "", url, baseUrl, sourceTabUrl, tabId: srcTabId,
         source: source === "jina" ? "jina" : "local",
-        sourceIncognito, bookmarkDraft, account: previewAccount, tags, description, ts: Date.now(),
+        sourceIncognito, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
         nonce: _pageNonce
       }
     : {
@@ -1915,7 +1892,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
         // while re-extracting, and a failed attempt otherwise read "Untitled".
         restore: true, title: title || "", url, tabId: srcTabId, sourceTabUrl,
         engine: source === "jina" ? "jina" : "local",
-        sourceIncognito, bookmarkDraft, account: previewAccount, tags, description, ts: Date.now(),
+        sourceIncognito, bookmarkDraft, account: bookmarkAccount, tags, description, ts: Date.now(),
         nonce: _pageNonce
       };
   try {
@@ -2108,7 +2085,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     const highlightsReady = includeHighlights && typeof pbpHlExportItems === "function"
       ? pbpHlExportItems().then(items => ({ items }), error => ({ error })) : null;
     return {
-      account: previewAccount, revision: _articleRevision, askRevision: exportAskRevision,
+      account: previewAccount, bookmarkAccount, revision: _articleRevision, askRevision: exportAskRevision,
       askOnly, includeAsk: askOnly || pbpExpTglOn(expIncludeAsk),
       md: askOnly ? "" : getViewMarkdown(), meta: structuredClone(buildMeta()), opts, highlightsReady,
       lang: !askOnly && (document.body.classList.contains("tr-only") || document.body.classList.contains("tr-bilingual"))
@@ -2116,7 +2093,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     };
   }
   function exportJobCurrent(job) {
-    return job.account === previewAccount && job.revision === _articleRevision
+    return job.account === previewAccount && job.bookmarkAccount === bookmarkAccount && job.revision === _articleRevision
       && (!job.includeAsk || job.askRevision === exportAskRevision);
   }
   function requireExportJob(job) {
@@ -2126,8 +2103,9 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
     if (!exportJobCurrent(job)) return false;
     // Storage events are asynchronous: check the effective credential itself
     // immediately before an output, including every Send-to dispatch.
-    const settings = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
-    if (!exportJobCurrent(job) || (pbpPinboardAccountFromToken(settings.pinboardToken) || "") !== job.account) return false;
+    const account = await pbpPersonalLibraryAccount();
+    const connection = await pbpReadBookmarkConnection();
+    if (!exportJobCurrent(job) || account !== job.account || connection.account !== job.bookmarkAccount) return false;
     if (job.includeAsk) {
       // Another reader can clear IDB without this document receiving its
       // notification yet. Re-read the data at the actual output boundary.
@@ -2242,7 +2220,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   window.addEventListener("focus", refreshExportCount);
   window.addEventListener("pagehide", () => exportHistoryChannel?.close(), { once: true });
   document.addEventListener("pbp:bookmark-changed", (e) => {
-    if (e.detail?.account === previewAccount && e.detail?.url === url) refreshBookmarkBadge();
+    if (e.detail?.account === bookmarkAccount && e.detail?.url === url) refreshBookmarkBadge();
   });
   document.addEventListener("pbp:rendered", refreshExportCount, { once: true });
   updateExportSummary();
@@ -2440,7 +2418,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
           r = await chrome.runtime.sendMessage({
             type: "reextractMarkdown",
             tabId: srcTabId, url: srcUrlForSwitch, engine: e, sourceTabUrl,
-            account: previewAccount, tags, description, k
+            account: bookmarkAccount, tags, description, k
           });
         } catch (_) { r = { ok: false, error: "network" }; }
         if (r && r.ok) { location.reload(); return; }
@@ -2988,7 +2966,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
       try {
         pr = await chrome.runtime.sendMessage({
           type: "reextractMarkdown", tabId: srcTabId, url, engine: "local", sourceTabUrl,
-          account: previewAccount, tags, description, k, reloadSource: true
+          account: bookmarkAccount, tags, description, k, reloadSource: true
         });
       } catch (_) { pr = { ok: false, error: "network" }; }
       if (pr && pr.ok) { location.reload(); return; }
@@ -3275,7 +3253,7 @@ function pbpReaderCollectAnchorRects(blocks, rectOf) {
   const _isForumPage = (typeof pbpForumShouldMark === "function")
     ? !!pbpForumShouldMark(info, renderedView) : !!info.forum;
   await pbpDeferredScriptsReady;
-  document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { url, title, forum: _isForumPage, account: previewAccount, bookmark: { tags, notes: description, sourceTabId: srcTabId, sourceTabUrl, draft: bookmarkDraft } } }));
+  document.dispatchEvent(new CustomEvent("pbp:rendered", { detail: { url, title, forum: _isForumPage, account: previewAccount, bookmarkAccount, bookmark: { tags, notes: description, sourceTabId: srcTabId, sourceTabUrl, draft: bookmarkDraft } } }));
 
   // Raw view populated lazily on first switch
 

@@ -17,7 +17,7 @@ const AI_STAGE_STARTED = new Map();
 const AI_BUTTON_BASE_TEXT = new Map();
 
 function pbpPopupAiAccount() {
-  return pbpPinboardAccountFromToken(settings?.pinboardToken);
+  return pbpBookmarkConnection(settings).account;
 }
 
 // WONTFIX (audit L14, documented): this guard compares against the

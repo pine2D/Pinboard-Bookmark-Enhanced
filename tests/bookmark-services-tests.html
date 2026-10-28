@@ -1,0 +1,223 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Bookmark Services Tests</title></head><body>
+<h1>Bookmark services</h1><div id="results"></div><div id="summary"></div>
+<script src="../shared.js"></script><script src="../bookmark-services.js"></script>
+<script>
+const cases = [];
+function test(name, run) { cases.push({name, run}); }
+function equal(actual, expected) { if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`); }
+function ok(value) { if (!value) throw new Error("assertion failed"); }
+async function rejects(run, code) { try { await run(); } catch (error) { equal(error.code, code); return; } throw new Error("expected rejection: " + code); }
+const pageUrl = "https://example.com/article";
+// Hand-written server records, not derived from the adapter's serializers.
+const ld = {id:7, url:pageUrl, title:"Saved title", description:"Website summary", notes:"My note", tag_names:["work"], unread:true, shared:false, is_archived:false, date_added:"2026-10-01T10:00:00Z", date_modified:"2026-10-02T10:00:00Z"};
+const kk = {id:"bk1", createdAt:"2026-10-01T10:00:00Z", modifiedAt:null, title:"Saved title", archived:true, favourited:false, note:"My note", summary:null, userId:"user1", tags:[{id:"tag1",name:"work",attachedBy:"human"}], content:{type:"link",url:pageUrl,title:"Crawled title",description:"Website summary"}, assets:[]};
+function harness(service, replies, extra = {}) {
+  const calls = [];
+  const client = pbpCreateBookmarkServiceClient({service, baseUrl:"https://bookmarks.example/base/", token:"fixture-token", beforeRequest:async()=>({token:"fixture-token"}),
+    fetchImpl:async(url, options)=>{ calls.push({url, ...options, body:options.body ? JSON.parse(options.body) : undefined}); const next = replies.shift(); if (!next) throw new Error("unexpected request"); if (next instanceof Error) throw next; return new Response(next[0] === 204 ? null : JSON.stringify(next[1]), {status:next[0],headers:{"Content-Type":"application/json"}}); }, ...extra});
+  return {client, calls};
+}
+test("service defaults to Pinboard, unknown services fail closed", () => {equal(pbpBookmarkServiceId({}),"pinboard"); equal(pbpBookmarkServiceId({bookmarkService:"linkding"}),"linkding"); equal(pbpBookmarkServiceId({bookmarkService:"typo"}),"");});
+test("base URL preserves subpaths and rejects insecure or credential-bearing inputs", () => {equal(pbpBookmarkEndpoint("https://bookmarks.example/base"),"https://bookmarks.example/base/");equal(pbpBookmarkEndpoint("http://127.0.0.1:8000"),"http://127.0.0.1:8000/");for(const url of ["http://192.168.1.2", "http://2130706433", "https://u:p@example.com", "https://example.com/?key=x", "https://example.com/#x", "javascript:alert(1)"])equal(pbpBookmarkEndpoint(url),"");});
+test("linkding lookup preserves independent notes, summary, unread and visibility", async()=>{const {client,calls}=harness("linkding",[[200,{bookmark:ld,metadata:{},auto_tags:[]}]]);const b=await client.lookup(pageUrl);equal([b.id,b.url,b.title,b.notes,b.summary,b.tags,b.toread,b.private],["7",pageUrl,"Saved title","My note","Website summary",["work"],true,true]);equal(calls[0].url,"https://bookmarks.example/base/api/bookmarks/check/?url=https%3A%2F%2Fexample.com%2Farticle");equal(calls[0].headers.Authorization,"Token fixture-token");equal(calls[0].redirect,"error");equal(calls[0].credentials,"omit");});
+test("linkding missing bookmark is null, malformed lookup is an error",async()=>{equal(await harness("linkding",[[200,{bookmark:null}]]).client.lookup(pageUrl),null);await rejects(()=>harness("linkding",[[200,{}]]).client.lookup(pageUrl),"invalid_response");});
+test("linkding update patches requested fields without rewriting scraped description",async()=>{const {client,calls}=harness("linkding",[[200,{...ld,title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true}]]);const result=await client.save({url:pageUrl,title:"New",notes:"Note",tags:["new"],toread:false,private:false},{id:"7",url:pageUrl});equal(result.status,"saved");equal(calls[0].method,"PATCH");equal(calls[0].body,{title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true});});
+test("linkding create uses API fields and does not send a Wayback flag as archive",async()=>{const {client,calls}=harness("linkding",[[201,ld]]);await client.save({url:pageUrl,title:"Title",notes:"",tags:[],toread:true,private:true,archive:true},null);equal(calls[0].body,{url:pageUrl,title:"Title",notes:"",tag_names:[],unread:true,shared:false});});
+test("linkding uses canonical tags returned by its server",async()=>{
+  // v1.47 models.sanitize_tag_name replaces spaces; the response, not the
+  // submitted spelling, is authoritative for the next edit.
+  const h=harness("linkding",[[201,{...ld,tag_names:["machine-learning"]}]]);
+  const result=await h.client.save({url:pageUrl,title:"Title",notes:"",tags:["machine learning"],toread:false,private:true},null);
+  equal(h.calls[0].body.tag_names,["machine learning"]);equal(result.bookmark.tags,["machine-learning"]);
+});
+test("linkding pagination refuses to send credentials to another origin",async()=>{const {client,calls}=harness("linkding",[[200,{count:2,next:"https://evil.example/api/tags/",results:[{id:1,name:"a"}]}]]);await rejects(()=>client.tags(),"invalid_response");equal(calls.length,1);});
+test("linkding tags pagination retains the configured base path",async()=>{const {client,calls}=harness("linkding",[[200,{count:2,next:"https://bookmarks.example/base/api/tags/?offset=1",results:[{id:1,name:"a"}]}],[200,{count:2,next:null,results:[{id:2,name:"b"}]}]]);equal(await client.tags(),["a","b"]);equal(calls.length,2);});
+test("Karakeep lookup fetches full bookmark after URL check",async()=>{const {client,calls}=harness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk]]);const b=await client.lookup(pageUrl);equal([b.id,b.title,b.notes,b.tags,b.toread,b.archived],["bk1","Saved title","My note",["work"],false,true]);equal(calls[0].headers.Authorization,"Bearer fixture-token");equal(calls[1].url,"https://bookmarks.example/base/api/v1/bookmarks/bk1");});
+test("Karakeep concurrent creation requires review without changing the returned bookmark",async()=>{const {client,calls}=harness("karakeep",[[200,kk]]);await rejects(()=>client.save({url:pageUrl,title:"New",notes:"New note",tags:["new"]},null),"conflict");equal(calls.map(c=>c.method),["POST"]);});
+test("Karakeep failed tag update reports a saved bookmark and remaining step",async()=>{const {client,calls}=harness("karakeep",[[201,{...kk,tags:[]}],[503,{message:"unavailable"}]]);const result=await client.save({url:pageUrl,title:"Title",notes:"",tags:["new"]},null);equal([result.status,result.bookmark.id,result.failedStep],["partial","bk1","tags"]);equal(calls.length,2);});
+test("Karakeep mark-read removes only the private read-later list membership",async()=>{const list={id:"later",name:"Read later",type:"manual",public:false,hasCollaborators:false,userRole:"owner"};const {client,calls}=harness("karakeep",[[200,list],[204,null]],{readLaterListId:"later"});await client.setReadLater({id:"bk1"},false);equal(calls[1].method,"DELETE");equal(calls[1].url,"https://bookmarks.example/base/api/v1/lists/later/bookmarks/bk1");ok(!calls.some(c=>c.body?.archived!==undefined));});
+test("Karakeep refuses public, shared, smart or foreign lists",async()=>{for(const patch of [{public:true},{hasCollaborators:true},{type:"smart"},{userRole:"editor"}]){const {client,calls}=harness("karakeep",[[200,{id:"later",name:"Read later",type:"manual",public:false,hasCollaborators:false,userRole:"owner",...patch}]],{readLaterListId:"later"});await rejects(()=>client.setReadLater({id:"bk1"},true),"read_later_list");equal(calls.length,1);}});
+test("Karakeep creates a private read-later list only for an explicit read-later action",async()=>{let stored="";const list={id:"later",name:"Read later",type:"manual",public:false,hasCollaborators:false,userRole:"owner"};const {client,calls}=harness("karakeep",[[200,{lists:[]}],[201,list],[204,null]],{saveReadLaterList:async id=>{stored=id;}});await client.setReadLater({id:"bk1"},true);equal(stored,"later");equal(calls.map(c=>c.method),["GET","POST","PUT"]);equal(calls[2].url,"https://bookmarks.example/base/api/v1/lists/later/bookmarks/bk1");});
+test("credential rotation uses the dispatch-time token",async()=>{const {client,calls}=harness("linkding",[[200,{bookmark:null}]],{beforeRequest:async()=>({token:"rotated"})});await client.lookup(pageUrl);equal(calls[0].headers.Authorization,"Token rotated");});
+test("account change before dispatch sends no request",async()=>{const {client,calls}=harness("linkding",[],{beforeRequest:async()=>{throw Object.assign(new Error("changed"),{code:"account_changed"});}});await rejects(()=>client.lookup(pageUrl),"account_changed");equal(calls.length,0);});
+test("late responses are rejected when the connection changes",async()=>{let checks=0;const {client}=harness("linkding",[[200,{bookmark:ld}]],{beforeRequest:async()=>{if(++checks>1)throw Object.assign(new Error("changed"),{code:"account_changed"});return {token:"fixture-token"};}});await rejects(()=>client.lookup(pageUrl),"account_changed");});
+test("HTTP errors have bounded codes and never include server messages or credentials",async()=>{for(const [status,code] of [[401,"auth"],[403,"auth"],[429,"rate_limited"],[500,"server"]]){const {client}=harness("linkding",[[status,{message:"SECRET"}]]);try{await client.lookup(pageUrl);throw new Error("expected error");}catch(e){equal(e.code,code);ok(!e.message.includes("SECRET"));}}});
+test("deletion accepts an empty 204 body",async()=>{const {client}=harness("linkding",[[204,null]]);equal(await client.remove({id:"7"}),true);});
+test("unsafe record IDs cannot escape the API route",async()=>{const {client,calls}=harness("karakeep",[]);await rejects(()=>client.remove({id:"../users/me"}),"invalid_request");equal(calls.length,0);});
+test("service verification does not write remote data",async()=>{const a=harness("linkding",[[200,{theme:"auto",version:"1.44.0"}]]);const b=harness("karakeep",[[200,{id:"u1",name:"User",email:null,localUser:true}]]);equal((await a.client.verify()).id,"");equal((await b.client.verify()).id,"u1");equal(a.calls[0].method,"GET");equal(b.calls[0].method,"GET");});
+
+// Exercise the real worker save/replay pipeline with raw server fixtures.
+let workerSource;
+async function workerHarness(service, replies, options = {}) {
+  workerSource ||= await (await fetch("../background.js")).text();
+  const start = workerSource.indexOf("const PBP_SAVE_MODES");
+  const end = workerSource.indexOf("// ---- P1: Shared save function ----", start);
+  const settings = {...SETTINGS_DEFAULTS, bookmarkService:service, pinboardToken:"", offlineQueueEnabled:true,
+    [service + "Url"]:"https://bookmarks.example/base/", [service + "Token"]:JSON.stringify({v:1,baseUrl:"https://bookmarks.example/base/",token:"fixture-secret",connectionId:"connection1",userId:"user1"})};
+  const state = {settings, epoch:0, permitted:true, calls:[], queue:[], cache:new Map(), sideEffects:[], ...options};
+  const auth = async () => ({...pbpBookmarkConnection(settings), epoch:state.epoch});
+  const deps = {
+    console, t:key=>key, statusCache:state.cache,
+    loadSettings:async()=>({...settings}), getCurrentBookmarkAuth:auth,
+    pbpCaptureBookmarkAuth:value=>({...pbpBookmarkConnection(typeof value === "object" ? value : {pinboardToken:value}),epoch:state.epoch}),
+    pbpBookmarkAuthIsCurrent:a=>!!a?.account && a.epoch===state.epoch,
+    pbpReadFreshBookmarkAuthForAccount:async account=>{const a=await auth();return a.account===account?a:null;},
+    pbpStatusCacheGet:(url,a)=>state.cache.get(url)?.account===a.account?state.cache.get(url):null,
+    pbpStatusCacheSet:(url,a,data)=>{if(a.epoch!==state.epoch)return false;state.cache.set(url,{...data,account:a.account});return true;},
+    setIcon:()=>{}, updateBadge:async()=>{}, pbpWaybackArchive:async(url,settings,options)=>state.sideEffects.push({type:"wayback",options}),
+    persistSettings:async patch=>{Object.assign(settings,patch);return {ok:true};},
+    pinboardFetch:async()=>{throw new Error("unexpected Pinboard request");},
+    pbpCreateBookmarkServiceClient:config=>pbpCreateBookmarkServiceClient({...config,fetchImpl:async(url, init)=>{
+      state.calls.push({url,...init,body:init.body?JSON.parse(init.body):undefined});
+      if (state.beforeResponse) await state.beforeResponse();
+      const next=replies.shift(); if(next instanceof Error)throw next;
+      if(!next)throw new Error("unexpected API request");
+      return new Response(next[0]===204?null:JSON.stringify(next[1]),{status:next[0]});
+    }}),
+    chrome:{permissions:{contains:async()=>state.permitted},tabs:{query:async()=>[]},storage:{local:{
+      get:async()=>({offlineQueue:state.queue}),set:async value=>{if(value.offlineQueue)state.queue=value.offlineQueue;}
+    }}}
+  };
+  const api = new Function(...Object.keys(deps),workerSource.slice(start,end)+";return {submitSaveIntent,sendOfflineItem};")(...Object.values(deps));
+  return {...api,state,auth};
+}
+const saveIntent = {mode:"create",url:pageUrl,title:"Title",notes:"Note",tags:"work",private:true,toread:false};
+test("worker saves to linkding without a Pinboard credential", async()=>{
+  const h=await workerHarness("linkding",[[200,{bookmark:null}],[201,ld]]);
+  const result=await h.submitSaveIntent(saveIntent,{expectedAccount:(await h.auth()).account});
+  equal(result.status,"saved");equal(h.state.calls.length,2);ok(h.state.calls.every(c=>c.url.startsWith("https://bookmarks.example/base/api/")));
+  equal(h.state.calls[1].headers.Authorization,"Token fixture-secret");equal(h.state.queue,[]);
+});
+test("worker preserves merge semantics through Karakeep and does not archive", async()=>{
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[200,{id:"bk1",title:"Saved title",note:"My note"}],[200,{attached:["tag2"]}]]);
+  const result=await h.submitSaveIntent({...saveIntent,mode:"merge",tags:"new"});
+  equal(result.status,"saved");equal(h.state.calls[2].body,{title:"Saved title",note:"My note"});
+  equal(h.state.calls[3].body,{tags:[{tagName:"new"}]});ok(h.state.calls.every(c=>!c.body || !Object.hasOwn(c.body,"archived")));
+});
+test("worker never queues a partial Karakeep write as a fresh create", async()=>{
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[201,{...kk,tags:[]}],[500,{}]]);
+  const result=await h.submitSaveIntent(saveIntent);equal(result.reason,"partial");equal(result.failedStep,"tags");equal(h.state.queue,[]);equal(h.state.sideEffects,[]);
+});
+test("missing host permission prevents worker requests and queuing",async()=>{
+  const h=await workerHarness("linkding",[],{permitted:false});equal((await h.submitSaveIntent(saveIntent)).reason,"permission");equal(h.state.calls,[]);equal(h.state.queue,[]);
+});
+test("offline records contain only intent and connection identity; another service cannot replay them",async()=>{
+  const h=await workerHarness("linkding",[new TypeError("offline")]);
+  equal((await h.submitSaveIntent(saveIntent)).status,"queued");const item=h.state.queue[0];
+  ok(item.account.startsWith("linkding:"));ok(!JSON.stringify(item).includes("fixture-secret"));ok(!Object.hasOwn(item,"token"));
+  Object.assign(h.state.settings,{bookmarkService:"karakeep",karakeepUrl:"https://bookmarks.example/base/",karakeepToken:JSON.stringify({v:1,baseUrl:"https://bookmarks.example/base/",token:"other",connectionId:"other",userId:"other"})});h.state.epoch++;
+  equal((await h.sendOfflineItem(item)).result.reason,"account_mismatch");equal(h.state.calls.length,1);
+});
+test("late worker lookup cannot become a save after a service switch",async()=>{
+  const h=await workerHarness("linkding",[[200,{bookmark:null}]],{beforeResponse:()=>{h.state.settings.bookmarkService="pinboard";h.state.epoch++;}});
+  equal((await h.submitSaveIntent(saveIntent)).reason,"account_changed");equal(h.state.calls.length,1);equal(h.state.sideEffects,[]);
+});
+test("synced URL cannot send this device's existing credential to another server",async()=>{
+  const h=await workerHarness("linkding",[]);
+  const before=(await h.auth()).account;ok(before);
+  h.state.settings.linkdingUrl="https://other.example/";
+  equal((await h.auth()).account,"");equal((await h.submitSaveIntent(saveIntent)).reason,"not_logged_in");equal(h.state.calls,[]);
+});
+test("tags with spaces round-trip through the reader and offline intent format",()=>{
+  const names=["machine learning", "simple", 'a"b', "日本語"];
+  equal(pbpBookmarkParseTags(pbpBookmarkFormatTags(names)),names);
+  equal(pbpBookmarkAsPost({...pbpBookmarkNormalize("karakeep",kk),tags:names}).tagNames,names);
+});
+test("merge preserves a remote tag containing spaces as one tag",async()=>{
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,{...kk,tags:[{id:"tag1",name:"machine learning",attachedBy:"human"}]}],[200,{id:"bk1"}],[200,{attached:["tag2"]}]]);
+  equal((await h.submitSaveIntent({...saveIntent,mode:"merge",tags:"new"})).status,"saved");
+  equal(h.state.calls.length,4);equal(h.state.calls[3].body,{tags:[{tagName:"new"}]});
+});
+async function personalHarness(stored) {
+  const source=await(await fetch("../shared.js")).text();const a=source.indexOf("async function pbpPersonalLibraryAccount(");const b=source.indexOf("function pbpPinboardAccountFromToken",a);
+  let writes=0;
+  const current=new Function("pbpReadSettingsWithSecrets","persistSettings","navigator",source.slice(a,b)+";return pbpPersonalLibraryAccount;")(
+    async()=>({...stored}),async patch=>{Object.assign(stored,patch);writes++;return {ok:true};},{locks:{request:async(_key,run)=>run()}});
+  return {current,writes:()=>writes};
+}
+test("personal library adopts legacy data once and survives all bookmark switches and logout",async()=>{
+  const stored={pinboardToken:"alice:key"};const h=await personalHarness(stored);equal(await h.current(),"alice");
+  for(const bookmarkService of ["karakeep","linkding","pinboard"]){Object.assign(stored,{bookmarkService,pinboardToken:"bob:key"});equal(await h.current(),"alice");}
+  stored.pinboardToken="";equal(await h.current(),"alice");equal(h.writes(),1);
+});
+test("personal library and read-only backup work with no bookmark account",async()=>{
+  const stored={};const h=await personalHarness(stored);equal(await h.current({initialize:false}),"personal:default");equal(h.writes(),0);
+  equal(await h.current(),"personal:default");stored.pinboardToken="new-user:key";equal(await h.current(),"personal:default");equal(h.writes(),1);
+});
+test("new service tokens follow the existing opt-in backup credential boundary",()=>{
+  for(const key of ["karakeepToken","linkdingToken"])ok(API_KEY_FIELDS.includes(key));
+  const plain=pbpBuildBackupSnapshot({karakeepToken:"hidden",linkdingToken:"hidden"},{});
+  ok(!Object.hasOwn(plain,"karakeepToken"));ok(!Object.hasOwn(plain,"linkdingToken"));
+});
+test("settings-only backup cannot redirect the personal library",async()=>{
+  const source=await(await fetch("../options-backup.js")).text();
+  const fn=new Function(source+";return pbpSanitizeBackupSettings;")();
+  equal(fn({personalLibraryAccount:"another",bookmarkService:"karakeep"},["personalLibraryAccount","bookmarkService"]),{bookmarkService:"karakeep"});
+});
+test("invalid stored library identity fails closed instead of hiding existing records",async()=>{
+  const h=await personalHarness({personalLibraryAccount:"界".repeat(200)});
+  let failed=false;try{await h.current();}catch(_){failed=true;}ok(failed);equal(h.writes(),0);
+});
+test("Karakeep save side effects use actual private status even when the shared default is public",async()=>{
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[201,{...kk,tags:[]}]]);
+  equal((await h.submitSaveIntent({...saveIntent,tags:"",private:false})).status,"saved");
+  equal(h.state.sideEffects[0]?.options.isPrivate,true);
+});
+test("credential removal adopts the legacy library before deleting its token",async()=>{
+  const source=await(await fetch("../shared.js")).text();
+  const start=source.indexOf("async function persistSettings(");const end=source.indexOf("const API_KEY_FIELDS",start);
+  const stored={pinboardToken:"alice:key",optSyncEnabled:false};
+  const area={get:async q=>typeof q==="object"&&!Array.isArray(q)?{...q,...stored}:{...stored},set:async patch=>Object.assign(stored,patch)};
+  const persist=new Function("chrome","pbpReadSecretSyncStateUnlocked","pbpWithSecretStorageLock", "let _settingsStorageCache;"+source.slice(start,end)+";return persistSettings;")({storage:{local:area,sync:area}},async()=>({optSyncEnabled:false,syncApiKeys:false}),run=>run());
+  equal((await persist({pinboardToken:""})).ok,true);
+  equal(await(await personalHarness(stored)).current(),"alice");
+});
+test("popup tag selection preserves native spaces for both self-hosted services",async()=>{
+  const source=await(await fetch("../popup-tags.js")).text();const start=source.indexOf("function addTag(");const end=source.indexOf("function removeTag(",start);
+  for(const service of ["karakeep","linkding","pinboard"]){
+    const tags=[];new Function("settings","currentTags","renderTags",source.slice(start,end)+';addTag("machine learning");')({bookmarkService:service},tags,()=>{});
+    equal(tags,[service==="pinboard"?"machine-learning":"machine learning"]);
+  }
+});
+test("deleted Karakeep read-later list does not block ordinary bookmark lookup",async()=>{
+  let reset;
+  const h=harness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[404,{}]],{readLaterListId:"gone",saveReadLaterList:async id=>reset=id});
+  equal((await h.client.lookup(pageUrl)).id,"bk1");equal(reset,"");equal(h.calls.length,3);
+});
+test("unsafe Karakeep list is retired and an explicit later action creates a private replacement",async()=>{
+  let saved;
+  const privateList={id:"newlist",type:"manual",public:false,hasCollaborators:false,userRole:"owner"};
+  const h=harness("karakeep",[[200,{...privateList,id:"oldlist",public:true}],[200,{lists:[]}],[201,privateList],[204,null]],{readLaterListId:"oldlist",saveReadLaterList:async id=>saved=id});
+  await h.client.setReadLater({id:"bk1"},true);equal(saved,"newlist");equal(h.calls.at(-1).url,"https://bookmarks.example/base/api/v1/lists/newlist/bookmarks/bk1");
+  ok(!h.calls.some(c=>c.method!=="GET"&&c.url.includes("oldlist")));
+});
+test("empty-library backup restoration adopts only an explicitly selected data owner",async()=>{
+  const source=await(await fetch("../options-backup.js")).text();
+  const adopt=new Function(source+";return pbpBackupLibraryIdentity;")();
+  let owner="personal:default",writes=0;
+  const prepared={vocabulary:{owner:"alice",records:[]},highlightsOwner:"alice"};
+  const deps={readOwner:async()=>owner,isEmpty:async()=>true,persist:async patch=>{owner=patch.personalLibraryAccount;writes++;return {ok:true};}};
+  equal(await adopt(prepared,{vocabulary:true},deps),"alice");equal(writes,0);
+  equal(await adopt(prepared,{settings:true},{...deps,apply:true}),"");equal(writes,0);
+  equal(await adopt(prepared,{vocabulary:true},{...deps,isEmpty:async()=>false,apply:true}),"");equal(writes,0);
+  equal(await adopt(prepared,{vocabulary:true},{...deps,apply:true}),"alice");equal(owner,"alice");equal(writes,1);
+  equal(await adopt({vocabulary:{owner:"bob",records:[]}},{vocabulary:true},{...deps,apply:true}),"");equal(writes,1);
+});
+test("blank legacy Karakeep tags do not discard the whole tag list",async()=>{
+  const h=harness("karakeep",[[200,{tags:[{id:"empty",name:""},{id:"valid",name:"work"}],nextCursor:null}]]);
+  equal(await h.client.tags(),["work"]);
+});
+test("editing a bookmark preserves an attached blank legacy tag without displaying it",async()=>{
+  const record=pbpBookmarkNormalize("karakeep",{...kk,tags:[{id:"empty",name:""},...kk.tags]});
+  equal(record.tags,["work"]);
+  const h=harness("karakeep",[[200,{id:"bk1"}]]);
+  const result=await h.client.save({url:pageUrl,title:"Edited",notes:"Note",tags:["work"],toread:false},record);
+  equal(result.status,"saved");equal(h.calls.length,1);equal(h.calls[0].method,"PATCH");
+});
+test("Karakeep tags follow opaque pagination cursors",async()=>{
+  const h=harness("karakeep",[[200,{tags:[{id:"t1",name:"first"}],nextCursor:"opaque +/"}],[200,{tags:[{id:"t2",name:"second"}],nextCursor:null}]]);
+  equal(await h.client.tags(),["first","second"]);ok(h.calls[1].url.endsWith("cursor=opaque%20%2B%2F"));
+});
+(async()=>{let pass=0,fail=0;for(const item of cases){const row=document.createElement("div");try{await item.run();row.className="pass";row.textContent="PASS "+item.name;pass++;}catch(e){row.className="fail";row.textContent="FAIL "+item.name+": "+e.message;fail++;}document.getElementById("results").appendChild(row);}document.getElementById("summary").textContent=`${pass} passed, ${fail} failed`;})();
+</script></body></html>

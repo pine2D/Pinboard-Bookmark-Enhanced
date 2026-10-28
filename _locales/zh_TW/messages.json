@@ -3,13 +3,13 @@
     "message": "Pinboard 書籤強化"
   },
   "extDescription": {
-    "message": "一鍵儲存到 Pinboard：AI 標籤與摘要、內建閱讀器（全文翻譯、標記）、Markdown/EPUB 匯出、13 套網站主題。"
+    "message": "儲存至 Pinboard、Karakeep 或 linkding，支援 AI 標籤與摘要、翻譯和劃重點閱讀器，以及 Markdown/EPUB 匯出。"
   },
   "cmdOpenPopup": {
     "message": "開啟 Pinboard 書籤強化"
   },
   "cmdQuickSave": {
-    "message": "快速儲存到 Pinboard（無彈出式視窗）"
+    "message": "快速儲存至所選書籤服務（不開啟彈出視窗）"
   },
   "cmdReadLater": {
     "message": "快速儲存為稍後閱讀（無彈出式視窗）"
@@ -162,7 +162,7 @@
     "message": "AI 標籤"
   },
   "urlWarning": {
-    "message": "此頁面無法儲存到 Pinboard（不支援的網址類型）。下方的分頁集和批次儲存仍可使用。"
+    "message": "此頁面的網址類型不受支援，無法儲存為書籤。"
   },
   "urlCannotSave": {
     "message": "無法儲存：不支援的網址類型"
@@ -550,7 +550,7 @@
     }
   },
   "batchAccountChanged": {
-    "message": "Pinboard 帳號已切換，批次儲存已停止。"
+    "message": "批次儲存已停止：書籤連線已變更。"
   },
   "tabSetFailed": {
     "message": "分頁集儲存失敗：$ERROR$",
@@ -598,19 +598,19 @@
     }
   },
   "saveQueuedNetwork": {
-    "message": "連不上 Pinboard，請檢查網路。書籤已排入佇列，稍後會自動重試。"
+    "message": "無法連線至書籤伺服器。已加入離線佇列，稍後自動重試。"
   },
   "saveQueuedServer": {
-    "message": "Pinboard 暫時無法處理請求。書籤已排入佇列，稍後會自動重試。"
+    "message": "書籤伺服器暫時無法使用。已加入佇列，稍後自動重試。"
   },
   "offlineRetry": {
     "message": "立即重試"
   },
   "offlineRetryWrongAccount": {
-    "message": "這筆書籤是在另一個 Pinboard 帳號下加入佇列的，登入該帳號後才能傳送。"
+    "message": "此工作屬於另一個書籤連線。請恢復原連線，或檢查頁面後重新儲存。"
   },
   "offlineRetryAccountChanged": {
-    "message": "重試期間 Pinboard 帳號已切換，已停止傳送。"
+    "message": "重試期間書籤連線已變更，操作已停止。"
   },
   "offlineRetryFailed": {
     "message": "傳送這個書籤失敗，請再試一次。",
@@ -673,34 +673,34 @@
     "message": "刪除此書籤"
   },
   "bgNotLoggedIn": {
-    "message": "Pinboard：未登入"
+    "message": "尚未連線至書籤服務"
   },
   "bgSetToken": {
-    "message": "請先在擴充功能設定中配置 API Token。"
+    "message": "請在擴充功能設定中選擇並連線至書籤服務。"
   },
   "bgUndone": {
-    "message": "Pinboard：已撤銷"
+    "message": "已撤銷"
   },
   "bgUndoFailed": {
-    "message": "Pinboard：撤銷失敗"
+    "message": "撤銷失敗"
   },
   "bgBookmarkRemoved": {
     "message": "書籤已移除。"
   },
   "bgQuickSaved": {
-    "message": "Pinboard：快速儲存"
+    "message": "快速儲存"
   },
   "bgReadLater": {
-    "message": "Pinboard：稍後閱讀"
+    "message": "稍後閱讀"
   },
   "bgCannotSave": {
-    "message": "Pinboard：無法儲存"
+    "message": "無法儲存"
   },
   "bgCannotBookmark": {
     "message": "只能儲存 http 或 https 網頁。"
   },
   "bgMdPreviewFailed": {
-    "message": "Pinboard：無法轉換為 Markdown"
+    "message": "無法轉換為 Markdown"
   },
   "bgMdPreviewNoContent": {
     "message": "未能從此頁面擷取到可讀內容。"
@@ -831,19 +831,19 @@
     "message": "請先在此瀏覽器中登入 pinboard.in，然後重試。"
   },
   "bgQuickSaveFailed": {
-    "message": "Pinboard：快速儲存失敗"
+    "message": "快速儲存失敗"
   },
   "bgReadLaterFailed": {
-    "message": "Pinboard：稍後閱讀儲存失敗"
+    "message": "稍後閱讀儲存失敗"
   },
   "bgSaveFailed": {
-    "message": "Pinboard：儲存失敗"
+    "message": "儲存失敗"
   },
   "bgNetworkError": {
-    "message": "Pinboard：網路錯誤"
+    "message": "網路錯誤"
   },
   "bgQueuedOffline": {
-    "message": "Pinboard：已加入離線佇列"
+    "message": "已加入離線佇列"
   },
   "bgTitleSaved": {
     "message": "「$TITLE$」已儲存。",
@@ -870,10 +870,10 @@
     }
   },
   "bgBatchSaved": {
-    "message": "Pinboard：批次儲存完成"
+    "message": "批次儲存完成"
   },
   "bgBatchCancelled": {
-    "message": "Pinboard：批次儲存已取消"
+    "message": "批次儲存已取消"
   },
   "bgUndo": {
     "message": "撤銷"
@@ -930,7 +930,7 @@
     "message": "沒有符合篩選條件的筆記。"
   },
   "notesHiddenByOwner": {
-    "message": "這台裝置上保存的部分標記屬於其他 Pinboard 帳號，目前帳號看不到。"
+    "message": "部分標記屬於其他歷史資料庫，尚未合併至目前的個人資料庫。"
   },
   "notesUnknownPage": {
     "message": "未知頁面"
@@ -1095,7 +1095,7 @@
     "message": "預熱（背景每 15 分鐘更新，開啟即用）"
   },
   "tagSyncHint": {
-    "message": "控制如何從 Pinboard 取得你已有的標籤雲用於自動完成。僅讀取，不會向 Pinboard 上傳任何標籤。"
+    "message": "選擇何時載入既有標籤以供自動補全。載入不會修改伺服器上的標籤。"
   },
   "labelTagPresets": {
     "message": "標籤預設"
@@ -1134,13 +1134,13 @@
     "message": "在備份中包含生詞"
   },
   "backupIncludeVocabularyHint": {
-    "message": "只包含目前 Pinboard 帳號的生詞。"
+    "message": "只包含個人資料庫的生詞。"
   },
   "backupIncludeSecretsLabel": {
     "message": "在備份中包含 API Key 和 Token"
   },
   "backupIncludeSecretsHint": {
-    "message": "會把全部憑證以明文寫進檔案：Pinboard API Token、所有 AI 服務商的 API Key，以及 Jina、Wayback、Anki、歐路詞典、Notion、Gist 和 Webhook 的憑證。任何人開啟檔案都能直接使用。請按保管密碼的方式保管這個檔案。"
+    "message": "會把全部憑證以明文寫進檔案：Pinboard/Karakeep/linkding API Token、所有 AI 服務商的 API Key，以及 Jina、Wayback、Anki、歐路詞典、Notion、Gist 和 Webhook 的憑證。任何人開啟檔案都能直接使用。請按保管密碼的方式保管這個檔案。"
   },
   "backupSecretsExportTitle": {"message": "要匯出包含憑證的備份嗎？"},
   "backupSecretsExportConfirm": {
@@ -1162,13 +1162,13 @@
     "message": "此備份含明文憑證。只在你確認檔案來源可靠時才匯入。"
   },
   "backupVocabOwnerMissing": {
-    "message": "目前沒有可用的 Pinboard 帳號，因此未包含生詞。其他已選資料仍已匯出。"
+    "message": "目前沒有可用的 個人資料庫，因此未包含生詞。其他已選資料仍已匯出。"
   },
   "backupHighlightsOwnerMissing": {
-    "message": "目前沒有可用的 Pinboard 帳號，因此未包含歸屬帳號的標記與筆記。其他已選資料仍已匯出。"
+    "message": "目前沒有可用的 個人資料庫，因此未包含歸屬帳號的標記與筆記。其他已選資料仍已匯出。"
   },
   "backupHighlightsVocabOwnerMissing": {
-    "message": "目前沒有可用的 Pinboard 帳號，因此未包含生詞和歸屬帳號的標記與筆記。其他已選資料仍已匯出。"
+    "message": "目前沒有可用的 個人資料庫，因此未包含生詞和歸屬帳號的標記與筆記。其他已選資料仍已匯出。"
   },
   "backupPreviewTitle": {
     "message": "匯入預覽"
@@ -1200,7 +1200,7 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "backupPreviewHighlights": {
-    "message": "頁面：$PAGES$；記錄：$ITEMS$；Pinboard 帳號：$OWNER$",
+    "message": "頁面：$PAGES$；記錄：$ITEMS$；個人資料庫：$OWNER$",
     "placeholders": {
       "pages": { "content": "$1" },
       "items": { "content": "$2" },
@@ -1208,7 +1208,7 @@
     }
   },
   "backupPreviewVocabulary": {
-    "message": "生詞記錄：$COUNT$；Pinboard 帳號：$OWNER$",
+    "message": "生詞記錄：$COUNT$；個人資料庫：$OWNER$",
     "placeholders": {
       "count": { "content": "$1" },
       "owner": { "content": "$2" }
@@ -1224,10 +1224,10 @@
     "message": "無"
   },
   "backupPreviewOwnerMismatch": {
-    "message": "此備份屬於另一個 Pinboard 帳號，無法匯入其中的生詞。"
+    "message": "此備份屬於另一個 個人資料庫，無法匯入其中的生詞。"
   },
   "backupPreviewHighlightOwnerMismatch": {
-    "message": "此備份屬於另一個 Pinboard 帳號，無法匯入其中的標記與筆記。"
+    "message": "此備份屬於另一個 個人資料庫，無法匯入其中的標記與筆記。"
   },
   "backupPreviewReady": {
     "message": "匯入預覽已準備就緒。"
@@ -3411,7 +3411,7 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "連線後，同步目前 Pinboard 帳號的生詞、標記與筆記、完整 AI 詞條及補充，以及已儲存的問答和引用。"
+      "message": "連線後，同步個人資料庫的生詞、標記與筆記、完整 AI 詞條及補充，以及已儲存的問答和引用。"
     },
     "vocabDriveConnectionHint": { "message": "每部裝置需個別連線。Google Drive 不同步設定或憑證。" },
     "vocabDriveDisclosure": {
@@ -3448,7 +3448,7 @@
       "message": "Google 帳號"
     },
     "vocabDriveOwnerLabel": {
-      "message": "Pinboard 帳號"
+      "message": "個人資料庫"
     },
     "vocabDriveNever": {
       "message": "尚未同步"
@@ -3481,10 +3481,10 @@
       "message": "暫時無法取得 Google 授權。"
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "尚未登入 Pinboard 帳號。請在「帳號 → Pinboard 帳號」中填入 API Token，然後重新連線。"
+      "message": "個人資料庫目前無法使用，請重新開啟此頁面後再試。"
     },
     "vocabDriveErrorPinboardAuthSync": {
-      "message": "尚未登入 Pinboard 帳號。請在「帳號 → Pinboard 帳號」中填入 API Token，然後點選「立即同步」。"
+      "message": "個人資料庫目前無法使用，請重新開啟此頁面，再點選「立即同步」。"
     },
     "vocabDriveErrorPermission": {
       "message": "缺少 Google Drive 權限。"
@@ -3508,7 +3508,7 @@
       "message": "同步時發生未預期的錯誤。"
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "同步期間 Google 帳號或 Pinboard 帳號已變更，請重試。"
+      "message": "同步期間 Google 帳號或個人資料庫已變更，請重試。"
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "有一筆生詞或其上下文內容過大，無法同步。請縮短或刪除該筆內容，再按一下「立即同步」。"
@@ -3531,16 +3531,16 @@
       "message": "匯出與整合"
     },
     "vocabOwnerNoAccount": {
-      "message": "尚未登入 Pinboard"
+      "message": "個人資料庫目前無法使用，請重新開啟此頁面後再試。"
     },
     "vocabLoadFailed": {
-      "message": "無法載入目前 Pinboard 帳號的生詞。請重新開啟「生詞」後再試。"
+      "message": "無法載入個人資料庫的生詞。請重新開啟「生詞」後再試。"
     },
     "vocabExportFailed": {
       "message": "無法匯出生詞，請重試。"
     },
     "vocabAccountChanged": {
-      "message": "操作完成前 Pinboard 帳號已切換，請重試。"
+      "message": "操作完成前個人資料庫已切換，請重試。"
     },
     "vocabSettingsSaveFailed": {
       "message": "無法儲存剛才修改的整合設定。請檢查設定後再試。"
@@ -3552,7 +3552,7 @@
       "message": "Cmd+點擊條目即可選取，Shift+點擊可選取連續多筆"
     },
     "vocabResultCount": {
-      "message": "找到 $RESULTS$ 筆；目前 Pinboard 帳號（$OWNER$）共儲存 $TOTAL$ 筆",
+      "message": "$OWNER$：找到 $RESULTS$ 筆，共儲存 $TOTAL$ 筆",
       "placeholders": {
         "results": {
           "content": "$1"
@@ -3863,7 +3863,7 @@
     "message": "在設定中設定 AI 服務商並開啟閱讀器 AI 後，即可產生詞條。"
   },
   "dictVocabEmpty": {
-    "message": "目前 Pinboard 帳號（$OWNER$）還沒有生詞。可從閱讀器的詞典檢視儲存單字。",
+    "message": "個人資料庫（$OWNER$）還沒有生詞。可從閱讀器的詞典檢視儲存單字。",
     "placeholders": {
       "owner": {
         "content": "$1"
@@ -4279,7 +4279,7 @@
   "diagnosticsCopied": { "message": "已複製診斷資訊" },
   "diagnosticsCopyFailed": { "message": "無法複製診斷資訊，請檢查剪貼簿權限後再試一次。" },
   "libraryVocabSignedOutTitle": { "message": "登入後使用生詞本" },
-  "libraryVocabSignedOutHint": { "message": "生字會依 Pinboard 帳號分開儲存；未登入時仍可使用字典查詢。" },
+  "libraryVocabSignedOutHint": { "message": "所有書籤服務共用個人資料庫中的生詞、螢光標記、筆記與 Ask 歷史。" },
   "libraryVocabOpenSettings": { "message": "開啟帳號設定" },
   "libraryLookupSignedOutHint": { "message": "可在「詞典」欄查詢單字；登入後即可儲存到生詞本。" },
   "mdPreviewClose": { "message": "關閉閱讀器" },
@@ -4383,7 +4383,7 @@
   "loginNeedsPaid": { "message": "需要付費的 Pinboard 帳號。" },
   "popupDraftDiscard": { "message": "捨棄草稿" },
   "readerBookmarkSection": {"message": "儲存"},
-  "readerBookmarkSave": {"message": "儲存到 Pinboard"},
+  "readerBookmarkSave": {"message": "儲存書籤"},
   "readerBookmarkSaved": {"message": "已儲存"},
   "readerBookmarkLater": {"message": "稍後閱讀"},
   "readerBookmarkMarkRead": {"message": "標為已讀"},
@@ -4391,7 +4391,7 @@
   "readerBookmarkChecking": {"message": "正在檢查書籤…"},
   "readerBookmarkSaving": {"message": "正在儲存…"},
   "readerBookmarkUpdated": {"message": "書籤已更新"},
-  "readerBookmarkQueued": {"message": "已加入離線佇列，尚未儲存到 Pinboard"},
+  "readerBookmarkQueued": {"message": "已加入離線佇列，尚未儲存至書籤服務"},
   "readerBookmarkLookupFailed": {"message": "無法檢查書籤，請重試後再編輯。"},
   "readerBookmarkFailed": {"message": "儲存失敗，請重試。"},
   "readerBookmarkAccountChanged": {"message": "帳號已切換，請重新開啟閱讀器後儲存。"},
@@ -4405,14 +4405,14 @@
     "message": "刪除書籤"
   },
   "readerBookmarkDeleteConfirm": {
-    "message": "要從 Pinboard 刪除此書籤嗎？"
+    "message": "刪除這筆書籤？"
   },
   "readerBookmarkDeleteDetail": {"message": "標記和閱讀筆記會保留。"},
   "readerBookmarkDeleting": {
     "message": "正在刪除書籤…"
   },
   "readerBookmarkDeleted": {
-    "message": "已從 Pinboard 刪除書籤"
+    "message": "書籤已刪除"
   },
   "readerBookmarkDeleteFailed": {
     "message": "無法確認刪除結果，請重試。"
@@ -4686,5 +4686,62 @@
   "dictGenerationServiceUnavailable": {"message": "供應商的服務暫時無法使用，請稍後再試。"},
   "dictProgressThinking": {"message": "模型正在思考…"},
   "dictProgressStreaming": {"message": "正在接收回答…"},
-  "dictProgressElapsed": {"message": "已等待 $SECONDS$ 秒", "placeholders": {"seconds": {"content": "$1"}}}
+  "dictProgressElapsed": {"message": "已等待 $SECONDS$ 秒", "placeholders": {"seconds": {"content": "$1"}}},
+  "bookmarkServiceTitle": {
+    "message": "書籤服務"
+  },
+  "bookmarkServiceChoose": {
+    "message": "選擇書籤儲存位置"
+  },
+  "bookmarkServiceHint": {
+    "message": "彈出視窗、閱讀器、快捷鍵與批次儲存都使用此服務。"
+  },
+  "personalLibraryTitle": {
+    "message": "個人資料庫"
+  },
+  "personalLibraryHint": {
+    "message": "所有書籤服務共用個人資料庫中的生詞、螢光標記、筆記與 Ask 歷史。"
+  },
+  "bookmarkServerUrl": {
+    "message": "伺服器網址"
+  },
+  "bookmarkServerHint": {
+    "message": "填入網站網址，包含部署子路徑。除了本機位址，都必須使用 HTTPS。"
+  },
+  "bookmarkConnectHint": {
+    "message": "網址與權杖會在連線成功後生效。權杖預設儲存在此裝置，只有啟用憑證同步後才會同步。"
+  },
+  "bookmarkConnect": {
+    "message": "連線"
+  },
+  "bookmarkConnecting": {
+    "message": "正在連線…"
+  },
+  "bookmarkConnected": {
+    "message": "已連線"
+  },
+  "bookmarkConnectFailed": {
+    "message": "連線失敗。請檢查伺服器網址、權杖與網站存取權限。"
+  },
+  "bookmarkInvalidConfig": {
+    "message": "請填入有效的伺服器網址與 API 權杖。"
+  },
+  "bookmarkPermissionDenied": {
+    "message": "請在設定中允許存取此伺服器，再重新連線。"
+  },
+  "bookmarkKarakeepHint": {
+    "message": "「稍後閱讀」使用專用私人清單。標記為已讀時只從清單移除，不變更服務中的封存狀態。"
+  },
+  "bookmarkReadLaterListName": {
+    "message": "稍後閱讀"
+  },
+  "bookmarkPartialSave": {
+    "message": "書籤可能已儲存，但部分變更未完成。請開啟編輯，確認後重新儲存。"
+  },
+  "bookmarkServiceSettings": {
+    "message": "選擇書籤服務"
+  },
+  "backupAdoptLibrary": {
+    "message": "個人資料庫是空的。還原生詞或標記時會採用備份所屬的資料庫，以便繼續讀取原有的 Drive 同步資料。"
+  }
 }

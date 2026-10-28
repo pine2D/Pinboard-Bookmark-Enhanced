@@ -80,8 +80,18 @@
     <!-- Tab 1: General -->
     <div id="panel-general" class="panel active" role="tabpanel" aria-labelledby="tab-general">
       <section class="settings-section">
-        <h2 class="section-title" data-i18n="secPinboardAccount">Pinboard Account</h2>
+        <h2 class="section-title" data-i18n="bookmarkServiceTitle">Bookmark service</h2>
         <div class="fg entry-block">
+          <div class="bl" id="bookmark-service-label" data-i18n="bookmarkServiceChoose">Choose where to save bookmarks</div>
+          <div class="pref-group pref-group-radio" role="radiogroup" aria-labelledby="bookmark-service-label">
+            <div class="pref-row"><label class="pick"><input type="radio" name="bookmark-service" value="pinboard" /> <span class="pick-text">Pinboard</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="bookmark-service" value="karakeep" /> <span class="pick-text">Karakeep</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="bookmark-service" value="linkding" /> <span class="pick-text">linkding</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+          </div>
+          <p class="hint" data-i18n="bookmarkServiceHint">Saving from the popup, reader, shortcuts and batch actions uses this service.</p>
+          <p class="hint" data-i18n="personalLibraryHint">Vocabulary, highlights, notes and Ask history share one personal library across all bookmark services.</p>
+        </div>
+        <div class="fg entry-block" id="bookmark-pinboard-fields">
           <label class="bl" for="opt-pinboard-token" data-i18n="labelApiToken">API Token</label>
           <span class="key-wrap"><input type="password" id="opt-pinboard-token" placeholder="username:XXXXXXXXXXXXXX" data-i18n-placeholder="loginTokenPlaceholder" autocomplete="off" spellcheck="false" />
           <button type="button" class="key-toggle" data-target="opt-pinboard-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
@@ -91,6 +101,41 @@
           <div class="fg-actions">
             <button class="btn btn-sm" id="test-pinboard-token" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-pinboard-status" role="status" aria-live="polite"></span>
+          </div>
+        </div>
+        <div id="bookmark-karakeep-fields" hidden>
+          <div class="fg entry-block">
+            <label class="bl" for="opt-karakeep-url" data-i18n="bookmarkServerUrl">Server URL</label>
+            <input type="text" inputmode="url" id="opt-karakeep-url" placeholder="https://bookmarks.example.com/" autocomplete="off" spellcheck="false" />
+            <p class="hint" data-i18n="bookmarkServerHint">Use the site URL, including any subpath. HTTPS is required except on localhost.</p>
+          </div>
+          <div class="fg entry-block">
+            <label class="bl" for="opt-karakeep-token" data-i18n="labelApiToken">API Token</label>
+            <span class="key-wrap"><input type="password" id="opt-karakeep-token" autocomplete="off" spellcheck="false" />
+            <button type="button" class="key-toggle" data-target="opt-karakeep-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+            <p class="hint" data-i18n="bookmarkConnectHint">URL and token changes take effect after connecting. Tokens stay on this device unless credential sync is enabled.</p>
+            <div class="fg-actions">
+              <button type="button" class="btn btn-sm" id="connect-karakeep" data-i18n="bookmarkConnect">Connect</button>
+              <span class="save-status" id="connect-karakeep-status" role="status" aria-live="polite"></span>
+            </div>
+          </div>
+          <p class="hint" data-i18n="bookmarkKarakeepHint">Read Later uses a dedicated private list. Marking a bookmark as read removes it from that list. Archiving in the service is unchanged.</p>
+        </div>
+        <div id="bookmark-linkding-fields" hidden>
+          <div class="fg entry-block">
+            <label class="bl" for="opt-linkding-url" data-i18n="bookmarkServerUrl">Server URL</label>
+            <input type="text" inputmode="url" id="opt-linkding-url" placeholder="https://bookmarks.example.com/" autocomplete="off" spellcheck="false" />
+            <p class="hint" data-i18n="bookmarkServerHint">Use the site URL, including any subpath. HTTPS is required except on localhost.</p>
+          </div>
+          <div class="fg entry-block">
+            <label class="bl" for="opt-linkding-token" data-i18n="labelApiToken">API Token</label>
+            <span class="key-wrap"><input type="password" id="opt-linkding-token" autocomplete="off" spellcheck="false" />
+            <button type="button" class="key-toggle" data-target="opt-linkding-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+            <p class="hint" data-i18n="bookmarkConnectHint">URL and token changes take effect after connecting. Tokens stay on this device unless credential sync is enabled.</p>
+            <div class="fg-actions">
+              <button type="button" class="btn btn-sm" id="connect-linkding" data-i18n="bookmarkConnect">Connect</button>
+              <span class="save-status" id="connect-linkding-status" role="status" aria-live="polite"></span>
+            </div>
           </div>
         </div>
         <!-- First-run follow-up, shown by renderConnectionOverview while the

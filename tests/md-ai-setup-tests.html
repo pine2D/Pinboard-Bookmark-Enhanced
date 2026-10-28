@@ -25,12 +25,9 @@ hasAIKey = s => !!s.customApiKey;
 pbpSettingsAreaName = async () => flags.optSyncEnabled ? "sync" : "local";
 pbpReadSecretSyncState = async () => ({...flags});
 pbpReadSettingsWithSecrets = async query => {
-  if (Object.keys(query).length === 1 && "pinboardToken" in query) {
-    if (ownerReads.length) return ownerReads.shift().promise;
-    return {pinboardToken:owner ? owner + ":fixture" : ""};
-  }
   return {...query,...settings};
 };
+pbpPersonalLibraryAccount = async () => ownerReads.length ? (await ownerReads.shift().promise).personalLibraryAccount : owner;
 deobfuscateSettings = s => s;
 pbpOpenOptionsTab = section => {navigation=section;};
 window.callAIStream = async () => {paidCalls++;throw new Error("setup must never generate");};
@@ -82,7 +79,7 @@ async function test(name, fn) {
     const read=deferred();ownerReads.push(read);settings.customApiKey="fixture-key";
     const first=changed({customApiKey:{newValue:"fixture-key"}});await settle();
     settings.customModel="second";await changed({customModel:{newValue:"second"}});
-    read.resolve({pinboardToken:"alice:fixture"});await first;
+    read.resolve({personalLibraryAccount:"alice"});await first;
     assert(calls.join(",")==="translate:alice,ask:alice","superseded refresh lost or duplicated controls");
   });
   await test("live settings refresh updates Explain without duplicating listeners",async()=>{
@@ -105,28 +102,28 @@ async function test(name, fn) {
     const read=deferred();ownerReads.push(read);settings.customApiKey="fixture-key";
     const first=changed({customApiKey:{newValue:"fixture-key"}});await settle();
     owner="bob";document.dispatchEvent(new CustomEvent("pbp:account-changed",{detail:{account:"bob"}}));await settle();
-    read.resolve({pinboardToken:"alice:fixture"});await first;
+    read.resolve({personalLibraryAccount:"alice"});await first;
     assert(calls.join(",")==="translate:bob,ask:bob","late read resurrected old owner");
   });
   await test("foreign sync settings cannot supersede local initialization",async()=>{
     const read=deferred();ownerReads.push(read);settings.customApiKey="fixture-key";
     const first=changed({customApiKey:{newValue:"fixture-key"}});await settle();
     await changed({customModel:{newValue:"foreign"}},"sync");
-    read.resolve({pinboardToken:"alice:fixture"});await first;
+    read.resolve({personalLibraryAccount:"alice"});await first;
     assert(calls.join(",")==="translate:alice,ask:alice","foreign area canceled local initialization");
   });
   await test("sync main plus local secrets are both consumed",async()=>{
     flags={optSyncEnabled:true,syncApiKeys:false};settings.customApiKey="fixture-key";
     const read=deferred();ownerReads.push(read);const first=changed({customApiKey:{newValue:"fixture-key"}},"local");await settle();
     settings.customModel="sync-model";await changed({customModel:{newValue:"sync-model"}},"sync");
-    read.resolve({pinboardToken:"alice:fixture"});await first;
+    read.resolve({personalLibraryAccount:"alice"});await first;
     assert(calls.join(",")==="translate:alice,ask:alice" && _pbpExplainSettings.customModel==="sync-model","split routing lost latest settings");
   });
   await test("cloud secrets are ignored while secrets route locally",async()=>{
     flags={optSyncEnabled:true,syncApiKeys:false};settings.customApiKey="fixture-key";
     const read=deferred();ownerReads.push(read);const first=changed({customApiKey:{newValue:"fixture-key"}},"local");await settle();
     await changed({customApiKey:{newValue:"foreign"}},"sync");
-    read.resolve({pinboardToken:"alice:fixture"});await first;
+    read.resolve({personalLibraryAccount:"alice"});await first;
     assert(calls.join(",")==="translate:alice,ask:alice","cloud secret superseded local initialization");
   });
   await test("master off neither configures nor enables selection AI",async()=>{

@@ -332,7 +332,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 if (typeof chrome !== "undefined") {
   chrome.storage?.onChanged?.addListener(changes => {
-    if (!changes.pinboardToken && !changes.optSyncEnabled && !changes.syncApiKeys) return;
+    if (!changes.personalLibraryAccount && !changes.optSyncEnabled && !changes.syncApiKeys) return;
     _libAskRevision++; _libAskLoad++; _libAskOwner = null; _libAskRestoreOwner = null; _libAskSessions = []; _libAskSelected = "";
     document.body.classList.remove("lib-narrow-ask");
     _pbpLibAskRenderList(); _pbpLibAskRenderDetail(); pbpLibAskRefresh();

@@ -6,7 +6,7 @@
 >
 > **Generated** by `node scripts/sync-store-descriptions.mjs` from the nine READMEs. Edit the
 > READMEs and regenerate; do not hand-edit the blocks below. The leading ⚠ paid-account
-> disclosure is the wording a CWS review already accepted and is carried across regenerations
+> disclosure states that Pinboard requires a paid account, while the other services do not; it is carried across regenerations
 > untouched.
 
 ---
@@ -14,7 +14,7 @@
 ## English (en)
 
 ```text
-⚠ Requires a Pinboard.in account — Pinboard (pinboard.in) is an independent, PAID bookmarking service. This extension is a third-party client that connects to your existing Pinboard account with your own Pinboard API token. It is not affiliated with, sponsored by, or endorsed by Pinboard. You must already have (or sign up for) a paid Pinboard.in account to use this extension. AI features are optional and use an API key you supply for the LLM provider of your choice.
+⚠ Choose one bookmark service in Settings. Karakeep and linkding work without a Pinboard account. Pinboard is an independent paid service and requires your own account and API token. This third-party extension is not affiliated with, sponsored by, or endorsed by Pinboard. AI features are optional and use an API key you supply for the LLM provider of your choice.
 
 # Save
 - One click, everything filled in: title, description, and selected text, with tracking parameters stripped from the URL
@@ -30,7 +30,7 @@
 # Read
 - Any page becomes a clean reader: a Markdown view with table of contents, search, and footnote peek; math, diagrams, and tables render properly
 - GitHub Discussions (pilot): keeps the loaded main post, comments, reply structure, and which reply was accepted; shows how much was loaded
-- Manage bookmarks as you read: save, edit, or delete the article’s Pinboard bookmark without returning to the popup
+- Manage bookmarks as you read: save, edit, or delete the article’s bookmark without returning to the popup
 - Five-color highlights with notes: they stay in place through translation and even later edits to the page
 - Translate the page or ask it questions: full-page translation with a bilingual view; answers cite the source and jump straight to it
 - Keep questions and answers with their citations: completed answers save automatically and sync through Google Drive. Browse conversations in the library, continue in the reader, or export them alone or with the article. Temporary conversations stay unsaved.
@@ -55,7 +55,7 @@
 ## 简体中文 (zh-CN)
 
 ```text
-⚠ 需要 Pinboard.in 账号 —— Pinboard（pinboard.in）是一项独立的付费书签服务。本扩展是第三方客户端，使用你自己的 Pinboard API Token 连接到你已有的 Pinboard 账号。本项目与 Pinboard 官方无关，未获其赞助或认可。你必须已经拥有（或注册）一个付费的 Pinboard.in 账号才能使用本扩展。AI 功能是可选的，需要你自备所选 LLM 服务商的 API Key。
+⚠ 在设置中选择一种书签服务。使用 Karakeep 或 linkding 无需 Pinboard 账号。Pinboard 是独立的付费服务，使用时需自备账号和 API Token。本扩展是第三方客户端，与 Pinboard 官方无关，未获其赞助或认可。 AI 功能是可选的，需要你自备所选 LLM 服务商的 API Key。
 
 # 保存
 - 一键保存，信息自动填好：标题、描述和选中文本一并填入，并去掉 URL 里的追踪参数
@@ -71,7 +71,7 @@
 # 阅读
 - 网页变成清爽的阅读器：Markdown 视图，带目录、搜索和脚注速览；公式、图表、表格都正常显示
 - GitHub Discussions（试点）：保留已加载的主帖、评论、回复关系和采纳标记，并说明提取范围
-- 阅读时管理书签：在阅读器里保存、编辑或删除 Pinboard 书签，不用切回弹窗
+- 阅读时管理书签：在阅读器里保存、编辑或删除书签，不用切回弹窗
 - 五色高亮与笔记：切换翻译、原文改动后仍留在原处
 - 整页翻译，或向文章提问：双语对照；回答附引用，点击直达原文出处
 - 问答连同引用一起留存：完成后自动保存，连接 Google Drive 后同步；可在问答页查看历史、回阅读器继续提问，或单独导出、附在正文后。临时对话不保存。
@@ -96,7 +96,7 @@
 ## 繁體中文 (zh-TW)
 
 ```text
-⚠ 需要 Pinboard.in 帳號 —— Pinboard (pinboard.in) 是一項獨立的付費書籤服務。本擴充功能是第三方用戶端，使用你自己的 Pinboard API token 連接到你既有的 Pinboard 帳號。本專案與 Pinboard 無任何隸屬、贊助或背書關係。你必須已擁有（或註冊）付費的 Pinboard.in 帳號才能使用本擴充功能。AI 功能為選用，並使用你自行提供、你所選 LLM 服務商的 API key。
+⚠ 在設定中選擇一種書籤服務。使用 Karakeep 或 linkding 不需要 Pinboard 帳號。Pinboard 是獨立的付費服務，使用時需自備帳號與 API Token。本擴充功能是第三方用戶端，與 Pinboard 無隸屬、贊助或背書關係。 AI 功能為選用，並使用你自行提供、你所選 LLM 服務商的 API key。
 
 # 儲存
 - 一鍵儲存，資料自動填妥：標題、描述與選取文字一併填入，並移除 URL 裡的追蹤參數
@@ -112,7 +112,7 @@
 # 閱讀
 - 網頁變成清爽的閱讀器：Markdown 檢視，內建目錄、搜尋與註腳速覽；數學式、圖表與表格都正確呈現
 - GitHub Discussions（試行）：保留已載入的主文、留言、回覆層級與採納標記，並註明擷取範圍
-- 閱讀時管理書籤：在閱讀器裡儲存、編輯或刪除 Pinboard 書籤，不用切回彈出視窗
+- 閱讀時管理書籤：在閱讀器裡儲存、編輯或刪除書籤，不用切回彈出視窗
 - 五色劃重點與筆記：切換翻譯、原文改動後仍留在原處
 - 整頁翻譯，或向文章提問：雙語對照；回答附引用，一按即跳回原文出處
 - 問答與引用一起留存：完成後自動儲存，連線 Google Drive 後同步；可在問答頁查看歷史、回閱讀器繼續提問，或單獨匯出、附在正文後。臨時對話不儲存。
@@ -137,7 +137,7 @@
 ## 繁體中文（香港） (zh-HK)
 
 ```text
-⚠ 需要 Pinboard.in 帳號 —— Pinboard (pinboard.in) 係一項獨立、付費嘅書籤服務。本擴充功能係第三方客戶端，會用你自己嘅 Pinboard API token 連接你現有嘅 Pinboard 帳號。本專案與 Pinboard 無任何隸屬、贊助或認可關係。你必須已經擁有（或註冊）一個付費 Pinboard.in 帳號先可以使用本擴充功能。AI 功能係可選嘅，會使用你為自選 LLM 服務商提供嘅 API key。
+⚠ 在設定選擇一種書籤服務。使用 Karakeep 或 linkding 無需 Pinboard 帳號。Pinboard 是獨立的付費服務，使用時需自備帳號及 API Token。本擴充功能是第三方客戶端，與 Pinboard 沒有隸屬、贊助或認可關係。 AI 功能係可選嘅，會使用你為自選 LLM 服務商提供嘅 API key。
 
 # 儲存
 - 一鍵儲存，資料自動填好：標題、描述與選取文字一併填入，並移除 URL 中的追蹤參數
@@ -153,7 +153,7 @@
 # 閱讀
 - 網頁變成清爽的閱讀器：Markdown 檢視，附目錄、搜尋與註腳速覽；數學公式、圖表與表格都正常顯示
 - GitHub Discussions（試行）：保留已載入的主帖、留言、回覆關係及獲採納的答案，並說明擷取範圍
-- 閱讀時管理書籤：在閱讀器內儲存、編輯或刪除 Pinboard 書籤，不用切回彈出視窗
+- 閱讀時管理書籤：在閱讀器內儲存、編輯或刪除書籤，不用切回彈出視窗
 - 五色高亮與筆記：切換翻譯、原文改動後仍留在原處
 - 整頁翻譯，或向文章提問：雙語對照；答案附引註，一按即跳回原文出處
 - 問答連同引用一併保留：完成後自動儲存，連線 Google Drive 後同步；可在問答頁查看記錄、返回閱讀器繼續提問，或獨立匯出、附在正文後。臨時對話不儲存。
@@ -178,7 +178,7 @@
 ## Deutsch (de)
 
 ```text
-⚠ Erfordert ein Pinboard.in-Konto — Pinboard (pinboard.in) ist ein unabhängiger, kostenpflichtiger Lesezeichendienst. Diese Erweiterung ist ein Drittanbieter-Client, der sich mit deinem eigenen Pinboard API token mit deinem bestehenden Pinboard-Konto verbindet. Sie ist nicht mit Pinboard verbunden, wird nicht von Pinboard gesponsert oder unterstützt. Zur Nutzung dieser Erweiterung musst du bereits ein kostenpflichtiges Pinboard.in-Konto besitzen (oder eines anlegen). KI-Funktionen sind optional und nutzen einen API-Key, den du für den LLM-Anbieter deiner Wahl bereitstellst.
+⚠ Wähle deinen Lesezeichendienst in den Einstellungen. Karakeep und linkding funktionieren ohne Pinboard-Konto. Pinboard ist ein unabhängiger, kostenpflichtiger Dienst und erfordert ein eigenes Konto mit API-Token. Diese Erweiterung stammt von einem Drittanbieter und wird von Pinboard weder gesponsert noch unterstützt. KI-Funktionen sind optional und nutzen einen API-Key, den du für den LLM-Anbieter deiner Wahl bereitstellst.
 
 # Speichern
 - Ein Klick, alles ausgefüllt: Titel, Beschreibung und markierter Text werden übernommen, Tracking-Parameter aus der URL entfernt
@@ -194,7 +194,7 @@
 # Lesen
 - Jede Seite wird zur Leseansicht: Markdown-Ansicht mit Inhaltsverzeichnis, Suche und Fußnoten-Vorschau; Formeln, Diagramme und Tabellen werden sauber dargestellt
 - GitHub Discussions (Pilot): übernimmt den geladenen Ausgangsbeitrag und die Kommentare, erhält die Antwortstruktur und markiert die akzeptierte Antwort; zeigt den Umfang der erfassten Inhalte
-- Lesezeichen beim Lesen verwalten: Pinboard-Lesezeichen direkt im Reader speichern, bearbeiten oder löschen, ohne zum Popup zurückzukehren
+- Lesezeichen beim Lesen verwalten: Lesezeichen direkt im Reader speichern, bearbeiten oder löschen, ohne zum Popup zurückzukehren
 - Markieren in fünf Farben, mit Notizen: beide bleiben an ihrer Stelle, auch nach der Übersetzung und späteren Änderungen an der Seite
 - Seite übersetzen oder befragen: Ganzseiten-Übersetzung mit zweisprachiger Ansicht; Antworten zitieren die Quelle, ein Klick führt direkt zur Fundstelle
 - Fragen und Antworten mit Quellen behalten: fertige Antworten werden automatisch gespeichert und über Google Drive synchronisiert. Gespräche in der Bibliothek lesen, im Lesemodus fortsetzen oder einzeln bzw. mit dem Artikel exportieren. Temporäre Gespräche bleiben ungespeichert.
@@ -219,7 +219,7 @@
 ## Français (fr)
 
 ```text
-⚠ Nécessite un compte Pinboard.in — Pinboard (pinboard.in) est un service de signets indépendant et payant. Cette extension est un client tiers qui se connecte à votre compte Pinboard existant à l'aide de votre propre jeton API Pinboard. Elle n'est ni affiliée à Pinboard, ni sponsorisée ou approuvée par Pinboard. Vous devez déjà posséder (ou souscrire à) un compte Pinboard.in payant pour utiliser cette extension. Les fonctionnalités IA sont optionnelles et utilisent une clé API que vous fournissez pour le fournisseur LLM de votre choix.
+⚠ Choisissez votre service de signets dans les paramètres. Karakeep et linkding fonctionnent sans compte Pinboard. Pinboard est un service indépendant payant, qui nécessite votre propre compte et votre jeton API. Cette extension tierce n’est ni affiliée à Pinboard, ni sponsorisée ou approuvée par Pinboard. Les fonctionnalités IA sont optionnelles et utilisent une clé API que vous fournissez pour le fournisseur LLM de votre choix.
 
 # Enregistrer
 - Un clic, tout est rempli : titre, description et texte sélectionné sont repris, les paramètres de suivi retirés de l'URL
@@ -235,7 +235,7 @@
 # Lecture
 - Chaque page passe en mode lecture épuré : vue Markdown avec table des matières, recherche et aperçu des notes de bas de page ; formules, diagrammes et tableaux s'affichent correctement
 - GitHub Discussions (phase pilote) : conserve le message initial et les commentaires chargés, la structure des réponses et la réponse acceptée ; précise le contenu récupéré
-- Gérez vos signets pendant la lecture : enregistrez, modifiez ou supprimez le signet Pinboard de l’article sans revenir au popup
+- Gérez vos signets pendant la lecture : enregistrez, modifiez ou supprimez le signet de l’article sans revenir au popup
 - Surlignage en cinq couleurs, avec notes : les deux restent à leur place après une traduction, et même si la page change ensuite
 - Traduisez la page ou posez-lui vos questions : traduction intégrale avec vue bilingue ; les réponses citent la source et y renvoient d'un clic
 - Conservez les questions et réponses avec leurs citations : les réponses terminées sont enregistrées automatiquement et synchronisées via Google Drive. Retrouvez les conversations dans la bibliothèque, poursuivez-les dans le lecteur ou exportez-les seules ou avec l’article. Les conversations temporaires ne sont pas enregistrées.
@@ -260,7 +260,7 @@
 ## 日本語 (ja)
 
 ```text
-⚠ Pinboard.in アカウントが必要です。Pinboard（pinboard.in）は独立した有料のブックマークサービスです。本拡張機能は、ご自身の Pinboard API token を使って既存の Pinboard アカウントに接続するサードパーティ製クライアントであり、Pinboard との提携・出資・公式の承認は一切ありません。本拡張機能を利用するには、有料の Pinboard.in アカウントを既にお持ちであるか、新たに登録する必要があります。AI 機能は任意で、ご自身が用意したお好みの LLM プロバイダーの API キーを使用します。
+⚠ 設定でブックマークサービスを選択します。Karakeep と linkding は Pinboard アカウントなしで使えます。Pinboard は独立した有料サービスで、自分のアカウントと API トークンが必要です。本拡張機能は第三者製で、Pinboard との提携・出資・公式の承認はありません。 AI 機能は任意で、ご自身が用意したお好みの LLM プロバイダーの API キーを使用します。
 
 # 保存
 - ワンクリック保存：タイトル・説明・選択テキストを自動入力し、URL のトラッキングパラメーターを除去します
@@ -276,7 +276,7 @@
 # リーダー
 - どんなページもすっきりしたリーダーに：目次・検索・脚注プレビュー付きの Markdown 表示。数式・図・表もきちんと表示されます
 - GitHub Discussions（試験対応）：読み込み済みの本文とコメント、返信の階層、採用された回答を保持し、取得した範囲も表示
-- 読みながらブックマークを管理：ポップアップに戻らず、Pinboardのブックマークを保存・編集・削除できます
+- 読みながらブックマークを管理：ポップアップに戻らず、ブックマークを保存・編集・削除できます
 - 5 色のハイライトとメモ：翻訳しても、あとでページが書き換わっても、元の位置に残ります
 - ページ全体の翻訳とページへの質問：対訳表示に対応し、回答には出典への引用が付き、クリックで該当箇所へジャンプします
 - 質問と回答を引用付きで残す：完了した回答を自動保存し、Google ドライブで同期します。ライブラリで履歴を確認し、リーダーで質問を続けたり、単独または記事と一緒にエクスポートしたりできます。一時的な会話は保存しません。
@@ -301,7 +301,7 @@
 ## Polski (pl)
 
 ```text
-⚠ Wymaga konta Pinboard.in — Pinboard (pinboard.in) to niezależna, płatna usługa zakładek. To rozszerzenie jest klientem innej firmy, który łączy się z Twoim istniejącym kontem Pinboard za pomocą Twojego własnego tokena API Pinboard. Nie jest powiązane z Pinboard, sponsorowane ani autoryzowane przez Pinboard. Aby korzystać z tego rozszerzenia, musisz już mieć (lub założyć) płatne konto Pinboard.in. Funkcje AI są opcjonalne i korzystają z klucza API, który podajesz dla wybranego przez Ciebie dostawcy LLM.
+⚠ Wybierz usługę zakładek w ustawieniach. Karakeep i linkding działają bez konta Pinboard. Pinboard to niezależna, płatna usługa, która wymaga własnego konta i tokenu API. To rozszerzenie jest klientem zewnętrznym, niepowiązanym z Pinboard, niesponsorowanym ani nieautoryzowanym przez ten serwis. Funkcje AI są opcjonalne i korzystają z klucza API, który podajesz dla wybranego przez Ciebie dostawcy LLM.
 
 # Zapisywanie
 - Jedno kliknięcie i wszystko wypełnione — tytuł, opis i zaznaczony tekst trafiają na miejsce, a z adresu URL znikają parametry śledzące
@@ -317,7 +317,7 @@
 # Czytanie
 - Każda strona staje się czytelna — widok Markdown ze spisem treści, wyszukiwaniem i podglądem przypisów; wzory, diagramy i tabele wyświetlają się poprawnie
 - GitHub Discussions (pilotaż) — zachowuje wczytany wpis główny, komentarze, strukturę odpowiedzi i oznaczenie zaakceptowanej odpowiedzi; pokazuje zakres pobranej treści
-- Zarządzaj zakładkami podczas czytania — zapisuj, edytuj lub usuwaj zakładkę artykułu w Pinboard bez wracania do okienka
+- Zarządzaj zakładkami podczas czytania — zapisuj, edytuj lub usuwaj zakładkę artykułu w wybranej usłudze bez wracania do okienka
 - Zaznaczenia w pięciu kolorach, z notatkami — zostają na swoim miejscu mimo tłumaczenia, a nawet późniejszych zmian na stronie
 - Przetłumacz stronę albo zadaj jej pytanie — tłumaczenie całości z widokiem dwujęzycznym; odpowiedzi cytują źródło i prowadzą prosto do niego
 - Zachowaj pytania i odpowiedzi z cytatami — gotowe odpowiedzi zapisują się automatycznie i synchronizują przez Google Drive. Przeglądaj rozmowy w bibliotece, kontynuuj w czytniku lub eksportuj osobno albo wraz z artykułem. Rozmowy tymczasowe nie są zapisywane.
@@ -342,7 +342,7 @@
 ## Русский (ru)
 
 ```text
-⚠ Требуется аккаунт Pinboard.in — Pinboard (pinboard.in) — это независимый, платный сервис закладок. Это расширение является сторонним клиентом, который подключается к вашему существующему аккаунту Pinboard с помощью вашего собственного API-токена Pinboard. Оно не связано с Pinboard, не спонсируется и не одобряется им. Чтобы пользоваться этим расширением, у вас уже должен быть (или нужно оформить) платный аккаунт Pinboard.in. Функции AI необязательны и используют API-ключ, который вы предоставляете для выбранного вами LLM-провайдера.
+⚠ Выберите сервис закладок в настройках. Karakeep и linkding работают без аккаунта Pinboard. Pinboard — независимый платный сервис, для которого нужны собственный аккаунт и API-токен. Это стороннее расширение не связано с Pinboard, не спонсируется и не одобряется им. Функции AI необязательны и используют API-ключ, который вы предоставляете для выбранного вами LLM-провайдера.
 
 # Сохранение
 - Один клик — всё заполнено — заголовок, описание и выделенный текст подставляются сами, а трекинг-параметры удаляются из URL
@@ -358,7 +358,7 @@
 # Чтение
 - Любая страница превращается в режим чтения — Markdown-просмотр с оглавлением, поиском и предпросмотром сносок; формулы, диаграммы и таблицы отображаются правильно
 - GitHub Discussions (пилотная поддержка) — сохраняет загруженный исходный пост, комментарии, связи между ответами и отметку принятого ответа; показывает объём извлечённого обсуждения
-- Управляйте закладками во время чтения — сохраняйте, изменяйте или удаляйте закладку статьи в Pinboard, не возвращаясь к окну расширения
+- Управляйте закладками во время чтения — сохраняйте, изменяйте или удаляйте закладку статьи в выбранном сервисе, не возвращаясь к окну расширения
 - Выделения пяти цветов с заметками — остаются на своих местах и после перевода, и после правок на самой странице
 - Переведите страницу или задайте ей вопрос — полный перевод с двуязычным режимом; ответы ссылаются на источник, и клик ведёт прямо к нему
 - Сохраняйте вопросы и ответы вместе с цитатами — готовые ответы сохраняются автоматически и синхронизируются через Google Диск. Просматривайте разговоры в библиотеке, продолжайте в режиме чтения или экспортируйте отдельно либо вместе со статьёй. Временные разговоры не сохраняются.

@@ -161,7 +161,7 @@ async function createBatchClickHarness({ ai = true, contains = false, request = 
   const source = await getPopupBatchSetupSource();
   const factory = new Function(
     "$id", "t", "setBtnIcon", "chrome", "showStatus", "batchIsRunning",
-    "BATCH_STALE_TTL", "getSettingsStorage", "pbpApplySecretOverlay", "pbpReadSettingsWithSecrets",
+    "BATCH_STALE_TTL", "getSettingsStorage", "pbpApplySecretOverlay", "pbpReadBookmarkConnection",
     "deobfuscateKey", "settings", "hasAIKey", "wireBatchProgress", "setTimeout",
     "_aiTargetOriginPattern", "pbpPinboardAccountFromToken", "document",
     source + "\nreturn { setupTabSet, getPending: () => batchAiPermissionPending };"
@@ -176,7 +176,7 @@ async function createBatchClickHarness({ ai = true, contains = false, request = 
     BATCH_STALE_TTL,
     async () => ({ get: async () => ({ pinboardToken: "token" }) }),
     async (value) => value,
-    async () => ({ pinboardToken: "alice:token" }),
+    async () => ({ service:"pinboard", token:"alice:token", account:"alice" }),
     (value) => value,
     { aiProvider: "openai", batchAiTags: ai, batchAiSummary: false },
     () => true,

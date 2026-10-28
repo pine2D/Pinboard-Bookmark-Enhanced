@@ -221,9 +221,10 @@
     editorStatusKey = ""; paint();
     const values = state.bookmark || context.bookmark?.draft || {};
     id("title").value = typeof values.title === "string" ? values.title : context.title || "";
-    id("tags").value = typeof values.tags === "string" ? values.tags : (context.bookmark?.tags || []).join(" ");
+    id("tags").value = typeof values.tags === "string" ? values.tags : pbpBookmarkFormatTags(context.bookmark?.tags || []);
     id("notes").value = typeof values.notes === "string" ? values.notes : context.bookmark?.notes || "";
-    id("private").checked = values.private === true; id("toread").checked = values.toread === true;
+    id("private").closest("label").hidden = state.privacySupported === false;
+    id("private").checked = state.privacySupported === false || values.private === true; id("toread").checked = values.toread === true;
     editorSource = document.activeElement;
     editor.showPopover(); id("title").focus();
   }
@@ -282,6 +283,10 @@
       document.dispatchEvent(new CustomEvent("pbp:bookmark-changed", { detail: { url: context.url, account: context.account } }));
     } else if (result?.status === "queued") {
       closeEditor(); statusKey = "readerBookmarkQueued";
+    } else if (result?.reason === "partial") {
+      await refresh(gen);
+      if (gen !== generation) return;
+      statusKey = "bookmarkPartialSave";
     } else statusKey = result?.reason === "account_changed" || result?.reason === "not_logged_in" ? "readerBookmarkAccountChanged" : "readerBookmarkFailed";
     inflight = false; paint();
   }
@@ -312,7 +317,7 @@
   });
 
   document.addEventListener("pbp:rendered", event => {
-    const next = event.detail;
+    const next = {...event.detail, account:event.detail?.bookmarkAccount ?? event.detail?.account};
     // A second render of the same article must not unlock an in-flight write.
     if (context?.url === next?.url && context?.account === next?.account) return;
     closeEditor();
@@ -320,10 +325,13 @@
     mount(); showStatus("readerBookmarkChecking"); const gen = generation;
     refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); } });
   });
-  document.addEventListener("pbp:account-changed", () => {
-    generation++; context = null; state = { known: false }; inflight = false; deleting = false; editorStatusKey = "";
+  document.addEventListener("pbp:bookmark-account-changed", event => {
+    generation++; context = event.detail || null; state = { known: false }; inflight = true; deleting = false; editorStatusKey = "";
     closeEditor();
     if (editor) for (const input of editor.querySelectorAll("input, textarea")) { input.value = ""; input.checked = false; }
-    showStatus("readerBookmarkAccountChanged");
+    if (!context?.account) { showStatus("readerBookmarkAccountChanged"); return; }
+    showStatus("readerBookmarkChecking");
+    const gen = generation;
+    refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); } });
   });
 })();

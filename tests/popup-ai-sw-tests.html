@@ -109,7 +109,7 @@ function buildAiHarness(source, opts) {
   const end = source.indexOf(AI_BLOCK_END, start);
   if (start < 0 || end <= start) throw new Error("popup AI worker block not found in background.js");
   const calls = { callAI: [], setAICache: [], loadSettings: 0, warn: [] };
-  // getCurrentPinboardAuth is re-read at every gate; a list lets a case model an
+  // getCurrentBookmarkAuth is re-read at every gate; a list lets a case model an
   // account switch that lands BETWEEN two specific gates.
   const accounts = o.accounts || ["alice"];
   let authReads = 0;
@@ -118,7 +118,7 @@ function buildAiHarness(source, opts) {
   const deps = {
     chrome: { storage: { local } },
     loadSettings: async () => { calls.loadSettings++; return structuredClone(o.settings || {}); },
-    getCurrentPinboardAuth: async () => {
+    getCurrentBookmarkAuth: async () => {
       const account = accounts[Math.min(authReads++, accounts.length - 1)];
       return { token: `${account}:token`, account, epoch: 0 };
     },
@@ -259,8 +259,8 @@ function buildRouterHarness(source, opts) {
     pbpVocabClearNotices: spy("vocabClear", Promise.resolve()),
     pbpDisconnectVocabDrive: spy("vocabDisc", Promise.resolve()),
     pbpDictOwnerScope: (a) => "acct_" + a,
-    getCurrentPinboardAuth: async () => ({ token: "alice:t", account: "alice", epoch: 0 }),
-    pbpPinboardAuthIsCurrent: () => true,
+    getCurrentBookmarkAuth: async () => ({ token: "alice:t", account: "alice", epoch: 0 }),
+    pbpBookmarkAuthIsCurrent: () => true,
     pbpStatusCacheGet: () => null,
     pbpStatusCacheSet: spy("cacheSet", true),
     pbpSameBookmark: () => false,

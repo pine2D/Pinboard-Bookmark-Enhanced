@@ -5,9 +5,7 @@
 let batchAiPermissionPending = null;
 
 async function readBatchAccount() {
-  const raw = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
-  const token = deobfuscateKey(raw.pinboardToken) || "";
-  return { token, account: pbpPinboardAccountFromToken(token) };
+  return pbpReadBookmarkConnection();
 }
 
 function batchAiPermissionOrigins(validTabs, s) {

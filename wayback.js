@@ -148,7 +148,7 @@ async function pbpWaybackArchive(url, settings, opts) {
   try {
     // Step 1: Centralized archive decision (enabled + skip-private + per-save override)
     if (!settings) return;
-    account = pbpPinboardAccountFromToken(settings.pinboardToken);
+    account = pbpBookmarkConnection(settings).account;
     attemptKey = pbpWaybackAttemptKey(account, url);
     const enabled = settings.waybackArchiveEnabled === true;
     const skipPrivate = settings.waybackSkipPrivate !== false; // default ON

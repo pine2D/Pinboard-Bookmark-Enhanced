@@ -3,7 +3,7 @@
 // ============================================================
 
 importScripts(
-  "i18n.js", "shared.js", "vocab-store.js", "vocab-gdrive.js", "notes-sync.js", "notes-gdrive.js",
+  "i18n.js", "shared.js", "bookmark-services.js", "vocab-store.js", "vocab-gdrive.js", "notes-sync.js", "notes-gdrive.js",
   "ai-cache.js", "dict-archive.js", "dict-archive-gdrive.js", "ask-archive.js", "ask-archive-gdrive.js", "ai.js", "jina.js", "wayback.js"
 );
 
@@ -69,23 +69,21 @@ const CACHE_TTL = 5 * 60 * 1000;
 const MAX_CACHE_SIZE = 500;
 let _pinboardAuthEpoch = 0;
 
-function pbpCapturePinboardAuth(token) {
-  return {
-    account: pbpPinboardAccountFromToken(token),
-    epoch: _pinboardAuthEpoch,
-  };
+function pbpCaptureBookmarkAuth(settingsOrToken) {
+  const settings = typeof settingsOrToken === "object" ? settingsOrToken : {pinboardToken:settingsOrToken};
+  return {...pbpBookmarkConnection(settings), epoch:_pinboardAuthEpoch};
 }
 
-function pbpPinboardAuthEpoch() {
+function pbpBookmarkAuthEpoch() {
   return _pinboardAuthEpoch;
 }
 
-function pbpPinboardAuthIsCurrent(auth) {
+function pbpBookmarkAuthIsCurrent(auth) {
   return !!auth?.account && auth.epoch === _pinboardAuthEpoch;
 }
 
 function pbpStatusCacheGet(url, auth) {
-  if (!pbpPinboardAuthIsCurrent(auth)) return null;
+  if (!pbpBookmarkAuthIsCurrent(auth)) return null;
   const cached = statusCache.get(url);
   return cached?.account === auth.account ? cached : null;
 }
@@ -98,7 +96,7 @@ function pbpStatusCacheGet(url, auth) {
 // caller that wants the cleaned spelling must QUERY the cleaned spelling
 // (debouncedCheck does exactly that).
 function pbpStatusCacheSet(url, auth, value) {
-  if (!pbpPinboardAuthIsCurrent(auth)) return false;
+  if (!pbpBookmarkAuthIsCurrent(auth)) return false;
   statusCache.set(url, { ...value, account: auth.account });
   cleanupStatusCache();
   return true;
@@ -121,13 +119,25 @@ async function getCachedToken() {
   return _cachedToken;
 }
 
-async function getCurrentPinboardAuth() {
+async function getCurrentBookmarkAuth() {
   while (true) {
     const epoch = _pinboardAuthEpoch;
-    const token = await getCachedToken();
-    if (epoch !== _pinboardAuthEpoch) continue;
-    return { token: token || "", account: pbpPinboardAccountFromToken(token), epoch };
+    const connection = await pbpReadBookmarkConnection();
+    if (epoch === _pinboardAuthEpoch) return {...connection, epoch};
   }
+}
+
+// Reading data and Drive have a stable identity, independent of bookmark keys.
+let _personalLibraryEpoch = 0;
+async function getCurrentLibraryAuth() {
+  while (true) {
+    const epoch = _personalLibraryEpoch;
+    const account = await pbpPersonalLibraryAccount();
+    if (epoch === _personalLibraryEpoch) return {account, epoch};
+  }
+}
+function pbpLibraryAuthIsCurrent(auth) {
+  return !!auth?.account && auth.epoch === _personalLibraryEpoch;
 }
 
 // ---- P3: Debounce + dedup for tab switch ----
@@ -145,7 +155,7 @@ function _scheduleTabCheck(tabId, fn, delay) {
 }
 const _pendingChecks = new Map(); // auth epoch + URL -> Promise
 
-function invalidatePinboardAuthState() {
+function invalidateBookmarkAuthState() {
   _pinboardAuthEpoch++;
   const epoch = _pinboardAuthEpoch;
   _cachedToken = null;
@@ -167,33 +177,8 @@ function invalidatePinboardAuthState() {
 
 let _authChangeTail = Promise.resolve();
 function scheduleEffectiveAuthRefresh(changes, area) {
-  if (!(changes.pinboardToken || changes.syncApiKeys || changes.optSyncEnabled)) return;
-  _authChangeTail = _authChangeTail.then(async () => {
-    let state;
-    try {
-      state = await pbpReadSecretSyncState({ includeGlobalWhenSyncOff: true, persistInferredState: false });
-    } catch (_) {
-      invalidatePinboardAuthState();
-      return;
-    }
-    if (!pbpAuthStorageChangeIsRelevant(changes, area, state)) return;
-    let freshToken;
-    try {
-      const raw = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
-      freshToken = deobfuscateKey(raw.pinboardToken) || "";
-    } catch (_) {
-      invalidatePinboardAuthState();
-      return;
-    }
-    if (_cachedToken === null) {
-      // A restarted worker has no in-memory baseline, while the browser can still
-      // display the previous worker's badge/icon. A relevant credential event is
-      // therefore an unknown-to-changed transition and must fail closed.
-      invalidatePinboardAuthState();
-      return;
-    }
-    if (freshToken !== _cachedToken) invalidatePinboardAuthState();
-  }).catch(() => invalidatePinboardAuthState());
+  if (!(pbpBookmarkSettingsChanged(changes) || changes.syncApiKeys || changes.optSyncEnabled)) return;
+  invalidateBookmarkAuthState();
 }
 
 async function debouncedCheck(url) {
@@ -206,7 +191,7 @@ async function debouncedCheck(url) {
   // (verified — no key of SETTINGS_DEFAULTS escapes that check). So when
   // _settingsCache is already warm, take the value from it instead of issuing a
   // second, redundant storage.get: this callback's own next step
-  // (_writeCurrentTabMirror -> getCurrentPinboardAuth -> getCachedToken) calls
+  // (_writeCurrentTabMirror -> getCurrentBookmarkAuth -> getCachedToken) calls
   // loadSettings() unconditionally a few lines down, so a warm cache here can
   // never skip a settings read that would otherwise not happen. A cold cache
   // keeps today's single-key get rather than forcing a full loadSettings() read
@@ -389,13 +374,13 @@ async function pbpSweepExpiredUndo() {
   if (Object.keys(map).length) chrome.alarms.create(PBP_UNDO_ALARM, { delayInMinutes: PBP_UNDO_ALARM_DELAY_MIN });
 }
 
-async function pbpReadFreshPinboardAuthForAccount(account) {
+async function pbpReadFreshBookmarkAuthForAccount(account) {
   while (true) {
-    const epoch = pbpPinboardAuthEpoch();
-    const raw = await pbpReadSettingsWithSecrets({ pinboardToken: SETTINGS_DEFAULTS.pinboardToken });
-    const token = deobfuscateKey(raw.pinboardToken) || "";
-    if (epoch !== pbpPinboardAuthEpoch()) continue;
-    const auth = { token, account: pbpPinboardAccountFromToken(token), epoch };
+    const epoch = pbpBookmarkAuthEpoch();
+    const query = Object.fromEntries(PBP_BOOKMARK_SETTING_KEYS.map(key => [key, SETTINGS_DEFAULTS[key]]));
+    const raw = await pbpReadSettingsWithSecrets(query);
+    if (epoch !== pbpBookmarkAuthEpoch()) continue;
+    const auth = {...pbpBookmarkConnection(raw), epoch};
     return auth.account && auth.account === account ? auth : null;
   }
 }
@@ -420,8 +405,12 @@ async function pbpResetPinboardAuth(expectedToken) {
       const rows = await chrome.storage.session.get(null);
       const keys = Object.keys(rows).filter((key) => key.startsWith(prefix) && rows[key]?.owner === owner);
       if (keys.length) await chrome.storage.session.remove(keys);
+      const mainArea = state.optSyncEnabled ? chrome.storage.sync : chrome.storage.local;
+      if (!(await mainArea.get({personalLibraryAccount:""})).personalLibraryAccount) {
+        await mainArea.set({personalLibraryAccount:owner});
+      }
       await area.set({ pinboardToken: "" });
-      invalidatePinboardAuthState();
+      invalidateBookmarkAuthState();
       return { ok: true };
     }));
   } catch (e) {
@@ -483,18 +472,18 @@ chrome.notifications.onButtonClicked.addListener(async (notifId, btnIndex) => {
     return;
   }
   try {
-    const auth = await pbpReadFreshPinboardAuthForAccount(info.account);
-    if (!auth || !pbpPinboardAuthIsCurrent(auth)) {
+    const auth = await pbpReadFreshBookmarkAuthForAccount(info.account);
+    if (!auth || !pbpBookmarkAuthIsCurrent(auth)) {
       // A different signed-in account is the deliberate isolation cancel — the
       // record belongs to an account this session may not act for, the same
       // reason the catch below exempts account_changed from even a log. A
       // cleared token is a real failure the click deserves to hear about; 401
       // is the shape classifyPinboardError maps to the auth copy.
-      const current = await getCurrentPinboardAuth().catch(() => null);
+      const current = await getCurrentBookmarkAuth().catch(() => null);
       if (!current?.token) pbpNotifyUndoFailed(401);
       return;
     }
-    const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?auth_token=${auth.token}&url=${encodeURIComponent(info.url)}&format=json`);
+    const resp = await (pbpSelfHostedAuth(auth) ? pbpBookmarkDeleteResponse(auth, info.url) : pinboardFetch(`https://api.pinboard.in/v1/posts/delete?auth_token=${auth.token}&url=${encodeURIComponent(info.url)}&format=json`));
     // Classify the HTTP layer first, the way deliverSaveIntent does: 401/403/429
     // and 5xx answer with an HTML body, so reading result_code first turned every
     // one of them into a silent JSON parse failure.
@@ -517,7 +506,7 @@ chrome.notifications.onButtonClicked.addListener(async (notifId, btnIndex) => {
         // Same reset the bookmark_deleted handler does: _lastIconState dedup would
         // otherwise pin the toolbar icon to "saved" until the user navigates away.
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (pbpPinboardAuthIsCurrent(auth) && tab?.id && pbpSameBookmark(tab.url, info.url)) {
+        if (pbpBookmarkAuthIsCurrent(auth) && tab?.id && pbpSameBookmark(tab.url, info.url)) {
           setIcon(tab.id, "default");
         }
       } catch (e) {
@@ -567,13 +556,17 @@ function setIcon(tabId, state) {
 
 // ---- 检查 URL 是否已收藏 (uses cached token, direct fetch for latency) ----
 async function checkBookmarked(url, capturedAuth = null) {
-  const auth = capturedAuth || await getCurrentPinboardAuth();
+  const auth = capturedAuth || await getCurrentBookmarkAuth();
   if (!auth.token || !auth.account) return false;
-  if (capturedAuth && !pbpPinboardAuthIsCurrent(auth)) return false;
+  if (capturedAuth && !pbpBookmarkAuthIsCurrent(auth)) return false;
   const cached = pbpStatusCacheGet(url, auth);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) return cached.bookmarked;
   try {
-    const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${auth.token}&format=json&url=${encodeURIComponent(url)}`);
+    if (pbpSelfHostedAuth(auth)) {
+      const found = await fetchExistingBookmark(url, auth.token, auth);
+      return !found.lookupFailed && found.exists;
+    }
+    const resp = await (pbpSelfHostedAuth(auth) ? pbpBookmarkPostsResponse(auth, url) : pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${auth.token}&format=json&url=${encodeURIComponent(url)}`));
     if (!resp.ok) return false;
     const data = await resp.json();
     const posts = data.posts || [];
@@ -593,15 +586,15 @@ async function checkBookmarked(url, capturedAuth = null) {
 // ---- Badge: unread count ----
 async function updateBadge() {
   const s = await loadSettings();
-  const auth = await getCurrentPinboardAuth();
-  if (!s.optShowBadge || !auth.token) {
+  const auth = await getCurrentBookmarkAuth();
+  if (!s.optShowBadge || !auth.token || pbpSelfHostedAuth(auth)) {
     chrome.action.setBadgeText({ text: "" });
     return;
   }
   try {
     const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/all?auth_token=${auth.token}&format=json&toread=yes&results=100&meta=no`);
     const data = await resp.json();
-    if (!pbpPinboardAuthIsCurrent(auth)) return;
+    if (!pbpBookmarkAuthIsCurrent(auth)) return;
     const count = Array.isArray(data) ? data.length : 0;
     chrome.action.setBadgeText({ text: count > 0 ? String(count > 99 ? "99+" : count) : "" });
     chrome.action.setBadgeBackgroundColor({ color: "#4477bb" });
@@ -613,6 +606,73 @@ async function updateBadge() {
 // ---- Unified save pipeline + offline queue ----
 
 const PBP_SAVE_MODES = new Set(["create", "update", "merge", "skip", "overwrite"]);
+
+// Each self-hosted request re-reads the selected connection and exact host grant.
+// Automatic paths never prompt for permissions.
+function pbpBookmarkClient(auth) {
+  return pbpCreateBookmarkServiceClient({
+    service:auth.service, baseUrl:auth.baseUrl, readLaterListId:auth.readLaterListId,
+    readLaterListName:t("bookmarkReadLaterListName"),
+    beforeRequest:async () => {
+      const current = await getCurrentBookmarkAuth();
+      if (!pbpBookmarkAuthIsCurrent(auth) || current.account !== auth.account || current.service !== auth.service || !current.token) throw pbpBookmarkServiceError("account_changed");
+      const origin = pbpEndpointOriginPattern(current.baseUrl);
+      if (!origin || !await chrome.permissions.contains({origins:[origin]})) throw pbpBookmarkServiceError("permission");
+      const fresh = await getCurrentBookmarkAuth();
+      if (!pbpBookmarkAuthIsCurrent(auth) || fresh.account !== auth.account || fresh.service !== auth.service || !fresh.token) throw pbpBookmarkServiceError("account_changed");
+      return fresh;
+    },
+    saveReadLaterList:async id => {
+      if (!(await pbpReadFreshBookmarkAuthForAccount(auth.account))) throw pbpBookmarkServiceError("account_changed");
+      const result = await persistSettings({karakeepReadLaterListId:id, karakeepReadLaterListOwner:auth.account});
+      if (!result.ok) throw pbpBookmarkServiceError("storage");
+    }
+  });
+}
+async function pbpBookmarkPostsResponse(auth, url) {
+  if (!pbpSelfHostedAuth(auth)) return pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${auth.token}&format=json&url=${encodeURIComponent(url)}`);
+  const bookmark = await pbpBookmarkClient(auth).lookup(url);
+  return {ok:true, status:200, json:async () => ({posts:bookmark ? [pbpBookmarkAsPost(bookmark)] : []})};
+}
+async function pbpBookmarkDeleteResponse(auth, url) {
+  if (!pbpSelfHostedAuth(auth)) return pinboardFetch(`https://api.pinboard.in/v1/posts/delete?auth_token=${auth.token}&url=${encodeURIComponent(url)}&format=json`);
+  const client = pbpBookmarkClient(auth);
+  const bookmark = await client.lookup(url);
+  if (bookmark) await client.remove(bookmark);
+  return {ok:true, status:200, json:async () => ({result_code:"done"})};
+}
+async function pbpBookmarkTagCounts(auth) {
+  if (pbpSelfHostedAuth(auth)) return Object.fromEntries((await pbpBookmarkClient(auth).tags()).map(name => [name, 0]));
+  const resp = await pinboardFetch(`https://api.pinboard.in/v1/tags/get?auth_token=${auth.token}&format=json`);
+  if (!resp.ok) throw Object.assign(new Error("bookmark_tags"), {status:resp.status});
+  return resp.json();
+}
+function pbpBookmarkFailure(error) {
+  return pbpSaveFailure(error?.code === "auth" ? "not_logged_in" : error?.code || "network", {httpStatus:error?.status});
+}
+async function pbpDeliverSelfHosted(intent, auth) {
+  try {
+    const lookup = await fetchExistingBookmark(intent.url, auth.token, auth);
+    if (lookup.lookupFailed) return {result:pbpSaveFailure(lookup.reason || "lookup", {httpStatus:lookup.httpStatus}), persisted:null, retryable:lookup.retryable};
+    if ((intent.mode === "create" && lookup.exists) || (intent.mode === "update" && !lookup.exists)) return {result:pbpSaveFailure("conflict"), persisted:null, retryable:false};
+    const plan = pbpResolveSavePlan(intent, lookup);
+    if (plan.action === "failed") return {result:plan.result, persisted:null, retryable:false};
+    if (plan.action === "skip") return {result:{status:"skipped"}, persisted:plan.fields, retryable:false};
+    const incomingTags = pbpBookmarkParseTags(intent.tags);
+    const names = intent.mode === "merge" && lookup.exists ? lookup.bookmark.tags.slice() : [];
+    for (const name of incomingTags) if (!names.some(existing => existing.toLowerCase() === name.toLowerCase())) names.push(name);
+    const fields = {...plan.fields, tags:names};
+    const result = await pbpBookmarkClient(auth).save(fields, lookup.bookmark);
+    if (!pbpBookmarkAuthIsCurrent(auth)) return {result:pbpSaveFailure("account_changed"), persisted:null, retryable:false};
+    if (result.status === "partial") {
+      statusCache.delete(intent.url);
+      return {result:{status:"failed", reason:"partial", failedStep:result.failedStep, httpStatus:result.httpStatus}, persisted:null, retryable:false};
+    }
+    return {result:{status:"saved", mutation:result.mutation}, persisted:{...plan.fields, private:result.bookmark.private, toread:result.bookmark.toread}, retryable:false};
+  } catch (error) {
+    return {result:pbpBookmarkFailure(error), persisted:null, retryable:["network","timeout","rate_limited","server"].includes(error?.code)};
+  }
+}
 const PBP_POPUP_SAVE_MODES = new Set(["create", "update", "merge"]);
 
 function pbpSaveFailure(reason, { detail, httpStatus } = {}) {
@@ -648,8 +708,15 @@ function validateSaveIntent(intent) {
 
 // Delivery-time merge/skip decisions always use a fresh read. statusCache remains
 // a presentation cache and is refreshed only after a successful lookup.
-async function fetchExistingBookmark(url, token, auth = pbpCapturePinboardAuth(token)) {
+async function fetchExistingBookmark(url, token, auth = pbpCaptureBookmarkAuth(token)) {
   try {
+    if (pbpSelfHostedAuth(auth)) {
+      const bookmark = await pbpBookmarkClient(auth).lookup(url);
+      const posts = bookmark ? [pbpBookmarkAsPost(bookmark)] : [];
+      if (!pbpStatusCacheSet(url, auth, {bookmarked:!!bookmark, timestamp:Date.now(), posts})) throw pbpBookmarkServiceError("account_changed");
+      return {exists:!!bookmark, lookupFailed:false, post:posts[0] || null, bookmark};
+    }
+
     const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${token}&format=json&url=${encodeURIComponent(url)}`);
     if (!resp.ok) {
       const httpStatus = Number.isInteger(resp.status) ? resp.status : undefined;
@@ -681,6 +748,7 @@ async function fetchExistingBookmark(url, token, auth = pbpCapturePinboardAuth(t
       post,
     };
   } catch (error) {
+    if (pbpSelfHostedAuth(auth)) return {exists:false, lookupFailed:true, reason:error?.code === "auth" ? "not_logged_in" : error?.code || "lookup", httpStatus:error?.status, retryable:["network","timeout","rate_limited","server"].includes(error?.code)};
     if (error?.code === "account_changed") {
       return { exists: false, lookupFailed: true, reason: "account_changed", retryable: false };
     }
@@ -757,16 +825,17 @@ async function pbpSendResolvedPlan(plan, settings) {
   };
 }
 
-async function deliverSaveIntent(intent, settings, auth = pbpCapturePinboardAuth(settings?.pinboardToken)) {
+async function deliverSaveIntent(intent, settings, auth = pbpCaptureBookmarkAuth(settings)) {
   const invalid = validateSaveIntent(intent);
   if (invalid) return { result: invalid, persisted: null, retryable: false };
+  if (pbpSelfHostedAuth(auth)) return pbpDeliverSelfHosted(intent, auth);
   if (!settings?.pinboardToken) {
     return { result: pbpSaveFailure("not_logged_in"), persisted: null, retryable: false };
   }
 
   let recoveredConflict = false;
   while (true) {
-    if (!pbpPinboardAuthIsCurrent(auth)) {
+    if (!pbpBookmarkAuthIsCurrent(auth)) {
       return { result: pbpSaveFailure("account_changed"), persisted: null, retryable: false };
     }
     let lookup = null;
@@ -775,7 +844,7 @@ async function deliverSaveIntent(intent, settings, auth = pbpCapturePinboardAuth
     if (intent.mode === "merge" || intent.mode === "skip" || intent.mode === "overwrite") {
       lookup = await fetchExistingBookmark(intent.url, settings.pinboardToken, auth);
     }
-    if (!pbpPinboardAuthIsCurrent(auth)) {
+    if (!pbpBookmarkAuthIsCurrent(auth)) {
       return { result: pbpSaveFailure("account_changed"), persisted: null, retryable: false };
     }
     const plan = pbpResolveSavePlan(intent, lookup);
@@ -788,8 +857,8 @@ async function deliverSaveIntent(intent, settings, auth = pbpCapturePinboardAuth
 
     const delivered = await pbpSendResolvedPlan(plan, settings);
     if (delivered.result.reason === "not_logged_in") {
-      const current = await pbpReadFreshPinboardAuthForAccount(auth.account);
-      if (!current || current.token !== settings.pinboardToken || !pbpPinboardAuthIsCurrent(auth)) {
+      const current = await pbpReadFreshBookmarkAuthForAccount(auth.account);
+      if (!current || current.token !== settings.pinboardToken || !pbpBookmarkAuthIsCurrent(auth)) {
         return { result: pbpSaveFailure("account_changed"), persisted: null, retryable: false };
       }
     }
@@ -882,7 +951,7 @@ const runSaveDeliveryTransaction = pbpCreateRecoveringTail();
 
 async function applySaveResultSideEffects(envelope, settings, {
   deferBadge = false,
-  auth = pbpCapturePinboardAuth(settings?.pinboardToken),
+  auth = pbpCaptureBookmarkAuth(settings),
 } = {}) {
   const { result, persisted } = envelope || {};
   if (!persisted || (result?.status !== "saved" && result?.status !== "skipped")) return;
@@ -897,7 +966,7 @@ async function applySaveResultSideEffects(envelope, settings, {
     });
     if (cacheUpdated) {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (pbpPinboardAuthIsCurrent(auth) && tab?.id && pbpSameBookmark(tab.url, persisted.url)) {
+      if (pbpBookmarkAuthIsCurrent(auth) && tab?.id && pbpSameBookmark(tab.url, persisted.url)) {
         setIcon(tab.id, iconStateFor(pbpStatusCacheGet(persisted.url, auth)));
       }
     }
@@ -939,20 +1008,20 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
       return pbpSaveFailure("internal");
     }
     let deliveryAuth;
-    try { deliveryAuth = await getCurrentPinboardAuth(); }
+    try { deliveryAuth = await getCurrentBookmarkAuth(); }
     catch (e) {
       console.warn("save intent failed:", e?.name, e?.message);
       return pbpSaveFailure("internal");
     }
-    const deliveryAccount = pbpPinboardAccountFromToken(settings.pinboardToken);
+    const deliveryAccount = pbpBookmarkConnection(settings).account;
     if (!deliveryAuth.token) return pbpSaveFailure("not_logged_in");
     if (expectedAccount && deliveryAuth.account !== expectedAccount) {
       return pbpSaveFailure("account_changed");
     }
-    if (settings.pinboardToken && deliveryAuth.account !== deliveryAccount) {
+    if (deliveryAccount && deliveryAuth.account !== deliveryAccount) {
       return pbpSaveFailure("internal");
     }
-    const deliverySettings = { ...settings, pinboardToken: deliveryAuth.token };
+    const deliverySettings = pbpBookmarkDeliverySettings(settings, deliveryAuth);
 
     // Reader edits/flag changes resolve server metadata inside this same
     // lookup-to-write transaction. The offline record remains a normal intent.
@@ -983,7 +1052,7 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
     if ((readerAction === "read" || readerAction === "later") && intent.mode === "update") return envelope.result;
 
     try {
-      const queueId = await enqueueOfflineSave(queueRecordFromSaveIntent(intent, deliverySettings.pinboardToken));
+      const queueId = await enqueueOfflineSave({...queueRecordFromSaveIntent(intent, deliverySettings.pinboardToken), account:deliveryAuth.account});
       // cause lets the popup say why: Pinboard answered 429/5xx ("server")
       // or the request never got an HTTP answer ("network").
       const cause = Number.isInteger(envelope.result?.httpStatus) ? "server" : "network";
@@ -1003,17 +1072,19 @@ function sendOfflineItem(item) {
       return { result: pbpSaveFailure("internal"), persisted: null, retryable: false, settings: {} };
     }
     let deliveryAuth;
-    try { deliveryAuth = await getCurrentPinboardAuth(); }
+    try { deliveryAuth = await getCurrentBookmarkAuth(); }
     catch (e) {
       console.warn("save intent failed:", e?.name, e?.message);
       return { result: pbpSaveFailure("internal"), persisted: null, retryable: false, settings };
     }
-    const token = pbpResolveOfflineQueueToken(deliveryAuth.token, item);
+    const token = pbpSelfHostedAuth(deliveryAuth)
+      ? (item.account === deliveryAuth.account ? deliveryAuth.token : "")
+      : pbpResolveOfflineQueueToken(deliveryAuth.token, item);
     if (!token) {
       const reason = deliveryAuth.token ? "account_mismatch" : "not_logged_in";
       return { result: pbpSaveFailure(reason), persisted: null, retryable: false, settings };
     }
-    const deliverySettings = { ...settings, pinboardToken: token };
+    const deliverySettings = pbpBookmarkDeliverySettings(settings, deliveryAuth);
     const intent = normalizeOfflineSaveIntent(item, settings);
     let envelope;
     try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth); }
@@ -1115,7 +1186,7 @@ async function pbpReaderBookmarkContext(sender, account) {
   // immediately after clicking must not cancel an already-delivered intent.
   const storageKey = "md_preview_data_" + key;
   const stored = (await chrome.storage.local.get(storageKey))[storageKey];
-  const auth = await pbpReadFreshPinboardAuthForAccount(account);
+  const auth = await pbpReadFreshBookmarkAuthForAccount(account);
   if (!stored || stored.account !== account || !auth?.token) return null;
   try { if (!/^https?:$/.test(new URL(stored.url).protocol)) return null; }
   catch (_) { return null; }
@@ -1125,7 +1196,7 @@ async function pbpReaderBookmarkContext(sender, account) {
 async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth) {
   if (action === "save") return { intent: { ...intent, mode: "skip" } };
   const lookup = await fetchExistingBookmark(intent.url, settings.pinboardToken, auth);
-  if (!pbpPinboardAuthIsCurrent(auth)) return { result: pbpSaveFailure("account_changed") };
+  if (!pbpBookmarkAuthIsCurrent(auth)) return { result: pbpSaveFailure("account_changed") };
   if (lookup.lookupFailed) {
     // Without server metadata a queued flag change cannot preserve both an
     // existing record and a new bookmark's privacy/defaults. Fail closed;
@@ -1150,7 +1221,7 @@ function pbpReaderInitialIntent(context, settings, action) {
     mode: "skip", url: context.url,
     title: typeof originalDraft?.title === "string" ? originalDraft.title : context.title || context.url,
     notes: typeof originalDraft?.notes === "string" ? originalDraft.notes : typeof context.description === "string" ? context.description : "",
-    tags: typeof originalDraft?.tags === "string" ? originalDraft.tags : Array.isArray(context.tags) ? context.tags.join(" ") : "",
+    tags: typeof originalDraft?.tags === "string" ? originalDraft.tags : Array.isArray(context.tags) ? (pbpBookmarkServiceId(settings) === "pinboard" ? context.tags.join(" ") : pbpBookmarkFormatTags(context.tags)) : "",
     private: typeof originalDraft?.private === "boolean" ? originalDraft.private : pbpEffectivePrivate(settings, { incognito: context.sourceIncognito === true }),
     toread: action === "later" || (typeof originalDraft?.toread === "boolean" ? originalDraft.toread : settings.optReadlaterDefault === true),
   };
@@ -1162,14 +1233,14 @@ function pbpDeleteReaderBookmark(context) {
   return runOfflineQueueConsumer(() => runSaveDeliveryTransaction(async () => {
     let failure = "storage";
     try {
-      let auth = await pbpReadFreshPinboardAuthForAccount(context.account);
+      let auth = await pbpReadFreshBookmarkAuthForAccount(context.account);
       if (!auth) return pbpSaveFailure("account_changed");
       // This explicit delete supersedes earlier pending saves, including when
       // its response is lost or the owner switches during the request. Cancel
       // those saves while we still own the account, before any remote mutation.
       const cleared = await runOfflineQueueWrite(async () => {
         const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
-        auth = await pbpReadFreshPinboardAuthForAccount(context.account);
+        auth = await pbpReadFreshBookmarkAuthForAccount(context.account);
         if (!auth) return false;
         if (Array.isArray(offlineQueue)) {
           // Only this exact bookmark and owner. Other URLs and accounts are
@@ -1180,25 +1251,25 @@ function pbpDeleteReaderBookmark(context) {
         }
         return true;
       });
-      auth = await pbpReadFreshPinboardAuthForAccount(context.account);
+      auth = await pbpReadFreshBookmarkAuthForAccount(context.account);
       if (!cleared || !auth) return pbpSaveFailure("account_changed");
       failure = "network";
-      const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?auth_token=${auth.token}&url=${encodeURIComponent(context.url)}&format=json`);
+      const resp = await pbpBookmarkDeleteResponse(auth, context.url);
       if (!resp.ok) return pbpSaveFailure(resp.status === 401 || resp.status === 403 ? "not_logged_in" : "http", { httpStatus: resp.status });
       const data = await resp.json();
-      auth = await pbpReadFreshPinboardAuthForAccount(context.account);
+      auth = await pbpReadFreshBookmarkAuthForAccount(context.account);
       if (!auth) return pbpSaveFailure("account_changed");
       if (data?.result_code !== "done" && data?.result_code !== "item not found") return pbpSaveFailure("api");
       try {
         if (pbpStatusCacheSet(context.url, auth, { bookmarked: false, timestamp: Date.now(), posts: [] })) {
           const tabs = await chrome.tabs.query({});
           for (const tab of tabs) {
-            if (pbpPinboardAuthIsCurrent(auth) && tab.id && pbpSameBookmark(tab.url, context.url)) setIcon(tab.id, "default");
+            if (pbpBookmarkAuthIsCurrent(auth) && tab.id && pbpSameBookmark(tab.url, context.url)) setIcon(tab.id, "default");
           }
         }
         await updateBadge();
       } catch (e) { console.warn("reader bookmark delete status failed:", e?.name, e?.message); }
-      return await pbpReadFreshPinboardAuthForAccount(context.account)
+      return await pbpReadFreshBookmarkAuthForAccount(context.account)
         ? { status: "deleted", account: context.account } : pbpSaveFailure("account_changed");
     } catch (e) {
       console.warn("reader bookmark delete failed:", e?.name, pbpSaveFailure(failure, { detail: e?.message }).detail);
@@ -1212,7 +1283,7 @@ async function pbpReaderBookmarkRequest(message, sender) {
   if (!context) return pbpSaveFailure("account_changed");
   if (message.type === "mdReaderBookmarkDelete") return pbpDeleteReaderBookmark(context);
   if (message.type === "mdReaderBookmarkState") {
-    const auth = await pbpReadFreshPinboardAuthForAccount(context.account);
+    const auth = await pbpReadFreshBookmarkAuthForAccount(context.account);
     if (!auth) return pbpSaveFailure("account_changed");
     const lookup = await fetchExistingBookmark(context.url, auth.token, auth);
     let result = { known: false, account: context.account };
@@ -1224,7 +1295,7 @@ async function pbpReaderBookmarkRequest(message, sender) {
     }
     // Token rotation under the same owner does not invalidate display metadata.
     // Re-read the effective owner after every await before returning it to UI.
-    return await pbpReadFreshPinboardAuthForAccount(context.account) ? result : pbpSaveFailure("account_changed");
+    return await pbpReadFreshBookmarkAuthForAccount(context.account) ? {...result, privacySupported:auth.service !== "karakeep"} : pbpSaveFailure("account_changed");
   }
   const action = message.action;
   if (!["save", "later", "read", "edit"].includes(action)) return pbpSaveFailure("invalid");
@@ -1238,7 +1309,7 @@ async function pbpReaderBookmarkRequest(message, sender) {
   const settings = await loadSettings();
   const intent = pbpReaderInitialIntent(context, settings, action);
   const result = await submitSaveIntent(intent, { expectedAccount: context.account, readerAction: action, readerDraft: draft });
-  const current = await pbpReadFreshPinboardAuthForAccount(context.account);
+  const current = await pbpReadFreshBookmarkAuthForAccount(context.account);
   if (!current) return pbpSaveFailure("account_changed");
   return { ...result, account: context.account };
 }
@@ -1253,7 +1324,7 @@ async function pbpRouteReaderSaveCommand(command, tab) {
 
 // ---- P1: Shared save function ----
 async function saveFromBackground({ url, title, tab, settingsOverrides, toread, notifyId, notifyTitle, notifyCategory }) {
-  const startAuth = await getCurrentPinboardAuth();
+  const startAuth = await getCurrentBookmarkAuth();
   if (!startAuth.token) {
     // This is the earliest possible notification in the SW's lifecycle — it
     // fires before any network round-trip, so on a cold SW the manual-language
@@ -1266,7 +1337,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     return pbpSaveFailure("not_logged_in");
   }
   const loadedSettings = await loadSettings();
-  const s = { ...loadedSettings, ...(settingsOverrides || {}), pinboardToken: startAuth.token };
+  const s = pbpBookmarkDeliverySettings({ ...loadedSettings, ...(settingsOverrides || {}) }, startAuth);
   const mode = s.bgSaveMode === "skip" || s.bgSaveMode === "overwrite" ? s.bgSaveMode : "merge";
   const isPrivate = pbpEffectivePrivate(s, { incognito: tab?.incognito });
 
@@ -1506,12 +1577,12 @@ async function _writeCurrentTabMirror(tabId, url, title) {
     try { await chrome.storage.session.remove("_currentTab"); } catch (_) {}
     return;
   }
-  const auth = await getCurrentPinboardAuth();
+  const auth = await getCurrentBookmarkAuth();
   try {
     await chrome.storage.session.set({
       _currentTab: { tabId, url, title: title || "", account: auth.account, ts: Date.now() }
     });
-    if (!pbpPinboardAuthIsCurrent(auth)) await chrome.storage.session.remove("_currentTab");
+    if (!pbpBookmarkAuthIsCurrent(auth)) await chrome.storage.session.remove("_currentTab");
   } catch (_) {}
 }
 
@@ -1555,7 +1626,7 @@ function _scheduleCurrentTabRefresh(tabId, expectedUrl) {
         // is debouncedCheck's target (K0: the cleaned URL whenever urlClean applies),
         // never the raw tab URL — reading back a key nothing wrote returns null and
         // would reset a saved page's icon to "default".
-        const auth = await getCurrentPinboardAuth();
+        const auth = await getCurrentBookmarkAuth();
         setIcon(currentTab.id, iconStateFor(pbpStatusCacheGet(status.target, auth)));
       }
       await _writeCurrentTabMirror(currentTab.id, currentTab.url, currentTab.title);
@@ -1592,7 +1663,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   // (the platform behaviour this listener already relies on), so the dedup entry
   // stops describing what the toolbar shows. Recomputing the SAME state after a
   // reload, or on a saved -> saved hop, would then short-circuit setIcon and
-  // leave the default pin up. Same rule invalidatePinboardAuthState follows:
+  // leave the default pin up. Same rule invalidateBookmarkAuthState follows:
   // when the truth behind the dedup moves, the dedup entry goes first.
   if (!sameDocument) _lastIconState.delete(tabId);
   _scheduleCurrentTabRefresh(tabId, tab.url);
@@ -2305,9 +2376,9 @@ const driveConnectClient = PBP_VOCAB_DRIVE_CAPABLE ? pbpCreateVocabDriveClient()
 async function pbpNotesDriveCurrentOwner({ requireDriveAccount = true, dataset = "notes" } = {}) {
   if (!await pbpDriveEnabled()) return "";
   const session = driveSession.type === dataset ? driveSession : null;
-  const auth = await getCurrentPinboardAuth();
-  if (!auth?.account || !pbpPinboardAuthIsCurrent(auth) ||
-      (session?.auth && (!pbpPinboardAuthIsCurrent(session.auth) ||
+  const auth = await getCurrentLibraryAuth();
+  if (!auth?.account || !pbpLibraryAuthIsCurrent(auth) ||
+      (session?.auth && (!pbpLibraryAuthIsCurrent(session.auth) ||
         auth.account !== session.auth.account))) return "";
   if (requireDriveAccount && session?.permissionId) {
     const current = await (dataset === "ask" ? askArchiveDriveClient : dataset === "dictionary" ? dictArchiveDriveClient : notesDriveClient).about();
@@ -2319,7 +2390,7 @@ async function pbpNotesDriveCurrentOwner({ requireDriveAccount = true, dataset =
     }
     if (current.permissionId !== session.permissionId) return "";
   }
-  if (!await pbpDriveEnabled() || !pbpPinboardAuthIsCurrent(auth)) return "";
+  if (!await pbpDriveEnabled() || !pbpLibraryAuthIsCurrent(auth)) return "";
   return pbpDictOwnerScope(auth.account);
 }
 
@@ -2364,12 +2435,12 @@ const driveConnectionStore = {
   async put(ownerHash, state) {
     const context = driveRoundContext;
     if (!context || context.ownerHash !== ownerHash || context.epoch !== driveScopeEpoch) return false;
-    const current = await getCurrentPinboardAuth().catch((e) => {
+    const current = await getCurrentLibraryAuth().catch((e) => {
       console.warn("[drive-sync] connection state owner check failed:", e?.name, e?.message);
       return null;
     });
     if (!current?.account || current.account !== context.auth?.account ||
-        !pbpPinboardAuthIsCurrent(context.auth) || !pbpPinboardAuthIsCurrent(current) ||
+        !pbpLibraryAuthIsCurrent(context.auth) || !pbpLibraryAuthIsCurrent(current) ||
         context.epoch !== driveScopeEpoch || driveRoundContext !== context) return false;
     const key = PBP_DRIVE_CONN_STATE_PREFIX + ownerHash;
     try {
@@ -2395,7 +2466,7 @@ const dictArchiveDriveStore = PBP_VOCAB_DRIVE_CAPABLE
       getCurrentOwner: options => pbpNotesDriveCurrentOwner({ ...options, dataset: "dictionary" }),
       getWriteGuard: () => {
         const epoch = driveScopeEpoch, auth = driveSession.auth;
-        return () => driveScopeEpoch === epoch && (!auth || pbpPinboardAuthIsCurrent(auth));
+        return () => driveScopeEpoch === epoch && (!auth || pbpLibraryAuthIsCurrent(auth));
       }
     }) : null;
 const askArchiveDriveStore = PBP_VOCAB_DRIVE_CAPABLE
@@ -2403,14 +2474,14 @@ const askArchiveDriveStore = PBP_VOCAB_DRIVE_CAPABLE
       getCurrentOwner: options => pbpNotesDriveCurrentOwner({ ...options, dataset: "ask" }),
       getWriteGuard: () => {
         const epoch = driveScopeEpoch, auth = driveSession.auth;
-        return () => driveScopeEpoch === epoch && (!auth || pbpPinboardAuthIsCurrent(auth));
+        return () => driveScopeEpoch === epoch && (!auth || pbpLibraryAuthIsCurrent(auth));
       }
     }) : null;
 const runVocabDriveSync = PBP_VOCAB_DRIVE_CAPABLE
   ? pbpCreateVocabDriveSyncRunner({
       client: vocabDriveClient,
-      getCurrentPinboardAuth,
-      pinboardAuthIsCurrent: pbpPinboardAuthIsCurrent,
+      getCurrentLibraryAuth,
+      libraryAuthIsCurrent: pbpLibraryAuthIsCurrent,
       isEnabled: pbpDriveEnabled,
       getScopeEpoch: () => driveScopeEpoch,
       onSession: pbpDriveSessionOpened,
@@ -2422,8 +2493,8 @@ const runVocabDriveSync = PBP_VOCAB_DRIVE_CAPABLE
 const runNotesDriveSync = PBP_VOCAB_DRIVE_CAPABLE
   ? pbpCreateNotesDriveSyncRunner({
       client: notesDriveClient, store: notesDriveStore,
-      getCurrentPinboardAuth,
-      pinboardAuthIsCurrent: pbpPinboardAuthIsCurrent,
+      getCurrentLibraryAuth,
+      libraryAuthIsCurrent: pbpLibraryAuthIsCurrent,
       isEnabled: pbpDriveEnabled,
       getScopeEpoch: () => driveScopeEpoch,
       onSession: pbpDriveSessionOpened,
@@ -2436,7 +2507,7 @@ const runNotesDriveSync = PBP_VOCAB_DRIVE_CAPABLE
 const runDictArchiveDriveSync = PBP_VOCAB_DRIVE_CAPABLE
   ? pbpCreateDictArchiveDriveSyncRunner({
       client: dictArchiveDriveClient, store: dictArchiveDriveStore,
-      getCurrentPinboardAuth, pinboardAuthIsCurrent: pbpPinboardAuthIsCurrent,
+      getCurrentLibraryAuth, libraryAuthIsCurrent: pbpLibraryAuthIsCurrent,
       isEnabled: pbpDriveEnabled, getScopeEpoch: () => driveScopeEpoch,
       onSession: pbpDriveSessionOpened, connection: driveConnectionStore,
       getCurrentPermissionId: () => dictArchiveDriveClient.about()
@@ -2445,7 +2516,7 @@ const runDictArchiveDriveSync = PBP_VOCAB_DRIVE_CAPABLE
 const runAskArchiveDriveSync = PBP_VOCAB_DRIVE_CAPABLE
   ? pbpCreateAskArchiveDriveSyncRunner({
       client: askArchiveDriveClient, store: askArchiveDriveStore,
-      getCurrentPinboardAuth, pinboardAuthIsCurrent: pbpPinboardAuthIsCurrent,
+      getCurrentLibraryAuth, libraryAuthIsCurrent: pbpLibraryAuthIsCurrent,
       isEnabled: pbpDriveEnabled, getScopeEpoch: () => driveScopeEpoch,
       onSession: pbpDriveSessionOpened, connection: driveConnectionStore,
       getCurrentPermissionId: () => askArchiveDriveClient.about()
@@ -2479,9 +2550,9 @@ async function pbpRefreshDriveConnectionAccount(type, auth, confirmedState) {
   if (!verified.ok) return verified;
   if (verified.permissionId !== confirmedState.drivePermissionId) return { ok: false, error: "account_changed" };
   if (!await pbpDriveEnabled()) return { ok: false, error: "account_changed" };
-  const currentAuth = await getCurrentPinboardAuth();
-  if (!auth?.account || currentAuth?.account !== auth.account || !pbpPinboardAuthIsCurrent(auth) ||
-      !pbpPinboardAuthIsCurrent(currentAuth) || driveScopeEpoch !== scopeEpoch) {
+  const currentAuth = await getCurrentLibraryAuth();
+  if (!auth?.account || currentAuth?.account !== auth.account || !pbpLibraryAuthIsCurrent(auth) ||
+      !pbpLibraryAuthIsCurrent(currentAuth) || driveScopeEpoch !== scopeEpoch) {
     return { ok: false, error: "account_changed" };
   }
   // The session that just finished is exempt; a Connect that observed a
@@ -2549,11 +2620,11 @@ const PBP_DRIVE_OVERDUE_RETRY_MS = 30 * 1000;
 async function pbpReconcileDriveAlarms() {
   if (!PBP_VOCAB_DRIVE_CAPABLE) return null;
   if (!await pbpDriveEnabled()) { await pbpClearDriveAlarms(); return null; }
-  const auth = await getCurrentPinboardAuth().catch((e) => {
+  const auth = await getCurrentLibraryAuth().catch((e) => {
     console.warn("[drive-sync] alarm reconcile owner read failed:", e?.name, e?.message);
     return null;
   });
-  const ownerHash = auth?.account && pbpPinboardAuthIsCurrent(auth)
+  const ownerHash = auth?.account && pbpLibraryAuthIsCurrent(auth)
     ? await pbpVocabOwnerHash(pbpDictOwnerScope(auth.account)).catch((e) => {
       console.warn("[drive-sync] alarm reconcile owner hash failed:", e?.name, e?.message);
       return "";
@@ -2620,7 +2691,7 @@ async function pbpRunDriveDataset(type, auth, ownerScope, runOptions) {
       result = null;
     }
     if (!result || typeof result !== "object") result = { ok: false, error: "unexpected", retryable: true };
-    if (result.ok && result.changed && auth && pbpPinboardAuthIsCurrent(auth)) {
+    if (result.ok && result.changed && auth && pbpLibraryAuthIsCurrent(auth)) {
       pbpBroadcastVocabSynced(ownerScope, type);
     }
     if (result.ok && !result.status?.waitingForRetry) {
@@ -2717,7 +2788,7 @@ async function pbpDriveClearAccountRowErrors(ownerScope, ownerHash) {
 // Force lifts shared connection state, every data-layer block and account-row
 // errors before any dataset runs, including datasets an earlier failure skips.
 async function pbpDriveForceClear(auth, ownerHash, roundEpoch) {
-  if (!pbpPinboardAuthIsCurrent(auth) || driveScopeEpoch !== roundEpoch) return;
+  if (!pbpLibraryAuthIsCurrent(auth) || driveScopeEpoch !== roundEpoch) return;
   const cleared = await Promise.allSettled([
     driveConnectionStore.put(ownerHash, null),
     pbpVocabDeletePreflightState(ownerHash),
@@ -2744,11 +2815,11 @@ async function pbpQueueDriveRound(options = {}) {
       return { ok: false, error: connected ? "permission" : "not_connected", results: {} };
     }
     const roundEpoch = driveScopeEpoch;
-    const auth = await getCurrentPinboardAuth().catch((e) => {
+    const auth = await getCurrentLibraryAuth().catch((e) => {
       console.warn("[drive-sync] round owner read failed:", e?.name, e?.message);
       return null;
     });
-    const ownerScope = auth?.account && pbpPinboardAuthIsCurrent(auth) ? pbpDictOwnerScope(auth.account) : "";
+    const ownerScope = auth?.account && pbpLibraryAuthIsCurrent(auth) ? pbpDictOwnerScope(auth.account) : "";
     const ownerHash = ownerScope ? await pbpVocabOwnerHash(ownerScope).catch((e) => {
       console.warn("[drive-sync] round owner hash failed:", e?.name, e?.message);
       return "";
@@ -2798,8 +2869,8 @@ async function pbpQueueDriveRound(options = {}) {
 }
 
 async function pbpConnectDrive() {
-  const auth = await getCurrentPinboardAuth();
-  if (!auth?.account || !pbpPinboardAuthIsCurrent(auth)) return { ok: false, error: "pinboard_auth" };
+  const auth = await getCurrentLibraryAuth();
+  if (!auth?.account || !pbpLibraryAuthIsCurrent(auth)) return { ok: false, error: "pinboard_auth" };
   if (!await chrome.permissions.contains({ permissions: ["identity"], origins: [PBP_GOOGLE_API_ORIGIN] })) {
     // Spec §10.8: the grant this device needs is gone, so it is not connected
     // any more (the handler did this before A4 moved the flag in here).
@@ -2837,9 +2908,9 @@ async function pbpConnectDrive() {
     }
     return account;
   }
-  const currentAuth = await getCurrentPinboardAuth();
-  if (currentAuth?.account !== auth.account || !pbpPinboardAuthIsCurrent(auth) ||
-      !pbpPinboardAuthIsCurrent(currentAuth)) return { ok: false, error: "account_changed" };
+  const currentAuth = await getCurrentLibraryAuth();
+  if (currentAuth?.account !== auth.account || !pbpLibraryAuthIsCurrent(auth) ||
+      !pbpLibraryAuthIsCurrent(currentAuth)) return { ok: false, error: "account_changed" };
   pbpObserveDriveIdentity(account.permissionId);
   await chrome.storage.local.set({
     [PBP_VOCAB_DRIVE_CONNECTED_KEY]: true,
@@ -2899,7 +2970,7 @@ function pbpDriveSnapshotStatus(snapshot, preflight, currentPermissionId = "") {
 }
 async function pbpGetVocabDriveStatus() {
   const [connected, auth, stored] = await Promise.all([
-    pbpVocabDriveIsConnected(), getCurrentPinboardAuth(),
+    pbpVocabDriveIsConnected(), getCurrentLibraryAuth(),
     chrome.storage.local.get({ [PBP_DRIVE_CONNECTION_ACCOUNT_KEY]: null })
   ]);
   const neutralDataset = () => ({ lastSuccessAt: null, lastError: null, retryAt: null,
@@ -2907,7 +2978,7 @@ async function pbpGetVocabDriveStatus() {
   const neutralConnection = { lastError: null, retryAt: null, blocked: false };
   const base = { connected, owner: "", connection: neutralConnection, vocabulary: neutralDataset(),
     notes: neutralDataset(), dictionary: neutralDataset(), ask: neutralDataset(), noticeTerms: [], lastSuccessAt: null, hasPending: false };
-  if (!auth?.account || !pbpPinboardAuthIsCurrent(auth)) return base;
+  if (!auth?.account || !pbpLibraryAuthIsCurrent(auth)) return base;
   const ownerScope = pbpDictOwnerScope(auth.account);
   const ownerHash = await pbpVocabOwnerHash(ownerScope);
   const savedAccount = stored[PBP_DRIVE_CONNECTION_ACCOUNT_KEY];
@@ -2921,7 +2992,7 @@ async function pbpGetVocabDriveStatus() {
     dictArchiveDriveStore.snapshot(ownerScope, ownerHash), dictArchiveDriveStore.getPreflightState(ownerHash),
     askArchiveDriveStore.snapshot(ownerScope, ownerHash), askArchiveDriveStore.getPreflightState(ownerHash)
   ]);
-  if (!pbpPinboardAuthIsCurrent(auth)) return base;
+  if (!pbpLibraryAuthIsCurrent(auth)) return base;
   const emptySnapshot = { states: [], outbox: [], batches: [], notices: [] };
   const connectionRead = reads[4];
   if (connectionRead.status === "rejected") {
@@ -3146,18 +3217,18 @@ function pbpDriveScrubbedRow(row) {
 // true: every current-owner row is clean (or there is no owner to clean for).
 // false: a write was refused or failed — the caller leaves the flag unset.
 async function pbpScrubDriveConnectionRows() {
-  const auth = await getCurrentPinboardAuth();
+  const auth = await getCurrentLibraryAuth();
   // Signed out: nothing is owner-scoped yet. The flag still lands; a later run
   // for that owner ignores legacy connection codes in these rows (spec §3.3).
   if (!auth?.account) return true;
   // Signed in but the auth already moved on: fail closed and retry next wake.
-  if (!pbpPinboardAuthIsCurrent(auth)) return false;
+  if (!pbpLibraryAuthIsCurrent(auth)) return false;
   const ownerScope = pbpDictOwnerScope(auth.account);
   const ownerHash = await pbpVocabOwnerHash(ownerScope);
   const sameOwner = async () => {
-    const current = await getCurrentPinboardAuth();
+    const current = await getCurrentLibraryAuth();
     return current?.account === auth.account &&
-      pbpPinboardAuthIsCurrent(auth) && pbpPinboardAuthIsCurrent(current);
+      pbpLibraryAuthIsCurrent(auth) && pbpLibraryAuthIsCurrent(current);
   };
   // Both stores refuse an account row whose own key disagrees with its
   // drivePermissionId / ownerHash. The runner never reads such a row (it looks
@@ -3243,7 +3314,7 @@ function syncPrewarmTagsAlarm() {
   return queuePrewarmAlarmSync(async () => {
     const s = await loadSettings();
     const existing = await chrome.alarms.get("prewarm-tags");
-    const shouldRun = s.tagSyncMode === "prewarmed" && !!s.pinboardToken;
+    const shouldRun = s.tagSyncMode === "prewarmed" && !!pbpBookmarkConnection(s).account;
     if (shouldRun && !existing) {
       chrome.alarms.create("prewarm-tags", { periodInMinutes: 15, delayInMinutes: 0.5 });
       prewarmTagsNow().catch(() => {}); // populate now; don't wait ~30s for the first alarm
@@ -3254,13 +3325,11 @@ function syncPrewarmTagsAlarm() {
 }
 
 async function prewarmTagsNow() {
-  const auth = await getCurrentPinboardAuth();
+  const auth = await getCurrentBookmarkAuth();
   if (!auth.token) return;
   try {
-    const resp = await pinboardFetch(`https://api.pinboard.in/v1/tags/get?auth_token=${auth.token}&format=json`);
-    if (!resp.ok) return;
-    const data = await resp.json();
-    if (!pbpPinboardAuthIsCurrent(auth)) return;
+    const data = await pbpBookmarkTagCounts(auth);
+    if (!pbpBookmarkAuthIsCurrent(auth)) return;
     // Store only the count map + timestamp; the popup rebuilds the sorted tag list
     // from counts on read (deterministic), so storing the array too is dead weight.
     await chrome.storage.local.set({
@@ -3319,6 +3388,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
     invalidateSettingsCache();
   }
   if (area === "sync" || area === "local") scheduleEffectiveAuthRefresh(changes, area);
+  if ((area === "sync" || area === "local") && (changes.personalLibraryAccount || changes.optSyncEnabled)) {
+    _personalLibraryEpoch++;
+    driveScopeEpoch++;
+  }
   if (area === "sync" && (changes.syncApiKeys || changes.exportTargets ||
       API_KEY_FIELDS.some((key) => !!changes[key]))) {
     // Mirror keys-on snapshots promptly on every participating online device;
@@ -3333,7 +3406,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     });
   }
   const routingChanged = !!(changes.optSyncEnabled || changes.syncApiKeys);
-  if ((area === "sync" || area === "local") && (routingChanged || changes.tagSyncMode || changes.pinboardToken)) {
+  if ((area === "sync" || area === "local") && (routingChanged || changes.tagSyncMode || pbpBookmarkSettingsChanged(changes))) {
     syncPrewarmTagsAlarm().catch(() => {});
   }
   // Conditional site-theme payload (roadmap #37): register/unregister the
@@ -3542,7 +3615,7 @@ async function pbpRunPopupAiCall(message) {
     // Account gate 1 (cross-cutting iron rule): re-read the live auth atomically
     // right before dispatch. A switch between the popup's click and this message
     // must not spend the new account's budget on the old account's page.
-    const before = await getCurrentPinboardAuth();
+    const before = await getCurrentBookmarkAuth();
     if (before.account !== account) {
       return { ok: false, error: { message: "account changed", code: "account_changed" } };
     }
@@ -3575,7 +3648,7 @@ async function pbpRunPopupAiCall(message) {
 
     // Account gate 2: the result belongs to whoever paid for it. A switch during
     // the call discards it rather than filing it under the new owner.
-    const after = await getCurrentPinboardAuth();
+    const after = await getCurrentBookmarkAuth();
     if (after.account !== account) {
       return { ok: false, error: { message: "account changed", code: "account_changed" } };
     }
@@ -3621,7 +3694,7 @@ async function pbpRunPopupDraft(message) {
       || (message.action !== "clearOwner" && !safeUrl(message.pageUrl))) return { ok: false, error: "invalid" };
   try {
     return await navigator.locks.request("pbp-popup-drafts", async () => {
-      const current = async () => (await getCurrentPinboardAuth()).account === message.account;
+      const current = async () => (await getCurrentBookmarkAuth()).account === message.account;
       if (!await current()) return { ok: false, error: "account_changed" };
       const ownerPrefix = prefix + encodeURIComponent(message.account) + ":";
       const key = ownerPrefix + (message.incognito === true ? "private:" : "normal:") + encodeURIComponent(message.pageUrl);
@@ -3743,6 +3816,45 @@ function handleRuntimeMessage(message, sender, sendResponse) {
   }
   noteActivity(); // using the popup keeps the SW warm for the next open
 
+  if (message.type === "bookmark_connect") {
+    if (new URL(sender.url).pathname !== "/options.html") { sendResponse({ok:false,error:"forbidden"}); return true; }
+    (async () => {
+      const {service, baseUrl, token} = message;
+      if (!["karakeep","linkding"].includes(service) || typeof token !== "string" || !token.trim()) return {ok:false,error:"invalid_request"};
+      const base = pbpBookmarkEndpoint(baseUrl);
+      const origin = pbpEndpointOriginPattern(base);
+      if (!origin) return {ok:false,error:"invalid_request"};
+      const client = pbpCreateBookmarkServiceClient({service, baseUrl:base, beforeRequest:async () => {
+        if (!await chrome.permissions.contains({origins:[origin]})) throw pbpBookmarkServiceError("permission");
+        return {token};
+      }});
+      const identity = await client.verify();
+      return {ok:true, identity};
+    })().then(sendResponse).catch(error => sendResponse({ok:false,error:error?.code || "network",status:error?.status}));
+    return true;
+  }
+  if (message.type === "bookmark_api") {
+    (async () => {
+      const auth = await getCurrentBookmarkAuth();
+      if (!message.account || message.account !== auth.account || !auth.token) return {ok:false,status:0,error:"account_changed"};
+      const client = pbpSelfHostedAuth(auth) ? pbpBookmarkClient(auth) : null;
+      let data;
+      if (message.action === "tags") data = await pbpBookmarkTagCounts(auth);
+      else if (message.action === "lookup") data = await (await pbpBookmarkPostsResponse(auth, message.url)).json();
+      else if (message.action === "recent" && client) data = {posts:(await client.recent(5)).map(pbpBookmarkAsPost)};
+      else if (message.action === "delete") {
+        if (!pbpBookmarkWebUrl(message.url)) return {ok:false,status:0,error:"invalid_request"};
+        const result = await pbpDeleteReaderBookmark({account:auth.account,url:message.url});
+        if (result.status !== "deleted") return {ok:false,status:result.httpStatus || 0,error:result.reason};
+        data = {result_code:"done"};
+      } else return {ok:false,status:0,error:"invalid_request"};
+      const fresh = await getCurrentBookmarkAuth();
+      if (!pbpBookmarkAuthIsCurrent(auth) || fresh.account !== auth.account) return {ok:false,status:0,error:"account_changed"};
+      return {ok:true,status:200,data,account:auth.account};
+    })().then(sendResponse).catch(error => sendResponse({ok:false,status:error?.status || 0,error:error?.code || "network"}));
+    return true;
+  }
+
   if (message.type === "PBP_RESET_PINBOARD_AUTH") {
     pbpResetPinboardAuth(message.expectedToken).then((result) => { try { sendResponse(result); } catch (_) {} });
     return true;
@@ -3766,14 +3878,14 @@ function handleRuntimeMessage(message, sender, sendResponse) {
 
   if (message.type === "PBP_DICT_ARCHIVE_SYNC") {
     (async () => {
-      const auth = await getCurrentPinboardAuth();
+      const auth = await getCurrentLibraryAuth();
       if (!auth?.account && !message.owner) return { ok: true, connected: false };
-      if (!auth?.account || !pbpPinboardAuthIsCurrent(auth) || pbpDictOwnerScope(auth.account) !== message.owner) {
+      if (!auth?.account || !pbpLibraryAuthIsCurrent(auth) || pbpDictOwnerScope(auth.account) !== message.owner) {
         return { ok: false, code: "account_changed" };
       }
       if (!await pbpVocabDriveIsConnected()) return { ok: true, connected: false };
       const result = await pbpQueueDriveRound({ dictionaryOnly: true, manual: true });
-      if (!pbpPinboardAuthIsCurrent(auth)) return { ok: false, code: "account_changed" };
+      if (!pbpLibraryAuthIsCurrent(auth)) return { ok: false, code: "account_changed" };
       const dataset = result.results?.dictionary;
       return { ok: result.ok === true && dataset?.status?.bootstrapComplete === true,
         connected: true, code: result.ok && dataset?.status?.bootstrapComplete === true ? null : result.error || "unexpected" };
@@ -3786,14 +3898,14 @@ function handleRuntimeMessage(message, sender, sendResponse) {
 
   if (message.type === "PBP_ASK_ARCHIVE_RESTORE") {
     (async () => {
-      const auth = await getCurrentPinboardAuth();
+      const auth = await getCurrentLibraryAuth();
       if (!auth?.account && (!message.owner || message.owner === "ownerless")) return { ok: true, connected: false };
-      if (!auth?.account || !pbpPinboardAuthIsCurrent(auth) || pbpDictOwnerScope(auth.account) !== message.owner) {
+      if (!auth?.account || !pbpLibraryAuthIsCurrent(auth) || pbpDictOwnerScope(auth.account) !== message.owner) {
         return { ok: false, code: "account_changed" };
       }
       if (!await pbpVocabDriveIsConnected()) return { ok: true, connected: false };
       const result = await pbpQueueDriveRound({ askOnly: true, manual: true });
-      if (!pbpPinboardAuthIsCurrent(auth)) return { ok: false, code: "account_changed" };
+      if (!pbpLibraryAuthIsCurrent(auth)) return { ok: false, code: "account_changed" };
       const dataset = result.results?.ask;
       return { ok: result.ok === true && dataset?.status?.bootstrapComplete === true,
         connected: true, code: result.ok && dataset?.status?.bootstrapComplete === true ? null : result.error || "unexpected" };
@@ -3836,14 +3948,14 @@ function handleRuntimeMessage(message, sender, sendResponse) {
   }
 
   if (message.type === "vocabDriveClearNotices") {
-    getCurrentPinboardAuth()
+    getCurrentLibraryAuth()
       .then(async (auth) => {
-        if (!auth.account || !pbpPinboardAuthIsCurrent(auth)) {
+        if (!auth.account || !pbpLibraryAuthIsCurrent(auth)) {
           return { ok: false, error: "pinboard_auth" };
         }
         const owner = pbpDictOwnerScope(auth.account);
         const cleared = await Promise.all([pbpVocabClearNotices(owner), pbpNotesClearNotices(owner)]);
-        if (!pbpPinboardAuthIsCurrent(auth)) return { ok: false, error: "account_changed" };
+        if (!pbpLibraryAuthIsCurrent(auth)) return { ok: false, error: "account_changed" };
         return cleared.every(Boolean) ? { ok: true } : { ok: false, error: "local_store" };
       })
       .then((result) => pbpVocabDriveResponse(result))
@@ -3898,7 +4010,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
   }
 
   if (message.type === "get_bookmark_data" && message.url) {
-    getCurrentPinboardAuth().then((auth) => {
+    getCurrentBookmarkAuth().then((auth) => {
       if (!message.account || message.account !== auth.account) {
         sendResponse({ posts: null, account: "" });
         return;
@@ -3936,7 +4048,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     const url = message.url;
     const refuse = () => sendResponse({ ok: false, status: 0, error: "account_changed", posts: null, account: "" });
     (async () => {
-      const auth = await getCurrentPinboardAuth();
+      const auth = await getCurrentBookmarkAuth();
       if (!message.account || message.account !== auth.account) { refuse(); return; }
       if (!auth.token) { refuse(); return; }
       const freshPosts = () => {
@@ -3946,7 +4058,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       let posts = freshPosts();
       if (!posts) {
         await _dedupedBookmarkCheck(url, auth);
-        if (!pbpPinboardAuthIsCurrent(auth)) { refuse(); return; }
+        if (!pbpBookmarkAuthIsCurrent(auth)) { refuse(); return; }
         posts = freshPosts();
       }
       if (!posts) {
@@ -3958,14 +4070,14 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         // above. It never fires for a genuinely unbookmarked page, though --
         // checkBookmarked() still writes `posts: []` on success, and `[]` is
         // truthy, so freshPosts() returns it and this second request is skipped.
-        const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${auth.token}&format=json&url=${encodeURIComponent(url)}`);
+        const resp = await (pbpSelfHostedAuth(auth) ? pbpBookmarkPostsResponse(auth, url) : pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${auth.token}&format=json&url=${encodeURIComponent(url)}`));
         if (!resp.ok) {
           sendResponse({ ok: false, status: resp.status, error: resp.error || "", posts: null, account: auth.account });
           return;
         }
         const data = await resp.json();
         posts = data.posts || [];
-        if (!pbpPinboardAuthIsCurrent(auth)) { refuse(); return; }
+        if (!pbpBookmarkAuthIsCurrent(auth)) { refuse(); return; }
         if (!pbpStatusCacheSet(url, auth, { bookmarked: posts.length > 0, timestamp: Date.now(), posts })) { refuse(); return; }
       }
       sendResponse({ ok: true, status: 200, posts, account: auth.account });
@@ -4059,7 +4171,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
   }
 
   if (message.type === "bookmark_deleted" && message.url) {
-    getCurrentPinboardAuth().then(async (auth) => {
+    getCurrentBookmarkAuth().then(async (auth) => {
       if (!message.account || message.account !== auth.account) {
         sendResponse({ ok: false });
         return;
@@ -4067,7 +4179,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       const updated = pbpStatusCacheSet(message.url, auth, { bookmarked: false, timestamp: Date.now() });
       if (updated) {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (pbpPinboardAuthIsCurrent(auth) && tab?.id && pbpSameBookmark(tab.url, message.url)) {
+        if (pbpBookmarkAuthIsCurrent(auth) && tab?.id && pbpSameBookmark(tab.url, message.url)) {
           setIcon(tab.id, "default");
         }
       }
@@ -4085,7 +4197,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
   if (message.action === "startBatchSave" && Array.isArray(message.tabs)) {
     if (_batchRunning) { sendResponse({ status: "busy" }); return true; }
     _batchRunning = true; // reserve synchronously before the first auth await
-    getCurrentPinboardAuth().then((auth) => {
+    getCurrentBookmarkAuth().then((auth) => {
       if (!message.account || auth.account !== message.account) {
         _batchRunning = false;
         sendResponse({ status: "account_changed" });
@@ -4106,7 +4218,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       sendResponse({ ok: false, status: 0, text: "", error: "invalid_pinboard_api_url" });
       return true;
     }
-    getCurrentPinboardAuth().then(async (auth) => {
+    getCurrentBookmarkAuth().then(async (auth) => {
       const authorizedUrl = pbpAuthorizePinboardApiUrl(message.url, auth.token);
       if (!authorizedUrl) {
         sendResponse({ ok: false, status: 0, text: "", error: "account_changed" });
@@ -4122,7 +4234,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         ? await pinboardFetchImmediate(authorizedUrl, { timeoutMs: 8000 })
         : await pinboardFetch(authorizedUrl, { timeoutMs });
         const text = await res.text();
-        if (!pbpPinboardAuthIsCurrent(auth)) {
+        if (!pbpBookmarkAuthIsCurrent(auth)) {
           sendResponse({ ok: false, status: 0, text: "", error: "account_changed" });
           return;
         }
@@ -4343,13 +4455,13 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     // (background.js:242). Any failure collapses to bookmarked:false.
     const url = message.url;
     (async () => {
-        const auth = await getCurrentPinboardAuth();
+        const auth = await getCurrentBookmarkAuth();
         if (!message.account || message.account !== auth.account) {
           sendResponse({ bookmarked: false, account: "" });
           return;
         }
         const bookmarked = await checkBookmarked(url, auth);
-        if (!pbpPinboardAuthIsCurrent(auth)) {
+        if (!pbpBookmarkAuthIsCurrent(auth)) {
           sendResponse({ bookmarked: false, account: "" });
           return;
         }
@@ -4357,9 +4469,9 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         let post = pbpStatusCacheGet(url, auth)?.posts?.[0];
         if (!post) {
           if (!auth.token) { sendResponse({ bookmarked: false, account: auth.account }); return; }
-          const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${auth.token}&format=json&url=${encodeURIComponent(url)}`);
+          const resp = await (pbpSelfHostedAuth(auth) ? pbpBookmarkPostsResponse(auth, url) : pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${auth.token}&format=json&url=${encodeURIComponent(url)}`));
           const posts = resp.ok ? (await resp.json()).posts || [] : [];
-          if (!pbpPinboardAuthIsCurrent(auth)) {
+          if (!pbpBookmarkAuthIsCurrent(auth)) {
             sendResponse({ bookmarked: false, account: "" });
             return;
           }
@@ -4441,7 +4553,7 @@ async function pbpSweepInterruptedBatch() {
   // about it. Leaving it untouched costs nothing — it is a single key that the
   // next batch (any account) overwrites wholesale, its stale ts already reads as
   // "not running" everywhere, and the owner's own session sweeps it on return.
-  const auth = await getCurrentPinboardAuth();
+  const auth = await getCurrentBookmarkAuth();
   if (bp.account && bp.account !== auth.account) return;
   // TOCTOU: the startBatchSave handler reserves _batchRunning synchronously and a
   // live batch rewrites batch_progress with a fresh ts, and both awaits above gave
@@ -4509,7 +4621,7 @@ function handleBatchSave(tabs, expectedAccount = "", reserved = false, resumeSta
 
 async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
   const runId = resumeState?.runId || _newBatchRunId();
-  const startAuth = await getCurrentPinboardAuth();
+  const startAuth = await getCurrentBookmarkAuth();
   const account = expectedAccount || startAuth.account;
   if (!startAuth.token || !account || startAuth.account !== account) {
     // audit A13: the message handler already replied "started" before this
@@ -4562,7 +4674,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
   try { await chrome.storage.local.set({ batch_job: jobRecord() }); }
   catch (e) { console.warn("[batch] initial checkpoint failed:", e?.name, e?.message); }
   const requireAccount = async () => {
-    const auth = await getCurrentPinboardAuth();
+    const auth = await getCurrentBookmarkAuth();
     if (auth.account !== account) {
       const error = new Error("account_changed");
       error.code = "account_changed";
@@ -4578,8 +4690,8 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     await requireAccount();
     const loadedSettings = await loadSettings();
     const currentAuth = await requireAccount();
-    const s = { ...loadedSettings, pinboardToken: currentAuth.token };
-    if (!s.pinboardToken) {
+    const s = pbpBookmarkDeliverySettings(loadedSettings, currentAuth);
+    if (!currentAuth.token) {
       await clearJob();
       await clearCancel();
       await _writeBatchProgress({ running: false, done: true, error: "not_logged_in", ...base() });
@@ -4795,6 +4907,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
 
 // ===================== Tab Set 保存 =====================
 async function handleSaveTabSet(tabsData) {
+  if (pbpBookmarkServiceId(await loadSettings()) !== "pinboard") return;
   try {
     // Tab Set uses pinboard.in web API (cookie auth, not API token)
     const result = { browser: "chrome", windows: [tabsData.map(t => ({ title: t.title, url: t.url }))] };
@@ -5127,7 +5240,7 @@ async function openMarkdownPreviewFromShortcut() {
   // path as the in-preview toggle). Follow the aiContentSource setting (fresh read).
   const [raw, auth] = await Promise.all([
     (await getSettingsStorage()).get({ aiContentSource: SETTINGS_DEFAULTS.aiContentSource }),
-    getCurrentPinboardAuth().catch(() => ({ account: "" })),
+    getCurrentBookmarkAuth().catch(() => ({ account: "" })),
   ]);
   const engine = raw.aiContentSource === "jina" ? "jina" : "local";
   // Per-open token key so two shortcut opens (or a shortcut + a popup Preview)

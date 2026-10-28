@@ -3,13 +3,13 @@
     "message": "Pinboard Bookmark Enhanced"
   },
   "extDescription": {
-    "message": "Pinboard-Lesezeichen: KI-Tags und Zusammenfassungen, Reader mit Übersetzung und Markierungen, Markdown/EPUB-Export, 13 Themes."
+    "message": "Für Pinboard, Karakeep und linkding: KI-Tags und Zusammenfassungen, Reader mit Übersetzung und Markierungen, Markdown/EPUB-Export."
   },
   "cmdOpenPopup": {
     "message": "Pinboard Bookmark Enhanced öffnen"
   },
   "cmdQuickSave": {
-    "message": "Schnell in Pinboard speichern (ohne Popup)"
+    "message": "Schnell im gewählten Lesezeichendienst speichern (ohne Popup)"
   },
   "cmdReadLater": {
     "message": "Schnell als Später lesen speichern (ohne Popup)"
@@ -162,7 +162,7 @@
     "message": "KI-Tags"
   },
   "urlWarning": {
-    "message": "Diese Seite kann nicht in Pinboard gespeichert werden (nicht unterstützte URL). Tab-Sets und Stapelspeicherung unten funktionieren weiterhin."
+    "message": "Diese URL wird nicht unterstützt und kann nicht als Lesezeichen gespeichert werden."
   },
   "urlCannotSave": {
     "message": "Speichern nicht möglich: nicht unterstützte URL"
@@ -550,7 +550,7 @@
     }
   },
   "batchAccountChanged": {
-    "message": "Stapelspeicherung gestoppt: Das Pinboard-Konto wurde gewechselt."
+    "message": "Stapelspeicherung gestoppt: Die Lesezeichenverbindung hat sich geändert."
   },
   "tabSetFailed": {
     "message": "Das Tab-Set konnte nicht gespeichert werden: $ERROR$",
@@ -598,19 +598,19 @@
     }
   },
   "saveQueuedNetwork": {
-    "message": "Pinboard ist nicht erreichbar, Verbindung prüfen. Das Lesezeichen wartet in der Warteschlange und wird automatisch erneut gesendet."
+    "message": "Server nicht erreichbar. Die Speicherung wartet in der Warteschlange und wird automatisch erneut versucht."
   },
   "saveQueuedServer": {
-    "message": "Pinboard antwortet gerade nicht. Das Lesezeichen wartet in der Warteschlange und wird automatisch erneut gesendet."
+    "message": "Server nicht verfügbar. Die Speicherung wartet in der Warteschlange und wird automatisch erneut versucht."
   },
   "offlineRetry": {
     "message": "Jetzt erneut versuchen"
   },
   "offlineRetryWrongAccount": {
-    "message": "Dieser Eintrag wurde für ein anderes Pinboard-Konto in die Warteschlange gestellt. Melde dich mit diesem Konto an, um ihn zu senden."
+    "message": "Dieser Eintrag gehört zu einer anderen Verbindung. Stelle sie wieder her oder prüfe die Seite und speichere sie erneut."
   },
   "offlineRetryAccountChanged": {
-    "message": "Das Pinboard-Konto wurde während des erneuten Versuchs gewechselt, daher wurde er abgebrochen."
+    "message": "Die Lesezeichenverbindung hat sich beim Wiederholen geändert. Der Vorgang wurde gestoppt."
   },
   "offlineRetryFailed": {
     "message": "Dieses Lesezeichen konnte nicht gesendet werden. Bitte erneut versuchen.",
@@ -673,34 +673,34 @@
     "message": "Dieses Lesezeichen löschen"
   },
   "bgNotLoggedIn": {
-    "message": "Pinboard: Nicht angemeldet"
+    "message": "Lesezeichendienst nicht verbunden"
   },
   "bgSetToken": {
-    "message": "Lege deinen API-Token in den Erweiterungseinstellungen fest."
+    "message": "Wähle und verbinde einen Lesezeichendienst in den Erweiterungseinstellungen."
   },
   "bgUndone": {
-    "message": "Pinboard: Rückgängig gemacht"
+    "message": "Rückgängig gemacht"
   },
   "bgUndoFailed": {
-    "message": "Pinboard: Rückgängig machen fehlgeschlagen"
+    "message": "Rückgängig machen fehlgeschlagen"
   },
   "bgBookmarkRemoved": {
     "message": "Lesezeichen entfernt."
   },
   "bgQuickSaved": {
-    "message": "Pinboard: Schnellspeichern"
+    "message": "Schnellspeichern"
   },
   "bgReadLater": {
-    "message": "Pinboard: Später lesen"
+    "message": "Später lesen"
   },
   "bgCannotSave": {
-    "message": "Pinboard: Speichern nicht möglich"
+    "message": "Speichern nicht möglich"
   },
   "bgCannotBookmark": {
     "message": "Nur http- und https-Seiten können gespeichert werden."
   },
   "bgMdPreviewFailed": {
-    "message": "Pinboard: Markdown-Konvertierung fehlgeschlagen"
+    "message": "Markdown-Konvertierung fehlgeschlagen"
   },
   "bgMdPreviewNoContent": {
     "message": "Auf dieser Seite wurde kein lesbarer Inhalt gefunden."
@@ -831,19 +831,19 @@
     "message": "Melde dich in diesem Browser bei pinboard.in an und versuche es dann erneut."
   },
   "bgQuickSaveFailed": {
-    "message": "Pinboard: Schnellspeicherung fehlgeschlagen"
+    "message": "Schnellspeicherung fehlgeschlagen"
   },
   "bgReadLaterFailed": {
-    "message": "Pinboard: Später lesen fehlgeschlagen"
+    "message": "Später lesen fehlgeschlagen"
   },
   "bgSaveFailed": {
-    "message": "Pinboard: Speichern fehlgeschlagen"
+    "message": "Speichern fehlgeschlagen"
   },
   "bgNetworkError": {
-    "message": "Pinboard: Netzwerkfehler"
+    "message": "Netzwerkfehler"
   },
   "bgQueuedOffline": {
-    "message": "Pinboard: Offline in Warteschlange"
+    "message": "Offline in Warteschlange"
   },
   "bgTitleSaved": {
     "message": "\"$TITLE$\" gespeichert.",
@@ -870,10 +870,10 @@
     }
   },
   "bgBatchSaved": {
-    "message": "Pinboard: Stapelspeicherung abgeschlossen"
+    "message": "Stapelspeicherung abgeschlossen"
   },
   "bgBatchCancelled": {
-    "message": "Pinboard: Stapelspeicherung abgebrochen"
+    "message": "Stapelspeicherung abgebrochen"
   },
   "bgUndo": {
     "message": "Rückgängig"
@@ -930,7 +930,7 @@
     "message": "Keine Notizen entsprechen diesem Filter."
   },
   "notesHiddenByOwner": {
-    "message": "Einige Markierungen auf diesem Gerät gehören zu anderen Pinboard-Konten und werden für dieses Konto nicht angezeigt."
+    "message": "Einige Markierungen gehören zu früheren Bibliotheken und wurden nicht in diese persönliche Bibliothek übernommen."
   },
   "notesUnknownPage": {
     "message": "Unbekannte Seite"
@@ -1095,7 +1095,7 @@
     "message": "Vorgewärmt (Hintergrundabruf alle 15 Min., sofort verfügbar)"
   },
   "tagSyncHint": {
-    "message": "Steuert, wie deine vorhandene Pinboard-Tag-Cloud für die Autovervollständigung in das Popup geladen wird. Nur Lesezugriff; es werden keine Tags zu Pinboard hochgeladen."
+    "message": "Wähle, wann vorhandene Tags zur Autovervollständigung geladen werden. Dabei werden keine Tags auf dem Server geändert."
   },
   "labelTagPresets": {
     "message": "Tag-Vorlagen"
@@ -1134,7 +1134,7 @@
     "message": "Vokabeln in Sicherungen einschließen"
   },
   "backupIncludeVocabularyHint": {
-    "message": "Enthält nur Vokabeln des aktuellen Pinboard-Kontos."
+    "message": "Enthält nur Vokabeln der persönlichen Bibliothek."
   },
   "backupIncludeSecretsLabel": {
     "message": "API-Schlüssel und Tokens in Sicherungen einschließen"
@@ -1162,13 +1162,13 @@
     "message": "Diese Sicherung enthält Zugangsdaten im Klartext. Nur importieren, wenn die Herkunft der Datei vertrauenswürdig ist."
   },
   "backupVocabOwnerMissing": {
-    "message": "Vokabeln wurden nicht einbezogen, weil kein Pinboard-Konto verfügbar ist. Die anderen ausgewählten Daten wurden exportiert."
+    "message": "Vokabeln wurden nicht einbezogen, weil keine persönliche Bibliothek verfügbar ist. Die anderen ausgewählten Daten wurden exportiert."
   },
   "backupHighlightsOwnerMissing": {
-    "message": "Kontogebundene Markierungen und Notizen wurden nicht einbezogen, weil kein Pinboard-Konto verfügbar ist. Die anderen ausgewählten Daten wurden exportiert."
+    "message": "Kontogebundene Markierungen und Notizen wurden nicht einbezogen, weil keine persönliche Bibliothek verfügbar ist. Die anderen ausgewählten Daten wurden exportiert."
   },
   "backupHighlightsVocabOwnerMissing": {
-    "message": "Vokabeln sowie kontogebundene Markierungen und Notizen wurden nicht einbezogen, weil kein Pinboard-Konto verfügbar ist. Die anderen ausgewählten Daten wurden exportiert."
+    "message": "Vokabeln sowie kontogebundene Markierungen und Notizen wurden nicht einbezogen, weil keine persönliche Bibliothek verfügbar ist. Die anderen ausgewählten Daten wurden exportiert."
   },
   "backupPreviewTitle": {
     "message": "Importvorschau"
@@ -1200,7 +1200,7 @@
     "placeholders": { "count": { "content": "$1" } }
   },
   "backupPreviewHighlights": {
-    "message": "Seiten: $PAGES$; Einträge: $ITEMS$; Pinboard-Konto: $OWNER$",
+    "message": "Seiten: $PAGES$; Einträge: $ITEMS$; persönliche Bibliothek: $OWNER$",
     "placeholders": {
       "pages": { "content": "$1" },
       "items": { "content": "$2" },
@@ -1208,7 +1208,7 @@
     }
   },
   "backupPreviewVocabulary": {
-    "message": "Vokabeleinträge: $COUNT$; Pinboard-Konto: $OWNER$",
+    "message": "Vokabeleinträge: $COUNT$; persönliche Bibliothek: $OWNER$",
     "placeholders": {
       "count": { "content": "$1" },
       "owner": { "content": "$2" }
@@ -1224,10 +1224,10 @@
     "message": "Keine"
   },
   "backupPreviewOwnerMismatch": {
-    "message": "Die Vokabeln können nicht importiert werden, weil diese Sicherung zu einem anderen Pinboard-Konto gehört."
+    "message": "Die Vokabeln können nicht importiert werden, weil diese Sicherung zu einer anderen persönlichen Bibliothek gehört."
   },
   "backupPreviewHighlightOwnerMismatch": {
-    "message": "Markierungen und Notizen können nicht importiert werden, weil diese Sicherung zu einem anderen Pinboard-Konto gehört."
+    "message": "Markierungen und Notizen können nicht importiert werden, weil diese Sicherung zu einer anderen persönlichen Bibliothek gehört."
   },
   "backupPreviewReady": {
     "message": "Die Importvorschau ist bereit."
@@ -3411,7 +3411,7 @@
       "message": "Google Drive"
     },
     "vocabDriveScope": {
-      "message": "Nach dem Verbinden synchronisiert dieses Gerät Vokabeln, Markierungen und Notizen, vollständige KI-Wörterbucheinträge samt Ergänzungen sowie gespeicherte Gespräche mit ihren Quellenauszügen für das aktuelle Pinboard-Konto."
+      "message": "Nach dem Verbinden synchronisiert dieses Gerät Vokabeln, Markierungen und Notizen, vollständige KI-Wörterbucheinträge samt Ergänzungen sowie gespeicherte Gespräche mit ihren Quellenauszügen für die persönliche Bibliothek."
     },
     "vocabDriveConnectionHint": { "message": "Verbinde jedes Gerät einzeln. Google Drive synchronisiert keine Einstellungen oder Zugangsdaten." },
     "vocabDriveDisclosure": {
@@ -3448,7 +3448,7 @@
       "message": "Google-Konto"
     },
     "vocabDriveOwnerLabel": {
-      "message": "Pinboard-Konto"
+      "message": "Persönliche Bibliothek"
     },
     "vocabDriveNever": {
       "message": "Noch nicht synchronisiert"
@@ -3481,10 +3481,10 @@
       "message": "Die Google-Autorisierung ist vorübergehend nicht verfügbar."
     },
     "vocabDriveErrorPinboardAuth": {
-      "message": "Kein Pinboard-Konto angemeldet. Trage unter „Konto → Pinboard-Konto“ deinen API-Token ein und verbinde dich erneut."
+      "message": "Die persönliche Bibliothek ist nicht verfügbar. Diese Seite erneut öffnen und noch einmal versuchen."
     },
     "vocabDriveErrorPinboardAuthSync": {
-      "message": "Kein Pinboard-Konto angemeldet. Trage unter „Konto → Pinboard-Konto“ deinen API-Token ein und klicke dann auf „Jetzt synchronisieren“."
+      "message": "Die persönliche Bibliothek ist nicht verfügbar. Öffne diese Seite erneut und klicke auf „Jetzt synchronisieren“."
     },
     "vocabDriveErrorPermission": {
       "message": "Die Berechtigung für Google Drive fehlt."
@@ -3508,7 +3508,7 @@
       "message": "Bei der Synchronisierung ist ein unerwarteter Fehler aufgetreten."
     },
     "vocabDriveErrorAccountChanged": {
-      "message": "Das Google- oder Pinboard-Konto hat sich während der Synchronisierung geändert. Versuche es erneut."
+      "message": "Das Google-Konto oder die persönliche Bibliothek hat sich während der Synchronisierung geändert. Versuche es erneut."
     },
     "vocabDriveErrorEntryTooLarge": {
       "message": "Eine gespeicherte Vokabel oder ihr Kontext ist zu groß für die Synchronisierung. Kürze oder entferne den Eintrag und klicke dann auf „Jetzt synchronisieren“."
@@ -3531,16 +3531,16 @@
       "message": "Export und Integrationen"
     },
     "vocabOwnerNoAccount": {
-      "message": "Kein Pinboard-Konto"
+      "message": "Die persönliche Bibliothek ist nicht verfügbar. Diese Seite erneut öffnen und noch einmal versuchen."
     },
     "vocabLoadFailed": {
-      "message": "Die Vokabeln des aktuellen Pinboard-Kontos konnten nicht geladen werden. Öffne „Vokabeln“ erneut und versuche es noch einmal."
+      "message": "Die Vokabeln der persönlichen Bibliothek konnten nicht geladen werden. Öffne „Vokabeln“ erneut und versuche es noch einmal."
     },
     "vocabExportFailed": {
       "message": "Die Vokabeln konnten nicht exportiert werden. Versuche es erneut."
     },
     "vocabAccountChanged": {
-      "message": "Das Pinboard-Konto wurde gewechselt, bevor der Vorgang abgeschlossen war. Versuche es erneut."
+      "message": "Die persönliche Bibliothek wurde gewechselt, bevor der Vorgang abgeschlossen war. Versuche es erneut."
     },
     "vocabSettingsSaveFailed": {
       "message": "Die geänderten Integrationseinstellungen konnten nicht gespeichert werden. Prüfe sie und versuche es noch einmal."
@@ -3552,7 +3552,7 @@
       "message": "Mit Cmd+Klick einen Eintrag auswählen, mit Umschalt+Klick einen Bereich"
     },
     "vocabResultCount": {
-      "message": "Aktuelles Pinboard-Konto ($OWNER$): $RESULTS$ Treffer · $TOTAL$ gespeichert",
+      "message": "$OWNER$: $RESULTS$ Treffer · $TOTAL$ gespeichert",
       "placeholders": {
         "results": {
           "content": "$1"
@@ -3863,7 +3863,7 @@
     "message": "Richte in den Einstellungen einen KI-Anbieter ein und aktiviere die KI der Leseansicht, um Einträge zu erstellen."
   },
   "dictVocabEmpty": {
-    "message": "Für das aktuelle Pinboard-Konto ($OWNER$) sind noch keine Vokabeln gespeichert. Speichere Wörter aus der Wörterbuchansicht des Readers.",
+    "message": "In der persönlichen Bibliothek ($OWNER$) sind noch keine Vokabeln gespeichert. Speichere Wörter aus der Wörterbuchansicht des Readers.",
     "placeholders": {
       "owner": {
         "content": "$1"
@@ -4279,7 +4279,7 @@
   "diagnosticsCopied": { "message": "Diagnose kopiert" },
   "diagnosticsCopyFailed": { "message": "Die Diagnose konnte nicht kopiert werden. Prüfe den Zugriff auf die Zwischenablage und versuche es erneut." },
   "libraryVocabSignedOutTitle": { "message": "Für Vokabeln anmelden" },
-  "libraryVocabSignedOutHint": { "message": "Vokabeln werden für jedes Pinboard-Konto getrennt gespeichert. Die Wörterbuchsuche bleibt ohne Anmeldung verfügbar." },
+  "libraryVocabSignedOutHint": { "message": "Vokabeln, Markierungen, Notizen und Ask-Verlauf bleiben für alle Lesezeichendienste in derselben persönlichen Bibliothek." },
   "libraryVocabOpenSettings": { "message": "Kontoeinstellungen öffnen" },
   "libraryLookupSignedOutHint": { "message": "Schlag Wörter im Bereich „Wörterbuch“ nach. Melde dich an, um sie in den Vokabeln zu speichern." },
   "mdPreviewClose": { "message": "Leser schließen" },
@@ -4383,7 +4383,7 @@
   "loginNeedsPaid": { "message": "Erfordert ein kostenpflichtiges Pinboard-Konto." },
   "popupDraftDiscard": { "message": "Entwurf verwerfen" },
   "readerBookmarkSection": {"message": "Speichern"},
-  "readerBookmarkSave": {"message": "In Pinboard speichern"},
+  "readerBookmarkSave": {"message": "Lesezeichen speichern"},
   "readerBookmarkSaved": {"message": "Gespeichert"},
   "readerBookmarkLater": {"message": "Später lesen"},
   "readerBookmarkMarkRead": {"message": "Als gelesen markieren"},
@@ -4391,7 +4391,7 @@
   "readerBookmarkChecking": {"message": "Lesezeichen wird geprüft…"},
   "readerBookmarkSaving": {"message": "Wird gespeichert…"},
   "readerBookmarkUpdated": {"message": "Lesezeichen aktualisiert"},
-  "readerBookmarkQueued": {"message": "Offline vorgemerkt; noch nicht in Pinboard gespeichert"},
+  "readerBookmarkQueued": {"message": "Offline vorgemerkt; noch nicht gespeichert"},
   "readerBookmarkLookupFailed": {"message": "Lesezeichen konnte nicht geprüft werden. Versuche es vor dem Bearbeiten erneut."},
   "readerBookmarkFailed": {"message": "Speichern fehlgeschlagen. Bitte erneut versuchen."},
   "readerBookmarkAccountChanged": {"message": "Das Konto hat sich geändert. Öffne den Reader zum Speichern erneut."},
@@ -4405,14 +4405,14 @@
     "message": "Lesezeichen löschen"
   },
   "readerBookmarkDeleteConfirm": {
-    "message": "Dieses Lesezeichen aus Pinboard löschen?"
+    "message": "Dieses Lesezeichen löschen?"
   },
   "readerBookmarkDeleteDetail": {"message": "Markierungen und Notizen im Reader bleiben erhalten."},
   "readerBookmarkDeleting": {
     "message": "Lesezeichen wird gelöscht…"
   },
   "readerBookmarkDeleted": {
-    "message": "Lesezeichen aus Pinboard gelöscht"
+    "message": "Lesezeichen gelöscht"
   },
   "readerBookmarkDeleteFailed": {
     "message": "Löschen konnte nicht bestätigt werden. Bitte erneut versuchen."
@@ -4686,5 +4686,62 @@
   "dictGenerationServiceUnavailable": {"message": "Der Dienst des Anbieters ist vorübergehend nicht erreichbar. Versuche es später erneut."},
   "dictProgressThinking": {"message": "Das Modell denkt nach…"},
   "dictProgressStreaming": {"message": "Antwort wird empfangen…"},
-  "dictProgressElapsed": {"message": "Seit $SECONDS$ s", "placeholders": {"seconds": {"content": "$1"}}}
+  "dictProgressElapsed": {"message": "Seit $SECONDS$ s", "placeholders": {"seconds": {"content": "$1"}}},
+  "bookmarkServiceTitle": {
+    "message": "Lesezeichendienst"
+  },
+  "bookmarkServiceChoose": {
+    "message": "Speicherort für Lesezeichen wählen"
+  },
+  "bookmarkServiceHint": {
+    "message": "Popup, Lesemodus, Tastenkürzel und Stapelspeicherung verwenden diesen Dienst."
+  },
+  "personalLibraryTitle": {
+    "message": "Persönliche Bibliothek"
+  },
+  "personalLibraryHint": {
+    "message": "Vokabeln, Markierungen, Notizen und Ask-Verlauf bleiben für alle Lesezeichendienste in derselben persönlichen Bibliothek."
+  },
+  "bookmarkServerUrl": {
+    "message": "Server-URL"
+  },
+  "bookmarkServerHint": {
+    "message": "Die Website-URL einschließlich Unterpfad angeben. Außer für localhost ist HTTPS erforderlich."
+  },
+  "bookmarkConnectHint": {
+    "message": "Änderungen an URL und Token werden erst nach dem Verbinden wirksam. Tokens bleiben auf diesem Gerät, sofern die Synchronisierung von Zugangsdaten deaktiviert ist."
+  },
+  "bookmarkConnect": {
+    "message": "Verbinden"
+  },
+  "bookmarkConnecting": {
+    "message": "Verbindung wird hergestellt…"
+  },
+  "bookmarkConnected": {
+    "message": "Verbunden"
+  },
+  "bookmarkConnectFailed": {
+    "message": "Verbindung fehlgeschlagen. Server-URL, Token und Website-Berechtigung prüfen."
+  },
+  "bookmarkInvalidConfig": {
+    "message": "Eine gültige Server-URL und ein API-Token eingeben."
+  },
+  "bookmarkPermissionDenied": {
+    "message": "In den Einstellungen den Zugriff auf diesen Server erlauben und erneut verbinden."
+  },
+  "bookmarkKarakeepHint": {
+    "message": "„Später lesen“ verwendet eine eigene private Liste. Als gelesen markierte Lesezeichen werden daraus entfernt. Der Archivstatus im Dienst bleibt unverändert."
+  },
+  "bookmarkReadLaterListName": {
+    "message": "Später lesen"
+  },
+  "bookmarkPartialSave": {
+    "message": "Das Lesezeichen wurde möglicherweise gespeichert, aber nicht alle Änderungen. Unter „Bearbeiten“ prüfen und erneut speichern."
+  },
+  "bookmarkServiceSettings": {
+    "message": "Lesezeichendienst wählen"
+  },
+  "backupAdoptLibrary": {
+    "message": "Die persönliche Bibliothek ist leer. Beim Wiederherstellen von Vokabeln oder Markierungen wird die Bibliothek der Sicherung übernommen, damit ihre bisherigen Drive-Daten verfügbar bleiben."
+  }
 }

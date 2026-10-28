@@ -155,7 +155,7 @@ await test('per-answer copy rejects its completed record after external Clear',a
     const names=['pbpReadSettingsWithSecrets','pbpPinboardAccountFromToken','flashButtonLabel'];const saved=Object.fromEntries(names.map(n=>[n,window[n]]));const descriptor=Object.getOwnPropertyDescriptor(navigator,'clipboard');
     const record={q:'copied question',a:'Kept completed answer',ts:3,model:'test-model'};let copies=0,notify;
     Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{copies++;notify?.();}}});
-    window.pbpReadSettingsWithSecrets=async()=>({pinboardToken:'alice:test-token'});window.pbpPinboardAccountFromToken=token=>token.split(':')[0];window.flashButtonLabel=()=>{};
+    window.pbpReadSettingsWithSecrets=async()=>({personalLibraryAccount:'alice'});window.pbpPinboardAccountFromToken=token=>token.split(':')[0];window.flashButtonLabel=()=>{};
     try{
       await realAskHistory.set(state.url,[record],state.account);answer._askExportRecord=record;_pbpAskFinalize(answer,record.a);
       const copied=new Promise(resolve=>notify=resolve);answer.querySelector('.ask-copy-btn').click();await Promise.race([copied,new Promise((_,reject)=>setTimeout(()=>reject(Error('initial copy did not finish')),1000))]);assert(copies===1);

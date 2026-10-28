@@ -5,11 +5,11 @@ title: Pinboard Bookmark Enhanced
 
 # Pinboard Bookmark Enhanced
 
-A Chrome extension for [Pinboard](https://pinboard.in) with AI tags and summaries, a reader with translation and highlights, and 13 themes for pinboard.in.
+A Chrome extension for [Pinboard](https://pinboard.in), Karakeep and linkding with AI tags and summaries, a reader with translation and highlights, and 13 themes for pinboard.in.
 
 ## Reading and translation
 
-- Save the article to Pinboard or edit its bookmark directly in the reader.
+- Save the article to your selected bookmark service or edit its bookmark directly in the reader. Karakeep and linkding need no Pinboard account; connect your server and API token under Settings → Account.
 - Choose the definition language for AI entries independently of the interface or the word’s language, and filter saved vocabulary by language. Original dictionary definitions retain their own language.
 - Import Yomitan v3 ZIP dictionaries for offline definitions and readings on this device. Dictionary packs are excluded from Drive sync and JSON backups.
 - See a word in real sentences from Wikisource texts, with author, work and a revision link. The search never calls AI and never translates.
@@ -21,11 +21,13 @@ A Chrome extension for [Pinboard](https://pinboard.in) with AI tags and summarie
 - The reader translates the extracted article text rather than the live page, so headings, lists, tables, code blocks, and math keep their structure in both the bilingual and translated views.
 - Translation runs between your browser and the AI provider you configured with your own key. The extension operates no translation snapshot or sharing service, so a translated page cannot appear on a public URL unless you export it yourself.
 
+Vocabulary, highlights, notes, AI dictionary archives and Ask history share one personal library, independent of your bookmark connection. Upgrades keep the current library without merging other historical accounts. Karakeep Read Later uses a dedicated private list; linkding uses its unread flag.
+
 ## Sync and backup
 
 - Chrome Sync can share settings between devices where you enable it. Credential sync is a separate opt-in.
-- Manual schema v3 JSON backups contain settings and can optionally include reader highlights, notes, and vocabulary from the current Pinboard account, plus API keys and tokens if you tick that box.
-- Google Drive syncs the current Pinboard account's vocabulary, highlights, notes, complete AI dictionary entries with their supplements, and saved Ask conversations. Connect it on each device under General → Data Sync while signed in to Chrome; disconnecting a device stops syncing there and keeps your data.
+- Manual schema v3 JSON backups contain settings and can optionally include reader highlights, notes, and vocabulary from the personal library, plus API keys and tokens if you tick that box.
+- Google Drive syncs the personal library’s vocabulary, highlights, notes, complete AI dictionary entries with their supplements, and saved Ask conversations. Connect it on each device under General → Data Sync while signed in to Chrome; disconnecting a device stops syncing there and keeps your data.
 - Update the extension on every device that syncs vocabulary. This version reads existing vocabulary data, but older versions cannot receive vocabulary changes written by this version.
 
 ## Video pages

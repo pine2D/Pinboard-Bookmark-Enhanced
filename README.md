@@ -2,9 +2,9 @@
 
 **English** | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [繁體中文（香港）](README.zh-HK.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [日本語](README.ja.md) | [Polski](README.pl.md) | [Русский](README.ru.md)
 
-A Chrome extension for [Pinboard](https://pinboard.in): AI tags and summaries, a built-in reader with translation and highlights, and 13 themes for the site itself.
+A Chrome extension for [Pinboard](https://pinboard.in), Karakeep and linkding: AI tags and summaries, a reader with translation and highlights, and 13 themes for pinboard.in.
 
-> **Note:** This extension requires a Pinboard.in account. [Pinboard](https://pinboard.in) is an independent, **PAID** bookmarking service. This extension is a third-party client that connects to your existing Pinboard account with your own Pinboard API token. It is not affiliated with, sponsored by, or endorsed by Pinboard. You must already have (or sign up for) a paid Pinboard.in account to use this extension.
+> **Note:** Choose one bookmark service in Settings. Karakeep and linkding work without a Pinboard account. Pinboard is an independent **paid** service and requires your own account and API token. This third-party extension is not affiliated with, sponsored by, or endorsed by Pinboard.
 
 [![Chrome](https://img.shields.io/badge/Chrome-MV3-brightgreen?logo=googlechrome&logoColor=white)](https://developer.chrome.com/docs/extensions/)
 [![Version](https://img.shields.io/github/v/release/pine2D/Pinboard-Bookmark-Enhanced?label=version)](https://github.com/pine2D/Pinboard-Bookmark-Enhanced/releases/latest)
@@ -32,7 +32,7 @@ A Chrome extension for [Pinboard](https://pinboard.in): AI tags and summaries, a
 ### Read
 - **Any page becomes a clean reader**: a Markdown view with table of contents, search, and footnote peek; math, diagrams, and tables render properly
 - **GitHub Discussions (pilot)**: keeps the loaded main post, comments, reply structure, and which reply was accepted; shows how much was loaded
-- **Manage bookmarks as you read**: save, edit, or delete the article’s Pinboard bookmark without returning to the popup
+- **Manage bookmarks as you read**: save, edit, or delete the article’s bookmark without returning to the popup
 - **Five-color highlights with notes**: they stay in place through translation and even later edits to the page
 - **Translate the page or ask it questions**: full-page translation with a bilingual view; answers cite the source and jump straight to it
 - **Keep questions and answers with their citations**: completed answers save automatically and sync through Google Drive. Browse conversations in the library, continue in the reader, or export them alone or with the article. Temporary conversations stay unsaved.
@@ -74,13 +74,17 @@ Or load unpacked from a release ZIP:
 
 The source checkout has a separate fixed development ID, so it can coexist with the Chrome Web Store version for testing. A release ZIP uses the Chrome Web Store ID, so those two versions cannot coexist in one Chrome profile. Chrome Sync can share settings after you enable settings sync on each device. Before replacing an older unpacked release, click **Export backup** in its settings; after loading the new release, use **Import backup**.
 
-After installing, click the toolbar icon → paste your [Pinboard API token](https://pinboard.in/settings/password) → **Log in**
+After installing, open **Settings → Account** and choose your bookmark service. For Karakeep or linkding, enter the site URL and API token, then click **Connect** and allow access to that server. Include any site subpath; HTTPS is required except on localhost. For Pinboard, paste your [API token](https://pinboard.in/settings/password) in the popup and log in.
+
+Popup, reader, shortcut and batch saves use the selected service. Karakeep uses a dedicated private list for Read Later; marking an item as read removes it from the list without archiving it. linkding uses its unread flag. Pinboard suggestions, tag cleanup, unread counts, site search and Tab Sets remain Pinboard-only.
+
+Vocabulary, highlights, notes, AI dictionary archives and Ask history share one personal library across all three services. Switching services or signing out does not switch the library. Upgrading preserves the current Pinboard library; other historical accounts are not merged. Bookmark caches, drafts and offline queues remain tied to their original connection. Reconnecting linkding creates a new connection, so earlier pending saves require review.
 
 ## Privacy
 
 No tracking, no analytics, no telemetry. For new users, settings and credentials stay on this device by default. Ordinary settings sync is enabled separately on each device. Credential sync is one Chrome-account-wide choice, but only devices with settings sync enabled participate; other devices continue using local credentials. New users start with credential sync off, while upgrades keep it on when non-empty credentials already exist in Chrome Sync to avoid data loss. When enabled, API keys, tokens, passwords, and export credentials are shared through Chrome Sync and are obfuscated, not encrypted. Saved bookmarks, page content, and the offline queue never enter Chrome Sync. AI requests come **only** from AI features you turn on or use, and go directly to the provider you configured. At install time, only Pinboard access is granted. Any other site the extension needs (an AI provider, an export or archive destination, a dictionary, Google Drive, video subtitles, or the sites in a Batch Save) is requested one exact site at a time, the first time you use that feature. Custom network endpoints must use HTTPS; HTTP is allowed only for `localhost`, `127.0.0.1`, and `[::1]`. Extension pages enforce a strict Content-Security-Policy (no remote code). Full policy: <https://pine2d.github.io/Pinboard-Bookmark-Enhanced/privacy.html>
 
-Google Drive connects separately on each device and syncs the current Pinboard account’s vocabulary, highlights, notes, complete AI dictionary entries with their supplements, and saved questions and answers with source excerpts. Drive copies are plaintext in the private appDataFolder and are not end-to-end encrypted. Optional word-origin evidence comes from Wiktionary. The extension checks the source text and sends short excerpts and relevant metadata to your chosen AI provider. Examples in usage points are AI-written. Original-text examples are searched on Wikisource and shown as found, without translation; they are never sent to AI. Earlier paid results are retained; a new version is generated only on request.
+Google Drive connects separately on each device and syncs the personal library’s vocabulary, highlights, notes, complete AI dictionary entries with their supplements, and saved questions and answers with source excerpts. Drive copies are plaintext in the private appDataFolder and are not end-to-end encrypted. Optional word-origin evidence comes from Wiktionary. The extension checks the source text and sends short excerpts and relevant metadata to your chosen AI provider. Examples in usage points are AI-written. Original-text examples are searched on Wikisource and shown as found, without translation; they are never sent to AI. Earlier paid results are retained; a new version is generated only on request.
 
 Update the extension on every device that syncs vocabulary. This version reads existing vocabulary data, but older versions cannot receive vocabulary changes written by this version.
 

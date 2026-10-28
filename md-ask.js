@@ -1601,9 +1601,9 @@ async function _pbpAskRun(question, aEl, opts) {
         signal: st.ctrl.signal,
         beforeRequest: async () => {
           const fresh = await pbpAiGetSettings();
-          const live = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
+          const live = await pbpPersonalLibraryAccount();
           if (runCtrl.signal.aborted || !pbpAiAvailable(fresh) || st.account !== runAccount ||
-              (pbpPinboardAccountFromToken(live.pinboardToken) || "") !== runAccount ||
+              live !== runAccount ||
               (st.archiveRev || 0) !== runArchiveRev || st.sessionId !== runSession) {
             throw Object.assign(new Error("request cancelled"), { name: "AbortError" });
           }
@@ -2273,10 +2273,10 @@ document.addEventListener("pbp:ask-history-external", (event) => {
 async function _pbpAskExportOwnerCurrent(account, revision, articleRevision, snapshot) {
   const current = () => _pbpAskState && _pbpAskState.account === account
     && _pbpAskExportRevision === revision && _pbpAskArticleRev === articleRevision;
-  if (!current() || typeof pbpReadSettingsWithSecrets !== "function" || typeof pbpPinboardAccountFromToken !== "function") return false;
+  if (!current() || typeof pbpPersonalLibraryAccount !== "function") return false;
   try {
-    const settings = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
-    if (!current() || (pbpPinboardAccountFromToken(settings.pinboardToken) || "") !== account) return false;
+    const accountNow = await pbpPersonalLibraryAccount();
+    if (!current() || accountNow !== account) return false;
     if (snapshot) {
       const fresh = await pbpAskExportSnapshot({ url: snapshot.url, account, title: snapshot.title });
       if (JSON.stringify(fresh.rounds) !== JSON.stringify(snapshot.rounds)) return false;

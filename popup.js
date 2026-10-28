@@ -45,6 +45,13 @@ pinboardFetchImmediate = function(url) {
   return _pbpProxyPinboardFetch(url, true);
 };
 
+async function pbpPopupBookmarkApi(action, url) {
+  const account = pbpBookmarkConnection(settings).account;
+  const result = await chrome.runtime.sendMessage({type:"bookmark_api",action,url,account});
+  return {ok:result?.ok === true, status:result?.status || 0, error:result?.error,
+    json:async () => result?.data || {}};
+}
+
 let currentTags = [];
 let allUserTags = [];
 let allUserTagCounts = {};
@@ -81,6 +88,13 @@ function pbpPopupFormIsDirty() {
 }
 
 function pbpRebasePopupTags(serverTags, submittedTags, liveTags) {
+  if (Array.isArray(serverTags)) {
+    const baseline = Array.isArray(submittedTags) ? submittedTags : [];
+    const current = Array.isArray(liveTags) ? liveTags : [];
+    const unchanged = baseline.length === current.length && baseline.every((tag,index)=>tag===current[index]);
+    const controlled = new Set([...baseline,...current].map(tag=>tag.toLowerCase()));
+    return [...new Set([...(unchanged ? serverTags : serverTags.filter(tag=>!controlled.has(tag.toLowerCase()))),...current])];
+  }
   const baseline = Array.isArray(submittedTags) ? submittedTags : [];
   const current = Array.isArray(liveTags) ? liveTags : [];
   const unchanged = baseline.length === current.length && baseline.every((tag, index) => tag === current[index]);
@@ -295,9 +309,9 @@ async function initPopupDraft(account, tab) {
   if (_popupDraftChangedFields.size) pbpRememberPopupDraft();
   try {
     const result = await chrome.runtime.sendMessage({ type: "PBP_POPUP_DRAFT", ...context, action: "read" });
-    const auth = await pbpReadSettingsWithSecrets({ pinboardToken: "" });
+    const auth = await pbpReadBookmarkConnection();
     if (_popupDraftContext !== context || (result?.ok && result.account !== account)
-        || pbpPinboardAccountFromToken(auth.pinboardToken) !== account) return;
+        || auth.account !== account) return;
     if (!result?.ok) {
       showStatus("status-msg", t("popupDraftRestoreFailed"), "error");
       return;
@@ -476,8 +490,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
   }
 
-  if (!settings.pinboardToken) showLogin();
-  else showMain(settings.pinboardToken);
+  if (!pbpBookmarkConnection(settings).account) {
+    showLogin();
+    $id("login-form").hidden = pbpBookmarkServiceId(settings) !== "pinboard";
+  } else showMain(pbpBookmarkConnection(settings).token);
+  $id("login-service-settings")?.addEventListener("click", () => pbpOpenOptionsTab("general"));
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if ((area === "local" || area === "sync") && (pbpBookmarkSettingsChanged(changes) || changes.optSyncEnabled || changes.syncApiKeys)) window.location.reload();
+  });
 
   $id("library-link").addEventListener("click", (e) => {
     e.preventDefault();
@@ -504,7 +524,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       noText: t("cancel"),
       onConfirm: async () => {
         await pbpDiscardPopupDraft(true);
-        const result = await persistSettings({ pinboardToken: "" });
+        const result = await persistSettings({ [(pbpBookmarkServiceId(settings) || "pinboard") + "Token"]: "" });
         if (!result.ok) return;
         settings.pinboardToken = "";
         invalidateBookmarkLookup();
@@ -605,20 +625,29 @@ async function showMain(token) {
   }
   const qa = document.querySelector(".quick-actions");
   if (qa) qa.classList.remove("hidden");
-  const username = token.split(":")[0];
-  const sessionAccount = pbpPinboardAccountFromToken(token);
+  const service = pbpBookmarkServiceId(settings);
+  const username = service === "pinboard" ? token.split(":")[0] : "";
+  const sessionAccount = pbpBookmarkConnection(typeof settings === "object" ? settings : {pinboardToken:token}).account;
   const userInfo = $id("user-info");
   userInfo.innerHTML = "";
   const pbLink = document.createElement("a");
-  pbLink.href = "https://pinboard.in/";
+  pbLink.href = pbpBookmarkHome(settings);
   pbLink.target = "_blank";
-  pbLink.textContent = "Pinboard";
+  pbLink.textContent = pbpBookmarkServiceLabel(settings);
   userInfo.appendChild(pbLink);
-  userInfo.appendChild(document.createTextNode(` \u2014 ${username}`));
+  if (username) userInfo.appendChild(document.createTextNode(` \u2014 ${username}`));
   const unreadLink = $id("unread-link");
-  if (unreadLink) unreadLink.href = `https://pinboard.in/u:${encodeURIComponent(username)}/unread/`;
+  if (unreadLink) unreadLink.href = pbpBookmarkHome(settings, true);
+  $id("save-tabset-btn").hidden = service !== "pinboard";
+  if (service !== "pinboard") {
+    for (const el of document.querySelectorAll(".quick-links > *")) el.hidden = el !== unreadLink;
+  }
+  if (service === "karakeep") {
+    $id("private-check").checked = true;
+    $id("private-check").closest("label").hidden = true;
+  }
 
-  if (!settings.optShowSearch) {
+  if (!settings.optShowSearch || pbpBookmarkServiceId(settings) !== "pinboard") {
     const searchRow = document.querySelector(".search-row");
     if (searchRow) searchRow.classList.add("hidden");
   }
@@ -646,7 +675,7 @@ async function showMain(token) {
   // screen from the very first frame instead of popping in once the async
   // chain settles -- one less layout shift above .submit-bar in the first
   // second.
-  if (settings.optShowSuggestTags) {
+  if (settings.optShowSuggestTags && pbpBookmarkServiceId(settings) === "pinboard") {
     const suggestRow = $id("suggest-row");
     if (suggestRow) suggestRow.classList.remove("hidden");
   }
@@ -1293,7 +1322,7 @@ async function htmlToMarkdownAsync(html, opts) {
               sourceIncognito: tab.incognito === true,
               bookmarkDraft: {
                 title: $id("title-input")?.value || result.title || "",
-                tags: Array.isArray(currentTags) ? currentTags.join(" ") : "",
+                tags: Array.isArray(currentTags) ? (pbpBookmarkServiceId(settings) === "pinboard" ? currentTags.join(" ") : pbpBookmarkFormatTags(currentTags)) : "",
                 notes: $id("description-input")?.value || "",
                 private: $id("private-check")?.checked === true,
                 toread: $id("readlater-check")?.checked === true,
@@ -1479,7 +1508,7 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
       if (!forceFresh) {
         try {
           let cached;
-          const lookupAccount = pbpPinboardAccountFromToken(token);
+          const lookupAccount = pbpBookmarkConnection(typeof settings === "object" ? settings : {pinboardToken:token}).account;
           if (prefetch && prefetch.prefetchUrl === lookupUrl && prefetch.prefetchPromise) {
             cached = await prefetch.prefetchPromise;
           } else {
@@ -1501,7 +1530,7 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
       if (!forceFresh && !data) {
         let workerError = null;
         try {
-          const lookupAccount = pbpPinboardAccountFromToken(token);
+          const lookupAccount = pbpBookmarkConnection(typeof settings === "object" ? settings : {pinboardToken:token}).account;
           const resolved = await chrome.runtime.sendMessage({ type: "lookup_bookmark", url: lookupUrl, account: lookupAccount });
           if (resolved?.ok && resolved.account === lookupAccount && Array.isArray(resolved.posts)) {
             data = { posts: resolved.posts };
@@ -1531,7 +1560,7 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         if (workerError) throw workerError;
       }
       if (!data) {
-        const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/get?url=${enc(lookupUrl)}&auth_token=${token}&format=json`);
+        const resp = await (pbpBookmarkServiceId(typeof settings === "object" ? settings : null) === "pinboard" ? pinboardFetch(`https://api.pinboard.in/v1/posts/get?url=${enc(lookupUrl)}&auth_token=${token}&format=json`) : pbpPopupBookmarkApi("lookup", lookupUrl));
         // Carry the status on the error so the catch can name the failure
         // (and stay silent on 401, where pinboardFetch already swapped in the
         // login screen). Carry the worker's reason string as well: status 0 is
@@ -1558,8 +1587,8 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         recomputeArchiveCheck();
         if (shouldUpdateField("readlater-check")) $id("readlater-check").checked = existingBookmark.toread === "yes";
         currentTags = Array.isArray(submittedTags)
-          ? pbpRebasePopupTags(existingBookmark.tags || "", submittedTags, currentTags)
-          : (_popupDraftRestored || _tagsUserTouched) ? currentTags : unionTags(existingBookmark.tags || "", currentTags.join(" ")).split(/\s+/).filter(Boolean);
+          ? pbpRebasePopupTags(existingBookmark.tagNames || existingBookmark.tags || "", submittedTags, currentTags)
+          : (_popupDraftRestored || _tagsUserTouched) ? currentTags : Array.isArray(existingBookmark.tagNames) ? [...new Set([...existingBookmark.tagNames, ...currentTags])] : unionTags(existingBookmark.tags || "", currentTags.join(" ")).split(/\s+/).filter(Boolean);
         renderTags();
         $id("submit-btn").textContent = t("update");
         $id("delete-btn").classList.remove("hidden");
@@ -1588,7 +1617,7 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
             }
             parts.push(t("savedOnDate", dateStr));
           }
-          const tagCount = existingBookmark.tags?.trim() ? existingBookmark.tags.trim().split(/\s+/).length : 0;
+          const tagCount = existingBookmark.tagNames?.length ?? (existingBookmark.tags?.trim() ? existingBookmark.tags.trim().split(/\s+/).length : 0);
           if (tagCount > 0) parts.push(tagCount > 1 ? t("tagCountPlural", String(tagCount)) : t("tagCount", String(tagCount)));
           // Brackets and separator come from the catalogue: CJK UIs use full-width ones.
           if (parts.length) info = t("editingExistingDetails", info, parts.join(t("editingExistingDetailSep")));
@@ -1678,7 +1707,7 @@ function setupSubmit(token) {
   const btn = $id("submit-btn");
   if (btn._pbpSubmitBound) return;
   btn._pbpSubmitBound = true;
-  const submitAccount = pbpPinboardAccountFromToken(token);
+  const submitAccount = pbpBookmarkConnection(typeof settings === "object" ? settings : {pinboardToken:token}).account;
   let submitErrorResetTimer = null;
   let submitAttemptSeq = 0;
 
@@ -1707,7 +1736,7 @@ function setupSubmit(token) {
       btn.textContent = label || t("saving");
       saveWaitNoteTimer = setTimeout(() => {
         saveWaitNoteTimer = null;
-        if (!btn.classList.contains("loading")) return;
+        if (!btn.classList.contains("loading") || pbpBookmarkServiceId(settings) !== "pinboard") return;
         showStatus("status-msg", t("saveWaitRateLimit"), "info");
         const el = $id("status-msg");
         if (el?.dataset) el.dataset.saveWait = "1";
@@ -1828,7 +1857,7 @@ function setupSubmit(token) {
         url: saveUrl,
         title,
         notes: extended,
-        tags: tags.join(" "),
+        tags: pbpBookmarkServiceId(settings) === "pinboard" ? tags.join(" ") : pbpBookmarkFormatTags(tags),
         private: isPrivate,
         toread: isReadLater,
         archive: _archiveUserTouched ? archiveRequested : undefined,
@@ -1875,7 +1904,7 @@ function setupSubmit(token) {
       if (!result || typeof result !== "object" || typeof result.status !== "string") {
         throw new Error("invalid save response");
       }
-      if (result.status === "failed" && result.reason === "not_logged_in") {
+      if (result.status === "failed" && result.reason === "not_logged_in" && pbpBookmarkServiceId(settings) === "pinboard") {
         if (!await resetPinboardSession(token) && ownsSubmitUi()) {
           showStatus("status-msg", t("pinboardErrorAuth"), "error");
           setSubmitState("idle");
@@ -1891,6 +1920,16 @@ function setupSubmit(token) {
         showSaveQueued(result);
         setSubmitState("idle");
         try { if (window.PPOffline) await window.PPOffline.refresh(); } catch (_) {}
+        return;
+      }
+
+      if (result.status === "failed" && result.reason === "partial") {
+        // Keep the user's intended edits, but obtain the ID/time of the remote
+        // bookmark so Retry updates it instead of repeating a create or skip.
+        Object.keys(fieldDirtyFlags).forEach(id => { fieldDirtyFlags[id] = true; });
+        _tagsUserTouched = true;
+        await checkExistingBookmark(token, url, null, true);
+        if (ownsSubmitUi()) { setSubmitState("idle"); showSaveError(result); }
         return;
       }
 
@@ -2149,7 +2188,7 @@ function setupSubmit(token) {
         const delOrig = delBtn.textContent;
         delBtn.disabled = true; delBtn.classList.add("loading"); delBtn.textContent = t("deleting");
         try {
-          const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?url=${enc(deleteUrl)}&auth_token=${token}&format=json`);
+          const resp = await pbpPopupBookmarkApi("delete", deleteUrl);
           // Same gate the recent-bookmark delete uses: _pbpProxyPinboardFetch
           // resolves a stand-in whose json() is {} on 401, so without this the
           // result_code is undefined and the user reads an API error ending in
@@ -2187,7 +2226,7 @@ async function loadBookmarkForEdit(url, token) {
   if (!await pbpDiscardPopupDraft()) return;
   const sourceUrl = _popupDraftContext?.pageUrl || _activeTabAtOpen?.url;
   _popupDraftContext = /^https?:\/\//.test(sourceUrl || "")
-    ? { account: pbpPinboardAccountFromToken(token), pageUrl: sourceUrl, incognito: _activeTabAtOpen?.incognito === true, ready: true } : null;
+    ? { account: pbpBookmarkConnection(typeof settings === "object" ? settings : {pinboardToken:token}).account, pageUrl: sourceUrl, incognito: _activeTabAtOpen?.incognito === true, ready: true } : null;
   _popupDraftLastSnapshot = "";
   _popupDraftChangedFields.clear();
   _popupDraftUserUrl = false;
@@ -2245,10 +2284,10 @@ async function exitEditMode() {
 // ===================== Recent Bookmarks =====================
 async function fetchRecentBookmarks(token) {
   const container = $id("recent-bookmarks");
-  const account = pbpPinboardAccountFromToken(token);
+  const account = pbpBookmarkConnection(typeof settings === "object" ? settings : {pinboardToken:token}).account;
   if (!container) return;
   try {
-    const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/recent?auth_token=${token}&format=json&count=5`);
+    const resp = await (pbpBookmarkServiceId(typeof settings === "object" ? settings : null) === "pinboard" ? pinboardFetch(`https://api.pinboard.in/v1/posts/recent?auth_token=${token}&format=json&count=5`) : pbpPopupBookmarkApi("recent"));
     if (resp.status === 401) return; // pinboardFetch already redirected to login
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
@@ -2323,7 +2362,7 @@ async function fetchRecentBookmarks(token) {
           noText: t("cancel"),
           onConfirm: async () => {
             try {
-              const resp = await pinboardFetch(`https://api.pinboard.in/v1/posts/delete?url=${enc(p.href)}&auth_token=${token}&format=json`);
+              const resp = await pbpPopupBookmarkApi("delete", p.href);
               if (resp.status === 401) return; // pinboardFetch already redirected to login
               const data = await resp.json();
               if (data.result_code === "done" || data.result_code === "item not found") {
@@ -2421,7 +2460,7 @@ function updateCharCount() {
   // carries replace=no. Missing dt let the counter read under budget on a
   // bookmark that posts/add then rejected as too_long.
   const isUpdate = !!existingBookmark;
-  const uriLen = buildPostsAddUri({
+  const uriLen = pbpBookmarkServiceId(settings) === "pinboard" ? buildPostsAddUri({
     token: settings.pinboardToken || "user:0000000000000000000000000000000000000000",
     url: $id("url-input").value,
     title: $id("title-input").value,
@@ -2431,10 +2470,10 @@ function updateCharCount() {
     toread: $id("readlater-check").checked ? "yes" : "no",
     dt: isUpdate ? (existingBookmark.time || "") : undefined,
     replace: isUpdate,
-  }).length;
+  }).length : 0;
   const el = $id("desc-char-count");
   // "B" is a unit symbol and stays; the word for characters is not.
-  el.textContent = `${t("descCharCount", String(len))} · ${uriLen}/${POSTS_ADD_URI_BUDGET} B`;
+  el.textContent = uriLen ? `${t("descCharCount", String(len))} · ${uriLen}/${POSTS_ADD_URI_BUDGET} B` : t("descCharCount", String(len));
   const over = uriLen > POSTS_ADD_URI_BUDGET || len > 65000;
   const near = uriLen > POSTS_ADD_URI_BUDGET * 0.8 || len > 60000;
   // State classes only. The inline style this replaces always outranked the
@@ -2489,6 +2528,11 @@ function clearSaveError() {
 // when the save threw before a result came back.
 function pbpSaveErrorView(result) {
   const reason = result?.reason;
+  if (reason === "partial") return {message:t("bookmarkPartialSave"), retry:true};
+  if (reason === "permission") return {message:t("bookmarkPermissionDenied"), retry:false};
+  if (typeof settings === "object" && pbpBookmarkServiceId(settings) !== "pinboard") {
+    return {message:t(["account_changed","not_logged_in"].includes(reason) ? "bookmarkConnectFailed" : "saveFailedGeneric"), retry:!["account_changed","not_logged_in"].includes(reason)};
+  }
   if (reason === "too_long") {
     return { message: t("uriTooLong", String(result.detail || ""), String(POSTS_ADD_URI_BUDGET)), retry: false };
   }

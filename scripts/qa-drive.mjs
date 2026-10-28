@@ -556,7 +556,7 @@ async function seedAll(context, worker, aiPort) {
       // This tour models a migrated installation. Otherwise the phase-2 SW
       // startup claims the deliberately ownerless legacy fixture for "qa".
       _hlOwnerClaimDone: true,
-      pinboardToken: obfuscateKey(token),
+      pinboardToken: obfuscateKey(token), personalLibraryAccount: token.split(":")[0],
       optLang: "zh_CN",
       optTheme: "light",
       themePresetKey: siteTheme,
@@ -617,7 +617,7 @@ async function seedAll(context, worker, aiPort) {
 // md-preview navigation (perf-cold-sample re-seeds per open for the same reason).
 async function seedPreviewData(worker, storageKey = PREVIEW_KEY) {
   await worker.evaluate(async ({ storageKey, markdown, title, url }) => {
-    const auth = await getCurrentPinboardAuth();
+    const auth = await getCurrentBookmarkAuth();
     await chrome.storage.local.set({
       [`md_preview_data_${storageKey}`]: {
         markdown, contentHtml: "", title, url, baseUrl: url,
@@ -1192,7 +1192,7 @@ async function driveJourney(context, worker, extId, rep) {
     await rep.shot(library,s,'narrow-filter-recovery');
     await library.setViewportSize({width:1280,height:900});
     requireState(!(await library.locator("#vocab-list").innerText()).includes("account-separate"), "foreign vocabulary leaked into current account");
-    await worker.evaluate(async token => chrome.storage.local.set({ pinboardToken: obfuscateKey(token) }), FAKE_OTHER_TOKEN);
+    await worker.evaluate(async token => chrome.storage.local.set({ personalLibraryAccount: token.split(":")[0] }), FAKE_OTHER_TOKEN);
     await library.locator("#vocab-list .notes-card-head").filter({ hasText: "account-separate" }).waitFor({ timeout: TIMEOUT_MS });
     requireState(await library.locator("#vocab-list .vocab-card").count() === 1, "previous owner's vocabulary survived account switch");
     await library.locator("#lib-tab-notes").click();
@@ -1201,7 +1201,7 @@ async function driveJourney(context, worker, extId, rep) {
     requireState(otherText.includes("FOREIGN_IN_SHARED_PAGE") && otherText.includes("第二条固定高亮"), "foreign/legacy fixture visibility incorrect after account switch");
     requireState(!otherText.includes(marker) && !otherText.includes("这是第一条固定高亮"), "previous owner's notes survived account switch");
     await rep.shot(library, s, "other-account-isolated");
-    await worker.evaluate(async token => chrome.storage.local.set({ pinboardToken: obfuscateKey(token) }), FAKE_TOKEN);
+    await worker.evaluate(async token => chrome.storage.local.set({ personalLibraryAccount: token.split(":")[0] }), FAKE_TOKEN);
     await library.locator("#notes-list .notes-hit-btn").filter({ hasText: marker }).first().waitFor({ timeout: TIMEOUT_MS });
     requireState(!(await library.locator("#notes-list").innerText()).includes("FOREIGN_"), "foreign notes survived switching back");
     s.notes.push("PASS：阅读器保存两条笔记 → 搜索找回 → 同页连续阅读/跳转 → 原文；窄屏返回恢复焦点；切换账号隔离生词与笔记，保留 legacy ownerless 可见性。");
@@ -1211,7 +1211,7 @@ async function driveJourney(context, worker, extId, rep) {
     await rep.shot(library, s, "failure-state").catch(() => {});
   } finally {
     // Keep subsequent surfaces independent even if a journey assertion fails.
-    await worker.evaluate(async token => chrome.storage.local.set({ pinboardToken: obfuscateKey(token) }), FAKE_TOKEN);
+    await worker.evaluate(async token => chrome.storage.local.set({ personalLibraryAccount: token.split(":")[0] }), FAKE_TOKEN);
     detachReader(); detachLibrary();
     await reader.close().catch(() => {});
     await library.close().catch(() => {});
@@ -2558,12 +2558,12 @@ async function driveDiscovery(context, worker, extId, rep) {
     await reader.locator('#btn-rendered').click();
     requireState(await reader.locator('#engine-status').evaluate(el=>!el.closest('details')),"engine errors hidden behind source disclosure");
     await worker.evaluate(async token=>chrome.storage.local.set({pinboardToken:obfuscateKey(token)}),FAKE_OTHER_TOKEN);
-    await reader.waitForFunction(account=>_pbpAiSetupDetail.account===account,FAKE_OTHER_TOKEN.split(':')[0]);
+    await reader.waitForFunction(account=>_pbpAiSetupDetail.account===account,FAKE_TOKEN.split(':')[0]);
     await reader.locator('#reader-ai-configure').click();
     await options.waitForURL('**/options.html#ai');
     requireState(aiRequests.length===aiBefore,"configuration navigation triggered AI");
     await worker.evaluate(async base=>{
-      await chrome.storage.sync.set({aiProvider:'custom',customBaseUrl:base,customModel:'qa-first',previewAiEnabled:true,translateTargetLang:'zh-CN',syncApiKeys:false});
+      await chrome.storage.sync.set({aiProvider:'custom',customBaseUrl:base,customModel:'qa-first',previewAiEnabled:true,translateTargetLang:'zh-CN',syncApiKeys:false,personalLibraryAccount:'qa'});
       await chrome.storage.local.set({optSyncEnabled:true});
     },`http://127.0.0.1:${aiPort}/v1`);
     await reader.waitForFunction(()=>!!document.getElementById('reader-ai-configure'));
@@ -2571,7 +2571,7 @@ async function driveDiscovery(context, worker, extId, rep) {
       const original=pbpReadSettingsWithSecrets;let held=false;
       window.qaRestoreReaderRead=()=>{pbpReadSettingsWithSecrets=original;};
       pbpReadSettingsWithSecrets=query=>{
-        if(!held&&Object.keys(query).length===1&&'pinboardToken' in query){
+        if(!held&&'personalLibraryAccount' in query){
           held=true;return new Promise(resolve=>{window.qaReleaseOwnerRead=async()=>resolve(await original(query));});
         }
         return original(query);
@@ -2586,7 +2586,7 @@ async function driveDiscovery(context, worker, extId, rep) {
     // Ask and translate initialize asynchronously after the settings read;
     // wait for both states to exist (not for their account) before judging.
     await reader.waitForFunction(()=>!!_pbpAskState&&!!_pbpTrState,null,{timeout:TIMEOUT_MS}).catch(()=>{});
-    const account=FAKE_OTHER_TOKEN.split(':')[0];
+    const account=FAKE_TOKEN.split(':')[0];
     requireState(await reader.evaluate(account=>_pbpAskState?.account===account&&_pbpTrState?.account===account,account),"live AI controls carry stale account");
     requireState(await reader.locator('#ask-open').count()===1&&await reader.locator('#btn-translate').count()===1,"split settings write duplicated AI controls");
     requireState(await reader.locator('#reader-ai-configure').count()===0,"configured reader still promotes setup");
@@ -2707,7 +2707,7 @@ async function driveReaderEdge(context, worker, extId, rep) {
   };
   const LONG_TITLE = "Serendipity in Distributed Systems: How Unplanned Discoveries Shape Long-Lived Software Architectures, Teams and the Documents They Leave Behind";
   const seed = (lang) => worker.evaluate(async ({ storageKey, markdown, title, url, lang }) => {
-    const auth = await getCurrentPinboardAuth();
+    const auth = await getCurrentBookmarkAuth();
     await chrome.storage.local.set({
       [`md_preview_data_${storageKey}`]: {
         markdown, contentHtml: "", title, url, baseUrl: url, lang,
