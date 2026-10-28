@@ -107,6 +107,29 @@ function pbpSanitizeBackupExportTargets(value) {
   return out;
 }
 
+// The synced custom-provider list, through the one sanitizer every reader
+// uses. Any malformed entry drops the whole key (and only that key): half a
+// list would strand key slots, and throwing would let one bad synced value
+// stop this device from ever exporting a backup again (the export runs the
+// same preflight). The warning names the field, never its value.
+function pbpSanitizeBackupAiCustomProviders(value) {
+  const list = pbpSanitizeAiCustomProviders(value);
+  if (list) return list;
+  console.warn("[backup] dropped invalid field:", "aiCustomProviders");
+  return undefined;
+}
+
+// One sanitizer per SETTINGS_DEFAULTS key whose default is an object, an
+// array or null; a key missing here never reaches storage from a file (see
+// pbpSanitizeBackupSettings). Each returns the cleaned value, undefined to
+// drop only that key, or throws pbpBackupValueError to reject the file.
+const PBP_BACKUP_OBJECT_SANITIZERS = Object.freeze({
+  exportTargets: pbpSanitizeBackupExportTargets,
+  urlClean: pbpSanitizeBackupUrlClean,
+  previewAiModelByProvider: pbpSanitizeBackupPreviewModelMap,
+  aiCustomProviders: pbpSanitizeBackupAiCustomProviders,
+});
+
 // Credentials travel on their own path, NOT through exportableKeys: that
 // whitelist stays credential-free so the ordinary settings sanitize can never
 // be widened by accident. Returns null when the backup carries none, so the
@@ -141,19 +164,18 @@ function pbpSanitizeBackupSettings(data, exportableKeys) {
     if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
     const value = data[key];
     if (key === "personalLibraryAccount") continue;
-    if (key === "exportTargets") {
-      safe[key] = pbpSanitizeBackupExportTargets(value);
-      continue;
-    }
-    if (key === "urlClean") {
-      safe[key] = pbpSanitizeBackupUrlClean(value);
-      continue;
-    }
-    if (key === "previewAiModelByProvider") {
-      safe[key] = pbpSanitizeBackupPreviewModelMap(value);
-      continue;
-    }
     const expected = SETTINGS_DEFAULTS[key];
+    if (Object.prototype.hasOwnProperty.call(PBP_BACKUP_OBJECT_SANITIZERS, key)) {
+      const cleaned = PBP_BACKUP_OBJECT_SANITIZERS[key](value);
+      if (cleaned !== undefined) safe[key] = cleaned;
+      continue;
+    }
+    // Fail closed: an object-shaped setting nobody wrote a sanitizer for
+    // would otherwise reach (synced) storage exactly as the file spelled it.
+    if (expected === null || typeof expected === "object") {
+      console.warn("[backup] dropped field without a sanitizer:", key);
+      continue;
+    }
     if (typeof expected === "boolean" && typeof value !== "boolean") throw pbpBackupValueError(key);
     if (typeof expected === "string" && typeof value !== "string") throw pbpBackupValueError(key);
     if (typeof expected === "number" && (typeof value !== "number" || !Number.isFinite(value))) {
