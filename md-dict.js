@@ -2378,7 +2378,10 @@ function _pbpDictEntryMount(host, opts) {
             const parent = addition.archiveId === record.archiveId ? record : record.previousEntries?.find(entry => entry.archiveId === addition.archiveId);
             const meaning = parent?.entry.meanings[point.sense - 1]?.definition;
             if (meaning) {
-              const sense = document.createElement("p"); sense.className = "xp-dict-src";
+              // A small source-style line, but its text is the AI entry's own
+              // sense, so it keeps greedy wrapping like every AI-written line
+              // (rules/dict.md, task 3d), not the short notes' balance.
+              const sense = document.createElement("p"); sense.className = "xp-dict-src"; sense.dataset.text = "ai";
               sense.textContent = t("dictSupplementMeaning", meaning); unit.insertBefore(sense, explanation);
             }
             if (point.example) {

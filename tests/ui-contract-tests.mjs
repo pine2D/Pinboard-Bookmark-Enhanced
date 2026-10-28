@@ -10009,6 +10009,26 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "md-preview.css / library.css: the break between dictionary sources must be the block level (sp-4) on both surfaces (dict redesign 3.5)");
 }
 
+// Short lookup notes balance their lines; AI-written text keeps greedy
+// wrapping (rules/dict.md, task 3d): the usage point's matching-sense line is
+// a source-style line carrying the AI entry's own sense, so it opts out, and
+// the library choice list's help balances like the reader's.
+{
+  const mdCss = read("md-preview.css");
+  check(declarationValueMap(mdCss, '.xp-dict-src[data-text="ai"]').get("text-wrap") === "wrap" &&
+    declarationValueMap(libraryCss, '#vocab-ref-result .xp-dict-src[data-text="ai"]').get("text-wrap") === "wrap" &&
+    /sense\.className = "xp-dict-src"; sense\.dataset\.text = "ai";/.test(mdDictJs),
+    "md-dict.js / md-preview.css / library.css: the AI-written matching-sense line must opt out of the notes' text-wrap: balance on both surfaces");
+  check(declarationValueMap(libraryCss, ".listbox-help").get("text-wrap") === "balance",
+    "library.css: the meaning choice list's help must balance its lines like the reader's .xp-dict-choice-help");
+  // Print hides both narrow back buttons, so it hides both page-fill bands
+  // stuck under them (task 3d: the notes twin was missing).
+  for (const pane of ["#vocab-detail-pane", "#notes-detail-pane"]) {
+    check(declarationValueMap(libraryCss, `${pane}::before`, { context: ["@media print"] }).get("content") === "none",
+      `library.css: @media print must drop ${pane}::before, the narrow back bar's band, with its back button`);
+  }
+}
+
 if (timingEnabled) {
   console.error(`[ui-contract timing] ${JSON.stringify({
     totalMilliseconds: Math.round(performance.now() - auditStarted),

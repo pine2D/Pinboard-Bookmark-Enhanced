@@ -9215,8 +9215,8 @@ async function probeDictStickyBars(cfg) {
       // How many text lines the label takes (rects of one line merged), and
       // the rung it must fit: control-h for one line plus one body line per
       // wrap, read from the page's own tokens.
-      const lineCount = (el) => {
-        if (!el) return 0;
+      const lineBoxes = (el) => {
+        if (!el) return [];
         const range = document.createRange();
         range.selectNodeContents(el);
         const tops = [];
@@ -9224,15 +9224,21 @@ async function probeDictStickyBars(cfg) {
           const mid = (r.top + r.bottom) / 2;
           if (!tops.some((t) => mid > t.top && mid < t.bottom)) tops.push({ top: r.top, bottom: r.bottom });
         }
-        return tops.length;
+        return tops.sort((a, b) => a.top - b.top);
       };
+      const lines = lineBoxes(label);
+      // The icon's vertical centre against the label's first line (task 3d):
+      // a wrapped label keeps its icon on the first line, not between lines.
+      const iconBox = save.querySelector(":scope > .btn-ic svg")?.getBoundingClientRect();
+      const first = lines[0];
       const px = (name) => parseFloat(getComputedStyle(save).getPropertyValue(name)) || 0;
       out.save = {
         labelVisible: !!lr && lr.width > 0 && lr.height > 0,
         label: label ? label.textContent.trim() : "",
         width: save.getBoundingClientRect().width,
         height: save.getBoundingClientRect().height,
-        lines: lineCount(label),
+        lines: lines.length,
+        iconOffset: iconBox && first ? (iconBox.top + iconBox.bottom) / 2 - (first.top + first.bottom) / 2 : null,
         controlH: px(cfg.controlH),
         bodyLh: px(cfg.bodyLh),
         relookupWidth: relookup && visible(relookup) ? relookup.getBoundingClientRect().width : 0,

@@ -295,7 +295,7 @@ test('save bar focus: a focused control clear of the stuck bar; one under it fai
 test('save text: the save button keeps its label beside the icon-only re-lookup; two icon squares fail', () => {
   const blocks = [{ role: 'sense', left: 24 }];
   const foot = { stuck: true, bottom: 900, scrollerBottom: 900, strip: [] };
-  const save = (over = {}) => ({ labelVisible: true, label: 'Save to vocabulary', width: 180, height: 32, lines: 1, controlH: 32, bodyLh: 20, relookupWidth: 26, iconOnly: ['button.btn.vocab-ref-relookup'], ...over });
+  const save = (over = {}) => ({ labelVisible: true, label: 'Save to vocabulary', width: 180, height: 32, lines: 1, iconOffset: 0, controlH: 32, bodyLh: 20, relookupWidth: 26, iconOnly: ['button.btn.vocab-ref-relookup'], ...over });
   const at = (s360, s1280 = save()) => ({ ...probe(blocks), sticky: [{ width: 360, foot, back: null, save: s360 }, { width: 1280, foot, back: null, save: s1280 }] });
   for (const context of ['dict-entry-result', 'dict-entry-usage-result', 'dict-save-bar', 'dict-entry-paid-negative']) {
     const out = verdicts(at(save()), context, 'library');
@@ -317,6 +317,11 @@ test('save text: the save button keeps its label beside the icon-only re-lookup;
   assert.equal(verdicts(at(save({ label: 'Gespeicherte Vokabel aktualisieren', width: 262, lines: 2, height: 62 })), 'dict-save-bar', 'library').dictSaveText360, 'FAIL');
   assert.equal(verdicts(at(save({ label: 'Gespeicherte Vokabel aktualisieren', width: 262, lines: 2, height: 52 })), 'dict-save-bar', 'library').dictSaveText360, 'OK');
   assert.equal(verdicts(at(save({ lines: 1, height: 34 })), 'dict-save-bar', 'library').dictSaveText360, 'FAIL');
+  // Task 3d: a two-line label centred its icon across both lines (10px below
+  // the first line's centre in a 52px button); the icon belongs to line one.
+  assert.equal(verdicts(at(save({ label: 'Gespeicherte Vokabel aktualisieren', width: 262, lines: 2, height: 52, iconOffset: 10 })), 'dict-save-bar', 'library').dictSaveText360, 'FAIL');
+  assert.equal(verdicts(at(save({ label: 'Gespeicherte Vokabel aktualisieren', width: 262, lines: 2, height: 52, iconOffset: -0.5 })), 'dict-save-bar', 'library').dictSaveText360, 'OK');
+  assert.equal(verdicts(at(save({ iconOffset: null })), 'dict-save-bar', 'library').dictSaveText360, 'FAIL');
   // Compact density: 28 + 18 for a second line.
   assert.equal(verdicts(at(save({ controlH: 28, bodyLh: 18, lines: 2, height: 46 })), 'dict-save-bar', 'library').dictSaveText360, 'OK');
   // Unread tokens cannot pass the height check.

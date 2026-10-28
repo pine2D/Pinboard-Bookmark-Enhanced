@@ -2130,12 +2130,16 @@ html.motion-ready .vocab-note-save {
    rung's line-height (control-h - 2) made German "Gespeicherte Vokabel
    aktualisieren" two 30px lines in a 62px button (batch-3b review). Body
    line-height plus the block inset that centres one line keeps one line at
-   exactly control-h and adds one body line per wrap (audit dictSaveText). */
+   exactly control-h and adds one body line per wrap (audit dictSaveText).
+   The icon sits on the first line, not centred across a wrapped label: the
+   items start at the top, and the icon's box is one body line tall, which
+   centres it on that line (and leaves a one-line button as it was). */
 @container dict-save (max-width: 440px) {
   .vocab-save-controls { display: flex; flex-wrap: wrap; }
   .vocab-save-controls > .listbox { flex: 1 1 160px; }
   .vocab-save-controls > .vocab-lookup-save { flex: 0 1 auto; max-width: 100%; height: auto; min-height: var(--lib-control-h); white-space: normal; text-align: start;
-    line-height: var(--lib-lh-body); padding-block: calc((var(--lib-control-h) - 2px - var(--lib-lh-body)) / 2); }
+    line-height: var(--lib-lh-body); padding-block: calc((var(--lib-control-h) - 2px - var(--lib-lh-body)) / 2); align-items: flex-start; }
+  .vocab-save-controls > .vocab-lookup-save > .btn-ic { height: var(--lib-lh-body); }
   .vocab-save-controls > .save-status { flex: 1 1 100%; }
 }
 .vocab-lemma-hint, .vocab-hidden-word { margin-top: var(--lib-sp-2); }
@@ -2251,6 +2255,9 @@ html.motion-ready .vocab-note-save {
    line (as in the reader, md-preview.css). Short text only; AI-written text
    and senses keep greedy wrapping. */
 #vocab-ref-result :is(.xp-dict-msg, .xp-dict-src) { text-wrap: balance; }
+/* ...except a source-style line carrying AI-written text (a usage point's
+   matching sense, data-text="ai"): it wraps greedily, as in the reader. */
+#vocab-ref-result .xp-dict-src[data-text="ai"] { text-wrap: wrap; }
 /* The local pack's block: no fill, no frame -- a small bold title and its senses. */
 #vocab-ref-result .xp-dict-local-title { margin-bottom: var(--lib-sp-2); font-size: 13px; line-height: 18px; font-weight: 700; color: var(--lib-fg-muted); }
 #vocab-ref-result .xp-skel {
@@ -3369,8 +3376,8 @@ body { display: flex; flex-direction: column; }
   #vocab-ref-result .vocab-ref-foot, #vocab-ref-result .vocab-ref-idle, .vocab-edit-groups, .vocab-group-editor,
   .vocab-detail-status, .vocab-detail-speak, #vocab-detail-tail { display: none; }
   #vocab-detail-pane, #notes-detail-pane { display: block; overflow: visible; margin: 0; padding: 0; }
-  /* The narrow-mode band under the back button hides with the button. */
-  #vocab-detail-pane::before { content: none; }
+  /* The narrow-mode bands under the back buttons hide with the buttons. */
+  #vocab-detail-pane::before, #notes-detail-pane::before { content: none; }
 }
 /* ---- Listbox (library redesign T6, spec §8.2 / §8.4): listbox.js draws
    select[data-listbox] as a button + a popover list. Geometry only: the
@@ -3447,7 +3454,10 @@ select[data-listbox] { height: var(--lib-control-h); box-sizing: border-box; }
 .listbox-pop[data-layout="meaning"][data-help] { max-height: min(330px, var(--listbox-room, 330px)); overflow: hidden; }
 .listbox-pop[data-layout="meaning"][data-help]:not([hidden]) { display: flex; flex-direction: column; }
 .listbox-pop[data-layout="meaning"][data-help] > .listbox-list { flex: 1 1 auto; min-height: 0; }
-.listbox-help { flex: none; box-sizing: border-box; max-height: calc(var(--listbox-room, 330px) / 2); overflow-y: auto; margin: 0; padding: var(--lib-sp-2) var(--lib-sp-3); font-size: var(--lib-text-meta); line-height: var(--lib-lh-secondary); color: var(--lib-fg-muted); white-space: normal; overflow-wrap: anywhere; }
+/* The choice list's help is one to three lines of guidance: balanced like
+   the reader's .xp-dict-choice-help, so a CJK line does not end on one or two
+   characters (rules/dict.md, task 3d). */
+.listbox-help { flex: none; box-sizing: border-box; max-height: calc(var(--listbox-room, 330px) / 2); overflow-y: auto; margin: 0; padding: var(--lib-sp-2) var(--lib-sp-3); font-size: var(--lib-text-meta); line-height: var(--lib-lh-secondary); color: var(--lib-fg-muted); white-space: normal; overflow-wrap: anywhere; text-wrap: balance; }
 .listbox-pop[data-layout="meaning"] .listbox-opt {
   height: auto; min-height: var(--lib-control-h); line-height: 20px;
   padding: var(--lib-sp-2) var(--lib-sp-3); white-space: normal; overflow-wrap: anywhere;

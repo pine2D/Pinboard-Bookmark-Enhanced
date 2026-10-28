@@ -764,7 +764,9 @@ export function evaluateMediaProbe(probe, check) {
 // control rung plus one body line per extra line (+edgeTolerancePx). The
 // batch-3b review's 16-save-bar-b (de, 360): "Gespeicherte Vokabel
 // aktualisieren" kept the rung's 30px line-height, two lines in a 62px
-// button with the icon floating between them.
+// button with the icon floating between them. The icon's vertical centre
+// stays on the label's first line (within +edgeTolerancePx), so a wrapped
+// label does not centre the icon across both lines (task 3d).
 //
 // dictSaveBarFocus<W> (requires "sticky", library only, the same widths):
 // with the save bar stuck, keyboard focus on any control of the lookup above
@@ -1095,10 +1097,11 @@ export function evaluateDictLookupGeometry(probe, opts) {
         const lines = Math.max(1, save.lines || 0);
         const rung = save.controlH > 0 && save.bodyLh > 0 ? save.controlH + (lines - 1) * save.bodyLh : NaN;
         const fits = Number.isFinite(rung) && Number.isFinite(save.height) && save.height <= rung + tol;
-        const ok = save.labelVisible && !!save.label && save.width > save.relookupWidth && iconOnly.length <= 1 && fits;
+        const iconOnFirst = Number.isFinite(save.iconOffset) && Math.abs(save.iconOffset) <= tol;
+        const ok = save.labelVisible && !!save.label && save.width > save.relookupWidth && iconOnly.length <= 1 && fits && iconOnFirst;
         row(text, ok,
-          `label ${save.labelVisible ? `"${save.label}"` : "not rendered"}, save ${round(save.width)}x${round(save.height)}px (${lines} line(s), rung ${Number.isFinite(rung) ? round(rung) : "unmeasured"}px) vs re-lookup ${round(save.relookupWidth)}px; icon-only: ${iconOnly.length ? iconOnly.join(", ") : "none"}`,
-          `the save button shows its label, is wider than the re-lookup, is no taller than control-h + one body line per wrap (+${tol}px), and the bar has at most one icon-only button`);
+          `label ${save.labelVisible ? `"${save.label}"` : "not rendered"}, save ${round(save.width)}x${round(save.height)}px (${lines} line(s), rung ${Number.isFinite(rung) ? round(rung) : "unmeasured"}px, icon ${Number.isFinite(save.iconOffset) ? round(save.iconOffset) + "px off the first line" : "unmeasured"}) vs re-lookup ${round(save.relookupWidth)}px; icon-only: ${iconOnly.length ? iconOnly.join(", ") : "none"}`,
+          `the save button shows its label, is wider than the re-lookup, is no taller than control-h + one body line per wrap (+${tol}px), centres its icon on the label's first line (+${tol}px), and the bar has at most one icon-only button`);
       }
       const back = view?.back;
       if (!back) continue; // two panes: there is no back bar at this width
