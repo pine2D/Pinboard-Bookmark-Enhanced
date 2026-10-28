@@ -1,7 +1,7 @@
 # Pinboard Bookmark Enhanced 项目配置
 
 作者：pine2D
-更新：2026-10-13
+更新：2026-10-28
 
 > 本文件只保留每个会话都需要的跨领域约定。子系统深水区规则在 `.claude/rules/`（按 paths 匹配自动加载，见文末索引表）；机器可验证的铁律已由 pre-commit / verify.sh / release 硬门强制——prose 是提醒，lint 是底线。
 
@@ -37,7 +37,7 @@ md-*.js                      # 阅读器子模块：ai-core / translate / ask / 
 vocab-store.js               # pbp-vocab IndexedDB 唯一写边界（words + vector/outbox/tombstone/sync 状态）
 vocab-gdrive.js              # SW-only Google Drive appDataFolder 同步
 dict-pack.js                 # 离线词典包导入（CC-CEDICT / ECDICT / 多语言 Yomitan v3；词包仅本机）
-dict-entry.js                # 可复用 AI 词条与按需补充（2026-10-26/27 裁决收为用法要点／原文用例／词源三块；原文用例是免费检索，不经 dict-entry.js：dict-evidence.js 的 pbpDictUsageExamplesFetch 取原句，md-dict.js 的 pbpDictExamplesView 在阅读器与资料库独立于 AI 面板显示，不调 AI、不翻译、不归档；流式生成，施工中）
+dict-entry.js                # 可复用 AI 词条与按需补充（2026-10-26/27 裁决收为用法要点／原文用例／词源三块；原文用例是免费检索，不经 dict-entry.js：dict-evidence.js 的 pbpDictUsageExamplesFetch 取原句，md-dict.js 的 pbpDictExamplesView 在阅读器与资料库独立于 AI 面板显示，不调 AI、不翻译、不归档；生成走 callAIStream 流式，180 秒总期限与 8192 输出额度，完整通过校验才保存）
 dict-archive.js / dict-archive-gdrive.js  # 完整 AI 词条持久归档与独立 Drive 数据集（不属于生词本、不随缓存淘汰）
 ask-archive.js / ask-archive-gdrive.js  # Ask 完整问答、证据与版本持久归档及 Drive 同步
 library-ask.js              # 按文章与会话浏览、继续提问和删除 Ask 历史
