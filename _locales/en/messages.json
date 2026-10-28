@@ -1290,6 +1290,9 @@
   "backupFieldModelStudioWorkspace": {
     "message": "Model Studio workspace ID"
   },
+  "backupFieldProviderChoice": {
+    "message": "AI provider region or format"
+  },
   "backupImportKeptCustomKeys": {
     "message": "$N$ custom provider key(s) in the backup were not applied because this device's existing key still works.",
     "placeholders": { "n": { "content": "$1" } }

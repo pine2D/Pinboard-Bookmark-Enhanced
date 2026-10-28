@@ -1285,6 +1285,9 @@
   "backupFieldModelStudioWorkspace": {
     "message": "百煉業務空間 ID"
   },
+  "backupFieldProviderChoice": {
+    "message": "AI 服務商的地域或介面格式"
+  },
   "backupImportKeptCustomKeys": {
     "message": "備份中有 $N$ 個自訂服務商金鑰未寫入：本機現有金鑰仍可正常使用。",
     "placeholders": { "n": { "content": "$1" } }

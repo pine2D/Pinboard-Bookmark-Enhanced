@@ -1285,6 +1285,9 @@
   "backupFieldModelStudioWorkspace": {
     "message": "Model Studio のワークスペース ID"
   },
+  "backupFieldProviderChoice": {
+    "message": "AI プロバイダーのリージョンまたは形式"
+  },
   "backupImportKeptCustomKeys": {
     "message": "バックアップ内のカスタムプロバイダーのキー $N$ 件は、この端末の既存キーがそのまま使えるため反映しませんでした。",
     "placeholders": { "n": { "content": "$1" } }

@@ -52,6 +52,11 @@ const PBP_BACKUP_ENUMS = Object.freeze({
   customProtocol: ["openai", "anthropic"],
 });
 
+// Provider region/format enums whose out-of-table value is dropped (key by
+// key) instead of rejecting the whole file; every other enum above still throws.
+const PBP_BACKUP_DROP_ON_UNKNOWN_ENUM = new Set(
+  ["qwenRegion", "arkRegion", "opencodeProtocol", "commandcodeProtocol", "customProtocol"]);
+
 // Per-provider preview model overrides: keys must look like provider ids and
 // values like model names. Bounded (entry count / value length) because backup
 // files are untrusted input and this object round-trips into synced settings.
@@ -188,7 +193,17 @@ function pbpSanitizeBackupSettings(data, exportableKeys, dropped) {
     if (typeof expected === "number" && (typeof value !== "number" || !Number.isFinite(value))) {
       throw pbpBackupValueError(key);
     }
-    if (PBP_BACKUP_ENUMS[key] && !PBP_BACKUP_ENUMS[key].includes(value)) throw pbpBackupValueError(key);
+    if (PBP_BACKUP_ENUMS[key] && !PBP_BACKUP_ENUMS[key].includes(value)) {
+      // Settings keeps an out-of-table provider region/format as stored (R7),
+      // so the user's own export carries it. Drop only that key; rejecting it
+      // would make the file fail its own preflight (and export impossible).
+      if (PBP_BACKUP_DROP_ON_UNKNOWN_ENUM.has(key)) {
+        console.warn("[backup] dropped unknown value:", key);
+        drop(key);
+        continue;
+      }
+      throw pbpBackupValueError(key);
+    }
     // Settings saves what the user typed and the resolver fails it closed, so
     // a malformed workspace ID can sit in the user's own export. Drop only
     // that key: rejecting it would make the file fail its own preflight.
@@ -267,6 +282,11 @@ const PBP_BACKUP_DROPPED_LABELS = Object.freeze({
   aiCustomProviders: "backupFieldCustomProviders",
   customDisplayName: "backupFieldCustomName",
   qwenWorkspaceId: "backupFieldModelStudioWorkspace",
+  qwenRegion: "backupFieldProviderChoice",
+  arkRegion: "backupFieldProviderChoice",
+  opencodeProtocol: "backupFieldProviderChoice",
+  commandcodeProtocol: "backupFieldProviderChoice",
+  customProtocol: "backupFieldProviderChoice",
 });
 
 function pbpBackupImportResultKey(result) {

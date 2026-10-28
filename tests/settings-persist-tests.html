@@ -1225,7 +1225,11 @@ async function run() {
           catch (_) { enumsMatch = false; }
         }
         for (const bad of ["", "hongkong"]) {
-          try { pbpSanitizeBackupSettings({ [cfg.regionField]: bad }, keys); enumsMatch = false; } catch (_) {}
+          // An out-of-table region is dropped as a single key, never accepted.
+          try {
+            const out = pbpSanitizeBackupSettings({ [cfg.regionField]: bad }, keys);
+            if (cfg.regionField in out) enumsMatch = false;
+          } catch (_) { enumsMatch = false; }
         }
       }
       check("backup accepts exactly the registry's Model Studio regions", enumsMatch);
@@ -1244,7 +1248,7 @@ async function run() {
           catch (_) { formatsOk = false; }
         }
         for (const bad of ["", "gemini"]) {
-          try { pbpSanitizeBackupSettings({ [key]: bad }, keys); } catch (_) { formatRejected++; }
+          try { if (!(key in pbpSanitizeBackupSettings({ [key]: bad }, keys))) formatRejected++; } catch (_) {}
         }
       }
       check("backup accepts exactly the gateway formats", formatsOk && formatRejected === 4);
@@ -4273,8 +4277,11 @@ async function run() {
       protocolKeys.every((key) => (PBP_BACKUP_ENUMS[key] || []).includes(SETTINGS_DEFAULTS[key])) &&
       [...(PBP_BACKUP_ENUMS.customProtocol || [])].sort().join(",") === [...PBP_AI_PROTOCOLS].sort().join(",") &&
       anthropicOk &&
-      throwsType(() => preflight({ customProtocol: "gemini" })) &&
-      throwsType(() => preflight({ customProtocol: "" })));
+      ["gemini", ""].every((bad) => {
+        let out = null;
+        try { out = preflight({ customProtocol: bad, optTheme: "dark" }); } catch (_) {}
+        return !!out && !("customProtocol" in out.safeData) && out.droppedKeys.includes("customProtocol") && out.safeData.optTheme === "dark";
+      }));
 
     let list7 = null;
     try { list7 = preflight({ aiCustomProviders: LIST7 }).safeData.aiCustomProviders; } catch (_) {}
@@ -4372,6 +4379,29 @@ async function run() {
         !/[()]/.test(enLocale[PBP_BACKUP_DROPPED_LABELS[key]].message)) &&
       enLocale[PBP_BACKUP_DROPPED_LABELS.qwenWorkspaceId].message.includes("Model Studio") &&
       typeof enLocale.backupPreviewDroppedFields?.message === "string");
+
+    // M3: a provider region/format this build does not know (a newer synced
+    // value Settings keeps as stored) drops that one key; it neither blocks
+    // the user's own export nor rejects the whole imported file.
+    let exportOk = false, importDropped = null, legacyRejected = 0, labelOk = false;
+    try {
+      const exported = preflight({ arkRegion: "eu", optTheme: "dark" });
+      exportOk = !("arkRegion" in exported.safeData) && exported.safeData.optTheme === "dark" &&
+        exported.droppedKeys.includes("arkRegion");
+      importDropped = preflight({ opencodeProtocol: "x", optTheme: "dark", popupWidth: 500 });
+      for (const bad of [{ bookmarkService: "x" }, { optTheme: "sepia" }, { bgSaveMode: "x" }]) {
+        try { preflight(bad); } catch (_) { legacyRejected++; }
+      }
+      labelOk = ["qwenRegion", "arkRegion", "opencodeProtocol", "commandcodeProtocol", "customProtocol"].every((key) =>
+        typeof PBP_BACKUP_DROPPED_LABELS[key] === "string" && !!enLocale[PBP_BACKUP_DROPPED_LABELS[key]]);
+    } catch (_) {}
+    check("M3 backup: an unknown provider region does not block export and is reported dropped", exportOk);
+    check("M3 backup: an unknown provider format drops only that key on import, other settings still import",
+      !!importDropped && !("opencodeProtocol" in importDropped.safeData) &&
+      importDropped.safeData.optTheme === "dark" && importDropped.safeData.popupWidth === 500 &&
+      importDropped.droppedKeys.includes("opencodeProtocol"));
+    check("M3 backup: other enum keys still reject an unknown value, and dropped region/format keys have labels",
+      legacyRejected === 3 && labelOk);
 
     const popupSource = await fetch("../popup-ai.js").then((response) => response.text());
     const orderAt = popupSource.indexOf("const AI_PROVIDER_ORDER = [");

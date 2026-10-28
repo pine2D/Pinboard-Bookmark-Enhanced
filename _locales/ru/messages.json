@@ -1285,6 +1285,9 @@
   "backupFieldModelStudioWorkspace": {
     "message": "ID рабочего пространства Model Studio"
   },
+  "backupFieldProviderChoice": {
+    "message": "Регион или формат ИИ-провайдера"
+  },
   "backupImportKeptCustomKeys": {
     "message": "Ключи пользовательских провайдеров из резервной копии ($N$) не применены: имеющийся на этом устройстве ключ по-прежнему работает.",
     "placeholders": { "n": { "content": "$1" } }
