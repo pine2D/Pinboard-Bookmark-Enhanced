@@ -7,7 +7,7 @@
 
 function pbpLiveAiSettingsSnapshot(provider) {
   function getOptVal(id, fallback) { return $id(id)?.value?.trim() || fallback || ""; }
-  return {
+  const out = {
     aiProvider: provider,
     geminiApiKey: getOptVal("opt-gemini-key"), geminiModel: getOptVal("opt-gemini-model", "gemini-3.5-flash-lite"),
     openaiApiKey: getOptVal("opt-openai-key"), openaiModel: getOptVal("opt-openai-model", "gpt-5.4-nano"), openaiBaseUrl: getOptVal("opt-openai-baseurl", "https://api.openai.com/v1"),
@@ -36,6 +36,316 @@ function pbpLiveAiSettingsSnapshot(provider) {
     commandcodeProtocol: $id("opt-commandcode-protocol")?.value ?? "openai",
     customApiKey: getOptVal("opt-custom-key"), customModel: getOptVal("opt-custom-model"), customBaseUrl: getOptVal("opt-custom-baseurl"),
   };
+  // The custom entries' unsaved edits live in the editor model, not in the
+  // shared panel's fields (which show one entry at a time).
+  if (pbpOptAiCustomEditorState) Object.assign(out, pbpOptAiCustomSnapshot(pbpOptAiCustomEditorState));
+  return out;
+}
+
+// ============================================================
+// Custom AI provider entries: the Settings editor model.
+// One shared #fields-custom panel edits every entry ("custom" = slot 1 plus
+// the aiCustomProviders list), so each entry's unsaved values are held here,
+// keyed by id, and the panel is refilled on every switch. Pure functions and
+// two small DOM helpers; test pages load this file directly.
+// ============================================================
+let pbpOptAiCustomEditorState = null;
+// setupApiTests' field-mark helpers, published for options.js.
+let pbpOptMarkFieldInvalid = null;
+let pbpOptClearFieldInvalid = null;
+// Entry ids whose Test is in flight; the shared Test button follows the
+// entry on screen.
+const pbpAiTestInflight = new Set();
+
+const PBP_OPT_AI_CUSTOM_FIELDS = ["name", "protocol", "baseUrl", "model", "key"];
+
+function _pbpOptAiCustomBlank() {
+  return { id: "custom", name: "", protocol: "openai", baseUrl: "", model: "", slot: 1, key: "", keyRebind: false, keyTouched: false };
+}
+
+// The editor model of one settings read. "custom" always has a draft (blank
+// when unused) because its five keys are always written; it is in `order`
+// only when pbpAiCustomEntries counts it. List entries keep their stored
+// field values as read -- an enum this version does not know round-trips
+// untouched (R7), since only pbpOptAiCustomUpdate writes a draft. A list
+// whose entries cannot be told apart (no valid unique id and slot) is
+// `locked`: it is shown as far as it can be read and never written back.
+function pbpOptAiCustomState(s) {
+  const st = s || {};
+  const state = { drafts: {}, order: [], rawSlots: {}, freedSlots: new Set(), locked: false };
+  for (const slot of PBP_AI_CUSTOM_SLOTS) {
+    const raw = st[pbpAiCustomKeyField(slot)];
+    state.rawSlots[slot] = typeof raw === "string" ? raw : "";
+  }
+  const custom = _pbpOptAiCustomBlank();
+  if (typeof st.customDisplayName === "string") custom.name = st.customDisplayName;
+  if (st.customProtocol !== undefined) custom.protocol = st.customProtocol;
+  custom.baseUrl = typeof st.customBaseUrl === "string" ? st.customBaseUrl : "";
+  custom.model = typeof st.customModel === "string" ? st.customModel : "";
+  custom.key = deobfuscateKey(typeof st.customApiKey === "string" ? st.customApiKey : "") || "";
+  state.drafts.custom = custom;
+  if (pbpAiCustomEntries(st).some((e) => e.id === "custom")) state.order.push("custom");
+  const list = st.aiCustomProviders;
+  if (list !== undefined && !Array.isArray(list)) state.locked = true;
+  const slots = new Set();
+  for (const e of Array.isArray(list) ? list : []) {
+    const ok = e && typeof e === "object" && !Array.isArray(e) && pbpAiCustomEntryIdOk(e.id) && !state.drafts[e.id]
+      && PBP_AI_CUSTOM_SLOTS.includes(e.slot) && !slots.has(e.slot);
+    if (!ok) { state.locked = true; continue; }
+    slots.add(e.slot);
+    const key = pbpAiCustomKeyOpen(st, e);
+    state.drafts[e.id] = {
+      id: e.id, name: e.name, protocol: e.protocol, baseUrl: e.baseUrl, model: e.model, slot: e.slot,
+      key, keyRebind: state.rawSlots[e.slot] !== "" && key === "", keyTouched: false,
+    };
+    state.order.push(e.id);
+  }
+  return state;
+}
+
+function pbpOptAiCustomOrder(state) {
+  return state ? state.order.slice() : [];
+}
+
+// A new entry: the unused "custom" slot first, else custom-xxxxxx in a free
+// key slot. The id's six characters come from crypto bytes by rejection
+// sampling (a byte >= 252 would bias % 36); a short or colliding draw is
+// retried a bounded number of times. null when full or no id was found.
+function pbpOptAiCustomAdd(state, { randomBytes, defaultName }) {
+  if (!state || state.order.length >= PBP_AI_CUSTOM_MAX) return null;
+  const nameFor = () => {
+    const taken = new Set(state.order.map((id) => String(state.drafts[id].name).trim()));
+    for (let n = state.order.length + 1; ; n++) {
+      const name = String(defaultName(n)).trim().slice(0, 40);
+      if (!taken.has(name)) return name;
+    }
+  };
+  if (!state.order.includes("custom")) {
+    const draft = state.drafts.custom;
+    Object.assign(draft, { name: nameFor(), protocol: "openai", keyRebind: false });
+    state.order.unshift("custom");
+    return "custom";
+  }
+  if (state.locked) return null;
+  const used = new Set(state.order.filter((id) => id !== "custom").map((id) => state.drafts[id].slot));
+  const free = PBP_AI_CUSTOM_SLOTS.filter((slot) => !used.has(slot));
+  const slot = free.find((n) => state.rawSlots[n] === "") ?? free[0];
+  if (slot === undefined) return null;
+  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+  let id = null;
+  for (let attempt = 0; attempt < 8 && !id; attempt++) {
+    let text = "";
+    for (const b of randomBytes(16)) {
+      if (b < 252) text += alphabet[b % 36];
+      if (text.length === 6) break;
+    }
+    const candidate = "custom-" + text;
+    if (text.length === 6 && candidate !== "custom" && !state.drafts[candidate]) id = candidate;
+  }
+  if (!id) return null;
+  state.freedSlots.delete(slot);
+  state.drafts[id] = { id, name: nameFor(), protocol: "openai", baseUrl: "", model: "", slot, key: "", keyRebind: false, keyTouched: false };
+  state.order.push(id);
+  return id;
+}
+
+// Delete an entry: "custom" goes back to blank (its keys are cleared on the
+// next save); a list entry's slot is freed and written "" on the next save.
+function pbpOptAiCustomRemove(state, id) {
+  if (!state || !state.drafts[id]) return false;
+  if (id === "custom") {
+    state.drafts.custom = Object.assign(_pbpOptAiCustomBlank(), { keyTouched: true });
+  } else {
+    if (state.locked) return false;
+    const { slot } = state.drafts[id];
+    delete state.drafts[id];
+    state.freedSlots.add(slot);
+    state.rawSlots[slot] = "";
+  }
+  state.order = state.order.filter((x) => x !== id);
+  return true;
+}
+
+// Write one field of one draft, but only a value the list sanitizer would
+// accept (the same Task 5 predicates, R3): a refused value is not written and
+// the last accepted one stays. Names, addresses and models are stored
+// trimmed. "custom" may have no name (shown as the generic custom name).
+function pbpOptAiCustomUpdate(state, id, field, value) {
+  const draft = state && state.drafts[id];
+  if (!draft || !PBP_OPT_AI_CUSTOM_FIELDS.includes(field)) return false;
+  if (id !== "custom" && state.locked) return false;
+  const text = typeof value === "string" ? value.trim() : "";
+  if (field === "protocol") {
+    if (!PBP_AI_PROTOCOLS.includes(value)) return false;
+    draft.protocol = value;
+  } else if (field === "name") {
+    if (!((id === "custom" && text === "") || pbpAiCustomNameOk(text))) return false;
+    draft.name = text;
+  } else if (field === "baseUrl") {
+    if (!(text === "" || pbpAiCustomBaseUrlOk(text))) return false;
+    draft.baseUrl = text;
+  } else if (field === "model") {
+    if (!pbpAiCustomModelOk(text)) return false;
+    draft.model = text;
+  } else {
+    draft.key = text;
+    draft.keyTouched = true;
+    draft.keyRebind = false;
+  }
+  return true;
+}
+
+// The settings this editor owns, ready to save: the five "custom" keys, the
+// list in display order, each occupied slot's key sealed to its entry (an
+// entry with no usable key keeps the slot's stored value unless its key was
+// edited), and "" for slots freed in this session. Other slots are left out
+// so the save writes nothing there. A locked list writes neither the list
+// nor its slots.
+function pbpOptAiCustomCollect(state) {
+  const c = state.drafts.custom;
+  const out = {
+    customDisplayName: c.name, customProtocol: c.protocol,
+    customBaseUrl: c.baseUrl, customApiKey: obfuscateKey(c.key), customModel: c.model,
+  };
+  if (state.locked) return out;
+  out.aiCustomProviders = [];
+  for (const id of state.order) {
+    if (id === "custom") continue;
+    const d = state.drafts[id];
+    const entry = { id: d.id, name: d.name, protocol: d.protocol, baseUrl: d.baseUrl, model: d.model, slot: d.slot };
+    out.aiCustomProviders.push(entry);
+    const sealed = d.key ? pbpAiCustomKeySeal(entry, d.key) : "";
+    out[pbpAiCustomKeyField(d.slot)] = sealed || (d.keyTouched ? "" : state.rawSlots[d.slot]);
+  }
+  for (const slot of state.freedSlots) {
+    const field = pbpAiCustomKeyField(slot);
+    if (!(field in out)) out[field] = "";
+  }
+  return out;
+}
+
+// The same settings as live values for a Test or a configured-provider
+// check: plain keys, envelopes deobfuscated.
+function pbpOptAiCustomSnapshot(state) {
+  const out = pbpOptAiCustomCollect(state);
+  out.customApiKey = state.drafts.custom.key;
+  for (const slot of PBP_AI_CUSTOM_SLOTS) {
+    const field = pbpAiCustomKeyField(slot);
+    if (field in out) out[field] = deobfuscateKey(out[field]);
+  }
+  return out;
+}
+
+function pbpOptAiCustomLabel(state, id) {
+  const d = state && state.drafts[id];
+  const name = d && typeof d.name === "string" ? d.name.trim() : "";
+  return name || (typeof t === "function" ? t("provCustomShort") : "Custom");
+}
+
+// Delete an entry and settle the page around it, in this order: remove it,
+// pick the provider (the current one, or when the deleted entry WAS current
+// the first configured provider in `order` without it, else gemini), apply
+// that provider -- which stashes the outgoing provider's reader model under
+// the deleted id -- then drop that stash and the entry's health record.
+function pbpOptAiCustomDeleteEntry({ state, id, current, snapshot, order, ollamaGranted, previewModelMap, applyProvider, forgetHealth }) {
+  pbpOptAiCustomRemove(state, id);
+  const next = current === id
+    ? (pbpAiFirstConfiguredProvider(snapshot(), new Set([id]), { ollamaGranted, order }) || "gemini")
+    : current;
+  applyProvider(next);
+  if (previewModelMap) delete previewModelMap[id];
+  forgetHealth("ai:" + id);
+  return next;
+}
+
+// The DOM id stem a provider's controls use: every custom entry shares the
+// "custom" panel.
+function pbpOptAiDomId(provider) {
+  return provider === "custom" || pbpAiCustomEntryIdOk(provider) ? "custom" : provider;
+}
+
+// The custom entry the provider picker is on, or "".
+function pbpOptAiCustomActiveId() {
+  const value = $id("opt-ai-provider")?.value || "";
+  return pbpOptAiDomId(value) === "custom" ? value : "";
+}
+
+// List the entries in the provider picker: the static "custom" option shows
+// while that entry exists (or is selected), each list entry gets an option
+// named by textContent, and a stored provider this device cannot resolve
+// keeps the picker's value through a placeholder option instead of turning
+// into "" (which a save would write back). A group with nothing visible is
+// hidden. `current` is the value the picker must keep.
+function pbpOptAiCustomRenderOptions(select, state, current) {
+  if (!select) return;
+  const stat = select.querySelector('option[value="custom"]');
+  const group = stat ? stat.parentElement : select;
+  for (const o of select.querySelectorAll("option[data-ai-custom-entry],option[data-provider-unavailable]")) o.remove();
+  if (stat) {
+    stat.hidden = !(state.order.includes("custom") || current === "custom");
+    stat.textContent = pbpOptAiCustomLabel(state, "custom");
+  }
+  for (const id of state.order) {
+    if (id === "custom") continue;
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = pbpOptAiCustomLabel(state, id);
+    opt.setAttribute("data-ai-custom-entry", "");
+    group.appendChild(opt);
+  }
+  const value = typeof current === "string" ? current : "";
+  if (value && /^[a-z][a-z0-9_-]{0,31}$/.test(value) && ![...select.options].some((o) => o.value === value)) {
+    const ph = document.createElement("option");
+    ph.value = value;
+    ph.textContent = typeof t === "function" ? t("aiProviderUnavailable") : value;
+    ph.setAttribute("data-provider-unavailable", "");
+    group.appendChild(ph);
+  }
+  for (const g of select.querySelectorAll("optgroup")) g.hidden = ![...g.children].some((o) => !o.hidden);
+  select.value = value;
+}
+
+// Fill the shared panel with one entry's draft. false when there is none.
+function pbpOptAiCustomFillPanel(state, id) {
+  const d = state && state.drafts[id];
+  if (!d) return false;
+  const set = (elId, v) => { const el = $id(elId); if (el) el.value = typeof v === "string" ? v : ""; };
+  const fields = ["opt-custom-name", "opt-custom-protocol", "opt-custom-baseurl", "opt-custom-key", "opt-custom-model"];
+  for (const elId of fields) {
+    const el = $id(elId);
+    if (el && pbpOptClearFieldInvalid) pbpOptClearFieldInvalid(el);
+  }
+  const protoBtn = $id("opt-custom-protocol-btn");
+  if (protoBtn && pbpOptClearFieldInvalid) pbpOptClearFieldInvalid(protoBtn);
+  set("opt-custom-name", d.name);
+  // A format this version does not know shows no option, like a region.
+  set("opt-custom-protocol", PBP_AI_PROTOCOLS.includes(d.protocol) ? d.protocol : "");
+  set("opt-custom-baseurl", d.baseUrl);
+  set("opt-custom-key", d.key);
+  set("opt-custom-model", d.model);
+  const title = $id("fields-custom-title");
+  if (title) title.textContent = pbpOptAiCustomLabel(state, id);
+  const hint = $id("hint-custom-baseurl");
+  if (hint) {
+    const key = d.protocol === "anthropic" ? "hintCustomBaseUrlAnthropic" : "hintCustomBaseUrl";
+    hint.setAttribute("data-i18n", key);
+    hint.textContent = t(key);
+  }
+  const rebind = $id("ai-custom-key-rebind");
+  if (rebind) rebind.hidden = !d.keyRebind;
+  for (const warn of ["ai-custom-name-invalid", "ai-custom-baseurl-invalid", "ai-custom-model-invalid"]) {
+    const el = $id(warn);
+    if (el) el.hidden = true;
+  }
+  const status = $id("test-custom-status");
+  if (status) {
+    status.textContent = "";
+    status.classList.remove("ok", "bad", "pending", "warn");
+  }
+  const test = $id("test-custom");
+  if (test) test.disabled = pbpAiTestInflight.has(id);
+  if (typeof window !== "undefined") window.pbpListboxSync?.($id("opt-custom-protocol"));
+  return true;
 }
 
 function setupApiTests() {

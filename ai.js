@@ -574,7 +574,7 @@ function _aiResolveCustomEntry(st, provider, customShort) {
     official: false,
     apiKey: pbpAiCustomKeyOpen(st, entry),
     model: entry.model,
-    label: entry.name,
+    label: String(entry.name).trim(),
     cfg: protocol === "openai" ? { base: "", endpoint, defaultModel: "" } : null,
     error: endpoint ? null : "endpoint_invalid",
   };
@@ -910,6 +910,39 @@ async function _ensureAIHostPermission(s) {
     err.code = "host_permission";
     throw err;
   }
+}
+
+// ---- Provider fallback order ----
+// The provider order with "custom" expanded in place into every configured
+// custom entry ("custom" first, then the list), dropped when there are none,
+// and de-duplicated. `order` defaults to popup-ai.js's AI_PROVIDER_ORDER; a
+// page without popup-ai.js (options) must pass its own list.
+function pbpAiExpandProviderOrder(s, order = AI_PROVIDER_ORDER) {
+  const out = [];
+  for (const p of order) {
+    if (p === "custom") for (const e of pbpAiCustomEntries(s)) out.push(e.id);
+    else out.push(p);
+  }
+  return [...new Set(out)];
+}
+
+// The first provider in that expanded order that is not in `skip` and is set
+// up: Ollama needs no key, so it counts once its origin is granted or its URL
+// or model differs from the defaults; every other id needs hasAIKey. null
+// when none is.
+function pbpAiFirstConfiguredProvider(s, skip, { ollamaGranted = false, order = AI_PROVIDER_ORDER } = {}) {
+  const st = s || {};
+  const d = typeof SETTINGS_DEFAULTS === "object" && SETTINGS_DEFAULTS ? SETTINGS_DEFAULTS : {};
+  for (const p of pbpAiExpandProviderOrder(st, order)) {
+    if (skip && skip.has(p)) continue;
+    if (p === "ollama") {
+      if (ollamaGranted || (st.ollamaBaseUrl !== undefined && st.ollamaBaseUrl !== d.ollamaBaseUrl)
+        || (st.ollamaModel !== undefined && st.ollamaModel !== d.ollamaModel)) return p;
+      continue;
+    }
+    if (hasAIKey({ ...st, aiProvider: p })) return p;
+  }
+  return null;
 }
 
 // OpenAI-compatible request configuration shared by callAI and callAIStream,

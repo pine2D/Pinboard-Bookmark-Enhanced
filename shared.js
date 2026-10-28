@@ -2764,6 +2764,9 @@ function pbpAiCustomKeyOpen(settings, entry) {
   try { env = JSON.parse(raw); } catch (_) { return ""; }
   if (!env || typeof env !== "object" || env.v !== 1) return "";
   const baseUrl = pbpAiEndpointNorm(entry.baseUrl);
+  // The envelope binds id, address and format but deliberately not the slot:
+  // pbpSanitizeAiCustomProviders guarantees one entry per slot, so the slot
+  // an envelope sits in can only belong to the entry it names.
   if (!baseUrl || env.entryId !== entry.id || env.baseUrl !== baseUrl || env.protocol !== entry.protocol) return "";
   return typeof env.key === "string" && env.key ? env.key : "";
 }

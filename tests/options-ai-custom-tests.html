@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Options AI Custom Entry Tests</title>
+<style>
+body { font-family: monospace; padding: 16px; max-width: 1200px; }
+.case { padding: 4px 8px; margin: 4px 0; white-space: pre-wrap; }
+.pass { color: #0a0; background: #f0fff0; }
+.fail { color: #c00; background: #fff0f0; font-weight: bold; }
+#summary { font-weight: bold; margin: 8px 0; }
+</style></head>
+<body>
+<h1>Options: custom AI provider entries (editor model)</h1>
+<div id="summary"></div>
+<div id="results"></div>
+<div id="scratch" hidden></div>
+
+<script src="../i18n.js"></script>
+<script src="../shared.js"></script>
+<script src="../ai.js"></script>
+<script src="../options-connectivity.js"></script>
+
+<script>
+// t() reads chrome.i18n; the key comes back as its own text.
+if (!window.chrome || !window.chrome.i18n) window.chrome = Object.assign(window.chrome || {}, { i18n: { getMessage: (key) => key } });
+let PASS = 0, FAIL = 0;
+function report(name, err) {
+  const div = document.createElement("div");
+  if (!err) { PASS++; div.className = "case pass"; div.textContent = "PASS " + name; }
+  else { FAIL++; div.className = "case fail"; div.textContent = "FAIL " + name + "\n  " + (err && err.message || err); }
+  document.getElementById("results").appendChild(div);
+}
+function test(name, fn) { try { fn(); report(name); } catch (e) { report(name, e); } }
+async function atest(name, fn) { try { await fn(); report(name); } catch (e) { report(name, e); } }
+function assert(cond, msg) { if (!cond) throw new Error(msg || "assertion failed"); }
+function assertEq(actual, expected, label) {
+  if (actual !== expected) throw new Error((label || "assertEq") + ": expected " + JSON.stringify(expected) + " got " + JSON.stringify(actual));
+}
+function assertDeep(actual, expected, label) {
+  assertEq(JSON.stringify(actual), JSON.stringify(expected), label);
+}
+function extractBalanced(source, marker, open, close) {
+  const at = source.indexOf(marker);
+  if (at === -1) throw new Error("could not find `" + marker + "`");
+  const openIdx = at + marker.length - 1;
+  if (source[openIdx] !== open) throw new Error("`" + marker + "` is not followed by `" + open + "`");
+  let depth = 0;
+  for (let i = openIdx; i < source.length; i++) {
+    if (source[i] === open) depth++;
+    else if (source[i] === close) {
+      depth--;
+      if (depth === 0) return source.slice(openIdx, i + 1);
+    }
+  }
+  throw new Error("unbalanced `" + open + "`/`" + close + "` reading `" + marker + "`");
+}
+
+// ---- Hand-written fixtures (never produced by collect) ----
+const C = { customDisplayName: "Relay A", customBaseUrl: "https://a.example/v1", customApiKey: "k1", customModel: "m", customProtocol: "openai" };
+const B = { id: "custom-b2b2b2", name: "B", protocol: "openai", baseUrl: "https://old.example/v1", model: "", slot: 3 };
+const A = { id: "custom-a1a1a1", name: "A", protocol: "anthropic", baseUrl: "https://a2.example/v1", model: "x", slot: 2 };
+const SLOT3 = obfuscateKey(pbpAiCustomKeySeal(B, "sk"));
+const S = (extra) => Object.assign({}, SETTINGS_DEFAULTS, extra || {});
+const ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
+const bytesFor = (text) => { const out = new Uint8Array(16); for (let i = 0; i < 16; i++) out[i] = i < text.length ? ALPHABET.indexOf(text[i]) : 255; return out; };
+const seqBytes = (...batches) => { let i = 0; return (n) => { assertEq(n, 16, "randomBytes length"); return batches[Math.min(i++, batches.length - 1)]; }; };
+const defaultName = (n) => "Custom " + n;
+const freshBytes = (() => { let k = 0; return () => bytesFor("zz" + String(k++).padStart(4, "0")); })();
+
+// A select shaped like options.html's #opt-ai-provider.
+function providerSelect() {
+  const host = document.getElementById("scratch");
+  host.innerHTML = '<select id="t-provider"><optgroup label="Cloud"><option value="gemini">Gemini</option></optgroup>' +
+    '<optgroup label="Local"><option value="ollama">Ollama</option></optgroup>' +
+    '<optgroup label="Custom" id="t-compat"><option value="custom">Custom</option></optgroup></select>';
+  return document.getElementById("t-provider");
+}
+
+test("state: legacy custom first, list entries follow stored order", () => {
+  const st = pbpOptAiCustomState(S({ ...C, aiCustomProviders: [B, A], customApiKey3: SLOT3 }));
+  assertDeep(pbpOptAiCustomOrder(st), ["custom", "custom-b2b2b2", "custom-a1a1a1"], "order");
+  assertEq(st.drafts.custom.key, "k1", "custom key");
+  assertEq(st.drafts[B.id].key, "sk", "B key opened from its slot");
+});
+
+test("state: a mismatched envelope reads as no key and flags rebind", () => {
+  const moved = { ...B, baseUrl: "https://new.example/v1" };
+  const st = pbpOptAiCustomState(S({ aiCustomProviders: [moved], customApiKey3: SLOT3 }));
+  assertEq(st.drafts[B.id].key, "", "no key");
+  assertEq(st.drafts[B.id].keyRebind, true, "rebind flagged");
+  const ok = pbpOptAiCustomState(S({ aiCustomProviders: [B], customApiKey3: SLOT3 }));
+  assertEq(ok.drafts[B.id].keyRebind, false, "matching envelope is not a rebind");
+});
+
+test("state: unknown protocol values round-trip through collect unchanged", () => {
+  const list = [{ ...B, protocol: "" }, { ...A, protocol: "grpc" }];
+  const st = pbpOptAiCustomState(S({ ...C, customProtocol: "xx", aiCustomProviders: list, customApiKey3: SLOT3 }));
+  const c = pbpOptAiCustomCollect(st);
+  assertDeep(c.aiCustomProviders.map((e) => e.protocol), ["", "grpc"], "entry protocols");
+  assertEq(c.customProtocol, "xx", "customProtocol");
+  assertDeep(c.aiCustomProviders, list, "whole list unchanged");
+});
+
+test("add: an empty custom slot is reclaimed before any custom-xxxxxx", () => {
+  const st = pbpOptAiCustomState(S());
+  assertEq(pbpOptAiCustomAdd(st, { randomBytes: freshBytes, defaultName }), "custom", "first add");
+  assertDeep(pbpOptAiCustomOrder(st), ["custom"], "order");
+  assertEq(st.drafts.custom.name, "Custom 1", "non-empty default name");
+});
+
+test("add: a leftover retired customName:\"Custom\" does not occupy the custom slot", () => {
+  const st = pbpOptAiCustomState(S({ customName: "Custom" }));
+  assertDeep(pbpOptAiCustomOrder(st), [], "no ghost entry");
+  assertEq(pbpOptAiCustomAdd(st, { randomBytes: freshBytes, defaultName }), "custom", "add reclaims custom");
+});
+
+test("add: id is custom- plus 6 [a-z0-9] from crypto bytes, bytes >= 252 rejected, collisions retried", () => {
+  const st = pbpOptAiCustomState(S({ ...C, aiCustomProviders: [B] }));
+  const short = new Uint8Array(16).fill(255); short.set([252, 253, 254, 0, 1, 2, 3, 4], 0);
+  const id = pbpOptAiCustomAdd(st, { randomBytes: seqBytes(short, bytesFor("b2b2b2"), bytesFor("q7q7q7")), defaultName });
+  assert(pbpAiCustomEntryIdOk(id), "id shape: " + id);
+  assertEq(id, "custom-q7q7q7", "third batch wins (first too short after rejection, second collides)");
+  assert(id !== B.id && id !== "custom", "unique");
+  const st2 = pbpOptAiCustomState(S({ ...C, aiCustomProviders: [B] }));
+  assertEq(pbpOptAiCustomAdd(st2, { randomBytes: () => bytesFor("b2b2b2"), defaultName }), null, "gives up after bounded retries");
+});
+
+test("add: slot prefers raw-empty slots; null at PBP_AI_CUSTOM_MAX", () => {
+  const st = pbpOptAiCustomState(S({ ...C, customApiKey2: "obf:orphan" }));
+  const id = pbpOptAiCustomAdd(st, { randomBytes: freshBytes, defaultName });
+  assertEq(st.drafts[id].slot, 3, "skips raw-occupied slot 2");
+  while (pbpOptAiCustomOrder(st).length < PBP_AI_CUSTOM_MAX) assert(pbpOptAiCustomAdd(st, { randomBytes: freshBytes, defaultName }), "add below max");
+  assertEq(pbpOptAiCustomOrder(st).length, 8, "eight entries");
+  const slots = pbpOptAiCustomCollect(st).aiCustomProviders.map((e) => e.slot).sort();
+  assertDeep(slots, [2, 3, 4, 5, 6, 7, 8], "every slot used once (slot 2 last)");
+  assertEq(pbpOptAiCustomAdd(st, { randomBytes: freshBytes, defaultName }), null, "null at max");
+});
+
+test("add: default name counts up and stays unique", () => {
+  const st = pbpOptAiCustomState(S({ ...C, customDisplayName: "Custom 2" }));
+  const id = pbpOptAiCustomAdd(st, { randomBytes: freshBytes, defaultName });
+  assertEq(st.drafts[id].name, "Custom 3", "skips the taken name");
+  const id2 = pbpOptAiCustomAdd(st, { randomBytes: freshBytes, defaultName });
+  assertEq(st.drafts[id2].name, "Custom 4", "next one");
+});
+
+test("collect: legacy custom keys come from the custom draft", () => {
+  const c = pbpOptAiCustomCollect(pbpOptAiCustomState(S()));
+  for (const k of ["customDisplayName", "customProtocol", "customBaseUrl", "customApiKey", "customModel"]) {
+    assertEq(c[k], SETTINGS_DEFAULTS[k], k);
+  }
+  assertDeep(c.aiCustomProviders, [], "empty list");
+  const c2 = pbpOptAiCustomCollect(pbpOptAiCustomState(S(C)));
+  assertEq(deobfuscateKey(c2.customApiKey), "k1", "custom key obfuscated");
+  assertEq(c2.customDisplayName, "Relay A", "name");
+});
+
+test("collect: a local baseUrl/protocol edit reseals with the typed key", () => {
+  const st = pbpOptAiCustomState(S({ aiCustomProviders: [B], customApiKey3: SLOT3 }));
+  assert(pbpOptAiCustomUpdate(st, B.id, "baseUrl", "https://moved.example/v1"), "base accepted");
+  assert(pbpOptAiCustomUpdate(st, B.id, "protocol", "anthropic"), "protocol accepted");
+  const c = pbpOptAiCustomCollect(st);
+  const entry = c.aiCustomProviders[0];
+  assertEq(entry.baseUrl, "https://moved.example/v1", "base saved");
+  assertEq(pbpAiCustomKeyOpen(c, entry), "sk", "key reopens under the new binding");
+});
+
+test("collect: unoccupied slots are omitted unless freed this session", () => {
+  const st = pbpOptAiCustomState(S({ aiCustomProviders: [B, A], customApiKey3: SLOT3 }));
+  assert(pbpOptAiCustomRemove(st, B.id), "removed");
+  const c = pbpOptAiCustomCollect(st);
+  assertEq(c.customApiKey3, "", "freed slot cleared");
+  assert(!("customApiKey4" in c), "untouched unoccupied slot omitted");
+  assert("customApiKey2" in c, "occupied slot written");
+  assertDeep(c.aiCustomProviders.map((e) => e.id), [A.id], "list");
+});
+
+test("collect: deleting custom clears every custom* key incl. customDisplayName/customProtocol", () => {
+  const st = pbpOptAiCustomState(S({ ...C, customProtocol: "anthropic" }));
+  assert(pbpOptAiCustomRemove(st, "custom"), "removed");
+  const c = pbpOptAiCustomCollect(st);
+  for (const k of ["customDisplayName", "customProtocol", "customBaseUrl", "customApiKey", "customModel"]) {
+    assertEq(c[k], SETTINGS_DEFAULTS[k], k);
+  }
+  assertDeep(pbpOptAiCustomOrder(st), [], "custom gone from the order");
+});
+
+test("update: values the sanitizer would refuse are rejected in place and never written", () => {
+  const st = pbpOptAiCustomState(S({ ...C, aiCustomProviders: [B, A], customApiKey3: SLOT3 }));
+  const before = JSON.stringify(st.drafts[B.id]);
+  const aBefore = JSON.stringify(pbpOptAiCustomCollect(st).aiCustomProviders[1]);
+  const refused = [
+    ["baseUrl", "https://x.example/v1?k=1"], ["baseUrl", "https://例子.测试/v1"], ["baseUrl", "http://192.168.1.5/v1"],
+    ["name", "a\tb"], ["name", "😀".repeat(40)], ["name", ""], ["model", "m\u0007"], ["protocol", "grpc"],
+  ];
+  for (const [field, value] of refused) {
+    assertEq(pbpOptAiCustomUpdate(st, B.id, field, value), false, field + " " + JSON.stringify(value));
+    assertEq(JSON.stringify(st.drafts[B.id]), before, "draft unchanged after " + field);
+  }
+  const c = pbpOptAiCustomCollect(st);
+  assert(pbpSanitizeAiCustomProviders(c.aiCustomProviders) !== null, "saved list still passes the sanitizer");
+  assertEq(JSON.stringify(c.aiCustomProviders[1]), aBefore, "other entry untouched");
+  assert(pbpOptAiCustomUpdate(st, B.id, "name", "  Padded  "), "trimmed name accepted");
+  assertEq(st.drafts[B.id].name, "Padded", "stored trimmed");
+  assertEq(pbpOptAiCustomUpdate(st, "custom", "name", ""), true, "custom may clear its name");
+  assertEq(pbpOptAiCustomLabel(st, "custom"), t("provCustomShort"), "label falls back");
+});
+
+test("snapshot: an unsaved entry resolves through hasAIKey and its exact origin", () => {
+  const st = pbpOptAiCustomState(S({ aiCustomProviders: [B], customApiKey3: SLOT3 }));
+  assert(pbpOptAiCustomUpdate(st, B.id, "baseUrl", "https://moved.example/v1"), "base");
+  try {
+    pbpOptAiCustomEditorState = st;
+    const snap = pbpLiveAiSettingsSnapshot(B.id);
+    assert(hasAIKey(snap), "entry key visible to hasAIKey");
+    assertEq(_aiTargetOriginPattern(snap), "https://moved.example/*", "origin");
+  } finally {
+    pbpOptAiCustomEditorState = null;
+  }
+  assertEq(pbpLiveAiSettingsSnapshot(B.id).aiCustomProviders, undefined, "null state keeps the old snapshot");
+  const padded = S({ aiCustomProviders: [{ ...B, name: "  B  " }] });
+  assertEq(pbpAiResolveTarget(padded, B.id).label, "B", "resolver trims an entry label like the custom slot");
+});
+
+test("order: pbpAiExpandProviderOrder expands custom in place, drops it when absent, dedupes", () => {
+  const order = ["gemini", "custom", "ollama", "gemini"];
+  assertDeep(pbpAiExpandProviderOrder(S({ ...C, aiCustomProviders: [B, A] }), order),
+    ["gemini", "custom", B.id, A.id, "ollama"], "expanded");
+  assertDeep(pbpAiExpandProviderOrder(S(), order), ["gemini", "ollama"], "absent custom dropped");
+});
+
+test("first configured: skips given ids, keyless entries and default ollama", () => {
+  const order = ["gemini", "openai", "ollama", "custom"];
+  assertEq(pbpAiFirstConfiguredProvider(S(), new Set(), { order }), null, "nothing configured");
+  assertEq(pbpAiFirstConfiguredProvider(S(), new Set(), { order, ollamaGranted: true }), "ollama", "granted ollama");
+  assertEq(pbpAiFirstConfiguredProvider(S({ ollamaModel: "qwen3" }), new Set(), { order }), "ollama", "changed ollama");
+  assertEq(pbpAiFirstConfiguredProvider(S({ geminiApiKey: "g", aiCustomProviders: [B] }), new Set(["gemini"]), { order }), null, "keyless entry skipped");
+  assertEq(pbpAiFirstConfiguredProvider(S({ geminiApiKey: "g", aiCustomProviders: [B], customApiKey3: SLOT3 }), new Set(["gemini"]), { order }), B.id, "keyed entry");
+  assertEq(pbpAiFirstConfiguredProvider(S({ geminiApiKey: "g" }), new Set(), { order }), "gemini", "first in order");
+});
+
+test("delete: removing the current entry runs every side effect in order", () => {
+  const st = pbpOptAiCustomState(S({ ...C, aiCustomProviders: [B], customApiKey3: SLOT3 }));
+  const map = { [B.id]: "pm", gemini: "g" };
+  const events = [];
+  const next = pbpOptAiCustomDeleteEntry({
+    state: st, id: B.id, current: B.id,
+    snapshot: () => S(pbpOptAiCustomSnapshot(st)),
+    order: ["gemini", "openai", "ollama", "custom"], ollamaGranted: false,
+    previewModelMap: map,
+    applyProvider: (p) => { events.push("apply:" + p); map[B.id] = "stashed"; },
+    forgetHealth: (id) => { events.push("forget:" + id); },
+  });
+  assertEq(next, "custom", "first configured provider");
+  assertDeep(events, ["apply:custom", "forget:ai:custom-b2b2b2"], "side effects, once each");
+  assert(!(B.id in map), "preview model entry removed after applyProvider stashed it");
+  assertEq(map.gemini, "g", "other preview models kept");
+  assertEq(pbpOptAiCustomCollect(st).customApiKey3, "", "slot cleared");
+});
+
+test("delete: falls back to gemini when nothing is configured; a non-current delete keeps aiProvider", () => {
+  const mk = () => pbpOptAiCustomState(S({ aiCustomProviders: [B, A] }));
+  const ctx = (st, current) => ({ state: st, id: B.id, current, snapshot: () => S(pbpOptAiCustomSnapshot(st)),
+    order: ["gemini", "openai", "ollama", "custom"], ollamaGranted: false, previewModelMap: {},
+    applyProvider: () => {}, forgetHealth: () => {} });
+  assertEq(pbpOptAiCustomDeleteEntry(ctx(mk(), B.id)), "gemini", "gemini fallback");
+  const st = mk();
+  assertEq(pbpOptAiCustomDeleteEntry(ctx(st, "openai")), "openai", "non-current keeps aiProvider");
+  assertDeep(pbpOptAiCustomOrder(st), [A.id], "entry removed");
+});
+
+test("render options: entries listed by name via textContent, static custom hidden when empty, empty group hidden", () => {
+  const select = providerSelect();
+  const st = pbpOptAiCustomState(S({ aiCustomProviders: [{ ...B, name: "<b>x</b>" }] }));
+  pbpOptAiCustomRenderOptions(select, st, "gemini");
+  const stat = select.querySelector('option[value="custom"]');
+  assert(stat.hidden, "static custom hidden while custom* is empty");
+  const opt = select.querySelector('option[value="' + B.id + '"]');
+  assert(opt, "entry option rendered");
+  assertEq(opt.textContent, "<b>x</b>", "name as text");
+  assert(!select.querySelector("b"), "no markup parsed");
+  assertEq(opt.parentElement.id, "t-compat", "inside the custom group");
+  assertEq(select.value, "gemini", "value kept");
+  const st2 = pbpOptAiCustomState(S(C));
+  pbpOptAiCustomRenderOptions(select, st2, "gemini");
+  assert(!select.querySelector('option[value="' + B.id + '"]'), "stale entry option removed");
+  assert(!stat.hidden, "custom shown once configured");
+  assertEq(stat.textContent, "Relay A", "custom option shows its name");
+  pbpOptAiCustomRenderOptions(select, pbpOptAiCustomState(S()), "gemini");
+  assert(document.getElementById("t-compat").hidden, "empty group hidden");
+});
+
+test("render options: an unresolvable aiProvider keeps select.value via a placeholder", () => {
+  const select = providerSelect();
+  pbpOptAiCustomRenderOptions(select, pbpOptAiCustomState(S()), "custom-zz9zz9");
+  assertEq(select.value, "custom-zz9zz9", "value kept");
+  const ph = select.selectedOptions[0];
+  assert(ph && ph.hasAttribute("data-provider-unavailable"), "placeholder marked");
+  assertEq(ph.textContent, t("aiProviderUnavailable"), "placeholder text");
+  assert(!document.getElementById("t-compat").hidden, "group shown for the placeholder");
+  pbpOptAiCustomRenderOptions(select, pbpOptAiCustomState(S()), "gemini");
+  assert(!select.querySelector("[data-provider-unavailable]"), "placeholder dropped once not selected");
+  pbpOptAiCustomRenderOptions(select, pbpOptAiCustomState(S()), "Not An Id");
+  assert(!select.querySelector("[data-provider-unavailable]"), "no placeholder for a malformed value");
+});
+
+(async () => {
+  await atest("health: pbpForgetConnectionHealth removes only ai:<id> through the serial write tail", async () => {
+    const source = await fetch("../options.js").then((r) => r.text());
+    const start = source.indexOf("const PBP_CONNECTION_HEALTH_IDS = new Set([");
+    const end = source.indexOf("// Set only while pbpExpandOptionsAncestors", start);
+    assert(start > 0 && end > start, "health block found");
+    const store = { _connectionHealthV1: {
+      "ai:custom-b2b2b2": { ok: true, code: "connected", checkedAt: 1 },
+      "ai:gemini": { ok: false, code: "failed", checkedAt: 1 },
+    } };
+    const local = {
+      get: async (k) => { await new Promise((r) => setTimeout(r, 5)); return { [k]: JSON.parse(JSON.stringify(store[k] || {})) }; },
+      set: async (o) => { await new Promise((r) => setTimeout(r, 1)); Object.assign(store, JSON.parse(JSON.stringify(o))); },
+    };
+    const mod = new Function("chrome", "PBP_CONNECTION_HEALTH_KEY",
+      source.slice(start, end) + "\nreturn { pbpRecordConnectionHealth, pbpForgetConnectionHealth };")({ storage: { local } }, "_connectionHealthV1");
+    const [a, b] = await Promise.all([
+      mod.pbpForgetConnectionHealth("ai:custom-b2b2b2"),
+      mod.pbpRecordConnectionHealth("ai:custom-a1a1a1", true, "connected"),
+    ]);
+    assertEq(a, true, "forget result");
+    assertEq(b, true, "record result");
+    const map = store._connectionHealthV1;
+    assert(!("ai:custom-b2b2b2" in map), "forgotten");
+    assert(map["ai:gemini"] && map["ai:custom-a1a1a1"], "other records and the concurrent write kept");
+    assertEq(await mod.pbpForgetConnectionHealth("ai:custom-zzzzzz"), false, "absent id is a no-op");
+  });
+
+  const el = document.getElementById("summary");
+  el.textContent = "SUMMARY: " + PASS + " passed, " + FAIL + " failed";
+  el.style.color = FAIL ? "#c00" : "#0a0";
+  document.title = (FAIL ? "FAIL " : "PASS ") + document.title;
+})();
+</script>
+</body></html>

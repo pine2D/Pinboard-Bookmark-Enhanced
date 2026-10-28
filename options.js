@@ -127,6 +127,27 @@ function pbpRecordConnectionHealth(id, ok, rawCode) {
   return run;
 }
 
+// Drop one record (a deleted custom entry's ai:<id>) through the same serial
+// tail, so it cannot interleave with a concurrent record and lose either.
+// Resolves true when a record was removed.
+function pbpForgetConnectionHealth(id) {
+  const run = _connectionHealthWriteTail.catch(() => {}).then(async () => {
+    try {
+      const stored = await chrome.storage.local.get(PBP_CONNECTION_HEALTH_KEY);
+      const map = pbpConnectionHealthMap(stored[PBP_CONNECTION_HEALTH_KEY]);
+      if (!Object.prototype.hasOwnProperty.call(map, id)) return false;
+      delete map[id];
+      await chrome.storage.local.set({ [PBP_CONNECTION_HEALTH_KEY]: map });
+      return true;
+    } catch (e) {
+      console.warn("[connection-health] forget failed:", e?.name, e?.message);
+      return false;
+    }
+  });
+  _connectionHealthWriteTail = run;
+  return run;
+}
+
 // Set only while pbpExpandOptionsAncestors flips a <details> open, and read by
 // the delegated toggle listener further down: a navigation must not rewrite the
 // collapse state the user has remembered.
