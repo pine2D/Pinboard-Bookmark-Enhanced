@@ -2678,6 +2678,16 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(!shown.includes("custom-zzzzzz"), "the raw entry id reached the card: " + shown);
     });
 
+    await testAsync("an empty stored aiProvider is labelled and skipped as gemini, like the resolver", async () => {
+      const h = makePopupAi({ realErrorCard: true, settings: { ...chainSettings, aiProvider: "", geminiApiKey: "g" },
+        fallback: buildFallback(), respond: failQuota, sanitize: realAi.pbpSanitizeAiOverrides });
+      await h.doAISummary(false);
+      const shown = h.el["ai-error-message"].textContent;
+      assert(shown.startsWith("[" + pbpAiProviderLabel("gemini") + "] "), "the card did not name Gemini: " + shown);
+      const btn = h.el["ai-error-fallback"];
+      assert(btn.classList.contains("hidden") || btn.dataset.provider !== "gemini", "Try-with recommended gemini itself");
+    });
+
     await testAsync("a bus answer with no envelope renders the localized unknown error", async () => {
       const h = makePopupAi({ realErrorCard: true, respond: async () => undefined });
       await h.doAISummary(false);

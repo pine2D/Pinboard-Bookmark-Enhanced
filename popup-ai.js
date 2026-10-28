@@ -519,7 +519,7 @@ function showAIError(op, err, opSettings) {
   } : null;
   const card = $id("ai-error-card");
   if (!card) return;
-  const providerKey = (s.aiProvider || "openai");
+  const providerKey = (s.aiProvider || "gemini");
   const provLabel = _aiPopupProviderLabel(s, providerKey);
   $id("ai-error-title").textContent = t("aiErrorTitle", op === "tags" ? t("aiErrorOpTags") : t("aiErrorOpSummary"));
   const msgEl = $id("ai-error-message");
