@@ -207,4 +207,11 @@ test('usage slots: each category under its own label, patterns before confusable
   // not show the usage block does not require the check.
   assert.equal(verdicts(withSlots([{ ...good[0], items: 0 }, good[1]]), 'dict-entry-usage-result').dictUsageSlots, 'OK');
   assert.equal(verdicts(withSlots([]), 'dict-entry-result').dictUsageSlots, undefined);
+  // The learner-profile line serves both slots: nearer to the last slot
+  // than the slots are apart (sp-2 under sp-4, the 55db5993 review's
+  // 06-usage-busy-p2), it reads as part of confusables and fails.
+  const withLead = (profileGap, slotGap = 16) => ({ ...withSlots(good), slotProfile: { slotGap, profileGap, path: 'profile' } });
+  assert.equal(verdicts(withLead(8), 'dict-entry-usage-busy').dictUsageSlots, 'FAIL');
+  assert.equal(verdicts(withLead(16), 'dict-entry-usage-busy').dictUsageSlots, 'OK');
+  assert.equal(verdicts(withLead(15.5), 'dict-entry-usage-busy').dictUsageSlots, 'OK');
 });

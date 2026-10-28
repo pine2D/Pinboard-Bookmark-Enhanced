@@ -729,7 +729,10 @@ export function evaluateMediaProbe(probe, check) {
 // carries (data-category / data-supplement-category), not from the slot
 // markup, so a receipt printed under the other category's button, or a result
 // listed above both buttons, fails here (the batch-3 review's
-// 08-usage-result-p3 / 06-usage-busy-p2 / 18-paid-negative-b shots).
+// 08-usage-result-p3 / 06-usage-busy-p2 / 18-paid-negative-b shots). The
+// learner-profile line after the slots belongs to both categories, so it sits
+// at least as far below the last slot as the slots sit apart; nearer, it reads
+// as part of the confusables slot (the 55db5993 review's 06-usage-busy-p2).
 //
 // dictScrollClip (requires "clip"): every lookup scroll container keeps its
 // content inside it (scrollWidth <= clientWidth), and every measured text
@@ -755,7 +758,8 @@ export const DICT_LOOKUP_GEOMETRY = {
   // dictUsageSlots: the usage block, its categories in their fixed order,
   // and how a node names the category it belongs to.
   slots: { block: '[data-learning-block="usage"]', categories: ["patterns", "confusables"], label: ".xp-dict-learning-label",
-    action: ".xp-dict-supplement-generate", row: ".xp-dict-usage-actions", result: "[data-supplement-category]" },
+    action: ".xp-dict-supplement-generate", row: ".xp-dict-usage-actions", result: "[data-supplement-category]",
+    slot: ".xp-dict-learning-slot", profile: ".xp-dict-supplement-profile" },
   surfaces: {
     "md-preview": {
       // .xp-dict is the lookup column; the whole popover (its foot holds the
@@ -920,6 +924,8 @@ export function evaluateDictLookupGeometry(probe, { surface, context }) {
       const start = Math.min(next.top, next.label ? next.label.top : Infinity);
       if (prev.index > next.index || prev.bottom > start + tol) faults.push(`${prev.category} (to ${round(prev.bottom)}) does not end before ${next.category} starts (${round(start)})`);
     }
+    const lead = probe?.slotProfile;
+    if (lead && lead.profileGap < lead.slotGap - tol) faults.push(`profile line ${round(lead.profileGap)}px under the last slot, nearer than the ${round(lead.slotGap)}px between slots (${lead.path})`);
     row("dictUsageSlots", !faults.length, faults.length ? faults.slice(0, 3).join("; ") : slots.map((b) => b.category).join(" < "),
       `each category under its own label, ${spec.slots.categories.join(" before ")} (±${tol}px)`);
   } else if (requires.has("slots")) setup("dictUsageSlots", "the usage block's categories");

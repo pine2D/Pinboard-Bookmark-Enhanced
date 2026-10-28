@@ -2213,6 +2213,15 @@ function _pbpDictEntryMount(host, opts) {
     usageForm?.refresh();
   };
   const supplementId = addition => addition.id || String(addition.generatedAt);
+  // A result outside its slot says which learner profile it was made for:
+  // the native language, and the level for the categories that use it
+  // (pbpDictSupplementProfile); an unset value reads "not specified".
+  const profileTitle = addition => {
+    const unset = t("dictLearnerLevelUnspecified"), level = ["beginner", "intermediate", "advanced"].includes(addition.profile.level) ? addition.profile.level : "";
+    const parts = [t("dictSupplementNativeLanguage", addition.profile.nativeLanguage || unset)];
+    if (addition.category !== "patterns") parts.push(t("dictSupplementLevel", level ? t("dictLearnerLevel" + level[0].toUpperCase() + level.slice(1)) : unset));
+    return parts.join(" · ");
+  };
   const renderSupplements = (answerLanguage, revealId) => {
     if (typeof pbpDictSupplementRun !== "function") return;
     if (record.archiveSaved === false) {
@@ -2245,6 +2254,14 @@ function _pbpDictEntryMount(host, opts) {
       const summary = document.createElement("summary"); summary.textContent = t("dictSupplementPrevious"); previousSupplements.appendChild(summary);
     }
     const form = learningForm();
+    // Each slot is for the current learner settings: it holds the newest
+    // result made for them (or its button). A result made for another native
+    // language or level -- the settings changed, or Drive brought it from a
+    // device set up differently -- is read outside the blocks under a title
+    // naming its profile, so a slot never shows a result beside its button
+    // or two untitled results read as one card.
+    const inSlot = new Set(["patterns", "confusables", "etymology"].map(category => form.current(category)).filter(Boolean).map(supplementId));
+    const profileSections = [];
     for (const addition of record.supplements || []) {
       const id = supplementId(addition);
       retained.add(id);
@@ -2255,7 +2272,7 @@ function _pbpDictEntryMount(host, opts) {
         // A generated block shows its content directly (no "view saved" step):
         // a current-category result opens where its button was. Older
         // categories and superseded versions stay folded.
-        section.open = _pbpDictGeneratableCategory(addition.category) && !replaced.has(id);
+        section.open = inSlot.has(id);
         const heading = document.createElement("summary");
         const text = document.createElement("div"); text.className = "xp-dict-supplement-text"; text.dir = "auto";
         const receipt = document.createElement("p"); receipt.className = "xp-dict-src";
@@ -2270,8 +2287,10 @@ function _pbpDictEntryMount(host, opts) {
       // a failed save can still be retried. dictSupplementLegacy is a
       // different note: old content without the v2 structure.
       const legacyCategory = !_pbpDictGeneratableCategory(addition.category);
+      const slotted = inSlot.has(id);
+      const otherProfile = !slotted && !replaced.has(id) && !legacyCategory;
       const name = t("dictSupplement" + addition.category[0].toUpperCase() + addition.category.slice(1)) +
-        (addition.profile.topic ? " · " + addition.profile.topic : "");
+        (addition.profile.topic ? " · " + addition.profile.topic : "") + (otherProfile ? " · " + profileTitle(addition) : "");
       const title = name + (legacyCategory ? " · " + t("dictSupplementLegacyCategory") : "");
       if (heading.textContent !== title) {
         heading.textContent = legacyCategory ? name + " · " : name;
@@ -2401,12 +2420,12 @@ function _pbpDictEntryMount(host, opts) {
       // block heading -- so it carries no title of its own and stays open: a
       // second title would repeat the category. Old categories and earlier
       // versions keep their folded title.
-      const slotted = !replaced.has(id) && !legacyCategory;
       heading.hidden = slotted;
-      if (slotted) section.open = true;
+      if (slotted) { section.open = true; delete section.dataset.aiBlock; }
       if (replaced.has(id)) {
         if (section.parentElement !== previousSupplements) previousSupplements.appendChild(section);
       } else if (legacyCategory) legacySections.push(section);
+      else if (otherProfile) profileSections.push(section);
       else if (section.parentElement !== form.slots[addition.category]) form.slotEnd(addition.category).before(section);
       if (id === revealId) section.open = true;
     }
@@ -2414,13 +2433,14 @@ function _pbpDictEntryMount(host, opts) {
       if (!retained.has(id)) { item.section.remove(); supplementNodes.delete(id); }
     }
     // Fixed order after the AI entry: usage points, the free examples block,
-    // etymology, then readable old categories and earlier versions, then the
-    // metadata line. A node moves only when it is out of order, so open folds
+    // etymology, then results made for another learner profile, readable old
+    // categories and earlier versions, then the metadata line. A node moves only when it is out of order, so open folds
     // and keyboard focus survive re-renders.
     for (const node of legacySections) node.dataset.aiBlock = "legacy";
+    for (const node of profileSections) node.dataset.aiBlock = "profile";
     if (previousSupplements) previousSupplements.dataset.aiBlock = "previous";
     let previous = content;
-    for (const node of [form.usage, ...(opts.examples ? [opts.examples] : []), form.etymology, ...legacySections,
+    for (const node of [form.usage, ...(opts.examples ? [opts.examples] : []), form.etymology, ...profileSections, ...legacySections,
       ...(replaced.size ? [previousSupplements] : []), meta]) {
       if (node.parentElement !== panel || !(previous.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING)) previous.after(node);
       previous = node;
@@ -2514,6 +2534,7 @@ function _pbpDictEntryMount(host, opts) {
       const replaced = new Set(matches.map(item => item.learning?.replacesId).filter(Boolean));
       return matches.filter(item => !replaced.has(item.id)).sort((a, b) => b.generatedAt - a.generatedAt || String(b.id).localeCompare(String(a.id)))[0];
     };
+    const slotHolds = addition => { const held = existing(addition.category); return !!held && supplementId(held) === supplementId(addition); };
     const refresh = () => {
       const canGenerate = configured() && !!record?.archiveId;
       const model = canGenerate ? modelName() : "";
@@ -2531,9 +2552,9 @@ function _pbpDictEntryMount(host, opts) {
         // remembered button drops the category name and reads only "Not found
         // last time · Try again" plus the model note -- one line in the
         // reader's 480px popover. Its accessible name still says what it
-        // generates (category, retry, model). In the usage block, which holds
-        // two such buttons, the neutral note beside each names its category,
-        // so the two rows stay apart on screen too.
+        // generates (category, retry, model). In the usage block each of the
+        // two such buttons sits under its own slot's category label, with its
+        // category-specific neutral note below it.
         labels[category].textContent = remembered ? t("dictNegRetry") : t("dictSlotGenerate");
         if (remembered) el.dataset.remembered = "true"; else delete el.dataset.remembered;
         // Retrieval and AI judgement read differently; both are neutral answers
@@ -2573,9 +2594,10 @@ function _pbpDictEntryMount(host, opts) {
       const answerLanguage = learningLanguage();
       const feedback = usageFeedback(origin);
       // An update reports its progress and failures beside its own button,
-      // but its outcome lands in the slot's own row, under the new version:
-      // the version it replaces folds away with its row.
-      const outcome = updating ? feedbacks[category] : feedback;
+      // but its outcome lands under the new version: the version it replaces
+      // folds away with its row. A slotted result's outcome is the slot's own
+      // row; a result for another learner profile clears only its own.
+      const outcome = updating && !slotHolds(updating) ? feedback : feedbacks[category];
       // Retrying is this ordinary click: this attempt's own outcome replaces
       // the remembered "last time" state.
       negTouched.add(category); negState[category] = false; feedback.remembered = false; outcome.remembered = false;
@@ -2628,10 +2650,14 @@ function _pbpDictEntryMount(host, opts) {
         if (category !== "etymology") pbpDictNegForget(opts.owner, negParts(category));
         const id = supplementId(addition), focusStayed = document.activeElement === feedback.cancel;
         render(record, answerLanguage, false, id);
-        if (outcome !== feedback) usageMessage(feedback, "");
+        // The receipt sits under the version it describes: the slot's row
+        // when it is the slot's result, else the row of its own update.
+        const fresh = supplementNodes.get(id);
+        const landing = slotHolds(addition) ? feedbacks[category] : fresh?.update?.isConnected ? usageFeedback(fresh.update) : feedback;
+        if (landing !== feedback) usageMessage(feedback, "");
         // A failed save is an error; a partial result is a neutral answer
         // (info icon, no alert); a full one is a plain "saved".
-        usageMessage(outcome, addition.archiveSaved === false ? t("dictSupplementSaveFailed") : addition.learning?.omittedItems
+        usageMessage(landing, addition.archiveSaved === false ? t("dictSupplementSaveFailed") : addition.learning?.omittedItems
           ? t("dictSupplementPartial", String(addition.learning.items.length), String(addition.learning.omittedItems)) : t("dictSupplementSaved"),
           addition.archiveSaved === false ? "error" : addition.learning?.omittedItems ? "neutral" : "saved");
         // The result replaces its button; focus moves to its heading without
@@ -2663,7 +2689,7 @@ function _pbpDictEntryMount(host, opts) {
       }
     };
     for (const [category, el] of Object.entries(buttons)) el.addEventListener("click", () => generateSupplement(null, category));
-    usageForm = { usage, etymology, slots, slotEnd, focusTarget, refresh, enable: enableForm, update: addition => generateSupplement(addition) };
+    usageForm = { usage, etymology, slots, slotEnd, focusTarget, current: existing, refresh, enable: enableForm, update: addition => generateSupplement(addition) };
     return usageForm;
   };
   const run = async (manual, updateId = "", origin = null) => {

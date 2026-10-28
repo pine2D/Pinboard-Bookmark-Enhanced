@@ -2402,11 +2402,19 @@ async function runDictionaryEntryUiTests() {
         const label=slot.querySelector(':scope > .xp-dict-learning-label');
         if(category==='etymology'?!!label:(slot.firstElementChild!==label||label.textContent!=='dictSupplement'+category[0].toUpperCase()+category.slice(1)))return category+' label';
         if(row?.parentElement!==slot)return category+' button outside its slot';
-        for(const section of host.querySelectorAll('[data-learning-block] [data-supplement-category="'+category+'"]')){
+        const results=[...host.querySelectorAll('[data-learning-block] [data-supplement-category="'+category+'"]')];
+        for(const section of results){
           if(section.parentElement!==slot)return category+' result outside its slot';
           if(!(section.compareDocumentPosition(row)&Node.DOCUMENT_POSITION_FOLLOWING))return category+' result below its actions';
           if(section.querySelector(':scope > summary').checkVisibility())return category+' result repeats a title';
         }
+        // The slot holds its button OR its result: at most one untitled
+        // result, and never one beside the button (blocking review of
+        // 55db5993: a result for another learner profile sat in the slot
+        // with the generate button, two such results read as one card).
+        const shown=results.filter(section=>section.checkVisibility());
+        if(shown.length>1)return category+' slot holds '+shown.length+' untitled results';
+        if(shown.length&&button?.checkVisibility())return category+' slot shows a result and its button';
       }
       for(const note of host.querySelectorAll('[data-learning-block] :is(.xp-dict-usage-feedback:not([hidden]), .xp-dict-action-error)')){
         if(!note.closest('[data-slot]'))return 'a note outside every slot: '+note.textContent;
@@ -2546,6 +2554,61 @@ async function runDictionaryEntryUiTests() {
         !section.querySelector(':scope > summary').textContent.includes('dictSupplementLegacyCategory')&&!paid(currentUi.host,category).checkVisibility()&&
         section.parentElement===slotOf(currentUi.host,category)&&slotFault(currentUi.host)==='');
       currentUi.ctrl.abort();
+    }
+    // A slot is for the current learner settings (blocking review of
+    // 55db5993). A result saved for another native language or level -- the
+    // settings changed, or Drive brought it from another device -- is read
+    // outside the blocks under a title naming its profile, so the slot shows
+    // either the button for the current settings or the one result made for
+    // them, never both and never two untitled results side by side.
+    {
+      const blank={nativeLanguage:'',level:'',topic:''};
+      const other={id:'5'.repeat(64),category:'confusables',profile:{nativeLanguage:'German',level:'beginner',topic:''},content:'Other profile guidance',sources:[],provider:'fixture',model:'fixture-model',generatedAt:1700000000000,archiveSaved:true};
+      const otherTitle='dictSupplementConfusables · dictSupplementNativeLanguage:German · dictSupplementLevel:dictLearnerLevelBeginner';
+      window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[other]});
+      const otherUi=mount();await otherUi.ui.ready;
+      const otherSection=otherUi.host.querySelector('[data-supplement-id="'+other.id+'"]');
+      check("a result saved for another learner profile leaves its slot to the button, and is read outside the blocks under a title naming its profile",
+        slotFault(otherUi.host)===''&&paid(otherUi.host,'confusables')?.checkVisibility()&&!otherSection?.closest('[data-learning-block]')&&
+        otherSection.querySelector(':scope > summary').checkVisibility()&&otherSection.querySelector(':scope > summary').textContent===otherTitle&&
+        otherSection.textContent.includes('Other profile guidance')&&otherSection.dataset.aiBlock==='profile');
+      otherUi.ctrl.abort();
+      const mine={...other,id:'3'.repeat(64),profile:blank,content:'Current profile guidance',generatedAt:1600000000000};
+      window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[other,mine]});
+      const bothUi=mount();await bothUi.ui.ready;
+      const mineSection=bothUi.host.querySelector('[data-supplement-id="'+mine.id+'"]'),foreign=bothUi.host.querySelector('[data-supplement-id="'+other.id+'"]');
+      check("with results for two profiles, only the current one sits untitled in the slot; the other keeps its profile title outside",
+        slotFault(bothUi.host)===''&&mineSection?.parentElement===slotOf(bothUi.host,'confusables')&&!paid(bothUi.host,'confusables').checkVisibility()&&
+        !foreign?.closest('[data-learning-block]')&&foreign.querySelector(':scope > summary').textContent===otherTitle&&
+        slotOf(bothUi.host,'confusables').querySelectorAll('[data-supplement-id]').length===1);
+      bothUi.ctrl.abort();
+      // Patterns ignore the level, so only the native language names it; an
+      // unset value reads "not specified".
+      const otherPatterns={...other,id:'2'.repeat(64),category:'patterns',profile:blank};
+      window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[otherPatterns]});
+      const germanUi=mount({settings:{...settings,dictLearnerNativeLanguage:'German',dictLearnerLevel:'beginner'}});await germanUi.ui.ready;
+      const unset=germanUi.host.querySelector('[data-supplement-id="'+otherPatterns.id+'"]');
+      check("a patterns result made with no native language, read under German settings, is titled with the native language only",
+        slotFault(germanUi.host)===''&&paid(germanUi.host,'patterns')?.checkVisibility()&&!unset?.closest('[data-learning-block]')&&
+        unset.querySelector(':scope > summary').textContent==='dictSupplementPatterns · dictSupplementNativeLanguage:dictLearnerLevelUnspecified');
+      germanUi.ctrl.abort();
+      // Updating it keeps its profile (the request's settings say so), and
+      // the new version and its receipt stay together outside the slots.
+      window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[other]});
+      const updateUi=mount();await updateUi.ui.ready;
+      const newerOther={...other,id:'9'.repeat(64),generatedAt:1700000005000,learning:{version:2,language:{name:'Spanish',lang:'es'},summary:'',replacesId:other.id,
+        items:[{sense:1,title:'Gift / Geschenk',explanation:'Nueva guía.',example:'',translation:'',sourceIndex:-1}]}};
+      let sentProfile=null;
+      window.pbpDictSupplementRun=async input=>{sentProfile=[input.settings.dictLearnerNativeLanguage,input.settings.dictLearnerLevel];return structuredClone(newerOther);};
+      const otherUpdate=updateUi.host.querySelector('[data-supplement-id="'+other.id+'"] .xp-dict-update-supplement');
+      otherUpdate.focus();otherUpdate.click();await settle();
+      const newerSection=updateUi.host.querySelector('[data-supplement-id="'+newerOther.id+'"]');
+      const otherReceipts=[...updateUi.host.querySelectorAll('.xp-dict-usage-status')].filter(el=>el.textContent==='dictSupplementSaved'&&el.checkVisibility());
+      check("updating another profile's result keeps its profile, and its new version and one receipt stay together outside the slots",
+        JSON.stringify(sentProfile)==='["German","beginner"]'&&slotFault(updateUi.host)===''&&!!newerSection&&!newerSection.closest('[data-learning-block]')&&
+        newerSection.querySelector(':scope > summary').textContent===otherTitle&&paid(updateUi.host,'confusables').checkVisibility()&&
+        otherReceipts.length===1&&newerSection.contains(otherReceipts[0])&&!otherReceipts[0].closest('[data-slot]'));
+      updateUi.ctrl.abort();
     }
     window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[]});
     const baseBeforeUsage=usage.host.querySelector('.xp-dict-entry');

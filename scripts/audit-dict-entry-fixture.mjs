@@ -101,6 +101,14 @@ export async function installDictEntryFixture(page) {
           explanation: '在该社群中引申为遥不可及的理想，多见于讨论帖。', example: '', translation: '', sourceIndex: 0 }] } });
       await store.append({ ...common, generatedAt: 1760000003000, category: 'collocations', profile: { nativeLanguage: '', level: '', topic: 'work' },
         content: '早先按话题“work”保存的搭配说明：make a word count、keep one’s word。这是没有结构化条目的旧式纯文本补充。', sources: [] });
+      // A current category made for another learner profile (another device's
+      // settings, or settings changed since): read outside the slots under a
+      // title naming its profile, the confusables slot keeping its button.
+      await store.append({ ...common, generatedAt: 1760000004000, category: 'confusables', profile: { nativeLanguage: 'Deutsch', level: 'beginner', topic: '' },
+        content: '为另一份学习偏好生成的易混词辨析。', sources: [],
+        learning: { version: 2, language, summary: '', replacesId: '', items: [{ sense: 1, title: 'word / term',
+          explanation: '两者都指语言单位；前者泛指说出或写下的词，后者偏指某个领域里有确定含义的用语。', example: 'Use the right term in the report.',
+          translation: '报告里要用准确的术语。', sourceIndex: -1 }] } });
       await store.close();
     };
     await window._auditDictEntry.resetArchive();
@@ -555,7 +563,7 @@ export async function openDictEntryState(page, state) {
     await page.waitForFunction(() => window._auditDictEntry.legacySeeded || window._auditDictEntry.legacySeedError);
     const seedError = await page.evaluate(() => window._auditDictEntry.legacySeedError);
     if (seedError) throw new Error('SETUP: the archive refused the old-category seed: ' + seedError);
-    for (const category of ['literature', 'culture', 'collocations']) {
+    for (const category of ['literature', 'culture', 'collocations', 'confusables']) {
       const section = page.locator(`.xp-dict-ai-details[data-supplement-category="${category}"]`);
       await section.waitFor();
       if (!(await section.evaluate(node => node.open))) await section.locator(':scope > summary').click();
@@ -567,13 +575,22 @@ export async function openDictEntryState(page, state) {
     const legacy = await page.evaluate(() => ({
       labelled: ['literature', 'culture', 'collocations'].every(category =>
         document.querySelector(`.xp-dict-ai-details[data-supplement-category="${category}"] > summary`)?.textContent.endsWith(t('dictSupplementLegacyCategory'))),
-      updates: document.querySelectorAll('.xp-dict-ai-details[data-supplement-category] .xp-dict-update-supplement').length,
+      updates: document.querySelectorAll('.xp-dict-ai-details[data-supplement-category]:not([data-supplement-category="confusables"]) .xp-dict-update-supplement').length,
+      // The other profile's result is outside every slot, titled with its
+      // profile, and the confusables slot shows its button instead.
+      profile: (() => {
+        const section = document.querySelector('.xp-dict-ai-details[data-supplement-category="confusables"]');
+        return !!section && section.dataset.aiBlock === 'profile' && !section.closest('[data-slot]') &&
+          section.querySelector(':scope > summary')?.checkVisibility() && section.querySelector(':scope > summary').textContent.includes('Deutsch') &&
+          !!document.querySelector('[data-slot="confusables"] .xp-dict-supplement-generate')?.checkVisibility();
+      })(),
       // A paid action on screen proves the key reached this view.
       paid: document.querySelectorAll('.xp-dict-supplement-generate:not([hidden])').length,
       calls: window._auditDictEntry.calls }));
     if (!legacy.paid) throw new Error('SETUP: the legacy view has no configured AI key, so its no-update check cannot fail');
     if (!legacy.labelled) throw new Error('SETUP: an old-category record lost its old-category label');
     if (legacy.updates) throw new Error('SETUP: an old-category record offers an update');
+    if (!legacy.profile) throw new Error('SETUP: a result for another learner profile is not read outside its slot under its profile title');
     if (legacy.calls !== before) throw new Error('SETUP: reading old-category records issued an AI request');
     return page.locator('.xp-dict-ai-details[data-supplement-category="literature"][open] .xp-dict-example-translation').isVisible();
   }

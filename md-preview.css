@@ -2497,6 +2497,9 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
 .xp-dict-learning-slot + .xp-dict-learning-slot { margin-top: var(--sp-4); }
 .xp-dict-learning-slot > p { margin: var(--sp-2) 0 0; }
 .xp-dict-learning-slot > .xp-dict-learning-label { margin: 0; font-size: 12px; line-height: 18px; font-weight: 500; color: var(--fg); }
+/* The learner-profile line serves both slots: it keeps the slots' own gap
+   below the last one, so it never reads as part of the confusables slot. */
+.xp-dict-learning-section > .xp-dict-learning-slot + .xp-dict-supplement-profile { margin-top: var(--sp-4); }
 /* Programmatic focus lands on a heading or label once a result replaces its
    button; only keyboard focus draws the ring. */
 .xp-dict-learning-title:focus, .xp-dict-learning-label:focus { outline: none; }

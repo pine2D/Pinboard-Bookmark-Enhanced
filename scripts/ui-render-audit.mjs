@@ -9005,6 +9005,14 @@ function probeDictLookupGeometry(cfg) {
       out.slots.push({ category, index, items: nodes.length, top, bottom: rects.length ? Math.max(...rects.map((r) => r.bottom)) : 0,
         path: first ? pathOf(first) : "", label: lr ? { top: lr.top, bottom: lr.bottom } : null });
     });
+    // The learner-profile line serves both categories: its gap to the last
+    // slot is measured against the gap between the two slots.
+    const slotEls = [...block.children].filter((c) => c.matches(slotSpec.slot) && visible(c));
+    const profileEl = [...block.children].find((c) => c.matches(slotSpec.profile) && visible(c));
+    if (slotEls.length >= 2 && profileEl) {
+      const r = slotEls.map((el) => el.getBoundingClientRect());
+      out.slotProfile = { slotGap: r[1].top - r[0].bottom, profileGap: profileEl.getBoundingClientRect().top - r[r.length - 1].bottom, path: pathOf(profileEl) };
+    }
   }
   return out;
 }

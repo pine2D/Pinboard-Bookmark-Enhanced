@@ -2322,6 +2322,8 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-learning-slot + .xp-dict-learning-slot { margin-top: var(--lib-sp-4); }
 #vocab-ref-result .xp-dict-learning-slot > p { margin: var(--lib-sp-2) 0 0; }
 #vocab-ref-result .xp-dict-learning-slot > .xp-dict-learning-label { margin: 0; font-size: 12px; line-height: 18px; font-weight: 500; color: var(--lib-fg); }
+/* The learner-profile line serves both slots: the slots' own gap below the last. */
+#vocab-ref-result .xp-dict-learning-slot + .xp-dict-supplement-profile { margin-top: var(--lib-sp-4); }
 #vocab-ref-result .xp-dict-learning-slot > .xp-dict-ai-details { margin-top: var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-ai-details > summary[hidden] { display: none; }
 #vocab-ref-result .xp-dict-learning-title:focus, #vocab-ref-result .xp-dict-learning-label:focus { outline: none; }
