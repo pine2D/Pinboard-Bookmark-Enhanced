@@ -1242,6 +1242,10 @@
     "message": "Diese Felder sind zu groß für Chrome Sync und werden möglicherweise nur auf diesem Gerät gespeichert: $FIELDS$.",
     "placeholders": { "fields": { "content": "$1" } }
   },
+  "backupPreviewDroppedFields": {
+    "message": "Diese Einstellungen in der Sicherung sind ungültig und werden übersprungen. Dieses Gerät behält seine aktuellen Werte: $FIELDS$.",
+    "placeholders": { "fields": { "content": "$1" } }
+  },
   "backupPreviewSemantics": {
     "message": "Beim Wiederherstellen werden deine eigenen Themes ersetzt, auf den Seiten aus dieser Datei auch die Markierungen und Notizen dieses Kontos. Einstellungen und Vokabeln werden zusammengeführt; bei Abweichungen gilt die Datei."
   },

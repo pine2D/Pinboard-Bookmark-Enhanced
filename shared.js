@@ -1426,6 +1426,10 @@ function pbpBuildBackupPreview(prepared, currentOwner, syncState) {
     schemaVersion: prepared.schemaVersion,
     metadata: prepared.metadata || null,
     settingsCount: Object.keys(prepared.safeData || {}).length,
+    // Settings the preflight skipped as invalid without rejecting the file
+    // (pbpSanitizeBackupSettings): the preview names them, since the device
+    // keeps its own value for each.
+    droppedKeys: Array.isArray(prepared?.droppedKeys) ? prepared.droppedKeys.slice() : [],
     // customOverlayCSS is not part of the exportable key set, so it never
     // reaches safeData and settingsCount cannot see it -- while
     // sections.settings.enabled above DOES count it. Without this field a

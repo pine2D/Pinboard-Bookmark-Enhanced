@@ -1242,6 +1242,10 @@
     "message": "次の項目は Chrome Sync には大きすぎるため、このデバイスだけに保存される場合があります：$FIELDS$。",
     "placeholders": { "fields": { "content": "$1" } }
   },
+  "backupPreviewDroppedFields": {
+    "message": "このバックアップの次の設定は無効なため、インポートされません。このデバイスの現在の値はそのまま残ります：$FIELDS$。",
+    "placeholders": { "fields": { "content": "$1" } }
+  },
   "backupPreviewSemantics": {
     "message": "復元するとカスタムテーマは置き換わり、このファイルに含まれるページではこのアカウントのハイライトとメモも置き換わります。設定と単語は項目ごとに統合され、内容が異なる場合はファイル側が優先されます。"
   },

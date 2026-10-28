@@ -4265,6 +4265,221 @@ async function run() {
     check("E7g fail-closed: a non-primitive default with no sanitizer is dropped, never passed through raw",
       !probeError && !!probeSafe && !("__probeE7g" in probeSafe) && probeSafe.optTheme === "dark");
 
+    const protocolKeys = Object.keys(SETTINGS_DEFAULTS).filter((key) => /Protocol$/.test(key));
+    let anthropicOk = false;
+    try { anthropicOk = preflight({ customProtocol: "anthropic" }).safeData.customProtocol === "anthropic"; } catch (_) {}
+    check("E7g enums: every *Protocol default has an exact backup enum that contains it; customProtocol is exact",
+      protocolKeys.includes("customProtocol") &&
+      protocolKeys.every((key) => (PBP_BACKUP_ENUMS[key] || []).includes(SETTINGS_DEFAULTS[key])) &&
+      [...(PBP_BACKUP_ENUMS.customProtocol || [])].sort().join(",") === [...PBP_AI_PROTOCOLS].sort().join(",") &&
+      anthropicOk &&
+      throwsType(() => preflight({ customProtocol: "gemini" })) &&
+      throwsType(() => preflight({ customProtocol: "" })));
+
+    let list7 = null;
+    try { list7 = preflight({ aiCustomProviders: LIST7 }).safeData.aiCustomProviders; } catch (_) {}
+    check("E7g aiCustomProviders: a well-formed 7-entry list survives the settings section field-for-field",
+      sameJson(list7, LIST7));
+
+    const withEntry = (patch) => [{ ...LIST7[0], ...patch }];
+    const longUrlBase = "https://gw.example.com/";
+    const hostileLists = [
+      {},
+      LIST7.concat([{ ...LIST7[0], id: "custom-aaaaa8" }]),
+      [{ ...LIST7[0], slot: 3 }, { ...LIST7[1], slot: 3 }],
+      withEntry({ slot: 1 }),
+      withEntry({ id: "custom" }),
+      withEntry({ id: "custom:abc" }),
+      withEntry({ protocol: "gemini" }),
+      withEntry({ baseUrl: "http://evil.example/v1" }),
+      withEntry({ baseUrl: "https://u:p@gw.example.com/v1" }),
+      withEntry({ baseUrl: "https://gw.example.com/v1?k=1" }),
+      withEntry({ baseUrl: "https://gw.example.com/v1#x" }),
+      withEntry({ baseUrl: "https://网关.example/v1" }),
+      withEntry({ baseUrl: longUrlBase + "a".repeat(301 - longUrlBase.length) }),
+      withEntry({ name: "x".repeat(41) }),
+      withEntry({ name: "a\tb" }),
+      withEntry({ model: "m".repeat(121) }),
+      withEntry({ apiKey: "sk-x" }),
+      withEntry({ key: "sk-y" }),
+    ];
+    const hostileFailures = [];
+    warned.length = 0;
+    hostileLists.forEach((bad, index) => {
+      try {
+        const safe = preflight({ aiCustomProviders: bad, optTheme: "dark" }).safeData;
+        if ("aiCustomProviders" in safe || safe.optTheme !== "dark" || JSON.stringify(safe).includes("sk-")) hostileFailures.push(index);
+      } catch (_) { hostileFailures.push(index); }
+    });
+    check("E7g aiCustomProviders: each hostile list drops only that key while the rest of the file imports",
+      hostileFailures.length === 0 && warned.length === hostileLists.length &&
+      warned.every((line) => line.includes("aiCustomProviders") && !line.includes("sk-")));
+
+    const nameKept = (name) => {
+      try { return preflight({ customDisplayName: name, optTheme: "dark" }).safeData.customDisplayName === name; }
+      catch (_) { return false; }
+    };
+    const nameDropped = (name) => {
+      try {
+        const safe = preflight({ customDisplayName: name, optTheme: "dark" }).safeData;
+        return !("customDisplayName" in safe) && safe.optTheme === "dark";
+      } catch (_) { return false; }
+    };
+    check("E7g customDisplayName: empty or a valid name restores; overlong, control-char or blank drops only that key",
+      nameKept("") && nameKept("Team \u{1F469}‍\u{1F4BB}") &&
+      nameDropped("x".repeat(41)) && nameDropped("a\tb") && nameDropped("   "));
+
+    const slotFields = [1, ...PBP_AI_CUSTOM_SLOTS].map((slot) => pbpAiCustomKeyField(slot));
+    const prepared7 = preflight({ customApiKey2: ENV(ENTRY_OLD.id, ENTRY_OLD.baseUrl, "sk-local") });
+    check("E7g credentials: every custom key slot is a credential that the settings section never carries",
+      slotFields.length === 8 && slotFields.every((field) => field && API_KEY_FIELDS.includes(field) && !exportableKeys.includes(field)) &&
+      !("customApiKey2" in prepared7.safeData) &&
+      typeof prepared7.secretData?.keys?.customApiKey2 === "string" && prepared7.secretData.keys.customApiKey2 !== "");
+
+    // Export side: the snapshot builder is the thing under test here, fed a
+    // settings read that holds every slot.
+    const rawAll = { ...SETTINGS_DEFAULTS, aiCustomProviders: LIST7, customApiKey: "sk-first-plain" };
+    LIST7.forEach((entry) => {
+      rawAll[pbpAiCustomKeyField(entry.slot)] = ENV(entry.id, entry.baseUrl, "sk-slot" + entry.slot, entry.protocol);
+    });
+    const envelopes = LIST7.map((entry) => rawAll[pbpAiCustomKeyField(entry.slot)]);
+    const plainFile = JSON.stringify(pbpBuildBackupSnapshot(rawAll, {}));
+    const keyFile = pbpBuildBackupSnapshot(rawAll, { includeSecrets: true });
+    check("E7g export: a credential-free export carries the list but no custom key slot or envelope; the opt-in one carries all eight",
+      plainFile.includes('"aiCustomProviders"') && !/"customApiKey\d*"/.test(plainFile) &&
+      !plainFile.includes("sk-first-plain") && !plainFile.includes("sk-slot") &&
+      envelopes.every((value) => !plainFile.includes(value)) &&
+      slotFields.every((field) => typeof keyFile[field] === "string" && keyFile[field] !== ""));
+
+    let dropPreview = null;
+    let cleanPreview = null;
+    try {
+      dropPreview = pbpBuildBackupPreview(preflight({ aiCustomProviders: withEntry({ slot: 1 }),
+        customDisplayName: "a\tb", optTheme: "dark" }), "", { enabled: false });
+      cleanPreview = pbpBuildBackupPreview(preflight({ aiCustomProviders: LIST7, optTheme: "dark" }), "", { enabled: false });
+    } catch (_) {}
+    const backupSource = await fetch("../options-backup.js").then((response) => response.text());
+    const renderSlice = backupSource.slice(backupSource.indexOf("const renderPreview ="),
+      backupSource.indexOf("const renderResult =", backupSource.indexOf("const renderPreview =")));
+    const enLocale = await fetch("../_locales/en/messages.json").then((response) => response.json());
+    check("E7g preview: a dropped key is named in the preview and warned about, a clean file names none",
+      sameJson([...(dropPreview?.droppedKeys || [])].sort(), ["aiCustomProviders", "customDisplayName"]) &&
+      sameJson(cleanPreview?.droppedKeys, []) &&
+      renderSlice.includes('t("backupPreviewDroppedFields", preview.droppedKeys.join(", "))') &&
+      typeof enLocale.backupPreviewDroppedFields?.message === "string");
+
+    const popupSource = await fetch("../popup-ai.js").then((response) => response.text());
+    const orderAt = popupSource.indexOf("const AI_PROVIDER_ORDER = [");
+    const order = Function('"use strict"; return ' +
+      popupSource.slice(orderAt + "const AI_PROVIDER_ORDER = ".length, popupSource.indexOf("];", orderAt) + 1))();
+    const map25 = {};
+    order.concat(LIST7.map((entry) => entry.id)).forEach((id) => { map25[id] = "model"; });
+    const map33 = { ...map25 };
+    for (let i = 0; i < 8; i++) map33["extra" + i] = "model";
+    let kept25 = -1;
+    try { kept25 = Object.keys(preflight({ previewAiModelByProvider: map25 }).safeData.previewAiModelByProvider).length; } catch (_) {}
+    check("E7g preview map: every built-in provider plus 7 custom entries fit the 32-key cap",
+      order.length === 18 && kept25 === 25 && throwsType(() => preflight({ previewAiModelByProvider: map33 })));
+
+    // Import combinations against one stateful store: persistSettings writes
+    // through the harness seam, pbpReadSettingsWithSecrets reads the same
+    // object as chrome.storage.local (settings sync is off).
+    const previousChrome = globalThis.chrome;
+    const previousStorage = globalThis.__pbpTestStorage;
+    const previousLarge = globalThis.__pbpTestSyncSetLarge;
+    const previousCache = _settingsStorageCache;
+    let store = {};
+    const pick = (keys) => {
+      if (keys == null) return { ...store };
+      if (typeof keys === "string") return keys in store ? { [keys]: store[keys] } : {};
+      if (Array.isArray(keys)) {
+        const out = {};
+        keys.forEach((key) => { if (key in store) out[key] = store[key]; });
+        return out;
+      }
+      const out = { ...keys };
+      Object.keys(keys).forEach((key) => { if (key in store) out[key] = store[key]; });
+      return out;
+    };
+    const reset = () => {
+      store = { optSyncEnabled: false, aiCustomProviders: [ENTRY_OLD],
+        customApiKey2: ENV(ENTRY_OLD.id, ENTRY_OLD.baseUrl, "sk-local") };
+    };
+    const apply = (extra, sections) => captureWarnAsync(() => pbpApplyBackupPayload({ ...HDR, ...extra }, {
+      exportableKeys, saveOverlayWithFallback: async () => {}, sections,
+    }));
+    const CRED_ONLY = { settings: false, themes: false, highlights: false, vocabulary: false, secrets: true };
+    try {
+      globalThis.chrome = { storage: {
+        local: { get: async (keys) => pick(keys), set: async (data) => { Object.assign(store, data); }, remove: async () => {} },
+        sync: { get: async () => ({ syncApiKeys: false }), set: async () => {}, remove: async () => {} },
+        onChanged: { addListener() {} },
+      } };
+      _settingsStorageCache = null;
+      globalThis.__pbpTestStorage = { get: async () => ({ ...store }), set: async (data) => { Object.assign(store, data); } };
+      globalThis.__pbpTestSyncSetLarge = async () => {};
+
+      reset();
+      const moved = { ...ENTRY_OLD, baseUrl: "https://gw-evil.example.com/v1" };
+      const r8 = await apply({ aiCustomProviders: [moved] });
+      check("E7g combo: settings-only import that re-points an entry leaves the local key sealed to the old address unusable",
+        r8.settings === "applied" && r8.secrets === "skipped" && sameJson(store.aiCustomProviders, [moved]) &&
+        typeof store.customApiKey2 === "string" && store.customApiKey2 !== "" && pbpAiCustomKeyOpen(store, moved) === "");
+
+      reset();
+      const renamed = { ...ENTRY_OLD, name: "Renamed gateway" };
+      const r9 = await apply({ aiCustomProviders: [renamed] });
+      check("E7g combo: settings-only import that keeps the address leaves the local key usable",
+        r9.settings === "applied" && sameJson(store.aiCustomProviders, [renamed]) && pbpAiCustomKeyOpen(store, renamed) === "sk-local");
+
+      reset();
+      const localSlot = store.customApiKey2;
+      const r10 = await apply({ customApiKey2: ENV("custom-zzz999", "https://gw-z.example.com/v1", "sk-foreign") }, CRED_ONLY);
+      check("E7g combo: credentials-only import never overwrites a local key with one sealed to an entry this device lacks",
+        r10.secrets === "skipped" && r10.settings === "skipped" && sameJson(store.aiCustomProviders, [ENTRY_OLD]) &&
+        store.customApiKey2 === localSlot && pbpAiCustomKeyOpen(store, ENTRY_OLD) === "sk-local");
+
+      reset();
+      const r11 = await apply({ customApiKey2: ENV(ENTRY_OLD.id, ENTRY_OLD.baseUrl, "sk-restored") }, CRED_ONLY);
+      check("E7g combo: credentials-only import sealed to the existing entry restores that key",
+        r11.secrets === "applied" && sameJson(store.aiCustomProviders, [ENTRY_OLD]) &&
+        pbpAiCustomKeyOpen(store, ENTRY_OLD) === "sk-restored");
+
+      reset();
+      const fresh = { ...ENTRY_OLD, baseUrl: "https://gw-new.example.com/v1" };
+      const r12 = await apply({ aiCustomProviders: [fresh], customApiKey2: ENV(fresh.id, fresh.baseUrl, "sk-restored") }, { secrets: true });
+      check("E7g combo: importing both sections makes the restored entry usable",
+        r12.settings === "applied" && r12.secrets === "applied" && sameJson(store.aiCustomProviders, [fresh]) &&
+        pbpAiCustomKeyOpen(store, fresh) === "sk-restored");
+
+      reset();
+      const localSlot17 = store.customApiKey2;
+      const orphan = { ...LIST7[1], slot: 3 };
+      const r17 = await apply({
+        aiCustomProviders: [fresh, { ...orphan, slot: 1 }],
+        optTheme: "dark",
+        geminiApiKey: "gem-restored",
+        customApiKey2: ENV(fresh.id, fresh.baseUrl, "sk-new"),
+        customApiKey3: ENV(orphan.id, orphan.baseUrl, "sk-orphan", orphan.protocol),
+      }, { secrets: true });
+      check("E7g combo: an invalid list is dropped as a unit and its keys never land, while the rest of both sections imports",
+        r17.settings === "applied" && r17.secrets === "applied" && store.optTheme === "dark" &&
+        store.geminiApiKey === "gem-restored" && sameJson(store.aiCustomProviders, [ENTRY_OLD]) &&
+        store.customApiKey2 === localSlot17 && !("customApiKey3" in store) &&
+        pbpAiCustomKeyOpen(store, ENTRY_OLD) === "sk-local");
+
+      reset();
+      const r14 = await apply({ aiProvider: "custom", customBaseUrl: "https://legacy.example.com/v1",
+        customModel: "legacy-model", previewAiModelByProvider: { openai: "gpt-x" } });
+      check("E7g legacy: a v3 backup without any new key imports and leaves the local custom list and slots untouched",
+        r14.settings === "applied" && store.customBaseUrl === "https://legacy.example.com/v1" &&
+        sameJson(store.aiCustomProviders, [ENTRY_OLD]) && pbpAiCustomKeyOpen(store, ENTRY_OLD) === "sk-local");
+    } finally {
+      globalThis.chrome = previousChrome;
+      globalThis.__pbpTestStorage = previousStorage;
+      globalThis.__pbpTestSyncSetLarge = previousLarge;
+      _settingsStorageCache = previousCache;
+    }
   })();
 
   // ---------- E8: options deep links route to the requested tab ----------

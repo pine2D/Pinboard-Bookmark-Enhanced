@@ -1242,6 +1242,10 @@
     "message": "Ces champs dépassent la capacité de Chrome Sync et risquent de n'être enregistrés que sur cet appareil : $FIELDS$.",
     "placeholders": { "fields": { "content": "$1" } }
   },
+  "backupPreviewDroppedFields": {
+    "message": "Ces paramètres de la sauvegarde ne sont pas valides et seront ignorés. Cet appareil conserve ses valeurs actuelles : $FIELDS$.",
+    "placeholders": { "fields": { "content": "$1" } }
+  },
   "backupPreviewSemantics": {
     "message": "La restauration remplace vos thèmes personnalisés et, sur les pages présentes dans ce fichier, les surlignages et notes de ce compte. Les paramètres et le vocabulaire sont fusionnés : en cas de différence, le fichier fait foi."
   },

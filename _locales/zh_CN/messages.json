@@ -1242,6 +1242,10 @@
     "message": "以下字段超出 Chrome Sync 的容量限制，可能只保存在本设备：$FIELDS$。",
     "placeholders": { "fields": { "content": "$1" } }
   },
+  "backupPreviewDroppedFields": {
+    "message": "备份中的以下设置无效，将被跳过，本设备保留现有值：$FIELDS$。",
+    "placeholders": { "fields": { "content": "$1" } }
+  },
   "backupPreviewSemantics": {
     "message": "还原会替换你的自定义主题；在这份文件涉及的页面上，也会替换当前账号的高亮和笔记。设置和生词按条合并，两边不同的地方以文件为准。"
   },

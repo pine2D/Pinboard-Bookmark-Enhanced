@@ -1242,6 +1242,10 @@
     "message": "以下欄位超出 Chrome Sync 的容量限制，可能只會儲存在本裝置：$FIELDS$。",
     "placeholders": { "fields": { "content": "$1" } }
   },
+  "backupPreviewDroppedFields": {
+    "message": "備份中的以下設定無效，會略過不匯入，本裝置保留現有值：$FIELDS$。",
+    "placeholders": { "fields": { "content": "$1" } }
+  },
   "backupPreviewSemantics": {
     "message": "還原會取代你的自訂主題；在這份檔案涉及的頁面上，也會取代目前帳號的標記和筆記。設定和生詞會逐項合併，兩邊不同的地方以檔案為準。"
   },

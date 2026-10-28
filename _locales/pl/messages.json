@@ -1242,6 +1242,10 @@
     "message": "Te pola są za duże dla Chrome Sync i mogą zostać zapisane tylko na tym urządzeniu: $FIELDS$.",
     "placeholders": { "fields": { "content": "$1" } }
   },
+  "backupPreviewDroppedFields": {
+    "message": "Te ustawienia w kopii są nieprawidłowe i zostaną pominięte. To urządzenie zachowa obecne wartości: $FIELDS$.",
+    "placeholders": { "fields": { "content": "$1" } }
+  },
   "backupPreviewSemantics": {
     "message": "Przywracanie zastępuje Twoje motywy niestandardowe, a na stronach zawartych w tym pliku również zaznaczenia i notatki tego konta. Ustawienia i słówka są scalane, a w razie różnic decyduje plik."
   },

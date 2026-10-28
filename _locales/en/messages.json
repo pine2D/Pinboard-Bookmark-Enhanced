@@ -1247,6 +1247,10 @@
     "message": "These fields are too large for Chrome Sync and may be saved on this device only: $FIELDS$.",
     "placeholders": { "fields": { "content": "$1" } }
   },
+  "backupPreviewDroppedFields": {
+    "message": "These settings in the backup are invalid and will be skipped. This device keeps its current values: $FIELDS$.",
+    "placeholders": { "fields": { "content": "$1" } }
+  },
   "backupPreviewSemantics": {
     "message": "Restoring replaces your custom themes and, on the pages in this file, this account's highlights and notes. Settings and vocabulary are merged, with the file winning where they differ."
   },

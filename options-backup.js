@@ -48,6 +48,8 @@ const PBP_BACKUP_ENUMS = Object.freeze({
   // The formats ai.js _aiProtocolOf accepts for an entry with a protocolField.
   opencodeProtocol: ["openai", "anthropic"],
   commandcodeProtocol: ["openai", "anthropic"],
+  // The first custom entry's format; equals shared.js PBP_AI_PROTOCOLS.
+  customProtocol: ["openai", "anthropic"],
 });
 
 // Per-provider preview model overrides: keys must look like provider ids and
@@ -158,8 +160,11 @@ function pbpSanitizeBackupSecrets(data) {
   return { keys, exportTargets: targets };
 }
 
-function pbpSanitizeBackupSettings(data, exportableKeys) {
+// dropped (optional) collects the keys skipped as invalid without rejecting
+// the file, so the import preview can name them.
+function pbpSanitizeBackupSettings(data, exportableKeys, dropped) {
   const safe = {};
+  const drop = (key) => { if (Array.isArray(dropped)) dropped.push(key); };
   for (const key of exportableKeys) {
     if (!Object.prototype.hasOwnProperty.call(data, key)) continue;
     const value = data[key];
@@ -168,12 +173,14 @@ function pbpSanitizeBackupSettings(data, exportableKeys) {
     if (Object.prototype.hasOwnProperty.call(PBP_BACKUP_OBJECT_SANITIZERS, key)) {
       const cleaned = PBP_BACKUP_OBJECT_SANITIZERS[key](value);
       if (cleaned !== undefined) safe[key] = cleaned;
+      else drop(key);
       continue;
     }
     // Fail closed: an object-shaped setting nobody wrote a sanitizer for
     // would otherwise reach (synced) storage exactly as the file spelled it.
     if (expected === null || typeof expected === "object") {
       console.warn("[backup] dropped field without a sanitizer:", key);
+      drop(key);
       continue;
     }
     if (typeof expected === "boolean" && typeof value !== "boolean") throw pbpBackupValueError(key);
@@ -185,7 +192,13 @@ function pbpSanitizeBackupSettings(data, exportableKeys) {
     // Settings saves what the user typed and the resolver fails it closed, so
     // a malformed workspace ID can sit in the user's own export. Drop only
     // that key: rejecting it would make the file fail its own preflight.
-    if (key === "qwenWorkspaceId" && value !== "" && !pbpAiWorkspaceIdOk(value)) continue;
+    if (key === "qwenWorkspaceId" && value !== "" && !pbpAiWorkspaceIdOk(value)) { drop(key); continue; }
+    // Same reasoning, same predicate as the Settings form (R3).
+    if (key === "customDisplayName" && value !== "" && !pbpAiCustomNameOk(value)) {
+      console.warn("[backup] dropped invalid field:", key);
+      drop(key);
+      continue;
+    }
     if (key === "dictLearnerNativeLanguage" && (value.length > 80 || /[\p{Cc}\p{Cf}]/u.test(value))) throw pbpBackupValueError(key);
     if (key === "popupWidth" && (value < 420 || value > 720)) throw pbpBackupValueError(key);
     if (key === "aiCacheDuration" && (value < 0 || value > 10080)) throw pbpBackupValueError(key);
@@ -201,7 +214,8 @@ function pbpSanitizeBackupSettings(data, exportableKeys) {
 
 function pbpPreflightBackupPayload(data, exportableKeys) {
   const schemaVersion = pbpBackupSchemaVersion(data);
-  const safeData = pbpSanitizeBackupSettings(data, exportableKeys);
+  const droppedKeys = [];
+  const safeData = pbpSanitizeBackupSettings(data, exportableKeys, droppedKeys);
   const metadata = schemaVersion === 3
     ? pbpSanitizeBackupMetadata(data._backup)
     : undefined;
@@ -235,6 +249,7 @@ function pbpPreflightBackupPayload(data, exportableKeys) {
     schemaVersion,
     metadata,
     safeData,
+    droppedKeys,
     secretData,
     secretCount: pbpCountBackupSecrets(data),
     customCSS,
@@ -400,6 +415,28 @@ async function pbpBackupLibraryIdentity(prepared, selected, {
   return globalThis.navigator?.locks?.request ? navigator.locks.request("pbp-personal-library",run) : run();
 }
 
+// A list entry's key slot restores only when its envelope opens for the
+// entry holding that slot on this device AFTER the settings section ran.
+// Anything else -- sealed to an entry or address this device does not have,
+// or to a list the settings section dropped as invalid -- would land as an
+// unusable key and, worse, overwrite a working one in the same slot.
+// Deletes those fields from batch and returns their names. The first entry's
+// plain customApiKey has no envelope and is not this function's business.
+async function pbpBackupDropUnboundCustomKeys(batch) {
+  const fields = PBP_AI_CUSTOM_SLOTS.map((slot) => pbpAiCustomKeyField(slot))
+    .filter((field) => Object.prototype.hasOwnProperty.call(batch, field));
+  if (!fields.length) return [];
+  const current = await pbpReadSettingsWithSecrets({ aiCustomProviders: [] });
+  const entries = pbpSanitizeAiCustomProviders(current.aiCustomProviders) || [];
+  const skipped = fields.filter((field) => {
+    const entry = entries.find((item) => pbpAiCustomKeyField(item.slot) === field);
+    return !entry || !pbpAiCustomKeyOpen({ [field]: batch[field] }, entry);
+  });
+  skipped.forEach((field) => { delete batch[field]; });
+  if (skipped.length) console.warn("[backup] skipped credentials with no matching entry:", skipped.join(","));
+  return skipped;
+}
+
 // Applies the selected sections of one already-preflighted backup. Each
 // section reports its own outcome so a later failure cannot hide earlier
 // committed writes.
@@ -500,6 +537,7 @@ async function pbpApplyBackupPayload(data, {
   if (selected.secrets && prepared.secretData) {
     try {
       const batch = Object.assign({}, prepared.secretData.keys);
+      await pbpBackupDropUnboundCustomKeys(batch);
       const targetIds = Object.keys(prepared.secretData.exportTargets);
       if (targetIds.length) {
         const curRead = await pbpReadSettingsWithSecrets({ exportTargets: {} });
@@ -509,9 +547,11 @@ async function pbpApplyBackupPayload(data, {
         }
         batch.exportTargets = merged;
       }
-      const secretRes = await persistSettings(batch);
-      if (!secretRes.ok) throw secretRes.error || new Error("credential import failed");
-      result.secrets = "applied";
+      if (Object.keys(batch).length) {
+        const secretRes = await persistSettings(batch);
+        if (!secretRes.ok) throw secretRes.error || new Error("credential import failed");
+        result.secrets = "applied";
+      }
     } catch (error) {
       console.warn("[backup] credential import failed:", error && error.name, error && error.message);
       result.secrets = "failed";
@@ -766,6 +806,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     if (preview.ownerMismatch) warnings.push(t("backupPreviewOwnerMismatch"));
     if (preview.highlightOwnerMismatch) warnings.push(t("backupPreviewHighlightOwnerMismatch"));
     if (preview.syncWarning) warnings.push(t("backupPreviewSyncWarning"));
+    if (preview.droppedKeys.length) warnings.push(t("backupPreviewDroppedFields", preview.droppedKeys.join(", ")));
     if (preview.localFallbackKeys.length) {
       warnings.push(t("backupPreviewLocalWarning", preview.localFallbackKeys
         .map((key) => t(pbpLargeFallbackFieldLabel(key)))
