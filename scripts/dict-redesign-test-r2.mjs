@@ -400,13 +400,15 @@ async function runModel(ctx, model) {
     for (const target of [...new Set(plan.words.map(word => word.target))]) {
       const targetCases = cases.filter(item => plan.words.find(word => word.id === item.wordId).target === target);
       if (!targetCases.length || ledger.halted || row.halted) continue;
-      await worker.evaluate(async ({ model, dummy, base, target, native, token }) => {
+      await worker.evaluate(async ({ model, dummy, base, target, native, token, account }) => {
         if (typeof primeSettings === "function") await primeSettings();
+        // Let the worker's boot claim settle the library identity first, then pin it to the fixture.
+        await pbpPersonalLibraryAccount();
         await chrome.storage.local.set({ optSyncEnabled: false, syncApiKeys: false, optLang: "zh_CN", previewAiEnabled: true,
-          pinboardToken: obfuscateKey(token), _hlOwnerClaimDone: true, aiProvider: "custom", customApiKey: obfuscateKey(dummy),
+          pinboardToken: obfuscateKey(token), personalLibraryAccount: account, _hlOwnerClaimDone: true, aiProvider: "custom", customApiKey: obfuscateKey(dummy),
           customModel: model, customBaseUrl: base, previewAiModelByProvider: {}, dictDefaultView: "ai-saved", dictDefinitionLang: target,
           dictLearnerNativeLanguage: native, dictLearnerLevel: "intermediate" });
-      }, { model: model.id, dummy: DUMMY, base: plan.endpoint, target, native: plan.profile.nativeLanguage[target], token: ACCOUNT + ":nonsecret_synthetic_token" });
+      }, { model: model.id, dummy: DUMMY, base: plan.endpoint, target, native: plan.profile.nativeLanguage[target], token: ACCOUNT + ":nonsecret_synthetic_token", account: ACCOUNT });
       const page = await context.newPage();
       await page.goto("chrome-extension://" + extensionId + "/library.html#vocab");
       await page.waitForFunction(() => typeof _pbpDictEntryMount === "function" && typeof pbpDictSupplementRun === "function" &&

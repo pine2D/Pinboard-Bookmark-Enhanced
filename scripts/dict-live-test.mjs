@@ -314,8 +314,10 @@ async function executeProvider(plan, approval, ledger, id, key, saveLedger, { re
     const worker = context.serviceWorkers()[0] || await context.waitForEvent("serviceworker", { timeout: 15000 });
     await worker.evaluate(async ({ def, config, dummy }) => {
       if (typeof primeSettings === "function") await primeSettings();
+      // Let the worker's boot claim settle the library identity first, then pin it to the fixture.
+      await pbpPersonalLibraryAccount();
       await chrome.storage.local.set({ optSyncEnabled: false, syncApiKeys: false, optLang: "zh_CN", previewAiEnabled: true,
-        pinboardToken: obfuscateKey("dict_live_fixture:nonsecret_synthetic_token"), _hlOwnerClaimDone: true,
+        pinboardToken: obfuscateKey("dict_live_fixture:nonsecret_synthetic_token"), personalLibraryAccount: "dict_live_fixture", _hlOwnerClaimDone: true,
         aiProvider: def.provider, [def.keyField]: obfuscateKey(dummy), [def.modelField]: config.model,
         customBaseUrl: config.baseUrl, dictDefaultView: "ai-saved", dictDefinitionLang: "" });
     }, { def, config, dummy: DUMMY_KEY });
