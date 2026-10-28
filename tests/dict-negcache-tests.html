@@ -323,6 +323,111 @@ await test("the learning block shows no paid action until the memory read before
     return waited && !!shown && !shown.hidden && shown.dataset.remembered === "true";
   } finally { window.pbpDictNegHas = read; release(); controller.abort(); host.remove(); }
 });
+// Holds every memory read for one answer language until released; reads for
+// other languages go straight through.
+function holdReads(lang) {
+  const read = window.pbpDictNegHas;
+  let release; const gate = new Promise(resolve => { release = resolve; });
+  window.pbpDictNegHas = async (owner, parts) => { if (parts.target?.lang === lang) await gate; return read(owner, parts); };
+  return { release: () => release(), restore: () => { release(); window.pbpDictNegHas = read; } };
+}
+// The mount reads the memory for the interface language; the first
+// generation runs after the interface language changed, so the entry renders
+// in another language and that render re-reads the memory.
+async function switchingMount(heldLang) {
+  const definition = settings.dictDefinitionLang, ui0 = window.uiLangToBCP47, read0 = window.pbpDictEntryRead, run0 = window.pbpDictEntryRun;
+  settings.dictDefinitionLang = "";
+  window.uiLangToBCP47 = () => "en";
+  window.pbpDictEntryRead = async () => null;
+  window.pbpDictEntryRun = async () => record();
+  const hold = holdReads(heldLang);
+  const host = document.createElement("div"), controller = new AbortController();
+  document.body.appendChild(host);
+  const ui = _pbpDictEntryMount(host, { term: "Gift", lang: "de", owner: "acct_alice", settings, signal: controller.signal, isCurrent: () => true });
+  await settle();
+  const paid = category => host.querySelector('.xp-dict-supplement-generate[data-category="' + category + '"]');
+  const generate = async () => { window.uiLangToBCP47 = () => "fr"; host.querySelector(".xp-dict-ai-generate").click(); await settle(); };
+  return { host, ui, hold, paid, generate, close: () => {
+    hold.restore(); controller.abort(); host.remove();
+    settings.dictDefinitionLang = definition; window.uiLangToBCP47 = ui0; window.pbpDictEntryRead = read0;
+    if (run0 === undefined) delete window.pbpDictEntryRun; else window.pbpDictEntryRun = run0;
+  } };
+}
+const negParts = (category, ui) => ({ term: "Gift", sourceLanguage: "de", target: pbpDictLearningTarget({ ...settings, dictDefinitionLang: "" }, ui), category });
+await test("a memory read for the language the entry left behind is discarded when it answers late", async () => {
+  // The mount's read (English) is still in flight when the first generation
+  // renders the entry in French; the French read answers first. The English
+  // answer arriving afterwards must not mark a French block "not found".
+  reset();
+  await pbpDictNegRecord("acct_alice", negParts("patterns", "en"));
+  const view = await switchingMount("en");
+  try {
+    await view.generate();
+    const switched = view.host.querySelector(".xp-dict-senses > li")?.lang === "fr";
+    const before = view.paid("patterns");
+    const plainBefore = !!before && !before.hidden && !before.dataset.remembered;
+    view.hold.release(); await settle();
+    // Any later refresh of the blocks (here: another category's result
+    // arriving) must still find no French memory for patterns.
+    supplementRun = async () => addition("confusables");
+    view.paid("confusables").click(); await settle();
+    const after = view.paid("patterns");
+    return switched && plainBefore && !!view.host.querySelector('[data-slot="confusables"] [data-supplement-category="confusables"]') &&
+      !after.hidden && !after.dataset.remembered && label(after) === "dictSlotGenerate" &&
+      !after.closest(".xp-dict-usage-actions").querySelector(".xp-dict-usage-status").textContent;
+  } finally { view.close(); }
+});
+await test("a render that switches language hides the learning blocks' paid actions until the new memory read resolves", async () => {
+  // Exactly like the first render: no plain button that later renames itself
+  // to "Not found last time · Try again".
+  reset();
+  await pbpDictNegRecord("acct_alice", negParts("patterns", "fr"));
+  const view = await switchingMount("fr");
+  try {
+    await view.generate();
+    const switched = view.host.querySelector(".xp-dict-senses > li")?.lang === "fr";
+    const held = ["patterns", "confusables", "etymology"].map(view.paid);
+    const waited = held.every(el => !el || el.hidden);
+    view.hold.release(); await settle();
+    const patterns = view.paid("patterns"), confusables = view.paid("confusables");
+    return switched && waited && !patterns.hidden && patterns.dataset.remembered === "true" &&
+      !confusables.hidden && !confusables.dataset.remembered;
+  } finally { view.close(); }
+});
+await test("a read that fails after a language switch still brings the paid actions back", async () => {
+  reset();
+  const read = window.pbpDictNegHas;
+  const view = await switchingMount("none");
+  window.pbpDictNegHas = async (owner, parts) => { if (parts.target?.lang === "fr") throw new Error("storage"); return read(owner, parts); };
+  try {
+    await view.generate();
+    const patterns = view.paid("patterns");
+    return view.host.querySelector(".xp-dict-senses > li")?.lang === "fr" && !!patterns && !patterns.hidden && !patterns.dataset.remembered;
+  } finally { window.pbpDictNegHas = read; view.close(); }
+});
+await test("updating the entry asks for the language of the entry on screen, not one changed since", async () => {
+  // The interface language changes in another tab after the saved entry
+  // rendered in English: the update replaces the English entry the user is
+  // looking at (its archive record), as the supplement and save retries do.
+  reset();
+  const definition = settings.dictDefinitionLang, ui0 = window.uiLangToBCP47, run0 = window.pbpDictEntryRun;
+  settings.dictDefinitionLang = "";
+  window.uiLangToBCP47 = () => "en";
+  const asked = [];
+  window.pbpDictEntryRun = async input => { asked.push(input.target.lang + ":" + input.updateId); return record(); };
+  try {
+    const ui = await entryView();
+    const before = ui.host.querySelector(".xp-dict-senses > li")?.lang;
+    window.uiLangToBCP47 = () => "fr";
+    ui.host.querySelector(".xp-dict-update-entry").click(); await settle();
+    const after = ui.host.querySelector(".xp-dict-senses > li")?.lang;
+    ui.close();
+    return before === "en" && asked.join() === "en:" + "a".repeat(64) && after === "en";
+  } finally {
+    settings.dictDefinitionLang = definition; window.uiLangToBCP47 = ui0;
+    if (run0 === undefined) delete window.pbpDictEntryRun; else window.pbpDictEntryRun = run0;
+  }
+});
 await test("registry: the memory is reclaimable, never a setting, never a never-clear key, never in a backup", async () => {
   reset(); await pbpDictNegRecord("acct_alice", examples());
   const key = negKeys()[0];

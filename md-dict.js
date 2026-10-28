@@ -1922,6 +1922,11 @@ function _pbpDictEntryMount(host, opts) {
   // The language the memory above was read for; a render in another language
   // re-reads it, so a block never shows another language's "not found".
   let negLanguage = null;
+  // True while that read is in flight: the learning blocks show no paid
+  // action until it answers, so a plain button never renames itself to
+  // "Not found last time · Try again" a moment later (first render and a
+  // language-switching render alike).
+  let negPending = false;
   let renderedBase = "", baseDetails = null, baseRetry = null, usageForm = null, previousSupplements = null;
   const supplementNodes = new Map();
   const preference = () => typeof pbpDictDefaultView === "function" ? pbpDictDefaultView(settings) :
@@ -2211,15 +2216,20 @@ function _pbpDictEntryMount(host, opts) {
   const negForget = category => { negState[category] = false; pbpDictNegForget(opts.owner, negParts(category)); };
   const loadNeg = async () => {
     const language = learningLanguage(), key = _pbpDictLanguageKey(language);
-    negLanguage = key;
-    if (!_pbpDictNegOwner(opts.owner)) return;
-    const categories = ["patterns", "confusables", "etymology"];
-    const found = await Promise.all(categories.map(category => pbpDictNegHas(opts.owner, negParts(category, language))));
-    // A later render switched the language: its own read answers that view.
-    if (!alive() || negLanguage !== key) return;
-    // A click made while this read was in flight already answered this view.
-    categories.forEach((category, index) => { if (found[index] && !negTouched.has(category)) negState[category] = true; });
-    usageForm?.refresh();
+    negLanguage = key; negPending = true;
+    try {
+      if (!_pbpDictNegOwner(opts.owner)) return;
+      const categories = ["patterns", "confusables", "etymology"];
+      const found = await Promise.all(categories.map(category => pbpDictNegHas(opts.owner, negParts(category, language))));
+      // A later render switched the language: its own read answers that view.
+      if (!alive() || negLanguage !== key) return;
+      // A click made while this read was in flight already answered this view.
+      categories.forEach((category, index) => { if (found[index] && !negTouched.has(category)) negState[category] = true; });
+    } finally {
+      // Only the read for the language on screen releases the actions; a
+      // failed read shows the ordinary buttons rather than none.
+      if (negLanguage === key) { negPending = false; if (alive()) usageForm?.refresh(); }
+    }
   };
   const supplementId = addition => addition.id || String(addition.generatedAt);
   // A result outside its slot says which learner profile it was made for:
@@ -2561,7 +2571,7 @@ function _pbpDictEntryMount(host, opts) {
       for (const [category, el] of Object.entries(buttons)) {
         const feedback = feedbacks[category];
         const saved = existing(category);
-        el.hidden = feedback.box.dataset.state === "busy" || !canGenerate || !!saved;
+        el.hidden = feedback.box.dataset.state === "busy" || !canGenerate || !!saved || negPending;
         // A positive record (generated here or brought by Drive) wins over the
         // memory and forgets it; for etymology only one with sources does,
         // since a formation-only answer is itself a source miss.
@@ -2735,7 +2745,11 @@ function _pbpDictEntryMount(host, opts) {
       if (!current()) return;
       ledgerStage = "generating";
       if (typeof pbpAiBumpCounter === "function") pbpAiBumpCounter("explain");
-      const request = input(controller.signal, current);
+      // An update replaces the entry on screen, in its language (as the
+      // supplements and the save retry ask), even if a setting or the
+      // interface language changed since; a first generation has none yet
+      // and asks for the current target.
+      const request = entryInput(controller.signal, current);
       // A dropped sense (Q6=B) is a partial failure of this paid answer: file
       // its fixed code at the checking stage; the entry itself still saves.
       const onDrop = error => { if (current()) _pbpDictLedgerFail(opts.owner, error, "checking", "entry"); };

@@ -59,7 +59,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/dict-entry-tests.html": 112,
   "tests/dict-language-tests.html": 33,
   "tests/dict-ledger-tests.html": 20,
-  "tests/dict-negcache-tests.html": 13,
+  "tests/dict-negcache-tests.html": 17,
   "tests/dict-protocol-tests.html": 18,
   "tests/dict-settings-tests.html": 8,
   "tests/dict-usage-tests.html": 139,
