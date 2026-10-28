@@ -9599,6 +9599,25 @@ async function runSweep(page, sw, extBase) {
         provider.value = "gemini"; provider.dispatchEvent(new Event("change", { bubbles: true }));
       });
     }
+
+    // Volcengine Ark's region list box and OpenCode Zen's API-format list box
+    // (Command Code shares the OpenCode panel's structure) only render while
+    // that provider is selected.
+    for (const [name, id] of [["ai-provider-ark", "ark"], ["ai-provider-opencode", "opencode"]]) {
+      if (!wants("options", name)) continue;
+      await page.click("#tab-ai");
+      await page.waitForTimeout(150);
+      await page.evaluate((value) => {
+        const provider = document.getElementById("opt-ai-provider");
+        provider.value = value; provider.dispatchEvent(new Event("change", { bubbles: true }));
+      }, id);
+      await page.waitForTimeout(150);
+      await scan("options", name);
+      await page.evaluate(() => {
+        const provider = document.getElementById("opt-ai-provider");
+        provider.value = "gemini"; provider.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    }
   }
 
   // ---- library: vocab (list, detail pane, batch bar) + notes (list, detail pane). ----
