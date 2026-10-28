@@ -9434,6 +9434,21 @@ suiteIf("pbpAiStatusLink", "pbpAiStatusLink", () => {
     assert(a.textContent.length > 0, "empty label");
     assertEq(pbpAiStatusLink({ aiProvider: "claude" }, { status: 401, message: "x" }), null);
   });
+  test("a status url without a status-table entry still renders a link", () => {
+    // The page's i18n stub drops substitutions; echo them so the label shows.
+    const realUrl = window.pbpAiStatusPageUrl, realT = window.t;
+    try {
+      window.pbpAiStatusPageUrl = () => "https://status.example/";
+      window.t = (k, ...a) => k + (a.length ? "(" + a.join(",") + ")" : "");
+      let a = null;
+      try { a = pbpAiStatusLink({ aiProvider: "brandnew" }, { status: 503 }); } catch (e) { throw new Error("threw: " + e.message); }
+      assertEq(a && a.tagName, "A");
+      assert(a.textContent.includes("brandnew"), "label: " + a.textContent);
+    } finally {
+      window.pbpAiStatusPageUrl = realUrl;
+      window.t = realT;
+    }
+  });
 });
 
 suiteIf("pbpAiErrorText (ZH-3)", "pbpAiErrorText", () => {

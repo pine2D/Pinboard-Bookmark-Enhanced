@@ -680,7 +680,8 @@ function pbpAiStatusLink(s, err) {
   a.href = url;
   a.target = "_blank";
   a.rel = "noopener noreferrer";
-  a.textContent = t("aiStatusPage", PBP_AI_STATUS_PAGES[(s && s.aiProvider) || "gemini"].name);
+  const p = (s && s.aiProvider) || "gemini";
+  a.textContent = t("aiStatusPage", (PBP_AI_STATUS_PAGES[p] && PBP_AI_STATUS_PAGES[p].name) || pbpAiProviderName(s));
   return a;
 }
 
