@@ -673,7 +673,9 @@ suite("endpoint origin policy", () => {
       const full = "INTRO_" + "h".repeat(4000) + "_MIDDLE_" + "m".repeat(4000) + "_t".repeat(500) + "_CONCLUSION";
       assert(full.length > 8000, "fixture is longer than the retired 8000-char cap");
       const realDefuddle = window.Defuddle, realURL = window.URL, realShim = window.__pp_urlShimInstalled;
-      window.Defuddle = function () { this.parse = () => ({ textContent: full }); };
+      // Real Defuddle returns article HTML in `content`; it has never returned
+      // a `textContent` field (see the vendor contract test below).
+      window.Defuddle = function () { this.parse = () => ({ content: "<p>" + full + "</p>" }); };
       try {
         window.chrome = k90RunsInjected("https://k90.test/long");
         const info = await getPageInfoFromTab(7, { withDefuddle: true });
@@ -687,6 +689,33 @@ suite("endpoint origin policy", () => {
         window.Defuddle = realDefuddle;
         window.URL = realURL;
         window.__pp_urlShimInstalled = realShim;
+      }
+    });
+
+    await atest("vendored Defuddle returns the whole page as content HTML, not textContent", async () => {
+      // The page-text extractor must consume the shape the REAL library returns.
+      // A card grid wraps each card in its own <article>; the legacy fallback's
+      // querySelector("article") would keep only the first card.
+      const realDefuddle = window.Defuddle;
+      await new Promise((resolve, reject) => {
+        const tag = document.createElement("script");
+        tag.src = "../vendor/defuddle.js"; tag.onload = resolve; tag.onerror = () => reject(new Error("vendor/defuddle.js failed to load"));
+        document.head.appendChild(tag);
+      });
+      const vendored = window.Defuddle;
+      try {
+        const doc = new DOMParser().parseFromString("<!doctype html><html><head><title>Cards</title></head><body><main>" +
+          "<h1>What people are researching</h1><p>The reports readers turned to most in the last thirty days, across every category we track.</p>" +
+          ["Alpha", "Bravo", "Charlie"].map(name => "<article><h2>" + name + " Product</h2><p>" + name +
+            " is a product with a description long enough to count as real card content for the extractor.</p></article>").join("") +
+          "</main></body></html>", "text/html");
+        const result = new vendored(doc).parse();
+        assertEq(typeof result.content, "string", "content is the article HTML");
+        assertEq("textContent" in result, false, "there is no textContent field to read");
+        for (const name of ["Alpha", "Bravo", "Charlie"]) assert(result.content.includes(name + " Product"), name + " card is in the content");
+      } finally {
+        window.Defuddle = realDefuddle;
+        if (realDefuddle === undefined) delete window.Defuddle;
       }
     });
 

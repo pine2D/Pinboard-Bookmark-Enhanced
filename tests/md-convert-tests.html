@@ -4030,14 +4030,15 @@ window._pbpSiteEntryDone = (async () => {
         const doc = new DOMParser().parseFromString(mode === "missing" ? sample.replace('/alice/status/222', '/other/status/111') : sample, "text/html");
         let calls = 0;
         const genericText = "Ordinary article content retained by the Defuddle fallback. ".repeat(3);
-        class NativeExtractor { parse() { calls++; return { content: '<p>' + genericText + '</p>', textContent: genericText, title: 'Ordinary article' }; } }
+        // Defuddle's real result shape: article HTML in content, no textContent.
+        class NativeExtractor { parse() { calls++; return { content: '<p>' + genericText + '</p>', title: 'Ordinary article' }; } }
         const win = { URL, __pp_urlShimInstalled: true, getSelection: () => null, addEventListener() {}, removeEventListener() {} };
         const execute = async options => options.func ? [{ result: await options.func(...(options.args || [])) }] : [{}];
         const fn = new Function("document", "location", "window", "Defuddle", "_cbExecuteScript", "_cbTabsGet", "AI_CONTENT_HEAD", "AI_CONTENT_TAIL", "setTimeout", source + "\nreturn " + name)(doc, new URL(url), win, NativeExtractor, execute, async () => ({ url }), 3200, 800, () => 0);
         const result = await fn(7, { withDefuddle: true, expectedUrl: url });
         const okay = mode === "missing" ? (i === 2 ? result === null : result?.error === "site_target_missing") && calls === 0
           : mode === "short" ? (i === 2 ? result?.pageText : result?.contentHtml)?.includes("Short post") && calls === 0
-          : (i === 2 ? result?.pageText : result?.contentHtml)?.includes(genericText) && calls === 1;
+          : (i === 2 ? result?.pageText : result?.contentHtml)?.includes(genericText.trim()) && calls === 1;
         check(label, okay, JSON.stringify({ result, calls }));
       } catch (e) { check(label, false, e.message); }
     }

@@ -158,8 +158,15 @@ async function getPageInfoFromTab(tabId, opts = {}) {
             console.error = (...a) => { if (!String(a[0]).startsWith("Defuddle:")) _origCE.apply(console, a); };
             let result;
             try { result = new Defuddle(clone).parse(); } finally { console.error = _origCE; }
-            if (result?.textContent && result.textContent.length > 50) {
-              info.pageText = headTail(result.textContent, headChars, tailChars);
+            // Defuddle returns the article as HTML in `content`; it has no
+            // textContent field. Flatten it in an inert document (the paired
+            // site-rules.js helper keeps block breaks and never loads images).
+            const html = typeof result?.content === "string" ? result.content : "";
+            const text = !html ? "" : typeof pbpSiteRuleText === "function"
+              ? pbpSiteRuleText(html)
+              : (new DOMParser().parseFromString(html, "text/html").body.textContent || "").trim();
+            if (text.length > 50) {
+              info.pageText = headTail(text, headChars, tailChars);
               return info;
             }
           } catch (_) { /* fall through to legacy */ }
