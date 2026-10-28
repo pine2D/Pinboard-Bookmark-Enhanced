@@ -870,6 +870,9 @@ export const DICT_LOOKUP_GEOMETRY = {
         // its click-opened choice list, which must stay inside the viewport.
         "dict-save-bar": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-save-change-menu": { requires: ["overflow", "menu"] },
+        // A word already saved (ruling 2026-10-28): the bar's prompt face,
+        // Change, and Update disabled beside the Learning | Known control.
+        "dict-save-saved": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         // A saved AI entry with its three paid learning actions in the
         // remembered "Not found last time · Try again" state (plan 3.3), run in
         // each listed UI locale; controlRung holds each action to one line,

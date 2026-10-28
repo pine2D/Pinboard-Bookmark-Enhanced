@@ -3334,6 +3334,7 @@ async function pbpDictRun(cap, ctx, pop, ctrl, s, navigation = null) {
 
 function _pbpDictApplyVisibleChoice(cur) {
   cur.fullEntryOnly = false;
+  cur.keptSaved = false;
   if (cur.packChoice) { _pbpDictApplyPackChoice(cur, cur.packChoice); return; }
   if (cur.packInvalidated) return;
   const sources = [...(cur.meaningSources?.values() || [])].filter(source => !source.norm.aiGenerated && source.choices.length);
@@ -3344,7 +3345,16 @@ function _pbpDictApplyVisibleChoice(cur) {
   const norm = cur.aiExpanded ? cur.aiNorm : sources[0]?.norm || cur.dictionaryNorm;
   const choice = norm && pbpDictNormChoices({ ...norm,
     entries: pbpDictOrderForContext(norm.entries, cur.aiExpanded ? "" : cur.sentence) }, cur.lang, t("dictSource"))[0];
-  if (choice) _pbpDictApplyPackChoice(cur, choice);
+  // A word already in the vocabulary keeps its saved definition: no default
+  // is applied for it (ruling 2026-10-28, as in the library), so the save bar
+  // shows the "Definition to save" prompt and Update stays disabled until the
+  // reader picks one. The saved word itself stays the target, so its saved
+  // face (Learning | Known) and the commit gates still answer for it.
+  // savedKeys is filled by _pbpDictRefreshSave's owner-gated read.
+  if (choice && cur.savedKeys?.has(pbpDictVocabKey(cur.owner, choice.language || "und", choice.term))) {
+    cur.keptSaved = true;
+    Object.assign(cur, { term: choice.term, lang: choice.language, gloss: "", ipa: "", sourceUrl: "", license: "", lemma: "" });
+  } else if (choice) _pbpDictApplyPackChoice(cur, choice);
   else {
     cur.fullEntryOnly = !cur.aiExpanded && [...(cur.meaningSources?.values() || [])].some(source => source.norm.hasFullEntry);
     Object.assign(cur, { term: cur.queryTerm || cur.term, gloss: "", ipa: "", sourceUrl: "", license: "", lemma: "" });
@@ -3388,7 +3398,8 @@ function _pbpDictSyncMeaningSelect(cur) {
   change.hidden = rows.length < 2 && selected >= 0;
   bar.hidden = !rows.length;
   const help = cur.meaningMenu.querySelector(".xp-dict-choice-help");
-  help.textContent = t(selected < 0 ? "dictMeaningChooseHelp" : cur.packChoice ? "dictMeaningManualHelp" : "dictMeaningDefaultHelp");
+  help.textContent = t(selected < 0 ? cur.keptSaved ? "dictMeaningSavedHelp" : "dictMeaningChooseHelp"
+    : cur.packChoice ? "dictMeaningManualHelp" : "dictMeaningDefaultHelp");
   const list = cur.meaningMenu.querySelector(".xp-dict-save-options");
   const focused = list.contains(document.activeElement) ? document.activeElement.dataset.index : null;
   list.replaceChildren();
@@ -3525,7 +3536,7 @@ function _pbpDictMountMeaningBar(cur, pop, box, signal) {
 }
 
 function _pbpDictApplyPackChoice(cur, choice) {
-  Object.assign(cur, { fullEntryOnly: false, term: choice.term, lang: choice.language, gloss: choice.gloss,
+  Object.assign(cur, { fullEntryOnly: false, keptSaved: false, term: choice.term, lang: choice.language, gloss: choice.gloss,
     ipa: choice.ipa, sourceUrl: choice.sourceUrl, license: choice.license, lemma: "" });
 }
 
@@ -3549,10 +3560,13 @@ async function _pbpDictRefreshSave(pop, cur, signal) {
   const contextRevision = cur.contextRevision || 0;
   if (signal.aborted || _pbpDictCurrent !== cur) return;
   cur.saved = false; cur.savedRecord = null;
+  // A saved word waiting for an explicit choice (ruling 2026-10-28) cannot be
+  // updated with nothing picked.
+  const blocked = () => !!cur.fullEntryOnly || !!cur.packInvalidated || !!cur.keptSaved;
   if (vocabBtn) {
     vocabBtn.dataset.contextRevision = String(contextRevision);
     vocabBtn.dataset.packRevision = String(cur.packRevision || 0);
-    vocabBtn.hidden = false; vocabBtn.disabled = !!cur.fullEntryOnly || !!cur.packInvalidated;
+    vocabBtn.hidden = false; vocabBtn.disabled = blocked();
     delete vocabBtn.dataset.face;
     if (typeof _pbpExplainIconBtn === "function") {
       _pbpExplainIconBtn(vocabBtn, PBP_EXPLAIN_VOCAB_ADD_SVG, t("dictSaveVocab"));
@@ -3573,10 +3587,18 @@ async function _pbpDictRefreshSave(pop, cur, signal) {
     // below are the ones that must be fail-closed against a token swap this
     // page has not seen yet.
     if (cur.owner !== _pbpDictOwner) { vocabBtn.disabled = false; return; }
-    const hit = await pbpVocabGet(pbpDictVocabKey(cur.owner, cur.lang || "und", cur.term));
+    const key = pbpDictVocabKey(cur.owner, cur.lang || "und", cur.term);
+    const hit = await pbpVocabGet(key);
     if (signal.aborted || _pbpDictCurrent !== cur || cur.packChoice !== choice ||
         (cur.contextRevision || 0) !== contextRevision || vocabBtn.dataset.runId !== String(runId)) return;
     if (cur.owner !== _pbpDictOwner) { vocabBtn.disabled = false; return; } // switch landed during the read
+    // What this owner has saved decides the default (ruling 2026-10-28): a
+    // saved word gets none, a word deleted meanwhile gets Q14=A's again. The
+    // term stays the same either way, so this read still answers for it.
+    const savedKeys = cur.savedKeys || (cur.savedKeys = new Set());
+    const had = savedKeys.has(key);
+    if (hit) savedKeys.add(key); else savedKeys.delete(key);
+    if (!cur.packChoice && had !== !!hit) { _pbpDictApplyVisibleChoice(cur); _pbpDictSyncMeaningSelect(cur); }
     if (hit) {
       cur.saved = true;
       // Saved-word face (critique 2026-10-21): the Learning | Known control
@@ -3588,7 +3610,16 @@ async function _pbpDictRefreshSave(pop, cur, signal) {
       // aria-label keep "Update saved word". Without the control (an entry
       // point that did not build it) the old labeled Update face stays.
       const shown = _pbpDictShowSaved(pop, cur, hit);
-      if (shown && !_pbpDictLookupAddsTo(hit, cur)) {
+      // Waiting for a choice (ruling 2026-10-28), Update stays on screen,
+      // disabled (below), while some definition on offer would change the
+      // record: it shows what picking one enables. When none would, there is
+      // nothing to update, as before.
+      const adds = cur.keptSaved
+        ? (cur.meaningChoices || []).some(c => c.language !== cur.lang ||
+            pbpDictNormalizeTerm(c.term) !== pbpDictNormalizeTerm(cur.term) ||
+            _pbpDictLookupAddsTo(hit, { ...cur, gloss: c.gloss, ipa: c.ipa, lemma: "" }))
+        : _pbpDictLookupAddsTo(hit, cur);
+      if (shown && !adds) {
         vocabBtn.hidden = true;
       } else if (typeof _pbpExplainIconBtn === "function") {
         _pbpExplainIconBtn(vocabBtn, shown ? "" : PBP_ICONS.refresh, t("dictUpdateVocab"), shown ? t("update") : "");
@@ -3597,7 +3628,7 @@ async function _pbpDictRefreshSave(pop, cur, signal) {
         vocabBtn.textContent = t("dictUpdateVocab");
       }
     }
-    vocabBtn.disabled = !!cur.fullEntryOnly || !!cur.packInvalidated;
+    vocabBtn.disabled = blocked();
   }
 }
 
@@ -3705,6 +3736,7 @@ async function pbpDictSaveCurrent() {
   const packRevision = cur?.packRevision || 0;
   const contextRevision = cur?.contextRevision || 0;
   if (!cur || !cur.term || cur.fullEntryOnly) return false;
+  if (cur.keptSaved) return false; // a saved word is updated only with an explicit choice
   if (cur.owner !== _pbpDictOwner) return false; // owner re-check at commit time (invariant)
   const urlEl = document.getElementById("preview-url");
   const titleEl = document.getElementById("preview-title");
@@ -3752,7 +3784,7 @@ async function pbpDictSaveCurrent() {
   }
   // A reused lookup can acquire another selection during the owner read.
   // Never pair the earlier highlight target with the later sentence.
-  if (cur.fullEntryOnly || cur.packInvalidated || (cur.packRevision || 0) !== packRevision ||
+  if (cur.fullEntryOnly || cur.packInvalidated || cur.keptSaved || (cur.packRevision || 0) !== packRevision ||
       (cur.contextRevision || 0) !== contextRevision) return false;
   const entry = await pbpVocabSaveWord(cur.owner, {
     term: cur.term, lemma: cur.lemma, language: cur.lang || "und",

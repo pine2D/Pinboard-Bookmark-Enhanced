@@ -1393,8 +1393,60 @@ async function runDictNoAiAndSavedStateTests() {
     await pbpDictRun({ text: "hello" }, { sentence: "hello" }, pop, new AbortController(), {});
     assert(status.hidden === false && pressedOf(pop) === "new=true+active known=false",
       "a saved learning word shows Learning | Known with Learning pressed: " + pressedOf(pop));
-    assert(button.hidden === true,
-      "a saved word whose lookup adds nothing hides the save/update button (the control is the state)");
+    // Ruling 2026-10-28: a saved word keeps its saved definition -- nothing
+    // is preselected, and Update waits, disabled, for an explicit choice
+    // while another definition on offer would change the record.
+    const barOf = () => pop.querySelector(".xp-dict-save-meaning");
+    const helpOf = () => pop.querySelector(".xp-dict-save-menu .xp-dict-choice-help");
+    assert(_pbpDictCurrent.gloss === "" && barOf()?.querySelector(".xp-dict-save-preview")?.dataset.empty === "true" &&
+      !barOf().querySelector(".xp-dict-save-change").hidden &&
+      !pop.querySelector('.xp-dict-save-menu [aria-selected="true"]') && helpOf()?.textContent === "dictMeaningSavedHelp",
+      "a saved word gets no preselected definition: the bar prompts for one and its help says the saved one stays");
+    // This harness has no md-ask icon helper, so Update is the plain label.
+    const updates = () => [button.textContent, button.getAttribute("aria-label")].includes("dictUpdateVocab");
+    assert(button.hidden === false && button.disabled === true && updates(),
+      "a saved word waiting for a choice shows Update, disabled");
+    let saveWrites = 0;
+    const realSaveWord = window.pbpVocabSaveWord, realOwnerRead = window.pbpVocabCurrentOwner;
+    window.pbpVocabSaveWord = async () => { saveWrites++; return { id: "acct_a|en|hello", status: "new" }; };
+    window.pbpVocabCurrentOwner = async () => "acct_a";
+    try {
+      assert(await pbpDictSaveCurrent() === false && saveWrites === 0,
+        "a save request with nothing picked for a saved word is refused at commit time");
+      const other = _pbpDictCurrent.meaningChoices.findIndex(c => c.gloss !== sameGloss && c.term === "hello");
+      assert(pickMeaning(pop, other), "the saved word's lookup still offers its other definitions");
+      await new Promise((r) => setTimeout(r, 0));
+      assert(_pbpDictCurrent.gloss === _pbpDictCurrent.meaningChoices[other].gloss && button.hidden === false && button.disabled === false &&
+        updates() && helpOf()?.textContent === "dictMeaningManualHelp",
+        "picking a different definition enables Update for the saved word");
+      // The owner gates are unchanged: an account switch refuses the commit.
+      window.pbpVocabCurrentOwner = async () => "acct_b";
+      assert(await pbpDictSaveCurrent() === false && saveWrites === 0, "an explicit choice still passes the live owner gate before writing");
+      window.pbpVocabCurrentOwner = async () => "acct_a";
+      assert(await pbpDictSaveCurrent() === true && saveWrites === 1, "an explicit choice updates the saved word");
+      const same = _pbpDictCurrent.meaningChoices.findIndex(c => c.gloss === sameGloss);
+      pickMeaning(pop, same);
+      await new Promise((r) => setTimeout(r, 0));
+      assert(button.hidden === true,
+        "a saved word whose explicit choice adds nothing hides the save/update button (the control is the state)");
+    } finally { window.pbpVocabSaveWord = realSaveWord; window.pbpVocabCurrentOwner = realOwnerRead; }
+    // A word not saved yet still gets Q14=A's default and an enabled Save.
+    pbpVocabGet = async () => null;
+    await pbpDictRun({ text: "hello" }, { sentence: "hello" }, pop, new AbortController(), {});
+    assert(_pbpDictCurrent.gloss === sameGloss && button.hidden === false && button.disabled === false && button.textContent === "dictSaveVocab" &&
+      helpOf()?.textContent === "dictMeaningDefaultHelp",
+      "a word not saved yet keeps the first definition as its default and an enabled Save");
+    // Saved state is the signed-in owner's: another account's saved word
+    // does not withhold this account's default.
+    pbpVocabGet = async (id) => id === "acct_a|en|hello" ? { id, status: "new", gloss: sameGloss, contexts: [] } : null;
+    _pbpDictOwner = "acct_b";
+    await pbpDictRun({ text: "hello" }, { sentence: "hello" }, pop, new AbortController(), {});
+    assert(_pbpDictCurrent.owner === "acct_b" && _pbpDictCurrent.gloss === sameGloss && button.disabled === false && button.textContent === "dictSaveVocab",
+      "another account's saved word leaves this account's default and Save alone");
+    _pbpDictOwner = "acct_a";
+    pbpVocabGet = async () => ({ id: "acct_a|en|hello", status: "new", gloss: sameGloss, ipa: "x", lemma: "hello",
+      contexts: [{ quote: "hello", articleUrl: "https://example.com/" }] });
+    await pbpDictRun({ text: "hello" }, { sentence: "hello" }, pop, new AbortController(), {});
     assert(pop.querySelector(".xp-open-vocab").hidden === false, "a saved word offers the jump to the vocabulary page");
     assert(!/[\u2713\u2714\u2705]/.test(pop.textContent), "no literal tick text anywhere in the footer");
 
@@ -1436,8 +1488,8 @@ async function runDictNoAiAndSavedStateTests() {
       contexts: [{ quote: "an older sentence", articleUrl: "https://example.com/" }] });
     await pbpDictRun({ text: "hello" }, { sentence: "hello" }, pop, new AbortController(), {});
     assert(pressedOf(pop) === "new=false known=true+active", "a saved known word shows Known pressed");
-    assert(button.hidden === false && !button.disabled && button.textContent === "dictUpdateVocab",
-      "a lookup that would add to the saved record keeps an enabled Update action");
+    assert(button.hidden === false && button.disabled === true && button.textContent === "dictUpdateVocab",
+      "a lookup that would add to the saved record keeps Update on screen, disabled until a definition is picked");
 
     // 6. A different gloss alone also re-offers Update.
     pbpVocabGet = async () => ({ id: "acct_a|en|hello", status: "new", gloss: "an older gloss", ipa: "x", lemma: "hello",
@@ -3197,6 +3249,8 @@ async function runDictionaryEntryReaderTests() {
     pop.querySelector('.xp-vocab').hidden=true;
     pbpDictUpdateContext({text:'Gift',itemId:'another-highlight'},{sentence:'Noch ein Gift.'});await settle();
     check("reusing a saved word in a new sentence refreshes its visible update action",!pop.querySelector('.xp-vocab').hidden&&pop.querySelector('.xp-vocab').textContent==='dictUpdateVocab');
+    // A saved word is updated only with an explicit choice (ruling 2026-10-28).
+    pickMeaning(pop,_pbpDictCurrent.meaningChoices.findIndex(c=>c.gloss==="original poison"));await settle();
     let releaseContextOwner,contextWrites=[];window.pbpVocabCurrentOwner=()=>new Promise(resolve=>{releaseContextOwner=resolve;});window.pbpVocabSaveWord=async(owner,value)=>{contextWrites.push({owner,value});return {id:'saved-fixture'};};
     const savingEarlierContext=pbpDictSaveCurrent();pbpDictUpdateContext({text:'Gift',itemId:'newest-highlight'},{sentence:'Das neue Gift.'});releaseContextOwner('acct_entry');
     check("a selection change during the save owner check cannot mix an old highlight with a new sentence",await savingEarlierContext===false&&contextWrites.length===0);

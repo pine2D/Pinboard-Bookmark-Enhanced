@@ -111,7 +111,7 @@ import { cr, hexRgb, parseRgba, composite } from "../docs/theme-surface/tools/co
 import { CHIP_TARGETS } from "../docs/theme-surface/composers/ui-components.mjs";
 // Options density per theme, from the pilots (docs/theme-surface/tools/options-density.mjs).
 import { readOptionsDensity } from "../docs/theme-surface/tools/options-density.mjs";
-import { installDictEntryFixture, openDictEntryState, restoreDictEntryView, closeDictSaveMenu } from "./audit-dict-entry-fixture.mjs";
+import { installDictEntryFixture, openDictEntryState, restoreDictEntryView, closeDictSaveMenu, forgetDictSavedWord } from "./audit-dict-entry-fixture.mjs";
 import { ledgerKey, reconcileKnownFailures } from "./render-audit-ledger.mjs";
 import { installAskHistoryFixture, openAskHistoryState } from "./audit-ask-history-fixture.mjs";
 import { openVocabPackPreview, installVocabPackFixture } from "./audit-vocab-pack-fixture.mjs";
@@ -9771,7 +9771,7 @@ async function runSweep(page, sw, extBase) {
           if (/^dict-(entry|save)-/.test(name)) {
             // The examples and save-bar states need no earlier AI state: open
             // the lookup for them when they run on their own.
-            if (name.endsWith("-idle") || (["dict-entry-examples", "dict-entry-negative", "dict-entry-legacy", "dict-save-bar", "dict-entry-paid-negative"].includes(name) &&
+            if (name.endsWith("-idle") || (["dict-entry-examples", "dict-entry-negative", "dict-entry-legacy", "dict-save-bar", "dict-save-saved", "dict-entry-paid-negative"].includes(name) &&
                 !(await page.locator("#explain-pop .xp-dict-query-tools > .xp-dict-lang").isVisible().catch(() => false)))) {
               await installDictEntryFixture(page);
               if (await page.evaluate(openReaderSurface, "explain-pop") !== true || await page.evaluate(openReaderSurface, "explain-dict") !== true) throw new Error("SETUP: dictionary entry opener failed");
@@ -9780,6 +9780,7 @@ async function runSweep(page, sw, extBase) {
             if (name === "dict-entry-paid-negative") await scanDictPaidNegative(page, extBase, "md-preview", scan);
             else await scan("md-preview", name, () => openDictEntryState(page, name.replace(/^dict-(entry-)?/, "")));
             if (name === "dict-save-change-menu") await closeDictSaveMenu(page);
+            if (name === "dict-save-saved") await forgetDictSavedWord(page);
             if (name === "dict-entry-panel") await page.locator("#reader-dict-view .reader-dict-return").click();
             // The folded states switch dictDefaultView to "dictionary"; put the
             // fixture's "ai-saved" back after the last of them.

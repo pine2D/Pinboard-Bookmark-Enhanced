@@ -619,6 +619,41 @@ export async function openDictEntryState(page, state) {
     await control.waitFor();
     return control.isVisible();
   }
+  if (state === 'save-saved') {
+    // A word already in this owner's vocabulary (ruling 2026-10-28): the
+    // reader preselects nothing, so the preview is the "Definition to save"
+    // prompt, Change is on screen, Update sits disabled beside the Learning |
+    // Known control, and the choice list's help says the saved definition
+    // stays. The word goes through the production store and is removed again
+    // by forgetDictSavedWord after the scan.
+    const seeded = await page.evaluate(async () => {
+      const cur = _pbpDictCurrent;
+      if (!cur || typeof pbpVocabSaveWord !== 'function' || !_pbpDictOwner) return 'no lookup or vocabulary store';
+      const saved = await pbpVocabSaveWord(_pbpDictOwner, { term: cur.queryTerm || cur.term, language: cur.lang || 'en',
+        gloss: 'A definition saved before this lookup.', ipa: '', sourceUrl: '', license: '' });
+      if (!saved?.id) return 'the vocabulary store saved nothing';
+      window._auditDictSavedWord = { id: saved.id, owner: _pbpDictOwner };
+      cur.rerun();
+      return true;
+    });
+    if (seeded !== true) throw new Error('SETUP: ' + seeded);
+    const bar = page.locator('#explain-pop .xp-dict-save-meaning:not([hidden]) .xp-dict-save-preview[data-empty="true"]');
+    await bar.waitFor();
+    // The lookup's own footer is in its live session, not in a retired one.
+    const vocab = "(document.querySelector('#explain-pop > .reader-dict-session:not([data-retired]) .xp-vocab') || document.querySelector('#explain-pop .xp-vocab'))";
+    await page.waitForFunction(`${vocab}?.getAttribute('aria-label') === t('dictUpdateVocab')`);
+    const face = await page.evaluate(`(() => {
+      const vocab = ${vocab}, pop = vocab.closest('.reader-dict-session') || document.getElementById('explain-pop');
+      return { disabled: vocab.disabled, hidden: vocab.hidden,
+        control: !pop.querySelector('.xp-vocab-status')?.hidden, change: !pop.querySelector('.xp-dict-save-change')?.hidden,
+        help: document.querySelector('.xp-dict-save-menu .xp-dict-choice-help')?.textContent === t('dictMeaningSavedHelp'),
+        picked: !!document.querySelector('.xp-dict-save-menu [aria-selected="true"]'), gloss: _pbpDictCurrent?.gloss };
+    })()`);
+    if (face.gloss || face.picked) throw new Error('SETUP: a saved word got a preselected definition: ' + JSON.stringify(face));
+    if (face.hidden || !face.disabled) throw new Error('SETUP: Update is not on screen and disabled: ' + JSON.stringify(face));
+    if (!face.control || !face.change || !face.help) throw new Error('SETUP: the saved face is incomplete: ' + JSON.stringify(face));
+    return bar.isVisible();
+  }
   if (state === 'save-change-menu') {
     // "Change" opens the choice list on click (never on hover) with the
     // selected definition focused; the driver closes it with Escape after the
@@ -651,6 +686,21 @@ export async function openDictEntryState(page, state) {
     return option.isVisible();
   }
   throw new Error('SETUP: unknown dictionary entry state ' + state);
+}
+
+// Remove the word a save-saved scan put in the vocabulary, through the same
+// store, and rerun the lookup so the next state starts from an unsaved word.
+export async function forgetDictSavedWord(page) {
+  const gone = await page.evaluate(async () => {
+    const seed = window._auditDictSavedWord;
+    delete window._auditDictSavedWord;
+    if (!seed) return true;
+    const ok = await pbpVocabDelete(seed.id, seed.owner);
+    _pbpDictCurrent?.rerun();
+    return ok !== false;
+  });
+  if (!gone) throw new Error('SETUP: the saved-word fixture could not be removed from the vocabulary');
+  await page.waitForFunction(() => !document.querySelector('#explain-pop .xp-dict-save-preview[data-empty="true"]'));
 }
 
 // Close the choice list a save-change-menu scan left open, the way a

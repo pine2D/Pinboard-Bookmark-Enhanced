@@ -23,7 +23,7 @@ export const RENDER_READER_CONTEXTS = Object.freeze([
   'reader-source-details', 'export-more', 'reader-bookmark-footer', 'reader-bookmark-editor', 'reader-bookmark-delete-confirm',
   'explain-pop', 'explain-dict', 'dict-resize-menu', 'dict-entry-idle', 'dict-entry-busy', 'dict-entry-progress', 'dict-entry-result', 'dict-entry-details',
   'dict-entry-usage-busy', 'dict-entry-usage-error', 'dict-entry-usage-result',
-  'dict-entry-panel', 'dict-entry-cached', 'dict-entry-folded', 'dict-entry-revealed', 'dict-entry-error', 'dict-entry-examples', 'dict-entry-negative', 'dict-entry-legacy', 'dict-save-bar', 'dict-save-change-menu', 'dict-entry-paid-negative', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
+  'dict-entry-panel', 'dict-entry-cached', 'dict-entry-folded', 'dict-entry-revealed', 'dict-entry-error', 'dict-entry-examples', 'dict-entry-negative', 'dict-entry-legacy', 'dict-save-bar', 'dict-save-change-menu', 'dict-save-saved', 'dict-entry-paid-negative', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
   'pb-hl-card', 'send-menu', 'confirm-popover', 'tr-ask',
 ]);
 const context = (name, dependencies = [], extra = {}) => ({ name, dependencies, ...extra });
