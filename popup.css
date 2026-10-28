@@ -701,6 +701,10 @@ html[data-section="login"] .quick-actions { display: none !important; }
 }
 .fc-btn:hover { background: color-mix(in srgb, currentColor 18%, transparent); }
 .fc-btn:active:not(:disabled) { transform: scale(0.97); }
+/* "Try with <name>": a custom entry's name runs up to 40 characters, wider
+   than the 420px popup at 11px under nowrap. It ellipsizes inside the row;
+   the button's title carries the whole name. */
+#ai-error-fallback { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 /* The focus rule this button never had -- it fell through to the UA ring on
    every theme. `borderless` per COMPONENTS.md §7.3's second question: its
    1px `currentColor` edge is SEMANTIC (it carries the feedback card's own
