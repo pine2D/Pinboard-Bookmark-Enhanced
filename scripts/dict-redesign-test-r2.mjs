@@ -53,7 +53,7 @@ export const BLOCK_OF = Object.freeze({ patterns: "usage", confusables: "usage",
 // builds every request.
 export const SELECTORS = Object.freeze({
   content: ".xp-dict-ai-content", senses: ".xp-dict-senses > li", entryGenerate: ".xp-dict-ai-generate",
-  block: "[data-learning-block]", generate: ".xp-dict-supplement-generate", section: "[data-supplement-category]",
+  block: "[data-learning-block]", slot: "[data-slot]", generate: ".xp-dict-supplement-generate", section: "[data-supplement-category]",
   text: ".xp-dict-supplement-text", actions: ".xp-dict-usage-actions", feedback: ".xp-dict-usage-feedback",
   errors: ".xp-dict-ai-status, .xp-dict-action-error", status: ".xp-dict-ai-status", progress: ".xp-dict-ai > .xp-dict-usage-feedback",
   actionError: ".xp-dict-action-error"
@@ -546,7 +546,10 @@ async function runCase(page, word, arm, swallow = false) {
     const replaced = new Set((record?.supplements || []).map(item => item.learning?.replacesId).filter(Boolean));
     const saved = (record?.supplements || []).find(item => item.category === arm && !replaced.has(item.id));
     const blockEl = host.querySelector(sel.block.slice(0, -1) + '="' + block + '"]');
-    const section = saved && blockEl?.querySelector(":scope > " + sel.section.slice(0, -1) + '="' + arm + '"][data-supplement-id="' + CSS.escape(saved.id) + '"]');
+    // Each category has a fixed slot in its block; the current result is a
+    // direct child of that slot (results for other learner settings sit
+    // outside the blocks and must not count).
+    const section = saved && blockEl?.querySelector(":scope > " + sel.slot.slice(0, -1) + '="' + arm + '"] > ' + sel.section.slice(0, -1) + '="' + arm + '"][data-supplement-id="' + CSS.escape(saved.id) + '"]');
     const shown = saved?.learning?.items?.[0]?.explanation;
     const rendered = visible(section) && !!shown && !!section.querySelector(sel.text)?.textContent.includes(shown);
     // The button's own feedback line (saved / partial / error), read for its state only.

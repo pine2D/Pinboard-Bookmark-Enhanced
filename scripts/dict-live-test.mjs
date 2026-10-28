@@ -358,11 +358,12 @@ async function executeProvider(plan, approval, ledger, id, key, saveLedger, { re
           const visible = node => node.checkVisibility({ checkVisibilityCSS: true }) && node.getBoundingClientRect().height > 0;
           const content = host.querySelector(".xp-dict-ai-content");
           const meanings = [...host.querySelectorAll(".xp-dict-senses > li")].filter(visible).length;
-          // The saved supplement is its own section inside the "usage points"
-          // block, showing its items directly (a patterns card has no summary,
-          // so the first item's explanation is what must be visible).
+          // The saved supplement is its own section in its category's fixed
+          // slot of the "usage points" block, showing its items directly (the
+          // slot label names it, so the first item's explanation is what must
+          // be visible).
           const saved = caseId === "entry" ? null : reread?.supplements.find(item => item.id === value.id);
-          const section = saved && host.querySelector('[data-learning-block="usage"] > [data-supplement-category="' + caseId + '"][data-supplement-id="' + CSS.escape(saved.id) + '"]');
+          const section = saved && host.querySelector('[data-learning-block="usage"] > [data-slot="' + caseId + '"] > [data-supplement-category="' + caseId + '"][data-supplement-id="' + CSS.escape(saved.id) + '"]');
           const shown = saved?.learning?.items?.[0]?.explanation;
           const supplementRendered = !!section && visible(section) && !!shown && !!section.querySelector(".xp-dict-supplement-text")?.textContent.includes(shown);
           const errors = [...host.querySelectorAll(".xp-dict-ai-status, .xp-dict-action-error")].filter(node => visible(node) && node.textContent.trim()).length;
