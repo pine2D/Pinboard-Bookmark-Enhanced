@@ -2568,13 +2568,15 @@ async function driveDiscovery(context, worker, extId, rep) {
     },`http://127.0.0.1:${aiPort}/v1`);
     await reader.waitForFunction(()=>!!document.getElementById('reader-ai-configure'));
     await reader.evaluate(()=>{
-      const original=pbpReadSettingsWithSecrets;let held=false;
-      window.qaRestoreReaderRead=()=>{pbpReadSettingsWithSecrets=original;};
-      pbpReadSettingsWithSecrets=query=>{
-        if(!held&&'personalLibraryAccount' in query){
-          held=true;return new Promise(resolve=>{window.qaReleaseOwnerRead=async()=>resolve(await original(query));});
+      // Hold the owner read outside pbpPersonalLibraryAccount's Web Lock:
+      // holding the settings read inside it blocks every other owner read.
+      const original=pbpPersonalLibraryAccount;let held=false;
+      window.qaRestoreReaderRead=()=>{pbpPersonalLibraryAccount=original;};
+      pbpPersonalLibraryAccount=(...args)=>{
+        if(!held){
+          held=true;return new Promise(resolve=>{window.qaReleaseOwnerRead=async()=>resolve(await original(...args));});
         }
-        return original(query);
+        return original(...args);
       };
     });
     await worker.evaluate(async()=>chrome.storage.local.set({customApiKey:obfuscateKey('qa-mock-key')}));
