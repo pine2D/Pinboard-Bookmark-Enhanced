@@ -1002,6 +1002,34 @@ async function run() {
         try { pbpSanitizeBackupSettings(bad, keys); } catch (_) { rejected++; }
       }
       check("dictionary backup rejects unsupported modes and unbounded learner profile", rejected === 4);
+      // The registry is the authority on which regions exist; the backup enum
+      // must accept exactly those, or a valid synced value fails the whole file.
+      const aiSrc = await (await fetch("../ai.js")).text();
+      const regStart = aiSrc.indexOf("const OPENAI_COMPAT_PROVIDERS = {");
+      const regEnd = aiSrc.indexOf("\n};", regStart);
+      const registry = new Function(aiSrc.slice(regStart, regEnd + 3) + "\nreturn OPENAI_COMPAT_PROVIDERS;")();
+      const regional = Object.values(registry).filter((cfg) => cfg.regionField);
+      let enumsMatch = regional.length > 0;
+      for (const cfg of regional) {
+        const declared = Object.keys(cfg.regions).sort().join(",");
+        enumsMatch = enumsMatch && [...(PBP_BACKUP_ENUMS[cfg.regionField] || [])].sort().join(",") === declared;
+        for (const region of Object.keys(cfg.regions)) {
+          try { enumsMatch = enumsMatch && pbpSanitizeBackupSettings({ [cfg.regionField]: region }, keys)[cfg.regionField] === region; }
+          catch (_) { enumsMatch = false; }
+        }
+        for (const bad of ["", "hongkong"]) {
+          try { pbpSanitizeBackupSettings({ [cfg.regionField]: bad }, keys); enumsMatch = false; } catch (_) {}
+        }
+      }
+      check("backup accepts exactly the registry's Model Studio regions", enumsMatch);
+      let wsKept = false, wsDropped = false;
+      try {
+        const good = pbpSanitizeBackupSettings({ qwenWorkspaceId: "ws-7f3k9q", optTheme: "dark" }, keys);
+        wsKept = good.qwenWorkspaceId === "ws-7f3k9q" && good.optTheme === "dark";
+        const bad = pbpSanitizeBackupSettings({ qwenWorkspaceId: "evil.com/x", optTheme: "dark" }, keys);
+        wsDropped = !("qwenWorkspaceId" in bad) && bad.optTheme === "dark";
+      } catch (_) {}
+      check("backup keeps a valid workspace ID and drops an injected one without failing the file", wsKept && wsDropped);
     } finally { globalThis.chrome = savedChrome; _settingsStorageCache = savedCache; }
   })();
 

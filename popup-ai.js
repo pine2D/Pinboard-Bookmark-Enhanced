@@ -445,14 +445,15 @@ const AI_PROVIDER_ORDER = [
 ];
 const AI_PROVIDER_LABEL = {
   gemini: "Gemini", openai: "OpenAI", claude: "Claude", deepseek: "DeepSeek",
-  qwen: "Qwen", minimax: "MiniMax", openrouter: "OpenRouter", groq: "Groq",
+  qwen: "Model Studio", minimax: "MiniMax", openrouter: "OpenRouter", groq: "Groq",
   mistral: "Mistral", cohere: "Cohere", siliconflow: "SiliconFlow", zhipu: "Zhipu",
   kimi: "Kimi", ollama: "Ollama", custom: "Custom"
 };
-// Display name for status/error text: brand names stay literal, the custom
-// endpoint is the one entry that needs translating.
+// Display name for status/error text: brand names stay literal; the custom
+// endpoint and Alibaba Cloud Model Studio (written 百炼 in Chinese) translate.
 function pbpAiProviderLabel(key) {
   if (key === "custom") return t("provCustomShort");
+  if (key === "qwen") return t("provQwenShort");
   return AI_PROVIDER_LABEL[key] || key;
 }
 

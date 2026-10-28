@@ -324,10 +324,27 @@ async function handleAIError(res, provider) {
 //                thinkingOff, not a model allowlist — every current OpenAI chat model
 //                accepts the new name, and a base URL pointed at an older third-party
 //                proxy heals back via the 400 self-heal below.
+//   regionField  optional settings key naming the provider's region; with it:
+//     regions    { region: shared base | "" } -- "" means the region has no
+//                shared address and needs a workspace. A missing setting means
+//                the region whose base equals `base`; "" or any value not in
+//                this table is a broken configuration (endpoint_invalid),
+//                never a silent fallback to the default region.
+//   workspaceField  optional settings key holding a workspace ID; non-empty
+//                selects the workspace's dedicated host instead of the shared
+//                base. With it:
+//     workspaceRegions   { region: the region code the template expects }
+//     workspaceTemplate  dedicated base with {ws} and {region} placeholders
+//   Every target from these fields is the provider's own service (official).
 const OPENAI_COMPAT_PROVIDERS = {
   openai:      { keyField: "openaiApiKey",      base: "https://api.openai.com/v1",                         baseField: "openaiBaseUrl", modelField: "openaiModel",      defaultModel: "gpt-5.4-nano",                thinkingOff: { reasoning_effort: "none" }, tokenField: "max_completion_tokens" },
   deepseek:    { keyField: "deepseekApiKey",    base: "https://api.deepseek.com/v1",                                            modelField: "deepseekModel",    defaultModel: "deepseek-v4-flash",               thinkingOff: { thinking: { type: "disabled" } } },  // v4-flash defaults thinking ON; 4xx self-heal (deepseek-reasoner rejects it)
-  qwen:        { keyField: "qwenApiKey",        base: "https://dashscope.aliyuncs.com/compatible-mode/v1",                      modelField: "qwenModel",        defaultModel: "qwen-flash",                      thinkingOff: { enable_thinking: false } },
+  qwen:        { keyField: "qwenApiKey",        base: "https://dashscope.aliyuncs.com/compatible-mode/v1",                      modelField: "qwenModel",        defaultModel: "qwen-flash",                      thinkingOff: { enable_thinking: false },
+                 regionField: "qwenRegion",
+                 regions: { beijing: "https://dashscope.aliyuncs.com/compatible-mode/v1", singapore: "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", virginia: "https://dashscope-us.aliyuncs.com/compatible-mode/v1", tokyo: "" },
+                 workspaceField: "qwenWorkspaceId",
+                 workspaceRegions: { beijing: "cn-beijing", singapore: "ap-southeast-1", virginia: "us-east-1", tokyo: "ap-northeast-1" },
+                 workspaceTemplate: "https://{ws}.{region}.maas.aliyuncs.com/compatible-mode/v1" },  // Alibaba Cloud Model Studio; regions and dedicated hosts per the official Base URL overview
   minimax:     { keyField: "minimaxApiKey",     base: "https://api.minimaxi.com/v1",                                            modelField: "minimaxModel",     defaultModel: "MiniMax-M2",                      thinkingOff: { thinking: { type: "disabled" } }, thinkingFallback: { reasoning_effort: "low" } },  // Servers requiring thinking use the documented low effort after refusing disabled.
   openrouter:  { keyField: "openrouterApiKey",  base: "https://openrouter.ai/api/v1",                                           modelField: "openrouterModel",  defaultModel: "openai/gpt-oss-20b",              thinkingOff: { reasoning: { enabled: false } } },  // paid slug: the :free twin lost every serving endpoint
   groq:        { keyField: "groqApiKey",        base: "https://api.groq.com/openai/v1",                                         modelField: "groqModel",        defaultModel: "openai/gpt-oss-20b" },               // no thinkingOff: groq's disable dialect is per-model (gpt-oss takes reasoning_effort low|medium|high; other families take "none"), unverified on a live key
@@ -348,8 +365,9 @@ const OPENAI_COMPAT_PROVIDERS = {
 // its provider-resolution golden).
 // The bespoke callers' own table (gemini / claude / ollama). A plain literal:
 // the K81 gate in tests/ui-contract-tests.mjs evaluates it and compares each
-// defaultModel with SETTINGS_DEFAULTS. callGemini / callAnthropicMessages / callOllama
-// still carry their own fallback models; K81 keeps the copies equal.
+// defaultModel with SETTINGS_DEFAULTS. callGemini and callOllama still carry
+// their own fallback models, which K81 keeps equal to these; callAnthropicMessages
+// has none and sends only the resolved target.model.
 const _AI_BESPOKE_PROVIDERS = {
   gemini: { protocol: "gemini",    keyField: "geminiApiKey", modelField: "geminiModel", defaultModel: "gemini-3.5-flash-lite", base: "https://generativelanguage.googleapis.com" },
   claude: { protocol: "anthropic", keyField: "claudeApiKey", modelField: "claudeModel", defaultModel: "claude-haiku-4-5",      base: "https://api.anthropic.com/v1" },
@@ -359,6 +377,59 @@ const _AI_BESPOKE_PROVIDERS = {
 // Resolve a provider's base URL (per-provider baseField override wins).
 function _openaiCompatBase(cfg, s) {
   return (cfg.baseField && s[cfg.baseField]) || cfg.base;
+}
+
+// The region a regional provider's settings select. A missing value (never
+// saved) means the region whose shared base is the built-in one; anything
+// else is returned as stored, for the caller to check against cfg.regions.
+function _aiRegionOf(cfg, s) {
+  const raw = s[cfg.regionField];
+  if (raw !== undefined && raw !== null) return raw;
+  return Object.keys(cfg.regions).find((k) => cfg.regions[k] === cfg.base);
+}
+
+function _aiRegistryEntry(providerId) {
+  const provider = String(providerId);
+  if (Object.hasOwn(_AI_BESPOKE_PROVIDERS, provider)) return _AI_BESPOKE_PROVIDERS[provider];
+  return Object.hasOwn(OPENAI_COMPAT_PROVIDERS, provider) ? OPENAI_COMPAT_PROVIDERS[provider] : null;
+}
+
+// Why a regional provider's region/workspace settings cannot form a request
+// host: "" (fine, or the provider has no region field), "region_unknown",
+// "workspace_required" or "workspace_invalid". Pure; shared by the resolver,
+// the host-permission gate's message and the Settings warning. The workspace
+// ID is checked as stored (not trimmed, not lowered).
+function pbpAiEndpointProblem(s, providerId = (s && s.aiProvider) || "gemini") {
+  return _aiRegionalProblem(_aiRegistryEntry(providerId), s || {});
+}
+function _aiRegionalProblem(cfg, st) {
+  if (!cfg || !cfg.regionField) return "";
+  const region = _aiRegionOf(cfg, st);
+  if (typeof region !== "string" || !Object.hasOwn(cfg.regions, region)) return "region_unknown";
+  let ws = cfg.workspaceField ? st[cfg.workspaceField] : "";
+  if (ws === undefined || ws === null) ws = "";
+  if (typeof ws !== "string" || (ws !== "" && !pbpAiWorkspaceIdOk(ws))) return "workspace_invalid";
+  if (ws === "" && cfg.regions[region] === "") return "workspace_required";
+  if (ws !== "" && !(cfg.workspaceRegions && Object.hasOwn(cfg.workspaceRegions, region))) return "region_unknown";
+  return "";
+}
+
+// The endpoint a regional provider's valid settings select, or "" when they
+// select none (pbpAiEndpointProblem is non-empty, or the dedicated host does
+// not come out exactly as the template's host with the ID and region code).
+function _aiRegionalEndpoint(cfg, s) {
+  if (_aiRegionalProblem(cfg, s)) return "";
+  const region = _aiRegionOf(cfg, s);
+  const ws = (cfg.workspaceField && s[cfg.workspaceField]) || "";
+  if (!ws) return cfg.regions[region];
+  const code = cfg.workspaceRegions[region];
+  const fill = (text) => text.replace("{ws}", () => ws).replace("{region}", () => code);
+  const templateHost = (/^https:\/\/([^/?#]+)/.exec(cfg.workspaceTemplate) || [])[1];
+  const endpoint = fill(cfg.workspaceTemplate);
+  try {
+    if (!templateHost || new URL(endpoint).hostname !== fill(templateHost)) return "";
+  } catch (_) { return ""; }
+  return endpoint;
 }
 
 // Pure: never throws, never writes a global, never touches `s`. Returns a new
@@ -394,13 +465,17 @@ function pbpAiResolveTarget(s, providerId = (s && s.aiProvider) || "gemini") {
   }
   const kind = provider === "custom" ? "custom" : "builtin";
   const protocol = bespoke ? bespoke.protocol : "openai";
-  const endpoint = _openaiCompatBase(cfg, st);
+  // A regional provider's region/workspace settings pick the host; a broken
+  // pair resolves to no endpoint at all (never the default region's base).
+  const endpoint = cfg.regionField ? _aiRegionalEndpoint(cfg, st) : _openaiCompatBase(cfg, st);
   // gemini and claude are fixed hosts: their fingerprints never carried an
   // endpoint term, so theirs stays "".
   const fpEndpoint = (protocol === "gemini" || protocol === "anthropic") ? "" : norm(endpoint);
+  // Every region and workspace host is the provider's own service, so a
+  // regional provider stays official; only a user base URL can leave it.
   let official = true;
   if (kind === "custom") official = false;
-  else if (cfg.baseField) {
+  else if (cfg.baseField && !cfg.regionField) {
     const own = norm(st[cfg.baseField]);
     official = !own || own === norm(cfg.base);
   }
@@ -409,7 +484,7 @@ function pbpAiResolveTarget(s, providerId = (s && s.aiProvider) || "gemini") {
     apiKey: cfg.keyField ? (st[cfg.keyField] || "") : "",
     model: st[cfg.modelField] || cfg.defaultModel,
     label, cfg,
-    error: pbpEndpointOriginPattern(endpoint) ? null : "endpoint_invalid",
+    error: endpoint && pbpEndpointOriginPattern(endpoint) ? null : "endpoint_invalid",
   };
 }
 
@@ -611,8 +686,39 @@ function hasAIKey(s) {
 function _aiTargetOriginPattern(s) {
   const target = pbpAiResolveTarget(s);
   if (target.error === "provider_missing") return null;
-  if (target.error === "endpoint_invalid") throw _aiTargetErrorFor(target);
+  if (target.error === "endpoint_invalid") throw _aiTargetErrorFor(target, s);
   return pbpEndpointOriginPattern(target.endpoint);
+}
+
+// Localized text, or the English fallback where no catalogue is reachable
+// (file:// test pages, a worker before i18n loads).
+function _aiMessage(key, fallback, ...args) {
+  try {
+    const translated = t(key, ...args);
+    if (translated && translated !== key) return translated;
+  } catch (_) {}
+  return fallback;
+}
+
+// The message for a regional provider whose settings form no host, by
+// problem code; "" when the settings are not the reason.
+function _aiRegionalProblemMessage(target, s) {
+  const cfg = target && target.cfg;
+  if (!cfg || !cfg.regionField || !s) return "";
+  const problem = _aiRegionalProblem(cfg, s);
+  if (problem === "workspace_required") {
+    const region = String(_aiRegionOf(cfg, s));
+    const key = target.provider + "Region" + region.charAt(0).toUpperCase() + region.slice(1);
+    const name = _aiMessage(key, region);
+    return _aiMessage("aiWorkspaceRequired", "Enter a workspace ID: " + name + " has no shared address.", name);
+  }
+  if (problem === "workspace_invalid") {
+    return _aiMessage("aiWorkspaceInvalid", "A workspace ID can contain only lowercase letters, digits and hyphens, and cannot start or end with a hyphen.");
+  }
+  if (problem === "region_unknown") {
+    return _aiMessage("aiRegionUnknown", "This region isn't supported by this version. Choose a region again in Settings.");
+  }
+  return "";
 }
 
 function _aiEndpointInvalidMessage() {
@@ -625,9 +731,12 @@ function _aiEndpointInvalidMessage() {
 }
 
 // The Error a failed resolution throws, before any request: carries the
-// resolver's code. Shared by the permission gate and the dispatchers.
-function _aiTargetErrorFor(target) {
+// resolver's code. Shared by the permission gate and the dispatchers. With
+// the settings, a regional provider's endpoint_invalid also carries
+// err.reason (the non-secret pbpAiEndpointProblem code) and its own message.
+function _aiTargetErrorFor(target, s) {
   let message;
+  let reason = "";
   if (target.error === "provider_missing") {
     message = "The selected AI provider is no longer configured. Choose one in Settings.";
     try {
@@ -635,10 +744,13 @@ function _aiTargetErrorFor(target) {
       if (translated && translated !== "aiErrorProviderMissing") message = translated;
     } catch (_) {}
   } else {
-    message = _aiEndpointInvalidMessage();
+    message = _aiRegionalProblemMessage(target, s);
+    if (message) reason = _aiRegionalProblem(target.cfg, s);
+    else message = _aiEndpointInvalidMessage();
   }
   const err = new Error(message);
   err.code = target.error;
+  if (reason) err.reason = reason;
   return err;
 }
 
@@ -749,7 +861,7 @@ function _aiCompatCfg(s, p, opts = {}, target = pbpAiResolveTarget(s, p)) {
 async function callAI(s, prompt, opts = {}) {
   await _ensureAIHostPermission(s);
   const target = pbpAiResolveTarget(s);
-  if (target.error) throw _aiTargetErrorFor(target);
+  if (target.error) throw _aiTargetErrorFor(target, s);
   const p = target.provider;
   if (target.protocol === "gemini") return callGemini(s, prompt, opts);
   if (target.protocol === "anthropic") return callAnthropicMessages(target, prompt, opts);
@@ -1691,17 +1803,19 @@ async function _streamGemini(s, prompt, opts, onDelta) {
   return full;
 }
 
-// Anthropic deprecated temperature/top_p/top_k for Claude Opus 4.7 and later
-// models: a non-default value now returns a 400 (recommended replacement is
-// to omit the field and steer behavior via prompting instead). The
-// non-streaming callAnthropicMessages above never sent temperature, so this body now
-// matches that already-safe shape. opts.temperature is intentionally
-// ignored on this branch — callers that pass it (md-translate.js's 0.1) are
-// still honored on every other provider. No parameter-level self-heal is
-// built for this one, unlike thinkingOff: omitting it has no measurable
-// downside (tags/summary already run on default sampling via callAnthropicMessages;
-// pbpAiCache keys only on prompt/model, not sampling params), so there is
-// nothing worth memoizing per (provider, model).
+// Protocol-wide rule for every Anthropic-format endpoint (built-in Claude and
+// any user endpoint that speaks the Messages API): neither caller sends
+// temperature or response_format, streaming or not. opts.temperature and the
+// JSON-mode options are intentionally ignored on this protocol; callers that
+// pass them (md-translate.js's 0.1, the dictionary's schema) are still honored
+// on every other protocol. Rationale for temperature: Anthropic deprecated
+// temperature/top_p/top_k for Claude Opus 4.7 and later models, where a
+// non-default value returns a 400 (the recommended replacement is to omit the
+// field and steer behavior through the prompt). No parameter-level self-heal
+// is built for it, unlike thinkingOff: omitting it has no measurable downside
+// (pbpAiCache keys only on prompt/model, not sampling params), so there is
+// nothing worth memoizing per (provider, model). Structure stays a prompt plus
+// strict parsing, never another protocol's response_format field.
 async function _streamAnthropicMessages(target, prompt, opts, onDelta) {
   const body = {
     model: opts.model || target.model,
@@ -1836,7 +1950,7 @@ async function callAIStream(s, prompt, opts = {}, onDelta) {
 async function _aiStreamDispatch(s, prompt, opts, cb, control) {
   await _ensureAIHostPermission(s);
   const target = pbpAiResolveTarget(s);
-  if (target.error) throw _aiTargetErrorFor(target);
+  if (target.error) throw _aiTargetErrorFor(target, s);
   const p = target.provider;
   if (target.protocol === "gemini") {
     // Streaming keeps thinking ON by default — 3c03380 scoped the shared
@@ -2170,7 +2284,7 @@ const PBP_AI_STATUS_PAGES = {
   claude: { url: "https://status.claude.com/", name: "Claude" },
   gemini: { url: "https://aistudio.google.com/status", name: "Gemini" },
   deepseek: { url: "https://status.deepseek.com/", name: "DeepSeek" },
-  qwen: { url: "https://status.aliyun.com/", name: "Qwen" },
+  qwen: { url: "https://status.aliyun.com/", name: "Alibaba Cloud" },
   minimax: { url: "https://status.minimaxi.com/", name: "MiniMax" },
   openrouter: { url: "https://status.openrouter.ai/", name: "OpenRouter" },
   groq: { url: "https://groqstatus.com/", name: "Groq" },

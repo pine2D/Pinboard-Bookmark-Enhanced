@@ -313,6 +313,15 @@ function pbpEndpointOriginPattern(raw) {
   }
 }
 
+// A provider workspace ID becomes the first DNS label of the request host
+// (Model Studio's {WorkspaceId}.{region}.maas.aliyuncs.com), so it may only be
+// one lowercase LDH label: no dot, slash, "@", percent escape, whitespace or
+// upper case can steer the request to another host. Not trimmed or lowered
+// here; callers pass the stored value as is and fail closed on a mismatch.
+function pbpAiWorkspaceIdOk(ws) {
+  return typeof ws === "string" && /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(ws);
+}
+
 function pbpIsAllowedPinboardApiUrl(raw) {
   try {
     const u = new URL(String(raw == null ? "" : raw));
@@ -531,7 +540,7 @@ const SETTINGS_DEFAULTS = {
   openaiApiKey: "", openaiModel: "gpt-5.4-nano", openaiBaseUrl: "https://api.openai.com/v1",
   claudeApiKey: "", claudeModel: "claude-haiku-4-5",
   deepseekApiKey: "", deepseekModel: "deepseek-v4-flash",
-  qwenApiKey: "", qwenModel: "qwen-flash",
+  qwenApiKey: "", qwenModel: "qwen-flash", qwenRegion: "beijing", qwenWorkspaceId: "",
   minimaxApiKey: "", minimaxModel: "MiniMax-M2",
   openrouterApiKey: "", openrouterModel: "openai/gpt-oss-20b",
   groqApiKey: "", groqModel: "openai/gpt-oss-20b",
@@ -2690,6 +2699,10 @@ const PBP_AI_OVERRIDE_FIELDS = Object.freeze([
   "minimaxModel", "openrouterModel", "groqModel", "mistralModel", "cohereModel",
   "siliconflowModel", "zhipuModel", "kimiModel", "ollamaModel", "customModel",
   "openaiBaseUrl", "ollamaBaseUrl", "customBaseUrl",
+  // Region and workspace pick the request host. They ride the bus like the
+  // base URLs above; the worker's resolver validates them again (unknown
+  // region or malformed workspace ID fails closed before any request).
+  "qwenRegion", "qwenWorkspaceId",
   "customTagPrompt", "customSummaryPrompt",
 ]);
 

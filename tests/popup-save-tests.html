@@ -2413,12 +2413,13 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // B42/B48: progress and error text name the provider by display name, and
     // the custom endpoint's name follows the UI language.
     test("AI progress and error text use provider display names", () => {
-      const zh = { provCustomShort: "自定义", aiStage_calling: "调用 {provider}…" };
+      const zh = { provCustomShort: "自定义", provQwenShort: "百炼", aiStage_calling: "调用 {provider}…" };
       const tZh = (key) => zh[key] || key;
       const { pbpAiProviderLabel: labelZh } = new Function("t", providerLabelSource +
         "; return { pbpAiProviderLabel };")(tZh);
       assert(labelZh("custom") === "自定义", "custom provider name is not localized: " + labelZh("custom"));
       assert(labelZh("zhipu") === "Zhipu", "brand name lost: " + labelZh("zhipu"));
+      assert(labelZh("qwen") === "百炼", "Model Studio short name is not localized: " + labelZh("qwen"));
       const progressSrc = popupAiSource.slice(popupAiSource.indexOf("function setAiProgress("),
         popupAiSource.indexOf("function clearAiProgress("));
       const label = { textContent: "", setAttribute() {} };

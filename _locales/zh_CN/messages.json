@@ -1818,7 +1818,10 @@
     "message": "DeepSeek（深度求索）"
   },
   "provQwen": {
-    "message": "通义千问"
+    "message": "阿里云百炼"
+  },
+  "provQwenShort": {
+    "message": "百炼"
   },
   "provMinimax": {
     "message": "MiniMax"
@@ -1861,6 +1864,32 @@
   },
   "provCustomShort": {
     "message": "自定义"
+  },
+  "qwenRegionBeijing": {
+    "message": "中国（北京）"
+  },
+  "qwenRegionSingapore": {
+    "message": "新加坡"
+  },
+  "qwenRegionVirginia": {
+    "message": "美国（弗吉尼亚）"
+  },
+  "qwenRegionTokyo": {
+    "message": "日本（东京）"
+  },
+  "aiWorkspaceRequired": {
+    "message": "请填写业务空间 ID：$REGION$没有公共地址。",
+    "placeholders": {
+      "region": {
+        "content": "$1"
+      }
+    }
+  },
+  "aiWorkspaceInvalid": {
+    "message": "业务空间 ID 只能包含小写字母、数字和连字符，且不能以连字符开头或结尾。"
+  },
+  "aiRegionUnknown": {
+    "message": "此版本不支持该地域，请在设置中重新选择。"
   },
   "jinaMarkdownBtn": {
     "message": "阅读器"

@@ -1882,6 +1882,16 @@ async function pbpDictNegHas(owner, parts) {
 // "dictionary", folded into one free "view AI entry" line. opts.onView(expanded)
 // reports that state; expanded means a rendered entry is on screen.
 let _pbpDictEntryMountSeq = 0;
+
+// Whether a changed settings key can change what the lookup's AI entry would
+// send or where: the dictionary preferences, the provider choice and every
+// field that forms a provider target (key, model, base URL, region, workspace,
+// format; numbered custom-entry key slots), plus the custom-entry list and
+// the first entry's display name.
+const _PBP_DICT_SETTINGS_KEYS = new Set(["dictDefaultView", "dictAiAutoGenerate", "dictLearnerNativeLanguage", "dictLearnerLevel", "dictDefinitionLang", "previewAiEnabled", "aiProvider", "previewAiModelByProvider", "optSyncEnabled", "syncApiKeys", "aiCustomProviders", "customDisplayName"]);
+function _pbpDictSettingsKeyRelevant(key) {
+  return _PBP_DICT_SETTINGS_KEYS.has(key) || /(?:Model|ApiKey\d*|BaseUrl|Region|WorkspaceId|Protocol)$/.test(key);
+}
 function _pbpDictEntryMount(host, opts) {
   if (typeof pbpDictEntryRead !== "function" || typeof pbpDictEntryRun !== "function") return null;
   const panel = document.createElement("div"); panel.className = "xp-dict-ai";
@@ -2906,9 +2916,7 @@ function _pbpDictEntryMount(host, opts) {
     let settingsSequence = 0, lastRelevant = 0;
     const listener = async (changes, area) => {
       const keys = Object.keys(changes);
-      if (!alive() || !["sync", "local"].includes(area) || !keys.some(key =>
-        ["dictDefaultView", "dictAiAutoGenerate", "dictLearnerNativeLanguage", "dictLearnerLevel", "dictDefinitionLang", "previewAiEnabled", "aiProvider", "previewAiModelByProvider", "optSyncEnabled", "syncApiKeys"].includes(key) ||
-        /(?:Model|ApiKey|BaseUrl)$/.test(key))) return;
+      if (!alive() || !["sync", "local"].includes(area) || !keys.some(_pbpDictSettingsKeyRelevant)) return;
       const sequence = ++settingsSequence;
       if (!changes.optSyncEnabled && typeof pbpReadSecretSyncState === "function") {
         const flags = await pbpReadSecretSyncState({ persistInferredState: false });

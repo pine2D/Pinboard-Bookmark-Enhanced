@@ -15,12 +15,14 @@ paths:
 |---|---|
 | zhipu / moonshot(kimi) | `{"thinking":{"type":"disabled"}}` |
 | minimax | 先传 `{"thinking":{"type":"disabled"}}`；服务端拒绝后才尝试 `{"reasoning_effort":"low"}`，避免强制思考模型退回默认的最高强度。是否回退由服务端响应与能力记忆决定，不按模型名写名单 |
-| siliconflow / qwen | `{"enable_thinking":false}` |
+| siliconflow / qwen（阿里云百炼，四个地域及业务空间专属地址同一方言，核实结论与链接见注） | `{"enable_thinking":false}` |
 | openai / mistral / cohere | `{"reasoning_effort":"none"}`（flat，非 Responses 的 nested；cohere compat 端点仅 none/high） |
 | openrouter | `{"reasoning":{"enabled":false}}`（勿用 exclude，仍计费） |
 | gemini | bespoke：`thinkingConfig.thinkingBudget:0` |
 | deepseek | thinkingOff（deepseek-reasoner 会拒收，靠 4xx 回退兜住） |
 | groq / custom / ollama | 默认不加 thinkingOff；兼容协议的任务级低思考偏好见后文，Ollama 不发送该字段 |
+
+百炼地域与业务空间（2026-10-28 按阿里云官方文档核实）：[Base URL 总览](https://help.aliyun.com/zh/model-studio/base-url) 的「DashScope 域名」表把 OpenAI 兼容地址列为北京 `https://dashscope.aliyuncs.com/compatible-mode/v1`、新加坡 `https://dashscope-intl.aliyuncs.com/compatible-mode/v1`、美国（弗吉尼亚）`https://dashscope-us.aliyuncs.com/compatible-mode/v1`，日本（东京）不在该表；[地域与接入域名](https://help.aliyun.com/zh/model-studio/regions) 表中东京的 DashScope 域名为「不支持」，四地的业务空间专属域名均为 `{WorkspaceId}.{地域 ID}.maas.aliyuncs.com`（cn-beijing / ap-southeast-1 / us-east-1 / ap-northeast-1）。因此注册表 `regions.tokyo` 为 `""`（必须填业务空间 ID），弗吉尼亚用 dashscope-us。业务空间 ID 官方示例为 `llm-7c72iiw36kd8****`（[业务空间管理](https://docs.modelstudio.console.alibabacloud.com/zh/model-studio/use-workspace)），小写字母数字加连字符，满足 `pbpAiWorkspaceIdOk` 的 DNS 标签规则，不放宽。[深度思考](https://help.aliyun.com/zh/model-studio/deep-thinking/) 页按模型说明 `enable_thinking`（混合思考模型可关、仅思考模型无法关闭），未按地域区分，故保留 provider 级 `thinkingOff`，由 `_aiWithDialectFallback` 按精确 endpoint 隔离 400 自愈，不写地域分支。地域与 ID 的解析规则见 `ai.js` 注册表表头与 `pbpAiEndpointProblem`：表外或空地域、东京缺 ID、ID 非法一律 `endpoint_invalid`，不回落北京。
 
 MiniMax 的说明于 2026-10-25 按[官方 OpenAI 兼容接口文档](https://platform.minimax.cn/docs/api-reference/text-openai-api)复核：M3 支持关闭思考，M3.1-Flash 强制开启，默认思考强度为 `max`。这些型号用于说明能力差异，运行时仍只依据服务端拒绝决定方言。若 `low` 也被 400/422 拒绝，再剥离该字段；明确点名 `reasoning_effort` 不支持时立即记入现有按 provider/model 隔离的 `pbpAiParamFix`，泛 4xx 不触发参数剥离或重试。参数名修复仍优先，思考、强度及参数修复合计最多四次实际请求，每次重过 `beforeRequest`；401/402/429/5xx、取消、空正文或输出截断不得触发额外请求。已解析的 HTTP 2xx 配合固定的空正文/截断错误码可证明方言被接受，普通无状态异常不可以。
 

@@ -1824,7 +1824,11 @@
     "message": "DeepSeek"
   },
   "provQwen": {
-    "message": "Qwen"
+    "message": "Alibaba Cloud Model Studio"
+  },
+  "provQwenShort": {
+    "message": "Model Studio",
+    "description": "Short name of Alibaba Cloud Model Studio, used inside popup AI status and error text."
   },
   "provMinimax": {
     "message": "MiniMax"
@@ -1868,6 +1872,32 @@
   "provCustomShort": {
     "message": "Custom",
     "description": "Short name of the custom OpenAI-compatible provider, used inside popup AI status and error text."
+  },
+  "qwenRegionBeijing": {
+    "message": "China (Beijing)"
+  },
+  "qwenRegionSingapore": {
+    "message": "Singapore"
+  },
+  "qwenRegionVirginia": {
+    "message": "US (Virginia)"
+  },
+  "qwenRegionTokyo": {
+    "message": "Japan (Tokyo)"
+  },
+  "aiWorkspaceRequired": {
+    "message": "Enter a workspace ID: $REGION$ has no shared address.",
+    "placeholders": {
+      "region": {
+        "content": "$1"
+      }
+    }
+  },
+  "aiWorkspaceInvalid": {
+    "message": "A workspace ID can contain only lowercase letters, digits and hyphens, and cannot start or end with a hyphen."
+  },
+  "aiRegionUnknown": {
+    "message": "This region isn't supported by this version. Choose a region again in Settings."
   },
   "jinaMarkdownBtn": {
     "message": "Reader"

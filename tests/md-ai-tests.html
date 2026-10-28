@@ -9420,6 +9420,13 @@ suite("pbpAiResolveTarget", () => {
     const s = { aiProvider: "gemini" };
     assert(pbpAiResolveTarget(s) !== pbpAiResolveTarget(s), "the same target object was returned twice");
   });
+  test("reader cache key separates Model Studio regions and keeps the default key", () => {
+    assertEq(pbpAiCacheModelKey({ aiProvider: "qwen" }), "qwen:qwen-flash", "default key");
+    assertEq(pbpAiCacheModelKey({ aiProvider: "qwen", qwenRegion: "beijing", qwenWorkspaceId: "" }), "qwen:qwen-flash", "explicit Beijing");
+    assertEq(pbpAiCacheModelKey({ aiProvider: "qwen", qwenRegion: "singapore" }),
+      "qwen:qwen-flash:e" + pbpAiHash("https://dashscope-intl.aliyuncs.com/compatible-mode/v1"), "Singapore key");
+    assert(pbpAiCacheModelKey({ aiProvider: "qwen", qwenWorkspaceId: "ws-7f3k9q" }) !== "qwen:qwen-flash", "workspace key");
+  });
 });
 </script>
 <script>

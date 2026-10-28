@@ -3134,6 +3134,24 @@ async function runDictionaryEntrySettingsTests() {
     check("local API-key changes refresh a sync-settings lookup while foreign-area changes remain ignored",reads===1&&applied.length===1&&applied[0].openaiApiKey==="rotated-fixture");
     secret.ctrl.abort();
 
+    // Every field the provider registry declares as part of a target (key,
+    // model, base, region, workspace, format) and the custom-entry fields must
+    // rebuild the lookup, derived from the evaluated registry, not typed here.
+    {
+      const aiSrc=await (await fetch("../ai.js")).text();
+      const regStart=aiSrc.indexOf("const OPENAI_COMPAT_PROVIDERS = {"),regEnd=aiSrc.indexOf("\n};",regStart);
+      const registry=new Function(aiSrc.slice(regStart,regEnd+3)+"\nreturn OPENAI_COMPAT_PROVIDERS;")();
+      const fields=new Set(["aiCustomProviders","customDisplayName","customApiKey2","customApiKey8"]);
+      for(const cfg of Object.values(registry))for(const f of ["keyField","modelField","baseField","regionField","workspaceField","protocolField"])if(cfg[f])fields.add(cfg[f]);
+      const allRelevant=[...fields].every(key=>_pbpDictSettingsKeyRelevant(key));
+      reads=0;applied=[];
+      window.pbpReadSettingsWithSecrets=async()=>{reads++;return {qwenRegion:"singapore"};};
+      const regional=await mount(next=>applied.push(next));
+      await regional.listener({qwenRegion:{newValue:"singapore"}},"sync");
+      regional.ctrl.abort();
+      check("every registry-declared target field rebuilds the lookup",fields.has("qwenRegion")&&fields.has("qwenWorkspaceId")&&allRelevant&&reads===1);
+    }
+
     const pending=[];applied=[];
     window.pbpReadSettingsWithSecrets=()=>new Promise(resolve=>pending.push(resolve));
     const concurrent=await mount(next=>{applied.push(next.dictDefinitionLang);concurrent.ctrl.abort();});

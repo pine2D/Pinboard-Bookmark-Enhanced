@@ -40,6 +40,9 @@ const PBP_BACKUP_ENUMS = Object.freeze({
   selectionTrigger: ["icon", "hotkey", "off"],
   dictDefaultView: ["dictionary", "ai-saved", "ai-generate"],
   dictLearnerLevel: ["", "beginner", "intermediate", "advanced"],
+  // Must equal the keys of ai.js's OPENAI_COMPAT_PROVIDERS.qwen.regions
+  // (settings-persist-tests evaluates the registry and compares).
+  qwenRegion: ["beijing", "singapore", "virginia", "tokyo"],
 });
 
 // Per-provider preview model overrides: keys must look like provider ids and
@@ -152,6 +155,10 @@ function pbpSanitizeBackupSettings(data, exportableKeys) {
       throw pbpBackupValueError(key);
     }
     if (PBP_BACKUP_ENUMS[key] && !PBP_BACKUP_ENUMS[key].includes(value)) throw pbpBackupValueError(key);
+    // Settings saves what the user typed and the resolver fails it closed, so
+    // a malformed workspace ID can sit in the user's own export. Drop only
+    // that key: rejecting it would make the file fail its own preflight.
+    if (key === "qwenWorkspaceId" && value !== "" && !pbpAiWorkspaceIdOk(value)) continue;
     if (key === "dictLearnerNativeLanguage" && (value.length > 80 || /[\p{Cc}\p{Cf}]/u.test(value))) throw pbpBackupValueError(key);
     if (key === "popupWidth" && (value < 420 || value > 720)) throw pbpBackupValueError(key);
     if (key === "aiCacheDuration" && (value < 0 || value > 10080)) throw pbpBackupValueError(key);

@@ -68,8 +68,32 @@
       "disclosedAs": "DeepSeek"
     },
     "dashscope.aliyuncs.com": {
-      "purpose": "AI provider: Qwen (BYO key, user-selected)",
-      "disclosedAs": "Qwen"
+      "purpose": "AI provider: Alibaba Cloud Model Studio, China (Beijing) region shared address (BYO key, user-selected, default region)",
+      "disclosedAs": "Alibaba Cloud Model Studio"
+    },
+    "dashscope-intl.aliyuncs.com": {
+      "purpose": "AI provider: Alibaba Cloud Model Studio, Singapore region shared address (BYO key, user-selected region)",
+      "disclosedAs": "Alibaba Cloud Model Studio"
+    },
+    "dashscope-us.aliyuncs.com": {
+      "purpose": "AI provider: Alibaba Cloud Model Studio, US (Virginia) region shared address (BYO key, user-selected region)",
+      "disclosedAs": "Alibaba Cloud Model Studio"
+    },
+    "example.cn-beijing.maas.aliyuncs.com": {
+      "purpose": "AI provider: Alibaba Cloud Model Studio, representative of the {ws}.cn-beijing.maas.aliyuncs.com workspace-dedicated family (user-entered workspace ID)",
+      "disclosedAs": "Alibaba Cloud Model Studio"
+    },
+    "example.ap-southeast-1.maas.aliyuncs.com": {
+      "purpose": "AI provider: Alibaba Cloud Model Studio, representative of the {ws}.ap-southeast-1.maas.aliyuncs.com workspace-dedicated family (user-entered workspace ID)",
+      "disclosedAs": "Alibaba Cloud Model Studio"
+    },
+    "example.us-east-1.maas.aliyuncs.com": {
+      "purpose": "AI provider: Alibaba Cloud Model Studio, representative of the {ws}.us-east-1.maas.aliyuncs.com workspace-dedicated family (user-entered workspace ID)",
+      "disclosedAs": "Alibaba Cloud Model Studio"
+    },
+    "example.ap-northeast-1.maas.aliyuncs.com": {
+      "purpose": "AI provider: Alibaba Cloud Model Studio, representative of the {ws}.ap-northeast-1.maas.aliyuncs.com workspace-dedicated family (user-entered workspace ID; Tokyo has no shared address)",
+      "disclosedAs": "Alibaba Cloud Model Studio"
     },
     "api.minimaxi.com": {
       "purpose": "AI provider: MiniMax (BYO key, user-selected)",
@@ -104,7 +128,7 @@
       "disclosedAs": "Moonshot"
     }
   },
-  "userConfiguredExits": "Language-derived Wikisource/Wiktionary subdomains require the current exact origin (no wildcard grant). Karakeep/linkding server APIs, custom OpenAI-compatible endpoint, non-loopback Ollama, webhook export target and batch-save tab origins are user-supplied at runtime; the endpoint validator enforces HTTPS (loopback-literal HTTP only) and runtime grants are exact origins — see CLAUDE.md 跨领域安全铁律 and privacy.md.",
+  "userConfiguredExits": "Language-derived Wikisource/Wiktionary subdomains require the current exact origin (no wildcard grant). Karakeep/linkding server APIs, custom OpenAI-compatible endpoint, non-loopback Ollama, webhook export target and batch-save tab origins are user-supplied at runtime; the Alibaba Cloud Model Studio workspace ID is user-entered, must be one DNS label, and only ever forms a host inside the disclosed {ws}.<region code>.maas.aliyuncs.com families (one representative exit per region; scripts/network-exits-check.mjs step 1c derives them from the registry), granted as that exact origin; the endpoint validator enforces HTTPS (loopback-literal HTTP only) and runtime grants are exact origins — see CLAUDE.md 跨领域安全铁律 and privacy.md.",
   "nonExitHosts": {
     "github.com": "discussion sample URL and source permalinks; DOM-only extraction, no background fetch",
     "math.stackexchange.com": "site-rule sample URL only; no background fetch",

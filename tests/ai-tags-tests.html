@@ -510,7 +510,21 @@ const AI_ORIGIN_CASES = [
   [{ aiProvider: "kimi" }, "https://api.moonshot.cn/*"],
   [{ aiProvider: "ollama" }, "http://localhost:11434/*"],
   [{ aiProvider: "custom", customBaseUrl: "https://proxy.example/v1" }, "https://proxy.example/*"],
+  [{ aiProvider: "qwen", qwenRegion: "singapore" }, "https://dashscope-intl.aliyuncs.com/*"],
+  [{ aiProvider: "qwen", qwenWorkspaceId: "ws-7f3k9q" }, "https://ws-7f3k9q.cn-beijing.maas.aliyuncs.com/*"],
 ];
+
+// Alibaba Cloud Model Studio regions and workspaces (spec §6.4). Hosts are the
+// ones the official Base URL overview lists; the workspace fixture is a DNS
+// label shaped like the console's IDs.
+const QWEN_LEGACY = "https://dashscope.aliyuncs.com/compatible-mode/v1";
+const QWEN_WS_CODES = { beijing: "cn-beijing", singapore: "ap-southeast-1", virginia: "us-east-1", tokyo: "ap-northeast-1" };
+const qwenS = (extra) => ({ ...SETTINGS_DEFAULTS, aiProvider: "qwen", qwenApiKey: "sk-test", ...extra });
+const BAD_WS = ["evil.com/x", "a.b", "x@evil.com", "Upper", "-lead", "trail-", "a b", "a_b", "%2e", "ws\n", "a".repeat(64), 5];
+function qwenOriginError(s) {
+  try { _aiTargetOriginPattern(s); } catch (e) { return e; }
+  return null;
+}
 
 suite("endpoint origin policy", () => {
   test("normalizes HTTPS to an exact origin pattern", () => {
@@ -549,6 +563,69 @@ suite("endpoint origin policy", () => {
     let caught = null;
     try { _aiRequiredOriginPatterns({ aiProvider: "gemini" }, ["*://*/*"]); } catch (e) { caught = e; }
     assert(caught && caught.code === "endpoint_invalid", "invalid additional pattern rejected");
+  });
+});
+
+suite("Model Studio regions and workspaces", () => {
+  test("Model Studio default resolves byte-identical to the legacy base", () => {
+    for (const s of [{ aiProvider: "qwen", qwenApiKey: "k" }, qwenS({}), qwenS({ qwenRegion: "beijing", qwenWorkspaceId: "" })]) {
+      const target = pbpAiResolveTarget(s);
+      assertEq(target.error, null, "no error");
+      assertEq(target.endpoint, QWEN_LEGACY, "endpoint");
+      assertEq(target.fpEndpoint, QWEN_LEGACY, "fpEndpoint");
+      assertEq(target.official, true, "official");
+      assertEq(_aiTargetOriginPattern(s), "https://dashscope.aliyuncs.com/*", "origin");
+      assertEq(aiCacheFingerprint(s, "tags"), "qwen:qwen-flash:exjgppg|len|s-|c45h", "tags fingerprint");
+      assertEq(aiCacheFingerprint(s, "summary"), "qwen:qwen-flash:exjgppg|lauto|c45h", "summary fingerprint");
+    }
+    assertEq(OPENAI_COMPAT_PROVIDERS.qwen.regions.beijing, OPENAI_COMPAT_PROVIDERS.qwen.base, "Beijing is the built-in base");
+    assertEq(SETTINGS_DEFAULTS.qwenRegion, "beijing", "default region");
+    assertEq(SETTINGS_DEFAULTS.qwenWorkspaceId, "", "default workspace");
+  });
+  test("each region without a workspace uses its shared address or fails closed", () => {
+    const sg = qwenS({ qwenRegion: "singapore" });
+    assertEq(pbpAiResolveTarget(sg).endpoint, "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "Singapore endpoint");
+    assertEq(_aiTargetOriginPattern(sg), "https://dashscope-intl.aliyuncs.com/*", "Singapore origin");
+    const tokyo = qwenS({ qwenRegion: "tokyo" });
+    const tt = pbpAiResolveTarget(tokyo);
+    assertEq(tt.error, "endpoint_invalid", "Tokyo without a workspace");
+    assert(!tt.endpoint.includes("dashscope.aliyuncs.com"), "Tokyo fell back to Beijing: " + tt.endpoint);
+    const err = qwenOriginError(tokyo);
+    assert(err && err.code === "endpoint_invalid" && err.reason === "workspace_required", "Tokyo origin error: " + (err && err.reason));
+    // Virginia has an official shared address (Base URL overview, DashScope domain table).
+    const va = qwenS({ qwenRegion: "virginia" });
+    assertEq(pbpAiResolveTarget(va).endpoint, "https://dashscope-us.aliyuncs.com/compatible-mode/v1", "Virginia endpoint");
+    assertEq(_aiTargetOriginPattern(va), "https://dashscope-us.aliyuncs.com/*", "Virginia origin");
+  });
+  test("a workspace ID selects the region's dedicated address", () => {
+    for (const [region, code] of Object.entries(QWEN_WS_CODES)) {
+      const s = qwenS({ qwenRegion: region, qwenWorkspaceId: "ws-7f3k9q" });
+      const target = pbpAiResolveTarget(s);
+      assertEq(target.endpoint, `https://ws-7f3k9q.${code}.maas.aliyuncs.com/compatible-mode/v1`, region + " endpoint");
+      assertEq(_aiTargetOriginPattern(s), `https://ws-7f3k9q.${code}.maas.aliyuncs.com/*`, region + " origin");
+      assertEq(target.official, true, region + " official");
+      assertEq(pbpAiStatusPageUrl(s, { status: 503 }), "https://status.aliyun.com/", region + " status page");
+    }
+  });
+  test("workspace ID validator accepts DNS labels only", () => {
+    for (const ok of ["a", "0a", "ws-7f3k9q", "a".repeat(63)]) assertEq(pbpAiWorkspaceIdOk(ok), true, JSON.stringify(ok));
+    for (const bad of ["", null, ...BAD_WS]) assertEq(pbpAiWorkspaceIdOk(bad), false, JSON.stringify(bad));
+  });
+  test("an unknown or empty region fails closed instead of using Beijing", () => {
+    for (const region of ["", "hongkong", "BEIJING", 5]) {
+      const s = qwenS({ qwenRegion: region });
+      assertEq(pbpAiResolveTarget(s).error, "endpoint_invalid", JSON.stringify(region));
+      assertEq(pbpAiEndpointProblem(s, "qwen"), "region_unknown", JSON.stringify(region) + " problem");
+    }
+  });
+  test("region and workspace move the popup fingerprint", () => {
+    const sets = [qwenS({}), qwenS({ qwenRegion: "singapore" }), qwenS({ qwenWorkspaceId: "ws-7f3k9q" })];
+    for (const type of ["tags", "summary"]) {
+      const fps = sets.map((s) => aiCacheFingerprint(s, type));
+      assertEq(new Set(fps).size, fps.length, type + " fingerprints distinct");
+      assert(aiCacheFingerprint(qwenS({ qwenWorkspaceId: "ws-7f3k9q" }), type) !==
+        aiCacheFingerprint(qwenS({ qwenRegion: "singapore", qwenWorkspaceId: "ws-7f3k9q" }), type), type + ": same ID in two regions");
+    }
   });
 });
 </script>
@@ -860,6 +937,36 @@ suite("endpoint origin policy", () => {
       // Derived, not hardcoded: one check per origin case plus the stream call,
       // so adding a provider does not fail this on an unrelated count.
       assertEq(checks, AI_ORIGIN_CASES.length + 1, "one contains check per call");
+      assertEq(fetches, 0, "zero fetches");
+    });
+
+    await atest("an injected workspace ID is rejected for every region and sends nothing", async () => {
+      let fetches = 0;
+      window.fetch = async () => { fetches++; throw new Error("must not fetch"); };
+      const envs = [
+        () => { window.chrome = undefined; },
+        () => { window.chrome = { runtime: { id: "test-extension" }, permissions: { contains: async () => true } }; },
+      ];
+      let cases = 0;
+      for (const env of envs) {
+        env();
+        for (const region of Object.keys(QWEN_WS_CODES)) {
+          for (const ws of BAD_WS) {
+            const s = qwenS({ qwenRegion: region, qwenWorkspaceId: ws });
+            const label = region + " " + JSON.stringify(ws);
+            assertEq(pbpAiResolveTarget(s).error, "endpoint_invalid", label + " resolver");
+            const err = qwenOriginError(s);
+            assert(err && err.reason === "workspace_invalid", label + " origin reason: " + (err && err.reason));
+            let a = null, b = null;
+            try { await callAI(s, "x"); } catch (e) { a = e; }
+            try { await callAIStream(s, "x", {}, () => {}); } catch (e) { b = e; }
+            assert(a && a.code === "endpoint_invalid", label + " callAI: " + (a && a.code));
+            assert(b && b.code === "endpoint_invalid", label + " callAIStream: " + (b && b.code));
+            cases++;
+          }
+        }
+      }
+      assertEq(cases, 2 * 4 * BAD_WS.length, "every case ran");
       assertEq(fetches, 0, "zero fetches");
     });
 

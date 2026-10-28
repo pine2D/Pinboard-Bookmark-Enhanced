@@ -1818,7 +1818,10 @@
     "message": "DeepSeek"
   },
   "provQwen": {
-    "message": "Qwen"
+    "message": "Alibaba Cloud Model Studio"
+  },
+  "provQwenShort": {
+    "message": "Model Studio"
   },
   "provMinimax": {
     "message": "MiniMax"
@@ -1861,6 +1864,32 @@
   },
   "provCustomShort": {
     "message": "Personnalisé"
+  },
+  "qwenRegionBeijing": {
+    "message": "Chine (Pékin)"
+  },
+  "qwenRegionSingapore": {
+    "message": "Singapour"
+  },
+  "qwenRegionVirginia": {
+    "message": "États-Unis (Virginie)"
+  },
+  "qwenRegionTokyo": {
+    "message": "Japon (Tokyo)"
+  },
+  "aiWorkspaceRequired": {
+    "message": "Saisissez un ID d’espace de travail : $REGION$ n’a pas d’adresse partagée.",
+    "placeholders": {
+      "region": {
+        "content": "$1"
+      }
+    }
+  },
+  "aiWorkspaceInvalid": {
+    "message": "Un ID d’espace de travail ne peut contenir que des lettres minuscules, des chiffres et des traits d’union, et ne peut ni commencer ni se terminer par un trait d’union."
+  },
+  "aiRegionUnknown": {
+    "message": "Cette version ne prend pas en charge cette région. Choisissez de nouveau une région dans les paramètres."
   },
   "jinaMarkdownBtn": {
     "message": "Lecture"

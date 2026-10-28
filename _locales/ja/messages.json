@@ -1818,7 +1818,10 @@
     "message": "DeepSeek"
   },
   "provQwen": {
-    "message": "Qwen"
+    "message": "Alibaba Cloud Model Studio"
+  },
+  "provQwenShort": {
+    "message": "Model Studio"
   },
   "provMinimax": {
     "message": "MiniMax"
@@ -1861,6 +1864,32 @@
   },
   "provCustomShort": {
     "message": "カスタム"
+  },
+  "qwenRegionBeijing": {
+    "message": "中国（北京）"
+  },
+  "qwenRegionSingapore": {
+    "message": "シンガポール"
+  },
+  "qwenRegionVirginia": {
+    "message": "米国（バージニア）"
+  },
+  "qwenRegionTokyo": {
+    "message": "日本（東京）"
+  },
+  "aiWorkspaceRequired": {
+    "message": "ワークスペース ID を入力してください。$REGION$ には共通アドレスがありません。",
+    "placeholders": {
+      "region": {
+        "content": "$1"
+      }
+    }
+  },
+  "aiWorkspaceInvalid": {
+    "message": "ワークスペース ID に使えるのは英小文字、数字、ハイフンだけです。先頭と末尾にはハイフンを使えません。"
+  },
+  "aiRegionUnknown": {
+    "message": "このバージョンはこのリージョンに対応していません。設定でリージョンを選び直してください。"
   },
   "jinaMarkdownBtn": {
     "message": "リーダー"

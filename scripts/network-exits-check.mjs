@@ -8,11 +8,16 @@
 //  1b. Every language-derived Wikimedia evidence host (pbpDictEvidenceOrigin,
 //     evaluated, not text-scanned) shares its parent domain with a listed
 //     exit, and every exit of that family counts as mentioned (not stale).
+//  1c. Every workspace-dedicated AI host family (a registry workspaceTemplate
+//     filled with a probe ID for each region code) is represented the same
+//     way, by one exit per region family.
 //  2. Every oracle exit host appears in docs/privacy.md.
 //  3. Every manifest static host is a listed exit.
-//  4. Every host in the AI provider registry (ai.js) is a disclosed exit —
-//     the structural under-inclusion guard for the one place endpoint hosts
-//     actually live, complementing step 1's text-scan over-inclusion guard.
+//  4. Every host in the AI provider registry (ai.js) — each base, each
+//     regional shared base and each Anthropic-format base — is a disclosed
+//     exit: the structural under-inclusion guard for the one place endpoint
+//     hosts actually live, complementing step 1's text-scan over-inclusion
+//     guard.
 //  5. Every loopback http:// literal (AnkiConnect, Ollama) is on a hardcoded
 //     origin-granularity allowlist and disclosed in docs/privacy.md (K130).
 //     Deliberately independent of steps 1-3: the https regex and the oracle
@@ -69,6 +74,20 @@ for (const [origin, expected] of [
 ]) {
   const got = hostFromOrigin(origin);
   if (got !== expected) fail(`internal error: hostFromOrigin(${origin}) = ${got}, expected ${expected} — bracket-aware host extraction regressed`);
+}
+
+// The provider registry the runtime dispatches through, evaluated once (not
+// text-scanned) and shared by steps 1c and 4.
+let registry = null;
+let registryError = "";
+try {
+  const aiSrc = readFileSync(join(ROOT, "ai.js"), "utf8");
+  const regStart = aiSrc.indexOf("const OPENAI_COMPAT_PROVIDERS = {");
+  const regEnd = aiSrc.indexOf("\n};", regStart);
+  if (regStart < 0 || regEnd <= regStart) throw new Error("provider registry not found in ai.js");
+  registry = new Function(aiSrc.slice(regStart, regEnd + 3) + "\nreturn OPENAI_COMPAT_PROVIDERS;")();
+} catch (e) {
+  registryError = e.message;
 }
 
 // 1. Classify every literal https host in runtime scripts.
@@ -136,6 +155,30 @@ for (const host of derivedHosts) {
   for (const exit of represented) representedBy.add(exit);
 }
 
+// 1c. Workspace-dedicated AI hosts are built from a registry template
+// ("https://{ws}.{region}.maas.aliyuncs.com/..."), which the literal scan
+// cannot see either. Fill every template with a probe ID for each region
+// code the entry declares; each derived host needs an exit of its family
+// (same parent domain), and those exits count as mentioned.
+try {
+  if (!registry) throw new Error(registryError || "registry unavailable");
+  let derived = 0;
+  for (const [id, cfg] of Object.entries(registry)) {
+    if (!cfg.workspaceTemplate) continue;
+    for (const [region, code] of Object.entries(cfg.workspaceRegions || {})) {
+      const url = cfg.workspaceTemplate.replace("{ws}", "ws-probe").replace("{region}", code);
+      const host = new URL(url).hostname;
+      derived++;
+      const represented = representativesOf(host, exits);
+      if (!represented.length) fail(`${host}: workspace host derived for ${id} (${region}) but no exit in docs/network-exits.json shares its parent domain`);
+      for (const exit of represented) representedBy.add(exit);
+    }
+  }
+  if (!derived) throw new Error("no workspace host derived from the registry");
+} catch (e) {
+  fail(`workspace-host structural check failed to run: ${e.message}`);
+}
+
 // Reverse direction: a classified host that no script mentions any more is a
 // stale oracle row — prune it so the list stays honest.
 for (const host of [...exits, ...nonExits]) {
@@ -182,17 +225,14 @@ for (const entry of LOOPBACK_ALLOWLIST) {
 // demand classification); this layer is the under-inclusion guard for the
 // registry, the single structure where endpoint hosts actually live.
 try {
-  const aiSrc = readFileSync(join(ROOT, "ai.js"), "utf8");
-  const regStart = aiSrc.indexOf("const OPENAI_COMPAT_PROVIDERS = {");
-  const regEnd = aiSrc.indexOf("\n};", regStart);
-  if (regStart < 0 || regEnd <= regStart) throw new Error("provider registry not found in ai.js");
-  const registry = new Function(aiSrc.slice(regStart, regEnd + 3) + "\nreturn OPENAI_COMPAT_PROVIDERS;")();
+  if (!registry) throw new Error(registryError || "registry unavailable");
   const bespoke = [
     "https://generativelanguage.googleapis.com", // gemini
     "https://api.anthropic.com",                 // claude
   ];
   const registryHosts = [
-    ...Object.values(registry).map((cfg) => cfg.base).filter(Boolean),
+    ...Object.values(registry).flatMap((cfg) =>
+      [cfg.base, ...Object.values(cfg.regions || {}), cfg.anthropicBase]).filter(Boolean),
     ...bespoke,
   ].map((u) => new URL(u).hostname);
   for (const host of registryHosts) {

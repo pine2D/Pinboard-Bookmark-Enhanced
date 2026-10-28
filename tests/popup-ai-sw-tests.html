@@ -787,23 +787,63 @@ function buildRouterHarness(source, opts) {
     // whether or not anyone remembers this case exists.
     const registryFields = [];
     for (const cfg of Object.values(OPENAI_COMPAT_PROVIDERS)) {
-      if (cfg.modelField) registryFields.push(cfg.modelField);
-      if (cfg.baseField) registryFields.push(cfg.baseField);
+      for (const field of ["modelField", "baseField", "regionField", "workspaceField", "protocolField"]) {
+        if (cfg[field]) registryFields.push(cfg[field]);
+      }
     }
     const candidates = [...new Set(Object.keys(SETTINGS_DEFAULTS).concat(registryFields))]
       .filter((key) => !API_KEY_FIELDS.includes(key));
     const providers = ["gemini", "claude", "ollama", ...Object.keys(OPENAI_COMPAT_PROVIDERS)];
     if (candidates.length < 20 || providers.length < 6) return false;  // never vacuous
+    // A field with a closed value set must be probed with a VALID other value:
+    // an invalid one also moves the fingerprint (the target fails closed), which
+    // would pass this case for the wrong reason.
+    const probeValue = (key, provider) => {
+      const cfg = Object.hasOwn(OPENAI_COMPAT_PROVIDERS, provider) ? OPENAI_COMPAT_PROVIDERS[provider] : null;
+      if (cfg && key === cfg.regionField) {
+        const def = SETTINGS_DEFAULTS[key];
+        return Object.keys(cfg.regions).find((k) => k !== def && cfg.regions[k] !== "");
+      }
+      if (cfg && key === cfg.workspaceField) return "probe-ws";
+      if (cfg && key === cfg.protocolField) return SETTINGS_DEFAULTS[key] === "anthropic" ? "openai" : "anthropic";
+      return "zzz-different";
+    };
+    if (!Object.values(OPENAI_COMPAT_PROVIDERS).some((cfg) => cfg.regionField)) return false;
     const missing = new Set();
+    const movedQwen = new Set();
     for (const provider of providers) {
       const base = { ...SETTINGS_DEFAULTS, aiProvider: provider };
       for (const key of candidates) {
+        const value = probeValue(key, provider);
         const moved = ["tags", "summary"].some((type) =>
-          aiCacheFingerprint({ ...base, [key]: "zzz-different" }, type) !== aiCacheFingerprint(base, type));
+          aiCacheFingerprint({ ...base, [key]: value }, type) !== aiCacheFingerprint(base, type));
         if (moved && !listed.includes(key)) missing.add(key);
+        if (moved && provider === "qwen") movedQwen.add(key);
       }
     }
-    return missing.size === 0;
+    return missing.size === 0 && movedQwen.has("qwenRegion") && movedQwen.has("qwenWorkspaceId");
+  });
+
+  await testCase("Model Studio region and workspace overrides reach the worker's real request", async () => {
+    const kept = pbpSanitizeAiOverrides({ qwenRegion: "singapore", qwenWorkspaceId: "ws-7f3k9q", qwenApiKey: "sk-POISON" });
+    if (kept.qwenRegion !== "singapore" || kept.qwenWorkspaceId !== "ws-7f3k9q" || "qwenApiKey" in kept) return false;
+    const requests = [];
+    const realFetch = window.fetch;
+    window.fetch = async (url, init) => {
+      requests.push({ url: String(url), init });
+      return jsonResponse(200, openaiChatReply('{"summary":"S","tags":["t"]}'));
+    };
+    try {
+      const h = buildAiHarness(source, {
+        settings: { aiProvider: "qwen", qwenApiKey: "sk-worker-REAL", qwenRegion: "beijing", aiTagSeparator: "-" },
+        callAI: (s, prompt, opts) => callAI(s, prompt, opts),
+      });
+      await h.pbpRunPopupAiCall(baseMessage({ aiOverrides: { aiProvider: "qwen", qwenRegion: "singapore" } }));
+      const auth = JSON.stringify(requests[0] && requests[0].init.headers);
+      return requests.length === 1 &&
+        requests[0].url.startsWith("https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions") &&
+        auth.includes("sk-worker-REAL");
+    } finally { window.fetch = realFetch; }
   });
 
   await testCase("a custom prompt template override reaches the fingerprint, so the worker writes the POPUP's key", async () => {
