@@ -24,7 +24,7 @@ paths:
 
 MiniMax 的说明于 2026-10-25 按[官方 OpenAI 兼容接口文档](https://platform.minimax.cn/docs/api-reference/text-openai-api)复核：M3 支持关闭思考，M3.1-Flash 强制开启，默认思考强度为 `max`。这些型号用于说明能力差异，运行时仍只依据服务端拒绝决定方言。若 `low` 也被 400/422 拒绝，再剥离该字段；明确点名 `reasoning_effort` 不支持时立即记入现有按 provider/model 隔离的 `pbpAiParamFix`，泛 4xx 不触发参数剥离或重试。参数名修复仍优先，思考、强度及参数修复合计最多四次实际请求，每次重过 `beforeRequest`；401/402/429/5xx、取消、空正文或输出截断不得触发额外请求。已解析的 HTTP 2xx 配合固定的空正文/截断错误码可证明方言被接受，普通无状态异常不可以。
 
-同一个包装器还管请求体参数方言（K133）：输出上限字段名是 per-provider 列 `tokenField`（openai = `max_completion_tokens`，其余留空即 `max_tokens`），`temperature` 则**不声明**——它在单一 provider 内逐模型变化（gpt-5 家族只接受默认值 1），只在服务端 400 点名后剥掉。两种修复都从服务端自己的 `error.param` / 报文里读（`handleAIError` 挂 `err.paramHint`），按版本、provider、精确 endpoint 与 model 隔离并保留 7 天，记在 `storage.local` 的 `pbpAiParamFix`，**绝不做按 model id 的静态 allowlist**。Anthropic 的 `callClaude` / `_streamClaude` 用的 `max_tokens` 是 Messages API 必填字段，语义不同，永远不参与改名。
+同一个包装器还管请求体参数方言（K133）：输出上限字段名是 per-provider 列 `tokenField`（openai = `max_completion_tokens`，其余留空即 `max_tokens`），`temperature` 则**不声明**——它在单一 provider 内逐模型变化（gpt-5 家族只接受默认值 1），只在服务端 400 点名后剥掉。两种修复都从服务端自己的 `error.param` / 报文里读（`handleAIError` 挂 `err.paramHint`），按版本、provider、精确 endpoint 与 model 隔离并保留 7 天，记在 `storage.local` 的 `pbpAiParamFix`，**绝不做按 model id 的静态 allowlist**。Anthropic 的 `callAnthropicMessages` / `_streamAnthropicMessages` 用的 `max_tokens` 是 Messages API 必填字段，语义不同，永远不参与改名。这两个函数由内置 Claude 与 Anthropic 格式端点共用：base 含版本段，拼接 `/messages`，只发 `x-api-key`，不发 Bearer；`callAI` / `callAIStream` 按解析出的 `target.protocol` 派发，`target.error` 非空时在任何请求之前抛错。
 
 改动后用 options 页联通性测试（options-connectivity.js）逐家验证；出现 400 先读服务端指向的参数；不得把任意 400 推断为思考字段不兼容。
 
