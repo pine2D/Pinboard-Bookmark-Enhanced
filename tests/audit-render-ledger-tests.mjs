@@ -270,6 +270,53 @@ test('sticky bars: the save bar on the scroller bottom and the back bar from its
   assert.equal(verdicts(withSticky(good), 'dict-save-bar', 'md-preview').dictSaveBarFlush360, undefined);
 });
 
+test('save bar focus: a focused control clear of the stuck bar; one under it fails', () => {
+  const blocks = [{ role: 'sense', left: 24 }];
+  const foot = (focus) => ({ stuck: true, bottom: 900, scrollerBottom: 900, strip: [], focus });
+  const at = (f360, f1280 = { controls: 15, covered: [] }) => ({ ...probe(blocks), sticky: [{ width: 360, foot: foot(f360), back: null }, { width: 1280, foot: foot(f1280), back: null }] });
+  for (const context of ['dict-entry-result', 'dict-entry-usage-result', 'dict-save-bar', 'dict-entry-paid-negative']) {
+    const out = verdicts(at({ controls: 16, covered: [] }), context, 'library');
+    assert.equal(out.dictSaveBarFocus360, 'OK', context);
+    assert.equal(out.dictSaveBarFocus1280, 'OK', context);
+  }
+  // The 3b.2 review: "Generate" focused wholly under the bar at 1280.
+  const under = verdicts(at({ controls: 16, covered: [] }, { controls: 15, covered: ['button.xp-dict-supplement-generate [692, 720] under the bar [672, 720]'] }), 'dict-save-bar', 'library');
+  assert.equal(under.dictSaveBarFocus360, 'OK');
+  assert.equal(under.dictSaveBarFocus1280, 'FAIL');
+  // An unstuck bar, no probe, or no control to focus is SETUP, not a pass.
+  assert.equal(verdicts({ ...probe(blocks), sticky: [{ width: 360, foot: { stuck: false }, back: null }] }, 'dict-save-bar', 'library').dictSaveBarFocus360, 'SETUP');
+  assert.equal(verdicts(at(undefined), 'dict-save-bar', 'library').dictSaveBarFocus360, 'SETUP');
+  assert.equal(verdicts(at({ controls: 0, covered: [] }), 'dict-save-bar', 'library').dictSaveBarFocus360, 'SETUP');
+  assert.equal(verdicts(at({ controls: 16, covered: [] }), 'dict-save-bar', 'md-preview').dictSaveBarFocus360, undefined);
+});
+
+test('save text: the save button keeps its label beside the icon-only re-lookup; two icon squares fail', () => {
+  const blocks = [{ role: 'sense', left: 24 }];
+  const foot = { stuck: true, bottom: 900, scrollerBottom: 900, strip: [] };
+  const save = (over = {}) => ({ labelVisible: true, label: 'Save to vocabulary', width: 180, relookupWidth: 26, iconOnly: ['button.btn.vocab-ref-relookup'], ...over });
+  const at = (s360, s1280 = save()) => ({ ...probe(blocks), sticky: [{ width: 360, foot, back: null, save: s360 }, { width: 1280, foot, back: null, save: s1280 }] });
+  for (const context of ['dict-entry-result', 'dict-entry-usage-result', 'dict-save-bar', 'dict-entry-paid-negative']) {
+    const out = verdicts(at(save()), context, 'library');
+    assert.equal(out.dictSaveText360, 'OK', context);
+    assert.equal(out.dictSaveText1280, 'OK', context);
+  }
+  // e023a00b's (d): <=440px hid the label and cut the button to a square.
+  const square = save({ labelVisible: false, width: 26, iconOnly: ['button.btn.vocab-lookup-save', 'button.btn.vocab-ref-relookup'] });
+  const old = verdicts(at(square), 'dict-save-bar', 'library');
+  assert.equal(old.dictSaveText360, 'FAIL');
+  assert.equal(old.dictSaveText1280, 'OK');
+  // Each condition alone fails: a hidden label, an empty one, a button no
+  // wider than the re-lookup, a second icon-only button in the bar.
+  for (const over of [{ labelVisible: false }, { label: '' }, { width: 26 }, { iconOnly: ['a', 'b'] }]) {
+    assert.equal(verdicts(at(save(over)), 'dict-save-bar', 'library').dictSaveText360, 'FAIL', JSON.stringify(over));
+  }
+  // No save button measured at a width the axis selects is SETUP.
+  assert.equal(verdicts(at(null), 'dict-save-bar', 'library').dictSaveText360, 'SETUP');
+  assert.equal(verdicts({ ...probe(blocks), sticky: [] }, 'dict-save-bar', 'library').dictSaveText1280, 'SETUP');
+  // The reader has no library save bar.
+  assert.equal(verdicts(at(save()), 'dict-save-bar', 'md-preview').dictSaveText360, undefined);
+});
+
 test('the library states with the save bar and paid buttons run at a phone and a desktop width', () => {
   for (const name of ['dict-save-bar', 'dict-entry-result', 'dict-entry-paid-negative', 'dict-entry-usage-result']) {
     const item = RENDER_SWEEP_CONTEXTS.library.find((c) => c.name === name);

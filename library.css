@@ -1569,6 +1569,9 @@ html.motion-ready .notes-excerpt-jump { transition: background-color var(--motio
   padding: var(--lib-sp-2) var(--lib-page-pad) var(--lib-sp-9) var(--lib-sp-4);
   margin-block-start: calc(-1 * var(--lib-sp-2));
   margin-inline-start: calc(-1 * var(--lib-sp-4));
+  /* Focus scrolls a control clear of the sticky save bar (.vocab-ref-foot)
+     and sp-2 above it; library-vocab.js writes the bar's live height. */
+  scroll-padding-bottom: calc(var(--vocab-ref-foot-h, 0px) + var(--lib-sp-2));
   /* UI scale by default; every reading element in the sheet states its own size (spec §6.1). */
   font-size: var(--lib-text-body);
   line-height: var(--lib-lh-body);

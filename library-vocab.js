@@ -1638,6 +1638,25 @@ function _pbpVocabFocusLookupLang() {
   if (ref) ref.scrollIntoView({ block: "nearest" });
 }
 
+// Keyboard focus clear of the sticky save bar (WCAG 2.4.11): the detail
+// pane's scroll-padding-bottom is the bar's live height, which grows when the
+// save button takes a second row or a save status shows. One observer for
+// whichever foot is current; a replaced foot reports 0 and is dropped.
+const _vocabRefFootObserver = typeof ResizeObserver === "function"
+  ? new ResizeObserver((entries) => {
+    for (const entry of entries) if (!entry.target.isConnected) _vocabRefFootObserver.unobserve(entry.target);
+    _pbpVocabSyncFootClearance();
+  })
+  : null;
+function _pbpVocabSyncFootClearance() {
+  const pane = $id("vocab-detail-pane");
+  if (!pane) return;
+  const foot = document.querySelector("#vocab-ref-result > .vocab-ref-foot");
+  const height = foot ? foot.offsetHeight : 0;
+  if (height) pane.style.setProperty("--vocab-ref-foot-h", height + "px");
+  else pane.style.removeProperty("--vocab-ref-foot-h");
+}
+
 // The slot pair md-dict writes into, plus the column's own foot. Slot
 // invariant (rules/dict.md): two stable children, and nothing here ever
 // replaceChildren()s the slot itself -- only #vocab-ref-result is replaced.
@@ -1676,6 +1695,7 @@ function _pbpVocabRefSlot() {
   });
   foot.appendChild(again);
   if (host) host.replaceChildren(wrap, foot);
+  if (host && _vocabRefFootObserver) _vocabRefFootObserver.observe(foot);
   return { localEl, onlineEl };
 }
 

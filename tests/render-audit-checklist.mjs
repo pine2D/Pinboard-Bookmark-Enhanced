@@ -754,6 +754,22 @@ export function evaluateMediaProbe(probe, check) {
 // bottom:0 stops at the pane's padding edge) and 12-error-b (8px of text
 // above the back bar, the pane's top padding).
 //
+// dictSaveText<W> (requires "sticky", library only, the same widths): the
+// save bar's save button keeps its label -- rendered, with a non-empty box --
+// so the button is wider than the icon-only re-lookup beside it and the bar
+// holds at most one icon-only button. e023a00b's (d): at <=440px the bar
+// used to cut the save button to a bare bookmarkPlus square next to the
+// re-lookup square, two identical icon squares that read as the same action.
+//
+// dictSaveBarFocus<W> (requires "sticky", library only, the same widths):
+// with the save bar stuck, keyboard focus on any control of the lookup above
+// it lands clear of the bar (overlap <= edgeTolerancePx; WCAG 2.4.11). The
+// probe focuses each one from the top of the scroller, which scrolls it into
+// view as Tab does. The 3b.2 review's focus probe: with no bottom scroll
+// padding, focus scrolled "Update this entry" and "Generate" to the visible
+// bottom, half and wholly under the bar (1280), and two controls under the
+// taller two-row bar at 360.
+//
 // dictPaidModel<W> (requires "paid", at every width the probe visits): each
 // paid button is one inline flow -- its icon, its label and the model note
 // -- so the note "· gpt-5.4-nano" stays on one line, and when the button
@@ -765,7 +781,11 @@ export const DICT_LOOKUP_GEOMETRY = {
   edgeTolerancePx: 1,
   maxLeftEdges: 2,
   viewports: [320, 360],
-  sticky: { viewports: [360, 1280], scroller: "#vocab-detail-pane", foot: "#vocab-ref-result .vocab-ref-foot", back: ".vocab-detail-back" },
+  sticky: {
+    viewports: [360, 1280], scroller: "#vocab-detail-pane", foot: "#vocab-ref-result .vocab-ref-foot", back: ".vocab-detail-back",
+    save: ".vocab-lookup-save", saveLabel: ":scope > span:last-child", relookup: ".vocab-ref-relookup",
+    focusables: "button, a[href], summary, select, input, textarea, [tabindex]:not([tabindex='-1'])",
+  },
   paid: { note: "button > .xp-dict-model" },
   blocks: [
     { role: "sense", selector: "ol.xp-dict-senses > li" },
@@ -1004,6 +1024,24 @@ export function evaluateDictLookupGeometry(probe, opts) {
         row(flush, Math.abs(gap) <= tol && !strip.length,
           `bar bottom ${round(foot.bottom)}, scroller visible bottom ${round(foot.scrollerBottom)}${strip.length ? `; under the bar: ${strip.slice(0, 3).join(", ")}` : ""}`,
           `bar bottom = scroller visible bottom (±${tol}px), nothing of the scrolling content under it`);
+      }
+      const focus = `dictSaveBarFocus${width}`;
+      if (!foot || !foot.stuck || !foot.focus || !foot.focus.controls) setup(focus, `focusable controls above the stuck save bar of ${spec.sticky.scroller} at ${width}px`);
+      else {
+        const covered = foot.focus.covered || [];
+        row(focus, !covered.length,
+          covered.length ? `${covered.length}/${foot.focus.controls} focused control(s) under the bar, e.g. ${covered.slice(0, 2).join("; ")}` : `${foot.focus.controls} control(s) focused, none under the bar`,
+          `a focused control clear of the stuck save bar (overlap <= ${tol}px)`);
+      }
+      const text = `dictSaveText${width}`;
+      const save = view?.save;
+      if (!save) setup(text, `a visible save button in ${spec.sticky.foot} at ${width}px`);
+      else {
+        const iconOnly = save.iconOnly || [];
+        const ok = save.labelVisible && !!save.label && save.width > save.relookupWidth && iconOnly.length <= 1;
+        row(text, ok,
+          `label ${save.labelVisible ? `"${save.label}"` : "not rendered"}, save ${round(save.width)}px vs re-lookup ${round(save.relookupWidth)}px; icon-only: ${iconOnly.length ? iconOnly.join(", ") : "none"}`,
+          "the save button shows its label, is wider than the re-lookup, and the bar has at most one icon-only button");
       }
       const back = view?.back;
       if (!back) continue; // two panes: there is no back bar at this width

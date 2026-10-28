@@ -9117,7 +9117,9 @@ function probeDictPaidModels(cfg) {
 // each sticky bar and the scroller's visible edge it should sit on. A hit on
 // anything inside the scroller but the bar itself, its ancestors or the
 // scroller (whose ::before is the back bar's band) is scrolling content
-// painted there.
+// painted there. dictSaveText: the save button's label as rendered at the
+// same width, and which buttons of the bar render no text at all.
+// dictSaveBarFocus: what of each focused control the stuck bar covers.
 async function probeDictStickyBars(cfg) {
   const frame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   const visible = (el) => !!el && el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) && el.getClientRects().length > 0;
@@ -9152,9 +9154,26 @@ async function probeDictStickyBars(cfg) {
   const saved = sc.scrollTop;
   const savedMax = sc.style.maxHeight;
   let shrunk = false;
-  const out = { foot: null, back: null };
+  const out = { foot: null, back: null, save: null };
   try {
     const foot = document.querySelector(cfg.foot);
+    // dictSaveText: the save button keeps its words at this width, so the
+    // bar never shows two icon-only squares (save beside the re-lookup).
+    const save = foot && foot.querySelector(cfg.save);
+    if (visible(foot) && visible(save)) {
+      const label = save.querySelector(cfg.saveLabel);
+      const lr = label && visible(label) ? label.getBoundingClientRect() : null;
+      const relookup = foot.querySelector(cfg.relookup);
+      const textOf = (button) => [...button.children].some((child) => !child.matches(".btn-ic") && visible(child) && child.textContent.trim() && child.getBoundingClientRect().width > 0);
+      const iconOnly = [...foot.querySelectorAll("button")].filter((b) => visible(b) && !textOf(b)).map(pathOf);
+      out.save = {
+        labelVisible: !!lr && lr.width > 0 && lr.height > 0,
+        label: label ? label.textContent.trim() : "",
+        width: save.getBoundingClientRect().width,
+        relookupWidth: relookup && visible(relookup) ? relookup.getBoundingClientRect().width : 0,
+        iconOnly,
+      };
+    }
     if (visible(foot)) {
       // Chrome settles sticky offsets in the frame, not on a forced layout:
       // every read of the bar's place in the flow (position: static for one
@@ -9187,6 +9206,28 @@ async function probeDictStickyBars(cfg) {
       const hits = strip(r.bottom, e.bottom, foot);
       const stuck = (await flowBottom()) > e.bottom + 1;
       out.foot = { stuck, bottom: r.bottom, scrollerBottom: e.bottom, strip: stuck ? hits : [] };
+      // dictSaveBarFocus: keyboard focus lands clear of the stuck bar. From
+      // the top, focus each control of the lookup in turn (focus() scrolls
+      // it into view the way Tab does) and read what of it the bar covers.
+      if (stuck) {
+        const prior = document.activeElement;
+        const back = document.querySelector(cfg.back);
+        const controls = [...sc.querySelectorAll(cfg.focusables)].filter((el) => visible(el) && !el.disabled && !foot.contains(el) && !(back && back.contains(el)));
+        const covered = [];
+        sc.scrollTop = 0;
+        await frame();
+        for (const el of controls) {
+          el.focus();
+          await frame();
+          if (document.activeElement !== el) continue;
+          const a = el.getBoundingClientRect(), f = foot.getBoundingClientRect();
+          const overlap = Math.min(a.bottom, f.bottom) - Math.max(a.top, f.top);
+          if (overlap > cfg.tol) covered.push(`${pathOf(el)} [${Math.round(a.top)}, ${Math.round(a.bottom)}] under the bar [${Math.round(f.top)}, ${Math.round(f.bottom)}]`);
+        }
+        if (prior && prior !== document.body && typeof prior.focus === "function") prior.focus({ preventScroll: true });
+        else if (document.activeElement && typeof document.activeElement.blur === "function") document.activeElement.blur();
+        out.foot.focus = { controls: controls.length, covered };
+      }
       if (shrunk) { sc.style.maxHeight = savedMax; await frame(); }
     }
     const back = document.querySelector(cfg.back);
@@ -9230,7 +9271,11 @@ async function measureDictLookupGeometry(page, surface, context, theme) {
   const stickyViewports = spec.contexts[context].requires.includes("sticky")
     ? audit.values(sweepScenarioId(surface, context), "viewport", DICT_LOOKUP_GEOMETRY.sticky.viewports.map(String)).map(Number)
     : [];
-  const widths = [...new Set([...DICT_LOOKUP_GEOMETRY.viewports, ...stickyViewports])].sort((a, b) => a - b);
+  // The reader's paid check also runs at the scenario's own width, where the
+  // lookup bubble has its default 480px (the 3b.2 review: 320/360 only
+  // narrowed the bubble, the width most readers see went unmeasured).
+  const ownWidth = surface === "md-preview" && restore ? [restore.width] : [];
+  const widths = [...new Set([...DICT_LOOKUP_GEOMETRY.viewports, ...stickyViewports, ...ownWidth])].sort((a, b) => a - b);
   // Below 860px library shows one pane; the lookup lives in the detail one.
   const wasNarrow = surface === "library"
     ? await page.evaluate(() => { const was = document.body.classList.contains("lib-narrow-detail"); document.body.classList.add("lib-narrow-detail"); return was; })
@@ -9243,8 +9288,9 @@ async function measureDictLookupGeometry(page, surface, context, theme) {
       if (DICT_LOOKUP_GEOMETRY.viewports.includes(width)) probe.viewports.push({ width, ...(await page.evaluate(probeDictLookupOverflow, overflowRoot)) });
       probe.paid.push({ width, buttons: await page.evaluate(probeDictPaidModels, { root, note: DICT_LOOKUP_GEOMETRY.paid.note }) });
       if (stickyViewports.includes(width)) {
-        const { scroller, foot, back } = DICT_LOOKUP_GEOMETRY.sticky;
-        probe.sticky.push({ width, ...(await page.evaluate(probeDictStickyBars, { scroller, foot, back })) });
+        const { scroller, foot, back, save, saveLabel, relookup, focusables } = DICT_LOOKUP_GEOMETRY.sticky;
+        const tol = DICT_LOOKUP_GEOMETRY.edgeTolerancePx;
+        probe.sticky.push({ width, ...(await page.evaluate(probeDictStickyBars, { scroller, foot, back, save, saveLabel, relookup, focusables, tol })) });
       }
     }
   } finally {
