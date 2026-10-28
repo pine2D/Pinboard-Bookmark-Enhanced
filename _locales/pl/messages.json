@@ -1282,6 +1282,9 @@
   "backupFieldCustomName": {
     "message": "Nazwa niestandardowego dostawcy"
   },
+  "backupFieldModelStudioWorkspace": {
+    "message": "Identyfikator obszaru roboczego Model Studio"
+  },
   "backupImportKeptCustomKeys": {
     "message": "Klucze niestandardowych dostawców z kopii ($N$) nie zostały zastosowane, bo istniejący klucz na tym urządzeniu nadal działa.",
     "placeholders": { "n": { "content": "$1" } }

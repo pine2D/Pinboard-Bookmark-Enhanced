@@ -1282,6 +1282,9 @@
   "backupFieldCustomName": {
     "message": "自訂服務商名稱"
   },
+  "backupFieldModelStudioWorkspace": {
+    "message": "百煉業務空間 ID"
+  },
   "backupImportKeptCustomKeys": {
     "message": "備份中有 $N$ 個自訂服務商金鑰未寫入：本機現有金鑰仍可正常使用。",
     "placeholders": { "n": { "content": "$1" } }

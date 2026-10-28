@@ -1282,6 +1282,9 @@
   "backupFieldCustomName": {
     "message": "Nom du fournisseur personnalisé"
   },
+  "backupFieldModelStudioWorkspace": {
+    "message": "ID d’espace de travail Model Studio"
+  },
   "backupImportKeptCustomKeys": {
     "message": "$N$ clé(s) de fournisseur personnalisé de la sauvegarde n’ont pas été appliquées : la clé existante de cet appareil fonctionne toujours.",
     "placeholders": { "n": { "content": "$1" } }

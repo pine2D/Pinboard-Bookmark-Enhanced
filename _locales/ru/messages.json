@@ -1282,6 +1282,9 @@
   "backupFieldCustomName": {
     "message": "Название пользовательского провайдера"
   },
+  "backupFieldModelStudioWorkspace": {
+    "message": "ID рабочего пространства Model Studio"
+  },
   "backupImportKeptCustomKeys": {
     "message": "Ключи пользовательских провайдеров из резервной копии ($N$) не применены: имеющийся на этом устройстве ключ по-прежнему работает.",
     "placeholders": { "n": { "content": "$1" } }

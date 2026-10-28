@@ -1282,6 +1282,9 @@
   "backupFieldCustomName": {
     "message": "自定义服务商名称"
   },
+  "backupFieldModelStudioWorkspace": {
+    "message": "百炼业务空间 ID"
+  },
   "backupImportKeptCustomKeys": {
     "message": "备份中有 $N$ 个自定义服务商密钥未写入：本机现有密钥仍可正常使用。",
     "placeholders": { "n": { "content": "$1" } }

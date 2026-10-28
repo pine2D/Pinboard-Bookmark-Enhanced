@@ -1282,6 +1282,9 @@
   "backupFieldCustomName": {
     "message": "Name des benutzerdefinierten Anbieters"
   },
+  "backupFieldModelStudioWorkspace": {
+    "message": "Workspace-ID für Model Studio"
+  },
   "backupImportKeptCustomKeys": {
     "message": "$N$ Schlüssel benutzerdefinierter Anbieter aus dem Backup wurden nicht übernommen, weil der vorhandene Schlüssel auf diesem Gerät noch funktioniert.",
     "placeholders": { "n": { "content": "$1" } }

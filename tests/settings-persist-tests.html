@@ -4368,7 +4368,9 @@ async function run() {
       renderSlice.includes('t("backupPreviewDroppedFields", preview.droppedKeys') &&
       renderSlice.includes("PBP_BACKUP_DROPPED_LABELS[key]") &&
       ["aiCustomProviders", "customDisplayName", "qwenWorkspaceId"].every((key) =>
-        typeof PBP_BACKUP_DROPPED_LABELS[key] === "string" && !!enLocale[PBP_BACKUP_DROPPED_LABELS[key]]) &&
+        typeof PBP_BACKUP_DROPPED_LABELS[key] === "string" && !!enLocale[PBP_BACKUP_DROPPED_LABELS[key]] &&
+        !/[()]/.test(enLocale[PBP_BACKUP_DROPPED_LABELS[key]].message)) &&
+      enLocale[PBP_BACKUP_DROPPED_LABELS.qwenWorkspaceId].message.includes("Model Studio") &&
       typeof enLocale.backupPreviewDroppedFields?.message === "string");
 
     const popupSource = await fetch("../popup-ai.js").then((response) => response.text());
@@ -4470,6 +4472,30 @@ async function run() {
         store.geminiApiKey === "gem-restored" && sameJson(store.aiCustomProviders, [ENTRY_OLD]) &&
         store.customApiKey2 === localSlot17 && !("customApiKey3" in store) &&
         pbpAiCustomKeyOpen(store, ENTRY_OLD) === "sk-local");
+      check("E7g combo: a dropped list counts only the local key it kept, never the orphan slot it threw away",
+        r17.secretsSkipped === 1);
+
+      reset();
+      const rO = await apply({
+        aiCustomProviders: [{ ...orphan, slot: 1 }],
+        customApiKey3: ENV(orphan.id, orphan.baseUrl, "sk-orphan", orphan.protocol),
+      }, { settings: true, themes: false, highlights: false, vocabulary: false, secrets: true });
+      check("E7g combo: a dropped list whose only key is an orphan slot reports no kept local key",
+        rO.secretsSkipped === 0 && rO.secrets !== "kept" && !("customApiKey3" in store) &&
+        pbpAiCustomKeyOpen(store, ENTRY_OLD) === "sk-local");
+
+      store = { optSyncEnabled: false, aiCustomProviders: [ENTRY_OLD], customApiKey2: "" };
+      const rA = await apply({ customApiKey2: ENV("custom-zzz999", "https://gw-z.example.com/v1", "sk-unbound") }, CRED_ONLY);
+      check("E7g combo: a local entry with an empty slot takes even a backup key that does not open for it",
+        rA.secrets === "applied" && rA.secretsSkipped === 0 &&
+        store.customApiKey2 === ENV("custom-zzz999", "https://gw-z.example.com/v1", "sk-unbound"));
+
+      store = { optSyncEnabled: false, aiCustomProviders: [ENTRY_OLD],
+        customApiKey2: ENV(ENTRY_OLD.id, "https://gw-old-moved.example.com/v1", "sk-stale") };
+      const rB = await apply({ customApiKey2: ENV("custom-zzz999", "https://gw-z.example.com/v1", "sk-unbound") }, CRED_ONLY);
+      check("E7g combo: when neither the local nor the backup envelope opens for the entry, the backup value is written",
+        rB.secrets === "applied" && rB.secretsSkipped === 0 &&
+        store.customApiKey2 === ENV("custom-zzz999", "https://gw-z.example.com/v1", "sk-unbound"));
 
       reset();
       const localSlotP = store.customApiKey2;

@@ -266,7 +266,7 @@ function pbpPreflightBackupPayload(data, exportableKeys) {
 const PBP_BACKUP_DROPPED_LABELS = Object.freeze({
   aiCustomProviders: "backupFieldCustomProviders",
   customDisplayName: "backupFieldCustomName",
-  qwenWorkspaceId: "labelQwenWorkspace",
+  qwenWorkspaceId: "backupFieldModelStudioWorkspace",
 });
 
 function pbpBackupImportResultKey(result) {
@@ -433,24 +433,30 @@ async function pbpBackupLibraryIdentity(prepared, selected, {
 // then "settings only" works). The exception is a list the settings section
 // just dropped as invalid (listDropped): its slots have no legitimate owner on
 // this device, so only slots that open for a local entry may land.
-// Deletes those fields from batch and returns their names. The first entry's
-// plain customApiKey has no envelope and is not this function's business.
+// Deletes those fields from batch and returns the names of the ones whose
+// local slot still opens for its local entry -- the keys this import KEPT. An
+// orphan slot of a dropped list is deleted too but is not a kept key, so it
+// is not returned. The first entry's plain customApiKey has no envelope and
+// is not this function's business.
 async function pbpBackupDropUnboundCustomKeys(batch, listDropped) {
   const fields = PBP_AI_CUSTOM_SLOTS.map((slot) => pbpAiCustomKeyField(slot))
     .filter((field) => Object.prototype.hasOwnProperty.call(batch, field));
   if (!fields.length) return [];
   const current = await pbpReadSettingsWithSecrets({ aiCustomProviders: [], ...Object.fromEntries(fields.map((field) => [field, ""])) });
   const entries = pbpSanitizeAiCustomProviders(current.aiCustomProviders) || [];
+  const kept = [];
   const skipped = fields.filter((field) => {
     const entry = entries.find((item) => pbpAiCustomKeyField(item.slot) === field);
     const backupOpens = !!entry && !!pbpAiCustomKeyOpen({ [field]: batch[field] }, entry);
-    if (listDropped) return !backupOpens;
-    if (!entry || backupOpens) return false;
-    return !!pbpAiCustomKeyOpen({ [field]: current[field] }, entry);
+    const localOpens = !!entry && !!pbpAiCustomKeyOpen({ [field]: current[field] }, entry);
+    const skip = listDropped ? !backupOpens : (!!entry && !backupOpens && localOpens);
+    if (skip && localOpens) kept.push(field);
+    return skip;
   });
   skipped.forEach((field) => { delete batch[field]; });
-  if (skipped.length) console.warn("[backup] kept working local credentials over unusable ones:", skipped.join(","));
-  return skipped;
+  if (kept.length) console.warn("[backup] kept working local credentials over unusable ones:", kept.join(","));
+  if (skipped.length > kept.length) console.warn("[backup] dropped custom key slots with no local entry:", skipped.filter((field) => !kept.includes(field)).join(","));
+  return kept;
 }
 
 // Applies the selected sections of one already-preflighted backup. Each

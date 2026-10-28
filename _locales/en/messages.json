@@ -1287,6 +1287,9 @@
   "backupFieldCustomName": {
     "message": "Custom provider name"
   },
+  "backupFieldModelStudioWorkspace": {
+    "message": "Model Studio workspace ID"
+  },
   "backupImportKeptCustomKeys": {
     "message": "$N$ custom provider key(s) in the backup were not applied because this device's existing key still works.",
     "placeholders": { "n": { "content": "$1" } }

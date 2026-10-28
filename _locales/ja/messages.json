@@ -1282,6 +1282,9 @@
   "backupFieldCustomName": {
     "message": "カスタムプロバイダー名"
   },
+  "backupFieldModelStudioWorkspace": {
+    "message": "Model Studio のワークスペース ID"
+  },
   "backupImportKeptCustomKeys": {
     "message": "バックアップ内のカスタムプロバイダーのキー $N$ 件は、この端末の既存キーがそのまま使えるため反映しませんでした。",
     "placeholders": { "n": { "content": "$1" } }
