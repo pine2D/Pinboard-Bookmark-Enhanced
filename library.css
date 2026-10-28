@@ -1628,7 +1628,8 @@ html.motion-ready .notes-excerpt-jump { transition: background-color var(--motio
 @media (max-width: 860px) {
   .vocab-workbench { grid-template-columns: minmax(0, 1fr); column-gap: 0; }
   .vocab-list-pane { margin-inline-end: var(--lib-page-pad); }
-  .vocab-detail-pane { scroll-padding-top: calc(var(--lib-control-h) - 4px + var(--lib-sp-2)); }
+  /* Keeps a focused control clear of the back bar's band (below). */
+  .vocab-detail-pane { scroll-padding-top: calc(var(--lib-control-h) - 4px + 2 * var(--lib-sp-2)); }
   /* Narrow mode is list OR detail, driven by a body class */
   body.lib-narrow-detail .vocab-list-pane { display: none; }
   body:not(.lib-narrow-detail) .vocab-detail-pane { display: none; }
@@ -1639,10 +1640,14 @@ html.motion-ready .notes-excerpt-jump { transition: background-color var(--motio
      layer below, across the pane's full width (its inline padding included)
      and sp-2 under the button -- the clearance scroll-padding-top already
      keeps for focus. Behind the button, so its hover fill still shows. */
+  /* The band sticks sp-2 higher than the button, on the scroller's visible
+     top: a sticky box stops at the pane's sp-2 top padding, which left a
+     strip of the scrolled word above the bar (batch-3 review, task 3b.2). So
+     it is sp-2 taller and still ends sp-2 under the button. */
   body.lib-narrow-detail .vocab-detail-pane::before {
     content: ""; grid-area: 1 / 1; align-self: start;
-    position: sticky; top: 0; z-index: calc(var(--lib-z-sticky) - 1);
-    block-size: calc(var(--lib-control-h) - 4px + var(--lib-sp-2));
+    position: sticky; top: calc(-1 * var(--lib-sp-2)); z-index: calc(var(--lib-z-sticky) - 1);
+    block-size: calc(var(--lib-control-h) - 4px + 2 * var(--lib-sp-2));
     margin-inline: calc(-1 * var(--lib-sp-4)) calc(-1 * var(--lib-page-pad));
     background: var(--lib-bg);
   }
@@ -2086,16 +2091,27 @@ html.motion-ready .vocab-note-save {
 .vocab-ref-head > .vocab-lookup-saved { margin-inline-start: auto; }
 /* The save bar (dict redesign 3.2) stays at the bottom of the detail scroller
    while the lookup above it is longer than the pane: the page's own ground,
-   no edge or shadow (flat canvas). margin + block inset = the sp-3 it had. */
-.vocab-ref-foot { position: sticky; bottom: 0; z-index: 1; display: flex; align-items: flex-start; gap: var(--lib-sp-2); margin-top: var(--lib-sp-1); padding-block: var(--lib-sp-2); background: var(--lib-bg); container-type: inline-size; container-name: dict-save; }
+   no edge or shadow (flat canvas). margin + block inset = the sp-3 it had.
+   A sticky box stops at the scroller's padding edge, and the pane keeps
+   sp-9 of bottom padding: with bottom:0 the bar stuck 96px above the visible
+   bottom and the lookup scrolled on under it (batch-3 review, task 3b.2).
+   The negative inset lands it on the visible edge; scrolled to the end, the
+   bar sits in the flow above that padding as before. */
+.vocab-ref-foot { position: sticky; bottom: calc(-1 * var(--lib-sp-9)); z-index: 1; display: flex; align-items: flex-start; gap: var(--lib-sp-2); margin-top: var(--lib-sp-1); padding-block: var(--lib-sp-2); background: var(--lib-bg); container-type: inline-size; container-name: dict-save; }
 .vocab-save-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; flex: 1 1 0; min-width: 0; align-items: center; gap: var(--lib-sp-2); }
 .vocab-save-controls > .listbox { min-width: 0; max-width: 100%; }
 .vocab-save-controls > .save-status { grid-column: 1 / -1; }
 .vocab-save-controls > .save-status:empty { display: none; }
 .vocab-ref-relookup { flex: none; width: var(--lib-control-h); padding: 0; }
+/* A narrow bar keeps Save's text: only the secondary re-lookup is an icon
+   (with two icon squares side by side the two read alike). The meaning
+   listbox keeps the row while it has 160px beside Save; below that Save
+   moves to the line under it, and a long label wraps inside the button. */
 @container dict-save (max-width: 440px) {
-  .vocab-lookup-save { width: var(--lib-control-h); padding-inline: 0; }
-  .vocab-lookup-save > span:last-child { display: none; }
+  .vocab-save-controls { display: flex; flex-wrap: wrap; }
+  .vocab-save-controls > .listbox { flex: 1 1 160px; }
+  .vocab-save-controls > .vocab-lookup-save { flex: 0 1 auto; max-width: 100%; height: auto; min-height: var(--lib-control-h); white-space: normal; text-align: start; }
+  .vocab-save-controls > .save-status { flex: 1 1 100%; }
 }
 .vocab-lemma-hint, .vocab-hidden-word { margin-top: var(--lib-sp-2); }
 .vocab-word-family { display: flex; flex-wrap: wrap; gap: var(--lib-sp-1); margin-top: var(--lib-sp-2); }
@@ -2333,6 +2349,23 @@ html.motion-ready .vocab-note-save {
    row above). */
 #vocab-ref-result :is(.xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement) { display: inline-flex; align-items: center; gap: var(--lib-sp-1); }
 #vocab-ref-result :is(.xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement) > svg { width: 14px; height: 14px; flex: none; }
+/* ...laid out as one inline flow, not as flex items (batch-3 review, task
+   3b.2): as flex items a label that wraps became a column with the model
+   note in a second column beside it, centred, and "gpt-5.4-nano" broke at its
+   hyphen. Here the label wraps like text and starts every line at the same
+   edge (the icon hangs in the start padding: 14 + sp-1 = 18px), and the note
+   is one unbreakable piece that moves to the next line whole. The block
+   inset centres one 18/16px line in the sm rung (26/22px between borders).
+   :not([hidden]) so a hidden action stays hidden. */
+#vocab-ref-result button.xp-dict-connect:is(.xp-dict-ai-generate, .xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement):not([hidden]) {
+  display: inline-block; text-align: start;
+  padding-block: calc((var(--lib-control-h) - 6px - var(--lib-lh-secondary)) / 2);
+  padding-inline-start: calc(var(--lib-control-pad-x-sm) + 18px); text-indent: -18px;
+}
+#vocab-ref-result button.xp-dict-connect:is(.xp-dict-ai-generate, .xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement) > svg { vertical-align: -2px; margin-inline-end: var(--lib-sp-1); }
+#vocab-ref-result button.xp-dict-connect:is(.xp-dict-ai-generate, .xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement) > span:not(.xp-dict-model) { margin-inline-end: var(--lib-sp-1); }
+#vocab-ref-result button.xp-dict-connect > .xp-dict-model { display: inline-block; text-indent: 0; white-space: nowrap; }
+#vocab-ref-result button.xp-dict-connect > .xp-dict-model:empty { display: none; }
 /* The free original-text examples action (1C.2): quote icon and text only. */
 #vocab-ref-result .xp-dict-examples-find { display: inline-flex; align-items: center; gap: var(--lib-sp-1); }
 #vocab-ref-result .xp-dict-examples-find > svg { width: 14px; height: 14px; flex: none; }

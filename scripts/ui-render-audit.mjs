@@ -9063,6 +9063,155 @@ function probeDictLookupOverflow(rootSel) {
   const box = root.getBoundingClientRect();
   return { rootVisible: true, viewport, rootLeft: box.left, rootRight: box.right, offenders };
 }
+// dictPaidModel: per visible paid button, how many lines its model note's
+// text takes and whether the note continues the label's flow (on the label's
+// last line, or on a later line starting no further right than the label).
+function probeDictPaidModels(cfg) {
+  const visible = (el) => !!el && el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) && el.getClientRects().length > 0;
+  const pathOf = (el) => {
+    const parts = [];
+    for (let n = el; n && n !== document.body && parts.length < 4; n = n.parentElement) {
+      const cls = typeof n.className === "string" ? n.className.trim().split(/\s+/).filter(Boolean).join(".") : "";
+      parts.unshift(n.id ? "#" + n.id : n.tagName.toLowerCase() + (cls ? "." + cls : ""));
+      if (n.id) break;
+    }
+    return parts.join(" > ");
+  };
+  // Text line boxes of an element, one per line (rects of one line merged).
+  const lines = (el) => {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const out = [];
+    for (const r of [...range.getClientRects()].filter((r) => r.width > 0.5 && r.height > 0.5).sort((a, b) => a.top - b.top || a.left - b.left)) {
+      const mid = (r.top + r.bottom) / 2;
+      const line = out.find((l) => mid > l.top && mid < l.bottom);
+      if (line) { line.left = Math.min(line.left, r.left); line.right = Math.max(line.right, r.right); }
+      else out.push({ top: r.top, bottom: r.bottom, left: r.left, right: r.right });
+    }
+    return out;
+  };
+  const root = document.querySelector(cfg.root);
+  if (!visible(root)) return [];
+  const buttons = [];
+  for (const note of root.querySelectorAll(cfg.note)) {
+    if (!visible(note) || !/\S/.test(note.textContent)) continue;
+    const button = note.parentElement;
+    const label = note.previousElementSibling;
+    const n = lines(note), l = label ? lines(label) : [];
+    if (!n.length) continue;
+    const r = (v) => Math.round(v * 10) / 10;
+    let flow = true, detail = `${n.length} line(s)`;
+    if (l.length) {
+      const last = l[l.length - 1], first = n[0];
+      const onLast = (first.top + first.bottom) / 2 > last.top && (first.top + first.bottom) / 2 < last.bottom;
+      const later = first.top >= last.bottom - 1 && first.left <= l[0].left + 1;
+      flow = onLast || later;
+      if (!flow) detail = `note starts at (${r(first.left)}, ${r(first.top)}) beside a ${l.length}-line label starting at ${r(l[0].left)} and ending on [${r(last.top)}, ${r(last.bottom)}]`;
+      else if (n.length !== 1) detail = `note "${note.textContent}" takes ${n.length} lines`;
+    }
+    buttons.push({ path: pathOf(button), lines: n.length, flow, detail });
+  }
+  return buttons;
+}
+// dictSaveBarFlush / dictBackBarTop (library): hit-test the strips between
+// each sticky bar and the scroller's visible edge it should sit on. A hit on
+// anything inside the scroller but the bar itself, its ancestors or the
+// scroller (whose ::before is the back bar's band) is scrolling content
+// painted there.
+async function probeDictStickyBars(cfg) {
+  const frame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  const visible = (el) => !!el && el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) && el.getClientRects().length > 0;
+  const pathOf = (el) => {
+    const parts = [];
+    for (let n = el; n && n !== document.body && parts.length < 3; n = n.parentElement) {
+      const cls = typeof n.className === "string" ? n.className.trim().split(/\s+/).filter(Boolean).join(".") : "";
+      parts.unshift(n.id ? "#" + n.id : n.tagName.toLowerCase() + (cls ? "." + cls : ""));
+      if (n.id) break;
+    }
+    return parts.join(" > ");
+  };
+  const sc = document.querySelector(cfg.scroller);
+  if (!visible(sc)) return { foot: null, back: null };
+  const edges = () => {
+    const b = sc.getBoundingClientRect();
+    const top = b.top + sc.clientTop, left = b.left + sc.clientLeft;
+    return { top, bottom: top + sc.clientHeight, left, right: left + sc.clientWidth };
+  };
+  const strip = (y0, y1, bar) => {
+    const e = edges();
+    const hits = new Set();
+    for (let y = Math.ceil(y0) + 0.5; y < y1; y += 2) {
+      for (let x = e.left + 1; x < e.right - 1; x += 6) {
+        const el = document.elementFromPoint(x, y);
+        if (!el || el === sc || !sc.contains(el) || el.contains(bar) || bar.contains(el)) continue;
+        hits.add(pathOf(el));
+      }
+    }
+    return [...hits];
+  };
+  const saved = sc.scrollTop;
+  const savedMax = sc.style.maxHeight;
+  let shrunk = false;
+  const out = { foot: null, back: null };
+  try {
+    const foot = document.querySelector(cfg.foot);
+    if (visible(foot)) {
+      // Chrome settles sticky offsets in the frame, not on a forced layout:
+      // every read of the bar's place in the flow (position: static for one
+      // read) is followed by a frame before the stuck bar is read.
+      const flowBottom = async () => {
+        const prev = foot.style.position;
+        foot.style.position = "static";
+        const bottom = foot.getBoundingClientRect().bottom;
+        foot.style.position = prev;
+        await frame();
+        return bottom;
+      };
+      // Put the bar's place in the flow 40px under the visible bottom, so it
+      // is stuck whatever the state before left on screen. A lookup shorter
+      // than that gets a shorter scroller (the bar belongs on the visible
+      // edge at any pane height).
+      sc.scrollTop = 0;
+      await frame();
+      let below = (await flowBottom()) - edges().bottom;
+      if (below < 40) {
+        shrunk = true;
+        sc.style.maxHeight = `${Math.max(160, sc.getBoundingClientRect().height + below - 40)}px`;
+        await frame();
+        below = (await flowBottom()) - edges().bottom;
+      }
+      sc.scrollTop = Math.max(0, below - 40);
+      await frame();
+      const e = edges();
+      const r = foot.getBoundingClientRect();
+      const hits = strip(r.bottom, e.bottom, foot);
+      const stuck = (await flowBottom()) > e.bottom + 1;
+      out.foot = { stuck, bottom: r.bottom, scrollerBottom: e.bottom, strip: stuck ? hits : [] };
+      if (shrunk) { sc.style.maxHeight = savedMax; await frame(); }
+    }
+    const back = document.querySelector(cfg.back);
+    if (visible(back)) {
+      // Scroll the content under the top strip at a few offsets, so a strip
+      // as thin as the pane's top padding cannot fall between two lines.
+      const hits = new Set();
+      let measured = false, top = Infinity, scrollerTop = 0;
+      for (const offset of [40, 90, 140, 190, 240]) {
+        if (sc.scrollHeight - sc.clientHeight < offset) break;
+        sc.scrollTop = offset;
+        await frame();
+        measured = true;
+        const e = edges(), r = back.getBoundingClientRect();
+        top = Math.min(top, r.top); scrollerTop = e.top;
+        for (const hit of strip(e.top, r.bottom, back)) hits.add(hit);
+      }
+      out.back = measured ? { measured, top, scrollerTop, strip: [...hits] } : { measured: false };
+    }
+  } finally {
+    sc.style.maxHeight = savedMax;
+    sc.scrollTop = saved;
+  }
+  return out;
+}
 async function measureDictLookupGeometry(page, surface, context, theme) {
   const spec = DICT_LOOKUP_GEOMETRY.surfaces[surface];
   if (!spec?.contexts[context]) return;
@@ -9072,17 +9221,31 @@ async function measureDictLookupGeometry(page, surface, context, theme) {
     noteRow: DICT_LOOKUP_GEOMETRY.notes.row, note: DICT_LOOKUP_GEOMETRY.notes.note, slots: DICT_LOOKUP_GEOMETRY.slots,
   });
   probe.viewports = [];
+  probe.paid = [];
+  probe.sticky = [];
   const restore = page.viewportSize();
+  // The library's sticky bars at the widths the scenario's viewport axis
+  // selects (DICT_STICKY_VIEWPORTS); the overflow and paid checks at the
+  // narrow widths, the paid one at those widths too.
+  const stickyViewports = spec.contexts[context].requires.includes("sticky")
+    ? audit.values(sweepScenarioId(surface, context), "viewport", DICT_LOOKUP_GEOMETRY.sticky.viewports.map(String)).map(Number)
+    : [];
+  const widths = [...new Set([...DICT_LOOKUP_GEOMETRY.viewports, ...stickyViewports])].sort((a, b) => a - b);
   // Below 860px library shows one pane; the lookup lives in the detail one.
   const wasNarrow = surface === "library"
     ? await page.evaluate(() => { const was = document.body.classList.contains("lib-narrow-detail"); document.body.classList.add("lib-narrow-detail"); return was; })
     : null;
   try {
-    for (const width of DICT_LOOKUP_GEOMETRY.viewports) {
+    for (const width of widths) {
       await page.setViewportSize({ width, height: restore ? restore.height : 900 });
       await page.waitForTimeout(250);
       await settleAnimations(page);
-      probe.viewports.push({ width, ...(await page.evaluate(probeDictLookupOverflow, overflowRoot)) });
+      if (DICT_LOOKUP_GEOMETRY.viewports.includes(width)) probe.viewports.push({ width, ...(await page.evaluate(probeDictLookupOverflow, overflowRoot)) });
+      probe.paid.push({ width, buttons: await page.evaluate(probeDictPaidModels, { root, note: DICT_LOOKUP_GEOMETRY.paid.note }) });
+      if (stickyViewports.includes(width)) {
+        const { scroller, foot, back } = DICT_LOOKUP_GEOMETRY.sticky;
+        probe.sticky.push({ width, ...(await page.evaluate(probeDictStickyBars, { scroller, foot, back })) });
+      }
     }
   } finally {
     if (restore) await page.setViewportSize(restore);
@@ -9090,7 +9253,7 @@ async function measureDictLookupGeometry(page, surface, context, theme) {
     await page.waitForTimeout(250);
     await settleAnimations(page);
   }
-  for (const row of evaluateDictLookupGeometry(probe, { surface, context })) {
+  for (const row of evaluateDictLookupGeometry(probe, { surface, context, stickyViewports })) {
     dictLookupRows.push({ surface, theme, selector: root, state: context, ...row });
   }
 }

@@ -111,6 +111,14 @@ test('dictionary feature plans retain the actual registered AI entry states on b
   assert.ok(catalog.find(row => row.id === 'render.library.sweep.dict-save-change-menu')?.dependencies.includes('render.library.sweep.dict-save-bar'), 'the change list opens from the save bar');
   assert.ok(catalog.find(row => row.id === 'render.md-preview.sweep.dict-save-change-menu')?.dependencies.includes('render.md-preview.sweep.dict-save-bar'), 'the reader change list opens from the save bar');
   assert.equal(catalog.some(row => /dict-(assist|analyze)-/.test(row.id)), false, 'retired AI action states must not remain registered');
+  // The sticky save bar and the paid buttons run at a phone and a desktop
+  // width, and --viewport selects one of them (task 3b.2).
+  for (const state of ['dict-save-bar', 'dict-entry-result', 'dict-entry-paid-negative', 'dict-entry-usage-result']) {
+    const id = `render.library.sweep.${state}`;
+    assert.deepEqual(catalog.find(row => row.id === id)?.axes.viewport, ['360', '1280'], id);
+    const narrow = createAuditPlan(catalog, parseAuditArgs([`--scenario=${id}`, '--viewport=360', '--plan']));
+    assert.ok(narrow.scenarios.some(selected => selected.id === id), `${id} --viewport=360`);
+  }
   for (const surface of ['library', 'reader']) {
     assert.ok(rows.some(row => row.surfaces.some(value => value === surface || surface === 'reader' && value === 'md-preview')), surface);
   }

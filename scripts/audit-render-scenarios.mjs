@@ -32,6 +32,12 @@ const context = (name, dependencies = [], extra = {}) => ({ name, dependencies, 
 // Latin and Cyrillic labels. The state runs once per locale (--locale picks).
 export const DICT_PAID_NEGATIVE_LOCALES = Object.freeze(['en', 'zh_CN', 'de', 'ru', 'pl', 'ja']);
 const DICT_PAID_NEGATIVE_TARGET = '[data-learning-block="etymology"] .xp-dict-supplement-generate[data-remembered="true"]';
+// The library states that show the sticky save bar and paid buttons run at a
+// phone and a desktop width (batch-3 review, task 3b.2): the save bar must sit
+// on the detail scroller's visible bottom and the back bar on its top, and a
+// paid button's model note must stay on one line, at both. --viewport picks.
+export const DICT_STICKY_VIEWPORTS = Object.freeze(['360', '1280']);
+const sticky = { viewports: DICT_STICKY_VIEWPORTS };
 export const RENDER_SWEEP_CONTEXTS = Object.freeze({
   options: [...RENDER_OPTIONS_TABS.map((name) => context(name, [], { target: `#panel-${name.slice(4)}.active` })),
     context('vocab-pack-preview', [], { target: '#multi-pack-preview:not([hidden])' }),
@@ -50,11 +56,11 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     // waits for the seconds waited.
     context('dict-entry-busy', ['dict-entry-idle'], { target: '.xp-dict-ai > .xp-dict-usage-feedback[data-state="busy"] .xp-dict-usage-stop' }),
     context('dict-entry-progress', ['dict-entry-busy'], { target: '.xp-dict-ai > .xp-dict-usage-feedback[data-state="busy"] .xp-dict-usage-elapsed:not([hidden])' }),
-    context('dict-entry-result', ['dict-entry-busy'], { target: '.xp-dict-ai-content:not([hidden])' }),
+    context('dict-entry-result', ['dict-entry-busy'], { target: '.xp-dict-ai-content:not([hidden])', ...sticky }),
     context('dict-entry-details', ['dict-entry-result'], { target: '.xp-dict-ai-details[data-supplement-id][open]' }),
     context('dict-entry-usage-busy', ['dict-entry-result'], { target: '.xp-dict-usage-feedback[data-state="busy"]' }),
     context('dict-entry-usage-error', ['dict-entry-usage-busy'], { target: '.xp-dict-usage-actions > .xp-dict-action-error' }),
-    context('dict-entry-usage-result', ['dict-entry-usage-error'], { target: '[data-learning-block="usage"] .xp-dict-usage-feedback[data-state="saved"]' }),
+    context('dict-entry-usage-result', ['dict-entry-usage-error'], { target: '[data-learning-block="usage"] .xp-dict-usage-feedback[data-state="saved"]', ...sticky }),
     context('dict-entry-cached', ['dict-entry-result'], { target: '.xp-dict-ai-content:not([hidden])' }),
     // dictDefaultView "dictionary" (Q14=A, plan 3.1): the saved entry the
     // result state archived folds into one free reveal line; opening it shows
@@ -73,12 +79,12 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('dict-entry-legacy', [], { target: '.xp-dict-ai-details[data-supplement-category="literature"][open]' }),
     // The sticky save bar (dict redesign 3.2): the meaning listbox beside
     // Save, then its choice list opened by click.
-    context('dict-save-bar', [], { target: '.vocab-save-controls .listbox-btn' }),
+    context('dict-save-bar', [], { target: '.vocab-save-controls .listbox-btn', ...sticky }),
     context('dict-save-change-menu', ['dict-save-bar'], { target: '[id^="vocab-save-definition-opt-"]' }),
     // A saved AI entry whose three paid learning actions this account last
     // found nothing for, with an AI key configured (plan 3.3): each reads
     // "Not found last time · Try again" plus the model note on one line.
-    context('dict-entry-paid-negative', [], { target: DICT_PAID_NEGATIVE_TARGET, locales: DICT_PAID_NEGATIVE_LOCALES }),
+    context('dict-entry-paid-negative', [], { target: DICT_PAID_NEGATIVE_TARGET, locales: DICT_PAID_NEGATIVE_LOCALES, ...sticky }),
     context('vocab-batch-bar', ['vocab-detail'], { target: '#vocab-batch-toolbar.selecting' }),
     context('ask-history-list', [], { target: '#ask-library-list .ask-library-hit' }),
     context('ask-history-detail', ['ask-history-list'], { target: '#ask-library-detail:not([hidden])' }),
@@ -139,6 +145,7 @@ export const RENDER_SCENARIOS = Object.freeze([
       : { theme: themes.map((t) => t || 'default'), scheme: [item.scheme || 'light'] };
     if (item.dpr) axes.dpr = item.dpr;
     if (item.locales) axes.locale = [...item.locales];
+    if (item.viewports) axes.viewport = [...item.viewports];
     return row(sweepScenarioId(surface, item.name), surface, themes, {
       type: 'sweep', context: item.name,
       ...(item.name.startsWith('vocab-pack-') ? { files: [...files(surface), 'options-vocab.js', 'dict-pack.js', 'scripts/audit-vocab-pack-fixture.mjs'] } : {}),

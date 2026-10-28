@@ -2510,6 +2510,22 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
    action in the lookup. */
 .xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement, .xp-dict-usage-stop { gap: var(--sp-1); }
 .xp-dict-supplement-generate > svg, .xp-dict-update-entry > svg, .xp-dict-update-supplement > svg, .xp-dict-usage-stop > svg { width: 14px; height: 14px; flex: none; }
+/* ...laid out as one inline flow, not as centred flex items (batch-3 review,
+   task 3b.2): as flex items a label that wraps became a column with the model
+   note in a second column beside it, and "gpt-5.4-nano" broke at its hyphen.
+   Here the label wraps like text and starts every line at the same edge (the
+   icon hangs in the start padding: 14 + sp-1 = 18px), and the note is one
+   unbreakable piece that moves to the next line whole. 3px of block inset
+   centres one 18px line in the 26px rung. :not([hidden]) so a hidden action
+   stays hidden. */
+button.xp-dict-connect:is(.xp-dict-ai-generate, .xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement):not([hidden]) {
+  display: inline-block; text-align: start; padding-block: 3px;
+  padding-inline-start: calc(var(--sp-2) + 18px); text-indent: -18px;
+}
+button.xp-dict-connect:is(.xp-dict-ai-generate, .xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement) > svg { vertical-align: -2px; margin-inline-end: var(--sp-1); }
+button.xp-dict-connect:is(.xp-dict-ai-generate, .xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement) > span:not(.xp-dict-model) { margin-inline-end: var(--sp-1); }
+button.xp-dict-connect > .xp-dict-model { display: inline-block; text-indent: 0; white-space: nowrap; }
+button.xp-dict-connect > .xp-dict-model:empty { display: none; }
 /* The free original-text examples action (1C.2): the quote icon and its text,
    no model name -- it never calls AI. */
 .xp-dict-examples-find { gap: var(--sp-1); }

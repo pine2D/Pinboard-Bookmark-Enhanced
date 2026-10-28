@@ -1173,7 +1173,8 @@ function _pbpVocabSyncLookupSave(state) {
   state.expectedExisting = !!id && _vocabRows.some(w => w.id === id);
   const saveLabel = t(state.expectedExisting ? "dictUpdateVocab" : "dictSaveVocab");
   setBtnIcon(state.button, "bookmarkPlus", saveLabel);
-  // Compact reference columns keep the meaning preview and show only the icon.
+  // A narrow save bar keeps this text too (only the re-lookup is an icon);
+  // title and aria-label name the action for every width.
   state.button.title = saveLabel;
   state.button.setAttribute("aria-label", saveLabel);
   state.button.disabled = state.busy || !choice;

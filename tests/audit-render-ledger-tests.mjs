@@ -215,3 +215,66 @@ test('usage slots: each category under its own label, patterns before confusable
   assert.equal(verdicts(withLead(16), 'dict-entry-usage-busy').dictUsageSlots, 'OK');
   assert.equal(verdicts(withLead(15.5), 'dict-entry-usage-busy').dictUsageSlots, 'OK');
 });
+
+test('paid model note: one line in one flow; a wrapped note or a column beside the label fails; none measured is SETUP', () => {
+  const blocks = [{ role: 'sense', left: 24 }];
+  const withPaid = (buttons, width = 360) => ({ ...probe(blocks), paid: [{ width, buttons }] });
+  const good = [{ path: 'a', lines: 1, flow: true, detail: '' }, { path: 'b', lines: 1, flow: true, detail: '' }];
+  for (const surface of ['md-preview', 'library']) {
+    for (const context of ['dict-entry-result', 'dict-entry-usage-result', 'dict-entry-error', 'dict-entry-paid-negative']) {
+      assert.equal(verdicts(withPaid(good), context, surface).dictPaidModel360, 'OK', `${surface}/${context}`);
+      // 18-paid-negative-b: "· gpt-5.4- / nano" in a column beside the label.
+      assert.equal(verdicts(withPaid([...good, { path: 'c', lines: 2, flow: false, detail: 'column' }]), context, surface).dictPaidModel360, 'FAIL', `${surface}/${context}`);
+      assert.equal(verdicts(withPaid([...good, { path: 'c', lines: 1, flow: false, detail: 'beside' }]), context, surface).dictPaidModel360, 'FAIL', `${surface}/${context}`);
+      assert.equal(verdicts(withPaid([]), context, surface).dictPaidModel360, 'SETUP', `${surface}/${context}`);
+      assert.equal(verdicts(probe(blocks), context, surface).dictPaidModel, 'SETUP', `${surface}/${context}`);
+    }
+  }
+  // A state without paid buttons does not require the check.
+  assert.equal(verdicts(probe(blocks), 'dict-entry-examples', 'library').dictPaidModel, undefined);
+});
+
+test('sticky bars: the save bar on the scroller bottom and the back bar from its top; a strip of content fails', () => {
+  const blocks = [{ role: 'sense', left: 24 }];
+  const foot = (bottom, strip = []) => ({ stuck: true, bottom, scrollerBottom: 900, strip });
+  const back = (strip = []) => ({ measured: true, top: 124, scrollerTop: 124, strip });
+  const withSticky = (sticky) => ({ ...probe(blocks), sticky });
+  const good = [{ width: 360, foot: foot(900), back: back() }, { width: 1280, foot: foot(900.4), back: null }];
+  for (const context of ['dict-entry-result', 'dict-entry-usage-result', 'dict-save-bar', 'dict-entry-paid-negative']) {
+    const out = verdicts(withSticky(good), context, 'library');
+    assert.equal(out.dictSaveBarFlush360, 'OK', context);
+    assert.equal(out.dictSaveBarFlush1280, 'OK', context);
+    assert.equal(out.dictBackBarTop360, 'OK', context);
+    // Two panes at 1280: there is no back bar to measure.
+    assert.equal(out.dictBackBarTop1280, undefined, context);
+  }
+  // 04-result-b: a sticky bottom:0 stops at the pane's 96px bottom padding.
+  const raised = verdicts(withSticky([{ width: 360, foot: foot(804, ['li']), back: back() }, good[1]]), 'dict-save-bar', 'library');
+  assert.equal(raised.dictSaveBarFlush360, 'FAIL');
+  assert.equal(raised.dictSaveBarFlush1280, 'OK');
+  // Content painted under a flush bar still fails.
+  assert.equal(verdicts(withSticky([{ width: 360, foot: foot(900, ['p']), back: back() }, good[1]]), 'dict-save-bar', 'library').dictSaveBarFlush360, 'FAIL');
+  // 12-error-b: 8px of text above the back button.
+  assert.equal(verdicts(withSticky([{ width: 360, foot: foot(900), back: back(['ol.xp-dict-senses > li']) }, good[1]]), 'dict-save-bar', 'library').dictBackBarTop360, 'FAIL');
+  // A bar that is not stuck (the lookup is shorter than the pane) or a width
+  // never measured is SETUP, not a pass.
+  const unstuck = verdicts(withSticky([{ width: 360, foot: { stuck: false }, back: back() }]), 'dict-save-bar', 'library');
+  assert.equal(unstuck.dictSaveBarFlush360, 'SETUP');
+  assert.equal(unstuck.dictSaveBarFlush1280, 'SETUP');
+  assert.equal(verdicts(withSticky([{ width: 360, foot: foot(900), back: { measured: false } }]), 'dict-save-bar', 'library').dictBackBarTop360, 'SETUP');
+  // The viewport axis narrows the widths that must be measured.
+  const only360 = Object.fromEntries(evaluateDictLookupGeometry(withSticky([good[0]]), { surface: 'library', context: 'dict-save-bar', stickyViewports: [360] }).map((r) => [r.check, r.status]));
+  assert.equal(only360.dictSaveBarFlush360, 'OK');
+  assert.equal(only360.dictSaveBarFlush1280, undefined);
+  // The reader has no sticky library bars.
+  assert.equal(verdicts(withSticky(good), 'dict-save-bar', 'md-preview').dictSaveBarFlush360, undefined);
+});
+
+test('the library states with the save bar and paid buttons run at a phone and a desktop width', () => {
+  for (const name of ['dict-save-bar', 'dict-entry-result', 'dict-entry-paid-negative', 'dict-entry-usage-result']) {
+    const item = RENDER_SWEEP_CONTEXTS.library.find((c) => c.name === name);
+    assert.deepEqual(item?.viewports, ['360', '1280'], name);
+    assert.ok(DICT_LOOKUP_GEOMETRY.surfaces.library.contexts[name].requires.includes('sticky'), `${name} requires the sticky bars`);
+  }
+  assert.deepEqual(DICT_LOOKUP_GEOMETRY.sticky.viewports, [360, 1280]);
+});

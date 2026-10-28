@@ -9928,6 +9928,7 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
 // 2026-10-26: "eight em steps plus three px steps, three layers all 16px"
 // was the defect this closes.
 {
+  const PAID_FLOW_SELECTOR = "button.xp-dict-connect:is(.xp-dict-ai-generate, .xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement):not([hidden])";
   const SPACING_PROPS = /^(?:margin|padding|gap|row-gap|column-gap)(?:-|$)/;
   const scan = (fileName, css, { sizes, base, spacing, spacingExempt, lines = true }) => {
     const at = (rule) => lines ? `${fileName}:${rule.lineNum}` : `${fileName}, hand-written region`;
@@ -9969,14 +9970,21 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     // The select's inline end inset is its chevron's room (control geometry);
     // the senses' 1.4em indent is an em of the text it hangs (the geometry
     // gate's senseIndent), not rhythm.
-    spacingExempt: { ".xp-dict-lang|padding": true, ".xp-dict-senses li|margin-inline-start": true },
+    // A paid button's block inset centres its one 18px line in the 26px rung,
+    // and its start inset is the hanging icon's room (14 + sp-1): control
+    // geometry of the one-flow paid button (task 3b.2), not rhythm.
+    spacingExempt: { ".xp-dict-lang|padding": true, ".xp-dict-senses li|margin-inline-start": true,
+      [`${PAID_FLOW_SELECTOR}|padding-block`]: true, [`${PAID_FLOW_SELECTOR}|padding-inline-start`]: true },
   });
   scan("library.css", stripGeneratedRegions(libraryCss), {
     sizes: ["15px", "14px", "13px", "12px", "calc(var(--lib-text-body) - 1px)"],
     spacing: ["calc(-1 * var(--lib-sp-2))", "calc(-1 * var(--lib-control-pad-x-sm))", "var(--lib-control-pad-x-sm)",
       "var(--lib-sp-1)", "var(--lib-sp-2)", "var(--lib-sp-4)"],
     // The numbered senses' 24px number column is a column width, not rhythm.
-    spacingExempt: { "#vocab-ref-result .xp-dict-senses > li|padding-inline-start": true },
+    // The paid button's block inset and hanging-icon room: control geometry
+    // as in the reader above.
+    spacingExempt: { "#vocab-ref-result .xp-dict-senses > li|padding-inline-start": true,
+      [`#vocab-ref-result ${PAID_FLOW_SELECTOR}|padding-block`]: true, [`#vocab-ref-result ${PAID_FLOW_SELECTOR}|padding-inline-start`]: true },
     lines: false,
   });
   // The three levels by role, the same on both surfaces: a sentence under its

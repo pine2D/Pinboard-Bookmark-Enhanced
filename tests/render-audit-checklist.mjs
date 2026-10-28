@@ -740,10 +740,33 @@ export function evaluateMediaProbe(probe, check) {
 // column with a negative inline margin -- stays inside the padding box of its
 // nearest clipping ancestor. A box that sticks out of a scroller adds a
 // sideways scroll; one that sticks out of an overflow:hidden box is cut.
+//
+// dictSaveBarFlush<W> / dictBackBarTop<W> (requires "sticky", library only,
+// at each width of `sticky.viewports` the scenario's viewport axis selects):
+// the library's two sticky bars cover the detail scroller's visible edges.
+// The save bar, stuck while the lookup runs past the pane, ends on the
+// scroller's visible bottom (±1px) and no box of the scrolling content shows
+// under it; below the single-pane threshold the "back to list" bar's page-fill
+// band starts on the scroller's visible top, so no box shows above or beside
+// the button. Measured by hit-testing the strips in the page (what is
+// painted there), not by reading the stylesheet: the batch-3 review's
+// 04-result-b / 16-save-bar-b (96px of definitions under the bar -- a sticky
+// bottom:0 stops at the pane's padding edge) and 12-error-b (8px of text
+// above the back bar, the pane's top padding).
+//
+// dictPaidModel<W> (requires "paid", at every width the probe visits): each
+// paid button is one inline flow -- its icon, its label and the model note
+// -- so the note "· gpt-5.4-nano" stays on one line, and when the button
+// wraps, the note goes to a later line as a whole, starting no further right
+// than the label does; it never stands in a column beside a wrapped label
+// (the review's 18-paid-negative-b at 360px: "Not found last time · Try /
+// again" with "· gpt-5.4- / nano" centred beside it).
 export const DICT_LOOKUP_GEOMETRY = {
   edgeTolerancePx: 1,
   maxLeftEdges: 2,
   viewports: [320, 360],
+  sticky: { viewports: [360, 1280], scroller: "#vocab-detail-pane", foot: "#vocab-ref-result .vocab-ref-foot", back: ".vocab-detail-back" },
+  paid: { note: "button > .xp-dict-model" },
   blocks: [
     { role: "sense", selector: "ol.xp-dict-senses > li" },
     { role: "summary", selector: ".xp-dict-ai-details > summary" },
@@ -774,19 +797,19 @@ export const DICT_LOOKUP_GEOMETRY = {
         // seconds waited and Cancel take the generate button's place in the
         // AI block, under the dictionary result.
         "dict-entry-progress": { requires: ["edges", "senseIndent", "overflow", "clip"] },
-        "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
+        "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "paid"] },
         "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         // A usage supplement in flight (plan 2.6): its phase line, the
         // seconds waited and Cancel take the button's place in its row.
         "dict-entry-usage-busy": { requires: ["edges", "original", "translation", "overflow", "clip", "slots"] },
-        "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip", "slots"] },
+        "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip", "slots", "paid"] },
         // Free original-text examples: source sentences, never a translation.
         "dict-entry-examples": { requires: ["edges", "senseIndent", "original", "overflow", "clip"] },
         // A remembered empty result: the action and its neutral note, no sentence.
         "dict-entry-negative": { requires: ["edges", "senseIndent", "overflow", "clip", "notes"] },
         // A failed first generation and a failed usage point (plan 3.4): each
         // error is the line below the button that failed.
-        "dict-entry-error": { requires: ["edges", "senseIndent", "overflow", "clip", "notes"] },
+        "dict-entry-error": { requires: ["edges", "senseIndent", "overflow", "clip", "notes", "paid"] },
         "dict-entry-usage-error": { requires: ["edges", "original", "translation", "overflow", "clip", "notes", "slots"] },
         // dictDefaultView "dictionary": the dictionary result with the saved
         // AI entry folded into its free reveal line, then opened in place.
@@ -803,7 +826,7 @@ export const DICT_LOOKUP_GEOMETRY = {
         // remembered "Not found last time · Try again" state (plan 3.3), run in
         // each listed UI locale; controlRung holds each action to one line,
         // dictActionNoteBelow puts each note on the line below its action.
-        "dict-entry-paid-negative": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "notes", "slots"] },
+        "dict-entry-paid-negative": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "notes", "slots", "paid"] },
         "dict-entry-panel": { root: "#reader-dict-view .xp-dict", overflowRoot: "#reader-dict-view",
           requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
       },
@@ -816,20 +839,20 @@ export const DICT_LOOKUP_GEOMETRY = {
       contexts: {
         "dict-entry-idle": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-entry-progress": { requires: ["edges", "senseIndent", "overflow", "clip"] },
-        "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
+        "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "sticky", "paid"] },
         "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-usage-busy": { requires: ["edges", "original", "translation", "overflow", "clip", "slots"] },
-        "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip", "slots"] },
+        "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip", "slots", "sticky", "paid"] },
         "dict-entry-examples": { requires: ["edges", "senseIndent", "original", "overflow", "clip"] },
         "dict-entry-negative": { requires: ["edges", "senseIndent", "overflow", "clip", "notes"] },
-        "dict-entry-error": { requires: ["edges", "senseIndent", "overflow", "clip", "notes"] },
+        "dict-entry-error": { requires: ["edges", "senseIndent", "overflow", "clip", "notes", "paid"] },
         "dict-entry-usage-error": { requires: ["edges", "original", "translation", "overflow", "clip", "notes", "slots"] },
         "dict-entry-folded": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-entry-revealed": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-legacy": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "slots"] },
-        "dict-save-bar": { requires: ["edges", "senseIndent", "overflow", "clip"] },
+        "dict-save-bar": { requires: ["edges", "senseIndent", "overflow", "clip", "sticky"] },
         "dict-save-change-menu": { requires: ["overflow"] },
-        "dict-entry-paid-negative": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "notes", "slots"] },
+        "dict-entry-paid-negative": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "notes", "slots", "sticky", "paid"] },
       },
     },
   },
@@ -848,11 +871,16 @@ export function dictLookupRoots(surface, context) {
 //           notes: [{ path, top, buttonBottom }],
 //           slots: [{ category, index, items, top, bottom, path, label: { top, bottom } | null }],
 //           clip: { measured, offenders: [{ path, kind: "scroll" | "box", detail }] },
-//           viewports: [{ width, rootVisible, offenders: [{ path, left, right }] }] }
+//           viewports: [{ width, rootVisible, offenders: [{ path, left, right }] }],
+//           paid: [{ width, buttons: [{ path, lines, flow, detail }] }],
+//           sticky: [{ width, foot: { stuck, bottom, scrollerBottom, strip: [path] } | null,
+//                      back: { measured, top, scrollerTop, strip: [path] } | null }] }
+// (opts.stickyViewports: the widths the scenario's viewport axis selected.)
 // where `left` is the inline start of the block's first line of text, in px
 // from the lookup column's content edge. Returns one row per check:
 // { check, status: "OK" | "FAIL" | "SETUP", actual, expected, note }.
-export function evaluateDictLookupGeometry(probe, { surface, context }) {
+export function evaluateDictLookupGeometry(probe, opts) {
+  const { surface, context } = opts;
   const spec = DICT_LOOKUP_GEOMETRY;
   const contextSpec = spec.surfaces[surface]?.contexts?.[context];
   if (!contextSpec) throw new Error(`no dictionary geometry spec for ${surface}/${context}`);
@@ -948,6 +976,44 @@ export function evaluateDictLookupGeometry(probe, { surface, context }) {
     const off = view.offenders || [];
     row(check, !off.length, off.length ? `${off.length} element(s) outside, e.g. ${off.slice(0, 3).map((o) => `${o.path} [${round(o.left)}, ${round(o.right)}]`).join("; ")}` : `inside (${overflowRoot} at [${round(view.rootLeft)}, ${round(view.rootRight)}] of ${view.viewport}px)`,
       `every visible descendant within [0, ${width}]px`);
+  }
+
+  // Each paid button: one inline flow, the model note on one line.
+  const paid = probe?.paid || [];
+  for (const view of paid) {
+    const check = `dictPaidModel${view.width}`;
+    const buttons = view.buttons || [];
+    if (!buttons.length) { if (requires.has("paid")) setup(check, `a paid button with its model note at ${view.width}px`); continue; }
+    const bad = buttons.filter((b) => b.lines !== 1 || !b.flow);
+    row(check, !bad.length, bad.length ? `${bad.length}/${buttons.length}, e.g. ${bad.slice(0, 3).map((b) => `${b.path}: ${b.detail}`).join("; ")}` : `${buttons.length} button(s), note on one line`,
+      "model note on one line, on the label's last line or a later line starting no further right than the label");
+  }
+  if (!paid.length && requires.has("paid")) setup("dictPaidModel", "a paid button with its model note");
+
+  // library's sticky bars cover the detail scroller's visible edges.
+  if (requires.has("sticky")) {
+    const want = (opts.stickyViewports || spec.sticky.viewports).map(Number);
+    for (const width of want) {
+      const view = (probe?.sticky || []).find((v) => v.width === width);
+      const flush = `dictSaveBarFlush${width}`;
+      const foot = view?.foot;
+      if (!foot || !foot.stuck) setup(flush, `the save bar stuck at the bottom of ${spec.sticky.scroller} at ${width}px (the lookup must run past the pane)`);
+      else {
+        const gap = foot.scrollerBottom - foot.bottom;
+        const strip = foot.strip || [];
+        row(flush, Math.abs(gap) <= tol && !strip.length,
+          `bar bottom ${round(foot.bottom)}, scroller visible bottom ${round(foot.scrollerBottom)}${strip.length ? `; under the bar: ${strip.slice(0, 3).join(", ")}` : ""}`,
+          `bar bottom = scroller visible bottom (±${tol}px), nothing of the scrolling content under it`);
+      }
+      const back = view?.back;
+      if (!back) continue; // two panes: there is no back bar at this width
+      const top = `dictBackBarTop${width}`;
+      if (!back.measured) { setup(top, `scrolling content under the back bar of ${spec.sticky.scroller} at ${width}px`); continue; }
+      const strip = back.strip || [];
+      row(top, back.top >= back.scrollerTop - tol && !strip.length,
+        `button top ${round(back.top)}, scroller visible top ${round(back.scrollerTop)}${strip.length ? `; showing above or beside it: ${strip.slice(0, 3).join(", ")}` : ""}`,
+        "the back bar covers the scroller from its visible top, nothing of the scrolling content above or beside the button");
+    }
   }
   return rows;
 }
