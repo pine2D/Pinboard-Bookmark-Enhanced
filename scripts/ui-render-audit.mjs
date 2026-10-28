@@ -9088,9 +9088,11 @@ function probeDictLookupOverflow(rootSel) {
   const box = root.getBoundingClientRect();
   return { rootVisible: true, viewport, rootLeft: box.left, rootRight: box.right, offenders };
 }
-// dictPaidModel: per visible paid button, how many lines its model note's
-// text takes and whether the note continues the label's flow (on the label's
-// last line, or on a later line starting no further right than the label).
+// dictPaidModel: per visible paid button, how many lines its model name
+// takes, whether the name continues the label's flow (on the label's last
+// line, or on a later line starting no further right than the label), and
+// whether the note's "·" separator stays on the label's last line (a wrapped
+// note starts with the model name, never with the separator).
 function probeDictPaidModels(cfg) {
   const visible = (el) => !!el && el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) && el.getClientRects().length > 0;
   const pathOf = (el) => {
@@ -9118,23 +9120,40 @@ function probeDictPaidModels(cfg) {
   const root = document.querySelector(cfg.root);
   if (!visible(root)) return [];
   const buttons = [];
+  // The client rect of the note's separator glyph, if the note has one.
+  const sepRect = (note) => {
+    const walker = document.createTreeWalker(note, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      const at = node.data.indexOf(cfg.separator);
+      if (at < 0) continue;
+      const range = document.createRange();
+      range.setStart(node, at); range.setEnd(node, at + cfg.separator.length);
+      return [...range.getClientRects()].find((r) => r.width > 0.5 && r.height > 0.5) || null;
+    }
+    return null;
+  };
   for (const note of root.querySelectorAll(cfg.note)) {
     if (!visible(note) || !/\S/.test(note.textContent)) continue;
     const button = note.parentElement;
     const label = note.previousElementSibling;
-    const n = lines(note), l = label ? lines(label) : [];
+    const name = note.querySelector(cfg.name) || note;
+    const n = lines(name), l = label ? lines(label) : [];
     if (!n.length) continue;
     const r = (v) => Math.round(v * 10) / 10;
-    let flow = true, detail = `${n.length} line(s)`;
+    let flow = true, sep = true, detail = `${n.length} line(s)`;
     if (l.length) {
       const last = l[l.length - 1], first = n[0];
-      const onLast = (first.top + first.bottom) / 2 > last.top && (first.top + first.bottom) / 2 < last.bottom;
+      const onLine = (box, line) => (box.top + box.bottom) / 2 > line.top && (box.top + box.bottom) / 2 < line.bottom;
+      const onLast = onLine(first, last);
       const later = first.top >= last.bottom - 1 && first.left <= l[0].left + 1;
       flow = onLast || later;
+      const dot = sepRect(note);
+      sep = !dot || onLine(dot, last);
       if (!flow) detail = `note starts at (${r(first.left)}, ${r(first.top)}) beside a ${l.length}-line label starting at ${r(l[0].left)} and ending on [${r(last.top)}, ${r(last.bottom)}]`;
-      else if (n.length !== 1) detail = `note "${note.textContent}" takes ${n.length} lines`;
+      else if (n.length !== 1) detail = `model name "${name.textContent}" takes ${n.length} lines`;
+      else if (!sep) detail = `"${cfg.separator}" at (${r(dot.left)}, ${r(dot.top)}) starts a line below the label's last line [${r(last.top)}, ${r(last.bottom)}]`;
     }
-    buttons.push({ path: pathOf(button), lines: n.length, flow, detail });
+    buttons.push({ path: pathOf(button), lines: n.length, flow, sep, detail });
   }
   return buttons;
 }
@@ -9361,7 +9380,7 @@ async function measureDictLookupGeometry(page, surface, context, theme) {
       await page.waitForTimeout(250);
       await settleAnimations(page);
       if (DICT_LOOKUP_GEOMETRY.viewports.includes(width)) probe.viewports.push({ width, ...(await page.evaluate(probeDictLookupOverflow, overflowRoot)) });
-      probe.paid.push({ width, buttons: await page.evaluate(probeDictPaidModels, { root, note: DICT_LOOKUP_GEOMETRY.paid.note }) });
+      probe.paid.push({ width, buttons: await page.evaluate(probeDictPaidModels, { root, ...DICT_LOOKUP_GEOMETRY.paid }) });
       if (stickyViewports.includes(width)) {
         const { scroller, foot, back, save, saveLabel, relookup, focusables, controlH, bodyLh } = DICT_LOOKUP_GEOMETRY.sticky;
         const tol = DICT_LOOKUP_GEOMETRY.edgeTolerancePx;

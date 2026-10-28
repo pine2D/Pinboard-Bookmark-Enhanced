@@ -1877,7 +1877,8 @@ function _pbpDictEntryMount(host, opts) {
     return el;
   };
   // A paid action (plan 3.3): wandSparkles, its text and only the model name
-  // beside it ([icon, label, .xp-dict-model]). That it calls AI and uses
+  // beside it ([icon, label, .xp-dict-model] -- the note holds " ·", a space
+  // and .xp-dict-model-name, see modelNotes). That it calls AI and uses
   // tokens is said in its description (title / aria-description), never in
   // the note, and no token count or price is shown. The model note follows
   // the current settings (modelNotes).
@@ -2034,7 +2035,16 @@ function _pbpDictEntryMount(host, opts) {
   const modelNotes = () => {
     const name = modelName();
     for (const note of panel.querySelectorAll("button > .xp-dict-model")) {
-      note.textContent = name ? "· " + name : "";
+      // " ·" is glued to the end of the label (nowrap, and no break before a
+      // space), the real space after it is the one break, and the name never
+      // breaks: a wrapped note starts with the model name, never with "·".
+      // The button's text reads "label · model" with ordinary spaces.
+      if (!name) note.replaceChildren();
+      else if (note.lastElementChild?.textContent !== name) {
+        const sep = document.createElement("span"); sep.className = "xp-dict-model-sep"; sep.textContent = " ·";
+        const model = document.createElement("span"); model.className = "xp-dict-model-name"; model.textContent = name;
+        note.replaceChildren(sep, " ", model);
+      }
       // A slot's buttons leave their category to the slot's label on screen;
       // their accessible name says it: category · text · model.
       const el = note.parentElement, category = el.dataset.categoryName;

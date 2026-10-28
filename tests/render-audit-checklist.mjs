@@ -777,11 +777,13 @@ export function evaluateMediaProbe(probe, check) {
 //
 // dictPaidModel<W> (requires "paid", at every width the probe visits): each
 // paid button is one inline flow -- its icon, its label and the model note
-// -- so the note "· gpt-5.4-nano" stays on one line, and when the button
-// wraps, the note goes to a later line as a whole, starting no further right
+// -- so the model name "gpt-5.4-nano" stays on one line, and when the button
+// wraps, the name goes to a later line as a whole, starting no further right
 // than the label does; it never stands in a column beside a wrapped label
 // (the review's 18-paid-negative-b at 360px: "Not found last time · Try /
-// again" with "· gpt-5.4- / nano" centred beside it).
+// again" with "· gpt-5.4- / nano" centred beside it). The note's "·" stays
+// on the label's last line, so a wrapped note starts with the model name
+// (the batch-3b review: a second line reading "· gpt-5.4-nano").
 //
 // dictSaveMenuBox (requires "menu", reader): the save bar's open choice list
 // spans the lookup card's content box -- the bubble's inner edges, or the
@@ -807,7 +809,7 @@ export const DICT_LOOKUP_GEOMETRY = {
     controlH: "--lib-control-h", bodyLh: "--lib-lh-body",
     focusables: "button, a[href], summary, select, input, textarea, [tabindex]:not([tabindex='-1'])",
   },
-  paid: { note: "button > .xp-dict-model" },
+  paid: { note: "button > .xp-dict-model", name: ".xp-dict-model-name", separator: "·" },
   blocks: [
     { role: "sense", selector: "ol.xp-dict-senses > li" },
     { role: "summary", selector: ".xp-dict-ai-details > summary" },
@@ -1056,9 +1058,9 @@ export function evaluateDictLookupGeometry(probe, opts) {
     const check = `dictPaidModel${view.width}`;
     const buttons = view.buttons || [];
     if (!buttons.length) { if (requires.has("paid")) setup(check, `a paid button with its model note at ${view.width}px`); continue; }
-    const bad = buttons.filter((b) => b.lines !== 1 || !b.flow);
+    const bad = buttons.filter((b) => b.lines !== 1 || !b.flow || b.sep === false);
     row(check, !bad.length, bad.length ? `${bad.length}/${buttons.length}, e.g. ${bad.slice(0, 3).map((b) => `${b.path}: ${b.detail}`).join("; ")}` : `${buttons.length} button(s), note on one line`,
-      "model note on one line, on the label's last line or a later line starting no further right than the label");
+      `model name on one line, on the label's last line or a later line starting no further right than the label; "${spec.paid.separator}" on the label's last line`);
   }
   if (!paid.length && requires.has("paid")) setup("dictPaidModel", "a paid button with its model note");
 

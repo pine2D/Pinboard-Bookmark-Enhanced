@@ -4479,7 +4479,7 @@ await (async () => {
         const generate=$id('vocab-ref').querySelector('.xp-dict-ai-generate'),note=generate?.querySelector(':scope > .xp-dict-model');
         check("AI entry: the library's generate is wandSparkles, its text and only the model name",generate?.querySelectorAll('svg').length===1&&
           generate.firstElementChild?.outerHTML===new DOMParser().parseFromString(PBP_ICONS.wandSparkles,"text/html").body.firstElementChild.outerHTML&&
-          generate.children[1]?.textContent===t("dictEntryGenerate")&&!!t("dictEntryGenerate")&&note?.textContent==="· llama3.2"&&!/token/i.test(note.textContent)&&
+          generate.children[1]?.textContent===t("dictEntryGenerate")&&!!t("dictEntryGenerate")&&note?.textContent===" · llama3.2"&&[...generate.childNodes].filter(node=>node.nodeName.toLowerCase()!=="svg").map(node=>node.textContent).join("")===t("dictEntryGenerate")+" · llama3.2"&&note.firstElementChild?.classList.contains("xp-dict-model-sep")&&note.lastElementChild?.textContent==="llama3.2"&&!/token/i.test(note.textContent)&&
           generate.title===t("dictPaidActionHint")&&!!host.querySelector('.xp-dict-examples-find > svg')&&
           host.querySelector('.xp-dict-examples-find > svg').outerHTML!==generate.firstElementChild.outerHTML&&!host.querySelector('.xp-dict-examples-find .xp-dict-model'));
       }

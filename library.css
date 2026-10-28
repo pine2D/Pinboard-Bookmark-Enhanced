@@ -2230,10 +2230,11 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-msg[data-state="neutral"] { color: var(--lib-fg-muted); }
 #vocab-ref-result .xp-dict-msg-ic { display: inline-flex; vertical-align: -2px; margin-inline-end: var(--lib-sp-1); }
 #vocab-ref-result .xp-dict-msg-ic svg { display: block; }
-/* Notes, hints and inline errors wrap without stranding a last word (as in
-   the reader, md-preview.css); a few lines each, so pretty costs nothing.
-   AI-written text and senses keep greedy wrapping. */
-#vocab-ref-result :is(.xp-dict-msg, .xp-dict-src) { text-wrap: pretty; }
+/* Notes, hints and inline errors are one to three lines: balance evens
+   them, so neither a Latin word nor CJK characters end up alone on the last
+   line (as in the reader, md-preview.css). Short text only; AI-written text
+   and senses keep greedy wrapping. */
+#vocab-ref-result :is(.xp-dict-msg, .xp-dict-src) { text-wrap: balance; }
 /* The local pack's block: no fill, no frame -- a small bold title and its senses. */
 #vocab-ref-result .xp-dict-local-title { margin-bottom: var(--lib-sp-2); font-size: 13px; line-height: 18px; font-weight: 700; color: var(--lib-fg-muted); }
 #vocab-ref-result .xp-skel {
@@ -2376,8 +2377,15 @@ html.motion-ready .vocab-note-save {
   padding-inline-start: calc(var(--lib-control-pad-x-sm) + 18px); text-indent: -18px;
 }
 #vocab-ref-result button.xp-dict-connect:is(.xp-dict-ai-generate, .xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement) > svg { vertical-align: -2px; margin-inline-end: var(--lib-sp-1); }
-#vocab-ref-result button.xp-dict-connect:is(.xp-dict-ai-generate, .xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement) > span:not(.xp-dict-model) { margin-inline-end: var(--lib-sp-1); }
-#vocab-ref-result button.xp-dict-connect > .xp-dict-model { display: inline-block; text-indent: 0; white-space: nowrap; }
+/* The note is " ·", a space, then the model name (md-dict.js modelNotes):
+   " ·" stays on the label's last line (nowrap, and a line never breaks
+   before a space), the space after it is the note's one break, and the name
+   moves to the next line whole -- a wrapped note starts with the model name,
+   never with "·" (batch-3b review). The real spaces replace the label's
+   end margin. */
+#vocab-ref-result button.xp-dict-connect > .xp-dict-model { text-indent: 0; }
+#vocab-ref-result button.xp-dict-connect > .xp-dict-model > .xp-dict-model-sep { white-space: nowrap; }
+#vocab-ref-result button.xp-dict-connect > .xp-dict-model > .xp-dict-model-name { display: inline-block; text-indent: 0; white-space: nowrap; }
 #vocab-ref-result button.xp-dict-connect > .xp-dict-model:empty { display: none; }
 /* The free original-text examples action (1C.2): quote icon and text only. */
 #vocab-ref-result .xp-dict-examples-find { display: inline-flex; align-items: center; gap: var(--lib-sp-1); }

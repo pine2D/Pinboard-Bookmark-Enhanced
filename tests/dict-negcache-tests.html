@@ -212,10 +212,10 @@ await test("retrieval and AI-judgement memories read differently, both neutral w
   const patternsOk = label(patterns) === "dictNegRetry" && patterns.getAttribute("aria-label") === "dictSupplementPatterns · dictNegRetry · fixture-model" &&
     ui.status("patterns").textContent === "dictPatternsNone" && infoIcon(ui.status("patterns")) && ui.status("patterns").dataset.state === "neutral";
   const etymologyOk = label(etymology) === "dictNegRetry" && etymology.getAttribute("aria-label") === "dictSupplementEtymology · dictNegRetry · fixture-model" &&
-    etymology.querySelector(".xp-dict-model").textContent === "· fixture-model" &&
+    etymology.querySelector(".xp-dict-model").textContent === " · fixture-model" &&
     ui.status("etymology").textContent === "dictSupplementNoSources" && infoIcon(ui.status("etymology"));
   // Retrying stays the paid action: wandSparkles, its text and the model name.
-  const paidOk = patterns.querySelector("svg")?.outerHTML === svgOf(PBP_ICONS.wandSparkles) && patterns.querySelector(".xp-dict-model").textContent === "· fixture-model" &&
+  const paidOk = patterns.querySelector("svg")?.outerHTML === svgOf(PBP_ICONS.wandSparkles) && patterns.querySelector(".xp-dict-model").textContent === " · fixture-model" &&
     !patterns.disabled && !patterns.hidden;
   // A plain slot button is the generate verb; its category is its slot's
   // label on screen and the start of its accessible name.

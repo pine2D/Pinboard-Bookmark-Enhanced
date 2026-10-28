@@ -2416,11 +2416,14 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
 .xp-dict-msg-ic { display: inline-flex; vertical-align: -2px; margin-inline-end: var(--sp-1); }
 .xp-dict-msg-ic svg { display: block; }
 /* Notes, hints and inline errors (the action error, the examples hint, a
-   receipt, the progress line, the choice list's help) wrap without leaving a
-   last word alone on its line. Each is a few lines at most, so the cost CSSWG
-   flags for text-wrap:pretty on long body text does not arise; AI-written
-   text and entry senses keep greedy wrapping, block titles stay one line. */
-.xp-dict-msg, .xp-dict-src, .xp-dict-choice-help { text-wrap: pretty; }
+   receipt, the progress line, the choice list's help) are one to three
+   lines: balance evens their lines. pretty only keeps a last *word* off its
+   own line, and CJK has a break after every character, so Chinese and
+   Japanese hints still ended on one or two characters (batch-3b review);
+   balance fixes both scripts. It is for short text only (Chromium balances
+   up to a few lines, then wraps greedily); AI-written text and entry senses
+   keep greedy wrapping, block titles stay one line. */
+.xp-dict-msg, .xp-dict-src, .xp-dict-choice-help { text-wrap: balance; }
 /* One column (dict redesign 3.1): the AI part follows the dictionary results,
    separated by whitespace and its own source title -- no rule, fill or card. */
 .xp-dict-ai { min-width: 0; margin-top: var(--sp-4); overflow-wrap: anywhere; }
@@ -2528,8 +2531,15 @@ button.xp-dict-connect:is(.xp-dict-ai-generate, .xp-dict-supplement-generate, .x
   padding-inline-start: calc(var(--sp-2) + 18px); text-indent: -18px;
 }
 button.xp-dict-connect:is(.xp-dict-ai-generate, .xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement) > svg { vertical-align: -2px; margin-inline-end: var(--sp-1); }
-button.xp-dict-connect:is(.xp-dict-ai-generate, .xp-dict-supplement-generate, .xp-dict-update-entry, .xp-dict-update-supplement) > span:not(.xp-dict-model) { margin-inline-end: var(--sp-1); }
-button.xp-dict-connect > .xp-dict-model { display: inline-block; text-indent: 0; white-space: nowrap; }
+/* The note is " ·", a space, then the model name (md-dict.js modelNotes):
+   " ·" stays on the label's last line (nowrap, and a line never breaks
+   before a space), the space after it is the note's one break, and the name
+   moves to the next line whole -- a wrapped note starts with the model name,
+   never with "·" (batch-3b review). The real spaces replace the label's
+   end margin. */
+button.xp-dict-connect > .xp-dict-model { text-indent: 0; }
+button.xp-dict-connect > .xp-dict-model > .xp-dict-model-sep { white-space: nowrap; }
+button.xp-dict-connect > .xp-dict-model > .xp-dict-model-name { display: inline-block; text-indent: 0; white-space: nowrap; }
 button.xp-dict-connect > .xp-dict-model:empty { display: none; }
 /* The free original-text examples action (1C.2): the quote icon and its text,
    no model name -- it never calls AI. */

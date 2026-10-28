@@ -2439,8 +2439,8 @@ async function runDictionaryEntryUiTests() {
     check("every paid learning button is the wandSparkles icon, the generate verb and the model name, its category only in its accessible name",
       [['patterns','dictSupplementPatterns'],['confusables','dictSupplementConfusables'],['etymology','dictSupplementEtymology']].every(([category,key])=>{
         const el=paid(modelUi.host,category);
-        return el?.firstElementChild?.dataset.icon==='wandSparkles'&&el.children[1]?.textContent==='dictSlotGenerate'&&el.querySelector('.xp-dict-model')?.textContent==='· fixture-model'&&
-          el.textContent==='dictSlotGenerate· fixture-model'&&!el.textContent.includes(key)&&el.getAttribute('aria-label')===key+' · dictSlotGenerate · fixture-model';
+        return el?.firstElementChild?.dataset.icon==='wandSparkles'&&el.children[1]?.textContent==='dictSlotGenerate'&&el.querySelector('.xp-dict-model')?.textContent===' · fixture-model'&&el.querySelector('.xp-dict-model > .xp-dict-model-name')?.textContent==='fixture-model'&&
+          el.textContent==='dictSlotGenerate · fixture-model'&&!el.textContent.includes(key)&&el.getAttribute('aria-label')===key+' · dictSlotGenerate · fixture-model';
       })&&slotFault(modelUi.host)==='');
     // Plan 3.3: every paid action -- generate, update entry, update
     // supplement and the three learning buttons -- is wandSparkles, non-empty
@@ -2449,7 +2449,7 @@ async function runDictionaryEntryUiTests() {
     {
       const paidShape=(el,key,hint,name=null)=>!!el&&el.querySelectorAll('svg').length===1&&el.firstElementChild?.dataset.icon==='wandSparkles'&&
         el.children[1]?.textContent===key&&!!key&&el.children[2]?.classList.contains('xp-dict-model')&&el.children.length===3&&
-        el.querySelector('.xp-dict-model').textContent==='· model-one'&&!/token/i.test(el.querySelector('.xp-dict-model').textContent)&&
+        el.querySelector('.xp-dict-model').textContent===' · model-one'&&el.textContent===key+' · model-one'&&!/token/i.test(el.querySelector('.xp-dict-model').textContent)&&
         el.title===hint&&el.getAttribute('aria-description')===hint&&(name===null?!el.hasAttribute('aria-label'):el.getAttribute('aria-label')===name);
       window.pbpDictEntryRead=async()=>null;
       const fresh=mount({settings:{...settings,previewAiModel:'model-one'}});await fresh.ui.ready;
@@ -2468,7 +2468,7 @@ async function runDictionaryEntryUiTests() {
         withSaved.host.querySelector('.xp-dict-update-supplement').closest('[data-slot]')===slotOf(withSaved.host,'patterns'));
       const paidButtons=withSaved.host.querySelectorAll('button:has(> svg[data-icon="wandSparkles"])');
       check("every button carrying wandSparkles carries the model name and no token wording in its note",[...paidButtons].filter(el=>el.checkVisibility()).length===4&&
-        [...paidButtons].every(el=>el.querySelector(':scope > .xp-dict-model')?.textContent==='· model-one'&&!/token/i.test(el.querySelector('.xp-dict-model').textContent)));
+        [...paidButtons].every(el=>el.querySelector(':scope > .xp-dict-model')?.textContent===' · model-one'&&!/token/i.test(el.querySelector('.xp-dict-model').textContent)));
       check("no button without wandSparkles carries a model note",[...withSaved.host.querySelectorAll('.xp-dict-model'),...fresh.host.querySelectorAll('.xp-dict-model')]
         .every(note=>note.parentElement.querySelector(':scope > svg[data-icon="wandSparkles"]')));
       const free=[fresh.host.querySelector('.xp-dict-ai-reveal'),fresh.host.querySelector('.xp-dict-ai-configure'),...fresh.host.querySelectorAll('.xp-dict-usage-stop'),
@@ -3096,7 +3096,7 @@ async function runDictionaryEntrySettingsTests() {
     await oneModel.listener({previewAiModelByProvider:{newValue:{openai:'model-two'}}},"sync");
     oneModel.ctrl.abort();
     const twoModel=switched&&await mount(()=>{},switched);
-    check("a model change reruns the lookup and the paid action names the new model",noteBefore==='· model-one'&&modelNote(twoModel?.host)==='· model-two'&&
+    check("a model change reruns the lookup and the paid action names the new model",noteBefore===' · model-one'&&modelNote(twoModel?.host)===' · model-two'&&
       twoModel.host.querySelector('.xp-dict-ai-generate').checkVisibility());
 
     // A settings change voids a running generation: its seconds stop and its

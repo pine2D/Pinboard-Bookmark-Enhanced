@@ -518,13 +518,14 @@ export async function openDictEntryState(page, state) {
     const face = await page.evaluate(() => {
       const keys = { patterns: 'dictSupplementPatterns', confusables: 'dictSupplementConfusables', etymology: 'dictSupplementEtymology' };
       return [...document.querySelectorAll('[data-learning-block] .xp-dict-supplement-generate[data-remembered="true"]')].map(el => {
-        const model = el.querySelector(':scope > .xp-dict-model')?.textContent || '';
+        const model = el.querySelector(':scope > .xp-dict-model > .xp-dict-model-name')?.textContent || '';
+        const note = el.querySelector(':scope > .xp-dict-model')?.textContent || '';
         const label = el.querySelector(':scope > .xp-dict-model')?.previousElementSibling?.textContent;
         const icon = el.querySelector(':scope > svg')?.outerHTML.replace(/\s+/g, ' ');
         const wand = new DOMParser().parseFromString(PBP_ICONS.wandSparkles, 'text/html').body.firstElementChild.outerHTML.replace(/\s+/g, ' ');
         const aria = el.getAttribute('aria-label') || '';
-        const ok = icon === wand && label === t('dictNegRetry') && /^· \S/.test(model) && !/token/i.test(model) &&
-          aria.startsWith(t(keys[el.dataset.category]) + ' · ') && aria.includes(t('dictNegRetry')) && aria.endsWith(model.slice(2));
+        const ok = icon === wand && label === t('dictNegRetry') && /^\S/.test(model) && note === ' · ' + model && !/token/i.test(note) &&
+          aria.startsWith(t(keys[el.dataset.category]) + ' · ') && aria.includes(t('dictNegRetry')) && aria.endsWith(' · ' + model);
         return ok ? '' : `${el.dataset.category}: label=${label} model=${model} aria=${aria}`;
       }).filter(Boolean);
     });

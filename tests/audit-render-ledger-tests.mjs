@@ -219,13 +219,15 @@ test('usage slots: each category under its own label, patterns before confusable
 test('paid model note: one line in one flow; a wrapped note or a column beside the label fails; none measured is SETUP', () => {
   const blocks = [{ role: 'sense', left: 24 }];
   const withPaid = (buttons, width = 360) => ({ ...probe(blocks), paid: [{ width, buttons }] });
-  const good = [{ path: 'a', lines: 1, flow: true, detail: '' }, { path: 'b', lines: 1, flow: true, detail: '' }];
+  const good = [{ path: 'a', lines: 1, flow: true, sep: true, detail: '' }, { path: 'b', lines: 1, flow: true, sep: true, detail: '' }];
   for (const surface of ['md-preview', 'library']) {
     for (const context of ['dict-entry-result', 'dict-entry-usage-result', 'dict-entry-error', 'dict-entry-paid-negative']) {
       assert.equal(verdicts(withPaid(good), context, surface).dictPaidModel360, 'OK', `${surface}/${context}`);
       // 18-paid-negative-b: "· gpt-5.4- / nano" in a column beside the label.
       assert.equal(verdicts(withPaid([...good, { path: 'c', lines: 2, flow: false, detail: 'column' }]), context, surface).dictPaidModel360, 'FAIL', `${surface}/${context}`);
       assert.equal(verdicts(withPaid([...good, { path: 'c', lines: 1, flow: false, detail: 'beside' }]), context, surface).dictPaidModel360, 'FAIL', `${surface}/${context}`);
+      // The batch-3b review: a wrapped note whose second line starts "· gpt-5.4-nano".
+      assert.equal(verdicts(withPaid([...good, { path: 'c', lines: 1, flow: true, sep: false, detail: 'separator' }]), context, surface).dictPaidModel360, 'FAIL', `${surface}/${context}`);
       assert.equal(verdicts(withPaid([]), context, surface).dictPaidModel360, 'SETUP', `${surface}/${context}`);
       assert.equal(verdicts(probe(blocks), context, surface).dictPaidModel, 'SETUP', `${surface}/${context}`);
     }
