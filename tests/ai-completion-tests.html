@@ -772,6 +772,70 @@ await test('other stream consumers keep their exact empty-stream error shape',as
   try{await callAIStream(COMPAT.settings,'x',SNAP_ASK,()=>{});}catch(e){error=e;}
   assert(error?.message==='API response has no stream body'&&!('code'in error)&&!('status'in error),'Missing-body error changed for Ask');
 });
+// ---- Anthropic Messages caller parameterized by target ----
+// Hand-written from the official Messages schema (platform.claude.com/docs/en/build-with-claude/streaming);
+// the 401 body is the documented error envelope.
+const ANTH_TARGET={provider:'custom-ab12cd',kind:'custom',protocol:'anthropic',endpoint:'https://gateway.example.test/anthropic/v1/',fpEndpoint:'https://gateway.example.test/anthropic/v1#anthropic',official:false,apiKey:'fixture-key',model:'gateway-model',label:'My Gateway',cfg:null,error:null};
+const ANTH_HEADERS='{"Content-Type":"application/json","x-api-key":"fixture-key","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"}';
+const noBearer=h=>!Object.keys(h||{}).some(k=>/^authorization$/i.test(k));
+function captureRequests(){
+  const seen=[],inner=globalThis.fetch;
+  globalThis.fetch=async(url,init)=>{seen.push({url:String(url),headers:init.headers,redirect:init.redirect});return inner(url,init);};
+  return seen;
+}
+await test('Anthropic Messages caller posts to the target base plus /messages with SDK headers and no bearer',async()=>{
+  reset([reply(PROTOCOLS[2].complete),reply(PROTOCOLS[2].complete)]);const seen=captureRequests();
+  const out=await callAnthropicMessages(ANTH_TARGET,'Synthetic provider learning request',{maxTokens:2048,temperature:0.1,jsonMode:true,responseSchema:{type:'object'}});
+  assert(out==='ready','Wrong answer: '+out);
+  assert(seen[0].url==='https://gateway.example.test/anthropic/v1/messages','URL: '+seen[0].url);
+  assert(JSON.stringify(seen[0].headers)===ANTH_HEADERS&&noBearer(seen[0].headers),'Headers: '+JSON.stringify(seen[0].headers));
+  assert(raw[0]==='{"model":"gateway-model","max_tokens":2048,"messages":[{"role":"user","content":"Synthetic provider learning request"}]}','Body: '+raw[0]);
+  await callAnthropicMessages(ANTH_TARGET,'Synthetic provider learning request',{model:'override-model'});
+  assert(calls[1].model==='override-model'&&calls[1].max_tokens===1024,'Override body: '+raw[1]);
+});
+await test('Anthropic Messages stream sends the documented SSE request to the target base',async()=>{
+  reset([STREAM_DONE.claude]);const seen=captureRequests();
+  const out=await _streamAnthropicMessages(ANTH_TARGET,'Synthetic provider learning request',{...SNAP_ASK},()=>{});
+  assert(out==='ready','Wrong answer: '+out);
+  assert(seen[0].url==='https://gateway.example.test/anthropic/v1/messages','URL: '+seen[0].url);
+  assert(JSON.stringify(seen[0].headers)===ANTH_HEADERS&&noBearer(seen[0].headers),'Headers: '+JSON.stringify(seen[0].headers));
+  assert(seen[0].redirect==='error','Redirect: '+seen[0].redirect);
+  assert(raw[0]==='{"model":"fixture-model","max_tokens":2048,"messages":['+SNAP_USER+'],"stream":true,"system":"Synthetic system"}','Body: '+raw[0]);
+});
+await test('a named Anthropic target keeps the empty-stream error shape under its own label',async()=>{
+  const shape=e=>JSON.stringify({ctor:e?.constructor?.name,message:e?.message,code:'code'in(e||{}),status:'status'in(e||{}),reason:'reason'in(e||{}),paramHint:'paramHint'in(e||{})});
+  reset([S(CL_START+clEnd('end_turn'))]);let error;
+  try{await _streamAnthropicMessages(ANTH_TARGET,'x',{...SNAP_ASK},()=>{});}catch(e){error=e;}
+  assert(shape(error)===JSON.stringify({ctor:'Error',message:'My Gateway returned empty response',code:false,status:false,reason:false,paramHint:false}),'Shape: '+shape(error));
+  assert(calls.length===1&&pbpAiStatusPageUrl({aiProvider:'custom-ab12cd'},error)==='','Retried or linked a status page');
+  reset([reply({type:'error',error:{type:'authentication_error',message:'invalid x-api-key'}},401)]);error=null;
+  try{await callAnthropicMessages(ANTH_TARGET,'x',{});}catch(e){error=e;}
+  assert(error&&error.message.startsWith('My Gateway: ')&&error.status===401,'401: '+(error&&error.message)+' '+(error&&error.status));
+});
+await test('built-in Claude reaches api.anthropic.com/v1/messages through its resolved target, keys unchanged',async()=>{
+  const s=PROTOCOLS[2].settings,t0=pbpAiResolveTarget(s);
+  assert(t0.protocol==='anthropic'&&t0.endpoint==='https://api.anthropic.com/v1'&&t0.fpEndpoint===''&&t0.apiKey==='fixture'&&t0.model==='free-model','Target: '+JSON.stringify(t0));
+  reset([reply(PROTOCOLS[2].complete),STREAM_DONE.claude]);const seen=captureRequests();
+  assert(await run({},s)==='ready'&&await stream({},s)==='ready','Wrong answer');
+  for(const r of seen){assert(r.url==='https://api.anthropic.com/v1/messages','URL: '+r.url);assert(r.headers['x-api-key']==='fixture'&&noBearer(r.headers),'Headers');}
+});
+await test('callAI and callAIStream dispatch on the resolved protocol, not the provider id',async()=>{
+  const real=globalThis.pbpAiResolveTarget,s=PROTOCOLS[0].settings;
+  try{
+    reset([reply(PROTOCOLS[0].complete)]);let seen=captureRequests();
+    await run({},s);
+    assert(seen[0].url.endsWith('/chat/completions')&&seen[0].headers.Authorization==='Bearer fixture','Unstubbed custom: '+seen[0].url);
+    globalThis.pbpAiResolveTarget=(x,id)=>({...real(x,id),protocol:'anthropic',endpoint:'https://example.test/v1',label:'Fixture'});
+    reset([reply(PROTOCOLS[2].complete),STREAM_DONE.claude]);seen=captureRequests();
+    await run({temperature:0.1},s);await stream({temperature:0.1},s);
+    for(const r of seen){assert(r.url==='https://example.test/v1/messages'&&noBearer(r.headers)&&r.headers['x-api-key']==='fixture','Anthropic dispatch: '+r.url);}
+    assert(raw.every(b=>!b.includes('temperature')),'temperature leaked: '+raw);
+    globalThis.pbpAiResolveTarget=(x,id)=>({...real(x,id),error:'provider_missing'});
+    reset([reply(PROTOCOLS[0].complete)]);
+    await rejected(()=>run({},s),'provider_missing');assert(calls.length===0,'run fetched');
+    await rejected(()=>stream({},s),'provider_missing');assert(calls.length===0,'stream fetched');
+  }finally{globalThis.pbpAiResolveTarget=real;}
+});
 await test('Gemini thoughts, compatible reasoning and Claude thinking never reach answer text',async()=>{
   const cases=[[COMPAT,oa({role:'assistant',reasoning_content:PRIVATE})+oa({reasoning:PRIVATE})+oa({content:'ready'})+oa({},'stop')],
     [GEMINI,gm([{thought:true,text:PRIVATE},{text:'ready'}],'STOP')],

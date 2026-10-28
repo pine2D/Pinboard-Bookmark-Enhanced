@@ -9386,7 +9386,7 @@ suite("pbpAiResolveTarget", () => {
     assertEq(g.error, null, "gemini error");
     const c = pbpAiResolveTarget(d({ aiProvider: "claude" }));
     assertEq(c.protocol, "anthropic", "claude protocol");
-    assertEq(c.endpoint, "https://api.anthropic.com", "claude endpoint");
+    assertEq(c.endpoint, "https://api.anthropic.com/v1", "claude endpoint");
     assertEq(c.fpEndpoint, "", "claude fpEndpoint");
     const o = pbpAiResolveTarget(d({ aiProvider: "ollama" }));
     assertEq(o.endpoint, "http://localhost:11434", "ollama endpoint");

@@ -348,11 +348,11 @@ const OPENAI_COMPAT_PROVIDERS = {
 // its provider-resolution golden).
 // The bespoke callers' own table (gemini / claude / ollama). A plain literal:
 // the K81 gate in tests/ui-contract-tests.mjs evaluates it and compares each
-// defaultModel with SETTINGS_DEFAULTS. callGemini / callClaude / callOllama
+// defaultModel with SETTINGS_DEFAULTS. callGemini / callAnthropicMessages / callOllama
 // still carry their own fallback models; K81 keeps the copies equal.
 const _AI_BESPOKE_PROVIDERS = {
   gemini: { protocol: "gemini",    keyField: "geminiApiKey", modelField: "geminiModel", defaultModel: "gemini-3.5-flash-lite", base: "https://generativelanguage.googleapis.com" },
-  claude: { protocol: "anthropic", keyField: "claudeApiKey", modelField: "claudeModel", defaultModel: "claude-haiku-4-5",      base: "https://api.anthropic.com" },
+  claude: { protocol: "anthropic", keyField: "claudeApiKey", modelField: "claudeModel", defaultModel: "claude-haiku-4-5",      base: "https://api.anthropic.com/v1" },
   ollama: { protocol: "ollama",    keyField: "",             modelField: "ollamaModel", defaultModel: "llama3.2",              base: "http://localhost:11434", baseField: "ollamaBaseUrl" },
 };
 
@@ -611,17 +611,41 @@ function hasAIKey(s) {
 function _aiTargetOriginPattern(s) {
   const target = pbpAiResolveTarget(s);
   if (target.error === "provider_missing") return null;
-  if (target.error === "endpoint_invalid") {
-    let message = "Invalid or insecure AI endpoint. Use HTTPS, or HTTP only with localhost, 127.0.0.1, or [::1].";
-    try {
-      const translated = t("mdTargetWebhookHttpWarn");
-      if (translated && translated !== "mdTargetWebhookHttpWarn") message = translated;
-    } catch (_) {}
-    const err = new Error(message);
-    err.code = "endpoint_invalid";
-    throw err;
-  }
+  if (target.error === "endpoint_invalid") throw _aiTargetErrorFor(target);
   return pbpEndpointOriginPattern(target.endpoint);
+}
+
+function _aiEndpointInvalidMessage() {
+  let message = "Invalid or insecure AI endpoint. Use HTTPS, or HTTP only with localhost, 127.0.0.1, or [::1].";
+  try {
+    const translated = t("mdTargetWebhookHttpWarn");
+    if (translated && translated !== "mdTargetWebhookHttpWarn") message = translated;
+  } catch (_) {}
+  return message;
+}
+
+// The Error a failed resolution throws, before any request: carries the
+// resolver's code. Shared by the permission gate and the dispatchers.
+function _aiTargetErrorFor(target) {
+  let message;
+  if (target.error === "provider_missing") {
+    message = "The selected AI provider is no longer configured. Choose one in Settings.";
+    try {
+      const translated = t("aiErrorProviderMissing");
+      if (translated && translated !== "aiErrorProviderMissing") message = translated;
+    } catch (_) {}
+  } else {
+    message = _aiEndpointInvalidMessage();
+  }
+  const err = new Error(message);
+  err.code = target.error;
+  return err;
+}
+
+// Error-message label of a transport: built-in Claude keeps its literal name
+// (the resolver label there is the i18n name); anything else shows the entry.
+function _aiTransportLabel(target) {
+  return target.provider === "claude" ? "Claude" : (target.label || "API");
 }
 
 // Synchronous collector used by direct user gestures. Extra destinations (currently
@@ -701,8 +725,7 @@ async function _ensureAIHostPermission(s) {
 // never a model-name list. Callers that pass none of these options get the
 // registered provider entry plus its endpoint and two false flags, which the
 // body dialect already defaulted to — their requests stay byte-identical.
-function _aiCompatCfg(s, p, opts = {}) {
-  const target = pbpAiResolveTarget(s, p);
+function _aiCompatCfg(s, p, opts = {}, target = pbpAiResolveTarget(s, p)) {
   const registered = target.protocol === "openai" ? target.cfg : null;
   if (!registered) throw new Error("Unknown provider: " + p);
   const endpoint = target.endpoint;
@@ -725,12 +748,13 @@ function _aiCompatCfg(s, p, opts = {}) {
 // cannot send a request. Calls without the callback retain their existing path.
 async function callAI(s, prompt, opts = {}) {
   await _ensureAIHostPermission(s);
-  const p = s.aiProvider || "gemini";
-  if (p === "gemini") return callGemini(s, prompt, opts);
-  if (p === "claude") return callClaude(s, prompt, opts);
-  if (p === "ollama") return callOllama(s, prompt, opts);
-  const target = pbpAiResolveTarget(s, p);
-  const cfg = _aiCompatCfg(s, p, opts);
+  const target = pbpAiResolveTarget(s);
+  if (target.error) throw _aiTargetErrorFor(target);
+  const p = target.provider;
+  if (target.protocol === "gemini") return callGemini(s, prompt, opts);
+  if (target.protocol === "anthropic") return callAnthropicMessages(target, prompt, opts);
+  if (target.protocol === "ollama") return callOllama(s, prompt, opts);
+  const cfg = _aiCompatCfg(s, p, opts, target);
   const model = opts.model || target.model;
   return _aiWithDialectFallback(p, model, cfg, (extraBody, dialect) =>
     callOpenAICompat(cfg.endpoint, target.apiKey, model, prompt, { ...opts, extraBody, ...dialect }));
@@ -923,18 +947,18 @@ async function _callGeminiOnce(s, model, prompt, opts, extraBody) {
   return _aiReadCompletion(res, "gemini", opts);
 }
 
-async function callClaude(s, prompt, opts = {}) {
+async function callAnthropicMessages(target, prompt, opts = {}) {
   const maxTokens = opts.maxTokens || 1024;
   if (typeof opts.beforeRequest === "function") {
     await opts.beforeRequest();
     opts.signal?.throwIfAborted();
   }
-  const res = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
+  const res = await fetchWithTimeout(target.endpoint.replace(/\/+$/, "") + "/messages", {
     method: "POST", signal: opts.signal,
-    headers: { "Content-Type": "application/json", "x-api-key": s.claudeApiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-    body: JSON.stringify({ model: opts.model || s.claudeModel || "claude-haiku-4-5", max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] })
+    headers: { "Content-Type": "application/json", "x-api-key": target.apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+    body: JSON.stringify({ model: opts.model || target.model, max_tokens: maxTokens, messages: [{ role: "user", content: prompt }] })
   }, _aiCompletionTimeout(opts));
-  if (!res.ok) await handleAIError(res, "Claude");
+  if (!res.ok) await handleAIError(res, _aiTransportLabel(target));
   return _aiReadCompletion(res, "claude", opts);
 }
 
@@ -1670,17 +1694,17 @@ async function _streamGemini(s, prompt, opts, onDelta) {
 // Anthropic deprecated temperature/top_p/top_k for Claude Opus 4.7 and later
 // models: a non-default value now returns a 400 (recommended replacement is
 // to omit the field and steer behavior via prompting instead). The
-// non-streaming callClaude above never sent temperature, so this body now
+// non-streaming callAnthropicMessages above never sent temperature, so this body now
 // matches that already-safe shape. opts.temperature is intentionally
 // ignored on this branch — callers that pass it (md-translate.js's 0.1) are
 // still honored on every other provider. No parameter-level self-heal is
 // built for this one, unlike thinkingOff: omitting it has no measurable
-// downside (tags/summary already run on default sampling via callClaude;
+// downside (tags/summary already run on default sampling via callAnthropicMessages;
 // pbpAiCache keys only on prompt/model, not sampling params), so there is
 // nothing worth memoizing per (provider, model).
-async function _streamClaude(s, prompt, opts, onDelta) {
+async function _streamAnthropicMessages(target, prompt, opts, onDelta) {
   const body = {
-    model: opts.model || s.claudeModel || "claude-haiku-4-5",
+    model: opts.model || target.model,
     max_tokens: opts.maxTokens || 1024,
     messages: [{ role: "user", content: prompt }],
     stream: true
@@ -1690,23 +1714,23 @@ async function _streamClaude(s, prompt, opts, onDelta) {
   const usage = _pbpUsageSink(_pbpClaudeUsage, opts);
   const contract = _pbpStreamContract("claude", opts);
   const status = await _pbpStreamRead(
-    "https://api.anthropic.com/v1/messages",
+    target.endpoint.replace(/\/+$/, "") + "/messages",
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": s.claudeApiKey,
+        "x-api-key": target.apiKey,
         "anthropic-version": "2023-06-01",
         "anthropic-dangerous-direct-browser-access": "true"
       },
       body: JSON.stringify(body)
     },
-    opts, "Claude",
+    opts, _aiTransportLabel(target),
     _pbpSseConsumer(_pbpClaudeDelta, (d) => { contract.onText(d); full += d; onDelta(d, full); },
       (obj) => { usage.onRaw(obj); contract.onRaw(obj); }, contract.onParseError)
   );
   contract.finish(full, status);
-  if (!full.trim()) throw new Error("Claude returned empty response");
+  if (!full.trim()) throw new Error(_aiTransportLabel(target) + " returned empty response");
   usage.flush();
   return full;
 }
@@ -1811,8 +1835,10 @@ async function callAIStream(s, prompt, opts = {}, onDelta) {
 
 async function _aiStreamDispatch(s, prompt, opts, cb, control) {
   await _ensureAIHostPermission(s);
-  const p = s.aiProvider || "gemini";
-  if (p === "gemini") {
+  const target = pbpAiResolveTarget(s);
+  if (target.error) throw _aiTargetErrorFor(target);
+  const p = target.provider;
+  if (target.protocol === "gemini") {
     // Streaming keeps thinking ON by default — 3c03380 scoped the shared
     // self-heal to the non-streaming caller. Only the translate path asks for a
     // zero budget, and it is that request that needs the wrapper's 400/422
@@ -1829,13 +1855,12 @@ async function _aiStreamDispatch(s, prompt, opts, cb, control) {
     return _aiWithDialectFallback("gemini", gModel, _GEMINI_THINKING_CFG, (extraBody) =>
       _streamGemini(s, prompt, { ...opts, model: gModel, extraBody }, cb), control);
   }
-  if (p === "claude") return _streamClaude(s, prompt, opts, cb);
-  if (p === "ollama") return _streamOllama(s, prompt, opts, cb);
+  if (target.protocol === "anthropic") return _streamAnthropicMessages(target, prompt, opts, cb);
+  if (target.protocol === "ollama") return _streamOllama(s, prompt, opts, cb);
   // Same task configuration and capability record as callAI. The dialect is
   // spread after opts on purpose: its jsonMode/schemaMode come from this cfg,
   // which read them from opts, so the two cannot disagree.
-  const target = pbpAiResolveTarget(s, p);
-  const cfg = _aiCompatCfg(s, p, opts);
+  const cfg = _aiCompatCfg(s, p, opts, target);
   const model = opts.model || target.model;
   return _aiWithDialectFallback(p, model, cfg, (extraBody, dialect) =>
     _streamOpenAICompat(cfg.endpoint, target.apiKey, model, prompt, { ...opts, extraBody, ...dialect }, cb), control);
