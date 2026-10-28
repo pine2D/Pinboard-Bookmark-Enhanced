@@ -38,6 +38,10 @@ const DICT_PAID_NEGATIVE_TARGET = '[data-learning-block="etymology"] .xp-dict-su
 // paid button's model note must stay on one line, at both. --viewport picks.
 export const DICT_STICKY_VIEWPORTS = Object.freeze(['360', '1280']);
 const sticky = { viewports: DICT_STICKY_VIEWPORTS };
+// The library save bar's Save label wraps inside the button below 440px; the
+// longest labels are German and French (batch-3b review, 16-save-bar-b), so
+// the state runs once per locale (--locale picks).
+export const DICT_SAVE_BAR_LOCALES = Object.freeze(['en', 'de', 'fr']);
 export const RENDER_SWEEP_CONTEXTS = Object.freeze({
   options: [...RENDER_OPTIONS_TABS.map((name) => context(name, [], { target: `#panel-${name.slice(4)}.active` })),
     context('vocab-pack-preview', [], { target: '#multi-pack-preview:not([hidden])' }),
@@ -79,7 +83,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('dict-entry-legacy', [], { target: '.xp-dict-ai-details[data-supplement-category="literature"][open]' }),
     // The sticky save bar (dict redesign 3.2): the meaning listbox beside
     // Save, then its choice list opened by click.
-    context('dict-save-bar', [], { target: '.vocab-save-controls .listbox-btn', ...sticky }),
+    context('dict-save-bar', [], { target: '.vocab-save-controls .listbox-btn', locales: DICT_SAVE_BAR_LOCALES, ...sticky }),
     context('dict-save-change-menu', ['dict-save-bar'], { target: '[id^="vocab-save-definition-opt-"]:not([hidden])' }),
     // A saved AI entry whose three paid learning actions this account last
     // found nothing for, with an AI key configured (plan 3.3): each reads

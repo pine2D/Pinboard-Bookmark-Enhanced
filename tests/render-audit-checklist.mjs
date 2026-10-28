@@ -760,6 +760,11 @@ export function evaluateMediaProbe(probe, check) {
 // holds at most one icon-only button. e023a00b's (d): at <=440px the bar
 // used to cut the save button to a bare bookmarkPlus square next to the
 // re-lookup square, two identical icon squares that read as the same action.
+// A label that wraps reads in body lines: the button is no taller than the
+// control rung plus one body line per extra line (+edgeTolerancePx). The
+// batch-3b review's 16-save-bar-b (de, 360): "Gespeicherte Vokabel
+// aktualisieren" kept the rung's 30px line-height, two lines in a 62px
+// button with the icon floating between them.
 //
 // dictSaveBarFocus<W> (requires "sticky", library only, the same widths):
 // with the save bar stuck, keyboard focus on any control of the lookup above
@@ -788,7 +793,10 @@ export function evaluateMediaProbe(probe, check) {
 // dictSaveMenuChoices (requires "menu", library): every row the open save
 // list shows names a definition; the closed face's "Definition to save"
 // prompt is never one of them (dict.md: no "none" option; the review's
-// 17-save-change-menu-a).
+// 17-save-change-menu-a). No row repeats the word the lookup's heading
+// names as "word · ": the word leads a row only when that choice saves a
+// different word (the reader's rule, 1e428072; the batch-3b review's
+// lib-menus: "serendipity · ..." on every row under "serendipity").
 export const DICT_LOOKUP_GEOMETRY = {
   edgeTolerancePx: 1,
   maxLeftEdges: 2,
@@ -796,6 +804,7 @@ export const DICT_LOOKUP_GEOMETRY = {
   sticky: {
     viewports: [360, 1280], scroller: "#vocab-detail-pane", foot: "#vocab-ref-result .vocab-ref-foot", back: ".vocab-detail-back",
     save: ".vocab-lookup-save", saveLabel: ":scope > span:last-child", relookup: ".vocab-ref-relookup",
+    controlH: "--lib-control-h", bodyLh: "--lib-lh-body",
     focusables: "button, a[href], summary, select, input, textarea, [tabindex]:not([tabindex='-1'])",
   },
   paid: { note: "button > .xp-dict-model" },
@@ -814,7 +823,7 @@ export const DICT_LOOKUP_GEOMETRY = {
   // and how a node names the category it belongs to.
   // dictSaveMenuBox / dictSaveMenuChoices: the open save choice list, and
   // (reader) the lookup card whose content box it must span.
-  menu: { reader: ".xp-dict-save-menu:popover-open", frame: ".reader-dict-session", library: '[id="vocab-save-definition-list"]' },
+  menu: { reader: ".xp-dict-save-menu:popover-open", frame: ".reader-dict-session", library: '[id="vocab-save-definition-list"]', titles: ["#vocab-ref-result .vocab-ref-term", "#vocab-detail-pane .vocab-detail-term"] },
   slots: { block: '[data-learning-block="usage"]', categories: ["patterns", "confusables"], label: ".xp-dict-learning-label",
     action: ".xp-dict-supplement-generate", row: ".xp-dict-usage-actions", result: "[data-supplement-category]",
     slot: ".xp-dict-learning-slot", profile: ".xp-dict-supplement-profile" },
@@ -1003,9 +1012,14 @@ export function evaluateDictLookupGeometry(probe, opts) {
     else if (surface === "library") {
       const rows = menu.rows || [];
       const prompts = rows.filter((r) => !r.value);
+      const title = String(menu.title || "").trim();
+      const repeats = title ? rows.filter((r) => r.value && String(r.text || "").startsWith(`${title} · `)) : [];
       if (!rows.length) setup(check, "rows in the save bar's open choice list");
-      else row(check, !prompts.length, prompts.length ? `${prompts.length} row(s) without a definition, e.g. "${prompts[0].text}"` : `${rows.length} definition row(s)`,
-        "every listed row names a definition; the face's prompt is not a choice");
+      else if (!title) setup(check, "the lookup heading's word above the save bar");
+      else row(check, !prompts.length && !repeats.length,
+        prompts.length ? `${prompts.length} row(s) without a definition, e.g. "${prompts[0].text}"`
+          : repeats.length ? `${repeats.length}/${rows.length} row(s) repeat the heading's word, e.g. "${repeats[0].text}"` : `${rows.length} definition row(s)`,
+        `every listed row names a definition, none led by the heading's "${title} · "; the face's prompt is not a choice`);
     } else if (!menu.frame) setup(check, "the lookup card around the open choice list");
     else {
       const { box, frame } = menu;
@@ -1076,10 +1090,13 @@ export function evaluateDictLookupGeometry(probe, opts) {
       if (!save) setup(text, `a visible save button in ${spec.sticky.foot} at ${width}px`);
       else {
         const iconOnly = save.iconOnly || [];
-        const ok = save.labelVisible && !!save.label && save.width > save.relookupWidth && iconOnly.length <= 1;
+        const lines = Math.max(1, save.lines || 0);
+        const rung = save.controlH > 0 && save.bodyLh > 0 ? save.controlH + (lines - 1) * save.bodyLh : NaN;
+        const fits = Number.isFinite(rung) && Number.isFinite(save.height) && save.height <= rung + tol;
+        const ok = save.labelVisible && !!save.label && save.width > save.relookupWidth && iconOnly.length <= 1 && fits;
         row(text, ok,
-          `label ${save.labelVisible ? `"${save.label}"` : "not rendered"}, save ${round(save.width)}px vs re-lookup ${round(save.relookupWidth)}px; icon-only: ${iconOnly.length ? iconOnly.join(", ") : "none"}`,
-          "the save button shows its label, is wider than the re-lookup, and the bar has at most one icon-only button");
+          `label ${save.labelVisible ? `"${save.label}"` : "not rendered"}, save ${round(save.width)}x${round(save.height)}px (${lines} line(s), rung ${Number.isFinite(rung) ? round(rung) : "unmeasured"}px) vs re-lookup ${round(save.relookupWidth)}px; icon-only: ${iconOnly.length ? iconOnly.join(", ") : "none"}`,
+          `the save button shows its label, is wider than the re-lookup, is no taller than control-h + one body line per wrap (+${tol}px), and the bar has at most one icon-only button`);
       }
       const back = view?.back;
       if (!back) continue; // two panes: there is no back bar at this width

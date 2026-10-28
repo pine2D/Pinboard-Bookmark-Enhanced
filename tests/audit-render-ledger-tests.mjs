@@ -293,7 +293,7 @@ test('save bar focus: a focused control clear of the stuck bar; one under it fai
 test('save text: the save button keeps its label beside the icon-only re-lookup; two icon squares fail', () => {
   const blocks = [{ role: 'sense', left: 24 }];
   const foot = { stuck: true, bottom: 900, scrollerBottom: 900, strip: [] };
-  const save = (over = {}) => ({ labelVisible: true, label: 'Save to vocabulary', width: 180, relookupWidth: 26, iconOnly: ['button.btn.vocab-ref-relookup'], ...over });
+  const save = (over = {}) => ({ labelVisible: true, label: 'Save to vocabulary', width: 180, height: 32, lines: 1, controlH: 32, bodyLh: 20, relookupWidth: 26, iconOnly: ['button.btn.vocab-ref-relookup'], ...over });
   const at = (s360, s1280 = save()) => ({ ...probe(blocks), sticky: [{ width: 360, foot, back: null, save: s360 }, { width: 1280, foot, back: null, save: s1280 }] });
   for (const context of ['dict-entry-result', 'dict-entry-usage-result', 'dict-save-bar', 'dict-entry-paid-negative']) {
     const out = verdicts(at(save()), context, 'library');
@@ -310,6 +310,15 @@ test('save text: the save button keeps its label beside the icon-only re-lookup;
   for (const over of [{ labelVisible: false }, { label: '' }, { width: 26 }, { iconOnly: ['a', 'b'] }]) {
     assert.equal(verdicts(at(save(over)), 'dict-save-bar', 'library').dictSaveText360, 'FAIL', JSON.stringify(over));
   }
+  // The batch-3b review's 16-save-bar-b (de, 360): a two-line label in the
+  // rung's 30px line-height made a 62px button; two body lines fit 52.
+  assert.equal(verdicts(at(save({ label: 'Gespeicherte Vokabel aktualisieren', width: 262, lines: 2, height: 62 })), 'dict-save-bar', 'library').dictSaveText360, 'FAIL');
+  assert.equal(verdicts(at(save({ label: 'Gespeicherte Vokabel aktualisieren', width: 262, lines: 2, height: 52 })), 'dict-save-bar', 'library').dictSaveText360, 'OK');
+  assert.equal(verdicts(at(save({ lines: 1, height: 34 })), 'dict-save-bar', 'library').dictSaveText360, 'FAIL');
+  // Compact density: 28 + 18 for a second line.
+  assert.equal(verdicts(at(save({ controlH: 28, bodyLh: 18, lines: 2, height: 46 })), 'dict-save-bar', 'library').dictSaveText360, 'OK');
+  // Unread tokens cannot pass the height check.
+  assert.equal(verdicts(at(save({ controlH: 0 })), 'dict-save-bar', 'library').dictSaveText360, 'FAIL');
   // No save button measured at a width the axis selects is SETUP.
   assert.equal(verdicts(at(null), 'dict-save-bar', 'library').dictSaveText360, 'SETUP');
   assert.equal(verdicts({ ...probe(blocks), sticky: [] }, 'dict-save-bar', 'library').dictSaveText1280, 'SETUP');
@@ -337,10 +346,17 @@ test('save choice list: inside the reader card, definitions only in the library'
   assert.equal(verdicts(withMenu({ open: true, box: { left: 440, right: 905 }, frame, rows: [] }), 'dict-save-change-menu').dictSaveMenuBox, 'FAIL');
   assert.equal(verdicts(withMenu(null), 'dict-save-change-menu').dictSaveMenuBox, 'SETUP');
   assert.equal(verdicts(withMenu({ open: true, box: { left: 427, right: 905 }, frame: null, rows: [] }), 'dict-save-change-menu').dictSaveMenuBox, 'SETUP');
-  const lib = (rows) => verdicts(withMenu({ open: true, rows }), 'dict-save-change-menu', 'library').dictSaveMenuChoices;
+  const lib = (rows, title = 'serendipity') => verdicts(withMenu({ open: true, rows, title }), 'dict-save-change-menu', 'library').dictSaveMenuChoices;
   assert.equal(lib([{ value: 'online:0', text: 'a' }, { value: 'ai:0', text: 'b' }]), 'OK');
   // 17-save-change-menu-a: the "Definition to save" prompt listed as a row.
   assert.equal(lib([{ value: '', text: 'Definition to save' }, { value: 'online:0', text: 'a' }]), 'FAIL');
+  // The batch-3b review's lib-menus: every row led by the heading's word.
+  assert.equal(lib([{ value: 'online:0', text: 'serendipity · luck (Wiktionary)' }, { value: 'ai:0', text: 'b' }]), 'FAIL');
+  // A different word to save (a lemma, a shorter headword) keeps its word.
+  assert.equal(lib([{ value: 'pack:0', text: 'run · to move fast (Pack)' }, { value: 'online:0', text: 'luck' }], 'running'), 'OK');
+  assert.equal(lib([{ value: 'online:0', text: 'serendipityism · x' }]), 'OK');
+  // No heading to compare with is SETUP, not a pass.
+  assert.equal(lib([{ value: 'online:0', text: 'a' }], ''), 'SETUP');
   assert.equal(lib([]), 'SETUP');
   assert.equal(verdicts(withMenu({ open: false, rows: [] }), 'dict-save-change-menu', 'library').dictSaveMenuChoices, 'SETUP');
   // Other contexts do not require it.

@@ -2109,11 +2109,17 @@ html.motion-ready .vocab-note-save {
 /* A narrow bar keeps Save's text: only the secondary re-lookup is an icon
    (with two icon squares side by side the two read alike). The meaning
    listbox keeps the row while it has 160px beside Save; below that Save
-   moves to the line under it, and a long label wraps inside the button. */
+   moves to the line under it, and a long label wraps inside the button.
+   A wrapped label reads in body lines, not in control-high ones: the .btn
+   rung's line-height (control-h - 2) made German "Gespeicherte Vokabel
+   aktualisieren" two 30px lines in a 62px button (batch-3b review). Body
+   line-height plus the block inset that centres one line keeps one line at
+   exactly control-h and adds one body line per wrap (audit dictSaveText). */
 @container dict-save (max-width: 440px) {
   .vocab-save-controls { display: flex; flex-wrap: wrap; }
   .vocab-save-controls > .listbox { flex: 1 1 160px; }
-  .vocab-save-controls > .vocab-lookup-save { flex: 0 1 auto; max-width: 100%; height: auto; min-height: var(--lib-control-h); white-space: normal; text-align: start; }
+  .vocab-save-controls > .vocab-lookup-save { flex: 0 1 auto; max-width: 100%; height: auto; min-height: var(--lib-control-h); white-space: normal; text-align: start;
+    line-height: var(--lib-lh-body); padding-block: calc((var(--lib-control-h) - 2px - var(--lib-lh-body)) / 2); }
   .vocab-save-controls > .save-status { flex: 1 1 100%; }
 }
 .vocab-lemma-hint, .vocab-hidden-word { margin-top: var(--lib-sp-2); }

@@ -4380,6 +4380,21 @@ await (async () => {
       let select=$id("vocab-ref-result").querySelector(".vocab-save-definition");
       check("packs: two actual headwords from one source remain independently selectable",select?.options.length===3);
       check("packs: local choices appear while the online lookup is still pending",!!select&&remoteCalls===1&&$id("vocab-ref-result").getAttribute("aria-busy")==="true");
+      {
+        // The heading names "gift": its own definition is listed without the
+        // word, a different word to save ("Gift") keeps "word · " (the
+        // reader's rule from 1e428072), on the closed face too.
+        const options=select?[...select.options].filter(option=>option.value):[];
+        const same=options.find(option=>option.textContent.includes("gabe")),other=options.find(option=>option.textContent.includes("poison"));
+        check("packs: a choice for the heading's word omits the word, another word keeps it",
+          same?.textContent==="gabe (User dictionary)"&&same?.dataset.meaningText==="gabe"&&
+          other?.textContent==="Gift · poison (User dictionary)"&&other?.dataset.meaningText==="Gift · poison");
+        if(same){select.value=same.value;select.dispatchEvent(new Event("change"));}
+        // listbox.js (not loaded here) draws the closed face from the selected
+        // option's text.
+        const face=select?.selectedOptions[0]?.textContent||"";
+        check("packs: the closed face shows the chosen definition without repeating the heading's word",face==="gabe (User dictionary)",face);
+      }
       const opt=select&&[...select.options].find(option=>option.textContent.includes("Gift · poison"));
       if(opt){select.value=opt.value;select.dispatchEvent(new Event("change"));$id("vocab-ref-result").querySelector(".vocab-lookup-save").click();await settle();}
       check("packs: Save writes the matched headword, original gloss and reading",writes[0]?.data.term==="Gift"&&writes[0]?.data.gloss==="poison"&&writes[0]?.data.ipa==="reading");

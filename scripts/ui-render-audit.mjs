@@ -88,7 +88,7 @@ import { isolatedFontconfigEnv, parityProbeEnv, parityReproduceCommand } from ".
 import { auditSelection } from "./audit-scope.mjs";
 import { RENDER_SCENARIOS, RENDER_SWEEP_CONTEXTS, RENDER_OPTIONS_TABS, RENDER_READER_CONTEXTS,
   RENDER_DARK_THEMES, checkScenarioId, sweepScenarioId, paintScenarioId, mediaScenarioId,
-  renderThemes, renderSweepPlan, runRenderScenario, popupCheckSetup, DICT_PAID_NEGATIVE_LOCALES } from "./audit-render-scenarios.mjs";
+  renderThemes, renderSweepPlan, runRenderScenario, popupCheckSetup, DICT_PAID_NEGATIVE_LOCALES, DICT_SAVE_BAR_LOCALES } from "./audit-render-scenarios.mjs";
 
 import {
   CHECKS,
@@ -3630,6 +3630,29 @@ async function scanDictPaidNegative(page, extBase, surface, scan) {
         if (surface === "library") await setLibraryLocale(page, extBase, locale);
         else await setReaderLocale(page, extBase, locale);
         return openDictEntryState(page, "paid-negative");
+      });
+    }
+  } finally {
+    await restoreDictLocale(page, extBase);
+  }
+}
+
+// The library save bar once per listed UI locale: switch the language, run
+// the lookup again so the bar is rebuilt with that locale's labels, measure.
+// The UI language goes back to English afterwards.
+async function scanDictSaveBar(page, extBase, scan) {
+  const id = sweepScenarioId("library", "dict-save-bar");
+  try {
+    for (const locale of audit.values(id, "locale", DICT_SAVE_BAR_LOCALES)) {
+      console.log(`[render-audit] library/dict-save-bar: ${locale}`);
+      await scan("library", "dict-save-bar", async () => {
+        await setLibraryLocale(page, extBase, locale);
+        await page.locator("#vocab-lookup-go").click();
+        await page.waitForFunction(() => {
+          const label = document.querySelector("#vocab-ref-result .vocab-lookup-save")?.getAttribute("aria-label");
+          return !!label && [t("dictSaveVocab"), t("dictUpdateVocab")].includes(label);
+        });
+        return openDictEntryState(page, "save-bar");
       });
     }
   } finally {
@@ -9168,10 +9191,29 @@ async function probeDictStickyBars(cfg) {
       const relookup = foot.querySelector(cfg.relookup);
       const textOf = (button) => [...button.children].some((child) => !child.matches(".btn-ic") && visible(child) && child.textContent.trim() && child.getBoundingClientRect().width > 0);
       const iconOnly = [...foot.querySelectorAll("button")].filter((b) => visible(b) && !textOf(b)).map(pathOf);
+      // How many text lines the label takes (rects of one line merged), and
+      // the rung it must fit: control-h for one line plus one body line per
+      // wrap, read from the page's own tokens.
+      const lineCount = (el) => {
+        if (!el) return 0;
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const tops = [];
+        for (const r of [...range.getClientRects()].filter((r) => r.width > 0.5 && r.height > 0.5)) {
+          const mid = (r.top + r.bottom) / 2;
+          if (!tops.some((t) => mid > t.top && mid < t.bottom)) tops.push({ top: r.top, bottom: r.bottom });
+        }
+        return tops.length;
+      };
+      const px = (name) => parseFloat(getComputedStyle(save).getPropertyValue(name)) || 0;
       out.save = {
         labelVisible: !!lr && lr.width > 0 && lr.height > 0,
         label: label ? label.textContent.trim() : "",
         width: save.getBoundingClientRect().width,
+        height: save.getBoundingClientRect().height,
+        lines: lineCount(label),
+        controlH: px(cfg.controlH),
+        bodyLh: px(cfg.bodyLh),
         relookupWidth: relookup && visible(relookup) ? relookup.getBoundingClientRect().width : 0,
         iconOnly,
       };
@@ -9277,7 +9319,11 @@ function probeDictSaveMenu(cfg) {
   if (!list || !shows(list)) return { open: false, rows: [] };
   const rows = [...list.querySelectorAll('[role="option"]')].filter(shows)
     .map((li) => ({ value: li.dataset.value || "", text: (li.textContent || "").trim().slice(0, 60) }));
-  return { open: true, rows };
+  // The word the lookup's heading names -- a free lookup's own heading, else
+  // the saved word's: a row repeats it only for a different word to save.
+  const heading = cfg.titles.map((sel) => document.querySelector(sel)).find(shows);
+  const title = (heading?.textContent || "").trim();
+  return { open: true, rows, title };
 }
 async function measureDictLookupGeometry(page, surface, context, theme) {
   const spec = DICT_LOOKUP_GEOMETRY.surfaces[surface];
@@ -9317,9 +9363,9 @@ async function measureDictLookupGeometry(page, surface, context, theme) {
       if (DICT_LOOKUP_GEOMETRY.viewports.includes(width)) probe.viewports.push({ width, ...(await page.evaluate(probeDictLookupOverflow, overflowRoot)) });
       probe.paid.push({ width, buttons: await page.evaluate(probeDictPaidModels, { root, note: DICT_LOOKUP_GEOMETRY.paid.note }) });
       if (stickyViewports.includes(width)) {
-        const { scroller, foot, back, save, saveLabel, relookup, focusables } = DICT_LOOKUP_GEOMETRY.sticky;
+        const { scroller, foot, back, save, saveLabel, relookup, focusables, controlH, bodyLh } = DICT_LOOKUP_GEOMETRY.sticky;
         const tol = DICT_LOOKUP_GEOMETRY.edgeTolerancePx;
-        probe.sticky.push({ width, ...(await page.evaluate(probeDictStickyBars, { scroller, foot, back, save, saveLabel, relookup, focusables, tol })) });
+        probe.sticky.push({ width, ...(await page.evaluate(probeDictStickyBars, { scroller, foot, back, save, saveLabel, relookup, focusables, controlH, bodyLh, tol })) });
       }
     }
   } finally {
@@ -9551,7 +9597,7 @@ async function runSweep(page, sw, extBase) {
         await vocabHead.click();
         await page.locator("#vocab-lookup-go").click();
       }
-      await scan("library", "dict-save-bar", () => openDictEntryState(page, "save-bar"));
+      await scanDictSaveBar(page, extBase, scan);
     }
     if (wants("library", "dict-save-change-menu")) {
       await scan("library", "dict-save-change-menu", () => openDictEntryState(page, "save-change-menu"));

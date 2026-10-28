@@ -1125,11 +1125,19 @@ function _pbpVocabSyncDictPronunciation() {
 }
 
 // Choices retain the normalized source record, never dictionary DOM text.
-// A source may resolve a shorter headword (CC-CEDICT prefix matching), so
-// every option names the exact word whose definition it would save.
+// A source may resolve a shorter headword (CC-CEDICT prefix matching).
 function _pbpVocabLookupChoices(norm, lang, sentence = "") {
   const shown = norm && { ...norm, entries: pbpDictOrderForContext(norm.entries, sentence) };
   return pbpDictNormChoices(shown, lang, t("dictSource"));
+}
+
+// A choice's text in the save list and on its closed face (the reader's
+// rule, md-dict.js _pbpDictChoiceLabel): the lookup's heading already names
+// the word, so the word is repeated only when the choice saves a different
+// one -- a linked lemma, or a shorter CC-CEDICT headword.
+function _pbpVocabLookupChoiceLabel(state, choice) {
+  const title = pbpDictNormalizeTerm(state.dictionaryTerm || "");
+  return choice.term && pbpDictNormalizeTerm(choice.term) !== title ? choice.term + " · " + choice.gloss : choice.gloss;
 }
 
 function _pbpVocabLookupChoiceIdentity(choice) {
@@ -1245,8 +1253,9 @@ function _pbpVocabAcceptLookupResult(state, source, norm) {
     choices.forEach((choice, index) => {
       const key = `${kind}:${index}`;
       state.choices.set(key, choice);
-      const option = new Option(`${choice.term} · ${choice.gloss} (${choice.sourceLabel})`, key);
-      option.dataset.meaningText = `${choice.term} · ${choice.gloss}`;
+      const text = _pbpVocabLookupChoiceLabel(state, choice);
+      const option = new Option(`${text} (${choice.sourceLabel})`, key);
+      option.dataset.meaningText = text;
       option.dataset.meaningSource = choice.sourceLabel;
       option.lang = choice.definitionLang;
       state.select.appendChild(option);
