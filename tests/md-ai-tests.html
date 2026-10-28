@@ -9427,6 +9427,34 @@ suite("pbpAiResolveTarget", () => {
       "qwen:qwen-flash:e" + pbpAiHash("https://dashscope-intl.aliyuncs.com/compatible-mode/v1"), "Singapore key");
     assert(pbpAiCacheModelKey({ aiProvider: "qwen", qwenWorkspaceId: "ws-7f3k9q" }) !== "qwen:qwen-flash", "workspace key");
   });
+  test("a registry entry with protocolField resolves Anthropic format to anthropicBase", () => {
+    OPENAI_COMPAT_PROVIDERS.zzprobe = { keyField: "zzprobeApiKey", base: "https://probe.example/openai/v1",
+      anthropicBase: "https://probe.example/anthropic/v1", protocolField: "zzprobeProtocol",
+      modelField: "zzprobeModel", defaultModel: "m" };
+    try {
+      const r = (extra) => pbpAiResolveTarget({ aiProvider: "zzprobe", zzprobeApiKey: "k", ...extra });
+      const plain = r({});
+      assertEq(plain.protocol, "openai", "missing format protocol");
+      assertEq(plain.endpoint, "https://probe.example/openai/v1", "missing format endpoint");
+      assertEq(plain.fpEndpoint, "https://probe.example/openai/v1", "missing format fpEndpoint");
+      assertEq(plain.error, null, "missing format error");
+      assertEq(r({ zzprobeProtocol: "openai" }).endpoint, "https://probe.example/openai/v1", "explicit openai endpoint");
+      const an = r({ zzprobeProtocol: "anthropic" });
+      assertEq(an.protocol, "anthropic", "anthropic protocol");
+      assertEq(an.endpoint, "https://probe.example/anthropic/v1", "anthropic endpoint");
+      assertEq(an.fpEndpoint, "https://probe.example/anthropic/v1#anthropic", "anthropic fpEndpoint");
+      assertEq(an.error, null, "anthropic error");
+      assertEq(an.apiKey, "k", "anthropic apiKey");
+      assert(an.cfg === OPENAI_COMPAT_PROVIDERS.zzprobe, "anthropic cfg is not the registry entry");
+      for (const bad of ["", "gemini", 5]) {
+        const b = r({ zzprobeProtocol: bad });
+        assertEq(b.error, "endpoint_invalid", "format " + JSON.stringify(bad));
+        assert(!String(b.endpoint).includes("probe.example/openai"), "format " + JSON.stringify(bad) + " fell back to " + b.endpoint);
+      }
+    } finally {
+      delete OPENAI_COMPAT_PROVIDERS.zzprobe;
+    }
+  });
 });
 </script>
 <script>

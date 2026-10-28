@@ -309,10 +309,13 @@ async function handleAIError(res, provider) {
   throw err;
 }
 
-// ---- OpenAI-compatible provider registry ----
-// Single source of truth for every provider reached via callOpenAICompat /
-// _streamOpenAICompat. gemini / claude / ollama use bespoke callers (different
-// request/response shapes) and are dispatched ahead of this table.
+// ---- Provider registry (OpenAI-compatible by default) ----
+// Single source of truth for every provider reached by default via
+// callOpenAICompat / _streamOpenAICompat. An entry declaring protocolField can
+// instead reach the Anthropic Messages caller (callAnthropicMessages /
+// _streamAnthropicMessages) by the user's format setting. gemini / claude /
+// ollama use bespoke callers (different request/response shapes) and are
+// dispatched ahead of this table.
 //   keyField     settings key holding the API key (also drives hasAIKey)
 //   base         default endpoint (overridable per-provider via baseField)
 //   baseField    optional settings key whose value overrides `base` (openai/custom)
@@ -335,6 +338,15 @@ async function handleAIError(res, provider) {
 //                base. With it:
 //     workspaceRegions   { region: the region code the template expects }
 //     workspaceTemplate  dedicated base with {ws} and {region} placeholders
+//   protocolField  optional settings key naming the API format, "openai" or
+//                "anthropic". A missing setting means "openai" (`base`, the
+//                compatible caller); "anthropic" sends to the Messages caller at
+//                `anthropicBase` and marks the cache identity "#anthropic"; ""
+//                or any other value is a broken configuration
+//                (endpoint_invalid), never a silent fallback to `base`.
+//     anthropicBase  the Anthropic-format base; like every base it carries the
+//                version segment, and the caller appends /messages. The Messages
+//                caller reads neither thinkingOff nor tokenField.
 //   Every target from these fields is the provider's own service (official).
 const OPENAI_COMPAT_PROVIDERS = {
   openai:      { keyField: "openaiApiKey",      base: "https://api.openai.com/v1",                         baseField: "openaiBaseUrl", modelField: "openaiModel",      defaultModel: "gpt-5.4-nano",                thinkingOff: { reasoning_effort: "none" }, tokenField: "max_completion_tokens" },
@@ -388,6 +400,14 @@ function _aiRegionOf(cfg, s) {
   return Object.keys(cfg.regions).find((k) => cfg.regions[k] === cfg.base);
 }
 
+// The API format an entry with a protocolField uses: a missing value (never
+// saved) means "openai"; anything else is returned as stored, for the caller
+// to accept only "openai" or "anthropic".
+function _aiProtocolOf(cfg, s) {
+  const raw = s[cfg.protocolField];
+  return (raw === undefined || raw === null) ? "openai" : raw;
+}
+
 function _aiRegistryEntry(providerId) {
   const provider = String(providerId);
   if (Object.hasOwn(_AI_BESPOKE_PROVIDERS, provider)) return _AI_BESPOKE_PROVIDERS[provider];
@@ -436,9 +456,11 @@ function _aiRegionalEndpoint(cfg, s) {
 // object each call with exactly these keys:
 //   provider   the id resolved (second argument, else s.aiProvider, else gemini)
 //   kind       "custom" for the custom slot, else "builtin"
-//   protocol   "gemini" | "anthropic" | "ollama" | "openai"
+//   protocol   "gemini" | "anthropic" | "ollama" | "openai" (a registry entry's
+//              protocolField setting can make it "anthropic")
 //   endpoint   the base the request uses, verbatim (not trimmed)
-//   fpEndpoint the normalised endpoint for cache identities ("" for gemini/claude)
+//   fpEndpoint the normalised endpoint for cache identities ("" for gemini/claude;
+//              a registry entry in the Anthropic format appends "#anthropic")
 //   official   false when a user base URL points away from the built-in one
 //   apiKey / model  the raw setting, else "" / the provider default (untrimmed)
 //   label      the Settings display name, else the id
@@ -456,21 +478,33 @@ function pbpAiResolveTarget(s, providerId = (s && s.aiProvider) || "gemini") {
       return (name && name !== key) ? name : provider;
     } catch (_) { return provider; }
   })();
-  const bespoke = Object.hasOwn(_AI_BESPOKE_PROVIDERS, provider) ? _AI_BESPOKE_PROVIDERS[provider] : null;
-  const compat = !bespoke && Object.hasOwn(OPENAI_COMPAT_PROVIDERS, provider) ? OPENAI_COMPAT_PROVIDERS[provider] : null;
-  const cfg = bespoke || compat;
+  const cfg = _aiRegistryEntry(provider);
+  const bespoke = !!cfg && Object.hasOwn(_AI_BESPOKE_PROVIDERS, provider);
   if (!cfg) {
     return { provider, kind: "builtin", protocol: "openai", endpoint: "", fpEndpoint: "", official: false,
       apiKey: "", model: "", label, cfg: null, error: "provider_missing" };
   }
   const kind = provider === "custom" ? "custom" : "builtin";
-  const protocol = bespoke ? bespoke.protocol : "openai";
-  // A regional provider's region/workspace settings pick the host; a broken
-  // pair resolves to no endpoint at all (never the default region's base).
-  const endpoint = cfg.regionField ? _aiRegionalEndpoint(cfg, st) : _openaiCompatBase(cfg, st);
+  // A regional provider's region/workspace settings pick the host, and an
+  // entry with a format setting picks its base by format; a broken setting
+  // resolves to no endpoint at all (never the default region's or format's).
+  let protocol = bespoke ? cfg.protocol : "openai";
+  let endpoint;
+  if (cfg.regionField) endpoint = _aiRegionalEndpoint(cfg, st);
+  else if (cfg.protocolField) {
+    const format = _aiProtocolOf(cfg, st);
+    if (format === "anthropic") {
+      protocol = "anthropic";
+      endpoint = cfg.anthropicBase || "";
+    } else endpoint = format === "openai" ? _openaiCompatBase(cfg, st) : "";
+  } else endpoint = _openaiCompatBase(cfg, st);
   // gemini and claude are fixed hosts: their fingerprints never carried an
-  // endpoint term, so theirs stays "".
-  const fpEndpoint = (protocol === "gemini" || protocol === "anthropic") ? "" : norm(endpoint);
+  // endpoint term, so theirs stays "". A registry entry answering in the
+  // Anthropic format marks its endpoint, so its caches never meet the same
+  // base's OpenAI-format answers.
+  let fpEndpoint = norm(endpoint);
+  if (bespoke && (protocol === "gemini" || protocol === "anthropic")) fpEndpoint = "";
+  else if (protocol === "anthropic" && fpEndpoint) fpEndpoint += "#anthropic";
   // Every region and workspace host is the provider's own service, so a
   // regional provider stays official; only a user base URL can leave it.
   let official = true;

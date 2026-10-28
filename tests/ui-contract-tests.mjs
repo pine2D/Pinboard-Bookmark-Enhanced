@@ -4582,10 +4582,10 @@ for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-l
 
 // Provider default-model & id-set parity gate (K81, follow-up to the
 // default-value equality gate above -- same "hand-copied, drift silently"
-// failure class, but for the 15 AI providers rather than plain settings).
+// failure class, but for the built-in AI providers rather than plain settings).
 // Each provider's default model string is hand-copied SIX times (shared.js
-// SETTINGS_DEFAULTS, ai.js OPENAI_COMPAT_PROVIDERS.defaultModel for the 12
-// callOpenAICompat-dispatched providers, options.html's `value=`, options.js
+// SETTINGS_DEFAULTS, ai.js OPENAI_COMPAT_PROVIDERS.defaultModel for the
+// registry-table providers, options.html's `value=`, options.js
 // PANEL_DEFAULTS.ai.fields, options.js collectSettingsFromForm's `||
 // "literal"` fallback, and options-connectivity.js pbpLiveAiSettingsSnapshot's
 // getOptVal(...) fallback), and the provider ID list is separately
@@ -4593,9 +4593,11 @@ for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-l
 // 2026-09) -- this gate is what keeps it that way without merging any of the
 // copies: K81's controller-reviewed direction explicitly rejects folding
 // gemini/claude/ollama into OPENAI_COMPAT_PROVIDERS (that table's contract is
-// "reached via callOpenAICompat", and scripts/network-exits-check.mjs parses
-// it expecting every `base` host to be an allowlisted network exit -- ollama's
-// localhost base would trip that door) and rejects merging the four ID
+// "reached via callOpenAICompat by default; an entry declaring protocolField
+// may reach the Messages caller at its anthropicBase by the user's format
+// setting", and scripts/network-exits-check.mjs parses it expecting every
+// `base`, region and `anthropicBase` host to be an allowlisted network exit --
+// ollama's localhost base would trip that door) and rejects merging the four ID
 // arrays (AI_PROVIDER_ORDER's ordering is a deliberate fallback-provider
 // priority, not an accidental duplicate of PBP_CONNECTION_HEALTH_IDS or the
 // options.js/options-connectivity.js provider-id lists). See task-1-brief.md
@@ -4607,8 +4609,8 @@ for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-l
   // not a provider's declared default -- K79's own DEFAULT_EQ_ALLOWLIST
   // documents the exact same exception for opt-preview-ai-model. Deriving
   // PROVIDERS from the real SETTINGS_DEFAULTS keys (instead of hand-typing a
-  // 15-provider array here, which would just be a seventh hand copy) means a
-  // 16th provider is picked up automatically the moment shared.js adds
+  // provider array here, which would just be a seventh hand copy) means a
+  // new provider is picked up automatically the moment shared.js adds
   // `<id>Model:` -- and the gate below will immediately point at every other
   // copy that still needs it.
   const NON_PROVIDER_MODEL_KEYS = new Set(["previewAiModel"]);
@@ -4630,7 +4632,7 @@ for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-l
   // ---- ai.js OPENAI_COMPAT_PROVIDERS (bespoke gemini/claude/ollama are
   // dispatched ahead of this table by design -- ai.js's own header comment
   // says so -- so they are excluded from this one comparison, not from the
-  // gate overall: every other copy below still covers all 15).
+  // gate overall: every other copy below still covers every provider).
   const cpStart = aiJs.indexOf("const OPENAI_COMPAT_PROVIDERS = {");
   const cpEnd = aiJs.indexOf("\n};", cpStart);
   let compatProviders = null;
