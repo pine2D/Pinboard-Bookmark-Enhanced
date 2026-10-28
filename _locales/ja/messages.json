@@ -1273,6 +1273,19 @@
   "backupStatusSkipped": {
     "message": "スキップ"
   },
+  "backupStatusKept": {
+    "message": "既存のキーを保持"
+  },
+  "backupFieldCustomProviders": {
+    "message": "カスタムプロバイダー一覧"
+  },
+  "backupFieldCustomName": {
+    "message": "カスタムプロバイダー名"
+  },
+  "backupImportKeptCustomKeys": {
+    "message": "バックアップ内のカスタムプロバイダーのキー $N$ 件は、この端末の既存キーがそのまま使えるため反映しませんでした。",
+    "placeholders": { "n": { "content": "$1" } }
+  },
   "backupStatusLocalOnly": {
     "message": "このデバイスだけに保存"
   },

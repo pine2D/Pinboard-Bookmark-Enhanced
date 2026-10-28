@@ -1278,6 +1278,19 @@
   "backupStatusSkipped": {
     "message": "Skipped"
   },
+  "backupStatusKept": {
+    "message": "Existing key kept"
+  },
+  "backupFieldCustomProviders": {
+    "message": "Custom providers"
+  },
+  "backupFieldCustomName": {
+    "message": "Custom provider name"
+  },
+  "backupImportKeptCustomKeys": {
+    "message": "$N$ custom provider key(s) in the backup were not applied because this device's existing key still works.",
+    "placeholders": { "n": { "content": "$1" } }
+  },
   "backupStatusLocalOnly": {
     "message": "Saved on this device only"
   },

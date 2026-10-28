@@ -1273,6 +1273,19 @@
   "backupStatusSkipped": {
     "message": "已跳过"
   },
+  "backupStatusKept": {
+    "message": "已保留本机密钥"
+  },
+  "backupFieldCustomProviders": {
+    "message": "自定义服务商列表"
+  },
+  "backupFieldCustomName": {
+    "message": "自定义服务商名称"
+  },
+  "backupImportKeptCustomKeys": {
+    "message": "备份中有 $N$ 个自定义服务商密钥未写入：本机现有密钥仍可正常使用。",
+    "placeholders": { "n": { "content": "$1" } }
+  },
   "backupStatusLocalOnly": {
     "message": "仅保存到本设备"
   },

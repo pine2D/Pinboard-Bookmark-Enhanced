@@ -1273,6 +1273,19 @@
   "backupStatusSkipped": {
     "message": "已略過"
   },
+  "backupStatusKept": {
+    "message": "已保留本機金鑰"
+  },
+  "backupFieldCustomProviders": {
+    "message": "自訂服務商清單"
+  },
+  "backupFieldCustomName": {
+    "message": "自訂服務商名稱"
+  },
+  "backupImportKeptCustomKeys": {
+    "message": "備份中有 $N$ 個自訂服務商金鑰未寫入：本機現有金鑰仍可正常使用。",
+    "placeholders": { "n": { "content": "$1" } }
+  },
   "backupStatusLocalOnly": {
     "message": "只儲存在本裝置"
   },

@@ -261,6 +261,14 @@ function pbpPreflightBackupPayload(data, exportableKeys) {
   };
 }
 
+// Human labels for settings keys the preview names as dropped. Unmapped keys
+// fall through to pbpLargeFallbackFieldLabel, which returns the key itself.
+const PBP_BACKUP_DROPPED_LABELS = Object.freeze({
+  aiCustomProviders: "backupFieldCustomProviders",
+  customDisplayName: "backupFieldCustomName",
+  qwenWorkspaceId: "labelQwenWorkspace",
+});
+
 function pbpBackupImportResultKey(result) {
   const statuses = ["settings", "themes", "highlights", "vocabulary", "secrets"]
     .map((key) => result && result[key]);
@@ -415,25 +423,33 @@ async function pbpBackupLibraryIdentity(prepared, selected, {
   return globalThis.navigator?.locks?.request ? navigator.locks.request("pbp-personal-library",run) : run();
 }
 
-// A list entry's key slot restores only when its envelope opens for the
-// entry holding that slot on this device AFTER the settings section ran.
-// Anything else -- sealed to an entry or address this device does not have,
-// or to a list the settings section dropped as invalid -- would land as an
-// unusable key and, worse, overwrite a working one in the same slot.
+// A list entry's key slot is never replaced by a key that cannot work. The
+// backup value is kept out of the batch ONLY when this device's slot already
+// holds an envelope that opens for the local entry owning it and the backup
+// envelope does not open for that same entry -- a working key is never swapped
+// for an unusable one. Every other case writes the backup value: an empty slot
+// or an entry not imported yet is fine, because the envelope binding keeps an
+// unmatched key inert until a matching entry arrives (so "credentials only",
+// then "settings only" works). The exception is a list the settings section
+// just dropped as invalid (listDropped): its slots have no legitimate owner on
+// this device, so only slots that open for a local entry may land.
 // Deletes those fields from batch and returns their names. The first entry's
 // plain customApiKey has no envelope and is not this function's business.
-async function pbpBackupDropUnboundCustomKeys(batch) {
+async function pbpBackupDropUnboundCustomKeys(batch, listDropped) {
   const fields = PBP_AI_CUSTOM_SLOTS.map((slot) => pbpAiCustomKeyField(slot))
     .filter((field) => Object.prototype.hasOwnProperty.call(batch, field));
   if (!fields.length) return [];
-  const current = await pbpReadSettingsWithSecrets({ aiCustomProviders: [] });
+  const current = await pbpReadSettingsWithSecrets({ aiCustomProviders: [], ...Object.fromEntries(fields.map((field) => [field, ""])) });
   const entries = pbpSanitizeAiCustomProviders(current.aiCustomProviders) || [];
   const skipped = fields.filter((field) => {
     const entry = entries.find((item) => pbpAiCustomKeyField(item.slot) === field);
-    return !entry || !pbpAiCustomKeyOpen({ [field]: batch[field] }, entry);
+    const backupOpens = !!entry && !!pbpAiCustomKeyOpen({ [field]: batch[field] }, entry);
+    if (listDropped) return !backupOpens;
+    if (!entry || backupOpens) return false;
+    return !!pbpAiCustomKeyOpen({ [field]: current[field] }, entry);
   });
   skipped.forEach((field) => { delete batch[field]; });
-  if (skipped.length) console.warn("[backup] skipped credentials with no matching entry:", skipped.join(","));
+  if (skipped.length) console.warn("[backup] kept working local credentials over unusable ones:", skipped.join(","));
   return skipped;
 }
 
@@ -467,6 +483,7 @@ async function pbpApplyBackupPayload(data, {
     highlights: "skipped",
     vocabulary: "skipped",
     secrets: "skipped",
+    secretsSkipped: 0,
     vocabularyApplied: 0,
     vocabularyProcessed: 0,
   };
@@ -537,7 +554,9 @@ async function pbpApplyBackupPayload(data, {
   if (selected.secrets && prepared.secretData) {
     try {
       const batch = Object.assign({}, prepared.secretData.keys);
-      await pbpBackupDropUnboundCustomKeys(batch);
+      const keptLocal = await pbpBackupDropUnboundCustomKeys(batch,
+        selected.settings === true && (prepared.droppedKeys || []).includes("aiCustomProviders"));
+      result.secretsSkipped = keptLocal.length;
       const targetIds = Object.keys(prepared.secretData.exportTargets);
       if (targetIds.length) {
         const curRead = await pbpReadSettingsWithSecrets({ exportTargets: {} });
@@ -551,6 +570,8 @@ async function pbpApplyBackupPayload(data, {
         const secretRes = await persistSettings(batch);
         if (!secretRes.ok) throw secretRes.error || new Error("credential import failed");
         result.secrets = "applied";
+      } else if (keptLocal.length) {
+        result.secrets = "kept";
       }
     } catch (error) {
       console.warn("[backup] credential import failed:", error && error.name, error && error.message);
@@ -806,7 +827,9 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     if (preview.ownerMismatch) warnings.push(t("backupPreviewOwnerMismatch"));
     if (preview.highlightOwnerMismatch) warnings.push(t("backupPreviewHighlightOwnerMismatch"));
     if (preview.syncWarning) warnings.push(t("backupPreviewSyncWarning"));
-    if (preview.droppedKeys.length) warnings.push(t("backupPreviewDroppedFields", preview.droppedKeys.join(", ")));
+    if (preview.droppedKeys.length) warnings.push(t("backupPreviewDroppedFields", preview.droppedKeys
+      .map((key) => (PBP_BACKUP_DROPPED_LABELS[key] ? t(PBP_BACKUP_DROPPED_LABELS[key]) : key))
+      .join(", ")));
     if (preview.localFallbackKeys.length) {
       warnings.push(t("backupPreviewLocalWarning", preview.localFallbackKeys
         .map((key) => t(pbpLargeFallbackFieldLabel(key)))
@@ -839,6 +862,7 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     const statusKeys = {
       applied: "backupStatusApplied",
       skipped: "backupStatusSkipped",
+      kept: "backupStatusKept",
       "local-only": "backupStatusLocalOnly",
       failed: "backupStatusFailed",
     };
@@ -853,10 +877,12 @@ function setupBackup({ exportableKeys, saveOverlayWithFallback, loadThemes, befo
     // it looked at -- an import that found every record already up to date
     // passes 0. No published locale spends the placeholder today; a copy that
     // starts to has to read as "applied", never as "restored from the file".
+    const keptNote = result.secretsSkipped > 0
+      ? " " + t("backupImportKeptCustomKeys", String(result.secretsSkipped)) : "";
     setStatusIcon(status, resultKey === "backupImportComplete", t(
       resultKey,
       String(result.vocabularyApplied || 0)
-    ));
+    ) + keptNote);
   };
 
   // The previous page instance imported and reloaded: show its result card

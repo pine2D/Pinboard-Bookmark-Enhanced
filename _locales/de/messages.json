@@ -1273,6 +1273,19 @@
   "backupStatusSkipped": {
     "message": "Übersprungen"
   },
+  "backupStatusKept": {
+    "message": "Vorhandener Schlüssel behalten"
+  },
+  "backupFieldCustomProviders": {
+    "message": "Benutzerdefinierte Anbieter"
+  },
+  "backupFieldCustomName": {
+    "message": "Name des benutzerdefinierten Anbieters"
+  },
+  "backupImportKeptCustomKeys": {
+    "message": "$N$ Schlüssel benutzerdefinierter Anbieter aus dem Backup wurden nicht übernommen, weil der vorhandene Schlüssel auf diesem Gerät noch funktioniert.",
+    "placeholders": { "n": { "content": "$1" } }
+  },
   "backupStatusLocalOnly": {
     "message": "Nur auf diesem Gerät gespeichert"
   },

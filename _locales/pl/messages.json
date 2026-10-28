@@ -1273,6 +1273,19 @@
   "backupStatusSkipped": {
     "message": "Pominięto"
   },
+  "backupStatusKept": {
+    "message": "Zachowano istniejący klucz"
+  },
+  "backupFieldCustomProviders": {
+    "message": "Niestandardowi dostawcy"
+  },
+  "backupFieldCustomName": {
+    "message": "Nazwa niestandardowego dostawcy"
+  },
+  "backupImportKeptCustomKeys": {
+    "message": "Klucze niestandardowych dostawców z kopii ($N$) nie zostały zastosowane, bo istniejący klucz na tym urządzeniu nadal działa.",
+    "placeholders": { "n": { "content": "$1" } }
+  },
   "backupStatusLocalOnly": {
     "message": "Zapisano tylko na tym urządzeniu"
   },

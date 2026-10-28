@@ -1273,6 +1273,19 @@
   "backupStatusSkipped": {
     "message": "Пропущено"
   },
+  "backupStatusKept": {
+    "message": "Существующий ключ сохранён"
+  },
+  "backupFieldCustomProviders": {
+    "message": "Пользовательские провайдеры"
+  },
+  "backupFieldCustomName": {
+    "message": "Название пользовательского провайдера"
+  },
+  "backupImportKeptCustomKeys": {
+    "message": "Ключи пользовательских провайдеров из резервной копии ($N$) не применены: имеющийся на этом устройстве ключ по-прежнему работает.",
+    "placeholders": { "n": { "content": "$1" } }
+  },
   "backupStatusLocalOnly": {
     "message": "Сохранено только на этом устройстве"
   },

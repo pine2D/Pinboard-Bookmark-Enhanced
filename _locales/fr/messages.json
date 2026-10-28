@@ -1273,6 +1273,19 @@
   "backupStatusSkipped": {
     "message": "Ignoré"
   },
+  "backupStatusKept": {
+    "message": "Clé existante conservée"
+  },
+  "backupFieldCustomProviders": {
+    "message": "Fournisseurs personnalisés"
+  },
+  "backupFieldCustomName": {
+    "message": "Nom du fournisseur personnalisé"
+  },
+  "backupImportKeptCustomKeys": {
+    "message": "$N$ clé(s) de fournisseur personnalisé de la sauvegarde n’ont pas été appliquées : la clé existante de cet appareil fonctionne toujours.",
+    "placeholders": { "n": { "content": "$1" } }
+  },
   "backupStatusLocalOnly": {
     "message": "Enregistré uniquement sur cet appareil"
   },
