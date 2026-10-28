@@ -2436,8 +2436,10 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // fallback must not offer it to a user who never set it up.
     await testAsync("the error card offers Ollama as a fallback only once it is granted or configured", async () => {
       const aiSource = await (await fetch("../ai.js")).text();
-      const realHasKey = new Function("OPENAI_COMPAT_PROVIDERS",
-        aiSource.slice(aiSource.indexOf("function hasAIKey(s)"), aiSource.indexOf("// ---- Host-permission gate")) + "\nreturn hasAIKey;")({});
+      const resolveTarget = new Function("OPENAI_COMPAT_PROVIDERS",
+        aiSource.slice(aiSource.indexOf("// ---- Unified AI target resolver ----"), aiSource.indexOf("// ---- Thinking-disable")) + "\nreturn pbpAiResolveTarget;")({});
+      const realHasKey = new Function("pbpAiResolveTarget",
+        aiSource.slice(aiSource.indexOf("function hasAIKey(s)"), aiSource.indexOf("// ---- Host-permission gate")) + "\nreturn hasAIKey;")(resolveTarget);
       assert(realHasKey({ aiProvider: "ollama" }) === true, "precondition changed: hasAIKey no longer waves Ollama through");
       const src = popupAiSource.slice(popupAiSource.indexOf("const AI_PROVIDER_ORDER = ["),
         popupAiSource.indexOf("function showAIError(op, err, opSettings)"));

@@ -339,9 +339,78 @@ const OPENAI_COMPAT_PROVIDERS = {
   custom:      { keyField: "customApiKey",      base: "",                                                  baseField: "customBaseUrl", modelField: "customModel",      defaultModel: "" },                          // no thinkingOff: dialect unknown
 };
 
-// Resolve an OpenAI-compatible provider's base URL (per-provider baseField override wins).
+// ---- Unified AI target resolver ----
+// One place that answers "where does this provider's request go, with which
+// key and model, under which display name". Every derived identity -- host
+// origin, key check, compatible dispatch, popup fingerprint, reader cache key,
+// dictionary provenance, video punctuation key, status page -- reads it, so
+// they can no longer drift apart (tests/md-ai-tests.html pins each output in
+// its provider-resolution golden).
+// The bespoke callers' own table (gemini / claude / ollama). A plain literal:
+// the K81 gate in tests/ui-contract-tests.mjs evaluates it and compares each
+// defaultModel with SETTINGS_DEFAULTS. callGemini / callClaude / callOllama
+// still carry their own fallback models; K81 keeps the copies equal.
+const _AI_BESPOKE_PROVIDERS = {
+  gemini: { protocol: "gemini",    keyField: "geminiApiKey", modelField: "geminiModel", defaultModel: "gemini-3.5-flash-lite", base: "https://generativelanguage.googleapis.com" },
+  claude: { protocol: "anthropic", keyField: "claudeApiKey", modelField: "claudeModel", defaultModel: "claude-haiku-4-5",      base: "https://api.anthropic.com" },
+  ollama: { protocol: "ollama",    keyField: "",             modelField: "ollamaModel", defaultModel: "llama3.2",              base: "http://localhost:11434", baseField: "ollamaBaseUrl" },
+};
+
+// Resolve a provider's base URL (per-provider baseField override wins).
 function _openaiCompatBase(cfg, s) {
   return (cfg.baseField && s[cfg.baseField]) || cfg.base;
+}
+
+// Pure: never throws, never writes a global, never touches `s`. Returns a new
+// object each call with exactly these keys:
+//   provider   the id resolved (second argument, else s.aiProvider, else gemini)
+//   kind       "custom" for the custom slot, else "builtin"
+//   protocol   "gemini" | "anthropic" | "ollama" | "openai"
+//   endpoint   the base the request uses, verbatim (not trimmed)
+//   fpEndpoint the normalised endpoint for cache identities ("" for gemini/claude)
+//   official   false when a user base URL points away from the built-in one
+//   apiKey / model  the raw setting, else "" / the provider default (untrimmed)
+//   label      the Settings display name, else the id
+//   cfg        the registry entry itself (same object), or null
+//   error      null | "endpoint_invalid" | "provider_missing"
+function pbpAiResolveTarget(s, providerId = (s && s.aiProvider) || "gemini") {
+  const st = s || {};
+  const provider = String(providerId);
+  const norm = (v) => String(v || "").trim().replace(/\/+$/, "");
+  const label = (() => {
+    if (typeof t !== "function") return provider;
+    const key = "prov" + provider.charAt(0).toUpperCase() + provider.slice(1);
+    try {
+      const name = t(key);
+      return (name && name !== key) ? name : provider;
+    } catch (_) { return provider; }
+  })();
+  const bespoke = Object.hasOwn(_AI_BESPOKE_PROVIDERS, provider) ? _AI_BESPOKE_PROVIDERS[provider] : null;
+  const compat = !bespoke && Object.hasOwn(OPENAI_COMPAT_PROVIDERS, provider) ? OPENAI_COMPAT_PROVIDERS[provider] : null;
+  const cfg = bespoke || compat;
+  if (!cfg) {
+    return { provider, kind: "builtin", protocol: "openai", endpoint: "", fpEndpoint: "", official: false,
+      apiKey: "", model: "", label, cfg: null, error: "provider_missing" };
+  }
+  const kind = provider === "custom" ? "custom" : "builtin";
+  const protocol = bespoke ? bespoke.protocol : "openai";
+  const endpoint = _openaiCompatBase(cfg, st);
+  // gemini and claude are fixed hosts: their fingerprints never carried an
+  // endpoint term, so theirs stays "".
+  const fpEndpoint = (protocol === "gemini" || protocol === "anthropic") ? "" : norm(endpoint);
+  let official = true;
+  if (kind === "custom") official = false;
+  else if (cfg.baseField) {
+    const own = norm(st[cfg.baseField]);
+    official = !own || own === norm(cfg.base);
+  }
+  return {
+    provider, kind, protocol, endpoint, fpEndpoint, official,
+    apiKey: cfg.keyField ? (st[cfg.keyField] || "") : "",
+    model: st[cfg.modelField] || cfg.defaultModel,
+    label, cfg,
+    error: pbpEndpointOriginPattern(endpoint) ? null : "endpoint_invalid",
+  };
 }
 
 // ---- Thinking-disable: dialect param + 4xx self-healing fallback + memo (spec T0-c) ----
@@ -527,32 +596,22 @@ async function _aiWithDialectFallback(provider, model, cfg, makeCall, control = 
 
 // ---- Check if AI key is configured ----
 function hasAIKey(s) {
-  const p = s.aiProvider || "gemini";
-  if (p === "ollama") return true;
-  const keyField = p === "gemini" ? "geminiApiKey"
-    : p === "claude" ? "claudeApiKey"
-    : OPENAI_COMPAT_PROVIDERS[p] && OPENAI_COMPAT_PROVIDERS[p].keyField;
-  return !!(keyField && s[keyField]);
+  // An invalid endpoint does not hide a configured key here; the host gate
+  // refuses that endpoint before any request.
+  const target = pbpAiResolveTarget(s);
+  if (target.error === "provider_missing") return false;
+  if (target.protocol === "ollama") return true;
+  return !!target.apiKey;
 }
 
 // ---- Host-permission gate ----
-// Resolve the exact origin every provider call will hit. Compatible providers reuse
-// their request registry; the three bespoke callers use the same bases as their fetch
-// functions below. User-configured URLs also pass the shared HTTPS/loopback policy.
+// Resolve the exact origin every provider call will hit, from the same target the
+// request uses (pbpAiResolveTarget). User-configured URLs also pass the shared
+// HTTPS/loopback policy. An unknown provider still resolves to null here.
 function _aiTargetOriginPattern(s) {
-  s = s || {};
-  const p = s.aiProvider || "gemini";
-  let base;
-  if (p === "gemini") base = "https://generativelanguage.googleapis.com";
-  else if (p === "claude") base = "https://api.anthropic.com";
-  else if (p === "ollama") base = s.ollamaBaseUrl || "http://localhost:11434";
-  else {
-    const cfg = OPENAI_COMPAT_PROVIDERS[p];
-    if (!cfg) return null;
-    base = _openaiCompatBase(cfg, s);
-  }
-  const pattern = pbpEndpointOriginPattern(base);
-  if (!pattern) {
+  const target = pbpAiResolveTarget(s);
+  if (target.error === "provider_missing") return null;
+  if (target.error === "endpoint_invalid") {
     let message = "Invalid or insecure AI endpoint. Use HTTPS, or HTTP only with localhost, 127.0.0.1, or [::1].";
     try {
       const translated = t("mdTargetWebhookHttpWarn");
@@ -562,7 +621,7 @@ function _aiTargetOriginPattern(s) {
     err.code = "endpoint_invalid";
     throw err;
   }
-  return pattern;
+  return pbpEndpointOriginPattern(target.endpoint);
 }
 
 // Synchronous collector used by direct user gestures. Extra destinations (currently
@@ -643,9 +702,10 @@ async function _ensureAIHostPermission(s) {
 // registered provider entry plus its endpoint and two false flags, which the
 // body dialect already defaulted to — their requests stay byte-identical.
 function _aiCompatCfg(s, p, opts = {}) {
-  const registered = OPENAI_COMPAT_PROVIDERS[p];
+  const target = pbpAiResolveTarget(s, p);
+  const registered = target.protocol === "openai" ? target.cfg : null;
   if (!registered) throw new Error("Unknown provider: " + p);
-  const endpoint = _openaiCompatBase(registered, s);
+  const endpoint = target.endpoint;
   return { ...registered, endpoint, jsonMode: opts.jsonMode === true,
     // Arbitrary compatible gateways do not promise constrained decoding. Use
     // the common JSON mode there; strict local validation always still runs.
@@ -669,10 +729,11 @@ async function callAI(s, prompt, opts = {}) {
   if (p === "gemini") return callGemini(s, prompt, opts);
   if (p === "claude") return callClaude(s, prompt, opts);
   if (p === "ollama") return callOllama(s, prompt, opts);
+  const target = pbpAiResolveTarget(s, p);
   const cfg = _aiCompatCfg(s, p, opts);
-  const model = opts.model || s[cfg.modelField] || cfg.defaultModel;
+  const model = opts.model || target.model;
   return _aiWithDialectFallback(p, model, cfg, (extraBody, dialect) =>
-    callOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], model, prompt, { ...opts, extraBody, ...dialect }));
+    callOpenAICompat(cfg.endpoint, target.apiKey, model, prompt, { ...opts, extraBody, ...dialect }));
 }
 
 // Non-streaming protocols have different envelopes, but the same answer
@@ -1773,10 +1834,11 @@ async function _aiStreamDispatch(s, prompt, opts, cb, control) {
   // Same task configuration and capability record as callAI. The dialect is
   // spread after opts on purpose: its jsonMode/schemaMode come from this cfg,
   // which read them from opts, so the two cannot disagree.
+  const target = pbpAiResolveTarget(s, p);
   const cfg = _aiCompatCfg(s, p, opts);
-  const model = opts.model || s[cfg.modelField] || cfg.defaultModel;
+  const model = opts.model || target.model;
   return _aiWithDialectFallback(p, model, cfg, (extraBody, dialect) =>
-    _streamOpenAICompat(_openaiCompatBase(cfg, s), s[cfg.keyField], model, prompt, { ...opts, extraBody, ...dialect }, cb), control);
+    _streamOpenAICompat(cfg.endpoint, target.apiKey, model, prompt, { ...opts, extraBody, ...dialect }, cb), control);
 }
 
 // ---- Shared prompt fragments (used by tag, summary, and combined builders) ----
@@ -2103,11 +2165,7 @@ function pbpAiStatusPageUrl(s, err) {
   const page = PBP_AI_STATUS_PAGES[provider];
   if (!page || !err || err.name === "AbortError") return "";
   const url = page.url;
-  const reg = OPENAI_COMPAT_PROVIDERS[provider];
-  if (reg && reg.baseField) {
-    const own = String(s[reg.baseField] || "").trim().replace(/\/+$/, "");
-    if (own && own !== reg.base) return "";
-  }
+  if (!pbpAiResolveTarget(s).official) return "";
   const code = err.code;
   if (code === "host_permission" || code === "endpoint_invalid" || code === "model_not_found") return "";
   const msg = String(err.message || "");
@@ -2161,12 +2219,7 @@ function _aiFpHash(str) {
 // Effective model for the fingerprint - mirrors what callAI actually
 // dispatches per provider (configured model, else that provider's default).
 function _aiEffectiveModelForFp(s) {
-  const p = s.aiProvider || "gemini";
-  if (p === "gemini") return s.geminiModel || "gemini-3.5-flash-lite";
-  if (p === "claude") return s.claudeModel || "claude-haiku-4-5";
-  if (p === "ollama") return s.ollamaModel || "llama3.2";
-  const cfg = OPENAI_COMPAT_PROVIDERS[p];
-  return cfg ? (s[cfg.modelField] || cfg.defaultModel || "default") : "default";
+  return pbpAiResolveTarget(s).model || "default";
 }
 
 // Generation-identity fingerprint (audit A5): a tags/summary result
@@ -2181,19 +2234,15 @@ function _aiEffectiveModelForFp(s) {
 // point the SAME provider:model at a different backend - a fingerprint
 // that ignores it kept serving the old backend's results.
 function _aiEffectiveEndpointForFp(s) {
-  const p = s.aiProvider || "gemini";
-  const raw = (p === "ollama")
-    ? (s.ollamaBaseUrl || "http://localhost:11434")
-    : (OPENAI_COMPAT_PROVIDERS[p] ? _openaiCompatBase(OPENAI_COMPAT_PROVIDERS[p], s) : "");
-  // Normalise (trim + strip trailing slashes) so an equivalent base -
+  // Normalised (trim + strip trailing slashes) so an equivalent base -
   // "https://api.openai.com/v1" vs ".../v1/" - fingerprints identically
   // (K37): the request path already collapses both to the same URL (see the
   // four request-path .replace(/\/+$/, "") calls in callOpenAICompat,
-  // callOllama, _streamOpenAICompat and _streamOllama -- named, not lined,
-  // since line numbers here have already drifted twice), so treating them
-  // as different backends was a pure cache-key artifact, not a real
-  // endpoint change.
-  return String(raw || "").trim().replace(/\/+$/, "");
+  // callOllama, _streamOpenAICompat and _streamOllama), so treating them as
+  // different backends was a pure cache-key artifact, not a real endpoint
+  // change. The normalisation itself lives in pbpAiResolveTarget's
+  // fpEndpoint, which every cache identity reads.
+  return pbpAiResolveTarget(s).fpEndpoint;
 }
 
 // This fingerprint hashes the endpoint UNCONDITIONALLY (even when it equals

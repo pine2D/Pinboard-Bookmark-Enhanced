@@ -9372,6 +9372,55 @@ suite("provider resolution golden (pre-resolver)", () => {
     goldenCheck(GOLDEN_PUNCT, goldenEval((s) => window.pbpVideoPunctModelId(s)));
   });
 });
+suite("pbpAiResolveTarget", () => {
+  test("pbpAiResolveTarget returns the documented target for built-ins and the single custom slot", () => {
+    const d = (extra) => ({ ...SETTINGS_DEFAULTS, ...extra });
+    const keys = Object.keys(pbpAiResolveTarget(d({ aiProvider: "gemini" }))).sort().join(",");
+    assertEq(keys, "apiKey,cfg,endpoint,error,fpEndpoint,kind,label,model,official,protocol,provider", "target keys");
+    const g = pbpAiResolveTarget(d({ aiProvider: "gemini" }));
+    assertEq(g.protocol, "gemini", "gemini protocol");
+    assertEq(g.endpoint, "https://generativelanguage.googleapis.com", "gemini endpoint");
+    assertEq(g.fpEndpoint, "", "gemini fpEndpoint");
+    assertEq(g.model, "gemini-3.5-flash-lite", "gemini model");
+    assertEq(g.official, true, "gemini official");
+    assertEq(g.error, null, "gemini error");
+    const c = pbpAiResolveTarget(d({ aiProvider: "claude" }));
+    assertEq(c.protocol, "anthropic", "claude protocol");
+    assertEq(c.endpoint, "https://api.anthropic.com", "claude endpoint");
+    assertEq(c.fpEndpoint, "", "claude fpEndpoint");
+    const o = pbpAiResolveTarget(d({ aiProvider: "ollama" }));
+    assertEq(o.endpoint, "http://localhost:11434", "ollama endpoint");
+    assertEq(o.fpEndpoint, "http://localhost:11434", "ollama fpEndpoint");
+    assertEq(o.apiKey, "", "ollama apiKey");
+    const q = pbpAiResolveTarget(d({ aiProvider: "qwen", qwenApiKey: "q" }));
+    assertEq(q.endpoint, "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen endpoint");
+    assert(q.cfg === OPENAI_COMPAT_PROVIDERS.qwen, "qwen cfg is not the registry entry");
+    assertEq(q.apiKey, "q", "qwen apiKey");
+    const oa = pbpAiResolveTarget(d({ aiProvider: "openai", openaiBaseUrl: "https://proxy.example/v1/" }));
+    assertEq(oa.endpoint, "https://proxy.example/v1/", "openai endpoint kept verbatim");
+    assertEq(oa.fpEndpoint, "https://proxy.example/v1", "openai fpEndpoint normalised");
+    assertEq(oa.official, false, "openai through a proxy is not official");
+    const cu = pbpAiResolveTarget(d({ aiProvider: "custom", customBaseUrl: "https://gw.example/v1", customApiKey: "k", customModel: "m" }));
+    assertEq(cu.kind, "custom", "custom kind");
+    assertEq(cu.protocol, "openai", "custom protocol");
+    assertEq(cu.official, false, "custom official");
+    assertEq(cu.error, null, "custom error");
+    assertEq(pbpAiResolveTarget({ aiProvider: "custom" }).error, "endpoint_invalid", "custom without a base");
+  });
+  test("pbpAiResolveTarget is pure and fails closed on unknown ids", () => {
+    assertEq(pbpAiResolveTarget(null).provider, "gemini", "null settings");
+    const frozen = Object.freeze({ aiProvider: "brandnew" });
+    const u = pbpAiResolveTarget(frozen);
+    assertEq(u.error, "provider_missing", "unknown error");
+    assertEq(u.apiKey, "", "unknown apiKey");
+    assertEq(u.model, "", "unknown model");
+    assertEq(u.fpEndpoint, "", "unknown fpEndpoint");
+    assertEq(u.cfg, null, "unknown cfg");
+    assertEq(pbpAiResolveTarget({ aiProvider: "gemini", qwenApiKey: "q" }, "qwen").apiKey, "q", "second argument wins");
+    const s = { aiProvider: "gemini" };
+    assert(pbpAiResolveTarget(s) !== pbpAiResolveTarget(s), "the same target object was returned twice");
+  });
+});
 </script>
 <script>
 suiteIf("pbpAiStatusLink", "pbpAiStatusLink", () => {

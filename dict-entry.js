@@ -95,14 +95,12 @@ function _pbpDictEntryModel(settings) {
   const raw = map && typeof map === "object" && !Array.isArray(map) && Object.prototype.hasOwnProperty.call(map, provider)
     ? map[provider] : s.previewAiModel;
   const override = typeof raw === "string" ? raw.trim() || undefined : undefined;
-  const registry = typeof OPENAI_COMPAT_PROVIDERS === "object" ? OPENAI_COMPAT_PROVIDERS[provider] : null;
-  const model = override || (provider === "gemini" ? s.geminiModel || "gemini-3.5-flash-lite"
-    : provider === "claude" ? s.claudeModel || "claude-haiku-4-5"
-    : provider === "ollama" ? s.ollamaModel || "llama3.2"
-    : registry && (s[registry.modelField] || registry.defaultModel)) || "default";
-  const endpoint = provider === "ollama" ? s.ollamaBaseUrl || "http://localhost:11434"
-    : registry ? (registry.baseField && s[registry.baseField]) || registry.base || "" : "";
-  return { provider, model: String(model), endpoint: String(endpoint).trim().replace(/\/+$/, ""), override };
+  // The override read stays duplicated here: library loads this file without
+  // md-ai-core.js. Without ai.js this degrades like an unknown provider.
+  const target = typeof pbpAiResolveTarget === "function" ? pbpAiResolveTarget(s, provider) : null;
+  const model = override || (target && target.model) || "default";
+  const endpoint = target ? target.fpEndpoint : "";
+  return { provider, model: String(model), endpoint, override };
 }
 
 // The model a paid dictionary button will use, for its model-name note.

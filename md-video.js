@@ -2262,14 +2262,17 @@ async function pbpYtDomTranscriptInPage(vid, opts) {
   function punctModelId(sa) {
     const p = sa.aiProvider || "gemini";
     const override = punctModelOverride(sa);
-    if (p === "gemini") return "gemini:" + (override || sa.geminiModel || "default");
-    if (p === "claude") return "claude:" + (override || sa.claudeModel || "default");
-    if (p === "ollama") return "ollama:" + (override || sa.ollamaModel || "default") + "@" + _pbpVideoNormBase(sa.ollamaBaseUrl);
-    const cfg = (typeof OPENAI_COMPAT_PROVIDERS === "object" && OPENAI_COMPAT_PROVIDERS[p]) || null;
-    const model = override || (cfg && ((cfg.modelField && sa[cfg.modelField]) || cfg.defaultModel)) || "default";
-    let base = "";
-    try { base = (typeof _openaiCompatBase === "function" && cfg) ? String(_openaiCompatBase(cfg, sa) || "") : ""; } catch (_) {}
-    return p + ":" + model + "@" + _pbpVideoNormBase(base);
+    // Without ai.js this degrades like an unknown provider.
+    const target = (typeof pbpAiResolveTarget === "function") ? pbpAiResolveTarget(sa) : null;
+    const cfg = target && target.cfg;
+    // The bespoke trio keeps its stored key shape: the raw model setting with
+    // a "default" placeholder (not the provider default), and for ollama the
+    // raw base URL without the built-in localhost fallback.
+    if (cfg && target.protocol !== "openai") {
+      const id = p + ":" + (override || sa[cfg.modelField] || "default");
+      return cfg.baseField ? id + "@" + _pbpVideoNormBase(sa[cfg.baseField]) : id;
+    }
+    return p + ":" + (override || (target && target.model) || "default") + "@" + (target ? target.fpEndpoint : "");
   }
   // Test-only exposure (K37): punctModelId is otherwise closure-scoped inside
   // this runtime IIFE (only pure top-level functions, e.g. pbpVideoStateBuild,

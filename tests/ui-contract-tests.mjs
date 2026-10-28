@@ -4638,6 +4638,21 @@ for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-l
   check(compatProviders && typeof compatProviders === "object",
     "ai.js: OPENAI_COMPAT_PROVIDERS is not a plain literal the K81 parity gate can evaluate");
   const BESPOKE_PROVIDERS = new Set(["gemini", "claude", "ollama"]);
+  // The bespoke trio's own target table (ai.js _AI_BESPOKE_PROVIDERS, read by
+  // pbpAiResolveTarget for the fingerprint/cache side), evaluated the same way:
+  // its key set must be exactly the bespoke set, and each defaultModel is
+  // compared with SETTINGS_DEFAULTS in the loop below.
+  const bpStart = aiJs.indexOf("const _AI_BESPOKE_PROVIDERS = {");
+  const bpEnd = aiJs.indexOf("\n};", bpStart);
+  let bespoke = null;
+  if (bpStart >= 0) {
+    try { bespoke = runInNewContext("(" + aiJs.slice(bpStart + "const _AI_BESPOKE_PROVIDERS = ".length, bpEnd + 2) + ")", {}); } catch (_) {}
+  }
+  check(bespoke && typeof bespoke === "object",
+    "ai.js: _AI_BESPOKE_PROVIDERS is not a plain literal the K81 parity gate can evaluate");
+  const bespokeIds = Object.keys(bespoke || {}).sort();
+  check(JSON.stringify(bespokeIds) === JSON.stringify([...BESPOKE_PROVIDERS].sort()),
+    "ai.js: _AI_BESPOKE_PROVIDERS keys " + JSON.stringify(bespokeIds) + " differ from the bespoke set " + JSON.stringify([...BESPOKE_PROVIDERS].sort()));
 
   // ---- reasoned allowlist: providers with no API-key concept at all.
   // ollama is a self-hosted local server -- confirmed by grep: there is no
@@ -4735,6 +4750,10 @@ for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-l
       const cfg = compatProviders && compatProviders[id];
       if (!cfg) offenders.push(`${id}: OPENAI_COMPAT_PROVIDERS has no entry (and it is not in the bespoke gemini/claude/ollama exclusion set)`);
       else if (cfg.defaultModel !== expected) offenders.push(`${id}: SETTINGS_DEFAULTS.${key}=${JSON.stringify(expected)} but OPENAI_COMPAT_PROVIDERS.${id}.defaultModel=${JSON.stringify(cfg.defaultModel)}`);
+    } else {
+      const cfg = bespoke && bespoke[id];
+      if (!cfg) offenders.push(`${id}: _AI_BESPOKE_PROVIDERS has no entry for a bespoke provider`);
+      else if (cfg.defaultModel !== expected) offenders.push(`${id}: SETTINGS_DEFAULTS.${key}=${JSON.stringify(expected)} but _AI_BESPOKE_PROVIDERS.${id}.defaultModel=${JSON.stringify(cfg.defaultModel)}`);
     }
   }
   check(offenders.length === 0,

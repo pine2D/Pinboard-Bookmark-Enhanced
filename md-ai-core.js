@@ -665,10 +665,8 @@ function pbpAiResolveModelOverride(s) {
 // "SiliconFlow". A provider without a prov* key falls back to its id. DISPLAY
 // ONLY -- cache keys and request routing keep using s.aiProvider.
 function pbpAiProviderName(s) {
-  const id = (s && s.aiProvider) || "gemini";
-  const key = "prov" + id.charAt(0).toUpperCase() + id.slice(1);
-  const name = t(key);
-  return (name && name !== key) ? name : id;
+  if (typeof pbpAiResolveTarget === "function") return pbpAiResolveTarget(s).label;
+  return String((s && s.aiProvider) || "gemini");
 }
 
 // Inline "check <provider> status" link for a reader failure line, or null
@@ -708,15 +706,19 @@ function pbpAiEffectiveModel(s) {
   const o = pbpAiResolveModelOverride(s);
   if (o) return o;
   const st = s || {};
-  const p = st.aiProvider || "gemini";
-  const own = p === "gemini" ? (st.geminiModel || "gemini-3.5-flash-lite")
-    : p === "claude" ? (st.claudeModel || "claude-haiku-4-5")
-    : p === "ollama" ? (st.ollamaModel || "llama3.2")
-    : null;
-  if (own !== null) return String(own).trim() || "default";
-  const reg = (typeof OPENAI_COMPAT_PROVIDERS === "object" && OPENAI_COMPAT_PROVIDERS[p]) || null;
-  const conf = (reg && reg.modelField && st[reg.modelField]) || "";
-  return String(conf).trim() || (reg && reg.defaultModel) || "default";
+  // Without ai.js this degrades like an unknown provider.
+  if (typeof pbpAiResolveTarget !== "function") return "default";
+  const target = pbpAiResolveTarget(st);
+  const cfg = target.cfg;
+  // The two shapes differ on purpose and the stored cache keys depend on it:
+  // the bespoke trio trims the resolved model (a blank-padded setting keys as
+  // "default"), while a compatible provider trims the raw setting first and
+  // then falls back to its registry default.
+  if (cfg && cfg.modelField) {
+    if (target.protocol !== "openai") return String(target.model).trim() || "default";
+    return String(st[cfg.modelField] || "").trim() || cfg.defaultModel || "default";
+  }
+  return String(target.model).trim() || "default";
 }
 
 // Full cache identity for the reader's paid per-article caches (tr_, gloss_,
@@ -734,16 +736,12 @@ function pbpAiCacheModelKey(s) {
   const st = s || {};
   const p = st.aiProvider || "gemini";
   const norm = (v) => String(v || "").trim().replace(/\/+$/, "");
-  let base = "";
-  let builtIn = "";
-  if (p === "ollama") {
-    base = norm(st.ollamaBaseUrl);
-    builtIn = "http://localhost:11434";
-  } else {
-    const reg = (typeof OPENAI_COMPAT_PROVIDERS === "object" && OPENAI_COMPAT_PROVIDERS[p]) || null;
-    base = (reg && reg.baseField) ? norm(st[reg.baseField]) : "";
-    builtIn = norm(reg && reg.base);
-  }
+  // Deviation is judged against the registry's built-in base, not the
+  // target's `official` flag: a later regional or workspace endpoint can be
+  // official for the status page and still be a different backend here.
+  const target = (typeof pbpAiResolveTarget === "function") ? pbpAiResolveTarget(st) : null;
+  const base = target ? target.fpEndpoint : "";
+  const builtIn = norm(target && target.cfg && target.cfg.base);
   const endpoint = (base && base !== builtIn) ? ":e" + pbpAiHash(base) : "";
   return p + ":" + pbpAiEffectiveModel(st) + endpoint;
 }
