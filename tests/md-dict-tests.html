@@ -1413,6 +1413,13 @@ async function runDictNoAiAndSavedStateTests() {
     try {
       assert(await pbpDictSaveCurrent() === false && saveWrites === 0,
         "a save request with nothing picked for a saved word is refused at commit time");
+      // Before the display read lands, keptSaved is still false and Q14=A's
+      // default is applied: the commit itself must find the saved word.
+      const settled = { keptSaved: _pbpDictCurrent.keptSaved, gloss: _pbpDictCurrent.gloss };
+      Object.assign(_pbpDictCurrent, { keptSaved: false, gloss: sameGloss });
+      assert(await pbpDictSaveCurrent() === false && saveWrites === 0,
+        "a save clicked before the saved-state read lands still refuses to overwrite the saved definition");
+      Object.assign(_pbpDictCurrent, settled);
       const other = _pbpDictCurrent.meaningChoices.findIndex(c => c.gloss !== sameGloss && c.term === "hello");
       assert(pickMeaning(pop, other), "the saved word's lookup still offers its other definitions");
       await new Promise((r) => setTimeout(r, 0));

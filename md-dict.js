@@ -3782,6 +3782,17 @@ async function pbpDictSaveCurrent() {
     const live = await pbpVocabCurrentOwner().catch(() => null);
     if (live !== cur.owner) return false;
   }
+  // A saved word keeps its definition until the reader picks one (ruling
+  // 2026-10-28). The display read in _pbpDictRefreshSave may still be pending
+  // when Save is clicked -- keptSaved is then false and Q14=A's default is
+  // applied -- so without an explicit choice the commit asks the vocabulary
+  // itself. A failed read refuses (fail-closed).
+  if (!cur.packChoice && typeof pbpVocabGet === "function") {
+    let saved;
+    try { saved = await pbpVocabGet(pbpDictVocabKey(cur.owner, cur.lang || "und", cur.term)); }
+    catch (error) { console.warn("[dict] saved state read failed:", error?.name); return false; }
+    if (saved) return false;
+  }
   // A reused lookup can acquire another selection during the owner read.
   // Never pair the earlier highlight target with the later sentence.
   if (cur.fullEntryOnly || cur.packInvalidated || cur.keptSaved || (cur.packRevision || 0) !== packRevision ||
