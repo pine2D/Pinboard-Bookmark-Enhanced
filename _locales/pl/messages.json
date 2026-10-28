@@ -1908,7 +1908,45 @@
     "message": "Lokalnie"
   },
   "providerGroupCompat": {
-    "message": "Zgodne z OpenAI"
+    "message": "Własne"
+  },
+  "aiCustomAdd": {
+    "message": "Dodaj własnego dostawcę"
+  },
+  "aiCustomLimit": {
+    "message": "Możesz dodać maksymalnie 8 własnych dostawców. Aby dodać kolejnego, usuń jednego z nich."
+  },
+  "aiCustomDefaultName": {
+    "message": "Własny $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "labelProviderName": {
+    "message": "Nazwa"
+  },
+  "hintCustomBaseUrlAnthropic": {
+    "message": "Do tego adresu dopisywane jest /messages; adres musi zawierać segment wersji, np. …/v1"
+  },
+  "aiCustomBaseUrlInvalid": {
+    "message": "Użyj adresu https:// (http:// tylko dla localhost). Ten adres nie został zapisany."
+  },
+  "aiCustomFieldInvalid": {
+    "message": "Tej wartości nie można zapisać. Zachowano ostatnio zapisaną wartość."
+  },
+  "aiCustomKeyRebind": {
+    "message": "Adres lub format tego dostawcy zmieniono na innym urządzeniu albo przez kopię zapasową. Wpisz ponownie klucz API."
+  },
+  "aiCustomDeleteConfirm": {
+    "message": "Usunąć tego własnego dostawcę?"
+  },
+  "aiCustomDeleteDetail": {
+    "message": "Jego klucz API zapisany na tym urządzeniu również zostanie usunięty."
+  },
+  "aiProviderUnavailable": {
+    "message": "Dostawca niedostępny na tym urządzeniu"
   },
   "provCustomShort": {
     "message": "Własny"

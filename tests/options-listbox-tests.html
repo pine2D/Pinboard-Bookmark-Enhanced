@@ -247,7 +247,9 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     showPanel("panel-ai");
     setValue(provider(), "gemini");
     const btn = btnOf(provider());
-    const last = provider().options.length - 1;
+    // Hidden options (the custom entry slot while no custom provider exists)
+    // are skipped by every key, so End lands on the last visible one.
+    const last = [...provider().options].map((o) => !o.hidden && !o.disabled).lastIndexOf(true);
     const ev = key(btn, "ArrowDown");
     assert(ev.defaultPrevented, "ArrowDown not consumed");
     assert(btn.getAttribute("aria-expanded") === "true", "ArrowDown did not open");
@@ -426,6 +428,27 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     doc.getElementById(groups[1].getAttribute("aria-labelledby")).click();
     assert(provider().value === "gemini" && btn.getAttribute("aria-expanded") === "true", "a group label click picked or closed");
     close(provider());
+  });
+
+  test("an optgroup whose options are all hidden renders no group", () => {
+    const sel = doc.createElement("select");
+    sel.id = "lb-hidden-group";
+    sel.innerHTML = '<optgroup label="One"><option value="a">A</option></optgroup>' +
+      '<optgroup label="Two"><option value="b" hidden>B</option><option value="c" hidden>C</option></optgroup>';
+    doc.getElementById("panel-ai").appendChild(sel);
+    try {
+      assert(win.pbpEnhanceListbox(sel), "enhance failed");
+      const groups = () => [...listOf(sel).querySelectorAll(':scope > [role="group"]')];
+      assert(groups().length === 2, "groups=" + groups().length);
+      assert(!groups()[0].hidden && groups()[1].hidden, "the all-hidden group still renders");
+      sel.querySelector('option[value="c"]').hidden = false;
+      win.pbpListboxSync(sel);
+      assert(!groups()[1].hidden, "the group stayed hidden once an option showed");
+    } finally {
+      // The list box root is inserted right after its select.
+      if (sel.nextElementSibling?.classList.contains("listbox")) sel.nextElementSibling.remove();
+      sel.remove();
+    }
   });
 
   test("programmatic value + pbpListboxSync updates the button text", () => {
@@ -862,8 +885,9 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
       assert(pop.getBoundingClientRect().bottom <= win.innerHeight + 0.5,
         "the open list runs past the viewport bottom: " + pop.getBoundingClientRect().bottom + " > " + win.innerHeight);
       key(btn, "End");
-      const items = itemsOf(provider());
-      assert(activeIndex(provider()) === items.length - 1, "End did not reach the last option");
+      // Hidden options are not stops, so "last" is the last visible one.
+      const items = itemsOf(provider()).filter((li) => !li.hidden);
+      assert(itemsOf(provider())[activeIndex(provider())] === items[items.length - 1], "End did not reach the last option");
       const box = list.getBoundingClientRect();
       const lastRect = items[items.length - 1].getBoundingClientRect();
       assert(list.scrollTop > 0, "the list did not scroll to the last option");

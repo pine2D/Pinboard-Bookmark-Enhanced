@@ -1908,7 +1908,45 @@
     "message": "Локально"
   },
   "providerGroupCompat": {
-    "message": "Совместимые с OpenAI"
+    "message": "Свои провайдеры"
+  },
+  "aiCustomAdd": {
+    "message": "Добавить провайдера"
+  },
+  "aiCustomLimit": {
+    "message": "Можно добавить не больше 8 своих провайдеров. Чтобы добавить новый, удалите один из них."
+  },
+  "aiCustomDefaultName": {
+    "message": "Свой провайдер $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "labelProviderName": {
+    "message": "Название"
+  },
+  "hintCustomBaseUrlAnthropic": {
+    "message": "К этому URL добавляется /messages; адрес должен включать версию, например …/v1"
+  },
+  "aiCustomBaseUrlInvalid": {
+    "message": "Укажите адрес https:// (http:// только для localhost). Этот адрес не сохранён."
+  },
+  "aiCustomFieldInvalid": {
+    "message": "Это значение нельзя сохранить. Оставлено последнее сохранённое значение."
+  },
+  "aiCustomKeyRebind": {
+    "message": "Адрес или формат этого провайдера изменили на другом устройстве или через резервную копию. Введите API-ключ ещё раз."
+  },
+  "aiCustomDeleteConfirm": {
+    "message": "Удалить этого провайдера?"
+  },
+  "aiCustomDeleteDetail": {
+    "message": "API-ключ, сохранённый на этом устройстве, тоже будет удалён."
+  },
+  "aiProviderUnavailable": {
+    "message": "Провайдер недоступен на этом устройстве"
   },
   "provCustomShort": {
     "message": "Свой эндпоинт"

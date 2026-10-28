@@ -2131,7 +2131,9 @@ function _pbpDictEntryMount(host, opts) {
     const norm = pbpDictEntryNorm(record, answerLanguage, settings);
     // Supplement receipts and additions do not change the paid base entry.
     // Retaining these nodes also retains open disclosures and reading position.
-    const baseKey = JSON.stringify([record.entry, record.provider, record.model, record.generatedAt, answerLanguage, record.previousEntries?.map(v => v.archiveId)]);
+    // norm.license carries the provider's display label: renaming a custom
+    // provider entry must re-render the line that names it.
+    const baseKey = JSON.stringify([record.entry, record.provider, record.model, record.generatedAt, answerLanguage, record.previousEntries?.map(v => v.archiveId), norm.license]);
     if (baseKey !== renderedBase) {
       const wasOpen = baseDetails?.open || false;
       _pbpDictRenderEntry(content, norm, opts.term, opts.lang, opts.term, "");

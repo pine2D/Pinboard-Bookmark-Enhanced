@@ -1915,7 +1915,45 @@
     "message": "Local"
   },
   "providerGroupCompat": {
-    "message": "OpenAI-compatible"
+    "message": "Custom"
+  },
+  "aiCustomAdd": {
+    "message": "Add custom provider"
+  },
+  "aiCustomLimit": {
+    "message": "You can add up to 8 custom providers. Delete one to add another."
+  },
+  "aiCustomDefaultName": {
+    "message": "Custom $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "labelProviderName": {
+    "message": "Name"
+  },
+  "hintCustomBaseUrlAnthropic": {
+    "message": "/messages is appended to this URL. Include the version segment, such as …/v1"
+  },
+  "aiCustomBaseUrlInvalid": {
+    "message": "Use an https:// address (http:// only for localhost). This address isn't saved."
+  },
+  "aiCustomFieldInvalid": {
+    "message": "This value can't be saved. The last saved value is kept."
+  },
+  "aiCustomKeyRebind": {
+    "message": "This provider's address or format was changed on another device or by a backup. Enter the API key again."
+  },
+  "aiCustomDeleteConfirm": {
+    "message": "Delete this custom provider?"
+  },
+  "aiCustomDeleteDetail": {
+    "message": "Its API key on this device is deleted too."
+  },
+  "aiProviderUnavailable": {
+    "message": "Provider not available on this device"
   },
   "provCustomShort": {
     "message": "Custom",

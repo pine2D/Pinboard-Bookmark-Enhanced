@@ -1908,7 +1908,45 @@
     "message": "Local"
   },
   "providerGroupCompat": {
-    "message": "Compatible OpenAI"
+    "message": "Personnalisés"
+  },
+  "aiCustomAdd": {
+    "message": "Ajouter un fournisseur personnalisé"
+  },
+  "aiCustomLimit": {
+    "message": "Vous pouvez ajouter jusqu'à 8 fournisseurs personnalisés. Supprimez-en un pour en ajouter un autre."
+  },
+  "aiCustomDefaultName": {
+    "message": "Personnalisé $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "labelProviderName": {
+    "message": "Nom"
+  },
+  "hintCustomBaseUrlAnthropic": {
+    "message": "/messages est ajouté à cette URL ; indiquez aussi le segment de version, par exemple …/v1"
+  },
+  "aiCustomBaseUrlInvalid": {
+    "message": "Utilisez une adresse https:// (http:// uniquement pour localhost). Cette adresse n'est pas enregistrée."
+  },
+  "aiCustomFieldInvalid": {
+    "message": "Cette valeur ne peut pas être enregistrée. La dernière valeur enregistrée est conservée."
+  },
+  "aiCustomKeyRebind": {
+    "message": "L'adresse ou le format de ce fournisseur a été modifié sur un autre appareil ou par une sauvegarde. Saisissez de nouveau la clé API."
+  },
+  "aiCustomDeleteConfirm": {
+    "message": "Supprimer ce fournisseur personnalisé ?"
+  },
+  "aiCustomDeleteDetail": {
+    "message": "Sa clé API enregistrée sur cet appareil est également supprimée."
+  },
+  "aiProviderUnavailable": {
+    "message": "Fournisseur indisponible sur cet appareil"
   },
   "provCustomShort": {
     "message": "Personnalisé"

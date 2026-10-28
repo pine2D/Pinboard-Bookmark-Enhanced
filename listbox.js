@@ -291,6 +291,8 @@
     for (const { label, optgroup } of state.groups) {
       const text = (optgroup.label || "").trim();
       if (label.textContent !== text) label.textContent = text;
+      // A group with no option to show (every option hidden) shows no label.
+      label.parentElement.hidden = optgroup.hidden || ![...optgroup.children].some((o) => !o.hidden);
     }
     for (let i = 0; i < opts.length; i++) {
       const li = state.items[i];

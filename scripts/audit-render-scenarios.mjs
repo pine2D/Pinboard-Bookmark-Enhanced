@@ -51,7 +51,12 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('ai-qwen-fields', [], { target: '#fields-qwen:not([hidden]) #opt-qwen-region-btn' }),
     context('ai-qwen-workspace-warn', ['ai-qwen-fields'], { target: '#qwen-workspace-warn:not([hidden])' }),
     context('ai-provider-ark', [], { target: '#fields-ark:not([hidden]) #opt-ark-region-btn' }),
-    context('ai-provider-opencode', [], { target: '#fields-opencode:not([hidden]) #opt-opencode-protocol-btn' })],
+    context('ai-provider-opencode', [], { target: '#fields-opencode:not([hidden]) #opt-opencode-protocol-btn' }),
+    // Custom AI provider entries share one panel; the driver seeds eight.
+    context('ai-custom-entry', [], { target: '#fields-custom:not([hidden]) #opt-custom-name' }),
+    context('ai-custom-limit', ['ai-custom-entry'], { target: '#ai-custom-limit-hint:not([hidden])' }),
+    context('ai-custom-key-rebind', ['ai-custom-entry'], { target: '#ai-custom-key-rebind:not([hidden])' }),
+    context('ai-custom-delete-confirm', ['ai-custom-entry'], { target: '.confirm-popover .confirm-subject' })],
   library: [
     context('vocab-list', [], { target: '#vocab-list .vocab-card' }),
     context('vocab-filter-set', [], { target: '#vocab-filter-set:popover-open' }),

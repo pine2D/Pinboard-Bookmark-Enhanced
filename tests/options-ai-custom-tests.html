@@ -302,6 +302,19 @@ test("render options: an unresolvable aiProvider keeps select.value via a placeh
   assert(!select.querySelector("[data-provider-unavailable]"), "no placeholder for a malformed value");
 });
 
+test("render options: a fallback label is interface text a later language load re-translates, a user's name is not", () => {
+  const select = providerSelect();
+  const st = pbpOptAiCustomState(S({ ...C, customDisplayName: "", aiCustomProviders: [{ ...B, name: "Relay B" }] }));
+  pbpOptAiCustomRenderOptions(select, st, "custom-zz9zz9");
+  const stat = select.querySelector('option[value="custom"]');
+  assertEq(stat.getAttribute("data-i18n"), "provCustomShort", "unnamed custom option follows the interface language");
+  assert(!select.querySelector('option[value="' + B.id + '"]').hasAttribute("data-i18n"), "a named entry keeps its name");
+  assertEq(select.querySelector("[data-provider-unavailable]").getAttribute("data-i18n"), "aiProviderUnavailable", "placeholder follows the interface language");
+  const st2 = pbpOptAiCustomState(S(C));
+  pbpOptAiCustomRenderOptions(select, st2, "gemini");
+  assert(!stat.hasAttribute("data-i18n"), "naming the custom provider drops data-i18n");
+});
+
 (async () => {
   await atest("health: pbpForgetConnectionHealth removes only ai:<id> through the serial write tail", async () => {
     const source = await fetch("../options.js").then((r) => r.text());
@@ -328,6 +341,40 @@ test("render options: an unresolvable aiProvider keeps select.value via a placeh
     assert(!("ai:custom-b2b2b2" in map), "forgotten");
     assert(map["ai:gemini"] && map["ai:custom-a1a1a1"], "other records and the concurrent write kept");
     assertEq(await mod.pbpForgetConnectionHealth("ai:custom-zzzzzz"), false, "absent id is a no-op");
+  });
+
+  await atest("reset: panel reset keeps entries and keys and reopening an entry shows the saved values", async () => {
+    const [html, source] = await Promise.all([
+      fetch("../options.html").then((r) => r.text()),
+      fetch("../options.js").then((r) => r.text()),
+    ]);
+    const panel = document.importNode(new DOMParser().parseFromString(html, "text/html").querySelector("#panel-ai"), true);
+    const scratch = document.getElementById("scratch");
+    scratch.replaceChildren(panel);
+    try {
+      const PANEL_DEFAULTS = new Function("return (" + extractBalanced(source, "const PANEL_DEFAULTS = {", "{", "}") + ")")();
+      const body = extractBalanced(source, "function applyPanelReset(def, root) {", "{", "}");
+      const applyPanelReset = new Function("$id", "syncSubRows", "syncPromptStates",
+        "return function applyPanelReset(def, root) " + body)((id) => document.getElementById(id), () => {}, () => {});
+      const st = pbpOptAiCustomState(S({ ...C, aiCustomProviders: [B, A], customApiKey3: SLOT3 }));
+      assert(pbpOptAiCustomFillPanel(st, B.id), "fill B");
+      const before = pbpOptAiCustomCollect(st);
+      for (const id of ["opt-custom-name", "opt-custom-protocol", "opt-custom-baseurl", "opt-custom-model"]) {
+        assert(!(id in PANEL_DEFAULTS.ai.fields) && PANEL_DEFAULTS.ai.skip.includes(id), id + " is skipped by the reset, not cleared");
+      }
+      applyPanelReset(PANEL_DEFAULTS.ai, document);
+      assertEq(document.getElementById("opt-custom-baseurl").value, B.baseUrl, "the shared panel still shows the entry");
+      assertDeep(pbpOptAiCustomCollect(st), before, "entries, list and key slots kept");
+      assert(pbpOptAiCustomFillPanel(st, B.id), "refill B");
+      const saved = pbpOptAiCustomCollect(st).aiCustomProviders.find((e) => e.id === B.id);
+      assertEq(document.getElementById("opt-custom-name").value, saved.name, "name");
+      assertEq(document.getElementById("opt-custom-protocol").value, saved.protocol, "format");
+      assertEq(document.getElementById("opt-custom-baseurl").value, saved.baseUrl, "base URL");
+      assertEq(document.getElementById("opt-custom-key").value, pbpAiCustomKeyOpen(pbpOptAiCustomCollect(st), saved), "key");
+      assertEq(document.getElementById("opt-custom-model").value, saved.model, "model");
+    } finally {
+      scratch.replaceChildren();
+    }
   });
 
   const el = document.getElementById("summary");

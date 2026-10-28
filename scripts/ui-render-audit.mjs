@@ -6873,11 +6873,20 @@ async function runLibraryTheme(page, extBase, theme, checks, results) {
 // still isn't gemini after reload" SETUP ERROR the switchChecks guard below
 // was added to catch, so this polls the ACTUAL persisted value via the
 // service worker instead of guessing a delay.
-async function selectProviderViaListbox(page, value, sw) {
+// Checklist rows inside the custom provider panel (Task 6) and the stored
+// settings that make that panel reachable: one legacy custom provider.
+const CUSTOM_PROVIDER_ROWS = new Set(["#opt-custom-protocol-btn", "#add-custom-provider", "#delete-custom-entry", "#fields-custom .key-wrap"]);
+const CUSTOM_PROVIDER_SEED = Object.freeze({
+  customDisplayName: "Relay", customProtocol: "openai", customBaseUrl: "https://relay.example/v1", customModel: "relay-model",
+});
+
+// `panelId` names the provider panel when it is not the value itself: every
+// custom entry (custom-xxxxxx) shows the shared #fields-custom panel.
+async function selectProviderViaListbox(page, value, sw, panelId = value) {
   await page.click("#opt-ai-provider-btn");
   await page.click(`#opt-ai-provider-list [role="option"][data-value="${value}"]`);
   await settleAnimations(page);
-  await page.waitForSelector(`#fields-${value}`, { state: "visible", timeout: TIMEOUT_MS });
+  await page.waitForSelector(`#fields-${panelId}`, { state: "visible", timeout: TIMEOUT_MS });
   if (!sw) return;
   const deadline = Date.now() + TIMEOUT_MS;
   let persisted;
@@ -7171,7 +7180,7 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
     // ruling C): the re-pinned #fields-openai .key-wrap row needs the SAME
     // "provider switched to openai" precondition as the two above.
     const aiProviderChecks = untabbed.filter((c) => c.selector === "#opt-openai-baseurl" || c.selector === "#opt-openai-model"
-      || c.selector === "#fields-openai .key-wrap");
+      || c.selector === "#fields-openai .key-wrap" || CUSTOM_PROVIDER_ROWS.has(c.selector));
     const aiBehaviorChecks = untabbed.filter((c) => c.selector === "#opt-ai-cache-duration");
     // `.switch` rows (taste-uplift batch4 T1 reference instance + T2's one
     // row per DOM shape): the track rows (`#id ~ .switch-track`) and the
@@ -7383,7 +7392,25 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // combobox button, click the option.
       await selectProviderViaListbox(page, "openai");
       await page.waitForSelector("#fields-openai #opt-openai-baseurl", { state: "visible", timeout: TIMEOUT_MS });
-      for (const check of aiProviderChecks) await runOneCheck(page, theme, check, results);
+      for (const check of aiProviderChecks.filter((c) => !CUSTOM_PROVIDER_ROWS.has(c.selector))) await runOneCheck(page, theme, check, results);
+      // The custom panel (Task 6) shows only once a custom provider exists:
+      // seed one (fake key, never tested), reload, pick it like a user.
+      const customRows = aiProviderChecks.filter((c) => CUSTOM_PROVIDER_ROWS.has(c.selector));
+      if (customRows.length) {
+        await selectProviderViaListbox(page, "gemini", sw);
+        await sw.evaluate((seed) => chrome.storage.local.set({ ...seed, customApiKey: obfuscateKey("render-fixture-key") }), CUSTOM_PROVIDER_SEED);
+        // Re-apply the theme before the reload, as the .switch group does:
+        // the appearance group may have left a site preset on the page.
+        const { themePresetKey: _cpPresetKey, optTheme: _cpMode } = themeToStorage(theme);
+        await setTheme(sw, _cpPresetKey, _cpMode);
+        await page.goto(url, { waitUntil: "load", timeout: TIMEOUT_MS });
+        await page.waitForTimeout(500);
+        const _cpLanded = await page.evaluate(() => document.documentElement.getAttribute("data-theme") || "");
+        if (_cpLanded !== theme) throw new Error(`SETUP ERROR [options|${theme}|custom provider group]: page is on data-theme=${JSON.stringify(_cpLanded)}`);
+        await page.click("#tab-ai");
+        await selectProviderViaListbox(page, "custom");
+        for (const check of customRows) await runOneCheck(page, theme, check, results);
+      }
       // Restore the default (Task 4 fix wave, Controller ruling C follow-up):
       // this group's own selectOption above autosaves `aiProvider: "openai"`
       // into the SAME persistent Playwright profile every later group in this
@@ -7404,6 +7431,9 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // is the one call whose autosave genuinely needs to be on disk before
       // the next navigation, not just reflected in this page's live DOM.
       await selectProviderViaListbox(page, "gemini", sw);
+      if (customRows.length) {
+        await sw.evaluate((keys) => chrome.storage.local.remove(keys), [...Object.keys(CUSTOM_PROVIDER_SEED), "customApiKey"]);
+      }
     }
     if (aiBehaviorChecks.length) {
       await page.click("#tab-ai-behavior");
@@ -9617,6 +9647,63 @@ async function runSweep(page, sw, extBase) {
         const provider = document.getElementById("opt-ai-provider");
         provider.value = "gemini"; provider.dispatchEvent(new Event("change", { bubbles: true }));
       });
+    }
+
+    // Custom AI provider entries (Task 6): the shared #fields-custom panel,
+    // the limit hint (8 entries), the re-enter-key hint (an envelope bound to
+    // an old address) and the delete confirmation. Seeded as stored settings
+    // with fake keys, then reloaded; no Test button is ever clicked.
+    const CUSTOM_CONTEXTS = ["ai-custom-entry", "ai-custom-limit", "ai-custom-key-rebind", "ai-custom-delete-confirm"];
+    if (CUSTOM_CONTEXTS.some((name) => wants("options", name))) {
+      const seeded = await sw.evaluate(async () => {
+        const store = {
+          customDisplayName: "Relay one", customProtocol: "openai", customBaseUrl: "https://relay-one.example/v1",
+          customApiKey: obfuscateKey("render-fixture-key"), customModel: "relay-model", aiProvider: "custom",
+        };
+        const list = [];
+        for (let i = 0; i < 7; i++) {
+          const slot = i + 2;
+          const entry = { id: "custom-ra" + "abcdefg"[i] + "000", name: "Relay " + (i + 2), protocol: i % 2 ? "anthropic" : "openai",
+            baseUrl: `https://relay-${i + 2}.example/v1`, model: "relay-model", slot };
+          list.push(entry);
+          // The first list entry's key is sealed to an address it no longer has.
+          const sealTo = i === 0 ? { ...entry, baseUrl: "https://relay-old.example/v1" } : entry;
+          store["customApiKey" + slot] = obfuscateKey(pbpAiCustomKeySeal(sealTo, "render-fixture-key"));
+        }
+        store.aiCustomProviders = list;
+        await chrome.storage.local.set(store);
+        return { rebindId: list[0].id, keys: Object.keys(store) };
+      });
+      await page.goto(`${extBase}options.html`, { waitUntil: "load", timeout: TIMEOUT_MS });
+      await page.waitForTimeout(500);
+      await page.click("#tab-ai");
+      await page.waitForTimeout(150);
+      await scan("options", "ai-custom-entry");
+      await scan("options", "ai-custom-limit");
+      if (wants("options", "ai-custom-key-rebind") || wants("options", "ai-custom-delete-confirm")) {
+        await selectProviderViaListbox(page, seeded.rebindId, null, "custom");
+        await scan("options", "ai-custom-key-rebind");
+        if (wants("options", "ai-custom-delete-confirm")) {
+          await scan("options", "ai-custom-delete-confirm", async () => {
+            // Scroll first and let the scroll event fire: Playwright's own
+            // scroll-into-view lands one frame after its click, and a page
+            // scroll dismisses an open confirm (shared.js onScroll).
+            await page.locator("#delete-custom-entry").scrollIntoViewIfNeeded();
+            await page.waitForTimeout(100);
+            await page.click("#delete-custom-entry");
+            await page.waitForSelector(".confirm-popover .confirm-subject");
+            return true;
+          });
+          await page.locator(".confirm-popover .confirm-no").click();
+        }
+      }
+      // Leave the page before clearing the fixture, so no pending autosave
+      // (the provider switch above) writes it back afterwards.
+      await page.goto("about:blank");
+      await sw.evaluate(async (keys) => {
+        await chrome.storage.local.remove(keys);
+        await chrome.storage.local.set({ aiProvider: "gemini" });
+      }, seeded.keys.filter((key) => key !== "aiProvider"));
     }
   }
 

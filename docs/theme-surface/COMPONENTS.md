@@ -856,7 +856,7 @@ options 的 contrast-audit 字段段合计：配对行每块 8 行（聚焦边 2
   label）。成本明显大于收益（一处未被任何门检查的 HTML 语义违规），暂不做。
 - **例外 2：`.listbox`**（stage2 R4，spec `2026-09-24-ui-system-stage2-design.md` §3）。设置页其余 select 仍是原生控件（options.css 的
   `appearance: base-select` picker 样式），`.listbox` 是全仓**唯一**获准的自绘 select，只增强标了
-  `data-listbox` 的 `<select>`（options 10 处 + library 3 处。options：options.html 里 9 处——`#opt-lang`、`#opt-ai-provider`、
+  `data-listbox` 的 `<select>`（options 10 处 + library 3 处。options：options.html 里 9 处——`#opt-lang`、`#opt-ai-provider`、`#opt-custom-protocol`（自定义服务商共用面板的接口格式）、
   `#opt-ai-tag-lang`、`#opt-ai-summary-lang`、`#opt-ai-tag-separator`、`#translate-target-lang`、
   `#opt-selection-trigger`、`#opt-md-image-policy`、`#opt-theme`；另有 Send-to 构建器在运行时生成的
   Obsidian「route」一处，由 options.js 插入后调用 `pbpEnhanceListbox`；library：`#vocab-group-filter`、

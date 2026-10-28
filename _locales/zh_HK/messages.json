@@ -1908,7 +1908,45 @@
     "message": "本機"
   },
   "providerGroupCompat": {
-    "message": "OpenAI 相容介面"
+    "message": "自訂"
+  },
+  "aiCustomAdd": {
+    "message": "新增自訂服務商"
+  },
+  "aiCustomLimit": {
+    "message": "最多可新增 8 個自訂服務商，刪除一個後便可再新增。"
+  },
+  "aiCustomDefaultName": {
+    "message": "自訂 $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "labelProviderName": {
+    "message": "名稱"
+  },
+  "hintCustomBaseUrlAnthropic": {
+    "message": "請求時會在此網址後加上 /messages，網址必須包含版本段，例如 …/v1"
+  },
+  "aiCustomBaseUrlInvalid": {
+    "message": "網址必須以 https:// 開頭（只有本機位址可用 http://），此網址未有儲存。"
+  },
+  "aiCustomFieldInvalid": {
+    "message": "此值無法儲存，已保留上次儲存的值。"
+  },
+  "aiCustomKeyRebind": {
+    "message": "這個服務商的網址或格式已在其他裝置或備份中更改，請重新輸入 API Key。"
+  },
+  "aiCustomDeleteConfirm": {
+    "message": "刪除這個自訂服務商？"
+  },
+  "aiCustomDeleteDetail": {
+    "message": "這部裝置上儲存的 API Key 亦會一併刪除。"
+  },
+  "aiProviderUnavailable": {
+    "message": "這部裝置上沒有這個服務商"
   },
   "provCustomShort": {
     "message": "自訂"

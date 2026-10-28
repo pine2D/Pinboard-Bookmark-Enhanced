@@ -230,11 +230,13 @@ let _pbpAiPermissionMissing = false;
 // the origin grant is, else the provider picker as before.
 function pbpAiSetupTarget() {
   const provider = $id("opt-ai-provider")?.value || "gemini";
+  // Every custom entry shares the "custom" panel's controls.
+  const dom = pbpOptAiDomId(provider);
   let configured = true;
   try { configured = hasAIKey(pbpLiveAiSettingsSnapshot(provider)); }
   catch (e) { console.warn("[options] AI key check failed:", e?.name, e?.message); }
-  const id = !configured ? `opt-${provider}-key`
-    : (_pbpAiPermissionMissing ? `test-${provider}` : "opt-ai-provider-btn");
+  const id = !configured ? `opt-${dom}-key`
+    : (_pbpAiPermissionMissing ? `test-${dom}` : "opt-ai-provider-btn");
   return $id(id) ? id : "opt-ai-provider-btn";
 }
 
@@ -321,7 +323,7 @@ async function renderConnectionOverview() {
       connected: selfHosted && !!bookmarkConnection.account,
       permission: selfHosted ? await permissionFor(bookmarkConnection.baseUrl ? {origins:[pbpEndpointOriginPattern(bookmarkConnection.baseUrl)]} : null) : true },
     { id: `ai:${provider}`, name: $id("opt-ai-provider")?.selectedOptions?.[0]?.textContent?.trim() || provider,
-      panel: "ai", target: `test-${provider}`, configured: aiConfigured, permission: aiPermission },
+      panel: "ai", target: `test-${pbpOptAiDomId(provider)}`, configured: aiConfigured, permission: aiPermission },
     { id: "drive", name: "Google Drive", panel: "storage", target: "vocab-drive-connect",
       connected: stored.vocabDriveConnected === true, permission: drivePermission },
     // The port input ships a default ("8765"), so a non-empty field proves
@@ -1905,11 +1907,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-ark-model": "doubao-seed-2-0-mini-260428", "opt-ark-region": "cn",
         "opt-opencode-model": "glm-5.3-flash", "opt-opencode-protocol": "openai",
         "opt-commandcode-model": "deepseek/deepseek-v4-flash", "opt-commandcode-protocol": "openai",
-        "opt-ollama-baseurl": "http://localhost:11434", "opt-ollama-model": "llama3.2",
-        "opt-custom-baseurl": "", "opt-custom-model": ""
+        "opt-ollama-baseurl": "http://localhost:11434", "opt-ollama-model": "llama3.2"
       },
       keepsSecrets: true,
-      skip: ["opt-gemini-key","opt-openai-key","opt-claude-key","opt-deepseek-key","opt-qwen-key","opt-minimax-key","opt-openrouter-key","opt-groq-key","opt-mistral-key","opt-cohere-key","opt-siliconflow-key","opt-zhipu-key","opt-kimi-key","opt-ark-key","opt-opencode-key","opt-commandcode-key","opt-custom-key"]
+      // The custom panel shows one stored provider entry: a reset keeps the
+      // entries (they are records the user added, like the keys), so its
+      // fields are not reset either.
+      skip: ["opt-gemini-key","opt-openai-key","opt-claude-key","opt-deepseek-key","opt-qwen-key","opt-minimax-key","opt-openrouter-key","opt-groq-key","opt-mistral-key","opt-cohere-key","opt-siliconflow-key","opt-zhipu-key","opt-kimi-key","opt-ark-key","opt-opencode-key","opt-commandcode-key","opt-custom-key",
+        "opt-custom-name","opt-custom-protocol","opt-custom-baseurl","opt-custom-model"]
     },
     "ai-behavior": {
       fields: {
@@ -2811,6 +2816,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // ---- Custom AI provider entries ----
+  // The editor model holds every entry's values (the shared #fields-custom
+  // panel shows one at a time); their options must exist before the picker's
+  // value is assigned, or a stored entry id would read back as "" and a save
+  // would write that over aiProvider.
+  pbpOptAiCustomEditorState = pbpOptAiCustomState(s);
+  pbpOptAiCustomRenderOptions($id("opt-ai-provider"), pbpOptAiCustomEditorState, s.aiProvider);
+
   // ---- Fill text/password/select fields ----
   // A region or API format this version does not know leaves its select on no
   // option (value ""); saving then omits the key, so the stored value survives.
@@ -2835,8 +2848,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-opencode-key": s.opencodeApiKey, "opt-opencode-model": s.opencodeModel, "opt-opencode-protocol": s.opencodeProtocol,
     "opt-commandcode-key": s.commandcodeApiKey, "opt-commandcode-model": s.commandcodeModel, "opt-commandcode-protocol": s.commandcodeProtocol,
     "opt-ollama-baseurl": s.ollamaBaseUrl, "opt-ollama-model": s.ollamaModel,
-    "opt-custom-baseurl": s.customBaseUrl,
-    "opt-custom-key": s.customApiKey, "opt-custom-model": s.customModel,
     "opt-ai-tag-lang": s.aiTagLang, "opt-ai-summary-lang": s.aiSummaryLang, "opt-ai-cache-duration": s.aiCacheDuration,
     "opt-custom-tag-prompt": s.customTagPrompt, "opt-custom-summary-prompt": s.customSummaryPrompt,
     "opt-batch-tag": s.optBatchTag, "opt-lang": s.optLang, "opt-theme": s.optTheme,
@@ -3479,7 +3490,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ---- Provider field toggle ----
-  const providers = ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","ark","opencode","commandcode","ollama","custom"];
+  // Same order as popup-ai.js AI_PROVIDER_ORDER (K81): deleting the current
+  // custom entry falls back along it.
+  const providers = ["gemini","openai","claude","deepseek","qwen","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","minimax","ark","opencode","commandcode","ollama","custom"];
   // Reader tab's model-override input follows the selected provider: stash the
   // visible value under the outgoing provider, show the incoming provider's
   // entry (absent -> empty, NOT the legacy single key: showing a stale
@@ -3497,15 +3510,158 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   function updateProviderFields() {
     const selected = $id("opt-ai-provider").value;
+    // A custom entry shows the shared custom panel, refilled with that
+    // entry's values (switching must never carry one entry's unsaved input
+    // into another). An unavailable placeholder shows no panel.
+    const entry = pbpOptAiDomId(selected) === "custom"
+      && pbpOptAiCustomFillPanel(pbpOptAiCustomEditorState, selected);
+    const shown = entry ? "custom" : selected;
     providers.forEach(p => {
       const el = $id("fields-" + p);
-      if (el) el.hidden = p !== selected; // native hidden: .pf reveal transition keys off [hidden]
+      if (el) el.hidden = p !== shown; // native hidden: .pf reveal transition keys off [hidden]
     });
     syncPreviewModelToProvider(selected);
     window.pbpListboxSync?.($id("opt-ai-provider"));
   }
   updateProviderFields();
   $id("opt-ai-provider").addEventListener("change", updateProviderFields);
+
+  // ---- Custom entries: edit, add, delete ----
+  // Each field writes its draft on input; a value the list would refuse is
+  // not written (the draft keeps the last accepted one) and, once the field
+  // is left, is marked invalid with the reason under it.
+  const syncAddCustomButton = () => {
+    const btn = $id("add-custom-provider");
+    const hint = $id("ai-custom-limit-hint");
+    const full = !pbpOptAiCustomEditorState
+      || pbpOptAiCustomOrder(pbpOptAiCustomEditorState).length >= PBP_AI_CUSTOM_MAX;
+    if (btn) {
+      btn.disabled = full;
+      if (full) btn.setAttribute("aria-describedby", "ai-custom-limit-hint");
+      else btn.removeAttribute("aria-describedby");
+    }
+    if (hint) hint.hidden = !full;
+  };
+  const rerenderCustomOptions = (value) => {
+    const select = $id("opt-ai-provider");
+    pbpOptAiCustomRenderOptions(select, pbpOptAiCustomEditorState, value);
+    window.pbpListboxSync?.(select);
+  };
+  // A programmatic switch runs everything a picked provider runs: the panel
+  // (updateProviderFields), the connection overview, the tag-governance reset.
+  const switchProvider = (value) => {
+    const select = $id("opt-ai-provider");
+    rerenderCustomOptions(value);
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  const CUSTOM_FIELD_INPUTS = [
+    ["opt-custom-name", "name", "ai-custom-name-invalid"],
+    ["opt-custom-protocol", "protocol", ""],
+    ["opt-custom-baseurl", "baseUrl", "ai-custom-baseurl-invalid"],
+    ["opt-custom-key", "key", ""],
+    ["opt-custom-model", "model", "ai-custom-model-invalid"],
+  ];
+  for (const [elId, field, warnId] of CUSTOM_FIELD_INPUTS) {
+    const el = $id(elId);
+    if (!el) continue;
+    const write = () => {
+      const id = pbpOptAiCustomActiveId();
+      if (!id) return false;
+      const ok = pbpOptAiCustomUpdate(pbpOptAiCustomEditorState, id, field, el.value);
+      if (ok && warnId) $id(warnId).hidden = true;
+      if (!ok || field === "key") return ok;
+      if (field === "name") {
+        rerenderCustomOptions(id);
+        const title = $id("fields-custom-title");
+        if (title) _pbpOptAiCustomLabelInto(title, pbpOptAiCustomEditorState, id);
+        syncPreviewModelToProvider(id);
+      } else if (field === "protocol") {
+        pbpOptAiCustomSyncFormat(pbpOptAiCustomEditorState, id);
+      }
+      return ok;
+    };
+    el.addEventListener(el.tagName === "SELECT" ? "change" : "input", write);
+    if (warnId) {
+      el.addEventListener("change", () => {
+        if (write()) return;
+        $id(warnId).hidden = false;
+        // Leaving the field must not be undone: mark it without taking focus back.
+        pbpOptMarkFieldInvalid?.(el, warnId, { focus: false });
+      });
+    }
+  }
+  syncAddCustomButton();
+  $id("add-custom-provider")?.addEventListener("click", () => {
+    const id = pbpOptAiCustomAdd(pbpOptAiCustomEditorState, {
+      randomBytes: (n) => crypto.getRandomValues(new Uint8Array(n)),
+      defaultName: (n) => t("aiCustomDefaultName", String(n)),
+    });
+    if (!id) { syncAddCustomButton(); return; }
+    switchProvider(id);
+    const name = $id("opt-custom-name");
+    name?.focus();
+    name?.select();
+    saveAllSafely();
+    syncAddCustomButton();
+  });
+  $id("delete-custom-entry")?.addEventListener("click", function () {
+    const button = this;
+    const id = pbpOptAiCustomActiveId();
+    if (!id || !pbpOptAiCustomEditorState?.drafts[id]) return;
+    // Focus as in the dictionary pack list (options-vocab.js): Cancel returns
+    // to this button unless the user clicked or tabbed elsewhere; Delete
+    // moves to the provider picker, since this button's entry is gone.
+    let outsidePointer = false;
+    let confirmation = null;
+    const pointer = (event) => {
+      if (!button.contains(event.target) && !event.target.closest?.(".confirm-popover")) outsidePointer = true;
+    };
+    const cleanup = () => document.removeEventListener("pointerdown", pointer, true);
+    document.addEventListener("pointerdown", pointer, true);
+    const shown = showConfirmPopover(button, {
+      msg: t("aiCustomDeleteConfirm"),
+      subject: pbpOptAiCustomLabel(pbpOptAiCustomEditorState, id),
+      detail: t("aiCustomDeleteDetail"),
+      yesText: t("delete"),
+      noText: t("cancel"),
+      onDismiss: cleanup,
+      onCancel: () => {
+        cleanup();
+        queueMicrotask(() => {
+          const current = document.activeElement;
+          const leaving = confirmation?.inert && confirmation.contains(current);
+          if (outsidePointer || (current !== document.body && !leaving)) return;
+          if (button.isConnected) button.focus();
+        });
+      },
+      onConfirm: async () => {
+        cleanup();
+        let ollamaGranted = false;
+        try {
+          const live = pbpLiveAiSettingsSnapshot($id("opt-ai-provider").value);
+          ollamaGranted = (await chrome.permissions.contains({
+            origins: [_aiTargetOriginPattern({ ...live, aiProvider: "ollama" })],
+          })) === true;
+        } catch (e) {
+          console.warn("[options] Ollama permission read failed:", e?.name, e?.message);
+          ollamaGranted = false;
+        }
+        const select = $id("opt-ai-provider");
+        pbpOptAiCustomDeleteEntry({
+          state: pbpOptAiCustomEditorState, id, current: select.value,
+          snapshot: () => pbpLiveAiSettingsSnapshot(select.value),
+          order: providers, ollamaGranted, previewModelMap: _previewModelMap,
+          applyProvider: switchProvider,
+          forgetHealth: pbpForgetConnectionHealth,
+        });
+        syncAddCustomButton();
+        saveAllSafely();
+        $id("opt-ai-provider-btn")?.focus();
+      },
+    });
+    confirmation = document.activeElement?.closest(".confirm-popover") || null;
+    if (shown === false) cleanup();
+  });
 
   // Region, workspace and API-format settings: say why they form no request
   // (the same pbpAiEndpointProblem codes the resolver fails closed on) while
@@ -3812,9 +3968,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       ...pbpOptKnownEnumPatch("commandcodeProtocol", $id("opt-commandcode-protocol").value, PBP_AI_PROTOCOLS),
       ollamaBaseUrl: $id("opt-ollama-baseurl").value.trim() || "http://localhost:11434",
       ollamaModel: $id("opt-ollama-model").value.trim() || "llama3.2",
-      customBaseUrl: $id("opt-custom-baseurl").value.trim(),
-      customApiKey: obfuscateKey($id("opt-custom-key").value.trim()),
-      customModel: $id("opt-custom-model").value.trim(),
+      // Every custom entry (customDisplayName/Protocol/BaseUrl/ApiKey/Model,
+      // aiCustomProviders and the key slots) comes from the editor model.
+      ...pbpOptAiCustomCollect(pbpOptAiCustomEditorState),
       // AI Behavior & Prompts
       optAiAutoTags: $id("opt-ai-auto-tags").checked,
       aiUseTranscript: $id("opt-ai-use-transcript").checked,
@@ -4265,7 +4421,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-groq-key", "opt-mistral-key", "opt-cohere-key", "opt-siliconflow-key", "opt-zhipu-key",
     "opt-kimi-key", "opt-ollama-baseurl", "opt-custom-key", "opt-custom-baseurl", "dict-anki-port",
     "dict-eudic-token", "opt-qwen-region", "opt-qwen-workspace", "opt-ark-key", "opt-opencode-key",
-    "opt-commandcode-key", "opt-ark-region", "opt-opencode-protocol", "opt-commandcode-protocol"]) {
+    "opt-commandcode-key", "opt-ark-region", "opt-opencode-protocol", "opt-commandcode-protocol",
+    "opt-custom-protocol"]) {
     const el = $id(id);
     el?.addEventListener(el.tagName === "SELECT" ? "change" : "input", scheduleConnectionOverview);
   }

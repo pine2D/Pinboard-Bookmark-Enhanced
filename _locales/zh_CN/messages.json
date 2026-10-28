@@ -1908,7 +1908,45 @@
     "message": "本地"
   },
   "providerGroupCompat": {
-    "message": "OpenAI 兼容接口"
+    "message": "自定义"
+  },
+  "aiCustomAdd": {
+    "message": "添加自定义服务商"
+  },
+  "aiCustomLimit": {
+    "message": "最多可添加 8 个自定义服务商，删除一个后才能再添加。"
+  },
+  "aiCustomDefaultName": {
+    "message": "自定义 $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "labelProviderName": {
+    "message": "名称"
+  },
+  "hintCustomBaseUrlAnthropic": {
+    "message": "请求时会在此地址后追加 /messages，地址需包含版本段，如 …/v1"
+  },
+  "aiCustomBaseUrlInvalid": {
+    "message": "地址须以 https:// 开头（仅本机地址可用 http://），此地址未保存。"
+  },
+  "aiCustomFieldInvalid": {
+    "message": "这个值无法保存，已保留上次保存的值。"
+  },
+  "aiCustomKeyRebind": {
+    "message": "这个服务商的地址或格式在其他设备或备份中被修改过，请重新输入 API Key。"
+  },
+  "aiCustomDeleteConfirm": {
+    "message": "删除这个自定义服务商？"
+  },
+  "aiCustomDeleteDetail": {
+    "message": "本机保存的 API Key 会一并删除。"
+  },
+  "aiProviderUnavailable": {
+    "message": "本机没有这个服务商"
   },
   "provCustomShort": {
     "message": "自定义"

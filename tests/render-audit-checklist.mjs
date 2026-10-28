@@ -2383,6 +2383,20 @@ export const CHECKS = [
   // for `.key-wrap input` at the same specificity, source-order-last.
   { surface: "options", page: "options.html", selector: "#fields-openai .key-wrap", state: "default",
     expect: { widthLteWith: { selector: ".fg:has(#opt-openai-key)" } } },
+  // Custom AI provider entries (Task 6): the shared #fields-custom panel only
+  // shows once a custom provider exists, so scripts/ui-render-audit.mjs seeds
+  // one and picks it through the list box before these rows run. Its format
+  // list box is a value box on the control rung like the provider picker; the
+  // add and delete actions sit on the .btn-sm rung like #test-gemini; the key
+  // row stays inside its field like #fields-openai's.
+  { surface: "options", page: "options.html", selector: "#opt-custom-protocol-btn", state: "default",
+    expect: { heightPx: { comfortable: 32, compact: 28 }, widthLteWith: { selector: ".fg:has(#opt-custom-protocol-btn)" } } },
+  { surface: "options", page: "options.html", selector: "#add-custom-provider", state: "default",
+    expect: { heightPx: { comfortable: 28, compact: 24 } } },
+  { surface: "options", page: "options.html", selector: "#delete-custom-entry", state: "default",
+    expect: { heightPx: { comfortable: 28, compact: 24 } } },
+  { surface: "options", page: "options.html", selector: "#fields-custom .key-wrap", state: "default",
+    expect: { widthLteWith: { selector: ".fg:has(#opt-custom-key)" } } },
 
   // ---- `.listbox` primitive (R4, ui-system-stage2 spec §3, COMPONENTS.md
   // §6.4 exception 2): the one drawn <select> this codebase allows. Two

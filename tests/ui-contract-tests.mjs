@@ -4691,6 +4691,13 @@ for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-l
     return (m[0].match(/\bvalue="([^"]*)"/) || [])[1] ?? "";
   };
 
+  // Providers whose settings collectSettingsFromForm takes from the custom
+  // entry editor model (options-connectivity.js) instead of their fields.
+  const EDITOR_COLLECTED_PROVIDERS = new Set(["custom"]);
+  const collectStart = optionsJs.indexOf("function collectSettingsFromForm() {");
+  const collectBody = collectStart >= 0 ? optionsJs.slice(collectStart, optionsJs.indexOf("\n  }\n", collectStart)) : "";
+  check(collectBody.length > 0, "options.js: collectSettingsFromForm not found for the K81 parity gate");
+
   const offenders = [];
   const keyOffenders = [];
   for (const id of PROVIDERS) {
@@ -4701,7 +4708,13 @@ for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-l
     if (htmlVal === undefined) offenders.push(`${id}: options.html has no id="opt-${id}-model" input`);
     else if (htmlVal !== expected) offenders.push(`${id}: SETTINGS_DEFAULTS.${key}=${JSON.stringify(expected)} but options.html value="opt-${id}-model"=${JSON.stringify(htmlVal)}`);
 
-    if (!Object.prototype.hasOwnProperty.call(aiFields, `opt-${id}-model`)) {
+    if (EDITOR_COLLECTED_PROVIDERS.has(id)) {
+      // The shared custom panel shows one stored entry, which a reset keeps:
+      // its model field is skipped, never reset to a default.
+      if (Object.prototype.hasOwnProperty.call(aiFields, `opt-${id}-model`) || !(panelDefaultsK81.ai.skip || []).includes(`opt-${id}-model`)) {
+        offenders.push(`${id}: PANEL_DEFAULTS.ai must skip opt-${id}-model (a reset keeps custom entries), not reset it`);
+      }
+    } else if (!Object.prototype.hasOwnProperty.call(aiFields, `opt-${id}-model`)) {
       offenders.push(`${id}: PANEL_DEFAULTS.ai.fields is missing opt-${id}-model`);
     } else if (aiFields[`opt-${id}-model`] !== expected) {
       offenders.push(`${id}: SETTINGS_DEFAULTS.${key}=${JSON.stringify(expected)} but PANEL_DEFAULTS.ai.fields["opt-${id}-model"]=${JSON.stringify(aiFields[`opt-${id}-model`])}`);
@@ -4713,7 +4726,14 @@ for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-l
     // group is optional and a missing match resolves to "".
     const collectRe = new RegExp(`\\b${key}:\\s*\\$id\\("opt-${id}-model"\\)\\.value\\.trim\\(\\)(?:\\s*\\|\\|\\s*"((?:[^"\\\\]|\\\\.)*)")?`);
     const collectM = optionsJs.match(collectRe);
-    if (!collectM) {
+    if (EDITOR_COLLECTED_PROVIDERS.has(id)) {
+      // The custom entries' keys come from the editor model, not the shared
+      // panel's fields; their value checks live in options-ai-custom-tests
+      // ("collect: legacy custom keys come from the custom draft").
+      if (!collectBody.includes("...pbpOptAiCustomCollect(pbpOptAiCustomEditorState)")) {
+        offenders.push(`${id}: collectSettingsFromForm does not spread pbpOptAiCustomCollect(pbpOptAiCustomEditorState) (see options-ai-custom-tests "collect: legacy custom keys come from the custom draft")`);
+      }
+    } else if (!collectM) {
       offenders.push(`${id}: collectSettingsFromForm has no "${key}: $id(\\"opt-${id}-model\\").value.trim()" assignment`);
     } else {
       const collectVal = collectM[1] !== undefined ? collectM[1] : "";
@@ -4764,11 +4784,13 @@ for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-l
     "K81: pbpLiveAiSettingsSnapshot is missing a provider's API-key field -> " + keyOffenders.join("; "));
 
   // ---- id-set parity: five more hand-copied provider-id lists, compared as
-  // SETS against PROVIDERS -- never by order (AI_PROVIDER_ORDER's order is a
+  // SETS against PROVIDERS -- not by order (AI_PROVIDER_ORDER's order is a
   // deliberate fallback-provider priority, e.g. minimax sits near the end on
   // purpose; PBP_CONNECTION_HEALTH_IDS is an independent validation
   // allowlist by design). A missing or extra id is a real drift signal
-  // either way; only the ORDER is intentionally allowed to differ.
+  // either way. The one pair compared BY ORDER is options.js `providers` vs
+  // AI_PROVIDER_ORDER (below): deleting the current custom entry falls back
+  // along `providers`, which must be the popup's fallback order.
   const idOffenders = [];
 
   // options.js PBP_CONNECTION_HEALTH_IDS: `new Set(["pinboard","anki","eudic",
@@ -4834,6 +4856,9 @@ for (const [id, label, heading, tag] of [["opt-lang", "secLanguage", "opt-lang-l
   }
   check(idOffenders.length === 0,
     "K81: provider id set drifted (compared as sets, order ignored) -> " + idOffenders.join("; "));
+  check(Array.isArray(providersArr) && Array.isArray(aiProviderOrder)
+    && JSON.stringify(providersArr) === JSON.stringify(aiProviderOrder),
+    "K81: options.js providers order must equal popup-ai.js AI_PROVIDER_ORDER (delete-fallback order)");
 
   // ---- API_KEY_FIELDS coverage (group 4, fix round 1): shared.js's
   // API_KEY_FIELDS drives the sync/local credential-routing split (shared.js
@@ -6353,7 +6378,7 @@ check(mdCss.includes("text-autospace: normal") && /#rendered-view :is\(pre, code
   check(!/setTimeout\(\(\) => \{ statusEl\.textContent = ""/.test(optionsConnectivityJs),
     "options-connectivity.js: a status clear timer is unkeyed again — a finished run will wipe the next run's result off screen");
   check(optionsConnectivityJs.includes("const _testClearTimers = new Map();") &&
-    /function scheduleStatusClear\(key, statusEl, ms\) \{\s*\n\s*cancelStatusClear\(key\);/.test(optionsConnectivityJs),
+    /function scheduleStatusClear\(key, statusEl, ms(?:, live)?\) \{\s*\n\s*cancelStatusClear\(key\);/.test(optionsConnectivityJs),
     "options-connectivity.js: the per-target status clear timers are gone");
 }
 

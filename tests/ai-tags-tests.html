@@ -1242,6 +1242,126 @@ suite("custom provider entries", () => {
       fixture.remove();
     });
 
+    // ---- Custom list entries share one Test button (Task 6, R13) ----
+    const EB = { id: "custom-b2b2b2", name: "B", protocol: "openai", baseUrl: "https://b.example/v1", model: "m", slot: 3 };
+    const EA = { id: "custom-a1a1a1", name: "A", protocol: "openai", baseUrl: "https://a.example/v1", model: "m", slot: 2 };
+    async function withEntryFixture(settings, fn) {
+      const fixture = document.createElement("div");
+      fixture.innerHTML = '<select id="opt-ai-provider"><option value="gemini">G</option>' +
+        '<option value="custom-b2b2b2">B</option><option value="custom-a1a1a1">A</option></select>' +
+        '<input id="opt-custom-name"><select id="opt-custom-protocol"><option value="openai">o</option><option value="anthropic">a</option></select>' +
+        '<input id="opt-custom-baseurl"><input id="opt-custom-key"><input id="opt-custom-model">' +
+        '<p id="ai-custom-key-rebind" hidden></p>' +
+        '<button id="test-custom"></button><span id="test-custom-status"></span>' +
+        '<input id="opt-pinboard-token"><span id="token-format-warn"></span>';
+      document.body.appendChild(fixture);
+      const saved = { req: window.requestAIHostPermissions, call: window.callAI, rec: window.pbpRecordConnectionHealth, chrome: window.chrome, st: window.setTimeout };
+      const env = { reqCalls: 0, calls: [], health: [], timers: [] };
+      window.requestAIHostPermissions = () => { env.reqCalls++; return Promise.resolve(true); };
+      window.callAI = async (s) => { env.calls.push(s.aiProvider); return "OK"; };
+      window.pbpRecordConnectionHealth = (id, ok, code) => { env.health.push({ id, ok, code }); return Promise.resolve(); };
+      window.chrome = { i18n: { getMessage: (key) => key } };
+      window.setTimeout = function (cb, ms) { env.timers.push(ms); return saved.st.call(window, cb, ms); };
+      pbpOptAiCustomEditorState = pbpOptAiCustomState({ ...SETTINGS_DEFAULTS, ...settings });
+      env.state = pbpOptAiCustomEditorState;
+      env.select = document.getElementById("opt-ai-provider");
+      env.status = () => document.getElementById("test-custom-status").textContent;
+      env.settle = async () => { for (let i = 0; i < 6; i++) await new Promise((r) => saved.st.call(window, r, 0)); };
+      try {
+        setupApiTests();
+        await fn(env);
+      } finally {
+        window.requestAIHostPermissions = saved.req;
+        window.callAI = saved.call;
+        window.pbpRecordConnectionHealth = saved.rec;
+        window.chrome = saved.chrome;
+        window.setTimeout = saved.st;
+        pbpOptAiCustomEditorState = null;
+        pbpAiTestInflight.clear();
+        fixture.remove();
+      }
+    }
+    const sealedB = () => obfuscateKey(pbpAiCustomKeySeal(EB, "sk"));
+
+    await atest("entry Test: one click runs one test and one permission request, synchronously inside the click", async () => {
+      await withEntryFixture({ aiCustomProviders: [EB, EA], customApiKey3: sealedB() }, async (env) => {
+        env.select.value = EB.id;
+        pbpOptAiCustomFillPanel(env.state, EB.id);
+        document.getElementById("test-custom").click();
+        assertEq(env.reqCalls, 1, "permission requested synchronously inside the click");
+        await env.settle();
+        assertEq(env.reqCalls, 1, "one permission request");
+        assertEq(env.calls.length, 1, "one test call");
+        assertEq(env.calls[0], EB.id, "tested the selected entry");
+        assert(env.health.some((h) => h.id === "ai:custom-b2b2b2" && h.code === "connected"), "health under the entry id");
+      });
+    });
+
+    await atest("a late entry test result is dropped after switching entries", async () => {
+      await withEntryFixture({ aiCustomProviders: [EB, EA], customApiKey3: sealedB() }, async (env) => {
+        let resolveCall = null;
+        window.callAI = (s) => { env.calls.push(s.aiProvider); return new Promise((r) => { resolveCall = r; }); };
+        env.select.value = EB.id;
+        pbpOptAiCustomFillPanel(env.state, EB.id);
+        document.getElementById("test-custom").click();
+        await env.settle();
+        assert(resolveCall, "the test reached callAI");
+        env.select.value = EA.id;
+        pbpOptAiCustomFillPanel(env.state, EA.id);
+        assert(!document.getElementById("test-custom").disabled, "the shared button follows the entry on screen");
+        env.timers.length = 0;
+        resolveCall("OK");
+        await env.settle();
+        assertEq(env.status(), "", "B's result did not land on A's panel");
+        assert(env.health.some((h) => h.id === "ai:custom-b2b2b2" && h.ok && h.code === "connected"), "B's health still recorded");
+        assert(!env.timers.includes(4000), "no status-clear timer armed for the panel now showing A");
+      });
+    });
+
+    await atest("entry test failures mark the shared key field", async () => {
+      await withEntryFixture({ aiCustomProviders: [EB] }, async (env) => {
+        env.select.value = EB.id;
+        pbpOptAiCustomFillPanel(env.state, EB.id);
+        document.getElementById("test-custom").click();
+        await env.settle();
+        assertEq(env.reqCalls, 0, "no permission request");
+        assert(env.status().includes("testNoApiKey"), "no-key status: " + env.status());
+        assertEq(document.getElementById("opt-custom-key").getAttribute("aria-invalid"), "true", "key field marked");
+        assert(env.health.some((h) => h.id === "ai:custom-b2b2b2" && h.code === "missing_key"), "health missing_key");
+      });
+    });
+
+    await atest("entry test with an unusable base URL asks for nothing", async () => {
+      await withEntryFixture({ aiCustomProviders: [{ ...EB, baseUrl: "" }], customApiKey3: sealedB() }, async (env) => {
+        env.select.value = EB.id;
+        pbpOptAiCustomFillPanel(env.state, EB.id);
+        assert(pbpOptAiCustomUpdate(env.state, EB.id, "key", "sk2"), "key typed");
+        document.getElementById("test-custom").click();
+        await env.settle();
+        assertEq(env.reqCalls, 0, "no permission request");
+        assertEq(env.calls.length, 0, "no request");
+        assert(env.status().includes("aiCustomBaseUrlInvalid"), "address status: " + env.status());
+        assertEq(document.getElementById("opt-custom-baseurl").getAttribute("aria-invalid"), "true", "address field marked");
+        assert(env.health.some((h) => h.id === "ai:custom-b2b2b2" && h.code === "endpoint_invalid"), "health endpoint_invalid");
+      });
+    });
+
+    await atest("entry test of an entry this device does not have reports provider_missing and asks for nothing", async () => {
+      await withEntryFixture({ aiCustomProviders: [EB], customApiKey3: sealedB() }, async (env) => {
+        const ghost = document.createElement("option");
+        ghost.value = "custom-zzzzzz"; ghost.dataset.providerUnavailable = "";
+        env.select.append(ghost);
+        env.select.value = "custom-zzzzzz";
+        document.getElementById("test-custom").click();
+        await env.settle();
+        assertEq(env.reqCalls, 0, "no permission request");
+        assertEq(env.calls.length, 0, "no request");
+        assert(env.status().includes("aiErrorProviderMissing"), "provider-missing status: " + env.status());
+        assert(document.getElementById("opt-custom-key").getAttribute("aria-invalid") !== "true", "the key field is not blamed");
+        assert(env.health.some((h) => h.id === "ai:custom-zzzzzz" && !h.ok && h.code === "provider_missing"), "health provider_missing, not permission_error");
+      });
+    });
+
     await atest("live snapshot carries the unsaved Model Studio region and workspace", async () => {
       const fixture = document.createElement("div");
       fixture.innerHTML = '<select id="opt-qwen-region"><option value="beijing">B</option><option value="tokyo" selected>T</option></select>' +

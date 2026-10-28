@@ -177,6 +177,9 @@ function uiLangToBCP47() { return "en"; }
 function pbpLiveAiSettingsSnapshot() { return { aiProvider:"openai", openaiApiKey:"sk-LEAK-ME", openaiBaseUrl:"https://private.example/v1" }; }
 function hasAIKey(s) { return !!s.openaiApiKey; }
 function _aiTargetOriginPattern() { return "https://private.example/*"; }
+// options-connectivity.js is not loaded here either: the same mapping it
+// exports (every custom entry shares the "custom" panel's controls).
+function pbpOptAiDomId(p) { return p === "custom" || /^custom-[a-z0-9]{6}$/.test(p) ? "custom" : p; }
 function pbpAnkiEndpointFor() { return "http://127.0.0.1:8765"; }
 function pbpEndpointOriginPattern(value) { return value + "/*"; }
 const PBP_EUDIC_ENDPOINT = "https://api.frdic.com";
@@ -1030,6 +1033,28 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(!!ai, "panel-ai is missing");
     assert([...ai.querySelectorAll(".fg")].every((f) => f.classList.contains("entry-block")),
       "every .fg inside the AI panel must carry entry-block");
+  });
+
+  await test("ai tab: the shared custom panel carries name, format, base URL, key, model and a test/delete action row", async () => {
+    const ai = await panelDoc("ai");
+    const panel = ai.querySelector("#fields-custom");
+    assert(!!panel, "#fields-custom is missing");
+    const order = ["opt-custom-name", "opt-custom-protocol", "opt-custom-baseurl", "opt-custom-key", "opt-custom-model"]
+      .map((id) => panel.querySelector("#" + id));
+    assert(order.every(Boolean), "a custom field is missing");
+    for (let i = 1; i < order.length; i++) {
+      assert(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING,
+        "#" + order[i].id + " comes before #" + order[i - 1].id);
+    }
+    assert(order[1].matches("select[data-listbox]"), "the format field is not a list box");
+    const actions = panel.querySelector(".fg-actions");
+    assert(actions && actions.querySelector("#test-custom"), "#test-custom is not in the action row");
+    assert(actions.querySelector('button.btn.btn-sm.danger#delete-custom-entry[data-i18n="delete"]'), "the delete button is not a small danger button in the action row");
+    const providerFg = ai.querySelector("#opt-ai-provider").closest(".fg");
+    assert(providerFg.querySelector(":scope > .fg-actions > #add-custom-provider.btn.btn-sm"), "the add button is not in the provider field's action row");
+    assert(providerFg.querySelector("p.hint#ai-custom-limit-hint[hidden]"), "the limit hint is missing or not hidden");
+    const stat = ai.querySelector('#opt-ai-provider option[value="custom"]');
+    assert(stat && !stat.hasAttribute("data-i18n"), "the static custom option must not carry data-i18n (the entry name replaces it)");
   });
 
   await test("stage2: provider panels keep their ids and count", async () => {

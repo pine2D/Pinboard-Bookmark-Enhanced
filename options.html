@@ -421,10 +421,14 @@
             <optgroup data-i18n-label="providerGroupLocal" label="Local">
               <option value="ollama" data-i18n="provOllama">Ollama (Local)</option>
             </optgroup>
-            <optgroup data-i18n-label="providerGroupCompat" label="OpenAI-compatible">
-              <option value="custom" data-i18n="provCustom">Custom OpenAI-compatible</option>
+            <optgroup data-i18n-label="providerGroupCompat" label="Custom">
+              <option value="custom">Custom</option>
             </optgroup>
           </select>
+          <div class="fg-actions">
+            <button type="button" class="btn btn-sm" id="add-custom-provider" data-i18n="aiCustomAdd">Add custom provider</button>
+          </div>
+          <p class="hint" id="ai-custom-limit-hint" data-i18n="aiCustomLimit" hidden>You can add up to 8 custom providers. Delete one to add another.</p>
           <p class="hint" data-i18n="aiKeyLocalHint">AI is optional: saving and reading work without it. Each API key stays in this browser and is sent only to its own provider.</p>
         </div>
         <div class="fg entry-block" id="ai-provider-unavailable" hidden>
@@ -664,14 +668,25 @@
 
         <!-- Custom -->
         <div class="pf" hidden id="fields-custom">
-          <h3 class="sr-only" data-i18n="provCustom">Custom OpenAI-compatible</h3>
-          <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="opt-custom-baseurl" data-i18n="labelBaseUrl">Base URL</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintCustomBaseUrl">Must support <code>/chat/completions</code> endpoint</p></details><input type="text" class="fg-url" id="opt-custom-baseurl" placeholder="https://api.example.com/v1" /></div>
-          <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="opt-custom-key" data-i18n="labelApiKey">API Key</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintCustomKey">Leave empty if not required</p></details><span class="key-wrap"><input type="password" id="opt-custom-key" /><button type="button" class="key-toggle" data-target="opt-custom-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span></div>
-          <div class="fg entry-block"><label class="bl" for="opt-custom-model" data-i18n="labelModel">Model</label><input type="text" id="opt-custom-model" placeholder="model-name" /></div>
+          <h3 class="sr-only" id="fields-custom-title">Custom</h3>
+          <div class="fg entry-block"><label class="bl" for="opt-custom-name" data-i18n="labelProviderName">Name</label><input type="text" id="opt-custom-name" maxlength="40" aria-describedby="ai-custom-name-invalid" /><p class="hint hint-warn" id="ai-custom-name-invalid" data-i18n="aiCustomFieldInvalid" role="status" aria-live="polite" hidden>This value can't be saved. The last saved value is kept.</p></div>
+          <div class="fg entry-block">
+            <label class="bl" for="opt-custom-protocol" data-i18n="labelAiProtocol">API format</label>
+            <select id="opt-custom-protocol" data-listbox aria-describedby="ai-custom-protocol-warn">
+              <option value="openai" data-i18n="optAiProtocolOpenai" selected>OpenAI-compatible (/chat/completions)</option>
+              <option value="anthropic" data-i18n="optAiProtocolAnthropic">Anthropic Messages (/messages)</option>
+            </select>
+            <p class="hint hint-warn" id="ai-custom-protocol-warn" data-i18n="aiProtocolUnknown" role="status" aria-live="polite" hidden>This API format isn't supported by this version. Choose a format again in Settings.</p>
+          </div>
+          <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="opt-custom-baseurl" data-i18n="labelBaseUrl">Base URL</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" id="hint-custom-baseurl" data-i18n="hintCustomBaseUrl">Must support <code>/chat/completions</code> endpoint</p></details><input type="text" class="fg-url" id="opt-custom-baseurl" maxlength="300" placeholder="https://api.example.com/v1" aria-describedby="ai-custom-baseurl-invalid" /><p class="hint hint-warn" id="ai-custom-baseurl-invalid" data-i18n="aiCustomBaseUrlInvalid" role="status" aria-live="polite" hidden>Use an https:// address (http:// only for localhost). This address isn't saved.</p></div>
+          <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="opt-custom-key" data-i18n="labelApiKey">API Key</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="hintCustomKey">Leave empty if not required</p></details><span class="key-wrap"><input type="password" id="opt-custom-key" aria-describedby="ai-custom-key-rebind" /><button type="button" class="key-toggle" data-target="opt-custom-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint hint-warn" id="ai-custom-key-rebind" data-i18n="aiCustomKeyRebind" role="status" aria-live="polite" hidden>This provider's address or format was changed on another device or by a backup. Enter the API key again.</p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-custom-model" data-i18n="labelModel">Model</label><input type="text" id="opt-custom-model" maxlength="120" placeholder="model-name" aria-describedby="ai-custom-model-invalid" /><p class="hint hint-warn" id="ai-custom-model-invalid" data-i18n="aiCustomFieldInvalid" role="status" aria-live="polite" hidden>This value can't be saved. The last saved value is kept.</p></div>
           <div class="fg-actions">
             <button class="btn btn-sm" id="test-custom" data-i18n="testConnection">Test connection</button>
+            <button type="button" class="btn btn-sm danger" id="delete-custom-entry" data-i18n="delete">Delete</button>
             <span class="save-status" id="test-custom-status" role="status" aria-live="polite"></span>
           </div>
+        </div>
         </div>
 
       </section>

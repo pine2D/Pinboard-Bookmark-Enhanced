@@ -1908,7 +1908,45 @@
     "message": "ローカル"
   },
   "providerGroupCompat": {
-    "message": "OpenAI 互換"
+    "message": "カスタム"
+  },
+  "aiCustomAdd": {
+    "message": "カスタムプロバイダーを追加"
+  },
+  "aiCustomLimit": {
+    "message": "カスタムプロバイダーは 8 個まで追加できます。さらに追加するには、いずれかを削除してください。"
+  },
+  "aiCustomDefaultName": {
+    "message": "カスタム $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "labelProviderName": {
+    "message": "名前"
+  },
+  "hintCustomBaseUrlAnthropic": {
+    "message": "この URL の末尾に /messages が付加されます。…/v1 のようにバージョン部分まで含めてください"
+  },
+  "aiCustomBaseUrlInvalid": {
+    "message": "https:// で始まるアドレスを入力してください（http:// は localhost のみ）。このアドレスは保存されていません。"
+  },
+  "aiCustomFieldInvalid": {
+    "message": "この値は保存できません。前回保存した値のままです。"
+  },
+  "aiCustomKeyRebind": {
+    "message": "このプロバイダーのアドレスまたは形式が、別のデバイスかバックアップで変更されました。API キーを入力し直してください。"
+  },
+  "aiCustomDeleteConfirm": {
+    "message": "このカスタムプロバイダーを削除しますか？"
+  },
+  "aiCustomDeleteDetail": {
+    "message": "このデバイスに保存された API キーも削除されます。"
+  },
+  "aiProviderUnavailable": {
+    "message": "このデバイスでは使えないプロバイダーです"
   },
   "provCustomShort": {
     "message": "カスタム"

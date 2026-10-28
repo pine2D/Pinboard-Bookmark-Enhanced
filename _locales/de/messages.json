@@ -1908,7 +1908,45 @@
     "message": "Lokal"
   },
   "providerGroupCompat": {
-    "message": "OpenAI-kompatibel"
+    "message": "Benutzerdefiniert"
+  },
+  "aiCustomAdd": {
+    "message": "Eigenen Anbieter hinzufügen"
+  },
+  "aiCustomLimit": {
+    "message": "Du kannst bis zu 8 eigene Anbieter hinzufügen. Lösch einen, um einen weiteren anzulegen."
+  },
+  "aiCustomDefaultName": {
+    "message": "Eigener Anbieter $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "labelProviderName": {
+    "message": "Bezeichnung"
+  },
+  "hintCustomBaseUrlAnthropic": {
+    "message": "An diese URL wird /messages angehängt. Gib den Versionsteil mit an, etwa …/v1"
+  },
+  "aiCustomBaseUrlInvalid": {
+    "message": "Verwende eine https://-Adresse (http:// nur für localhost). Diese Adresse wurde nicht gespeichert."
+  },
+  "aiCustomFieldInvalid": {
+    "message": "Dieser Wert lässt sich nicht speichern. Der zuletzt gespeicherte Wert bleibt erhalten."
+  },
+  "aiCustomKeyRebind": {
+    "message": "Adresse oder Format dieses Anbieters wurden auf einem anderen Gerät oder durch eine Sicherung geändert. Gib den API-Schlüssel erneut ein."
+  },
+  "aiCustomDeleteConfirm": {
+    "message": "Diesen eigenen Anbieter löschen?"
+  },
+  "aiCustomDeleteDetail": {
+    "message": "Sein API-Schlüssel auf diesem Gerät wird ebenfalls gelöscht."
+  },
+  "aiProviderUnavailable": {
+    "message": "Anbieter auf diesem Gerät nicht verfügbar"
   },
   "provCustomShort": {
     "message": "Benutzerdefiniert"

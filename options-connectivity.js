@@ -202,6 +202,8 @@ function pbpOptAiCustomUpdate(state, id, field, value) {
 // so the save writes nothing there. A locked list writes neither the list
 // nor its slots.
 function pbpOptAiCustomCollect(state) {
+  // No editor (the settings never loaded): write none of the custom keys.
+  if (!state) return {};
   const c = state.drafts.custom;
   const out = {
     customDisplayName: c.name, customProtocol: c.protocol,
@@ -240,6 +242,17 @@ function pbpOptAiCustomLabel(state, id) {
   const d = state && state.drafts[id];
   const name = d && typeof d.name === "string" ? d.name.trim() : "";
   return name || (typeof t === "function" ? t("provCustomShort") : "Custom");
+}
+
+// Write an entry's label into `el`. The fallback label is interface text and
+// carries data-i18n, so a later language load (applyI18n) re-translates it;
+// a name the user gave is left alone.
+function _pbpOptAiCustomLabelInto(el, state, id) {
+  const d = state && state.drafts[id];
+  const named = !!(d && typeof d.name === "string" && d.name.trim());
+  if (named) el.removeAttribute("data-i18n");
+  else el.setAttribute("data-i18n", "provCustomShort");
+  el.textContent = pbpOptAiCustomLabel(state, id);
 }
 
 // Delete an entry and settle the page around it, in this order: remove it,
@@ -283,13 +296,13 @@ function pbpOptAiCustomRenderOptions(select, state, current) {
   for (const o of select.querySelectorAll("option[data-ai-custom-entry],option[data-provider-unavailable]")) o.remove();
   if (stat) {
     stat.hidden = !(state.order.includes("custom") || current === "custom");
-    stat.textContent = pbpOptAiCustomLabel(state, "custom");
+    _pbpOptAiCustomLabelInto(stat, state, "custom");
   }
   for (const id of state.order) {
     if (id === "custom") continue;
     const opt = document.createElement("option");
     opt.value = id;
-    opt.textContent = pbpOptAiCustomLabel(state, id);
+    _pbpOptAiCustomLabelInto(opt, state, id);
     opt.setAttribute("data-ai-custom-entry", "");
     group.appendChild(opt);
   }
@@ -298,11 +311,27 @@ function pbpOptAiCustomRenderOptions(select, state, current) {
     const ph = document.createElement("option");
     ph.value = value;
     ph.textContent = typeof t === "function" ? t("aiProviderUnavailable") : value;
+    ph.setAttribute("data-i18n", "aiProviderUnavailable");
     ph.setAttribute("data-provider-unavailable", "");
     group.appendChild(ph);
   }
   for (const g of select.querySelectorAll("optgroup")) g.hidden = ![...g.children].some((o) => !o.hidden);
   select.value = value;
+}
+
+// The parts of the panel that follow an entry's format: the base URL hint
+// (which path is appended) and the unknown-format warning.
+function pbpOptAiCustomSyncFormat(state, id) {
+  const d = state && state.drafts[id];
+  if (!d) return;
+  const hint = $id("hint-custom-baseurl");
+  if (hint) {
+    const key = d.protocol === "anthropic" ? "hintCustomBaseUrlAnthropic" : "hintCustomBaseUrl";
+    hint.setAttribute("data-i18n", key);
+    hint.textContent = t(key);
+  }
+  const warn = $id("ai-custom-protocol-warn");
+  if (warn) warn.hidden = PBP_AI_PROTOCOLS.includes(d.protocol);
 }
 
 // Fill the shared panel with one entry's draft. false when there is none.
@@ -324,13 +353,8 @@ function pbpOptAiCustomFillPanel(state, id) {
   set("opt-custom-key", d.key);
   set("opt-custom-model", d.model);
   const title = $id("fields-custom-title");
-  if (title) title.textContent = pbpOptAiCustomLabel(state, id);
-  const hint = $id("hint-custom-baseurl");
-  if (hint) {
-    const key = d.protocol === "anthropic" ? "hintCustomBaseUrlAnthropic" : "hintCustomBaseUrl";
-    hint.setAttribute("data-i18n", key);
-    hint.textContent = t(key);
-  }
+  if (title) _pbpOptAiCustomLabelInto(title, state, id);
+  pbpOptAiCustomSyncFormat(state, id);
   const rebind = $id("ai-custom-key-rebind");
   if (rebind) rebind.hidden = !d.keyRebind;
   for (const warn of ["ai-custom-name-invalid", "ai-custom-baseurl-invalid", "ai-custom-model-invalid"]) {
@@ -395,13 +419,14 @@ function setupApiTests() {
   // next edit clears the mark. A field's own description (the Model Studio
   // region and workspace fields carry hints and a standing warning) is set
   // aside while the failure reason describes it, and put back when it clears.
-  function markFieldInvalid(field, reasonId) {
+  // `focus: false` marks a field the user is leaving without pulling focus back.
+  function markFieldInvalid(field, reasonId, { focus = true } = {}) {
     if (!field) return;
     if (!field.dataset.invalidMarked) field.dataset.prevDescribedby = field.getAttribute("aria-describedby") || "";
     field.dataset.invalidMarked = "1";
     field.setAttribute("aria-invalid", "true");
     field.setAttribute("aria-describedby", reasonId);
-    field.focus();
+    if (focus) field.focus();
     // A list box's button (listbox.js: "<select id>-btn") clears when its
     // select changes; a text field clears on input.
     const select = field.id.endsWith("-btn") ? $id(field.id.slice(0, -4)) : null;
@@ -418,6 +443,8 @@ function setupApiTests() {
     else field.removeAttribute("aria-describedby");
     if (field === tokenInput) validateTokenField();
   }
+  pbpOptMarkFieldInvalid = markFieldInvalid;
+  pbpOptClearFieldInvalid = clearFieldInvalid;
 
   // Only a SUCCESSFUL result is wiped by a timer. A failure is the one line the
   // user has to read and usually copy -- the provider's own error body, the
@@ -432,34 +459,71 @@ function setupApiTests() {
     clearTimeout(_testClearTimers.get(key));
     _testClearTimers.delete(key);
   }
-  function scheduleStatusClear(key, statusEl, ms) {
+  // `live` (optional) says whether the status line still belongs to `key`:
+  // the custom entries share one line, so a clear for an entry the panel no
+  // longer shows must not wipe the entry now on screen.
+  function scheduleStatusClear(key, statusEl, ms, live) {
     cancelStatusClear(key);
     _testClearTimers.set(key, setTimeout(() => {
       _testClearTimers.delete(key);
+      if (live && !live()) return;
       statusEl.textContent = "";
       statusEl.classList.remove("ok", "bad", "pending", "warn");
     }, ms));
   }
 
   async function testAIProvider(provider) {
-    const statusEl = $id(`test-${provider}-status`);
+    // Every custom entry shares the "custom" panel's button, status line and
+    // key field; timers, in-flight guards and health records stay per entry.
+    const dom = pbpOptAiDomId(provider);
+    const statusEl = $id(`test-${dom}-status`);
     if (!statusEl) return;
+    // The shared line belongs to whichever entry the picker shows: a result
+    // that arrives after the user switched entries is dropped (its health
+    // record is still written). Without a picker (test pages) it is live.
+    const live = () => dom !== "custom" || !$id("opt-ai-provider") || pbpOptAiCustomActiveId() === provider;
+    const pending = (text) => { if (live()) setStatusPending(statusEl, text); };
+    const result = (ok, text) => { if (live()) setStatusResult(statusEl, ok, text); };
+    const warn = (text) => { if (live()) setStatusWarn(statusEl, text); };
+    const mark = (field) => { if (live()) markFieldInvalid(field, statusEl.id); };
     // The call underneath is an unbounded network request. Without this the
     // button stayed live throughout, so a second click started a concurrent run
     // against the same status element. Mirrors the Pinboard token test below.
-    const btn = $id(`test-${provider}`);
-    if (btn?.disabled) return;
+    const btn = $id(`test-${dom}`);
+    if (btn?.disabled || pbpAiTestInflight.has(provider)) return;
+    pbpAiTestInflight.add(provider);
     if (btn) btn.disabled = true;
     cancelStatusClear(provider);
     try {
-      setStatusPending(statusEl, t("testTesting"));
+      pending(t("testTesting"));
 
       const cs = pbpLiveAiSettingsSnapshot(provider);
 
+      // A custom address the request could never use is reported on the
+      // address field, synchronously and before any permission prompt.
+      if (dom === "custom") {
+        const listed = Array.isArray(cs.aiCustomProviders)
+          ? cs.aiCustomProviders.find((e) => e && e.id === provider) : null;
+        // An entry deleted elsewhere or not synced here yet: nothing to test
+        // and no key to ask for (hasAIKey would read it as a missing key).
+        if (provider !== "custom" && !listed) {
+          result(false, t("aiErrorProviderMissing"));
+          recordHealth(`ai:${provider}`, false, "provider_missing");
+          return;
+        }
+        const base = provider === "custom" ? cs.customBaseUrl : listed?.baseUrl;
+        if (base !== undefined && !(typeof base === "string" && base && pbpAiCustomBaseUrlOk(base))) {
+          result(false, t("aiCustomBaseUrlInvalid"));
+          recordHealth(`ai:${provider}`, false, "endpoint_invalid");
+          mark($id("opt-custom-baseurl"));
+          return;
+        }
+      }
+
       if (!hasAIKey(cs)) {
-        setStatusResult(statusEl, false, t("testNoApiKey"));
+        result(false, t("testNoApiKey"));
         recordHealth(`ai:${provider}`, false, "missing_key");
-        markFieldInvalid($id(`opt-${provider}-key`), statusEl.id);
+        mark($id(`opt-${dom}-key`));
         return;
       }
 
@@ -474,16 +538,22 @@ function setupApiTests() {
         originPattern = _aiTargetOriginPattern(cs);
       } catch (err) {
         if (err?.code === "endpoint_invalid" && err.reason) {
-          setStatusResult(statusEl, false, err.message);
+          result(false, err.message);
           recordHealth(`ai:${provider}`, false, "endpoint_invalid");
-          const field = err.reason === "region_unknown" ? $id(`opt-${provider}-region-btn`)
-            : err.reason === "protocol_unknown" ? $id(`opt-${provider}-protocol-btn`)
-            : $id(`opt-${provider}-workspace`);
-          markFieldInvalid(field, statusEl.id);
+          const field = err.reason === "region_unknown" ? $id(`opt-${dom}-region-btn`)
+            : err.reason === "protocol_unknown" ? $id(`opt-${dom}-protocol-btn`)
+            : $id(`opt-${dom}-workspace`);
+          mark(field);
+          return;
+        }
+        // An entry that was deleted or has not synced here: nothing to ask for.
+        if (err?.code === "provider_missing") {
+          result(false, err.message);
+          recordHealth(`ai:${provider}`, false, "provider_missing");
           return;
         }
         console.warn("[connectivity] AI permission request failed:", err?.name, err?.message);
-        setStatusResult(statusEl, false, err?.message || t("networkError"));
+        result(false, err?.message || t("networkError"));
         recordHealth(`ai:${provider}`, false, "permission_error");
         return;
       }
@@ -491,18 +561,18 @@ function setupApiTests() {
         granted = await requestAIHostPermissions(cs);
       } catch (err) {
         console.warn("[connectivity] AI permission request failed:", err?.name, err?.message);
-        setStatusResult(statusEl, false, err?.message || t("networkError"));
+        result(false, err?.message || t("networkError"));
         recordHealth(`ai:${provider}`, false, "permission_error");
         return;
       }
       if (!granted) {
-        setStatusResult(statusEl, false, t("aiErrorHostPermission", originPattern.replace(/\/\*$/, "")));
+        result(false, t("aiErrorHostPermission", originPattern.replace(/\/\*$/, "")));
         recordHealth(`ai:${provider}`, false, "permission_denied");
         return;
       }
 
       try {
-        const result = await callAI(cs, "Reply with just the word: OK");
+        const reply = await callAI(cs, "Reply with just the word: OK");
 
         // Second leg (K96): the Reader's per-provider model override. The call
         // above used the provider's CONFIGURED model -- the one popup tags and
@@ -539,20 +609,22 @@ function setupApiTests() {
             // this as a provider failure would render "this API key is broken"
             // over a mistyped or retired reader model; the overview reads
             // override_bad as its own warning row instead.
-            setStatusWarn(statusEl, t("testOverrideFailed", ov,
+            warn(t("testOverrideFailed", ov,
               ovTimedOut ? t("testTimeout") : (ovErr?.message || "")));
             recordHealth(`ai:${provider}`, true, "override_bad");
             return;
           }
-          setStatusResult(statusEl, true, t("testOkWithOverride", (result || "OK").substring(0, 20), ov));
           recordHealth(`ai:${provider}`, true, "connected");
-          scheduleStatusClear(provider, statusEl, 4000);
+          if (!live()) return;
+          setStatusResult(statusEl, true, t("testOkWithOverride", (reply || "OK").substring(0, 20), ov));
+          scheduleStatusClear(provider, statusEl, 4000, live);
           return;
         }
 
-        setStatusResult(statusEl, true, t("testConnected", (result || "OK").substring(0, 20)));
         recordHealth(`ai:${provider}`, true, "connected");
-        scheduleStatusClear(provider, statusEl, 4000);
+        if (!live()) return;
+        setStatusResult(statusEl, true, t("testConnected", (reply || "OK").substring(0, 20)));
+        scheduleStatusClear(provider, statusEl, 4000, live);
       } catch (err) {
         // Two names, one meaning: the request deadline is an AbortSignal.timeout
         // (TimeoutError) while a caller-driven cancel is AbortError — same pairing
@@ -565,17 +637,21 @@ function setupApiTests() {
           const mnf = pbpAiModelNotFoundText(provOpt?.textContent.trim() || cs.aiProvider);
           msg = mnf.msg + " " + mnf.hint;
         }
-        setStatusResult(statusEl, false, msg);
+        result(false, msg);
         recordHealth(`ai:${provider}`, false,
           timedOut ? "timeout" : (err?.code === "model_not_found" ? "model_not_found" : "failed"));
       }
     } finally {
-      if (btn) btn.disabled = false;
+      pbpAiTestInflight.delete(provider);
+      // The shared custom button belongs to the entry on screen now.
+      if (btn && live()) btn.disabled = false;
     }
   }
 
   ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","ark","opencode","commandcode","ollama","custom"].forEach(p => {
-    $id(`test-${p}`)?.addEventListener("click", () => testAIProvider(p));
+    // One listener per button (R13): the shared custom button tests the
+    // entry the picker shows.
+    $id(`test-${p}`)?.addEventListener("click", () => testAIProvider(p === "custom" ? (pbpOptAiCustomActiveId() || "custom") : p));
   });
 
   // ---- Pinboard token: real-time format validation (shared.js rule) ----
