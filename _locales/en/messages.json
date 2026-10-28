@@ -4575,6 +4575,7 @@
   "dictExamplesFind": {"message": "Find examples in texts"},
   "dictExamplesNone": {"message": "This search found no verifiable source text."},
   "dictNegRetry": {"message": "Not found last time · Try again"},
+  "dictSlotGenerate": {"message": "Generate"},
   "dictExamplesUnsupported": {"message": "Source text search isn’t available for this language yet."},
   "dictExamplesFailed": {"message": "Couldn’t search Wikisource. Try again."},
   "dictExamplesGrantNeeded": {"message": "Allow access to Wikisource to search for examples."},

@@ -2019,7 +2019,13 @@ function _pbpDictEntryMount(host, opts) {
   const modelName = () => configured() && typeof pbpDictEntryModelName === "function" ? pbpDictEntryModelName(settings) || "" : "";
   const modelNotes = () => {
     const name = modelName();
-    for (const note of panel.querySelectorAll("button > .xp-dict-model")) note.textContent = name ? "· " + name : "";
+    for (const note of panel.querySelectorAll("button > .xp-dict-model")) {
+      note.textContent = name ? "· " + name : "";
+      // A slot's buttons leave their category to the slot's label on screen;
+      // their accessible name says it: category · text · model.
+      const el = note.parentElement, category = el.dataset.categoryName;
+      if (category) el.setAttribute("aria-label", [category, note.previousElementSibling?.textContent, name].filter(Boolean).join(" · "));
+    }
   };
   const sync = () => {
     const off = !record && !!settings && settings.previewAiEnabled === false;
@@ -2167,6 +2173,8 @@ function _pbpDictEntryMount(host, opts) {
     const next = !title.hidden ? title : !reveal.hidden ? reveal : !generate.hidden ? generate : null;
     next?.focus({ preventScroll: true });
   };
+  // A slotted result has no title of its own: its slot's label stands in.
+  const itemFocus = item => !item ? null : !item.heading.hidden ? item.heading : usageForm?.focusTarget(item.addition.category) || null;
   // The card's one metadata line (ruling 3.1): model, date and explanation
   // language, once, after every AI block -- not a receipt per block. The models
   // of the entry and its shown learning blocks are named once each; the date
@@ -2357,6 +2365,7 @@ function _pbpDictEntryMount(host, opts) {
       if (configured() && addition.id && addition.archiveSaved !== false && !replaced.has(id) && !legacyCategory && !addition.profile?.topic) {
         if (!item.update) {
           item.update = paidButton("dictSupplementUpdate", "xp-dict-update-supplement", "dictSupplementUpdateHint");
+          item.update.dataset.categoryName = t("dictSupplement" + addition.category[0].toUpperCase() + addition.category.slice(1));
           item.update.addEventListener("click", () => usageForm?.update(item.addition));
         }
         if (!item.update.isConnected) section.appendChild(item.update);
@@ -2377,7 +2386,7 @@ function _pbpDictEntryMount(host, opts) {
               record.supplements = record.supplements.map(value => supplementId(value) === id ? saved : value);
               render(record, answerLanguage, false, section.open ? supplementId(saved) : "");
               usageMessage(feedback, t("dictSupplementSaved"), "saved");
-              if (hadFocus) supplementNodes.get(supplementId(saved))?.heading.focus({ preventScroll: true });
+              if (hadFocus) itemFocus(supplementNodes.get(supplementId(saved)))?.focus({ preventScroll: true });
             } catch (error) {
               if (alive()) usageMessage(feedback, t("dictSupplementSaveFailed"), "error");
               console.warn("[dict-entry] usage save retry failed:", error?.name);
@@ -2387,16 +2396,18 @@ function _pbpDictEntryMount(host, opts) {
         }
         if (!item.retry.isConnected) section.appendChild(item.retry);
       } else item.retry?.remove();
+      // A current result sits in its category's fixed slot (ruling
+      // 2026-10-28), under the slot's label -- or, for etymology, under the
+      // block heading -- so it carries no title of its own and stays open: a
+      // second title would repeat the category. Old categories and earlier
+      // versions keep their folded title.
+      const slotted = !replaced.has(id) && !legacyCategory;
+      heading.hidden = slotted;
+      if (slotted) section.open = true;
       if (replaced.has(id)) {
         if (section.parentElement !== previousSupplements) previousSupplements.appendChild(section);
       } else if (legacyCategory) legacySections.push(section);
-      else {
-        // Fixed order inside a block: patterns before confusables, results
-        // above the block's actions.
-        const block = addition.category === "etymology" ? form.etymology : form.usage;
-        if (section.parentElement !== block) (addition.category === "patterns" &&
-          block.querySelector(':scope > [data-supplement-category="confusables"]') || form.resultsEnd(block)).before(section);
-      }
+      else if (section.parentElement !== form.slots[addition.category]) form.slotEnd(addition.category).before(section);
       if (id === revealId) section.open = true;
     }
     for (const [id, item] of supplementNodes) {
@@ -2417,11 +2428,23 @@ function _pbpDictEntryMount(host, opts) {
     form.refresh();
   };
   // The learning blocks (redesign 1B.8, Q8=A): "usage points" holds two paid
-  // buttons -- collocations and patterns, confusables -- each generating,
+  // categories -- collocations and patterns, confusables -- each generating,
   // saving and failing on its own; "etymology" holds one. Each paid button is
   // the wandSparkles icon, its text and the model name. A category that has a
   // result shows it in the block instead of its button, so no control ever
   // switches between a free "view saved" and a paid "generate".
+  //
+  // Slots (ruling 2026-10-28): every category has one fixed slot, and
+  // everything about that category -- its button or its result with the
+  // result's update button, its progress, notes, receipts and alerts -- stays
+  // inside it, so generating, updating, failing or remembering a miss never
+  // reorders the block or leaves a receipt under the other category's button.
+  // The usage block's two slots open with a small label line naming their
+  // category (patterns, then confusables); the etymology block has one
+  // category, so its heading is the slot's only label. A button inside a slot
+  // never repeats the category name on screen ("Generate", or "Not found last
+  // time · Try again", plus the model); its accessible name still starts with
+  // the category.
   const learningForm = () => {
     if (usageForm) return usageForm;
     const block = (name, key) => {
@@ -2429,19 +2452,32 @@ function _pbpDictEntryMount(host, opts) {
       el.dataset.aiBlock = name;
       el.setAttribute("role", "group"); el.setAttribute("aria-label", t(key));
       const heading = document.createElement("p"); heading.className = "xp-dict-learning-title"; heading.textContent = t(key);
+      heading.tabIndex = -1;
       el.appendChild(heading); return el;
     };
-    const paid = (category, key) => {
-      const el = paidButton(key, "xp-dict-supplement-generate", "dictPaidActionHint"); el.dataset.category = category;
+    const labelKeys = { patterns: "dictSupplementPatterns", confusables: "dictSupplementConfusables", etymology: "dictSupplementEtymology" };
+    const paid = category => {
+      const el = paidButton("dictSlotGenerate", "xp-dict-supplement-generate", "dictPaidActionHint"); el.dataset.category = category;
+      el.dataset.categoryName = t(labelKeys[category]);
       return el;
     };
     const usage = block("usage", "dictLearningUsagePoints"), etymology = block("etymology", "dictLearningEtymology");
-    const labelKeys = { patterns: "dictSupplementPatterns", confusables: "dictSupplementConfusables", etymology: "dictSupplementEtymology" };
-    const buttons = Object.fromEntries(Object.entries(labelKeys).map(([category, key]) => [category, paid(category, key)]));
+    const slot = (category, labelled) => {
+      const el = document.createElement("div"); el.className = "xp-dict-learning-slot"; el.dataset.slot = category;
+      if (labelled) {
+        const label = document.createElement("p"); label.className = "xp-dict-learning-label"; label.dataset.category = category;
+        label.textContent = t(labelKeys[category]); label.tabIndex = -1; el.appendChild(label);
+      }
+      return el;
+    };
+    const slots = { patterns: slot("patterns", true), confusables: slot("confusables", true), etymology: slot("etymology", false) };
+    const buttons = Object.fromEntries(Object.keys(labelKeys).map(category => [category, paid(category)]));
     // [icon..., label, model]: the label is the model span's previous sibling.
     const labels = Object.fromEntries(Object.entries(buttons).map(([category, el]) => [category, el.lastElementChild.previousElementSibling]));
     const etymologyHint = document.createElement("p"); etymologyHint.className = "xp-dict-src"; etymologyHint.textContent = t("dictEtymologyHint");
-    usage.append(buttons.patterns, buttons.confusables); etymology.append(etymologyHint, buttons.etymology);
+    slots.patterns.appendChild(buttons.patterns); slots.confusables.appendChild(buttons.confusables);
+    slots.etymology.append(etymologyHint, buttons.etymology);
+    usage.append(slots.patterns, slots.confusables); etymology.appendChild(slots.etymology);
     const feedbacks = Object.fromEntries(Object.entries(buttons).map(([category, el]) => [category, usageFeedback(el)]));
     const profile = document.createElement("p"); profile.className = "xp-dict-src xp-dict-supplement-profile";
     const learner = pbpDictSupplementProfile(settings);
@@ -2464,9 +2500,12 @@ function _pbpDictEntryMount(host, opts) {
     languageHint.textContent = t("dictSupplementLanguage", languageName(target()));
     profile.prepend(languageHint);
     usage.appendChild(profile);
-    // Results sit above a block's actions: the first action row (usage) or
-    // the hint that introduces the etymology button.
-    const resultsEnd = el => el === usage ? feedbacks.patterns.box.parentElement : etymologyHint;
+    // A slot's results sit above its action row: below the label in the usage
+    // slots, before the hint that introduces the etymology button.
+    const slotEnd = category => category === "etymology" ? etymologyHint : feedbacks[category].box.parentElement;
+    // Where focus goes once a result has replaced its button: the slot's
+    // label, or the etymology block's heading.
+    const focusTarget = category => category === "etymology" ? etymology.firstElementChild : slots[category]?.firstElementChild || null;
     // The topic no longer takes part in reuse (1B.5), as in dict-entry.js's find().
     const existing = category => {
       const profile = pbpDictSupplementProfile(settings, category);
@@ -2495,9 +2534,7 @@ function _pbpDictEntryMount(host, opts) {
         // generates (category, retry, model). In the usage block, which holds
         // two such buttons, the neutral note beside each names its category,
         // so the two rows stay apart on screen too.
-        labels[category].textContent = remembered ? t("dictNegRetry") : t(labelKeys[category]);
-        if (remembered) el.setAttribute("aria-label", [t(labelKeys[category]), t("dictNegRetry"), model].filter(Boolean).join(" · "));
-        else el.removeAttribute("aria-label");
+        labels[category].textContent = remembered ? t("dictNegRetry") : t("dictSlotGenerate");
         if (remembered) el.dataset.remembered = "true"; else delete el.dataset.remembered;
         // Retrieval and AI judgement read differently; both are neutral answers
         // with the info icon, never errors, and never claim the usage is absent.
@@ -2513,10 +2550,14 @@ function _pbpDictEntryMount(host, opts) {
         feedback.box.parentElement.hidden = el.hidden && feedback.box.hidden &&
           !el.nextElementSibling?.classList.contains("xp-dict-action-error");
       }
+      // The accessible names follow the faces just set (and the model).
+      modelNotes();
       profile.hidden = buttons.patterns.hidden && buttons.confusables.hidden;
       etymologyHint.hidden = buttons.etymology.hidden;
-      // A block shows only while the AI entry is expanded and has something
-      // in it besides its title.
+      // A slot shows while it holds anything besides its label; a block
+      // shows only while the AI entry is expanded and has something in it
+      // besides its title.
+      for (const el of Object.values(slots)) el.hidden = ![...el.children].some(node => !node.hidden && !node.matches(".xp-dict-learning-label"));
       for (const el of [usage, etymology]) {
         el.dataset.aiBlockEmpty = String(![...el.children].slice(1).some(node => !node.hidden));
         el.hidden = !expanded || el.dataset.aiBlockEmpty === "true";
@@ -2531,10 +2572,16 @@ function _pbpDictEntryMount(host, opts) {
       if (!origin?.isConnected || !_pbpDictGeneratableCategory(category)) return;
       const answerLanguage = learningLanguage();
       const feedback = usageFeedback(origin);
+      // An update reports its progress and failures beside its own button,
+      // but its outcome lands in the slot's own row, under the new version:
+      // the version it replaces folds away with its row.
+      const outcome = updating ? feedbacks[category] : feedback;
       // Retrying is this ordinary click: this attempt's own outcome replaces
       // the remembered "last time" state.
-      negTouched.add(category); negState[category] = false; feedback.remembered = false;
+      negTouched.add(category); negState[category] = false; feedback.remembered = false; outcome.remembered = false;
       usageMessage(feedback, "");
+      // The slot says one thing at a time: an earlier receipt goes.
+      if (outcome !== feedback) usageMessage(outcome, "");
       let restoreFocus = null;
       const hadFocus = document.activeElement === origin || (updating && panel.contains(document.activeElement));
       const version = ++epoch, controller = new AbortController(); active = controller; busy = true;
@@ -2581,14 +2628,15 @@ function _pbpDictEntryMount(host, opts) {
         if (category !== "etymology") pbpDictNegForget(opts.owner, negParts(category));
         const id = supplementId(addition), focusStayed = document.activeElement === feedback.cancel;
         render(record, answerLanguage, false, id);
+        if (outcome !== feedback) usageMessage(feedback, "");
         // A failed save is an error; a partial result is a neutral answer
         // (info icon, no alert); a full one is a plain "saved".
-        usageMessage(feedback, addition.archiveSaved === false ? t("dictSupplementSaveFailed") : addition.learning?.omittedItems
+        usageMessage(outcome, addition.archiveSaved === false ? t("dictSupplementSaveFailed") : addition.learning?.omittedItems
           ? t("dictSupplementPartial", String(addition.learning.items.length), String(addition.learning.omittedItems)) : t("dictSupplementSaved"),
           addition.archiveSaved === false ? "error" : addition.learning?.omittedItems ? "neutral" : "saved");
         // The result replaces its button; focus moves to its heading without
         // scrolling, so the reader stays where they were while waiting.
-        if (focusStayed) restoreFocus = supplementNodes.get(id)?.heading;
+        if (focusStayed) restoreFocus = itemFocus(supplementNodes.get(id));
       } catch (error) {
         if (!current()) return;
         console.warn("[dict-entry] usage generation failed:", error?.name, _pbpDictFailureCode(error), _pbpDictFailureReason(error));
@@ -2615,7 +2663,7 @@ function _pbpDictEntryMount(host, opts) {
       }
     };
     for (const [category, el] of Object.entries(buttons)) el.addEventListener("click", () => generateSupplement(null, category));
-    usageForm = { usage, etymology, resultsEnd, refresh, enable: enableForm, update: addition => generateSupplement(addition) };
+    usageForm = { usage, etymology, slots, slotEnd, focusTarget, refresh, enable: enableForm, update: addition => generateSupplement(addition) };
     return usageForm;
   };
   const run = async (manual, updateId = "", origin = null) => {

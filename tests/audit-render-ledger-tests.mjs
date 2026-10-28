@@ -184,3 +184,27 @@ test('action notes: a note beside its button (a narrow column) fails; the line b
   // A context that renders no remembered note does not require the check.
   assert.equal(verdicts(withNotes([]), 'dict-entry-result').dictActionNoteBelow, undefined);
 });
+
+test('usage slots: each category under its own label, patterns before confusables; a receipt under the other button fails', () => {
+  const blocks = [{ role: 'sense', left: 24 }];
+  const withSlots = (slots) => ({ ...probe(blocks), slots });
+  const band = (category, index, top, bottom, label = { top: top - 26, bottom: top - 8 }) => ({ category, index, items: 2, top, bottom, path: category, label });
+  const good = [band('patterns', 0, 126, 160), band('confusables', 1, 210, 320)];
+  for (const surface of ['md-preview', 'library']) {
+    for (const context of ['dict-entry-usage-busy', 'dict-entry-usage-error', 'dict-entry-usage-result', 'dict-entry-paid-negative', 'dict-entry-legacy']) {
+      assert.equal(verdicts(withSlots(good), context, surface).dictUsageSlots, 'OK', `${surface}/${context}`);
+      // Before the slots: no label line names either category.
+      assert.equal(verdicts(withSlots(good.map((b) => ({ ...b, label: null }))), context, surface).dictUsageSlots, 'FAIL', `${surface}/${context}`);
+      assert.equal(verdicts(withSlots([]), context, surface).dictUsageSlots, 'SETUP', `${surface}/${context}`);
+    }
+  }
+  // 08-usage-result-p3: the confusables result sits above the patterns
+  // button and its receipt below it -- the two bands interleave.
+  assert.equal(verdicts(withSlots([band('patterns', 0, 300, 330), band('confusables', 1, 120, 360)]), 'dict-entry-usage-result').dictUsageSlots, 'FAIL');
+  // A label under the thing it names fails too.
+  assert.equal(verdicts(withSlots([band('patterns', 0, 126, 160, { top: 150, bottom: 168 }), good[1]]), 'dict-entry-usage-result').dictUsageSlots, 'FAIL');
+  // A category with nothing on screen is not measured; a context that does
+  // not show the usage block does not require the check.
+  assert.equal(verdicts(withSlots([{ ...good[0], items: 0 }, good[1]]), 'dict-entry-usage-result').dictUsageSlots, 'OK');
+  assert.equal(verdicts(withSlots([]), 'dict-entry-result').dictUsageSlots, undefined);
+});

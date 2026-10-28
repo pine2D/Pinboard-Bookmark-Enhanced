@@ -4568,6 +4568,7 @@
   "dictExamplesFind": {"message": "尋找原文用例"},
   "dictExamplesNone": {"message": "本次檢索未找到可核實的原文。"},
   "dictNegRetry": {"message": "上次未找到 · 再試"},
+  "dictSlotGenerate": {"message": "產生"},
   "dictExamplesUnsupported": {"message": "這個語言尚不支援原文檢索。"},
   "dictExamplesFailed": {"message": "無法檢索 Wikisource，請重試。"},
   "dictExamplesGrantNeeded": {"message": "需要允許存取 Wikisource 才能檢索原文。"},

@@ -217,8 +217,10 @@ await test("retrieval and AI-judgement memories read differently, both neutral w
   // Retrying stays the paid action: wandSparkles, its text and the model name.
   const paidOk = patterns.querySelector("svg")?.outerHTML === svgOf(PBP_ICONS.wandSparkles) && patterns.querySelector(".xp-dict-model").textContent === "· fixture-model" &&
     !patterns.disabled && !patterns.hidden;
-  const plainOk = label(confusables) === "dictSupplementConfusables" && !confusables.dataset.remembered && ui.status("confusables").textContent === "" &&
-    !confusables.hasAttribute("aria-label");
+  // A plain slot button is the generate verb; its category is its slot's
+  // label on screen and the start of its accessible name.
+  const plainOk = label(confusables) === "dictSlotGenerate" && !confusables.dataset.remembered && ui.status("confusables").textContent === "" &&
+    confusables.getAttribute("aria-label") === "dictSupplementConfusables · dictSlotGenerate · fixture-model";
   // A remembered miss is a neutral answer (plan 3.4): polite, never an alert.
   const politeOk = ["patterns", "etymology"].every(category => ui.status(category).getAttribute("role") === "status" &&
     !ui.status(category).closest('[role="alert"]')) && !ui.host.querySelector('[role="alert"], .xp-dict-action-error');
@@ -226,12 +228,22 @@ await test("retrieval and AI-judgement memories read differently, both neutral w
   return hiddenUntilRead && examplesOk && patternsOk && etymologyOk && paidOk && plainOk && politeOk &&
     new Set(["dictSupplementNoSources", "dictPatternsNone", "dictConfusablesNone"].map(key => t(key))).size === 3;
 });
-await test("two remembered usage buttons read alike and the note beside each names its own category", async () => {
+await test("two remembered usage buttons read alike, each under its own category's label with the note naming its category", async () => {
   reset();
   await pbpDictNegRecord("acct_alice", usage("patterns")); await pbpDictNegRecord("acct_alice", usage("confusables"));
   const ui = await entryView();
   const rows = ["patterns", "confusables"].map(category => ({ category, button: ui.paid(category), status: ui.status(category) }));
-  const ok = rows.every(({ category, button, status }) => label(button) === "dictNegRetry" && button.dataset.remembered === "true" &&
+  // Each sits in its category's fixed slot (ruling 2026-10-28): the slot's
+  // label line, naming the category, comes first; the button and its note
+  // follow inside the same slot; patterns' slot comes before confusables'.
+  const slotOk = ({ category, button, status }) => {
+    const slot = button.closest("[data-slot]"), first = slot?.firstElementChild;
+    return slot?.dataset.slot === category && status.closest("[data-slot]") === slot && first?.classList.contains("xp-dict-learning-label") &&
+      first.textContent === (category === "patterns" ? "dictSupplementPatterns" : "dictSupplementConfusables") &&
+      !!(first.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING) && !button.textContent.includes(first.textContent);
+  };
+  const order = [...ui.host.querySelectorAll('[data-learning-block="usage"] > [data-slot]')].map(el => el.dataset.slot).join();
+  const ok = order === "patterns,confusables" && rows.every(row => slotOk(row)) && rows.every(({ category, button, status }) => label(button) === "dictNegRetry" && button.dataset.remembered === "true" &&
     button.getAttribute("aria-label") === (category === "patterns" ? "dictSupplementPatterns" : "dictSupplementConfusables") + " · dictNegRetry · fixture-model" &&
     status.textContent === (category === "patterns" ? "dictPatternsNone" : "dictConfusablesNone") && status.dataset.state === "neutral" &&
     button.closest(".xp-dict-usage-actions") === status.closest(".xp-dict-usage-actions"));

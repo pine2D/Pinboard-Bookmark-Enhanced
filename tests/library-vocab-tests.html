@@ -4483,6 +4483,23 @@ await (async () => {
       _pbpVocabLookupOther("Gift","de");await settle();
       check("AI entry: the reusable cache is shown in a new lookup without a paid request",calls.length===1&&host.querySelector('.xp-dict-ai-content')?.textContent.includes("veneno"));
       check("AI entry: cached data never silently chooses a definition to overwrite",host.querySelector('.vocab-save-definition').value===""&&writes.length===2);
+      {
+        // Slots (ruling 2026-10-28) in the library's mount too: the usage
+        // block's two labelled slots in fixed order, a saved confusables
+        // result inside its own slot (no second title), the patterns slot's
+        // button not repeating its category on screen.
+        const supplement={id:'c'.repeat(64),category:'confusables',profile:{nativeLanguage:'',level:'',topic:''},content:'Saved comparison',sources:[],provider:'ollama',model:'fixture-model',generatedAt:1792800000001,archiveSaved:true};
+        cached={...record,cached:true,archiveId:'a'.repeat(64),archiveSaved:true,supplements:[supplement]};
+        _pbpVocabLookupOther("Gift","de");await settle();
+        const usage=host.querySelector('[data-learning-block="usage"]');
+        const slots=[...(usage?.querySelectorAll(':scope > [data-slot]')||[])];
+        const result=host.querySelector('[data-supplement-id="'+supplement.id+'"]'),button=slots[0]?.querySelector('.xp-dict-supplement-generate');
+        check("AI entry: the library's usage block keeps its two labelled slots in order, a saved result inside its own",
+          slots.map(el=>el.dataset.slot).join()==="patterns,confusables"&&
+          slots.every(el=>el.firstElementChild?.classList.contains('xp-dict-learning-label')&&el.firstElementChild.textContent===t(el.dataset.slot==="patterns"?"dictSupplementPatterns":"dictSupplementConfusables"))&&
+          result?.parentElement===slots[1]&&!result.querySelector(':scope > summary').checkVisibility()&&!!button?.checkVisibility()&&
+          !button.textContent.includes(t("dictSupplementPatterns"))&&button.getAttribute('aria-label')?.startsWith(t("dictSupplementPatterns")+" · ")&&calls.length===1);
+      }
       cached=null;let resolveSettings;pbpReadSettingsWithSecrets=()=>new Promise(resolve=>{resolveSettings=resolve;});
       _pbpVocabLookupOther("Gift","de");await settle();
       check("AI entry: generation stays disabled until its settings snapshot is ready",$id('vocab-ref').querySelector('.xp-dict-ai-generate').disabled);

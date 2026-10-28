@@ -2383,26 +2383,59 @@ async function runDictionaryEntryUiTests() {
     const usage=mount();await usage.ui.ready;
     const block=(host,name)=>host.querySelector('[data-learning-block="'+name+'"]');
     const paid=(host,category)=>host.querySelector('.xp-dict-supplement-generate[data-category="'+category+'"]');
+    // Slots (ruling 2026-10-28): one fixed slot per category. The usage block
+    // is [title, patterns slot, confusables slot, profile]; each usage slot
+    // opens with its category label; the etymology block is [title, its one
+    // unlabelled slot]. Everything about a category -- its button, its
+    // current results (no title of their own), its update button, progress,
+    // notes, receipts and alerts -- is inside its slot, results above the
+    // slot's action row. Returns "" when all of that holds, else what broke.
+    const slotOf=(host,category)=>host.querySelector('[data-learning-block] [data-slot="'+category+'"]');
+    const slotFault=host=>{
+      const usageBlock=block(host,'usage'),etymologyBlock=block(host,'etymology');
+      if(!usageBlock||!etymologyBlock)return 'no learning blocks';
+      const shape=el=>[...el.children].map(node=>node.dataset.slot||node.className);
+      if(JSON.stringify(shape(usageBlock))!==JSON.stringify(['xp-dict-learning-title','patterns','confusables','xp-dict-src xp-dict-supplement-profile']))return 'usage block '+JSON.stringify(shape(usageBlock));
+      if(JSON.stringify(shape(etymologyBlock))!==JSON.stringify(['xp-dict-learning-title','etymology']))return 'etymology block '+JSON.stringify(shape(etymologyBlock));
+      for(const category of ['patterns','confusables','etymology']){
+        const slot=slotOf(host,category),button=paid(host,category),row=button?.closest('.xp-dict-usage-actions');
+        const label=slot.querySelector(':scope > .xp-dict-learning-label');
+        if(category==='etymology'?!!label:(slot.firstElementChild!==label||label.textContent!=='dictSupplement'+category[0].toUpperCase()+category.slice(1)))return category+' label';
+        if(row?.parentElement!==slot)return category+' button outside its slot';
+        for(const section of host.querySelectorAll('[data-learning-block] [data-supplement-category="'+category+'"]')){
+          if(section.parentElement!==slot)return category+' result outside its slot';
+          if(!(section.compareDocumentPosition(row)&Node.DOCUMENT_POSITION_FOLLOWING))return category+' result below its actions';
+          if(section.querySelector(':scope > summary').checkVisibility())return category+' result repeats a title';
+        }
+      }
+      for(const note of host.querySelectorAll('[data-learning-block] :is(.xp-dict-usage-feedback:not([hidden]), .xp-dict-action-error)')){
+        if(!note.closest('[data-slot]'))return 'a note outside every slot: '+note.textContent;
+      }
+      return '';
+    };
     check("a saved AI entry shows the usage-points and etymology blocks with three paid buttons and no category select (1B.8)",
       block(usage.host,'usage')?.checkVisibility()&&block(usage.host,'etymology')?.checkVisibility()&&!usage.host.querySelector('select')&&!usage.host.querySelector('.xp-dict-supplement')&&
       block(usage.host,'usage').querySelector('.xp-dict-learning-title')?.textContent==='dictLearningUsagePoints'&&block(usage.host,'etymology').querySelector('.xp-dict-learning-title')?.textContent==='dictLearningEtymology'&&
       JSON.stringify([...block(usage.host,'usage').querySelectorAll('.xp-dict-supplement-generate')].map(el=>el.dataset.category))==='["patterns","confusables"]'&&
       JSON.stringify([...block(usage.host,'etymology').querySelectorAll('.xp-dict-supplement-generate')].map(el=>el.dataset.category))==='["etymology"]');
     const modelUi=mount({settings:{...settings,previewAiModel:'fixture-model'}});await modelUi.ui.ready;
-    check("every paid learning button is the wandSparkles icon, its text and the model name",
+    // Inside its slot a button never repeats its category on screen; its
+    // accessible name starts with it (ruling 2026-10-28).
+    check("every paid learning button is the wandSparkles icon, the generate verb and the model name, its category only in its accessible name",
       [['patterns','dictSupplementPatterns'],['confusables','dictSupplementConfusables'],['etymology','dictSupplementEtymology']].every(([category,key])=>{
         const el=paid(modelUi.host,category);
-        return el?.firstElementChild?.dataset.icon==='wandSparkles'&&el.children[1]?.textContent===key&&el.querySelector('.xp-dict-model')?.textContent==='· fixture-model'&&el.textContent===key+'· fixture-model';
-      }));
+        return el?.firstElementChild?.dataset.icon==='wandSparkles'&&el.children[1]?.textContent==='dictSlotGenerate'&&el.querySelector('.xp-dict-model')?.textContent==='· fixture-model'&&
+          el.textContent==='dictSlotGenerate· fixture-model'&&!el.textContent.includes(key)&&el.getAttribute('aria-label')===key+' · dictSlotGenerate · fixture-model';
+      })&&slotFault(modelUi.host)==='');
     // Plan 3.3: every paid action -- generate, update entry, update
     // supplement and the three learning buttons -- is wandSparkles, non-empty
     // text and only the model name; the token cost is in its description,
     // never in the note. Free actions never carry wandSparkles or a model.
     {
-      const paidShape=(el,key,hint)=>!!el&&el.querySelectorAll('svg').length===1&&el.firstElementChild?.dataset.icon==='wandSparkles'&&
+      const paidShape=(el,key,hint,name=null)=>!!el&&el.querySelectorAll('svg').length===1&&el.firstElementChild?.dataset.icon==='wandSparkles'&&
         el.children[1]?.textContent===key&&!!key&&el.children[2]?.classList.contains('xp-dict-model')&&el.children.length===3&&
         el.querySelector('.xp-dict-model').textContent==='· model-one'&&!/token/i.test(el.querySelector('.xp-dict-model').textContent)&&
-        el.title===hint&&el.getAttribute('aria-description')===hint&&!el.hasAttribute('aria-label');
+        el.title===hint&&el.getAttribute('aria-description')===hint&&(name===null?!el.hasAttribute('aria-label'):el.getAttribute('aria-label')===name);
       window.pbpDictEntryRead=async()=>null;
       const fresh=mount({settings:{...settings,previewAiModel:'model-one'}});await fresh.ui.ready;
       const generateButton=fresh.host.querySelector('.xp-dict-ai-generate');
@@ -2413,9 +2446,11 @@ async function runDictionaryEntryUiTests() {
       const withSaved=mount({settings:{...settings,previewAiModel:'model-one'}});await withSaved.ui.ready;
       check("updating the entry and updating a supplement are paid actions of the same shape (3.3)",
         paidShape(withSaved.host.querySelector('.xp-dict-update-entry'),'dictEntryUpdate','dictEntryUpdateHint')&&
-        paidShape(withSaved.host.querySelector('.xp-dict-update-supplement'),'dictSupplementUpdate','dictSupplementUpdateHint'));
+        paidShape(withSaved.host.querySelector('.xp-dict-update-supplement'),'dictSupplementUpdate','dictSupplementUpdateHint','dictSupplementPatterns · dictSupplementUpdate · model-one'));
       check("the remaining learning buttons are paid actions of the same shape (3.3)",
-        [['confusables','dictSupplementConfusables'],['etymology','dictSupplementEtymology']].every(([category,key])=>paidShape(paid(withSaved.host,category),key,'dictPaidActionHint')));
+        [['confusables','dictSupplementConfusables'],['etymology','dictSupplementEtymology']].every(([category,key])=>paidShape(paid(withSaved.host,category),'dictSlotGenerate','dictPaidActionHint',key+' · dictSlotGenerate · model-one')));
+      check("a saved result and its update sit in their category's slot, which keeps its label (ruling 2026-10-28)",slotFault(withSaved.host)===''&&
+        withSaved.host.querySelector('.xp-dict-update-supplement').closest('[data-slot]')===slotOf(withSaved.host,'patterns'));
       const paidButtons=withSaved.host.querySelectorAll('button:has(> svg[data-icon="wandSparkles"])');
       check("every button carrying wandSparkles carries the model name and no token wording in its note",[...paidButtons].filter(el=>el.checkVisibility()).length===4&&
         [...paidButtons].every(el=>el.querySelector(':scope > .xp-dict-model')?.textContent==='· model-one'&&!/token/i.test(el.querySelector('.xp-dict-model').textContent)));
@@ -2472,6 +2507,8 @@ async function runDictionaryEntryUiTests() {
     const legacyUsage=mount();await legacyUsage.ui.ready;
     check("an old collocations record saved with topic \"work\" is still read and its heading shows \"· work\" and the old-category label",legacyUsage.host.querySelector('[data-supplement-id] > summary').textContent==='dictSupplementCollocations · work · dictSupplementLegacyCategory'&&legacyUsage.host.textContent.includes('Earlier paid guidance'));
     check("an old paid record saved with a topic offers no update and leaves every current button in place",!legacyUsage.host.querySelector('.xp-dict-update-supplement')&&['patterns','confusables','etymology'].every(category=>paid(legacyUsage.host,category)?.checkVisibility()));
+    check("a read-only old record stays outside the slots, which keep their order and labels",slotFault(legacyUsage.host)===''&&
+      !legacyUsage.host.querySelector('[data-supplement-id]').closest('[data-slot]'));
     // 1C.3: structured old literature (a source quotation with its AI
     // translation) and culture (a Wikipedia-cited explanation) records render
     // from the record alone, with the old-category label and no update.
@@ -2506,7 +2543,8 @@ async function runDictionaryEntryUiTests() {
       const section=currentUi.host.querySelector('[data-supplement-id]');
       check("a saved "+category+" result is shown open in its block in place of its button, with an update and no old-category label",
         section?.open&&section.closest('[data-learning-block]')===block(currentUi.host,category==='etymology'?'etymology':'usage')&&!!section.querySelector('.xp-dict-update-supplement')&&
-        !section.querySelector(':scope > summary').textContent.includes('dictSupplementLegacyCategory')&&!paid(currentUi.host,category).checkVisibility());
+        !section.querySelector(':scope > summary').textContent.includes('dictSupplementLegacyCategory')&&!paid(currentUi.host,category).checkVisibility()&&
+        section.parentElement===slotOf(currentUi.host,category)&&slotFault(currentUi.host)==='');
       currentUi.ctrl.abort();
     }
     window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[]});
@@ -2531,19 +2569,28 @@ async function runDictionaryEntryUiTests() {
     check("one usage point in progress leaves the other's button in place but locked",paid(usage.host,'confusables').checkVisibility()&&paid(usage.host,'confusables').disabled);
     resolveUsage(addition);await settle();
     const patternsSection=usage.host.querySelector('[data-supplement-id="'+addition.id+'"]');
-    check("a completed usage point replaces its button with its open result and moves focus to the result's heading",
-      !submit.checkVisibility()&&patternsSection?.open&&patternsSection.parentElement===blockBeforeUsage&&document.activeElement===patternsSection.querySelector('summary')&&
-      submit.closest('.xp-dict-usage-actions').querySelector('.xp-dict-usage-status')?.textContent==='dictSupplementSaved');
+    check("a completed usage point replaces its button with its open result in its slot and moves focus to the slot's label",
+      !submit.checkVisibility()&&patternsSection?.open&&patternsSection.parentElement===slotOf(usage.host,'patterns')&&patternsSection.closest('[data-learning-block]')===blockBeforeUsage&&
+      document.activeElement===slotOf(usage.host,'patterns').querySelector('.xp-dict-learning-label')&&
+      submit.closest('.xp-dict-usage-actions').querySelector('.xp-dict-usage-status')?.textContent==='dictSupplementSaved'&&slotFault(usage.host)==='');
     check("appending usage keeps the base definition and open etymology nodes intact",usage.host.querySelector('.xp-dict-entry')===baseBeforeUsage&&usage.host.querySelector('.xp-dict-ai-details')===originBeforeUsage&&originBeforeUsage.open);
     check("appending usage preserves the mounted block",block(usage.host,'usage')===blockBeforeUsage);
-    patternsSection.open=false;
+    const patternsSlot=slotOf(usage.host,'patterns'),confusablesSlot=slotOf(usage.host,'confusables');
     submit=paid(usage.host,'confusables');submit.focus();submit.click();await settle();
+    check("a usage point in flight keeps its progress in its own slot, under its label",slotFault(usage.host)===''&&
+      progressOf(submit.closest('.xp-dict-usage-actions')).box.closest('[data-slot]')===confusablesSlot&&!patternsSlot.querySelector('.xp-dict-usage-feedback[data-state="busy"]'));
     outside.focus();resolveUsage({...addition,id:'c'.repeat(64),category:'confusables'});await settle();
     check("supplement completion never steals focus after the user moves elsewhere",document.activeElement===outside);
-    check("a second usage point does not reopen or replace an earlier closed one",usage.host.querySelector('[data-supplement-id="'+addition.id+'"]')===patternsSection&&!patternsSection.open&&originBeforeUsage.open);
-    check("usage-point results keep a fixed order above the block's actions: patterns, then confusables",
-      JSON.stringify([...blockBeforeUsage.children].filter(el=>el.dataset.supplementId).map(el=>el.dataset.supplementCategory))==='["patterns","confusables"]'&&
-      !!(usage.host.querySelector('[data-supplement-category="confusables"]').compareDocumentPosition(blockBeforeUsage.querySelector('.xp-dict-usage-actions'))&Node.DOCUMENT_POSITION_FOLLOWING));
+    check("a second usage point does not replace or move an earlier one",usage.host.querySelector('[data-supplement-id="'+addition.id+'"]')===patternsSection&&patternsSection.parentElement===patternsSlot&&patternsSection.open&&originBeforeUsage.open);
+    // The receipt of the second result is in the second slot, under that
+    // result -- never under the other category's button (batch-3 review,
+    // 08-usage-result-p3).
+    const receipts=[...blockBeforeUsage.querySelectorAll('.xp-dict-usage-status')].filter(el=>el.textContent==='dictSupplementSaved'&&el.checkVisibility());
+    const confusablesReceipt=receipts.find(el=>el.closest('[data-slot]')===confusablesSlot);
+    check("usage-point results keep their slots' fixed order, patterns then confusables, each with its receipt inside its own slot",slotFault(usage.host)===''&&
+      JSON.stringify([...blockBeforeUsage.querySelectorAll('[data-supplement-id]')].map(el=>el.dataset.supplementCategory))==='["patterns","confusables"]'&&
+      blockBeforeUsage.querySelector('[data-slot]')===patternsSlot&&patternsSlot.nextElementSibling===confusablesSlot&&
+      receipts.length===2&&receipts[0].closest('[data-slot]')===patternsSlot&&!!confusablesReceipt&&!!(usage.host.querySelector('[data-supplement-category="confusables"]').compareDocumentPosition(confusablesReceipt)&Node.DOCUMENT_POSITION_FOLLOWING));
     check("the usage block keeps its order in the lookup: base entry, usage points, etymology",
       !!(baseBeforeUsage.compareDocumentPosition(blockBeforeUsage)&Node.DOCUMENT_POSITION_FOLLOWING)&&!!(blockBeforeUsage.compareDocumentPosition(block(usage.host,'etymology'))&Node.DOCUMENT_POSITION_FOLLOWING));
     window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[{...addition,archiveSaved:false}]});
@@ -2553,16 +2600,18 @@ async function runDictionaryEntryUiTests() {
     const retryButton=retrySection.querySelector('.xp-dict-retry-save');
     const beforeRetryCalls=calls.length;
     window.pbpDictSupplementSave=async()=>{throw new Error('fixture storage failure');};retryButton.focus();retryButton.click();await settle();
-    check("failed supplement persistence reports beside its local retry without losing paid content",noteOf(retryButton)?.textContent==='dictSupplementSaveFailed'&&noteOf(retryButton).getAttribute('role')==='alert'&&retryButton.checkVisibility()&&retryUsage.host.querySelector('.xp-dict-ai-status').hidden&&retrySection.textContent.includes(addition.content));
+    check("failed supplement persistence reports beside its local retry without losing paid content",noteOf(retryButton)?.textContent==='dictSupplementSaveFailed'&&noteOf(retryButton).getAttribute('role')==='alert'&&retryButton.checkVisibility()&&retryUsage.host.querySelector('.xp-dict-ai-status').hidden&&retrySection.textContent.includes(addition.content)&&
+      noteOf(retryButton).closest('[data-slot]')===slotOf(retryUsage.host,'patterns')&&slotFault(retryUsage.host)==='');
     window.pbpDictSupplementSave=async(_input,value)=>({...value,archiveSaved:true});
     retryButton.focus();retryButton.click();await settle();
-    check("retry saving a supplement updates its receipt without recreating open content or calling AI",retryUsage.host.querySelector('[data-supplement-id]')===retrySection&&retrySection.open&&retryOrigin.open&&!retrySection.querySelector('.xp-dict-retry-save')&&document.activeElement===retrySection.querySelector('summary')&&calls.length===beforeRetryCalls);
+    check("retry saving a supplement updates its receipt without recreating open content or calling AI",retryUsage.host.querySelector('[data-supplement-id]')===retrySection&&retrySection.open&&retryOrigin.open&&!retrySection.querySelector('.xp-dict-retry-save')&&document.activeElement===slotOf(retryUsage.host,'patterns').querySelector('.xp-dict-learning-label')&&calls.length===beforeRetryCalls&&slotFault(retryUsage.host)==='');
     window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[]});
     const failUi=mount();await failUi.ui.ready;
     window.pbpDictSupplementRun=async()=>{throw new Error('fixture failure');};
     submit=paid(failUi.host,'confusables');submit.focus();submit.click();await settle();
     check("failed supplement returns keyboard focus to its retryable action",document.activeElement===submit&&!submit.disabled);
-    check("failed supplement leaves a visible local message next to its retryable action",noteOf(submit)?.textContent==='dictSupplementUnavailable'&&noteOf(submit).checkVisibility()&&noteOf(submit).parentElement===submit.closest('.xp-dict-usage-actions')&&failUi.host.querySelector('.xp-dict-ai-status').hidden);
+    check("failed supplement leaves a visible local message next to its retryable action",noteOf(submit)?.textContent==='dictSupplementUnavailable'&&noteOf(submit).checkVisibility()&&noteOf(submit).parentElement===submit.closest('.xp-dict-usage-actions')&&failUi.host.querySelector('.xp-dict-ai-status').hidden&&
+      noteOf(submit).closest('[data-slot]')===slotOf(failUi.host,'confusables')&&slotFault(failUi.host)==='');
     check("one usage point failing leaves the other usable and quiet",!paid(failUi.host,'patterns').disabled&&paid(failUi.host,'patterns').checkVisibility()&&
       paid(failUi.host,'patterns').closest('.xp-dict-usage-actions').querySelector('.xp-dict-usage-feedback').hidden);
     // "Nothing usable" for a usage point has its own neutral copy, apart
@@ -2636,11 +2685,14 @@ async function runDictionaryEntryUiTests() {
       document.activeElement===originAction.parentElement.querySelector('.xp-dict-usage-stop'));
     resolveUsage({...addition,id:'5'.repeat(64),category:'etymology',learning:{version:2,language:{name:'Spanish',lang:'es'},summary:'Una palabra relacionada.',replacesId:'',
       items:[{sense:1,kind:'family',title:'giftig',explanation:'Significa venenoso.',example:'',translation:'',sourceIndex:-1}]}});await settle();
-    check("completed etymology replaces its button and hint with a focusable, open saved result in its block",!originAction.checkVisibility()&&
-      !separateOrigin.host.querySelector('[data-learning-block="etymology"] > .xp-dict-src').checkVisibility()&&
-      separateOrigin.host.querySelector('[data-supplement-id]').open&&separateOrigin.host.querySelector('[data-supplement-id]').closest('[data-learning-block]')?.dataset.learningBlock==='etymology'&&
-      document.activeElement===separateOrigin.host.querySelector('[data-supplement-id] > summary')&&
-      separateOrigin.host.querySelector('[data-supplement-id]').textContent.includes('dictSupplementEtymology'));
+    // The etymology block has one category: its heading is the only label,
+    // so the result carries no second, same-meaning title under it.
+    check("completed etymology replaces its button and hint with an open saved result under the block heading, which takes focus",!originAction.checkVisibility()&&
+      !slotOf(separateOrigin.host,'etymology').querySelector(':scope > .xp-dict-src').checkVisibility()&&
+      separateOrigin.host.querySelector('[data-supplement-id]').open&&separateOrigin.host.querySelector('[data-supplement-id]').parentElement===slotOf(separateOrigin.host,'etymology')&&
+      document.activeElement===block(separateOrigin.host,'etymology').querySelector('.xp-dict-learning-title')&&
+      !separateOrigin.host.querySelector('[data-supplement-id] > summary').checkVisibility()&&
+      ![...block(separateOrigin.host,'etymology').querySelectorAll('summary, .xp-dict-learning-label')].some(el=>el.checkVisibility())&&slotFault(separateOrigin.host)==='');
     const relatedWord=separateOrigin.host.querySelector('[data-supplement-id] .xp-dict-lemma-link');relatedWord.click();
     check("new etymology relations keep direct lookup and original-language pronunciation semantics",lookups.at(-1)==='giftig'&&relatedWord.lang==='de'&&!!relatedWord.title);
     const partial={...addition,id:'6'.repeat(64),learning:{version:2,language:{name:'Spanish',lang:'es'},summary:'',replacesId:'',omittedItems:1,
@@ -2718,6 +2770,26 @@ async function runDictionaryEntryUiTests() {
     updateButton.focus();updateButton.click();await settle();outside.focus();
     rejectUpdate(Object.assign(new Error('late fixture failure'),{code:'invalid_response'}));await settle();
     check("a late failed update does not reclaim focus after the user moves away",document.activeElement===outside);
+    check("a failed supplement update keeps its alert beside its own button, inside its slot",slotFault(reloadedMeaning.host)===''&&
+      updateButton.closest('[data-slot]')===slotOf(reloadedMeaning.host,'patterns'));
+    // A successful update: the new version takes the old one's place in the
+    // same slot and its one receipt sits under it there; the replaced
+    // version folds away with its own title (ruling 2026-10-28).
+    {
+      window.pbpDictEntryRead=async()=>structuredClone(replacementBase);
+      const updated=mount();await updated.ui.ready;
+      const oldSection=updated.host.querySelector('[data-supplement-id]'),oldUpdate=oldSection.querySelector('.xp-dict-update-supplement');
+      const newer={...learningAddition,id:'1'.repeat(64),generatedAt:1700000002000,learning:{...learningAddition.learning,replacesId:learningAddition.id}};
+      window.pbpDictSupplementRun=async()=>structuredClone(newer);
+      oldUpdate.focus();oldUpdate.click();await settle();
+      const slot=slotOf(updated.host,'patterns'),fresh=updated.host.querySelector('[data-supplement-id="'+newer.id+'"]');
+      const receipts=[...updated.host.querySelectorAll('.xp-dict-usage-status')].filter(el=>el.textContent==='dictSupplementSaved'&&el.checkVisibility());
+      check("an updated usage point replaces the old version in the same slot, its one receipt under it in that slot",
+        slotFault(updated.host)===''&&fresh?.parentElement===slot&&!oldSection.closest('[data-learning-block]')&&!oldSection.querySelector(':scope > summary').hidden&&
+        receipts.length===1&&receipts[0].closest('[data-slot]')===slot&&!!(fresh.compareDocumentPosition(receipts[0])&Node.DOCUMENT_POSITION_FOLLOWING)&&
+        document.activeElement===slot.querySelector('.xp-dict-learning-label'));
+      updated.ctrl.abort();
+    }
     // A base update reports beside its own button (plan 2.6) and its cancel
     // gives focus back to that button, not to the toolbar.
     let releaseBase;window.pbpDictEntryRun=input=>new Promise(resolve=>{releaseBase=resolve;});
@@ -2832,6 +2904,8 @@ async function runDictionaryEntryUiTests() {
         messageListeners.at(-1)({type:'PBP_DICT_ARCHIVE_SYNCED',owner:'ownerless'});await settle();
         check("a passive sync refresh reads and renders the entry in the language on screen, not the changed target",
           syncReads.join()==="en"&&synced.host.querySelectorAll('[data-supplement-id]').length===1&&synced.host.querySelector('.xp-dict-senses > li')?.lang==="en");
+        check("a result a passive sync brings lands in its category's slot, under its label",slotFault(synced.host)===''&&
+          synced.host.querySelector('[data-supplement-id]').parentElement===slotOf(synced.host,addition.category));
       } finally { uiLanguage="en";window.pbpDictEntrySave=entrySave0;window.pbpDictSupplementSave=supplementSave0; }
     }
     window.pbpDictEntryRead=async()=>record({archiveId:'a'.repeat(64),archiveSaved:true,supplements:[addition]});
@@ -2841,8 +2915,8 @@ async function runDictionaryEntryUiTests() {
     window.pbpDictSupplementRun=async input=>({...addition,id:'3'.repeat(64),category:input.category});
     const scrollAction=localScroll.host.querySelector('.xp-dict-supplement-generate[data-category="confusables"]');scrollAction.focus({preventScroll:true});
     localScroll.root.scrollTop=0;const pageScrollBefore=document.scrollingElement.scrollTop;scrollAction.click();await settle();
-    check("a completed result takes focus at its heading without scrolling the lookup or the page",
-      document.activeElement===localScroll.host.querySelector('[data-supplement-id="'+'3'.repeat(64)+'"] > summary')&&localScroll.root.scrollTop===0&&document.scrollingElement.scrollTop===pageScrollBefore);
+    check("a completed result takes focus at its slot's label without scrolling the lookup or the page",
+      document.activeElement===slotOf(localScroll.host,'confusables').querySelector('.xp-dict-learning-label')&&localScroll.root.scrollTop===0&&document.scrollingElement.scrollTop===pageScrollBefore);
     const beforeClose=messageListeners.length;remote.ctrl.abort();
     check("closing lookup removes its archive sync listener",messageListeners.length===beforeClose-1);
 

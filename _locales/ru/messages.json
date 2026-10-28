@@ -4568,6 +4568,7 @@
   "dictExamplesFind": {"message": "Найти примеры в текстах"},
   "dictExamplesNone": {"message": "Этот поиск не нашёл проверяемого исходного текста."},
   "dictNegRetry": {"message": "В прошлый раз ничего не найдено · Повторить"},
+  "dictSlotGenerate": {"message": "Создать"},
   "dictExamplesUnsupported": {"message": "Поиск по исходным текстам для этого языка пока недоступен."},
   "dictExamplesFailed": {"message": "Не удалось выполнить поиск в Wikisource. Повторите попытку."},
   "dictExamplesGrantNeeded": {"message": "Разрешите доступ к Wikisource, чтобы искать примеры."},

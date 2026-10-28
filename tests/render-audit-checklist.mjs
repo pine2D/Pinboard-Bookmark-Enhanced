@@ -719,6 +719,18 @@ export function evaluateMediaProbe(probe, check) {
 // generate -- also on the line below it (dict-entry-error,
 // dict-entry-usage-error).
 //
+// dictUsageSlots (requires "slots"): the usage block's two categories each
+// keep one fixed slot (2026-10-28 ruling) -- collocations and patterns, then
+// confusables. Everything on screen about a category (its button or its
+// result with the result's update, and every note, receipt and alert in its
+// action row) is measured as one vertical band; the band's label line, naming
+// the category, must sit above all of it, and the patterns band must end
+// before the confusables label starts. Measured from the category each node
+// carries (data-category / data-supplement-category), not from the slot
+// markup, so a receipt printed under the other category's button, or a result
+// listed above both buttons, fails here (the batch-3 review's
+// 08-usage-result-p3 / 06-usage-busy-p2 / 18-paid-negative-b shots).
+//
 // dictScrollClip (requires "clip"): every lookup scroll container keeps its
 // content inside it (scrollWidth <= clientWidth), and every measured text
 // block's border box -- disclosure titles hang their hover fill outside the
@@ -740,6 +752,10 @@ export const DICT_LOOKUP_GEOMETRY = {
   ],
   // dictActionNoteBelow: the row of one learning action and its note.
   notes: { row: ".xp-dict-usage-actions, .xp-dict-ai-controls", note: ".xp-dict-usage-feedback, .xp-dict-action-error" },
+  // dictUsageSlots: the usage block, its categories in their fixed order,
+  // and how a node names the category it belongs to.
+  slots: { block: '[data-learning-block="usage"]', categories: ["patterns", "confusables"], label: ".xp-dict-learning-label",
+    action: ".xp-dict-supplement-generate", row: ".xp-dict-usage-actions", result: "[data-supplement-category]" },
   surfaces: {
     "md-preview": {
       // .xp-dict is the lookup column; the whole popover (its foot holds the
@@ -758,8 +774,8 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         // A usage supplement in flight (plan 2.6): its phase line, the
         // seconds waited and Cancel take the button's place in its row.
-        "dict-entry-usage-busy": { requires: ["edges", "original", "translation", "overflow", "clip"] },
-        "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip"] },
+        "dict-entry-usage-busy": { requires: ["edges", "original", "translation", "overflow", "clip", "slots"] },
+        "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip", "slots"] },
         // Free original-text examples: source sentences, never a translation.
         "dict-entry-examples": { requires: ["edges", "senseIndent", "original", "overflow", "clip"] },
         // A remembered empty result: the action and its neutral note, no sentence.
@@ -767,14 +783,14 @@ export const DICT_LOOKUP_GEOMETRY = {
         // A failed first generation and a failed usage point (plan 3.4): each
         // error is the line below the button that failed.
         "dict-entry-error": { requires: ["edges", "senseIndent", "overflow", "clip", "notes"] },
-        "dict-entry-usage-error": { requires: ["edges", "original", "translation", "overflow", "clip", "notes"] },
+        "dict-entry-usage-error": { requires: ["edges", "original", "translation", "overflow", "clip", "notes", "slots"] },
         // dictDefaultView "dictionary": the dictionary result with the saved
         // AI entry folded into its free reveal line, then opened in place.
         "dict-entry-folded": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-entry-revealed": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         // Old-category records opened: a literature quotation with its saved
         // AI translation, a culture explanation and a plain-text record.
-        "dict-entry-legacy": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
+        "dict-entry-legacy": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "slots"] },
         // The save bar (dict redesign 3.2) under the dictionary result, then
         // its click-opened choice list, which must stay inside the viewport.
         "dict-save-bar": { requires: ["edges", "senseIndent", "overflow", "clip"] },
@@ -783,7 +799,7 @@ export const DICT_LOOKUP_GEOMETRY = {
         // remembered "Not found last time · Try again" state (plan 3.3), run in
         // each listed UI locale; controlRung holds each action to one line,
         // dictActionNoteBelow puts each note on the line below its action.
-        "dict-entry-paid-negative": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "notes"] },
+        "dict-entry-paid-negative": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "notes", "slots"] },
         "dict-entry-panel": { root: "#reader-dict-view .xp-dict", overflowRoot: "#reader-dict-view",
           requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
       },
@@ -798,18 +814,18 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-entry-progress": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-entry-result": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-details": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
-        "dict-entry-usage-busy": { requires: ["edges", "original", "translation", "overflow", "clip"] },
-        "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip"] },
+        "dict-entry-usage-busy": { requires: ["edges", "original", "translation", "overflow", "clip", "slots"] },
+        "dict-entry-usage-result": { requires: ["edges", "original", "translation", "overflow", "clip", "slots"] },
         "dict-entry-examples": { requires: ["edges", "senseIndent", "original", "overflow", "clip"] },
         "dict-entry-negative": { requires: ["edges", "senseIndent", "overflow", "clip", "notes"] },
         "dict-entry-error": { requires: ["edges", "senseIndent", "overflow", "clip", "notes"] },
-        "dict-entry-usage-error": { requires: ["edges", "original", "translation", "overflow", "clip", "notes"] },
+        "dict-entry-usage-error": { requires: ["edges", "original", "translation", "overflow", "clip", "notes", "slots"] },
         "dict-entry-folded": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-entry-revealed": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
-        "dict-entry-legacy": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
+        "dict-entry-legacy": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "slots"] },
         "dict-save-bar": { requires: ["edges", "senseIndent", "overflow", "clip"] },
         "dict-save-change-menu": { requires: ["overflow"] },
-        "dict-entry-paid-negative": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "notes"] },
+        "dict-entry-paid-negative": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "notes", "slots"] },
       },
     },
   },
@@ -826,6 +842,7 @@ export function dictLookupRoots(surface, context) {
 
 // probe = { blocks: [{ role, left, path }], examples: [{ role, color, expected, path }],
 //           notes: [{ path, top, buttonBottom }],
+//           slots: [{ category, index, items, top, bottom, path, label: { top, bottom } | null }],
 //           clip: { measured, offenders: [{ path, kind: "scroll" | "box", detail }] },
 //           viewports: [{ width, rootVisible, offenders: [{ path, left, right }] }] }
 // where `left` is the inline start of the block's first line of text, in px
@@ -889,6 +906,23 @@ export function evaluateDictLookupGeometry(probe, { surface, context }) {
       beside.length ? `${beside.length}/${notes.length} beside the action, e.g. ${beside.slice(0, 3).map((n) => `${n.path} top ${round(n.top)} < ${round(n.buttonBottom)}`).join("; ")}` : `${notes.length} note(s) below`,
       `note top >= action bottom (±${tol}px)`);
   } else if (requires.has("notes")) setup("dictActionNoteBelow", "a learning action with its note");
+
+  // The usage block's categories, each under its own label, in fixed order.
+  const slots = (probe?.slots || []).filter((b) => b.items > 0);
+  if (slots.length) {
+    const faults = [];
+    for (const band of slots) {
+      if (!band.label) faults.push(`${band.category}: no label line above ${band.path}`);
+      else if (band.label.bottom > band.top + tol) faults.push(`${band.category}: label bottom ${round(band.label.bottom)} below its first node top ${round(band.top)} (${band.path})`);
+    }
+    for (let i = 1; i < slots.length; i++) {
+      const prev = slots[i - 1], next = slots[i];
+      const start = Math.min(next.top, next.label ? next.label.top : Infinity);
+      if (prev.index > next.index || prev.bottom > start + tol) faults.push(`${prev.category} (to ${round(prev.bottom)}) does not end before ${next.category} starts (${round(start)})`);
+    }
+    row("dictUsageSlots", !faults.length, faults.length ? faults.slice(0, 3).join("; ") : slots.map((b) => b.category).join(" < "),
+      `each category under its own label, ${spec.slots.categories.join(" before ")} (±${tol}px)`);
+  } else if (requires.has("slots")) setup("dictUsageSlots", "the usage block's categories");
 
   // Nothing inside the lookup sticks out of a scroller or a clipping box.
   const clip = probe?.clip;

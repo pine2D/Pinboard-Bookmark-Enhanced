@@ -4568,6 +4568,7 @@
   "dictExamplesFind": {"message": "Belege in Originaltexten suchen"},
   "dictExamplesNone": {"message": "Bei dieser Suche wurde kein überprüfbarer Originaltext gefunden."},
   "dictNegRetry": {"message": "Zuletzt nichts gefunden · Erneut versuchen"},
+  "dictSlotGenerate": {"message": "Erstellen"},
   "dictExamplesUnsupported": {"message": "Für diese Sprache gibt es noch keine Suche in Originaltexten."},
   "dictExamplesFailed": {"message": "Wikisource konnte nicht durchsucht werden. Versuche es erneut."},
   "dictExamplesGrantNeeded": {"message": "Erlaube den Zugriff auf Wikisource, um nach Belegen zu suchen."},

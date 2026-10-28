@@ -8981,6 +8981,31 @@ function probeDictLookupGeometry(cfg) {
     out.notes.push({ path: pathOf(note), top: note.getBoundingClientRect().top,
       buttonBottom: Math.max(...actions.map((a) => a.getBoundingClientRect().bottom)) });
   }
+  // dictUsageSlots: per category of the usage block, the vertical band of
+  // every visible node that belongs to it -- its action and the visible
+  // members of that action's row, its results -- and its label line.
+  out.slots = [];
+  const slotSpec = cfg.slots;
+  for (const block of root.querySelectorAll(slotSpec.block)) {
+    if (!visible(block)) continue;
+    slotSpec.categories.forEach((category, index) => {
+      const nodes = [];
+      for (const action of block.querySelectorAll(`${slotSpec.action}[data-category="${category}"]`)) {
+        const rowEl = action.closest(slotSpec.row);
+        nodes.push(...(rowEl ? [...rowEl.children] : [action]).filter((c) => visible(c) && (c === action || /\S/.test(c.textContent))));
+      }
+      for (const result of block.querySelectorAll(slotSpec.result)) {
+        if (result.dataset.supplementCategory === category && visible(result)) nodes.push(result);
+      }
+      const label = [...block.querySelectorAll(slotSpec.label)].find((el) => el.dataset.category === category && visible(el));
+      const rects = nodes.map((n) => n.getBoundingClientRect());
+      const top = rects.length ? Math.min(...rects.map((r) => r.top)) : 0;
+      const first = nodes[rects.findIndex((r) => r.top === top)];
+      const lr = label?.getBoundingClientRect();
+      out.slots.push({ category, index, items: nodes.length, top, bottom: rects.length ? Math.max(...rects.map((r) => r.bottom)) : 0,
+        path: first ? pathOf(first) : "", label: lr ? { top: lr.top, bottom: lr.bottom } : null });
+    });
+  }
   return out;
 }
 function probeDictLookupOverflow(rootSel) {
@@ -9036,7 +9061,7 @@ async function measureDictLookupGeometry(page, surface, context, theme) {
   const { root, overflowRoot } = dictLookupRoots(surface, context);
   const probe = await page.evaluate(probeDictLookupGeometry, {
     root, overflowRoot, blocks: DICT_LOOKUP_GEOMETRY.blocks, examples: DICT_LOOKUP_GEOMETRY.examples, tokens: spec.tokens,
-    noteRow: DICT_LOOKUP_GEOMETRY.notes.row, note: DICT_LOOKUP_GEOMETRY.notes.note,
+    noteRow: DICT_LOOKUP_GEOMETRY.notes.row, note: DICT_LOOKUP_GEOMETRY.notes.note, slots: DICT_LOOKUP_GEOMETRY.slots,
   });
   probe.viewports = [];
   const restore = page.viewportSize();

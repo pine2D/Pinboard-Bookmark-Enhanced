@@ -4568,6 +4568,7 @@
   "dictExamplesFind": {"message": "原文の用例を探す"},
   "dictExamplesNone": {"message": "今回の検索では、確認できる原文が見つかりませんでした。"},
   "dictNegRetry": {"message": "前回は見つからず · 再試行"},
+  "dictSlotGenerate": {"message": "生成"},
   "dictExamplesUnsupported": {"message": "この言語の原文検索にはまだ対応していません。"},
   "dictExamplesFailed": {"message": "Wikisource を検索できませんでした。もう一度お試しください。"},
   "dictExamplesGrantNeeded": {"message": "原文を検索するには、Wikisource へのアクセスを許可してください。"},

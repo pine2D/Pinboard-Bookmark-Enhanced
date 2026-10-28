@@ -4568,6 +4568,7 @@
   "dictExamplesFind": {"message": "Znajdź przykłady w tekstach"},
   "dictExamplesNone": {"message": "To wyszukiwanie nie znalazło weryfikowalnego tekstu źródłowego."},
   "dictNegRetry": {"message": "Ostatnio nic nie znaleziono · Spróbuj ponownie"},
+  "dictSlotGenerate": {"message": "Wygeneruj"},
   "dictExamplesUnsupported": {"message": "Wyszukiwanie w tekstach źródłowych nie jest jeszcze dostępne dla tego języka."},
   "dictExamplesFailed": {"message": "Nie udało się przeszukać Wikisource. Spróbuj ponownie."},
   "dictExamplesGrantNeeded": {"message": "Zezwól na dostęp do Wikisource, aby wyszukać przykłady."},

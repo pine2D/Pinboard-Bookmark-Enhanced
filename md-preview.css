@@ -2486,6 +2486,21 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
    border or card -- spacing and the title separate them. */
 .xp-dict-learning-section { margin-top: var(--sp-4); }
 .xp-dict-learning-section > p:not(.xp-dict-learning-title) { margin: var(--sp-2) 0 0; }
+/* One fixed slot per category (ruling 2026-10-28): the usage block's two
+   slots open with a label line naming their category, so their buttons never
+   repeat it; the etymology block's one slot has its heading as its label. A
+   slot holds its button or its result, the result's update button and every
+   note about that category, in that order. Whitespace parts the slots. The
+   label is a step below the block title: body ink at medium weight under the
+   title's secondary-ink semibold, so the two never read as one level. */
+.xp-dict-learning-slot { margin-top: var(--sp-2); }
+.xp-dict-learning-slot + .xp-dict-learning-slot { margin-top: var(--sp-4); }
+.xp-dict-learning-slot > p { margin: var(--sp-2) 0 0; }
+.xp-dict-learning-slot > .xp-dict-learning-label { margin: 0; font-size: 12px; line-height: 18px; font-weight: 500; color: var(--fg); }
+/* Programmatic focus lands on a heading or label once a result replaces its
+   button; only keyboard focus draws the ring. */
+.xp-dict-learning-title:focus, .xp-dict-learning-label:focus { outline: none; }
+.xp-dict-learning-title:focus-visible, .xp-dict-learning-label:focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 /* A paid action (plan 3.3): wandSparkles, its text and the model name --
    generate in the AI row, every supplement button, and the update actions.
    The in-place cancel is its stop icon and its text too: no icon-only
