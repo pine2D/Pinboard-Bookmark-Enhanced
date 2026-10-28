@@ -25,7 +25,7 @@ Eine Chrome-Erweiterung für [Pinboard](https://pinboard.in), Karakeep und linkd
 - **Entwürfe bleiben erhalten**: Popup schließen, wieder öffnen und genau dort weiterschreiben
 
 ### Tags
-- **KI-Tags und Zusammenfassung**: gelesen wird der Artikeltext ohne Werbung, Menüs und Seitenleisten; eigener API-Schlüssel, 14 Anbieter oder ein beliebiger OpenAI-kompatibler Endpunkt
+- **KI-Tags und Zusammenfassung**: gelesen wird der Artikeltext ohne Werbung, Menüs und Seitenleisten; eigener API-Schlüssel, 17 Anbieter oder ein beliebiger OpenAI- oder Anthropic-kompatibler Endpunkt
 - **Autovervollständigung**: aus deinen Tags, Pinboards Vorschlägen und Ein-Klick-Voreinstellungen
 - **Tags aufräumen**: ähnliche Tags zusammenführen und selten genutzte ausmisten
 

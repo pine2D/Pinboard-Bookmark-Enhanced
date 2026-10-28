@@ -10,6 +10,11 @@
 > The copy below includes the new bookmark destinations and all four Drive datasets.
 > Review and paste the changed fields at the next submission, then update Last synced.
 > The existing extension ID and privacy-policy URL remain unchanged.
+> Pending review and paste (2026-10-29): built-in provider count raised to 17 (Ollama
+> included) with the Bailian rename to Alibaba Cloud Model Studio, Volcengine Ark /
+> BytePlus ModelArk, OpenCode Zen and Command Code; custom AI endpoints are now a list
+> of OpenAI- or Anthropic-compatible entries. No field below names providers or counts
+> them, so this changes nothing to paste beyond the bookmark-service fields above.
 
 ## Single purpose description (909/1000)
 

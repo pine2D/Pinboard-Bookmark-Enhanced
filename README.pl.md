@@ -25,7 +25,7 @@ Rozszerzenie Chrome dla [Pinboard](https://pinboard.in), Karakeep i linkding: ta
 - **Szkice nie przepadają** — zamknij okno w trakcie edycji i wróć do pisania w tym samym miejscu
 
 ### Tagi
-- **Tagi i streszczenie od AI** — AI czyta treść artykułu bez reklam, menu i pasków bocznych; własny klucz API, 14 dostawców lub dowolny endpoint zgodny z OpenAI
+- **Tagi i streszczenie od AI** — AI czyta treść artykułu bez reklam, menu i pasków bocznych; własny klucz API, 17 dostawców lub dowolny endpoint zgodny z OpenAI albo Anthropic
 - **Autouzupełnianie** — z własnych tagów, podpowiedzi Pinboarda i gotowych zestawów na jedno kliknięcie
 - **Porządki w tagach** — scalaj prawie identyczne tagi i usuwaj te rzadko używane
 

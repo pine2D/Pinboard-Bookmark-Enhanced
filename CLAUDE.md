@@ -18,7 +18,7 @@ Chrome Extension (Manifest V3)，将当前页面保存到可选主服务 Pinboar
 | 平台 | Chrome Extension Manifest V3 |
 | 语言 | Vanilla JavaScript（无框架、无构建步骤、零运行时依赖——保持这一点） |
 | 存储 | Chrome Storage API（sync + local）+ IndexedDB |
-| AI providers | OpenAI / Anthropic / Gemini / DeepSeek / Qwen / MiniMax / OpenRouter / Groq / Mistral / Cohere / SiliconFlow / Zhipu (BigModel) / Moonshot (Kimi) / Ollama (local) |
+| AI providers | OpenAI / Anthropic / Gemini / DeepSeek / Alibaba Cloud Model Studio (Bailian) / MiniMax / OpenRouter / Groq / Mistral / Cohere / SiliconFlow / Zhipu (BigModel) / Moonshot (Kimi) / Volcengine Ark / BytePlus ModelArk / OpenCode Zen / Command Code / Ollama (local)；另可添加多个 OpenAI / Anthropic 兼容的自定义端点 |
 | 页面正文抽取 | Defuddle（vendor/ 本地化，懒注入）；备用 Jina Reader API |
 | 主题生产 | 自建 theme factory（`docs/theme-surface/`） |
 

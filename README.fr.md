@@ -25,7 +25,7 @@ Une extension Chrome pour [Pinboard](https://pinboard.in), Karakeep et linkding 
 - **Brouillons préservés** : fermez la fenêtre en pleine saisie et reprenez là où vous en étiez
 
 ### Étiquettes
-- **Étiquettes et résumé par IA** : l'IA lit le corps de l'article, débarrassé des publicités, des menus et des barres latérales ; votre propre clé API, 14 fournisseurs ou tout point de terminaison compatible OpenAI
+- **Étiquettes et résumé par IA** : l'IA lit le corps de l'article, débarrassé des publicités, des menus et des barres latérales ; votre propre clé API, 17 fournisseurs ou tout point de terminaison compatible OpenAI ou Anthropic
 - **Autocomplétion** : à partir de vos étiquettes, des suggestions de Pinboard et de préréglages en un clic
 - **Nettoyage des étiquettes** : fusionnez les étiquettes quasi identiques et élaguez celles qui servent peu
 

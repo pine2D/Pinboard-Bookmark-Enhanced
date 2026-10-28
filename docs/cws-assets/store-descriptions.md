@@ -30,7 +30,7 @@
 - Drafts survive: close the popup mid-edit and pick up where you left off
 
 # Tag
-- AI tags & summary: reads the article body without the ads, menus, and sidebars; bring your own key (14 providers, or any OpenAI-compatible endpoint)
+- AI tags & summary: reads the article body without the ads, menus, and sidebars; bring your own key (17 providers, or any OpenAI- or Anthropic-compatible endpoint)
 - Autocomplete from your own tags, Pinboard's suggestions, and one-tap presets
 - Tag cleanup: merge near-duplicate tags and prune rarely used ones
 
@@ -73,7 +73,7 @@
 - 草稿不丢：关掉弹窗再打开，接着写
 
 # 标签
-- AI 生成标签和摘要：只读文章正文，不掺广告、菜单和侧边栏；自备 API Key，14 家服务商或任意 OpenAI 兼容接口
+- AI 生成标签和摘要：只读文章正文，不掺广告、菜单和侧边栏；自备 API Key，17 家服务商或任意 OpenAI / Anthropic 兼容接口
 - 标签自动补全：历史标签、Pinboard 建议、一键预设
 - 标签治理：合并近似标签，清理低频标签
 
@@ -116,7 +116,7 @@
 - 草稿不會遺失：關掉彈出視窗再打開，接著寫
 
 # 標籤
-- AI 產生標籤與摘要：只讀文章正文，不含廣告、選單與側欄；自備 API Key，14 家服務商或任何 OpenAI 相容端點
+- AI 產生標籤與摘要：只讀文章正文，不含廣告、選單與側欄；自備 API Key，17 家服務商或任何 OpenAI / Anthropic 相容端點
 - 標籤自動補全：歷史標籤、Pinboard 建議、一鍵預設
 - 標籤治理：合併相近標籤，清理低使用率標籤
 
@@ -159,7 +159,7 @@
 - 草稿不會遺失：關掉彈出視窗再打開，繼續寫
 
 # 標籤
-- AI 產生標籤與摘要：只讀文章正文，不含廣告、選單與側欄；自備 API Key，14 家服務商或任何 OpenAI 兼容端點
+- AI 產生標籤與摘要：只讀文章正文，不含廣告、選單與側欄；自備 API Key，17 家服務商或任何 OpenAI / Anthropic 兼容端點
 - 標籤自動完成：歷史標籤、Pinboard 建議、一按即用的預設
 - 標籤治理：合併相近標籤，清理少用的標籤
 
@@ -202,7 +202,7 @@
 - Entwürfe bleiben erhalten: Popup schließen, wieder öffnen und genau dort weiterschreiben
 
 # Tags
-- KI-Tags und Zusammenfassung: gelesen wird der Artikeltext ohne Werbung, Menüs und Seitenleisten; eigener API-Schlüssel, 14 Anbieter oder ein beliebiger OpenAI-kompatibler Endpunkt
+- KI-Tags und Zusammenfassung: gelesen wird der Artikeltext ohne Werbung, Menüs und Seitenleisten; eigener API-Schlüssel, 17 Anbieter oder ein beliebiger OpenAI- oder Anthropic-kompatibler Endpunkt
 - Autovervollständigung: aus deinen Tags, Pinboards Vorschlägen und Ein-Klick-Voreinstellungen
 - Tags aufräumen: ähnliche Tags zusammenführen und selten genutzte ausmisten
 
@@ -245,7 +245,7 @@
 - Brouillons préservés : fermez la fenêtre en pleine saisie et reprenez là où vous en étiez
 
 # Étiquettes
-- Étiquettes et résumé par IA : l'IA lit le corps de l'article, débarrassé des publicités, des menus et des barres latérales ; votre propre clé API, 14 fournisseurs ou tout point de terminaison compatible OpenAI
+- Étiquettes et résumé par IA : l'IA lit le corps de l'article, débarrassé des publicités, des menus et des barres latérales ; votre propre clé API, 17 fournisseurs ou tout point de terminaison compatible OpenAI ou Anthropic
 - Autocomplétion : à partir de vos étiquettes, des suggestions de Pinboard et de préréglages en un clic
 - Nettoyage des étiquettes : fusionnez les étiquettes quasi identiques et élaguez celles qui servent peu
 
@@ -288,7 +288,7 @@
 - 下書きが消えない：ポップアップを閉じても、開き直せば続きから書けます
 
 # タグ
-- AI タグ・要約：広告・メニュー・サイドバーを除いた記事本文だけを読み取ります。API キーは自前で、14 のプロバイダーまたは任意の OpenAI 互換エンドポイントを使えます
+- AI タグ・要約：広告・メニュー・サイドバーを除いた記事本文だけを読み取ります。API キーは自前で、17 のプロバイダーまたは任意の OpenAI / Anthropic 互換エンドポイントを使えます
 - タグ補完：自分のタグ、Pinboard のおすすめ、ワンタップのプリセットから入力できます
 - タグ整理：似たタグを統合し、ほとんど使わないタグを片付けます
 
@@ -331,7 +331,7 @@
 - Szkice nie przepadają — zamknij okno w trakcie edycji i wróć do pisania w tym samym miejscu
 
 # Tagi
-- Tagi i streszczenie od AI — AI czyta treść artykułu bez reklam, menu i pasków bocznych; własny klucz API, 14 dostawców lub dowolny endpoint zgodny z OpenAI
+- Tagi i streszczenie od AI — AI czyta treść artykułu bez reklam, menu i pasków bocznych; własny klucz API, 17 dostawców lub dowolny endpoint zgodny z OpenAI albo Anthropic
 - Autouzupełnianie — z własnych tagów, podpowiedzi Pinboarda i gotowych zestawów na jedno kliknięcie
 - Porządki w tagach — scalaj prawie identyczne tagi i usuwaj te rzadko używane
 
@@ -374,7 +374,7 @@
 - Черновики не теряются — закройте окно на середине правки и продолжите с того же места
 
 # Теги
-- AI-теги и краткое содержание — AI читает текст статьи без рекламы, меню и боковых панелей; свой API-ключ, 14 провайдеров или любой OpenAI-совместимый эндпоинт
+- AI-теги и краткое содержание — AI читает текст статьи без рекламы, меню и боковых панелей; свой API-ключ, 17 провайдеров или любой эндпоинт, совместимый с OpenAI или Anthropic
 - Автодополнение — из ваших тегов, подсказок Pinboard и пресетов в один клик
 - Порядок в тегах — объединяйте похожие теги и убирайте редко используемые
 

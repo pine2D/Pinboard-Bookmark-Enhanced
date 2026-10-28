@@ -25,7 +25,7 @@ A Chrome extension for [Pinboard](https://pinboard.in), Karakeep and linkding: A
 - **Drafts survive**: close the popup mid-edit and pick up where you left off
 
 ### Tag
-- **AI tags & summary**: reads the article body without the ads, menus, and sidebars; bring your own key (14 providers, or any OpenAI-compatible endpoint)
+- **AI tags & summary**: reads the article body without the ads, menus, and sidebars; bring your own key (17 providers, or any OpenAI- or Anthropic-compatible endpoint)
 - **Autocomplete** from your own tags, Pinboard's suggestions, and one-tap presets
 - **Tag cleanup**: merge near-duplicate tags and prune rarely used ones
 
