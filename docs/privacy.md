@@ -3,13 +3,13 @@ layout: default
 title: Privacy Policy
 ---
 
-# Privacy Policy: Pinboard Bookmark Enhanced
+# Privacy Policy: Bookmark Enhanced
 
-**Last updated:** 2026-10-27
+**Last updated:** 2026-10-28
 
 ## Summary
 
-Pinboard Bookmark Enhanced is local-first and bring-your-own-key. It has no developer servers, no analytics, no tracking, and no telemetry; the developer never receives your data. The extension uses your selected Pinboard, Karakeep or linkding service for bookmark features and contacts other services only as described below. Bookmark-status checks and offline-save retries can run automatically; features you turn on, such as Wayback archiving, key-points skim, the unread badge, Google Drive sync, and video subtitles you have already granted, can also make automatic requests. After you have granted access to the online dictionary, opening a saved word on the Library page can also look it up automatically.
+Bookmark Enhanced is local-first and bring-your-own-key. It has no developer servers, no analytics, no tracking, and no telemetry; the developer never receives your data. The extension uses your selected Pinboard, Karakeep or linkding service for bookmark features and contacts other services only as described below. Bookmark-status checks and offline-save retries can run automatically; features you turn on, such as Wayback archiving, key-points skim, the unread badge, Google Drive sync, and video subtitles you have already granted, can also make automatic requests. After you have granted access to the online dictionary, opening a saved word on the Library page can also look it up automatically.
 
 Google Drive sync remains off until you explicitly connect it on a device. Once connected, it syncs the personal library’s vocabulary, highlights, notes, complete AI dictionary entries with their supplements, and saved Ask conversations through the extension's private Google Drive application-data folder; disconnecting that device stops it. Drive does not sync settings, credentials, unowned legacy highlights, or dictionary packs.
 

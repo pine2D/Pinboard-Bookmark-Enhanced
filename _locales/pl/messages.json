@@ -1,12 +1,12 @@
 {
   "extName": {
-    "message": "Pinboard Bookmark Enhanced"
+    "message": "Bookmark Enhanced"
   },
   "extDescription": {
     "message": "Pinboard, Karakeep i linkding: tagi i streszczenia AI, czytnik z tłumaczeniem i wyróżnieniami oraz eksport Markdown/EPUB."
   },
   "cmdOpenPopup": {
-    "message": "Otwórz Pinboard Bookmark Enhanced"
+    "message": "Otwórz Bookmark Enhanced"
   },
   "cmdQuickSave": {
     "message": "Szybki zapis w wybranej usłudze zakładek (bez okienka)"
@@ -21,7 +21,7 @@
     "message": "Zapisz karty bieżącego okna jako zestaw kart"
   },
   "appName": {
-    "message": "Pinboard Bookmark Enhanced"
+    "message": "Bookmark Enhanced"
   },
   "settings": {
     "message": "Ustawienia"
@@ -879,7 +879,7 @@
     "message": "Cofnij"
   },
   "optTitle": {
-    "message": "Pinboard Bookmark Enhanced — Ustawienia"
+    "message": "Bookmark Enhanced — Ustawienia"
   },
   "settingsCategory": {
     "message": "Kategoria ustawień"

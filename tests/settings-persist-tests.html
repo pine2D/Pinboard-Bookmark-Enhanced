@@ -4244,7 +4244,7 @@ async function run() {
     check("E11 export metadata records manual source", snapshot?._backup?.source === "manual");
     check("E11 export filename contains the local date",
       task9Ready && pbpBackupFilename(new Date(2026, 6, 24)) ===
-        "Pinboard Bookmark Enhanced backup 2026-07-24.json");
+        "Bookmark Enhanced backup 2026-07-24.json");
 
     // Credential export is opt-in: one settings object, two snapshots.
     const credentialSettings = {
@@ -4281,7 +4281,7 @@ async function run() {
       pbpSanitizeBackupMetadata(plainSnapshot._backup).includesSecrets === undefined);
     check("E11 credential backups are named apart",
       task9Ready && pbpBackupFilename(new Date(2026, 6, 24), true) ===
-        "Pinboard Bookmark Enhanced backup with credentials 2026-07-24.json");
+        "Bookmark Enhanced backup with credentials 2026-07-24.json");
     globalThis.chrome = previousChrome;
 
     const optionsHtml = await (await fetch("../options.html")).text();

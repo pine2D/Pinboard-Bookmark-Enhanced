@@ -1,5 +1,5 @@
 // ============================================================
-// Pinboard Bookmark Enhanced - Shared Constants
+// Bookmark Enhanced - Shared Constants
 // ============================================================
 
 // ---- CITES block parser (ask answers) ----
@@ -2822,7 +2822,7 @@ function pbpBackupFilename(date = new Date(), includeSecrets = false) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   const marker = includeSecrets ? " with credentials" : "";
-  return `Pinboard Bookmark Enhanced backup${marker} ${year}-${month}-${day}.json`;
+  return `Bookmark Enhanced backup${marker} ${year}-${month}-${day}.json`;
 }
 
 // Shared schema-v3 snapshot used by manual settings export.

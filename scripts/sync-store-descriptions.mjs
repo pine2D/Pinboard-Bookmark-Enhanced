@@ -92,7 +92,7 @@ function buildFeatures(readmePath) {
   if (sections !== 4) {
     throw new Error(`${readmePath}: expected 4 sections, got ${sections}`);
   }
-  return { text: lines.join("\n").trim(), sections, bullets };
+  return { name: text.split("\n")[0].replace(/^# /, ""), text: lines.join("\n").trim(), sections, bullets };
 }
 
 // Store-only prose for the README bullets that read as keyword lists, keyed by
@@ -166,7 +166,12 @@ const parts = [
   "> **Generated** by `node scripts/sync-store-descriptions.mjs` from the nine READMEs. Edit the",
   "> READMEs and regenerate; do not hand-edit the blocks below. The leading ⚠ paid-account",
   "> disclosure states that Pinboard requires a paid account, while the other services do not; it is carried across regenerations",
-  "> untouched.",
+  "> untouched. Display names below match the localized extension name; the repository and listing URLs stay unchanged.",
+  ">",
+  "> **Rename submission (2026-10-28):** these are local drafts, not a record of a live store update.",
+  "> Before publishing Bookmark Enhanced, refresh the promotional PNGs that still show the old",
+  "> brand (including the marquee tile and save screenshot); capture UI from the release candidate.",
+  "> Keep `originals/` as the historical source archive. Review the linked video before reusing it.",
   "",
 ];
 let baseline = null;
@@ -177,7 +182,7 @@ LOCALES.forEach(([label, readme], index) => {
   } else if (feat.bullets !== baseline.bullets) {
     throw new Error(`${readme}: ${feat.bullets} bullets do not mirror ${baseline.path} (${baseline.bullets})`);
   }
-  parts.push("---", "", `## ${label}`, "", "```text", disclosures[index], "", feat.text, "```", "");
+  parts.push("---", "", `## ${label}`, "", `**Extension name:** ${feat.name}`, "", "```text", disclosures[index], "", feat.text, "```", "");
 });
 const output = parts.join("\n");
 

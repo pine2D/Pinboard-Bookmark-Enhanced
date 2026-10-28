@@ -1,12 +1,12 @@
 {
   "extName": {
-    "message": "Pinboard 书签增强"
+    "message": "书签增强"
   },
   "extDescription": {
     "message": "保存到 Pinboard、Karakeep 或 linkding，支持 AI 标签与摘要、翻译和高亮阅读器，以及 Markdown/EPUB 导出。"
   },
   "cmdOpenPopup": {
-    "message": "打开 Pinboard 书签增强"
+    "message": "打开书签增强"
   },
   "cmdQuickSave": {
     "message": "快捷保存到所选书签服务（不打开弹窗）"
@@ -21,7 +21,7 @@
     "message": "将当前窗口的标签页保存为标签页集"
   },
   "appName": {
-    "message": "Pinboard 书签增强"
+    "message": "书签增强"
   },
   "settings": {
     "message": "设置"
@@ -879,7 +879,7 @@
     "message": "撤销"
   },
   "optTitle": {
-    "message": "Pinboard 书签增强 - 设置"
+    "message": "书签增强 - 设置"
   },
   "settingsCategory": {
     "message": "设置分类"

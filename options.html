@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="color-scheme" content="light dark" />
-  <title>Pinboard Bookmark Enhanced - Settings</title>
+  <title>Bookmark Enhanced - Settings</title>
   <script src="options-theme-early.js"></script>
   <link rel="stylesheet" href="options.css">
 </head>
@@ -12,7 +12,7 @@
     <!-- Peripheral feedback stays in the title row, without live announcements on every save;
          a save failure takes the same row instead of pushing the page down. -->
     <header>
-      <h1><span data-i18n="optTitle">Pinboard Bookmark Enhanced - Settings</span> <span class="auto-save-hint" id="auto-save-status" data-i18n="optAutoSave">auto-save enabled</span></h1>
+      <h1><span data-i18n="optTitle">Bookmark Enhanced - Settings</span> <span class="auto-save-hint" id="auto-save-status" data-i18n="optAutoSave">auto-save enabled</span></h1>
       <div id="opt-global-error" class="fg-actions hidden">
         <p id="opt-global-alert" class="opt-error hidden" role="alert"></p>
         <button type="button" class="btn btn-sm" id="auto-save-retry" data-i18n="optRetrySave" hidden>Retry saving</button>
@@ -259,7 +259,7 @@
           <label class="bl subhead" id="tag-sync-label" data-i18n="tagSyncLabel">Tag Cache Strategy</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="tagSyncHint">Controls how your existing Pinboard tag cloud is pulled into the popup for autocomplete. Tags are read-only; nothing is uploaded back to Pinboard.</p>
+            <p class="hint context-help-body" data-i18n="tagSyncHint">Choose when to load your existing tags for autocomplete. Loading tags does not change them on the server.</p>
           </details>
           <div class="pref-group pref-group-radio">
             <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-cached" value="cached" checked /> <span class="pick-text" data-i18n="tagSyncCached">Cached (default, refreshes after 10 min)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
@@ -1349,13 +1349,13 @@
                   <p class="hint context-help-body" data-i18n="vocabDriveConnectionHint">Connect each device separately. Google Drive does not sync settings or credentials.</p>
                   <p class="hint context-help-body" id="vocab-drive-disclosure" data-i18n="vocabDriveDisclosure">Copies in Google Drive are plaintext, without end-to-end encryption. They include the saved content above and associated learning preferences, cited excerpts, titles, URLs, and timestamps.</p>
                 </details>
-                <p class="hint" data-i18n="vocabDriveScope">Once connected, this device syncs vocabulary, highlights and notes, complete AI entries and supplements, and saved conversations with their cited excerpts for the current Pinboard account.</p>
+                <p class="hint" data-i18n="vocabDriveScope">Once connected, this device syncs vocabulary, highlights and notes, complete AI dictionary entries and supplements, and saved conversations with their cited excerpts for the personal library.</p>
               </div>
               <div id="vocab-drive-body">
                 <p id="vocab-drive-state" class="save-status vocab-drive-state" role="status" aria-live="polite" data-i18n="vocabDriveLoading">Loading Google Drive sync status…</p>
                 <dl id="vocab-drive-fields" class="vocab-drive-fields" hidden>
                   <dt data-i18n="vocabDriveAccountLabel">Google account</dt><dd id="vocab-drive-account"></dd>
-                  <dt data-i18n="vocabDriveOwnerLabel">Pinboard account</dt><dd id="vocab-drive-owner"></dd>
+                  <dt data-i18n="vocabDriveOwnerLabel">Personal library</dt><dd id="vocab-drive-owner"></dd>
                   <dt data-i18n="driveLastSuccess">Last synced</dt><dd id="vocab-drive-last-success"></dd>
                 </dl>
                 <p id="vocab-drive-error" class="field-error" role="status" aria-live="polite"></p>
@@ -1390,12 +1390,12 @@
         <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" role="switch" id="opt-backup-include-vocabulary" aria-labelledby="opt-backup-include-vocabulary-label" checked /> <span class="switch-text" id="opt-backup-include-vocabulary-label" data-i18n="backupIncludeVocabularyLabel">Include vocabulary in backups</span>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="backupIncludeVocabularyHint">Includes vocabulary only for the current Pinboard account.</p>
+            <p class="hint context-help-body" data-i18n="backupIncludeVocabularyHint">Includes vocabulary only for the personal library.</p>
           </details><span class="switch-track" aria-hidden="true"></span></label>
         </div>
         <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-backup-include-secrets" aria-describedby="backup-secrets-warning" /> <span class="switch-text" data-i18n="backupIncludeSecretsLabel">Include API keys and tokens in backups</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
-        <p class="hint hint-warn" id="backup-secrets-warning" data-i18n="backupIncludeSecretsHint" hidden>Writes every credential to the file in plain text: your Pinboard token, all AI provider keys, and the Jina, Wayback, Anki, Eudic, Notion, Gist and Webhook credentials. Anyone who opens the file can use them. Keep it where you would keep a password.</p>
+        <p class="hint hint-warn" id="backup-secrets-warning" data-i18n="backupIncludeSecretsHint" hidden>Writes every credential to the file in plain text: your bookmark service tokens, all AI provider keys, and the Jina, Wayback, Anki, Eudic, Notion, Gist and Webhook credentials. Anyone who opens the file can use them. Keep it where you would keep a password.</p>
         <div class="backup-actions fg-actions">
           <button class="btn" id="export-settings" data-i18n="exportSettings">Export backup</button>
           <button type="button" class="btn" id="import-settings" title="Import from a JSON backup file" data-i18n="importSettings" data-i18n-title="importSettingsTitle">Import backup</button>

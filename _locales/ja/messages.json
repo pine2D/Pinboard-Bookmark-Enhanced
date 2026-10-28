@@ -1,12 +1,12 @@
 {
   "extName": {
-    "message": "Pinboard Bookmark Enhanced"
+    "message": "Bookmark Enhanced"
   },
   "extDescription": {
     "message": "Pinboard、Karakeep、linkding に保存。AI タグと要約、翻訳・ハイライト付きリーダー、Markdown/EPUB 出力に対応。"
   },
   "cmdOpenPopup": {
-    "message": "Pinboard Bookmark Enhanced を開く"
+    "message": "Bookmark Enhanced を開く"
   },
   "cmdQuickSave": {
     "message": "選択したサービスにクイック保存（ポップアップなし）"
@@ -21,7 +21,7 @@
     "message": "このウィンドウのタブをタブセットとして保存"
   },
   "appName": {
-    "message": "Pinboard Bookmark Enhanced"
+    "message": "Bookmark Enhanced"
   },
   "settings": {
     "message": "設定"
@@ -879,7 +879,7 @@
     "message": "取り消し"
   },
   "optTitle": {
-    "message": "Pinboard Bookmark Enhanced - 設定"
+    "message": "Bookmark Enhanced - 設定"
   },
   "settingsCategory": {
     "message": "設定カテゴリ"

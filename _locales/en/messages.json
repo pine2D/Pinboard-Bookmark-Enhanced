@@ -1,12 +1,12 @@
 {
   "extName": {
-    "message": "Pinboard Bookmark Enhanced"
+    "message": "Bookmark Enhanced"
   },
   "extDescription": {
     "message": "Save to Pinboard, Karakeep or linkding. AI tags and summaries, a reader with translation and highlights, and Markdown/EPUB export."
   },
   "cmdOpenPopup": {
-    "message": "Open Pinboard Bookmark Enhanced"
+    "message": "Open Bookmark Enhanced"
   },
   "cmdQuickSave": {
     "message": "Quick save to the selected bookmark service (no popup)"
@@ -21,7 +21,7 @@
     "message": "Save this window's tabs as a Tab Set"
   },
   "appName": {
-    "message": "Pinboard Bookmark Enhanced"
+    "message": "Bookmark Enhanced"
   },
   "settings": {
     "message": "Settings"
@@ -884,7 +884,7 @@
     "message": "Undo"
   },
   "optTitle": {
-    "message": "Pinboard Bookmark Enhanced - Settings"
+    "message": "Bookmark Enhanced - Settings"
   },
   "settingsCategory": {
     "message": "Settings category"

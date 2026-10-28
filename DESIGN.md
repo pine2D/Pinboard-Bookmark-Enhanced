@@ -1,5 +1,5 @@
 ---
-name: Pinboard Bookmark Enhanced
+name: Bookmark Enhanced
 description: A precise, quiet toolkit for saving, reading, and learning from the web — a neutral skeleton that 14 presets can reskin.
 colors:
   bookmark-blue: "#4477bb"
@@ -169,7 +169,7 @@ components:
     height: "32px"
 ---
 
-# Design System: Pinboard Bookmark Enhanced
+# Design System: Bookmark Enhanced
 
 ## Overview
 

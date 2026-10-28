@@ -7,11 +7,18 @@
 > **Generated** by `node scripts/sync-store-descriptions.mjs` from the nine READMEs. Edit the
 > READMEs and regenerate; do not hand-edit the blocks below. The leading ⚠ paid-account
 > disclosure states that Pinboard requires a paid account, while the other services do not; it is carried across regenerations
-> untouched.
+> untouched. Display names below match the localized extension name; the repository and listing URLs stay unchanged.
+>
+> **Rename submission (2026-10-28):** these are local drafts, not a record of a live store update.
+> Before publishing Bookmark Enhanced, refresh the promotional PNGs that still show the old
+> brand (including the marquee tile and save screenshot); capture UI from the release candidate.
+> Keep `originals/` as the historical source archive. Review the linked video before reusing it.
 
 ---
 
 ## English (en)
+
+**Extension name:** Bookmark Enhanced
 
 ```text
 ⚠ Choose one bookmark service in Settings. Karakeep and linkding work without a Pinboard account. Pinboard is an independent paid service and requires your own account and API token. This third-party extension is not affiliated with, sponsored by, or endorsed by Pinboard. AI features are optional and use an API key you supply for the LLM provider of your choice.
@@ -54,6 +61,8 @@
 
 ## 简体中文 (zh-CN)
 
+**Extension name:** 书签增强
+
 ```text
 ⚠ 在设置中选择一种书签服务。使用 Karakeep 或 linkding 无需 Pinboard 账号。Pinboard 是独立的付费服务，使用时需自备账号和 API Token。本扩展是第三方客户端，与 Pinboard 官方无关，未获其赞助或认可。 AI 功能是可选的，需要你自备所选 LLM 服务商的 API Key。
 
@@ -94,6 +103,8 @@
 ---
 
 ## 繁體中文 (zh-TW)
+
+**Extension name:** 書籤強化
 
 ```text
 ⚠ 在設定中選擇一種書籤服務。使用 Karakeep 或 linkding 不需要 Pinboard 帳號。Pinboard 是獨立的付費服務，使用時需自備帳號與 API Token。本擴充功能是第三方用戶端，與 Pinboard 無隸屬、贊助或背書關係。 AI 功能為選用，並使用你自行提供、你所選 LLM 服務商的 API key。
@@ -136,6 +147,8 @@
 
 ## 繁體中文（香港） (zh-HK)
 
+**Extension name:** 書籤增強
+
 ```text
 ⚠ 在設定選擇一種書籤服務。使用 Karakeep 或 linkding 無需 Pinboard 帳號。Pinboard 是獨立的付費服務，使用時需自備帳號及 API Token。本擴充功能是第三方客戶端，與 Pinboard 沒有隸屬、贊助或認可關係。 AI 功能係可選嘅，會使用你為自選 LLM 服務商提供嘅 API key。
 
@@ -176,6 +189,8 @@
 ---
 
 ## Deutsch (de)
+
+**Extension name:** Bookmark Enhanced
 
 ```text
 ⚠ Wähle deinen Lesezeichendienst in den Einstellungen. Karakeep und linkding funktionieren ohne Pinboard-Konto. Pinboard ist ein unabhängiger, kostenpflichtiger Dienst und erfordert ein eigenes Konto mit API-Token. Diese Erweiterung stammt von einem Drittanbieter und wird von Pinboard weder gesponsert noch unterstützt. KI-Funktionen sind optional und nutzen einen API-Key, den du für den LLM-Anbieter deiner Wahl bereitstellst.
@@ -218,6 +233,8 @@
 
 ## Français (fr)
 
+**Extension name:** Bookmark Enhanced
+
 ```text
 ⚠ Choisissez votre service de signets dans les paramètres. Karakeep et linkding fonctionnent sans compte Pinboard. Pinboard est un service indépendant payant, qui nécessite votre propre compte et votre jeton API. Cette extension tierce n’est ni affiliée à Pinboard, ni sponsorisée ou approuvée par Pinboard. Les fonctionnalités IA sont optionnelles et utilisent une clé API que vous fournissez pour le fournisseur LLM de votre choix.
 
@@ -258,6 +275,8 @@
 ---
 
 ## 日本語 (ja)
+
+**Extension name:** Bookmark Enhanced
 
 ```text
 ⚠ 設定でブックマークサービスを選択します。Karakeep と linkding は Pinboard アカウントなしで使えます。Pinboard は独立した有料サービスで、自分のアカウントと API トークンが必要です。本拡張機能は第三者製で、Pinboard との提携・出資・公式の承認はありません。 AI 機能は任意で、ご自身が用意したお好みの LLM プロバイダーの API キーを使用します。
@@ -300,6 +319,8 @@
 
 ## Polski (pl)
 
+**Extension name:** Bookmark Enhanced
+
 ```text
 ⚠ Wybierz usługę zakładek w ustawieniach. Karakeep i linkding działają bez konta Pinboard. Pinboard to niezależna, płatna usługa, która wymaga własnego konta i tokenu API. To rozszerzenie jest klientem zewnętrznym, niepowiązanym z Pinboard, niesponsorowanym ani nieautoryzowanym przez ten serwis. Funkcje AI są opcjonalne i korzystają z klucza API, który podajesz dla wybranego przez Ciebie dostawcy LLM.
 
@@ -340,6 +361,8 @@
 ---
 
 ## Русский (ru)
+
+**Extension name:** Bookmark Enhanced
 
 ```text
 ⚠ Выберите сервис закладок в настройках. Karakeep и linkding работают без аккаунта Pinboard. Pinboard — независимый платный сервис, для которого нужны собственный аккаунт и API-токен. Это стороннее расширение не связано с Pinboard, не спонсируется и не одобряется им. Функции AI необязательны и используют API-ключ, который вы предоставляете для выбранного вами LLM-провайдера.

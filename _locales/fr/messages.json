@@ -1,12 +1,12 @@
 {
   "extName": {
-    "message": "Pinboard Bookmark Enhanced"
+    "message": "Bookmark Enhanced"
   },
   "extDescription": {
     "message": "Pour Pinboard, Karakeep et linkding : tags et résumés IA, lecteur avec traduction et surlignage, export Markdown/EPUB."
   },
   "cmdOpenPopup": {
-    "message": "Ouvrir Pinboard Bookmark Enhanced"
+    "message": "Ouvrir Bookmark Enhanced"
   },
   "cmdQuickSave": {
     "message": "Enregistrer dans le service choisi sans ouvrir le popup"
@@ -21,7 +21,7 @@
     "message": "Enregistrer les onglets de cette fenêtre comme ensemble d'onglets"
   },
   "appName": {
-    "message": "Pinboard Bookmark Enhanced"
+    "message": "Bookmark Enhanced"
   },
   "settings": {
     "message": "Paramètres"
@@ -879,7 +879,7 @@
     "message": "Annuler"
   },
   "optTitle": {
-    "message": "Pinboard Bookmark Enhanced — Paramètres"
+    "message": "Bookmark Enhanced — Paramètres"
   },
   "settingsCategory": {
     "message": "Catégorie de paramètres"

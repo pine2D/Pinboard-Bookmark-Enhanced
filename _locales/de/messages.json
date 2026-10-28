@@ -1,12 +1,12 @@
 {
   "extName": {
-    "message": "Pinboard Bookmark Enhanced"
+    "message": "Bookmark Enhanced"
   },
   "extDescription": {
     "message": "Für Pinboard, Karakeep und linkding: KI-Tags und Zusammenfassungen, Reader mit Übersetzung und Markierungen, Markdown/EPUB-Export."
   },
   "cmdOpenPopup": {
-    "message": "Pinboard Bookmark Enhanced öffnen"
+    "message": "Bookmark Enhanced öffnen"
   },
   "cmdQuickSave": {
     "message": "Schnell im gewählten Lesezeichendienst speichern (ohne Popup)"
@@ -21,7 +21,7 @@
     "message": "Tabs dieses Fensters als Tab-Set speichern"
   },
   "appName": {
-    "message": "Pinboard Bookmark Enhanced"
+    "message": "Bookmark Enhanced"
   },
   "settings": {
     "message": "Einstellungen"
@@ -879,7 +879,7 @@
     "message": "Rückgängig"
   },
   "optTitle": {
-    "message": "Pinboard Bookmark Enhanced – Einstellungen"
+    "message": "Bookmark Enhanced – Einstellungen"
   },
   "settingsCategory": {
     "message": "Einstellungskategorie"

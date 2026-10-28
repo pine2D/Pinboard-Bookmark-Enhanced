@@ -55,7 +55,7 @@ ZIP_NAME="pinboard-bookmark-enhanced-v${VERSION}.zip"
 ZIP_PATH="${RELEASE_DIR}/${ZIP_NAME}"
 
 echo "================================================"
-echo "  Pinboard Bookmark Enhanced — Release ${TAG}"
+echo "  Bookmark Enhanced — Release ${TAG}"
 echo "================================================"
 echo ""
 echo "  ZIP : ${ZIP_PATH}"

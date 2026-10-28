@@ -12,24 +12,24 @@ web
 
 Two primary audiences, weighted equally:
 
-- **Heavy Pinboard users.** Paying Pinboard members who save, tag, search, and batch-manage bookmarks every day, often bringing their own AI key for tags and summaries. They are impatient with waiting (AI latency, cold opens) and notice small UI defects such as 1px gaps, contrast slips, or double borders.
+- **Frequent bookmark users.** People who save and organize pages in Pinboard, Karakeep, or linkding every day, often bringing their own AI key for tags and summaries. They are impatient with waiting (AI latency, cold opens) and notice small UI defects such as 1px gaps, contrast slips, or double borders.
 - **Foreign-language readers and learners.** People who use the built-in reader to read articles and videos in another language: full-page translation, Ask-the-page, word lookup, highlights and notes, and a vocabulary book they review and send to Anki or Eudic.
 
 Many users belong to both groups. Saving is the entry point, and reading, highlighting, and vocabulary are core jobs, not side features.
 
 ## Product Purpose
 
-A third-party Chrome client for Pinboard.in that turns a bookmark into a complete loop: save the page (with AI tags and a summary) → read it cleanly → translate it, ask it questions, highlight it, collect words from it → keep and export the results. Success means a user saves in one click without waiting, and a saved page becomes something they actually read and learn from instead of a dead link.
+A Chrome extension for Pinboard, Karakeep, and linkding that turns a bookmark into a complete loop: save the page (with AI tags and a summary) → read it cleanly → translate it, ask it questions, highlight it, collect words from it → keep and export the results. Success means a user saves in one click without waiting, and a saved page becomes something they actually read and learn from instead of a dead link.
 
 ## Positioning
 
-- **All-in-one Pinboard client.** Save → read → highlight/vocabulary → export runs as one connected flow. Pinboard itself offers none of the reading or learning layer.
-- **Bring your own key, local-first, zero tracking.** AI calls happen only for AI features the user turns on or uses, and go straight to the provider they configured. At install, only Pinboard access is granted; every other site is requested one exact origin at a time, on first use. Data stays on the device or in the user's own Google Drive appDataFolder. No analytics or telemetry.
+- **Bookmark, read, and learn.** Save → read → highlight/vocabulary → export runs as one connected flow. Users choose their bookmark service and keep one personal library across all three services.
+- **Bring your own key, local-first, zero tracking.** AI calls happen only for AI features the user turns on or uses, and go straight to the provider they configured. At install, only Pinboard access is granted; every other site is requested one exact origin at a time, on first use. Bookmarks go to the selected service. Reading data stays on the device or syncs to the user's own Google Drive appDataFolder when connected; AI and export actions send only their required data to the configured destination. No analytics or telemetry.
 - **Fast.** No cold-open stall and no needless waiting. Zero runtime dependencies, no build step, and strict first-paint performance rules are part of the product promise, not just an implementation detail.
 
 ## Operating Context
 
-- Requires a paid Pinboard.in account and the user's own Pinboard API token. Not affiliated with, sponsored by, or endorsed by Pinboard; this disclosure must stay visible wherever the product is described.
+- Choose Pinboard, Karakeep, or linkding as the primary bookmark service. Karakeep and linkding require the user's server URL and API token, with no Pinboard account. Pinboard requires a paid account and the user's own API token. The extension is not affiliated with, sponsored by, or endorsed by Pinboard; keep this conditional paid-service disclosure visible wherever the product is described.
 - Distributed on the Chrome Web Store (ID `pnjndmjhljjbdlbejeenkepdalokfooh`) and as release ZIPs on GitHub.
 - Popup, options, and library are short-lived, single-render surfaces opened many times a day. The reader is a long-session reading surface.
 - Main usage environment: high-DPI / 4K Windows with cold starts. This is the reference for font and first-paint behavior.
@@ -37,14 +37,17 @@ A third-party Chrome client for Pinboard.in that turns a bookmark into a complet
 
 ## Capabilities and Constraints
 
-- Capabilities: one-click save with stripped tracking params, hotkeys, Batch Save, offline queue, drafts; AI tags and summaries; tag autocomplete and tag cleanup; Markdown reader with TOC, search, footnotes, math, Mermaid and tables; five-color highlights with notes; full-page bilingual translation; Ask-the-page with citations; opt-in key-point skim; dictionary lookup and vocabulary book; notes and vocabulary page (library); export to `.md` / `.html` / `.epub`; video pages with a transcript that follows playback; 13 themes for pinboard.in plus custom CSS; Wayback auto-archive; JSON backup, Chrome Sync for settings, Google Drive for vocabulary, highlights, and notes.
+- Capabilities: one-click save with stripped tracking params, hotkeys, Batch Save, offline queue, drafts; AI tags and summaries; tag autocomplete and tag cleanup; Markdown reader with TOC, search, footnotes, math, Mermaid and tables; five-color highlights with notes; full-page bilingual translation; Ask-the-page with citations; opt-in key-point skim; dictionary lookup and vocabulary book; notes and vocabulary page (library); export to `.md` / `.html` / `.epub`; video pages with a transcript that follows playback; 13 themes for pinboard.in plus custom CSS; Wayback auto-archive; JSON backup, Chrome Sync for settings, Google Drive for the personal library's vocabulary, highlights, notes, complete AI dictionary entries and supplements, and saved Ask conversations.
 - Technical constraints: vanilla JavaScript, no framework, no build step, zero runtime dependencies; MV3 CSP (no remote code, no remote fonts); service-worker lifecycle rules; theme surfaces generated from the theme factory (`docs/theme-surface/`), never hand-edited.
 - Terminology: credentials take the form developers in each language actually write, one form per locale (2026-10-16 ruling). zh-CN / zh-TW / zh-HK keep the English "API Key" and "API Token"; en writes "API key" / "API token" in running text and title case on field labels; de "API-Schlüssel" / "API-Token", fr "clé API" / "jeton API", ja "API キー" / "API トークン", pl "klucz API" / "token API", ru "API-ключ" / "API-токен". "Batch Save" (批量保存), "tab set" (标签页集) follow the 2026-10-10 copy ruling.
-- Pinboard account isolation: account-derived data carries a non-secret owner and is checked at every read, write-back, and UI commit.
+- Bookmark connection isolation: caches, drafts, and pending saves carry a non-secret connection identity and are checked at every read, write-back, and UI commit. Switching services does not send an earlier connection's pending work to the new service.
+- Shared personal library: vocabulary, highlights, notes, dictionary archives, and Ask history retain one identity across bookmark services and sign-outs. Upgrades preserve the current library without merging other historical accounts.
+- Service-specific behavior: Karakeep Read Later uses an owned private manual list, separate from archiving; linkding uses its unread flag. Pinboard suggestions, tag cleanup, unread counts, site search, Tab Sets, and site themes remain Pinboard-specific.
 
 ## Brand Commitments
 
-- Name: Pinboard Bookmark Enhanced. Author: pine2D. License: MIT.
+- Name: Bookmark Enhanced; zh-CN: 书签增强, zh-TW: 書籤強化, zh-HK: 書籤增強. Author: pine2D. License: MIT.
+- Renaming changes display copy only. Keep the existing GitHub repository and Pages URLs, extension IDs and OAuth clients, storage keys, default Anki deck, and Karakeep Read Later list marker stable so upgrades keep existing data and integrations.
 - Icons: Lucide v0.525.0 paths only (24 box, stroke 2), with the Obsidian brand diamond as the single exception. No literal emoji or dingbat characters in UI.
 - Voice: concise, plain, identity-first feature descriptions with strong verbs, not lists of operations. Each of the nine locales is rewritten for its readers, not machine-translated.
 - Chrome Web Store copy must not list brands, formats, or URLs as keyword strings (rejected for keyword spam on 2026-10-10).

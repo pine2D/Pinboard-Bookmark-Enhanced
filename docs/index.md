@@ -1,9 +1,9 @@
 ---
 layout: default
-title: Pinboard Bookmark Enhanced
+title: Bookmark Enhanced
 ---
 
-# Pinboard Bookmark Enhanced
+# Bookmark Enhanced
 
 A Chrome extension for [Pinboard](https://pinboard.in), Karakeep and linkding with AI tags and summaries, a reader with translation and highlights, and 13 themes for pinboard.in.
 

@@ -1,31 +1,31 @@
 # CWS privacy-tab copy (paste-ready)
 
-> Canonical archive of the Chrome Web Store developer-dashboard privacy tab.
-> Update this file whenever the dashboard text changes, and re-check it against
-> docs/privacy.md whenever a release adds a data exit or permission.
+> Local copy for the Chrome Web Store developer-dashboard privacy tab.
+> Re-check it against docs/privacy.md whenever a release adds a data exit or permission.
+> Updating this file does not change the live dashboard.
 > Last synced: 2026-08-29 (provider count lowered to 13 after the GitHub Models
 > service retirement and provider removal in v2.107.6).
-> Pending paste (2026-10-13): the identity justification below now says Drive
-> sync always covers vocabulary, highlights, and notes. Paste it into the
-> dashboard at the next submission, then fold this note into Last synced.
+> Pending review and paste (2026-10-28): Bookmark Enhanced now supports Pinboard,
+> Karakeep and linkding as primary bookmark services, with one shared personal library.
+> The copy below includes the new bookmark destinations and all four Drive datasets.
+> Review and paste the changed fields at the next submission, then update Last synced.
+> The existing extension ID and privacy-policy URL remain unchanged.
 
-## Single purpose description (994/1000)
+## Single purpose description (909/1000)
 
-Save, enrich, read, and export Pinboard bookmarks. The extension captures the page you choose, optionally extracts readable article content, generates AI tags, summaries, translations, or Ask-the-page answers with the provider you select, then saves or exports the result to destinations you configure.
+Save, enrich, read, and export bookmarked pages. Choose Pinboard, Karakeep or linkding for bookmarks; the latter two need no Pinboard account. Open the popup or use a shortcut to review the current page, optionally use AI or the reader, then save to the selected service.
 
-Workflow: toolbar or shortcut -> review the current page -> optional AI, reader, or export -> save to Pinboard.
+Related features include AI tags and summaries, translation and questions about the page, batch saves, an offline queue, optional archiving, video subtitles, and export to configured destinations. Vocabulary, highlights, notes, AI dictionary entries and saved conversations share one personal library, with optional Google Drive sync. Pinboard-specific features include tag cleanup, Tab Sets and site themes.
 
-Related features: AI tags/summaries, translation, Ask/Explain, key-points skim; Batch Save, offline queue, optional Wayback archiving; word lookup and vocabulary with optional Google Drive sync; YouTube/bilibili subtitles in the reader; Send to Obsidian, Notion, NotebookLM, GitHub Gist, or a webhook; JSON backups; tag autocomplete and cleanup; pinboard.in themes.
-
-Data: local-first. No developer servers, no analytics, no telemetry, no sale of data. Page URLs and content go only to Pinboard or to a service you configured, for an action you take or a feature you turned on.
+Data is local-first. No developer servers, analytics, telemetry or sale of data. Page URLs and content go only to the selected bookmark service or another configured destination for an action you take or a feature you turn on.
 
 ## activeTab justification (unchanged, accurate)
 
 Read the active tab's URL and title to pre-fill the bookmark form when you open the popup, and to scope content extraction to the tab you are acting on.
 
-## storage justification (tail sentence replaced)
+## storage justification (752/1000)
 
-Persist settings, credentials, and local caches needed for the bookmark workflow: Pinboard token, AI provider keys, export-target tokens, preferences, custom CSS/themes, bookmark-status cache, tag cache/tag-cleanup state, AI result cache, offline queue, unsaved popup drafts, reader handoff data, highlights/notes and their Google Drive sync state, and the Wayback log. Stored in chrome.storage.local by default; selected non-content settings sync via chrome.storage.sync only if you enable settings sync, and obfuscated credentials join only with the separate account-wide credential-sync option. Nothing is sent to any developer server.
+Persist settings, credentials and state for saving and reading: bookmark-service tokens, AI and export credentials, preferences, themes, bookmark and tag caches, tag-cleanup state, AI results, pending saves, popup drafts, reader handoffs, highlights and notes, and the archive log. Reading data and its sync state also use IndexedDB. Vocabulary, highlights, notes, AI dictionary archives and Ask history share one personal library across bookmark services. Chrome storage is local by default. Ordinary settings use chrome.storage.sync only if settings sync is enabled on this device; obfuscated credentials join only with the separate credential-sync option. Page content and pending saves never enter Chrome Sync. Nothing is sent to developer servers.
 
 ## scripting justification (965/1000)
 
@@ -35,25 +35,25 @@ Inject the bundled Defuddle extractor (and optional per-site extraction rules) i
 
 Enumerate open tabs for batch save, and read tab titles/URLs for "save tab set" (which POSTs them to pinboard.in/tabs/save/ using your existing pinboard.in login cookie, then opens tabs/show for you to confirm). Also read the active tab's URL/title on tab switch or navigation to update the toolbar icon (bookmarked state) and pre-fill the popup.
 
-## notifications justification (unchanged, accurate)
+## notifications justification (259/1000)
 
-Show success/failure/queued feedback after save operations (quick-save, read-later, batch, tab-set, offline retry) and provide a 30-second Undo button that deletes the just-saved bookmark via the Pinboard API.
+Show success, failure or queued feedback after quick saves, Read Later, Batch Save, Pinboard Tab Sets and offline retries. A 30-second Undo action deletes a just-saved bookmark through its original bookmark service only while that connection is still current.
 
-## alarms justification (418/1000)
+## alarms justification (356/1000)
 
-Run recurring background tasks: keep the service worker warm during active use, re-prime the settings cache, expire the bookmark-status cache, retry the offline save queue, refresh the unread badge, optionally prewarm the Pinboard tag list, and schedule Google Drive sync after it is connected. Alarms themselves send nothing; tasks that contact Pinboard or Google Drive do so only while their configuration allows it.
+Schedule background work: re-prime settings, expire bookmark-status caches, retry pending saves, refresh the Pinboard unread badge, optionally prewarm tags, and run Google Drive sync after connection. Alarms themselves send nothing. Tasks contact the selected bookmark service or Google Drive only while the required connection and permission remain valid.
 
-## Host permission justification (899/1000)
+## Host permission justification (894/1000)
 
-Static hosts: api.pinboard.in and pinboard.in, for saving/fetching/managing bookmarks, pinboard.in themes and tag sorting, and cookie-based Save Tab Set. Every other host is optional and requested at runtime as one exact origin, from a direct user action: your AI provider (13 cloud providers, a custom OpenAI-compatible endpoint, or Ollama), Jina Reader, web.archive.org for opt-in archiving, GitHub Gist, Notion, or webhook export, the tabs in a Batch Save, Free Dictionary, Eudic, AnkiConnect on 127.0.0.1, Google Drive, YouTube and bilibili subtitles, an embedded article frame, and image origins for Embed (offline) downloads or hotlink-blocked images. HTTP is allowed only for localhost, 127.0.0.1, and [::1]. The https://*/* ceiling only lets Chrome offer these exact-origin prompts; the extension never requests it. Page content goes only to the service you selected, never to the developer.
+Static hosts api.pinboard.in and pinboard.in support Pinboard bookmarks, site themes, tag sorting and cookie-based Tab Sets. Other hosts are optional, requested from a direct user action for one exact origin: the configured Karakeep or linkding server, AI providers, Jina Reader, Wayback archiving, export destinations, selected Batch Save tabs, dictionaries and language evidence, Eudic, AnkiConnect, Google Drive, video subtitles and playback, embedded article frames, or image downloads and hotlink fixes. Karakeep and linkding work without a Pinboard account. Custom endpoints require HTTPS; HTTP is allowed only for localhost, 127.0.0.1 and [::1]. The https://*/* ceiling lets Chrome offer these exact-origin prompts; the extension never requests the wildcard. Automatic paths only check existing grants. URLs and content go to the selected service for its feature, never to the developer.
 
 ## declarativeNetRequestWithHostAccess justification (481/1000; field will appear on next submit)
 
 Set the Referer header (to the article page's origin only) on the extension's own image re-fetches during two user actions in Markdown preview: the Fix button for hotlink-blocked images, and the Embed (offline) export retry. Implemented as a temporary session rule scoped to the granted image origins, the fetch request type, and that single preview tab; the rule is removed when the run finishes. It grants no page access by itself and never touches other tabs' or sites' traffic.
 
-## identity justification (914/1000)
+## identity justification (840/1000)
 
-Obtain an OAuth access token for optional Google Drive sync, and nothing else. This is an optional permission: nothing requests it until you click Connect Google Drive in settings, and every other feature works without it. The only scope is drive.appdata, which reaches the extension's own hidden application-data folder and cannot read, list, or modify any other file in your Drive. It stores the current Pinboard account's vocabulary, highlights, and notes as batches so your devices converge on the same data, and makes one Drive about.get call so settings can show which account is connected. identity never signs you in to this extension, never identifies you to the developer, and is not used for analytics or advertising. Background syncs only check that the permission is granted and never open an OAuth prompt. Disconnect this device removes the cached token and this permission and keeps your local data.
+Obtain OAuth access tokens only for optional Google Drive sync. This permission is requested when you click Connect Google Drive; other features work without it. The sole scope, drive.appdata, reaches the extension's hidden app-data folder and cannot read, list or modify other Drive files. It syncs one personal library across bookmark services: vocabulary, highlights and notes, complete AI dictionary entries with supplements, and saved Ask conversations with cited excerpts. A Drive about.get call shows the connected account in settings. identity does not sign you in to this extension or identify you to the developer, and is not used for analytics or advertising. Background sync only checks the existing permission and never opens an OAuth prompt. Disconnect this device removes the cached token and permission and keeps local data.
 
 ## Remote code
 

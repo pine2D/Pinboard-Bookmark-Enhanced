@@ -1,4 +1,4 @@
-# Pinboard Bookmark Enhanced 项目配置
+# Bookmark Enhanced 项目配置
 
 作者：pine2D
 更新：2026-10-28
@@ -8,6 +8,8 @@
 ## 项目概述
 
 Chrome Extension (Manifest V3)，将当前页面保存到可选主服务 Pinboard、Karakeep 或 linkding（后两者无需 Pinboard 账号），支持多 LLM 提供商的 AI 标签/摘要/全文翻译/Ask-the-page 问答与 opt-in 要点提炼（skim）。md-preview 阅读器支持直接保存/编辑/删除所选服务的书签，完整 Ask 问答可连同引用单独导出或附在正文后；带划词高亮/笔记/搜索/专注模式、YouTube / B 站视频页的播放器+多语种字幕面板、在线词典与可选离线词典（CC-CEDICT 汉英、用户自备 ECDICT 英汉与多语言 Yomitan v3 包）；高亮、笔记、生词与已保存的问答集中在独立的「资料库」页（library.html，索引 + 详情平铺双栏）；生词、高亮、笔记、AI 词条归档与 Ask 历史由所有书签服务共用一个个人资料库，可按语言筛选、从查词结果选义保存并关联原形；支持完整 TSV 与可选多语言 Anki 笔记类型，保留原六字段导出，也可发送到欧路词典；连接 Google Drive 即同步生词、高亮、笔记及完整 AI 词条、补充用法和 Ask 问答记录。导出可 Send-to Obsidian/Notion/NotebookLM/Gist/Webhook，另有 Wayback 自动归档、标签治理和 13 套 pinboard.in 站点主题。功能全貌见 README.md。
+
+显示名称为 **Bookmark Enhanced**（简体中文：书签增强）；仓库地址、扩展 ID、公钥/OAuth client、`pbp-*` 存储标识、默认 Anki 牌组与 Karakeep 稍后读列表识别标记保持兼容，不随品牌名更改。
 
 ## 技术栈
 
@@ -24,7 +26,7 @@ Chrome Extension (Manifest V3)，将当前页面保存到可选主服务 Pinboar
 
 ```
 manifest.json                # MV3 配置（permissions / host_permissions / 入口）
-background.js                # Service Worker：图标状态、书签检测、URL 缓存、storage 预热、DNR 防盗链规则、popup AI 调用代理（PBP_AI_CALL → pbpRunPopupAiCall，两道 getCurrentPinboardAuth 门，覆盖白名单 PBP_AI_OVERRIDE_FIELDS 在 shared.js）
+background.js                # Service Worker：图标状态、书签检测、URL 缓存、storage 预热、DNR 防盗链规则、popup AI 调用代理（PBP_AI_CALL → pbpRunPopupAiCall，两道 getCurrentBookmarkAuth 门，覆盖白名单 PBP_AI_OVERRIDE_FIELDS 在 shared.js）
 popup.{html,css,js}          # 主弹窗 + popup-{ai,batch,offline,tags,theme-early}.js（AI 标签/摘要、批量、离线兜底、标签补全、防 FOUC）
 options.{html,css,js}        # 设置页 + options-{connectivity,backup,vocab,theme-early}.js（联通测试、JSON 备份、生词设置侧）
 library.{html,css,js}        # 资料库独立页 + library-{vocab,notes}.js（索引 + 详情平铺双栏，owner 隔离）

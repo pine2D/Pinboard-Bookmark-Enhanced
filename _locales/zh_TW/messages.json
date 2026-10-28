@@ -1,12 +1,12 @@
 {
   "extName": {
-    "message": "Pinboard 書籤強化"
+    "message": "書籤強化"
   },
   "extDescription": {
     "message": "儲存至 Pinboard、Karakeep 或 linkding，支援 AI 標籤與摘要、翻譯和劃重點閱讀器，以及 Markdown/EPUB 匯出。"
   },
   "cmdOpenPopup": {
-    "message": "開啟 Pinboard 書籤強化"
+    "message": "開啟書籤強化"
   },
   "cmdQuickSave": {
     "message": "快速儲存至所選書籤服務（不開啟彈出視窗）"
@@ -21,7 +21,7 @@
     "message": "將目前視窗的分頁儲存為分頁集"
   },
   "appName": {
-    "message": "Pinboard 書籤強化"
+    "message": "書籤強化"
   },
   "settings": {
     "message": "設定"
@@ -879,7 +879,7 @@
     "message": "撤銷"
   },
   "optTitle": {
-    "message": "Pinboard 書籤強化 - 設定"
+    "message": "書籤強化 - 設定"
   },
   "settingsCategory": {
     "message": "設定分類"

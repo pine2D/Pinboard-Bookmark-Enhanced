@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="color-scheme" content="light dark" />
-  <title>Pinboard Bookmark Enhanced</title>
+  <title>Bookmark Enhanced</title>
   <script src="popup-theme-early.js"></script>
   <link rel="stylesheet" href="popup.css" />
 </head>
 <body>
   <main>
   <div id="login-section" class="hidden">
-    <div class="header-bar"><h1 data-i18n="appName">Pinboard Bookmark Enhanced</h1><span class="header-icons"><button type="button" class="header-ic" id="login-options-link" data-i18n-title="settings" data-i18n-aria="settings"><span class="btn-ic" data-ic="gear"></span></button></span></div>
+    <div class="header-bar"><h1 data-i18n="appName">Bookmark Enhanced</h1><span class="header-icons"><button type="button" class="header-ic" id="login-options-link" data-i18n-title="settings" data-i18n-aria="settings"><span class="btn-ic" data-ic="gear"></span></button></span></div>
     <form id="login-form" class="login-body">
       <p><span data-i18n="loginPrompt">Enter your API token from</span> <a href="https://pinboard.in/settings/password" target="_blank" rel="noopener"><span data-i18n="settingsPassword">pinboard.in/settings/password</span></a></p>
       <div class="secret-field">
@@ -33,7 +33,7 @@
     <div class="form-body">
       <div id="existing-banner" class="existing-banner hidden" role="status" aria-live="polite"></div>
       <div id="url-warning" class="url-warning hidden" role="status">
-        <span class="btn-ic" data-ic="info"></span><span data-i18n="urlWarning">This page cannot be saved to Pinboard (unsupported URL). Tab Sets and Batch Save below still work.</span>
+        <span class="btn-ic" data-ic="info"></span><span data-i18n="urlWarning">This page has an unsupported URL and cannot be bookmarked.</span>
       </div>
       <div class="row">
         <label class="label" for="url-input" data-i18n="labelUrl">URL</label>
