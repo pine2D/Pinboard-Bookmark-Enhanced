@@ -47,7 +47,9 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('vocab-pack-preview', [], { target: '#multi-pack-preview:not([hidden])' }),
     context('vocab-pack-installed', ['vocab-pack-preview'], { target: '#multi-pack-list button[data-pack-action]' }),
     context('vocab-pack-delete-confirm', ['vocab-pack-installed'], { target: '.confirm-popover .confirm-subject' }),
-    context('save-failure', [], { target: '#auto-save-retry' })],
+    context('save-failure', [], { target: '#auto-save-retry' }),
+    context('ai-qwen-fields', [], { target: '#fields-qwen:not([hidden]) #opt-qwen-region-btn' }),
+    context('ai-qwen-workspace-warn', ['ai-qwen-fields'], { target: '#qwen-workspace-warn:not([hidden])' })],
   library: [
     context('vocab-list', [], { target: '#vocab-list .vocab-card' }),
     context('vocab-filter-set', [], { target: '#vocab-filter-set:popover-open' }),

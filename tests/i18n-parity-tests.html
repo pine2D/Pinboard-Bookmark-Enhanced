@@ -152,7 +152,8 @@ async function loadLocale(loc) {
   // language, so the key stays checked everywhere else.
   const LOCALE_SAME_OK = {
     fr: new Set(["libraryCountPages", "libraryCountPagesOne", "readerBookmarkNotes", "askExportSources", "dictSupplementSources", "mdExportArticle", "mdExportSummaryArticle", "askHistoryTab"]), // These words, including "Questions", are also French
-    pl: new Set(["askExportModel"]), // "Model" is also Polish
+    pl: new Set(["askExportModel", "labelAiRegion"]), // "Model" and "Region" are also Polish
+    de: new Set(["labelAiRegion"]), // "Region" is also German
   };
   for (const loc of ["de","fr","pl","ru","zh_HK"]) {
     const offenders = Object.keys(msgs.en).filter(k =>

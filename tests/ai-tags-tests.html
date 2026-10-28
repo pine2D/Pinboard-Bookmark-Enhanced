@@ -1136,6 +1136,25 @@ suite("Model Studio regions and workspaces", () => {
       fixture.remove();
     });
 
+    await atest("live snapshot carries the unsaved Model Studio region and workspace", async () => {
+      const fixture = document.createElement("div");
+      fixture.innerHTML = '<select id="opt-qwen-region"><option value="beijing">B</option><option value="tokyo" selected>T</option></select>' +
+        '<input id="opt-qwen-workspace" value=" ws-7f3k9q ">';
+      document.body.appendChild(fixture);
+      try {
+        const snapshot = pbpLiveAiSettingsSnapshot("qwen");
+        assertEq(snapshot.qwenRegion, "tokyo", "region");
+        assertEq(snapshot.qwenWorkspaceId, "ws-7f3k9q", "workspace");
+        // A stored region this version does not know leaves the select on no
+        // option: the snapshot must pass "" through, never the Beijing default.
+        fixture.innerHTML = '<select id="opt-qwen-region"></select><input id="opt-qwen-workspace" value="">';
+        const unknown = pbpLiveAiSettingsSnapshot("qwen");
+        assertEq(document.getElementById("opt-qwen-region").value, "", "empty select value");
+        assertEq(unknown.qwenRegion, "", "region passed through");
+        assertEq(pbpAiResolveTarget(unknown).error, "endpoint_invalid", "fails closed");
+      } finally { fixture.remove(); }
+    });
+
     await atest("non-extension test contexts skip the permission gate", async () => {
       window.chrome = undefined;
       await _ensureAIHostPermission({ aiProvider: "custom", customBaseUrl: "https://proxy.example/v1" });

@@ -475,7 +475,23 @@
 
         <!-- Qwen -->
         <div class="pf" hidden id="fields-qwen">
-          <h3 class="sr-only" data-i18n="provQwen">Qwen</h3>
+          <h3 class="sr-only" data-i18n="provQwen">Alibaba Cloud Model Studio</h3>
+          <div class="fg entry-block">
+            <label class="bl" for="opt-qwen-region" data-i18n="labelAiRegion">Region</label>
+            <select id="opt-qwen-region" data-listbox aria-describedby="hint-qwen-region">
+              <option value="beijing" data-i18n="qwenRegionBeijing" selected>China (Beijing)</option>
+              <option value="singapore" data-i18n="qwenRegionSingapore">Singapore</option>
+              <option value="virginia" data-i18n="qwenRegionVirginia">US (Virginia)</option>
+              <option value="tokyo" data-i18n="qwenRegionTokyo">Japan (Tokyo)</option>
+            </select>
+            <p class="hint" id="hint-qwen-region" data-i18n="hintQwenRegion">Keys belong to one region: a key from another region is rejected (401). Third-party models such as DeepSeek and Kimi are available only in Beijing.</p>
+          </div>
+          <div class="fg entry-block">
+            <label class="bl" for="opt-qwen-workspace" data-i18n="labelQwenWorkspace">Workspace ID (optional)</label>
+            <input type="text" id="opt-qwen-workspace" maxlength="63" spellcheck="false" autocomplete="off" aria-describedby="hint-qwen-workspace qwen-workspace-warn" />
+            <p class="hint" id="hint-qwen-workspace" data-i18n="hintQwenWorkspace">With a workspace ID, requests use its dedicated address. Tokyo has no shared address and needs one.</p>
+            <p class="hint hint-warn" id="qwen-workspace-warn" role="status" aria-live="polite" hidden></p>
+          </div>
           <div class="fg entry-block"><label class="bl" for="opt-qwen-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-qwen-key" placeholder="sk-…" /><button type="button" class="key-toggle" data-target="opt-qwen-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://dashscope.console.aliyun.com/apiKey" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
           <div class="fg entry-block"><label class="bl" for="opt-qwen-model" data-i18n="labelModel">Model</label><input type="text" id="opt-qwen-model" value="qwen-flash" /></div>
           <div class="fg-actions">

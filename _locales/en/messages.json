@@ -1497,6 +1497,18 @@
       }
     }
   },
+  "labelAiRegion": {
+    "message": "Region"
+  },
+  "labelQwenWorkspace": {
+    "message": "Workspace ID (optional)"
+  },
+  "hintQwenRegion": {
+    "message": "Keys belong to one region: a key from another region is rejected (401). Third-party models such as DeepSeek and Kimi are available only in Beijing."
+  },
+  "hintQwenWorkspace": {
+    "message": "With a workspace ID, requests use its dedicated address. Tokyo has no shared address and needs one."
+  },
   "hintOpenAIBaseUrl": {
     "message": "Change this to use a proxy or a compatible endpoint"
   },

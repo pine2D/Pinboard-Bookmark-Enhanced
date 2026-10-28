@@ -1491,6 +1491,18 @@
       }
     }
   },
+  "labelAiRegion": {
+    "message": "リージョン"
+  },
+  "labelQwenWorkspace": {
+    "message": "ワークスペース ID（任意）"
+  },
+  "hintQwenRegion": {
+    "message": "API キーは発行したリージョンでのみ有効です。別のリージョンのキーは拒否されます（401）。DeepSeek や Kimi などのサードパーティモデルは北京リージョンでのみ利用できます。"
+  },
+  "hintQwenWorkspace": {
+    "message": "ワークスペース ID を入力すると、そのワークスペース専用のアドレスにリクエストを送ります。東京リージョンには共通アドレスがないため、入力が必要です。"
+  },
   "hintOpenAIBaseUrl": {
     "message": "プロキシや互換エンドポイントを使う場合に変更します"
   },

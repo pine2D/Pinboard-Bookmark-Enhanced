@@ -1491,6 +1491,18 @@
       }
     }
   },
+  "labelAiRegion": {
+    "message": "Région"
+  },
+  "labelQwenWorkspace": {
+    "message": "ID d’espace de travail (facultatif)"
+  },
+  "hintQwenRegion": {
+    "message": "Une clé n’est valable que dans sa région : une clé d’une autre région est refusée (401). Les modèles tiers comme DeepSeek et Kimi ne sont proposés qu’à Pékin."
+  },
+  "hintQwenWorkspace": {
+    "message": "Avec un ID d’espace de travail, les requêtes passent par son adresse dédiée. Tokyo n’a pas d’adresse partagée et en exige un."
+  },
   "hintOpenAIBaseUrl": {
     "message": "À modifier pour passer par un proxy ou un endpoint compatible"
   },

@@ -1862,6 +1862,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-gemini-model": "gemini-3.5-flash-lite", "opt-openai-model": "gpt-5.4-nano",
         "opt-openai-baseurl": "https://api.openai.com/v1", "opt-claude-model": "claude-haiku-4-5",
         "opt-deepseek-model": "deepseek-v4-flash", "opt-qwen-model": "qwen-flash",
+        "opt-qwen-region": "beijing", "opt-qwen-workspace": "",
         "opt-minimax-model": "MiniMax-M2", "opt-openrouter-model": "openai/gpt-oss-20b",
         "opt-groq-model": "openai/gpt-oss-20b", "opt-mistral-model": "mistral-small-latest",
         "opt-cohere-model": "command-r7b-12-2024", "opt-siliconflow-model": "Qwen/Qwen3-8B",
@@ -2486,6 +2487,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         syncTranslateLangCustomState();
         syncDictDefinitionLangCustomState();
         updateProviderFields();
+        updateQwenWorkspaceWarn();
         // Same class, one panel over: the General reset puts #opt-lang back to
         // "auto" by assignment, so the language handler (pause auto-save ->
         // flush -> prime the pp-i18n-* mirror -> reload) never ran and the page
@@ -2772,6 +2774,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ---- Fill text/password/select fields ----
+  // A Model Studio region this version does not know leaves its select on no
+  // option (value ""); saving then omits the key, so the stored value survives.
   const fieldMap = {
     "opt-pinboard-token": s.pinboardToken,
     "opt-ai-provider": s.aiProvider,
@@ -2780,6 +2784,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-claude-key": s.claudeApiKey, "opt-claude-model": s.claudeModel,
     "opt-deepseek-key": s.deepseekApiKey, "opt-deepseek-model": s.deepseekModel,
     "opt-qwen-key": s.qwenApiKey, "opt-qwen-model": s.qwenModel,
+    "opt-qwen-region": s.qwenRegion, "opt-qwen-workspace": s.qwenWorkspaceId,
     "opt-minimax-key": s.minimaxApiKey, "opt-minimax-model": s.minimaxModel,
     "opt-openrouter-key": s.openrouterApiKey, "opt-openrouter-model": s.openrouterModel,
     "opt-groq-key": s.groqApiKey, "opt-groq-model": s.groqModel,
@@ -3461,6 +3466,34 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateProviderFields();
   $id("opt-ai-provider").addEventListener("change", updateProviderFields);
 
+  // Model Studio region + workspace: say why the pair forms no request host
+  // (the same pbpAiEndpointProblem codes the resolver fails closed on),
+  // while the user is still editing it. The region select's "" (a stored
+  // region this version does not know) reads as region_unknown, not Beijing.
+  function updateQwenWorkspaceWarn() {
+    const warn = $id("qwen-workspace-warn");
+    const region = $id("opt-qwen-region");
+    const input = $id("opt-qwen-workspace");
+    if (!warn || !region || !input) return;
+    const problem = pbpAiEndpointProblem({ aiProvider: "qwen", qwenRegion: region.value, qwenWorkspaceId: input.value.trim() }, "qwen");
+    let text = "";
+    if (problem === "workspace_required") {
+      const option = region.selectedOptions[0];
+      text = t("aiWorkspaceRequired", option ? option.textContent.trim() : region.value);
+    } else if (problem === "workspace_invalid") text = t("aiWorkspaceInvalid");
+    else if (problem === "region_unknown") text = t("aiRegionUnknown");
+    if (warn.textContent !== text) warn.textContent = text;
+    warn.hidden = !text;
+    if (problem.startsWith("workspace_")) input.setAttribute("aria-invalid", "true");
+    else if (!input.dataset.invalidMarked) input.removeAttribute("aria-invalid");
+  }
+  updateQwenWorkspaceWarn();
+  // After the event's other listeners: the Test button's own invalid mark
+  // clears on the same input and must not erase a standing aria-invalid.
+  const deferQwenWarn = () => queueMicrotask(updateQwenWorkspaceWarn);
+  $id("opt-qwen-region")?.addEventListener("change", deferQwenWarn);
+  $id("opt-qwen-workspace")?.addEventListener("input", deferQwenWarn);
+
   // ---- Reset prompt buttons ----
   // Empty IS the default for these two fields: the placeholder shows the
   // built-in prompt, the hint says "leave empty to use the default", ai.js
@@ -3684,6 +3717,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       deepseekModel: $id("opt-deepseek-model").value.trim() || "deepseek-v4-flash",
       qwenApiKey: obfuscateKey($id("opt-qwen-key").value.trim()),
       qwenModel: $id("opt-qwen-model").value.trim() || "qwen-flash",
+      // Saved as typed (trimmed): an invalid ID fails closed when read, never
+      // turned into "" here, which would silently fall back to Beijing.
+      qwenWorkspaceId: $id("opt-qwen-workspace").value.trim(),
+      // Only a region the registry declares is written. A select showing no
+      // option (a stored value this version does not know) omits the key, so
+      // the stored value is kept rather than rewritten.
+      ...(Object.hasOwn(OPENAI_COMPAT_PROVIDERS.qwen.regions, $id("opt-qwen-region").value)
+        ? { qwenRegion: $id("opt-qwen-region").value } : {}),
       minimaxApiKey: obfuscateKey($id("opt-minimax-key").value.trim()),
       minimaxModel: $id("opt-minimax-model").value.trim() || "MiniMax-M2",
       openrouterApiKey: obfuscateKey($id("opt-openrouter-key").value.trim()),
@@ -4154,7 +4195,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-claude-key", "opt-deepseek-key", "opt-qwen-key", "opt-minimax-key", "opt-openrouter-key",
     "opt-groq-key", "opt-mistral-key", "opt-cohere-key", "opt-siliconflow-key", "opt-zhipu-key",
     "opt-kimi-key", "opt-ollama-baseurl", "opt-custom-key", "opt-custom-baseurl", "dict-anki-port",
-    "dict-eudic-token"]) {
+    "dict-eudic-token", "opt-qwen-region", "opt-qwen-workspace"]) {
     const el = $id(id);
     el?.addEventListener(el.tagName === "SELECT" ? "change" : "input", scheduleConnectionOverview);
   }

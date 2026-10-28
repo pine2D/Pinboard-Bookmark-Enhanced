@@ -1491,6 +1491,18 @@
       }
     }
   },
+  "labelAiRegion": {
+    "message": "Region"
+  },
+  "labelQwenWorkspace": {
+    "message": "Workspace-ID (optional)"
+  },
+  "hintQwenRegion": {
+    "message": "Ein API-Schlüssel gilt nur in seiner Region: Ein Schlüssel aus einer anderen Region wird abgelehnt (401). Drittanbietermodelle wie DeepSeek und Kimi gibt es nur in Peking."
+  },
+  "hintQwenWorkspace": {
+    "message": "Mit einer Workspace-ID gehen Anfragen an deren eigene Adresse. Tokio hat keine gemeinsame Adresse und braucht eine ID."
+  },
   "hintOpenAIBaseUrl": {
     "message": "Ändern, um einen Proxy oder einen kompatiblen Endpunkt zu nutzen"
   },

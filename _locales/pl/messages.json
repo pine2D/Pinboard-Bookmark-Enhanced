@@ -1491,6 +1491,18 @@
       }
     }
   },
+  "labelAiRegion": {
+    "message": "Region"
+  },
+  "labelQwenWorkspace": {
+    "message": "Identyfikator obszaru roboczego (opcjonalnie)"
+  },
+  "hintQwenRegion": {
+    "message": "Klucz działa tylko w swoim regionie: klucz z innego regionu zostanie odrzucony (401). Modele innych firm, takie jak DeepSeek i Kimi, są dostępne tylko w Pekinie."
+  },
+  "hintQwenWorkspace": {
+    "message": "Po podaniu identyfikatora obszaru roboczego żądania trafiają na jego dedykowany adres. Tokio nie ma wspólnego adresu i wymaga identyfikatora."
+  },
   "hintOpenAIBaseUrl": {
     "message": "Zmień, aby użyć serwera proxy lub zgodnego endpointu"
   },

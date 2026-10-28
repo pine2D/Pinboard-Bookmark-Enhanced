@@ -1491,6 +1491,18 @@
       }
     }
   },
+  "labelAiRegion": {
+    "message": "地區"
+  },
+  "labelQwenWorkspace": {
+    "message": "業務空間 ID（選填）"
+  },
+  "hintQwenRegion": {
+    "message": "API Key 只在所屬地區有效，選錯地區會傳回 401。DeepSeek、Kimi 等第三方模型只在北京地區提供。"
+  },
+  "hintQwenWorkspace": {
+    "message": "填寫後請求會改用該業務空間的專屬位址。東京地區沒有公用位址，必須填寫。"
+  },
   "hintOpenAIBaseUrl": {
     "message": "可修改為代理或相容端點網址"
   },

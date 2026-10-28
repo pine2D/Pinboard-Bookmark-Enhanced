@@ -14,6 +14,10 @@ function pbpLiveAiSettingsSnapshot(provider) {
     claudeApiKey: getOptVal("opt-claude-key"), claudeModel: getOptVal("opt-claude-model", "claude-haiku-4-5"),
     deepseekApiKey: getOptVal("opt-deepseek-key"), deepseekModel: getOptVal("opt-deepseek-model", "deepseek-v4-flash"),
     qwenApiKey: getOptVal("opt-qwen-key"), qwenModel: getOptVal("opt-qwen-model", "qwen-flash"),
+    // The default only stands in for a missing element: a select showing no
+    // option ("", a region this version does not know) is passed through so
+    // the resolver fails it closed instead of testing Beijing.
+    qwenRegion: $id("opt-qwen-region")?.value ?? "beijing", qwenWorkspaceId: getOptVal("opt-qwen-workspace"),
     minimaxApiKey: getOptVal("opt-minimax-key"), minimaxModel: getOptVal("opt-minimax-model", "MiniMax-M2"),
     openrouterApiKey: getOptVal("opt-openrouter-key"), openrouterModel: getOptVal("opt-openrouter-model", "openai/gpt-oss-20b"),
     ollamaBaseUrl: getOptVal("opt-ollama-baseurl", "http://localhost:11434"), ollamaModel: getOptVal("opt-ollama-model", "llama3.2"),
@@ -71,21 +75,30 @@ function setupApiTests() {
   // A failure that is about one field (no key, a malformed or rejected token)
   // marks that field invalid, points its description at the line that says
   // why, and hands focus back, so the fix starts where the problem is. The
-  // next edit clears the mark. None of these fields carries a description of
-  // its own in options.html, so the reason simply occupies the slot.
+  // next edit clears the mark. A field's own description (the Model Studio
+  // region and workspace fields carry hints and a standing warning) is set
+  // aside while the failure reason describes it, and put back when it clears.
   function markFieldInvalid(field, reasonId) {
     if (!field) return;
+    if (!field.dataset.invalidMarked) field.dataset.prevDescribedby = field.getAttribute("aria-describedby") || "";
     field.dataset.invalidMarked = "1";
     field.setAttribute("aria-invalid", "true");
     field.setAttribute("aria-describedby", reasonId);
     field.focus();
-    field.addEventListener("input", () => clearFieldInvalid(field), { once: true });
+    // A list box's button (listbox.js: "<select id>-btn") clears when its
+    // select changes; a text field clears on input.
+    const select = field.id.endsWith("-btn") ? $id(field.id.slice(0, -4)) : null;
+    if (select && select.tagName === "SELECT") select.addEventListener("change", () => clearFieldInvalid(field), { once: true });
+    else field.addEventListener("input", () => clearFieldInvalid(field), { once: true });
   }
   function clearFieldInvalid(field) {
     if (!field || !field.dataset.invalidMarked) return;
+    const prev = field.dataset.prevDescribedby || "";
     delete field.dataset.invalidMarked;
+    delete field.dataset.prevDescribedby;
     field.removeAttribute("aria-invalid");
-    field.removeAttribute("aria-describedby");
+    if (prev) field.setAttribute("aria-describedby", prev);
+    else field.removeAttribute("aria-describedby");
     if (field === tokenInput) validateTokenField();
   }
 
@@ -137,8 +150,25 @@ function setupApiTests() {
       // calling it. Automatic/background paths stay contains-only and never prompt.
       let originPattern = null;
       let granted = false;
+      // Settings that form no request host (a regional provider's region or
+      // workspace) are caught here, synchronously and before any permission
+      // prompt, and point at the field to fix.
       try {
         originPattern = _aiTargetOriginPattern(cs);
+      } catch (err) {
+        if (err?.code === "endpoint_invalid" && err.reason) {
+          setStatusResult(statusEl, false, err.message);
+          recordHealth(`ai:${provider}`, false, "endpoint_invalid");
+          const field = err.reason === "region_unknown" ? $id(`opt-${provider}-region-btn`) : $id(`opt-${provider}-workspace`);
+          markFieldInvalid(field, statusEl.id);
+          return;
+        }
+        console.warn("[connectivity] AI permission request failed:", err?.name, err?.message);
+        setStatusResult(statusEl, false, err?.message || t("networkError"));
+        recordHealth(`ai:${provider}`, false, "permission_error");
+        return;
+      }
+      try {
         granted = await requestAIHostPermissions(cs);
       } catch (err) {
         console.warn("[connectivity] AI permission request failed:", err?.name, err?.message);

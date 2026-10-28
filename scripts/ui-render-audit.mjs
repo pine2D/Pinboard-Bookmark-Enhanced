@@ -9569,6 +9569,36 @@ async function runSweep(page, sw, extBase) {
       });
       await scan("options", "save-failure");
     }
+
+    // Alibaba Cloud Model Studio's region list box and workspace field only
+    // render while that provider is selected; the warning only once the pair
+    // forms no request host (Tokyo has no shared address and needs an ID).
+    if (wants("options", "ai-qwen-fields") || wants("options", "ai-qwen-workspace-warn")) {
+      await page.click("#tab-ai");
+      await page.waitForTimeout(150);
+      await page.evaluate(() => {
+        const provider = document.getElementById("opt-ai-provider");
+        provider.value = "qwen"; provider.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      await page.waitForTimeout(150);
+      await scan("options", "ai-qwen-fields");
+      if (wants("options", "ai-qwen-workspace-warn")) {
+        await page.evaluate(() => {
+          const region = document.getElementById("opt-qwen-region");
+          region.value = "tokyo"; region.dispatchEvent(new Event("change", { bubbles: true }));
+          const ws = document.getElementById("opt-qwen-workspace");
+          ws.value = ""; ws.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        await page.waitForTimeout(150);
+        await scan("options", "ai-qwen-workspace-warn");
+      }
+      await page.evaluate(() => {
+        const region = document.getElementById("opt-qwen-region");
+        region.value = "beijing"; region.dispatchEvent(new Event("change", { bubbles: true }));
+        const provider = document.getElementById("opt-ai-provider");
+        provider.value = "gemini"; provider.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    }
   }
 
   // ---- library: vocab (list, detail pane, batch bar) + notes (list, detail pane). ----
