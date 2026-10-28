@@ -100,6 +100,8 @@ import {
   DICT_LOOKUP_GEOMETRY,
   dictLookupRoots,
   evaluateDictLookupGeometry,
+  NOTES_BACK_BAR,
+  evaluateNotesBackBar,
 } from "../tests/render-audit-checklist.mjs";
 // Reused, not re-implemented, so this audit and contrast-audit.mjs's static
 // CSS-source audit can never quietly disagree on what a passing ratio is.
@@ -9398,6 +9400,38 @@ async function measureDictLookupGeometry(page, surface, context, theme) {
   }
 }
 
+// notesBackBarTop (library notes-detail): the notes detail at the narrow
+// widths, single pane, probed with the same strip test as the vocabulary
+// back bar (probeDictStickyBars with no save bar to find).
+async function measureNotesBackBar(page) {
+  const restore = page.viewportSize();
+  const was = await page.evaluate((cls) => { const had = document.body.classList.contains(cls); document.body.classList.add(cls); return had; }, NOTES_BACK_BAR.narrowClass);
+  const probe = [];
+  try {
+    for (const width of NOTES_BACK_BAR.viewports) {
+      await page.setViewportSize({ width, height: restore ? restore.height : 900 });
+      await page.waitForTimeout(250);
+      await settleAnimations(page);
+      // The fixture's page fits a 900px window; a phone-height pane (240px)
+      // makes it scroll under the bar.
+      await page.evaluate((sel) => { const sc = document.querySelector(sel); if (sc) sc.style.maxHeight = "240px"; }, NOTES_BACK_BAR.scroller);
+      try {
+        probe.push({ width, ...(await page.evaluate(probeDictStickyBars, { scroller: NOTES_BACK_BAR.scroller, foot: ":not(*)", back: NOTES_BACK_BAR.back, tol: NOTES_BACK_BAR.edgeTolerancePx })) });
+      } finally {
+        await page.evaluate((sel) => { const sc = document.querySelector(sel); if (sc) sc.style.removeProperty("max-height"); }, NOTES_BACK_BAR.scroller);
+      }
+    }
+  } finally {
+    if (restore) await page.setViewportSize(restore);
+    if (!was) await page.evaluate((cls) => document.body.classList.remove(cls), NOTES_BACK_BAR.narrowClass);
+    await page.waitForTimeout(250);
+    await settleAnimations(page);
+  }
+  for (const row of evaluateNotesBackBar(probe)) {
+    dictLookupRows.push({ surface: "library", theme: "", selector: NOTES_BACK_BAR.back, state: "notes-detail", ...row });
+  }
+}
+
 async function runSweep(page, sw, extBase) {
   const hits = [];
   const contexts = Object.fromEntries(Object.keys(RENDER_SWEEP_CONTEXTS).map((surface) => [surface, new Set(selectedSweep(surface))]));
@@ -9418,6 +9452,7 @@ async function runSweep(page, sw, extBase) {
     }, async () => {
       add(await runFamilySweep(page), surface, name);
       if (!SWEEP && !WRITE_SPACING) await measureDictLookupGeometry(page, surface, name, surface === "md-preview" && readerScheme === "dark" ? "dark" : "");
+      if (!SWEEP && !WRITE_SPACING && surface === "library" && name === "notes-detail") await measureNotesBackBar(page);
     });
   };
   // The free examples states run without an AI key (plan 1C.2, 1C.4); their

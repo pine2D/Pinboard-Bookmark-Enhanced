@@ -1510,9 +1510,25 @@ html.motion-ready .notes-excerpt-jump { transition: background-color var(--motio
   .notes-list-pane { margin-inline-end: var(--lib-page-pad); }
   body.lib-narrow-notes .notes-list-pane { display: none; }
   body:not(.lib-narrow-notes) .notes-detail-pane { display: none; }
-  /* Keeps a focused control clear of the back button (sm rung + 8). */
-  .notes-detail-pane { scroll-padding-top: calc(var(--lib-control-h) - 4px + var(--lib-sp-2)); }
+  /* Keeps a focused control clear of the back bar's band (below). */
+  .notes-detail-pane { scroll-padding-top: calc(var(--lib-control-h) - 4px + 2 * var(--lib-sp-2)); }
   .notes-detail-back { display: inline-flex; position: sticky; top: 0; z-index: var(--lib-z-sticky); }
+  /* The vocabulary twin's band (.vocab-detail-pane::before, e023a00b): the
+     stuck button masked only its own box, and a sticky box stops at the
+     pane's sp-2 top padding, so the scrolled title and excerpts showed above
+     and beside it (batch-3b review). A page-fill band sticks on the
+     scroller's visible top, one layer under the button, across the pane's
+     full width and sp-2 under the button. It shares the sheet's grid cell, so
+     the sheet keeps its place. Only while a page is open (the cover is never
+     shown in this mode: no open page drops lib-narrow-notes). */
+  body.lib-narrow-notes .notes-detail-pane::before {
+    content: ""; grid-area: 1 / 1; align-self: start;
+    position: sticky; top: calc(-1 * var(--lib-sp-2)); z-index: calc(var(--lib-z-sticky) - 1);
+    block-size: calc(var(--lib-control-h) - 4px + 2 * var(--lib-sp-2));
+    margin-inline: calc(-1 * var(--lib-sp-4)) calc(-1 * var(--lib-page-pad));
+    background: var(--lib-bg);
+  }
+  body.lib-narrow-notes .notes-detail-pane > .notes-sheet { grid-area: 1 / 1; }
 }
 
 /* ============================================================

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { ledgerKey, reconcileKnownFailures } from '../scripts/render-audit-ledger.mjs';
-import { DICT_LOOKUP_GEOMETRY, dictLookupRoots, evaluateDictLookupGeometry } from './render-audit-checklist.mjs';
+import { DICT_LOOKUP_GEOMETRY, dictLookupRoots, evaluateDictLookupGeometry, NOTES_BACK_BAR, evaluateNotesBackBar } from './render-audit-checklist.mjs';
 import { RENDER_SWEEP_CONTEXTS } from '../scripts/audit-render-scenarios.mjs';
 
 const row = (status, check, extra = {}) => ({ surface: 'md-preview', theme: '', selector: '#explain-pop .xp-dict', state: 'dict-entry-result', check, status, ...extra });
@@ -363,4 +363,18 @@ test('save choice list: inside the reader card, definitions only in the library'
   assert.equal(verdicts(withMenu({ open: false, rows: [] }), 'dict-save-change-menu', 'library').dictSaveMenuChoices, 'SETUP');
   // Other contexts do not require it.
   assert.equal(verdicts(withMenu(null), 'dict-save-bar').dictSaveMenuBox, undefined);
+});
+
+test('notes back bar: the band covers the scroller from its visible top; a strip of the scrolled page fails', () => {
+  const at = (back) => Object.fromEntries(evaluateNotesBackBar([{ width: 360, foot: null, back }]).map((r) => [r.check, r.status]));
+  assert.deepEqual(NOTES_BACK_BAR.viewports, [360]);
+  assert.equal(at({ measured: true, top: 132, scrollerTop: 124, strip: [] }).notesBackBarTop360, 'OK');
+  // The batch-3b review: the bare sticky button stopped at the pane's top
+  // padding, the scrolled title showing above and beside it.
+  assert.equal(at({ measured: true, top: 132, scrollerTop: 124, strip: ['h2.notes-detail-source'] }).notesBackBarTop360, 'FAIL');
+  assert.equal(at({ measured: true, top: 110, scrollerTop: 124, strip: [] }).notesBackBarTop360, 'FAIL');
+  // Nothing scrolled under the bar, or no bar, is SETUP, not a pass.
+  assert.equal(at({ measured: false }).notesBackBarTop360, 'SETUP');
+  assert.equal(at(null).notesBackBarTop360, 'SETUP');
+  assert.equal(Object.fromEntries(evaluateNotesBackBar([]).map((r) => [r.check, r.status])).notesBackBarTop360, 'SETUP');
 });

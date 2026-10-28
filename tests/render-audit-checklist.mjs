@@ -1113,6 +1113,37 @@ export function evaluateDictLookupGeometry(probe, opts) {
   return rows;
 }
 
+// notesBackBarTop<W> (library notes-detail, at each width of
+// NOTES_BACK_BAR.viewports): below the two-pane threshold the notes detail's
+// sticky "back to list" button and its page-fill band cover the detail
+// scroller from its visible top, so no box of the scrolled page shows above
+// or beside the button -- the same hit-tested strip as dictBackBarTop, for
+// the notes twin. The batch-3b review: the vocabulary bar got its band in
+// e023a00b, the notes bar kept a bare sticky button that stopped at the
+// pane's sp-2 top padding, with the scrolled title and excerpts showing above
+// and beside it.
+export const NOTES_BACK_BAR = { viewports: [360], scroller: "#notes-detail-pane", back: "#notes-detail .notes-detail-back", narrowClass: "lib-narrow-notes", edgeTolerancePx: 1 };
+
+export function evaluateNotesBackBar(probe) {
+  const tol = NOTES_BACK_BAR.edgeTolerancePx;
+  return NOTES_BACK_BAR.viewports.map((width) => {
+    const check = `notesBackBarTop${width}`;
+    const back = (probe || []).find((v) => v.width === width)?.back;
+    if (!back || !back.measured) {
+      return { check, status: "SETUP", actual: "nothing measured", expected: `scrolling content under the back bar of ${NOTES_BACK_BAR.scroller} at ${width}px`, note: null };
+    }
+    const strip = back.strip || [];
+    const round = (v) => Math.round(v * 10) / 10;
+    return {
+      check,
+      status: back.top >= back.scrollerTop - tol && !strip.length ? "OK" : "FAIL",
+      actual: `button top ${round(back.top)}, scroller visible top ${round(back.scrollerTop)}${strip.length ? `; showing above or beside it: ${strip.slice(0, 3).join(", ")}` : ""}`,
+      expected: "the back bar covers the scroller from its visible top, nothing of the scrolled page above or beside the button",
+      note: null,
+    };
+  });
+}
+
 // Selectors below are written against the CURRENT shipped markup (pre-Task
 // 9/10 uplift). Task 9/10/12/13 migrate one selector's underlying CSS at a
 // time and delete the matching known-failures key as they land -- this file
