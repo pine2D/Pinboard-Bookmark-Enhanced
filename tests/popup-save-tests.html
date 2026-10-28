@@ -2599,16 +2599,21 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const globalJson = JSON.stringify(global);
       const failed = { ...chainSettings, aiProvider: "custom-bbbbbb", customModel: "FAILED" };
       const build = ({ permission = null, granted = true, op = "summary" } = {}) => {
-        const calls = { run: [], request: [] };
+        const calls = { run: [], request: [], hide: 0 };
         const handlers = {};
         const els = {};
         const $id = (id) => (els[id] = els[id] || { id, disabled: false, dataset: {},
           addEventListener(type, fn) { handlers[id] = fn; } });
-        new Function("$id", "hideAIError", "doAITags", "doAISummary", "requestAIHostPermissions", "_aiTargetOriginPattern",
-          "settings", "_aiErrorLastOp", "_aiErrorLastPermission", "_aiErrorLastSettings", handlerSrc)(
-          $id, () => {}, async (f, s) => calls.run.push({ op: "tags", f, s }), async (f, s) => calls.run.push({ op: "summary", f, s }),
+        // hideAIError clears the card state exactly as popup-ai.js's does, so
+        // a handler that read the snapshot only after hiding would rerun nothing.
+        new Function("$id", "doAITags", "doAISummary", "requestAIHostPermissions", "_aiTargetOriginPattern",
+          "settings", "lastOp", "lastPermission", "lastSettings", "onHide",
+          "let _aiErrorLastOp = lastOp, _aiErrorLastPermission = lastPermission, _aiErrorLastSettings = lastSettings;\n" +
+          "function hideAIError() { onHide(); _aiErrorLastOp = null; _aiErrorLastPermission = null; _aiErrorLastSettings = null; }\n" +
+          handlerSrc)(
+          $id, async (f, s) => calls.run.push({ op: "tags", f, s }), async (f, s) => calls.run.push({ op: "summary", f, s }),
           async (s, extra) => { calls.request.push({ s, extra }); return granted; }, () => "https://b.example/*",
-          global, op, permission, failed);
+          global, op, permission, failed, () => { calls.hide++; });
         const click = (id, provider) => {
           const el = $id(id);
           if (provider) el.dataset.provider = provider;
@@ -2621,6 +2626,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(retry.calls.run.length === 1, "Retry ran " + retry.calls.run.length + " times");
       assert(same(retry.calls.run[0].s, failed) && retry.calls.run[0].s !== failed, "Retry did not rerun a copy of the failed snapshot");
       assert(JSON.stringify(global) === globalJson, "Retry touched the global settings");
+      assert(retry.calls.hide === 1, "Retry hid the card " + retry.calls.hide + " times");
+      await retry.click("ai-error-retry");
+      assert(retry.calls.run.length === 1, "a second Retry reran after the card state was cleared");
 
       const tryWith = build();
       await tryWith.click("ai-error-fallback", "custom-cccccc");
@@ -2642,15 +2650,32 @@ test("posts/add default remains replace=yes for existing callers", () => {
     });
 
     await testAsync("a Try-with on a custom entry sends its id and list over the bus, never its key", async () => {
-      const h = makePopupAi({ settings: { ...chainSettings, aiProvider: "custom-bbbbbb", customApiKey2: realAi.pbpAiCustomKeySeal(B, "sk-B-SECRET") },
+      // The slot holds an obf: envelope, so the plaintext key alone can never
+      // show up in it: check the stored envelope value itself, and the first
+      // entry's plain key, against the whole message.
+      const envelope = realAi.pbpAiCustomKeySeal(B, "sk-B-SECRET");
+      const h = makePopupAi({ settings: { ...chainSettings, aiProvider: "custom-bbbbbb", customApiKey: "sk-A-PLAIN", customApiKey2: envelope },
         sanitize: realAi.pbpSanitizeAiOverrides });
       await h.fetchAIArtifacts("summary", true, h.account, h.snapshot, "local");
       const msg = h.calls.sent[0];
+      assert(typeof envelope === "string" && envelope.startsWith("obf:"), "precondition: the slot no longer holds an obf: envelope");
+      assert(!JSON.stringify(msg).includes(envelope), "the entry's sealed key reached the message bus");
+      assert(!JSON.stringify(msg).includes("sk-A-PLAIN"), "the first entry's key reached the message bus");
       assert(msg && msg.aiOverrides.aiProvider === "custom-bbbbbb", "the entry id did not travel");
       assert(same(msg.aiOverrides.aiCustomProviders, [B, C]), "the entry list did not travel: " + JSON.stringify(msg.aiOverrides.aiCustomProviders));
       assert(!Object.keys(msg.aiOverrides).some((k) => /^customApiKey/.test(k)), "a key slot rode the overrides");
       assert(!JSON.stringify(msg).includes("sk-B-SECRET"), "the entry's key reached the message bus");
       assert(!("customDisplayName" in msg.aiOverrides), "the display name rode the overrides");
+    });
+
+    await testAsync("the error card names a dangling entry id by the generic custom label, never the raw id", async () => {
+      const h = makePopupAi({ realErrorCard: true, settings: { ...chainSettings, aiProvider: "custom-zzzzzz" },
+        fallback: buildFallback(), respond: failQuota, sanitize: realAi.pbpSanitizeAiOverrides });
+      await h.doAISummary(false);
+      const shown = h.el["ai-error-message"].textContent;
+      assert(!h.el["ai-error-card"].classList.contains("hidden"), "the error card was not shown");
+      assert(shown.startsWith("[" + tEn("provCustomShort") + "] "), "the dangling id was not named by provCustomShort: " + shown);
+      assert(!shown.includes("custom-zzzzzz"), "the raw entry id reached the card: " + shown);
     });
 
     await testAsync("a bus answer with no envelope renders the localized unknown error", async () => {
