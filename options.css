@@ -373,6 +373,9 @@ h1 { flex: 1 1 auto; margin: 0; font-size: 18px; line-height: calc(var(--opt-con
 .listbox-opt[data-active] { background: var(--opt-btn-hover); color: var(--opt-btn-fg); }
 .listbox-opt[aria-selected="true"] { background: var(--opt-accent); color: var(--opt-on-accent); }
 .listbox-opt[aria-disabled="true"] { color: var(--opt-fg-hint); cursor: default; }
+/* An <option hidden> (a prompt, not a choice) is never listed; display above
+   outranks the UA [hidden] rule. */
+.listbox-opt[hidden] { display: none; }
 /* <optgroup> (listbox.js): a non-interactive group label in the overline
    face, inset to the options' text column; the inner list is a plain stack.
    A group after the first one gets a little air above its label. */

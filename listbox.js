@@ -29,6 +29,9 @@
 //                                       into the rounded corners)
 //       ul.listbox-list#<id>-list[role=listbox]   <- the scroll layer
 //         li.listbox-opt#<id>-opt-<i>[role=option][aria-selected]
+//                                       <- [hidden] for an <option hidden>: a
+//                                          prompt the face may show, never a
+//                                          choice in the list
 //         li.listbox-optgroup[role=group][aria-labelledby]  <- one per <optgroup>
 //           div.listbox-optgroup-label#<id>-grp-<g>   <- the group's label,
 //                                                        not an option: never
@@ -84,9 +87,12 @@
     return typeof PBP_ICONS !== "undefined" && PBP_ICONS.chevronDown ? PBP_ICONS.chevronDown : "";
   }
 
+  // A hidden <option> (the library save bar's "Definition to save" prompt)
+  // can be the closed face's text but is never listed, active or picked, as
+  // in a native select's own list.
   function isEnabled(state, i) {
     const opt = state.select.options[i];
-    return !!opt && !opt.disabled;
+    return !!opt && !opt.disabled && !opt.hidden;
   }
 
   // Nearest enabled index from `from` walking in `dir` (±1); stays on `from`
@@ -310,6 +316,7 @@
       li.setAttribute("aria-selected", i === select.selectedIndex ? "true" : "false");
       if (opts[i].disabled) li.setAttribute("aria-disabled", "true");
       else li.removeAttribute("aria-disabled");
+      li.hidden = opts[i].hidden;
     }
     if (state.ghost) {
       syncFace(state);

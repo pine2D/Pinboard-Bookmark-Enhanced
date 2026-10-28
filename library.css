@@ -3404,6 +3404,9 @@ select[data-listbox] { height: var(--lib-control-h); box-sizing: border-box; }
 .listbox-opt[data-active] { background: var(--lib-btn-hover); color: var(--lib-btn-fg); }
 .listbox-opt[aria-selected="true"] { background: var(--lib-accent); color: var(--lib-on-accent); }
 .listbox-opt[aria-disabled="true"] { color: var(--lib-fg-hint); cursor: default; }
+/* An <option hidden> (a prompt, not a choice) is never listed; display above
+   outranks the UA [hidden] rule. */
+.listbox-opt[hidden] { display: none; }
 /* Only the saved-meaning picker uses prose-sized options. Regular settings,
    languages and group menus retain their compact single-line geometry. */
 .listbox-pop[data-layout="meaning"] { box-sizing: border-box; }

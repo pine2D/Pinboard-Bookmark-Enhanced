@@ -1171,7 +1171,10 @@ function _pbpVocabSyncLookupSave(state) {
   const choice = state.choices.get(state.select.value);
   const id = choice && pbpDictVocabKey(state.owner, choice.language, choice.term);
   state.expectedExisting = !!id && _vocabRows.some(w => w.id === id);
-  const saveLabel = t(state.expectedExisting ? "dictUpdateVocab" : "dictSaveVocab");
+  // A saved word waiting for an explicit choice (dictMeaningSavedHelp says a
+  // choice updates it) names Update on its disabled button, not Save.
+  const updates = state.expectedExisting || (!choice && state.keptSavedDefinition && !state.choiceRevoked);
+  const saveLabel = t(updates ? "dictUpdateVocab" : "dictSaveVocab");
   setBtnIcon(state.button, "bookmarkPlus", saveLabel);
   // A narrow save bar keeps this text too (only the re-lookup is an icon);
   // title and aria-label name the action for every width.
@@ -1233,7 +1236,11 @@ function _pbpVocabAcceptLookupResult(state, source, norm) {
     window.pbpEnhanceListbox?.(definition);
   }
   state.choices.clear();
-  state.select.replaceChildren(new Option(t("vocabSaveDefinitionLabel"), ""));
+  // The prompt is the closed face's text when nothing is chosen, never a
+  // choice in the list (dict.md: the list offers no "none" option).
+  const prompt = new Option(t("vocabSaveDefinitionLabel"), "");
+  prompt.hidden = true;
+  state.select.replaceChildren(prompt);
   for (const [kind, choices] of state.sources) {
     choices.forEach((choice, index) => {
       const key = `${kind}:${index}`;

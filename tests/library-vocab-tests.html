@@ -4060,6 +4060,7 @@ await (async () => {
       _pbpVocabAutoLookup=async()=>"idle";
       await reload(); await run();
       check("B a new lookup preselects the first displayed definition and can be saved immediately", !!select()&&select().options.length===3&&select().value==="online:0"&&save()?.disabled===false);
+      check("B the \"Definition to save\" prompt is a hidden option: the closed face's text, never a choice in the list", select()?.options[0].value===""&&select().options[0].hidden&&[...select().options].slice(1).every(o=>!o.hidden));
       {
         const icon=document.createElement("div");icon.innerHTML=PBP_ICONS.bookmarkPlus;
         check("B the save action uses the bookmarkPlus icon (Q26=A keeps bookMarked for the saved state only)", save()?.querySelector("svg")?.outerHTML===icon.innerHTML);
@@ -4077,7 +4078,9 @@ await (async () => {
       check("B collecting opens the saved word's detail", _pbpVocabDetailWordId===pbpDictVocabKey(ownerA,"en","run"));
 
       if(store[0]){store[0].note="keep this note";store[0].status="known";store[0].groups=["Keep"];}
-      await reload();await run();choose("Move swiftly");
+      await reload();await run();
+      check("B a saved word awaiting an explicit choice names Update, not Save, on its disabled button", select()?.value===""&&save()?.disabled===true&&save().textContent.includes("dictUpdateVocab")&&!save().textContent.includes("dictSaveVocab")&&save().getAttribute("aria-label")==="dictUpdateVocab");
+      choose("Move swiftly");
       check("B an existing identity explicitly offers Update saved word", save()?.textContent.includes("dictUpdateVocab"));
       save()?.click();await settle();
       check("B updating a definition leaves notes, groups and learning state alone", store[0]?.note==="keep this note"&&store[0]?.status==="known"&&store[0]?.groups[0]==="Keep"&&store[0]?.gloss==="Move swiftly on foot.");

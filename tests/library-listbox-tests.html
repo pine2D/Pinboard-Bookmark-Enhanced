@@ -1198,6 +1198,33 @@ async function libraryPageMeaningCases() {
     check("meaning help: Home and Enter still choose the first actual option", select.value === "short" && button.getAttribute("aria-expanded") === "false");
     delete select.dataset.listboxHelp; win.pbpListboxSync(select);
     check("meaning help: removing guidance drops only its own accessible description", !pop.querySelector(".listbox-help") && !pop.hasAttribute("data-help") && button.getAttribute("aria-describedby") === context.id && list.getAttribute("aria-describedby") === context.id);
+
+    // The save bar's prompt (library-vocab.js): an <option hidden> that names
+    // the closed face while nothing is chosen, never a row of the open list.
+    const saveSel = doc.createElement("select"); saveSel.id = "prompt-probe"; saveSel.dataset.listbox = "float"; saveSel.dataset.listboxLayout = "meaning";
+    saveSel.setAttribute("aria-label", "Definition to save");
+    const prompt = new win.Option("Definition to save", ""); prompt.hidden = true;
+    const first = new win.Option("serendipity · a happy accident (Wiktionary)", "online:0"); first.dataset.meaningText = "a happy accident"; first.dataset.meaningSource = "Wiktionary";
+    const second = new win.Option("serendipity · luck in finding (AI)", "ai:0"); second.dataset.meaningText = "luck in finding"; second.dataset.meaningSource = "AI";
+    saveSel.append(prompt, first, second); saveSel.value = "";
+    doc.body.appendChild(saveSel); win.pbpEnhanceListbox(saveSel);
+    const pWrap = saveSel.nextElementSibling, pBtn = pWrap.querySelector("button"), pPop = pWrap.querySelector(".listbox-pop");
+    pWrap.style.cssText = "position:fixed;left:16px;top:80px;width:420px";
+    const pKey = (k) => pBtn.dispatchEvent(new win.KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true }));
+    const shown = () => [...pPop.querySelectorAll('[role="option"]')].filter((li) => li.getClientRects().length > 0);
+    const activeValue = () => doc.getElementById(pBtn.getAttribute("aria-activedescendant") || "")?.dataset.value;
+    check("save prompt: the closed face shows the prompt while nothing is chosen", pBtn.querySelector(".listbox-value")?.textContent === "Definition to save" && saveSel.value === "");
+    pBtn.focus(); pBtn.click(); await libFrames(win);
+    const rows = shown();
+    check("save prompt: the open list shows only definitions, the prompt is no row and not active",
+      pPop.matches(":popover-open") && rows.length === 2 && rows.every((li) => li.dataset.value) && activeValue() === "online:0" &&
+      pPop.querySelector('[data-value=""]')?.hidden === true, rows.map((li) => li.dataset.value).join("|"));
+    pKey("ArrowUp"); const upStays = activeValue(); pKey("Home"); const home = activeValue(); pKey("End"); const end = activeValue();
+    check("save prompt: ArrowUp and Home stop at the first definition, End reaches the last", upStays === "online:0" && home === "online:0" && end === "ai:0");
+    pKey("Escape"); await libFrames(win);
+    check("save prompt: Escape closes without choosing and focus stays on the control", !pPop.matches(":popover-open") && doc.activeElement === pBtn && saveSel.value === "" && pBtn.getAttribute("aria-expanded") === "false");
+    pKey("ArrowDown"); pKey("Enter"); await libFrames(win);
+    check("save prompt: the keyboard still picks a definition, and the face follows it", saveSel.value === "online:0" && pBtn.querySelector(".listbox-value")?.textContent === first.textContent);
   } finally { frame.remove(); }
 }
 
