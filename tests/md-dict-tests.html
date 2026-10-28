@@ -464,27 +464,34 @@ section("_pbpDictRenderEntry source line");
 // page); stub it so the render call below does not throw.
 window.t = window.t || ((k, ...args) => k + (args.length ? ":" + args.join(",") : ""));
 const RENDER_ENTRIES = [{ pos: "", ipas: [], forms: [], senses: [{ definition: "d", examples: [] }] }];
+// Metadata once per card (3b.3): the source's title names it; the footer
+// holds only its licence (and any declared attribution), linked to the page.
 const cedictSlot = document.createElement("div");
 _pbpDictRenderEntry(cedictSlot, { entries: RENDER_ENTRIES, sourceLabel: "CC-CEDICT", sourceUrl: "https://cc-cedict.org/wiki/", license: "CC BY-SA 4.0" }, "词", "zh");
-assert(cedictSlot.querySelector(".xp-dict-src a").textContent.includes("CC-CEDICT"), "CC-CEDICT source rendered");
+assert(cedictSlot.querySelector(".xp-dict-local-title").textContent.includes("CC-CEDICT"), "CC-CEDICT source named in its title");
+assertEq(cedictSlot.querySelector(".xp-dict-src").textContent, "CC BY-SA 4.0", "the footer is only the licence, with no source label or name");
+assertEq(cedictSlot.querySelector(".xp-dict-src a").getAttribute("href"), "https://cc-cedict.org/wiki/", "the licence links to the source page");
+assertEq(cedictSlot.querySelector(".xp-dict-src a").getAttribute("aria-label"), "CC-CEDICT · CC BY-SA 4.0", "the link's accessible name still names the source");
+assertEq(cedictSlot.textContent.split("CC-CEDICT").length - 1, 1, "the source name is shown once per card");
 const legacySlot = document.createElement("div");
 // No sourceLabel field at all -- shape of an entry cached before this field existed.
 _pbpDictRenderEntry(legacySlot, { entries: RENDER_ENTRIES, sourceUrl: "https://en.wiktionary.org/wiki/word", license: "CC BY-SA 4.0" }, "word", "en");
-assert(legacySlot.querySelector(".xp-dict-src a").textContent.includes("Wiktionary"), "missing sourceLabel (old cache shape) falls back to Wiktionary");
-// Source label spacing: a full-width colon (zh) already carries its spacing,
-// a half-width one (en/ja) gets one space before the link.
+assert(legacySlot.querySelector(".xp-dict-local-title").textContent.includes("Wiktionary"), "missing sourceLabel (old cache shape) falls back to Wiktionary in the title");
+assertEq(legacySlot.querySelector(".xp-dict-src").textContent, "CC BY-SA 4.0", "old cache shape: footer is the licence alone");
+assertEq(legacySlot.textContent.split("Wiktionary").length - 1, 1, "old cache shape: Wiktionary is named once");
 {
-  const realT = window.t;
-  const srcText = (label) => {
-    window.t = (k, ...args) => k === "dictSource" ? label : realT(k, ...args);
-    try {
-      const slot = document.createElement("div");
-      _pbpDictRenderEntry(slot, { entries: RENDER_ENTRIES, sourceLabel: "Wiktionary", sourceUrl: "https://en.wiktionary.org/wiki/word", license: "CC BY-SA 4.0" }, "word", "en");
-      return slot.querySelector(".xp-dict-src span").textContent;
-    } finally { window.t = realT; }
-  };
-  assert(srcText("来源：") === "来源：", "full-width colon label gets no extra space: " + JSON.stringify(srcText("来源：")));
-  assert(srcText("Source:") === "Source: ", "half-width colon label keeps one space: " + JSON.stringify(srcText("Source:")));
+  const noLicence = document.createElement("div");
+  _pbpDictRenderEntry(noLicence, { entries: RENDER_ENTRIES, sourceLabel: "Wiktionary", sourceUrl: "https://en.wiktionary.org/wiki/word", license: "" }, "word", "en");
+  assertEq(noLicence.querySelector(".xp-dict-src").textContent, "CC BY-SA", "Wiktionary without a stored licence keeps its CC BY-SA notice");
+  const pack = document.createElement("div");
+  _pbpDictRenderEntry(pack, { packId: "p1", entries: RENDER_ENTRIES, sourceLabel: "My pack", sourceUrl: "https://example.org/dict", license: "", attribution: "" }, "word", "en");
+  assertEq(pack.querySelector(".xp-dict-src a")?.textContent, "My pack", "a pack with a source page but no licence keeps a link, named by its source");
+  const bare = document.createElement("div");
+  _pbpDictRenderEntry(bare, { packId: "p2", entries: RENDER_ENTRIES, sourceLabel: "Bare pack", sourceUrl: "", license: "", attribution: "" }, "word", "en");
+  assert(!bare.querySelector(".xp-dict-src"), "a pack with no licence, attribution or page has no empty footer");
+  const ai = document.createElement("div");
+  _pbpDictRenderEntry(ai, { aiGenerated: true, entries: RENDER_ENTRIES, sourceUrl: "", license: "AI-generated · fixture / model" }, "word", "en");
+  assert(!ai.querySelector(".xp-dict-src") && !ai.textContent.includes("dictAiLabel"), "the AI entry has no footer: its block title already names it");
 }
 const matchedSlot = document.createElement("div");
 _pbpDictRenderEntry(matchedSlot, { word: "défense", entries: RENDER_ENTRIES, sourceLabel: "Wiktionary", sourceUrl: "https://en.wiktionary.org/wiki/défense", license: "CC BY-SA 4.0" }, "défense", "fr", "Défense");
@@ -2472,6 +2479,11 @@ async function runDictionaryEntryUiTests() {
     }
     check("the learning blocks have no topic input or scene disclosure (1B.5)",!usage.host.querySelector('[data-learning-block] input, [data-learning-block] label, [data-learning-block] details'));
     check("an unspecified learner profile makes no claim about a native language or level",!usage.host.querySelector('.xp-dict-supplement-profile bdi')&&usage.host.querySelector('.xp-dict-profile-link')?.textContent==='dictSupplementProfileSet'&&usage.host.querySelector('.xp-dict-profile-link')?.getAttribute('href')==='options.html#vocab-learning');
+    // The explanation language is the card metadata line's (3b.3): the usage
+    // block's preference row holds only the learner profile and its link.
+    check("the usage block's preference row does not repeat the explanation language of the card's metadata line",
+      !usage.host.querySelector('.xp-dict-supplement-profile').textContent.includes('dictSupplementLanguage')&&
+      usage.host.querySelector('.xp-dict-supplement-profile').textContent==='dictSupplementProfileSet');
     const configuredProfile=mount({settings:{...settings,dictLearnerNativeLanguage:'English',dictLearnerLevel:'beginner'}});await configuredProfile.ui.ready;
     check("learner summary shows the explicit profile independently of UI and definition languages",configuredProfile.host.querySelector('.xp-dict-supplement-profile')?.textContent.includes('dictSupplementNativeLanguage:English')&&configuredProfile.host.querySelector('.xp-dict-supplement-profile')?.textContent.includes('dictSupplementLevel:dictLearnerLevelBeginner')&&reads.at(-1).target.lang==='es');
     const categoryUi=mount();await categoryUi.ui.ready;
@@ -2800,6 +2812,39 @@ async function runDictionaryEntryUiTests() {
       [...emptySummaryText.children].every(node=>node.classList.contains('xp-dict-learning-item'))&&emptySummaryText.firstChild===emptySummaryText.firstElementChild);
     check("supplements identify each original meaning across interleaved part-of-speech groups without ambiguous ordinals",
       JSON.stringify(meaningLabels(meaningUi.host))===JSON.stringify(expectedMeanings)&&!meaningUi.host.textContent.includes('dictSupplementSense:'));
+    // Metadata once per card (3b.3): an AI result says once that its examples
+    // are AI-written, after its items, not under every item.
+    {
+      const section=meaningUi.host.querySelector('[data-supplement-id="'+learningAddition.id+'"]');
+      const notes=[...section.querySelectorAll('.xp-dict-src')].filter(node=>node.textContent==='dictSupplementOriginal');
+      check("an AI usage result states once, after its items, that its examples are AI-written",
+        notes.length===1&&!notes[0].closest('.xp-dict-learning-item')&&notes[0].parentElement===section&&
+        notes[0].previousElementSibling===section.querySelector('.xp-dict-supplement-text')&&
+        !section.querySelector('.xp-dict-supplement-text').textContent.includes('dictSupplementOriginal'),
+        notes.map(node=>node.parentElement?.className).join());
+      const mixed={...learningAddition,id:'9'.repeat(64),category:'etymology',
+        sources:[{url:'https://de.wiktionary.org/wiki/Gift',title:'Gift',location:'¶ 1'}],
+        learning:{version:2,language:{lang:'es',name:'Spanish'},summary:'',replacesId:'',items:[
+          {sense:1,kind:'history',title:'Gift',explanation:'Del alto alemán antiguo.',example:'',translation:'',sourceIndex:0},
+          {sense:1,kind:'formation',title:'gift + -ig',explanation:'Raíz más sufijo.',example:'',translation:'',sourceIndex:-1},
+          {sense:1,kind:'formation',title:'ver + gift + -en',explanation:'Prefijo, raíz y sufijo.',example:'',translation:'',sourceIndex:-1}]}};
+      window.pbpDictEntryRead=async()=>({...structuredClone(learningBase),supplements:[mixed]});
+      const mixedUi=mount();await mixedUi.ui.ready;
+      const etymologySection=mixedUi.host.querySelector('[data-supplement-id="'+mixed.id+'"]');
+      const aiNotes=[...(etymologySection?.querySelectorAll('.xp-dict-src')||[])].filter(node=>node.textContent==='dictAiLabel');
+      const items=[...(etymologySection?.querySelectorAll('.xp-dict-learning-item')||[])];
+      check("an etymology result says AI generated once; a sourced item keeps its own source line",
+        aiNotes.length===1&&!aiNotes[0].closest('.xp-dict-learning-item')&&items.length===3&&
+        items[0].querySelector('a')?.href===mixed.sources[0].url&&items[0].textContent.includes('dictSupplementSourceVerified')&&
+        items.slice(1).every(item=>!item.querySelector('a')&&![...item.querySelectorAll('.xp-dict-src')].some(node=>/dictAiLabel|dictSupplementSourceVerified/.test(node.textContent))));
+      window.pbpDictEntryRead=async()=>({...structuredClone(learningBase),supplements:[{...mixed,learning:{...mixed.learning,items:mixed.learning.items.slice(0,1)}}]});
+      const sourcedUi=mount();await sourcedUi.ui.ready;
+      check("a result whose every item is sourced makes no AI-generated claim",
+        !!sourcedUi.host.querySelector('[data-supplement-id] .xp-dict-learning-item a')&&
+        ![...sourcedUi.host.querySelectorAll('.xp-dict-src')].some(node=>node.textContent==='dictAiLabel'));
+      mixedUi.ctrl.abort();sourcedUi.ctrl.abort();
+      window.pbpDictEntryRead=async()=>structuredClone(learningBase);
+    }
     const replacementBase={...structuredClone(learningBase),archiveId:'f'.repeat(64),generatedAt:1700000001000,
       previousEntries:[structuredClone(learningBase)]};
     replacementBase.entry.meanings=[...replacementBase.entry.meanings].reverse().map(meaning=>({...meaning,definition:'Updated '+meaning.definition}));

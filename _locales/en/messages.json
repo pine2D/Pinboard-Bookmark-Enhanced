@@ -4656,7 +4656,7 @@
   "dictEtymologyHint": {"message": "Explains word formation, origins and related words on request. Historical claims use retrieved sources only."},
   "dictEtymologyGenerating": {"message": "Generating word origins…"},
   "dictSupplementPartial": {"message": "Retained: $ACCEPTED$. Left out after failing checks: $OMITTED$.", "placeholders": {"accepted": {"content": "$1"}, "omitted": {"content": "$2"}}},
-  "dictSupplementOriginal": {"message": "AI-written example"},
+  "dictSupplementOriginal": {"message": "AI-written examples"},
   "dictSupplementMeaning": {"message": "Here, it means: $MEANING$", "placeholders": {"meaning": {"content": "$1"}}},
   "dictSupplementUpdate": {"message": "Update this supplement"},
   "dictSupplementUpdateHint": {"message": "Generates a new version and uses tokens. Earlier results are kept and sync when Drive is connected."},

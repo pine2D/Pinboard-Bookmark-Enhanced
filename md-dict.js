@@ -928,28 +928,37 @@ function _pbpDictRenderEntry(slot, norm, term, lang, selectedTerm, sentence) {
     const hint = document.createElement("p"); hint.className = "xp-dict-msg";
     hint.textContent = t("multiPackReimportHint"); slot.appendChild(hint);
   }
-  const src = document.createElement("div");
-  src.className = "xp-dict-src";
-  const label = document.createElement("span");
-  // A label that already ends in full-width punctuation (zh "来源：") carries
-  // its own spacing; only a half-width one (en "Source:", ja "出典:") gets a space.
-  const srcLabel = t("dictSource");
-  label.textContent = /[\u3000-\u303f\uff00-\uffef]$/.test(srcLabel) ? srcLabel : srcLabel + " ";
-  const sourceUrl = pbpDictSafeUrl(norm.sourceUrl) || (!norm.packId && !norm.aiGenerated ? pbpDictWiktionaryUrl(term) : "");
-  const a = document.createElement(sourceUrl ? "a" : "span");
-  // Defense-in-depth: sourceUrl is already sanitized at the normalize/merge
-  // layers, but this is the only point it reaches a live href.
-  if (sourceUrl) { a.href = sourceUrl; a.target = "_blank"; a.rel = "noopener noreferrer"; }
-  a.textContent = norm.aiGenerated ? t("dictAiLabel") :
-    [norm.sourceLabel || "Wiktionary", norm.license || (!norm.packId ? "CC BY-SA" : ""), norm.attribution || ""].filter(Boolean).join(" · ");
-  src.appendChild(label);
-  src.appendChild(a);
-  slot.appendChild(src);
+  // Metadata once per card (3b.3): the source is named by its title (above,
+  // or the pack's box title), so the footer holds only its licence and any
+  // declared attribution, linked to the source page; the link's accessible
+  // name still says whose page it opens. The AI entry has no footer -- its
+  // block title says what it is. With no licence or attribution, a source
+  // page is still linked under the source's name; with neither, no footer.
+  if (!norm.aiGenerated) {
+    const sourceName = norm.sourceLabel || (!norm.packId ? "Wiktionary" : "");
+    const sourceUrl = pbpDictSafeUrl(norm.sourceUrl) || (!norm.packId ? pbpDictWiktionaryUrl(term) : "");
+    const notice = [norm.license || (!norm.packId ? "CC BY-SA" : ""), norm.attribution || ""].filter(Boolean).join(" · ");
+    const text = notice || (sourceUrl ? sourceName : "");
+    if (text) {
+      const src = document.createElement("div");
+      src.className = "xp-dict-src";
+      const a = document.createElement(sourceUrl ? "a" : "span");
+      // Defense-in-depth: sourceUrl is already sanitized at the normalize/merge
+      // layers, but this is the only point it reaches a live href.
+      if (sourceUrl) {
+        a.href = sourceUrl; a.target = "_blank"; a.rel = "noopener noreferrer";
+        if (notice && sourceName) a.setAttribute("aria-label", sourceName + " · " + notice);
+      }
+      a.textContent = text;
+      src.appendChild(a);
+      slot.appendChild(src);
+    }
+  }
   _pbpDictSyncSourceDividers(slot);
 }
 
 // "Label: value" fields take their colon from the UI language's dictFieldLabel
-// template (zh "$1：", fr "$1 :"), as dictSource does; a label ending in
+// template (zh "$1：", fr "$1 :"); a label ending in
 // full-width punctuation carries its own spacing, a half-width one gets a space.
 function _pbpDictFieldLabel(key) {
   const text = t("dictFieldLabel", t(key));
@@ -2275,9 +2284,11 @@ function _pbpDictEntryMount(host, opts) {
         section.open = inSlot.has(id);
         const heading = document.createElement("summary");
         const text = document.createElement("div"); text.className = "xp-dict-supplement-text"; text.dir = "auto";
+        const aiNote = document.createElement("p"); aiNote.className = "xp-dict-src"; aiNote.hidden = true;
+        aiNote.lang = document.documentElement.lang || "und";
         const receipt = document.createElement("p"); receipt.className = "xp-dict-src";
-        section.append(heading, text, receipt);
-        item = { section, heading, text, receipt, sources: [], sourceKey: "", retry: null, addition, contentKey: "", update: null };
+        section.append(heading, text, aiNote, receipt);
+        item = { section, heading, text, aiNote, receipt, sources: [], sourceKey: "", retry: null, addition, contentKey: "", update: null };
         supplementNodes.set(id, item);
       }
       item.addition = addition;
@@ -2305,6 +2316,7 @@ function _pbpDictEntryMount(host, opts) {
       const contentKey = JSON.stringify(addition.learning || addition.content);
       if (item.contentKey !== contentKey) {
         text.replaceChildren();
+        let aiWritten = false;
         if (addition.learning?.version === 2) {
           const learning = addition.learning;
           if (learning.summary) { const p = document.createElement("p"); p.textContent = learning.summary; text.appendChild(p); }
@@ -2336,14 +2348,17 @@ function _pbpDictEntryMount(host, opts) {
               const translation = document.createElement("p"); translation.className = "xp-dict-example-translation"; translation.textContent = point.translation;
               unit.append(example, translation);
             }
-            const note = document.createElement("p"); note.className = "xp-dict-src";
+            // A sourced item keeps its own citation; that an item is the
+            // model's own writing is said once for the result (aiNote).
             const source = addition.sources?.[point.sourceIndex];
             if (source) {
+              const note = document.createElement("p"); note.className = "xp-dict-src";
               const link = document.createElement("a"); link.href = source.url; link.target = "_blank"; link.rel = "noopener noreferrer";
               link.textContent = [source.author, source.work || source.title, source.location].filter(Boolean).join(" · ");
               note.append(link, " · " + t("dictSupplementSourceVerified"));
-            } else note.textContent = t(addition.category === "etymology" ? "dictAiLabel" : "dictSupplementOriginal");
-            unit.appendChild(note); text.appendChild(unit);
+              unit.appendChild(note);
+            } else aiWritten = true;
+            text.appendChild(unit);
           }
           if (learning.omittedItems) {
             const partial = document.createElement("p"); partial.className = "xp-dict-msg";
@@ -2357,6 +2372,12 @@ function _pbpDictEntryMount(host, opts) {
           const p = document.createElement("p"); p.textContent = addition.content;
           const legacy = document.createElement("p"); legacy.className = "xp-dict-src"; legacy.textContent = t("dictSupplementLegacy"); text.append(p, legacy);
         }
+        // Metadata once per card (3b.3): one statement per AI result, right
+        // after its items, that its unsourced items -- the usage examples, the
+        // etymology's formation -- are the model's own writing (rules/dict.md
+        // "明确标识的 AI 编写例句"), never a label under each item.
+        item.aiNote.textContent = aiWritten ? t(addition.category === "etymology" ? "dictAiLabel" : "dictSupplementOriginal") : "";
+        item.aiNote.hidden = !aiWritten;
         item.contentKey = contentKey;
       }
       text.lang = addition.learning?.language?.lang || answerLanguage.lang;
@@ -2515,10 +2536,8 @@ function _pbpDictEntryMount(host, opts) {
     edit.href = "options.html#vocab-learning"; edit.target = "_blank"; edit.rel = "noopener noreferrer";
     edit.textContent = t(values.length ? "dictSupplementProfileEdit" : "dictSupplementProfileSet");
     edit.title = t("dictLearnerProfileHint");
+    // The explanation language is said once, in the card's metadata line.
     profile.appendChild(edit);
-    const languageHint = document.createElement("span"); languageHint.className = "xp-dict-src";
-    languageHint.textContent = t("dictSupplementLanguage", languageName(target()));
-    profile.prepend(languageHint);
     usage.appendChild(profile);
     // A slot's results sit above its action row: below the label in the usage
     // slots, before the hint that introduces the etymology button.

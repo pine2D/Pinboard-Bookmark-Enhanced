@@ -83,7 +83,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/reader-dict-panel-tests.html": 15,
   "tests/md-ai-setup-tests.html": 18,
   "tests/md-convert-tests.html": 827,
-  "tests/md-dict-tests.html": 886,
+  "tests/md-dict-tests.html": 898,
   "tests/md-embed-tests.html": 54,
   "tests/md-explain-layout-tests.html": 17,
   "tests/md-highlight-commit-tests.html": 259,

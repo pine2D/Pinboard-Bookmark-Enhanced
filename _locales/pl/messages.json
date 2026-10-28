@@ -4649,7 +4649,7 @@
   "dictEtymologyHint": {"message": "Na żądanie wyjaśnia budowę, pochodzenie i powiązane słowa. Informacje historyczne opierają się wyłącznie na pobranych źródłach."},
   "dictEtymologyGenerating": {"message": "Generowanie pochodzenia słowa…"},
   "dictSupplementPartial": {"message": "Zachowane punkty: $ACCEPTED$. Pominięte po weryfikacji: $OMITTED$.", "placeholders": {"accepted": {"content": "$1"}, "omitted": {"content": "$2"}}},
-  "dictSupplementOriginal": {"message": "Przykład napisany przez AI"},
+  "dictSupplementOriginal": {"message": "Przykłady napisane przez AI"},
   "dictSupplementMeaning": {"message": "W tym użyciu: $MEANING$", "placeholders": {"meaning": {"content": "$1"}}},
   "dictSupplementUpdate": {"message": "Zaktualizuj uzupełnienie"},
   "dictSupplementUpdateHint": {"message": "Generuje nową wersję i zużywa tokeny. Poprzednie wyniki zostają zachowane i są synchronizowane po połączeniu z Drive."},

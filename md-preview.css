@@ -2479,7 +2479,6 @@ html.motion-ready #explain-pop[data-transferring] { transition: none; }
   max-inline-size: 100%; line-height: 18px; white-space: normal; overflow-wrap: anywhere;
 }
 .xp-dict-supplement-profile { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--sp-1) var(--sp-2); }
-.xp-dict-supplement-profile > .xp-dict-src { margin: 0; }
 .xp-dict-supplement-profile .xp-dict-profile-link { color: var(--link); }
 /* Learning blocks (dict redesign 1B.8): "usage points" and "etymology", each
    a small title, its results, then one action row per paid category. No fill,

@@ -4649,7 +4649,7 @@
   "dictEtymologyHint": {"message": "Explique sur demande la formation, l’origine et les mots associés. Les explications historiques reposent uniquement sur les sources consultées."},
   "dictEtymologyGenerating": {"message": "Génération de l’étymologie…"},
   "dictSupplementPartial": {"message": "Points conservés : $ACCEPTED$. Écartés après vérification : $OMITTED$.", "placeholders": {"accepted": {"content": "$1"}, "omitted": {"content": "$2"}}},
-  "dictSupplementOriginal": {"message": "Exemple rédigé par l’IA"},
+  "dictSupplementOriginal": {"message": "Exemples rédigés par l’IA"},
   "dictSupplementMeaning": {"message": "Ici, le sens est : $MEANING$", "placeholders": {"meaning": {"content": "$1"}}},
   "dictSupplementUpdate": {"message": "Actualiser ce complément"},
   "dictSupplementUpdateHint": {"message": "Génère une nouvelle version et consomme des jetons. Les résultats précédents sont conservés et synchronisés lorsque Drive est connecté."},

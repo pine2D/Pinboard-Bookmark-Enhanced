@@ -4649,7 +4649,7 @@
   "dictEtymologyHint": {"message": "По запросу объясняет словообразование, происхождение и связанные слова. Исторические сведения опираются только на найденные источники."},
   "dictEtymologyGenerating": {"message": "Создаётся объяснение происхождения…"},
   "dictSupplementPartial": {"message": "Сохранённые пункты: $ACCEPTED$. Не прошли проверку и опущены: $OMITTED$.", "placeholders": {"accepted": {"content": "$1"}, "omitted": {"content": "$2"}}},
-  "dictSupplementOriginal": {"message": "Пример составлен ИИ"},
+  "dictSupplementOriginal": {"message": "Примеры составлены ИИ"},
   "dictSupplementMeaning": {"message": "Значение здесь: $MEANING$", "placeholders": {"meaning": {"content": "$1"}}},
   "dictSupplementUpdate": {"message": "Обновить дополнение"},
   "dictSupplementUpdateHint": {"message": "Создаёт новую версию с расходом токенов. Прежние результаты сохраняются и синхронизируются при подключении Drive."},

@@ -2377,7 +2377,6 @@ html.motion-ready .vocab-note-save {
 #vocab-ref-result .xp-dict-examples .xp-dict-learning-item > p { margin: var(--lib-sp-1) 0 0; }
 #vocab-ref-result .xp-dict-examples .xp-dict-learning-item > .xp-dict-example { margin-top: 0; }
 #vocab-ref-result .xp-dict-supplement-profile { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--lib-sp-1) var(--lib-sp-2); }
-#vocab-ref-result .xp-dict-supplement-profile > .xp-dict-src { margin: 0; }
 #vocab-ref-result .xp-dict-supplement-profile .xp-dict-profile-link { color: var(--lib-link); }
 #vocab-ref-result .xp-dict-usage-actions,
 #vocab-ref-result .xp-dict-usage-feedback { display: flex; align-items: center; flex-wrap: wrap; gap: var(--lib-sp-2); min-width: 0; }

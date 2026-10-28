@@ -4649,7 +4649,7 @@
   "dictEtymologyHint": {"message": "Erklärt auf Anfrage Wortbildung, Herkunft und verwandte Wörter. Historische Aussagen stützen sich nur auf abgerufene Quellen."},
   "dictEtymologyGenerating": {"message": "Wortherkunft wird erstellt…"},
   "dictSupplementPartial": {"message": "Beibehalten: $ACCEPTED$. Wegen nicht bestandener Prüfung ausgelassen: $OMITTED$.", "placeholders": {"accepted": {"content": "$1"}, "omitted": {"content": "$2"}}},
-  "dictSupplementOriginal": {"message": "KI-verfasstes Beispiel"},
+  "dictSupplementOriginal": {"message": "KI-verfasste Beispiele"},
   "dictSupplementMeaning": {"message": "Hier gemeint: $MEANING$", "placeholders": {"meaning": {"content": "$1"}}},
   "dictSupplementUpdate": {"message": "Ergänzung aktualisieren"},
   "dictSupplementUpdateHint": {"message": "Erzeugt eine neue Version und verbraucht Tokens. Frühere Ergebnisse bleiben erhalten und werden bei verbundener Drive-Synchronisierung mitgespeichert."},
