@@ -2818,7 +2818,7 @@ async function runDictionaryEntryUiTests() {
       const section=meaningUi.host.querySelector('[data-supplement-id="'+learningAddition.id+'"]');
       const notes=[...section.querySelectorAll('.xp-dict-src')].filter(node=>node.textContent==='dictSupplementOriginal');
       check("an AI usage result states once, after its items, that its examples are AI-written",
-        notes.length===1&&!notes[0].closest('.xp-dict-learning-item')&&notes[0].parentElement===section&&
+        notes.length===1&&!notes[0].hidden&&!notes[0].closest('.xp-dict-learning-item')&&notes[0].parentElement===section&&
         notes[0].previousElementSibling===section.querySelector('.xp-dict-supplement-text')&&
         !section.querySelector('.xp-dict-supplement-text').textContent.includes('dictSupplementOriginal'),
         notes.map(node=>node.parentElement?.className).join());
@@ -2834,14 +2834,18 @@ async function runDictionaryEntryUiTests() {
       const aiNotes=[...(etymologySection?.querySelectorAll('.xp-dict-src')||[])].filter(node=>node.textContent==='dictAiLabel');
       const items=[...(etymologySection?.querySelectorAll('.xp-dict-learning-item')||[])];
       check("an etymology result says AI generated once; a sourced item keeps its own source line",
-        aiNotes.length===1&&!aiNotes[0].closest('.xp-dict-learning-item')&&items.length===3&&
+        aiNotes.length===1&&!aiNotes[0].hidden&&!aiNotes[0].closest('.xp-dict-learning-item')&&items.length===3&&
         items[0].querySelector('a')?.href===mixed.sources[0].url&&items[0].textContent.includes('dictSupplementSourceVerified')&&
         items.slice(1).every(item=>!item.querySelector('a')&&![...item.querySelectorAll('.xp-dict-src')].some(node=>/dictAiLabel|dictSupplementSourceVerified/.test(node.textContent))));
       window.pbpDictEntryRead=async()=>({...structuredClone(learningBase),supplements:[{...mixed,learning:{...mixed.learning,items:mixed.learning.items.slice(0,1)}}]});
       const sourcedUi=mount();await sourcedUi.ui.ready;
+      // The result-level note slot sits right after the items: it must be
+      // hidden and empty, not merely free of the label text.
+      const sourcedNote=sourcedUi.host.querySelector('[data-supplement-id] > .xp-dict-supplement-text')?.nextElementSibling;
       check("a result whose every item is sourced makes no AI-generated claim",
         !!sourcedUi.host.querySelector('[data-supplement-id] .xp-dict-learning-item a')&&
-        ![...sourcedUi.host.querySelectorAll('.xp-dict-src')].some(node=>node.textContent==='dictAiLabel'));
+        ![...sourcedUi.host.querySelectorAll('.xp-dict-src')].some(node=>node.textContent==='dictAiLabel')&&
+        !!sourcedNote&&sourcedNote.classList.contains('xp-dict-src')&&sourcedNote.hidden&&sourcedNote.textContent==='');
       mixedUi.ctrl.abort();sourcedUi.ctrl.abort();
       window.pbpDictEntryRead=async()=>structuredClone(learningBase);
     }
