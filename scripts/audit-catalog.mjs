@@ -48,8 +48,8 @@ export const TEST_SCENARIOS = testFiles.filter(name => name !== 'pinboard-theme-
   const file = 'tests/' + name;
   return {
     id: 'test.' + base, runner: name.endsWith('.html') ? 'html' : 'node', file,
-    surfaces, features: features(base), kinds: ['popup-label-fit', 'confirm-layout'].includes(base) ? ['layout', 'i18n'] : [name.endsWith('.html') || ['ask-history', 'library-ask-history'].includes(base) ? 'logic' : 'contract'],
-    browser: ['popup-label-fit', 'confirm-layout', 'ask-history', 'library-ask-history'].includes(base),
+    surfaces, features: features(base), kinds: ['popup-label-fit', 'confirm-layout'].includes(base) ? ['layout', 'i18n'] : [name.endsWith('.html') || ['ask-history', 'library-ask-history', 'bookmark-service-runtime'].includes(base) ? 'logic' : 'contract'],
+    browser: ['popup-label-fit', 'confirm-layout', 'ask-history', 'library-ask-history', 'bookmark-service-runtime'].includes(base),
     files: [file, base + '.js', ...surfaces.flatMap(s => sourcePatterns[s] || []), ...(/^dict-(?:entry|usage|evidence|archive)$/.test(base) ? ['dict-entry.js', 'dict-evidence.js', 'dict-archive.js'] : []), ...(base === 'confirm-layout' ? ['shared.js'] : []), ...(base.startsWith('theme-') ? ['docs/theme-surface/**'] : [])],
     dependencies: [], axes: {},
   };
