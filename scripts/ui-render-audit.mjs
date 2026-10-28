@@ -9253,6 +9253,30 @@ async function probeDictStickyBars(cfg) {
   }
   return out;
 }
+// dictSaveMenuBox / dictSaveMenuChoices: the open save choice list. Reader:
+// its border box and the content box of the lookup card it belongs to (the
+// .reader-dict-session in the bubble or the docked panel). Library: the rows
+// the open listbox actually shows.
+function probeDictSaveMenu(cfg) {
+  const shows = (el) => !!el && el.getClientRects().length > 0 && el.checkVisibility({ checkVisibilityCSS: true });
+  const reader = document.querySelector(cfg.reader);
+  if (reader) {
+    const box = reader.getBoundingClientRect();
+    const frameEl = reader.parentElement?.closest(cfg.frame);
+    let frame = null;
+    if (frameEl) {
+      const f = frameEl.getBoundingClientRect(), cs = getComputedStyle(frameEl);
+      const inset = (side) => (parseFloat(cs[`border${side}Width`]) || 0) + (parseFloat(cs[`padding${side}`]) || 0);
+      frame = { left: f.left + inset("Left"), right: f.right - inset("Right") };
+    }
+    return { open: shows(reader), box: { left: box.left, right: box.right }, frame, rows: [] };
+  }
+  const list = document.querySelector(cfg.library);
+  if (!list || !shows(list)) return { open: false, rows: [] };
+  const rows = [...list.querySelectorAll('[role="option"]')].filter(shows)
+    .map((li) => ({ value: li.dataset.value || "", text: (li.textContent || "").trim().slice(0, 60) }));
+  return { open: true, rows };
+}
 async function measureDictLookupGeometry(page, surface, context, theme) {
   const spec = DICT_LOOKUP_GEOMETRY.surfaces[surface];
   if (!spec?.contexts[context]) return;
@@ -9264,6 +9288,9 @@ async function measureDictLookupGeometry(page, surface, context, theme) {
   probe.viewports = [];
   probe.paid = [];
   probe.sticky = [];
+  // At the scenario's own width, before any resize (the library's float list
+  // closes on resize).
+  if (spec.contexts[context].requires.includes("menu")) probe.menu = await page.evaluate(probeDictSaveMenu, DICT_LOOKUP_GEOMETRY.menu);
   const restore = page.viewportSize();
   // The library's sticky bars at the widths the scenario's viewport axis
   // selects (DICT_STICKY_VIEWPORTS); the overflow and paid checks at the

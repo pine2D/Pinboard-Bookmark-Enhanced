@@ -4629,7 +4629,7 @@
   "driveAskErrorEntryTooLarge": {"message": "有一則回答超出同步大小限制，仍儲存在此裝置。"},
   "askHistoryUnavailable": {"message": "此對話已刪除或在此裝置上無法使用。可以開始新對話繼續提問。"},
   "askHistoryKeysMove": {"message": "上一個或下一個對話"},
-  "dictMeaningDefaultHelp": {"message": "已選好目前顯示來源的第一項解釋，可直接儲存。手動更換後，這次查詞會保留你的選擇。"},
+  "dictMeaningDefaultHelp": {"message": "已預先選好一項解釋，可直接儲存。手動更換後，這次查詞會保留你的選擇。"},
   "dictMeaningManualHelp": {"message": "將儲存你選取的解釋。這次查詞會保留這個選擇。"},
   "dictMeaningSavedHelp": {"message": "已儲存的解釋不會自動更改。選取一項解釋後，即可更新這個生詞。"},
   "dictMeaningChooseHelp": {"message": "請選取要儲存的解釋；這次查詞會保留你的選擇。"},

@@ -605,8 +605,12 @@ export async function openDictEntryState(page, state) {
       await bar.waitFor();
       const face = await bar.evaluate(node => ({
         text: node.querySelector('.xp-dict-save-preview')?.textContent || '',
+        empty: node.querySelector('.xp-dict-save-preview')?.hasAttribute('data-empty'),
+        title: (document.querySelector('#explain-pop .xp-term')?.textContent || '').trim(),
         change: !node.querySelector('.xp-dict-save-change')?.hidden }));
-      if (!face.text.includes(' · ')) throw new Error('SETUP: the save bar preview does not name a definition: ' + face.text);
+      if (!face.text || face.empty) throw new Error('SETUP: the save bar preview does not name a definition: ' + face.text);
+      // The title already names the word; the preview repeats it only for a different word.
+      if (face.title && face.text.startsWith(face.title + ' · ')) throw new Error('SETUP: the save bar preview repeats the title word: ' + face.text);
       if (!face.change) throw new Error('SETUP: the save bar offers no Change for a lookup with several definitions');
       return bar.isVisible();
     }
@@ -620,6 +624,19 @@ export async function openDictEntryState(page, state) {
     // scan.
     const reader = await page.locator('#explain-pop').count() > 0;
     if (reader) {
+      // Move the bubble to the middle of the viewport, as a reader who dragged
+      // it there would (the same placement the drag and Alt+arrow use), so the
+      // list cannot pass dictSaveMenuBox just by being clamped to the viewport
+      // edge the bubble happens to sit on. closeDictSaveMenu puts it back.
+      const moved = await page.evaluate(() => {
+        const pop = document.getElementById('explain-pop');
+        if (!pop || typeof _pbpExplainPlace !== 'function') return false;
+        const r = pop.getBoundingClientRect();
+        window._auditDictSaveMenuOrigin = { left: r.left, top: r.top };
+        const at = _pbpExplainPlace(pop, (document.documentElement.clientWidth - r.width) / 2, r.top);
+        return at.left >= 32;
+      });
+      if (!moved) throw new Error('SETUP: the dictionary bubble could not be moved away from the viewport edge');
       await page.locator('#explain-pop .xp-dict-save-change').click();
       const menu = page.locator('.xp-dict-save-menu:popover-open');
       await menu.waitFor();
@@ -628,7 +645,7 @@ export async function openDictEntryState(page, state) {
       return menu.isVisible();
     }
     await page.locator('#vocab-ref-result .vocab-save-controls .listbox-btn').click();
-    const option = page.locator('[id^="vocab-save-definition-opt-"]').first();
+    const option = page.locator('[id^="vocab-save-definition-opt-"]:not([hidden])').first();
     await option.waitFor();
     return option.isVisible();
   }
@@ -642,4 +659,9 @@ export async function closeDictSaveMenu(page) {
   const back = await page.evaluate(() => !document.querySelector('.xp-dict-save-menu:popover-open') &&
     !!document.activeElement?.matches('.xp-dict-save-change, .vocab-save-controls .listbox-btn'));
   if (!back) throw new Error('SETUP: Escape did not close the save choice list and return focus to its control');
+  await page.evaluate(() => {
+    const origin = window._auditDictSaveMenuOrigin, pop = document.getElementById('explain-pop');
+    if (origin && pop && typeof _pbpExplainPlace === 'function') _pbpExplainPlace(pop, origin.left, origin.top);
+    delete window._auditDictSaveMenuOrigin;
+  });
 }

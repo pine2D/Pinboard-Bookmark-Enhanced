@@ -777,6 +777,18 @@ export function evaluateMediaProbe(probe, check) {
 // than the label does; it never stands in a column beside a wrapped label
 // (the review's 18-paid-negative-b at 360px: "Not found last time · Try /
 // again" with "· gpt-5.4- / nano" centred beside it).
+//
+// dictSaveMenuBox (requires "menu", reader): the save bar's open choice list
+// spans the lookup card's content box -- the bubble's inner edges, or the
+// docked panel's text column -- its left and right edges on the card's
+// (±edgeTolerancePx), so no part of it hangs past the card. The batch-3
+// review's 18-save-change-menu-viewport: right-aligned to "Change" at the
+// viewport's 480px cap, the list ran ~120px past the bubble's left edge.
+//
+// dictSaveMenuChoices (requires "menu", library): every row the open save
+// list shows names a definition; the closed face's "Definition to save"
+// prompt is never one of them (dict.md: no "none" option; the review's
+// 17-save-change-menu-a).
 export const DICT_LOOKUP_GEOMETRY = {
   edgeTolerancePx: 1,
   maxLeftEdges: 2,
@@ -800,6 +812,9 @@ export const DICT_LOOKUP_GEOMETRY = {
   notes: { row: ".xp-dict-usage-actions, .xp-dict-ai-controls", note: ".xp-dict-usage-feedback, .xp-dict-action-error" },
   // dictUsageSlots: the usage block, its categories in their fixed order,
   // and how a node names the category it belongs to.
+  // dictSaveMenuBox / dictSaveMenuChoices: the open save choice list, and
+  // (reader) the lookup card whose content box it must span.
+  menu: { reader: ".xp-dict-save-menu:popover-open", frame: ".reader-dict-session", library: '[id="vocab-save-definition-list"]' },
   slots: { block: '[data-learning-block="usage"]', categories: ["patterns", "confusables"], label: ".xp-dict-learning-label",
     action: ".xp-dict-supplement-generate", row: ".xp-dict-usage-actions", result: "[data-supplement-category]",
     slot: ".xp-dict-learning-slot", profile: ".xp-dict-supplement-profile" },
@@ -841,7 +856,7 @@ export const DICT_LOOKUP_GEOMETRY = {
         // The save bar (dict redesign 3.2) under the dictionary result, then
         // its click-opened choice list, which must stay inside the viewport.
         "dict-save-bar": { requires: ["edges", "senseIndent", "overflow", "clip"] },
-        "dict-save-change-menu": { requires: ["overflow"] },
+        "dict-save-change-menu": { requires: ["overflow", "menu"] },
         // A saved AI entry with its three paid learning actions in the
         // remembered "Not found last time · Try again" state (plan 3.3), run in
         // each listed UI locale; controlRung holds each action to one line,
@@ -871,7 +886,7 @@ export const DICT_LOOKUP_GEOMETRY = {
         "dict-entry-revealed": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip"] },
         "dict-entry-legacy": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "slots"] },
         "dict-save-bar": { requires: ["edges", "senseIndent", "overflow", "clip", "sticky"] },
-        "dict-save-change-menu": { requires: ["overflow"] },
+        "dict-save-change-menu": { requires: ["overflow", "menu"] },
         "dict-entry-paid-negative": { requires: ["edges", "senseIndent", "original", "translation", "overflow", "clip", "notes", "slots", "sticky", "paid"] },
       },
     },
@@ -894,7 +909,9 @@ export function dictLookupRoots(surface, context) {
 //           viewports: [{ width, rootVisible, offenders: [{ path, left, right }] }],
 //           paid: [{ width, buttons: [{ path, lines, flow, detail }] }],
 //           sticky: [{ width, foot: { stuck, bottom, scrollerBottom, strip: [path] } | null,
-//                      back: { measured, top, scrollerTop, strip: [path] } | null }] }
+//                      back: { measured, top, scrollerTop, strip: [path] } | null }],
+//           menu: { open, box: { left, right }, frame: { left, right } | null,
+//                   rows: [{ value, text }] } | null }
 // (opts.stickyViewports: the widths the scenario's viewport axis selected.)
 // where `left` is the inline start of the block's first line of text, in px
 // from the lookup column's content edge. Returns one row per check:
@@ -977,6 +994,27 @@ export function evaluateDictLookupGeometry(probe, opts) {
     row("dictUsageSlots", !faults.length, faults.length ? faults.slice(0, 3).join("; ") : slots.map((b) => b.category).join(" < "),
       `each category under its own label, ${spec.slots.categories.join(" before ")} (±${tol}px)`);
   } else if (requires.has("slots")) setup("dictUsageSlots", "the usage block's categories");
+
+  // The open save choice list: inside the card (reader), definitions only (library).
+  if (requires.has("menu")) {
+    const menu = probe?.menu;
+    const check = surface === "library" ? "dictSaveMenuChoices" : "dictSaveMenuBox";
+    if (!menu || !menu.open) setup(check, "the save bar's open choice list");
+    else if (surface === "library") {
+      const rows = menu.rows || [];
+      const prompts = rows.filter((r) => !r.value);
+      if (!rows.length) setup(check, "rows in the save bar's open choice list");
+      else row(check, !prompts.length, prompts.length ? `${prompts.length} row(s) without a definition, e.g. "${prompts[0].text}"` : `${rows.length} definition row(s)`,
+        "every listed row names a definition; the face's prompt is not a choice");
+    } else if (!menu.frame) setup(check, "the lookup card around the open choice list");
+    else {
+      const { box, frame } = menu;
+      const dl = box.left - frame.left, dr = box.right - frame.right;
+      row(check, Math.abs(dl) <= tol && Math.abs(dr) <= tol,
+        `list [${round(box.left)}, ${round(box.right)}], card content box [${round(frame.left)}, ${round(frame.right)}]`,
+        `list left and right on the card's content edges (±${tol}px)`);
+    }
+  }
 
   // Nothing inside the lookup sticks out of a scroller or a clipping box.
   const clip = probe?.clip;

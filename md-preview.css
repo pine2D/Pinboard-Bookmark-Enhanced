@@ -2573,8 +2573,9 @@ button.xp-dict-connect > .xp-dict-model:empty { display: none; }
 .xp-dict-lang::picker(select) { max-inline-size: min(100%, calc(100vw - 32px)); white-space: normal; }
 .xp-dict-lang option { white-space: normal; overflow-wrap: anywhere; }
 /* The save bar's choice list: a click-opened popover (no hover overlay in the
-   reader), placed above "Change" by md-dict.js. Long glossaries stay bounded
-   and every row names its source. */
+   reader), placed above "Change" by md-dict.js, which also gives it the
+   card's content-box width and left edge (the width here only holds until
+   then). Long glossaries stay bounded and every row names its source. */
 .xp-dict-save-menu {
   position: fixed; inset: auto; margin: 0; box-sizing: border-box;
   width: min(480px, calc(100vw - 32px)); max-height: min(320px, calc(100vh - 32px));

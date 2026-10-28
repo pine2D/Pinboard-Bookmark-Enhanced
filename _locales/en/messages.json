@@ -4636,7 +4636,7 @@
   "driveAskErrorEntryTooLarge": {"message": "An answer exceeds the sync size limit. It remains saved on this device."},
   "askHistoryUnavailable": {"message": "This conversation was deleted or is not available on this device. Start a new conversation to continue."},
   "askHistoryKeysMove": {"message": "Previous or next conversation"},
-  "dictMeaningDefaultHelp": {"message": "The first definition from the displayed source is selected and ready to save. If you choose another, your choice stays selected during this lookup."},
+  "dictMeaningDefaultHelp": {"message": "A definition is already selected and ready to save. If you choose another, your choice stays selected during this lookup."},
   "dictMeaningManualHelp": {"message": "The definition you selected will be saved. Your choice stays selected during this lookup."},
   "dictMeaningSavedHelp": {"message": "The saved definition will not change automatically. Choose a definition to update this saved word."},
   "dictMeaningChooseHelp": {"message": "Choose a definition to save. Your choice stays selected during this lookup."},

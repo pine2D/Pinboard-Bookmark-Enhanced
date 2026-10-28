@@ -325,3 +325,24 @@ test('the library states with the save bar and paid buttons run at a phone and a
   }
   assert.deepEqual(DICT_LOOKUP_GEOMETRY.sticky.viewports, [360, 1280]);
 });
+
+test('save choice list: inside the reader card, definitions only in the library', () => {
+  const withMenu = (menu) => ({ ...probe([]), menu });
+  const frame = { left: 427, right: 905 };
+  assert.equal(verdicts(withMenu({ open: true, box: { left: 427, right: 905 }, frame, rows: [] }), 'dict-save-change-menu').dictSaveMenuBox, 'OK');
+  // 18-save-change-menu-viewport: right-aligned to "Change" at a 480px cap,
+  // the list hung ~120px past the card's left edge.
+  assert.equal(verdicts(withMenu({ open: true, box: { left: 309, right: 789 }, frame, rows: [] }), 'dict-save-change-menu').dictSaveMenuBox, 'FAIL');
+  // Inside but narrower than the card is not aligned either.
+  assert.equal(verdicts(withMenu({ open: true, box: { left: 440, right: 905 }, frame, rows: [] }), 'dict-save-change-menu').dictSaveMenuBox, 'FAIL');
+  assert.equal(verdicts(withMenu(null), 'dict-save-change-menu').dictSaveMenuBox, 'SETUP');
+  assert.equal(verdicts(withMenu({ open: true, box: { left: 427, right: 905 }, frame: null, rows: [] }), 'dict-save-change-menu').dictSaveMenuBox, 'SETUP');
+  const lib = (rows) => verdicts(withMenu({ open: true, rows }), 'dict-save-change-menu', 'library').dictSaveMenuChoices;
+  assert.equal(lib([{ value: 'online:0', text: 'a' }, { value: 'ai:0', text: 'b' }]), 'OK');
+  // 17-save-change-menu-a: the "Definition to save" prompt listed as a row.
+  assert.equal(lib([{ value: '', text: 'Definition to save' }, { value: 'online:0', text: 'a' }]), 'FAIL');
+  assert.equal(lib([]), 'SETUP');
+  assert.equal(verdicts(withMenu({ open: false, rows: [] }), 'dict-save-change-menu', 'library').dictSaveMenuChoices, 'SETUP');
+  // Other contexts do not require it.
+  assert.equal(verdicts(withMenu(null), 'dict-save-bar').dictSaveMenuBox, undefined);
+});

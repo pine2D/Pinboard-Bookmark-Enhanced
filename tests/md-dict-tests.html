@@ -3322,10 +3322,10 @@ async function runDictionaryStructureUiTests() {
     const help = () => menu.querySelector(".xp-dict-choice-help"), list = () => menu.querySelector('[role="listbox"]');
     check("structure: a later reliable source supplies a real default without selecting unknown full text", !cur.fullEntryOnly && cur.gloss === "與策略規劃有關的" && !pop.querySelector(".xp-vocab").disabled);
     check("meaning help: explanation is descriptive content outside the options", menu.querySelectorAll('[role="option"]').length === 2 && help().textContent === "dictMeaningDefaultHelp" && !list().contains(help()) && list().getAttribute("aria-describedby") === help().id);
-    check("save bar: the preview names the definition Save writes", !bar.hidden && bar.querySelector(".xp-dict-save-preview").textContent === "strategic · 與策略規劃有關的" && !bar.querySelector(".xp-dict-save-change").hidden);
+    check("save bar: the preview names the definition Save writes", !bar.hidden && bar.querySelector(".xp-dict-save-preview").textContent === "與策略規劃有關的" && !bar.querySelector(".xp-dict-save-change").hidden);
     pickMeaning(pop, 1);
     await new Promise(resolve => setTimeout(resolve, 0));
-    check("meaning help: explicit selection remains intact and changes the explanation", cur.gloss === "有策略的" && menu.querySelector('[data-index="1"]').getAttribute("aria-selected") === "true" && help().textContent === "dictMeaningManualHelp" && bar.querySelector(".xp-dict-save-preview").textContent === "strategic · 有策略的");
+    check("meaning help: explicit selection remains intact and changes the explanation", cur.gloss === "有策略的" && menu.querySelector('[data-index="1"]').getAttribute("aria-selected") === "true" && help().textContent === "dictMeaningManualHelp" && bar.querySelector(".xp-dict-save-preview").textContent === "有策略的");
     _pbpDictReaderPackChoices(known, slot, cur, pop, controller.signal);
     await new Promise(resolve => setTimeout(resolve, 0));
     check("meaning help: a later result for the same source keeps the explicit selection", cur.gloss === "有策略的" && cur.packChoice?.gloss === "有策略的");
@@ -3385,7 +3385,7 @@ async function runDictSaveBarTests() {
     pbpDictSpeak=text=>{spoken=text;};
 
     await run("lone",{word:"lone",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/lone",license:"CC BY-SA 4.0",entries:[{pos:"adjective",ipas:[],forms:[],senses:[sense("the only definition")]}]});
-    check("save bar: one savable definition still shows its text preview, with no Change to offer",!!bar()&&!bar().hidden&&preview().textContent==="lone · the only definition"&&change().hidden&&pop.querySelector(".xp-foot").firstElementChild===bar());
+    check("save bar: one savable definition still shows its text preview, with no Change to offer",!!bar()&&!bar().hidden&&preview().textContent==="the only definition"&&change().hidden&&pop.querySelector(".xp-foot").firstElementChild===bar());
 
     // A full entry and an etymology lead the online result; neither is a definition.
     const rich={word:"gift",sourceLabel:"Wiktionary",sourceUrl:"https://en.wiktionary.org/wiki/gift",license:"CC BY-SA 4.0",entries:[
@@ -3401,6 +3401,7 @@ async function runDictSaveBarTests() {
     const options=()=>[...menu().querySelectorAll('[role="option"]')];
     check("Change opens a click-triggered list on the selected definition",open()&&change().getAttribute("aria-expanded")==="true"&&document.activeElement===options()[0]&&options()[0].getAttribute("aria-selected")==="true"&&options().length===2);
     const key=k=>document.activeElement.dispatchEvent(new KeyboardEvent("keydown",{key:k,bubbles:true,cancelable:true}));
+    check("the preview and each listed definition repeat the word only when it differs from the title word",preview().textContent==="gift · a present"&&options().every(o=>o.querySelector(".xp-dict-choice-text").textContent.startsWith("gift · ")&&o.querySelector(".xp-dict-choice-source").textContent==="Wiktionary"));
     key("ArrowDown");
     check("arrow keys move through the listed definitions",document.activeElement===options()[1]);
     key("Enter");await settle();
@@ -3416,6 +3417,19 @@ async function runDictSaveBarTests() {
     mounted.onEntry(ai,null,document.createElement("div"));mounted.onView(true);await settle();
     check("an async AI result and its expanded block keep the manual choice",_pbpDictCurrent.gloss==="a talent"&&_pbpDictCurrent.packChoice?.gloss==="a talent"&&options().length===3);
 
+    // The list spans the card's content box: its left and right edges on the
+    // card's, never past them (the batch-3 review's 18-save-change-menu).
+    {
+      pop.style.cssText="position:fixed;left:200px;top:420px;width:480px;border:1px solid;padding:0 6px;box-sizing:border-box";
+      await run("gift",rich);
+      change().click();
+      const box=pop.getBoundingClientRect(),cs=getComputedStyle(pop);
+      const inner=box.left+parseFloat(cs.borderLeftWidth)+parseFloat(cs.paddingLeft),innerRight=box.right-parseFloat(cs.borderRightWidth)-parseFloat(cs.paddingRight);
+      check("the choice list is placed across the card's content box, not hung off Change",open()&&parseFloat(menu().style.left)===inner&&Math.abs(parseFloat(menu().style.left)+parseFloat(menu().style.width)-innerRight)<0.5,`left ${menu().style.left} width ${menu().style.width} content [${inner}, ${innerRight}]`);
+      const texts=[...menu().querySelectorAll(".xp-dict-choice-text")].map(n=>n.textContent);
+      check("with the title word saved, the preview and the list show the meaning and its source only",preview().textContent==="a present"&&texts.join("|")==="a present|a talent"&&[...menu().querySelectorAll(".xp-dict-choice-source")].every(n=>n.textContent==="Wiktionary"));
+      key("Escape");pop.style.cssText="";
+    }
     await run("gifts",rich);
     mounted.onEntry(ai,null,document.createElement("div"));await settle();
     check("Q14=A: a folded AI block leaves the default on the dictionary",_pbpDictCurrent.gloss==="a present");

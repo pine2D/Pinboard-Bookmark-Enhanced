@@ -4629,7 +4629,7 @@
   "driveAskErrorEntryTooLarge": {"message": "Jedna z odpowiedzi przekracza limit rozmiaru synchronizacji. Pozostaje zapisana na tym urządzeniu."},
   "askHistoryUnavailable": {"message": "Ta rozmowa została usunięta lub nie jest dostępna na tym urządzeniu. Rozpocznij nową rozmowę, aby kontynuować."},
   "askHistoryKeysMove": {"message": "Poprzednia lub następna rozmowa"},
-  "dictMeaningDefaultHelp": {"message": "Pierwsza definicja z wyświetlanego źródła jest wybrana i gotowa do zapisania. Jeśli wybierzesz inną, wybór pozostanie zachowany podczas tego wyszukiwania."},
+  "dictMeaningDefaultHelp": {"message": "Jedna z definicji jest już wybrana i gotowa do zapisania. Jeśli wybierzesz inną, wybór pozostanie zachowany podczas tego wyszukiwania."},
   "dictMeaningManualHelp": {"message": "Zapisana zostanie wybrana definicja. Wybór pozostanie zachowany podczas tego wyszukiwania."},
   "dictMeaningSavedHelp": {"message": "Zapisana definicja nie zmieni się automatycznie. Wybierz definicję, aby zaktualizować zapisane słowo."},
   "dictMeaningChooseHelp": {"message": "Wybierz definicję do zapisania. Wybór pozostanie zachowany podczas tego wyszukiwania."},

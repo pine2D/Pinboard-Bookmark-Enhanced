@@ -3302,6 +3302,13 @@ function _pbpDictApplyVisibleChoice(cur) {
 // user always sees what the button commits. The choice list is a click-opened
 // popover (the reader allows no hover-triggered overlays), operable by
 // keyboard; Escape or a choice returns focus to "Change".
+// A choice's text in the save bar and its list: the card's title already
+// names the looked-up word, so the word is repeated only when the choice
+// saves a different one (a linked lemma, a shorter CC-CEDICT headword).
+function _pbpDictChoiceLabel(cur, term, gloss) {
+  return term && pbpDictNormalizeTerm(term) !== pbpDictNormalizeTerm(cur.queryTerm || "") ? term + " · " + gloss : gloss;
+}
+
 function _pbpDictSyncMeaningSelect(cur) {
   const bar = cur.meaningBar;
   if (!bar) return;
@@ -3314,7 +3321,7 @@ function _pbpDictSyncMeaningSelect(cur) {
   // The face names what Save writes: the applied choice, or the prompt when
   // there is none (a revoked source, a full entry only).
   if (cur.gloss) {
-    preview.textContent = cur.term + " · " + cur.gloss;
+    preview.textContent = _pbpDictChoiceLabel(cur, cur.term, cur.gloss);
     preview.lang = shown?.definitionLang || "und";
     preview.removeAttribute("data-empty");
   } else {
@@ -3338,7 +3345,7 @@ function _pbpDictSyncMeaningSelect(cur) {
     option.dataset.index = String(index);
     option.setAttribute("aria-selected", String(index === selected));
     option.lang = choice.definitionLang;
-    const body = document.createElement("span"); body.className = "xp-dict-choice-text"; body.textContent = choice.term + " · " + choice.gloss;
+    const body = document.createElement("span"); body.className = "xp-dict-choice-text"; body.textContent = _pbpDictChoiceLabel(cur, choice.term, choice.gloss);
     const source = document.createElement("span"); source.className = "xp-dict-choice-source"; source.textContent = choice.sourceLabel;
     option.append(body, source);
     list.appendChild(option);
@@ -3349,15 +3356,22 @@ function _pbpDictSyncMeaningSelect(cur) {
   }
 }
 
-// Fixed placement for the choice list: above "Change" (the bar sits at the
-// bottom of the card), below it when the room above is too small, and kept
-// 16px inside the viewport either way.
-function _pbpDictPlaceMeaningMenu(menu, anchor) {
-  const vw = window.innerWidth, vh = window.innerHeight;
+// Fixed placement for the choice list: across the card's content box -- its
+// left and right edges on the card's (the bubble's inner edges, or the docked
+// panel's text column), so it never hangs past the card -- above "Change"
+// (the bar sits at the bottom of the card), below it when the room above is
+// too small, and kept 16px inside the viewport vertically either way.
+function _pbpDictPlaceMeaningMenu(menu, anchor, frame) {
+  const vw = document.documentElement.clientWidth || window.innerWidth, vh = window.innerHeight;
+  const f = frame.getBoundingClientRect(), cs = getComputedStyle(frame);
+  const inset = side => (parseFloat(cs["border" + side + "Width"]) || 0) + (parseFloat(cs["padding" + side]) || 0);
+  const left = Math.max(0, f.left + inset("Left")), right = Math.min(vw, f.right - inset("Right"));
+  menu.style.left = left + "px";
+  menu.style.width = Math.max(0, right - left) + "px";
+  // Measured after the width is set: the height follows the wrapped text.
   const a = anchor.getBoundingClientRect(), m = menu.getBoundingClientRect();
   const above = a.top - m.height - 8, below = a.bottom + 8;
   const top = above >= 16 ? above : below + m.height <= vh - 16 ? below : Math.max(16, vh - 16 - m.height);
-  menu.style.left = Math.max(16, Math.min(a.right - m.width, vw - m.width - 16)) + "px";
   menu.style.top = Math.max(16, top) + "px";
 }
 
@@ -3400,7 +3414,7 @@ function _pbpDictMountMeaningBar(cur, pop, box, signal) {
   };
   cur.meaningMenuOpen = isOpen;
   cur.meaningMenuClose = close;
-  const place = () => { if (isOpen()) _pbpDictPlaceMeaningMenu(menu, change); };
+  const place = () => { if (isOpen()) _pbpDictPlaceMeaningMenu(menu, change, pop); };
   window.addEventListener("resize", place);
   signal.addEventListener("abort", () => {
     window.removeEventListener("resize", place);
@@ -3417,7 +3431,7 @@ function _pbpDictMountMeaningBar(cur, pop, box, signal) {
     _pbpDictSyncMeaningSelect(cur);
     try { menu.showPopover(); } catch (_) { return; }
     change.setAttribute("aria-expanded", "true");
-    _pbpDictPlaceMeaningMenu(menu, change);
+    _pbpDictPlaceMeaningMenu(menu, change, pop);
     (list.querySelector('[aria-selected="true"]') || list.firstElementChild)?.focus({ preventScroll: true });
   });
   const choose = (option) => {

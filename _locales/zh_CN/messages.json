@@ -4623,7 +4623,7 @@
   "driveAskErrorEntryTooLarge": {"message": "有一条回答超出同步大小限制，仍保存在本机。"},
   "askHistoryUnavailable": {"message": "此对话已删除或在本机不可用。可以开始新对话继续提问。"},
   "askHistoryKeysMove": {"message": "上一个或下一个对话"},
-  "dictMeaningDefaultHelp": {"message": "已选好当前显示来源的第一条解释，可直接保存。手动更换后，本次查词会保留你的选择。"},
+  "dictMeaningDefaultHelp": {"message": "已预先选好一条解释，可直接保存。手动更换后，本次查词会保留你的选择。"},
   "dictMeaningManualHelp": {"message": "将保存你选中的解释。本次查词会保留这个选择。"},
   "dictMeaningSavedHelp": {"message": "已保存的解释不会自动更改。选择一条解释后，可更新这个生词。"},
   "dictMeaningChooseHelp": {"message": "请选择要保存的解释；本次查词会保留你的选择。"},
