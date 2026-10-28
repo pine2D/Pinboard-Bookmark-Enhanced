@@ -9653,7 +9653,7 @@ async function runSweep(page, sw, extBase) {
     // the limit hint (8 entries), the re-enter-key hint (an envelope bound to
     // an old address) and the delete confirmation. Seeded as stored settings
     // with fake keys, then reloaded; no Test button is ever clicked.
-    const CUSTOM_CONTEXTS = ["ai-custom-entry", "ai-custom-limit", "ai-custom-key-rebind", "ai-custom-delete-confirm"];
+    const CUSTOM_CONTEXTS = ["ai-custom-entry", "ai-custom-limit", "ai-custom-key-rebind", "ai-custom-key-pending", "ai-custom-delete-confirm"];
     if (CUSTOM_CONTEXTS.some((name) => wants("options", name))) {
       const seeded = await sw.evaluate(async () => {
         const store = {
@@ -9680,9 +9680,18 @@ async function runSweep(page, sw, extBase) {
       await page.waitForTimeout(150);
       await scan("options", "ai-custom-entry");
       await scan("options", "ai-custom-limit");
-      if (wants("options", "ai-custom-key-rebind") || wants("options", "ai-custom-delete-confirm")) {
+      if (CUSTOM_CONTEXTS.slice(2).some((name) => wants("options", name))) {
         await selectProviderViaListbox(page, seeded.rebindId, null, "custom");
         await scan("options", "ai-custom-key-rebind");
+        if (wants("options", "ai-custom-key-pending")) {
+          // A key typed while the address is empty cannot be sealed yet.
+          await scan("options", "ai-custom-key-pending", async () => {
+            await page.fill("#opt-custom-baseurl", "");
+            await page.fill("#opt-custom-key", "render-fixture-key");
+            await page.waitForSelector("#ai-custom-key-pending:not([hidden])");
+            return true;
+          });
+        }
         if (wants("options", "ai-custom-delete-confirm")) {
           await scan("options", "ai-custom-delete-confirm", async () => {
             // Scroll first and let the scroll event fire: Playwright's own

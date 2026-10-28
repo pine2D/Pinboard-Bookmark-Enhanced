@@ -1941,7 +1941,13 @@
     "message": "Use an https:// address (http:// only for localhost). This address isn't saved."
   },
   "aiCustomFieldInvalid": {
-    "message": "This value can't be saved. The last saved value is kept."
+    "message": "This value can't be saved. The last valid value is kept."
+  },
+  "aiCustomKeyPending": {
+    "message": "The key is saved once this provider has a valid address and a supported format."
+  },
+  "aiCustomLocked": {
+    "message": "The saved custom providers can't be read on this device, so they can't be added or deleted here."
   },
   "aiCustomKeyRebind": {
     "message": "This provider's address or format was changed on another device or by a backup. Enter the API key again."

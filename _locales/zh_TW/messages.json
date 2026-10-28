@@ -1934,7 +1934,13 @@
     "message": "網址須以 https:// 開頭（只有本機位址可用 http://），這個網址未儲存。"
   },
   "aiCustomFieldInvalid": {
-    "message": "這個值無法儲存，已保留上次儲存的值。"
+    "message": "這個值無法儲存，已保留上一個有效的值。"
+  },
+  "aiCustomKeyPending": {
+    "message": "這個服務商有了有效網址與支援的格式後，才會儲存 API Key。"
+  },
+  "aiCustomLocked": {
+    "message": "這台裝置讀不到已儲存的自訂服務商，因此無法在此新增或刪除。"
   },
   "aiCustomKeyRebind": {
     "message": "這個服務商的網址或格式已在其他裝置或備份中變更，請重新輸入 API Key。"

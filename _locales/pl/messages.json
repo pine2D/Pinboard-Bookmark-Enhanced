@@ -1934,7 +1934,13 @@
     "message": "Użyj adresu https:// (http:// tylko dla localhost). Ten adres nie został zapisany."
   },
   "aiCustomFieldInvalid": {
-    "message": "Tej wartości nie można zapisać. Zachowano ostatnio zapisaną wartość."
+    "message": "Tej wartości nie można zapisać. Zachowano ostatnią prawidłową wartość."
+  },
+  "aiCustomKeyPending": {
+    "message": "Klucz zostanie zapisany, gdy ten dostawca będzie miał prawidłowy adres i obsługiwany format."
+  },
+  "aiCustomLocked": {
+    "message": "Zapisanych własnych dostawców nie można odczytać na tym urządzeniu, więc nie da się tu ich dodawać ani usuwać."
   },
   "aiCustomKeyRebind": {
     "message": "Adres lub format tego dostawcy zmieniono na innym urządzeniu albo przez kopię zapasową. Wpisz ponownie klucz API."

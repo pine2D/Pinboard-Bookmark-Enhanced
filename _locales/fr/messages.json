@@ -1934,7 +1934,13 @@
     "message": "Utilisez une adresse https:// (http:// uniquement pour localhost). Cette adresse n'est pas enregistrée."
   },
   "aiCustomFieldInvalid": {
-    "message": "Cette valeur ne peut pas être enregistrée. La dernière valeur enregistrée est conservée."
+    "message": "Cette valeur ne peut pas être enregistrée. La dernière valeur valide est conservée."
+  },
+  "aiCustomKeyPending": {
+    "message": "La clé est enregistrée dès que ce fournisseur a une adresse valide et un format pris en charge."
+  },
+  "aiCustomLocked": {
+    "message": "Les fournisseurs personnalisés enregistrés sont illisibles sur cet appareil : vous ne pouvez donc ni en ajouter ni en supprimer ici."
   },
   "aiCustomKeyRebind": {
     "message": "L'adresse ou le format de ce fournisseur a été modifié sur un autre appareil ou par une sauvegarde. Saisissez de nouveau la clé API."

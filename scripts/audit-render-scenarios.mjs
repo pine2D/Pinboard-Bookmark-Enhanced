@@ -56,6 +56,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('ai-custom-entry', [], { target: '#fields-custom:not([hidden]) #opt-custom-name' }),
     context('ai-custom-limit', ['ai-custom-entry'], { target: '#ai-custom-limit-hint:not([hidden])' }),
     context('ai-custom-key-rebind', ['ai-custom-entry'], { target: '#ai-custom-key-rebind:not([hidden])' }),
+    context('ai-custom-key-pending', ['ai-custom-entry'], { target: '#ai-custom-key-pending:not([hidden])' }),
     context('ai-custom-delete-confirm', ['ai-custom-entry'], { target: '.confirm-popover .confirm-subject' })],
   library: [
     context('vocab-list', [], { target: '#vocab-list .vocab-card' }),

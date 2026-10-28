@@ -144,6 +144,12 @@ function pbpOptAiCustomAdd(state, { randomBytes, defaultName }) {
   }
   if (!id) return null;
   state.freedSlots.delete(slot);
+  // An orphan slot (a key whose entry is gone) is taken over empty, so the
+  // new entry neither inherits it nor warns about it; the save writes "".
+  if (state.rawSlots[slot] !== "") {
+    state.rawSlots[slot] = "";
+    state.freedSlots.add(slot);
+  }
   state.drafts[id] = { id, name: nameFor(), protocol: "openai", baseUrl: "", model: "", slot, key: "", keyRebind: false, keyTouched: false };
   state.order.push(id);
   return id;
@@ -217,7 +223,11 @@ function pbpOptAiCustomCollect(state) {
     const entry = { id: d.id, name: d.name, protocol: d.protocol, baseUrl: d.baseUrl, model: d.model, slot: d.slot };
     out.aiCustomProviders.push(entry);
     const sealed = d.key ? pbpAiCustomKeySeal(entry, d.key) : "";
-    out[pbpAiCustomKeyField(d.slot)] = sealed || (d.keyTouched ? "" : state.rawSlots[d.slot]);
+    // A typed key that cannot be sealed yet (no valid address, or a format
+    // this version does not know) must not wipe what is stored: only an
+    // actual clear writes "".
+    const keep = d.key && !sealed;
+    out[pbpAiCustomKeyField(d.slot)] = sealed || (d.keyTouched && !keep ? "" : state.rawSlots[d.slot]);
   }
   for (const slot of state.freedSlots) {
     const field = pbpAiCustomKeyField(slot);
@@ -261,7 +271,7 @@ function _pbpOptAiCustomLabelInto(el, state, id) {
 // that provider -- which stashes the outgoing provider's reader model under
 // the deleted id -- then drop that stash and the entry's health record.
 function pbpOptAiCustomDeleteEntry({ state, id, current, snapshot, order, ollamaGranted, previewModelMap, applyProvider, forgetHealth }) {
-  pbpOptAiCustomRemove(state, id);
+  if (!pbpOptAiCustomRemove(state, id)) return null;
   const next = current === id
     ? (pbpAiFirstConfiguredProvider(snapshot(), new Set([id]), { ollamaGranted, order }) || "gemini")
     : current;
@@ -334,6 +344,44 @@ function pbpOptAiCustomSyncFormat(state, id) {
   if (warn) warn.hidden = PBP_AI_PROTOCOLS.includes(d.protocol);
 }
 
+// True while a list entry holds a typed key that cannot be sealed yet (the
+// address is empty or invalid, or the format is unknown to this version).
+function pbpOptAiCustomKeyUnsealed(state, id) {
+  const d = state && state.drafts[id];
+  if (!d || id === "custom" || !d.key) return false;
+  const entry = { id: d.id, name: d.name, protocol: d.protocol, baseUrl: d.baseUrl, model: d.model, slot: d.slot };
+  return !pbpAiCustomKeySeal(entry, d.key);
+}
+
+function pbpOptAiCustomSyncKeyHint(state, id) {
+  const hint = $id("ai-custom-key-pending");
+  if (hint) hint.hidden = !pbpOptAiCustomKeyUnsealed(state, id);
+}
+
+// Add and Delete are unavailable while the stored list could not be read
+// (locked) or when the limit is reached; the matching hint says why.
+function pbpOptAiCustomSyncActions(state) {
+  const add = $id("add-custom-provider");
+  const del = $id("delete-custom-entry");
+  const limitHint = $id("ai-custom-limit-hint");
+  const lockedHint = $id("ai-custom-locked-hint");
+  const locked = !!(state && state.locked);
+  const full = !state || state.order.length >= PBP_AI_CUSTOM_MAX;
+  if (add) {
+    add.disabled = full || locked;
+    const why = locked ? "ai-custom-locked-hint" : full ? "ai-custom-limit-hint" : "";
+    if (why) add.setAttribute("aria-describedby", why);
+    else add.removeAttribute("aria-describedby");
+  }
+  if (del) {
+    del.disabled = locked;
+    if (locked) del.setAttribute("aria-describedby", "ai-custom-locked-hint");
+    else del.removeAttribute("aria-describedby");
+  }
+  if (limitHint) limitHint.hidden = !full || locked;
+  if (lockedHint) lockedHint.hidden = !locked;
+}
+
 // Fill the shared panel with one entry's draft. false when there is none.
 function pbpOptAiCustomFillPanel(state, id) {
   const d = state && state.drafts[id];
@@ -357,6 +405,7 @@ function pbpOptAiCustomFillPanel(state, id) {
   pbpOptAiCustomSyncFormat(state, id);
   const rebind = $id("ai-custom-key-rebind");
   if (rebind) rebind.hidden = !d.keyRebind;
+  pbpOptAiCustomSyncKeyHint(state, id);
   for (const warn of ["ai-custom-name-invalid", "ai-custom-baseurl-invalid", "ai-custom-model-invalid"]) {
     const el = $id(warn);
     if (el) el.hidden = true;

@@ -3530,18 +3530,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Each field writes its draft on input; a value the list would refuse is
   // not written (the draft keeps the last accepted one) and, once the field
   // is left, is marked invalid with the reason under it.
-  const syncAddCustomButton = () => {
-    const btn = $id("add-custom-provider");
-    const hint = $id("ai-custom-limit-hint");
-    const full = !pbpOptAiCustomEditorState
-      || pbpOptAiCustomOrder(pbpOptAiCustomEditorState).length >= PBP_AI_CUSTOM_MAX;
-    if (btn) {
-      btn.disabled = full;
-      if (full) btn.setAttribute("aria-describedby", "ai-custom-limit-hint");
-      else btn.removeAttribute("aria-describedby");
-    }
-    if (hint) hint.hidden = !full;
-  };
+  const syncAddCustomButton = () => pbpOptAiCustomSyncActions(pbpOptAiCustomEditorState);
   const rerenderCustomOptions = (value) => {
     const select = $id("opt-ai-provider");
     pbpOptAiCustomRenderOptions(select, pbpOptAiCustomEditorState, value);
@@ -3569,6 +3558,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!id) return false;
       const ok = pbpOptAiCustomUpdate(pbpOptAiCustomEditorState, id, field, el.value);
       if (ok && warnId) $id(warnId).hidden = true;
+      if (ok && (field === "key" || field === "baseUrl" || field === "protocol")) {
+        pbpOptAiCustomSyncKeyHint(pbpOptAiCustomEditorState, id);
+      }
       if (!ok || field === "key") return ok;
       if (field === "name") {
         rerenderCustomOptions(id);
@@ -4422,7 +4414,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-kimi-key", "opt-ollama-baseurl", "opt-custom-key", "opt-custom-baseurl", "dict-anki-port",
     "dict-eudic-token", "opt-qwen-region", "opt-qwen-workspace", "opt-ark-key", "opt-opencode-key",
     "opt-commandcode-key", "opt-ark-region", "opt-opencode-protocol", "opt-commandcode-protocol",
-    "opt-custom-protocol"]) {
+    "opt-custom-protocol", "opt-custom-name"]) {
     const el = $id(id);
     el?.addEventListener(el.tagName === "SELECT" ? "change" : "input", scheduleConnectionOverview);
   }

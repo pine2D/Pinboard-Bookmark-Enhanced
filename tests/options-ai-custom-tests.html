@@ -173,6 +173,48 @@ test("collect: unoccupied slots are omitted unless freed this session", () => {
   assertDeep(c.aiCustomProviders.map((e) => e.id), [A.id], "list");
 });
 
+test("collect: a key that cannot be sealed yet keeps the stored slot and flags the key hint", () => {
+  const st = pbpOptAiCustomState(S({ aiCustomProviders: [B], customApiKey3: SLOT3 }));
+  assert(pbpOptAiCustomUpdate(st, B.id, "baseUrl", ""), "empty address accepted");
+  assert(pbpOptAiCustomUpdate(st, B.id, "key", "typed"), "key typed");
+  assertEq(pbpOptAiCustomCollect(st).customApiKey3, SLOT3, "stored envelope not cleared");
+  assertEq(pbpOptAiCustomKeyUnsealed(st, B.id), true, "hint on");
+  assert(pbpOptAiCustomUpdate(st, B.id, "baseUrl", "https://ok.example/v1"), "address filled");
+  assertEq(pbpOptAiCustomKeyUnsealed(st, B.id), false, "hint off once sealable");
+  assertEq(pbpAiCustomKeyOpen(pbpOptAiCustomCollect(st), pbpOptAiCustomCollect(st).aiCustomProviders[0]), "typed", "now sealed");
+  assert(pbpOptAiCustomUpdate(st, B.id, "baseUrl", ""), "address cleared again");
+  assert(pbpOptAiCustomUpdate(st, B.id, "key", ""), "key cleared by the user");
+  assertEq(pbpOptAiCustomCollect(st).customApiKey3, "", "an actual clear still writes empty");
+  assertEq(pbpOptAiCustomKeyUnsealed(st, B.id), false, "no hint without a typed key");
+});
+
+test("collect: re-entering a key on an unknown-format entry does not clear the other device's envelope", () => {
+  const st = pbpOptAiCustomState(S({ aiCustomProviders: [{ ...B, protocol: "grpc" }], customApiKey3: SLOT3 }));
+  assert(pbpOptAiCustomUpdate(st, B.id, "key", "typed"), "key typed");
+  assertEq(pbpOptAiCustomCollect(st).customApiKey3, SLOT3, "raw slot kept");
+  assertEq(pbpOptAiCustomKeyUnsealed(st, B.id), true, "hint on");
+});
+
+test("add: claiming an orphan slot clears its stored value and writes empty on save", () => {
+  const st = pbpOptAiCustomState(S({ customApiKey2: "obf:orphan", customApiKey3: "obf:o3", customApiKey4: "obf:o4",
+    customApiKey5: "obf:o5", customApiKey6: "obf:o6", customApiKey7: "obf:o7", customApiKey8: "obf:o8" }));
+  const id = pbpOptAiCustomAdd(st, { randomBytes: freshBytes, defaultName });
+  const slot = st.drafts[id].slot;
+  assertEq(st.drafts[id].keyRebind, false, "no rebind warning");
+  assertEq(pbpOptAiCustomCollect(st)[pbpAiCustomKeyField(slot)], "", "claimed slot written empty");
+});
+
+test("delete: a refused removal (locked list) aborts every side effect", () => {
+  const st = pbpOptAiCustomState(S({ aiCustomProviders: [B] }));
+  st.locked = true;
+  const events = [];
+  const next = pbpOptAiCustomDeleteEntry({ state: st, id: B.id, current: B.id, snapshot: () => S(), order: ["gemini"],
+    ollamaGranted: false, previewModelMap: { [B.id]: "pm" }, applyProvider: (p) => events.push(p), forgetHealth: (i) => events.push(i) });
+  assertEq(next, null, "nothing done");
+  assertDeep(events, [], "no switch, no forget");
+  assertDeep(pbpOptAiCustomOrder(st), [B.id], "entry kept");
+});
+
 test("collect: deleting custom clears every custom* key incl. customDisplayName/customProtocol", () => {
   const st = pbpOptAiCustomState(S({ ...C, customProtocol: "anthropic" }));
   assert(pbpOptAiCustomRemove(st, "custom"), "removed");
@@ -372,6 +414,37 @@ test("render options: a fallback label is interface text a later language load r
       assertEq(document.getElementById("opt-custom-baseurl").value, saved.baseUrl, "base URL");
       assertEq(document.getElementById("opt-custom-key").value, pbpAiCustomKeyOpen(pbpOptAiCustomCollect(st), saved), "key");
       assertEq(document.getElementById("opt-custom-model").value, saved.model, "model");
+    } finally {
+      scratch.replaceChildren();
+    }
+  });
+
+  await atest("panel: key hint and locked actions follow the editor state", async () => {
+    const html = await fetch("../options.html").then((r) => r.text());
+    const panel = document.importNode(new DOMParser().parseFromString(html, "text/html").querySelector("#panel-ai"), true);
+    const scratch = document.getElementById("scratch");
+    scratch.replaceChildren(panel);
+    try {
+      const $ = (id) => document.getElementById(id);
+      assert(($("opt-custom-key").getAttribute("aria-describedby") || "").split(" ").includes("ai-custom-key-pending"), "key input describes the hint");
+      assert($("ai-custom-key-pending").classList.contains("hint-warn"), "hint-warn pattern");
+      const st = pbpOptAiCustomState(S({ aiCustomProviders: [B], customApiKey3: SLOT3 }));
+      pbpOptAiCustomUpdate(st, B.id, "baseUrl", "");
+      pbpOptAiCustomUpdate(st, B.id, "key", "typed");
+      assert(pbpOptAiCustomFillPanel(st, B.id), "fill");
+      assertEq($("ai-custom-key-pending").hidden, false, "hint shown");
+      pbpOptAiCustomUpdate(st, B.id, "baseUrl", "https://ok.example/v1");
+      pbpOptAiCustomSyncKeyHint(st, B.id);
+      assertEq($("ai-custom-key-pending").hidden, true, "hint hidden");
+      pbpOptAiCustomSyncActions(st);
+      assertEq($("add-custom-provider").disabled, false, "add enabled");
+      assertEq($("delete-custom-entry").disabled, false, "delete enabled");
+      assertEq($("ai-custom-locked-hint").hidden, true, "no locked hint");
+      st.locked = true;
+      pbpOptAiCustomSyncActions(st);
+      assertEq($("add-custom-provider").disabled, true, "add disabled when locked");
+      assertEq($("delete-custom-entry").disabled, true, "delete disabled when locked");
+      assertEq($("ai-custom-locked-hint").hidden, false, "locked hint shown");
     } finally {
       scratch.replaceChildren();
     }

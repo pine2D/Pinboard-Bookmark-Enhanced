@@ -1934,7 +1934,13 @@
     "message": "地址须以 https:// 开头（仅本机地址可用 http://），此地址未保存。"
   },
   "aiCustomFieldInvalid": {
-    "message": "这个值无法保存，已保留上次保存的值。"
+    "message": "这个值无法保存，已保留上一个有效的值。"
+  },
+  "aiCustomKeyPending": {
+    "message": "这个服务商有了有效地址和受支持的格式后，才会保存 API Key。"
+  },
+  "aiCustomLocked": {
+    "message": "这台设备读不到已保存的自定义服务商，所以无法在此添加或删除。"
   },
   "aiCustomKeyRebind": {
     "message": "这个服务商的地址或格式在其他设备或备份中被修改过，请重新输入 API Key。"
