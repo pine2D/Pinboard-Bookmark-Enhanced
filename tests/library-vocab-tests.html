@@ -4089,8 +4089,24 @@ await (async () => {
       const beforeDeleted=writes.length;save()?.click();await settle();
       check("B an Update whose word was deleted requires an explicit new Save",writes.length===beforeDeleted&&save()?.textContent.includes("dictSaveVocab"));
       await run();choose("Operate");store=[row("run","en",{gloss:"saved elsewhere"})];
+      // The save bar's status is a polite live region: while empty it takes
+      // no room but stays rendered (so in the accessibility tree), and the
+      // "already saved" line is then a change to a region already there, not
+      // a node arriving with its text (task 3d).
+      const saveLine=panel().querySelector(".vocab-save-controls > .save-status");
+      const idle=saveLine&&{shown:saveLine.checkVisibility(),display:getComputedStyle(saveLine).display,height:saveLine.getBoundingClientRect().height,
+        gap:panel().querySelector(".vocab-save-controls").getBoundingClientRect().bottom-save().getBoundingClientRect().bottom};
+      check("B the empty save status stays in the accessibility tree without taking a row",!!idle&&!saveLine.textContent&&idle.shown&&idle.display!=="none"&&
+        getComputedStyle(saveLine).position==="absolute"&&idle.height<=1&&Math.abs(idle.gap)<1,JSON.stringify(idle));
+      const shownBefore=new WeakMap(),lateLines=[];
+      const lookLines=()=>{for(const el of panel().querySelectorAll('[aria-live="polite"]')){const on=el.checkVisibility();if(on&&!shownBefore.get(el)&&el.textContent.trim())lateLines.push(el.textContent.trim());shownBefore.set(el,on);}};
+      lookLines();
+      const lineWatch=new MutationObserver(()=>requestAnimationFrame(lookLines));
+      lineWatch.observe(panel(),{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:["hidden","class","style"]});
       const beforeCreated=writes.length;save()?.click();await settle();
+      await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));lineWatch.disconnect();
       check("B a Save whose word was created elsewhere requires an explicit Update",writes.length===beforeCreated&&store[0].gloss==="saved elsewhere"&&save()?.textContent.includes("dictUpdateVocab"));
+      check("B the save bar's status line was laid out before its text arrived",lateLines.length===0&&saveLine.textContent.includes("dictSavedVocab"),lateLines.join(" | "));
 
       store=[row("gehen","de")];await reload();
       $id("vocab-language-filter").value="de";$id("vocab-language-filter").dispatchEvent(new Event("change"));

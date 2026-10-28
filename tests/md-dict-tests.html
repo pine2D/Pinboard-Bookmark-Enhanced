@@ -1339,6 +1339,9 @@ async function runDictPermissionFeedbackTests() {
       "production permission gate explains the online dictionary before requesting access");
     button.click();
     await new Promise((resolve) => setTimeout(resolve, 0));
+    // The hidden feedback row is laid out empty first and written after that
+    // frame (_pbpDictLiveSay, task 3d).
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     const feedback = slot.querySelector('[role="status"]');
     assert(feedback && !feedback.hidden && feedback.textContent === "dictPermissionDenied" &&
       button.textContent === "dictConnectRetry" && !button.disabled,
@@ -2893,7 +2896,13 @@ async function runDictionaryEntryUiTests() {
       const oldSection=updated.host.querySelector('[data-supplement-id]'),oldUpdate=oldSection.querySelector('.xp-dict-update-supplement');
       const newer={...learningAddition,id:'1'.repeat(64),generatedAt:1700000002000,learning:{...learningAddition.learning,replacesId:learningAddition.id}};
       window.pbpDictSupplementRun=async()=>structuredClone(newer);
+      // Every polite row this update shows (its progress, then the receipt
+      // in the slot's own action row) must first be laid out empty (task 3d).
+      const reveal=liveRevealProbe(updated.host);
       oldUpdate.focus();oldUpdate.click();await settle();
+      await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));reveal.stop();
+      check("an updated usage point's receipt is laid out empty before it is written",reveal.late.length===0&&
+        [...updated.host.querySelectorAll('.xp-dict-usage-status')].some(el=>el.textContent==='dictSupplementSaved'&&el.checkVisibility()),reveal.late.join(' | '));
       const slot=slotOf(updated.host,'patterns'),fresh=updated.host.querySelector('[data-supplement-id="'+newer.id+'"]');
       const receipts=[...updated.host.querySelectorAll('.xp-dict-usage-status')].filter(el=>el.textContent==='dictSupplementSaved'&&el.checkVisibility());
       check("an updated usage point replaces the old version in the same slot, its one receipt under it in that slot",
@@ -2906,7 +2915,7 @@ async function runDictionaryEntryUiTests() {
     // gives focus back to that button, not to the toolbar.
     let releaseBase;window.pbpDictEntryRun=input=>new Promise(resolve=>{releaseBase=resolve;});
     baseUpdate=reloadedMeaning.host.querySelector('.xp-dict-update-entry');
-    baseUpdate.focus();baseUpdate.click();await settle();
+    baseUpdate.focus();baseUpdate.click();await settle();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
     const updateLine=progressOf(baseUpdate.closest('.xp-dict-usage-actions'));
     check("a base update shows its phase, seconds and cancel beside the update button and focuses that cancel",
       !!updateLine.box&&updateLine.box.checkVisibility()&&updateLine.text.textContent==='dictEntryGenerating'&&updateLine.elapsed.checkVisibility()&&
@@ -3577,9 +3586,30 @@ async function runDictionaryExamplesTests() {
 }
 
 // A status row is a live region: a hidden one is revealed empty first and
-// written on the next frame, so its text is a change a screen reader reads
-// (the batch-3b review: the updated-supplement receipt was revealed and
-// written in one task). A shown row is written at once; a later call wins.
+// written only after a frame has laid it out empty, so its text is a change
+// to a region already in the accessibility tree (task 3d: a single frame was
+// not enough -- a rAF callback runs before its own frame's layout, so the
+// first layout after the reveal already held the text). A shown row is
+// written at once; a later call wins.
+// liveRevealProbe(root) watches every polite live region under root and
+// records each one whose FIRST rendered layout already carries text. Its
+// look runs in a frame callback queued from a mutation observer, i.e. after
+// every callback the mutating task queued, right before that frame's style
+// and layout: what it sees is what the first layout of the change sees.
+function liveRevealProbe(root) {
+  const shown = new WeakMap(), late = [];
+  const look = () => {
+    for (const el of root.querySelectorAll('[aria-live="polite"]')) {
+      const on = el.isConnected && el.checkVisibility();
+      if (on && !shown.get(el) && el.textContent.trim()) late.push(el.textContent.trim());
+      shown.set(el, on);
+    }
+  };
+  look();
+  const observer = new MutationObserver(() => requestAnimationFrame(look));
+  observer.observe(root, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["hidden", "class", "style"] });
+  return { late, stop: () => observer.disconnect() };
+}
 async function runDictLiveRowTests() {
   const frame = () => new Promise(resolve => requestAnimationFrame(() => resolve()));
   const row = document.createElement("p"); row.hidden = true; document.body.appendChild(row);
@@ -3587,20 +3617,33 @@ async function runDictLiveRowTests() {
   try {
     _pbpDictLiveSay(row, paint, "Saved");
     check("live row: a hidden row is shown empty before its text is written", row.hidden === false && row.textContent === "");
+    // Queued after the helper's own callback: it runs right before the first
+    // layout of the revealed row, which must still be empty.
+    const atFirstLayout = await new Promise(resolve => requestAnimationFrame(() => resolve({ hidden: row.hidden, text: row.textContent })));
+    check("live row: the first layout after the reveal holds the row empty", atFirstLayout.hidden === false && atFirstLayout.text === "");
     await frame();
-    check("live row: the text lands on the next frame", row.hidden === false && row.textContent === "Saved");
+    check("live row: the text lands after that layout", row.hidden === false && row.textContent === "Saved");
     _pbpDictLiveSay(row, paint, "Updated");
     check("live row: a shown row is written at once", row.textContent === "Updated");
     _pbpDictLiveSay(row, paint, "");
     check("live row: empty text hides the row", row.hidden === true && row.textContent === "");
     _pbpDictLiveSay(row, paint, "First");
     _pbpDictLiveSay(row, paint, "");
-    await frame();
+    await frame(); await frame();
     check("live row: a hide cancels a pending write", row.hidden === true && row.textContent === "");
     _pbpDictLiveSay(row, paint, "Old");
     _pbpDictLiveSay(row, paint, "New");
-    await frame();
+    check("live row: a write while the row is still entering waits for its layout too", row.hidden === false && row.textContent === "");
+    await frame(); await frame();
     check("live row: the last write wins", row.hidden === false && row.textContent === "New");
+    // The probe itself must catch the bug it guards: a row revealed and
+    // written in one task.
+    row.hidden = true; row.textContent = ""; row.setAttribute("aria-live", "polite");
+    const probe = liveRevealProbe(document.body);
+    row.hidden = false; row.textContent = "Same task";
+    await frame(); await frame();
+    probe.stop();
+    check("live row: the reveal probe catches a row revealed together with its text", probe.late.includes("Same task"));
   } finally { row.remove(); }
 }
 

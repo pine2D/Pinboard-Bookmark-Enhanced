@@ -35,9 +35,10 @@ async function test(name, fn) {
 }
 const DAY = 24 * 60 * 60 * 1000;
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
-// A hidden status row is shown first and written on the next frame (md-dict
-// _pbpDictLiveSay), so settling ends on a frame.
-const frame = () => new Promise(resolve => requestAnimationFrame(() => resolve()));
+// A hidden status row is shown first and written only after a frame has laid
+// it out empty (md-dict _pbpDictLiveSay: two frame callbacks), so settling
+// ends on two frames.
+const frame = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 const settle = async () => { for (let i = 0; i < 12; i++) await tick(); await frame(); };
 const negKeys = () => Object.keys(store).filter(key => key.startsWith("pbpDictNeg:"));
 const examples = (term = "Zauberwort") => ({ term, sourceLanguage: "de", target: "", category: "examples" });

@@ -1613,24 +1613,32 @@ function _pbpDictToneText(el, text, tone = "") {
   if (text && tone) el.dataset.state = tone; else delete el.dataset.state;
 }
 // A status row is a live region, and screen readers often skip a row that is
-// revealed and filled in the same task (the change happens while the node
-// enters the accessibility tree). Every lookup status row therefore goes
-// through here: a hidden row is shown empty first and gets its text on the
-// next frame; a row already shown is written at once; empty text hides it.
-// A later write or hide cancels a pending one, so the last call wins.
+// revealed and filled in the same rendering update (the change happens while
+// the node enters the accessibility tree). Every lookup status row therefore
+// goes through here: a hidden row is shown empty first and gets its text only
+// after a frame has laid it out empty; a row already shown is written at
+// once; empty text hides it. Two frames, not one: a requestAnimationFrame
+// callback runs BEFORE the style and layout of its own frame, so text written
+// in the first callback still enters the tree together with the row (task
+// 3d, measured with a ResizeObserver). The second callback runs after that
+// frame's layout, which is when Chromium has exposed the empty row. A write
+// while the row is still entering only replaces the pending text, and a hide
+// cancels it, so the last call wins.
 const _pbpDictLivePending = new WeakMap();
 function _pbpDictLiveSay(row, paint, text) {
+  const pending = _pbpDictLivePending.get(row);
+  if (pending && text) { pending.paint = paint; pending.text = text; return; }
   _pbpDictLivePending.delete(row);
   if (!text || !row.hidden) { paint(text || ""); row.hidden = !text; return; }
   paint("");
   row.hidden = false;
-  const token = {};
-  _pbpDictLivePending.set(row, token);
-  requestAnimationFrame(() => {
-    if (_pbpDictLivePending.get(row) !== token) return;
+  const job = { paint, text };
+  _pbpDictLivePending.set(row, job);
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (_pbpDictLivePending.get(row) !== job) return;
     _pbpDictLivePending.delete(row);
-    paint(text);
-  });
+    job.paint(job.text);
+  }));
 }
 // An action's failure (plan 3.4) is its own role=alert line placed right
 // after the button that failed -- in the same action row, so it reads where

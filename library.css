@@ -1552,10 +1552,14 @@ html.motion-ready .notes-excerpt-jump { transition: background-color var(--motio
 /* An empty status is not a zero-width status: it still carries that 8px
    margin, and in the vocabulary count row it was stealing 16px off the right
    edge of a row whose whole job is to end flush. It has content only while
-   there is something to say, so collapse it the rest of the time. (The
-   element becomes visible in the same frame its text is written, so the
-   aria-live announcement is unaffected.) */
-.save-status:empty { display: none; }
+   there is something to say, so it takes no room the rest of the time --
+   but it stays rendered: these lines are polite live regions, and one that
+   is display:none while empty enters the accessibility tree together with
+   its first text, which screen readers often do not announce (task 3d).
+   Out of flow and clipped to nothing, the empty line takes no grid track,
+   flex line or gap and paints nothing, yet stays in the tree, so its text is
+   a change to a region already there. */
+.save-status:empty { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .save-status.bad { color: var(--lib-danger); }
 
 /* Index + detail, the same grammar as .notes-workbench (see its comment). */
@@ -2120,7 +2124,6 @@ html.motion-ready .vocab-note-save {
 .vocab-save-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; flex: 1 1 0; min-width: 0; align-items: center; gap: var(--lib-sp-2); }
 .vocab-save-controls > .listbox { min-width: 0; max-width: 100%; }
 .vocab-save-controls > .save-status { grid-column: 1 / -1; }
-.vocab-save-controls > .save-status:empty { display: none; }
 .vocab-ref-relookup { flex: none; width: var(--lib-control-h); padding: 0; }
 /* A narrow bar keeps Save's text: only the secondary re-lookup is an icon
    (with two icon squares side by side the two read alike). The meaning
@@ -2314,7 +2317,11 @@ html.motion-ready .vocab-note-save {
 /* The card's metadata line, once, after every AI block. */
 #vocab-ref-result .xp-dict-ai-provenance { margin-top: var(--lib-sp-4); }
 #vocab-ref-result .xp-dict-ai-content { min-width: 0; }
-#vocab-ref-result .xp-dict-ai-status:empty { display: none; }
+/* No :empty collapse here: the status line is a polite live region that
+   md-dict's _pbpDictLiveSay reveals empty and fills a frame later, and
+   [hidden] (above) already removes it while there is nothing to say. An
+   empty line hidden by CSS would enter the accessibility tree with its text
+   after all (task 3d). */
 #vocab-ref-result .xp-dict-ai-status:not(:empty),
 #vocab-ref-result .xp-dict-ai > .xp-dict-action-error { margin-bottom: var(--lib-sp-2); }
 #vocab-ref-result .xp-dict-ai-details { margin-top: var(--lib-sp-4); font-size: 14px; line-height: 23px; }

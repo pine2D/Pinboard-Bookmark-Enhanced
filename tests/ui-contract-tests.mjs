@@ -2799,9 +2799,16 @@ check(focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:
   check(!/vocab-stat-chip/.test(libraryCss + libraryHtml + libraryVocabJs),
     "library: .vocab-stat-chip came back -- the status filter is the .lib-toggle primitive now (spec §3.2)");
   // An empty status span still carried its 8px margin and stole 16px off the
-  // right edge of the count row, which is the row that has to end flush.
-  check(/\.save-status:empty \{ display: none; \}/.test(libraryCss),
-    "library.css: .save-status:empty no longer collapses — an empty status span takes its margin with it and the count row stops ending flush");
+  // right edge of the count row, which is the row that has to end flush. It
+  // collapses out of flow, and stays rendered: a polite live region hidden by
+  // display:none while empty enters the accessibility tree together with its
+  // first text, which screen readers often skip (task 3d).
+  {
+    const empty = /\.save-status:empty \{([^}]*)\}/.exec(libraryCss)?.[1] || "";
+    check(/position:\s*absolute/.test(empty) && /margin:\s*0/.test(empty) && /clip-path:\s*inset\(50%\)/.test(empty) && !/display:\s*none/.test(empty) &&
+      !/\.save-status:empty\s*\{[^}]*display:\s*none/.test(libraryCss) && !/\.xp-dict-ai-status:empty\s*\{[^}]*display:\s*none/.test(libraryCss),
+      "library.css: an empty .save-status (or lookup status line) must collapse out of flow without display:none — it takes no room and stays in the accessibility tree, so its first text is announced");
+  }
   // The count text takes the slack so Select all lands on the right edge.
   // Without it the slack went to the status span's `margin-left: auto`, which
   // right-aligned an EMPTY span and left Select all mid-row.
