@@ -9718,6 +9718,12 @@ async function runSweep(page, sw, extBase) {
 
   // ---- library: vocab (list, detail pane, batch bar) + notes (list, detail pane). ----
   if (contexts.library.size) {
+    // The options blocks above switch the provider through the page and put
+    // "gemini" back, which the page autosaves; the library dictionary states
+    // need the sweep's keyed provider again, so seed it before the page loads.
+    if ([...contexts.library].some(name => /^dict-entry-(?!(?:examples|negative|legacy)$)/.test(name))) {
+      await sw.evaluate(() => chrome.storage.local.set({ aiProvider: "openai", openaiApiKey: obfuscateKey("render-fixture-key"), previewAiEnabled: true, dictAiAutoGenerate: false, dictDefinitionLang: "zh-Hans" }));
+    }
     await page.goto(`${extBase}library.html?_ra=sweep#vocab`, { waitUntil: "load", timeout: TIMEOUT_MS });
     await page.waitForSelector("#vocab-list .vocab-card", { timeout: TIMEOUT_MS }).catch(() => {});
     await page.waitForTimeout(300);
