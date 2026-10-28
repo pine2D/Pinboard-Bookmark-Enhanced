@@ -928,8 +928,8 @@ function pbpAiExpandProviderOrder(s, order = AI_PROVIDER_ORDER) {
 
 // The first provider in that expanded order that is not in `skip` and is set
 // up: Ollama needs no key, so it counts once its origin is granted or its URL
-// or model differs from the defaults; every other id needs hasAIKey. null
-// when none is.
+// or model differs from the defaults; every other id needs hasAIKey and an
+// endpoint that resolves. null when none is.
 function pbpAiFirstConfiguredProvider(s, skip, { ollamaGranted = false, order = AI_PROVIDER_ORDER } = {}) {
   const st = s || {};
   const d = typeof SETTINGS_DEFAULTS === "object" && SETTINGS_DEFAULTS ? SETTINGS_DEFAULTS : {};
@@ -940,7 +940,9 @@ function pbpAiFirstConfiguredProvider(s, skip, { ollamaGranted = false, order = 
         || (st.ollamaModel !== undefined && st.ollamaModel !== d.ollamaModel)) return p;
       continue;
     }
-    if (hasAIKey({ ...st, aiProvider: p })) return p;
+    // hasAIKey deliberately ignores an unusable endpoint; a fallback must not.
+    const probe = { ...st, aiProvider: p };
+    if (hasAIKey(probe) && !pbpAiResolveTarget(probe, p).error) return p;
   }
   return null;
 }

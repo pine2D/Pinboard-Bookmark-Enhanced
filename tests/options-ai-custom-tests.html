@@ -279,6 +279,16 @@ test("first configured: skips given ids, keyless entries and default ollama", ()
   assertEq(pbpAiFirstConfiguredProvider(S({ geminiApiKey: "g" }), new Set(), { order }), "gemini", "first in order");
 });
 
+test("first configured: skips providers whose endpoint cannot resolve", () => {
+  const order = ["qwen", "custom", "gemini"];
+  const tokyo = { qwenApiKey: "q", qwenRegion: "tokyo", qwenWorkspaceId: "" };
+  assertEq(pbpAiFirstConfiguredProvider(S(tokyo), new Set(), { order }), null, "tokyo without workspace skipped");
+  assertEq(pbpAiFirstConfiguredProvider(S({ ...tokyo, qwenWorkspaceId: "ws1abc" }), new Set(), { order }), "qwen", "tokyo with workspace kept");
+  assertEq(pbpAiFirstConfiguredProvider(S({ customApiKey: "k", customBaseUrl: "" }), new Set(), { order }), null, "custom with key but no address skipped");
+  assertEq(pbpAiFirstConfiguredProvider(S({ ...tokyo, geminiApiKey: "g" }), new Set(), { order }), "gemini", "falls through to a healthy provider");
+  assertEq(pbpAiFirstConfiguredProvider(S({ qwenApiKey: "q" }), new Set(), { order }), "qwen", "normal config kept");
+});
+
 test("delete: removing the current entry runs every side effect in order", () => {
   const st = pbpOptAiCustomState(S({ ...C, aiCustomProviders: [B], customApiKey3: SLOT3 }));
   const map = { [B.id]: "pm", gemini: "g" };
