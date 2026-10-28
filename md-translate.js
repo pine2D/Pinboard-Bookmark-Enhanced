@@ -453,6 +453,15 @@ function _pbpTrIs429(err) {
   return /HTTP 429|rate.?limit|too many requests|resource.*exhausted/i.test(String(err.message || ""));
 }
 
+// AI summaries are cached by the popup and background under the bookmark
+// connection that generated them, not under the personal library that owns
+// translations. Read the live connection; an empty account finds nothing.
+async function _pbpTrSummaryAccount() {
+  if (typeof pbpReadBookmarkConnection !== "function") return "";
+  try { return (await pbpReadBookmarkConnection()).account || ""; }
+  catch (e) { console.warn("[translate] bookmark connection read failed", e?.name, e?.message); return ""; }
+}
+
 function _pbpTrMissingIds(batch, filledSet) {
   const out = [];
   for (const seg of batch) { if (!filledSet.has(seg.id)) out.push(seg.id); }
@@ -2241,7 +2250,7 @@ async function _pbpTrStart(st) {
   try {
     const activeSeg = document.querySelector("#source-badge .src-seg.active");
     const source = (activeSeg && activeSeg.getAttribute("data-engine") === "jina") ? "jina" : "local";
-    summary = (await getAICache(st.url, "summary", st.s.aiCacheDuration, source, st.account, st.s)) || "";
+    summary = (await getAICache(st.url, "summary", st.s.aiCacheDuration, source, await _pbpTrSummaryAccount(), st.s)) || "";
   } catch (_) {}
   if (st.rev !== runRev) return;
   const prog0 = document.getElementById("tr-progress");
@@ -2830,7 +2839,7 @@ async function _pbpTrTranslateBlock(st, w, signal, lang = st.target.code, langNa
   try {
     const activeSeg = document.querySelector("#source-badge .src-seg.active");
     const source = (activeSeg && activeSeg.getAttribute("data-engine") === "jina") ? "jina" : "local";
-    summary = (await getAICache(st.url, "summary", st.s.aiCacheDuration, source, st.account, st.s)) || "";
+    summary = (await getAICache(st.url, "summary", st.s.aiCacheDuration, source, await _pbpTrSummaryAccount(), st.s)) || "";
   } catch (_) {}
   const out = [];
   let failedParts = 0;

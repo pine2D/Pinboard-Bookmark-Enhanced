@@ -1289,7 +1289,7 @@ suite("md-ai IDB key conventions", () => {
     const init = pbpTrInit.toString();
     const start = _pbpTrStart.toString();
     assert(init.includes('account: String((detail && detail.account) || "")'), "render detail owner not captured");
-    assert(start.includes('getAICache(st.url, "summary", st.s.aiCacheDuration, source, st.account, st.s)'), "summary context owner missing");
+    assert(start.includes('getAICache(st.url, "summary", st.s.aiCacheDuration, source, await _pbpTrSummaryAccount(), st.s)'), "summary context owner missing");
     assert(start.includes("pbpTrCacheSet(st.url, st.target.code, st.modelKey, st.newly, st.account, st.runMeta, st.replaceRun)"), "translation write owner, run meta or replace flag missing");
     assert(_pbpTrEnsureGlossary.toString().includes("pbpTrGlossaryCacheGet(st.url, st.target.code, st.modelKey, st.account)"), "glossary owner missing");
   });
@@ -11537,7 +11537,8 @@ window._t4AsyncDone = (async function () {
         });
         await st.workReady;
         newRun = _pbpTrStart(st);
-        await new Promise(resolve => setTimeout(resolve, 0));
+        // The old run stays held on its delayed operation while the new one starts.
+        for (let i = 0; i < 300 && !newEntered; i++) await new Promise(resolve => setTimeout(resolve, 0));
         assert(newEntered, "a replacement immediately frees the module for an explicit new run");
         const newController = st.ctrl;
         release(stage === "summary" ? "" : stage === "glossary-cache" ? null : '{"terms":[{"term":"terminology","translation":"term"}]}');
@@ -11603,7 +11604,7 @@ window._t4AsyncDone = (async function () {
         });
         await st.workReady;
         newRun = _pbpTrStart(st);
-        await new Promise(resolve => setTimeout(resolve, 0));
+        for (let i = 0; i < 300 && !newEntered; i++) await new Promise(resolve => setTimeout(resolve, 0));
         assert(newEntered, "control: the new explicit run reached its own cache await");
         const newController = st.ctrl;
         st.flushBuf.newPaid = "new unflushed block"; st.replaceRun = true; st.wroteOk = false; st.flushInflight = true;
@@ -11631,6 +11632,38 @@ window._t4AsyncDone = (async function () {
       }
     });
   }
+
+  await atest("translation reads the cached summary under the bookmark connection, not the personal library", async () => {
+    const saved = _pbpTrState, savedStream = window.callAIStream, savedSummary = window.getAICache;
+    const savedSet = window.pbpTrCacheSet, savedGet = window.pbpTrCacheGet, savedConn = window.pbpReadBookmarkConnection;
+    const sec = document.createElement("div"); sec.id = "tr-section"; document.body.appendChild(sec);
+    const view = _t4View("<p>article text for the summary owner</p>");
+    const st = _t4TrState("https://example.test/t4-summary-owner-" + Date.now());
+    st.account = "personal:default";
+    st.work = [_t4Work(1, "article text for the summary owner", 0)]; _pbpTrState = st;
+    const reads = [], prompts = [];
+    window.pbpTrCacheGet = async () => null;
+    window.pbpTrCacheSet = async () => {};
+    window.getAICache = async (...args) => { reads.push(args); return args[4] === "karakeep:https://keep.example:u1" ? "the popup summary" : ""; };
+    const answer = '{"translations":[{"id":1,"text":"translated article text"}]}';
+    window.callAIStream = async (settings, prompt, opts, onDelta) => { prompts.push(String(prompt)); onDelta(answer, answer); return answer; };
+    try {
+      window.pbpReadBookmarkConnection = async () => ({ account: "karakeep:https://keep.example:u1" });
+      await _pbpTrStart(st);
+      assertEq(reads.length, 1, "one summary lookup per run");
+      assertEq(reads[0][1], "summary", "the lookup is for the summary");
+      assertEq(reads[0][4], "karakeep:https://keep.example:u1", "the summary is looked up under the bookmark connection");
+      assert(prompts.some(p => p.includes("the popup summary")), "the cached summary reaches the translation prompt");
+      window.pbpReadBookmarkConnection = async () => { throw new Error("storage unavailable"); };
+      st.running = false; st.ctrl = null; st.trMd = Object.create(null); st.newly = {}; reads.length = 0;
+      assertEq(await _pbpTrSummaryAccount(), "", "a failed connection read finds no summary");
+    } finally {
+      if (st.ctrl) st.ctrl.abort();
+      window.callAIStream = savedStream; window.getAICache = savedSummary; window.pbpReadBookmarkConnection = savedConn;
+      window.pbpTrCacheSet = savedSet; window.pbpTrCacheGet = savedGet; _pbpTrState = saved;
+      sec.remove(); view.remove(); document.body.classList.remove("tr-bilingual", "tr-only"); window.pbpViewMarkdown = null;
+    }
+  });
 
   await atest("a new article never shares the previous article's in-flight translation", async () => {
     const saved = _pbpTrState, savedStream = window.callAIStream, savedSummary = window.getAICache;
