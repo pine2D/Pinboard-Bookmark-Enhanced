@@ -2765,7 +2765,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         status.textContent = t(saved.ok ? "bookmarkConnected" : "bookmarkConnectFailed");
         void renderConnectionOverview();
       } catch (error) {
-        console.warn("[bookmark-connect] failed:", error?.name);
+        console.warn("[bookmark-connect] failed:", error?.name, error?.message);
         status.textContent = t("bookmarkConnectFailed");
       } finally { button.disabled = false; }
     });

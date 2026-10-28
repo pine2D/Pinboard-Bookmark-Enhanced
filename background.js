@@ -3830,7 +3830,11 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       }});
       const identity = await client.verify();
       return {ok:true, identity};
-    })().then(sendResponse).catch(error => sendResponse({ok:false,error:error?.code || "network",status:error?.status}));
+    })().then(sendResponse).catch(error => {
+      // Product codes are already classified; keep unclassified platform failures observable.
+      if (typeof error?.code !== "string") console.warn("[bookmark-connect] failed:", error?.name, error?.message);
+      sendResponse({ok:false,error:error?.code || "network",status:error?.status});
+    });
     return true;
   }
   if (message.type === "bookmark_api") {
@@ -3851,7 +3855,10 @@ function handleRuntimeMessage(message, sender, sendResponse) {
       const fresh = await getCurrentBookmarkAuth();
       if (!pbpBookmarkAuthIsCurrent(auth) || fresh.account !== auth.account) return {ok:false,status:0,error:"account_changed"};
       return {ok:true,status:200,data,account:auth.account};
-    })().then(sendResponse).catch(error => sendResponse({ok:false,status:error?.status || 0,error:error?.code || "network"}));
+    })().then(sendResponse).catch(error => {
+      if (typeof error?.code !== "string") console.warn("[bookmark-api] failed:", error?.name, error?.message);
+      sendResponse({ok:false,status:error?.status || 0,error:error?.code || "network"});
+    });
     return true;
   }
 
