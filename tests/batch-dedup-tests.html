@@ -68,16 +68,33 @@ async function getPopupBatchSetupSource() {
   return popupBatchSetupSource;
 }
 
-async function createPermissionHarness(providerOrigin = "https://api.example/*") {
+// The real resolver, for the case that names a custom entry; ai.js's top
+// level only declares, so it evaluates without chrome.
+let realResolveTarget = null;
+async function getRealResolveTarget(t) {
+  if (realResolveTarget) return realResolveTarget;
+  const aiSource = await (await fetch("../ai.js")).text();
+  realResolveTarget = new Function("t", aiSource + "\nreturn pbpAiResolveTarget;")(t);
+  return realResolveTarget;
+}
+
+// A built-in's label the way the resolver forms it: its prov* name when the
+// catalogue has one, else the id.
+function stubResolveTarget(s, t, id = (s && s.aiProvider) || "gemini") {
+  const key = "prov" + id[0].toUpperCase() + id.slice(1);
+  const name = t(key);
+  return { label: name && name !== key ? name : id };
+}
+
+async function createPermissionHarness(providerOrigin = "https://api.example/*", { realResolver = false } = {}) {
   const source = await getPopupBatchPermissionSource();
+  const t = (key, ...args) => key + ":" + args.join("|");
   const factory = new Function(
-    "_aiTargetOriginPattern", "t",
+    "_aiTargetOriginPattern", "t", "pbpAiResolveTarget",
     source + "\nreturn { batchAiPermissionOrigins, batchAiPermissionRows };"
   );
-  return factory(
-    () => providerOrigin,
-    (key, ...args) => key + ":" + args.join("|")
-  );
+  const resolve = realResolver ? await getRealResolveTarget(t) : (s, id) => stubResolveTarget(s, t, id);
+  return factory(() => providerOrigin, t, resolve);
 }
 
 function fakeElement() {
@@ -163,7 +180,7 @@ async function createBatchClickHarness({ ai = true, contains = false, request = 
     "$id", "t", "setBtnIcon", "chrome", "showStatus", "batchIsRunning",
     "BATCH_STALE_TTL", "getSettingsStorage", "pbpApplySecretOverlay", "pbpReadBookmarkConnection",
     "deobfuscateKey", "settings", "hasAIKey", "wireBatchProgress", "setTimeout",
-    "_aiTargetOriginPattern", "pbpPinboardAccountFromToken", "document",
+    "_aiTargetOriginPattern", "pbpPinboardAccountFromToken", "document", "pbpAiResolveTarget",
     source + "\nreturn { setupTabSet, getPending: () => batchAiPermissionPending };"
   );
   const api = factory(
@@ -184,7 +201,8 @@ async function createBatchClickHarness({ ai = true, contains = false, request = 
     () => 0,
     () => "https://api.example/*",
     pbpPinboardAccountFromToken,
-    document
+    document,
+    (s) => stubResolveTarget(s, (key, ...args) => args.length ? key + ":" + args.join(":") : key)
   );
   api.setupTabSet();
   return {
@@ -280,6 +298,21 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     equal(rows.length, 13, "full list was truncated");
     assert(rows[10].includes("site-11.example"), "eleventh site missing");
     assert(rows[12].includes("provOpenai") && rows[12].includes("https://api.example"), "provider is not named");
+  });
+
+  await test("permission rows name a custom entry by its user-given name", async () => {
+    const h = await createPermissionHarness("https://b.example/*", { realResolver: true });
+    const B = { id: "custom-bbbbbb", name: "Relay B", protocol: "openai", baseUrl: "https://b.example/v1", model: "mb", slot: 2 };
+    const C = { id: "custom-cccccc", name: "Relay C", protocol: "anthropic", baseUrl: "https://c.example/v1", model: "mc", slot: 3 };
+    const chainBase = {
+      ...SETTINGS_DEFAULTS, aiProvider: "openai", openaiApiKey: "k",
+      customDisplayName: "Relay A", customBaseUrl: "https://a.example/v1", customApiKey: "ka", customModel: "ma",
+      aiCustomProviders: [B, C],
+      customApiKey2: pbpAiCustomKeySeal(B, "kb"), customApiKey3: pbpAiCustomKeySeal(C, "kc"),
+    };
+    const rows = h.batchAiPermissionRows(["https://one.example/*", "https://b.example/*"], { ...chainBase, aiProvider: "custom-bbbbbb" });
+    assert(rows[1].includes("Relay B") && rows[1].includes("https://b.example"), "the entry is not named: " + rows[1]);
+    assert(!rows[1].includes("custom-bbbbbb") && !rows[1].includes("provCustom-bbbbbb"), "the raw id leaked: " + rows[1]);
   });
 
   await test("first AI click snapshots tabs and origins without requesting or starting", async () => {

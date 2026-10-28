@@ -30,10 +30,8 @@ function batchAiPermissionOrigins(validTabs, s) {
 
 function batchAiPermissionRows(origins, s) {
   const providerOrigin = _aiTargetOriginPattern(s);
-  const provider = s.aiProvider || "gemini";
-  const providerKey = "prov" + provider[0].toUpperCase() + provider.slice(1);
-  const translated = t(providerKey);
-  const providerName = translated === providerKey ? provider : translated;
+  // The resolver's name: a built-in's Settings name, a custom entry's own.
+  const providerName = pbpAiResolveTarget(s).label;
   return origins.map(pattern => {
     const origin = pattern.replace(/\/\*$/, "");
     return pattern === providerOrigin ? t("batchPermProvider", providerName, origin) : origin;

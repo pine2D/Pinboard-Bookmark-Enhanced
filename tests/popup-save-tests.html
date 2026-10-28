@@ -1318,7 +1318,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     test("AI ops run on immutable settings snapshots - no global provider mutation (A4)", () => {
       assert(!popupAiSource.includes("settings.aiProvider = "), "global settings.aiProvider mutation must be gone");
       assert(popupAiSource.includes("const s = { ...(sOverride || settings) }"), "op-level snapshot missing");
-      assert(popupAiSource.includes("{ ...settings, aiProvider: next }"), "fallback must build its own snapshot");
+      assert(!/\{\s*\.\.\.settings\s*,\s*aiProvider:/.test(popupAiSource), "error-card handlers must build from the failed snapshot, never the global settings");
       assert(popupAiSource.includes("async function fetchAIArtifacts(kind, forceRefresh, account, s, source)"),
         "fetchAIArtifacts must take the snapshot explicitly");
     });
@@ -2058,6 +2058,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         },
         querySelector: () => null,
         querySelectorAll: () => [],
+        removeAttribute(name) { delete this[name]; },
         nodes: [],
         append(...nodes) {
           for (const n of nodes) { this.nodes.push(n); this.textContent += typeof n === "string" ? n : n.textContent; }
@@ -2122,7 +2123,10 @@ test("posts/add default remains replace=yes for existing callers", () => {
           calls.order.push("permission");
           if (o.permissionError) throw o.permissionError();
         },
-        pbpSanitizeAiOverrides, resolveTagCase, AI_TAG_CAP,
+        // A case that sends real custom entries over the bus passes a sanitizer
+        // evaluated with the real URL constructor (this page's global `const URL`
+        // string shadows it for shared.js's own copy).
+        pbpSanitizeAiOverrides: o.sanitize || pbpSanitizeAiOverrides, resolveTagCase, AI_TAG_CAP,
         $id: (id) => (id in fields ? fields[id] : null),
         getOrCreateInflight: (key, factory) => {
           if (inflight.has(key)) return inflight.get(key);
@@ -2158,7 +2162,10 @@ test("posts/add default remains replace=yes for existing callers", () => {
         showAIError: (kind, e) => calls.errors.push({ kind, e }),
         t: tEn,
         AI_PROVIDER_LABEL, pbpAiProviderLabel, pbpAiModelNotFoundText: () => ({ msg: "", hint: "" }),
-        pickFallbackProvider: () => null,
+        pickFallbackProvider: o.fallback ? o.fallback.pickFallbackProvider : () => null,
+        _aiPopupProviderLabel: o.fallback ? o.fallback._aiPopupProviderLabel : (_s, id) => pbpAiProviderLabel(id),
+        _aiFallbackTried: o.tried || { tags: new Set(), summary: new Set() },
+        _aiErrorLastSettings: null,
         pbpAiStatusPageUrl: o.statusPageUrl || (() => ""),
         _aiErrorLastOp: null, _aiErrorLastPermission: null, _aiErrorHideTimer: null,
         pbpAiFastCached: async () => null,
@@ -2441,30 +2448,209 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
     // Ollama has no key, so hasAIKey() is true for it unconditionally; the
     // fallback must not offer it to a user who never set it up.
+    // ---- Fallback chain fixtures (T7) ------------------------------------
+    // The real ai.js helpers, evaluated together with a second copy of
+    // shared.js so both see the real URL constructor: this page's global
+    // `const URL` string shadows it for the copy loaded by <script>, which
+    // would make every custom entry's base URL (and its sealed key) invalid.
+    const aiJsSource = await (await fetch("../ai.js")).text();
+    const realAi = new Function("t", "URL", "chrome", sharedSource + "\n" + aiJsSource +
+      "\nreturn { hasAIKey, pbpAiResolveTarget, pbpAiExpandProviderOrder, pbpAiFirstConfiguredProvider, pbpAiCustomKeySeal, pbpSanitizeAiOverrides };")(
+      tEn, window.URL, undefined);
+    const fallbackSrc = popupAiSource.slice(popupAiSource.indexOf("const AI_PROVIDER_ORDER = ["),
+      popupAiSource.indexOf("function showAIError(op, err, opSettings)"));
+    const buildFallback = ({ granted = false } = {}) => new Function(
+      "hasAIKey", "pbpAiResolveTarget", "pbpAiExpandProviderOrder", "pbpAiFirstConfiguredProvider",
+      "SETTINGS_DEFAULTS", "_aiTargetOriginPattern", "chrome", "t",
+      fallbackSrc + "\nreturn { pbpAiFallbackCandidates, pickFallbackProvider, _aiPopupProviderLabel, probe: _aiProbeOllamaGrant };")(
+      realAi.hasAIKey, realAi.pbpAiResolveTarget, realAi.pbpAiExpandProviderOrder, realAi.pbpAiFirstConfiguredProvider,
+      SETTINGS_DEFAULTS, () => "http://localhost/*", { permissions: { contains: async () => granted } }, tEn);
+    const orderAt = popupAiSource.indexOf("const AI_PROVIDER_ORDER = [") + "const AI_PROVIDER_ORDER = ".length;
+    const SOURCE_ORDER = JSON.parse(popupAiSource.slice(orderAt, popupAiSource.indexOf("];", orderAt) + 1));
+    const B = { id: "custom-bbbbbb", name: "Relay B", protocol: "openai", baseUrl: "https://b.example/v1", model: "mb", slot: 2 };
+    const C = { id: "custom-cccccc", name: "Relay C", protocol: "anthropic", baseUrl: "https://c.example/v1", model: "mc", slot: 3 };
+    const chainBase = {
+      ...SETTINGS_DEFAULTS, aiProvider: "openai", openaiApiKey: "k",
+      customDisplayName: "Relay A", customBaseUrl: "https://a.example/v1", customApiKey: "ka", customModel: "ma",
+      aiCustomProviders: [B, C],
+      customApiKey2: realAi.pbpAiCustomKeySeal(B, "kb"), customApiKey3: realAi.pbpAiCustomKeySeal(C, "kc"),
+    };
+    assert(chainBase.customApiKey2 && chainBase.customApiKey3, "fixture keys did not seal");
+    const chainSettings = { ...chainBase, ollamaBaseUrl: SETTINGS_DEFAULTS.ollamaBaseUrl, ollamaModel: SETTINGS_DEFAULTS.ollamaModel };
+    const failQuota = async () => ({ ok: false, error: { message: "Insufficient balance", status: 402 } });
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
     await testAsync("the error card offers Ollama as a fallback only once it is granted or configured", async () => {
-      const aiSource = await (await fetch("../ai.js")).text();
-      const resolveTarget = new Function("OPENAI_COMPAT_PROVIDERS",
-        aiSource.slice(aiSource.indexOf("// ---- Unified AI target resolver ----"), aiSource.indexOf("// ---- Thinking-disable")) + "\nreturn pbpAiResolveTarget;")({});
-      const realHasKey = new Function("pbpAiResolveTarget",
-        aiSource.slice(aiSource.indexOf("function hasAIKey(s)"), aiSource.indexOf("// ---- Host-permission gate")) + "\nreturn hasAIKey;")(resolveTarget);
-      assert(realHasKey({ aiProvider: "ollama" }) === true, "precondition changed: hasAIKey no longer waves Ollama through");
-      const src = popupAiSource.slice(popupAiSource.indexOf("const AI_PROVIDER_ORDER = ["),
-        popupAiSource.indexOf("function showAIError(op, err, opSettings)"));
-      const hasAIKey = (s) => s.aiProvider === "ollama" || (s.aiProvider === "custom" ? !!s.customApiKey : !!s[s.aiProvider + "ApiKey"]);
-      const build = (granted) => new Function("hasAIKey", "SETTINGS_DEFAULTS", "_aiTargetOriginPattern", "chrome", "t",
-        src + "\nreturn { pickFallbackProvider, probe: _aiProbeOllamaGrant };")(
-        hasAIKey, SETTINGS_DEFAULTS, () => "http://localhost/*",
-        { permissions: { contains: async () => granted } }, (k) => k);
+      assert(realAi.hasAIKey({ aiProvider: "ollama" }) === true, "precondition changed: hasAIKey no longer waves Ollama through");
       const defaults = { ...SETTINGS_DEFAULTS, aiProvider: "openai", openaiApiKey: "k" };
-      const fresh = build(false);
+      const fresh = buildFallback({ granted: false });
       await fresh.probe(defaults);
       assert(fresh.pickFallbackProvider(defaults) === null, "a single-provider user was offered " + fresh.pickFallbackProvider(defaults));
-      assert(fresh.pickFallbackProvider({ ...defaults, customApiKey: "c" }) === "custom", "Ollama still shadows a configured custom endpoint");
+      assert(fresh.pickFallbackProvider({ ...defaults, customBaseUrl: "https://a.example/v1", customApiKey: "c" }) === "custom",
+        "Ollama still shadows a configured custom endpoint");
       assert(fresh.pickFallbackProvider({ ...defaults, ollamaModel: "qwen3:8b" }) === "ollama", "a changed Ollama model does not count as set up");
-      const granted = build(true);
+      const granted = buildFallback({ granted: true });
       await granted.probe(defaults);
       assert(granted.pickFallbackProvider(defaults) === "ollama", "a granted Ollama origin does not count as set up");
       assert(granted.pickFallbackProvider({ ...defaults, aiProvider: "ollama" }) === "openai", "a failed Ollama did not fall back to the keyed provider");
+    });
+
+    await testAsync("fallback wrappers delegate to ai.js and skip every provider this run tried", async () => {
+      const f = buildFallback({ granted: false });
+      await f.probe(chainBase);
+      const candidates = f.pbpAiFallbackCandidates(chainBase);
+      assert(same(candidates, realAi.pbpAiExpandProviderOrder(chainBase, SOURCE_ORDER)),
+        "the popup expands the order itself: " + candidates.join(","));
+      const at = candidates.indexOf("custom");
+      assert(at >= 0 && candidates[at + 1] === "custom-bbbbbb" && candidates[at + 2] === "custom-cccccc",
+        "entries are not expanded in place after custom: " + candidates.join(","));
+      const minimax = candidates.indexOf("minimax"), ollama = candidates.indexOf("ollama");
+      assert(["ark", "opencode", "commandcode"].every((p) => candidates.indexOf(p) > minimax && candidates.indexOf(p) < ollama),
+        "ark/opencode/commandcode are not between minimax and ollama: " + candidates.join(","));
+      assert(f.pickFallbackProvider(chainBase, new Set(["openai"])) === "custom", "the first entry is not offered first");
+      assert(f.pickFallbackProvider({ ...chainBase, aiProvider: "custom" }, new Set(["openai", "custom"])) === "custom-bbbbbb",
+        "the second entry is not offered after the first");
+      assert(f.pickFallbackProvider({ ...chainBase, aiProvider: "custom-cccccc" },
+        new Set(["openai", "custom", "custom-bbbbbb"])) === null, "a provider this run already tried was offered again");
+      const dangling = { ...chainBase, aiProvider: "custom-zzzzzz" };
+      assert(f.pickFallbackProvider(dangling) === "openai", "a dangling current id did not fall back to the keyed provider");
+      assert(!f.pbpAiFallbackCandidates(dangling).includes("custom-zzzzzz"), "a dangling id became a candidate");
+      // Real hasAIKey, no stub: a missing key or an envelope sealed to another
+      // address is not "set up".
+      const afterA = new Set(["openai", "custom"]);
+      assert(f.pickFallbackProvider({ ...chainBase, aiProvider: "custom", customApiKey2: "" }, afterA) === "custom-cccccc",
+        "an entry without a key was offered");
+      const moved = { ...chainBase, aiProvider: "custom", aiCustomProviders: [{ ...B, baseUrl: "https://evil.example/v1" }, C] };
+      assert(f.pickFallbackProvider(moved, afterA) === "custom-cccccc", "an entry whose sealed key belongs to another address was offered");
+    });
+
+    await testAsync("the error card walks A → B → C, then hides Try-with; a fresh operation starts the chain over", async () => {
+      const h = makePopupAi({ realErrorCard: true, settings: chainSettings, fallback: buildFallback(), respond: failQuota,
+        sanitize: realAi.pbpSanitizeAiOverrides });
+      const btn = h.el["ai-error-fallback"], retry = h.el["ai-error-retry"];
+      const offered = () => (btn.classList.contains("hidden") ? null : btn.dataset.provider);
+      await h.doAISummary(false);
+      assert(offered() === "custom", "openai failed but the card offered " + offered());
+      await h.doAISummary(true, { ...h.snapshot, aiProvider: "custom" });
+      assert(offered() === "custom-bbbbbb", "A failed but the card offered " + offered());
+      await h.doAISummary(true, { ...h.snapshot, aiProvider: "custom-bbbbbb" });
+      assert(offered() === "custom-cccccc", "B failed but the card offered " + offered());
+      assert(!retry.classList.contains("hidden"), "Retry left the card mid-chain");
+      await h.doAISummary(true, { ...h.snapshot, aiProvider: "custom-cccccc" });
+      assert(btn.classList.contains("hidden") && !("provider" in btn.dataset) && !btn.title, "Try-with stayed after every provider was tried");
+      assert(!retry.classList.contains("hidden"), "Retry left the card once the chain ran out");
+      await h.doAISummary(false);
+      assert(offered() === "custom", "a fresh operation did not start the chain over: " + offered());
+    });
+
+    await testAsync("tags and summary keep separate fallback chains", async () => {
+      const tried = { tags: new Set(), summary: new Set() };
+      const h = makePopupAi({ realErrorCard: true, settings: chainSettings, fallback: buildFallback(), respond: failQuota,
+        sanitize: realAi.pbpSanitizeAiOverrides, tried });
+      const btn = h.el["ai-error-fallback"];
+      await h.doAISummary(false);
+      await h.doAISummary(true, { ...h.snapshot, aiProvider: "custom" });
+      assert(btn.dataset.provider === "custom-bbbbbb", "summary chain did not advance: " + btn.dataset.provider);
+      await h.doAITags(false);
+      assert(!btn.classList.contains("hidden") && btn.dataset.provider === "custom", "the tags chain inherited summary's tries: " + btn.dataset.provider);
+      assert(tried.summary.has("custom") && !tried.tags.has("custom"), "the two chains share one tried set");
+    });
+
+    await testAsync("Try-with names the custom entry by its user-given name, as text", async () => {
+      const f = buildFallback();
+      const h = makePopupAi({ realErrorCard: true, settings: { ...chainSettings, customDisplayName: "<b>Relay A</b>" },
+        fallback: f, respond: failQuota, sanitize: realAi.pbpSanitizeAiOverrides });
+      const btn = h.el["ai-error-fallback"];
+      await h.doAISummary(false);
+      assert(btn.textContent === tEn("aiErrorTryWith", "<b>Relay A</b>"), "Try-with does not name the entry: " + btn.textContent);
+      assert(btn.title === btn.textContent, "the full name is not in the tooltip: " + btn.title);
+      await h.doAISummary(true, { ...h.snapshot, aiProvider: "custom" });
+      const shown = h.el["ai-error-message"].textContent;
+      assert(shown.startsWith("[<b>Relay A</b>] "), "the failed entry is not named by its own name: " + shown);
+      assert(f._aiPopupProviderLabel(chainSettings, "openai") === "OpenAI", "a built-in lost its short brand name");
+    });
+
+    test("AI progress names a custom entry by its user-given name", () => {
+      const zh = { provCustomShort: "自定义", aiStage_calling: "调用 {provider}…" };
+      const tZh = (key) => zh[key] || key;
+      const { pbpAiProviderLabel: labelZh } = new Function("t", providerLabelSource +
+        "; return { pbpAiProviderLabel };")(tZh);
+      const progressSrc = popupAiSource.slice(popupAiSource.indexOf("function setAiProgress("),
+        popupAiSource.indexOf("function clearAiProgress("));
+      const run = (args) => {
+        const label = { textContent: "", setAttribute() {} };
+        const btn = { childNodes: [], dataset: {}, classList: { contains: () => false }, querySelector: () => label };
+        new Function("$id", "t", "pbpAiProviderLabel", "AI_BUTTON_BASE_TEXT", "AI_STAGE_STARTED", "AI_STAGE_TIMERS", "Node", "setTimeout",
+          progressSrc + "\nreturn setAiProgress;")(() => btn, tZh, labelZh, new Map(), new Map(), new Map(), { TEXT_NODE: 3 }, () => 0)(
+          "ai-summary-btn", args);
+        return label.textContent;
+      };
+      const named = run({ provider: "custom-bbbbbb", stage: "calling", label: "Relay B" });
+      assert(named === " · 调用 Relay B…", "progress does not name the entry: " + named);
+      const bare = run({ provider: "custom", stage: "calling" });
+      assert(bare === " · 调用 自定义…", "progress without a label lost the display-name helper: " + bare);
+    });
+
+    await testAsync("Retry reruns the failed snapshot; Try-with overlays only aiProvider; neither touches global settings", async () => {
+      const handlerSrc = popupAiSource.slice(popupAiSource.indexOf('$id("ai-error-retry")?.addEventListener'),
+        popupAiSource.indexOf('$id("ai-error-details-toggle")?.addEventListener'));
+      assert(handlerSrc.includes("ai-error-fallback"), "error card handlers not found");
+      const global = { ...chainSettings, aiProvider: "openai", customModel: "GLOBAL" };
+      const globalJson = JSON.stringify(global);
+      const failed = { ...chainSettings, aiProvider: "custom-bbbbbb", customModel: "FAILED" };
+      const build = ({ permission = null, granted = true, op = "summary" } = {}) => {
+        const calls = { run: [], request: [] };
+        const handlers = {};
+        const els = {};
+        const $id = (id) => (els[id] = els[id] || { id, disabled: false, dataset: {},
+          addEventListener(type, fn) { handlers[id] = fn; } });
+        new Function("$id", "hideAIError", "doAITags", "doAISummary", "requestAIHostPermissions", "_aiTargetOriginPattern",
+          "settings", "_aiErrorLastOp", "_aiErrorLastPermission", "_aiErrorLastSettings", handlerSrc)(
+          $id, () => {}, async (f, s) => calls.run.push({ op: "tags", f, s }), async (f, s) => calls.run.push({ op: "summary", f, s }),
+          async (s, extra) => { calls.request.push({ s, extra }); return granted; }, () => "https://b.example/*",
+          global, op, permission, failed);
+        const click = (id, provider) => {
+          const el = $id(id);
+          if (provider) el.dataset.provider = provider;
+          return handlers[id]({ currentTarget: el, preventDefault() {} });
+        };
+        return { calls, click };
+      };
+      const retry = build();
+      await retry.click("ai-error-retry");
+      assert(retry.calls.run.length === 1, "Retry ran " + retry.calls.run.length + " times");
+      assert(same(retry.calls.run[0].s, failed) && retry.calls.run[0].s !== failed, "Retry did not rerun a copy of the failed snapshot");
+      assert(JSON.stringify(global) === globalJson, "Retry touched the global settings");
+
+      const tryWith = build();
+      await tryWith.click("ai-error-fallback", "custom-cccccc");
+      assert(tryWith.calls.run.length === 1 && same(tryWith.calls.run[0].s, { ...failed, aiProvider: "custom-cccccc" }),
+        "Try-with did not overlay only aiProvider on the failed snapshot");
+      assert(JSON.stringify(global) === globalJson, "Try-with touched the global settings");
+
+      const permission = { settings: { ...failed }, stage: "calling", origins: ["https://b.example/*", "https://r.jina.ai/*"] };
+      const grant = build({ permission });
+      await grant.click("ai-error-retry");
+      assert(grant.calls.request.length === 1 && same(grant.calls.request[0].extra, ["https://r.jina.ai/*"]),
+        "the grant retry did not ask once for the extra origin");
+      assert(grant.calls.run.length === 1 && grant.calls.run[0].s.customModel === "FAILED" && same(grant.calls.run[0].s, failed),
+        "the grant retry did not rerun the whole failed snapshot");
+
+      const denied = build({ permission, granted: false });
+      await denied.click("ai-error-retry");
+      assert(denied.calls.run.length === 0, "a denied grant still ran the op");
+    });
+
+    await testAsync("a Try-with on a custom entry sends its id and list over the bus, never its key", async () => {
+      const h = makePopupAi({ settings: { ...chainSettings, aiProvider: "custom-bbbbbb", customApiKey2: realAi.pbpAiCustomKeySeal(B, "sk-B-SECRET") },
+        sanitize: realAi.pbpSanitizeAiOverrides });
+      await h.fetchAIArtifacts("summary", true, h.account, h.snapshot, "local");
+      const msg = h.calls.sent[0];
+      assert(msg && msg.aiOverrides.aiProvider === "custom-bbbbbb", "the entry id did not travel");
+      assert(same(msg.aiOverrides.aiCustomProviders, [B, C]), "the entry list did not travel: " + JSON.stringify(msg.aiOverrides.aiCustomProviders));
+      assert(!Object.keys(msg.aiOverrides).some((k) => /^customApiKey/.test(k)), "a key slot rode the overrides");
+      assert(!JSON.stringify(msg).includes("sk-B-SECRET"), "the entry's key reached the message bus");
+      assert(!("customDisplayName" in msg.aiOverrides), "the display name rode the overrides");
     });
 
     await testAsync("a bus answer with no envelope renders the localized unknown error", async () => {

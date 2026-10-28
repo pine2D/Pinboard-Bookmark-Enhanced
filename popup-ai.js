@@ -35,7 +35,9 @@ function pbpPopupAiAccountIsCurrent(account) {
   return !!account && pbpPopupAiAccount() === account;
 }
 
-function setAiProgress(buttonId, { provider, stage }) {
+// `label` names the provider when the caller already resolved it (a custom
+// entry's own name); otherwise the id's display name.
+function setAiProgress(buttonId, { provider, stage, label }) {
   const btn = $id(buttonId);
   if (!btn) return;
   if (!AI_BUTTON_BASE_TEXT.has(buttonId)) {
@@ -54,7 +56,7 @@ function setAiProgress(buttonId, { provider, stage }) {
   }
   btn.dataset.stage = stage;
   const tpl = t(`aiStage_${stage}`) || "";
-  labelEl.textContent = " · " + tpl.replace("{provider}", provider ? pbpAiProviderLabel(provider) : "AI");
+  labelEl.textContent = " · " + tpl.replace("{provider}", label || (provider ? pbpAiProviderLabel(provider) : "AI"));
   labelEl.setAttribute("data-slow-hint", t("aiSlowHint") || "");
 
   const startedAt = AI_STAGE_STARTED.get(buttonId) || Date.now();
@@ -198,7 +200,7 @@ function pbpEnsureVideoModule() {
 // configured source.
 async function pbpAiTranscriptText(s, buttonId) {
   if (!(await pbpAiVideoGrant(s))) return "";
-  if (buttonId) setAiProgress(buttonId, { provider: s.aiProvider, stage: "transcript" });
+  if (buttonId) setAiProgress(buttonId, { provider: s.aiProvider, stage: "transcript", label: _aiPopupProviderLabel(s, s.aiProvider) });
   try { await pbpEnsureVideoModule(); } catch (e) { console.warn("[pbp-video] popup transcript module:", e && e.message); return ""; }
   let sess = null;
   try {
@@ -436,6 +438,13 @@ async function pbpAiLoadSummaryOwnership(account, url, description) {
 // ---- AI Error Card ----
 let _aiErrorLastOp = null; // "summary" | "tags"
 let _aiErrorLastPermission = null;
+// Every provider one operation chain already tried, per op: Try-with never
+// offers one twice, and hides once nothing is left. A fresh user-started
+// operation (doAI* without a snapshot) clears its own op's chain.
+const _aiFallbackTried = { tags: new Set(), summary: new Set() };
+// The settings snapshot the failed op ran with: Retry reruns exactly it and
+// Try-with overlays only the provider on it, never the global settings.
+let _aiErrorLastSettings = null;
 
 // Fallback provider order: stable list, current provider gets skipped.
 const AI_PROVIDER_ORDER = [
@@ -464,15 +473,10 @@ function pbpAiProviderLabel(key) {
 // Ollama needs no key, so hasAIKey() is always true for it and every
 // single-provider user used to be offered "Try with Ollama" on failure.
 // It only counts as set up once its origin is granted (the options Test
-// button asks for it) or the user changed its URL/model from the defaults.
-// Probed once at setup, read-only; the card renders synchronously.
+// button asks for it) or the user changed its URL/model from the defaults
+// (ai.js's pbpAiFirstConfiguredProvider judges both; the grant is probed
+// here). Probed once at setup, read-only; the card renders synchronously.
 let _aiOllamaGranted = false;
-function _aiOllamaConfigured(s) {
-  if (_aiOllamaGranted) return true;
-  const d = typeof SETTINGS_DEFAULTS === "object" && SETTINGS_DEFAULTS ? SETTINGS_DEFAULTS : {};
-  return (s.ollamaBaseUrl !== undefined && s.ollamaBaseUrl !== d.ollamaBaseUrl)
-    || (s.ollamaModel !== undefined && s.ollamaModel !== d.ollamaModel);
-}
 async function _aiProbeOllamaGrant(s) {
   try {
     const pattern = _aiTargetOriginPattern({ ...s, aiProvider: "ollama" });
@@ -482,14 +486,23 @@ async function _aiProbeOllamaGrant(s) {
 }
 
 // Find first provider OTHER than `current` that the user actually set up, by
-// iterating AI_PROVIDER_ORDER. Returns null if no fallback is available.
-function pickFallbackProvider(s) {
-  const current = s.aiProvider || "gemini";
-  for (const p of AI_PROVIDER_ORDER) {
-    if (p === current) continue;
-    if (p === "ollama" ? _aiOllamaConfigured(s) : hasAIKey({ ...s, aiProvider: p })) return p;
-  }
-  return null;
+// iterating AI_PROVIDER_ORDER with "custom" expanded in place into every
+// configured entry (ai.js owns both steps; these are thin wrappers). Neither
+// the provider that just failed nor any in `tried` is offered. Returns null
+// if no fallback is available.
+function pbpAiFallbackCandidates(s) {
+  return pbpAiExpandProviderOrder(s, AI_PROVIDER_ORDER);
+}
+function pickFallbackProvider(s, tried = new Set()) {
+  return pbpAiFirstConfiguredProvider(s, new Set([...tried, s.aiProvider || "gemini"]),
+    { ollamaGranted: _aiOllamaGranted, order: AI_PROVIDER_ORDER });
+}
+
+// Status/error name for a provider: a custom entry (or a dangling entry id)
+// by the resolver's name, a built-in by the popup's short brand name above.
+function _aiPopupProviderLabel(s, id) {
+  const target = pbpAiResolveTarget(s, id);
+  return target.kind === "custom" ? target.label : pbpAiProviderLabel(id);
 }
 
 function showAIError(op, err, opSettings) {
@@ -498,6 +511,7 @@ function showAIError(op, err, opSettings) {
   // not whatever the global settings hold by the time it renders.
   const s = opSettings || settings;
   _aiErrorLastOp = op;
+  _aiErrorLastSettings = { ...s };
   _aiErrorLastPermission = err?.code === "host_permission" ? {
     settings: { ...s },
     stage: err.permissionStage,
@@ -506,7 +520,7 @@ function showAIError(op, err, opSettings) {
   const card = $id("ai-error-card");
   if (!card) return;
   const providerKey = (s.aiProvider || "openai");
-  const provLabel = pbpAiProviderLabel(providerKey);
+  const provLabel = _aiPopupProviderLabel(s, providerKey);
   $id("ai-error-title").textContent = t("aiErrorTitle", op === "tags" ? t("aiErrorOpTags") : t("aiErrorOpSummary"));
   const msgEl = $id("ai-error-message");
 
@@ -550,18 +564,24 @@ function showAIError(op, err, opSettings) {
   // Fallback button: show when another provider has a valid key
   const fallbackBtn = $id("ai-error-fallback");
   if (fallbackBtn) {
-    // Pick relative to the provider that actually FAILED (Codex r2 L5):
-    // after a fallback-provider failure, choosing from the global default
-    // could re-offer the provider that just failed.
-    const next = pickFallbackProvider(s);
+    // Pick relative to the provider that actually FAILED (Codex r2 L5),
+    // skipping every one this operation chain already tried: after a
+    // fallback-provider failure, choosing from the global default could
+    // re-offer the provider that just failed.
+    const tried = _aiFallbackTried[op];
+    if (tried) tried.add(s.aiProvider || "gemini");
+    const next = pickFallbackProvider(s, tried || new Set());
     if (next) {
-      const nextLabel = pbpAiProviderLabel(next);
+      const nextLabel = _aiPopupProviderLabel(s, next);
       fallbackBtn.textContent = t("aiErrorTryWith", nextLabel) || `Try with ${nextLabel}`;
+      // A long entry name is ellipsized on the card; the tooltip keeps it whole.
+      fallbackBtn.title = fallbackBtn.textContent;
       fallbackBtn.dataset.provider = next;
       fallbackBtn.classList.remove("hidden");
     } else {
       fallbackBtn.classList.add("hidden");
       delete fallbackBtn.dataset.provider;
+      fallbackBtn.removeAttribute("title");
     }
   }
 
@@ -613,6 +633,7 @@ function hideAIError({ animate = false } = {}) {
   if (retryBtn) retryBtn.textContent = t("aiErrorRetry");
   _aiErrorLastOp = null;
   _aiErrorLastPermission = null;
+  _aiErrorLastSettings = null;
 }
 
 function setupAIFeatures() {
@@ -626,7 +647,8 @@ function setupAIFeatures() {
     try {
       const op = _aiErrorLastOp;
       const recovery = _aiErrorLastPermission;
-      if (!op) return;
+      const failed = _aiErrorLastSettings;
+      if (!op || !failed) return;
       if (recovery) {
         const providerOrigin = _aiTargetOriginPattern(recovery.settings);
         const extraOrigins = recovery.origins.filter(origin => origin !== providerOrigin);
@@ -638,9 +660,9 @@ function setupAIFeatures() {
       // GLOBAL settings.aiProvider for the await's duration, so a
       // concurrent tags/summary op could read the wrong provider
       // mid-flight and the interleaved finally could restore a stale one.
-      const opSettings = recovery
-        ? { ...settings, aiProvider: recovery.settings.aiProvider }
-        : undefined;
+      // Retry reruns the snapshot that failed (a Try-with provider, its
+      // model and the rest), not whatever the global settings hold now.
+      const opSettings = { ...failed };
       if (op === "tags") await doAITags(true, opSettings);
       else if (op === "summary") await doAISummary(true, opSettings);
     } finally {
@@ -650,12 +672,14 @@ function setupAIFeatures() {
   $id("ai-error-fallback")?.addEventListener("click", async (e) => {
     const next = e.currentTarget.dataset.provider;
     const op = _aiErrorLastOp;
-    if (!next || !op) return;
+    const failed = _aiErrorLastSettings;
+    if (!next || !op || !failed) return;
     // One-shot override via an immutable snapshot (audit A4) — never by
     // mutating the global settings: a concurrent op would read the swapped
     // provider mid-flight. Nothing to restore; the global stays untouched.
+    // Only the provider changes on the snapshot that failed.
     hideAIError();
-    const opSettings = { ...settings, aiProvider: next };
+    const opSettings = { ...failed, aiProvider: next };
     if (op === "tags") await doAITags(true, opSettings);
     else if (op === "summary") await doAISummary(true, opSettings);
   });
@@ -1100,6 +1124,9 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s, source) {
 async function doAISummary(forceRefresh, sOverride) {
   const btn = $id("ai-summary-btn");
   const s = { ...(sOverride || settings) };
+  // No snapshot = an operation the user started afresh (the error card's
+  // Retry / Try-with always pass one): its fallback chain starts over.
+  if (!sOverride) _aiFallbackTried.summary.clear();
   const account = pbpPopupAiAccount();
   if (!account) return;
   if (!hasAIKey(s)) { showSetKeyError(); return; }
@@ -1134,17 +1161,17 @@ async function doAISummary(forceRefresh, sOverride) {
       }
     }
 
-    if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "extracting" });
+    if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "extracting", label: _aiPopupProviderLabel(s, s.aiProvider) });
     const contentSource = await ensurePageText(s, showProgressOnBtn ? "ai-summary-btn" : "");
     if (!_aiOpStillCurrent(account)) return;
     if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
-    if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "calling" });
+    if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "calling", label: _aiPopupProviderLabel(s, s.aiProvider) });
     const summary = await fetchAIArtifacts("summary", forceRefresh, account, s, contentSource);
     // account-only here: the result belongs to pageInfo.url and SHOULD be
     // cached even if the URL field drifted; the stillCurrent gate below
     // protects the form commit.
     if (!pbpPopupAiAccountIsCurrent(account)) return;
-    if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "parsing" });
+    if (showProgressOnBtn) setAiProgress("ai-summary-btn", { provider: s.aiProvider, stage: "parsing", label: _aiPopupProviderLabel(s, s.aiProvider) });
     // A8, now enforced on BOTH sides of the bus: an empty half is a miss. The
     // worker already declines to file one; caching "" here would re-create
     // exactly the sticky fake success it is avoiding, for the whole TTL.
@@ -1267,6 +1294,9 @@ async function doAITags(forceRefresh, sOverride) {
   const btn = $id("ai-tags-btn");
   const container = $id("ai-suggest-tags");
   const s = { ...(sOverride || settings) };
+  // No snapshot = an operation the user started afresh (the error card's
+  // Retry / Try-with always pass one): its fallback chain starts over.
+  if (!sOverride) _aiFallbackTried.tags.clear();
   const account = pbpPopupAiAccount();
   if (!account) return;
   hideAIError();
@@ -1294,16 +1324,16 @@ async function doAITags(forceRefresh, sOverride) {
   }
 
   try {
-    if (showProgressOnBtn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "extracting" });
+    if (showProgressOnBtn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "extracting", label: _aiPopupProviderLabel(s, s.aiProvider) });
     const contentSource = await ensurePageText(s, showProgressOnBtn ? "ai-tags-btn" : "");
     if (!_aiOpStillCurrent(account)) return;
     if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
-    if (showProgressOnBtn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "calling" });
+    if (showProgressOnBtn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "calling", label: _aiPopupProviderLabel(s, s.aiProvider) });
     const tags = await fetchAIArtifacts("tags", forceRefresh, account, s, contentSource);
     // account-only here: cache the paid result regardless of URL drift;
     // the stillCurrent gate below protects the chip render.
     if (!pbpPopupAiAccountIsCurrent(account)) return;
-    if (showProgressOnBtn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "parsing" });
+    if (showProgressOnBtn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "parsing", label: _aiPopupProviderLabel(s, s.aiProvider) });
     // Empty result = miss, never a cached fake success (same ruling as the
     // combined-parse halves above): caching [] would make every later click
     // return "no tags" for free until the entry expired.
