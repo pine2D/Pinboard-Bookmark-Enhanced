@@ -2082,8 +2082,13 @@ test("posts/add default remains replace=yes for existing callers", () => {
         aiTagSeparator: "-", optRespectTagCase: !!o.respectCase,
         openaiApiKey: "sk-live-SECRET", pinboardToken: "alice:SECRET-TOKEN",
       }, o.settings || {});
+      // A field the sanitizer validates gets a value it keeps. The entry has no
+      // base URL yet (legal for a new entry): this page's global `const URL`
+      // string shadows the URL constructor the address predicate needs.
+      const keepable = { customProtocol: "anthropic",
+        aiCustomProviders: [{ id: "custom-fp0001", name: "FP", protocol: "openai", baseUrl: "", model: "fp", slot: 2 }] };
       for (const field of PBP_AI_OVERRIDE_FIELDS) {
-        if (!(field in snapshot)) snapshot[field] = "fp-" + field;
+        if (!(field in snapshot)) snapshot[field] = Object.hasOwn(keepable, field) ? keepable[field] : "fp-" + field;
       }
       const account = o.account || "alice";
       const container = fakeEl();
@@ -2190,7 +2195,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         msg.account === h.account && msg.cacheDuration === 60, "the message lost a cache coordinate");
       assert(msg.inflightKey === `${h.account}|openai#summary|summary|${URL}|jina`,
         "the popup's inflight key must travel verbatim, got " + msg.inflightKey);
-      const missing = PBP_AI_OVERRIDE_FIELDS.filter((f) => msg.aiOverrides[f] !== h.snapshot[f]);
+      // By value: the entry list is rebuilt on the way out, never the same array.
+      const missing = PBP_AI_OVERRIDE_FIELDS.filter((f) => JSON.stringify(msg.aiOverrides[f]) !== JSON.stringify(h.snapshot[f]));
       assert(missing.length === 0, "the overrides dropped fingerprint inputs: " + missing.join(","));
       assert(API_KEY_FIELDS.every((f) => !(f in msg.aiOverrides)), "a credential field rode the overrides");
       const wire = JSON.stringify(msg);

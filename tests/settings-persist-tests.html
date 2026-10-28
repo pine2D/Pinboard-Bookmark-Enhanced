@@ -947,6 +947,197 @@ async function run() {
     _settingsStorageCache = prevPrimeCache;
   })();
 
+  // ---------- AI custom providers ----------
+  // Storage shape, address-bound key envelopes and the single field
+  // predicates the Settings page and the backup guard also use (R3).
+  await (async () => {
+    // A missing constant or function is a red row, never an aborted page.
+    const safe = (fn) => { try { return fn(); } catch (_) { return false; } };
+    const E = { id: "custom-ab12cd", name: "Relay A", protocol: "openai", baseUrl: "https://gw.example/v1/", model: "m-1", slot: 3 };
+    const project = (e) => ({ id: e.id, name: e.name, protocol: e.protocol, baseUrl: e.baseUrl, model: e.model, slot: e.slot });
+    const url300 = "https://gw.example/" + "a".repeat(300 - "https://gw.example/".length);
+    const ACCEPT_URLS = ["https://gw.example/v1", "https://gw.example/v1/", "https://xn--fsqu00a.example/v1",
+      "http://localhost:8080/v1", "http://127.0.0.1/v1", "http://[::1]:3000/v1", url300];
+    const REJECT_URLS = ["", "http://192.168.1.2/v1", "https://u:p@x.example/v1", "https://gw.example/v1?k=1",
+      "https://gw.example/v1#a", "https://gw.example/v1?", " https://gw.example/v1", "https://gw.example/v 1",
+      "https://例子.example/v1", "https://gw.example\\v1", "ftp://x.example", url300 + "a", null, 42];
+    const ACCEPT_NAMES = ["Relay A", "a".repeat(40), "😀".repeat(20), "👩‍💻 Relay"];
+    const REJECT_NAMES = ["", "   ", "a".repeat(41), "😀".repeat(21), "a\tb", "a\nb", "a\u007f", null, 7];
+    const ACCEPT_MODELS = ["", "m-1", "m".repeat(120)];
+    const REJECT_MODELS = ["m".repeat(121), "m\n", null, 7];
+
+    check("AC1 constants and id predicate", safe(() =>
+      JSON.stringify(PBP_AI_CUSTOM_SLOTS) === "[2,3,4,5,6,7,8]" && PBP_AI_CUSTOM_MAX === 8 &&
+      pbpAiCustomEntryIdOk("custom-ab12cd") === true &&
+      ["custom-AB12CD", "custom-ab12c", "custom-ab12cd9", "custom:ab12cd", "custom", "", null, undefined]
+        .every((id) => pbpAiCustomEntryIdOk(id) === false)));
+    check("AC2 key field per slot", safe(() =>
+      pbpAiCustomKeyField(3) === "customApiKey3" && pbpAiCustomKeyField(1) === "customApiKey" &&
+      pbpAiCustomKeyField(8) === "customApiKey8" && pbpAiCustomKeyField(9) === "" && pbpAiCustomKeyField("3") === ""));
+    check("AC3 seal/open round trip", safe(() => {
+      const sealed = pbpAiCustomKeySeal(E, "sk-test");
+      return sealed.startsWith("obf:") &&
+        pbpAiCustomKeyOpen({ customApiKey3: deobfuscateKey(sealed) }, E) === "sk-test" &&
+        pbpAiCustomKeyOpen({ customApiKey3: sealed }, E) === "sk-test" &&
+        pbpAiCustomKeyOpen({ customApiKey3: sealed }, { ...E, baseUrl: "https://gw.example/v1" }) === "sk-test" &&
+        pbpAiEndpointNorm(" https://gw.example/v1/ ") === "https://gw.example/v1";
+    }));
+    check("AC4 seal refuses", safe(() =>
+      pbpAiCustomKeySeal(E, "") === "" &&
+      pbpAiCustomKeySeal({ ...E, baseUrl: "http://192.168.1.2/v1" }, "sk") === "" &&
+      pbpAiCustomKeySeal({ ...E, baseUrl: "" }, "sk") === ""));
+    check("AC5 binding mismatch fails closed", safe(() => {
+      const s = { customApiKey3: pbpAiCustomKeySeal(E, "sk-test"), customApiKey4: "" };
+      return pbpAiCustomKeyOpen(s, E) === "sk-test" &&
+        [{ id: "custom-zz99zz" }, { baseUrl: "https://evil.example/v1" }, { protocol: "anthropic" }, { slot: 4 }]
+          .every((patch) => pbpAiCustomKeyOpen(s, { ...E, ...patch }) === "");
+    }));
+    check("AC6 malformed slot values", safe(() => {
+      // Hand-built envelopes (not Seal's output): the stored shape itself.
+      const env = (o) => obfuscateKey(JSON.stringify({ v: 1, entryId: E.id, baseUrl: "https://gw.example/v1", protocol: "openai", key: "sk-x", ...o }));
+      return pbpAiCustomKeyOpen({ customApiKey3: env({}) }, E) === "sk-x" &&
+        ["sk-raw", "{not json", env({ v: 2 }), env({ key: 42 })]
+          .every((v) => pbpAiCustomKeyOpen({ customApiKey3: v }, E) === "");
+    }));
+    check("AC7 field predicates accept", safe(() =>
+      url300.length === 300 &&
+      ACCEPT_URLS.every((u) => pbpAiCustomBaseUrlOk(u) === true) &&
+      ACCEPT_NAMES.every((n) => pbpAiCustomNameOk(n) === true) &&
+      "😀".repeat(20).length === 40 &&
+      ACCEPT_MODELS.every((m) => pbpAiCustomModelOk(m) === true)));
+    check("AC8 field predicates reject", safe(() =>
+      REJECT_URLS.every((u) => pbpAiCustomBaseUrlOk(u) === false) &&
+      // Norm trims first, so only the padded spelling is excluded here (AC3).
+      REJECT_URLS.filter((u) => u !== " https://gw.example/v1").every((u) => pbpAiEndpointNorm(u) === "") &&
+      REJECT_NAMES.every((n) => pbpAiCustomNameOk(n) === false) &&
+      REJECT_MODELS.every((m) => pbpAiCustomModelOk(m) === false)));
+    check("AC9 sanitize projects valid lists", safe(() => {
+      const input = [{ ...E, extra: 1 }];
+      const out = pbpSanitizeAiCustomProviders(input);
+      const fresh = { id: "custom-new001", name: "New", protocol: "anthropic", baseUrl: "", model: "", slot: 2 };
+      return JSON.stringify(out) === JSON.stringify([project(E)]) && out[0] !== input[0] &&
+        JSON.stringify(pbpSanitizeAiCustomProviders([])) === "[]" &&
+        JSON.stringify(pbpSanitizeAiCustomProviders([fresh])) === JSON.stringify([fresh]);
+    }));
+    check("AC10 sanitize rejects whole list", safe(() => {
+      const e2 = { ...E, id: "custom-ef34gh", slot: 4 };
+      const seven = [2, 3, 4, 5, 6, 7, 8].map((slot, i) => ({ ...E, id: "custom-aaaaa" + i, slot }));
+      const bad = [
+        "x", null, {}, [null], [...seven, { ...E, id: "custom-bbbbbb", slot: 8 }],
+        [E, { ...e2, id: E.id }], [E, { ...e2, slot: 3 }],
+        [{ ...E, slot: 1 }], [{ ...E, slot: 9 }], [{ ...E, slot: "3" }],
+        [{ ...E, id: "custom" }], [{ ...E, id: "custom-AB12CD" }], [{ ...E, protocol: "gemini" }],
+        [E, { ...e2, name: "a\tb" }], [{ ...E, name: undefined }], [{ ...E, baseUrl: "https://gw.example/v1?k=1" }],
+        [{ ...E, model: "m\n" }],
+        [{ ...E, apiKey: "x" }], [{ ...E, token: "x" }], [{ ...E, clientSecret: "x" }], [{ ...E, Password: "x" }],
+      ];
+      return pbpSanitizeAiCustomProviders(seven)?.length === 7 &&
+        bad.every((list) => pbpSanitizeAiCustomProviders(list) === null);
+    }));
+    check("AC11 worst-case list stays under one sync item", safe(() => {
+      // BMP Han is three UTF-8 bytes per code unit: the heaviest legal text.
+      const list = [2, 3, 4, 5, 6, 7, 8].map((slot, i) => ({ id: "custom-wc000" + i, name: "汉".repeat(40),
+        protocol: "anthropic", baseUrl: url300, model: "汉".repeat(120), slot }));
+      const clean = pbpSanitizeAiCustomProviders(list);
+      return Array.isArray(clean) && clean.length === 7 &&
+        new TextEncoder().encode("aiCustomProviders" + JSON.stringify(clean)).length < 8192;
+    }));
+    check("AC12 entries order", safe(() => {
+      const D = SETTINGS_DEFAULTS;
+      const e2 = { ...E, id: "custom-ef34gh", slot: 4 };
+      const base = { ...D, customBaseUrl: "https://proxy.example/v1" };
+      const only = pbpAiCustomEntries(base);
+      const anth = pbpAiCustomEntries({ ...base, customProtocol: "anthropic" });
+      const both = pbpAiCustomEntries({ ...base, aiCustomProviders: [E, e2] });
+      const broken = pbpAiCustomEntries({ ...base, aiCustomProviders: [E, { ...e2, slot: 3 }] });
+      return JSON.stringify(pbpAiCustomEntries(D)) === "[]" &&
+        only.length === 1 && only[0].id === "custom" && only[0].slot === 1 && only[0].protocol === "openai" &&
+        anth.length === 1 && anth[0].protocol === "anthropic" &&
+        JSON.stringify(both.map((e) => e.id)) === JSON.stringify(["custom", E.id, e2.id]) &&
+        JSON.stringify(broken.map((e) => e.id)) === '["custom"]';
+    }));
+    check("AC13 the retired customName never makes a ghost entry", safe(() =>
+      JSON.stringify(pbpAiCustomEntries({ ...SETTINGS_DEFAULTS, customName: "Custom" })) === "[]" &&
+      JSON.stringify(pbpAiCustomEntries({ ...SETTINGS_DEFAULTS, customDisplayName: "X" })) === "[]" &&
+      JSON.stringify(pbpAiCustomEntries({ ...SETTINGS_DEFAULTS, customProtocol: "anthropic" })) === "[]" &&
+      JSON.stringify(pbpAiCustomEntries({ ...SETTINGS_DEFAULTS, customBaseUrl: "  ", customModel: " " })) === "[]"));
+    check("AC14 slots are credentials and defaults are inert", safe(() => {
+      const slots = [2, 3, 4, 5, 6, 7, 8].map((n) => "customApiKey" + n);
+      return slots.every((k) => API_KEY_FIELDS.includes(k) && SETTINGS_DEFAULTS[k] === "") &&
+        SETTINGS_DEFAULTS.customDisplayName === "" && SETTINGS_DEFAULTS.customProtocol === "openai" &&
+        Array.isArray(SETTINGS_DEFAULTS.aiCustomProviders) && SETTINGS_DEFAULTS.aiCustomProviders.length === 0 &&
+        !API_KEY_FIELDS.includes("aiCustomProviders") && !("customName" in SETTINGS_DEFAULTS);
+    }));
+
+    // AC15: the E4 end-to-end fixture, keys-off. The list is an ordinary
+    // setting; the sealed slot is a credential.
+    {
+      const prevChrome = globalThis.chrome;
+      const localWrites = [];
+      let syncSet = null, ok = false;
+      globalThis.chrome = {
+        storage: {
+          local: {
+            get: (keys) => Promise.resolve((Array.isArray(keys) || typeof keys === "object") ? { optSyncEnabled: true, syncApiKeys: false } : {}),
+            set: (d) => { localWrites.push(d); return Promise.resolve(); },
+          },
+        },
+      };
+      globalThis.__pbpTestStorage = { set: (d) => { syncSet = d; return Promise.resolve(); }, get: () => Promise.resolve({}) };
+      globalThis.__pbpTestSyncSetLarge = () => Promise.resolve();
+      try {
+        const sealed = pbpAiCustomKeySeal(E, "sk-test");
+        const r = await persistSettings({ aiCustomProviders: [E], customApiKey3: sealed });
+        const syncText = JSON.stringify(syncSet || {});
+        ok = r.ok === true && !!sealed && !!syncSet && Array.isArray(syncSet.aiCustomProviders) &&
+          syncSet.aiCustomProviders[0].id === E.id && !("customApiKey3" in syncSet) &&
+          !syncText.includes(btoa("sk")) && !syncText.includes(sealed) &&
+          localWrites.some((w) => typeof w.customApiKey3 === "string" && w.customApiKey3 !== "");
+      } catch (_) { ok = false; }
+      finally {
+        globalThis.chrome = prevChrome;
+        delete globalThis.__pbpTestStorage;
+        delete globalThis.__pbpTestSyncSetLarge;
+      }
+      check("AC15 keys-off routing", ok);
+    }
+
+    // AC16: the E3b prime fixtures plus a local-only one. The list defaults
+    // to [] on read and only a user action writes it.
+    {
+      const prevChrome = globalThis.chrome;
+      const prevCache = _settingsStorageCache;
+      const firsts = [];
+      try {
+        for (const fixture of [
+          { local: { optSyncEnabled: true }, keys: false, area: "sync" },
+          { local: { optSyncEnabled: true }, keys: true, area: "sync" },
+          { local: { optSyncEnabled: false }, keys: false, area: "local" },
+        ]) {
+          const primeWrites = [];
+          const record = async (data) => { primeWrites.push(data); };
+          globalThis.chrome = {
+            storage: {
+              local: { get: async () => ({ ...fixture.local }), remove: async () => {}, set: fixture.area === "local" ? record : async () => {} },
+              sync: {
+                get: async (keys) => typeof keys === "string" ? { syncApiKeys: fixture.keys } : {},
+                set: fixture.area === "sync" ? record : async () => {},
+              },
+            },
+          };
+          _settingsStorageCache = null;
+          await primeSettings();
+          firsts.push(primeWrites[0] || null);
+        }
+      } finally {
+        globalThis.chrome = prevChrome;
+        _settingsStorageCache = prevCache;
+      }
+      check("AC16 prime never seeds the list", firsts.length === 3 &&
+        firsts.every((w) => w && Object.prototype.hasOwnProperty.call(w, "optTheme") && !("aiCustomProviders" in w)));
+    }
+  })();
+
   // Dictionary display upgrades preserve the actual old preference, not
   // the false default inserted by object-form storage.get.
   await (async () => {
@@ -1041,6 +1232,13 @@ async function run() {
         }
       }
       check("backup accepts exactly the gateway formats", formatsOk && formatRejected === 4);
+      // One format list (shared.js PBP_AI_PROTOCOLS): every protocolField the
+      // registry declares has a backup enum equal to it, like the regions above.
+      const protocolFields = Object.values(registry).filter((cfg) => cfg.protocolField).map((cfg) => cfg.protocolField);
+      const formats = typeof PBP_AI_PROTOCOLS !== "undefined" ? [...PBP_AI_PROTOCOLS].sort().join(",") : "";
+      check("backup format enums equal PBP_AI_PROTOCOLS for every registry protocolField",
+        formats === "anthropic,openai" && protocolFields.length >= 2 &&
+        protocolFields.every((f) => [...(PBP_BACKUP_ENUMS[f] || [])].sort().join(",") === formats));
       // R7/R17: a value this version does not know (synced from a newer
       // device) is left out of the form's save, so storage keeps it as is.
       let roundTrip = typeof pbpOptKnownEnumPatch === "function";

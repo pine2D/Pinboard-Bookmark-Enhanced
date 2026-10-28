@@ -718,6 +718,28 @@ function buildRouterHarness(source, opts) {
     return !("aiCacheDuration" in out) && !("exportTargets" in out) && !("pinboardToken" in out);
   });
 
+  // Custom provider entries: the list is rebuilt field by field, never passed
+  // through, and the sealed slot keys stay with the worker.
+  const CP_ENTRY = { id: "custom-ab12cd", name: "Relay A", protocol: "openai", baseUrl: "https://gw.example/v1/", model: "m-1", slot: 3 };
+  await testCase("W1 the whitelist carries customProtocol and a sanitized aiCustomProviders", async () => {
+    const out = pbpSanitizeAiOverrides({ aiProvider: CP_ENTRY.id, customProtocol: "anthropic",
+      aiCustomProviders: [{ ...CP_ENTRY, extra: 1 }], customDisplayName: "X" });
+    const unknown = pbpSanitizeAiOverrides({ aiProvider: "custom", customProtocol: "gemini" });
+    return out.aiProvider === CP_ENTRY.id && out.customProtocol === "anthropic" &&
+      JSON.stringify(out.aiCustomProviders) === JSON.stringify([CP_ENTRY]) &&
+      !("customDisplayName" in out) && unknown.aiProvider === "custom" && !("customProtocol" in unknown);
+  });
+
+  await testCase("W2 an entry smuggling a credential drops the whole list off the bus", async () => {
+    const out = pbpSanitizeAiOverrides({ aiProvider: CP_ENTRY.id, aiCustomProviders: [{ ...CP_ENTRY, apiKey: "POISON-entry" }] });
+    return out.aiProvider === CP_ENTRY.id && !("aiCustomProviders" in out) && !JSON.stringify(out).includes("POISON");
+  });
+
+  await testCase("W3 sealed slot keys never ride the overrides", async () => {
+    const out = pbpSanitizeAiOverrides({ ...SETTINGS_DEFAULTS, aiProvider: CP_ENTRY.id, aiCustomProviders: [CP_ENTRY], customApiKey3: "sk-LIVE-slot" });
+    return Array.isArray(out.aiCustomProviders) && out.aiCustomProviders.length === 1 && !JSON.stringify(out).includes("sk-LIVE");
+  });
+
   await testCase("the settings handed to the provider hold the WORKER's stored key, not the message's", async () => {
     const h = buildAiHarness(source, {
       settings: { openaiApiKey: "sk-live-REAL", aiProvider: "openai", aiTagSeparator: "-" },

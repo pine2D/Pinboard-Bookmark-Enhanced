@@ -1145,10 +1145,6 @@ function pbpArmCloudHintSyncRetest() {
   onChanged.addListener(retest);
 }
 
-// The API formats a registry entry with a protocolField accepts (ai.js
-// _aiProtocolOf). Only these are written back from the format selects.
-const PBP_OPT_AI_PROTOCOLS = ["openai", "anthropic"];
-
 // The settings patch for an enumerated select: {key: value} when the value is
 // one this version knows, else {} so the save leaves the stored value alone.
 // A select whose stored value is unknown here (synced from a newer version)
@@ -3784,10 +3780,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       ...pbpOptKnownEnumPatch("arkRegion", $id("opt-ark-region").value, Object.keys(OPENAI_COMPAT_PROVIDERS.ark.regions)),
       opencodeApiKey: obfuscateKey($id("opt-opencode-key").value.trim()),
       opencodeModel: $id("opt-opencode-model").value.trim() || "glm-5.3-flash",
-      ...pbpOptKnownEnumPatch("opencodeProtocol", $id("opt-opencode-protocol").value, PBP_OPT_AI_PROTOCOLS),
+      ...pbpOptKnownEnumPatch("opencodeProtocol", $id("opt-opencode-protocol").value, PBP_AI_PROTOCOLS),
       commandcodeApiKey: obfuscateKey($id("opt-commandcode-key").value.trim()),
       commandcodeModel: $id("opt-commandcode-model").value.trim() || "deepseek/deepseek-v4-flash",
-      ...pbpOptKnownEnumPatch("commandcodeProtocol", $id("opt-commandcode-protocol").value, PBP_OPT_AI_PROTOCOLS),
+      ...pbpOptKnownEnumPatch("commandcodeProtocol", $id("opt-commandcode-protocol").value, PBP_AI_PROTOCOLS),
       ollamaBaseUrl: $id("opt-ollama-baseurl").value.trim() || "http://localhost:11434",
       ollamaModel: $id("opt-ollama-model").value.trim() || "llama3.2",
       customBaseUrl: $id("opt-custom-baseurl").value.trim(),

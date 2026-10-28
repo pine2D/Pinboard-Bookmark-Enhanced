@@ -554,6 +554,11 @@ const SETTINGS_DEFAULTS = {
   commandcodeApiKey: "", commandcodeModel: "deepseek/deepseek-v4-flash", commandcodeProtocol: "openai",
   ollamaBaseUrl: "http://localhost:11434", ollamaModel: "llama3.2",
   customApiKey: "", customModel: "", customBaseUrl: "",
+  // More custom provider entries (aiCustomProviders, non-secret) with sealed
+  // keys in slots 2..8; customDisplayName / customProtocol belong to the first
+  // entry ("custom", slot 1). The retired customName stays out of here (R1).
+  customDisplayName: "", customProtocol: "openai", aiCustomProviders: [],
+  customApiKey2: "", customApiKey3: "", customApiKey4: "", customApiKey5: "", customApiKey6: "", customApiKey7: "", customApiKey8: "",
   aiTagLang: "en", aiSummaryLang: "auto", aiCacheDuration: 60,
   aiContentSource: "local", jinaApiKey: "",
   customTagPrompt: "", customSummaryPrompt: "",
@@ -2009,7 +2014,10 @@ async function pbpDrainOfflineQueue(queueIds, { getItem, sendItem, removeItem, o
 //   object-form get against SETTINGS_DEFAULTS), so absence costs nothing but
 //   the boot-lag micro-optimization on one key.
 // Never seed the retired boolean: absence distinguishes a new installation.
-const PRIME_EXCLUDED_KEYS = ["bgSaveMode", "dictAiAutoGenerate"];
+//   aiCustomProviders -- a missing list reads as [] and only a user action
+//   writes it; a primed [] on a fresh device would win last-writer-wins over
+//   the list the cloud already holds and erase every synced entry.
+const PRIME_EXCLUDED_KEYS = ["bgSaveMode", "dictAiAutoGenerate", "aiCustomProviders"];
 
 function pbpDictDefaultView(settings = {}) {
   if (["dictionary", "ai-saved", "ai-generate"].includes(settings.dictDefaultView)) return settings.dictDefaultView;
@@ -2670,7 +2678,141 @@ async function persistSettings(data) {
   }
 }
 
-const API_KEY_FIELDS = ["pinboardToken","karakeepToken","linkdingToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","arkApiKey","opencodeApiKey","commandcodeApiKey","customApiKey","jinaApiKey","waybackS3Key","waybackS3Secret","dictAnkiKey","dictEudicToken"];
+// ---- AI custom providers ----------------------------------------------------
+// The API formats a user-chosen endpoint can speak: OpenAI-compatible Chat
+// Completions or Anthropic Messages. One list for every reader of a format
+// setting (ai.js resolver, Settings selects, the entry sanitizer below).
+const PBP_AI_PROTOCOLS = Object.freeze(["openai", "anthropic"]);
+
+// Entry "custom" is slot 1 (customBaseUrl / customApiKey / customModel /
+// customDisplayName / customProtocol). Further entries live in the synced
+// aiCustomProviders list, each owning one key slot customApiKey2..8.
+const PBP_AI_CUSTOM_SLOTS = Object.freeze([2, 3, 4, 5, 6, 7, 8]);
+const PBP_AI_CUSTOM_MAX = 8;
+
+function pbpAiCustomEntryIdOk(id) {
+  return typeof id === "string" && /^custom-[a-z0-9]{6}$/.test(id);
+}
+
+// The three field predicates are the ONLY standard (R3): the sanitizer below,
+// the Settings form before it saves and the backup guard all call them, so a
+// value one of them accepts is never thrown out by another. Lengths are JS
+// .length (UTF-16 code units).
+// A base URL: printable ASCII only (an IDN goes in as punycode), at most 300,
+// HTTPS or literal-loopback HTTP, with no credentials, query or fragment.
+function pbpAiCustomBaseUrlOk(url) {
+  if (typeof url !== "string" || !/^[\x21-\x7e]{1,300}$/.test(url) || /[\\?#]/.test(url)) return false;
+  if (!pbpEndpointOriginPattern(url)) return false;
+  try {
+    const u = new URL(url);
+    return !u.username && !u.password && !u.search && !u.hash;
+  } catch (_) { return false; }
+}
+// A display name: 1..40 code units with something besides whitespace, no
+// control characters (emoji and ZWJ sequences are fine). The bound applies
+// to the stored text, so whitespace padding cannot grow the synced list.
+function pbpAiCustomNameOk(name) {
+  return typeof name === "string" && name.length <= 40 && name.trim().length > 0 && !/\p{Cc}/u.test(name);
+}
+// A model id: empty (not filled in yet) or up to 120 code units, no control
+// characters.
+function pbpAiCustomModelOk(model) {
+  return typeof model === "string" && model.length <= 120 && !/\p{Cc}/u.test(model);
+}
+
+// The canonical form of an entry's base URL: trimmed, then accepted by the
+// predicate above, with trailing slashes removed; "" when not acceptable.
+// Seal, Open and the resolver all compare and send this form.
+function pbpAiEndpointNorm(url) {
+  const text = typeof url === "string" ? url.trim() : "";
+  return pbpAiCustomBaseUrlOk(text) ? text.replace(/\/+$/, "") : "";
+}
+
+// The settings key holding a slot's key: slot 1 is the first entry's plain
+// customApiKey; 2..8 hold sealed envelopes; anything else has none.
+function pbpAiCustomKeyField(slot) {
+  if (slot === 1) return "customApiKey";
+  return PBP_AI_CUSTOM_SLOTS.includes(slot) ? "customApiKey" + slot : "";
+}
+
+// A list entry's key is stored sealed to the entry: id, normalised base URL
+// and format travel inside the (obfuscated, not encrypted) envelope, and Open
+// returns the key only while all three still match. A synced list edited on
+// another device to point the same id elsewhere therefore never sends this
+// device's key to the new address. "" when there is nothing safe to seal.
+function pbpAiCustomKeySeal(entry, key) {
+  if (!entry || !pbpAiCustomEntryIdOk(entry.id) || typeof key !== "string" || !key) return "";
+  if (!PBP_AI_PROTOCOLS.includes(entry.protocol)) return "";
+  const baseUrl = pbpAiEndpointNorm(entry.baseUrl);
+  if (!baseUrl) return "";
+  return obfuscateKey(JSON.stringify({ v: 1, entryId: entry.id, baseUrl, protocol: entry.protocol, key }));
+}
+
+// The key an entry may use, or "". Deobfuscates by itself (idempotent), since
+// a settings read may hand over either form. The first entry has no envelope:
+// its key is the plain customApiKey, as it always was (design §6.1).
+function pbpAiCustomKeyOpen(settings, entry) {
+  const s = settings || {};
+  if (!entry) return "";
+  if (entry.id === "custom") return deobfuscateKey(s.customApiKey) || "";
+  if (!pbpAiCustomEntryIdOk(entry.id)) return "";
+  const field = pbpAiCustomKeyField(entry.slot);
+  if (!field || field === "customApiKey") return "";
+  const raw = deobfuscateKey(s[field]);
+  if (typeof raw !== "string" || !raw) return "";
+  let env;
+  try { env = JSON.parse(raw); } catch (_) { return ""; }
+  if (!env || typeof env !== "object" || env.v !== 1) return "";
+  const baseUrl = pbpAiEndpointNorm(entry.baseUrl);
+  if (!baseUrl || env.entryId !== entry.id || env.baseUrl !== baseUrl || env.protocol !== entry.protocol) return "";
+  return typeof env.key === "string" && env.key ? env.key : "";
+}
+
+// The synced entry list, projected to its six fields, or null when ANY entry
+// is malformed: ids and slots unique, at most seven entries (slot 1 is the
+// first entry), each field through its predicate; a base URL or model may be
+// "" on an entry not filled in yet. A field whose name looks like a secret
+// rejects the whole list, so a credential can never ride it anywhere. Readers
+// treat null as an empty list; nothing here repairs or drops single entries.
+function pbpSanitizeAiCustomProviders(list) {
+  if (!Array.isArray(list) || list.length > PBP_AI_CUSTOM_SLOTS.length) return null;
+  const ids = new Set(), slots = new Set(), out = [];
+  for (const e of list) {
+    if (!e || typeof e !== "object" || Array.isArray(e)) return null;
+    if (Object.keys(e).some((k) => /key|token|secret|password/i.test(k))) return null;
+    if (!pbpAiCustomEntryIdOk(e.id) || ids.has(e.id)) return null;
+    if (!PBP_AI_CUSTOM_SLOTS.includes(e.slot) || slots.has(e.slot)) return null;
+    if (!PBP_AI_PROTOCOLS.includes(e.protocol)) return null;
+    if (!pbpAiCustomNameOk(e.name) || !pbpAiCustomModelOk(e.model)) return null;
+    if (typeof e.baseUrl !== "string" || (e.baseUrl !== "" && !pbpAiCustomBaseUrlOk(e.baseUrl))) return null;
+    ids.add(e.id);
+    slots.add(e.slot);
+    out.push({ id: e.id, name: e.name, protocol: e.protocol, baseUrl: e.baseUrl, model: e.model, slot: e.slot });
+  }
+  return out;
+}
+
+// Every configured custom entry, "custom" first. The first entry counts only
+// when its address, key or model holds something (R1): a display name, a
+// format or the retired customName alone never conjures an entry.
+function pbpAiCustomEntries(s) {
+  const st = s || {};
+  const filled = (k) => typeof st[k] === "string" && st[k].trim() !== "";
+  const out = [];
+  if (filled("customBaseUrl") || filled("customApiKey") || filled("customModel")) {
+    out.push({
+      id: "custom",
+      name: typeof st.customDisplayName === "string" ? st.customDisplayName.trim() : "",
+      protocol: st.customProtocol === "anthropic" ? "anthropic" : "openai",
+      baseUrl: typeof st.customBaseUrl === "string" ? st.customBaseUrl : "",
+      model: typeof st.customModel === "string" ? st.customModel : "",
+      slot: 1,
+    });
+  }
+  return out.concat(pbpSanitizeAiCustomProviders(st.aiCustomProviders) || []);
+}
+
+const API_KEY_FIELDS = ["pinboardToken","karakeepToken","linkdingToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","arkApiKey","opencodeApiKey","commandcodeApiKey","customApiKey","customApiKey2","customApiKey3","customApiKey4","customApiKey5","customApiKey6","customApiKey7","customApiKey8","jinaApiKey","waybackS3Key","waybackS3Secret","dictAnkiKey","dictEudicToken"];
 
 // ---- PBP_AI_CALL override whitelist (K44) ----------------------------------
 // Non-secret settings a popup PBP_AI_CALL message may override for one call: the
@@ -2708,14 +2850,29 @@ const PBP_AI_OVERRIDE_FIELDS = Object.freeze([
   // them again (an unknown region or format, or a malformed workspace ID,
   // fails closed before any request).
   "qwenRegion", "qwenWorkspaceId", "arkRegion", "opencodeProtocol", "commandcodeProtocol",
+  // The first custom entry's format, and the entry list (an entry id in
+  // aiProvider resolves through it). The display name is not here: it never
+  // enters a fingerprint.
+  "customProtocol", "aiCustomProviders",
   "customTagPrompt", "customSummaryPrompt",
 ]);
 
+// The entry list is rebuilt from its field whitelist (pbpSanitizeAiCustomProviders),
+// never passed through as the received object: a malformed list, or one with
+// a credential-shaped field, leaves the bus entirely.
 function pbpSanitizeAiOverrides(raw) {
   const out = {};
   if (!raw || typeof raw !== "object") return out;
   for (const key of PBP_AI_OVERRIDE_FIELDS) {
     if (Object.prototype.hasOwnProperty.call(raw, key)) out[key] = raw[key];
+  }
+  if (Object.prototype.hasOwnProperty.call(out, "aiCustomProviders")) {
+    const list = pbpSanitizeAiCustomProviders(out.aiCustomProviders);
+    if (list) out.aiCustomProviders = list;
+    else delete out.aiCustomProviders;
+  }
+  if (Object.prototype.hasOwnProperty.call(out, "customProtocol") && !PBP_AI_PROTOCOLS.includes(out.customProtocol)) {
+    delete out.customProtocol;
   }
   // Belt and braces over the whitelist above: if a credential field is ever
   // renamed onto one of those names, it still must not survive the bus.
