@@ -145,6 +145,18 @@ for (const f of ["md-dict.js", "library-vocab.js", ...dictFiles]) {
   check(uiHtmlRe.test(f), `pre-commit UI_HTML_RE does not trigger on ${f}; ui-contract would meet it only in verify/CI`);
 }
 check(!uiHtmlRe.test("md-dict.json") && !uiHtmlRe.test("tests/dict-entry.js"), "pre-commit UI_HTML_RE must stay anchored to root .js files");
+// The edit-time hook runs layout-lint and the vocabulary gate, never
+// ui-contract, and layout-lint reads only the CSS and HTML files. So on the
+// JS side it governs exactly the files the commit-time vocabulary arm
+// (UI_VOCAB_RE) does: a dict-*.js module (no class tokens, not in the
+// registry) reaches ui-contract at commit time and neither edit-time gate
+// would read it, while md-dict.js is in both (it mints the lookup's classes).
+for (const f of readdirSync(root).filter((name) => name.endsWith(".js"))) {
+  check(governedRe.test(f) === uiVocabRe.test(f),
+    `ui-consumer-lint GOVERNED and pre-commit UI_VOCAB_RE disagree on ${f}; the edit-time hook and the commit-time vocabulary gate must cover the same JS`);
+}
+for (const f of dictFiles) check(!governedRe.test(f), `ui-consumer-lint GOVERNED matches ${f}, but neither edit-time gate reads it`);
+check(governedRe.test("md-dict.js"), "ui-consumer-lint GOVERNED must cover md-dict.js (it mints the lookup's class tokens)");
 
 if (fail.length) { console.error(fail.map((m) => `FAIL ${m}`).join("\n")); process.exit(1); }
 console.log("ui vocabulary tests ok");

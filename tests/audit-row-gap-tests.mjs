@@ -97,13 +97,17 @@ test('chip-row exemption still leaves off-token rhythm to spacingScale', () => {
     .map(hit => [hit.prop, hit.value]).sort(), [['column-gap', 5], ['row-gap', 5]]);
   assert.ok(!hits.some(hit => hit.path === 'body > #chips-4' && hit.kind === 'spacingScale'), '4px chip-row gap is on scale');
 });
+// The lookup's AI row is no icon cluster any more: since the one-column
+// redesign (plan 3.3) every action in it is icon + text, so even two
+// icon-only buttons there are an ordinary action row held to 8px -- the
+// 4px cluster rung no longer applies to them on either surface.
 for (const surface of ['library', 'md-preview']) {
   for (const [id, expected] of [
-    ['dict-icons-4', []], ['dict-icons-8', ['clusterGap']],
-    ['dict-mixed-label', ['actionRowGap']], ['dict-hidden-label', []],
+    ['dict-icons-4', ['actionRowGap']], ['dict-icons-8', []],
+    ['dict-mixed-label', ['actionRowGap']], ['dict-hidden-label', ['actionRowGap']],
     ['dict-outside-controls', ['actionRowGap']], ['dict-nested-actions', ['actionRowGap']],
   ]) {
-    test(`dictionary icon-cluster classification: ${surface} ${id}`, () => {
+    test(`dictionary AI row is an action row: ${surface} ${id}`, () => {
       assert.deepEqual(dictionaryHits.get(surface)
         .filter(hit => hit.path === `#${id}` && ['actionRowGap', 'clusterGap'].includes(hit.kind))
         .map(hit => hit.kind).sort(), expected);

@@ -236,11 +236,6 @@
     },
     {
       "surface": "library",
-      "token": "vocab-lookup-saved",
-      "structural": false
-    },
-    {
-      "surface": "library",
       "token": "vocab-main-status",
       "structural": false
     },

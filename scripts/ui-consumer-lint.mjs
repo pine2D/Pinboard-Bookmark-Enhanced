@@ -30,6 +30,13 @@
 // because they only judge the generated/hand-written files themselves, not
 // the composer/pilot sources that feed them.
 //
+// JS coverage mirrors the commit-time vocabulary arm (pre-commit UI_VOCAB_RE):
+// md-dict.js is here because it mints the lookup's class tokens; dict-*.js
+// is not, because it mints none and layout-lint reads only CSS/HTML -- both
+// gates would run and could never fail. Those modules meet ui-contract at
+// commit time (UI_HTML_RE), which is not an edit-time gate.
+// tests/ui-vocabulary-tests.mjs pins the two regexes to agree on every root .js.
+//
 // Manual use: node scripts/ui-consumer-lint.mjs --file options.html
 
 import { spawnSync } from "node:child_process";

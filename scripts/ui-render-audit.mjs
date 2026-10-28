@@ -8030,11 +8030,13 @@ const SWEEP_CFG = {
   //     Besides named cluster containers, registered compact members identify
   //     a cluster only when they are every visible child and carry no label.
   //     An arbitrary icon-only action row (e.g. export toggles) still uses 8px.
+  //     The lookup's AI row (.xp-dict-ai-controls) is no member any more:
+  //     since the one-column redesign (plan 3.3) every action in it is icon +
+  //     text, so it is an 8px action row that actionRowGap measures.
   clusterGap: {
     selectors: { library: ".lib-cluster", popup: ".header-icons", "md-preview": ".xp-window-actions" },
     members: {
-      library: ".xp-dict-ai-controls > button.xp-dict-connect",
-      "md-preview": ".reader-bookmark-ic, .xp-dict-ai-controls > button.xp-dict-connect",
+      "md-preview": ".reader-bookmark-ic",
     },
     expected: 4,
   },

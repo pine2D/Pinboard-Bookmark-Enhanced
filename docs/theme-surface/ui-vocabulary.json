@@ -414,8 +414,12 @@
         "xp-dict-action-error",
         "xp-dict-examples-hint",
         "xp-dict-examples-find",
+        "xp-dict-msg-ic",
+        "xp-dict-supplement-text",
+        "xp-dict-supplement-profile",
         "vocab-save-definition",
-        "vocab-lookup-save"
+        "vocab-lookup-save",
+        "vocab-lookup-saved"
       ],
       "canvasStructures": [
         "lib-header",
@@ -711,7 +715,10 @@
         "xp-dict-model",
         "xp-dict-action-error",
         "xp-dict-examples-hint",
-        "xp-dict-examples-find"
+        "xp-dict-examples-find",
+        "xp-dict-msg-ic",
+        "xp-dict-supplement-text",
+        "xp-dict-supplement-profile"
       ]
     },
     "shared": {
