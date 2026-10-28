@@ -480,7 +480,7 @@ Questions skipped: 复审问题已在授权范围内修复；当前没有需要�
 
 ### 施工对照与验证记录（2026-10-28）
 
-按 `docs/superpowers/plans/2026-10-27-dict-redesign-implementation.md`（本地计划，不入库）分批施工，`e5ae24a6..27915cee` 共 87 个提交，均在 main 上、尚未 push。区间按 `git log` 首尾提交标注：
+按 `docs/superpowers/plans/2026-10-27-dict-redesign-implementation.md`（本地计划，不入库）分批施工，`e5ae24a6^..27915cee`（含首尾）共 87 个提交，均在 main 上、尚未 push。区间按 `git log` 首尾提交标注：
 
 | 批次 | 提交区间（条数） | 落地内容 |
 |---|---|---|
