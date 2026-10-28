@@ -116,6 +116,8 @@ async function loadLocale(loc) {
     "provGemini","provOpenai","provClaude","provDeepseek","provQwen","provMinimax",
     "provOpenrouter","provGroq","provMistral","provCohere","provSiliconflow","provZhipu",
     "provKimi","provOllama","provCustom","provHuggingface","provQwenShort",
+    "provArk","provOpencode","provCommandcode", // brand names; only the zh locales write Volcengine Ark as 火山方舟
+    "optAiProtocolAnthropic", // API name plus its path: "Anthropic Messages (/messages)"
     "jinaMarkdownBtn","aiContentSourceJina","secJinaReader","mdStripObsidian","tabMarkdown",
     "labelAiTags","placeholderTags",
     "optUrlCleanCustomPlaceholder","optUrlCleanExcludePlaceholder","customCSSPlaceholder",
@@ -151,9 +153,9 @@ async function loadLocale(loc) {
   // Per-locale exemptions: a word that is genuinely the same in that one
   // language, so the key stays checked everywhere else.
   const LOCALE_SAME_OK = {
-    fr: new Set(["libraryCountPages", "libraryCountPagesOne", "readerBookmarkNotes", "askExportSources", "dictSupplementSources", "mdExportArticle", "mdExportSummaryArticle", "askHistoryTab"]), // These words, including "Questions", are also French
+    fr: new Set(["libraryCountPages", "libraryCountPagesOne", "readerBookmarkNotes", "askExportSources", "dictSupplementSources", "mdExportArticle", "mdExportSummaryArticle", "askHistoryTab", "optArkRegionIntl"]), // These words, including "Questions" and "International", are also French
     pl: new Set(["askExportModel", "labelAiRegion"]), // "Model" and "Region" are also Polish
-    de: new Set(["labelAiRegion"]), // "Region" is also German
+    de: new Set(["labelAiRegion", "optArkRegionIntl"]), // "Region" and "International" are also German
   };
   for (const loc of ["de","fr","pl","ru","zh_HK"]) {
     const offenders = Object.keys(msgs.en).filter(k =>

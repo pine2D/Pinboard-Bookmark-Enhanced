@@ -512,6 +512,12 @@ const AI_ORIGIN_CASES = [
   [{ aiProvider: "custom", customBaseUrl: "https://proxy.example/v1" }, "https://proxy.example/*"],
   [{ aiProvider: "qwen", qwenRegion: "singapore" }, "https://dashscope-intl.aliyuncs.com/*"],
   [{ aiProvider: "qwen", qwenWorkspaceId: "ws-7f3k9q" }, "https://ws-7f3k9q.cn-beijing.maas.aliyuncs.com/*"],
+  [{ aiProvider: "ark" }, "https://ark.cn-beijing.volces.com/*"],
+  [{ aiProvider: "ark", arkRegion: "intl" }, "https://ark.ap-southeast.bytepluses.com/*"],
+  [{ aiProvider: "opencode" }, "https://opencode.ai/*"],
+  [{ aiProvider: "opencode", opencodeProtocol: "anthropic" }, "https://opencode.ai/*"],
+  [{ aiProvider: "commandcode" }, "https://api.commandcode.ai/*"],
+  [{ aiProvider: "commandcode", commandcodeProtocol: "anthropic" }, "https://api.commandcode.ai/*"],
 ];
 
 // Alibaba Cloud Model Studio regions and workspaces (spec §6.4). Hosts are the
@@ -551,7 +557,7 @@ suite("endpoint origin policy", () => {
     ["https://*.example.com/v1", "https://%2a.example.com/v1", "https://%2A.example.com/v1"].forEach((url) =>
       assertEq(pbpEndpointOriginPattern(url), null, url));
   });
-  test("all 15 AI providers resolve to the origin actually fetched", () => {
+  test("every AI provider resolves to the origin actually fetched", () => {
     AI_ORIGIN_CASES.forEach(([settings, expected]) =>
       assertEq(_aiTargetOriginPattern(settings), expected, settings.aiProvider));
     assertEq(_aiTargetOriginPattern({ aiProvider: "openai", openaiBaseUrl: "https://azure.example:8443/openai" }), "https://azure.example:8443/*", "OpenAI override");
@@ -563,6 +569,24 @@ suite("endpoint origin policy", () => {
     let caught = null;
     try { _aiRequiredOriginPatterns({ aiProvider: "gemini" }, ["*://*/*"]); } catch (e) { caught = e; }
     assert(caught && caught.code === "endpoint_invalid", "invalid additional pattern rejected");
+  });
+});
+
+suite("Volcengine Ark regions and gateway formats", () => {
+  test("bad Ark region or gateway format fails closed", () => {
+    const cases = [
+      [{ aiProvider: "ark", arkRegion: "eu" }, "region_unknown"],
+      [{ aiProvider: "ark", arkRegion: "" }, "region_unknown"],
+      [{ aiProvider: "opencode", opencodeProtocol: "" }, "protocol_unknown"],
+      [{ aiProvider: "commandcode", commandcodeProtocol: "gemini" }, "protocol_unknown"],
+    ];
+    for (const [s, reason] of cases) {
+      let caught = null, origin;
+      try { origin = _aiTargetOriginPattern({ ...SETTINGS_DEFAULTS, ...s }); } catch (e) { caught = e; }
+      assert(caught, JSON.stringify(s) + " resolved to " + origin);
+      assertEq(caught.code, "endpoint_invalid", JSON.stringify(s) + " code");
+      assertEq(caught.reason, reason, JSON.stringify(s) + " reason");
+    }
   });
 });
 
@@ -1152,6 +1176,30 @@ suite("Model Studio regions and workspaces", () => {
         assertEq(document.getElementById("opt-qwen-region").value, "", "empty select value");
         assertEq(unknown.qwenRegion, "", "region passed through");
         assertEq(pbpAiResolveTarget(unknown).error, "endpoint_invalid", "fails closed");
+      } finally { fixture.remove(); }
+    });
+
+    await atest("live snapshot carries the unsaved Ark region and gateway formats", async () => {
+      const fixture = document.createElement("div");
+      fixture.innerHTML = '<select id="opt-ark-region"><option value="cn">C</option><option value="intl" selected>I</option></select>' +
+        '<select id="opt-opencode-protocol"><option value="openai">O</option><option value="anthropic" selected>A</option></select>' +
+        '<select id="opt-commandcode-protocol"><option value="openai" selected>O</option><option value="anthropic">A</option></select>';
+      document.body.appendChild(fixture);
+      try {
+        const snapshot = pbpLiveAiSettingsSnapshot("ark");
+        assertEq(snapshot.arkRegion, "intl", "region");
+        assertEq(snapshot.opencodeProtocol, "anthropic", "opencode format");
+        assertEq(snapshot.commandcodeProtocol, "openai", "commandcode format");
+        assertEq(pbpAiResolveTarget(snapshot).endpoint, "https://ark.ap-southeast.bytepluses.com/api/v3", "intl endpoint");
+        // A stored region this version does not know leaves the select on no
+        // option: the snapshot passes "" through and fails closed, never cn.
+        fixture.querySelector("#opt-ark-region").replaceChildren();
+        const unknown = pbpLiveAiSettingsSnapshot("ark");
+        assertEq(document.getElementById("opt-ark-region").value, "", "empty select value");
+        assertEq(unknown.arkRegion, "", "region passed through");
+        const target = pbpAiResolveTarget(unknown);
+        assertEq(target.error, "endpoint_invalid", "fails closed");
+        assert(!target.endpoint.includes("volces.com"), "fell back to cn: " + target.endpoint);
       } finally { fixture.remove(); }
     });
 

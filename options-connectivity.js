@@ -27,6 +27,13 @@ function pbpLiveAiSettingsSnapshot(provider) {
     siliconflowApiKey: getOptVal("opt-siliconflow-key"), siliconflowModel: getOptVal("opt-siliconflow-model", "Qwen/Qwen3-8B"),
     zhipuApiKey: getOptVal("opt-zhipu-key"), zhipuModel: getOptVal("opt-zhipu-model", "glm-4.7-flash"),
     kimiApiKey: getOptVal("opt-kimi-key"), kimiModel: getOptVal("opt-kimi-model", "kimi-k2.6"),
+    // Region and format selects pass "" through like the Model Studio region.
+    arkApiKey: getOptVal("opt-ark-key"), arkModel: getOptVal("opt-ark-model", "doubao-seed-2-0-mini-260428"),
+    arkRegion: $id("opt-ark-region")?.value ?? "cn",
+    opencodeApiKey: getOptVal("opt-opencode-key"), opencodeModel: getOptVal("opt-opencode-model", "glm-5.3-flash"),
+    opencodeProtocol: $id("opt-opencode-protocol")?.value ?? "openai",
+    commandcodeApiKey: getOptVal("opt-commandcode-key"), commandcodeModel: getOptVal("opt-commandcode-model", "deepseek/deepseek-v4-flash"),
+    commandcodeProtocol: $id("opt-commandcode-protocol")?.value ?? "openai",
     customApiKey: getOptVal("opt-custom-key"), customModel: getOptVal("opt-custom-model"), customBaseUrl: getOptVal("opt-custom-baseurl"),
   };
 }
@@ -150,16 +157,18 @@ function setupApiTests() {
       // calling it. Automatic/background paths stay contains-only and never prompt.
       let originPattern = null;
       let granted = false;
-      // Settings that form no request host (a regional provider's region or
-      // workspace) are caught here, synchronously and before any permission
-      // prompt, and point at the field to fix.
+      // Settings that form no request (a region, workspace or API format) are
+      // caught here, synchronously and before any permission prompt, and
+      // point at the field to fix.
       try {
         originPattern = _aiTargetOriginPattern(cs);
       } catch (err) {
         if (err?.code === "endpoint_invalid" && err.reason) {
           setStatusResult(statusEl, false, err.message);
           recordHealth(`ai:${provider}`, false, "endpoint_invalid");
-          const field = err.reason === "region_unknown" ? $id(`opt-${provider}-region-btn`) : $id(`opt-${provider}-workspace`);
+          const field = err.reason === "region_unknown" ? $id(`opt-${provider}-region-btn`)
+            : err.reason === "protocol_unknown" ? $id(`opt-${provider}-protocol-btn`)
+            : $id(`opt-${provider}-workspace`);
           markFieldInvalid(field, statusEl.id);
           return;
         }
@@ -255,7 +264,7 @@ function setupApiTests() {
     }
   }
 
-  ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","ollama","custom"].forEach(p => {
+  ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","ark","opencode","commandcode","ollama","custom"].forEach(p => {
     $id(`test-${p}`)?.addEventListener("click", () => testAIProvider(p));
   });
 

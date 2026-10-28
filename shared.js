@@ -549,6 +549,9 @@ const SETTINGS_DEFAULTS = {
   siliconflowApiKey: "", siliconflowModel: "Qwen/Qwen3-8B",
   zhipuApiKey: "", zhipuModel: "glm-4.7-flash",
   kimiApiKey: "", kimiModel: "kimi-k2.6",
+  arkApiKey: "", arkModel: "doubao-seed-2-0-mini-260428", arkRegion: "cn",
+  opencodeApiKey: "", opencodeModel: "glm-5.3-flash", opencodeProtocol: "openai",
+  commandcodeApiKey: "", commandcodeModel: "deepseek/deepseek-v4-flash", commandcodeProtocol: "openai",
   ollamaBaseUrl: "http://localhost:11434", ollamaModel: "llama3.2",
   customApiKey: "", customModel: "", customBaseUrl: "",
   aiTagLang: "en", aiSummaryLang: "auto", aiCacheDuration: 60,
@@ -2667,7 +2670,7 @@ async function persistSettings(data) {
   }
 }
 
-const API_KEY_FIELDS = ["pinboardToken","karakeepToken","linkdingToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","customApiKey","jinaApiKey","waybackS3Key","waybackS3Secret","dictAnkiKey","dictEudicToken"];
+const API_KEY_FIELDS = ["pinboardToken","karakeepToken","linkdingToken","geminiApiKey","openaiApiKey","claudeApiKey","deepseekApiKey","qwenApiKey","minimaxApiKey","openrouterApiKey","groqApiKey","mistralApiKey","cohereApiKey","siliconflowApiKey","zhipuApiKey","kimiApiKey","arkApiKey","opencodeApiKey","commandcodeApiKey","customApiKey","jinaApiKey","waybackS3Key","waybackS3Secret","dictAnkiKey","dictEudicToken"];
 
 // ---- PBP_AI_CALL override whitelist (K44) ----------------------------------
 // Non-secret settings a popup PBP_AI_CALL message may override for one call: the
@@ -2697,12 +2700,14 @@ const PBP_AI_OVERRIDE_FIELDS = Object.freeze([
   "aiProvider", "aiTagLang", "aiSummaryLang", "aiTagSeparator", "optRespectTagCase",
   "geminiModel", "openaiModel", "claudeModel", "deepseekModel", "qwenModel",
   "minimaxModel", "openrouterModel", "groqModel", "mistralModel", "cohereModel",
-  "siliconflowModel", "zhipuModel", "kimiModel", "ollamaModel", "customModel",
+  "siliconflowModel", "zhipuModel", "kimiModel", "arkModel", "opencodeModel", "commandcodeModel",
+  "ollamaModel", "customModel",
   "openaiBaseUrl", "ollamaBaseUrl", "customBaseUrl",
-  // Region and workspace pick the request host. They ride the bus like the
-  // base URLs above; the worker's resolver validates them again (unknown
-  // region or malformed workspace ID fails closed before any request).
-  "qwenRegion", "qwenWorkspaceId",
+  // Region, workspace and API format pick the request host and caller. They
+  // ride the bus like the base URLs above; the worker's resolver validates
+  // them again (an unknown region or format, or a malformed workspace ID,
+  // fails closed before any request).
+  "qwenRegion", "qwenWorkspaceId", "arkRegion", "opencodeProtocol", "commandcodeProtocol",
   "customTagPrompt", "customSummaryPrompt",
 ]);
 

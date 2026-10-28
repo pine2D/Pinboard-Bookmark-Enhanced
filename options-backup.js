@@ -40,9 +40,14 @@ const PBP_BACKUP_ENUMS = Object.freeze({
   selectionTrigger: ["icon", "hotkey", "off"],
   dictDefaultView: ["dictionary", "ai-saved", "ai-generate"],
   dictLearnerLevel: ["", "beginner", "intermediate", "advanced"],
-  // Must equal the keys of ai.js's OPENAI_COMPAT_PROVIDERS.qwen.regions
-  // (settings-persist-tests evaluates the registry and compares).
+  // Each region enum must equal the keys of its registry entry's `regions` in
+  // ai.js's OPENAI_COMPAT_PROVIDERS (settings-persist-tests evaluates the
+  // registry and compares).
   qwenRegion: ["beijing", "singapore", "virginia", "tokyo"],
+  arkRegion: ["cn", "intl"],
+  // The formats ai.js _aiProtocolOf accepts for an entry with a protocolField.
+  opencodeProtocol: ["openai", "anthropic"],
+  commandcodeProtocol: ["openai", "anthropic"],
 });
 
 // Per-provider preview model overrides: keys must look like provider ids and

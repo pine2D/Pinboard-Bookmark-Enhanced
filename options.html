@@ -414,6 +414,9 @@
               <option value="siliconflow" data-i18n="provSiliconflow">SiliconFlow</option>
               <option value="zhipu" data-i18n="provZhipu">Zhipu</option>
               <option value="kimi" data-i18n="provKimi">Kimi</option>
+              <option value="ark" data-i18n="provArk">Volcengine Ark</option>
+              <option value="opencode" data-i18n="provOpencode">OpenCode Zen</option>
+              <option value="commandcode" data-i18n="provCommandcode">Command Code</option>
             </optgroup>
             <optgroup data-i18n-label="providerGroupLocal" label="Local">
               <option value="ollama" data-i18n="provOllama">Ollama (Local)</option>
@@ -478,7 +481,7 @@
           <h3 class="sr-only" data-i18n="provQwen">Alibaba Cloud Model Studio</h3>
           <div class="fg entry-block">
             <label class="bl" for="opt-qwen-region" data-i18n="labelAiRegion">Region</label>
-            <select id="opt-qwen-region" data-listbox aria-describedby="hint-qwen-region">
+            <select id="opt-qwen-region" data-listbox aria-describedby="hint-qwen-region qwen-workspace-warn">
               <option value="beijing" data-i18n="qwenRegionBeijing" selected>China (Beijing)</option>
               <option value="singapore" data-i18n="qwenRegionSingapore">Singapore</option>
               <option value="virginia" data-i18n="qwenRegionVirginia">US (Virginia)</option>
@@ -585,6 +588,66 @@
           <div class="fg-actions">
             <button class="btn btn-sm" id="test-kimi" data-i18n="testConnection">Test connection</button>
             <span class="save-status" id="test-kimi-status" role="status" aria-live="polite"></span>
+          </div>
+        </div>
+
+        <!-- Volcengine Ark -->
+        <div class="pf" hidden id="fields-ark">
+          <h3 class="sr-only" data-i18n="provArk">Volcengine Ark</h3>
+          <div class="fg entry-block">
+            <label class="bl" for="opt-ark-region" data-i18n="labelAiRegion">Region</label>
+            <select id="opt-ark-region" data-listbox aria-describedby="hint-ark-region ark-region-warn">
+              <option value="cn" data-i18n="optArkRegionCn" selected>China (Beijing)</option>
+              <option value="intl" data-i18n="optArkRegionIntl">International (BytePlus ModelArk)</option>
+            </select>
+            <p class="hint" id="hint-ark-region" data-i18n="hintArkRegion">The two regions are separate accounts: keys and model IDs from one do not work in the other.</p>
+            <p class="hint hint-warn" id="ark-region-warn" role="status" aria-live="polite" hidden></p>
+          </div>
+          <div class="fg entry-block"><label class="bl" for="opt-ark-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-ark-key" /><button type="button" class="key-toggle" data-target="opt-ark-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-ark-model" data-i18n="labelModel">Model</label><input type="text" id="opt-ark-model" value="doubao-seed-2-0-mini-260428" /></div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-ark" data-i18n="testConnection">Test connection</button>
+            <span class="save-status" id="test-ark-status" role="status" aria-live="polite"></span>
+          </div>
+        </div>
+
+        <!-- OpenCode Zen -->
+        <div class="pf" hidden id="fields-opencode">
+          <h3 class="sr-only" data-i18n="provOpencode">OpenCode Zen</h3>
+          <div class="fg entry-block"><label class="bl" for="opt-opencode-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-opencode-key" /><button type="button" class="key-toggle" data-target="opt-opencode-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://opencode.ai/console" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-opencode-model" data-i18n="labelModel">Model</label><input type="text" id="opt-opencode-model" value="glm-5.3-flash" /></div>
+          <div class="fg entry-block">
+            <label class="bl" for="opt-opencode-protocol" data-i18n="labelAiProtocol">API format</label>
+            <select id="opt-opencode-protocol" data-listbox aria-describedby="hint-opencode-protocol opencode-protocol-warn">
+              <option value="openai" data-i18n="optAiProtocolOpenai" selected>OpenAI-compatible (/chat/completions)</option>
+              <option value="anthropic" data-i18n="optAiProtocolAnthropic">Anthropic Messages (/messages)</option>
+            </select>
+            <p class="hint" id="hint-opencode-protocol" data-i18n="hintAiProtocolGateway">Pick the format this model is served on; the gateway's model list shows it.</p>
+            <p class="hint hint-warn" id="opencode-protocol-warn" role="status" aria-live="polite" hidden></p>
+          </div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-opencode" data-i18n="testConnection">Test connection</button>
+            <span class="save-status" id="test-opencode-status" role="status" aria-live="polite"></span>
+          </div>
+        </div>
+
+        <!-- Command Code -->
+        <div class="pf" hidden id="fields-commandcode">
+          <h3 class="sr-only" data-i18n="provCommandcode">Command Code</h3>
+          <div class="fg entry-block"><label class="bl" for="opt-commandcode-key" data-i18n="labelApiKey">API Key</label><span class="key-wrap"><input type="password" id="opt-commandcode-key" /><button type="button" class="key-toggle" data-target="opt-commandcode-key" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://commandcode.ai/settings/keys" target="_blank" data-i18n="getKey" rel="noopener">Get key</a></p></div>
+          <div class="fg entry-block"><label class="bl" for="opt-commandcode-model" data-i18n="labelModel">Model</label><input type="text" id="opt-commandcode-model" value="deepseek/deepseek-v4-flash" /></div>
+          <div class="fg entry-block">
+            <label class="bl" for="opt-commandcode-protocol" data-i18n="labelAiProtocol">API format</label>
+            <select id="opt-commandcode-protocol" data-listbox aria-describedby="hint-commandcode-protocol commandcode-protocol-warn">
+              <option value="openai" data-i18n="optAiProtocolOpenai" selected>OpenAI-compatible (/chat/completions)</option>
+              <option value="anthropic" data-i18n="optAiProtocolAnthropic">Anthropic Messages (/messages)</option>
+            </select>
+            <p class="hint" id="hint-commandcode-protocol" data-i18n="hintAiProtocolGateway">Pick the format this model is served on; the gateway's model list shows it.</p>
+            <p class="hint hint-warn" id="commandcode-protocol-warn" role="status" aria-live="polite" hidden></p>
+          </div>
+          <div class="fg-actions">
+            <button class="btn btn-sm" id="test-commandcode" data-i18n="testConnection">Test connection</button>
+            <span class="save-status" id="test-commandcode-status" role="status" aria-live="polite"></span>
           </div>
         </div>
 

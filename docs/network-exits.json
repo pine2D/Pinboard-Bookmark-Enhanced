@@ -126,9 +126,25 @@
     "api.moonshot.cn": {
       "purpose": "AI provider: Moonshot Kimi (BYO key, user-selected)",
       "disclosedAs": "Moonshot"
+    },
+    "ark.cn-beijing.volces.com": {
+      "purpose": "AI provider: Volcengine Ark, China (Beijing) region (BYO key, user-selected region)",
+      "disclosedAs": "Volcengine Ark"
+    },
+    "ark.ap-southeast.bytepluses.com": {
+      "purpose": "AI provider: BytePlus ModelArk, Volcengine Ark's international region (BYO key, user-selected region)",
+      "disclosedAs": "BytePlus ModelArk"
+    },
+    "opencode.ai": {
+      "purpose": "AI provider: OpenCode Zen gateway, OpenAI-compatible or Anthropic Messages format (BYO key, user-selected)",
+      "disclosedAs": "OpenCode Zen"
+    },
+    "api.commandcode.ai": {
+      "purpose": "AI provider: Command Code gateway, OpenAI-compatible or Anthropic Messages format (BYO key, user-selected)",
+      "disclosedAs": "Command Code"
     }
   },
-  "userConfiguredExits": "Language-derived Wikisource/Wiktionary subdomains require the current exact origin (no wildcard grant). Karakeep/linkding server APIs, custom OpenAI-compatible endpoint, non-loopback Ollama, webhook export target and batch-save tab origins are user-supplied at runtime; the Alibaba Cloud Model Studio workspace ID is user-entered, must be one DNS label, and only ever forms a host inside the disclosed {ws}.<region code>.maas.aliyuncs.com families (one representative exit per region; scripts/network-exits-check.mjs step 1c derives them from the registry), granted as that exact origin; the endpoint validator enforces HTTPS (loopback-literal HTTP only) and runtime grants are exact origins — see CLAUDE.md 跨领域安全铁律 and privacy.md.",
+  "userConfiguredExits": "Language-derived Wikisource/Wiktionary subdomains require the current exact origin (no wildcard grant). Karakeep/linkding server APIs, custom OpenAI-compatible endpoint, non-loopback Ollama, webhook export target and batch-save tab origins are user-supplied at runtime; the Alibaba Cloud Model Studio workspace ID is user-entered, must be one DNS label, and only ever forms a host inside the disclosed {ws}.<region code>.maas.aliyuncs.com families (one representative exit per region; scripts/network-exits-check.mjs step 1c derives them from the registry), granted as that exact origin; the Volcengine Ark region and the OpenCode Zen / Command Code API format only choose between the disclosed fixed hosts above, never a user-typed one; the endpoint validator enforces HTTPS (loopback-literal HTTP only) and runtime grants are exact origins — see CLAUDE.md 跨领域安全铁律 and privacy.md.",
   "nonExitHosts": {
     "github.com": "discussion sample URL and source permalinks; DOM-only extraction, no background fetch",
     "math.stackexchange.com": "site-rule sample URL only; no background fetch",

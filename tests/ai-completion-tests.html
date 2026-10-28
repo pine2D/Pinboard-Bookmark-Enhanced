@@ -1180,6 +1180,59 @@ await test('abort priority: caller abort > budget stop > deadline',async()=>{
     assert(st2.error?.name==='AbortError'&&calls.length===1,'Caller abort during a guard lost to the deadline');
   });
 });
+// ---- Gateways with a format setting (OpenCode Zen, Command Code) and Ark regions ----
+// Responses reuse the hand-written Messages / Chat Completions fixtures above.
+const lowerHeaders=h=>{const out={};for(const [k,v] of new Headers(h||{}).entries())out[k]=v;return out;};
+const assertAnthropicRequest=(r,body,url)=>{
+  const h=lowerHeaders(r.headers);
+  assert(r.url===url,'URL: '+r.url);
+  assert(h['x-api-key']==='fixture'&&h['anthropic-version']==='2023-06-01'&&h['anthropic-dangerous-direct-browser-access']==='true','Headers: '+JSON.stringify(h));
+  assert(!('authorization'in h),'Bearer sent: '+JSON.stringify(h));
+  assert(typeof body.max_tokens==='number'&&!('temperature'in body)&&!('response_format'in body),'Body: '+JSON.stringify(body));
+};
+await test('OpenCode Zen in the Anthropic format posts to its Messages base',async()=>{
+  const s={aiProvider:'opencode',opencodeApiKey:'fixture',opencodeModel:'free-model',opencodeProtocol:'anthropic'};
+  reset([reply(PROTOCOLS[2].complete)]);const seen=captureRequests();
+  assert(await run({temperature:0.1,jsonMode:true},s)==='ready','Wrong answer');
+  assert(seen.length===1,'Requests: '+seen.length);
+  assertAnthropicRequest(seen[0],calls[0],'https://opencode.ai/inference/anthropic/v1/messages');
+});
+await test('Command Code in the Anthropic format posts to its shared base',async()=>{
+  const s={aiProvider:'commandcode',commandcodeApiKey:'fixture',commandcodeModel:'free-model',commandcodeProtocol:'anthropic'};
+  reset([reply(PROTOCOLS[2].complete)]);const seen=captureRequests();
+  assert(await run({temperature:0.1,jsonMode:true},s)==='ready','Wrong answer');
+  assert(seen.length===1,'Requests: '+seen.length);
+  assertAnthropicRequest(seen[0],calls[0],'https://api.commandcode.ai/provider/v1/messages');
+});
+await test('both gateways in the OpenAI format use Chat Completions with a bearer key',async()=>{
+  const cases=[['opencode','https://opencode.ai/inference/openai/v1/chat/completions'],['commandcode','https://api.commandcode.ai/provider/v1/chat/completions']];
+  for(const [id,url] of cases){
+    for(const format of [undefined,'openai']){
+      const s={aiProvider:id,[id+'ApiKey']:'fixture',[id+'Model']:'free-model',...(format?{[id+'Protocol']:format}:{})};
+      reset([reply(PROTOCOLS[0].complete)]);const seen=captureRequests();
+      assert(await run({},s)==='ready',id+' answer');
+      const h=lowerHeaders(seen[0].headers);
+      assert(seen.length===1&&seen[0].url===url,id+' URL: '+seen[0].url);
+      assert(h.authorization==='Bearer fixture'&&!('x-api-key'in h),id+' headers: '+JSON.stringify(h));
+    }
+  }
+});
+await test('Ark in the international region posts to the BytePlus base',async()=>{
+  const s={aiProvider:'ark',arkApiKey:'fixture',arkModel:'free-model',arkRegion:'intl'};
+  reset([reply(PROTOCOLS[0].complete)]);const seen=captureRequests();
+  assert(await run({},s)==='ready','Wrong answer');
+  assert(seen.length===1&&seen[0].url==='https://ark.ap-southeast.bytepluses.com/api/v3/chat/completions','URL: '+(seen[0]&&seen[0].url));
+  assert(lowerHeaders(seen[0].headers).authorization==='Bearer fixture','Bearer missing');
+});
+await test('OpenCode Zen in the Anthropic format streams through callAIStream',async()=>{
+  const s={aiProvider:'opencode',opencodeApiKey:'fixture',opencodeModel:'free-model',opencodeProtocol:'anthropic'};
+  reset([STREAM_DONE.claude]);const seen=captureRequests();const deltas=[];
+  const out=await callAIStream(s,'Synthetic provider learning request',{maxTokens:2048,beforeRequest:async()=>{checks++;}},d=>deltas.push(d));
+  assert(out==='ready'&&deltas.join('')==='ready','Stream answer: '+out);
+  assert(seen.length===1,'Requests: '+seen.length);
+  assertAnthropicRequest(seen[0],calls[0],'https://opencode.ai/inference/anthropic/v1/messages');
+  assert(calls[0].stream===true,'Not a stream request');
+});
 document.getElementById('summary').textContent=pass+' passed, '+fail+' failed';
 })();
 </script>

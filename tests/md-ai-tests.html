@@ -3849,6 +3849,20 @@ suite("effectiveExtraBody: provider dialect when not rejected", () => {
   test("deepseek migrated to thinkingOff", () => {
     assertEq(JSON.stringify(_aiEffectiveExtraBody(OPENAI_COMPAT_PROVIDERS.deepseek, false)), '{"thinking":{"type":"disabled"}}', "deepseek migrated to thinkingOff");
   });
+  test("ark thinkingOff matches the verified Ark doc", () => {
+    // Volcengine Ark "深度思考" doc: the thinking field's `disabled` value turns
+    // deep thinking off; the OpenAI SDK example sends it at the body's top level.
+    const cfg = OPENAI_COMPAT_PROVIDERS.ark;
+    assert(cfg, "no ark registry entry");
+    assertEq(JSON.stringify(_aiEffectiveExtraBody(cfg, false)), '{"thinking":{"type":"disabled"}}', "ark");
+    assertEq(JSON.stringify(_aiEffectiveExtraBody(cfg, true)), "{}", "rejected ark -> stripped");
+  });
+  test("opencode and commandcode declare no thinkingOff", () => {
+    for (const id of ["opencode", "commandcode"]) {
+      assert(OPENAI_COMPAT_PROVIDERS[id], "no " + id + " registry entry");
+      assertEq(JSON.stringify(_aiEffectiveExtraBody(OPENAI_COMPAT_PROVIDERS[id], false)), "{}", id);
+    }
+  });
 });
 suite("effectiveExtraBody: empty when rejected or no thinkingOff", () => {
   test("rejected zhipu -> stripped", () => {
@@ -8632,6 +8646,27 @@ function goldenRows() {
   rows.push(["unknown", d({ aiProvider: "brandnew" })]);
   rows.push(["empty", {}]);
   if (!(ids.length === 15 && rows.length >= 86)) throw new Error("golden matrix lost rows: " + ids.length + " ids, " + rows.length + " rows");
+  rows.push(...T4_ROWS(d));
+  return rows;
+}
+// Explicit rows added with Volcengine Ark, OpenCode Zen and Command Code
+// (multi-custom-providers T4); the 15 frozen ids and their rows above are
+// untouched. Each new id gets the five standard rows plus its endpoint rows.
+function T4_ROWS(d) {
+  const rows = [];
+  for (const id of ["ark", "opencode", "commandcode"]) {
+    rows.push([id + "/defaults", d({ aiProvider: id })]);
+    rows.push([id + "/configured", d({ aiProvider: id, [id + "Model"]: "golden-model", [id + "ApiKey"]: "golden-key" })]);
+    rows.push([id + "/blank-model", d({ aiProvider: id, [id + "Model"]: "" })]);
+    rows.push([id + "/padded-model", d({ aiProvider: id, [id + "Model"]: "  " })]);
+    rows.push([id + "/override", d({ aiProvider: id, previewAiModelByProvider: { [id]: "ovr" } })]);
+  }
+  rows.push(["ark/region-intl", d({ aiProvider: "ark", arkRegion: "intl" })]);
+  rows.push(["ark/region-empty", d({ aiProvider: "ark", arkRegion: "" })]);
+  rows.push(["ark/region-unknown", d({ aiProvider: "ark", arkRegion: "eu" })]);
+  rows.push(["opencode/protocol-anthropic", d({ aiProvider: "opencode", opencodeProtocol: "anthropic" })]);
+  rows.push(["opencode/protocol-empty", d({ aiProvider: "opencode", opencodeProtocol: "" })]);
+  rows.push(["commandcode/protocol-anthropic", d({ aiProvider: "commandcode", commandcodeProtocol: "anthropic" })]);
   return rows;
 }
 // Evaluate fn over the matrix ({label: value}); a throw is recorded as its code
@@ -8740,7 +8775,29 @@ const GOLDEN_FP = {
   "ollama/base-alt": "ollama:llama3.2:e1804qne|len|s-|c45h‖ollama:llama3.2:e1804qne|lauto|c45h",
   "ollama/base-default-slash": "ollama:llama3.2:euacbbx|len|s-|c45h‖ollama:llama3.2:euacbbx|lauto|c45h",
   "unknown": "brandnew:default:e45h|len|s-|c45h‖brandnew:default:e45h|lauto|c45h",
-  "empty": "gemini:gemini-3.5-flash-lite:e45h|len|s-|c45h‖gemini:gemini-3.5-flash-lite:e45h|lauto|c45h"
+  "empty": "gemini:gemini-3.5-flash-lite:e45h|len|s-|c45h‖gemini:gemini-3.5-flash-lite:e45h|lauto|c45h",
+  // Explicit T4 rows: Volcengine Ark, OpenCode Zen, Command Code.
+  "ark/defaults": "ark:doubao-seed-2-0-mini-260428:e37bb5m|len|s-|c45h‖ark:doubao-seed-2-0-mini-260428:e37bb5m|lauto|c45h",
+  "ark/configured": "ark:golden-model:e37bb5m|len|s-|c45h‖ark:golden-model:e37bb5m|lauto|c45h",
+  "ark/blank-model": "ark:doubao-seed-2-0-mini-260428:e37bb5m|len|s-|c45h‖ark:doubao-seed-2-0-mini-260428:e37bb5m|lauto|c45h",
+  "ark/padded-model": "ark:  :e37bb5m|len|s-|c45h‖ark:  :e37bb5m|lauto|c45h",
+  "ark/override": "ark:doubao-seed-2-0-mini-260428:e37bb5m|len|s-|c45h‖ark:doubao-seed-2-0-mini-260428:e37bb5m|lauto|c45h",
+  "opencode/defaults": "opencode:glm-5.3-flash:e1kx2das|len|s-|c45h‖opencode:glm-5.3-flash:e1kx2das|lauto|c45h",
+  "opencode/configured": "opencode:golden-model:e1kx2das|len|s-|c45h‖opencode:golden-model:e1kx2das|lauto|c45h",
+  "opencode/blank-model": "opencode:glm-5.3-flash:e1kx2das|len|s-|c45h‖opencode:glm-5.3-flash:e1kx2das|lauto|c45h",
+  "opencode/padded-model": "opencode:  :e1kx2das|len|s-|c45h‖opencode:  :e1kx2das|lauto|c45h",
+  "opencode/override": "opencode:glm-5.3-flash:e1kx2das|len|s-|c45h‖opencode:glm-5.3-flash:e1kx2das|lauto|c45h",
+  "commandcode/defaults": "commandcode:deepseek/deepseek-v4-flash:eddzshm|len|s-|c45h‖commandcode:deepseek/deepseek-v4-flash:eddzshm|lauto|c45h",
+  "commandcode/configured": "commandcode:golden-model:eddzshm|len|s-|c45h‖commandcode:golden-model:eddzshm|lauto|c45h",
+  "commandcode/blank-model": "commandcode:deepseek/deepseek-v4-flash:eddzshm|len|s-|c45h‖commandcode:deepseek/deepseek-v4-flash:eddzshm|lauto|c45h",
+  "commandcode/padded-model": "commandcode:  :eddzshm|len|s-|c45h‖commandcode:  :eddzshm|lauto|c45h",
+  "commandcode/override": "commandcode:deepseek/deepseek-v4-flash:eddzshm|len|s-|c45h‖commandcode:deepseek/deepseek-v4-flash:eddzshm|lauto|c45h",
+  "ark/region-intl": "ark:doubao-seed-2-0-mini-260428:e1j0eoh2|len|s-|c45h‖ark:doubao-seed-2-0-mini-260428:e1j0eoh2|lauto|c45h",
+  "ark/region-empty": "ark:doubao-seed-2-0-mini-260428:e45h|len|s-|c45h‖ark:doubao-seed-2-0-mini-260428:e45h|lauto|c45h",
+  "ark/region-unknown": "ark:doubao-seed-2-0-mini-260428:e45h|len|s-|c45h‖ark:doubao-seed-2-0-mini-260428:e45h|lauto|c45h",
+  "opencode/protocol-anthropic": "opencode:glm-5.3-flash:efd9gp7|len|s-|c45h‖opencode:glm-5.3-flash:efd9gp7|lauto|c45h",
+  "opencode/protocol-empty": "opencode:glm-5.3-flash:e45h|len|s-|c45h‖opencode:glm-5.3-flash:e45h|lauto|c45h",
+  "commandcode/protocol-anthropic": "commandcode:deepseek/deepseek-v4-flash:e1duocsl|len|s-|c45h‖commandcode:deepseek/deepseek-v4-flash:e1duocsl|lauto|c45h"
 };
 const GOLDEN_READER = {
   "gemini/defaults": "gemini:gemini-3.5-flash-lite‖gemini-3.5-flash-lite",
@@ -8828,7 +8885,29 @@ const GOLDEN_READER = {
   "ollama/base-alt": "ollama:llama3.2:ec9a26ac0‖llama3.2",
   "ollama/base-default-slash": "ollama:llama3.2‖llama3.2",
   "unknown": "brandnew:default‖default",
-  "empty": "gemini:gemini-3.5-flash-lite‖gemini-3.5-flash-lite"
+  "empty": "gemini:gemini-3.5-flash-lite‖gemini-3.5-flash-lite",
+  // Explicit T4 rows: Volcengine Ark, OpenCode Zen, Command Code.
+  "ark/defaults": "ark:doubao-seed-2-0-mini-260428‖doubao-seed-2-0-mini-260428",
+  "ark/configured": "ark:golden-model‖golden-model",
+  "ark/blank-model": "ark:doubao-seed-2-0-mini-260428‖doubao-seed-2-0-mini-260428",
+  "ark/padded-model": "ark:doubao-seed-2-0-mini-260428‖doubao-seed-2-0-mini-260428",
+  "ark/override": "ark:ovr‖ovr",
+  "opencode/defaults": "opencode:glm-5.3-flash‖glm-5.3-flash",
+  "opencode/configured": "opencode:golden-model‖golden-model",
+  "opencode/blank-model": "opencode:glm-5.3-flash‖glm-5.3-flash",
+  "opencode/padded-model": "opencode:glm-5.3-flash‖glm-5.3-flash",
+  "opencode/override": "opencode:ovr‖ovr",
+  "commandcode/defaults": "commandcode:deepseek/deepseek-v4-flash‖deepseek/deepseek-v4-flash",
+  "commandcode/configured": "commandcode:golden-model‖golden-model",
+  "commandcode/blank-model": "commandcode:deepseek/deepseek-v4-flash‖deepseek/deepseek-v4-flash",
+  "commandcode/padded-model": "commandcode:deepseek/deepseek-v4-flash‖deepseek/deepseek-v4-flash",
+  "commandcode/override": "commandcode:ovr‖ovr",
+  "ark/region-intl": "ark:doubao-seed-2-0-mini-260428:ea0ca4efe‖doubao-seed-2-0-mini-260428",
+  "ark/region-empty": "ark:doubao-seed-2-0-mini-260428:!endpoint_invalid‖doubao-seed-2-0-mini-260428",
+  "ark/region-unknown": "ark:doubao-seed-2-0-mini-260428:!endpoint_invalid‖doubao-seed-2-0-mini-260428",
+  "opencode/protocol-anthropic": "opencode:glm-5.3-flash:ece0c26b9‖glm-5.3-flash",
+  "opencode/protocol-empty": "opencode:glm-5.3-flash:!endpoint_invalid‖glm-5.3-flash",
+  "commandcode/protocol-anthropic": "commandcode:deepseek/deepseek-v4-flash:eeaa97cb7‖deepseek/deepseek-v4-flash"
 };
 const GOLDEN_CAPABILITY = {
   "openai/defaults": "[2,\"openai\",\"https://api.openai.com/v1\",\"m\"]‖https://api.openai.com/v1",
@@ -8984,7 +9063,29 @@ const GOLDEN_ORIGIN = {
   "ollama/base-alt": "http://127.0.0.1:11435/*",
   "ollama/base-default-slash": "http://localhost:11434/*",
   "unknown": null,
-  "empty": "https://generativelanguage.googleapis.com/*"
+  "empty": "https://generativelanguage.googleapis.com/*",
+  // Explicit T4 rows: Volcengine Ark, OpenCode Zen, Command Code.
+  "ark/defaults": "https://ark.cn-beijing.volces.com/*",
+  "ark/configured": "https://ark.cn-beijing.volces.com/*",
+  "ark/blank-model": "https://ark.cn-beijing.volces.com/*",
+  "ark/padded-model": "https://ark.cn-beijing.volces.com/*",
+  "ark/override": "https://ark.cn-beijing.volces.com/*",
+  "opencode/defaults": "https://opencode.ai/*",
+  "opencode/configured": "https://opencode.ai/*",
+  "opencode/blank-model": "https://opencode.ai/*",
+  "opencode/padded-model": "https://opencode.ai/*",
+  "opencode/override": "https://opencode.ai/*",
+  "commandcode/defaults": "https://api.commandcode.ai/*",
+  "commandcode/configured": "https://api.commandcode.ai/*",
+  "commandcode/blank-model": "https://api.commandcode.ai/*",
+  "commandcode/padded-model": "https://api.commandcode.ai/*",
+  "commandcode/override": "https://api.commandcode.ai/*",
+  "ark/region-intl": "https://ark.ap-southeast.bytepluses.com/*",
+  "ark/region-empty": "throw:endpoint_invalid",
+  "ark/region-unknown": "throw:endpoint_invalid",
+  "opencode/protocol-anthropic": "https://opencode.ai/*",
+  "opencode/protocol-empty": "throw:endpoint_invalid",
+  "commandcode/protocol-anthropic": "https://api.commandcode.ai/*"
 };
 const GOLDEN_STATUS = {
   "gemini/defaults": "https://aistudio.google.com/status‖‖https://aistudio.google.com/status",
@@ -9072,7 +9173,29 @@ const GOLDEN_STATUS = {
   "ollama/base-alt": "‖‖",
   "ollama/base-default-slash": "‖‖",
   "unknown": "‖‖",
-  "empty": "https://aistudio.google.com/status‖‖https://aistudio.google.com/status"
+  "empty": "https://aistudio.google.com/status‖‖https://aistudio.google.com/status",
+  // Explicit T4 rows: Volcengine Ark, OpenCode Zen, Command Code.
+  "ark/defaults": "‖‖",
+  "ark/configured": "‖‖",
+  "ark/blank-model": "‖‖",
+  "ark/padded-model": "‖‖",
+  "ark/override": "‖‖",
+  "opencode/defaults": "‖‖",
+  "opencode/configured": "‖‖",
+  "opencode/blank-model": "‖‖",
+  "opencode/padded-model": "‖‖",
+  "opencode/override": "‖‖",
+  "commandcode/defaults": "‖‖",
+  "commandcode/configured": "‖‖",
+  "commandcode/blank-model": "‖‖",
+  "commandcode/padded-model": "‖‖",
+  "commandcode/override": "‖‖",
+  "ark/region-intl": "‖‖",
+  "ark/region-empty": "‖‖",
+  "ark/region-unknown": "‖‖",
+  "opencode/protocol-anthropic": "‖‖",
+  "opencode/protocol-empty": "‖‖",
+  "commandcode/protocol-anthropic": "‖‖"
 };
 const GOLDEN_HASKEY = {
   "gemini/defaults": false,
@@ -9160,7 +9283,29 @@ const GOLDEN_HASKEY = {
   "ollama/base-alt": true,
   "ollama/base-default-slash": true,
   "unknown": false,
-  "empty": false
+  "empty": false,
+  // Explicit T4 rows: Volcengine Ark, OpenCode Zen, Command Code.
+  "ark/defaults": false,
+  "ark/configured": true,
+  "ark/blank-model": false,
+  "ark/padded-model": false,
+  "ark/override": false,
+  "opencode/defaults": false,
+  "opencode/configured": true,
+  "opencode/blank-model": false,
+  "opencode/padded-model": false,
+  "opencode/override": false,
+  "commandcode/defaults": false,
+  "commandcode/configured": true,
+  "commandcode/blank-model": false,
+  "commandcode/padded-model": false,
+  "commandcode/override": false,
+  "ark/region-intl": false,
+  "ark/region-empty": false,
+  "ark/region-unknown": false,
+  "opencode/protocol-anthropic": false,
+  "opencode/protocol-empty": false,
+  "commandcode/protocol-anthropic": false
 };
 const GOLDEN_NAME = {
   "gemini/defaults": "T:provGemini",
@@ -9248,7 +9393,29 @@ const GOLDEN_NAME = {
   "ollama/base-alt": "T:provOllama",
   "ollama/base-default-slash": "T:provOllama",
   "unknown": "T:provBrandnew",
-  "empty": "T:provGemini"
+  "empty": "T:provGemini",
+  // Explicit T4 rows: Volcengine Ark, OpenCode Zen, Command Code.
+  "ark/defaults": "T:provArk",
+  "ark/configured": "T:provArk",
+  "ark/blank-model": "T:provArk",
+  "ark/padded-model": "T:provArk",
+  "ark/override": "T:provArk",
+  "opencode/defaults": "T:provOpencode",
+  "opencode/configured": "T:provOpencode",
+  "opencode/blank-model": "T:provOpencode",
+  "opencode/padded-model": "T:provOpencode",
+  "opencode/override": "T:provOpencode",
+  "commandcode/defaults": "T:provCommandcode",
+  "commandcode/configured": "T:provCommandcode",
+  "commandcode/blank-model": "T:provCommandcode",
+  "commandcode/padded-model": "T:provCommandcode",
+  "commandcode/override": "T:provCommandcode",
+  "ark/region-intl": "T:provArk",
+  "ark/region-empty": "T:provArk",
+  "ark/region-unknown": "T:provArk",
+  "opencode/protocol-anthropic": "T:provOpencode",
+  "opencode/protocol-empty": "T:provOpencode",
+  "commandcode/protocol-anthropic": "T:provCommandcode"
 };
 const GOLDEN_PUNCT = {
   "gemini/defaults": "gemini:gemini-3.5-flash-lite",
@@ -9336,7 +9503,29 @@ const GOLDEN_PUNCT = {
   "ollama/base-alt": "ollama:llama3.2@http://127.0.0.1:11435",
   "ollama/base-default-slash": "ollama:llama3.2@http://localhost:11434",
   "unknown": "brandnew:default@",
-  "empty": "gemini:default"
+  "empty": "gemini:default",
+  // Explicit T4 rows: Volcengine Ark, OpenCode Zen, Command Code.
+  "ark/defaults": "ark:doubao-seed-2-0-mini-260428@https://ark.cn-beijing.volces.com/api/v3",
+  "ark/configured": "ark:golden-model@https://ark.cn-beijing.volces.com/api/v3",
+  "ark/blank-model": "ark:doubao-seed-2-0-mini-260428@https://ark.cn-beijing.volces.com/api/v3",
+  "ark/padded-model": "ark:  @https://ark.cn-beijing.volces.com/api/v3",
+  "ark/override": "ark:ovr@https://ark.cn-beijing.volces.com/api/v3",
+  "opencode/defaults": "opencode:glm-5.3-flash@https://opencode.ai/inference/openai/v1",
+  "opencode/configured": "opencode:golden-model@https://opencode.ai/inference/openai/v1",
+  "opencode/blank-model": "opencode:glm-5.3-flash@https://opencode.ai/inference/openai/v1",
+  "opencode/padded-model": "opencode:  @https://opencode.ai/inference/openai/v1",
+  "opencode/override": "opencode:ovr@https://opencode.ai/inference/openai/v1",
+  "commandcode/defaults": "commandcode:deepseek/deepseek-v4-flash@https://api.commandcode.ai/provider/v1",
+  "commandcode/configured": "commandcode:golden-model@https://api.commandcode.ai/provider/v1",
+  "commandcode/blank-model": "commandcode:deepseek/deepseek-v4-flash@https://api.commandcode.ai/provider/v1",
+  "commandcode/padded-model": "commandcode:  @https://api.commandcode.ai/provider/v1",
+  "commandcode/override": "commandcode:ovr@https://api.commandcode.ai/provider/v1",
+  "ark/region-intl": "ark:doubao-seed-2-0-mini-260428@https://ark.ap-southeast.bytepluses.com/api/v3",
+  "ark/region-empty": "ark:doubao-seed-2-0-mini-260428@",
+  "ark/region-unknown": "ark:doubao-seed-2-0-mini-260428@",
+  "opencode/protocol-anthropic": "opencode:glm-5.3-flash",
+  "opencode/protocol-empty": "opencode:glm-5.3-flash@",
+  "commandcode/protocol-anthropic": "commandcode:deepseek/deepseek-v4-flash"
 };
 
 suite("provider resolution golden (pre-resolver)", () => {
@@ -9427,6 +9616,14 @@ suite("pbpAiResolveTarget", () => {
       "qwen:qwen-flash:e" + pbpAiHash("https://dashscope-intl.aliyuncs.com/compatible-mode/v1"), "Singapore key");
     assert(pbpAiCacheModelKey({ aiProvider: "qwen", qwenWorkspaceId: "ws-7f3k9q" }) !== "qwen:qwen-flash", "workspace key");
   });
+  test("an invalid region never reads the default region's reader cache", () => {
+    const def = pbpAiCacheModelKey({ aiProvider: "qwen" });
+    for (const extra of [{ qwenRegion: "tokyo" }, { qwenRegion: "" }, { qwenRegion: "hongkong" }, { qwenWorkspaceId: "Upper" }]) {
+      const key = pbpAiCacheModelKey({ aiProvider: "qwen", ...extra });
+      assert(key !== def, JSON.stringify(extra) + " shares the Beijing key " + key);
+      assert(!/:e[0-9a-f]{8}$/.test(key), JSON.stringify(extra) + " looks like a valid endpoint key " + key);
+    }
+  });
   test("a registry entry with protocolField resolves Anthropic format to anthropicBase", () => {
     OPENAI_COMPAT_PROVIDERS.zzprobe = { keyField: "zzprobeApiKey", base: "https://probe.example/openai/v1",
       anthropicBase: "https://probe.example/anthropic/v1", protocolField: "zzprobeProtocol",
@@ -9453,6 +9650,85 @@ suite("pbpAiResolveTarget", () => {
       }
     } finally {
       delete OPENAI_COMPAT_PROVIDERS.zzprobe;
+    }
+  });
+});
+suite("pbpAiResolveTarget: Ark / OpenCode Zen / Command Code", () => {
+  const ARK_CN = "https://ark.cn-beijing.volces.com/api/v3";
+  const ARK_INTL = "https://ark.ap-southeast.bytepluses.com/api/v3";
+  const OC_OPENAI = "https://opencode.ai/inference/openai/v1";
+  const OC_ANTHROPIC = "https://opencode.ai/inference/anthropic/v1";
+  const CC_BASE = "https://api.commandcode.ai/provider/v1";
+  const d = (extra) => ({ ...SETTINGS_DEFAULTS, ...extra });
+  test("ark region resolution", () => {
+    for (const extra of [{}, { arkRegion: "cn" }, { arkRegion: undefined }]) {
+      const tg = pbpAiResolveTarget({ aiProvider: "ark", ...extra });
+      assertEq(tg.endpoint, ARK_CN, "cn endpoint " + JSON.stringify(extra));
+      assertEq(tg.protocol, "openai", "cn protocol");
+      assertEq(tg.official, true, "cn official");
+      assertEq(tg.error, null, "cn error");
+    }
+    const intl = pbpAiResolveTarget(d({ aiProvider: "ark", arkRegion: "intl" }));
+    assertEq(intl.endpoint, ARK_INTL, "intl endpoint");
+    assertEq(intl.protocol, "openai", "intl protocol");
+    assertEq(intl.official, true, "intl official");
+    assertEq(intl.error, null, "intl error");
+    const cnKey = pbpAiCacheModelKey(d({ aiProvider: "ark" }));
+    for (const bad of ["", "eu", 5]) {
+      const b = pbpAiResolveTarget(d({ aiProvider: "ark", arkRegion: bad }));
+      assertEq(b.error, "endpoint_invalid", "region " + JSON.stringify(bad));
+      assert(!String(b.endpoint).includes("volces.com"), "region " + JSON.stringify(bad) + " fell back to " + b.endpoint);
+      assertEq(pbpAiEndpointProblem(d({ aiProvider: "ark", arkRegion: bad }), "ark"), "region_unknown", "problem " + JSON.stringify(bad));
+      assert(pbpAiCacheModelKey(d({ aiProvider: "ark", arkRegion: bad })) !== cnKey, "region " + JSON.stringify(bad) + " reads the cn cache");
+    }
+    assert(pbpAiCacheModelKey(d({ aiProvider: "ark", arkRegion: "intl" })) !== cnKey, "intl and cn share a reader key");
+    // The default region adds no endpoint term, the same shape kimi has.
+    assertEq(cnKey, "ark:" + OPENAI_COMPAT_PROVIDERS.ark.defaultModel, "cn reader key");
+    assertEq(pbpAiCacheModelKey(d({ aiProvider: "kimi" })), "kimi:" + OPENAI_COMPAT_PROVIDERS.kimi.defaultModel, "kimi reader key");
+  });
+  test("opencode format resolution", () => {
+    const plain = pbpAiResolveTarget(d({ aiProvider: "opencode", opencodeProtocol: undefined }));
+    assertEq(plain.endpoint, OC_OPENAI, "missing format endpoint");
+    assertEq(plain.protocol, "openai", "missing format protocol");
+    assertEq(pbpAiResolveTarget(d({ aiProvider: "opencode" })).endpoint, OC_OPENAI, "default format endpoint");
+    const an = pbpAiResolveTarget(d({ aiProvider: "opencode", opencodeProtocol: "anthropic" }));
+    assertEq(an.endpoint, OC_ANTHROPIC, "anthropic endpoint");
+    assertEq(an.protocol, "anthropic", "anthropic protocol");
+    assertEq(an.fpEndpoint, OC_ANTHROPIC + "#anthropic", "anthropic fpEndpoint");
+    assertEq(an.official, true, "anthropic official");
+    const empty = pbpAiResolveTarget(d({ aiProvider: "opencode", opencodeProtocol: "" }));
+    assertEq(empty.error, "endpoint_invalid", "empty format");
+    assert(!String(empty.endpoint).includes("opencode.ai"), "empty format fell back to " + empty.endpoint);
+    assertEq(pbpAiEndpointProblem(d({ aiProvider: "opencode", opencodeProtocol: "" }), "opencode"), "protocol_unknown", "empty format problem");
+    assertEq(pbpAiEndpointProblem(d({ aiProvider: "opencode", opencodeProtocol: "anthropic" }), "opencode"), "", "anthropic problem");
+  });
+  test("commandcode formats share one base but split caches", () => {
+    const o = d({ aiProvider: "commandcode", commandcodeProtocol: "openai" });
+    const a = d({ aiProvider: "commandcode", commandcodeProtocol: "anthropic" });
+    const to = pbpAiResolveTarget(o), ta = pbpAiResolveTarget(a);
+    assertEq(to.endpoint, CC_BASE, "openai endpoint");
+    assertEq(ta.endpoint, CC_BASE, "anthropic endpoint");
+    assertEq(ta.protocol, "anthropic", "anthropic protocol");
+    assertEq(ta.fpEndpoint, CC_BASE + "#anthropic", "anthropic fpEndpoint");
+    assert(aiCacheFingerprint(o, "tags") !== aiCacheFingerprint(a, "tags"), "tags fingerprints collide");
+    assert(aiCacheFingerprint(o, "summary") !== aiCacheFingerprint(a, "summary"), "summary fingerprints collide");
+    assert(pbpAiCacheModelKey(o) !== pbpAiCacheModelKey(a), "reader keys collide");
+    assertEq(pbpAiCacheModelKey(o), "commandcode:" + OPENAI_COMPAT_PROVIDERS.commandcode.defaultModel, "openai format keeps the default key");
+    assertEq(pbpAiResolveTarget(d({ aiProvider: "commandcode", commandcodeProtocol: "gemini" })).error, "endpoint_invalid", "unknown format");
+  });
+  test("new builtins read their own key and model fields", () => {
+    for (const id of ["ark", "opencode", "commandcode"]) {
+      const cfg = OPENAI_COMPAT_PROVIDERS[id];
+      assert(cfg, "no " + id + " registry entry");
+      assertEq(cfg.keyField, id + "ApiKey", id + " keyField");
+      assertEq(cfg.modelField, id + "Model", id + " modelField");
+      const tg = pbpAiResolveTarget({ aiProvider: id, [id + "ApiKey"]: "k-" + id, [id + "Model"]: "m-" + id });
+      assertEq(tg.apiKey, "k-" + id, id + " apiKey");
+      assertEq(tg.model, "m-" + id, id + " model");
+      assertEq(pbpAiResolveTarget({ aiProvider: id, [id + "Model"]: "" }).model, cfg.defaultModel, id + " blank model");
+      assertEq(SETTINGS_DEFAULTS[id + "Model"], cfg.defaultModel, id + " default model copy");
+      assertEq(hasAIKey({ aiProvider: id }), false, id + " without key");
+      assertEq(hasAIKey({ aiProvider: id, [id + "ApiKey"]: "k" }), true, id + " with key");
     }
   });
 });

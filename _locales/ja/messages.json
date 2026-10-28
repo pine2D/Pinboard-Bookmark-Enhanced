@@ -1859,6 +1859,39 @@
   "provKimi": {
     "message": "Kimi"
   },
+  "provArk": {
+    "message": "Volcengine Ark"
+  },
+  "provOpencode": {
+    "message": "OpenCode Zen"
+  },
+  "provCommandcode": {
+    "message": "Command Code"
+  },
+  "optArkRegionCn": {
+    "message": "中国（北京）"
+  },
+  "optArkRegionIntl": {
+    "message": "海外（BytePlus ModelArk）"
+  },
+  "hintArkRegion": {
+    "message": "2 つのリージョンは別々のアカウントです。一方のキーやモデル ID はもう一方では使えません。"
+  },
+  "labelAiProtocol": {
+    "message": "API 形式"
+  },
+  "optAiProtocolOpenai": {
+    "message": "OpenAI 互換（/chat/completions）"
+  },
+  "optAiProtocolAnthropic": {
+    "message": "Anthropic Messages（/messages）"
+  },
+  "hintAiProtocolGateway": {
+    "message": "このモデルが提供されている形式を選んでください。ゲートウェイのモデル一覧に記載されています。"
+  },
+  "aiProtocolUnknown": {
+    "message": "このバージョンはこの API 形式に対応していません。設定で形式を選び直してください。"
+  },
   "provOllama": {
     "message": "Ollama (ローカル)"
   },

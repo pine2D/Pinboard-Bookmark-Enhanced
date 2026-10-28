@@ -365,6 +365,13 @@ const OPENAI_COMPAT_PROVIDERS = {
   siliconflow: { keyField: "siliconflowApiKey", base: "https://api.siliconflow.cn/v1",                                          modelField: "siliconflowModel", defaultModel: "Qwen/Qwen3-8B",                   thinkingOff: { enable_thinking: false } },
   zhipu:       { keyField: "zhipuApiKey",       base: "https://open.bigmodel.cn/api/paas/v4",                                   modelField: "zhipuModel",       defaultModel: "glm-4.7-flash",                   thinkingOff: { thinking: { type: "disabled" } } },
   kimi:        { keyField: "kimiApiKey",        base: "https://api.moonshot.cn/v1",                                             modelField: "kimiModel",        defaultModel: "kimi-k2.6",                       thinkingOff: { thinking: { type: "disabled" } } },
+  ark:         { keyField: "arkApiKey",         base: "https://ark.cn-beijing.volces.com/api/v3",                               modelField: "arkModel",         defaultModel: "doubao-seed-2-0-mini-260428",     thinkingOff: { thinking: { type: "disabled" } },
+                 regionField: "arkRegion",
+                 regions: { cn: "https://ark.cn-beijing.volces.com/api/v3", intl: "https://ark.ap-southeast.bytepluses.com/api/v3" } },  // Volcengine Ark; intl = BytePlus ModelArk (a separate account; model IDs differ). thinkingOff per Ark's deep-thinking doc
+  opencode:    { keyField: "opencodeApiKey",    base: "https://opencode.ai/inference/openai/v1",                                modelField: "opencodeModel",    defaultModel: "glm-5.3-flash",
+                 protocolField: "opencodeProtocol", anthropicBase: "https://opencode.ai/inference/anthropic/v1" },  // no thinkingOff: a gateway forwarding to upstream models whose dialects differ
+  commandcode: { keyField: "commandcodeApiKey", base: "https://api.commandcode.ai/provider/v1",                                  modelField: "commandcodeModel", defaultModel: "deepseek/deepseek-v4-flash",
+                 protocolField: "commandcodeProtocol", anthropicBase: "https://api.commandcode.ai/provider/v1" },  // no thinkingOff: a gateway forwarding to upstream models whose dialects differ
   custom:      { keyField: "customApiKey",      base: "",                                                  baseField: "customBaseUrl", modelField: "customModel",      defaultModel: "" },                          // no thinkingOff: dialect unknown
 };
 
@@ -414,13 +421,23 @@ function _aiRegistryEntry(providerId) {
   return Object.hasOwn(OPENAI_COMPAT_PROVIDERS, provider) ? OPENAI_COMPAT_PROVIDERS[provider] : null;
 }
 
-// Why a regional provider's region/workspace settings cannot form a request
-// host: "" (fine, or the provider has no region field), "region_unknown",
-// "workspace_required" or "workspace_invalid". Pure; shared by the resolver,
-// the host-permission gate's message and the Settings warning. The workspace
-// ID is checked as stored (not trimmed, not lowered).
+// Why a provider's region, workspace or API-format settings cannot form a
+// request: "" (fine, or the provider has none of these fields),
+// "region_unknown", "workspace_required", "workspace_invalid" or
+// "protocol_unknown". Pure; shared by the host-permission gate's message and
+// the Settings warnings, and it agrees with the resolver's endpoint_invalid.
+// The workspace ID is checked as stored (not trimmed, not lowered).
 function pbpAiEndpointProblem(s, providerId = (s && s.aiProvider) || "gemini") {
-  return _aiRegionalProblem(_aiRegistryEntry(providerId), s || {});
+  return _aiEndpointProblemOf(_aiRegistryEntry(providerId), s || {});
+}
+function _aiEndpointProblemOf(cfg, st) {
+  const regional = _aiRegionalProblem(cfg, st);
+  if (regional) return regional;
+  if (cfg && cfg.protocolField) {
+    const format = _aiProtocolOf(cfg, st);
+    if (format !== "openai" && format !== "anthropic") return "protocol_unknown";
+  }
+  return "";
 }
 function _aiRegionalProblem(cfg, st) {
   if (!cfg || !cfg.regionField) return "";
@@ -734,12 +751,12 @@ function _aiMessage(key, fallback, ...args) {
   return fallback;
 }
 
-// The message for a regional provider whose settings form no host, by
-// problem code; "" when the settings are not the reason.
-function _aiRegionalProblemMessage(target, s) {
+// The message for a provider whose region, workspace or format settings form
+// no request, by problem code; "" when the settings are not the reason.
+function _aiEndpointProblemMessage(target, s) {
   const cfg = target && target.cfg;
-  if (!cfg || !cfg.regionField || !s) return "";
-  const problem = _aiRegionalProblem(cfg, s);
+  if (!cfg || !s) return "";
+  const problem = _aiEndpointProblemOf(cfg, s);
   if (problem === "workspace_required") {
     const region = String(_aiRegionOf(cfg, s));
     const key = target.provider + "Region" + region.charAt(0).toUpperCase() + region.slice(1);
@@ -752,35 +769,26 @@ function _aiRegionalProblemMessage(target, s) {
   if (problem === "region_unknown") {
     return _aiMessage("aiRegionUnknown", "This region isn't supported by this version. Choose a region again in Settings.");
   }
+  if (problem === "protocol_unknown") {
+    return _aiMessage("aiProtocolUnknown", "This API format isn't supported by this version. Choose a format again in Settings.");
+  }
   return "";
-}
-
-function _aiEndpointInvalidMessage() {
-  let message = "Invalid or insecure AI endpoint. Use HTTPS, or HTTP only with localhost, 127.0.0.1, or [::1].";
-  try {
-    const translated = t("mdTargetWebhookHttpWarn");
-    if (translated && translated !== "mdTargetWebhookHttpWarn") message = translated;
-  } catch (_) {}
-  return message;
 }
 
 // The Error a failed resolution throws, before any request: carries the
 // resolver's code. Shared by the permission gate and the dispatchers. With
-// the settings, a regional provider's endpoint_invalid also carries
-// err.reason (the non-secret pbpAiEndpointProblem code) and its own message.
+// the settings, an endpoint_invalid caused by a region, workspace or format
+// setting also carries err.reason (the non-secret pbpAiEndpointProblem code)
+// and its own message.
 function _aiTargetErrorFor(target, s) {
   let message;
   let reason = "";
   if (target.error === "provider_missing") {
-    message = "The selected AI provider is no longer configured. Choose one in Settings.";
-    try {
-      const translated = t("aiErrorProviderMissing");
-      if (translated && translated !== "aiErrorProviderMissing") message = translated;
-    } catch (_) {}
+    message = _aiMessage("aiErrorProviderMissing", "The selected AI provider is no longer configured. Choose one in Settings.");
   } else {
-    message = _aiRegionalProblemMessage(target, s);
-    if (message) reason = _aiRegionalProblem(target.cfg, s);
-    else message = _aiEndpointInvalidMessage();
+    message = _aiEndpointProblemMessage(target, s);
+    if (message) reason = _aiEndpointProblemOf(target.cfg, s);
+    else message = _aiMessage("mdTargetWebhookHttpWarn", "Invalid or insecure AI endpoint. Use HTTPS, or HTTP only with localhost, 127.0.0.1, or [::1].");
   }
   const err = new Error(message);
   err.code = target.error;

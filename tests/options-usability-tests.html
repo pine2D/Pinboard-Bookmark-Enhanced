@@ -1035,8 +1035,24 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   await test("stage2: provider panels keep their ids and count", async () => {
     const ai = await panelDoc("ai");
     assert(!!ai, "panel-ai is missing");
-    assert(ai.querySelectorAll(".pf[id^='fields-']").length === 15 && !!ai.querySelector("#opt-ai-provider"),
-      "expected 15 .pf[id^=fields-] panels and #opt-ai-provider to survive the rewrite");
+    const picker = ai.querySelector("#opt-ai-provider");
+    assert(!!picker, "#opt-ai-provider must survive the rewrite");
+    // Derived from the picker, not a hand-kept count: every provider option
+    // has its own panel, and no panel lacks an option.
+    const values = [...picker.querySelectorAll("option[value]")].map((o) => o.value);
+    const missing = values.filter((v) => !ai.querySelector("#fields-" + CSS.escape(v)));
+    assert(values.length > 0 && missing.length === 0, "provider options without a .pf panel: " + missing.join(", "));
+    const panels = ai.querySelectorAll(".pf[id^='fields-']").length;
+    assert(panels === values.length, panels + " .pf[id^=fields-] panels for " + values.length + " provider options");
+    // A region or format select whose stored value this version does not know
+    // shows a warning; the select itself must point at it, not only a sibling.
+    const warned = [...ai.querySelectorAll(".pf select[id$='-region'], .pf select[id$='-protocol']")];
+    assert(warned.length >= 4, "expected the region and format selects, found " + warned.length);
+    for (const select of warned) {
+      const ids = (select.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean);
+      const warn = ids.map((id) => ai.querySelector("#" + CSS.escape(id))).find((el) => el && el.classList.contains("hint-warn"));
+      assert(!!warn, "#" + select.id + " does not describe itself with its warning");
+    }
   });
 
   // Re-counted against the live DOM (not just the survey): bookmarks has 6

@@ -1859,6 +1859,39 @@
   "provKimi": {
     "message": "Kimi（月之暗面）"
   },
+  "provArk": {
+    "message": "火山方舟"
+  },
+  "provOpencode": {
+    "message": "OpenCode Zen"
+  },
+  "provCommandcode": {
+    "message": "Command Code"
+  },
+  "optArkRegionCn": {
+    "message": "中國（北京）"
+  },
+  "optArkRegionIntl": {
+    "message": "國際（BytePlus ModelArk）"
+  },
+  "hintArkRegion": {
+    "message": "中國與國際是兩套帳戶，Key 和模型 ID 都不能混用。"
+  },
+  "labelAiProtocol": {
+    "message": "介面格式"
+  },
+  "optAiProtocolOpenai": {
+    "message": "OpenAI 相容（/chat/completions）"
+  },
+  "optAiProtocolAnthropic": {
+    "message": "Anthropic Messages（/messages）"
+  },
+  "hintAiProtocolGateway": {
+    "message": "按此模型在網關上提供的介面選擇，網關的模型清單會註明。"
+  },
+  "aiProtocolUnknown": {
+    "message": "此版本不支援該介面格式，請在設定中重新選擇。"
+  },
   "provOllama": {
     "message": "Ollama（本機）"
   },

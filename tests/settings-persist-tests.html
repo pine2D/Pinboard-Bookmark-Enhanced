@@ -1030,6 +1030,40 @@ async function run() {
         wsDropped = !("qwenWorkspaceId" in bad) && bad.optTheme === "dark";
       } catch (_) {}
       check("backup keeps a valid workspace ID and drops an injected one without failing the file", wsKept && wsDropped);
+      let formatsOk = true, formatRejected = 0;
+      for (const key of ["opencodeProtocol", "commandcodeProtocol"]) {
+        for (const good of ["openai", "anthropic"]) {
+          try { formatsOk = formatsOk && pbpSanitizeBackupSettings({ [key]: good }, keys)[key] === good; }
+          catch (_) { formatsOk = false; }
+        }
+        for (const bad of ["", "gemini"]) {
+          try { pbpSanitizeBackupSettings({ [key]: bad }, keys); } catch (_) { formatRejected++; }
+        }
+      }
+      check("backup accepts exactly the gateway formats", formatsOk && formatRejected === 4);
+      // R7/R17: a value this version does not know (synced from a newer
+      // device) is left out of the form's save, so storage keeps it as is.
+      let roundTrip = typeof pbpOptKnownEnumPatch === "function";
+      if (roundTrip) {
+        roundTrip = JSON.stringify(pbpOptKnownEnumPatch("arkRegion", "eu", ["cn", "intl"])) === "{}" &&
+          JSON.stringify(pbpOptKnownEnumPatch("opencodeProtocol", "", ["openai", "anthropic"])) === "{}" &&
+          JSON.stringify(pbpOptKnownEnumPatch("arkRegion", "intl", ["cn", "intl"])) === JSON.stringify({ arkRegion: "intl" });
+        let delta = null;
+        const state = { settings: { arkRegion: "eu", opencodeProtocol: "", optTheme: "auto" }, overlay: "" };
+        await pbpSaveOptionsSnapshot(state,
+          { optTheme: "dark", ...pbpOptKnownEnumPatch("arkRegion", "", ["cn", "intl"]), ...pbpOptKnownEnumPatch("opencodeProtocol", "", ["openai", "anthropic"]) },
+          "", { persist: async (d) => { delta = d; return { ok: true, fellBackToLocal: false }; },
+            saveOverlay: async () => ({ fellBackToLocal: false }), assertOverlay: () => {} });
+        roundTrip = roundTrip && JSON.stringify(delta) === JSON.stringify({ optTheme: "dark" }) &&
+          state.settings.arkRegion === "eu" && state.settings.opencodeProtocol === "";
+        const optSrc = await (await fetch("../options.js")).text();
+        const collectAt = optSrc.indexOf("function collectSettingsFromForm");
+        const collect = collectAt < 0 ? "" : optSrc.slice(collectAt, optSrc.indexOf("\n  }\n", collectAt));
+        roundTrip = roundTrip && collect.includes('pbpOptKnownEnumPatch("qwenRegion"') && collect.includes('pbpOptKnownEnumPatch("arkRegion"') &&
+          collect.includes('pbpOptKnownEnumPatch("opencodeProtocol"') && collect.includes('pbpOptKnownEnumPatch("commandcodeProtocol"') &&
+          !/\b(?:qwenRegion|arkRegion|opencodeProtocol|commandcodeProtocol): \$id\(/.test(collect);
+      }
+      check("unknown provider enum values survive an options round-trip unchanged", roundTrip);
     } finally { globalThis.chrome = savedChrome; _settingsStorageCache = savedCache; }
   })();
 

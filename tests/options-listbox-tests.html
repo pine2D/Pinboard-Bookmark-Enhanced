@@ -796,9 +796,15 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
     const btn = btnOf(provider());
     key(btn, "ArrowDown");
     const at = () => itemsOf(provider())[activeIndex(provider())]?.dataset.value;
+    // The expected cycle comes from the option list itself (every label
+    // starting with "o", in order, then wrapping), so adding a provider does
+    // not rewrite this test; there must be at least two to see a wrap.
+    const matches = itemsOf(provider()).filter((li) => /^o/i.test(li.textContent.trim())).map((li) => li.dataset.value);
+    assert(matches.length >= 2 && matches[0] === "openai", "o-matches were " + matches.join(","));
+    const expected = [...matches, matches[0]];
     const seen = [];
-    for (let i = 0; i < 4; i++) { await sleep(600); key(btn, "o"); seen.push(at()); }
-    assert(seen.join(",") === "openai,openrouter,ollama,openai", "cycle was " + seen.join(","));
+    for (let i = 0; i < expected.length; i++) { await sleep(600); key(btn, "o"); seen.push(at()); }
+    assert(seen.join(",") === expected.join(","), "cycle was " + seen.join(",") + ", expected " + expected.join(","));
     close(provider());
     await sleep(600);
   });

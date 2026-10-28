@@ -65,7 +65,11 @@ rows.push(['openai/base-slash',d({aiProvider:'openai',openaiBaseUrl:'https://pro
 rows.push(['custom/base',d({aiProvider:'custom',customBaseUrl:'https://gw.example/v1',customApiKey:'k',customModel:'m'})]);rows.push(['custom/base-padded',d({aiProvider:'custom',customBaseUrl:' https://gw.example/v1/ '})]);rows.push(['custom/base-lan',d({aiProvider:'custom',customBaseUrl:'http://192.168.1.2/v1'})]);
 rows.push(['ollama/base-blank',d({aiProvider:'ollama',ollamaBaseUrl:''})]);rows.push(['ollama/base-alt',d({aiProvider:'ollama',ollamaBaseUrl:'http://127.0.0.1:11435/'})]);rows.push(['ollama/base-default-slash',d({aiProvider:'ollama',ollamaBaseUrl:'http://localhost:11434/'})]);
 rows.push(['unknown',d({aiProvider:'brandnew'})]);rows.push(['empty',{}]);
-if(!(ids.length===15&&rows.length>=86))throw new Error('golden matrix lost rows: '+ids.length+' ids, '+rows.length+' rows');return rows;}
+if(!(ids.length===15&&rows.length>=86))throw new Error('golden matrix lost rows: '+ids.length+' ids, '+rows.length+' rows');rows.push(...T4_ROWS(d));return rows;}
+// Explicit rows added with Volcengine Ark, OpenCode Zen and Command Code (T4); the 15 frozen ids above are untouched.
+function T4_ROWS(d){const rows=[];for(const id of["ark","opencode","commandcode"]){rows.push([id+'/defaults',d({aiProvider:id})]);rows.push([id+'/configured',d({aiProvider:id,[id+'Model']:'golden-model',[id+'ApiKey']:'golden-key'})]);rows.push([id+'/blank-model',d({aiProvider:id,[id+'Model']:''})]);rows.push([id+'/padded-model',d({aiProvider:id,[id+'Model']:'  '})]);rows.push([id+'/override',d({aiProvider:id,previewAiModelByProvider:{[id]:'ovr'}})]);}
+rows.push(['ark/region-intl',d({aiProvider:'ark',arkRegion:'intl'})]);rows.push(['ark/region-empty',d({aiProvider:'ark',arkRegion:''})]);rows.push(['ark/region-unknown',d({aiProvider:'ark',arkRegion:'eu'})]);
+rows.push(['opencode/protocol-anthropic',d({aiProvider:'opencode',opencodeProtocol:'anthropic'})]);rows.push(['opencode/protocol-empty',d({aiProvider:'opencode',opencodeProtocol:''})]);rows.push(['commandcode/protocol-anthropic',d({aiProvider:'commandcode',commandcodeProtocol:'anthropic'})]);return rows;}
 const GOLDEN_DICT={
 "gemini/defaults":"{\"provider\":\"gemini\",\"model\":\"gemini-3.5-flash-lite\",\"endpoint\":\"\"}",
 "gemini/configured":"{\"provider\":\"gemini\",\"model\":\"golden-model\",\"endpoint\":\"\"}",
@@ -152,7 +156,29 @@ const GOLDEN_DICT={
 "ollama/base-alt":"{\"provider\":\"ollama\",\"model\":\"llama3.2\",\"endpoint\":\"http://127.0.0.1:11435\"}",
 "ollama/base-default-slash":"{\"provider\":\"ollama\",\"model\":\"llama3.2\",\"endpoint\":\"http://localhost:11434\"}",
 "unknown":"{\"provider\":\"brandnew\",\"model\":\"default\",\"endpoint\":\"\"}",
-"empty":"{\"provider\":\"gemini\",\"model\":\"gemini-3.5-flash-lite\",\"endpoint\":\"\"}"
+"empty":"{\"provider\":\"gemini\",\"model\":\"gemini-3.5-flash-lite\",\"endpoint\":\"\"}",
+// Explicit T4 rows: Volcengine Ark, OpenCode Zen, Command Code.
+"ark/defaults":"{\"provider\":\"ark\",\"model\":\"doubao-seed-2-0-mini-260428\",\"endpoint\":\"https://ark.cn-beijing.volces.com/api/v3\"}",
+"ark/configured":"{\"provider\":\"ark\",\"model\":\"golden-model\",\"endpoint\":\"https://ark.cn-beijing.volces.com/api/v3\"}",
+"ark/blank-model":"{\"provider\":\"ark\",\"model\":\"doubao-seed-2-0-mini-260428\",\"endpoint\":\"https://ark.cn-beijing.volces.com/api/v3\"}",
+"ark/padded-model":"{\"provider\":\"ark\",\"model\":\"  \",\"endpoint\":\"https://ark.cn-beijing.volces.com/api/v3\"}",
+"ark/override":"{\"provider\":\"ark\",\"model\":\"ovr\",\"endpoint\":\"https://ark.cn-beijing.volces.com/api/v3\",\"override\":\"ovr\"}",
+"opencode/defaults":"{\"provider\":\"opencode\",\"model\":\"glm-5.3-flash\",\"endpoint\":\"https://opencode.ai/inference/openai/v1\"}",
+"opencode/configured":"{\"provider\":\"opencode\",\"model\":\"golden-model\",\"endpoint\":\"https://opencode.ai/inference/openai/v1\"}",
+"opencode/blank-model":"{\"provider\":\"opencode\",\"model\":\"glm-5.3-flash\",\"endpoint\":\"https://opencode.ai/inference/openai/v1\"}",
+"opencode/padded-model":"{\"provider\":\"opencode\",\"model\":\"  \",\"endpoint\":\"https://opencode.ai/inference/openai/v1\"}",
+"opencode/override":"{\"provider\":\"opencode\",\"model\":\"ovr\",\"endpoint\":\"https://opencode.ai/inference/openai/v1\",\"override\":\"ovr\"}",
+"commandcode/defaults":"{\"provider\":\"commandcode\",\"model\":\"deepseek/deepseek-v4-flash\",\"endpoint\":\"https://api.commandcode.ai/provider/v1\"}",
+"commandcode/configured":"{\"provider\":\"commandcode\",\"model\":\"golden-model\",\"endpoint\":\"https://api.commandcode.ai/provider/v1\"}",
+"commandcode/blank-model":"{\"provider\":\"commandcode\",\"model\":\"deepseek/deepseek-v4-flash\",\"endpoint\":\"https://api.commandcode.ai/provider/v1\"}",
+"commandcode/padded-model":"{\"provider\":\"commandcode\",\"model\":\"  \",\"endpoint\":\"https://api.commandcode.ai/provider/v1\"}",
+"commandcode/override":"{\"provider\":\"commandcode\",\"model\":\"ovr\",\"endpoint\":\"https://api.commandcode.ai/provider/v1\",\"override\":\"ovr\"}",
+"ark/region-intl":"{\"provider\":\"ark\",\"model\":\"doubao-seed-2-0-mini-260428\",\"endpoint\":\"https://ark.ap-southeast.bytepluses.com/api/v3\"}",
+"ark/region-empty":"{\"provider\":\"ark\",\"model\":\"doubao-seed-2-0-mini-260428\",\"endpoint\":\"\"}",
+"ark/region-unknown":"{\"provider\":\"ark\",\"model\":\"doubao-seed-2-0-mini-260428\",\"endpoint\":\"\"}",
+"opencode/protocol-anthropic":"{\"provider\":\"opencode\",\"model\":\"glm-5.3-flash\",\"endpoint\":\"https://opencode.ai/inference/anthropic/v1#anthropic\"}",
+"opencode/protocol-empty":"{\"provider\":\"opencode\",\"model\":\"glm-5.3-flash\",\"endpoint\":\"\"}",
+"commandcode/protocol-anthropic":"{\"provider\":\"commandcode\",\"model\":\"deepseek/deepseek-v4-flash\",\"endpoint\":\"https://api.commandcode.ai/provider/v1#anthropic\"}"
 };
 await test('golden: dictionary provenance model and endpoint per provider',async()=>{const actual={};for(const[label,s]of goldenRows()){let value;try{value=JSON.stringify(_pbpDictEntryModel(s));}catch(e){value='throw:'+(e.code||e.message);}actual[label]=value;}const labels=[...new Set([...Object.keys(GOLDEN_DICT),...Object.keys(actual)])];const bad=labels.filter(l=>actual[l]!==GOLDEN_DICT[l]);if(bad.length)throw new Error(bad.join(', ')+'\nACTUAL '+JSON.stringify(actual));return true;});
 await test('API key rotation does not invalidate reusable dictionary content',async()=>{reset();await pbpDictEntryRun(request());const req=request();req.settings.openaiApiKey='NEW_PRIVATE_SECRET';await pbpDictEntryRun(req);return calls.length===1;});

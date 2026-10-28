@@ -743,7 +743,13 @@ function pbpAiCacheModelKey(s) {
   const target = (typeof pbpAiResolveTarget === "function") ? pbpAiResolveTarget(st) : null;
   const base = target ? target.fpEndpoint : "";
   const builtIn = norm(target && target.cfg && target.cfg.base);
-  const endpoint = (base && base !== builtIn) ? ":e" + pbpAiHash(base) : "";
+  let endpoint = (base && base !== builtIn) ? ":e" + pbpAiHash(base) : "";
+  // A region or format setting that selects no endpoint resolves to "", which
+  // would otherwise key exactly like the default region or format and replay
+  // its cached output while the configuration is broken. Mark it instead; the
+  // "!" never appears in a valid key's hex endpoint term.
+  const cfg = target && target.cfg;
+  if (target && target.error && cfg && (cfg.regionField || cfg.protocolField)) endpoint = ":!" + target.error;
   return p + ":" + pbpAiEffectiveModel(st) + endpoint;
 }
 

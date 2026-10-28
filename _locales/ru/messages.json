@@ -1859,6 +1859,39 @@
   "provKimi": {
     "message": "Kimi"
   },
+  "provArk": {
+    "message": "Volcengine Ark"
+  },
+  "provOpencode": {
+    "message": "OpenCode Zen"
+  },
+  "provCommandcode": {
+    "message": "Command Code"
+  },
+  "optArkRegionCn": {
+    "message": "Китай (Пекин)"
+  },
+  "optArkRegionIntl": {
+    "message": "Международный (BytePlus ModelArk)"
+  },
+  "hintArkRegion": {
+    "message": "Это два отдельных аккаунта: ключи и идентификаторы моделей из одного региона не работают в другом."
+  },
+  "labelAiProtocol": {
+    "message": "Формат API"
+  },
+  "optAiProtocolOpenai": {
+    "message": "Совместимый с OpenAI (/chat/completions)"
+  },
+  "optAiProtocolAnthropic": {
+    "message": "Anthropic Messages (/messages)"
+  },
+  "hintAiProtocolGateway": {
+    "message": "Выберите формат, в котором шлюз предоставляет эту модель; он указан в списке моделей шлюза."
+  },
+  "aiProtocolUnknown": {
+    "message": "Эта версия не поддерживает выбранный формат API. Выберите формат заново в настройках."
+  },
   "provOllama": {
     "message": "Ollama (Local)"
   },

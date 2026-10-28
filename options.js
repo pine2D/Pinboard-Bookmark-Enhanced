@@ -80,7 +80,8 @@ const PBP_CONNECTION_HEALTH_KEY = "_connectionHealthV1";
 const PBP_CONNECTION_HEALTH_IDS = new Set([
   "pinboard", "anki", "eudic",
   ...["gemini", "openai", "claude", "deepseek", "qwen", "minimax", "openrouter",
-    "groq", "mistral", "cohere", "siliconflow", "zhipu", "kimi", "ollama", "custom"]
+    "groq", "mistral", "cohere", "siliconflow", "zhipu", "kimi", "ark", "opencode", "commandcode",
+    "ollama", "custom"]
     .map((provider) => `ai:${provider}`),
 ]);
 let _connectionHealthWriteTail = Promise.resolve();
@@ -1144,6 +1145,18 @@ function pbpArmCloudHintSyncRetest() {
   onChanged.addListener(retest);
 }
 
+// The API formats a registry entry with a protocolField accepts (ai.js
+// _aiProtocolOf). Only these are written back from the format selects.
+const PBP_OPT_AI_PROTOCOLS = ["openai", "anthropic"];
+
+// The settings patch for an enumerated select: {key: value} when the value is
+// one this version knows, else {} so the save leaves the stored value alone.
+// A select whose stored value is unknown here (synced from a newer version)
+// shows no option and reads "", and must not overwrite that value.
+function pbpOptKnownEnumPatch(key, value, allowed) {
+  return Array.isArray(allowed) && allowed.includes(value) ? { [key]: value } : {};
+}
+
 // One auto-save transaction with explicit mutable baselines. Ordinary
 // settings commit first; an invalid/failed overlay cannot roll their baseline
 // back or cause an unrelated stale form snapshot to be retried later.
@@ -1867,11 +1880,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         "opt-groq-model": "openai/gpt-oss-20b", "opt-mistral-model": "mistral-small-latest",
         "opt-cohere-model": "command-r7b-12-2024", "opt-siliconflow-model": "Qwen/Qwen3-8B",
         "opt-zhipu-model": "glm-4.7-flash", "opt-kimi-model": "kimi-k2.6",
+        "opt-ark-model": "doubao-seed-2-0-mini-260428", "opt-ark-region": "cn",
+        "opt-opencode-model": "glm-5.3-flash", "opt-opencode-protocol": "openai",
+        "opt-commandcode-model": "deepseek/deepseek-v4-flash", "opt-commandcode-protocol": "openai",
         "opt-ollama-baseurl": "http://localhost:11434", "opt-ollama-model": "llama3.2",
         "opt-custom-baseurl": "", "opt-custom-model": ""
       },
       keepsSecrets: true,
-      skip: ["opt-gemini-key","opt-openai-key","opt-claude-key","opt-deepseek-key","opt-qwen-key","opt-minimax-key","opt-openrouter-key","opt-groq-key","opt-mistral-key","opt-cohere-key","opt-siliconflow-key","opt-zhipu-key","opt-kimi-key","opt-custom-key"]
+      skip: ["opt-gemini-key","opt-openai-key","opt-claude-key","opt-deepseek-key","opt-qwen-key","opt-minimax-key","opt-openrouter-key","opt-groq-key","opt-mistral-key","opt-cohere-key","opt-siliconflow-key","opt-zhipu-key","opt-kimi-key","opt-ark-key","opt-opencode-key","opt-commandcode-key","opt-custom-key"]
     },
     "ai-behavior": {
       fields: {
@@ -2487,7 +2503,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         syncTranslateLangCustomState();
         syncDictDefinitionLangCustomState();
         updateProviderFields();
-        updateQwenWorkspaceWarn();
+        updateEndpointWarns();
         // Same class, one panel over: the General reset puts #opt-lang back to
         // "auto" by assignment, so the language handler (pause auto-save ->
         // flush -> prime the pp-i18n-* mirror -> reload) never ran and the page
@@ -2774,7 +2790,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ---- Fill text/password/select fields ----
-  // A Model Studio region this version does not know leaves its select on no
+  // A region or API format this version does not know leaves its select on no
   // option (value ""); saving then omits the key, so the stored value survives.
   const fieldMap = {
     "opt-pinboard-token": s.pinboardToken,
@@ -2793,6 +2809,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-siliconflow-key": s.siliconflowApiKey, "opt-siliconflow-model": s.siliconflowModel,
     "opt-zhipu-key": s.zhipuApiKey, "opt-zhipu-model": s.zhipuModel,
     "opt-kimi-key": s.kimiApiKey, "opt-kimi-model": s.kimiModel,
+    "opt-ark-key": s.arkApiKey, "opt-ark-model": s.arkModel, "opt-ark-region": s.arkRegion,
+    "opt-opencode-key": s.opencodeApiKey, "opt-opencode-model": s.opencodeModel, "opt-opencode-protocol": s.opencodeProtocol,
+    "opt-commandcode-key": s.commandcodeApiKey, "opt-commandcode-model": s.commandcodeModel, "opt-commandcode-protocol": s.commandcodeProtocol,
     "opt-ollama-baseurl": s.ollamaBaseUrl, "opt-ollama-model": s.ollamaModel,
     "opt-custom-baseurl": s.customBaseUrl,
     "opt-custom-key": s.customApiKey, "opt-custom-model": s.customModel,
@@ -3438,7 +3457,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // ---- Provider field toggle ----
-  const providers = ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","ollama","custom"];
+  const providers = ["gemini","openai","claude","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","ark","opencode","commandcode","ollama","custom"];
   // Reader tab's model-override input follows the selected provider: stash the
   // visible value under the outgoing provider, show the incoming provider's
   // entry (absent -> empty, NOT the legacy single key: showing a stale
@@ -3466,33 +3485,53 @@ document.addEventListener("DOMContentLoaded", async () => {
   updateProviderFields();
   $id("opt-ai-provider").addEventListener("change", updateProviderFields);
 
-  // Model Studio region + workspace: say why the pair forms no request host
-  // (the same pbpAiEndpointProblem codes the resolver fails closed on),
-  // while the user is still editing it. The region select's "" (a stored
-  // region this version does not know) reads as region_unknown, not Beijing.
-  function updateQwenWorkspaceWarn() {
-    const warn = $id("qwen-workspace-warn");
-    const region = $id("opt-qwen-region");
-    const input = $id("opt-qwen-workspace");
-    if (!warn || !region || !input) return;
-    const problem = pbpAiEndpointProblem({ aiProvider: "qwen", qwenRegion: region.value, qwenWorkspaceId: input.value.trim() }, "qwen");
+  // Region, workspace and API-format settings: say why they form no request
+  // (the same pbpAiEndpointProblem codes the resolver fails closed on) while
+  // the user is still editing them. A select's "" (a stored value this
+  // version does not know) reads as region_unknown / protocol_unknown, never
+  // as the default region or format. Each warning sits under the field it is
+  // about, and every listed control names it in aria-describedby.
+  const ENDPOINT_WARNS = [
+    { provider: "qwen", warn: "qwen-workspace-warn", region: "opt-qwen-region", workspace: "opt-qwen-workspace" },
+    { provider: "ark", warn: "ark-region-warn", region: "opt-ark-region" },
+    { provider: "opencode", warn: "opencode-protocol-warn", protocol: "opt-opencode-protocol" },
+    { provider: "commandcode", warn: "commandcode-protocol-warn", protocol: "opt-commandcode-protocol" },
+  ];
+  function updateEndpointWarn(spec) {
+    const warn = $id(spec.warn);
+    const cfg = OPENAI_COMPAT_PROVIDERS[spec.provider];
+    if (!warn || !cfg) return;
+    const region = spec.region ? $id(spec.region) : null;
+    const input = spec.workspace ? $id(spec.workspace) : null;
+    const protocol = spec.protocol ? $id(spec.protocol) : null;
+    const st = { aiProvider: spec.provider };
+    if (region) st[cfg.regionField] = region.value;
+    if (input) st[cfg.workspaceField] = input.value.trim();
+    if (protocol) st[cfg.protocolField] = protocol.value;
+    const problem = pbpAiEndpointProblem(st, spec.provider);
     let text = "";
     if (problem === "workspace_required") {
-      const option = region.selectedOptions[0];
-      text = t("aiWorkspaceRequired", option ? option.textContent.trim() : region.value);
+      const option = region && region.selectedOptions[0];
+      text = t("aiWorkspaceRequired", option ? option.textContent.trim() : (region ? region.value : ""));
     } else if (problem === "workspace_invalid") text = t("aiWorkspaceInvalid");
     else if (problem === "region_unknown") text = t("aiRegionUnknown");
+    else if (problem === "protocol_unknown") text = t("aiProtocolUnknown");
     if (warn.textContent !== text) warn.textContent = text;
     warn.hidden = !text;
-    if (problem.startsWith("workspace_")) input.setAttribute("aria-invalid", "true");
-    else if (!input.dataset.invalidMarked) input.removeAttribute("aria-invalid");
+    if (input) {
+      if (problem.startsWith("workspace_")) input.setAttribute("aria-invalid", "true");
+      else if (!input.dataset.invalidMarked) input.removeAttribute("aria-invalid");
+    }
   }
-  updateQwenWorkspaceWarn();
+  function updateEndpointWarns() { ENDPOINT_WARNS.forEach(updateEndpointWarn); }
+  updateEndpointWarns();
   // After the event's other listeners: the Test button's own invalid mark
   // clears on the same input and must not erase a standing aria-invalid.
-  const deferQwenWarn = () => queueMicrotask(updateQwenWorkspaceWarn);
-  $id("opt-qwen-region")?.addEventListener("change", deferQwenWarn);
-  $id("opt-qwen-workspace")?.addEventListener("input", deferQwenWarn);
+  for (const spec of ENDPOINT_WARNS) {
+    const defer = () => queueMicrotask(() => updateEndpointWarn(spec));
+    for (const id of [spec.region, spec.protocol]) if (id) $id(id)?.addEventListener("change", defer);
+    if (spec.workspace) $id(spec.workspace)?.addEventListener("input", defer);
+  }
 
   // ---- Reset prompt buttons ----
   // Empty IS the default for these two fields: the placeholder shows the
@@ -3720,11 +3759,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Saved as typed (trimmed): an invalid ID fails closed when read, never
       // turned into "" here, which would silently fall back to Beijing.
       qwenWorkspaceId: $id("opt-qwen-workspace").value.trim(),
-      // Only a region the registry declares is written. A select showing no
-      // option (a stored value this version does not know) omits the key, so
-      // the stored value is kept rather than rewritten.
-      ...(Object.hasOwn(OPENAI_COMPAT_PROVIDERS.qwen.regions, $id("opt-qwen-region").value)
-        ? { qwenRegion: $id("opt-qwen-region").value } : {}),
+      // Only a region or format the registry declares is written. A select
+      // showing no option (a stored value this version does not know) omits
+      // the key, so the stored value is kept rather than rewritten.
+      ...pbpOptKnownEnumPatch("qwenRegion", $id("opt-qwen-region").value, Object.keys(OPENAI_COMPAT_PROVIDERS.qwen.regions)),
       minimaxApiKey: obfuscateKey($id("opt-minimax-key").value.trim()),
       minimaxModel: $id("opt-minimax-model").value.trim() || "MiniMax-M2",
       openrouterApiKey: obfuscateKey($id("opt-openrouter-key").value.trim()),
@@ -3741,6 +3779,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       zhipuModel: $id("opt-zhipu-model").value.trim() || "glm-4.7-flash",
       kimiApiKey: obfuscateKey($id("opt-kimi-key").value.trim()),
       kimiModel: $id("opt-kimi-model").value.trim() || "kimi-k2.6",
+      arkApiKey: obfuscateKey($id("opt-ark-key").value.trim()),
+      arkModel: $id("opt-ark-model").value.trim() || "doubao-seed-2-0-mini-260428",
+      ...pbpOptKnownEnumPatch("arkRegion", $id("opt-ark-region").value, Object.keys(OPENAI_COMPAT_PROVIDERS.ark.regions)),
+      opencodeApiKey: obfuscateKey($id("opt-opencode-key").value.trim()),
+      opencodeModel: $id("opt-opencode-model").value.trim() || "glm-5.3-flash",
+      ...pbpOptKnownEnumPatch("opencodeProtocol", $id("opt-opencode-protocol").value, PBP_OPT_AI_PROTOCOLS),
+      commandcodeApiKey: obfuscateKey($id("opt-commandcode-key").value.trim()),
+      commandcodeModel: $id("opt-commandcode-model").value.trim() || "deepseek/deepseek-v4-flash",
+      ...pbpOptKnownEnumPatch("commandcodeProtocol", $id("opt-commandcode-protocol").value, PBP_OPT_AI_PROTOCOLS),
       ollamaBaseUrl: $id("opt-ollama-baseurl").value.trim() || "http://localhost:11434",
       ollamaModel: $id("opt-ollama-model").value.trim() || "llama3.2",
       customBaseUrl: $id("opt-custom-baseurl").value.trim(),
@@ -4195,7 +4242,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     "opt-claude-key", "opt-deepseek-key", "opt-qwen-key", "opt-minimax-key", "opt-openrouter-key",
     "opt-groq-key", "opt-mistral-key", "opt-cohere-key", "opt-siliconflow-key", "opt-zhipu-key",
     "opt-kimi-key", "opt-ollama-baseurl", "opt-custom-key", "opt-custom-baseurl", "dict-anki-port",
-    "dict-eudic-token", "opt-qwen-region", "opt-qwen-workspace"]) {
+    "dict-eudic-token", "opt-qwen-region", "opt-qwen-workspace", "opt-ark-key", "opt-opencode-key",
+    "opt-commandcode-key", "opt-ark-region", "opt-opencode-protocol", "opt-commandcode-protocol"]) {
     const el = $id(id);
     el?.addEventListener(el.tagName === "SELECT" ? "change" : "input", scheduleConnectionOverview);
   }
