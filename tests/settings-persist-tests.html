@@ -204,6 +204,22 @@ async function run() {
         available && map !== healthStore._connectionHealthV1 &&
         healthStore._connectionHealthV1.eudic?.code === "failed" &&
         !("not/a/known/integration" in healthStore._connectionHealthV1));
+
+      // AC17: a custom provider entry gets its own record by id pattern; any
+      // near-miss id is neither written nor read back.
+      const badEntryIds = ["ai:custom-ABCDEF", "ai:custom-ab12cd9", "ai:custom:x"];
+      if (available) {
+        await pbpRecordConnectionHealth("ai:custom-ab12cd", true, "connected");
+        for (const id of badEntryIds) await pbpRecordConnectionHealth(id, true, "connected");
+      }
+      const stored = healthStore._connectionHealthV1 || {};
+      const reread = typeof pbpConnectionHealthMap === "function"
+        ? pbpConnectionHealthMap({ ...stored, ...Object.fromEntries(badEntryIds.map((id) => [id, { ok: true, code: "connected", checkedAt: 1 }])) })
+        : {};
+      check("AC17 connection health accepts entry ids by pattern only",
+        available && stored["ai:custom-ab12cd"]?.ok === true &&
+        reread["ai:custom-ab12cd"]?.ok === true &&
+        badEntryIds.every((id) => !(id in stored) && !(id in reread)));
     } finally {
       globalThis.chrome = previousChrome;
     }

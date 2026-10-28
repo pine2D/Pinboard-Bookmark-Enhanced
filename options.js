@@ -85,12 +85,17 @@ const PBP_CONNECTION_HEALTH_IDS = new Set([
     .map((provider) => `ai:${provider}`),
 ]);
 let _connectionHealthWriteTail = Promise.resolve();
+// A custom provider list entry is admitted by its id pattern alone; the Set
+// above stays the fixed allowlist for everything else.
+function pbpConnectionHealthIdOk(id) {
+  return PBP_CONNECTION_HEALTH_IDS.has(id) || /^ai:custom-[a-z0-9]{6}$/.test(id);
+}
 
 function pbpConnectionHealthMap(raw) {
   const out = {};
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
   for (const [id, value] of Object.entries(raw)) {
-    if (!PBP_CONNECTION_HEALTH_IDS.has(id) || !value || typeof value !== "object") continue;
+    if (!pbpConnectionHealthIdOk(id) || !value || typeof value !== "object") continue;
     if (typeof value.ok !== "boolean" || !Number.isFinite(value.checkedAt)) continue;
     const code = /^[a-z0-9_:-]{1,48}$/.test(String(value.code || "")) ? String(value.code) : "failed";
     out[id] = { ok: value.ok, code, checkedAt: value.checkedAt };
@@ -99,7 +104,7 @@ function pbpConnectionHealthMap(raw) {
 }
 
 function pbpRecordConnectionHealth(id, ok, rawCode) {
-  if (!PBP_CONNECTION_HEALTH_IDS.has(id)) return Promise.resolve(false);
+  if (!pbpConnectionHealthIdOk(id)) return Promise.resolve(false);
   const code = /^[a-z0-9_:-]{1,48}$/.test(String(rawCode || "")) ? String(rawCode) : "failed";
   const run = _connectionHealthWriteTail.catch(() => {}).then(async () => {
     try {
