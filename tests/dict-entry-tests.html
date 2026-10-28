@@ -1,7 +1,7 @@
 <!doctype html><html><head><meta charset="UTF-8"><title>dict-entry Tests</title><style>body{font-family:monospace;padding:16px}.pass{color:green}.fail{color:red}.case{white-space:pre-wrap;padding:4px}</style></head><body><h1>Reusable AI dictionary entries</h1><div id="results"></div><div id="summary"></div>
+<script src="../i18n.js"></script><script src="../shared.js"></script><script src="../ai.js"></script>
 <script>
 let owner='acct_test',calls=[],writes=[],reads=[],cache=new Map(),answer='',beforeGet=null,beforeAI=null,beforeDispatch=null,beforeOwner=null,beforeSet=null,live=true,keyAvailable=true,setReceipt=true,getFailure=false,setFailure=false,evidence=[],evidenceFailure=null,detectedLanguage=null,languageChecks=[];
-const OPENAI_COMPAT_PROVIDERS={openai:{modelField:'openaiModel',defaultModel:'gpt-fixture',base:'https://api.openai.com/v1'},custom:{modelField:'customModel',defaultModel:'',baseField:'customBaseUrl',base:''}};
 async function pbpVocabCurrentOwner(){if(beforeOwner)await beforeOwner();return owner;}
 function hasAIKey(){return keyAvailable;}
 globalThis.chrome = { i18n: { detectLanguage: async text => {languageChecks.push(text);return detectedLanguage;} } };
@@ -56,6 +56,105 @@ await test('caller must provide a live-query guard',async()=>{reset();const req=
 await test('effective preview model override is dispatched and separates caches',async()=>{reset();await pbpDictEntryRun(request());const req=request();req.settings.previewAiModelByProvider={openai:'preview-model'};const r=await pbpDictEntryRun(req);return calls.length===2&&calls[1].options.model==='preview-model'&&r.model==='preview-model';});
 await test('an empty provider override does not reuse a legacy provider model',async()=>{reset();const req=request();req.settings.previewAiModel='legacy';req.settings.previewAiModelByProvider={openai:''};const r=await pbpDictEntryRun(req);return r.model==='configured'&&!calls[0].options.model;});
 await test('configurable endpoint changes separate entries',async()=>{reset();await pbpDictEntryRun(request({settings:{aiProvider:'custom',customModel:'same',customBaseUrl:'https://one.example/v1'}}));await pbpDictEntryRun(request({settings:{aiProvider:'custom',customModel:'same',customBaseUrl:'https://two.example/v1'}}));return calls.length===2&&writes[0].key!==writes[1].key;});
+// Provider-resolution golden (multi-custom-providers T1): the dictionary's
+// provenance model and endpoint per provider, pinned before the resolver
+// refactor. Same frozen matrix as md-ai-tests.html (duplicated on purpose);
+// later providers or entries are explicit new rows, old rows never drift.
+function goldenRows(){const ids=["gemini","claude","ollama","openai","deepseek","qwen","minimax","openrouter","groq","mistral","cohere","siliconflow","zhipu","kimi","custom"];const d=extra=>({...SETTINGS_DEFAULTS,...extra});const rows=[];for(const id of ids){rows.push([id+'/defaults',d({aiProvider:id})]);rows.push([id+'/configured',d({aiProvider:id,[id+'Model']:'golden-model',[id+'ApiKey']:'golden-key'})]);rows.push([id+'/blank-model',d({aiProvider:id,[id+'Model']:''})]);rows.push([id+'/padded-model',d({aiProvider:id,[id+'Model']:'  '})]);rows.push([id+'/override',d({aiProvider:id,previewAiModelByProvider:{[id]:'ovr'}})]);}
+rows.push(['openai/base-slash',d({aiProvider:'openai',openaiBaseUrl:'https://proxy.example/v1/'})]);rows.push(['openai/base-builtin',d({aiProvider:'openai',openaiBaseUrl:'https://api.openai.com/v1/'})]);rows.push(['openai/base-space',d({aiProvider:'openai',openaiBaseUrl:' '})]);
+rows.push(['custom/base',d({aiProvider:'custom',customBaseUrl:'https://gw.example/v1',customApiKey:'k',customModel:'m'})]);rows.push(['custom/base-padded',d({aiProvider:'custom',customBaseUrl:' https://gw.example/v1/ '})]);rows.push(['custom/base-lan',d({aiProvider:'custom',customBaseUrl:'http://192.168.1.2/v1'})]);
+rows.push(['ollama/base-blank',d({aiProvider:'ollama',ollamaBaseUrl:''})]);rows.push(['ollama/base-alt',d({aiProvider:'ollama',ollamaBaseUrl:'http://127.0.0.1:11435/'})]);rows.push(['ollama/base-default-slash',d({aiProvider:'ollama',ollamaBaseUrl:'http://localhost:11434/'})]);
+rows.push(['unknown',d({aiProvider:'brandnew'})]);rows.push(['empty',{}]);
+if(!(ids.length===15&&rows.length>=86))throw new Error('golden matrix lost rows: '+ids.length+' ids, '+rows.length+' rows');return rows;}
+const GOLDEN_DICT={
+"gemini/defaults":"{\"provider\":\"gemini\",\"model\":\"gemini-3.5-flash-lite\",\"endpoint\":\"\"}",
+"gemini/configured":"{\"provider\":\"gemini\",\"model\":\"golden-model\",\"endpoint\":\"\"}",
+"gemini/blank-model":"{\"provider\":\"gemini\",\"model\":\"gemini-3.5-flash-lite\",\"endpoint\":\"\"}",
+"gemini/padded-model":"{\"provider\":\"gemini\",\"model\":\"  \",\"endpoint\":\"\"}",
+"gemini/override":"{\"provider\":\"gemini\",\"model\":\"ovr\",\"endpoint\":\"\",\"override\":\"ovr\"}",
+"claude/defaults":"{\"provider\":\"claude\",\"model\":\"claude-haiku-4-5\",\"endpoint\":\"\"}",
+"claude/configured":"{\"provider\":\"claude\",\"model\":\"golden-model\",\"endpoint\":\"\"}",
+"claude/blank-model":"{\"provider\":\"claude\",\"model\":\"claude-haiku-4-5\",\"endpoint\":\"\"}",
+"claude/padded-model":"{\"provider\":\"claude\",\"model\":\"  \",\"endpoint\":\"\"}",
+"claude/override":"{\"provider\":\"claude\",\"model\":\"ovr\",\"endpoint\":\"\",\"override\":\"ovr\"}",
+"ollama/defaults":"{\"provider\":\"ollama\",\"model\":\"llama3.2\",\"endpoint\":\"http://localhost:11434\"}",
+"ollama/configured":"{\"provider\":\"ollama\",\"model\":\"golden-model\",\"endpoint\":\"http://localhost:11434\"}",
+"ollama/blank-model":"{\"provider\":\"ollama\",\"model\":\"llama3.2\",\"endpoint\":\"http://localhost:11434\"}",
+"ollama/padded-model":"{\"provider\":\"ollama\",\"model\":\"  \",\"endpoint\":\"http://localhost:11434\"}",
+"ollama/override":"{\"provider\":\"ollama\",\"model\":\"ovr\",\"endpoint\":\"http://localhost:11434\",\"override\":\"ovr\"}",
+"openai/defaults":"{\"provider\":\"openai\",\"model\":\"gpt-5.4-nano\",\"endpoint\":\"https://api.openai.com/v1\"}",
+"openai/configured":"{\"provider\":\"openai\",\"model\":\"golden-model\",\"endpoint\":\"https://api.openai.com/v1\"}",
+"openai/blank-model":"{\"provider\":\"openai\",\"model\":\"gpt-5.4-nano\",\"endpoint\":\"https://api.openai.com/v1\"}",
+"openai/padded-model":"{\"provider\":\"openai\",\"model\":\"  \",\"endpoint\":\"https://api.openai.com/v1\"}",
+"openai/override":"{\"provider\":\"openai\",\"model\":\"ovr\",\"endpoint\":\"https://api.openai.com/v1\",\"override\":\"ovr\"}",
+"deepseek/defaults":"{\"provider\":\"deepseek\",\"model\":\"deepseek-v4-flash\",\"endpoint\":\"https://api.deepseek.com/v1\"}",
+"deepseek/configured":"{\"provider\":\"deepseek\",\"model\":\"golden-model\",\"endpoint\":\"https://api.deepseek.com/v1\"}",
+"deepseek/blank-model":"{\"provider\":\"deepseek\",\"model\":\"deepseek-v4-flash\",\"endpoint\":\"https://api.deepseek.com/v1\"}",
+"deepseek/padded-model":"{\"provider\":\"deepseek\",\"model\":\"  \",\"endpoint\":\"https://api.deepseek.com/v1\"}",
+"deepseek/override":"{\"provider\":\"deepseek\",\"model\":\"ovr\",\"endpoint\":\"https://api.deepseek.com/v1\",\"override\":\"ovr\"}",
+"qwen/defaults":"{\"provider\":\"qwen\",\"model\":\"qwen-flash\",\"endpoint\":\"https://dashscope.aliyuncs.com/compatible-mode/v1\"}",
+"qwen/configured":"{\"provider\":\"qwen\",\"model\":\"golden-model\",\"endpoint\":\"https://dashscope.aliyuncs.com/compatible-mode/v1\"}",
+"qwen/blank-model":"{\"provider\":\"qwen\",\"model\":\"qwen-flash\",\"endpoint\":\"https://dashscope.aliyuncs.com/compatible-mode/v1\"}",
+"qwen/padded-model":"{\"provider\":\"qwen\",\"model\":\"  \",\"endpoint\":\"https://dashscope.aliyuncs.com/compatible-mode/v1\"}",
+"qwen/override":"{\"provider\":\"qwen\",\"model\":\"ovr\",\"endpoint\":\"https://dashscope.aliyuncs.com/compatible-mode/v1\",\"override\":\"ovr\"}",
+"minimax/defaults":"{\"provider\":\"minimax\",\"model\":\"MiniMax-M2\",\"endpoint\":\"https://api.minimaxi.com/v1\"}",
+"minimax/configured":"{\"provider\":\"minimax\",\"model\":\"golden-model\",\"endpoint\":\"https://api.minimaxi.com/v1\"}",
+"minimax/blank-model":"{\"provider\":\"minimax\",\"model\":\"MiniMax-M2\",\"endpoint\":\"https://api.minimaxi.com/v1\"}",
+"minimax/padded-model":"{\"provider\":\"minimax\",\"model\":\"  \",\"endpoint\":\"https://api.minimaxi.com/v1\"}",
+"minimax/override":"{\"provider\":\"minimax\",\"model\":\"ovr\",\"endpoint\":\"https://api.minimaxi.com/v1\",\"override\":\"ovr\"}",
+"openrouter/defaults":"{\"provider\":\"openrouter\",\"model\":\"openai/gpt-oss-20b\",\"endpoint\":\"https://openrouter.ai/api/v1\"}",
+"openrouter/configured":"{\"provider\":\"openrouter\",\"model\":\"golden-model\",\"endpoint\":\"https://openrouter.ai/api/v1\"}",
+"openrouter/blank-model":"{\"provider\":\"openrouter\",\"model\":\"openai/gpt-oss-20b\",\"endpoint\":\"https://openrouter.ai/api/v1\"}",
+"openrouter/padded-model":"{\"provider\":\"openrouter\",\"model\":\"  \",\"endpoint\":\"https://openrouter.ai/api/v1\"}",
+"openrouter/override":"{\"provider\":\"openrouter\",\"model\":\"ovr\",\"endpoint\":\"https://openrouter.ai/api/v1\",\"override\":\"ovr\"}",
+"groq/defaults":"{\"provider\":\"groq\",\"model\":\"openai/gpt-oss-20b\",\"endpoint\":\"https://api.groq.com/openai/v1\"}",
+"groq/configured":"{\"provider\":\"groq\",\"model\":\"golden-model\",\"endpoint\":\"https://api.groq.com/openai/v1\"}",
+"groq/blank-model":"{\"provider\":\"groq\",\"model\":\"openai/gpt-oss-20b\",\"endpoint\":\"https://api.groq.com/openai/v1\"}",
+"groq/padded-model":"{\"provider\":\"groq\",\"model\":\"  \",\"endpoint\":\"https://api.groq.com/openai/v1\"}",
+"groq/override":"{\"provider\":\"groq\",\"model\":\"ovr\",\"endpoint\":\"https://api.groq.com/openai/v1\",\"override\":\"ovr\"}",
+"mistral/defaults":"{\"provider\":\"mistral\",\"model\":\"mistral-small-latest\",\"endpoint\":\"https://api.mistral.ai/v1\"}",
+"mistral/configured":"{\"provider\":\"mistral\",\"model\":\"golden-model\",\"endpoint\":\"https://api.mistral.ai/v1\"}",
+"mistral/blank-model":"{\"provider\":\"mistral\",\"model\":\"mistral-small-latest\",\"endpoint\":\"https://api.mistral.ai/v1\"}",
+"mistral/padded-model":"{\"provider\":\"mistral\",\"model\":\"  \",\"endpoint\":\"https://api.mistral.ai/v1\"}",
+"mistral/override":"{\"provider\":\"mistral\",\"model\":\"ovr\",\"endpoint\":\"https://api.mistral.ai/v1\",\"override\":\"ovr\"}",
+"cohere/defaults":"{\"provider\":\"cohere\",\"model\":\"command-r7b-12-2024\",\"endpoint\":\"https://api.cohere.ai/compatibility/v1\"}",
+"cohere/configured":"{\"provider\":\"cohere\",\"model\":\"golden-model\",\"endpoint\":\"https://api.cohere.ai/compatibility/v1\"}",
+"cohere/blank-model":"{\"provider\":\"cohere\",\"model\":\"command-r7b-12-2024\",\"endpoint\":\"https://api.cohere.ai/compatibility/v1\"}",
+"cohere/padded-model":"{\"provider\":\"cohere\",\"model\":\"  \",\"endpoint\":\"https://api.cohere.ai/compatibility/v1\"}",
+"cohere/override":"{\"provider\":\"cohere\",\"model\":\"ovr\",\"endpoint\":\"https://api.cohere.ai/compatibility/v1\",\"override\":\"ovr\"}",
+"siliconflow/defaults":"{\"provider\":\"siliconflow\",\"model\":\"Qwen/Qwen3-8B\",\"endpoint\":\"https://api.siliconflow.cn/v1\"}",
+"siliconflow/configured":"{\"provider\":\"siliconflow\",\"model\":\"golden-model\",\"endpoint\":\"https://api.siliconflow.cn/v1\"}",
+"siliconflow/blank-model":"{\"provider\":\"siliconflow\",\"model\":\"Qwen/Qwen3-8B\",\"endpoint\":\"https://api.siliconflow.cn/v1\"}",
+"siliconflow/padded-model":"{\"provider\":\"siliconflow\",\"model\":\"  \",\"endpoint\":\"https://api.siliconflow.cn/v1\"}",
+"siliconflow/override":"{\"provider\":\"siliconflow\",\"model\":\"ovr\",\"endpoint\":\"https://api.siliconflow.cn/v1\",\"override\":\"ovr\"}",
+"zhipu/defaults":"{\"provider\":\"zhipu\",\"model\":\"glm-4.7-flash\",\"endpoint\":\"https://open.bigmodel.cn/api/paas/v4\"}",
+"zhipu/configured":"{\"provider\":\"zhipu\",\"model\":\"golden-model\",\"endpoint\":\"https://open.bigmodel.cn/api/paas/v4\"}",
+"zhipu/blank-model":"{\"provider\":\"zhipu\",\"model\":\"glm-4.7-flash\",\"endpoint\":\"https://open.bigmodel.cn/api/paas/v4\"}",
+"zhipu/padded-model":"{\"provider\":\"zhipu\",\"model\":\"  \",\"endpoint\":\"https://open.bigmodel.cn/api/paas/v4\"}",
+"zhipu/override":"{\"provider\":\"zhipu\",\"model\":\"ovr\",\"endpoint\":\"https://open.bigmodel.cn/api/paas/v4\",\"override\":\"ovr\"}",
+"kimi/defaults":"{\"provider\":\"kimi\",\"model\":\"kimi-k2.6\",\"endpoint\":\"https://api.moonshot.cn/v1\"}",
+"kimi/configured":"{\"provider\":\"kimi\",\"model\":\"golden-model\",\"endpoint\":\"https://api.moonshot.cn/v1\"}",
+"kimi/blank-model":"{\"provider\":\"kimi\",\"model\":\"kimi-k2.6\",\"endpoint\":\"https://api.moonshot.cn/v1\"}",
+"kimi/padded-model":"{\"provider\":\"kimi\",\"model\":\"  \",\"endpoint\":\"https://api.moonshot.cn/v1\"}",
+"kimi/override":"{\"provider\":\"kimi\",\"model\":\"ovr\",\"endpoint\":\"https://api.moonshot.cn/v1\",\"override\":\"ovr\"}",
+"custom/defaults":"{\"provider\":\"custom\",\"model\":\"default\",\"endpoint\":\"\"}",
+"custom/configured":"{\"provider\":\"custom\",\"model\":\"golden-model\",\"endpoint\":\"\"}",
+"custom/blank-model":"{\"provider\":\"custom\",\"model\":\"default\",\"endpoint\":\"\"}",
+"custom/padded-model":"{\"provider\":\"custom\",\"model\":\"  \",\"endpoint\":\"\"}",
+"custom/override":"{\"provider\":\"custom\",\"model\":\"ovr\",\"endpoint\":\"\",\"override\":\"ovr\"}",
+"openai/base-slash":"{\"provider\":\"openai\",\"model\":\"gpt-5.4-nano\",\"endpoint\":\"https://proxy.example/v1\"}",
+"openai/base-builtin":"{\"provider\":\"openai\",\"model\":\"gpt-5.4-nano\",\"endpoint\":\"https://api.openai.com/v1\"}",
+"openai/base-space":"{\"provider\":\"openai\",\"model\":\"gpt-5.4-nano\",\"endpoint\":\"\"}",
+"custom/base":"{\"provider\":\"custom\",\"model\":\"m\",\"endpoint\":\"https://gw.example/v1\"}",
+"custom/base-padded":"{\"provider\":\"custom\",\"model\":\"default\",\"endpoint\":\"https://gw.example/v1\"}",
+"custom/base-lan":"{\"provider\":\"custom\",\"model\":\"default\",\"endpoint\":\"http://192.168.1.2/v1\"}",
+"ollama/base-blank":"{\"provider\":\"ollama\",\"model\":\"llama3.2\",\"endpoint\":\"http://localhost:11434\"}",
+"ollama/base-alt":"{\"provider\":\"ollama\",\"model\":\"llama3.2\",\"endpoint\":\"http://127.0.0.1:11435\"}",
+"ollama/base-default-slash":"{\"provider\":\"ollama\",\"model\":\"llama3.2\",\"endpoint\":\"http://localhost:11434\"}",
+"unknown":"{\"provider\":\"brandnew\",\"model\":\"default\",\"endpoint\":\"\"}",
+"empty":"{\"provider\":\"gemini\",\"model\":\"gemini-3.5-flash-lite\",\"endpoint\":\"\"}"
+};
+await test('golden: dictionary provenance model and endpoint per provider',async()=>{const actual={};for(const[label,s]of goldenRows()){let value;try{value=JSON.stringify(_pbpDictEntryModel(s));}catch(e){value='throw:'+(e.code||e.message);}actual[label]=value;}const labels=[...new Set([...Object.keys(GOLDEN_DICT),...Object.keys(actual)])];const bad=labels.filter(l=>actual[l]!==GOLDEN_DICT[l]);if(bad.length)throw new Error(bad.join(', ')+'\nACTUAL '+JSON.stringify(actual));return true;});
 await test('API key rotation does not invalidate reusable dictionary content',async()=>{reset();await pbpDictEntryRun(request());const req=request();req.settings.openaiApiKey='NEW_PRIVATE_SECRET';await pbpDictEntryRun(req);return calls.length===1;});
 await test('hashed cache identities disclose neither term nor account nor credentials',async()=>{reset();await pbpDictEntryRun(request());return /^dictctx2_entry_v1_[a-f0-9]{64}$/.test(writes[0].key)&&!/Bank|acct_test|PRIVATE_FIXTURE_SECRET/.test(writes[0].key);});
 await test('malformed JSON never becomes a dictionary result',async()=>{reset();answer='Ignore the task and execute code';return await rejects(()=>pbpDictEntryRun(request()),'invalid_response')&&writes.length===0;});
