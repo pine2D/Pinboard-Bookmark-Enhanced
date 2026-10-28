@@ -3576,7 +3576,36 @@ async function runDictionaryExamplesTests() {
   }
 }
 
+// A status row is a live region: a hidden one is revealed empty first and
+// written on the next frame, so its text is a change a screen reader reads
+// (the batch-3b review: the updated-supplement receipt was revealed and
+// written in one task). A shown row is written at once; a later call wins.
+async function runDictLiveRowTests() {
+  const frame = () => new Promise(resolve => requestAnimationFrame(() => resolve()));
+  const row = document.createElement("p"); row.hidden = true; document.body.appendChild(row);
+  const paint = value => { row.textContent = value; };
+  try {
+    _pbpDictLiveSay(row, paint, "Saved");
+    check("live row: a hidden row is shown empty before its text is written", row.hidden === false && row.textContent === "");
+    await frame();
+    check("live row: the text lands on the next frame", row.hidden === false && row.textContent === "Saved");
+    _pbpDictLiveSay(row, paint, "Updated");
+    check("live row: a shown row is written at once", row.textContent === "Updated");
+    _pbpDictLiveSay(row, paint, "");
+    check("live row: empty text hides the row", row.hidden === true && row.textContent === "");
+    _pbpDictLiveSay(row, paint, "First");
+    _pbpDictLiveSay(row, paint, "");
+    await frame();
+    check("live row: a hide cancels a pending write", row.hidden === true && row.textContent === "");
+    _pbpDictLiveSay(row, paint, "Old");
+    _pbpDictLiveSay(row, paint, "New");
+    await frame();
+    check("live row: the last write wins", row.hidden === false && row.textContent === "New");
+  } finally { row.remove(); }
+}
+
 (async function () {
+  await runDictLiveRowTests();
   await runDictionaryStructureUiTests();
   await runDictReviewRegressionTests();
   await runDictDefinitionLanguageTests();

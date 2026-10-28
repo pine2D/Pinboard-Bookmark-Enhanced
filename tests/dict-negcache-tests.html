@@ -35,7 +35,10 @@ async function test(name, fn) {
 }
 const DAY = 24 * 60 * 60 * 1000;
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
-const settle = async () => { for (let i = 0; i < 12; i++) await tick(); };
+// A hidden status row is shown first and written on the next frame (md-dict
+// _pbpDictLiveSay), so settling ends on a frame.
+const frame = () => new Promise(resolve => requestAnimationFrame(() => resolve()));
+const settle = async () => { for (let i = 0; i < 12; i++) await tick(); await frame(); };
 const negKeys = () => Object.keys(store).filter(key => key.startsWith("pbpDictNeg:"));
 const examples = (term = "Zauberwort") => ({ term, sourceLanguage: "de", target: "", category: "examples" });
 const usage = (category = "patterns", term = "Gift") => ({ term, sourceLanguage: "de", target: pbpDictLearningTarget(settings, "en"), category });
@@ -194,7 +197,7 @@ await test("retrieval and AI-judgement memories read differently, both neutral w
   await pbpDictNegRecord("acct_alice", examples()); await pbpDictNegRecord("acct_alice", usage("patterns")); await pbpDictNegRecord("acct_alice", usage("etymology"));
   const view = examplesView();
   const hiddenUntilRead = view.button.closest(".xp-dict-usage-actions").hidden === true;
-  await view.ready;
+  await view.ready; await frame();
   // Under its block's own heading the remembered action drops its name
   // (ruling 2026-10-28); its accessible name still says what it finds.
   const examplesOk = label(view.button) === "dictNegRetry" && view.button.getAttribute("aria-label") === "dictExamplesFind · dictNegRetry" &&

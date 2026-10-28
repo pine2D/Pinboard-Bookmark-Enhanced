@@ -1320,18 +1320,17 @@ async function _pbpDictSlotRun(slot, term, lang, parentSignal, lemmaPromise, onR
     feedback.setAttribute("role", "status");
     feedback.setAttribute("aria-live", "polite");
     feedback.hidden = true;
+    const say = text => _pbpDictLiveSay(feedback, value => { feedback.textContent = value; }, text);
     btn.addEventListener("click", async () => {
       if (btn.disabled) return;
       btn.disabled = true;
-      feedback.hidden = true;
-      feedback.textContent = "";
+      say("");
       let granted = false;
       // FIRST await in the click chain must be the permission request.
       try { granted = await chrome.permissions.request({ origins: [PBP_DICT_ORIGIN + "/*"] }); } catch (_) {}
       if (!granted) {
         btn.textContent = t("dictConnectRetry");
-        feedback.hidden = false;
-        feedback.textContent = t("dictPermissionDenied");
+        say(t("dictPermissionDenied"));
         btn.disabled = false;
         return;
       }
@@ -1612,6 +1611,26 @@ function _pbpDictToneText(el, text, tone = "") {
     el.replaceChildren(mark, document.createTextNode(text));
   } else el.textContent = text;
   if (text && tone) el.dataset.state = tone; else delete el.dataset.state;
+}
+// A status row is a live region, and screen readers often skip a row that is
+// revealed and filled in the same task (the change happens while the node
+// enters the accessibility tree). Every lookup status row therefore goes
+// through here: a hidden row is shown empty first and gets its text on the
+// next frame; a row already shown is written at once; empty text hides it.
+// A later write or hide cancels a pending one, so the last call wins.
+const _pbpDictLivePending = new WeakMap();
+function _pbpDictLiveSay(row, paint, text) {
+  _pbpDictLivePending.delete(row);
+  if (!text || !row.hidden) { paint(text || ""); row.hidden = !text; return; }
+  paint("");
+  row.hidden = false;
+  const token = {};
+  _pbpDictLivePending.set(row, token);
+  requestAnimationFrame(() => {
+    if (_pbpDictLivePending.get(row) !== token) return;
+    _pbpDictLivePending.delete(row);
+    paint(text);
+  });
 }
 // An action's failure (plan 3.4) is its own role=alert line placed right
 // after the button that failed -- in the same action row, so it reads where
@@ -1947,7 +1966,7 @@ function _pbpDictEntryMount(host, opts) {
   // place instead (plan 3.4), so only an error interrupts.
   const message = (text, tone = "") => {
     const error = tone === "error";
-    _pbpDictToneText(status, error ? "" : text, error ? "" : tone); status.hidden = error || !text;
+    _pbpDictLiveSay(status, value => _pbpDictToneText(status, value, error ? "" : tone), error ? "" : text);
     _pbpDictActionError(status, error ? text : "");
   };
   // One feedback box: the phase line (the only live region), the elapsed
@@ -1990,8 +2009,8 @@ function _pbpDictEntryMount(host, opts) {
     if (error && !trigger?.isConnected) message(text, "error");
     else if (trigger) _pbpDictActionError(trigger, error ? text : "");
     if (error) { text = ""; state = ""; }
-    _pbpDictToneText(feedback.text, text, state === "neutral" ? state : "");
-    feedback.box.hidden = !text;
+    const tone = state === "neutral" ? state : "";
+    _pbpDictLiveSay(feedback.box, value => _pbpDictToneText(feedback.text, value, tone), text);
     feedback.box.dataset.state = state;
     feedback.cancel.hidden = state !== "busy";
     feedback.elapsed.hidden = state !== "busy" || !feedback.elapsed.textContent;
@@ -2954,8 +2973,9 @@ function pbpDictExamplesView(opts) {
     const error = state === "error" && !!text;
     _pbpDictActionError(find, error ? text : "");
     if (error) { text = ""; state = ""; }
-    _pbpDictToneText(status, text, state === "neutral" ? state : "");
-    box.hidden = !text; box.dataset.state = state;
+    const tone = state === "neutral" ? state : "";
+    _pbpDictLiveSay(box, value => _pbpDictToneText(status, value, tone), text);
+    box.dataset.state = state;
   };
   const results = [];
   const show = examples => {
