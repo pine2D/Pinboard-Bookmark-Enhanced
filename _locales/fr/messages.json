@@ -4876,8 +4876,21 @@
   "bookmarkGatewayCfHint": {
     "message": "Créez un jeton de service dans Service Tokens, dans Zero Trust. Le Client Secret n’est affiché qu’une fois, à la création du jeton. L’application Access doit aussi avoir une stratégie avec l’action Service Auth."
   },
-  "bookmarkGatewayHeaderName": {
-    "message": "Nom de l’en-tête"
+  "bookmarkGatewayHeaderN": {
+    "message": "En-tête $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkGatewayHeaderValueN": {
+    "message": "Valeur de l’en-tête $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
   },
   "bookmarkGatewayHeaderValue": {
     "message": "Valeur"

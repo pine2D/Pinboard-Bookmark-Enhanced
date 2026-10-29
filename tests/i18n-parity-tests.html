@@ -156,7 +156,7 @@ async function loadLocale(loc) {
   const LOCALE_SAME_OK = {
     fr: new Set(["libraryCountPages", "libraryCountPagesOne", "readerBookmarkNotes", "askExportSources", "dictSupplementSources", "mdExportArticle", "mdExportSummaryArticle", "askHistoryTab", "optArkRegionIntl"]), // These words, including "Questions" and "International", are also French
     pl: new Set(["askExportModel", "labelAiRegion"]), // "Model" and "Region" are also Polish
-    de: new Set(["labelAiRegion", "optArkRegionIntl"]), // "Region" and "International" are also German
+    de: new Set(["labelAiRegion", "optArkRegionIntl", "bookmarkGatewayHeaderN"]), // "Region" and "International" are also German; "Header $N$" is the German term too
   };
   for (const loc of ["de","fr","pl","ru","zh_HK"]) {
     const offenders = Object.keys(msgs.en).filter(k =>
@@ -1160,6 +1160,11 @@ async function loadLocale(loc) {
     check(`${loc}.backupIncludeSecretsHint lists the Pinboard, Karakeep and linkding tokens`,
       /Pinboard/.test(hint) && /Karakeep/.test(hint) && /linkding/.test(hint), hint);
   }
+  // Header rows are numbered through one $N$ key, never four copies of one label.
+  check("custom gateway header labels carry the row number in every locale",
+    LOCALES.every((loc) => ["bookmarkGatewayHeaderN", "bookmarkGatewayHeaderValueN"].every((k) =>
+      /\$N\$/.test(msgs[loc][k]?.message || "") && msgs[loc][k]?.placeholders?.n?.content === "$1") &&
+      !msgs[loc].bookmarkGatewayHeaderName));
   console.log(`PASS ${pass} | FAIL ${fail}`);
 })();
 </script></body></html>

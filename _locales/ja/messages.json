@@ -4876,8 +4876,21 @@
   "bookmarkGatewayCfHint": {
     "message": "Zero TrustのService Tokensでサービストークンを作成します。Client Secretは作成時に一度だけ表示されます。Accessアプリケーションには、アクションがService Authのポリシーも必要です。"
   },
-  "bookmarkGatewayHeaderName": {
-    "message": "ヘッダー名"
+  "bookmarkGatewayHeaderN": {
+    "message": "ヘッダー $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkGatewayHeaderValueN": {
+    "message": "ヘッダー $N$ の値",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
   },
   "bookmarkGatewayHeaderValue": {
     "message": "値"

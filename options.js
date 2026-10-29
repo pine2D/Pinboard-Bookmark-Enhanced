@@ -2836,6 +2836,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.pbpListboxSync?.(select);
     pbpOptGatewaySync(service);
   }
+  // One numbered name per header row, so a screen reader (and an error mark)
+  // can tell the four apart. Set here, not by data-i18n: the number is an argument.
+  for (const label of document.querySelectorAll("label[data-gw-header]")) label.textContent = t("bookmarkGatewayHeaderN", label.dataset.gwHeader);
+  for (const input of document.querySelectorAll("input[data-gw-header-value]")) input.setAttribute("aria-label", t("bookmarkGatewayHeaderValueN", input.dataset.gwHeaderValue));
   for (const service of ["karakeep", "linkding"]) {
     $id("opt-" + service + "-url").value = s[service + "Url"] || "";
     $id("opt-" + service + "-token").value = pbpBookmarkConnection({...s,bookmarkService:service}).token;

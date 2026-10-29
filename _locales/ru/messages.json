@@ -4876,8 +4876,21 @@
   "bookmarkGatewayCfHint": {
     "message": "Создайте сервисный токен в разделе Service Tokens в Zero Trust. Client Secret показывается только один раз, при создании токена. Приложению Access также нужна политика с действием Service Auth."
   },
-  "bookmarkGatewayHeaderName": {
-    "message": "Имя заголовка"
+  "bookmarkGatewayHeaderN": {
+    "message": "Заголовок $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkGatewayHeaderValueN": {
+    "message": "Значение заголовка $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
   },
   "bookmarkGatewayHeaderValue": {
     "message": "Значение"

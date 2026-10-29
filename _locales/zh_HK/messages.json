@@ -4876,8 +4876,21 @@
   "bookmarkGatewayCfHint": {
     "message": "請在 Zero Trust 的 Service Tokens 建立 Service Token。Client Secret 只會在建立時顯示一次。該 Access 應用程式亦須加入一項動作為 Service Auth 的政策。"
   },
-  "bookmarkGatewayHeaderName": {
-    "message": "標頭名稱"
+  "bookmarkGatewayHeaderN": {
+    "message": "標頭 $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkGatewayHeaderValueN": {
+    "message": "標頭 $N$ 的值",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
   },
   "bookmarkGatewayHeaderValue": {
     "message": "值"

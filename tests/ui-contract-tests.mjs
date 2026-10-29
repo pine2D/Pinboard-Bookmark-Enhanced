@@ -10103,6 +10103,11 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "options.js: choosing a bookmark service must refresh the connection overview and the AI nudge");
   check(!/-gateway-help"\)\.hidden/.test(optionsJs),
     "options.js: the access-gateway ? must stay visible for every gateway type (a stable anchor for the gateway errors)");
+  const labelled = [...optionsHtml.matchAll(/<label class="bl" for="opt-(\w+)-gw-name-(\d)" data-gw-header="(\d)"/g)];
+  const named = [...optionsHtml.matchAll(/id="opt-(\w+)-gw-value-(\d)"[^>]*data-gw-header-value="(\d)"/g)];
+  check(labelled.length === 8 && named.length === 8 && labelled.every((m) => m[2] === m[3]) && named.every((m) => m[2] === m[3]) &&
+    !optionsHtml.includes("bookmarkGatewayHeaderName"),
+    "options.html: each of the eight custom header rows needs a numbered name label and a value box named by its row");
 }
 
 if (timingEnabled) {

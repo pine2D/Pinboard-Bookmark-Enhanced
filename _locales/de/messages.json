@@ -4876,8 +4876,21 @@
   "bookmarkGatewayCfHint": {
     "message": "Unter Service Tokens in Zero Trust ein Service-Token erstellen. Das Client Secret wird nur einmal beim Erstellen angezeigt. Die Access-Anwendung braucht außerdem eine Richtlinie mit der Aktion Service Auth."
   },
-  "bookmarkGatewayHeaderName": {
-    "message": "Header-Name"
+  "bookmarkGatewayHeaderN": {
+    "message": "Header $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkGatewayHeaderValueN": {
+    "message": "Wert von Header $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
   },
   "bookmarkGatewayHeaderValue": {
     "message": "Wert"

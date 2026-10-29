@@ -4876,8 +4876,21 @@
   "bookmarkGatewayCfHint": {
     "message": "Utwórz token usługi w sekcji Service Tokens w Zero Trust. Client Secret jest wyświetlany tylko raz, podczas tworzenia tokenu. Aplikacja Access potrzebuje też zasady z akcją Service Auth."
   },
-  "bookmarkGatewayHeaderName": {
-    "message": "Nazwa nagłówka"
+  "bookmarkGatewayHeaderN": {
+    "message": "Nagłówek $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkGatewayHeaderValueN": {
+    "message": "Wartość nagłówka $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
   },
   "bookmarkGatewayHeaderValue": {
     "message": "Wartość"
