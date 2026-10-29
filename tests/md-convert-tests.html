@@ -3527,7 +3527,7 @@ section("Lazy-image outcome lock on the vendored Defuddle (real library, popup o
   }
   {
     const r = run('<p><img alt="eg" loading="lazy" data-uri="photo-key.jpg"></p><p><img alt="eg" src="https://cdn.fixture.test/img/photo-key.jpg?width=2048"></p>');
-    check("bare-file-name data-uri is not promoted to a same-site URL", r.md.indexOf("fixture.test/post/photo-key.jpg") === -1 && r.md.indexOf("fixture.test/photo-key.jpg") === -1, r.md.slice(0, 300));
+    check("bare-file-name data-uri is not promoted to a same-site URL", r.md.indexOf("](https://cdn.fixture.test/img/photo-key.jpg?width=2048)") !== -1 && r.md.indexOf("fixture.test/post/photo-key.jpg") === -1 && r.md.indexOf("fixture.test/photo-key.jpg") === -1, r.md.slice(0, 300));
   }
   // Static-file placeholders count as placeholders, so the real URL is promoted.
   for (const [label, img, want] of [
