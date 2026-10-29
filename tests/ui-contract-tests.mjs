@@ -1710,7 +1710,7 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     "optThemeHint", "popupFollowHint", "customCSSOverlayHelp", "saveAsThemeHint",
     "storageIntro", "diagnosticsHint",
     "bookmarkServiceHint", "personalLibraryHint", "bookmarkKarakeepHint",
-    "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp",
+    "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp", "themeGroupAdaptiveHint",
   ];
   const isInsideContextHelp = (key) => {
     const marker = optionsHtml.indexOf(`data-i18n="${key}"`);
@@ -1777,7 +1777,7 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
       : !Object.prototype.hasOwnProperty.call(enMessages, entry));
     check(!dangling.length, `tests/options-hint-policy.json: entries name no message or element: ${dangling.join(", ")}`);
     // Ratchet: copy the policy sends into ? but that has not moved yet.
-    check((policy.categories.pending || []).length <= 4,
+    check((policy.categories.pending || []).length <= 3,
       "tests/options-hint-policy.json: the pending list grew; classify new copy instead of parking it");
     check(contextualHelpKeys.every((key) => policy.categories.help.includes(key)) &&
       directWarnings.every((key) => ["consequence", "status"].some((name) => policy.categories[name].includes(key))),

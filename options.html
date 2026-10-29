@@ -1464,8 +1464,12 @@
       </section>
       <section class="settings-section">
         <h2 class="section-title" data-i18n="secCustomStyle">Pinboard.in Custom Style</h2>
-        <div class="fg">
+        <div class="fg context-help-host" data-help-role="field">
           <label class="bl subhead" data-i18n="labelThemePresets">Theme Presets</label>
+          <details class="context-help" id="theme-presets-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="themeGroupAdaptiveHint">Adaptive presets follow the light/dark setting under Extension Appearance above.</p>
+          </details>
           <div class="theme-presets-group">
             <button class="btn btn-sm theme-preset-btn" data-theme="" data-i18n="themeGroupNone" aria-pressed="false">No preset</button>
           </div>
@@ -1497,7 +1501,6 @@
               </div>
             </div>
           </div>
-          <p class="hint" data-i18n="themeGroupAdaptiveHint">Adaptive presets follow the light/dark setting under Extension Appearance above.</p>
         </div>
         <div class="fg" id="saved-themes-section" hidden>
           <label class="bl subhead" data-i18n="labelSavedThemes">Saved Themes</label>

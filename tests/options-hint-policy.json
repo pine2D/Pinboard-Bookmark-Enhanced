@@ -38,10 +38,10 @@
       "summaryPromptHint", "syncApiKeysHint", "tagPresetsHint", "tagPromptHint", "tagSyncHint",
       "translateGlossaryHint", "vocabDriveConnectionHint", "vocabDriveDisclosure",
       "bookmarkServiceHint", "personalLibraryHint", "bookmarkKarakeepHint",
-      "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp"
+      "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp", "themeGroupAdaptiveHint"
     ],
     "pending": [
-      "themeGroupAdaptiveHint", "vocabCompleteExportHint", "ecdictHint", "dictPackHint"
+      "vocabCompleteExportHint", "ecdictHint", "dictPackHint"
     ]
   }
 }
