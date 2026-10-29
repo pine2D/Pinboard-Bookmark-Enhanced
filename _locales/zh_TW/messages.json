@@ -4921,6 +4921,9 @@
   "bookmarkInvalidConfig": {
     "message": "請填入有效的伺服器網址與 API 權杖。"
   },
+  "bookmarkUrlInvalid": {
+    "message": "請填入以 https:// 開頭的伺服器網址。只有 localhost 可以使用 http://。"
+  },
   "bookmarkPermissionDenied": {
     "message": "請在設定中允許存取此伺服器，再重新連線。"
   },
@@ -4950,6 +4953,9 @@
   },
   "bookmarkErrAuth": {
     "message": "伺服器拒絕了 API 權杖。請在設定中確認權杖，再重新連線。"
+  },
+  "bookmarkConnectErrAuth": {
+    "message": "伺服器拒絕了 API Token。請確認上方的 Token，再重新連線。"
   },
   "offlineQueuePaused": {
     "message": "自動重試已暫停：$REASON$",

@@ -4921,6 +4921,9 @@
   "bookmarkInvalidConfig": {
     "message": "有効なサーバーURLとAPIトークンを入力してください。"
   },
+  "bookmarkUrlInvalid": {
+    "message": "https:// で始まるサーバーURLを入力してください。HTTP が使えるのは localhost だけです。"
+  },
   "bookmarkPermissionDenied": {
     "message": "設定でこのサーバーへのアクセスを許可してから、再接続してください。"
   },
@@ -4950,6 +4953,9 @@
   },
   "bookmarkErrAuth": {
     "message": "サーバーがAPIトークンを拒否しました。設定でトークンを確認し、再接続してください。"
+  },
+  "bookmarkConnectErrAuth": {
+    "message": "サーバーがAPIトークンを拒否しました。上のトークンを確認して、もう一度接続してください。"
   },
   "offlineQueuePaused": {
     "message": "自動再送を一時停止しました：$REASON$",

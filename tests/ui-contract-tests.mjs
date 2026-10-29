@@ -10082,6 +10082,25 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   }
 }
 
+// Critique 6 batch 1: the self-hosted Connect status line states its outcome.
+// .save-status defaults to the success colour, so a bare textContent write
+// painted "Connecting…" and every error green (the 10-15 regression class).
+{
+  const start = optionsJs.indexOf('$id("connect-" + service).addEventListener("click"');
+  const end = optionsJs.indexOf("// ---- Custom AI provider entries ----", start);
+  const handler = start >= 0 && end > start ? optionsJs.slice(start, end) : "";
+  check(handler.length > 0, "options.js: the bookmark Connect handler moved; the status-state gate cannot find it");
+  const helper = handler.match(/const setConnectStatus = \(state, text\) => \{[\s\S]*?\n      \};/)?.[0] || "";
+  check(/classList\.add\("pending"\)/.test(helper) && /setStatusIcon\(status, state === "ok"/.test(helper) && /classList\.remove\([^)]*"bad"/.test(helper),
+    "options.js: setConnectStatus must set .pending, .ok or .bad (via setStatusIcon) and clear the stale ones");
+  const outside = handler.replace(helper, "");
+  check(!/\bstatus\.(textContent|innerHTML|innerText)\s*=/.test(outside),
+    "options.js: the Connect handler writes its status line without a state class; use setConnectStatus(state, text)");
+  const states = [...outside.matchAll(/setConnectStatus\("(\w+)"/g)].map((m) => m[1]);
+  check(states.length > 0 && states.every((state) => ["pending", "ok", "bad", "clear"].includes(state)),
+    "options.js: setConnectStatus called with a state other than pending / ok / bad / clear");
+}
+
 if (timingEnabled) {
   console.error(`[ui-contract timing] ${JSON.stringify({
     totalMilliseconds: Math.round(performance.now() - auditStarted),

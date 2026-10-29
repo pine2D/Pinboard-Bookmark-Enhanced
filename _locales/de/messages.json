@@ -4921,6 +4921,9 @@
   "bookmarkInvalidConfig": {
     "message": "Eine gültige Server-URL und ein API-Token eingeben."
   },
+  "bookmarkUrlInvalid": {
+    "message": "Die Serveradresse mit https:// angeben. HTTP ist nur für localhost zulässig."
+  },
   "bookmarkPermissionDenied": {
     "message": "In den Einstellungen den Zugriff auf diesen Server erlauben und erneut verbinden."
   },
@@ -4950,6 +4953,9 @@
   },
   "bookmarkErrAuth": {
     "message": "Der Server hat das API-Token abgelehnt. Das Token in den Einstellungen prüfen und erneut verbinden."
+  },
+  "bookmarkConnectErrAuth": {
+    "message": "Der Server hat das API-Token abgelehnt. Das Token oben prüfen und erneut verbinden."
   },
   "offlineQueuePaused": {
     "message": "Automatisches erneutes Senden pausiert: $REASON$",

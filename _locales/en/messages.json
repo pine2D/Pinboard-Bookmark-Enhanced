@@ -4929,6 +4929,9 @@
   "bookmarkInvalidConfig": {
     "message": "Enter a valid server URL and API token."
   },
+  "bookmarkUrlInvalid": {
+    "message": "Enter the server address starting with https://. HTTP is allowed only for localhost."
+  },
   "bookmarkPermissionDenied": {
     "message": "Allow access to this server in Settings, then reconnect."
   },
@@ -4958,6 +4961,9 @@
   },
   "bookmarkErrAuth": {
     "message": "The server rejected the API token. Check the token in Settings, then reconnect."
+  },
+  "bookmarkConnectErrAuth": {
+    "message": "The server rejected the API token. Check the token above, then connect again."
   },
   "offlineQueuePaused": {
     "message": "Automatic retry paused: $REASON$",

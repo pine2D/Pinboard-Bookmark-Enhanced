@@ -2848,30 +2848,61 @@ document.addEventListener("DOMContentLoaded", async () => {
       const token = $id("opt-" + service + "-token").value.trim();
       const status = $id("connect-" + service + "-status");
       const button = $id("connect-" + service);
-      if (!baseUrl || !token) { status.textContent = t("bookmarkInvalidConfig"); return; }
+      const urlField = $id("opt-" + service + "-url"), tokenField = $id("opt-" + service + "-token");
+      const statusId = "connect-" + service + "-status";
+      // Every write below sets a state class (pending / ok / bad); a bare
+      // textContent would paint an error in the success colour.
+      const setConnectStatus = (state, text) => {
+        if (state === "pending") {
+          status.classList.remove("ok", "bad", "warn");
+          status.classList.add("pending");
+          status.textContent = text;
+        } else if (state === "clear") {
+          status.classList.remove("pending", "ok", "bad", "warn");
+          status.textContent = "";
+        } else {
+          status.classList.remove("pending", "warn");
+          setStatusIcon(status, state === "ok", text);
+        }
+      };
+      pbpOptClearFieldInvalid?.(urlField);
+      pbpOptClearFieldInvalid?.(tokenField);
+      if (!baseUrl || !token) {
+        // A typed address the endpoint rule refused (plain http on a public host,
+        // credentials in the URL, ...) is a URL problem, not a missing field.
+        const urlRaw = urlField.value.trim();
+        const urlBad = !baseUrl;
+        setConnectStatus("bad", t(urlBad && urlRaw ? "bookmarkUrlInvalid" : "bookmarkInvalidConfig"));
+        pbpOptMarkFieldInvalid?.(urlBad ? urlField : tokenField, statusId);
+        return;
+      }
       // Validated before any permission prompt or request.
       const gatewayRead = pbpOptGatewayRead(service);
       if (!gatewayRead.ok) {
-        status.textContent = t(PBP_BOOKMARK_GATEWAY_ERROR_KEYS[gatewayRead.error] || "bookmarkInvalidConfig");
-        pbpOptMarkFieldInvalid?.(gatewayRead.field, "connect-" + service + "-status");
+        setConnectStatus("bad", t(PBP_BOOKMARK_GATEWAY_ERROR_KEYS[gatewayRead.error] || "bookmarkInvalidConfig"));
+        pbpOptMarkFieldInvalid?.(gatewayRead.field, statusId);
         return;
       }
       const gateway = gatewayRead.gateway;
       const gatewayJson = JSON.stringify(gateway);
       button.disabled = true;
-      status.textContent = t("bookmarkConnecting");
+      setConnectStatus("pending", t("bookmarkConnecting"));
       try {
         // Called directly in the click handler to preserve Chrome's user gesture.
         const granted = await chrome.permissions.request({origins:[pbpEndpointOriginPattern(baseUrl)]});
-        if (!granted) { status.textContent = t("bookmarkPermissionDenied"); return; }
+        if (!granted) { setConnectStatus("bad", t("bookmarkPermissionDenied")); return; }
         const result = await chrome.runtime.sendMessage({type:"bookmark_connect",service,baseUrl,token,gateway});
         const gatewayNow = pbpOptGatewayRead(service);
         if (pbpBookmarkEndpoint($id("opt-" + service + "-url").value) !== baseUrl || $id("opt-" + service + "-token").value.trim() !== token ||
-          !gatewayNow.ok || JSON.stringify(gatewayNow.gateway) !== gatewayJson) { status.textContent = ""; return; }
+          !gatewayNow.ok || JSON.stringify(gatewayNow.gateway) !== gatewayJson) { setConnectStatus("clear"); return; }
         if (!result?.ok) {
           const failureKey = pbpBookmarkFailureKey({reason:result?.error, httpStatus:result?.status}, service);
-          status.textContent = t(failureKey || (result?.error === "permission" ? "bookmarkPermissionDenied"
-            : result?.error === "invalid_request" ? "bookmarkInvalidConfig" : "bookmarkConnectFailed"));
+          // The shared auth copy says "check the token in Settings", which points
+          // at the page the user is already on; here the token field is just above.
+          const authRejected = failureKey === "bookmarkErrAuth";
+          setConnectStatus("bad", t(authRejected ? "bookmarkConnectErrAuth" : failureKey || (result?.error === "permission" ? "bookmarkPermissionDenied"
+            : result?.error === "invalid_request" ? "bookmarkInvalidConfig" : "bookmarkConnectFailed")));
+          if (authRejected) pbpOptMarkFieldInvalid?.(tokenField, statusId);
           return;
         }
         const fresh = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
@@ -2885,12 +2916,12 @@ document.addEventListener("DOMContentLoaded", async () => {
           patch.karakeepReadLaterListOwner = "";
         }
         const saved = await persistSettings(patch);
-        status.textContent = t(saved.ok ? "bookmarkConnected" : "bookmarkConnectFailed");
+        setConnectStatus(saved.ok ? "ok" : "bad", t(saved.ok ? "bookmarkConnected" : "bookmarkConnectFailed"));
         if (saved.ok) { gatewayStored[service] = gateway; pbpOptGatewaySync(service); }
         void renderConnectionOverview();
       } catch (error) {
         console.warn("[bookmark-connect] failed:", error?.name, error?.message);
-        status.textContent = t("bookmarkConnectFailed");
+        setConnectStatus("bad", t("bookmarkConnectFailed"));
       } finally { button.disabled = false; }
     });
   }

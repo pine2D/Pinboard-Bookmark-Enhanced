@@ -131,9 +131,18 @@ try{
     if(service==='linkding'){
       await options.locator('#opt-'+service+'-token').fill('wrong-key');
       await options.locator('#connect-'+service).click();
-      const authMessage=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8')).bookmarkErrAuth.message;
+      const authMessage=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8')).bookmarkConnectErrAuth.message;
       await options.locator('#connect-'+service+'-status').filter({hasText:authMessage}).waitFor({timeout:10000}).catch(async error=>{console.error({status:await options.locator('#connect-'+service+'-status').textContent()});throw error;});
-      assert.equal(await options.locator('#connect-'+service+'-status').textContent(),authMessage);
+      assert.equal((await options.locator('#connect-'+service+'-status').textContent()).trim(),authMessage);
+      // A rejected connect is an error state, not the default success colour, and it marks the token field.
+      assert(await options.locator('#connect-'+service+'-status.bad').count(),'auth rejection status has no .bad state class');
+      assert.equal(await options.locator('#opt-'+service+'-token').getAttribute('aria-invalid'),'true');
+      // Plain http on a public host is a URL problem: its own message, and the URL field is marked.
+      await options.locator('#opt-'+service+'-url').fill('http://bookmarks.example.com/');
+      await options.locator('#connect-'+service).click();
+      assert.equal((await options.locator('#connect-'+service+'-status').textContent()).trim(),JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8')).bookmarkUrlInvalid.message);
+      assert.equal(await options.locator('#opt-'+service+'-url').getAttribute('aria-invalid'),'true');
+      await options.locator('#opt-'+service+'-url').fill(origin+'/'+service+'/');
       assert(!(await options.evaluate(async()=>(await pbpReadBookmarkConnection()).account)),'wrong-key connection was saved');
     }
     await options.locator('#opt-'+service+'-token').fill('fixture-key');
@@ -192,12 +201,12 @@ try{
     gate.linkding=true;
     await options.locator('#connect-linkding').click();
     await waitStatus(en.bookmarkErrGatewayRedirect.message);
-    assert.equal(await status.textContent(),en.bookmarkErrGatewayRedirect.message);
+    assert.equal((await status.textContent()).trim(),en.bookmarkErrGatewayRedirect.message);
     await chooseGateway('cloudflare');
     const wireBefore=wire.length;
     await options.locator('#connect-linkding').click();
     await waitStatus(en.bookmarkGatewayErrRequired.message);
-    assert.equal(await status.textContent(),en.bookmarkGatewayErrRequired.message);
+    assert.equal((await status.textContent()).trim(),en.bookmarkGatewayErrRequired.message);
     assert.equal(wire.length,wireBefore,'an invalid gateway form sent a request');
     assert.equal(await options.locator('#opt-linkding-cf-id').getAttribute('aria-invalid'),'true');
     await options.locator('#opt-linkding-cf-id').fill('fixture-cf-id');

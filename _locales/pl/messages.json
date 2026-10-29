@@ -4921,6 +4921,9 @@
   "bookmarkInvalidConfig": {
     "message": "Podaj prawidłowy adres serwera i token API."
   },
+  "bookmarkUrlInvalid": {
+    "message": "Podaj adres serwera zaczynający się od https://. HTTP jest dozwolone tylko dla localhost."
+  },
   "bookmarkPermissionDenied": {
     "message": "Zezwól na dostęp do tego serwera w ustawieniach, a następnie połącz ponownie."
   },
@@ -4950,6 +4953,9 @@
   },
   "bookmarkErrAuth": {
     "message": "Serwer odrzucił token API. Sprawdź token w ustawieniach i połącz ponownie."
+  },
+  "bookmarkConnectErrAuth": {
+    "message": "Serwer odrzucił token API. Sprawdź token powyżej i połącz ponownie."
   },
   "offlineQueuePaused": {
     "message": "Automatyczne ponawianie wstrzymane: $REASON$",

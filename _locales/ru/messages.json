@@ -4921,6 +4921,9 @@
   "bookmarkInvalidConfig": {
     "message": "Введите допустимый адрес сервера и токен API."
   },
+  "bookmarkUrlInvalid": {
+    "message": "Введите адрес сервера, начинающийся с https://. HTTP допускается только для localhost."
+  },
   "bookmarkPermissionDenied": {
     "message": "Разрешите доступ к этому серверу в настройках и подключитесь снова."
   },
@@ -4950,6 +4953,9 @@
   },
   "bookmarkErrAuth": {
     "message": "Сервер отклонил токен API. Проверьте токен в настройках и подключитесь снова."
+  },
+  "bookmarkConnectErrAuth": {
+    "message": "Сервер отклонил токен API. Проверьте токен выше и подключитесь снова."
   },
   "offlineQueuePaused": {
     "message": "Автоматический повтор приостановлен: $REASON$",

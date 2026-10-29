@@ -4921,6 +4921,9 @@
   "bookmarkInvalidConfig": {
     "message": "Saisissez une URL de serveur valide et un jeton API."
   },
+  "bookmarkUrlInvalid": {
+    "message": "Saisissez l’adresse du serveur en commençant par https://. HTTP n’est accepté que pour localhost."
+  },
   "bookmarkPermissionDenied": {
     "message": "Autorisez l’accès à ce serveur dans les paramètres, puis reconnectez-vous."
   },
@@ -4950,6 +4953,9 @@
   },
   "bookmarkErrAuth": {
     "message": "Le serveur a refusé le jeton API. Vérifiez le jeton dans les paramètres, puis reconnectez-vous."
+  },
+  "bookmarkConnectErrAuth": {
+    "message": "Le serveur a refusé le jeton API. Vérifiez le jeton ci-dessus, puis reconnectez-vous."
   },
   "offlineQueuePaused": {
     "message": "Nouvel essai automatique suspendu : $REASON$",

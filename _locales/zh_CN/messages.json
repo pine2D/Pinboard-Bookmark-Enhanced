@@ -4915,6 +4915,9 @@
   "bookmarkInvalidConfig": {
     "message": "请填写有效的服务器地址和 API 令牌。"
   },
+  "bookmarkUrlInvalid": {
+    "message": "请填写以 https:// 开头的服务器地址。只有 localhost 可以使用 http://。"
+  },
   "bookmarkPermissionDenied": {
     "message": "请在设置中允许访问此服务器，然后重新连接。"
   },
@@ -4944,6 +4947,9 @@
   },
   "bookmarkErrAuth": {
     "message": "服务器拒绝了 API 令牌。请在设置中检查令牌，然后重新连接。"
+  },
+  "bookmarkConnectErrAuth": {
+    "message": "服务器拒绝了 API Token。请检查上方的 Token，然后重新连接。"
   },
   "offlineQueuePaused": {
     "message": "自动重试已暂停：$REASON$",
