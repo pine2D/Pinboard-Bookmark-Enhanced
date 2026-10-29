@@ -242,7 +242,8 @@ async function fetchAllUserTags(token) {
     if (!pbpPopupTagAccountIsCurrent(account)) return;
     if (resp.status === 401) return; // pinboardFetch already redirected to login
     if (!resp.ok) {
-      showTagSyncError(classifyPinboardError(resp));
+      const tagFailureKey = pbpBookmarkServiceId(settings) === "pinboard" ? "" : pbpBookmarkFailureKey(resp.error, pbpBookmarkServiceId(settings));
+      showTagSyncError(tagFailureKey || classifyPinboardError(resp));
       return;
     }
     const data = await resp.json();

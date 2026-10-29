@@ -108,7 +108,7 @@
       retry.innerHTML = PBP_ICONS.refresh;
       retry.title = t("offlineRetry");
       retry.setAttribute("aria-label", t("offlineRetry"));
-      retry.addEventListener("click", () => onRetry(item.queueId, retry));
+      retry.addEventListener("click", () => onRetry(item.queueId, retry, pbpBookmarkAccountService(item.account)));
 
       const remove = document.createElement("button");
       remove.type = "button";
@@ -140,8 +140,10 @@
   // replay is fail-closed, so an item queued under another account (the row's meta
   // already prints its @account) can never succeed however often it is clicked.
   // Same reason -> message table the save path uses in popup.js.
-  function retryFailureMessage(result) {
+  function retryFailureMessage(result, service) {
     const reason = result && typeof result === "object" ? result.reason : "";
+    const failureKey = pbpBookmarkFailureKey(result, service);
+    if (failureKey) return t(failureKey);
     if (reason === "account_mismatch") return t("offlineRetryWrongAccount");
     if (reason === "not_logged_in") return t("batchNotLoggedIn");
     if (reason === "account_changed") return t("offlineRetryAccountChanged");
@@ -173,7 +175,7 @@
     });
   }
 
-  async function onRetry(queueId, btn) {
+  async function onRetry(queueId, btn, service) {
     btn.disabled = true;
     btn.classList.add("loading");
     try {
@@ -186,7 +188,7 @@
         setTimeout(() => btn.classList.remove("offline-queue-failed"), 1200);
         // The pulse acknowledges the click in place; the reason goes to the
         // popup's error card, the same surface batch and save failures use.
-        showStatus("status-msg", retryFailureMessage(resp && resp.result), "error");
+        showStatus("status-msg", retryFailureMessage(resp && resp.result, service), "error");
         return;
       }
       // Success — background has removed this item; refresh list

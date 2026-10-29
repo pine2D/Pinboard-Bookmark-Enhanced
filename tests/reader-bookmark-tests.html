@@ -320,6 +320,32 @@ await test("runtime script implements guarded shared keyboard and action state",
   w.document.dispatchEvent(new w.CustomEvent("pbp:bookmark-account-changed", { detail: { account: "bob" } })); w.pbpReaderBookmarkAction("save"); equal(calls.filter(x => x.type === "mdReaderBookmarkSave").length, 1); equal(w.document.getElementById("reader-bookmark-status").textContent, "readerBookmarkChecking");
   assert(!w.document.getElementById("rendered-view").contains(w.document.getElementById("reader-bookmark-footer")), "footer must stay outside exported article"); frame.remove();
 });
+await test("reader save, delete and lookup show self-hosted causes", async () => {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  const run = async (account, handler, act) => {
+    const frame = document.createElement("iframe"); document.body.append(frame);
+    try {
+      const w = frame.contentWindow;
+      w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+      w.eval(await (await fetch("../shared.js")).text());
+      w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p, sendMessage: async msg => handler(msg), onMessage: { addListener() {} } } };
+      w.t = k => k; w.eval(runtime);
+      w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "" } } }));
+      await new Promise(r => setTimeout(r, 30));
+      await act(w); await new Promise(r => setTimeout(r, 30));
+      return w.document.getElementById("reader-bookmark-status").textContent;
+    } finally { frame.remove(); }
+  };
+  const ld = "linkding:https://ld.example:c1";
+  const known = (account) => ({ known: true, bookmarked: true, account, bookmark: { tags: [], notes: "" } });
+  equal(await run(ld, m => m.type === "mdReaderBookmarkState" ? known(ld) : { status: "failed", reason: "gateway_redirect", account: ld },
+    w => w.pbpReaderBookmarkAction("later")), "bookmarkErrGatewayRedirect");
+  equal(await run(ld, m => m.type === "mdReaderBookmarkState" ? known(ld) : { status: "failed", reason: "not_logged_in", httpStatus: 403, account: ld },
+    async w => { w.pbpReaderBookmarkAction("edit"); await new Promise(r => setTimeout(r, 20)); w.document.getElementById("reader-bookmark-delete").click(); await new Promise(r => setTimeout(r, 20)); w.document.querySelector(".confirm-yes")?.click(); }), "bookmarkErrAuth");
+  equal(await run(ld, () => ({ known: false, reason: "not_api", account: ld }), () => {}), "bookmarkErrNotApi");
+  equal(await run("alice", m => m.type === "mdReaderBookmarkState" ? known("alice") : { status: "failed", reason: "not_logged_in", account: "alice" },
+    w => w.pbpReaderBookmarkAction("later")), "readerBookmarkAccountChanged");
+});
 await test("real reader editor shows the configured privacy default and saves the user's checkbox choice", async () => {
   runtime ||= await (await fetch("../md-bookmark.js")).text();
   for (const privateDefault of [false, true]) {

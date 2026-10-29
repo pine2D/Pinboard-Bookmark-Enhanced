@@ -380,6 +380,44 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
     });
 
+    function bookmarkErrorView(service) {
+      const viewSource = source.slice(source.indexOf("function pbpSaveErrorView("), source.indexOf("function showSaveError("));
+      return new Function("t", "classifyPinboardError", "POSTS_ADD_URI_BUDGET", "settings", "pbpBookmarkServiceId", "pbpBookmarkFailureKey", "PBP_BOOKMARK_GATEWAY_CODES",
+        `${viewSource}\nreturn pbpSaveErrorView;`)(
+        (key, ...args) => key + (args.length ? "(" + args.join(",") + ")" : ""), classifyPinboardError, 3900,
+        { bookmarkService: service }, () => service, pbpBookmarkFailureKey, PBP_BOOKMARK_GATEWAY_CODES);
+    }
+    test("self-hosted save errors name gateway causes and offer no retry", () => {
+      const view = bookmarkErrorView("linkding");
+      const keys = { gateway_redirect: "bookmarkErrGatewayRedirect", gateway_challenge: "bookmarkErrGatewayChallenge", gateway_basic: "bookmarkErrGatewayBasic", gateway_denied: "bookmarkErrGatewayDenied", not_api: "bookmarkErrNotApi" };
+      for (const code of PBP_BOOKMARK_GATEWAY_CODES) {
+        const got = view({ reason: code });
+        assert(got.message === keys[code] && got.retry === false, code + " -> " + JSON.stringify(got));
+        assert(enMessages[keys[code]]?.message, "en catalogue lacks " + keys[code]);
+      }
+      const auth = view({ reason: "not_logged_in", httpStatus: 401 });
+      assert(auth.message === "bookmarkErrAuth" && auth.retry === false, JSON.stringify(auth));
+      const remote = view({ reason: "remote" });
+      assert(remote.message === "saveFailedGeneric" && remote.retry === true, JSON.stringify(remote));
+    });
+    test("Pinboard save errors are unchanged", () => {
+      const view = bookmarkErrorView("pinboard");
+      assert(view({ reason: "not_logged_in" }).message === "pinboardErrorAuth", "pinboard auth copy changed");
+      assert(view({ reason: "network" }).message === "pinboardErrorOffline", "pinboard offline copy changed");
+      assert(view({ reason: "gateway_basic" }).message === "saveFailedGeneric", "pinboard must not use the gateway table");
+    });
+    test("offline retry copy follows the queued item's service", () => {
+      const fnStart = popupOfflineSource.indexOf("function retryFailureMessage(result, service) {");
+      const fnEnd = popupOfflineSource.indexOf("\n  }\n", fnStart);
+      assert(fnStart >= 0 && fnEnd > fnStart, "retryFailureMessage source not found");
+      const message = new Function("t", "POSTS_ADD_URI_BUDGET", "pbpBookmarkFailureKey",
+        popupOfflineSource.slice(fnStart, fnEnd + 4) + "\nreturn retryFailureMessage;"
+      )((key, ...args) => args.length ? `${key}:${args.join(":")}` : key, 4000, pbpBookmarkFailureKey);
+      assert(message({ reason: "not_logged_in", httpStatus: 401 }, "linkding") === "bookmarkErrAuth", "linkding auth failure not named");
+      assert(message({ reason: "gateway_basic" }, "linkding") === "bookmarkErrGatewayBasic", "gateway failure not named");
+      assert(message({ reason: "not_logged_in" }, "pinboard") === "batchNotLoggedIn", "pinboard copy changed");
+    });
+
     // A queued save used to print "queued (offline)" in body colour even when
     // Pinboard itself answered 5xx (impeccable critique 2026-10-20).
     await testAsync("a queued save names its cause in the warning card and can be sent now", async () => {
@@ -394,14 +432,14 @@ test("posts/add default remains replace=yes for existing callers", () => {
           refresh: async () => {},
           retryFailureMessage: (r) => "fail:" + (r?.reason || ""),
         } };
-        const show = new Function("t", "$id", "showFeedback", "showStatus", "clearSaveError", "window", "_saveErrorFeedback",
+        const show = new Function("t", "$id", "showFeedback", "showStatus", "clearSaveError", "window", "_saveErrorFeedback", "settings", "pbpBookmarkServiceId",
           `${cardSource}\nreturn showSaveQueued;`)(
           (k) => k,
           () => ({ closest: () => ({ after: () => { log.placed++; } }) }),
           (opts) => { log.cards.push(opts); return { element, dismiss() {} }; },
           (...a) => log.status.push(a),
           () => { log.cleared++; },
-          win, null);
+          win, null, { bookmarkService: "pinboard" }, () => "pinboard");
         show(result);
         return { log, element, btn };
       };
@@ -2955,12 +2993,12 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
     // B38/B51: the retry outcome copy runs through the real retryFailureMessage.
     test("offline retry failures are localized and name an account switch", () => {
-      const fnStart = popupOfflineSource.indexOf("function retryFailureMessage(result) {");
+      const fnStart = popupOfflineSource.indexOf("function retryFailureMessage(result, service) {");
       const fnEnd = popupOfflineSource.indexOf("\n  }\n", fnStart);
       assert(fnStart >= 0 && fnEnd > fnStart, "retryFailureMessage source not found");
-      const message = new Function("t", "POSTS_ADD_URI_BUDGET",
+      const message = new Function("t", "POSTS_ADD_URI_BUDGET", "pbpBookmarkFailureKey",
         popupOfflineSource.slice(fnStart, fnEnd + 4) + "\nreturn retryFailureMessage;"
-      )((key, ...args) => args.length ? `${key}:${args.join(":")}` : key, 4000);
+      )((key, ...args) => args.length ? `${key}:${args.join(":")}` : key, 4000, pbpBookmarkFailureKey);
       assert(message({ status: "failed", reason: "api", detail: "missing url" }) === "pinboardApiError:missing url",
         "API failure kept a hard-coded English prefix");
       assert(message({ status: "failed", reason: "account_changed" }) === "offlineRetryAccountChanged",
@@ -4225,7 +4263,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const block = source.slice(start, end);
       assert(/showFeedback\(\{[^}]*target: container/.test(block), "failure card must mount in the recent list (target: container)");
       assert(!/showStatus\(/.test(block), "no failure path may fall back to the form's status card");
-      assert((block.match(/reportDeleteFailure\(t\(/g) || []).length === 2, "both failure paths (API result, network) must use the in-list report");
+      assert((block.match(/reportDeleteFailure\(t\(/g) || []).length === 3, "all failure paths (self-hosted result, API result, network) must use the in-list report");
     });
 
     // ===================== Shift+Enter: AI shortcut, never in the notes =====================

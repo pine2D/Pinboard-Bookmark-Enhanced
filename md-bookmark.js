@@ -131,6 +131,12 @@
     }
   }
 
+  // Self-hosted failure key for a background result; "" keeps the default copy.
+  function failureKey(result) {
+    return typeof pbpBookmarkFailureKey === "function"
+      ? pbpBookmarkFailureKey(result, pbpBookmarkAccountService(context?.account)) : "";
+  }
+
   async function refresh(expectedGeneration) {
     const result = await request({ type: "mdReaderBookmarkState" });
     if (expectedGeneration !== generation || result?.account !== context?.account) {
@@ -138,7 +144,7 @@
       return false;
     }
     state = result?.known ? result : { known: false };
-    if (!state.known) showStatus("readerBookmarkLookupFailed");
+    if (!state.known) showStatus(failureKey(result?.reason) || "readerBookmarkLookupFailed");
     else paint();
     return state.known;
   }
@@ -259,8 +265,9 @@
       closeEditor();
       document.dispatchEvent(new CustomEvent("pbp:bookmark-changed", { detail: { url: context.url, account: context.account } }));
     } else {
-      editorStatusKey = result?.reason === "account_changed" || result?.reason === "not_logged_in"
-        || (result?.account && result.account !== context.account) ? "readerBookmarkAccountChanged" : "readerBookmarkDeleteFailed";
+      const foreign = !!(result?.account && result.account !== context.account);
+      editorStatusKey = foreign ? "readerBookmarkAccountChanged" : failureKey(result)
+        || (result?.reason === "account_changed" || result?.reason === "not_logged_in" ? "readerBookmarkAccountChanged" : "readerBookmarkDeleteFailed");
       statusKey = editorStatusKey;
     }
     paint();
@@ -287,7 +294,7 @@
       await refresh(gen);
       if (gen !== generation) return;
       statusKey = "bookmarkPartialSave";
-    } else statusKey = result?.reason === "account_changed" || result?.reason === "not_logged_in" ? "readerBookmarkAccountChanged" : "readerBookmarkFailed";
+    } else statusKey = failureKey(result) || (result?.reason === "account_changed" || result?.reason === "not_logged_in" ? "readerBookmarkAccountChanged" : "readerBookmarkFailed");
     inflight = false; paint();
   }
 

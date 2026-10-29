@@ -122,6 +122,14 @@ try{
     const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
     await options.locator(`input[name="bookmark-service"][value="${service}"]`).check();
     await options.locator('#opt-'+service+'-url').fill(origin+'/'+service+'/');
+    if(service==='linkding'){
+      await options.locator('#opt-'+service+'-token').fill('wrong-key');
+      await options.locator('#connect-'+service).click();
+      const authMessage=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8')).bookmarkErrAuth.message;
+      await options.locator('#connect-'+service+'-status').filter({hasText:authMessage}).waitFor({timeout:10000}).catch(async error=>{console.error({status:await options.locator('#connect-'+service+'-status').textContent()});throw error;});
+      assert.equal(await options.locator('#connect-'+service+'-status').textContent(),authMessage);
+      assert(!(await options.evaluate(async()=>(await pbpReadBookmarkConnection()).account)),'wrong-key connection was saved');
+    }
     await options.locator('#opt-'+service+'-token').fill('fixture-key');
     console.log(service+' permission:',await options.evaluate(origin=>chrome.permissions.contains({origins:[origin+'/*']}),origin));
     await options.locator('#connect-'+service).click();

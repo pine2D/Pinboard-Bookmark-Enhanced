@@ -1672,7 +1672,13 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         // below -- exactly the misattribution this branch exists to avoid. The
         // worker's reason string is the one detail that survives the flattening,
         // which is why the throw above copies it onto .code.
-        if (e?.code === "account_changed") {
+        const lookupFailureKey = typeof settings === "object"
+          ? pbpBookmarkFailureKey({reason:e?.code, httpStatus:e?.status}, pbpBookmarkServiceId(settings)) : "";
+        if (lookupFailureKey) {
+          // Self-hosted: name the gateway or token cause; classifyPinboardError
+          // would read a 403 challenge as a Pinboard auth failure.
+          showStatus("status-msg", t(lookupFailureKey), "error");
+        } else if (e?.code === "account_changed") {
           // The worker refuses to dispatch once the stored token stops matching
           // the one it authorised this call with (background.js's
           // pinboard_api_call handler answers { status: 0, error:
@@ -2193,6 +2199,10 @@ function setupSubmit(token) {
           // resolves a stand-in whose json() is {} on 401, so without this the
           // result_code is undefined and the user reads an API error ending in
           // "undefined" instead of the login redirect already under way.
+          if (!resp.ok && pbpBookmarkServiceId(settings) !== "pinboard") {
+            if (ownsDeleteForm()) showStatus("status-msg", t(pbpBookmarkFailureKey(resp.error, pbpBookmarkServiceId(settings)) || "saveFailedGeneric"), "error");
+            return;
+          }
           if (resp.status === 401) return; // pinboardFetch already redirected to login
           const data = await resp.json();
           const deleted = data.result_code === "done" || data.result_code === "item not found";
@@ -2363,6 +2373,10 @@ async function fetchRecentBookmarks(token) {
           onConfirm: async () => {
             try {
               const resp = await pbpPopupBookmarkApi("delete", p.href);
+              if (!resp.ok && pbpBookmarkServiceId(settings) !== "pinboard") {
+                reportDeleteFailure(t(pbpBookmarkFailureKey(resp.error, pbpBookmarkServiceId(settings)) || "saveFailedGeneric"));
+                return;
+              }
               if (resp.status === 401) return; // pinboardFetch already redirected to login
               const data = await resp.json();
               if (data.result_code === "done" || data.result_code === "item not found") {
@@ -2531,6 +2545,8 @@ function pbpSaveErrorView(result) {
   if (reason === "partial") return {message:t("bookmarkPartialSave"), retry:true};
   if (reason === "permission") return {message:t("bookmarkPermissionDenied"), retry:false};
   if (typeof settings === "object" && pbpBookmarkServiceId(settings) !== "pinboard") {
+    const key = pbpBookmarkFailureKey(result, pbpBookmarkServiceId(settings));
+    if (key) return {message:t(key), retry:!PBP_BOOKMARK_GATEWAY_CODES.includes(reason) && key !== "bookmarkErrAuth" && key !== "bgSetToken"};
     return {message:t(["account_changed","not_logged_in"].includes(reason) ? "bookmarkConnectFailed" : "saveFailedGeneric"), retry:!["account_changed","not_logged_in"].includes(reason)};
   }
   if (reason === "too_long") {
@@ -2582,7 +2598,7 @@ function showSaveQueued(result) {
           return;
         }
         if (btn) btn.disabled = false;
-        showStatus("status-msg", window.PPOffline.retryFailureMessage(resp && resp.result), "error");
+        showStatus("status-msg", window.PPOffline.retryFailureMessage(resp && resp.result, pbpBookmarkServiceId(settings)), "error");
       },
     });
   }

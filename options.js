@@ -2797,7 +2797,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!granted) { status.textContent = t("bookmarkPermissionDenied"); return; }
         const result = await chrome.runtime.sendMessage({type:"bookmark_connect",service,baseUrl,token});
         if (pbpBookmarkEndpoint($id("opt-" + service + "-url").value) !== baseUrl || $id("opt-" + service + "-token").value.trim() !== token) return;
-        if (!result?.ok) { status.textContent = t("bookmarkConnectFailed"); return; }
+        if (!result?.ok) {
+          const failureKey = pbpBookmarkFailureKey({reason:result?.error, httpStatus:result?.status}, service);
+          status.textContent = t(failureKey || (result?.error === "permission" ? "bookmarkPermissionDenied"
+            : result?.error === "invalid_request" ? "bookmarkInvalidConfig" : "bookmarkConnectFailed"));
+          return;
+        }
         const fresh = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
         const credential = {v:1, baseUrl, token, connectionId:crypto.randomUUID(), userId:result.identity.id};
         const patch = {[service + "Url"]:baseUrl, [service + "Token"]:obfuscateKey(JSON.stringify(credential))};
