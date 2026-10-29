@@ -4889,6 +4889,20 @@
   "bookmarkGatewayHeaderValue": {
     "message": "值"
   },
+  "bookmarkGatewayNoneHint": {
+    "message": "只有服务器前面还有一层要求先登录的网关（例如 Cloudflare Access）时才需要设置。直接访问服务器就保持「无」。"
+  },
+  "bookmarkGatewayHeaderNameN": {
+    "message": "请求头 $N$ 的名称",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkGatewayNamePlaceholder": {
+    "message": "名称"
+  },
   "bookmarkGatewayCustomHint": {
     "message": "这些请求头会随每个书签接口请求发往这台服务器。不能填写 Authorization、Cookie 等请求头。如果网关使用 Basic 认证，请在网关中为接口路径放行。"
   },

@@ -4895,6 +4895,20 @@
   "bookmarkGatewayHeaderValue": {
     "message": "Wert"
   },
+  "bookmarkGatewayNoneHint": {
+    "message": "Nur nötig, wenn vor dem Server ein Gateway mit Anmeldung steht, etwa Cloudflare Access. Bei direktem Zugriff auf den Server bleibt die Einstellung auf „Keines“."
+  },
+  "bookmarkGatewayHeaderNameN": {
+    "message": "Name von Header $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkGatewayNamePlaceholder": {
+    "message": "Header-Name"
+  },
   "bookmarkGatewayCustomHint": {
     "message": "Diese Header gehen mit jeder Anfrage an die Lesezeichen-API an diesen Server. Authorization, Cookie und ähnliche Header sind nicht erlaubt. Nutzt das Gateway Basic-Authentifizierung, stattdessen den API-Pfad im Gateway freigeben."
   },

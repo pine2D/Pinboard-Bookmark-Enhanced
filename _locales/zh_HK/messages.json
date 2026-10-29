@@ -4895,6 +4895,20 @@
   "bookmarkGatewayHeaderValue": {
     "message": "值"
   },
+  "bookmarkGatewayNoneHint": {
+    "message": "只有伺服器前面另有一層要求先登入的網關（例如 Cloudflare Access）時才需要設定。直接連線伺服器的話，維持「無」即可。"
+  },
+  "bookmarkGatewayHeaderNameN": {
+    "message": "標頭 $N$ 的名稱",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkGatewayNamePlaceholder": {
+    "message": "名稱"
+  },
   "bookmarkGatewayCustomHint": {
     "message": "這些標頭會隨每個書籤 API 請求傳送到這部伺服器。不可填入 Authorization、Cookie 等標頭。如網關使用 Basic 認證，請在網關為 API 路徑放行。"
   },

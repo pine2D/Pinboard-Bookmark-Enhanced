@@ -4895,6 +4895,20 @@
   "bookmarkGatewayHeaderValue": {
     "message": "値"
   },
+  "bookmarkGatewayNoneHint": {
+    "message": "サーバーの前にログインを求めるゲートウェイ（Cloudflare Access など）がある場合にだけ設定します。サーバーに直接アクセスできるなら「なし」のままにしてください。"
+  },
+  "bookmarkGatewayHeaderNameN": {
+    "message": "ヘッダー $N$ の名前",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkGatewayNamePlaceholder": {
+    "message": "名前"
+  },
   "bookmarkGatewayCustomHint": {
     "message": "これらのヘッダーは、ブックマークAPIへのすべてのリクエストと一緒にこのサーバーへ送信されます。Authorization、Cookieなどのヘッダーは指定できません。ゲートウェイがBasic認証を使う場合は、ゲートウェイでAPIのパスを許可してください。"
   },

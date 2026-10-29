@@ -4895,6 +4895,20 @@
   "bookmarkGatewayHeaderValue": {
     "message": "Значение"
   },
+  "bookmarkGatewayNoneHint": {
+    "message": "Нужно только если перед сервером стоит шлюз с входом, например Cloudflare Access. При прямом доступе к серверу оставьте «Нет»."
+  },
+  "bookmarkGatewayHeaderNameN": {
+    "message": "Имя заголовка $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkGatewayNamePlaceholder": {
+    "message": "Имя"
+  },
   "bookmarkGatewayCustomHint": {
     "message": "Эти заголовки отправляются на этот сервер с каждым запросом к API закладок. Заголовки Authorization, Cookie и подобные указывать нельзя. Если шлюз использует аутентификацию Basic, вместо этого разрешите в нём путь API."
   },

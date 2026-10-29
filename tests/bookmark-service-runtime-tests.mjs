@@ -127,9 +127,22 @@ try{
   for(const service of ['linkding','karakeep']){
     const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
     await options.locator(`input[name="bookmark-service"][value="${service}"]`).check();
-    // The gateway ? stays reachable with the gateway on None, and shows the Cloudflare route.
-    assert(await options.locator('#'+service+'-gateway-help').isVisible(),'gateway help is hidden while the gateway is None');
-    assert(await options.locator('#'+service+'-gateway-cf-help').count(),'gateway help lost its Cloudflare text');
+    const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
+    // The gateway ? stays reachable with the gateway on None and answers "when do I need one": only that paragraph is visible.
+    await options.locator('#'+service+'-gateway-help > summary').click();
+    await options.locator('#'+service+'-gateway-none-help').waitFor({state:'visible',timeout:5000}).catch(()=>{throw new Error('gateway help does not say when a gateway is needed while the gateway is None')});
+    assert((await options.locator('#'+service+'-gateway-none-help').textContent()).trim()===en.bookmarkGatewayNoneHint.message,'none help text is not the new copy');
+    assert(await options.locator('#'+service+'-gateway-cf-help').isHidden(),'Cloudflare steps show while the gateway is None');
+    assert(await options.locator('#'+service+'-gateway-custom-help').isHidden(),'custom help shows while the gateway is None');
+    await options.evaluate(service=>{const s=document.getElementById('opt-'+service+'-gateway');s.value='cloudflare';s.dispatchEvent(new Event('change',{bubbles:true}));},service);
+    assert(await options.locator('#'+service+'-gateway-cf-help').isVisible()&&await options.locator('#'+service+'-gateway-none-help').isHidden(),'Cloudflare help does not replace the none help');
+    await options.evaluate(service=>{const s=document.getElementById('opt-'+service+'-gateway');s.value='none';s.dispatchEvent(new Event('change',{bubbles:true}));},service);
+    // The connection overview follows the chosen service (its first row names it).
+    await until(()=>options.evaluate(name=>(document.querySelector('#connection-health .connection-health-name')?.textContent||'').includes(name),service==='karakeep'?'Karakeep':'linkding'),'connection overview names '+service);
+    // Header names/labels re-apply on a language re-apply: a stale name is rewritten, not left behind.
+    await options.evaluate(()=>{for(const el of document.querySelectorAll('[data-gw-header],[data-gw-header-name],[data-gw-header-value]'))el.matches('label')?el.textContent='stale':el.setAttribute('aria-label','stale');document.dispatchEvent(new Event('pbp:i18n-applied'));});
+    assert.equal(await options.evaluate(()=>[document.querySelector('label[data-gw-header="2"]').textContent,document.querySelector('[data-gw-header-name="2"]').getAttribute('aria-label'),document.querySelector('[data-gw-header-value="2"]').getAttribute('aria-label')].join('|')),
+      ['Header 2','Header 2 name','Header 2 value'].join('|'),'gateway header names stayed stale after pbp:i18n-applied');
     await options.locator('#opt-'+service+'-url').fill(origin+'/'+service+'/');
     if(service==='linkding'){
       await options.locator('#opt-'+service+'-token').fill('wrong-key');

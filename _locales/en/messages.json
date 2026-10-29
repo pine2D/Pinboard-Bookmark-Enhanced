@@ -4903,6 +4903,20 @@
   "bookmarkGatewayHeaderValue": {
     "message": "Value"
   },
+  "bookmarkGatewayNoneHint": {
+    "message": "Only needed when a login gateway, such as Cloudflare Access, sits in front of the server. Leave it on None if you reach the server directly."
+  },
+  "bookmarkGatewayHeaderNameN": {
+    "message": "Header $N$ name",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkGatewayNamePlaceholder": {
+    "message": "Name"
+  },
   "bookmarkGatewayCustomHint": {
     "message": "These headers go to this server with every bookmark API request. Authorization, Cookie and similar headers aren't allowed. If the gateway uses Basic authentication, allow the API path in the gateway instead."
   },

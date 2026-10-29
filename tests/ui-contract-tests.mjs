@@ -10094,13 +10094,23 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   check(/classList\.add\("pending"\)/.test(helper) && /setStatusIcon\(status, state === "ok"/.test(helper) && /classList\.remove\([^)]*"bad"/.test(helper),
     "options.js: setConnectStatus must set .pending, .ok or .bad (via setStatusIcon) and clear the stale ones");
   const outside = handler.replace(helper, "");
-  check(!/\bstatus\.(textContent|innerHTML|innerText)\s*=/.test(outside),
+  // Every DOM write form, on the cached element or re-fetched by id; comments are stripped so a commented-out line cannot satisfy or trip a gate.
+  const stripComments = (src) => src.replace(/^\s*\/\/.*$/gm, "");
+  check(!/(\bstatus|\$id\(statusId\)|\$id\("connect-[^"]*status"\))\??\.(textContent|innerHTML|innerText|outerHTML)\s*=|(\bstatus|\$id\(statusId\))\??\.(replaceChildren|append|prepend|before|after|insertAdjacent\w+)\(/.test(stripComments(outside)),
     "options.js: the Connect handler writes its status line without a state class; use setConnectStatus(state, text)");
+  // The status ids are only reachable through that handler: nothing else in the options scripts may address them.
+  const addressing = /connect-(?:karakeep|linkding)-status|"connect-" \+ service \+ "-status"/g;
+  const outsideHandler = stripComments(optionsJs.slice(0, start) + optionsJs.slice(end)).match(addressing)?.length || 0;
+  const elsewhere = [optionsConnectivityJs, optionsVocabJs, read("options-backup.js")].reduce((n, src) => n + (stripComments(src).match(addressing) || []).length, 0);
+  check(outsideHandler + elsewhere === 0, `options scripts: the Connect status line must be addressed only by the Connect handler (found ${outsideHandler + elsewhere} other references)`);
   const states = [...outside.matchAll(/setConnectStatus\("(\w+)"/g)].map((m) => m[1]);
   check(states.length > 0 && states.every((state) => ["pending", "ok", "bad", "clear"].includes(state)),
     "options.js: setConnectStatus called with a state other than pending / ok / bad / clear");
-  check(/radio\.addEventListener\("change", \(\) => scheduleConnectionOverview\(\)\)/.test(optionsJs),
+  check(/radio\.addEventListener\("change", \(\) => scheduleConnectionOverview\(\)\)/.test(stripComments(optionsJs)),
     "options.js: choosing a bookmark service must refresh the connection overview and the AI nudge");
+  // Each gateway type owns exactly one help paragraph; the ? itself is never hidden.
+  check(["none", "cf", "custom"].every((k) => new RegExp(`-gateway-${k}-help"\\)\\.hidden = type !== "${{none: "none", cf: "cloudflare", custom: "custom"}[k]}"`).test(optionsJs)),
+    "options.js: pbpOptGatewaySync must show the none / Cloudflare / custom help paragraph for its own type only");
   check(!/-gateway-help"\)\.hidden/.test(optionsJs),
     "options.js: the access-gateway ? must stay visible for every gateway type (a stable anchor for the gateway errors)");
   const labelled = [...optionsHtml.matchAll(/<label class="bl" for="opt-(\w+)-gw-name-(\d)" data-gw-header="(\d)"/g)];

@@ -2814,8 +2814,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     $id(service + "-gateway-cloudflare").hidden = type !== "cloudflare";
     $id(service + "-gateway-custom").hidden = type !== "custom";
     // The ? is a stable anchor: the gateway errors send the user here whatever
-    // the type is. With None it explains the Cloudflare route (the common one).
-    $id(service + "-gateway-cf-help").hidden = type === "custom";
+    // the type is. Each type shows its own help; None says when a gateway is needed at all.
+    $id(service + "-gateway-none-help").hidden = type !== "none";
+    $id(service + "-gateway-cf-help").hidden = type !== "cloudflare";
     $id(service + "-gateway-custom-help").hidden = type !== "custom";
     // An unreadable form counts as modified: it differs from any valid stored gateway.
     const read = pbpOptGatewayRead(service);
@@ -2838,8 +2839,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
   // One numbered name per header row, so a screen reader (and an error mark)
   // can tell the four apart. Set here, not by data-i18n: the number is an argument.
-  for (const label of document.querySelectorAll("label[data-gw-header]")) label.textContent = t("bookmarkGatewayHeaderN", label.dataset.gwHeader);
-  for (const input of document.querySelectorAll("input[data-gw-header-value]")) input.setAttribute("aria-label", t("bookmarkGatewayHeaderValueN", input.dataset.gwHeaderValue));
+  // Re-run on pbp:i18n-applied, or a language switch leaves the old names behind.
+  const pbpOptGatewayHeaderNames = () => {
+    for (const label of document.querySelectorAll("label[data-gw-header]")) label.textContent = t("bookmarkGatewayHeaderN", label.dataset.gwHeader);
+    for (const input of document.querySelectorAll("input[data-gw-header-name]")) input.setAttribute("aria-label", t("bookmarkGatewayHeaderNameN", input.dataset.gwHeaderName));
+    for (const input of document.querySelectorAll("input[data-gw-header-value]")) input.setAttribute("aria-label", t("bookmarkGatewayHeaderValueN", input.dataset.gwHeaderValue));
+  };
+  pbpOptGatewayHeaderNames();
+  document.addEventListener("pbp:i18n-applied", pbpOptGatewayHeaderNames);
   for (const service of ["karakeep", "linkding"]) {
     $id("opt-" + service + "-url").value = s[service + "Url"] || "";
     $id("opt-" + service + "-token").value = pbpBookmarkConnection({...s,bookmarkService:service}).token;

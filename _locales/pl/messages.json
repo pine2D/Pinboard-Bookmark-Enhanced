@@ -4895,6 +4895,20 @@
   "bookmarkGatewayHeaderValue": {
     "message": "Wartość"
   },
+  "bookmarkGatewayNoneHint": {
+    "message": "Potrzebne tylko wtedy, gdy przed serwerem stoi bramka wymagająca logowania, np. Cloudflare Access. Jeśli łączysz się z serwerem bezpośrednio, zostaw „Brak”."
+  },
+  "bookmarkGatewayHeaderNameN": {
+    "message": "Nazwa nagłówka $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkGatewayNamePlaceholder": {
+    "message": "Nazwa"
+  },
   "bookmarkGatewayCustomHint": {
     "message": "Te nagłówki trafiają do tego serwera z każdym żądaniem do API zakładek. Nie można użyć nagłówków Authorization, Cookie i podobnych. Jeśli bramka używa uwierzytelniania Basic, zezwól w niej zamiast tego na ścieżkę API."
   },

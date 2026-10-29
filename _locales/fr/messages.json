@@ -4895,6 +4895,20 @@
   "bookmarkGatewayHeaderValue": {
     "message": "Valeur"
   },
+  "bookmarkGatewayNoneHint": {
+    "message": "Nécessaire seulement si une passerelle d’authentification, comme Cloudflare Access, précède le serveur. Si vous accédez directement au serveur, laissez Aucune."
+  },
+  "bookmarkGatewayHeaderNameN": {
+    "message": "Nom de l’en-tête $N$",
+    "placeholders": {
+      "n": {
+        "content": "$1"
+      }
+    }
+  },
+  "bookmarkGatewayNamePlaceholder": {
+    "message": "Nom"
+  },
   "bookmarkGatewayCustomHint": {
     "message": "Ces en-têtes sont envoyés à ce serveur avec chaque requête vers l’API des signets. Authorization, Cookie et les en-têtes similaires ne sont pas autorisés. Si la passerelle utilise l’authentification Basic, autorisez plutôt le chemin de l’API dans la passerelle."
   },
