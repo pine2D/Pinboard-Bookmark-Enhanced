@@ -1892,6 +1892,14 @@ html[data-theme] .context-help-host[data-help-role="field"] > label.bl {
    .listbox rule and left Theme's box at its content width. */
 .context-help-host[data-help-role="field"] > .context-help ~ .listbox { min-width: min(240px, 100%); }
 .hint { font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); }
+/* .pick-desc (options critique 6, U7): a radio option's always-visible helper
+   line, the second line inside its .pick-text -- the option's name stays the
+   body-type line, what sets it apart from its siblings sits right under it
+   in the helper face (COMPONENTS.md §10.2). No margin: the two line-heights
+   are the spacing. The row grows to fit; the mark keeps the row's vertical
+   centre like a switch track beside two-line copy. Disabled options already
+   read --opt-fg-hint, so the line needs no disabled rule of its own. */
+.pick-text > .pick-desc { display: block; font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); color: var(--opt-fg-hint); }
 /* `.pref-row > label` (the row model) sets gap: --opt-sp-5 (12px),
    outranking .switch's own base gap: --opt-sp-3 (6px) for a choice-role
    switch too. The choice-host's copy -> help-icon offset (context-help

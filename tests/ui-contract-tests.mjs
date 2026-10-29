@@ -1712,6 +1712,8 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     "storageIntro", "diagnosticsHint",
     "bookmarkServiceHint", "personalLibraryHint", "bookmarkKarakeepHint",
     "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp", "themeGroupAdaptiveHint",
+    "optUrlCleanOnOpenHint", "optUrlCleanOnPasteHint", "optUrlCleanCustomHint", "optUrlCleanExcludeHint",
+    "optShowQuickLinksHint", "optShowQuickRowHint", "optRespectTagCaseHint", "mdExportExtendedMetaHelp",
   ];
   const isInsideContextHelp = (key) => {
     const marker = optionsHtml.indexOf(`data-i18n="${key}"`);
@@ -1799,6 +1801,7 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     optVideoLangPrefHint: "opt-md-video-lang", dictEudicSupportedHint: "dict-eudic-token",
     mdExportImagePolicyHint: "opt-md-image-policy", customCSSOverlayHelp: "opt-custom-css",
     bookmarkKarakeepTokenHelp: "opt-karakeep-token", bookmarkLinkdingTokenHelp: "opt-linkding-token",
+    optUrlCleanCustomHint: "opt-urlclean-custom", optUrlCleanExcludeHint: "opt-urlclean-exclude",
   };
   check(Object.entries(helpBeforeControl).every(([key, id]) => {
     const help = optionsHtml.indexOf(`data-i18n="${key}"`);

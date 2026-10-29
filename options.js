@@ -519,7 +519,9 @@ function pbpBuildSettingsSearchIndex(root = document) {
     // buttons options.js builds at render time, but those set textContent
     // directly and carry no data-i18n anywhere, on themselves or a child, so
     // neither this nor `button[data-i18n]` ever matches them.
-    for (const node of panelEl.querySelectorAll("h2,h3,label,.hint,button[data-i18n],summary,button > [data-i18n]")) {
+    // .pick-desc: a radio option's always-visible helper line (U7). It is
+    // help copy, found like a .hint and shown under its option's name.
+    for (const node of panelEl.querySelectorAll("h2,h3,label,.hint,.pick-desc,button[data-i18n],summary,button > [data-i18n]")) {
       // data-search-skip: a live readout, not a heading or a control's label
       // (#tag-gov-overview: "27 tags · 3,412 uses" -- resolves to no target
       // and would otherwise print as a dead row).
@@ -527,6 +529,7 @@ function pbpBuildSettingsSearchIndex(root = document) {
       let target = "";
       let weak = false;
       const isSectionName = node.matches("summary");
+      const isHelpCopy = node.matches(".hint, .pick-desc");
       const labelledButton = node.parentElement?.tagName === "BUTTON" ? node.parentElement : null;
       // A radio group's name (an unbound label.bl.subhead, TH-1) jumps to the
       // first addressable control inside the group it names.
@@ -551,7 +554,7 @@ function pbpBuildSettingsSearchIndex(root = document) {
       // A hint resolves the control it explains through its row-model owner:
       // an entry block (.fg) or a preference row/group (.pref-row/.pref-group,
       // where 3a/3b moved every choice-help host).
-      else if (node.matches(".hint")) target = node.closest(".fg, .pref-row, .pref-group")?.querySelector("input,select,textarea,button")?.id || "";
+      else if (isHelpCopy) target = node.closest(".fg, .pref-row, .pref-group")?.querySelector("input,select,textarea,button")?.id || "";
       else {
         target = node.id || "";
         if (!target) { target = panelFallbackId(); weak = true; }
@@ -584,20 +587,24 @@ function pbpBuildSettingsSearchIndex(root = document) {
         copy.querySelectorAll(".summary-state").forEach((st) => st.remove());
         text = copy.textContent;
       }
-      if (node.matches("label") && node.querySelector("details.context-help")) {
+      if (node.matches("label") && node.querySelector("details.context-help, .pick-desc")) {
         const copy = node.cloneNode(true);
-        copy.querySelectorAll("details.context-help").forEach((help) => help.remove());
+        copy.querySelectorAll("details.context-help, .pick-desc").forEach((help) => help.remove());
         text = copy.textContent;
       }
       // A help paragraph is found by its words but shown under the name of
       // the setting it explains (pbpSearchSettings / render below): a result
       // row that is a whole paragraph of prose reads as noise.
       let owner = "";
-      if (node.matches(".hint")) {
+      if (node.matches(".pick-desc")) {
+        owner = (node.previousElementSibling?.textContent || "").replace(/\s+/g, " ").trim();
+      } else if (node.matches(".hint")) {
         const host = node.closest(".context-help-host, .fg, .pref-row, .pref-group");
         const nameEl = host?.querySelector(".switch-text, .pick-text, label.bl, .bl, .section-title");
         if (nameEl && !nameEl.contains(node) && !node.contains(nameEl)) {
-          owner = nameEl.textContent.replace(/\s+/g, " ").trim();
+          const copy = nameEl.cloneNode(true);
+          copy.querySelectorAll(".pick-desc").forEach((desc) => desc.remove());
+          owner = copy.textContent.replace(/\s+/g, " ").trim();
         }
       }
       // The section a row sits in, shown after the panel name: the Quick
@@ -605,7 +612,7 @@ function pbpBuildSettingsSearchIndex(root = document) {
       // Later, and without it the two results read identically.
       const section = node.closest("section.settings-section")?.querySelector(".section-title")
         ?.textContent.replace(/\s+/g, " ").trim() || "";
-      add(text, target, isSectionName, weak, node.matches(".hint"), owner, section);
+      add(text, target, isSectionName, weak, isHelpCopy, owner, section);
     }
   }
   return entries;

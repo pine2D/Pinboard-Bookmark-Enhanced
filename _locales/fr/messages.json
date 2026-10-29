@@ -1068,7 +1068,10 @@
     "message": "Tags"
   },
   "optRespectTagCase": {
-    "message": "Reprendre la casse des tags existants (la forme la plus utilisée l'emporte)"
+    "message": "Reprendre la casse des tags existants"
+  },
+  "optRespectTagCaseHint": {
+    "message": "Quand un tag existe sous plusieurs casses, la forme la plus utilisée l'emporte."
   },
   "optShowSuggestTags": {
     "message": "Afficher les tags suggérés par Pinboard dans le popup"
@@ -1080,22 +1083,37 @@
     "message": "Afficher la zone de tags IA dans le popup"
   },
   "optShowQuickLinks": {
-    "message": "Afficher les liens rapides dans le popup (Ensembles · Réseau · Non lu · Notes · Populaire)"
+    "message": "Afficher les liens rapides dans le popup"
+  },
+  "optShowQuickLinksHint": {
+    "message": "Liens vers Ensembles, Réseau, Non lu, Notes et Populaire."
   },
   "optShowQuickRow": {
-    "message": "Afficher les boutons d'actions rapides (Enregistrer l'ensemble d'onglets · Enregistrement groupé · Lecture)"
+    "message": "Afficher les boutons d'actions rapides"
+  },
+  "optShowQuickRowHint": {
+    "message": "Les boutons Enregistrer l'ensemble d'onglets, Enregistrement groupé et Lecture."
   },
   "tagSyncLabel": {
     "message": "Stratégie de cache des tags"
   },
   "tagSyncCached": {
-    "message": "En cache (par défaut, actualisé après 10 min)"
+    "message": "En cache"
+  },
+  "tagSyncCachedDesc": {
+    "message": "Par défaut. Actualisé au bout de 10 minutes."
   },
   "tagSyncFresh": {
-    "message": "En direct (récupération à chaque ouverture du popup, plus lent)"
+    "message": "En direct"
+  },
+  "tagSyncFreshDesc": {
+    "message": "Récupéré à chaque ouverture du popup ; plus lent."
   },
   "tagSyncPrewarmed": {
-    "message": "Préchauffé (récupération en arrière-plan toutes les 15 min, popup instantané)"
+    "message": "Préchauffé"
+  },
+  "tagSyncPrewarmedDesc": {
+    "message": "Récupéré en arrière-plan toutes les 15 minutes ; le popup s'ouvre instantanément."
   },
   "tagSyncHint": {
     "message": "Choisissez quand charger vos étiquettes pour l’autocomplétion. Leur chargement ne les modifie pas sur le serveur."
@@ -2144,7 +2162,10 @@
     "message": "Inclure la table des matières"
   },
   "mdExportExtendedMeta": {
-    "message": "Inclure les métadonnées étendues (auteur, date de publication, site, image de couverture, nombre de mots)"
+    "message": "Inclure les métadonnées étendues"
+  },
+  "mdExportExtendedMetaHelp": {
+    "message": "Ajoute l'auteur, la date de publication, le site, l'image de couverture et le nombre de mots."
   },
   "mdOptIncludeHl": {
     "message": "Inclure les surlignages"
@@ -2396,19 +2417,31 @@
     "message": "Nettoyer automatiquement les paramètres de suivi des URL"
   },
   "optUrlCleanOnOpen": {
-    "message": "Nettoyer à l'ouverture de la popup (silencieux, avec lien annuler)"
+    "message": "Nettoyer à l'ouverture du popup"
+  },
+  "optUrlCleanOnOpenHint": {
+    "message": "Le nettoyage est silencieux ; un lien Annuler dans le popup rétablit l'URL d'origine."
   },
   "optUrlCleanOnPaste": {
-    "message": "Nettoyer lors du collage d'une URL (notification avec option Annuler)"
+    "message": "Nettoyer au collage d'une URL"
+  },
+  "optUrlCleanOnPasteHint": {
+    "message": "Une notification avec Annuler s'affiche, au cas où vous voudriez garder l'URL d'origine."
   },
   "optUrlCleanAggressive": {
     "message": "Mode agressif : supprimer aussi ref, si, igshid et similaires (peut casser certains liens)"
   },
   "optUrlCleanCustom": {
-    "message": "Paramètres personnalisés (un par ligne, ajoutés à la liste par défaut)"
+    "message": "Paramètres personnalisés"
+  },
+  "optUrlCleanCustomHint": {
+    "message": "Un par ligne. Ils sont retirés en plus de la liste par défaut."
   },
   "optUrlCleanExclude": {
-    "message": "Paramètres jamais nettoyés (un par ligne, ex. tag pour conserver les tags d'affiliation)"
+    "message": "Paramètres jamais nettoyés"
+  },
+  "optUrlCleanExcludeHint": {
+    "message": "Un par ligne. Par exemple, tag pour conserver les tags d'affiliation."
   },
   "emptyRecentBookmarks": {
     "message": "Aucun favori récent"
@@ -2825,13 +2858,22 @@
     "message": "Quand un enregistrement par raccourci trouve un signet existant"
   },
   "optBgSaveModeMerge": {
-    "message": "Fusion (par défaut, combine les nouvelles étiquettes avec les existantes)"
+    "message": "Fusionner"
+  },
+  "optBgSaveModeMergeDesc": {
+    "message": "Par défaut. Ajoute les nouvelles étiquettes aux existantes."
   },
   "optBgSaveModeSkip": {
-    "message": "Ignorer (si l'URL est déjà sauvegardée, ne rien faire)"
+    "message": "Ignorer"
+  },
+  "optBgSaveModeSkipDesc": {
+    "message": "Ne fait rien : le favori enregistré reste tel quel."
   },
   "optBgSaveModeOverwrite": {
-    "message": "Remplacer (remplace toutes les étiquettes, sans fusion)"
+    "message": "Remplacer"
+  },
+  "optBgSaveModeOverwriteDesc": {
+    "message": "Remplace toutes les étiquettes existantes par les nouvelles."
   },
   "bgSkippedTitle": {
     "message": "Déjà en signet"

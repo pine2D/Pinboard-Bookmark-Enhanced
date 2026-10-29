@@ -1068,7 +1068,10 @@
     "message": "Tagi"
   },
   "optRespectTagCase": {
-    "message": "Dopasowuj wielkość liter do istniejących tagów (wygrywa najczęściej używana forma)"
+    "message": "Dopasowuj wielkość liter do istniejących tagów"
+  },
+  "optRespectTagCaseHint": {
+    "message": "Gdy tag występuje w kilku zapisach, wygrywa ten używany najczęściej."
   },
   "optShowSuggestTags": {
     "message": "Pokaż sugerowane tagi Pinboard w okienku"
@@ -1080,22 +1083,37 @@
     "message": "Pokaż panel tagów AI w okienku"
   },
   "optShowQuickLinks": {
-    "message": "Pokaż szybkie linki w okienku (Zestawy · Sieć · Nieprzeczytane · Notki · Popularne)"
+    "message": "Pokaż szybkie linki w okienku"
+  },
+  "optShowQuickLinksHint": {
+    "message": "Linki: Zestawy, Sieć, Nieprzeczytane, Notki i Popularne."
   },
   "optShowQuickRow": {
-    "message": "Pokaż przyciski szybkich akcji (Zapisz zestaw kart · Zapis zbiorczy · Czytnik)"
+    "message": "Pokaż przyciski szybkich akcji"
+  },
+  "optShowQuickRowHint": {
+    "message": "Przyciski: Zapisz zestaw kart, Zapis zbiorczy i Czytnik."
   },
   "tagSyncLabel": {
     "message": "Strategia pamięci podręcznej tagów"
   },
   "tagSyncCached": {
-    "message": "W pamięci podręcznej (domyślnie — odświeża się po 10 min)"
+    "message": "Pamięć podręczna"
+  },
+  "tagSyncCachedDesc": {
+    "message": "Domyślnie. Odświeżane po 10 minutach."
   },
   "tagSyncFresh": {
-    "message": "Na żywo (pobiera przy każdym otwarciu okienka, wolniej)"
+    "message": "Na żywo"
+  },
+  "tagSyncFreshDesc": {
+    "message": "Pobierane przy każdym otwarciu okienka; wolniej."
   },
   "tagSyncPrewarmed": {
-    "message": "Wstępnie załadowane (pobieranie w tle co 15 min — natychmiastowy popup)"
+    "message": "Wstępne ładowanie"
+  },
+  "tagSyncPrewarmedDesc": {
+    "message": "Pobierane w tle co 15 minut, więc okienko otwiera się od razu."
   },
   "tagSyncHint": {
     "message": "Wybierz, kiedy pobierać tagi do autouzupełniania. Pobranie nie zmienia tagów na serwerze."
@@ -2144,7 +2162,10 @@
     "message": "Dołącz spis treści"
   },
   "mdExportExtendedMeta": {
-    "message": "Dołącz rozszerzone metadane (autor, data publikacji, witryna, obraz okładki, liczba słów)"
+    "message": "Dołącz rozszerzone metadane"
+  },
+  "mdExportExtendedMetaHelp": {
+    "message": "Dodaje autora, datę publikacji, witrynę, obraz okładki i liczbę słów."
   },
   "mdOptIncludeHl": {
     "message": "Uwzględnij zaznaczenia"
@@ -2396,19 +2417,31 @@
     "message": "Automatyczne czyszczenie parametrów śledzących URL"
   },
   "optUrlCleanOnOpen": {
-    "message": "Czyść przy otwarciu okienka (cicho, z linkiem cofnij)"
+    "message": "Czyść przy otwarciu okienka"
+  },
+  "optUrlCleanOnOpenHint": {
+    "message": "Dzieje się po cichu; link „Cofnij” w okienku przywraca pierwotny adres."
   },
   "optUrlCleanOnPaste": {
-    "message": "Czyść przy wklejaniu adresu URL (pokazuje powiadomienie z opcją „Cofnij”)"
+    "message": "Czyść przy wklejaniu adresu URL"
+  },
+  "optUrlCleanOnPasteHint": {
+    "message": "Pojawia się powiadomienie z opcją „Cofnij”, na wypadek gdyby trzeba było zachować pierwotny adres."
   },
   "optUrlCleanAggressive": {
     "message": "Tryb agresywny: usuwa też ref, si, igshid i podobne (może zepsuć niektóre linki)"
   },
   "optUrlCleanCustom": {
-    "message": "Niestandardowe parametry (jeden na linię, dodawane do domyślnej listy)"
+    "message": "Niestandardowe parametry"
+  },
+  "optUrlCleanCustomHint": {
+    "message": "Jeden w wierszu. Są usuwane oprócz tych z domyślnej listy."
   },
   "optUrlCleanExclude": {
-    "message": "Parametry, które nigdy nie są czyszczone (jeden na wiersz, np. tag, aby zachować tagi afiliacyjne)"
+    "message": "Parametry, które nigdy nie są czyszczone"
+  },
+  "optUrlCleanExcludeHint": {
+    "message": "Jeden w wierszu. Na przykład tag, aby zachować tagi afiliacyjne."
   },
   "emptyRecentBookmarks": {
     "message": "Brak ostatnich zakładek"
@@ -2825,13 +2858,22 @@
     "message": "Gdy zapis skrótem natrafi na istniejącą zakładkę"
   },
   "optBgSaveModeMerge": {
-    "message": "Połącz (domyślnie — łączy nowe tagi z istniejącymi)"
+    "message": "Połącz"
+  },
+  "optBgSaveModeMergeDesc": {
+    "message": "Domyślnie. Dodaje nowe tagi do istniejących."
   },
   "optBgSaveModeSkip": {
-    "message": "Pomiń (jeśli adres URL jest już zapisany, nic nie rób)"
+    "message": "Pomiń"
+  },
+  "optBgSaveModeSkipDesc": {
+    "message": "Nic nie robi; zapisana zakładka zostaje bez zmian."
   },
   "optBgSaveModeOverwrite": {
-    "message": "Zastąp (zastąp wszystkie tagi, bez łączenia)"
+    "message": "Zastąp"
+  },
+  "optBgSaveModeOverwriteDesc": {
+    "message": "Zastępuje wszystkie istniejące tagi nowymi."
   },
   "bgSkippedTitle": {
     "message": "Już w zakładkach"

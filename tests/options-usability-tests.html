@@ -270,6 +270,26 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     });
   });
 
+  // Options critique 6 (U7): a radio option's .pick-desc helper line is found
+  // by its words, listed as help under the option's name, and kept out of the
+  // option's own name row -- the real options.html, not a stand-in.
+  await test("search finds a radio option's .pick-desc line under the option name, and the name row stays short", async () => {
+    const html = await (await fetch("../options.html")).text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const index = pbpBuildSettingsSearchIndex(doc);
+    const desc = index.find((e) => e.text === "Replaces all existing tags with the new ones.");
+    assert(desc, "the Overwrite option's helper line is not in the search index");
+    assert(desc.hint === true && desc.owner === "Overwrite" && desc.targetId === "opt-bgsave-overwrite",
+      "the helper line indexed as " + JSON.stringify(desc));
+    const name = index.find((e) => e.targetId === "opt-bgsave-overwrite" && !e.hint);
+    assert(name && name.text === "Overwrite", "the option's name row reads " + JSON.stringify(name && name.text));
+    const sw = index.find((e) => e.targetId === "opt-show-quick-links" && !e.hint);
+    assert(sw && sw.text === "Show the quick links row", "a switch's name row carries its ? answer: " + JSON.stringify(sw && sw.text));
+    const swHelp = index.find((e) => e.text.startsWith("Links to your Sets"));
+    assert(swHelp && swHelp.owner === "Show the quick links row" && swHelp.targetId === "opt-show-quick-links",
+      "the switch's moved note is not found under its name: " + JSON.stringify(swHelp));
+  });
+
   await test("a live readout (#tag-gov-overview) marked data-search-skip never becomes a dead search row", async () => {
     // Regression: it changed from <p class="fg"> to <p class="hint">, which
     // the .hint branch resolves a target from via .closest(".fg, .pref-row,
@@ -1008,11 +1028,15 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       "every switch must sit directly in a .pref-row inside a .pref-group");
   });
 
-  await test("stage0: every .hint in the panel still resolves a .fg owner for the search index", async () => {
+  // The index resolves a hint's control through its row-model owner -- an
+  // entry block or, for a choice row's ? (options critique 6 moved the
+  // popup panel's switch notes into them), the preference row or group.
+  await test("stage0: every .hint in the panel still resolves an owner control for the search index", async () => {
     const proto = await panelDoc("popup");
     const hints = [...proto.querySelectorAll(".hint")];
     assert(hints.length > 0, "expected at least one .hint in the popup panel");
-    assert(hints.every((h) => h.closest(".fg")), "every .hint must resolve a .fg owner");
+    const orphans = hints.filter((h) => !h.closest(".fg, .pref-row, .pref-group")?.querySelector("input,select,textarea,button"));
+    assert(orphans.length === 0, "every .hint must resolve an owner control: " + orphans.map((h) => h.dataset.i18n || h.id).join(", "));
   });
 
   // Review round 1, finding 1 (IMPORTANT): the row model's label rule

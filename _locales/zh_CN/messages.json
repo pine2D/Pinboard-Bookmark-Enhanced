@@ -1068,7 +1068,10 @@
     "message": "标签"
   },
   "optRespectTagCase": {
-    "message": "沿用已有标签的大小写（以使用最多的写法为准）"
+    "message": "沿用已有标签的大小写"
+  },
+  "optRespectTagCaseHint": {
+    "message": "同一标签有几种大小写写法时，以使用最多的为准。"
   },
   "optShowSuggestTags": {
     "message": "在弹窗中显示 Pinboard 推荐标签"
@@ -1080,22 +1083,37 @@
     "message": "在弹窗中显示 AI 标签区"
   },
   "optShowQuickLinks": {
-    "message": "在弹窗中显示快捷链接（标签页集 · 关注 · 待读 · 笔记 · 热门）"
+    "message": "在弹窗中显示快捷链接"
+  },
+  "optShowQuickLinksHint": {
+    "message": "包括标签页集、关注、待读、笔记和热门。"
   },
   "optShowQuickRow": {
-    "message": "在弹窗中显示快捷操作按钮（保存标签页集 · 批量保存 · 阅读器）"
+    "message": "在弹窗中显示快捷操作按钮"
+  },
+  "optShowQuickRowHint": {
+    "message": "包括保存标签页集、批量保存和阅读器。"
   },
   "tagSyncLabel": {
     "message": "标签缓存策略"
   },
   "tagSyncCached": {
-    "message": "缓存（默认，10 分钟后刷新）"
+    "message": "缓存"
+  },
+  "tagSyncCachedDesc": {
+    "message": "默认。10 分钟后刷新。"
   },
   "tagSyncFresh": {
-    "message": "实时（每次打开弹窗都请求，较慢）"
+    "message": "实时"
+  },
+  "tagSyncFreshDesc": {
+    "message": "每次打开弹窗都重新请求，较慢。"
   },
   "tagSyncPrewarmed": {
-    "message": "预热（后台每 15 分钟刷新，打开即用）"
+    "message": "预热"
+  },
+  "tagSyncPrewarmedDesc": {
+    "message": "后台每 15 分钟刷新一次，打开弹窗即可使用。"
   },
   "tagSyncHint": {
     "message": "选择何时加载已有标签用于自动补全。加载标签不会修改服务器上的数据。"
@@ -2144,7 +2162,10 @@
     "message": "包含文章目录"
   },
   "mdExportExtendedMeta": {
-    "message": "包含扩展元数据（作者、发布日期、来源站点、封面图、字数）"
+    "message": "包含扩展元数据"
+  },
+  "mdExportExtendedMetaHelp": {
+    "message": "额外写入作者、发布日期、来源站点、封面图和字数。"
   },
   "mdOptIncludeHl": {
     "message": "包含高亮"
@@ -2396,19 +2417,31 @@
     "message": "自动清理 URL 追踪参数"
   },
   "optUrlCleanOnOpen": {
-    "message": "打开弹窗时清理（静默，含撤销链接）"
+    "message": "打开弹窗时清理"
+  },
+  "optUrlCleanOnOpenHint": {
+    "message": "静默清理，弹窗里有撤销链接，可恢复原网址。"
   },
   "optUrlCleanOnPaste": {
-    "message": "粘贴 URL 时清理（弹出提示，可撤销）"
+    "message": "粘贴 URL 时清理"
+  },
+  "optUrlCleanOnPasteHint": {
+    "message": "清理后弹出提示，可撤销，保留原网址。"
   },
   "optUrlCleanAggressive": {
     "message": "激进模式：额外清除 ref / si / igshid 等可能影响功能的参数"
   },
   "optUrlCleanCustom": {
-    "message": "自定义参数（每行一个，追加到默认列表）"
+    "message": "自定义参数"
+  },
+  "optUrlCleanCustomHint": {
+    "message": "每行一个，在默认列表之外一并清理。"
   },
   "optUrlCleanExclude": {
-    "message": "永不清理的参数（每行一个，例如填 tag 保留联盟推广标记）"
+    "message": "永不清理的参数"
+  },
+  "optUrlCleanExcludeHint": {
+    "message": "每行一个。例如填 tag，可保留联盟推广标记。"
   },
   "emptyRecentBookmarks": {
     "message": "暂无最近书签"
@@ -2825,13 +2858,22 @@
     "message": "快捷键保存遇到已有书签时"
   },
   "optBgSaveModeMerge": {
-    "message": "合并（默认，新标签与现有标签合并）"
+    "message": "合并"
+  },
+  "optBgSaveModeMergeDesc": {
+    "message": "默认。把新标签并入现有标签。"
   },
   "optBgSaveModeSkip": {
-    "message": "跳过（如果网址已保存则不操作）"
+    "message": "跳过"
+  },
+  "optBgSaveModeSkipDesc": {
+    "message": "不做任何改动，已保存的书签保持原样。"
   },
   "optBgSaveModeOverwrite": {
-    "message": "覆盖（完全替换标签，不合并）"
+    "message": "覆盖"
+  },
+  "optBgSaveModeOverwriteDesc": {
+    "message": "用新标签替换全部现有标签。"
   },
   "bgSkippedTitle": {
     "message": "已收藏"

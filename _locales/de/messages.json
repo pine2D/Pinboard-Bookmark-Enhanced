@@ -1068,7 +1068,10 @@
     "message": "Tags"
   },
   "optRespectTagCase": {
-    "message": "Groß-/Kleinschreibung vorhandener Tags übernehmen (die häufigste Schreibweise gilt)"
+    "message": "Groß-/Kleinschreibung vorhandener Tags übernehmen"
+  },
+  "optRespectTagCaseHint": {
+    "message": "Gibt es einen Tag in mehreren Schreibweisen, gilt die am häufigsten verwendete."
   },
   "optShowSuggestTags": {
     "message": "Pinboard-Tagvorschläge im Popup anzeigen"
@@ -1080,22 +1083,37 @@
     "message": "KI-Tag-Bereich im Popup anzeigen"
   },
   "optShowQuickLinks": {
-    "message": "Schnelllinks im Popup anzeigen (Sets · Netzwerk · Ungelesen · Notizen · Beliebt)"
+    "message": "Schnelllinks im Popup anzeigen"
+  },
+  "optShowQuickLinksHint": {
+    "message": "Links zu Sets, Netzwerk, Ungelesen, Notizen und Beliebt."
   },
   "optShowQuickRow": {
-    "message": "Schnellaktionsschaltflächen im Popup anzeigen (Tab-Set speichern · Stapelspeicherung · Leseansicht)"
+    "message": "Schnellaktionsschaltflächen im Popup anzeigen"
+  },
+  "optShowQuickRowHint": {
+    "message": "Die Schaltflächen „Tab-Set speichern“, „Stapelspeicherung“ und „Leseansicht“."
   },
   "tagSyncLabel": {
     "message": "Tag-Cache-Strategie"
   },
   "tagSyncCached": {
-    "message": "Cached (Standard, alle 10 Min. neu laden)"
+    "message": "Zwischengespeichert"
+  },
+  "tagSyncCachedDesc": {
+    "message": "Standard. Wird nach 10 Minuten neu geladen."
   },
   "tagSyncFresh": {
-    "message": "Live (bei jedem Öffnen des Popups abrufen, langsamer)"
+    "message": "Immer aktuell"
+  },
+  "tagSyncFreshDesc": {
+    "message": "Wird bei jedem Öffnen des Popups abgerufen; langsamer."
   },
   "tagSyncPrewarmed": {
-    "message": "Vorgewärmt (Hintergrundabruf alle 15 Min., sofort verfügbar)"
+    "message": "Vorgewärmt"
+  },
+  "tagSyncPrewarmedDesc": {
+    "message": "Wird alle 15 Minuten im Hintergrund abgerufen, das Popup öffnet sofort."
   },
   "tagSyncHint": {
     "message": "Wähle, wann vorhandene Tags zur Autovervollständigung geladen werden. Dabei werden keine Tags auf dem Server geändert."
@@ -2144,7 +2162,10 @@
     "message": "Inhaltsverzeichnis einfügen"
   },
   "mdExportExtendedMeta": {
-    "message": "Erweiterte Metadaten einschließen (Autor, Veröffentlichungsdatum, Website, Titelbild, Wortzahl)"
+    "message": "Erweiterte Metadaten einschließen"
+  },
+  "mdExportExtendedMetaHelp": {
+    "message": "Fügt Autor, Veröffentlichungsdatum, Website, Titelbild und Wortzahl hinzu."
   },
   "mdOptIncludeHl": {
     "message": "Markierungen einbeziehen"
@@ -2396,19 +2417,31 @@
     "message": "URL-Tracking-Parameter automatisch bereinigen"
   },
   "optUrlCleanOnOpen": {
-    "message": "Beim Öffnen des Popups bereinigen (still, mit Rückgängig-Link)"
+    "message": "Beim Öffnen des Popups bereinigen"
+  },
+  "optUrlCleanOnOpenHint": {
+    "message": "Geschieht still; über „Rückgängig“ im Popup bekommst du die ursprüngliche URL zurück."
   },
   "optUrlCleanOnPaste": {
-    "message": "Beim Einfügen einer URL bereinigen (mit Hinweis und „Rückgängig“)"
+    "message": "Beim Einfügen einer URL bereinigen"
+  },
+  "optUrlCleanOnPasteHint": {
+    "message": "Ein Hinweis mit „Rückgängig“ erscheint, falls du die ursprüngliche URL behalten willst."
   },
   "optUrlCleanAggressive": {
     "message": "Aggressiver Modus: auch ref, si, igshid und Ähnliches entfernen (kann manche Links unbrauchbar machen)"
   },
   "optUrlCleanCustom": {
-    "message": "Benutzerdefinierte Parameter (einer pro Zeile, zur Standardliste hinzufügen)"
+    "message": "Benutzerdefinierte Parameter"
+  },
+  "optUrlCleanCustomHint": {
+    "message": "Einer pro Zeile. Sie werden zusätzlich zur Standardliste entfernt."
   },
   "optUrlCleanExclude": {
-    "message": "Parameter, die nie bereinigt werden (einer pro Zeile, z. B. tag, um Affiliate-Tags zu behalten)"
+    "message": "Parameter, die nie bereinigt werden"
+  },
+  "optUrlCleanExcludeHint": {
+    "message": "Einer pro Zeile. Mit tag bleiben zum Beispiel Affiliate-Tags erhalten."
   },
   "emptyRecentBookmarks": {
     "message": "Keine aktuellen Lesezeichen"
@@ -2825,13 +2858,22 @@
     "message": "Wenn beim Speichern per Tastenkürzel bereits ein Lesezeichen existiert"
   },
   "optBgSaveModeMerge": {
-    "message": "Zusammenführen (Standard, neue Tags mit vorhandenen kombinieren)"
+    "message": "Zusammenführen"
+  },
+  "optBgSaveModeMergeDesc": {
+    "message": "Standard. Die neuen Tags kommen zu den vorhandenen hinzu."
   },
   "optBgSaveModeSkip": {
-    "message": "Überspringen (wenn URL bereits gespeichert, nichts tun)"
+    "message": "Überspringen"
+  },
+  "optBgSaveModeSkipDesc": {
+    "message": "Nichts geschieht; das gespeicherte Lesezeichen bleibt unverändert."
   },
   "optBgSaveModeOverwrite": {
-    "message": "Überschreiben (alle Tags ersetzen, nicht zusammenführen)"
+    "message": "Überschreiben"
+  },
+  "optBgSaveModeOverwriteDesc": {
+    "message": "Alle vorhandenen Tags werden durch die neuen ersetzt."
   },
   "bgSkippedTitle": {
     "message": "Bereits als Lesezeichen gespeichert"

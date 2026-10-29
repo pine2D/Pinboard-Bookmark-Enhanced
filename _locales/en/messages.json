@@ -1073,7 +1073,10 @@
     "message": "Tags"
   },
   "optRespectTagCase": {
-    "message": "Match the casing of existing tags (the most-used form wins)"
+    "message": "Match the casing of existing tags"
+  },
+  "optRespectTagCaseHint": {
+    "message": "When a tag exists in more than one casing, the form you use most wins."
   },
   "optShowSuggestTags": {
     "message": "Show Pinboard suggested tags in popup"
@@ -1085,22 +1088,37 @@
     "message": "Show AI tags row in popup"
   },
   "optShowQuickLinks": {
-    "message": "Show quick links row (Sets · Network · Unread · Notes · Popular)"
+    "message": "Show the quick links row"
+  },
+  "optShowQuickLinksHint": {
+    "message": "Links to your Sets, Network, Unread, Notes and Popular pages."
   },
   "optShowQuickRow": {
-    "message": "Show quick action buttons (Save Tab Set · Batch Save · Reader)"
+    "message": "Show quick action buttons"
+  },
+  "optShowQuickRowHint": {
+    "message": "The Save Tab Set, Batch Save and Reader buttons."
   },
   "tagSyncLabel": {
     "message": "Tag Cache Strategy"
   },
   "tagSyncCached": {
-    "message": "Cached (default, refreshes after 10 min)"
+    "message": "Cached"
+  },
+  "tagSyncCachedDesc": {
+    "message": "Default. Refreshes after 10 minutes."
   },
   "tagSyncFresh": {
-    "message": "Live (fetches each time the popup opens, slower)"
+    "message": "Live"
+  },
+  "tagSyncFreshDesc": {
+    "message": "Fetches each time the popup opens. Slower."
   },
   "tagSyncPrewarmed": {
-    "message": "Prewarmed (background fetch every 15 min, instant popup)"
+    "message": "Prewarmed"
+  },
+  "tagSyncPrewarmedDesc": {
+    "message": "Fetches in the background every 15 minutes, so the popup opens instantly."
   },
   "tagSyncHint": {
     "message": "Choose when to load your existing tags for autocomplete. Loading tags does not change them on the server."
@@ -2378,19 +2396,31 @@
     "message": "Auto-clean URL tracking parameters"
   },
   "optUrlCleanOnOpen": {
-    "message": "Clean when popup opens (silent, with undo link)"
+    "message": "Clean when the popup opens"
+  },
+  "optUrlCleanOnOpenHint": {
+    "message": "Happens silently; an Undo link in the popup restores the original URL."
   },
   "optUrlCleanOnPaste": {
-    "message": "Clean when pasting URL (shows a notice with Undo)"
+    "message": "Clean when a URL is pasted"
+  },
+  "optUrlCleanOnPasteHint": {
+    "message": "Shows a notice with Undo, in case you want to keep the original URL."
   },
   "optUrlCleanAggressive": {
     "message": "Aggressive mode: also remove ref, si, igshid and similar (may break some links)"
   },
   "optUrlCleanCustom": {
-    "message": "Custom parameters (one per line, appended to default list)"
+    "message": "Custom parameters"
+  },
+  "optUrlCleanCustomHint": {
+    "message": "One per line. These are removed on top of the default list."
   },
   "optUrlCleanExclude": {
-    "message": "Parameters that are never cleaned (one per line, e.g. tag to keep affiliate tags)"
+    "message": "Parameters never cleaned"
+  },
+  "optUrlCleanExcludeHint": {
+    "message": "One per line. For example, add tag to keep affiliate tags."
   },
   "emptyRecentBookmarks": {
     "message": "No recent bookmarks"
@@ -2447,7 +2477,10 @@
     "message": "Include table of contents"
   },
   "mdExportExtendedMeta": {
-    "message": "Include extended metadata (author, publish date, site, cover image, word count)"
+    "message": "Include extended metadata"
+  },
+  "mdExportExtendedMetaHelp": {
+    "message": "Adds author, publish date, site, cover image and word count."
   },
   "obsidianInstallHint": {
     "message": "Obsidian must be installed to create the note. The note is also on your clipboard, so you can paste it anywhere."
@@ -2835,13 +2868,22 @@
     "message": "When a shortcut save finds an existing bookmark"
   },
   "optBgSaveModeMerge": {
-    "message": "Merge (default, combines new tags with existing)"
+    "message": "Merge"
+  },
+  "optBgSaveModeMergeDesc": {
+    "message": "Default. Adds the new tags to the existing ones."
   },
   "optBgSaveModeSkip": {
-    "message": "Skip (if URL already saved, do nothing)"
+    "message": "Skip"
+  },
+  "optBgSaveModeSkipDesc": {
+    "message": "Does nothing; the saved bookmark stays as it is."
   },
   "optBgSaveModeOverwrite": {
-    "message": "Overwrite (replace all tags, no merge)"
+    "message": "Overwrite"
+  },
+  "optBgSaveModeOverwriteDesc": {
+    "message": "Replaces all existing tags with the new ones."
   },
   "bgSkippedTitle": {
     "message": "Already bookmarked"

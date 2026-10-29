@@ -1068,7 +1068,10 @@
     "message": "タグ"
   },
   "optRespectTagCase": {
-    "message": "既存タグの大文字・小文字の表記に合わせる（最も多く使われている表記を優先）"
+    "message": "既存タグの大文字・小文字の表記に合わせる"
+  },
+  "optRespectTagCaseHint": {
+    "message": "同じタグに複数の表記があるときは、最も多く使われている表記を使います。"
   },
   "optShowSuggestTags": {
     "message": "ポップアップに Pinboard のおすすめタグを表示"
@@ -1080,22 +1083,37 @@
     "message": "ポップアップに AI タグ欄を表示"
   },
   "optShowQuickLinks": {
-    "message": "ポップアップにクイックリンクを表示（セット · ネットワーク · 未読 · メモ · 人気）"
+    "message": "ポップアップにクイックリンクを表示"
+  },
+  "optShowQuickLinksHint": {
+    "message": "セット、ネットワーク、未読、メモ、人気へのリンクです。"
   },
   "optShowQuickRow": {
-    "message": "ポップアップにクイック操作ボタンを表示（タブセットを保存 · 一括保存 · リーダー）"
+    "message": "ポップアップにクイック操作ボタンを表示"
+  },
+  "optShowQuickRowHint": {
+    "message": "「タブセットを保存」「一括保存」「リーダー」のボタンです。"
   },
   "tagSyncLabel": {
     "message": "タグキャッシュ戦略"
   },
   "tagSyncCached": {
-    "message": "キャッシュ（デフォルト、10 分後に再取得）"
+    "message": "キャッシュ"
+  },
+  "tagSyncCachedDesc": {
+    "message": "デフォルト。10 分たつと再取得します。"
   },
   "tagSyncFresh": {
-    "message": "ライブ（ポップアップを開くたびに取得、低速）"
+    "message": "ライブ"
+  },
+  "tagSyncFreshDesc": {
+    "message": "ポップアップを開くたびに取得します。低速です。"
   },
   "tagSyncPrewarmed": {
-    "message": "プリウォーム（バックグラウンドで 15 分ごとに取得、即表示）"
+    "message": "プリウォーム"
+  },
+  "tagSyncPrewarmedDesc": {
+    "message": "バックグラウンドで 15 分ごとに取得するので、ポップアップをすぐ使えます。"
   },
   "tagSyncHint": {
     "message": "タグ補完用に既存のタグを読み込むタイミングを選びます。サーバー上のタグは変更しません。"
@@ -2144,7 +2162,10 @@
     "message": "目次を含める"
   },
   "mdExportExtendedMeta": {
-    "message": "拡張メタデータ（著者、公開日、サイト、カバー画像、文字数）を含める"
+    "message": "拡張メタデータを含める"
+  },
+  "mdExportExtendedMetaHelp": {
+    "message": "著者、公開日、サイト、カバー画像、文字数を追加します。"
   },
   "mdOptIncludeHl": {
     "message": "ハイライトを含める"
@@ -2396,19 +2417,31 @@
     "message": "URL トラッキングパラメータを自動的にクリーンアップ"
   },
   "optUrlCleanOnOpen": {
-    "message": "ポップアップを開いたときにクリーンアップ（無音、元に戻すリンク付き）"
+    "message": "ポップアップを開いたときにクリーンアップ"
+  },
+  "optUrlCleanOnOpenHint": {
+    "message": "通知なしで処理します。ポップアップの「元に戻す」リンクで元の URL に戻せます。"
   },
   "optUrlCleanOnPaste": {
-    "message": "URL を貼り付けたときにクリーンアップ（通知を表示し、元に戻せます）"
+    "message": "URL を貼り付けたときにクリーンアップ"
+  },
+  "optUrlCleanOnPasteHint": {
+    "message": "処理後に通知が表示され、「元に戻す」で元の URL に戻せます。"
   },
   "optUrlCleanAggressive": {
     "message": "アグレッシブモード：ref、si、igshid なども削除（一部のリンクが機能しなくなる場合があります）"
   },
   "optUrlCleanCustom": {
-    "message": "カスタムパラメータ（1 行に 1 つ、デフォルトリストに追加）"
+    "message": "カスタムパラメータ"
+  },
+  "optUrlCleanCustomHint": {
+    "message": "1 行に 1 つ。デフォルトのリストに加えて削除します。"
   },
   "optUrlCleanExclude": {
-    "message": "クリーンアップしないパラメータ（1 行に 1 つ。例：アフィリエイトの tag を残すには tag）"
+    "message": "クリーンアップしないパラメータ"
+  },
+  "optUrlCleanExcludeHint": {
+    "message": "1 行に 1 つ。たとえば tag を入れると、アフィリエイトのタグが残ります。"
   },
   "emptyRecentBookmarks": {
     "message": "最近のブックマークはありません"
@@ -2825,13 +2858,22 @@
     "message": "ショートカットでの保存時に既存のブックマークが見つかった場合"
   },
   "optBgSaveModeMerge": {
-    "message": "マージ（デフォルト、新しいタグと既存タグを結合）"
+    "message": "マージ"
+  },
+  "optBgSaveModeMergeDesc": {
+    "message": "デフォルト。新しいタグを既存のタグに追加します。"
   },
   "optBgSaveModeSkip": {
-    "message": "スキップ（URL が既に保存されている場合は何もしない）"
+    "message": "スキップ"
+  },
+  "optBgSaveModeSkipDesc": {
+    "message": "何もしません。保存済みのブックマークはそのままです。"
   },
   "optBgSaveModeOverwrite": {
-    "message": "上書き（すべてのタグを置換、マージしない）"
+    "message": "上書き"
+  },
+  "optBgSaveModeOverwriteDesc": {
+    "message": "既存のタグをすべて新しいタグに置き換えます。"
   },
   "bgSkippedTitle": {
     "message": "既にブックマーク済み"

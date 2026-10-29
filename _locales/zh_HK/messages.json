@@ -1068,7 +1068,10 @@
     "message": "標籤"
   },
   "optRespectTagCase": {
-    "message": "沿用已有標籤的大小寫（以使用最多的寫法為準）"
+    "message": "沿用已有標籤的大小寫"
+  },
+  "optRespectTagCaseHint": {
+    "message": "同一個標籤有幾種大小寫寫法時，以使用最多的為準。"
   },
   "optShowSuggestTags": {
     "message": "在彈出視窗中顯示 Pinboard 推薦標籤"
@@ -1080,22 +1083,37 @@
     "message": "在彈出視窗中顯示 AI 標籤區"
   },
   "optShowQuickLinks": {
-    "message": "在彈出視窗中顯示快捷連結（標籤頁集 · 社交網絡 · 待讀 · 筆記 · 熱門）"
+    "message": "在彈出視窗中顯示快捷連結"
+  },
+  "optShowQuickLinksHint": {
+    "message": "包括標籤頁集、社交網絡、待讀、筆記和熱門。"
   },
   "optShowQuickRow": {
-    "message": "在彈出視窗中顯示快捷操作按鈕（儲存標籤頁集 · 批量儲存 · 閱讀器）"
+    "message": "在彈出視窗中顯示快捷操作按鈕"
+  },
+  "optShowQuickRowHint": {
+    "message": "包括儲存標籤頁集、批量儲存和閱讀器。"
   },
   "tagSyncLabel": {
     "message": "標籤快取策略"
   },
   "tagSyncCached": {
-    "message": "快取（預設，10 分鐘後重新取得）"
+    "message": "快取"
+  },
+  "tagSyncCachedDesc": {
+    "message": "預設。10 分鐘後重新取得。"
   },
   "tagSyncFresh": {
-    "message": "即時（每次開啟彈出視窗都請求，較慢）"
+    "message": "即時"
+  },
+  "tagSyncFreshDesc": {
+    "message": "每次開啟彈出視窗都重新請求，較慢。"
   },
   "tagSyncPrewarmed": {
-    "message": "預熱（背景每 15 分鐘更新，開啟即用）"
+    "message": "預熱"
+  },
+  "tagSyncPrewarmedDesc": {
+    "message": "背景每 15 分鐘更新一次，開啟彈出視窗即可使用。"
   },
   "tagSyncHint": {
     "message": "選擇何時載入現有標籤以供自動完成。載入不會修改伺服器上的標籤。"
@@ -2144,7 +2162,10 @@
     "message": "包含文章目錄"
   },
   "mdExportExtendedMeta": {
-    "message": "包含擴充中繼資料（作者、發佈日期、來源網站、封面圖、字數）"
+    "message": "包含擴充中繼資料"
+  },
+  "mdExportExtendedMetaHelp": {
+    "message": "另外寫入作者、發佈日期、來源網站、封面圖和字數。"
   },
   "mdOptIncludeHl": {
     "message": "包含標記"
@@ -2396,19 +2417,31 @@
     "message": "自動清理 URL 追蹤參數"
   },
   "optUrlCleanOnOpen": {
-    "message": "開啟彈窗時清理（靜默，含撤銷連結）"
+    "message": "開啟彈出視窗時清理"
+  },
+  "optUrlCleanOnOpenHint": {
+    "message": "靜默清理，彈出視窗中有撤銷連結，可還原原本的網址。"
   },
   "optUrlCleanOnPaste": {
-    "message": "貼上 URL 時清理（彈出提示，可撤銷）"
+    "message": "貼上 URL 時清理"
+  },
+  "optUrlCleanOnPasteHint": {
+    "message": "清理後會彈出提示，可撤銷並保留原本的網址。"
   },
   "optUrlCleanAggressive": {
     "message": "激進模式：額外清除 ref、si、igshid 等參數（部分連結可能因此失效）"
   },
   "optUrlCleanCustom": {
-    "message": "自訂參數（每行一個，附加到預設列表）"
+    "message": "自訂參數"
+  },
+  "optUrlCleanCustomHint": {
+    "message": "每行一個，在預設列表之外一併清理。"
   },
   "optUrlCleanExclude": {
-    "message": "永不清理的參數（每行一個，例如填 tag 可保留聯盟推廣標記）"
+    "message": "永不清理的參數"
+  },
+  "optUrlCleanExcludeHint": {
+    "message": "每行一個。例如填 tag，可保留聯盟推廣標記。"
   },
   "emptyRecentBookmarks": {
     "message": "暫無最近書籤"
@@ -2825,13 +2858,22 @@
     "message": "快捷鍵儲存遇到已有書籤時"
   },
   "optBgSaveModeMerge": {
-    "message": "合併（預設，新標籤與現有標籤合併）"
+    "message": "合併"
+  },
+  "optBgSaveModeMergeDesc": {
+    "message": "預設。把新標籤併入現有標籤。"
   },
   "optBgSaveModeSkip": {
-    "message": "跳過（如果網址已儲存則不操作）"
+    "message": "跳過"
+  },
+  "optBgSaveModeSkipDesc": {
+    "message": "不作任何改動，已儲存的書籤保持原樣。"
   },
   "optBgSaveModeOverwrite": {
-    "message": "覆蓋（完全取代標籤，不合併）"
+    "message": "覆蓋"
+  },
+  "optBgSaveModeOverwriteDesc": {
+    "message": "以新標籤取代全部現有標籤。"
   },
   "bgSkippedTitle": {
     "message": "已收藏"

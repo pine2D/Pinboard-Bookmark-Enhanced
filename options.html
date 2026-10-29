@@ -315,16 +315,36 @@
         <h2 class="section-title" data-i18n="optUrlCleanTitle">URL tracking parameter cleanup</h2>
         <div class="pref-group">
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-urlclean-enabled" checked /> <span class="switch-text" data-i18n="optUrlCleanEnabled">Auto-clean URL tracking parameters</span><span class="switch-track" aria-hidden="true"></span></label></div>
-          <div class="pref-row pref-row-sub" data-parent="opt-urlclean-enabled"><label class="switch"><input type="checkbox" role="switch" id="opt-urlclean-on-open" checked /> <span class="switch-text" data-i18n="optUrlCleanOnOpen">Clean when popup opens (silent, with undo link)</span><span class="switch-track" aria-hidden="true"></span></label></div>
-          <div class="pref-row pref-row-sub" data-parent="opt-urlclean-enabled"><label class="switch"><input type="checkbox" role="switch" id="opt-urlclean-on-paste" checked /> <span class="switch-text" data-i18n="optUrlCleanOnPaste">Clean when pasting URL (shows a notice with Undo)</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row pref-row-sub context-help-host" data-parent="opt-urlclean-enabled" data-help-role="choice">
+            <label class="switch"><input type="checkbox" role="switch" id="opt-urlclean-on-open" checked aria-labelledby="opt-urlclean-on-open-label" /> <span class="switch-text" id="opt-urlclean-on-open-label" data-i18n="optUrlCleanOnOpen">Clean when the popup opens</span>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="optUrlCleanOnOpenHint">Happens silently; an Undo link in the popup restores the original URL.</p>
+            </details><span class="switch-track" aria-hidden="true"></span></label>
+          </div>
+          <div class="pref-row pref-row-sub context-help-host" data-parent="opt-urlclean-enabled" data-help-role="choice">
+            <label class="switch"><input type="checkbox" role="switch" id="opt-urlclean-on-paste" checked aria-labelledby="opt-urlclean-on-paste-label" /> <span class="switch-text" id="opt-urlclean-on-paste-label" data-i18n="optUrlCleanOnPaste">Clean when a URL is pasted</span>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="optUrlCleanOnPasteHint">Shows a notice with Undo, in case you want to keep the original URL.</p>
+            </details><span class="switch-track" aria-hidden="true"></span></label>
+          </div>
           <div class="pref-row pref-row-sub" data-parent="opt-urlclean-enabled"><label class="switch"><input type="checkbox" role="switch" id="opt-urlclean-aggressive" /> <span class="switch-text" data-i18n="optUrlCleanAggressive">Aggressive mode: also remove ref, si, igshid and similar (may break some links)</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
-        <div class="fg edit-area entry-block-sub" data-parent="opt-urlclean-enabled">
-          <label class="bl" for="opt-urlclean-custom" data-i18n="optUrlCleanCustom">Custom parameters (one per line, appended to default list)</label>
+        <div class="fg edit-area entry-block-sub context-help-host" data-parent="opt-urlclean-enabled" data-help-role="field">
+          <label class="bl" for="opt-urlclean-custom" data-i18n="optUrlCleanCustom">Custom parameters</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="optUrlCleanCustomHint">One per line. These are removed on top of the default list.</p>
+          </details>
           <textarea id="opt-urlclean-custom" rows="3" maxlength="2000" placeholder="utm_other&#10;custom_track_id&#10;_branch_referrer" data-i18n-placeholder="optUrlCleanCustomPlaceholder"></textarea>
         </div>
-        <div class="fg edit-area entry-block-sub" data-parent="opt-urlclean-enabled">
-          <label class="bl" for="opt-urlclean-exclude" data-i18n="optUrlCleanExclude">Parameters that are never cleaned (one per line, e.g. tag to keep affiliate tags)</label>
+        <div class="fg edit-area entry-block-sub context-help-host" data-parent="opt-urlclean-enabled" data-help-role="field">
+          <label class="bl" for="opt-urlclean-exclude" data-i18n="optUrlCleanExclude">Parameters never cleaned</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="optUrlCleanExcludeHint">One per line. For example, add tag to keep affiliate tags.</p>
+          </details>
           <textarea id="opt-urlclean-exclude" rows="3" maxlength="2000" placeholder="tag&#10;ref&#10;si" data-i18n-placeholder="optUrlCleanExcludePlaceholder"></textarea>
         </div>
       </section>
@@ -337,8 +357,20 @@
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-show-suggest-tags" checked /> <span class="switch-text" data-i18n="optShowSuggestTags">Show Pinboard suggested tags in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-show-ai-summary" checked /> <span class="switch-text" data-i18n="optShowAiSummary">Show AI summary button in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-show-ai-tags" checked /> <span class="switch-text" data-i18n="optShowAiTags">Show AI tags row in popup</span><span class="switch-track" aria-hidden="true"></span></label></div>
-          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-show-quick-links" checked /> <span class="switch-text" data-i18n="optShowQuickLinks">Show quick links row (Sets · Network · Unread · Notes · Popular)</span><span class="switch-track" aria-hidden="true"></span></label></div>
-          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-show-quick-row" checked /> <span class="switch-text" data-i18n="optShowQuickRow">Show quick action buttons (Save Tab Set · Batch Save · Reader)</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row context-help-host" data-help-role="choice">
+            <label class="switch"><input type="checkbox" role="switch" id="opt-show-quick-links" checked aria-labelledby="opt-show-quick-links-label" /> <span class="switch-text" id="opt-show-quick-links-label" data-i18n="optShowQuickLinks">Show the quick links row</span>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="optShowQuickLinksHint">Links to your Sets, Network, Unread, Notes and Popular pages.</p>
+            </details><span class="switch-track" aria-hidden="true"></span></label>
+          </div>
+          <div class="pref-row context-help-host" data-help-role="choice">
+            <label class="switch"><input type="checkbox" role="switch" id="opt-show-quick-row" checked aria-labelledby="opt-show-quick-row-label" /> <span class="switch-text" id="opt-show-quick-row-label" data-i18n="optShowQuickRow">Show quick action buttons</span>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="optShowQuickRowHint">The Save Tab Set, Batch Save and Reader buttons.</p>
+            </details><span class="switch-track" aria-hidden="true"></span></label>
+          </div>
         </div>
       </section>
     </div>
@@ -355,9 +387,9 @@
         <div class="fg entry-block">
           <label class="bl subhead" id="bgsave-mode-label" data-i18n="optBgSaveMode">When a shortcut save finds an existing bookmark</label>
           <div class="pref-group pref-group-radio" role="radiogroup" aria-labelledby="bgsave-mode-label">
-            <div class="pref-row"><label class="pick"><input type="radio" name="bgsave-mode" id="opt-bgsave-merge" value="merge" /> <span class="pick-text" data-i18n="optBgSaveModeMerge">Merge (default, combines new tags with existing)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
-            <div class="pref-row"><label class="pick"><input type="radio" name="bgsave-mode" id="opt-bgsave-skip" value="skip" /> <span class="pick-text" data-i18n="optBgSaveModeSkip">Skip (if URL already saved, do nothing)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
-            <div class="pref-row"><label class="pick"><input type="radio" name="bgsave-mode" id="opt-bgsave-overwrite" value="overwrite" /> <span class="pick-text" data-i18n="optBgSaveModeOverwrite">Overwrite (replace all tags, no merge)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="bgsave-mode" id="opt-bgsave-merge" value="merge" aria-labelledby="opt-bgsave-merge-name" aria-describedby="opt-bgsave-merge-desc" /> <span class="pick-text"><span id="opt-bgsave-merge-name" data-i18n="optBgSaveModeMerge">Merge</span><span class="pick-desc" id="opt-bgsave-merge-desc" data-i18n="optBgSaveModeMergeDesc">Default. Adds the new tags to the existing ones.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="bgsave-mode" id="opt-bgsave-skip" value="skip" aria-labelledby="opt-bgsave-skip-name" aria-describedby="opt-bgsave-skip-desc" /> <span class="pick-text"><span id="opt-bgsave-skip-name" data-i18n="optBgSaveModeSkip">Skip</span><span class="pick-desc" id="opt-bgsave-skip-desc" data-i18n="optBgSaveModeSkipDesc">Does nothing; the saved bookmark stays as it is.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="bgsave-mode" id="opt-bgsave-overwrite" value="overwrite" aria-labelledby="opt-bgsave-overwrite-name" aria-describedby="opt-bgsave-overwrite-desc" /> <span class="pick-text"><span id="opt-bgsave-overwrite-name" data-i18n="optBgSaveModeOverwrite">Overwrite</span><span class="pick-desc" id="opt-bgsave-overwrite-desc" data-i18n="optBgSaveModeOverwriteDesc">Replaces all existing tags with the new ones.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
           </div>
         </div>
       </section>
@@ -372,7 +404,13 @@
       <section class="settings-section">
         <h2 class="section-title" data-i18n="secTags">Tags</h2>
         <div class="pref-group">
-          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-respect-tag-case" checked /> <span class="switch-text" data-i18n="optRespectTagCase">Match the casing of existing tags (the most-used form wins)</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row context-help-host" data-help-role="choice">
+            <label class="switch"><input type="checkbox" role="switch" id="opt-respect-tag-case" checked aria-labelledby="opt-respect-tag-case-label" /> <span class="switch-text" id="opt-respect-tag-case-label" data-i18n="optRespectTagCase">Match the casing of existing tags</span>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="optRespectTagCaseHint">When a tag exists in more than one casing, the form you use most wins.</p>
+            </details><span class="switch-track" aria-hidden="true"></span></label>
+          </div>
         </div>
         <div class="fg entry-block context-help-host" data-help-role="field">
           <label class="bl subhead" id="tag-sync-label" data-i18n="tagSyncLabel">Tag Cache Strategy</label>
@@ -381,9 +419,9 @@
             <p class="hint context-help-body" data-i18n="tagSyncHint">Choose when to load your existing tags for autocomplete. Loading tags does not change them on the server.</p>
           </details>
           <div class="pref-group pref-group-radio" role="radiogroup" aria-labelledby="tag-sync-label">
-            <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-cached" value="cached" checked /> <span class="pick-text" data-i18n="tagSyncCached">Cached (default, refreshes after 10 min)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
-            <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-fresh" value="fresh" /> <span class="pick-text" data-i18n="tagSyncFresh">Live (fetches each time the popup opens, slower)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
-            <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-prewarmed" value="prewarmed" /> <span class="pick-text" data-i18n="tagSyncPrewarmed">Prewarmed (background fetch every 15 min, instant popup)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-cached" value="cached" checked aria-labelledby="opt-tag-sync-cached-name" aria-describedby="opt-tag-sync-cached-desc" /> <span class="pick-text"><span id="opt-tag-sync-cached-name" data-i18n="tagSyncCached">Cached</span><span class="pick-desc" id="opt-tag-sync-cached-desc" data-i18n="tagSyncCachedDesc">Default. Refreshes after 10 minutes.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-fresh" value="fresh" aria-labelledby="opt-tag-sync-fresh-name" aria-describedby="opt-tag-sync-fresh-desc" /> <span class="pick-text"><span id="opt-tag-sync-fresh-name" data-i18n="tagSyncFresh">Live</span><span class="pick-desc" id="opt-tag-sync-fresh-desc" data-i18n="tagSyncFreshDesc">Fetches each time the popup opens. Slower.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
+            <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-prewarmed" value="prewarmed" aria-labelledby="opt-tag-sync-prewarmed-name" aria-describedby="opt-tag-sync-prewarmed-desc" /> <span class="pick-text"><span id="opt-tag-sync-prewarmed-name" data-i18n="tagSyncPrewarmed">Prewarmed</span><span class="pick-desc" id="opt-tag-sync-prewarmed-desc" data-i18n="tagSyncPrewarmedDesc">Fetches in the background every 15 minutes, so the popup opens instantly.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
           </div>
         </div>
         <div class="fg entry-block context-help-host" data-help-role="field">
@@ -1252,7 +1290,13 @@
         <h2 class="section-title" id="sec-md-export" data-i18n="secMdExport">Markdown Export Defaults</h2>
         <div class="pref-group" role="group" aria-labelledby="sec-md-export">
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-md-frontmatter" checked /> <span class="switch-text" data-i18n="mdExportFrontmatter">Add YAML frontmatter to exported Markdown</span><span class="switch-track" aria-hidden="true"></span></label></div>
-          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-md-extended-meta" checked /> <span class="switch-text" data-i18n="mdExportExtendedMeta">Include extended metadata (author, publish date, site, cover image, word count)</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row context-help-host" data-help-role="choice">
+            <label class="switch"><input type="checkbox" role="switch" id="opt-md-extended-meta" checked aria-labelledby="opt-md-extended-meta-label" /> <span class="switch-text" id="opt-md-extended-meta-label" data-i18n="mdExportExtendedMeta">Include extended metadata</span>
+            <details class="context-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="mdExportExtendedMetaHelp">Adds author, publish date, site, cover image and word count.</p>
+            </details><span class="switch-track" aria-hidden="true"></span></label>
+          </div>
         </div>
         <div class="fg entry-block context-help-host" data-help-role="field">
           <label class="bl" for="opt-md-image-policy" data-i18n="mdExportImagePolicy">Image handling</label>

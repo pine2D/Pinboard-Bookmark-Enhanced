@@ -38,7 +38,9 @@
       "summaryPromptHint", "syncApiKeysHint", "tagPresetsHint", "tagPromptHint", "tagSyncHint",
       "translateGlossaryHint", "vocabDriveConnectionHint", "vocabDriveDisclosure",
       "bookmarkServiceHint", "personalLibraryHint", "bookmarkKarakeepHint",
-      "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp", "themeGroupAdaptiveHint"
+      "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp", "themeGroupAdaptiveHint",
+      "optUrlCleanOnOpenHint", "optUrlCleanOnPasteHint", "optUrlCleanCustomHint", "optUrlCleanExcludeHint",
+      "optShowQuickLinksHint", "optShowQuickRowHint", "optRespectTagCaseHint", "mdExportExtendedMetaHelp"
     ],
     "pending": [
       "vocabCompleteExportHint", "ecdictHint", "dictPackHint"
