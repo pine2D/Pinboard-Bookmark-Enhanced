@@ -67,6 +67,10 @@ html { scrollbar-gutter: stable both-edges; }
   --opt-row-pad-y: var(--opt-sp-5);   /* 12 */
   --opt-row-min-h: 44px;
   --opt-section-gap: var(--opt-sp-8); /* 32 */
+  /* Between two nested subsections of one section (Data Sync's Chrome Sync /
+     Google Drive): one step under the section gap, so the nesting reads
+     (critique 6, SP-03; 24 comfortable / 16 compact). */
+  --opt-subsection-gap: var(--opt-sp-7); /* 24 */
   /* Label -> control gap (spec §2: 8 comfortable / 4 compact). Was a literal
      --opt-sp-4 on the stage-0 label.bl rule in both tiers (fixwave F1) --
      the compact fgRhythm contract expects 4, not 8. */
@@ -206,6 +210,7 @@ html[data-density="compact"] {
   --opt-row-pad-y: var(--opt-sp-4);   /* 8 */
   --opt-row-min-h: 36px;
   --opt-section-gap: var(--opt-sp-7); /* 24 */
+  --opt-subsection-gap: var(--opt-sp-6); /* 16 */
   --opt-label-gap: var(--opt-sp-2);   /* 4 */
   --opt-panel-pad: var(--opt-sp-5);   /* 12 */
 }
@@ -1738,6 +1743,7 @@ html.motion-ready .backup-import-result:not([hidden]) {
    height; it just does so via the SAME plain-row geometry every other
    .pref-row uses, not a radio-specific rung. */
 .settings-section + .settings-section { margin-top: var(--opt-section-gap); }
+.settings-section .settings-section + .settings-section { margin-top: var(--opt-subsection-gap); }
 .section-title { display: block; font-size: var(--opt-text-section); line-height: var(--opt-lh-section); font-weight: 600; color: var(--opt-fg); margin: 0 0 var(--opt-sp-5); }
 /* `.disclosure > summary` reads the section-title face (--opt-text-section /
    --opt-lh-section), the same face every h2.section-title on the page uses,
