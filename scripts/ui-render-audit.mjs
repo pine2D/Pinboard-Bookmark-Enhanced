@@ -6880,6 +6880,26 @@ const CUSTOM_PROVIDER_SEED = Object.freeze({
   customDisplayName: "Relay", customProtocol: "openai", customBaseUrl: "https://relay.example/v1", customModel: "relay-model",
 });
 
+// The service worker writes every SETTINGS_DEFAULTS key at startup and, on its
+// five-minute storage-warm alarm, writes again any key that has gone missing
+// (shared.js primeSettings). A fixture that seeds settings and then removes
+// them leaves such holes, and the refill lands minutes later as a settings
+// change in whatever page is open then: the dictionary lookup reruns on any
+// *ApiKey / *BaseUrl / *Model / *Protocol change (md-dict.js) and replaces the
+// state being scanned. Seeded keys therefore go back as they were -- the
+// earlier value where the profile held one, removed only where it held none.
+async function snapshotStoredKeys(sw, keys) {
+  return sw.evaluate(async (keys) => ({ keys, before: await chrome.storage.local.get(keys) }), keys);
+}
+async function restoreStoredKeys(sw, snapshot, overrides = {}) {
+  await sw.evaluate(async ({ keys, before, overrides }) => {
+    const absent = keys.filter((key) => !(key in before) && !(key in overrides));
+    if (absent.length) await chrome.storage.local.remove(absent);
+    const back = Object.fromEntries(keys.filter((key) => key in before).map((key) => [key, before[key]]));
+    await chrome.storage.local.set({ ...back, ...overrides });
+  }, { ...snapshot, overrides });
+}
+
 // `panelId` names the provider panel when it is not the value itself: every
 // custom entry (custom-xxxxxx) shows the shared #fields-custom panel.
 async function selectProviderViaListbox(page, value, sw, panelId = value) {
@@ -7396,8 +7416,10 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // The custom panel (Task 6) shows only once a custom provider exists:
       // seed one (fake key, never tested), reload, pick it like a user.
       const customRows = aiProviderChecks.filter((c) => CUSTOM_PROVIDER_ROWS.has(c.selector));
+      let customSnapshot = null;
       if (customRows.length) {
         await selectProviderViaListbox(page, "gemini", sw);
+        customSnapshot = await snapshotStoredKeys(sw, [...Object.keys(CUSTOM_PROVIDER_SEED), "customApiKey"]);
         await sw.evaluate((seed) => chrome.storage.local.set({ ...seed, customApiKey: obfuscateKey("render-fixture-key") }), CUSTOM_PROVIDER_SEED);
         // Re-apply the theme before the reload, as the .switch group does:
         // the appearance group may have left a site preset on the page.
@@ -7431,9 +7453,7 @@ async function runSimpleTheme(page, url, theme, checks, results, surface, sw) {
       // is the one call whose autosave genuinely needs to be on disk before
       // the next navigation, not just reflected in this page's live DOM.
       await selectProviderViaListbox(page, "gemini", sw);
-      if (customRows.length) {
-        await sw.evaluate((keys) => chrome.storage.local.remove(keys), [...Object.keys(CUSTOM_PROVIDER_SEED), "customApiKey"]);
-      }
+      if (customSnapshot) await restoreStoredKeys(sw, customSnapshot);
     }
     if (aiBehaviorChecks.length) {
       await page.click("#tab-ai-behavior");
@@ -9606,6 +9626,15 @@ async function runSweep(page, sw, extBase) {
     const GATEWAY_CONTEXTS = [["bookmark-karakeep-cloudflare", "karakeep", "cloudflare"], ["bookmark-karakeep-custom", "karakeep", "custom"],
       ["bookmark-linkding-cloudflare", "linkding", "cloudflare"], ["bookmark-linkding-custom", "linkding", "custom"]];
     const wantsPending = wants("options", "bookmark-gateway-pending");
+    // The service radio autosaves on options.js's 500ms debounce. A scan that
+    // outlasts it (shard load) persists the self-hosted service, and the
+    // restore below only schedules the way back -- the provider switches that
+    // follow keep pushing that save out until the page is left. Every later
+    // surface then runs signed out of Pinboard (the reader's bookmark fixture
+    // loses its owner). Each pass therefore flushes the restore and checks
+    // the stored service is the one it started from.
+    const storedService = async () => (await sw.evaluate(() => chrome.storage.local.get("bookmarkService"))).bookmarkService;
+    const serviceBefore = await storedService();
     for (const [name, service, type] of GATEWAY_CONTEXTS) {
       const isPendingBase = wantsPending && name === "bookmark-linkding-cloudflare";
       if (!wants("options", name) && !isPendingBase) continue;
@@ -9636,6 +9665,11 @@ async function runSweep(page, sw, extBase) {
         const radio = document.querySelector('input[name="bookmark-service"][value="pinboard"]');
         radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true }));
       }, { service });
+      const flushed = await page.evaluate(async () => (await window.pbpOptionsFlushAutoSave?.())?.ok === true);
+      const serviceAfter = await storedService();
+      if (!flushed || serviceAfter !== serviceBefore) {
+        throw new Error(`SETUP: ${name} left the stored bookmark service at ${JSON.stringify(serviceAfter)} (was ${JSON.stringify(serviceBefore)}; flush ${flushed ? "ran" : "failed"})`);
+      }
     }
 
     // Alibaba Cloud Model Studio's region list box and workspace field only
@@ -9709,8 +9743,9 @@ async function runSweep(page, sw, extBase) {
           store["customApiKey" + slot] = obfuscateKey(pbpAiCustomKeySeal(sealTo, "render-fixture-key"));
         }
         store.aiCustomProviders = list;
+        const before = await chrome.storage.local.get(Object.keys(store));
         await chrome.storage.local.set(store);
-        return { rebindId: list[0].id, keys: Object.keys(store) };
+        return { rebindId: list[0].id, keys: Object.keys(store), before };
       });
       await page.goto(`${extBase}options.html`, { waitUntil: "load", timeout: TIMEOUT_MS });
       await page.waitForTimeout(500);
@@ -9747,10 +9782,7 @@ async function runSweep(page, sw, extBase) {
       // Leave the page before clearing the fixture, so no pending autosave
       // (the provider switch above) writes it back afterwards.
       await page.goto("about:blank");
-      await sw.evaluate(async (keys) => {
-        await chrome.storage.local.remove(keys);
-        await chrome.storage.local.set({ aiProvider: "gemini" });
-      }, seeded.keys.filter((key) => key !== "aiProvider"));
+      await restoreStoredKeys(sw, { keys: seeded.keys, before: seeded.before }, { aiProvider: "gemini" });
     }
   }
 

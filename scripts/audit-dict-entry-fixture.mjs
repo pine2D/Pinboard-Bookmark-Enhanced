@@ -408,8 +408,11 @@ export async function openDictEntryState(page, state) {
     // Free original-text examples (plan 1C.2): no AI key and no AI entry.
     await armSettingsChange(page, ['openaiApiKey']);
     await page.evaluate(async () => {
-      await chrome.storage.local.remove(['openaiApiKey']);
-      if (typeof _pbpExplainSettings === 'object' && _pbpExplainSettings) delete _pbpExplainSettings.openaiApiKey;
+      // Cleared the way Options stores an emptied key field: an absent
+      // default would be refilled by the service worker's storage-warm prime
+      // at any moment, rerunning the lookup mid-state.
+      await chrome.storage.local.set({ openaiApiKey: '' });
+      if (typeof _pbpExplainSettings === 'object' && _pbpExplainSettings) _pbpExplainSettings.openaiApiKey = '';
       window._auditDictEntry.cache.clear();
       await window._auditDictEntry.resetArchive();
     });
@@ -432,8 +435,11 @@ export async function openDictEntryState(page, state) {
     // retry" with the retrieval note. No AI key, no AI entry, no AI call.
     await armSettingsChange(page, ['openaiApiKey']);
     await page.evaluate(async () => {
-      await chrome.storage.local.remove(['openaiApiKey']);
-      if (typeof _pbpExplainSettings === 'object' && _pbpExplainSettings) delete _pbpExplainSettings.openaiApiKey;
+      // Cleared the way Options stores an emptied key field: an absent
+      // default would be refilled by the service worker's storage-warm prime
+      // at any moment, rerunning the lookup mid-state.
+      await chrome.storage.local.set({ openaiApiKey: '' });
+      if (typeof _pbpExplainSettings === 'object' && _pbpExplainSettings) _pbpExplainSettings.openaiApiKey = '';
       window._auditDictEntry.cache.clear();
       await window._auditDictEntry.resetArchive();
       window._auditDictEntry.examplesMiss = true;
