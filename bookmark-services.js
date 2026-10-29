@@ -7,6 +7,27 @@ function pbpBookmarkServiceError(code, status) {
   return error;
 }
 
+// Contract rows: design 4.4. Only an explicit non-JSON Content-Type counts as a
+// web page; a missing one stays on the non-gateway side.
+function pbpBookmarkContentKind(headers) {
+  const type = String(headers?.get?.("Content-Type") || "").split(";")[0].trim().toLowerCase();
+  if (!type) return "none";
+  return type === "application/json" || type.endsWith("+json") ? "json" : "other";
+}
+
+function pbpBookmarkResponseFailure(response, phase) {
+  const status = response.status;
+  const challenged = String(response.headers?.get?.("cf-mitigated") || "").trim().toLowerCase() === "challenge";
+  const kind = pbpBookmarkContentKind(response.headers);
+  if (challenged) return "gateway_challenge";
+  if (phase === "body") return kind === "other" ? "not_api" : "invalid_response";
+  if (status === 401 && /^basic(?:\s|$)/i.test(String(response.headers?.get?.("WWW-Authenticate") || "").trim())) return "gateway_basic";
+  if ((status === 401 || status === 403) && kind === "other") return "gateway_denied";
+  if (status === 401 || status === 403) return "auth";
+  if (status === 429) return "rate_limited";
+  return status >= 500 ? "server" : "remote";
+}
+
 function pbpBookmarkRecordId(value) {
   const id = typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? String(value) : value;
   if (typeof id !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(id)) throw pbpBookmarkServiceError("invalid_request");
@@ -67,6 +88,7 @@ function pbpCreateBookmarkServiceClient(config) {
   const guard = async () => {
     const auth = await beforeRequest();
     if (!auth || typeof auth.token !== "string" || !auth.token) throw pbpBookmarkServiceError("account_changed");
+    if (auth.headers !== undefined && !Array.isArray(auth.headers)) throw pbpBookmarkServiceError("invalid_request");
     return auth;
   };
   const request = async (path, method = "GET", body) => {
@@ -75,29 +97,34 @@ function pbpCreateBookmarkServiceClient(config) {
     const auth = await guard();
     let response;
     try {
+      // Gateway headers first, application headers last so they always win.
+      const headers = new Headers();
+      for (const [name, value] of auth.headers || []) headers.append(name, value);
+      headers.set("Authorization", (service === "linkding" ? "Token " : "Bearer ") + auth.token);
+      headers.set("Accept", "application/json");
+      if (body !== undefined) headers.set("Content-Type", "application/json");
       response = await fetchImpl(url.href, {
-        method, headers:{Authorization:(service === "linkding" ? "Token " : "Bearer ") + auth.token,
-          Accept:"application/json", ...(body === undefined ? {} : {"Content-Type":"application/json"})},
-        ...(body === undefined ? {} : {body:JSON.stringify(body)}),
-        credentials:"omit", redirect:"error", signal:AbortSignal.timeout(20000)
+        method, headers, ...(body === undefined ? {} : {body:JSON.stringify(body)}),
+        credentials:"omit", redirect:"manual", signal:AbortSignal.timeout(20000)
       });
     } catch (error) {
+      console.warn("[bookmark-services] fetch failed:", error?.name, error?.message);
       await guard();
       throw pbpBookmarkServiceError(error?.name === "TimeoutError" ? "timeout" : "network");
     }
     await guard();
-    if (!response.ok) {
-      const code = response.status === 401 || response.status === 403 ? "auth" :
-        response.status === 429 ? "rate_limited" : response.status >= 500 ? "server" : "remote";
-      throw pbpBookmarkServiceError(code, response.status);
-    }
+    if (response.type === "opaqueredirect") throw pbpBookmarkServiceError("gateway_redirect");
+    if (!response.ok) throw pbpBookmarkServiceError(pbpBookmarkResponseFailure(response, "status"), response.status);
     if (response.status === 204) return {status:204, data:null};
     let data;
+    let text = "";
     try {
-      const text = await response.text();
-      if (text.length > 4 * 1024 * 1024) throw new Error("size");
+      text = await response.text();
+      if (text.length > 4 * 1024 * 1024) { text = null; throw new Error("size"); }
       data = JSON.parse(text);
-    } catch (_) { throw pbpBookmarkServiceError("invalid_response"); }
+    } catch (_) {
+      throw pbpBookmarkServiceError(text === null ? "invalid_response" : pbpBookmarkResponseFailure(response, "body"));
+    }
     await guard();
     return {status:response.status, data};
   };

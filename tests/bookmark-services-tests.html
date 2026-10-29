@@ -15,12 +15,12 @@ const kk = {id:"bk1", createdAt:"2026-10-01T10:00:00Z", modifiedAt:null, title:"
 function harness(service, replies, extra = {}) {
   const calls = [];
   const client = pbpCreateBookmarkServiceClient({service, baseUrl:"https://bookmarks.example/base/", token:"fixture-token", beforeRequest:async()=>({token:"fixture-token"}),
-    fetchImpl:async(url, options)=>{ calls.push({url, ...options, body:options.body ? JSON.parse(options.body) : undefined}); const next = replies.shift(); if (!next) throw new Error("unexpected request"); if (next instanceof Error) throw next; return new Response(next[0] === 204 ? null : JSON.stringify(next[1]), {status:next[0],headers:{"Content-Type":"application/json"}}); }, ...extra});
+    fetchImpl:async(url, options)=>{ calls.push({url, ...options, body:options.body ? JSON.parse(options.body) : undefined}); const next = replies.shift(); if (!next) throw new Error("unexpected request"); if (next instanceof Error) throw next; if (next instanceof Response || typeof next.type === "string") return next; return new Response(next[0] === 204 ? null : JSON.stringify(next[1]), {status:next[0],headers:{"Content-Type":"application/json"}}); }, ...extra});
   return {client, calls};
 }
 test("service defaults to Pinboard, unknown services fail closed", () => {equal(pbpBookmarkServiceId({}),"pinboard"); equal(pbpBookmarkServiceId({bookmarkService:"linkding"}),"linkding"); equal(pbpBookmarkServiceId({bookmarkService:"typo"}),"");});
 test("base URL preserves subpaths and rejects insecure or credential-bearing inputs", () => {equal(pbpBookmarkEndpoint("https://bookmarks.example/base"),"https://bookmarks.example/base/");equal(pbpBookmarkEndpoint("http://127.0.0.1:8000"),"http://127.0.0.1:8000/");for(const url of ["http://192.168.1.2", "http://2130706433", "https://u:p@example.com", "https://example.com/?key=x", "https://example.com/#x", "javascript:alert(1)"])equal(pbpBookmarkEndpoint(url),"");});
-test("linkding lookup preserves independent notes, summary, unread and visibility", async()=>{const {client,calls}=harness("linkding",[[200,{bookmark:ld,metadata:{},auto_tags:[]}]]);const b=await client.lookup(pageUrl);equal([b.id,b.url,b.title,b.notes,b.summary,b.tags,b.toread,b.private],["7",pageUrl,"Saved title","My note","Website summary",["work"],true,true]);equal(calls[0].url,"https://bookmarks.example/base/api/bookmarks/check/?url=https%3A%2F%2Fexample.com%2Farticle");equal(calls[0].headers.Authorization,"Token fixture-token");equal(calls[0].redirect,"error");equal(calls[0].credentials,"omit");});
+test("linkding lookup preserves independent notes, summary, unread and visibility", async()=>{const {client,calls}=harness("linkding",[[200,{bookmark:ld,metadata:{},auto_tags:[]}]]);const b=await client.lookup(pageUrl);equal([b.id,b.url,b.title,b.notes,b.summary,b.tags,b.toread,b.private],["7",pageUrl,"Saved title","My note","Website summary",["work"],true,true]);equal(calls[0].url,"https://bookmarks.example/base/api/bookmarks/check/?url=https%3A%2F%2Fexample.com%2Farticle");equal(calls[0].headers.get("Authorization"),"Token fixture-token");equal(calls[0].redirect,"manual");equal(calls[0].credentials,"omit");});
 test("linkding missing bookmark is null, malformed lookup is an error",async()=>{equal(await harness("linkding",[[200,{bookmark:null}]]).client.lookup(pageUrl),null);await rejects(()=>harness("linkding",[[200,{}]]).client.lookup(pageUrl),"invalid_response");});
 test("linkding update patches requested fields without rewriting scraped description",async()=>{const {client,calls}=harness("linkding",[[200,{...ld,title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true}]]);const result=await client.save({url:pageUrl,title:"New",notes:"Note",tags:["new"],toread:false,private:false},{id:"7",url:pageUrl});equal(result.status,"saved");equal(calls[0].method,"PATCH");equal(calls[0].body,{title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true});});
 test("linkding create uses API fields and does not send a Wayback flag as archive",async()=>{const {client,calls}=harness("linkding",[[201,ld]]);await client.save({url:pageUrl,title:"Title",notes:"",tags:[],toread:true,private:true,archive:true},null);equal(calls[0].body,{url:pageUrl,title:"Title",notes:"",tag_names:[],unread:true,shared:false});});
@@ -33,13 +33,13 @@ test("linkding uses canonical tags returned by its server",async()=>{
 });
 test("linkding pagination refuses to send credentials to another origin",async()=>{const {client,calls}=harness("linkding",[[200,{count:2,next:"https://evil.example/api/tags/",results:[{id:1,name:"a"}]}]]);await rejects(()=>client.tags(),"invalid_response");equal(calls.length,1);});
 test("linkding tags pagination retains the configured base path",async()=>{const {client,calls}=harness("linkding",[[200,{count:2,next:"https://bookmarks.example/base/api/tags/?offset=1",results:[{id:1,name:"a"}]}],[200,{count:2,next:null,results:[{id:2,name:"b"}]}]]);equal(await client.tags(),["a","b"]);equal(calls.length,2);});
-test("Karakeep lookup fetches full bookmark after URL check",async()=>{const {client,calls}=harness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk]]);const b=await client.lookup(pageUrl);equal([b.id,b.title,b.notes,b.tags,b.toread,b.archived],["bk1","Saved title","My note",["work"],false,true]);equal(calls[0].headers.Authorization,"Bearer fixture-token");equal(calls[1].url,"https://bookmarks.example/base/api/v1/bookmarks/bk1");});
+test("Karakeep lookup fetches full bookmark after URL check",async()=>{const {client,calls}=harness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk]]);const b=await client.lookup(pageUrl);equal([b.id,b.title,b.notes,b.tags,b.toread,b.archived],["bk1","Saved title","My note",["work"],false,true]);equal(calls[0].headers.get("Authorization"),"Bearer fixture-token");equal(calls[1].url,"https://bookmarks.example/base/api/v1/bookmarks/bk1");});
 test("Karakeep concurrent creation requires review without changing the returned bookmark",async()=>{const {client,calls}=harness("karakeep",[[200,kk]]);await rejects(()=>client.save({url:pageUrl,title:"New",notes:"New note",tags:["new"]},null),"conflict");equal(calls.map(c=>c.method),["POST"]);});
 test("Karakeep failed tag update reports a saved bookmark and remaining step",async()=>{const {client,calls}=harness("karakeep",[[201,{...kk,tags:[]}],[503,{message:"unavailable"}]]);const result=await client.save({url:pageUrl,title:"Title",notes:"",tags:["new"]},null);equal([result.status,result.bookmark.id,result.failedStep],["partial","bk1","tags"]);equal(calls.length,2);});
 test("Karakeep mark-read removes only the private read-later list membership",async()=>{const list={id:"later",name:"Read later",type:"manual",public:false,hasCollaborators:false,userRole:"owner"};const {client,calls}=harness("karakeep",[[200,list],[204,null]],{readLaterListId:"later"});await client.setReadLater({id:"bk1"},false);equal(calls[1].method,"DELETE");equal(calls[1].url,"https://bookmarks.example/base/api/v1/lists/later/bookmarks/bk1");ok(!calls.some(c=>c.body?.archived!==undefined));});
 test("Karakeep refuses public, shared, smart or foreign lists",async()=>{for(const patch of [{public:true},{hasCollaborators:true},{type:"smart"},{userRole:"editor"}]){const {client,calls}=harness("karakeep",[[200,{id:"later",name:"Read later",type:"manual",public:false,hasCollaborators:false,userRole:"owner",...patch}]],{readLaterListId:"later"});await rejects(()=>client.setReadLater({id:"bk1"},true),"read_later_list");equal(calls.length,1);}});
 test("Karakeep creates a private read-later list only for an explicit read-later action",async()=>{let stored="";const list={id:"later",name:"Read later",type:"manual",public:false,hasCollaborators:false,userRole:"owner"};const {client,calls}=harness("karakeep",[[200,{lists:[]}],[201,list],[204,null]],{saveReadLaterList:async id=>{stored=id;}});await client.setReadLater({id:"bk1"},true);equal(stored,"later");equal(calls.map(c=>c.method),["GET","POST","PUT"]);equal(calls[2].url,"https://bookmarks.example/base/api/v1/lists/later/bookmarks/bk1");});
-test("credential rotation uses the dispatch-time token",async()=>{const {client,calls}=harness("linkding",[[200,{bookmark:null}]],{beforeRequest:async()=>({token:"rotated"})});await client.lookup(pageUrl);equal(calls[0].headers.Authorization,"Token rotated");});
+test("credential rotation uses the dispatch-time token",async()=>{const {client,calls}=harness("linkding",[[200,{bookmark:null}]],{beforeRequest:async()=>({token:"rotated"})});await client.lookup(pageUrl);equal(calls[0].headers.get("Authorization"),"Token rotated");});
 test("account change before dispatch sends no request",async()=>{const {client,calls}=harness("linkding",[],{beforeRequest:async()=>{throw Object.assign(new Error("changed"),{code:"account_changed"});}});await rejects(()=>client.lookup(pageUrl),"account_changed");equal(calls.length,0);});
 test("late responses are rejected when the connection changes",async()=>{let checks=0;const {client}=harness("linkding",[[200,{bookmark:ld}]],{beforeRequest:async()=>{if(++checks>1)throw Object.assign(new Error("changed"),{code:"account_changed"});return {token:"fixture-token"};}});await rejects(()=>client.lookup(pageUrl),"account_changed");});
 test("HTTP errors have bounded codes and never include server messages or credentials",async()=>{for(const [status,code] of [[401,"auth"],[403,"auth"],[429,"rate_limited"],[500,"server"]]){const {client}=harness("linkding",[[status,{message:"SECRET"}]]);try{await client.lookup(pageUrl);throw new Error("expected error");}catch(e){equal(e.code,code);ok(!e.message.includes("SECRET"));}}});
@@ -170,13 +170,14 @@ async function workerHarness(service, replies, options = {}) {
       if (state.beforeResponse) await state.beforeResponse();
       const next=replies.shift(); if(next instanceof Error)throw next;
       if(!next)throw new Error("unexpected API request");
-      return new Response(next[0]===204?null:JSON.stringify(next[1]),{status:next[0]});
+      if(next instanceof Response||typeof next.type==="string")return next;
+      return new Response(next[0]===204?null:JSON.stringify(next[1]),{status:next[0],headers:{"Content-Type":"application/json"}});
     }}),
     chrome:{permissions:{contains:async()=>state.permitted},tabs:{query:async()=>[]},storage:{local:{
       get:async()=>({offlineQueue:state.queue}),set:async value=>{if(value.offlineQueue)state.queue=value.offlineQueue;}
     }}}
   };
-  const api = new Function(...Object.keys(deps),workerSource.slice(start,end)+";return {submitSaveIntent,sendOfflineItem};")(...Object.values(deps));
+  const api = new Function(...Object.keys(deps),workerSource.slice(start,end)+";return {submitSaveIntent,sendOfflineItem,verifyConnection:pbpVerifyBookmarkConnection};")(...Object.values(deps));
   return {...api,state,auth};
 }
 const saveIntent = {mode:"create",url:pageUrl,title:"Title",notes:"Note",tags:"work",private:true,toread:false};
@@ -184,7 +185,7 @@ test("worker saves to linkding without a Pinboard credential", async()=>{
   const h=await workerHarness("linkding",[[200,{bookmark:null}],[201,ld]]);
   const result=await h.submitSaveIntent(saveIntent,{expectedAccount:(await h.auth()).account});
   equal(result.status,"saved");equal(h.state.calls.length,2);ok(h.state.calls.every(c=>c.url.startsWith("https://bookmarks.example/base/api/")));
-  equal(h.state.calls[1].headers.Authorization,"Token fixture-secret");equal(h.state.queue,[]);
+  equal(h.state.calls[1].headers.get("Authorization"),"Token fixture-secret");equal(h.state.queue,[]);
 });
 test("worker preserves merge semantics through Karakeep and does not archive", async()=>{
   const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[200,{id:"bk1",title:"Saved title",note:"My note"}],[200,{attached:["tag2"]}]]);
@@ -225,6 +226,91 @@ test("merge preserves a remote tag containing spaces as one tag",async()=>{
   const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,{...kk,tags:[{id:"tag1",name:"machine learning",attachedBy:"human"}]}],[200,{id:"bk1"}],[200,{attached:["tag2"]}]]);
   equal((await h.submitSaveIntent({...saveIntent,mode:"merge",tags:"new"})).status,"saved");
   equal(h.state.calls.length,4);equal(h.state.calls[3].body,{tags:[{tagName:"new"}]});
+});
+// Gateway fixtures: hand-written from the design's measured shapes (survey section 2), not built by the adapter.
+const gwHtml = (status, headers = {}, body = "<html><body>Forbidden</body></html>") => new Response(body, {status, headers:{"Content-Type":"text/html; charset=UTF-8", ...headers}});
+const gwChallenge = (status = 403) => gwHtml(status, {"cf-mitigated":"challenge"}, '<!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title></head><body></body></html>');
+const gwBasic = (scheme = 'Basic realm="Restricted"') => new Response("Unauthorized", {status:401, headers:{"Content-Type":"text/plain", "WWW-Authenticate":scheme}});
+// new Response() cannot build type "opaqueredirect" (type is read-only and always "default"); a real 302 is covered by the runtime test.
+const gwRedirect = () => ({type:"opaqueredirect", ok:false, status:0, headers:new Headers(), text:async()=>""});
+const gwCode = async (reply, service = "linkding") => { try { await harness(service, [reply]).client.verify(); } catch (error) { return error.code; } return "ok"; };
+test("gateway headers precede app headers and come from the dispatch-time auth", async () => {
+  let value = "one";  // the guard runs several times per request, so rotate between requests
+  const {client, calls} = harness("linkding", [[200,{bookmark:null}], [200,{bookmark:null}]], {beforeRequest:async()=>({token:"fixture-token", headers:[["X-Gw",value]]})});
+  await client.lookup(pageUrl); value = "two"; await client.lookup(pageUrl);
+  equal(calls[0].headers.get("X-Gw"), "one"); equal(calls[1].headers.get("X-Gw"), "two");
+  // Headers iterates sorted, so wire order is unobservable here; precedence is shown by the clash case below.
+  equal(calls[0].headers.get("Authorization"), "Token fixture-token");
+  const clash = harness("linkding", [[200,{bookmark:null}]], {beforeRequest:async()=>({token:"fixture-token", headers:[["Accept","text/html"]]})});
+  await clash.client.lookup(pageUrl); equal(clash.calls[0].headers.get("Accept"), "application/json");
+  const bad = harness("linkding", [], {beforeRequest:async()=>({token:"fixture-token", headers:"x"})});
+  await rejects(()=>bad.client.lookup(pageUrl), "invalid_request"); equal(bad.calls.length, 0);
+});
+test("requests never follow redirects and omit cookies", async () => {
+  const {client, calls} = harness("linkding", [[200,{bookmark:null}]]); await client.lookup(pageUrl);
+  equal([calls[0].redirect, calls[0].credentials], ["manual", "omit"]);
+});
+test("a redirect response is gateway_redirect and is not retried", async () => {
+  const h = harness("linkding", [gwRedirect(), gwRedirect()]);
+  await rejects(()=>h.client.verify(), "gateway_redirect"); equal(h.calls.length, 1);
+});
+test("a Cloudflare challenge is gateway_challenge regardless of status", async () => {
+  for (const reply of [gwChallenge(403), gwChallenge(503), gwHtml(200, {"cf-mitigated":" Challenge "}, "<html></html>")]) equal(await gwCode(reply), "gateway_challenge");
+});
+test("a Basic proxy 401 is gateway_basic", async () => {
+  equal(await gwCode(gwBasic()), "gateway_basic"); equal(await gwCode(gwBasic("basic realm=x")), "gateway_basic");
+  equal(await gwCode(gwBasic("Basic")), "gateway_basic"); equal(await gwCode(gwBasic('Bearer realm="x"')), "gateway_denied");
+  equal(await gwCode(gwBasic("Basically")), "gateway_denied");
+  const h = harness("linkding", [gwBasic()]); try { await h.client.verify(); } catch (error) { equal(error.status, 401); }
+});
+test("HTML 401/403 are gateway_denied; JSON or untyped stay auth", async () => {
+  for (const status of [401, 403]) {
+    const reply = (type, body = "{}") => new Response(body, {status, headers:type ? {"Content-Type":type} : {}});
+    const untyped = reply(null, "x"); untyped.headers.delete("Content-Type");
+    equal(await gwCode(reply("text/html")), "gateway_denied");
+    equal(await gwCode(reply("application/json")), "auth");
+    equal(await gwCode(reply("application/problem+json")), "auth");
+    equal(await gwCode(untyped), "auth");
+    const h = harness("linkding", [reply("text/html")]); try { await h.client.verify(); } catch (error) { equal(error.status, status); }
+  }
+});
+test("HTML 200 is not_api; JSON with a wrong Content-Type still parses; untyped non-JSON stays invalid_response", async () => {
+  equal(await gwCode(new Response("<html><title>Sign in</title></html>", {status:200, headers:{"Content-Type":"text/html; charset=utf-8"}})), "not_api");
+  equal(await gwCode(new Response('{"theme":"auto","version":"1.44.0"}', {status:200, headers:{"Content-Type":"text/html"}})), "ok");
+  const untyped = new Response("<html>", {status:200}); untyped.headers.delete("Content-Type");
+  equal(await gwCode(untyped), "invalid_response");
+  equal(await gwCode(gwHtml(200, {"cf-mitigated":"challenge"}, "<html></html>")), "gateway_challenge");
+});
+test("gateway failures are not queued and stay non-retryable", async () => {
+  const fixtures = {gateway_redirect:gwRedirect, gateway_challenge:gwChallenge, gateway_basic:gwBasic, gateway_denied:()=>gwHtml(403),
+    not_api:()=>new Response("<html><title>Sign in</title></html>", {status:200, headers:{"Content-Type":"text/html"}})};
+  equal(Object.keys(fixtures).sort(), [...PBP_BOOKMARK_GATEWAY_CODES].sort());
+  for (const code of PBP_BOOKMARK_GATEWAY_CODES) {
+    const h = await workerHarness("linkding", [fixtures[code]()]);
+    const result = await h.submitSaveIntent(saveIntent);
+    equal([result.status, result.reason, h.state.queue], ["failed", code, []]);
+  }
+});
+test("fetch failures log name and message without header values", async () => {
+  const warns = [], original = console.warn; console.warn = (...args) => warns.push(args);
+  try {
+    const {client} = harness("linkding", [new TypeError("Failed to fetch")], {beforeRequest:async()=>({token:"fixture-token", headers:[["X-Gw","SECRET-GW-VALUE"]]})});
+    await rejects(()=>client.verify(), "network");
+  } finally { console.warn = original; }
+  ok(warns.length >= 1); ok(!JSON.stringify(warns).includes("SECRET-GW-VALUE")); ok(!JSON.stringify(warns).includes("fixture-token"));
+});
+test("connection verification validates the gateway before any request and sends it on success", async () => {
+  const h = await workerHarness("linkding", [[200,{theme:"auto",version:"1.44.0"}]]);
+  const bad = await h.verifyConnection({service:"linkding", baseUrl:"https://bookmarks.example/base/", token:"tok", gateway:{type:"custom", headers:[["Cookie","x"]]}});
+  equal([bad.ok, bad.error, h.state.calls.length], [false, "invalid_request", 0]);
+  const cf = {type:"cloudflare", headers:[["CF-Access-Client-Id","id"],["CF-Access-Client-Secret","sec"]]};
+  const good = await h.verifyConnection({service:"linkding", baseUrl:"https://bookmarks.example/base/", token:"tok", gateway:cf});
+  equal(good.ok, true); equal(h.state.calls.length, 1);
+  equal([h.state.calls[0].headers.get("CF-Access-Client-Id"), h.state.calls[0].headers.get("CF-Access-Client-Secret"), h.state.calls[0].headers.get("Authorization")], ["id", "sec", "Token tok"]);
+  const unknown = await workerHarness("linkding", []);
+  Object.assign(unknown.state.settings, gwEnvSettings("linkding", {type:"pomerium", headers:[["X-A","v"]]}));
+  const result = await unknown.submitSaveIntent(saveIntent);
+  equal([result.reason, unknown.state.calls.length], ["not_logged_in", 0]);
 });
 async function personalHarness(stored) {
   const source=await(await fetch("../shared.js")).text();const a=source.indexOf("async function pbpPersonalLibraryAccount(");const b=source.indexOf("function pbpPinboardAccountFromToken",a);

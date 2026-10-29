@@ -10,11 +10,28 @@ import assert from 'node:assert/strict';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const {chromium}=createRequire(resolve(root,'.qa-scan/package.json'))('playwright');
 const profile=mkdtempSync(join(tmpdir(),'pbp-bookmark-runtime-'));
-const records={linkding:new Map(),karakeep:new Map()}, requests=[], membership=new Set();
+const records={linkding:new Map(),karakeep:new Map()}, requests=[], membership=new Set(), wire=[];
 const list={id:'later1',name:'Read Later',description:'Pinboard Bookmark Enhanced: Read Later',icon:'bookmark',type:'manual',public:false,hasCollaborators:false,userRole:'owner'};
 let listCreated=false;
 const server=createServer(async(req,res)=>{
   const url=new URL(req.url,'http://localhost');
+  wire.push({method:req.method,path:url.pathname,hasCookie:!!req.headers.cookie});
+  const probe=url.pathname.match(/^\/probe\/([a-z]+)\/api\//);
+  if(probe){
+    // Hand-written gateway shapes (design section 5); the redirect target must never be requested.
+    const kind=probe[1];
+    if(kind==='redirect'){res.writeHead(302,{Location:origin+'/cdn-cgi/access/login/probe'});res.end();return;}
+    if(kind==='challenge'){res.writeHead(403,{'Content-Type':'text/html; charset=UTF-8','cf-mitigated':'challenge'});res.end('<!DOCTYPE html><html lang="en-US"><head><title>Just a moment...</title></head><body></body></html>');return;}
+    if(kind==='basic'){res.writeHead(401,{'Content-Type':'text/plain','WWW-Authenticate':'Basic realm="Restricted"'});res.end('Unauthorized');return;}
+    if(kind==='denied'){res.writeHead(403,{'Content-Type':'text/html'});res.end('<html><body>Forbidden</body></html>');return;}
+    if(kind==='page'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end('<html><title>Sign in</title></html>');return;}
+    if(kind==='headers'){
+      if(req.headers['x-probe-gateway']==='probe-value'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({theme:'auto',version:'1.44.0'}));}
+      else{res.writeHead(400).end();}
+      return;
+    }
+    res.writeHead(404).end();return;
+  }
   if(url.pathname.startsWith('/article')) {res.setHeader('Content-Type','text/html');res.end('<html><head><title>Runtime article</title></head><body><article><h1>Runtime article</h1><p>'+('Public synthetic article for a local extension test. '.repeat(80))+'</p></article></body></html>');return;}
   const service=url.pathname.startsWith('/linkding/')?'linkding':'karakeep';
   const path=url.pathname.replace(/^\/(?:linkding|karakeep)\/api(?:\/v1)?\//,'');
@@ -145,6 +162,22 @@ try{
     assert.equal(await worker.evaluate(()=>pbpVocabCurrentOwner()),personalOwner);
     console.log(service+': settings, popup save, reader Read Later/delete, shared vocabulary passed');
   }
+  const probes=await worker.evaluate(async origin=>{
+    const out={};
+    for(const kind of ['redirect','challenge','basic','denied','page','headers']){
+      const client=pbpCreateBookmarkServiceClient({service:'linkding',baseUrl:origin+'/probe/'+kind+'/',beforeRequest:async()=>({token:'probe',headers:[['X-Probe-Gateway','probe-value']]})});
+      try{await client.verify();out[kind]='ok';}catch(error){out[kind]=error.code;}
+    }
+    return out;
+  },origin);
+  console.log('probe results:',JSON.stringify(probes));
+  assert.deepEqual(probes,{redirect:'gateway_redirect',challenge:'gateway_challenge',basic:'gateway_basic',denied:'gateway_denied',page:'not_api',headers:'ok'});
+  const probeWire=wire.filter(w=>w.path.startsWith('/probe/')||w.path.startsWith('/cdn-cgi/'));
+  console.log('probe wire:',JSON.stringify(probeWire.map(w=>w.method+' '+w.path+(w.hasCookie?' cookie':''))));
+  assert.equal(wire.filter(w=>w.method==='OPTIONS').length,0,'custom headers triggered a preflight');
+  assert(!wire.some(w=>w.path.startsWith('/cdn-cgi/')),'redirect was followed');
+  assert(wire.every(w=>!w.hasCookie),'a request carried cookies');
+  console.log('gateway probes classified; no preflight; redirect not followed');
   assert.equal(errors.length,0,errors.join('\n'));
   assert(requests.every(r=>r.service==='linkding'||r.service==='karakeep'));
   console.log('bookmark service runtime smoke passed; synthetic loopback APIs only');

@@ -1945,6 +1945,9 @@ function pbpBookmarkReusableConnectionId(settings, service, baseUrl, token) {
   const old = pbpBookmarkConnection({...settings, bookmarkService:service});
   return old.connectionId && old.baseUrl === baseUrl && old.token === token ? old.connectionId : "";
 }
+// Codes a self-hosted request can fail with when an access gateway, not the
+// bookmark server, answered. They are never retryable and never queued.
+const PBP_BOOKMARK_GATEWAY_CODES = Object.freeze(["gateway_redirect", "gateway_challenge", "gateway_basic", "gateway_denied", "not_api"]);
 async function pbpReadBookmarkConnection() {
   const query = Object.fromEntries(PBP_BOOKMARK_SETTING_KEYS.map(key => [key, SETTINGS_DEFAULTS[key]]));
   return pbpBookmarkConnection(await pbpReadSettingsWithSecrets(query));

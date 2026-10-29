@@ -629,6 +629,29 @@ function pbpBookmarkClient(auth) {
     }
   });
 }
+// Connect-time check: validates the gateway before any request, then reads
+// one profile endpoint. Header values are never logged.
+async function pbpVerifyBookmarkConnection({service, baseUrl, token, gateway}) {
+  try {
+    if (!["karakeep","linkding"].includes(service) || typeof token !== "string" || !token.trim()) return {ok:false,error:"invalid_request"};
+    const base = pbpBookmarkEndpoint(baseUrl);
+    const origin = pbpEndpointOriginPattern(base);
+    if (!origin) return {ok:false,error:"invalid_request"};
+    const checked = pbpBookmarkGatewayNormalize(gateway === undefined ? null : gateway); // callers without a gateway (older options page) mean none
+    if (!checked.ok) return {ok:false,error:"invalid_request"};
+    const headers = checked.gateway ? checked.gateway.headers : [];
+    const client = pbpCreateBookmarkServiceClient({service, baseUrl:base, beforeRequest:async () => {
+      if (!await chrome.permissions.contains({origins:[origin]})) throw pbpBookmarkServiceError("permission");
+      return {token, headers};
+    }});
+    const identity = await client.verify();
+    return {ok:true, identity};
+  } catch (error) {
+    // Product codes are already classified; keep unclassified platform failures observable.
+    if (typeof error?.code !== "string") console.warn("[bookmark-connect] failed:", error?.name, error?.message);
+    return {ok:false,error:error?.code || "network",status:error?.status};
+  }
+}
 async function pbpBookmarkPostsResponse(auth, url) {
   if (!pbpSelfHostedAuth(auth)) return pinboardFetch(`https://api.pinboard.in/v1/posts/get?auth_token=${auth.token}&format=json&url=${encodeURIComponent(url)}`);
   const bookmark = await pbpBookmarkClient(auth).lookup(url);
@@ -3825,23 +3848,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
 
   if (message.type === "bookmark_connect") {
     if (new URL(sender.url).pathname !== "/options.html") { sendResponse({ok:false,error:"forbidden"}); return true; }
-    (async () => {
-      const {service, baseUrl, token} = message;
-      if (!["karakeep","linkding"].includes(service) || typeof token !== "string" || !token.trim()) return {ok:false,error:"invalid_request"};
-      const base = pbpBookmarkEndpoint(baseUrl);
-      const origin = pbpEndpointOriginPattern(base);
-      if (!origin) return {ok:false,error:"invalid_request"};
-      const client = pbpCreateBookmarkServiceClient({service, baseUrl:base, beforeRequest:async () => {
-        if (!await chrome.permissions.contains({origins:[origin]})) throw pbpBookmarkServiceError("permission");
-        return {token};
-      }});
-      const identity = await client.verify();
-      return {ok:true, identity};
-    })().then(sendResponse).catch(error => {
-      // Product codes are already classified; keep unclassified platform failures observable.
-      if (typeof error?.code !== "string") console.warn("[bookmark-connect] failed:", error?.name, error?.message);
-      sendResponse({ok:false,error:error?.code || "network",status:error?.status});
-    });
+    pbpVerifyBookmarkConnection(message).then(sendResponse);
     return true;
   }
   if (message.type === "bookmark_api") {
