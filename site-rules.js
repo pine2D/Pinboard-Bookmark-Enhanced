@@ -66,6 +66,9 @@
     return last;
   }
 
+  // COMPAT (Defuddle >= 0.19.5 dropped its "any attribute that looks like an
+  // image URL" promotion): named lazy-loader attributes Defuddle no longer reads.
+  var PBP_COLD_LAZY_ATTRS = ["data-actualsrc", "data-echo", "data-lazyload", "data-original-src", "data-hi-res-src"];
   function pbpNormalizeLazyImages(rootEl, baseHref) {
     if (!rootEl || typeof rootEl.querySelectorAll !== "function") return 0;
     var count = 0;
@@ -79,6 +82,7 @@
       if (img.hasAttribute("data-src")) candidate = img.getAttribute("data-src");
       else if (img.hasAttribute("data-original")) candidate = img.getAttribute("data-original");
       else if (img.hasAttribute("data-lazy-src")) candidate = img.getAttribute("data-lazy-src");
+      else if (PBP_COLD_LAZY_ATTRS.some(function (n) { return img.hasAttribute(n) && (candidate = img.getAttribute(n), true); })) { /* candidate set */ }
       else {
         var srcset = img.hasAttribute("srcset") ? img.getAttribute("srcset")
           : (img.hasAttribute("data-srcset") ? img.getAttribute("data-srcset") : null);
@@ -146,6 +150,10 @@
       if (!/^https?:$/.test(new URL(resolved).protocol)) return;
       var current;
       try { current = new URL(trimmed, baseHref || undefined).href; } catch (_) { current = trimmed; }
+      // COMPAT (Defuddle >= 0.19.5 copies data-src/data-original/data-lazy-src
+      // over src unconditionally): keep the lazy attributes in step with the
+      // upgrade so the parse does not revert it.
+      ["data-src", "data-original", "data-lazy-src"].forEach(function (n) { if (img.hasAttribute(n)) img.setAttribute(n, resolved); });
       if (resolved === current) return;
       img.setAttribute("src", resolved);
       count++;
