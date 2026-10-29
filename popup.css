@@ -1686,9 +1686,12 @@ html[data-theme] .batch-progress-text {
 }
 
 /* Offline Queue Bar */
+/* flex-start (not center): when the toggle's text wraps (a paused queue
+   appends its cause), Clear stays on the first line. Both rows are
+   control-h-sm tall, so a single-line bar renders as before. */
 .offline-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   padding: var(--pp-sp-2) var(--pp-sp-4);
   background: var(--pp-offline-bg);
@@ -1730,20 +1733,30 @@ html[data-theme] .batch-progress-text {
   border-right: 1.5px solid currentColor;
   border-bottom: 1.5px solid currentColor;
   opacity: 0.7;
-  transform: translateY(-2px) rotate(45deg);
+  flex-shrink: 0;
+  /* (1lh - 6px) / 2 centres the 6px box on the first text line (the toggle is
+     flex-start so it can wrap); the -2px / +1px are the original optical nudges.
+     A transform, not a margin: the offset is optical, not spacing rhythm. */
+  transform: translateY(calc((1lh - 6px) / 2 - 2px)) rotate(45deg);
   transition: transform var(--pp-motion-state) var(--ease-in-out);
 }
-.offline-toggle[aria-expanded="true"] #offline-queue-chevron { transform: translateY(1px) rotate(225deg); }
+.offline-toggle[aria-expanded="true"] #offline-queue-chevron { transform: translateY(calc((1lh - 6px) / 2 + 1px)) rotate(225deg); }
 .offline-toggle {
   flex: 1;
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start; /* chevron tracks the first line of wrapped text */
   gap: var(--pp-sp-2);
   min-height: var(--pp-control-h-sm); /* sm rung, same reason as .offline-clear */
   color: inherit;
+  text-align: start; /* the UA button default centres wrapped lines */
   text-decoration: none;
   cursor: pointer;
 }
+/* Keeps one text line in the middle of the sm rung (2 + 15.4 + 2 inside the
+   20px min-height: within 0.3px of the old `center`); a wrapped cause grows
+   downward from there.
+   button.* specificity beats the button-as-link padding reset above. */
+button.offline-toggle { padding-block: var(--pp-sp-1); }
 .offline-toggle:hover { text-decoration: none; }
 /* The expanded queue is the offline bar's second tone, not a second colour
    system: one `color-mix(offline-bg 75%, bg)` fill and one solid
