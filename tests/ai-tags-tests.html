@@ -896,6 +896,11 @@ suite("custom provider entries", () => {
         assertEq(typeof result.content, "string", "content is the article HTML");
         assertEq("textContent" in result, false, "there is no textContent field to read");
         for (const name of ["Alpha", "Bravo", "Charlie"]) assert(result.content.includes(name + " Product"), name + " card is in the content");
+        // Every field popup.js / background.js / ai.js read off parse() must still exist
+        // with the vendored library's real name (a renamed field fails silently to "").
+        for (const key of ["content", "title", "author", "published", "site", "image", "language"]) {
+          assert(key in result, "parse() result still carries `" + key + "`");
+        }
       } finally {
         window.Defuddle = realDefuddle;
         if (realDefuddle === undefined) delete window.Defuddle;

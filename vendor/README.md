@@ -8,7 +8,7 @@ For Chrome Web Store reviewers: library payloads are unmodified upstream output.
 
 | File | Version | Upstream | License | Purpose |
 |------|---------|----------|---------|---------|
-| `defuddle.js` | 0.19.4 | https://github.com/kepano/defuddle | MIT | Extracts main article content from arbitrary web pages so AI tag/summary requests can send clean text instead of full HTML. Injected via `chrome.scripting.executeScript` into the active tab on user action only. |
+| `defuddle.js` | 0.19.6 | https://github.com/kepano/defuddle | MIT | Extracts main article content from arbitrary web pages so AI tag/summary requests can send clean text instead of full HTML. Injected via `chrome.scripting.executeScript` into the active tab on user action only. |
 | `turndown.js` | 7.2.4 | https://github.com/mixmark-io/turndown | MIT | Converts captured HTML to canonical Markdown. Loaded in `md-preview.html` and lazily in the popup when conversion is needed. |
 | `marked.min.js` | 18.1.0 | https://github.com/markedjs/marked | MIT | Converts canonical Markdown to HTML for the preview render (then sanitized by DOMPurify). Loaded only inside `md-preview.html`. Vendored from the npm UMD build (`lib/marked.umd.js`) under the historical `.min.js` name. |
 | `purify.min.js` | 3.4.16 | https://github.com/cure53/DOMPurify | Apache-2.0 / MPL-2.0 | The single sanitize point: cleans all HTML before it enters the preview DOM (both `marked` output and arbitrary web-page Markdown). Loaded only inside `md-preview.html`. Official unminified UMD (`dist/purify.js`) under the historical `.min.js` name; see the performance review below. |
@@ -20,8 +20,8 @@ For Chrome Web Store reviewers: library payloads are unmodified upstream output.
 
 ### `defuddle.js`
 ```bash
-npm pack defuddle@0.19.4
-tar -xzf defuddle-0.19.4.tgz package/dist/index.js
+npm pack defuddle@0.19.6
+tar -xzf defuddle-0.19.6.tgz package/dist/index.js
 tail -n +2 vendor/defuddle.js | diff package/dist/index.js -
 ```
 The comparison skips the extension's added provenance comment. Compare against the published tarball rather than rebuilding with potentially different dependency versions.
@@ -87,6 +87,7 @@ Vendor files are pinned to reviewed official stable releases. When refreshing, c
 All seven versions above match official stable releases on the review date. All 11 locked artifacts and all 20 woff2 fonts were compared against upstream bytes; the KaTeX auto-render script and fonts are unchanged between 0.18.4 and 0.19.0.
 
 - [Defuddle 0.19.4](https://github.com/kepano/defuddle/releases/tag/0.19.4) improves extraction, code/inline serialization, MathML tables, declarative shadow DOM and sanitization. The extension's synchronous `parse()`/HTML-to-Markdown path is unchanged. This release does not change its AI conversation extractors; bespoke AI chat adapters remain outside this update.
+- [Defuddle 0.19.6](https://github.com/kepano/defuddle/releases/tag/0.19.6) (VETTED 2026-10-29, upgraded from 0.19.4 on its own; no other vendor file touched). A 76-document differential (31 real URLs raw and JS-rendered, plus 14 synthetic pages) ran the extension's real injected extraction functions on 0.19.4, 0.19.5 and 0.19.6: result field set, `content` HTML shape, card-grid text, metadata, tables/SVG/math/Mermaid counts and parse errors are identical; every difference came in with 0.19.5 and 0.19.5 to 0.19.6 is byte-identical. Intended improvements: Wikipedia fractions, NHS severity headings, table captions, and larger `data-original` images. The only regressions were in 0.19.5's lazy-image rules (it overwrites `src` from `data-src`/`data-original`/`data-lazy-src` unconditionally and no longer promotes unnamed image-URL attributes), handled in `site-rules.js`: `pbpUpgradeSrcsetImages` keeps those attributes in step with the upgraded `src`, and `pbpNormalizeLazyImages` also reads `data-actualsrc`, `data-echo`, `data-lazyload`, `data-original-src` and `data-hi-res-src` for placeholder images (a real `src` is still never rewritten). Locked by the real-library tests in `tests/md-convert-tests.html` and the result-shape contract in `tests/ai-tags-tests.html`. Side effect: pages whose extracted text changed re-miss the AI cache once and may need highlights re-anchored.
 - [marked 18.1.0](https://github.com/markedjs/marked/releases/tag/v18.1.0) and the intervening patches fix Markdown edge cases and expensive link-parser backtracking. Existing token-based heading/table renderers remain compatible.
 - [DOMPurify 3.4.15](https://github.com/cure53/DOMPurify/releases/tag/3.4.15) and [3.4.16](https://github.com/cure53/DOMPurify/releases/tag/3.4.16) add hardening and hook/root fixes. The existing single sanitize point, hooks and reject-by-default class/id policy remain in place. A 758,507-byte / 3,601-block synthetic article exposed a performance difference between the official 3.4.16 builds in Chromium: the minified UMD took about 169–172 ms to sanitize, versus 75–81 ms for the unminified UMD and 63–67 ms for 3.4.14/3.4.15. These are local fixture measurements, not user-device cold-start guarantees. The extension therefore ships the official `dist/purify.js` verbatim and the updater keeps that choice; no sanitizer checks are disabled. Recompare both upstream builds on later updates.
 - [KaTeX 0.19.0](https://github.com/KaTeX/KaTeX/releases/tag/v0.19.0) changes missing-character reporting through `strict`. The extension uses default warning behavior and `throwOnError: false`, with no strict callback, so no consumer change is needed.

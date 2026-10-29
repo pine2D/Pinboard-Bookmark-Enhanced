@@ -2,10 +2,10 @@
   "_comment": "Vendor lock manifest (roadmap #38). Hand-maintained oracle: version, upstream source, license and SHA-256 for every vendored artifact. scripts/vendor-lock-check.mjs verifies shipped bytes against this file (verify.sh). Update TOGETHER with any vendor refresh — update-vendor.sh prints new hashes; a mismatch is either an unrecorded upgrade or a tampered file, and both must stop a release. KaTeX fonts are covered by count+extension policy (20 woff2), not per-file hashes.",
   "files": {
     "vendor/defuddle.js": {
-      "version": "0.19.4",
+      "version": "0.19.6",
       "source": "npm:defuddle (dist/index.js, version banner prepended)",
       "license": "MIT",
-      "sha256": "c5ae98384a7ce0f04c746e736d42de3f91a906feaad8ad37c08c75309250f426"
+      "sha256": "415a0ae4d8b6638fca02352e7c033ece7ef983d074298417b9bea02011741e37"
     },
     "vendor/turndown.js": {
       "version": "7.2.4",

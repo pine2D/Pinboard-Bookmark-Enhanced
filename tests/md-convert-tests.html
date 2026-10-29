@@ -3457,6 +3457,57 @@ section("B2: mermaid language survives Defuddle (pre-normalize)");
 </script>
 
 <script>
+section("Defuddle >= 0.19.5 lazy-image compat (real library, popup order: normalize -> upgrade -> parse)");
+(() => {
+  // Page-shaped fixtures: a lazy-loading theme markup (class "lazyloaded" with
+  // a data-src that still names the small file) and an old-style loader that
+  // keeps the real URL in data-echo while src is a placeholder. The pipeline is
+  // the one popup.js / background.js run: site-rules lazy pass, srcset upgrade,
+  // then the REAL vendored Defuddle parse (never a hand-built result).
+  const BASE = "https://fixture.test/post/";
+  const prose = '<p>' + "prose word ".repeat(80) + '</p>';
+  const run = (imgHtml) => {
+    const doc = document.implementation.createHTMLDocument("t");
+    doc.body.innerHTML = '<article><h1>Post</h1>' + prose + imgHtml + prose + '</article>';
+    pbpNormalizeLazyImages(doc.body, BASE);
+    pbpUpgradeSrcsetImages(doc.body, BASE);
+    const result = new Defuddle(doc).parse();
+    return { html: result.content || "", md: htmlToMarkdown(result.content || "") };
+  };
+
+  // R1: upgraded srcset src must not be reverted by data-src.
+  {
+    const r = run('<p><img class="lazyloaded" alt="hero" src="https://fixture.test/img/a-400.jpg" '
+      + 'srcset="https://fixture.test/img/a-400.jpg 400w, https://fixture.test/img/a-1600.jpg 1600w" '
+      + 'data-src="https://fixture.test/img/a-400.jpg"></p>');
+    check("R1 srcset-upgraded hi-res image survives Defuddle", /a-1600\.jpg/.test(r.md), r.md.slice(0, 300));
+    check("R1 small image is not what ends up in the Markdown", !/a-400\.jpg\)/.test(r.md), r.md.slice(0, 300));
+  }
+  // R1b: src already the largest candidate, data-src names a smaller one.
+  {
+    const r = run('<p><img class="lazyloaded" alt="hero" src="https://fixture.test/img/b-1600.jpg" '
+      + 'srcset="https://fixture.test/img/b-400.jpg 400w, https://fixture.test/img/b-1600.jpg 1600w" '
+      + 'data-src="https://fixture.test/img/b-400.jpg"></p>');
+    check("R1b already-largest src is kept", /b-1600\.jpg/.test(r.md) && !/b-400\.jpg\)/.test(r.md), r.md.slice(0, 300));
+  }
+  // R2: named legacy lazy attributes with an SVG placeholder src.
+  const PH = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%221%22 height=%221%22%3E%3C/svg%3E';
+  for (const attr of ["data-echo", "data-actualsrc", "data-lazyload", "data-original-src", "data-hi-res-src"]) {
+    const url = "https://cdn.fixture.test/img/" + attr + ".jpg";
+    const r = run('<p><img class="lazy" alt="' + attr + '" src="' + PH + '" ' + attr + '="' + url + '"></p>');
+    check("R2 " + attr + " real URL replaces the SVG placeholder", r.md.indexOf(url) !== -1 && r.md.indexOf("data:image/svg") === -1, r.md.slice(0, 300));
+  }
+  // Guard: a real src is still never rewritten by the lazy pass.
+  {
+    const d = document.createElement("div");
+    d.innerHTML = '<img src="https://fixture.test/real.jpg" data-echo="https://fixture.test/other.jpg">';
+    pbpNormalizeLazyImages(d, BASE);
+    check("real src untouched by named cold attrs", d.querySelector("img").getAttribute("src") === "https://fixture.test/real.jpg", d.innerHTML);
+  }
+})();
+</script>
+
+<script>
 section("B3: inline SVG diagrams become data-URI images");
 const b3decode = (md) => {
   const b64 = (md.match(/base64,([A-Za-z0-9+/=]+)\)/) || [])[1] || "";
