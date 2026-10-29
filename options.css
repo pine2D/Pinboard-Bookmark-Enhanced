@@ -3876,11 +3876,10 @@ html.motion-ready .wayback-log-row:focus-within .wayback-perm-tip {
   .tag-gov-group-row { grid-template-columns: minmax(0, 1fr); }
   .tag-gov-reason, .tag-gov-queued-note { grid-column: 1; }
 }
-.tag-gov-count {
-  font-weight: 400;
-  color: var(--opt-fg-muted);
-  font-variant-numeric: tabular-nums;
-}
+/* The low-count disclosure's tally is a .summary-state readout (12/18, muted,
+   body weight) like every other disclosure header's state; it used to be its
+   own 16/400 face (critique 6, TH-11). Only the digit alignment stays here. */
+.tag-gov-count { font-variant-numeric: tabular-nums; }
 #tag-gov-lowcount-list { margin-bottom: var(--opt-sp-4); }   /* list -> select-all row; an empty list still separates summary and row */
 /* .hint's own `margin: 2px 0 12px` (baseline-flow spacing) shifts this
    readout ~5px above the row centre inside .fg-actions (flex,
