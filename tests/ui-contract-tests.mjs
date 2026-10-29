@@ -1758,6 +1758,32 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
   check(directWarnings.every((key) => !isInsideContextHelp(key)),
     "options.html: a conditional or irreversible-action warning was hidden behind contextual help");
 
+  // COMPONENTS.md §2.5 copy policy registry. The DOM half (every hint on the
+  // page classified, visible classes outside ?, help inside it) runs in
+  // tests/options-context-help-tests.html; this half keeps the file honest.
+  {
+    const policy = JSON.parse(read("tests/options-hint-policy.json"));
+    const enMessages = JSON.parse(read("_locales/en/messages.json"));
+    const categories = Object.keys(policy.categories || {});
+    const expected = ["success", "credential", "obtain", "guide", "consequence", "status", "help", "pending"];
+    check(categories.length === expected.length && expected.every((name) => categories.includes(name)),
+      "tests/options-hint-policy.json: the copy-policy categories drifted from COMPONENTS.md §2.5");
+    const all = categories.flatMap((name) => policy.categories[name]);
+    check(new Set(all).size === all.length, "tests/options-hint-policy.json: a hint is classified more than once");
+    const dangling = all.filter((entry) => entry.startsWith("#")
+      ? !optionsHtml.includes(`id="${entry.slice(1)}"`)
+      : !Object.prototype.hasOwnProperty.call(enMessages, entry));
+    check(!dangling.length, `tests/options-hint-policy.json: entries name no message or element: ${dangling.join(", ")}`);
+    // Ratchet: copy the policy sends into ? but that has not moved yet.
+    check((policy.categories.pending || []).length <= 8,
+      "tests/options-hint-policy.json: the pending list grew; classify new copy instead of parking it");
+    check(contextualHelpKeys.every((key) => policy.categories.help.includes(key)) &&
+      directWarnings.every((key) => ["consequence", "status"].some((name) => policy.categories[name].includes(key))),
+      "tests/options-hint-policy.json: disagrees with the contextual-help and direct-warning lists above");
+    check(read("tests/options-context-help-tests.html").includes('fetch("options-hint-policy.json")'),
+      "tests/options-context-help-tests.html: the DOM half of the copy-policy gate is gone");
+  }
+
   // Field help expands between the label and its control. Putting <details>
   // after a tall textarea/input makes the question icon and its answer appear
   // in different visual regions even though both are inside the same host.

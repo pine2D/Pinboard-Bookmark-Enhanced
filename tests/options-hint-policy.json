@@ -1,0 +1,46 @@
+{
+  "about": "Options page copy policy (COMPONENTS.md §2.5 'Always-visible copy vs ?'). Every .hint in a settings panel is classified here exactly once, by its own data-i18n key, else '#id', else the first data-i18n key inside it. A hint that carries no key or id and announces itself (role=status/alert or aria-live) is a live status line and needs no entry. tests/options-context-help-tests.html enforces this on the parsed DOM; tests/ui-contract-tests.mjs checks the file itself. 'pending' holds copy the policy sends into ? that has not moved yet; it may only shrink.",
+  "categories": {
+    "success": [
+      "bookmarkServerHint", "hintQwenRegion", "hintQwenWorkspace", "hintArkRegion", "hintAiProtocolGateway",
+      "multiPackHint", "multiPackLanguageHint", "ecdictFormatNote", "dictPackImportHint"
+    ],
+    "credential": [
+      "tokenLocalHint", "aiKeyLocalHint"
+    ],
+    "obtain": [
+      "hintApiToken", "getKey", "browseModelsAt", "dictEudicTokenHint", "multiPackBrowse", "optVideoLangCodesLink"
+    ],
+    "guide": [
+      "onboardNextAi", "batchRevokeHint", "aiCustomLimit", "optFollowNeedsPreset", "dependentsNeedParent"
+    ],
+    "consequence": [
+      "connectionOverviewHint", "dictAnkiFormatHint", "multiPackLicenseHint", "tagGovIrreversibleWarn", "tagGovBundlesWarn",
+      "vocabDriveScope", "backupPreviewSemantics"
+    ],
+    "status": [
+      "bookmarkGatewayPending", "labelShortcut", "aiUnavailableHint", "previewAiUnavailableHint", "aiCustomLocked",
+      "aiCustomFieldInvalid", "aiProtocolUnknown", "aiCustomBaseUrlInvalid", "aiCustomKeyRebind", "aiCustomKeyPending",
+      "backupIncludeSecretsHint",
+      "#preview-ai-model-provider", "#multi-pack-name", "#tag-gov-overview", "#tag-gov-ai-status",
+      "#tag-gov-selected-count", "#opt-theme-overridden"
+    ],
+    "help": [
+      "aiCacheHint", "aiContentSourceJinaHint", "aiContentSourceLocalHint", "archiveLogNote",
+      "backupIncludeHighlightsHint", "backupIncludeVocabularyHint", "backupPlaintextDisclosure", "batchAiHint",
+      "batchTagsHint", "bookmarkGatewayCfHint", "bookmarkGatewayCustomHint", "bookmarkGatewayNoneHint",
+      "customCSSOverlayHelp", "diagnosticsHint", "dictDefaultViewHint", "dictDefinitionLangHint", "dictEchoHint",
+      "dictEudicSupportedHint", "dictLearnerProfileHint", "freeTierResourcesPrefix", "freeTierTitle",
+      "hintCustomBaseUrl", "hintCustomKey", "hintOllamaModel", "hintOpenAIBaseUrl", "jinaFreeTierHint",
+      "mdExportImagePolicyHint", "openrouterTagline", "optAiUseTranscriptHint", "optPopupWidthHelp", "optSyncHint",
+      "optThemeHint", "optVideoLangPrefHint", "optVideoUseLoginHint", "optWaybackBatchHint", "optWaybackHint",
+      "optWaybackS3Hint", "popupFollowHint", "promptsHint", "saveAsThemeHint", "skimEnableHint", "storageIntro",
+      "summaryPromptHint", "syncApiKeysHint", "tagPresetsHint", "tagPromptHint", "tagSyncHint",
+      "translateGlossaryHint", "vocabDriveConnectionHint", "vocabDriveDisclosure"
+    ],
+    "pending": [
+      "bookmarkServiceHint", "personalLibraryHint", "bookmarkConnectHint", "bookmarkKarakeepHint",
+      "themeGroupAdaptiveHint", "vocabCompleteExportHint", "ecdictHint", "dictPackHint"
+    ]
+  }
+}

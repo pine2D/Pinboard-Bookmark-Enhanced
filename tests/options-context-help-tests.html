@@ -153,6 +153,46 @@ function test(name, fn) {
     return range.getBoundingClientRect();
   }
 
+  // COMPONENTS.md §2.5: every hint on a settings panel is classified once in
+  // tests/options-hint-policy.json -- read from the parsed DOM, not the source
+  // text, so a key named in a comment or another attribute cannot satisfy it.
+  // Visible-class copy must stay out of ?, and keyed ? copy must be "help".
+  const hintPolicy = await fetch("options-hint-policy.json").then((response) => response.json());
+  test("every settings hint is classified by the copy policy and sits where its class says", () => {
+    const classOf = new Map();
+    for (const [category, ids] of Object.entries(hintPolicy.categories)) {
+      for (const id of ids) {
+        assert(!classOf.has(id), `${id} is classified twice (${classOf.get(id)}, ${category})`);
+        classOf.set(id, category);
+      }
+    }
+    const seen = new Set();
+    const problems = [];
+    doc.querySelectorAll(".panel .hint").forEach((node) => {
+      const inHelp = !!node.closest("details.context-help");
+      const own = node.dataset.i18n;
+      const live = node.matches('[role="status"],[role="alert"],[aria-live]');
+      // A live line with no copy of its own is filled at run time: a status line.
+      if (!own && live && !inHelp) return;
+      const identity = own || (node.id && "#" + node.id) || node.querySelector("[data-i18n]")?.dataset.i18n || "";
+      if (!identity) {
+        // Inside ?, a copy-free line is the link that continues an answer.
+        if (!inHelp) {
+          problems.push(`unidentified hint "${node.textContent.trim().slice(0, 40)}"`);
+        }
+        return;
+      }
+      seen.add(identity);
+      const category = classOf.get(identity);
+      if (!category) { problems.push(`${identity} is not classified`); return; }
+      if (inHelp && category !== "help") problems.push(`${identity} (${category}) is hidden behind ?`);
+      if (!inHelp && category === "help") problems.push(`${identity} (help) is permanently visible`);
+    });
+    const stale = [...classOf.keys()].filter((id) => !seen.has(id));
+    assert(!problems.length, problems.join("; "));
+    assert(!stale.length, "classified but no longer on the page: " + stale.join(", "));
+  });
+
   test("context help has one adjacent text anchor", () => {
     const disclosures = [...doc.querySelectorAll("details.context-help:not(.context-help-inline)")];
     assert(disclosures.length >= 25, "too few contextual disclosures: " + disclosures.length);
