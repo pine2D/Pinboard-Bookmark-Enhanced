@@ -1882,6 +1882,12 @@ html[data-theme] .fg.entry-block-sub[data-off] > label.bl { color: var(--opt-fg-
    that gap comes out too. */
 .fg.context-help-host > .context-help:not([open]) + .pref-group { margin-top: calc(var(--opt-sp-5) - var(--opt-row-pad-y)); }
 .fg > .bl.subhead + .pref-group { margin-top: calc(var(--opt-sp-5) - var(--opt-row-pad-y) - var(--opt-label-gap)); }
+/* An "AI does nothing yet" warning (critique 6, SP-08) reads as the caption
+   of the switches right above it, 2px under the last switch's text like
+   #opt-sync-api-keys-requires -- while staying the section's own child. The
+   unit above it ends 16 - pad below its text (A2), so pulling up by
+   sp-6 - sp-1 leaves sp-1 - pad, i.e. sp-1 between the two texts. */
+.settings-section > [data-ai-unavailable] { margin-top: calc(var(--opt-sp-1) - var(--opt-sp-6)); }
 /* The field label face: body size/line-height/colour and the label ->
    control gap. The `html[data-theme]` twin keeps the label body colour
    under every preset theme (spec §2) against `html[data-theme] .fg label
