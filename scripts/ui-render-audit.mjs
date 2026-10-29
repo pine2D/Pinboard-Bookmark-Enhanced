@@ -8044,6 +8044,14 @@ const SWEEP_CFG = {
   // metrics and vary by platform, which is why textInset stays a discovery
   // family rather than a gate.
   textInsetH: 4, textInsetV: { sm: 1.5, md: 2, other: 2 }, rowTolerance: 1, rhythmLabelMin: 3, rhythmLabelMax: 6, rhythmActionMin: 4,
+  // Family 5 unit rhythm (options critique 6, SP-01/02/04, rhythm A2): text to
+  // text, measured on line boxes (a control counts by its border box). 16
+  // between two setting units of a section or disclosure body; 2 x row
+  // padding where two row groups meet (their rows keep full padding, so 24
+  // comfortable / 16 compact is the floor -- the one place A2 cannot reach
+  // 16); 12 from a group subhead to its first item; 4 between the paragraphs
+  // of one note. Literal oracle values, not read from options.css.
+  unitRhythm: { unit: 16, rowPadY: { comfortable: 12, compact: 8 }, subheadFirst: 12, hintStep: 4, tol: 1 },
   // The sweep pass runs once, on the deterministic default theme runSweep's
   // options/library legs set up (setTheme(sw, "", "light")) -- a fixed tier,
   // not a per-theme lookup, is correct here.
@@ -8558,6 +8566,82 @@ function sweepProbe(cfg) {
       if (!prev) continue;
       const gap = stackedGap(prev, row);
       if (gap !== null && gap < cfg.rhythmActionMin) push(row, "action", gap);
+    }
+    // Unit rhythm (rhythm A2, critique 6). Text edges come from line boxes
+    // (line-height, not glyph boxes) so a 44px row's copy and an entry
+    // block's label are measured the same way; controls count by their box.
+    const ur = cfg.unitRhythm;
+    if (ur && onDensitySurface) {
+      const CONTROL = "input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea, button, .btn, .listbox-btn, .key-wrap";
+      // The ? target is absolutely placed beside its text and taller than the
+      // line, so it is not a text edge.
+      const skipped = (el) => el.closest(".context-help-body, .context-help-toggle, .switch-track, .pick-mark, details:not([open]) > :not(summary)");
+      const edge = (root, which) => {
+        let best = null;
+        const take = (v) => { if (best === null || (which === "top" ? v < best : v > best)) best = v; };
+        for (const c of root.querySelectorAll(CONTROL)) {
+          if (!visible(c) || skipped(c) || c.parentElement?.closest(CONTROL)) continue;
+          const r = c.getBoundingClientRect(); take(which === "top" ? r.top : r.bottom);
+        }
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+          const host = n.parentElement;
+          if (!n.textContent.trim() || !visible(host) || skipped(host) || host.closest(CONTROL)) continue;
+          const lh = parseFloat(getComputedStyle(host).lineHeight);
+          const range = document.createRange(); range.selectNodeContents(n);
+          for (const r of range.getClientRects()) {
+            if (!r.height) continue;
+            const half = Math.max(Number.isFinite(lh) ? lh : 0, r.height) / 2, mid = (r.top + r.bottom) / 2;
+            take(which === "top" ? mid - half : mid + half);
+          }
+        }
+        return best;
+      };
+      const textGap = (a, b) => {
+        const lo = edge(a, "bottom"), hi = edge(b, "top");
+        return lo === null || hi === null ? null : Math.round((hi - lo) * 100) / 100;
+      };
+      const shownKids = (el) => Array.from(el.children).filter((k) => visible(k) && k.getBoundingClientRect().height > 0);
+      const UNIT = ".pref-group, .fg.entry-block, .fg.edit-area";
+      const padY = ur.rowPadY[cfg.densityTier] ?? ur.rowPadY.comfortable;
+      for (const host of document.querySelectorAll(".settings-section, .disclosure-body")) {
+        if (!visible(host)) continue;
+        const kids = shownKids(host);
+        for (let i = 1; i < kids.length; i++) {
+          const a = kids[i - 1], b = kids[i];
+          // An "AI does nothing yet" block is the caption of the switches above
+          // (2px, SP-08), not a unit of its own.
+          if (!a.matches(UNIT) || !b.matches(UNIT) || a.matches("[data-ai-unavailable]") || b.matches("[data-ai-unavailable]")) continue;
+          const want = a.matches(".pref-group") && b.matches(".pref-group") ? Math.max(ur.unit, 2 * padY) : ur.unit;
+          const gap = textGap(a, b);
+          if (gap !== null && Math.abs(gap - want) > ur.tol) push(b, `unit ${want}`, gap);
+        }
+      }
+      for (const head of document.querySelectorAll(".fg > .bl.subhead")) {
+        if (!visible(head)) continue;
+        let next = head.nextElementSibling, answerOpen = false;
+        while (next && (next.matches("details.context-help") || !visible(next))) {
+          if (next.matches("details.context-help[open]")) answerOpen = true;
+          next = next.nextElementSibling;
+        }
+        if (answerOpen) continue; // an open answer owns the band below (8px, .context-help[open] + *)
+        if (!next) {
+          next = head.parentElement.nextElementSibling;
+          while (next && !visible(next)) next = next.nextElementSibling;
+        }
+        if (!next || !next.matches(".pref-group, .fg")) continue; // chip tracks, toolbars, captions
+        const gap = textGap(head, next);
+        if (gap !== null && Math.abs(gap - ur.subheadFirst) > ur.tol) push(next, `subhead-first ${ur.subheadFirst}`, gap);
+      }
+      const paragraph = (el) => el?.matches(".hint:not(.context-help-body)") && visible(el) && el.getBoundingClientRect().height > 0;
+      for (const p of document.querySelectorAll(".hint:not(.context-help-body)")) {
+        if (!paragraph(p)) continue;
+        let prev = p.previousElementSibling;
+        while (prev && !(visible(prev) && prev.getBoundingClientRect().height > 0)) prev = prev.previousElementSibling;
+        if (!paragraph(prev)) continue;
+        const gap = stackedGap(prev, p);
+        if (gap !== null && Math.abs(gap - ur.hintStep) > ur.tol) push(p, `hint-step ${ur.hintStep}`, gap);
+      }
     }
   }
 
@@ -10862,8 +10946,10 @@ async function main() {
         check: "fgRhythm",
         status: "FAIL",
         actual: h.gap,
-        expected: h.rel === "label-control" ? "3..6" : ">=4",
-        note: h.rel === "label-control" ? "label.bl -> control gap (px)" : "gap above an action row (px)",
+        expected: h.rel === "label-control" ? "3..6" : h.rel === "action" ? ">=4" : h.rel.split(" ").pop(),
+        note: h.rel === "label-control" ? "label.bl -> control gap (px)" : h.rel === "action" ? "gap above an action row (px)"
+          : h.rel.startsWith("unit") ? "text-to-text gap between two setting units (px, rhythm A2)"
+          : h.rel.startsWith("subhead") ? "group subhead -> first item text gap (px)" : "gap between two paragraphs of one note (px)",
       });
     }
     // ---- families 6-9 (design-language class scans): same gating shape.
