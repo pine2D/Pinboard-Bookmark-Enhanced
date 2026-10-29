@@ -811,7 +811,8 @@ options 的 contrast-audit 字段段合计：配对行每块 8 行（聚焦边 2
 | 勾几项、再交给按钮执行 | `.pick.pick-box`（方形勾选框，圆角固定 `--opt-radius-box` = 4px，不随主题） | 1px `--opt-border` 细描边方框 | `--opt-accent` 实心方块加白勾；只勾了一部分时（`:indeterminate`，仅 checkbox）画 10px 横杠 | 同一图形变淡：`--opt-border-section` 描边、**透明底，不加灰填充**，选中的勾改 `--opt-fg-hint` |
 
 - 禁用描边的地板是 contrast-audit 的 `border-section vs panel` ≥ 1.1（`defaultStrict`，terminal 的 8 位色合成到 panel 上再量）；
-  禁用控件按 WCAG 1.4.11 豁免对比度，这条只保证「还看得见」。禁用的 `:checked` / `:indeterminate` 写在同一条规则的选择器表里，
+  禁用控件按 WCAG 1.4.11 豁免对比度，这条只保证「还看得见」。「比可用态浅」另由同一审计的相对行
+  `border-section < border (panel)` 保证（仅 opt，逐主题要求禁用描边对 panel 的对比度严格低于可用态 `--opt-border`）。禁用的 `:checked` / `:indeterminate` 写在同一条规则的选择器表里，
   靠特异性 (0,4,1)/(0,5,1) 压过 accent 填充，不赌源序。
 - 焦点三种控件一律 §7.3 `borderless`：`outline: 1px solid --opt-accent; outline-offset: 2px; box-shadow: --opt-focus-ring`，
   `.pick` 与 `.switch-track` 逐条声明相同（ui-contract 对比两条规则）。只有光晕时，选中态的 accent 填充会把光晕吃掉。

@@ -960,6 +960,32 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict, isDefaultSurfa
     }
   }
 
+  // A disabled choice mark is the enabled mark, FAINTER (U2, options
+  // critique 6): the `border-section vs panel` row above only keeps the
+  // outline visible -- nothing stopped a pilot from darkening its divider
+  // until the disabled box read as strong as (or stronger than) the enabled
+  // --opt-border one. Relative, not a fixed ceiling: the mark must stay
+  // strictly below the enabled border's own contrast on the same panel.
+  // Options only (the .pick consumer); missing roles FAIL like the
+  // defaultStrict row they pair with.
+  if (ns === "opt") {
+    const faintLabel = "border-section < border (panel)";
+    const sec = resolveRole("border-section"), bd = resolveRole("border"), pnl = resolveRole("panel");
+    if (!sec.rgb || !bd.rgb || !pnl.rgb) {
+      const why = sec.note || bd.note || pnl.note;
+      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + faintLabel.padEnd(28) + " FAIL (" + why + ")";
+      console.log(line);
+      violations.push(line);
+    } else {
+      const faint = cr(sec.rgb, pnl.rgb), enabled = cr(bd.rgb, pnl.rgb);
+      const ok = faint < enabled;
+      const line = "  " + scope.padEnd(10) + " " + blockLabel.padEnd(20) + " " + faintLabel.padEnd(28) + " " +
+        faint.toFixed(2) + " < " + enabled.toFixed(2) + (ok ? "" : "  FAIL (disabled outline not fainter than the enabled border)");
+      console.log(line);
+      if (!ok) violations.push(line);
+    }
+  }
+
   // Primary hover contrast (COMPONENTS.md §1.2 primary chrome, Task 4 fix
   // round 1): `.btn.primary:hover` repaints the fill via `color-mix(...)`
   // (ui-components.mjs), not a token pair, so COMPONENT_PAIR_SPEC's
