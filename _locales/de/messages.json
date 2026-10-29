@@ -4883,7 +4883,7 @@
     "message": "Das Lesezeichen wurde möglicherweise gespeichert, aber nicht alle Änderungen. Unter „Bearbeiten“ prüfen und erneut speichern."
   },
   "bookmarkErrGatewayRedirect": {
-    "message": "Der Server hat die Anfrage umgeleitet. Häufige Ursache ist ein Zugangs-Gateway mit Anmeldung wie Cloudflare Access oder eine falsche Server-URL. Unter „Zugangs-Gateway“ ein Service-Token eintragen oder den API-Pfad im Gateway freigeben."
+    "message": "Der Server hat die Anfrage umgeleitet. Häufige Ursache ist ein Zugangs-Gateway mit Anmeldung wie Cloudflare Access. Unter „Zugangs-Gateway“ ein Service-Token eintragen oder den API-Pfad im Gateway freigeben."
   },
   "bookmarkErrGatewayChallenge": {
     "message": "Eine Sicherheitsprüfung (Bot-Challenge) hat die Anfrage blockiert. Häufige Ursache sind die Sicherheitsregeln von Cloudflare; dort den API-Pfad freigeben."

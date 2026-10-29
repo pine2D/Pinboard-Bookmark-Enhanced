@@ -4883,7 +4883,7 @@
     "message": "書籤可能已儲存，但部分變更未完成。請開啟編輯，核對後重新儲存。"
   },
   "bookmarkErrGatewayRedirect": {
-    "message": "伺服器把請求轉到別處。常見原因是前面設有須登入的存取網關（如 Cloudflare Access），或伺服器網址有誤。可在「存取網關」填入服務權杖，或在網關為 API 路徑放行。"
+    "message": "伺服器把請求轉到別處。常見原因是前面設有須登入的存取網關（如 Cloudflare Access）。可在「存取網關」填入服務權杖，或在網關為 API 路徑放行。"
   },
   "bookmarkErrGatewayChallenge": {
     "message": "請求被安全驗證（真人驗證）攔住。常見來源是 Cloudflare 的安全規則，請在規則中為 API 路徑放行。"

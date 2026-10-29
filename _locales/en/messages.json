@@ -4891,7 +4891,7 @@
     "message": "The bookmark may be saved, but some changes failed. Open Edit to check and save again."
   },
   "bookmarkErrGatewayRedirect": {
-    "message": "The server redirected the request. A common cause is a sign-in gateway such as Cloudflare Access, or a wrong server URL. Add a service token under Access gateway, or allow the API path in the gateway."
+    "message": "The server redirected the request. A common cause is a sign-in gateway such as Cloudflare Access. Add a service token under Access gateway, or allow the API path there."
   },
   "bookmarkErrGatewayChallenge": {
     "message": "A security check (bot challenge) blocked the request. Cloudflare security rules are a common cause; allow the API path there."

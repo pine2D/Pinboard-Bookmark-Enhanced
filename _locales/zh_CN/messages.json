@@ -4877,7 +4877,7 @@
     "message": "书签可能已保存，但部分修改未完成。请打开编辑，核对后重新保存。"
   },
   "bookmarkErrGatewayRedirect": {
-    "message": "服务器把请求跳转走了。常见原因是前面有要求登录的访问网关（如 Cloudflare Access），或服务器地址填错。可在「访问网关」中填写服务令牌，或在网关里为接口路径放行。"
+    "message": "服务器把请求重定向到了别处。常见原因是前面有要求登录的访问网关（如 Cloudflare Access）。可在「访问网关」中填写服务令牌，或在网关里为接口路径放行。"
   },
   "bookmarkErrGatewayChallenge": {
     "message": "请求被安全验证（人机验证）拦下。常见来源是 Cloudflare 的安全规则，请在规则里为接口路径放行。"
