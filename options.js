@@ -2785,6 +2785,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   function refreshBookmarkServiceFields() {
     const service = document.querySelector('input[name="bookmark-service"]:checked')?.value || "pinboard";
     for (const name of ["pinboard", "karakeep", "linkding"]) $id("bookmark-" + name + "-fields").hidden = name !== service;
+    // The service group's ? explains Karakeep's Read Later list only while Karakeep is chosen.
+    $id("bookmark-karakeep-help").hidden = service !== "karakeep";
     const tab = $id("tab-tags");
     if (tab) tab.hidden = service !== "pinboard";
     for (const id of ["opt-show-search", "opt-show-badge", "opt-show-suggest-tags"]) {

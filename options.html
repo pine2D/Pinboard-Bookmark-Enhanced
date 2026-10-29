@@ -81,15 +81,19 @@
     <div id="panel-general" class="panel active" role="tabpanel" aria-labelledby="tab-general">
       <section class="settings-section">
         <h2 class="section-title" data-i18n="bookmarkServiceTitle">Bookmark service</h2>
-        <div class="fg entry-block">
+        <div class="fg entry-block context-help-host" data-help-role="group">
           <div class="bl subhead" id="bookmark-service-label" data-i18n="bookmarkServiceChoose">Choose where to save bookmarks</div>
+          <details class="context-help" id="bookmark-service-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="bookmarkServiceHint">Saving from the popup, reader, shortcuts and batch actions uses this service.</p>
+            <p class="hint context-help-body" data-i18n="personalLibraryHint">Vocabulary, highlights, notes and Ask history share one personal library across all bookmark services.</p>
+            <p class="hint context-help-body" id="bookmark-karakeep-help" data-i18n="bookmarkKarakeepHint" hidden>Read Later uses a dedicated private list. Marking a bookmark as read removes it from that list. Archiving in the service is unchanged.</p>
+          </details>
           <div class="pref-group pref-group-radio" role="radiogroup" aria-labelledby="bookmark-service-label">
             <div class="pref-row"><label class="pick"><input type="radio" name="bookmark-service" value="pinboard" /> <span class="pick-text">Pinboard</span><span class="pick-mark" aria-hidden="true"></span></label></div>
             <div class="pref-row"><label class="pick"><input type="radio" name="bookmark-service" value="karakeep" /> <span class="pick-text">Karakeep</span><span class="pick-mark" aria-hidden="true"></span></label></div>
             <div class="pref-row"><label class="pick"><input type="radio" name="bookmark-service" value="linkding" /> <span class="pick-text">linkding</span><span class="pick-mark" aria-hidden="true"></span></label></div>
           </div>
-          <p class="hint" data-i18n="bookmarkServiceHint">Saving from the popup, reader, shortcuts and batch actions uses this service.</p>
-          <p class="hint" data-i18n="personalLibraryHint">Vocabulary, highlights, notes and Ask history share one personal library across all bookmark services.</p>
         </div>
         <div class="fg entry-block" id="bookmark-pinboard-fields">
           <label class="bl" for="opt-pinboard-token" data-i18n="labelApiToken">API Token</label>
@@ -173,7 +177,6 @@
               <span class="save-status" id="connect-karakeep-status" role="status" aria-live="polite"></span>
             </div>
           </div>
-          <p class="hint" data-i18n="bookmarkKarakeepHint">Read Later uses a dedicated private list. Marking a bookmark as read removes it from that list. Archiving in the service is unchanged.</p>
         </div>
         <div id="bookmark-linkding-fields" hidden>
           <div class="fg entry-block">

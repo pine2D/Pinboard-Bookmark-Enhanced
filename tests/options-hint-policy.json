@@ -36,10 +36,11 @@
       "optThemeHint", "optVideoLangPrefHint", "optVideoUseLoginHint", "optWaybackBatchHint", "optWaybackHint",
       "optWaybackS3Hint", "popupFollowHint", "promptsHint", "saveAsThemeHint", "skimEnableHint", "storageIntro",
       "summaryPromptHint", "syncApiKeysHint", "tagPresetsHint", "tagPromptHint", "tagSyncHint",
-      "translateGlossaryHint", "vocabDriveConnectionHint", "vocabDriveDisclosure"
+      "translateGlossaryHint", "vocabDriveConnectionHint", "vocabDriveDisclosure",
+      "bookmarkServiceHint", "personalLibraryHint", "bookmarkKarakeepHint"
     ],
     "pending": [
-      "bookmarkServiceHint", "personalLibraryHint", "bookmarkConnectHint", "bookmarkKarakeepHint",
+      "bookmarkConnectHint",
       "themeGroupAdaptiveHint", "vocabCompleteExportHint", "ecdictHint", "dictPackHint"
     ]
   }
