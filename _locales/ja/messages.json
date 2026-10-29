@@ -4031,9 +4031,6 @@
   "mdSendEnableTo": {
     "message": "{name} へのエクスポートを有効化"
   },
-  "mdSendHowToSetUp": {
-    "message": "設定方法"
-  },
   "mdSendChoose": {
     "message": "送信先を選択"
   },

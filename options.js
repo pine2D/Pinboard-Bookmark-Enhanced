@@ -4,8 +4,10 @@ function pbpRefreshContextHelpScriptFamilies(root = document) {
     // copy and the track), so the label itself is the anchor there.
     const details = host.querySelector(":scope > details.context-help, :scope > label > details.context-help");
     const anchor = details?.parentElement?.matches("label") ? details.parentElement : details?.previousElementSibling;
+    // The choice copy span, never the whole label: a .switch label also holds
+    // the answer. Send-to switches are built in JS and carry no data-i18n.
     const copyNode = host.dataset.helpRole === "choice"
-      ? (anchor?.querySelector("span[data-i18n]") || anchor)
+      ? (anchor?.querySelector(".switch-text, .pick-text, span[data-i18n]") || anchor)
       : host.dataset.helpRole === "action"
         ? (anchor?.querySelector("button") || anchor)
         : anchor;
@@ -2098,7 +2100,36 @@ document.addEventListener("DOMContentLoaded", async () => {
       sp.textContent = t("mdSendEnableTo").replace("{name}", row.label);
       const track = document.createElement("span");
       track.className = "switch-track";
-      enableLabel.appendChild(cb); enableLabel.appendChild(sp); enableLabel.appendChild(track);
+      enableLabel.appendChild(cb); enableLabel.appendChild(sp);
+      // How to set the target up is a ? on its enable switch (U8): the page's
+      // one help form, the answer inside the label between copy and track
+      // (Ruling 36), the same DOM the static choice rows carry.
+      if (row.onboarding) {
+        enableRow.classList.add("context-help-host");
+        enableRow.dataset.helpRole = "choice";
+        sp.id = "et-" + id + "-enable-label";
+        cb.setAttribute("aria-labelledby", sp.id);
+        const help = document.createElement("details");
+        help.className = "context-help";
+        help.id = "et-" + id + "-help";
+        const sum = document.createElement("summary");
+        sum.className = "btn btn-sm ghost context-help-toggle";
+        sum.title = t("contextHelpTitle");
+        sum.setAttribute("aria-label", t("contextHelpTitle"));
+        const ic = document.createElement("span");
+        ic.className = "btn-ic";
+        ic.dataset.ic = "help";
+        ic.innerHTML = PBP_ICONS.help || "";
+        sum.appendChild(ic);
+        const body = document.createElement("p");
+        body.className = "hint context-help-body";
+        body.id = "et-" + id + "-help-body";
+        body.textContent = t(row.onboarding);
+        cb.setAttribute("aria-describedby", body.id);
+        help.append(sum, body);
+        enableLabel.appendChild(help);
+      }
+      enableLabel.appendChild(track);
       enableRow.appendChild(enableLabel);
       enableGroup.appendChild(enableRow);
       card.appendChild(enableGroup);
@@ -2206,17 +2237,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
       });
 
-      if (row.onboarding) {
-        const det = document.createElement("details");
-        det.className = "et-onboarding";
-        const sum = document.createElement("summary");
-        sum.textContent = t("mdSendHowToSetUp");
-        const p = document.createElement("p");
-        p.className = "hint";
-        p.textContent = t(row.onboarding);
-        det.appendChild(sum); det.appendChild(p);
-        card.appendChild(det);
-      }
       if (row.precheckRequest) {
         const testWrap = document.createElement("div");
         // .fg-actions is the row-model button-row shape.
@@ -2285,6 +2305,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       card.querySelectorAll("select[data-listbox]").forEach((sel) => window.pbpEnhanceListbox?.(sel));
     });
     pbpAccRestore(host);
+    // Name each new ? after its switch and mark its copy's script family, as
+    // the i18n pass does for the static hosts.
+    pbpRefreshContextHelpScriptFamilies(host);
     // These cards are built AFTER the page-level setupSecretToggles() pass, and
     // are rebuilt on panel reset -- bind the freshly created .key-toggle buttons
     // here so every render (initial and reset) gets a working show/hide.

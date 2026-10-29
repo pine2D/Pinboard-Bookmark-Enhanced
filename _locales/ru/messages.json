@@ -4031,9 +4031,6 @@
   "mdSendEnableTo": {
     "message": "Включить экспорт в {name}"
   },
-  "mdSendHowToSetUp": {
-    "message": "Как настроить"
-  },
   "mdSendChoose": {
     "message": "Выбрать место назначения"
   },

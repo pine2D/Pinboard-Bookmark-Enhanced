@@ -167,7 +167,7 @@ html { scrollbar-gutter: stable both-edges; }
      block at the end of @generated:ui-themes below. */
   /* Task 12: shared secondary-text shade used verbatim across several
      unrelated hand-written rules (label.bl, free-tier-help, .pf h3,
-     et-onboarding, theme-name-popover label, key-toggle:hover). Has no
+     theme-name-popover label, key-toggle:hover). Has no
      per-theme role of its own -- every one of these selectors is either
      fully superseded by an existing html[data-theme] override that reads a
      DIFFERENT token (so this default only ever paints the true no-preset
@@ -2019,9 +2019,9 @@ html[data-theme] .pf > h3 {
    (options critique 6, CC-10). */
 .fg-actions > label.pick { min-height: 24px; margin-bottom: 0; gap: var(--opt-sp-5); margin-right: var(--opt-sp-6); font-size: var(--opt-text-body); line-height: var(--opt-lh-body); }
 .fg + .fg-actions, .pf > .fg-actions { margin-top: var(--opt-sp-6); }
-/* Send-to card Test row (options.js renderExportTargets): its previous sibling is
-   the .et-onboarding disclosure when a target ships onboarding copy, so the
-   `.fg + .fg-actions` rule above misses it. Pin the action-row gap on the row
+/* Send-to card Test row (options.js renderExportTargets): its previous sibling
+   is a field block or a hint-warn line, not always a bare .fg, so the
+   `.fg + .fg-actions` rule above can miss it. Pin the action-row gap on the row
    itself so sibling order cannot zero it (fgRhythm gate: >=4px above an action row). */
 .export-target-card > .fg-actions { margin-top: var(--opt-sp-6); }
 /* Enable row -> first field: `.settings-section > .pref-group`'s sp-6 does
@@ -2044,13 +2044,6 @@ html.motion-ready .pf:not([hidden]) {
               display var(--motion-pop) allow-discrete;
   @starting-style { opacity: 0; translate: 0 -4px; }
 }
-
-/* ---- Markdown export targets (Send-to destination cards) ---- */
-.et-onboarding { margin-top: var(--opt-sp-4); font-size: 12px; color: var(--opt-fg-soft); }
-.et-onboarding summary { cursor: pointer; padding: var(--opt-sp-2) 0; color: var(--opt-link); user-select: none; }
-.et-onboarding summary:hover { text-decoration: underline; }
-.et-onboarding[open] summary { margin-bottom: var(--opt-sp-2); }
-.et-onboarding .hint { margin: 0; }
 
 /* ---- Accordion ---- */
 
@@ -2148,7 +2141,6 @@ html.motion-ready details.motion-toggle[open]::details-content {
    surface in Options shares this. Drawn with borders, never a glyph
    (font-fallback stall rule). */
 details.disclosure > summary,
-details.et-onboarding > summary,
 #preset-preview-section > summary {
   display: flex; align-items: center; gap: var(--opt-sp-3);
   list-style: none; cursor: pointer; user-select: none;
@@ -2167,10 +2159,8 @@ details.et-onboarding > summary,
    cause -- fixed by just not fighting the class rule's already-correct
    padding here. */
 details.disclosure > summary::-webkit-details-marker,
-details.et-onboarding > summary::-webkit-details-marker,
 #preset-preview-section > summary::-webkit-details-marker { display: none; }
 details.disclosure > summary::after,
-details.et-onboarding > summary::after,
 #preset-preview-section > summary::after {
   content: ""; width: 7px; height: 7px; flex: none;
   border-right: 1.5px solid currentColor;
@@ -2179,14 +2169,11 @@ details.et-onboarding > summary::after,
   color: var(--opt-fg-muted);
 }
 details.disclosure[open] > summary::after,
-details.et-onboarding[open] > summary::after,
 #preset-preview-section[open] > summary::after { transform: translateY(1px) rotate(225deg); }
-/* Section-style headers park the chevron on the right edge; the small help
-   disclosures keep it riding right after their link-styled text. */
+/* Section-style headers park the chevron on the right edge. */
 details.disclosure > summary::after,
 #preset-preview-section > summary::after { margin-left: auto; }
 html.motion-ready details.disclosure > summary::after,
-html.motion-ready details.et-onboarding > summary::after,
 html.motion-ready #preset-preview-section > summary::after {
   transition: transform var(--motion-collapse) var(--ease-in-out);
 }
@@ -3285,9 +3272,6 @@ html[data-theme] .fg label { color: var(--opt-fg); }
   }
 }
 html[data-theme] .hint code { color: var(--opt-fg-muted); }
-/* .et-onboarding: deliberate second form -- unthemed reads --opt-fg-soft,
-   themed reads --opt-fg-muted. */
-html[data-theme] .et-onboarding { color: var(--opt-fg-muted); }
 .et-test-status { font-size: 12px; }
 .et-test-status.ok { color: var(--opt-save); }
 .et-test-status.err { color: var(--opt-danger); }

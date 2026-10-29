@@ -1021,11 +1021,6 @@
     },
     {
       "surface": "options",
-      "token": "et-onboarding",
-      "structural": false
-    },
-    {
-      "surface": "options",
       "token": "export-target-card",
       "structural": true
     },

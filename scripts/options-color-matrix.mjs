@@ -57,8 +57,6 @@ const PROBES = [
   [".section-title", false],
   [".pf", false],
   [".pf h3", false],
-  [".et-onboarding", false],
-  [".et-onboarding summary", false],
   [".auto-save-hint", false],
   [".auto-save-hint.saved", false],
   [".theme-group-label", false],

@@ -5056,8 +5056,10 @@ for (const m of optionsHtml.matchAll(/<details class="disclosure"[^>]*>\s*<(\w+)
 // builder check above pins popup-tags.js: input FIRST (so collectExportTargets()'s
 // `el.type === "checkbox" ? el.checked : ...` and the generic
 // `input[type="checkbox"]` autosave binding keep working unchanged), then the
-// copy span, then the drawn track, appended to the label in that order.
-check(/enableLabel\.className = "switch";[\s\S]{0,200}cb\.type = "checkbox";[\s\S]{0,300}sp\.className = "switch-text";[\s\S]{0,300}track\.className = "switch-track";[\s\S]{0,200}enableLabel\.appendChild\(cb\); enableLabel\.appendChild\(sp\); enableLabel\.appendChild\(track\);/.test(optionsJs),
+// copy span, then the drawn track, appended to the label in that order. A
+// target's "how to set up" ? goes between copy and track (Ruling 36, options
+// critique 6 U8); the runtime harvest below checks that DOM.
+check(/enableLabel\.className = "switch";[\s\S]{0,200}cb\.type = "checkbox";[\s\S]{0,300}sp\.className = "switch-text";[\s\S]{0,300}track\.className = "switch-track";[\s\S]{0,200}enableLabel\.appendChild\(cb\); enableLabel\.appendChild\(sp\);[\s\S]{0,2000}?enableLabel\.appendChild\(track\);/.test(optionsJs),
   "options.js: Send-to enable toggle is not rendered as label.switch > input + span.switch-text + span.switch-track");
 // Options critique 5 (2026-10-21): a .switch is announced as a switch, not a
 // checkbox -- every static one and the Send-to builder's.
@@ -8493,7 +8495,7 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
       addEventListener() {}
       querySelector() { return null; }
       querySelectorAll() { return []; }
-      set innerHTML(_) { this.children = []; }
+      set innerHTML(v) { this.children = []; this.innerHTMLSet = !!v; }
     }
     const host = new StubEl("div");
     try {
@@ -8501,6 +8503,32 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
         document: { createElement: (tag) => new StubEl(tag) }, window: {},
         $id: (id) => (id === "export-targets" ? host : null), t: (key) => key, deobfuscateKey: (v) => v,
         pbpAccRestore() {}, setupSecretToggles() {}, bindAutoSave() {},
+        PBP_ICONS: { help: "<svg></svg>" }, pbpRefreshContextHelpScriptFamilies() {},
+      });
+      // U8: a target with onboarding copy answers it in a ? on its enable
+      // switch -- choice host, details inside the label between copy and
+      // track, filled help icon, the copy as the answer -- and no second
+      // disclosure form survives anywhere in the card.
+      const find = (node, pred, out = []) => { for (const c of node.children || []) { if (pred(c)) out.push(c); find(c, pred, out); } return out; };
+      const hasClass = (n, c) => typeof n.className === "string" && n.className.split(/\s+/).includes(c);
+      const reg = runInNewContext(`${read("export-targets.js")}\nPBP_EXPORT_TARGETS`, {});
+      targetIds.forEach((id, i) => {
+        const card = host.children[i];
+        const onboarding = (reg.find?.((r) => r.id === id) || reg[id] || {}).onboarding;
+        const helps = find(card, (n) => n.tagName === "DETAILS" && hasClass(n, "context-help"));
+        check(!find(card, (n) => hasClass(n, "et-onboarding")).length, `options.js: Send-to ${id} still renders an .et-onboarding disclosure`);
+        if (!onboarding) { check(helps.length === 0, `options.js: Send-to ${id} has no onboarding copy but renders a ?`); return; }
+        const label = find(card, (n) => n.tagName === "LABEL" && hasClass(n, "switch"))[0];
+        const row = find(card, (n) => (n.children || []).includes(label))[0];
+        const kids = label ? label.children.map((n) => n.tagName + "." + n.className) : [];
+        check(helps.length === 1 && label && label.children[2] === helps[0] &&
+          hasClass(label.children[1], "switch-text") && hasClass(label.children[3], "switch-track") &&
+          row && hasClass(row, "context-help-host") && row.dataset.helpRole === "choice",
+          `options.js: Send-to ${id}'s setup copy must be one choice ? inside its enable label between copy and track -- got ${JSON.stringify(kids)}`);
+        const sum = helps[0]?.children[0]; const body = helps[0]?.children[1];
+        check(sum?.tagName === "SUMMARY" && hasClass(sum, "context-help-toggle") && sum.children[0]?.innerHTMLSet &&
+          body?.tagName === "P" && hasClass(body, "context-help-body") && body.textContent === onboarding,
+          `options.js: Send-to ${id}'s ? must be summary.context-help-toggle with a filled help icon and the ${onboarding} answer`);
       });
       check(host.children.length === targetIds.length && host.children.every((det, i) =>
         det.tagName === "DETAILS" && det.className.split(/\s+/).includes("disclosure") &&

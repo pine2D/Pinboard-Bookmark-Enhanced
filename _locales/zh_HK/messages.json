@@ -4031,9 +4031,6 @@
   "mdSendEnableTo": {
     "message": "啟用匯出到 {name}"
   },
-  "mdSendHowToSetUp": {
-    "message": "如何設定"
-  },
   "mdSendChoose": {
     "message": "選擇目標"
   },

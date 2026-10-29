@@ -4043,9 +4043,6 @@
   "mdSendEnableTo": {
     "message": "Enable export to {name}"
   },
-  "mdSendHowToSetUp": {
-    "message": "How to set up"
-  },
   "mdSendChoose": {
     "message": "Choose destination"
   },

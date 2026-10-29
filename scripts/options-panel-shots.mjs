@@ -214,11 +214,8 @@ async function setTheme(page, theme) {
 
 async function reveal(page, panel) {
   await page.evaluate((id) => {
-    // Open every non-help disclosure, not just `.disclosure` -- the Send-to
-    // builder's "how to set up" details (`.et-onboarding`) is a second kind
-    // of non-help disclosure (options.js ~1913) and its `.hint` body must be
-    // visible in the gate too. `.context-help` answers stay closed (an open
-    // answer would inflate the section gap); `[hidden]` sections are inert.
+    // Open every non-help disclosure. `.context-help` answers stay closed (an
+    // open answer would inflate the section gap); `[hidden]` sections are inert.
     document.querySelectorAll(`#panel-${id} details:not(.context-help)`).forEach((d) => { d.open = true; });
   }, panel);
   if (panel === "storage") {
