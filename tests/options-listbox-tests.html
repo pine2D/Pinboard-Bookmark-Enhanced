@@ -1037,6 +1037,25 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
       assert(title && title.matches(".bl.subhead, h2.section-title") && title.textContent.trim(), name + ": radiogroup is not named by a visible group title");
       assert(!group.parentElement.closest('[role="group"]'), name + ": an ancestor role=group re-names the radio group");
       assert(!(title.matches("label") && title.htmlFor), name + ": the group title is bound to a control (for=" + title.htmlFor + ")");
+      // Fix round 1 (TH-1 regression): with the group title no longer bound
+      // to the first input[id], an inline control inside a radio row (the
+      // custom popup width box) sits in a label.pick whose labeled control
+      // is the RADIO, so it has no label of its own -- it must carry an
+      // explicit name, or it falls back to its placeholder value ("550").
+      for (const el of group.querySelectorAll("input:not([type=\"radio\"]), select, textarea")) {
+        const byIds = (el.getAttribute("aria-labelledby") || "").split(/\s+/).filter(Boolean)
+          .map((id) => doc.getElementById(id)).filter(Boolean).map((n) => n.textContent.trim()).join(" ").trim();
+        const own = [...(el.labels || [])].filter((l) => l.control === el).map((l) => l.textContent.trim()).join(" ").trim();
+        assert(byIds || (el.getAttribute("aria-label") || "").trim() || own,
+          name + ": inline control #" + el.id + " inside the radiogroup has no accessible name (no own label, aria-labelledby or aria-label)");
+        // ...and the radio sharing that label names itself by its own text,
+        // or the inline control's name is spliced into the radio's
+        // ("Custom: Popup width px" in Chrome's accessibility tree).
+        const pick = el.closest("label.pick");
+        const radio = pick && pick.querySelector('input[type="radio"]');
+        assert(!radio || (radio.getAttribute("aria-labelledby") || "").trim(),
+          name + ": the radio sharing a label with inline control #" + el.id + " must name itself with aria-labelledby");
+      }
     }
   });
 
