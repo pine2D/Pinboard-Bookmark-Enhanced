@@ -80,7 +80,7 @@
     <!-- Tab 1: General -->
     <div id="panel-general" class="panel active" role="tabpanel" aria-labelledby="tab-general">
       <section class="settings-section">
-        <h2 class="section-title" data-i18n="bookmarkServiceTitle">Bookmark service</h2>
+        <h2 class="section-title" data-i18n="bookmarkServiceTitle">Bookmark Service</h2>
         <div class="fg entry-block context-help-host" data-help-role="group">
           <div class="bl subhead" id="bookmark-service-label" data-i18n="bookmarkServiceChoose">Choose where to save bookmarks</div>
           <details class="context-help" id="bookmark-service-help">
@@ -312,7 +312,7 @@
         </div>
       </section>
       <section class="settings-section">
-        <h2 class="section-title" data-i18n="optUrlCleanTitle">URL tracking parameter cleanup</h2>
+        <h2 class="section-title" data-i18n="optUrlCleanTitle">URL Tracking Parameter Cleanup</h2>
         <div class="pref-group">
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-urlclean-enabled" checked /> <span class="switch-text" data-i18n="optUrlCleanEnabled">Auto-clean URL tracking parameters</span><span class="switch-track" aria-hidden="true"></span></label></div>
           <div class="pref-row pref-row-sub context-help-host" data-parent="opt-urlclean-enabled" data-help-role="choice">
@@ -413,7 +413,7 @@
           </div>
         </div>
         <div class="fg entry-block context-help-host" data-help-role="field">
-          <label class="bl" for="opt-tag-presets" data-i18n="labelTagPresets">Tag Presets</label>
+          <label class="bl" for="opt-tag-presets" data-i18n="labelTagPresets">Tag presets</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
             <p class="hint context-help-body" data-i18n="tagPresetsHint">Format: <code>Name: tag1, tag2, tag3</code>. Each preset appears as a quick-add button in the popup.</p>
@@ -421,7 +421,7 @@
           <textarea id="opt-tag-presets" rows="4" placeholder="One preset per line:&#10;Work: project, review, report&#10;Dev: programming, tutorial, tool" data-i18n-placeholder="tagPresetsPlaceholder"></textarea>
         </div>
         <div class="fg entry-block context-help-host" data-help-role="field">
-          <label class="bl subhead" id="tag-sync-label" data-i18n="tagSyncLabel">Tag Cache Strategy</label>
+          <label class="bl subhead" id="tag-sync-label" data-i18n="tagSyncLabel">Tag cache strategy</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
             <p class="hint context-help-body" data-i18n="tagSyncHint">Choose when to load your existing tags for autocomplete. Loading tags does not change them on the server.</p>
@@ -451,7 +451,7 @@
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="qs-blockquote" checked /> <span class="switch-text" data-i18n="qsBlockquote">Wrap selected text with blockquote</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
         <div class="fg entry-block">
-          <label class="bl" for="qs-default-tags" data-i18n="labelDefaultTags">Default Tags (comma-separated)</label>
+          <label class="bl" for="qs-default-tags" data-i18n="labelDefaultTags">Default tags (comma-separated)</label>
           <input type="text" id="qs-default-tags" placeholder="tag1, tag2" data-i18n-placeholder="placeholderTags" autocomplete="off" spellcheck="false" />
         </div>
         <div class="pref-group">
@@ -477,7 +477,7 @@
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="rl-blockquote" checked /> <span class="switch-text" data-i18n="qsBlockquote">Wrap selected text with blockquote</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
         <div class="fg entry-block">
-          <label class="bl" for="rl-default-tags" data-i18n="labelDefaultTags">Default Tags (comma-separated)</label>
+          <label class="bl" for="rl-default-tags" data-i18n="labelDefaultTags">Default tags (comma-separated)</label>
           <input type="text" id="rl-default-tags" placeholder="tag1, tag2" data-i18n-placeholder="placeholderTags" autocomplete="off" spellcheck="false" />
         </div>
         <div class="pref-group">
@@ -905,7 +905,7 @@
           <div class="fg-actions"><button type="button" class="btn btn-sm" data-ai-setup data-i18n="onboardNextAiLink">Set up AI</button></div>
         </div>
         <div class="fg entry-block">
-          <label class="bl" for="opt-ai-tag-lang" data-i18n="labelAiTagLang">AI Tag Language</label>
+          <label class="bl" for="opt-ai-tag-lang" data-i18n="labelAiTagLang">AI tag language</label>
           <select id="opt-ai-tag-lang" data-listbox>
             <option value="auto" data-i18n="aiLangAuto">Auto (same as content)</option>
             <option value="en" data-i18n="langEn" selected>English</option>
@@ -922,7 +922,7 @@
           </select>
         </div>
         <div class="fg entry-block">
-          <label class="bl" for="opt-ai-summary-lang" data-i18n="labelAiSummaryLang">AI Summary Language</label>
+          <label class="bl" for="opt-ai-summary-lang" data-i18n="labelAiSummaryLang">AI summary language</label>
           <select id="opt-ai-summary-lang" data-listbox>
             <option value="auto" data-i18n="aiLangAuto">Auto (same as content)</option>
             <option value="en" data-i18n="langEn">English</option>
@@ -939,7 +939,7 @@
           </select>
         </div>
         <div class="fg entry-block context-help-host" data-help-role="field">
-          <label class="bl" for="opt-ai-cache-duration" data-i18n="labelAiCache">Cache Duration for AI Tags, Summaries &amp; Fetched Pages (minutes)</label>
+          <label class="bl" for="opt-ai-cache-duration" data-i18n="labelAiCache">Cache duration for AI tags, summaries &amp; fetched pages (minutes)</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
             <p class="hint context-help-body" data-i18n="aiCacheHint">Cached per URL in a shared pool of 200 entries; the least recently used are dropped first. Set 0 to disable.</p>
@@ -966,7 +966,7 @@
         </div>
 
         <div class="fg entry-block context-help-host" data-help-role="field">
-          <label class="bl" for="opt-custom-tag-prompt" data-i18n="labelTagPrompt">AI Tags Prompt</label>
+          <label class="bl" for="opt-custom-tag-prompt" data-i18n="labelTagPrompt">AI tags prompt</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
             <p class="hint context-help-body" data-i18n="tagPromptHint">Leave empty to use the default prompt shown in this field. Must instruct AI to return <code>["tag1","tag2"]</code> format.</p>
@@ -976,7 +976,7 @@
         </div>
 
         <div class="fg entry-block context-help-host" data-help-role="field">
-          <label class="bl" for="opt-custom-summary-prompt" data-i18n="labelSummaryPrompt">AI Summary Prompt</label>
+          <label class="bl" for="opt-custom-summary-prompt" data-i18n="labelSummaryPrompt">AI summary prompt</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
             <p class="hint context-help-body" data-i18n="summaryPromptHint">Leave empty to use the default prompt shown in this field. Use <code>{{lang_instruction}}</code> for auto language.</p>
@@ -1189,7 +1189,7 @@
           </select>
         </div>
         <details class="disclosure" data-acc-key="vocab-reading">
-          <summary data-i18n="vocabReadingSection">Reading hints</summary>
+          <summary data-i18n="vocabReadingSection">Reading Hints</summary>
           <div class="disclosure-body">
             <div class="pref-group">
               <div class="pref-row context-help-host" data-help-role="choice"><label class="switch"><input type="checkbox" role="switch" id="dict-echo-enabled" aria-labelledby="dict-echo-enabled-label" checked /> <span class="switch-text" id="dict-echo-enabled-label" data-i18n="dictEchoToggle">Underline saved words while reading</span>
@@ -1202,7 +1202,7 @@
           </div>
         </details>
         <details class="disclosure" data-acc-key="vocab-learning">
-          <summary data-i18n="vocabLearningSection">Export and integrations</summary>
+          <summary data-i18n="vocabLearningSection">Export and Integrations</summary>
           <div class="disclosure-body">
             <div class="fg"><div class="bl subhead" role="heading" aria-level="3">Anki</div></div>
             <div class="fg entry-block"><label class="bl" for="dict-anki-format" data-i18n="dictAnkiFormatLabel">Anki note format</label>
@@ -1231,7 +1231,7 @@
           </div>
         </details>
         <details class="disclosure" id="multi-pack-section" data-acc-key="vocab-multilingual-packs">
-          <summary><span data-i18n="multiPackSection">Multilingual offline dictionaries</span><span class="summary-state" id="multi-pack-summary"></span></summary>
+          <summary><span data-i18n="multiPackSection">Multilingual Offline Dictionaries</span><span class="summary-state" id="multi-pack-summary"></span></summary>
           <div class="disclosure-body">
             <p class="hint" data-i18n="multiPackHint">Import a Yomitan v3 ZIP dictionary. Definitions and readings stay on this device. Styles, images and audio are not imported.</p>
             <p class="hint"><a href="https://yomitan.wiki/dictionaries/" target="_blank" rel="noopener noreferrer" data-i18n="multiPackBrowse">Find dictionary files</a> · <a href="https://yomidevs.github.io/wiktionary-to-yomitan/download/" target="_blank" rel="noopener noreferrer">WTY</a> · <a href="https://jitendex.org/pages/downloads.html" target="_blank" rel="noopener noreferrer">Jitendex</a></p>
@@ -1251,7 +1251,7 @@
           </div>
         </details>
         <details class="disclosure" data-acc-key="vocab-ecdict-pack">
-          <summary><span data-i18n="ecdictSection">Offline English–Chinese dictionary</span><span class="summary-state" id="ecdict-pack-summary"></span></summary>
+          <summary><span data-i18n="ecdictSection">Offline English–Chinese Dictionary</span><span class="summary-state" id="ecdict-pack-summary"></span></summary>
           <div class="disclosure-body">
             <p class="hint" data-i18n="ecdictHint">Adds Chinese definitions above the English entry when you look up an English word. The English entry still loads as usual.</p>
             <p class="hint" data-i18n="ecdictFormatNote">Expects a CSV file whose first line is the column header and includes word, translation, tag, collins, oxford, frq and bnc. Prebuilt dictionary packages such as mdx, eudic, stardict, mobi and sqlite are different formats and cannot be imported. This project does not provide, recommend or verify a source for the data, and is not affiliated with it. You supply the file and are responsible for its license.</p>
@@ -1266,7 +1266,7 @@
           </div>
         </details>
         <details class="disclosure" data-acc-key="vocab-dictionary-pack">
-          <summary><span data-i18n="dictPackSection">Offline Chinese–English dictionary</span><span class="summary-state" id="dict-pack-summary"></span></summary>
+          <summary><span data-i18n="dictPackSection">Offline Chinese–English Dictionary</span><span class="summary-state" id="dict-pack-summary"></span></summary>
           <div class="disclosure-body">
             <p class="hint" data-i18n="dictPackHint">CC-CEDICT looks up Simplified or Traditional Chinese terms and returns English definitions.</p>
             <p class="hint" data-i18n="dictPackImportHint">Import a CC-CEDICT .txt, .txt.gz, or .zip file.</p>
@@ -1365,7 +1365,7 @@
              <summary> text with title + " (" + n + ")", which also threw away
              the data-i18n node a later language switch needs. -->
         <details id="tag-gov-lowcount" class="disclosure">
-          <summary><span id="tag-gov-lowcount-title" data-i18n="tagGovLowCountTitle">Low-count tags (1 use or fewer)</span> <span id="tag-gov-lowcount-count" class="summary-state tag-gov-count"></span></summary>
+          <summary><span id="tag-gov-lowcount-title" data-i18n="tagGovLowCountTitle">Low-Count Tags (1 Use or Fewer)</span> <span id="tag-gov-lowcount-count" class="summary-state tag-gov-count"></span></summary>
           <div class="disclosure-body">
             <div id="tag-gov-lowcount-list"></div>
             <div class="fg">
@@ -1507,7 +1507,7 @@
       <section class="settings-section">
         <h2 class="section-title" data-i18n="secCustomStyle">Pinboard.in Custom Style</h2>
         <div class="fg context-help-host" data-help-role="field">
-          <label class="bl subhead" data-i18n="labelThemePresets">Theme Presets</label>
+          <label class="bl subhead" data-i18n="labelThemePresets">Theme presets</label>
           <details class="context-help" id="theme-presets-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
             <p class="hint context-help-body" data-i18n="themeGroupAdaptiveHint">Adaptive presets follow the light/dark setting under Extension Appearance above.</p>
@@ -1549,15 +1549,15 @@
           </div>
         </div>
         <div class="fg" id="saved-themes-section" hidden>
-          <label class="bl subhead" data-i18n="labelSavedThemes">Saved Themes</label>
+          <label class="bl subhead" data-i18n="labelSavedThemes">Saved themes</label>
           <div id="saved-themes-list" class="theme-presets-group"></div>
         </div>
         <div class="fg entry-block">
-          <label class="bl" for="opt-custom-font" data-i18n="labelCustomFont">Custom Font</label>
+          <label class="bl" for="opt-custom-font" data-i18n="labelCustomFont">Custom font</label>
           <input type="text" id="opt-custom-font" placeholder="e.g. 'Noto Sans', sans-serif" data-i18n-placeholder="customFontPlaceholder" />
         </div>
         <div class="fg edit-area context-help-host" data-help-role="field">
-          <label class="bl" for="opt-custom-css" data-i18n="labelCustomCSSOverlay">Custom CSS Overlay</label>
+          <label class="bl" for="opt-custom-css" data-i18n="labelCustomCSSOverlay">Custom CSS overlay</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
             <p class="hint context-help-body" data-i18n="customCSSOverlayHelp">Your CSS loads after the selected preset, so it wins over preset rules with the same selector. Leave empty to use the preset only.</p>
@@ -1578,7 +1578,7 @@
         </div>
 
         <details id="preset-preview-section" class="preset-preview-section" hidden>
-          <summary data-i18n="presetPreviewToggle">View current preset CSS (read-only)</summary>
+          <summary data-i18n="presetPreviewToggle">View Current Preset CSS (Read-Only)</summary>
           <pre id="preset-preview-content" class="preset-preview-content"></pre>
         </details>
       </section>

@@ -2930,6 +2930,43 @@ check(focusShapeOffenders("@media (forced-colors: active) { .r.selected .b:not(:
       `_locales: ${key} points at a direction -- in the single-pane layout there is nothing to the left or right of anything`);
   }
 }
+// English capitalisation, one style per level (options critique 6, TH-10 /
+// ruling U12 B): section titles (h2.section-title) and disclosure titles
+// (a non-help <summary>, or its first span) are Title Case; field labels and
+// group subheads (.bl, .bl.subhead) are sentence case. Asked as a category
+// over every such element in options.html, so a new heading or label is
+// covered the moment it lands. Sentence case keeps acronyms (API, URL, AI)
+// and the few proper names below: credential names (API Token / API Key /
+// Client Secret / S3 Access Key, PRODUCT.md) and the product names Chrome
+// Sync and Google Drive.
+{
+  const en = JSON.parse(read("_locales/en/messages.json"));
+  const msg = (key) => (en[key] || {}).message;
+  const keysOf = (re) => [...new Set([...optionsHtml.matchAll(re)].map((m) => m[1]))];
+  const titleKeys = [
+    ...keysOf(/<h2\b[^>]*class="[^"]*\bsection-title\b[^"]*"[^>]*data-i18n="([^"]+)"/g),
+    ...keysOf(/<summary\b(?![^>]*context-help-toggle)[^>]*data-i18n="([^"]+)"/g),
+    ...keysOf(/<summary\b(?![^>]*context-help-toggle)[^>]*>\s*<span\b[^>]*data-i18n="([^"]+)"/g),
+  ];
+  const labelKeys = keysOf(/<(?:label|div)\b[^>]*class="bl(?: subhead)?"[^>]*data-i18n="([^"]+)"/g);
+  check(titleKeys.length >= 35 && labelKeys.length >= 60,
+    `options.html: the English capitalisation gate stopped finding headings (${titleKeys.length}) or labels (${labelKeys.length})`);
+  const SMALL = new Set("a an and as at but by for from in into of on or per the to vs via with".split(" "));
+  const PROPER = new Set(["Token", "Key", "Secret", "Access", "Sync", "Drive"]);
+  const words = (text) => text.match(/[A-Za-z][A-Za-z.'’]*/g) || [];
+  for (const key of titleKeys) {
+    const text = msg(key);
+    const bad = words(text || "").filter((w, i) => /^[a-z]/.test(w) && !/^[a-z]+\.[a-z]+$/.test(w) && (i === 0 || !SMALL.has(w)));
+    check(typeof text === "string" && bad.length === 0,
+      `_locales/en: heading ${key} ("${text}") is not Title Case -- section and disclosure titles capitalise every major word (U12): ${bad.join(", ")}`);
+  }
+  for (const key of labelKeys) {
+    const text = msg(key);
+    const bad = words(text || "").slice(1).filter((w) => /^[A-Z][a-z]+$/.test(w) && !PROPER.has(w));
+    check(typeof text === "string" && bad.length === 0,
+      `_locales/en: label ${key} ("${text}") is not sentence case -- field labels and group subheads capitalise only the first word, acronyms and proper names (U12): ${bad.join(", ")}`);
+  }
+}
 // Note editor (2026-08-06): the save button must stay IN LAYOUT while hidden.
 // `display: none` is what made the textarea jump narrower on the first
 // keystroke; `visibility: hidden` keeps the box, and still drops the button

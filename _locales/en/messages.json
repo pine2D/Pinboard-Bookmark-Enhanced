@@ -1100,7 +1100,7 @@
     "message": "The Save Tab Set, Batch Save and Reader buttons."
   },
   "tagSyncLabel": {
-    "message": "Tag Cache Strategy"
+    "message": "Tag cache strategy"
   },
   "tagSyncCached": {
     "message": "Cached"
@@ -1124,7 +1124,7 @@
     "message": "Choose when to load your existing tags for autocomplete. Loading tags does not change them on the server."
   },
   "labelTagPresets": {
-    "message": "Tag Presets"
+    "message": "Tag presets"
   },
   "tagPresetsPlaceholder": {
     "message": "One preset per line:\nWork: project, review, report\nDev: programming, tutorial, tool"
@@ -1404,7 +1404,7 @@
     "message": "Wrap selected text with blockquote"
   },
   "labelDefaultTags": {
-    "message": "Default Tags (comma-separated)"
+    "message": "Default tags (comma-separated)"
   },
   "placeholderTags": {
     "message": "tag1, tag2"
@@ -1574,10 +1574,10 @@
   "optAiUseTranscript": { "message": "Use video subtitles as the AI content source" },
   "optAiUseTranscriptHint": { "message": "On YouTube and bilibili video pages, AI tags and summaries read the subtitles instead of the page text. Active only after you have granted subtitle access; it never prompts on its own." },
   "labelAiTagLang": {
-    "message": "AI Tag Language"
+    "message": "AI tag language"
   },
   "labelAiSummaryLang": {
-    "message": "AI Summary Language"
+    "message": "AI summary language"
   },
   "aiLangAuto": {
     "message": "Auto (same as content)"
@@ -1616,7 +1616,7 @@
     "message": "Polski"
   },
   "labelAiCache": {
-    "message": "Cache Duration for AI Tags, Summaries & Fetched Pages (minutes)"
+    "message": "Cache duration for AI tags, summaries & fetched pages (minutes)"
   },
   "aiCacheHint": {
     "message": "Cached per URL in a shared pool of 200 entries; the least recently used are dropped first. Set 0 to disable."
@@ -1637,7 +1637,7 @@
     "message": "Customize the prompts sent to the AI. Use placeholders: {{title}} {{url}} {{content}} {{description}} {{lang_instruction}} {{separator_instruction}}. Leave empty to use defaults."
   },
   "labelTagPrompt": {
-    "message": "AI Tags Prompt"
+    "message": "AI tags prompt"
   },
   "tagPromptHint": {
     "message": "Leave empty to use the default prompt shown in this field. Must instruct AI to return [\"tag1\",\"tag2\"] format."
@@ -1652,7 +1652,7 @@
     "message": "Customized"
   },
   "labelSummaryPrompt": {
-    "message": "AI Summary Prompt"
+    "message": "AI summary prompt"
   },
   "summaryPromptHint": {
     "message": "Leave empty to use the default prompt shown in this field. Use {{lang_instruction}} for auto language."
@@ -1736,13 +1736,13 @@
     "message": "Pinboard.in Custom Style"
   },
   "labelCustomFont": {
-    "message": "Custom Font"
+    "message": "Custom font"
   },
   "customFontPlaceholder": {
     "message": "e.g. 'Noto Sans', sans-serif"
   },
   "labelThemePresets": {
-    "message": "Theme Presets"
+    "message": "Theme presets"
   },
   "themeGroupNone": {
     "message": "No preset"
@@ -1757,7 +1757,7 @@
     "message": "Fixed dark"
   },
   "labelSavedThemes": {
-    "message": "Saved Themes"
+    "message": "Saved themes"
   },
   "saveAsTheme": {
     "message": "Save as theme"
@@ -2281,13 +2281,13 @@
     "message": "Save the Custom CSS Overlay as a reusable theme (needs CSS, up to 50 KB)"
   },
   "labelCustomCSSOverlay": {
-    "message": "Custom CSS Overlay"
+    "message": "Custom CSS overlay"
   },
   "customCSSOverlayHelp": {
     "message": "Your CSS loads after the selected preset, so it wins over preset rules with the same selector. Leave empty to use the preset only."
   },
   "presetPreviewToggle": {
-    "message": "View current preset CSS (read-only)"
+    "message": "View Current Preset CSS (Read-Only)"
   },
   "optSavedLocally": {
     "message": "Saved locally (sync quota full)"
@@ -2390,7 +2390,7 @@
     "message": "Undo"
   },
   "optUrlCleanTitle": {
-    "message": "URL tracking parameter cleanup"
+    "message": "URL Tracking Parameter Cleanup"
   },
   "optUrlCleanEnabled": {
     "message": "Auto-clean URL tracking parameters"
@@ -2685,7 +2685,7 @@
     "message": "No AI provider configured. Set one up on the AI Providers tab"
   },
   "tagGovLowCountTitle": {
-    "message": "Low-count tags (1 use or fewer)"
+    "message": "Low-Count Tags (1 Use or Fewer)"
   },
   "tagGovSelectAll": {
     "message": "Select all"
@@ -3457,7 +3457,7 @@
     "message": "Simplified"
   },
   "ecdictSection": {
-    "message": "Offline English–Chinese dictionary"
+    "message": "Offline English–Chinese Dictionary"
   },
   "ecdictEmpty": {
     "message": "Not imported. Choose a CSV file in the ECDICT field layout."
@@ -3602,7 +3602,7 @@
       "message": "Loading saved words…"
     },
     "vocabReadingSection": {
-      "message": "Reading hints"
+      "message": "Reading Hints"
     },
     "vocabDriveSection": {
       "message": "Google Drive"
@@ -3725,7 +3725,7 @@
       "message": "Automatic sync is paused. Click Sync now to try again."
     },
     "vocabLearningSection": {
-      "message": "Export and integrations"
+      "message": "Export and Integrations"
     },
     "vocabOwnerNoAccount": {
       "message": "The personal library is unavailable. Reopen this page and try again."
@@ -3916,7 +3916,7 @@
     "message": "AnkiConnect API key (optional)"
   },
   "dictPackSection": {
-    "message": "Offline Chinese–English dictionary"
+    "message": "Offline Chinese–English Dictionary"
   },
   "dictPackOpen": {
     "message": "Open download page"
@@ -4654,7 +4654,7 @@
   "dictExportLegacyTsv": { "message": "Export six-field TSV" },
   "vocabCompleteExportHint": { "message": "Complete TSV includes language, base form, notes and every context with its source. Use JSON backup to restore data in this extension." },
   "dictAnkiModelMismatchNamed": {"message": "The \"$MODEL$\" note type in Anki has different fields. Restore its original fields, or rename it so a new one can be created, then try again.", "placeholders": {"model": {"content": "$1"}}},
-  "multiPackSection": {"message": "Multilingual offline dictionaries"},
+  "multiPackSection": {"message": "Multilingual Offline Dictionaries"},
   "multiPackHint": {"message": "Import a Yomitan v3 ZIP dictionary. Definitions and readings stay on this device. Styles, images and audio are not imported."},
   "multiPackBrowse": {"message": "Find dictionary files"},
   "multiPackChoose": {"message": "Choose a ZIP file"},
@@ -4879,7 +4879,7 @@
   "dictProgressStreaming": {"message": "Receiving the answer…"},
   "dictProgressElapsed": {"message": "$SECONDS$s elapsed", "placeholders": {"seconds": {"content": "$1"}}},
   "bookmarkServiceTitle": {
-    "message": "Bookmark service"
+    "message": "Bookmark Service"
   },
   "bookmarkServiceChoose": {
     "message": "Choose where to save bookmarks"
