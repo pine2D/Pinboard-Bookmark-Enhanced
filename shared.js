@@ -1948,6 +1948,32 @@ function pbpBookmarkReusableConnectionId(settings, service, baseUrl, token) {
 // Codes a self-hosted request can fail with when an access gateway, not the
 // bookmark server, answered. They are never retryable and never queued.
 const PBP_BOOKMARK_GATEWAY_CODES = Object.freeze(["gateway_redirect", "gateway_challenge", "gateway_basic", "gateway_denied", "not_api"]);
+// Self-hosted failure code -> i18n key. Every error outlet (notification,
+// popup, reader, offline row, batch, options) reads this one table.
+const PBP_BOOKMARK_FAILURE_KEYS = Object.freeze({
+  gateway_redirect:"bookmarkErrGatewayRedirect", gateway_challenge:"bookmarkErrGatewayChallenge",
+  gateway_basic:"bookmarkErrGatewayBasic", gateway_denied:"bookmarkErrGatewayDenied",
+  not_api:"bookmarkErrNotApi", auth:"bookmarkErrAuth"});
+// Service named by a non-secret owner string: self-hosted owners carry their
+// service prefix, any other non-empty owner is a Pinboard username.
+function pbpBookmarkAccountService(account) {
+  if (typeof account !== "string" || !account) return "";
+  if (account.startsWith("karakeep:")) return "karakeep";
+  if (account.startsWith("linkding:")) return "linkding";
+  return "pinboard";
+}
+// Key for a failed self-hosted result ({reason, httpStatus}, or a raw SW code).
+// "" means the caller keeps its own copy; Pinboard never uses this table.
+function pbpBookmarkFailureKey(result, service) {
+  if (service !== "karakeep" && service !== "linkding") return "";
+  const reason = typeof result === "string" ? result : result?.reason;
+  if (typeof reason !== "string" || !reason) return "";
+  if (Object.hasOwn(PBP_BOOKMARK_FAILURE_KEYS, reason)) return PBP_BOOKMARK_FAILURE_KEYS[reason];
+  if (reason !== "not_logged_in") return "";
+  const status = typeof result === "object" ? result.httpStatus : undefined;
+  // With a status the server rejected the token; without one no connection exists.
+  return status === 401 || status === 403 ? "bookmarkErrAuth" : "bgSetToken";
+}
 async function pbpReadBookmarkConnection() {
   const query = Object.fromEntries(PBP_BOOKMARK_SETTING_KEYS.map(key => [key, SETTINGS_DEFAULTS[key]]));
   return pbpBookmarkConnection(await pbpReadSettingsWithSecrets(query));

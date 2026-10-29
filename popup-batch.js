@@ -388,6 +388,9 @@ function renderBatchProgress(p, currentAccount) {
     else if (p.error === "interrupted") showStatus("status-msg", t("batchInterrupted", String(cur), String(total)), "error");
     // User-requested cancel is an outcome, not a failure — info tone.
     else if (p.error === "cancelled") showStatus("status-msg", t("batchCancelled", String(p.saved || 0)), "info");
+    // The SW stops a run on the first gateway failure and records its code;
+    // show the cause rather than the raw code inside batchFailed.
+    else if (PBP_BOOKMARK_GATEWAY_CODES.includes(p.error)) showStatus("status-msg", t(PBP_BOOKMARK_FAILURE_KEYS[p.error]), "error");
     else if (p.error) showStatus("status-msg", t("batchFailed", p.error), "error");
     else {
       const hasFailure = (p.failed || 0) > 0 || (p.tooLong || 0) > 0;

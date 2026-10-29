@@ -4890,6 +4890,24 @@
   "bookmarkPartialSave": {
     "message": "The bookmark may be saved, but some changes failed. Open Edit to check and save again."
   },
+  "bookmarkErrGatewayRedirect": {
+    "message": "The server redirected the request. A common cause is a sign-in gateway such as Cloudflare Access, or a wrong server URL. Add a service token under Access gateway, or allow the API path in the gateway."
+  },
+  "bookmarkErrGatewayChallenge": {
+    "message": "A security check (bot challenge) blocked the request. Cloudflare security rules are a common cause; allow the API path there."
+  },
+  "bookmarkErrGatewayBasic": {
+    "message": "A proxy in front of the server asks for a username and password (Basic). That can't be combined with the bookmark token, so allow the API path in the proxy."
+  },
+  "bookmarkErrGatewayDenied": {
+    "message": "A gateway in front of the server refused the request. Check the credentials under Access gateway and that its policy allows them. With Cloudflare, the policy action must be Service Auth."
+  },
+  "bookmarkErrNotApi": {
+    "message": "The server returned a web page, not API data. Check that the URL points to Karakeep or linkding itself."
+  },
+  "bookmarkErrAuth": {
+    "message": "The server rejected the API token. Check the token in Settings, then reconnect."
+  },
   "bookmarkServiceSettings": {
     "message": "Choose bookmark service"
   },

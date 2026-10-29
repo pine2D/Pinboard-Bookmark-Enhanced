@@ -305,6 +305,8 @@ async function createBackgroundSaveHarness(options) {
       token: cachedSettings.pinboardToken,
       account: pbpPinboardAccountFromToken(cachedSettings.pinboardToken),
       epoch: 0,
+      service: "pinboard",
+      ...(opts.auth || {}),
     }),
     POSTS_ADD_URI_BUDGET,
     // K100: pbpI18nReady is a dep of saveFromBackground now (awaited on the
@@ -346,11 +348,12 @@ async function createBatchSaveHarness(options) {
   const progress = [];
   const notifications = [];
   const badgeCalls = [];
+  const removed = [];
   const outcomes = opts.outcomes || [{ status: "saved", mutation: "created" }];
   let outcomeIndex = 0;
   const deps = {
     _newBatchRunId: () => opts.runId || "test-batch-run",
-    _removeBatchRecordIfOwned: async () => true,
+    _removeBatchRecordIfOwned: async (key) => { removed.push(key); return true; },
     _writeBatchProgress: async (value) => progress.push({ ...value }),
     loadSettings: opts.loadSettings || (async () => settings),
     getCurrentBookmarkAuth: async () => ({ token: settings.pinboardToken, account: "alice", epoch: 0 }),
@@ -382,6 +385,7 @@ async function createBatchSaveHarness(options) {
     progress,
     notifications,
     badgeCalls,
+    removed,
   };
 }
 
@@ -1820,6 +1824,57 @@ await suite("unified save pipeline", async () => {
     equal(noToken.i18nReadyCalls, 1, "not-logged-in branch should await pbpI18nReady exactly once");
   });
 
+  const SELF_HOSTED_AUTH = {
+    linkding: { service: "linkding", account: "linkding:https://links.example/:conn-1" },
+    karakeep: { service: "karakeep", account: "karakeep:https://keep.example/:user-1" },
+  };
+
+  await test("gateway reasons notify their cause and never a raw code", async () => {
+    for (const auth of Object.values(SELF_HOSTED_AUTH)) {
+      for (const code of PBP_BOOKMARK_GATEWAY_CODES) {
+        const h = await createBackgroundSaveHarness({ auth, result: { status: "failed", reason: code, httpStatus: 302 } });
+        await runBackgroundSave(h);
+        equal(h.notifications.length, 1, `${auth.service} ${code} notification count`);
+        equal(h.notifications[0][0], "qs-error");
+        equal(h.notifications[0][1], "bgSaveFailed");
+        equal(h.notifications[0][2], PBP_BOOKMARK_FAILURE_KEYS[code], `${auth.service} ${code} body`);
+        equal(h.notifications[0][3], "error");
+      }
+      for (const httpStatus of [401, 403]) {
+        const h = await createBackgroundSaveHarness({ auth, result: { status: "failed", reason: "not_logged_in", httpStatus } });
+        await runBackgroundSave(h);
+        equal(h.notifications[0][2], "bookmarkErrAuth", `${auth.service} ${httpStatus} must name the token, not Pinboard login`);
+      }
+    }
+  });
+
+  await test("unknown and internal reasons notify generic copy", async () => {
+    const services = [{ service: "pinboard" }, ...Object.values(SELF_HOSTED_AUTH)];
+    for (const auth of services) {
+      const cases = [
+        [{ reason: "permission" }, "bookmarkPermissionDenied"],
+        [{ reason: "remote" }, "saveFailedGeneric"],
+        [{ reason: "invalid_response" }, "saveFailedGeneric"],
+        [{ reason: "storage" }, "saveFailedGeneric"],
+        [{ reason: "made_up" }, "saveFailedGeneric"],
+        [{ reason: "http", httpStatus: 503 }, "HTTP 503"],
+        [{ reason: "http" }, "saveFailedGeneric"],
+        [{ reason: "api" }, "saveFailedGeneric"],
+        [{ reason: "partial", failedStep: "tags", httpStatus: 500 }, "bookmarkPartialSave"],
+      ];
+      for (const [failure, expected] of cases) {
+        const h = await createBackgroundSaveHarness({ auth, result: { status: "failed", ...failure } });
+        await runBackgroundSave(h);
+        equal(h.notifications[0][1], "bgSaveFailed", `${auth.service} ${failure.reason} title`);
+        equal(h.notifications[0][2], expected, `${auth.service} ${failure.reason} body`);
+        assert(h.notifications[0][2] !== failure.reason, `${auth.service} leaked the raw ${failure.reason} code`);
+      }
+    }
+    const pinboardApi = await createBackgroundSaveHarness({ result: { status: "failed", reason: "api", detail: "item already exists" } });
+    await runBackgroundSave(pinboardApi);
+    equal(pinboardApi.notifications[0][2], "item already exists", "Pinboard api detail is the server's own message");
+  });
+
   await test("K100: not-logged-in notification waits for pbpI18nReady before reading text", async () => {
     let resolveReady;
     const ready = new Promise((resolve) => { resolveReady = resolve; });
@@ -2055,6 +2110,26 @@ await suite("unified save pipeline", async () => {
     equal(tooLong.notifications[0][0], "batch-error");
     equal(tooLong.notifications[0][1], "bgSaveFailed", "an all-too-long Batch must not be headlined as a saved batch");
     assert(tooLong.notifications[0][2].includes("batchTooLong:2"), "too-long count missing from the notification");
+  });
+
+  await test("first gateway failure stops the batch and records the code", async () => {
+    const h = await createBatchSaveHarness({ outcomes: [
+      { status: "saved", mutation: "created" },
+      { status: "failed", reason: "gateway_redirect", httpStatus: 302 },
+      { status: "saved", mutation: "created" },
+    ] });
+    await h.handleBatchSave(batchTabs(3));
+    equal(h.intents.length, 2, "the batch kept requesting after a gateway failure");
+    const done = h.progress[h.progress.length - 1];
+    equal(done.running, false);
+    equal(done.done, true);
+    equal(done.error, "gateway_redirect");
+    equal(done.saved, 1);
+    assert(h.removed.includes("batch_job"), "a gateway stop left a resumable job behind");
+    equal(h.notifications.length, 1);
+    equal(h.notifications[0][0], "batch-error");
+    equal(h.notifications[0][1], "bgSaveFailed");
+    equal(h.notifications[0][2], "bookmarkErrGatewayRedirect");
   });
 
   await test("authorize swaps ONLY the token bytes, preserving every other query byte", async () => {

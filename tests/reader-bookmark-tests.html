@@ -47,11 +47,14 @@ async function pipelineHarness(options = {}) {
     console, pbpCreateRecoveringTail, pbpOfflineQueueReduce, pbpPinboardAccountFromToken, pbpEffectivePrivate,
     pbpResolveOfflineQueueToken, pbpDrainOfflineQueue, pbpResolveSavePlan, buildPostsAddUri, POSTS_ADD_URI_BUDGET,
     loadSettings: async () => ({ pinboardToken: "alice:stale-token", offlineQueueEnabled: true, optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false, ...env.settings }),
-    getCurrentBookmarkAuth: async () => ({ account: env.account, token: env.token, epoch: env.epoch }),
+    getCurrentBookmarkAuth: async () => ({ account: env.account, token: env.token, epoch: env.epoch, service: env.service }),
     pbpCaptureBookmarkAuth: () => ({ account: env.account, epoch: env.epoch }),
+    t: key => key,
+    // Self-hosted cases inject the client so its failures can be scripted.
+    pbpCreateBookmarkServiceClient: () => env.client,
     pbpBookmarkAuthIsCurrent: auth => auth.account === env.account && auth.epoch === env.epoch,
     pbpStatusCacheSet: (url, auth, state) => { (env.cacheWrites ||= []).push({ url, account: auth.account, ...state }); return false; }, pbpStatusCacheGet: () => null,
-    pbpReadFreshBookmarkAuthForAccount: async account => account === env.account ? { account, token: env.token, epoch: env.epoch } : null,
+    pbpReadFreshBookmarkAuthForAccount: async account => account === env.account ? { account, token: env.token, epoch: env.epoch, service: env.service } : null,
     pbpWaybackArchive: async () => {}, updateBadge: async () => {}, setIcon: () => {},
     pinboardFetch: async raw => {
       const url = new URL(raw); env.calls.push(url);
@@ -174,6 +177,13 @@ await test("incognito default is independently configurable and private default 
 await test("status unknown is explicitly unknown rather than unbookmarked", async () => {
   const h = await harness({ lookup: { lookupFailed: true, exists: false } }); const r = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account: "alice" }, SENDER); equal(r.known, false); assert(r.bookmarked !== false);
 });
+await test("reader state reports the lookup failure reason", async () => {
+  const h = await harness({ lookup: { lookupFailed: true, exists: false, reason: "gateway_challenge", httpStatus: 403, retryable: false } });
+  const r = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account: "alice" }, SENDER);
+  equal(r.known, false); equal(r.reason, "gateway_challenge"); assert(r.bookmarked !== false);
+  const ok = await (await harness()).pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account: "alice" }, SENDER);
+  equal(ok.known, true); assert(!("reason" in ok), "a successful lookup must not carry a failure reason");
+});
 await test("queued response is passed through honestly without saved metadata", async () => {
   const h = await harness({ result: { status: "queued", queueId: "q1", cause: "network" } }); const r = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "save" }, SENDER); equal(r.status, "queued"); assert(!r.bookmark);
 });
@@ -236,6 +246,24 @@ await test("delete errors never enqueue a deletion or clear saved state", async 
     const h = await pipelineHarness(opts);
     equal((await h.pbpReaderBookmarkRequest(deleteMessage, SENDER)).status, "failed");
     equal(h.env.queue.length, 0); assert(!h.env.cacheWrites?.some(item => item.bookmarked === false), "failed deletion cleared saved cache");
+  }
+});
+await test("self-hosted reader delete keeps the service error code", async () => {
+  const account = "linkding:https://links.example/:conn-1";
+  // Same shape bookmark-services.js throws: a product code plus the HTTP status.
+  const productError = (code, status) => Object.assign(new Error(code), { code, status });
+  const cases = [
+    [productError("gateway_denied", 403), "gateway_denied", 403],
+    [productError("auth", 403), "not_logged_in", 403],
+    [productError("remote", 500), "remote", 500],
+    [new TypeError("Failed to fetch"), "network", undefined],
+  ];
+  for (const [error, reason, httpStatus] of cases) {
+    const h = await pipelineHarness({ account, service: "linkding", slot: { account },
+      client: { lookup: async () => { throw error; }, remove: async () => { throw new Error("remove must not run"); } } });
+    const result = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkDelete", account }, SENDER);
+    equal(result.status, "failed"); equal(result.reason, reason); equal(result.httpStatus, httpStatus);
+    equal(h.env.queue.length, 0);
   }
 });
 await test("account switch during deletion suppresses success and foreign-account side effects", async () => {

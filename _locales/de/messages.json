@@ -4882,6 +4882,24 @@
   "bookmarkPartialSave": {
     "message": "Das Lesezeichen wurde möglicherweise gespeichert, aber nicht alle Änderungen. Unter „Bearbeiten“ prüfen und erneut speichern."
   },
+  "bookmarkErrGatewayRedirect": {
+    "message": "Der Server hat die Anfrage umgeleitet. Häufige Ursache ist ein Zugangs-Gateway mit Anmeldung wie Cloudflare Access oder eine falsche Server-URL. Unter „Zugangs-Gateway“ ein Service-Token eintragen oder den API-Pfad im Gateway freigeben."
+  },
+  "bookmarkErrGatewayChallenge": {
+    "message": "Eine Sicherheitsprüfung (Bot-Challenge) hat die Anfrage blockiert. Häufige Ursache sind die Sicherheitsregeln von Cloudflare; dort den API-Pfad freigeben."
+  },
+  "bookmarkErrGatewayBasic": {
+    "message": "Ein Proxy vor dem Server verlangt Benutzername und Passwort (Basic). Das lässt sich nicht mit dem Token des Lesezeichendienstes kombinieren, daher den API-Pfad im Proxy freigeben."
+  },
+  "bookmarkErrGatewayDenied": {
+    "message": "Ein Gateway vor dem Server hat die Anfrage abgelehnt. Die Zugangsdaten unter „Zugangs-Gateway“ prüfen und ob die Gateway-Richtlinie sie zulässt. Bei Cloudflare muss die Richtlinie die Aktion Service Auth haben."
+  },
+  "bookmarkErrNotApi": {
+    "message": "Der Server hat eine Webseite statt API-Daten geliefert. Prüfen, ob die URL direkt auf Karakeep bzw. linkding zeigt."
+  },
+  "bookmarkErrAuth": {
+    "message": "Der Server hat das API-Token abgelehnt. Das Token in den Einstellungen prüfen und erneut verbinden."
+  },
   "bookmarkServiceSettings": {
     "message": "Lesezeichendienst wählen"
   },

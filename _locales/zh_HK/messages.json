@@ -4882,6 +4882,24 @@
   "bookmarkPartialSave": {
     "message": "書籤可能已儲存，但部分變更未完成。請開啟編輯，核對後重新儲存。"
   },
+  "bookmarkErrGatewayRedirect": {
+    "message": "伺服器把請求轉到別處。常見原因是前面設有須登入的存取網關（如 Cloudflare Access），或伺服器網址有誤。可在「存取網關」填入服務權杖，或在網關為 API 路徑放行。"
+  },
+  "bookmarkErrGatewayChallenge": {
+    "message": "請求被安全驗證（真人驗證）攔住。常見來源是 Cloudflare 的安全規則，請在規則中為 API 路徑放行。"
+  },
+  "bookmarkErrGatewayBasic": {
+    "message": "伺服器前面的代理要求輸入用戶名稱和密碼（Basic 認證），不能與書籤服務的權杖一併使用。請在代理為 API 路徑放行。"
+  },
+  "bookmarkErrGatewayDenied": {
+    "message": "請求被伺服器前面的網關拒絕。請檢查「存取網關」的憑證是否正確，以及網關政策是否容許。如使用 Cloudflare，政策動作須為 Service Auth。"
+  },
+  "bookmarkErrNotApi": {
+    "message": "伺服器傳回的是網頁，不是 API 數據。請檢查網址是否指向 Karakeep 或 linkding 本身。"
+  },
+  "bookmarkErrAuth": {
+    "message": "伺服器拒絕了 API 權杖。請在設定中檢查權杖，然後重新連線。"
+  },
   "bookmarkServiceSettings": {
     "message": "選擇書籤服務"
   },

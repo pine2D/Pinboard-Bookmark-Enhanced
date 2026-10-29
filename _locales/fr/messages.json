@@ -4882,6 +4882,24 @@
   "bookmarkPartialSave": {
     "message": "Le favori a peut-être été enregistré, mais certaines modifications ont échoué. Ouvrez la modification pour vérifier, puis enregistrez à nouveau."
   },
+  "bookmarkErrGatewayRedirect": {
+    "message": "Le serveur a redirigé la requête. Cause fréquente : une passerelle d’accès qui exige une connexion, comme Cloudflare Access, ou une URL de serveur erronée. Ajoutez un jeton de service dans « Passerelle d’accès » ou autorisez le chemin de l’API dans la passerelle."
+  },
+  "bookmarkErrGatewayChallenge": {
+    "message": "Une vérification de sécurité (test anti-robot) a bloqué la requête. Elle vient souvent des règles de sécurité de Cloudflare ; autorisez-y le chemin de l’API."
+  },
+  "bookmarkErrGatewayBasic": {
+    "message": "Un proxy placé devant le serveur demande un nom d’utilisateur et un mot de passe (Basic). Ce mode ne peut pas s’ajouter au jeton du service de signets : autorisez le chemin de l’API dans le proxy."
+  },
+  "bookmarkErrGatewayDenied": {
+    "message": "Une passerelle placée devant le serveur a refusé la requête. Vérifiez les identifiants dans « Passerelle d’accès » et que la stratégie de la passerelle les autorise. Avec Cloudflare, la stratégie doit avoir l’action Service Auth."
+  },
+  "bookmarkErrNotApi": {
+    "message": "Le serveur a renvoyé une page web au lieu de données d’API. Vérifiez que l’URL pointe directement vers Karakeep ou linkding."
+  },
+  "bookmarkErrAuth": {
+    "message": "Le serveur a refusé le jeton API. Vérifiez le jeton dans les paramètres, puis reconnectez-vous."
+  },
   "bookmarkServiceSettings": {
     "message": "Choisir le service de favoris"
   },

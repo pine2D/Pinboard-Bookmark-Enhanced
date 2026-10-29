@@ -4876,6 +4876,24 @@
   "bookmarkPartialSave": {
     "message": "书签可能已保存，但部分修改未完成。请打开编辑，核对后重新保存。"
   },
+  "bookmarkErrGatewayRedirect": {
+    "message": "服务器把请求跳转走了。常见原因是前面有要求登录的访问网关（如 Cloudflare Access），或服务器地址填错。可在「访问网关」中填写服务令牌，或在网关里为接口路径放行。"
+  },
+  "bookmarkErrGatewayChallenge": {
+    "message": "请求被安全验证（人机验证）拦下。常见来源是 Cloudflare 的安全规则，请在规则里为接口路径放行。"
+  },
+  "bookmarkErrGatewayBasic": {
+    "message": "服务器前的代理要求输入用户名和密码（Basic 认证），无法与书签服务的令牌同时使用。请在代理中为接口路径放行。"
+  },
+  "bookmarkErrGatewayDenied": {
+    "message": "请求被服务器前的网关拒绝。请检查「访问网关」中的凭据是否正确，以及网关策略是否允许它。使用 Cloudflare 时，策略动作须为 Service Auth。"
+  },
+  "bookmarkErrNotApi": {
+    "message": "服务器返回的是网页，不是接口数据。请检查地址是否指向 Karakeep 或 linkding 本身。"
+  },
+  "bookmarkErrAuth": {
+    "message": "服务器拒绝了 API 令牌。请在设置中检查令牌，然后重新连接。"
+  },
   "bookmarkServiceSettings": {
     "message": "选择书签服务"
   },

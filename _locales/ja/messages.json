@@ -4882,6 +4882,24 @@
   "bookmarkPartialSave": {
     "message": "ブックマークは保存されている可能性がありますが、一部の変更に失敗しました。編集画面で確認し、もう一度保存してください。"
   },
+  "bookmarkErrGatewayRedirect": {
+    "message": "サーバーがリクエストをリダイレクトしました。よくある原因は、ログインを求めるアクセスゲートウェイ（Cloudflare Accessなど）か、サーバーURLの誤りです。「アクセスゲートウェイ」にサービストークンを入力するか、ゲートウェイでAPIのパスを許可してください。"
+  },
+  "bookmarkErrGatewayChallenge": {
+    "message": "セキュリティチェック（ボット判定）でリクエストがブロックされました。よくある原因はCloudflareのセキュリティルールです。ルールでAPIのパスを許可してください。"
+  },
+  "bookmarkErrGatewayBasic": {
+    "message": "サーバーの手前にあるプロキシがユーザー名とパスワード（Basic認証）を求めています。ブックマークサービスのトークンとは併用できないため、プロキシでAPIのパスを許可してください。"
+  },
+  "bookmarkErrGatewayDenied": {
+    "message": "サーバーの手前にあるゲートウェイがリクエストを拒否しました。「アクセスゲートウェイ」の認証情報が正しいか、ゲートウェイのポリシーで許可されているかを確認してください。Cloudflareでは、ポリシーのアクションをService Authにする必要があります。"
+  },
+  "bookmarkErrNotApi": {
+    "message": "サーバーがAPIデータではなくWebページを返しました。URLがKarakeepまたはlinkding本体を指しているか確認してください。"
+  },
+  "bookmarkErrAuth": {
+    "message": "サーバーがAPIトークンを拒否しました。設定でトークンを確認し、再接続してください。"
+  },
   "bookmarkServiceSettings": {
     "message": "ブックマークサービスを選択"
   },

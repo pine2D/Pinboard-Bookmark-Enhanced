@@ -1296,7 +1296,11 @@ function pbpDeleteReaderBookmark(context) {
         ? { status: "deleted", account: context.account } : pbpSaveFailure("account_changed");
     } catch (e) {
       console.warn("reader bookmark delete failed:", e?.name, pbpSaveFailure(failure, { detail: e?.message }).detail);
-      return pbpSaveFailure(e?.code === "account_changed" ? "account_changed" : failure);
+      if (e?.code === "account_changed") return pbpSaveFailure("account_changed");
+      // Self-hosted clients throw classified product errors; keep their code
+      // (gateway, auth, remote) instead of folding everything into network.
+      if (typeof e?.code === "string" && e.code) return pbpBookmarkFailure(e);
+      return pbpSaveFailure(failure);
     }
   }));
 }
@@ -1310,6 +1314,8 @@ async function pbpReaderBookmarkRequest(message, sender) {
     if (!auth) return pbpSaveFailure("account_changed");
     const lookup = await fetchExistingBookmark(context.url, auth.token, auth);
     let result = { known: false, account: context.account };
+    // A non-secret product code, so the reader can name why status is unknown.
+    if (lookup.lookupFailed && typeof lookup.reason === "string") result.reason = lookup.reason;
     if (!lookup.lookupFailed && !lookup.exists) {
       result = { known: true, bookmarked: false, bookmark: pbpReaderInitialIntent(context, await loadSettings(), "save"), account: context.account };
     } else if (!lookup.lookupFailed) {
@@ -1549,17 +1555,22 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     showNotification(notifyId + "-skipped", t("bgSkippedTitle"), t("bgSkippedExists"), notifyCategory);
     return result;
   }
-  notifySaveFailure(notifyId, result);
+  notifySaveFailure(notifyId, result, startAuth.service);
   return result;
 }
 
 // Failure-reason -> showNotification mapping, shared by the background
 // quick-save path above (saveFromBackground) and the popup save_intent
 // router branch below (submitPopupSaveIntent has no popup document left to
-// hand the result to once it fails). Extracted verbatim from the block that
-// used to live at the end of saveFromBackground — behavior is unchanged.
-function notifySaveFailure(notifyId, result) {
-  if (result.reason === "not_logged_in") {
+// hand the result to once it fails). `service` comes from the caller's
+// connection; unknown reasons never surface as raw codes.
+function notifySaveFailure(notifyId, result, service) {
+  // Self-hosted causes first: their auth and gateway codes must not fall into
+  // the Pinboard login copy below.
+  const key = pbpBookmarkFailureKey(result, service);
+  if (key) {
+    showNotification(notifyId + "-error", t("bgSaveFailed"), t(key), "error");
+  } else if (result.reason === "not_logged_in") {
     showNotification(notifyId + "-error", t("bgNotLoggedIn"), t("bgSetToken"), "error");
   } else if (result.reason === "too_long") {
     showNotification(
@@ -1572,8 +1583,17 @@ function notifySaveFailure(notifyId, result) {
     showNotification(notifyId + "-error", t("bgNetworkError"), result.detail || t("pinboardErrorOffline"), "error");
   } else if (result.reason === "account_changed") {
     showNotification(notifyId + "-error", t("bgNotLoggedIn"), t("pinboardErrorAuth"), "error");
+  } else if (result.reason === "permission") {
+    showNotification(notifyId + "-error", t("bgSaveFailed"), t("bookmarkPermissionDenied"), "error");
+  } else if (result.reason === "partial") {
+    showNotification(notifyId + "-error", t("bgSaveFailed"), t("bookmarkPartialSave"), "error");
   } else {
-    showNotification(notifyId + "-error", t("bgSaveFailed"), result.detail || result.reason || "Unknown error", "error");
+    // Only Pinboard's own API message and an HTTP status are user-readable;
+    // any other reason is an internal code and gets the generic copy.
+    const body = result.reason === "api" && result.detail ? result.detail
+      : result.reason === "http" && Number.isInteger(result.httpStatus) ? "HTTP " + result.httpStatus
+      : t("saveFailedGeneric");
+    showNotification(notifyId + "-error", t("bgSaveFailed"), body, "error");
   }
 }
 
@@ -4161,7 +4181,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
         sendResponse(result);
         if (result.status !== "failed") return;
         const ctx = await chrome.runtime.getContexts({ contextTypes: ["POPUP"] }).catch(() => []);
-        if (!ctx.length) notifySaveFailure("popup-save", result);
+        if (!ctx.length) notifySaveFailure("popup-save", result, pbpBookmarkAccountService(message.account));
       })
       // Programming-error path only: submitPopupSaveIntent itself never rejects
       // on a delivery failure (those resolve to a "failed" result and take the
@@ -4870,13 +4890,18 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
           error.code = "account_changed";
           throw error;
         }
+        // A gateway in front of the server answers every tab the same way:
+        // stop the run instead of sending the remaining requests.
+        if (PBP_BOOKMARK_GATEWAY_CODES.includes(result.reason)) {
+          throw Object.assign(new Error(result.reason), { code: result.reason });
+        }
         if (result.status === "saved") saved++;
         else if (result.status === "queued") queued++;
         else if (result.status === "skipped") skipped++;
         else if (result.reason === "too_long") tooLong++;
         else failed++;
       } catch (e) {
-        if (e?.code === "account_changed") throw e;
+        if (e?.code === "account_changed" || PBP_BOOKMARK_GATEWAY_CODES.includes(e?.code)) throw e;
         failed++;
       } finally {
         processed = i + 1;
@@ -4920,7 +4945,8 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     await clearJob();
     await clearCancel();
     await _writeBatchProgress({ running: false, done: true, error: e.message, ...base() });
-    if (e?.code !== "account_changed") showNotification("batch-error", t("bgSaveFailed"), e.message, "error");
+    const gatewayKey = PBP_BOOKMARK_GATEWAY_CODES.includes(e?.code) ? PBP_BOOKMARK_FAILURE_KEYS[e.code] : "";
+    if (e?.code !== "account_changed") showNotification("batch-error", t("bgSaveFailed"), gatewayKey ? t(gatewayKey) : e.message, "error");
   } finally {
     _batchRunning = false;
   }

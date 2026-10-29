@@ -402,5 +402,31 @@ test("Karakeep tags follow opaque pagination cursors",async()=>{
   const h=harness("karakeep",[[200,{tags:[{id:"t1",name:"first"}],nextCursor:"opaque +/"}],[200,{tags:[{id:"t2",name:"second"}],nextCursor:null}]]);
   equal(await h.client.tags(),["first","second"]);ok(h.calls[1].url.endsWith("cursor=opaque%20%2B%2F"));
 });
+test("failure keys exist in all nine locales and cover every gateway code",async()=>{
+  // Read the table the outlets consume, not a hand-copied key list.
+  const keys=Object.values(PBP_BOOKMARK_FAILURE_KEYS);
+  ok(keys.length>0);
+  ok(PBP_BOOKMARK_GATEWAY_CODES.every(code=>typeof PBP_BOOKMARK_FAILURE_KEYS[code]==="string"&&PBP_BOOKMARK_FAILURE_KEYS[code]));
+  for(const loc of ["de","en","fr","ja","pl","ru","zh_CN","zh_HK","zh_TW"]){
+    const messages=await (await fetch(`../_locales/${loc}/messages.json`)).json();
+    for(const key of keys){const text=messages[key]?.message;if(typeof text!=="string"||!text.trim())throw new Error(`${loc} lacks ${key}`);}
+  }
+});
+test("failure keys apply only to self-hosted services",()=>{
+  equal([pbpBookmarkAccountService("karakeep:https://k.example/:u1"),pbpBookmarkAccountService("linkding:https://l.example/:c1"),pbpBookmarkAccountService("alice"),pbpBookmarkAccountService(""),pbpBookmarkAccountService(undefined)],["karakeep","linkding","pinboard","",""]);
+  const reasons=[...PBP_BOOKMARK_GATEWAY_CODES,"auth","not_logged_in","remote","network","made_up"];
+  for(const service of ["pinboard","",undefined,"typo"])for(const reason of reasons){
+    equal(pbpBookmarkFailureKey({reason,httpStatus:401},service),"");equal(pbpBookmarkFailureKey({reason},service),"");equal(pbpBookmarkFailureKey(reason,service),"");
+  }
+  for(const service of ["linkding","karakeep"]){
+    for(const code of PBP_BOOKMARK_GATEWAY_CODES)equal(pbpBookmarkFailureKey({reason:code,httpStatus:302},service),PBP_BOOKMARK_FAILURE_KEYS[code]);
+    equal(pbpBookmarkFailureKey("auth",service),"bookmarkErrAuth");
+    equal(pbpBookmarkFailureKey({reason:"not_logged_in",httpStatus:401},service),"bookmarkErrAuth");
+    equal(pbpBookmarkFailureKey({reason:"not_logged_in",httpStatus:403},service),"bookmarkErrAuth");
+    equal(pbpBookmarkFailureKey({reason:"not_logged_in"},service),"bgSetToken");
+    for(const reason of ["remote","network","permission","made_up","","toString","__proto__","constructor"])equal(pbpBookmarkFailureKey({reason},service),"");
+    equal(pbpBookmarkFailureKey(null,service),"");
+  }
+});
 (async()=>{let pass=0,fail=0;for(const item of cases){const row=document.createElement("div");try{await item.run();row.className="pass";row.textContent="PASS "+item.name;pass++;}catch(e){row.className="fail";row.textContent="FAIL "+item.name+": "+e.message;fail++;}document.getElementById("results").appendChild(row);}document.getElementById("summary").textContent=`${pass} passed, ${fail} failed`;})();
 </script></body></html>

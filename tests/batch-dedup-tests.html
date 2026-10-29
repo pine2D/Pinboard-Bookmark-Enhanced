@@ -589,6 +589,22 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     equal(switched.statuses[0].message, "batchAccountChanged", "account switch was reported as a token failure");
   });
 
+  await test("gateway batch error shows its cause", async () => {
+    for (const code of PBP_BOOKMARK_GATEWAY_CODES) {
+      const h = await createUiHarness(null, 5000);
+      h.renderBatchProgress({ running: false, done: true, total: 3, i: 2, saved: 1, queued: 0, failed: 0, error: code });
+      equal(h.statuses[0].message, PBP_BOOKMARK_FAILURE_KEYS[code], code + " fell back to the raw batchFailed code");
+      equal(h.statuses[0].kind, "error");
+    }
+    const notApi = await createUiHarness(null, 5000);
+    notApi.renderBatchProgress({ running: false, done: true, total: 1, saved: 0, error: "not_api" });
+    equal(notApi.statuses[0].message, "bookmarkErrNotApi");
+    // Only gateway codes take this branch; other thrown messages keep batchFailed.
+    const other = await createUiHarness(null, 5000);
+    other.renderBatchProgress({ running: false, done: true, total: 1, saved: 0, error: "auth" });
+    equal(other.statuses[0].message, "batchFailed:auth");
+  });
+
   await test("reopen restores fresh running/done progress but ignores stale done", async () => {
     const freshRunning = await createUiHarness({ running: true, done: false, total: 3, i: 1, queued: 1, ts: 4500 }, 5000);
     freshRunning.wireBatchProgress();
