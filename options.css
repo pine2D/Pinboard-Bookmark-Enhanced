@@ -1468,7 +1468,8 @@ input[type="checkbox"], input[type="radio"] {
   border-color: var(--opt-fg-muted);
 }
 .pick > input:focus-visible ~ .pick-mark {
-  outline: none;
+  outline: 1px solid var(--opt-accent);
+  outline-offset: 2px;
   box-shadow: var(--opt-focus-ring);
 }
 .pick > input:disabled ~ .pick-text {

@@ -7774,6 +7774,19 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
     "options.css: a checked .pick radio must draw a round currentColor dot (composer pickRules: radius-full, background currentColor, border 0, transform none, square box) -- found " + JSON.stringify([...dot]));
 }
 
+// Options critique 6, CC-09: a focused choice mark wears exactly the focus the
+// switch track wears (§7.3 borderless: 1px accent core, offset 2px, the glow).
+// Compared declaration by declaration against the switch rule, so the two can
+// only move together.
+{
+  const pickFocus = declarationValueMap(optionsCss, ".pick > input:focus-visible ~ .pick-mark");
+  const switchFocus = declarationValueMap(optionsCss, ".switch > input:focus-visible ~ .switch-track");
+  const props = ["outline", "outline-offset", "box-shadow"];
+  check(switchFocus.get("outline") === "1px solid var(--opt-accent)" && props.every((p) => pickFocus.get(p) === switchFocus.get(p)),
+    "options.css: the .pick mark's :focus-visible ring must match the .switch track's (outline, outline-offset, box-shadow) -- pick " +
+    JSON.stringify(props.map((p) => pickFocus.get(p))) + " vs switch " + JSON.stringify(props.map((p) => switchFocus.get(p))));
+}
+
 // Options critique 6, CC-03: the checkbox square keeps a 4px corner on every
 // theme. The generated .pick-box rule reads --opt-radius-box, the hand-written
 // :root declares it as 4px, and no other block (a theme, a density tier, a

@@ -1144,8 +1144,14 @@ function pickRules(ns) {
       ["transform", "none"],
     ], { pairColorWith: ".pick-mark" }),
     rule(".pick:hover > .pick-mark", [["border-color", `var(--${ns}-fg-muted)`]]),
+    // §7.3 `borderless` placement, the SAME three declarations as the
+    // .switch-track focus rule above (CC-09, options critique 6): a 1px
+    // accent core 2px outside the mark plus the glow. The glow alone sank
+    // into a checked mark's accent fill, so focus on a selected radio or
+    // ticked box was invisible.
     rule(".pick > input:focus-visible ~ .pick-mark", [
-      ["outline", "none"],
+      ["outline", `1px solid var(--${ns}-accent)`],
+      ["outline-offset", "2px"],
       ["box-shadow", `var(--${ns}-focus-ring)`],
     ]),
     // Disabled: the same mark, fainter -- a --border-section outline (the
