@@ -4847,7 +4847,7 @@
     "message": "填写站点地址，包含部署子路径。除本机地址外，必须使用 HTTPS。"
   },
   "bookmarkConnectHint": {
-    "message": "地址和令牌在连接成功后生效。令牌默认保存在本机，只有开启凭据同步后才会同步。"
+    "message": "地址和 Token 在连接成功后生效。Token 默认保存在本机，只有开启凭据同步后才会同步。"
   },
   "bookmarkGatewayLabel": {
     "message": "访问网关"
@@ -4868,7 +4868,7 @@
     "message": "Client Secret"
   },
   "bookmarkGatewayCfHint": {
-    "message": "在 Zero Trust 的 Service Tokens 中创建服务令牌。Client Secret 只在创建时显示一次。该 Access 应用还需要一条动作为 Service Auth 的策略。"
+    "message": "在 Zero Trust 的 Service Tokens 中创建 Service Token。Client Secret 只在创建时显示一次。该 Access 应用还需要一条动作为 Service Auth 的策略。"
   },
   "bookmarkGatewayHeaderName": {
     "message": "请求头名称"
@@ -4910,10 +4910,10 @@
     "message": "已连接"
   },
   "bookmarkConnectFailed": {
-    "message": "连接失败。请检查服务器地址、令牌和站点访问权限。"
+    "message": "连接失败。请检查服务器地址、Token 和站点访问权限。"
   },
   "bookmarkInvalidConfig": {
-    "message": "请填写有效的服务器地址和 API 令牌。"
+    "message": "请填写有效的服务器地址和 API Token。"
   },
   "bookmarkUrlInvalid": {
     "message": "请填写以 https:// 开头的服务器地址。只有 localhost 可以使用 http://。"
@@ -4922,7 +4922,7 @@
     "message": "请在设置中允许访问此服务器，然后重新连接。"
   },
   "bookmarkKarakeepHint": {
-    "message": "“稍后阅读”使用专用私有列表。标记为已读时只从列表移除，不更改服务中的归档状态。"
+    "message": "「稍后阅读」使用专用私有列表。标记为已读时只从列表移除，不更改服务中的归档状态。"
   },
   "bookmarkReadLaterListName": {
     "message": "稍后阅读"
@@ -4931,13 +4931,13 @@
     "message": "书签可能已保存，但部分修改未完成。请打开编辑，核对后重新保存。"
   },
   "bookmarkErrGatewayRedirect": {
-    "message": "服务器把请求重定向到了别处。常见原因是前面有要求登录的访问网关（如 Cloudflare Access），或地址填错。可在「访问网关」中填写服务令牌，或在网关里为接口路径放行。"
+    "message": "服务器把请求重定向到了别处。常见原因是前面有要求登录的访问网关（如 Cloudflare Access），或地址填错。可在「访问网关」中填写 Service Token，或在网关里为接口路径放行。"
   },
   "bookmarkErrGatewayChallenge": {
     "message": "请求被安全验证（人机验证）拦下。常见来源是 Cloudflare 的安全规则，请在规则里为接口路径放行。"
   },
   "bookmarkErrGatewayBasic": {
-    "message": "服务器前的代理要求输入用户名和密码（Basic 认证），无法与书签服务的令牌同时使用。请在代理中为接口路径放行。"
+    "message": "服务器前的代理要求输入用户名和密码（Basic 认证），无法与书签服务的 Token 同时使用。请在代理中为接口路径放行。"
   },
   "bookmarkErrGatewayDenied": {
     "message": "请求被服务器前的网关拒绝。请检查「访问网关」中的凭据是否正确，以及网关策略是否允许它。使用 Cloudflare 时，策略动作须为 Service Auth。"
@@ -4946,7 +4946,7 @@
     "message": "服务器返回的是网页，不是接口数据。请检查地址是否指向 Karakeep 或 linkding 本身。"
   },
   "bookmarkErrAuth": {
-    "message": "服务器拒绝了 API 令牌。请在设置中检查令牌，然后重新连接。"
+    "message": "服务器拒绝了 API Token。请在设置中检查 Token，然后重新连接。"
   },
   "bookmarkConnectErrAuth": {
     "message": "服务器拒绝了 API Token。请检查上方的 Token，然后重新连接。"

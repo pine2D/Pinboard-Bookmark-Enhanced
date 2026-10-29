@@ -1143,7 +1143,7 @@
     "message": "API-Schlüssel und Tokens in Sicherungen einschließen"
   },
   "backupIncludeSecretsHint": {
-    "message": "Schreibt sämtliche Zugangsdaten im Klartext in die Datei: deinen Pinboard-API-Token, die Zugangsdaten des Zugangs-Gateways für Karakeep und linkding, alle API-Schlüssel der KI-Anbieter sowie die Zugangsdaten für Jina, Wayback, Anki, Eudic, Notion, Gist und Webhook. Wer die Datei öffnet, kann sie direkt verwenden. Bewahre die Datei wie ein Passwort auf."
+    "message": "Schreibt sämtliche Zugangsdaten im Klartext in die Datei: deine API-Tokens für Pinboard, Karakeep und linkding, die Zugangsdaten des Zugangs-Gateways, alle API-Schlüssel der KI-Anbieter sowie die Zugangsdaten für Jina, Wayback, Anki, Eudic, Notion, Gist und Webhook. Wer die Datei öffnet, kann sie direkt verwenden. Bewahre die Datei wie ein Passwort auf."
   },
   "backupSecretsExportTitle": {"message": "Sicherung mit Zugangsdaten exportieren?"},
   "backupSecretsExportConfirm": {

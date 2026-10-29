@@ -4853,7 +4853,7 @@
     "message": "輸入網站網址，包括部署子路徑。本機位址以外的連線必須使用 HTTPS。"
   },
   "bookmarkConnectHint": {
-    "message": "網址和權杖會在連線成功後生效。權杖預設儲存在本機，啟用憑證同步後才會同步。"
+    "message": "網址和 Token 會在連線成功後生效。Token 預設儲存在本機，啟用憑證同步後才會同步。"
   },
   "bookmarkGatewayLabel": {
     "message": "存取網關"
@@ -4874,7 +4874,7 @@
     "message": "Client Secret"
   },
   "bookmarkGatewayCfHint": {
-    "message": "請在 Zero Trust 的 Service Tokens 建立服務權杖。Client Secret 只會在建立時顯示一次。該 Access 應用程式亦須加入一項動作為 Service Auth 的政策。"
+    "message": "請在 Zero Trust 的 Service Tokens 建立 Service Token。Client Secret 只會在建立時顯示一次。該 Access 應用程式亦須加入一項動作為 Service Auth 的政策。"
   },
   "bookmarkGatewayHeaderName": {
     "message": "標頭名稱"
@@ -4916,10 +4916,10 @@
     "message": "已連線"
   },
   "bookmarkConnectFailed": {
-    "message": "連線失敗。請檢查伺服器網址、權杖和網站存取權限。"
+    "message": "連線失敗。請檢查伺服器網址、Token 和網站存取權限。"
   },
   "bookmarkInvalidConfig": {
-    "message": "請輸入有效的伺服器網址和 API 權杖。"
+    "message": "請輸入有效的伺服器網址和 API Token。"
   },
   "bookmarkUrlInvalid": {
     "message": "請輸入以 https:// 開頭的伺服器網址。只有 localhost 可以使用 http://。"
@@ -4937,13 +4937,13 @@
     "message": "書籤可能已儲存，但部分變更未完成。請開啟編輯，核對後重新儲存。"
   },
   "bookmarkErrGatewayRedirect": {
-    "message": "伺服器把請求轉到別處。常見原因是前面設有須登入的存取網關（如 Cloudflare Access），或網址有誤。可在「存取網關」填入服務權杖，或在網關為 API 路徑放行。"
+    "message": "伺服器把請求轉到別處。常見原因是前面設有須登入的存取網關（如 Cloudflare Access），或網址有誤。可在「存取網關」填入 Service Token，或在網關為 API 路徑放行。"
   },
   "bookmarkErrGatewayChallenge": {
     "message": "請求被安全驗證（真人驗證）攔住。常見來源是 Cloudflare 的安全規則，請在規則中為 API 路徑放行。"
   },
   "bookmarkErrGatewayBasic": {
-    "message": "伺服器前面的代理要求輸入用戶名稱和密碼（Basic 認證），不能與書籤服務的權杖一併使用。請在代理為 API 路徑放行。"
+    "message": "伺服器前面的代理要求輸入用戶名稱和密碼（Basic 認證），不能與書籤服務的 Token 一併使用。請在代理為 API 路徑放行。"
   },
   "bookmarkErrGatewayDenied": {
     "message": "請求被伺服器前面的網關拒絕。請檢查「存取網關」的憑證是否正確，以及網關政策是否容許。如使用 Cloudflare，政策動作須為 Service Auth。"
@@ -4952,7 +4952,7 @@
     "message": "伺服器傳回的是網頁，不是 API 數據。請檢查網址是否指向 Karakeep 或 linkding 本身。"
   },
   "bookmarkErrAuth": {
-    "message": "伺服器拒絕了 API 權杖。請在設定中檢查權杖，然後重新連線。"
+    "message": "伺服器拒絕了 API Token。請在設定中檢查 Token，然後重新連線。"
   },
   "bookmarkConnectErrAuth": {
     "message": "伺服器拒絕了 API Token。請檢查上方的 Token，然後重新連線。"

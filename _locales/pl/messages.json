@@ -1143,7 +1143,7 @@
     "message": "Uwzględniaj klucze API i tokeny w kopiach zapasowych"
   },
   "backupIncludeSecretsHint": {
-    "message": "Zapisuje wszystkie poświadczenia w pliku jawnym tekstem: token API Pinboard, poświadczenia bramki dostępu, klucze API wszystkich dostawców AI oraz poświadczenia Jina, Wayback, Anki, Eudic, Notion, Gist i Webhook. Każdy, kto otworzy plik, może ich użyć. Przechowuj go tak jak hasło."
+    "message": "Zapisuje wszystkie poświadczenia w pliku jawnym tekstem: tokeny API Pinboard, Karakeep i linkding, poświadczenia bramki dostępu, klucze API wszystkich dostawców AI oraz poświadczenia Jina, Wayback, Anki, Eudic, Notion, Gist i Webhook. Każdy, kto otworzy plik, może ich użyć. Przechowuj go tak jak hasło."
   },
   "backupSecretsExportTitle": {"message": "Wyeksportować kopię zapasową z danymi logowania?"},
   "backupSecretsExportConfirm": {

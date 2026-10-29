@@ -1138,6 +1138,28 @@ async function loadLocale(loc) {
     if (previousMirror === null) localStorage.removeItem("pp-i18n-msgs");
     else localStorage.setItem("pp-i18n-msgs", previousMirror);
   }
+  // Critique 6 batch 1: terminology and warning completeness.
+  // Chinese keeps the credential name in English (2026-10-10 terminology
+  // ruling): "Token" / "API Token" / "Service Token", never 令牌 or 權杖.
+  for (const loc of ["zh_CN", "zh_TW", "zh_HK"]) {
+    const hits = Object.entries(msgs[loc]).filter(([, v]) => /令牌|權杖/.test(v.message || "")).map(([k]) => k);
+    check(`${loc} never renames the credential to 令牌/權杖`, hits.length === 0, hits.join(", "));
+  }
+  // UI names in the bookmark copy are quoted with 「」, not curly quotes.
+  const zhCurly = Object.entries(msgs.zh_CN).filter(([k, v]) => /^bookmark/.test(k) && /[\u201c\u201d]/.test(v.message || "")).map(([k]) => k);
+  check("zh_CN bookmark copy quotes UI names with corner brackets", zhCurly.length === 0, zhCurly.join(", "));
+  // A full-width colon already carries its gap: no space after it in CJK copy.
+  const colonGap = [];
+  for (const loc of ["zh_CN", "zh_TW", "zh_HK", "ja"]) {
+    for (const [k, v] of Object.entries(msgs[loc])) if (/\uff1a[ \t\u3000]/.test(v.message || "")) colonGap.push(`${loc}.${k}`);
+  }
+  check("CJK copy has no space after a full-width colon", colonGap.length === 0, colonGap.join(", "));
+  // The plain-text export warning must name every bookmark service whose token it writes.
+  for (const loc of LOCALES) {
+    const hint = msgs[loc].backupIncludeSecretsHint?.message || "";
+    check(`${loc}.backupIncludeSecretsHint lists the Pinboard, Karakeep and linkding tokens`,
+      /Pinboard/.test(hint) && /Karakeep/.test(hint) && /linkding/.test(hint), hint);
+  }
   console.log(`PASS ${pass} | FAIL ${fail}`);
 })();
 </script></body></html>

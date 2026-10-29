@@ -96,7 +96,7 @@
           <span class="key-wrap"><input type="password" id="opt-pinboard-token" placeholder="username:XXXXXXXXXXXXXX" data-i18n-placeholder="loginTokenPlaceholder" autocomplete="off" spellcheck="false" />
           <button type="button" class="key-toggle" data-target="opt-pinboard-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
           <span id="token-format-warn" class="field-warn" data-i18n="loginInvalidFormat">Invalid format. Use username:TOKEN</span>
-          <p class="hint"><span data-i18n="hintApiToken">Get your token at</span> <a href="https://pinboard.in/settings/password" target="_blank" rel="noopener">pinboard.in/settings/password</a></p>
+          <p class="hint"><span data-i18n="hintApiToken">Get your token at</span><a href="https://pinboard.in/settings/password" target="_blank" rel="noopener">pinboard.in/settings/password</a></p>
           <p class="hint" data-i18n="tokenLocalHint">Your token stays in this browser and is sent only to Pinboard. It reaches your other devices only if you sync API keys and tokens.</p>
           <div class="fg-actions">
             <button class="btn btn-sm" id="test-pinboard-token" data-i18n="testConnection">Test connection</button>
@@ -1595,7 +1595,7 @@
         </div>
         <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-backup-include-secrets" aria-describedby="backup-secrets-warning" /> <span class="switch-text" data-i18n="backupIncludeSecretsLabel">Include API keys and tokens in backups</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
-        <p class="hint hint-warn" id="backup-secrets-warning" data-i18n="backupIncludeSecretsHint" hidden>Writes every credential to the file in plain text: your bookmark service tokens, all AI provider keys, and the Jina, Wayback, Anki, Eudic, Notion, Gist and Webhook credentials. Anyone who opens the file can use them. Keep it where you would keep a password.</p>
+        <p class="hint hint-warn" id="backup-secrets-warning" data-i18n="backupIncludeSecretsHint" hidden>Writes every credential to the file in plain text: your Pinboard, Karakeep and linkding API tokens, your access gateway credentials, all AI provider keys, and the Jina, Wayback, Anki, Eudic, Notion, Gist and Webhook credentials. Anyone who opens the file can use them. Keep it where you would keep a password.</p>
         <div class="backup-actions fg-actions">
           <button class="btn" id="export-settings" data-i18n="exportSettings">Export backup</button>
           <button type="button" class="btn" id="import-settings" title="Import from a JSON backup file" data-i18n="importSettings" data-i18n-title="importSettingsTitle">Import backup</button>

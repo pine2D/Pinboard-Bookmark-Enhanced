@@ -1021,6 +1021,10 @@ html[data-theme] .panel-foot a { color: var(--opt-fg-hint, var(--opt-fg-muted));
    links) keeps the .btn recipe's ink -- (0,1,1) used to beat .btn's (0,1,0)
    and painted accent text on the button fills, 3.4-3.7:1 on hover. */
 .hint a:not(.btn) { color: var(--opt-link); }
+/* The sentence before the Pinboard token link ends in a full-width colon in
+   Chinese and Japanese, which already carries its own gap; every other language
+   needs the word space the markup no longer holds. */
+[data-i18n="hintApiToken"]:not(:lang(zh)):not(:lang(ja))::after { content: " "; }
 .hint code { background: var(--opt-code-bg); border-radius: var(--opt-radius-sm); padding: 1px var(--opt-sp-2); font-size: 11px; font-family: "SF Mono", Consolas, Menlo, "Liberation Mono", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", "Noto Sans SC", "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", monospace; }
 /* A hint slot that doubles as a failure report (tag governance's AI status,
    Batch's legacy-permission line): setStatusIcon() adds .bad, so the themed
