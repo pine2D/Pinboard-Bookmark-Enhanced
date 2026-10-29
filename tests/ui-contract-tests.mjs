@@ -7774,6 +7774,20 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
     "options.css: a checked .pick radio must draw a round currentColor dot (composer pickRules: radius-full, background currentColor, border 0, transform none, square box) -- found " + JSON.stringify([...dot]));
 }
 
+// Options critique 6, CC-03: the checkbox square keeps a 4px corner on every
+// theme. The generated .pick-box rule reads --opt-radius-box, the hand-written
+// :root declares it as 4px, and no other block (a theme, a density tier, a
+// media query) redeclares it -- the per-pilot radius-sm ladder once rounded
+// the 20px box to 8px on catppuccin-latte, nearly the radio's circle.
+{
+  const boxRadius = declarationValueMap(optionsCss, ".pick-box > .pick-mark").get("border-radius");
+  const decls = parseStyleRules(optionsCss).flatMap((r) => parseDeclarations(r.body)
+    .filter((d) => d.property === "--opt-radius-box").map((d) => ({ sel: r.selectors.join(", "), value: d.value })));
+  check(boxRadius === "var(--opt-radius-box)" && decls.length === 1 && decls[0].sel === ":root" && decls[0].value === "4px",
+    "options.css: the .pick-box mark must round with var(--opt-radius-box), declared once as 4px on :root and never per theme (CC-03) -- found " +
+    JSON.stringify({ boxRadius, decls }));
+}
+
 // Options critique 6, user ruling U2 (supersedes stage-3c N1 and the 10-21
 // critique-5 btn-bg well): a disabled .pick mark is the same mark, fainter --
 // a --opt-border-section outline on NO fill, checked or not, with the tick /

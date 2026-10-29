@@ -263,9 +263,13 @@ for (const ns of NS_LIST) {
 //     -- its pilot sets radius-sm/md to 2/4px and the recipe inherits that
 //     without a single :not([data-theme="terminal"]) anywhere. A literal
 //     would opt that one rule out of every theme's scale at once.
+//     One deliberate non-ladder token: options' --opt-radius-box, the
+//     checkbox square's FIXED 4px corner (options critique 6, CC-03), a
+//     hand-written :root geometry invariant that no theme redeclares
+//     (tests/ui-contract-tests.mjs pins that half).
 // ---------------------------------------------------------------------------
 {
-  const OK_RE = /^var\(--(?:pp|opt|lib)-radius-(?:sm|md|lg|full)\)$|^inherit$/;
+  const OK_RE = /^var\(--(?:pp|opt|lib)-radius-(?:sm|md|lg|full)\)$|^var\(--opt-radius-box\)$|^inherit$/;
   for (const ns of NS_LIST) {
     for (const r of FAMILIES.flatMap(f => familyRules(ns, f))) {
       for (const [prop, value] of r.decls) {

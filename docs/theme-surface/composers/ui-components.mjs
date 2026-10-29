@@ -1105,7 +1105,10 @@ function pickRules(ns) {
       ["position", "relative"],
       ["transition", `background ${motion(ns)}, border-color ${motion(ns)}`],
     ]),
-    rule(".pick-box > .pick-mark", [["border-radius", `var(--${ns}-radius-sm)`]]),
+    // The checkbox square keeps a fixed 4px corner on every theme: a
+    // hand-written :root geometry token, never re-derived per pilot (CC-03 --
+    // catppuccin-latte's 8px radius-sm made the 20px box nearly a circle).
+    rule(".pick-box > .pick-mark", [["border-radius", `var(--${ns}-radius-box)`]]),
     rule(".pick-mark::after", [
       ["content", "\"\""],
       ["position", "absolute"],

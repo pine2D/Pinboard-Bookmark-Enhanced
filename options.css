@@ -30,6 +30,11 @@ html { scrollbar-gutter: stable both-edges; }
   --opt-radius-md: 8px;
   --opt-radius-lg: 10px;
   --opt-radius-full: 9999px;
+  /* The checkbox square (.pick-box > .pick-mark). A geometry invariant, not a
+     theme step: the ladder above is re-derived per pilot, and catppuccin-
+     latte's 8px radius-sm rounded the 20px box 40% of the way to the radio
+     circle (options critique 6, CC-03). No theme block may redeclare it. */
+  --opt-radius-box: 4px;
 
   /* Spacing scale — 2026-07 density tokenization (Claude Design round 1).
      Same 8-step scale as popup's --pp-sp-*; options binds its layout-level
@@ -1428,7 +1433,7 @@ input[type="checkbox"], input[type="radio"] {
   transition: background var(--motion-state), border-color var(--motion-state);
 }
 .pick-box > .pick-mark {
-  border-radius: var(--opt-radius-sm);
+  border-radius: var(--opt-radius-box);
 }
 .pick-mark::after {
   content: "";
