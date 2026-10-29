@@ -1449,6 +1449,16 @@ input[type="checkbox"], input[type="radio"] {
 .pick > input:checked ~ .pick-mark::after {
   opacity: 1;
 }
+.pick > input[type="radio"] ~ .pick-mark::after {
+  inset: 0;
+  margin: auto;
+  width: 8px;
+  height: 8px;
+  border: 0;
+  border-radius: var(--opt-radius-full);
+  background: currentColor;
+  transform: none;
+}
 .pick:hover > .pick-mark {
   border-color: var(--opt-fg-muted);
 }

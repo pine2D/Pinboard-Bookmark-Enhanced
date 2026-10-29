@@ -7763,6 +7763,17 @@ for (const f of readdirSync(root).filter((n) => n.endsWith(".js"))) {
 check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[^}]*opacity:\s*0;[^}]*\}/.test(optionsCss),
   'options.css: .pick > input[type="radio"|"checkbox"] does not hide the native control with opacity: 0 (composer pickRules, ui-components.mjs)');
 
+// Options critique 6, user ruling U1: a checked radio draws a round dot and a
+// checkbox keeps its tick, so the two choice shapes never read as one control
+// in two corner radii. The dot rule is keyed on the input type (never on
+// `.pick-box`) and must replace the tick's border geometry outright.
+{
+  const dot = declarationValueMap(optionsCss, '.pick > input[type="radio"] ~ .pick-mark::after');
+  check(dot.get("border-radius") === "var(--opt-radius-full)" && dot.get("background") === "currentColor" &&
+    dot.get("border") === "0" && dot.get("transform") === "none" && dot.get("width") === dot.get("height"),
+    "options.css: a checked .pick radio must draw a round currentColor dot (composer pickRules: radius-full, background currentColor, border 0, transform none, square box) -- found " + JSON.stringify([...dot]));
+}
+
 // Stage-3c hand-off N1: a disabled-AND-checked .pick mark (no producer today
 // -- options-backup.js and renderStoragePanel force checked=false when
 // disabled) must fill with the hint role and a bg tick, not draw a hint tick

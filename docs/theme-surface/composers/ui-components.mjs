@@ -1018,8 +1018,9 @@ function switchRules(ns) {
 // checkbox list Task 2 wires up -- built on the same "hidden native input
 // covers the row, a CSS-drawn face carries the visible state cue" technique
 // as `.switch` above. Unlike `.switch` (fill = the whole state cue), the
-// mark stays a ring at rest and only fills + draws an L-shaped checkmark
-// border when checked -- the user picked this shape (scratchpad design "B",
+// mark stays a ring at rest and only fills when checked -- a white dot for
+// a radio, an L-shaped checkmark border for a checkbox (U1, 2026-10-29) --
+// the user picked this row shape (scratchpad design "B",
 // docs/superpowers/.../scratchpad/radio/index.html) specifically because
 // bookmarks' bgsave-mode/tag-sync-mode rows, popup-width's custom-number
 // row, and ai-content-source's help-annotated rows all carry copy too long
@@ -1122,6 +1123,23 @@ function pickRules(ns) {
       ["border-color", `var(--${ns}-accent)`],
     ], { pairColorWith: ".pick-mark" }),
     rule(".pick > input:checked ~ .pick-mark::after", [["opacity", "1"]]),
+    // A radio's checked face is a dot, a checkbox's is the tick above
+    // (2026-10-29 options critique 6, user ruling U1: overturns only the
+    // "tick" glyph of R11 -- row layout and the accent fill stay). The dot
+    // keys off the input TYPE, not `.pick-box`, so the glyph always says
+    // what the control is. 8px centred in the 18px content box; it paints
+    // the mark's own `color` (on-accent, or fg-hint when disabled) the way
+    // the tick's border does.
+    rule(".pick > input[type=\"radio\"] ~ .pick-mark::after", [
+      ["inset", "0"],
+      ["margin", "auto"],
+      ["width", "8px"],
+      ["height", "8px"],
+      ["border", "0"],
+      ["border-radius", `var(--${ns}-radius-full)`],
+      ["background", "currentColor"],
+      ["transform", "none"],
+    ], { pairColorWith: ".pick-mark" }),
     rule(".pick:hover > .pick-mark", [["border-color", `var(--${ns}-fg-muted)`]]),
     rule(".pick > input:focus-visible ~ .pick-mark", [
       ["outline", "none"],
