@@ -236,6 +236,33 @@ await suite("offline queue", async () => {
     assert(successes === 0, "success callback waits for durable acknowledgement");
     assert(queue.length === 1 && queue[0].queueId === "a", "item remains queued");
   });
+
+  await test("drain skips items the hook marks and reports failures to onFailure", async () => {
+    const run = async (hooks) => {
+      let queue = Q();
+      const sent = [];
+      const failures = [];
+      const outcomes = await pbpDrainOfflineQueue(["a", "b", "c"], {
+        getItem: (queueId) => queue.find((item) => item.queueId === queueId) || null,
+        sendItem: (item) => { sent.push(item.queueId); return item.queueId === "a" ? { result: { status: "failed", reason: "gateway_redirect" } } : true; },
+        removeItem: (queueId) => { queue = pbpOfflineQueueReduce(queue, { kind: "remove", queueId }); },
+        onSuccess: () => {},
+        ...hooks,
+        ...(hooks.onFailure ? { onFailure: async (item, delivered) => { await hooks.onFailure(item, delivered); failures.push([item.queueId, delivered.result.reason]); } } : {}),
+      });
+      return { queue, sent, failures, outcomes };
+    };
+    const hooked = await run({ skipItem: async (item) => item.queueId === "b", onFailure: () => {} });
+    assert(hooked.sent.join() === "a,c", "the marked item is never sent: " + hooked.sent.join());
+    assert(hooked.failures.length === 1 && hooked.failures[0].join() === "a,gateway_redirect", "the failed item reaches onFailure once");
+    assert(hooked.outcomes.map((o) => o.item.queueId).join() === "a,c", "a skipped item yields no outcome");
+    assert(hooked.queue.map((i) => i.queueId).join() === "a,b", "failed and skipped items stay queued");
+
+    const plain = await run({});
+    assert(plain.sent.join() === "a,b,c", "without hooks every item is sent");
+    assert(plain.outcomes.length === 3 && !plain.outcomes[0].acknowledged && plain.outcomes[1].acknowledged, "outcomes unchanged without hooks");
+    assert(plain.queue.map((i) => i.queueId).join() === "a", "only the failed item remains without hooks");
+  });
 });
 })();
 </script>

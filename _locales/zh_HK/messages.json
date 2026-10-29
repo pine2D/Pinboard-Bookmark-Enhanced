@@ -4900,6 +4900,14 @@
   "bookmarkErrAuth": {
     "message": "伺服器拒絕了 API 權杖。請在設定中檢查權杖，然後重新連線。"
   },
+  "offlineQueuePaused": {
+    "message": "已暫停自動重試：$REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
   "bookmarkServiceSettings": {
     "message": "選擇書籤服務"
   },

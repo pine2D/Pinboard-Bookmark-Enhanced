@@ -4900,6 +4900,14 @@
   "bookmarkErrAuth": {
     "message": "Der Server hat das API-Token abgelehnt. Das Token in den Einstellungen prüfen und erneut verbinden."
   },
+  "offlineQueuePaused": {
+    "message": "Automatisches erneutes Senden pausiert: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
   "bookmarkServiceSettings": {
     "message": "Lesezeichendienst wählen"
   },

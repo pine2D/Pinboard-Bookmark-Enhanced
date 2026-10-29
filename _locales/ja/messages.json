@@ -4900,6 +4900,14 @@
   "bookmarkErrAuth": {
     "message": "サーバーがAPIトークンを拒否しました。設定でトークンを確認し、再接続してください。"
   },
+  "offlineQueuePaused": {
+    "message": "自動再送を一時停止しました：$REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
   "bookmarkServiceSettings": {
     "message": "ブックマークサービスを選択"
   },

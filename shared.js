@@ -2078,15 +2078,20 @@ function pbpResolveOfflineQueueToken(currentToken, item) {
   return currentAccount && queuedAccount === currentAccount ? currentToken : "";
 }
 
-async function pbpDrainOfflineQueue(queueIds, { getItem, sendItem, removeItem, onSuccess }) {
+// skipItem (optional, may be async) leaves an item queued without sending it
+// and without an outcome; onFailure (optional) is awaited after each
+// unacknowledged delivery. Without either hook the drain is unchanged.
+async function pbpDrainOfflineQueue(queueIds, { getItem, sendItem, removeItem, onSuccess, skipItem, onFailure }) {
   const outcomes = [];
   for (const queueId of queueIds) {
     const item = await getItem(queueId);
     if (!item) continue;
+    if (skipItem && await skipItem(item)) continue;
     const delivered = await sendItem(item);
     const result = delivered?.result || delivered;
     if (result !== true && result?.status !== "saved" && result?.status !== "skipped") {
       outcomes.push({ item, result, acknowledged: false });
+      if (onFailure) await onFailure(item, delivered);
       continue;
     }
     await removeItem(queueId);

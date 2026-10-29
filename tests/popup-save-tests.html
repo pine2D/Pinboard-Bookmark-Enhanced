@@ -462,6 +462,32 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(message({ reason: "not_logged_in" }, "pinboard") === "batchNotLoggedIn", "pinboard copy changed");
     });
 
+    await testAsync("the queue bar shows the pause cause", async () => {
+      const tr = (key, ...args) => args.length ? `${key}:${args.join(":")}` : key;
+      const render = async (queue, pause) => {
+        const els = {};
+        for (const id of ["offline-queue-bar", "offline-queue-text", "offline-queue-list", "offline-queue-toggle"]) {
+          els[id] = { textContent: "", classList: { add() {}, remove() {} }, setAttribute() {}, removeChild() {} };
+        }
+        const win = {};
+        const chromeStub = {
+          runtime: { lastError: null, sendMessage: (message, callback) => callback(message.type === "get_offline_queue" ? { ok: true, queue, pause } : null) },
+          storage: { local: { get: async () => ({}) } },
+        };
+        new Function("window", "chrome", "$id", "t", "pbpBookmarkFailureKey", "pbpBookmarkAccountService", popupOfflineSource)(
+          win, chromeStub, (id) => els[id], tr, pbpBookmarkFailureKey, pbpBookmarkAccountService);
+        await win.PPOffline.refresh();
+        return els["offline-queue-text"].textContent;
+      };
+      const account = "linkding:https://b.example/:c1";
+      const pause = { account, reason: "gateway_denied" };
+      const paused = await render([{ queueId: "q1", url: "https://a.example/", account }], pause);
+      assert(paused === tr("offlineQueued", "1") + " · " + tr("offlineQueuePaused", tr("bookmarkErrGatewayDenied")), "pause cause missing: " + paused);
+      const other = await render([{ queueId: "q1", url: "https://a.example/", account: "alice" }], pause);
+      assert(other === tr("offlineQueued", "1"), "pause shown for an account with no queued item: " + other);
+      assert(/\$REASON\$/.test(enMessages.offlineQueuePaused?.message || ""), "en catalogue lacks offlineQueuePaused");
+    });
+
     // A queued save used to print "queued (offline)" in body colour even when
     // Pinboard itself answered 5xx (impeccable critique 2026-10-20).
     await testAsync("a queued save names its cause in the warning card and can be sent now", async () => {

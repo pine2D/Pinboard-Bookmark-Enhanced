@@ -77,7 +77,7 @@ function pbpBookmarkAsPost(bookmark) {
 }
 
 function pbpCreateBookmarkServiceClient(config) {
-  const {service, beforeRequest, fetchImpl = globalThis.fetch} = config || {};
+  const {service, beforeRequest, onResponseOk, fetchImpl = globalThis.fetch} = config || {};
   const base = pbpBookmarkEndpoint(config?.baseUrl);
   if (!["karakeep", "linkding"].includes(service) || !base || typeof beforeRequest !== "function" || typeof fetchImpl !== "function") {
     throw pbpBookmarkServiceError("invalid_request");
@@ -90,6 +90,13 @@ function pbpCreateBookmarkServiceClient(config) {
     if (!auth || typeof auth.token !== "string" || !auth.token) throw pbpBookmarkServiceError("account_changed");
     if (auth.headers !== undefined && !Array.isArray(auth.headers)) throw pbpBookmarkServiceError("invalid_request");
     return auth;
+  };
+  // Fire-and-forget success signal (the worker lifts an offline-queue pause);
+  // never awaited, never allowed to fail the request.
+  const responseOk = () => {
+    if (typeof onResponseOk !== "function") return;
+    try { onResponseOk(); }
+    catch (error) { console.warn("[bookmark-services] onResponseOk failed:", error?.name, error?.message); }
   };
   const request = async (path, method = "GET", body) => {
     const url = new URL(path, root);
@@ -115,7 +122,7 @@ function pbpCreateBookmarkServiceClient(config) {
     await guard();
     if (response.type === "opaqueredirect") throw pbpBookmarkServiceError("gateway_redirect");
     if (!response.ok) throw pbpBookmarkServiceError(pbpBookmarkResponseFailure(response, "status"), response.status);
-    if (response.status === 204) return {status:204, data:null};
+    if (response.status === 204) { responseOk(); return {status:204, data:null}; }
     let data;
     let text = "";
     try {
@@ -126,6 +133,7 @@ function pbpCreateBookmarkServiceClient(config) {
       throw pbpBookmarkServiceError(text === null ? "invalid_response" : pbpBookmarkResponseFailure(response, "body"));
     }
     await guard();
+    responseOk();
     return {status:response.status, data};
   };
   const validList = list => list && list.type === "manual" && list.public === false &&

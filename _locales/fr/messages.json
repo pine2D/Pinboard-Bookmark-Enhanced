@@ -4900,6 +4900,14 @@
   "bookmarkErrAuth": {
     "message": "Le serveur a refusé le jeton API. Vérifiez le jeton dans les paramètres, puis reconnectez-vous."
   },
+  "offlineQueuePaused": {
+    "message": "Nouvel essai automatique suspendu : $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
   "bookmarkServiceSettings": {
     "message": "Choisir le service de favoris"
   },

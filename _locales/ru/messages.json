@@ -4900,6 +4900,14 @@
   "bookmarkErrAuth": {
     "message": "Сервер отклонил токен API. Проверьте токен в настройках и подключитесь снова."
   },
+  "offlineQueuePaused": {
+    "message": "Автоматический повтор приостановлен: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
   "bookmarkServiceSettings": {
     "message": "Выбрать сервис закладок"
   },

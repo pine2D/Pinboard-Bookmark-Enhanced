@@ -613,6 +613,8 @@ function pbpBookmarkClient(auth) {
   return pbpCreateBookmarkServiceClient({
     service:auth.service, baseUrl:auth.baseUrl, readLaterListId:auth.readLaterListId,
     readLaterListName:t("bookmarkReadLaterListName"),
+    // Any answered request proves this connection passes its gateway again.
+    onResponseOk:() => void pbpClearOfflineQueuePause(auth.account),
     beforeRequest:async () => {
       const current = await getCurrentBookmarkAuth();
       if (!pbpBookmarkAuthIsCurrent(auth) || current.account !== auth.account || current.service !== auth.service || !current.token) throw pbpBookmarkServiceError("account_changed");
@@ -1119,7 +1121,55 @@ function sendOfflineItem(item) {
   });
 }
 
-function drainOfflineQueueIds(queueIds) {
+// Connection-level replay pause. A gateway that rejected a queued item will
+// reject the rest of that connection's items too, so automatic replay skips
+// the account until it reconnects, any request for it succeeds, or the user
+// retries by hand. A separate non-secret local key: queue records keep only
+// their listed fields. Runs on the queue's write tail; storage failures are
+// logged and swallowed (the pause is advisory, the queue stays intact).
+const PBP_OFFLINE_QUEUE_PAUSE_KEY = "offlineQueuePause";
+function pbpOfflineQueuePauseShape(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const { account, reason, ts } = value;
+  if (typeof account !== "string" || !account || typeof reason !== "string" || !reason || !Number.isFinite(ts)) return null;
+  return { account, reason, ts };
+}
+function pbpReadOfflineQueuePause() {
+  return runOfflineQueueWrite(async () => {
+    const stored = await chrome.storage.local.get(PBP_OFFLINE_QUEUE_PAUSE_KEY);
+    return pbpOfflineQueuePauseShape(stored?.[PBP_OFFLINE_QUEUE_PAUSE_KEY]);
+  }).catch((e) => {
+    console.warn("offline queue pause read failed:", e?.name, e?.message);
+    return null;
+  });
+}
+function pbpSetOfflineQueuePause(account, reason) {
+  return runOfflineQueueWrite(async () => {
+    await chrome.storage.local.set({ [PBP_OFFLINE_QUEUE_PAUSE_KEY]: { account, reason, ts: Date.now() } });
+  }).catch((e) => console.warn("offline queue pause write failed:", e?.name, e?.message));
+}
+// "" clears any pause; an account clears only its own. Reads first so the
+// per-request success signal does not write (or fire onChanged) when idle.
+function pbpClearOfflineQueuePause(account = "") {
+  return runOfflineQueueWrite(async () => {
+    const stored = await chrome.storage.local.get(PBP_OFFLINE_QUEUE_PAUSE_KEY);
+    const current = stored?.[PBP_OFFLINE_QUEUE_PAUSE_KEY];
+    if (current === undefined) return;
+    const pause = pbpOfflineQueuePauseShape(current);
+    if (account && pause && pause.account !== account) return;
+    await chrome.storage.local.remove(PBP_OFFLINE_QUEUE_PAUSE_KEY);
+  }).catch((e) => console.warn("offline queue pause clear failed:", e?.name, e?.message));
+}
+// A new self-hosted credential envelope (this device or synced in) is a reconnect.
+function pbpOfflinePauseOnCredentialChange(changes) {
+  if (!changes || !(changes.karakeepToken || changes.linkdingToken)) return Promise.resolve();
+  return pbpClearOfflineQueuePause();
+}
+
+// manual: a user-initiated retry ignores the pause (and lifts it first); the
+// automatic path skips paused accounts, starting from the stored pause.
+function drainOfflineQueueIds(queueIds, { manual = false, pausedAccount = "" } = {}) {
+  const paused = new Set(pausedAccount ? [pausedAccount] : []);
   return pbpDrainOfflineQueue(queueIds, {
     getItem: (queueId) => runOfflineQueueWrite(async () => {
       const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
@@ -1127,13 +1177,27 @@ function drainOfflineQueueIds(queueIds) {
         ? offlineQueue.find((item) => item?.queueId === queueId) || null
         : null;
     }),
+    ...(manual ? {} : { skipItem: (item) => typeof item.account === "string" && paused.has(item.account) }),
     // noteActivity: replay work is activity (same rationale as batch progress —
     // a long drain driven by the keepalive alarm must not idle-terminate
     // mid-run). typeof-guarded: source-slice test pages execute this function
     // without the keepalive block in scope.
-    sendItem: (item) => { if (typeof noteActivity === "function") noteActivity(); return sendOfflineItem(item); },
+    sendItem: async (item) => {
+      if (manual && typeof item.account === "string" && item.account) await pbpClearOfflineQueuePause(item.account);
+      if (typeof noteActivity === "function") noteActivity();
+      return sendOfflineItem(item);
+    },
     removeItem: (queueId) => mutateOfflineQueue({ kind: "remove", queueId }),
-    onSuccess: (_item, delivered) => applySaveResultSideEffects(delivered, delivered.settings, { auth: delivered.auth }),
+    onSuccess: async (item, delivered) => {
+      await applySaveResultSideEffects(delivered, delivered.settings, { auth: delivered.auth });
+      if (typeof item.account === "string" && item.account) await pbpClearOfflineQueuePause(item.account);
+    },
+    onFailure: async (item, delivered) => {
+      const reason = (delivered?.result || delivered)?.reason;
+      if (!PBP_BOOKMARK_GATEWAY_CODES.includes(reason) || typeof item.account !== "string" || !item.account) return;
+      paused.add(item.account);
+      await pbpSetOfflineQueuePause(item.account, reason);
+    },
   });
 }
 
@@ -1144,7 +1208,8 @@ function processOfflineQueue() {
   const operation = runOfflineQueueConsumer(async () => {
     const snapshot = await readOfflineQueueWithIds();
     if (!snapshot.length) return;
-    await drainOfflineQueueIds(snapshot.map((item) => item?.queueId).filter(Boolean));
+    const pause = await pbpReadOfflineQueuePause();
+    await drainOfflineQueueIds(snapshot.map((item) => item?.queueId).filter(Boolean), { pausedAccount: pause?.account || "" });
   });
   const drain = operation.finally(() => {
     if (_offlineQueueDrain === drain) _offlineQueueDrain = null;
@@ -1160,7 +1225,7 @@ function retryOfflineItem(queueId) {
   return runOfflineQueueConsumer(async () => {
     try {
       await readOfflineQueueWithIds();
-      const outcomes = await drainOfflineQueueIds([queueId]);
+      const outcomes = await drainOfflineQueueIds([queueId], { manual: true });
       const outcome = outcomes[0];
       return outcome
         ? { ok: outcome.acknowledged, result: outcome.result }
@@ -3431,7 +3496,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if ((area === "sync" || area === "local") && pbpSettingsKeysChanged(changes)) {
     invalidateSettingsCache();
   }
-  if (area === "sync" || area === "local") scheduleEffectiveAuthRefresh(changes, area);
+  if (area === "sync" || area === "local") {
+    scheduleEffectiveAuthRefresh(changes, area);
+    pbpOfflinePauseOnCredentialChange(changes);
+  }
   if ((area === "sync" || area === "local") && (changes.personalLibraryAccount || changes.optSyncEnabled)) {
     _personalLibraryEpoch++;
     driveScopeEpoch++;
@@ -4138,8 +4206,9 @@ function handleRuntimeMessage(message, sender, sendResponse) {
   }
 
   if (message.type === "get_offline_queue") {
-    readOfflineQueueWithIds()
-      .then((queue) => sendResponse({ ok: true, queue }))
+    // pbpReadOfflineQueuePause never rejects; a failed read reports no pause.
+    Promise.all([readOfflineQueueWithIds(), pbpReadOfflineQueuePause()])
+      .then(([queue, pause]) => sendResponse({ ok: true, queue, pause: pause ? { account: pause.account, reason: pause.reason } : null }))
       .catch(() => sendResponse({ ok: false, queue: [] }));
     return true;
   }

@@ -4894,6 +4894,14 @@
   "bookmarkErrAuth": {
     "message": "服务器拒绝了 API 令牌。请在设置中检查令牌，然后重新连接。"
   },
+  "offlineQueuePaused": {
+    "message": "自动重试已暂停：$REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
   "bookmarkServiceSettings": {
     "message": "选择书签服务"
   },

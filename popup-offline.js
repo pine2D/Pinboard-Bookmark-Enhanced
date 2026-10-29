@@ -19,23 +19,36 @@
     return t("offlineDayAgo", String(d));
   }
 
-  async function getQueue() {
+  // { queue, pause }: pause is the worker's connection-level replay pause
+  // ({account, reason}) or null.
+  async function getQueueState() {
     const response = await new Promise((resolve) => {
       chrome.runtime.sendMessage({ type: "get_offline_queue" }, (resp) => {
         if (chrome.runtime.lastError) { resolve(null); return; }
         resolve(resp);
       });
     });
-    if (response?.ok && Array.isArray(response.queue)) return response.queue;
-    const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
-    return offlineQueue;
+    if (response?.ok && Array.isArray(response.queue)) return { queue: response.queue, pause: response.pause || null };
+    const { offlineQueue = [], offlineQueuePause = null } = await chrome.storage.local.get(["offlineQueue", "offlineQueuePause"]);
+    return { queue: Array.isArray(offlineQueue) ? offlineQueue : [], pause: offlineQueuePause };
+  }
+  async function getQueue() {
+    return (await getQueueState()).queue;
+  }
+
+  // The pause only matters while that connection still has queued items.
+  function pauseText(queue, pause) {
+    if (!pause || typeof pause.account !== "string" || !pause.account || typeof pause.reason !== "string") return "";
+    if (!queue.some((item) => item?.account === pause.account)) return "";
+    const key = pbpBookmarkFailureKey({ reason: pause.reason }, pbpBookmarkAccountService(pause.account));
+    return key ? t("offlineQueuePaused", t(key)) : "";
   }
   // NOTE: no setQueue() here — the offline queue is mutated ONLY by the SW
   // (background.js mutateOfflineQueue, single-writer mutex, D1). The popup reads
   // via getQueue() and sends messages for retry/remove; it never writes directly.
 
   async function refreshBar() {
-    const q = await getQueue();
+    const { queue: q, pause } = await getQueueState();
     const bar = $id("offline-queue-bar");
     const text = $id("offline-queue-text");
     if (!bar || !text) return;
@@ -45,7 +58,8 @@
       return;
     }
     bar.classList.remove("hidden");
-    text.textContent = t("offlineQueued", String(q.length));
+    const paused = pauseText(q, pause);
+    text.textContent = t("offlineQueued", String(q.length)) + (paused ? " · " + paused : "");
     if (expanded) renderList(q);
   }
 
@@ -230,7 +244,7 @@
     // React to storage changes so the list updates after background auto-retries
     if (chrome?.storage?.onChanged) {
       chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === "local" && changes.offlineQueue) refreshBar();
+        if (area === "local" && (changes.offlineQueue || changes.offlineQueuePause)) refreshBar();
       });
     }
   }

@@ -152,7 +152,7 @@ async function workerHarness(service, replies, options = {}) {
   const end = workerSource.indexOf("// ---- P1: Shared save function ----", start);
   const settings = {...SETTINGS_DEFAULTS, bookmarkService:service, pinboardToken:"", offlineQueueEnabled:true,
     [service + "Url"]:"https://bookmarks.example/base/", [service + "Token"]:JSON.stringify({v:1,baseUrl:"https://bookmarks.example/base/",token:"fixture-secret",connectionId:"connection1",userId:"user1"})};
-  const state = {settings, epoch:0, permitted:true, calls:[], queue:[], cache:new Map(), sideEffects:[], ...options};
+  const state = {settings, epoch:0, permitted:true, calls:[], queue:[], local:{}, sends:0, cache:new Map(), sideEffects:[], ...options};
   const auth = async () => ({...pbpBookmarkConnection(settings), epoch:state.epoch});
   const deps = {
     console, t:key=>key, statusCache:state.cache,
@@ -173,11 +173,18 @@ async function workerHarness(service, replies, options = {}) {
       if(next instanceof Response||typeof next.type==="string")return next;
       return new Response(next[0]===204?null:JSON.stringify(next[1]),{status:next[0],headers:{"Content-Type":"application/json"}});
     }}),
+    // noteActivity runs once per replay attempt, so it counts sendOfflineItem calls.
+    noteActivity:()=>{state.sends++;},
     chrome:{permissions:{contains:async()=>state.permitted},tabs:{query:async()=>[]},storage:{local:{
-      get:async()=>({offlineQueue:state.queue}),set:async value=>{if(value.offlineQueue)state.queue=value.offlineQueue;}
+      // Generic key-value store; offlineQueue stays mirrored in state.queue.
+      get:async keys=>{const all={...state.local,offlineQueue:state.queue};if(keys==null)return all;
+        if(typeof keys==="object"&&!Array.isArray(keys))return Object.fromEntries(Object.keys(keys).map(k=>[k,all[k]!==undefined?all[k]:keys[k]]));
+        return Object.fromEntries([].concat(keys).filter(k=>all[k]!==undefined).map(k=>[k,all[k]]));},
+      set:async value=>{for(const [k,v] of Object.entries(value)){if(k==="offlineQueue")state.queue=v;else state.local[k]=v;}},
+      remove:async keys=>{for(const k of [].concat(keys)){if(k==="offlineQueue")state.queue=[];else delete state.local[k];}}
     }}}
   };
-  const api = new Function(...Object.keys(deps),workerSource.slice(start,end)+";return {submitSaveIntent,sendOfflineItem,verifyConnection:pbpVerifyBookmarkConnection};")(...Object.values(deps));
+  const api = new Function(...Object.keys(deps),workerSource.slice(start,end)+";return {submitSaveIntent,sendOfflineItem,verifyConnection:pbpVerifyBookmarkConnection,processOfflineQueue,retryOfflineItem,pbpOfflinePauseOnCredentialChange,readPause:pbpReadOfflineQueuePause,client:pbpBookmarkClient};")(...Object.values(deps));
   return {...api,state,auth};
 }
 const saveIntent = {mode:"create",url:pageUrl,title:"Title",notes:"Note",tags:"work",private:true,toread:false};
@@ -290,6 +297,61 @@ test("gateway failures are not queued and stay non-retryable", async () => {
     const result = await h.submitSaveIntent(saveIntent);
     equal([result.status, result.reason, h.state.queue], ["failed", code, []]);
   }
+});
+// Offline pause: a gateway that keeps rejecting one connection stops automatic replay for it.
+test("a gateway failure on replay pauses automatic retry for that connection", async () => {
+  const replies = [new TypeError("offline"), new TypeError("offline")];
+  const h = await workerHarness("linkding", replies);
+  for (const n of [0, 1]) equal((await h.submitSaveIntent({...saveIntent, url:pageUrl + "?n=" + n})).status, "queued");
+  const account = (await h.auth()).account;
+  h.state.calls = []; replies.push(gwRedirect(), gwRedirect());
+  await h.processOfflineQueue();
+  equal(h.state.calls.length, 1);
+  const pause = h.state.local.offlineQueuePause;
+  equal([pause?.account, pause?.reason], [account, "gateway_redirect"]); ok(Number.isFinite(pause.ts));
+  ok(!JSON.stringify(pause).includes("fixture-secret")); ok(!JSON.stringify(h.state.queue).includes("gateway"));
+  h.state.calls = [];
+  await h.processOfflineQueue();
+  equal(h.state.calls.length, 0); equal(h.state.queue.length, 2);
+});
+test("pause skips only the paused account", async () => {
+  const h = await workerHarness("linkding", [new TypeError("offline")]);
+  equal((await h.submitSaveIntent(saveIntent)).status, "queued");
+  const account = (await h.auth()).account;
+  const record = h.state.queue[0];
+  h.state.queue.push({...record, queueId:"pin1", account:"alice"}, {...record, queueId:"kk1", account:"karakeep:https://k.example/:u9"});
+  h.state.local.offlineQueuePause = {account, reason:"gateway_denied", ts:1};
+  h.state.calls = []; h.state.sends = 0;
+  await h.processOfflineQueue();
+  equal(h.state.sends, 2); equal(h.state.calls.length, 0);
+  equal(h.state.queue.map(item => item.queueId), [record.queueId, "pin1", "kk1"]);
+  equal(h.state.local.offlineQueuePause, {account, reason:"gateway_denied", ts:1});
+});
+test("credential change, a successful request or a manual retry lifts the pause", async () => {
+  const replies = [];
+  const h = await workerHarness("linkding", replies);
+  const account = (await h.auth()).account;
+  const pause = (who = account, reason = "gateway_denied") => { h.state.local.offlineQueuePause = {account:who, reason, ts:1}; };
+  pause(); await h.pbpOfflinePauseOnCredentialChange({optTheme:{newValue:"dark"}}); ok(await h.readPause());
+  await h.pbpOfflinePauseOnCredentialChange({linkdingToken:{}}); equal(await h.readPause(), null);
+  pause(); await h.pbpOfflinePauseOnCredentialChange({karakeepToken:{}}); equal(await h.readPause(), null);
+
+  pause("karakeep:https://k.example/:u9"); replies.push([200, {bookmark:null}]);
+  equal(await h.client(await h.auth()).lookup(pageUrl), null); ok(await h.readPause());
+  pause(); replies.push([200, {bookmark:null}]);
+  equal(await h.client(await h.auth()).lookup(pageUrl), null); equal(await h.readPause(), null);
+  pause(); replies.push([204, null]);
+  equal(await h.client(await h.auth()).remove({id:"7"}), true); equal(await h.readPause(), null);
+
+  replies.push(new TypeError("offline"));
+  const queued = await h.submitSaveIntent(saveIntent); equal(queued.status, "queued");
+  pause(); replies.push(new TypeError("offline")); h.state.calls = [];
+  equal((await h.retryOfflineItem(queued.queueId)).result.reason, "network"); equal(h.state.calls.length, 1); equal(await h.readPause(), null);
+  pause(); replies.push(gwRedirect());
+  equal((await h.retryOfflineItem(queued.queueId)).result.reason, "gateway_redirect"); equal((await h.readPause())?.reason, "gateway_redirect");
+  replies.push([200, {bookmark:null}], [201, ld]); h.state.calls = [];
+  equal((await h.retryOfflineItem(queued.queueId)).ok, true); equal(h.state.calls.length, 2);
+  equal(await h.readPause(), null); equal(h.state.queue, []);
 });
 test("fetch failures log name and message without header values", async () => {
   const warns = [], original = console.warn; console.warn = (...args) => warns.push(args);

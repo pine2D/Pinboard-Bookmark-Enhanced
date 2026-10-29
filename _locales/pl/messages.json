@@ -4900,6 +4900,14 @@
   "bookmarkErrAuth": {
     "message": "Serwer odrzucił token API. Sprawdź token w ustawieniach i połącz ponownie."
   },
+  "offlineQueuePaused": {
+    "message": "Automatyczne ponawianie wstrzymane: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
   "bookmarkServiceSettings": {
     "message": "Wybierz usługę zakładek"
   },

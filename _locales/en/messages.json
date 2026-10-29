@@ -4908,6 +4908,14 @@
   "bookmarkErrAuth": {
     "message": "The server rejected the API token. Check the token in Settings, then reconnect."
   },
+  "offlineQueuePaused": {
+    "message": "Automatic retry paused: $REASON$",
+    "placeholders": {
+      "reason": {
+        "content": "$1"
+      }
+    }
+  },
   "bookmarkServiceSettings": {
     "message": "Choose bookmark service"
   },
