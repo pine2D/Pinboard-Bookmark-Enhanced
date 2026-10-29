@@ -1019,6 +1019,27 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
   // `page.keyboard.press`, which DOES send trusted input, is not exposed to
   // in-page test code and run-test.mjs runs every suite through one generic,
   // no-per-suite-automation driver -- see its header).
+  // Options critique 6 (TH-1, U10): the five radio groups are written one way.
+  // Every radio sits in a `.pref-group-radio[role=radiogroup]` whose
+  // aria-labelledby names a visible group title (a `.bl.subhead`, or the
+  // section h2 for AI content source); no ancestor re-names the group with a
+  // role=group, and the group title never doubles as a <label> of one radio or
+  // of the custom-width field (the loose-label binder used to bind it).
+  test("every radio group is one named radiogroup and its title labels no single control", () => {
+    const names = [...new Set([...doc.querySelectorAll('input[type="radio"]')]
+      .filter((r) => !r.closest(".tag-gov-chip")).map((r) => r.name))];
+    assert(names.length === 5, "expected the five settings radio groups, got " + names.join(", "));
+    for (const name of names) {
+      const radios = [...doc.querySelectorAll(`input[type="radio"][name="${name}"]`)];
+      const group = radios[0].closest('.pref-group-radio[role="radiogroup"]');
+      assert(group && radios.every((r) => r.closest('[role="radiogroup"]') === group), name + ": radios are not all inside one .pref-group-radio[role=radiogroup]");
+      const title = doc.getElementById(group.getAttribute("aria-labelledby") || "");
+      assert(title && title.matches(".bl.subhead, h2.section-title") && title.textContent.trim(), name + ": radiogroup is not named by a visible group title");
+      assert(!group.parentElement.closest('[role="group"]'), name + ": an ancestor role=group re-names the radio group");
+      assert(!(title.matches("label") && title.htmlFor), name + ": the group title is bound to a control (for=" + title.htmlFor + ")");
+    }
+  });
+
   test("bgsave-mode's .pick radios stay a native, keyboard-operable name group", () => {
     showPanel("panel-bookmarks");
     const radios = [...doc.querySelectorAll('.pref-group-radio input[name="bgsave-mode"]')];

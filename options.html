@@ -82,7 +82,7 @@
       <section class="settings-section">
         <h2 class="section-title" data-i18n="bookmarkServiceTitle">Bookmark service</h2>
         <div class="fg entry-block">
-          <div class="bl" id="bookmark-service-label" data-i18n="bookmarkServiceChoose">Choose where to save bookmarks</div>
+          <div class="bl subhead" id="bookmark-service-label" data-i18n="bookmarkServiceChoose">Choose where to save bookmarks</div>
           <div class="pref-group pref-group-radio" role="radiogroup" aria-labelledby="bookmark-service-label">
             <div class="pref-row"><label class="pick"><input type="radio" name="bookmark-service" value="pinboard" /> <span class="pick-text">Pinboard</span><span class="pick-mark" aria-hidden="true"></span></label></div>
             <div class="pref-row"><label class="pick"><input type="radio" name="bookmark-service" value="karakeep" /> <span class="pick-text">Karakeep</span><span class="pick-mark" aria-hidden="true"></span></label></div>
@@ -284,13 +284,13 @@
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-auto-close" checked /> <span class="switch-text" data-i18n="optAutoClose">Auto-close popup after save</span><span class="switch-track" aria-hidden="true"></span></label></div>
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="offline-queue-enabled" checked /> <span class="switch-text" data-i18n="optOfflineQueue">Enable offline save queue</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
-        <div class="fg entry-block context-help-host" data-help-role="field" role="group" aria-labelledby="popup-width-label">
+        <div class="fg entry-block context-help-host" data-help-role="field">
           <label class="bl subhead" id="popup-width-label" data-i18n="optPopupWidthTitle">Popup width</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
             <p class="hint context-help-body" data-i18n="optPopupWidthHelp">Range: 420–720px (stays under Chrome's 800px popup limit)</p>
           </details>
-          <div class="pref-group pref-group-radio">
+          <div class="pref-group pref-group-radio" role="radiogroup" aria-labelledby="popup-width-label">
             <div class="pref-row"><label class="pick"><input type="radio" name="popup-width-preset" value="450" /> <span class="pick-text" data-i18n="optPopupWidth450">Compact (450px)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
             <div class="pref-row"><label class="pick"><input type="radio" name="popup-width-preset" value="550" /> <span class="pick-text" data-i18n="optPopupWidth550">Standard (550px)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
             <div class="pref-row"><label class="pick"><input type="radio" name="popup-width-preset" value="650" /> <span class="pick-text" data-i18n="optPopupWidth650">Wide (650px)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
@@ -341,9 +341,9 @@
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-private-incognito" checked /> <span class="switch-text" data-i18n="optPrivateIncognito">Private in Incognito</span><span class="switch-track" aria-hidden="true"></span></label></div>
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-readlater-default" /> <span class="switch-text" data-i18n="optReadlaterDefault">Read Later by default</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
-        <div class="fg entry-block" role="group" aria-labelledby="bgsave-mode-label">
+        <div class="fg entry-block">
           <label class="bl subhead" id="bgsave-mode-label" data-i18n="optBgSaveMode">When a shortcut save finds an existing bookmark</label>
-          <div class="pref-group pref-group-radio">
+          <div class="pref-group pref-group-radio" role="radiogroup" aria-labelledby="bgsave-mode-label">
             <div class="pref-row"><label class="pick"><input type="radio" name="bgsave-mode" id="opt-bgsave-merge" value="merge" /> <span class="pick-text" data-i18n="optBgSaveModeMerge">Merge (default, combines new tags with existing)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
             <div class="pref-row"><label class="pick"><input type="radio" name="bgsave-mode" id="opt-bgsave-skip" value="skip" /> <span class="pick-text" data-i18n="optBgSaveModeSkip">Skip (if URL already saved, do nothing)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
             <div class="pref-row"><label class="pick"><input type="radio" name="bgsave-mode" id="opt-bgsave-overwrite" value="overwrite" /> <span class="pick-text" data-i18n="optBgSaveModeOverwrite">Overwrite (replace all tags, no merge)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
@@ -363,13 +363,13 @@
         <div class="pref-group">
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-respect-tag-case" checked /> <span class="switch-text" data-i18n="optRespectTagCase">Match the casing of existing tags (the most-used form wins)</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
-        <div class="fg entry-block context-help-host" data-help-role="field" role="group" aria-labelledby="tag-sync-label">
+        <div class="fg entry-block context-help-host" data-help-role="field">
           <label class="bl subhead" id="tag-sync-label" data-i18n="tagSyncLabel">Tag Cache Strategy</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
             <p class="hint context-help-body" data-i18n="tagSyncHint">Choose when to load your existing tags for autocomplete. Loading tags does not change them on the server.</p>
           </details>
-          <div class="pref-group pref-group-radio">
+          <div class="pref-group pref-group-radio" role="radiogroup" aria-labelledby="tag-sync-label">
             <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-cached" value="cached" checked /> <span class="pick-text" data-i18n="tagSyncCached">Cached (default, refreshes after 10 min)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
             <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-fresh" value="fresh" /> <span class="pick-text" data-i18n="tagSyncFresh">Live (fetches each time the popup opens, slower)</span><span class="pick-mark" aria-hidden="true"></span></label></div>
             <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-prewarmed" value="prewarmed" /> <span class="pick-text" data-i18n="tagSyncPrewarmed">Prewarmed (background fetch every 15 min, instant popup)</span><span class="pick-mark" aria-hidden="true"></span></label></div>

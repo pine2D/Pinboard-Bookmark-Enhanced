@@ -526,7 +526,10 @@ function pbpBuildSettingsSearchIndex(root = document) {
       let weak = false;
       const isSectionName = node.matches("summary");
       const labelledButton = node.parentElement?.tagName === "BUTTON" ? node.parentElement : null;
-      if (node.matches("label")) target = node.htmlFor || node.querySelector("input,select,textarea,button")?.id || "";
+      // A radio group's name (an unbound label.bl.subhead, TH-1) jumps to the
+      // first addressable control inside the group it names.
+      if (node.matches("label")) target = node.htmlFor || node.querySelector("input,select,textarea,button")?.id ||
+        (node.id && panelEl.querySelector(`[role="radiogroup"][aria-labelledby~="${node.id}"] input[id]`)?.id) || "";
       // A section name owns no control of its own: aim at the first control in
       // the <details> it opens (pbpOpenOptionsTarget expands the ancestors on
       // the way in), falling back to the body itself when it holds none.
@@ -1429,8 +1432,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   // md-preview.js use, over the key the <h1> already shows.
   document.title = t("optTitle");
 
+  // A label that names a radio GROUP (popup width, shortcut-save conflict,
+  // tag cache strategy -- the group's aria-labelledby points at it) labels
+  // no single control: binding it to the box's first input[id] made it a
+  // second accessible name of one radio, or of the custom-width number field
+  // (options critique 6, TH-1).
+  const pbpNamesRadioGroup = (label, scope) => !!label.id &&
+    !!scope.querySelector(`[role="radiogroup"][aria-labelledby~="${label.id}"]`);
   function pbpBindLooseLabels(root) {
     (root || document).querySelectorAll("label.bl:not([for])").forEach((label) => {
+      if (pbpNamesRadioGroup(label, root || document)) return;
       const box = label.parentElement;
       const control = box && box.querySelector("input[id], select[id], textarea[id]");
       if (control) label.htmlFor = control.id;
