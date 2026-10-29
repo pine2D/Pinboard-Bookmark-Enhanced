@@ -807,7 +807,7 @@ options 的 contrast-audit 字段段合计：配对行每块 8 行（聚焦边 2
 | 语义 | 控件 | 未选中 | 选中 | 禁用 |
 |---|---|---|---|---|
 | 改了立刻生效的长期开关 | `.switch`（轨道，`input` 带 `role="switch"`） | `--opt-border` 轨道 | `--opt-accent` 轨道 | `btn-bg` 浅填充加 `--opt-border` 内描边（轨道本是实心图形，不变） |
-| 多选一 | `.pick`（圆形单选） | 1px `--opt-border` 细描边圆、透明底 | `--opt-accent` 实心圆，中间 8px **白色圆点**（`::after` 取 `currentColor` 即 `--opt-on-accent`） | 同一图形变淡：`--opt-border-section` 描边、透明底，选中的圆点改 `--opt-fg-hint` |
+| 多选一 | `.pick`（圆形单选） | 1px `--opt-border` 细描边圆、透明底 | `--opt-accent` 实心圆，中间 8px **on-accent 圆点**（多数主题为白；`::after` 取 `currentColor` 即 `--opt-on-accent`，dracula 这类浅色 accent 主题上是深色，与勾同色） | 同一图形变淡：`--opt-border-section` 描边、透明底，选中的圆点改 `--opt-fg-hint` |
 | 勾几项、再交给按钮执行 | `.pick.pick-box`（方形勾选框，圆角固定 `--opt-radius-box` = 4px，不随主题） | 1px `--opt-border` 细描边方框 | `--opt-accent` 实心方块加白勾；只勾了一部分时（`:indeterminate`，仅 checkbox）画 10px 横杠 | 同一图形变淡：`--opt-border-section` 描边、**透明底，不加灰填充**，选中的勾改 `--opt-fg-hint` |
 
 - 禁用描边的地板是 contrast-audit 的 `border-section vs panel` ≥ 1.1（`defaultStrict`，terminal 的 8 位色合成到 panel 上再量）；
