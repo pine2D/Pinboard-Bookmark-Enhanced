@@ -1660,8 +1660,8 @@
         </div>
         <p class="hint hint-warn" id="backup-secrets-warning" data-i18n="backupIncludeSecretsHint" hidden>Writes every credential to the file in plain text: your Pinboard, Karakeep and linkding API tokens, your access gateway credentials, all AI provider keys, and the Jina, Wayback, Anki, Eudic, Notion, Gist and Webhook credentials. Anyone who opens the file can use them. Keep it where you would keep a password.</p>
         <div class="backup-actions fg-actions">
-          <button class="btn" id="export-settings" data-i18n="exportSettings">Export backup</button>
-          <button type="button" class="btn" id="import-settings" title="Import from a JSON backup file" data-i18n="importSettings" data-i18n-title="importSettingsTitle">Import backup</button>
+          <button class="btn btn-sm" id="export-settings" data-i18n="exportSettings">Export backup</button>
+          <button type="button" class="btn btn-sm" id="import-settings" title="Import from a JSON backup file" data-i18n="importSettings" data-i18n-title="importSettingsTitle">Import backup</button>
           <input type="file" id="import-settings-file" accept=".json" hidden />
           <span class="save-status" id="import-status" role="status" aria-live="polite"></span>
         </div>
@@ -1690,8 +1690,8 @@
             </div>
           </fieldset>
           <div class="backup-apply-row fg-actions">
-            <button type="button" class="btn primary" id="backup-import-apply" data-i18n="backupApplySelected">Apply selected</button>
-            <button type="button" class="btn" id="backup-import-cancel" data-i18n="cancel">Cancel</button>
+            <button type="button" class="btn btn-sm primary" id="backup-import-apply" data-i18n="backupApplySelected">Apply selected</button>
+            <button type="button" class="btn btn-sm" id="backup-import-cancel" data-i18n="cancel">Cancel</button>
             <span id="backup-import-progress" role="status" aria-live="polite"></span>
           </div>
         </section>
@@ -1713,7 +1713,7 @@
         </div>
         <div id="storage-cats" class="storage-cats"></div>
         <div class="fg fg-actions">
-          <button type="button" class="btn" id="storage-clear-btn" data-i18n="storageClear">Clear selected</button>
+          <button type="button" class="btn btn-sm" id="storage-clear-btn" data-i18n="storageClear">Clear selected</button>
           <span id="storage-status" class="et-test-status hidden" role="status" aria-live="polite"></span>
         </div>
       </section>
@@ -1726,7 +1726,7 @@
           </details>
         </div>
         <div class="fg fg-actions">
-          <button type="button" class="btn" id="copy-diagnostics-btn" data-i18n="diagnosticsCopy">Copy diagnostics</button>
+          <button type="button" class="btn btn-sm" id="copy-diagnostics-btn" data-i18n="diagnosticsCopy">Copy diagnostics</button>
           <span id="diagnostics-status" class="et-test-status hidden" role="status" aria-live="polite"></span>
         </div>
       </section>
