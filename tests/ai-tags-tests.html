@@ -896,11 +896,69 @@ suite("custom provider entries", () => {
         assertEq(typeof result.content, "string", "content is the article HTML");
         assertEq("textContent" in result, false, "there is no textContent field to read");
         for (const name of ["Alpha", "Bravo", "Charlie"]) assert(result.content.includes(name + " Product"), name + " card is in the content");
-        // Every field popup.js / background.js / ai.js read off parse() must still exist
-        // with the vendored library's real name (a renamed field fails silently to "").
-        for (const key of ["content", "title", "author", "published", "site", "image", "language"]) {
-          assert(key in result, "parse() result still carries `" + key + "`");
+      } finally {
+        window.Defuddle = realDefuddle;
+        if (realDefuddle === undefined) delete window.Defuddle;
+      }
+    });
+
+    await atest("every field the extractors read off parse() exists on the real vendored result", async () => {
+      // The field list comes from the callers' own source, not from this
+      // test: in popup.js, background.js and ai.js, find each
+      // `<v> = new Defuddle(...)` and collect every `<v>.field` / `<v>?.field`
+      // (and `{ field } = <v>`) inside the block that declares <v>. A renamed
+      // or misspelled field (result.lang, result.textContent) fails silently
+      // to "" in production, so each one must be present on what the
+      // vendored library really returns.
+      const sources = {};
+      for (const f of ["popup.js", "background.js", "ai.js"]) {
+        const res = await realFetch("../" + f);
+        if (!res.ok) throw new Error(f + ": HTTP " + res.status + " (serve the repo over HTTP, e.g. .qa-scan/run-test.mjs)");
+        sources[f] = await res.text();
+      }
+      const reads = new Set();
+      for (const [f, code] of Object.entries(sources)) {
+        const ctor = /([A-Za-z_$][\w$]*)\s*=\s*new Defuddle\(/g;
+        let m, calls = 0;
+        const fields = new Set();
+        while ((m = ctor.exec(code))) {
+          calls++;
+          const v = m[1];
+          const decl = new RegExp("\\b(?:let|const|var)\\s+" + v + "\\b", "g");
+          let from = m.index, d;
+          while ((d = decl.exec(code)) && d.index < m.index) from = d.index;
+          let depth = 0, end = code.length;
+          for (let i = from; i < code.length; i++) {
+            if (code[i] === "{") depth++;
+            else if (code[i] === "}" && --depth < 0) { end = i; break; }
+          }
+          const scope = code.slice(from, end);
+          const member = new RegExp("\\b" + v + "\\s*\\??\\.\\s*([A-Za-z_$][\\w$]*)", "g");
+          let r;
+          while ((r = member.exec(scope))) fields.add(r[1]);
+          const destr = new RegExp("\\{([^{}]*)\\}\\s*=\\s*" + v + "\\b", "g");
+          while ((r = destr.exec(scope))) {
+            for (const part of r[1].split(",")) {
+              const k = part.split(":")[0].replace(/=.*$/, "").trim();
+              if (/^[A-Za-z_$][\w$]*$/.test(k)) fields.add(k);
+            }
+          }
         }
+        assert(calls > 0, f + ": a `new Defuddle(...)` call was found");
+        assert(fields.has("content"), f + ": the scan found the caller reading `content` (got " + [...fields].join(",") + ")");
+        fields.forEach((k) => reads.add(k));
+      }
+      const realDefuddle = window.Defuddle;
+      await new Promise((resolve, reject) => {
+        const tag = document.createElement("script");
+        tag.src = "../vendor/defuddle.js"; tag.onload = resolve; tag.onerror = () => reject(new Error("vendor/defuddle.js failed to load"));
+        document.head.appendChild(tag);
+      });
+      try {
+        const doc = new DOMParser().parseFromString("<!doctype html><html lang=\"en\"><head><title>Shape</title></head><body><article><h1>Shape</h1><p>" +
+          "A paragraph long enough to be treated as the article body by the extractor. ".repeat(6) + "</p></article></body></html>", "text/html");
+        const result = new window.Defuddle(doc).parse();
+        for (const key of reads) assert(key in result, "parse() result carries `" + key + "`, which an extractor reads");
       } finally {
         window.Defuddle = realDefuddle;
         if (realDefuddle === undefined) delete window.Defuddle;

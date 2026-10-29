@@ -2205,6 +2205,8 @@ section("site-rules: popup/background extractor mirror invariants");
     ["site-rule payload incl. math/forum flags", 'title: hit.title || document.title, url: location.href, math: !!hit.math, forum: !!hit.forum'],
     ["MathML-derived math flag on Defuddle path", 'math: !!document.querySelector("math")'],
     ["Defuddle metadata forwarding", 'author: result.author || "", published: result.published || "", site: result.site || "", image: result.image || ""'],
+    ["Defuddle language forwarding", 'lang: result.language || document.documentElement.lang || ""'],
+    ["Defuddle console noise filter (both message forms)", 'if (!/^Defuddle(?::|$)/.test(String(a[0]))) _origCE.apply(console, a);'],
   ];
   // ai.js's getPageInfoFromTab is the third extraction surface (AI tags/
   // summary + batch save): it must keep injecting site-rules.js and trying
@@ -2213,6 +2215,7 @@ section("site-rules: popup/background extractor mirror invariants");
     ["site-rules.js injection wired", 'files: ["site-rules.js"]'],
     ["site-rule dispatch wired", 'applySiteRule(document, location.href)'],
     ["hit flattened via pbpSiteRuleText", 'pbpSiteRuleText(hit.contentHtml)'],
+    ["Defuddle console noise filter (both message forms)", 'if (!/^Defuddle(?::|$)/.test(String(a[0]))) _origCE.apply(console, a);'],
   ];
   let pj = "", bj = "", aj = "";
   try {
@@ -3471,6 +3474,7 @@ section("Defuddle >= 0.19.5 lazy-image compat (real library, popup order: normal
     doc.body.innerHTML = '<article><h1>Post</h1>' + prose + imgHtml + prose + '</article>';
     pbpNormalizeLazyImages(doc.body, BASE);
     pbpUpgradeSrcsetImages(doc.body, BASE);
+    pbpPreDefuddleNormalize(doc);
     const result = new Defuddle(doc).parse();
     return { html: result.content || "", md: htmlToMarkdown(result.content || "") };
   };
@@ -3503,6 +3507,89 @@ section("Defuddle >= 0.19.5 lazy-image compat (real library, popup order: normal
     d.innerHTML = '<img src="https://fixture.test/real.jpg" data-echo="https://fixture.test/other.jpg">';
     pbpNormalizeLazyImages(d, BASE);
     check("real src untouched by named cold attrs", d.querySelector("img").getAttribute("src") === "https://fixture.test/real.jpg", d.innerHTML);
+  }
+  // Q1-Q5: a cold loader attribute used as a flag ("true", "1", bare) must not
+  // shadow srcset / data-srcset / a later attribute that holds the real URL.
+  // 0.19.4 produced the commented image for each; a flag must never become
+  // a same-site path such as /post/true.
+  const flagCases = [
+    ["Q1 data-lazyload=true + x-descriptor srcset", '<img alt="q1" src="' + PH + '" data-lazyload="true" srcset="/img/q1.jpg 1x, /img/q1@2x.jpg 2x">', "https://fixture.test/img/q1@2x.jpg"],
+    ["Q2 bare data-lazyload, no src, w srcset", '<img alt="q2" data-lazyload srcset="/img/q2-400.jpg 400w, /img/q2-1600.jpg 1600w">', "https://fixture.test/img/q2-1600.jpg"],
+    ["Q3 data-lazyload=true + single data-srcset", '<img alt="q3" src="' + PH + '" data-lazyload="true" data-srcset="/img/q3.jpg">', "https://fixture.test/img/q3.jpg"],
+    ["Q4 data-lazyload=true before a real data-original-src", '<img alt="q4" src="' + PH + '" data-lazyload="true" data-original-src="//cdn.fixture.test/q4.png">', "https://cdn.fixture.test/q4.png"],
+    ["Q5 data-echo=1 + empty src + 1x srcset", '<img alt="q5" src="" data-echo="1" srcset="/img/q5.jpg 1x">', "https://fixture.test/img/q5.jpg"],
+  ];
+  for (const [label, img, want] of flagCases) {
+    const r = run("<p>" + img + "</p>");
+    check(label + " -> real image, not the flag", r.md.indexOf("](" + want + ")") !== -1 && !/\/(true|1)\)/.test(r.md) && r.md.indexOf("data:image/svg") === -1, r.md.slice(0, 400));
+  }
+  // A real src must not be replaced by a lazy attribute 0.19.4 ignored:
+  // an extensionless smaller variant, or a value that is not a URL at all.
+  {
+    const r = run('<p><img alt="p5" src="https://cdn.fixture.test/p5/full?w=1600" data-src="https://cdn.fixture.test/p5/full?w=200"></p>');
+    check("extensionless data-src does not downgrade a real absolute src", r.md.indexOf("full?w=1600") !== -1 && r.md.indexOf("w=200") === -1, r.md.slice(0, 300));
+  }
+  {
+    const r = run('<p><img alt="pix" src="https://fixture.test/img/d.jpg" data-src="tracking-pixel"></p>');
+    check("non-URL data-src does not replace a real src", r.md.indexOf("](https://fixture.test/img/d.jpg)") !== -1 && r.md.indexOf("tracking-pixel") === -1, r.md.slice(0, 300));
+  }
+  {
+    const r = run('<p><img alt="orig" src="https://fixture.test/img/e.jpg" data-original="https://fixture.test/img/e-small.jpg"></p>');
+    check("data-original on a non-lazy image does not replace its real src", r.md.indexOf("](https://fixture.test/img/e.jpg)") !== -1 && r.md.indexOf("e-small") === -1, r.md.slice(0, 300));
+  }
+  {
+    const r = run('<p><img alt="lazyreal" class="lazy" src="https://fixture.test/img/thumb-small.png" data-echo="https://cdn.fixture.test/img/full.jpg"></p>');
+    check("lazy image with a real src still takes its cold loader URL, as 0.19.4 did", r.md.indexOf("](https://cdn.fixture.test/img/full.jpg)") !== -1 && r.md.indexOf("thumb-small") === -1, r.md.slice(0, 300));
+  }
+  {
+    const r = run('<p><img alt="eg" loading="lazy" data-uri="photo-key.jpg"></p><p><img alt="eg" src="https://cdn.fixture.test/img/photo-key.jpg?width=2048"></p>');
+    check("bare-file-name data-uri is not promoted to a same-site URL", r.md.indexOf("fixture.test/post/photo-key.jpg") === -1 && r.md.indexOf("fixture.test/photo-key.jpg") === -1, r.md.slice(0, 300));
+  }
+  // Static-file placeholders count as placeholders, so the real URL is promoted.
+  for (const [label, img, want] of [
+    ["loading.gif + data-actualsrc (no lazy class)", '<img alt="gif" src="/static/loading.gif" data-actualsrc="https://cdn.fixture.test/img/p15.jpg">', "https://cdn.fixture.test/img/p15.jpg"],
+    ["blank.gif + data-src", '<img alt="blank" src="/static/blank.gif?v=2" data-src="/img/blank-real.jpg">', "https://fixture.test/img/blank-real.jpg"],
+    ["lazy-placeholder.png + data-echo", '<img alt="ph" class="lazy" src="/assets/lazy-placeholder.png" data-echo="https://cdn.fixture.test/img/echo.jpg">', "https://cdn.fixture.test/img/echo.jpg"],
+    ["data: placeholder + data-url image (0.19.4 heuristic)", '<img alt="durl" src="' + PH + '" data-url="https://cdn.fixture.test/img/durl.webp">', "https://cdn.fixture.test/img/durl.webp"],
+    ["loading.gif + data-url image", '<img alt="durl2" class="lazy" src="/static/loading.gif" data-url="https://cdn.fixture.test/img/durl2.jpg">', "https://cdn.fixture.test/img/durl2.jpg"],
+  ]) {
+    const r = run("<p>" + img + "</p>");
+    check("placeholder file: " + label, r.md.indexOf("](" + want + ")") !== -1 && !/loading\.gif|blank\.gif|lazy-placeholder/.test(r.md), r.md.slice(0, 300));
+  }
+  // Lazy-pass unit rows: placeholder names, data-url links, cold flags.
+  {
+    const one = (html) => { const d = document.createElement("div"); d.innerHTML = html; pbpNormalizeLazyImages(d, BASE); return d.querySelector("img").getAttribute("src"); };
+    check("pixel-art.png is a real image, not a placeholder", one('<img src="/img/pixel-art.png" data-src="/img/other.jpg">') === "/img/pixel-art.png");
+    check("grey-heron.jpg is a real image, not a placeholder", one('<img src="/img/grey-heron.jpg" data-echo="/img/other.jpg">') === "/img/grey-heron.jpg");
+    check("img-loading@2x.gif is a placeholder", one('<img src="/s/img-loading@2x.gif" data-src="/img/x.jpg">') === "https://fixture.test/img/x.jpg");
+    check("spacer_1x1.png is a placeholder", one('<img src="spacer_1x1.png" data-original="/img/y.jpg">') === "https://fixture.test/img/y.jpg");
+    check("data-url that is a page link is not promoted", one('<img src="' + PH + '" data-url="https://fixture.test/post/42">') === PH);
+    check("all-flag cold attrs fall through to nothing", one('<img src="" data-echo="true" data-lazyload="1">') === "");
+    check("flag cold attr skipped for the next named attr", one('<img data-echo="lazy" data-hi-res-src="/img/hi.jpg">') === "https://fixture.test/img/hi.jpg");
+  }
+  // Guard unit rows: run on a detached copy, mirror 0.19.4's acceptance.
+  {
+    const guard = (html) => { const d = document.createElement("div"); d.innerHTML = html; pbpGuardLazyOverrides(d); return d.querySelector("img"); };
+    let g = guard('<img src="https://x.test/a.jpg" data-src="https://x.test/a?w=200">');
+    check("guard drops an extensionless data-src on a real src", !g.hasAttribute("data-src"), g.outerHTML);
+    g = guard('<img src="https://x.test/a.jpg" loading="lazy" data-src="/a-hd.jpg">');
+    check("guard drops a relative data-src that would replace an absolute src", !g.hasAttribute("data-src"), g.outerHTML);
+    g = guard('<img class="lazy" src="/a.jpg" data-src="/a-hd.jpg">');
+    check("guard keeps a data-src 0.19.4 would have used", g.getAttribute("data-src") === "/a-hd.jpg", g.outerHTML);
+    g = guard('<img src="/a.jpg" data-original="/a-hd.jpg">');
+    check("guard drops data-original on an image 0.19.4 did not treat as lazy", !g.hasAttribute("data-original"), g.outerHTML);
+    g = guard('<img src="' + PH + '" data-src="tracking-pixel">');
+    check("guard leaves placeholder images to the lazy pass", g.getAttribute("data-src") === "tracking-pixel", g.outerHTML);
+    g = guard('<img src="/a.jpg" data-src="/a.jpg" data-srcset="/a-400.jpg 400w, /a-800.jpg 800w">');
+    check("guard keeps data-srcset when there is no srcset", g.getAttribute("data-srcset") !== null, g.outerHTML);
+    g = guard('<img src="/a.jpg" srcset="/a.jpg 1x" data-srcset="lazy">');
+    check("guard drops a non-srcset data-srcset over a real srcset", !g.hasAttribute("data-srcset"), g.outerHTML);
+    g = guard('<img class="lazy" src="/img/pixel-art.png" data-echo="/img/other.jpg">');
+    check("guard hands a lazy image's cold loader URL to Defuddle as data-src (0.19.4 outcome)", g.getAttribute("data-src") === "/img/other.jpg" && g.getAttribute("src") === "/img/pixel-art.png", g.outerHTML);
+    g = guard('<img src="/img/pixel-art.png" data-echo="/img/other.jpg">');
+    check("guard leaves a cold attribute alone on an image 0.19.4 did not treat as lazy", !g.hasAttribute("data-src"), g.outerHTML);
+    g = guard('<img loading="lazy" src="https://x.test/a.jpg" data-echo="true" data-src="https://x.test/a?w=200">');
+    check("guard: a cold flag is not a winner and the extensionless data-src still goes", !g.hasAttribute("data-src"), g.outerHTML);
   }
 })();
 </script>
