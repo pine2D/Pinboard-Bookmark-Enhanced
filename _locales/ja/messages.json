@@ -4935,7 +4935,7 @@
     "message": "有効なサーバーURLとAPIトークンを入力してください。"
   },
   "bookmarkUrlInvalid": {
-    "message": "https:// で始まるサーバーURLを入力してください。HTTP が使えるのは localhost だけです。"
+    "message": "https:// で始まるサーバーURLを入力してください。ユーザー名、パスワード、クエリ、# 以降は付けられません。HTTPが使えるのはローカルホストだけです。"
   },
   "bookmarkPermissionDenied": {
     "message": "設定でこのサーバーへのアクセスを許可してから、再接続してください。"

@@ -4935,7 +4935,7 @@
     "message": "Podaj prawidłowy adres serwera i token API."
   },
   "bookmarkUrlInvalid": {
-    "message": "Podaj adres serwera zaczynający się od https://. HTTP jest dozwolone tylko dla localhost."
+    "message": "Podaj adres serwera zaczynający się od https://, bez nazwy użytkownika, hasła, zapytania i fragmentu. HTTP jest dozwolone tylko dla localhost."
   },
   "bookmarkPermissionDenied": {
     "message": "Zezwól na dostęp do tego serwera w ustawieniach, a następnie połącz ponownie."

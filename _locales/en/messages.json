@@ -4943,7 +4943,7 @@
     "message": "Enter a valid server URL and API token."
   },
   "bookmarkUrlInvalid": {
-    "message": "Enter the server address starting with https://. HTTP is allowed only for localhost."
+    "message": "Enter an https:// server address with no username, password, query or fragment. HTTP is allowed only for localhost."
   },
   "bookmarkPermissionDenied": {
     "message": "Allow access to this server in Settings, then reconnect."

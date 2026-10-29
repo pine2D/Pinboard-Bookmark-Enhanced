@@ -4929,7 +4929,7 @@
     "message": "请填写有效的服务器地址和 API Token。"
   },
   "bookmarkUrlInvalid": {
-    "message": "请填写以 https:// 开头的服务器地址。只有 localhost 可以使用 http://。"
+    "message": "请填写 https:// 服务器地址，不要带用户名、密码、查询参数或 # 片段。只有本机地址可以使用 http://。"
   },
   "bookmarkPermissionDenied": {
     "message": "请在设置中允许访问此服务器，然后重新连接。"

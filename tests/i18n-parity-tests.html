@@ -1146,8 +1146,10 @@ async function loadLocale(loc) {
     check(`${loc} never renames the credential to 令牌/權杖`, hits.length === 0, hits.join(", "));
   }
   // UI names in the bookmark copy are quoted with 「」, not curly quotes.
-  const zhCurly = Object.entries(msgs.zh_CN).filter(([k, v]) => /^bookmark/.test(k) && /[\u201c\u201d]/.test(v.message || "")).map(([k]) => k);
-  check("zh_CN bookmark copy quotes UI names with corner brackets", zhCurly.length === 0, zhCurly.join(", "));
+  for (const loc of ["zh_CN", "zh_TW", "zh_HK"]) {
+    const zhCurly = Object.entries(msgs[loc]).filter(([k, v]) => /^bookmark/.test(k) && /[\u201c\u201d]/.test(v.message || "")).map(([k]) => k);
+    check(`${loc} bookmark copy quotes UI names with corner brackets`, zhCurly.length === 0, zhCurly.join(", "));
+  }
   // A full-width colon already carries its gap: no space after it in CJK copy.
   const colonGap = [];
   for (const loc of ["zh_CN", "zh_TW", "zh_HK", "ja"]) {

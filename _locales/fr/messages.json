@@ -4935,7 +4935,7 @@
     "message": "Saisissez une URL de serveur valide et un jeton API."
   },
   "bookmarkUrlInvalid": {
-    "message": "Saisissez l’adresse du serveur en commençant par https://. HTTP n’est accepté que pour localhost."
+    "message": "Saisissez l’adresse du serveur en https://, sans identifiants, paramètres de requête ni fragment. HTTP n’est accepté que pour localhost."
   },
   "bookmarkPermissionDenied": {
     "message": "Autorisez l’accès à ce serveur dans les paramètres, puis reconnectez-vous."

@@ -4935,7 +4935,7 @@
     "message": "請填入有效的伺服器網址與 API Token。"
   },
   "bookmarkUrlInvalid": {
-    "message": "請填入以 https:// 開頭的伺服器網址。只有 localhost 可以使用 http://。"
+    "message": "請填入 https:// 伺服器網址，不要附帶使用者名稱、密碼、查詢參數或 # 片段。只有本機位址可以使用 http://。"
   },
   "bookmarkPermissionDenied": {
     "message": "請在設定中允許存取此伺服器，再重新連線。"
