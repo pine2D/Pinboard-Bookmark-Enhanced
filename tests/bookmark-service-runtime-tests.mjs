@@ -127,6 +127,9 @@ try{
   for(const service of ['linkding','karakeep']){
     const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
     await options.locator(`input[name="bookmark-service"][value="${service}"]`).check();
+    // The gateway ? stays reachable with the gateway on None, and shows the Cloudflare route.
+    assert(await options.locator('#'+service+'-gateway-help').isVisible(),'gateway help is hidden while the gateway is None');
+    assert(await options.locator('#'+service+'-gateway-cf-help').count(),'gateway help lost its Cloudflare text');
     await options.locator('#opt-'+service+'-url').fill(origin+'/'+service+'/');
     if(service==='linkding'){
       await options.locator('#opt-'+service+'-token').fill('wrong-key');

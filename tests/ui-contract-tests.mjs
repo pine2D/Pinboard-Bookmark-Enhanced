@@ -10101,6 +10101,8 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
     "options.js: setConnectStatus called with a state other than pending / ok / bad / clear");
   check(/radio\.addEventListener\("change", \(\) => scheduleConnectionOverview\(\)\)/.test(optionsJs),
     "options.js: choosing a bookmark service must refresh the connection overview and the AI nudge");
+  check(!/-gateway-help"\)\.hidden/.test(optionsJs),
+    "options.js: the access-gateway ? must stay visible for every gateway type (a stable anchor for the gateway errors)");
 }
 
 if (timingEnabled) {

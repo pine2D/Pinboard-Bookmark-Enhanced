@@ -2813,8 +2813,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const type = $id("opt-" + service + "-gateway").value;
     $id(service + "-gateway-cloudflare").hidden = type !== "cloudflare";
     $id(service + "-gateway-custom").hidden = type !== "custom";
-    $id(service + "-gateway-help").hidden = type !== "cloudflare" && type !== "custom";
-    $id(service + "-gateway-cf-help").hidden = type !== "cloudflare";
+    // The ? is a stable anchor: the gateway errors send the user here whatever
+    // the type is. With None it explains the Cloudflare route (the common one).
+    $id(service + "-gateway-cf-help").hidden = type === "custom";
     $id(service + "-gateway-custom-help").hidden = type !== "custom";
     // An unreadable form counts as modified: it differs from any valid stored gateway.
     const read = pbpOptGatewayRead(service);
