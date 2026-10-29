@@ -4855,6 +4855,12 @@
   "bookmarkTokenLocalHint": {
     "message": "トークンとゲートウェイの認証情報はこのブラウザーに保存され、このサーバーにだけ送信されます。ほかのデバイスに届くのは、API キーとトークンの同期をオンにした場合だけです。"
   },
+  "bookmarkKarakeepTokenHelp": {
+    "message": "Karakeep の「ユーザ設定 → APIキー」で、フルアクセスの新しいキーを作成します。キーは一度しか表示されないので、作成したらすぐここにコピーしてください。"
+  },
+  "bookmarkLinkdingTokenHelp": {
+    "message": "linkding で Settings → Integrations を開き、REST API の欄でトークンを確認または作成します。新しいバージョンでは、トークンは作成時に一度だけ表示されます。"
+  },
   "bookmarkGatewayLabel": {
     "message": "アクセスゲートウェイ"
   },

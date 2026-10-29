@@ -4863,6 +4863,12 @@
   "bookmarkTokenLocalHint": {
     "message": "The token and any gateway credentials stay in this browser and are sent only to this server. They reach your other devices only if you sync API keys and tokens."
   },
+  "bookmarkKarakeepTokenHelp": {
+    "message": "In Karakeep, open User Settings → API Keys and create a new API key with full access. Copy it right away: it is shown only once."
+  },
+  "bookmarkLinkdingTokenHelp": {
+    "message": "In linkding, open Settings → Integrations. The REST API section shows your token or lets you create one; newer versions show a new token only once."
+  },
   "bookmarkGatewayLabel": {
     "message": "Access gateway"
   },

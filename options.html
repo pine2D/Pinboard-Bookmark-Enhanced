@@ -113,8 +113,12 @@
             <input type="text" inputmode="url" id="opt-karakeep-url" placeholder="https://bookmarks.example.com/" autocomplete="off" spellcheck="false" />
             <p class="hint" data-i18n="bookmarkServerHint">Use the site URL, including any subpath. HTTPS is required except on localhost.</p>
           </div>
-          <div class="fg entry-block">
+          <div class="fg entry-block context-help-host" data-help-role="field">
             <label class="bl" for="opt-karakeep-token" data-i18n="labelApiToken">API Token</label>
+            <details class="context-help" id="opt-karakeep-token-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="bookmarkKarakeepTokenHelp">In Karakeep, open User Settings → API Keys and create a new API key with full access. Copy it right away: it is shown only once.</p>
+            </details>
             <span class="key-wrap"><input type="password" id="opt-karakeep-token" autocomplete="off" spellcheck="false" />
             <button type="button" class="key-toggle" data-target="opt-karakeep-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
             <p class="hint" data-i18n="bookmarkTokenLocalHint">The token and any gateway credentials stay in this browser and are sent only to this server. They reach your other devices only if you sync API keys and tokens.</p>
@@ -184,8 +188,12 @@
             <input type="text" inputmode="url" id="opt-linkding-url" placeholder="https://bookmarks.example.com/" autocomplete="off" spellcheck="false" />
             <p class="hint" data-i18n="bookmarkServerHint">Use the site URL, including any subpath. HTTPS is required except on localhost.</p>
           </div>
-          <div class="fg entry-block">
+          <div class="fg entry-block context-help-host" data-help-role="field">
             <label class="bl" for="opt-linkding-token" data-i18n="labelApiToken">API Token</label>
+            <details class="context-help" id="opt-linkding-token-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" data-i18n="bookmarkLinkdingTokenHelp">In linkding, open Settings → Integrations. The REST API section shows your token or lets you create one; newer versions show a new token only once.</p>
+            </details>
             <span class="key-wrap"><input type="password" id="opt-linkding-token" autocomplete="off" spellcheck="false" />
             <button type="button" class="key-toggle" data-target="opt-linkding-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
             <p class="hint" data-i18n="bookmarkTokenLocalHint">The token and any gateway credentials stay in this browser and are sent only to this server. They reach your other devices only if you sync API keys and tokens.</p>

@@ -1710,6 +1710,7 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     "optThemeHint", "popupFollowHint", "customCSSOverlayHelp", "saveAsThemeHint",
     "storageIntro", "diagnosticsHint",
     "bookmarkServiceHint", "personalLibraryHint", "bookmarkKarakeepHint",
+    "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp",
   ];
   const isInsideContextHelp = (key) => {
     const marker = optionsHtml.indexOf(`data-i18n="${key}"`);
@@ -1796,6 +1797,7 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     summaryPromptHint: "opt-custom-summary-prompt", translateGlossaryHint: "opt-translate-glossary",
     optVideoLangPrefHint: "opt-md-video-lang", dictEudicSupportedHint: "dict-eudic-token",
     mdExportImagePolicyHint: "opt-md-image-policy", customCSSOverlayHelp: "opt-custom-css",
+    bookmarkKarakeepTokenHelp: "opt-karakeep-token", bookmarkLinkdingTokenHelp: "opt-linkding-token",
   };
   check(Object.entries(helpBeforeControl).every(([key, id]) => {
     const help = optionsHtml.indexOf(`data-i18n="${key}"`);

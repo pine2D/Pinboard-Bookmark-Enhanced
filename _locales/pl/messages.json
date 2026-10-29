@@ -4855,6 +4855,12 @@
   "bookmarkTokenLocalHint": {
     "message": "Token i dane uwierzytelniające bramki zostają w tej przeglądarce i trafiają wyłącznie do tego serwera. Na inne urządzenia przejdą tylko wtedy, gdy włączysz synchronizację kluczy API i tokenów."
   },
+  "bookmarkKarakeepTokenHelp": {
+    "message": "W Karakeep otwórz Ustawienia użytkownika → Klucze API i utwórz nowy klucz z pełnym dostępem. Klucz jest pokazywany tylko raz, więc od razu skopiuj go tutaj."
+  },
+  "bookmarkLinkdingTokenHelp": {
+    "message": "W linkding otwórz Settings → Integrations. W sekcji REST API zobaczysz swój token albo utworzysz nowy; nowsze wersje pokazują nowy token tylko raz."
+  },
   "bookmarkGatewayLabel": {
     "message": "Bramka dostępu"
   },

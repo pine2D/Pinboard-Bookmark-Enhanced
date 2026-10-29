@@ -4855,6 +4855,12 @@
   "bookmarkTokenLocalHint": {
     "message": "Token 與閘道憑證儲存在這個瀏覽器，只會傳送給這台伺服器。開啟 API Key 和 Token 同步後，才會出現在你的其他裝置上。"
   },
+  "bookmarkKarakeepTokenHelp": {
+    "message": "在 Karakeep 的「使用者設定 → API 金鑰」中新增一個金鑰，保留完整存取權限。金鑰只會顯示一次，建立後請立即複製到這裡。"
+  },
+  "bookmarkLinkdingTokenHelp": {
+    "message": "在 linkding 中開啟 Settings → Integrations，在 REST API 區段查看或新增 Token。較新版本的 Token 只會在建立時顯示一次。"
+  },
   "bookmarkGatewayLabel": {
     "message": "存取閘道"
   },

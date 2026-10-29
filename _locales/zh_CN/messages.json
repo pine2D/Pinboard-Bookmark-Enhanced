@@ -4849,6 +4849,12 @@
   "bookmarkTokenLocalHint": {
     "message": "Token 和网关凭据保存在本浏览器，只发送给这个服务器。开启 API Key 和 Token 同步后，才会出现在你的其他设备上。"
   },
+  "bookmarkKarakeepTokenHelp": {
+    "message": "在 Karakeep 的「用户设置 → API 密钥」中新建一个密钥，保留完全访问权限。密钥只显示一次，创建后立即复制到这里。"
+  },
+  "bookmarkLinkdingTokenHelp": {
+    "message": "在 linkding 中打开 Settings → Integrations，在 REST API 一节查看或新建 Token。较新版本的 Token 只在创建时显示一次。"
+  },
   "bookmarkGatewayLabel": {
     "message": "访问网关"
   },

@@ -4855,6 +4855,12 @@
   "bookmarkTokenLocalHint": {
     "message": "Token und Gateway-Zugangsdaten bleiben in diesem Browser und gehen nur an diesen Server. Auf deine anderen Geräte gelangen sie nur, wenn du API-Schlüssel und Tokens synchronisierst."
   },
+  "bookmarkKarakeepTokenHelp": {
+    "message": "Erstelle in Karakeep unter „Benutzereinstellungen → API-Schlüssel“ einen neuen Schlüssel mit vollem Zugriff. Er wird nur einmal angezeigt, kopiere ihn also sofort hierher."
+  },
+  "bookmarkLinkdingTokenHelp": {
+    "message": "Öffne in linkding Settings → Integrations. Im Abschnitt REST API findest du dein Token oder erstellst ein neues; neuere Versionen zeigen ein neues Token nur einmal an."
+  },
   "bookmarkGatewayLabel": {
     "message": "Zugangs-Gateway"
   },

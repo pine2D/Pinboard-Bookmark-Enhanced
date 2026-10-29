@@ -37,7 +37,8 @@
       "optWaybackS3Hint", "popupFollowHint", "promptsHint", "saveAsThemeHint", "skimEnableHint", "storageIntro",
       "summaryPromptHint", "syncApiKeysHint", "tagPresetsHint", "tagPromptHint", "tagSyncHint",
       "translateGlossaryHint", "vocabDriveConnectionHint", "vocabDriveDisclosure",
-      "bookmarkServiceHint", "personalLibraryHint", "bookmarkKarakeepHint"
+      "bookmarkServiceHint", "personalLibraryHint", "bookmarkKarakeepHint",
+      "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp"
     ],
     "pending": [
       "themeGroupAdaptiveHint", "vocabCompleteExportHint", "ecdictHint", "dictPackHint"

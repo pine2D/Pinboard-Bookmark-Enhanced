@@ -4855,6 +4855,12 @@
   "bookmarkTokenLocalHint": {
     "message": "Le jeton et les identifiants de passerelle restent dans ce navigateur et ne sont envoyés qu'à ce serveur. Ils ne rejoignent vos autres appareils que si vous synchronisez les clés API et les jetons."
   },
+  "bookmarkKarakeepTokenHelp": {
+    "message": "Dans Karakeep, ouvrez Paramètres utilisateur → Clés API et créez une clé avec un accès complet. Elle ne s’affiche qu’une fois : copiez-la tout de suite ici."
+  },
+  "bookmarkLinkdingTokenHelp": {
+    "message": "Dans linkding, ouvrez Settings → Integrations. La section REST API affiche votre jeton ou permet d’en créer un ; les versions récentes n’affichent un nouveau jeton qu’une seule fois."
+  },
   "bookmarkGatewayLabel": {
     "message": "Passerelle d’accès"
   },
