@@ -2258,11 +2258,15 @@ html.motion-ready #preset-preview-section > summary::after {
   color: var(--opt-fg-muted);
 }
 .theme-preset-groups .fg-actions { min-width: 0; }
+/* A row with no label ("No preset", critique 6 SP-16) puts its chips in the
+   chip track, not under the labels, so the whole choice set has one left edge. */
+.theme-preset-groups > .theme-presets-group > .fg-actions:only-child { grid-column: 2; }
 .theme-preset-groups + .hint { margin-top: var(--opt-sp-4); }
 @media (max-width: 600px) {
   .theme-preset-groups { grid-template-columns: minmax(0, 1fr); gap: var(--opt-sp-6); }
   .theme-preset-groups > .theme-presets-group { row-gap: var(--opt-sp-2); }
   .theme-group-label { min-height: 0; }
+  .theme-preset-groups > .theme-presets-group > .fg-actions:only-child { grid-column: 1; }
 }
 /* Borderless swatch pill (design-uplift, user-selected Variant A,
    2026-08-04) -- shared base for .theme-preset-btn and .saved-theme-btn; see

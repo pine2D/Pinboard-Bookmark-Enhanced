@@ -1512,10 +1512,14 @@
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
             <p class="hint context-help-body" data-i18n="themeGroupAdaptiveHint">Adaptive presets follow the light/dark setting under Extension Appearance above.</p>
           </details>
-          <div class="theme-presets-group">
-            <button class="btn btn-sm theme-preset-btn" data-theme="" data-i18n="themeGroupNone" aria-pressed="false">No preset</button>
-          </div>
           <div class="theme-preset-groups">
+            <!-- "No preset" sits in the chip track with its label cell left
+                 empty, so all four rows of chips share one left edge. -->
+            <div class="theme-presets-group">
+              <div class="fg-actions">
+                <button class="btn btn-sm theme-preset-btn" data-theme="" data-i18n="themeGroupNone" aria-pressed="false">No preset</button>
+              </div>
+            </div>
             <div class="theme-presets-group" role="group" aria-labelledby="theme-group-adaptive">
               <span id="theme-group-adaptive" class="theme-group-label" data-i18n="themeGroupAdaptive">Adaptive</span>
               <div class="fg-actions">
