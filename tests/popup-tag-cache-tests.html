@@ -268,6 +268,28 @@ function typeInto(value) {
     assert(suggestBox.querySelectorAll(".tag-skel").length === 4, "the suggest skeleton was overwritten");
   });
 
+  await testAsync("self-hosted tag sync names a 401 gateway or token failure instead of staying silent", async () => {
+    const savedSettings = { ...settings };
+    const realApi = window.pbpPopupBookmarkApi;
+    const baseUrl = pbpBookmarkEndpoint("https://ld.example/");
+    Object.assign(settings, { bookmarkService: "linkding", linkdingUrl: baseUrl, tagSyncMode: "fresh",
+      linkdingToken: obfuscateKey(JSON.stringify({ v: 1, baseUrl, token: "tok", connectionId: "c1", userId: "c1" })) });
+    try {
+      assert(pbpBookmarkConnection(settings).account, "fixture connection is not ready");
+      for (const [error, key] of [["gateway_basic", "bookmarkErrGatewayBasic"], ["not_logged_in", "bookmarkErrAuth"]]) {
+        resetInput();
+        suggestRow.classList.add("hidden");
+        window.pbpPopupBookmarkApi = async () => ({ ok: false, status: 401, error, json: async () => ({}) });
+        await fetchAllUserTags("ignored");
+        assert(statusCalls.length === 1 && statusCalls[0].msg === key, error + " -> " + JSON.stringify(statusCalls));
+      }
+    } finally {
+      window.pbpPopupBookmarkApi = realApi;
+      for (const k of Object.keys(settings)) delete settings[k];
+      Object.assign(settings, savedSettings);
+    }
+  });
+
   await test("a visible, empty Suggest row keeps the inline message", () => {
     resetInput();
     suggestRow.classList.remove("hidden");

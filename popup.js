@@ -2199,8 +2199,9 @@ function setupSubmit(token) {
           // resolves a stand-in whose json() is {} on 401, so without this the
           // result_code is undefined and the user reads an API error ending in
           // "undefined" instead of the login redirect already under way.
-          if (!resp.ok && pbpBookmarkServiceId(settings) !== "pinboard") {
-            if (ownsDeleteForm()) showStatus("status-msg", t(pbpBookmarkFailureKey(resp.error, pbpBookmarkServiceId(settings)) || "saveFailedGeneric"), "error");
+          const deleteService = pbpBookmarkServiceId(settings);
+          if (!resp.ok && deleteService !== "pinboard") {
+            if (ownsDeleteForm()) showStatus("status-msg", t(pbpBookmarkFailureKey({reason:resp.error, httpStatus:resp.status}, deleteService) || "saveFailedGeneric"), "error");
             return;
           }
           if (resp.status === 401) return; // pinboardFetch already redirected to login
@@ -2373,8 +2374,9 @@ async function fetchRecentBookmarks(token) {
           onConfirm: async () => {
             try {
               const resp = await pbpPopupBookmarkApi("delete", p.href);
-              if (!resp.ok && pbpBookmarkServiceId(settings) !== "pinboard") {
-                reportDeleteFailure(t(pbpBookmarkFailureKey(resp.error, pbpBookmarkServiceId(settings)) || "saveFailedGeneric"));
+              const deleteService = pbpBookmarkServiceId(settings);
+              if (!resp.ok && deleteService !== "pinboard") {
+                reportDeleteFailure(t(pbpBookmarkFailureKey({reason:resp.error, httpStatus:resp.status}, deleteService) || "saveFailedGeneric"));
                 return;
               }
               if (resp.status === 401) return; // pinboardFetch already redirected to login

@@ -181,6 +181,7 @@ await test("reader state reports the lookup failure reason", async () => {
   const h = await harness({ lookup: { lookupFailed: true, exists: false, reason: "gateway_challenge", httpStatus: 403, retryable: false } });
   const r = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account: "alice" }, SENDER);
   equal(r.known, false); equal(r.reason, "gateway_challenge"); assert(r.bookmarked !== false);
+  equal(r.httpStatus, 403, "the non-secret HTTP status must reach the reader");
   const ok = await (await harness()).pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account: "alice" }, SENDER);
   equal(ok.known, true); assert(!("reason" in ok), "a successful lookup must not carry a failure reason");
 });
@@ -345,6 +346,20 @@ await test("reader save, delete and lookup show self-hosted causes", async () =>
   equal(await run(ld, () => ({ known: false, reason: "not_api", account: ld }), () => {}), "bookmarkErrNotApi");
   equal(await run("alice", m => m.type === "mdReaderBookmarkState" ? known("alice") : { status: "failed", reason: "not_logged_in", account: "alice" },
     w => w.pbpReaderBookmarkAction("later")), "readerBookmarkAccountChanged");
+});
+await test("reader lookup of a rejected self-hosted token names the token, not a missing connection", async () => {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  const frame = document.createElement("iframe"); document.body.append(frame);
+  try {
+    const w = frame.contentWindow, ld = "linkding:https://ld.example:c1";
+    w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+    w.eval(await (await fetch("../shared.js")).text());
+    w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p, sendMessage: async () => ({ known: false, reason: "not_logged_in", httpStatus: 401, account: ld }), onMessage: { addListener() {} } } };
+    w.t = k => k; w.eval(runtime);
+    w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account: ld, bookmark: { tags: [], notes: "" } } }));
+    await new Promise(r => setTimeout(r, 40));
+    equal(w.document.getElementById("reader-bookmark-status").textContent, "bookmarkErrAuth");
+  } finally { frame.remove(); }
 });
 await test("real reader editor shows the configured privacy default and saves the user's checkbox choice", async () => {
   runtime ||= await (await fetch("../md-bookmark.js")).text();

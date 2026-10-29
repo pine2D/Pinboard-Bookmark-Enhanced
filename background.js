@@ -1316,6 +1316,7 @@ async function pbpReaderBookmarkRequest(message, sender) {
     let result = { known: false, account: context.account };
     // A non-secret product code, so the reader can name why status is unknown.
     if (lookup.lookupFailed && typeof lookup.reason === "string") result.reason = lookup.reason;
+    if (lookup.lookupFailed && Number.isInteger(lookup.httpStatus)) result.httpStatus = lookup.httpStatus;
     if (!lookup.lookupFailed && !lookup.exists) {
       result = { known: true, bookmarked: false, bookmark: pbpReaderInitialIntent(context, await loadSettings(), "save"), account: context.account };
     } else if (!lookup.lookupFailed) {

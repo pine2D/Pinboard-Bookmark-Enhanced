@@ -240,9 +240,11 @@ async function fetchAllUserTags(token) {
   try {
     const resp = await (pbpBookmarkServiceId(settings) === "pinboard" ? pinboardFetch(`https://api.pinboard.in/v1/tags/get?auth_token=${token}&format=json`) : pbpPopupBookmarkApi("tags"));
     if (!pbpPopupTagAccountIsCurrent(account)) return;
-    if (resp.status === 401) return; // pinboardFetch already redirected to login
+    const tagService = pbpBookmarkServiceId(settings);
+    // Self-hosted never redirects to the Pinboard login, so only Pinboard may stay silent on 401.
+    if (resp.status === 401 && tagService === "pinboard") return; // pinboardFetch already redirected to login
     if (!resp.ok) {
-      const tagFailureKey = pbpBookmarkServiceId(settings) === "pinboard" ? "" : pbpBookmarkFailureKey(resp.error, pbpBookmarkServiceId(settings));
+      const tagFailureKey = pbpBookmarkFailureKey({reason:resp.error, httpStatus:resp.status}, tagService);
       showTagSyncError(tagFailureKey || classifyPinboardError(resp));
       return;
     }

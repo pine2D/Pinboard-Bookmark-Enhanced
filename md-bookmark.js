@@ -133,7 +133,7 @@
 
   // Self-hosted failure key for a background result; "" keeps the default copy.
   function failureKey(result) {
-    return typeof pbpBookmarkFailureKey === "function"
+    return typeof pbpBookmarkFailureKey === "function" && typeof pbpBookmarkAccountService === "function"
       ? pbpBookmarkFailureKey(result, pbpBookmarkAccountService(context?.account)) : "";
   }
 
@@ -144,7 +144,7 @@
       return false;
     }
     state = result?.known ? result : { known: false };
-    if (!state.known) showStatus(failureKey(result?.reason) || "readerBookmarkLookupFailed");
+    if (!state.known) showStatus(failureKey({reason:result?.reason, httpStatus:result?.httpStatus}) || "readerBookmarkLookupFailed");
     else paint();
     return state.known;
   }
