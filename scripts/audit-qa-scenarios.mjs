@@ -31,6 +31,7 @@ export const QA_SCENARIOS = [
   ...QA_OPTIONS_PANELS.map(panel => row(`options.panel.${panel}`, 'options', panel, ['options'], [panel, 'settings', ...(panel === 'vocab' ? ['dictionary-packs'] : [])], ['interaction', 'layout'], {}, panel === 'vocab' ? { files: [...files.options, 'dict-pack.js', 'scripts/audit-vocab-pack-fixture.mjs'] } : {})),
   ...QA_OPTIONS_PANELS.map(panel => row(`options.layout.${panel}`, 'layouts', `options-${panel}`, ['options'], [panel, 'settings'], ['layout'], narrowAxes)),
   row('options.locale-refresh', 'options-save', 'locale-refresh', ['options'], ['settings', 'locale'], ['interaction']),
+  row('options.bookmark-gateway', 'options-save', 'bookmark-gateway', ['options'], ['settings', 'bookmark', 'gateway'], ['interaction', 'layout'], narrowAxes),
   row('options.save-failure', 'options-save', 'save-failure', ['options'], ['settings', 'save', 'retry'], ['interaction', 'layout', 'error'], narrowAxes),
   ...['vocab-list', 'vocab-detail', 'vocab-rich-detail', 'vocab-batch-bar', 'vocab-export-menu', 'notes-two-pane', 'notes-same-page', 'narrow'].map(step => row(`library.${step}`, 'library', step, ['library'], [step.startsWith('notes') ? 'notes' : 'vocabulary', ...(step.includes('export') ? ['export'] : [])], ['interaction', 'layout'], step === 'narrow' ? { viewport: ['420'] } : {})),
   ...['base', 'help-overlay', 'search', 'dictionary', 'highlight-bar', 'highlight', 'export-rail', 'ask-panel', 'translate-ask', 'translate'].map(step => row(`reader.${step}`, 'preview', step, ['reader'], [step.startsWith('highlight') ? 'highlight' : step.startsWith('translate') ? 'translation' : step === 'ask-panel' ? 'ask' : step], ['interaction'], {}, { needsNetwork: ['dictionary', 'ask-panel', 'translate'].includes(step) })),
@@ -106,7 +107,7 @@ export function qaExpectedCases(scenario, axes = {}, { font = 'native', represen
       const cases = scenario.step === 'history' ? [{ mode: 'dark', width: 360, tier: 2 }] : qaReaderControlCases(locale, axes, { representative });
       for (const c of cases) rows.push({ locale, viewport: c.width, scheme: c.mode, density: c.tier === 2 ? 'large' : 'default' });
     }
-  } else if (scenario.id.startsWith('qa.options.layout.') || scenario.id === 'qa.options.save-failure') {
+  } else if (scenario.id.startsWith('qa.options.layout.') || scenario.id === 'qa.options.save-failure' || scenario.id === 'qa.options.bookmark-gateway') {
     for (const locale of selected(axes, 'locale', QA_LOCALES)) for (const density of selected(axes, 'density', narrowAxes.density))
       for (const scheme of selected(axes, 'scheme', narrowAxes.scheme)) for (const viewport of selected(axes, 'viewport', [320, 420])) rows.push({ locale, density, scheme, viewport: Number(viewport) });
   } else if (scenario.id === 'qa.reader.layout.ask') {

@@ -9600,6 +9600,44 @@ async function runSweep(page, sw, extBase) {
       await scan("options", "save-failure");
     }
 
+    // Access gateway of Karakeep / linkding: the fields render only for the
+    // chosen service radio and gateway type; the pending hint only once the
+    // form differs from the stored gateway (nothing is ever connected here).
+    const GATEWAY_CONTEXTS = [["bookmark-karakeep-cloudflare", "karakeep", "cloudflare"], ["bookmark-karakeep-custom", "karakeep", "custom"],
+      ["bookmark-linkding-cloudflare", "linkding", "cloudflare"], ["bookmark-linkding-custom", "linkding", "custom"]];
+    const wantsPending = wants("options", "bookmark-gateway-pending");
+    for (const [name, service, type] of GATEWAY_CONTEXTS) {
+      const isPendingBase = wantsPending && name === "bookmark-linkding-cloudflare";
+      if (!wants("options", name) && !isPendingBase) continue;
+      await page.click("#tab-general");
+      await page.waitForTimeout(150);
+      await page.evaluate(({ service, type }) => {
+        const radio = document.querySelector(`input[name="bookmark-service"][value="${service}"]`);
+        radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true }));
+        const gateway = document.getElementById("opt-" + service + "-gateway");
+        gateway.value = type; gateway.dispatchEvent(new Event("change", { bubbles: true }));
+      }, { service, type });
+      await page.waitForTimeout(150);
+      if (wants("options", name)) await scan("options", name);
+      if (isPendingBase) {
+        await page.evaluate(() => {
+          const id = document.getElementById("opt-linkding-cf-id");
+          id.value = "a"; id.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        await page.waitForTimeout(150);
+        await scan("options", "bookmark-gateway-pending");
+      }
+      await page.evaluate(({ service }) => {
+        const gateway = document.getElementById("opt-" + service + "-gateway");
+        gateway.value = "none"; gateway.dispatchEvent(new Event("change", { bubbles: true }));
+        for (const input of document.querySelectorAll(`#${service}-gateway-cloudflare input, #${service}-gateway-custom input`)) {
+          input.value = ""; input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        const radio = document.querySelector('input[name="bookmark-service"][value="pinboard"]');
+        radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true }));
+      }, { service });
+    }
+
     // Alibaba Cloud Model Studio's region list box and workspace field only
     // render while that provider is selected; the warning only once the pair
     // forms no request host (Tokyo has no shared address and needs an ID).

@@ -48,6 +48,13 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     context('vocab-pack-installed', ['vocab-pack-preview'], { target: '#multi-pack-list button[data-pack-action]' }),
     context('vocab-pack-delete-confirm', ['vocab-pack-installed'], { target: '.confirm-popover .confirm-subject' }),
     context('save-failure', [], { target: '#auto-save-retry' }),
+    // Access gateway of the self-hosted bookmark services (hidden until the
+    // service radio and the gateway type are chosen).
+    context('bookmark-karakeep-cloudflare', [], { target: '#karakeep-gateway-cloudflare:not([hidden]) #opt-karakeep-cf-secret' }),
+    context('bookmark-karakeep-custom', [], { target: '#karakeep-gateway-custom:not([hidden]) #opt-karakeep-gw-value-4' }),
+    context('bookmark-linkding-cloudflare', [], { target: '#linkding-gateway-cloudflare:not([hidden]) #opt-linkding-cf-secret' }),
+    context('bookmark-linkding-custom', [], { target: '#linkding-gateway-custom:not([hidden]) #opt-linkding-gw-value-4' }),
+    context('bookmark-gateway-pending', ['bookmark-linkding-cloudflare'], { target: '#linkding-gateway-pending:not([hidden])' }),
     context('ai-qwen-fields', [], { target: '#fields-qwen:not([hidden]) #opt-qwen-region-btn' }),
     context('ai-qwen-workspace-warn', ['ai-qwen-fields'], { target: '#qwen-workspace-warn:not([hidden])' }),
     context('ai-provider-ark', [], { target: '#fields-ark:not([hidden]) #opt-ark-region-btn' }),

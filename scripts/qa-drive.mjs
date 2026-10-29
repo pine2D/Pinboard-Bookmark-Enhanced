@@ -3006,6 +3006,74 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
       "default General tab still renders or writes the retired Drive data-scope controls");
     s.notes.push("PASS: default General entry refreshes a same-version stale locale and renders no Drive data-scope controls.");
     }
+    if (includesStep("bookmark-gateway")) {
+      await page.goto(`chrome-extension://${extId}/options.html#general`);
+      await page.waitForFunction(() => document.documentElement.hasAttribute("data-options-ready"));
+      const gatewayGeometry = (service, visibleIds) => page.evaluate(({service, visibleIds}) => {
+        const rect = (e) => { const r = e.getBoundingClientRect(); return { width: r.width, height: r.height, left: r.left, right: r.right }; };
+        const out = { overflow: document.documentElement.scrollWidth - innerWidth, viewport: innerWidth, boxes: {} };
+        for (const id of ["opt-" + service + "-gateway-btn", "connect-" + service, ...visibleIds]) {
+          const e = document.getElementById(id);
+          out.boxes[id] = e ? { ...rect(e), visible: !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length) } : null;
+        }
+        out.containers = { cloudflare: document.getElementById(service + "-gateway-cloudflare").hidden, custom: document.getElementById(service + "-gateway-custom").hidden };
+        out.selectVisible = !!document.getElementById("opt-" + service + "-gateway-btn")?.offsetParent;
+        return out;
+      }, {service, visibleIds});
+      const assertGateway = (label, g, expectCf, expectCustom) => {
+        if (g.overflow > 1) throw new Error(`${label}: horizontal overflow ${g.overflow}px`);
+        if (g.containers.cloudflare !== !expectCf || g.containers.custom !== !expectCustom) throw new Error(`${label}: container visibility wrong ${JSON.stringify(g.containers)}`);
+        for (const [id, r] of Object.entries(g.boxes)) {
+          if (!r || !r.visible || r.width <= 0 || r.height <= 0 || r.left < 0 || r.right > g.viewport + 1) throw new Error(`${label}: ${id} not fully visible ${JSON.stringify(r)}`);
+        }
+      };
+      const setGateway = async (service, type) => {
+        await page.evaluate(({service, type}) => {
+          const radio = document.querySelector(`input[name="bookmark-service"][value="${service}"]`);
+          radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true }));
+          const gateway = document.getElementById("opt-" + service + "-gateway");
+          gateway.value = type; gateway.dispatchEvent(new Event("change", { bubbles: true }));
+        }, {service, type});
+        await page.waitForTimeout(150);
+      };
+      const gatewayCases = activeScenario
+        ? axisValues("locale", ["en","zh_CN","zh_TW","zh_HK","ja","de","fr","pl","ru"]).flatMap(locale => axisValues("scheme", ["light","dark"]).flatMap(mode =>
+          axisValues("density", ["comfortable","compact"]).flatMap(density => axisValues("viewport", [320,420]).map(width => ({locale, mode, density, width})))))
+        : [null];
+      for (const gc of gatewayCases) {
+      if (gc) {
+        await page.evaluate(async (lang) => { await chrome.storage.local.set({optLang:lang}); initI18n(); await pbpI18nReady(); }, gc.locale);
+        await page.setViewportSize({ width: gc.width, height: 640 });
+        await page.evaluate(({mode,density}) => {
+          document.documentElement.dataset.theme = mode === "dark" ? "catppuccin-mocha" : "modern-card";
+          document.documentElement.dataset.density = density;
+        }, gc);
+      }
+      const tag = gc ? `-${gc.locale}-${gc.density}-${gc.mode}-${gc.width}` : "";
+      for (const service of ["karakeep", "linkding"]) {
+        // Default state first: the gateway select and Connect are all a new user sees.
+        await setGateway(service, "none");
+        await page.locator("#opt-" + service + "-gateway-btn").scrollIntoViewIfNeeded();
+        assertGateway(`${service} none`, await gatewayGeometry(service, []), false, false);
+        await rep.shot(page, s, `bookmark-gateway-${service}-none${tag}`);
+        const cases = [["cloudflare", ["opt-" + service + "-cf-id", "opt-" + service + "-cf-secret"]],
+          ["custom", [1,2,3,4].flatMap(n => ["opt-" + service + "-gw-name-" + n, "opt-" + service + "-gw-value-" + n])]];
+        for (const [type, ids] of cases) {
+          await setGateway(service, type);
+          await page.locator("#connect-" + service).scrollIntoViewIfNeeded();
+          assertGateway(`${service} ${type}`, await gatewayGeometry(service, ids), type === "cloudflare", type === "custom");
+          await rep.shot(page, s, `bookmark-gateway-${service}-${type}${tag}`);
+        }
+        await setGateway(service, "none");
+      }
+      if (gc) recordCase({ locale: gc.locale, scheme: gc.mode, density: gc.density, viewport: gc.width });
+      }
+      await page.evaluate(() => {
+        const radio = document.querySelector('input[name="bookmark-service"][value="pinboard"]');
+        radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      s.notes.push("PASS: Karakeep and linkding access gateway (none, Cloudflare, custom) stay inside the viewport with the Connect button visible.");
+    }
     if (!includesStep("save-failure")) return;
     await page.goto(`chrome-extension://${extId}/options.html#general`);
     await page.waitForFunction(() => document.documentElement.hasAttribute("data-options-ready")
