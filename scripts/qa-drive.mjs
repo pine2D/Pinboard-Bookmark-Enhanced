@@ -3016,13 +3016,17 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
           const e = document.getElementById(id);
           out.boxes[id] = e ? { ...rect(e), visible: !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length) } : null;
         }
-        out.containers = { cloudflare: document.getElementById(service + "-gateway-cloudflare").hidden, custom: document.getElementById(service + "-gateway-custom").hidden };
-        out.selectVisible = !!document.getElementById("opt-" + service + "-gateway-btn")?.offsetParent;
+        // Rendered, not the [hidden] property: a display rule can override [hidden].
+        const rendered = (e) => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length);
+        const cf = document.getElementById(service + "-gateway-cloudflare"), custom = document.getElementById(service + "-gateway-custom");
+        out.containers = { cloudflare: cf.hidden, custom: custom.hidden };
+        out.rendered = { cloudflare: rendered(cf), custom: rendered(custom) };
         return out;
       }, {service, visibleIds});
       const assertGateway = (label, g, expectCf, expectCustom) => {
         if (g.overflow > 1) throw new Error(`${label}: horizontal overflow ${g.overflow}px`);
-        if (g.containers.cloudflare !== !expectCf || g.containers.custom !== !expectCustom) throw new Error(`${label}: container visibility wrong ${JSON.stringify(g.containers)}`);
+        if (g.rendered.cloudflare !== expectCf || g.rendered.custom !== expectCustom) throw new Error(`${label}: rendered containers wrong ${JSON.stringify(g.rendered)}`);
+        if (g.containers.cloudflare !== !expectCf || g.containers.custom !== !expectCustom) throw new Error(`${label}: container [hidden] wrong ${JSON.stringify(g.containers)}`);
         for (const [id, r] of Object.entries(g.boxes)) {
           if (!r || !r.visible || r.width <= 0 || r.height <= 0 || r.left < 0 || r.right > g.viewport + 1) throw new Error(`${label}: ${id} not fully visible ${JSON.stringify(r)}`);
         }
@@ -3036,6 +3040,7 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
         }, {service, type});
         await page.waitForTimeout(150);
       };
+      try {
       const gatewayCases = activeScenario
         ? axisValues("locale", ["en","zh_CN","zh_TW","zh_HK","ja","de","fr","pl","ru"]).flatMap(locale => axisValues("scheme", ["light","dark"]).flatMap(mode =>
           axisValues("density", ["comfortable","compact"]).flatMap(density => axisValues("viewport", [320,420]).map(width => ({locale, mode, density, width})))))
@@ -3068,10 +3073,12 @@ async function driveOptionsSaveFeedback(context, extId, rep) {
       }
       if (gc) recordCase({ locale: gc.locale, scheme: gc.mode, density: gc.density, viewport: gc.width });
       }
-      await page.evaluate(() => {
-        const radio = document.querySelector('input[name="bookmark-service"][value="pinboard"]');
-        radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true }));
-      });
+      } finally {
+        await page.evaluate(() => {
+          const radio = document.querySelector('input[name="bookmark-service"][value="pinboard"]');
+          radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true }));
+        }).catch(() => {});
+      }
       s.notes.push("PASS: Karakeep and linkding access gateway (none, Cloudflare, custom) stay inside the viewport with the Connect button visible.");
     }
     if (!includesStep("save-failure")) return;
