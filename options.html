@@ -413,6 +413,14 @@
           </div>
         </div>
         <div class="fg entry-block context-help-host" data-help-role="field">
+          <label class="bl" for="opt-tag-presets" data-i18n="labelTagPresets">Tag Presets</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="tagPresetsHint">Format: <code>Name: tag1, tag2, tag3</code>. Each preset appears as a quick-add button in the popup.</p>
+          </details>
+          <textarea id="opt-tag-presets" rows="4" placeholder="One preset per line:&#10;Work: project, review, report&#10;Dev: programming, tutorial, tool" data-i18n-placeholder="tagPresetsPlaceholder"></textarea>
+        </div>
+        <div class="fg entry-block context-help-host" data-help-role="field">
           <label class="bl subhead" id="tag-sync-label" data-i18n="tagSyncLabel">Tag Cache Strategy</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
@@ -423,14 +431,6 @@
             <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-fresh" value="fresh" aria-labelledby="opt-tag-sync-fresh-name" aria-describedby="opt-tag-sync-fresh-desc" /> <span class="pick-text"><span id="opt-tag-sync-fresh-name" data-i18n="tagSyncFresh">Live</span><span class="pick-desc" id="opt-tag-sync-fresh-desc" data-i18n="tagSyncFreshDesc">Fetches each time the popup opens. Slower.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
             <div class="pref-row"><label class="pick"><input type="radio" name="tag-sync-mode" id="opt-tag-sync-prewarmed" value="prewarmed" aria-labelledby="opt-tag-sync-prewarmed-name" aria-describedby="opt-tag-sync-prewarmed-desc" /> <span class="pick-text"><span id="opt-tag-sync-prewarmed-name" data-i18n="tagSyncPrewarmed">Prewarmed</span><span class="pick-desc" id="opt-tag-sync-prewarmed-desc" data-i18n="tagSyncPrewarmedDesc">Fetches in the background every 15 minutes, so the popup opens instantly.</span></span><span class="pick-mark" aria-hidden="true"></span></label></div>
           </div>
-        </div>
-        <div class="fg entry-block context-help-host" data-help-role="field">
-          <label class="bl" for="opt-tag-presets" data-i18n="labelTagPresets">Tag Presets</label>
-          <details class="context-help">
-            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="tagPresetsHint">Format: <code>Name: tag1, tag2, tag3</code>. Each preset appears as a quick-add button in the popup.</p>
-          </details>
-          <textarea id="opt-tag-presets" rows="4" placeholder="One preset per line:&#10;Work: project, review, report&#10;Dev: programming, tutorial, tool" data-i18n-placeholder="tagPresetsPlaceholder"></textarea>
         </div>
       </section>
     </div>
