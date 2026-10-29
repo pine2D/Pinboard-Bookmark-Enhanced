@@ -1016,10 +1016,19 @@ html[data-theme] .panel-foot a { color: var(--opt-fg-hint, var(--opt-fg-muted));
 .hint { color: var(--opt-fg-hint); margin: var(--opt-sp-1) 0 var(--opt-rhythm); }
 .fg > .hint { margin: var(--opt-sp-1) 0 0; }   /* inside a form group: tight to its control; the group's own margin-bottom (10px) provides separation */
 .fg + .hint { margin-top: -6px; }  /* a hint owned by the preceding group: pull close (net ~4px gap above, 10px below) */
+/* Paragraphs of one note sit 4px apart wherever the note lives (critique 6,
+   SP-04): inside a .fg they were 2px apart, as bare siblings 12px (the first
+   paragraph's rhythm margin-bottom). The negative top margin takes the
+   rhythm back out -- it collapses to 4px in block flow and sums to 4px in a
+   grid help host, where margins do not collapse. Answers inside a ? keep
+   their own 2px step (.context-help-body + .context-help-body); a hidden or
+   empty status line is not a paragraph, so it never pulls the next one up. */
+.hint:not(.context-help-body, [hidden], .hidden, :empty) + .hint:not(.context-help-body, :empty) { margin-top: calc(var(--opt-sp-2) - var(--opt-rhythm)); }
+.fg > .hint:not(.context-help-body, [hidden], .hidden, :empty) + .hint:not(.context-help-body, :empty) { margin-top: var(--opt-sp-2); }
 /* Shortcut rows ("[label] <keys> [Open Chrome Shortcut Settings]") are a plain
    .fg-actions: its gap spaces the parts and a wrapped button starts flush at
    the row's edge (the old `.shortcut-current + .btn` margin-left kept its
-   indent after wrapping). A leading "Shortcut:" hint drops its block rhythm. */
+   indent after wrapping). A status hint inside a row drops its block rhythm. */
 .fg-actions > .hint { margin: 0; }
 .fg.entry-block > .fg-actions:first-child { margin-top: 0; }
 /* :not(.btn): a button-styled link inside a hint (the Chrome shortcut
