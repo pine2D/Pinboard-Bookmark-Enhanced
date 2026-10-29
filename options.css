@@ -1066,15 +1066,31 @@ html[data-theme] .panel-foot a { color: var(--opt-fg-hint, var(--opt-fg-muted));
   font-size: var(--opt-text-helper);
   line-height: var(--opt-lh-helper);
 }
+/* Warning lines (critique 6, TH-12). The triangle is Lucide v0.525.0
+   triangle-alert (24-box, stroke 2) used as a mask, so it paints in
+   --opt-warn and follows every preset -- the old one was a hand-drawn 16-box
+   at stroke 1.5 with #c0840a baked into the data URI. It hangs in the panel's
+   left padding (16px) so the warning's text starts on the same edge as every
+   other hint and wrapped lines stay under the text, not under the icon. Below
+   600px the panel padding shrinks toward 8px, so the line takes a hanging
+   indent instead: icon at the column edge, text after one sp-6 step. */
+.hint-warn { position: relative; }
 .hint-warn::before {
   content: "";
-  display: inline-block;
-  width: 11px; height: 11px;
-  margin-right: var(--opt-sp-2);
-  vertical-align: -2px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23c0840a' stroke-width='1.5' stroke-linejoin='round'%3E%3Cpath d='M8 2 15 14H1Z'/%3E%3Cpath d='M8 6.5v3.5' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='12' r='0.6' fill='%23c0840a' stroke='none'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-size: contain;
+  position: absolute;
+  left: calc(-12px - var(--opt-sp-1));
+  top: calc((var(--opt-lh-helper) - 12px) / 2);
+  width: 12px; height: 12px;
+  background-color: var(--opt-warn);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+@media (max-width: 600px) {
+  .hint-warn { padding-left: var(--opt-sp-6); }
+  .hint-warn::before { left: 0; }
+}
+@media (forced-colors: active) {
+  .hint-warn::before { background-color: CanvasText; }
 }
 .opt-error { font-size: 12px; color: var(--opt-danger); margin: var(--opt-sp-2) 0 var(--opt-sp-4); padding: var(--opt-sp-3) var(--opt-sp-4); background: color-mix(in srgb, var(--opt-danger) 8%, var(--opt-bg)); border: 1px solid var(--opt-error-border); border-radius: var(--opt-radius-sm); }
 .opt-error.hidden { display: none; }

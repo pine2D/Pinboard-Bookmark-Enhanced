@@ -1664,7 +1664,7 @@ contrast-audit 的宿主分离段直接守（F1–F3）。
 | md-preview | `.exp-scope.row` | 导出内容选择沿用 26px action-btn 与 sp-2 按钮间距；短文案同排、长文案按钮独立换行；摘要和附问答开关由相邻关系以 sp-2 分隔 |
 | md-preview | `#reader-bookmark-section` / `#reader-bookmark-footer` / `#reader-bookmark-editor.pop-panel` | 保存区复用 rail-section/row/msg-bar；文末操作随正文宽度、上距 sp-5；编辑器沿用 pop-panel、宽 ≤420px 且距视口两侧 sp-4、字段与操作按钮 26px、组间 sp-3，窄窗在浮层内滚动 |
 | options | `.fg-actions` | 按钮/状态行：flex + gap sp-4；作 `.fg` 末子元素时 `margin-top: --opt-label-gap`（8/4），作 `.fg` 的兄弟或 `.pf` 子元素时 `sp-6`；Send-to 卡片测试行 `sp-6` |
-| options | `.hint` / `.hint-warn` | 辅助文字 `--opt-text-helper`/`--opt-lh-helper`（12/18）；`.fg > .hint` 距控件 sp-1；组外 `margin: sp-1 0 rhythm` |
+| options | `.hint` / `.hint-warn` | 辅助文字 `--opt-text-helper`/`--opt-lh-helper`（12/18）；`.fg > .hint` 距控件 sp-1；组外 `margin: sp-1 0 rhythm`。`.hint-warn` 的三角是 Lucide triangle-alert 遮罩（12px、线宽 2、`--opt-warn` 着色），挂在左侧留白里（`left: -(12px + sp-1)`），文字与其他说明同一左缘；600px 以下改为悬挂缩进（`padding-left: sp-6`，图标在列左缘）（第六轮 TH-12） |
 | options | `.section-title` | h2，`--opt-text-section`/`--opt-lh-section`，600，`margin: 0 0 --opt-sp-5` |
 | options | `details.disclosure` + `.disclosure-body` | 唯一折叠原语；标题 = section-title 面 + 右侧 chevron；成员自带上边线，堆叠对称 12px；正文齐平，`> :last-child` 去下 margin；summary 字号/行高同 `.section-title`；`.disclosure-subsection` 用正文字号/行高、600 字重，供「发送目标」内的目标标题，与 400 字重的字段标签组成第三层，沿用同一折叠机制 |
 | options | `.context-help-host` (+ `-section` / `-action-row`) | 上下文帮助宿主 grid；24px 帮助按钮**不参与行高**（零高 margin box）；纯文字角色 baseline 锚定、带控件角色 center 锚定（§2.5） |

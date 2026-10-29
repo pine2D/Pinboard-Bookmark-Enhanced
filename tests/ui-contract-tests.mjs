@@ -770,6 +770,24 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
   check(stateUsesBtnFgMuted,
     "options.css: .connection-health-state's base rule no longer reads --opt-btn-fg-muted for its (rest + hover) text color");
 
+  // Critique 6 TH-12: the warning triangle is Lucide triangle-alert (24-box,
+  // stroke 2) painted through a mask in --opt-warn, hung in the left padding
+  // so the warning's text starts on the hint edge; below 600px it becomes a
+  // hanging indent. A colour baked into the SVG (the old #c0840a) or a
+  // background-image triangle would ignore every preset again.
+  const warnIcon = rules.filter((r) => r.context.length === 0 && r.selectors.includes(".hint-warn::before"));
+  const warnDecls = warnIcon.flatMap((r) => parseDeclarations(r.body));
+  const warnDecl = (prop) => warnDecls.filter((d) => d.property === prop).map((d) => d.value).pop() || "";
+  const warnMask = warnDecl("mask");
+  check(warnIcon.length === 1 && warnDecl("background-color") === "var(--opt-warn)" && !warnDecl("background-image")
+      && /viewBox='0 0 24 24'/.test(warnMask) && /stroke-width='2'/.test(warnMask) && warnMask.includes("m21.73 18-8-14")
+      && !/%23[0-9a-f]{3,8}|#[0-9a-f]{3,8}|rgb\(|hsl\(/i.test(warnMask) && warnDecl("-webkit-mask") === warnMask
+      && warnDecl("position") === "absolute" && /^calc\(-/.test(warnDecl("left")),
+    "options.css: .hint-warn::before must be the Lucide triangle-alert mask (24-box, stroke 2, no colour literal) painted in var(--opt-warn) and hung left of the text (position: absolute; negative left) -- critique 6 TH-12");
+  const narrowWarn = rules.filter((r) => r.context.some((c) => /max-width:\s*600px/.test(c)) && r.selectors.includes(".hint-warn"));
+  check(narrowWarn.some((r) => parseDeclarations(r.body).some((d) => d.property === "padding-left" && /^var\(--opt-sp-\d\)$/.test(d.value))),
+    "options.css: below 600px .hint-warn must take a hanging indent (padding-left on the spacing scale) instead of hanging its icon in the shrinking panel padding");
+
   const offenders = [];
   for (const rule of rules) {
     // :disabled is the one documented WCAG 1.4.3 exemption (plan §0 /
