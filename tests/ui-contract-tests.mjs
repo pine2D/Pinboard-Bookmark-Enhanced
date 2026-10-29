@@ -259,10 +259,11 @@ check(optionsHtml.includes('data-i18n="secBackupRestore">Backup &amp; Restore</h
       `options.html: sub row #${ownId} names data-parent="${parent}", which is not a checkbox outside the row`);
   }
   // Indented field blocks hold controls too; each one that does must name its
-  // parent switch the same way. A block with no control (the archive.org
-  // "Get key" link line) just follows its neighbours' indent.
+  // parent switch the same way. A block with no control just follows its
+  // neighbours' indent (the archive.org "Get key" line was one until it moved
+  // under the S3 Access Key field).
   const blockOpens = [...html.matchAll(/<(?:div|p)\b[^>]*\bclass="[^"]*\bentry-block-sub\b[^"]*"[^>]*>/g)];
-  check(blockOpens.length >= 9, `options.html: expected at least nine .entry-block-sub blocks, found ${blockOpens.length}`);
+  check(blockOpens.length >= 8, `options.html: expected at least eight .entry-block-sub blocks, found ${blockOpens.length}`);
   for (const m of blockOpens) {
     const tail = html.slice(m.index + m[0].length, m.index + m[0].length + 1500);
     const ownId = (tail.match(/<(?:input|textarea|select)\b[^>]*\bid="([^"]+)"/) || [])[1];
