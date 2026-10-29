@@ -1872,6 +1872,16 @@ html[data-theme] .fg.entry-block-sub[data-off] > label.bl { color: var(--opt-fg-
    margin. In a block-flow .fg the margin collapses through; in a grid help
    host it shrinks the last track by the same amount. */
 .fg > .pref-group:last-child { margin-bottom: calc(-1 * var(--opt-row-pad-y)); }
+/* Group subhead -> its first row (critique 6, SP-02): 12 between the two
+   texts everywhere, as under Chrome Sync. The row's own padding already
+   supplies 12 (compact 8), so the group's top margin is what is left of
+   sp-5. Without this a subhead whose ? sits beside it read 16 (the help
+   host's sp-2 + padding) and a field-role one 20 (label gap + padding).
+   Open answers keep their own 8px band (.context-help[open] + *). In block
+   flow (no ?) the subhead's label-gap margin collapses with this one, so
+   that gap comes out too. */
+.fg.context-help-host > .context-help:not([open]) + .pref-group { margin-top: calc(var(--opt-sp-5) - var(--opt-row-pad-y)); }
+.fg > .bl.subhead + .pref-group { margin-top: calc(var(--opt-sp-5) - var(--opt-row-pad-y) - var(--opt-label-gap)); }
 /* The field label face: body size/line-height/colour and the label ->
    control gap. The `html[data-theme]` twin keeps the label body colour
    under every preset theme (spec §2) against `html[data-theme] .fg label
@@ -1893,15 +1903,18 @@ html[data-theme] .fg.entry-block-sub[data-off] > label.bl { color: var(--opt-fg-
    selector ((0,3,2)) outranks it -- and `.wayback-log-heading .bl
    { margin-bottom: 0 }` ((0,2,0)) too -- so a group title
    (`#batch-ai-title`, the wayback log heading) keeps --opt-label-gap (8px comfortable, 4px compact, e.g.
-   terminal) whenever a preset is active. That is a KNOWN, PARKED defect
-   (pre-existing since stage 0; stage 3c final review S2), left in place
-   for the user's call -- the fix would be a themed-only pixel change,
-   `html[data-theme] .context-help-host[data-help-role="group"] > .bl {
-   margin-bottom: 0 }`. */
+   terminal) whenever a preset is active. That defect (pre-existing since
+   stage 0; stage 3c final review S2) was parked until critique 6 SP-02
+   ("group subhead -> first item 12, everywhere") made it a measured
+   regression: under a preset the 8px margin grew the help host's first grid
+   row and put Bookmark Service's radios 20px under their subhead. The themed
+   twins below restore the zero margin. */
 .fg :is(label, div).bl,
 html[data-theme] .fg :is(label, div).bl {
   font-size: var(--opt-text-body); line-height: var(--opt-lh-body); color: var(--opt-fg); margin-bottom: var(--opt-label-gap);
 }
+html[data-theme] .context-help-host[data-help-role="group"] > .bl,
+html[data-theme] .wayback-log-heading .bl { margin-bottom: 0; }
 /* Hierarchy inside a section is carried by type, never by indentation:
    section title (16/600) > group subhead (13/600) > setting row (14/400).
    `.subhead` marks a `.bl` that names a GROUP (radio sets, chip sets, the
