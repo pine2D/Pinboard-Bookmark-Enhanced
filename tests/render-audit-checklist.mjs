@@ -1461,7 +1461,12 @@ export const CHECKS = [
   // Context help is intentionally quieter than an ordinary ghost action:
   // the 24px hit target remains, while hover is communicated by glyph
   // color/opacity rather than exposing the whole target as a filled button.
-  { surface: "options", page: "options.html", selector: ".context-help > summary.context-help-toggle", state: "hover",
+  // Anchored to the Popup tab (Popup width help): the bare selector's
+  // first DOM match became the Karakeep gateway help once the access
+  // gateway field landed on the Account tab, and that toggle sits inside the
+  // hidden self-hosted block, so the real-pointer hover could never reach
+  // it. Popup width was the bare selector's first match before then.
+  { surface: "options", page: "options.html", selector: "#panel-popup .context-help > summary.context-help-toggle", tab: "popup", state: "hover",
     expect: { backgroundAlphaMax: 0 } },
 
   // ---- defect 3: .vocab-group-chip is `padding: 0 4px` on a `radius-full`
