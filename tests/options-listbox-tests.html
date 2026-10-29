@@ -1638,15 +1638,22 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
   });
 
   // B30: the colon after "Shortcut" was literal HTML, so every locale got an
-  // ASCII ": " (Chinese showed "快捷键: "). It now belongs to the message.
-  test("shortcut lines: the label's colon comes from labelShortcut, not the markup", () => {
+  // ASCII ": " (Chinese showed "快捷键: "). Critique 6 TH-9 then moved the
+  // Quick Save / Read Later label off the action row (a 12px inline hint) onto
+  // its own .bl line above it, the shape the popup and reader shortcut rows
+  // use -- a field label, so neither the message nor the markup carries a colon.
+  test("shortcut lines: Quick Save and Read Later label their shortcut on its own .bl line", () => {
     const labels = [...doc.querySelectorAll('[data-i18n="labelShortcut"]')];
     assert(labels.length === 2, "expected the Quick Save + Read Later shortcut labels, got " + labels.length);
-    for (const span of labels) {
-      assert(span.textContent === enMessages.labelShortcut.message, "label text " + JSON.stringify(span.textContent));
-      const next = span.nextSibling;
-      assert(!next || next.nodeType !== 3 || !/[:：]/.test(next.textContent),
-        "markup still adds its own colon after the label: " + JSON.stringify(next && next.textContent));
+    assert(!/[:：]\s*$/.test(enMessages.labelShortcut.message), "labelShortcut still ends in a colon: " + JSON.stringify(enMessages.labelShortcut.message));
+    const peers = [doc.getElementById("popup-shortcut-label"), doc.getElementById("md-shortcut-label")];
+    for (const label of [...labels, ...peers]) {
+      assert(label && label.tagName === "DIV" && label.classList.contains("bl") && !label.classList.contains("hint"),
+        "shortcut label is not a .bl line: " + (label && label.outerHTML));
+      const row = label.nextElementSibling;
+      assert(row && row.classList.contains("fg-actions") && row.querySelector(".shortcut-current"),
+        "shortcut label is not directly above its action row: " + (label && label.id));
+      assert(!row.querySelector(".hint"), "the action row still carries an inline label: " + label.id);
     }
   });
 

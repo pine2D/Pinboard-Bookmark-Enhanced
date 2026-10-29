@@ -19,7 +19,7 @@
       "vocabDriveScope", "backupPreviewSemantics"
     ],
     "status": [
-      "bookmarkConnectPending", "labelShortcut", "aiUnavailableHint", "previewAiUnavailableHint", "aiCustomLocked",
+      "bookmarkConnectPending", "aiUnavailableHint", "previewAiUnavailableHint", "aiCustomLocked",
       "aiCustomFieldInvalid", "aiProtocolUnknown", "aiCustomBaseUrlInvalid", "aiCustomKeyRebind", "aiCustomKeyPending",
       "backupIncludeSecretsHint",
       "#preview-ai-model-provider", "#multi-pack-name", "#tag-gov-overview", "#tag-gov-ai-status",
