@@ -374,6 +374,15 @@ export const COMPONENT_PAIR_SPEC = [
   // popup's btn-bg/panel to bg2 for this same registry's other rows.
   ["border", "btn-bg", 3],
   ["border", "panel", 3],
+  // A disabled choice mark (.pick, options only) is the same mark, fainter:
+  // a --border-section outline on no fill (COMPONENTS.md §6.4, 2026-10-29
+  // options critique 6, user ruling U2). Disabled controls are exempt from
+  // WCAG 1.4.11, so this is a VISIBILITY floor, not a legibility one: the
+  // outline must still separate from the panel it sits on. The previous
+  // btn-bg well measured 1.00:1 on terminal (btn-bg == panel) and the box
+  // vanished. terminal's border-section is an 8-digit alpha hex; it is
+  // composited over the panel (COMPOSITE_OVER_PANEL) like the chip fills.
+  ["border-section", "panel", 1.1, ["opt"], false, true],
   // Two rows below: the FOCUS EDGE vs the two fills a focusable control wears
   // (design-uplift follow-up 2026-08-06, independent review F1). COMPONENTS.md
   // §7.3 has demanded ">=3:1 against the adjacent background" since it was
@@ -801,6 +810,7 @@ export const DEFAULT_SURFACE_OPTIONAL_ROLE_REASONS = {
   "spinner-bg": "popup-only: hand-maintained UI-indicator base fill (spinner-fg IS a derived output; this is only what it's measured against)",
   link: "popup ONLY: an INPUT role there (4/13 pilots override ui.popup.<mode>.link), taken as the seed and moved only where it misses 4.5 on bg/bg2; on options it IS a UI_DERIVED_OUTPUT_ROLES member and stays strict. The popup link rows are defaultStrict either way",
   bg2: "popup-only: hand-maintained strip/secondary surface base token (popup's panel), same reasoning as bg; the popup link rows are defaultStrict, so it cannot silently SKIP there",
+  "border-section": "options-only: hand-maintained :root hairline literal, per theme the composer's ui.divider input (options-chrome.mjs), never a finalizeUiControlRoles output; its one row (the disabled .pick outline) is defaultStrict, so it cannot silently SKIP",
   "pf-bg": "options-only hand-maintained :root literal (provider sub-panel fill); per theme a composer map value (ui.bg2 or a pilot override), never a finalizeUiControlRoles output",
 };
 
@@ -849,7 +859,7 @@ function auditComponentPairs(scope, ns, blockLabel, dict, strict, isDefaultSurfa
   // unparseable, audit-breaking value.
   const panelRaw = roleRaw("panel");
   const panelRgb = panelRaw && isHex(panelRaw) ? hexRgb(panelRaw) : null;
-  const COMPOSITE_OVER_PANEL = new Set(["chip-bg", "tag-bg", "spinner-bg"]);
+  const COMPOSITE_OVER_PANEL = new Set(["chip-bg", "tag-bg", "spinner-bg", "border-section"]);
   const resolveRole = (role) => {
     const raw = roleRaw(role);
     if (!raw) return { rgb: null, note: `--${roleKey(role)} not declared` };

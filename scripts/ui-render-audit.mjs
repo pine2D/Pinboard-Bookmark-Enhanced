@@ -371,10 +371,15 @@ function compositeStack(rawColors) {
 // extraBgRaw) is a solid theme token, not a foreground painted over
 // something -- every `--{ns}-btn-hover` in the shipped CSS is a plain hex
 // literal (verified: grep -n -- '--lib-btn-hover:' library.css), so this
-// only needs the two imported parsers, no compositing.
+// only needs the two imported parsers, no compositing. One token is not
+// solid: terminal's --opt-border-section is an 8-digit #rrggbbaa (options
+// critique 6, the disabled .pick outline row). Both sides of an *EqVar
+// comparison drop alpha -- the rgba() branch below already slices it off the
+// computed colour -- so the token's #rrggbb part is what must match.
 function parseSolidColor(raw) {
   const s = String(raw || "").trim();
   if (!s) return null;
+  if (/^#[0-9a-f]{8}$/i.test(s)) return hexRgb(s.slice(0, 7));
   if (s.startsWith("#")) return hexRgb(s);
   const parsed = parseRgba(s);
   return parsed ? parsed.slice(0, 3) : null;
@@ -4480,21 +4485,25 @@ async function runOneCheckInPanel(page, theme, check, results, extBase) {
     // `enabled: true` also lifts a state-driven `disabled` for the probe (the
     // Appearance follow switch is disabled while no preset is picked, which is
     // exactly the default surface), restored with the checked value below.
-    const { input, checked, enabled } = check.seedChecked;
+    // `disabled: true` (options critique 6, U2) does the opposite: it
+    // disables the input for the probe so a row can pin the disabled .pick
+    // mark's faint outline; restored with the rest below.
+    const { input, checked, enabled, disabled } = check.seedChecked;
     // type: "radio" too (stage-3b Task 1, .pick) -- writing `.checked = true`
     // on a radio input is the SAME spec-defined DOM side effect as a real
     // user click for the rest of its native `name` group (every OTHER radio
     // sharing that name is automatically un-checked, no `change` event
     // needed either), so a `.pick-mark` checked-state seed needs nothing
     // beyond what this already does for a checkbox-backed `.switch-track`.
-    const prev = await page.evaluate(({ input, checked, enabled }) => {
+    const prev = await page.evaluate(({ input, checked, enabled, disabled }) => {
       const el = document.querySelector(input);
       if (!el || (el.type !== "checkbox" && el.type !== "radio")) return null;
       const was = { checked: el.checked, disabled: el.disabled };
       el.checked = checked;
       if (enabled) el.disabled = false;
+      if (disabled) el.disabled = true;
       return was;
-    }, { input, checked: !!checked, enabled: !!enabled });
+    }, { input, checked: !!checked, enabled: !!enabled, disabled: !!disabled });
     if (prev === null) throw new Error(`SETUP ERROR [${check.surface}|${theme}|${check.selector}|${check.state}]: seedChecked input not found or not a checkbox/radio: ${input}`);
     seedRestore = { input, checked: prev.checked, disabled: prev.disabled };
     // The `.switch-track` transition this settles lives on the row wrapping

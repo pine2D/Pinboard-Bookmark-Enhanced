@@ -1145,24 +1145,23 @@ function pickRules(ns) {
       ["outline", "none"],
       ["box-shadow", `var(--${ns}-focus-ring)`],
     ]),
-    // Disabled: the unchecked mark goes flat -- the btn-bg fill with its ring
-    // collapsed into it, the same recessed well a disabled .switch track is
-    // (2026-10-21 options critique 5: the old fg-hint ring was darker than a
-    // live mark's --border ring, so an empty storage category read as the
-    // most clickable box in its group). A disabled-AND-checked mark (no
-    // producer today -- options-backup.js and renderStoragePanel force
-    // checked=false when disabled) fills with the hint role and a bg tick
-    // instead of drawing a hint tick on an accent fill.
+    // Disabled: the same mark, fainter -- a --border-section outline (the
+    // page's row-hairline ink, lighter than a live mark's --border ring) on
+    // NO fill, in both states; a checked one keeps its tick or dot, drawn in
+    // fg-hint instead of on-accent (2026-10-29 options critique 6, user
+    // ruling U2). The 10-21 critique-5 btn-bg well this replaces read as a
+    // borderless grey block -- 1.21:1 on white, and on terminal btn-bg ==
+    // panel (#111111), so the box vanished; disabled-checked filled with
+    // fg-hint and came out darker than a live checked mark. The outline's
+    // floor is contrast-audit's `border-section vs panel` >= 1.1 row. Listed
+    // with the :checked / :indeterminate twins so a disabled mark loses the
+    // accent fill by specificity (0,4,1), not source order -- the same shape
+    // as the disabled .switch rule above.
     rule(".pick > input:disabled ~ .pick-text", [["color", `var(--${ns}-fg-hint)`]]),
-    rule(".pick > input:disabled:not(:checked) ~ .pick-mark", [
-      ["background", `var(--${ns}-btn-bg)`],
-      ["border-color", `var(--${ns}-btn-bg)`],
+    rule(".pick > input:disabled ~ .pick-mark, .pick > input:disabled:checked ~ .pick-mark", [
+      ["background", "transparent"],
+      ["border-color", `var(--${ns}-border-section)`],
       ["color", `var(--${ns}-fg-hint)`],
-    ]),
-    rule(".pick > input:disabled:checked ~ .pick-mark", [
-      ["background", `var(--${ns}-fg-hint)`],
-      ["border-color", `var(--${ns}-fg-hint)`],
-      ["color", `var(--${ns}-bg)`],
     ]),
     rule(".pick > input:disabled", [["cursor", "default"]]),
     // Forced colors (Windows High Contrast): same handoff as .switch --

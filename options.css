@@ -1469,15 +1469,10 @@ input[type="checkbox"], input[type="radio"] {
 .pick > input:disabled ~ .pick-text {
   color: var(--opt-fg-hint);
 }
-.pick > input:disabled:not(:checked) ~ .pick-mark {
-  background: var(--opt-btn-bg);
-  border-color: var(--opt-btn-bg);
+.pick > input:disabled ~ .pick-mark, .pick > input:disabled:checked ~ .pick-mark {
+  background: transparent;
+  border-color: var(--opt-border-section);
   color: var(--opt-fg-hint);
-}
-.pick > input:disabled:checked ~ .pick-mark {
-  background: var(--opt-fg-hint);
-  border-color: var(--opt-fg-hint);
-  color: var(--opt-bg);
 }
 .pick > input:disabled {
   cursor: default;

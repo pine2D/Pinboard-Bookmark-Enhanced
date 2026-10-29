@@ -7774,14 +7774,23 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
     "options.css: a checked .pick radio must draw a round currentColor dot (composer pickRules: radius-full, background currentColor, border 0, transform none, square box) -- found " + JSON.stringify([...dot]));
 }
 
-// Stage-3c hand-off N1: a disabled-AND-checked .pick mark (no producer today
-// -- options-backup.js and renderStoragePanel force checked=false when
-// disabled) must fill with the hint role and a bg tick, not draw a hint tick
-// on an accent fill -- and the old single rule that lumped disabled-checked
-// in with disabled-unchecked must be gone.
-check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--opt-fg-hint\);[^}]*color: var\(--opt-bg\);/.test(optionsCss) &&
-  !/\.pick > input:disabled ~ \.pick-mark\b/.test(optionsCss),
-  "options.css: a disabled+checked .pick mark must fill with --opt-fg-hint and a --opt-bg tick (composer pickRules), not a hint tick on the accent fill");
+// Options critique 6, user ruling U2 (supersedes stage-3c N1 and the 10-21
+// critique-5 btn-bg well): a disabled .pick mark is the same mark, fainter --
+// a --opt-border-section outline on NO fill, checked or not, with the tick /
+// dot inked in --opt-fg-hint. Both selectors must sit in ONE rule so the
+// :checked twin outranks the accent fill by specificity; no disabled rule may
+// paint a fill (the grey block vanished on terminal, where btn-bg == panel).
+{
+  const DIS = ".pick > input:disabled ~ .pick-mark", DIS_ON = ".pick > input:disabled:checked ~ .pick-mark";
+  const rules = parseStyleRules(optionsCss).filter((r) => r.selectors.some((sel) => /^\.pick > input:disabled\S* ~ \.pick-mark$/.test(sel)));
+  const shared = rules.find((r) => r.selectors.includes(DIS) && r.selectors.includes(DIS_ON));
+  const decl = shared ? new Map(parseDeclarations(shared.body).map((d) => [d.property, d.value])) : new Map();
+  const filled = rules.filter((r) => parseDeclarations(r.body).some((d) => /^background(?:-color)?$/.test(d.property) && d.value !== "transparent"));
+  check(shared && decl.get("background") === "transparent" && decl.get("border-color") === "var(--opt-border-section)" &&
+    decl.get("color") === "var(--opt-fg-hint)" && filled.length === 0,
+    "options.css: a disabled .pick mark (checked or not, one rule) must be a --opt-border-section outline on a transparent fill with an --opt-fg-hint tick/dot (composer pickRules, user ruling U2) -- found " +
+    rules.map((r) => r.selectors.join(", ") + " { " + r.body.trim() + " }").join(" | "));
+}
 
 // ---- B+ field family, Task 1 (spec docs/superpowers/specs/2026-09-28-ui-
 // fields-bplus-design.md §2/§3): the generated .fg recipe paints every value

@@ -360,7 +360,9 @@
 //                      seedChecked.checked === true (it is only a distinct
 //                      results key for the on state). Optional
 //                      `enabled: true` also clears a state-driven
-//                      `disabled` for the probe and restores it after.
+//                      `disabled` for the probe and restores it after;
+//                      `disabled: true` does the opposite (options
+//                      critique 6: the disabled `.pick` mark rows).
 //   tab            -- optional (options only): the tab id whose panel owns the
 //                      row (e.g. "storage" -> #tab-storage). The runner clicks
 //                      it, waits for the selector to attach (JS-built rows),
@@ -2800,6 +2802,18 @@ export const CHECKS = [
   { surface: "options", page: "options.html", selector: "#opt-bgsave-merge ~ .pick-mark", state: "checked",
     seedChecked: { input: "#opt-bgsave-merge", checked: true },
     expect: { bgEqVar: "accent" } },
+  // Disabled marks (options critique 6, user ruling U2): the same mark,
+  // fainter -- a --border-section outline on NO fill, the tick or dot inked
+  // in fg-hint. One unchecked radio (bgsave-mode, static) and one checked
+  // checkbox (storage's third category row, JS-built) so both shapes and
+  // both states are pinned. backgroundAlphaMax 0 is the "no fill" half: the
+  // 10-21 btn-bg well this replaces vanished on terminal (btn-bg == panel).
+  { surface: "options", page: "options.html", selector: "#opt-bgsave-overwrite ~ .pick-mark", tab: "bookmarks", state: "default",
+    seedChecked: { input: "#opt-bgsave-overwrite", checked: false, disabled: true },
+    expect: { widthPx: { min: 20, max: 20 }, heightPx: { value: 20 }, borderColorEqVar: "border-section", backgroundAlphaMax: 0 } },
+  { surface: "options", page: "options.html", selector: "#storage-cats .pref-row:nth-child(3) > label.pick.pick-box > .pick-mark", tab: "storage", state: "checked",
+    seedChecked: { input: "#storage-cats .pref-row:nth-child(3) input", checked: true, disabled: true },
+    expect: { borderColorEqVar: "border-section", backgroundAlphaMax: 0, colorEqVar: "fg-hint" } },
   // Stage 3c (N2): a trusted ArrowDown inside the bgsave-mode .pick group
   // moves the checked radio -- the hidden-native-input recipe keeps native
   // radio-group keyboard navigation.
