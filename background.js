@@ -5178,7 +5178,7 @@ function extractPageForMarkdown() {
     if (typeof pbpUpgradeSrcsetImages === "function") pbpUpgradeSrcsetImages(clone, location.href);
     if (typeof pbpPreDefuddleNormalize === "function") pbpPreDefuddleNormalize(clone);
     const _origCE = console.error;
-    console.error = (...a) => { if (!String(a[0]).startsWith("Defuddle:")) _origCE.apply(console, a); };
+    console.error = (...a) => { if (!/^Defuddle(?::|$)/.test(String(a[0]))) _origCE.apply(console, a); };
     let result;
     try { result = new Defuddle(clone).parse(); } finally { console.error = _origCE; }
     if (!result?.content || extractionLooksEmpty(result.content)) return { error: "No content extracted", frameOrigin: dominantFrameOrigin() };

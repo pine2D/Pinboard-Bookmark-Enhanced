@@ -1025,9 +1025,9 @@ async function extractLocalMarkdown(tabId) {
           if (typeof pbpNormalizeLazyImages === "function") pbpNormalizeLazyImages(clone, location.href);
           if (typeof pbpUpgradeSrcsetImages === "function") pbpUpgradeSrcsetImages(clone, location.href);
           if (typeof pbpPreDefuddleNormalize === "function") pbpPreDefuddleNormalize(clone);
-          // Suppress Defuddle's internal console.error for malformed schema.org JSON on third-party pages
+          // Suppress Defuddle's own console.error noise on third-party pages: "Defuddle: …" and the bare ("Defuddle", "Error processing document:", e) form its retried parse attempts log
           const _origCE = console.error;
-          console.error = (...a) => { if (!String(a[0]).startsWith("Defuddle:")) _origCE.apply(console, a); };
+          console.error = (...a) => { if (!/^Defuddle(?::|$)/.test(String(a[0]))) _origCE.apply(console, a); };
           let result;
           try { result = new Defuddle(clone).parse(); } finally { console.error = _origCE; }
           if (!result?.content || extractionLooksEmpty(result.content)) return { error: "No content extracted", frameOrigin: dominantFrameOrigin() };

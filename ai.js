@@ -153,9 +153,9 @@ async function getPageInfoFromTab(tabId, opts = {}) {
           }, 3000);
           try {
             const clone = document.cloneNode(true);
-            // Suppress Defuddle's internal console.error for malformed schema.org JSON on third-party pages
+            // Suppress Defuddle's own console.error noise on third-party pages: "Defuddle: …" and the bare ("Defuddle", "Error processing document:", e) form its retried parse attempts log
             const _origCE = console.error;
-            console.error = (...a) => { if (!String(a[0]).startsWith("Defuddle:")) _origCE.apply(console, a); };
+            console.error = (...a) => { if (!/^Defuddle(?::|$)/.test(String(a[0]))) _origCE.apply(console, a); };
             let result;
             try { result = new Defuddle(clone).parse(); } finally { console.error = _origCE; }
             // Defuddle returns the article as HTML in `content`; it has no
