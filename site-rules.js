@@ -38,12 +38,15 @@
   // NEVER be pointed at the live page DOM -- callers own that guarantee.
   //
   // Per <img>: only a placeholder src (missing / empty-or-whitespace / a "data:"
-  // URI) is eligible; a real src is left untouched. Candidate order: data-src,
-  // then data-original, then data-lazy-src -- the first of the three that is
-  // PRESENT wins even if its value later fails URL validation (no fallthrough to
-  // srcset in that case). Only when none of the three attributes exists does it
-  // fall back to the LAST candidate in srcset (or data-srcset when srcset is
-  // absent), which by convention is the highest-resolution source. The winning
+  // URI / a placeholder file name, see pbpIsPlaceholderSrc) is eligible; a real
+  // src is left untouched. Candidate order: data-src, then data-original, then
+  // data-lazy-src -- the first of the three that is PRESENT wins even if its
+  // value later fails URL validation (no fallthrough to srcset in that case).
+  // Only when none of the three attributes exists: the first named cold loader
+  // attribute whose value reads as a URL, else the LAST candidate in srcset (or
+  // data-srcset when srcset is absent), which by convention is the
+  // highest-resolution source, else Defuddle 0.19.4's any-attribute image-URL
+  // heuristic (pbpLegacyAttrCandidate). The winning
   // candidate is resolved against baseHref and only kept when the result is
   // http: or https: -- this also rejects the background extractor's SafeURL
   // about:blank shim result, plus javascript:/data: candidates.
@@ -66,27 +69,89 @@
     return last;
   }
 
+  // A src that only stands in for the real image: missing, empty, a "data:"
+  // URI, or a same-purpose static file such as /static/loading.gif,
+  // blank.gif, spacer.png or lazy-placeholder.svg. The file-name test reads
+  // the basename's words: at least one placeholder word, and every other word
+  // a harmless modifier (img, default, white, 1x1, 300x200, a number), so
+  // "pixel-art.png" or "grey-heron.jpg" stay real images.
+  var PBP_PLACEHOLDER_WORD = /^(?:loading|loader|placeholder|blank|spacer|lazy|grey|gray|transparent|pixel|1x1)$/;
+  var PBP_PLACEHOLDER_MODIFIER = /^(?:img|image|images|default|white|black|bg|small|\d+x\d+|\d+x|\d+)$/;
+  function pbpIsPlaceholderSrc(src) {
+    if (src == null) return true;
+    var trimmed = String(src).replace(/^\s+|\s+$/g, "");
+    if (trimmed === "" || trimmed.indexOf("data:") === 0) return true;
+    var path = trimmed.split(/[?#]/)[0];
+    var m = path.slice(path.lastIndexOf("/") + 1).toLowerCase().match(/^(.+)\.(?:gif|png|svg|jpe?g|webp)$/);
+    if (!m) return false;
+    var words = m[1].split(/[-_.@]+/), core = false;
+    for (var i = 0; i < words.length; i++) {
+      if (!words[i]) continue;
+      if (PBP_PLACEHOLDER_WORD.test(words[i])) core = true;
+      else if (!PBP_PLACEHOLDER_MODIFIER.test(words[i])) return false;
+    }
+    return core;
+  }
+
   // COMPAT (Defuddle >= 0.19.5 dropped its "any attribute that looks like an
-  // image URL" promotion): named lazy-loader attributes Defuddle no longer reads.
+  // image URL" promotion): named lazy-loader attributes Defuddle no longer
+  // reads. Unlike data-src, these are often boolean flags ("true", "1", bare
+  // attribute), so a value counts only when it reads as a URL; otherwise the
+  // search moves on to the next attribute and then to srcset.
   var PBP_COLD_LAZY_ATTRS = ["data-actualsrc", "data-echo", "data-lazyload", "data-original-src", "data-hi-res-src"];
+  function pbpLooksLikeUrlValue(v) {
+    var t = (v == null) ? "" : String(v).replace(/^\s+|\s+$/g, "");
+    if (!t || /\s/.test(t)) return false;
+    if (/^(?:true|false|null|undefined|lazy|lazyload|loaded|yes|no|on|off|[-+]?\d+(?:\.\d+)?)$/i.test(t)) return false;
+    return t.indexOf("/") !== -1 || t.indexOf(".") !== -1;
+  }
+  // Defuddle 0.19.4's own heuristic, kept for placeholder images: any other
+  // attribute whose whole value is one image-file URL (0.19.4 srcPattern;
+  // JSON-like values skipped), the last such attribute winning, except that a
+  // relative URL never replaces an absolute one. This is what still covers
+  // data-url, data-lazy, data-full and similar loader names. A bare file name
+  // with no "/" (Eurogamer's data-uri="photo.jpg", a CDN key, not a URL on
+  // the page's own site) is not taken.
+  var PBP_DF194_SRC_RE = /^\s*\S+\.(jpg|jpeg|png|webp)\S*\s*$/;
+  var PBP_DF194_SRCSET_RE = /\.(jpg|jpeg|png|webp)\s+\d/;
+  var PBP_ABS_URL_RE = /^https?:\/\//;
+  function pbpLegacyAttrCandidate(img) {
+    var cand = "";
+    for (var i = 0; i < img.attributes.length; i++) {
+      var a = img.attributes[i];
+      if (a.name === "src" || a.name === "srcset" || a.name === "alt" || a.name === "title") continue;
+      var c0 = a.value.charAt(0);
+      if (c0 === "{" || c0 === "[") continue;
+      var v = "";
+      if (PBP_DF194_SRC_RE.test(a.value)) v = a.value.replace(/^\s+|\s+$/g, "");
+      else if (PBP_DF194_SRCSET_RE.test(a.value)) v = lastSrcsetCandidate(a.value);
+      if (v.indexOf("/") === -1) continue;
+      if (!PBP_ABS_URL_RE.test(cand) || PBP_ABS_URL_RE.test(v)) cand = v;
+    }
+    return cand;
+  }
+
   function pbpNormalizeLazyImages(rootEl, baseHref) {
     if (!rootEl || typeof rootEl.querySelectorAll !== "function") return 0;
     var count = 0;
     rootEl.querySelectorAll("img").forEach(function (img) {
-      var src = img.getAttribute("src");
-      var trimmed = (src == null) ? "" : String(src).replace(/^\s+|\s+$/g, "");
-      var isPlaceholder = (src === null) || trimmed === "" || trimmed.indexOf("data:") === 0;
-      if (!isPlaceholder) return; // real src: never touched
+      if (!pbpIsPlaceholderSrc(img.getAttribute("src"))) return; // real src: never touched
 
       var candidate = null;
       if (img.hasAttribute("data-src")) candidate = img.getAttribute("data-src");
       else if (img.hasAttribute("data-original")) candidate = img.getAttribute("data-original");
       else if (img.hasAttribute("data-lazy-src")) candidate = img.getAttribute("data-lazy-src");
-      else if (PBP_COLD_LAZY_ATTRS.some(function (n) { return img.hasAttribute(n) && (candidate = img.getAttribute(n), true); })) { /* candidate set */ }
       else {
-        var srcset = img.hasAttribute("srcset") ? img.getAttribute("srcset")
-          : (img.hasAttribute("data-srcset") ? img.getAttribute("data-srcset") : null);
-        if (srcset) candidate = lastSrcsetCandidate(srcset);
+        for (var i = 0; i < PBP_COLD_LAZY_ATTRS.length; i++) {
+          var v = img.getAttribute(PBP_COLD_LAZY_ATTRS[i]);
+          if (pbpLooksLikeUrlValue(v)) { candidate = v; break; }
+        }
+        if (candidate == null) {
+          var srcset = img.hasAttribute("srcset") ? img.getAttribute("srcset")
+            : (img.hasAttribute("data-srcset") ? img.getAttribute("data-srcset") : null);
+          if (srcset) candidate = lastSrcsetCandidate(srcset);
+        }
+        if (!candidate) candidate = pbpLegacyAttrCandidate(img);
       }
       if (candidate != null) candidate = String(candidate).replace(/^\s+|\s+$/g, "");
       if (!candidate) return; // present-but-empty/whitespace or absent: no write, no fallthrough
@@ -98,6 +163,60 @@
       count++;
     });
     return count;
+  }
+
+  // COMPAT (Defuddle >= 0.19.5 copies data-src / data-original / data-lazy-src
+  // over src, and data-srcset / data-lazy-srcset over srcset, with no further
+  // check, and ignores every other loader attribute): on an image whose src is
+  // real, 0.19.4 replaced that src only on images it recognised as lazy, only
+  // with a value that names an image file, never an absolute src with a
+  // relative one, and the last such attribute in document order won. Rebuild
+  // that outcome on the CLONE for the lazy attributes 0.19.5+ reads plus the
+  // named cold loader attributes: drop every lazy attribute 0.19.4 would not
+  // have used (so a resized "?w=200" variant or a "tracking-pixel" token cannot
+  // replace a good src), and when a cold loader attribute was 0.19.4's winner,
+  // hand its value to Defuddle as data-src. Other attributes (Jetpack
+  // data-orig-file / data-medium-file, RDFa resource) stay ignored, as
+  // 0.19.5 intends. Placeholder images are left to the lazy pass above. Never
+  // run this on the live page DOM.
+  var PBP_DF194_LAZY_SELECTOR = 'img[data-src], img[data-srcset], img[loading="lazy"], img.lazy, img.lazyload, img[src^="data:image/svg+xml"]';
+  var PBP_LAZY_SRC_ATTRS = ["data-src", "data-original", "data-lazy-src"];
+  var PBP_LAZY_SRCSET_ATTRS = ["data-srcset", "data-lazy-srcset"];
+  function pbpGuardLazyOverrides(rootEl) {
+    if (!rootEl || typeof rootEl.querySelectorAll !== "function") return 0;
+    var changed = 0;
+    var sel = PBP_LAZY_SRC_ATTRS.concat(PBP_LAZY_SRCSET_ATTRS, PBP_COLD_LAZY_ATTRS)
+      .map(function (n) { return "img[" + n + "]"; }).join(", ");
+    rootEl.querySelectorAll(sel).forEach(function (img) {
+      var src = img.getAttribute("src");
+      if (pbpIsPlaceholderSrc(src)) return;
+      var lazy = false;
+      try { lazy = img.matches(PBP_DF194_LAZY_SELECTOR); } catch (_) { return; }
+      var winner = null, winnerValue = null, keepSrcset = null, cur = String(src);
+      if (lazy) {
+        for (var i = 0; i < img.attributes.length; i++) {
+          var a = img.attributes[i];
+          var srcLike = PBP_LAZY_SRC_ATTRS.indexOf(a.name) !== -1 || PBP_COLD_LAZY_ATTRS.indexOf(a.name) !== -1;
+          if (srcLike && PBP_DF194_SRC_RE.test(a.value) && (!PBP_ABS_URL_RE.test(cur) || PBP_ABS_URL_RE.test(a.value))) {
+            winner = a.name; winnerValue = a.value; cur = a.value;
+          }
+          if (PBP_LAZY_SRCSET_ATTRS.indexOf(a.name) !== -1 && PBP_DF194_SRCSET_RE.test(a.value)) keepSrcset = a.name;
+        }
+        if (!keepSrcset && !img.getAttribute("srcset") && img.getAttribute("data-srcset")) keepSrcset = "data-srcset";
+      }
+      var keepSrc = winner;
+      if (winner && PBP_COLD_LAZY_ATTRS.indexOf(winner) !== -1) {
+        img.setAttribute("data-src", winnerValue);
+        keepSrc = "data-src";
+        changed++;
+      }
+      PBP_LAZY_SRC_ATTRS.concat(PBP_LAZY_SRCSET_ATTRS).forEach(function (n) {
+        if (n === keepSrc || n === keepSrcset || !img.hasAttribute(n)) return;
+        img.removeAttribute(n);
+        changed++;
+      });
+    });
+    return changed;
   }
 
   // Real-src upgrade (separate from the lazy pass above, whose "real src is
@@ -1215,6 +1334,7 @@
   g.pbpContentHasMath = pbpContentHasMath;
   g.pbpNormalizeLazyImages = pbpNormalizeLazyImages;
   g.pbpUpgradeSrcsetImages = pbpUpgradeSrcsetImages;
+  g.pbpGuardLazyOverrides = pbpGuardLazyOverrides;
   g.buildReplyTree = buildReplyTree;
   g.buildDepthTree = buildDepthTree;
   g.renderThreadHtml = renderThreadHtml;
@@ -1249,5 +1369,11 @@ function pbpPreDefuddleNormalize(root) {
       pre.appendChild(code);
       d.replaceWith(pre);
     });
+  } catch (_) { /* a normalize step must never fail extraction */ }
+  // Defuddle >= 0.19.5 lets lazy attributes replace a real src unchecked;
+  // drop the ones 0.19.4 would have ignored (see pbpGuardLazyOverrides).
+  // Last step before parse(), after the lazy pass and the srcset upgrade.
+  try {
+    if (typeof pbpGuardLazyOverrides === "function") pbpGuardLazyOverrides(root);
   } catch (_) { /* a normalize step must never fail extraction */ }
 }
