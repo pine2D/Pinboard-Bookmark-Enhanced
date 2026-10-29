@@ -804,7 +804,7 @@
     <div id="panel-ai-behavior" class="panel" role="tabpanel" aria-labelledby="tab-ai-behavior">
       <section class="settings-section">
         <h2 class="section-title" id="sec-ai-content-source" data-i18n="secAiContentSource">AI Content Source</h2>
-        <div class="pref-group" role="group" aria-labelledby="sec-ai-content-source">
+        <div class="pref-group pref-group-radio" role="radiogroup" aria-labelledby="sec-ai-content-source">
           <div class="pref-row context-help-host" data-help-role="choice">
             <label class="pick"><input type="radio" name="ai-content-source" id="opt-ai-src-local" value="local" checked /> <span class="pick-text" data-i18n="aiContentSourceLocal">Local (Defuddle)</span><span class="pick-mark" aria-hidden="true"></span></label>
             <details class="context-help">
@@ -819,6 +819,11 @@
               <p class="hint context-help-body" data-i18n="aiContentSourceJinaHint">Sends the page URL to Jina Reader, which fetches the page and returns cleaned Markdown. Needs network; an API key is optional and raises the quota.</p>
             </details>
           </div>
+        </div>
+        <!-- The subtitle switch is not a third source: it gets its own group, set
+             off by the group gap, so it no longer reads as a third radio row
+             (options critique 6, CC-11; no subhead, no fill). -->
+        <div class="pref-group">
           <div class="pref-row context-help-host" data-help-role="choice">
             <label class="switch"><input type="checkbox" role="switch" id="opt-ai-use-transcript" aria-labelledby="opt-ai-use-transcript-label" checked /> <span class="switch-text" id="opt-ai-use-transcript-label" data-i18n="optAiUseTranscript">Use video subtitles as the AI content source</span>
             <details class="context-help">
