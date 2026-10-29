@@ -784,6 +784,15 @@ const inForcedColors = (rule) => rule.context.some((c) => FORCED_ACTIVE_RE.test(
       && !/%23[0-9a-f]{3,8}|#[0-9a-f]{3,8}|rgb\(|hsl\(/i.test(warnMask) && warnDecl("-webkit-mask") === warnMask
       && warnDecl("position") === "absolute" && /^calc\(-/.test(warnDecl("left")),
     "options.css: .hint-warn::before must be the Lucide triangle-alert mask (24-box, stroke 2, no colour literal) painted in var(--opt-warn) and hung left of the text (position: absolute; negative left) -- critique 6 TH-12");
+  // Critique 6 SP-11: an indented row's hairline starts at the indent (the
+  // same --opt-sp-7 the sub-row label is padded by), with the 1px border kept
+  // transparent so no row height moves.
+  const subLine = rules.filter((r) => r.context.length === 0 && r.selectors.includes(".pref-row + .pref-row-sub"))
+    .flatMap((r) => parseDeclarations(r.body));
+  const subLineBg = subLine.filter((d) => d.property === "background").map((d) => d.value).pop() || "";
+  check(subLine.some((d) => d.property === "border-top-color" && d.value === "transparent")
+      && subLineBg.includes("var(--opt-border-section)") && /\)\s*var\(--opt-sp-7\)\s+0\s*\//.test(subLineBg),
+    "options.css: `.pref-row + .pref-row-sub` must keep its 1px border transparent and paint the hairline from the --opt-sp-7 indent (critique 6 SP-11)");
   const narrowWarn = rules.filter((r) => r.context.some((c) => /max-width:\s*600px/.test(c)) && r.selectors.includes(".hint-warn"));
   check(narrowWarn.some((r) => parseDeclarations(r.body).some((d) => d.property === "padding-left" && /^var\(--opt-sp-\d\)$/.test(d.value))),
     "options.css: below 600px .hint-warn must take a hanging indent (padding-left on the spacing scale) instead of hanging its icon in the shrinking panel padding");

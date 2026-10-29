@@ -1756,6 +1756,15 @@ html.motion-ready .backup-import-result:not([hidden]) {
 .pref-row > label.switch { min-height: var(--opt-row-min-h); }
 .pref-row .switch-text { font-size: var(--opt-text-body); line-height: var(--opt-lh-body); }
 .pref-row-sub > label { padding-left: var(--opt-sp-7); }
+/* The hairline above an indented row starts where its text starts (critique
+   6, SP-11): it separates items of the dependent list, not top-level rows,
+   and drawn from 0 it ran 24px left of the copy it sat over. The 1px border
+   stays (transparent) so the row's height and every rung measured on it are
+   unchanged; the visible line is the same colour, painted from the indent. */
+.pref-row + .pref-row-sub {
+  border-top-color: transparent;
+  background: linear-gradient(var(--opt-border-section) 0 0) var(--opt-sp-7) 0 / calc(100% - var(--opt-sp-7)) 1px no-repeat border-box;
+}
 /* Stage-3a (Task 2, 2026-09-24-ui-system-stage3a): subordinate entry block --
    an .fg.entry-block whose control is dependent on a sibling switch/field
    above it (Reader's four indented model-override/translate/glossary/skim
