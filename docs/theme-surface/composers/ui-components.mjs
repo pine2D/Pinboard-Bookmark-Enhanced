@@ -1143,6 +1143,23 @@ function pickRules(ns) {
       ["background", "currentColor"],
       ["transform", "none"],
     ], { pairColorWith: ".pick-mark" }),
+    // A checkbox that is partly true (tag governance's Select all with some
+    // tags ticked) fills like a checked one and draws a 10px bar instead of
+    // the tick (CC-10). Typed to checkbox: Chrome also matches :indeterminate
+    // on every radio of a group with none checked.
+    rule(".pick > input[type=\"checkbox\"]:indeterminate ~ .pick-mark", [
+      ["background", `var(--${ns}-accent)`],
+      ["border-color", `var(--${ns}-accent)`],
+    ], { pairColorWith: ".pick-mark" }),
+    rule(".pick > input[type=\"checkbox\"]:indeterminate ~ .pick-mark::after", [
+      ["left", "4px"],
+      ["top", "8px"],
+      ["width", "10px"],
+      ["height", "0"],
+      ["border-width", "0 0 2px 0"],
+      ["transform", "none"],
+      ["opacity", "1"],
+    ]),
     rule(".pick:hover > .pick-mark", [["border-color", `var(--${ns}-fg-muted)`]]),
     // §7.3 `borderless` placement, the SAME three declarations as the
     // .switch-track focus rule above (CC-09, options critique 6): a 1px
@@ -1167,7 +1184,7 @@ function pickRules(ns) {
     // accent fill by specificity (0,4,1), not source order -- the same shape
     // as the disabled .switch rule above.
     rule(".pick > input:disabled ~ .pick-text", [["color", `var(--${ns}-fg-hint)`]]),
-    rule(".pick > input:disabled ~ .pick-mark, .pick > input:disabled:checked ~ .pick-mark", [
+    rule(".pick > input:disabled ~ .pick-mark, .pick > input:disabled:checked ~ .pick-mark, .pick > input[type=\"checkbox\"]:disabled:indeterminate ~ .pick-mark", [
       ["background", "transparent"],
       ["border-color", `var(--${ns}-border-section)`],
       ["color", `var(--${ns}-fg-hint)`],

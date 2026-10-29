@@ -611,13 +611,18 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     boxes.forEach(cb => { cb.checked = true; });  // programmatic: fires no 'change'
     pbpSyncTagGovDeleteBtnState();
     assert(selectAll.checked === true, "both boxes checked: Select-all stayed unticked");
+    assert(selectAll.indeterminate === false, "both boxes checked: Select-all showed the mixed bar");
     boxes[0].checked = false;
     pbpSyncTagGovDeleteBtnState();
     assert(selectAll.checked === false, "one box unticked: Select-all stayed ticked (contradicts the readout)");
+    assert(selectAll.indeterminate === true, "one of two boxes checked: Select-all did not show the mixed state");
     assert(out.textContent === "tagGovSelectedCount:1", "1 selected, got " + out.textContent);
+    boxes[1].checked = false;
+    pbpSyncTagGovDeleteBtnState();
+    assert(selectAll.indeterminate === false, "no box checked: Select-all kept the mixed bar");
     list.replaceChildren();
     pbpSyncTagGovDeleteBtnState();
-    assert(selectAll.checked === false, "empty list: Select-all stayed ticked");
+    assert(selectAll.checked === false && selectAll.indeterminate === false, "empty list: Select-all stayed ticked or mixed");
   });
 
   await test("connection overview is read-only and never requests permission or contacts a service", async () => {

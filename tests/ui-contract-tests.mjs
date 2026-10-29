@@ -7787,6 +7787,21 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
     JSON.stringify(props.map((p) => pickFocus.get(p))) + " vs switch " + JSON.stringify(props.map((p) => switchFocus.get(p))));
 }
 
+// Options critique 6, CC-10: a partly-true checkbox (tag governance's Select
+// all) shows a mixed bar on the accent fill. Every :indeterminate .pick rule
+// must be typed to checkbox -- Chrome also matches :indeterminate on each
+// radio of a group with none checked, which would paint an unselected radio
+// group as selected.
+{
+  const mixed = declarationValueMap(optionsCss, '.pick > input[type="checkbox"]:indeterminate ~ .pick-mark');
+  const bar = declarationValueMap(optionsCss, '.pick > input[type="checkbox"]:indeterminate ~ .pick-mark::after');
+  const untyped = parseStyleRules(optionsCss).flatMap((r) => r.selectors)
+    .filter((sel) => /\.pick > input\S*:indeterminate/.test(sel) && !/input\[type="checkbox"\]/.test(sel));
+  check(mixed.get("background") === "var(--opt-accent)" && bar.get("opacity") === "1" && bar.get("transform") === "none" &&
+    bar.get("border-width") === "0 0 2px 0" && untyped.length === 0,
+    "options.css: a mixed .pick checkbox must fill with --opt-accent and draw a bar (composer pickRules), and every :indeterminate .pick selector must be typed to checkbox -- untyped: " + untyped.join(" | "));
+}
+
 // Options critique 6, CC-03: the checkbox square keeps a 4px corner on every
 // theme. The generated .pick-box rule reads --opt-radius-box, the hand-written
 // :root declares it as 4px, and no other block (a theme, a density tier, a

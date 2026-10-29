@@ -1279,7 +1279,10 @@ function pbpExportTargetsResetSeed(current) {
 // It now owns three derived states for the same reason -- programmatic
 // .checked writes fire no 'change': the Delete button's disabled state, the
 // "N selected" readout, and Select-all's own checked state (all-checked =
-// ticked, anything else = unticked; an empty list can't be "all checked").
+// ticked, anything else = unticked; an empty list can't be "all checked") --
+// plus its mixed state: some but not all checked shows the indeterminate bar
+// (options critique 6, CC-10). A click on a mixed box ticks it, so the
+// change handler then selects every tag, the native mixed -> all order.
 function pbpSyncTagGovDeleteBtnState() {
   const boxes = document.querySelectorAll(".tag-gov-lowcount-checkbox");
   const n = [...boxes].filter((cb) => cb.checked).length;
@@ -1288,7 +1291,10 @@ function pbpSyncTagGovDeleteBtnState() {
   const btn = $id("tag-gov-delete-selected");
   if (btn) btn.disabled = n === 0;
   const selectAll = $id("tag-gov-select-all");
-  if (selectAll) selectAll.checked = boxes.length > 0 && n === boxes.length;
+  if (selectAll) {
+    selectAll.checked = boxes.length > 0 && n === boxes.length;
+    selectAll.indeterminate = n > 0 && n < boxes.length;
+  }
 }
 
 // One tag rendered as a selectable chip: a real radio/checkbox, visually hidden

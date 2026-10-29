@@ -1464,6 +1464,19 @@ input[type="checkbox"], input[type="radio"] {
   background: currentColor;
   transform: none;
 }
+.pick > input[type="checkbox"]:indeterminate ~ .pick-mark {
+  background: var(--opt-accent);
+  border-color: var(--opt-accent);
+}
+.pick > input[type="checkbox"]:indeterminate ~ .pick-mark::after {
+  left: 4px;
+  top: 8px;
+  width: 10px;
+  height: 0;
+  border-width: 0 0 2px 0;
+  transform: none;
+  opacity: 1;
+}
 .pick:hover > .pick-mark {
   border-color: var(--opt-fg-muted);
 }
@@ -1475,7 +1488,7 @@ input[type="checkbox"], input[type="radio"] {
 .pick > input:disabled ~ .pick-text {
   color: var(--opt-fg-hint);
 }
-.pick > input:disabled ~ .pick-mark, .pick > input:disabled:checked ~ .pick-mark {
+.pick > input:disabled ~ .pick-mark, .pick > input:disabled:checked ~ .pick-mark, .pick > input[type="checkbox"]:disabled:indeterminate ~ .pick-mark {
   background: transparent;
   border-color: var(--opt-border-section);
   color: var(--opt-fg-hint);
@@ -1991,7 +2004,11 @@ html[data-theme] .pf > h3 {
    child (the "已选 N 个" readout) on top of the row's own 8px flex gap, so
    the mark still reads as belonging to "全选" rather than the count
    (task-5-review S2, fix round 1). */
-.fg-actions > label.pick { min-height: 24px; margin-bottom: 0; gap: var(--opt-sp-5); margin-right: var(--opt-sp-6); }
+/* Select all (tag governance) is the one .pick outside a .pref-row, so the row
+   model's label face never reached it and it rendered at the 13px/normal body
+   default -- the only choice label off the 14 / body line-height pair
+   (options critique 6, CC-10). */
+.fg-actions > label.pick { min-height: 24px; margin-bottom: 0; gap: var(--opt-sp-5); margin-right: var(--opt-sp-6); font-size: var(--opt-text-body); line-height: var(--opt-lh-body); }
 .fg + .fg-actions, .pf > .fg-actions { margin-top: var(--opt-sp-6); }
 /* Send-to card Test row (options.js renderExportTargets): its previous sibling is
    the .et-onboarding disclosure when a target ships onboarding copy, so the
