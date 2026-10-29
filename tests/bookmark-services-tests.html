@@ -46,6 +46,103 @@ test("HTTP errors have bounded codes and never include server messages or creden
 test("deletion accepts an empty 204 body",async()=>{const {client}=harness("linkding",[[204,null]]);equal(await client.remove({id:"7"}),true);});
 test("unsafe record IDs cannot escape the API route",async()=>{const {client,calls}=harness("karakeep",[]);await rejects(()=>client.remove({id:"../users/me"}),"invalid_request");equal(calls.length,0);});
 test("service verification does not write remote data",async()=>{const a=harness("linkding",[[200,{theme:"auto",version:"1.44.0"}]]);const b=harness("karakeep",[[200,{id:"u1",name:"User",email:null,localUser:true}]]);equal((await a.client.verify()).id,"");equal((await b.client.verify()).id,"u1");equal(a.calls[0].method,"GET");equal(b.calls[0].method,"GET");});
+test("gateway names follow the RFC 9110 token grammar and 1-64 length", () => {
+  const one = name => pbpBookmarkGatewayNormalize({type:"custom", headers:[[name, "v"]]});
+  for (const name of ["X-Pomerium-Authorization", "x_a", "A".repeat(64), "!#$%&'*+.^_`|~"]) equal(one(name).ok, true);
+  for (const name of ["", "A".repeat(65), "X Header", "X:Y", "X\"Y", "名字", "X(Y)", "X/Y", "X@Y"]) equal([one(name).ok, one(name).error], [false, "name_invalid"]);
+});
+test("every Fetch forbidden header, proxy-/sec- prefix and app-owned header is refused in any letter case", () => {
+  // Independent oracle copied from the Fetch spec list (research §7), not from shared.js.
+  const names = ["Accept-Charset","Accept-Encoding","Access-Control-Request-Headers","Access-Control-Request-Method","Connection","Content-Length","Cookie","Cookie2","Date","DNT","Expect","Host","Keep-Alive","Origin","Referer","Set-Cookie","TE","Trailer","Transfer-Encoding","Upgrade","Via","Authorization","Accept","Content-Type","X-HTTP-Method","X-HTTP-Method-Override","X-Method-Override","Proxy-Authorization","Proxy-Anything","Sec-Fetch-Site","Sec-X"];
+  for (const base of names) for (const name of [base, base.toLowerCase(), base.toUpperCase()]) {
+    const r = pbpBookmarkGatewayNormalize({type:"custom", headers:[[name, "v"]]});
+    equal([r.ok, r.error, r.row, r.field], [false, "name_forbidden", 0, "name"]);
+  }
+});
+test("custom headers dedupe case-insensitively and allow the Cloudflare names", () => {
+  const dup = pbpBookmarkGatewayNormalize({type:"custom", headers:[["X-A","1"],["x-a","2"]]});
+  equal([dup.ok, dup.error, dup.row, dup.field], [false, "name_duplicate", 1, "name"]);
+  const cf = pbpBookmarkGatewayNormalize({type:"custom", headers:[["CF-Access-Client-Id","a"],["CF-Access-Client-Secret","b"]]});
+  equal([cf.ok, cf.gateway.headers], [true, [["CF-Access-Client-Id","a"],["CF-Access-Client-Secret","b"]]]);
+});
+test("gateway values allow only visible ASCII and space without quote or backslash, trimmed, 1-2048", () => {
+  const one = value => pbpBookmarkGatewayNormalize({type:"custom", headers:[["X-A", value]]});
+  for (let c = 0; c < 128; c++) {
+    const legal = c >= 0x20 && c <= 0x7E && c !== 0x22 && c !== 0x5C;
+    const r = one("a" + String.fromCharCode(c) + "b");
+    equal([c, r.ok], [c, legal]);
+    if (!legal) equal([r.error, r.row, r.field], ["value_invalid", 0, "value"]);
+  }
+  for (const bad of [" a", "a ", "a\r", "\na", "a\0b", "café", "中", "", "\t"]) equal([bad, one(bad).error], [bad, "value_invalid"]);
+  equal(one("a".repeat(2048)).ok, true);
+  equal([one("a".repeat(2049)).error, one("a".repeat(2049)).field], ["value_invalid", "value"]);
+  equal(one("a b").ok, true);
+});
+test("gateway total name+value length is capped at 4096", () => {
+  const two = v2 => pbpBookmarkGatewayNormalize({type:"custom", headers:[["X-A1","a".repeat(2044)],["X-A2",v2]]});
+  equal(two("a".repeat(2044)).ok, true);
+  const r = two("a".repeat(2045));
+  equal([r.ok, r.error, r.row], [false, "too_long", 1]);
+});
+test("cloudflare needs exactly the two fixed headers with values; custom needs 1-4 rows; unknown types fail", () => {
+  const cf = headers => pbpBookmarkGatewayNormalize({type:"cloudflare", headers});
+  const good = cf([["cf-access-client-id","id"],["CF-ACCESS-CLIENT-SECRET","sec"]]);
+  equal([good.ok, good.gateway], [true, {type:"cloudflare", headers:[["CF-Access-Client-Id","id"],["CF-Access-Client-Secret","sec"]]}]);
+  equal(cf([["CF-Access-Client-Id","id"]]).error, "required");
+  equal(cf([]).error, "required");
+  equal(cf([["CF-Access-Client-Id","id"],["CF-Access-Client-Secret",""]]).error, "required");
+  equal(cf([["CF-Access-Client-Id","id"],["X-A","sec"]]).error, "name_invalid");
+  const custom = n => pbpBookmarkGatewayNormalize({type:"custom", headers:Array.from({length:n}, (_, i) => ["X-H" + i, "v"])});
+  equal([custom(0).error, custom(5).error], ["required", "required"]);
+  equal([custom(1).ok, custom(4).ok], [true, true]);
+  for (const type of ["pomerium", undefined, 7, null]) equal(pbpBookmarkGatewayNormalize({type, headers:[["X-A","v"]]}).error, "type_invalid");
+  equal(pbpBookmarkGatewayNormalize(undefined).error, "type_invalid");
+  equal(pbpBookmarkGatewayNormalize(null), {ok:true, gateway:null});
+});
+const gwEnvSettings = (service, gateway, extra = {}) => ({bookmarkService:service, [service + "Url"]:"https://bookmarks.example/base/",
+  [service + "Token"]:pbpBookmarkCredentialSeal({baseUrl:"https://bookmarks.example/base/", token:"tok", connectionId:"conn-1", userId:service === "karakeep" ? "u1" : "conn-1", ...extra, gateway})});
+test("envelope gateway: absent means none, valid adds header copies, anything invalid closes the whole connection", () => {
+  const none = pbpBookmarkConnection(gwEnvSettings("linkding", undefined));
+  equal([none.gatewayType, none.headers, none.connectionId, !!none.account, none.token], ["none", [], "conn-1", true, "tok"]);
+  const gateway = {type:"cloudflare", headers:[["CF-Access-Client-Id","id"],["CF-Access-Client-Secret","sec"]]};
+  const settings = gwEnvSettings("linkding", gateway);
+  const first = pbpBookmarkConnection(settings);
+  equal([first.gatewayType, first.headers, first.token], ["cloudflare", gateway.headers, "tok"]);
+  first.headers[0][1] = "mutated"; first.headers.push(["X", "y"]);
+  equal(pbpBookmarkConnection(settings).headers, gateway.headers);
+  equal(pbpBookmarkConnection(gwEnvSettings("karakeep", gateway)).headers, gateway.headers);
+  // The seal omits a null gateway, so a hand-written envelope carries the explicit null.
+  const rawNull = {bookmarkService:"linkding", linkdingUrl:"https://bookmarks.example/base/", linkdingToken:obfuscateKey(JSON.stringify({v:1, baseUrl:"https://bookmarks.example/base/", token:"tok", connectionId:"conn-1", userId:"conn-1", gateway:null}))};
+  equal(pbpBookmarkConnection(rawNull).token, "");
+  for (const bad of [{type:"pomerium"}, {type:"custom", headers:[["Cookie","a"]]}, {type:"custom", headers:[["X-A","a\nb"]]}, "cloudflare", 3]) {
+    const c = pbpBookmarkConnection(gwEnvSettings("linkding", bad));
+    equal([c.token, c.account, c.headers, c.connectionId, c.gatewayType], ["", "", [], "", "none"]);
+  }
+});
+test("largest gateway envelope fits one sync item under 8192 bytes", () => {
+  // Assumption: neither token nor baseUrl has a length cap in the existing code, so the budget
+  // uses 512-char token, 256-char https URL, 128-char Karakeep userId (pbpBookmarkRecordId cap),
+  // 36-char UUID connectionId and the worst gateway shape: custom, 4 rows, name 64 + value 960.
+  const gateway = {type:"custom", headers:Array.from({length:4}, (_, i) => [String(i).repeat(64), "v".repeat(960)])};
+  equal(pbpBookmarkGatewayNormalize(gateway).ok, true);
+  const baseUrl = "https://" + "a".repeat(256 - "https:///".length) + "/";
+  equal(baseUrl.length, 256);
+  const sealed = pbpBookmarkCredentialSeal({baseUrl, token:"t".repeat(512), connectionId:"12345678-1234-1234-1234-123456789abc", userId:"u".repeat(128), gateway});
+  const bytes = new TextEncoder().encode("karakeepToken").length + new TextEncoder().encode(JSON.stringify(sealed)).length;
+  ok(bytes < 8192 || (() => { throw new Error("sealed envelope uses " + bytes + " bytes"); })());
+});
+test("linkding reconnect reuses the connection ID only for the same URL and token", () => {
+  const url = "https://bookmarks.example/base/";
+  const gateway = {type:"custom", headers:[["X-A","v"]]};
+  equal(pbpBookmarkReusableConnectionId(gwEnvSettings("linkding", undefined), "linkding", url, "tok"), "conn-1");
+  equal(pbpBookmarkReusableConnectionId(gwEnvSettings("linkding", gateway), "linkding", url, "tok"), "conn-1");
+  equal(pbpBookmarkReusableConnectionId(gwEnvSettings("linkding", undefined), "linkding", url, "other"), "");
+  equal(pbpBookmarkReusableConnectionId(gwEnvSettings("linkding", undefined), "linkding", "https://other.example/", "tok"), "");
+  equal(pbpBookmarkReusableConnectionId({...gwEnvSettings("linkding", undefined), linkdingToken:"obf:not-json"}, "linkding", url, "tok"), "");
+  equal(pbpBookmarkReusableConnectionId(gwEnvSettings("linkding", {type:"pomerium"}), "linkding", url, "tok"), "");
+  equal(pbpBookmarkReusableConnectionId({}, "linkding", url, "tok"), "");
+  equal(pbpBookmarkReusableConnectionId(gwEnvSettings("karakeep", undefined), "karakeep", url, "tok"), "conn-1");
+});
 
 // Exercise the real worker save/replay pipeline with raw server fixtures.
 let workerSource;

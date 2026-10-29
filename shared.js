@@ -1850,9 +1850,65 @@ function pbpBookmarkEndpoint(raw) {
   } catch (_) { return ""; }
 }
 
+// ---- Bookmark access gateway ----
+// Optional request headers for self-hosted servers behind an access proxy
+// (Cloudflare Access service token or up to four custom headers). Values are
+// secrets: they live only inside the sealed credential envelope and must never
+// reach logs or error messages.
+const PBP_BOOKMARK_GATEWAY_CF_NAMES = Object.freeze(["CF-Access-Client-Id", "CF-Access-Client-Secret"]);
+const PBP_BOOKMARK_GATEWAY_FORBIDDEN = Object.freeze(new Set([
+  "accept-charset", "accept-encoding", "access-control-request-headers", "access-control-request-method",
+  "connection", "content-length", "cookie", "cookie2", "date", "dnt", "expect", "host", "keep-alive", "origin",
+  "referer", "set-cookie", "te", "trailer", "transfer-encoding", "upgrade", "via",
+  "authorization", "accept", "content-type",
+  "x-http-method", "x-http-method-override", "x-method-override"]));
+const PBP_BOOKMARK_GATEWAY_FORBIDDEN_PREFIXES = Object.freeze(["proxy-", "sec-"]);
+const PBP_BOOKMARK_GATEWAY_NAME_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]{1,64}$/;
+const PBP_BOOKMARK_GATEWAY_VALUE_RE = /^[\x21\x23-\x5B\x5D-\x7E](?:[\x20\x21\x23-\x5B\x5D-\x7E]*[\x21\x23-\x5B\x5D-\x7E])?$/;
+function pbpBookmarkGatewayNormalize(input) {
+  const fail = (error, row = -1, field = "") => ({ok:false, error, row, field});
+  if (input === null) return {ok:true, gateway:null};
+  const type = input && typeof input === "object" ? input.type : undefined;
+  if (type !== "cloudflare" && type !== "custom") return fail("type_invalid");
+  const rows = input.headers;
+  const cloudflare = type === "cloudflare";
+  if (!Array.isArray(rows) || (cloudflare ? rows.length !== 2 : rows.length < 1 || rows.length > 4)) return fail("required");
+  const names = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const name = Array.isArray(row) ? row[0] : undefined;
+    if (typeof name !== "string") return fail("name_invalid", i, "name");
+    if (cloudflare) {
+      if (name.toLowerCase() !== PBP_BOOKMARK_GATEWAY_CF_NAMES[i].toLowerCase()) return fail("name_invalid", i, "name");
+      names.push(PBP_BOOKMARK_GATEWAY_CF_NAMES[i]);
+      continue;
+    }
+    if (!PBP_BOOKMARK_GATEWAY_NAME_RE.test(name)) return fail("name_invalid", i, "name");
+    const lower = name.toLowerCase();
+    if (PBP_BOOKMARK_GATEWAY_FORBIDDEN.has(lower) || PBP_BOOKMARK_GATEWAY_FORBIDDEN_PREFIXES.some(prefix => lower.startsWith(prefix))) return fail("name_forbidden", i, "name");
+    if (names.some(other => other.toLowerCase() === lower)) return fail("name_duplicate", i, "name");
+    names.push(name);
+  }
+  let total = 0;
+  const headers = [];
+  for (let i = 0; i < rows.length; i++) {
+    const value = rows[i][1];
+    if (cloudflare && (typeof value !== "string" || !value)) return fail("required", i, "value");
+    if (typeof value !== "string" || value.length > 2048 || !PBP_BOOKMARK_GATEWAY_VALUE_RE.test(value)) return fail("value_invalid", i, "value");
+    headers.push([names[i], value]);
+  }
+  for (let i = 0; i < headers.length; i++) {
+    total += headers[i][0].length + headers[i][1].length;
+    if (total > 4096) return fail("too_long", i, "value");
+  }
+  return {ok:true, gateway:{type, headers}};
+}
+function pbpBookmarkCredentialSeal({baseUrl, token, connectionId, userId, gateway}) {
+  return obfuscateKey(JSON.stringify({v:1, baseUrl, token, connectionId, userId, ...(gateway ? {gateway} : {})}));
+}
+
 // A connection's non-secret identity scopes bookmark caches and pending work.
-// Tokens never become cache keys. linkding has no account ID endpoint, so each
-// verified reconnection receives a new opaque ID.
+// Tokens never become cache keys. linkding has no account ID endpoint; a reconnection keeps its opaque ID only when the server URL and token are unchanged.
 const PBP_BOOKMARK_SETTING_KEYS = ["bookmarkService", "pinboardToken", "karakeepUrl", "karakeepToken",
   "karakeepReadLaterListId", "karakeepReadLaterListOwner",
   "linkdingUrl", "linkdingToken"];
@@ -1868,11 +1924,26 @@ function pbpBookmarkConnection(settings) {
   const token = typeof credential?.token === "string" ? credential.token : "";
   const connectionId = credential?.connectionId;
   const userId = service === "karakeep" ? credential?.userId : connectionId;
-  const ready = service && baseUrl && credential?.v === 1 && credential.baseUrl === baseUrl && token &&
-    typeof connectionId === "string" && connectionId && typeof userId === "string" && userId;
+  // Absent gateway means none; any other value (including null) must validate.
+  let gateway = null;
+  let gatewayOk = true;
+  if (credential && typeof credential === "object" && credential.gateway !== undefined) {
+    const checked = pbpBookmarkGatewayNormalize(credential.gateway);
+    gatewayOk = checked.ok && !!checked.gateway;
+    gateway = gatewayOk ? checked.gateway : null;
+  }
+  const ready = !!(service && baseUrl && credential?.v === 1 && credential.baseUrl === baseUrl && token &&
+    typeof connectionId === "string" && connectionId && typeof userId === "string" && userId && gatewayOk);
   const account = ready ? service + ":" + baseUrl + ":" + userId : "";
   return {service, baseUrl, token:ready ? token : "", account,
+    connectionId:ready ? connectionId : "",
+    gatewayType:ready && gateway ? gateway.type : "none",
+    headers:ready && gateway ? gateway.headers.map(row => [...row]) : [],
     readLaterListId:service === "karakeep" && settings?.karakeepReadLaterListOwner === account ? settings?.karakeepReadLaterListId || "" : ""};
+}
+function pbpBookmarkReusableConnectionId(settings, service, baseUrl, token) {
+  const old = pbpBookmarkConnection({...settings, bookmarkService:service});
+  return old.connectionId && old.baseUrl === baseUrl && old.token === token ? old.connectionId : "";
 }
 async function pbpReadBookmarkConnection() {
   const query = Object.fromEntries(PBP_BOOKMARK_SETTING_KEYS.map(key => [key, SETTINGS_DEFAULTS[key]]));
