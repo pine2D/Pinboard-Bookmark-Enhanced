@@ -513,6 +513,8 @@ h1 { flex: 1 1 auto; margin: 0; font-size: 18px; line-height: calc(var(--opt-con
 .fg-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--opt-sp-4); }
 /* A follow-up field revealed under a <select> (translate: custom language). */
 .fg > select + input { margin-top: var(--opt-sp-3); }
+/* A name/value pair stacked in one field (access gateway custom headers). */
+.fg > input + .key-wrap { margin-top: var(--opt-sp-3); }
 /* Contextual help keeps native <details> motion, but its visible pieces are
    placed on an explicit grid: anchor + compact help target in row 1, answer
    across row 2, and any owned controls in later full-width rows. Unlike the

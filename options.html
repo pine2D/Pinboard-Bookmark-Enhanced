@@ -113,6 +113,59 @@
             <label class="bl" for="opt-karakeep-token" data-i18n="labelApiToken">API Token</label>
             <span class="key-wrap"><input type="password" id="opt-karakeep-token" autocomplete="off" spellcheck="false" />
             <button type="button" class="key-toggle" data-target="opt-karakeep-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+          </div>
+          <div class="fg entry-block context-help-host" data-help-role="field">
+            <label class="bl" id="opt-karakeep-gateway-label" for="opt-karakeep-gateway" data-i18n="bookmarkGatewayLabel">Access gateway</label>
+            <details class="context-help" id="karakeep-gateway-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" id="karakeep-gateway-cf-help" data-i18n="bookmarkGatewayCfHint">Create a service token under Service Tokens in Zero Trust. The Client Secret is shown only once, when the token is created. The Access application also needs a policy with the Service Auth action.</p>
+              <p class="hint context-help-body" id="karakeep-gateway-custom-help" data-i18n="bookmarkGatewayCustomHint" hidden>These headers go to this server with every bookmark API request. Authorization, Cookie and similar headers aren't allowed. If the gateway uses Basic authentication, allow the API path in the gateway instead.</p>
+            </details>
+            <select id="opt-karakeep-gateway" data-listbox data-no-autosave>
+              <option value="none" data-i18n="bookmarkGatewayNone" selected>None</option>
+              <option value="cloudflare" data-i18n="bookmarkGatewayCloudflare">Cloudflare Access</option>
+              <option value="custom" data-i18n="bookmarkGatewayCustom">Custom headers</option>
+            </select>
+          </div>
+          <div id="karakeep-gateway-cloudflare" hidden>
+            <div class="fg entry-block">
+              <label class="bl" for="opt-karakeep-cf-id" data-i18n="bookmarkGatewayCfId">Client ID</label>
+              <input type="text" id="opt-karakeep-cf-id" data-no-autosave autocomplete="off" spellcheck="false" />
+            </div>
+            <div class="fg entry-block">
+              <label class="bl" for="opt-karakeep-cf-secret" data-i18n="bookmarkGatewayCfSecret">Client Secret</label>
+              <span class="key-wrap"><input type="password" id="opt-karakeep-cf-secret" data-no-autosave autocomplete="off" spellcheck="false" />
+              <button type="button" class="key-toggle" data-target="opt-karakeep-cf-secret" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+            </div>
+          </div>
+          <div id="karakeep-gateway-custom" role="group" aria-labelledby="opt-karakeep-gateway-label" hidden>
+              <div class="fg entry-block">
+                <label class="bl" for="opt-karakeep-gw-name-1" data-i18n="bookmarkGatewayHeaderName">Header name</label>
+                <input type="text" id="opt-karakeep-gw-name-1" data-no-autosave autocomplete="off" spellcheck="false" />
+                <span class="key-wrap"><input type="password" id="opt-karakeep-gw-value-1" data-no-autosave autocomplete="off" spellcheck="false" aria-label="Value" data-i18n-aria="bookmarkGatewayHeaderValue" placeholder="Value" data-i18n-placeholder="bookmarkGatewayHeaderValue" />
+                <button type="button" class="key-toggle" data-target="opt-karakeep-gw-value-1" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+              </div>
+              <div class="fg entry-block">
+                <label class="bl" for="opt-karakeep-gw-name-2" data-i18n="bookmarkGatewayHeaderName">Header name</label>
+                <input type="text" id="opt-karakeep-gw-name-2" data-no-autosave autocomplete="off" spellcheck="false" />
+                <span class="key-wrap"><input type="password" id="opt-karakeep-gw-value-2" data-no-autosave autocomplete="off" spellcheck="false" aria-label="Value" data-i18n-aria="bookmarkGatewayHeaderValue" placeholder="Value" data-i18n-placeholder="bookmarkGatewayHeaderValue" />
+                <button type="button" class="key-toggle" data-target="opt-karakeep-gw-value-2" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+              </div>
+              <div class="fg entry-block">
+                <label class="bl" for="opt-karakeep-gw-name-3" data-i18n="bookmarkGatewayHeaderName">Header name</label>
+                <input type="text" id="opt-karakeep-gw-name-3" data-no-autosave autocomplete="off" spellcheck="false" />
+                <span class="key-wrap"><input type="password" id="opt-karakeep-gw-value-3" data-no-autosave autocomplete="off" spellcheck="false" aria-label="Value" data-i18n-aria="bookmarkGatewayHeaderValue" placeholder="Value" data-i18n-placeholder="bookmarkGatewayHeaderValue" />
+                <button type="button" class="key-toggle" data-target="opt-karakeep-gw-value-3" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+              </div>
+              <div class="fg entry-block">
+                <label class="bl" for="opt-karakeep-gw-name-4" data-i18n="bookmarkGatewayHeaderName">Header name</label>
+                <input type="text" id="opt-karakeep-gw-name-4" data-no-autosave autocomplete="off" spellcheck="false" />
+                <span class="key-wrap"><input type="password" id="opt-karakeep-gw-value-4" data-no-autosave autocomplete="off" spellcheck="false" aria-label="Value" data-i18n-aria="bookmarkGatewayHeaderValue" placeholder="Value" data-i18n-placeholder="bookmarkGatewayHeaderValue" />
+                <button type="button" class="key-toggle" data-target="opt-karakeep-gw-value-4" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+              </div>
+          </div>
+          <div class="fg entry-block">
+            <p class="hint hint-warn" id="karakeep-gateway-pending" data-i18n="bookmarkGatewayPending" role="status" aria-live="polite" hidden>Gateway settings changed. Click Connect to apply them.</p>
             <p class="hint" data-i18n="bookmarkConnectHint">URL and token changes take effect after connecting. Tokens stay on this device unless credential sync is enabled.</p>
             <div class="fg-actions">
               <button type="button" class="btn btn-sm" id="connect-karakeep" data-i18n="bookmarkConnect">Connect</button>
@@ -131,6 +184,59 @@
             <label class="bl" for="opt-linkding-token" data-i18n="labelApiToken">API Token</label>
             <span class="key-wrap"><input type="password" id="opt-linkding-token" autocomplete="off" spellcheck="false" />
             <button type="button" class="key-toggle" data-target="opt-linkding-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+          </div>
+          <div class="fg entry-block context-help-host" data-help-role="field">
+            <label class="bl" id="opt-linkding-gateway-label" for="opt-linkding-gateway" data-i18n="bookmarkGatewayLabel">Access gateway</label>
+            <details class="context-help" id="linkding-gateway-help">
+              <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+              <p class="hint context-help-body" id="linkding-gateway-cf-help" data-i18n="bookmarkGatewayCfHint">Create a service token under Service Tokens in Zero Trust. The Client Secret is shown only once, when the token is created. The Access application also needs a policy with the Service Auth action.</p>
+              <p class="hint context-help-body" id="linkding-gateway-custom-help" data-i18n="bookmarkGatewayCustomHint" hidden>These headers go to this server with every bookmark API request. Authorization, Cookie and similar headers aren't allowed. If the gateway uses Basic authentication, allow the API path in the gateway instead.</p>
+            </details>
+            <select id="opt-linkding-gateway" data-listbox data-no-autosave>
+              <option value="none" data-i18n="bookmarkGatewayNone" selected>None</option>
+              <option value="cloudflare" data-i18n="bookmarkGatewayCloudflare">Cloudflare Access</option>
+              <option value="custom" data-i18n="bookmarkGatewayCustom">Custom headers</option>
+            </select>
+          </div>
+          <div id="linkding-gateway-cloudflare" hidden>
+            <div class="fg entry-block">
+              <label class="bl" for="opt-linkding-cf-id" data-i18n="bookmarkGatewayCfId">Client ID</label>
+              <input type="text" id="opt-linkding-cf-id" data-no-autosave autocomplete="off" spellcheck="false" />
+            </div>
+            <div class="fg entry-block">
+              <label class="bl" for="opt-linkding-cf-secret" data-i18n="bookmarkGatewayCfSecret">Client Secret</label>
+              <span class="key-wrap"><input type="password" id="opt-linkding-cf-secret" data-no-autosave autocomplete="off" spellcheck="false" />
+              <button type="button" class="key-toggle" data-target="opt-linkding-cf-secret" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+            </div>
+          </div>
+          <div id="linkding-gateway-custom" role="group" aria-labelledby="opt-linkding-gateway-label" hidden>
+              <div class="fg entry-block">
+                <label class="bl" for="opt-linkding-gw-name-1" data-i18n="bookmarkGatewayHeaderName">Header name</label>
+                <input type="text" id="opt-linkding-gw-name-1" data-no-autosave autocomplete="off" spellcheck="false" />
+                <span class="key-wrap"><input type="password" id="opt-linkding-gw-value-1" data-no-autosave autocomplete="off" spellcheck="false" aria-label="Value" data-i18n-aria="bookmarkGatewayHeaderValue" placeholder="Value" data-i18n-placeholder="bookmarkGatewayHeaderValue" />
+                <button type="button" class="key-toggle" data-target="opt-linkding-gw-value-1" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+              </div>
+              <div class="fg entry-block">
+                <label class="bl" for="opt-linkding-gw-name-2" data-i18n="bookmarkGatewayHeaderName">Header name</label>
+                <input type="text" id="opt-linkding-gw-name-2" data-no-autosave autocomplete="off" spellcheck="false" />
+                <span class="key-wrap"><input type="password" id="opt-linkding-gw-value-2" data-no-autosave autocomplete="off" spellcheck="false" aria-label="Value" data-i18n-aria="bookmarkGatewayHeaderValue" placeholder="Value" data-i18n-placeholder="bookmarkGatewayHeaderValue" />
+                <button type="button" class="key-toggle" data-target="opt-linkding-gw-value-2" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+              </div>
+              <div class="fg entry-block">
+                <label class="bl" for="opt-linkding-gw-name-3" data-i18n="bookmarkGatewayHeaderName">Header name</label>
+                <input type="text" id="opt-linkding-gw-name-3" data-no-autosave autocomplete="off" spellcheck="false" />
+                <span class="key-wrap"><input type="password" id="opt-linkding-gw-value-3" data-no-autosave autocomplete="off" spellcheck="false" aria-label="Value" data-i18n-aria="bookmarkGatewayHeaderValue" placeholder="Value" data-i18n-placeholder="bookmarkGatewayHeaderValue" />
+                <button type="button" class="key-toggle" data-target="opt-linkding-gw-value-3" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+              </div>
+              <div class="fg entry-block">
+                <label class="bl" for="opt-linkding-gw-name-4" data-i18n="bookmarkGatewayHeaderName">Header name</label>
+                <input type="text" id="opt-linkding-gw-name-4" data-no-autosave autocomplete="off" spellcheck="false" />
+                <span class="key-wrap"><input type="password" id="opt-linkding-gw-value-4" data-no-autosave autocomplete="off" spellcheck="false" aria-label="Value" data-i18n-aria="bookmarkGatewayHeaderValue" placeholder="Value" data-i18n-placeholder="bookmarkGatewayHeaderValue" />
+                <button type="button" class="key-toggle" data-target="opt-linkding-gw-value-4" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+              </div>
+          </div>
+          <div class="fg entry-block">
+            <p class="hint hint-warn" id="linkding-gateway-pending" data-i18n="bookmarkGatewayPending" role="status" aria-live="polite" hidden>Gateway settings changed. Click Connect to apply them.</p>
             <p class="hint" data-i18n="bookmarkConnectHint">URL and token changes take effect after connecting. Tokens stay on this device unless credential sync is enabled.</p>
             <div class="fg-actions">
               <button type="button" class="btn btn-sm" id="connect-linkding" data-i18n="bookmarkConnect">Connect</button>

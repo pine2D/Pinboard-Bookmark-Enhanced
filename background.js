@@ -639,7 +639,8 @@ async function pbpVerifyBookmarkConnection({service, baseUrl, token, gateway}) {
     const base = pbpBookmarkEndpoint(baseUrl);
     const origin = pbpEndpointOriginPattern(base);
     if (!origin) return {ok:false,error:"invalid_request"};
-    const checked = pbpBookmarkGatewayNormalize(gateway === undefined ? null : gateway); // callers without a gateway (older options page) mean none
+    // The settings page always sends the field (null for none); a missing one is a malformed request.
+    const checked = pbpBookmarkGatewayNormalize(gateway);
     if (!checked.ok) return {ok:false,error:"invalid_request"};
     const headers = checked.gateway ? checked.gateway.headers : [];
     const client = pbpCreateBookmarkServiceClient({service, baseUrl:base, beforeRequest:async () => {

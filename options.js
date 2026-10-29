@@ -2780,23 +2780,94 @@ document.addEventListener("DOMContentLoaded", async () => {
     radio.addEventListener("change", refreshBookmarkServiceFields);
   }
   refreshBookmarkServiceFields();
+  // ---- Access gateway form (Cloudflare Access or custom headers) ----
+  // Like the URL and token, the gateway is only written by a successful
+  // Connect, sealed inside the credential envelope; the form never autosaves.
+  // Values are secrets: never logged, never put in status text.
+  const gatewayStored = {};
+  const gatewayFields = service => [...document.querySelectorAll(`#${service}-gateway-cloudflare input, #${service}-gateway-custom input`)];
+  // Synchronous on purpose: Connect reads it before permissions.request.
+  function pbpOptGatewayRead(service) {
+    const type = $id("opt-" + service + "-gateway").value;
+    if (type === "cloudflare") {
+      const fields = [$id("opt-" + service + "-cf-id"), $id("opt-" + service + "-cf-secret")];
+      const checked = pbpBookmarkGatewayNormalize({type, headers:PBP_BOOKMARK_GATEWAY_CF_NAMES.map((name, i) => [name, fields[i].value.trim()])});
+      return checked.ok ? {ok:true, gateway:checked.gateway} : {ok:false, error:checked.error, field:fields[Math.max(0, checked.row)]};
+    }
+    if (type !== "custom") return {ok:true, gateway:null};
+    const rows = [];
+    for (let i = 1; i <= 4; i++) {
+      const name = $id(`opt-${service}-gw-name-${i}`), value = $id(`opt-${service}-gw-value-${i}`);
+      const pair = [name.value.trim(), value.value.trim()];
+      if (pair[0] || pair[1]) rows.push({pair, name, value});
+    }
+    const checked = pbpBookmarkGatewayNormalize({type, headers:rows.map(row => row.pair)});
+    if (checked.ok) return {ok:true, gateway:checked.gateway};
+    // The predicate counts only the non-empty rows; map its row back to the inputs.
+    const row = rows[checked.row];
+    return {ok:false, error:checked.error, field:row ? row[checked.field === "value" ? "value" : "name"] : $id(`opt-${service}-gw-name-1`)};
+  }
+  function pbpOptGatewaySync(service) {
+    const type = $id("opt-" + service + "-gateway").value;
+    $id(service + "-gateway-cloudflare").hidden = type !== "cloudflare";
+    $id(service + "-gateway-custom").hidden = type !== "custom";
+    $id(service + "-gateway-help").hidden = type !== "cloudflare" && type !== "custom";
+    $id(service + "-gateway-cf-help").hidden = type !== "cloudflare";
+    $id(service + "-gateway-custom-help").hidden = type !== "custom";
+    // An unreadable form counts as modified: it differs from any valid stored gateway.
+    const read = pbpOptGatewayRead(service);
+    $id(service + "-gateway-pending").hidden = read.ok && JSON.stringify(read.gateway) === JSON.stringify(gatewayStored[service] || null);
+  }
+  function pbpOptGatewayFill(service, connection) {
+    const type = connection?.gatewayType === "cloudflare" || connection?.gatewayType === "custom" ? connection.gatewayType : "none";
+    const headers = type === "none" ? [] : (connection.headers || []).map(row => [...row]);
+    const select = $id("opt-" + service + "-gateway");
+    select.value = type;
+    $id("opt-" + service + "-cf-id").value = type === "cloudflare" ? headers[0]?.[1] || "" : "";
+    $id("opt-" + service + "-cf-secret").value = type === "cloudflare" ? headers[1]?.[1] || "" : "";
+    for (let i = 1; i <= 4; i++) {
+      $id(`opt-${service}-gw-name-${i}`).value = type === "custom" ? headers[i - 1]?.[0] || "" : "";
+      $id(`opt-${service}-gw-value-${i}`).value = type === "custom" ? headers[i - 1]?.[1] || "" : "";
+    }
+    gatewayStored[service] = type === "none" ? null : {type, headers};
+    window.pbpListboxSync?.(select);
+    pbpOptGatewaySync(service);
+  }
   for (const service of ["karakeep", "linkding"]) {
     $id("opt-" + service + "-url").value = s[service + "Url"] || "";
     $id("opt-" + service + "-token").value = pbpBookmarkConnection({...s,bookmarkService:service}).token;
+    pbpOptGatewayFill(service, pbpBookmarkConnection({...s,bookmarkService:service}));
+    $id("opt-" + service + "-gateway").addEventListener("change", () => {
+      // A mark on a field the new choice hides would otherwise outlive it.
+      for (const field of gatewayFields(service)) pbpOptClearFieldInvalid?.(field);
+      pbpOptGatewaySync(service);
+    });
+    for (const field of gatewayFields(service)) field.addEventListener("input", () => pbpOptGatewaySync(service));
     $id("connect-" + service).addEventListener("click", async () => {
       const baseUrl = pbpBookmarkEndpoint($id("opt-" + service + "-url").value);
       const token = $id("opt-" + service + "-token").value.trim();
       const status = $id("connect-" + service + "-status");
       const button = $id("connect-" + service);
       if (!baseUrl || !token) { status.textContent = t("bookmarkInvalidConfig"); return; }
+      // Validated before any permission prompt or request.
+      const gatewayRead = pbpOptGatewayRead(service);
+      if (!gatewayRead.ok) {
+        status.textContent = t(PBP_BOOKMARK_GATEWAY_ERROR_KEYS[gatewayRead.error] || "bookmarkInvalidConfig");
+        pbpOptMarkFieldInvalid?.(gatewayRead.field, "connect-" + service + "-status");
+        return;
+      }
+      const gateway = gatewayRead.gateway;
+      const gatewayJson = JSON.stringify(gateway);
       button.disabled = true;
       status.textContent = t("bookmarkConnecting");
       try {
         // Called directly in the click handler to preserve Chrome's user gesture.
         const granted = await chrome.permissions.request({origins:[pbpEndpointOriginPattern(baseUrl)]});
         if (!granted) { status.textContent = t("bookmarkPermissionDenied"); return; }
-        const result = await chrome.runtime.sendMessage({type:"bookmark_connect",service,baseUrl,token});
-        if (pbpBookmarkEndpoint($id("opt-" + service + "-url").value) !== baseUrl || $id("opt-" + service + "-token").value.trim() !== token) return;
+        const result = await chrome.runtime.sendMessage({type:"bookmark_connect",service,baseUrl,token,gateway});
+        const gatewayNow = pbpOptGatewayRead(service);
+        if (pbpBookmarkEndpoint($id("opt-" + service + "-url").value) !== baseUrl || $id("opt-" + service + "-token").value.trim() !== token ||
+          !gatewayNow.ok || JSON.stringify(gatewayNow.gateway) !== gatewayJson) return;
         if (!result?.ok) {
           const failureKey = pbpBookmarkFailureKey({reason:result?.error, httpStatus:result?.status}, service);
           status.textContent = t(failureKey || (result?.error === "permission" ? "bookmarkPermissionDenied"
@@ -2804,8 +2875,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           return;
         }
         const fresh = await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS);
-        const credential = {v:1, baseUrl, token, connectionId:crypto.randomUUID(), userId:result.identity.id};
-        const patch = {[service + "Url"]:baseUrl, [service + "Token"]:obfuscateKey(JSON.stringify(credential))};
+        // Same URL and token keep the connection ID, so a gateway-only change keeps queued linkding saves.
+        const connectionId = pbpBookmarkReusableConnectionId(fresh, service, baseUrl, token) || crypto.randomUUID();
+        const patch = {[service + "Url"]:baseUrl,
+          [service + "Token"]:pbpBookmarkCredentialSeal({baseUrl, token, connectionId, userId:result.identity.id, gateway})};
         if (document.querySelector('input[name="bookmark-service"]:checked')?.value === service) patch.bookmarkService = service;
         if (service === "karakeep" && pbpBookmarkConnection({...fresh,bookmarkService:service}).account !== "karakeep:" + baseUrl + ":" + result.identity.id) {
           patch.karakeepReadLaterListId = "";
@@ -2813,6 +2886,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         const saved = await persistSettings(patch);
         status.textContent = t(saved.ok ? "bookmarkConnected" : "bookmarkConnectFailed");
+        if (saved.ok) { gatewayStored[service] = gateway; pbpOptGatewaySync(service); }
         void renderConnectionOverview();
       } catch (error) {
         console.warn("[bookmark-connect] failed:", error?.name, error?.message);

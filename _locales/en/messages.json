@@ -4863,6 +4863,57 @@
   "bookmarkConnectHint": {
     "message": "URL and token changes take effect after connecting. Tokens stay on this device unless credential sync is enabled."
   },
+  "bookmarkGatewayLabel": {
+    "message": "Access gateway"
+  },
+  "bookmarkGatewayNone": {
+    "message": "None"
+  },
+  "bookmarkGatewayCloudflare": {
+    "message": "Cloudflare Access"
+  },
+  "bookmarkGatewayCustom": {
+    "message": "Custom headers"
+  },
+  "bookmarkGatewayCfId": {
+    "message": "Client ID"
+  },
+  "bookmarkGatewayCfSecret": {
+    "message": "Client Secret"
+  },
+  "bookmarkGatewayCfHint": {
+    "message": "Create a service token under Service Tokens in Zero Trust. The Client Secret is shown only once, when the token is created. The Access application also needs a policy with the Service Auth action."
+  },
+  "bookmarkGatewayHeaderName": {
+    "message": "Header name"
+  },
+  "bookmarkGatewayHeaderValue": {
+    "message": "Value"
+  },
+  "bookmarkGatewayCustomHint": {
+    "message": "These headers go to this server with every bookmark API request. Authorization, Cookie and similar headers aren't allowed. If the gateway uses Basic authentication, allow the API path in the gateway instead."
+  },
+  "bookmarkGatewayPending": {
+    "message": "Gateway settings changed. Click Connect to apply them."
+  },
+  "bookmarkGatewayErrRequired": {
+    "message": "Fill in the access gateway fields, or set the gateway to None."
+  },
+  "bookmarkGatewayErrName": {
+    "message": "This header name isn't valid. Use up to 64 letters, digits and hyphens, such as X-Auth-Token."
+  },
+  "bookmarkGatewayErrNameForbidden": {
+    "message": "This header can't be set here. The browser controls it, or the extension already sends it (for example Authorization or Cookie)."
+  },
+  "bookmarkGatewayErrDuplicate": {
+    "message": "Each header name can be used only once (letter case is ignored)."
+  },
+  "bookmarkGatewayErrValue": {
+    "message": "Enter a value of up to 2048 printable ASCII characters, without quotation marks (\") or backslashes (\\)."
+  },
+  "bookmarkGatewayErrTooLong": {
+    "message": "The headers are too long. Names and values can total at most 4096 characters."
+  },
   "bookmarkConnect": {
     "message": "Connect"
   },

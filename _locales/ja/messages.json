@@ -4855,6 +4855,57 @@
   "bookmarkConnectHint": {
     "message": "URLとトークンの変更は接続後に反映されます。認証情報の同期を有効にしない限り、トークンはこの端末に保存されます。"
   },
+  "bookmarkGatewayLabel": {
+    "message": "アクセスゲートウェイ"
+  },
+  "bookmarkGatewayNone": {
+    "message": "なし"
+  },
+  "bookmarkGatewayCloudflare": {
+    "message": "Cloudflare Access"
+  },
+  "bookmarkGatewayCustom": {
+    "message": "カスタムヘッダー"
+  },
+  "bookmarkGatewayCfId": {
+    "message": "Client ID"
+  },
+  "bookmarkGatewayCfSecret": {
+    "message": "Client Secret"
+  },
+  "bookmarkGatewayCfHint": {
+    "message": "Zero TrustのService Tokensでサービストークンを作成します。Client Secretは作成時に一度だけ表示されます。Accessアプリケーションには、アクションがService Authのポリシーも必要です。"
+  },
+  "bookmarkGatewayHeaderName": {
+    "message": "ヘッダー名"
+  },
+  "bookmarkGatewayHeaderValue": {
+    "message": "値"
+  },
+  "bookmarkGatewayCustomHint": {
+    "message": "これらのヘッダーは、ブックマークAPIへのすべてのリクエストと一緒にこのサーバーへ送信されます。Authorization、Cookieなどのヘッダーは指定できません。ゲートウェイがBasic認証を使う場合は、ゲートウェイでAPIのパスを許可してください。"
+  },
+  "bookmarkGatewayPending": {
+    "message": "ゲートウェイの設定が変更されています。「接続」をクリックすると反映されます。"
+  },
+  "bookmarkGatewayErrRequired": {
+    "message": "アクセスゲートウェイの各項目を入力するか、ゲートウェイを「なし」にしてください。"
+  },
+  "bookmarkGatewayErrName": {
+    "message": "ヘッダー名が無効です。X-Auth-Tokenのように、64文字以内の英字、数字、ハイフンで入力してください。"
+  },
+  "bookmarkGatewayErrNameForbidden": {
+    "message": "このヘッダーはここでは指定できません。ブラウザーが管理するヘッダーか、拡張機能が自ら送信するヘッダー（AuthorizationやCookieなど）です。"
+  },
+  "bookmarkGatewayErrDuplicate": {
+    "message": "同じヘッダー名は一度しか使えません（大文字と小文字は区別しません）。"
+  },
+  "bookmarkGatewayErrValue": {
+    "message": "値が無効です。引用符（\"）とバックスラッシュ（\\）を含まない、2048文字以内の表示可能なASCII文字で入力してください。"
+  },
+  "bookmarkGatewayErrTooLong": {
+    "message": "ヘッダーが長すぎます。名前と値の合計は4096文字以内にしてください。"
+  },
   "bookmarkConnect": {
     "message": "接続"
   },

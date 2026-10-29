@@ -4855,6 +4855,57 @@
   "bookmarkConnectHint": {
     "message": "Изменения адреса и токена вступают в силу после подключения. Токены остаются на этом устройстве, если синхронизация учётных данных отключена."
   },
+  "bookmarkGatewayLabel": {
+    "message": "Шлюз доступа"
+  },
+  "bookmarkGatewayNone": {
+    "message": "Нет"
+  },
+  "bookmarkGatewayCloudflare": {
+    "message": "Cloudflare Access"
+  },
+  "bookmarkGatewayCustom": {
+    "message": "Свои заголовки"
+  },
+  "bookmarkGatewayCfId": {
+    "message": "Client ID"
+  },
+  "bookmarkGatewayCfSecret": {
+    "message": "Client Secret"
+  },
+  "bookmarkGatewayCfHint": {
+    "message": "Создайте сервисный токен в разделе Service Tokens в Zero Trust. Client Secret показывается только один раз, при создании токена. Приложению Access также нужна политика с действием Service Auth."
+  },
+  "bookmarkGatewayHeaderName": {
+    "message": "Имя заголовка"
+  },
+  "bookmarkGatewayHeaderValue": {
+    "message": "Значение"
+  },
+  "bookmarkGatewayCustomHint": {
+    "message": "Эти заголовки отправляются на этот сервер с каждым запросом к API закладок. Заголовки Authorization, Cookie и подобные указывать нельзя. Если шлюз использует аутентификацию Basic, вместо этого разрешите в нём путь API."
+  },
+  "bookmarkGatewayPending": {
+    "message": "Настройки шлюза изменены. Нажмите «Подключить», чтобы применить их."
+  },
+  "bookmarkGatewayErrRequired": {
+    "message": "Заполните поля шлюза доступа или выберите для шлюза значение «Нет»."
+  },
+  "bookmarkGatewayErrName": {
+    "message": "Недопустимое имя заголовка. Используйте до 64 латинских букв, цифр и дефисов, например X-Auth-Token."
+  },
+  "bookmarkGatewayErrNameForbidden": {
+    "message": "Этот заголовок здесь задать нельзя: им управляет браузер или расширение отправляет его само (например, Authorization или Cookie)."
+  },
+  "bookmarkGatewayErrDuplicate": {
+    "message": "Каждое имя заголовка можно использовать только один раз (регистр не учитывается)."
+  },
+  "bookmarkGatewayErrValue": {
+    "message": "Недопустимое значение. Введите до 2048 печатных символов ASCII без кавычек (\") и обратных косых черт (\\)."
+  },
+  "bookmarkGatewayErrTooLong": {
+    "message": "Заголовки слишком длинные: имена и значения вместе не должны превышать 4096 символов."
+  },
   "bookmarkConnect": {
     "message": "Подключить"
   },

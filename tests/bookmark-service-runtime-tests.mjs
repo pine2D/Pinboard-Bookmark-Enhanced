@@ -13,6 +13,8 @@ const profile=mkdtempSync(join(tmpdir(),'pbp-bookmark-runtime-'));
 const records={linkding:new Map(),karakeep:new Map()}, requests=[], membership=new Set(), wire=[];
 const list={id:'later1',name:'Read Later',description:'Pinboard Bookmark Enhanced: Read Later',icon:'bookmark',type:'manual',public:false,hasCollaborators:false,userRole:'owner'};
 let listCreated=false;
+// gate.linkding puts a Cloudflare Access-shaped gateway in front of /linkding/.
+const gate={linkding:false}, acceptedKeys=new Set(['fixture-key']);
 const server=createServer(async(req,res)=>{
   const url=new URL(req.url,'http://localhost');
   wire.push({method:req.method,path:url.pathname,hasCookie:!!req.headers.cookie});
@@ -34,12 +36,16 @@ const server=createServer(async(req,res)=>{
   }
   if(url.pathname.startsWith('/article')) {res.setHeader('Content-Type','text/html');res.end('<html><head><title>Runtime article</title></head><body><article><h1>Runtime article</h1><p>'+('Public synthetic article for a local extension test. '.repeat(80))+'</p></article></body></html>');return;}
   const service=url.pathname.startsWith('/linkding/')?'linkding':'karakeep';
+  if(service==='linkding'&&gate.linkding&&(req.headers['cf-access-client-id']!=='fixture-cf-id'||req.headers['cf-access-client-secret']!=='fixture-cf-secret')){
+    res.writeHead(302,{Location:origin+'/cdn-cgi/access/login/fixture'});res.end();return;
+  }
   const path=url.pathname.replace(/^\/(?:linkding|karakeep)\/api(?:\/v1)?\//,'');
   let body='';for await(const chunk of req)body+=chunk;
   let data;try{data=body?JSON.parse(body):{};}catch{res.writeHead(400).end();return;}
   requests.push({service,path,method:req.method,data});
   const reply=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(status===204?'':JSON.stringify(value));};
-  if(req.headers.authorization!==(service==='linkding'?'Token ':'Bearer ')+'fixture-key'){reply(401,{});return;}
+  const scheme=service==='linkding'?'Token ':'Bearer ';
+  if(![...acceptedKeys].some(key=>req.headers.authorization===scheme+key)){reply(401,{});return;}
   const store=records[service];
   if(path==='user/profile/')return reply(200,{theme:'auto',version:'1.44.0'});
   if(path==='users/me')return reply(200,{id:'u1',name:'Fixture',email:null,localUser:true});
@@ -169,6 +175,59 @@ try{
     assert.equal(records[service].size,0);await reader.close();
     assert.equal(await worker.evaluate(()=>pbpVocabCurrentOwner()),personalOwner);
     console.log(service+': settings, popup save, reader Read Later/delete, shared vocabulary passed');
+  }
+  {
+    // Access gateway form: validation before any request, Cloudflare headers
+    // sealed on Connect, linkding keeps its connection ID for the same URL and token.
+    const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
+    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    const status=options.locator('#connect-linkding-status');
+    const waitStatus=text=>status.filter({hasText:text}).waitFor({timeout:10000}).catch(async error=>{console.error({status:await status.textContent(),errors});throw error;});
+    const linkdingAccount=()=>options.evaluate(async()=>pbpBookmarkConnection({...await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS),bookmarkService:'linkding'}).account);
+    const chooseGateway=value=>options.evaluate(value=>{const select=document.getElementById('opt-linkding-gateway');select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}));},value);
+    await options.locator('input[name="bookmark-service"][value="linkding"]').check();
+    await options.locator('#opt-linkding-url').fill(origin+'/linkding/');
+    await options.locator('#opt-linkding-token').fill('fixture-key');
+    const before=await linkdingAccount();assert(before,'linkding connection from the main loop is missing');
+    gate.linkding=true;
+    await options.locator('#connect-linkding').click();
+    await waitStatus(en.bookmarkErrGatewayRedirect.message);
+    assert.equal(await status.textContent(),en.bookmarkErrGatewayRedirect.message);
+    await chooseGateway('cloudflare');
+    const wireBefore=wire.length;
+    await options.locator('#connect-linkding').click();
+    await waitStatus(en.bookmarkGatewayErrRequired.message);
+    assert.equal(await status.textContent(),en.bookmarkGatewayErrRequired.message);
+    assert.equal(wire.length,wireBefore,'an invalid gateway form sent a request');
+    assert.equal(await options.locator('#opt-linkding-cf-id').getAttribute('aria-invalid'),'true');
+    await options.locator('#opt-linkding-cf-id').fill('fixture-cf-id');
+    await options.locator('#opt-linkding-cf-secret').fill('fixture-cf-secret');
+    assert(await options.locator('#linkding-gateway-pending').isVisible(),'pending gateway change is not shown');
+    await options.locator('#connect-linkding').click();
+    await waitStatus('Connected');
+    assert(await options.locator('#linkding-gateway-pending').isHidden(),'pending hint stayed after connecting');
+    assert.equal(await linkdingAccount(),before,'same URL and token did not keep the linkding connection ID');
+    await options.reload();
+    await until(()=>options.evaluate(()=>document.getElementById('opt-linkding-gateway')?.value==='cloudflare'),'gateway type restored');
+    assert.equal(await options.locator('#opt-linkding-cf-id').inputValue(),'fixture-cf-id');
+    assert.equal(await options.locator('#opt-linkding-cf-secret').inputValue(),'fixture-cf-secret');
+    await until(async()=>(await options.locator('#opt-linkding-gateway-btn .listbox-value').textContent()).trim()===en.bookmarkGatewayCloudflare.message,'gateway listbox shows Cloudflare Access');
+    assert(await options.locator('#linkding-gateway-pending').isHidden(),'restored gateway reads as modified');
+    acceptedKeys.add('fixture-key-2');
+    await options.locator('#opt-linkding-token').fill('fixture-key-2');
+    await options.locator('#connect-linkding').click();
+    await waitStatus('Connected');
+    const rotated=await linkdingAccount();
+    assert(rotated&&rotated!==before,'a new token kept the old linkding connection ID');
+    await options.setViewportSize({width:400,height:900});
+    await chooseGateway('custom');
+    assert(await options.locator('#opt-linkding-gw-value-4').isVisible(),'custom header rows are hidden');
+    assert(await options.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'gateway form horizontal overflow');
+    assert.equal(wire.filter(w=>w.method==='OPTIONS').length,0,'gateway headers triggered a preflight');
+    assert(wire.every(w=>!w.hasCookie),'a gateway request carried cookies');
+    assert(!wire.some(w=>w.path==='/cdn-cgi/access/login/fixture'),'gateway redirect was followed');
+    gate.linkding=false;await options.close();
+    console.log('access gateway form: validation, Cloudflare connect, restore and connection ID reuse passed');
   }
   const probes=await worker.evaluate(async origin=>{
     const out={};

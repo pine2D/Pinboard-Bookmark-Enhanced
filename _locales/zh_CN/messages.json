@@ -4849,6 +4849,57 @@
   "bookmarkConnectHint": {
     "message": "地址和令牌在连接成功后生效。令牌默认保存在本机，只有开启凭据同步后才会同步。"
   },
+  "bookmarkGatewayLabel": {
+    "message": "访问网关"
+  },
+  "bookmarkGatewayNone": {
+    "message": "无"
+  },
+  "bookmarkGatewayCloudflare": {
+    "message": "Cloudflare Access"
+  },
+  "bookmarkGatewayCustom": {
+    "message": "自定义请求头"
+  },
+  "bookmarkGatewayCfId": {
+    "message": "Client ID"
+  },
+  "bookmarkGatewayCfSecret": {
+    "message": "Client Secret"
+  },
+  "bookmarkGatewayCfHint": {
+    "message": "在 Zero Trust 的 Service Tokens 中创建服务令牌。Client Secret 只在创建时显示一次。该 Access 应用还需要一条动作为 Service Auth 的策略。"
+  },
+  "bookmarkGatewayHeaderName": {
+    "message": "请求头名称"
+  },
+  "bookmarkGatewayHeaderValue": {
+    "message": "值"
+  },
+  "bookmarkGatewayCustomHint": {
+    "message": "这些请求头会随每个书签接口请求发往这台服务器。不能填写 Authorization、Cookie 等请求头。如果网关使用 Basic 认证，请在网关中为接口路径放行。"
+  },
+  "bookmarkGatewayPending": {
+    "message": "网关设置已修改，点「连接」后生效。"
+  },
+  "bookmarkGatewayErrRequired": {
+    "message": "请填写访问网关的各项，或把网关设为「无」。"
+  },
+  "bookmarkGatewayErrName": {
+    "message": "请求头名称无效。请使用不超过 64 个字符的英文字母、数字和连字符，例如 X-Auth-Token。"
+  },
+  "bookmarkGatewayErrNameForbidden": {
+    "message": "这个请求头不能在这里设置：它由浏览器控制，或扩展已经自行发送（如 Authorization、Cookie）。"
+  },
+  "bookmarkGatewayErrDuplicate": {
+    "message": "每个请求头名称只能用一次（不区分大小写）。"
+  },
+  "bookmarkGatewayErrValue": {
+    "message": "值无效。请填写不超过 2048 个可见 ASCII 字符，不能包含引号（\"）或反斜杠（\\）。"
+  },
+  "bookmarkGatewayErrTooLong": {
+    "message": "请求头过长：所有名称和值合计不能超过 4096 个字符。"
+  },
   "bookmarkConnect": {
     "message": "连接"
   },

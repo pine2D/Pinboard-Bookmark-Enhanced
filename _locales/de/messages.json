@@ -4855,6 +4855,57 @@
   "bookmarkConnectHint": {
     "message": "Änderungen an URL und Token werden erst nach dem Verbinden wirksam. Tokens bleiben auf diesem Gerät, sofern die Synchronisierung von Zugangsdaten deaktiviert ist."
   },
+  "bookmarkGatewayLabel": {
+    "message": "Zugangs-Gateway"
+  },
+  "bookmarkGatewayNone": {
+    "message": "Keines"
+  },
+  "bookmarkGatewayCloudflare": {
+    "message": "Cloudflare Access"
+  },
+  "bookmarkGatewayCustom": {
+    "message": "Eigene Header"
+  },
+  "bookmarkGatewayCfId": {
+    "message": "Client ID"
+  },
+  "bookmarkGatewayCfSecret": {
+    "message": "Client Secret"
+  },
+  "bookmarkGatewayCfHint": {
+    "message": "Unter Service Tokens in Zero Trust ein Service-Token erstellen. Das Client Secret wird nur einmal beim Erstellen angezeigt. Die Access-Anwendung braucht außerdem eine Richtlinie mit der Aktion Service Auth."
+  },
+  "bookmarkGatewayHeaderName": {
+    "message": "Header-Name"
+  },
+  "bookmarkGatewayHeaderValue": {
+    "message": "Wert"
+  },
+  "bookmarkGatewayCustomHint": {
+    "message": "Diese Header gehen mit jeder Anfrage an die Lesezeichen-API an diesen Server. Authorization, Cookie und ähnliche Header sind nicht erlaubt. Nutzt das Gateway Basic-Authentifizierung, stattdessen den API-Pfad im Gateway freigeben."
+  },
+  "bookmarkGatewayPending": {
+    "message": "Gateway-Einstellungen geändert. Zum Übernehmen auf „Verbinden“ klicken."
+  },
+  "bookmarkGatewayErrRequired": {
+    "message": "Die Felder des Zugangs-Gateways ausfüllen oder das Gateway auf „Keines“ setzen."
+  },
+  "bookmarkGatewayErrName": {
+    "message": "Ungültiger Header-Name. Bis zu 64 Buchstaben, Ziffern und Bindestriche verwenden, z. B. X-Auth-Token."
+  },
+  "bookmarkGatewayErrNameForbidden": {
+    "message": "Dieser Header lässt sich hier nicht festlegen: Der Browser verwaltet ihn, oder die Erweiterung sendet ihn selbst (z. B. Authorization oder Cookie)."
+  },
+  "bookmarkGatewayErrDuplicate": {
+    "message": "Jeder Header-Name darf nur einmal vorkommen (Groß- und Kleinschreibung zählt nicht)."
+  },
+  "bookmarkGatewayErrValue": {
+    "message": "Ungültiger Wert. Bis zu 2048 druckbare ASCII-Zeichen ohne Anführungszeichen (\") und Backslash (\\) eingeben."
+  },
+  "bookmarkGatewayErrTooLong": {
+    "message": "Die Header sind zu lang: Namen und Werte dürfen zusammen höchstens 4096 Zeichen haben."
+  },
   "bookmarkConnect": {
     "message": "Verbinden"
   },

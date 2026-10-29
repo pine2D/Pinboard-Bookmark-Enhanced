@@ -4855,6 +4855,57 @@
   "bookmarkConnectHint": {
     "message": "網址與權杖會在連線成功後生效。權杖預設儲存在此裝置，只有啟用憑證同步後才會同步。"
   },
+  "bookmarkGatewayLabel": {
+    "message": "存取閘道"
+  },
+  "bookmarkGatewayNone": {
+    "message": "無"
+  },
+  "bookmarkGatewayCloudflare": {
+    "message": "Cloudflare Access"
+  },
+  "bookmarkGatewayCustom": {
+    "message": "自訂標頭"
+  },
+  "bookmarkGatewayCfId": {
+    "message": "Client ID"
+  },
+  "bookmarkGatewayCfSecret": {
+    "message": "Client Secret"
+  },
+  "bookmarkGatewayCfHint": {
+    "message": "請在 Zero Trust 的 Service Tokens 中建立服務權杖。Client Secret 只會在建立時顯示一次。此 Access 應用程式還需要一條動作為 Service Auth 的原則。"
+  },
+  "bookmarkGatewayHeaderName": {
+    "message": "標頭名稱"
+  },
+  "bookmarkGatewayHeaderValue": {
+    "message": "值"
+  },
+  "bookmarkGatewayCustomHint": {
+    "message": "這些標頭會隨每個書籤 API 請求傳送到這台伺服器。不能填入 Authorization、Cookie 等標頭。如果閘道使用 Basic 驗證，請在閘道中允許 API 路徑通過。"
+  },
+  "bookmarkGatewayPending": {
+    "message": "閘道設定已變更，按一下「連線」後生效。"
+  },
+  "bookmarkGatewayErrRequired": {
+    "message": "請填寫存取閘道的各個欄位，或將閘道設為「無」。"
+  },
+  "bookmarkGatewayErrName": {
+    "message": "標頭名稱無效。請使用不超過 64 個字元的英文字母、數字和連字號，例如 X-Auth-Token。"
+  },
+  "bookmarkGatewayErrNameForbidden": {
+    "message": "這個標頭無法在此設定：它由瀏覽器控制，或擴充功能已自行傳送（例如 Authorization、Cookie）。"
+  },
+  "bookmarkGatewayErrDuplicate": {
+    "message": "每個標頭名稱只能使用一次（不區分大小寫）。"
+  },
+  "bookmarkGatewayErrValue": {
+    "message": "值無效。請填入不超過 2048 個可見 ASCII 字元，不能包含引號（\"）或反斜線（\\）。"
+  },
+  "bookmarkGatewayErrTooLong": {
+    "message": "標頭過長：所有名稱和值合計不得超過 4096 個字元。"
+  },
   "bookmarkConnect": {
     "message": "連線"
   },

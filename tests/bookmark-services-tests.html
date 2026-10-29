@@ -386,6 +386,9 @@ test("connection verification validates the gateway before any request and sends
   const h = await workerHarness("linkding", [[200,{theme:"auto",version:"1.44.0"}]]);
   const bad = await h.verifyConnection({service:"linkding", baseUrl:"https://bookmarks.example/base/", token:"tok", gateway:{type:"custom", headers:[["Cookie","x"]]}});
   equal([bad.ok, bad.error, h.state.calls.length], [false, "invalid_request", 0]);
+  // The settings page always sends the field (null for none); a message without it is malformed.
+  const missing = await h.verifyConnection({service:"linkding", baseUrl:"https://bookmarks.example/base/", token:"tok"});
+  equal([missing.ok, missing.error, h.state.calls.length], [false, "invalid_request", 0]);
   const cf = {type:"cloudflare", headers:[["CF-Access-Client-Id","id"],["CF-Access-Client-Secret","sec"]]};
   const good = await h.verifyConnection({service:"linkding", baseUrl:"https://bookmarks.example/base/", token:"tok", gateway:cf});
   equal(good.ok, true); equal(h.state.calls.length, 1);
@@ -493,6 +496,25 @@ test("failure keys exist in all nine locales and cover every gateway code",async
   for(const loc of ["de","en","fr","ja","pl","ru","zh_CN","zh_HK","zh_TW"]){
     const messages=await (await fetch(`../_locales/${loc}/messages.json`)).json();
     for(const key of keys){const text=messages[key]?.message;if(typeof text!=="string"||!text.trim())throw new Error(`${loc} lacks ${key}`);}
+  }
+});
+test("gateway form error keys exist in all nine locales", async () => {
+  // Trigger each error the settings form can meet from the predicate itself;
+  // type_invalid only comes from storage, so the form table must not need it.
+  const custom = headers => pbpBookmarkGatewayNormalize({type:"custom", headers});
+  const produced = new Set([
+    custom([]), pbpBookmarkGatewayNormalize({type:"cloudflare", headers:[["CF-Access-Client-Id",""],["CF-Access-Client-Secret","s"]]}),
+    custom([["X A","v"]]), custom([["Cookie","v"]]), custom([["X-A","1"],["x-a","2"]]), custom([["X-A"," v"]]),
+    custom([["X-A1","a".repeat(2048)],["X-A2","a".repeat(2048)]]),
+  ].map(result => { ok(!result.ok); return result.error; }));
+  equal([...produced].sort(), Object.keys(PBP_BOOKMARK_GATEWAY_ERROR_KEYS).sort());
+  ok(!Object.hasOwn(PBP_BOOKMARK_GATEWAY_ERROR_KEYS, "type_invalid"));
+  for (const loc of ["de","en","fr","ja","pl","ru","zh_CN","zh_HK","zh_TW"]) {
+    const messages = await (await fetch(`../_locales/${loc}/messages.json`)).json();
+    for (const key of Object.values(PBP_BOOKMARK_GATEWAY_ERROR_KEYS)) {
+      const text = messages[key]?.message;
+      if (typeof text !== "string" || !text.trim()) throw new Error(`${loc} lacks ${key}`);
+    }
   }
 });
 test("failure keys apply only to self-hosted services",()=>{

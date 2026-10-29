@@ -4855,6 +4855,57 @@
   "bookmarkConnectHint": {
     "message": "Les modifications de l’URL et du jeton prennent effet après connexion. Les jetons restent sur cet appareil, sauf si la synchronisation des identifiants est activée."
   },
+  "bookmarkGatewayLabel": {
+    "message": "Passerelle d’accès"
+  },
+  "bookmarkGatewayNone": {
+    "message": "Aucune"
+  },
+  "bookmarkGatewayCloudflare": {
+    "message": "Cloudflare Access"
+  },
+  "bookmarkGatewayCustom": {
+    "message": "En-têtes personnalisés"
+  },
+  "bookmarkGatewayCfId": {
+    "message": "Client ID"
+  },
+  "bookmarkGatewayCfSecret": {
+    "message": "Client Secret"
+  },
+  "bookmarkGatewayCfHint": {
+    "message": "Créez un jeton de service dans Service Tokens, dans Zero Trust. Le Client Secret n’est affiché qu’une fois, à la création du jeton. L’application Access doit aussi avoir une stratégie avec l’action Service Auth."
+  },
+  "bookmarkGatewayHeaderName": {
+    "message": "Nom de l’en-tête"
+  },
+  "bookmarkGatewayHeaderValue": {
+    "message": "Valeur"
+  },
+  "bookmarkGatewayCustomHint": {
+    "message": "Ces en-têtes sont envoyés à ce serveur avec chaque requête vers l’API des signets. Authorization, Cookie et les en-têtes similaires ne sont pas autorisés. Si la passerelle utilise l’authentification Basic, autorisez plutôt le chemin de l’API dans la passerelle."
+  },
+  "bookmarkGatewayPending": {
+    "message": "Paramètres de la passerelle modifiés. Cliquez sur « Connecter » pour les appliquer."
+  },
+  "bookmarkGatewayErrRequired": {
+    "message": "Remplissez les champs de la passerelle d’accès ou choisissez « Aucune »."
+  },
+  "bookmarkGatewayErrName": {
+    "message": "Nom d’en-tête non valide. Utilisez au plus 64 lettres, chiffres et traits d’union, par exemple X-Auth-Token."
+  },
+  "bookmarkGatewayErrNameForbidden": {
+    "message": "Cet en-tête ne peut pas être défini ici : le navigateur le gère, ou l’extension l’envoie déjà (par exemple Authorization ou Cookie)."
+  },
+  "bookmarkGatewayErrDuplicate": {
+    "message": "Chaque nom d’en-tête ne peut servir qu’une fois (sans tenir compte de la casse)."
+  },
+  "bookmarkGatewayErrValue": {
+    "message": "Valeur non valide. Saisissez au plus 2048 caractères ASCII imprimables, sans guillemets (\") ni barres obliques inverses (\\)."
+  },
+  "bookmarkGatewayErrTooLong": {
+    "message": "Les en-têtes sont trop longs : noms et valeurs ne doivent pas dépasser 4096 caractères au total."
+  },
   "bookmarkConnect": {
     "message": "Connecter"
   },

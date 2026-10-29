@@ -1974,6 +1974,12 @@ function pbpBookmarkFailureKey(result, service) {
   // With a status the server rejected the token; without one no connection exists.
   return status === 401 || status === 403 ? "bookmarkErrAuth" : "bgSetToken";
 }
+// Gateway form validation error -> i18n key (settings page). type_invalid can
+// only come from storage, never from the form, so it has no entry.
+const PBP_BOOKMARK_GATEWAY_ERROR_KEYS = Object.freeze({
+  required:"bookmarkGatewayErrRequired", name_invalid:"bookmarkGatewayErrName",
+  name_forbidden:"bookmarkGatewayErrNameForbidden", name_duplicate:"bookmarkGatewayErrDuplicate",
+  value_invalid:"bookmarkGatewayErrValue", too_long:"bookmarkGatewayErrTooLong"});
 async function pbpReadBookmarkConnection() {
   const query = Object.fromEntries(PBP_BOOKMARK_SETTING_KEYS.map(key => [key, SETTINGS_DEFAULTS[key]]));
   return pbpBookmarkConnection(await pbpReadSettingsWithSecrets(query));

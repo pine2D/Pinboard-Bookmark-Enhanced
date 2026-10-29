@@ -4855,6 +4855,57 @@
   "bookmarkConnectHint": {
     "message": "Zmiany adresu i tokenu obowiązują po połączeniu. Tokeny pozostają na tym urządzeniu, chyba że włączono synchronizację danych uwierzytelniających."
   },
+  "bookmarkGatewayLabel": {
+    "message": "Bramka dostępu"
+  },
+  "bookmarkGatewayNone": {
+    "message": "Brak"
+  },
+  "bookmarkGatewayCloudflare": {
+    "message": "Cloudflare Access"
+  },
+  "bookmarkGatewayCustom": {
+    "message": "Własne nagłówki"
+  },
+  "bookmarkGatewayCfId": {
+    "message": "Client ID"
+  },
+  "bookmarkGatewayCfSecret": {
+    "message": "Client Secret"
+  },
+  "bookmarkGatewayCfHint": {
+    "message": "Utwórz token usługi w sekcji Service Tokens w Zero Trust. Client Secret jest wyświetlany tylko raz, podczas tworzenia tokenu. Aplikacja Access potrzebuje też zasady z akcją Service Auth."
+  },
+  "bookmarkGatewayHeaderName": {
+    "message": "Nazwa nagłówka"
+  },
+  "bookmarkGatewayHeaderValue": {
+    "message": "Wartość"
+  },
+  "bookmarkGatewayCustomHint": {
+    "message": "Te nagłówki trafiają do tego serwera z każdym żądaniem do API zakładek. Nie można użyć nagłówków Authorization, Cookie i podobnych. Jeśli bramka używa uwierzytelniania Basic, zezwól w niej zamiast tego na ścieżkę API."
+  },
+  "bookmarkGatewayPending": {
+    "message": "Zmieniono ustawienia bramki. Kliknij „Połącz”, aby je zastosować."
+  },
+  "bookmarkGatewayErrRequired": {
+    "message": "Wypełnij pola bramki dostępu albo ustaw bramkę na „Brak”."
+  },
+  "bookmarkGatewayErrName": {
+    "message": "Nieprawidłowa nazwa nagłówka. Użyj najwyżej 64 liter, cyfr i łączników, np. X-Auth-Token."
+  },
+  "bookmarkGatewayErrNameForbidden": {
+    "message": "Tego nagłówka nie można tu ustawić: kontroluje go przeglądarka albo rozszerzenie wysyła go samo (np. Authorization lub Cookie)."
+  },
+  "bookmarkGatewayErrDuplicate": {
+    "message": "Każdej nazwy nagłówka można użyć tylko raz (wielkość liter nie ma znaczenia)."
+  },
+  "bookmarkGatewayErrValue": {
+    "message": "Nieprawidłowa wartość. Wpisz najwyżej 2048 drukowalnych znaków ASCII, bez cudzysłowów (\") i ukośników odwrotnych (\\)."
+  },
+  "bookmarkGatewayErrTooLong": {
+    "message": "Nagłówki są za długie: nazwy i wartości mogą mieć łącznie najwyżej 4096 znaków."
+  },
   "bookmarkConnect": {
     "message": "Połącz"
   },
