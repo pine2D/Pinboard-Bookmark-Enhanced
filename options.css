@@ -1653,14 +1653,23 @@ html.motion-ready .backup-import-result:not([hidden]) {
 .backup-import-result > div > :first-child { color: var(--opt-fg-muted); }
 .backup-preview-counts dd { min-width: 0; margin: 0; }
 .backup-preview-warning:empty { display: none; }
+/* The section picker sits inside the bordered preview card, so it draws no
+   frame of its own -- a framed fieldset inside a framed card read as a box in
+   a box (options critique 6, CC-06). The legend stays for the group's
+   accessible name and takes the group-subhead face (13/600, body ink) every
+   other choice group on the page opens with, at the subhead's label gap. */
 .backup-section-picker {
-  display: grid;
-  gap: var(--opt-sp-3);
+  min-width: 0;
   margin: 0 0 var(--opt-sp-4);
-  padding: var(--opt-sp-4);
-  border: 1px solid var(--opt-border-section);
+  padding: 0;
+  border: 0;
 }
-.backup-section-picker legend { padding: 0 var(--opt-sp-2); color: var(--opt-fg-muted); }
+.backup-section-picker legend {
+  padding: 0;
+  margin-bottom: var(--opt-label-gap);
+  font-size: var(--opt-text-subhead); line-height: var(--opt-lh-subhead); font-weight: 600;
+  color: var(--opt-fg);
+}
 .backup-section-picker label { min-width: 0; }
 /* Stage-3b moved the backup picker and storage-cats onto `.pick.pick-box`, whose own composer rules handle the disabled dimming. */
 /* The storage category list's own group rhythm. It once shared a selector
