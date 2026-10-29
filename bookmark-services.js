@@ -124,13 +124,20 @@ function pbpCreateBookmarkServiceClient(config) {
     if (!response.ok) throw pbpBookmarkServiceError(pbpBookmarkResponseFailure(response, "status"), response.status);
     if (response.status === 204) { responseOk(); return {status:204, data:null}; }
     let data;
-    let text = "";
-    try {
-      text = await response.text();
-      if (text.length > 4 * 1024 * 1024) { text = null; throw new Error("size"); }
-      data = JSON.parse(text);
-    } catch (_) {
-      throw pbpBookmarkServiceError(text === null ? "invalid_response" : pbpBookmarkResponseFailure(response, "body"));
+    let text;
+    try { text = await response.text(); }
+    catch (error) {
+      // Name and message only: never the body, token or header values.
+      console.warn("[bookmark-services] body read failed:", error?.name, error?.message);
+      throw pbpBookmarkServiceError(error?.name === "TimeoutError" || error?.name === "AbortError"
+        ? "timeout" : pbpBookmarkResponseFailure(response, "body"));
+    }
+    if (text.length > 4 * 1024 * 1024) throw pbpBookmarkServiceError("invalid_response");
+    try { data = JSON.parse(text); }
+    catch (error) {
+      // V8's SyntaxError message quotes the start of the body, so log the name only.
+      console.warn("[bookmark-services] body parse failed:", error?.name);
+      throw pbpBookmarkServiceError(pbpBookmarkResponseFailure(response, "body"));
     }
     await guard();
     responseOk();

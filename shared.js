@@ -1859,7 +1859,7 @@ const PBP_BOOKMARK_GATEWAY_CF_NAMES = Object.freeze(["CF-Access-Client-Id", "CF-
 const PBP_BOOKMARK_GATEWAY_FORBIDDEN = Object.freeze(new Set([
   "accept-charset", "accept-encoding", "access-control-request-headers", "access-control-request-method",
   "connection", "content-length", "cookie", "cookie2", "date", "dnt", "expect", "host", "keep-alive", "origin",
-  "referer", "set-cookie", "te", "trailer", "transfer-encoding", "upgrade", "via",
+  "referer", "set-cookie", "te", "trailer", "transfer-encoding", "upgrade", "user-agent", "via",
   "authorization", "accept", "content-type",
   "x-http-method", "x-http-method-override", "x-method-override"]));
 const PBP_BOOKMARK_GATEWAY_FORBIDDEN_PREFIXES = Object.freeze(["proxy-", "sec-"]);

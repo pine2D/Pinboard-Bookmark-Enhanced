@@ -2867,7 +2867,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const result = await chrome.runtime.sendMessage({type:"bookmark_connect",service,baseUrl,token,gateway});
         const gatewayNow = pbpOptGatewayRead(service);
         if (pbpBookmarkEndpoint($id("opt-" + service + "-url").value) !== baseUrl || $id("opt-" + service + "-token").value.trim() !== token ||
-          !gatewayNow.ok || JSON.stringify(gatewayNow.gateway) !== gatewayJson) return;
+          !gatewayNow.ok || JSON.stringify(gatewayNow.gateway) !== gatewayJson) { status.textContent = ""; return; }
         if (!result?.ok) {
           const failureKey = pbpBookmarkFailureKey({reason:result?.error, httpStatus:result?.status}, service);
           status.textContent = t(failureKey || (result?.error === "permission" ? "bookmarkPermissionDenied"

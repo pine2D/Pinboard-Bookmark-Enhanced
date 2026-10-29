@@ -219,6 +219,9 @@ try{
     await waitStatus('Connected');
     const rotated=await linkdingAccount();
     assert(rotated&&rotated!==before,'a new token kept the old linkding connection ID');
+    // Editing the form while Connect is in flight abandons it and must not leave "Connecting..." behind.
+    await options.evaluate(()=>{document.getElementById('connect-linkding').click();document.getElementById('opt-linkding-token').value='fixture-key-3';});
+    await until(async()=>(await status.textContent())==='','abandoned Connect left a stale status');
     await options.setViewportSize({width:400,height:900});
     await chooseGateway('custom');
     assert(await options.locator('#opt-linkding-gw-value-4').isVisible(),'custom header rows are hidden');

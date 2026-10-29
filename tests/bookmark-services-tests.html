@@ -53,7 +53,7 @@ test("gateway names follow the RFC 9110 token grammar and 1-64 length", () => {
 });
 test("every Fetch forbidden header, proxy-/sec- prefix and app-owned header is refused in any letter case", () => {
   // Independent oracle copied from the Fetch spec list (research §7), not from shared.js.
-  const names = ["Accept-Charset","Accept-Encoding","Access-Control-Request-Headers","Access-Control-Request-Method","Connection","Content-Length","Cookie","Cookie2","Date","DNT","Expect","Host","Keep-Alive","Origin","Referer","Set-Cookie","TE","Trailer","Transfer-Encoding","Upgrade","Via","Authorization","Accept","Content-Type","X-HTTP-Method","X-HTTP-Method-Override","X-Method-Override","Proxy-Authorization","Proxy-Anything","Sec-Fetch-Site","Sec-X"];
+  const names = ["Accept-Charset","Accept-Encoding","Access-Control-Request-Headers","Access-Control-Request-Method","Connection","Content-Length","Cookie","Cookie2","Date","DNT","Expect","Host","Keep-Alive","Origin","Referer","Set-Cookie","TE","Trailer","Transfer-Encoding","Upgrade","User-Agent","Via","Authorization","Accept","Content-Type","X-HTTP-Method","X-HTTP-Method-Override","X-Method-Override","Proxy-Authorization","Proxy-Anything","Sec-Fetch-Site","Sec-X"];
   for (const base of names) for (const name of [base, base.toLowerCase(), base.toUpperCase()]) {
     const r = pbpBookmarkGatewayNormalize({type:"custom", headers:[[name, "v"]]});
     equal([r.ok, r.error, r.row, r.field], [false, "name_forbidden", 0, "name"]);
@@ -397,6 +397,51 @@ test("connection verification validates the gateway before any request and sends
   Object.assign(unknown.state.settings, gwEnvSettings("linkding", {type:"pomerium", headers:[["X-A","v"]]}));
   const result = await unknown.submitSaveIntent(saveIntent);
   equal([result.reason, unknown.state.calls.length], ["not_logged_in", 0]);
+});
+// The sealed gateway headers must reach every real worker path, not just the injected-client unit cases.
+// Counter-example caught: beforeRequest returning {token} only, or the envelope's `headers` renamed, sends no CF headers.
+const gwCf = {type:"cloudflare", headers:[["CF-Access-Client-Id","cf-id-value"],["CF-Access-Client-Secret","cf-secret-value"]]};
+const gwWireOk = calls => calls.length > 0 && calls.every(c => c.url.startsWith("https://bookmarks.example/base/api/") &&
+  c.headers.get("CF-Access-Client-Id") === "cf-id-value" && c.headers.get("CF-Access-Client-Secret") === "cf-secret-value" &&
+  c.headers.get("Authorization") === "Token tok");
+test("worker save (lookup + create) sends the sealed Cloudflare headers to the bound origin only", async () => {
+  const h = await workerHarness("linkding", [[200,{bookmark:null}],[201,ld]]);
+  Object.assign(h.state.settings, gwEnvSettings("linkding", gwCf));
+  const result = await h.submitSaveIntent(saveIntent);
+  equal([result.status, h.state.calls.length], ["saved", 2]); ok(gwWireOk(h.state.calls));
+});
+test("offline replay sends the sealed Cloudflare headers and the queue never stores them", async () => {
+  const replies = [new TypeError("offline")];
+  const h = await workerHarness("linkding", replies);
+  Object.assign(h.state.settings, gwEnvSettings("linkding", gwCf));
+  equal((await h.submitSaveIntent(saveIntent)).status, "queued");
+  const stored = JSON.stringify(h.state.queue);
+  ok(!stored.includes("cf-id-value") && !stored.includes("cf-secret-value") && !stored.includes("tok\""));
+  h.state.calls = []; replies.push([200,{bookmark:null}],[201,ld]);
+  await h.processOfflineQueue();
+  equal([h.state.calls.length, h.state.queue], [2, []]); ok(gwWireOk(h.state.calls));
+});
+test("a response body read that times out is a timeout and is logged by name and message only", async () => {
+  const warns = [], original = console.warn; console.warn = (...args) => warns.push(args);
+  const failing = error => ({type:"basic", ok:true, status:200, headers:new Headers({"Content-Type":"application/json"}), text:async()=>{ throw error; }});
+  try {
+    for (const name of ["TimeoutError", "AbortError"]) {
+      await rejects(()=>harness("linkding", [failing(new DOMException("body stalled", name))]).client.verify(), "timeout");
+    }
+    const other = await gwCode(failing(new TypeError("connection reset")));
+    ok(other && other !== "timeout" && other !== "ok");
+  } finally { console.warn = original; }
+  ok(warns.length === 3 && warns.every(args => args[0].includes("body read failed")));
+  equal(warns.map(args => args[1]), ["TimeoutError", "AbortError", "TypeError"]);
+});
+test("a malformed JSON body logs only the error name, never the body", async () => {
+  const warns = [], original = console.warn; console.warn = (...args) => warns.push(args);
+  let code;
+  try { code = await gwCode(new Response("SECRET-BODY-TEXT {not json", {status:200, headers:{"Content-Type":"application/json"}})); }
+  finally { console.warn = original; }
+  ok(code && code !== "ok"); equal(warns.length, 1);
+  equal(warns[0], ["[bookmark-services] body parse failed:", "SyntaxError"]);
+  ok(!JSON.stringify(warns).includes("SECRET-BODY-TEXT"));
 });
 async function personalHarness(stored) {
   const source=await(await fetch("../shared.js")).text();const a=source.indexOf("async function pbpPersonalLibraryAccount(");const b=source.indexOf("function pbpPinboardAccountFromToken",a);
