@@ -10099,6 +10099,8 @@ check(/\.pick > input:disabled:checked ~ \.pick-mark \{[^}]*background: var\(--o
   const states = [...outside.matchAll(/setConnectStatus\("(\w+)"/g)].map((m) => m[1]);
   check(states.length > 0 && states.every((state) => ["pending", "ok", "bad", "clear"].includes(state)),
     "options.js: setConnectStatus called with a state other than pending / ok / bad / clear");
+  check(/radio\.addEventListener\("change", \(\) => scheduleConnectionOverview\(\)\)/.test(optionsJs),
+    "options.js: choosing a bookmark service must refresh the connection overview and the AI nudge");
 }
 
 if (timingEnabled) {

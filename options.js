@@ -2778,6 +2778,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   for (const radio of document.querySelectorAll('input[name="bookmark-service"]')) {
     radio.checked = radio.value === pbpBookmarkServiceId(s);
     radio.addEventListener("change", refreshBookmarkServiceFields);
+    // The overview's bookmark card and the "set up AI" nudge follow the chosen service.
+    radio.addEventListener("change", () => scheduleConnectionOverview());
   }
   refreshBookmarkServiceFields();
   // ---- Access gateway form (Cloudflare Access or custom headers) ----
