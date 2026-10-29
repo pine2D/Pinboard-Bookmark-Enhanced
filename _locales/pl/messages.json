@@ -4883,7 +4883,7 @@
     "message": "Zakładka mogła zostać zapisana, ale część zmian się nie powiodła. Otwórz edycję, sprawdź dane i zapisz ponownie."
   },
   "bookmarkErrGatewayRedirect": {
-    "message": "Serwer przekierował żądanie. Częstą przyczyną jest bramka dostępu wymagająca logowania, np. Cloudflare Access. Dodaj token usługi w sekcji „Bramka dostępu” lub zezwól w bramce na ścieżkę API."
+    "message": "Serwer przekierował żądanie. Częstą przyczyną jest bramka dostępu wymagająca logowania, np. Cloudflare Access, albo błędny adres. Dodaj token usługi w sekcji „Bramka dostępu” lub zezwól w bramce na ścieżkę API."
   },
   "bookmarkErrGatewayChallenge": {
     "message": "Kontrola bezpieczeństwa (test antybotowy) zablokowała żądanie. Częstą przyczyną są reguły bezpieczeństwa Cloudflare; zezwól w nich na ścieżkę API."

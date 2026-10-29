@@ -4883,7 +4883,7 @@
     "message": "Le favori a peut-être été enregistré, mais certaines modifications ont échoué. Ouvrez la modification pour vérifier, puis enregistrez à nouveau."
   },
   "bookmarkErrGatewayRedirect": {
-    "message": "Le serveur a redirigé la requête. Cause fréquente : une passerelle d’accès qui exige une connexion, comme Cloudflare Access. Ajoutez un jeton de service dans « Passerelle d’accès » ou autorisez le chemin de l’API dans la passerelle."
+    "message": "Le serveur a redirigé la requête. Cause fréquente : une passerelle d’accès qui exige une connexion, comme Cloudflare Access, ou une URL erronée. Ajoutez un jeton de service dans « Passerelle d’accès » ou autorisez le chemin de l’API dans la passerelle."
   },
   "bookmarkErrGatewayChallenge": {
     "message": "Une vérification de sécurité (test anti-robot) a bloqué la requête. Elle vient souvent des règles de sécurité de Cloudflare ; autorisez-y le chemin de l’API."
