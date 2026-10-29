@@ -2122,7 +2122,12 @@ html.motion-ready .pf:not([hidden]) {
 .disclosure > summary:hover { color: var(--opt-accent-hover); background: var(--opt-panel); }
 .disclosure > summary > span:first-child {
   min-width: 0;
-  overflow-wrap: anywhere;
+  /* break-word, not anywhere: a header breaks between words; a word only
+     splits when it alone is wider than the line. No hyphens: auto -- with a
+     dictionary present Chromium hyphenates headings greedily ("utili-
+     sation" with room to spare), and whether one is present differs per
+     machine. */
+  overflow-wrap: break-word;
 }
 /* A live readout inside a disclosure header ("Not imported", "On", "Needs
    attention: 2"): body weight at the helper size so it reads as state, not as
@@ -4213,6 +4218,16 @@ html[data-theme="flexoki-dark"] #panel-vocab .disclosure-body > .hint {
      the container's larger row gap reads as the break before the panel. */
   .reset-tab-btn { justify-self: start; border-left: 0; padding-left: 0; padding-block: 0; min-height: 24px; white-space: normal; }
   .panel.active { padding: var(--opt-sp-4); }
+  /* A disclosure header's readout drops under the title instead of squeezing
+     it (critique 6, L10N-3): beside a nowrap "Handlungsbedarf: 1" and the
+     chevron, "Verbindungsstatus" was pressed narrower than the word and broke
+     mid-word. Line 1 is title + chevron, line 2 the readout. */
+  .disclosure > summary { flex-wrap: wrap; row-gap: var(--opt-sp-1); }
+  /* Basis 0: a two-line title must not claim the whole line at its
+     max-content width and push the chevron onto a line of its own. */
+  .disclosure > summary > span:first-child { flex: 1 1 0; }
+  .disclosure > summary::after { order: 1; }
+  .disclosure > summary > .summary-state { order: 2; flex-basis: 100%; }
   .fg > .listbox { min-width: 0; width: 100%; }
   .fg select { min-width: 0; }
   .connection-health { grid-template-columns: minmax(0, 1fr); }

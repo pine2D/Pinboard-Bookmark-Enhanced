@@ -2640,6 +2640,30 @@ async function driveNarrowLayouts(context, worker, extId, rep) {
           if (!includesStep(`options-${tab}`)) continue;
           const previousFailures = s.failures.length;
           await page.evaluate(tab=>document.querySelector('.tabs [data-panel="'+tab+'"]').click(),tab);
+          // Critique 6 L10N-3: a disclosure header's readout must not squeeze
+          // its title into a mid-word break. A fresh fixture leaves the
+          // connection overview's readout empty, so fill it the way
+          // _pbpConnectionOverviewSummary does before measuring.
+          if (tab === 'general') await page.evaluate(()=>{const st=document.getElementById('connection-overview-state');if(st){st.textContent=t('connectionSummaryIssues','1');st.classList.add('bad');}});
+          const brokenWords = await page.evaluate(()=>{
+            const out=[];
+            for(const span of document.querySelectorAll('.panel.active details.disclosure > summary > span:first-child')){
+              if(!span.getBoundingClientRect().width) continue;
+              const tw=document.createTreeWalker(span,NodeFilter.SHOW_TEXT);
+              for(let n=tw.nextNode();n;n=tw.nextNode()){
+                // Latin/Cyrillic words only: CJK lines legitimately break
+                // between characters, and a hyphen is a break point.
+                for(const m of n.data.matchAll(/[^\s\-\u2010-\u2014/]+/g)){
+                  if(/[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uff00-\uffef]/.test(m[0])) continue;
+                  const r=document.createRange();r.setStart(n,m.index);r.setEnd(n,m.index+m[0].length);
+                  const lines=new Set([...r.getClientRects()].filter(x=>x.width>0).map(x=>Math.round(x.top)));
+                  if(lines.size>1) out.push(`${m[0]} (${span.textContent.trim()})`);
+                }
+              }
+            }
+            return out;
+          });
+          for(const w of brokenWords) s.failures.push(`${locale}/${density}/${mode}/${width}/${tab}: disclosure header breaks mid-word: ${w}`);
           const g = await page.evaluate(()=>({viewport:innerWidth,scroll:document.documentElement.scrollWidth, controls:[...document.querySelectorAll('.panel.active input,.panel.active textarea,.panel.active .listbox-btn,.options-nav button,.panel.active .btn')].filter(el=>el.getBoundingClientRect().width).map(el=>({id:el.id||el.className,left:el.getBoundingClientRect().left,right:el.getBoundingClientRect().right}))}));
           if(g.scroll>width) s.failures.push(`${locale}/${density}/${mode}/${width}/${tab}: scrollWidth=${g.scroll}`);
           for(const c of g.controls) if(c.left<0||c.right>width+1) s.failures.push(`${locale}/${width}/${tab}: ${c.id} outside viewport`);
