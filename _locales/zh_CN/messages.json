@@ -4846,8 +4846,8 @@
   "bookmarkServerHint": {
     "message": "填写站点地址，包含部署子路径。除本机地址外，必须使用 HTTPS。"
   },
-  "bookmarkConnectHint": {
-    "message": "地址和 Token 在连接成功后生效。Token 默认保存在本机，只有开启凭据同步后才会同步。"
+  "bookmarkTokenLocalHint": {
+    "message": "Token 和网关凭据保存在本浏览器，只发送给这个服务器。开启 API Key 和 Token 同步后，才会出现在你的其他设备上。"
   },
   "bookmarkGatewayLabel": {
     "message": "访问网关"
@@ -4906,8 +4906,8 @@
   "bookmarkGatewayCustomHint": {
     "message": "这些请求头会随每个书签接口请求发往这台服务器。不能填写 Authorization、Cookie 等请求头。如果网关使用 Basic 认证，请在网关中为接口路径放行。"
   },
-  "bookmarkGatewayPending": {
-    "message": "网关设置已修改，点「连接」后生效。"
+  "bookmarkConnectPending": {
+    "message": "地址、Token 或网关的修改尚未应用，点「连接」后生效。"
   },
   "bookmarkGatewayErrRequired": {
     "message": "请填写访问网关的各项，或把网关设为「无」。"

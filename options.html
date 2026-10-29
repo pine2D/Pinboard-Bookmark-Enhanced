@@ -117,6 +117,7 @@
             <label class="bl" for="opt-karakeep-token" data-i18n="labelApiToken">API Token</label>
             <span class="key-wrap"><input type="password" id="opt-karakeep-token" autocomplete="off" spellcheck="false" />
             <button type="button" class="key-toggle" data-target="opt-karakeep-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+            <p class="hint" data-i18n="bookmarkTokenLocalHint">The token and any gateway credentials stay in this browser and are sent only to this server. They reach your other devices only if you sync API keys and tokens.</p>
           </div>
           <div class="fg entry-block context-help-host" data-help-role="field">
             <label class="bl" id="opt-karakeep-gateway-label" for="opt-karakeep-gateway" data-i18n="bookmarkGatewayLabel">Access gateway</label>
@@ -170,8 +171,7 @@
               </div>
           </div>
           <div class="fg entry-block">
-            <p class="hint hint-warn" id="karakeep-gateway-pending" data-i18n="bookmarkGatewayPending" role="status" aria-live="polite" hidden>Gateway settings changed. Click Connect to apply them.</p>
-            <p class="hint" data-i18n="bookmarkConnectHint">URL and token changes take effect after connecting. Tokens stay on this device unless credential sync is enabled.</p>
+            <p class="hint hint-warn" id="karakeep-connect-pending" data-i18n="bookmarkConnectPending" role="status" aria-live="polite" hidden>Changes to the URL, token or gateway aren't applied yet. Click Connect to apply them.</p>
             <div class="fg-actions">
               <button type="button" class="btn btn-sm" id="connect-karakeep" data-i18n="bookmarkConnect">Connect</button>
               <span class="save-status" id="connect-karakeep-status" role="status" aria-live="polite"></span>
@@ -188,6 +188,7 @@
             <label class="bl" for="opt-linkding-token" data-i18n="labelApiToken">API Token</label>
             <span class="key-wrap"><input type="password" id="opt-linkding-token" autocomplete="off" spellcheck="false" />
             <button type="button" class="key-toggle" data-target="opt-linkding-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span>
+            <p class="hint" data-i18n="bookmarkTokenLocalHint">The token and any gateway credentials stay in this browser and are sent only to this server. They reach your other devices only if you sync API keys and tokens.</p>
           </div>
           <div class="fg entry-block context-help-host" data-help-role="field">
             <label class="bl" id="opt-linkding-gateway-label" for="opt-linkding-gateway" data-i18n="bookmarkGatewayLabel">Access gateway</label>
@@ -241,8 +242,7 @@
               </div>
           </div>
           <div class="fg entry-block">
-            <p class="hint hint-warn" id="linkding-gateway-pending" data-i18n="bookmarkGatewayPending" role="status" aria-live="polite" hidden>Gateway settings changed. Click Connect to apply them.</p>
-            <p class="hint" data-i18n="bookmarkConnectHint">URL and token changes take effect after connecting. Tokens stay on this device unless credential sync is enabled.</p>
+            <p class="hint hint-warn" id="linkding-connect-pending" data-i18n="bookmarkConnectPending" role="status" aria-live="polite" hidden>Changes to the URL, token or gateway aren't applied yet. Click Connect to apply them.</p>
             <div class="fg-actions">
               <button type="button" class="btn btn-sm" id="connect-linkding" data-i18n="bookmarkConnect">Connect</button>
               <span class="save-status" id="connect-linkding-status" role="status" aria-live="polite"></span>

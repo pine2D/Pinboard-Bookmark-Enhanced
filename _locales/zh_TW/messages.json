@@ -4852,8 +4852,8 @@
   "bookmarkServerHint": {
     "message": "填入網站網址，包含部署子路徑。除了本機位址，都必須使用 HTTPS。"
   },
-  "bookmarkConnectHint": {
-    "message": "網址與 Token 會在連線成功後生效。Token 預設儲存在此裝置，只有啟用憑證同步後才會同步。"
+  "bookmarkTokenLocalHint": {
+    "message": "Token 與閘道憑證儲存在這個瀏覽器，只會傳送給這台伺服器。開啟 API Key 和 Token 同步後，才會出現在你的其他裝置上。"
   },
   "bookmarkGatewayLabel": {
     "message": "存取閘道"
@@ -4912,8 +4912,8 @@
   "bookmarkGatewayCustomHint": {
     "message": "這些標頭會隨每個書籤 API 請求傳送到這台伺服器。不能填入 Authorization、Cookie 等標頭。如果閘道使用 Basic 驗證，請在閘道中允許 API 路徑通過。"
   },
-  "bookmarkGatewayPending": {
-    "message": "閘道設定已變更，按一下「連線」後生效。"
+  "bookmarkConnectPending": {
+    "message": "網址、Token 或閘道的變更尚未套用，按一下「連線」後生效。"
   },
   "bookmarkGatewayErrRequired": {
     "message": "請填寫存取閘道的各個欄位，或將閘道設為「無」。"

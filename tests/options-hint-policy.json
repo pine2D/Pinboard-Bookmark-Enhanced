@@ -6,7 +6,7 @@
       "multiPackHint", "multiPackLanguageHint", "ecdictFormatNote", "dictPackImportHint"
     ],
     "credential": [
-      "tokenLocalHint", "aiKeyLocalHint"
+      "tokenLocalHint", "bookmarkTokenLocalHint", "aiKeyLocalHint"
     ],
     "obtain": [
       "hintApiToken", "getKey", "browseModelsAt", "dictEudicTokenHint", "multiPackBrowse", "optVideoLangCodesLink"
@@ -19,7 +19,7 @@
       "vocabDriveScope", "backupPreviewSemantics"
     ],
     "status": [
-      "bookmarkGatewayPending", "labelShortcut", "aiUnavailableHint", "previewAiUnavailableHint", "aiCustomLocked",
+      "bookmarkConnectPending", "labelShortcut", "aiUnavailableHint", "previewAiUnavailableHint", "aiCustomLocked",
       "aiCustomFieldInvalid", "aiProtocolUnknown", "aiCustomBaseUrlInvalid", "aiCustomKeyRebind", "aiCustomKeyPending",
       "backupIncludeSecretsHint",
       "#preview-ai-model-provider", "#multi-pack-name", "#tag-gov-overview", "#tag-gov-ai-status",
@@ -40,7 +40,6 @@
       "bookmarkServiceHint", "personalLibraryHint", "bookmarkKarakeepHint"
     ],
     "pending": [
-      "bookmarkConnectHint",
       "themeGroupAdaptiveHint", "vocabCompleteExportHint", "ecdictHint", "dictPackHint"
     ]
   }

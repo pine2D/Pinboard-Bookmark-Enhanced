@@ -4852,8 +4852,8 @@
   "bookmarkServerHint": {
     "message": "Die Website-URL einschließlich Unterpfad angeben. Außer für localhost ist HTTPS erforderlich."
   },
-  "bookmarkConnectHint": {
-    "message": "Änderungen an URL und Token werden erst nach dem Verbinden wirksam. Tokens bleiben auf diesem Gerät, sofern die Synchronisierung von Zugangsdaten deaktiviert ist."
+  "bookmarkTokenLocalHint": {
+    "message": "Token und Gateway-Zugangsdaten bleiben in diesem Browser und gehen nur an diesen Server. Auf deine anderen Geräte gelangen sie nur, wenn du API-Schlüssel und Tokens synchronisierst."
   },
   "bookmarkGatewayLabel": {
     "message": "Zugangs-Gateway"
@@ -4912,8 +4912,8 @@
   "bookmarkGatewayCustomHint": {
     "message": "Diese Header gehen mit jeder Anfrage an die Lesezeichen-API an diesen Server. Authorization, Cookie und ähnliche Header sind nicht erlaubt. Nutzt das Gateway Basic-Authentifizierung, stattdessen den API-Pfad im Gateway freigeben."
   },
-  "bookmarkGatewayPending": {
-    "message": "Gateway-Einstellungen geändert. Zum Übernehmen auf „Verbinden“ klicken."
+  "bookmarkConnectPending": {
+    "message": "Änderungen an URL, Token oder Gateway sind noch nicht übernommen. Zum Übernehmen auf „Verbinden“ klicken."
   },
   "bookmarkGatewayErrRequired": {
     "message": "Die Felder des Zugangs-Gateways ausfüllen oder das Gateway auf „Keines“ setzen."

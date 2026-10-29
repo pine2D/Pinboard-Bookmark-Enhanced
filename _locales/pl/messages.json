@@ -4852,8 +4852,8 @@
   "bookmarkServerHint": {
     "message": "Podaj adres witryny wraz z podścieżką, jeśli jest używana. Poza localhost wymagany jest HTTPS."
   },
-  "bookmarkConnectHint": {
-    "message": "Zmiany adresu i tokenu obowiązują po połączeniu. Tokeny pozostają na tym urządzeniu, chyba że włączono synchronizację danych uwierzytelniających."
+  "bookmarkTokenLocalHint": {
+    "message": "Token i dane uwierzytelniające bramki zostają w tej przeglądarce i trafiają wyłącznie do tego serwera. Na inne urządzenia przejdą tylko wtedy, gdy włączysz synchronizację kluczy API i tokenów."
   },
   "bookmarkGatewayLabel": {
     "message": "Bramka dostępu"
@@ -4912,8 +4912,8 @@
   "bookmarkGatewayCustomHint": {
     "message": "Te nagłówki trafiają do tego serwera z każdym żądaniem do API zakładek. Nie można użyć nagłówków Authorization, Cookie i podobnych. Jeśli bramka używa uwierzytelniania Basic, zezwól w niej zamiast tego na ścieżkę API."
   },
-  "bookmarkGatewayPending": {
-    "message": "Zmieniono ustawienia bramki. Kliknij „Połącz”, aby je zastosować."
+  "bookmarkConnectPending": {
+    "message": "Zmiany adresu, tokenu lub bramki nie zostały jeszcze zastosowane. Kliknij „Połącz”, aby je zastosować."
   },
   "bookmarkGatewayErrRequired": {
     "message": "Wypełnij pola bramki dostępu albo ustaw bramkę na „Brak”."

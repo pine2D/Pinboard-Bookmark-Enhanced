@@ -227,21 +227,28 @@ try{
     assert.equal(await options.locator('#opt-linkding-cf-id').getAttribute('aria-invalid'),'true');
     await options.locator('#opt-linkding-cf-id').fill('fixture-cf-id');
     await options.locator('#opt-linkding-cf-secret').fill('fixture-cf-secret');
-    assert(await options.locator('#linkding-gateway-pending').isVisible(),'pending gateway change is not shown');
+    assert(await options.locator('#linkding-connect-pending').isVisible(),'pending gateway change is not shown');
     await options.locator('#connect-linkding').click();
     await waitStatus('Connected');
-    assert(await options.locator('#linkding-gateway-pending').isHidden(),'pending hint stayed after connecting');
+    assert(await options.locator('#linkding-connect-pending').isHidden(),'pending hint stayed after connecting');
     assert.equal(await linkdingAccount(),before,'same URL and token did not keep the linkding connection ID');
     await options.reload();
     await until(()=>options.evaluate(()=>document.getElementById('opt-linkding-gateway')?.value==='cloudflare'),'gateway type restored');
     assert.equal(await options.locator('#opt-linkding-cf-id').inputValue(),'fixture-cf-id');
     assert.equal(await options.locator('#opt-linkding-cf-secret').inputValue(),'fixture-cf-secret');
     await until(async()=>(await options.locator('#opt-linkding-gateway-btn .listbox-value').textContent()).trim()===en.bookmarkGatewayCloudflare.message,'gateway listbox shows Cloudflare Access');
-    assert(await options.locator('#linkding-gateway-pending').isHidden(),'restored gateway reads as modified');
+    assert(await options.locator('#linkding-connect-pending').isHidden(),'restored gateway reads as modified');
     acceptedKeys.add('fixture-key-2');
+    // U4: the not-applied warning covers the URL and the token too, not only the gateway.
+    await options.locator('#opt-linkding-url').fill(origin+'/linkding/other/');
+    assert(await options.locator('#linkding-connect-pending').isVisible(),'a changed URL is not reported as unapplied');
+    await options.locator('#opt-linkding-url').fill(origin+'/linkding');
+    assert(await options.locator('#linkding-connect-pending').isHidden(),'the saved URL, retyped without its slash, reads as modified');
     await options.locator('#opt-linkding-token').fill('fixture-key-2');
+    assert(await options.locator('#linkding-connect-pending').isVisible(),'a changed token is not reported as unapplied');
     await options.locator('#connect-linkding').click();
     await waitStatus('Connected');
+    assert(await options.locator('#linkding-connect-pending').isHidden(),'pending hint stayed after connecting a new token');
     const rotated=await linkdingAccount();
     assert(rotated&&rotated!==before,'a new token kept the old linkding connection ID');
     // Editing the form while Connect is in flight abandons it and must not leave "Connecting..." behind.

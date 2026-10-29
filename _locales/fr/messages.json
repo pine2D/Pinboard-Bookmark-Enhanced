@@ -4852,8 +4852,8 @@
   "bookmarkServerHint": {
     "message": "Indiquez l’URL du site, avec son sous-chemin éventuel. HTTPS est obligatoire, sauf sur localhost."
   },
-  "bookmarkConnectHint": {
-    "message": "Les modifications de l’URL et du jeton prennent effet après connexion. Les jetons restent sur cet appareil, sauf si la synchronisation des identifiants est activée."
+  "bookmarkTokenLocalHint": {
+    "message": "Le jeton et les identifiants de passerelle restent dans ce navigateur et ne sont envoyés qu'à ce serveur. Ils ne rejoignent vos autres appareils que si vous synchronisez les clés API et les jetons."
   },
   "bookmarkGatewayLabel": {
     "message": "Passerelle d’accès"
@@ -4912,8 +4912,8 @@
   "bookmarkGatewayCustomHint": {
     "message": "Ces en-têtes sont envoyés à ce serveur avec chaque requête vers l’API des signets. Authorization, Cookie et les en-têtes similaires ne sont pas autorisés. Si la passerelle utilise l’authentification Basic, autorisez plutôt le chemin de l’API dans la passerelle."
   },
-  "bookmarkGatewayPending": {
-    "message": "Paramètres de la passerelle modifiés. Cliquez sur « Connecter » pour les appliquer."
+  "bookmarkConnectPending": {
+    "message": "Les modifications de l’URL, du jeton ou de la passerelle ne sont pas encore appliquées. Cliquez sur « Connecter » pour les appliquer."
   },
   "bookmarkGatewayErrRequired": {
     "message": "Remplissez les champs de la passerelle d’accès ou choisissez « Aucune »."

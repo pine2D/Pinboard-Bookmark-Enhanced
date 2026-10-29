@@ -4852,8 +4852,8 @@
   "bookmarkServerHint": {
     "message": "サブパスを含むサイトのURLを入力してください。ローカルホスト以外はHTTPSが必要です。"
   },
-  "bookmarkConnectHint": {
-    "message": "URLとトークンの変更は接続後に反映されます。認証情報の同期を有効にしない限り、トークンはこの端末に保存されます。"
+  "bookmarkTokenLocalHint": {
+    "message": "トークンとゲートウェイの認証情報はこのブラウザーに保存され、このサーバーにだけ送信されます。ほかのデバイスに届くのは、API キーとトークンの同期をオンにした場合だけです。"
   },
   "bookmarkGatewayLabel": {
     "message": "アクセスゲートウェイ"
@@ -4912,8 +4912,8 @@
   "bookmarkGatewayCustomHint": {
     "message": "これらのヘッダーは、ブックマークAPIへのすべてのリクエストと一緒にこのサーバーへ送信されます。Authorization、Cookieなどのヘッダーは指定できません。ゲートウェイがBasic認証を使う場合は、ゲートウェイでAPIのパスを許可してください。"
   },
-  "bookmarkGatewayPending": {
-    "message": "ゲートウェイの設定が変更されています。「接続」をクリックすると反映されます。"
+  "bookmarkConnectPending": {
+    "message": "URL、トークン、ゲートウェイの変更はまだ反映されていません。「接続」をクリックすると反映されます。"
   },
   "bookmarkGatewayErrRequired": {
     "message": "アクセスゲートウェイの各項目を入力するか、ゲートウェイを「なし」にしてください。"

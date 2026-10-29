@@ -4860,8 +4860,8 @@
   "bookmarkServerHint": {
     "message": "Use the site URL, including any subpath. HTTPS is required except on localhost."
   },
-  "bookmarkConnectHint": {
-    "message": "URL and token changes take effect after connecting. Tokens stay on this device unless credential sync is enabled."
+  "bookmarkTokenLocalHint": {
+    "message": "The token and any gateway credentials stay in this browser and are sent only to this server. They reach your other devices only if you sync API keys and tokens."
   },
   "bookmarkGatewayLabel": {
     "message": "Access gateway"
@@ -4920,8 +4920,8 @@
   "bookmarkGatewayCustomHint": {
     "message": "These headers go to this server with every bookmark API request. Authorization, Cookie and similar headers aren't allowed. If the gateway uses Basic authentication, allow the API path in the gateway instead."
   },
-  "bookmarkGatewayPending": {
-    "message": "Gateway settings changed. Click Connect to apply them."
+  "bookmarkConnectPending": {
+    "message": "Changes to the URL, token or gateway aren't applied yet. Click Connect to apply them."
   },
   "bookmarkGatewayErrRequired": {
     "message": "Fill in the access gateway fields, or set the gateway to None."

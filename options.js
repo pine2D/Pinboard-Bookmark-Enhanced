@@ -2837,9 +2837,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     $id(service + "-gateway-none-help").hidden = type !== "none";
     $id(service + "-gateway-cf-help").hidden = type !== "cloudflare";
     $id(service + "-gateway-custom-help").hidden = type !== "custom";
-    // An unreadable form counts as modified: it differs from any valid stored gateway.
+    pbpOptConnectPendingSync(service);
+  }
+  // "Not applied yet" is said by state, not by a standing sentence (U4): the
+  // warning shows while the URL, token or gateway in the form differs from the
+  // saved connection -- including a first fill, which differs from nothing.
+  // An unreadable gateway form counts as modified: it differs from any valid stored one.
+  const connectStored = {};
+  function pbpOptConnectPendingSync(service) {
+    const pending = $id(service + "-connect-pending");
+    if (!pending || !connectStored[service]) return;
+    const urlRaw = $id("opt-" + service + "-url").value.trim();
     const read = pbpOptGatewayRead(service);
-    $id(service + "-gateway-pending").hidden = read.ok && JSON.stringify(read.gateway) === JSON.stringify(gatewayStored[service] || null);
+    pending.hidden = (pbpBookmarkEndpoint(urlRaw) || urlRaw) === connectStored[service].url &&
+      $id("opt-" + service + "-token").value.trim() === connectStored[service].token &&
+      read.ok && JSON.stringify(read.gateway) === JSON.stringify(gatewayStored[service] || null);
   }
   function pbpOptGatewayFill(service, connection) {
     const type = connection?.gatewayType === "cloudflare" || connection?.gatewayType === "custom" ? connection.gatewayType : "none";
@@ -2869,7 +2881,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   for (const service of ["karakeep", "linkding"]) {
     $id("opt-" + service + "-url").value = s[service + "Url"] || "";
     $id("opt-" + service + "-token").value = pbpBookmarkConnection({...s,bookmarkService:service}).token;
+    const urlLoaded = $id("opt-" + service + "-url").value.trim();
+    connectStored[service] = {url:pbpBookmarkEndpoint(urlLoaded) || urlLoaded, token:$id("opt-" + service + "-token").value.trim()};
     pbpOptGatewayFill(service, pbpBookmarkConnection({...s,bookmarkService:service}));
+    for (const id of ["-url", "-token"]) $id("opt-" + service + id).addEventListener("input", () => pbpOptConnectPendingSync(service));
     $id("opt-" + service + "-gateway").addEventListener("change", () => {
       // A mark on a field the new choice hides would otherwise outlive it.
       for (const field of gatewayFields(service)) pbpOptClearFieldInvalid?.(field);
@@ -2950,7 +2965,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
         const saved = await persistSettings(patch);
         setConnectStatus(saved.ok ? "ok" : "bad", t(saved.ok ? "bookmarkConnected" : "bookmarkConnectFailed"));
-        if (saved.ok) { gatewayStored[service] = gateway; pbpOptGatewaySync(service); }
+        if (saved.ok) { gatewayStored[service] = gateway; connectStored[service] = {url:baseUrl, token}; pbpOptGatewaySync(service); }
         void renderConnectionOverview();
       } catch (error) {
         console.warn("[bookmark-connect] failed:", error?.name, error?.message);
