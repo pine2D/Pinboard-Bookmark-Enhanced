@@ -305,7 +305,9 @@ window.chrome = {
 
   // UX-11: with the switches gone the status line leads #vocab-drive-body.
   // Rendered from the production markup against options.css: its gap under
-  // the heading must equal Chrome Sync's heading -> first-row gap.
+  // the heading must equal Chrome Sync's heading -> first-row gap, measured
+  // to the row's TEXT (rhythm A2, critique 6: the row keeps its own padding
+  // and the group's margin gives it back, so the row box starts flush).
   const spacingHost = document.createElement("div");
   spacingHost.style.cssText = "position:fixed;left:-9999px;top:0;width:700px";
   spacingHost.innerHTML = dataSync.outerHTML;
@@ -314,7 +316,8 @@ window.chrome = {
   const driveSection = spacingHost.querySelector("#sec-google-drive").closest(".settings-section");
   const gapBelowHeading = (section, first) =>
     first.getBoundingClientRect().top - section.querySelector(":scope > .fg").getBoundingClientRect().bottom;
-  const chromeGap = gapBelowHeading(chromeSection, chromeSection.querySelector(":scope > .pref-group"));
+  const firstRowLabel = chromeSection.querySelector(":scope > .pref-group > .pref-row > label");
+  const chromeGap = gapBelowHeading(chromeSection, firstRowLabel) + parseFloat(getComputedStyle(firstRowLabel).paddingTop);
   const driveGap = gapBelowHeading(driveSection, spacingHost.querySelector("#vocab-drive-state"));
   spacingHost.remove();
   // Simplest miss: delete the switches' markup only; a leftover first-child

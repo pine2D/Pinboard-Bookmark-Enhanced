@@ -2754,10 +2754,10 @@ export const CHECKS = [
   // (never a density token). Complements, not replaces, the re-pinned Shape
   // A/E1 entries above -- those prove the `.switch` TRACK survived the
   // container rebuild, these prove the new container's own geometry.
-  // R9 (Task 3, spec 2026-09-23-ui-system-stage1-design §2.3/§3): a pref-row
-  // that directly follows its section title drops its top padding and one
-  // pad of min-height (32/28), so title -> first copy reads the same 12px
-  // as an entry-block label. That reduced first row can no longer stand in
+  // R9 (Task 3, spec 2026-09-23-ui-system-stage1-design §2.3/§3; retired by
+  // rhythm A2 2026-10-30, see the row below): a pref-row that directly
+  // followed its section title dropped its top padding and one pad of
+  // min-height (32/28). That reduced first row could no longer stand in
   // for "any" pref-row's min-height, so the entry below re-points off the
   // bare `.pref-row > label.switch` (which the audit's first-match rule
   // would now land on the shrunk row) onto `.pref-row + .pref-row >
@@ -2773,8 +2773,11 @@ export const CHECKS = [
     expect: { minHeightPx: { comfortable: 44, compact: 36 }, fontSizePx: { comfortable: 14, compact: 13 }, hitRectMin: { height: 24 } } },
   { surface: "options", page: "options.html", selector: '#panel-popup .pref-group:not(.pref-group-radio) > .pref-row + .pref-row', tab: "popup", state: "default",
     expect: { borderTopWidthPx: { value: 1 } } },
+  // Rhythm A2 (options critique 6, SP-01 / ruling U3, 2026-10-30) retired R9:
+  // the title-led first row is back on the full 44/36 floor -- the group's
+  // negative top margin, not a trimmed row, now keeps title -> copy at 12.
   { surface: "options", page: "options.html", selector: '#panel-popup .settings-section > h2.section-title + .pref-group > .pref-row:first-child > label.switch', tab: "popup", state: "default",
-    expect: { minHeightPx: { comfortable: 32, compact: 28 }, hitRectMin: { height: 24 } } },
+    expect: { minHeightPx: { comfortable: 44, compact: 36 }, hitRectMin: { height: 24 } } },
 
   // ---- Stage-3b Task 1 pick family (spec 2026-09-24-ui-system-stage3b-
   // design §2, COMPONENTS.md §6.4 exception 3): the four radio groups
@@ -2880,15 +2883,15 @@ export const CHECKS = [
   // checkboxes) sits behind an actual JSON-import preview render with no
   // reachable trigger in this harness's page setup, so it is not pinned here
   // -- flagged for the controller rather than forced (task-5-report.md).
-  // The FIRST storage row is a title-led R9 row (the group sits right under
-  // the Storage Management title, inside `#storage-cats`; final whole-stage
-  // review S1 widened R9 to that wrapper), so its label carries
-  // `--opt-row-min-h - --opt-row-pad-y` = 32/28 -- this row is the pin for
-  // S1's storage half. The second category row is the plain 44/36 pick-box
+  // The FIRST storage row sits right under the Storage Management title,
+  // inside `#storage-cats`. It was a trimmed R9 row (32/28) until rhythm A2
+  // (options critique 6, SP-01) retired R9: every row, title-led or not, is
+  // on the 44/36 floor now, and this pin keeps the wrapper case from
+  // regressing to a trimmed row. The second category row is the plain pick-box
   // geometry the bookmarks row proves; anchored by position so a first-match
-  // shift cannot silently swap the two contracts.
+  // shift cannot silently swap the two.
   { surface: "options", page: "options.html", selector: "#storage-cats .pref-row > label.pick.pick-box", tab: "storage", state: "default",
-    expect: { minHeightPx: { comfortable: 32, compact: 28 }, hitRectMin: { height: 24 } } },
+    expect: { minHeightPx: { comfortable: 44, compact: 36 }, hitRectMin: { height: 24 } } },
   { surface: "options", page: "options.html", selector: "#storage-cats .pref-row:nth-child(2) > label.pick.pick-box", tab: "storage", state: "default",
     expect: { minHeightPx: { comfortable: 44, compact: 36 }, hitRectMin: { height: 24 } } },
 ];

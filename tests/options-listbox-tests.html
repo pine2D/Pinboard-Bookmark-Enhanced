@@ -1266,30 +1266,20 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
           // JS-built group inside #storage-cats.
           const leadGroup = (block) => block?.matches(".pref-group") ? block : (block?.matches(".storage-cats") ? block.querySelector(":scope > .pref-group") : null);
           const titleOf = (section) => section.querySelector(":scope > h2.section-title, :scope > .context-help-section > h2.section-title");
-          const isR9 = (label) => {
-            const row = label.parentElement, group = row.parentElement;
-            if (!row.matches(".pref-row:first-child") || !group.matches(".pref-group")) return false;
-            const block = group.parentElement.matches(".storage-cats") ? group.parentElement : group;
-            const section = block.parentElement;
-            // Data Sync's two subsection headings use the same first-row
-            // optical alignment as top-level titles, at the child text rung.
-            const subsectionTitle=group.previousElementSibling ||
-              (group.parentElement.id === "vocab-drive-body" ? group.parentElement.previousElementSibling : null);
-            if (subsectionTitle?.matches(".fg") &&
-                subsectionTitle.querySelector(':scope > .bl[role="heading"][aria-level="3"]')) return true;
-            return section.matches(".settings-section") && !!block.previousElementSibling
-              && block.previousElementSibling.matches("h2.section-title, .context-help-section") && titleOf(section) !== null;
-          };
+          // Rhythm A2 (critique 6, SP-01) retired R9: EVERY row keeps the full
+          // row-model floor and padding, title-led or not; the group's own
+          // negative margin is what puts the first copy 12px under a title.
           panel.querySelectorAll(".pref-row > label").forEach((label) => {
             if (!label.offsetParent) return;   // rows inside [hidden] hosts have no layout
             rows++;
-            const want = isR9(label) ? rowMin - padY : rowMin;
+            const name = label.querySelector("input")?.id || label.textContent.trim().slice(0, 24);
             const got = q(win.getComputedStyle(label).minHeight);
-            if (got !== want) problems.push(density + " " + panel.id + " " + (label.querySelector("input")?.id || label.textContent.trim().slice(0, 24)) + ": min-height " + got + " != " + want + (isR9(label) ? " (R9 row)" : ""));
-            // R9 is two declarations; a padding-top regression alone would leave
-            // min-height right and only show up as a gap on panels that have no
-            // entry-block reference below -- pin it directly.
-            if (isR9(label) && q(win.getComputedStyle(label).paddingTop) !== 0) problems.push(density + " " + panel.id + " " + (label.querySelector("input")?.id || "?") + ": R9 row padding-top " + win.getComputedStyle(label).paddingTop + " != 0px");
+            if (got !== rowMin) problems.push(density + " " + panel.id + " " + name + ": min-height " + got + " != " + rowMin);
+            // A trimmed row keeps min-height and only shows up as a short row,
+            // so pin the padding too (the simplest regression: R9 coming back).
+            const pt = q(win.getComputedStyle(label).paddingTop);
+            if (pt !== padY) problems.push(density + " " + panel.id + " " + name + ": padding-top " + pt + " != " + padY);
+            if (label.getBoundingClientRect().height < rowMin - 0.5) problems.push(density + " " + panel.id + " " + name + ": rendered row " + label.getBoundingClientRect().height + " < " + rowMin);
             const mark = label.querySelector(".pick-mark");
             if (mark) {
               marks++;
@@ -1297,8 +1287,9 @@ function pbpTestChromeStub(enMessages, storageDelayMs, localSeed) {
               if (Math.abs(r.width - 20) > 0.5 || Math.abs(r.height - 20) > 0.5) problems.push(density + " " + panel.id + " pick-mark " + r.width + "x" + r.height + " != 20x20");
             }
           });
-          // R9's definition: title -> first copy of a title-led group equals
-          // title -> label of a title-led entry block. Compare, don't hardcode.
+          // Title -> first copy of a title-led group equals title -> label of a
+          // title-led entry block (A2 gets there by margin, R9 did by trimming
+          // the row). Compare, don't hardcode.
           const gaps = { group: [], entry: [] };
           // A help-bearing switch's copy is an inline box (the help target
           // flows after its last word), and an inline box's rect is the

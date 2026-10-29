@@ -584,13 +584,10 @@ h1 { flex: 1 1 auto; margin: 0; font-size: 18px; line-height: calc(var(--opt-con
    the same reason -- the mark chased the now-taller host's new vertical
    centre downward, off row 1 entirely.
    Fix: give both an EXPLICIT row-1-only box instead of `inset: 0` / `50%`
-   of a box that can grow. Row 1's real height is `--opt-row-min-h`
-   normally, or R9's reduced `calc(--opt-row-min-h - --opt-row-pad-y)` for
-   this group's FIRST row specifically (`opt-ai-src-local`'s -- R9's own
-   selector reaches this host too, see the updated comment on that rule);
-   `--pick-row1-h` holds whichever applies so the radio height rule and the
-   mark's centring calc below both read one value instead of duplicating
-   the condition. Both are anchored from `top: 0`, which is row 1's own top
+   of a box that can grow. Row 1's real height is `--opt-row-min-h` (R9's
+   reduced title-led first row was retired by rhythm A2, critique 6 SP-01);
+   `--pick-row1-h` holds it so the radio height rule and the mark's
+   centring calc below both read one value. Both are anchored from `top: 0`, which is row 1's own top
    edge on this grid REGARDLESS of whether row 2 (the open answer) exists,
    so neither needs to know the host's current total height at all. The
    radio's height override is skipped under forced-colors (Windows High
@@ -601,9 +598,6 @@ h1 { flex: 1 1 auto; margin: 0; font-size: 18px; line-height: calc(var(--opt-con
   position: static;
   --pick-row1-h: var(--opt-row-min-h);
 }
-/* The R9 (title-led first row) value of --pick-row1-h is declared by the R9
-   rule itself (stage-0 block, "R9 (2026-09-23)") so the two selectors cannot
-   drift apart (final whole-stage review S1). */
 @media (forced-colors: none) {
   .context-help-host[data-help-role="choice"] > label.pick > input[type="radio"] {
     bottom: auto;
@@ -678,8 +672,7 @@ h1 { flex: 1 1 auto; margin: 0; font-size: 18px; line-height: calc(var(--opt-con
    and margin-block: auto centres the 16px track between them:
    - top: a zero-size float (`label::before`) sits at the top of the first
      line box, i.e. the label's content-box top, whatever padding-top the row
-     has (R9's title-led first rows and the Chrome Sync section's own first
-     row drop it to 0; a padding-box 50% would miss both);
+     has (a padding-box 50% would miss any row that ever drops it);
    - bottom: the answer copy's top minus its sp-3 top margin (rule below) is
      the copy's last line-box bottom. Closed, the answer is skipped content
      (content-visibility: hidden), which can never be an anchor, so anchor()
@@ -1819,34 +1812,20 @@ html[data-theme] .fg.entry-block-sub[data-off] > label.bl { color: var(--opt-fg-
    the three markup groups (tests/registry reference the class) -- it just
    carries no geometry of its own any more. */
 .entry-block, .edit-area { margin-bottom: var(--opt-sp-6); }
-/* R9 (2026-09-23): a preference row that directly follows its section title
-   drops its top padding and one pad of min-height, so title -> first copy is
-   the same 12px as title -> entry-block label. Two title shapes lead a
-   `.pref-group`: a bare `h2.section-title`, and an h2 wrapped in a
-   `.context-help-section` host (General's Backup & Restore); Storage's
-   JS-built group additionally sits inside `#storage-cats`. The final
-   whole-stage review (S1) found the rule only knew the bare-h2 shape, leaving
-   those two sections at 24/20px against 12px (both densities) everywhere
-   else -- both shapes and the storage wrapper are covered below, and
-   tests/options-listbox-tests.html asserts the class (every title-led group
-   on the page, both densities) rather than one representative row.
-   bgsave-mode's/tag-sync-mode's/popup-width's `.pref-group-radio` groups
-   live one level deeper (inside a `.fg.entry-block`) so this rule does not
-   reach them; stage-3b Task 1's ai-content-source `.pick` rows DO, and the
-   hidden radio's row-1 hit area / the mark's centring track that reduced
-   height through --pick-row1-h, declared HERE (one selector to keep in step;
-   the (0,3,1) default above loses to this rule). */
-.settings-section > :is(h2.section-title, .context-help-section) + .pref-group > .pref-row:first-child > label,
-.settings-section > :is(h2.section-title, .context-help-section) + .storage-cats > .pref-group > .pref-row:first-child > label {
-  padding-top: 0;
-  min-height: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));
-  --pick-row1-h: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));
-  /* The copy in this row sits at the TOP of the reduced box (no top pad,
-     the bottom pad kept), so its centre is (min-h - 2 * pad) / 2 down, not
-     half of --pick-row1-h -- centring the absolutely placed radio mark on
-     the whole box left it 6px (compact 4px) below the Defuddle copy. */
-  --pick-mark-y: calc((var(--opt-row-min-h) - 2 * var(--opt-row-pad-y) - 20px) / 2);
-}
+/* Rhythm A2 (options critique 6, SP-01 / ruling U3, 2026-10-30): a preference
+   row keeps its full --opt-row-min-h (44 / compact 36) and its own block
+   padding, and a .pref-group takes that padding back out of its OUTER
+   margins instead. The distance between two units is then text to text,
+   whatever the units are: 16 between units (--opt-sp-6), 12 under a section
+   title, 32 between sections (--opt-section-gap) -- not 28 next to a switch
+   list and 16 next to a field, and not 44-46 before a section title that
+   follows a list. The negative margins collapse with the neighbour's
+   positive one (title 12 - 12 = 0, entry block 16 - 12 = 4, next section
+   32 - 12 = 20), so no box overlaps (two groups back to back are the one
+   exception, handled below). This replaces R9 (2026-09-23), which
+   trimmed the first row under a title to 32 / 28px; with A2 every row is
+   back on the 44 / 36 floor, and --pick-row1-h / --pick-mark-y need no
+   title-led override. */
 /* .pref-group is its own row-grouping shape (checkboxes, radios) and was the
    one stage-0 block with no trailing margin of its own: an entry block or
    edit area right after one sat flush against it (fixwave F2). Section-end
@@ -1858,8 +1837,41 @@ html[data-theme] .fg.entry-block-sub[data-off] > label.bl { color: var(--opt-fg-
    the host's own edge the way a block child's margin would. An unscoped
    rule inflated the radio group's own trailing edge by 16px, growing the
    whole help-host block and the gap before the next section's title. */
-.settings-section > .pref-group { margin-bottom: var(--opt-sp-6); }
+:is(.settings-section, .disclosure-body) > .pref-group {
+  margin-top: calc(-1 * var(--opt-row-pad-y));
+  margin-bottom: calc(var(--opt-sp-6) - var(--opt-row-pad-y));
+}
 .settings-section > :last-child { margin-bottom: 0; }
+/* Last in its section -- counting only what is shown, since a hidden status
+   line or warning may follow -- the row padding comes out of the section gap
+   too. */
+:is(.settings-section, .disclosure-body) > .pref-group:nth-last-child(1 of :not([hidden], .hidden)) { margin-bottom: calc(-1 * var(--opt-row-pad-y)); }
+/* A disclosure list that ends its section: the last header's (or open
+   body's) 12px bottom padding comes out of the section gap, as a row's does. */
+.settings-section > .disclosure:nth-last-child(1 of :not([hidden], .hidden)) { margin-bottom: calc(-1 * var(--opt-sp-5)); }
+/* Two row groups back to back (AI Content Source's radios, then the
+   transcript switch): the trims would collapse to -8 and lay the second
+   group's first row over the first group's last one, where a switch's input
+   would take clicks meant for an open answer. Their padding meets with no
+   gap instead -- 24 between the texts (compact 16), the one place A2 cannot
+   reach 16 without shrinking a row. */
+:is(.settings-section, .disclosure-body) > .pref-group + .pref-group { margin-top: calc(var(--opt-row-pad-y) - var(--opt-sp-6)); }
+/* A group that ends in a caption instead of a row (Appearance's "needs a
+   preset" note) puts the row padding back under that caption as padding: a
+   margin would collapse into the trims above and land 12px short. */
+:is(.settings-section, .disclosure-body) > .pref-group > :not(.pref-row):last-child,
+.fg > .pref-group:last-child > :not(.pref-row):last-child { padding-bottom: var(--opt-row-pad-y); }
+/* First in a disclosure body: the header's own bottom padding sits right
+   above, and a negative margin would slide the row under it, where the
+   switch would take clicks meant for the header. */
+.disclosure-body > .pref-group:first-child { margin-top: 0; }
+/* Storage's JS-built list sits one wrapper down (#storage-cats). */
+.storage-cats > .pref-group:first-child { margin-top: calc(-1 * var(--opt-row-pad-y)); }
+/* A row group inside a field block (Batch Save's AI group, the radio groups)
+   ends the block: its last row's padding comes out of the block's own 16px
+   margin. In a block-flow .fg the margin collapses through; in a grid help
+   host it shrinks the last track by the same amount. */
+.fg > .pref-group:last-child { margin-bottom: calc(-1 * var(--opt-row-pad-y)); }
 /* The field label face: body size/line-height/colour and the label ->
    control gap. The `html[data-theme]` twin keeps the label body colour
    under every preset theme (spec §2) against `html[data-theme] .fg label
@@ -2082,7 +2094,7 @@ html[data-theme] .pf > h3 {
    Task 5 housekeeping) matches every OTHER stage-0 pref-group spacer in this
    file -- a card whose enable switch is the only `.pref-group` (no fields
    below it) must not carry a trailing margin nothing follows. */
-.export-target-card > .pref-group:not(:last-child) { margin-bottom: var(--opt-sp-6); }
+.export-target-card > .pref-group:not(:last-child) { margin-bottom: calc(var(--opt-sp-6) - var(--opt-row-pad-y)); }   /* rhythm A2: 16 text to text */
 .save-status { font-size: var(--opt-text-helper); line-height: var(--opt-lh-helper); }
 
 /* ---- Provider fields ---- */
@@ -2167,7 +2179,13 @@ html.motion-ready .pf:not([hidden]) {
    matches the summaries' 12px rhythm; the last block inside drops its own
    bottom margin so the two do not stack to 24. */
 .disclosure-body { padding: 0 0 var(--opt-sp-5); }
-.disclosure-body > :last-child { margin-bottom: 0; }
+/* "Last" counts what is shown: a hidden file input or an empty list holder
+   after the toolbar used to take :last-child and leave the toolbar's 12px
+   margin stacked on the body padding (36-38px to the next header).
+   A wrapper's own last child would push its margin out through the wrapper
+   (#multi-pack-list's "none imported" line did), so that one drops it too. */
+.disclosure-body > :nth-last-child(1 of :not([hidden], .hidden, :empty)),
+.disclosure-body > :nth-last-child(1 of :not([hidden], .hidden, :empty)) > :last-child { margin-bottom: 0; }
 
 /* Native details disclosure motion (height + content-visibility). Older
    Chromium versions that lack ::details-content simply keep native instant
@@ -4054,10 +4072,6 @@ html.motion-ready #tag-gov-progress:not([hidden]) {
 .tag-gov-head > .fg-actions > .btn-sm.ghost:last-child,
 .wayback-log-heading > .btn-sm.ghost:last-child { margin-right: calc(-1 * var(--opt-sp-4)); }
 .vocab-drive-pointer, html[data-theme] .vocab-drive-pointer { color: var(--opt-fg-muted); }
-#chrome-sync-section > .fg + .pref-group > .pref-row:first-child > label {
-  padding-top: 0;
-  min-height: calc(var(--opt-row-min-h) - var(--opt-row-pad-y));
-}
 /* The status line leads #vocab-drive-body since the data-scope switches went
    away (spec §6.1). Its sp-3 top margin collapses into the heading .fg's
    rhythm margin, so the heading -> first-line gap equals Chrome Sync's
