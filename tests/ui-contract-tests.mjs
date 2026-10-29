@@ -7772,6 +7772,19 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
   check(dot.get("border-radius") === "var(--opt-radius-full)" && dot.get("background") === "currentColor" &&
     dot.get("border") === "0" && dot.get("transform") === "none" && dot.get("width") === dot.get("height"),
     "options.css: a checked .pick radio must draw a round currentColor dot (composer pickRules: radius-full, background currentColor, border 0, transform none, square box) -- found " + JSON.stringify([...dot]));
+  // The other half of U1: the checkbox keeps its tick. The base ::after is the
+  // rotated tick, and no .pick-mark::after rule that is not typed to radio may
+  // paint the dot (a round corner or a fill) -- an untyped dot rule would turn
+  // every checked checkbox into a radio look-alike while the check above
+  // stayed green.
+  const tick = declarationValueMap(optionsCss, ".pick-mark::after");
+  const dotLeaks = parseStyleRules(optionsCss).filter((r) => r.selectors.some((sel) =>
+    /\.pick-mark::after$/.test(sel) && !/input\[type="radio"\]/.test(sel)) &&
+    parseDeclarations(r.body).some((d) => (d.property === "border-radius" && d.value !== "0") ||
+      (/^background(?:-color)?$/.test(d.property) && d.value !== "transparent")));
+  check(tick.get("transform") === "rotate(45deg)" && tick.get("border-width") === "0 2px 2px 0" && dotLeaks.length === 0,
+    "options.css: a checked .pick checkbox must keep its rotated tick (.pick-mark::after: transform rotate(45deg), border-width 0 2px 2px 0) and no untyped .pick-mark::after rule may draw the radio dot (U1) -- tick " +
+    JSON.stringify([...tick]) + ", leaks: " + dotLeaks.map((r) => r.selectors.join(", ")).join(" | "));
 }
 
 // Options critique 6, CC-09: a focused choice mark wears exactly the focus the
@@ -7824,7 +7837,7 @@ check(/\.pick > input\[type="radio"\],\s*\.pick > input\[type="checkbox"\]\s*\{[
 // paint a fill (the grey block vanished on terminal, where btn-bg == panel).
 {
   const DIS = ".pick > input:disabled ~ .pick-mark", DIS_ON = ".pick > input:disabled:checked ~ .pick-mark";
-  const rules = parseStyleRules(optionsCss).filter((r) => r.selectors.some((sel) => /^\.pick > input:disabled\S* ~ \.pick-mark$/.test(sel)));
+  const rules = parseStyleRules(optionsCss).filter((r) => r.selectors.some((sel) => /^\.pick > input(?:\[type="(?:checkbox|radio)"\])?:disabled/.test(sel)));
   const shared = rules.find((r) => r.selectors.includes(DIS) && r.selectors.includes(DIS_ON));
   const decl = shared ? new Map(parseDeclarations(shared.body).map((d) => [d.property, d.value])) : new Map();
   const filled = rules.filter((r) => parseDeclarations(r.body).some((d) => /^background(?:-color)?$/.test(d.property) && d.value !== "transparent"));

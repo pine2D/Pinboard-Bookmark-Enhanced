@@ -815,7 +815,7 @@ options 的 contrast-audit 字段段合计：配对行每块 8 行（聚焦边 2
   靠特异性 (0,4,1)/(0,5,1) 压过 accent 填充，不赌源序。
 - 焦点三种控件一律 §7.3 `borderless`：`outline: 1px solid --opt-accent; outline-offset: 2px; box-shadow: --opt-focus-ring`，
   `.pick` 与 `.switch-track` 逐条声明相同（ui-contract 对比两条规则）。只有光晕时，选中态的 accent 填充会把光晕吃掉。
-- 圆点按 `input[type=radio]` 判定，不按 `.pick-box`；横杠按 `input[type=checkbox]:indeterminate` 判定——Chrome 对
+- 圆点按 `input[type=radio]` 判定，不按 `.pick-box`（勾选框的 `::after` 保持旋转的勾，ui-contract 拦截不限类型的圆点规则）；横杠按 `input[type=checkbox]:indeterminate` 判定——Chrome 对
   「组内一个都没选」的每个 radio 也匹配 `:indeterminate`，不加类型会把未选的单选组画成已选。
 - 「清理所选」这类禁用按钮的浅灰是按钮家族的禁用样式（§3），不归本表。
 - 选择控件的组：每个单选组是一个 `.pref-group.pref-group-radio[role=radiogroup]`，`aria-labelledby` 指向组小标题
