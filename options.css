@@ -4021,6 +4021,14 @@ html.motion-ready #tag-gov-progress:not([hidden]) {
 .vocab-entry-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--opt-sp-4); }
 .vocab-entry-row > .fg-actions { margin: 0; min-width: 0; }
 .vocab-entry-row .save-status { margin: 0; overflow-wrap: anywhere; }
+/* Optical edge (critique 6, SP-13): a ghost button that ends a right-aligned
+   row has no visible box, so its 8px inner padding left its text 8px inside
+   the column edge the switch tracks and chevrons share. The button moves out
+   by that padding -- the hover fill then reaches into the panel padding, the
+   same give-back .disclosure > summary uses -- and its hit box is unchanged. */
+.vocab-entry-row > .fg-actions > .btn-sm.ghost:last-child,
+.tag-gov-head > .fg-actions > .btn-sm.ghost:last-child,
+.wayback-log-heading > .btn-sm.ghost:last-child { margin-right: calc(-1 * var(--opt-sp-4)); }
 .vocab-drive-pointer, html[data-theme] .vocab-drive-pointer { color: var(--opt-fg-muted); }
 #chrome-sync-section > .fg + .pref-group > .pref-row:first-child > label {
   padding-top: 0;
