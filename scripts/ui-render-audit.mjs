@@ -8155,7 +8155,10 @@ const SWEEP_CFG = {
   textFloor: { min: 11, exempt: "sup, sub" },
   radiusScale: {
     prefix: { options: "--opt-radius-", popup: "--pp-radius-", library: "--lib-radius-", "md-preview": "--radius-" },
-    names: ["sm", "md", "lg", "full", "tag"],
+    // "box" is options' fixed checkbox corner (--opt-radius-box, 4px on every
+    // theme; options critique 6 CC-03). The other surfaces declare no such
+    // token, so it drops out of their live scale.
+    names: ["sm", "md", "lg", "full", "tag", "box"],
     tokens: { options: [3, 8, 10], popup: [3, 8, 10], library: [4, 8, 12], "md-preview": [4, 8, 12] },
     exemptWithin: ".source-badge, .view-toggle, .vocab-group-unit, .tags-input-wrap, .send-split",
     valueBoxes: {
