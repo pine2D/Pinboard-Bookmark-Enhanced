@@ -1143,7 +1143,7 @@
     "message": "在備份中包含 API Key 和 Token"
   },
   "backupIncludeSecretsHint": {
-    "message": "會把全部憑證以明文寫進檔案：Pinboard/Karakeep/linkding API Token、所有 AI 服務商的 API Key，以及 Jina、Wayback、Anki、歐路詞典、Notion、Gist 和 Webhook 的憑證。任何人開啟檔案都能直接使用。請按保管密碼的方式保管這個檔案。"
+    "message": "會把全部憑證以明文寫進檔案：Pinboard/Karakeep/linkding API Token、存取閘道憑證、所有 AI 服務商的 API Key，以及 Jina、Wayback、Anki、歐路詞典、Notion、Gist 和 Webhook 的憑證。任何人開啟檔案都能直接使用。請按保管密碼的方式保管這個檔案。"
   },
   "backupSecretsExportTitle": {"message": "要匯出包含憑證的備份嗎？"},
   "backupSecretsExportConfirm": {

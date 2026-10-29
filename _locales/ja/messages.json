@@ -1143,7 +1143,7 @@
     "message": "バックアップに API キーとトークンを含める"
   },
   "backupIncludeSecretsHint": {
-    "message": "すべての認証情報が平文でファイルに書き込まれます。Pinboard の API トークン、各 AI プロバイダーの API キー、Jina、Wayback、Anki、Eudic、Notion、Gist、Webhook の認証情報が対象です。ファイルを開いた人は誰でもそのまま使用できます。パスワードと同じ扱いで保管してください。"
+    "message": "すべての認証情報が平文でファイルに書き込まれます。Pinboard の API トークン、アクセスゲートウェイの認証情報、各 AI プロバイダーの API キー、Jina、Wayback、Anki、Eudic、Notion、Gist、Webhook の認証情報が対象です。ファイルを開いた人は誰でもそのまま使用できます。パスワードと同じ扱いで保管してください。"
   },
   "backupSecretsExportTitle": {"message": "認証情報を含むバックアップをエクスポートしますか？"},
   "backupSecretsExportConfirm": {

@@ -1143,7 +1143,7 @@
     "message": "Включать ключи API и токены в резервные копии"
   },
   "backupIncludeSecretsHint": {
-    "message": "Записывает все учётные данные в файл открытым текстом: API-токены Pinboard/Karakeep/linkding, API-ключи всех AI-провайдеров, а также учётные данные Jina, Wayback, Anki, Eudic, Notion, Gist и Webhook. Любой, кто откроет файл, сможет ими воспользоваться. Храните его так же, как пароль."
+    "message": "Записывает все учётные данные в файл открытым текстом: API-токены Pinboard/Karakeep/linkding, учётные данные шлюза доступа, API-ключи всех AI-провайдеров, а также учётные данные Jina, Wayback, Anki, Eudic, Notion, Gist и Webhook. Любой, кто откроет файл, сможет ими воспользоваться. Храните его так же, как пароль."
   },
   "backupSecretsExportTitle": {"message": "Экспортировать резервную копию с учётными данными?"},
   "backupSecretsExportConfirm": {

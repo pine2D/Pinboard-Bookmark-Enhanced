@@ -91,7 +91,7 @@ docs/superpowers/ DESIGN-IS-2026-07-22/ release/  # gitignored 本地产物（.q
 - **离线队列**只存 local：新记录**仅**保存保存模式、URL、标题、备注、标签、私密/稍后读/归档标志、书签时间、队列 ID/入队时间与非秘密书签连接身份绑定——此外一律不存，禁止保存 token；legacy token 记录读取时改写为账号绑定并删除 token。重放必须用当前登录 token 且服务和连接身份与队列绑定精确一致，否则保留队列并 fail-closed。
 
 - **个人资料库**：`personalLibraryAccount` 首次采用当前 Pinboard 用户名，无账号时为 `personal:default`，随后不随书签服务/凭据切换；保留旧 owner 与 Drive hash，不自动合并其他历史账号。普通设置同步可携带此非秘密身份；普通 JSON 设置导入忽略它，资料分项仍核对所属资料库。阅读器的 library `account` 与 `bookmarkAccount` 分开，storage handoff 的 `account` 仍表示书签连接。
-- **自托管书签连接**：设置三选一；Connect 点击申请精确 origin 并只读验证，成功后才保存地址与绑定该地址的凭据封套。Karakeep owner 含服务、地址与验证后的用户 ID；linkding 无用户 ID，Connect 时地址与 Token 都未变则沿用连接 ID，任一变化才生成新 ID，旧队列不跨连接重放。Karakeep 稍后阅读只用本人独占的私有普通列表，不映射 archived。Pinboard 建议/标签治理/未读计数/站点搜索/Tab Set 保留专用。
+- **自托管书签连接**：设置三选一；Connect 点击申请精确 origin 并只读验证，成功后才保存地址与绑定该地址的凭据封套。Karakeep owner 含服务、地址与验证后的用户 ID；linkding 无用户 ID，Connect 时地址与 Token 都未变则沿用连接 ID，任一变化才生成新 ID，旧队列不跨连接重放。访问网关凭据存于同一 `<service>Token` 封套的 `gateway` 字段，随封套走凭据路由、绑定地址，校验谓词唯一在 shared.js，非法即连接未就绪。Karakeep 稍后阅读只用本人独占的私有普通列表，不映射 archived。Pinboard 建议/标签治理/未读计数/站点搜索/Tab Set 保留专用。
 
 ## 跨领域安全铁律
 
