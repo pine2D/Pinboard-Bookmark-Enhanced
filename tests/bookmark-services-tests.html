@@ -184,7 +184,7 @@ async function workerHarness(service, replies, options = {}) {
       remove:async keys=>{for(const k of [].concat(keys)){if(k==="offlineQueue")state.queue=[];else delete state.local[k];}}
     }}}
   };
-  const api = new Function(...Object.keys(deps),workerSource.slice(start,end)+";return {submitSaveIntent,sendOfflineItem,verifyConnection:pbpVerifyBookmarkConnection,processOfflineQueue,retryOfflineItem,pbpOfflinePauseOnCredentialChange,readPause:pbpReadOfflineQueuePause,client:pbpBookmarkClient};")(...Object.values(deps));
+  const api = new Function(...Object.keys(deps),workerSource.slice(start,end)+";return {submitSaveIntent,sendOfflineItem,verifyConnection:pbpVerifyBookmarkConnection,processOfflineQueue,retryOfflineItem,pbpOfflinePauseOnCredentialChange,readPause:pbpReadOfflineQueuePause,client:pbpBookmarkClient,mutateOfflineQueue};")(...Object.values(deps));
   return {...api,state,auth};
 }
 const saveIntent = {mode:"create",url:pageUrl,title:"Title",notes:"Note",tags:"work",private:true,toread:false};
@@ -352,6 +352,27 @@ test("credential change, a successful request or a manual retry lifts the pause"
   replies.push([200, {bookmark:null}], [201, ld]); h.state.calls = [];
   equal((await h.retryOfflineItem(queued.queueId)).ok, true); equal(h.state.calls.length, 2);
   equal(await h.readPause(), null); equal(h.state.queue, []);
+});
+test("a pause ends with its account's last queued item, so a later queued save replays", async () => {
+  const replies = [new TypeError("offline"), new TypeError("offline")];
+  const h = await workerHarness("linkding", replies);
+  const account = (await h.auth()).account;
+  for (const n of [0, 1]) equal((await h.submitSaveIntent({...saveIntent, url:pageUrl + "?n=" + n})).status, "queued");
+  const [first, second] = h.state.queue.map(item => item.queueId);
+  h.state.queue.push({...h.state.queue[0], queueId:"pin1", account:"alice"});
+  const pause = () => { h.state.local.offlineQueuePause = {account, reason:"gateway_redirect", ts:1}; };
+  pause(); await h.mutateOfflineQueue({kind:"remove", queueId:"pin1"}); ok(await h.readPause());
+  await h.mutateOfflineQueue({kind:"remove", queueId:first}); ok(await h.readPause());
+  await h.mutateOfflineQueue({kind:"remove", queueId:second}); equal(await h.readPause(), null);
+  replies.push(new TypeError("offline"));
+  equal((await h.submitSaveIntent(saveIntent)).status, "queued");
+  pause(); await h.mutateOfflineQueue({kind:"clear"}); equal(await h.readPause(), null); equal(h.state.queue, []);
+  h.state.local.offlineQueuePause = {account:"broken"}; await h.mutateOfflineQueue({kind:"clear"}); equal(h.state.local.offlineQueuePause, undefined);
+  replies.push(new TypeError("offline"));
+  equal((await h.submitSaveIntent(saveIntent)).status, "queued");
+  replies.push([200, {bookmark:null}], [201, ld]); h.state.calls = [];
+  await h.processOfflineQueue();
+  equal(h.state.calls.length, 2); equal(h.state.queue, []);
 });
 test("fetch failures log name and message without header values", async () => {
   const warns = [], original = console.warn; console.warn = (...args) => warns.push(args);

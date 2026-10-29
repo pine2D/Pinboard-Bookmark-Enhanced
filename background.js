@@ -904,6 +904,19 @@ function mutateOfflineQueue(action) {
     const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
     const next = pbpOfflineQueueReduce(offlineQueue, action);
     await chrome.storage.local.set({ offlineQueue: next });
+    // A replay pause must not outlive its account's last queued item (clear,
+    // remove or final acknowledgement), or a later network-queued save for
+    // that account would be skipped. Already on this tail: direct storage
+    // calls, never pbpClearOfflineQueuePause (it would wait on this tail).
+    try {
+      const stored = await chrome.storage.local.get(PBP_OFFLINE_QUEUE_PAUSE_KEY);
+      if (stored?.[PBP_OFFLINE_QUEUE_PAUSE_KEY] !== undefined) {
+        const pause = pbpOfflineQueuePauseShape(stored[PBP_OFFLINE_QUEUE_PAUSE_KEY]);
+        if (!pause || !next.some((item) => item?.account === pause.account)) await chrome.storage.local.remove(PBP_OFFLINE_QUEUE_PAUSE_KEY);
+      }
+    } catch (e) {
+      console.warn("offline queue pause cleanup failed:", e?.name, e?.message);
+    }
     // A non-empty queue needs the (conditional) keepalive alarm alive to drive
     // replay. typeof-guarded: source-slice test pages run this without the
     // alarm block in scope.
