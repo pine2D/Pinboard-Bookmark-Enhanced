@@ -94,6 +94,17 @@ All seven versions above match official stable releases on the review date. All 
 
 `scripts/update-vendor.sh --check-only` is a separate, read-only mode: it diffs every `vendor-lock.json` version (all 7 packages, including `katex` and `mermaid` which the refresh above doesn't fetch from npm) against `registry.npmjs.org` `latest`, plus a liveness check of the OpenRouter default model against its free `/api/v1/models` catalog, and exits non-zero if anything is behind or dead. It downloads and writes nothing, and is deliberately not wired into `verify.sh` / pre-commit / `release.sh` — run it by hand when you want a signal the world moved.
 
+## Defuddle 0.19.5/0.19.6 - evaluated 2026-10-29, deferred
+
+`defuddle.js` stays at 0.19.4. `update-vendor.sh --check-only` will keep reporting it as behind; that is intentional until the bar below is met.
+
+- **Upstream changes.** 0.19.5 rewrites lazy-image handling: `data-src` / `data-original` now override the real `src` unconditionally (extensionless variants and non-image values included), and image URLs are no longer guessed from arbitrary attributes, so obscure loader attributes (`data-echo`, `actualsrc`, `lazyload`, `url`, ...) are lost. Screen-reader-only text is kept (Wikipedia fractions, NHS headings), which changes article text, re-anchors highlights and misses the AI cache. Parsing retries and no longer throws, logging a bare `"Defuddle"` console.error form. 0.19.6 strips XHTML iframe `data:` content and touches YouTube / Markdown-only paths. Result fields are unchanged: still content HTML, no `textContent`.
+- **Why deferred.** Two compat-patch rounds in `site-rules.js` each introduced new regressions found by adversarial probes. Approximating 0.19.4's semantics with word lists of attributes and placeholder names does not converge, and the benefit of 0.19.5/0.19.6 for this extension is small.
+- **Bar for the next attempt.** A differential run of old vs new on the archived corpus plus adversarial probes must show no image or content outcome worse than 0.19.4.
+- **Suggested approach.** Wait for an upstream fix (consider filing an issue with the minimal repros), or port 0.19.4's lazy-image routine verbatim as a pre-hook on the cloned document and strip the lazy attributes so the newer rules have nothing to act on, which gives parity by construction.
+- **Evidence.** Harness, corpus and probes are local only (gitignored) in `docs/superpowers/research/2026-10-29-defuddle-0.19.6/`. The 0.19.6 vendored `defuddle.js` (with banner) had sha256 `415a0ae4d8b6638fca02352e7c033ece7ef983d074298417b9bea02011741e37`.
+- **Kept from the attempt.** The `/^Defuddle(?::|$)/` console filter, the caller-derived `result.*` field lock in `tests/ai-tags-tests.html`, and the lazy-image outcome rows in `tests/md-convert-tests.html` (green on 0.19.4) are the regression net for the next upgrade.
+
 ## Why Bundled Instead of npm-installed
 
 This extension has no build step (vanilla JS, no bundler). Chrome Web Store policy forbids loading scripts from a remote origin at runtime, so the dependencies must be on disk inside the package. Inlining via `<script src="vendor/...">` is the simplest compliant pattern.
