@@ -1076,25 +1076,22 @@ html[data-theme] .panel-foot a { color: var(--opt-fg-hint, var(--opt-fg-muted));
 /* Warning lines (critique 6, TH-12). The triangle is Lucide v0.525.0
    triangle-alert (24-box, stroke 2) used as a mask, so it paints in
    --opt-warn and follows every preset -- the old one was a hand-drawn 16-box
-   at stroke 1.5 with #c0840a baked into the data URI. It hangs in the panel's
-   left padding (16px) so the warning's text starts on the same edge as every
-   other hint and wrapped lines stay under the text, not under the icon. Below
-   600px the panel padding shrinks toward 8px, so the line takes a hanging
-   indent instead: icon at the column edge, text after one sp-6 step. */
-.hint-warn { position: relative; }
+   at stroke 1.5 with #c0840a baked into the data URI. Every width uses a
+   hanging indent: the icon sits at the column edge and the text starts one
+   sp-6 step in (12px icon + sp-1), so wrapped lines align with the text after
+   the icon, not under it. The icon used to hang in the panel's left padding
+   at >= 600px, which put it ~3px from the card border (TH-12 follow-up,
+   2026-10-30). */
+.hint-warn { position: relative; padding-left: var(--opt-sp-6); }
 .hint-warn::before {
   content: "";
   position: absolute;
-  left: calc(-12px - var(--opt-sp-1));
+  left: 0;
   top: calc((var(--opt-lh-helper) - 12px) / 2);
   width: 12px; height: 12px;
   background-color: var(--opt-warn);
   -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E") center / contain no-repeat;
   mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3'/%3E%3Cpath d='M12 9v4'/%3E%3Cpath d='M12 17h.01'/%3E%3C/svg%3E") center / contain no-repeat;
-}
-@media (max-width: 600px) {
-  .hint-warn { padding-left: var(--opt-sp-6); }
-  .hint-warn::before { left: 0; }
 }
 @media (forced-colors: active) {
   .hint-warn::before { background-color: CanvasText; }
