@@ -1084,10 +1084,10 @@
     "message": "標籤"
   },
   "optRespectTagCase": {
-    "message": "沿用已有標籤的大小寫"
+    "message": "沿用已有標籤的寫法"
   },
   "optRespectTagCaseHint": {
-    "message": "同一個標籤有幾種大小寫寫法時，以使用最多的為準。"
+    "message": "同一標籤如有不同寫法（只差大小寫，或只差空格、連字號、底線），會採用最常用的寫法；書籤上已有的標籤維持原樣。"
   },
   "optShowSuggestTags": {
     "message": "在彈出視窗中顯示 Pinboard 推薦標籤"
@@ -1414,7 +1414,7 @@
     "message": "以引用格式包裹選取文字"
   },
   "labelDefaultTags": {
-    "message": "預設標籤（逗號分隔）"
+    "message": "預設標籤（以空格或逗號分隔）"
   },
   "placeholderTags": {
     "message": "標籤1, 標籤2"
@@ -1438,7 +1438,7 @@
     "message": "標籤（逗號分隔）"
   },
   "batchTagsHint": {
-    "message": "多個標籤用逗號分隔，標籤內的空格會轉為連字號。如 batch_saved, research"
+    "message": "多個標籤請用逗號分隔。新標籤內的空格會換成「多詞標籤分隔符」。例如 batch_saved, research"
   },
   "batchAiTags": {
     "message": "為每個標籤頁自動產生 AI 標籤"
@@ -1633,6 +1633,9 @@
   },
   "labelTagSeparator": {
     "message": "多詞標籤分隔符"
+  },
+  "tagSeparatorHint": {
+    "message": "AI 產生的標籤和新建立的多詞標籤會用這個字元連接；已有標籤維持原本寫法。"
   },
   "sepHyphen": {
     "message": "連字符（machine-learning）"

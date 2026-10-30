@@ -1089,10 +1089,10 @@
     "message": "Tags"
   },
   "optRespectTagCase": {
-    "message": "Match the casing of existing tags"
+    "message": "Reuse existing tag spelling"
   },
   "optRespectTagCaseHint": {
-    "message": "When a tag exists in more than one casing, the form you use most wins."
+    "message": "If a tag has variants that differ only in case, spaces, hyphens, or underscores, use the most common spelling. Tags already on a bookmark stay as they are."
   },
   "optShowSuggestTags": {
     "message": "Show Pinboard suggested tags in popup"
@@ -1420,7 +1420,7 @@
     "message": "Wrap selected text with blockquote"
   },
   "labelDefaultTags": {
-    "message": "Default tags (comma-separated)"
+    "message": "Default tags (separated by spaces or commas)"
   },
   "placeholderTags": {
     "message": "tag1, tag2"
@@ -1444,7 +1444,7 @@
     "message": "Tags (comma-separated)"
   },
   "batchTagsHint": {
-    "message": "Separate tags with commas; spaces inside a tag become hyphens. E.g. batch_saved, research"
+    "message": "Separate tags with commas. Spaces within a new tag become the multi-word tag separator. E.g. batch_saved, research"
   },
   "batchAiTags": {
     "message": "Auto-generate AI tags for each tab"
@@ -1639,6 +1639,9 @@
   },
   "labelTagSeparator": {
     "message": "Multi-word tag separator"
+  },
+  "tagSeparatorHint": {
+    "message": "AI-generated tags and new multi-word tags use this character to join words. Existing tags keep their spelling."
   },
   "sepHyphen": {
     "message": "hyphen (machine-learning)"

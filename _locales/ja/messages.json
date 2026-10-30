@@ -1084,10 +1084,10 @@
     "message": "タグ"
   },
   "optRespectTagCase": {
-    "message": "既存タグの大文字・小文字の表記に合わせる"
+    "message": "既存タグの表記を引き継ぐ"
   },
   "optRespectTagCaseHint": {
-    "message": "同じタグに複数の表記があるときは、最も多く使われている表記を使います。"
+    "message": "大文字・小文字、スペース、ハイフン、アンダースコアだけが異なるタグは、最もよく使われている表記に合わせます。ブックマークに既に付いているタグは変更しません。"
   },
   "optShowSuggestTags": {
     "message": "ポップアップに Pinboard のおすすめタグを表示"
@@ -1414,7 +1414,7 @@
     "message": "選択テキストを blockquote で囲む"
   },
   "labelDefaultTags": {
-    "message": "デフォルトタグ（カンマ区切り）"
+    "message": "デフォルトタグ（スペースまたはカンマ区切り）"
   },
   "placeholderTags": {
     "message": "タグ1, タグ2"
@@ -1438,7 +1438,7 @@
     "message": "タグ（カンマ区切り）"
   },
   "batchTagsHint": {
-    "message": "複数のタグはカンマで区切ります。タグ内のスペースはハイフンに変換されます。例：batch_saved, research"
+    "message": "複数のタグはカンマで区切ります。新しいタグ内のスペースは「複数語タグの区切り文字」に置き換わります。例：batch_saved, research"
   },
   "batchAiTags": {
     "message": "各タブに AI タグを自動生成"
@@ -1633,6 +1633,9 @@
   },
   "labelTagSeparator": {
     "message": "複数語タグの区切り文字"
+  },
+  "tagSeparatorHint": {
+    "message": "AI が生成したタグと新しい複数語タグでは、この文字で単語をつなぎます。既存のタグの表記は変わりません。"
   },
   "sepHyphen": {
     "message": "ハイフン（machine-learning）"

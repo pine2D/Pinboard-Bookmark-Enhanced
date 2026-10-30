@@ -1084,10 +1084,10 @@
     "message": "Tags"
   },
   "optRespectTagCase": {
-    "message": "Groß-/Kleinschreibung vorhandener Tags übernehmen"
+    "message": "Schreibweise vorhandener Tags übernehmen"
   },
   "optRespectTagCaseHint": {
-    "message": "Gibt es einen Tag in mehreren Schreibweisen, gilt die am häufigsten verwendete."
+    "message": "Unterscheiden sich Varianten eines Tags nur durch Groß- und Kleinschreibung, Leerzeichen, Bindestriche oder Unterstriche, wird die am häufigsten verwendete Schreibweise übernommen. Tags, die bereits am Lesezeichen stehen, bleiben unverändert."
   },
   "optShowSuggestTags": {
     "message": "Pinboard-Tagvorschläge im Popup anzeigen"
@@ -1414,7 +1414,7 @@
     "message": "Markierten Text mit blockquote umschließen"
   },
   "labelDefaultTags": {
-    "message": "Standard-Tags (kommagetrennt)"
+    "message": "Standard-Tags (durch Leerzeichen oder Kommas getrennt)"
   },
   "placeholderTags": {
     "message": "Tag1, Tag2"
@@ -1438,7 +1438,7 @@
     "message": "Tags (kommagetrennt)"
   },
   "batchTagsHint": {
-    "message": "Tags durch Kommas trennen; Leerzeichen innerhalb eines Tags werden zu Bindestrichen. Z. B. batch_saved, research"
+    "message": "Trenne mehrere Tags durch Kommas. Leerzeichen innerhalb eines neuen Tags werden durch das Trennzeichen für mehrteilige Tags ersetzt. Beispiel: batch_saved, research"
   },
   "batchAiTags": {
     "message": "KI-Tags für jeden Tab automatisch generieren"
@@ -1633,6 +1633,9 @@
   },
   "labelTagSeparator": {
     "message": "Trennzeichen für mehrteilige Tags"
+  },
+  "tagSeparatorHint": {
+    "message": "KI-generierte und neue mehrteilige Tags verbinden ihre Wörter mit diesem Zeichen. Vorhandene Tags behalten ihre Schreibweise."
   },
   "sepHyphen": {
     "message": "Bindestrich (machine-learning)"

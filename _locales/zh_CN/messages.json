@@ -1084,10 +1084,10 @@
     "message": "标签"
   },
   "optRespectTagCase": {
-    "message": "沿用已有标签的大小写"
+    "message": "沿用已有标签的写法"
   },
   "optRespectTagCaseHint": {
-    "message": "同一标签有几种大小写写法时，以使用最多的为准。"
+    "message": "同一标签有几种写法（只差大小写，或只差空格、连字符、下划线）时，以使用最多的为准；书签上已有的标签保持原样。"
   },
   "optShowSuggestTags": {
     "message": "在弹窗中显示 Pinboard 推荐标签"
@@ -1414,7 +1414,7 @@
     "message": "以引用格式包裹选中文本"
   },
   "labelDefaultTags": {
-    "message": "默认标签（逗号分隔）"
+    "message": "默认标签（以空格或逗号分隔）"
   },
   "placeholderTags": {
     "message": "标签1, 标签2"
@@ -1438,7 +1438,7 @@
     "message": "标签（逗号分隔）"
   },
   "batchTagsHint": {
-    "message": "多个标签用逗号分隔，标签内的空格会转为连字符。如 batch_saved, research"
+    "message": "多个标签用逗号分隔，新标签内的空格会换成「多词标签分隔符」。如 batch_saved, research"
   },
   "batchAiTags": {
     "message": "为每个标签页自动生成 AI 标签"
@@ -1633,6 +1633,9 @@
   },
   "labelTagSeparator": {
     "message": "多词标签分隔符"
+  },
+  "tagSeparatorHint": {
+    "message": "AI 生成的标签和新建的多词标签用这个字符连接；已有标签保持原写法。"
   },
   "sepHyphen": {
     "message": "连字符（machine-learning）"

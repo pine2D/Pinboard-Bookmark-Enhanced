@@ -1084,10 +1084,10 @@
     "message": "Tagi"
   },
   "optRespectTagCase": {
-    "message": "Dopasowuj wielkość liter do istniejących tagów"
+    "message": "Zachowuj pisownię istniejących tagów"
   },
   "optRespectTagCaseHint": {
-    "message": "Gdy tag występuje w kilku zapisach, wygrywa ten używany najczęściej."
+    "message": "Jeśli warianty tagu różnią się tylko wielkością liter, spacjami, łącznikami lub podkreśleniami, używana jest najczęstsza pisownia. Tagi już przypisane do zakładki pozostają bez zmian."
   },
   "optShowSuggestTags": {
     "message": "Pokaż sugerowane tagi Pinboard w okienku"
@@ -1414,7 +1414,7 @@
     "message": "Zawijaj zaznaczony tekst w blockquote"
   },
   "labelDefaultTags": {
-    "message": "Domyślne tagi (rozdzielone przecinkami)"
+    "message": "Domyślne tagi (rozdzielone spacjami lub przecinkami)"
   },
   "placeholderTags": {
     "message": "tag1, tag2"
@@ -1438,7 +1438,7 @@
     "message": "Tagi (rozdzielone przecinkami)"
   },
   "batchTagsHint": {
-    "message": "Rozdzielaj tagi przecinkami; spacje wewnątrz tagu zamieniają się w łączniki. Np. batch_saved, research"
+    "message": "Oddzielaj tagi przecinkami. Spacje wewnątrz nowego tagu są zastępowane separatorem tagów wielowyrazowych. Przykład: batch_saved, research"
   },
   "batchAiTags": {
     "message": "Automatycznie generuj tagi AI dla każdej karty"
@@ -1633,6 +1633,9 @@
   },
   "labelTagSeparator": {
     "message": "Separator tagów wielowyrazowych"
+  },
+  "tagSeparatorHint": {
+    "message": "Ten znak łączy słowa w tagach wygenerowanych przez AI i nowych tagach wielowyrazowych. Istniejące tagi zachowują swoją pisownię."
   },
   "sepHyphen": {
     "message": "łącznik (machine-learning)"

@@ -41,7 +41,7 @@
       "bookmarkServiceHint", "personalLibraryHint", "bookmarkKarakeepHint",
       "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp", "themeGroupAdaptiveHint",
       "optUrlCleanOnOpenHint", "optUrlCleanOnPasteHint", "optUrlCleanCustomHint", "optUrlCleanExcludeHint",
-      "optShowQuickLinksHint", "optShowQuickRowHint", "optRespectTagCaseHint", "mdExportExtendedMetaHelp",
+      "optShowQuickLinksHint", "optShowQuickRowHint", "optRespectTagCaseHint", "tagSeparatorHint", "mdExportExtendedMetaHelp",
       "vocabCompleteExportHint", "ecdictHint", "dictPackHint"
     ],
     "pending": []

@@ -1084,10 +1084,10 @@
     "message": "Tags"
   },
   "optRespectTagCase": {
-    "message": "Reprendre la casse des tags existants"
+    "message": "Reprendre l’écriture des tags existants"
   },
   "optRespectTagCaseHint": {
-    "message": "Quand un tag existe sous plusieurs casses, la forme la plus utilisée l'emporte."
+    "message": "Si plusieurs formes d’un tag ne diffèrent que par la casse, les espaces, les traits d’union ou les tirets bas, la forme la plus utilisée est reprise. Les tags déjà présents sur un favori restent inchangés."
   },
   "optShowSuggestTags": {
     "message": "Afficher les tags suggérés par Pinboard dans le popup"
@@ -1414,7 +1414,7 @@
     "message": "Encadrer le texte sélectionné avec blockquote"
   },
   "labelDefaultTags": {
-    "message": "Tags par défaut (séparés par des virgules)"
+    "message": "Tags par défaut (séparés par des espaces ou des virgules)"
   },
   "placeholderTags": {
     "message": "tag1, tag2"
@@ -1438,7 +1438,7 @@
     "message": "Tags (séparés par des virgules)"
   },
   "batchTagsHint": {
-    "message": "Séparez les tags par des virgules ; les espaces à l'intérieur d'un tag deviennent des tirets. Ex. batch_saved, research"
+    "message": "Séparez les tags par des virgules. Dans un nouveau tag, les espaces sont remplacés par le séparateur de tags multi-mots. Ex. : batch_saved, research"
   },
   "batchAiTags": {
     "message": "Générer automatiquement des tags IA pour chaque onglet"
@@ -1633,6 +1633,9 @@
   },
   "labelTagSeparator": {
     "message": "Séparateur de tags multi-mots"
+  },
+  "tagSeparatorHint": {
+    "message": "Ce caractère relie les mots des tags générés par l’IA et des nouveaux tags multi-mots. Les tags existants conservent leur écriture."
   },
   "sepHyphen": {
     "message": "tiret (machine-learning)"

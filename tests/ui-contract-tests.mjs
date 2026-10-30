@@ -1749,7 +1749,7 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     "bookmarkServiceHint", "personalLibraryHint", "bookmarkKarakeepHint",
     "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp", "themeGroupAdaptiveHint",
     "optUrlCleanOnOpenHint", "optUrlCleanOnPasteHint", "optUrlCleanCustomHint", "optUrlCleanExcludeHint",
-    "optShowQuickLinksHint", "optShowQuickRowHint", "optRespectTagCaseHint", "mdExportExtendedMetaHelp",
+    "optShowQuickLinksHint", "optShowQuickRowHint", "optRespectTagCaseHint", "tagSeparatorHint", "mdExportExtendedMetaHelp",
     "vocabCompleteExportHint", "ecdictHint", "dictPackHint",
   ];
   const isInsideContextHelp = (key) => {
@@ -1838,7 +1838,8 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     tagPresetsHint: "opt-tag-presets", batchTagsHint: "opt-batch-tag",
     hintOpenAIBaseUrl: "opt-openai-baseurl", hintOllamaModel: "opt-ollama-model",
     hintCustomBaseUrl: "opt-custom-baseurl", hintCustomKey: "opt-custom-key",
-    aiCacheHint: "opt-ai-cache-duration", tagPromptHint: "opt-custom-tag-prompt",
+    aiCacheHint: "opt-ai-cache-duration", tagSeparatorHint: "opt-ai-tag-separator",
+    tagPromptHint: "opt-custom-tag-prompt",
     summaryPromptHint: "opt-custom-summary-prompt", translateGlossaryHint: "opt-translate-glossary",
     optVideoLangPrefHint: "opt-md-video-lang", dictEudicSupportedHint: "dict-eudic-token",
     mdExportImagePolicyHint: "opt-md-image-policy", customCSSOverlayHelp: "opt-custom-css",

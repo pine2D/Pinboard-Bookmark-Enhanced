@@ -406,10 +406,10 @@
         <h2 class="section-title" data-i18n="secTags">Tags</h2>
         <div class="pref-group">
           <div class="pref-row context-help-host" data-help-role="choice">
-            <label class="switch"><input type="checkbox" role="switch" id="opt-respect-tag-case" checked aria-labelledby="opt-respect-tag-case-label" /> <span class="switch-text" id="opt-respect-tag-case-label" data-i18n="optRespectTagCase">Match the casing of existing tags</span>
+            <label class="switch"><input type="checkbox" role="switch" id="opt-respect-tag-case" checked aria-labelledby="opt-respect-tag-case-label" /> <span class="switch-text" id="opt-respect-tag-case-label" data-i18n="optRespectTagCase">Reuse existing tag spelling</span>
             <details class="context-help">
               <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-              <p class="hint context-help-body" data-i18n="optRespectTagCaseHint">When a tag exists in more than one casing, the form you use most wins.</p>
+              <p class="hint context-help-body" data-i18n="optRespectTagCaseHint">If a tag has variants that differ only in case, spaces, hyphens, or underscores, use the most common spelling. Tags already on a bookmark stay as they are.</p>
             </details><span class="switch-track" aria-hidden="true"></span></label>
           </div>
         </div>
@@ -452,7 +452,7 @@
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="qs-blockquote" checked /> <span class="switch-text" data-i18n="qsBlockquote">Wrap selected text with blockquote</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
         <div class="fg entry-block">
-          <label class="bl" for="qs-default-tags" data-i18n="labelDefaultTags">Default tags (comma-separated)</label>
+          <label class="bl" for="qs-default-tags" data-i18n="labelDefaultTags">Default tags (separated by spaces or commas)</label>
           <input type="text" id="qs-default-tags" placeholder="tag1, tag2" data-i18n-placeholder="placeholderTags" autocomplete="off" spellcheck="false" />
         </div>
         <div class="pref-group">
@@ -478,7 +478,7 @@
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="rl-blockquote" checked /> <span class="switch-text" data-i18n="qsBlockquote">Wrap selected text with blockquote</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
         <div class="fg entry-block">
-          <label class="bl" for="rl-default-tags" data-i18n="labelDefaultTags">Default tags (comma-separated)</label>
+          <label class="bl" for="rl-default-tags" data-i18n="labelDefaultTags">Default tags (separated by spaces or commas)</label>
           <input type="text" id="rl-default-tags" placeholder="tag1, tag2" data-i18n-placeholder="placeholderTags" autocomplete="off" spellcheck="false" />
         </div>
         <div class="pref-group">
@@ -499,7 +499,7 @@
           <label class="bl" for="opt-batch-tag" data-i18n="batchTagsLabel">Tags (comma-separated)</label>
           <details class="context-help">
             <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
-            <p class="hint context-help-body" data-i18n="batchTagsHint">Multiple tags separated by commas. E.g. <code>batch_saved, research</code></p>
+            <p class="hint context-help-body" data-i18n="batchTagsHint">Separate tags with commas. Spaces within a new tag become the multi-word tag separator. E.g. <code>batch_saved, research</code></p>
           </details>
           <input type="text" id="opt-batch-tag" value="batch_saved" />
         </div>
@@ -947,14 +947,16 @@
           </details>
           <input type="number" id="opt-ai-cache-duration" value="60" min="0" max="10080" step="15" />
         </div>
-        <div class="fg entry-block">
-          <div class="row-inline">
-            <label class="bl" for="opt-ai-tag-separator" data-i18n="labelTagSeparator">Multi-word tag separator</label>
-            <select id="opt-ai-tag-separator" data-listbox>
-              <option value="-" data-i18n="sepHyphen">hyphen (machine-learning)</option>
-              <option value="_" data-i18n="sepUnderscore">underscore (machine_learning)</option>
-            </select>
-          </div>
+        <div class="fg entry-block context-help-host" data-help-role="field">
+          <label class="bl" for="opt-ai-tag-separator" data-i18n="labelTagSeparator">Multi-word tag separator</label>
+          <details class="context-help">
+            <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+            <p class="hint context-help-body" data-i18n="tagSeparatorHint">AI-generated tags and new multi-word tags use this character to join words. Existing tags keep their spelling.</p>
+          </details>
+          <select id="opt-ai-tag-separator" data-listbox>
+            <option value="-" data-i18n="sepHyphen">hyphen (machine-learning)</option>
+            <option value="_" data-i18n="sepUnderscore">underscore (machine_learning)</option>
+          </select>
         </div>
       </section>
       <section class="settings-section">
