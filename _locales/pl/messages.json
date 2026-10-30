@@ -111,6 +111,14 @@
       }
     }
   },
+  "titleTooLong": {
+    "message": "Tytuł może mieć maksymalnie $MAX$ znaków.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
   "descCharCount": {
     "message": "$COUNT$ zn.",
     "placeholders": {

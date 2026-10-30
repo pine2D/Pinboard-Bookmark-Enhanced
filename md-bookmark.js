@@ -12,7 +12,7 @@
   let editor = null;
   let editorSource = null;
   const buttons = [];
-  const text = key => typeof t === "function" ? t(key) : key;
+  const text = (key, ...args) => typeof t === "function" ? t(key, ...args) : key;
   const id = name => document.getElementById("reader-bookmark-" + name);
 
   function label(node, key) {
@@ -77,7 +77,11 @@
     if (id("editor-status")) {
       label(id("editor-status"), editorStatusKey);
       id("editor-status").hidden = !editorStatusKey;
-      id("editor-status").dataset.state = editorStatusKey === "readerBookmarkDeleteFailed" ? "error" : "";
+      if (editorStatusKey === "titleTooLong") {
+        id("editor-status").removeAttribute("data-i18n");
+        id("editor-status").textContent = text("titleTooLong", String(pbpBookmarkLimits(pbpBookmarkAccountService(context?.account)).title));
+      }
+      id("editor-status").dataset.state = ["readerBookmarkDeleteFailed", "titleTooLong", "submitUriTooLong"].includes(editorStatusKey) ? "error" : "";
     }
     if (editor) for (const input of editor.querySelectorAll("input, textarea")) input.disabled = deleting;
   }
@@ -283,6 +287,17 @@
 
   async function save(action, draft) {
     if (inflight || !context?.account) return;
+    if (action === "edit" && draft) {
+      const service = pbpBookmarkAccountService(context.account);
+      const limits = pbpBookmarkLimits(service);
+      const titleOver = pbpBookmarkTitleTooLong(draft.title, service);
+      if (titleOver || (limits.notesHard !== null && draft.notes.length > limits.notesHard)) {
+        editorStatusKey = titleOver ? "titleTooLong" : "submitUriTooLong";
+        paint();
+        return;
+      }
+    }
+    editorStatusKey = "";
     const gen = generation;
     inflight = true; showStatus("readerBookmarkSaving");
     const result = await request({ type: "mdReaderBookmarkSave", action, ...(draft ? { draft } : {}) });

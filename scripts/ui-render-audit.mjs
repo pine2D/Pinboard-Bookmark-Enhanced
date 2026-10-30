@@ -8973,6 +8973,7 @@ async function openReaderSurface(name) {
       return shown(footer);
     }
     case "reader-bookmark-editor":
+    case "reader-bookmark-title-error":
     case "reader-bookmark-sharing":
     case "reader-bookmark-delete-confirm": {
       if (typeof window.pbpReaderBookmarkAction !== "function") return "reader bookmark module not loaded";
@@ -8981,17 +8982,23 @@ async function openReaderSurface(name) {
       const key = new URL(location.href).searchParams.get("k");
       const row = (await chrome.storage.local.get("md_preview_data_" + key))["md_preview_data_" + key];
       if (!row?.account) return "reader bookmark fixture has no owner";
+      const account = name === "reader-bookmark-title-error" ? "linkding:render-fixture" : row.account;
       const send = chrome.runtime.sendMessage;
       chrome.runtime.sendMessage = function (message, ...args) {
-        if (message?.type === "mdReaderBookmarkState") return Promise.resolve({ account: row.account, known: true, bookmarked: true, ...(name === "reader-bookmark-sharing" ? {privacySupported:false,sharingSupported:true} : {}), bookmark: { title: "Render audit bookmark", tags: "qa reader", notes: "A reader bookmark note.", private: true, toread: true } });
+        if (message?.type === "mdReaderBookmarkSave") throw new Error("render fixture must not send a save");
+        if (message?.type === "mdReaderBookmarkState") return Promise.resolve({ account, known: true, bookmarked: true, ...(name === "reader-bookmark-sharing" ? {privacySupported:false,sharingSupported:true} : {}), bookmark: { title: "Render audit bookmark", tags: "qa reader", notes: "A reader bookmark note.", private: true, toread: true } });
         return send.call(chrome.runtime, message, ...args);
       };
       try {
         // Cancel any real initial lookup still pending in the save module,
         // then replay this same fixture owner/article with the stub active.
-        document.dispatchEvent(new CustomEvent("pbp:bookmark-account-changed", { detail: { account: row.account, url: row.url, title: row.title } }));
+        document.dispatchEvent(new CustomEvent("pbp:bookmark-account-changed", { detail: { account, url: row.url, title: row.title } }));
         await wait(50);
         await window.pbpReaderBookmarkAction("edit");
+        if (name === "reader-bookmark-title-error") {
+          document.getElementById("reader-bookmark-title").value = "a".repeat(513);
+          document.getElementById("reader-bookmark-apply").click();
+        }
       }
       finally { chrome.runtime.sendMessage = send; }
       await wait(100);
@@ -9000,6 +9007,8 @@ async function openReaderSurface(name) {
         await wait(300);
         return shown(document.querySelector(".confirm-popover"));
       }
+      if (name === "reader-bookmark-title-error") return shown(document.getElementById("reader-bookmark-editor-status"))
+        && document.getElementById("reader-bookmark-editor-status").dataset.state === "error";
       return shown(document.getElementById("reader-bookmark-editor"));
     }
     case "explain-pop": {
@@ -9077,6 +9086,7 @@ function closeReaderSurface(name) {
     case "reader-source-details": { document.getElementById(name).open = false; return; }
     case "export-more": { document.getElementById(name).open = false; return; }
     case "reader-bookmark-footer": { window.scrollTo({ top: 0, behavior: "instant" }); return; }
+    case "reader-bookmark-title-error": { document.getElementById("reader-bookmark-cancel")?.click(); return; }
     case "reader-bookmark-delete-confirm": {
       document.querySelector(".confirm-popover .confirm-no")?.click();
       document.getElementById("reader-bookmark-cancel")?.click(); return;
@@ -9662,6 +9672,12 @@ async function runSweep(page, sw, extBase) {
       if (target && !(await page.locator(target).first().isVisible())) return `target not visible: ${target}`;
       return true;
     }, async () => {
+      // Bookmark editor focus can leave a rail heading's 120ms hover fade
+      // running. Park and settle before measuring its resting header face.
+      if (surface === "md-preview" && name.startsWith("reader-bookmark-")) {
+        await page.mouse.move(0, 0);
+        await settleAnimations(page);
+      }
       add(await runFamilySweep(page), surface, name);
       if (!SWEEP && !WRITE_SPACING) await measureDictLookupGeometry(page, surface, name, surface === "md-preview" && readerScheme === "dark" ? "dark" : "");
       if (!SWEEP && !WRITE_SPACING && surface === "library" && name === "notes-detail") await measureNotesBackBar(page);
@@ -10287,6 +10303,16 @@ async function runSweep(page, sw, extBase) {
     if (!formShown) throw new Error("SETUP ERROR: popup form sweep leg: popup.html is missing #main-section / .search-row");
     await page.waitForTimeout(150);
     await scan("popup", "form");
+  }
+
+  if (wants("popup", "title-error")) {
+    await page.evaluate(() => {
+      settings = {...settings, bookmarkService:"linkding"};
+      document.getElementById("title-input").value = "a".repeat(513);
+      updateCharCount();
+      if (!document.getElementById("submit-btn").disabled) throw new Error("over-limit title is not blocked");
+    });
+    await scan("popup", "title-error");
   }
 
   if (wants("popup", "linkding-sharing")) {

@@ -111,6 +111,14 @@
       }
     }
   },
+  "titleTooLong": {
+    "message": "Le titre ne doit pas dépasser $MAX$ caractères.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
   "descCharCount": {
     "message": "$COUNT$ car.",
     "placeholders": {

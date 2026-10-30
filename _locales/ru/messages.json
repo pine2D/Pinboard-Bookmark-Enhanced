@@ -111,6 +111,14 @@
       }
     }
   },
+  "titleTooLong": {
+    "message": "В заголовке допускается не более $MAX$ символов.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
   "descCharCount": {
     "message": "$COUNT$ симв.",
     "placeholders": {

@@ -1863,6 +1863,21 @@ function pbpBookmarkServiceId(settings) {
   return ["pinboard", "karakeep", "linkding"].includes(id) ? id : "";
 }
 
+// Title limits mirror the service validators: Django counts Unicode code
+// points; Karakeep's Zod schema counts JavaScript UTF-16 code units.
+function pbpBookmarkLimits(service) {
+  if (service === "linkding") return { title: 512, notesHard: null, notesWarn: 100000 };
+  if (service === "karakeep") return { title: 1000, notesHard: null, notesWarn: 100000 };
+  return { title: null, notesHard: 65000, notesWarn: 60000 };
+}
+
+function pbpBookmarkTitleTooLong(title, service) {
+  const limit = pbpBookmarkLimits(service).title;
+  if (limit === null) return false;
+  const value = String(title ?? "");
+  return (service === "linkding" ? Array.from(value).length : value.length) > limit;
+}
+
 function pbpBookmarkEndpoint(raw) {
   if (!pbpEndpointOriginPattern(raw)) return "";
   try {

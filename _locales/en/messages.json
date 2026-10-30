@@ -111,6 +111,14 @@
       }
     }
   },
+  "titleTooLong": {
+    "message": "Title must be $MAX$ characters or fewer.",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
   "descCharCount": {
     "message": "$COUNT$ chars",
     "placeholders": {

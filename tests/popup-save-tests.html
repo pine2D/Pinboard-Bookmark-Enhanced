@@ -382,6 +382,56 @@ test("posts/add default remains replace=yes for existing callers", () => {
       };
     }
 
+    function runLimitCounter(h) {
+      const start = source.indexOf("function updateCharCount()");
+      const end = source.indexOf("function showElement(", start);
+      const deps = { $id: id => h.elements[id] ||= createElementStub(), settings: h.settings,
+        existingBookmark: null, currentTags: h.currentTags, _pageInfoReady: true,
+        t: (key, value) => key + (value === undefined ? "" : ":" + value),
+        buildPostsAddUri, POSTS_ADD_URI_BUDGET };
+      new Function(...Object.keys(deps), source.slice(start, end) + ";updateCharCount();")(...Object.values(deps));
+    }
+
+    for (const [service, limit] of [["linkding", 512], ["karakeep", 1000]]) {
+      await testAsync(service + " title boundary blocks submission without truncating the editable title", async () => {
+        for (const [title, blocked] of [["a".repeat(limit), false], ["a".repeat(limit + 1), true],
+          ["𠮷".repeat(service === "linkding" ? limit : limit / 2), false],
+          ["𠮷".repeat(service === "linkding" ? limit : limit / 2) + "a", true]]) {
+          const h = createSubmitHarness(); h.settings.bookmarkService = service;
+          h.elements["title-input"] = new DOMParser().parseFromString(popupHtml, "text/html").getElementById("title-input");
+          h.elements["title-input"].value = title;
+          assert(h.elements["title-input"].maxLength === -1, "title has a truncating maxlength");
+          runLimitCounter(h);
+          assert(h.elements["submit-btn"].disabled === blocked, "wrong title gate for " + title.length + " UTF-16 units");
+          assert(h.elements["title-input"].value === title, "counter truncated the entered title");
+          if (blocked) {
+            assert(h.elements["desc-char-count"].textContent === "titleTooLong:" + limit, "title error not visible");
+            await h.click(); assert(h.messages.length === 0, "over-limit title sent a save intent");
+          } else {
+            h.resolveSave({status:"saved"}); await h.click();
+            assert(h.messages.some(m => m.type === "save_intent" && m.intent.title === title), "boundary title did not submit intact");
+          }
+        }
+      });
+    }
+    await testAsync("self-hosted notes use only a soft warning at 100000 and still submit 65001 characters", async () => {
+      for (const service of ["linkding", "karakeep"]) for (const length of [65001, 100000, 100001]) {
+        const h = createSubmitHarness(); h.settings.bookmarkService = service;
+        h.elements["description-input"].value = "n".repeat(length); runLimitCounter(h);
+        assert(!h.elements["submit-btn"].disabled, service + " notes incorrectly blocked");
+        assert(h.elements["desc-char-count"].classList.contains("near-limit") === (length >= 100000), "soft threshold wrong");
+        h.resolveSave({status:"saved"}); await h.click();
+        assert(h.messages.some(m => m.intent?.notes.length === length), "full notes were not submitted");
+      }
+    });
+    test("Pinboard retains URI and notes limits without a self-hosted title bound", () => {
+      const h = createSubmitHarness(); h.elements["title-input"].value = "a".repeat(1001);
+      runLimitCounter(h); assert(!h.elements["submit-btn"].disabled, "Pinboard acquired a title bound");
+      h.elements["description-input"].value = "n".repeat(65001); runLimitCounter(h);
+      assert(h.elements["submit-btn"].disabled, "Pinboard over-limit notes allowed");
+      assert(h.elements["submit-btn"].title === "submitUriTooLong", "Pinboard limit explanation changed");
+    });
+
     // Save failures name their cause and only retryable ones carry a Retry
     // action (impeccable critique 2026-10-15). Runs the real pbpSaveErrorView
     // source against the real classifier, then checks every key it can return

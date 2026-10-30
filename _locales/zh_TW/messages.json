@@ -111,6 +111,14 @@
       }
     }
   },
+  "titleTooLong": {
+    "message": "標題最多 $MAX$ 個字元",
+    "placeholders": {
+      "max": {
+        "content": "$1"
+      }
+    }
+  },
   "descCharCount": {
     "message": "$COUNT$ 字元",
     "placeholders": {

@@ -931,6 +931,8 @@ html[data-section="login"] .quick-actions { display: none !important; }
 
 .notes-bar { display: flex; justify-content: space-between; align-items: center; margin-top: var(--pp-sp-1); }
 #desc-char-count { font-size: 11px; color: var(--pp-fg-hint); white-space: nowrap; }
+/* Full title errors share this bar with AI summary; long locales must wrap. */
+#desc-char-count[data-title-limit="true"] { white-space: normal; }
 /* Both states carry their colour here, not from an inline style in popup.js --
    an inline style outranks every rule in this file, which is what kept the
    themed twin below dead and pinned "nearly full" to a literal #e80 (2.57:1 on

@@ -373,6 +373,7 @@ await test("real reader editor shows the configured privacy default and saves th
       w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
         sendMessage: msg => { const request = h.pbpReaderBookmarkRequest(msg, SENDER); pending.push(request); return request; },
         onMessage: { addListener: () => {} } } };
+      w.eval(await (await fetch("../shared.js")).text());
       w.t = k => k; w.eval(runtime);
       w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account: "alice", bookmark: { tags: [], notes: "" } } }));
       await Promise.all(pending); await new Promise(resolve => setTimeout(resolve, 0));
@@ -394,6 +395,7 @@ await test("reader linkding editor shows supported sharing and inverts the saved
     try {
       const w=frame.contentWindow, messages=[];
       w.document.body.innerHTML='<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+      w.eval(await (await fetch("../shared.js")).text());
       w.t=k=>k;
       w.chrome={runtime:{id:"test-id",getURL:p=>p,onMessage:{addListener(){}},sendMessage:async msg=>{messages.push(msg);return {known:true,bookmarked:true,account:"linkding:c1",privacySupported:false,sharingSupported,bookmark:{title:"T",notes:"",tags:"",private:false,toread:false}};}}};
       w.eval(runtime);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account:"linkding:c1"}}));
@@ -401,6 +403,36 @@ await test("reader linkding editor shows supported sharing and inverts the saved
       const box=w.document.getElementById("reader-bookmark-private");
       equal(box.closest("label").hidden,sharingSupported!==true);
       if(sharingSupported){equal(box.checked,true);assert(box.closest("label").textContent.includes("bookmarkShare"));box.checked=false;w.document.getElementById("reader-bookmark-apply").click();await new Promise(r=>setTimeout(r,0));equal(messages.find(m=>m.action==="edit").draft.private,true);}
+    } finally {frame.remove();}
+  }
+});
+await test("reader editor rejects over-limit titles locally, keeps the full input, and allows correction", async () => {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  for (const [service, limit] of [["linkding",512],["karakeep",1000]]) {
+    const frame=document.createElement("iframe");document.body.append(frame);
+    try {
+      const w=frame.contentWindow, messages=[], account=service+":fixture";
+      w.document.body.innerHTML='<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+      w.eval(await (await fetch("../shared.js")).text());
+      w.t=(key,value)=>key+(value===undefined?"":":"+value);
+      w.chrome={runtime:{id:"test-id",getURL:p=>p,onMessage:{addListener(){}},sendMessage:async msg=>{
+        messages.push(msg);return msg.type === "mdReaderBookmarkState"
+          ? {known:true,bookmarked:true,account,bookmark:{title:"T",notes:"",tags:"",private:true,toread:false}}
+          : {status:"queued",account};
+      }}};
+      w.eval(runtime);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account}}));
+      await new Promise(r=>setTimeout(r,20));await w.pbpReaderBookmarkAction("edit");
+      const title=w.document.getElementById("reader-bookmark-title"), apply=w.document.getElementById("reader-bookmark-apply");
+      equal(title.maxLength,-1);
+      title.value="a".repeat(limit+1);apply.click();await new Promise(r=>setTimeout(r,0));
+      assert(!messages.some(m=>m.type==="mdReaderBookmarkSave"),"over-limit reader title sent a request");
+      equal(title.value,"a".repeat(limit+1));
+      const status=w.document.getElementById("reader-bookmark-editor-status");
+      equal(status.hidden,false);equal(status.textContent,"titleTooLong:"+limit);equal(status.dataset.state,"error");
+      w.document.getElementById("reader-bookmark-notes").value="n".repeat(100001);
+      title.value="𠮷".repeat(service==="linkding"?limit:limit/2);apply.click();await new Promise(r=>setTimeout(r,0));
+      equal(messages.find(m=>m.type==="mdReaderBookmarkSave")?.draft.title,title.value);
+      equal(messages.find(m=>m.type==="mdReaderBookmarkSave")?.draft.notes.length,100001);
     } finally {frame.remove();}
   }
 });

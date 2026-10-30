@@ -1869,6 +1869,11 @@ function setupSubmit(token) {
         setSubmitState("idle");
         return;
       }
+      if (pbpBookmarkTitleTooLong(title, pbpBookmarkServiceId(settings))) {
+        showStatus("status-msg", t("titleTooLong", String(pbpBookmarkLimits(pbpBookmarkServiceId(settings)).title)), "error");
+        setSubmitState("idle");
+        return;
+      }
       const summaryOwnership =
         typeof pbpAiSummaryOwnershipSnapshot === "function"
           ? pbpAiSummaryOwnershipSnapshot(extended)
@@ -2488,13 +2493,16 @@ function autoResizeTextarea(el) {
 }
 function updateCharCount() {
   const len = $id("description-input").value.length;
+  const service = pbpBookmarkServiceId(settings);
+  const limits = pbpBookmarkLimits(service);
+  const titleOver = pbpBookmarkTitleTooLong($id("title-input").value, service);
   // Same shape the save path actually sends: re-saving an existing bookmark
   // carries &dt=<original time> (~28 B once encoded, popup.js -> shared.js ->
   // background.js `dt: plan.fields.time`) and replace=yes, while a create
   // carries replace=no. Missing dt let the counter read under budget on a
   // bookmark that posts/add then rejected as too_long.
   const isUpdate = !!existingBookmark;
-  const uriLen = pbpBookmarkServiceId(settings) === "pinboard" ? buildPostsAddUri({
+  const uriLen = service === "pinboard" ? buildPostsAddUri({
     token: settings.pinboardToken || "user:0000000000000000000000000000000000000000",
     url: $id("url-input").value,
     title: $id("title-input").value,
@@ -2507,9 +2515,11 @@ function updateCharCount() {
   }).length : 0;
   const el = $id("desc-char-count");
   // "B" is a unit symbol and stays; the word for characters is not.
-  el.textContent = uriLen ? `${t("descCharCount", String(len))} · ${uriLen}/${POSTS_ADD_URI_BUDGET} B` : t("descCharCount", String(len));
-  const over = uriLen > POSTS_ADD_URI_BUDGET || len > 65000;
-  const near = uriLen > POSTS_ADD_URI_BUDGET * 0.8 || len > 60000;
+  el.setAttribute("data-title-limit", String(titleOver));
+  el.textContent = titleOver ? t("titleTooLong", String(limits.title))
+    : uriLen ? `${t("descCharCount", String(len))} · ${uriLen}/${POSTS_ADD_URI_BUDGET} B` : t("descCharCount", String(len));
+  const over = titleOver || uriLen > POSTS_ADD_URI_BUDGET || (limits.notesHard !== null && len > limits.notesHard);
+  const near = uriLen > POSTS_ADD_URI_BUDGET * 0.8 || (service === "pinboard" ? len > limits.notesWarn : len >= limits.notesWarn);
   // State classes only. The inline style this replaces always outranked the
   // themed rules, so the "nearly full" signal was pinned to a literal #e80
   // that reads 2.57:1 on the default surface -- unreadable exactly when it
@@ -2526,7 +2536,8 @@ function updateCharCount() {
   // on a busy page this disable can last seconds; without a reason the user
   // cannot tell "this page cannot be saved" from "still getting ready", and an
   // empty title is exactly the state the other two rungs exist to avoid.
-  sub.title = over ? t("submitUriTooLong")
+  sub.title = titleOver ? t("titleTooLong", String(limits.title))
+    : over ? t("submitUriTooLong")
     : urlBad ? t("urlCannotSave")
     : !_pageInfoReady ? t("loading") : "";
   if (typeof pbpRememberPopupDraft === "function") pbpRememberPopupDraft();
