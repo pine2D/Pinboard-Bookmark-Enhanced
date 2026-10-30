@@ -1892,5 +1892,27 @@ test("buildAutoNotes routes the description through the same check", () => {
   assertEq(buildAutoNotes({ title: "T", metaDescription: "More" }, opts), "More");
   assertEq(buildAutoNotes({ title: "T", metaDescription: "More" }, { ...opts, autoDescription: false }), "");
 });
+test("selected text uses each service's quote syntax without changing Pinboard bytes", () => {
+  const text = "# heading\n\n<b> *bold*\n  12. list";
+  const cases = [
+    ["pinboard", "<blockquote># heading\n\n&lt;b&gt; *bold*\n  12. list</blockquote>"],
+    ["linkding", "> \\# heading\n>\n> &lt;b> \\*bold\\*\n>   12\\. list"],
+    ["karakeep", "> # heading\n>\n> <b> *bold*\n>   12. list"],
+  ];
+  for (const [service, expected] of cases) {
+    assertEq(pbpFormatQuote(text, service), expected);
+    assertEq(buildAutoNotes({ selectedText: text }, { blockquote: true, service }), expected);
+    assertEq(buildAutoNotes({ selectedText: text }, { blockquote: false, service }), text);
+  }
+});
+test("linkding quotes escape Markdown markers, literal slashes and inline syntax", () => {
+  assertEq(pbpFormatQuote("+ a\n- b\n> c\n`code` [x]_y_\\z", "linkding"),
+    "> \\+ a\n> \\- b\n> \\> c\n> \\`code\\` \\[x\\]\\_y\\_\\\\z");
+});
+test("AI summary blocks omit the legacy marker and Karakeep stays plain text", () => {
+  assertEq(pbpFormatSummaryBlock(" <b> summary \n", "karakeep"), "<b> summary");
+  assertEq(pbpFormatSummaryBlock("<b> summary", "pinboard"), "<blockquote>&lt;b&gt; summary</blockquote>");
+  assertEq(pbpFormatSummaryBlock("<b> summary", "linkding"), "> &lt;b> summary");
+});
 </script>
 </body></html>

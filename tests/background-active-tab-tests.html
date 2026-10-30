@@ -396,6 +396,20 @@ async function run() {
     assert(threw && marker === null, "failed removal wrote a completion marker");
   });
 
+  await test("background saves format cached and fresh summaries for their service", async () => {
+    for (const [service, expected] of [["pinboard", "<blockquote>&lt;b&gt; *summary*</blockquote>"],
+      ["linkding", "> &lt;b> \\*summary\\*"], ["karakeep", "<b> *summary*"]]) {
+      for (const cached of [{ summary: "<b> *summary*" }, {}]) {
+        const h = buildBackgroundSaveHarness(source, async () => "<b> *summary*", cached,
+          { _aiTags: false }, true, {
+            getCurrentBookmarkAuth: async () => ({ service, token: "fixture", account: "fixture", epoch: 1 })
+          });
+        await h.save({ url, title: "Article", tab: { id: 7 }, settingsOverrides: {}, notifyId: "qs", notifyCategory: "quickSave" });
+        assert(h.intents[0]?.notes === expected, service + " summary format: " + h.intents[0]?.notes);
+      }
+    }
+  });
+
   await test("background save keeps the extraction fast path when AI is disabled", async () => {
     const h = buildBackgroundSaveHarness(source, async () => "unused", {}, { _aiTags: false, _aiSummary: false });
     await h.save({

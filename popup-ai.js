@@ -292,12 +292,13 @@ function _aiOpStillCurrent(account) {
     && _aiUrlEquivalent($id("url-input").value, pageInfo.url);
 }
 
-function pbpAiWrapSummary(summary) {
-  return `<blockquote>${escapeForExtended(summary)}</blockquote>`;
+function pbpAiWrapSummary(summary, service = "pinboard") {
+  return pbpFormatSummaryBlock(summary, service);
 }
 
-function pbpAiFindLastExactSummaryRange(value, summary) {
-  const wrapped = pbpAiWrapSummary(summary);
+function pbpAiFindLastExactSummaryRange(value, summary, service = "pinboard") {
+  const wrapped = pbpAiWrapSummary(summary, service);
+  if (!wrapped) return null;
   const start = String(value).lastIndexOf(wrapped);
   return start < 0 ? null : { start, end: start + wrapped.length };
 }
@@ -804,7 +805,7 @@ async function _aiRestoreSummaryOwnership(account, url, cachedSummary) {
   if (legacyRange && _aiAdoptSummaryRange(value, legacyRange, false)) return "legacy";
 
   const cachedRange = cachedSummary
-    ? pbpAiFindLastExactSummaryRange(value, cachedSummary)
+    ? pbpAiFindLastExactSummaryRange(value, cachedSummary, pbpBookmarkServiceId(settings))
     : null;
   if (cachedRange && _aiAdoptSummaryRange(value, cachedRange, true)) return "cache";
   return null;
@@ -816,7 +817,7 @@ async function _aiRestoreSummaryOwnership(account, url, cachedSummary) {
 function upsertSummary(summary, { userEdit = true } = {}) {
   const di = $id("description-input");
   const cur = di.value;
-  const wrapped = pbpAiWrapSummary(summary);
+  const wrapped = pbpAiWrapSummary(summary, pbpBookmarkServiceId(settings));
   let next;
   let start;
   if (_aiSummaryValue === cur && _pbpAiSummaryRangeValid(cur, _aiSummaryRange)) {

@@ -1,6 +1,7 @@
 <!doctype html>
 <html><head><meta charset="utf-8"><title>Popup Draft Tests</title></head><body>
 <h1>Popup Draft Tests</h1><div id="results"></div>
+<script src="../shared.js"></script>
 <script>
 const assert = (v,m) => { if(!v)throw new Error(m||'assertion failed'); };
 async function test(name,fn){const d=document.createElement('div');d.className='case';try{await fn();d.classList.add('pass');d.textContent='PASS '+name;}catch(e){d.classList.add('fail');d.textContent='FAIL '+name+': '+e.message;}document.getElementById('results').append(d);}

@@ -1466,6 +1466,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     notes = buildAutoNotes(pageInfo, {
       autoDescription: s._autoNotes,
       blockquote: s._blockquote,
+      service: startAuth.service,
       includeReferrer: false
     });
   }
@@ -1589,7 +1590,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   // Apply combined-path results, then whatever the single calls produced.
   if (aiTagsResolved) tags = [...tags, ...aiTagsResolved];
   if (summaryResolved) {
-    const wrapped = `[AI Summary]\n<blockquote>${escapeForExtended(summaryResolved)}</blockquote>`;
+    const wrapped = pbpFormatSummaryBlock(summaryResolved, startAuth.service);
     notes = notes ? notes + "\n\n" + wrapped : wrapped;
   }
   const aiResults = await Promise.all(aiPromises);
@@ -1597,7 +1598,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     if (!r) continue;
     if (r.type === "tags") tags = [...tags, ...r.result];
     if (r.type === "summary") {
-      const wrapped = `[AI Summary]\n<blockquote>${escapeForExtended(r.result)}</blockquote>`;
+      const wrapped = pbpFormatSummaryBlock(r.result, startAuth.service);
       notes = notes ? notes + "\n\n" + wrapped : wrapped;
     }
   }
@@ -4937,12 +4938,12 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
                 } catch (e) { console.warn("batch AI summary failed:", tab.url, e.message); aiFailed++; return null; }
               })());
               if (aiTagsResolved) tags = [...tags, ...aiTagsResolved];
-              if (summaryResolved) notes = `[AI Summary]\n<blockquote>${escapeForExtended(summaryResolved)}</blockquote>`;
+              if (summaryResolved) notes = pbpFormatSummaryBlock(summaryResolved, currentAuth.service);
               const results = await Promise.all(aiJobs);
               for (const r of results) {
                 if (!r) continue;
                 if (r.type === "tags") tags = [...tags, ...r.result];
-                if (r.type === "summary") notes = `[AI Summary]\n<blockquote>${escapeForExtended(r.result)}</blockquote>`;
+                if (r.type === "summary") notes = pbpFormatSummaryBlock(r.result, currentAuth.service);
               }
             }
           } else {

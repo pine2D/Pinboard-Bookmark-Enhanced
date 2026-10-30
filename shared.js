@@ -226,6 +226,24 @@ function escapeForExtended(text) {
   return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+// Notes are HTML on Pinboard, Markdown on linkding, and plain text on Karakeep.
+function pbpFormatQuote(text, service = "pinboard") {
+  if (service === "pinboard") return `<blockquote>${escapeForExtended(text)}</blockquote>`;
+  return String(text || "").split(/\r?\n/).map((line) => {
+    if (!line) return ">";
+    if (service === "linkding") {
+      line = line.replace(/\\/g, "\\\\").replace(/[`*_\[\]]/g, "\\$&").replace(/</g, "&lt;")
+        .replace(/^(\s*)([#+\->])/, "$1\\$2")
+        .replace(/^(\s*\d+)\./, "$1\\.");
+    }
+    return "> " + line;
+  }).join("\n");
+}
+
+function pbpFormatSummaryBlock(summary, service = "pinboard") {
+  return service === "karakeep" ? String(summary || "").trim() : pbpFormatQuote(summary, service);
+}
+
 // Max AI tags to keep (enforced in refineTags; also stated in DEFAULT_TAG_PROMPT).
 const AI_TAG_CAP = 8;
 

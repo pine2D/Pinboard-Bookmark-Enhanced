@@ -1720,16 +1720,28 @@ test("posts/add default remains replace=yes for existing callers", () => {
       )((value) => "[" + value + "]");
     }
 
+    test("popup prefill formats selected text for the connected service", () => {
+      const start = source.indexOf('  let desc = "";', source.indexOf('async function showMain('));
+      const end = source.indexOf('  updateCharCount();', start);
+      const input = { value: "" };
+      const fill = new Function("pageInfo", "settings", "shouldUpdateField", "$id", source.slice(start, end));
+      for (const [service, expected] of [["pinboard", "<blockquote># heading\n\n&lt;b&gt; *bold*</blockquote>"],
+        ["linkding", "> \\# heading\n>\n> &lt;b> \\*bold\\*"], ["karakeep", "> # heading\n>\n> <b> *bold*"]]) {
+        fill({ selectedText: "# heading\n\n<b> *bold*" }, { bookmarkService: service, optBlockquote: true }, () => true, () => input);
+        assert(input.value === expected, service + " prefill: " + input.value);
+      }
+    });
+
     test("new AI summaries contain only a marker-free blockquote", () => {
       const { pbpAiWrapSummary } = summaryHelpers();
       const wrapped = pbpAiWrapSummary("summary");
-      assert(wrapped === "<blockquote>[summary]</blockquote>", "unexpected wrapper: " + wrapped);
+      assert(wrapped === "<blockquote>summary</blockquote>", "unexpected wrapper: " + wrapped);
       assert(!wrapped.includes("[AI Summary]"), "new wrapper still leaks the legacy marker");
     });
 
     test("cached summary exact fallback adopts the last identical block", () => {
       const { pbpAiFindLastExactSummaryRange } = summaryHelpers();
-      const block = "<blockquote>[same]</blockquote>";
+      const block = "<blockquote>same</blockquote>";
       const value = block + "\n\nnotes\n\n" + block;
       const range = pbpAiFindLastExactSummaryRange(value, "same");
       assert(range.start === value.lastIndexOf(block) && range.end === value.length,
@@ -1807,7 +1819,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "stripTrackingParams", "pbpAiCacheGet", "pbpAiCacheSet", "pbpAiCacheDelete",
         "crypto", "TextEncoder", "_AI_BQ_REGEX_SHARED", "URL", "$id",
         "pbpPopupAiAccountIsCurrent", "pageInfo", "existingBookmark", "escapeForExtended",
-        "showSummaryActions", "loadReceipt",
+        "showSummaryActions", "loadReceipt", "settings",
         popupAiSource.slice(start, end) +
         "; async function pbpAiLoadSummaryOwnership(account, url, value) {" +
         " return loadReceipt(account, url, value); }" +
@@ -1828,7 +1840,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         options.existingBookmark || null,
         (value) => value,
         (fromCache) => actions.push(fromCache),
-        loadReceipt
+        loadReceipt,
+        { bookmarkService: options.service || "pinboard" }
       );
       return {
         field,
@@ -2048,16 +2061,24 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const runtimeStart = popupAiSource.indexOf("function pbpAiWrapSummary");
       const runtimeEnd = popupAiSource.indexOf("// Unified \"no AI key\"", runtimeStart);
       assert(runtimeStart >= 0 && runtimeEnd > runtimeStart, "summary runtime source missing");
-      const createRuntime = (description) => {
+      const createRuntime = (description, service = "pinboard") => {
         const field = { value: description };
         const api = new Function("_AI_BQ_REGEX_SHARED", "escapeForExtended", "$id",
-          "updateCharCount", "autoResizeTextarea",
+          "updateCharCount", "autoResizeTextarea", "settings",
           popupAiSource.slice(runtimeStart, runtimeEnd) +
           "; return { upsertSummary, removeSummary };"
-        )(_AI_BQ_REGEX_SHARED, (text) => text, () => field, () => {}, () => {});
+        )(_AI_BQ_REGEX_SHARED, (text) => text, () => field, () => {}, () => {}, { bookmarkService: service });
         return { field, ...api };
       };
       const legacy = "before\n\n[AI Summary]\n<blockquote>old</blockquote>\n\nafter";
+      for (const [service, wrapped] of [["pinboard", "<blockquote>fresh</blockquote>"], ["linkding", "> fresh"], ["karakeep", "fresh"]]) {
+        const h = createRuntime(legacy, service);
+        h.upsertSummary("old replacement");
+        h.upsertSummary("fresh");
+        assert(h.field.value === "before\n\n" + wrapped + "\n\nafter", service + " did not replace the owned summary");
+        const range = summaryHelpers().pbpAiFindLastExactSummaryRange(h.field.value, "fresh", service);
+        assert(range && h.field.value.slice(range.start, range.end) === wrapped, service + " cache could not locate its summary");
+      }
       const migrated = createRuntime(legacy);
       migrated.upsertSummary("new");
       assert(migrated.field.value === "before\n\n<blockquote>new</blockquote>\n\nafter",

@@ -2613,7 +2613,7 @@ function pbpNotesDescription(pageInfo) {
 function buildAutoNotes(pageInfo, opts) {
   let desc = "";
   if (pageInfo.selectedText) {
-    desc = opts.blockquote ? `<blockquote>${escapeForExtended(pageInfo.selectedText)}</blockquote>` : pageInfo.selectedText;
+    desc = opts.blockquote ? pbpFormatQuote(pageInfo.selectedText, opts.service) : pageInfo.selectedText;
   } else if (opts.autoDescription) {
     desc = pbpNotesDescription(pageInfo);
   }
