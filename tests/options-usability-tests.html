@@ -1020,6 +1020,12 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
   });
 
   await test("tag-gov missing-auth readout explains a non-Pinboard deep link", async () => {
+    const markup = new DOMParser().parseFromString(await (await fetch("../options.html")).text(), "text/html");
+    const source = markup.querySelector("#panel-tags #tag-gov-need-token");
+    assert(source?.querySelector("#tag-gov-enter-token"), "production Pinboard-token action is missing");
+    const needToken = document.importNode(source, true);
+    document.getElementById("panel-tags").appendChild(needToken);
+    const refresh = document.getElementById("tag-gov-refresh");
     const service = document.createElement("input");
     service.type = "radio";
     service.name = "bookmark-service";
@@ -1030,15 +1036,24 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
         service.value = value;
         _tagGovShowLoadFailed("no-token");
         assert(document.getElementById("tag-gov-stats").textContent === "tagGovPinboardOnly", value + " still asks for a Pinboard token");
+        assert(needToken.hidden && getComputedStyle(needToken).display === "none", value + " still shows the Pinboard-token action");
+        assert(refresh.disabled, value + " offers a refresh that cannot load tags");
       }
       service.value = "pinboard";
       _tagGovShowLoadFailed("no-token");
       assert(document.getElementById("tag-gov-stats").textContent === "tagGovNeedToken", "Pinboard without a token must retain setup guidance");
+      assert(!needToken.hidden && getComputedStyle(needToken).display !== "none", "Pinboard setup action is hidden");
+      assert(refresh.disabled, "refresh must stay disabled without a Pinboard token");
       service.value = "linkding";
+      _tagGovShowLoadFailed("no-token");
+      assert(needToken.hidden && getComputedStyle(needToken).display === "none", "switching from Pinboard left its token action visible");
+      assert(document.getElementById("panel-tags").dataset.tagGovState === "pinboard-only", "service change did not replace the missing-token state");
       _tagGovShowLoadFailed();
       assert(document.getElementById("tag-gov-stats").textContent === "tagGovLoadFailed", "a real load failure must retain its error");
+      assert(needToken.hidden && !refresh.disabled, "a load error must hide token setup and allow retry");
     } finally {
       service.remove();
+      needToken.remove();
     }
   });
 

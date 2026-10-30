@@ -5276,19 +5276,18 @@ function pbpSetTagGovIgnoredCount(n) {
 // pinboard.in/u:<user>/... links without an extra async hop at render time.
 let _tagGovUser = "";
 
-// The overview's load state: "ready" (counts loaded), "no-token", "failed"
-// (offline / API error). With no token the one useful action is the jump
-// to Account.
+// The overview's load state: "ready" (counts loaded), "no-token" (Pinboard
+// setup), "pinboard-only" (another bookmark service), or "failed" (offline /
+// API error). Only missing Pinboard auth offers the jump to Account.
 function pbpSetTagGovDataState(state) {
   const panel = $id("panel-tags");
   if (panel) panel.dataset.tagGovState = state;
   const needToken = $id("tag-gov-need-token");
   if (needToken) needToken.hidden = state !== "no-token";
-  // With no token, Refresh could only repeat the line above it; the "enter
-  // your API token" button beside that line is the one way forward. Every
-  // token change re-runs the account reload, which leaves this state.
+  // Neither missing Pinboard auth nor another bookmark service can load tags.
+  // Only the former offers token setup; account changes re-run this panel.
   const refresh = $id("tag-gov-refresh");
-  if (refresh) refresh.disabled = state === "no-token";
+  if (refresh) refresh.disabled = state === "no-token" || state === "pinboard-only";
 }
 
 // Whether the panel has tag counts to work on -- what renderTagGov actually
@@ -5315,11 +5314,12 @@ function pbpSetTagGovHasData(hasData) {
 function _tagGovShowLoadFailed(reason = "failed") {
   const noToken = reason === "no-token";
   const service = document.querySelector('input[name="bookmark-service"]:checked')?.value;
+  const pinboardOnly = noToken && ["karakeep", "linkding"].includes(service);
   const stats = $id("tag-gov-stats");
   if (stats) stats.textContent = t(noToken
-    ? (["karakeep", "linkding"].includes(service) ? "tagGovPinboardOnly" : "tagGovNeedToken")
+    ? (pinboardOnly ? "tagGovPinboardOnly" : "tagGovNeedToken")
     : "tagGovLoadFailed");
-  pbpSetTagGovDataState(noToken ? "no-token" : "failed");
+  pbpSetTagGovDataState(pinboardOnly ? "pinboard-only" : noToken ? "no-token" : "failed");
 }
 
 // Shared token reader for tag-governance operations.
