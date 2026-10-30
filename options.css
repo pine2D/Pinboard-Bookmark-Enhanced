@@ -1927,13 +1927,21 @@ html[data-theme] .wayback-log-heading .bl { margin-bottom: 0; }
 html[data-theme] .fg .bl.subhead {
   font-size: var(--opt-text-subhead); line-height: var(--opt-lh-subhead); font-weight: 600;
 }
-/* A disclosure that stacks several service groups (Vocabulary's Anki / Eudic /
-   file export) opens each later group with extra room above its subhead, so
-   the gap between groups outweighs the 24px between fields inside one.
-   Padding, not margin: a margin-top here collapses into the previous
-   entry-block's 24px margin-bottom (the wrapper .fg has no padding or
-   border to stop it) and adds nothing. */
-.disclosure-body > .fg:not(:first-child) > .bl.subhead[role="heading"] { padding-top: var(--opt-sp-4); }
+/* Unit -> group subhead (critique 6, SP-02 follow-up, 2026-10-30): a subhead
+   that opens a group after another unit sits 20 under that unit's text, one
+   sp-2 step more than the 16 between two units, so it reads as the head of
+   the group below and not as floating between the two (it keeps 12 to its
+   first item, SP-02). Padding, not margin: a margin-top here collapses into
+   the previous unit's margin-bottom (the wrapper .fg has no padding or
+   border to stop it) and adds nothing, and the units' trims make that
+   margin anything from 0 to 16. Both densities: the unit gap is 16 in
+   compact too. A subhead that opens its section or disclosure body (right
+   under a section title, or first in its body) keeps the title -> first copy
+   12, so it takes no padding. This replaces the Vocabulary-only sp-4 (24)
+   on the Anki / Eudic / file-export headings: one subhead rhythm everywhere. */
+.fg .bl.subhead { padding-top: var(--opt-sp-2); }
+:is(.settings-section, .disclosure-body) > :is(h2.section-title, .context-help-section) + .fg > .bl.subhead:first-child,
+:is(.settings-section, .disclosure-body) > .fg:first-child > .bl.subhead:first-child { padding-top: 0; }
 /* Inside a help-host field (popup-width-label): the themed twin of the
    label rule above ((0,3,2)) outranks the generic
    `.context-help-host[data-help-role="field"] > label.bl { margin: 0; }`

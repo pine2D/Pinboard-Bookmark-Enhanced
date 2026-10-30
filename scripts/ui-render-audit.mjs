@@ -8051,7 +8051,7 @@ const SWEEP_CFG = {
   // comfortable / 16 compact is the floor -- the one place A2 cannot reach
   // 16); 12 from a group subhead to its first item; 4 between the paragraphs
   // of one note. Literal oracle values, not read from options.css.
-  unitRhythm: { unit: 16, rowPadY: { comfortable: 12, compact: 8 }, subheadFirst: 12, hintStep: 4, tol: 1 },
+  unitRhythm: { unit: 16, rowPadY: { comfortable: 12, compact: 8 }, subheadFirst: 12, subheadAbove: 20, hintStep: 4, tol: 1 },
   // The sweep pass runs once, on the deterministic default theme runSweep's
   // options/library legs set up (setTheme(sw, "", "light")) -- a fixed tier,
   // not a per-theme lookup, is correct here.
@@ -8603,6 +8603,14 @@ function sweepProbe(cfg) {
       };
       const shownKids = (el) => Array.from(el.children).filter((k) => visible(k) && k.getBoundingClientRect().height > 0);
       const UNIT = ".pref-group, .fg.entry-block, .fg.edit-area";
+      // A unit whose first text is a group subhead opens a new group: the
+      // gap above it is the subhead step (SP-02 follow-up), not the unit step.
+      const opensWithSubhead = (unit) => {
+        const head = unit.querySelector(".bl.subhead");
+        if (!head || !visible(head) || !head.getBoundingClientRect().height) return null;
+        const headTop = edge(head, "top"), unitTop = edge(unit, "top");
+        return headTop !== null && unitTop !== null && unitTop >= headTop - ur.tol ? head : null;
+      };
       const padY = ur.rowPadY[cfg.densityTier] ?? ur.rowPadY.comfortable;
       for (const host of document.querySelectorAll(".settings-section, .disclosure-body")) {
         if (!visible(host)) continue;
@@ -8612,9 +8620,11 @@ function sweepProbe(cfg) {
           // An "AI does nothing yet" block is the caption of the switches above
           // (2px, SP-08), not a unit of its own.
           if (!a.matches(UNIT) || !b.matches(UNIT) || a.matches("[data-ai-unavailable]") || b.matches("[data-ai-unavailable]")) continue;
-          const want = a.matches(".pref-group") && b.matches(".pref-group") ? Math.max(ur.unit, 2 * padY) : ur.unit;
+          const opensGroup = !!opensWithSubhead(b);
+          const want = a.matches(".pref-group") && b.matches(".pref-group") ? Math.max(ur.unit, 2 * padY)
+            : opensGroup ? ur.subheadAbove : ur.unit;
           const gap = textGap(a, b);
-          if (gap !== null && Math.abs(gap - want) > ur.tol) push(b, `unit ${want}`, gap);
+          if (gap !== null && Math.abs(gap - want) > ur.tol) push(b, opensGroup ? `subhead-above ${want}` : `unit ${want}`, gap);
         }
       }
       for (const head of document.querySelectorAll(".fg > .bl.subhead")) {
@@ -8632,6 +8642,31 @@ function sweepProbe(cfg) {
         if (!next || !next.matches(".pref-group, .fg")) continue; // chip tracks, toolbars, captions
         const gap = textGap(head, next);
         if (gap !== null && Math.abs(gap - ur.subheadFirst) > ur.tol) push(next, `subhead-first ${ur.subheadFirst}`, gap);
+      }
+      // Unit -> group subhead (SP-02 follow-up): a subhead that opens a group
+      // after another unit sits 20 under that unit's text, more than the 12
+      // it keeps to its own first item, so it reads as the head of the group
+      // below rather than floating between the two. The unit scan above
+      // measures that 20 between two A2 units; this one adds the plain .fg
+      // groups (Vocabulary's Eudic / file-export headings) and the ordering
+      // above > below for both. A subhead that opens its section or
+      // disclosure body (title -> first copy 12) has no unit above it.
+      for (const head of document.querySelectorAll(".fg .bl.subhead")) {
+        if (!visible(head) || !head.getBoundingClientRect().height) continue;
+        let unit = head;
+        while (unit.parentElement && !unit.parentElement.matches(".settings-section, .disclosure-body")) unit = unit.parentElement;
+        if (!unit.parentElement || !unit.matches(".fg, " + UNIT) || opensWithSubhead(unit) !== head) continue;
+        let prev = unit.previousElementSibling;
+        while (prev && !(visible(prev) && prev.getBoundingClientRect().height > 0)) prev = prev.previousElementSibling;
+        if (!prev || !prev.matches(UNIT)) continue; // a title, a summary or a caption above: not a unit -> subhead step
+        const above = textGap(prev, head);
+        if (above === null) continue;
+        if (!unit.matches(UNIT) && Math.abs(above - ur.subheadAbove) > ur.tol) push(head, `subhead-above ${ur.subheadAbove}`, above);
+        let next = head.nextElementSibling;
+        while (next && (next.matches("details.context-help") || !visible(next))) next = next.nextElementSibling;
+        if (!next) { next = head.parentElement.nextElementSibling; while (next && !visible(next)) next = next.nextElementSibling; }
+        const below = next && next.matches(".pref-group, .fg") ? textGap(head, next) : null;
+        if (below !== null && !(above > below)) push(head, `subhead-above >${below}`, above);
       }
       const paragraph = (el) => el?.matches(".hint:not(.context-help-body)") && visible(el) && el.getBoundingClientRect().height > 0;
       for (const p of document.querySelectorAll(".hint:not(.context-help-body)")) {
@@ -10949,6 +10984,7 @@ async function main() {
         expected: h.rel === "label-control" ? "3..6" : h.rel === "action" ? ">=4" : h.rel.split(" ").pop(),
         note: h.rel === "label-control" ? "label.bl -> control gap (px)" : h.rel === "action" ? "gap above an action row (px)"
           : h.rel.startsWith("unit") ? "text-to-text gap between two setting units (px, rhythm A2)"
+          : h.rel.startsWith("subhead-above") ? "previous unit -> group subhead text gap (px; must exceed the subhead -> first item gap)"
           : h.rel.startsWith("subhead") ? "group subhead -> first item text gap (px)" : "gap between two paragraphs of one note (px)",
       });
     }
