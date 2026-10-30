@@ -154,6 +154,9 @@
   "labelTitle": {
     "message": "Заголовок"
   },
+  "labelDescription": {
+    "message": "Описание"
+  },
   "labelNotes": {
     "message": "Заметки"
   },
@@ -283,6 +286,9 @@
   },
   "aiGenerateBtn": {
     "message": "сгенерировать"
+  },
+  "aiSummaryKeptDescription": {
+    "message": "Вы изменили описание, поэтому ИИ не заменил его аннотацией."
   },
   "aiSummaryGenerated": {
     "message": "Аннотация сгенерирована"

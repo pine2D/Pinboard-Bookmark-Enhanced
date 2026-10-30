@@ -696,12 +696,13 @@ function setupAIFeatures() {
     await doAISummary(false);
   });
 
-  const descriptionInput = $id("description-input");
+  const descriptionInput = $id(pbpBookmarkServiceId(settings) === "linkding" ? "linkding-description-input" : "description-input");
   _aiSummaryValue = descriptionInput.value;
   descriptionInput.addEventListener("input", () => {
     const nextValue = descriptionInput.value;
     if (!_aiSummaryRange) {
       _aiSummaryValue = nextValue;
+      if (pbpBookmarkServiceId(settings) === "linkding") _aiResetSummaryActions();
       return;
     }
     const tracked = pbpAiTrackSummaryRange(_aiSummaryRange, _aiSummaryValue, nextValue);
@@ -746,9 +747,8 @@ function setupAIFeatures() {
       // A restored draft is the user's last state of this form: a summary
       // missing from it was removed or rewritten on purpose -- never put back.
       if (typeof _popupDraftRestored !== "undefined" && _popupDraftRestored) return;
-      if (pbpShouldRestoreCachedSummary(existingBookmark, $id("description-input").value)) {
-        upsertSummary(cached, { userEdit: false });
-        showSummaryActions(true);
+      if (pbpBookmarkServiceId(settings) === "linkding" || pbpShouldRestoreCachedSummary(existingBookmark, $id("description-input").value)) {
+        if (upsertSummary(cached, { userEdit: false }) !== false) showSummaryActions(true);
       }
     });
   }
@@ -787,6 +787,8 @@ function _aiAdoptSummaryRange(value, range, fromCache) {
 }
 
 async function _aiRestoreSummaryOwnership(account, url, cachedSummary) {
+  // linkding Description is plain text, separate from legacy Notes ownership.
+  if (pbpBookmarkServiceId(settings) === "linkding") return null;
   const input = $id("description-input");
   const value = input.value;
   if (_aiSummaryValue === value &&
@@ -815,6 +817,21 @@ async function _aiRestoreSummaryOwnership(account, url, cachedSummary) {
 // Replace the session-owned range, migrate the last legacy block in place,
 // or append a new block without rewriting surrounding notes.
 function upsertSummary(summary, { userEdit = true } = {}) {
+  if (pbpBookmarkServiceId(settings) === "linkding") {
+    if (_linkdingDescriptionTouched) {
+      if (userEdit) showStatus("status-msg", t("aiSummaryKeptDescription"), "info");
+      return false;
+    }
+    const input = $id("linkding-description-input");
+    const next = String(summary).replace(/\s+/g, " ").trim();
+    const changed = input.value !== next;
+    input.value = next;
+    _aiSummaryValue = next;
+    _aiSummaryRange = null;
+    if (userEdit && changed && typeof pbpPopupDraftFieldEdited === "function") pbpPopupDraftFieldEdited("linkding-description-input", { manual: false });
+    updateCharCount();
+    return true;
+  }
   const di = $id("description-input");
   const cur = di.value;
   const wrapped = pbpAiWrapSummary(summary, pbpBookmarkServiceId(settings));
@@ -841,11 +858,22 @@ function upsertSummary(summary, { userEdit = true } = {}) {
   if (userEdit && next !== cur && typeof pbpPopupDraftFieldEdited === "function") pbpPopupDraftFieldEdited("description-input");
   updateCharCount();
   autoResizeTextarea(di);
+  return true;
 }
 
 // ---- Remove AI summary block from description ----
 // Remove only the session-owned range, or the last identifiable legacy block.
 function removeSummary() {
+  if (pbpBookmarkServiceId(settings) === "linkding") {
+    const input = $id("linkding-description-input");
+    if (_linkdingDescriptionTouched || !input.value || input.value !== _aiSummaryValue) return false;
+    input.value = "";
+    _aiSummaryValue = "";
+    _aiSummaryRange = null;
+    if (typeof pbpPopupDraftFieldEdited === "function") pbpPopupDraftFieldEdited("linkding-description-input", { manual: false });
+    updateCharCount();
+    return true;
+  }
   const di = $id("description-input");
   const cur = di.value;
   let removed = { value: cur, removed: false };
@@ -1156,8 +1184,7 @@ async function doAISummary(forceRefresh, sOverride) {
         const adopted = await _aiRestoreSummaryOwnership(account, pageInfo.url, cached);
         if (!_aiOpStillCurrent(account)) return;
         if (adopted) return;
-        upsertSummary(cached);
-        showSummaryActions(true);
+        if (upsertSummary(cached) !== false) showSummaryActions(true);
         return;
       }
     }
@@ -1185,7 +1212,7 @@ async function doAISummary(forceRefresh, sOverride) {
     if (!_aiOpStillCurrent(account)) return;
     // The page text was there (checked above); an empty reply is the model's.
     if (!summary) { showStatus("status-msg", t("aiEmptyResult"), "error"); return; }
-    upsertSummary(summary);
+    if (upsertSummary(summary) === false) return true;
     showSummaryActions(false);
     showStatus("status-msg", forceRefresh ? t("aiSummaryRegenerated") : t("aiSummaryGenerated"), "success");
     return true;

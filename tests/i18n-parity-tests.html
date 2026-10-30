@@ -154,7 +154,7 @@ async function loadLocale(loc) {
   // Per-locale exemptions: a word that is genuinely the same in that one
   // language, so the key stays checked everywhere else.
   const LOCALE_SAME_OK = {
-    fr: new Set(["libraryCountPages", "libraryCountPagesOne", "readerBookmarkNotes", "askExportSources", "dictSupplementSources", "mdExportArticle", "mdExportSummaryArticle", "askHistoryTab", "optArkRegionIntl"]), // These words, including "Questions" and "International", are also French
+    fr: new Set(["labelDescription", "libraryCountPages", "libraryCountPagesOne", "readerBookmarkNotes", "askExportSources", "dictSupplementSources", "mdExportArticle", "mdExportSummaryArticle", "askHistoryTab", "optArkRegionIntl"]), // These words, including "Description", "Questions" and "International", are also French
     pl: new Set(["askExportModel", "labelAiRegion"]), // "Model" and "Region" are also Polish
     de: new Set(["labelAiRegion", "optArkRegionIntl", "bookmarkGatewayHeaderN"]), // "Region" and "International" are also German; "Header $N$" is the German term too
   };

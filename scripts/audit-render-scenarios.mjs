@@ -121,7 +121,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     name === 'explain-dict' ? ['explain-pop'] : name === 'dict-resize-menu' ? ['explain-dict'] : name === 'dict-entry-busy' ? ['dict-entry-idle'] : name === 'dict-entry-progress' ? ['dict-entry-busy'] : name === 'dict-entry-result' ? ['dict-entry-busy'] : ['dict-entry-details', 'dict-entry-cached', 'dict-entry-usage-busy', 'dict-entry-panel', 'dict-entry-folded'].includes(name) ? ['dict-entry-result'] : name === 'dict-entry-revealed' ? ['dict-entry-folded'] : name === 'dict-entry-usage-error' ? ['dict-entry-usage-busy'] : name === 'dict-entry-usage-result' ? ['dict-entry-usage-error'] : name === 'dict-entry-error' ? ['dict-entry-idle'] : name === 'dict-save-change-menu' ? ['dict-save-bar'] : [],
     name === 'dict-entry-paid-negative' ? { target: DICT_PAID_NEGATIVE_TARGET, locales: DICT_PAID_NEGATIVE_LOCALES } : {})), context('video', [], { target: '.pbv-bar' })],
   popup: [context('light', [], { target: '#main-section' }), context('states', [], { target: '.offline-queue-item' }),
-    context('form', [], { target: '#url-input' }), context('title-error', ['form'], { target: '#desc-char-count.over-limit' }), context('linkding-sharing', ['form'], { target: '#share-check' }), context('dpi', [], { dpr: [1.5, 2] }),
+    context('form', [], { target: '#url-input' }), context('title-error', ['form'], { target: '#desc-char-count.over-limit' }), context('linkding-sharing', ['form'], { target: '#share-check' }), context('linkding-description', ['form'], { target: '#linkding-description-input' }), context('dpi', [], { dpr: [1.5, 2] }),
     context('dark', [], { theme: 'flexoki-dark', scheme: 'dark', target: '#main-section' }),
     context('login', [], { target: '#login-section' })],
 });

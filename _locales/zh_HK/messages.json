@@ -154,6 +154,9 @@
   "labelTitle": {
     "message": "標題"
   },
+  "labelDescription": {
+    "message": "描述"
+  },
   "labelNotes": {
     "message": "備註"
   },
@@ -283,6 +286,9 @@
   },
   "aiGenerateBtn": {
     "message": "產生"
+  },
+  "aiSummaryKeptDescription": {
+    "message": "你改過描述，AI 摘要沒有覆蓋它。"
   },
   "aiSummaryGenerated": {
     "message": "摘要已產生"

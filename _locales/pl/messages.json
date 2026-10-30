@@ -154,6 +154,9 @@
   "labelTitle": {
     "message": "Tytuł"
   },
+  "labelDescription": {
+    "message": "Opis"
+  },
   "labelNotes": {
     "message": "Notki"
   },
@@ -283,6 +286,9 @@
   },
   "aiGenerateBtn": {
     "message": "generuj"
+  },
+  "aiSummaryKeptDescription": {
+    "message": "Opis został zmieniony, więc podsumowanie AI go nie zastąpiło."
   },
   "aiSummaryGenerated": {
     "message": "Podsumowanie wygenerowane"

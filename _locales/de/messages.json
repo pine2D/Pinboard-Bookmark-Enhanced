@@ -154,6 +154,9 @@
   "labelTitle": {
     "message": "Titel"
   },
+  "labelDescription": {
+    "message": "Beschreibung"
+  },
   "labelNotes": {
     "message": "Notizen"
   },
@@ -283,6 +286,9 @@
   },
   "aiGenerateBtn": {
     "message": "Generieren"
+  },
+  "aiSummaryKeptDescription": {
+    "message": "Du hast die Beschreibung bearbeitet. Die KI-Zusammenfassung hat sie deshalb nicht ersetzt."
   },
   "aiSummaryGenerated": {
     "message": "Zusammenfassung erstellt"

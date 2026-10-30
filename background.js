@@ -3825,8 +3825,12 @@ async function pbpRunPopupDraft(message) {
         || typeof d.tagInput !== "string" || !Array.isArray(d.tags) || d.tags.length > 1000
         || !d.tags.every((s) => typeof s === "string")
         || !["private", "toread", "archive", "archiveTouched"].every((k) => typeof d[k] === "boolean")) return null;
+    if ((d.summary !== undefined && typeof d.summary !== "string")
+        || (d.summaryTouched !== undefined && typeof d.summaryTouched !== "boolean")) return null;
     const out = { url: d.url, title: d.title, notes: d.notes, tags: d.tags.slice(), tagInput: d.tagInput,
       private: d.private, toread: d.toread, archive: d.archive, archiveTouched: d.archiveTouched };
+    if (d.summary !== undefined) out.summary = d.summary;
+    if (d.summaryTouched !== undefined) out.summaryTouched = d.summaryTouched;
     return JSON.stringify(out).length <= 65536 ? out : null;
   };
   if (!message.account || !["read", "write", "clear", "clearOwner"].includes(message.action)

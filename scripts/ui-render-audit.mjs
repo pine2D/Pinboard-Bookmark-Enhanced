@@ -8171,7 +8171,7 @@ const SWEEP_CFG = {
     exemptWithin: ".source-badge, .view-toggle, .vocab-group-unit, .tags-input-wrap, .send-split",
     valueBoxes: {
       options: '.fg input[type="text"], .fg input[type="password"], .fg input[type="number"], .fg textarea, .fg select, .listbox-btn, .mobile-tab-picker select, .options-search input[type="search"]',
-      popup: "#url-input, #title-input, #description-input, .tags-input-wrap, #token-input, #search-input",
+      popup: "#url-input, #title-input, #description-input, #linkding-description-input, .tags-input-wrap, #token-input, #search-input",
       library: "#vocab-search, #notes-filter, #vocab-lookup-input, .listbox-btn, .vocab-group-unit, .vocab-note-input",
     },
     valueBoxExempt: '.theme-name-popover input[type="text"], .tags-input-wrap.ac-open',
@@ -10322,6 +10322,28 @@ async function runSweep(page, sw, extBase) {
       pbpPopupBookmarkPrivacy();
     });
     await scan("popup", "linkding-sharing");
+  }
+
+  if (wants("popup", "linkding-description")) {
+    await page.evaluate(() => {
+      const input = document.getElementById("linkding-description-input");
+      const row = document.getElementById("linkding-description-row");
+      const visible = () => getComputedStyle(row).display !== "none" && input.getBoundingClientRect().height > 0;
+      pageInfo = { ...pageInfo, metaDescription:"Metadata description", selectedText:"Selected note" };
+      for (const service of ["pinboard", "karakeep", "linkding"]) {
+        settings = { ...settings, bookmarkService:service };
+        pbpPopupPrefillDescription();
+        if (visible() !== (service === "linkding")) throw new Error(`Description visibility: ${service}`);
+      }
+      if (input.value !== "Metadata description") throw new Error("Description metadata prefill missing");
+      input.readOnly = false;
+      input.value = "Manual description";
+      input.dispatchEvent(new Event("input", { bubbles:true }));
+      upsertSummary("Generated summary");
+      if (input.value !== "Manual description") throw new Error("AI replaced a manual Description");
+      if (document.getElementById("description-input").value.includes("Generated summary")) throw new Error("AI entered Notes");
+    });
+    await scan("popup", "linkding-description");
   }
 
   // ---- popup, hi-DPI width cap (2026-10-02). Chrome caps an action popup at

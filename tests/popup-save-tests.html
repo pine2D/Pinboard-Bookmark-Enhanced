@@ -45,6 +45,7 @@ function assert(condition, message) {
 }
 
 const URL = "https://example.com/article";
+async function flushMicrotasks() { for(let i=0;i<20;i++) await Promise.resolve(); }
 
 test("intent tag serialization preserves self-hosted names with whitespace, quotes and backslashes", () => {
   const names = ["machine learning", 'say"hello', "path\\name", "line\tbreak", "plain"];
@@ -135,6 +136,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       fetch("../_locales/en/messages.json").then((response) => response.json()),
       fetch("../popup-offline.js").then((response) => response.text())
     ]);
+    const aiJsSource = await (await fetch("../ai.js")).text();
+    const pbpNotesDescription = new Function(aiJsSource.slice(aiJsSource.indexOf("function pbpNotesDescription("),aiJsSource.indexOf("function buildAutoNotes("))+";return pbpNotesDescription;")();
     const start = source.indexOf("function setupSubmit(token)");
     const handlerEnd = source.indexOf('  document.addEventListener("keydown"', start);
     assert(start >= 0 && handlerEnd > start, "setupSubmit source not found");
@@ -223,13 +226,14 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(elements["private-check"].checked && !elements["share-check"].checked,"new popup defaults to shared");
       }
     });
-    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false } = {}) {
+    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard" } = {}) {
       const elements = {
         "submit-btn": createElementStub(),
         "delete-btn": createElementStub({ classes: ["hidden"] }),
         "url-input": createElementStub({ value: URL }),
         "title-input": createElementStub({ value: "Submitted title" }),
         "description-input": createElementStub({ value: "Submitted notes" }),
+        "linkding-description-input": createElementStub({ value: "Submitted description" }),
         "private-check": createElementStub({ checked: false }),
         "readlater-check": createElementStub({ checked: false }),
         "archive-check": createElementStub({ checked: archiveRequested }),
@@ -241,10 +245,15 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const bookmarkLookup = { status: lookupFailed ? "failed" : "missing", url: URL, generation: 1, promise: null, formLoaded: false };
       const settings = {
         pinboardToken: "alice:token",
+        bookmarkService: service,
         optAutoCloseAfterSave: true,
         waybackArchiveEnabled: archiveRequested,
         waybackSkipPrivate: true,
       };
+      if (service !== "pinboard") {
+        settings[service+"Url"] = "https://bookmarks.example/";
+        settings[service+"Token"] = pbpBookmarkCredentialSeal({baseUrl:settings[service+"Url"],token:"fixture-token",connectionId:"fixture-connection",userId:"fixture-user",sharing:true});
+      }
       const messages = [];
       const statuses = [];
       const timers = [];
@@ -345,6 +354,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         currentTags,
         _archiveUserTouched: archiveUserTouched,
         _popupDraftContext: draftContext ? {pageUrl: URL, incognito: false} : null,
+        _linkdingDescriptionTouched: false,
         _popupDraftEdited: false,
         _popupDraftRestored: false,
         _popupDraftLastSnapshot: "",
@@ -392,6 +402,20 @@ test("posts/add default remains replace=yes for existing callers", () => {
       new Function(...Object.keys(deps), source.slice(start, end) + ";updateCharCount();")(...Object.values(deps));
     }
 
+    await testAsync("only linkding submits a normalized Description and async save preserves later edits", async () => {
+      for (const service of ["pinboard", "karakeep", "linkding"]) {
+        const h = createSubmitHarness({ service, draftContext:true });
+        h.elements["linkding-description-input"].value = "  First\n  second\t third  ";
+        const saving = h.click(); await flushMicrotasks();
+        const message = h.messages.find(m => m.type === "save_intent");
+        assert(message, "save was not dispatched for " + service);
+        assert(service === "linkding" ? message.intent.summary === "First second third" : !Object.hasOwn(message.intent,"summary"), "Description service scope or normalization failed");
+        assert(!Object.hasOwn(message.intent,"summaryTouched"), "manual draft state leaked into intent");
+        h.elements["linkding-description-input"].value = "New edit";
+        h.resolveSave({ok:true,status:"saved",data:{}}); await saving;
+        if (service === "linkding") assert(!h.timers.some(t=>!t.cancelled&&t.delay===1800), "newer Description scheduled auto-close");
+      }
+    });
     for (const [service, limit] of [["linkding", 512], ["karakeep", 1000]]) {
       await testAsync(service + " title boundary blocks submission without truncating the editable title", async () => {
         for (const [title, blocked] of [["a".repeat(limit), false], ["a".repeat(limit + 1), true],
@@ -1846,15 +1870,38 @@ test("posts/add default remains replace=yes for existing callers", () => {
     }
 
     test("popup prefill formats selected text for the connected service", () => {
-      const start = source.indexOf('  let desc = "";', source.indexOf('async function showMain('));
-      const end = source.indexOf('  updateCharCount();', start);
-      const input = { value: "" };
-      const fill = new Function("pageInfo", "settings", "shouldUpdateField", "$id", source.slice(start, end));
+      const start = source.indexOf('function pbpPopupPrefillDescription(');
+      const end = source.indexOf('function recomputeArchiveCheck(', start);
+      const elements = {"description-input":{value:""},"linkding-description-input":{value:""},"linkding-description-row":document.createElement("div")};
+      const fill = new Function("pageInfo", "settings", "shouldUpdateField", "$id", "pbpNotesDescription", source.slice(start, end)+";pbpPopupPrefillDescription();");
       for (const [service, expected] of [["pinboard", "<blockquote># heading\n\n&lt;b&gt; *bold*</blockquote>"],
         ["linkding", "> \\# heading\n>\n> &lt;b> \\*bold\\*"], ["karakeep", "> # heading\n>\n> <b> *bold*"]]) {
-        fill({ selectedText: "# heading\n\n<b> *bold*" }, { bookmarkService: service, optBlockquote: true }, () => true, () => input);
-        assert(input.value === expected, service + " prefill: " + input.value);
+        fill({ selectedText: "# heading\n\n<b> *bold*" }, { bookmarkService: service, optBlockquote: true }, () => true, id=>elements[id], pbpNotesDescription);
+        assert(elements["description-input"].value === expected, service + " prefill: " + elements["description-input"].value);
       }
+    });
+
+    test("fresh linkding metadata enters Description while Notes keep only selection and via", () => {
+      const a=source.indexOf('function pbpPopupPrefillDescription('),b=source.indexOf('function recomputeArchiveCheck(',a);
+      const elements={"description-input":{value:""},"linkding-description-input":{value:""},"linkding-description-row":document.createElement("div")};
+      const fill=new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription",source.slice(a,b)+";pbpPopupPrefillDescription();");
+      for(const selectedText of ["", "Selected text"]){fill({metaDescription:"Meta description",selectedText,referrer:"https://source.example/"},{bookmarkService:"linkding",optIncludeReferrer:true},()=>true,id=>elements[id],pbpNotesDescription);assert(elements["linkding-description-input"].value==="Meta description");assert(elements["description-input"].value===(selectedText?selectedText+"\n\n":"")+"via: https://source.example/");}
+    });
+
+    await testAsync("Description row has actual visible geometry only for linkding", async () => {
+      const iframe=document.createElement("iframe");iframe.style.pointerEvents="none";document.body.appendChild(iframe);
+      const loaded=new Promise(r=>iframe.onload=r);iframe.srcdoc=popupHtml.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,"").replace(/<link\b[^>]*>/g,"");await loaded;
+      const doc=iframe.contentDocument;const css=doc.createElement("style");css.textContent=popupCss+'\n*,*::before,*::after { transition:none!important; animation:none!important; }';doc.head.appendChild(css);
+      doc.getElementById("main-section").classList.remove("hidden");doc.documentElement.dataset.section="main";
+      const a=source.indexOf('function pbpPopupPrefillDescription('),b=source.indexOf('function recomputeArchiveCheck(',a);
+      for(const service of ["pinboard","karakeep","linkding"]){new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription",source.slice(a,b)+";pbpPopupPrefillDescription();")({},{bookmarkService:service},()=>true,id=>doc.getElementById(id),pbpNotesDescription);const row=doc.getElementById("linkding-description-row");assert(iframe.contentWindow.getComputedStyle(row).display===(service==="linkding"?"flex":"none"),service+" Description visibility is wrong");}
+      const { FIELD_TARGETS }=await import('../docs/theme-surface/composers/ui-components.mjs');
+      const input=doc.getElementById("linkding-description-input"),title=doc.getElementById("title-input");
+      const registrations=FIELD_TARGETS.pp.filter(entry=>input.matches(entry.rest));
+      assert(registrations.length===1&&registrations[0].id==="pp-text","Description does not match the actual field registry");
+      const descriptionStyle=iframe.contentWindow.getComputedStyle(input),titleStyle=iframe.contentWindow.getComputedStyle(title);
+      for(const property of ["backgroundColor","borderTopColor","borderBottomColor","borderRadius","height"])assert(descriptionStyle[property]===titleStyle[property],"Description field recipe differs: "+property+" "+descriptionStyle[property]+" vs "+titleStyle[property]);
+      iframe.remove();
     });
 
     test("new AI summaries contain only a marker-free blockquote", () => {
@@ -2189,14 +2236,14 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const createRuntime = (description, service = "pinboard") => {
         const field = { value: description };
         const api = new Function("_AI_BQ_REGEX_SHARED", "escapeForExtended", "$id",
-          "updateCharCount", "autoResizeTextarea", "settings",
+          "updateCharCount", "autoResizeTextarea", "settings", "_linkdingDescriptionTouched",
           popupAiSource.slice(runtimeStart, runtimeEnd) +
           "; return { upsertSummary, removeSummary };"
-        )(_AI_BQ_REGEX_SHARED, (text) => text, () => field, () => {}, () => {}, { bookmarkService: service });
+        )(_AI_BQ_REGEX_SHARED, (text) => text, () => field, () => {}, () => {}, { bookmarkService: service }, false);
         return { field, ...api };
       };
       const legacy = "before\n\n[AI Summary]\n<blockquote>old</blockquote>\n\nafter";
-      for (const [service, wrapped] of [["pinboard", "<blockquote>fresh</blockquote>"], ["linkding", "> fresh"], ["karakeep", "fresh"]]) {
+      for (const [service, wrapped] of [["pinboard", "<blockquote>fresh</blockquote>"], ["karakeep", "fresh"]]) {
         const h = createRuntime(legacy, service);
         h.upsertSummary("old replacement");
         h.upsertSummary("fresh");
@@ -2352,6 +2399,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const fields = {
         "title-input": { value: "Title" },
         "description-input": { value: "Notes" },
+        "linkding-description-input": { value: "Meta description" },
         "url-input": { value: URL },
         "ai-suggest-tags": container,
         "ai-summary-btn": fakeEl(),
@@ -2368,6 +2416,13 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const deps = {
         PBP_AI_VIA_SW: o.viaSW !== false,
         settings: snapshot,
+        pbpBookmarkServiceId,
+        _linkdingDescriptionTouched: false,
+        fieldsEdit: value => { fields["linkding-description-input"].value = value; },
+        pbpPopupDraftFieldEdited() {}, updateCharCount() {},
+        ...(o.realSummary ? { _popupDraftRevision:0, _popupDraftEdited:false, _popupDraftUserUrl:false,
+          _popupDraftChangedFields:new Set(), fieldDirtyFlags:{"linkding-description-input":false},
+          _archiveUserTouched:false, pbpRememberPopupDraft() {} } : {}),
         pageInfo: { url: URL, pageText: "extracted body" },
         allUserTags: [],
         tagCaseMap: o.tagCaseMap || {},
@@ -2436,13 +2491,26 @@ test("posts/add default remains replace=yes for existing callers", () => {
       // With the real card appended, its declaration shadows the showAIError
       // parameter above - the cases that want rendered text opt in, the rest
       // keep the recording stub.
-      const body = k44SliceA + "\n" + k44SliceB + (o.realErrorCard ? "\n" + k44SliceC : "");
+      const realSummary = o.realSummary ? popupAiSource.slice(popupAiSource.indexOf("function upsertSummary("), popupAiSource.indexOf("// ---- Remove AI summary block")) : "";
+      const realDraftEdit = o.realSummary ? source.slice(source.indexOf("function pbpPopupDraftFieldEdited("),source.indexOf("function setupPopupDraftTracking(")) : "";
+      const body = k44SliceA + "\n" + k44SliceB + "\n" + realSummary + "\n" + realDraftEdit + (o.realErrorCard ? "\n" + k44SliceC : "");
       const api = new Function(...Object.keys(deps),
-        body + "\n; return { fetchAIArtifacts, doAISummary, doAITags };"
+        body + "\n; return { fetchAIArtifacts, doAISummary, doAITags, editDescription(value) { fieldsEdit(value); pbpPopupDraftFieldEdited('linkding-description-input'); } };"
       )(...Object.values(deps));
       return { ...api, calls, snapshot, account, el: fields };
     }
 
+    await testAsync("manual Description edited during the actual summary request keeps visible completion feedback", async () => {
+      let resolveResponse;
+      const pendingResponse = new Promise(resolve => { resolveResponse = resolve; });
+      const h = makePopupAi({ realSummary:true, settings:{bookmarkService:"linkding"}, respond:() => pendingResponse });
+      const pending = h.doAISummary(true); await flushMicrotasks();
+      h.editDescription("Manual while waiting");
+      resolveResponse({ok:true,summary:"Generated result",tags:null}); await pending;
+      assert(h.el["linkding-description-input"].value === "Manual while waiting", "completion replaced manual input");
+      assert(h.el["description-input"].value === "Notes", "AI changed linkding Notes");
+      assert(h.calls.status.at(-1)?.[1] === tEn("aiSummaryKeptDescription"), "generic completion hid kept feedback");
+    });
     await testAsync("the popup hands the worker a finished prompt, its cache coordinates and no credential", async () => {
       const h = makePopupAi({ source: "jina" });
       const out = await h.fetchAIArtifacts("summary", true, h.account, h.snapshot, "jina");
@@ -2707,7 +2775,6 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // shared.js so both see the real URL constructor: this page's global
     // `const URL` string shadows it for the copy loaded by <script>, which
     // would make every custom entry's base URL (and its sealed key) invalid.
-    const aiJsSource = await (await fetch("../ai.js")).text();
     const realAi = new Function("t", "URL", "chrome", sharedSource + "\n" + aiJsSource +
       "\nreturn { hasAIKey, pbpAiResolveTarget, pbpAiExpandProviderOrder, pbpAiFirstConfiguredProvider, pbpAiCustomKeySeal, pbpSanitizeAiOverrides };")(
       tEn, window.URL, undefined);
@@ -3370,7 +3437,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // and feed them worker replies, so the whole chain has to carry the cause.
     const proxySource = source.slice(source.indexOf("function _pbpProxyPinboardFetch"), source.indexOf("let currentTags"));
 
-    function createLookupHarness(workerReply, { nullField = "" } = {}) {
+    function createLookupHarness(workerReply, { nullField = "", service = "pinboard", dirtyDescription = false } = {}) {
       const statuses = [];
       const warns = [];
       const sent = [];
@@ -3379,6 +3446,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "url-input": createElementStub({ value: URL }),
         "title-input": createElementStub(),
         "description-input": createElementStub(),
+        "linkding-description-input": createElementStub({value:"Manual"}),
         "private-check": createElementStub(),
         "readlater-check": createElementStub(),
         "submit-btn": createElementStub(),
@@ -3387,6 +3455,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "status-msg": createElementStub(),
       };
       const dependencies = {
+        settings: {bookmarkService:service,pinboardToken:"alice:token"},
         chrome: {
           runtime: {
             sendMessage(message) {
@@ -3404,7 +3473,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         showSaveQueued: (result) => statuses.push(["status-msg", "save-queued:" + (result?.cause || ""), "warning"]),
         console: { warn: (...args) => warns.push(args) },
         enc: encodeURIComponent,
-        shouldUpdateField: () => true,
+        shouldUpdateField: id => id !== "linkding-description-input" || !dirtyDescription,
         invalidateBookmarkLookup() {},
         recomputeArchiveCheck() {},
         renderTags() {},
@@ -3435,10 +3504,15 @@ test("posts/add default remains replace=yes for existing callers", () => {
       ].join("\n");
       const names = Object.keys(dependencies);
       const built = new Function(...names, body)(...names.map((name) => dependencies[name]));
-      return { run: (...args) => built.checkExistingBookmark("alice:token", URL, null, true, ...args), getLookup: built.getLookup, getTags: built.getTags, touchTags: built.touchTags, statuses, warns, sent, resets: () => resets };
+      return { elements, run: (...args) => built.checkExistingBookmark("alice:token", URL, null, true, ...args), getLookup: built.getLookup, getTags: built.getTags, touchTags: built.touchTags, statuses, warns, sent, resets: () => resets };
     }
 
     const FOUND_BODY = JSON.stringify({ posts: [{ description: "Saved title", extended: "", tags: "alpha", shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }] });
+
+    await testAsync("existing linkding summary refills Description but a later user edit wins",async()=>{
+      const response={ok:true,status:200,data:{posts:[{href:URL,description:"Saved title",extended:"Saved notes",summary:"Saved description",tags:"",shared:"no",toread:"no",time:"2026-10-30T00:00:00Z"}]}};
+      for(const dirtyDescription of [false,true]){const h=createLookupHarness(response,{service:"linkding",dirtyDescription});assert((await h.run()).status==="found",JSON.stringify({statuses:h.statuses,warns:h.warns}));assert(h.elements["linkding-description-input"].value===(dirtyDescription?"Manual":"Saved description"),"wrong Description "+h.elements["linkding-description-input"].value);assert(h.elements["description-input"].value==="Saved notes");}
+    });
 
     await testAsync("a pending lookup preserves a user's explicitly cleared tags", async () => {
       let release;
@@ -3611,6 +3685,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "status-msg": createElementStub(),
       };
       const dependencies = {
+        settings: {bookmarkService:"pinboard",pinboardToken:token},
         chrome: { runtime: { sendMessage } },
         resetPinboardSession() { resets++; },
         $id: (id) => (elements[id] ||= createElementStub()),
