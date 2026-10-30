@@ -2511,6 +2511,63 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(h.el["description-input"].value === "Notes", "AI changed linkding Notes");
       assert(h.calls.status.at(-1)?.[1] === tEn("aiSummaryKeptDescription"), "generic completion hid kept feedback");
     });
+    function pressCombinedAi(h) {
+      const startAt = source.indexOf('  document.addEventListener("keydown", (e) => {\n    if ((e.ctrlKey || e.metaKey) && e.key === "Enter")');
+      const endAt = source.indexOf("\n  });\n", startAt);
+      assert(startAt >= 0 && endAt > startAt, "Shift+Enter listener missing");
+      let handler;
+      const runs = {};
+      new Function("document", "$id", "settings", "doAISummary", "doAITags", "showStatus", "t",
+        source.slice(startAt, endAt + 5))(
+        { addEventListener: (_type, fn) => { handler = fn; } },
+        id => id === "main-section" ? document.createElement("div") : h.el[id], h.snapshot,
+        (...args) => (runs.summary = h.doAISummary(...args)),
+        (...args) => (runs.tags = h.doAITags(...args)),
+        (...args) => h.calls.status.push(args), tEn);
+      handler({key:"Enter",shiftKey:true,ctrlKey:false,metaKey:false,altKey:false,
+        target:document.createElement("input"),preventDefault() {}});
+      return runs;
+    }
+
+    for (const first of ["summary", "tags"]) {
+      await testAsync("Shift+Enter keeps the manual Description feedback when " + first + " completes first", async () => {
+        const releases = {};
+        const h = makePopupAi({ realSummary:true,
+          settings:{bookmarkService:"linkding",customSummaryPrompt:"summary fixture",customTagPrompt:"tags fixture"},
+          respond:msg => new Promise(resolve => { releases[msg.kind] = resolve; }) });
+        const runs = pressCombinedAi(h);
+        await flushMicrotasks();
+        assert(h.calls.sent.length === 2 && releases.summary && releases.tags,"both requests must be in flight");
+        h.editDescription("Manual while both requests wait");
+        const complete = kind => releases[kind]({ok:true,summary:kind === "summary" ? "Generated summary" : null,
+          tags:kind === "tags" ? ["valid-tag"] : null});
+        complete(first); await runs[first];
+        const second = first === "summary" ? "tags" : "summary";
+        complete(second); await runs[second]; await flushMicrotasks();
+        assert(h.el["linkding-description-input"].value === "Manual while both requests wait","Description was replaced");
+        assert(h.calls.rendered.at(-1).tags.length > 0,"valid tags were not rendered");
+        assert(h.calls.status.at(-1)?.[1] === tEn("aiSummaryKeptDescription"),"Shift+Enter aggregate hid kept feedback: " + JSON.stringify(h.calls.status));
+        assert(!h.calls.status.some(row=>row[1] === tEn("aiSummaryTagsGenerated")),"kept Description was reported as written");
+      });
+    }
+
+    await testAsync("Shift+Enter still reports normal combined success and real tag failures", async () => {
+      for (const service of ["pinboard","karakeep","linkding"]) {
+        const h = makePopupAi({realSummary:service === "linkding",settings:{bookmarkService:service},respond:async msg=>({ok:true,
+          summary:msg.kind === "summary" ? "Generated" : null,tags:msg.kind === "tags" ? ["valid-tag"] : null})});
+        const runs = pressCombinedAi(h); await Promise.all(Object.values(runs)); await flushMicrotasks();
+        assert(h.calls.status.at(-1)?.[1] === tEn("aiSummaryTagsGenerated"),service + " lost combined success");
+        if (service === "linkding") assert(h.el["linkding-description-input"].value === "Generated","linkding summary was not written");
+      }
+      for (const failedKind of ["summary","tags"]) {
+        const h = makePopupAi({settings:{bookmarkService:"linkding"},respond:async msg=>msg.kind === failedKind
+          ? {ok:false,error:{code:"server",provider:"openai"}}
+          : {ok:true,summary:msg.kind === "summary" ? "Generated" : null,tags:msg.kind === "tags" ? ["valid-tag"] : null}});
+        const runs = pressCombinedAi(h); await Promise.all(Object.values(runs)); await flushMicrotasks();
+        assert(h.calls.errors.some(row=>row.kind === failedKind),"actual " + failedKind + " failure was hidden");
+        assert(!h.calls.status.some(row=>row[1] === tEn("aiSummaryTagsGenerated")),"failed " + failedKind + " reported double success");
+      }
+    });
     await testAsync("the popup hands the worker a finished prompt, its cache coordinates and no credential", async () => {
       const h = makePopupAi({ source: "jina" });
       const out = await h.fetchAIArtifacts("summary", true, h.account, h.snapshot, "jina");

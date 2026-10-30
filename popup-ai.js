@@ -1184,7 +1184,8 @@ async function doAISummary(forceRefresh, sOverride) {
         const adopted = await _aiRestoreSummaryOwnership(account, pageInfo.url, cached);
         if (!_aiOpStillCurrent(account)) return;
         if (adopted) return;
-        if (upsertSummary(cached) !== false) showSummaryActions(true);
+        if (upsertSummary(cached) === false) return "kept";
+        showSummaryActions(true);
         return;
       }
     }
@@ -1212,7 +1213,8 @@ async function doAISummary(forceRefresh, sOverride) {
     if (!_aiOpStillCurrent(account)) return;
     // The page text was there (checked above); an empty reply is the model's.
     if (!summary) { showStatus("status-msg", t("aiEmptyResult"), "error"); return; }
-    if (upsertSummary(summary) === false) return true;
+    // A protected Description is a completed request, but no summary was written.
+    if (upsertSummary(summary) === false) return "kept";
     showSummaryActions(false);
     showStatus("status-msg", forceRefresh ? t("aiSummaryRegenerated") : t("aiSummaryGenerated"), "success");
     return true;

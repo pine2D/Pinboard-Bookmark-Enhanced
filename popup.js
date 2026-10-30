@@ -2188,7 +2188,11 @@ function setupSubmit(token) {
       // (critique 2026-10-20); a cache hit or a failure keeps its own line.
       if (runs.length === 2) {
         Promise.all(runs).then(([summaryDone, tagsDone]) => {
-          if (summaryDone === true && tagsDone === true) showStatus("status-msg", t("aiSummaryTagsGenerated"), "success");
+          if (summaryDone === "kept" && tagsDone === true) {
+            showStatus("status-msg", t("aiSummaryKeptDescription"), "info");
+          } else if (summaryDone === true && tagsDone === true) {
+            showStatus("status-msg", t("aiSummaryTagsGenerated"), "success");
+          }
         }, () => {});
       }
     } else if (e.key === "Escape" && !e.isComposing && e.keyCode !== 229) {
