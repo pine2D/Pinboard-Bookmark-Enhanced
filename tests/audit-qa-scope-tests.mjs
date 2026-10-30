@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 
 const catalog = await import('../scripts/audit-qa-scenarios.mjs').catch(() => null);
 
@@ -106,4 +108,47 @@ test('unsupported axis combinations and misspelled legacy surfaces fail before a
   assert.notEqual(incompatible.status, 0);
   assert.match(incompatible.stderr, /Invalid theme\/scheme combination/);
   assert.doesNotMatch(incompatible.stdout, /phase 1|AI mock/);
+});
+
+// Run the page-side predicate that Playwright actually serializes, without
+// loading qa-drive's main entry point or looking at any product geometry.
+test('reader viewport readiness rejects new JS dimensions with stale CSS viewport units', () => {
+  const source = readFileSync(qaScript, 'utf8');
+  const start = source.indexOf('function qaReaderViewportReady(');
+  assert.ok(start >= 0, 'CSS viewport barrier is missing');
+  const end = source.indexOf('\n}', start) + 2;
+  let cssWidth = 360, cssHeight = 900, present = true;
+  const fixture = { innerWidth: 320, innerHeight: 900, document: { getElementById(id) {
+    assert.equal(id, 'qa-reader-viewport', 'readiness must not depend on editor geometry');
+    return present ? { getBoundingClientRect: () => ({ width: cssWidth, height: cssHeight }) } : null;
+  } } };
+  const ready = vm.runInNewContext(source.slice(start, end) + '; qaReaderViewportReady', fixture);
+  const target = { width: 320, height: 900 };
+  assert.equal(ready(target), false, 'old 360px CSS viewport was accepted after JS changed to 320px');
+  cssWidth = 320; assert.equal(ready(target), true);
+  cssHeight = 860; assert.equal(ready(target), false, 'stale CSS height was accepted');
+  cssHeight = 900; present = false; assert.equal(ready(target), false, 'missing fixture was accepted');
+});
+
+test('reader viewport barrier has a bounded timeout and aborts before applying product state', async () => {
+  const source = readFileSync(qaScript, 'utf8');
+  const driver = source.indexOf('async function driveReaderControls(');
+  const start = source.indexOf('  const arrange = async ', driver);
+  const end = source.indexOf('  const chosenShot = ', start);
+  assert.ok(driver >= 0 && start > driver && end > start);
+  const calls = [];
+  const page = {
+    async setViewportSize(size) { calls.push(['viewport', size]); },
+    async waitForFunction(predicate, size, options) {
+      calls.push(['barrier', size]);
+      assert.equal(typeof predicate, 'function');
+      assert.ok(options.timeout > 0 && options.timeout <= 15000, 'viewport barrier must have a finite timeout');
+      throw new Error('CSS viewport timeout');
+    },
+    async evaluate() { calls.push(['product']); },
+  };
+  const arrange = new Function('page', 'includesStep', 'qaReaderViewportReady', 'TIMEOUT_MS',
+    source.slice(start, end) + '; return arrange;')(page, step => step === 'editor', () => false, 15000);
+  await assert.rejects(arrange({ mode: 'light', width: 320, tier: 2 }), /CSS viewport timeout/);
+  assert.deepEqual(calls, [['viewport', { width: 320, height: 900 }], ['barrier', { width: 320, height: 900 }]]);
 });

@@ -2273,6 +2273,14 @@ async function driveReaderBookmark(context, worker, extId, rep) {
   }
 }
 
+// CSS viewport units can still reflect the preceding emulated viewport after
+// innerWidth has changed. This fixture is independent of product geometry;
+// registering and measuring it also causes the browser to refresh that layout.
+function qaReaderViewportReady({ width, height }) {
+  const box = document.getElementById("qa-reader-viewport")?.getBoundingClientRect();
+  return !!box && box.width === width && box.height === height;
+}
+
 // Reader controls: real extension DOM and native interactions, with only the
 // article, persisted history, player position and network supplied as fixtures.
 async function driveReaderControls(context, worker, extId, rep) {
@@ -2293,6 +2301,9 @@ async function driveReaderControls(context, worker, extId, rep) {
   }, null, { timeout: 30_000 });
   const arrange = async ({ mode, width, tier }) => {
     await page.setViewportSize({ width, height: 900 });
+    if (includesStep("editor")) {
+      await page.waitForFunction(qaReaderViewportReady, { width, height: 900 }, { timeout: TIMEOUT_MS });
+    }
     await page.evaluate(({ mode, tier }) => {
       pbpReaderSchemeSet(mode); _pbpTypoSet(tier, 0);
       return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -2331,7 +2342,13 @@ async function driveReaderControls(context, worker, extId, rep) {
       });
       await page.keyboard.press("Shift+s");
       await page.locator("#reader-bookmark-editor:popover-open").waitFor();
-      await page.evaluate(() => { qaRestoreBookmarkState(); delete window.qaRestoreBookmarkState; });
+      await page.evaluate(() => {
+        qaRestoreBookmarkState(); delete window.qaRestoreBookmarkState;
+        const probe = document.createElement("div");
+        probe.id = "qa-reader-viewport";
+        probe.style.cssText = "position:fixed;inset:0 auto auto 0;width:100vw;height:100vh;visibility:hidden;pointer-events:none;contain:strict";
+        document.body.appendChild(probe);
+      });
       requireState(await page.locator("#reader-bookmark-title").evaluate(el => document.activeElement === el), locale + ": Shift+S did not focus title");
       for (const c of cases) {
         const previousFailures = s.failures.length;
@@ -2342,6 +2359,11 @@ async function driveReaderControls(context, worker, extId, rep) {
           const editor = document.getElementById("reader-bookmark-editor"), box = editor.getBoundingClientRect();
           fail(getComputedStyle(document.documentElement).colorScheme === mode, "wrong color scheme");
           fail(box.left >= 0 && box.right <= innerWidth + 1 && editor.scrollWidth <= editor.clientWidth + 1, "editor overflows");
+          if (errors.at(-1) === "editor overflows") {
+            errors[errors.length - 1] += " " + JSON.stringify({ viewport: [innerWidth, innerHeight], editor: box.toJSON(),
+              scroll: [editor.scrollWidth, editor.scrollHeight], client: [editor.clientWidth, editor.clientHeight],
+              cssViewport: document.getElementById("qa-reader-viewport").getBoundingClientRect().toJSON() });
+          }
           const labels = [...document.querySelectorAll("#reader-bookmark-options > label")];
           fail(labels.length === 2, "checkbox options missing");
           const options = document.getElementById("reader-bookmark-options"), row = options.getBoundingClientRect();
