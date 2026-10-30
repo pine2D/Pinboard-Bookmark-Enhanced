@@ -46,6 +46,20 @@ function assert(condition, message) {
 
 const URL = "https://example.com/article";
 
+test("intent tag serialization preserves self-hosted names with whitespace, quotes and backslashes", () => {
+  const names = ["machine learning", 'say"hello', "path\\name", "line\tbreak", "plain"];
+  for (const service of ["karakeep", "linkding"]) {
+    assert(JSON.stringify(pbpBookmarkParseTags(pbpSerializeIntentTags(names, service))) === JSON.stringify(names), service + " tag names changed");
+    assert(pbpSerializeIntentTags([], service) === "", service + " empty tag list changed");
+  }
+});
+
+test("Pinboard intent tag serialization keeps the legacy bytes including quotes", () => {
+  const names = ['say"hello', "plain", "path\\name"];
+  assert(pbpSerializeIntentTags(names, "pinboard") === 'say"hello plain path\\name');
+  assert(pbpSerializeIntentTags([], "pinboard") === "");
+});
+
 test("missing exact URL maps to create", () => {
   const result = pbpPopupSavePolicy({ lookupStatus: "missing", lookupUrl: URL, currentUrl: URL, formLoaded: false, reviewedAtClick: false });
   assert(result.allow && result.mode === "create" && !("replace" in result));
@@ -696,6 +710,38 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
     });
 
+    await testAsync("popup submit serializes special tag names for each bookmark service", async () => {
+      const names = ["machine learning", 'say"hello', "path\\name"];
+      for (const service of ["pinboard", "karakeep", "linkding"]) {
+        const h = createSubmitHarness();
+        h.settings.bookmarkService = service;
+        h.currentTags.splice(0, h.currentTags.length, ...names);
+        const pending = h.click();
+        const tags = h.messages[0]?.intent.tags;
+        h.resolveSave({status:"saved", mutation:"created"});
+        await pending;
+        if (service === "pinboard") assert(tags === 'machine learning say"hello path\\name', "Pinboard legacy tags changed");
+        else assert(JSON.stringify(pbpBookmarkParseTags(tags)) === JSON.stringify(names), service + " popup names changed");
+      }
+    });
+
+    test("reader initial intents preserve service tags and an existing serialized draft", () => {
+      const start = backgroundSource.indexOf("function pbpReaderInitialIntent(");
+      const end = backgroundSource.indexOf("function pbpDeleteReaderBookmark(", start);
+      assert(start >= 0 && end > start, "reader initial intent source not found");
+      const initialIntent = new Function(backgroundSource.slice(start, end) + "\nreturn pbpReaderInitialIntent;")();
+      const names = ["machine learning", 'say"hello', "path\\name"];
+      for (const service of ["pinboard", "karakeep", "linkding"]) {
+        const settings = {bookmarkService:service};
+        const context = {url:URL, title:"Reader", tags:names};
+        const intent = initialIntent(context, settings, "save");
+        if (service === "pinboard") assert(intent.tags === 'machine learning say"hello path\\name', "Pinboard reader bytes changed");
+        else assert(JSON.stringify(pbpBookmarkParseTags(intent.tags)) === JSON.stringify(names), service + " reader names changed");
+        const draft = 'already "serialized draft"';
+        assert(initialIntent({...context, bookmarkDraft:{tags:draft}}, settings, "save").tags === draft, "reader draft was serialized twice");
+      }
+    });
+
     await testAsync("linkding submit uses the inverse sharing choice and preserves a later sharing edit", async () => {
       for(const shared of [false,true]) {
         const h=createSubmitHarness();h.settings.bookmarkService="linkding";
@@ -778,7 +824,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(snapshot.includes(`$id("${field}")`), `${field} is not in the final snapshot`);
       }
       assert(snapshot.includes("currentTags.slice()"), "tags are not copied into the final snapshot");
-      for (const field of ["mode: savePolicy.mode", "url: saveUrl", "title", "notes: extended", 'tags: pbpBookmarkServiceId(settings) === "pinboard" ? tags.join(" ") : pbpBookmarkFormatTags(tags)', "private: isPrivate", "toread: isReadLater"]) {
+      for (const field of ["mode: savePolicy.mode", "url: saveUrl", "title", "notes: extended", 'tags: pbpSerializeIntentTags(tags, pbpBookmarkServiceId(settings))', "private: isPrivate", "toread: isReadLater"]) {
         assert(intentBlock.includes(field), `intent is missing ${field}`);
       }
       assert(intentBlock.includes("archive: _archiveUserTouched ? archiveRequested : undefined"), "automatic archive choice is still sent as an override");

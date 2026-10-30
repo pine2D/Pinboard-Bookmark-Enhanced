@@ -10,6 +10,7 @@ body { font-family: monospace; padding: 16px; max-width: 900px; }
 <h1>Batch progress and liveness tests</h1>
 <div id="results"></div>
 <script src="../shared.js"></script>
+<script src="../wayback.js"></script>
 <script>
 async function test(name, fn) {
   let ok = true;
@@ -33,6 +34,64 @@ function equal(actual, expected, message) {
 let popupBatchSource;
 let popupBatchPermissionSource;
 let popupBatchSetupSource;
+
+// Run the shipped SW entry points. External work is bounded to local doubles:
+// the AI cache supplies names verbatim; Pinboard runs the shipped delivery and
+// URI builder against a hand-written success response, never the network.
+async function createSaveTagsHarness(service, names) {
+  const source = await (await fetch("../background.js")).text();
+  function block(startMarker, endMarker) {
+    const start = source.indexOf(startMarker);
+    const end = source.indexOf(endMarker, start);
+    assert(start >= 0 && end > start, "SW source block not found: " + startMarker);
+    return source.slice(start, end);
+  }
+  const settings = {bookmarkService:service, pinboardToken:"fixture-token", _aiTags:true, batchAiTags:true};
+  const auth = {service, account:"test-owner", token:"fixture-token"};
+  const calls = {intents:[], uris:[], names:[], progress:[]};
+  const dependencies = {
+    getCurrentBookmarkAuth:async () => auth,
+    loadSettings:async () => settings,
+    chrome:{storage:{local:{get:async () => ({}), set:async () => {}}}},
+    getPageInfoFromTab:async () => ({pageText:"Synthetic public text"}),
+    buildAutoNotes:() => "",
+    hasAIKey:() => true,
+    getAICache:async () => names.slice(),
+    callAI:async () => { throw new Error("unexpected AI request"); },
+    showNotification() {},
+    notifySaveFailure() { throw new Error("save failed"); },
+    processOfflineQueue:async () => {},
+    updateBadge:async () => {},
+    _newBatchRunId:() => "test-run",
+    _removeBatchRecordIfOwned:async () => {},
+    _writeBatchProgress:async row => { calls.progress.push(row); return true; },
+    t:key => key,
+    submitSaveIntent:async intent => {
+      const invalid = delivery.validateSaveIntent(intent);
+      if (invalid) return invalid;
+      calls.intents.push(intent);
+      if (service === "pinboard") {
+        return (await delivery.deliverSaveIntent(intent, settings, auth)).result;
+      } else {
+        calls.names.push(pbpBookmarkParseTags(intent.tags));
+      }
+      return {status:"saved", mutation:"created", account:auth.account};
+    },
+  };
+  const validatorSource = block("function pbpSaveFailure(", "// Delivery-time merge/skip");
+  const deliverySource = block("async function pbpSendResolvedPlan(", "// Serialize ALL offlineQueue writes");
+  const delivery = new Function("PBP_SAVE_MODES", "pinboardFetch", "pbpBookmarkAuthIsCurrent", "fetchExistingBookmark",
+    validatorSource + deliverySource + "\nreturn {validateSaveIntent, deliverSaveIntent};")(
+    new Set(["create", "update", "merge", "skip", "overwrite"]),
+    async uri => { calls.uris.push(uri); return {ok:true, status:200, json:async () => ({result_code:"done"})}; },
+    () => true, async () => ({exists:false}));
+  const swSource = block("async function saveFromBackground(", "// Failure-reason -> showNotification")
+    + block("async function _runBatchSave(", "// ===================== Tab Set");
+  const keys = Object.keys(dependencies);
+  const entry = new Function(...keys, "let _batchRunning = false;\n" + swSource + "\nreturn {saveFromBackground, _runBatchSave};")(...keys.map(key => dependencies[key]));
+  return {calls, quick:() => entry.saveFromBackground({url:"https://example.com/tags", title:"Tags", tab:{id:1}}),
+    batch:() => entry._runBatchSave([{id:1, url:"https://example.com/tags", title:"Tags"}], auth.account)};
+}
 
 async function getPopupBatchSource() {
   return (await (await fetch("../popup-batch.js")).text());
@@ -274,6 +333,28 @@ async function createUiHarness(storedProgress, now, opts = {}) {
 }
 
 (async () => {
+  for (const path of ["quick", "batch"]) {
+    await test(path + " save preserves self-hosted tag names with spaces, quotes and backslashes", async () => {
+      const names = ["machine learning", 'say"hello', "path\\name"];
+      for (const service of ["karakeep", "linkding"]) {
+        const h = await createSaveTagsHarness(service, names);
+        const result = await h[path]();
+        equal(JSON.stringify(h.calls.names), JSON.stringify([names]), service + " changed tag names");
+        if (path === "quick") equal(result.status, "saved");
+        else equal(h.calls.progress.at(-1).saved, 1, service + " batch did not save");
+      }
+    });
+
+    await test(path + " Pinboard save keeps quote tags and the legacy posts/add URI", async () => {
+      const h = await createSaveTagsHarness("pinboard", ['say"hello', "plain", "path\\name"]);
+      const result = await h[path]();
+      equal(h.calls.intents.length, 1, "Pinboard intent was rejected");
+      equal(h.calls.intents[0].tags, 'say"hello plain path\\name');
+      equal(h.calls.uris[0], "https://api.pinboard.in/v1/posts/add?auth_token=fixture-token&format=json&url=https%3A%2F%2Fexample.com%2Ftags&description=Tags&extended=&tags=say%22hello%20plain%20path%5Cname&shared=yes&toread=no&replace=no");
+      if (path === "quick") equal(result.status, "saved");
+      else equal(h.calls.progress.at(-1).saved, 1, "Pinboard batch did not save");
+    });
+  }
   await test("Batch AI origins are exact, deduplicated, ceiling-filtered, and include the provider", async () => {
     const h = await createPermissionHarness();
     // Roadmap #33: the optional_host_permissions ceiling is https + literal-

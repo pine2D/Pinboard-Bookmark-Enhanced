@@ -1878,7 +1878,7 @@ function setupSubmit(token) {
         url: saveUrl,
         title,
         notes: extended,
-        tags: pbpBookmarkServiceId(settings) === "pinboard" ? tags.join(" ") : pbpBookmarkFormatTags(tags),
+        tags: pbpSerializeIntentTags(tags, pbpBookmarkServiceId(settings)),
         private: isPrivate,
         toread: isReadLater,
         archive: _archiveUserTouched ? archiveRequested : undefined,

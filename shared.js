@@ -2022,6 +2022,9 @@ function pbpBookmarkServiceLabel(settings) {
 function pbpBookmarkFormatTags(names) {
   return names.map(name => /[\s"\\]/.test(name) ? JSON.stringify(name) : name).join(" ");
 }
+function pbpSerializeIntentTags(names, service) {
+  return service === "pinboard" ? names.join(" ") : pbpBookmarkFormatTags(names);
+}
 function pbpBookmarkParseTags(text) {
   const source = String(text || "").trim();
   const names = [];
