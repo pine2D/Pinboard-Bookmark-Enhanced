@@ -137,7 +137,7 @@ function pbpPopupPrefillDescription() {
   row.hidden = !linkding;
   row.classList.toggle("hidden", !linkding);
   if (linkding && shouldUpdateField("linkding-description-input")) {
-    $id("linkding-description-input").value = settings.optAutoDescription !== false ? pbpNotesDescription(pageInfo) : "";
+    $id("linkding-description-input").value = settings.optAutoDescription !== false ? pbpNotesDescription(pageInfo).replace(/\s+/g, " ").trim() : "";
   }
   let notes = "";
   if (pageInfo.selectedText) {
@@ -352,7 +352,11 @@ async function initPopupDraft(account, tab) {
       const d = result.draft;
       for (const [id, key] of Object.entries({ "url-input": "url", "title-input": "title", "description-input": "notes", "linkding-description-input": "summary", "tags-input": "tagInput",
         "private-check": "private", "readlater-check": "toread", "archive-check": "archive" })) {
-        if (!_popupDraftChangedFields.has(key) && d[key] !== undefined) $id(id)[id.endsWith("check") ? "checked" : "value"] = d[key];
+        if (!_popupDraftChangedFields.has(key) && d[key] !== undefined) {
+          // Text inputs strip line breaks themselves; preserve word boundaries first.
+          const value = key === "summary" ? d[key].replace(/\s+/g, " ").trim() : d[key];
+          $id(id)[id.endsWith("check") ? "checked" : "value"] = value;
+        }
       }
       if (pbpBookmarkServiceId(settings) === "linkding" && !pbpBookmarkConnection(settings).sharingEnabled) $id("private-check").checked = true;
       $id("share-check").checked = !$id("private-check").checked;
@@ -1613,7 +1617,7 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         existingBookmark = data.posts[0];
         if (shouldUpdateField("title-input")) $id("title-input").value = existingBookmark.description;
         if (shouldUpdateField("description-input")) $id("description-input").value = existingBookmark.extended;
-        if (pbpBookmarkServiceId(settings) === "linkding" && shouldUpdateField("linkding-description-input")) $id("linkding-description-input").value = existingBookmark.summary || "";
+        if (pbpBookmarkServiceId(settings) === "linkding" && shouldUpdateField("linkding-description-input")) $id("linkding-description-input").value = String(existingBookmark.summary || "").replace(/\s+/g, " ").trim();
         if (shouldUpdateField("private-check")) {
           $id("private-check").checked = existingBookmark.shared === "no";
           $id("share-check").checked = existingBookmark.shared === "yes";

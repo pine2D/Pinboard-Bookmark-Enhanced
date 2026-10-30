@@ -1883,9 +1883,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
     test("fresh linkding metadata enters Description while Notes keep only selection and via", () => {
       const a=source.indexOf('function pbpPopupPrefillDescription('),b=source.indexOf('function recomputeArchiveCheck(',a);
-      const elements={"description-input":{value:""},"linkding-description-input":{value:""},"linkding-description-row":document.createElement("div")};
+      const elements={"description-input":{value:""},"linkding-description-input":document.createElement("input"),"linkding-description-row":document.createElement("div")};
       const fill=new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription",source.slice(a,b)+";pbpPopupPrefillDescription();");
-      for(const selectedText of ["", "Selected text"]){fill({metaDescription:"Meta description",selectedText,referrer:"https://source.example/"},{bookmarkService:"linkding",optIncludeReferrer:true},()=>true,id=>elements[id],pbpNotesDescription);assert(elements["linkding-description-input"].value==="Meta description");assert(elements["description-input"].value===(selectedText?selectedText+"\n\n":"")+"via: https://source.example/");}
+      for(const selectedText of ["", "Selected text"]){fill({metaDescription:"Meta\ndescription",selectedText,referrer:"https://source.example/"},{bookmarkService:"linkding",optIncludeReferrer:true},()=>true,id=>elements[id],pbpNotesDescription);assert(elements["linkding-description-input"].value==="Meta description");assert(elements["description-input"].value===(selectedText?selectedText+"\n\n":"")+"via: https://source.example/");}
     });
 
     await testAsync("Description row has actual visible geometry only for linkding", async () => {
@@ -3437,7 +3437,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // and feed them worker replies, so the whole chain has to carry the cause.
     const proxySource = source.slice(source.indexOf("function _pbpProxyPinboardFetch"), source.indexOf("let currentTags"));
 
-    function createLookupHarness(workerReply, { nullField = "", service = "pinboard", dirtyDescription = false } = {}) {
+    function createLookupHarness(workerReply, { nullField = "", service = "pinboard", dirtyDescription = false, realDescription = false } = {}) {
       const statuses = [];
       const warns = [];
       const sent = [];
@@ -3446,7 +3446,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "url-input": createElementStub({ value: URL }),
         "title-input": createElementStub(),
         "description-input": createElementStub(),
-        "linkding-description-input": createElementStub({value:"Manual"}),
+        "linkding-description-input": realDescription ? Object.assign(document.createElement("input"),{type:"text",value:"Manual"}) : createElementStub({value:"Manual"}),
         "private-check": createElementStub(),
         "readlater-check": createElementStub(),
         "submit-btn": createElementStub(),
@@ -3510,8 +3510,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
     const FOUND_BODY = JSON.stringify({ posts: [{ description: "Saved title", extended: "", tags: "alpha", shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }] });
 
     await testAsync("existing linkding summary refills Description but a later user edit wins",async()=>{
-      const response={ok:true,status:200,data:{posts:[{href:URL,description:"Saved title",extended:"Saved notes",summary:"Saved description",tags:"",shared:"no",toread:"no",time:"2026-10-30T00:00:00Z"}]}};
-      for(const dirtyDescription of [false,true]){const h=createLookupHarness(response,{service:"linkding",dirtyDescription});assert((await h.run()).status==="found",JSON.stringify({statuses:h.statuses,warns:h.warns}));assert(h.elements["linkding-description-input"].value===(dirtyDescription?"Manual":"Saved description"),"wrong Description "+h.elements["linkding-description-input"].value);assert(h.elements["description-input"].value==="Saved notes");}
+      const response={ok:true,status:200,data:{posts:[{href:URL,description:"Saved title",extended:"Saved notes",summary:"Saved\ndescription",tags:"",shared:"no",toread:"no",time:"2026-10-30T00:00:00Z"}]}};
+      for(const dirtyDescription of [false,true]){const h=createLookupHarness(response,{service:"linkding",dirtyDescription,realDescription:true});assert((await h.run()).status==="found",JSON.stringify({statuses:h.statuses,warns:h.warns}));assert(h.elements["linkding-description-input"].value===(dirtyDescription?"Manual":"Saved description"),"wrong Description "+h.elements["linkding-description-input"].value);assert(h.elements["description-input"].value==="Saved notes");}
     });
 
     await testAsync("a pending lookup preserves a user's explicitly cleared tags", async () => {

@@ -104,7 +104,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/popup-ai-sw-tests.html": 61,
   "tests/popup-tag-cache-tests.html": 26,
   "tests/popup-save-tests.html": 234,
-  "tests/popup-draft-tests.html": 51,
+  "tests/popup-draft-tests.html": 52,
   "tests/save-pipeline-tests.html": 76,
   "tests/settings-cache-invalidate-tests.html": 8,
   "tests/settings-persist-tests.html": 530,
