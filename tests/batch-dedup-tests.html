@@ -55,6 +55,7 @@ async function createSaveTagsHarness(service, names) {
     chrome:{storage:{local:{get:async () => ({}), set:async () => {}}}},
     getPageInfoFromTab:async () => ({pageText:"Synthetic public text"}),
     buildAutoNotes:() => "",
+    pbpNotesDescription:() => "",
     hasAIKey:() => true,
     getAICache:async () => names.slice(),
     callAI:async () => { throw new Error("unexpected AI request"); },

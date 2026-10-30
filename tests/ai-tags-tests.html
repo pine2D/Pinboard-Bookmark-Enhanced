@@ -1891,6 +1891,7 @@ test("buildAutoNotes routes the description through the same check", () => {
   assertEq(buildAutoNotes({ title: "Same words", metaDescription: "same words" }, opts), "");
   assertEq(buildAutoNotes({ title: "T", metaDescription: "More" }, opts), "More");
   assertEq(buildAutoNotes({ title: "T", metaDescription: "More" }, { ...opts, autoDescription: false }), "");
+  assertEq(buildAutoNotes({ title: "T", metaDescription: "More" }, { ...opts, service: "linkding" }), "");
 });
 test("selected text uses each service's quote syntax without changing Pinboard bytes", () => {
   const text = "# heading\n\n<b> *bold*\n  12. list";

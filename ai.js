@@ -2596,7 +2596,8 @@ async function setAICache(url, type, result, cacheDuration, source, account, s) 
 }
 
 // ---- Build notes/description for a page ----
-// The page's meta description as a notes default, or "" when it says nothing
+// The page's meta description as a notes default (except linkding, whose
+// Description field receives it separately), or "" when it says nothing
 // the title does not: compared with case, whitespace, punctuation and symbols
 // ignored, after dropping GitHub's stock "Contribute to owner/repo development
 // by creating an account on GitHub." tail (signed-out repo pages append it to
@@ -2614,7 +2615,7 @@ function buildAutoNotes(pageInfo, opts) {
   let desc = "";
   if (pageInfo.selectedText) {
     desc = opts.blockquote ? pbpFormatQuote(pageInfo.selectedText, opts.service) : pageInfo.selectedText;
-  } else if (opts.autoDescription) {
+  } else if (opts.autoDescription && opts.service !== "linkding") {
     desc = pbpNotesDescription(pageInfo);
   }
   if (opts.includeReferrer && pageInfo.referrer) {

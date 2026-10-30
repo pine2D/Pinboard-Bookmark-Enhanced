@@ -220,6 +220,7 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
     customTagPrompt: "", customSummaryPrompt: "", ...settingsPatch,
   };
   const extractionCalls = [];
+  const cacheWrites = [];
   const i18nReadyCalls = { count: 0 };
   const dependencies = {
     getCurrentBookmarkAuth: async () => ({ token: "alice:token", account: "alice", epoch: 1 }),
@@ -227,14 +228,14 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
     pbpServiceEffectivePrivate,
     showNotification: (...args) => notifications.push(args),
     pbpSaveFailure: (reason) => ({ status: "failed", reason }),
-    getPageInfoFromTab: async (...args) => { extractionCalls.push(args); return { pageText: "article body" }; },
+    getPageInfoFromTab: async (...args) => { extractionCalls.push(args); return { pageText: "article body", ...(overrides.pageInfo || {}) }; },
     buildAutoNotes: () => "",
     hasAIKey: () => hasKey,
     getAICache: async (_url, kind) => cached[kind] ?? null,
     callAI,
     buildCombinedPrompt: () => "combined",
     parseAICombined: () => ({ tags: ["combined-tag"], summary: "combined-summary" }),
-    setAICache: async () => {},
+    setAICache: async (...args) => { cacheWrites.push(args); },
     escapeForExtended: (value) => value,
     buildTagPrompt: () => "tags",
     refineTags: (tags) => tags,
@@ -257,6 +258,7 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
     notifications,
     intents,
     extractionCalls,
+    cacheWrites,
     i18nReadyCalls,
   };
 }
@@ -399,7 +401,7 @@ async function run() {
 
   await test("background saves format cached and fresh summaries for their service", async () => {
     for (const [service, expected] of [["pinboard", "<blockquote>&lt;b&gt; *summary*</blockquote>"],
-      ["linkding", "> &lt;b> \\*summary\\*"], ["karakeep", "<b> *summary*"]]) {
+      ["linkding", ""], ["karakeep", "<b> *summary*"]]) {
       for (const cached of [{ summary: "<b> *summary*" }, {}]) {
         const h = buildBackgroundSaveHarness(source, async () => "<b> *summary*", cached,
           { _aiTags: false }, true, {
@@ -407,8 +409,51 @@ async function run() {
           });
         await h.save({ url, title: "Article", tab: { id: 7 }, settingsOverrides: {}, notifyId: "qs", notifyCategory: "quickSave" });
         assert(h.intents[0]?.notes === expected, service + " summary format: " + h.intents[0]?.notes);
+        if (service === "linkding") assert(h.intents[0]?.summary === "<b> *summary*", "linkding summary did not reach Description");
       }
     }
+  });
+
+  await test("linkding quick saves normalize fresh combined, single-call, and cached AI descriptions", async () => {
+    for (const branch of ["combined", "single", "cached"]) {
+      const cached = branch === "cached" ? { summary: "  Cached\n Description  " } : {};
+      const h = buildBackgroundSaveHarness(source, async (_s, prompt) => prompt === "summary"
+        ? "  Single\n Description  " : "ignored", cached,
+        { _aiTags: branch === "combined", customSummaryPrompt: branch === "single" ? "custom" : "" }, true, {
+          getCurrentBookmarkAuth: async () => ({ service: "linkding", token: "fixture", account: "linkding:fixture", epoch: 1 }),
+          parseAICombined: () => ({ tags: ["ai-tag"], summary: "  Combined\n Description  " }),
+        });
+      await h.save({ url, title: "Article", tab: { id: 7 }, notifyId: "qs", notifyCategory: "quickSave" });
+      const expected = { combined: "Combined Description", single: "Single Description", cached: "Cached Description" }[branch];
+      assert(h.intents[0]?.summary === expected && h.intents[0]?.notes === "", branch + " AI output not routed to Description");
+      if (branch !== "cached") assert(h.cacheWrites.some(call => call[1] === "summary" && call[2].includes("\n")), "raw AI summary must stay in cache");
+    }
+  });
+
+  await test("linkding quick meta fallback respects both description preferences and preserves selection notes", async () => {
+    for (const [globalOn, quickOn, expected] of [[true, true, "Meta description"], [false, true, ""], [true, false, ""]]) {
+      const h = buildBackgroundSaveHarness(source, async () => "unused", {},
+        { _aiTags: false, _aiSummary: false, _autoNotes: quickOn, optAutoDescription: globalOn }, true, {
+          getCurrentBookmarkAuth: async () => ({ service: "linkding", token: "fixture", account: "linkding:fixture", epoch: 1 }),
+          pageInfo: { title: "Article", metaDescription: "  Meta\n description  ", selectedText: "quoted" },
+          buildAutoNotes: (info) => info.selectedText ? "> quoted" : "",
+          pbpNotesDescription: (info) => info.metaDescription || "",
+        });
+      await h.save({ url, title: "Article", tab: { id: 7 }, notifyId: "qs", notifyCategory: "quickSave" });
+      assert(h.intents[0]?.summary === expected && h.intents[0]?.notes === "> quoted", "quick meta/selection routing changed");
+      assert(h.extractionCalls.length === 1 && !h.extractionCalls[0][1].withDefuddle, "meta fallback loaded Defuddle");
+    }
+  });
+
+  await test("linkding quick saves fall back to meta when AI summary is empty", async () => {
+    const h = buildBackgroundSaveHarness(source, async () => " \n ", {},
+      { _aiTags: false, _aiSummary: true, _autoNotes: true, optAutoDescription: true }, true, {
+        getCurrentBookmarkAuth: async () => ({ service: "linkding", token: "fixture", account: "linkding:fixture", epoch: 1 }),
+        pageInfo: { title: "Article", metaDescription: "  Fallback\n meta  " },
+        pbpNotesDescription: (info) => info.metaDescription || "",
+      });
+    await h.save({ url, title: "Article", tab: { id: 7 }, notifyId: "qs", notifyCategory: "quickSave" });
+    assert(h.intents[0]?.summary === "Fallback meta" && h.intents[0]?.notes === "", "empty AI summary was treated as Description");
   });
 
   await test("background save keeps the extraction fast path when AI is disabled", async () => {

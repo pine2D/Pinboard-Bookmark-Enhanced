@@ -347,6 +347,8 @@ async function createBatchSaveHarness(options) {
   const progress = [];
   const notifications = [];
   const badgeCalls = [];
+  const extractionCalls = [];
+  const cacheWrites = [];
   const removed = [];
   const outcomes = opts.outcomes || [{ status: "saved", mutation: "created" }];
   let outcomeIndex = 0;
@@ -355,10 +357,21 @@ async function createBatchSaveHarness(options) {
     _removeBatchRecordIfOwned: async (key) => { removed.push(key); return true; },
     _writeBatchProgress: async (value) => progress.push({ ...value }),
     loadSettings: opts.loadSettings || (async () => settings),
-    getCurrentBookmarkAuth: async () => ({ token: settings.pinboardToken, account: "alice", epoch: 0 }),
+    getCurrentBookmarkAuth: async () => ({ token: settings.pinboardToken, account: "alice", epoch: 0, service: settings.bookmarkService || "pinboard" }),
     showNotification: (...args) => notifications.push(args),
     t: (key, ...args) => args.length ? `${key}:${args.join(":")}` : key,
-    hasAIKey: () => false,
+    hasAIKey: () => opts.hasAIKey === true,
+    getPageInfoFromTab: async (...args) => { extractionCalls.push(args); return opts.pageInfo === undefined ? null : opts.pageInfo; },
+    pbpNotesDescription: (info) => info.metaDescription || "",
+    getAICache: async (_url, kind) => opts.cached?.[kind] ?? null,
+    setAICache: async (...args) => { cacheWrites.push(args); },
+    callAI: opts.callAI || (async () => "AI summary"),
+    buildCombinedPrompt: () => "combined",
+    parseAICombined: () => ({ tags: ["ai-tag"], summary: "  Combined\n summary  " }),
+    buildSummaryPrompt: () => "summary",
+    buildTagPrompt: () => "tags",
+    parseAITags: () => ["ai-tag"],
+    refineTags: (tags) => tags,
     chrome: { storage: { local: { get: opts.storageGet || (async () => ({})) } } },
     buildTagCaseMap: () => ({}),
     pbpServiceEffectivePrivate,
@@ -383,6 +396,8 @@ async function createBatchSaveHarness(options) {
     notifications,
     badgeCalls,
     removed,
+    extractionCalls,
+    cacheWrites,
   };
 }
 
@@ -1806,6 +1821,69 @@ await suite("unified save pipeline", async () => {
     }
     const batch=await createBatchSaveHarness({settings:{bookmarkService:"linkding",optPrivateDefault:false,optPrivateIncognito:false}});
     await batch.handleBatchSave(batchTabs(2));equal(batch.intents.length,2);assert(batch.intents.every(row=>row.prepared.private===true));
+  });
+
+  await test("linkding Batch uses the local meta fast path without AI and honors the description preference", async () => {
+    for (const [preference, pageInfo, expected] of [
+      [true, { title: "Tab 1", metaDescription: "  Meta\n description  " }, "Meta description"],
+      [false, { title: "Tab 1", metaDescription: "  Meta\n description  " }, ""],
+      [true, { title: "Tab 1", metaDescription: "  \n  " }, ""],
+      [true, null, ""],
+    ]) {
+      const h = await createBatchSaveHarness({ settings: { bookmarkService: "linkding", optAutoDescription: preference }, pageInfo });
+      await h.handleBatchSave(batchTabs(1));
+      equal(h.intents[0].prepared.summary, expected);
+      equal(h.intents[0].prepared.notes, "");
+      if (preference) assert(h.extractionCalls.length === 1 && h.extractionCalls[0][1].expectedUrl === "https://batch.example/1"
+        && !h.extractionCalls[0][1].withDefuddle, "AI-off linkding Batch did not use URL-bound fast extraction");
+      else equal(h.extractionCalls.length, 0, "disabled description preference still extracted the page");
+    }
+  });
+
+  await test("linkding Batch routes fresh, cached and single-call AI summaries to Description", async () => {
+    for (const branch of ["combined", "cached", "single"]) {
+      const h = await createBatchSaveHarness({
+        settings: { bookmarkService: "linkding", optAutoDescription: false,
+          batchAiTags: branch === "combined", batchAiSummary: true,
+          customSummaryPrompt: branch === "single" ? "custom" : "" },
+        hasAIKey: true,
+        pageInfo: { pageText: "article body", metaDescription: "Meta description" },
+        cached: branch === "cached" ? { summary: "  Cached\n summary  " } : {},
+        callAI: async () => "  Single\n summary  ",
+      });
+      await h.handleBatchSave(batchTabs(1));
+      const expected = { combined: "Combined summary", cached: "Cached summary", single: "Single summary" }[branch];
+      equal(h.intents[0].prepared.summary, expected);
+      equal(h.intents[0].prepared.notes, "");
+      assert(h.extractionCalls.length === 1 && h.extractionCalls[0][1].withDefuddle, "AI Batch extraction changed");
+      if (branch !== "cached") assert(h.cacheWrites.some(call => call[1] === "summary" && call[2].includes("\n")), "Batch cache was normalized before storage");
+    }
+  });
+
+  await test("linkding Batch falls back to meta when AI content is unavailable", async () => {
+    const h = await createBatchSaveHarness({ settings: { bookmarkService: "linkding", optAutoDescription: true, batchAiSummary: true },
+      hasAIKey: true, pageInfo: { pageText: "", metaDescription: "  Fallback\n meta  " } });
+    await h.handleBatchSave(batchTabs(1));
+    equal(h.intents[0].prepared.summary, "Fallback meta");
+    equal(h.intents[0].prepared.notes, "");
+    equal(h.progress[h.progress.length - 1].aiFailed, 1);
+  });
+
+  await test("non-linkding Batch keeps AI summaries in Notes and avoids meta-only extraction", async () => {
+    for (const service of ["pinboard", "karakeep"]) {
+      const h = await createBatchSaveHarness({ settings: { bookmarkService: service, optAutoDescription: true },
+        pageInfo: { metaDescription: "Meta description" } });
+      await h.handleBatchSave(batchTabs(1));
+      equal(h.intents[0].prepared.notes, "");
+      equal(h.intents[0].prepared.summary, undefined);
+      equal(h.extractionCalls.length, 0);
+
+      const ai = await createBatchSaveHarness({ settings: { bookmarkService: service, batchAiSummary: true },
+        hasAIKey: true, pageInfo: { pageText: "article body", metaDescription: "Meta description" } });
+      await ai.handleBatchSave(batchTabs(1));
+      equal(ai.intents[0].prepared.notes, pbpFormatSummaryBlock("AI summary", service));
+      equal(ai.intents[0].prepared.summary, undefined);
+    }
   });
 
   await test("queued background save notifies without success or opportunistic drain", async () => {

@@ -1509,6 +1509,8 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   // silently treated as a produced result.
   let aiTagsResolved = null;
   let summaryResolved = null;
+  const linkding = startAuth.service === "linkding";
+  let linkdingSummary = "";
 
   // Both tags AND summary requested -> one combined call (sends the body once).
   // Gated OFF when the user set a custom tag/summary prompt: the combined prompt uses
@@ -1594,24 +1596,36 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   // Apply combined-path results, then whatever the single calls produced.
   if (aiTagsResolved) tags = [...tags, ...aiTagsResolved];
   if (summaryResolved) {
-    const wrapped = pbpFormatSummaryBlock(summaryResolved, startAuth.service);
-    notes = notes ? notes + "\n\n" + wrapped : wrapped;
+    if (linkding) linkdingSummary = summaryResolved;
+    else {
+      const wrapped = pbpFormatSummaryBlock(summaryResolved, startAuth.service);
+      notes = notes ? notes + "\n\n" + wrapped : wrapped;
+    }
   }
   const aiResults = await Promise.all(aiPromises);
   for (const r of aiResults) {
     if (!r) continue;
     if (r.type === "tags") tags = [...tags, ...r.result];
     if (r.type === "summary") {
-      const wrapped = pbpFormatSummaryBlock(r.result, startAuth.service);
-      notes = notes ? notes + "\n\n" + wrapped : wrapped;
+      if (linkding) linkdingSummary = r.result;
+      else {
+        const wrapped = pbpFormatSummaryBlock(r.result, startAuth.service);
+        notes = notes ? notes + "\n\n" + wrapped : wrapped;
+      }
     }
   }
+  const description = linkding
+    ? String(linkdingSummary || "").replace(/\s+/g, " ").trim()
+      || (s._autoNotes && s.optAutoDescription !== false && pageInfo
+        ? pbpNotesDescription(pageInfo).replace(/\s+/g, " ").trim() : "")
+    : "";
 
   const result = await submitSaveIntent({
     mode,
     url,
     title,
     notes,
+    ...(linkding ? { summary: description } : {}),
     tags: pbpSerializeIntentTags(tags, startAuth.service),
     private: isPrivate,
     toread: toread === true ? true : undefined,
@@ -4839,6 +4853,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
       : [];
     const useAiTags = s.batchAiTags && hasAIKey(s);
     const useAiSummary = s.batchAiSummary && hasAIKey(s);
+    const linkding = currentAuth.service === "linkding";
     // Batch extraction is always local Defuddle - cache under the matching
     // namespace, never the configured aiContentSource (audit A3, same as
     // saveFromBackground).
@@ -4887,11 +4902,16 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         await requireAccount();
         let tags = [...baseTags];
         let notes = "";
+        let linkdingSummary = "";
+        let pageInfo = null;
 
-        if (useAiTags || useAiSummary) {
-          let pageInfo = null;
-          try { pageInfo = await getPageInfoFromTab(tab.id, { withDefuddle: true, expectedUrl: tab.url }); }
+        if (useAiTags || useAiSummary || (linkding && s.optAutoDescription !== false)) {
+          try { pageInfo = await getPageInfoFromTab(tab.id, {
+            withDefuddle: !!(useAiTags || useAiSummary), expectedUrl: tab.url
+          }); }
           catch (e) { console.warn("batch: cannot extract page content for", tab.url, e.message); }
+        }
+        if (useAiTags || useAiSummary) {
           await requireAccount();
           if (pageInfo?.pageText) {
             // Per-artifact resolution (audit A8, mirrors the quick-save
@@ -4947,12 +4967,18 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
                 } catch (e) { console.warn("batch AI summary failed:", tab.url, e.message); aiFailed++; return null; }
               })());
               if (aiTagsResolved) tags = [...tags, ...aiTagsResolved];
-              if (summaryResolved) notes = pbpFormatSummaryBlock(summaryResolved, currentAuth.service);
+              if (summaryResolved) {
+                if (linkding) linkdingSummary = summaryResolved;
+                else notes = pbpFormatSummaryBlock(summaryResolved, currentAuth.service);
+              }
               const results = await Promise.all(aiJobs);
               for (const r of results) {
                 if (!r) continue;
                 if (r.type === "tags") tags = [...tags, ...r.result];
-                if (r.type === "summary") notes = pbpFormatSummaryBlock(r.result, currentAuth.service);
+                if (r.type === "summary") {
+                  if (linkding) linkdingSummary = r.result;
+                  else notes = pbpFormatSummaryBlock(r.result, currentAuth.service);
+                }
               }
             }
           } else {
@@ -4968,12 +4994,18 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
 
         const dedupedTags = [...new Set(tags.map(tg => tg.toLowerCase()))].map(lower => tags.find(tg => tg.toLowerCase() === lower));
         const isPrivate = pbpServiceEffectivePrivate(s, { incognito: tab.incognito });
+        const description = linkding
+          ? String(linkdingSummary || "").replace(/\s+/g, " ").trim()
+            || (s.optAutoDescription !== false && pageInfo
+              ? pbpNotesDescription(pageInfo).replace(/\s+/g, " ").trim() : "")
+          : "";
         await requireAccount();
         const result = await submitSaveIntent({
           mode: s.batchSkipExisting ? "skip" : "merge",
           url: tab.url,
           title: tab.title || tab.url,
           notes,
+          ...(linkding ? { summary: description } : {}),
           tags: pbpSerializeIntentTags(dedupedTags, currentAuth.service),
           private: isPrivate,
           toread: s.optReadlaterDefault ? true : undefined,
