@@ -2045,7 +2045,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
     function summaryRestoreRuntime(description, options = {}) {
       const start = popupAiSource.indexOf("function _aiNormalizeUrl");
-      const end = popupAiSource.indexOf("// ---- Insert or replace AI summary", start);
+      const end = popupAiSource.indexOf('// Unified "no AI key"', start);
       assert(start >= 0 && end > start, "summary restore runtime missing");
       const field = { value: description };
       const urlField = { value: URL };
@@ -2062,12 +2062,12 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "stripTrackingParams", "pbpAiCacheGet", "pbpAiCacheSet", "pbpAiCacheDelete",
         "crypto", "TextEncoder", "_AI_BQ_REGEX_SHARED", "URL", "$id",
         "pbpPopupAiAccountIsCurrent", "pageInfo", "existingBookmark", "escapeForExtended",
-        "showSummaryActions", "loadReceipt", "settings",
+        "showSummaryActions", "loadReceipt", "settings", "updateCharCount", "autoResizeTextarea",
         popupAiSource.slice(start, end) +
         "; async function pbpAiLoadSummaryOwnership(account, url, value) {" +
         " return loadReceipt(account, url, value); }" +
         "; function setSummaryState(value, range) { _aiSummaryValue = value; _aiSummaryRange = range; }" +
-        "; return { _aiRestoreSummaryOwnership, setSummaryState };"
+        "; return { _aiRestoreSummaryOwnership, setSummaryState, upsertSummary, removeSummary };"
       )(
         (url) => ({ cleaned: String(url) }),
         async () => null,
@@ -2084,7 +2084,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         (value) => value,
         (fromCache) => actions.push(fromCache),
         loadReceipt,
-        { bookmarkService: options.service || "pinboard" }
+        { bookmarkService: options.service || "pinboard" }, () => {}, () => {}
       );
       return {
         field,
@@ -2092,6 +2092,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         state,
         actions,
         restore: api._aiRestoreSummaryOwnership,
+        upsert: api.upsertSummary, remove: api.removeSummary,
         setSummaryState: api.setSummaryState,
         resolveReceipt: () => resolveReceipt?.(),
         get loadCalls() { return loadCalls; }
@@ -2205,6 +2206,26 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(await pending === null && h.actions.length === 0,
           `${stale} change retained stale ownership`);
       }
+    });
+
+    await testAsync("Karakeep cached summaries only own one complete standalone paragraph", async () => {
+      for (const notes of ["A manual note says buy milk tomorrow.", "buy milkshake", "buy milk\n\nbuy milk", "before\nbuy milk\nafter"]) {
+        for (const action of ["remove", "replace"]) {
+          const h = summaryRestoreRuntime(notes, { service: "karakeep" });
+          assert(await h.restore("alice", URL, "buy milk") === null, "cache claimed handwritten/ambiguous text: " + notes);
+          if (action === "remove") { h.remove(); assert(h.field.value === notes, "removed manual text"); }
+          else { h.upsert("fresh"); assert(h.field.value === notes + "\n\nfresh", "replaced manual text"); }
+        }
+      }
+      for (const notes of ["buy milk", "before\n\nbuy milk\n\nafter"]) {
+        const h = summaryRestoreRuntime(notes, { service: "karakeep" });
+        assert(await h.restore("alice", URL, "buy milk") === "cache", "standalone paragraph was not restored");
+        h.upsert("fresh"); assert(h.field.value === notes.replace("buy milk", "fresh"), "standalone replace damaged notes");
+        h.remove(); assert(h.field.value === (notes === "buy milk" ? "" : "before\n\nafter"), "standalone removal damaged notes");
+      }
+      const notes = "A manual note says buy milk tomorrow.";
+      const receipt = summaryRestoreRuntime(notes, { service: "karakeep", existingBookmark: { extended: notes }, receipt: { start: 19, end: 27 } });
+      assert(await receipt.restore("alice", URL, "buy milk") === "receipt", "valid receipt lost priority");
     });
 
     await testAsync("saved bookmark text still restores its ownership receipt", async () => {

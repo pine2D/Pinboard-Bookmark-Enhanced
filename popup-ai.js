@@ -299,7 +299,19 @@ function pbpAiWrapSummary(summary, service = "pinboard") {
 function pbpAiFindLastExactSummaryRange(value, summary, service = "pinboard") {
   const wrapped = pbpAiWrapSummary(summary, service);
   if (!wrapped) return null;
-  const start = String(value).lastIndexOf(wrapped);
+  const text = String(value);
+  if (service === "karakeep") {
+    // Raw cached text carries no receipt. Only a unique whole paragraph can
+    // restore ownership; a substring or repeated paragraph is ambiguous.
+    const matches = [];
+    for (let start = text.indexOf(wrapped); start >= 0; start = text.indexOf(wrapped, start + 1)) {
+      const end = start + wrapped.length;
+      if ((start === 0 || text.slice(0, start).endsWith("\n\n")) &&
+          (end === text.length || text.slice(end).startsWith("\n\n"))) matches.push({ start, end });
+    }
+    return matches.length === 1 ? matches[0] : null;
+  }
+  const start = text.lastIndexOf(wrapped);
   return start < 0 ? null : { start, end: start + wrapped.length };
 }
 
