@@ -1069,7 +1069,7 @@
     "message": "自动将页面描述填入备注"
   },
   "optBlockquote": {
-    "message": "以引用格式包裹选中文本"
+    "message": "把选中文字标为引用"
   },
   "optIncludeReferrer": {
     "message": "在备注中附加来源页地址"
@@ -2536,6 +2536,9 @@
   },
   "waybackSkipPrivate": {
     "message": "保存为私密的书签一律不提交到 archive.org"
+  },
+  "waybackSelfHostedPrivateHint": {
+    "message": "Karakeep 书签和未共享的 linkding 书签都按私密处理，默认不会自动存档。保存时可以手动勾选「存档」，或关闭「保存为私密的书签一律不提交到 archive.org」。"
   },
   "waybackPermDenied": {
     "message": "存档需要 web.archive.org 的访问权限，目前尚未授予。重新开启存档即可再次申请。"

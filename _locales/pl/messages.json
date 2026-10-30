@@ -1069,7 +1069,7 @@
     "message": "Automatycznie wypełniaj opis strony w notkach"
   },
   "optBlockquote": {
-    "message": "Zawijaj zaznaczony tekst w <blockquote>"
+    "message": "Oznaczaj zaznaczony tekst jako cytat"
   },
   "optIncludeReferrer": {
     "message": "Dodawaj do notki adres strony odsyłającej"
@@ -2536,6 +2536,9 @@
   },
   "waybackSkipPrivate": {
     "message": "Nigdy nie archiwizuj w archive.org zakładek zapisanych jako prywatne"
+  },
+  "waybackSelfHostedPrivateHint": {
+    "message": "Zakładki Karakeep i nieudostępnione zakładki linkding są traktowane jako prywatne, więc domyślnie nie są automatycznie archiwizowane. Przy zapisywaniu możesz zaznaczyć „archiwizuj” lub wyłączyć opcję „Nigdy nie archiwizuj w archive.org zakładek zapisanych jako prywatne”."
   },
   "waybackPermDenied": {
     "message": "Archiwizacja wymaga dostępu do web.archive.org, którego nie przyznano. Włącz archiwizację ponownie, aby o niego poprosić."

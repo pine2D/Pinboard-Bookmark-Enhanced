@@ -1069,7 +1069,7 @@
     "message": "Meta-Beschreibung automatisch in Notizen einfügen"
   },
   "optBlockquote": {
-    "message": "Markierten Text mit <blockquote> umschließen"
+    "message": "Ausgewählten Text als Zitat kennzeichnen"
   },
   "optIncludeReferrer": {
     "message": "URL der verweisenden Seite zu den Notizen hinzufügen"
@@ -2536,6 +2536,9 @@
   },
   "waybackSkipPrivate": {
     "message": "Als privat gespeicherte Lesezeichen nie bei archive.org archivieren"
+  },
+  "waybackSelfHostedPrivateHint": {
+    "message": "Karakeep-Lesezeichen und nicht geteilte linkding-Lesezeichen gelten als privat und werden standardmäßig nicht automatisch archiviert. Beim Speichern kannst du „Archivieren“ manuell auswählen oder „Als privat gespeicherte Lesezeichen nie bei archive.org archivieren“ ausschalten."
   },
   "waybackPermDenied": {
     "message": "Zum Archivieren ist Zugriff auf web.archive.org nötig, der nicht erteilt wurde. Aktiviere das Archivieren erneut, um ihn anzufordern."

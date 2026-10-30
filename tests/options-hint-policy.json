@@ -12,11 +12,12 @@
       "hintApiToken", "getKey", "browseModelsAt", "dictEudicTokenHint", "multiPackBrowse", "optVideoLangCodesLink"
     ],
     "guide": [
-      "onboardNextAi", "batchRevokeHint", "aiCustomLimit", "optFollowNeedsPreset", "dependentsNeedParent"
+      "onboardNextAi", "batchRevokeHint", "aiCustomLimit", "optFollowNeedsPreset", "dependentsNeedParent",
+      "bookmarkLinkdingSharingHint"
     ],
     "consequence": [
       "connectionOverviewHint", "dictAnkiFormatHint", "multiPackLicenseHint", "tagGovIrreversibleWarn", "tagGovBundlesWarn",
-      "vocabDriveScope", "backupPreviewSemantics"
+      "vocabDriveScope", "backupPreviewSemantics", "waybackSelfHostedPrivateHint"
     ],
     "status": [
       "bookmarkConnectPending", "aiUnavailableHint", "previewAiUnavailableHint", "aiCustomLocked",

@@ -1074,7 +1074,7 @@
     "message": "Auto-fill meta description into notes"
   },
   "optBlockquote": {
-    "message": "Wrap selected text with <blockquote>"
+    "message": "Mark selected text as a quote"
   },
   "optIncludeReferrer": {
     "message": "Add the referring page's URL to notes"
@@ -2545,6 +2545,9 @@
   },
   "waybackSkipPrivate": {
     "message": "Never archive bookmarks you save as private"
+  },
+  "waybackSelfHostedPrivateHint": {
+    "message": "Karakeep bookmarks and unshared linkding bookmarks are treated as private, so they are not archived automatically by default. When saving, you can select “archive” manually, or turn off “Never archive bookmarks you save as private”."
   },
   "waybackPermDenied": {
     "message": "Archiving needs access to web.archive.org, which hasn't been granted. Re-enable archiving to request it."

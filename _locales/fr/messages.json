@@ -1069,7 +1069,7 @@
     "message": "Remplir automatiquement la méta-description dans les notes"
   },
   "optBlockquote": {
-    "message": "Encadrer le texte sélectionné avec <blockquote>"
+    "message": "Mettre le texte sélectionné en citation"
   },
   "optIncludeReferrer": {
     "message": "Ajouter aux notes l'URL de la page de provenance"
@@ -2536,6 +2536,9 @@
   },
   "waybackSkipPrivate": {
     "message": "Ne jamais archiver sur archive.org les favoris enregistrés comme privés"
+  },
+  "waybackSelfHostedPrivateHint": {
+    "message": "Les favoris Karakeep et les favoris linkding non partagés sont considérés comme privés. Par défaut, ils ne sont donc pas archivés automatiquement. À l’enregistrement, vous pouvez cocher « archiver » ou désactiver « Ne jamais archiver sur archive.org les favoris enregistrés comme privés »."
   },
   "waybackPermDenied": {
     "message": "L’archivage nécessite l’accès à web.archive.org, qui n’a pas été accordé. Réactivez l’archivage pour le demander."

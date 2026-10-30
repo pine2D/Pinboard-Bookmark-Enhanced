@@ -398,7 +398,7 @@
         <h2 class="section-title" id="sec-notes-behavior" data-i18n="secNotesBehavior">Notes in the Popup</h2>
         <div class="pref-group" role="group" aria-labelledby="sec-notes-behavior">
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-auto-description" checked /> <span class="switch-text" data-i18n="optAutoDescription">Auto-fill meta description into notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
-          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-blockquote" checked /> <span class="switch-text" data-i18n="optBlockquote">Wrap selected text with &lt;blockquote&gt;</span><span class="switch-track" aria-hidden="true"></span></label></div>
+          <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-blockquote" checked /> <span class="switch-text" data-i18n="optBlockquote">Mark selected text as a quote</span><span class="switch-track" aria-hidden="true"></span></label></div>
           <div class="pref-row"><label class="switch"><input type="checkbox" role="switch" id="opt-include-referrer" /> <span class="switch-text" data-i18n="optIncludeReferrer">Add the referring page's URL to notes</span><span class="switch-track" aria-hidden="true"></span></label></div>
         </div>
       </section>
@@ -1445,7 +1445,9 @@
              it (nothing is submitted to archive.org while archiving is off), so
              it carries the same indent instead of sitting at the parent's own
              level. -->
-        <div class="pref-row pref-row-sub" data-parent="opt-wayback-enabled"><label class="switch"><input type="checkbox" role="switch" id="opt-wayback-skip-private" checked /> <span class="switch-text" data-i18n="waybackSkipPrivate">Never archive bookmarks you save as private</span><span class="switch-track" aria-hidden="true"></span></label></div>
+        <div class="pref-row pref-row-sub" data-parent="opt-wayback-enabled"><label class="switch"><input type="checkbox" role="switch" id="opt-wayback-skip-private" checked /> <span class="switch-text" data-i18n="waybackSkipPrivate">Never archive bookmarks you save as private</span><span class="switch-track" aria-hidden="true"></span></label>
+          <p class="hint" id="wayback-selfhosted-private-hint" data-i18n="waybackSelfHostedPrivateHint" hidden>Karakeep bookmarks and unshared linkding bookmarks are treated as private, so they are not archived automatically by default. When saving, you can select “archive” manually, or turn off “Never archive bookmarks you save as private”.</p>
+        </div>
         </div>
         <div class="fg entry-block entry-block-sub context-help-host" data-parent="opt-wayback-enabled" data-help-role="field">
           <label class="bl" for="opt-wayback-s3key" data-i18n="optWaybackS3Key">archive.org S3 Access Key (optional)</label>

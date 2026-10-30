@@ -1069,7 +1069,7 @@
     "message": "自動將頁面描述填入備註"
   },
   "optBlockquote": {
-    "message": "以引用格式包裹選取文字"
+    "message": "將選取文字標示為引用"
   },
   "optIncludeReferrer": {
     "message": "在備註中附加來源頁地址"
@@ -2536,6 +2536,9 @@
   },
   "waybackSkipPrivate": {
     "message": "凡儲存為私密的書籤，一律不提交到 archive.org"
+  },
+  "waybackSelfHostedPrivateHint": {
+    "message": "Karakeep 書籤及未分享的 linkding 書籤均視為私密，預設不會自動封存。儲存時可手動勾選「封存」，或關閉「凡儲存為私密的書籤，一律不提交到 archive.org」。"
   },
   "waybackPermDenied": {
     "message": "存檔需要 web.archive.org 的存取權限，目前尚未授予。重新開啟存檔即可再次申請。"

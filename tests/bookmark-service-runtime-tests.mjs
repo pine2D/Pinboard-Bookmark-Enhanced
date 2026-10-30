@@ -110,6 +110,17 @@ try{
   const article=await ctx.newPage();await article.goto(origin+'/article');
   const pageUrl='chrome-extension://'+extId+'/';
   const backupPage=await ctx.newPage();await backupPage.goto(pageUrl+'options.html');
+  // The archive explanation follows the selected service immediately, before
+  // any Connect or Save, and switching back must hide it again.
+  const archiveHint=backupPage.locator('#wayback-selfhosted-private-hint');
+  assert.equal(await archiveHint.count(),1,'self-hosted archive explanation is missing');
+  for(const service of ['pinboard','karakeep','linkding','pinboard']){
+    await backupPage.locator('#tab-general').click();
+    await backupPage.locator(`input[name="bookmark-service"][value="${service}"]`).check();
+    await backupPage.locator('#tab-archive').click();
+    assert.equal(await archiveHint.isVisible(),service!=='pinboard',service+' archive explanation visibility');
+  }
+  console.log('archive explanation follows Pinboard / Karakeep / linkding selection and hides on return');
   const restored=await backupPage.evaluate(async()=>{
     const before=(await indexedDB.databases()).map(db=>db.name).filter(name=>['pbp-vocab','pbp-dict-archive','pbp-ask-archive'].includes(name)).sort();
     const empty=await pbpBackupPersonalLibraryEmpty();

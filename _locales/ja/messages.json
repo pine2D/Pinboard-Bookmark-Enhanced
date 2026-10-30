@@ -1069,7 +1069,7 @@
     "message": "ページの説明をメモに自動入力"
   },
   "optBlockquote": {
-    "message": "選択テキストを <blockquote> で囲む"
+    "message": "選択したテキストを引用として表示"
   },
   "optIncludeReferrer": {
     "message": "参照元ページの URL をメモに追加する"
@@ -2536,6 +2536,9 @@
   },
   "waybackSkipPrivate": {
     "message": "非公開で保存したブックマークは archive.org に送信しない"
+  },
+  "waybackSelfHostedPrivateHint": {
+    "message": "Karakeepのブックマークと共有していないlinkdingのブックマークは非公開として扱われるため、初期設定では自動アーカイブされません。保存時に「アーカイブ」を手動で選択するか、「非公開で保存したブックマークは archive.org に送信しない」をオフにするとアーカイブできます。"
   },
   "waybackPermDenied": {
     "message": "アーカイブには web.archive.org へのアクセス権が必要ですが、許可されていません。アーカイブを有効にし直すと、もう一度リクエストできます。"
