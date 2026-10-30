@@ -4896,6 +4896,12 @@
   "bookmarkLinkdingTokenHelp": {
     "message": "在 linkding 中打开 Settings → Integrations，在 REST API 一节查看或新建 Token。较新版本的 Token 只在创建时显示一次。"
   },
+  "bookmarkShare": {
+    "message": "共享"
+  },
+  "bookmarkLinkdingSharingHint": {
+    "message": "在 linkding 中更改共享设置后，请再次点击「连接」，刷新这里的共享选项。"
+  },
   "bookmarkGatewayLabel": {
     "message": "访问网关"
   },

@@ -191,6 +191,24 @@ test("posts/add default remains replace=yes for existing callers", () => {
       return element;
     }
 
+    await testAsync("linkding popup shows only supported sharing, defaulting to unshared", async () => {
+      const start = source.indexOf("function pbpPopupBookmarkPrivacy(");
+      assert(start >= 0, "sharing UI setup is missing");
+      const body = source.slice(start, source.indexOf("\n}",start)+2);
+      for (const sharing of [undefined,false,true]) {
+        const elements = {};
+        for (const name of ["private-check","share-check"]) {
+          const label = {hidden:false};
+          elements[name] = {checked:false,closest:()=>label};
+        }
+        // Connection envelope parsing is covered in service and runtime tests.
+        const settings = {bookmarkService:"linkding"};
+        new Function("$id","settings","pbpBookmarkServiceId","pbpBookmarkConnection", body+";pbpPopupBookmarkPrivacy();")(id=>elements[id],settings,pbpBookmarkServiceId,()=>({sharingEnabled:sharing===true}));
+        assert(elements["private-check"].closest().hidden,"linkding private label is visible");
+        assert(elements["share-check"].closest().hidden === (sharing !== true),"sharing visibility does not match capability");
+        assert(elements["private-check"].checked && !elements["share-check"].checked,"new popup defaults to shared");
+      }
+    });
     function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false } = {}) {
       const elements = {
         "submit-btn": createElementStub(),
@@ -678,6 +696,17 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
     });
 
+    await testAsync("linkding submit uses the inverse sharing choice and preserves a later sharing edit", async () => {
+      for(const shared of [false,true]) {
+        const h=createSubmitHarness();h.settings.bookmarkService="linkding";
+        h.elements["share-check"]=createElementStub({checked:shared});h.elements["private-check"].checked=!shared;
+        const pending=h.click();assert(h.messages[0].intent.private===!shared,"sharing was not mapped into private intent");
+        // Exercise the visible field directly as well as its canonical draft value.
+        h.elements["share-check"].checked=!shared;
+        h.resolveSave({status:"saved",mutation:"created"});await pending;
+        assert(h.timers.every(timer=>timer.delay!==1800),"a later visible sharing edit scheduled auto-close");
+      }
+    });
     await testAsync("real auto-close callback rechecks edits made after timer creation", async () => {
       const mutations = [
         ["title", (harness) => { harness.elements["title-input"].value = "Edited title"; }],

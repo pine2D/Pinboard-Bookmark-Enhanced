@@ -8973,6 +8973,7 @@ async function openReaderSurface(name) {
       return shown(footer);
     }
     case "reader-bookmark-editor":
+    case "reader-bookmark-sharing":
     case "reader-bookmark-delete-confirm": {
       if (typeof window.pbpReaderBookmarkAction !== "function") return "reader bookmark module not loaded";
       // Only this audit request is replaced: real editor construction and
@@ -8982,7 +8983,7 @@ async function openReaderSurface(name) {
       if (!row?.account) return "reader bookmark fixture has no owner";
       const send = chrome.runtime.sendMessage;
       chrome.runtime.sendMessage = function (message, ...args) {
-        if (message?.type === "mdReaderBookmarkState") return Promise.resolve({ account: row.account, known: true, bookmarked: true, bookmark: { title: "Render audit bookmark", tags: "qa reader", notes: "A reader bookmark note.", private: true, toread: true } });
+        if (message?.type === "mdReaderBookmarkState") return Promise.resolve({ account: row.account, known: true, bookmarked: true, ...(name === "reader-bookmark-sharing" ? {privacySupported:false,sharingSupported:true} : {}), bookmark: { title: "Render audit bookmark", tags: "qa reader", notes: "A reader bookmark note.", private: true, toread: true } });
         return send.call(chrome.runtime, message, ...args);
       };
       try {
@@ -10286,6 +10287,15 @@ async function runSweep(page, sw, extBase) {
     if (!formShown) throw new Error("SETUP ERROR: popup form sweep leg: popup.html is missing #main-section / .search-row");
     await page.waitForTimeout(150);
     await scan("popup", "form");
+  }
+
+  if (wants("popup", "linkding-sharing")) {
+    await page.evaluate(() => {
+      settings = {...settings, bookmarkService:"linkding",linkdingUrl:"https://bookmarks.example/",
+        linkdingToken:pbpBookmarkCredentialSeal({baseUrl:"https://bookmarks.example/",token:"render-fixture",connectionId:"render",sharing:true})};
+      pbpPopupBookmarkPrivacy();
+    });
+    await scan("popup", "linkding-sharing");
   }
 
   // ---- popup, hi-DPI width cap (2026-10-02). Chrome caps an action popup at

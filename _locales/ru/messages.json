@@ -4902,6 +4902,12 @@
   "bookmarkLinkdingTokenHelp": {
     "message": "В linkding откройте Settings → Integrations. В разделе REST API можно посмотреть токен или создать новый; в новых версиях токен показывается только один раз, при создании."
   },
+  "bookmarkShare": {
+    "message": "Общий доступ"
+  },
+  "bookmarkLinkdingSharingHint": {
+    "message": "После изменения настроек общего доступа в linkding снова нажмите «Подключить», чтобы обновить эту опцию здесь."
+  },
   "bookmarkGatewayLabel": {
     "message": "Шлюз доступа"
   },

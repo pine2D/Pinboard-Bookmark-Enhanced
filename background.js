@@ -611,7 +611,7 @@ const PBP_SAVE_MODES = new Set(["create", "update", "merge", "skip", "overwrite"
 // Automatic paths never prompt for permissions.
 function pbpBookmarkClient(auth) {
   return pbpCreateBookmarkServiceClient({
-    service:auth.service, baseUrl:auth.baseUrl, readLaterListId:auth.readLaterListId,
+    service:auth.service, baseUrl:auth.baseUrl, readLaterListId:auth.readLaterListId, sharingEnabled:auth.sharingEnabled,
     readLaterListName:t("bookmarkReadLaterListName"),
     // Any answered request proves this connection passes its gateway again.
     onResponseOk:() => void pbpClearOfflineQueuePause(auth.account),
@@ -687,7 +687,8 @@ async function pbpDeliverSelfHosted(intent, auth) {
     const incomingTags = pbpBookmarkParseTags(intent.tags);
     const names = intent.mode === "merge" && lookup.exists ? lookup.bookmark.tags.slice() : [];
     for (const name of incomingTags) if (!names.some(existing => existing.toLowerCase() === name.toLowerCase())) names.push(name);
-    const fields = {...plan.fields, tags:names};
+    // Only a visible update choice may change linkding sharing. Merge keeps it.
+    const fields = {...plan.fields, tags:names, sharedExplicit:intent.mode === "update" && auth.sharingEnabled === true};
     const result = await pbpBookmarkClient(auth).save(fields, lookup.bookmark);
     if (!pbpBookmarkAuthIsCurrent(auth)) return {result:pbpSaveFailure("account_changed"), persisted:null, retryable:false};
     if (result.status === "partial") {
@@ -1324,7 +1325,7 @@ function pbpReaderInitialIntent(context, settings, action) {
     title: typeof originalDraft?.title === "string" ? originalDraft.title : context.title || context.url,
     notes: typeof originalDraft?.notes === "string" ? originalDraft.notes : typeof context.description === "string" ? context.description : "",
     tags: typeof originalDraft?.tags === "string" ? originalDraft.tags : Array.isArray(context.tags) ? (pbpBookmarkServiceId(settings) === "pinboard" ? context.tags.join(" ") : pbpBookmarkFormatTags(context.tags)) : "",
-    private: typeof originalDraft?.private === "boolean" ? originalDraft.private : pbpEffectivePrivate(settings, { incognito: context.sourceIncognito === true }),
+    private: pbpBookmarkServiceId(settings) === "linkding" ? true : typeof originalDraft?.private === "boolean" ? originalDraft.private : pbpServiceEffectivePrivate(settings, { incognito: context.sourceIncognito === true }),
     toread: action === "later" || (typeof originalDraft?.toread === "boolean" ? originalDraft.toread : settings.optReadlaterDefault === true),
   };
 }
@@ -1404,7 +1405,7 @@ async function pbpReaderBookmarkRequest(message, sender) {
     }
     // Token rotation under the same owner does not invalidate display metadata.
     // Re-read the effective owner after every await before returning it to UI.
-    return await pbpReadFreshBookmarkAuthForAccount(context.account) ? {...result, privacySupported:auth.service !== "karakeep"} : pbpSaveFailure("account_changed");
+    return await pbpReadFreshBookmarkAuthForAccount(context.account) ? {...result, privacySupported:!["karakeep","linkding"].includes(auth.service), sharingSupported:auth.service === "linkding" && auth.sharingEnabled === true} : pbpSaveFailure("account_changed");
   }
   const action = message.action;
   if (!["save", "later", "read", "edit"].includes(action)) return pbpSaveFailure("invalid");
@@ -1448,7 +1449,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   const loadedSettings = await loadSettings();
   const s = pbpBookmarkDeliverySettings({ ...loadedSettings, ...(settingsOverrides || {}) }, startAuth);
   const mode = s.bgSaveMode === "skip" || s.bgSaveMode === "overwrite" ? s.bgSaveMode : "merge";
-  const isPrivate = pbpEffectivePrivate(s, { incognito: tab?.incognito });
+  const isPrivate = pbpServiceEffectivePrivate(s, { incognito: tab?.incognito });
 
   // Extract page info if tab available
   let pageInfo = null;
@@ -4959,7 +4960,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         }
 
         const dedupedTags = [...new Set(tags.map(tg => tg.toLowerCase()))].map(lower => tags.find(tg => tg.toLowerCase() === lower));
-        const isPrivate = pbpEffectivePrivate(s, { incognito: tab.incognito });
+        const isPrivate = pbpServiceEffectivePrivate(s, { incognito: tab.incognito });
         await requireAccount();
         const result = await submitSaveIntent({
           mode: s.batchSkipExisting ? "skip" : "merge",

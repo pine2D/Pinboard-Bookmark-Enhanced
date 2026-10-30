@@ -24,7 +24,30 @@ test("service defaults to Pinboard, unknown services fail closed", () => {equal(
 test("base URL preserves subpaths and rejects insecure or credential-bearing inputs", () => {equal(pbpBookmarkEndpoint("https://bookmarks.example/base"),"https://bookmarks.example/base/");equal(pbpBookmarkEndpoint("http://127.0.0.1:8000"),"http://127.0.0.1:8000/");for(const url of ["http://192.168.1.2", "http://2130706433", "https://u:p@example.com", "https://example.com/?key=x", "https://example.com/#x", "javascript:alert(1)"])equal(pbpBookmarkEndpoint(url),"");});
 test("linkding lookup preserves independent notes, summary, unread and visibility", async()=>{const {client,calls}=harness("linkding",[[200,{bookmark:ld,metadata:{},auto_tags:[]}]]);const b=await client.lookup(pageUrl);equal([b.id,b.url,b.title,b.notes,b.summary,b.tags,b.toread,b.private],["7",pageUrl,"Saved title","My note","Website summary",["work"],true,true]);equal(calls[0].url,"https://bookmarks.example/base/api/bookmarks/check/?url=https%3A%2F%2Fexample.com%2Farticle");equal(calls[0].headers.get("Authorization"),"Token fixture-token");equal(calls[0].redirect,"manual");equal(calls[0].credentials,"omit");});
 test("linkding missing bookmark is null, malformed lookup is an error",async()=>{equal(await harness("linkding",[[200,{bookmark:null}]]).client.lookup(pageUrl),null);await rejects(()=>harness("linkding",[[200,{}]]).client.lookup(pageUrl),"invalid_response");});
-test("linkding update patches requested fields without rewriting scraped description",async()=>{const {client,calls}=harness("linkding",[[200,{...ld,title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true,date_modified:"2026-10-02T10:00:00Z"}]]);const result=await client.save({url:pageUrl,title:"New",notes:"Note",tags:["new"],toread:false,private:false},{id:"7",url:pageUrl});equal([result.status,result.mutation],["saved","updated"]);equal(calls[0].method,"PATCH");equal(calls[0].body,{title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true});});
+test("linkding update patches requested fields without rewriting scraped description",async()=>{const {client,calls}=harness("linkding",[[200,{...ld,title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true,date_modified:"2026-10-02T10:00:00Z"}]],{sharingEnabled:true});const result=await client.save({url:pageUrl,title:"New",notes:"Note",tags:["new"],toread:false,private:false,sharedExplicit:true},{id:"7",url:pageUrl,private:true});equal([result.status,result.mutation],["saved","updated"]);equal(calls[0].method,"PATCH");equal(calls[0].body,{title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true});});
+test("linkding sharing capability fails closed and only boolean true enables it", async()=>{
+  for (const sharing of [undefined,false,true,"true",1]) {
+    const settings=gwEnvSettings("linkding",undefined,{sharing});
+    equal(pbpBookmarkConnection(settings).sharingEnabled,sharing===true);
+    const h=harness("linkding",[[200,{theme:"auto",enable_sharing:sharing,permanent_notes:false}]]);
+    equal((await h.client.verify()).sharing,sharing===true);
+  }
+});
+test("linkding creates are unshared unless sharing is enabled and explicitly chosen", async()=>{
+  for(const sharingEnabled of [undefined,false,true]) for(const privateChoice of [undefined,true,false]) {
+    const h=harness("linkding",[[201,ld]],{sharingEnabled});
+    await h.client.save({url:pageUrl,title:"T",notes:"",tags:[],private:privateChoice},null);
+    equal(h.calls[0].body.shared,sharingEnabled===true && privateChoice===false);
+  }
+});
+test("linkding PATCH changes sharing only for an explicit visible change", async()=>{
+  for(const sharingEnabled of [undefined,false,true]) for(const sharedExplicit of [undefined,false,true]) for(const initial of [false,true]) for(const choice of [false,true]) {
+    const h=harness("linkding",[[200,ld]],{sharingEnabled});
+    await h.client.save({url:pageUrl,title:"T",notes:"",tags:[],private:choice,sharedExplicit},{id:"7",private:initial});
+    equal(Object.hasOwn(h.calls[0].body,"shared"),sharingEnabled===true && sharedExplicit===true && initial!==choice);
+    if(Object.hasOwn(h.calls[0].body,"shared")) equal(h.calls[0].body.shared,!choice);
+  }
+});
 test("linkding POST detects a merge only when parseable server dates differ by more than two seconds",async()=>{
   const variants=[
     [{},"merged"],
@@ -230,6 +253,15 @@ test("worker saves to linkding without a Pinboard credential", async()=>{
   equal(result.status,"saved");equal(h.state.calls.length,2);ok(h.state.calls.every(c=>c.url.startsWith("https://bookmarks.example/base/api/")));
   equal(h.state.calls[1].headers.get("Authorization"),"Token fixture-secret");equal(h.state.queue,[]);
 });
+test("worker linkding updates preserve sharing unless the visible choice changes; merge never changes sharing", async()=>{
+  for(const mode of ["update","merge"]) for(const sharing of [undefined,false,true]) for(const chosenPrivate of [false,true]) {
+    const h=await workerHarness("linkding",[[200,{bookmark:ld}],[200,ld]]);
+    const credential=JSON.parse(h.state.settings.linkdingToken); credential.sharing=sharing;
+    h.state.settings.linkdingToken=JSON.stringify(credential);
+    equal((await h.submitSaveIntent({...saveIntent,mode,private:chosenPrivate,...(mode==="update"?{time:ld.date_added}:{})})).status,"saved");
+    equal(Object.hasOwn(h.state.calls[1].body,"shared"),mode==="update" && sharing===true && chosenPrivate===false);
+  }
+});
 test("worker preserves merge semantics through Karakeep and does not archive", async()=>{
   const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[200,{id:"bk1",title:"Saved title",note:"My note"}],[200,{attached:["tag2"]}]]);
   const result=await h.submitSaveIntent({...saveIntent,mode:"merge",tags:"new"});
@@ -246,7 +278,7 @@ test("missing host permission prevents worker requests and queuing",async()=>{
 test("offline records contain only intent and connection identity; another service cannot replay them",async()=>{
   const h=await workerHarness("linkding",[new TypeError("offline")]);
   equal((await h.submitSaveIntent(saveIntent)).status,"queued");const item=h.state.queue[0];
-  ok(item.account.startsWith("linkding:"));ok(!JSON.stringify(item).includes("fixture-secret"));ok(!Object.hasOwn(item,"token"));
+  ok(item.account.startsWith("linkding:"));ok(!JSON.stringify(item).includes("fixture-secret"));ok(!Object.hasOwn(item,"token"));ok(!Object.hasOwn(item,"sharedExplicit"));
   Object.assign(h.state.settings,{bookmarkService:"karakeep",karakeepUrl:"https://bookmarks.example/base/",karakeepToken:JSON.stringify({v:1,baseUrl:"https://bookmarks.example/base/",token:"other",connectionId:"other",userId:"other"})});h.state.epoch++;
   equal((await h.sendOfflineItem(item)).result.reason,"account_mismatch");equal(h.state.calls.length,1);
 });

@@ -14,6 +14,12 @@ h2 { margin-top: 24px; font-size: 16px; }
 <script src="../shared.js"></script>
 <script src="../wayback.js"></script>
 <script>
+test("automatic linkding saves stay private regardless of global defaults", () => {
+  for(const bookmarkService of ["linkding","karakeep","pinboard"]) for(const optPrivateDefault of [false,true]) for(const optPrivateIncognito of [false,true]) for(const incognito of [false,true]) {
+    const settings={bookmarkService,optPrivateDefault,optPrivateIncognito};
+    assert(pbpServiceEffectivePrivate(settings,{incognito})===(bookmarkService==="linkding"||optPrivateDefault||optPrivateIncognito&&incognito));
+  }
+});
 const T0 = 1750000000000; // fixed timestamp for deterministic tests
 
 function test(name, fn) {

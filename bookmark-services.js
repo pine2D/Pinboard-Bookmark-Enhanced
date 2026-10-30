@@ -220,7 +220,8 @@ function pbpCreateBookmarkServiceClient(config) {
     if (service === "linkding") {
       const body = {...(existing ? {} : {url:fields.url}), title:fields.title || "", notes:fields.notes || "",tag_names:tags,
         ...(typeof fields.toread === "boolean" ? {unread:fields.toread} : {}),
-        ...(typeof fields.private === "boolean" ? {shared:!fields.private} : {})};
+        ...(!existing ? {shared:config.sharingEnabled === true && fields.private === false}
+          : config.sharingEnabled === true && fields.sharedExplicit === true && typeof fields.private === "boolean" && fields.private !== existing.private ? {shared:!fields.private} : {})};
       const {data} = await request(existing ? "bookmarks/" + pbpBookmarkRecordId(existing.id) + "/" : "bookmarks/", existing ? "PATCH" : "POST", body);
       const bookmark = pbpBookmarkNormalize(service,data);
       const added = Date.parse(data.date_added), modified = Date.parse(data.date_modified);
@@ -304,7 +305,8 @@ function pbpCreateBookmarkServiceClient(config) {
       const {data} = await request(service === "linkding" ? "user/profile/" : "users/me");
       if (!data || typeof data !== "object" || Array.isArray(data) ||
           (service === "karakeep" && typeof data.id !== "string") || (service === "linkding" && typeof data.theme !== "string")) throw pbpBookmarkServiceError("invalid_response");
-      return {id:service === "karakeep" ? pbpBookmarkRecordId(data.id) : "",label:service === "karakeep" ? String(data.name || "") : "linkding"};
+      return {id:service === "karakeep" ? pbpBookmarkRecordId(data.id) : "",label:service === "karakeep" ? String(data.name || "") : "linkding",
+        ...(service === "linkding" ? {sharing:data.enable_sharing === true} : {})};
     },
     async remove(bookmark) {
       await request("bookmarks/" + pbpBookmarkRecordId(bookmark.id) + (service === "linkding" ? "/" : ""),"DELETE");

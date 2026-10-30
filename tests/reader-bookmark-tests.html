@@ -387,6 +387,23 @@ await test("real reader editor shows the configured privacy default and saves th
     } finally { frame.remove(); }
   }
 });
+await test("reader linkding editor shows supported sharing and inverts the saved private choice", async () => {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  for (const sharingSupported of [undefined,false,true]) {
+    const frame=document.createElement("iframe");document.body.append(frame);
+    try {
+      const w=frame.contentWindow, messages=[];
+      w.document.body.innerHTML='<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+      w.t=k=>k;
+      w.chrome={runtime:{id:"test-id",getURL:p=>p,onMessage:{addListener(){}},sendMessage:async msg=>{messages.push(msg);return {known:true,bookmarked:true,account:"linkding:c1",privacySupported:false,sharingSupported,bookmark:{title:"T",notes:"",tags:"",private:false,toread:false}};}}};
+      w.eval(runtime);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account:"linkding:c1"}}));
+      await new Promise(r=>setTimeout(r,30));await w.pbpReaderBookmarkAction("edit");
+      const box=w.document.getElementById("reader-bookmark-private");
+      equal(box.closest("label").hidden,sharingSupported!==true);
+      if(sharingSupported){equal(box.checked,true);assert(box.closest("label").textContent.includes("bookmarkShare"));box.checked=false;w.document.getElementById("reader-bookmark-apply").click();await new Promise(r=>setTimeout(r,0));equal(messages.find(m=>m.action==="edit").draft.private,true);}
+    } finally {frame.remove();}
+  }
+});
 async function deleteUiHarness(options = {}) {
   const h = await pipelineHarness(options);
   const frame = document.createElement("iframe"); frame.width = 800; frame.height = 600; document.body.append(frame);

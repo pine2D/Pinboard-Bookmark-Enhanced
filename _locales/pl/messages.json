@@ -4902,6 +4902,12 @@
   "bookmarkLinkdingTokenHelp": {
     "message": "W linkding otwórz Settings → Integrations. W sekcji REST API zobaczysz swój token albo utworzysz nowy; nowsze wersje pokazują nowy token tylko raz."
   },
+  "bookmarkShare": {
+    "message": "Udostępnij"
+  },
+  "bookmarkLinkdingSharingHint": {
+    "message": "Po zmianie ustawień udostępniania w linkding kliknij ponownie Połącz, aby odświeżyć tę opcję tutaj."
+  },
   "bookmarkGatewayLabel": {
     "message": "Bramka dostępu"
   },

@@ -20,7 +20,7 @@ export const RENDER_OPTIONS_TABS = Object.freeze([
   'tab-reader', 'tab-vocab', 'tab-markdown', 'tab-tags', 'tab-archive', 'tab-appearance', 'tab-storage',
 ]);
 export const RENDER_READER_CONTEXTS = Object.freeze([
-  'reader-source-details', 'export-more', 'reader-bookmark-footer', 'reader-bookmark-editor', 'reader-bookmark-delete-confirm',
+  'reader-source-details', 'export-more', 'reader-bookmark-footer', 'reader-bookmark-editor', 'reader-bookmark-sharing', 'reader-bookmark-delete-confirm',
   'explain-pop', 'explain-dict', 'dict-resize-menu', 'dict-entry-idle', 'dict-entry-busy', 'dict-entry-progress', 'dict-entry-result', 'dict-entry-details',
   'dict-entry-usage-busy', 'dict-entry-usage-error', 'dict-entry-usage-result',
   'dict-entry-panel', 'dict-entry-cached', 'dict-entry-folded', 'dict-entry-revealed', 'dict-entry-error', 'dict-entry-examples', 'dict-entry-negative', 'dict-entry-legacy', 'dict-save-bar', 'dict-save-change-menu', 'dict-save-saved', 'dict-entry-paid-negative', 'ask-panel', 'ask-clear-confirm', 'search-pop', 'kbd-help-pop', 'typo-pop',
@@ -121,7 +121,7 @@ export const RENDER_SWEEP_CONTEXTS = Object.freeze({
     name === 'explain-dict' ? ['explain-pop'] : name === 'dict-resize-menu' ? ['explain-dict'] : name === 'dict-entry-busy' ? ['dict-entry-idle'] : name === 'dict-entry-progress' ? ['dict-entry-busy'] : name === 'dict-entry-result' ? ['dict-entry-busy'] : ['dict-entry-details', 'dict-entry-cached', 'dict-entry-usage-busy', 'dict-entry-panel', 'dict-entry-folded'].includes(name) ? ['dict-entry-result'] : name === 'dict-entry-revealed' ? ['dict-entry-folded'] : name === 'dict-entry-usage-error' ? ['dict-entry-usage-busy'] : name === 'dict-entry-usage-result' ? ['dict-entry-usage-error'] : name === 'dict-entry-error' ? ['dict-entry-idle'] : name === 'dict-save-change-menu' ? ['dict-save-bar'] : [],
     name === 'dict-entry-paid-negative' ? { target: DICT_PAID_NEGATIVE_TARGET, locales: DICT_PAID_NEGATIVE_LOCALES } : {})), context('video', [], { target: '.pbv-bar' })],
   popup: [context('light', [], { target: '#main-section' }), context('states', [], { target: '.offline-queue-item' }),
-    context('form', [], { target: '#url-input' }), context('dpi', [], { dpr: [1.5, 2] }),
+    context('form', [], { target: '#url-input' }), context('linkding-sharing', ['form'], { target: '#share-check' }), context('dpi', [], { dpr: [1.5, 2] }),
     context('dark', [], { theme: 'flexoki-dark', scheme: 'dark', target: '#main-section' }),
     context('login', [], { target: '#login-section' })],
 });

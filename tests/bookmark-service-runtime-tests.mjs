@@ -48,7 +48,7 @@ const server=createServer(async(req,res)=>{
   const scheme=service==='linkding'?'Token ':'Bearer ';
   if(![...acceptedKeys].some(key=>req.headers.authorization===scheme+key)){reply(401,{});return;}
   const store=records[service];
-  if(path==='user/profile/')return reply(200,{theme:'auto',version:'1.44.0'});
+  if(path==='user/profile/')return reply(200,{theme:'auto',enable_sharing:true,permanent_notes:false});
   if(path==='users/me')return reply(200,{id:'u1',name:'Fixture',email:null,localUser:true});
   if(path.startsWith('bookmarks/check')){
     const row=[...store.values()].find(b=>(b.url||b.content?.url)===url.searchParams.get('url'));
@@ -67,7 +67,7 @@ const server=createServer(async(req,res)=>{
     if(race){store.set(String(race.record.id),structuredClone(race.record));return reply(race.status,race.record);}
     const id=service==='linkding'?store.size+1:'b'+(store.size+1);
     // Hand-authored API record schemas, independently filled from HTTP input.
-    const row=service==='linkding'?{id,url:data.url,title:data.title,description:'Site summary',notes:data.notes,tag_names:data.tag_names||[],unread:data.unread||false,shared:data.shared||false,is_archived:false,date_added:'2026-10-01T00:00:00Z'}:
+    const row=service==='linkding'?{id,url:data.url,title:data.title,description:'Site summary',notes:data.notes,tag_names:data.tag_names===undefined?[]:data.tag_names,unread:data.unread===undefined?false:data.unread,shared:data.shared===undefined?false:data.shared,is_archived:false,date_added:'2026-10-01T00:00:00Z'}:
       {id,title:data.title,note:data.note,summary:null,archived:false,favourited:false,createdAt:'2026-10-01T00:00:00Z',userId:'u1',tags:[],content:{type:'link',url:data.url,title:'Site title'},assets:[]};
     store.set(String(id),row);return reply(201,row);
   }
@@ -178,17 +178,39 @@ try{
     assert.equal(owner,personalOwner);
     assert.equal(await worker.evaluate(async owner=>(await pbpVocabAll(owner)).length,owner),1);
     assert.equal((await worker.evaluate(()=>pbpReadBookmarkConnection())).service,service);
+    if(service==='linkding') assert.equal(await options.evaluate(async()=>JSON.parse(deobfuscateKey((await pbpReadSettingsWithSecrets(SETTINGS_DEFAULTS)).linkdingToken)).sharing),true,'Connect did not persist the non-secret sharing capability');
     await options.close();await article.bringToFront();
     const popupPromise=ctx.waitForEvent('page');
     await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');
-    const popup=await popupPromise;await popup.waitForLoadState();
+    let popup=await popupPromise;await popup.waitForLoadState();
     await popup.locator('#main-section:not(.hidden)').waitFor({timeout:10000}).catch(async error=>{console.error({errors,popupUrl:popup.url(),body:(await popup.locator('body').innerText()).slice(0,1200),connection:await popup.evaluate(async()=>{const c=await pbpReadBookmarkConnection();return {service:c.service,connected:!!c.account};})});throw error;});
-    await popup.waitForFunction(()=>!document.getElementById('submit-btn').disabled);
+    await popup.waitForFunction(()=>typeof _popupDraftContext!=='undefined'&&_popupDraftContext?.ready===true&&!document.getElementById('submit-btn').disabled);
+    if(service==='linkding'){
+      assert(await popup.locator('#private-check').isHidden());assert(await popup.locator('#share-check').isVisible());assert(!await popup.locator('#share-check').isChecked());
+      await popup.locator('#share-check').check();
+      await until(()=>worker.evaluate(async()=>Object.values(await chrome.storage.session.get(null)).some(row=>row?.draft?.private===false)),'shared choice persisted in private draft field');
+      await popup.close();await article.bringToFront();
+      const reopened=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');popup=await reopened;
+      await popup.waitForFunction(()=>typeof _popupDraftContext!=='undefined'&&_popupDraftContext?.ready===true&&!document.getElementById('submit-btn').disabled);
+      assert(await popup.locator('#share-check').isChecked(),'reopening lost the shared draft choice');
+      await popup.locator('#share-check').uncheck();
+    }
     await popup.locator('#title-input').fill(service+' title');await popup.locator('#description-input').fill('My note');
     await popup.locator('#tags-input').fill('reading');await popup.locator('#tags-input').press('Enter');
     await popup.locator('#submit-btn').click();
     await until(()=>popup.evaluate(()=>document.getElementById('submit-btn').classList.contains('saved-success')),'popup save success').catch(async error=>{console.error({requests:requests.map(r=>({path:r.path,method:r.method})),status:await popup.locator('body').innerText()});throw error;});
-    assert.equal(records[service].size,1,service+' popup did not save');await popup.close();
+    assert.equal(records[service].size,1,service+' popup did not save');
+    if(service==='linkding'){
+      const latestWrite=()=>requests.filter(r=>r.service==='linkding'&&['POST','PATCH'].includes(r.method)).at(-1);
+      assert.equal(latestWrite().method,'POST');assert.equal(latestWrite().data.shared,false);
+      const reopen=async()=>{await popup.close();await article.bringToFront();const event=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');popup=await event;await popup.waitForFunction(()=>document.getElementById('existing-banner')&&!document.getElementById('existing-banner').classList.contains('hidden')&&!document.getElementById('submit-btn').disabled);};
+      await reopen();assert(!await popup.locator('#share-check').isChecked());
+      await popup.locator('#share-check').check();await popup.locator('#submit-btn').click();await until(()=>latestWrite().data.shared===true,'popup changed sharing');
+      await reopen();assert(await popup.locator('#share-check').isChecked(),'existing shared record was not filled');
+      await popup.locator('#title-input').fill('Unrelated title edit');await popup.locator('#submit-btn').click();await until(()=>latestWrite().data.title==='Unrelated title edit','title-only update');assert(!Object.hasOwn(latestWrite().data,'shared'),'title update rewrote shared');
+      const merge=await worker.evaluate(url=>submitSaveIntent({mode:'merge',url,title:'Ignored',notes:'',tags:'extra',private:true,toread:false}),origin+'/article');assert.equal(merge.status,'saved');assert(!Object.hasOwn(latestWrite().data,'shared'),'merge rewrote shared');
+    }
+    await popup.close();
     const account=(await worker.evaluate(()=>getCurrentBookmarkAuth())).account;
     await worker.evaluate(async data=>chrome.storage.local.set({md_preview_data_services:{markdown:'# Runtime article\n\nA synthetic article for the reader.',title:'Runtime article',url:data.url,baseUrl:data.url,account:data.account,tags:[],description:'',source:'local',ts:Date.now()}}),{url:origin+'/article',account});
     const reader=await ctx.newPage();await reader.goto(pageUrl+'md-preview.html?k=services');
@@ -197,7 +219,9 @@ try{
     await reader.waitForFunction(()=>document.getElementById('reader-bookmark-later')?.getAttribute('aria-pressed')==='true');
     assert(service==='linkding'?[...records.linkding.values()][0].unread:membership.size===1);
     await reader.locator('#reader-bookmark-edit').click();
+    await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
     if(service==='karakeep')assert(await reader.locator('#reader-bookmark-private').isHidden());
+    else {assert(await reader.locator('#reader-bookmark-private').isVisible());assert(await reader.locator('#reader-bookmark-private').isChecked());assert((await reader.locator('#reader-bookmark-private').locator('xpath=ancestor::label').textContent()).includes('Share'));assert(!Object.hasOwn(requests.filter(r=>r.service==='linkding'&&r.method==='PATCH').at(-1).data,'shared'),'reader Read Later changed sharing');}
     await reader.locator('#reader-bookmark-delete').click();await reader.locator('.confirm-yes').click();
     await reader.waitForFunction(()=>document.getElementById('reader-bookmark-status')?.textContent==='Bookmark deleted');
     assert.equal(records[service].size,0);await reader.close();
@@ -267,6 +291,26 @@ try{
     gate.linkding=false;await options.close();
     console.log('access gateway form: validation, Cloudflare connect, restore and connection ID reuse passed');
   }
+  // Old envelopes and disabled sharing expose no checkbox in either surface.
+  const sharingCredential=await worker.evaluate(async()=>(await loadSettings()).linkdingToken);
+  for(const capability of ['missing','disabled']){
+    await worker.evaluate(async({credential,capability})=>{const value=JSON.parse(deobfuscateKey(credential));if(capability==='missing')delete value.sharing;else value.sharing=false;await persistSettings({linkdingToken:JSON.stringify(value)});},{credential:sharingCredential,capability});
+    await article.bringToFront();const opened=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');const popup=await opened;
+    await popup.waitForFunction(()=>typeof _popupDraftContext!=='undefined'&&_popupDraftContext?.ready===true&&!document.getElementById('submit-btn').disabled);
+    assert(await popup.locator('#private-check').isHidden());assert(await popup.locator('#share-check').isHidden());assert(await popup.locator('#private-check').isChecked());await popup.close();
+    const auth=await worker.evaluate(()=>getCurrentBookmarkAuth());const url=origin+'/article-'+capability;
+    await worker.evaluate(async({account,url})=>chrome.storage.local.set({md_preview_data_sharing:{markdown:'# Fixture',title:'Sharing fixture',url,account,ts:Date.now()}}),{account:auth.account,url});
+    const reader=await ctx.newPage();await reader.goto(pageUrl+'md-preview.html?k=sharing');await reader.waitForFunction(()=>document.getElementById('reader-bookmark-edit')?.getAttribute('aria-busy')==='false');await reader.locator('#reader-bookmark-edit').click();await reader.locator('#reader-bookmark-editor:popover-open').waitFor({timeout:5000}).catch(async error=>{console.error({capability,status:await reader.locator('#reader-bookmark-status').textContent(),errors,paths:requests.slice(-5).map(r=>r.path),state:await reader.evaluate(async()=>{const auth=await pbpReadBookmarkConnection();const result=await chrome.runtime.sendMessage({type:'mdReaderBookmarkState',account:auth.account});return {known:result?.known,reason:result?.reason};})});throw error;});assert(await reader.locator('#reader-bookmark-private').isHidden());await reader.close();
+    // A forged/stale public choice cannot enable sharing on an unsupported connection.
+    const created=await worker.evaluate(url=>submitSaveIntent({mode:'create',url,title:'T',notes:'',tags:'',private:false,toread:false}),url);assert.equal(created.status,'saved');assert.equal([...records.linkding.values()].find(row=>row.url===url).shared,false);
+    const row=[...records.linkding.values()].find(row=>row.url===url);row.shared=true;
+    const updated=await worker.evaluate(({url,time})=>submitSaveIntent({mode:'update',url,title:'Edit without sharing control',notes:'',tags:'',private:true,toread:false,time}),{url,time:row.date_added});assert.equal(updated.status,'saved');assert(!Object.hasOwn(requests.filter(r=>r.service==='linkding'&&r.method==='PATCH').at(-1).data,'shared'));assert.equal(row.shared,true);records.linkding.delete(String(row.id));
+  }
+  await worker.evaluate(async credential=>persistSettings({linkdingToken:credential}),sharingCredential);
+  const publicUrl=origin+'/article-explicit-shared';
+  assert.equal((await worker.evaluate(url=>submitSaveIntent({mode:'create',url,title:'Explicit share',notes:'',tags:'',private:false,toread:false}),publicUrl)).status,'saved');
+  const publicRow=[...records.linkding.values()].find(row=>row.url===publicUrl);assert.equal(publicRow.shared,true,'enabled explicit new sharing was lost');records.linkding.delete(String(publicRow.id));
+  console.log('linkding missing/disabled sharing: popup and reader controls hidden, new shared=false, existing shared=true preserved');
   // A second client saves after check-url. The server response is authored
   // independently of the submitted fields (Karakeep 0.34.1 B2 shape).
   const raceUrl=origin+'/article-race';

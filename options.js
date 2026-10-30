@@ -2990,7 +2990,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Same URL and token keep the connection ID, so a gateway-only change keeps queued linkding saves.
         const connectionId = pbpBookmarkReusableConnectionId(fresh, service, baseUrl, token) || crypto.randomUUID();
         const patch = {[service + "Url"]:baseUrl,
-          [service + "Token"]:pbpBookmarkCredentialSeal({baseUrl, token, connectionId, userId:result.identity.id, gateway})};
+          [service + "Token"]:pbpBookmarkCredentialSeal({baseUrl, token, connectionId, userId:result.identity.id, gateway, ...(service === "linkding" ? {sharing:result.identity.sharing === true} : {})})};
         if (document.querySelector('input[name="bookmark-service"]:checked')?.value === service) patch.bookmarkService = service;
         if (service === "karakeep" && pbpBookmarkConnection({...fresh,bookmarkService:service}).account !== "karakeep:" + baseUrl + ":" + result.identity.id) {
           patch.karakeepReadLaterListId = "";

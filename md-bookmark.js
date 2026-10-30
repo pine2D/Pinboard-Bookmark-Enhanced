@@ -210,7 +210,7 @@
     label(apply, "readerBookmarkApply");
     apply.addEventListener("click", () => save("edit", {
       title: id("title").value, tags: id("tags").value, notes: id("notes").value,
-      private: id("private").checked, toread: id("toread").checked,
+      private: state.sharingSupported === true ? !id("private").checked : state.privacySupported === false || id("private").checked, toread: id("toread").checked,
     }));
     const cancel = document.createElement("button");
     cancel.id = "reader-bookmark-cancel"; cancel.type = "button"; cancel.className = "action-btn";
@@ -235,8 +235,10 @@
     id("title").value = typeof values.title === "string" ? values.title : context.title || "";
     id("tags").value = typeof values.tags === "string" ? values.tags : pbpBookmarkFormatTags(context.bookmark?.tags || []);
     id("notes").value = typeof values.notes === "string" ? values.notes : context.bookmark?.notes || "";
-    id("private").closest("label").hidden = state.privacySupported === false;
-    id("private").checked = state.privacySupported === false || values.private === true; id("toread").checked = values.toread === true;
+    const privacyLabel = id("private").closest("label");
+    privacyLabel.hidden = state.privacySupported === false && state.sharingSupported !== true;
+    label(privacyLabel.lastElementChild, state.sharingSupported === true ? "bookmarkShare" : "readerBookmarkPrivate");
+    id("private").checked = state.sharingSupported === true ? values.private === false : state.privacySupported === false || values.private === true; id("toread").checked = values.toread === true;
     editorSource = document.activeElement;
     editor.showPopover(); id("title").focus();
   }

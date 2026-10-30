@@ -4910,6 +4910,12 @@
   "bookmarkLinkdingTokenHelp": {
     "message": "In linkding, open Settings → Integrations. The REST API section shows your token or lets you create one; newer versions show a new token only once."
   },
+  "bookmarkShare": {
+    "message": "Share"
+  },
+  "bookmarkLinkdingSharingHint": {
+    "message": "After changing sharing in linkding, click Connect again to refresh the sharing option here."
+  },
   "bookmarkGatewayLabel": {
     "message": "Access gateway"
   },

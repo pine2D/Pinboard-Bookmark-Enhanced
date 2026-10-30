@@ -4902,6 +4902,12 @@
   "bookmarkLinkdingTokenHelp": {
     "message": "Dans linkding, ouvrez Settings → Integrations. La section REST API affiche votre jeton ou permet d’en créer un ; les versions récentes n’affichent un nouveau jeton qu’une seule fois."
   },
+  "bookmarkShare": {
+    "message": "Partager"
+  },
+  "bookmarkLinkdingSharingHint": {
+    "message": "Après avoir modifié le partage dans linkding, cliquez à nouveau sur Connecter pour actualiser cette option ici."
+  },
   "bookmarkGatewayLabel": {
     "message": "Passerelle d’accès"
   },

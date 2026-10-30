@@ -1925,8 +1925,8 @@ function pbpBookmarkGatewayNormalize(input) {
   }
   return {ok:true, gateway:{type, headers}};
 }
-function pbpBookmarkCredentialSeal({baseUrl, token, connectionId, userId, gateway}) {
-  return obfuscateKey(JSON.stringify({v:1, baseUrl, token, connectionId, userId, ...(gateway ? {gateway} : {})}));
+function pbpBookmarkCredentialSeal({baseUrl, token, connectionId, userId, gateway, sharing}) {
+  return obfuscateKey(JSON.stringify({v:1, baseUrl, token, connectionId, userId, ...(gateway ? {gateway} : {}), ...(sharing !== undefined ? {sharing:sharing === true} : {})}));
 }
 
 // A connection's non-secret identity scopes bookmark caches and pending work.
@@ -1958,6 +1958,7 @@ function pbpBookmarkConnection(settings) {
     typeof connectionId === "string" && connectionId && typeof userId === "string" && userId && gatewayOk);
   const account = ready ? service + ":" + baseUrl + ":" + userId : "";
   return {service, baseUrl, token:ready ? token : "", account,
+    sharingEnabled:ready && service === "linkding" && credential.sharing === true,
     connectionId:ready ? connectionId : "",
     gatewayType:ready && gateway ? gateway.type : "none",
     headers:ready && gateway ? gateway.headers.map(row => [...row]) : [],

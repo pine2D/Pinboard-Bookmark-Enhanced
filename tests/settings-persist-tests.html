@@ -28,6 +28,12 @@ function check(name, cond) {
   root.appendChild(div);
 }
 async function run() {
+  {
+    const settings={bookmarkService:"linkding",linkdingUrl:"https://bookmarks.example/",linkdingToken:pbpBookmarkCredentialSeal({baseUrl:"https://bookmarks.example/",token:"backup-fixture",connectionId:"c1",sharing:true})};
+    const secrets=pbpSanitizeBackupSecrets(settings);
+    check("linkding sharing capability survives the opt-in backup credential envelope",secrets.keys.linkdingToken===settings.linkdingToken&&pbpBookmarkConnection({...settings,...secrets.keys}).sharingEnabled===true);
+  }
+
   // ---------- P0: Pinboard proxy preserves native Response.json failures ----------
   {
     const previousChrome = globalThis.chrome;

@@ -10,6 +10,7 @@ body { font-family: monospace; padding: 16px; max-width: 1000px; }
 <h1>Background Active Tab Tests</h1>
 <div id="results"></div>
 <script src="../shared.js"></script>
+<script src="../wayback.js"></script>
 <script>
 function assert(condition, message) {
   if (!condition) throw new Error(message || "assertion failed");
@@ -223,7 +224,7 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
   const dependencies = {
     getCurrentBookmarkAuth: async () => ({ token: "alice:token", account: "alice", epoch: 1 }),
     loadSettings: async () => settings,
-    pbpEffectivePrivate: () => false,
+    pbpServiceEffectivePrivate,
     showNotification: (...args) => notifications.push(args),
     pbpSaveFailure: (reason) => ({ status: "failed", reason }),
     getPageInfoFromTab: async (...args) => { extractionCalls.push(args); return { pageText: "article body" }; },

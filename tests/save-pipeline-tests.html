@@ -12,6 +12,7 @@ h2 { margin-top: 24px; font-size: 16px; }
 <h1>Unified Save Pipeline Tests</h1>
 <div id="results"></div>
 <script src="../shared.js"></script>
+<script src="../wayback.js"></script>
 <script>
 async function test(name, fn) {
   try {
@@ -277,9 +278,7 @@ async function createBackgroundSaveHarness(options) {
   const result = opts.result || { status: "queued", queueId: "q1" };
   const deps = {
     loadSettings: opts.loadSettings || (async () => settingsSequence[Math.min(loadCount++, settingsSequence.length - 1)]),
-    pbpEffectivePrivate: (settings, ctx) => !!(
-      settings.optPrivateDefault || (settings.optPrivateIncognito && ctx?.incognito)
-    ),
+    pbpServiceEffectivePrivate,
     pbpSaveFailure: (reason) => ({ status: "failed", reason }),
     showNotification: (...args) => notifications.push(args),
     t: opts.t || ((key, ...args) => args.length ? `${key}:${args.join(":")}` : key),
@@ -362,9 +361,7 @@ async function createBatchSaveHarness(options) {
     hasAIKey: () => false,
     chrome: { storage: { local: { get: opts.storageGet || (async () => ({})) } } },
     buildTagCaseMap: () => ({}),
-    pbpEffectivePrivate: (loaded, ctx) => !!(
-      loaded.optPrivateDefault || (loaded.optPrivateIncognito && ctx?.incognito)
-    ),
+    pbpServiceEffectivePrivate,
     submitSaveIntent: async (prepared, deliveryOptions) => {
       intents.push({ prepared, deliveryOptions });
       if (opts.submitSaveIntent) return opts.submitSaveIntent(prepared, deliveryOptions, intents.length - 1);
@@ -1770,6 +1767,15 @@ await suite("unified save pipeline", async () => {
     await settled();
     equal(toasts.length, beforeGone + 1);
     equal(toasts[beforeGone].title, "bgUndone", "an already-removed bookmark must not raise an error toast");
+  });
+
+  await test("linkding Quick Save, Read Later and Batch create private intents even with public defaults", async () => {
+    for(const toread of [false,true]) {
+      const h=await createBackgroundSaveHarness({cachedSettings:{bookmarkService:"linkding",pinboardToken:"fixture",bgSaveMode:"merge",optPrivateDefault:false,optPrivateIncognito:false,_defaultTags:""},auth:{service:"linkding",token:"fixture",account:"linkding:fixture"}});
+      await runBackgroundSave(h,{toread});equal(h.intents[0].private,true);
+    }
+    const batch=await createBatchSaveHarness({settings:{bookmarkService:"linkding",optPrivateDefault:false,optPrivateIncognito:false}});
+    await batch.handleBatchSave(batchTabs(2));equal(batch.intents.length,2);assert(batch.intents.every(row=>row.prepared.private===true));
   });
 
   await test("queued background save notifies without success or opportunistic drain", async () => {

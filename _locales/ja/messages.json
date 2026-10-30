@@ -4902,6 +4902,12 @@
   "bookmarkLinkdingTokenHelp": {
     "message": "linkding で Settings → Integrations を開き、REST API の欄でトークンを確認または作成します。新しいバージョンでは、トークンは作成時に一度だけ表示されます。"
   },
+  "bookmarkShare": {
+    "message": "共有"
+  },
+  "bookmarkLinkdingSharingHint": {
+    "message": "linkdingで共有設定を変更した場合は、もう一度「接続」をクリックして、この画面の共有オプションを更新してください。"
+  },
   "bookmarkGatewayLabel": {
     "message": "アクセスゲートウェイ"
   },

@@ -137,6 +137,11 @@ function pbpWaybackShouldArchive({ enabled, skipPrivate, isPrivate, force, overr
   return !!enabled && !(skipPrivate && isPrivate);
 }
 
+// Automatic saves never opt a new linkding bookmark into sharing.
+function pbpServiceEffectivePrivate(settings, ctx) {
+  return pbpBookmarkServiceId(settings) === "linkding" || pbpEffectivePrivate(settings, ctx);
+}
+
 // ---- Orchestrator (chrome.* usage allowed inside function body) ----
 
 async function pbpWaybackArchive(url, settings, opts) {

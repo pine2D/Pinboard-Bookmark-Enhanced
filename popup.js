@@ -124,6 +124,13 @@ async function refreshWaybackHostPermission() {
   }
   return _waybackHostGranted;
 }
+function pbpPopupBookmarkPrivacy() {
+  const service = pbpBookmarkServiceId(settings);
+  $id("private-check").closest("label").hidden = service !== "pinboard";
+  $id("share-check").closest("label").hidden = service !== "linkding" || !pbpBookmarkConnection(settings).sharingEnabled;
+  if (service !== "pinboard") $id("private-check").checked = true;
+  $id("share-check").checked = false;
+}
 function recomputeArchiveCheck() {
   if (_archiveUserTouched) return;
   const el = $id("archive-check");
@@ -131,7 +138,7 @@ function recomputeArchiveCheck() {
   el.checked = _waybackHostGranted && pbpWaybackShouldArchive({
     enabled: settings.waybackArchiveEnabled === true,
     skipPrivate: settings.waybackSkipPrivate !== false,
-    isPrivate: $id("private-check").checked,
+    isPrivate: pbpBookmarkServiceId(settings) === "linkding" ? !$id("share-check").checked : $id("private-check").checked,
     force: false,
     override: undefined,
   });
@@ -255,17 +262,22 @@ async function pbpDiscardPopupDraft(allOwner = false) {
 function pbpPopupDraftFieldEdited(id) {
   _popupDraftRevision++;
   _popupDraftEdited = true;
+  // The shared UI is the inverse view of the existing private draft field.
+  if (id === "share-check") {
+    $id("private-check").checked = !$id("share-check").checked;
+    fieldDirtyFlags["private-check"] = true;
+  }
   if (id in fieldDirtyFlags) fieldDirtyFlags[id] = true;
   if (id === "url-input") _popupDraftUserUrl = true;
   if (id === "archive-check") _archiveUserTouched = true;
   const key = { "url-input": "url", "title-input": "title", "description-input": "notes", "tags-input": "tagInput",
-    "private-check": "private", "readlater-check": "toread", "archive-check": "archive" }[id];
+    "private-check": "private", "share-check": "private", "readlater-check": "toread", "archive-check": "archive" }[id];
   _popupDraftChangedFields.add(key);
   if (id === "archive-check") _popupDraftChangedFields.add("archiveTouched");
   pbpRememberPopupDraft();
 }
 function setupPopupDraftTracking() {
-  for (const id of ["url-input", "title-input", "description-input", "tags-input", "private-check", "readlater-check", "archive-check"]) {
+  for (const id of ["url-input", "title-input", "description-input", "tags-input", "private-check", "share-check", "readlater-check", "archive-check"]) {
     const mark = () => pbpPopupDraftFieldEdited(id);
     $id(id).addEventListener("input", mark);
     $id(id).addEventListener("change", mark);
@@ -301,7 +313,7 @@ async function initPopupDraft(account, tab) {
   _popupDraftContext = context;
   _popupDraftLastSnapshot = "";
   const revision = _popupDraftRevision;
-  for (const id of ["url-input", "title-input", "description-input", "tags-input", "private-check", "readlater-check", "archive-check"]) {
+  for (const id of ["url-input", "title-input", "description-input", "tags-input", "private-check", "share-check", "readlater-check", "archive-check"]) {
     const el = $id(id);
     if (id.endsWith("check")) el.disabled = false; else el.readOnly = false;
   }
@@ -322,6 +334,8 @@ async function initPopupDraft(account, tab) {
         "private-check": "private", "readlater-check": "toread", "archive-check": "archive" })) {
         if (!_popupDraftChangedFields.has(key)) $id(id)[id.endsWith("check") ? "checked" : "value"] = d[key];
       }
+      if (pbpBookmarkServiceId(settings) === "linkding" && !pbpBookmarkConnection(settings).sharingEnabled) $id("private-check").checked = true;
+      $id("share-check").checked = !$id("private-check").checked;
       if (!_popupDraftChangedFields.has("archiveTouched")) _archiveUserTouched = d.archiveTouched;
       _popupDraftUserUrl = true;
       _popupDraftRestored = true;
@@ -642,10 +656,7 @@ async function showMain(token) {
   if (service !== "pinboard") {
     for (const el of document.querySelectorAll(".quick-links > *")) el.hidden = el !== unreadLink;
   }
-  if (service === "karakeep") {
-    $id("private-check").checked = true;
-    $id("private-check").closest("label").hidden = true;
-  }
+  pbpPopupBookmarkPrivacy();
 
   if (!settings.optShowSearch || pbpBookmarkServiceId(settings) !== "pinboard") {
     const searchRow = document.querySelector(".search-row");
@@ -883,6 +894,7 @@ async function showMain(token) {
   if (_archiveUserTouched && !_waybackHostGranted) $id("archive-check").checked = false;
   recomputeArchiveCheck();
   $id("private-check").addEventListener("change", recomputeArchiveCheck);
+  $id("share-check").addEventListener("change", recomputeArchiveCheck);
   $id("archive-check").addEventListener("change", async (e) => {
     _archiveUserTouched = true;
     if (e.target.checked) {
@@ -1583,7 +1595,10 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         existingBookmark = data.posts[0];
         if (shouldUpdateField("title-input")) $id("title-input").value = existingBookmark.description;
         if (shouldUpdateField("description-input")) $id("description-input").value = existingBookmark.extended;
-        if (shouldUpdateField("private-check")) $id("private-check").checked = existingBookmark.shared === "no";
+        if (shouldUpdateField("private-check")) {
+          $id("private-check").checked = existingBookmark.shared === "no";
+          $id("share-check").checked = existingBookmark.shared === "yes";
+        }
         recomputeArchiveCheck();
         if (shouldUpdateField("readlater-check")) $id("readlater-check").checked = existingBookmark.toread === "yes";
         currentTags = Array.isArray(submittedTags)
@@ -1877,6 +1892,7 @@ function setupSubmit(token) {
         $id("title-input").value === title
         && $id("description-input").value === extended
         && $id("private-check").checked === isPrivate
+        && (pbpBookmarkServiceId(settings) !== "linkding" || $id("share-check").checked === !isPrivate)
         && $id("readlater-check").checked === isReadLater
         && $id("archive-check").checked === archiveRequested
         && $id("tags-input").value.trim() === ""
@@ -2253,7 +2269,8 @@ async function loadBookmarkForEdit(url, token) {
   $id("url-input").value = url;
   $id("title-input").value = "";
   $id("description-input").value = "";
-  $id("private-check").checked = false;
+  $id("private-check").checked = pbpBookmarkServiceId(settings) !== "pinboard";
+  $id("share-check").checked = false;
   $id("readlater-check").checked = false;
   $id("submit-btn").textContent = t("submit");
   $id("delete-btn").classList.add("hidden");
