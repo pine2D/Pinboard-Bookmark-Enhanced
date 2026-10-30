@@ -1670,11 +1670,16 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
       const container = document.createElement("div");
       if (attach) document.body.appendChild(container);
+      const clearBtn = document.createElement("button");
       const urlInput = document.createElement("input");
       urlInput.value = formUrl;
       const calls = { renderTags: 0, doAITags: 0, status: [] };
       const tagAddRemoveSource = popupTagsSource.slice(
         popupTagsSource.indexOf("function addTag(tag) {"), popupTagsSource.indexOf("function renderTags() {"));
+      const clearStart = popupTagsSource.indexOf('$id("tags-clear-all")?.addEventListener("click"');
+      const clearEnd = popupTagsSource.indexOf('$id("tags-copy-all")', clearStart);
+      assert(clearStart >= 0 && clearEnd > clearStart, "clear-all source not found");
+      const clearAllSource = popupTagsSource.slice(clearStart, clearEnd);
       // `const URL = ...` at the top of this page is a GLOBAL LEXICAL binding,
       // so it shadows the constructor for new Function bodies AND for every
       // other classic script in the realm -- hand the real one in explicitly.
@@ -1698,6 +1703,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "let _tagsUserTouched = false;\n" +
         "function pbpPopupTagContext() { return { service: 'pinboard', separator: '-', bookmarkNames, index: pbpTagVocabIndex(counts), respectCase: true }; }\n" +
         tagAddRemoveSource + "\n" +
+        clearAllSource + "\n" +
         popupAiSource.slice(acctStart, acctEnd) + "\n" +
         popupAiSource.slice(urlStart, urlEnd) + "\n" +
         popupAiSource.slice(liveStart, liveEnd) + "\n" +
@@ -1705,7 +1711,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "return { renderAITags, addTag, removeTag, provenance: _aiSessionAddedTags, tags: () => currentTags.slice()," +
         " touched: () => _tagsUserTouched };"
       )(
-        (id) => (id === "url-input" ? urlInput : id === "ai-suggest-tags" ? container : null),
+        (id) => (id === "url-input" ? urlInput : id === "ai-suggest-tags" ? container : id === "tags-clear-all" ? clearBtn : null),
         (key) => key,
         { check: "<svg></svg>" },
         {},
@@ -1736,7 +1742,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const links = Array.from(container.querySelectorAll(".regen-link"));
       const replaceLink = links.find((link) => link.dataset.mode === "replace");
       assert(replaceLink, "renderAITags did not produce a replace-mode regen link");
-      return { container, urlInput, calls, links, replaceLink, ...runtime };
+      return { container, clearBtn, urlInput, calls, links, replaceLink, ...runtime };
     }
 
     // A macrotask turn, not a bare microtask: if the guard ever moves behind an
@@ -1812,6 +1818,18 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(run.tags().join("|") === "manual|Nick_Drake", "manual re-add changed the spelling");
       run.replaceLink.click(); await settle();
       assert(run.tags().join("|") === "manual|Nick_Drake", "replace removed the manually re-added tag");
+    });
+
+    await testAsync("Clear all then manually re-adding a same-group spelling survives AI replace", async () => {
+      const run = regenRuntime({ formUrl: URL, pageUrl: URL, tags: ["nick-drake"], seedTags: [] });
+      assert(run.tags().join("|") === "nick-drake" && run.provenance.has("nickdrake"),
+        "fixture did not adopt the AI tag");
+      run.clearBtn.click();
+      assert(run.tags().length === 0, "Clear all did not remove the tag");
+      run.addTag("nick_drake");
+      assert(run.tags().join("|") === "nick_drake", "manual re-add lost its spelling");
+      run.replaceLink.click(); await settle();
+      assert(run.tags().join("|") === "nick_drake", "replace removed the manually re-added tag");
     });
 
     await testAsync("duplicate AI chip and Add all do not claim a manual tag", async () => {

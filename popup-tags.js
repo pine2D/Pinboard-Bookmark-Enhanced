@@ -475,6 +475,8 @@ function setupTagsInput() {
   $id("tags-clear-all")?.addEventListener("click", (e) => {
     e.preventDefault();
     currentTags = [];
+    // A later manual re-add must not inherit AI ownership from cleared chips.
+    if (typeof _aiSessionAddedTags !== "undefined") _aiSessionAddedTags.clear();
     // K75: a one-click destructive edit that bypasses removeTag entirely --
     // without this, clearing every tag and then clicking a recent bookmark's
     // pencil discarded the deliberate clear with no confirm.
