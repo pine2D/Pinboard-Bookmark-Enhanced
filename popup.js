@@ -55,7 +55,7 @@ async function pbpPopupBookmarkApi(action, url) {
 let currentTags = [];
 let allUserTags = [];
 let allUserTagCounts = {};
-let tagCaseMap = {};
+let tagVocabIndex = pbpTagVocabIndex({});
 let pageInfo = {};
 // Submit stays gated until page info has landed and setupSubmit() -- the only
 // binder of the click / Ctrl+Enter handlers -- has run. Disabling the button once
@@ -1505,11 +1505,11 @@ async function htmlToMarkdownAsync(html, opts) {
     });
   }
 
-  // Fetch all user tags first (cache hit is instant, populates tagCaseMap for case resolution)
+  // Fetch all user tags first (cache hit is instant, populates the spelling index)
   fetchAllUserTags(token).then(() => {
     if (settings.optAiAutoTags && settings.optShowAiTags !== false && hasAIKey(settings)) $id("ai-tags-btn").click();
   });
-  // Suggest tags — enqueue after user tags so tagCaseMap is ready.
+  // Suggest tags — enqueue after user tags so the spelling index is ready.
   // #suggest-row's own unhide already happened up in the showMain visibility
   // switch (K70) so the skeleton isn't waiting on this await chain to paint.
   if (settings.optShowSuggestTags && pbpPopupHasWebUrl(targetUrl)) fetchPinboardSuggestTags(token, targetUrl);
@@ -1627,7 +1627,8 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         recomputeArchiveCheck();
         if (shouldUpdateField("readlater-check")) $id("readlater-check").checked = existingBookmark.toread === "yes";
         currentTags = Array.isArray(submittedTags)
-          ? pbpRebasePopupTags(existingBookmark.tagNames || existingBookmark.tags || "", submittedTags, currentTags)
+          ? pbpRebasePopupTags(pbpBookmarkServiceId(settings) === "pinboard"
+            ? existingBookmark.tags || "" : existingBookmark.tagNames || [], submittedTags, currentTags)
           : (_popupDraftRestored || _tagsUserTouched) ? currentTags : Array.isArray(existingBookmark.tagNames) ? [...new Set([...existingBookmark.tagNames, ...currentTags])] : unionTags(existingBookmark.tags || "", currentTags.join(" ")).split(/\s+/).filter(Boolean);
         renderTags();
         $id("submit-btn").textContent = t("update");
@@ -2037,6 +2038,7 @@ function setupSubmit(token) {
             description: title,
             extended,
             tags: tags.join(" "),
+            tagNames: tags.slice(),
             shared: isPrivate ? "no" : "yes",
             toread: isReadLater ? "yes" : "no",
             time: intent.time,

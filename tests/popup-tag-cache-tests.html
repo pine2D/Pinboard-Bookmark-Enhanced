@@ -15,7 +15,8 @@ let settings = { pinboardToken: "alice:token" };
 let currentTags = [];
 let allUserTags = [];
 let allUserTagCounts = {};
-let tagCaseMap = null;
+let tagVocabIndex = null;
+let existingBookmark = null;
 let acIndex = -1;
 const statusCalls = [];
 function t(key, ...args) { return args.length ? key + ":" + args.join(",") : key; }
@@ -23,6 +24,7 @@ function showStatus(id, msg, kind) { statusCalls.push({ id, msg, kind }); }
 </script>
 <script src="../shared.js"></script>
 <script src="../popup-tags.js"></script>
+<script src="../popup-batch.js"></script>
 <script>
 function test(name, fn) {
   let ok = true;
@@ -117,6 +119,7 @@ fixture.innerHTML = `
   <div id="suggest-row" class="row hidden">
     <div id="pinboard-suggest-tags" class="suggest-area" aria-busy="true">${SKEL}</div>
   </div>
+  <div id="ai-suggest-tags"></div>
   <div class="tags-input-wrap">
     <span id="tags-display"></span>
     <input id="tags-input" type="text">
@@ -124,7 +127,8 @@ fixture.innerHTML = `
   <div id="tags-autocomplete" class="autocomplete-dropdown hidden"></div>
   <a id="tags-clear-all" href="#"></a>
   <a id="tags-copy-all" href="#"></a>
-  <div id="tags-last-used" class="hidden"></div>`;
+  <div id="tags-last-used" class="hidden"></div>
+  <div id="presets-row" class="hidden"><div id="tag-presets"></div></div>`;
 document.body.appendChild(fixture);
 
 const tagsInput = document.getElementById("tags-input");
@@ -148,8 +152,16 @@ window.chrome = {
 settings.pinboardToken = "alice:token";
 setupTagsInput();
 
-function resetInput(tags) {
+function resetInput(tags, resetService = true) {
   currentTags = [];
+  if (resetService) {
+    settings.bookmarkService = "pinboard";
+    settings.optRespectTagCase = false;
+    settings.aiTagSeparator = "-";
+  }
+  existingBookmark = null;
+  applyTagData({});
+  _lastUsedTagsCache = [];
   allUserTags = tags || [];
   allUserTagCounts = {};
   acIndex = -1;
@@ -188,6 +200,105 @@ function typeInto(value) {
     tagsInput.value = "biaoqian";
     tagsInput.dispatchEvent(key({ key: " " }));
     assert(currentTags.join("|") === "biaoqian", "guard swallowed a real keystroke: " + currentTags.join("|"));
+  });
+
+  await testAsync("typed Space keeps two separate names while a selected multiword completion stays intact", async () => {
+    resetInput();
+    settings.bookmarkService = "karakeep";
+    applyTagData({ "Nick Drake": 3 });
+    typeInto("nick");
+    await nextFrame();
+    dropdown.querySelector('.ac-item[data-tag="Nick Drake"]').click();
+    assert(currentTags.join("|") === "Nick Drake", "completion changed the server name");
+    currentTags = [];
+    tagsInput.value = "nick";
+    tagsInput.dispatchEvent(key({ key: " " }));
+    tagsInput.value = "drake";
+    tagsInput.dispatchEvent(key({ key: " " }));
+    assert(currentTags.join("|") === "nick|drake", "Space did not commit two tags");
+  });
+
+  await test("case option aligns a typed spelling to the majority, and the off state preserves a selected server spelling", () => {
+    resetInput();
+    settings.bookmarkService = "karakeep";
+    settings.optRespectTagCase = true;
+    applyTagData({ "Nick Drake": 8, "nick-drake": 2 });
+    assert(addTag("nick drake") === "Nick Drake", "typed name did not align to majority");
+    currentTags = [];
+    settings.optRespectTagCase = false;
+    assert(addTag("Nick Drake") === "Nick Drake", "selected exact spelling was minted");
+    assert(addTag("nick_drake") === "Nick Drake" && currentTags.length === 1,
+      "same group entered twice with case option off");
+  });
+
+  await test("last-used multiword names restore as one tag, and the hint remains readable", () => {
+    resetInput();
+    settings.bookmarkService = "karakeep";
+    applyTagData({ "machine learning": 1 });
+    _lastUsedTagsCache = ["machine learning", "second"];
+    renderLastUsedHint();
+    assert(document.querySelector("#tags-last-used .lu-tags").textContent === "machine learning, second");
+    document.getElementById("tags-last-used").click();
+    assert(currentTags.join("|") === "machine learning|second", "last-used list split its first name");
+  });
+
+  await testAsync("copy and paste round trip preserves quoted spaces and commas", async () => {
+    resetInput();
+    settings.bookmarkService = "karakeep";
+    currentTags = ["machine learning", "a,b", "中文，标签"];
+    existingBookmark = { tagNames: currentTags.slice() };
+    let copied = "";
+    const prior = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async value => { copied = value; } } });
+    try { document.getElementById("tags-copy-all").click(); await Promise.resolve(); }
+    finally { if (prior) Object.defineProperty(navigator, "clipboard", prior); else delete navigator.clipboard; }
+    currentTags = [];
+    const data = new DataTransfer(); data.setData("text", copied);
+    tagsInput.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: data }));
+    assert(currentTags.join("|") === "machine learning|a,b|中文，标签", "round trip changed names: " + currentTags.join("|"));
+  });
+
+  await test("malformed quoted paste remains usable", () => {
+    resetInput();
+    settings.bookmarkService = "linkding";
+    const data = new DataTransfer(); data.setData("text", '"unpaired second');
+    tagsInput.dispatchEvent(new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: data }));
+    assert(currentTags.length === 2 && currentTags[1] === "second", "malformed quote discarded the paste");
+  });
+
+  await test("Enter splits quoted multi-value input while keeping a quoted name", () => {
+    resetInput();
+    settings.bookmarkService = "karakeep";
+    existingBookmark = { tagNames: ["machine learning"] };
+    tagsInput.value = '"machine learning" second';
+    tagsInput.dispatchEvent(key({ key: "Enter" }));
+    assert(currentTags.join("|") === "machine learning|second", "Enter lost quoted name");
+  });
+
+  await test("suggestion and AI chips show used for a group-equivalent saved name", () => {
+    resetInput();
+    currentTags = ["Nick_Drake"];
+    suggestBox.innerHTML = '<button class="stag" data-tag="nick-drake"></button>';
+    const aiBox = document.getElementById("ai-suggest-tags");
+    aiBox.innerHTML = '<button class="stag" data-tag="nick drake"></button>';
+    syncSuggestTagStates();
+    assert([...document.querySelectorAll("#pinboard-suggest-tags .stag, #ai-suggest-tags .stag")]
+      .every(chip => chip.disabled && chip.classList.contains("used")), "a group-equivalent chip remained usable");
+    aiBox.replaceChildren(); suggestBox.replaceChildren();
+  });
+
+  await test("preset passes a multiword name through addTag without splitting it", () => {
+    resetInput();
+    settings.bookmarkService = "karakeep";
+    settings.aiTagSeparator = "_";
+    settings.tagPresets = "Work: machine learning, second";
+    const presets = document.getElementById("tag-presets");
+    presets.replaceChildren();
+    try {
+      setupTagPresets();
+      presets.querySelector(".preset-btn").click();
+      assert(currentTags.join("|") === "machine_learning|second", "preset split or changed the first tag");
+    } finally { delete settings.tagPresets; presets.replaceChildren(); }
   });
 
   await testAsync("Enter before the pending rebuild commits the current input, not the last frame's", async () => {
@@ -277,7 +388,7 @@ function typeInto(value) {
     try {
       assert(pbpBookmarkConnection(settings).account, "fixture connection is not ready");
       for (const [error, key] of [["gateway_basic", "bookmarkErrGatewayBasic"], ["not_logged_in", "bookmarkErrAuth"]]) {
-        resetInput();
+        resetInput(undefined, false);
         suggestRow.classList.add("hidden");
         window.pbpPopupBookmarkApi = async () => ({ ok: false, status: 401, error, json: async () => ({}) });
         await fetchAllUserTags("ignored");

@@ -10,6 +10,7 @@ body { font-family: monospace; padding: 16px; max-width: 1000px; }
 <h1>Popup Save Tests</h1>
 <div id="results"></div>
 <script src="../shared.js"></script>
+<script src="../popup-tags.js"></script>
 <script src="../wayback.js"></script>
 <script>
 function test(name, fn) {
@@ -642,6 +643,12 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(JSON.stringify(result) === JSON.stringify(["ServerOnly", "Alpha", "Beta"]), result.join(" "));
     });
 
+    test("self-hosted tag rebase preserves preexisting same-group variants", () => {
+      const variants = ["Nick Drake", "nick-drake"];
+      const result = rebasePopupTags(variants, variants, variants);
+      assert(JSON.stringify(result) === JSON.stringify(variants), "existing variants were merged: " + result.join("|"));
+    });
+
     test("tag rebase preserves server-only tags and applies live remove, reorder, case, and add", () => {
       const result = rebasePopupTags(
         "Alpha Beta Gamma ServerOnly",
@@ -653,7 +660,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
     test("fresh bookmark lookup wires the submitted tag baseline into the rebase helper", () => {
       assert(lookupSource.includes("Array.isArray(submittedTags)"), "lookup does not detect the submitted tag baseline");
-      assert(lookupSource.includes("pbpRebasePopupTags(existingBookmark.tagNames || existingBookmark.tags || \"\", submittedTags, currentTags)"), "lookup bypasses the production rebase helper");
+      assert(lookupSource.includes('pbpRebasePopupTags(pbpBookmarkServiceId(settings) === "pinboard"'), "lookup bypasses the service-aware rebase helper");
     });
 
     await testAsync("real submit callback keeps queued separate from saved side effects", async () => {
@@ -1622,7 +1629,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(hotkey.slice(0, 400).includes("el.click();") && !hotkey.slice(0, 400).includes("addTag(el.dataset.tag)"),
         "Alt+N must route through the chip click handler");
       const removeSrc = await fetch("../popup-tags.js").then(r => r.text());
-      assert(removeSrc.includes("_aiSessionAddedTags.delete(tag.toLowerCase())"),
+      assert(removeSrc.includes("_aiSessionAddedTags.delete(pbpPopupTagGroupKey(tag))"),
         "removeTag must drop AI provenance for re-added names");
       // The third leg of r2 M3 -- the replace-mode regen link must abort when
       // the form was switched to another bookmark -- is a BEHAVIOUR, not a
@@ -1644,7 +1651,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // duringCall: runs inside the doAITags stub, i.e. while the regen is
     // in flight -- the only place the form can be switched to another bookmark
     // after the handler's entry guard has already passed.
-    function regenRuntime({ formUrl, pageUrl, tags, seedTags = ["manual"], accept = tags, attach = false, duringCall = null }) {
+    function regenRuntime({ formUrl, pageUrl, tags, seedTags = ["manual"], accept = tags,
+      counts = {}, bookmarkNames = [], attach = false, duringCall = null }) {
       const renderStart = popupAiSource.indexOf("function renderAITags(");
       const renderEnd = popupAiSource.indexOf("\n}\n", renderStart);
       assert(renderStart >= 0 && renderEnd > renderStart, "renderAITags source not found");
@@ -1665,6 +1673,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const urlInput = document.createElement("input");
       urlInput.value = formUrl;
       const calls = { renderTags: 0, doAITags: 0, status: [] };
+      const tagAddRemoveSource = popupTagsSource.slice(
+        popupTagsSource.indexOf("function addTag(tag) {"), popupTagsSource.indexOf("function renderTags() {"));
       // `const URL = ...` at the top of this page is a GLOBAL LEXICAL binding,
       // so it shadows the constructor for new Function bodies AND for every
       // other classic script in the realm -- hand the real one in explicitly.
@@ -1676,26 +1686,23 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "$id", "t", "PBP_ICONS", "allUserTagCounts", "pageInfo",
         "renderTags", "doAITags", "showStatus", "pbpAssignAltNumBadges",
         "_aiClearTagsOutput", "_aiAppendEmptyState", "_aiParkTagsBtn",
-        "stripTrackingParams", "URL", "seedTags", "settings",
+        "stripTrackingParams", "URL", "seedTags", "settings", "counts", "bookmarkNames",
         "let currentTags = seedTags.slice();\n" +
         "const _aiSessionAddedTags = new Set();\n" +
-        // Finding 5: mirrors the real addTag's dedup-before-flag-set order
-        // (popup-tags.js) -- a dup add (e.g. clicking an AI chip that names a
+        // Finding 5: use the real addTag's dedup-before-flag-set order.
+        // A dup add (e.g. clicking an AI chip that names a
         // tag the server already loaded) must not flip _tagsUserTouched. The
         // real replace-mode rollback (sliced in verbatim below, via
         // renderStart..renderEnd) reads/writes this same binding through its
         // own `typeof _tagsUserTouched !== "undefined"` guard.
         "let _tagsUserTouched = false;\n" +
-        "function addTag(tag) {\n" +
-        "  if (currentTags.some((x) => x.toLowerCase() === String(tag).toLowerCase())) return;\n" +
-        "  currentTags.push(tag);\n" +
-        "  _tagsUserTouched = true;\n" +
-        "}\n" +
+        "function pbpPopupTagContext() { return { service: 'pinboard', separator: '-', bookmarkNames, index: pbpTagVocabIndex(counts), respectCase: true }; }\n" +
+        tagAddRemoveSource + "\n" +
         popupAiSource.slice(acctStart, acctEnd) + "\n" +
         popupAiSource.slice(urlStart, urlEnd) + "\n" +
         popupAiSource.slice(liveStart, liveEnd) + "\n" +
         popupAiSource.slice(renderStart, renderEnd + 2) + "\n" +
-        "return { renderAITags, provenance: _aiSessionAddedTags, tags: () => currentTags.slice()," +
+        "return { renderAITags, addTag, removeTag, provenance: _aiSessionAddedTags, tags: () => currentTags.slice()," +
         " touched: () => _tagsUserTouched };"
       )(
         (id) => (id === "url-input" ? urlInput : id === "ai-suggest-tags" ? container : null),
@@ -1716,7 +1723,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
         // pbpPopupAiAccount derives the owner from this token via shared.js's
         // real pbpPinboardAccountFromToken, so the account half of the liveness
         // guard runs for real and only the URL half varies per case.
-        { pinboardToken: "alice:0123456789ABCDEF" }
+        { pinboardToken: "alice:0123456789ABCDEF" },
+        counts,
+        bookmarkNames
       );
 
       runtime.renderAITags(tags, true); // fromCache: true is what renders the regen links
@@ -1741,6 +1750,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         tags: ["alpha", "beta"],
       });
       const before = run.tags();
+      const renderedBefore = run.calls.renderTags;
       const chipsBefore = run.container.querySelectorAll(".stag.ai").length;
       assert(before.join("|") === "manual|alpha|beta" && run.provenance.size === 2,
         "harness did not accept both AI chips, got " + before.join("|"));
@@ -1751,7 +1761,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(run.container.querySelectorAll(".stag.ai").length === chipsBefore,
         "a regen on a switched-away form rebuilt the AI chips");
       assert(run.provenance.size === 2, "provenance was mutated, got " + run.provenance.size);
-      assert(run.calls.renderTags === 0 && run.calls.doAITags === 0,
+      assert(run.calls.renderTags === renderedBefore && run.calls.doAITags === 0,
         "a stale regen must neither re-render the tag row nor start an AI call");
       assert(run.links.every((link) => !link.classList.contains("loading")),
         "a stale regen must not park the links in their loading state");
@@ -1772,15 +1782,48 @@ test("posts/add default remains replace=yes for existing callers", () => {
         seedTags: ["manual", "alpha"],
         accept: ["beta"],
       });
+      const renderedBefore = run.calls.renderTags;
       run.replaceLink.click();
       await settle();
       assert(run.tags().join("|") === "manual|alpha",
         "replace must retract exactly this session's AI tags, got " + run.tags().join("|"));
-      assert(run.calls.renderTags === 1, "the retraction must re-render the tag row");
+      assert(run.calls.renderTags === renderedBefore + 1, "the retraction must re-render the tag row");
       assert(run.calls.doAITags === 1, "a live regen must start the AI call");
       assert(run.links.every((link) => link.classList.contains("loading")),
         "a live regen must show its loading state");
       assert(run.calls.status.length === 0, "a live regen must not report a switched-away form");
+    });
+
+    await testAsync("a canonicalized AI chip is retracted by group on replace", async () => {
+      const run = regenRuntime({ formUrl: URL, pageUrl: URL, tags: ["nick-drake"],
+        counts: { Nick_Drake: 8 }, seedTags: ["manual"] });
+      assert(run.tags().join("|") === "manual|Nick_Drake" && run.provenance.has("nickdrake"),
+        "AI adoption did not record the final canonical name");
+      run.replaceLink.click(); await settle();
+      assert(run.tags().join("|") === "manual", "replace retained the aligned AI tag");
+    });
+
+    await testAsync("removing and manually re-adding an AI tag clears its ownership", async () => {
+      const run = regenRuntime({ formUrl: URL, pageUrl: URL, tags: ["nick-drake"],
+        counts: { Nick_Drake: 8 }, seedTags: ["manual"] });
+      run.removeTag("Nick_Drake");
+      assert(!run.provenance.has("nickdrake"), "removal kept AI ownership");
+      run.addTag("nick-drake");
+      assert(run.tags().join("|") === "manual|Nick_Drake", "manual re-add changed the spelling");
+      run.replaceLink.click(); await settle();
+      assert(run.tags().join("|") === "manual|Nick_Drake", "replace removed the manually re-added tag");
+    });
+
+    await testAsync("duplicate AI chip and Add all do not claim a manual tag", async () => {
+      const run = regenRuntime({ formUrl: URL, pageUrl: URL, tags: ["nick-drake", "beta"],
+        counts: { Nick_Drake: 8 }, seedTags: ["Nick_Drake"], accept: ["nick-drake"] });
+      assert(run.provenance.size === 0 && run.tags().join("|") === "Nick_Drake",
+        "duplicate chip claimed a preexisting manual tag");
+      run.container.querySelector(".add-all-link").click();
+      assert(run.provenance.size === 1 && run.provenance.has("beta") && run.tags().join("|") === "Nick_Drake|beta",
+        "Add all claimed the manual tag or missed the new tag");
+      run.replaceLink.click(); await settle();
+      assert(run.tags().join("|") === "Nick_Drake", "replace retracted a preexisting manual tag");
     });
 
     await testAsync("a regen that refuses without rebuilding restores the links and the retraction", async () => {
@@ -1846,7 +1889,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
     test("replace-mode regen retracts only session-AI-added tags (A10)", () => {
       assert(popupAiSource.includes("const _aiSessionAddedTags = new Set()"), "provenance set missing");
-      assert(popupAiSource.includes("cachedTagSet.has(t.toLowerCase()) && _aiSessionAddedTags.has(t.toLowerCase())"),
+      assert(popupAiSource.includes("cachedTagSet.has(pbpPopupTagGroupKey(t)) && _aiSessionAddedTags.has(pbpPopupTagGroupKey(t))"),
         "replace filter must require AI provenance, not just name equality");
       const chipAdds = (popupAiSource.match(/_aiSessionAddedTags\.add\(/g) || []).length;
       assert(chipAdds >= 2, "both the single-chip and add-all paths must record provenance, got " + chipAdds);
@@ -2425,7 +2468,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
           _archiveUserTouched:false, pbpRememberPopupDraft() {} } : {}),
         pageInfo: { url: URL, pageText: "extracted body" },
         allUserTags: [],
-        tagCaseMap: o.tagCaseMap || {},
+        pbpPopupTagContext: (s) => ({ service: pbpBookmarkServiceId(s), separator: s.aiTagSeparator,
+          bookmarkNames: [], index: pbpTagVocabIndex(Object.fromEntries(Object.values(o.tagCaseMap || {}).map(name => [name, 1]))),
+          respectCase: s.optRespectTagCase }),
         _inflightAI: inflight,
         chrome: { runtime: { sendMessage: async (msg) => { calls.order.push("message"); calls.sent.push(msg); return respond(msg); } } },
         _ensureAIHostPermission: async () => {
@@ -3920,9 +3965,10 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const realFocus = tagsInput.focus.bind(tagsInput);
       tagsInput.focus = (opts) => { focusCalls.push(opts); realFocus(opts); };
       const added = [];
+      const currentTags = [];
       const runtime = new Function(
         "$id", "t", "PBP_ICONS", "allUserTagCounts",
-        "addTag", "_aiSessionAddedTags", "pbpAssignAltNumBadges",
+        "addTag", "currentTags", "_aiSessionAddedTags", "pbpAssignAltNumBadges",
         "_aiClearTagsOutput", "_aiAppendEmptyState", "_aiParkTagsBtn",
         popupAiSource.slice(renderStart, renderEnd + 2) + "\nreturn { renderAITags };"
       )(
@@ -3930,7 +3976,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         (key) => key,
         { check: "<svg></svg>" },
         {},
-        (tag) => added.push(tag),
+        (tag) => { currentTags.push(tag); added.push(tag); return tag; },
+        currentTags,
         new Set(),
         () => {},
         () => {},
@@ -4000,9 +4047,10 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const renderEnd = popupAiSource.indexOf("\n}\n", renderStart);
       const container = document.createElement("div");
       document.body.appendChild(container);
+      const currentTags = [];
       const runtime = new Function(
         "$id", "t", "PBP_ICONS", "allUserTagCounts",
-        "addTag", "_aiSessionAddedTags", "pbpAssignAltNumBadges",
+        "addTag", "currentTags", "_aiSessionAddedTags", "pbpAssignAltNumBadges",
         "_aiClearTagsOutput", "_aiAppendEmptyState", "_aiParkTagsBtn",
         popupAiSource.slice(renderStart, renderEnd + 2) + "\nreturn { renderAITags };"
       )(
@@ -4010,7 +4058,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         (key) => key,
         { check: "<svg></svg>" },
         {},
-        () => {},
+        (tag) => { currentTags.push(tag); return tag; },
+        currentTags,
         new Set(),
         () => {},
         () => {},
@@ -4036,8 +4085,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // popup-tags.js's buildSuggestGroup + the add-all-suggest wiring, extracted
     // verbatim (it lives nested inside the network-fetching
     // fetchPinboardSuggestTags and is not itself a standalone top-level
-    // function -- resolveTag is stubbed to identity here, sidestepping its
-    // settings/tagCaseMap dependency, which this focus contract does not touch).
+    // function -- resolveTag is stubbed to identity here because this focus
+    // contract does not touch spelling alignment.
     function suggestTagFocusRuntime(popularTags, recommendedTags) {
       const buildStart = popupTagsSource.indexOf("function buildSuggestGroup(");
       const buildEnd = popupTagsSource.indexOf("\n  } catch (e) {", buildStart);
@@ -4226,8 +4275,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const dependencies = {
         currentTags,
         settings: {},
-        tagCaseMap: {},
-        resolveTagCase: (tag) => tag,
+        pbpPopupTagContext: () => ({ service: "pinboard", separator: "-", bookmarkNames: [], index: pbpTagVocabIndex({}), respectCase: false }),
         renderTags: () => {},
       };
       const names = Object.keys(dependencies);

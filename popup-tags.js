@@ -92,7 +92,7 @@ async function fetchPinboardSuggestTags(token, url) {
       return;
     }
 
-    const resolveTag = (t) => (settings.optRespectTagCase && tagCaseMap) ? resolveTagCase(t, tagCaseMap) : t;
+    const resolveTag = (tag) => pbpAlignTagName(tag, pbpPopupTagContext()).name;
 
     function buildSuggestGroup(label, tags, addAllId) {
       const g = document.createElement("div");
@@ -195,7 +195,17 @@ async function fetchPinboardSuggestTags(token, url) {
 function applyTagData(counts) {
   allUserTagCounts = counts;
   allUserTags = pbpTagsByCount(counts); // shared.js: same ordering the SW AI prompts use (A14)
-  tagCaseMap = buildTagCaseMap(counts);
+  tagVocabIndex = pbpTagVocabIndex(counts);
+}
+
+function pbpPopupTagContext(s = settings) {
+  return { service: pbpBookmarkServiceId(s), separator: s.aiTagSeparator,
+    bookmarkNames: existingBookmark?.tagNames || [], index: tagVocabIndex,
+    respectCase: s.optRespectTagCase };
+}
+
+function pbpPopupTagGroupKey(name) {
+  return pbpTagGroupKey(name) || name.toLowerCase();
 }
 
 // Prewarmed mode serves cache ignoring the 10-min TTL (the SW alarm refreshes it),
@@ -396,7 +406,7 @@ function setupTagsInput() {
     e.preventDefault();
     const text = (e.clipboardData || window.clipboardData).getData("text");
     if (text) {
-      text.split(/[,，\s]+/).map(t => t.trim()).filter(Boolean).forEach(t => addTag(t));
+      pbpSplitTagInput(text).forEach(t => addTag(t));
       input.value = "";
       closeAutocomplete();
     }
@@ -435,7 +445,7 @@ function setupTagsInput() {
       } else if (acVisible) {
         addTag(items[0].dataset.tag);
       } else if (hasPending) {
-        input.value.trim().split(/[\s,，]+/).filter(Boolean).forEach((t) => addTag(t));
+        pbpSplitTagInput(input.value).forEach((t) => addTag(t));
       }
       input.value = ""; closeAutocomplete();
     } else if (e.key === " " || e.key === "," || e.key === "，") {
@@ -474,7 +484,7 @@ function setupTagsInput() {
   $id("tags-copy-all")?.addEventListener("click", async (e) => {
     e.preventDefault();
     if (!currentTags.length) return;
-    const text = currentTags.join(" ");
+    const text = pbpSerializeIntentTags(currentTags, pbpBookmarkServiceId(settings));
     let copied = false;
     try { await navigator.clipboard.writeText(text); copied = true; }
     catch (e) {
@@ -499,9 +509,7 @@ function setupTagsInput() {
   });
   $id("tags-last-used")?.addEventListener("click", (e) => {
     e.preventDefault();
-    const raw = e.currentTarget.dataset.tags || "";
-    if (!raw) return;
-    raw.split(/\s+/).filter(Boolean).forEach(tag => addTag(tag));
+    _lastUsedTagsCache.forEach(tag => addTag(tag));
   });
   loadLastUsedTags();
 }
@@ -531,7 +539,6 @@ function renderLastUsedHint() {
   const el = $id("tags-last-used");
   if (!el) return;
   if (!_lastUsedTagsCache.length || currentTags.length > 0) {
-    delete el.dataset.tags;
     el.classList.add("hidden");
     return;
   }
@@ -541,10 +548,9 @@ function renderLastUsedHint() {
   label.textContent = t("lastUsedTagsLabel");
   const tags = document.createElement("span");
   tags.className = "lu-tags";
-  tags.textContent = _lastUsedTagsCache.join(" ");
+  tags.textContent = _lastUsedTagsCache.join(_lastUsedTagsCache.some(tag => /\s/.test(tag)) ? ", " : " ");
   el.appendChild(label);
   el.appendChild(tags);
-  el.dataset.tags = _lastUsedTagsCache.join(" ");
   el.classList.remove("hidden");
 }
 
@@ -578,19 +584,18 @@ let _dragReorderFromIdx = null;
 
 function addTag(tag) {
   if (typeof tag !== "string" || !tag) return;
-  tag = tag.trim();
-  if (pbpBookmarkServiceId(settings) === "pinboard") tag = tag.replace(/\s+/g, settings.aiTagSeparator || "-");
+  tag = pbpCanonicalTagName(tag, pbpPopupTagContext());
   if (!tag) return;
-  if (settings.optRespectTagCase && tagCaseMap) {
-    tag = resolveTagCase(tag, tagCaseMap);
-  }
-  if (currentTags.some((t) => t.toLowerCase() === tag.toLowerCase())) return;
+  const key = pbpPopupTagGroupKey(tag);
+  const already = currentTags.find(t => pbpPopupTagGroupKey(t) === key);
+  if (already !== undefined) return already;
   currentTags.push(tag);
   // K75: this is the only entry point that pushes a tag on the user's
   // behalf (typed, chip click, AI-chip click, paste, preset) -- see
   // popup.js's _tagsUserTouched comment for what must never set this.
   if (typeof _tagsUserTouched !== "undefined") _tagsUserTouched = true;
   renderTags();
+  return tag;
 }
 
 function removeTag(tag) {
@@ -599,7 +604,7 @@ function removeTag(tag) {
   // Codex r2 M3: a removed tag loses its AI provenance - if the user
   // re-adds the same name by hand, replace-mode regen must treat it as
   // the user's tag and never retract it.
-  if (typeof _aiSessionAddedTags !== "undefined") _aiSessionAddedTags.delete(tag.toLowerCase());
+  if (typeof _aiSessionAddedTags !== "undefined") _aiSessionAddedTags.delete(pbpPopupTagGroupKey(tag));
   renderTags();
 }
 
@@ -674,10 +679,10 @@ function renderTags() {
 }
 
 function syncSuggestTagStates() {
-  const lowerTags = new Set(currentTags.map(t => t.toLowerCase()));
+  const usedTags = new Set(currentTags.map(pbpPopupTagGroupKey));
   document.querySelectorAll("#pinboard-suggest-tags .stag, #ai-suggest-tags .stag").forEach((el) => {
-    const tag = (el.dataset.tag || "").toLowerCase();
-    if (lowerTags.has(tag)) { el.classList.add("used"); el.disabled = true; }
+    const tag = pbpPopupTagGroupKey(el.dataset.tag || "");
+    if (usedTags.has(tag)) { el.classList.add("used"); el.disabled = true; }
     else { el.classList.remove("used"); el.disabled = false; }
   });
   pbpSyncRovingToolbars();

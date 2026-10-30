@@ -922,9 +922,9 @@ function showSetKeyError() {
   window._lastStatusFeedback = showFeedback({ variant: "error", messageNode: msg });
 }
 
-// Apply optional case-resolution to AI tags (mirrors the prior inline doAITags logic).
+// Canonicalize AI results at the same input boundary as typed and selected tags.
 function finalizeAITags(rawTags, s) {
-  return (s || settings).optRespectTagCase ? rawTags.map(t => resolveTagCase(t, tagCaseMap)) : rawTags;
+  return rawTags.map(tag => pbpCanonicalTagName(tag, pbpPopupTagContext(s || settings)));
 }
 
 // The two codes the worker mints itself (everything else comes from
@@ -1397,7 +1397,7 @@ async function doAITags(forceRefresh, sOverride) {
   }
 }
 
-// Tags added via AI chips THIS popup session (lowercase). Replace-mode
+// Tags added via AI chips THIS popup session (group key). Replace-mode
 // regen may only retract tags it knows the AI added here: a same-named
 // tag the user typed, or that came back on an existing bookmark, has no
 // AI provenance and must survive (audit A10).
@@ -1474,8 +1474,11 @@ function renderAITags(tags, fromCache) {
       // the click actually came from this chip (Tab+Enter), never on the
       // Alt+N synthetic .click() path.
       const hadFocus = document.activeElement === el;
-      addTag(tag);
-      _aiSessionAddedTags.add(tag.toLowerCase());
+      const priorKeys = new Set(currentTags.map(pbpPopupTagGroupKey));
+      const added = addTag(tag);
+      if (added && !priorKeys.has(pbpPopupTagGroupKey(added))) {
+        _aiSessionAddedTags.add(pbpPopupTagGroupKey(added));
+      }
       el.classList.add("used");
       el.disabled = true;
       if (hadFocus) $id("tags-input")?.focus({ preventScroll: true });
@@ -1493,8 +1496,11 @@ function renderAITags(tags, fromCache) {
     // any chip (or this button) gets disabled.
     const hadFocus = document.activeElement === aa;
     container.querySelectorAll(".stag:not(.used)").forEach((el) => {
-      addTag(el.dataset.tag);
-      _aiSessionAddedTags.add(el.dataset.tag.toLowerCase());
+      const priorKeys = new Set(currentTags.map(pbpPopupTagGroupKey));
+      const added = addTag(el.dataset.tag);
+      if (added && !priorKeys.has(pbpPopupTagGroupKey(added))) {
+        _aiSessionAddedTags.add(pbpPopupTagGroupKey(added));
+      }
       el.classList.add("used");
     });
     aa.innerHTML = PBP_ICONS.check; aa.disabled = true; aa.classList.add("tag-copied-flash");
@@ -1507,7 +1513,7 @@ function renderAITags(tags, fromCache) {
   // and the cached pair "Regenerate" (append) / "Replace" read as the
   // opposite of the summary's "Regenerate" (replace). "New set" retracts the
   // chips this round added, then asks again.
-  const cachedTagSet = new Set(tags.map(t => t.toLowerCase()));
+  const cachedTagSet = new Set(tags.map(pbpPopupTagGroupKey));
   // No inline display/margin-left here (T5 fix round F2, dropped): #ai-
   // suggest-tags is a flex row (popup.css chip-flow rule), which blockifies
   // every child regardless of its own `display` -- an explicit
@@ -1552,7 +1558,7 @@ function renderAITags(tags, fromCache) {
     // tag with no AI provenance (typed, or from the saved bookmark)
     // stays (audit A10).
     const wasAddedByThisRound = (t) =>
-      cachedTagSet.has(t.toLowerCase()) && _aiSessionAddedTags.has(t.toLowerCase());
+      cachedTagSet.has(pbpPopupTagGroupKey(t)) && _aiSessionAddedTags.has(pbpPopupTagGroupKey(t));
     let retracted = [];
     // Finding 5: snapshot _tagsUserTouched before the removal below so a
     // refused regen's rollback (finally block) can restore it -- addTag
