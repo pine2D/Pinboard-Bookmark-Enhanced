@@ -202,7 +202,7 @@ try{
       assert(await popup.locator('#private-check').isHidden());assert(await popup.locator('#share-check').isVisible());assert(!await popup.locator('#share-check').isChecked());
       await popup.keyboard.press('Alt+p');assert(await popup.locator('#private-check').isChecked(),'Alt+P toggled hidden supported Private');assert(!await popup.locator('#share-check').isChecked(),'Alt+P changed visible Share');
       await popup.locator('#share-check').check();
-      await until(()=>worker.evaluate(async()=>Object.values(await chrome.storage.session.get(null)).some(row=>row?.draft?.private===false)),'shared choice persisted in private draft field');
+      await until(()=>worker.evaluate(async()=>Object.values(await chrome.storage.session.get(null)).some(row=>row?.draft?.private===false&&row.draft.sharedExplicit===true)),'shared choice persisted in private draft field');
       await popup.close();await article.bringToFront();
       const reopened=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');popup=await reopened;
       await popup.waitForFunction(()=>typeof _popupDraftContext!=='undefined'&&_popupDraftContext?.ready===true&&!document.getElementById('submit-btn').disabled);
@@ -219,10 +219,21 @@ try{
       assert.equal(latestWrite().method,'POST');assert.equal(latestWrite().data.shared,false);
       const reopen=async()=>{await popup.close();await article.bringToFront();const event=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');popup=await event;await popup.waitForFunction(()=>document.getElementById('existing-banner')&&!document.getElementById('existing-banner').classList.contains('hidden')&&!document.getElementById('submit-btn').disabled);};
       await reopen();assert(!await popup.locator('#share-check').isChecked());
+      await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});
       await popup.locator('#share-check').check();await popup.locator('#submit-btn').click();await until(()=>latestWrite().data.shared===true,'popup changed sharing');
+      await popup.waitForFunction(()=>document.getElementById('submit-btn').classList.contains('saved-success'));
+      [...records.linkding.values()][0].shared=false;
+      await popup.locator('#title-input').fill('Second same-popup title edit');await popup.locator('#submit-btn').click();
+      await until(()=>latestWrite().data.title==='Second same-popup title edit','second same-popup update');
+      assert(!Object.hasOwn(latestWrite().data,'shared')&&![...records.linkding.values()][0].shared,'settled sharing intent leaked into later title edit');
+      [...records.linkding.values()][0].shared=true;
+
       await reopen();assert(await popup.locator('#share-check').isChecked(),'existing shared record was not filled');
       await popup.keyboard.press('Alt+p');assert(!await popup.locator('#private-check').isChecked()&&await popup.locator('#share-check').isChecked(),'Alt+P changed hidden Private on an existing shared record');
+      [...records.linkding.values()][0].shared=false; // Another client unshares after this popup loaded.
       await popup.locator('#title-input').fill('Unrelated title edit');await popup.locator('#submit-btn').click();await until(()=>latestWrite().data.title==='Unrelated title edit','title-only update');assert(!Object.hasOwn(latestWrite().data,'shared'),'title update rewrote shared');
+      assert.equal([...records.linkding.values()][0].shared,false,'untouched popup republished remote private bookmark');
+      [...records.linkding.values()][0].shared=true;
       const merge=await worker.evaluate(url=>submitSaveIntent({mode:'merge',url,title:'Ignored',notes:'',tags:'extra',private:true,toread:false}),origin+'/article');assert.equal(merge.status,'saved');assert(!Object.hasOwn(latestWrite().data,'shared'),'merge rewrote shared');
     }
     await popup.close();
@@ -237,6 +248,24 @@ try{
     await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
     if(service==='karakeep')assert(await reader.locator('#reader-bookmark-private').isHidden());
     else {assert(await reader.locator('#reader-bookmark-private').isVisible());assert(await reader.locator('#reader-bookmark-private').isChecked());assert((await reader.locator('#reader-bookmark-private').locator('xpath=ancestor::label').textContent()).includes('Share'));assert(!Object.hasOwn(requests.filter(r=>r.service==='linkding'&&r.method==='PATCH').at(-1).data,'shared'),'reader Read Later changed sharing');}
+    if(service==='linkding'){
+      const latestPatch=()=>requests.filter(r=>r.service==='linkding'&&r.method==='PATCH').at(-1);
+      const row=[...records.linkding.values()][0];row.shared=false;
+      await reader.locator('#reader-bookmark-title').fill('Reader title-only edit');
+      await reader.locator('#reader-bookmark-apply').click();
+      await until(()=>latestPatch().data.title==='Reader title-only edit','reader title-only delivery');
+      assert(!Object.hasOwn(latestPatch().data,'shared')&&!row.shared,'untouched reader republished remotely private bookmark');
+      for(const desired of [true,false]){
+        await reader.locator('#reader-bookmark-editor:popover-open').waitFor({state:'hidden'});
+        await reader.locator('#reader-bookmark-edit').click();await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
+        await reader.locator('#reader-bookmark-private').setChecked(desired);
+        const before=requests.length;await reader.locator('#reader-bookmark-apply').click();
+        await until(()=>requests.length>before&&latestPatch().data.shared===desired,'reader explicit sharing delivery');
+        assert.equal(row.shared,desired);
+      }
+      await reader.locator('#reader-bookmark-editor:popover-open').waitFor({state:'hidden'});
+      await reader.locator('#reader-bookmark-edit').click();await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
+    }
     await reader.locator('#reader-bookmark-delete').click();await reader.locator('.confirm-yes').click();
     await reader.waitForFunction(()=>document.getElementById('reader-bookmark-status')?.textContent==='Bookmark deleted');
     assert.equal(records[service].size,0);await reader.close();
@@ -323,7 +352,7 @@ try{
   }
   await worker.evaluate(async credential=>persistSettings({linkdingToken:credential}),sharingCredential);
   const publicUrl=origin+'/article-explicit-shared';
-  assert.equal((await worker.evaluate(url=>submitSaveIntent({mode:'create',url,title:'Explicit share',notes:'',tags:'',private:false,toread:false}),publicUrl)).status,'saved');
+  assert.equal((await worker.evaluate(url=>submitSaveIntent({mode:'create',url,title:'Explicit share',notes:'',tags:'',private:false,toread:false,sharedExplicit:true}),publicUrl)).status,'saved');
   const publicRow=[...records.linkding.values()].find(row=>row.url===publicUrl);assert.equal(publicRow.shared,true,'enabled explicit new sharing was lost');records.linkding.delete(String(publicRow.id));
   console.log('linkding missing/disabled sharing: popup and reader controls hidden, new shared=false, existing shared=true preserved');
   // A second client saves after check-url. The server response is authored

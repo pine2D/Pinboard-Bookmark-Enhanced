@@ -1624,6 +1624,7 @@ await suite("unified save pipeline", async () => {
     const batch = await createBatchSaveHarness({settings:{bookmarkService:"pinboard",optBatchTag:"web_design",optBatchTagEnabled:true,batchAiTags:true,optRespectTagCase:true},hasAIKey:true,pageInfo:{pageText:"Synthetic public text"},cached:{tags:["webdesign"]},tagVocabIndex:vocab});
     await batch.handleBatchSave(batchTabs(1));
     for (const prepared of [quick.intents[0], batch.intents[0].prepared]) {
+      assert(!Object.hasOwn(prepared,"sharedExplicit"),"automatic save manufactured sharing intent");
       assert(prepared.tags.includes("web-design"), "entry did not use library majority");
       for (const replay of [false,true]) {
         const post = {href:prepared.url,description:"Saved",extended:"Notes",tags:"web_design",shared:"no",toread:"no",time:"2026-10-30T00:00:00Z"};

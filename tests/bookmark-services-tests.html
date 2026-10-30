@@ -78,10 +78,10 @@ test("linkding sharing capability fails closed and only boolean true enables it"
   }
 });
 test("linkding creates are unshared unless sharing is enabled and explicitly chosen", async()=>{
-  for(const sharingEnabled of [undefined,false,true]) for(const privateChoice of [undefined,true,false]) {
+  for(const sharingEnabled of [undefined,false,true]) for(const privateChoice of [undefined,true,false]) for(const sharedExplicit of [undefined,false,true]) {
     const h=harness("linkding",[[201,ld]],{sharingEnabled});
-    await h.client.save({url:pageUrl,title:"T",notes:"",tags:[],private:privateChoice},null);
-    equal(h.calls[0].body.shared,sharingEnabled===true && privateChoice===false);
+    await h.client.save({url:pageUrl,title:"T",notes:"",tags:[],private:privateChoice,sharedExplicit},null);
+    equal(h.calls[0].body.shared,sharingEnabled===true && privateChoice===false && sharedExplicit===true);
   }
 });
 test("linkding PATCH changes sharing only for an explicit visible change", async()=>{
@@ -311,12 +311,35 @@ test("worker saves to linkding without a Pinboard credential", async()=>{
   equal(h.state.calls[1].headers.get("Authorization"),"Token fixture-secret");equal(h.state.queue,[]);
 });
 test("worker linkding updates preserve sharing unless the visible choice changes; merge never changes sharing", async()=>{
-  for(const mode of ["update","merge"]) for(const sharing of [undefined,false,true]) for(const chosenPrivate of [false,true]) {
+  for(const mode of ["update","merge"]) for(const sharing of [undefined,false,true]) for(const chosenPrivate of [false,true]) for(const sharedExplicit of [undefined,false,true]) {
     const h=await workerHarness("linkding",[[200,{bookmark:ld}],[200,ld]]);
     const credential=JSON.parse(h.state.settings.linkdingToken); credential.sharing=sharing;
     h.state.settings.linkdingToken=JSON.stringify(credential);
-    equal((await h.submitSaveIntent({...saveIntent,mode,private:chosenPrivate,...(mode==="update"?{time:ld.date_added}:{})})).status,"saved");
-    equal(Object.hasOwn(h.state.calls[1].body,"shared"),mode==="update" && sharing===true && chosenPrivate===false);
+    equal((await h.submitSaveIntent({...saveIntent,mode,private:chosenPrivate,sharedExplicit,...(mode==="update"?{time:ld.date_added}:{})})).status,"saved");
+    equal(Object.hasOwn(h.state.calls[1].body,"shared"),mode==="update" && sharing===true && sharedExplicit===true && chosenPrivate===false);
+  }
+});
+test("explicit sharing survives actual offline replay while legacy and invalid flags fail closed", async()=>{
+  for(const sharedExplicit of [undefined,false,true,"true",1,null]) {
+    const replies=[new TypeError("offline"),[200,{bookmark:{...ld,shared:false}}],[200,ld]];
+    const h=await workerHarness("linkding",replies);
+    const credential=JSON.parse(h.state.settings.linkdingToken);credential.sharing=true;h.state.settings.linkdingToken=JSON.stringify(credential);
+    const prepared={...saveIntent,mode:"update",time:ld.date_added,private:false,...(sharedExplicit===undefined?{}:{sharedExplicit})};
+    const first=await h.submitSaveIntent(prepared);
+    if(sharedExplicit!==undefined&&typeof sharedExplicit!=="boolean") {equal(first.reason,"invalid");equal(h.state.calls.length,0);continue;}
+    equal(first.status,"queued");equal(h.state.queue[0].sharedExplicit,sharedExplicit);
+    const replay=await h.sendOfflineItem(h.state.queue[0]);equal(replay.result.status,"saved");
+    equal(Object.hasOwn(h.state.calls.at(-1).body,"shared"),sharedExplicit===true);
+  }
+});
+test("queued explicit creates may share a new bookmark but never an existing replay target",async()=>{
+  for(const exists of [false,true]) {
+    const h=await workerHarness("linkding",[new TypeError("offline"),[200,{bookmark:exists?ld:null}],[exists?200:201,ld]]);
+    const credential=JSON.parse(h.state.settings.linkdingToken);credential.sharing=true;h.state.settings.linkdingToken=JSON.stringify(credential);
+    equal((await h.submitSaveIntent({...saveIntent,private:false,sharedExplicit:true})).status,"queued");
+    const item=h.state.queue[0];equal(item.mode,"merge");equal(item.sharedExplicit,true);
+    equal((await h.sendOfflineItem(item)).result.status,"saved");
+    if(exists)ok(!Object.hasOwn(h.state.calls.at(-1).body,"shared"));else equal(h.state.calls.at(-1).body.shared,true);
   }
 });
 test("worker preserves merge semantics through Karakeep and does not archive", async()=>{

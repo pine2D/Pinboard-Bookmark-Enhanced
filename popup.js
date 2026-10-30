@@ -130,6 +130,7 @@ function pbpPopupBookmarkPrivacy() {
   $id("share-check").closest("label").hidden = service !== "linkding" || !pbpBookmarkConnection(settings).sharingEnabled;
   if (service !== "pinboard") $id("private-check").checked = true;
   $id("share-check").checked = false;
+  _linkdingSharedExplicit = false;
 }
 function pbpPopupPrefillDescription() {
   const linkding = pbpBookmarkServiceId(settings) === "linkding";
@@ -218,6 +219,9 @@ let _activeTabAtOpen = null;
 let _popupDraftContext = null;
 // Draft-only provenance: AI/meta writes must remain regenerable after reopening.
 let _linkdingDescriptionTouched = false;
+// Only an actual visible Share change (or its owner-scoped draft) sets this.
+let _linkdingSharedExplicit = false;
+let _linkdingSharedRevision = 0;
 let _popupDraftRevision = 0;
 let _popupDraftWriteRevision = 0;
 let _popupDraftUserUrl = false;
@@ -228,7 +232,7 @@ const _popupDraftChangedFields = new Set();
 function pbpPopupDraftSnapshot() {
   return { url: $id("url-input").value, title: $id("title-input").value,
     notes: $id("description-input").value,
-    ...(pbpBookmarkServiceId(settings) === "linkding" ? { summary: $id("linkding-description-input").value, summaryTouched: _linkdingDescriptionTouched } : {}), tags: currentTags.slice(), tagInput: $id("tags-input").value,
+    ...(pbpBookmarkServiceId(settings) === "linkding" ? { summary: $id("linkding-description-input").value, summaryTouched: _linkdingDescriptionTouched, sharedExplicit: _linkdingSharedExplicit } : {}), tags: currentTags.slice(), tagInput: $id("tags-input").value,
     private: $id("private-check").checked, toread: $id("readlater-check").checked,
     archive: $id("archive-check").checked, archiveTouched: _archiveUserTouched };
 }
@@ -278,6 +282,18 @@ async function pbpDiscardPopupDraft(allOwner = false) {
   return true;
 }
 function pbpPopupDraftFieldEdited(id, { manual = true } = {}) {
+  if (id === "share-check") {
+    const share = $id(id);
+    if (pbpBookmarkServiceId(settings) !== "linkding" || !pbpBookmarkConnection(settings).sharingEnabled
+        || share.disabled || share.closest("label")?.hidden) return;
+    // Repeated input/change notifications do not create a choice. A toggle
+    // back to the initial value is still the user's explicit final choice.
+    if ($id("private-check").checked !== !share.checked) {
+      _linkdingSharedExplicit = true;
+      _linkdingSharedRevision++;
+      _popupDraftChangedFields.add("sharedExplicit");
+    }
+  }
   _popupDraftRevision++;
   _popupDraftEdited = true;
   // The shared UI is the inverse view of the existing private draft field.
@@ -362,6 +378,7 @@ async function initPopupDraft(account, tab) {
       $id("share-check").checked = !$id("private-check").checked;
       if (!_popupDraftChangedFields.has("archiveTouched")) _archiveUserTouched = d.archiveTouched;
       if (!_popupDraftChangedFields.has("summaryTouched")) _linkdingDescriptionTouched = d.summaryTouched === true;
+      if (!_popupDraftChangedFields.has("sharedExplicit")) _linkdingSharedExplicit = pbpBookmarkServiceId(settings) === "linkding" && pbpBookmarkConnection(settings).sharingEnabled && d.sharedExplicit === true;
       _popupDraftUserUrl = true;
       _popupDraftRestored = true;
       for (const id of Object.keys(fieldDirtyFlags)) {
@@ -1223,7 +1240,7 @@ async function htmlToMarkdownAsync(html, opts) {
                 account: sessionAccount,
                 tags: Array.isArray(currentTags) ? currentTags.slice() : [],
                 description: $id("description-input")?.value || "",
-                ...(pbpBookmarkServiceId(settings) === "linkding" ? { bookmarkDraft: { summary: ($id("linkding-description-input")?.value || "").replace(/\s+/g, " ").trim() } } : {}),
+                ...(pbpBookmarkServiceId(settings) === "linkding" ? { bookmarkDraft: { summary: ($id("linkding-description-input")?.value || "").replace(/\s+/g, " ").trim(), private: $id("private-check")?.checked === true, sharedExplicit: _linkdingSharedExplicit } } : {}),
                 ts: Date.now()
               }
             });
@@ -1359,7 +1376,7 @@ async function htmlToMarkdownAsync(html, opts) {
                 title: $id("title-input")?.value || result.title || "",
                 tags: Array.isArray(currentTags) ? (pbpBookmarkServiceId(settings) === "pinboard" ? currentTags.join(" ") : pbpBookmarkFormatTags(currentTags)) : "",
                 notes: $id("description-input")?.value || "",
-                ...(pbpBookmarkServiceId(settings) === "linkding" ? { summary: ($id("linkding-description-input")?.value || "").replace(/\s+/g, " ").trim() } : {}),
+                ...(pbpBookmarkServiceId(settings) === "linkding" ? { summary: ($id("linkding-description-input")?.value || "").replace(/\s+/g, " ").trim(), sharedExplicit: _linkdingSharedExplicit } : {}),
                 private: $id("private-check")?.checked === true,
                 toread: $id("readlater-check")?.checked === true,
               },
@@ -1882,6 +1899,8 @@ function setupSubmit(token) {
         title,
         extended,
         summary,
+        sharedExplicit,
+        sharedRevision,
         tags,
         isPrivate,
         isReadLater,
@@ -1891,6 +1910,8 @@ function setupSubmit(token) {
         title: $id("title-input").value,
         extended: $id("description-input").value,
         summary: $id("linkding-description-input").value,
+        sharedExplicit: _linkdingSharedExplicit,
+        sharedRevision: _linkdingSharedRevision,
         tags: currentTags.slice(),
         isPrivate: $id("private-check").checked,
         isReadLater: $id("readlater-check").checked,
@@ -1922,7 +1943,7 @@ function setupSubmit(token) {
         url: saveUrl,
         title,
         notes: extended,
-        ...(pbpBookmarkServiceId(settings) === "linkding" ? { summary: summary.replace(/\s+/g, " ").trim() } : {}),
+        ...(pbpBookmarkServiceId(settings) === "linkding" ? { summary: summary.replace(/\s+/g, " ").trim(), sharedExplicit } : {}),
         tags: pbpSerializeIntentTags(tags, pbpBookmarkServiceId(settings)),
         private: isPrivate,
         toread: isReadLater,
@@ -1933,12 +1954,13 @@ function setupSubmit(token) {
       }
       const popupDraft = _popupDraftContext ? { pageUrl: _popupDraftContext.pageUrl,
         incognito: _popupDraftContext.incognito, expectedDraft: pbpPopupDraftSnapshot() } : null;
+      let sharingIntentConsumed = false;
       const formMatchesSubmitted = () => (
         $id("title-input").value === title
         && $id("description-input").value === extended
         && (pbpBookmarkServiceId(settings) !== "linkding" || $id("linkding-description-input").value === summary)
         && $id("private-check").checked === isPrivate
-        && (pbpBookmarkServiceId(settings) !== "linkding" || $id("share-check").checked === !isPrivate)
+        && (pbpBookmarkServiceId(settings) !== "linkding" || ($id("share-check").checked === !isPrivate && _linkdingSharedExplicit === (sharingIntentConsumed ? false : sharedExplicit) && _linkdingSharedRevision === sharedRevision))
         && $id("readlater-check").checked === isReadLater
         && $id("archive-check").checked === archiveRequested
         && $id("tags-input").value.trim() === ""
@@ -2023,11 +2045,23 @@ function setupSubmit(token) {
       }
 
       if (result.status === "saved") {
+        // A successful delivery consumes only this click's sharing choice.
+        // Controls remain editable during I/O: a newer toggle, even back to
+        // the same value, belongs to the next save and keeps its provenance.
+        if (pbpBookmarkServiceId(settings) === "linkding" && _linkdingSharedRevision === sharedRevision) {
+          _linkdingSharedExplicit = false;
+          sharingIntentConsumed = true;
+        }
         if (formMatchesSubmitted()) {
           _popupDraftEdited = false;
           _popupDraftRestored = false;
           _popupDraftLastSnapshot = "";
           _popupDraftChangedFields.clear();
+        } else if (pbpBookmarkServiceId(settings) === "linkding" && typeof pbpRememberPopupDraft === "function") {
+          // The worker may have cleared an identical submitted snapshot;
+          // retain later edits with their current, possibly consumed marker.
+          _popupDraftLastSnapshot = "";
+          pbpRememberPopupDraft();
         }
         try {
           if (typeof pbpAiSaveSummaryOwnership === "function") {
@@ -2324,6 +2358,7 @@ async function loadBookmarkForEdit(url, token) {
   _linkdingDescriptionTouched = false;
   $id("private-check").checked = pbpBookmarkServiceId(settings) !== "pinboard";
   $id("share-check").checked = false;
+  _linkdingSharedExplicit = false;
   $id("readlater-check").checked = false;
   $id("submit-btn").textContent = t("submit");
   $id("delete-btn").classList.add("hidden");

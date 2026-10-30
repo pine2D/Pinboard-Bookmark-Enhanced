@@ -208,22 +208,23 @@ await test("normal and pending popup preview payloads carry linkding Description
     else if (opener[i] === "}" && --depth === 0) { closing = i; break; }
   }
   assert(closing > opening, "normal draft object did not close");
-  const normal = new Function("$id", "settings", "currentTags", "pbpBookmarkServiceId", "pbpBookmarkFormatTags", "result",
+  const normal = new Function("$id", "settings", "currentTags", "pbpBookmarkServiceId", "pbpBookmarkFormatTags", "result", "_linkdingSharedExplicit",
     "return (" + opener.slice(opening, closing + 1) + ");");
   const pendingLine = source.split("\n").find(line => line.includes("{ bookmarkDraft: { summary:"));
   assert(pendingLine, "pending preview has no Description draft");
-  const pending = new Function("$id", "settings", "pbpBookmarkServiceId", "return ({" + pendingLine.trim() + "}).bookmarkDraft;");
+  const pending = new Function("$id", "settings", "pbpBookmarkServiceId", "_linkdingSharedExplicit", "return ({" + pendingLine.trim() + "}).bookmarkDraft;");
   const fields = { "title-input": "T", "description-input": "Note", "linkding-description-input": "first second", "private-check": false, "readlater-check": false };
   const $id = name => ({ value: fields[name], checked: fields[name] });
-  for (const service of ["linkding", "pinboard"]) {
+  for (const service of ["linkding", "pinboard"]) for (const sharedExplicit of [false,true]) {
     const settings = { bookmarkService: service }, account = service === "linkding" ? "linkding:fixture" : "alice";
-    for (const draft of [normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }),
-      pending($id, settings, pbpBookmarkServiceId)]) {
+    for (const draft of [normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, sharedExplicit),
+      pending($id, settings, pbpBookmarkServiceId, sharedExplicit)]) {
       if (service === "linkding") {
         equal(draft.summary, "first second");
         const h = await harness({ account, service, post: null, slot: { account, bookmarkDraft: draft } });
         const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER);
         equal(state.bookmark.summary, "first second");
+        equal(state.bookmark.sharedExplicit, sharedExplicit); equal(state.bookmark.private, !sharedExplicit);
       } else assert(!draft || !("summary" in draft));
     }
   }
@@ -233,6 +234,7 @@ await test("reader initial linkding Description follows the owner-bound preview 
   const h = await harness({ account, service: "linkding", post: null, slot: { account, bookmarkDraft: { title: "T", tags: "one", notes: "Note", summary: "first\nsecond", summaryTouched: true } } });
   const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER);
   equal(state.descriptionSupported, true); equal(state.bookmark.summary, "first second");
+  for (const sharedExplicit of [null,1,"true"]) equal((await h.pbpReaderBookmarkRequest({type:"mdReaderBookmarkSave",account,action:"edit",draft:{...state.bookmark,sharedExplicit}},SENDER)).reason,"invalid");
   const invalid = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action: "edit", draft: { ...state.bookmark, summary: 7 } }, SENDER);
   equal(invalid.reason, "invalid");
   const saved = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action: "edit", draft: { ...state.bookmark, summary: "changed\nvalue" } }, SENDER);
@@ -485,7 +487,27 @@ await test("reader linkding editor shows supported sharing and inverts the saved
       await new Promise(r=>setTimeout(r,30));await w.pbpReaderBookmarkAction("edit");
       const box=w.document.getElementById("reader-bookmark-private");
       equal(box.closest("label").hidden,sharingSupported!==true);
-      if(sharingSupported){equal(box.checked,true);assert(box.closest("label").textContent.includes("bookmarkShare"));box.checked=false;w.document.getElementById("reader-bookmark-apply").click();await new Promise(r=>setTimeout(r,0));equal(messages.find(m=>m.action==="edit").draft.private,true);}
+      if(sharingSupported){equal(box.checked,true);assert(box.closest("label").textContent.includes("bookmarkShare"));box.click();w.document.getElementById("reader-bookmark-apply").click();await new Promise(r=>setTimeout(r,0));equal(messages.find(m=>m.action==="edit").draft.private,true);equal(messages.find(m=>m.action==="edit").draft.sharedExplicit,true);}
+    } finally {frame.remove();}
+  }
+});
+await test("reader title-only edit does not fabricate sharing intent, but explicit toggle back remains a choice", async () => {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  for(const toggles of [0,1,2]) {
+    const frame=document.createElement("iframe");document.body.append(frame);
+    try {
+      const w=frame.contentWindow,messages=[];
+      w.document.body.innerHTML='<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+      w.eval(await(await fetch("../shared.js")).text());w.t=k=>k;
+      w.chrome={runtime:{id:"test-id",getURL:p=>p,onMessage:{addListener(){}},sendMessage:async msg=>{messages.push(msg);return {known:true,bookmarked:true,account:"linkding:c1",privacySupported:false,sharingSupported:true,bookmark:{title:"T",notes:"",tags:"",private:false,toread:false}};}}};
+      w.eval(runtime);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account:"linkding:c1"}}));
+      await new Promise(r=>setTimeout(r,30));await w.pbpReaderBookmarkAction("edit");
+      const box=w.document.getElementById("reader-bookmark-private");
+      for(let i=0;i<toggles;i++)box.click();
+      w.document.getElementById("reader-bookmark-title").value="Title only";
+      w.document.getElementById("reader-bookmark-apply").click();await new Promise(r=>setTimeout(r,0));
+      const draft=messages.find(m=>m.action==="edit").draft;
+      equal(draft.sharedExplicit,toggles>0);equal(draft.private,toggles===1);
     } finally {frame.remove();}
   }
 });

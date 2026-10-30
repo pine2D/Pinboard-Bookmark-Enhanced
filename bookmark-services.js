@@ -222,7 +222,7 @@ function pbpCreateBookmarkServiceClient(config) {
         ...(!existing ? {description:fields.summary ?? ""}
           : typeof fields.summary === "string" && fields.summary !== existing.summary ? {description:fields.summary} : {}),
         ...(typeof fields.toread === "boolean" ? {unread:fields.toread} : {}),
-        ...(!existing ? {shared:config.sharingEnabled === true && fields.private === false}
+        ...(!existing ? {shared:config.sharingEnabled === true && fields.sharedExplicit === true && fields.private === false}
           : config.sharingEnabled === true && fields.sharedExplicit === true && typeof fields.private === "boolean" && fields.private !== existing.private ? {shared:!fields.private} : {})};
       const {data} = await request(existing ? "bookmarks/" + pbpBookmarkRecordId(existing.id) + "/" : "bookmarks/?disable_scraping", existing ? "PATCH" : "POST", body);
       const bookmark = pbpBookmarkNormalize(service,data);

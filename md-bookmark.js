@@ -11,6 +11,8 @@
   let editorStatusKey = "";
   let editor = null;
   let editorSource = null;
+  let sharedExplicit = false;
+  let sharingChoice = false;
   const buttons = [];
   const text = (key, ...args) => typeof t === "function" ? t(key, ...args) : key;
   const id = name => document.getElementById("reader-bookmark-" + name);
@@ -188,6 +190,11 @@
       const input = type === "textarea" ? document.createElement("textarea") : document.createElement("input");
       input.id = "reader-bookmark-" + name;
       if (type !== "textarea") input.type = type;
+      if (name === "private") input.addEventListener("change", () => {
+        if (state.sharingSupported !== true || input.disabled || input.closest("label").hidden) return;
+        if (input.checked !== sharingChoice) sharedExplicit = true;
+        sharingChoice = input.checked;
+      });
       if (type === "checkbox") {
         field.className = "row";
         const mark = document.createElement("span"); mark.className = "reader-check";
@@ -215,6 +222,7 @@
     apply.addEventListener("click", () => save("edit", {
       title: id("title").value, tags: id("tags").value, notes: id("notes").value,
       ...(state.descriptionSupported === true ? { summary: id("summary").value.replace(/\s+/g, " ").trim() } : {}),
+      ...(state.sharingSupported === true ? { sharedExplicit } : {}),
       private: state.sharingSupported === true ? !id("private").checked : state.privacySupported === false || id("private").checked, toread: id("toread").checked,
     }));
     const cancel = document.createElement("button");
@@ -247,6 +255,8 @@
     privacyLabel.hidden = state.privacySupported === false && state.sharingSupported !== true;
     label(privacyLabel.lastElementChild, state.sharingSupported === true ? "bookmarkShare" : "readerBookmarkPrivate");
     id("private").checked = state.sharingSupported === true ? values.private === false : state.privacySupported === false || values.private === true; id("toread").checked = values.toread === true;
+    sharedExplicit = state.sharingSupported === true && !state.bookmarked && values.sharedExplicit === true;
+    sharingChoice = id("private").checked;
     editorSource = document.activeElement;
     editor.showPopover(); id("title").focus();
   }

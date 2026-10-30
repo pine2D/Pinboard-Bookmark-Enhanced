@@ -101,6 +101,18 @@ await suite("offline queue", async () => {
     assert(h.validateSaveIntent(normalized) === null, "round-tripped intent is valid");
     assert(queue[0].account === "alice", "non-secret owner binding preserved");
   });
+  await test("optional explicit sharing round-trips and rejects nonboolean queue fields", async () => {
+    const h=await queueIntentHarness();
+    for(const sharedExplicit of [undefined,false,true,"true",1,null]) {
+      const prepared={...SAVE_INTENT,...(sharedExplicit===undefined?{}:{sharedExplicit})};
+      const record=h.queueRecordFromSaveIntent(prepared,"alice:fixture");
+      const expected=["account","mode","url","title","notes","summary","tags","private","toread","archive","time",...(sharedExplicit===undefined?[]:["sharedExplicit"])].sort();
+      assert(JSON.stringify(Object.keys(record).sort())===JSON.stringify(expected),"sharing widened the queue whitelist");
+      const restored=h.normalizeOfflineSaveIntent(record,{});
+      assert(restored.sharedExplicit===sharedExplicit,"sharing provenance lost");
+      assert((h.validateSaveIntent(restored)===null)===(sharedExplicit===undefined||typeof sharedExplicit==="boolean"),"invalid marker accepted");
+    }
+  });
   await test("optional summary accepts missing and empty legacy values", async () => {
     const h = await queueIntentHarness();
     for (const summary of [undefined, ""]) {

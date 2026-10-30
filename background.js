@@ -709,8 +709,9 @@ async function pbpDeliverSelfHosted(intent, auth, settings) {
     const bookmarkNames = lookup.exists ? lookup.bookmark.tags : [];
     const respectCase = settings?.optRespectTagCase === true;
     const names = pbpAlignIncomingTags(incomingTags, bookmarkNames, index, respectCase, intent.mode === "merge" && lookup.exists);
-    // Only a visible update choice may change linkding sharing. Merge keeps it.
-    const fields = {...plan.fields, tags:names, sharedExplicit:intent.mode === "update" && auth.sharingEnabled === true};
+    // Only a recorded visible user choice may change sharing; merge/replay
+    // against an existing bookmark preserves its current server state.
+    const fields = {...plan.fields, tags:names, sharedExplicit:intent.sharedExplicit === true && auth.sharingEnabled === true && (intent.mode === "update" || !lookup.exists)};
     const alignCreatedTags = auth.service === "karakeep" ? (tags, bookmark) =>
       pbpAlignIncomingTags(tags, bookmark.tags, index, respectCase, true) : undefined;
     const result = await pbpBookmarkClient(auth, alignCreatedTags).save(fields, lookup.bookmark);
@@ -749,6 +750,7 @@ function validateSaveIntent(intent) {
   } catch (_) {
     return pbpSaveFailure("invalid");
   }
+  if (intent.sharedExplicit !== undefined && typeof intent.sharedExplicit !== "boolean") return pbpSaveFailure("invalid");
   if (intent.summary !== undefined && typeof intent.summary !== "string") return pbpSaveFailure("invalid");
   if (intent.toread !== undefined && typeof intent.toread !== "boolean") return pbpSaveFailure("invalid");
   if (intent.archive !== undefined && typeof intent.archive !== "boolean") return pbpSaveFailure("invalid");
@@ -1010,6 +1012,7 @@ function normalizeOfflineSaveIntent(item, settings) {
     title: typeof item?.title === "string" ? item.title : "",
     notes: typeof item?.notes === "string" ? item.notes : "",
     summary: item?.summary,
+    ...(item?.sharedExplicit !== undefined ? { sharedExplicit: item.sharedExplicit } : {}),
     tags: typeof item?.tags === "string" ? item.tags : "",
     private: item?.private === true,
     toread: item?.toread === true || item?.toread === "yes",
@@ -1065,6 +1068,7 @@ function queueRecordFromSaveIntent(intent, token) {
     title: intent.title,
     notes: intent.notes,
     summary: intent.summary,
+    ...(intent.sharedExplicit !== undefined ? { sharedExplicit: intent.sharedExplicit } : {}),
     tags: intent.tags,
     private: intent.private,
     toread: intent.toread,
@@ -1372,7 +1376,8 @@ function pbpReaderInitialIntent(context, settings, action) {
     notes: typeof originalDraft?.notes === "string" ? originalDraft.notes : typeof context.description === "string" ? context.description : "",
     ...(linkding ? { summary: typeof originalDraft?.summary === "string" ? originalDraft.summary.replace(/\s+/g, " ").trim() : "" } : {}),
     tags: typeof originalDraft?.tags === "string" ? originalDraft.tags : Array.isArray(context.tags) ? pbpSerializeIntentTags(context.tags, pbpBookmarkServiceId(settings)) : "",
-    private: linkding ? true : typeof originalDraft?.private === "boolean" ? originalDraft.private : pbpServiceEffectivePrivate(settings, { incognito: context.sourceIncognito === true }),
+    ...(linkding ? { sharedExplicit: originalDraft?.sharedExplicit === true } : {}),
+    private: linkding ? !(originalDraft?.sharedExplicit === true && originalDraft?.private === false) : typeof originalDraft?.private === "boolean" ? originalDraft.private : pbpServiceEffectivePrivate(settings, { incognito: context.sourceIncognito === true }),
     toread: action === "later" || (typeof originalDraft?.toread === "boolean" ? originalDraft.toread : settings.optReadlaterDefault === true),
   };
 }
@@ -1461,8 +1466,10 @@ async function pbpReaderBookmarkRequest(message, sender) {
     const input = message.draft;
     if (!input || typeof input.title !== "string" || typeof input.tags !== "string"
         || typeof input.notes !== "string" || typeof input.private !== "boolean" || typeof input.toread !== "boolean"
-        || (input.summary !== undefined && typeof input.summary !== "string")) return pbpSaveFailure("invalid");
+        || (input.summary !== undefined && typeof input.summary !== "string")
+        || (input.sharedExplicit !== undefined && typeof input.sharedExplicit !== "boolean")) return pbpSaveFailure("invalid");
     draft = { title: input.title, tags: input.tags, notes: input.notes, private: input.private, toread: input.toread,
+      ...(input.sharedExplicit !== undefined ? { sharedExplicit: input.sharedExplicit } : {}),
       ...(input.summary !== undefined && (await pbpReadFreshBookmarkAuthForAccount(context.account))?.service === "linkding"
         ? { summary: input.summary.replace(/\s+/g, " ").trim() } : {}) };
   }
@@ -1525,7 +1532,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   // Default tags
   let tags = [];
   if (s._defaultTags) {
-    // Full-width comma too: the field is labelled "comma-separated" in CJK UIs.
+    // Full-width comma too: default tags accept whitespace or commas.
     tags = s._defaultTags.split(/[,，\s]+/).map(t => t.trim()).filter(Boolean);
   }
 
@@ -3867,11 +3874,13 @@ async function pbpRunPopupDraft(message) {
         || !d.tags.every((s) => typeof s === "string")
         || !["private", "toread", "archive", "archiveTouched"].every((k) => typeof d[k] === "boolean")) return null;
     if ((d.summary !== undefined && typeof d.summary !== "string")
-        || (d.summaryTouched !== undefined && typeof d.summaryTouched !== "boolean")) return null;
+        || (d.summaryTouched !== undefined && typeof d.summaryTouched !== "boolean")
+        || (d.sharedExplicit !== undefined && typeof d.sharedExplicit !== "boolean")) return null;
     const out = { url: d.url, title: d.title, notes: d.notes, tags: d.tags.slice(), tagInput: d.tagInput,
       private: d.private, toread: d.toread, archive: d.archive, archiveTouched: d.archiveTouched };
     if (d.summary !== undefined) out.summary = d.summary;
     if (d.summaryTouched !== undefined) out.summaryTouched = d.summaryTouched;
+    if (d.sharedExplicit !== undefined) out.sharedExplicit = d.sharedExplicit;
     return JSON.stringify(out).length <= 65536 ? out : null;
   };
   if (!message.account || !["read", "write", "clear", "clearOwner"].includes(message.action)

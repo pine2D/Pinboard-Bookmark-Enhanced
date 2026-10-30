@@ -227,7 +227,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(elements["private-check"].checked && !elements["share-check"].checked,"new popup defaults to shared");
       }
     });
-    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard" } = {}) {
+    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard", sharedExplicit = false } = {}) {
       const elements = {
         "submit-btn": createElementStub(),
         "delete-btn": createElementStub({ classes: ["hidden"] }),
@@ -354,6 +354,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         existingBookmark: null,
         currentTags,
         _archiveUserTouched: archiveUserTouched,
+        _linkdingSharedExplicit: sharedExplicit,
+        _linkdingSharedRevision: 0,
         _popupDraftContext: draftContext ? {pageUrl: URL, incognito: false} : null,
         _linkdingDescriptionTouched: false,
         _popupDraftEdited: false,
@@ -377,8 +379,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
         POSTS_ADD_URI_BUDGET,
       };
       const names = Object.keys(dependencies);
-      const factory = new Function(...names, `${source.slice(source.indexOf("function pbpPopupDraftSnapshot("), source.indexOf("function pbpRememberPopupDraft("))}\n${resetSource}\n${setupSource}\nreturn setupSubmit;`);
-      const setupSubmit = factory(...names.map((name) => dependencies[name]));
+      const factory = new Function(...names, `${source.slice(source.indexOf("function pbpPopupDraftSnapshot("), source.indexOf("function pbpRememberPopupDraft("))}\n${resetSource}\n${setupSource}\nreturn {setupSubmit, sharing:()=>_linkdingSharedExplicit, changeSharing:()=>{_linkdingSharedExplicit=true;_linkdingSharedRevision++;}};`);
+      const submitApi = factory(...names.map((name) => dependencies[name]));
+      const setupSubmit = submitApi.setupSubmit;
       setupSubmit("alice:token");
       const click = elements["submit-btn"]._listeners.click[0];
       return {
@@ -387,6 +390,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         click, resolveSave, resolveWayback,
         setCurrentToken: (token) => { effectiveToken = token; },
         currentToken: () => effectiveToken,
+        sharing: submitApi.sharing, changeSharing: submitApi.changeSharing,
         queueRefreshes: () => queueRefreshes,
         closeCalls: () => closeCalls,
         reloadCalls: () => reloadCalls,
@@ -417,6 +421,18 @@ test("posts/add default remains replace=yes for existing callers", () => {
         if (service === "linkding") assert(!h.timers.some(t=>!t.cancelled&&t.delay===1800), "newer Description scheduled auto-close");
       }
     });
+    await testAsync("saved sharing intent is consumed without clearing a newer same-value sharing choice", async () => {
+      for(const newerChoice of [false,true]) {
+        const h=createSubmitHarness({service:"linkding",sharedExplicit:true});
+        h.elements["share-check"]=createElementStub({checked:true});
+        const pending=h.click();await flushMicrotasks();
+        assert(h.messages.find(m=>m.type==="save_intent").intent.sharedExplicit===true,"explicit intent was not sent");
+        if(newerChoice)h.changeSharing();
+        h.resolveSave({status:"saved",mutation:"created"});await pending;
+        assert(h.sharing()===newerChoice,"consumption lost new sharing choice or retained settled intent");
+      }
+    });
+
     for (const [service, limit] of [["linkding", 512], ["karakeep", 1000]]) {
       await testAsync(service + " title boundary blocks submission without truncating the editable title", async () => {
         for (const [title, blocked] of [["a".repeat(limit), false], ["a".repeat(limit + 1), true],
