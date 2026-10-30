@@ -22,6 +22,22 @@ function harness(service, replies, extra = {}) {
 }
 test("service defaults to Pinboard, unknown services fail closed", () => {equal(pbpBookmarkServiceId({}),"pinboard"); equal(pbpBookmarkServiceId({bookmarkService:"linkding"}),"linkding"); equal(pbpBookmarkServiceId({bookmarkService:"typo"}),"");});
 test("base URL preserves subpaths and rejects insecure or credential-bearing inputs", () => {equal(pbpBookmarkEndpoint("https://bookmarks.example/base"),"https://bookmarks.example/base/");equal(pbpBookmarkEndpoint("http://127.0.0.1:8000"),"http://127.0.0.1:8000/");for(const url of ["http://192.168.1.2", "http://2130706433", "https://u:p@example.com", "https://example.com/?key=x", "https://example.com/#x", "javascript:alert(1)"])equal(pbpBookmarkEndpoint(url),"");});
+test("quick links keep service-specific unread destinations and configured subpaths", () => {
+  const linkding = {bookmarkService:"linkding",linkdingUrl:"https://bookmarks.example/base"};
+  equal(pbpBookmarkHome(linkding),"https://bookmarks.example/base/");
+  equal(pbpBookmarkHome(linkding,true),"https://bookmarks.example/base/bookmarks?unread=yes");
+  const karakeep = {bookmarkService:"karakeep",karakeepUrl:"https://keep.example/base"};
+  equal(pbpBookmarkHome(karakeep,true),"https://keep.example/base/");
+  const token = "fixture-token";
+  const baseUrl = "https://keep.example/base/";
+  karakeep.karakeepToken = pbpBookmarkCredentialSeal({baseUrl,token,connectionId:"fixture-connection",userId:"fixture-user"});
+  karakeep.karakeepReadLaterListId = "later list";
+  karakeep.karakeepReadLaterListOwner = pbpBookmarkConnection(karakeep).account;
+  equal(pbpBookmarkHome(karakeep,true),"https://keep.example/base/dashboard/lists/later%20list");
+  const pinboard = {bookmarkService:"pinboard",pinboardToken:obfuscateKey("fixture-user:fixture-token")};
+  equal(pbpBookmarkHome(pinboard),"https://pinboard.in/u:fixture-user/");
+  equal(pbpBookmarkHome(pinboard,true),"https://pinboard.in/u:fixture-user/unread/");
+});
 test("linkding lookup preserves independent notes, summary, unread and visibility", async()=>{const {client,calls}=harness("linkding",[[200,{bookmark:ld,metadata:{},auto_tags:[]}]]);const b=await client.lookup(pageUrl);equal([b.id,b.url,b.title,b.notes,b.summary,b.tags,b.toread,b.private],["7",pageUrl,"Saved title","My note","Website summary",["work"],true,true]);equal(calls[0].url,"https://bookmarks.example/base/api/bookmarks/check/?url=https%3A%2F%2Fexample.com%2Farticle");equal(calls[0].headers.get("Authorization"),"Token fixture-token");equal(calls[0].redirect,"manual");equal(calls[0].credentials,"omit");});
 test("linkding missing bookmark is null, malformed lookup is an error",async()=>{equal(await harness("linkding",[[200,{bookmark:null}]]).client.lookup(pageUrl),null);await rejects(()=>harness("linkding",[[200,{}]]).client.lookup(pageUrl),"invalid_response");});
 test("linkding update patches requested fields without rewriting scraped description",async()=>{const {client,calls}=harness("linkding",[[200,{...ld,title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true,date_modified:"2026-10-02T10:00:00Z"}]],{sharingEnabled:true});const result=await client.save({url:pageUrl,title:"New",notes:"Note",tags:["new"],toread:false,private:false,sharedExplicit:true},{id:"7",url:pageUrl,private:true});equal([result.status,result.mutation],["saved","updated"]);equal(calls[0].method,"PATCH");equal(calls[0].body,{title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true});});

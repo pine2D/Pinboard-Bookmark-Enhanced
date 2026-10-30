@@ -2152,6 +2152,9 @@ function pbpBookmarkHome(settings, unread = false) {
   if (connection.service === "karakeep" && unread && connection.readLaterListId) {
     return connection.baseUrl + "dashboard/lists/" + encodeURIComponent(connection.readLaterListId);
   }
+  if (connection.service === "linkding" && unread && connection.baseUrl) {
+    return connection.baseUrl + "bookmarks?unread=yes";
+  }
   return connection.baseUrl || "";
 }
 
