@@ -14,6 +14,7 @@ const records={linkding:new Map(),karakeep:new Map()}, requests=[], membership=n
 const raceCreates=new Map(), descriptionReplies=new Map();
 const list={id:'later1',name:'Read Later',description:'Pinboard Bookmark Enhanced: Read Later',icon:'bookmark',type:'manual',public:false,hasCollaborators:false,userRole:'owner'};
 let listCreated=false;
+let holdLinkdingPatch = null;
 // gate.linkding puts a Cloudflare Access-shaped gateway in front of /linkding/.
 const gate={linkding:false}, acceptedKeys=new Set(['fixture-key']);
 const server=createServer(async(req,res)=>{
@@ -81,6 +82,7 @@ const server=createServer(async(req,res)=>{
     row.tags=row.tags.filter(t=>!data.tags.some(x=>x.tagId===t.id));return reply(200,{detached:data.tags.map(t=>t.tagId)});
   }
   if(req.method==='DELETE'){store.delete(id);return reply(204);}
+  if(req.method==='PATCH'&&service==='linkding'&&holdLinkdingPatch) await holdLinkdingPatch;
   if(req.method==='PATCH')Object.assign(row,data);
   return reply(200,row);
 });
@@ -221,11 +223,33 @@ try{
       await reopen();assert(!await popup.locator('#share-check').isChecked());
       await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});
       await popup.locator('#share-check').check();await popup.locator('#submit-btn').click();await until(()=>latestWrite().data.shared===true,'popup changed sharing');
-      await popup.waitForFunction(()=>document.getElementById('submit-btn').classList.contains('saved-success'));
+      await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+      assert.match(await popup.locator('#status-msg').textContent(),/saved/i,'popup did not confirm its completed save');
       [...records.linkding.values()][0].shared=false;
       await popup.locator('#title-input').fill('Second same-popup title edit');await popup.locator('#submit-btn').click();
       await until(()=>latestWrite().data.title==='Second same-popup title edit','second same-popup update');
       assert(!Object.hasOwn(latestWrite().data,'shared')&&![...records.linkding.values()][0].shared,'settled sharing intent leaked into later title edit');
+      await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+      assert.match(await popup.locator('#status-msg').textContent(),/saved/i,'popup did not confirm its completed save');
+      [...records.linkding.values()][0].shared=true;
+      let releasePatch;
+      holdLinkdingPatch=new Promise(resolve=>{releasePatch=resolve;});
+      await popup.locator('#share-check').uncheck();
+      const beforePending=requests.length;await popup.locator('#submit-btn').click();
+      await until(()=>requests.length>beforePending&&latestWrite().data.shared===false,'held sharing PATCH');
+      assert(await popup.locator('#share-check').isEnabled(),'sharing control unexpectedly disabled during delivery');
+      await popup.locator('#share-check').check();await popup.locator('#share-check').uncheck();
+      holdLinkdingPatch=null;releasePatch();
+      await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+      assert.match(await popup.locator('#status-msg').textContent(),/saved/i,'popup did not confirm its completed save');
+      assert(await popup.evaluate(()=>_linkdingSharedExplicit),'delivery cleared a later same-value sharing choice');
+      [...records.linkding.values()][0].shared=true;
+      await popup.locator('#title-input').fill('Apply later explicit choice');await popup.locator('#submit-btn').click();
+      await until(()=>latestWrite().data.title==='Apply later explicit choice','later explicit choice delivery');
+      assert.equal(latestWrite().data.shared,false,'later explicit choice was not delivered');
+      await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+      assert.match(await popup.locator('#status-msg').textContent(),/saved/i,'popup did not confirm its completed save');
+      assert(!await popup.evaluate(()=>_linkdingSharedExplicit),'latest settled choice was not consumed');
       [...records.linkding.values()][0].shared=true;
 
       await reopen();assert(await popup.locator('#share-check').isChecked(),'existing shared record was not filled');
