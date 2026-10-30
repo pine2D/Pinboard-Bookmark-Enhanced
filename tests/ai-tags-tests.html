@@ -1930,6 +1930,7 @@ suite("shared tag canonicalization", () => {
     assertEq(index.exact.has("-"), true);
     assertEq(index.groups.has(""), false);
     assertEq(pbpAlignTagName("_", ctx({"-": 9, "_": 2})).name, "_");
+    assertEq(pbpAlignTagName("_", ctx({"-": 9, "_": 2})).hit, true);
     assertEq(pbpAlignTagName("--", ctx({"-": 9, "_": 2})).hit, false);
   });
 

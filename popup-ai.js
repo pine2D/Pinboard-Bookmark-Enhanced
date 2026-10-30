@@ -1616,14 +1616,9 @@ function renderAITags(tags, fromCache) {
     const wasAddedByThisRound = (t) =>
       cachedTagSet.has(pbpPopupTagGroupKey(t)) && _aiSessionAddedTags.has(pbpPopupTagGroupKey(t));
     let retracted = [];
-    // Finding 5: snapshot _tagsUserTouched before the removal below so a
-    // refused regen's rollback (finally block) can restore it -- addTag
-    // sets the flag unconditionally on every real push, but a retracted
-    // tag that shares a name with one already on the form with no AI
-    // provenance (audit A10: a dup-named chip click still records
-    // provenance even though addTag no-ops) re-adds as a genuine push on
-    // rollback and would force-dirty a form whose tag list never
-    // actually changed.
+    // A refused regeneration restores the same adopted tags. Preserve the
+    // prior dirty flag across addTag's rollback pushes; duplicate chip clicks
+    // never acquire AI provenance or mark an unchanged form dirty.
     let tagsUserTouchedBeforeRetract;
     if (typeof _tagsUserTouched !== "undefined") tagsUserTouchedBeforeRetract = _tagsUserTouched;
     retracted = currentTags.filter(wasAddedByThisRound);

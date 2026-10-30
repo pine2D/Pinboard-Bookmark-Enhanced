@@ -1718,7 +1718,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         popupAiSource.slice(renderStart, renderEnd + 2) + "\n" +
         "return { renderAITags, addTag, removeTag, provenance: _aiSessionAddedTags, tags: () => currentTags.slice()," +
         " touched: () => _tagsUserTouched, account: pbpPopupAiAccount, show: pbpShowAITagResult, refresh: pbpRefreshDisplayedAITagsForBookmark," +
-        " setLookup: state => {bookmarkLookup=state;} };"
+        " setLookup: state => {bookmarkLookup=state;}, acceptLookup: post => { const existingBookmark=post; let submittedTags; const _popupDraftRestored=false; " +
+        source.slice(source.indexOf("        const ownTagNames ="), source.indexOf('        $id("submit-btn").textContent = t("update");', source.indexOf("        const ownTagNames ="))) + "} };"
       )(
         (id) => (id === "url-input" ? urlInput : id === "ai-suggest-tags" ? container : id === "tags-clear-all" ? clearBtn : id === "tags-input" ? tagsInput : null),
         (key) => key,
@@ -1817,6 +1818,15 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "AI adoption did not record the final canonical name");
       run.replaceLink.click(); await settle();
       assert(run.tags().join("|") === "manual", "replace retained the aligned AI tag");
+    });
+
+    await testAsync("accepted cached AI tags align at late Pinboard fill and remain retractable", async () => {
+      const run = regenRuntime({ formUrl: URL, pageUrl: URL, tags: ["web-design"], counts: {"web-design":9,web_design:1}, seedTags:["manual"] });
+      assert(run.provenance.has("webdesign"), "AI acceptance missing");
+      run.acceptLookup({tags:"web_design"});
+      assert(run.tags().join("|") === "manual|web_design" && run.provenance.has("webdesign"), "late fill lost spelling or AI provenance");
+      run.replaceLink.click(); await settle();
+      assert(run.tags().join("|") === "manual", "New set did not retract late-aligned AI tag");
     });
 
     await testAsync("removing and manually re-adding an AI tag clears its ownership", async () => {
@@ -3728,6 +3738,24 @@ test("posts/add default remains replace=yes for existing callers", () => {
     await testAsync("existing linkding summary refills Description but a later user edit wins",async()=>{
       const response={ok:true,status:200,data:{posts:[{href:URL,description:"Saved title",extended:"Saved notes",summary:"Saved\ndescription",tags:"",shared:"no",toread:"no",time:"2026-10-30T00:00:00Z"}]}};
       for(const dirtyDescription of [false,true]){const h=createLookupHarness(response,{service:"linkding",dirtyDescription,realDescription:true});assert((await h.run()).status==="found",JSON.stringify({statuses:h.statuses,warns:h.warns}));assert(h.elements["linkding-description-input"].value===(dirtyDescription?"Manual":"Saved description"),"wrong Description "+h.elements["linkding-description-input"].value);assert(h.elements["description-input"].value==="Saved notes");}
+    });
+
+    await testAsync("late Pinboard lookup aligns accepted tags without resurrecting deletions or dropping exact twins", async () => {
+      for (const [live, submitted, want] of [
+        [["web-design", "manual"], undefined, "web_design manual"],
+        [[], undefined, ""],
+        [["web-design", "web_design", 'literal"tag', '"quoted"'], undefined, 'web-design web_design literal"tag "quoted"'],
+        [["manual"], ["web-design"], "manual"]
+      ]) {
+        const own = live.includes("web_design") ? 'web-design web_design literal"tag "quoted"' : 'web_design';
+        let release;
+        const h = createLookupHarness(() => new Promise(resolve => { release = resolve; }));
+        const pending = h.run(submitted);
+        h.touchTags(live);
+        release({ok:true,status:200,text:JSON.stringify({posts:[{href:URL,description:"Saved",extended:"",tags:own,shared:"no",toread:"no",time:"2026-10-30T00:00:00Z"}]})});
+        assert((await pending).status === "found", JSON.stringify(h.warns));
+        assert(h.getTags().join(" ") === want, "wrong late alignment: " + h.getTags().join(" "));
+      }
     });
 
     await testAsync("a pending lookup preserves a user's explicitly cleared tags", async () => {

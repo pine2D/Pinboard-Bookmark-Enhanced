@@ -696,22 +696,6 @@ async function pbpReadTagVocab(account) {
     return null;
   }
 }
-function pbpAlignIncomingTags(incoming, bookmarkNames, index, respectCase, keepExisting = false) {
-  const names = keepExisting ? bookmarkNames.slice() : [];
-  const seen = new Set(names.map(name => pbpTagGroupKey(name) || `exact:${name}`));
-  for (const raw of incoming) {
-    const name = pbpAlignTagName(raw, {bookmarkNames, index, respectCase}).name;
-    const key = pbpTagGroupKey(name) || `exact:${name}`;
-    // In update/overwrite an exact existing name is an explicit user choice:
-    // two same-group names supplied together remain two associations. A sole
-    // choice can still remove its sibling. New spellings are group-deduped.
-    if ((!keepExisting && bookmarkNames.includes(String(raw).trim()) && !names.includes(name)) || !seen.has(key)) {
-      names.push(name);
-      seen.add(key);
-    }
-  }
-  return names;
-}
 async function pbpDeliverSelfHosted(intent, auth, settings) {
   try {
     const lookup = await fetchExistingBookmark(intent.url, auth.token, auth);
@@ -915,7 +899,14 @@ async function deliverSaveIntent(intent, settings, auth = pbpCaptureBookmarkAuth
     if (!pbpBookmarkAuthIsCurrent(auth)) {
       return { result: pbpSaveFailure("account_changed"), persisted: null, retryable: false };
     }
-    const plan = pbpResolveSavePlan(intent, lookup);
+    // Pinboard posts/get has a whitespace-delimited tags string, with literal
+    // quotes. Align only against this fresh bookmark; delivery never mints or
+    // fetches a vocabulary, and merge retains every preexisting exact twin.
+    const alignedIntent = lookup?.exists && typeof lookup.post?.tags === "string"
+      ? { ...intent, tags: pbpAlignIncomingTags(intent.tags.split(/\s+/).filter(Boolean),
+          lookup.post.tags.split(/\s+/).filter(Boolean), null, false).join(" ") }
+      : intent;
+    const plan = pbpResolveSavePlan(alignedIntent, lookup);
     if (plan.action === "failed") {
       return { result: plan.result, persisted: null, retryable: !!plan.retryable || !!lookup?.retryable };
     }

@@ -1603,6 +1603,39 @@ await suite("unified save pipeline", async () => {
     equal(readLater.intents[0].toread, true);
   });
 
+  await test("fresh Pinboard delivery aligns quick batch and replay tags to posts/get names", async () => {
+    for (const mode of ["merge", "overwrite"]) {
+      const post = {href:BASE_INTENT.url,description:"Saved",extended:"Notes",tags:'web_design web-design literal"tag "quoted"',shared:"yes",toread:"yes",time:"2026-10-30T00:00:00Z"};
+      const h = await createHarness({ pinboardFetch: async url => url.includes("posts/get") ? response(200,{posts:[post]}) : response(200,{result_code:"done"}) });
+      const incoming = intent({mode,tags:'webdesign literal"tag "quoted" new_tag'});
+      const result = await h.deliverSaveIntent(incoming,h.settings);
+      equal(result.result.status,"saved");
+      const query = new URL(h.fetchCalls.find(url=>url.includes("posts/add"))).searchParams;
+      equal(query.get("tags"),mode === "merge" ? 'web_design web-design literal"tag "quoted" new_tag' : 'web_design literal"tag "quoted" new_tag');
+      equal(query.get("description"),"Saved"); equal(query.get("extended"),"Notes");
+      equal(h.fetchCalls.length,2,"extra lookup or vocabulary fetch");
+    }
+  });
+
+  await test("quick defaults batch AI and offline replay deliver one Pinboard own spelling", async () => {
+    const vocab = pbpTagVocabIndex({"web-design":9,web_design:1});
+    const quick = await createBackgroundSaveHarness({cachedSettings:{pinboardToken:"alice:token",bgSaveMode:"merge",_defaultTags:"web_design",_aiTags:false,_aiSummary:false,optRespectTagCase:true},tagVocabIndex:vocab});
+    await runBackgroundSave(quick);
+    const batch = await createBatchSaveHarness({settings:{bookmarkService:"pinboard",optBatchTag:"web_design",optBatchTagEnabled:true,batchAiTags:true,optRespectTagCase:true},hasAIKey:true,pageInfo:{pageText:"Synthetic public text"},cached:{tags:["webdesign"]},tagVocabIndex:vocab});
+    await batch.handleBatchSave(batchTabs(1));
+    for (const prepared of [quick.intents[0], batch.intents[0].prepared]) {
+      assert(prepared.tags.includes("web-design"), "entry did not use library majority");
+      for (const replay of [false,true]) {
+        const post = {href:prepared.url,description:"Saved",extended:"Notes",tags:"web_design",shared:"no",toread:"no",time:"2026-10-30T00:00:00Z"};
+        const h = await createHarness({pinboardFetch:async url=>url.includes("posts/get")?response(200,{posts:[post]}):response(200,{result_code:"done"})});
+        const result = replay ? await h.sendOfflineItem({account:"alice",...prepared}) : await h.deliverSaveIntent(prepared,h.settings);
+        equal(result.result.status,"saved");
+        equal(new URL(h.fetchCalls.find(url=>url.includes("posts/add"))).searchParams.get("tags"),"web_design");
+        equal(h.fetchCalls.length,2);
+      }
+    }
+  });
+
   await test("quick save splits default tags on spaces and commas", async () => {
     const h=await createBackgroundSaveHarness({cachedSettings:{pinboardToken:"alice:token",bgSaveMode:"merge",_defaultTags:"a b, c",_aiTags:false,_aiSummary:false,optPrivateDefault:false,optPrivateIncognito:false}});
     await runBackgroundSave(h);

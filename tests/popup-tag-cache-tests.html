@@ -287,6 +287,15 @@ function typeInto(value) {
     aiBox.replaceChildren(); suggestBox.replaceChildren();
   });
 
+  await test("Pinboard posts/get own tags survive remove and re-add with literal quotes", () => {
+    settings = { bookmarkService: "pinboard", optRespectTagCase: true, aiTagSeparator: "_" };
+    existingBookmark = { tags: 'web_design literal"tag "quoted"', shared: "no" };
+    applyTagData({ "web-design": 9, web_design: 1 });
+    currentTags = ["web_design"];
+    removeTag("web_design");
+    assert(addTag("web_design") === "web_design", "own spelling lost to library majority");
+    assert(pbpPopupTagContext().bookmarkNames.join("|") === 'web_design|literal"tag|"quoted"', "Pinboard quotes were parsed");
+  });
   await test("preset passes a multiword name through addTag without splitting it", () => {
     resetInput();
     settings.bookmarkService = "karakeep";

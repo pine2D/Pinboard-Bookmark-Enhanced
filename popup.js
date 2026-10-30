@@ -1626,6 +1626,13 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         }
         recomputeArchiveCheck();
         if (shouldUpdateField("readlater-check")) $id("readlater-check").checked = existingBookmark.toread === "yes";
+        const ownTagNames = pbpBookmarkServiceId(settings) === "pinboard"
+          ? String(existingBookmark.tags || "").split(/\s+/).filter(Boolean) : existingBookmark.tagNames || [];
+        // Late lookup may follow accepted AI/cache tags or manual edits. Align
+        // only the surviving choices, keeping exact old twins and group-based
+        // AI provenance; do not reintroduce anything the user removed.
+        currentTags = pbpAlignIncomingTags(currentTags, ownTagNames, null, false);
+        if (Array.isArray(submittedTags)) submittedTags = pbpAlignIncomingTags(submittedTags, ownTagNames, null, false);
         currentTags = Array.isArray(submittedTags)
           ? pbpRebasePopupTags(pbpBookmarkServiceId(settings) === "pinboard"
             ? existingBookmark.tags || "" : existingBookmark.tagNames || [], submittedTags, currentTags)

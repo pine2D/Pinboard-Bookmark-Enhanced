@@ -200,7 +200,8 @@ function applyTagData(counts) {
 
 function pbpPopupTagContext(s = settings) {
   return { service: pbpBookmarkServiceId(s), separator: s.aiTagSeparator,
-    bookmarkNames: existingBookmark?.tagNames || [], index: tagVocabIndex,
+    bookmarkNames: pbpBookmarkServiceId(s) === "pinboard"
+      ? String(existingBookmark?.tags || "").split(/\s+/).filter(Boolean) : existingBookmark?.tagNames || [], index: tagVocabIndex,
     respectCase: s.optRespectTagCase };
 }
 

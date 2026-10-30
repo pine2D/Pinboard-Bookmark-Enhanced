@@ -1027,6 +1027,23 @@ function buildPostsAddUri({ token, url, title = "", extended = "", tags = "", sh
 
 // Resolve save semantics without I/O. Callers must validate the intent first and
 // provide a fresh lookup for merge/skip/overwrite modes.
+function pbpAlignIncomingTags(incoming, bookmarkNames, index, respectCase, keepExisting = false) {
+  const names = keepExisting ? bookmarkNames.slice() : [];
+  const seen = new Set(names.map(name => pbpTagGroupKey(name) || `exact:${name}`));
+  for (const raw of incoming) {
+    const name = pbpAlignTagName(raw, {bookmarkNames, index, respectCase}).name;
+    const key = pbpTagGroupKey(name) || `exact:${name}`;
+    // In update/overwrite an exact existing name is an explicit user choice:
+    // two same-group names supplied together remain two associations. A sole
+    // choice can still remove its sibling. New spellings are group-deduped.
+    if ((!keepExisting && bookmarkNames.includes(String(raw).trim()) && !names.includes(name)) || !seen.has(key)) {
+      names.push(name);
+      seen.add(key);
+    }
+  }
+  return names;
+}
+
 function pbpResolveSavePlan(intent, lookup) {
   const incoming = {
     url: intent?.url || "",
