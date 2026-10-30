@@ -4608,6 +4608,7 @@
   "readerBookmarkApply": {"message": "Save changes"},
   "readerBookmarkTitle": {"message": "Title"},
   "readerBookmarkTags": {"message": "Tags (space-separated)"},
+  "readerBookmarkDescription": {"message": "Description"},
   "readerBookmarkNotes": {"message": "Notes"},
   "readerBookmarkPrivate": {"message": "Private"},
   "readerBookmarkCancel": {"message": "Cancel"},

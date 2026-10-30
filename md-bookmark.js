@@ -182,7 +182,7 @@
     label(title, "readerBookmarkEdit"); head.appendChild(title); editor.appendChild(head);
     const options = document.createElement("div");
     options.id = "reader-bookmark-options"; options.className = "row";
-    for (const [name, key, type] of [["title", "readerBookmarkTitle", "text"], ["tags", "readerBookmarkTags", "text"], ["notes", "readerBookmarkNotes", "textarea"], ["private", "readerBookmarkPrivate", "checkbox"], ["toread", "readerBookmarkLater", "checkbox"]]) {
+    for (const [name, key, type] of [["title", "readerBookmarkTitle", "text"], ["tags", "readerBookmarkTags", "text"], ["summary", "readerBookmarkDescription", "text"], ["notes", "readerBookmarkNotes", "textarea"], ["private", "readerBookmarkPrivate", "checkbox"], ["toread", "readerBookmarkLater", "checkbox"]]) {
       const field = document.createElement("label");
       const caption = document.createElement("span"); label(caption, key);
       const input = type === "textarea" ? document.createElement("textarea") : document.createElement("input");
@@ -214,6 +214,7 @@
     label(apply, "readerBookmarkApply");
     apply.addEventListener("click", () => save("edit", {
       title: id("title").value, tags: id("tags").value, notes: id("notes").value,
+      ...(state.descriptionSupported === true ? { summary: id("summary").value.replace(/\s+/g, " ").trim() } : {}),
       private: state.sharingSupported === true ? !id("private").checked : state.privacySupported === false || id("private").checked, toread: id("toread").checked,
     }));
     const cancel = document.createElement("button");
@@ -238,6 +239,8 @@
     const values = state.bookmark || context.bookmark?.draft || {};
     id("title").value = typeof values.title === "string" ? values.title : context.title || "";
     id("tags").value = typeof values.tags === "string" ? values.tags : pbpBookmarkFormatTags(context.bookmark?.tags || []);
+    id("summary").closest("label").hidden = state.descriptionSupported !== true;
+    id("summary").value = state.descriptionSupported === true && typeof values.summary === "string" ? values.summary.replace(/\s+/g, " ").trim() : "";
     id("notes").value = typeof values.notes === "string" ? values.notes : context.bookmark?.notes || "";
     const privacyLabel = id("private").closest("label");
     privacyLabel.hidden = state.privacySupported === false && state.sharingSupported !== true;

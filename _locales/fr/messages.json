@@ -4600,6 +4600,7 @@
   "readerBookmarkApply": {"message": "Enregistrer les modifications"},
   "readerBookmarkTitle": {"message": "Titre"},
   "readerBookmarkTags": {"message": "Tags (séparés par des espaces)"},
+  "readerBookmarkDescription": {"message": "Description du signet"},
   "readerBookmarkNotes": {"message": "Notes"},
   "readerBookmarkPrivate": {"message": "Privé"},
   "readerBookmarkCancel": {"message": "Annuler"},

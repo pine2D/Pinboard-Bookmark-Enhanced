@@ -25,12 +25,12 @@ async function harness(options = {}) {
   const deps = {
     chrome: { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p }, storage: { local: { get: async key => ({ [key]: options.slot === null ? null : { ...SLOT, ...(options.slot || {}) } }) } }, tabs: { get: async () => { if (env.closedReader) throw new Error("reader closed after sending"); return { id: 9, url: READER }; }, sendMessage: async (id, msg) => { env.requests.push({ id, msg }); return { ok: true }; } } },
     getCurrentBookmarkAuth: async () => ({ token: env.token, account: env.account, epoch: env.epoch }),
-    pbpReadFreshBookmarkAuthForAccount: async account => account === env.account ? { token: env.token, account: env.account, epoch: env.epoch } : null,
+    pbpReadFreshBookmarkAuthForAccount: async account => account === env.account ? { token: env.token, account: env.account, epoch: env.epoch, service: env.service } : null,
     pbpBookmarkAuthIsCurrent: auth => auth.account === env.account && auth.epoch === env.epoch,
     fetchExistingBookmark: async (url, token) => { env.calls.push({ url, token }); if (env.onLookup) env.onLookup(); return env.lookup || { exists: !!env.post, lookupFailed: false, post: env.post }; },
     pbpSaveFailure: reason => ({ status: "failed", reason }),
     pbpResolveSavePlan, pbpEffectivePrivate,
-    loadSettings: async () => ({ optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false, qsDefaultTags: "quick", rlDefaultTags: "later" }),
+    loadSettings: async () => ({ bookmarkService: env.service || "pinboard", optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false, qsDefaultTags: "quick", rlDefaultTags: "later" }),
     submitSaveIntent: async (intent, opts) => { env.submitted = { intent, opts }; if (env.onSubmit) env.onSubmit(); return env.result || { status: "saved", mutation: "created", account: "alice" }; },
   };
   const api = new Function(...Object.keys(deps), background.slice(start, end) + "\nreturn { pbpReaderBookmarkContext, pbpPrepareReaderSaveIntent, pbpReaderBookmarkRequest, pbpRouteReaderSaveCommand }; ")(...Object.values(deps));
@@ -165,6 +165,60 @@ await test("popup privacy draft remains an explicit choice when opening the read
     equal(state.bookmark.private, isPrivate);
     const result = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action: "save" }, SENDER);
     equal(result.status, "saved"); equal(h.env.post.shared, isPrivate ? "no" : "yes");
+  }
+});
+await test("normal and pending popup preview payloads carry linkding Description into reader state", async () => {
+  const source = await (await fetch("../popup.js")).text();
+  const opener = source.slice(source.indexOf("const openPreview"), source.indexOf("const downloadMd"));
+  const objectAt = opener.lastIndexOf("bookmarkDraft: {");
+  assert(objectAt >= 0, "normal preview has no bookmark draft");
+  const opening = opener.indexOf("{", objectAt);
+  let depth = 0, closing = -1;
+  for (let i = opening; i < opener.length; i++) {
+    if (opener[i] === "{") depth++;
+    else if (opener[i] === "}" && --depth === 0) { closing = i; break; }
+  }
+  assert(closing > opening, "normal draft object did not close");
+  const normal = new Function("$id", "settings", "currentTags", "pbpBookmarkServiceId", "pbpBookmarkFormatTags", "result",
+    "return (" + opener.slice(opening, closing + 1) + ");");
+  const pendingLine = source.split("\n").find(line => line.includes("{ bookmarkDraft: { summary:"));
+  assert(pendingLine, "pending preview has no Description draft");
+  const pending = new Function("$id", "settings", "pbpBookmarkServiceId", "return ({" + pendingLine.trim() + "}).bookmarkDraft;");
+  const fields = { "title-input": "T", "description-input": "Note", "linkding-description-input": "first second", "private-check": false, "readlater-check": false };
+  const $id = name => ({ value: fields[name], checked: fields[name] });
+  for (const service of ["linkding", "pinboard"]) {
+    const settings = { bookmarkService: service }, account = service === "linkding" ? "linkding:fixture" : "alice";
+    for (const draft of [normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }),
+      pending($id, settings, pbpBookmarkServiceId)]) {
+      if (service === "linkding") {
+        equal(draft.summary, "first second");
+        const h = await harness({ account, service, post: null, slot: { account, bookmarkDraft: draft } });
+        const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER);
+        equal(state.bookmark.summary, "first second");
+      } else assert(!draft || !("summary" in draft));
+    }
+  }
+});
+await test("reader initial linkding Description follows the owner-bound preview draft and edit request", async () => {
+  const account = "linkding:fixture";
+  const h = await harness({ account, service: "linkding", post: null, slot: { account, bookmarkDraft: { title: "T", tags: "one", notes: "Note", summary: "first\nsecond", summaryTouched: true } } });
+  const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER);
+  equal(state.descriptionSupported, true); equal(state.bookmark.summary, "first second");
+  const invalid = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action: "edit", draft: { ...state.bookmark, summary: 7 } }, SENDER);
+  equal(invalid.reason, "invalid");
+  const saved = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action: "edit", draft: { ...state.bookmark, summary: "changed\nvalue" } }, SENDER);
+  equal(saved.status, "saved"); equal(h.env.submitted.intent.summary, "first second");
+  equal(h.env.submitted.opts.readerDraft.summary, "changed value");
+  assert(!("summaryTouched" in h.env.submitted.intent) && !("summaryTouched" in h.env.submitted.opts.readerDraft));
+  h.env.account = "linkding:other";
+  equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER)).reason, "account_changed");
+});
+await test("non-linkding reader state hides Description", async () => {
+  for (const service of ["pinboard", "karakeep"]) {
+    const account = service === "pinboard" ? "alice" : "karakeep:fixture";
+    const h = await harness({ account, service, post: null, slot: { account, bookmarkDraft: { summary: "foreign" } } });
+    const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER);
+    equal(state.descriptionSupported, false); assert(!("summary" in state.bookmark));
   }
 });
 await test("incognito default is independently configurable and private default still takes precedence", async () => {
@@ -404,6 +458,31 @@ await test("reader linkding editor shows supported sharing and inverts the saved
       equal(box.closest("label").hidden,sharingSupported!==true);
       if(sharingSupported){equal(box.checked,true);assert(box.closest("label").textContent.includes("bookmarkShare"));box.checked=false;w.document.getElementById("reader-bookmark-apply").click();await new Promise(r=>setTimeout(r,0));equal(messages.find(m=>m.action==="edit").draft.private,true);}
     } finally {frame.remove();}
+  }
+});
+await test("reader Description uses a text input, shows only for linkding, and preserves words on edit", async () => {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  for (const [account, supported] of [["linkding:fixture", true], ["karakeep:fixture", false], ["alice", false]]) {
+    const frame = document.createElement("iframe"); document.body.append(frame);
+    try {
+      const w = frame.contentWindow, messages = [];
+      w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+      w.eval(await (await fetch("../shared.js")).text()); w.t = key => key;
+      w.chrome = { runtime: { id: "test-id", getURL: path => path, onMessage: { addListener() {} }, sendMessage: async msg => {
+        messages.push(msg); return msg.type === "mdReaderBookmarkState"
+          ? { known: true, bookmarked: true, account, descriptionSupported: supported, bookmark: { title: "T", notes: "N", tags: "one", summary: "first\nsecond", private: true, toread: false } }
+          : { status: "queued", account };
+      } } };
+      w.eval(runtime); w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "T", account } }));
+      await new Promise(resolve => setTimeout(resolve, 20)); await w.pbpReaderBookmarkAction("edit");
+      const input = w.document.getElementById("reader-bookmark-summary");
+      if (!supported) { assert(!input || input.closest("label").hidden); continue; }
+      assert(input && input.type === "text"); equal(input.value, "first second");
+      input.value = "changed value"; w.document.getElementById("reader-bookmark-apply").click();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const draft = messages.find(msg => msg.action === "edit")?.draft;
+      equal(draft?.summary, "changed value"); assert(!("summaryTouched" in draft));
+    } finally { frame.remove(); }
   }
 });
 await test("reader editor rejects over-limit titles locally, keeps the full input, and allows correction", async () => {

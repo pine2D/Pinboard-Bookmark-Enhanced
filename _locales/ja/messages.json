@@ -4600,6 +4600,7 @@
   "readerBookmarkApply": {"message": "変更を保存"},
   "readerBookmarkTitle": {"message": "タイトル"},
   "readerBookmarkTags": {"message": "タグ（スペース区切り）"},
+  "readerBookmarkDescription": {"message": "説明"},
   "readerBookmarkNotes": {"message": "メモ"},
   "readerBookmarkPrivate": {"message": "非公開"},
   "readerBookmarkCancel": {"message": "キャンセル"},

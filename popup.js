@@ -1223,6 +1223,7 @@ async function htmlToMarkdownAsync(html, opts) {
                 account: sessionAccount,
                 tags: Array.isArray(currentTags) ? currentTags.slice() : [],
                 description: $id("description-input")?.value || "",
+                ...(pbpBookmarkServiceId(settings) === "linkding" ? { bookmarkDraft: { summary: ($id("linkding-description-input")?.value || "").replace(/\s+/g, " ").trim() } } : {}),
                 ts: Date.now()
               }
             });
@@ -1358,6 +1359,7 @@ async function htmlToMarkdownAsync(html, opts) {
                 title: $id("title-input")?.value || result.title || "",
                 tags: Array.isArray(currentTags) ? (pbpBookmarkServiceId(settings) === "pinboard" ? currentTags.join(" ") : pbpBookmarkFormatTags(currentTags)) : "",
                 notes: $id("description-input")?.value || "",
+                ...(pbpBookmarkServiceId(settings) === "linkding" ? { summary: ($id("linkding-description-input")?.value || "").replace(/\s+/g, " ").trim() } : {}),
                 private: $id("private-check")?.checked === true,
                 toread: $id("readlater-check")?.checked === true,
               },

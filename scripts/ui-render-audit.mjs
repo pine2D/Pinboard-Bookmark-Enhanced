@@ -8982,11 +8982,11 @@ async function openReaderSurface(name) {
       const key = new URL(location.href).searchParams.get("k");
       const row = (await chrome.storage.local.get("md_preview_data_" + key))["md_preview_data_" + key];
       if (!row?.account) return "reader bookmark fixture has no owner";
-      const account = name === "reader-bookmark-title-error" ? "linkding:render-fixture" : row.account;
+      const account = ["reader-bookmark-title-error", "reader-bookmark-sharing"].includes(name) ? "linkding:render-fixture" : row.account;
       const send = chrome.runtime.sendMessage;
       chrome.runtime.sendMessage = function (message, ...args) {
         if (message?.type === "mdReaderBookmarkSave") throw new Error("render fixture must not send a save");
-        if (message?.type === "mdReaderBookmarkState") return Promise.resolve({ account, known: true, bookmarked: true, ...(name === "reader-bookmark-sharing" ? {privacySupported:false,sharingSupported:true} : {}), bookmark: { title: "Render audit bookmark", tags: "qa reader", notes: "A reader bookmark note.", private: true, toread: true } });
+        if (message?.type === "mdReaderBookmarkState") return Promise.resolve({ account, known: true, bookmarked: true, ...(name === "reader-bookmark-sharing" ? {privacySupported:false,sharingSupported:true,descriptionSupported:true} : {}), bookmark: { title: "Render audit bookmark", tags: "qa reader", notes: "A reader bookmark note.", summary: "A linkding Description.", private: true, toread: true } });
         return send.call(chrome.runtime, message, ...args);
       };
       try {

@@ -1323,12 +1323,14 @@ async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth)
 
 function pbpReaderInitialIntent(context, settings, action) {
   const originalDraft = context.bookmarkDraft;
+  const linkding = pbpBookmarkServiceId(settings) === "linkding";
   return {
     mode: "skip", url: context.url,
     title: typeof originalDraft?.title === "string" ? originalDraft.title : context.title || context.url,
     notes: typeof originalDraft?.notes === "string" ? originalDraft.notes : typeof context.description === "string" ? context.description : "",
+    ...(linkding ? { summary: typeof originalDraft?.summary === "string" ? originalDraft.summary.replace(/\s+/g, " ").trim() : "" } : {}),
     tags: typeof originalDraft?.tags === "string" ? originalDraft.tags : Array.isArray(context.tags) ? pbpSerializeIntentTags(context.tags, pbpBookmarkServiceId(settings)) : "",
-    private: pbpBookmarkServiceId(settings) === "linkding" ? true : typeof originalDraft?.private === "boolean" ? originalDraft.private : pbpServiceEffectivePrivate(settings, { incognito: context.sourceIncognito === true }),
+    private: linkding ? true : typeof originalDraft?.private === "boolean" ? originalDraft.private : pbpServiceEffectivePrivate(settings, { incognito: context.sourceIncognito === true }),
     toread: action === "later" || (typeof originalDraft?.toread === "boolean" ? originalDraft.toread : settings.optReadlaterDefault === true),
   };
 }
@@ -1408,7 +1410,7 @@ async function pbpReaderBookmarkRequest(message, sender) {
     }
     // Token rotation under the same owner does not invalidate display metadata.
     // Re-read the effective owner after every await before returning it to UI.
-    return await pbpReadFreshBookmarkAuthForAccount(context.account) ? {...result, privacySupported:!["karakeep","linkding"].includes(auth.service), sharingSupported:auth.service === "linkding" && auth.sharingEnabled === true} : pbpSaveFailure("account_changed");
+    return await pbpReadFreshBookmarkAuthForAccount(context.account) ? {...result, privacySupported:!["karakeep","linkding"].includes(auth.service), sharingSupported:auth.service === "linkding" && auth.sharingEnabled === true, descriptionSupported:auth.service === "linkding"} : pbpSaveFailure("account_changed");
   }
   const action = message.action;
   if (!["save", "later", "read", "edit"].includes(action)) return pbpSaveFailure("invalid");
@@ -1416,8 +1418,11 @@ async function pbpReaderBookmarkRequest(message, sender) {
   if (action === "edit") {
     const input = message.draft;
     if (!input || typeof input.title !== "string" || typeof input.tags !== "string"
-        || typeof input.notes !== "string" || typeof input.private !== "boolean" || typeof input.toread !== "boolean") return pbpSaveFailure("invalid");
-    draft = { title: input.title, tags: input.tags, notes: input.notes, private: input.private, toread: input.toread };
+        || typeof input.notes !== "string" || typeof input.private !== "boolean" || typeof input.toread !== "boolean"
+        || (input.summary !== undefined && typeof input.summary !== "string")) return pbpSaveFailure("invalid");
+    draft = { title: input.title, tags: input.tags, notes: input.notes, private: input.private, toread: input.toread,
+      ...(input.summary !== undefined && (await pbpReadFreshBookmarkAuthForAccount(context.account))?.service === "linkding"
+        ? { summary: input.summary.replace(/\s+/g, " ").trim() } : {}) };
   }
   const settings = await loadSettings();
   const intent = pbpReaderInitialIntent(context, settings, action);

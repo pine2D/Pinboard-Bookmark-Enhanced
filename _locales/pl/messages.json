@@ -4600,6 +4600,7 @@
   "readerBookmarkApply": {"message": "Zapisz zmiany"},
   "readerBookmarkTitle": {"message": "Tytuł"},
   "readerBookmarkTags": {"message": "Tagi (oddzielone spacjami)"},
+  "readerBookmarkDescription": {"message": "Opis"},
   "readerBookmarkNotes": {"message": "Notki"},
   "readerBookmarkPrivate": {"message": "Prywatne"},
   "readerBookmarkCancel": {"message": "Anuluj"},

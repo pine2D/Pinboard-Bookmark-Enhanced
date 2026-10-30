@@ -4594,6 +4594,7 @@
   "readerBookmarkApply": {"message": "保存修改"},
   "readerBookmarkTitle": {"message": "标题"},
   "readerBookmarkTags": {"message": "标签（以空格分隔）"},
+  "readerBookmarkDescription": {"message": "描述"},
   "readerBookmarkNotes": {"message": "备注"},
   "readerBookmarkPrivate": {"message": "私密"},
   "readerBookmarkCancel": {"message": "取消"},
