@@ -8051,7 +8051,7 @@ const SWEEP_CFG = {
   // comfortable / 16 compact is the floor -- the one place A2 cannot reach
   // 16); 12 from a group subhead to its first item; 4 between the paragraphs
   // of one note. Literal oracle values, not read from options.css.
-  unitRhythm: { unit: 16, rowPadY: { comfortable: 12, compact: 8 }, subheadFirst: 12, subheadAbove: 20, hintStep: 4, tol: 1 },
+  unitRhythm: { unit: 16, rowPadY: { comfortable: 12, compact: 8 }, groupGap: { comfortable: 32, compact: 24 }, subheadFirst: 12, subheadAbove: 20, hintStep: 4, tol: 1 },
   // The sweep pass runs once, on the deterministic default theme runSweep's
   // options/library legs set up (setTheme(sw, "", "light")) -- a fixed tier,
   // not a per-theme lookup, is correct here.
@@ -8621,10 +8621,25 @@ function sweepProbe(cfg) {
           // (2px, SP-08), not a unit of its own.
           if (!a.matches(UNIT) || !b.matches(UNIT) || a.matches("[data-ai-unavailable]") || b.matches("[data-ai-unavailable]")) continue;
           const opensGroup = !!opensWithSubhead(b);
-          const want = a.matches(".pref-group") && b.matches(".pref-group") ? Math.max(ur.unit, 2 * padY)
+          const groups = a.matches(".pref-group") && b.matches(".pref-group");
+          // Two row groups back to back (CC-11): no subhead and no divider
+          // between them, so the section gap carries the boundary, and it
+          // must clear the text gap between two rows inside either group.
+          const want = groups ? (ur.groupGap[cfg.densityTier] ?? ur.groupGap.comfortable)
             : opensGroup ? ur.subheadAbove : ur.unit;
           const gap = textGap(a, b);
-          if (gap !== null && Math.abs(gap - want) > ur.tol) push(b, opensGroup ? `subhead-above ${want}` : `unit ${want}`, gap);
+          if (gap !== null && Math.abs(gap - want) > ur.tol) push(b, groups ? `group-gap ${want}` : opensGroup ? `subhead-above ${want}` : `unit ${want}`, gap);
+          if (groups && gap !== null) {
+            let rowGap = null;
+            for (const g of [a, b]) {
+              const rows = Array.from(g.children).filter((k) => k.matches(".pref-row") && visible(k) && k.getBoundingClientRect().height > 0);
+              for (let r = 1; r < rows.length; r++) {
+                const inner = textGap(rows[r - 1], rows[r]);
+                if (inner !== null && (rowGap === null || inner > rowGap)) rowGap = inner;
+              }
+            }
+            if (rowGap !== null && !(gap > rowGap)) push(b, `group-gap >${rowGap}`, gap);
+          }
         }
       }
       for (const head of document.querySelectorAll(".fg > .bl.subhead")) {
@@ -10984,6 +10999,7 @@ async function main() {
         expected: h.rel === "label-control" ? "3..6" : h.rel === "action" ? ">=4" : h.rel.split(" ").pop(),
         note: h.rel === "label-control" ? "label.bl -> control gap (px)" : h.rel === "action" ? "gap above an action row (px)"
           : h.rel.startsWith("unit") ? "text-to-text gap between two setting units (px, rhythm A2)"
+          : h.rel.startsWith("group-gap") ? "text gap between two row groups back to back (px; the section gap, wider than any row gap inside either group)"
           : h.rel.startsWith("subhead-above") ? "previous unit -> group subhead text gap (px; must exceed the subhead -> first item gap)"
           : h.rel.startsWith("subhead") ? "group subhead -> first item text gap (px)" : "gap between two paragraphs of one note (px)",
       });

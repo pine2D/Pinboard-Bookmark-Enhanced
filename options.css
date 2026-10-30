@@ -1834,8 +1834,8 @@ html[data-theme] .fg.entry-block-sub[data-off] > label.bl { color: var(--opt-fg-
    list and 16 next to a field, and not 44-46 before a section title that
    follows a list. The negative margins collapse with the neighbour's
    positive one (title 12 - 12 = 0, entry block 16 - 12 = 4, next section
-   32 - 12 = 20), so no box overlaps (two groups back to back are the one
-   exception, handled below). This replaces R9 (2026-09-23), which
+   32 - 12 = 20), so no box overlaps (two groups back to back take the
+   section gap instead, handled below). This replaces R9 (2026-09-23), which
    trimmed the first row under a title to 32 / 28px; with A2 every row is
    back on the 44 / 36 floor, and --pick-row1-h / --pick-mark-y need no
    title-led override. */
@@ -1865,10 +1865,15 @@ html[data-theme] .fg.entry-block-sub[data-off] > label.bl { color: var(--opt-fg-
 /* Two row groups back to back (AI Content Source's radios, then the
    transcript switch): the trims would collapse to -8 and lay the second
    group's first row over the first group's last one, where a switch's input
-   would take clicks meant for an open answer. Their padding meets with no
-   gap instead -- 24 between the texts (compact 16), the one place A2 cannot
-   reach 16 without shrinking a row. */
-:is(.settings-section, .disclosure-body) > .pref-group + .pref-group { margin-top: calc(var(--opt-row-pad-y) - var(--opt-sp-6)); }
+   would take clicks meant for an open answer. They are set apart by the
+   section gap instead, 32 between the texts (compact 24): the two groups
+   carry no subhead and no divider between them, so the gap alone has to read
+   as a group boundary, and 2 x row padding (24 / 16) sat level with the
+   25 / 17 between two rows of one group (critique 6 CC-11, undone by A2,
+   restored 2026-10-30). The margin is what is left after both rows'
+   padding, section gap - 2 x pad = 8 in both densities; it collapses with
+   the first group's sp-6 - pad (4 / 8), never negative, so no box overlaps. */
+:is(.settings-section, .disclosure-body) > .pref-group + .pref-group { margin-top: calc(var(--opt-section-gap) - 2 * var(--opt-row-pad-y)); }
 /* A group that ends in a caption instead of a row (Appearance's "needs a
    preset" note) puts the row padding back under that caption as padding: a
    margin would collapse into the trims above and land 12px short. */
