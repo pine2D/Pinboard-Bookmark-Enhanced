@@ -1652,7 +1652,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // in flight -- the only place the form can be switched to another bookmark
     // after the handler's entry guard has already passed.
     function regenRuntime({ formUrl, pageUrl, tags, seedTags = ["manual"], accept = tags,
-      counts = {}, bookmarkNames = [], attach = false, duringCall = null }) {
+      counts = {}, bookmarkNames = [], attach = false, duringCall = null, lateLookup = false,
+      disableRefreshedChip = false }) {
       const renderStart = popupAiSource.indexOf("function renderAITags(");
       const renderEnd = popupAiSource.indexOf("\n}\n", renderStart);
       assert(renderStart >= 0 && renderEnd > renderStart, "renderAITags source not found");
@@ -1667,12 +1668,17 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const liveStart = popupAiSource.indexOf("function _aiOpStillCurrent");
       const liveEnd = popupAiSource.indexOf("function pbpAiWrapSummary", liveStart);
       assert(liveStart >= 0 && liveEnd > liveStart, "op-liveness guard not found");
+      const alignStart = popupAiSource.indexOf("function finalizeAITags(");
+      const alignEnd = popupAiSource.indexOf("// The two codes the worker mints itself", alignStart);
+      assert(alignStart >= 0 && alignEnd > alignStart, "AI tag alignment source not found");
 
       const container = document.createElement("div");
       if (attach) document.body.appendChild(container);
       const clearBtn = document.createElement("button");
       const urlInput = document.createElement("input");
+      const tagsInput = document.createElement("input");
       urlInput.value = formUrl;
+      let badgeCalls = 0;
       const calls = { renderTags: 0, doAITags: 0, status: [] };
       const tagAddRemoveSource = popupTagsSource.slice(
         popupTagsSource.indexOf("function addTag(tag) {"), popupTagsSource.indexOf("function renderTags() {"));
@@ -1694,6 +1700,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "stripTrackingParams", "URL", "seedTags", "settings", "counts", "bookmarkNames",
         "let currentTags = seedTags.slice();\n" +
         "const _aiSessionAddedTags = new Set();\n" +
+        "let bookmarkLookup = {status:'pending',url:pageInfo.url,formLoaded:false};\n" +
         // Finding 5: use the real addTag's dedup-before-flag-set order.
         // A dup add (e.g. clicking an AI chip that names a
         // tag the server already loaded) must not flip _tagsUserTouched. The
@@ -1707,11 +1714,13 @@ test("posts/add default remains replace=yes for existing callers", () => {
         popupAiSource.slice(acctStart, acctEnd) + "\n" +
         popupAiSource.slice(urlStart, urlEnd) + "\n" +
         popupAiSource.slice(liveStart, liveEnd) + "\n" +
+        popupAiSource.slice(alignStart, alignEnd) + "\n" +
         popupAiSource.slice(renderStart, renderEnd + 2) + "\n" +
         "return { renderAITags, addTag, removeTag, provenance: _aiSessionAddedTags, tags: () => currentTags.slice()," +
-        " touched: () => _tagsUserTouched };"
+        " touched: () => _tagsUserTouched, account: pbpPopupAiAccount, show: pbpShowAITagResult, refresh: pbpRefreshDisplayedAITagsForBookmark," +
+        " setLookup: state => {bookmarkLookup=state;} };"
       )(
-        (id) => (id === "url-input" ? urlInput : id === "ai-suggest-tags" ? container : id === "tags-clear-all" ? clearBtn : null),
+        (id) => (id === "url-input" ? urlInput : id === "ai-suggest-tags" ? container : id === "tags-clear-all" ? clearBtn : id === "tags-input" ? tagsInput : null),
         (key) => key,
         { check: "<svg></svg>" },
         {},
@@ -1719,8 +1728,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         () => { calls.renderTags++; },
         async () => { calls.doAITags++; if (duringCall) duringCall(urlInput); },
         (id, message, kind) => calls.status.push({ id, message, kind }),
-        () => {},
-        () => {},
+        () => {if (disableRefreshedChip && ++badgeCalls > 1) container.querySelector(".stag.ai").disabled = true;},
+        (host) => host.querySelectorAll(".stag, .add-all-link, .cache-hint-wrap, .empty-state").forEach((node) => node.remove()),
         () => {},
         () => {},
         window.stripTrackingParams,
@@ -1734,7 +1743,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         bookmarkNames
       );
 
-      runtime.renderAITags(tags, true); // fromCache: true is what renders the regen links
+      if (lateLookup) runtime.show(tags, true, {pinboardToken:"alice:0123456789ABCDEF"}, runtime.account());
+      else runtime.renderAITags(tags, true); // fromCache: true is what renders the regen links
       const acceptSet = new Set(accept.map((tag) => tag.toLowerCase()));
       container.querySelectorAll(".stag.ai").forEach((chip) => {
         if (acceptSet.has(chip.dataset.tag.toLowerCase())) chip.click();
@@ -1742,7 +1752,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const links = Array.from(container.querySelectorAll(".regen-link"));
       const replaceLink = links.find((link) => link.dataset.mode === "replace");
       assert(replaceLink, "renderAITags did not produce a replace-mode regen link");
-      return { container, clearBtn, urlInput, calls, links, replaceLink, ...runtime };
+      return { container, clearBtn, urlInput, tagsInput, calls, links, replaceLink, ...runtime };
     }
 
     // A macrotask turn, not a bare microtask: if the guard ever moves behind an
@@ -2455,6 +2465,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
       }
       const account = o.account || "alice";
       const container = fakeEl();
+      container.chips = [];
+      container.querySelectorAll = selector => selector === ".stag.ai" ? container.chips : [];
+      const lookupState = {status:"pending",url:URL,formLoaded:false};
       const card = fakeEl();
       card.classList.add("hidden");
       const fields = {
@@ -2485,6 +2498,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
           _popupDraftChangedFields:new Set(), fieldDirtyFlags:{"linkding-description-input":false},
           _archiveUserTouched:false, pbpRememberPopupDraft() {} } : {}),
         pageInfo: { url: URL, pageText: "extracted body" },
+        bookmarkLookup: lookupState,
         allUserTags: [],
         pbpPopupTagContext: (s) => ({ service: pbpBookmarkServiceId(s), separator: s.aiTagSeparator,
           bookmarkNames: o.bookmarkNames || [], index: pbpTagVocabIndex(o.tagCounts || Object.fromEntries(Object.values(o.tagCaseMap || {}).map(name => [name, 1]))),
@@ -2519,11 +2533,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
         parseAICombined: () => ({ tags: ["in-document"], summary: "in-document combined" }),
         pbpRelevantTagsFirst: () => [],
         pbpPopupAiAccount: () => account,
-        pbpPopupAiAccountIsCurrent: (a) => a === account,
+        pbpPopupAiAccountIsCurrent: (a) => a === account && !o.ownerChanged,
         // urlDrifted: the account stays current but the URL field is edited
         // away while the call is in flight -- once the message has left, the
         // stronger (account + URL) gate must fail while the account gate holds.
-        _aiOpStillCurrent: (a) => a === account && !(o.urlDrifted && calls.sent.length > 0),
+        _aiOpStillCurrent: (a) => a === account && !o.ownerChanged && !o.urlDriftedNow && !(o.urlDrifted && calls.sent.length > 0),
         _aiUrlEquivalent: () => true,
         _aiAwaitBookmarkLookup: async () => {},
         _aiRestoreSummaryOwnership: async () => false,
@@ -2546,7 +2560,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         ensurePageText: async () => o.source || "local",
         upsertSummary: (text) => calls.summary.push(text),
         showSummaryActions: () => {},
-        renderAITags: (tags, cached) => calls.rendered.push({ tags, cached }),
+        renderAITags: (tags, cached) => { container.chips = tags.map(tag=>({dataset:{tag}})); calls.rendered.push({ tags, cached }); },
         _aiClearTagsOutput: () => {},
         _aiParkTagsBtn: () => {},
         pbpAssignAltNumBadges: () => {},
@@ -2558,9 +2572,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const realDraftEdit = o.realSummary ? source.slice(source.indexOf("function pbpPopupDraftFieldEdited("),source.indexOf("function setupPopupDraftTracking(")) : "";
       const body = k44SliceA + "\n" + k44SliceB + "\n" + realSummary + "\n" + realDraftEdit + (o.realErrorCard ? "\n" + k44SliceC : "");
       const api = new Function(...Object.keys(deps),
-        body + "\n; return { fetchAIArtifacts, doAISummary, doAITags, editDescription(value) { fieldsEdit(value); pbpPopupDraftFieldEdited('linkding-description-input'); } };"
+        body + "\n; return { fetchAIArtifacts, doAISummary, doAITags, refreshAITags: typeof pbpRefreshDisplayedAITagsForBookmark === 'function' ? pbpRefreshDisplayedAITagsForBookmark : null, editDescription(value) { fieldsEdit(value); pbpPopupDraftFieldEdited('linkding-description-input'); } };"
       )(...Object.values(deps));
-      return { ...api, calls, snapshot, account, el: fields };
+      return { ...api, calls, snapshot, account, el: fields, lookupState };
     }
 
     await testAsync("manual Description edited during the actual summary request keeps visible completion feedback", async () => {
@@ -3617,7 +3631,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // and feed them worker replies, so the whole chain has to carry the cause.
     const proxySource = source.slice(source.indexOf("function _pbpProxyPinboardFetch"), source.indexOf("let currentTags"));
 
-    function createLookupHarness(workerReply, { nullField = "", service = "pinboard", dirtyDescription = false, realDescription = false } = {}) {
+    function createLookupHarness(workerReply, { nullField = "", service = "pinboard", dirtyDescription = false, realDescription = false, onRefresh = () => {} } = {}) {
       const statuses = [];
       const warns = [];
       const sent = [];
@@ -3657,6 +3671,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         invalidateBookmarkLookup() {},
         recomputeArchiveCheck() {},
         renderTags() {},
+        pbpRefreshDisplayedAITagsForBookmark: onRefresh,
         updateCharCount() {},
         autoResizeTextarea() {},
         setTimeout: () => 0,
@@ -3680,11 +3695,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "let _popupDraftRestored = false;",
         "let _tagsUserTouched = false;",
         lookupSource,
-        "return { checkExistingBookmark, getLookup: () => bookmarkLookup, getTags: () => currentTags, touchTags: tags => {currentTags=tags;_tagsUserTouched=true;} };",
+        "return { checkExistingBookmark, getLookup: () => bookmarkLookup, getBookmark: () => existingBookmark, getTags: () => currentTags, touchTags: tags => {currentTags=tags;_tagsUserTouched=true;} };",
       ].join("\n");
       const names = Object.keys(dependencies);
       const built = new Function(...names, body)(...names.map((name) => dependencies[name]));
-      return { elements, run: (...args) => built.checkExistingBookmark("alice:token", URL, null, true, ...args), getLookup: built.getLookup, getTags: built.getTags, touchTags: built.touchTags, statuses, warns, sent, resets: () => resets };
+      return { elements, run: (...args) => built.checkExistingBookmark("alice:token", URL, null, true, ...args), getLookup: built.getLookup, getBookmark: built.getBookmark, getTags: built.getTags, touchTags: built.touchTags, statuses, warns, sent, resets: () => resets };
     }
 
     const FOUND_BODY = JSON.stringify({ posts: [{ description: "Saved title", extended: "", tags: "alpha", shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }] });
@@ -4065,6 +4080,152 @@ test("posts/add default remains replace=yes for existing callers", () => {
       runtime.renderAITags(tags, false);
       return { container, tagsInput, focusCalls, added, cleanup() { container.remove(); tagsInput.remove(); } };
     }
+
+    await testAsync("late bookmark lookup repairs a cached AI chip to the bookmark's own spelling", async () => {
+      const names=[];
+      const ai=makePopupAi({settings:{bookmarkService:"linkding"},respectCase:true,tagCounts:{JavaScript:9,javascript:1},bookmarkNames:names,fastCached:{tags:["javascript"]}});
+      let release;
+      let refreshes=0;
+      const lookup=createLookupHarness(()=>new Promise(resolve=>{release=resolve;}),{service:"linkding",onRefresh:()=>{
+        refreshes++;
+        names.splice(0,names.length,...lookup.getBookmark().tagNames);
+        Object.assign(ai.lookupState,lookup.getLookup());
+        ai.refreshAITags?.();
+      }});
+      const pending=lookup.run();
+      await ai.doAITags(false);
+      assert(ai.calls.rendered[0]?.tags?.[0]==="JavaScript","setup: cached chip did not render before lookup");
+      assert(typeof release==="function","lookup was not deferred");
+      release({ok:true,status:200,data:{posts:[{href:URL,description:"Saved",extended:"",tags:"java-script",tagNames:["java-script"],shared:"no",toread:"no",time:"2026-10-30T00:00:00Z"}]}});
+      assert((await pending).status==="found","deferred bookmark lookup did not finish");
+      const run=aiTagFocusRuntime(ai.calls.rendered.at(-1).tags);
+      try {
+        const chip=run.container.querySelector(".stag.ai");
+        assert(refreshes===1 && chip?.dataset.tag==="java-script" && chip.textContent==="java-script","final real chip missed the bookmark's own spelling");
+        assert(ai.calls.sent.length===0 && ai.calls.cache.length===0,"lookup refresh issued AI work or rewrote cache");
+      } finally {run.cleanup();}
+    });
+
+    await testAsync("late lookup repaint preserves accepted AI provenance and manual tags for New set", async () => {
+      const names=[];
+      let release;
+      let run;
+      let refreshes=0;
+      const lookup=createLookupHarness(()=>new Promise(resolve=>{release=resolve;}),{service:"linkding",onRefresh:()=>{
+        refreshes++;
+        names.splice(0,names.length,...lookup.getBookmark().tagNames);
+        run.setLookup(lookup.getLookup());
+        run.refresh();
+      }});
+      const pending=lookup.run();
+      run=regenRuntime({formUrl:URL,pageUrl:URL,tags:["javascript","scripting"],seedTags:["manual"],accept:["JavaScript"],
+        counts:{JavaScript:9,javascript:1},bookmarkNames:names,attach:true,lateLookup:true,
+        duringCall:()=>run.container.querySelector(".cache-hint-wrap")?.remove()});
+      try {
+        assert(run.container.querySelector(".stag.ai")?.dataset.tag==="JavaScript","setup: cached chip did not use library spelling");
+        run.addTag("handwritten");
+        assert(run.tags().join("|")==="manual|JavaScript|handwritten" && run.provenance.has("javascript") && run.touched(),
+          "setup: AI adoption and manual edit did not populate form provenance");
+        run.container.querySelectorAll(".stag.ai")[1].focus();
+        assert(document.activeElement?.dataset.tag==="scripting","setup: second AI chip did not take focus");
+        assert(typeof release==="function","lookup was not deferred");
+        release({ok:true,status:200,data:{posts:[{href:URL,description:"Saved",extended:"",tags:"java-script",tagNames:["java-script"],shared:"no",toread:"no",time:"2026-10-30T00:00:00Z"}]}});
+        assert((await pending).status==="found","late lookup did not complete: " + JSON.stringify({lookup:lookup.getLookup(),statuses:lookup.statuses,warns:lookup.warns}));
+        assert(refreshes===1 && run.container.querySelector(".stag.ai")?.dataset.tag==="java-script",
+          "lookup did not repaint chip spelling");
+        assert(run.tags().join("|")==="manual|JavaScript|handwritten" && run.provenance.has("javascript") && run.touched(),
+          "lookup repaint changed adopted tags, provenance, or edit flag");
+        assert(document.activeElement?.dataset.tag==="scripting" && document.activeElement===run.container.querySelectorAll(".stag.ai")[1],
+          "lookup repaint lost keyboard focus on the unadopted AI chip");
+        assert(run.calls.doAITags===0,"lookup repaint requested AI");
+        run.container.querySelector(".regen-link")?.click();
+        await settle();
+        assert(run.calls.doAITags===1 && run.tags().join("|")==="manual|handwritten" && run.touched(),
+          "New set failed to retract only the accepted AI tag after lookup repaint");
+      } finally {run.container.remove();}
+    });
+
+    await testAsync("late lookup moves focus to tag input if the replacement AI chip is disabled", async () => {
+      const names=[];
+      const run=regenRuntime({formUrl:URL,pageUrl:URL,tags:["javascript"],accept:[],
+        counts:{JavaScript:9,javascript:1},bookmarkNames:names,attach:true,lateLookup:true,disableRefreshedChip:true});
+      document.body.appendChild(run.tagsInput);
+      try {
+        run.container.querySelector(".stag.ai").focus();
+        assert(document.activeElement?.dataset.tag==="JavaScript","setup: original chip did not take focus");
+        names.push("java-script");
+        run.setLookup({status:"found",url:URL,formLoaded:true});
+        run.refresh();
+        assert(run.container.querySelector(".stag.ai")?.disabled && document.activeElement===run.tagsInput,
+          "disabled replacement chip did not hand focus to tag input");
+      } finally {run.container.remove();run.tagsInput.remove();}
+    });
+
+    await testAsync("lookup during a refused New set waits for rollback before repainting cached chips", async () => {
+      const names=[];
+      let run;
+      run=regenRuntime({formUrl:URL,pageUrl:URL,tags:["javascript"],seedTags:["manual"],
+        counts:{JavaScript:9,javascript:1},bookmarkNames:names,attach:true,lateLookup:true,
+        duringCall:()=>{
+          names.push("java-script");
+          run.setLookup({status:"found",url:URL,formLoaded:true});
+          run.refresh();
+        }});
+      try {
+        run.addTag("handwritten");
+        assert(run.tags().join("|")==="manual|JavaScript|handwritten" && run.provenance.has("javascript"),
+          "setup: cached chip was not adopted");
+        run.container.querySelector(".regen-link").click();
+        await settle();
+        assert(run.calls.doAITags===1 && run.tags().join("|")==="manual|handwritten|java-script",
+          "late lookup skipped New set rollback or lost manual tags: " + run.tags().join("|"));
+        assert(run.container.querySelector(".stag.ai")?.dataset.tag==="java-script" && run.provenance.has("javascript"),
+          "cached chip did not settle on the bookmark spelling after rollback");
+      } finally {run.container.remove();}
+    });
+
+    await testAsync("missing and failed lookups let cached tags settle without another AI call", async () => {
+      for(const reply of [{ok:true,status:200,data:{posts:[]}},{ok:false,status:503,error:"network"}]){
+        const ai=makePopupAi({respectCase:true,tagCounts:{JavaScript:9,javascript:1},fastCached:{tags:["javascript"]}});
+        let release;
+        let refreshes=0;
+        const lookup=createLookupHarness(()=>new Promise(resolve=>{release=resolve;}),{onRefresh:()=>{refreshes++;ai.refreshAITags?.();}});
+        const pending=lookup.run();
+        const settled=await Promise.race([ai.doAITags(false).then(()=>true),new Promise(resolve=>setTimeout(()=>resolve(false),200))]);
+        assert(settled && ai.calls.rendered[0]?.tags?.[0]==="JavaScript","cached tags waited indefinitely for lookup");
+        assert(typeof release==="function","lookup was not deferred");
+        release(reply);await pending;
+        assert(refreshes===0 && ai.calls.rendered.at(-1).tags[0]==="JavaScript","miss/failure changed cached chips");
+        assert(ai.calls.sent.length===0 && ai.calls.cache.length===0,"miss/failure issued AI work or rewrote cache");
+      }
+    });
+
+    await testAsync("owner drift prevents a late bookmark from replacing AI chips", async () => {
+      const names=[];
+      const opts={respectCase:true,tagCounts:{JavaScript:9,javascript:1},bookmarkNames:names,fastCached:{tags:["javascript"]}};
+      const ai=makePopupAi(opts);
+      let release;
+      const lookup=createLookupHarness(()=>new Promise(resolve=>{release=resolve;}),{onRefresh:()=>{
+        names.splice(0,names.length,"java-script");Object.assign(ai.lookupState,lookup.getLookup());ai.refreshAITags?.();
+      }});
+      const pending=lookup.run();await ai.doAITags(false);
+      opts.ownerChanged=true;
+      release({ok:true,status:200,data:{posts:[{description:"Saved",extended:"",tags:"java-script",tagNames:["java-script"],shared:"no",toread:"no",time:"2026-10-30T00:00:00Z"}]}});
+      await pending;
+      assert(ai.calls.rendered.length===1 && ai.calls.rendered[0].tags[0]==="JavaScript","stale owner repainted AI chips");
+    });
+
+    await testAsync("URL drift leaves a late bookmark lookup stale and AI chips unchanged", async () => {
+      const ai=makePopupAi({respectCase:true,tagCounts:{JavaScript:9,javascript:1},fastCached:{tags:["javascript"]}});
+      let release;
+      let refreshes=0;
+      const lookup=createLookupHarness(()=>new Promise(resolve=>{release=resolve;}),{onRefresh:()=>{refreshes++;ai.refreshAITags?.();}});
+      const pending=lookup.run();await ai.doAITags(false);
+      lookup.elements["url-input"].value="https://other.example/page";
+      release({ok:true,status:200,data:{posts:[{description:"Saved",extended:"",tags:"java-script",tagNames:["java-script"],shared:"no",toread:"no",time:"2026-10-30T00:00:00Z"}]}});
+      assert((await pending).status==="stale","drifted lookup was applied");
+      assert(refreshes===0 && ai.calls.rendered.length===1,"drifted URL repainted AI chips");
+    });
 
     await testAsync("a raw cache hit reaches real AI chips with the current vocabulary spelling", async () => {
       const h = makePopupAi({ respectCase:true, tagCounts:{JavaScript:9,javascript:1}, fastCached:{tags:["javascript"]} });

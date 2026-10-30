@@ -928,6 +928,44 @@ function finalizeAITags(rawTags, s) {
   return rawTags.map(tag => pbpCanonicalTagName(tag, pbpPopupTagContext(s || settings)));
 }
 
+// A cached result can paint before the bookmark lookup finishes. Keep only
+// this popup's displayed raw result so that lookup completion can choose the
+// bookmark's own spelling without another AI call or a cache rewrite.
+let _aiDisplayedTagResult = null;
+let _aiTagRegenerationDepth = 0;
+let _aiTagRefreshAfterRegeneration = false;
+function pbpShowAITagResult(rawTags, fromCache, s, account) {
+  _aiDisplayedTagResult = {rawTags:rawTags.slice(), fromCache, settings:s, account, url:pageInfo.url};
+  renderAITags(finalizeAITags(rawTags, s), fromCache);
+}
+function pbpRefreshDisplayedAITagsForBookmark() {
+  const displayed = _aiDisplayedTagResult;
+  if (!displayed || !_aiOpStillCurrent(displayed.account) || pageInfo.url !== displayed.url
+      || bookmarkLookup.status !== "found" || bookmarkLookup.url !== displayed.url || !bookmarkLookup.formLoaded) return;
+  // New set temporarily retracts adopted tags and uses the current render's
+  // connected link to decide whether a refused run must roll them back.
+  if (_aiTagRegenerationDepth) { _aiTagRefreshAfterRegeneration = true; return; }
+  const container = $id("ai-suggest-tags");
+  const chips = [...(container?.querySelectorAll(".stag.ai") || [])];
+  if (!chips.length) return;
+  const aligned = finalizeAITags(displayed.rawTags, displayed.settings);
+  if (aligned.length === chips.length && aligned.every((name, i) => name === chips[i].dataset.tag)) return;
+  const focused = document.activeElement;
+  const focusedChip = chips.indexOf(focused);
+  let focusedAction = "";
+  if (container?.contains?.(focused)) {
+    if (focused.classList.contains("add-all-link")) focusedAction = ".add-all-link";
+    else if (focused.classList.contains("regen-link")) focusedAction = ".regen-link";
+  }
+  renderAITags(aligned, displayed.fromCache);
+  if (focusedChip >= 0) {
+    const replacement = container.querySelectorAll(".stag.ai")[focusedChip];
+    if (replacement && !replacement.disabled) replacement.focus({preventScroll:true});
+    else $id("tags-input")?.focus({preventScroll:true});
+  }
+  else if (focusedAction) container.querySelector(focusedAction)?.focus({preventScroll:true});
+}
+
 // The two codes the worker mints itself (everything else comes from
 // handleAIError, whose message is the provider's own words). Their messages are
 // log strings — "malformed AI call", "account changed" — written for a console,
@@ -1342,7 +1380,7 @@ async function doAITags(forceRefresh, sOverride) {
   if (!forceRefresh) {
     const cached = await pbpAiFastCached("tags", s, account);
     if (cached && _aiOpStillCurrent(account)) {
-      renderAITags(finalizeAITags(cached, s), true);
+      pbpShowAITagResult(cached, true, s, account);
       return;
     }
   }
@@ -1375,7 +1413,7 @@ async function doAITags(forceRefresh, sOverride) {
     // turns a cache hit into a fresh write; only the local fallback owns one.
     if (tags.length && !PBP_AI_VIA_SW && !resultMeta.fromCache) await setAICache(pageInfo.url, "tags", tags, s.aiCacheDuration, contentSource, account, s);
     if (!_aiOpStillCurrent(account)) return;
-    renderAITags(finalizeAITags(tags, s), false);
+    pbpShowAITagResult(tags, false, s, account);
     if (forceRefresh) {
       showStatus("status-msg", t("aiTagsRegenerated"), "success");
     }
@@ -1579,9 +1617,11 @@ function renderAITags(tags, fromCache) {
     retracted = currentTags.filter(wasAddedByThisRound);
     currentTags = currentTags.filter(t => !wasAddedByThisRound(t));
     renderTags();
+    _aiTagRegenerationDepth++;
     try {
       await doAITags(true);
     } finally {
+      _aiTagRegenerationDepth--;
       // Every doAITags path that actually ran rebuilds this bar (success
       // re-renders the chips, catch clears them), so a hintWrap still in the
       // document means it refused early -- no key, account drift, no page
@@ -1606,6 +1646,10 @@ function renderAITags(tags, fromCache) {
             _tagsUserTouched = tagsUserTouchedBeforeRetract;
           }
         }
+      }
+      if (!_aiTagRegenerationDepth && _aiTagRefreshAfterRegeneration) {
+        _aiTagRefreshAfterRegeneration = false;
+        pbpRefreshDisplayedAITagsForBookmark();
       }
     }
   });

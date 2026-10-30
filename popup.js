@@ -1666,6 +1666,10 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
           banner.classList.remove("hidden");
         }
         bookmarkLookup = { status: "found", url: lookupUrl, generation, promise: null, formLoaded: true };
+        // Cached AI chips may have rendered before this lookup supplied the
+        // bookmark's own tag spelling. Refresh those chips from their raw
+        // result; this does not request AI or write the shared cache.
+        if (typeof pbpRefreshDisplayedAITagsForBookmark === "function") pbpRefreshDisplayedAITagsForBookmark();
       } else {
         existingBookmark = null;
         bookmarkLookup = { status: "missing", url: lookupUrl, generation, promise: null, formLoaded: false };
