@@ -2861,6 +2861,9 @@
   "tagGovNeedToken": {
     "message": "Saisissez votre jeton API Pinboard dans l’onglet Compte pour charger vos étiquettes ici."
   },
+  "tagGovPinboardOnly": {
+    "message": "La gestion des étiquettes est actuellement réservée à Pinboard."
+  },
   "tagGovEnterToken": {
     "message": "Saisir le jeton API"
   },

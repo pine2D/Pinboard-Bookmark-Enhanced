@@ -1019,6 +1019,29 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     assert(document.getElementById("tag-gov-reset-ignored"), "load-failed re-render must not drop the reset link either");
   });
 
+  await test("tag-gov missing-auth readout explains a non-Pinboard deep link", async () => {
+    const service = document.createElement("input");
+    service.type = "radio";
+    service.name = "bookmark-service";
+    service.checked = true;
+    document.body.appendChild(service);
+    try {
+      for (const value of ["karakeep", "linkding"]) {
+        service.value = value;
+        _tagGovShowLoadFailed("no-token");
+        assert(document.getElementById("tag-gov-stats").textContent === "tagGovPinboardOnly", value + " still asks for a Pinboard token");
+      }
+      service.value = "pinboard";
+      _tagGovShowLoadFailed("no-token");
+      assert(document.getElementById("tag-gov-stats").textContent === "tagGovNeedToken", "Pinboard without a token must retain setup guidance");
+      service.value = "linkding";
+      _tagGovShowLoadFailed();
+      assert(document.getElementById("tag-gov-stats").textContent === "tagGovLoadFailed", "a real load failure must retain its error");
+    } finally {
+      service.remove();
+    }
+  });
+
   await test("tag-gov overview: the ignored tail shows only when something is ignored", async () => {
     const wrap = document.getElementById("tag-gov-ignored");
     pbpSetTagGovIgnoredCount(0);

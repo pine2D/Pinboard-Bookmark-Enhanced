@@ -2861,6 +2861,9 @@
   "tagGovNeedToken": {
     "message": "先在「账号」中填写 Pinboard API Token，这里才能读取你的标签。"
   },
+  "tagGovPinboardOnly": {
+    "message": "标签治理目前只支持 Pinboard。"
+  },
   "tagGovEnterToken": {
     "message": "填写 API Token"
   },

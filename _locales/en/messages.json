@@ -2871,6 +2871,9 @@
   "tagGovNeedToken": {
     "message": "Add your Pinboard API Token under Account to load your tags here."
   },
+  "tagGovPinboardOnly": {
+    "message": "Tag management currently supports Pinboard only."
+  },
   "tagGovEnterToken": {
     "message": "Enter API token"
   },

@@ -5310,11 +5310,15 @@ function pbpSetTagGovHasData(hasData) {
 
 // Loading tag counts failed: say why in the overview line instead of leaving
 // the unfilled "$TAGS$ tags" template visible. `reason` "no-token" names the
-// missing step; anything else is the offline / API-error message.
+// missing step for Pinboard or the unsupported-service explanation; anything
+// else is the offline / API-error message.
 function _tagGovShowLoadFailed(reason = "failed") {
   const noToken = reason === "no-token";
+  const service = document.querySelector('input[name="bookmark-service"]:checked')?.value;
   const stats = $id("tag-gov-stats");
-  if (stats) stats.textContent = t(noToken ? "tagGovNeedToken" : "tagGovLoadFailed");
+  if (stats) stats.textContent = t(noToken
+    ? (["karakeep", "linkding"].includes(service) ? "tagGovPinboardOnly" : "tagGovNeedToken")
+    : "tagGovLoadFailed");
   pbpSetTagGovDataState(noToken ? "no-token" : "failed");
 }
 

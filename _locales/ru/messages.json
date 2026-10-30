@@ -2861,6 +2861,9 @@
   "tagGovNeedToken": {
     "message": "Введите API-токен Pinboard в разделе «Аккаунт», чтобы загрузить здесь свои теги."
   },
+  "tagGovPinboardOnly": {
+    "message": "Управление тегами пока доступно только для Pinboard."
+  },
   "tagGovEnterToken": {
     "message": "Ввести API-токен"
   },

@@ -2861,6 +2861,9 @@
   "tagGovNeedToken": {
     "message": "Wpisz token API Pinboard w sekcji „Konto”, aby wczytać tu swoje tagi."
   },
+  "tagGovPinboardOnly": {
+    "message": "Zarządzanie tagami jest obecnie dostępne tylko dla Pinboard."
+  },
   "tagGovEnterToken": {
     "message": "Wpisz token API"
   },

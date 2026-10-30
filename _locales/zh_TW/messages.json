@@ -2861,6 +2861,9 @@
   "tagGovNeedToken": {
     "message": "請先在「帳號」中填寫 Pinboard API Token，這裡才能讀取你的標籤。"
   },
+  "tagGovPinboardOnly": {
+    "message": "標籤治理目前僅支援 Pinboard。"
+  },
   "tagGovEnterToken": {
     "message": "填寫 API Token"
   },

@@ -2861,6 +2861,9 @@
   "tagGovNeedToken": {
     "message": "Trage unter „Konto“ deinen Pinboard-API-Token ein, damit hier deine Tags geladen werden."
   },
+  "tagGovPinboardOnly": {
+    "message": "Die Tag-Verwaltung ist derzeit nur mit Pinboard verfügbar."
+  },
   "tagGovEnterToken": {
     "message": "API-Token eintragen"
   },

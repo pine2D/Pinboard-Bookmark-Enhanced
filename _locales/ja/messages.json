@@ -2861,6 +2861,9 @@
   "tagGovNeedToken": {
     "message": "タグを読み込むには、まず「アカウント」で Pinboard の API トークンを入力してください。"
   },
+  "tagGovPinboardOnly": {
+    "message": "タグ管理は現在 Pinboard のみ対応しています。"
+  },
   "tagGovEnterToken": {
     "message": "API トークンを入力"
   },
