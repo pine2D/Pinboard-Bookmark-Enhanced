@@ -286,6 +286,35 @@ try{
   assert(raceCalls.some(r=>r.path==='lists/later1/bookmarks/race1'&&r.method==='PUT'),'Read Later did not continue');
   assert(!Object.hasOwn(raceCalls.find(r=>r.method==='PATCH').data,'title'),'crawled title was written back');
   console.log('Karakeep create race merged safely, preserved tags and continued Read Later');
+  // linkding 1.47 T7: a repeated POST is still 201 with the original id and
+  // date_added. Only the server's own timestamps identify the merged record.
+  const linkdingRaceUrl=origin+'/article-linkding-race';
+  const linkdingPost={id:11,url:linkdingRaceUrl,title:'T',description:'',notes:'',web_archive_snapshot_url:'https://web.archive.org/web/20261030030122/https://example.com/a',favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:['pbp-research','second'],date_added:'2026-10-30T03:01:22.656384Z',date_modified:'2026-10-30T04:01:22.656384Z',website_title:null,website_description:null};
+  raceCreates.set('linkding:'+linkdingRaceUrl,{status:201,record:linkdingPost});
+  const linkdingSave=async url=>worker.evaluate(url=>submitSaveIntent({mode:'create',url,title:'T',notes:'',tags:'pbp-research second',private:true,toread:false}),url);
+  const linkdingRaceStart=requests.length;
+  const linkdingRaceResult=await linkdingSave(linkdingRaceUrl);
+  assert.equal(linkdingRaceResult.status,'saved');assert.equal(linkdingRaceResult.mutation,'merged');
+  assert(!Object.hasOwn(linkdingRaceResult,'account'),'a merged POST exposed a deletion undo account');
+  assert.deepEqual(requests.slice(linkdingRaceStart).map(r=>r.method),['GET','POST']);
+  assert(records.linkding.has('11'),'merged bookmark was removed');
+  console.log('linkding 201 POST with a one-hour server timestamp gap is merged without deletion undo');
+  for(const [label,dates] of [
+    ['equal',{date_modified:'2026-10-30T03:01:22.656384Z'}],
+    ['milliseconds',{date_modified:'2026-10-30T03:01:22.696Z'}],
+    ['two-seconds',{date_modified:'2026-10-30T03:01:24.656Z'}],
+    ['missing-modified',{date_modified:undefined}],
+    ['invalid-modified',{date_modified:'invalid'}],
+    ['missing-added',{date_added:undefined}],
+    ['invalid-added',{date_added:'invalid'}]
+  ]){
+    const url=origin+'/article-linkding-'+label;
+    raceCreates.set('linkding:'+url,{status:201,record:{...linkdingPost,id:20+records.linkding.size,url,...dates}});
+    const result=await linkdingSave(url);
+    assert.equal(result.status,'saved',label);assert.equal(result.mutation,'created',label);
+    assert(result.account,label+' create lost its undo account');
+  }
+  console.log('linkding equal, near-equal, two-second and unparseable server dates remain created');
   const probes=await worker.evaluate(async origin=>{
     const out={};
     for(const kind of ['redirect','challenge','basic','denied','page','headers']){

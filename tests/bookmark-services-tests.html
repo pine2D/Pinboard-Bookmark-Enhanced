@@ -10,7 +10,9 @@ function ok(value) { if (!value) throw new Error("assertion failed"); }
 async function rejects(run, code) { try { await run(); } catch (error) { equal(error.code, code); return; } throw new Error("expected rejection: " + code); }
 const pageUrl = "https://example.com/article";
 // Hand-written server records, not derived from the adapter's serializers.
-const ld = {id:7, url:pageUrl, title:"Saved title", description:"Website summary", notes:"My note", tag_names:["work"], unread:true, shared:false, is_archived:false, date_added:"2026-10-01T10:00:00Z", date_modified:"2026-10-02T10:00:00Z"};
+const ld = {id:7, url:pageUrl, title:"Saved title", description:"Website summary", notes:"My note", tag_names:["work"], unread:true, shared:false, is_archived:false, date_added:"2026-10-01T10:00:00Z", date_modified:"2026-10-01T10:00:00Z"};
+// linkding 1.47 POST serializer (T7): an existing URL keeps date_added.
+const ldMergedPost = {id:11,url:pageUrl,title:"T",description:"",notes:"",web_archive_snapshot_url:"https://web.archive.org/web/20261030030122/https://example.com/article",favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:["pbp-research","second"],date_added:"2026-10-30T03:01:22.656384Z",date_modified:"2026-10-30T04:01:22.656384Z",website_title:null,website_description:null};
 const kk = {id:"bk1", createdAt:"2026-10-01T10:00:00Z", modifiedAt:null, title:"Saved title", archived:true, favourited:false, note:"My note", summary:null, userId:"user1", tags:[{id:"tag1",name:"work",attachedBy:"human"}], content:{type:"link",url:pageUrl,title:"Crawled title",description:"Website summary"}, assets:[]};
 function harness(service, replies, extra = {}) {
   const calls = [];
@@ -22,7 +24,27 @@ test("service defaults to Pinboard, unknown services fail closed", () => {equal(
 test("base URL preserves subpaths and rejects insecure or credential-bearing inputs", () => {equal(pbpBookmarkEndpoint("https://bookmarks.example/base"),"https://bookmarks.example/base/");equal(pbpBookmarkEndpoint("http://127.0.0.1:8000"),"http://127.0.0.1:8000/");for(const url of ["http://192.168.1.2", "http://2130706433", "https://u:p@example.com", "https://example.com/?key=x", "https://example.com/#x", "javascript:alert(1)"])equal(pbpBookmarkEndpoint(url),"");});
 test("linkding lookup preserves independent notes, summary, unread and visibility", async()=>{const {client,calls}=harness("linkding",[[200,{bookmark:ld,metadata:{},auto_tags:[]}]]);const b=await client.lookup(pageUrl);equal([b.id,b.url,b.title,b.notes,b.summary,b.tags,b.toread,b.private],["7",pageUrl,"Saved title","My note","Website summary",["work"],true,true]);equal(calls[0].url,"https://bookmarks.example/base/api/bookmarks/check/?url=https%3A%2F%2Fexample.com%2Farticle");equal(calls[0].headers.get("Authorization"),"Token fixture-token");equal(calls[0].redirect,"manual");equal(calls[0].credentials,"omit");});
 test("linkding missing bookmark is null, malformed lookup is an error",async()=>{equal(await harness("linkding",[[200,{bookmark:null}]]).client.lookup(pageUrl),null);await rejects(()=>harness("linkding",[[200,{}]]).client.lookup(pageUrl),"invalid_response");});
-test("linkding update patches requested fields without rewriting scraped description",async()=>{const {client,calls}=harness("linkding",[[200,{...ld,title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true}]]);const result=await client.save({url:pageUrl,title:"New",notes:"Note",tags:["new"],toread:false,private:false},{id:"7",url:pageUrl});equal(result.status,"saved");equal(calls[0].method,"PATCH");equal(calls[0].body,{title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true});});
+test("linkding update patches requested fields without rewriting scraped description",async()=>{const {client,calls}=harness("linkding",[[200,{...ld,title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true,date_modified:"2026-10-02T10:00:00Z"}]]);const result=await client.save({url:pageUrl,title:"New",notes:"Note",tags:["new"],toread:false,private:false},{id:"7",url:pageUrl});equal([result.status,result.mutation],["saved","updated"]);equal(calls[0].method,"PATCH");equal(calls[0].body,{title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true});});
+test("linkding POST detects a merge only when parseable server dates differ by more than two seconds",async()=>{
+  const variants=[
+    [{},"merged"],
+    [{date_modified:"2026-10-30T03:01:24.657Z"},"merged"],
+    [{date_modified:"2026-10-30T03:01:22.656384Z"},"created"],
+    [{date_modified:"2026-10-30T03:01:22.696Z"},"created"],
+    [{date_modified:"2026-10-30T03:01:24.656Z"},"created"],
+    [{date_modified:"2026-10-30T02:01:22.656Z"},"created"],
+    [{date_modified:undefined},"created"],
+    [{date_modified:"invalid"},"created"],
+    [{date_added:undefined},"created"],
+    [{date_added:"invalid"},"created"]
+  ];
+  for(const [dates,mutation] of variants){
+    const h=harness("linkding",[[201,{...ldMergedPost,...dates}]]);
+    const result=await h.client.save({url:pageUrl,title:"T",notes:"",tags:[]});
+    equal([result.status,result.mutation,result.bookmark.id],["saved",mutation,"11"]);
+    equal(h.calls.map(c=>c.method),["POST"]);
+  }
+});
 test("linkding create uses API fields and does not send a Wayback flag as archive",async()=>{const {client,calls}=harness("linkding",[[201,ld]]);await client.save({url:pageUrl,title:"Title",notes:"",tags:[],toread:true,private:true,archive:true},null);equal(calls[0].body,{url:pageUrl,title:"Title",notes:"",tag_names:[],unread:true,shared:false});});
 test("linkding uses canonical tags returned by its server",async()=>{
   // v1.47 models.sanitize_tag_name replaces spaces; the response, not the
@@ -248,6 +270,12 @@ test("a concurrent Karakeep create is saved without a deletion undo account",asy
   const result=await h.submitSaveIntent({...saveIntent,mode:"create",tags:"work"});
   equal([result.status,result.mutation],["saved","merged"]);
   ok(!Object.hasOwn(result,"account"));ok(!h.state.calls.some(c=>c.method==="DELETE"));
+});
+test("a linkding POST merged into an existing bookmark has no deletion undo account",async()=>{
+  const h=await workerHarness("linkding",[[200,{bookmark:null}],[201,ldMergedPost]]);
+  const result=await h.submitSaveIntent(saveIntent);
+  equal([result.status,result.mutation],["saved","merged"]);
+  ok(!Object.hasOwn(result,"account"));equal(h.state.calls.map(c=>c.method),["GET","POST"]);
 });
 test("merge preserves a remote tag containing spaces as one tag",async()=>{
   const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,{...kk,tags:[{id:"tag1",name:"machine learning",attachedBy:"human"}]}],[200,{id:"bk1"}],[200,{attached:["tag2"]}]]);

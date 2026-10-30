@@ -222,7 +222,12 @@ function pbpCreateBookmarkServiceClient(config) {
         ...(typeof fields.toread === "boolean" ? {unread:fields.toread} : {}),
         ...(typeof fields.private === "boolean" ? {shared:!fields.private} : {})};
       const {data} = await request(existing ? "bookmarks/" + pbpBookmarkRecordId(existing.id) + "/" : "bookmarks/", existing ? "PATCH" : "POST", body);
-      return {status:"saved",bookmark:pbpBookmarkNormalize(service,data),mutation:existing ? "updated" : "created"};
+      const bookmark = pbpBookmarkNormalize(service,data);
+      const added = Date.parse(data.date_added), modified = Date.parse(data.date_modified);
+      // linkding also returns 201 when POST merges an existing URL. Compare
+      // server timestamps only, so that record never receives a deletion undo.
+      const merged = Number.isFinite(added) && Number.isFinite(modified) && modified - added > 2000;
+      return {status:"saved",bookmark,mutation:existing ? "updated" : merged ? "merged" : "created"};
     }
     let bookmark = existing, step = "bookmark", mutation = existing ? "updated" : "created";
     try {
