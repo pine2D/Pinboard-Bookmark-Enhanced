@@ -668,7 +668,7 @@ async function pbpBookmarkDeleteResponse(auth, url) {
   return {ok:true, status:200, json:async () => ({result_code:"done"})};
 }
 async function pbpBookmarkTagCounts(auth) {
-  if (pbpSelfHostedAuth(auth)) return Object.fromEntries((await pbpBookmarkClient(auth).tags()).map(name => [name, 0]));
+  if (pbpSelfHostedAuth(auth)) return Object.fromEntries((await pbpBookmarkClient(auth).tags()).map(tag => [tag.name, tag.count]));
   const resp = await pinboardFetch(`https://api.pinboard.in/v1/tags/get?auth_token=${auth.token}&format=json`);
   if (!resp.ok) throw Object.assign(new Error("bookmark_tags"), {status:resp.status});
   return resp.json();

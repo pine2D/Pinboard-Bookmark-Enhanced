@@ -292,7 +292,12 @@ function pbpCreateBookmarkServiceClient(config) {
       ? await pages("tags/?limit=100",data=>data?.results,data=>data.next)
       : await pages("tags?limit=1000",data=>data?.tags,data=>data.nextCursor ? "tags?limit=1000&cursor=" + encodeURIComponent(data.nextCursor) : "");
     if (!Array.isArray(rows) || rows.some(tag=>typeof tag?.name !== "string")) throw pbpBookmarkServiceError("invalid_response");
-    return [...new Set(rows.map(tag=>tag.name).filter(name=>name.trim()))];
+    const seen = new Set();
+    return rows.filter(tag=>{
+      if (!tag.name.trim() || seen.has(tag.name)) return false;
+      seen.add(tag.name);
+      return true;
+    }).map(tag=>({name:tag.name,count:service === "karakeep" ? tag.numBookmarks : 0}));
   };
   const recent = async (limit = 5) => {
     limit = Math.max(1,Math.min(100,Number(limit)||5));

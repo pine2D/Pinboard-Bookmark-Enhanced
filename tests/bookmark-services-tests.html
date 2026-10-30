@@ -105,7 +105,19 @@ test("linkding uses canonical tags returned by its server",async()=>{
   equal(h.calls[0].body.tag_names,["machine learning"]);equal(result.bookmark.tags,["machine-learning"]);
 });
 test("linkding pagination refuses to send credentials to another origin",async()=>{const {client,calls}=harness("linkding",[[200,{count:2,next:"https://evil.example/api/tags/",results:[{id:1,name:"a"}]}]]);await rejects(()=>client.tags(),"invalid_response");equal(calls.length,1);});
-test("linkding tags pagination retains the configured base path",async()=>{const {client,calls}=harness("linkding",[[200,{count:2,next:"https://bookmarks.example/base/api/tags/?offset=1",results:[{id:1,name:"a"}]}],[200,{count:2,next:null,results:[{id:2,name:"b"}]}]]);equal(await client.tags(),["a","b"]);equal(calls.length,2);});
+test("linkding tags follow three next links and report unavailable counts as zero",async()=>{
+  const h=harness("linkding",[
+    [200,{count:3,next:"https://bookmarks.example/base/api/tags/?limit=100&offset=1",previous:null,results:[{id:1,name:"a",date_added:"2026-10-30T03:01:22.656384Z"}]}],
+    [200,{count:3,next:"https://bookmarks.example/base/api/tags/?limit=100&offset=2",previous:"https://bookmarks.example/base/api/tags/?limit=100",results:[{id:2,name:"b",date_added:"2026-10-30T03:02:22.656384Z"}]}],
+    [200,{count:3,next:null,previous:"https://bookmarks.example/base/api/tags/?limit=100&offset=1",results:[{id:3,name:"c",date_added:"2026-10-30T03:03:22.656384Z"}]}]
+  ]);
+  equal(await h.client.tags(),[{name:"a",count:0},{name:"b",count:0},{name:"c",count:0}]);
+  equal(h.calls.map(call=>call.url),[
+    "https://bookmarks.example/base/api/tags/?limit=100",
+    "https://bookmarks.example/base/api/tags/?limit=100&offset=1",
+    "https://bookmarks.example/base/api/tags/?limit=100&offset=2"
+  ]);
+});
 test("Karakeep lookup fetches full bookmark after URL check",async()=>{const {client,calls}=harness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk]]);const b=await client.lookup(pageUrl);equal([b.id,b.title,b.notes,b.tags,b.toread,b.archived],["bk1","Saved title","My note",["work"],false,true]);equal(calls[0].headers.get("Authorization"),"Bearer fixture-token");equal(calls[1].url,"https://bookmarks.example/base/api/v1/bookmarks/bk1");});
 test("Karakeep concurrent creation merges without deleting server tags",async()=>{
   const record={...kk,alreadyExists:true,archived:false};
@@ -627,8 +639,8 @@ test("empty-library backup restoration adopts only an explicitly selected data o
   equal(await adopt({vocabulary:{owner:"bob",records:[]}},{vocabulary:true},{...deps,apply:true}),"");equal(writes,1);
 });
 test("blank legacy Karakeep tags do not discard the whole tag list",async()=>{
-  const h=harness("karakeep",[[200,{tags:[{id:"empty",name:""},{id:"valid",name:"work"}],nextCursor:null}]]);
-  equal(await h.client.tags(),["work"]);
+  const h=harness("karakeep",[[200,{tags:[{id:"empty",name:"",numBookmarks:1,numBookmarksByAttachedType:{ai:0,human:1}},{id:"valid",name:"work",numBookmarks:3,numBookmarksByAttachedType:{ai:2,human:1}}],nextCursor:null}]]);
+  equal(await h.client.tags(),[{name:"work",count:3}]);
 });
 test("editing a bookmark preserves an attached blank legacy tag without displaying it",async()=>{
   const record=pbpBookmarkNormalize("karakeep",{...kk,tags:[{id:"empty",name:""},...kk.tags]});
@@ -638,8 +650,23 @@ test("editing a bookmark preserves an attached blank legacy tag without displayi
   equal(result.status,"saved");equal(h.calls.length,1);equal(h.calls[0].method,"PATCH");
 });
 test("Karakeep tags follow opaque pagination cursors",async()=>{
-  const h=harness("karakeep",[[200,{tags:[{id:"t1",name:"first"}],nextCursor:"opaque +/"}],[200,{tags:[{id:"t2",name:"second"}],nextCursor:null}]]);
-  equal(await h.client.tags(),["first","second"]);ok(h.calls[1].url.endsWith("cursor=opaque%20%2B%2F"));
+  const h=harness("karakeep",[
+    [200,{tags:[{id:"t1",name:"first",numBookmarks:3,numBookmarksByAttachedType:{ai:2,human:1}}],nextCursor:"opaque +/"}],
+    [200,{tags:[{id:"t2",name:"second",numBookmarks:7,numBookmarksByAttachedType:{ai:0,human:7}}],nextCursor:null}]
+  ]);
+  equal(await h.client.tags(),[{name:"first",count:3},{name:"second",count:7}]);
+  equal(h.calls.map(call=>call.url),["https://bookmarks.example/base/api/v1/tags?limit=1000","https://bookmarks.example/base/api/v1/tags?limit=1000&cursor=opaque%20%2B%2F"]);
+});
+test("background tag-count consumer preserves Karakeep counts and linkding zeroes",async()=>{
+  const source=await(await fetch("../background.js")).text();
+  const start=source.indexOf("async function pbpBookmarkTagCounts(auth) {");
+  const end=source.indexOf("function pbpBookmarkFailure(error)",start);
+  ok(start>=0 && end>start);
+  const make=new Function("pbpSelfHostedAuth","pbpBookmarkClient","pinboardFetch",source.slice(start,end)+";return pbpBookmarkTagCounts;");
+  const counts=make(()=>true,()=>({tags:async()=>[{name:"first",count:3},{name:"second",count:7}]}),async()=>{throw new Error("unexpected Pinboard request");});
+  equal(await counts({service:"karakeep"}),{first:3,second:7});
+  const zeroes=make(()=>true,()=>({tags:async()=>[{name:"a",count:0},{name:"b",count:0}]}),async()=>{throw new Error("unexpected Pinboard request");});
+  equal(await zeroes({service:"linkding"}),{a:0,b:0});
 });
 test("failure keys exist in all nine locales and cover every gateway code",async()=>{
   // Read the table the outlets consume, not a hand-copied key list.
