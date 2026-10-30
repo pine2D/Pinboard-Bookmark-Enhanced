@@ -4464,6 +4464,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       };
       new Function("document", "$id", altHotkeySource)(documentStub, (id) => byId[id] || null);
       assert(handler, "the sliced Alt hotkey listener never registered a keydown handler");
+      host.addEventListener("keydown", handler);
       return {
         boxes, changes, host,
         isArchiveTouched: () => archiveUserTouched,
@@ -4474,6 +4475,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
             key: "", code: "", ...init, preventDefault() { prevented = true; },
           });
           return prevented;
+        },
+        dispatch(init) {
+          const event = new KeyboardEvent("keydown", {key:"p",code:"KeyP",altKey:true,bubbles:true,cancelable:true,...init});
+          host.dispatchEvent(event);
+          return event.defaultPrevented;
         },
         cleanup: () => host.remove(),
       };
@@ -4491,6 +4497,22 @@ test("posts/add default remains replace=yes for existing callers", () => {
         h.press({ key: "p", code: "KeyP" });
         assert(h.boxes["private-check"].checked === false, "a second Alt+P did not toggle back off");
       } finally { h.cleanup(); }
+    });
+
+    test("Alt+P ignores hidden linkding Private and preserves visible Pinboard keyboard behavior", () => {
+      for(const sharingSupported of [true,false]) {
+        const h=createAltHotkeyHarness();
+        try {
+          const label=document.createElement("label");label.hidden=true;label.appendChild(h.boxes["private-check"]);h.host.appendChild(label);
+          const share=document.createElement("input");share.type="checkbox";share.hidden=!sharingSupported;h.host.appendChild(share);
+          h.boxes["private-check"].checked=true;
+          assert(!h.dispatch(),"hidden Private consumed Alt+P");
+          assert(h.boxes["private-check"].checked&&!share.checked&&h.changes.length===0,"hidden Private changed without visible Share consent");
+        } finally {h.cleanup();}
+      }
+      const pinboard=createAltHotkeyHarness();
+      try {assert(pinboard.dispatch(),"visible Pinboard Alt+P was not handled");assert(pinboard.boxes["private-check"].checked&&pinboard.changes.join(",")==="private-check","visible Pinboard Private did not toggle through click/change");}
+      finally {pinboard.cleanup();}
     });
 
     test("K72 甲: Alt+R toggles #readlater-check and leaves the other two boxes alone", () => {

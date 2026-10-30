@@ -187,6 +187,7 @@ try{
     await popup.waitForFunction(()=>typeof _popupDraftContext!=='undefined'&&_popupDraftContext?.ready===true&&!document.getElementById('submit-btn').disabled);
     if(service==='linkding'){
       assert(await popup.locator('#private-check').isHidden());assert(await popup.locator('#share-check').isVisible());assert(!await popup.locator('#share-check').isChecked());
+      await popup.keyboard.press('Alt+p');assert(await popup.locator('#private-check').isChecked(),'Alt+P toggled hidden supported Private');assert(!await popup.locator('#share-check').isChecked(),'Alt+P changed visible Share');
       await popup.locator('#share-check').check();
       await until(()=>worker.evaluate(async()=>Object.values(await chrome.storage.session.get(null)).some(row=>row?.draft?.private===false)),'shared choice persisted in private draft field');
       await popup.close();await article.bringToFront();
@@ -207,6 +208,7 @@ try{
       await reopen();assert(!await popup.locator('#share-check').isChecked());
       await popup.locator('#share-check').check();await popup.locator('#submit-btn').click();await until(()=>latestWrite().data.shared===true,'popup changed sharing');
       await reopen();assert(await popup.locator('#share-check').isChecked(),'existing shared record was not filled');
+      await popup.keyboard.press('Alt+p');assert(!await popup.locator('#private-check').isChecked()&&await popup.locator('#share-check').isChecked(),'Alt+P changed hidden Private on an existing shared record');
       await popup.locator('#title-input').fill('Unrelated title edit');await popup.locator('#submit-btn').click();await until(()=>latestWrite().data.title==='Unrelated title edit','title-only update');assert(!Object.hasOwn(latestWrite().data,'shared'),'title update rewrote shared');
       const merge=await worker.evaluate(url=>submitSaveIntent({mode:'merge',url,title:'Ignored',notes:'',tags:'extra',private:true,toread:false}),origin+'/article');assert.equal(merge.status,'saved');assert(!Object.hasOwn(latestWrite().data,'shared'),'merge rewrote shared');
     }
@@ -297,7 +299,7 @@ try{
     await worker.evaluate(async({credential,capability})=>{const value=JSON.parse(deobfuscateKey(credential));if(capability==='missing')delete value.sharing;else value.sharing=false;await persistSettings({linkdingToken:JSON.stringify(value)});},{credential:sharingCredential,capability});
     await article.bringToFront();const opened=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');const popup=await opened;
     await popup.waitForFunction(()=>typeof _popupDraftContext!=='undefined'&&_popupDraftContext?.ready===true&&!document.getElementById('submit-btn').disabled);
-    assert(await popup.locator('#private-check').isHidden());assert(await popup.locator('#share-check').isHidden());assert(await popup.locator('#private-check').isChecked());await popup.close();
+    assert(await popup.locator('#private-check').isHidden());assert(await popup.locator('#share-check').isHidden());assert(await popup.locator('#private-check').isChecked());await popup.keyboard.press('Alt+p');assert(await popup.locator('#private-check').isChecked(),'Alt+P toggled hidden legacy/disabled Private');await popup.close();
     const auth=await worker.evaluate(()=>getCurrentBookmarkAuth());const url=origin+'/article-'+capability;
     await worker.evaluate(async({account,url})=>chrome.storage.local.set({md_preview_data_sharing:{markdown:'# Fixture',title:'Sharing fixture',url,account,ts:Date.now()}}),{account:auth.account,url});
     const reader=await ctx.newPage();await reader.goto(pageUrl+'md-preview.html?k=sharing');await reader.waitForFunction(()=>document.getElementById('reader-bookmark-edit')?.getAttribute('aria-busy')==='false');await reader.locator('#reader-bookmark-edit').click();await reader.locator('#reader-bookmark-editor:popover-open').waitFor({timeout:5000}).catch(async error=>{console.error({capability,status:await reader.locator('#reader-bookmark-status').textContent(),errors,paths:requests.slice(-5).map(r=>r.path),state:await reader.evaluate(async()=>{const auth=await pbpReadBookmarkConnection();const result=await chrome.runtime.sendMessage({type:'mdReaderBookmarkState',account:auth.account});return {known:result?.known,reason:result?.reason};})});throw error;});assert(await reader.locator('#reader-bookmark-private').isHidden());await reader.close();

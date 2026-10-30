@@ -2701,7 +2701,7 @@ document.addEventListener("keydown", (e) => {
   const mainSection = $id("main-section");
   if (!mainSection || mainSection.classList.contains("hidden") || mainSection.classList.contains("unsupported-url")) return;
   const box = $id(boxId);
-  if (!box || box.disabled) return;
+  if (!box || box.disabled || box.closest("[hidden]")) return;
   e.preventDefault();
   // .click(), never a direct assignment to the .checked property (which the
   // ui-contract gate also forbids, comments included): the archive box's change
