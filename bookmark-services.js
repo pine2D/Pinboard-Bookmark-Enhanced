@@ -70,7 +70,7 @@ function pbpBookmarkNormalize(service, value) {
 // stay in bookmark; no provider credential is ever shaped like a Pinboard key.
 function pbpBookmarkAsPost(bookmark) {
   return {
-    href: bookmark.url, description: bookmark.title, extended: bookmark.notes,
+    href: bookmark.url, description: bookmark.title, extended: bookmark.notes, summary: bookmark.summary,
     tags: pbpBookmarkFormatTags(bookmark.tags), tagNames:bookmark.tags.slice(), shared: bookmark.private ? "no" : "yes",
     toread: bookmark.toread ? "yes" : "no", time: bookmark.time,
     bookmarkId: bookmark.id
@@ -219,10 +219,12 @@ function pbpCreateBookmarkServiceClient(config) {
     const tags = [...new Set(fields.tags)];
     if (service === "linkding") {
       const body = {...(existing ? {} : {url:fields.url}), title:fields.title || "", notes:fields.notes || "",tag_names:tags,
+        ...(!existing ? {description:fields.summary ?? ""}
+          : typeof fields.summary === "string" && fields.summary !== existing.summary ? {description:fields.summary} : {}),
         ...(typeof fields.toread === "boolean" ? {unread:fields.toread} : {}),
         ...(!existing ? {shared:config.sharingEnabled === true && fields.private === false}
           : config.sharingEnabled === true && fields.sharedExplicit === true && typeof fields.private === "boolean" && fields.private !== existing.private ? {shared:!fields.private} : {})};
-      const {data} = await request(existing ? "bookmarks/" + pbpBookmarkRecordId(existing.id) + "/" : "bookmarks/", existing ? "PATCH" : "POST", body);
+      const {data} = await request(existing ? "bookmarks/" + pbpBookmarkRecordId(existing.id) + "/" : "bookmarks/?disable_scraping", existing ? "PATCH" : "POST", body);
       const bookmark = pbpBookmarkNormalize(service,data);
       const added = Date.parse(data.date_added), modified = Date.parse(data.date_modified);
       // linkding also returns 201 when POST merges an existing URL. Compare

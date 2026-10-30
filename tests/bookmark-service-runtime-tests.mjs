@@ -11,7 +11,7 @@ const root=fileURLToPath(new URL('../',import.meta.url));
 const {chromium}=createRequire(resolve(root,'.qa-scan/package.json'))('playwright');
 const profile=mkdtempSync(join(tmpdir(),'pbp-bookmark-runtime-'));
 const records={linkding:new Map(),karakeep:new Map()}, requests=[], membership=new Set(), wire=[];
-const raceCreates=new Map();
+const raceCreates=new Map(), descriptionReplies=new Map();
 const list={id:'later1',name:'Read Later',description:'Pinboard Bookmark Enhanced: Read Later',icon:'bookmark',type:'manual',public:false,hasCollaborators:false,userRole:'owner'};
 let listCreated=false;
 // gate.linkding puts a Cloudflare Access-shaped gateway in front of /linkding/.
@@ -43,11 +43,13 @@ const server=createServer(async(req,res)=>{
   const path=url.pathname.replace(/^\/(?:linkding|karakeep)\/api(?:\/v1)?\//,'');
   let body='';for await(const chunk of req)body+=chunk;
   let data;try{data=body?JSON.parse(body):{};}catch{res.writeHead(400).end();return;}
-  requests.push({service,path,method:req.method,data});
+  requests.push({service,path,query:url.search,method:req.method,data});
   const reply=(status,value)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(status===204?'':JSON.stringify(value));};
   const scheme=service==='linkding'?'Token ':'Bearer ';
   if(![...acceptedKeys].some(key=>req.headers.authorization===scheme+key)){reply(401,{});return;}
   const store=records[service];
+  const descriptionReply=descriptionReplies.get(req.method+':'+url.pathname)?.shift();
+  if(descriptionReply){store.set(String(descriptionReply.id),structuredClone(descriptionReply));return reply(req.method==='POST'?201:200,descriptionReply);}
   if(path==='user/profile/')return reply(200,{theme:'auto',enable_sharing:true,permanent_notes:false});
   if(path==='users/me')return reply(200,{id:'u1',name:'Fixture',email:null,localUser:true});
   if(path.startsWith('bookmarks/check')){
@@ -372,6 +374,36 @@ try{
     assert(result.account,label+' create lost its undo account');
   }
   console.log('linkding equal, near-equal, two-second and unparseable server dates remain created');
+  // Full v1.47 serializer fixtures, authored independently of request data.
+  // id 18 represents a previously scraped Description; id 19 skips scraping.
+  const descriptionUrl=origin+'/article-description', customDescriptionUrl=origin+'/article-description-custom';
+  const scrapedDescription={id:18,url:descriptionUrl,title:'T',description:'Meta description',notes:'Meta description\nMy note',web_archive_snapshot_url:null,favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:[],date_added:'2026-10-30T03:01:22.656384Z',date_modified:'2026-10-30T03:01:22.656384Z',website_title:null,website_description:null};
+  const blankDescription={id:19,url:descriptionUrl,title:'T',description:'',notes:'Meta description\nMy note',web_archive_snapshot_url:null,favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:[],date_added:'2026-10-30T03:02:22.656384Z',date_modified:'2026-10-30T03:02:22.656384Z',website_title:null,website_description:null};
+  descriptionReplies.set('POST:/linkding/api/bookmarks/',[blankDescription,{...blankDescription,id:20,url:customDescriptionUrl,description:'Custom description'}]);
+  descriptionReplies.set('PATCH:/linkding/api/bookmarks/18/',[scrapedDescription,scrapedDescription,{...scrapedDescription,description:'Changed description'},{...scrapedDescription,description:''}]);
+  const descriptionStart=requests.length;
+  const descriptions=await worker.evaluate(async({origin,url,customUrl,scraped})=>{
+    const client=pbpCreateBookmarkServiceClient({service:'linkding',baseUrl:origin+'/linkding/',beforeRequest:async()=>({token:'fixture-key'})});
+    const fields={url,title:'T',notes:'Meta description\nMy note',tags:[]};
+    const blank=await client.save(fields);
+    const custom=await client.save({...fields,url:customUrl,summary:'Custom description'});
+    const existing=pbpBookmarkNormalize('linkding',scraped);
+    const summaries=[];
+    for(const summary of [undefined,'Meta description','Changed description','']){
+      const result=await client.save({...fields,summary},existing);summaries.push(result.bookmark.summary);
+    }
+    return {blank:blank.bookmark,custom:custom.bookmark,summaries,post:pbpBookmarkAsPost(existing)};
+  },{origin,url:descriptionUrl,customUrl:customDescriptionUrl,scraped:scrapedDescription});
+  const descriptionCalls=requests.slice(descriptionStart);
+  assert.deepEqual(descriptionCalls.map(r=>[r.method,r.path,r.query]),[['POST','bookmarks/','?disable_scraping'],['POST','bookmarks/','?disable_scraping'],...Array.from({length:4},()=>['PATCH','bookmarks/18/',''])]);
+  assert.equal(descriptionCalls[0].data.description,'');assert(Object.hasOwn(descriptionCalls[0].data,'description'));
+  assert.equal(descriptionCalls[1].data.description,'Custom description');
+  assert.deepEqual(descriptionCalls.slice(2).map(r=>Object.hasOwn(r.data,'description')),[false,false,true,true]);
+  assert.equal(descriptionCalls[4].data.description,'Changed description');assert.equal(descriptionCalls[5].data.description,'');
+  assert.equal(descriptions.blank.summary,'');assert.equal(descriptions.custom.summary,'Custom description');
+  assert.deepEqual(descriptions.summaries,['Meta description','Meta description','Changed description','']);
+  assert.deepEqual([descriptions.post.description,descriptions.post.extended,descriptions.post.summary],['T','Meta description\nMy note','Meta description']);
+  console.log('linkding Description: disable_scraping, explicit empty/custom creates, unchanged/changed/cleared PATCH and independent post projection passed');
   const probes=await worker.evaluate(async origin=>{
     const out={};
     for(const kind of ['redirect','challenge','basic','denied','page','headers']){

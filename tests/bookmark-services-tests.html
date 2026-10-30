@@ -25,6 +25,34 @@ test("base URL preserves subpaths and rejects insecure or credential-bearing inp
 test("linkding lookup preserves independent notes, summary, unread and visibility", async()=>{const {client,calls}=harness("linkding",[[200,{bookmark:ld,metadata:{},auto_tags:[]}]]);const b=await client.lookup(pageUrl);equal([b.id,b.url,b.title,b.notes,b.summary,b.tags,b.toread,b.private],["7",pageUrl,"Saved title","My note","Website summary",["work"],true,true]);equal(calls[0].url,"https://bookmarks.example/base/api/bookmarks/check/?url=https%3A%2F%2Fexample.com%2Farticle");equal(calls[0].headers.get("Authorization"),"Token fixture-token");equal(calls[0].redirect,"manual");equal(calls[0].credentials,"omit");});
 test("linkding missing bookmark is null, malformed lookup is an error",async()=>{equal(await harness("linkding",[[200,{bookmark:null}]]).client.lookup(pageUrl),null);await rejects(()=>harness("linkding",[[200,{}]]).client.lookup(pageUrl),"invalid_response");});
 test("linkding update patches requested fields without rewriting scraped description",async()=>{const {client,calls}=harness("linkding",[[200,{...ld,title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true,date_modified:"2026-10-02T10:00:00Z"}]],{sharingEnabled:true});const result=await client.save({url:pageUrl,title:"New",notes:"Note",tags:["new"],toread:false,private:false,sharedExplicit:true},{id:"7",url:pageUrl,private:true});equal([result.status,result.mutation],["saved","updated"]);equal(calls[0].method,"PATCH");equal(calls[0].body,{title:"New",notes:"Note",tag_names:["new"],unread:false,shared:true});});
+// v1.47 id 18 was scraped; id 19 was created with disable_scraping.
+const ldScraped = {id:18,url:pageUrl,title:"T",description:"Meta description",notes:"Meta description\nMy note",web_archive_snapshot_url:null,favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:[],date_added:"2026-10-30T03:01:22.656384Z",date_modified:"2026-10-30T03:01:22.656384Z",website_title:null,website_description:null};
+const ldUnscraped = {id:19,url:pageUrl,title:"T",description:"",notes:"Meta description\nMy note",web_archive_snapshot_url:null,favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:[],date_added:"2026-10-30T03:02:22.656384Z",date_modified:"2026-10-30T03:02:22.656384Z",website_title:null,website_description:null};
+test("service post projection keeps summary separate from title and notes",()=>{
+  const post=pbpBookmarkAsPost(pbpBookmarkNormalize("linkding",ldScraped));
+  equal([post.description,post.extended,post.summary],["T","Meta description\nMy note","Meta description"]);
+});
+test("linkding create disables scraping and sends explicit Description including empty defaults",async()=>{
+  for(const [summary,description] of [[undefined,""],[null,""],["",""],["Custom description","Custom description"]]){
+    const reply=summary==="Custom description"?{...ldUnscraped,description:"Custom description"}:ldUnscraped;
+    const h=harness("linkding",[[201,reply]]);
+    const result=await h.client.save({url:pageUrl,title:"T",notes:"Meta description\nMy note",tags:[],summary});
+    equal(h.calls[0].url,"https://bookmarks.example/base/api/bookmarks/?disable_scraping");
+    equal(h.calls[0].body.description,description);ok(Object.hasOwn(h.calls[0].body,"description"));
+    equal([result.bookmark.summary,result.bookmark.notes],[description,"Meta description\nMy note"]);
+  }
+});
+test("linkding PATCH sends Description only for changed strings and supports clearing",async()=>{
+  for(const [summary,changed] of [[undefined,false],[null,false],[7,false],["Meta description",false],["",true],["Custom description",true]]){
+    const reply=changed?{...ldScraped,description:summary}:ldScraped;
+    const h=harness("linkding",[[200,reply]]);
+    const result=await h.client.save({url:pageUrl,title:"T",notes:"Meta description\nMy note",tags:[],summary},pbpBookmarkNormalize("linkding",ldScraped));
+    equal(h.calls[0].url,"https://bookmarks.example/base/api/bookmarks/18/");equal(h.calls[0].method,"PATCH");
+    equal(Object.hasOwn(h.calls[0].body,"description"),changed);
+    if(changed)equal(h.calls[0].body.description,summary);
+    equal(result.bookmark.summary,changed?summary:"Meta description");
+  }
+});
 test("linkding sharing capability fails closed and only boolean true enables it", async()=>{
   for (const sharing of [undefined,false,true,"true",1]) {
     const settings=gwEnvSettings("linkding",undefined,{sharing});
@@ -68,7 +96,7 @@ test("linkding POST detects a merge only when parseable server dates differ by m
     equal(h.calls.map(c=>c.method),["POST"]);
   }
 });
-test("linkding create uses API fields and does not send a Wayback flag as archive",async()=>{const {client,calls}=harness("linkding",[[201,ld]]);await client.save({url:pageUrl,title:"Title",notes:"",tags:[],toread:true,private:true,archive:true},null);equal(calls[0].body,{url:pageUrl,title:"Title",notes:"",tag_names:[],unread:true,shared:false});});
+test("linkding create uses API fields and does not send a Wayback flag as archive",async()=>{const {client,calls}=harness("linkding",[[201,ld]]);await client.save({url:pageUrl,title:"Title",notes:"",tags:[],toread:true,private:true,archive:true},null);equal(calls[0].body,{url:pageUrl,title:"Title",notes:"",tag_names:[],description:"",unread:true,shared:false});});
 test("linkding uses canonical tags returned by its server",async()=>{
   // v1.47 models.sanitize_tag_name replaces spaces; the response, not the
   // submitted spelling, is authoritative for the next edit.
@@ -82,7 +110,7 @@ test("Karakeep lookup fetches full bookmark after URL check",async()=>{const {cl
 test("Karakeep concurrent creation merges without deleting server tags",async()=>{
   const record={...kk,alreadyExists:true,archived:false};
   const h=harness("karakeep",[[200,record],[200,{attached:["tag2"]}]]);
-  const result=await h.client.save({url:pageUrl,title:"",notes:"",tags:["work","new"]},null);
+  const result=await h.client.save({url:pageUrl,title:"",notes:"",summary:"Ignored",tags:["work","new"]},null);
   equal([result.status,result.mutation,result.bookmark.tags],["saved","merged",["work","new"]]);
   equal(h.calls.map(c=>c.method),["POST","POST"]);
   equal(h.calls[0].body,{type:"link",url:pageUrl,source:"extension"});
@@ -91,7 +119,7 @@ test("Karakeep concurrent creation merges without deleting server tags",async()=
 test("Karakeep crawled fallback titles are not written back by a merge",async()=>{
   const bookmark=pbpBookmarkNormalize("karakeep",{...kk,title:null});
   const h=harness("karakeep",[[200,{id:"bk1"}]]);
-  await h.client.save({url:pageUrl,title:"Crawled title",notes:"My note",tags:["work"]},bookmark);
+  await h.client.save({url:pageUrl,title:"Crawled title",notes:"My note",summary:"Ignored",tags:["work"]},bookmark);
   equal(h.calls[0].body,{note:"My note"});
 });
 test("Karakeep failed tag update reports a saved bookmark and remaining step",async()=>{const {client,calls}=harness("karakeep",[[201,{...kk,tags:[]}],[503,{message:"unavailable"}]]);const result=await client.save({url:pageUrl,title:"Title",notes:"",tags:["new"]},null);equal([result.status,result.bookmark.id,result.failedStep],["partial","bk1","tags"]);equal(calls.length,2);});
