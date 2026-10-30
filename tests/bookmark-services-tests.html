@@ -261,6 +261,7 @@ async function workerHarness(service, replies, options = {}) {
     pbpReadFreshBookmarkAuthForAccount:async account=>{const a=await auth();return a.account===account?a:null;},
     pbpStatusCacheGet:(url,a)=>state.cache.get(url)?.account===a.account?state.cache.get(url):null,
     pbpStatusCacheSet:(url,a,data)=>{if(a.epoch!==state.epoch)return false;state.cache.set(url,{...data,account:a.account});return true;},
+    PBP_TAG_VOCAB_STALE_CEILING, pbpTagVocabIndex, pbpTagGroupKey, pbpAlignTagName,
     setIcon:()=>{}, updateBadge:async()=>{}, pbpWaybackArchive:async(url,settings,options)=>state.sideEffects.push({type:"wayback",options}),
     persistSettings:async patch=>{Object.assign(settings,patch);return {ok:true};},
     pinboardFetch:async()=>{throw new Error("unexpected Pinboard request");},
@@ -283,7 +284,7 @@ async function workerHarness(service, replies, options = {}) {
       remove:async keys=>{for(const k of [].concat(keys)){if(k==="offlineQueue")state.queue=[];else delete state.local[k];}}
     }}}
   };
-  const api = new Function(...Object.keys(deps),workerSource.slice(start,end)+";return {submitSaveIntent,sendOfflineItem,verifyConnection:pbpVerifyBookmarkConnection,processOfflineQueue,retryOfflineItem,pbpOfflinePauseOnCredentialChange,readPause:pbpReadOfflineQueuePause,client:pbpBookmarkClient,mutateOfflineQueue};")(...Object.values(deps));
+  const api = new Function(...Object.keys(deps),workerSource.slice(start,end)+";return {submitSaveIntent,sendOfflineItem,verifyConnection:pbpVerifyBookmarkConnection,processOfflineQueue,retryOfflineItem,pbpOfflinePauseOnCredentialChange,readPause:pbpReadOfflineQueuePause,client:pbpBookmarkClient,mutateOfflineQueue,pbpReadTagVocab};")(...Object.values(deps));
   return {...api,state,auth};
 }
 const saveIntent = {mode:"create",url:pageUrl,title:"Title",notes:"Note",tags:"work",private:true,toread:false};
@@ -353,6 +354,62 @@ test("merge preserves a remote tag containing spaces as one tag",async()=>{
   const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,{...kk,tags:[{id:"tag1",name:"machine learning",attachedBy:"human"}]}],[200,{id:"bk1"}],[200,{attached:["tag2"]}]]);
   equal((await h.submitSaveIntent({...saveIntent,mode:"merge",tags:"new"})).status,"saved");
   equal(h.state.calls.length,4);equal(h.state.calls[3].body,{tags:[{tagName:"new"}]});
+});
+test("worker aligns incoming variants to existing Karakeep tags",async()=>{
+  const remote={...kk,tags:[{id:"tag-a",name:"machine learning",attachedBy:"human"}]};
+  for(const mode of ["update","merge","overwrite"]){
+    const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,remote],[200,{id:"bk1"}]]);
+    h.state.local.cached_user_tags={account:(await h.auth()).account,counts:{machine_learning:10},timestamp:Date.now()};
+    const result=await h.submitSaveIntent({...saveIntent,mode,tags:"machine_learning",...(mode==="update"?{time:"2026-10-01T10:00:00Z"}:{})});
+    equal(result.status,"saved");
+    equal(h.state.calls.map(c=>c.method),["GET","GET","PATCH"]);
+  }
+});
+test("update and overwrite retain existing same-group twins supplied by the user",async()=>{
+  const remote={...kk,tags:[{id:"tag-one",name:"web-design",attachedBy:"human"},{id:"tag-two",name:"web_design",attachedBy:"human"}]};
+  for(const mode of ["update","overwrite"]){
+    const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,remote],[200,{id:"bk1"}]]);
+    const result=await h.submitSaveIntent({...saveIntent,mode,tags:"web-design web_design",...(mode==="update"?{time:"2026-10-01T10:00:00Z"}:{})});
+    equal(result.status,"saved");
+    equal(h.state.calls.map(c=>c.method),["GET","GET","PATCH"]);
+  }
+});
+test("update and overwrite can explicitly remove one same-group twin",async()=>{
+  const remote={...kk,tags:[{id:"tag-one",name:"web-design",attachedBy:"human"},{id:"tag-two",name:"web_design",attachedBy:"human"}]};
+  for(const mode of ["update","overwrite"]){
+    const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,remote],[200,{id:"bk1"}],[200,{removed:["tag-two"]}]]);
+    const result=await h.submitSaveIntent({...saveIntent,mode,tags:"web-design",...(mode==="update"?{time:"2026-10-01T10:00:00Z"}:{})});
+    equal(result.status,"saved");
+    equal(h.state.calls.at(-1).body,{tags:[{tagId:"tag-two"}]});
+  }
+});
+test("Karakeep create-200 race aligns against returned names before tag attachment",async()=>{
+  const raced={id:"zcnye4616rolgje1u3a2mz3k",createdAt:"2026-10-30T03:05:10.000Z",modifiedAt:"2026-10-30T03:05:10.000Z",title:null,archived:false,favourited:true,note:"n",summary:null,source:"api",taggingStatus:null,summarizationStatus:null,tags:[{id:"bgbvx6nze9nrl768iy3joejr",name:"machine learning",attachedBy:"human"}],content:{type:"link",url:pageUrl,title:"Example Domain",description:null},assets:[],alreadyExists:true};
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[200,raced]]);
+  equal((await h.submitSaveIntent({...saveIntent,tags:"machine_learning"})).status,"saved");
+  equal(h.state.calls.map(c=>c.method),["GET","POST"]);
+});
+test("delivery uses only fresh owner vocabulary and never mints missing names",async()=>{
+  for(const cached of [undefined,{account:"other",counts:{"Nick Drake":9},timestamp:Date.now()},{account:"same",counts:{"Nick Drake":9},timestamp:Date.now()-2*60*60*1000-1}]){
+    const h=await workerHarness("linkding",[[200,{bookmark:null}],[201,ld]]);
+    if(cached)h.state.local.cached_user_tags={...cached,account:cached.account==="same"?(await h.auth()).account:cached.account};
+    equal(await h.pbpReadTagVocab((await h.auth()).account),null);
+    equal((await h.submitSaveIntent({...saveIntent,tags:pbpBookmarkFormatTags(["Nick Drake"])})).status,"saved");
+    equal(h.state.calls[1].body.tag_names,["Nick Drake"]);
+  }
+});
+test("fresh owner vocabulary exact hits work with case preference disabled",async()=>{
+  const h=await workerHarness("linkding",[[200,{bookmark:null}],[201,ld]]);
+  h.state.settings.optRespectTagCase=false;
+  h.state.local.cached_user_tags={account:(await h.auth()).account,counts:{"Nick Drake":3,"machine_learning":10},timestamp:Date.now()};
+  ok((await h.pbpReadTagVocab((await h.auth()).account)).exact.has("Nick Drake"));
+  equal((await h.submitSaveIntent({...saveIntent,tags:pbpBookmarkFormatTags(["Nick Drake"])})).status,"saved");
+  equal(h.state.calls[1].body.tag_names,["Nick Drake"]);
+});
+test("delivery keeps distinct empty group keys by exact name",async()=>{
+  const h=await workerHarness("linkding",[[200,{bookmark:null}],[201,ld]]);
+  equal((await h.submitSaveIntent({...saveIntent,tags:"- _"})).status,"saved");
+  equal(h.state.calls[1].body.tag_names,["-","_"]);
 });
 // Gateway fixtures: hand-written from the design's measured shapes (survey section 2), not built by the adapter.
 const gwHtml = (status, headers = {}, body = "<html><body>Forbidden</body></html>") => new Response(body, {status, headers:{"Content-Type":"text/html; charset=UTF-8", ...headers}});
@@ -610,7 +667,7 @@ test("credential removal adopts the legacy library before deleting its token",as
 test("popup tag selection preserves native spaces for both self-hosted services",async()=>{
   const source=await(await fetch("../popup-tags.js")).text();const start=source.indexOf("function addTag(");const end=source.indexOf("function removeTag(",start);
   for(const service of ["karakeep","linkding","pinboard"]){
-    const tags=[];new Function("settings","currentTags","renderTags",source.slice(start,end)+';addTag("machine learning");')({bookmarkService:service},tags,()=>{});
+    const tags=[];new Function("settings","currentTags","renderTags","pbpPopupTagContext","pbpCanonicalTagName","pbpPopupTagGroupKey",source.slice(start,end)+';addTag("machine learning");')({bookmarkService:service},tags,()=>{},()=>({service,separator:"-",bookmarkNames:[],index:pbpTagVocabIndex(service==="pinboard"?{}:{"machine learning":1}),respectCase:false}),pbpCanonicalTagName,pbpTagGroupKey);
     equal(tags,[service==="pinboard"?"machine-learning":"machine learning"]);
   }
 });

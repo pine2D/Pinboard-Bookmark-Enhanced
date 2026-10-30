@@ -226,6 +226,8 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
     getCurrentBookmarkAuth: async () => ({ token: "alice:token", account: "alice", epoch: 1 }),
     loadSettings: async () => settings,
     pbpServiceEffectivePrivate,
+    pbpReadTagVocab: async () => null,
+    pbpCanonicalTagName,
     showNotification: (...args) => notifications.push(args),
     pbpSaveFailure: (reason) => ({ status: "failed", reason }),
     getPageInfoFromTab: async (...args) => { extractionCalls.push(args); return { pageText: "article body", ...(overrides.pageInfo || {}) }; },

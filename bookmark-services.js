@@ -216,7 +216,7 @@ function pbpCreateBookmarkServiceClient(config) {
   const save = async (fields, existing) => {
     if (!fields || !pbpBookmarkWebUrl(fields.url) || !Array.isArray(fields.tags) ||
         fields.tags.some(tag => typeof tag !== "string" || !tag.trim())) throw pbpBookmarkServiceError("invalid_request");
-    const tags = [...new Set(fields.tags)];
+    let tags = [...new Set(fields.tags)];
     if (service === "linkding") {
       const body = {...(existing ? {} : {url:fields.url}), title:fields.title || "", notes:fields.notes || "",tag_names:tags,
         ...(!existing ? {description:fields.summary ?? ""}
@@ -241,7 +241,10 @@ function pbpCreateBookmarkServiceClient(config) {
         // A concurrent create is already merged by Karakeep 0.34.1: supplied
         // title/note replace the old values, archived is reset, createdAt is
         // refreshed. Preserve its tags and continue the Read Later operation.
-        if (created.status === 200) mutation = "merged";
+        if (created.status === 200) {
+          mutation = "merged";
+          if (typeof config.alignCreatedTags === "function") tags = config.alignCreatedTags(tags, bookmark);
+        }
       }
       if (existing) {
         const id = pbpBookmarkRecordId(bookmark.id);

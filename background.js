@@ -609,9 +609,10 @@ const PBP_SAVE_MODES = new Set(["create", "update", "merge", "skip", "overwrite"
 
 // Each self-hosted request re-reads the selected connection and exact host grant.
 // Automatic paths never prompt for permissions.
-function pbpBookmarkClient(auth) {
+function pbpBookmarkClient(auth, alignCreatedTags) {
   return pbpCreateBookmarkServiceClient({
     service:auth.service, baseUrl:auth.baseUrl, readLaterListId:auth.readLaterListId, sharingEnabled:auth.sharingEnabled,
+    alignCreatedTags,
     readLaterListName:t("bookmarkReadLaterListName"),
     // Any answered request proves this connection passes its gateway again.
     onResponseOk:() => void pbpClearOfflineQueuePause(auth.account),
@@ -676,7 +677,42 @@ async function pbpBookmarkTagCounts(auth) {
 function pbpBookmarkFailure(error) {
   return pbpSaveFailure(error?.code === "auth" ? "not_logged_in" : error?.code || "network", {httpStatus:error?.status});
 }
-async function pbpDeliverSelfHosted(intent, auth) {
+// A vocabulary cache is advisory. Never use another owner's or an old device
+// snapshot to choose a spelling at dispatch time.
+async function pbpReadTagVocab(account) {
+  try {
+    const entry = (await chrome.storage.local.get("cached_user_tags"))?.cached_user_tags;
+    if (entry?.account !== account || !entry?.counts) {
+      console.warn("[bookmark-tags] vocabulary missing for current account");
+      return null;
+    }
+    if (!Number.isFinite(entry.timestamp) || Date.now() - entry.timestamp > PBP_TAG_VOCAB_STALE_CEILING) {
+      console.warn("[bookmark-tags] vocabulary stale");
+      return null;
+    }
+    return pbpTagVocabIndex(entry.counts);
+  } catch (error) {
+    console.warn("[bookmark-tags] vocabulary read failed:", error?.name, error?.message);
+    return null;
+  }
+}
+function pbpAlignIncomingTags(incoming, bookmarkNames, index, respectCase, keepExisting = false) {
+  const names = keepExisting ? bookmarkNames.slice() : [];
+  const seen = new Set(names.map(name => pbpTagGroupKey(name) || `exact:${name}`));
+  for (const raw of incoming) {
+    const name = pbpAlignTagName(raw, {bookmarkNames, index, respectCase}).name;
+    const key = pbpTagGroupKey(name) || `exact:${name}`;
+    // In update/overwrite an exact existing name is an explicit user choice:
+    // two same-group names supplied together remain two associations. A sole
+    // choice can still remove its sibling. New spellings are group-deduped.
+    if ((!keepExisting && bookmarkNames.includes(String(raw).trim()) && !names.includes(name)) || !seen.has(key)) {
+      names.push(name);
+      seen.add(key);
+    }
+  }
+  return names;
+}
+async function pbpDeliverSelfHosted(intent, auth, settings) {
   try {
     const lookup = await fetchExistingBookmark(intent.url, auth.token, auth);
     if (lookup.lookupFailed) return {result:pbpSaveFailure(lookup.reason || "lookup", {httpStatus:lookup.httpStatus}), persisted:null, retryable:lookup.retryable};
@@ -685,11 +721,15 @@ async function pbpDeliverSelfHosted(intent, auth) {
     if (plan.action === "failed") return {result:plan.result, persisted:null, retryable:false};
     if (plan.action === "skip") return {result:{status:"skipped"}, persisted:plan.fields, retryable:false};
     const incomingTags = pbpBookmarkParseTags(intent.tags);
-    const names = intent.mode === "merge" && lookup.exists ? lookup.bookmark.tags.slice() : [];
-    for (const name of incomingTags) if (!names.some(existing => existing.toLowerCase() === name.toLowerCase())) names.push(name);
+    const index = await pbpReadTagVocab(auth.account);
+    const bookmarkNames = lookup.exists ? lookup.bookmark.tags : [];
+    const respectCase = settings?.optRespectTagCase === true;
+    const names = pbpAlignIncomingTags(incomingTags, bookmarkNames, index, respectCase, intent.mode === "merge" && lookup.exists);
     // Only a visible update choice may change linkding sharing. Merge keeps it.
     const fields = {...plan.fields, tags:names, sharedExplicit:intent.mode === "update" && auth.sharingEnabled === true};
-    const result = await pbpBookmarkClient(auth).save(fields, lookup.bookmark);
+    const alignCreatedTags = auth.service === "karakeep" ? (tags, bookmark) =>
+      pbpAlignIncomingTags(tags, bookmark.tags, index, respectCase, true) : undefined;
+    const result = await pbpBookmarkClient(auth, alignCreatedTags).save(fields, lookup.bookmark);
     if (!pbpBookmarkAuthIsCurrent(auth)) return {result:pbpSaveFailure("account_changed"), persisted:null, retryable:false};
     if (result.status === "partial") {
       statusCache.delete(intent.url);
@@ -856,7 +896,7 @@ async function pbpSendResolvedPlan(plan, settings) {
 async function deliverSaveIntent(intent, settings, auth = pbpCaptureBookmarkAuth(settings)) {
   const invalid = validateSaveIntent(intent);
   if (invalid) return { result: invalid, persisted: null, retryable: false };
-  if (pbpSelfHostedAuth(auth)) return pbpDeliverSelfHosted(intent, auth);
+  if (pbpSelfHostedAuth(auth)) return pbpDeliverSelfHosted(intent, auth, settings);
   if (!settings?.pinboardToken) {
     return { result: pbpSaveFailure("not_logged_in"), persisted: null, retryable: false };
   }
@@ -1503,6 +1543,9 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     const entry = cachedTags?.cached_user_tags;
     if (entry?.account === startAuth.account && entry.counts) userTagsTop = pbpTagsByCount(entry.counts);
   } catch (_) { /* no cache -> unanchored prompt, same as before */ }
+  const tagVocabIndex = await pbpReadTagVocab(startAuth.account);
+  const tagContext = {service:startAuth.service, separator:s.aiTagSeparator,
+    bookmarkNames:[], index:tagVocabIndex, respectCase:s.optRespectTagCase === true};
   const aiPromises = [];
   let aiHostPermissionMissing = false;
   let combinedCachedTags = null;
@@ -1631,7 +1674,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     title,
     notes,
     ...(linkding ? { summary: description } : {}),
-    tags: pbpSerializeIntentTags(tags, startAuth.service),
+    tags: pbpSerializeIntentTags(tags.map(tag => pbpCanonicalTagName(tag, tagContext)).filter(Boolean), startAuth.service),
     private: isPrivate,
     toread: toread === true ? true : undefined,
     archive: undefined,
@@ -3719,27 +3762,6 @@ function pbpAiErrorEnvelope(err) {
   return envelope;
 }
 
-// Case resolution lives popup-side in finalizeAITags(), against a tagCaseMap the
-// worker does not have — the one thing that could silently degrade the moment
-// the call moved here. Rebuild it from the SAME storage entry the quick-save
-// path reads, and only when the entry belongs to THIS account.
-async function pbpAiTagCaseMap(account, s) {
-  if (!s || !s.optRespectTagCase) return null;
-  try {
-    const stored = await chrome.storage.local.get("cached_user_tags");
-    const entry = stored && stored.cached_user_tags;
-    if (!entry || entry.account !== account || !entry.counts) {
-      // MV3 iron rule: leave a trace before degrading. No tag text, no account.
-      console.warn("[pbp-ai] no tag vocabulary cached for this account; skipping tag case resolution");
-      return null;
-    }
-    return buildTagCaseMap(entry.counts);
-  } catch (e) {
-    console.warn("[pbp-ai] tag case map unavailable:", e && e.name, e && e.message);
-    return null;
-  }
-}
-
 // Run one popup-originated AI call to completion inside the worker. Always
 // resolves to the wire envelope and never rejects — everything after the shape
 // check, storage reads and cache writes included, runs inside the one try, so
@@ -3793,13 +3815,11 @@ async function pbpRunPopupAiCall(message) {
       const resp = await callAI(s, prompt);
       if (mode === "combined") {
         const parsed = parseAICombined(resp, s.aiTagSeparator);
-        const caseMap = await pbpAiTagCaseMap(account, s);
-        return { tags: caseMap ? parsed.tags.map((tag) => resolveTagCase(tag, caseMap)) : parsed.tags, summary: parsed.summary };
+        return { tags: parsed.tags, summary: parsed.summary };
       }
       if (kind === "tags") {
         const tags = refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator });
-        const caseMap = await pbpAiTagCaseMap(account, s);
-        return { tags: caseMap ? tags.map((tag) => resolveTagCase(tag, caseMap)) : tags, summary: "" };
+        return { tags, summary: "" };
       }
       return { tags: [], summary: typeof resp === "string" ? resp : "" };
     });
@@ -4635,7 +4655,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
           post = posts[0];
         }
         if (!post) { sendResponse({ bookmarked: false, account: auth.account }); return; }
-        sendResponse({ bookmarked: true, tags: post.tags || "", shared: post.shared, toread: post.toread, account: auth.account });
+        sendResponse({ bookmarked: true, tags: post.tags || "", tagNames: Array.isArray(post.tagNames) ? post.tagNames.slice() : String(post.tags || "").split(/\s+/).filter(Boolean), shared: post.shared, toread: post.toread, account: auth.account });
       })()
       .catch(() => sendResponse({ bookmarked: false, account: "" }));
     return true;
@@ -4853,8 +4873,11 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
       return;
     }
 
+    const tagVocabIndex = await pbpReadTagVocab(account);
+    const tagContext = {service:currentAuth.service, separator:s.aiTagSeparator,
+      bookmarkNames:[], index:tagVocabIndex, respectCase:s.optRespectTagCase === true};
     const baseTags = s.optBatchTagEnabled && s.optBatchTag
-      ? s.optBatchTag.split(/[,，]+/).map(x => x.trim().replace(/\s+/g, "-")).filter(Boolean)
+      ? s.optBatchTag.split(/[,，]+/).map(x => pbpCanonicalTagName(x, tagContext)).filter(Boolean)
       : [];
     const useAiTags = s.batchAiTags && hasAIKey(s);
     const useAiSummary = s.batchAiSummary && hasAIKey(s);
@@ -4868,7 +4891,6 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     // user-tag counts (popup-tags.js persists them under "cached_user_tags").
     // The same counts also feed the frequency-sorted vocabulary the tag
     // prompts anchor on (audit A14, popup parity).
-    let tagCaseMap = {};
     let userTagsTop = [];
     try {
       const cached = await chrome.storage.local.get("cached_user_tags");
@@ -4876,9 +4898,8 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
       const counts = entry?.account === account ? entry.counts : null;
       if (counts) {
         userTagsTop = pbpTagsByCount(counts);
-        if (s.optRespectTagCase) tagCaseMap = buildTagCaseMap(counts);
       }
-    } catch (_) { /* no cache -> map stays empty, prompt unanchored (same as before) */ }
+    } catch (_) { /* no cache -> prompt unanchored (same as before) */ }
 
     for (let i = startIndex; i < tabs.length; i++) {
       const tab = tabs[i];
@@ -4937,7 +4958,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
                   const resp = await callAI(s, buildCombinedPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", pbpRelevantTagsFirst(userTagsTop, tab.title || "", tab.url)));
                   const parsed = parseAICombined(resp, s.aiTagSeparator);
                   if (parsed.tags.length) {
-                    aiTagsResolved = s.optRespectTagCase ? parsed.tags.map(tg => resolveTagCase(tg, tagCaseMap)) : parsed.tags;
+                    aiTagsResolved = parsed.tags;
                     await setAICache(tab.url, "tags", aiTagsResolved, s.aiCacheDuration, aiCacheSource, account, s);
                   }
                   if (parsed.summary) {
@@ -4956,9 +4977,8 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
                   const prompt = buildTagPrompt(s, tab.title || tab.url, tab.url, pageInfo.pageText, "", pbpRelevantTagsFirst(userTagsTop, tab.title || "", tab.url));
                   const resp = await callAI(s, prompt);
                   const rawTags = refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator });
-                  const aiTags = s.optRespectTagCase ? rawTags.map(tg => resolveTagCase(tg, tagCaseMap)) : rawTags;
-                  await setAICache(tab.url, "tags", aiTags, s.aiCacheDuration, aiCacheSource, account, s);
-                  return { type: "tags", result: aiTags };
+                  await setAICache(tab.url, "tags", rawTags, s.aiCacheDuration, aiCacheSource, account, s);
+                  return { type: "tags", result: rawTags };
                 } catch (e) { console.warn("batch AI tags failed:", tab.url, e.message); aiFailed++; return null; }
               })());
               if (useAiSummary && summaryResolved === null) aiJobs.push((async () => {
@@ -4997,7 +5017,13 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
           }
         }
 
-        const dedupedTags = [...new Set(tags.map(tg => tg.toLowerCase()))].map(lower => tags.find(tg => tg.toLowerCase() === lower));
+        const dedupedTags = [];
+        const seenTags = new Set();
+        for (const tag of tags) {
+          const name = pbpCanonicalTagName(tag, tagContext);
+          const key = pbpTagGroupKey(name) || `exact:${name}`;
+          if (name && !seenTags.has(key)) { dedupedTags.push(name); seenTags.add(key); }
+        }
         const isPrivate = pbpServiceEffectivePrivate(s, { incognito: tab.incognito });
         const description = linkding
           ? String(linkdingSummary || "").replace(/\s+/g, " ").trim()

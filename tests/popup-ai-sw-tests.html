@@ -472,11 +472,11 @@ function buildRouterHarness(source, opts) {
   });
 
   // ======================================================================
-  // D. tag case resolution (the quietest possible regression)
+  // D. cache stores raw model tags; the popup aligns them when it reads them
   // ======================================================================
   const CASE_LOCAL = { cached_user_tags: { account: "alice", counts: { JavaScript: 9, javascript: 1, MV3: 4 } } };
 
-  await testCase("optRespectTagCase=true resolves cached tags to the account's preferred casing", async () => {
+  await testCase("optRespectTagCase=true still caches raw model tags", async () => {
     const h = buildAiHarness(source, {
       settings: { aiTagSeparator: "-", optRespectTagCase: true },
       local: CASE_LOCAL,
@@ -484,29 +484,28 @@ function buildRouterHarness(source, opts) {
     });
     await h.pbpRunPopupAiCall(baseMessage({ mode: "single", kind: "tags", inflightKey: freshKey("tags") }));
     const w = cacheWrite(h.calls, "tags");
-    return !!w && w.result.join(",") === "JavaScript,MV3";
+    return !!w && w.result.join(",") === "javascript,mv3";
   });
 
-  await testCase("...and the response carries the resolved casing too", async () => {
+  await testCase("...and the response carries raw tags for popup alignment", async () => {
     const h = buildAiHarness(source, {
       settings: { aiTagSeparator: "-", optRespectTagCase: true },
       local: CASE_LOCAL,
       reply: '["javascript"]',
     });
     const r = await h.pbpRunPopupAiCall(baseMessage({ mode: "single", kind: "tags", inflightKey: freshKey("tags") }));
-    return r.tags.join(",") === "JavaScript";
+    return r.tags.join(",") === "javascript";
   });
 
-  await testCase("a tag vocabulary belonging to ANOTHER account is never used, and the degradation leaves a trace", async () => {
+  await testCase("the worker never reads another account's vocabulary for its raw cache", async () => {
     const h = buildAiHarness(source, {
       settings: { aiTagSeparator: "-", optRespectTagCase: true },
       local: { cached_user_tags: { account: "bob", counts: { JavaScript: 9 } } },
       reply: '["javascript"]',
     });
     const r = await h.pbpRunPopupAiCall(baseMessage({ mode: "single", kind: "tags", inflightKey: freshKey("tags") }));
-    const traced = h.calls.warn.some((a) => a.join(" ").toLowerCase().includes("case"));
     const leaked = h.calls.warn.some((a) => a.join(" ").includes("JavaScript") || a.join(" ").includes("bob"));
-    return r.tags.join(",") === "javascript" && traced && !leaked;
+    return r.tags.join(",") === "javascript" && !leaked;
   });
 
   await testCase("optRespectTagCase=false leaves the model's lowercase tags untouched", async () => {
@@ -519,7 +518,7 @@ function buildRouterHarness(source, opts) {
     return r.tags.join(",") === "javascript,mv3";
   });
 
-  await testCase("combined mode resolves case as well (not only the single path)", async () => {
+  await testCase("combined mode caches and returns raw tags too", async () => {
     const h = buildAiHarness(source, {
       settings: { aiTagSeparator: "-", optRespectTagCase: true },
       local: CASE_LOCAL,
@@ -527,10 +526,10 @@ function buildRouterHarness(source, opts) {
     });
     const r = await h.pbpRunPopupAiCall(baseMessage());
     const w = cacheWrite(h.calls, "tags");
-    return r.tags.join(",") === "JavaScript,MV3" && w.result.join(",") === "JavaScript,MV3";
+    return r.tags.join(",") === "javascript,mv3" && w.result.join(",") === "javascript,mv3";
   });
 
-  await testCase("optRespectTagCase may be overridden by the message and takes effect", async () => {
+  await testCase("a case override does not change the worker's raw cache", async () => {
     const h = buildAiHarness(source, {
       settings: { aiTagSeparator: "-", optRespectTagCase: false },
       local: CASE_LOCAL,
@@ -539,7 +538,7 @@ function buildRouterHarness(source, opts) {
     const r = await h.pbpRunPopupAiCall(baseMessage({
       mode: "single", kind: "tags", inflightKey: freshKey("tags"), aiOverrides: { optRespectTagCase: true },
     }));
-    return r.tags.join(",") === "JavaScript";
+    return r.tags.join(",") === "javascript";
   });
 
   // ======================================================================

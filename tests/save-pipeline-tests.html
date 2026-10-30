@@ -222,6 +222,7 @@ async function createHarness(options) {
     pbpResolveOfflineQueueToken,
     pbpDrainOfflineQueue,
     pbpResolveSavePlan,
+    PBP_TAG_VOCAB_STALE_CEILING, pbpTagVocabIndex, pbpTagGroupKey, pbpAlignTagName,
     buildPostsAddUri,
     POSTS_ADD_URI_BUDGET,
     pbpCaptureBookmarkAuth: captureAuth,
@@ -279,6 +280,8 @@ async function createBackgroundSaveHarness(options) {
   const deps = {
     loadSettings: opts.loadSettings || (async () => settingsSequence[Math.min(loadCount++, settingsSequence.length - 1)]),
     pbpServiceEffectivePrivate,
+    pbpReadTagVocab: async () => opts.tagVocabIndex || null,
+    pbpCanonicalTagName, pbpTagGroupKey,
     pbpSaveFailure: (reason) => ({ status: "failed", reason }),
     showNotification: (...args) => notifications.push(args),
     t: opts.t || ((key, ...args) => args.length ? `${key}:${args.join(":")}` : key),
@@ -374,6 +377,8 @@ async function createBatchSaveHarness(options) {
     refineTags: (tags) => tags,
     chrome: { storage: { local: { get: opts.storageGet || (async () => ({})) } } },
     buildTagCaseMap: () => ({}),
+    pbpReadTagVocab: async () => opts.tagVocabIndex || null,
+    pbpCanonicalTagName, pbpTagGroupKey,
     pbpServiceEffectivePrivate,
     submitSaveIntent: async (prepared, deliveryOptions) => {
       intents.push({ prepared, deliveryOptions });
@@ -828,6 +833,20 @@ await suite("unified save pipeline", async () => {
     }, resolve));
     equal(checks, 0, "ownerless legacy preview performed a Pinboard lookup");
     equal(legacy.account, "");
+  });
+  await test("preview bookmark info carries exact self-hosted tag names and splits Pinboard tags", async () => {
+    const source = await getBackgroundSource();
+    const start = source.indexOf('if (message.type === "mdPreviewBookmarkInfo"');
+    const anchor = source.indexOf('return true;\n  }\n}\nchrome.runtime.onMessage.addListener(handleRuntimeMessage);', start);
+    assert(start >= 0 && anchor > start, "preview bookmark branch missing");
+    const branch = source.slice(start, anchor + 'return true;\n  }'.length);
+    for (const post of [{tags:'"machine learning" web-design',tagNames:["machine learning","web-design"]},{tags:"one two"}]) {
+      const auth={account:"alice",token:"token"};
+      const run = new Function("getCurrentBookmarkAuth","checkBookmarked","pbpBookmarkAuthIsCurrent","pbpStatusCacheGet", "pbpSelfHostedAuth", "chrome", "pinboardFetch", "pbpStatusCacheSet", "pbpBookmarkPostsResponse", "return function(message,sendResponse){"+branch+"}")
+        (async()=>auth,async()=>true,()=>true,()=>({posts:[post]}),()=>false,{},async()=>{throw Error("unexpected")},()=>true,async()=>{throw Error("unexpected")});
+      const response = await new Promise(resolve=>run({type:"mdPreviewBookmarkInfo",url:BASE_INTENT.url,account:"alice"},resolve));
+      equal(JSON.stringify(response.tagNames),JSON.stringify(post.tagNames||["one","two"]));
+    }
   });
 
   await test("preview opener and restore payloads carry account, tags, and description", async () => {
@@ -1584,6 +1603,28 @@ await suite("unified save pipeline", async () => {
     equal(readLater.intents[0].toread, true);
   });
 
+  await test("quick save splits default tags on spaces and commas", async () => {
+    const h=await createBackgroundSaveHarness({cachedSettings:{pinboardToken:"alice:token",bgSaveMode:"merge",_defaultTags:"a b, c",_aiTags:false,_aiSummary:false,optPrivateDefault:false,optPrivateIncognito:false}});
+    await runBackgroundSave(h);
+    equal(h.intents[0].tags,"a b c");
+  });
+  await test("batch mints user-separated names and keeps cached AI tags raw", async () => {
+    const h=await createBatchSaveHarness({settings:{bookmarkService:"linkding",aiTagSeparator:"_",optBatchTag:"machine learning,web design",batchAiTags:true},hasAIKey:true,pageInfo:{pageText:"Synthetic public text"},cached:{tags:["Nick Drake"]}});
+    await h.handleBatchSave(batchTabs(1));
+    equal(JSON.stringify(pbpBookmarkParseTags(h.intents[0].prepared.tags)),JSON.stringify(["machine_learning","web_design","Nick_Drake"]));
+    equal(h.cacheWrites.length,0,"cached AI tags were rewritten");
+  });
+  await test("batch uses an exact vocabulary hit with case preference off", async () => {
+    const h=await createBatchSaveHarness({settings:{bookmarkService:"linkding",aiTagSeparator:"_",optBatchTagEnabled:false,batchAiTags:true,optRespectTagCase:false},hasAIKey:true,pageInfo:{pageText:"Synthetic public text"},cached:{tags:["Nick Drake"]},tagVocabIndex:pbpTagVocabIndex({"Nick Drake":3})});
+    await h.handleBatchSave(batchTabs(1));
+    equal(pbpBookmarkParseTags(h.intents[0].prepared.tags)[0],"Nick Drake");
+  });
+  await test("batch stores generated AI tags raw before spelling alignment", async () => {
+    const h=await createBatchSaveHarness({settings:{bookmarkService:"karakeep",optBatchTagEnabled:false,batchAiTags:true,optRespectTagCase:true},hasAIKey:true,pageInfo:{pageText:"Synthetic public text"},tagVocabIndex:pbpTagVocabIndex({"AI Tag":9})});
+    await h.handleBatchSave(batchTabs(1));
+    equal(h.cacheWrites.find(call=>call[1]==="tags")[2][0],"ai-tag");
+    equal(pbpBookmarkParseTags(h.intents[0].prepared.tags)[0],"AI Tag");
+  });
   await test("concurrent background preparations isolate prefix settings from the shared cache", async () => {
     const cachedSettings = {
       pinboardToken: "token", bgSaveMode: "merge", optPrivateDefault: false,

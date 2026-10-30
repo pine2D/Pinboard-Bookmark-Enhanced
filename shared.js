@@ -756,6 +756,7 @@ function pbpRelevantTagsFirst(tags, title, url) {
 }
 
 // ---- Shared tag spelling helpers ----
+const PBP_TAG_VOCAB_STALE_CEILING = 2 * 60 * 60 * 1000;
 function pbpTagGroupKey(name) {
   return name.toLowerCase().replace(/[\s_-]+/g, "");
 }

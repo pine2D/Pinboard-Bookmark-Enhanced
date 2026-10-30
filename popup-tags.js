@@ -211,7 +211,7 @@ function pbpPopupTagGroupKey(name) {
 // Prewarmed mode serves cache ignoring the 10-min TTL (the SW alarm refreshes it),
 // but with a staleness ceiling: if the alarm clearly hasn't run (cache older than
 // this), fall through to a one-shot fetch so tags can't be stuck stale forever.
-const PREWARM_STALE_CEILING = 2 * 60 * 60 * 1000; // 2 hours
+const PREWARM_STALE_CEILING = PBP_TAG_VOCAB_STALE_CEILING;
 let _popupUserTagAccount = "";
 
 async function fetchAllUserTags(token) {
