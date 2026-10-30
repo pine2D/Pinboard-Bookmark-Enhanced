@@ -922,7 +922,8 @@ function showSetKeyError() {
   window._lastStatusFeedback = showFeedback({ variant: "error", messageNode: msg });
 }
 
-// Canonicalize AI results at the same input boundary as typed and selected tags.
+// Cache AI tags in their refined model form. Choose the current bookmark and
+// vocabulary spelling only when rendering a result in this popup.
 function finalizeAITags(rawTags, s) {
   return rawTags.map(tag => pbpCanonicalTagName(tag, pbpPopupTagContext(s || settings)));
 }
@@ -1013,7 +1014,7 @@ async function pbpAiCallViaSW({ s, mode, kind, prompt, url, source, account, inf
 // (regenerate) always does a single dedicated call. Combined failure -> single fallback.
 // `s` = the caller's immutable settings snapshot (audit A4): every read
 // below sees one consistent provider/model/lang for the op's whole life.
-async function fetchAIArtifacts(kind, forceRefresh, account, s, source) {
+async function fetchAIArtifacts(kind, forceRefresh, account, s, source, resultMeta) {
   s = s || settings;
   source = source || s.aiContentSource;
   const url = pageInfo.url;
@@ -1044,14 +1045,12 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s, source) {
       const prompt = buildTagPrompt(s, $id("title-input").value, pageInfo.url, pageInfo.pageText, $id("description-input").value, pbpRelevantTagsFirst(allUserTags, $id("title-input").value, pageInfo.url));
       if (!PBP_AI_VIA_SW) {
         const resp = await callAI(s, prompt);
-        return finalizeAITags(refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator }), s);
+        return refineTags(parseAITags(resp, s.aiTagSeparator), { cap: AI_TAG_CAP, separator: s.aiTagSeparator });
       }
-      // The worker already parsed, refined and case-resolved this half against
-      // the SAME vocabulary entry. finalizeAITags runs again anyway because
-      // resolveTagCase is idempotent and this side still has to cover a worker
-      // that could not read the account's tag counts.
+      // The worker already parsed and refined this half. Keep it raw here so
+      // every popup cache writer stores the same value as the worker.
       const both = await pbpAiCallViaSW({ s, mode: "single", kind: "tags", prompt, url, source, account, inflightKey: tagsKey });
-      return finalizeAITags(both.tags, s);
+      return both.tags;
     });
   };
 
@@ -1066,7 +1065,10 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s, source) {
   {
     const own = await getAICache(url, kind, s.aiCacheDuration, source, account, s);
     if (!pbpPopupAiAccountIsCurrent(account)) return null;
-    if (own != null) return own;
+    if (own != null) {
+      if (resultMeta) resultMeta.fromCache = true;
+      return own;
+    }
   }
 
   // Custom-prompt users keep their own templates -> never use the combined prompt
@@ -1078,7 +1080,7 @@ async function fetchAIArtifacts(kind, forceRefresh, account, s, source) {
   // survives, but the requester of the EMPTY half must treat it as a
   // miss, not render/cache an empty artifact as success.
   const halfOf = (both, which) => which === "tags"
-    ? (both.tags && both.tags.length ? finalizeAITags(both.tags, s) : null)
+    ? (both.tags && both.tags.length ? both.tags : null)
     : (both.summary ? both.summary : null);
 
   // Ride an in-flight combined call if one is already running. If that call
@@ -1340,7 +1342,7 @@ async function doAITags(forceRefresh, sOverride) {
   if (!forceRefresh) {
     const cached = await pbpAiFastCached("tags", s, account);
     if (cached && _aiOpStillCurrent(account)) {
-      renderAITags(cached, true);
+      renderAITags(finalizeAITags(cached, s), true);
       return;
     }
   }
@@ -1359,17 +1361,21 @@ async function doAITags(forceRefresh, sOverride) {
     if (!_aiOpStillCurrent(account)) return;
     if (!pageInfo.pageText) { showStatus("status-msg", t("aiNoContent"), "error"); return; }
     if (showProgressOnBtn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "calling", label: _aiPopupProviderLabel(s, s.aiProvider) });
-    const tags = await fetchAIArtifacts("tags", forceRefresh, account, s, contentSource);
-    // account-only here: cache the paid result regardless of URL drift;
-    // the stillCurrent gate below protects the chip render.
+    const resultMeta = {};
+    const tags = await fetchAIArtifacts("tags", forceRefresh, account, s, contentSource, resultMeta);
+    // Account-only here: the worker already cached its paid result, while the
+    // local fallback may still need to cache it. The stillCurrent gate below
+    // protects the chip render when the URL field drifts.
     if (!pbpPopupAiAccountIsCurrent(account)) return;
     if (showProgressOnBtn) setAiProgress("ai-tags-btn", { provider: s.aiProvider, stage: "parsing", label: _aiPopupProviderLabel(s, s.aiProvider) });
     // Empty result = miss, never a cached fake success (same ruling as the
     // combined-parse halves above): caching [] would make every later click
     // return "no tags" for free until the entry expired.
-    if (tags.length) await setAICache(pageInfo.url, "tags", tags, s.aiCacheDuration, contentSource, account, s);
+    // The worker wrote this half before responding. Rewriting it here also
+    // turns a cache hit into a fresh write; only the local fallback owns one.
+    if (tags.length && !PBP_AI_VIA_SW && !resultMeta.fromCache) await setAICache(pageInfo.url, "tags", tags, s.aiCacheDuration, contentSource, account, s);
     if (!_aiOpStillCurrent(account)) return;
-    renderAITags(tags, false);
+    renderAITags(finalizeAITags(tags, s), false);
     if (forceRefresh) {
       showStatus("status-msg", t("aiTagsRegenerated"), "success");
     }

@@ -1583,7 +1583,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(!popupAiSource.includes("settings.aiProvider = "), "global settings.aiProvider mutation must be gone");
       assert(popupAiSource.includes("const s = { ...(sOverride || settings) }"), "op-level snapshot missing");
       assert(!/\{\s*\.\.\.settings\s*,\s*aiProvider:/.test(popupAiSource), "error-card handlers must build from the failed snapshot, never the global settings");
-      assert(popupAiSource.includes("async function fetchAIArtifacts(kind, forceRefresh, account, s, source)"),
+      assert(popupAiSource.includes("async function fetchAIArtifacts(kind, forceRefresh, account, s, source"),
         "fetchAIArtifacts must take the snapshot explicitly");
     });
 
@@ -2487,7 +2487,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         pageInfo: { url: URL, pageText: "extracted body" },
         allUserTags: [],
         pbpPopupTagContext: (s) => ({ service: pbpBookmarkServiceId(s), separator: s.aiTagSeparator,
-          bookmarkNames: [], index: pbpTagVocabIndex(Object.fromEntries(Object.values(o.tagCaseMap || {}).map(name => [name, 1]))),
+          bookmarkNames: o.bookmarkNames || [], index: pbpTagVocabIndex(o.tagCounts || Object.fromEntries(Object.values(o.tagCaseMap || {}).map(name => [name, 1]))),
           respectCase: s.optRespectTagCase }),
         _inflightAI: inflight,
         chrome: { runtime: { sendMessage: async (msg) => { calls.order.push("message"); calls.sent.push(msg); return respond(msg); } } },
@@ -2515,7 +2515,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         buildTagPrompt: () => "TAG-PROMPT",
         buildCombinedPrompt: () => "COMBINED-PROMPT",
         parseAITags: (resp) => String(resp).split(","),
-        refineTags: (tags) => tags,
+        refineTags: o.refineTags || ((tags) => tags),
         parseAICombined: () => ({ tags: ["in-document"], summary: "in-document combined" }),
         pbpRelevantTagsFirst: () => [],
         pbpPopupAiAccount: () => account,
@@ -2540,7 +2540,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         _aiErrorLastSettings: null,
         pbpAiStatusPageUrl: o.statusPageUrl || (() => ""),
         _aiErrorLastOp: null, _aiErrorLastPermission: null, _aiErrorHideTimer: null,
-        pbpAiFastCached: async () => null,
+        pbpAiFastCached: async kind => o.fastCached?.[kind] ?? null,
         setAiProgress: () => {},
         clearAiProgress: (id) => calls.progressCleared.push(id),
         ensurePageText: async () => o.source || "local",
@@ -2766,24 +2766,84 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(h.calls.cache.length === 0, "an empty tag list was written to the cache (A8: empty = miss)");
     });
 
+    await testAsync("single tag request leaves worker cache raw and displays the vocabulary majority", async () => {
+      const h = makePopupAi({ respectCase:true, tagCounts:{JavaScript:9,javascript:1},
+        respond:async()=>({ok:true,tags:["javascript"],summary:null}) });
+      await h.doAITags(true);
+      assert(!h.calls.cache.some(row=>row[1]==="tags"), "popup rewrote the worker's raw single cache");
+      assert(h.calls.rendered[0]?.tags?.[0] === "JavaScript", "single popup render missed majority spelling");
+    });
+
+    await testAsync("own bookmark name wins at display while the cache remains raw", async () => {
+      const h = makePopupAi({ respectCase:true, bookmarkNames:["java-script"], tagCounts:{JavaScript:9,javascript:1},
+        respond:async()=>({ok:true,tags:["javascript"],summary:null}) });
+      await h.doAITags(true);
+      assert(!h.calls.cache.some(row=>row[1]==="tags"), "bookmark spelling contaminated the worker cache");
+      assert(h.calls.rendered[0]?.tags?.[0] === "java-script", "own bookmark spelling did not win");
+    });
+
+    await testAsync("fast cached raw tags display with current vocabulary without rewriting cache", async () => {
+      const h = makePopupAi({ respectCase:true, tagCounts:{JavaScript:9,javascript:1}, fastCached:{tags:["javascript"]} });
+      await h.doAITags(false);
+      assert(h.calls.rendered[0]?.tags?.[0] === "JavaScript", "fast cache bypassed alignment");
+      assert(h.calls.cache.length === 0 && h.calls.sent.length === 0, "cache hit wrote or called again");
+    });
+
+    await testAsync("secondary cache check aligns at display and does not rewrite raw tags", async () => {
+      const h = makePopupAi({ respectCase:true, tagCounts:{JavaScript:9,javascript:1}, cached:{tags:["javascript"]} });
+      await h.doAITags(false);
+      assert(h.calls.rendered[0]?.tags?.[0] === "JavaScript", "secondary cache hit bypassed alignment");
+      assert(h.calls.cache.length === 0 && h.calls.sent.length === 0, "secondary cache hit rewrote or recalled");
+    });
+
+    await testAsync("local fallback secondary cache hit also avoids a rewrite", async () => {
+      const h = makePopupAi({viaSW:false, respectCase:true, tagCounts:{JavaScript:9,javascript:1}, cached:{tags:["javascript"]}});
+      await h.doAITags(false);
+      assert(h.calls.rendered[0]?.tags?.[0] === "JavaScript", "fallback cache hit bypassed alignment");
+      assert(h.calls.cache.length === 0 && h.calls.callAI.length === 0, "fallback cache hit rewrote or recalled");
+    });
+
+    await testAsync("summary-triggered combined request files its tags half raw", async () => {
+      const h = makePopupAi({ respectCase:true, tagCounts:{JavaScript:9,javascript:1}, settings:{customTagPrompt:"",customSummaryPrompt:""},
+        respond:async()=>({ok:true,tags:["javascript"],summary:"A summary"}) });
+      await h.doAISummary(false);
+      assert(h.calls.cache.find(row=>row[1]==="tags")?.[2]?.[0] === "javascript", "summary-triggered tags half was aligned in cache");
+    });
+
+    await testAsync("tags-triggered combined request files tags raw and renders aligned", async () => {
+      const h = makePopupAi({ respectCase:true, tagCounts:{JavaScript:9,javascript:1}, settings:{customTagPrompt:"",customSummaryPrompt:""},
+        respond:async()=>({ok:true,tags:["javascript"],summary:"A summary"}) });
+      await h.doAITags(false);
+      assert(!h.calls.cache.some(row=>row[1]==="tags"), "tags-triggered popup path rewrote worker cache");
+      assert(h.calls.rendered[0]?.tags?.[0] === "JavaScript", "combined tags render missed majority spelling");
+    });
+
+    await testAsync("popup fallback refines raw names before caching and aligns only for display", async () => {
+      const h = makePopupAi({viaSW:false, respectCase:true, tagCounts:{JavaScript:9,javascript:1}, aiText:" javascript ",
+        refineTags:tags=>tags.map(tag=>tag.trim())});
+      await h.doAITags(true);
+      assert(h.calls.cache.find(row=>row[1]==="tags")?.[2]?.[0] === "javascript", "fallback cache was not refined raw data");
+      assert(h.calls.rendered[0]?.tags?.[0] === "JavaScript", "fallback display missed alignment");
+    });
+
     await testAsync("case resolution survives the boundary in both directions", async () => {
       const caseMap = { javascript: "JavaScript", mv3: "MV3" };
-      // The worker resolved them against the same vocabulary: re-applying
-      // resolveTagCase here must be a no-op, not a second mangling.
+      // Legacy aligned cache entries remain idempotent at the display boundary.
       const resolved = makePopupAi({
         respectCase: true, tagCaseMap: caseMap,
         respond: async () => ({ ok: true, tags: ["JavaScript", "MV3"], summary: null }),
       });
-      const kept = await resolved.fetchAIArtifacts("tags", true, resolved.account, resolved.snapshot, "local");
-      assert(kept.join(",") === "JavaScript,MV3", "re-applying the case map changed an already-resolved tag: " + kept.join(","));
-      // And when the worker could NOT read this account's vocabulary it degrades
-      // to unresolved tags — the render side still fixes them up.
+      await resolved.doAITags(true);
+      const kept = resolved.calls.rendered[0]?.tags || [];
+      assert(kept.join(",") === "JavaScript,MV3", "display changed an already-resolved tag: " + kept.join(","));
+      // New worker entries are raw; the render side resolves them now.
       const degraded = makePopupAi({
         respectCase: true, tagCaseMap: caseMap,
         respond: async () => ({ ok: true, tags: ["javascript", "mv3"], summary: null }),
       });
-      const fixed = await degraded.fetchAIArtifacts("tags", true, degraded.account, degraded.snapshot, "local");
-      assert(fixed.join(",") === "JavaScript,MV3", "the popup did not cover a worker that skipped case resolution: " + fixed.join(","));
+      await degraded.doAITags(true);
+      const fixed = degraded.calls.rendered[0]?.tags || [];
+      assert(fixed.join(",") === "JavaScript,MV3", "the popup did not align a raw worker reply: " + fixed.join(","));
     });
 
     await testAsync("PBP_AI_VIA_SW=false keeps the tags parse inside the popup document", async () => {
@@ -4005,6 +4065,17 @@ test("posts/add default remains replace=yes for existing callers", () => {
       runtime.renderAITags(tags, false);
       return { container, tagsInput, focusCalls, added, cleanup() { container.remove(); tagsInput.remove(); } };
     }
+
+    await testAsync("a raw cache hit reaches real AI chips with the current vocabulary spelling", async () => {
+      const h = makePopupAi({ respectCase:true, tagCounts:{JavaScript:9,javascript:1}, fastCached:{tags:["javascript"]} });
+      await h.doAITags(false);
+      const run = aiTagFocusRuntime(h.calls.rendered[0].tags);
+      try {
+        const chip = run.container.querySelector(".stag.ai");
+        assert(chip?.dataset.tag === "JavaScript" && chip.textContent === "JavaScript", "real chip displayed raw cache spelling");
+        assert(h.calls.cache.length === 0, "display rewrote shared cache");
+      } finally { run.cleanup(); }
+    });
 
     await testAsync("K71: an AI chip that held focus hands off to #tags-input once disabled, with preventScroll", async () => {
       const run = aiTagFocusRuntime(["alpha", "beta"]);
