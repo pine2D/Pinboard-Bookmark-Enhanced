@@ -2831,6 +2831,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   for (const radio of document.querySelectorAll('input[name="bookmark-service"]')) {
     radio.checked = radio.value === pbpBookmarkServiceId(s);
     radio.addEventListener("change", refreshBookmarkServiceFields);
+    radio.addEventListener("change", pbpSyncTagGovServiceSelection);
     // The overview's bookmark card and the "set up AI" nudge follow the chosen service.
     radio.addEventListener("change", () => scheduleConnectionOverview());
   }
@@ -5288,6 +5289,13 @@ function pbpSetTagGovDataState(state) {
   // Only the former offers token setup; account changes re-run this panel.
   const refresh = $id("tag-gov-refresh");
   if (refresh) refresh.disabled = state === "no-token" || state === "pinboard-only";
+}
+
+// A reused options tab does not reinitialize the Tags panel on each visit.
+// Keep its no-auth explanation in step with the selected bookmark service.
+function pbpSyncTagGovServiceSelection() {
+  const state = $id("panel-tags")?.dataset.tagGovState;
+  if (state === "no-token" || state === "pinboard-only") _tagGovShowLoadFailed("no-token");
 }
 
 // Whether the panel has tag counts to work on -- what renderTagGov actually

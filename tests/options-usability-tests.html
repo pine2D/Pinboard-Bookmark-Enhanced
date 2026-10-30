@@ -1031,6 +1031,11 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
     service.name = "bookmark-service";
     service.checked = true;
     document.body.appendChild(service);
+    // The fixture suppresses options.js's full page boot. Bind its real
+    // service-change state handler to this radio before dispatching changes.
+    if (typeof pbpSyncTagGovServiceSelection === "function") {
+      service.addEventListener("change", pbpSyncTagGovServiceSelection);
+    }
     try {
       for (const value of ["karakeep", "linkding"]) {
         service.value = value;
@@ -1045,12 +1050,18 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       assert(!needToken.hidden && getComputedStyle(needToken).display !== "none", "Pinboard setup action is hidden");
       assert(refresh.disabled, "refresh must stay disabled without a Pinboard token");
       service.value = "linkding";
-      _tagGovShowLoadFailed("no-token");
+      service.dispatchEvent(new Event("change", { bubbles: true }));
       assert(needToken.hidden && getComputedStyle(needToken).display === "none", "switching from Pinboard left its token action visible");
       assert(document.getElementById("panel-tags").dataset.tagGovState === "pinboard-only", "service change did not replace the missing-token state");
+      service.value = "pinboard";
+      service.dispatchEvent(new Event("change", { bubbles: true }));
+      assert(!needToken.hidden && document.getElementById("tag-gov-stats").textContent === "tagGovNeedToken", "returning to Pinboard did not restore token setup");
+      service.value = "karakeep";
       _tagGovShowLoadFailed();
       assert(document.getElementById("tag-gov-stats").textContent === "tagGovLoadFailed", "a real load failure must retain its error");
       assert(needToken.hidden && !refresh.disabled, "a load error must hide token setup and allow retry");
+      service.dispatchEvent(new Event("change", { bubbles: true }));
+      assert(document.getElementById("tag-gov-stats").textContent === "tagGovLoadFailed" && !refresh.disabled, "service change overwrote a load error");
     } finally {
       service.remove();
       needToken.remove();
