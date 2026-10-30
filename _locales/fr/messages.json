@@ -1072,7 +1072,7 @@
     "message": "Notes dans le popup"
   },
   "optAutoDescription": {
-    "message": "Remplir automatiquement la méta-description dans les notes"
+    "message": "Ajouter automatiquement la description de la page : dans la description du signet sur linkding, sinon dans les notes si aucun texte n’est sélectionné"
   },
   "optBlockquote": {
     "message": "Mettre le texte sélectionné en citation"
@@ -1408,7 +1408,7 @@
     "message": "Non défini"
   },
   "qsAutoNotes": {
-    "message": "Ajouter la description de la page aux notes si aucun texte n'est sélectionné"
+    "message": "Ajouter la description de la page : dans la description du signet sur linkding, sinon dans les notes si aucun texte n’est sélectionné"
   },
   "qsBlockquote": {
     "message": "Encadrer le texte sélectionné avec blockquote"
@@ -1423,7 +1423,7 @@
     "message": "Générer automatiquement des tags IA"
   },
   "qsAiSummary": {
-    "message": "Générer automatiquement un résumé IA dans les notes"
+    "message": "Générer automatiquement un résumé IA : dans la description du signet sur linkding, sinon dans les notes"
   },
   "secReadLater": {
     "message": "À lire"

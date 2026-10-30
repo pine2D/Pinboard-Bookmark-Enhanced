@@ -1072,7 +1072,7 @@
     "message": "弹窗中的备注"
   },
   "optAutoDescription": {
-    "message": "自动将页面描述填入备注"
+    "message": "自动填入页面描述：linkding 写入描述，其他服务仅在未选中文字时写入备注"
   },
   "optBlockquote": {
     "message": "把选中文字标为引用"
@@ -1408,7 +1408,7 @@
     "message": "未设置"
   },
   "qsAutoNotes": {
-    "message": "未选中文字时，将页面描述填入备注"
+    "message": "填入页面描述：linkding 写入描述，其他服务仅在未选中文字时写入备注"
   },
   "qsBlockquote": {
     "message": "以引用格式包裹选中文本"
@@ -1423,7 +1423,7 @@
     "message": "自动生成 AI 标签"
   },
   "qsAiSummary": {
-    "message": "自动在备注中生成 AI 摘要"
+    "message": "自动生成 AI 摘要：linkding 写入描述，其他服务写入备注"
   },
   "secReadLater": {
     "message": "稍后阅读"

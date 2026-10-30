@@ -1072,7 +1072,7 @@
     "message": "ポップアップのメモ"
   },
   "optAutoDescription": {
-    "message": "ページの説明をメモに自動入力"
+    "message": "ページの説明を自動入力：linkdingでは「説明」に、他のサービスではテキスト未選択時のみメモに入力"
   },
   "optBlockquote": {
     "message": "選択したテキストを引用として表示"
@@ -1408,7 +1408,7 @@
     "message": "未設定"
   },
   "qsAutoNotes": {
-    "message": "テキストが選択されていないときは、ページの説明をメモに追加する"
+    "message": "ページの説明を追加：linkdingでは「説明」に、他のサービスではテキスト未選択時のみメモに追加"
   },
   "qsBlockquote": {
     "message": "選択テキストを blockquote で囲む"
@@ -1423,7 +1423,7 @@
     "message": "AI タグを自動生成"
   },
   "qsAiSummary": {
-    "message": "メモに AI 要約を自動生成"
+    "message": "AI 要約を自動生成：linkdingでは「説明」に、他のサービスではメモに入力"
   },
   "secReadLater": {
     "message": "あとで読む"

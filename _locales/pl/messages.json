@@ -1072,7 +1072,7 @@
     "message": "Notki w popupie"
   },
   "optAutoDescription": {
-    "message": "Automatycznie wypełniaj opis strony w notkach"
+    "message": "Automatycznie dodawaj opis strony: w linkding do pola Opis, w innych usługach do notki, jeśli nie zaznaczono tekstu"
   },
   "optBlockquote": {
     "message": "Oznaczaj zaznaczony tekst jako cytat"
@@ -1408,7 +1408,7 @@
     "message": "Nie ustawiono"
   },
   "qsAutoNotes": {
-    "message": "Dodawaj opis strony do notki, gdy nie zaznaczono tekstu"
+    "message": "Dodawaj opis strony: w linkding do pola Opis, w innych usługach do notki, jeśli nie zaznaczono tekstu"
   },
   "qsBlockquote": {
     "message": "Zawijaj zaznaczony tekst w blockquote"
@@ -1423,7 +1423,7 @@
     "message": "Automatycznie generuj tagi AI"
   },
   "qsAiSummary": {
-    "message": "Automatycznie generuj podsumowanie AI w notkach"
+    "message": "Automatycznie generuj podsumowanie AI: w linkding w polu Opis, w innych usługach w notce"
   },
   "secReadLater": {
     "message": "Przeczytaj później"

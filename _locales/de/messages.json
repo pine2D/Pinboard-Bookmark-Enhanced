@@ -1072,7 +1072,7 @@
     "message": "Notizen im Popup"
   },
   "optAutoDescription": {
-    "message": "Meta-Beschreibung automatisch in Notizen einfügen"
+    "message": "Seitenbeschreibung automatisch einfügen: in linkding als Beschreibung, sonst nur ohne Textauswahl als Notiz"
   },
   "optBlockquote": {
     "message": "Ausgewählten Text als Zitat kennzeichnen"
@@ -1408,7 +1408,7 @@
     "message": "Nicht festgelegt"
   },
   "qsAutoNotes": {
-    "message": "Seitenbeschreibung in die Notizen übernehmen, wenn kein Text markiert ist"
+    "message": "Seitenbeschreibung einfügen: in linkding als Beschreibung, sonst nur ohne Textauswahl als Notiz"
   },
   "qsBlockquote": {
     "message": "Markierten Text mit blockquote umschließen"
@@ -1423,7 +1423,7 @@
     "message": "KI-Tags automatisch generieren"
   },
   "qsAiSummary": {
-    "message": "KI-Zusammenfassung automatisch in Notizen generieren"
+    "message": "KI-Zusammenfassung automatisch einfügen: in linkding als Beschreibung, sonst als Notiz"
   },
   "secReadLater": {
     "message": "Später lesen"

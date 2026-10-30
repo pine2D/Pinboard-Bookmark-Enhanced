@@ -1077,7 +1077,7 @@
     "message": "Notes in the Popup"
   },
   "optAutoDescription": {
-    "message": "Auto-fill meta description into notes"
+    "message": "Auto-fill page description: Description in linkding; Notes elsewhere when no text is selected"
   },
   "optBlockquote": {
     "message": "Mark selected text as a quote"
@@ -1414,7 +1414,7 @@
     "message": "Not set"
   },
   "qsAutoNotes": {
-    "message": "Add page description to notes when no text is selected"
+    "message": "Add page description: Description in linkding; Notes elsewhere when no text is selected"
   },
   "qsBlockquote": {
     "message": "Wrap selected text with blockquote"
@@ -1429,7 +1429,7 @@
     "message": "Auto-generate AI tags"
   },
   "qsAiSummary": {
-    "message": "Auto-generate AI summary in notes"
+    "message": "Auto-generate AI summary: Description in linkding, Notes elsewhere"
   },
   "secReadLater": {
     "message": "Read Later"
