@@ -442,6 +442,29 @@ await suite("unified save pipeline", async () => {
     equal(promoted.fields.toread, true, "incoming true promotes read-later");
   });
 
+  await test("resolver carries optional summary verbatim through create, update and missing merge", () => {
+    for (const summary of [undefined, "", "  New description\nsecond line  "]) {
+      for (const mode of ["create", "update", "merge", "overwrite"]) {
+        const plan = pbpResolveSavePlan(intent({ mode, summary, time: mode === "update" ? "server-time" : undefined }), { exists: false });
+        equal(plan.action, "send");
+        equal(plan.fields.summary, summary, `${mode} must carry the optional description verbatim`);
+      }
+    }
+  });
+
+  await test("resolver merge and overwrite preserve the server summary without requiring it for legacy posts", () => {
+    for (const summary of [undefined, "", "  Server description\nsecond line  "]) {
+      for (const mode of ["merge", "overwrite"]) {
+        const post = { description: "Server title", extended: "Server note", tags: "old", shared: "yes", toread: "no", time: "server-time",
+          ...(summary === undefined ? {} : { summary }) };
+        const plan = pbpResolveSavePlan(intent({ mode, summary: "Incoming description" }), { exists: true, post });
+        equal(plan.action, "send", "summary remains optional in canonical posts");
+        equal(plan.fields.summary, summary, `${mode} must preserve the server description`);
+        equal(plan.fields.notes, "Server note", "description does not replace notes");
+      }
+    }
+  });
+
   await test("resolver merge promotes private one-way, mirroring the toread promotion", () => {
     const toPrivate = pbpResolveSavePlan(intent({ mode: "merge", private: true }), {
       exists: true, post: { description: "", extended: "", tags: "", shared: "yes", toread: "no", time: "known-time" },
@@ -505,6 +528,7 @@ await suite("unified save pipeline", async () => {
       url: BASE_INTENT.url,
       title: post.description,
       notes: post.extended,
+      summary: post.summary,
       private: post.shared === "no",
       toread: post.toread === "yes",
       time: post.time,
@@ -863,6 +887,9 @@ await suite("unified save pipeline", async () => {
     equal((await h.submitPopupSaveIntent(intent({ mode: "skip" }), "alice")).reason, "invalid");
     equal((await h.submitPopupSaveIntent(intent({ mode: "create", time: "fake" }), "alice")).reason, "invalid");
     equal((await h.submitPopupSaveIntent(intent({ mode: "update" }), "alice")).reason, "invalid");
+    for (const summary of [null, false, 0, [], {}]) {
+      equal((await h.submitPopupSaveIntent(intent({ summary }), "alice")).reason, "invalid", "invalid summary cannot reach dispatch");
+    }
     equal((await h.submitPopupSaveIntent(intent(), "")).reason, "account_changed");
     equal(h.fetchCalls.length, 0, "invalid popup intents make no request");
   });
@@ -1320,13 +1347,16 @@ await suite("unified save pipeline", async () => {
 
   await test("network-failed create is durably queued as merge without credentials", async () => {
     const h = await createHarness({ pinboardFetch: async () => { throw new TypeError("offline"); } });
-    const result = await h.submitSaveIntent(intent({ archive: true }));
+    const result = await h.submitSaveIntent(intent({ archive: true, summary: "Queued description" }));
     equal(result.status, "queued");
     equal(result.cause, "network");
     const queued = h.storageData.offlineQueue[0];
     equal(queued.queueId, result.queueId);
     equal(queued.mode, "merge");
     equal(queued.archive, true);
+    equal(queued.summary, "Queued description", "description reaches durable queue storage");
+    equal(h.normalizeOfflineSaveIntent(queued, h.settings).summary, "Queued description", "replay restores the queued description");
+    equal(Object.keys(queued).sort().join(","), ["account", "mode", "url", "title", "notes", "summary", "tags", "private", "toread", "archive", "time", "queueId", "queuedAt"].sort().join(","), "durable queue uses only the reviewed whitelist");
     equal(queued.account, "alice");
     assert(!("token" in queued), "queue must not persist credentials");
     equal(h.events.includes("storage:set"), true, "queued is returned after storage set");

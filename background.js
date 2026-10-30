@@ -725,6 +725,7 @@ function validateSaveIntent(intent) {
   } catch (_) {
     return pbpSaveFailure("invalid");
   }
+  if (intent.summary !== undefined && typeof intent.summary !== "string") return pbpSaveFailure("invalid");
   if (intent.toread !== undefined && typeof intent.toread !== "boolean") return pbpSaveFailure("invalid");
   if (intent.archive !== undefined && typeof intent.archive !== "boolean") return pbpSaveFailure("invalid");
   if (intent.time !== undefined && (typeof intent.time !== "string" || !intent.time)) return pbpSaveFailure("invalid");
@@ -977,6 +978,7 @@ function normalizeOfflineSaveIntent(item, settings) {
     url: typeof item?.url === "string" ? item.url : "",
     title: typeof item?.title === "string" ? item.title : "",
     notes: typeof item?.notes === "string" ? item.notes : "",
+    summary: item?.summary,
     tags: typeof item?.tags === "string" ? item.tags : "",
     private: item?.private === true,
     toread: item?.toread === true || item?.toread === "yes",
@@ -1031,6 +1033,7 @@ function queueRecordFromSaveIntent(intent, token) {
     url: intent.url,
     title: intent.title,
     notes: intent.notes,
+    summary: intent.summary,
     tags: intent.tags,
     private: intent.private,
     toread: intent.toread,

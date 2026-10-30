@@ -31,6 +31,26 @@ async function suite(name, fn) {
   await fn(); results.appendChild = savedAppend; results.appendChild(div);
 }
 
+// Exercise the production queue serializer, normalizer and intent validator.
+async function queueIntentHarness() {
+  const source = await (await fetch("../background.js")).text();
+  const block = (startText, endText) => {
+    const start = source.indexOf(startText);
+    const end = source.indexOf(endText, start);
+    assert(start >= 0 && end > start, "queue intent source block not found");
+    return source.slice(start, end);
+  };
+  return new Function("pbpPinboardAccountFromToken", `
+    const PBP_SAVE_MODES = new Set(["create", "update", "merge", "overwrite", "skip"]);
+    ${block("function pbpSaveFailure(", "// Delivery-time merge/skip decisions")}
+    ${block("function normalizeOfflineSaveIntent(", "// pinboardFetch serializes")}
+    ${block("function queueRecordFromSaveIntent(", "function submitSaveIntent(")}
+    return { validateSaveIntent, normalizeOfflineSaveIntent, queueRecordFromSaveIntent };
+  `)(pbpPinboardAccountFromToken);
+}
+const SAVE_INTENT = Object.freeze({ mode: "create", url: "https://example.com/a", title: "Title",
+  notes: "Note", tags: "tag", private: false, toread: true, archive: false });
+
 const Q = () => ([
   { queueId: "a", url: "https://a.com" },
   { queueId: "b", url: "https://b.com" },
@@ -66,6 +86,38 @@ await suite("offline queue", async () => {
     const out = pbpOfflineQueueReduce([], { kind: "enqueue", item: { queueId: "a", account: "alice", url: "https://a.com", token: "secret" } });
     assert(out.length === 1 && !("token" in out[0]), "new item strips token");
     assert(out[0].account === "alice", "non-secret account binding preserved");
+  });
+  await test("summary round-trips through the queue with only its whitelisted field added", async () => {
+    const h = await queueIntentHarness();
+    const prepared = { ...SAVE_INTENT, summary: "  Description\nsecond line  ", token: "discard", sharingEnabled: true,
+      gateway: { token: "discard" }, connectionCapabilities: { sharing: true } };
+    const record = { ...h.queueRecordFromSaveIntent(prepared, "alice:fixture"), queueId: "summary", queuedAt: 123 };
+    const queue = pbpOfflineQueueReduce([], { kind: "enqueue", item: record });
+    const expectedKeys = ["account", "mode", "url", "title", "notes", "summary", "tags", "private", "toread", "archive", "time", "queueId", "queuedAt"].sort();
+    assert(JSON.stringify(Object.keys(queue[0]).sort()) === JSON.stringify(expectedKeys), "only the exact queue whitelist is persisted");
+    const normalized = h.normalizeOfflineSaveIntent(queue[0], {});
+    assert(normalized.summary === prepared.summary, "description is preserved verbatim");
+    assert(normalized.notes === SAVE_INTENT.notes && normalized.mode === "merge", "notes and create replay semantics preserved");
+    assert(h.validateSaveIntent(normalized) === null, "round-tripped intent is valid");
+    assert(queue[0].account === "alice", "non-secret owner binding preserved");
+  });
+  await test("optional summary accepts missing and empty legacy values", async () => {
+    const h = await queueIntentHarness();
+    for (const summary of [undefined, ""]) {
+      const prepared = { ...SAVE_INTENT, ...(summary === undefined ? {} : { summary }) };
+      assert(h.validateSaveIntent(prepared) === null, "legacy and empty descriptions remain valid");
+      const restored = h.normalizeOfflineSaveIntent(h.queueRecordFromSaveIntent(prepared, "alice:fixture"), {});
+      assert(restored.summary === summary && h.validateSaveIntent(restored) === null, "optional description survives normalization");
+    }
+  });
+  await test("non-string summary is rejected for live and queued intents", async () => {
+    const h = await queueIntentHarness();
+    for (const summary of [null, false, 0, [], {}, ["description"]]) {
+      const prepared = { ...SAVE_INTENT, summary };
+      assert(h.validateSaveIntent(prepared)?.reason === "invalid", "non-string live description must fail closed");
+      const restored = h.normalizeOfflineSaveIntent(h.queueRecordFromSaveIntent(prepared, "alice:fixture"), {});
+      assert(h.validateSaveIntent(restored)?.reason === "invalid", "normalization must not hide an invalid description");
+    }
   });
   await test("account helper extracts the username from raw and obfuscated tokens", () => {
     assert(pbpPinboardAccountFromToken("alice:current-token") === "alice", "raw token account extracted");
