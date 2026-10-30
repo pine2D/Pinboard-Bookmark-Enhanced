@@ -179,6 +179,8 @@
   "saving": {
     "message": "Enregistrement…"
   },
+  "saveMergedExisting": {"message": "Cette URL était déjà enregistrée. Les modifications ont été fusionnées avec le signet existant."},
+  "saveMergedKarakeepNote": {"message": "Karakeep l’a retiré des archives et a actualisé sa date d’enregistrement."},
   "bookmarkSaved": {
     "message": "Signet enregistré."
   },

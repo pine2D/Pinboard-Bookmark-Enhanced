@@ -54,6 +54,7 @@ function pbpBookmarkNormalize(service, value) {
     id, url,
     title: typeof value.title === "string" && value.title ? value.title :
       (service === "karakeep" && typeof value.content?.title === "string" ? value.content.title : ""),
+    titleFromContent: service === "karakeep" && !value.title && !!value.content?.title,
     notes: String((service === "linkding" ? value.notes : value.note) ?? ""),
     summary: String((service === "linkding" ? value.description : value.summary) ?? ""),
     tags: [...new Set(tags.filter(tag=>tag.trim()))],
@@ -226,16 +227,19 @@ function pbpCreateBookmarkServiceClient(config) {
     let bookmark = existing, step = "bookmark", mutation = existing ? "updated" : "created";
     try {
       if (!bookmark) {
-        const created = await request("bookmarks", "POST", {type:"link",url:fields.url,title:fields.title || "",note:fields.notes || "",source:"extension"});
+        const created = await request("bookmarks", "POST", {type:"link",url:fields.url,
+          ...(fields.title ? {title:fields.title} : {}), ...(fields.notes ? {note:fields.notes} : {}),source:"extension"});
         bookmark = pbpBookmarkNormalize(service,created.data);
-        // Another client created the URL after our lookup. Karakeep's 200
-        // response did not apply these fields; ask the caller to review the
-        // existing bookmark rather than overwriting it with a stale create.
-        if (created.status === 200) throw pbpBookmarkServiceError("conflict");
+        // A concurrent create is already merged by Karakeep 0.34.1: supplied
+        // title/note replace the old values, archived is reset, createdAt is
+        // refreshed. Preserve its tags and continue the Read Later operation.
+        if (created.status === 200) mutation = "merged";
       }
       if (existing) {
         const id = pbpBookmarkRecordId(bookmark.id);
-        const {data} = await request("bookmarks/" + id,"PATCH",{title:fields.title || "",note:fields.notes || ""});
+        const keepCrawledTitle = existing.titleFromContent && fields.title === existing.title;
+        const {data} = await request("bookmarks/" + id,"PATCH",{
+          ...(!keepCrawledTitle ? {title:fields.title || ""} : {}),note:fields.notes || ""});
         if (!data || data.id !== id) throw pbpBookmarkServiceError("invalid_response");
         bookmark = {...bookmark,title:fields.title || "",notes:fields.notes || ""};
       }
@@ -244,10 +248,10 @@ function pbpCreateBookmarkServiceClient(config) {
       const add = tags.filter(name => !present.some(tag => tag.name === name));
       // Legacy servers can contain blank tag names. Hide them in the form, but
       // a normal metadata edit must not remove those remote associations.
-      const remove = present.filter(tag => tag.name.trim() && !tags.includes(tag.name));
+      const remove = mutation === "merged" ? [] : present.filter(tag => tag.name.trim() && !tags.includes(tag.name));
       if (add.length) await request("bookmarks/" + bookmark.id + "/tags", "POST", {tags:add.map(tagName=>({tagName}))});
       if (remove.length) await request("bookmarks/" + bookmark.id + "/tags", "DELETE", {tags:remove.map(tag=>({tagId:tag.id}))});
-      bookmark = {...bookmark,tags};
+      bookmark = {...bookmark,tags:mutation === "merged" ? [...new Set([...bookmark.tags,...tags])] : tags};
       step = "read_later";
       if (typeof fields.toread === "boolean" && fields.toread !== bookmark.toread) {
         await setReadLater(bookmark,fields.toread);

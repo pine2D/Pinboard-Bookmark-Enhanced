@@ -60,7 +60,13 @@
     }
     for (const name of ["status", "footer-status"]) {
       const el = id(name);
-      if (el) { label(el, statusKey); el.hidden = !statusKey; }
+      if (el) {
+        label(el, statusKey); el.hidden = !statusKey;
+        if (statusKey === "saveMergedExisting") {
+          el.removeAttribute("data-i18n");
+          el.textContent = pbpBookmarkMergedText(pbpBookmarkAccountService(context?.account), text);
+        }
+      }
     }
     if (id("apply")) { id("apply").disabled = !context?.account || inflight; id("apply").setAttribute("aria-busy", String(inflight)); }
     if (id("delete")) {
@@ -286,7 +292,8 @@
       closeEditor();
       await refresh(gen);
       if (gen !== generation) return;
-      statusKey = result.status === "saved" ? "readerBookmarkUpdated" : "readerBookmarkSaved";
+      statusKey = result.mutation === "merged" ? "saveMergedExisting"
+        : result.status === "saved" ? "readerBookmarkUpdated" : "readerBookmarkSaved";
       document.dispatchEvent(new CustomEvent("pbp:bookmark-changed", { detail: { url: context.url, account: context.account } }));
     } else if (result?.status === "queued") {
       closeEditor(); statusKey = "readerBookmarkQueued";

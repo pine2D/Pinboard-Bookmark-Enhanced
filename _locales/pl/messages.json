@@ -179,6 +179,8 @@
   "saving": {
     "message": "Zapisywanie…"
   },
+  "saveMergedExisting": {"message": "Ten adres URL był już zapisany. Zmiany zostały scalone z istniejącą zakładką."},
+  "saveMergedKarakeepNote": {"message": "Karakeep usunął ją z archiwum i zaktualizował czas zapisu."},
   "bookmarkSaved": {
     "message": "Zakładka zapisana."
   },

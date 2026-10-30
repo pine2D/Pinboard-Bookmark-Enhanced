@@ -11,6 +11,7 @@ const root=fileURLToPath(new URL('../',import.meta.url));
 const {chromium}=createRequire(resolve(root,'.qa-scan/package.json'))('playwright');
 const profile=mkdtempSync(join(tmpdir(),'pbp-bookmark-runtime-'));
 const records={linkding:new Map(),karakeep:new Map()}, requests=[], membership=new Set(), wire=[];
+const raceCreates=new Map();
 const list={id:'later1',name:'Read Later',description:'Pinboard Bookmark Enhanced: Read Later',icon:'bookmark',type:'manual',public:false,hasCollaborators:false,userRole:'owner'};
 let listCreated=false;
 // gate.linkding puts a Cloudflare Access-shaped gateway in front of /linkding/.
@@ -62,6 +63,8 @@ const server=createServer(async(req,res)=>{
   }
   if(/^bookmarks\/?$/.test(path)){
     if(req.method==='GET')return reply(200,service==='linkding'?{count:store.size,next:null,results:[...store.values()]}:{bookmarks:[...store.values()],nextCursor:null});
+    const race=raceCreates.get(service+':'+data.url);
+    if(race){store.set(String(race.record.id),structuredClone(race.record));return reply(race.status,race.record);}
     const id=service==='linkding'?store.size+1:'b'+(store.size+1);
     // Hand-authored API record schemas, independently filled from HTTP input.
     const row=service==='linkding'?{id,url:data.url,title:data.title,description:'Site summary',notes:data.notes,tag_names:data.tag_names||[],unread:data.unread||false,shared:data.shared||false,is_archived:false,date_added:'2026-10-01T00:00:00Z'}:
@@ -264,6 +267,25 @@ try{
     gate.linkding=false;await options.close();
     console.log('access gateway form: validation, Cloudflare connect, restore and connection ID reuse passed');
   }
+  // A second client saves after check-url. The server response is authored
+  // independently of the submitted fields (Karakeep 0.34.1 B2 shape).
+  const raceUrl=origin+'/article-race';
+  raceCreates.set('karakeep:'+raceUrl,{status:200,record:{id:'race1',createdAt:'2026-10-30T03:05:10.000Z',modifiedAt:'2026-10-30T03:05:10.000Z',title:null,archived:false,favourited:true,note:'Server note',summary:null,source:'api',taggingStatus:null,summarizationStatus:null,tags:[{id:'race-tag1',name:'existing',attachedBy:'human'}],content:{type:'link',url:raceUrl,title:'Crawled title',description:null},assets:[],alreadyExists:true}});
+  const raceStart=requests.length;
+  const raceResult=await worker.evaluate(async({origin,url})=>{
+    const client=pbpCreateBookmarkServiceClient({service:'karakeep',baseUrl:origin+'/karakeep/',beforeRequest:async()=>({token:'fixture-key'}),readLaterListId:'later1'});
+    const result=await client.save({url,title:'',notes:'',tags:['existing','new'],toread:true});
+    await client.save({url,title:'Crawled title',notes:'Server note',tags:result.bookmark.tags},result.bookmark);
+    return result;
+  },{origin,url:raceUrl});
+  assert.equal(raceResult.mutation,'merged');assert.equal(raceResult.status,'saved');
+  const raceCalls=requests.slice(raceStart);
+  assert.deepEqual(raceCalls[0].data,{type:'link',url:raceUrl,source:'extension'});
+  assert.deepEqual(raceCalls.find(r=>r.path==='bookmarks/race1/tags').data,{tags:[{tagName:'new'}]});
+  assert(!raceCalls.some(r=>r.method==='DELETE'),'race merge deleted server tags');
+  assert(raceCalls.some(r=>r.path==='lists/later1/bookmarks/race1'&&r.method==='PUT'),'Read Later did not continue');
+  assert(!Object.hasOwn(raceCalls.find(r=>r.method==='PATCH').data,'title'),'crawled title was written back');
+  console.log('Karakeep create race merged safely, preserved tags and continued Read Later');
   const probes=await worker.evaluate(async origin=>{
     const out={};
     for(const kind of ['redirect','challenge','basic','denied','page','headers']){

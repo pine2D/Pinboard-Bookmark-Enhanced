@@ -1621,7 +1621,8 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     showNotification(
       notifyId + "-saved",
       notifyTitle,
-      t(aiHostPermissionMissing ? "bgTitleSavedAiSkipped" : "bgTitleSaved", title.substring(0, 60)),
+      result.mutation === "merged" ? pbpBookmarkMergedText(startAuth.service, t)
+        : t(aiHostPermissionMissing ? "bgTitleSavedAiSkipped" : "bgTitleSaved", title.substring(0, 60)),
       notifyCategory,
       undoInfo
     );

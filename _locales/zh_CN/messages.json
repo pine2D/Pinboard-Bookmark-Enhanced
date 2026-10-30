@@ -179,6 +179,8 @@
   "saving": {
     "message": "保存中…"
   },
+  "saveMergedExisting": {"message": "这个网址已在服务里存在，已合并到原书签。"},
+  "saveMergedKarakeepNote": {"message": "Karakeep 已把它移出归档，并更新了保存时间。"},
   "bookmarkSaved": {
     "message": "书签已保存"
   },

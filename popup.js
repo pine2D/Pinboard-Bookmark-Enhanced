@@ -1994,7 +1994,8 @@ function setupSubmit(token) {
         } else {
           checkExistingBookmark(token, url, null, true, tags);
         }
-        showStatus("status-msg", t("bookmarkSaved"), "success");
+        showStatus("status-msg", result.mutation === "merged"
+          ? pbpBookmarkMergedText(pbpBookmarkServiceId(settings), t) : t("bookmarkSaved"), "success");
         setSubmitState("success");
         // Optimistic archive indicator (cosmetic only, never blocks save or auto-close)
         // The dedup window is per Pinboard account, so probe _waybackAttempts with

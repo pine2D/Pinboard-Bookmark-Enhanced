@@ -179,6 +179,8 @@
   "saving": {
     "message": "儲存中…"
   },
+  "saveMergedExisting": {"message": "服務中已有這個網址，變更已合併至原有書籤。"},
+  "saveMergedKarakeepNote": {"message": "Karakeep 已將書籤移出封存，並更新儲存時間。"},
   "bookmarkSaved": {
     "message": "書籤已儲存"
   },

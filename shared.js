@@ -244,6 +244,10 @@ function pbpFormatSummaryBlock(summary, service = "pinboard") {
   return service === "karakeep" ? String(summary || "").trim() : pbpFormatQuote(summary, service);
 }
 
+function pbpBookmarkMergedText(service, translate) {
+  return translate("saveMergedExisting") + (service === "karakeep" ? " " + translate("saveMergedKarakeepNote") : "");
+}
+
 // Max AI tags to keep (enforced in refineTags; also stated in DEFAULT_TAG_PROMPT).
 const AI_TAG_CAP = 8;
 

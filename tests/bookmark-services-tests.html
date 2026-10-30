@@ -34,7 +34,21 @@ test("linkding uses canonical tags returned by its server",async()=>{
 test("linkding pagination refuses to send credentials to another origin",async()=>{const {client,calls}=harness("linkding",[[200,{count:2,next:"https://evil.example/api/tags/",results:[{id:1,name:"a"}]}]]);await rejects(()=>client.tags(),"invalid_response");equal(calls.length,1);});
 test("linkding tags pagination retains the configured base path",async()=>{const {client,calls}=harness("linkding",[[200,{count:2,next:"https://bookmarks.example/base/api/tags/?offset=1",results:[{id:1,name:"a"}]}],[200,{count:2,next:null,results:[{id:2,name:"b"}]}]]);equal(await client.tags(),["a","b"]);equal(calls.length,2);});
 test("Karakeep lookup fetches full bookmark after URL check",async()=>{const {client,calls}=harness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk]]);const b=await client.lookup(pageUrl);equal([b.id,b.title,b.notes,b.tags,b.toread,b.archived],["bk1","Saved title","My note",["work"],false,true]);equal(calls[0].headers.get("Authorization"),"Bearer fixture-token");equal(calls[1].url,"https://bookmarks.example/base/api/v1/bookmarks/bk1");});
-test("Karakeep concurrent creation requires review without changing the returned bookmark",async()=>{const {client,calls}=harness("karakeep",[[200,kk]]);await rejects(()=>client.save({url:pageUrl,title:"New",notes:"New note",tags:["new"]},null),"conflict");equal(calls.map(c=>c.method),["POST"]);});
+test("Karakeep concurrent creation merges without deleting server tags",async()=>{
+  const record={...kk,alreadyExists:true,archived:false};
+  const h=harness("karakeep",[[200,record],[200,{attached:["tag2"]}]]);
+  const result=await h.client.save({url:pageUrl,title:"",notes:"",tags:["work","new"]},null);
+  equal([result.status,result.mutation,result.bookmark.tags],["saved","merged",["work","new"]]);
+  equal(h.calls.map(c=>c.method),["POST","POST"]);
+  equal(h.calls[0].body,{type:"link",url:pageUrl,source:"extension"});
+  equal(h.calls[1].body,{tags:[{tagName:"new"}]});
+});
+test("Karakeep crawled fallback titles are not written back by a merge",async()=>{
+  const bookmark=pbpBookmarkNormalize("karakeep",{...kk,title:null});
+  const h=harness("karakeep",[[200,{id:"bk1"}]]);
+  await h.client.save({url:pageUrl,title:"Crawled title",notes:"My note",tags:["work"]},bookmark);
+  equal(h.calls[0].body,{note:"My note"});
+});
 test("Karakeep failed tag update reports a saved bookmark and remaining step",async()=>{const {client,calls}=harness("karakeep",[[201,{...kk,tags:[]}],[503,{message:"unavailable"}]]);const result=await client.save({url:pageUrl,title:"Title",notes:"",tags:["new"]},null);equal([result.status,result.bookmark.id,result.failedStep],["partial","bk1","tags"]);equal(calls.length,2);});
 test("Karakeep mark-read removes only the private read-later list membership",async()=>{const list={id:"later",name:"Read later",type:"manual",public:false,hasCollaborators:false,userRole:"owner"};const {client,calls}=harness("karakeep",[[200,list],[204,null]],{readLaterListId:"later"});await client.setReadLater({id:"bk1"},false);equal(calls[1].method,"DELETE");equal(calls[1].url,"https://bookmarks.example/base/api/v1/lists/later/bookmarks/bk1");ok(!calls.some(c=>c.body?.archived!==undefined));});
 test("Karakeep refuses public, shared, smart or foreign lists",async()=>{for(const patch of [{public:true},{hasCollaborators:true},{type:"smart"},{userRole:"editor"}]){const {client,calls}=harness("karakeep",[[200,{id:"later",name:"Read later",type:"manual",public:false,hasCollaborators:false,userRole:"owner",...patch}]],{readLaterListId:"later"});await rejects(()=>client.setReadLater({id:"bk1"},true),"read_later_list");equal(calls.length,1);}});
@@ -228,6 +242,12 @@ test("tags with spaces round-trip through the reader and offline intent format",
   const names=["machine learning", "simple", 'a"b', "日本語"];
   equal(pbpBookmarkParseTags(pbpBookmarkFormatTags(names)),names);
   equal(pbpBookmarkAsPost({...pbpBookmarkNormalize("karakeep",kk),tags:names}).tagNames,names);
+});
+test("a concurrent Karakeep create is saved without a deletion undo account",async()=>{
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[200,{...kk,alreadyExists:true,archived:false}]]);
+  const result=await h.submitSaveIntent({...saveIntent,mode:"create",tags:"work"});
+  equal([result.status,result.mutation],["saved","merged"]);
+  ok(!Object.hasOwn(result,"account"));ok(!h.state.calls.some(c=>c.method==="DELETE"));
 });
 test("merge preserves a remote tag containing spaces as one tag",async()=>{
   const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,{...kk,tags:[{id:"tag1",name:"machine learning",attachedBy:"human"}]}],[200,{id:"bk1"}],[200,{attached:["tag2"]}]]);

@@ -179,6 +179,8 @@
   "saving": {
     "message": "Speichern…"
   },
+  "saveMergedExisting": {"message": "Diese URL war bereits gespeichert. Die Änderungen wurden mit dem vorhandenen Lesezeichen zusammengeführt."},
+  "saveMergedKarakeepNote": {"message": "Karakeep hat es aus dem Archiv geholt und den Speicherzeitpunkt aktualisiert."},
   "bookmarkSaved": {
     "message": "Lesezeichen gespeichert."
   },

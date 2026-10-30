@@ -179,6 +179,8 @@
   "saving": {
     "message": "Saving…"
   },
+  "saveMergedExisting": {"message": "This URL already existed in the service. Changes were merged into the existing bookmark."},
+  "saveMergedKarakeepNote": {"message": "Karakeep moved it out of the archive and updated its save time."},
   "bookmarkSaved": {
     "message": "Bookmark saved."
   },
