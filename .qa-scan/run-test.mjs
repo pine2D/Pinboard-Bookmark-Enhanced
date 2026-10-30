@@ -46,7 +46,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/a11y-tests.html": 34,
   "tests/ai-cache-tests.html": 26,
   "tests/ai-completion-tests.html": 118,
-  "tests/ai-tags-tests.html": 151,
+  "tests/ai-tags-tests.html": 162,
   "tests/anki-connect-tests.html": 62,
   "tests/background-active-tab-tests.html": 42,
   "tests/background-lifecycle-tests.html": 51,

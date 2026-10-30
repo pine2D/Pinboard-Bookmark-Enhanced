@@ -1915,5 +1915,116 @@ test("AI summary blocks omit the legacy marker and Karakeep stays plain text", (
   assertEq(pbpFormatSummaryBlock("<b> summary", "pinboard"), "<blockquote>&lt;b&gt; summary</blockquote>");
   assertEq(pbpFormatSummaryBlock("<b> summary", "linkding"), "> &lt;b> summary");
 });
+
+suite("shared tag canonicalization", () => {
+  const ctx = (counts = {}, bookmarkNames = [], respectCase = true, service = "linkding", separator = "_") =>
+    ({index:pbpTagVocabIndex(counts), bookmarkNames, respectCase, service, separator});
+
+  test("group key folds whitespace, hyphen, underscore and case, but empty keys do not group", () => {
+    assertEq(pbpTagGroupKey("  Web-_Design\u00a0"), "webdesign");
+    for (const name of ["JavaScript", "c-", "x_y", "A.B"]) {
+      assertEq(normalizeTagKey(name), name.toLowerCase().replace(/[-_]/g, ""), name);
+    }
+    assertEq(pbpTagGroupKey("-- _"), "");
+    const index = pbpTagVocabIndex({"-": 9, "_": 2});
+    assertEq(index.exact.has("-"), true);
+    assertEq(index.groups.has(""), false);
+    assertEq(pbpAlignTagName("_", ctx({"-": 9, "_": 2})).name, "_");
+    assertEq(pbpAlignTagName("--", ctx({"-": 9, "_": 2})).hit, false);
+  });
+
+  test("bookmark exact and same-group spellings win before the vocabulary", () => {
+    const c = ctx({machine_learning: 90, Nick_Drake: 30}, ["machine learning", "Nick Drake"]);
+    assertEq(pbpAlignTagName("  machine learning  ", c).name, "machine learning");
+    assertEq(pbpAlignTagName("MACHINE-LEARNING", c).name, "machine learning");
+    assertEq(pbpCanonicalTagName("Nick_Drake", c), "Nick Drake");
+    assertEq(pbpAlignTagName("Nick Drake", c).hit, true);
+  });
+
+  test("bookmark same-group match still works with respectCase disabled", () => {
+    const c = ctx({Web_Design: 20}, ["web design"], false);
+    assertEq(pbpAlignTagName("WEB-DESIGN", c).name, "web design");
+    assertEq(pbpAlignTagName("webdesign", ctx({Web_Design: 20}, [], false)).hit, false);
+  });
+
+  test("vocabulary same-group prefers majority, including a minority exact spelling", () => {
+    const c = ctx({JavaScript: 9, javascript: 1, web_design: 2, webdesign: 8});
+    assertEq(pbpAlignTagName("javascript", c).name, "JavaScript");
+    assertEq(pbpCanonicalTagName("web design", c), "webdesign");
+    assertEq(pbpAlignTagName("WEB-DESIGN", c).name, "webdesign");
+  });
+
+  test("respectCase disabled allows vocabulary exact names only, including names with spaces", () => {
+    const c = ctx({"Nick Drake": 3, Web_Design: 9}, [], false);
+    assertEq(pbpCanonicalTagName("Nick Drake", c), "Nick Drake");
+    assertEq(pbpAlignTagName("nick drake", c).hit, false);
+    assertEq(pbpCanonicalTagName("nick drake", c), "nick_drake");
+    assertEq(pbpCanonicalTagName("web design", c), "web_design");
+  });
+
+  test("equal counts break ties by input exact, all-lowercase, then code-unit order", () => {
+    const c = ctx({WebDesign: 2, webdesign: 2, WEBDESIGN: 2});
+    assertEq(pbpAlignTagName("WebDesign", c).name, "WebDesign");
+    assertEq(pbpAlignTagName("web-design", c).name, "webdesign");
+    const mixed = ctx({Beta: 2, BETA: 2});
+    assertEq(pbpAlignTagName("be-ta", mixed).name, "BETA");
+    assertEq(pbpAlignTagName("c-", ctx({c: 1})).name, "c");
+  });
+
+  test("new names mint an internal separator for all three services without converting hyphen or underscore", () => {
+    for (const service of ["pinboard", "linkding", "karakeep"]) {
+      for (const separator of ["-", "_"]) {
+        const c = ctx({}, [], true, service, separator);
+        assertEq(pbpCanonicalTagName("  alpha\t\u00a0  beta  ", c), "alpha" + separator + "beta", service + separator);
+        assertEq(pbpCanonicalTagName("a-b_c", c), "a-b_c");
+      }
+    }
+    assertEq(pbpCanonicalTagName(" ##tag ", ctx({}, [], true, "karakeep")), "tag");
+    assertEq(pbpCanonicalTagName(" ##tag ", ctx({}, [], true, "linkding")), "##tag");
+    assertEq(pbpCanonicalTagName(" ## ", ctx({}, [], true, "karakeep")), "");
+  });
+
+  test("alignment leaves new text untouched while canonicalization mints and can realign", () => {
+    const c = ctx({Nick_Drake: 3}, [], false);
+    assertEq(pbpAlignTagName("new name", c).name, "new name");
+    assertEq(pbpCanonicalTagName("new name", c), "new_name");
+    assertEq(pbpCanonicalTagName("Nick Drake", c), "Nick_Drake");
+  });
+
+  test("quoted multi-value input round-trips formatted names and retains malformed quote characters", () => {
+    const names = ["Nick Drake", 'a"b', "a\\b", "c,d", "中文，标签"];
+    assertEq(JSON.stringify(pbpSplitTagInput(pbpBookmarkFormatTags(names))), JSON.stringify(names));
+    assertEq(JSON.stringify(pbpSplitTagInput('one,two，three "four five"')), JSON.stringify(["one", "two", "three", "four five"]));
+    assertEq(JSON.stringify(pbpSplitTagInput('"unfinished tag')), JSON.stringify(['"unfinished', "tag"]));
+    assertEq(JSON.stringify(pbpSplitTagInput('"bad\\q" next')), JSON.stringify(['"bad\\q"', "next"]));
+  });
+
+  test("canonicalization and alignment remain idempotent across varied inputs", () => {
+    const c = ctx({"Nick Drake": 5, web_design: 3, webdesign: 1, "a\\b": 2}, ["machine learning"]);
+    const samples = [" Nick_Drake ", "web design", "WEB-DESIGN", "a\\b", "machine-learning", "##tag", "--", "_", "x\u00a0y"];
+    let seed = 1847;
+    const chars = "abCD-_ #\t";
+    for (let i = 0; i < 100; i++) {
+      let raw = "";
+      for (let j = 0; j < 12; j++) {
+        seed = (seed * 1664525 + 1013904223) >>> 0;
+        raw += chars[seed % chars.length];
+      }
+      samples.push(raw);
+    }
+    for (const raw of samples) {
+      const once = pbpCanonicalTagName(raw, c);
+      assertEq(pbpCanonicalTagName(once, c), once, "canonical " + JSON.stringify(raw));
+      const aligned = pbpAlignTagName(raw, c).name;
+      assertEq(pbpAlignTagName(aligned, c).name, aligned, "align " + JSON.stringify(raw));
+    }
+  });
+
+  test("legacy case wrappers keep majority-case behavior", () => {
+    const map = buildTagCaseMap({JavaScript: 9, javascript: 1, web_design: 3});
+    assertEq(resolveTagCase("javascript", map), "JavaScript");
+    assertEq(resolveTagCase("web design", map), "web_design");
+  });
+});
 </script>
 </body></html>

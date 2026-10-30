@@ -755,32 +755,119 @@ function pbpRelevantTagsFirst(tags, title, url) {
   return hit.concat(rest);
 }
 
-// ---- Tag case normalization helpers ----
-// Build a map: normalized_tag → preferred_casing (by highest count)
+// ---- Shared tag spelling helpers ----
+function pbpTagGroupKey(name) {
+  return name.toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+// The empty key is never grouped: names such as "-" and "_" only match exactly.
+function pbpTagVocabIndex(counts) {
+  const exact = new Set();
+  const groups = new Map();
+  for (const [name, rawCount] of Object.entries(counts || {})) {
+    exact.add(name);
+    const key = pbpTagGroupKey(name);
+    if (!key) continue;
+    if (!groups.has(key)) groups.set(key, []);
+    const parsed = Number(rawCount);
+    groups.get(key).push({name, count:Number.isFinite(parsed) ? parsed : 0});
+  }
+  return {exact, groups};
+}
+
+// A deterministic final tie break avoids depending on the device's locale.
+function pbpPreferredTagVariant(variants, input) {
+  return variants.reduce((best, item) => {
+    if (!best) return item;
+    if (item.count !== best.count) return item.count > best.count ? item : best;
+    if ((item.name === input) !== (best.name === input)) return item.name === input ? item : best;
+    if ((item.name === item.name.toLowerCase()) !== (best.name === best.name.toLowerCase())) {
+      return item.name === item.name.toLowerCase() ? item : best;
+    }
+    return item.name < best.name ? item : best;
+  }, null);
+}
+
+// Delivery and replay use alignment only; they must never mint a different name.
+// Aligning to a Karakeep server AI tag (attachedBy:"ai") sends no new tag POST:
+// its attachment stays AI-owned and a later server AI retag may remove it.
+function pbpAlignTagName(name, ctx) {
+  const input = String(name ?? "").trim();
+  const bookmarkNames = ctx?.bookmarkNames || [];
+  if (bookmarkNames.includes(input)) return {name:input, hit:true};
+  const key = pbpTagGroupKey(input);
+  if (key) {
+    const bookmarkMatch = bookmarkNames.find(existing => pbpTagGroupKey(existing) === key);
+    if (bookmarkMatch !== undefined) return {name:bookmarkMatch, hit:true};
+    if (ctx?.respectCase) {
+      const variants = ctx.index?.groups.get(key);
+      if (variants?.length) return {name:pbpPreferredTagVariant(variants, input).name, hit:true};
+    }
+  }
+  if (ctx?.index?.exact.has(input)) return {name:input, hit:true};
+  return {name:input, hit:false};
+}
+
+// linkding splits names containing commas on the server; that existing server
+// behavior is outside this client-side name normalization.
+function pbpMintTagName(raw, {service, separator} = {}) {
+  let name = String(raw ?? "").trim();
+  if (service === "karakeep") name = name.replace(/^#+/, "").trim();
+  return name.replace(/\s+/g, separator === "_" ? "_" : "-");
+}
+
+// Input boundaries use canonicalization; preserve an existing spelling first.
+function pbpCanonicalTagName(raw, ctx) {
+  const aligned = pbpAlignTagName(raw, ctx);
+  if (aligned.hit) return aligned.name;
+  const minted = pbpMintTagName(raw, ctx);
+  const mintedMatch = pbpAlignTagName(minted, ctx);
+  return mintedMatch.hit ? mintedMatch.name : minted;
+}
+
+// Multi-value input accepts JSON-quoted names, retaining malformed quotes as
+// literal characters in ordinary tokens instead of rejecting the whole paste.
+function pbpSplitTagInput(text) {
+  const source = String(text ?? "");
+  const names = [];
+  const separator = /[\s,，]/u;
+  let i = 0;
+  while (i < source.length) {
+    if (separator.test(source[i])) { i++; continue; }
+    if (source[i] === '"') {
+      let end = i + 1;
+      while (end < source.length) {
+        if (source[end] === "\\") { end += 2; continue; }
+        if (source[end] === '"') break;
+        end++;
+      }
+      if (end < source.length && (end + 1 === source.length || separator.test(source[end + 1]))) {
+        try {
+          names.push(JSON.parse(source.slice(i, end + 1)));
+          i = end + 1;
+          continue;
+        } catch (_) { /* Keep malformed quotes in an ordinary token. */ }
+      }
+    }
+    const start = i;
+    while (i < source.length && !separator.test(source[i])) i++;
+    names.push(source.slice(start, i));
+  }
+  return names;
+}
+
+// Legacy case helpers remain for popup/SW callers until they adopt the index.
+function normalizeTagKey(tag) { return pbpTagGroupKey(tag); }
 function buildTagCaseMap(tagCounts) {
-  const groups = {};
-  for (const [tag, count] of Object.entries(tagCounts)) {
-    const norm = normalizeTagKey(tag);
-    if (!groups[norm]) groups[norm] = [];
-    groups[norm].push({ tag, count: parseInt(count) || 0 });
-  }
-  const map = {};
-  for (const [norm, variants] of Object.entries(groups)) {
-    variants.sort((a, b) => b.count - a.count);
-    map[norm] = variants[0].tag;
-  }
+  const index = pbpTagVocabIndex(tagCounts);
+  const map = Object.create(null);
+  for (const [key, variants] of index.groups) map[key] = pbpPreferredTagVariant(variants, "").name;
+  for (const name of index.exact) if (!pbpTagGroupKey(name)) map[name] = name;
   return map;
 }
-
-// Normalize tag for fuzzy matching: lowercase, strip separators
-function normalizeTagKey(tag) {
-  return tag.toLowerCase().replace(/[-_]/g, "");
-}
-
-// Resolve a tag to its preferred existing casing
 function resolveTagCase(tag, caseMap) {
-  const norm = normalizeTagKey(tag);
-  return caseMap[norm] || tag;
+  const key = normalizeTagKey(tag);
+  return (key ? caseMap?.[key] : caseMap?.[tag]) || tag;
 }
 
 // Response.json() rejects an empty or malformed body. The popup/options SW
@@ -2034,10 +2121,10 @@ function pbpBookmarkDeliverySettings(settings, auth) {
 function pbpBookmarkServiceLabel(settings) {
   return {pinboard:"Pinboard", karakeep:"Karakeep", linkding:"linkding"}[pbpBookmarkServiceId(settings)] || "";
 }
-// Quoted names keep self-hosted tags containing spaces intact in the reader's
-// text editor and offline intents. Pinboard keeps its existing whitespace format.
+// Quoted names keep spaces, commas and escapes intact in the reader's text
+// editor and offline intents. Pinboard keeps its existing whitespace format.
 function pbpBookmarkFormatTags(names) {
-  return names.map(name => /[\s"\\]/.test(name) ? JSON.stringify(name) : name).join(" ");
+  return names.map(name => /[\s"\\,，]/.test(name) ? JSON.stringify(name) : name).join(" ");
 }
 function pbpSerializeIntentTags(names, service) {
   return service === "pinboard" ? names.join(" ") : pbpBookmarkFormatTags(names);
