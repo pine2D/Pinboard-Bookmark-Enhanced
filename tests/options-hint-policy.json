@@ -40,10 +40,9 @@
       "bookmarkServiceHint", "personalLibraryHint", "bookmarkKarakeepHint",
       "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp", "themeGroupAdaptiveHint",
       "optUrlCleanOnOpenHint", "optUrlCleanOnPasteHint", "optUrlCleanCustomHint", "optUrlCleanExcludeHint",
-      "optShowQuickLinksHint", "optShowQuickRowHint", "optRespectTagCaseHint", "mdExportExtendedMetaHelp"
-    ],
-    "pending": [
+      "optShowQuickLinksHint", "optShowQuickRowHint", "optRespectTagCaseHint", "mdExportExtendedMetaHelp",
       "vocabCompleteExportHint", "ecdictHint", "dictPackHint"
-    ]
+    ],
+    "pending": []
   }
 }

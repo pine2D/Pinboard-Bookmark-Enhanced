@@ -1750,6 +1750,7 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     "bookmarkKarakeepTokenHelp", "bookmarkLinkdingTokenHelp", "themeGroupAdaptiveHint",
     "optUrlCleanOnOpenHint", "optUrlCleanOnPasteHint", "optUrlCleanCustomHint", "optUrlCleanExcludeHint",
     "optShowQuickLinksHint", "optShowQuickRowHint", "optRespectTagCaseHint", "mdExportExtendedMetaHelp",
+    "vocabCompleteExportHint", "ecdictHint", "dictPackHint",
   ];
   const isInsideContextHelp = (key) => {
     const marker = optionsHtml.indexOf(`data-i18n="${key}"`);
@@ -1788,7 +1789,10 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
     new RegExp(`\\.context-help-host\\[data-help-role="${role}"\\] > \\.context-help > summary\\.context-help-toggle[^{]*\\{[^}]*align-self:\\s*baseline`).test(optionsCss)) &&
     /\.context-help-host\[data-help-role="choice"\] > label > span[^{]*\{[^}]*align-self:\s*baseline/.test(optionsCss) &&
     !/\[data-help-role="action"\][^{]*\{[^}]*align-items:\s*baseline/.test(optionsCss) &&
-    /(?:^|\n)\.context-help-action-row\[data-help-role="action"\] > \.save-theme-wrap,\s*\.context-help-action-row\[data-help-role="action"\] > \.context-help > summary\.context-help-toggle \{ align-self: baseline; \}/.test(optionsCss),
+    /(?:^|\n)\.context-help-action-row\[data-help-role="action"\] > \.save-theme-wrap,\s*\.context-help-action-row\[data-help-role="action"\] > \.context-help > summary\.context-help-toggle \{ align-self: baseline; \}/.test(optionsCss) &&
+    // An import toolbar anchors on its LAST button's text baseline (its first
+    // button may lead with an icon whose synthesized baseline is its bottom).
+    /(?:^|\n)\.context-help-action-row\[data-help-role="action"\] > \.vocab-toolbar,\s*\.context-help-action-row\[data-help-role="action"\] > \.vocab-toolbar ~ \.context-help > summary\.context-help-toggle \{ align-self: last baseline; \}/.test(optionsCss),
     "options.css: contextual help lost its anchoring split (copy roles on the text baseline via the label span, the action row's wrapper and toggle on the button-text baseline, its container centred)");
   check(/const det = summary && summary\.closest\("details"\);[\s\S]{0,500}details\.context-help\[open\]/.test(optionsJs),
     "options.js: contextual help lost the native-details motion gate or one-open-per-panel behavior");
@@ -1816,8 +1820,10 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
       : !Object.prototype.hasOwnProperty.call(enMessages, entry));
     check(!dangling.length, `tests/options-hint-policy.json: entries name no message or element: ${dangling.join(", ")}`);
     // Ratchet: copy the policy sends into ? but that has not moved yet.
-    check((policy.categories.pending || []).length <= 3,
-      "tests/options-hint-policy.json: the pending list grew; classify new copy instead of parking it");
+    // Emptied 2026-10-30 (the last three notes moved into ?): nothing may be
+    // parked here again.
+    check((policy.categories.pending || []).length === 0,
+      "tests/options-hint-policy.json: the pending list is closed; classify new copy instead of parking it");
     check(contextualHelpKeys.every((key) => policy.categories.help.includes(key)) &&
       directWarnings.every((key) => ["consequence", "status"].some((name) => policy.categories[name].includes(key))),
       "tests/options-hint-policy.json: disagrees with the contextual-help and direct-warning lists above");
@@ -1928,7 +1934,16 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
   // The "does not support English word lookup" clause is GONE on purpose: the
   // ECDICT pack provides exactly that, so pinning it here would pin a lie. What
   // still has to hold is that this hint describes CC-CEDICT's own direction.
-  check(packSection >= 0 && packHint > packSection && packStatus > packHint &&
+  const inHelp = (key) => {
+    const marker = optionsHtml.indexOf(`data-i18n="${key}"`);
+    return marker >= 0 && optionsHtml.lastIndexOf('<details class="context-help', marker) > optionsHtml.lastIndexOf("</details>", marker);
+  };
+  // dictPackHint is the answer of the import row's ? since 2026-10-30
+  // (COMPONENTS §2.5: the copy policy's last pending notes), so it now
+  // follows the status line, inside that row.
+  const packRow = optionsHtml.indexOf('class="context-help-action-row" data-help-role="action"', packStatus);
+  check(packSection >= 0 && packStatus > packSection && packRow > packStatus && packHint > packRow &&
+    optionsHtml.indexOf('id="dict-pack-import"', packRow) < packHint && inHelp("dictPackHint") &&
     optionsHtml.includes("Simplified or Traditional Chinese terms") &&
     !optionsHtml.includes("does not support English word lookup"),
   "options.html: CC-CEDICT capability hint is missing, misplaced, or still denies English lookup");
@@ -1939,8 +1954,10 @@ check(sharedJs.includes('const state = ok ? "ok" : "bad"') &&
   const eHint = optionsHtml.indexOf('data-i18n="ecdictHint"', eSection);
   const eNote = optionsHtml.indexOf('data-i18n="ecdictFormatNote"', eSection);
   const eStatus = optionsHtml.indexOf('id="ecdict-pack-status"', eSection);
-  check(eSection >= 0 && eHint > eSection && eNote > eHint && eStatus > eNote,
-    "options.html: ECDICT section, hint, provenance note and status are missing or out of order");
+  const eRow = optionsHtml.indexOf('class="context-help-action-row" data-help-role="action"', eStatus);
+  check(eSection >= 0 && eNote > eSection && eStatus > eNote && eRow > eStatus && eHint > eRow &&
+    optionsHtml.indexOf('id="ecdict-pack-import"', eRow) < eHint && inHelp("ecdictHint"),
+    "options.html: ECDICT section, provenance note, status and the import row's ? (ecdictHint) are missing or out of order");
   check(!/id="ecdict-pack-open"/.test(optionsHtml) &&
     !/ecdict[\s\S]{0,400}mdbg\.net|ecdict[\s\S]{0,400}github\.com/i.test(optionsHtml),
     "options.html: the ECDICT block offers a download route, which its licence position forbids");

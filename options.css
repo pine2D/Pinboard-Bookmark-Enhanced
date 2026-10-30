@@ -549,7 +549,7 @@ h1 { flex: 1 1 auto; margin: 0; font-size: 18px; line-height: calc(var(--opt-con
 .context-help-host[data-help-role="field"] > label.bl,
 .context-help-host[data-help-role="group"] > .bl,
 .context-help-host[data-help-role="section"] > .section-title,
-.context-help-action-row[data-help-role="action"] > .save-theme-wrap {
+.context-help-action-row[data-help-role="action"] > :is(.save-theme-wrap, .vocab-toolbar) {
   grid-column: 1;
   grid-row: 1;
   min-width: 0;
@@ -776,6 +776,14 @@ label.switch > .context-help > .context-help-body {
   min-width: 0;
 }
 .context-help-action-row { margin-top: var(--opt-sp-3); }
+/* A dictionary's import toolbar as an action row (critique 6, the last
+   pending notes moved into ?): the row takes over the toolbar's own block
+   margins, which a grid item would otherwise keep inside the row, and an
+   empty status slot drops out so the toolbar's flex gap does not push the
+   ? a step away from the last button. */
+.disclosure-body > .context-help-action-row { margin: var(--opt-sp-4) 0 var(--opt-sp-5); }
+.context-help-action-row > .vocab-toolbar { margin: 0; }
+.context-help-action-row > .vocab-toolbar > .save-status:empty { display: none; }
 .context-help { margin: 0; }
 .context-help > summary.context-help-toggle {
   --target: 24px;
@@ -860,6 +868,14 @@ label.switch > .context-help > .context-help-body {
    the row container itself stays centre-aligned. */
 .context-help-action-row[data-help-role="action"] > .save-theme-wrap,
 .context-help-action-row[data-help-role="action"] > .context-help > summary.context-help-toggle { align-self: baseline; }
+/* An import toolbar as the anchor (the offline dictionaries): the ? trails
+   the toolbar's LAST button, and a toolbar's first baseline is its first
+   button's -- for CC-CEDICT that button leads with the external-link SVG,
+   whose synthesized baseline is its bottom edge, 2px under the text. The
+   last baseline is the last shown button's text baseline instead (the empty
+   status slot drops out, below). */
+.context-help-action-row[data-help-role="action"] > .vocab-toolbar,
+.context-help-action-row[data-help-role="action"] > .vocab-toolbar ~ .context-help > summary.context-help-toggle { align-self: last baseline; }
 /* Calibration record (2026-09-28). Stage-3c Task 4 folded the old per-role
    translateY(calc(...)) addends into these constants (pixel-identical by
    construction); the values below then moved when the raster audit changed

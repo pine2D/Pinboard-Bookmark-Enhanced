@@ -1221,13 +1221,18 @@
             <div class="fg"><div class="bl subhead" role="heading" aria-level="3" data-i18n="vocabEudicHeading">Eudic</div></div>
             <div class="fg entry-block context-help-host" data-help-role="field"><label class="bl" for="dict-eudic-token" data-i18n="dictEudicTokenLabel">Eudic OpenAPI authorization</label><details class="context-help"><summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary><p class="hint context-help-body" data-i18n="dictEudicSupportedHint">Eudic supports only English, French, German, and Spanish (en/fr/de/es); other words are skipped.</p></details><span class="key-wrap"><input type="password" id="dict-eudic-token" autocomplete="off" spellcheck="false" /><button type="button" class="key-toggle" data-target="dict-eudic-token" title="Show/hide key" data-i18n-title="showHideKey" data-i18n-aria="showHideKey" aria-label="Show/hide key"></button></span><p class="hint"><a href="https://my.eudic.net/OpenAPI/Authorization" target="_blank" rel="noopener noreferrer" data-i18n="dictEudicTokenHint">Copy the full authorization value from Eudic</a></p>
               <div class="fg-actions"><button type="button" class="btn btn-sm" id="vocab-eudic-test-btn" data-i18n="dictEudicTest">Test Eudic connection</button><button type="button" class="btn btn-sm" id="vocab-eudic-btn" data-i18n="dictEudicSend" hidden>Send all supported words to Eudic</button><span class="save-status" id="vocab-eudic-test-status" role="status" aria-live="polite"></span></div></div>
-            <div class="fg"><div class="bl subhead" role="heading" aria-level="3" data-i18n="vocabFileExportHeading">File export</div></div>
+            <div class="fg context-help-host" data-help-role="group">
+              <div class="bl subhead" role="heading" aria-level="3" data-i18n="vocabFileExportHeading">File export</div>
+              <details class="context-help">
+                <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+                <p class="hint context-help-body" data-i18n="vocabCompleteExportHint">Complete TSV includes language, base form, notes and every context with its source. Use JSON backup to restore data in this extension.</p>
+              </details>
+            </div>
             <div class="vocab-toolbar">
               <button type="button" class="btn btn-sm" id="vocab-export-complete-btn" data-i18n="dictExportCompleteTsv">Export complete TSV</button>
               <button type="button" class="btn btn-sm" id="vocab-export-btn" data-i18n="dictExportLegacyTsv">Export six-field TSV</button>
               <span class="save-status" id="vocab-status" role="status" aria-live="polite"></span>
             </div>
-            <p class="hint" data-i18n="vocabCompleteExportHint">Complete TSV includes language, base form, notes and every context with its source. Use JSON backup to restore data in this extension.</p>
           </div>
         </details>
         <details class="disclosure" id="multi-pack-section" data-acc-key="vocab-multilingual-packs">
@@ -1253,14 +1258,19 @@
         <details class="disclosure" data-acc-key="vocab-ecdict-pack">
           <summary><span data-i18n="ecdictSection">Offline English–Chinese Dictionary</span><span class="summary-state" id="ecdict-pack-summary"></span></summary>
           <div class="disclosure-body">
-            <p class="hint" data-i18n="ecdictHint">Adds Chinese definitions above the English entry when you look up an English word. The English entry still loads as usual.</p>
             <p class="hint" data-i18n="ecdictFormatNote">Expects a CSV file whose first line is the column header and includes word, translation, tag, collins, oxford, frq and bnc. Prebuilt dictionary packages such as mdx, eudic, stardict, mobi and sqlite are different formats and cannot be imported. This project does not provide, recommend or verify a source for the data, and is not affiliated with it. You supply the file and are responsible for its license.</p>
             <p class="save-status" id="ecdict-pack-status" role="status" aria-live="polite"></p>
-            <div class="vocab-toolbar">
-              <button type="button" class="btn btn-sm" id="ecdict-pack-import" data-i18n="ecdictImportFile">Import file</button>
-              <button type="button" class="btn btn-sm" id="ecdict-pack-toggle" hidden></button>
-              <button type="button" class="btn btn-sm danger" id="ecdict-pack-delete" data-i18n="delete" hidden>Delete</button>
-              <span class="save-status" id="ecdict-pack-action-status" role="status" aria-live="polite"></span>
+            <div class="context-help-action-row" data-help-role="action">
+              <div class="vocab-toolbar">
+                <button type="button" class="btn btn-sm" id="ecdict-pack-import" data-i18n="ecdictImportFile">Import file</button>
+                <button type="button" class="btn btn-sm" id="ecdict-pack-toggle" hidden></button>
+                <button type="button" class="btn btn-sm danger" id="ecdict-pack-delete" data-i18n="delete" hidden>Delete</button>
+                <span class="save-status" id="ecdict-pack-action-status" role="status" aria-live="polite"></span>
+              </div>
+              <details class="context-help context-help-inline">
+                <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+                <p class="hint context-help-body" data-i18n="ecdictHint">Adds Chinese definitions above the English entry when you look up an English word. The English entry still loads as usual.</p>
+              </details>
             </div>
             <input type="file" id="ecdict-pack-file" accept=".csv,.txt,.gz,.zip" hidden />
           </div>
@@ -1268,15 +1278,20 @@
         <details class="disclosure" data-acc-key="vocab-dictionary-pack">
           <summary><span data-i18n="dictPackSection">Offline Chinese–English Dictionary</span><span class="summary-state" id="dict-pack-summary"></span></summary>
           <div class="disclosure-body">
-            <p class="hint" data-i18n="dictPackHint">CC-CEDICT looks up Simplified or Traditional Chinese terms and returns English definitions.</p>
             <p class="hint" data-i18n="dictPackImportHint">Import a CC-CEDICT .txt, .txt.gz, or .zip file.</p>
             <p class="save-status" id="dict-pack-status" role="status" aria-live="polite"></p>
-            <div class="vocab-toolbar">
-              <button type="button" class="btn btn-sm" id="dict-pack-open"><svg class="ext-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg><span data-i18n="dictPackOpen">Open download page</span></button>
-              <button type="button" class="btn btn-sm" id="dict-pack-import" data-i18n="dictPackImport">Import file</button>
-              <button type="button" class="btn btn-sm" id="dict-pack-toggle" hidden></button>
-              <button type="button" class="btn btn-sm danger" id="dict-pack-delete" data-i18n="delete" hidden>Delete</button>
-              <span class="save-status" id="dict-pack-action-status" role="status" aria-live="polite"></span>
+            <div class="context-help-action-row" data-help-role="action">
+              <div class="vocab-toolbar">
+                <button type="button" class="btn btn-sm" id="dict-pack-open"><svg class="ext-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg><span data-i18n="dictPackOpen">Open download page</span></button>
+                <button type="button" class="btn btn-sm" id="dict-pack-import" data-i18n="dictPackImport">Import file</button>
+                <button type="button" class="btn btn-sm" id="dict-pack-toggle" hidden></button>
+                <button type="button" class="btn btn-sm danger" id="dict-pack-delete" data-i18n="delete" hidden>Delete</button>
+                <span class="save-status" id="dict-pack-action-status" role="status" aria-live="polite"></span>
+              </div>
+              <details class="context-help context-help-inline">
+                <summary class="btn btn-sm ghost context-help-toggle" title="More information" aria-label="More information" data-i18n-title="contextHelpTitle" data-i18n-aria="contextHelpTitle"><span class="btn-ic" data-ic="help"></span></summary>
+                <p class="hint context-help-body" data-i18n="dictPackHint">CC-CEDICT looks up Simplified or Traditional Chinese terms and returns English definitions.</p>
+              </details>
             </div>
             <input type="file" id="dict-pack-file" accept=".txt,.txt.gz,.gz,.zip" hidden />
           </div>

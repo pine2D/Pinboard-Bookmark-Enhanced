@@ -49,8 +49,11 @@ function test(name, fn) {
     const anchorCopy = anchor?.matches("[data-i18n]")
       ? anchor
       : anchor?.querySelector("[data-i18n]");
-    const actionCopy = anchor?.matches(".save-theme-wrap")
-      ? anchor.querySelector("[data-i18n]")
+    // An action row's anchor is a button wrapper (Save as theme) or a
+    // toolbar (the offline dictionaries' import row): its first button's
+    // label is the copy the help sits beside.
+    const actionCopy = anchor?.matches(".save-theme-wrap, .vocab-toolbar")
+      ? anchor.querySelector("button [data-i18n], button[data-i18n]")
       : null;
     [body, anchorCopy, actionCopy].filter(Boolean).forEach((node) => {
       const message = zhMessages[node.dataset.i18n]?.message;
@@ -144,6 +147,11 @@ function test(name, fn) {
   function textInkRect(anchor) {
     if (anchor.matches(".save-theme-wrap")) {
       return (anchor.querySelector("button") || anchor).getBoundingClientRect();
+    }
+    // A toolbar anchor: the ? trails its last shown button.
+    if (anchor.matches(".vocab-toolbar")) {
+      const shown = [...anchor.querySelectorAll("button")].filter((button) => button.getClientRects().length);
+      return (shown[shown.length - 1] || anchor).getBoundingClientRect();
     }
     const textNode = anchor.matches("label")
       ? (anchor.querySelector("span[data-i18n]") || anchor)

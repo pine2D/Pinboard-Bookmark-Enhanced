@@ -553,8 +553,11 @@ function pbpBuildSettingsSearchIndex(root = document) {
       else if (labelledButton) target = labelledButton.id;
       // A hint resolves the control it explains through its row-model owner:
       // an entry block (.fg) or a preference row/group (.pref-row/.pref-group,
-      // where 3a/3b moved every choice-help host).
-      else if (isHelpCopy) target = node.closest(".fg, .pref-row, .pref-group")?.querySelector("input,select,textarea,button")?.id || "";
+      // where 3a/3b moved every choice-help host). An action row's ? outside
+      // any of those (the offline dictionaries' import rows) explains its
+      // row's buttons.
+      else if (isHelpCopy) target = (node.closest(".fg, .pref-row, .pref-group") || node.closest(".context-help-action-row"))
+        ?.querySelector("input,select,textarea,button")?.id || "";
       else {
         target = node.id || "";
         if (!target) { target = panelFallbackId(); weak = true; }

@@ -191,7 +191,7 @@ async function preparePage(page, locale) {
       const copyNode = host?.dataset.helpRole === "choice"
         ? (anchor?.querySelector("span[data-i18n]") || anchor)
         : host?.dataset.helpRole === "action"
-          ? (anchor?.querySelector("button") || anchor)
+          ? (anchor?.querySelector("button [data-i18n], button[data-i18n]") || anchor?.querySelector("button") || anchor)
           : anchor;
       if (!host || !copyNode) return;
       host.dataset.helpScript = /[\u3040-\u30ff\u3100-\u312f\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff]/u
@@ -247,7 +247,15 @@ async function capturePair(page, item) {
     details.open = false;
     const role = host.dataset.helpRole;
     const copyNode = role === "choice" ? (anchor.querySelector("span[data-i18n]") || anchor)
-      : role === "action" ? (anchor.querySelector("button") || anchor)
+      // The action copy is the LABEL of the button the ? anchors on: the one
+      // button of a wrapper, or a toolbar's last shown button (its baseline,
+      // options.css). A button that leads with an icon keeps its label in a
+      // child span, and the audit paints only the copy node's own text.
+      : role === "action" ? (() => {
+        const shown = [...anchor.querySelectorAll("button")].filter((button) => button.getClientRects().length);
+        const button = anchor.matches(".vocab-toolbar") ? shown[shown.length - 1] : shown[0];
+        return button ? (button.querySelector("[data-i18n]") || button) : anchor;
+      })()
       : anchor;
     const iconNode = details.querySelector(":scope > summary.context-help-toggle svg");
     if (!copyNode || !iconNode) return null;

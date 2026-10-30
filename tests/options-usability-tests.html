@@ -290,6 +290,27 @@ function assert(value, message) { if (!value) throw new Error(message || "assert
       "the switch's moved note is not found under its name: " + JSON.stringify(swHelp));
   });
 
+  // Options critique 6 follow-up (2026-10-30): the copy policy's last three
+  // pending notes moved into ? -- the file-export note under its group
+  // subhead, the two dictionary notes on their import rows. Search must still
+  // find each by its words, under its owner, and jump to its row.
+  await test("search still finds the notes moved into the vocabulary ? answers", async () => {
+    const html = await (await fetch("../options.html")).text();
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const index = pbpBuildSettingsSearchIndex(doc);
+    const exportNote = index.find((e) => e.text.startsWith("Complete TSV includes language"));
+    assert(exportNote && exportNote.hint === true && exportNote.owner === "File export" &&
+      doc.querySelector('[data-i18n="vocabCompleteExportHint"]').closest("details.context-help"),
+      "the complete-TSV note is not indexed under File export: " + JSON.stringify(exportNote));
+    [["Adds Chinese definitions above the English entry", "ecdict-pack-import"],
+      ["CC-CEDICT looks up Simplified or Traditional Chinese terms", "dict-pack-open"]].forEach(([snippet, id]) => {
+      const entry = index.find((e) => e.text.includes(snippet));
+      assert(entry && entry.hint === true && entry.panel === "vocab" && entry.targetId === id,
+        `"${snippet}" is not indexed against its import row: ` + JSON.stringify(entry));
+      assert(pbpSearchSettings(index, snippet.toLowerCase()).some((e) => e === entry), `searching "${snippet}" does not return it`);
+    });
+  });
+
   await test("a live readout (#tag-gov-overview) marked data-search-skip never becomes a dead search row", async () => {
     // Regression: it changed from <p class="fg"> to <p class="hint">, which
     // the .hint branch resolves a target from via .closest(".fg, .pref-row,
