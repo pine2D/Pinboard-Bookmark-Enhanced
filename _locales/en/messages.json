@@ -4608,6 +4608,8 @@
   "readerBookmarkApply": {"message": "Save changes"},
   "readerBookmarkTitle": {"message": "Title"},
   "readerBookmarkTags": {"message": "Tags (space-separated)"},
+  "readerBookmarkTagsQuoted": {"message": "Tags (space-separated; existing tags with spaces appear in double quotes)"},
+  "readerBookmarkTagsQuoteError": {"message": "Check the double quotes around tags, then try again."},
   "readerBookmarkDescription": {"message": "Description"},
   "readerBookmarkNotes": {"message": "Notes"},
   "readerBookmarkPrivate": {"message": "Private"},

@@ -4600,6 +4600,8 @@
   "readerBookmarkApply": {"message": "Сохранить изменения"},
   "readerBookmarkTitle": {"message": "Заголовок"},
   "readerBookmarkTags": {"message": "Метки (через пробел)"},
+  "readerBookmarkTagsQuoted": {"message": "Метки (через пробел; существующие метки с пробелами показаны в двойных кавычках)"},
+  "readerBookmarkTagsQuoteError": {"message": "Проверьте двойные кавычки в метках и попробуйте снова."},
   "readerBookmarkDescription": {"message": "Описание"},
   "readerBookmarkNotes": {"message": "Заметки"},
   "readerBookmarkPrivate": {"message": "Приватная"},

@@ -29,8 +29,10 @@ async function harness(options = {}) {
     pbpBookmarkAuthIsCurrent: auth => auth.account === env.account && auth.epoch === env.epoch,
     fetchExistingBookmark: async (url, token) => { env.calls.push({ url, token }); if (env.onLookup) env.onLookup(); return env.lookup || { exists: !!env.post, lookupFailed: false, post: env.post }; },
     pbpSaveFailure: reason => ({ status: "failed", reason }),
-    pbpResolveSavePlan, pbpEffectivePrivate,
-    loadSettings: async () => ({ bookmarkService: env.service || "pinboard", optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false, qsDefaultTags: "quick", rlDefaultTags: "later" }),
+    pbpResolveSavePlan, pbpEffectivePrivate, pbpSelfHostedAuth: auth => ["karakeep", "linkding"].includes(auth?.service),
+    pbpReadTagVocab: async account => account === env.account ? pbpTagVocabIndex(env.vocab || {}) : null,
+    pbpBookmarkParseTags, pbpCanonicalTagName, pbpSerializeIntentTags,
+    loadSettings: async () => ({ bookmarkService: env.service || "pinboard", optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false, qsDefaultTags: "quick", rlDefaultTags: "later", ...env.settings }),
     submitSaveIntent: async (intent, opts) => { env.submitted = { intent, opts }; if (env.onSubmit) env.onSubmit(); return env.result || { status: "saved", mutation: "created", account: "alice" }; },
   };
   const api = new Function(...Object.keys(deps), background.slice(start, end) + "\nreturn { pbpReaderBookmarkContext, pbpPrepareReaderSaveIntent, pbpReaderBookmarkRequest, pbpRouteReaderSaveCommand }; ")(...Object.values(deps));
@@ -111,6 +113,33 @@ await test("unknown readlater fails closed instead of queueing an intent that lo
 });
 await test("edit changes only explicit fields and preserves original server timestamp", async () => {
   const h = await harness(); const p = await h.pbpPrepareReaderSaveIntent(base(), "edit", { title: "Edited", tags: "only", notes: "", private: false, toread: false, time: "2099" }, { pinboardToken: h.env.token }, { account: "alice", epoch: 1 }); equal(p.intent.time, "2020-01-02T03:04:05Z"); equal(p.intent.title, "Edited"); equal(p.intent.notes, ""); equal(p.intent.private, false);
+});
+await test("self-hosted state enables quoted tags and reader edit keeps existing multi-word names", async () => {
+  const account = "karakeep:fixture", post = { ...POST, tags: '"machine learning"', tagNames: ["machine learning"] };
+  const h = await harness({ account, service: "karakeep", slot:{account}, post, vocab: {"Machine Learning": 8}, settings: {optRespectTagCase: false, aiTagSeparator: "_"} });
+  const state = await h.pbpReaderBookmarkRequest({type:"mdReaderBookmarkState", account}, SENDER);
+  equal(state.quotedTags, true); equal(state.bookmark.tags, '"machine learning"');
+  const draft = {...state.bookmark, tags:'"machine learning" "NEW TAG"'};
+  const prepared = await h.pbpPrepareReaderSaveIntent(base(), "edit", draft, {optRespectTagCase:false, aiTagSeparator:"_"}, {account, service:"karakeep", epoch:1});
+  equal(prepared.intent.tags, '"machine learning" NEW_TAG');
+});
+await test("self-hosted reader edit honors exact library spelling before minting with respect case off", async () => {
+  const account = "karakeep:fixture";
+  const h = await harness({account, service:"karakeep", vocab:{"Machine Learning":3}});
+  const prepared = await h.pbpPrepareReaderSaveIntent(base(), "edit", {title:"T",notes:"",tags:'"Machine Learning"',private:true,toread:false},
+    {optRespectTagCase:false,aiTagSeparator:"_"}, {account,service:"karakeep",epoch:1});
+  equal(prepared.intent.tags, '"Machine Learning"');
+});
+await test("self-hosted malformed quotes fail before dispatch while Pinboard keeps literal quotes", async () => {
+  const account = "linkding:fixture";
+  const h = await harness({account,service:"linkding"});
+  const bad = await h.pbpPrepareReaderSaveIntent(base(), "edit", {title:"T",notes:"",tags:'"unfinished',private:true,toread:false}, {}, {account,service:"linkding",epoch:1});
+  equal(bad.result?.reason,"invalid"); assert(!bad.intent);
+  const pin = await harness({post:{...POST,tags:'literal"tag'}});
+  const state = await pin.pbpReaderBookmarkRequest({type:"mdReaderBookmarkState",account:"alice"},SENDER);
+  equal(state.quotedTags,false);
+  const ok = await pin.pbpPrepareReaderSaveIntent(base(),"edit",{title:"T",notes:"",tags:'literal"tag',private:true,toread:false},{pinboardToken:pin.env.token},{account:"alice",service:"pinboard",epoch:1});
+  equal(ok.intent.tags,'literal"tag');
 });
 await test("owner change during lookup cancels prepared mutation", async () => {
   const h = await harness(); h.env.onLookup = () => { h.env.account = "bob"; h.env.epoch++; }; const p = await h.pbpPrepareReaderSaveIntent(base(), "read", null, { pinboardToken: h.env.token }, { account: "alice", epoch: 1 }); equal(p.result.reason, "account_changed");
@@ -484,6 +513,42 @@ await test("reader Description uses a text input, shows only for linkding, and p
       equal(draft?.summary, "changed value"); assert(!("summaryTouched" in draft));
     } finally { frame.remove(); }
   }
+});
+await test("reader validates self-hosted quotes locally and shows the edit hint", async () => {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  for (const [account, quoted] of [["linkding:fixture",true],["alice",false]]) {
+    const frame=document.createElement("iframe");document.body.append(frame);
+    try {
+      const w=frame.contentWindow,messages=[];
+      w.document.body.innerHTML='<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+      w.eval(await (await fetch("../shared.js")).text()); w.t=k=>k;
+      w.chrome={runtime:{id:"test-id",getURL:p=>p,onMessage:{addListener(){}},sendMessage:async msg=>{
+        messages.push(msg);return msg.type==="mdReaderBookmarkState"
+          ? {known:true,bookmarked:true,account,quotedTags:quoted,bookmark:{title:"T",notes:"",tags:quoted?'"machine learning"':'literal"tag',private:true,toread:false}}
+          : {status:"queued",account};
+      }}};
+      w.eval(runtime);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account}}));
+      await new Promise(r=>setTimeout(r,20));await w.pbpReaderBookmarkAction("edit");
+      const input=w.document.getElementById("reader-bookmark-tags"),apply=w.document.getElementById("reader-bookmark-apply");
+      equal(input.closest("label").firstElementChild.textContent,quoted?"readerBookmarkTagsQuoted":"readerBookmarkTags");
+      input.value=quoted?'"unfinished':'literal"tag';apply.click();await new Promise(r=>setTimeout(r,0));
+      if(quoted){
+        assert(!messages.some(m=>m.type==="mdReaderBookmarkSave"));
+        const status=w.document.getElementById("reader-bookmark-editor-status");
+        equal(status.textContent,"readerBookmarkTagsQuoteError");equal(status.dataset.state,"error");
+        input.value='machine learning';apply.click();await new Promise(r=>setTimeout(r,0));
+        equal(messages.find(m=>m.type==="mdReaderBookmarkSave")?.draft.tags,"machine learning");
+      }else equal(messages.find(m=>m.type==="mdReaderBookmarkSave")?.draft.tags,'literal"tag');
+    }finally{frame.remove();}
+  }
+});
+await test("bookmark badge uses supplied tag names as whole labels", async () => {
+  const source=await (await fetch("../md-preview.js")).text();
+  const start=source.indexOf("function pbpBuildBookmarkBadgeModel(");
+  const end=source.indexOf("// Takes the badge off screen",start);
+  assert(start>=0&&end>start);
+  const model=new Function(source.slice(start,end)+"return pbpBuildBookmarkBadgeModel({bookmarked:true,tags:'\"machine learning\" second',tagNames:['machine learning','second'],shared:'no'});")();
+  equal(model.tagsShown[0],"machine learning");equal(model.tagsFull,"machine learning second");
 });
 await test("reader editor rejects over-limit titles locally, keeps the full input, and allows correction", async () => {
   runtime ||= await (await fetch("../md-bookmark.js")).text();

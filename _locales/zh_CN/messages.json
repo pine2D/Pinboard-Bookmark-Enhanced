@@ -4594,6 +4594,8 @@
   "readerBookmarkApply": {"message": "保存修改"},
   "readerBookmarkTitle": {"message": "标题"},
   "readerBookmarkTags": {"message": "标签（以空格分隔）"},
+  "readerBookmarkTagsQuoted": {"message": "标签（以空格分隔；已有的带空格标签显示在英文双引号内）"},
+  "readerBookmarkTagsQuoteError": {"message": "检查标签的英文双引号是否成对，然后重试。"},
   "readerBookmarkDescription": {"message": "描述"},
   "readerBookmarkNotes": {"message": "备注"},
   "readerBookmarkPrivate": {"message": "私密"},

@@ -1349,6 +1349,17 @@ async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth)
     // ordinary save's skip intent can still safely enter the offline queue.
     return { result: pbpSaveFailure(lookup.reason || "lookup") };
   }
+  if (action === "edit" && pbpSelfHostedAuth(auth)) {
+    let names;
+    try { names = pbpBookmarkParseTags(draft.tags); }
+    catch (_) { return { result: pbpSaveFailure("invalid") }; }
+    const bookmarkNames = Array.isArray(lookup.post?.tagNames) ? lookup.post.tagNames : [];
+    const index = await pbpReadTagVocab(auth.account);
+    if (!pbpBookmarkAuthIsCurrent(auth)) return { result: pbpSaveFailure("account_changed") };
+    const tagContext = { bookmarkNames, index, service: auth.service,
+      separator: settings.aiTagSeparator, respectCase: settings.optRespectTagCase === true };
+    draft = { ...draft, tags: pbpSerializeIntentTags(names.map(name => pbpCanonicalTagName(name, tagContext)).filter(Boolean), auth.service) };
+  }
   if (!lookup.exists) {
     if (action === "read") return { result: pbpSaveFailure("lookup") };
     return { intent: { ...intent, mode: "create", ...(action === "edit" ? draft : {}), toread: action === "later" || (action === "edit" ? draft.toread : intent.toread) } };
@@ -1450,7 +1461,7 @@ async function pbpReaderBookmarkRequest(message, sender) {
     }
     // Token rotation under the same owner does not invalidate display metadata.
     // Re-read the effective owner after every await before returning it to UI.
-    return await pbpReadFreshBookmarkAuthForAccount(context.account) ? {...result, privacySupported:!["karakeep","linkding"].includes(auth.service), sharingSupported:auth.service === "linkding" && auth.sharingEnabled === true, descriptionSupported:auth.service === "linkding"} : pbpSaveFailure("account_changed");
+    return await pbpReadFreshBookmarkAuthForAccount(context.account) ? {...result, quotedTags:pbpSelfHostedAuth(auth), privacySupported:!["karakeep","linkding"].includes(auth.service), sharingSupported:auth.service === "linkding" && auth.sharingEnabled === true, descriptionSupported:auth.service === "linkding"} : pbpSaveFailure("account_changed");
   }
   const action = message.action;
   if (!["save", "later", "read", "edit"].includes(action)) return pbpSaveFailure("invalid");

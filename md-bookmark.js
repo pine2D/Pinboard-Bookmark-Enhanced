@@ -81,7 +81,7 @@
         id("editor-status").removeAttribute("data-i18n");
         id("editor-status").textContent = text("titleTooLong", String(pbpBookmarkLimits(pbpBookmarkAccountService(context?.account)).title));
       }
-      id("editor-status").dataset.state = ["readerBookmarkDeleteFailed", "titleTooLong", "submitUriTooLong"].includes(editorStatusKey) ? "error" : "";
+      id("editor-status").dataset.state = ["readerBookmarkDeleteFailed", "readerBookmarkTagsQuoteError", "titleTooLong", "submitUriTooLong"].includes(editorStatusKey) ? "error" : "";
     }
     if (editor) for (const input of editor.querySelectorAll("input, textarea")) input.disabled = deleting;
   }
@@ -238,6 +238,7 @@
     editorStatusKey = ""; paint();
     const values = state.bookmark || context.bookmark?.draft || {};
     id("title").value = typeof values.title === "string" ? values.title : context.title || "";
+    label(id("tags").closest("label").firstElementChild, state.quotedTags === true ? "readerBookmarkTagsQuoted" : "readerBookmarkTags");
     id("tags").value = typeof values.tags === "string" ? values.tags : pbpBookmarkFormatTags(context.bookmark?.tags || []);
     id("summary").closest("label").hidden = state.descriptionSupported !== true;
     id("summary").value = state.descriptionSupported === true && typeof values.summary === "string" ? values.summary.replace(/\s+/g, " ").trim() : "";
@@ -291,6 +292,10 @@
   async function save(action, draft) {
     if (inflight || !context?.account) return;
     if (action === "edit" && draft) {
+      if (state.quotedTags === true) {
+        try { pbpBookmarkParseTags(draft.tags); }
+        catch (_) { editorStatusKey = "readerBookmarkTagsQuoteError"; paint(); return; }
+      }
       const service = pbpBookmarkAccountService(context.account);
       const limits = pbpBookmarkLimits(service);
       const titleOver = pbpBookmarkTitleTooLong(draft.title, service);
@@ -321,6 +326,9 @@
       await refresh(gen);
       if (gen !== generation) return;
       statusKey = "bookmarkPartialSave";
+    } else if (action === "edit" && state.quotedTags === true && result?.reason === "invalid") {
+      editorStatusKey = "readerBookmarkTagsQuoteError";
+      statusKey = "readerBookmarkFailed";
     } else statusKey = failureKey(result) || (result?.reason === "account_changed" || result?.reason === "not_logged_in" ? "readerBookmarkAccountChanged" : "readerBookmarkFailed");
     inflight = false; paint();
   }

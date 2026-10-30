@@ -88,7 +88,8 @@ import { isolatedFontconfigEnv, parityProbeEnv, parityReproduceCommand } from ".
 import { auditSelection } from "./audit-scope.mjs";
 import { RENDER_SCENARIOS, RENDER_SWEEP_CONTEXTS, RENDER_OPTIONS_TABS, RENDER_READER_CONTEXTS,
   RENDER_DARK_THEMES, checkScenarioId, sweepScenarioId, paintScenarioId, mediaScenarioId,
-  renderThemes, renderSweepPlan, runRenderScenario, popupCheckSetup, DICT_PAID_NEGATIVE_LOCALES, DICT_SAVE_BAR_LOCALES } from "./audit-render-scenarios.mjs";
+  renderThemes, renderSweepPlan, runRenderScenario, popupCheckSetup, DICT_PAID_NEGATIVE_LOCALES, DICT_SAVE_BAR_LOCALES,
+  READER_BOOKMARK_QUOTE_LOCALES } from "./audit-render-scenarios.mjs";
 
 import {
   CHECKS,
@@ -8974,6 +8975,7 @@ async function openReaderSurface(name) {
     }
     case "reader-bookmark-editor":
     case "reader-bookmark-title-error":
+    case "reader-bookmark-quote-error":
     case "reader-bookmark-sharing":
     case "reader-bookmark-delete-confirm": {
       if (typeof window.pbpReaderBookmarkAction !== "function") return "reader bookmark module not loaded";
@@ -8982,11 +8984,14 @@ async function openReaderSurface(name) {
       const key = new URL(location.href).searchParams.get("k");
       const row = (await chrome.storage.local.get("md_preview_data_" + key))["md_preview_data_" + key];
       if (!row?.account) return "reader bookmark fixture has no owner";
-      const account = ["reader-bookmark-title-error", "reader-bookmark-sharing"].includes(name) ? "linkding:render-fixture" : row.account;
+      const account = ["reader-bookmark-title-error", "reader-bookmark-quote-error", "reader-bookmark-sharing"].includes(name) ? "linkding:render-fixture" : row.account;
       const send = chrome.runtime.sendMessage;
       chrome.runtime.sendMessage = function (message, ...args) {
         if (message?.type === "mdReaderBookmarkSave") throw new Error("render fixture must not send a save");
-        if (message?.type === "mdReaderBookmarkState") return Promise.resolve({ account, known: true, bookmarked: true, ...(name === "reader-bookmark-sharing" ? {privacySupported:false,sharingSupported:true,descriptionSupported:true} : {}), bookmark: { title: "Render audit bookmark", tags: "qa reader", notes: "A reader bookmark note.", summary: "A linkding Description.", private: true, toread: true } });
+        if (message?.type === "mdReaderBookmarkState") return Promise.resolve({ account, known: true, bookmarked: true,
+          ...(name === "reader-bookmark-sharing" ? {privacySupported:false,sharingSupported:true,descriptionSupported:true} : {}),
+          ...(name === "reader-bookmark-quote-error" ? {quotedTags:true} : {}),
+          bookmark: { title: "Render audit bookmark", tags: name === "reader-bookmark-quote-error" ? '"machine learning"' : "qa reader", notes: "A reader bookmark note.", summary: "A linkding Description.", private: true, toread: true } });
         return send.call(chrome.runtime, message, ...args);
       };
       try {
@@ -8999,6 +9004,10 @@ async function openReaderSurface(name) {
           document.getElementById("reader-bookmark-title").value = "a".repeat(513);
           document.getElementById("reader-bookmark-apply").click();
         }
+        if (name === "reader-bookmark-quote-error") {
+          document.getElementById("reader-bookmark-tags").value = '"unfinished';
+          document.getElementById("reader-bookmark-apply").click();
+        }
       }
       finally { chrome.runtime.sendMessage = send; }
       await wait(100);
@@ -9009,6 +9018,9 @@ async function openReaderSurface(name) {
       }
       if (name === "reader-bookmark-title-error") return shown(document.getElementById("reader-bookmark-editor-status"))
         && document.getElementById("reader-bookmark-editor-status").dataset.state === "error";
+      if (name === "reader-bookmark-quote-error") return shown(document.getElementById("reader-bookmark-editor-status"))
+        && document.getElementById("reader-bookmark-editor-status").dataset.state === "error"
+        && document.getElementById("reader-bookmark-tags").closest("label").firstElementChild.dataset.i18n === "readerBookmarkTagsQuoted";
       return shown(document.getElementById("reader-bookmark-editor"));
     }
     case "explain-pop": {
@@ -9087,6 +9099,7 @@ function closeReaderSurface(name) {
     case "export-more": { document.getElementById(name).open = false; return; }
     case "reader-bookmark-footer": { window.scrollTo({ top: 0, behavior: "instant" }); return; }
     case "reader-bookmark-title-error": { document.getElementById("reader-bookmark-cancel")?.click(); return; }
+    case "reader-bookmark-quote-error": { document.getElementById("reader-bookmark-cancel")?.click(); return; }
     case "reader-bookmark-delete-confirm": {
       document.querySelector(".confirm-popover .confirm-no")?.click();
       document.getElementById("reader-bookmark-cancel")?.click(); return;
@@ -10182,12 +10195,23 @@ async function runSweep(page, sw, extBase) {
             if (!/^dict-(entry|save)-/.test(following || "")) await page.evaluate(closeReaderSurface, "explain-dict");
             continue;
           }
-          await scan("md-preview", name, async () => {
-            const ok = await page.evaluate(openReaderSurface, name).catch((e) => `threw: ${e.message}`);
-            if (ok === true) await page.waitForTimeout(150);
-            return ok;
-          });
-          await page.evaluate(closeReaderSurface, name).catch(() => {});
+          const scanReader = async () => {
+            await scan("md-preview", name, async () => {
+              const ok = await page.evaluate(openReaderSurface, name).catch((e) => `threw: ${e.message}`);
+              if (ok === true) await page.waitForTimeout(150);
+              return ok;
+            });
+            await page.evaluate(closeReaderSurface, name).catch(() => {});
+          };
+          if (name === "reader-bookmark-quote-error") {
+            try {
+              for (const locale of audit.values(sweepScenarioId("md-preview", name), "locale", READER_BOOKMARK_QUOTE_LOCALES)) {
+                console.log(`[render-audit] md-preview/${name}: ${locale}`);
+                await setReaderLocale(page, extBase, locale);
+                await scanReader();
+              }
+            } finally { await restoreDictLocale(page, extBase); }
+          } else await scanReader();
         }
 
       }

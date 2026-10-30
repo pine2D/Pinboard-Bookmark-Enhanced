@@ -4600,6 +4600,8 @@
   "readerBookmarkApply": {"message": "Zapisz zmiany"},
   "readerBookmarkTitle": {"message": "Tytuł"},
   "readerBookmarkTags": {"message": "Tagi (oddzielone spacjami)"},
+  "readerBookmarkTagsQuoted": {"message": "Tagi (oddzielone spacjami; istniejące tagi ze spacjami są ujęte w cudzysłów)"},
+  "readerBookmarkTagsQuoteError": {"message": "Sprawdź cudzysłowy przy tagach i spróbuj ponownie."},
   "readerBookmarkDescription": {"message": "Opis"},
   "readerBookmarkNotes": {"message": "Notki"},
   "readerBookmarkPrivate": {"message": "Prywatne"},

@@ -479,8 +479,10 @@ const PBP_BOOKMARK_LOCK_SVG = typeof PBP_ICONS !== "undefined" ? PBP_ICONS.lock 
 // it isn't loaded by tests/md-ai-tests.html; see the task note).
 function pbpBuildBookmarkBadgeModel(resp) {
   if (!resp || resp.bookmarked !== true) return { show: false, tagsShown: [], tagsFull: "", isPrivate: false };
-  const tagsFull = typeof resp.tags === "string" ? resp.tags.trim() : "";
-  const tagsShown = tagsFull ? tagsFull.split(/\s+/).slice(0, 3) : [];
+  const names = Array.isArray(resp.tagNames) ? resp.tagNames
+    : typeof resp.tags === "string" ? resp.tags.trim().split(/\s+/).filter(Boolean) : [];
+  const tagsFull = names.join(" ");
+  const tagsShown = names.slice(0, 3);
   return { show: true, tagsShown, tagsFull, isPrivate: resp.shared === "no" };
 }
 

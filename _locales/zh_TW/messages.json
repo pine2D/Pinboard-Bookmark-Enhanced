@@ -4600,6 +4600,8 @@
   "readerBookmarkApply": {"message": "儲存變更"},
   "readerBookmarkTitle": {"message": "標題"},
   "readerBookmarkTags": {"message": "標籤（以空格分隔）"},
+  "readerBookmarkTagsQuoted": {"message": "標籤（以空格分隔；現有的含空格標籤會顯示在英文雙引號內）"},
+  "readerBookmarkTagsQuoteError": {"message": "檢查標籤的英文雙引號是否成對，再試一次。"},
   "readerBookmarkDescription": {"message": "描述"},
   "readerBookmarkNotes": {"message": "備註"},
   "readerBookmarkPrivate": {"message": "私人"},

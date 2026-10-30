@@ -4600,6 +4600,8 @@
   "readerBookmarkApply": {"message": "Änderungen speichern"},
   "readerBookmarkTitle": {"message": "Titel"},
   "readerBookmarkTags": {"message": "Tags (durch Leerzeichen getrennt)"},
+  "readerBookmarkTagsQuoted": {"message": "Tags (durch Leerzeichen getrennt; vorhandene Tags mit Leerzeichen stehen in doppelten Anführungszeichen)"},
+  "readerBookmarkTagsQuoteError": {"message": "Prüfe die doppelten Anführungszeichen bei den Tags und versuche es erneut."},
   "readerBookmarkDescription": {"message": "Beschreibung"},
   "readerBookmarkNotes": {"message": "Notizen"},
   "readerBookmarkPrivate": {"message": "Privat"},
