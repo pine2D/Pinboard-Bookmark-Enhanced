@@ -11,6 +11,7 @@ if(args.includes('--help')||(!args.includes('--run')&&!args.includes('--plan')))
   console.log('Opt-in: node scripts/bookmark-service-live.mjs --run --credentials /private/credentials.json --karakeep http://127.0.0.1:PORT --linkding http://127.0.0.1:PORT');
   console.log('Optional: --service karakeep|linkding; --read-only verifies Connect, tags and recent without remote writes.');
   console.log('--plan validates public arguments without accessing credentials, network or a browser.');
+  console.log('--scenario core|edges selects the original smoke or tag/offline/quote regressions (default core).');
   console.log('Karakeep writes also require --confirm-karakeep-no-auto-ai, after verifying server automatic tagging and summarization are both disabled.');
   process.exit(args.includes('--help')?0:2);
 }
@@ -18,7 +19,9 @@ const option=name=>args[args.indexOf(name)+1];
 const root=fileURLToPath(new URL('../',import.meta.url));
 const runId=randomUUID(),prefix='pbp-it-'+runId;
 const services=args.includes('--service')?[option('--service')]:['linkding','karakeep'];
-const report={runId,started:new Date().toISOString(),checks:[],created:[],lists:[],tags:[],cleanup:[],counts:{linkding:0,karakeep:0}};
+const scenario=args.includes('--scenario')?option('--scenario'):'core';
+const bookmarkLimit=scenario==='edges'?6:2;
+const report={runId,scenario,started:new Date().toISOString(),checks:[],created:[],lists:[],tags:[],cleanup:[],counts:{linkding:0,karakeep:0}};
 const reportPath=join(tmpdir(),prefix+'.json');
 const persist=()=>writeFileSync(reportPath,JSON.stringify(report,null,2),{mode:0o600});
 const fail=code=>{throw new Error(code);};
@@ -60,15 +63,16 @@ async function ownRow(service,url) {
   persist();return row;
 }
 try {
+  check(['core','edges'].includes(scenario),'scenario');
   check(services.every(s=>['linkding','karakeep'].includes(s)),'service');
   for(const service of services) {
     check(args.includes('--'+service),'missing_base');const u=new URL(option('--'+service));
     check(u.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(u.hostname)&&!u.username&&!u.password&&!u.search&&!u.hash,'loopback_required');
     bases[service]=u.href.replace(/\/$/,'')+'/';roots[service]=bases[service]+(service==='linkding'?'api/':'api/v1/');
-    allowed[service]=[1,2].map(n=>'https://example.com/?pbp-it='+runId+'-'+service+'-'+n);
+    allowed[service]=Array.from({length:bookmarkLimit},(_,i)=>'https://example.com/?pbp-it='+runId+'-'+service+'-'+(i+1));
   }
   if(args.includes('--plan')) {
-    const plan={services,bases,credentialsRead:false,realRequests:0,bookmarksPerService:args.includes('--read-only')?0:2,nodeRequestsPerService:180,browserRequestsPerService:180,automaticRetries:0,extensionAi:false,karakeepWritesRequireAutoAiDisabled:true,cleanup:'only this run bookmarks, empty lists and unused tags',webRenderingVerified:false};
+    const plan={services,bases,scenario,credentialsRead:false,realRequests:0,bookmarksPerService:args.includes('--read-only')?0:bookmarkLimit,nodeRequestsPerService:180,browserRequestsPerService:180,automaticRetries:0,extensionAi:false,karakeepWritesRequireAutoAiDisabled:true,cleanup:'only this run bookmarks, empty lists and unused tags',webRenderingVerified:false};
     await new Promise(resolve=>process.stdout.write(JSON.stringify(plan,null,2)+'\n',resolve));
     process.exit(0);
   }
@@ -106,13 +110,15 @@ try {
   // Extra guard for this opt-in test: even a production bug cannot mutate an
   // existing bookmark or dispatch beyond the two authorized API roots.
   await worker.evaluate(({roots,allowed})=>{
-    const original=globalThis.fetch;const state=globalThis.pbpLiveGuard={created:[],lists:[],counts:{linkding:0,karakeep:0}};
+    const original=globalThis.fetch;const state=globalThis.pbpLiveGuard={created:[],lists:[],counts:{linkding:0,karakeep:0},writes:{linkding:0,karakeep:0},offline:''};
     globalThis.fetch=async(input,opts={})=>{
       const url=typeof input==='string'?input:input.url;
       if(url.startsWith('chrome-extension://'))return original(input,opts);
       const service=Object.keys(roots).find(s=>url.startsWith(roots[s]));
       if(!service)throw new Error('live_guard_origin');
       if(++state.counts[service]>180)throw new Error('live_guard_request_budget');
+      // Only the transport fails; the product save, queue and replay code is real.
+      if(state.offline===service)throw new TypeError('Failed to fetch');
       const path=new URL(url).pathname.slice(new URL(roots[service]).pathname.length);
       const method=opts.method||'GET',body=opts.body?JSON.parse(opts.body):{};
       const create=method==='POST'&&/^bookmarks\/?$/.test(path);
@@ -124,6 +130,7 @@ try {
         const member=service==='karakeep'&&/^lists\/[^/]+\/bookmarks\/[^/]+$/.test(path)&&state.created.some(r=>r.service===service&&r.id===path.split('/')[3]);
         if(!((path.startsWith('bookmarks/')&&own)||listCreate||member))throw new Error('live_guard_mutation');
       }
+      if(method!=='GET')state.writes[service]++;
       const response=await original(input,opts);
       if(create&&response.ok) {
         const row=await response.clone().json(),id=String(row.id),actual=service==='linkding'?row.url:row.content?.url;
@@ -135,13 +142,171 @@ try {
     };
   },{roots,allowed});
   const pageErrors=[];ctx.on('page',p=>p.on('pageerror',()=>pageErrors.push('pageerror')));
+  let navigationProbe='',navigationObserved=false;
   await ctx.route(/^https?:\/\//,route=>{
     const url=route.request().url();
-    if(Object.values(allowed).flat().includes(url))return route.fulfill({contentType:'text/html',body:'<title>联调样例</title><meta name="description" content="Public synthetic meta description."><article><h1>联调样例</h1><p>'+('公开合成文本，不含个人资料。 '.repeat(100))+'</p></article>'});
+    if(url===navigationProbe){navigationObserved=true;return route.fulfill({contentType:'text/html',body:'<title>Navigation probe</title>'});}
+    if(Object.values(allowed).flat().includes(url))return route.fulfill({contentType:'text/html',body:'<title>联调样例</title><meta name="description" content="Public synthetic meta description."><article><h1>联调样例</h1><pre id="quote-fixture">First line\n\n# Heading\n**bold** &lt;tag&gt;\n1. item</pre><p>'+('公开合成文本，不含个人资料。 '.repeat(100))+'</p></article>'});
     if(Object.values(bases).some(base=>url.startsWith(base)))return route.continue();
     return route.abort();
   });
   const extension='chrome-extension://'+extId+'/';let libraryOwner;
+  const openPopup=async(url,{selection=false}={})=>{
+    const article=await ctx.newPage();await article.goto(url);await article.bringToFront();
+    if(selection)await article.evaluate(()=>{
+      const range=document.createRange();range.selectNodeContents(document.getElementById('quote-fixture'));
+      const selected=window.getSelection();selected.removeAllRanges();selected.addRange(range);
+    });
+    const opened=ctx.waitForEvent('page');
+    await worker.evaluate(url=>chrome.tabs.create({url,active:false}),extension+'popup.html');
+    const popup=await opened;await popup.waitForLoadState();
+    await popup.waitForFunction(()=>typeof _popupDraftContext!=='undefined'&&_popupDraftContext?.ready===true
+      &&['found','missing'].includes(bookmarkLookup.status)&&!document.getElementById('submit-btn').disabled);
+    return {popup,article,close:async()=>{await popup.close();await article.close();}};
+  };
+  const savePopup=async popup=>{
+    await popup.locator('#submit-btn').click();
+    await until(()=>popup.evaluate(()=>document.getElementById('submit-btn').classList.contains('saved-success')),'popup_save');
+  };
+  const openReader=async url=>{
+    const account=await worker.evaluate(async()=>(await getCurrentBookmarkAuth()).account);
+    await worker.evaluate(async data=>chrome.storage.local.set({md_preview_data_live:{markdown:'# Synthetic article\n\nPublic fixture.',title:'Synthetic article',url:data.url,baseUrl:data.url,account:data.account,tags:[],description:'',source:'local',ts:Date.now()}}),{url,account});
+    const reader=await ctx.newPage();await reader.goto(extension+'md-preview.html?k=live');
+    await reader.waitForFunction(()=>document.getElementById('reader-bookmark-save')?.getAttribute('aria-busy')==='false');
+    return reader;
+  };
+  const applyReader=async reader=>{
+    await reader.locator('#reader-bookmark-apply').click();
+    await until(()=>reader.evaluate(()=>!document.getElementById('reader-bookmark-editor').matches(':popover-open')),'reader_apply');
+  };
+  const runEdges=async service=>{
+    await worker.evaluate(async()=>{await chrome.storage.local.set({optBlockquote:true,optAutoDescription:true,optRespectTagCase:true,tagSyncMode:'fresh'});});
+    if(service==='karakeep') {
+      phase='karakeep_seed_spellings';
+      const names={own:prefix+' machine learning',double:prefix+' double  space',minority:prefix+' popular topic',twin:prefix+'_machine_learning',majority:prefix+'_popular_topic'};
+      // Seed independent service-native spellings through the real API, not the
+      // extension's canonicalizer. All URLs and mutations still pass the guard.
+      for(let i=0;i<3;i++) {
+        const seed=await worker.evaluate(async({root,url,title,tags})=>{
+          const auth=await getCurrentBookmarkAuth();
+          const send=async(path,body)=>{
+            const response=await fetch(root+path,{method:'POST',redirect:'error',headers:{Authorization:'Bearer '+auth.token,'Content-Type':'application/json'},body:JSON.stringify(body)});
+            if(!response.ok)throw new Error('seed_http_'+response.status);
+            return response.json();
+          };
+          const row=await send('bookmarks',{type:'link',url,title,note:'Public synthetic tag fixture',source:'api'});
+          await send('bookmarks/'+row.id+'/tags',{tags:tags.map(tagName=>({tagName}))});
+          return true;
+        },{root:roots[service],url:allowed[service][i],title:prefix+' seed '+i,tags:i===0?[names.own,names.double,names.minority]:[names.twin,names.majority]});
+        check(seed,'seed_failed');await ownRow(service,allowed[service][i]);
+      }
+      const url=allowed[service][0],initial=await ownRow(service,url);
+      const initialIds=initial.tags.map(t=>t.id).sort().join(',');
+      const preserved=async code=>{
+        const row=await ownRow(service,url);
+        check(row.tags.map(t=>t.id).sort().join(',')===initialIds,code);
+        check(row.tags.map(t=>t.name).sort().join('|')===[names.own,names.double,names.minority].sort().join('|'),code+'_names');
+      };
+      phase='karakeep_popup_existing_tags';
+      const form=await openPopup(url);
+      await form.popup.waitForFunction(name=>allUserTagCounts[name]===2,names.majority);
+      const chips=await form.popup.locator('#tags-display .tag-item').allTextContents();
+      check(chips.length===3&&chips.includes(names.own)&&chips.includes(names.double),'existing_tags_single_chips');
+      await form.popup.locator('#title-input').fill(prefix+' popup updated');
+      await savePopup(form.popup);await preserved('popup_preserves_existing_tag_ids');await form.close();
+      phase='karakeep_reader_tag_boundaries';
+      let reader=await openReader(url);await reader.locator('#reader-bookmark-edit').click();
+      const quoted=await reader.locator('#reader-bookmark-tags').inputValue();
+      check(quoted.includes(JSON.stringify(names.own))&&quoted.includes(JSON.stringify(names.double)),'reader_quotes_existing_space_tags');
+      const writes=await worker.evaluate(()=>pbpLiveGuard.writes.karakeep);
+      await reader.locator('#reader-bookmark-tags').fill('"'+names.own);
+      await reader.locator('#reader-bookmark-apply').click();
+      await reader.locator('#reader-bookmark-editor-status[data-state="error"]').waitFor();
+      check(await worker.evaluate(()=>pbpLiveGuard.writes.karakeep)===writes,'malformed_quote_dispatched');
+      await reader.locator('#reader-bookmark-tags').fill([names.twin,names.double,names.majority].map(n=>JSON.stringify(n)).join(' '));
+      await applyReader(reader);await preserved('reader_prefers_bookmark_spelling');await reader.close();
+      // Disabling library spelling alignment must not rewrite or delete names
+      // already on this bookmark, including consecutive spaces.
+      await worker.evaluate(()=>chrome.storage.local.set({optRespectTagCase:false}));
+      reader=await openReader(url);await reader.locator('#reader-bookmark-edit').click();
+      await reader.locator('#reader-bookmark-title').fill(prefix+' case alignment off');
+      await applyReader(reader);await preserved('disabled_alignment_preserves_existing_tags');await reader.close();
+      await worker.evaluate(()=>chrome.storage.local.set({optRespectTagCase:true}));
+      phase='karakeep_library_majority';
+      const fresh=await openPopup(allowed[service][3]);
+      await fresh.popup.waitForFunction(name=>allUserTagCounts[name]===2,names.majority);
+      await fresh.popup.locator('#tags-input').fill(JSON.stringify(names.minority));await fresh.popup.locator('#tags-input').press('Enter');
+      check((await fresh.popup.locator('#tags-display .tag-item').allTextContents()).includes(names.majority),'popup_library_majority_chip');
+      await savePopup(fresh.popup);
+      const added=await ownRow(service,allowed[service][3]);
+      check(added.tags.length===1&&added.tags[0].name===names.majority,'library_majority_reused');
+      await fresh.close();
+      const runTags=await worker.evaluate(async prefix=>(await pbpBookmarkClient(await getCurrentBookmarkAuth()).tags()).filter(t=>t.name.startsWith(prefix)),prefix);
+      check(runTags.length===5&&runTags.every(t=>Object.values(names).includes(t.name)),'unexpected_twin_tag');
+      report.checks.push('karakeep: existing space/double-space tag IDs preserved in popup and reader; own spelling beats library majority; malformed quote sends no writes; alignment-off preservation; new bookmark reuses majority without a twin');
+    } else {
+      phase='linkding_quote_and_unread';
+      const quote=await openPopup(allowed[service][0],{selection:true});
+      const expectedQuote='> First line\n>\n> \\# Heading\n> \\*\\*bold\\*\\* &lt;tag>\n> 1\\. item';
+      check(await quote.popup.locator('#description-input').inputValue()===expectedQuote,'selection_markdown_source');
+      check(await quote.popup.locator('#linkding-description-input').inputValue()==='Public synthetic meta description.','quote_description_separate');
+      await savePopup(quote.popup);
+      let row=await ownRow(service,allowed[service][0]);
+      check(row.notes===expectedQuote&&row.description==='Public synthetic meta description.','quote_server_fields');
+      navigationProbe=bases[service]+'bookmarks?unread=yes';
+      check(await quote.popup.locator('#unread-link').getAttribute('href')===navigationProbe,'unread_filter_href');
+      const opened=ctx.waitForEvent('page');await quote.popup.locator('#unread-link').click();const destination=await opened;
+      await destination.waitForLoadState();check(navigationObserved,'unread_filter_click');
+      await destination.close();navigationProbe='';await quote.close();
+      report.checks.push('linkding: selected multiline quote escapes Markdown and stays separate from Description; unread click emits bookmarks?unread=yes (destination rendering not tested)');
+      phase='linkding_offline_create';
+      await worker.evaluate(()=>chrome.storage.local.set({offlineQueueEnabled:true}));
+      let form=await openPopup(allowed[service][1]);
+      await form.popup.locator('#title-input').fill(prefix+' offline create');
+      await form.popup.locator('#description-input').fill('Offline notes\nSecond line');
+      await form.popup.locator('#linkding-description-input').fill('Offline description');
+      await form.popup.locator('#tags-input').fill(JSON.stringify(prefix+' offline tag'));await form.popup.locator('#tags-input').press('Enter');
+      await form.popup.locator('#readlater-check').check();
+      const tag=prefix+'_offline_tag';
+      const queueIsSafe=async(expectedSummary,expectedNotes)=>worker.evaluate(async({url,tag,summary,notes})=>{
+        const {offlineQueue=[]}=await chrome.storage.local.get('offlineQueue');
+        const auth=await getCurrentBookmarkAuth(),item=offlineQueue[0];
+        const fields=new Set(['account','mode','url','title','notes','summary','tags','private','sharedExplicit','toread','archive','time','queuedAt','queueId']);
+        return offlineQueue.length===1&&item.url===url&&item.account===auth.account&&item.summary===summary&&item.notes===notes
+          &&item.tags===tag&&item.private===true&&Object.keys(item).every(key=>fields.has(key))&&!JSON.stringify(item).includes(auth.token);
+      },{url:allowed[service][1],tag,summary:expectedSummary,notes:expectedNotes});
+      await worker.evaluate(()=>{pbpLiveGuard.offline='linkding';});
+      await form.popup.locator('#submit-btn').click();
+      await form.popup.locator('#offline-queue-bar:not(.hidden)').waitFor();
+      check(await queueIsSafe('Offline description','Offline notes\nSecond line'),'offline_create_queue_fields');
+      await worker.evaluate(()=>chrome.storage.local.set({aiTagSeparator:'-'}));
+      await form.popup.locator('#offline-queue-toggle').click();
+      await worker.evaluate(()=>{pbpLiveGuard.offline='';});
+      await form.popup.locator('.offline-queue-retry').click();
+      await until(()=>worker.evaluate(async()=>(await chrome.storage.local.get('offlineQueue')).offlineQueue?.length===0),'offline_create_replay');
+      row=await ownRow(service,allowed[service][1]);
+      check(row.description==='Offline description'&&row.notes==='Offline notes\nSecond line'&&row.unread===true&&row.shared===false,'offline_create_fields');
+      check(row.tag_names.length===1&&row.tag_names[0]===tag,'offline_replay_reminted_tag');
+      await form.close();
+      phase='linkding_offline_update';
+      form=await openPopup(allowed[service][1]);
+      await form.popup.locator('#description-input').fill('Updated offline notes');
+      await form.popup.locator('#linkding-description-input').fill('');
+      await form.popup.locator('#readlater-check').uncheck();
+      await worker.evaluate(()=>{pbpLiveGuard.offline='linkding';});
+      await form.popup.locator('#submit-btn').click();await form.popup.locator('#offline-queue-bar:not(.hidden)').waitFor();
+      check(await queueIsSafe('','Updated offline notes'),'offline_update_queue_fields');
+      await form.popup.locator('#offline-queue-toggle').click();
+      await worker.evaluate(()=>{pbpLiveGuard.offline='';});
+      await form.popup.locator('.offline-queue-retry').click();
+      await until(()=>worker.evaluate(async()=>(await chrome.storage.local.get('offlineQueue')).offlineQueue?.length===0),'offline_update_replay');
+      row=await ownRow(service,allowed[service][1]);
+      check(row.description===''&&row.notes==='Updated offline notes'&&!row.unread&&!row.shared&&row.tag_names.length===1&&row.tag_names[0]===tag,'offline_update_fields');
+      await form.close();await worker.evaluate(()=>chrome.storage.local.set({offlineQueueEnabled:false}));
+      report.checks.push('linkding: offline popup create and update replay through queue UI; secret-free identity-bound records; explicit empty Description preserved; Notes/unread/default privacy preserved; changed separator does not remint queued tags');
+    }
+    console.log(service+': targeted edge acceptance passed');await syncLedger();
+  };
   for(const service of services) {
     phase=service+'_connect';
     const options=await ctx.newPage();await options.goto(extension+'options.html');
@@ -154,6 +319,7 @@ try {
     if(!libraryOwner){libraryOwner=owner;await worker.evaluate(owner=>pbpVocabSaveWord(owner,{term:'shared',language:'en',gloss:'local fixture',contexts:[]}),owner);}
     check(owner===libraryOwner,'library_switched');check(await worker.evaluate(async owner=>(await pbpVocabAll(owner)).length===1,owner),'library_lost');
     await options.close();
+    if(scenario==='edges'&&!args.includes('--read-only')){await runEdges(service);continue;}
     if(args.includes('--read-only')) {
       const result=await worker.evaluate(async()=>{const client=pbpBookmarkClient(await getCurrentBookmarkAuth());return {tags:(await client.tags()).length,recent:(await client.recent(2)).length};});
       report.checks.push(service+': authenticated extension tags/recent passed ('+result.tags+' usable tags)');
@@ -261,7 +427,7 @@ try {
       let path='tags/?limit=100';const seen=new Set();
       while(path){check(!seen.has(path)&&seen.size<100,'cleanup_pagination');seen.add(path);const data=await api('linkding',path);
         for(const tag of data.results){
-          if(![prefix,prefix+'_空格',prefix+'-空格'].includes(tag.name))continue;
+          if(tag.name!==prefix&&!tag.name.startsWith(prefix+'_')&&!tag.name.startsWith(prefix+'-'))continue;
           const query='?limit=1&q='+encodeURIComponent('#'+tag.name);
           const active=await api('linkding','bookmarks/'+query),archived=await api('linkding','bookmarks/archived/'+query);
           const fresh=await api('linkding','tags/'+tag.id+'/');

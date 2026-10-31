@@ -46,6 +46,13 @@ try {
   const value=JSON.parse(plan.output);
   assert.deepEqual(value.services,['linkding']);assert.equal(value.bookmarksPerService,2);
   assert.equal(value.credentialsRead,false);assert.equal(value.realRequests,0);
+  const edges=await run(['--plan','--scenario','edges','--service','karakeep','--karakeep','http://127.0.0.1:3030']);
+  assert.equal(edges.code,0);
+  const edgePlan=JSON.parse(edges.output);
+  assert.equal(edgePlan.scenario,'edges');assert.equal(edgePlan.bookmarksPerService,6);
+  assert.equal(edgePlan.credentialsRead,false);assert.equal(edgePlan.realRequests,0);
+  const unknown=await run(['--run','--scenario','unknown','--service','linkding','--linkding','http://127.0.0.1:48100']);
+  assert.equal(unknown.code,1);assert.equal(unknown.report.failure.code,'scenario');
   for(const args of [['--help','--run'],[]]) {
     const result=await run(args);assert.equal(result.code,args.includes('--help')?0:2);
   }
