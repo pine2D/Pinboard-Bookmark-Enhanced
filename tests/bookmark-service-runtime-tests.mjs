@@ -268,7 +268,7 @@ try{
     await reader.locator('#reader-bookmark-later').click();
     await reader.waitForFunction(()=>document.getElementById('reader-bookmark-later')?.getAttribute('aria-pressed')==='true');
     assert(service==='linkding'?[...records.linkding.values()][0].unread:membership.size===1);
-    await reader.locator('#reader-bookmark-edit').click();
+    await reader.locator('#reader-bookmark-edit[aria-busy="false"]').click();
     await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
     if(service==='karakeep')assert(await reader.locator('#reader-bookmark-private').isHidden());
     else {assert(await reader.locator('#reader-bookmark-private').isVisible());assert(await reader.locator('#reader-bookmark-private').isChecked());assert((await reader.locator('#reader-bookmark-private').locator('xpath=ancestor::label').textContent()).includes('Share'));assert(!Object.hasOwn(requests.filter(r=>r.service==='linkding'&&r.method==='PATCH').at(-1).data,'shared'),'reader Read Later changed sharing');}
@@ -281,14 +281,16 @@ try{
       assert(!Object.hasOwn(latestPatch().data,'shared')&&!row.shared,'untouched reader republished remotely private bookmark');
       for(const desired of [true,false]){
         await reader.locator('#reader-bookmark-editor:popover-open').waitFor({state:'hidden'});
-        await reader.locator('#reader-bookmark-edit').click();await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
+        // Closing the editor precedes the post-save refresh. Wait for the
+        // operation to settle, otherwise edit() correctly ignores this click.
+        await reader.locator('#reader-bookmark-edit[aria-busy="false"]').click();await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
         await reader.locator('#reader-bookmark-private').setChecked(desired);
         const before=requests.length;await reader.locator('#reader-bookmark-apply').click();
         await until(()=>requests.length>before&&latestPatch().data.shared===desired,'reader explicit sharing delivery');
         assert.equal(row.shared,desired);
       }
       await reader.locator('#reader-bookmark-editor:popover-open').waitFor({state:'hidden'});
-      await reader.locator('#reader-bookmark-edit').click();await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
+      await reader.locator('#reader-bookmark-edit[aria-busy="false"]').click();await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
     }
     await reader.locator('#reader-bookmark-delete').click();await reader.locator('.confirm-yes').click();
     await reader.waitForFunction(()=>document.getElementById('reader-bookmark-status')?.textContent==='Bookmark deleted');
