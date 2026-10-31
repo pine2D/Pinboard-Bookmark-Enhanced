@@ -9752,6 +9752,13 @@ async function runSweep(page, sw, extBase) {
       // describe.
       await page.evaluate(() => { document.querySelectorAll(".panel.active details:not(.context-help)").forEach((d) => { d.open = true; }); });
       await page.waitForTimeout(100);
+      if (tabId === "tab-tags") {
+        // The seeded rows arrive through async auth/storage reads. Measuring
+        // the static hints before those rows render mistakes the loading
+        // state for adjacent paragraphs and omits both chip families.
+        await page.waitForSelector("#tag-gov-groups .tag-gov-chip-face", { timeout: TIMEOUT_MS });
+        await page.waitForSelector("#tag-gov-lowcount-list .tag-gov-chip-face", { timeout: TIMEOUT_MS });
+      }
       if (tabId === "tab-appearance") {
         // #preset-preview-section carries the `hidden` attribute until a
         // site-theme preset is picked (options.js renderPresetPreview) --
