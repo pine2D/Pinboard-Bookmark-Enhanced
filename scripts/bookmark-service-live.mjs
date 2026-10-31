@@ -98,7 +98,9 @@ try {
   const prefsPath=join(profile,'Default','Preferences'),prefs=JSON.parse(readFileSync(prefsPath,'utf8'));
   for(const key of ['granted_permissions','active_permissions']) {
     const bucket=prefs.extensions.settings[extId][key] ||= {};const hosts=bucket.explicit_host ||= [];
-    for(const base of Object.values(bases)){const pattern=new URL(base).origin+'/*';if(!hosts.includes(pattern))hosts.push(pattern);}
+    // Opening popup.html as a tab does not grant activeTab as an action click
+    // would. Permit only the intercepted synthetic article in this throwaway profile.
+    for(const base of [...Object.values(bases),'https://example.com/']){const pattern=new URL(base).origin+'/*';if(!hosts.includes(pattern))hosts.push(pattern);}
   }
   writeFileSync(prefsPath,JSON.stringify(prefs));ctx=await launch();worker=await getWorker();await worker.evaluate(()=>primeSettings());
   // Extra guard for this opt-in test: even a production bug cannot mutate an
@@ -155,7 +157,7 @@ try {
     if(args.includes('--read-only')) {
       const result=await worker.evaluate(async()=>{const client=pbpBookmarkClient(await getCurrentBookmarkAuth());return {tags:(await client.tags()).length,recent:(await client.recent(2)).length};});
       report.checks.push(service+': authenticated extension tags/recent passed ('+result.tags+' usable tags)');
-      console.log(service+': readonly extension checks passed ('+result.tags+' usable tags)');await syncLedger();continue;
+      console.log(service+': readonly extension checks passed ('+result.tags+' usable tags)');await syncLedger();
     }
     const url=allowed[service][0];const article=await ctx.newPage();await article.goto(url);await article.bringToFront();
     phase=service+'_popup';
@@ -167,6 +169,10 @@ try {
       check(await popup.locator('#linkding-description-input').inputValue()==='Public synthetic meta description.','linkding_meta_description');
       check(!(await popup.locator('#description-input').inputValue()).includes('Public synthetic meta description.'),'linkding_meta_repeated_in_notes');
       await popup.locator('#linkding-description-input').fill('手工描述，与笔记分开');
+    }
+    if(args.includes('--read-only')) {
+      report.checks.push(service+': synthetic article popup prefill without saving');
+      await popup.close();await article.close();await syncLedger();continue;
     }
     await popup.locator('#title-input').fill(prefix+' 中文标题');await popup.locator('#description-input').fill('中文笔记\n第二行');
     await popup.locator('#tags-input').fill(prefix);await popup.locator('#tags-input').press('Enter');await popup.locator('#submit-btn').click();
