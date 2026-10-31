@@ -102,7 +102,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/pinboard-sort-tests.html": 45,
   "tests/pinboard-style-cloak-tests.html": 21,
   "tests/popup-ai-sw-tests.html": 61,
-  "tests/popup-tag-cache-tests.html": 35,
+  "tests/popup-tag-cache-tests.html": 37,
   "tests/popup-save-tests.html": 262,
   "tests/popup-draft-tests.html": 55,
   "tests/save-pipeline-tests.html": 87,

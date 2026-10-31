@@ -361,7 +361,7 @@ function setupTagsInput() {
       hint.dataset.tag = input.value.trim();
       const icon = document.createElement("span"); icon.className = "ac-new-icon"; icon.textContent = "+ ";
       hint.appendChild(icon); hint.appendChild(document.createTextNode(input.value.trim()));
-      hint.addEventListener("click", () => { addTag(input.value.trim()); input.value = ""; closeAutocomplete(); input.focus(); });
+      hint.addEventListener("click", () => { pbpSplitTagInput(input.value).forEach(tag => addTag(tag)); input.value = ""; closeAutocomplete(); input.focus(); });
       dropdown.appendChild(hint);
       openAutocomplete();
       return;
@@ -441,10 +441,11 @@ function setupTagsInput() {
       const hasPending = input.value.trim().length > 0;
       if (e.key === "Tab" && !acVisible && !hasPending) return;
       e.preventDefault();
-      if (acIndex >= 0 && items[acIndex]) {
-        addTag(items[acIndex].dataset.tag);
-      } else if (acVisible) {
-        addTag(items[0].dataset.tag);
+      const selected = acVisible ? items[acIndex >= 0 ? acIndex : 0] : null;
+      // Existing completions are literal service names. The new-tag hint is
+      // pending input and must use the same parser as paste, even after rAF.
+      if (selected && !selected.classList.contains("ac-new-hint")) {
+        addTag(selected.dataset.tag);
       } else if (hasPending) {
         pbpSplitTagInput(input.value).forEach((t) => addTag(t));
       }
