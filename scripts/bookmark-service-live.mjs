@@ -7,9 +7,11 @@ import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
 const args=process.argv.slice(2);
-if(args.includes('--help')||!args.includes('--run')) {
+if(args.includes('--help')||(!args.includes('--run')&&!args.includes('--plan'))) {
   console.log('Opt-in: node scripts/bookmark-service-live.mjs --run --credentials /private/credentials.json --karakeep http://127.0.0.1:PORT --linkding http://127.0.0.1:PORT');
   console.log('Optional: --service karakeep|linkding; --read-only verifies Connect, tags and recent without remote writes.');
+  console.log('--plan validates public arguments without accessing credentials, network or a browser.');
+  console.log('Karakeep writes also require --confirm-karakeep-no-auto-ai, after verifying server automatic tagging and summarization are both disabled.');
   process.exit(args.includes('--help')?0:2);
 }
 const option=name=>args[args.indexOf(name)+1];
@@ -59,15 +61,23 @@ async function ownRow(service,url) {
 }
 try {
   check(services.every(s=>['linkding','karakeep'].includes(s)),'service');
+  for(const service of services) {
+    check(args.includes('--'+service),'missing_base');const u=new URL(option('--'+service));
+    check(u.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(u.hostname)&&!u.username&&!u.password&&!u.search&&!u.hash,'loopback_required');
+    bases[service]=u.href.replace(/\/$/,'')+'/';roots[service]=bases[service]+(service==='linkding'?'api/':'api/v1/');
+    allowed[service]=[1,2].map(n=>'https://example.com/?pbp-it='+runId+'-'+service+'-'+n);
+  }
+  if(args.includes('--plan')) {
+    const plan={services,bases,credentialsRead:false,realRequests:0,bookmarksPerService:args.includes('--read-only')?0:2,nodeRequestsPerService:180,browserRequestsPerService:180,automaticRetries:0,extensionAi:false,karakeepWritesRequireAutoAiDisabled:true,cleanup:'only this run bookmarks, empty lists and unused tags',webRenderingVerified:false};
+    await new Promise(resolve=>process.stdout.write(JSON.stringify(plan,null,2)+'\n',resolve));
+    process.exit(0);
+  }
+  check(args.includes('--read-only')||!services.includes('karakeep')||args.includes('--confirm-karakeep-no-auto-ai'),'karakeep_auto_ai_not_confirmed_off');
   const path=option('--credentials');check(args.includes('--credentials')&&path,'credentials_path');
   const stat=lstatSync(path);check(stat.isFile()&&!stat.isSymbolicLink()&&(stat.mode&0o077)===0,'credentials_permissions');
   credentials=JSON.parse(readFileSync(path,'utf8'));
   for(const service of services) {
     const token=credentials[service+'Token'];check(typeof token==='string'&&token.trim()&&!/[\r\n]/.test(token),'missing_'+service+'Token');
-    check(args.includes('--'+service),'missing_base');const u=new URL(option('--'+service));
-    check(u.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(u.hostname)&&!u.username&&!u.password&&!u.search&&!u.hash,'loopback_required');
-    bases[service]=u.href.replace(/\/$/,'')+'/';roots[service]=bases[service]+(service==='linkding'?'api/':'api/v1/');
-    allowed[service]=[1,2].map(n=>'https://example.com/?pbp-it='+runId+'-'+service+'-'+n);
     phase=service+'_readonly';
     const health=await api(service,new URL(service==='linkding'?'health':'api/health',bases[service]).href,{auth:false});
     check(['ok','healthy'].includes(health.status),'health');
@@ -83,7 +93,7 @@ try {
   const launch=()=>chromium.launchPersistentContext(profile,{headless:true,executablePath:chromium.executablePath(),viewport:{width:1280,height:900},args:[`--disable-extensions-except=${root}`,`--load-extension=${root}`,'--no-first-run','--disable-background-networking','--disable-component-update','--disable-sync','--no-pings','--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']});
   const getWorker=async()=>ctx.serviceWorkers().find(w=>w.url().startsWith('chrome-extension://'))||ctx.waitForEvent('serviceworker');
   ctx=await launch();worker=await getWorker();const extId=new URL(worker.url()).hostname;
-  await worker.evaluate(async()=>{await primeSettings();await chrome.storage.local.set({optSyncEnabled:false,optAiAutoTags:false,optAiAutoSummary:false,previewAiEnabled:false,optShowAiTags:false,optShowAiSummary:false,optAutoCloseAfterSave:false,optLang:'en',optCheckBookmarkStatus:false,waybackArchiveEnabled:false,optPrivateDefault:true,offlineQueueEnabled:false});});
+  await worker.evaluate(async()=>{await primeSettings();await chrome.storage.local.set({optSyncEnabled:false,optAiAutoTags:false,optAiAutoSummary:false,previewAiEnabled:false,optShowAiTags:false,optShowAiSummary:false,optAutoCloseAfterSave:false,optLang:'en',optCheckBookmarkStatus:false,waybackArchiveEnabled:false,optPrivateDefault:true,offlineQueueEnabled:false,aiTagSeparator:'_',optAutoDescription:true});});
   await ctx.close();ctx=null;worker=null;
   const prefsPath=join(profile,'Default','Preferences'),prefs=JSON.parse(readFileSync(prefsPath,'utf8'));
   for(const key of ['granted_permissions','active_permissions']) {
@@ -125,7 +135,7 @@ try {
   const pageErrors=[];ctx.on('page',p=>p.on('pageerror',()=>pageErrors.push('pageerror')));
   await ctx.route(/^https?:\/\//,route=>{
     const url=route.request().url();
-    if(Object.values(allowed).flat().includes(url))return route.fulfill({contentType:'text/html',body:'<title>联调样例</title><article><h1>联调样例</h1><p>'+('公开合成文本，不含个人资料。 '.repeat(100))+'</p></article>'});
+    if(Object.values(allowed).flat().includes(url))return route.fulfill({contentType:'text/html',body:'<title>联调样例</title><meta name="description" content="Public synthetic meta description."><article><h1>联调样例</h1><p>'+('公开合成文本，不含个人资料。 '.repeat(100))+'</p></article>'});
     if(Object.values(bases).some(base=>url.startsWith(base)))return route.continue();
     return route.abort();
   });
@@ -150,12 +160,20 @@ try {
     const url=allowed[service][0];const article=await ctx.newPage();await article.goto(url);await article.bringToFront();
     phase=service+'_popup';
     const opened=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),extension+'popup.html');const popup=await opened;
-    await popup.waitForLoadState();await popup.locator('#main-section:not(.hidden)').waitFor();await popup.waitForFunction(()=>!document.getElementById('submit-btn').disabled);
+    await popup.waitForLoadState();await popup.locator('#main-section:not(.hidden)').waitFor();await popup.waitForFunction(()=>typeof _popupDraftContext!=='undefined'&&_popupDraftContext?.ready===true&&!document.getElementById('submit-btn').disabled);
+    if(service==='linkding') {
+      check(await popup.locator('#private-check').isHidden(),'linkding_private_control');
+      check(!await popup.locator('#share-check').isChecked(),'linkding_default_shared');
+      check(await popup.locator('#linkding-description-input').inputValue()==='Public synthetic meta description.','linkding_meta_description');
+      check(!(await popup.locator('#description-input').inputValue()).includes('Public synthetic meta description.'),'linkding_meta_repeated_in_notes');
+      await popup.locator('#linkding-description-input').fill('手工描述，与笔记分开');
+    }
     await popup.locator('#title-input').fill(prefix+' 中文标题');await popup.locator('#description-input').fill('中文笔记\n第二行');
-    await popup.locator('#tags-input').fill(prefix);await popup.locator('#tags-input').press('Enter');if(service==='linkding')await popup.locator('#private-check').check();await popup.locator('#submit-btn').click();
+    await popup.locator('#tags-input').fill(prefix);await popup.locator('#tags-input').press('Enter');await popup.locator('#submit-btn').click();
     await until(()=>popup.evaluate(()=>document.getElementById('submit-btn').classList.contains('saved-success')),'popup_save');
     let row=await ownRow(service,url);check(row.title===prefix+' 中文标题','popup_title');check((service==='linkding'?row.notes:row.note)==='中文笔记\n第二行','popup_note');
-    check(service!=='linkding'||row.shared===false,'privacy');await popup.close();
+    check(service!=='linkding'||row.shared===false,'privacy');
+    check(service!=='linkding'||row.description==='手工描述，与笔记分开','linkding_description');await popup.close();
     phase=service+'_reader';const account=await worker.evaluate(async()=>(await getCurrentBookmarkAuth()).account);
     await worker.evaluate(async data=>chrome.storage.local.set({md_preview_data_live:{markdown:'# 合成文章\n\n不含个人资料。',title:'合成文章',url:data.url,baseUrl:data.url,account:data.account,tags:[],description:'',source:'local',ts:Date.now()}}),{url,account});
     const reader=await ctx.newPage();await reader.goto(extension+'md-preview.html?k=live');
@@ -170,7 +188,8 @@ try {
     await reader.locator('#reader-bookmark-tags').fill(JSON.stringify(prefix+' 空格'));await reader.locator('#reader-bookmark-apply').click();
     await until(()=>reader.evaluate(()=>!document.getElementById('reader-bookmark-editor').matches(':popover-open')),'reader_edit');
     row=await ownRow(service,url);check(row.title===prefix+' 已编辑'&&(service==='linkding'?row.notes:row.note)==='编辑后的笔记\n第二行','reader_fields');
-    check((service==='linkding'?row.tag_names:row.tags.map(t=>t.name)).includes(prefix+(service==='linkding'?'-':' ')+'空格'),'server_tag_semantics');
+    check((service==='linkding'?row.tag_names:row.tags.map(t=>t.name)).includes(prefix+'_空格'),'new_tag_separator');
+    check(service!=='linkding'||row.description==='手工描述，与笔记分开','reader_preserves_description');
     phase=service+'_reader_mark_read';
     await reader.waitForFunction(()=>document.getElementById('reader-bookmark-save')?.getAttribute('aria-busy')==='false');
     await reader.locator('#reader-bookmark-save').click();await reader.waitForFunction(()=>document.getElementById('reader-bookmark-later')?.getAttribute('aria-pressed')==='false');
@@ -236,7 +255,7 @@ try {
       let path='tags/?limit=100';const seen=new Set();
       while(path){check(!seen.has(path)&&seen.size<100,'cleanup_pagination');seen.add(path);const data=await api('linkding',path);
         for(const tag of data.results){
-          if(![prefix,prefix+'-空格'].includes(tag.name))continue;
+          if(![prefix,prefix+'_空格',prefix+'-空格'].includes(tag.name))continue;
           const query='?limit=1&q='+encodeURIComponent('#'+tag.name);
           const active=await api('linkding','bookmarks/'+query),archived=await api('linkding','bookmarks/archived/'+query);
           const fresh=await api('linkding','tags/'+tag.id+'/');

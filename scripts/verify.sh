@@ -51,6 +51,7 @@ fi
 
 echo "[bookmark-services] isolated primary-service UI and personal-library restore"
 node tests/bookmark-service-runtime-tests.mjs
+node tests/bookmark-live-preflight-tests.mjs
 
 echo "[selection] real pointer selection with native popover light-dismiss"
 node scripts/qa-drive.mjs --headless --surfaces selection --check --label selection-default-contract
