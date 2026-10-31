@@ -190,7 +190,7 @@ try {
         const seed=await worker.evaluate(async({root,url,title,tags})=>{
           const auth=await getCurrentBookmarkAuth();
           const send=async(path,body)=>{
-            const response=await fetch(root+path,{method:'POST',redirect:'error',headers:{Authorization:'Bearer '+auth.token,'Content-Type':'application/json'},body:JSON.stringify(body)});
+            const response=await fetch(root+path,{method:'POST',redirect:'error',signal:AbortSignal.timeout(20000),headers:{Authorization:'Bearer '+auth.token,'Content-Type':'application/json'},body:JSON.stringify(body)});
             if(!response.ok)throw new Error('seed_http_'+response.status);
             return response.json();
           };
