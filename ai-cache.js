@@ -386,3 +386,103 @@ async function pbpAiCacheStats() {
     return null;
   }
 }
+
+// ---- Summary ownership receipts ----
+// A receipt records which range of a bookmark's notes is the AI summary block
+// this extension wrote, so the popup can replace or remove that block in place
+// after the AI cache that produced it has expired. It carries the owner, the
+// page URL (normalized below), a SHA-256 of the full notes and the [start,
+// end) range -- never the notes text -- and is honoured only while all of them
+// still match the bookmark on screen, so an edit made on another client,
+// another account or another page fails closed. Kept here rather than in
+// popup-ai.js so every context that loads the AI cache shares one copy.
+
+// THIRD URL-normalization variant in this codebase - unconditionally drops
+// the hash below (no `#/` or `#!` router exception), unlike ai.js
+// `_aiCacheUrlNorm` / md-ai-core.js `pbpAiCacheUrlNorm` (both keep hash
+// ROUTERS as significant). Used only for the popup's URL-edit guard
+// (popup-ai.js `_aiUrlEquivalent`) and the `summary_owner_` keys below -
+// never for AI response cache keys. Must NOT be repointed at cache keys, and
+// must not be merged with the other two normalizers.
+function pbpAiPageUrlNorm(url) {
+  let normalized = String(url == null ? "" : url).trim();
+  try {
+    const parsed = new URL(normalized);
+    parsed.hash = "";
+    normalized = parsed.href;
+  } catch (_) {}
+  try {
+    if (typeof stripTrackingParams === "function") {
+      normalized = stripTrackingParams(normalized, {}).cleaned || normalized;
+    }
+  } catch (_) {}
+  return normalized;
+}
+
+function pbpAiSummaryRangeValid(value, range) {
+  return !!range &&
+    Number.isInteger(range.start) &&
+    Number.isInteger(range.end) &&
+    range.start >= 0 &&
+    range.end > range.start &&
+    range.end <= value.length;
+}
+
+function pbpAiSummaryOwnershipKey(account, url) {
+  const normalizedUrl = pbpAiPageUrlNorm(url);
+  if (!account || !normalizedUrl) return "";
+  return _PBP_AI_SUMMARY_OWNER_PREFIX + encodeURIComponent(account) + "_" + normalizedUrl;
+}
+
+async function pbpAiSummaryTextHash(value) {
+  const bytes = new TextEncoder().encode(String(value));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest),
+    (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+// A missing or invalid range deletes the receipt: the caller is saying these
+// notes carry no block it owns.
+async function pbpAiSaveSummaryOwnership(account, url, notes, range) {
+  const key = pbpAiSummaryOwnershipKey(account, url);
+  if (!key) return false;
+  if (typeof notes !== "string" || !pbpAiSummaryRangeValid(notes, range)) {
+    await pbpAiCacheDelete(key);
+    return false;
+  }
+  const savedAt = Date.now();
+  const receipt = {
+    account,
+    url: pbpAiPageUrlNorm(url),
+    notesHash: await pbpAiSummaryTextHash(notes),
+    start: range.start,
+    end: range.end,
+    savedAt
+  };
+  return pbpAiCacheSet(key, receipt, savedAt);
+}
+
+async function pbpAiLoadSummaryOwnership(account, url, notes) {
+  const key = pbpAiSummaryOwnershipKey(account, url);
+  if (!key) return null;
+  const entry = await pbpAiCacheGet(key);
+  const receipt = entry && entry.result;
+  const basicValid = receipt &&
+    receipt.account === account &&
+    receipt.url === pbpAiPageUrlNorm(url) &&
+    pbpAiSummaryRangeValid(notes, receipt);
+  if (!basicValid) {
+    if (entry) await pbpAiCacheDelete(key);
+    return null;
+  }
+  let notesHash;
+  try { notesHash = await pbpAiSummaryTextHash(notes); }
+  catch (_) { return null; }
+  if (notesHash !== receipt.notesHash) {
+    await pbpAiCacheDelete(key);
+    return null;
+  }
+  return { start: receipt.start, end: receipt.end };
+}
+
+// ---- End summary ownership receipts ----

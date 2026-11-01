@@ -227,30 +227,10 @@ async function pbpAiTranscriptText(s, buttonId) {
 // produce a summary of page A cached under A but saved onto bookmark B.
 // Equivalence deliberately ignores fragments and tracking params so the
 // paste-clean flow (strip utm etc.) keeps AI enabled.
-// THIRD URL-normalization variant in this codebase - unconditionally drops
-// the hash below (no `#/` or `#!` router exception), unlike ai.js
-// `_aiCacheUrlNorm` / md-ai-core.js `pbpAiCacheUrlNorm` (both keep hash
-// ROUTERS as significant). Used only for the URL-edit guard
-// (_aiUrlEquivalent) and the `summary_owner_` ownership keys further below -
-// never for AI response cache keys. Must NOT be repointed at cache keys, and
-// must not be merged with the other two normalizers.
-function _aiNormalizeUrl(url) {
-  let normalized = String(url == null ? "" : url).trim();
-  try {
-    const parsed = new URL(normalized);
-    parsed.hash = "";
-    normalized = parsed.href;
-  } catch (_) {}
-  try {
-    if (typeof stripTrackingParams === "function") {
-      normalized = stripTrackingParams(normalized, {}).cleaned || normalized;
-    }
-  } catch (_) {}
-  return normalized;
-}
-
+// The normalizer is ai-cache.js `pbpAiPageUrlNorm` (the third variant, shared
+// with the summary_owner_ receipt keys; read its warning before reusing it).
 function _aiUrlEquivalent(a, b) {
-  return _aiNormalizeUrl(a) === _aiNormalizeUrl(b);
+  return pbpAiPageUrlNorm(a) === pbpAiPageUrlNorm(b);
 }
 
 // Called from the url-input "input" listener (popup.js): grey the AI
@@ -315,21 +295,12 @@ function pbpAiFindLastExactSummaryRange(value, summary, service = "pinboard") {
   return start < 0 ? null : { start, end: start + wrapped.length };
 }
 
-function _pbpAiSummaryRangeValid(value, range) {
-  return !!range &&
-    Number.isInteger(range.start) &&
-    Number.isInteger(range.end) &&
-    range.start >= 0 &&
-    range.end > range.start &&
-    range.end <= value.length;
-}
-
 // Locate one continuous textarea edit through its longest common prefix/suffix.
 // Ownership fails closed when that edit crosses a summary/note boundary.
 function pbpAiTrackSummaryRange(range, oldValue, newValue) {
   const oldText = String(oldValue || "");
   const newText = String(newValue || "");
-  if (!_pbpAiSummaryRangeValid(oldText, range)) return { kind: "merged" };
+  if (!pbpAiSummaryRangeValid(oldText, range)) return { kind: "merged" };
 
   let oldStart = 0;
   while (oldStart < oldText.length &&
@@ -363,7 +334,7 @@ function pbpAiTrackSummaryRange(range, oldValue, newValue) {
 
 function pbpAiRemoveSummaryRange(value, range) {
   const text = String(value || "");
-  if (!_pbpAiSummaryRangeValid(text, range)) return { value: text, removed: false };
+  if (!pbpAiSummaryRangeValid(text, range)) return { value: text, removed: false };
   let before = text.slice(0, range.start);
   let after = text.slice(range.end);
   if (before.endsWith("\n\n") && after.startsWith("\n\n")) {
@@ -383,68 +354,10 @@ const AI_BQ_REGEX = _AI_BQ_REGEX_SHARED;
 let _aiSummaryRange = null;
 let _aiSummaryValue = "";
 
-const AI_SUMMARY_OWNER_PREFIX = "summary_owner_";
-
-function pbpAiSummaryOwnershipKey(account, url) {
-  const normalizedUrl = _aiNormalizeUrl(url);
-  if (!account || !normalizedUrl) return "";
-  return AI_SUMMARY_OWNER_PREFIX + encodeURIComponent(account) + "_" + normalizedUrl;
-}
-
-async function pbpAiSummaryTextHash(value) {
-  const bytes = new TextEncoder().encode(String(value));
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest),
-    (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
 function pbpAiSummaryOwnershipSnapshot(description) {
   if (_aiSummaryValue !== description ||
-      !_pbpAiSummaryRangeValid(description, _aiSummaryRange)) return null;
+      !pbpAiSummaryRangeValid(description, _aiSummaryRange)) return null;
   return { start: _aiSummaryRange.start, end: _aiSummaryRange.end };
-}
-
-async function pbpAiSaveSummaryOwnership(account, url, description, range) {
-  const key = pbpAiSummaryOwnershipKey(account, url);
-  if (!key) return;
-  if (!_pbpAiSummaryRangeValid(description, range)) {
-    if (typeof pbpAiCacheDelete === "function") await pbpAiCacheDelete(key);
-    return;
-  }
-  if (typeof pbpAiCacheSet !== "function") return;
-  const savedAt = Date.now();
-  const receipt = {
-    account,
-    url: _aiNormalizeUrl(url),
-    notesHash: await pbpAiSummaryTextHash(description),
-    start: range.start,
-    end: range.end,
-    savedAt
-  };
-  await pbpAiCacheSet(key, receipt, savedAt);
-}
-
-async function pbpAiLoadSummaryOwnership(account, url, description) {
-  const key = pbpAiSummaryOwnershipKey(account, url);
-  if (!key || typeof pbpAiCacheGet !== "function") return null;
-  const entry = await pbpAiCacheGet(key);
-  const receipt = entry && entry.result;
-  const basicValid = receipt &&
-    receipt.account === account &&
-    receipt.url === _aiNormalizeUrl(url) &&
-    _pbpAiSummaryRangeValid(description, receipt);
-  if (!basicValid) {
-    if (entry && typeof pbpAiCacheDelete === "function") await pbpAiCacheDelete(key);
-    return null;
-  }
-  let notesHash;
-  try { notesHash = await pbpAiSummaryTextHash(description); }
-  catch (_) { return null; }
-  if (notesHash !== receipt.notesHash) {
-    if (typeof pbpAiCacheDelete === "function") await pbpAiCacheDelete(key);
-    return null;
-  }
-  return { start: receipt.start, end: receipt.end };
 }
 
 // ---- Setup AI feature listeners ----
@@ -791,7 +704,7 @@ function _aiLastLegacySummaryRange(value) {
 
 function _aiAdoptSummaryRange(value, range, fromCache) {
   const input = $id("description-input");
-  if (input.value !== value || !_pbpAiSummaryRangeValid(value, range)) return false;
+  if (input.value !== value || !pbpAiSummaryRangeValid(value, range)) return false;
   _aiSummaryRange = { start: range.start, end: range.end };
   _aiSummaryValue = value;
   showSummaryActions(fromCache);
@@ -804,7 +717,7 @@ async function _aiRestoreSummaryOwnership(account, url, cachedSummary) {
   const input = $id("description-input");
   const value = input.value;
   if (_aiSummaryValue === value &&
-      _pbpAiSummaryRangeValid(value, _aiSummaryRange)) {
+      pbpAiSummaryRangeValid(value, _aiSummaryRange)) {
     showSummaryActions(false);
     return "session";
   }
@@ -849,7 +762,7 @@ function upsertSummary(summary, { userEdit = true } = {}) {
   const wrapped = pbpAiWrapSummary(summary, pbpBookmarkServiceId(settings));
   let next;
   let start;
-  if (_aiSummaryValue === cur && _pbpAiSummaryRangeValid(cur, _aiSummaryRange)) {
+  if (_aiSummaryValue === cur && pbpAiSummaryRangeValid(cur, _aiSummaryRange)) {
     start = _aiSummaryRange.start;
     next = cur.slice(0, start) + wrapped + cur.slice(_aiSummaryRange.end);
   } else {
@@ -889,7 +802,7 @@ function removeSummary() {
   const di = $id("description-input");
   const cur = di.value;
   let removed = { value: cur, removed: false };
-  if (_aiSummaryValue === cur && _pbpAiSummaryRangeValid(cur, _aiSummaryRange)) {
+  if (_aiSummaryValue === cur && pbpAiSummaryRangeValid(cur, _aiSummaryRange)) {
     removed = pbpAiRemoveSummaryRange(cur, _aiSummaryRange);
   } else {
     _aiSummaryRange = null;

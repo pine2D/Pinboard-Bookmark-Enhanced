@@ -138,6 +138,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       fetch("../popup-offline.js").then((response) => response.text())
     ]);
     const aiJsSource = await (await fetch("../ai.js")).text();
+    const aiCacheSource = await (await fetch("../ai-cache.js")).text();
     const pbpNotesDescription = new Function(aiJsSource.slice(aiJsSource.indexOf("function pbpNotesDescription("),aiJsSource.indexOf("function buildAutoNotes("))+";return pbpNotesDescription;")();
     const start = source.indexOf("function setupSubmit(token)");
     const handlerEnd = source.indexOf('  document.addEventListener("keydown"', start);
@@ -1654,7 +1655,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     });
 
     // Builds the real regen links out of popup-ai.js's own renderAITags, plus
-    // the real _aiNormalizeUrl/_aiUrlEquivalent pair, so the r2 M3 + A10
+    // the real pbpAiPageUrlNorm/_aiUrlEquivalent pair, so the r2 M3 + A10
     // contracts can be exercised instead of spelled out. Every source grep we
     // tried here was satisfiable by a guard whose result is discarded, or by
     // one that only exists in a comment, while the retraction still fired.
@@ -1673,7 +1674,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const renderStart = popupAiSource.indexOf("function renderAITags(");
       const renderEnd = popupAiSource.indexOf("\n}\n", renderStart);
       assert(renderStart >= 0 && renderEnd > renderStart, "renderAITags source not found");
-      const urlStart = popupAiSource.indexOf("function _aiNormalizeUrl");
+      const urlStart = popupAiSource.indexOf("function _aiUrlEquivalent");
       const urlEnd = popupAiSource.indexOf("function pbpAiSyncUrlEditState", urlStart);
       assert(urlStart >= 0 && urlEnd > urlStart, "URL-equivalence helpers not found");
       // The real op-liveness guard, not a stub: it is what decides whether the
@@ -1713,7 +1714,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "$id", "t", "PBP_ICONS", "allUserTagCounts", "pageInfo",
         "renderTags", "doAITags", "showStatus", "pbpAssignAltNumBadges",
         "_aiClearTagsOutput", "_aiAppendEmptyState", "_aiParkTagsBtn",
-        "stripTrackingParams", "URL", "seedTags", "settings", "counts", "bookmarkNames",
+        "pbpAiPageUrlNorm", "URL", "seedTags", "settings", "counts", "bookmarkNames",
         "let currentTags = seedTags.slice();\n" +
         "const _aiSessionAddedTags = new Set();\n" +
         "let bookmarkLookup = {status:'pending',url:pageInfo.url,formLoaded:false};\n" +
@@ -1749,7 +1750,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         (host) => host.querySelectorAll(".stag, .add-all-link, .cache-hint-wrap, .empty-state").forEach((node) => node.remove()),
         () => {},
         () => {},
-        window.stripTrackingParams,
+        summaryReceiptApi({ stripTrackingParams: window.stripTrackingParams }).pbpAiPageUrlNorm,
         window.URL,
         seedTags,
         // pbpPopupAiAccount derives the owner from this token via shared.js's
@@ -1809,7 +1810,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       // from the saved bookmark) and its chip is never clicked, so the
       // retraction may not take it even though the cached round offered it.
       const run = regenRuntime({
-        formUrl: URL + "#frag", // still equivalent: _aiNormalizeUrl drops the fragment
+        formUrl: URL + "#frag", // still equivalent: pbpAiPageUrlNorm drops the fragment
         pageUrl: URL,
         tags: ["alpha", "beta"],
         seedTags: ["manual", "alpha"],
@@ -1959,11 +1960,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const helperStart = popupAiSource.indexOf("function pbpAiWrapSummary");
       const helperEnd = popupAiSource.indexOf("const AI_BQ_REGEX", helperStart);
       assert(helperStart >= 0 && helperEnd > helperStart, "summary ownership helpers missing");
-      return new Function("escapeForExtended",
+      return new Function("escapeForExtended", "pbpAiSummaryRangeValid",
         popupAiSource.slice(helperStart, helperEnd) +
         "; return { pbpAiWrapSummary, pbpAiTrackSummaryRange, pbpAiRemoveSummaryRange," +
         " pbpAiFindLastExactSummaryRange };"
-      )((value) => "[" + value + "]");
+      )((value) => "[" + value + "]", summaryReceiptApi().pbpAiSummaryRangeValid);
     }
 
     test("popup prefill formats selected text for the connected service", () => {
@@ -2019,58 +2020,58 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "non-matching cache was guessed");
     });
 
-    function summaryReceiptHelpers() {
-      const start = popupAiSource.indexOf("function _aiNormalizeUrl");
-      const end = popupAiSource.indexOf("// ---- Setup AI feature listeners ----", start);
-      assert(start >= 0 && end > start, "summary receipt helpers missing");
-      const entries = new Map();
-      const api = new Function(
-        "stripTrackingParams", "pbpAiCacheGet", "pbpAiCacheSet", "pbpAiCacheDelete",
-        "crypto", "TextEncoder", "_AI_BQ_REGEX_SHARED", "URL",
-        popupAiSource.slice(start, end) +
-        "; return { pbpAiSummaryOwnershipKey, pbpAiSaveSummaryOwnership," +
-        " pbpAiLoadSummaryOwnership };"
-      )(
-        (url) => ({ cleaned: String(url).replace(/[?&]utm_source=[^&#]*/g, "") }),
-        async (key) => entries.get(key) || null,
-        async (key, result, ts) => entries.set(key, { key, result, ts }),
-        async (key) => entries.delete(key),
-        crypto,
-        TextEncoder,
-        /$a/g,
-        window.URL
-      );
-      return { entries, ...api };
-    }
-
-    function summaryOwnershipRuntime(description) {
-      const start = popupAiSource.indexOf("function _aiNormalizeUrl");
-      const end = popupAiSource.indexOf("// ---- Setup AI feature listeners ----", start);
-      assert(start >= 0 && end > start, "summary ownership runtime missing");
+    // ai-cache.js's real summary ownership section over an in-memory store.
+    // Sliced rather than loaded with <script>: this page's global `const URL`
+    // would shadow the constructor inside a loaded copy (see regenRuntime), so
+    // the real one is handed in. The prefix comes from its real declaration.
+    function summaryReceiptApi({ stripTrackingParams = (url) => ({ cleaned: String(url) }) } = {}) {
+      const start = aiCacheSource.indexOf("// ---- Summary ownership receipts ----");
+      const end = aiCacheSource.indexOf("// ---- End summary ownership receipts ----", start);
+      const prefix = aiCacheSource.match(/^const _PBP_AI_SUMMARY_OWNER_PREFIX = .*;$/m);
+      assert(start >= 0 && end > start && prefix, "summary ownership receipt section missing");
       const entries = new Map();
       const deletes = [];
       const api = new Function(
         "stripTrackingParams", "pbpAiCacheGet", "pbpAiCacheSet", "pbpAiCacheDelete",
-        "crypto", "TextEncoder", "_AI_BQ_REGEX_SHARED", "URL",
-        popupAiSource.slice(start, end) +
-        "; function setSummaryState(value, range) { _aiSummaryValue = value; _aiSummaryRange = range; }" +
-        "; return { pbpAiSummaryOwnershipKey, pbpAiSummaryOwnershipSnapshot," +
-        " pbpAiSaveSummaryOwnership, pbpAiLoadSummaryOwnership, setSummaryState };"
+        "crypto", "TextEncoder", "URL",
+        prefix[0] + "\n" + aiCacheSource.slice(start, end) +
+        "; return { pbpAiPageUrlNorm, pbpAiSummaryRangeValid, pbpAiSummaryOwnershipKey," +
+        " pbpAiSaveSummaryOwnership, pbpAiLoadSummaryOwnership };"
       )(
-        (url) => ({ cleaned: String(url) }),
+        stripTrackingParams,
         async (key) => entries.get(key) || null,
-        async (key, result, ts) => entries.set(key, { key, result, ts }),
+        async (key, result, ts) => { entries.set(key, { key, result, ts }); return true; },
         async (key) => { deletes.push(key); entries.delete(key); },
         crypto,
         TextEncoder,
-        /$a/g,
         window.URL
       );
-      return { field: { value: description }, entries, deletes, ...api };
+      return { entries, deletes, ...api };
+    }
+
+    function summaryReceiptHelpers() {
+      return summaryReceiptApi({
+        stripTrackingParams: (url) => ({ cleaned: String(url).replace(/[?&]utm_source=[^&#]*/g, "") })
+      });
+    }
+
+    function summaryOwnershipRuntime(description) {
+      const receipts = summaryReceiptApi();
+      const start = popupAiSource.indexOf("function _aiUrlEquivalent");
+      const end = popupAiSource.indexOf("// ---- Setup AI feature listeners ----", start);
+      assert(start >= 0 && end > start, "summary ownership runtime missing");
+      const api = new Function(
+        "pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "_AI_BQ_REGEX_SHARED",
+        popupAiSource.slice(start, end) +
+        "; function setSummaryState(value, range) { _aiSummaryValue = value; _aiSummaryRange = range; }" +
+        "; return { pbpAiSummaryOwnershipSnapshot, setSummaryState };"
+      )(receipts.pbpAiPageUrlNorm, receipts.pbpAiSummaryRangeValid, /$a/g);
+      return { field: { value: description }, ...receipts, ...api };
     }
 
     function summaryRestoreRuntime(description, options = {}) {
-      const start = popupAiSource.indexOf("function _aiNormalizeUrl");
+      const receipts = summaryReceiptApi();
+      const start = popupAiSource.indexOf("function _aiUrlEquivalent");
       const end = popupAiSource.indexOf('// Unified "no AI key"', start);
       assert(start >= 0 && end > start, "summary restore runtime missing");
       const field = { value: description };
@@ -2085,31 +2086,24 @@ test("posts/add default remains replace=yes for existing callers", () => {
         return new Promise((resolve) => { resolveReceipt = () => resolve(options.receipt || null); });
       };
       const api = new Function(
-        "stripTrackingParams", "pbpAiCacheGet", "pbpAiCacheSet", "pbpAiCacheDelete",
-        "crypto", "TextEncoder", "_AI_BQ_REGEX_SHARED", "URL", "$id",
+        "pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "pbpAiLoadSummaryOwnership",
+        "_AI_BQ_REGEX_SHARED", "$id",
         "pbpPopupAiAccountIsCurrent", "pageInfo", "existingBookmark", "escapeForExtended",
-        "showSummaryActions", "loadReceipt", "settings", "updateCharCount", "autoResizeTextarea",
+        "showSummaryActions", "settings", "updateCharCount", "autoResizeTextarea",
         popupAiSource.slice(start, end) +
-        "; async function pbpAiLoadSummaryOwnership(account, url, value) {" +
-        " return loadReceipt(account, url, value); }" +
         "; function setSummaryState(value, range) { _aiSummaryValue = value; _aiSummaryRange = range; }" +
         "; return { _aiRestoreSummaryOwnership, setSummaryState, upsertSummary, removeSummary };"
       )(
-        (url) => ({ cleaned: String(url) }),
-        async () => null,
-        async () => {},
-        async () => {},
-        crypto,
-        TextEncoder,
+        receipts.pbpAiPageUrlNorm,
+        receipts.pbpAiSummaryRangeValid,
+        (account, url, value) => loadReceipt(account, url, value),
         _AI_BQ_REGEX_SHARED,
-        window.URL,
         (id) => id === "description-input" ? field : urlField,
         (account) => account === "alice" && state.accountCurrent,
         { url: URL },
         options.existingBookmark || null,
         (value) => value,
         (fromCache) => actions.push(fromCache),
-        loadReceipt,
         { bookmarkService: options.service || "pinboard" }, () => {}, () => {}
       );
       return {
@@ -2354,10 +2348,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const createRuntime = (description, service = "pinboard") => {
         const field = { value: description };
         const api = new Function("_AI_BQ_REGEX_SHARED", "escapeForExtended", "$id",
-          "updateCharCount", "autoResizeTextarea", "settings", "_linkdingDescriptionTouched",
+          "updateCharCount", "autoResizeTextarea", "settings", "_linkdingDescriptionTouched", "pbpAiSummaryRangeValid",
           popupAiSource.slice(runtimeStart, runtimeEnd) +
           "; return { upsertSummary, removeSummary };"
-        )(_AI_BQ_REGEX_SHARED, (text) => text, () => field, () => {}, () => {}, { bookmarkService: service }, false);
+        )(_AI_BQ_REGEX_SHARED, (text) => text, () => field, () => {}, () => {}, { bookmarkService: service }, false,
+          summaryReceiptApi().pbpAiSummaryRangeValid);
         return { field, ...api };
       };
       const legacy = "before\n\n[AI Summary]\n<blockquote>old</blockquote>\n\nafter";
