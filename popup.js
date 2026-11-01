@@ -1982,12 +1982,17 @@ function setupSubmit(token) {
         typeof pbpAiSummaryOwnershipSnapshot === "function"
           ? pbpAiSummaryOwnershipSnapshot(extended)
           : undefined;
+      // An update writes the Description only when the user changed the line
+      // the loaded one was shown as, so a value another client wrote after the
+      // lookup is not overwritten with the one this popup loaded.
+      const descriptionUnchanged = savePolicy.mode === "update" && typeof existingBookmark?.summary === "string"
+        && pbpBookmarkDescriptionLine(summary) === pbpBookmarkDescriptionLine(existingBookmark.summary);
       const intent = {
         mode: savePolicy.mode,
         url: saveUrl,
         title,
         notes: extended,
-        ...(pbpBookmarkServiceId(settings) === "linkding" ? { ...(descriptionKnown ? { summary: pbpBookmarkDescriptionLine(summary) } : {}), sharedExplicit } : {}),
+        ...(pbpBookmarkServiceId(settings) === "linkding" ? { ...(descriptionKnown && !descriptionUnchanged ? { summary: pbpBookmarkDescriptionLine(summary) } : {}), sharedExplicit } : {}),
         tags: pbpSerializeIntentTags(tags, pbpBookmarkServiceId(settings)),
         private: isPrivate,
         toread: isReadLater,
@@ -2113,6 +2118,9 @@ function setupSubmit(token) {
             href: url,
             description: title,
             extended,
+            // The Description as this popup last knew it: the line it just
+            // wrote, or the loaded one it left alone.
+            ...(pbpBookmarkServiceId(settings) === "linkding" ? { summary: intent.summary ?? existingBookmark?.summary } : {}),
             tags: tags.join(" "),
             tagNames: tags.slice(),
             shared: isPrivate ? "no" : "yes",

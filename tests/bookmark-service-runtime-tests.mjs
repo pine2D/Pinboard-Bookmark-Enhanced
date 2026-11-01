@@ -496,12 +496,25 @@ try{
     await popup.waitForFunction(()=>document.getElementById('existing-banner')&&!document.getElementById('existing-banner').classList.contains('hidden')&&!document.getElementById('submit-btn').disabled);
     await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});
     assert.equal(await popup.locator('#linkding-description-input').inputValue(),'First line Second line','the popup did not show the stored Description as one line');
+    // Another client rewrites the Description after the popup loaded it, and
+    // again after the popup's first update. A tag-only update leaves it alone
+    // each time: the popup compares with the line it showed, so it neither
+    // flattens the stored value nor writes back the one it loaded.
+    const elsewhere=['Changed\n\n  elsewhere','Changed  again'];
+    Object.assign(records.linkding.get(multiId),{description:elsewhere[0],date_modified:serverNow()});
     await popup.locator('#tags-input').fill('added');await popup.locator('#tags-input').press('Enter');
     let before=multiPatches().length;await popup.locator('#submit-btn').click();
     await until(()=>multiPatches().length>before,'popup tag-only update');
     assert(!Object.hasOwn(multiPatches().at(-1).data,'description'),'a tag-only popup update rewrote the Description');
-    assert.equal(records.linkding.get(multiId).description,multiLine,'a tag-only popup update flattened the Description');
+    assert.equal(records.linkding.get(multiId).description,elsewhere[0],'a tag-only popup update flattened or overwrote the Description');
     assert.deepEqual(records.linkding.get(multiId).tag_names,['kept','added']);
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    Object.assign(records.linkding.get(multiId),{description:elsewhere[1],date_modified:serverNow()});
+    await popup.locator('#tags-input').fill('again');await popup.locator('#tags-input').press('Enter');
+    before=multiPatches().length;await popup.locator('#submit-btn').click();
+    await until(()=>multiPatches().length>before,'second popup tag-only update');
+    assert(!Object.hasOwn(multiPatches().at(-1).data,'description'),'a second tag-only popup update wrote the Description it loaded');
+    assert.equal(records.linkding.get(multiId).description,elsewhere[1],'a second tag-only popup update overwrote a Description changed elsewhere');
     await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
     await popup.locator('#linkding-description-input').fill('Edited   description ');
     before=multiPatches().length;await popup.locator('#submit-btn').click();
@@ -526,7 +539,7 @@ try{
     await reader.close();
   }
   records.linkding.delete(multiId);await article.goto(origin+'/article');
-  console.log('linkding multi-line Description: tag-only popup and title-only reader updates keep it; an edit writes its one line');
+  console.log('linkding multi-line Description: tag-only popup updates keep it, also after a change elsewhere; a title-only reader update keeps it; an edit writes its one line');
   // A page the extension may not read (the localhost name was never granted)
   // leaves the popup nothing to vouch for: the create sends no Description
   // and no disable_scraping, and linkding fills in the page's own meta

@@ -228,7 +228,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(elements["private-check"].checked && !elements["share-check"].checked,"new popup defaults to shared");
       }
     });
-    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard", sharedExplicit = false, summaryOwnership = null, ownershipKnown = true, descriptionKnown = true } = {}) {
+    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard", sharedExplicit = false, summaryOwnership = null, ownershipKnown = true, descriptionKnown = true, loaded = null } = {}) {
       const elements = {
         "submit-btn": createElementStub(),
         "delete-btn": createElementStub({ classes: ["hidden"] }),
@@ -244,7 +244,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       };
       const currentTags = ["One", "Two"];
       const fieldDirtyFlags = { "title-input": true, "description-input": true, "private-check": true, "readlater-check": true };
-      const bookmarkLookup = { status: lookupFailed ? "failed" : "missing", url: URL, generation: 1, promise: null, formLoaded: false };
+      // loaded: the bookmark a finished lookup filled the form from (update mode).
+      const bookmarkLookup = { status: lookupFailed ? "failed" : loaded ? "found" : "missing", url: URL, generation: 1, promise: null, formLoaded: !!loaded };
       const settings = {
         pinboardToken: "alice:token",
         bookmarkService: service,
@@ -354,7 +355,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         pbpPopupSavePolicy,
         fieldDirtyFlags,
         bookmarkLookup,
-        existingBookmark: null,
+        existingBookmark: loaded,
         currentTags,
         _archiveUserTouched: archiveUserTouched,
         _linkdingSharedExplicit: sharedExplicit,
@@ -444,6 +445,23 @@ test("posts/add default remains replace=yes for existing callers", () => {
           where + ": intent Description " + JSON.stringify(message.intent.summary));
         assert(Object.hasOwn(message.popupDraft.expectedDraft, "summary") === (expected !== undefined), where + ": draft snapshot disagrees with the intent");
         h.resolveSave({ ok: true, status: "saved", data: {} }); await saving;
+      }
+    });
+    await testAsync("linkding updates carry a Description only when the user changed the line it was shown as", async () => {
+      // The form showed the loaded Description as one line. Leaving that line
+      // alone sends nothing, so a value another client wrote after the lookup
+      // is not overwritten with the one this popup loaded.
+      for (const [stored, box, expected] of [["First line\n\n  Second   line", "First line Second line", undefined], ["Stored", "Stored", undefined], ["", "", undefined],
+        ["Stored", "  Edited\n value ", "Edited value"], ["Stored", "", ""], ["", "Typed", "Typed"]]) {
+        const loaded = { href: URL, description: "Stored title", extended: "", summary: stored, tags: "", tagNames: [], shared: "no", toread: "no", time: "2026-10-30T03:01:22Z" };
+        const h = createSubmitHarness({ service: "linkding", draftContext: true, loaded });
+        h.elements["linkding-description-input"].value = box;
+        const saving = h.click(); await flushMicrotasks();
+        const message = h.messages.find(m => m.type === "save_intent"), where = JSON.stringify({ stored, box });
+        assert(message?.intent.mode === "update" && message.intent.time === loaded.time, where + ": the loaded bookmark was not updated");
+        assert(Object.hasOwn(message.intent, "summary") === (expected !== undefined) && message.intent.summary === expected,
+          where + ": intent Description " + JSON.stringify(message.intent.summary));
+        h.resolveSave({ ok: true, status: "saved", mutation: "updated", data: {} }); await saving;
       }
     });
     await testAsync("saved sharing intent is consumed without clearing a newer same-value sharing choice", async () => {
