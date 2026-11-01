@@ -301,7 +301,7 @@ async function workerHarness(service, replies, options = {}) {
       remove:async keys=>{for(const k of [].concat(keys)){if(k==="offlineQueue")state.queue=[];else delete state.local[k];}}
     }}}
   };
-  const api = new Function(...Object.keys(deps),workerSource.slice(start,end)+";return {submitSaveIntent,sendOfflineItem,verifyConnection:pbpVerifyBookmarkConnection,processOfflineQueue,retryOfflineItem,pbpOfflinePauseOnCredentialChange,readPause:pbpReadOfflineQueuePause,client:pbpBookmarkClient,mutateOfflineQueue,pbpReadTagVocab};")(...Object.values(deps));
+  const api = new Function(...Object.keys(deps),workerSource.slice(start,end)+";return {submitSaveIntent,submitPopupSaveIntent,sendOfflineItem,verifyConnection:pbpVerifyBookmarkConnection,processOfflineQueue,retryOfflineItem,pbpOfflinePauseOnCredentialChange,readPause:pbpReadOfflineQueuePause,client:pbpBookmarkClient,mutateOfflineQueue,pbpReadTagVocab};")(...Object.values(deps));
   return {...api,state,auth};
 }
 const saveIntent = {mode:"create",url:pageUrl,title:"Title",notes:"Note",tags:"work",private:true,toread:false};
@@ -376,6 +376,24 @@ test("a Karakeep create merged into a concurrent bookmark owns the note it suppl
   equal((await kept.submitSaveIntent({...saveIntent,mode:"merge",tags:"work",notes},{summaryRange:range})).status,"saved");
   equal(kept.state.calls[2].body.note,"My note");
   equal((await pbpFixtureSummaryOwnershipEntries()).length,0);
+});
+test("a Karakeep popup update owns the note it wrote; a live merge into an identical note owns nothing", async()=>{
+  const notes="Auto notes\n\n" + KK_SUMMARY, range={start:"Auto notes\n\n".length, end:notes.length};
+  await pbpFixtureClearSummaryOwnership();
+  const updated=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[200,{id:"bk1",title:"Title",note:notes}]]);
+  const result=await updated.submitPopupSaveIntent({...saveIntent,mode:"update",time:kk.createdAt,tags:"work",notes},(await updated.auth()).account,range);
+  equal([result.status, updated.state.calls.map(c=>c.method), updated.state.calls[2]?.body?.note],["saved",["GET","GET","PATCH"],notes]);
+  const popup=await kkPopup(updated, notes);
+  const owner=await popup.restore();
+  popup.regenerate("Second paragraph.");
+  equal([popup.field.value, owner],["Auto notes\n\nSecond paragraph.","receipt"]);
+
+  await pbpFixtureClearSummaryOwnership();
+  const merged=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,{...kk,note:notes}],[200,{id:"bk1",title:"Saved title",note:notes}]]);
+  equal((await merged.submitSaveIntent({...saveIntent,mode:"merge",tags:"work",notes},{expectedAccount:(await merged.auth()).account,summaryRange:range})).status,"saved");
+  equal(merged.state.calls[2].body.note,notes);
+  equal((await pbpFixtureSummaryOwnershipEntries()).length,0);
+  equal(await (await kkPopup(merged, notes)).restore(),null);
 });
 test("a Karakeep summary saved offline is reclaimable after its replay writes it", async()=>{
   await pbpFixtureClearSummaryOwnership();
