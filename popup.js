@@ -1935,13 +1935,14 @@ function setupSubmit(token) {
         return;
       }
       // Where this popup's AI summary block sits in the submitted notes (null:
-      // none it owns). The worker records it once these notes are delivered,
-      // for every save path alike; it travels beside the intent, so offline
-      // records keep only their listed fields.
+      // none it owns; undefined: it cannot tell, e.g. the AI summary UI is off,
+      // and the message then carries no range). The worker records it once
+      // these notes are delivered, for every save path alike; it travels
+      // beside the intent, so offline records keep only their listed fields.
       const summaryOwnership =
         typeof pbpAiSummaryOwnershipSnapshot === "function"
           ? pbpAiSummaryOwnershipSnapshot(extended)
-          : null;
+          : undefined;
       const intent = {
         mode: savePolicy.mode,
         url: saveUrl,

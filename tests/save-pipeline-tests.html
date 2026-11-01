@@ -2556,6 +2556,26 @@ await suite("summary ownership after worker saves", async () => {
     }
   });
 
+  // The popup with its AI summary UI off never checks which block it owns,
+  // and a save clicked before that check completes cannot tell either. Its
+  // update writes the same notes back, so the page's receipt must survive.
+  await test("a popup save that cannot tell its summary ownership leaves the page's receipt alone", async () => {
+    await pbpFixtureClearSummaryOwnership();
+    await pbpAiSaveSummaryOwnership("alice", PAGE, QUICK_NOTES, QUICK_RANGE);
+    const unchecked = await popupOpens(QUICK_NOTES);
+    const core = await createHarness({ pinboardFetch: pinboard(NO_POSTS) });
+    const result = await core.submitPopupSaveIntent(
+      intent({ mode: "update", time: "2026-11-01T09:00:00Z", title: "Edited title", notes: QUICK_NOTES }), "alice",
+      JSON.parse(JSON.stringify({ range: unchecked.snapshot() })).range);
+    equal(result.status, "saved");
+    equal(extendedSent(core), QUICK_NOTES, "update notes bytes changed");
+    const popup = await popupOpens(QUICK_NOTES);
+    const owner = await popup.restore();
+    popup.regenerate("Second summary");
+    equal(owner, "receipt", "an update from a popup that never checked ownership retired the receipt");
+    equal(popup.field.value, "Auto notes\n\n<blockquote>Second summary</blockquote>", "Regenerate did not replace the block in place");
+  });
+
   await test("removing a queued save drops its offline hold", async () => {
     for (const removal of ["remove", "clear"]) {
       await pbpFixtureClearSummaryOwnership();

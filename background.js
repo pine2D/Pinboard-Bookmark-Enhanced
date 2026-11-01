@@ -1396,7 +1396,10 @@ function retryOfflineItem(queueId) {
   });
 }
 
-function submitPopupSaveIntent(intent, expectedAccount, summaryRange = null) {
+// summaryRange: the popup's AI summary block in intent.notes; null when its
+// ownership check found none of its own; absent when it cannot tell, which
+// leaves the page's receipt alone.
+function submitPopupSaveIntent(intent, expectedAccount, summaryRange) {
   if (!expectedAccount || typeof expectedAccount !== "string") {
     return Promise.resolve(pbpSaveFailure("account_changed"));
   }

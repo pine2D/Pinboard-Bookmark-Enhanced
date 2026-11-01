@@ -228,7 +228,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(elements["private-check"].checked && !elements["share-check"].checked,"new popup defaults to shared");
       }
     });
-    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard", sharedExplicit = false, summaryOwnership = null } = {}) {
+    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard", sharedExplicit = false, summaryOwnership = null, ownershipKnown = true } = {}) {
       const elements = {
         "submit-btn": createElementStub(),
         "delete-btn": createElementStub({ classes: ["hidden"] }),
@@ -380,7 +380,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         pbpWaybackShouldArchive,
         pbpWaybackShouldAttempt: () => true,
         POSTS_ADD_URI_BUDGET,
-        pbpAiSummaryOwnershipSnapshot: (value) => { ownershipReads.push(value); return summaryOwnership; },
+        pbpAiSummaryOwnershipSnapshot: (value) => { ownershipReads.push(value); return ownershipKnown ? summaryOwnership : undefined; },
         // Receipts are the worker's to write; the popup must never call this.
         pbpAiSaveSummaryOwnership: async (...args) => { receiptWrites.push(args); },
       };
@@ -443,21 +443,26 @@ test("posts/add default remains replace=yes for existing callers", () => {
     await testAsync("the popup hands its summary range to the worker and never writes a receipt itself", async () => {
       // The worker records ownership once the notes are delivered, the same
       // way for every save path; the range rides beside the intent so offline
-      // records keep only their listed fields.
+      // records keep only their listed fields. What reaches the worker is the
+      // JSON-serialised message: "cannot tell" arrives as no range at all,
+      // while null (no block of its own) arrives as null.
       for (const [label, ownership, outcome] of [
         ["owned block, saved", { start: 0, end: 15 }, { status: "saved", mutation: "created" }],
         ["owned block, queued", { start: 0, end: 15 }, { status: "queued", queueId: "q1", cause: "network" }],
         ["owned block, failed", { start: 0, end: 15 }, { status: "failed", reason: "http", httpStatus: 400 }],
         ["no owned block, saved", null, { status: "saved", mutation: "updated" }],
+        ["ownership unknown, saved", undefined, { status: "saved", mutation: "updated" }],
       ]) {
-        const h = createSubmitHarness({ summaryOwnership: ownership });
+        const h = createSubmitHarness({ summaryOwnership: ownership, ownershipKnown: ownership !== undefined });
         const saving = h.click(); await flushMicrotasks();
         const message = h.messages.find((m) => m.type === "save_intent");
         assert(message, label + ": save was not dispatched");
         assert(h.ownershipReads.length === 1 && h.ownershipReads[0] === "Submitted notes",
           label + ": ownership was not read for the submitted notes");
-        assert(Object.hasOwn(message, "summaryRange") && JSON.stringify(message.summaryRange) === JSON.stringify(ownership),
-          label + ": summary range not sent: " + JSON.stringify(message.summaryRange));
+        const wire = JSON.parse(JSON.stringify(message));
+        assert(ownership === undefined ? !Object.hasOwn(wire, "summaryRange")
+          : Object.hasOwn(wire, "summaryRange") && JSON.stringify(wire.summaryRange) === JSON.stringify(ownership),
+          label + ": summary range sent as " + JSON.stringify(wire.summaryRange));
         assert(!Object.hasOwn(message.intent, "summaryRange"), label + ": the range leaked into the intent");
         h.resolveSave(outcome); await saving;
         assert(h.receiptWrites.length === 0, label + ": the popup wrote a receipt itself");
@@ -2100,7 +2105,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "showSummaryActions", "settings", "updateCharCount", "autoResizeTextarea",
         popupAiSource.slice(start, end) +
         "; function setSummaryState(value, range) { _aiSummaryValue = value; _aiSummaryRange = range; }" +
-        "; return { _aiRestoreSummaryOwnership, setSummaryState, upsertSummary, removeSummary };"
+        "; function setExistingBookmark(value) { existingBookmark = value; }" +
+        "; return { _aiRestoreSummaryOwnership, setSummaryState, upsertSummary, removeSummary," +
+        " pbpAiSummaryOwnershipSnapshot, setExistingBookmark };"
       )(
         receipts.pbpAiPageUrlNorm,
         receipts.pbpAiSummaryRangeValid,
@@ -2122,6 +2129,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
         restore: api._aiRestoreSummaryOwnership,
         upsert: api.upsertSummary, remove: api.removeSummary,
         setSummaryState: api.setSummaryState,
+        snapshot: () => api.pbpAiSummaryOwnershipSnapshot(field.value),
+        setExistingBookmark: api.setExistingBookmark,
         resolveReceipt: () => resolveReceipt?.(),
         get loadCalls() { return loadCalls; }
       };
@@ -2165,12 +2174,50 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const owned = h.pbpAiSummaryOwnershipSnapshot(description);
       assert(owned && owned.start === 0 && owned.end === description.length,
         "live summary range was not snapshotted");
+      // No ownership check ran here, so without a live range it cannot tell.
       h.field.value += " external";
-      assert(h.pbpAiSummaryOwnershipSnapshot(h.field.value) === null,
+      assert(h.pbpAiSummaryOwnershipSnapshot(h.field.value) === undefined,
         "changed description retained ownership");
       h.setSummaryState(h.field.value, { start: 0, end: 0 });
-      assert(h.pbpAiSummaryOwnershipSnapshot(h.field.value) === null,
+      assert(h.pbpAiSummaryOwnershipSnapshot(h.field.value) === undefined,
         "invalid range was snapshotted");
+    });
+
+    // A null snapshot tells the worker these notes hold no block of the
+    // popup's own, and the worker retires the page's receipt. The popup may
+    // say so only once its ownership check completed for the bookmark and page
+    // on screen; before that (AI summary UI off, lookup or receipt read still
+    // pending, check abandoned) it cannot tell, and says nothing.
+    await testAsync("the ownership snapshot vouches for no block only after a completed check for the bookmark on screen", async () => {
+      const notes = "Typed by hand";
+      const h = summaryRestoreRuntime(notes, { existingBookmark: { extended: notes } });
+      assert(h.snapshot() === undefined, "vouched before any check");
+      assert(await h.restore("alice", URL, null) === null, "found a block in hand-typed notes");
+      assert(h.snapshot() === null, "a completed check did not vouch for no block");
+      h.urlField.value = "https://example.com/another-page";
+      assert(h.snapshot() === undefined, "vouched for another page");
+      h.urlField.value = URL;
+      assert(h.snapshot() === null, "the page on screen lost its check");
+      h.setExistingBookmark({ extended: notes });
+      assert(h.snapshot() === undefined, "vouched for a bookmark it never checked");
+
+      const owned = "<blockquote>receipt</blockquote>";
+      const pending = summaryRestoreRuntime(owned, { delayed: true, existingBookmark: { extended: owned },
+        receipt: { start: 0, end: owned.length } });
+      const restoring = pending.restore("alice", URL, null);
+      assert(pending.snapshot() === undefined, "vouched while the receipt read was pending");
+      pending.resolveReceipt();
+      assert(await restoring === "receipt", "the receipt was not adopted");
+      const range = pending.snapshot();
+      assert(range && range.start === 0 && range.end === owned.length, "the adopted range was not snapshotted");
+
+      const abandoned = summaryRestoreRuntime(owned, { delayed: true, existingBookmark: { extended: owned },
+        receipt: { start: 0, end: owned.length } });
+      const stale = abandoned.restore("alice", URL, null);
+      abandoned.state.accountCurrent = false;
+      abandoned.resolveReceipt();
+      assert(await stale === null, "an abandoned check adopted ownership");
+      assert(abandoned.snapshot() === undefined, "an abandoned check vouched for no block");
     });
 
     await testAsync("summary receipt deletion fails closed for invalid and stale receipts", async () => {

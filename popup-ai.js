@@ -353,11 +353,26 @@ const AI_BQ_REGEX = _AI_BQ_REGEX_SHARED;
 // pbpShouldRestoreCachedSummary is defined in shared.js (pure helper, B4).
 let _aiSummaryRange = null;
 let _aiSummaryValue = "";
+// The bookmark (the existingBookmark object it read, null for a new page) and
+// page _aiRestoreSummaryOwnership last completed its check for. Until then the
+// popup cannot say whether the notes hold a block of its own: the AI summary
+// UI may be off, or the check may still be waiting on the bookmark lookup or
+// the receipt read.
+let _aiSummaryOwnershipChecked = null;
 
+// Where this popup's AI summary block sits in `description`: the range it owns,
+// null once its ownership check completed for the bookmark and page on screen
+// and it owns none, undefined when it cannot tell -- the worker then leaves the
+// page's receipt alone instead of retiring one this popup never looked at.
 function pbpAiSummaryOwnershipSnapshot(description) {
-  if (_aiSummaryValue !== description ||
-      !pbpAiSummaryRangeValid(description, _aiSummaryRange)) return null;
-  return { start: _aiSummaryRange.start, end: _aiSummaryRange.end };
+  if (_aiSummaryValue === description && pbpAiSummaryRangeValid(description, _aiSummaryRange)) {
+    return { start: _aiSummaryRange.start, end: _aiSummaryRange.end };
+  }
+  const checked = _aiSummaryOwnershipChecked;
+  if (!checked) return undefined;
+  const bookmark = typeof existingBookmark === "undefined" ? null : existingBookmark;
+  return checked.bookmark === bookmark && _aiUrlEquivalent($id("url-input").value, checked.url)
+    ? null : undefined;
 }
 
 // ---- Setup AI feature listeners ----
@@ -716,16 +731,22 @@ async function _aiRestoreSummaryOwnership(account, url, cachedSummary) {
   if (pbpBookmarkServiceId(settings) === "linkding") return null;
   const input = $id("description-input");
   const value = input.value;
+  const bookmark = existingBookmark;
+  // From here on this popup knows which block it owns in these notes, and
+  // tracks it through edits (see pbpAiSummaryOwnershipSnapshot).
+  const checked = () => { _aiSummaryOwnershipChecked = { bookmark, url }; };
   if (_aiSummaryValue === value &&
       pbpAiSummaryRangeValid(value, _aiSummaryRange)) {
     showSummaryActions(false);
+    checked();
     return "session";
   }
 
-  const receiptRange = existingBookmark && value === existingBookmark.extended
+  const receiptRange = bookmark && value === bookmark.extended
     ? await pbpAiLoadSummaryOwnership(account, url, value)
     : null;
   if (!_aiOpStillCurrent(account) || input.value !== value) return null;
+  checked();
   if (receiptRange && _aiAdoptSummaryRange(value, receiptRange, false)) return "receipt";
 
   const legacyRange = _aiLastLegacySummaryRange(value);

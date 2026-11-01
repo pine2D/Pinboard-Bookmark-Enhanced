@@ -664,6 +664,20 @@ function buildUndoHarness(source, opts) {
     check("router: save_intent hands the popup's summary range to the worker beside the intent",
       args[0] === intent && args[1] === "alice" && args[2] === summaryRange && !Object.hasOwn(intent, "summaryRange"));
   }
+  {
+    // A popup that cannot tell which block it owns sends no range (undefined
+    // does not survive the message channel); only an explicit null says its
+    // notes hold none. The router must not turn one into the other.
+    const handed = [];
+    for (const message of [{}, { summaryRange: null }]) {
+      const h = buildRouterHarness();
+      await h.invoke({ type: "save_intent", intent: { mode: "update" }, account: "alice", ...message });
+      const args = h.calls.find(([n]) => n === "saveIntent")?.[1] || [];
+      handed.push(args.length >= 2 ? args[2] : "not called");
+    }
+    check("router: save_intent passes an absent summary range as unknown and null as no owned block",
+      handed[0] === undefined && handed[1] === null);
+  }
   // ---- K45: a failed popup-initiated save notifies iff no popup context is
   // left to show it. notifySaveFailure runs after sendResponse, inside an
   // await on getContexts — give the microtask queue a tick to drain before

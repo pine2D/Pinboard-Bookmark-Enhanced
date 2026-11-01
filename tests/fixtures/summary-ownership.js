@@ -28,7 +28,7 @@ async function pbpFixturePopupSummary({ service = "pinboard", account, url, note
     "$id", "pbpPopupAiAccountIsCurrent", "pageInfo", "existingBookmark",
     "showSummaryActions", "settings", "updateCharCount", "autoResizeTextarea",
     "let _linkdingDescriptionTouched = false;\n" + source.slice(start, end) +
-    "\nreturn { _aiRestoreSummaryOwnership, upsertSummary, removeSummary };"
+    "\nreturn { _aiRestoreSummaryOwnership, upsertSummary, removeSummary, pbpAiSummaryOwnershipSnapshot };"
   )(
     (id) => fields[id] || null,
     (candidate) => candidate === account,
@@ -45,6 +45,8 @@ async function pbpFixturePopupSummary({ service = "pinboard", account, url, note
     restore: () => api._aiRestoreSummaryOwnership(account, url, null),
     regenerate: (summary) => api.upsertSummary(summary),
     remove: () => api.removeSummary(),
+    // What this popup's save would hand the worker for the notes on screen.
+    snapshot: () => api.pbpAiSummaryOwnershipSnapshot(fields["description-input"].value),
   };
 }
 
