@@ -220,7 +220,12 @@ function pbpCreateBookmarkServiceClient(config) {
     if (service === "linkding") {
       const body = {...(existing ? {} : {url:fields.url}), title:fields.title || "", notes:fields.notes || "",tag_names:tags,
         ...(!existing ? {description:fields.summary ?? ""}
-          : typeof fields.summary === "string" && fields.summary !== existing.summary ? {description:fields.summary} : {}),
+          // The popup and reader show a stored Description as one line. Compare
+          // that line, so a multi-line value the user left alone is never
+          // flattened, and write only the line the user saw.
+          : typeof fields.summary === "string"
+            && pbpBookmarkDescriptionLine(fields.summary) !== pbpBookmarkDescriptionLine(existing.summary)
+            ? {description:pbpBookmarkDescriptionLine(fields.summary)} : {}),
         ...(typeof fields.toread === "boolean" ? {unread:fields.toread} : {}),
         ...(!existing ? {shared:config.sharingEnabled === true && fields.sharedExplicit === true && fields.private === false}
           : config.sharingEnabled === true && fields.sharedExplicit === true && typeof fields.private === "boolean" && fields.private !== existing.private ? {shared:!fields.private} : {})};

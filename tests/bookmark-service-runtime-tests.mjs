@@ -439,6 +439,49 @@ try{
     assert(result.account,label+' create lost its undo account');
   }
   console.log('linkding equal, near-equal, two-second and unparseable server dates remain created');
+  // A Description written elsewhere keeps its line breaks. The popup and the
+  // reader show it as one line; a save that leaves that line alone must not
+  // flatten it. Hand-written v1.47 record for a URL no lookup has cached yet.
+  const multiUrl=origin+'/article-multiline', multiId='40', multiLine='First line\n\n  Second   line';
+  await article.goto(multiUrl);
+  records.linkding.set(multiId,{id:40,url:multiUrl,title:'Stored title',description:multiLine,notes:'Stored notes',web_archive_snapshot_url:'https://web.archive.org/web/20261030030122/'+multiUrl,favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:['kept'],date_added:'2026-10-30T03:01:22.656384Z',date_modified:'2026-10-30T03:01:22.656384Z',website_title:null,website_description:null});
+  const multiPatches=()=>requests.filter(r=>r.service==='linkding'&&r.method==='PATCH'&&r.path==='bookmarks/'+multiId+'/');
+  {
+    await article.bringToFront();const opened=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');const popup=await opened;
+    await popup.waitForFunction(()=>document.getElementById('existing-banner')&&!document.getElementById('existing-banner').classList.contains('hidden')&&!document.getElementById('submit-btn').disabled);
+    await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});
+    assert.equal(await popup.locator('#linkding-description-input').inputValue(),'First line Second line','the popup did not show the stored Description as one line');
+    await popup.locator('#tags-input').fill('added');await popup.locator('#tags-input').press('Enter');
+    let before=multiPatches().length;await popup.locator('#submit-btn').click();
+    await until(()=>multiPatches().length>before,'popup tag-only update');
+    assert(!Object.hasOwn(multiPatches().at(-1).data,'description'),'a tag-only popup update rewrote the Description');
+    assert.equal(records.linkding.get(multiId).description,multiLine,'a tag-only popup update flattened the Description');
+    assert.deepEqual(records.linkding.get(multiId).tag_names,['kept','added']);
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    await popup.locator('#linkding-description-input').fill('Edited   description ');
+    before=multiPatches().length;await popup.locator('#submit-btn').click();
+    await until(()=>multiPatches().length>before,'popup Description edit');
+    assert.equal(multiPatches().at(-1).data.description,'Edited description','an edited Description was not written as its one line');
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    await popup.close();
+  }
+  records.linkding.get(multiId).description=multiLine;
+  {
+    const account=(await worker.evaluate(()=>getCurrentBookmarkAuth())).account;
+    await worker.evaluate(async data=>chrome.storage.local.set({md_preview_data_multiline:{markdown:'# Runtime article',title:'Runtime article',url:data.url,baseUrl:data.url,account:data.account,tags:[],description:'',source:'local',ts:Date.now()}}),{url:multiUrl,account});
+    const reader=await ctx.newPage();await reader.goto(pageUrl+'md-preview.html?k=multiline');
+    await reader.locator('#reader-bookmark-edit[aria-busy="false"]').click();await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
+    assert.equal(await reader.locator('#reader-bookmark-summary').inputValue(),'First line Second line','the reader did not show the stored Description as one line');
+    await reader.locator('#reader-bookmark-title').fill('Reader title edit');
+    const before=multiPatches().length;await reader.locator('#reader-bookmark-apply').click();
+    await until(()=>multiPatches().length>before,'reader title-only update');
+    assert.equal(multiPatches().at(-1).data.title,'Reader title edit');
+    assert(!Object.hasOwn(multiPatches().at(-1).data,'description'),'a title-only reader edit rewrote the Description');
+    assert.equal(records.linkding.get(multiId).description,multiLine,'a title-only reader edit flattened the Description');
+    await reader.close();
+  }
+  records.linkding.delete(multiId);await article.goto(origin+'/article');
+  console.log('linkding multi-line Description: tag-only popup and title-only reader updates keep it; an edit writes its one line');
   // Full v1.47 serializer fixtures, authored independently of request data.
   // id 18 represents a previously scraped Description; id 19 skips scraping.
   const descriptionUrl=origin+'/article-description', customDescriptionUrl=origin+'/article-description-custom';

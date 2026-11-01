@@ -70,6 +70,23 @@ test("linkding PATCH sends Description only for changed strings and supports cle
     equal(result.bookmark.summary,changed?summary:"Meta description");
   }
 });
+test("linkding PATCH leaves a multi-line Description the form showed as one line untouched",async()=>{
+  // Written by linkding's own editor or another client: line breaks and runs
+  // of spaces that the extension's one-line field cannot show.
+  const stored={...ldScraped,description:"First line\n\n  Second   line",tag_names:["kept"]};
+  const existing=pbpBookmarkNormalize("linkding",stored);
+  for(const [summary,sent] of [["First line Second line",undefined],[" First line\nSecond line ",undefined],
+    ["First line Second line, edited","First line Second line, edited"],["  Edited \n description ","Edited description"],["",""]]){
+    const reply=sent===undefined?{...stored,tag_names:["kept","added"],date_modified:"2026-10-30T05:00:00.000000Z"}
+      :{...stored,description:sent,tag_names:["kept","added"],date_modified:"2026-10-30T05:00:00.000000Z"};
+    const h=harness("linkding",[[200,reply]]);
+    const result=await h.client.save({url:pageUrl,title:"T",notes:stored.notes,tags:["kept","added"],summary},existing);
+    equal(h.calls[0].method,"PATCH");
+    equal([summary,Object.hasOwn(h.calls[0].body,"description")],[summary,sent!==undefined]);
+    if(sent!==undefined)equal(h.calls[0].body.description,sent);
+    equal(result.bookmark.summary,sent===undefined?stored.description:sent);
+  }
+});
 test("linkding sharing capability fails closed and only boolean true enables it", async()=>{
   for (const sharing of [undefined,false,true,"true",1]) {
     const settings=gwEnvSettings("linkding",undefined,{sharing});
