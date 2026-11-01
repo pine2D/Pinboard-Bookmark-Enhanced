@@ -523,6 +523,38 @@ try{
     await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
     await popup.close();
   }
+  // A draft keeps only a Description the user or an AI summary wrote; the one
+  // the lookup filled in is read again on the next open. A draft that kept the
+  // loaded line restored it as the user's: the lookup then left the box alone
+  // and the save overwrote a Description changed elsewhere in the meantime.
+  {
+    // Drop the worker's cached lookups, as five minutes or a worker restart
+    // would, so the reopened popup reads what the server holds now.
+    const clearLookups=()=>worker.evaluate(()=>statusCache.clear());
+    const storedDraft=()=>worker.evaluate(async url=>Object.values(await chrome.storage.session.get(null)).find(row=>row?.pageUrl===url)?.draft||null,multiUrl);
+    const openPopup=async()=>{await article.bringToFront();const opened=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');const popup=await opened;
+      await popup.waitForFunction(()=>document.getElementById('existing-banner')&&!document.getElementById('existing-banner').classList.contains('hidden')&&!document.getElementById('submit-btn').disabled);return popup;};
+    Object.assign(records.linkding.get(multiId),{description:multiLine,date_modified:serverNow()});await clearLookups();
+    assert.equal(await storedDraft(),null,'an earlier popup left a draft of this page');
+    let popup=await openPopup();
+    assert.equal(await popup.locator('#linkding-description-input').inputValue(),'First line Second line');
+    await popup.locator('#title-input').fill('Drafted title');
+    await until(async()=>(await storedDraft())?.title==='Drafted title','title edit drafted');
+    assert(!Object.hasOwn(await storedDraft(),'summary'),'the draft kept the Description the lookup filled in');
+    await popup.close();
+    const elsewhere='Changed\n\n  in another client';
+    Object.assign(records.linkding.get(multiId),{description:elsewhere,date_modified:serverNow()});await clearLookups();
+    popup=await openPopup();await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});
+    assert.equal(await popup.locator('#title-input').inputValue(),'Drafted title','the title draft was not restored');
+    assert.equal(await popup.locator('#linkding-description-input').inputValue(),'Changed in another client','the reopened popup did not show the current Description');
+    const before=multiPatches().length;await popup.locator('#submit-btn').click();
+    await until(()=>multiPatches().length>before,'update from a restored title draft');
+    assert.equal(multiPatches().at(-1).data.title,'Drafted title');
+    assert(!Object.hasOwn(multiPatches().at(-1).data,'description'),'a restored title draft rewrote the Description');
+    assert.equal(records.linkding.get(multiId).description,elsewhere,'a restored draft overwrote a Description changed elsewhere');
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    await popup.close();
+  }
   records.linkding.get(multiId).description=multiLine;
   {
     const account=(await worker.evaluate(()=>getCurrentBookmarkAuth())).account;
@@ -539,7 +571,7 @@ try{
     await reader.close();
   }
   records.linkding.delete(multiId);await article.goto(origin+'/article');
-  console.log('linkding multi-line Description: tag-only popup updates keep it, also after a change elsewhere; a title-only reader update keeps it; an edit writes its one line');
+  console.log('linkding multi-line Description: tag-only popup updates keep it, also after a change elsewhere; a reopened title draft shows and keeps the current one; a title-only reader update keeps it; an edit writes its one line');
   // A page the extension may not read (the localhost name was never granted)
   // leaves the popup nothing to vouch for: the create sends no Description
   // and no disable_scraping, and linkding fills in the page's own meta

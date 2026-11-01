@@ -772,6 +772,8 @@ function upsertSummary(summary, { userEdit = true } = {}) {
     const next = pbpBookmarkDescriptionLine(summary);
     const changed = input.value !== next;
     input.value = next;
+    // An AI summary is a Description to save, also one restored from the cache.
+    _linkdingDescriptionPending = true;
     _aiSummaryValue = next;
     _aiSummaryRange = null;
     if (userEdit && changed && typeof pbpPopupDraftFieldEdited === "function") pbpPopupDraftFieldEdited("linkding-description-input", { manual: false });
