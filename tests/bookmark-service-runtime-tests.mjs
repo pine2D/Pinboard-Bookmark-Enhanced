@@ -11,7 +11,14 @@ const root=fileURLToPath(new URL('../',import.meta.url));
 const {chromium}=createRequire(resolve(root,'.qa-scan/package.json'))('playwright');
 const profile=mkdtempSync(join(tmpdir(),'pbp-bookmark-runtime-'));
 const records={linkding:new Map(),karakeep:new Map()}, requests=[], membership=new Set(), wire=[];
-const raceCreates=new Map(), descriptionReplies=new Map();
+const raceCreates=new Map();
+// The synthetic pages this server publishes. linkding's own scraper reads the
+// same title and meta description, so a "server-scraped" value below comes
+// from the page itself, never from the request the extension sent.
+const pageMetadata=pathname=>pathname==='/article-meta'
+  ?{title:'Meta article',description:'Server-scraped description'}:{title:'Runtime article',description:null};
+// linkding v1.47 serializer timestamps carry microseconds.
+const serverNow=()=>new Date().toISOString().replace(/Z$/,'000Z');
 const list={id:'later1',name:'Read Later',description:'Pinboard Bookmark Enhanced: Read Later',icon:'bookmark',type:'manual',public:false,hasCollaborators:false,userRole:'owner'};
 let listCreated=false;
 let holdLinkdingPatch = null;
@@ -36,7 +43,7 @@ const server=createServer(async(req,res)=>{
     }
     res.writeHead(404).end();return;
   }
-  if(url.pathname.startsWith('/article')) {res.setHeader('Content-Type','text/html');res.end('<html><head><title>Runtime article</title></head><body><article><h1>Runtime article</h1><p>'+('Public synthetic article for a local extension test. '.repeat(80))+'</p></article></body></html>');return;}
+  if(url.pathname.startsWith('/article')) {const meta=pageMetadata(url.pathname);res.setHeader('Content-Type','text/html');res.end('<html><head><title>'+meta.title+'</title>'+(meta.description?'<meta name="description" content="'+meta.description+'">':'')+'</head><body><article><h1>'+meta.title+'</h1><p>'+('Public synthetic article for a local extension test. '.repeat(80))+'</p></article></body></html>');return;}
   const service=url.pathname.startsWith('/linkding/')?'linkding':'karakeep';
   if(service==='linkding'&&gate.linkding&&(req.headers['cf-access-client-id']!=='fixture-cf-id'||req.headers['cf-access-client-secret']!=='fixture-cf-secret')){
     res.writeHead(302,{Location:origin+'/cdn-cgi/access/login/fixture'});res.end();return;
@@ -49,13 +56,22 @@ const server=createServer(async(req,res)=>{
   const scheme=service==='linkding'?'Token ':'Bearer ';
   if(![...acceptedKeys].some(key=>req.headers.authorization===scheme+key)){reply(401,{});return;}
   const store=records[service];
-  const descriptionReply=descriptionReplies.get(req.method+':'+url.pathname)?.shift();
-  if(descriptionReply){store.set(String(descriptionReply.id),structuredClone(descriptionReply));return reply(req.method==='POST'?201:200,descriptionReply);}
+  // linkding v1.47 (website_loader): metadata of a page this server publishes;
+  // anything else could not be fetched, so the scraper finds nothing.
+  const scrapeMetadata=raw=>{try{const page=new URL(raw);if(page.origin===origin&&page.pathname.startsWith('/article'))return pageMetadata(page.pathname);}catch{}return {title:null,description:null};};
+  // serializers.py BookmarkSerializer: every field, the archive link falling
+  // back to a capture at date_added, website_* always null.
+  const serialize=row=>{const added=Date.parse(row.date_added);return {id:row.id,url:row.url,title:row.title,description:row.description,notes:row.notes,
+    web_archive_snapshot_url:row.web_archive_snapshot_url||(Number.isFinite(added)?'https://web.archive.org/web/'+new Date(added).toISOString().replace(/[-:T]/g,'').slice(0,14)+'/'+row.url:null),
+    favicon_url:null,preview_image_url:null,is_archived:row.is_archived,unread:row.unread,shared:row.shared,tag_names:row.tag_names,date_added:row.date_added,date_modified:row.date_modified,website_title:null,website_description:null};};
   if(path==='user/profile/')return reply(200,{theme:'auto',enable_sharing:true,permanent_notes:false});
   if(path==='users/me')return reply(200,{id:'u1',name:'Fixture',email:null,localUser:true});
   if(path.startsWith('bookmarks/check')){
     const row=[...store.values()].find(b=>(b.url||b.content?.url)===url.searchParams.get('url'));
-    return reply(200,service==='linkding'?{bookmark:row||null,metadata:{},auto_tags:[]}:{bookmarkId:row?.id||null});
+    if(service!=='linkding')return reply(200,{bookmarkId:row?.id||null});
+    // routes.py check(): the page's metadata is loaded whether or not it is saved.
+    const meta=scrapeMetadata(url.searchParams.get('url'));
+    return reply(200,{bookmark:row?serialize(row):null,metadata:{url:url.searchParams.get('url'),title:meta.title,description:meta.description,preview_image:null},auto_tags:[]});
   }
   if(path==='tags/'||path==='tags')return reply(200,service==='linkding'?{count:0,next:null,results:[]}:{tags:[]});
   if(path==='lists'&&req.method==='GET')return reply(200,{lists:listCreated?[list]:[]});
@@ -65,13 +81,29 @@ const server=createServer(async(req,res)=>{
     if(req.method==='PUT')membership.add(path.split('/').pop());else membership.delete(path.split('/').pop());return reply(204);
   }
   if(/^bookmarks\/?$/.test(path)){
-    if(req.method==='GET')return reply(200,service==='linkding'?{count:store.size,next:null,results:[...store.values()]}:{bookmarks:[...store.values()],nextCursor:null});
+    if(req.method==='GET')return reply(200,service==='linkding'?{count:store.size,next:null,previous:null,results:[...store.values()].map(serialize)}:{bookmarks:[...store.values()],nextCursor:null});
     const race=raceCreates.get(service+':'+data.url);
     if(race){store.set(String(race.record.id),structuredClone(race.record));return reply(race.status,race.record);}
-    const id=service==='linkding'?store.size+1:'b'+(store.size+1);
-    // Hand-authored API record schemas, independently filled from HTTP input.
-    const row=service==='linkding'?{id,url:data.url,title:data.title,description:'Site summary',notes:data.notes,tag_names:data.tag_names===undefined?[]:data.tag_names,unread:data.unread===undefined?false:data.unread,shared:data.shared===undefined?false:data.shared,is_archived:false,date_added:'2026-10-01T00:00:00Z'}:
-      {id,title:data.title,note:data.note,summary:null,archived:false,favourited:false,createdAt:'2026-10-01T00:00:00Z',userId:'u1',tags:[],content:{type:'link',url:data.url,title:'Site title'},assets:[]};
+    if(service==='linkding'){
+      // linkding v1.47 POST (serializers.py create, services/bookmarks.py):
+      // an existing URL is merged into (201, same id, date_added kept, tags
+      // replaced); omitted fields take the model defaults. Unless the query
+      // has disable_scraping, the server then fills an empty title and an
+      // empty Description from the page it fetches itself.
+      const now=serverNow(),found=[...store.values()].find(b=>b.url===data.url);
+      const row=found||{id:Math.max(0,...[...store.keys()].map(Number).filter(Number.isFinite))+1,url:data.url,web_archive_snapshot_url:null,is_archived:false,date_added:now};
+      Object.assign(row,{title:data.title===undefined?'':data.title,description:data.description===undefined?'':data.description,notes:data.notes===undefined?'':data.notes,
+        unread:data.unread===undefined?false:data.unread,shared:data.shared===undefined?false:data.shared,tag_names:data.tag_names===undefined?[]:data.tag_names,date_modified:now});
+      if(!url.searchParams.has('disable_scraping')){
+        const meta=scrapeMetadata(row.url);
+        if(!row.title)row.title=meta.title||'';
+        if(!row.description)row.description=meta.description||'';
+      }
+      store.set(String(row.id),row);return reply(201,serialize(row));
+    }
+    const id='b'+(store.size+1);
+    // Hand-authored API record schema, independently filled from HTTP input.
+    const row={id,title:data.title,note:data.note,summary:null,archived:false,favourited:false,createdAt:'2026-10-01T00:00:00Z',userId:'u1',tags:[],content:{type:'link',url:data.url,title:'Site title'},assets:[]};
     store.set(String(id),row);return reply(201,row);
   }
   const id=path.split('/')[1],row=store.get(id);
@@ -83,8 +115,15 @@ const server=createServer(async(req,res)=>{
   }
   if(req.method==='DELETE'){store.delete(id);return reply(204);}
   if(req.method==='PATCH'&&service==='linkding'&&holdLinkdingPatch) await holdLinkdingPatch;
+  if(req.method==='PATCH'&&service==='linkding'){
+    // serializers.py update(): only the writable fields that were sent change
+    // (tags are kept when omitted); update_bookmark() stamps date_modified.
+    for(const key of ['url','title','description','notes','is_archived','unread','shared','tag_names'])if(data[key]!==undefined)row[key]=data[key];
+    row.date_modified=serverNow();
+    return reply(200,serialize(row));
+  }
   if(req.method==='PATCH')Object.assign(row,data);
-  return reply(200,row);
+  return reply(200,service==='linkding'?serialize(row):row);
 });
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const origin='http://127.0.0.1:'+server.address().port;
@@ -482,36 +521,33 @@ try{
   }
   records.linkding.delete(multiId);await article.goto(origin+'/article');
   console.log('linkding multi-line Description: tag-only popup and title-only reader updates keep it; an edit writes its one line');
-  // Full v1.47 serializer fixtures, authored independently of request data.
-  // id 18 represents a previously scraped Description; id 19 skips scraping.
-  const descriptionUrl=origin+'/article-description', customDescriptionUrl=origin+'/article-description-custom';
-  const scrapedDescription={id:18,url:descriptionUrl,title:'T',description:'Meta description',notes:'Meta description\nMy note',web_archive_snapshot_url:null,favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:[],date_added:'2026-10-30T03:01:22.656384Z',date_modified:'2026-10-30T03:01:22.656384Z',website_title:null,website_description:null};
-  const blankDescription={id:19,url:descriptionUrl,title:'T',description:'',notes:'Meta description\nMy note',web_archive_snapshot_url:null,favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:[],date_added:'2026-10-30T03:02:22.656384Z',date_modified:'2026-10-30T03:02:22.656384Z',website_title:null,website_description:null};
-  descriptionReplies.set('POST:/linkding/api/bookmarks/',[blankDescription,{...blankDescription,id:20,url:customDescriptionUrl,description:'Custom description'}]);
-  descriptionReplies.set('PATCH:/linkding/api/bookmarks/18/',[scrapedDescription,scrapedDescription,{...scrapedDescription,description:'Changed description'},{...scrapedDescription,description:''}]);
+  // linkding Description against the server's own v1.47 create and update
+  // semantics (the mock above). /article-meta publishes a meta description,
+  // so a create the server may scrape picks it up by itself.
+  const descriptionUrl=origin+'/article-meta', emptyDescriptionUrl=origin+'/article-meta?empty', customDescriptionUrl=origin+'/article-meta?custom';
   const descriptionStart=requests.length;
-  const descriptions=await worker.evaluate(async({origin,url,customUrl,scraped})=>{
+  const descriptions=await worker.evaluate(async({origin,url,emptyUrl,customUrl})=>{
     const client=pbpCreateBookmarkServiceClient({service:'linkding',baseUrl:origin+'/linkding/',beforeRequest:async()=>({token:'fixture-key'})});
-    const fields={url,title:'T',notes:'Meta description\nMy note',tags:[]};
-    const blank=await client.save(fields);
+    const fields={url,title:'T',notes:'My note',tags:[]};
+    const unknown=await client.save(fields);
+    const empty=await client.save({...fields,url:emptyUrl,summary:''});
     const custom=await client.save({...fields,url:customUrl,summary:'Custom description'});
-    const existing=pbpBookmarkNormalize('linkding',scraped);
-    const summaries=[];
-    for(const summary of [undefined,'Meta description','Changed description','']){
-      const result=await client.save({...fields,summary},existing);summaries.push(result.bookmark.summary);
+    const summaries=[];let existing=custom.bookmark;
+    for(const summary of [undefined,'Custom description','Changed description','']){
+      const result=await client.save({...fields,url:customUrl,summary},existing);summaries.push(result.bookmark.summary);existing=result.bookmark;
     }
-    return {blank:blank.bookmark,custom:custom.bookmark,summaries,post:pbpBookmarkAsPost(existing)};
-  },{origin,url:descriptionUrl,customUrl:customDescriptionUrl,scraped:scrapedDescription});
-  const descriptionCalls=requests.slice(descriptionStart);
-  assert.deepEqual(descriptionCalls.map(r=>[r.method,r.path,r.query]),[['POST','bookmarks/','?disable_scraping'],['POST','bookmarks/','?disable_scraping'],...Array.from({length:4},()=>['PATCH','bookmarks/18/',''])]);
-  assert.equal(descriptionCalls[0].data.description,'');assert(Object.hasOwn(descriptionCalls[0].data,'description'));
-  assert.equal(descriptionCalls[1].data.description,'Custom description');
-  assert.deepEqual(descriptionCalls.slice(2).map(r=>Object.hasOwn(r.data,'description')),[false,false,true,true]);
-  assert.equal(descriptionCalls[4].data.description,'Changed description');assert.equal(descriptionCalls[5].data.description,'');
-  assert.equal(descriptions.blank.summary,'');assert.equal(descriptions.custom.summary,'Custom description');
-  assert.deepEqual(descriptions.summaries,['Meta description','Meta description','Changed description','']);
-  assert.deepEqual([descriptions.post.description,descriptions.post.extended,descriptions.post.summary],['T','Meta description\nMy note','Meta description']);
-  console.log('linkding Description: disable_scraping, explicit empty/custom creates, unchanged/changed/cleared PATCH and independent post projection passed');
+    return {unknown:unknown.bookmark,empty:empty.bookmark,custom:custom.bookmark,summaries,post:pbpBookmarkAsPost(custom.bookmark)};
+  },{origin,url:descriptionUrl,emptyUrl:emptyDescriptionUrl,customUrl:customDescriptionUrl});
+  const descriptionCalls=requests.slice(descriptionStart), customPatch=['PATCH','bookmarks/'+descriptions.custom.id+'/',''];
+  assert.deepEqual(descriptionCalls.map(r=>[r.method,r.path,r.query]),[['POST','bookmarks/','?disable_scraping'],['POST','bookmarks/','?disable_scraping'],['POST','bookmarks/','?disable_scraping'],customPatch,customPatch,customPatch,customPatch]);
+  assert.deepEqual(descriptionCalls.slice(0,3).map(r=>r.data.description),['','','Custom description']);
+  assert.deepEqual(descriptionCalls.slice(3).map(r=>Object.hasOwn(r.data,'description')),[false,false,true,true]);
+  assert.equal(descriptionCalls[5].data.description,'Changed description');assert.equal(descriptionCalls[6].data.description,'');
+  assert.deepEqual([descriptions.unknown.summary,descriptions.empty.summary,descriptions.custom.summary],['','','Custom description']);
+  assert.deepEqual(descriptions.summaries,['Custom description','Custom description','Changed description','']);
+  assert.deepEqual([descriptions.post.description,descriptions.post.extended,descriptions.post.summary],['T','My note','Custom description']);
+  for(const bookmark of [descriptions.unknown,descriptions.empty,descriptions.custom])records.linkding.delete(String(bookmark.id));
+  console.log('linkding Description: disable_scraping creates, unchanged/changed/cleared PATCH and independent post projection passed');
   const probes=await worker.evaluate(async origin=>{
     const out={};
     for(const kind of ['redirect','challenge','basic','denied','page','headers']){
