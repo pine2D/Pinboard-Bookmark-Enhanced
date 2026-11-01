@@ -51,12 +51,24 @@ async function rawEntry(key) {
 function rows(prefix, count, firstTs) {
   return Array.from({ length: count }, (_, i) => ({ key: prefix + i, result: i, ts: firstTs + i }));
 }
+// Pools by their literal key prefixes, not by ai-cache.js's own routing.
+const POOL_PREFIXES = [["dict2", "dict2_"], ["dictctx", "dictctx2_"], ["summaryOwner", "summary_owner_"],
+  ["summaryHold", "summary_hold_"], ["tr", "tr_"]];
 function counts(entries) {
-  const dict2 = entries.filter((entry) => _pbpAiIsDict2Key(entry.key)).length;
-  const dictctx = entries.filter((entry) => _pbpAiIsDictCtxKey(entry.key)).length;
-  const summaryOwner = entries.filter((entry) => _pbpAiIsSummaryOwnerKey(entry.key)).length;
-  const tr = entries.filter((entry) => _pbpAiIsTrKey(entry.key)).length;
-  return { dict2, dictctx, summaryOwner, tr, other: entries.length - dict2 - dictctx - summaryOwner - tr };
+  const result = { dict2: 0, dictctx: 0, summaryOwner: 0, summaryHold: 0, tr: 0, other: 0 };
+  for (const entry of entries) {
+    const pool = POOL_PREFIXES.find(([, prefix]) => entry.key.startsWith(prefix));
+    result[pool ? pool[0] : "other"]++;
+  }
+  return result;
+}
+// Counts the cursor steps an eviction walk takes while `run` writes.
+async function cursorSteps(run) {
+  const original = IDBCursor.prototype.continue;
+  let steps = 0;
+  IDBCursor.prototype.continue = function (...args) { steps++; return original.apply(this, args); };
+  try { await run(); } finally { IDBCursor.prototype.continue = original; }
+  return steps;
 }
 
 (async () => {
@@ -106,26 +118,76 @@ function counts(entries) {
     assert(!await rawEntry("skim_test_0"), "oldest other record survived");
   });
 
-  await test("summary ownership boundary keeps exactly 500 records", async () => {
+  // Receipts replaced the unbounded "[AI Summary]" marker: every AI summary
+  // block a save writes depends on one, quick saves and Batch included, so
+  // the pool has to hold years of saves, not one large Batch.
+  await test("summary receipts keep at least 20,000 records and evict only their own oldest", async () => {
+    const cap = _PBP_AI_SUMMARY_OWNER_MAX_ENTRIES;
+    assert(cap >= 20000, "receipt cap=" + cap);
     await clearEntries();
-    await seed(rows("summary_owner_alice|url", 499, 1));
-    await pbpAiCacheSet("summary_owner_alice|url499", "new", 500);
-    const count = counts(await allEntries());
-    assert(count.summaryOwner === 500 && count.other === 0 && count.dict2 === 0,
-      JSON.stringify(count));
+    await seed(rows("summary_owner_alice|url", cap - 1, 1).concat(rows("summary_hold_q", 3, cap + 1),
+      rows("dict2_en|word", 500, cap + 10), rows("skim_owner_mix_", 200, cap + 1000)));
+    await pbpAiCacheSet("summary_owner_alice|boundary", "new", cap + 2000);
+    let count = counts(await allEntries());
+    assert(count.summaryOwner === cap && count.summaryHold === 3 && count.dict2 === 500 && count.other === 200,
+      "boundary " + JSON.stringify(count));
+    await pbpAiCacheSet("summary_owner_alice|newest", "new", cap + 2001);
+    count = counts(await allEntries());
+    assert(count.summaryOwner === cap && count.summaryHold === 3 && count.dict2 === 500 && count.other === 200,
+      "overflow " + JSON.stringify(count));
+    assert(!await rawEntry("summary_owner_alice|url0"), "oldest receipt survived");
+    assert(await rawEntry("summary_owner_alice|url1") && await rawEntry("summary_owner_alice|newest"),
+      "receipt overflow evicted more than its oldest receipt");
+    assert(await rawEntry("summary_hold_q0") && await rawEntry("dict2_en|word0") && await rawEntry("skim_owner_mix_0"),
+      "receipt overflow evicted another pool");
   });
 
-  await test("summary ownership record 501 evicts only its oldest receipt", async () => {
+  // Every pool's eviction walks the ts index from its oldest entry. Receipts
+  // outlive everything else there, so unless they sort after every other
+  // entry each dictionary or ordinary-cache eviction would step over all of
+  // them first.
+  await test("other pools evict without stepping over summary receipts", async () => {
     await clearEntries();
-    await seed(rows("summary_owner_alice|url", 500, 1)
-      .concat(rows("dict2_en|word", 500, 1001), rows("skim_owner_mix_", 200, 2001)));
-    await pbpAiCacheSet("summary_owner_alice|newest", "new", 3001);
+    // Receipts saved long before anything else in the store.
+    for (let i = 0; i < 300; i++) await pbpAiCacheSet("summary_owner_alice|walk" + i, i, 1 + i);
+    await seed(rows("dict2_en|walk", 500, 1000));
+    const dictSteps = await cursorSteps(() => pbpAiCacheSet("dict2_en|walk-newest", "new", 3000));
+    await seed(rows("skim_walk_", 200, 500));
+    const ordinarySteps = await cursorSteps(() => pbpAiCacheSet("ask_walk_newest", "new", 3001));
     const count = counts(await allEntries());
-    assert(count.summaryOwner === 500 && count.dict2 === 500 && count.other === 200,
-      JSON.stringify(count));
-    assert(!await rawEntry("summary_owner_alice|url0"), "oldest receipt survived");
-    assert(await rawEntry("dict2_en|word0"), "receipt overflow evicted dict2");
-    assert(await rawEntry("skim_owner_mix_0"), "receipt overflow evicted ordinary cache");
+    assert(count.summaryOwner === 300 && count.dict2 === 500 && count.other === 200, JSON.stringify(count));
+    assert(!await rawEntry("dict2_en|walk0") && !await rawEntry("skim_walk_0"), "the oldest entries were not evicted");
+    assert(dictSteps < 50 && ordinarySteps < 50,
+      "eviction stepped over the receipts: dictionary " + dictSteps + ", ordinary " + ordinarySteps + " steps");
+  });
+
+  await test("written and read-touched receipts sort after every ordinary entry", async () => {
+    await clearEntries();
+    const now = Date.now();
+    await pbpAiCacheSet("summary_owner_alice|written", "r", now);
+    await pbpAiCacheSet("ask_written", "a", now);
+    const written = await rawEntry("summary_owner_alice|written");
+    const ordinary = await rawEntry("ask_written");
+    assert(written.ts > ordinary.ts, "a written receipt sorts among ordinary entries");
+    // A receipt the popup reads is refreshed like any LRU entry and stays
+    // past every ordinary entry, a receipt saved by an older version included.
+    const twoHours = 2 * 3600000;
+    await seed([
+      { key: "summary_owner_alice|stale", result: "r", ts: written.ts - twoHours },
+      { key: "summary_owner_alice|legacy", result: "r", ts: now - twoHours },
+    ]);
+    for (const key of ["summary_owner_alice|stale", "summary_owner_alice|legacy"]) {
+      const before = (await rawEntry(key)).ts;
+      await pbpAiCacheGet(key);
+      let touched = null;
+      for (let i = 0; i < 20; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        touched = await rawEntry(key);
+        if (touched && touched.ts !== before) break;
+      }
+      assert(touched && touched.ts > before && touched.ts > ordinary.ts,
+        key + ": read-touch " + before + " -> " + (touched && touched.ts));
+    }
   });
 
   await test("contextual-gloss pool keeps 500 without touching neighbours", async () => {
@@ -333,13 +395,15 @@ function counts(entries) {
   await test("pbpAiCacheStats reports exact per-pool counts and a matching total", async () => {
     await clearEntries();
     await seed(rows("dict2_en|word", 3, 1)
-      .concat(rows("tr_article_", 5, 100), rows("ask_misc_", 2, 200)));
+      .concat(rows("tr_article_", 5, 100), rows("ask_misc_", 2, 200),
+        rows("summary_owner_alice|url", 4, 300), rows("summary_hold_q", 1, 400)));
     const stats = await pbpAiCacheStats();
     assert(stats
       && stats.pools.dict2 === 3 && stats.pools.tr === 5 && stats.pools.other === 2
-      && stats.pools.dictctx === 0 && stats.pools["summary-owner"] === 0 && stats.pools.vpunct === 0,
+      && stats.pools.dictctx === 0 && stats.pools["summary-owner"] === 4 && stats.pools["summary-hold"] === 1
+      && stats.pools.vpunct === 0,
       JSON.stringify(stats));
-    assert(stats.total === 10, "total=" + stats.total);
+    assert(stats.total === 15, "total=" + stats.total);
   });
 
   await test("a pool key whose next character is U+FFFF still counts in its own pool", async () => {
@@ -377,7 +441,8 @@ function counts(entries) {
   const OWNED_URL = "https://example.com/article";
   const OWNED_NOTES = "Auto notes\n\n<blockquote>Summary</blockquote>";
   const OWNED_RANGE = { start: "Auto notes\n\n".length, end: OWNED_NOTES.length };
-  const ownershipKeys = async () => (await allEntries()).map((entry) => entry.key).filter(_pbpAiIsSummaryOwnerKey);
+  const ownershipKeys = async () => (await allEntries()).map((entry) => entry.key)
+    .filter((key) => key.startsWith("summary_owner_") || key.startsWith("summary_hold_"));
 
   await test("a held summary becomes a receipt only for the held owner, page and notes", async () => {
     for (const [label, account, url, notes, owned] of [
@@ -427,16 +492,39 @@ function counts(entries) {
     assert((await ownershipKeys()).length === 0, "consumed or refused holds left records behind");
   });
 
-  await test("holds share the bounded receipt pool without sharing a key with any receipt", async () => {
+  await test("holds sit in a pool of their own and never read as receipts", async () => {
     await clearEntries();
     await pbpAiHoldSummaryOwnership("q-5", "alice", OWNED_URL, OWNED_NOTES, OWNED_RANGE);
-    // An account literally named like a hold still gets a receipt key of its own.
-    await pbpAiSaveSummaryOwnership("|queue|q-5", OWNED_URL, OWNED_NOTES, OWNED_RANGE);
-    const keys = await ownershipKeys();
-    assert(keys.length === 2 && new Set(keys).size === 2, "records " + keys.length);
-    assert(keys.every((key) => _pbpAiPoolForKey(key) === "summary-owner"), "a hold left the summary_owner_ pool");
+    assert(await pbpAiLoadSummaryOwnership("alice", OWNED_URL, OWNED_NOTES) === null, "a hold read as a receipt");
+    await pbpAiSaveSummaryOwnership("alice", OWNED_URL, OWNED_NOTES, OWNED_RANGE);
+    const count = counts(await allEntries());
+    assert(count.summaryHold === 1 && count.summaryOwner === 1 && count.other === 0, JSON.stringify(count));
+    const stats = await pbpAiCacheStats();
+    assert(stats.pools["summary-hold"] === 1 && stats.pools["summary-owner"] === 1 && stats.pools.other === 0,
+      JSON.stringify(stats.pools));
     assert(await pbpAiClaimSummaryOwnership("q-5", "alice", OWNED_URL, OWNED_NOTES) === true,
-      "the look-alike receipt replaced the hold");
+      "the receipt replaced the hold");
+  });
+
+  // A large offline Batch queues one hold per save. Holds and receipts must
+  // not evict each other, and holds are not ordinary cache either.
+  await test("offline holds keep a bounded pool that evicts only holds", async () => {
+    const cap = _PBP_AI_SUMMARY_HOLD_MAX_ENTRIES;
+    await clearEntries();
+    await seed(rows("summary_owner_alice|url", 10, 1)
+      .concat(rows("summary_hold_q", cap, 100), rows("ask_hold_mix_", 200, cap + 1000)));
+    await pbpAiCacheSet("summary_hold_newest", "hold", cap + 5000);
+    let count = counts(await allEntries());
+    assert(count.summaryHold === cap && count.summaryOwner === 10 && count.other === 200,
+      "hold overflow " + JSON.stringify(count));
+    assert(!await rawEntry("summary_hold_q0") && await rawEntry("summary_hold_q1"), "hold overflow evicted the wrong holds");
+    assert(await rawEntry("summary_owner_alice|url0"), "a hold evicted a receipt");
+    await pbpAiCacheSet("skim_hold_newest", "other", cap + 6000);
+    count = counts(await allEntries());
+    assert(count.summaryHold === cap && count.summaryOwner === 10 && count.other === 200,
+      "ordinary overflow " + JSON.stringify(count));
+    assert(!await rawEntry("ask_hold_mix_0") && await rawEntry("ask_hold_mix_1"),
+      "holds were counted as ordinary cache");
   });
 
   await clearEntries();

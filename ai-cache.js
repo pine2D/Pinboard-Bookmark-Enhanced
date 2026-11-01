@@ -18,8 +18,31 @@ const _PBP_AI_DICT2_PREFIX = "dict2_";
 // paid translations. Same bound as dict2_ for the same repeat-heavy reason.
 const _PBP_AI_DICTCTX_MAX_ENTRIES = 500;
 const _PBP_AI_DICTCTX_PREFIX = "dictctx2_";
-const _PBP_AI_SUMMARY_OWNER_MAX_ENTRIES = 500;
+// Summary ownership receipts replaced the unbounded "[AI Summary]" marker:
+// every popup save, quick save, Batch item and offline replay that writes an
+// AI summary block records one, and a block whose receipt is evicted can no
+// longer be replaced or removed in place. One receipt is ~0.5 KB, so 20,000
+// cost ~10 MB of IndexedDB and cover years of heavy saving; the read-touch
+// keeps the receipts of bookmarks reopened in the popup.
+const _PBP_AI_SUMMARY_OWNER_MAX_ENTRIES = 20000;
 const _PBP_AI_SUMMARY_OWNER_PREFIX = "summary_owner_";
+// Every pool's eviction walks the ts index from its oldest entry and steps
+// over the entries of other pools. Receipts outlive everything else, so sorted
+// among ordinary entries thousands of them would sit in front of every other
+// pool's oldest entry and each dictionary or ordinary-cache eviction would
+// step over all of them. A receipt's ts is stored with this base added
+// (_pbpAiStoredTs), past every real timestamp: the other pools' walks end
+// before the first receipt, and receipts keep their LRU order among
+// themselves. Receipts written before this change keep a plain ts; being
+// older they are still evicted first, and they move up on their next
+// read-touch or rewrite.
+const _PBP_AI_SUMMARY_OWNER_TS_BASE = 1e15;
+// Ownership holds of saves waiting in the offline queue: one per queued save,
+// released when it leaves the queue. A pool of their own, so a large offline
+// Batch can neither evict receipts nor be evicted as ordinary cache; the bound
+// only limits what an interrupted release could leave behind.
+const _PBP_AI_SUMMARY_HOLD_MAX_ENTRIES = 5000;
+const _PBP_AI_SUMMARY_HOLD_PREFIX = "summary_hold_";
 // Full-text translations: one key per ARTICLE x (lang, model), the priciest
 // entries in the store (a whole article's paid output). In the shared
 // 200-slot pool a heavy reader's footprint is 5-7 keys per article
@@ -71,6 +94,17 @@ function _pbpAiOpenDB() {
 // entry.ts, so touching it is safe.
 const _PBP_AI_TOUCH_MIN_AGE = 3600000;
 
+// The ts stored for `key` at time `ts`, and back (see
+// _PBP_AI_SUMMARY_OWNER_TS_BASE). Only summary receipts are shifted.
+function _pbpAiStoredTs(key, ts) {
+  return _pbpAiIsSummaryOwnerKey(key) && typeof ts === "number" ? _PBP_AI_SUMMARY_OWNER_TS_BASE + ts : ts;
+}
+
+function _pbpAiEntryTime(key, storedTs) {
+  return _pbpAiIsSummaryOwnerKey(key) && storedTs >= _PBP_AI_SUMMARY_OWNER_TS_BASE
+    ? storedTs - _PBP_AI_SUMMARY_OWNER_TS_BASE : storedTs;
+}
+
 // Fire-and-forget ts bump. Get-then-put inside ONE readwrite transaction:
 // putting back the entry the caller already read would race a concurrent
 // pbpAiCacheAppend from another tab (the same lost-update window that
@@ -84,7 +118,7 @@ function _pbpAiTouch(db, key) {
     req.onsuccess = () => {
       const cur = req.result;
       if (cur) {
-        try { store.put({ key: cur.key, result: cur.result, ts: Date.now() }); } catch (_) {}
+        try { store.put({ key: cur.key, result: cur.result, ts: _pbpAiStoredTs(cur.key, Date.now()) }); } catch (_) {}
       }
     };
   } catch (_) {}
@@ -109,7 +143,7 @@ async function pbpAiCacheGet(key) {
     // without a code change here.
     if (entry && typeof entry.ts === "number"
       && String(key).indexOf("ai_cache_") !== 0
-      && Date.now() - entry.ts > _PBP_AI_TOUCH_MIN_AGE) {
+      && Date.now() - _pbpAiEntryTime(key, entry.ts) > _PBP_AI_TOUCH_MIN_AGE) {
       _pbpAiTouch(db, key);
     }
     return entry;
@@ -130,6 +164,10 @@ function _pbpAiIsSummaryOwnerKey(key) {
   return typeof key === "string" && key.startsWith(_PBP_AI_SUMMARY_OWNER_PREFIX);
 }
 
+function _pbpAiIsSummaryHoldKey(key) {
+  return typeof key === "string" && key.startsWith(_PBP_AI_SUMMARY_HOLD_PREFIX);
+}
+
 function _pbpAiIsTrKey(key) {
   return typeof key === "string" && key.startsWith(_PBP_AI_TR_PREFIX);
 }
@@ -142,6 +180,7 @@ function _pbpAiPoolForKey(key) {
   if (_pbpAiIsDict2Key(key)) return "dict2";
   if (_pbpAiIsDictCtxKey(key)) return "dictctx";
   if (_pbpAiIsSummaryOwnerKey(key)) return "summary-owner";
+  if (_pbpAiIsSummaryHoldKey(key)) return "summary-hold";
   if (_pbpAiIsTrKey(key)) return "tr";
   if (_pbpAiIsVpunctKey(key)) return "vpunct";
   return "other";
@@ -179,6 +218,12 @@ function _pbpAiSummaryOwnerRange() {
   return _pbpAiPrefixRange(_PBP_AI_SUMMARY_OWNER_PREFIX);
 }
 
+// "summary_hold_" and "summary_owner_" part at index 8 ('h' < 'o'), so the
+// two summary ranges cannot overlap.
+function _pbpAiSummaryHoldRange() {
+  return _pbpAiPrefixRange(_PBP_AI_SUMMARY_HOLD_PREFIX);
+}
+
 // "trview_" sorts ABOVE the exclusive upper bound "tr`" ('v' U+0076 > '`'
 // U+0060 at index 2), and no other family starts with "tr_", so this range
 // holds exactly the tr_ pool.
@@ -214,9 +259,10 @@ function _pbpAiDeleteOldestInPool(store, overflow, pool) {
 // is NOT in a dedicated pool, so every dedicated pool must be subtracted --
 // adding a pool without extending this subtraction silently over-evicts the
 // innocent other-pool families (ask/skim/tags/summary). Unit-tested (ZH-6).
-function _pbpAiOtherOverflow(totalCount, dict2Count, dictCtxCount, summaryOwnerCount, trCount, vpunctCount) {
+function _pbpAiOtherOverflow(totalCount, dict2Count, dictCtxCount, summaryOwnerCount, trCount, vpunctCount, summaryHoldCount) {
   return Math.max(0,
-    Math.max(0, totalCount - dict2Count - dictCtxCount - summaryOwnerCount - trCount - (vpunctCount || 0))
+    Math.max(0, totalCount - dict2Count - dictCtxCount - summaryOwnerCount - trCount - (vpunctCount || 0)
+      - (summaryHoldCount || 0))
       - _PBP_AI_CACHE_MAX_ENTRIES);
 }
 
@@ -227,11 +273,13 @@ function _pbpAiPruneWrittenPool(store, key) {
       : pool === "dictctx" ? _pbpAiDictCtxRange()
       : pool === "tr" ? _pbpAiTrRange()
       : pool === "vpunct" ? _pbpAiVpunctRange()
+      : pool === "summary-hold" ? _pbpAiSummaryHoldRange()
       : _pbpAiSummaryOwnerRange();
     const max = pool === "dict2" ? _PBP_AI_DICT2_MAX_ENTRIES
       : pool === "dictctx" ? _PBP_AI_DICTCTX_MAX_ENTRIES
       : pool === "tr" ? _PBP_AI_TR_MAX_ENTRIES
       : pool === "vpunct" ? _PBP_AI_VPUNCT_MAX_ENTRIES
+      : pool === "summary-hold" ? _PBP_AI_SUMMARY_HOLD_MAX_ENTRIES
       : _PBP_AI_SUMMARY_OWNER_MAX_ENTRIES;
     const countReq = store.count(range);
     countReq.onsuccess = () => {
@@ -246,12 +294,13 @@ function _pbpAiPruneWrittenPool(store, key) {
   let summaryOwnerCount = 0;
   let trCount = 0;
   let vpunctCount = 0;
-  let pending = 6;   // ZH-6: 4 -> 5 with the tr pool, 6 with vpunct; MUST stay equal to the count requests below
+  let summaryHoldCount = 0;
+  let pending = 7;   // ZH-6: 4 -> 5 with the tr pool, 6 with vpunct, 7 with summary holds; MUST stay equal to the count requests below
   const prune = () => {
     pending--;
     if (pending !== 0) return;
     _pbpAiDeleteOldestInPool(store,
-      _pbpAiOtherOverflow(totalCount, dict2Count, dictCtxCount, summaryOwnerCount, trCount, vpunctCount),
+      _pbpAiOtherOverflow(totalCount, dict2Count, dictCtxCount, summaryOwnerCount, trCount, vpunctCount, summaryHoldCount),
       "other");
   };
   const totalReq = store.count();
@@ -266,16 +315,18 @@ function _pbpAiPruneWrittenPool(store, key) {
   trReq.onsuccess = () => { trCount = trReq.result || 0; prune(); };
   const vpReq = store.count(_pbpAiVpunctRange());
   vpReq.onsuccess = () => { vpunctCount = vpReq.result || 0; prune(); };
+  const holdReq = store.count(_pbpAiSummaryHoldRange());
+  holdReq.onsuccess = () => { summaryHoldCount = holdReq.result || 0; prune(); };
 }
 
 // One store-scoped readwrite transaction owns the final write, target-pool
 // count, and ts-LRU pruning. IndexedDB serializes these transactions across
 // connections/tabs, so concurrent writers cannot observe the same overflow
 // and delete it repeatedly. Versioned online dictionary records (exact
-// `dict2_` prefix), contextual glosses (`dictctx2_`) and `summary_owner_`
-// receipts each have independent 500-entry pools; full-text translations
-// (`tr_`) have an independent 300-entry pool (ZH-6); every other family
-// shares 200.
+// `dict2_` prefix) and contextual glosses (`dictctx2_`) each have independent
+// 500-entry pools; full-text translations (`tr_`) and video punctuation
+// (`vpunct_`) 300 each (ZH-6); `summary_owner_` receipts 20,000 and
+// `summary_hold_` offline holds 5,000; every other family shares 200.
 // `makeResult` is synchronous; append passes the latest value read inside this
 // same transaction, preserving its existing no-lost-update guarantee.
 async function _pbpAiWriteAndPrune(key, makeResult, ts, readExisting) {
@@ -292,7 +343,7 @@ async function _pbpAiWriteAndPrune(key, makeResult, ts, readExisting) {
         let result;
         try { result = makeResult(previous); }
         catch (_) { try { tx.abort(); } catch (_) {} return; }
-        const putReq = store.put({ key, result, ts });
+        const putReq = store.put({ key, result, ts: _pbpAiStoredTs(key, ts) });
         putReq.onsuccess = () => _pbpAiPruneWrittenPool(store, key);
       };
 
@@ -360,7 +411,7 @@ async function pbpAiCacheStats() {
     return await new Promise((resolve, reject) => {
       const tx = db.transaction(_PBP_AI_STORE, "readonly");
       const store = tx.objectStore(_PBP_AI_STORE);
-      const pools = { dict2: 0, dictctx: 0, "summary-owner": 0, tr: 0, vpunct: 0, other: 0 };
+      const pools = { dict2: 0, dictctx: 0, "summary-owner": 0, "summary-hold": 0, tr: 0, vpunct: 0, other: 0 };
       let total = 0;
       tx.onabort = () => reject(tx.error || new Error("AI cache stats transaction aborted"));
       const totalReq = store.count();
@@ -369,6 +420,7 @@ async function pbpAiCacheStats() {
         ["dict2", _pbpAiDict2Range()],
         ["dictctx", _pbpAiDictCtxRange()],
         ["summary-owner", _pbpAiSummaryOwnerRange()],
+        ["summary-hold", _pbpAiSummaryHoldRange()],
         ["tr", _pbpAiTrRange()],
         ["vpunct", _pbpAiVpunctRange()],
       ].forEach(([name, range]) => {
@@ -376,7 +428,7 @@ async function pbpAiCacheStats() {
         req.onsuccess = () => { pools[name] = req.result || 0; };
       });
       tx.oncomplete = () => {
-        const named = pools.dict2 + pools.dictctx + pools["summary-owner"] + pools.tr + pools.vpunct;
+        const named = pools.dict2 + pools.dictctx + pools["summary-owner"] + pools["summary-hold"] + pools.tr + pools.vpunct;
         pools.other = Math.max(0, total - named);
         resolve({ pools, total });
       };
@@ -490,14 +542,14 @@ async function pbpAiLoadSummaryOwnership(account, url, notes) {
 }
 
 // A save queued offline has not written its notes yet, so it cannot have a
-// receipt. It gets a hold keyed by its queue ID instead: "|" never occurs in
-// encodeURIComponent output, so a hold key cannot collide with any account's
-// receipt key, and it stays inside the summary_owner_ pool and its LRU bound.
-// Replay turns the hold into a receipt only when it delivered exactly the held
-// notes for the held owner and page; every other outcome releases it.
+// receipt. It gets a hold keyed by its queue ID instead, in the summary_hold_
+// pool: a hold key never shares a range with a receipt key, and an offline
+// Batch never evicts receipts. Replay turns the hold into a receipt only when
+// it delivered exactly the held notes for the held owner and page; every other
+// outcome releases it.
 function _pbpAiSummaryHoldKey(queueId) {
   return typeof queueId === "string" && queueId
-    ? _PBP_AI_SUMMARY_OWNER_PREFIX + "|queue|" + queueId : "";
+    ? _PBP_AI_SUMMARY_HOLD_PREFIX + queueId : "";
 }
 
 async function pbpAiHoldSummaryOwnership(queueId, account, url, notes, range) {

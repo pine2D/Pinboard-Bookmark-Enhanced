@@ -48,7 +48,7 @@ async function pbpFixturePopupSummary({ service = "pinboard", account, url, note
   };
 }
 
-// Every record in the summary_owner_ pool (receipts and offline holds).
+// Every receipt and offline hold, by their literal key prefixes.
 async function pbpFixtureSummaryOwnershipEntries() {
   const db = await _pbpAiOpenDB();
   const entries = await new Promise((resolve, reject) => {
@@ -56,7 +56,8 @@ async function pbpFixtureSummaryOwnershipEntries() {
     request.onsuccess = () => resolve(request.result || []);
     request.onerror = () => reject(request.error);
   });
-  return entries.filter((entry) => _pbpAiIsSummaryOwnerKey(entry.key));
+  return entries.filter((entry) => typeof entry.key === "string" &&
+    (entry.key.startsWith("summary_owner_") || entry.key.startsWith("summary_hold_")));
 }
 
 async function pbpFixtureClearSummaryOwnership() {

@@ -44,7 +44,7 @@ const SAFETY_MARGIN_MS = 1000;
 // unregistered suite is rejected instead of guessed complete.
 const EXPECTED_RESULTS = Object.freeze({
   "tests/a11y-tests.html": 34,
-  "tests/ai-cache-tests.html": 29,
+  "tests/ai-cache-tests.html": 31,
   "tests/ai-completion-tests.html": 118,
   "tests/ai-tags-tests.html": 162,
   "tests/anki-connect-tests.html": 62,
