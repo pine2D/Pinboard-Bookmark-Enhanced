@@ -373,6 +373,10 @@ async function initPopupDraft(account, tab) {
   _popupDraftContext = context;
   _popupDraftLastSnapshot = "";
   const revision = _popupDraftRevision;
+  // The worker answers draft requests in the order they arrive. Ask for the
+  // stored draft before any edit made so far is written: the other way round,
+  // the read returned the popup's own fresh edit as a "restored" draft.
+  const reading = (async () => chrome.runtime.sendMessage({ type: "PBP_POPUP_DRAFT", ...context, action: "read" }))();
   for (const id of ["url-input", "title-input", "description-input", "linkding-description-input", "tags-input", "private-check", "share-check", "readlater-check", "archive-check"]) {
     const el = $id(id);
     if (id.endsWith("check")) el.disabled = false; else el.readOnly = false;
@@ -380,7 +384,7 @@ async function initPopupDraft(account, tab) {
   pbpPopupReplayEarlyTagKeys();
   if (_popupDraftChangedFields.size) pbpRememberPopupDraft();
   try {
-    const result = await chrome.runtime.sendMessage({ type: "PBP_POPUP_DRAFT", ...context, action: "read" });
+    const result = await reading;
     const auth = await pbpReadBookmarkConnection();
     if (_popupDraftContext !== context || (result?.ok && result.account !== account)
         || auth.account !== account) return;
