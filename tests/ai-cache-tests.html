@@ -371,6 +371,74 @@ function counts(entries) {
     assert(!serialized.includes("secret.example"), "leaked a hostname: " + serialized);
   });
 
+  // Offline holds, on the real store. A save queued offline has written no
+  // notes yet; its hold may only turn into the page's receipt for exactly the
+  // held owner, page and notes, and is consumed whatever the outcome.
+  const OWNED_URL = "https://example.com/article";
+  const OWNED_NOTES = "Auto notes\n\n<blockquote>Summary</blockquote>";
+  const OWNED_RANGE = { start: "Auto notes\n\n".length, end: OWNED_NOTES.length };
+  const ownershipKeys = async () => (await allEntries()).map((entry) => entry.key).filter(_pbpAiIsSummaryOwnerKey);
+
+  await test("a held summary becomes a receipt only for the held owner, page and notes", async () => {
+    for (const [label, account, url, notes, owned] of [
+      ["same owner, page and notes", "alice", OWNED_URL + "#later", OWNED_NOTES, true],
+      ["another owner", "bob", OWNED_URL, OWNED_NOTES, false],
+      ["another page", "alice", "https://example.com/other", OWNED_NOTES, false],
+      ["changed notes of the same length", "alice", OWNED_URL, OWNED_NOTES.replace("Auto", "Edit"), false],
+      ["notes shorter than the range", "alice", OWNED_URL, "Auto notes", false],
+      ["no owner", "", OWNED_URL, OWNED_NOTES, false],
+    ]) {
+      await clearEntries();
+      assert(await pbpAiHoldSummaryOwnership("q-1", "alice", OWNED_URL, OWNED_NOTES, OWNED_RANGE) === true, label + ": hold not written");
+      assert(await pbpAiLoadSummaryOwnership("alice", OWNED_URL, OWNED_NOTES) === null, label + ": a hold read as a receipt");
+      const claimed = await pbpAiClaimSummaryOwnership("q-1", account, url, notes);
+      assert(claimed === owned, label + ": claim=" + claimed);
+      const keys = await ownershipKeys();
+      if (owned) {
+        assert(keys.length === 1 && keys[0] === pbpAiSummaryOwnershipKey("alice", OWNED_URL), label + ": records " + keys.length);
+        const range = await pbpAiLoadSummaryOwnership("alice", OWNED_URL, OWNED_NOTES);
+        assert(range && range.start === OWNED_RANGE.start && range.end === OWNED_RANGE.end, label + ": range " + JSON.stringify(range));
+      } else {
+        assert(keys.length === 0, label + ": left " + keys.length + " record(s)");
+      }
+    }
+  });
+
+  await test("a hold is consumed by one claim or a release and never written without an owned range", async () => {
+    await clearEntries();
+    await pbpAiHoldSummaryOwnership("q-2", "alice", OWNED_URL, OWNED_NOTES, OWNED_RANGE);
+    assert(await pbpAiClaimSummaryOwnership("q-2", "alice", OWNED_URL, OWNED_NOTES) === true, "first claim failed");
+    await pbpAiCacheDelete(pbpAiSummaryOwnershipKey("alice", OWNED_URL));
+    assert(await pbpAiClaimSummaryOwnership("q-2", "alice", OWNED_URL, OWNED_NOTES) === false, "a hold was claimed twice");
+    await pbpAiHoldSummaryOwnership("q-3", "alice", OWNED_URL, OWNED_NOTES, OWNED_RANGE);
+    await pbpAiReleaseSummaryOwnership("q-3");
+    assert(await pbpAiClaimSummaryOwnership("q-3", "alice", OWNED_URL, OWNED_NOTES) === false, "a released hold was claimed");
+    for (const [label, args] of [
+      ["empty range", ["q-4", "alice", OWNED_URL, OWNED_NOTES, { start: 3, end: 3 }]],
+      ["range past the notes", ["q-4", "alice", OWNED_URL, OWNED_NOTES, { start: 0, end: OWNED_NOTES.length + 1 }]],
+      ["fractional range", ["q-4", "alice", OWNED_URL, OWNED_NOTES, { start: 0.5, end: 4 }]],
+      ["no range", ["q-4", "alice", OWNED_URL, OWNED_NOTES, null]],
+      ["no owner", ["q-4", "", OWNED_URL, OWNED_NOTES, OWNED_RANGE]],
+      ["no queue ID", ["", "alice", OWNED_URL, OWNED_NOTES, OWNED_RANGE]],
+      ["notes not text", ["q-4", "alice", OWNED_URL, null, OWNED_RANGE]],
+    ]) {
+      assert(await pbpAiHoldSummaryOwnership(...args) === false, label + " was held");
+    }
+    assert((await ownershipKeys()).length === 0, "consumed or refused holds left records behind");
+  });
+
+  await test("holds share the bounded receipt pool without sharing a key with any receipt", async () => {
+    await clearEntries();
+    await pbpAiHoldSummaryOwnership("q-5", "alice", OWNED_URL, OWNED_NOTES, OWNED_RANGE);
+    // An account literally named like a hold still gets a receipt key of its own.
+    await pbpAiSaveSummaryOwnership("|queue|q-5", OWNED_URL, OWNED_NOTES, OWNED_RANGE);
+    const keys = await ownershipKeys();
+    assert(keys.length === 2 && new Set(keys).size === 2, "records " + keys.length);
+    assert(keys.every((key) => _pbpAiPoolForKey(key) === "summary-owner"), "a hold left the summary_owner_ pool");
+    assert(await pbpAiClaimSummaryOwnership("q-5", "alice", OWNED_URL, OWNED_NOTES) === true,
+      "the look-alike receipt replaced the hold");
+  });
+
   await clearEntries();
   document.title = fail ? "FAIL ai-cache Tests" : "PASS ai-cache Tests";
 })();

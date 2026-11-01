@@ -296,6 +296,16 @@ try{
     await reader.waitForFunction(()=>document.getElementById('reader-bookmark-status')?.textContent==='Bookmark deleted');
     assert.equal(records[service].size,0);await reader.close();
     assert.equal(await worker.evaluate(()=>pbpVocabCurrentOwner()),personalOwner);
+    if(service==='karakeep'){
+      // The real worker records a delivered summary block where the popup reads it back (ai-cache.js in the service worker).
+      const owned=await worker.evaluate(async url=>{
+        const notes='Auto notes\n\nA plain summary paragraph.',range={start:'Auto notes\n\n'.length,end:notes.length};
+        const result=await submitSaveIntent({mode:'merge',url,title:'T',notes,tags:'',private:true,toread:false},{summaryRange:range});
+        return {status:result.status,range,owned:await pbpAiLoadSummaryOwnership((await getCurrentBookmarkAuth()).account,url,notes)};
+      },origin+'/article-summary');
+      assert.equal(owned.status,'saved');assert.deepEqual(owned.owned,owned.range,'the worker did not record the delivered summary block');
+      records.karakeep.clear();
+    }
     console.log(service+': settings, popup save, reader Read Later/delete, shared vocabulary passed');
   }
   {

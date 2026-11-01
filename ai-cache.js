@@ -390,12 +390,16 @@ async function pbpAiCacheStats() {
 // ---- Summary ownership receipts ----
 // A receipt records which range of a bookmark's notes is the AI summary block
 // this extension wrote, so the popup can replace or remove that block in place
-// after the AI cache that produced it has expired. It carries the owner, the
-// page URL (normalized below), a SHA-256 of the full notes and the [start,
-// end) range -- never the notes text -- and is honoured only while all of them
-// still match the bookmark on screen, so an edit made on another client,
-// another account or another page fails closed. Kept here rather than in
-// popup-ai.js so every context that loads the AI cache shares one copy.
+// after the AI cache that produced it has expired (quick saves and Batch no
+// longer mark the block with an "[AI Summary]" line). The service worker is
+// the only writer: popup saves, quick saves, Batch and offline replays hand it
+// the block's range, and it records a receipt once notes holding that block
+// were delivered (background.js pbpRecordSummaryOwnership). The popup only
+// reads. A receipt carries the owner, the page URL (normalized below), a
+// SHA-256 of the full notes and the [start, end) range -- never the notes
+// text -- and is honoured only while all of them still match the bookmark on
+// screen, so an edit made on another client, another account or another page
+// fails closed.
 
 // THIRD URL-normalization variant in this codebase - unconditionally drops
 // the hash below (no `#/` or `#!` router exception), unlike ai.js
@@ -485,4 +489,53 @@ async function pbpAiLoadSummaryOwnership(account, url, notes) {
   return { start: receipt.start, end: receipt.end };
 }
 
+// A save queued offline has not written its notes yet, so it cannot have a
+// receipt. It gets a hold keyed by its queue ID instead: "|" never occurs in
+// encodeURIComponent output, so a hold key cannot collide with any account's
+// receipt key, and it stays inside the summary_owner_ pool and its LRU bound.
+// Replay turns the hold into a receipt only when it delivered exactly the held
+// notes for the held owner and page; every other outcome releases it.
+function _pbpAiSummaryHoldKey(queueId) {
+  return typeof queueId === "string" && queueId
+    ? _PBP_AI_SUMMARY_OWNER_PREFIX + "|queue|" + queueId : "";
+}
+
+async function pbpAiHoldSummaryOwnership(queueId, account, url, notes, range) {
+  const key = _pbpAiSummaryHoldKey(queueId);
+  const normalizedUrl = pbpAiPageUrlNorm(url);
+  if (!key || !account || !normalizedUrl || typeof notes !== "string" ||
+      !pbpAiSummaryRangeValid(notes, range)) return false;
+  const savedAt = Date.now();
+  const hold = {
+    account,
+    url: normalizedUrl,
+    notesHash: await pbpAiSummaryTextHash(notes),
+    start: range.start,
+    end: range.end,
+    savedAt
+  };
+  return pbpAiCacheSet(key, hold, savedAt);
+}
+
+// Consumes the hold whatever the outcome; true once its receipt is written.
+async function pbpAiClaimSummaryOwnership(queueId, account, url, notes) {
+  const key = _pbpAiSummaryHoldKey(queueId);
+  if (!key) return false;
+  const entry = await pbpAiCacheGet(key);
+  await pbpAiCacheDelete(key);
+  const hold = entry && entry.result;
+  if (!hold || !account || hold.account !== account ||
+      hold.url !== pbpAiPageUrlNorm(url) ||
+      typeof notes !== "string" || !pbpAiSummaryRangeValid(notes, hold)) return false;
+  let notesHash;
+  try { notesHash = await pbpAiSummaryTextHash(notes); }
+  catch (_) { return false; }
+  if (notesHash !== hold.notesHash) return false;
+  return pbpAiSaveSummaryOwnership(account, url, notes, { start: hold.start, end: hold.end });
+}
+
+async function pbpAiReleaseSummaryOwnership(queueId) {
+  const key = _pbpAiSummaryHoldKey(queueId);
+  if (key) await pbpAiCacheDelete(key);
+}
 // ---- End summary ownership receipts ----

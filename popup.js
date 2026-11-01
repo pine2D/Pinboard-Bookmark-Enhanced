@@ -1934,6 +1934,10 @@ function setupSubmit(token) {
         setSubmitState("idle");
         return;
       }
+      // Where this popup's AI summary block sits in the submitted notes (null:
+      // none it owns). The worker records it once these notes are delivered,
+      // for every save path alike; it travels beside the intent, so offline
+      // records keep only their listed fields.
       const summaryOwnership =
         typeof pbpAiSummaryOwnershipSnapshot === "function"
           ? pbpAiSummaryOwnershipSnapshot(extended)
@@ -1990,7 +1994,7 @@ function setupSubmit(token) {
         if (ownsSubmitUi()) setSubmitState("idle");
         return;
       }
-      const result = await chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount, popupDraft });
+      const result = await chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount, popupDraft, summaryRange: summaryOwnership });
       if (!result || typeof result !== "object" || typeof result.status !== "string") {
         throw new Error("invalid save response");
       }
@@ -2063,19 +2067,6 @@ function setupSubmit(token) {
           _popupDraftLastSnapshot = "";
           pbpRememberPopupDraft();
         }
-        try {
-          if (typeof pbpAiSaveSummaryOwnership === "function") {
-            const exactRange =
-              savePolicy.mode === "create" || savePolicy.mode === "update"
-                ? summaryOwnership
-                : null;
-            await pbpAiSaveSummaryOwnership(
-              submitAccount, saveUrl, extended, exactRange);
-          }
-        } catch (_) {}
-        if (!ownsSubmitUi()
-            || bookmarkLookup.generation !== lookupGenerationAtSave
-            || $id("url-input").value.trim() !== url) return;
         if (typeof saveLastUsedTags === "function") saveLastUsedTags(tags, submitAccount);
         if (savePolicy.mode === "update") {
           existingBookmark = {

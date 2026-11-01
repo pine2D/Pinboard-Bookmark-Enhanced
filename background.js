@@ -940,6 +940,7 @@ function mutateOfflineQueue(action) {
     const { offlineQueue = [] } = await chrome.storage.local.get("offlineQueue");
     const next = pbpOfflineQueueReduce(offlineQueue, action);
     await chrome.storage.local.set({ offlineQueue: next });
+    await pbpReleaseDroppedSummaryHolds(offlineQueue, next);
     // A replay pause must not outlive its account's last queued item (clear,
     // remove or final acknowledgement), or a later network-queued save for
     // that account would be skipped. Already on this tail: direct storage
@@ -1077,7 +1078,72 @@ function queueRecordFromSaveIntent(intent, token) {
   };
 }
 
-function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", readerAction = "", readerDraft = null } = {}) {
+// ---- AI summary ownership (receipts and holds live in ai-cache.js) ----
+// The popup can replace or remove an AI summary block in place only while a
+// receipt says where it sits in the bookmark's notes. Every save path hands
+// the worker that block's [start, end) range in the notes it submits
+// (summaryRange: undefined = nothing to say, null = these notes hold no block
+// the caller owns), and the worker records it only once those notes were
+// delivered. A delivery that kept the server's notes (merge or overwrite of
+// an existing bookmark, skip) leaves receipts alone: they still describe
+// those notes, and the popup retires one as soon as its hash stops matching.
+// linkding keeps summaries in Description, never in notes. Bookkeeping only:
+// failures are logged and never change a save's outcome. typeof-guarded:
+// source-slice test pages run this region without ai-cache.js.
+function pbpSummaryReceiptNotes(intent, envelope, auth) {
+  if (auth?.service === "linkding" || envelope?.result?.status !== "saved") return null;
+  const notes = envelope.persisted?.notes;
+  const wroteSubmittedNotes = intent.mode === "create" || intent.mode === "update"
+    || envelope.result.mutation !== "updated";
+  return wroteSubmittedNotes && typeof notes === "string" && notes === intent.notes ? notes : null;
+}
+
+async function pbpRecordSummaryOwnership(intent, envelope, auth, range) {
+  if (range === undefined || typeof pbpAiSaveSummaryOwnership !== "function") return;
+  const notes = pbpSummaryReceiptNotes(intent, envelope, auth);
+  if (notes === null) return;
+  try { await pbpAiSaveSummaryOwnership(auth.account, intent.url, notes, range); }
+  catch (e) { console.warn("summary ownership receipt failed:", e?.name, e?.message); }
+}
+
+// A save queued offline has delivered nothing yet; it holds its range under
+// its queue ID (never in the queue record) until a replay settles it.
+async function pbpHoldSummaryOwnership(queueId, intent, auth, range) {
+  if (!range || auth?.service === "linkding" || typeof pbpAiHoldSummaryOwnership !== "function") return;
+  try { await pbpAiHoldSummaryOwnership(queueId, auth.account, intent.url, intent.notes, range); }
+  catch (e) { console.warn("summary ownership hold failed:", e?.name, e?.message); }
+}
+
+// Replay: the hold becomes the receipt only when this delivery wrote exactly
+// the queued notes for the held owner and page; any other saved or skipped
+// outcome ends it. A failure keeps it, as the queue keeps the record.
+async function pbpSettleSummaryOwnershipHold(queueId, intent, envelope, auth) {
+  const status = envelope?.result?.status;
+  if ((status !== "saved" && status !== "skipped") || typeof pbpAiClaimSummaryOwnership !== "function") return;
+  try {
+    const notes = pbpSummaryReceiptNotes(intent, envelope, auth);
+    if (notes === null) await pbpAiReleaseSummaryOwnership(queueId);
+    else await pbpAiClaimSummaryOwnership(queueId, auth.account, intent.url, notes);
+  } catch (e) {
+    console.warn("summary ownership hold failed:", e?.name, e?.message);
+  }
+}
+
+// Saves that leave the queue any other way (removed or cleared by the user,
+// cancelled by a reader delete) drop their holds. Acknowledged replays were
+// settled before their removal, so deleting their key again is a no-op.
+async function pbpReleaseDroppedSummaryHolds(before, after) {
+  if (!Array.isArray(before) || typeof pbpAiReleaseSummaryOwnership !== "function") return;
+  const kept = new Set((Array.isArray(after) ? after : []).map((item) => item?.queueId));
+  for (const item of before) {
+    const queueId = item?.queueId;
+    if (typeof queueId !== "string" || !queueId || kept.has(queueId)) continue;
+    try { await pbpAiReleaseSummaryOwnership(queueId); }
+    catch (e) { console.warn("summary ownership hold release failed:", e?.name, e?.message); }
+  }
+}
+
+function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", readerAction = "", readerDraft = null, summaryRange } = {}) {
   return runSaveDeliveryTransaction(async () => {
     let settings;
     try { settings = await loadSettings(); }
@@ -1108,6 +1174,9 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
       if (prepared.result) return prepared.result;
       intent = prepared.intent;
     }
+    // A caller's range describes the notes it submitted; a reader action may
+    // have replaced them with the server's.
+    const ownershipRange = readerAction ? undefined : summaryRange;
 
     let envelope;
     try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth); }
@@ -1117,6 +1186,7 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
     }
 
     if (envelope.result.status === "saved" || envelope.result.status === "skipped") {
+      await pbpRecordSummaryOwnership(intent, envelope, deliveryAuth, ownershipRange);
       await applySaveResultSideEffects(envelope, deliverySettings, { deferBadge, auth: deliveryAuth });
       return envelope.result.status === "saved" && envelope.result.mutation === "created"
         ? { ...envelope.result, account: deliveryAuth.account }
@@ -1131,6 +1201,7 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
 
     try {
       const queueId = await enqueueOfflineSave({...queueRecordFromSaveIntent(intent, deliverySettings.pinboardToken), account:deliveryAuth.account});
+      await pbpHoldSummaryOwnership(queueId, intent, deliveryAuth, ownershipRange);
       // cause lets the popup say why: Pinboard answered 429/5xx ("server")
       // or the request never got an HTTP answer ("network").
       const cause = Number.isInteger(envelope.result?.httpStatus) ? "server" : "network";
@@ -1170,6 +1241,7 @@ function sendOfflineItem(item) {
       console.warn("save intent failed:", e?.name, e?.message);
       envelope = { result: pbpSaveFailure("internal"), persisted: null, retryable: false };
     }
+    await pbpSettleSummaryOwnershipHold(item.queueId, intent, envelope, deliveryAuth);
     return { ...envelope, settings: deliverySettings, auth: deliveryAuth };
   });
 }
@@ -1289,7 +1361,7 @@ function retryOfflineItem(queueId) {
   });
 }
 
-function submitPopupSaveIntent(intent, expectedAccount) {
+function submitPopupSaveIntent(intent, expectedAccount, summaryRange = null) {
   if (!expectedAccount || typeof expectedAccount !== "string") {
     return Promise.resolve(pbpSaveFailure("account_changed"));
   }
@@ -1302,7 +1374,7 @@ function submitPopupSaveIntent(intent, expectedAccount) {
   if (intent.mode === "create" && intent.time !== undefined) {
     return Promise.resolve(pbpSaveFailure("invalid"));
   }
-  return submitSaveIntent(intent, { expectedAccount });
+  return submitSaveIntent(intent, { expectedAccount, summaryRange });
 }
 
 // ---- Reader bookmark workflow ----
@@ -1402,7 +1474,10 @@ function pbpDeleteReaderBookmark(context) {
           // untouched; legacy queue records may still carry a token binding.
           const next = offlineQueue.filter(item => item?.url !== context.url
             || (item.account || pbpPinboardAccountFromToken(item.token)) !== context.account);
-          if (next.length !== offlineQueue.length) await chrome.storage.local.set({ offlineQueue: next });
+          if (next.length !== offlineQueue.length) {
+            await chrome.storage.local.set({ offlineQueue: next });
+            await pbpReleaseDroppedSummaryHolds(offlineQueue, next);
+          }
         }
         return true;
       });
@@ -1650,14 +1725,22 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     }
   }
 
+  // Appends the summary block and remembers where it sits, so the worker can
+  // record ownership once these notes are delivered (the popup reclaims the
+  // block from that receipt after the AI cache is gone). null: these notes
+  // hold no block, which retires a stale receipt for the page once written.
+  let summaryRange = null;
+  const appendSummary = (summary) => {
+    const wrapped = pbpFormatSummaryBlock(summary, startAuth.service);
+    const start = notes ? notes.length + 2 : 0;
+    notes = notes ? notes + "\n\n" + wrapped : wrapped;
+    summaryRange = wrapped ? { start, end: start + wrapped.length } : null;
+  };
   // Apply combined-path results, then whatever the single calls produced.
   if (aiTagsResolved) tags = [...tags, ...aiTagsResolved];
   if (summaryResolved) {
     if (linkding) linkdingSummary = summaryResolved;
-    else {
-      const wrapped = pbpFormatSummaryBlock(summaryResolved, startAuth.service);
-      notes = notes ? notes + "\n\n" + wrapped : wrapped;
-    }
+    else appendSummary(summaryResolved);
   }
   const aiResults = await Promise.all(aiPromises);
   for (const r of aiResults) {
@@ -1665,10 +1748,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     if (r.type === "tags") tags = [...tags, ...r.result];
     if (r.type === "summary") {
       if (linkding) linkdingSummary = r.result;
-      else {
-        const wrapped = pbpFormatSummaryBlock(r.result, startAuth.service);
-        notes = notes ? notes + "\n\n" + wrapped : wrapped;
-      }
+      else appendSummary(r.result);
     }
   }
   const description = linkding
@@ -1687,7 +1767,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     private: isPrivate,
     toread: toread === true ? true : undefined,
     archive: undefined,
-  }, { expectedAccount: startAuth.account });
+  }, { expectedAccount: startAuth.account, summaryRange });
 
   if (result.status === "saved") {
     const undoInfo = result.mutation === "created" && result.account
@@ -4317,7 +4397,7 @@ function handleRuntimeMessage(message, sender, sendResponse) {
     // offline-queue row on next popup open, and the other two are not
     // failures. minimum_chrome_version is 123, so getContexts (Chrome 116+)
     // needs no feature-detection fallback.
-    submitPopupSaveIntent(message.intent, message.account)
+    submitPopupSaveIntent(message.intent, message.account, message.summaryRange)
       .then(async (result) => {
         if (result.status === "saved" && message.popupDraft) {
           await pbpRunPopupDraft({ ...message.popupDraft, account: message.account, action: "clear" });
@@ -5042,6 +5122,8 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
               ? pbpNotesDescription(pageInfo).replace(/\s+/g, " ").trim() : "")
           : "";
         await requireAccount();
+        // Batch notes hold the summary block and nothing else (null: no block).
+        const summaryRange = !linkding && notes ? { start: 0, end: notes.length } : null;
         const result = await submitSaveIntent({
           mode: s.batchSkipExisting ? "skip" : "merge",
           url: tab.url,
@@ -5052,7 +5134,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
           private: isPrivate,
           toread: s.optReadlaterDefault ? true : undefined,
           archive: s.waybackArchiveBatch ? undefined : false,
-        }, { deferBadge: true, expectedAccount: account });
+        }, { deferBadge: true, expectedAccount: account, summaryRange });
         if (result.reason === "account_changed") {
           const error = new Error("account_changed");
           error.code = "account_changed";

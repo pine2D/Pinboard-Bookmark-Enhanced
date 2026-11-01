@@ -213,6 +213,7 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
   assert(start >= 0 && end > start, "background save function not found");
   const notifications = [];
   const intents = [];
+  const deliveries = [];
   const settings = {
     pinboardToken: "token", bgSaveMode: "merge", aiProvider: "openai",
     aiCacheDuration: 60, aiContentSource: "local", aiTagSeparator: "space",
@@ -244,7 +245,7 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
     parseAITags: (value) => value,
     AI_TAG_CAP: 12,
     buildSummaryPrompt: () => "summary",
-    submitSaveIntent: async (intent) => { intents.push(intent); return { status: "saved", mutation: "updated" }; },
+    submitSaveIntent: async (intent, options) => { intents.push(intent); deliveries.push(options); return { status: "saved", mutation: "updated" }; },
     processOfflineQueue: () => Promise.resolve(),
     t: (key, value) => `${key}:${value || ""}`,
     // K100: pbpI18nReady must be a dep of every harness that slices
@@ -259,6 +260,7 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
     save: make(...names.map((name) => dependencies[name])),
     notifications,
     intents,
+    deliveries,
     extractionCalls,
     cacheWrites,
     i18nReadyCalls,
@@ -413,6 +415,52 @@ async function run() {
         assert(h.intents[0]?.notes === expected, service + " summary format: " + h.intents[0]?.notes);
         if (service === "linkding") assert(h.intents[0]?.summary === "<b> *summary*", "linkding summary did not reach Description");
       }
+    }
+  });
+
+  await test("background saves hand the worker the exact range of the summary block they append", async () => {
+    // The popup can reclaim a block only from a receipt; the worker writes one
+    // from this range once the notes are delivered. It must cover exactly the
+    // block that was appended, after whatever notes came before it. Notes that
+    // got no block say so with null, which retires a stale receipt for the page
+    // once they are written.
+    for (const service of ["pinboard", "karakeep", "linkding"]) {
+      for (const base of ["", "> quoted selection"]) {
+        for (const [label, cached, patch] of [
+          ["cached", { summary: "Cached <b>summary</b>" }, { _aiTags: false }],
+          ["fresh", {}, { _aiTags: false }],
+          ["combined", {}, { _aiTags: true }],
+        ]) {
+          const h = buildBackgroundSaveHarness(source, async () => "Fresh <b>summary</b>", cached, patch, true, {
+            getCurrentBookmarkAuth: async () => ({ service, token: "fixture", account: "fixture", epoch: 1 }),
+            buildAutoNotes: () => base,
+          });
+          await h.save({ url, title: "Article", tab: { id: 7 }, settingsOverrides: {}, notifyId: "qs", notifyCategory: "quickSave" });
+          const where = `${service}/${label}/${base ? "with notes" : "empty"}`;
+          const notes = h.intents[0]?.notes;
+          const range = h.deliveries[0]?.summaryRange;
+          assert(!Object.hasOwn(h.intents[0] || {}, "summaryRange"), where + ": the range leaked into the queued intent");
+          if (service === "linkding") {
+            assert(range === null && notes === base, where + ": linkding Notes gained ownership " + JSON.stringify(range));
+            continue;
+          }
+          const summary = cached.summary || (label === "combined" ? "combined-summary" : "Fresh <b>summary</b>");
+          const block = pbpFormatSummaryBlock(summary, service);
+          assert(notes === (base ? base + "\n\n" + block : block), where + ": notes bytes changed: " + JSON.stringify(notes));
+          assert(range && Number.isInteger(range.start) && Number.isInteger(range.end)
+            && notes.slice(range.start, range.end) === block && range.end === notes.length,
+          where + ": range " + JSON.stringify(range) + " does not cover the appended block");
+        }
+      }
+    }
+    for (const [label, patch, callAI] of [
+      ["summary off", { _aiTags: true, _aiSummary: false }, async () => "tag"],
+      ["summary failed", { _aiTags: false }, async () => { throw new Error("offline"); }],
+    ]) {
+      const h = buildBackgroundSaveHarness(source, callAI, {}, patch, true, { buildAutoNotes: () => "> quoted selection" });
+      await h.save({ url, title: "Article", tab: { id: 7 }, settingsOverrides: {}, notifyId: "qs", notifyCategory: "quickSave" });
+      assert(h.intents[0]?.notes === "> quoted selection" && h.deliveries[0]?.summaryRange === null,
+        label + ": did not say its notes hold no block: " + JSON.stringify(h.deliveries[0]?.summaryRange));
     }
   });
 

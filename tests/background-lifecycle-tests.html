@@ -654,9 +654,15 @@ function buildUndoHarness(source, opts) {
   }
   {
     const h = buildRouterHarness();
-    const r = await h.invoke({ type: "save_intent", intent: { mode: "create" }, account: "alice" });
+    const intent = { mode: "create" };
+    const summaryRange = { start: 0, end: 15 };
+    const r = await h.invoke({ type: "save_intent", intent, account: "alice", summaryRange });
+    const args = h.calls.find(([n]) => n === "saveIntent")?.[1] || [];
     check("router: save_intent reaches submitPopupSaveIntent and holds the channel",
       r.held === true && h.calls.some(([n]) => n === "saveIntent"));
+    // The popup's summary range rides beside the intent, never inside it.
+    check("router: save_intent hands the popup's summary range to the worker beside the intent",
+      args[0] === intent && args[1] === "alice" && args[2] === summaryRange && !Object.hasOwn(intent, "summaryRange"));
   }
   // ---- K45: a failed popup-initiated save notifies iff no popup context is
   // left to show it. notifySaveFailure runs after sendResponse, inside an

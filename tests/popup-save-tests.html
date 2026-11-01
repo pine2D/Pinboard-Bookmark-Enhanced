@@ -150,7 +150,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     const snapshotIndex = submit.indexOf('url: $id("url-input").value.trim()', policyIndex);
     const ownershipIndex = submit.indexOf("saveUrl !== url", snapshotIndex);
     const intentIndex = submit.indexOf("const intent = {", ownershipIndex);
-    const sendIndex = submit.indexOf('chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount, popupDraft })', intentIndex);
+    const sendIndex = submit.indexOf('chrome.runtime.sendMessage({ type: "save_intent", intent, account: submitAccount, popupDraft, summaryRange: summaryOwnership })', intentIndex);
     const snapshot = submit.slice(snapshotIndex, ownershipIndex);
     const intentBlock = submit.slice(intentIndex, sendIndex);
     const tagHelperStart = source.indexOf("function pbpRebasePopupTags(");
@@ -228,7 +228,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(elements["private-check"].checked && !elements["share-check"].checked,"new popup defaults to shared");
       }
     });
-    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard", sharedExplicit = false } = {}) {
+    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard", sharedExplicit = false, summaryOwnership = null } = {}) {
       const elements = {
         "submit-btn": createElementStub(),
         "delete-btn": createElementStub({ classes: ["hidden"] }),
@@ -266,6 +266,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const localTokenWrites = [];
       const authEvents = [];
       const reloadTokenValues = [];
+      const ownershipReads = [];
+      const receiptWrites = [];
       let queueRefreshes = 0;
       let closeCalls = 0;
       let reloadCalls = 0;
@@ -378,6 +380,9 @@ test("posts/add default remains replace=yes for existing callers", () => {
         pbpWaybackShouldArchive,
         pbpWaybackShouldAttempt: () => true,
         POSTS_ADD_URI_BUDGET,
+        pbpAiSummaryOwnershipSnapshot: (value) => { ownershipReads.push(value); return summaryOwnership; },
+        // Receipts are the worker's to write; the popup must never call this.
+        pbpAiSaveSummaryOwnership: async (...args) => { receiptWrites.push(args); },
       };
       const names = Object.keys(dependencies);
       const factory = new Function(...names, `${source.slice(source.indexOf("function pbpPopupDraftSnapshot("), source.indexOf("function pbpRememberPopupDraft("))}\n${resetSource}\n${setupSource}\nreturn {setupSubmit, sharing:()=>_linkdingSharedExplicit, changeSharing:()=>{_linkdingSharedExplicit=true;_linkdingSharedRevision++;}};`);
@@ -388,6 +393,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       return {
         elements, currentTags, fieldDirtyFlags, bookmarkLookup, settings, messages, statuses, timers, bars,
         checkCalls, savedTagCalls, syncRemovals, localTokenWrites, authEvents, reloadTokenValues,
+        ownershipReads, receiptWrites,
         click, resolveSave, resolveWayback,
         setCurrentToken: (token) => { effectiveToken = token; },
         currentToken: () => effectiveToken,
@@ -431,6 +437,30 @@ test("posts/add default remains replace=yes for existing callers", () => {
         if(newerChoice)h.changeSharing();
         h.resolveSave({status:"saved",mutation:"created"});await pending;
         assert(h.sharing()===newerChoice,"consumption lost new sharing choice or retained settled intent");
+      }
+    });
+
+    await testAsync("the popup hands its summary range to the worker and never writes a receipt itself", async () => {
+      // The worker records ownership once the notes are delivered, the same
+      // way for every save path; the range rides beside the intent so offline
+      // records keep only their listed fields.
+      for (const [label, ownership, outcome] of [
+        ["owned block, saved", { start: 0, end: 15 }, { status: "saved", mutation: "created" }],
+        ["owned block, queued", { start: 0, end: 15 }, { status: "queued", queueId: "q1", cause: "network" }],
+        ["owned block, failed", { start: 0, end: 15 }, { status: "failed", reason: "http", httpStatus: 400 }],
+        ["no owned block, saved", null, { status: "saved", mutation: "updated" }],
+      ]) {
+        const h = createSubmitHarness({ summaryOwnership: ownership });
+        const saving = h.click(); await flushMicrotasks();
+        const message = h.messages.find((m) => m.type === "save_intent");
+        assert(message, label + ": save was not dispatched");
+        assert(h.ownershipReads.length === 1 && h.ownershipReads[0] === "Submitted notes",
+          label + ": ownership was not read for the submitted notes");
+        assert(Object.hasOwn(message, "summaryRange") && JSON.stringify(message.summaryRange) === JSON.stringify(ownership),
+          label + ": summary range not sent: " + JSON.stringify(message.summaryRange));
+        assert(!Object.hasOwn(message.intent, "summaryRange"), label + ": the range leaked into the intent");
+        h.resolveSave(outcome); await saving;
+        assert(h.receiptWrites.length === 0, label + ": the popup wrote a receipt itself");
       }
     });
 
@@ -926,28 +956,6 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(intentBlock.includes(field), `intent is missing ${field}`);
       }
       assert(intentBlock.includes("archive: _archiveUserTouched ? archiveRequested : undefined"), "automatic archive choice is still sent as an override");
-    });
-
-    test("summary ownership persists only after a saved delivery", () => {
-      const summarySnapshotIndex = submit.indexOf("const summaryOwnership =", ownershipIndex);
-      const savedStart = submit.indexOf('if (result.status === "saved")', sendIndex);
-      const savedEnd = submit.indexOf('if (result.status === "failed" && result.reason === "too_long")', savedStart);
-      const saved = submit.slice(savedStart, savedEnd);
-      const persistIndex = saved.indexOf("await pbpAiSaveSummaryOwnership(");
-      const recheckIndex = saved.indexOf("bookmarkLookup.generation !== lookupGenerationAtSave", persistIndex);
-      assert(summarySnapshotIndex > ownershipIndex && summarySnapshotIndex < intentIndex,
-        "summary ownership snapshot is not captured before save_intent");
-      assert(!submit.slice(sendIndex, savedStart).includes("pbpAiSaveSummaryOwnership"),
-        "queued or conflict path persists summary ownership");
-      assert(persistIndex >= 0 && saved.includes("try {") && saved.includes("catch (_) {}"),
-        "saved ownership persistence is not exception-isolated");
-      assert(saved.includes('savePolicy.mode === "create" || savePolicy.mode === "update"')
-        && saved.includes("? summaryOwnership") && saved.includes(": null"),
-        "create/update and merge ownership ranges differ incorrectly");
-      const recheck = saved.slice(recheckIndex - 40, recheckIndex + 250);
-      assert(recheckIndex > persistIndex && recheck.includes("!ownsSubmitUi()")
-        && recheck.includes("$id(\"url-input\").value.trim() !== url"),
-        "ownership persistence does not revalidate the submit UI, URL, and lookup generation");
     });
 
     test("submit no longer builds or sends posts/add directly", () => {

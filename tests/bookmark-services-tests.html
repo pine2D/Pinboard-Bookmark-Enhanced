@@ -2,6 +2,7 @@
 <html><head><meta charset="utf-8"><title>Bookmark Services Tests</title></head><body>
 <h1>Bookmark services</h1><div id="results"></div><div id="summary"></div>
 <script src="../shared.js"></script><script src="../bookmark-services.js"></script>
+<script src="../ai-cache.js"></script><script src="fixtures/summary-ownership.js"></script>
 <script>
 const cases = [];
 function test(name, run) { cases.push({name, run}); }
@@ -304,6 +305,101 @@ async function workerHarness(service, replies, options = {}) {
   return {...api,state,auth};
 }
 const saveIntent = {mode:"create",url:pageUrl,title:"Title",notes:"Note",tags:"work",private:true,toread:false};
+// The real quick-save and Batch producers from background.js, handing their
+// intents and delivery options to a worker harness. Every summary is fresh, as
+// when the AI cache has nothing (left) for the page.
+async function producers(h, {autoNotes, summary}) {
+  workerSource ||= await (await fetch("../background.js")).text();
+  const slice = (from, to) => {
+    const start = workerSource.indexOf(from), end = workerSource.indexOf(to, start);
+    if (start < 0 || end <= start) throw new Error("producer source not found: " + from);
+    return workerSource.slice(start, end);
+  };
+  const settings = {...h.state.settings, bgSaveMode:"merge", _defaultTags:"", _autoNotes:true, _blockquote:false, _aiTags:false, _aiSummary:true,
+    batchAiSummary:true, batchAiTags:false, optBatchTagEnabled:false, batchSkipExisting:false, waybackArchiveBatch:false};
+  const deps = {
+    loadSettings:async()=>({...settings}), getCurrentBookmarkAuth:h.auth, submitSaveIntent:h.submitSaveIntent,
+    hasAIKey:()=>true, getPageInfoFromTab:async()=>({pageText:"article body"}), buildAutoNotes:()=>autoNotes,
+    getAICache:async()=>null, setAICache:async()=>{}, callAI:async()=>summary, buildSummaryPrompt:()=>"summary prompt",
+    pbpReadTagVocab:async()=>null, pbpServiceEffectivePrivate:()=>true, pbpNotesDescription:()=>"",
+    showNotification:()=>{}, t:key=>key, pbpI18nReady:async()=>{}, processOfflineQueue:async()=>{}, updateBadge:async()=>{},
+    _newBatchRunId:()=>"run-1", _removeBatchRecordIfOwned:async()=>true, _writeBatchProgress:async()=>{},
+    buildTagCaseMap:()=>({}), chrome:{storage:{local:{get:async()=>({}),set:async()=>{}}}},
+  };
+  const api = new Function(...Object.keys(deps), "let _batchRunning = false;\n"
+    + slice("async function saveFromBackground", "// Helper: resolve prefix-specific settings")
+    + slice("function handleBatchSave", "// ===================== Tab Set")
+    + ";return {saveFromBackground,handleBatchSave};")(...Object.values(deps));
+  const tab = {id:9, url:pageUrl, title:"Title", incognito:false};
+  return {
+    quickSave:()=>api.saveFromBackground({url:pageUrl, title:"Title", tab, notifyId:"qs", notifyTitle:"Quick saved", notifyCategory:"quickSave"}),
+    batchSave:()=>api.handleBatchSave([tab]),
+  };
+}
+// Karakeep notes are plain text, so its summary block is a paragraph of its
+// own. Hand-written bookmark records (Karakeep 0.34 API shape) holding the
+// notes the worker is expected to have written, typed out literally per case.
+const KK_SUMMARY = "A plain summary paragraph.";
+const kkRecord = (id, note) => ({id, createdAt:"2026-11-01T09:00:00Z", modifiedAt:"2026-11-01T09:00:00Z", title:"Title", archived:false, favourited:false,
+  note, summary:null, source:"extension", userId:"user1", tags:[], content:{type:"link",url:pageUrl,title:"Example Domain",description:null}, assets:[]});
+const kkPopup = async (h, notes) => pbpFixturePopupSummary({service:"karakeep", account:(await h.auth()).account, url:pageUrl, notes,
+  existingBookmark:pbpBookmarkAsPost(pbpBookmarkNormalize("karakeep", kkRecord("bk-new", notes)))});
+test("Karakeep quick-save and Batch summaries are replaced and removed in place once the AI cache is gone", async()=>{
+  for (const [label, run, stored, kept] of [
+    ["quick save", p=>p.quickSave(), "Auto notes\n\n" + KK_SUMMARY, "Auto notes"],
+    ["Batch", p=>p.batchSave(), KK_SUMMARY, ""],
+  ]) {
+    await pbpFixtureClearSummaryOwnership();
+    const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[201,kkRecord("bk-new", stored)]]);
+    await (await producers(h,{autoNotes:"Auto notes", summary:KK_SUMMARY}))[label === "Batch" ? "batchSave" : "quickSave"]();
+    equal([label, h.state.calls.map(c=>c.method), h.state.calls[1]?.body?.note], [label, ["GET","POST"], stored]);
+    let popup=await kkPopup(h, stored);
+    const owner=await popup.restore();
+    popup.regenerate("Second paragraph.");
+    equal([label, popup.field.value, owner], [label, (kept ? kept + "\n\n" : "") + "Second paragraph.", "receipt"]);
+    popup=await kkPopup(h, stored);
+    await popup.restore();
+    equal([label, popup.remove(), popup.field.value], [label, true, kept]);
+  }
+});
+test("a Karakeep create merged into a concurrent bookmark owns the note it supplied; a merge that keeps the server note owns nothing", async()=>{
+  const notes="Auto notes\n\n" + KK_SUMMARY, range={start:"Auto notes\n\n".length, end:notes.length};
+  await pbpFixtureClearSummaryOwnership();
+  // Karakeep 0.34.1 answers a racing create with 200 and replaces the stored note with the supplied one.
+  const raced=await workerHarness("karakeep",[[200,{bookmarkId:null}],[200,{...kkRecord("bk-new", notes),alreadyExists:true}]]);
+  const racedResult=await raced.submitSaveIntent({...saveIntent,mode:"merge",tags:"",notes},{summaryRange:range});
+  equal([racedResult.status,racedResult.mutation],["saved","merged"]);
+  equal(await (await kkPopup(raced, notes)).restore(),"receipt");
+
+  await pbpFixtureClearSummaryOwnership();
+  const kept=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[200,{id:"bk1",title:"Saved title",note:"My note"}]]);
+  equal((await kept.submitSaveIntent({...saveIntent,mode:"merge",tags:"work",notes},{summaryRange:range})).status,"saved");
+  equal(kept.state.calls[2].body.note,"My note");
+  equal((await pbpFixtureSummaryOwnershipEntries()).length,0);
+});
+test("a Karakeep summary saved offline is reclaimable after its replay writes it", async()=>{
+  await pbpFixtureClearSummaryOwnership();
+  const notes="Auto notes\n\n" + KK_SUMMARY;
+  const h=await workerHarness("karakeep",[new TypeError("offline"),[200,{bookmarkId:null}],[201,kkRecord("bk-new", notes)]]);
+  const queued=await h.submitSaveIntent({...saveIntent,tags:"",notes},{expectedAccount:(await h.auth()).account,summaryRange:{start:"Auto notes\n\n".length,end:notes.length}});
+  equal(queued.status,"queued");ok(!Object.hasOwn(h.state.queue[0],"summaryRange"));
+  await h.processOfflineQueue();
+  equal([h.state.queue, h.state.calls.map(c=>c.method), h.state.calls[2]?.body?.note],[[],["GET","GET","POST"],notes]);
+  const popup=await kkPopup(h, notes);
+  const owner=await popup.restore();
+  popup.regenerate("Second paragraph.");
+  equal([popup.field.value, owner],["Auto notes\n\nSecond paragraph.","receipt"]);
+  equal((await pbpFixtureSummaryOwnershipEntries()).length,1);
+});
+test("linkding saves never gain a Notes receipt or hold", async()=>{
+  const notes="Auto notes\n\n> quoted", range={start:"Auto notes\n\n".length, end:notes.length};
+  await pbpFixtureClearSummaryOwnership();
+  const h=await workerHarness("linkding",[[200,{bookmark:null}],[201,ld]]);
+  equal((await h.submitSaveIntent({...saveIntent,notes},{expectedAccount:(await h.auth()).account,summaryRange:range})).status,"saved");
+  const queued=await workerHarness("linkding",[new TypeError("offline")]);
+  equal((await queued.submitSaveIntent({...saveIntent,notes},{summaryRange:range})).status,"queued");
+  equal((await pbpFixtureSummaryOwnershipEntries()).length,0);
+});
 test("worker saves to linkding without a Pinboard credential", async()=>{
   const h=await workerHarness("linkding",[[200,{bookmark:null}],[201,ld]]);
   const result=await h.submitSaveIntent(saveIntent,{expectedAccount:(await h.auth()).account});

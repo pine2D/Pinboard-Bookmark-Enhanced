@@ -13,6 +13,8 @@ h2 { margin-top: 24px; font-size: 16px; }
 <div id="results"></div>
 <script src="../shared.js"></script>
 <script src="../wayback.js"></script>
+<script src="../ai-cache.js"></script>
+<script src="fixtures/summary-ownership.js"></script>
 <script>
 async function test(name, fn) {
   try {
@@ -247,7 +249,8 @@ async function createHarness(options) {
       validateSaveIntent, fetchExistingBookmark, deliverSaveIntent,
       submitSaveIntent, submitPopupSaveIntent, sendOfflineItem,
       drainOfflineQueueIds, readOfflineQueueWithIds, retryOfflineItem,
-      normalizeOfflineSaveIntent, applySaveResultSideEffects, processOfflineQueue
+      normalizeOfflineSaveIntent, applySaveResultSideEffects, processOfflineQueue,
+      mutateOfflineQueue
     };
   `);
   return {
@@ -316,6 +319,8 @@ async function createBackgroundSaveHarness(options) {
     // sliced function throws ReferenceError. Defaults to already-resolved so
     // the many existing cases in this file are unaffected.
     pbpI18nReady: opts.pbpI18nReady || (() => { i18nReadyCalls++; return Promise.resolve(); }),
+    // AI-enabled cases supply the collaborators the summary path calls.
+    ...(opts.deps || {}),
   };
   const source = await getBackgroundSaveSource();
   const factory = new Function(...Object.keys(deps), source + "\nreturn saveFromBackground;");
@@ -1104,7 +1109,7 @@ await suite("unified save pipeline", async () => {
     const end = source.indexOf('if (message.type === "archive_url"', start);
     const branch = source.slice(start, end);
     assert(start >= 0 && end > start, "save_intent branch not found");
-    assert(branch.includes("submitPopupSaveIntent(message.intent, message.account)"), "message uses the guarded popup boundary");
+    assert(branch.includes("submitPopupSaveIntent(message.intent, message.account, message.summaryRange)"), "message uses the guarded popup boundary");
     assert(branch.includes("return true;"), "listener keeps the response channel open");
     // K45's sendResponse-before-getContexts ordering, and the deferred notify
     // that fires only after the probe resolves, are exercised behaviourally
@@ -1961,6 +1966,36 @@ await suite("unified save pipeline", async () => {
     }
   });
 
+  await test("Batch hands the worker the exact range of the summary block it writes", async () => {
+    for (const service of ["pinboard", "karakeep", "linkding"]) {
+      for (const [label, extra, summary] of [
+        ["single", { settings: { batchAiSummary: true } }, "AI summary"],
+        ["combined", { settings: { batchAiSummary: true, batchAiTags: true } }, "  Combined\n summary  "],
+        ["cached", { settings: { batchAiSummary: true }, cached: { summary: "Cached summary" } }, "Cached summary"],
+      ]) {
+        const h = await createBatchSaveHarness({ ...extra, settings: { bookmarkService: service, ...extra.settings },
+          hasAIKey: true, pageInfo: { pageText: "article body" } });
+        await h.handleBatchSave(batchTabs(1));
+        const { prepared, deliveryOptions } = h.intents[0];
+        const where = service + "/" + label;
+        assert(!Object.hasOwn(prepared, "summaryRange"), where + ": the range leaked into the queued intent");
+        if (service === "linkding") {
+          equal(deliveryOptions.summaryRange, null, where + ": linkding Notes gained ownership");
+          equal(prepared.notes, "", where + ": linkding Notes changed");
+          continue;
+        }
+        const block = pbpFormatSummaryBlock(summary, service);
+        equal(prepared.notes, block, where + ": notes bytes changed");
+        equal(JSON.stringify(deliveryOptions.summaryRange), JSON.stringify({ start: 0, end: block.length }), where + ": range");
+      }
+      const plain = await createBatchSaveHarness({ settings: { bookmarkService: service, batchAiTags: true },
+        hasAIKey: true, pageInfo: { pageText: "article body" } });
+      await plain.handleBatchSave(batchTabs(1));
+      // null: these notes hold no block, so a stale receipt is retired once they are written.
+      equal(plain.intents[0].deliveryOptions.summaryRange, null, service + ": a save without a summary did not disown its notes");
+    }
+  });
+
   await test("queued background save notifies without success or opportunistic drain", async () => {
     const h = await createBackgroundSaveHarness({ result: { status: "queued", queueId: "q1" } });
     const result = await runBackgroundSave(h);
@@ -2333,6 +2368,187 @@ await suite("unified save pipeline", async () => {
     // Fail-closed edges: duplicate token pairs and cross-account swaps stay rejected.
     equal(pbpAuthorizePinboardApiUrl(raw + "&auth_token=alice%3Aold", obfuscateKey("alice:new")), "");
     equal(pbpAuthorizePinboardApiUrl(raw, obfuscateKey("bob:new")), "");
+  });
+});
+
+// Summary blocks written by the worker (quick save, Batch, offline replay)
+// must stay replaceable and removable from the popup after the AI cache that
+// produced them is gone. Receipts live in this page's real IndexedDB through
+// ai-cache.js; the popup side is popup-ai.js's own restore/Regenerate/Remove.
+await suite("summary ownership after worker saves", async () => {
+  const PAGE = BASE_INTENT.url;
+  // Hand-written Pinboard v1 bodies (posts/get, posts/add), never derived from
+  // what the worker sent: the stored notes below are typed out literally, and
+  // every case asserts that posts/add carried exactly those bytes.
+  const NO_POSTS = Object.freeze({ date: "2026-11-01T09:00:00Z", user: "alice", posts: [] });
+  const ADDED = Object.freeze({ result_code: "done" });
+  const QUICK_NOTES = "Auto notes\n\n<blockquote>Fresh summary</blockquote>";
+  const QUICK_RANGE = Object.freeze({ start: "Auto notes\n\n".length, end: QUICK_NOTES.length });
+  const BATCH_NOTES = "<blockquote>AI summary</blockquote>";
+  const SERVER_NOTES = "Typed on pinboard.in\n\n<blockquote>Older summary</blockquote>";
+  const SERVER_RANGE = Object.freeze({ start: "Typed on pinboard.in\n\n".length, end: SERVER_NOTES.length });
+  const postsGet = (extended) => ({ date: "2026-11-01T09:00:00Z", user: "alice", posts: [{
+    href: PAGE, description: "New title", extended,
+    meta: "5d41402abc4b2a76b9719d911017c592", hash: "7d793037a0760186574b0282f2f435e7",
+    time: "2026-11-01T09:00:00Z", shared: "yes", toread: "no", tags: "base-tag",
+  }] });
+  const pinboard = (body) => async (url) => url.includes("/posts/get?") ? response(200, body) : response(200, ADDED);
+  const extendedSent = (core) => {
+    const adds = core.fetchCalls.filter((url) => url.includes("/posts/add?"));
+    return adds.length === 1 ? new URL(adds[0]).searchParams.get("extended") : "posts/add sent " + adds.length + " times";
+  };
+  // The popup's next open of this bookmark, with no cached summary.
+  const popupOpens = (notes, account = "alice") => pbpFixturePopupSummary({
+    service: "pinboard", account, url: PAGE, notes, existingBookmark: postsGet(notes).posts[0],
+  });
+  const quickSave = (core, settings = {}) => createBackgroundSaveHarness({
+    cachedSettings: { pinboardToken: "alice:old-token", bgSaveMode: "merge", optPrivateDefault: false,
+      optPrivateIncognito: true, _defaultTags: "base-tag", _autoNotes: true, _blockquote: false,
+      _aiTags: false, _aiSummary: true, ...settings },
+    deps: {
+      hasAIKey: () => true,
+      getPageInfoFromTab: async () => ({ pageText: "article body" }),
+      buildAutoNotes: () => "Auto notes",
+      getAICache: async () => null,
+      setAICache: async () => {},
+      callAI: async () => "Fresh summary",
+      buildSummaryPrompt: () => "summary prompt",
+      submitSaveIntent: (prepared, options) => core.submitSaveIntent(prepared, options),
+    },
+  });
+
+  await test("a quick-saved summary is replaced and removed in place once the AI cache is gone", async () => {
+    await pbpFixtureClearSummaryOwnership();
+    const core = await createHarness({ pinboardFetch: pinboard(NO_POSTS) });
+    equal((await runBackgroundSave(await quickSave(core))).status, "saved");
+    equal(extendedSent(core), QUICK_NOTES, "quick-save notes bytes changed");
+    let popup = await popupOpens(QUICK_NOTES);
+    const owner = await popup.restore();
+    popup.regenerate("Second summary");
+    equal(popup.field.value, "Auto notes\n\n<blockquote>Second summary</blockquote>", "Regenerate did not replace the block in place");
+    equal(owner, "receipt", "the reopened popup did not reclaim the quick-saved block");
+    popup = await popupOpens(QUICK_NOTES);
+    await popup.restore();
+    equal(popup.remove(), true, "Remove found no block");
+    equal(popup.field.value, "Auto notes", "Remove left part of the block or the notes");
+  });
+
+  await test("a Batch-saved summary is replaced and removed in place once the AI cache is gone", async () => {
+    await pbpFixtureClearSummaryOwnership();
+    const core = await createHarness({ pinboardFetch: pinboard(NO_POSTS) });
+    const batch = await createBatchSaveHarness({ settings: { batchAiSummary: true }, hasAIKey: true,
+      pageInfo: { pageText: "article body" },
+      submitSaveIntent: (prepared, options) => core.submitSaveIntent(prepared, options) });
+    await batch.handleBatchSave([{ id: 1, title: "New title", url: PAGE, incognito: false }]);
+    equal(extendedSent(core), BATCH_NOTES, "Batch notes bytes changed");
+    let popup = await popupOpens(BATCH_NOTES);
+    const owner = await popup.restore();
+    popup.regenerate("Second summary");
+    equal(popup.field.value, "<blockquote>Second summary</blockquote>", "Regenerate did not replace the block in place");
+    equal(owner, "receipt", "the reopened popup did not reclaim the Batch block");
+    popup = await popupOpens(BATCH_NOTES);
+    await popup.restore();
+    equal(popup.remove(), true, "Remove found no block");
+    equal(popup.field.value, "", "Remove left part of the block");
+  });
+
+  await test("a summary saved offline becomes reclaimable when its replay writes those notes", async () => {
+    await pbpFixtureClearSummaryOwnership();
+    let online = false;
+    const core = await createHarness({ pinboardFetch: async (url, calls) => {
+      if (!online) throw new TypeError("Failed to fetch");
+      return pinboard(NO_POSTS)(url, calls);
+    } });
+    const queued = await core.submitSaveIntent(intent({ notes: QUICK_NOTES }), { expectedAccount: "alice", summaryRange: QUICK_RANGE });
+    equal(queued.status, "queued");
+    assert(!Object.hasOwn(core.storageData.offlineQueue[0], "summaryRange"), "the range entered the offline record");
+    equal(await (await popupOpens(QUICK_NOTES)).restore(), null, "a queued save already owned notes it had not written");
+    online = true;
+    core.fetchCalls.length = 0;
+    await core.processOfflineQueue();
+    equal(core.storageData.offlineQueue.length, 0, "the replay did not land");
+    equal(extendedSent(core), QUICK_NOTES, "replayed notes bytes changed");
+    const popup = await popupOpens(QUICK_NOTES);
+    const owner = await popup.restore();
+    popup.regenerate("Second summary");
+    equal(popup.field.value, "Auto notes\n\n<blockquote>Second summary</blockquote>", "Regenerate did not replace the replayed block in place");
+    equal(owner, "receipt", "the replayed block was not reclaimed");
+    equal((await pbpFixtureSummaryOwnershipEntries()).length, 1, "the offline hold outlived its replay");
+  });
+
+  await test("a queued summary whose replay keeps the server's notes leaves nothing to reclaim", async () => {
+    await pbpFixtureClearSummaryOwnership();
+    let online = false;
+    const core = await createHarness({ pinboardFetch: async (url, calls) => {
+      if (!online) throw new TypeError("Failed to fetch");
+      return pinboard(postsGet("Typed on pinboard.in"))(url, calls);
+    } });
+    equal((await core.submitSaveIntent(intent({ notes: QUICK_NOTES }), { expectedAccount: "alice", summaryRange: QUICK_RANGE })).status, "queued");
+    online = true;
+    core.fetchCalls.length = 0;
+    await core.processOfflineQueue();
+    equal(core.storageData.offlineQueue.length, 0, "the replay did not land");
+    equal(extendedSent(core), "Typed on pinboard.in", "the replay was expected to merge into the existing notes");
+    equal((await pbpFixtureSummaryOwnershipEntries()).length, 0, "a hold or receipt survived a merge that kept the server notes");
+    equal(await (await popupOpens("Typed on pinboard.in")).restore(), null);
+  });
+
+  await test("removing a queued save drops its offline hold", async () => {
+    for (const removal of ["remove", "clear"]) {
+      await pbpFixtureClearSummaryOwnership();
+      const core = await createHarness({ pinboardFetch: async () => { throw new TypeError("Failed to fetch"); } });
+      const queued = await core.submitSaveIntent(intent({ notes: QUICK_NOTES }), { expectedAccount: "alice", summaryRange: QUICK_RANGE });
+      equal(queued.status, "queued");
+      equal((await pbpFixtureSummaryOwnershipEntries()).length, 1, "the queued save holds no ownership");
+      await core.mutateOfflineQueue(removal === "remove" ? { kind: "remove", queueId: queued.queueId } : { kind: "clear" });
+      equal((await pbpFixtureSummaryOwnershipEntries()).length, 0, removal + " left the hold behind");
+    }
+  });
+
+  await test("a save that keeps the server's notes neither writes nor drops a receipt", async () => {
+    for (const mode of ["merge", "overwrite", "skip"]) {
+      await pbpFixtureClearSummaryOwnership();
+      await pbpAiSaveSummaryOwnership("alice", PAGE, SERVER_NOTES, SERVER_RANGE);
+      const before = JSON.stringify((await pbpFixtureSummaryOwnershipEntries()).map((entry) => [entry.key, entry.result]));
+      const core = await createHarness({ pinboardFetch: pinboard(postsGet(SERVER_NOTES)) });
+      const result = await core.submitSaveIntent(intent({ mode, notes: QUICK_NOTES }), { expectedAccount: "alice", summaryRange: QUICK_RANGE });
+      equal(result.status, mode === "skip" ? "skipped" : "saved", mode);
+      if (mode !== "skip") equal(extendedSent(core), SERVER_NOTES, mode + " was expected to keep the server notes");
+      const after = JSON.stringify((await pbpFixtureSummaryOwnershipEntries()).map((entry) => [entry.key, entry.result]));
+      equal(after, before, mode + " changed the page's receipts");
+      equal(await (await popupOpens(SERVER_NOTES)).restore(), "receipt", mode + ": the existing block lost its receipt");
+    }
+  });
+
+  await test("notes written without an owned block retire the page's receipt", async () => {
+    await pbpFixtureClearSummaryOwnership();
+    await pbpAiSaveSummaryOwnership("alice", PAGE, QUICK_NOTES, QUICK_RANGE);
+    const core = await createHarness({ pinboardFetch: async () => response(200, ADDED) });
+    equal((await core.submitSaveIntent(intent({ notes: "Rewritten by hand" }), { expectedAccount: "alice", summaryRange: null })).status, "saved");
+    equal((await pbpFixtureSummaryOwnershipEntries()).length, 0, "a receipt for replaced notes survived");
+  });
+
+  await test("only records own a block: identical text typed by hand, another account and edited notes are not reclaimed", async () => {
+    await pbpFixtureClearSummaryOwnership();
+    let popup = await popupOpens(QUICK_NOTES);
+    equal(await popup.restore(), null, "identical hand-typed text was adopted without a receipt");
+    equal(popup.remove(), false, "Remove deleted hand-typed text");
+    popup.regenerate("Second summary");
+    equal(popup.field.value, QUICK_NOTES + "\n\n<blockquote>Second summary</blockquote>", "Regenerate rewrote hand-typed text");
+
+    await pbpAiSaveSummaryOwnership("bob", PAGE, QUICK_NOTES, QUICK_RANGE);
+    equal(await (await popupOpens(QUICK_NOTES, "alice")).restore(), null, "another account's receipt was honoured");
+
+    await pbpAiSaveSummaryOwnership("alice", PAGE, QUICK_NOTES, QUICK_RANGE);
+    const edited = QUICK_NOTES.replace("Fresh summary", "Fresh summary, edited elsewhere");
+    popup = await popupOpens(edited);
+    equal(await popup.restore(), null, "a receipt for other notes was honoured");
+    equal(await pbpAiCacheGet(pbpAiSummaryOwnershipKey("alice", PAGE)), null, "the stale receipt was kept");
+
+    popup = await popupOpens("Auto notes\n\n[AI Summary]\n<blockquote>Old summary</blockquote>");
+    equal(await popup.restore(), "legacy", "the legacy marker is no longer recognized");
+    popup.regenerate("Second summary");
+    equal(popup.field.value, "Auto notes\n\n<blockquote>Second summary</blockquote>");
   });
 });
 })();
