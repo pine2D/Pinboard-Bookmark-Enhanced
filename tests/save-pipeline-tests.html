@@ -195,6 +195,8 @@ async function createHarness(options) {
       },
     },
     tabs: { query: async () => opts.activeTab ? [opts.activeTab] : [] },
+    // The reader's own extension origin; preview slots sit in storageData.
+    runtime: { id: "test-id" },
   };
   const pinboardFetchStub = async (url) => {
     fetchCalls.push(url);
@@ -250,7 +252,7 @@ async function createHarness(options) {
       submitSaveIntent, submitPopupSaveIntent, sendOfflineItem,
       drainOfflineQueueIds, readOfflineQueueWithIds, retryOfflineItem,
       normalizeOfflineSaveIntent, applySaveResultSideEffects, processOfflineQueue,
-      mutateOfflineQueue
+      mutateOfflineQueue, pbpReaderBookmarkRequest
     };
   `);
   return {
@@ -2574,6 +2576,97 @@ await suite("summary ownership after worker saves", async () => {
     popup.regenerate("Second summary");
     equal(owner, "receipt", "an update from a popup that never checked ownership retired the receipt");
     equal(popup.field.value, "Auto notes\n\n<blockquote>Second summary</blockquote>", "Regenerate did not replace the block in place");
+  });
+
+  // The popup hands the reader its notes and the summary block it can vouch
+  // for: popup.js writes both into the preview slot's bookmarkDraft, which
+  // storage keeps as JSON. A reader save that creates the bookmark with
+  // exactly those notes owns that block, as the popup's own save would.
+  const READER_SENDER = Object.freeze({ id: "test-id", frameId: 0,
+    url: "chrome-extension://test-id/md-preview.html?k=reader-key", tab: { id: 9 } });
+  const handToReader = (core, draft) => {
+    core.storageData["md_preview_data_reader-key"] = JSON.parse(JSON.stringify({
+      url: PAGE, baseUrl: PAGE, sourceTabUrl: PAGE, tabId: 8, title: "New title", account: "alice",
+      sourceIncognito: false, tags: ["base-tag"], description: draft.notes,
+      bookmarkDraft: { title: "New title", tags: "base-tag", private: false, toread: false, ...draft },
+    }));
+  };
+  // "edit" sends the editor as the reader fills it from the worker's state,
+  // optionally with the notes rewritten.
+  const readerSave = async (core, action, rewrite) => {
+    let draft;
+    if (action === "edit") {
+      const state = await core.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account: "alice" }, READER_SENDER);
+      draft = { ...state.bookmark, ...(rewrite ? { notes: rewrite(state.bookmark.notes) } : {}) };
+    }
+    return core.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action, ...(draft ? { draft } : {}) }, READER_SENDER);
+  };
+  // A popup on a page it has not saved, after Generate appended its summary.
+  const popupWithFreshSummary = async () => {
+    const popup = await pbpFixturePopupSummary({ service: "pinboard", account: "alice", url: PAGE, notes: "Auto notes" });
+    equal(await popup.restore(), null, "a page never saved already owned a block");
+    popup.regenerate("Fresh summary");
+    equal(popup.field.value, QUICK_NOTES, "the summary was not appended to the notes");
+    return popup;
+  };
+  const receipts = async () => JSON.stringify((await pbpFixtureSummaryOwnershipEntries()).map((entry) => [entry.key, entry.result]));
+
+  await test("a summary handed to the reader is reclaimable after a reader save creates the bookmark with it", async () => {
+    for (const action of ["save", "later", "edit"]) {
+      await pbpFixtureClearSummaryOwnership();
+      const popup = await popupWithFreshSummary();
+      const core = await createHarness({ pinboardFetch: pinboard(NO_POSTS) });
+      handToReader(core, { notes: popup.field.value, summaryRange: popup.snapshot() });
+      equal((await readerSave(core, action)).status, "saved", action);
+      equal(extendedSent(core), QUICK_NOTES, action + ": notes bytes changed");
+      const reopened = await popupOpens(QUICK_NOTES);
+      const owner = await reopened.restore();
+      reopened.regenerate("Second summary");
+      equal(owner, "receipt", action + ": the reader save left the handed block unowned");
+      equal(reopened.field.value, "Auto notes\n\n<blockquote>Second summary</blockquote>", action + ": Regenerate did not replace the block in place");
+    }
+  });
+
+  // The worker cannot follow a range through the reader's editor, so notes
+  // edited there own nothing, even when the handed range still fits them;
+  // nor do notes handed without a range (the popup could not vouch).
+  await test("a reader save owns no handed block it does not write exactly as handed", async () => {
+    await pbpFixtureClearSummaryOwnership();
+    const popup = await popupWithFreshSummary();
+    let core = await createHarness({ pinboardFetch: pinboard(NO_POSTS) });
+    handToReader(core, { notes: popup.field.value, summaryRange: popup.snapshot() });
+    const editedNotes = QUICK_NOTES.replace("Auto notes", "Auto nodes");
+    equal((await readerSave(core, "edit", () => editedNotes)).status, "saved");
+    equal(extendedSent(core), editedNotes, "edited notes bytes changed");
+    equal(await receipts(), "[]", "notes edited in the reader gained a receipt");
+    equal(await (await popupOpens(editedNotes)).restore(), null, "notes edited in the reader were reclaimed");
+    for (const action of ["save", "later", "edit"]) {
+      core = await createHarness({ pinboardFetch: pinboard(NO_POSTS) });
+      handToReader(core, { notes: QUICK_NOTES });
+      equal((await readerSave(core, action)).status, "saved", action);
+      equal(await receipts(), "[]", action + ": notes handed without a range gained a receipt");
+    }
+  });
+
+  // An existing bookmark keeps the server's notes (or the editor's, filled
+  // from them): the handed block is not written, and the receipt of the
+  // server's own block stays as it was.
+  await test("a reader save of an existing bookmark neither takes the handed block nor drops the page's receipt", async () => {
+    for (const action of ["save", "later", "read", "edit"]) {
+      await pbpFixtureClearSummaryOwnership();
+      await pbpAiSaveSummaryOwnership("alice", PAGE, SERVER_NOTES, SERVER_RANGE);
+      const before = await receipts();
+      const popup = await popupWithFreshSummary();
+      const core = await createHarness({ pinboardFetch: pinboard(postsGet(SERVER_NOTES)) });
+      handToReader(core, { notes: popup.field.value, summaryRange: popup.snapshot() });
+      const result = await readerSave(core, action);
+      assert(result.status === "saved" || result.status === "skipped", action + ": " + JSON.stringify(result));
+      for (const url of core.fetchCalls.filter((call) => call.includes("/posts/add?"))) {
+        equal(new URL(url).searchParams.get("extended"), SERVER_NOTES, action + " replaced the server notes");
+      }
+      equal(await receipts(), before, action + " changed the page's receipts");
+      equal(await (await popupOpens(SERVER_NOTES)).restore(), "receipt", action + ": the server's block lost its receipt");
+    }
   });
 
   await test("removing a queued save drops its offline hold", async () => {

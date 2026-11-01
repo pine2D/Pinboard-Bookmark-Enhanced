@@ -207,6 +207,16 @@ function invalidateBookmarkLookup() {
   }
 }
 
+// The popup's own AI summary block in the notes it hands the reader, when it
+// can vouch for one (pbpAiSummaryOwnershipSnapshot): it rides in the preview
+// slot's bookmarkDraft beside exactly those notes, and the worker records it
+// only when a reader save creates the bookmark with them. null ("none of
+// mine") and undefined ("cannot tell") both travel as nothing.
+function pbpPopupHandoffSummaryRange(notes) {
+  const range = typeof pbpAiSummaryOwnershipSnapshot === "function" ? pbpAiSummaryOwnershipSnapshot(notes) : undefined;
+  return range ? { start: range.start, end: range.end } : undefined;
+}
+
 let acIndex = -1;
 let settings = {};
 // Active tab resolved once at DOMContentLoaded and reused everywhere (a popup
@@ -1232,6 +1242,8 @@ async function htmlToMarkdownAsync(html, opts) {
           try {
             const k = crypto.randomUUID();
             const engine = settings.aiContentSource === "jina" ? "jina" : "local";
+            const handoffNotes = $id("description-input")?.value || "";
+            const handoffSummaryRange = pbpPopupHandoffSummaryRange(handoffNotes);
             await chrome.storage.local.set({
               ["md_preview_data_" + k]: {
                 pending: true, engine, source: engine,
@@ -1239,8 +1251,10 @@ async function htmlToMarkdownAsync(html, opts) {
                 title: $id("title-input")?.value || "",
                 account: sessionAccount,
                 tags: Array.isArray(currentTags) ? currentTags.slice() : [],
-                description: $id("description-input")?.value || "",
-                ...(pbpBookmarkServiceId(settings) === "linkding" ? { bookmarkDraft: { summary: ($id("linkding-description-input")?.value || "").replace(/\s+/g, " ").trim(), private: $id("private-check")?.checked === true, sharedExplicit: _linkdingSharedExplicit } } : {}),
+                description: handoffNotes,
+                // Without a draft the reader saves `description`; a summary
+                // range needs the notes it describes beside it.
+                ...(pbpBookmarkServiceId(settings) === "linkding" ? { bookmarkDraft: { summary: ($id("linkding-description-input")?.value || "").replace(/\s+/g, " ").trim(), private: $id("private-check")?.checked === true, sharedExplicit: _linkdingSharedExplicit } } : handoffSummaryRange ? { bookmarkDraft: { notes: handoffNotes, summaryRange: handoffSummaryRange } } : {}),
                 ts: Date.now()
               }
             });
@@ -1352,6 +1366,8 @@ async function htmlToMarkdownAsync(html, opts) {
         // unhandled rejection with no preview tab and no feedback.
         try {
           const k = crypto.randomUUID();
+          const handoffNotes = $id("description-input")?.value || "";
+          const handoffSummaryRange = pbpPopupHandoffSummaryRange(handoffNotes);
           await chrome.storage.local.set({
             ["md_preview_data_" + k]: {
               markdown: markdown || "",
@@ -1375,7 +1391,8 @@ async function htmlToMarkdownAsync(html, opts) {
               bookmarkDraft: {
                 title: $id("title-input")?.value || result.title || "",
                 tags: Array.isArray(currentTags) ? (pbpBookmarkServiceId(settings) === "pinboard" ? currentTags.join(" ") : pbpBookmarkFormatTags(currentTags)) : "",
-                notes: $id("description-input")?.value || "",
+                notes: handoffNotes,
+                ...(handoffSummaryRange ? { summaryRange: handoffSummaryRange } : {}),
                 ...(pbpBookmarkServiceId(settings) === "linkding" ? { summary: ($id("linkding-description-input")?.value || "").replace(/\s+/g, " ").trim(), sharedExplicit: _linkdingSharedExplicit } : {}),
                 private: $id("private-check")?.checked === true,
                 toread: $id("readlater-check")?.checked === true,

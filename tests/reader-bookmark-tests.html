@@ -196,7 +196,11 @@ await test("popup privacy draft remains an explicit choice when opening the read
     equal(result.status, "saved"); equal(h.env.post.shared, isPrivate ? "no" : "yes");
   }
 });
-await test("normal and pending popup preview payloads carry linkding Description into reader state", async () => {
+// The bookmarkDraft objects the popup writes into a preview slot: the normal
+// preview's literal and the pending (embedded-frame) preview's one line,
+// evaluated with the popup's form fields and the notes / summary range it
+// reads just before writing the slot.
+async function popupPreviewDrafts() {
   const source = await (await fetch("../popup.js")).text();
   const opener = source.slice(source.indexOf("const openPreview"), source.indexOf("const downloadMd"));
   const objectAt = opener.lastIndexOf("bookmarkDraft: {");
@@ -209,16 +213,25 @@ await test("normal and pending popup preview payloads carry linkding Description
   }
   assert(closing > opening, "normal draft object did not close");
   const normal = new Function("$id", "settings", "currentTags", "pbpBookmarkServiceId", "pbpBookmarkFormatTags", "result", "_linkdingSharedExplicit",
-    "return (" + opener.slice(opening, closing + 1) + ");");
+    "handoffNotes", "handoffSummaryRange", "return (" + opener.slice(opening, closing + 1) + ");");
   const pendingLine = source.split("\n").find(line => line.includes("{ bookmarkDraft: { summary:"));
   assert(pendingLine, "pending preview has no Description draft");
-  const pending = new Function("$id", "settings", "pbpBookmarkServiceId", "_linkdingSharedExplicit", "return ({" + pendingLine.trim() + "}).bookmarkDraft;");
+  const pending = new Function("$id", "settings", "pbpBookmarkServiceId", "_linkdingSharedExplicit",
+    "handoffNotes", "handoffSummaryRange", "return ({" + pendingLine.trim() + "}).bookmarkDraft;");
+  const helperAt = source.indexOf("function pbpPopupHandoffSummaryRange(");
+  assert(helperAt >= 0, "popup has no handoff summary range helper");
+  const handoffRange = (snapshot) => new Function("pbpAiSummaryOwnershipSnapshot",
+    source.slice(helperAt, source.indexOf("\n}\n", helperAt) + 2) + "\nreturn pbpPopupHandoffSummaryRange;")(snapshot);
+  return { normal, pending, handoffRange };
+}
+await test("normal and pending popup preview payloads carry linkding Description into reader state", async () => {
+  const { normal, pending } = await popupPreviewDrafts();
   const fields = { "title-input": "T", "description-input": "Note", "linkding-description-input": "first second", "private-check": false, "readlater-check": false };
   const $id = name => ({ value: fields[name], checked: fields[name] });
   for (const service of ["linkding", "pinboard"]) for (const sharedExplicit of [false,true]) {
     const settings = { bookmarkService: service }, account = service === "linkding" ? "linkding:fixture" : "alice";
-    for (const draft of [normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, sharedExplicit),
-      pending($id, settings, pbpBookmarkServiceId, sharedExplicit)]) {
+    for (const draft of [normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, sharedExplicit, "Note", undefined),
+      pending($id, settings, pbpBookmarkServiceId, sharedExplicit, "Note", undefined)]) {
       if (service === "linkding") {
         equal(draft.summary, "first second");
         const h = await harness({ account, service, post: null, slot: { account, bookmarkDraft: draft } });
@@ -227,6 +240,53 @@ await test("normal and pending popup preview payloads carry linkding Description
         equal(state.bookmark.sharedExplicit, sharedExplicit); equal(state.bookmark.private, !sharedExplicit);
       } else assert(!draft || !("summary" in draft));
     }
+  }
+});
+// The popup vouches for its own AI summary block in the notes it hands the
+// reader (pbpAiSummaryOwnershipSnapshot); the range travels in the slot's
+// bookmarkDraft right beside those notes, and only a range does: null ("none
+// of mine") and undefined ("cannot tell") both travel as nothing. linkding
+// keeps the summary out of Notes, so its pending draft carries neither.
+await test("popup preview payloads carry the summary range the popup vouches for beside the notes", async () => {
+  const { normal, pending, handoffRange } = await popupPreviewDrafts();
+  const range = { start: 0, end: 4 };
+  const read = [];
+  const vouched = handoffRange((notes) => { read.push(notes); return { ...range, kind: "session" }; })("Note");
+  equal(JSON.stringify(vouched), JSON.stringify(range)); equal(read.join(), "Note");
+  for (const snapshot of [null, undefined]) equal(handoffRange(() => snapshot)("Note"), undefined);
+  equal(handoffRange(undefined)("Note"), undefined);
+  const fields = { "title-input": "T", "description-input": "Note", "linkding-description-input": "first second", "private-check": false, "readlater-check": false };
+  const $id = name => ({ value: fields[name], checked: fields[name] });
+  for (const service of ["pinboard", "karakeep", "linkding"]) for (const handed of [range, undefined]) {
+    const settings = { bookmarkService: service };
+    const plain = normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, false, "Note", handed);
+    equal(plain.notes, "Note");
+    equal(Object.hasOwn(plain, "summaryRange"), !!handed, service + ": normal draft range presence");
+    if (handed) equal(JSON.stringify(plain.summaryRange), JSON.stringify(range));
+    const framed = pending($id, settings, pbpBookmarkServiceId, false, "Note", handed);
+    if (service === "linkding") assert(framed && !("notes" in framed) && !("summaryRange" in framed), "linkding pending draft gained Notes ownership");
+    else if (!handed) equal(framed, undefined);
+    else { equal(framed.notes, "Note"); equal(JSON.stringify(framed.summaryRange), JSON.stringify(range)); }
+  }
+});
+await test("the reader hands the worker the popup's summary range only beside the notes it describes", async () => {
+  const range = { start: 0, end: 5 };
+  const edit = { title: "T", tags: "", notes: "Draft notes", private: false, toread: false };
+  for (const [label, bookmarkDraft, expected] of [
+    ["range beside notes", { notes: "Draft notes", summaryRange: { ...range, kind: "extra" } }, range],
+    ["range without notes", { summaryRange: range }, undefined],
+    ["string edge", { notes: "Draft notes", summaryRange: { start: "0", end: 5 } }, undefined],
+    ["fractional edge", { notes: "Draft notes", summaryRange: { start: 0, end: 4.5 } }, undefined],
+    ["null range", { notes: "Draft notes", summaryRange: null }, undefined],
+    ["no range", { notes: "Draft notes" }, undefined],
+    ["no draft", undefined, undefined],
+  ]) for (const action of ["save", "later", "edit"]) {
+    const h = await harness({ post: null, slot: bookmarkDraft ? { bookmarkDraft } : {} });
+    const result = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account: "alice", action, ...(action === "edit" ? { draft: edit } : {}) }, SENDER);
+    equal(result.status, "saved");
+    equal(JSON.stringify(h.env.submitted.opts.summaryRange), JSON.stringify(expected));
+    assert(expected !== undefined || h.env.submitted.opts.summaryRange === undefined, label + " / " + action + ": a range reached the worker");
+    assert(!Object.hasOwn(h.env.submitted.intent, "summaryRange"), label + " / " + action + ": the range leaked into the intent");
   }
 });
 await test("reader initial linkding Description follows the owner-bound preview draft and edit request", async () => {

@@ -1200,16 +1200,21 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
     }
     const deliverySettings = pbpBookmarkDeliverySettings(settings, deliveryAuth);
 
+    // A caller's range describes the notes it submitted.
+    let ownershipRange = summaryRange;
     // Reader edits/flag changes resolve server metadata inside this same
     // lookup-to-write transaction. The offline record remains a normal intent.
     if (readerAction) {
+      const handedNotes = intent.notes;
       const prepared = await pbpPrepareReaderSaveIntent(intent, readerAction, readerDraft, deliverySettings, deliveryAuth);
       if (prepared.result) return prepared.result;
       intent = prepared.intent;
+      // The popup's handed range still describes a create (or a skip, which
+      // creates or keeps) that writes exactly the handed notes. An update
+      // writes the server's notes or the reader editor's, and the range cannot
+      // be followed through either.
+      if ((intent.mode !== "create" && intent.mode !== "skip") || intent.notes !== handedNotes) ownershipRange = undefined;
     }
-    // A caller's range describes the notes it submitted; a reader action may
-    // have replaced them with the server's.
-    const ownershipRange = readerAction ? undefined : summaryRange;
 
     let envelope;
     try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth); }
@@ -1588,7 +1593,14 @@ async function pbpReaderBookmarkRequest(message, sender) {
   }
   const settings = await loadSettings();
   const intent = pbpReaderInitialIntent(context, settings, action);
-  const result = await submitSaveIntent(intent, { expectedAccount: context.account, readerAction: action, readerDraft: draft });
+  // The popup's AI summary block in the notes it handed over, which the
+  // initial intent carries (popup.js pbpPopupHandoffSummaryRange). Only the
+  // frozen slot supplies it, never the reader's message.
+  const handed = context.bookmarkDraft?.summaryRange;
+  const summaryRange = typeof context.bookmarkDraft?.notes === "string"
+    && Number.isInteger(handed?.start) && Number.isInteger(handed?.end)
+    ? { start: handed.start, end: handed.end } : undefined;
+  const result = await submitSaveIntent(intent, { expectedAccount: context.account, readerAction: action, readerDraft: draft, summaryRange });
   const current = await pbpReadFreshBookmarkAuthForAccount(context.account);
   if (!current) return pbpSaveFailure("account_changed");
   return { ...result, account: context.account };
