@@ -1395,9 +1395,11 @@ await suite("unified save pipeline", async () => {
     equal(queued.queueId, result.queueId);
     equal(queued.mode, "merge");
     equal(queued.archive, true);
-    equal(queued.summary, "Queued description", "description reaches durable queue storage");
-    equal(h.normalizeOfflineSaveIntent(queued, h.settings).summary, "Queued description", "replay restores the queued description");
-    equal(Object.keys(queued).sort().join(","), ["account", "mode", "url", "title", "notes", "summary", "tags", "private", "toread", "archive", "time", "queueId", "queuedAt"].sort().join(","), "durable queue uses only the reviewed whitelist");
+    // Pinboard has no Description field: only a linkding save queues one
+    // (offline-queue-tests.html, reader-bookmark-tests.html).
+    equal(Object.hasOwn(queued, "summary"), false, "a Pinboard save queued a Description");
+    equal(Object.hasOwn(h.normalizeOfflineSaveIntent(queued, h.settings), "summary"), false, "replay restored a Description");
+    equal(Object.keys(queued).sort().join(","), ["account", "mode", "url", "title", "notes", "tags", "private", "toread", "archive", "time", "queueId", "queuedAt"].sort().join(","), "durable queue uses only the reviewed whitelist");
     equal(queued.account, "alice");
     assert(!("token" in queued), "queue must not persist credentials");
     equal(h.events.includes("storage:set"), true, "queued is returned after storage set");

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Reader Bookmark Tests</title></head><body>
-<div id="results"></div><script src="../shared.js"></script><script src="../wayback.js"></script><script>
+<div id="results"></div><script src="../shared.js"></script><script src="../wayback.js"></script><script src="../bookmark-services.js"></script><script>
 function assert(x, msg) { if (!x) throw new Error(msg || "assertion failed"); }
 function equal(a, b) { assert(a === b, JSON.stringify(a) + " !== " + JSON.stringify(b)); }
 async function test(name, fn) {
@@ -55,7 +55,9 @@ async function pipelineHarness(options = {}) {
     // Self-hosted cases inject the client so its failures can be scripted.
     pbpCreateBookmarkServiceClient: () => env.client,
     pbpBookmarkAuthIsCurrent: auth => auth.account === env.account && auth.epoch === env.epoch,
-    pbpStatusCacheSet: (url, auth, state) => { (env.cacheWrites ||= []).push({ url, account: auth.account, ...state }); return false; }, pbpStatusCacheGet: () => null,
+    // As in the worker, the write lands only for the current owner (a
+    // self-hosted lookup fails closed without it).
+    pbpStatusCacheSet: (url, auth, state) => { (env.cacheWrites ||= []).push({ url, account: auth.account, ...state }); return auth.account === env.account && auth.epoch === env.epoch; }, pbpStatusCacheGet: () => null,
     pbpReadFreshBookmarkAuthForAccount: async account => account === env.account ? { account, token: env.token, epoch: env.epoch, service: env.service } : null,
     pbpWaybackArchive: async () => {}, updateBadge: async () => {}, setIcon: () => {},
     pinboardFetch: async raw => {
@@ -78,6 +80,64 @@ async function pipelineHarness(options = {}) {
     },
   };
   return { ...new Function(...Object.keys(deps), background.slice(start, end) + "\nreturn { submitSaveIntent, pbpReaderBookmarkRequest, processOfflineQueue }; ")(...Object.values(deps)), env };
+}
+// The two self-hosted APIs as the adapter meets them, hand-written from
+// linkding v1.47 (routes.py check(), serializers.py update()) and Karakeep
+// 0.34.1's /api/v1 OpenAPI. A check answers the stored record; PATCH changes
+// only the fields it is sent and answers the stored record. Each failures[]
+// row lets `skip` matching requests through, then answers the next one with
+// the 503 a proxy in front of the server gives while it is down.
+function selfHostedServer(service, row) {
+  const requests = [], failures = [];
+  const json = (status, value) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
+  const linkdingRecord = () => ({ id: row.id, url: row.url, title: row.title, description: row.description, notes: row.notes,
+    web_archive_snapshot_url: null, favicon_url: null, preview_image_url: null, is_archived: row.is_archived, unread: row.unread,
+    shared: row.shared, tag_names: [...row.tag_names], date_added: row.date_added, date_modified: row.date_modified,
+    website_title: null, website_description: null });
+  const fetchImpl = async (href, init = {}) => {
+    const url = new URL(href), method = init.method || "GET";
+    const body = init.body === undefined ? undefined : JSON.parse(init.body);
+    requests.push({ method, path: url.pathname, body });
+    const failure = failures.find(f => f.method === method && f.path === url.pathname);
+    if (failure && failure.skip > 0) failure.skip--;
+    else if (failure) {
+      failures.splice(failures.indexOf(failure), 1);
+      return new Response("<html><body><h1>503 Service Temporarily Unavailable</h1></body></html>", { status: 503, headers: { "Content-Type": "text/html" } });
+    }
+    const page = url.searchParams.get("url");
+    if (service === "linkding") {
+      if (method === "GET" && url.pathname === "/api/bookmarks/check/") {
+        return json(200, { bookmark: page === row.url ? linkdingRecord() : null, metadata: { url: page, title: null, description: null, preview_image: null }, auto_tags: [] });
+      }
+      if (method === "PATCH" && url.pathname === "/api/bookmarks/" + row.id + "/") {
+        for (const key of ["url", "title", "description", "notes", "is_archived", "unread", "shared", "tag_names"]) if (body[key] !== undefined) row[key] = body[key];
+        row.date_modified = new Date().toISOString();
+        return json(200, linkdingRecord());
+      }
+      return json(404, { detail: "Not found." });
+    }
+    if (method === "GET" && url.pathname === "/api/v1/bookmarks/check-url") return json(200, { bookmarkId: page === row.content.url ? row.id : null });
+    if (method === "GET" && url.pathname === "/api/v1/bookmarks/" + row.id) return json(200, structuredClone(row));
+    if (method === "PATCH" && url.pathname === "/api/v1/bookmarks/" + row.id) {
+      for (const key of ["title", "note", "summary", "archived", "favourited"]) if (body[key] !== undefined) row[key] = body[key];
+      row.modifiedAt = new Date().toISOString();
+      const { tags, content, assets, ...bare } = row;
+      return json(200, structuredClone(bare));
+    }
+    return json(404, { code: "NOT_FOUND", message: "Bookmark not found" });
+  };
+  const client = pbpCreateBookmarkServiceClient({ service, baseUrl: service === "linkding" ? "https://links.example/" : "https://keep.example/",
+    beforeRequest: async () => ({ token: service + "-token" }), fetchImpl });
+  return { row, requests, failures, client };
+}
+// CLAUDE.md: a queued save keeps only these fields, the Description only for linkding.
+const QUEUE_FIELDS = ["account", "mode", "url", "title", "notes", "tags", "private", "toread", "archive", "sharedExplicit", "time", "queueId", "queuedAt"];
+function assertQueueFields(item, service) {
+  const stored = JSON.parse(JSON.stringify(item));
+  const allowed = new Set([...QUEUE_FIELDS, ...(service === "linkding" ? ["summary"] : [])]);
+  const extra = Object.keys(stored).filter(key => !allowed.has(key));
+  assert(!extra.length, service + " queue record holds " + extra.join());
+  return stored;
 }
 (async () => {
 await test("trusted reader derives frozen URL and owner from its own persisted slot", async () => {
@@ -462,6 +522,56 @@ await test("self-hosted reader delete keeps the service error code", async () =>
     equal(result.status, "failed"); equal(result.reason, reason); equal(result.httpStatus, httpStatus);
     equal(h.env.queue.length, 0);
   }
+});
+// A reader edit reads the bookmark only to keep its other fields through this
+// one dispatch. When that dispatch fails and is queued, the record carries the
+// reader's own edits and nothing it merely read: the replay runs later, against
+// a bookmark another client may have changed meanwhile.
+await test("a queued reader edit replays a linkding Description only when the reader changed it", async () => {
+  const account = "linkding:https://links.example/:conn-1";
+  for (const [label, typed, expected] of [["left alone", undefined, "Changed\n\n  in another client"], ["changed", "Mine\nnow", "Mine now"]]) {
+    const server = selfHostedServer("linkding", { id: 7, url: URL_ARTICLE, title: "Server title", description: "First line\n\nSecond  line",
+      notes: "Server notes", is_archived: false, unread: false, shared: false, tag_names: ["server"],
+      date_added: "2026-10-30T03:01:22.656384Z", date_modified: "2026-10-30T03:01:22.656384Z" });
+    const h = await pipelineHarness({ account, token: "linkding-token", service: "linkding", slot: { account }, client: server.client,
+      settings: { bookmarkService: "linkding" } });
+    server.failures.push({ method: "PATCH", path: "/api/bookmarks/7/", skip: 0 });
+    // md-bookmark.js sends a Description only when the reader's line changed.
+    const result = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action: "edit",
+      draft: { title: "Edited title", tags: "server", notes: "Server notes", private: true, toread: false, ...(typed === undefined ? {} : { summary: typed }) } }, SENDER);
+    equal(result.status, "queued"); equal(h.env.queue.length, 1);
+    const stored = assertQueueFields(h.env.queue[0], "linkding");
+    assert(Object.hasOwn(stored, "summary") === (typed !== undefined) && (typed === undefined || stored.summary === expected),
+      label + ": queued Description " + JSON.stringify(stored.summary));
+    server.row.description = "Changed\n\n  in another client";
+    await h.processOfflineQueue();
+    equal(h.env.queue.length, 0);
+    const patches = server.requests.filter(request => request.method === "PATCH");
+    equal(patches.length, 2);
+    assert(Object.hasOwn(patches[1].body, "description") === (typed !== undefined), label + ": the replay sent Description " + JSON.stringify(patches[1].body.description));
+    equal(server.row.title, "Edited title"); equal(server.row.description, expected);
+  }
+});
+// Karakeep's summary is the server's own AI text, which the extension never
+// writes; a queued reader edit must not store it either.
+await test("a queued Karakeep reader edit keeps the server's own summary out of the queue", async () => {
+  const account = "karakeep:https://keep.example/:user-1";
+  const summary = "Karakeep's AI summary of the article.";
+  const server = selfHostedServer("karakeep", { id: "kk1bookmark", createdAt: "2026-10-30T03:05:10.000Z", modifiedAt: "2026-10-30T03:05:10.000Z",
+    title: "Server title", archived: false, favourited: false, note: "Server notes", summary, source: "web",
+    taggingStatus: "success", summarizationStatus: "success", tags: [{ id: "tagserver01", name: "server", attachedBy: "human" }],
+    content: { type: "link", url: URL_ARTICLE, title: "Example Domain", description: null }, assets: [] });
+  const h = await pipelineHarness({ account, token: "karakeep-token", service: "karakeep", slot: { account }, client: server.client,
+    settings: { bookmarkService: "karakeep" } });
+  // The reader's read of the bookmark gets through; the delivery's fresh one meets the outage.
+  server.failures.push({ method: "GET", path: "/api/v1/bookmarks/check-url", skip: 1 });
+  const result = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action: "edit",
+    draft: { title: "Edited title", tags: "server", notes: "Edited notes", private: true, toread: false } }, SENDER);
+  equal(result.status, "queued"); equal(h.env.queue.length, 1);
+  assertQueueFields(h.env.queue[0], "karakeep");
+  await h.processOfflineQueue();
+  equal(h.env.queue.length, 0);
+  equal(server.row.title, "Edited title"); equal(server.row.note, "Edited notes"); equal(server.row.summary, summary);
 });
 await test("account switch during deletion suppresses success and foreign-account side effects", async () => {
   const h = await pipelineHarness({ onDelete: () => { h.env.account = "bob"; h.env.token = "bob:token"; h.env.epoch++; } });

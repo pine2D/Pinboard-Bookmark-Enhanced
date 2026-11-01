@@ -91,7 +91,7 @@ await suite("offline queue", async () => {
     const h = await queueIntentHarness();
     const prepared = { ...SAVE_INTENT, summary: "  Description\nsecond line  ", token: "discard", sharingEnabled: true,
       gateway: { token: "discard" }, connectionCapabilities: { sharing: true } };
-    const record = { ...h.queueRecordFromSaveIntent(prepared, "alice:fixture"), queueId: "summary", queuedAt: 123 };
+    const record = { ...h.queueRecordFromSaveIntent(prepared, "alice:fixture", "linkding"), queueId: "summary", queuedAt: 123 };
     const queue = pbpOfflineQueueReduce([], { kind: "enqueue", item: record });
     const expectedKeys = ["account", "mode", "url", "title", "notes", "summary", "tags", "private", "toread", "archive", "time", "queueId", "queuedAt"].sort();
     assert(JSON.stringify(Object.keys(queue[0]).sort()) === JSON.stringify(expectedKeys), "only the exact queue whitelist is persisted");
@@ -120,7 +120,7 @@ await suite("offline queue", async () => {
     for (const summary of [undefined, ""]) {
       const prepared = { ...SAVE_INTENT, ...(summary === undefined ? {} : { summary }) };
       assert(h.validateSaveIntent(prepared) === null, "legacy and empty descriptions remain valid");
-      const record = { ...h.queueRecordFromSaveIntent(prepared, "alice:fixture"), queueId: "q", queuedAt: 1 };
+      const record = { ...h.queueRecordFromSaveIntent(prepared, "alice:fixture", "linkding"), queueId: "q", queuedAt: 1 };
       const stored = JSON.parse(JSON.stringify(pbpOfflineQueueReduce([], { kind: "enqueue", item: record })[0]));
       const expectedKeys = ["account", "mode", "url", "title", "notes", ...(summary === undefined ? [] : ["summary"]), "tags", "private", "toread", "archive", "queueId", "queuedAt"].sort();
       assert(JSON.stringify(Object.keys(stored).sort()) === JSON.stringify(expectedKeys), "queued fields for " + JSON.stringify(summary) + ": " + Object.keys(stored).sort().join());
@@ -130,12 +130,24 @@ await suite("offline queue", async () => {
       }
     }
   });
+  // linkding is the one service whose Description the extension writes.
+  // Another service's summary (Karakeep's AI summary on the server record) is
+  // never a queue field, whatever intent carried it that far.
+  await test("only a linkding queue record keeps a Description", async () => {
+    const h = await queueIntentHarness();
+    for (const service of ["linkding", "karakeep", "pinboard", undefined]) for (const summary of ["Server summary\nsecond line", ""]) {
+      const stored = JSON.parse(JSON.stringify(h.queueRecordFromSaveIntent({ ...SAVE_INTENT, summary }, "alice:fixture", service)));
+      const expectedKeys = ["account", "mode", "url", "title", "notes", ...(service === "linkding" ? ["summary"] : []), "tags", "private", "toread", "archive"].sort();
+      assert(JSON.stringify(Object.keys(stored).sort()) === JSON.stringify(expectedKeys), String(service) + " queued " + Object.keys(stored).sort().join());
+      assert(service !== "linkding" || stored.summary === summary, "the linkding Description changed in the queue");
+    }
+  });
   await test("non-string summary is rejected for live and queued intents", async () => {
     const h = await queueIntentHarness();
     for (const summary of [null, false, 0, [], {}, ["description"]]) {
       const prepared = { ...SAVE_INTENT, summary };
       assert(h.validateSaveIntent(prepared)?.reason === "invalid", "non-string live description must fail closed");
-      const restored = h.normalizeOfflineSaveIntent(h.queueRecordFromSaveIntent(prepared, "alice:fixture"), {});
+      const restored = h.normalizeOfflineSaveIntent(h.queueRecordFromSaveIntent(prepared, "alice:fixture", "linkding"), {});
       assert(h.validateSaveIntent(restored)?.reason === "invalid", "normalization must not hide an invalid description");
     }
   });

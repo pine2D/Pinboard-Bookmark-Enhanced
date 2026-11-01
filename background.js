@@ -1073,15 +1073,17 @@ async function applySaveResultSideEffects(envelope, settings, {
   } catch (_) { /* accepted save is never requeued for a side-effect failure */ }
 }
 
-function queueRecordFromSaveIntent(intent, token) {
+function queueRecordFromSaveIntent(intent, token, service) {
   return {
     account: pbpPinboardAccountFromToken(token),
     mode: intent.mode === "create" ? "merge" : intent.mode,
     url: intent.url,
     title: intent.title,
     notes: intent.notes,
-    // An unknown Description (undefined) adds no field; "" is a known empty one.
-    ...(intent.summary !== undefined ? { summary: intent.summary } : {}),
+    // Only a linkding Description is a queue field (Karakeep's summary is the
+    // server's own text). An unknown one (undefined) adds no field; "" is a
+    // known empty one.
+    ...(service === "linkding" && intent.summary !== undefined ? { summary: intent.summary } : {}),
     ...(intent.sharedExplicit !== undefined ? { sharedExplicit: intent.sharedExplicit } : {}),
     tags: intent.tags,
     private: intent.private,
@@ -1242,7 +1244,7 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
     if ((readerAction === "read" || readerAction === "later") && intent.mode === "update") return envelope.result;
 
     try {
-      const queueId = await enqueueOfflineSave({...queueRecordFromSaveIntent(intent, deliverySettings.pinboardToken), account:deliveryAuth.account});
+      const queueId = await enqueueOfflineSave({...queueRecordFromSaveIntent(intent, deliverySettings.pinboardToken, deliveryAuth.service), account:deliveryAuth.account});
       await pbpHoldSummaryOwnership(queueId, intent, deliveryAuth, ownershipRange);
       // cause lets the popup say why: Pinboard answered 429/5xx ("server")
       // or the request never got an HTTP answer ("network").
@@ -1481,7 +1483,12 @@ async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth)
   if (action !== "edit" && plan.fields.toread === (action === "later")) {
     return { intent: { ...intent, mode: "skip" } };
   }
-  return { intent: { ...plan.fields, mode: "update", ...(action === "edit" ? draft : { toread: action === "later" }), time: plan.fields.time } };
+  // The stored Description (and Karakeep's own summary) was read, not edited.
+  // An update leaves it alone without it, and a queued replay of this intent
+  // would otherwise write that snapshot, as one line, over a Description
+  // changed elsewhere since. Only the reader's own edit (draft) carries one.
+  const { summary: _readSummary, ...kept } = plan.fields;
+  return { intent: { ...kept, mode: "update", ...(action === "edit" ? draft : { toread: action === "later" }), time: plan.fields.time } };
 }
 
 function pbpReaderInitialIntent(context, settings, action) {
