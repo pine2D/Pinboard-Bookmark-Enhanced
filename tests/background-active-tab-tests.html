@@ -495,6 +495,29 @@ async function run() {
     }
   });
 
+  // A page the worker could not read (no site access, a closed tab, a link
+  // saved from the context menu) has no known Description: the intent leaves
+  // it out so linkding fetches it. Turning the page description off is a
+  // known value, though: "" asks linkding not to add one either.
+  await test("linkding quick saves leave an unread page's Description to linkding unless a description preference is off", async () => {
+    for (const [globalOn, quickOn, aiSummary, tab, expected] of [
+      [true, true, false, { id: 7 }, undefined], [true, true, true, { id: 7 }, undefined], [true, true, false, undefined, undefined],
+      [false, true, false, { id: 7 }, ""], [true, false, true, { id: 7 }, ""],
+    ]) {
+      const h = buildBackgroundSaveHarness(source, async () => "unused", {},
+        { _aiTags: false, _aiSummary: aiSummary, _autoNotes: quickOn, optAutoDescription: globalOn }, true, {
+          getCurrentBookmarkAuth: async () => ({ service: "linkding", token: "fixture", account: "linkding:fixture", epoch: 1 }),
+          getPageInfoFromTab: async () => null,
+          pbpNotesDescription: () => { throw new Error("an unread page has no meta description to read"); },
+        });
+      await h.save({ url, title: "Article", tab, notifyId: "qs", notifyCategory: "quickSave" });
+      const where = JSON.stringify({ globalOn, quickOn, aiSummary, tab: !!tab });
+      assert(h.intents.length === 1, where + ": nothing was saved");
+      assert(Object.hasOwn(h.intents[0], "summary") === (expected !== undefined) && h.intents[0].summary === expected,
+        where + ": Description " + JSON.stringify(h.intents[0].summary));
+    }
+  });
+
   await test("linkding quick saves fall back to meta when AI summary is empty", async () => {
     const h = buildBackgroundSaveHarness(source, async () => " \n ", {},
       { _aiTags: false, _aiSummary: true, _autoNotes: true, optAutoDescription: true }, true, {

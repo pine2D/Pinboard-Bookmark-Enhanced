@@ -56,9 +56,10 @@ const server=createServer(async(req,res)=>{
   const scheme=service==='linkding'?'Token ':'Bearer ';
   if(![...acceptedKeys].some(key=>req.headers.authorization===scheme+key)){reply(401,{});return;}
   const store=records[service];
-  // linkding v1.47 (website_loader): metadata of a page this server publishes;
-  // anything else could not be fetched, so the scraper finds nothing.
-  const scrapeMetadata=raw=>{try{const page=new URL(raw);if(page.origin===origin&&page.pathname.startsWith('/article'))return pageMetadata(page.pathname);}catch{}return {title:null,description:null};};
+  // linkding v1.47 (website_loader): metadata of a page this server publishes,
+  // under either loopback name; anything else could not be fetched, so the
+  // scraper finds nothing.
+  const scrapeMetadata=raw=>{try{const page=new URL(raw);if([origin,unreadOrigin].includes(page.origin)&&page.pathname.startsWith('/article'))return pageMetadata(page.pathname);}catch{}return {title:null,description:null};};
   // serializers.py BookmarkSerializer: every field, the archive link falling
   // back to a capture at date_added, website_* always null.
   const serialize=row=>{const added=Date.parse(row.date_added);return {id:row.id,url:row.url,title:row.title,description:row.description,notes:row.notes,
@@ -127,6 +128,8 @@ const server=createServer(async(req,res)=>{
 });
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const origin='http://127.0.0.1:'+server.address().port;
+// The same pages under a name the extension is never granted, so it cannot read them.
+const unreadOrigin='http://localhost:'+server.address().port;
 const launch=()=>chromium.launchPersistentContext(profile,{headless:true,executablePath:chromium.executablePath(),viewport:{width:1280,height:900},args:[`--disable-extensions-except=${root}`,`--load-extension=${root}`,'--no-first-run','--disable-background-networking','--disable-component-update','--disable-sync','--no-pings','--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']});
 const getWorker=async ctx=>ctx.serviceWorkers().find(w=>w.url().startsWith('chrome-extension://'))||ctx.waitForEvent('serviceworker');
 let ctx;
@@ -258,6 +261,9 @@ try{
     if(service==='linkding'){
       const latestWrite=()=>requests.filter(r=>r.service==='linkding'&&['POST','PATCH'].includes(r.method)).at(-1);
       assert.equal(latestWrite().method,'POST');assert.equal(latestWrite().data.shared,false);
+      // The popup read /article and knows it has no meta description: a known
+      // empty Description, so linkding is asked not to scrape one in.
+      assert.deepEqual([latestWrite().query,latestWrite().data.description],['?disable_scraping',''],'a read page without a meta description was left to linkding');
       const reopen=async()=>{await popup.close();await article.bringToFront();const event=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');popup=await event;await popup.waitForFunction(()=>document.getElementById('existing-banner')&&!document.getElementById('existing-banner').classList.contains('hidden')&&!document.getElementById('submit-btn').disabled);};
       await reopen();assert(!await popup.locator('#share-check').isChecked());
       await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});
@@ -521,6 +527,47 @@ try{
   }
   records.linkding.delete(multiId);await article.goto(origin+'/article');
   console.log('linkding multi-line Description: tag-only popup and title-only reader updates keep it; an edit writes its one line');
+  // A page the extension may not read (the localhost name was never granted)
+  // leaves the popup nothing to vouch for: the create sends no Description
+  // and no disable_scraping, and linkding fills in the page's own meta
+  // description. The reader has no page description of its own either, so a
+  // reader save without a popup draft does the same.
+  const linkdingCreates=since=>requests.slice(since).filter(r=>r.service==='linkding'&&r.method==='POST'&&r.path==='bookmarks/');
+  {
+    const unreadUrl=unreadOrigin+'/article-meta';
+    await article.goto(unreadUrl);await article.bringToFront();
+    const opened=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');const popup=await opened;
+    await popup.waitForFunction(()=>typeof _popupDraftContext!=='undefined'&&_popupDraftContext?.ready===true&&!document.getElementById('submit-btn').disabled);
+    await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});
+    assert.equal(await popup.locator('#url-input').inputValue(),unreadUrl);
+    assert.equal(await popup.locator('#linkding-description-input').inputValue(),'','the popup showed a Description it could not read');
+    const before=requests.length;await popup.locator('#submit-btn').click();
+    await until(()=>linkdingCreates(before).length>0,'popup create for an unread page');
+    const create=linkdingCreates(before)[0];
+    assert.equal(create.query,'','an unread page still asked linkding not to scrape');
+    assert(!Object.hasOwn(create.data,'description'),'an unread page sent a Description');
+    const row=[...records.linkding.values()].find(b=>b.url===unreadUrl);
+    assert.equal(row?.description,'Server-scraped description','linkding did not fill in the Description itself');
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    await popup.close();records.linkding.delete(String(row.id));
+  }
+  {
+    const readerUrl=origin+'/article-meta?reader';
+    const account=(await worker.evaluate(()=>getCurrentBookmarkAuth())).account;
+    await worker.evaluate(async data=>chrome.storage.local.set({md_preview_data_scrape:{markdown:'# Meta article',title:'Meta article',url:data.url,baseUrl:data.url,account:data.account,tags:[],description:'',source:'local',ts:Date.now()}}),{url:readerUrl,account});
+    const reader=await ctx.newPage();await reader.goto(pageUrl+'md-preview.html?k=scrape');
+    const before=requests.length;await reader.locator('#reader-bookmark-save[aria-busy="false"]').click();
+    await until(()=>linkdingCreates(before).length>0,'reader create without a popup draft');
+    const create=linkdingCreates(before)[0];
+    assert.equal(create.data.url,readerUrl);
+    assert.equal(create.query,'','a reader save without a Description asked linkding not to scrape');
+    assert(!Object.hasOwn(create.data,'description'),'a reader save invented a Description');
+    const row=[...records.linkding.values()].find(b=>b.url===readerUrl);
+    assert.equal(row?.description,'Server-scraped description','linkding did not fill in the reader save Description');
+    await reader.close();records.linkding.delete(String(row.id));
+  }
+  await article.goto(origin+'/article');
+  console.log('linkding unknown Description: an unread popup page and a draft-free reader save let linkding scrape it');
   // linkding Description against the server's own v1.47 create and update
   // semantics (the mock above). /article-meta publishes a meta description,
   // so a create the server may scrape picks it up by itself.
@@ -539,15 +586,17 @@ try{
     return {unknown:unknown.bookmark,empty:empty.bookmark,custom:custom.bookmark,summaries,post:pbpBookmarkAsPost(custom.bookmark)};
   },{origin,url:descriptionUrl,emptyUrl:emptyDescriptionUrl,customUrl:customDescriptionUrl});
   const descriptionCalls=requests.slice(descriptionStart), customPatch=['PATCH','bookmarks/'+descriptions.custom.id+'/',''];
-  assert.deepEqual(descriptionCalls.map(r=>[r.method,r.path,r.query]),[['POST','bookmarks/','?disable_scraping'],['POST','bookmarks/','?disable_scraping'],['POST','bookmarks/','?disable_scraping'],customPatch,customPatch,customPatch,customPatch]);
-  assert.deepEqual(descriptionCalls.slice(0,3).map(r=>r.data.description),['','','Custom description']);
+  assert.deepEqual(descriptionCalls.map(r=>[r.method,r.path,r.query]),[['POST','bookmarks/',''],['POST','bookmarks/','?disable_scraping'],['POST','bookmarks/','?disable_scraping'],customPatch,customPatch,customPatch,customPatch]);
+  assert(!Object.hasOwn(descriptionCalls[0].data,'description'),'an unknown Description was sent');
+  assert.deepEqual(descriptionCalls.slice(1,3).map(r=>r.data.description),['','Custom description']);
   assert.deepEqual(descriptionCalls.slice(3).map(r=>Object.hasOwn(r.data,'description')),[false,false,true,true]);
   assert.equal(descriptionCalls[5].data.description,'Changed description');assert.equal(descriptionCalls[6].data.description,'');
-  assert.deepEqual([descriptions.unknown.summary,descriptions.empty.summary,descriptions.custom.summary],['','','Custom description']);
+  // Only the create that sent nothing reads back what linkding scraped.
+  assert.deepEqual([descriptions.unknown.summary,descriptions.empty.summary,descriptions.custom.summary],['Server-scraped description','','Custom description']);
   assert.deepEqual(descriptions.summaries,['Custom description','Custom description','Changed description','']);
   assert.deepEqual([descriptions.post.description,descriptions.post.extended,descriptions.post.summary],['T','My note','Custom description']);
   for(const bookmark of [descriptions.unknown,descriptions.empty,descriptions.custom])records.linkding.delete(String(bookmark.id));
-  console.log('linkding Description: disable_scraping creates, unchanged/changed/cleared PATCH and independent post projection passed');
+  console.log('linkding Description: known creates disable scraping, an unknown one is scraped; unchanged/changed/cleared PATCH and independent post projection passed');
   const probes=await worker.evaluate(async origin=>{
     const out={};
     for(const kind of ['redirect','challenge','basic','denied','page','headers']){

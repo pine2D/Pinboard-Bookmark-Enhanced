@@ -106,20 +106,28 @@ await suite("offline queue", async () => {
     for(const sharedExplicit of [undefined,false,true,"true",1,null]) {
       const prepared={...SAVE_INTENT,...(sharedExplicit===undefined?{}:{sharedExplicit})};
       const record=h.queueRecordFromSaveIntent(prepared,"alice:fixture");
-      const expected=["account","mode","url","title","notes","summary","tags","private","toread","archive","time",...(sharedExplicit===undefined?[]:["sharedExplicit"])].sort();
+      const expected=["account","mode","url","title","notes","tags","private","toread","archive","time",...(sharedExplicit===undefined?[]:["sharedExplicit"])].sort();
       assert(JSON.stringify(Object.keys(record).sort())===JSON.stringify(expected),"sharing widened the queue whitelist");
       const restored=h.normalizeOfflineSaveIntent(record,{});
       assert(restored.sharedExplicit===sharedExplicit,"sharing provenance lost");
       assert((h.validateSaveIntent(restored)===null)===(sharedExplicit===undefined||typeof sharedExplicit==="boolean"),"invalid marker accepted");
     }
   });
-  await test("optional summary accepts missing and empty legacy values", async () => {
+  // Missing means the extension could not tell (linkding fills it in); ""
+  // means it knows there is none. The two must survive the queue apart.
+  await test("optional summary keeps missing and empty apart through the queue", async () => {
     const h = await queueIntentHarness();
     for (const summary of [undefined, ""]) {
       const prepared = { ...SAVE_INTENT, ...(summary === undefined ? {} : { summary }) };
       assert(h.validateSaveIntent(prepared) === null, "legacy and empty descriptions remain valid");
-      const restored = h.normalizeOfflineSaveIntent(h.queueRecordFromSaveIntent(prepared, "alice:fixture"), {});
-      assert(restored.summary === summary && h.validateSaveIntent(restored) === null, "optional description survives normalization");
+      const record = { ...h.queueRecordFromSaveIntent(prepared, "alice:fixture"), queueId: "q", queuedAt: 1 };
+      const stored = JSON.parse(JSON.stringify(pbpOfflineQueueReduce([], { kind: "enqueue", item: record })[0]));
+      const expectedKeys = ["account", "mode", "url", "title", "notes", ...(summary === undefined ? [] : ["summary"]), "tags", "private", "toread", "archive", "queueId", "queuedAt"].sort();
+      assert(JSON.stringify(Object.keys(stored).sort()) === JSON.stringify(expectedKeys), "queued fields for " + JSON.stringify(summary) + ": " + Object.keys(stored).sort().join());
+      for (const restored of [h.normalizeOfflineSaveIntent(record, {}), h.normalizeOfflineSaveIntent(stored, {})]) {
+        assert(Object.hasOwn(restored, "summary") === (summary !== undefined) && restored.summary === summary, "replay turned " + JSON.stringify(summary) + " into " + JSON.stringify(restored.summary));
+        assert(h.validateSaveIntent(restored) === null, "optional description survives normalization");
+      }
     }
   });
   await test("non-string summary is rejected for live and queued intents", async () => {

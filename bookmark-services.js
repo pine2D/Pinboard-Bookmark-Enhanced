@@ -218,18 +218,25 @@ function pbpCreateBookmarkServiceClient(config) {
         fields.tags.some(tag => typeof tag !== "string" || !tag.trim())) throw pbpBookmarkServiceError("invalid_request");
     let tags = [...new Set(fields.tags)];
     if (service === "linkding") {
+      // A string Description is one the extension can vouch for (an AI summary,
+      // the page's meta description or the fact it has none, the user's own
+      // text); undefined means it could not tell. A new bookmark sends a known
+      // one and asks linkding not to scrape; an unknown one is left to the
+      // server, which then fills it in from the page itself.
+      const described = typeof fields.summary === "string";
       const body = {...(existing ? {} : {url:fields.url}), title:fields.title || "", notes:fields.notes || "",tag_names:tags,
-        ...(!existing ? {description:fields.summary ?? ""}
+        ...(!existing ? described ? {description:pbpBookmarkDescriptionLine(fields.summary)} : {}
           // The popup and reader show a stored Description as one line. Compare
           // that line, so a multi-line value the user left alone is never
           // flattened, and write only the line the user saw.
-          : typeof fields.summary === "string"
+          : described
             && pbpBookmarkDescriptionLine(fields.summary) !== pbpBookmarkDescriptionLine(existing.summary)
             ? {description:pbpBookmarkDescriptionLine(fields.summary)} : {}),
         ...(typeof fields.toread === "boolean" ? {unread:fields.toread} : {}),
         ...(!existing ? {shared:config.sharingEnabled === true && fields.sharedExplicit === true && fields.private === false}
           : config.sharingEnabled === true && fields.sharedExplicit === true && typeof fields.private === "boolean" && fields.private !== existing.private ? {shared:!fields.private} : {})};
-      const {data} = await request(existing ? "bookmarks/" + pbpBookmarkRecordId(existing.id) + "/" : "bookmarks/?disable_scraping", existing ? "PATCH" : "POST", body);
+      const {data} = await request(existing ? "bookmarks/" + pbpBookmarkRecordId(existing.id) + "/"
+        : described ? "bookmarks/?disable_scraping" : "bookmarks/", existing ? "PATCH" : "POST", body);
       const bookmark = pbpBookmarkNormalize(service,data);
       const added = Date.parse(data.date_added), modified = Date.parse(data.date_modified);
       // linkding also returns 201 when POST merges an existing URL. Compare

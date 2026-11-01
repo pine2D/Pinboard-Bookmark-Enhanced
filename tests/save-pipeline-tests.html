@@ -1905,16 +1905,19 @@ await suite("unified save pipeline", async () => {
     await batch.handleBatchSave(batchTabs(2));equal(batch.intents.length,2);assert(batch.intents.every(row=>row.prepared.private===true));
   });
 
-  await test("linkding Batch uses the local meta fast path without AI and honors the description preference", async () => {
+  // A tab Batch cannot read (no site access without AI) has no known
+  // Description: the intent leaves it out and linkding fetches it itself.
+  await test("linkding Batch uses the local meta fast path without AI, honors the description preference and leaves an unread tab to linkding", async () => {
     for (const [preference, pageInfo, expected] of [
       [true, { title: "Tab 1", metaDescription: "  Meta\n description  " }, "Meta description"],
       [false, { title: "Tab 1", metaDescription: "  Meta\n description  " }, ""],
       [true, { title: "Tab 1", metaDescription: "  \n  " }, ""],
-      [true, null, ""],
+      [true, null, undefined],
     ]) {
       const h = await createBatchSaveHarness({ settings: { bookmarkService: "linkding", optAutoDescription: preference }, pageInfo });
       await h.handleBatchSave(batchTabs(1));
       equal(h.intents[0].prepared.summary, expected);
+      equal(Object.hasOwn(h.intents[0].prepared, "summary"), expected !== undefined, "an unread tab got a Description, or a known one lost it");
       equal(h.intents[0].prepared.notes, "");
       if (preference) assert(h.extractionCalls.length === 1 && h.extractionCalls[0][1].expectedUrl === "https://batch.example/1"
         && !h.extractionCalls[0][1].withDefuddle, "AI-off linkding Batch did not use URL-bound fast extraction");
@@ -1949,6 +1952,17 @@ await suite("unified save pipeline", async () => {
     equal(h.intents[0].prepared.summary, "Fallback meta");
     equal(h.intents[0].prepared.notes, "");
     equal(h.progress[h.progress.length - 1].aiFailed, 1);
+  });
+
+  await test("linkding Batch with AI leaves an unread tab to linkding unless the description preference is off", async () => {
+    for (const [preference, expected] of [[true, undefined], [false, ""]]) {
+      const h = await createBatchSaveHarness({ settings: { bookmarkService: "linkding", optAutoDescription: preference, batchAiSummary: true },
+        hasAIKey: true, pageInfo: null });
+      await h.handleBatchSave(batchTabs(1));
+      equal(Object.hasOwn(h.intents[0].prepared, "summary"), expected !== undefined, "preference " + preference);
+      equal(h.intents[0].prepared.summary, expected);
+      equal(h.intents[0].prepared.notes, "");
+    }
   });
 
   await test("non-linkding Batch keeps AI summaries in Notes and avoids meta-only extraction", async () => {

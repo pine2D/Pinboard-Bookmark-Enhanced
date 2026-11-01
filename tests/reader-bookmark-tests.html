@@ -213,16 +213,21 @@ async function popupPreviewDrafts() {
   }
   assert(closing > opening, "normal draft object did not close");
   const normal = new Function("$id", "settings", "currentTags", "pbpBookmarkServiceId", "pbpBookmarkFormatTags", "result", "_linkdingSharedExplicit",
-    "handoffNotes", "handoffSummaryRange", "return (" + opener.slice(opening, closing + 1) + ");");
-  const pendingLine = source.split("\n").find(line => line.includes("{ bookmarkDraft: { summary:"));
+    "handoffNotes", "handoffSummaryRange", "pbpPopupDescriptionKnown", "return (" + opener.slice(opening, closing + 1) + ");");
+  const pendingLine = source.split("\n").find(line => line.includes('=== "linkding" ? { bookmarkDraft: {'));
   assert(pendingLine, "pending preview has no Description draft");
   const pending = new Function("$id", "settings", "pbpBookmarkServiceId", "_linkdingSharedExplicit",
-    "handoffNotes", "handoffSummaryRange", "return ({" + pendingLine.trim() + "}).bookmarkDraft;");
+    "handoffNotes", "handoffSummaryRange", "pbpPopupDescriptionKnown", "return ({" + pendingLine.trim() + "}).bookmarkDraft;");
+  // The popup's own answer to "can I vouch for the Description box?".
+  const knownAt = source.indexOf("function pbpPopupDescriptionKnown(");
+  assert(knownAt >= 0, "popup has no Description provenance helper");
+  const describedBy = (known, $id) => new Function("_linkdingDescriptionKnown", "$id",
+    source.slice(knownAt, source.indexOf("\n}\n", knownAt) + 2) + "\nreturn pbpPopupDescriptionKnown;")(known, $id);
   const helperAt = source.indexOf("function pbpPopupHandoffSummaryRange(");
   assert(helperAt >= 0, "popup has no handoff summary range helper");
   const handoffRange = (snapshot) => new Function("pbpAiSummaryOwnershipSnapshot",
     source.slice(helperAt, source.indexOf("\n}\n", helperAt) + 2) + "\nreturn pbpPopupHandoffSummaryRange;")(snapshot);
-  return { normal, pending, handoffRange };
+  return { normal, pending, handoffRange, describedBy };
 }
 await test("normal and pending popup preview payloads carry linkding Description into reader state", async () => {
   const { normal, pending } = await popupPreviewDrafts();
@@ -230,8 +235,8 @@ await test("normal and pending popup preview payloads carry linkding Description
   const $id = name => ({ value: fields[name], checked: fields[name] });
   for (const service of ["linkding", "pinboard"]) for (const sharedExplicit of [false,true]) {
     const settings = { bookmarkService: service }, account = service === "linkding" ? "linkding:fixture" : "alice";
-    for (const draft of [normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, sharedExplicit, "Note", undefined),
-      pending($id, settings, pbpBookmarkServiceId, sharedExplicit, "Note", undefined)]) {
+    for (const draft of [normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, sharedExplicit, "Note", undefined, () => true),
+      pending($id, settings, pbpBookmarkServiceId, sharedExplicit, "Note", undefined, () => true)]) {
       if (service === "linkding") {
         equal(draft.summary, "first second");
         const h = await harness({ account, service, post: null, slot: { account, bookmarkDraft: draft } });
@@ -239,6 +244,25 @@ await test("normal and pending popup preview payloads carry linkding Description
         equal(state.bookmark.summary, "first second");
         equal(state.bookmark.sharedExplicit, sharedExplicit); equal(state.bookmark.private, !sharedExplicit);
       } else assert(!draft || !("summary" in draft));
+    }
+  }
+});
+// A popup that could not read the page and has nothing in the Description box
+// hands the reader no Description, so a reader create leaves it to linkding.
+// Anything the box holds, or a known empty value, travels as before.
+await test("popup preview payloads leave out a Description the popup cannot vouch for", async () => {
+  const { normal, pending, describedBy } = await popupPreviewDrafts();
+  const account = "linkding:fixture", settings = { bookmarkService: "linkding" };
+  for (const [known, box, expected] of [[false, "", undefined], [false, " \n ", undefined], [true, "", ""], [false, "  Typed\n  line ", "Typed line"], [true, "Meta", "Meta"]]) {
+    const fields = { "title-input": "T", "description-input": "Note", "linkding-description-input": box, "private-check": true, "readlater-check": false };
+    const $id = name => ({ value: fields[name], checked: fields[name] });
+    const vouch = describedBy(known, $id), where = JSON.stringify({ known, box });
+    for (const draft of [normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, false, "Note", undefined, vouch),
+      pending($id, settings, pbpBookmarkServiceId, false, "Note", undefined, vouch)]) {
+      assert(Object.hasOwn(draft, "summary") === (expected !== undefined) && draft.summary === expected, where + ": handed " + JSON.stringify(draft.summary));
+      const h = await harness({ account, service: "linkding", post: null, slot: { account, bookmarkDraft: draft } });
+      const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER);
+      assert(Object.hasOwn(state.bookmark, "summary") === (expected !== undefined) && state.bookmark.summary === expected, where + ": reader state " + JSON.stringify(state.bookmark.summary));
     }
   }
 });
@@ -259,11 +283,11 @@ await test("popup preview payloads carry the summary range the popup vouches for
   const $id = name => ({ value: fields[name], checked: fields[name] });
   for (const service of ["pinboard", "karakeep", "linkding"]) for (const handed of [range, undefined]) {
     const settings = { bookmarkService: service };
-    const plain = normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, false, "Note", handed);
+    const plain = normal($id, settings, ["one"], pbpBookmarkServiceId, pbpBookmarkFormatTags, { title: "T" }, false, "Note", handed, () => true);
     equal(plain.notes, "Note");
     equal(Object.hasOwn(plain, "summaryRange"), !!handed, service + ": normal draft range presence");
     if (handed) equal(JSON.stringify(plain.summaryRange), JSON.stringify(range));
-    const framed = pending($id, settings, pbpBookmarkServiceId, false, "Note", handed);
+    const framed = pending($id, settings, pbpBookmarkServiceId, false, "Note", handed, () => true);
     if (service === "linkding") assert(framed && !("notes" in framed) && !("summaryRange" in framed), "linkding pending draft gained Notes ownership");
     else if (!handed) equal(framed, undefined);
     else { equal(framed.notes, "Note"); equal(JSON.stringify(framed.summaryRange), JSON.stringify(range)); }
@@ -303,6 +327,33 @@ await test("reader initial linkding Description follows the owner-bound preview 
   assert(!("summaryTouched" in h.env.submitted.intent) && !("summaryTouched" in h.env.submitted.opts.readerDraft));
   h.env.account = "linkding:other";
   equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER)).reason, "account_changed");
+});
+// The reader has no page description of its own. Without a popup draft value
+// its creates leave the Description out, so linkding fetches it; with
+// auto-fill off they send a known "", and a draft's value (even "") is kept.
+await test("reader linkding creates leave an unknown Description to linkding", async () => {
+  const account = "linkding:fixture";
+  for (const [settings, bookmarkDraft, expected] of [
+    [{}, undefined, undefined],
+    [{ optAutoDescription: false }, undefined, ""],
+    [{}, { title: "T", tags: "one", notes: "N" }, undefined],
+    [{}, { title: "T", tags: "one", notes: "N", summary: "" }, ""],
+    [{ optAutoDescription: false }, { title: "T", tags: "one", notes: "N", summary: "Kept\nline" }, "Kept line"],
+  ]) {
+    const where = JSON.stringify({ settings, bookmarkDraft });
+    const has = (value, label) => assert(Object.hasOwn(value, "summary") === (expected !== undefined) && value.summary === expected,
+      where + " " + label + ": " + JSON.stringify(value.summary));
+    const h = await harness({ account, service: "linkding", post: null, settings, slot: { account, ...(bookmarkDraft ? { bookmarkDraft } : {}) } });
+    has((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER)).bookmark, "reader state");
+    for (const action of ["save", "later"]) {
+      equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action }, SENDER)).status, "saved");
+      has(h.env.submitted.intent, action + " intent");
+    }
+    // An edit that leaves the box alone carries no Description of its own.
+    const prepared = await h.pbpPrepareReaderSaveIntent(h.env.submitted.intent, "edit",
+      { title: "T", tags: "one", notes: "N", private: true, toread: false }, { pinboardToken: h.env.token }, { account, service: "linkding", epoch: 1 });
+    equal(prepared.intent.mode, "create"); has(prepared.intent, "untouched edit create");
+  }
 });
 await test("non-linkding reader state hides Description", async () => {
   for (const service of ["pinboard", "karakeep"]) {
@@ -593,6 +644,44 @@ await test("reader Description uses a text input, shows only for linkding, and p
       await new Promise(resolve => setTimeout(resolve, 0));
       const draft = messages.find(msg => msg.action === "edit")?.draft;
       equal(draft?.summary, "changed value"); assert(!("summaryTouched" in draft));
+    } finally { frame.remove(); }
+  }
+});
+// The editor shows a stored Description as one line, or nothing when the
+// page's is unknown. Apply sends it only when the user changed that line, so
+// an untouched multi-line value stays as stored and an unknown one stays for
+// linkding to fill. Polls the editor's own busy state; no fixed waits.
+await test("reader edits send a Description only when the user changed its one line", async () => {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  const settle = async (read, label) => {
+    for (let i = 0; i < 400; i++) { if (read()) return; await new Promise(resolve => setTimeout(resolve, 5)); }
+    throw new Error("timed out: " + label);
+  };
+  for (const [bookmarked, stored, typed, sent] of [
+    [true, "first\nsecond", undefined, undefined], [true, "first\nsecond", "first   second", undefined],
+    [true, "first\nsecond", "", ""], [true, "first\nsecond", " changed \n value", "changed value"],
+    [false, undefined, undefined, undefined], [false, "", undefined, undefined], [false, undefined, "Typed  value ", "Typed value"],
+  ]) {
+    const frame = document.createElement("iframe"); document.body.append(frame);
+    try {
+      const w = frame.contentWindow, messages = [], account = "linkding:fixture", where = JSON.stringify({ bookmarked, stored, typed });
+      w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+      w.eval(await (await fetch("../shared.js")).text()); w.t = key => key;
+      w.chrome = { runtime: { id: "test-id", getURL: path => path, onMessage: { addListener() {} }, sendMessage: async msg => {
+        messages.push(msg); return msg.type === "mdReaderBookmarkState"
+          ? { known: true, bookmarked, account, descriptionSupported: true, bookmark: { title: "T", notes: "N", tags: "one", ...(stored === undefined ? {} : { summary: stored }), private: true, toread: false } }
+          : { status: "queued", account };
+      } } };
+      w.eval(runtime); w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "T", account } }));
+      await settle(() => w.document.getElementById("reader-bookmark-edit")?.getAttribute("aria-busy") === "false", where + " initial state");
+      await w.pbpReaderBookmarkAction("edit");
+      const input = w.document.getElementById("reader-bookmark-summary");
+      equal(input.value, stored === undefined ? "" : pbpBookmarkDescriptionLine(stored));
+      if (typed !== undefined) { input.value = typed; input.dispatchEvent(new w.Event("input", { bubbles: true })); }
+      w.document.getElementById("reader-bookmark-apply").click();
+      await settle(() => messages.some(msg => msg.action === "edit"), where + " apply");
+      const draft = messages.find(msg => msg.action === "edit").draft;
+      assert(Object.hasOwn(draft, "summary") === (sent !== undefined) && draft.summary === sent, where + ": sent " + JSON.stringify(draft.summary));
     } finally { frame.remove(); }
   }
 });

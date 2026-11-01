@@ -13,6 +13,10 @@
   let editorSource = null;
   let sharedExplicit = false;
   let sharingChoice = false;
+  // The one-line Description the editor opened with. Apply sends it only when
+  // the user changed it: an untouched line keeps a stored multi-line value as
+  // it is, and an unknown one (shown empty) stays for linkding to fill in.
+  let shownSummary = "";
   const buttons = [];
   const text = (key, ...args) => typeof t === "function" ? t(key, ...args) : key;
   const id = name => document.getElementById("reader-bookmark-" + name);
@@ -221,7 +225,8 @@
     label(apply, "readerBookmarkApply");
     apply.addEventListener("click", () => save("edit", {
       title: id("title").value, tags: id("tags").value, notes: id("notes").value,
-      ...(state.descriptionSupported === true ? { summary: pbpBookmarkDescriptionLine(id("summary").value) } : {}),
+      ...(state.descriptionSupported === true && pbpBookmarkDescriptionLine(id("summary").value) !== shownSummary
+        ? { summary: pbpBookmarkDescriptionLine(id("summary").value) } : {}),
       ...(state.sharingSupported === true ? { sharedExplicit } : {}),
       private: state.sharingSupported === true ? !id("private").checked : state.privacySupported === false || id("private").checked, toread: id("toread").checked,
     }));
@@ -250,6 +255,7 @@
     id("tags").value = typeof values.tags === "string" ? values.tags : pbpBookmarkFormatTags(context.bookmark?.tags || []);
     id("summary").closest("label").hidden = state.descriptionSupported !== true;
     id("summary").value = state.descriptionSupported === true && typeof values.summary === "string" ? pbpBookmarkDescriptionLine(values.summary) : "";
+    shownSummary = id("summary").value;
     id("notes").value = typeof values.notes === "string" ? values.notes : context.bookmark?.notes || "";
     const privacyLabel = id("private").closest("label");
     privacyLabel.hidden = state.privacySupported === false && state.sharingSupported !== true;

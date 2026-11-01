@@ -49,14 +49,24 @@ test("service post projection keeps summary separate from title and notes",()=>{
   const post=pbpBookmarkAsPost(pbpBookmarkNormalize("linkding",ldScraped));
   equal([post.description,post.extended,post.summary],["T","Meta description\nMy note","Meta description"]);
 });
-test("linkding create disables scraping and sends explicit Description including empty defaults",async()=>{
-  for(const [summary,description] of [[undefined,""],[null,""],["",""],["Custom description","Custom description"]]){
-    const reply=summary==="Custom description"?{...ldUnscraped,description:"Custom description"}:ldUnscraped;
-    const h=harness("linkding",[[201,reply]]);
+test("linkding create sends a known Description with disable_scraping and leaves an unknown one to the server",async()=>{
+  // A string is a value the extension vouches for, an empty one included: it
+  // goes out as the one line the form shows, and linkding is told not to
+  // scrape. Anything else means the extension could not tell, so the request
+  // carries neither and the server's own scrape fills the field (id 18).
+  for(const [summary,description] of [["",""],["Custom description","Custom description"],["  Custom\n\n  description ","Custom description"]]){
+    const h=harness("linkding",[[201,{...ldUnscraped,description}]]);
     const result=await h.client.save({url:pageUrl,title:"T",notes:"Meta description\nMy note",tags:[],summary});
     equal(h.calls[0].url,"https://bookmarks.example/base/api/bookmarks/?disable_scraping");
-    equal(h.calls[0].body.description,description);ok(Object.hasOwn(h.calls[0].body,"description"));
+    equal([summary,h.calls[0].body.description],[summary,description]);
     equal([result.bookmark.summary,result.bookmark.notes],[description,"Meta description\nMy note"]);
+  }
+  for(const summary of [undefined,null,7]){
+    const h=harness("linkding",[[201,ldScraped]]);
+    const result=await h.client.save({url:pageUrl,title:"T",notes:"Meta description\nMy note",tags:[],summary});
+    equal([summary,h.calls[0].url],[summary,"https://bookmarks.example/base/api/bookmarks/"]);
+    equal([summary,Object.hasOwn(h.calls[0].body,"description")],[summary,false]);
+    equal(result.bookmark.summary,"Meta description");
   }
 });
 test("linkding PATCH sends Description only for changed strings and supports clearing",async()=>{
@@ -130,7 +140,7 @@ test("linkding POST detects a merge only when parseable server dates differ by m
     equal(h.calls.map(c=>c.method),["POST"]);
   }
 });
-test("linkding create uses API fields and does not send a Wayback flag as archive",async()=>{const {client,calls}=harness("linkding",[[201,ld]]);await client.save({url:pageUrl,title:"Title",notes:"",tags:[],toread:true,private:true,archive:true},null);equal(calls[0].body,{url:pageUrl,title:"Title",notes:"",tag_names:[],description:"",unread:true,shared:false});});
+test("linkding create uses API fields and does not send a Wayback flag as archive",async()=>{const {client,calls}=harness("linkding",[[201,ld]]);await client.save({url:pageUrl,title:"Title",notes:"",tags:[],toread:true,private:true,archive:true},null);equal(calls[0].url,"https://bookmarks.example/base/api/bookmarks/");equal(calls[0].body,{url:pageUrl,title:"Title",notes:"",tag_names:[],unread:true,shared:false});});
 test("linkding uses canonical tags returned by its server",async()=>{
   // v1.47 models.sanitize_tag_name replaces spaces; the response, not the
   // submitted spelling, is authoritative for the next edit.

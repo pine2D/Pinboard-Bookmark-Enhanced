@@ -228,7 +228,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         assert(elements["private-check"].checked && !elements["share-check"].checked,"new popup defaults to shared");
       }
     });
-    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard", sharedExplicit = false, summaryOwnership = null, ownershipKnown = true } = {}) {
+    function createSubmitHarness({ archiveRequested = false, archiveUserTouched = false, deferWayback = false, lookupFailed = false, waybackHostGranted = true, draftContext = false, service = "pinboard", sharedExplicit = false, summaryOwnership = null, ownershipKnown = true, descriptionKnown = true } = {}) {
       const elements = {
         "submit-btn": createElementStub(),
         "delete-btn": createElementStub({ classes: ["hidden"] }),
@@ -361,6 +361,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         _linkdingSharedRevision: 0,
         _popupDraftContext: draftContext ? {pageUrl: URL, incognito: false} : null,
         _linkdingDescriptionTouched: false,
+        _linkdingDescriptionKnown: descriptionKnown,
         _popupDraftEdited: false,
         _popupDraftRestored: false,
         _popupDraftLastSnapshot: "",
@@ -426,6 +427,23 @@ test("posts/add default remains replace=yes for existing callers", () => {
         h.elements["linkding-description-input"].value = "New edit";
         h.resolveSave({ok:true,status:"saved",data:{}}); await saving;
         if (service === "linkding") assert(!h.timers.some(t=>!t.cancelled&&t.delay===1800), "newer Description scheduled auto-close");
+      }
+    });
+    // The popup could not read the page and nothing filled the Description box:
+    // the save (and the draft it clears) leave the Description out, so a
+    // create lets linkding fetch it. Whatever the box shows otherwise, an
+    // empty value included, is sent as its one line.
+    await testAsync("linkding submits no Description the popup cannot vouch for", async () => {
+      for (const [known, box, expected] of [[false, "", undefined], [false, " \n\t ", undefined], [false, "  Typed\n line ", "Typed line"], [true, "", ""], [true, " Meta  text ", "Meta text"]]) {
+        const h = createSubmitHarness({ service: "linkding", draftContext: true, descriptionKnown: known });
+        h.elements["linkding-description-input"].value = box;
+        const saving = h.click(); await flushMicrotasks();
+        const message = h.messages.find(m => m.type === "save_intent"), where = JSON.stringify({ known, box });
+        assert(message, where + ": save was not dispatched");
+        assert(Object.hasOwn(message.intent, "summary") === (expected !== undefined) && message.intent.summary === expected,
+          where + ": intent Description " + JSON.stringify(message.intent.summary));
+        assert(Object.hasOwn(message.popupDraft.expectedDraft, "summary") === (expected !== undefined), where + ": draft snapshot disagrees with the intent");
+        h.resolveSave({ ok: true, status: "saved", data: {} }); await saving;
       }
     });
     await testAsync("saved sharing intent is consumed without clearing a newer same-value sharing choice", async () => {
@@ -1984,7 +2002,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const start = source.indexOf('function pbpPopupPrefillDescription(');
       const end = source.indexOf('function recomputeArchiveCheck(', start);
       const elements = {"description-input":{value:""},"linkding-description-input":{value:""},"linkding-description-row":document.createElement("div")};
-      const fill = new Function("pageInfo", "settings", "shouldUpdateField", "$id", "pbpNotesDescription", source.slice(start, end)+";pbpPopupPrefillDescription();");
+      const fill = new Function("pageInfo", "settings", "shouldUpdateField", "$id", "pbpNotesDescription", "let _linkdingDescriptionKnown = true;"+source.slice(start, end)+";pbpPopupPrefillDescription();");
       for (const [service, expected] of [["pinboard", "<blockquote># heading\n\n&lt;b&gt; *bold*</blockquote>"],
         ["linkding", "> \\# heading\n>\n> &lt;b> \\*bold\\*"], ["karakeep", "> # heading\n>\n> <b> *bold*"]]) {
         fill({ selectedText: "# heading\n\n<b> *bold*" }, { bookmarkService: service, optBlockquote: true }, () => true, id=>elements[id], pbpNotesDescription);
@@ -1995,8 +2013,29 @@ test("posts/add default remains replace=yes for existing callers", () => {
     test("fresh linkding metadata enters Description while Notes keep only selection and via", () => {
       const a=source.indexOf('function pbpPopupPrefillDescription('),b=source.indexOf('function recomputeArchiveCheck(',a);
       const elements={"description-input":{value:""},"linkding-description-input":document.createElement("input"),"linkding-description-row":document.createElement("div")};
-      const fill=new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription",source.slice(a,b)+";pbpPopupPrefillDescription();");
+      const fill=new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription","let _linkdingDescriptionKnown = true;"+source.slice(a,b)+";pbpPopupPrefillDescription();");
       for(const selectedText of ["", "Selected text"]){fill({metaDescription:"Meta\ndescription",selectedText,referrer:"https://source.example/"},{bookmarkService:"linkding",optIncludeReferrer:true},()=>true,id=>elements[id],pbpNotesDescription);assert(elements["linkding-description-input"].value==="Meta description");assert(elements["description-input"].value===(selectedText?selectedText+"\n\n":"")+"via: https://source.example/");}
+    });
+
+    // A page the popup read has a known Description, its meta description or
+    // none at all; one it could not read (pageInfo marked _pbpUnavailable)
+    // does not, unless auto-fill is off. A box the user or a draft already
+    // filled keeps its value and its provenance.
+    test("linkding prefill knows the Description only when the page was read or auto-fill is off", () => {
+      const a=source.indexOf('function pbpPopupPrefillDescription('),b=source.indexOf('function recomputeArchiveCheck(',a);
+      const run=(pageInfo,settings,dirty=false)=>{
+        const elements={"description-input":{value:""},"linkding-description-input":document.createElement("input"),"linkding-description-row":document.createElement("div")};
+        elements["linkding-description-input"].value=dirty?"Typed":"";
+        const known=new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription","let _linkdingDescriptionKnown = 'untouched';"+source.slice(a,b)+";pbpPopupPrefillDescription();return _linkdingDescriptionKnown;")
+          (pageInfo,{bookmarkService:"linkding",...settings},id=>!(dirty&&id==="linkding-description-input"),id=>elements[id],pbpNotesDescription);
+        return {known,value:elements["linkding-description-input"].value};
+      };
+      const read={title:"Article",metaDescription:"Meta\ndescription"},bare={title:"Article",metaDescription:""},unread={title:"Article",metaDescription:"",_pbpUnavailable:true};
+      for(const [pageInfo,settings,dirty,known,value] of [[read,{},false,true,"Meta description"],[bare,{},false,true,""],[unread,{},false,false,""],
+        [unread,{optAutoDescription:false},false,true,""],[read,{optAutoDescription:false},false,true,""],[unread,{},true,"untouched","Typed"]]){
+        const got=run(pageInfo,settings,dirty),where=JSON.stringify({pageInfo,settings,dirty});
+        assert(got.known===known&&got.value===value,where+": "+JSON.stringify(got));
+      }
     });
 
     await testAsync("Description row has actual visible geometry only for linkding", async () => {
@@ -2005,7 +2044,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const doc=iframe.contentDocument;const css=doc.createElement("style");css.textContent=popupCss+'\n*,*::before,*::after { transition:none!important; animation:none!important; }';doc.head.appendChild(css);
       doc.getElementById("main-section").classList.remove("hidden");doc.documentElement.dataset.section="main";
       const a=source.indexOf('function pbpPopupPrefillDescription('),b=source.indexOf('function recomputeArchiveCheck(',a);
-      for(const service of ["pinboard","karakeep","linkding"]){new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription",source.slice(a,b)+";pbpPopupPrefillDescription();")({},{bookmarkService:service},()=>true,id=>doc.getElementById(id),pbpNotesDescription);const row=doc.getElementById("linkding-description-row");assert(iframe.contentWindow.getComputedStyle(row).display===(service==="linkding"?"flex":"none"),service+" Description visibility is wrong");}
+      for(const service of ["pinboard","karakeep","linkding"]){new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription","let _linkdingDescriptionKnown = true;"+source.slice(a,b)+";pbpPopupPrefillDescription();")({},{bookmarkService:service},()=>true,id=>doc.getElementById(id),pbpNotesDescription);const row=doc.getElementById("linkding-description-row");assert(iframe.contentWindow.getComputedStyle(row).display===(service==="linkding"?"flex":"none"),service+" Description visibility is wrong");}
       const { FIELD_TARGETS }=await import('../docs/theme-surface/composers/ui-components.mjs');
       const input=doc.getElementById("linkding-description-input"),title=doc.getElementById("title-input");
       const registrations=FIELD_TARGETS.pp.filter(entry=>input.matches(entry.rest));
@@ -2591,7 +2630,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         _linkdingDescriptionTouched: false,
         fieldsEdit: value => { fields["linkding-description-input"].value = value; },
         pbpPopupDraftFieldEdited() {}, updateCharCount() {},
-        ...(o.realSummary ? { _popupDraftRevision:0, _popupDraftEdited:false, _popupDraftUserUrl:false,
+        ...(o.realSummary ? { _popupDraftRevision:0, _popupDraftEdited:false, _popupDraftUserUrl:false, _linkdingDescriptionKnown:true,
           _popupDraftChangedFields:new Set(), fieldDirtyFlags:{"linkding-description-input":false},
           _archiveUserTouched:false, pbpRememberPopupDraft() {} } : {}),
         pageInfo: { url: URL, pageText: "extracted body" },
@@ -3791,19 +3830,22 @@ test("posts/add default remains replace=yes for existing callers", () => {
         proxySource,
         "let _popupDraftRestored = false;",
         "let _tagsUserTouched = false;",
+        "let _linkdingDescriptionKnown = false;",
         lookupSource,
-        "return { checkExistingBookmark, getLookup: () => bookmarkLookup, getBookmark: () => existingBookmark, getTags: () => currentTags, touchTags: tags => {currentTags=tags;_tagsUserTouched=true;} };",
+        "return { checkExistingBookmark, getLookup: () => bookmarkLookup, getBookmark: () => existingBookmark, getTags: () => currentTags, touchTags: tags => {currentTags=tags;_tagsUserTouched=true;}, descriptionKnown: () => _linkdingDescriptionKnown };",
       ].join("\n");
       const names = Object.keys(dependencies);
       const built = new Function(...names, body)(...names.map((name) => dependencies[name]));
-      return { elements, run: (...args) => built.checkExistingBookmark("alice:token", URL, null, true, ...args), getLookup: built.getLookup, getBookmark: built.getBookmark, getTags: built.getTags, touchTags: built.touchTags, statuses, warns, sent, resets: () => resets };
+      return { elements, descriptionKnown: built.descriptionKnown, run: (...args) => built.checkExistingBookmark("alice:token", URL, null, true, ...args), getLookup: built.getLookup, getBookmark: built.getBookmark, getTags: built.getTags, touchTags: built.touchTags, statuses, warns, sent, resets: () => resets };
     }
 
     const FOUND_BODY = JSON.stringify({ posts: [{ description: "Saved title", extended: "", tags: "alpha", shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }] });
 
     await testAsync("existing linkding summary refills Description but a later user edit wins",async()=>{
       const response={ok:true,status:200,data:{posts:[{href:URL,description:"Saved title",extended:"Saved notes",summary:"Saved\ndescription",tags:"",shared:"no",toread:"no",time:"2026-10-30T00:00:00Z"}]}};
-      for(const dirtyDescription of [false,true]){const h=createLookupHarness(response,{service:"linkding",dirtyDescription,realDescription:true});assert((await h.run()).status==="found",JSON.stringify({statuses:h.statuses,warns:h.warns}));assert(h.elements["linkding-description-input"].value===(dirtyDescription?"Manual":"Saved description"),"wrong Description "+h.elements["linkding-description-input"].value);assert(h.elements["description-input"].value==="Saved notes");}
+      for(const dirtyDescription of [false,true]){const h=createLookupHarness(response,{service:"linkding",dirtyDescription,realDescription:true});assert((await h.run()).status==="found",JSON.stringify({statuses:h.statuses,warns:h.warns}));assert(h.elements["linkding-description-input"].value===(dirtyDescription?"Manual":"Saved description"),"wrong Description "+h.elements["linkding-description-input"].value);assert(h.elements["description-input"].value==="Saved notes");
+        // The stored Description is a value the popup can vouch for; a box the user owns keeps its own provenance.
+        assert(h.descriptionKnown()===!dirtyDescription,"stored Description provenance "+h.descriptionKnown());}
     });
 
     await testAsync("late Pinboard lookup aligns accepted tags without resurrecting deletions or dropping exact twins", async () => {

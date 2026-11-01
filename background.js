@@ -1023,7 +1023,8 @@ function normalizeOfflineSaveIntent(item, settings) {
     url: typeof item?.url === "string" ? item.url : "",
     title: typeof item?.title === "string" ? item.title : "",
     notes: typeof item?.notes === "string" ? item.notes : "",
-    summary: item?.summary,
+    // Missing stays missing: the save then leaves the Description to linkding.
+    ...(item?.summary !== undefined ? { summary: item.summary } : {}),
     ...(item?.sharedExplicit !== undefined ? { sharedExplicit: item.sharedExplicit } : {}),
     tags: typeof item?.tags === "string" ? item.tags : "",
     private: item?.private === true,
@@ -1079,7 +1080,8 @@ function queueRecordFromSaveIntent(intent, token) {
     url: intent.url,
     title: intent.title,
     notes: intent.notes,
-    summary: intent.summary,
+    // An unknown Description (undefined) adds no field; "" is a known empty one.
+    ...(intent.summary !== undefined ? { summary: intent.summary } : {}),
     ...(intent.sharedExplicit !== undefined ? { sharedExplicit: intent.sharedExplicit } : {}),
     tags: intent.tags,
     private: intent.private,
@@ -1485,11 +1487,17 @@ async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth)
 function pbpReaderInitialIntent(context, settings, action) {
   const originalDraft = context.bookmarkDraft;
   const linkding = pbpBookmarkServiceId(settings) === "linkding";
+  // The reader has no page description of its own: it keeps the popup draft's
+  // Description, sends a known "" when auto-fill is off, and otherwise leaves
+  // it out so linkding fills it in from the page.
+  const summary = !linkding ? undefined
+    : typeof originalDraft?.summary === "string" ? pbpBookmarkDescriptionLine(originalDraft.summary)
+      : settings.optAutoDescription === false ? "" : undefined;
   return {
     mode: "skip", url: context.url,
     title: typeof originalDraft?.title === "string" ? originalDraft.title : context.title || context.url,
     notes: typeof originalDraft?.notes === "string" ? originalDraft.notes : typeof context.description === "string" ? context.description : "",
-    ...(linkding ? { summary: typeof originalDraft?.summary === "string" ? pbpBookmarkDescriptionLine(originalDraft.summary) : "" } : {}),
+    ...(summary !== undefined ? { summary } : {}),
     tags: typeof originalDraft?.tags === "string" ? originalDraft.tags : Array.isArray(context.tags) ? pbpSerializeIntentTags(context.tags, pbpBookmarkServiceId(settings)) : "",
     ...(linkding ? { sharedExplicit: originalDraft?.sharedExplicit === true } : {}),
     private: linkding ? !(originalDraft?.sharedExplicit === true && originalDraft?.private === false) : typeof originalDraft?.private === "boolean" ? originalDraft.private : pbpServiceEffectivePrivate(settings, { incognito: context.sourceIncognito === true }),
@@ -1801,18 +1809,21 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
       else appendSummary(r.result);
     }
   }
-  const description = linkding
-    ? pbpBookmarkDescriptionLine(linkdingSummary)
-      || (s._autoNotes && s.optAutoDescription !== false && pageInfo
-        ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : "")
-    : "";
+  // linkding Description: the AI summary, else the page's meta description
+  // (possibly none) when the page was read. With the page description turned
+  // off it is a known "", so linkding adds none either; a page that could not
+  // be read leaves it out, and linkding fills it in from the page itself.
+  const description = !linkding ? undefined
+    : pbpBookmarkDescriptionLine(linkdingSummary)
+      || (!(s._autoNotes && s.optAutoDescription !== false) ? ""
+        : pageInfo ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : undefined);
 
   const result = await submitSaveIntent({
     mode,
     url,
     title,
     notes,
-    ...(linkding ? { summary: description } : {}),
+    ...(description !== undefined ? { summary: description } : {}),
     tags: pbpSerializeIntentTags(tags.map(tag => pbpCanonicalTagName(tag, tagContext)).filter(Boolean), startAuth.service),
     private: isPrivate,
     toread: toread === true ? true : undefined,
@@ -5166,11 +5177,12 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
           if (name && !seenTags.has(key)) { dedupedTags.push(name); seenTags.add(key); }
         }
         const isPrivate = pbpServiceEffectivePrivate(s, { incognito: tab.incognito });
-        const description = linkding
-          ? pbpBookmarkDescriptionLine(linkdingSummary)
-            || (s.optAutoDescription !== false && pageInfo
-              ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : "")
-          : "";
+        // Same rule as quick save: a tab Batch could not read (no site
+        // access without AI) leaves the Description to linkding.
+        const description = !linkding ? undefined
+          : pbpBookmarkDescriptionLine(linkdingSummary)
+            || (s.optAutoDescription === false ? ""
+              : pageInfo ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : undefined);
         await requireAccount();
         // Batch notes hold the summary block and nothing else (null: no block).
         const summaryRange = !linkding && notes ? { start: 0, end: notes.length } : null;
@@ -5179,7 +5191,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
           url: tab.url,
           title: tab.title || tab.url,
           notes,
-          ...(linkding ? { summary: description } : {}),
+          ...(description !== undefined ? { summary: description } : {}),
           tags: pbpSerializeIntentTags(dedupedTags, currentAuth.service),
           private: isPrivate,
           toread: s.optReadlaterDefault ? true : undefined,

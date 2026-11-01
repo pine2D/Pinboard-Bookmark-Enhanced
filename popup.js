@@ -138,7 +138,10 @@ function pbpPopupPrefillDescription() {
   row.hidden = !linkding;
   row.classList.toggle("hidden", !linkding);
   if (linkding && shouldUpdateField("linkding-description-input")) {
-    $id("linkding-description-input").value = settings.optAutoDescription !== false ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : "";
+    const auto = settings.optAutoDescription !== false;
+    $id("linkding-description-input").value = auto ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : "";
+    // A page that could not be read has no known description of its own.
+    _linkdingDescriptionKnown = !auto || pageInfo?._pbpUnavailable !== true;
   }
   let notes = "";
   if (pageInfo.selectedText) {
@@ -229,6 +232,12 @@ let _activeTabAtOpen = null;
 let _popupDraftContext = null;
 // Draft-only provenance: AI/meta writes must remain regenerable after reopening.
 let _linkdingDescriptionTouched = false;
+// Whether the Description box holds a value the popup can vouch for: the
+// page's meta description or the fact it has none, an AI summary, the user's
+// edit, a restored draft, the stored bookmark, or "" with auto-fill off. It is
+// false only when the page could not be read and nothing filled the box; a
+// save then leaves the Description out, and linkding fills it in itself.
+let _linkdingDescriptionKnown = true;
 // Only an actual visible Share change (or its owner-scoped draft) sets this.
 let _linkdingSharedExplicit = false;
 let _linkdingSharedRevision = 0;
@@ -242,9 +251,13 @@ const _popupDraftChangedFields = new Set();
 function pbpPopupDraftSnapshot() {
   return { url: $id("url-input").value, title: $id("title-input").value,
     notes: $id("description-input").value,
-    ...(pbpBookmarkServiceId(settings) === "linkding" ? { summary: $id("linkding-description-input").value, summaryTouched: _linkdingDescriptionTouched, sharedExplicit: _linkdingSharedExplicit } : {}), tags: currentTags.slice(), tagInput: $id("tags-input").value,
+    ...(pbpBookmarkServiceId(settings) === "linkding" ? { ...(pbpPopupDescriptionKnown() ? { summary: $id("linkding-description-input").value } : {}), summaryTouched: _linkdingDescriptionTouched, sharedExplicit: _linkdingSharedExplicit } : {}), tags: currentTags.slice(), tagInput: $id("tags-input").value,
     private: $id("private-check").checked, toread: $id("readlater-check").checked,
     archive: $id("archive-check").checked, archiveTouched: _archiveUserTouched };
+}
+// Text in the box is always the user's to send; an empty box only once known.
+function pbpPopupDescriptionKnown() {
+  return _linkdingDescriptionKnown || pbpBookmarkDescriptionLine($id("linkding-description-input")?.value) !== "";
 }
 function pbpRememberPopupDraft() {
   if (!_popupDraftContext) return;
@@ -315,6 +328,7 @@ function pbpPopupDraftFieldEdited(id, { manual = true } = {}) {
   if (id === "url-input") _popupDraftUserUrl = true;
   if (id === "archive-check") _archiveUserTouched = true;
   if (id === "linkding-description-input" && manual) _linkdingDescriptionTouched = true;
+  if (id === "linkding-description-input") _linkdingDescriptionKnown = true;
   const key = { "url-input": "url", "title-input": "title", "description-input": "notes", "linkding-description-input": "summary", "tags-input": "tagInput",
     "private-check": "private", "share-check": "private", "readlater-check": "toread", "archive-check": "archive" }[id];
   _popupDraftChangedFields.add(key);
@@ -388,6 +402,7 @@ async function initPopupDraft(account, tab) {
       $id("share-check").checked = !$id("private-check").checked;
       if (!_popupDraftChangedFields.has("archiveTouched")) _archiveUserTouched = d.archiveTouched;
       if (!_popupDraftChangedFields.has("summaryTouched")) _linkdingDescriptionTouched = d.summaryTouched === true;
+      if (typeof d.summary === "string") _linkdingDescriptionKnown = true;
       if (!_popupDraftChangedFields.has("sharedExplicit")) _linkdingSharedExplicit = pbpBookmarkServiceId(settings) === "linkding" && pbpBookmarkConnection(settings).sharingEnabled && d.sharedExplicit === true;
       _popupDraftUserUrl = true;
       _popupDraftRestored = true;
@@ -823,11 +838,13 @@ async function showMain(token) {
   // window to seconds (getPageInfoFromTab has no timeout); a normal page flips
   // back within tens of milliseconds.
   $id("submit-btn").disabled = true;
+  // _pbpUnavailable: the page could not be read, so its empty fields are
+  // unknown rather than known to be empty (pbpPopupPrefillDescription).
   if (!tab) {
-    pageInfo = { url: "", title: "", selectedText: "", metaDescription: "", referrer: "", pageText: "" };
+    pageInfo = { url: "", title: "", selectedText: "", metaDescription: "", referrer: "", pageText: "", _pbpUnavailable: true };
   } else {
     pageInfo = (await _pageInfoPromise) || {
-      url: tab.url || "", title: tab.title || "", selectedText: "", metaDescription: "", referrer: "", pageText: ""
+      url: tab.url || "", title: tab.title || "", selectedText: "", metaDescription: "", referrer: "", pageText: "", _pbpUnavailable: true
     };
   }
 
@@ -1254,7 +1271,7 @@ async function htmlToMarkdownAsync(html, opts) {
                 description: handoffNotes,
                 // Without a draft the reader saves `description`; a summary
                 // range needs the notes it describes beside it.
-                ...(pbpBookmarkServiceId(settings) === "linkding" ? { bookmarkDraft: { summary: pbpBookmarkDescriptionLine($id("linkding-description-input")?.value), private: $id("private-check")?.checked === true, sharedExplicit: _linkdingSharedExplicit } } : handoffSummaryRange ? { bookmarkDraft: { notes: handoffNotes, summaryRange: handoffSummaryRange } } : {}),
+                ...(pbpBookmarkServiceId(settings) === "linkding" ? { bookmarkDraft: { ...(pbpPopupDescriptionKnown() ? { summary: pbpBookmarkDescriptionLine($id("linkding-description-input")?.value) } : {}), private: $id("private-check")?.checked === true, sharedExplicit: _linkdingSharedExplicit } } : handoffSummaryRange ? { bookmarkDraft: { notes: handoffNotes, summaryRange: handoffSummaryRange } } : {}),
                 ts: Date.now()
               }
             });
@@ -1393,7 +1410,7 @@ async function htmlToMarkdownAsync(html, opts) {
                 tags: Array.isArray(currentTags) ? (pbpBookmarkServiceId(settings) === "pinboard" ? currentTags.join(" ") : pbpBookmarkFormatTags(currentTags)) : "",
                 notes: handoffNotes,
                 ...(handoffSummaryRange ? { summaryRange: handoffSummaryRange } : {}),
-                ...(pbpBookmarkServiceId(settings) === "linkding" ? { summary: pbpBookmarkDescriptionLine($id("linkding-description-input")?.value), sharedExplicit: _linkdingSharedExplicit } : {}),
+                ...(pbpBookmarkServiceId(settings) === "linkding" ? { ...(pbpPopupDescriptionKnown() ? { summary: pbpBookmarkDescriptionLine($id("linkding-description-input")?.value) } : {}), sharedExplicit: _linkdingSharedExplicit } : {}),
                 private: $id("private-check")?.checked === true,
                 toread: $id("readlater-check")?.checked === true,
               },
@@ -1653,7 +1670,10 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         existingBookmark = data.posts[0];
         if (shouldUpdateField("title-input")) $id("title-input").value = existingBookmark.description;
         if (shouldUpdateField("description-input")) $id("description-input").value = existingBookmark.extended;
-        if (pbpBookmarkServiceId(settings) === "linkding" && shouldUpdateField("linkding-description-input")) $id("linkding-description-input").value = pbpBookmarkDescriptionLine(existingBookmark.summary);
+        if (pbpBookmarkServiceId(settings) === "linkding" && shouldUpdateField("linkding-description-input")) {
+          $id("linkding-description-input").value = pbpBookmarkDescriptionLine(existingBookmark.summary);
+          _linkdingDescriptionKnown = true;
+        }
         if (shouldUpdateField("private-check")) {
           $id("private-check").checked = existingBookmark.shared === "no";
           $id("share-check").checked = existingBookmark.shared === "yes";
@@ -1916,6 +1936,7 @@ function setupSubmit(token) {
         title,
         extended,
         summary,
+        descriptionKnown,
         sharedExplicit,
         sharedRevision,
         tags,
@@ -1927,6 +1948,7 @@ function setupSubmit(token) {
         title: $id("title-input").value,
         extended: $id("description-input").value,
         summary: $id("linkding-description-input").value,
+        descriptionKnown: pbpPopupDescriptionKnown(),
         sharedExplicit: _linkdingSharedExplicit,
         sharedRevision: _linkdingSharedRevision,
         tags: currentTags.slice(),
@@ -1965,7 +1987,7 @@ function setupSubmit(token) {
         url: saveUrl,
         title,
         notes: extended,
-        ...(pbpBookmarkServiceId(settings) === "linkding" ? { summary: pbpBookmarkDescriptionLine(summary), sharedExplicit } : {}),
+        ...(pbpBookmarkServiceId(settings) === "linkding" ? { ...(descriptionKnown ? { summary: pbpBookmarkDescriptionLine(summary) } : {}), sharedExplicit } : {}),
         tags: pbpSerializeIntentTags(tags, pbpBookmarkServiceId(settings)),
         private: isPrivate,
         toread: isReadLater,
@@ -2365,6 +2387,8 @@ async function loadBookmarkForEdit(url, token) {
   $id("description-input").value = "";
   $id("linkding-description-input").value = "";
   _linkdingDescriptionTouched = false;
+  // Nothing has read that bookmark's page; the lookup refills a stored one.
+  _linkdingDescriptionKnown = settings.optAutoDescription === false;
   $id("private-check").checked = pbpBookmarkServiceId(settings) !== "pinboard";
   $id("share-check").checked = false;
   _linkdingSharedExplicit = false;
