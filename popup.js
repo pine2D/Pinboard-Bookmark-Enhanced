@@ -234,10 +234,13 @@ let _popupDraftContext = null;
 let _linkdingDescriptionTouched = false;
 // Whether the Description box holds a value the popup can vouch for: the
 // page's meta description or the fact it has none, an AI summary, the user's
-// edit, a restored draft, the stored bookmark, or "" with auto-fill off. It is
-// false only when the page could not be read and nothing filled the box; a
-// save then leaves the Description out, and linkding fills it in itself.
-let _linkdingDescriptionKnown = true;
+// edit, a restored draft, the stored bookmark, or "" with auto-fill off. It
+// starts false: until the page is read or the bookmark looked up, the empty
+// box is not known to be empty, and an edit drafted in that window must not
+// save it as "". It stays false when the page could not be read and nothing
+// filled the box; a save then leaves the Description out, and linkding fills
+// it in itself.
+let _linkdingDescriptionKnown = false;
 // Only an actual visible Share change (or its owner-scoped draft) sets this.
 let _linkdingSharedExplicit = false;
 let _linkdingSharedRevision = 0;
