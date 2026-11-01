@@ -1489,7 +1489,7 @@ function pbpReaderInitialIntent(context, settings, action) {
     mode: "skip", url: context.url,
     title: typeof originalDraft?.title === "string" ? originalDraft.title : context.title || context.url,
     notes: typeof originalDraft?.notes === "string" ? originalDraft.notes : typeof context.description === "string" ? context.description : "",
-    ...(linkding ? { summary: typeof originalDraft?.summary === "string" ? originalDraft.summary.replace(/\s+/g, " ").trim() : "" } : {}),
+    ...(linkding ? { summary: typeof originalDraft?.summary === "string" ? pbpBookmarkDescriptionLine(originalDraft.summary) : "" } : {}),
     tags: typeof originalDraft?.tags === "string" ? originalDraft.tags : Array.isArray(context.tags) ? pbpSerializeIntentTags(context.tags, pbpBookmarkServiceId(settings)) : "",
     ...(linkding ? { sharedExplicit: originalDraft?.sharedExplicit === true } : {}),
     private: linkding ? !(originalDraft?.sharedExplicit === true && originalDraft?.private === false) : typeof originalDraft?.private === "boolean" ? originalDraft.private : pbpServiceEffectivePrivate(settings, { incognito: context.sourceIncognito === true }),
@@ -1589,7 +1589,7 @@ async function pbpReaderBookmarkRequest(message, sender) {
     draft = { title: input.title, tags: input.tags, notes: input.notes, private: input.private, toread: input.toread,
       ...(input.sharedExplicit !== undefined ? { sharedExplicit: input.sharedExplicit } : {}),
       ...(input.summary !== undefined && (await pbpReadFreshBookmarkAuthForAccount(context.account))?.service === "linkding"
-        ? { summary: input.summary.replace(/\s+/g, " ").trim() } : {}) };
+        ? { summary: pbpBookmarkDescriptionLine(input.summary) } : {}) };
   }
   const settings = await loadSettings();
   const intent = pbpReaderInitialIntent(context, settings, action);
@@ -1802,9 +1802,9 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     }
   }
   const description = linkding
-    ? String(linkdingSummary || "").replace(/\s+/g, " ").trim()
+    ? pbpBookmarkDescriptionLine(linkdingSummary)
       || (s._autoNotes && s.optAutoDescription !== false && pageInfo
-        ? pbpNotesDescription(pageInfo).replace(/\s+/g, " ").trim() : "")
+        ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : "")
     : "";
 
   const result = await submitSaveIntent({
@@ -5167,9 +5167,9 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         }
         const isPrivate = pbpServiceEffectivePrivate(s, { incognito: tab.incognito });
         const description = linkding
-          ? String(linkdingSummary || "").replace(/\s+/g, " ").trim()
+          ? pbpBookmarkDescriptionLine(linkdingSummary)
             || (s.optAutoDescription !== false && pageInfo
-              ? pbpNotesDescription(pageInfo).replace(/\s+/g, " ").trim() : "")
+              ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : "")
           : "";
         await requireAccount();
         // Batch notes hold the summary block and nothing else (null: no block).

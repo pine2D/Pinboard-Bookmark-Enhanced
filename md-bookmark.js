@@ -221,7 +221,7 @@
     label(apply, "readerBookmarkApply");
     apply.addEventListener("click", () => save("edit", {
       title: id("title").value, tags: id("tags").value, notes: id("notes").value,
-      ...(state.descriptionSupported === true ? { summary: id("summary").value.replace(/\s+/g, " ").trim() } : {}),
+      ...(state.descriptionSupported === true ? { summary: pbpBookmarkDescriptionLine(id("summary").value) } : {}),
       ...(state.sharingSupported === true ? { sharedExplicit } : {}),
       private: state.sharingSupported === true ? !id("private").checked : state.privacySupported === false || id("private").checked, toread: id("toread").checked,
     }));
@@ -249,7 +249,7 @@
     label(id("tags").closest("label").firstElementChild, state.quotedTags === true ? "readerBookmarkTagsQuoted" : "readerBookmarkTags");
     id("tags").value = typeof values.tags === "string" ? values.tags : pbpBookmarkFormatTags(context.bookmark?.tags || []);
     id("summary").closest("label").hidden = state.descriptionSupported !== true;
-    id("summary").value = state.descriptionSupported === true && typeof values.summary === "string" ? values.summary.replace(/\s+/g, " ").trim() : "";
+    id("summary").value = state.descriptionSupported === true && typeof values.summary === "string" ? pbpBookmarkDescriptionLine(values.summary) : "";
     id("notes").value = typeof values.notes === "string" ? values.notes : context.bookmark?.notes || "";
     const privacyLabel = id("private").closest("label");
     privacyLabel.hidden = state.privacySupported === false && state.sharingSupported !== true;

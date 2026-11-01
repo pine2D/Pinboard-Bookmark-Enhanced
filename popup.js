@@ -138,7 +138,7 @@ function pbpPopupPrefillDescription() {
   row.hidden = !linkding;
   row.classList.toggle("hidden", !linkding);
   if (linkding && shouldUpdateField("linkding-description-input")) {
-    $id("linkding-description-input").value = settings.optAutoDescription !== false ? pbpNotesDescription(pageInfo).replace(/\s+/g, " ").trim() : "";
+    $id("linkding-description-input").value = settings.optAutoDescription !== false ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : "";
   }
   let notes = "";
   if (pageInfo.selectedText) {
@@ -380,7 +380,7 @@ async function initPopupDraft(account, tab) {
         "private-check": "private", "readlater-check": "toread", "archive-check": "archive" })) {
         if (!_popupDraftChangedFields.has(key) && d[key] !== undefined) {
           // Text inputs strip line breaks themselves; preserve word boundaries first.
-          const value = key === "summary" ? d[key].replace(/\s+/g, " ").trim() : d[key];
+          const value = key === "summary" ? pbpBookmarkDescriptionLine(d[key]) : d[key];
           $id(id)[id.endsWith("check") ? "checked" : "value"] = value;
         }
       }
@@ -1254,7 +1254,7 @@ async function htmlToMarkdownAsync(html, opts) {
                 description: handoffNotes,
                 // Without a draft the reader saves `description`; a summary
                 // range needs the notes it describes beside it.
-                ...(pbpBookmarkServiceId(settings) === "linkding" ? { bookmarkDraft: { summary: ($id("linkding-description-input")?.value || "").replace(/\s+/g, " ").trim(), private: $id("private-check")?.checked === true, sharedExplicit: _linkdingSharedExplicit } } : handoffSummaryRange ? { bookmarkDraft: { notes: handoffNotes, summaryRange: handoffSummaryRange } } : {}),
+                ...(pbpBookmarkServiceId(settings) === "linkding" ? { bookmarkDraft: { summary: pbpBookmarkDescriptionLine($id("linkding-description-input")?.value), private: $id("private-check")?.checked === true, sharedExplicit: _linkdingSharedExplicit } } : handoffSummaryRange ? { bookmarkDraft: { notes: handoffNotes, summaryRange: handoffSummaryRange } } : {}),
                 ts: Date.now()
               }
             });
@@ -1393,7 +1393,7 @@ async function htmlToMarkdownAsync(html, opts) {
                 tags: Array.isArray(currentTags) ? (pbpBookmarkServiceId(settings) === "pinboard" ? currentTags.join(" ") : pbpBookmarkFormatTags(currentTags)) : "",
                 notes: handoffNotes,
                 ...(handoffSummaryRange ? { summaryRange: handoffSummaryRange } : {}),
-                ...(pbpBookmarkServiceId(settings) === "linkding" ? { summary: ($id("linkding-description-input")?.value || "").replace(/\s+/g, " ").trim(), sharedExplicit: _linkdingSharedExplicit } : {}),
+                ...(pbpBookmarkServiceId(settings) === "linkding" ? { summary: pbpBookmarkDescriptionLine($id("linkding-description-input")?.value), sharedExplicit: _linkdingSharedExplicit } : {}),
                 private: $id("private-check")?.checked === true,
                 toread: $id("readlater-check")?.checked === true,
               },
@@ -1653,7 +1653,7 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
         existingBookmark = data.posts[0];
         if (shouldUpdateField("title-input")) $id("title-input").value = existingBookmark.description;
         if (shouldUpdateField("description-input")) $id("description-input").value = existingBookmark.extended;
-        if (pbpBookmarkServiceId(settings) === "linkding" && shouldUpdateField("linkding-description-input")) $id("linkding-description-input").value = String(existingBookmark.summary || "").replace(/\s+/g, " ").trim();
+        if (pbpBookmarkServiceId(settings) === "linkding" && shouldUpdateField("linkding-description-input")) $id("linkding-description-input").value = pbpBookmarkDescriptionLine(existingBookmark.summary);
         if (shouldUpdateField("private-check")) {
           $id("private-check").checked = existingBookmark.shared === "no";
           $id("share-check").checked = existingBookmark.shared === "yes";
@@ -1965,7 +1965,7 @@ function setupSubmit(token) {
         url: saveUrl,
         title,
         notes: extended,
-        ...(pbpBookmarkServiceId(settings) === "linkding" ? { summary: summary.replace(/\s+/g, " ").trim(), sharedExplicit } : {}),
+        ...(pbpBookmarkServiceId(settings) === "linkding" ? { summary: pbpBookmarkDescriptionLine(summary), sharedExplicit } : {}),
         tags: pbpSerializeIntentTags(tags, pbpBookmarkServiceId(settings)),
         private: isPrivate,
         toread: isReadLater,

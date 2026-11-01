@@ -1985,6 +1985,15 @@ function pbpBookmarkTitleTooLong(title, service) {
   return (service === "linkding" ? Array.from(value).length : value.length) > limit;
 }
 
+// linkding's Description is shown and edited as one line in the popup and the
+// reader. This is the only definition of that line: every producer (form
+// fill, AI summary, page meta, drafts, reader hand-off, shortcut and batch
+// saves) and the adapter's "did the user change it" check go through it, so
+// the value a user sees and the value compared before a write can never drift.
+function pbpBookmarkDescriptionLine(value) {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
 function pbpBookmarkEndpoint(raw) {
   if (!pbpEndpointOriginPattern(raw)) return "";
   try {

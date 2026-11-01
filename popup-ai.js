@@ -769,7 +769,7 @@ function upsertSummary(summary, { userEdit = true } = {}) {
       return false;
     }
     const input = $id("linkding-description-input");
-    const next = String(summary).replace(/\s+/g, " ").trim();
+    const next = pbpBookmarkDescriptionLine(summary);
     const changed = input.value !== next;
     input.value = next;
     _aiSummaryValue = next;
