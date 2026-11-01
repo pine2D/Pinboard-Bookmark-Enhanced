@@ -409,6 +409,35 @@ test("a Karakeep summary saved offline is reclaimable after its replay writes it
   equal([popup.field.value, owner],["Auto notes\n\nSecond paragraph.","receipt"]);
   equal((await pbpFixtureSummaryOwnershipEntries()).length,1);
 });
+test("a Karakeep create that lost its answer is reclaimable after the replay finds its note", async()=>{
+  await pbpFixtureClearSummaryOwnership();
+  const notes="Auto notes\n\n" + KK_SUMMARY;
+  // The POST created the bookmark but its answer never arrived; the replay's
+  // lookup finds the bookmark holding the note it supplied.
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],new TypeError("Failed to fetch"),
+    [200,{bookmarkId:"bk-new"}],[200,kkRecord("bk-new", notes)],[200,{id:"bk-new",title:"Title",note:notes}]]);
+  const queued=await h.submitSaveIntent({...saveIntent,tags:"",notes},{expectedAccount:(await h.auth()).account,summaryRange:{start:"Auto notes\n\n".length,end:notes.length}});
+  equal(queued.status,"queued");
+  await h.processOfflineQueue();
+  equal([h.state.queue, h.state.calls.map(c=>c.method), h.state.calls[1]?.body?.note, h.state.calls[4]?.body?.note],
+    [[],["GET","POST","GET","GET","PATCH"],notes,notes]);
+  const popup=await kkPopup(h, notes);
+  const owner=await popup.restore();
+  popup.regenerate("Second paragraph.");
+  equal([popup.field.value, owner],["Auto notes\n\nSecond paragraph.","receipt"]);
+  equal((await pbpFixtureSummaryOwnershipEntries()).length,1);
+});
+test("a Karakeep create merged into a concurrent bookmark without a note of its own leaves that bookmark's receipt alone", async()=>{
+  const notes="Typed in Karakeep\n\n" + KK_SUMMARY, range={start:"Typed in Karakeep\n\n".length, end:notes.length};
+  await pbpFixtureClearSummaryOwnership();
+  // An empty note is left out of the create, so the racing bookmark keeps its own.
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:null}],[200,{...kkRecord("bk-new", notes),alreadyExists:true}]]);
+  const account=(await h.auth()).account;
+  await pbpAiSaveSummaryOwnership(account, pageUrl, notes, range);
+  const result=await h.submitSaveIntent({...saveIntent,mode:"merge",tags:"",notes:""},{expectedAccount:account,summaryRange:null});
+  equal([result.status, result.mutation, Object.hasOwn(h.state.calls[1].body,"note")],["saved","merged",false]);
+  equal(await (await kkPopup(h, notes)).restore(),"receipt");
+});
 test("linkding saves never gain a Notes receipt or hold", async()=>{
   const notes="Auto notes\n\n> quoted", range={start:"Auto notes\n\n".length, end:notes.length};
   await pbpFixtureClearSummaryOwnership();

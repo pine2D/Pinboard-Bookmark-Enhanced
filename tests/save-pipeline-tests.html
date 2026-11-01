@@ -2476,6 +2476,39 @@ await suite("summary ownership after worker saves", async () => {
     equal((await pbpFixtureSummaryOwnershipEntries()).length, 1, "the offline hold outlived its replay");
   });
 
+  // The first attempt can write the notes and still fail: the connection drops
+  // or Pinboard answers 5xx after storing them. The save is queued with its
+  // hold; the replay then finds exactly the queued notes on the server, and
+  // those are this save's own, so the block stays reclaimable.
+  await test("a summary whose first attempt landed but lost its answer is reclaimable after the replay", async () => {
+    for (const [lost, mode] of [["dropped connection", "merge"], ["503 after the write", "merge"], ["dropped connection", "skip"]]) {
+      const label = lost + ", " + mode;
+      await pbpFixtureClearSummaryOwnership();
+      let stored = false;
+      const core = await createHarness({ pinboardFetch: async (url) => {
+        if (url.includes("/posts/get?")) return response(200, stored ? postsGet(QUICK_NOTES) : NO_POSTS);
+        if (stored) return response(200, ADDED);
+        stored = true;
+        if (lost === "dropped connection") throw new TypeError("Failed to fetch");
+        return response(503, null, true);
+      } });
+      const queued = await core.submitSaveIntent(intent({ mode, notes: QUICK_NOTES }), { expectedAccount: "alice", summaryRange: QUICK_RANGE });
+      equal(queued.status, "queued", label);
+      equal(extendedSent(core), QUICK_NOTES, label + ": first attempt bytes changed");
+      core.fetchCalls.length = 0;
+      await core.processOfflineQueue();
+      equal(core.storageData.offlineQueue.length, 0, label + ": the replay did not land");
+      if (mode === "skip") equal(core.fetchCalls.filter((url) => url.includes("/posts/add?")).length, 0, label + ": the skip wrote");
+      else equal(extendedSent(core), QUICK_NOTES, label + ": replayed notes bytes changed");
+      const popup = await popupOpens(QUICK_NOTES);
+      const owner = await popup.restore();
+      popup.regenerate("Second summary");
+      equal(owner, "receipt", label + ": the block written by the lost attempt was not reclaimed");
+      equal(popup.field.value, "Auto notes\n\n<blockquote>Second summary</blockquote>", label + ": Regenerate did not replace the block in place");
+      equal((await pbpFixtureSummaryOwnershipEntries()).length, 1, label + ": the hold outlived its replay");
+    }
+  });
+
   await test("a queued summary whose replay keeps the server's notes leaves nothing to reclaim", async () => {
     await pbpFixtureClearSummaryOwnership();
     let online = false;

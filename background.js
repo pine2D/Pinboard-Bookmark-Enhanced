@@ -703,7 +703,7 @@ async function pbpDeliverSelfHosted(intent, auth, settings) {
     if ((intent.mode === "create" && lookup.exists) || (intent.mode === "update" && !lookup.exists)) return {result:pbpSaveFailure("conflict"), persisted:null, retryable:false};
     const plan = pbpResolveSavePlan(intent, lookup);
     if (plan.action === "failed") return {result:plan.result, persisted:null, retryable:false};
-    if (plan.action === "skip") return {result:{status:"skipped"}, persisted:plan.fields, retryable:false};
+    if (plan.action === "skip") return {result:{status:"skipped"}, persisted:pbpSkippedPersisted(plan, lookup), retryable:false};
     const incomingTags = pbpBookmarkParseTags(intent.tags);
     const index = await pbpReadTagVocab(auth.account);
     const bookmarkNames = lookup.exists ? lookup.bookmark.tags : [];
@@ -726,6 +726,13 @@ async function pbpDeliverSelfHosted(intent, auth, settings) {
   }
 }
 const PBP_POPUP_SAVE_MODES = new Set(["create", "update", "merge"]);
+
+// A skip writes nothing, but its fresh lookup still says which notes the
+// bookmark holds; a replayed save's summary ownership hold is settled by them.
+function pbpSkippedPersisted(plan, lookup) {
+  const notes = lookup?.post?.extended;
+  return typeof notes === "string" ? { ...plan.fields, notes } : plan.fields;
+}
 
 function pbpSaveFailure(reason, { detail, httpStatus } = {}) {
   const result = { status: "failed", reason };
@@ -913,7 +920,7 @@ async function deliverSaveIntent(intent, settings, auth = pbpCaptureBookmarkAuth
       return { result: plan.result, persisted: null, retryable: !!plan.retryable || !!lookup?.retryable };
     }
     if (plan.action === "skip") {
-      return { result: { status: "skipped" }, persisted: plan.fields, retryable: false };
+      return { result: { status: "skipped" }, persisted: pbpSkippedPersisted(plan, lookup), retryable: false };
     }
 
     const delivered = await pbpSendResolvedPlan(plan, settings);
@@ -1090,19 +1097,35 @@ function queueRecordFromSaveIntent(intent, token) {
 // linkding keeps summaries in Description, never in notes. Bookkeeping only:
 // failures are logged and never change a save's outcome. typeof-guarded:
 // source-slice test pages run this region without ai-cache.js.
-function pbpSummaryReceiptNotes(intent, envelope, auth) {
-  if (auth?.service === "linkding" || envelope?.result?.status !== "saved") return null;
-  const notes = envelope.persisted?.notes;
-  const wroteSubmittedNotes = intent.mode === "create" || intent.mode === "update"
-    || envelope.result.mutation !== "updated";
-  return wroteSubmittedNotes && typeof notes === "string" && notes === intent.notes ? notes : null;
+
+// What the bookmark's notes hold once a delivery is done, as far as that
+// delivery knows: the notes a save wrote or kept, or the ones a skip's fresh
+// lookup found. null when it does not know, and for linkding. `submitted`:
+// these are the notes the caller submitted, not the server's own that a
+// merge, overwrite or skip of an existing bookmark kept.
+function pbpSummaryNotesAfterDelivery(intent, envelope, auth) {
+  if (auth?.service === "linkding") return null;
+  const status = envelope?.result?.status;
+  const after = status === "saved" ? { notes: envelope.persisted?.notes, mutation: envelope.result.mutation }
+    : status === "skipped" ? { notes: envelope.persisted?.notes, mutation: "kept" }
+    : null;
+  if (typeof after?.notes !== "string") return null;
+  // Karakeep leaves an empty note out of a create, so a create merged into a
+  // concurrent bookmark keeps that bookmark's note, which this save never saw.
+  if (auth?.service === "karakeep" && after.mutation === "merged" && !after.notes) return null;
+  const submitted = after.mutation !== "kept"
+    && (intent.mode === "create" || intent.mode === "update" || after.mutation !== "updated");
+  return { notes: after.notes, submitted };
 }
 
+// A live save records the caller's range only for notes it wrote as
+// submitted. Server notes that merely equal them byte for byte may have been
+// typed anywhere, so a merge, overwrite or skip that kept them changes nothing.
 async function pbpRecordSummaryOwnership(intent, envelope, auth, range) {
   if (range === undefined || typeof pbpAiSaveSummaryOwnership !== "function") return;
-  const notes = pbpSummaryReceiptNotes(intent, envelope, auth);
-  if (notes === null) return;
-  try { await pbpAiSaveSummaryOwnership(auth.account, intent.url, notes, range); }
+  const after = pbpSummaryNotesAfterDelivery(intent, envelope, auth);
+  if (!after?.submitted || after.notes !== intent.notes) return;
+  try { await pbpAiSaveSummaryOwnership(auth.account, intent.url, after.notes, range); }
   catch (e) { console.warn("summary ownership receipt failed:", e?.name, e?.message); }
 }
 
@@ -1114,16 +1137,20 @@ async function pbpHoldSummaryOwnership(queueId, intent, auth, range) {
   catch (e) { console.warn("summary ownership hold failed:", e?.name, e?.message); }
 }
 
-// Replay: the hold becomes the receipt only when this delivery wrote exactly
-// the queued notes for the held owner and page; any other saved or skipped
-// outcome ends it. A failure keeps it, as the queue keeps the record.
+// Replay: the hold is this save's own record of the notes it submitted, so it
+// becomes the receipt whenever the bookmark now holds exactly those notes,
+// whatever the mode: a first attempt that wrote them but lost its answer
+// (timeout, dropped connection, 5xx after the write) leaves the replay to find
+// and keep them. The claim checks the held owner, page, range and hash; any
+// other saved or skipped outcome only consumes the hold. A failure keeps it,
+// as the queue keeps the record.
 async function pbpSettleSummaryOwnershipHold(queueId, intent, envelope, auth) {
   const status = envelope?.result?.status;
   if ((status !== "saved" && status !== "skipped") || typeof pbpAiClaimSummaryOwnership !== "function") return;
   try {
-    const notes = pbpSummaryReceiptNotes(intent, envelope, auth);
-    if (notes === null) await pbpAiReleaseSummaryOwnership(queueId);
-    else await pbpAiClaimSummaryOwnership(queueId, auth.account, intent.url, notes);
+    const after = pbpSummaryNotesAfterDelivery(intent, envelope, auth);
+    if (after) await pbpAiClaimSummaryOwnership(queueId, auth.account, intent.url, after.notes);
+    else await pbpAiReleaseSummaryOwnership(queueId);
   } catch (e) {
     console.warn("summary ownership hold failed:", e?.name, e?.message);
   }
