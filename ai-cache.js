@@ -131,7 +131,7 @@ async function pbpAiCacheGet(key) {
       const tx = db.transaction(_PBP_AI_STORE, "readonly");
       const req = tx.objectStore(_PBP_AI_STORE).get(key);
       req.onsuccess = () => resolve(req.result || null);
-      req.onerror = () => resolve(null);
+      req.onerror = () => { _pbpAiWarn("read", key, req.error); resolve(null); };
     });
     // ai_cache_ entries (tags/summary, ai.js getAICache) use ts as their
     // GENERATION time for a user-configured fixed TTL - touching them
@@ -147,9 +147,20 @@ async function pbpAiCacheGet(key) {
       _pbpAiTouch(db, key);
     }
     return entry;
-  } catch (_) {
+  } catch (e) {
+    _pbpAiWarn("read", key, e);
     return null;
   }
+}
+
+// A failed cache read, write or delete degrades to a miss or a no-op (a cache
+// failure must not break the paid call or the save around it), but the
+// swallow still leaves a trace. It logs the POOL, never the key: `dict2_`/
+// `dictctx2_` keys embed the looked-up word verbatim and `summary_owner_`
+// keys the account name and page URL -- exactly what the leave-a-trace rule
+// bars.
+function _pbpAiWarn(op, key, error) {
+  try { console.warn("[pbp-ai-cache] " + op + " failed pool=" + _pbpAiPoolForKey(key) + ":", (error && error.name) || "", (error && error.message) || ""); } catch (_) {}
 }
 
 function _pbpAiIsDict2Key(key) {
@@ -356,12 +367,7 @@ async function _pbpAiWriteAndPrune(key, makeResult, ts, readExisting) {
     });
     return true;
   } catch (e) {
-    // Degrading to a no-op stays the contract (a failed cache write must not
-    // break the paid call that produced the value), but the swallow still has
-    // to leave a trace. Log the POOL, never the key: `dict2_`/`dictctx2_`
-    // keys embed the looked-up word verbatim and `summary_owner_` embeds the
-    // Pinboard account name -- exactly what the leave-a-trace rule bars.
-    try { console.warn("[pbp-ai-cache] write failed pool=" + _pbpAiPoolForKey(key) + ":", (e && e.name) || "", (e && e.message) || ""); } catch (_) {}
+    _pbpAiWarn("write", key, e);
     return false;
   }
 }
@@ -393,9 +399,11 @@ async function pbpAiCacheDelete(key) {
       const tx = db.transaction(_PBP_AI_STORE, "readwrite");
       const req = tx.objectStore(_PBP_AI_STORE).delete(key);
       req.onsuccess = () => resolve();
-      req.onerror = () => resolve();
+      req.onerror = () => { _pbpAiWarn("delete", key, req.error); resolve(); };
     });
-  } catch (_) {}
+  } catch (e) {
+    _pbpAiWarn("delete", key, e);
+  }
 }
 
 // Read-only pool-count snapshot for the diagnostics export (options.js).
@@ -533,7 +541,12 @@ async function pbpAiLoadSummaryOwnership(account, url, notes) {
   }
   let notesHash;
   try { notesHash = await pbpAiSummaryTextHash(notes); }
-  catch (_) { return null; }
+  catch (e) {
+    // The receipt stays: a failed hash proves no mismatch. Only the platform
+    // error is logged, never the account, page or notes.
+    console.warn("[pbp-ai-cache] summary receipt hash failed:", (e && e.name) || "", (e && e.message) || "");
+    return null;
+  }
   if (notesHash !== receipt.notesHash) {
     await pbpAiCacheDelete(key);
     return null;
@@ -581,7 +594,10 @@ async function pbpAiClaimSummaryOwnership(queueId, account, url, notes) {
       typeof notes !== "string" || !pbpAiSummaryRangeValid(notes, hold)) return false;
   let notesHash;
   try { notesHash = await pbpAiSummaryTextHash(notes); }
-  catch (_) { return false; }
+  catch (e) {
+    console.warn("[pbp-ai-cache] summary hold hash failed:", (e && e.name) || "", (e && e.message) || "");
+    return false;
+  }
   if (notesHash !== hold.notesHash) return false;
   return pbpAiSaveSummaryOwnership(account, url, notes, { start: hold.start, end: hold.end });
 }

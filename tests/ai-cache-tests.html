@@ -527,6 +527,54 @@ async function cursorSteps(run) {
       "holds were counted as ordinary cache");
   });
 
+  // Each of these swallows a platform failure and resolves as a miss. The
+  // swallow has to leave a trace naming the error -- and never the account,
+  // the page or the notes that the keys and records hold.
+  await test("swallowed read, delete and hash failures leave a trace without account, page or notes", async () => {
+    const account = "alice-private-owner";
+    const url = "https://secret.example/private-article";
+    const notes = "Private notes\n\n<blockquote>Private summary</blockquote>";
+    const range = { start: "Private notes\n\n".length, end: notes.length };
+    const key = pbpAiSummaryOwnershipKey(account, url);
+    const failure = () => Object.assign(new Error("synthetic platform failure"), { name: "UnknownError" });
+    const originalWarn = console.warn;
+    const originalOpen = window._pbpAiOpenDB;
+    const originalHash = window.pbpAiSummaryTextHash;
+    const warnings = [];
+    console.warn = (...args) => { warnings.push(args.map(String).join(" ")); };
+    try {
+      await clearEntries();
+      await pbpAiSaveSummaryOwnership(account, url, notes, range);
+      await pbpAiHoldSummaryOwnership("q-trace", account, url, notes, range);
+      const cases = [
+        ["cache read", "open", () => pbpAiCacheGet(key), (value) => value === null],
+        ["cache delete", "open", () => pbpAiCacheDelete(key), (value) => value === undefined],
+        ["receipt hash", "hash", () => pbpAiLoadSummaryOwnership(account, url, notes), (value) => value === null],
+        ["hold hash", "hash", () => pbpAiClaimSummaryOwnership("q-trace", account, url, notes), (value) => value === false],
+      ];
+      for (const [label, broken, run, expected] of cases) {
+        if (broken === "open") window._pbpAiOpenDB = () => Promise.reject(failure());
+        else window.pbpAiSummaryTextHash = async () => { throw failure(); };
+        const before = warnings.length;
+        let value;
+        try { value = await run(); }
+        finally { window._pbpAiOpenDB = originalOpen; window.pbpAiSummaryTextHash = originalHash; }
+        assert(expected(value), label + ": resolved " + JSON.stringify(value));
+        const logged = warnings.slice(before);
+        assert(logged.some((line) => line.includes("UnknownError") && line.includes("synthetic platform failure")),
+          label + ": no trace of the failure in " + JSON.stringify(logged));
+        for (const secret of [account, "secret.example", "private-article", "Private notes", "Private summary"]) {
+          assert(!logged.some((line) => line.includes(secret)), label + ": the trace leaked " + secret);
+        }
+      }
+      assert(await rawEntry(key), "a receipt whose hash failed was deleted");
+    } finally {
+      console.warn = originalWarn;
+      window._pbpAiOpenDB = originalOpen;
+      window.pbpAiSummaryTextHash = originalHash;
+    }
+  });
+
   await clearEntries();
   document.title = fail ? "FAIL ai-cache Tests" : "PASS ai-cache Tests";
 })();
