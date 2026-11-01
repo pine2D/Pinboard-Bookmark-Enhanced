@@ -718,7 +718,11 @@ async function pbpDeliverSelfHosted(intent, auth, settings) {
     if (!pbpBookmarkAuthIsCurrent(auth)) return {result:pbpSaveFailure("account_changed"), persisted:null, retryable:false};
     if (result.status === "partial") {
       statusCache.delete(intent.url);
-      return {result:{status:"failed", reason:"partial", failedStep:result.failedStep, httpStatus:result.httpStatus}, persisted:null, retryable:false};
+      // Past the bookmark step the note is on the server (a create posts it,
+      // an update patches it before tags and Read Later), so summary
+      // ownership treats it as written while the save still reports failure.
+      return {result:{status:"failed", reason:"partial", failedStep:result.failedStep, httpStatus:result.httpStatus}, persisted:null, retryable:false,
+        ...(result.failedStep !== "bookmark" ? {notesDelivered:{notes:fields.notes, mutation:result.mutation}} : {})};
     }
     return {result:{status:"saved", mutation:result.mutation}, persisted:{...plan.fields, private:result.bookmark.private, toread:result.bookmark.toread}, retryable:false};
   } catch (error) {
@@ -1099,8 +1103,9 @@ function queueRecordFromSaveIntent(intent, token) {
 // source-slice test pages run this region without ai-cache.js.
 
 // What the bookmark's notes hold once a delivery is done, as far as that
-// delivery knows: the notes a save wrote or kept, or the ones a skip's fresh
-// lookup found. null when it does not know, and for linkding. `submitted`:
+// delivery knows: the notes a save wrote or kept (also a Karakeep save that
+// failed after its bookmark step), or the ones a skip's fresh lookup found.
+// null when it does not know, and for linkding. `submitted`:
 // these are the notes the caller submitted, not the server's own that a
 // merge, overwrite or skip of an existing bookmark kept.
 function pbpSummaryNotesAfterDelivery(intent, envelope, auth) {
@@ -1108,7 +1113,7 @@ function pbpSummaryNotesAfterDelivery(intent, envelope, auth) {
   const status = envelope?.result?.status;
   const after = status === "saved" ? { notes: envelope.persisted?.notes, mutation: envelope.result.mutation }
     : status === "skipped" ? { notes: envelope.persisted?.notes, mutation: "kept" }
-    : null;
+    : envelope?.notesDelivered;
   if (typeof after?.notes !== "string") return null;
   // Karakeep leaves an empty note out of a create, so a create merged into a
   // concurrent bookmark keeps that bookmark's note, which this save never saw.
@@ -1142,13 +1147,14 @@ async function pbpHoldSummaryOwnership(queueId, intent, auth, range) {
 // whatever the mode: a first attempt that wrote them but lost its answer
 // (timeout, dropped connection, 5xx after the write) leaves the replay to find
 // and keep them. The claim checks the held owner, page, range and hash; any
-// other saved or skipped outcome only consumes the hold. A failure keeps it,
-// as the queue keeps the record.
+// other saved or skipped outcome only consumes the hold. A failure that wrote
+// nothing keeps it, as the queue keeps the record.
 async function pbpSettleSummaryOwnershipHold(queueId, intent, envelope, auth) {
+  if (typeof pbpAiClaimSummaryOwnership !== "function") return;
+  const after = pbpSummaryNotesAfterDelivery(intent, envelope, auth);
   const status = envelope?.result?.status;
-  if ((status !== "saved" && status !== "skipped") || typeof pbpAiClaimSummaryOwnership !== "function") return;
+  if (!after && status !== "saved" && status !== "skipped") return;
   try {
-    const after = pbpSummaryNotesAfterDelivery(intent, envelope, auth);
     if (after) await pbpAiClaimSummaryOwnership(queueId, auth.account, intent.url, after.notes);
     else await pbpAiReleaseSummaryOwnership(queueId);
   } catch (e) {
@@ -1219,6 +1225,8 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
         ? { ...envelope.result, account: deliveryAuth.account }
         : envelope.result;
     }
+    // A Karakeep save that failed after its bookmark step wrote the note.
+    if (envelope.notesDelivered) await pbpRecordSummaryOwnership(intent, envelope, deliveryAuth, ownershipRange);
     if (!envelope.retryable || !deliverySettings.offlineQueueEnabled) return envelope.result;
     // A reader flag-only update carries freshly read server metadata solely
     // to preserve it during this dispatch. Replaying that snapshot later

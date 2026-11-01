@@ -308,7 +308,7 @@ const saveIntent = {mode:"create",url:pageUrl,title:"Title",notes:"Note",tags:"w
 // The real quick-save and Batch producers from background.js, handing their
 // intents and delivery options to a worker harness. Every summary is fresh, as
 // when the AI cache has nothing (left) for the page.
-async function producers(h, {autoNotes, summary}) {
+async function producers(h, {autoNotes, summary, settings: overrides = {}}) {
   workerSource ||= await (await fetch("../background.js")).text();
   const slice = (from, to) => {
     const start = workerSource.indexOf(from), end = workerSource.indexOf(to, start);
@@ -316,7 +316,7 @@ async function producers(h, {autoNotes, summary}) {
     return workerSource.slice(start, end);
   };
   const settings = {...h.state.settings, bgSaveMode:"merge", _defaultTags:"", _autoNotes:true, _blockquote:false, _aiTags:false, _aiSummary:true,
-    batchAiSummary:true, batchAiTags:false, optBatchTagEnabled:false, batchSkipExisting:false, waybackArchiveBatch:false};
+    batchAiSummary:true, batchAiTags:false, optBatchTagEnabled:false, batchSkipExisting:false, waybackArchiveBatch:false, ...overrides};
   const deps = {
     loadSettings:async()=>({...settings}), getCurrentBookmarkAuth:h.auth, submitSaveIntent:h.submitSaveIntent,
     hasAIKey:()=>true, getPageInfoFromTab:async()=>({pageText:"article body"}), buildAutoNotes:()=>autoNotes,
@@ -437,6 +437,46 @@ test("a Karakeep create merged into a concurrent bookmark without a note of its 
   const result=await h.submitSaveIntent({...saveIntent,mode:"merge",tags:"",notes:""},{expectedAccount:account,summaryRange:null});
   equal([result.status, result.mutation, Object.hasOwn(h.state.calls[1].body,"note")],["saved","merged",false]);
   equal(await (await kkPopup(h, notes)).restore(),"receipt");
+});
+// Karakeep posts the note with the create (an update patches it first); only
+// the tags and Read Later steps follow. A save that fails in one of those
+// still reports the failure, but the note on the server is the one it wrote.
+test("a Karakeep save that fails after its bookmark step still owns the note it wrote", async()=>{
+  const notes="Auto notes\n\n" + KK_SUMMARY, range={start:"Auto notes\n\n".length, end:notes.length};
+  for (const [label, run] of [
+    ["quick save", async h=>{await (await producers(h,{autoNotes:"Auto notes", summary:KK_SUMMARY, settings:{_defaultTags:"work"}})).quickSave();}],
+    ["popup", async h=>{
+      const result=await h.submitPopupSaveIntent({...saveIntent,tags:"work",notes},(await h.auth()).account,range);
+      equal([result.status, result.reason, result.failedStep],["failed","partial","tags"]);
+    }],
+    ["replay", async h=>{
+      equal((await h.submitSaveIntent({...saveIntent,tags:"work",notes},{expectedAccount:(await h.auth()).account,summaryRange:range})).status,"queued");
+      await h.processOfflineQueue();
+      equal(h.state.queue.length,1);
+    }],
+  ]) {
+    await pbpFixtureClearSummaryOwnership();
+    const h=await workerHarness("karakeep",[...(label==="replay" ? [new TypeError("offline")] : []),
+      [200,{bookmarkId:null}],[201,kkRecord("bk-new", notes)],[500,{}]]);
+    await run(h);
+    const create=h.state.calls.find(c=>c.method==="POST" && new URL(c.url).pathname.endsWith("/bookmarks"));
+    const tags=h.state.calls.at(-1);
+    equal([label, create?.body?.note, tags.method, new URL(tags.url).pathname.endsWith("/bookmarks/bk-new/tags")],[label, notes, "POST", true]);
+    const popup=await kkPopup(h, notes);
+    const owner=await popup.restore();
+    popup.regenerate("Second paragraph.");
+    equal([label, popup.field.value, owner],[label,"Auto notes\n\nSecond paragraph.","receipt"]);
+    equal([label, (await pbpFixtureSummaryOwnershipEntries()).length],[label, 1]);
+  }
+});
+test("a Karakeep update whose note PATCH fails owns nothing", async()=>{
+  const notes="Auto notes\n\n" + KK_SUMMARY, range={start:"Auto notes\n\n".length, end:notes.length};
+  await pbpFixtureClearSummaryOwnership();
+  const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[500,{}]]);
+  const result=await h.submitPopupSaveIntent({...saveIntent,mode:"update",time:kk.createdAt,tags:"work",notes},(await h.auth()).account,range);
+  equal([result.status, result.reason, result.failedStep, h.state.calls.at(-1).method],["failed","partial","bookmark","PATCH"]);
+  equal((await pbpFixtureSummaryOwnershipEntries()).length,0);
+  equal(await (await kkPopup(h, notes)).restore(),null);
 });
 test("linkding saves never gain a Notes receipt or hold", async()=>{
   const notes="Auto notes\n\n> quoted", range={start:"Auto notes\n\n".length, end:notes.length};
