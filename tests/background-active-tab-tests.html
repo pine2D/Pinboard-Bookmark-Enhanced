@@ -495,13 +495,18 @@ async function run() {
     }
   });
 
-  // A page the worker could not read (no site access, a closed tab, a link
-  // saved from the context menu) has no known Description: the intent leaves
-  // it out so linkding fetches it. Turning the page description off is a
-  // known value, though: "" asks linkding not to add one either.
+  // The quick save and Read Later shortcuts hand over the active http(s)
+  // tab, but the worker cannot always read it: the page blocks script
+  // injection (the Chrome Web Store, an error page) or the tab closed or moved
+  // on before it was read. Such a page has no known Description: the intent
+  // leaves it out so linkding fetches it. Turning the page description off is
+  // a known value, though: "" asks linkding not to add one either.
   await test("linkding quick saves leave an unread page's Description to linkding unless a description preference is off", async () => {
     for (const [globalOn, quickOn, aiSummary, tab, expected] of [
-      [true, true, false, { id: 7 }, undefined], [true, true, true, { id: 7 }, undefined], [true, true, false, undefined, undefined],
+      [true, true, false, { id: 7 }, undefined], [true, true, true, { id: 7 }, undefined],
+      // Defensive: no caller saves without a tab today; one that did must not
+      // invent a Description either.
+      [true, true, false, undefined, undefined],
       [false, true, false, { id: 7 }, ""], [true, false, true, { id: 7 }, ""],
     ]) {
       const h = buildBackgroundSaveHarness(source, async () => "unused", {},
