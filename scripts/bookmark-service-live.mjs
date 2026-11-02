@@ -170,7 +170,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // ---------------------------------------------------------------------------
 
 const BOOL_FLAGS = new Set(['--run', '--plan', '--list', '--help', '--read-only', '--confirm-karakeep-no-auto-ai', '--allow-dirty', '--shots', '--headed']);
-const VALUE_FLAGS = new Set(['--target', '--scenario', '--service', '--linkding', '--karakeep', '--credentials', '--cleanup', '--shots-dir', '--authorization', '--ext-root']);
+const VALUE_FLAGS = new Set(['--target', '--scenario', '--service', '--linkding', '--karakeep', '--credentials', '--cleanup', '--shots-dir', '--authorization', '--ext-root', '--rerun-failed']);
 
 export function parseArgs(argv) {
   const flags = new Set(), values = {}, errors = [];
@@ -289,6 +289,63 @@ export function selectModules(spec, { services = DEFAULT_SERVICES, target = 'tem
   }
   const selected = all.filter(m => chosen.has(m.id));
   return { selected, skipped: skipped.filter(s => !chosen.has(s.id)) };
+}
+
+// --rerun-failed REPORT: the modules of an earlier report that did not pass
+// (failed, aborted, interrupted, or selected and never started; skipped ones
+// were never meant to run), on the same target and services. Refused while
+// that report's cleanup is unfinished: its ledger must be empty first.
+export function rerunSource(report, values = {}) {
+  const isObject = v => !!v && typeof v === 'object' && !Array.isArray(v);
+  check(isObject(report) && report.harness === HARNESS_VERSION && typeof report.runId === 'string' && RUN_DIR_RE.test('pbp-it-' + report.runId)
+    && ['temp', 'user'].includes(report.target) && Array.isArray(report.modules) && isObject(report.cleanup) && isObject(report.instances), 'rerun_report_invalid');
+  check(report.cleanup.complete === true, 'rerun_source_cleanup_incomplete');
+  const passed = new Set(), seen = new Set();
+  for (const m of report.modules) {
+    check(isObject(m) && typeof m.id === 'string', 'rerun_report_invalid');
+    seen.add(m.id);
+    if (m.status === 'passed') passed.add(m.id);
+  }
+  const skipped = new Set((Array.isArray(report.skipped) ? report.skipped : []).map(x => x?.id));
+  const notStarted = (Array.isArray(report.selected) ? report.selected : []).filter(id => typeof id === 'string' && !seen.has(id) && !skipped.has(id));
+  const ids = [...new Set([...report.modules.map(m => m.id).filter(id => !passed.has(id)), ...notStarted])];
+  check(ids.length, 'rerun_nothing_failed');
+  check(!values.target || values.target === report.target, 'rerun_target_mismatch');
+  // The user target is given its bases again; they must be the report's.
+  if (report.target === 'user') {
+    for (const [instance, info] of Object.entries(report.instances)) {
+      if (!isObject(info) || instance === 'pinboard' || !values[info.service]) continue;
+      check(validateBase(values[info.service]) === info.base, 'rerun_base_mismatch');
+    }
+  }
+  return { runId: report.runId, target: report.target, ids };
+}
+export function readRerunSource(path) {
+  try { return JSON.parse(readFileSync(resolve(String(path)), 'utf8')); } catch { return fail('rerun_report_invalid'); }
+}
+
+// The run's modules from its arguments, for --plan and --run alike:
+// --scenario (default core) and --service, or --rerun-failed.
+export function resolveSelection({ values = {}, flags = new Set() }, { modules = MODULES, readReport = readRerunSource } = {}) {
+  let target = values.target || 'temp';
+  check(['temp', 'user'].includes(target), 'target');
+  let services = values.service ? values.service.split(',').map(s => s.trim()) : [...DEFAULT_SERVICES];
+  let scenario = values.scenario || 'core';
+  if (flags.has('--read-only')) { check(!values.scenario || values.scenario === 'readonly', 'read_only_conflict'); scenario = 'readonly'; }
+  let rerunOf = null;
+  if (values['rerun-failed']) {
+    check(!values.scenario && !values.service && !flags.has('--read-only'), 'rerun_conflict');
+    const source = rerunSource(readReport(values['rerun-failed']), values);
+    target = source.target;
+    const all = expandRegistry(modules);
+    check(source.ids.every(id => all.some(m => m.id === id)), 'rerun_report_invalid');
+    services = [...new Set(all.filter(m => source.ids.includes(m.id)).map(m => m.service))];
+    scenario = source.ids.join(',');
+    rerunOf = { runId: source.runId, modules: source.ids };
+  }
+  check(services.length && services.every(s => SERVICE_TYPES.includes(s)), 'service');
+  const { selected, skipped } = selectModules(scenario, { services, target, modules });
+  return { target, services, scenario, selected, skipped, rerunOf };
 }
 
 export function resolveBudget(mod) {
@@ -1654,18 +1711,13 @@ export class LiveRun {
   configure() {
     const { values, flags, errors } = this.opts;
     check(!errors.length, errors[0] || 'arguments');
-    const target = values.target || 'temp';
-    check(['temp', 'user'].includes(target), 'target');
-    this.target = target;
-    this.report.target = target;
     this.extRoot = resolveExtRoot(values['ext-root']);
     this.report.extRoot = this.extRoot;
-    const services = values.service ? values.service.split(',').map(s => s.trim()) : [...DEFAULT_SERVICES];
-    check(services.length && services.every(s => SERVICE_TYPES.includes(s)), 'service');
-    let scenario = values.scenario || 'core';
-    if (flags.has('--read-only')) { check(!values.scenario || values.scenario === 'readonly', 'read_only_conflict'); scenario = 'readonly'; }
+    const { target, scenario, selected, skipped, rerunOf } = resolveSelection(this.opts, { modules: this.opts.modules || MODULES });
+    this.target = target;
+    this.report.target = target;
     this.report.scenario = scenario;
-    const { selected, skipped } = selectModules(scenario, { services, target, modules: this.opts.modules || MODULES });
+    if (rerunOf) this.report.rerunOf = rerunOf;
     check(selected.length, 'no_modules_selected');
     this.report.skipped = skipped;
     this.selected = selected;
@@ -3657,6 +3709,8 @@ function printHelp() {
     '  Pinboard runs on --target user only, with pinboardToken ("user:HEX") from --credentials; without that key its',
     '  modules are skipped. Every Pinboard request waits 3 s after the previous answer; --plan shows the floor.',
     '--shots [--shots-dir DIR] saves masked screenshots; --headed launches a visible browser; --allow-dirty runs on a dirty tree.',
+    '--rerun-failed REPORT runs only the modules that did not pass in REPORT, on its target and services (the user target',
+    '  takes the same bases again); refused while that report\'s cleanup is unfinished. The new report names its runId.',
     '--ext-root DIR loads the extension from another worktree (e.g. a `git worktree add --detach` of a fix commit); it must',
     '  be clean (--allow-dirty covers only this harness\'s tree); the report records both HEADs.',
     '--cleanup REPORT resumes an incomplete cleanup of a report in the state directory; the user target needs',
@@ -3677,16 +3731,12 @@ export async function main(argv = process.argv.slice(2), { dockerExec, modules, 
   if (opts.mode === 'plan') {
     try {
       check(!opts.errors.length, opts.errors[0] || 'arguments');
-      const target = opts.values.target || 'temp';
-      check(['temp', 'user'].includes(target), 'target');
-      const services = opts.values.service ? opts.values.service.split(',').map(s => s.trim()) : [...DEFAULT_SERVICES];
-      check(services.every(s => SERVICE_TYPES.includes(s)), 'service');
-      const scenario = opts.flags.has('--read-only') ? 'readonly' : (opts.values.scenario || 'core');
-      const { selected, skipped } = selectModules(scenario, { services, target, modules: modules || MODULES });
+      const { target, services, scenario, selected, skipped, rerunOf } = resolveSelection(opts, { modules: modules || MODULES });
       check(selected.length, 'no_modules_selected');
       const plan = buildPlan({ target, selected, skipped, shotsEnabled: opts.flags.has('--shots') || !!opts.values['shots-dir'], headedFlag: opts.flags.has('--headed') });
       plan.scenario = scenario;
       plan.services = services;
+      if (rerunOf) plan.rerunOf = rerunOf;
       plan.extRoot = resolveExtRoot(opts.values['ext-root']);
       if (target === 'user') plan.bases = Object.fromEntries(services.filter(s => opts.values[s]).map(s => [s, validateBase(opts.values[s])]));
       // Rounds left under the named authorisation: a local count, no credential.

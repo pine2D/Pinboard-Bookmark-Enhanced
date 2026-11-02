@@ -2183,6 +2183,47 @@ try {
       assert.equal(JSON.parse((await run(['--plan'], { credentials: false })).output).extRoot, root);
     }
 
+    // --rerun-failed (E7): only what did not pass, on the report's own target
+    // and services; refused until that report's cleanup is complete. A
+    // skipped module was never meant to run; one never started was.
+    {
+      const sourceId = randomUUID();
+      const source = {
+        harness: live.HARNESS_VERSION, runId: sourceId, target: 'user', scenario: 'core,edges',
+        instances: { linkding: { service: 'linkding', base: 'http://127.0.0.1:9/' }, karakeep: { service: 'karakeep', base: 'http://127.0.0.1:10/' } },
+        selected: ['linkding.core.popup-reader', 'linkding.core.worker', 'linkding.edges.offline', 'karakeep.core.worker', 'karakeep.edges.tags'],
+        skipped: [{ id: 'karakeep.edges.tags', reason: 'pinboard_token_missing' }],
+        modules: [{ id: 'linkding.core.popup-reader', status: 'passed' }, { id: 'linkding.core.worker', status: 'failed' }, { id: 'karakeep.core.worker', status: 'interrupted' }],
+        cleanup: { complete: true, entries: [] },
+      };
+      const ids = live.rerunSource(source).ids;
+      assert.deepEqual(ids, ['linkding.core.worker', 'karakeep.core.worker', 'linkding.edges.offline']);
+      assert.throws(() => live.rerunSource({ ...source, cleanup: { complete: false, entries: [] } }), e => e.code === 'rerun_source_cleanup_incomplete');
+      assert.throws(() => live.rerunSource({ ...source, modules: source.modules.map(m => ({ ...m, status: 'passed' })), selected: source.modules.map(m => m.id) }), e => e.code === 'rerun_nothing_failed');
+      assert.throws(() => live.rerunSource(source, { target: 'temp' }), e => e.code === 'rerun_target_mismatch');
+      assert.throws(() => live.rerunSource(source, { linkding: 'http://127.0.0.1:11' }), e => e.code === 'rerun_base_mismatch');
+      assert.throws(() => live.rerunSource({ ...source, harness: live.HARNESS_VERSION - 1 }), e => e.code === 'rerun_report_invalid');
+      const sel = live.resolveSelection({ values: { 'rerun-failed': 'x' }, flags: new Set() }, { readReport: () => source });
+      assert.deepEqual([sel.target, sel.services, sel.selected.map(m => m.id)], ['user', ['linkding', 'karakeep'], ['linkding.core.worker', 'linkding.edges.offline', 'karakeep.core.worker']]);
+      assert.deepEqual(sel.rerunOf, { runId: sourceId, modules: ids });
+      for (const extra of [{ scenario: 'core' }, { service: 'linkding' }]) assert.throws(() => live.resolveSelection({ values: { 'rerun-failed': 'x', ...extra }, flags: new Set() }, { readReport: () => source }), e => e.code === 'rerun_conflict');
+      const sourcePath = join(dir, 'rerun-source.json');
+      writeFileSync(sourcePath, JSON.stringify(source));
+      const rerunPlan = await run(['--plan', '--rerun-failed', sourcePath, '--linkding', 'http://127.0.0.1:9', '--karakeep', 'http://127.0.0.1:10'], { credentials: false });
+      const rp = JSON.parse(rerunPlan.output);
+      assert.deepEqual([rp.target, rp.modules.map(m => m.id), rp.rerunOf.runId], ['user', sel.selected.map(m => m.id), sourceId]);
+      // The new run names its source; nothing else is read or sent.
+      const rerunState = stateDirFor('rerun');
+      const rerun = await run(['--run', '--rerun-failed', sourcePath, '--target', 'user', '--linkding', 'http://127.0.0.1:9', '--karakeep', 'http://127.0.0.1:10', '--confirm-karakeep-no-auto-ai', '--allow-dirty'], { credentials: false, state: rerunState });
+      assert.equal(rerun.report.failure.code, 'credentials_path', rerun.output);
+      assert.deepEqual(rerun.report.rerunOf, { runId: sourceId, modules: ids });
+      assert.deepEqual(rerun.report.selected, sel.selected.map(m => m.id));
+      writeFileSync(sourcePath, JSON.stringify({ ...source, cleanup: { complete: false, entries: [] } }));
+      const unclean = await run(['--run', '--rerun-failed', sourcePath, '--target', 'user', '--allow-dirty'], { credentials: false, state: rerunState });
+      assert.equal(unclean.report.failure.code, 'rerun_source_cleanup_incomplete');
+      assert.equal(unclean.report.authorization, undefined);
+    }
+
     // Rounds per authorisation: three per label, refused before any credential
     // read or request, and shown by --plan.
     {
