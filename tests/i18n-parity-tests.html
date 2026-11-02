@@ -323,6 +323,25 @@ async function loadLocale(loc) {
   check("H0 no message relies on a bare $1 that chrome.i18n will never substitute",
     LOCALES.every((loc) => Object.values(msgs[loc]).every((m) => !/\$\d/.test((m && m.message) || ""))),
     "a message contains a bare $1-style token instead of a declared $NAME$ placeholder");
+  // Callers pass one argument list to every locale, so each placeholder must
+  // bind the same argument everywhere: a locale that swaps two bindings shows
+  // one value where the other belongs. Names compare case-insensitively, as
+  // chrome.i18n reads them. A singular twin may leave a placeholder unused,
+  // but no locale may use one it does not declare.
+  const phContract = (entry) => JSON.stringify(Object.entries(entry?.placeholders || {})
+    .map(([name, value]) => [name.toLowerCase(), value?.content]).sort());
+  const phBroken = [];
+  for (const loc of LOCALES) for (const [key, entry] of Object.entries(msgs.en)) {
+    const local = msgs[loc][key];
+    if (!local) continue;
+    if (phContract(local) !== phContract(entry)) phBroken.push(`${loc} ${key}: ${phContract(local)} vs en ${phContract(entry)}`);
+    const declared = Object.keys(local.placeholders || {}).map((name) => name.toLowerCase());
+    for (const token of (local.message || "").match(/\$[A-Za-z0-9_@]+\$/g) || []) {
+      if (!declared.includes(token.slice(1, -1).toLowerCase())) phBroken.push(`${loc} ${key}: ${token} is not declared`);
+    }
+  }
+  check("H0b every placeholder binds the same argument as en in every locale, and none is used undeclared",
+    phBroken.length === 0, phBroken.slice(0, 5).join("; "));
 
   // The ECDICT status line once reused dictPackEmpty, which names MDBG, CC BY-SA
   // 4.0 and .txt.gz -- all facts about the OTHER pack. Shown to a user standing

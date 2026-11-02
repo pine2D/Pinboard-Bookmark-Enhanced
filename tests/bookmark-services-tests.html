@@ -1228,8 +1228,8 @@ test("quick save and Batch notify which linkding tag is too long and queue nothi
 });
 test("every placeholder the save failure copy fills keeps its name and order in all nine locales",async()=>{
   // The keys whose values come from pbpBookmarkFailureArgs, plus the Batch
-  // sentence that reuses them after its count.
-  const keys=[...new Set([...Object.values(PBP_BOOKMARK_FAILURE_KEYS),"batchTagTooLong"])];
+  // sentences (either mode) that reuse them after their count.
+  const keys=[...new Set([...Object.values(PBP_BOOKMARK_FAILURE_KEYS),"batchTagTooLong","batchTagTooLongSkip"])];
   const en=await (await fetch("../_locales/en/messages.json")).json();
   const contract=entry=>JSON.stringify(Object.entries(entry?.placeholders||{}).map(([name,value])=>[name.toLowerCase(),value.content]));
   for(const loc of ["de","en","fr","ja","pl","ru","zh_CN","zh_HK","zh_TW"]){
@@ -1244,7 +1244,7 @@ test("every placeholder the save failure copy fills keeps its name and order in 
     }
   }
   equal(contract(en.bookmarkErrTagTooLong),JSON.stringify([["tag","$1"],["max","$2"]]));
-  equal(contract(en.batchTagTooLong),JSON.stringify([["count","$1"],["tag","$2"],["max","$3"]]));
+  for(const key of ["batchTagTooLong","batchTagTooLongSkip"])equal([key,contract(en[key])],[key,JSON.stringify([["count","$1"],["tag","$2"],["max","$3"]])]);
 });
 (async()=>{let pass=0,fail=0;for(const item of cases){const row=document.createElement("div");try{await item.run();row.className="pass";row.textContent="PASS "+item.name;pass++;}catch(e){row.className="fail";row.textContent="FAIL "+item.name+": "+e.message;fail++;}document.getElementById("results").appendChild(row);}document.getElementById("summary").textContent=`${pass} passed, ${fail} failed`;})();
 </script></body></html>
