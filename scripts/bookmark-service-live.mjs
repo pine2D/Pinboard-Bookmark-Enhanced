@@ -3334,7 +3334,7 @@ export class LiveRun {
         throw error;
       }
       record.status = 'failed';
-      console.error('FAILED ' + mod.id + ' at ' + this.phaseName + ': ' + code);
+      console.error('FAILED ' + mod.id + ' at ' + record.failure.phase + ': ' + code);
       this.faults = [];
       await this.closePagesSince(pagesBefore);
       await this.cleanupModule(mod);
