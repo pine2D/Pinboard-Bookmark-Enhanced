@@ -231,11 +231,15 @@ function escapeForExtended(text) {
 // popup's textarea both read it so, and the text after it must stay quoted.
 function pbpFormatQuote(text, service = "pinboard") {
   if (service === "pinboard") return `<blockquote>${escapeForExtended(text)}</blockquote>`;
+  // In linkding, a line opens a Markdown block when it is the first line or
+  // follows a blank one; only there can indentation make a code block.
+  let blockStart = true;
   return String(text || "").split(/\r\n|\r|\n/).map((line) => {
     if (service === "linkding") {
       // A whitespace-only line ends the paragraph, as an empty one does.
-      if (!/\S/.test(line)) return ">";
-      line = pbpLinkdingQuoteLine(line);
+      if (!/\S/.test(line)) { blockStart = true; return ">"; }
+      line = pbpLinkdingQuoteLine(line, blockStart);
+      blockStart = false;
     }
     if (!line) return ">";
     return "> " + line;
@@ -246,23 +250,34 @@ function pbpFormatQuote(text, service = "pinboard") {
 // with fenced_code and nl2br, then bleach. Backslash escapes cover the
 // characters Python-Markdown can escape; the rest become numeric character
 // references, which Markdown passes through and the browser shows as the
-// original character.
-//   - & first, so an entity the user selected ("&amp;") stays as written,
-//     then < (inline HTML and autolinks);
+// original character. Each escape is written only where linkding would
+// otherwise misread the line, so the Notes field stays readable as typed.
+//   - & only where it starts a character reference ("&amp;", "&#33;",
+//     "&#x41;"; any case), so a reference the user selected stays as
+//     written; Markdown escapes every other & itself. Then < (inline HTML
+//     and autolinks);
 //   - inline markers ` * _ [ ] and a literal backslash;
 //   - a leading # + - > (heading, list, rule, nested quote, the "---" of a
 //     setext heading) and "12." (ordered list); "12)" is no list there;
-//   - a leading "=" (the "===" of a setext heading; = has no escape);
-//   - leading spaces or a tab: an indented code block once the line starts a
-//     block. Only the first character is replaced, so the rest of the
-//     indentation, and every later tab, is left as it was.
-function pbpLinkdingQuoteLine(line) {
-  return line.replace(/\\/g, "\\\\").replace(/&/g, "&amp;").replace(/</g, "&lt;")
+//   - the first "=" of a line made only of "=" and "-" and trailing blanks
+//     (the "===" or "=-=" of a setext heading; = has no escape);
+//   - leading spaces or tabs that reach four columns at the start of a
+//     block (an indented code block; tabs expand to stops of four after the
+//     "> " prefix, and the quote strips that one space). Only the first
+//     character is replaced; the rest of the line is left as it was.
+function pbpLinkdingQuoteLine(line, blockStart = true) {
+  let indent = 0;
+  for (const ch of line) {
+    if (ch === " ") indent++;
+    else if (ch === "\t") indent += 4 - (indent + 2) % 4;
+    else break;
+  }
+  const out = line.replace(/\\/g, "\\\\").replace(/&(?=#\d+;|#x[0-9a-f]+;|[0-9a-z]+;)/gi, "&amp;").replace(/</g, "&lt;")
     .replace(/[`*_\[\]]/g, "\\$&")
     .replace(/^(\s*)([#+\->])/, "$1\\$2")
     .replace(/^(\s*\d+)\./, "$1\\.")
-    .replace(/^(\s*)=/, "$1&#61;")
-    .replace(/^[ \t]/, (c) => `&#${c.charCodeAt(0)};`);
+    .replace(/^([ \t]*)=(?=[=-]*[ \t]*$)/, "$1&#61;");
+  return blockStart && indent >= 4 ? out.replace(/^[ \t]/, (c) => `&#${c.charCodeAt(0)};`) : out;
 }
 
 function pbpFormatSummaryBlock(summary, service = "pinboard") {
