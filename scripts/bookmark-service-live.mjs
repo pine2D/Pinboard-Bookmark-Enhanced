@@ -192,6 +192,8 @@ export function parseArgs(argv) {
   return { mode, flags, values, errors };
 }
 
+export const SNAPSHOT_SKIP_NOTE = id => `工具读不到用户 linkding 的「自动 HTML 快照」开关，user 目标默认跳过；确认开关已开后可用 --scenario ${id} 显式点名运行`;
+
 export function globToRegExp(glob) {
   const source = String(glob).split('').map(ch => (ch === '*' ? '.*' : ch === '?' ? '.' : ch.replace(/[\\^$+.()|[\]{}]/g, '\\$&'))).join('');
   return new RegExp('^' + source + '$');
@@ -250,6 +252,14 @@ export function selectModules(spec, { services = DEFAULT_SERVICES, target = 'tem
         }
         if (target === 'user' && mod.instance !== mod.service) {
           skipped.push({ id: mod.id, reason: 'temp_container_only' });
+          continue;
+        }
+        // The harness cannot read the user's linkding "automatic HTML
+        // snapshots" switch: with it off the module can only fail, with it on
+        // the user's server fetches the page. It runs on the user target only
+        // when its id is named exactly.
+        if (target === 'user' && mod.needs?.snapshots && !explicit) {
+          skipped.push({ id: mod.id, reason: 'snapshot_setting_unreadable', note: SNAPSHOT_SKIP_NOTE(mod.id) });
           continue;
         }
         chosen.add(mod.id);
@@ -3047,7 +3057,7 @@ export class LiveRun {
     lines.push(`- 截图 ${r.shots.count} 张${r.shots.dir ? `，目录 ${r.shots.dir}` : '（本轮未开启 --shots）'}；几何断言未通过 ${geometry.length} 张`);
     capped(geometry, 2, f => `- ${f.shot}：视口 ${f.viewport?.width}×${f.viewport?.height}，横向溢出 ${f.overflow}px${f.overflowBy?.length ? `，越界 ${f.overflowBy.join('、')}` : ''}；够不到 ${f.keys.join('、') || '无'}`);
     lines.push('', '## 未覆盖项');
-    const gaps = [...r.skipped.map(x => `${x.id}：因 ${x.reason} 未执行`), ...UNCOVERED.filter(u => !(u.coveredBy && r.modules.some(m => globToRegExp(u.coveredBy).test(m.id)))).map(u => u.text)];
+    const gaps = [...r.skipped.map(x => `${x.id}：因 ${x.reason} 未执行${x.note ? `（${x.note}）` : ''}`), ...UNCOVERED.filter(u => !(u.coveredBy && r.modules.some(m => globToRegExp(u.coveredBy).test(m.id)))).map(u => u.text)];
     capped(gaps, 4, g => `- ${g}`);
     lines.push('', '## 清理');
     lines.push(`- 书签：创建 ${r.ledger.created.length}，删除 ${r.ledger.created.filter(x => x.deleted).length}；列表：创建 ${r.ledger.lists.length}，删除 ${r.ledger.lists.filter(x => x.deleted).length}；前缀标签 ${r.ledger.tags.length}；清理完成：${r.cleanup.complete ? '是' : '否'}${r.temp ? `；临时容器已删除：${r.temp.removed ? '是' : '否'}` : ''}`);
@@ -3278,6 +3288,8 @@ function printHelp() {
     '  --plan --target user --authorization LABEL shows the rounds used and left. --cleanup never uses a round.',
     '--plan prints modules, budgets, URLs, containers, headed and shot needs without credentials, network, browser or Docker.',
     '--list prints module ids. --service linkding,karakeep[,pinboard] filters. --read-only = --scenario readonly.',
+    '  On --target user linkding.core.snapshot runs only when named exactly (the harness cannot read the user\'s',
+    '  automatic HTML snapshot switch); groups and globs skip it with that reason in --plan and the summary.',
     '  Pinboard runs on --target user only, with pinboardToken ("user:HEX") from --credentials; without that key its',
     '  modules are skipped. Every Pinboard request waits 3 s after the previous answer; --plan shows the floor.',
     '--shots [--shots-dir DIR] saves masked screenshots; --headed launches a visible browser; --allow-dirty runs on a dirty tree.',

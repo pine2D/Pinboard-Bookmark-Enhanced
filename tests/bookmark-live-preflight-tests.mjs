@@ -211,6 +211,20 @@ try {
   assert.deepEqual(live.selectModules('*', { target: 'user', modules: [tempOnly, sharingOn] }).selected, []);
   assert.deepEqual(live.selectModules('*', { target: 'user', modules: [tempOnly, sharingOn] }).skipped.map(s => s.reason), ['target_temp', 'sharing_on_temp_only']);
   assert.throws(() => live.selectModules('linkding.temp.only', { target: 'user', modules: [tempOnly] }), e => e.code === 'module_requires_temp');
+  // H1b: the harness cannot read the user's linkding "automatic HTML
+  // snapshots" switch, so on the user target the snapshot module runs only
+  // when named exactly; a group or glob skips it with the reason in --plan.
+  for (const spec of ['core', 'linkding.*', '*.core.snapshot', '*']) {
+    const sel = live.selectModules(spec, { target: 'user' });
+    assert(!sel.selected.some(m => m.id === 'linkding.core.snapshot'), spec + ' leaves the snapshot module out on the user target');
+    const skip = sel.skipped.find(x => x.id === 'linkding.core.snapshot');
+    assert.equal(skip?.reason, 'snapshot_setting_unreadable', spec);
+    assert.match(skip.note, /自动 HTML 快照/);
+    assert.match(skip.note, /--scenario linkding\.core\.snapshot/);
+  }
+  assert.deepEqual(pick('linkding.core.snapshot,core', { target: 'user' }), ['linkding.core.snapshot', 'linkding.core.popup-reader', 'linkding.core.worker', 'karakeep.core.popup-reader', 'karakeep.core.worker'], 'named exactly, it runs');
+  assert.deepEqual(live.selectModules('linkding.core.snapshot,core', { target: 'user' }).skipped.filter(x => x.id === 'linkding.core.snapshot'), [], 'and is not listed as skipped');
+  assert(pick('core', { target: 'temp' }).includes('linkding.core.snapshot'), 'the temp target keeps it');
   assert.deepEqual(live.selectModules('linkding.temp.only', { target: 'temp', modules: [tempOnly] }).selected.map(m => m.id), ['linkding.temp.only']);
 
   // The snapshot module polls every 5 s and stops while its module still has
@@ -323,7 +337,12 @@ try {
     assert.deepEqual(plan.budget.linkding.caps, { bookmarks: 15, node: 250, cleanupReserve: 60, browser: 350, tags: 20, lists: 0 });
     assert.deepEqual(plan.budget.karakeep.caps, { bookmarks: 12, node: 250, cleanupReserve: 60, browser: 500, tags: 20, lists: 1 });
     assert.deepEqual([plan.limits.runMinutes, plan.limits.moduleSeconds, plan.limits.fakeAi, plan.limits.automaticRetries], [20, 120, 60, 0]);
-    assert.deepEqual(plan.skipped.map(s => s.reason), ['target_temp', 'target_temp'], 'temp-only modules are skipped on the user target');
+    assert.deepEqual(plan.skipped.map(s => s.reason), ['snapshot_setting_unreadable', 'target_temp', 'target_temp'], 'the snapshot module and temp-only modules are skipped on the user target');
+    // Named exactly next to all, the snapshot module still fits the caps.
+    const named = live.selectModules('linkding.core.snapshot,all', { target: 'user' });
+    const namedPlan = live.buildPlan({ target: 'user', selected: named.selected, skipped: named.skipped });
+    assert.equal(namedPlan.withinCaps, true, namedPlan.problems.join(','));
+    assert(namedPlan.limits.worstCaseSeconds + namedPlan.limits.setupAllowanceSeconds <= namedPlan.limits.runMinutes * 60);
   }
   // Timeouts that could outlast the 20-minute run are refused up front.
   {
