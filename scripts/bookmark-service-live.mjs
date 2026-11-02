@@ -2096,13 +2096,19 @@ export class LiveRun {
     const stopped = () => this.cleaning || !!this.fatal;
     const docker = this.docker = createDocker({ runId: this.runId, exec: this.opts.dockerExec, log: entry => (this.report.temp.commands ||= []).push(entry), stopped });
     const names = docker.names;
-    this.report.temp = { names: [], network: '', images: {}, fixture: `http://${TEMP_FIXTURE_HOST}:${TEMP_FIXTURE_PORT}`, commands: [] };
-    const leftovers = await docker.leftovers();
+    this.report.temp = { names: [], network: '', images: {}, fixture: `http://${TEMP_FIXTURE_HOST}:${TEMP_FIXTURE_PORT}`, commands: [], timing: {} };
+    // Sub-steps of temp_start, in ms (E25): where container start-up goes.
+    const sub = async (name, fn) => {
+      const started = Date.now();
+      try { return await fn(); } finally { this.report.temp.timing[name] = Date.now() - started; }
+    };
+    const leftovers = await sub('leftovers', () => docker.leftovers());
     if (leftovers.length) { this.report.temp.leftovers = leftovers; this.persist(); fail('temp_leftovers_present'); }
     const need = new Set(this.plan.instances);
-    const images = { linkding: await docker.userImage('linkding') };
-    if (need.has('karakeep')) images.karakeep = await docker.userImage('karakeep');
-    if (need.has('linkding-pg')) images.postgres = await docker.image('postgres:18');
+    const images = await sub('images', async () => {
+      const [linkding, karakeep, postgres] = await Promise.all([docker.userImage('linkding'), need.has('karakeep') ? docker.userImage('karakeep') : '', need.has('linkding-pg') ? docker.image('postgres:18') : '']);
+      return { linkding, ...(karakeep ? { karakeep } : {}), ...(postgres ? { postgres } : {}) };
+    });
     this.report.temp.images = images;
     const envFile = values => {
       // Cleanup removes env files before the containers; none may appear after.
@@ -2123,20 +2129,30 @@ export class LiveRun {
     this.report.temp.network = names.net;
     this.persist();
     let netOk = false;
-    for (let attempt = 0; attempt < 8 && !netOk; attempt++) {
-      const third = 1 + ((parseInt(this.runId.slice(0, 2), 16) + attempt * 37) % 250);
-      const r = await docker.run(['network', 'create', '--internal', '--subnet', `10.234.${third}.0/24`, '--label', 'pbp-it=' + this.runId, names.net], { allowFail: true });
-      netOk = r.code === 0;
-    }
+    await sub('network', async () => {
+      for (let attempt = 0; attempt < 8 && !netOk; attempt++) {
+        const third = 1 + ((parseInt(this.runId.slice(0, 2), 16) + attempt * 37) % 250);
+        const r = await docker.run(['network', 'create', '--internal', '--subnet', `10.234.${third}.0/24`, '--label', 'pbp-it=' + this.runId, names.net], { allowFail: true });
+        netOk = r.code === 0;
+      }
+    });
     check(netOk, 'temp_network_failed');
     const forwards = [...need].map(i => `${TEMP_INSTANCES[i].edgePort}=${names[i]}:${TEMP_INSTANCES[i].port}`).join(',');
     const publish = [...need].flatMap(i => ['-p', '127.0.0.1::' + TEMP_INSTANCES[i].edgePort]);
-    created(names.edge);
-    const edgeEnv = envFile({ PBP_FORWARDS: forwards });
-    await docker.run(['create', '--pull', 'never', '--name', names.edge, '--label', 'pbp-it=' + this.runId, '--network', 'bridge', '--memory', '128m', ...publish, '--env-file', edgeEnv, images.linkding, 'python3', '-c', EDGE_SCRIPT]);
-    rmSync(edgeEnv, { force: true });
-    await docker.run(['network', 'connect', names.net, names.edge]);
-    await docker.run(['start', names.edge]);
+    // From here the containers start side by side (E25): the edge, each
+    // service (postgres first for linkding-pg; Karakeep once the edge's port
+    // gives its NEXTAUTH_URL), then each service's health wait and token as
+    // soon as it is up. A failure anywhere stops the run; commands still in
+    // flight are awaited by the cleanup (docker.settle) and none starts once
+    // it has begun (stopped()).
+    const edgeUp = sub('edge', async () => {
+      created(names.edge);
+      const edgeEnv = envFile({ PBP_FORWARDS: forwards });
+      await docker.run(['create', '--pull', 'never', '--name', names.edge, '--label', 'pbp-it=' + this.runId, '--network', 'bridge', '--memory', '128m', ...publish, '--env-file', edgeEnv, images.linkding, 'python3', '-c', EDGE_SCRIPT]);
+      rmSync(edgeEnv, { force: true });
+      await docker.run(['network', 'connect', names.net, names.edge]);
+      await docker.run(['start', names.edge]);
+    });
     // Fixture sidecar: joins the service's network namespace, so the
     // service's own `localhost:TEMP_FIXTURE_PORT` is the synthetic article.
     const startFixture = async instance => {
@@ -2146,8 +2162,14 @@ export class LiveRun {
       rmSync(env, { force: true });
     };
     const edgePorts = {};
-    for (const instance of need) edgePorts[instance] = await docker.port(names.edge, TEMP_INSTANCES[instance].edgePort);
     const baseOf = instance => `http://127.0.0.1:${edgePorts[instance]}/`;
+    const edgeReady = edgeUp.then(() => sub('ports', async () => {
+      for (const instance of need) edgePorts[instance] = await docker.port(names.edge, TEMP_INSTANCES[instance].edgePort);
+      for (const instance of need) {
+        const service = TEMP_INSTANCES[instance].service;
+        this.instances[instance] = { id: instance, service, base: baseOf(instance), root: apiRootFor(service, baseOf(instance)), token: '' };
+      }
+    }));
     const startLinkding = async (instance, extra = {}) => {
       const password = randomBytes(18).toString('base64url');
       const env = envFile({ LD_SUPERUSER_NAME: 'pbp-it', LD_SUPERUSER_PASSWORD: password, LD_SUPERVISOR_MANAGED: 'True', LD_ALLOWED_INTERNAL_HOSTS: TEMP_FIXTURE_HOST, ...extra });
@@ -2156,31 +2178,31 @@ export class LiveRun {
       rmSync(env, { force: true });
       await startFixture(instance);
     };
-    if (need.has('linkding')) await startLinkding('linkding');
-    if (need.has('linkding-pg')) {
-      const pgPassword = randomBytes(18).toString('base64url');
-      const env = envFile({ POSTGRES_USER: 'linkding', POSTGRES_PASSWORD: pgPassword, POSTGRES_DB: 'linkding' });
-      created(names.postgres);
-      await docker.run(['run', '-d', '--pull', 'never', '--name', names.postgres, '--label', 'pbp-it=' + this.runId, '--network', names.net, '--memory', '512m', '--tmpfs', '/var/lib/postgresql:rw,size=256m', '--env-file', env, images.postgres]);
-      rmSync(env, { force: true });
-      await this.waitFor(async () => (await docker.exec(names.postgres, ['pg_isready', '-U', 'linkding', '-d', 'linkding'], { allowFail: true })).code === 0, 60000, names.postgres, 'container_unhealthy');
-      await startLinkding('linkding-pg', { LD_DB_ENGINE: 'postgres', LD_DB_HOST: names.postgres, LD_DB_PORT: '5432', LD_DB_DATABASE: 'linkding', LD_DB_USER: 'linkding', LD_DB_PASSWORD: pgPassword });
-    }
-    if (need.has('karakeep')) {
-      const env = envFile({
-        DATA_DIR: '/data', NEXTAUTH_SECRET: randomBytes(32).toString('base64url'), NEXTAUTH_URL: baseOf('karakeep').replace(/\/$/, ''),
-        INFERENCE_ENABLE_AUTO_TAGGING: 'false', INFERENCE_ENABLE_AUTO_SUMMARIZATION: 'false', CRAWLER_ALLOWED_INTERNAL_HOSTNAMES: TEMP_FIXTURE_HOST,
-      });
-      created(names.karakeep);
-      await docker.run(['run', '-d', '--pull', 'never', '--name', names.karakeep, '--label', 'pbp-it=' + this.runId, '--network', names.net, '--memory', '2g', '--tmpfs', '/data:rw,size=512m', '--env-file', env, images.karakeep]);
-      rmSync(env, { force: true });
-      await startFixture('karakeep');
-    }
-    for (const instance of need) {
-      const service = TEMP_INSTANCES[instance].service;
-      const base = baseOf(instance);
-      this.instances[instance] = { id: instance, service, base, root: apiRootFor(service, base), token: '' };
-      await this.waitFor(async () => {
+    const start = {
+      linkding: () => sub('run:linkding', () => startLinkding('linkding')),
+      'linkding-pg': () => sub('run:linkding-pg', async () => {
+        const pgPassword = randomBytes(18).toString('base64url');
+        const env = envFile({ POSTGRES_USER: 'linkding', POSTGRES_PASSWORD: pgPassword, POSTGRES_DB: 'linkding' });
+        created(names.postgres);
+        await docker.run(['run', '-d', '--pull', 'never', '--name', names.postgres, '--label', 'pbp-it=' + this.runId, '--network', names.net, '--memory', '512m', '--tmpfs', '/var/lib/postgresql:rw,size=256m', '--env-file', env, images.postgres]);
+        rmSync(env, { force: true });
+        await sub('postgres_ready', () => this.waitFor(async () => (await docker.exec(names.postgres, ['pg_isready', '-U', 'linkding', '-d', 'linkding'], { allowFail: true })).code === 0, 60000, names.postgres, 'container_unhealthy'));
+        await startLinkding('linkding-pg', { LD_DB_ENGINE: 'postgres', LD_DB_HOST: names.postgres, LD_DB_PORT: '5432', LD_DB_DATABASE: 'linkding', LD_DB_USER: 'linkding', LD_DB_PASSWORD: pgPassword });
+      }),
+      karakeep: () => edgeReady.then(() => sub('run:karakeep', async () => {
+        const env = envFile({
+          DATA_DIR: '/data', NEXTAUTH_SECRET: randomBytes(32).toString('base64url'), NEXTAUTH_URL: baseOf('karakeep').replace(/\/$/, ''),
+          INFERENCE_ENABLE_AUTO_TAGGING: 'false', INFERENCE_ENABLE_AUTO_SUMMARIZATION: 'false', CRAWLER_ALLOWED_INTERNAL_HOSTNAMES: TEMP_FIXTURE_HOST,
+        });
+        created(names.karakeep);
+        await docker.run(['run', '-d', '--pull', 'never', '--name', names.karakeep, '--label', 'pbp-it=' + this.runId, '--network', names.net, '--memory', '2g', '--tmpfs', '/data:rw,size=512m', '--env-file', env, images.karakeep]);
+        rmSync(env, { force: true });
+        await startFixture('karakeep');
+      })),
+    };
+    const health = instance => {
+      const { service, base } = this.instances[instance];
+      return sub('health:' + instance, () => this.waitFor(async () => {
         const st = await docker.state(names[instance]);
         if (!st.startsWith('running')) { this.report.temp.logs = { [instance]: this.sanitize(await docker.logs(names[instance])).split('\n').slice(-15) }; fail('container_start_failed'); }
         try {
@@ -2189,9 +2211,9 @@ export class LiveRun {
           const data = r.ok ? await r.json() : {};
           return ['healthy', 'ok'].includes(data.status);
         } catch { return false; }
-      }, 120000, names[instance], 'container_unhealthy');
-    }
-    for (const instance of need) {
+      }, 120000, names[instance], 'container_unhealthy'));
+    };
+    const token = instance => sub('token:' + instance, async () => {
       const inst = this.instances[instance];
       if (inst.service === 'linkding') {
         const r = await docker.exec(names[instance], ['python', 'manage.py', 'shell', '-c', LINKDING_TOKEN_SCRIPT], { timeoutMs: 60000 });
@@ -2214,7 +2236,13 @@ export class LiveRun {
         inst.token = key;
       }
       this.addSecret(inst.token);
-    }
+    });
+    await Promise.all([edgeReady, ...[...need].map(async instance => {
+      await start[instance]();
+      await edgeReady;
+      await health(instance);
+      await token(instance);
+    })]);
     this.report.instances = Object.fromEntries(Object.values(this.instances).map(i => [i.id, { service: i.service, base: i.base }]));
     this.persist();
   }
