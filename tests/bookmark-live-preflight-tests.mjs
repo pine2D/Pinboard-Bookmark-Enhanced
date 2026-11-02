@@ -971,6 +971,7 @@ try {
   assert.equal(denied.code, 1);
   assert.equal(denied.report.failure.code, 'api_http_403');
   assert.deepEqual(requests.map(q => [q.path, q.method, q.authenticated]), [['/health', 'GET', false], ['/api/user/profile/', 'GET', true]], 'a failed preflight costs no cleanup requests');
+  assert.deepEqual(denied.report.stages.map(s => [s.name, s.ok]), [['credentials', true], ['preflight', false], ['cleanup', true]], 'a failed stage is timed too');
   assert.equal(denied.report.cleanup.complete, true);
   assert.match(denied.report.head, /^[0-9a-f]{40}$/);
   assert.equal(typeof denied.report.clean, 'boolean');
@@ -988,6 +989,10 @@ try {
   assert(!existsSync(join(success.reportPath, '..', 'profile')), 'browser profile removed');
   const summaryText = readFileSync(join(success.reportPath, '..', 'summary.zh.md'), 'utf8');
   assert(summaryText.includes('未覆盖项') && summaryText.includes('linkding.readonly'));
+  // Stage durations (E8/E10): setup steps and cleanup, in run order.
+  assert.deepEqual(success.report.stages.map(s => s.name), ['credentials', 'preflight', 'browser_start', 'connect:linkding', 'cleanup']);
+  assert(success.report.stages.every(s => Number.isInteger(s.ms) && s.ms >= 0 && !Number.isNaN(Date.parse(s.started))));
+  assert.match(summaryText, /阶段耗时：credentials \d+\.\ds，preflight \d+\.\ds，browser_start \d+\.\ds，connect:linkding \d+\.\ds，cleanup \d+\.\ds/);
   assert.equal(statSync(join(success.reportPath, '..', 'summary.zh.md')).mode & 0o777, 0o600);
 
   // An unfinished earlier run blocks the next one before any request.

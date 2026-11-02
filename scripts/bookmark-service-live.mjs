@@ -908,7 +908,19 @@ export class LiveRun {
       ledger: { created: [], lists: [], tags: [] }, counts: {}, checks: [], readBackDiffs: [], console: [], swConsole: [],
       pageErrors: [], requestFailed: [], blockedOrigins: [], violations: [], findings: [], shots: { dir: '', count: 0, manifest: '' },
       fakeAi: null, temp: null, cleanup: { complete: false, entries: [] }, failure: null, finished: null, passed: false,
+      stages: [],
     };
+  }
+
+  // Wall time of the setup steps and the cleanup (modules carry their own
+  // started/finished), so a slow stage shows up without a profiler.
+  async timed(name, fn) {
+    const started = new Date();
+    let ok = false;
+    try { const value = await fn(); ok = true; return value; } finally {
+      this.report.stages.push({ name, started: started.toISOString(), ms: Date.now() - started.getTime(), ok });
+      this.persist();
+    }
   }
 
   // Free text (module notes, console lines) may echo anything: redact the
@@ -1139,13 +1151,13 @@ export class LiveRun {
         this.report.authorization = claimAuthorizationRound(this.state, this.authorization, { runId: this.runId, started: this.report.started, scenario: this.report.scenario }, BUDGETS.user.run.roundsPerAuthorization);
         this.persist();
       }
-      if (this.target === 'temp') await this.startTemp();
-      else await this.loadCredentials();
-      await this.preflight();
-      if (this.plan.fakeAi.needed) await this.startFakeAi();
-      await this.setupBrowser();
+      if (this.target === 'temp') await this.timed('temp_start', () => this.startTemp());
+      else await this.timed('credentials', () => this.loadCredentials());
+      await this.timed('preflight', () => this.preflight());
+      if (this.plan.fakeAi.needed) await this.timed('fake_ai_start', () => this.startFakeAi());
+      await this.timed('browser_start', () => this.setupBrowser());
       for (const instance of this.plan.instances) {
-        await this.connect(instance);
+        await this.timed('connect:' + instance, () => this.connect(instance));
         for (const mod of this.selected.filter(m => m.instance === instance)) await this.runModule(mod);
       }
       this.stage = 'final';
@@ -1191,7 +1203,7 @@ export class LiveRun {
       clearTimeout(this.runTimer);
       this.cleaning = true;
       this.stage = 'cleanup';
-      try { await this.cleanupAll(); } catch (error) { this.report.cleanup.complete = false; this.report.cleanup.error = failureCode(error, this.secrets); }
+      try { await this.timed('cleanup', () => this.cleanupAll()); } catch (error) { this.report.cleanup.complete = false; this.report.cleanup.error = failureCode(error, this.secrets); }
       this.report.finished = new Date().toISOString();
       this.persist();
     })();
@@ -2196,6 +2208,10 @@ export class LiveRun {
     const instanceNames = Object.keys(r.instances || {});
     if (instanceNames.length) lines.push(`- 实例：${instanceNames.map(i => `${i}（Node ${r.counts?.[i]?.node ?? 0} / 浏览器 ${r.counts?.[i]?.browser ?? 0} 次请求）`).join('；')}`);
     if (r.fakeAi) lines.push(`- 假 AI：${(r.fakeAi.calls || []).filter(c => c.status === 200).length} 次成功调用，上限 ${r.fakeAi.limit}`);
+    if (r.stages?.length) {
+      const slow = r.modules.filter(m => m.started && m.finished).map(m => [m.id, Date.parse(m.finished) - Date.parse(m.started)]).sort((a, b) => b[1] - a[1]).slice(0, 3);
+      lines.push(`- 阶段耗时：${r.stages.map(s => `${s.name} ${(s.ms / 1000).toFixed(1)}s${s.ok ? '' : '（失败）'}`).join('，')}${slow.length ? `；最慢模块：${slow.map(([id, ms]) => `${id} ${(ms / 1000).toFixed(1)}s`).join('，')}` : ''}`);
+    }
     lines.push('', '## 新发现（失败或中止的模块与证据）', '');
     const bad = r.modules.filter(m => m.status !== 'passed');
     if (!bad.length) lines.push('- 无模块失败。');
