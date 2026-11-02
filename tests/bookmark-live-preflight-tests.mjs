@@ -249,8 +249,8 @@ try {
       const walk = rel => { for (const e of readdirSync(join(root, rel), { withFileTypes: true })) { const p = rel ? rel + '/' + e.name : e.name; if (e.isDirectory()) { if (!rel ? ['vendor', 'icons', '_locales'].includes(e.name) : true) walk(p); } else if (live.isProductRuntimeFile(p)) shipped.push(p); } };
       walk('');
       for (const mod of live.expandRegistry()) {
+        assert(mod.files !== undefined, mod.id + ' has no files field');
         const files = live.moduleFiles(mod);
-        assert(files.length, mod.id + ' declares no product file');
         for (const glob of files) {
           assert(live.isProductRuntimeFile(glob), mod.id + ': ' + glob + ' is not shipped');
           assert(shipped.some(f => live.globToRegExp(glob).test(f)), mod.id + ': ' + glob + ' matches no file');
@@ -258,25 +258,53 @@ try {
       }
       for (const [path, product] of [['popup.js', true], ['manifest.json', true], ['_locales/de/messages.json', true], ['vendor/marked.min.js', true], ['icons/pin-default-16.png', true], ['tests/x.html', false], ['scripts/release.sh', false], ['README.md', false], ['docs/index.md', false], ['.claude/rules/l10n.md', false]]) assert.equal(live.isProductRuntimeFile(path), product, path);
       const route = files => live.routeChangedFiles(files);
+      // A module covers every file its surfaces load, read from the tree
+      // itself: the worker's importScripts, each page's script and
+      // stylesheet tags and the files they inject. Every module connects
+      // through options.html and waits for English text, so the worker,
+      // the options page and the default locale belong to all of them.
+      const surfaces = live.surfaceFiles(root);
+      const tags = (page, re) => [...readFileSync(join(root, page), 'utf8').matchAll(re)].map(x => x[1]).filter(f => !/^[a-z]+:|^\/\//i.test(f));
+      const imported = [...readFileSync(join(root, 'background.js'), 'utf8').match(/importScripts\(([\s\S]*?)\)/)[1].matchAll(/"([^"]+)"/g)].map(x => x[1]);
+      for (const f of ['manifest.json', 'background.js', '_locales/en/messages.json', ...imported]) assert(surfaces.worker.includes(f), 'worker loads ' + f);
+      for (const [name, page] of Object.entries(live.SURFACE_PAGES)) {
+        for (const f of [page, ...tags(page, /<script\b[^>]*\bsrc="([^"]+)"/g)]) assert(surfaces[name].includes(f), name + ' loads ' + f);
+      }
+      for (const f of ['site-rules.js', 'vendor/defuddle.js']) assert(surfaces.popup.includes(f) && surfaces.worker.includes(f), 'injected ' + f);
+      for (const set of Object.values(surfaces)) for (const f of set) assert(shipped.includes(f), f + ' is loaded but not shipped');
+      for (const mod of live.expandRegistry()) {
+        const files = new Set(live.moduleFiles(mod));
+        for (const name of ['worker', 'options', ...mod.surfaces.map(s => (s === 'background' ? 'worker' : s))]) {
+          for (const f of surfaces[name]) assert(files.has(f), mod.id + ' drives ' + name + ' but leaves out ' + f);
+        }
+      }
+      assert.throws(() => live.moduleFiles({ id: 'x', surfaces: ['library'], files: [] }), e => e.code === 'module_surface_unknown');
       // A common file selects every module that declares it.
       assert.deepEqual(route(['shared.js']).modules, ids);
       assert.deepEqual(route(['background.js']).modules, ids);
-      assert.deepEqual(route(['bookmark-services.js']).modules, ids.filter(id => !id.startsWith('pinboard.')));
-      assert.deepEqual(route(['popup-offline.js']).modules, ['linkding.edges.offline', 'linkding-pg.limits.long-tag']);
+      assert.deepEqual(route(['bookmark-services.js']).modules, ids, 'the worker loads it for Pinboard too');
+      // The review's counterexamples: ai.js (prefill, quick-save notes) and
+      // the English messages (Connect, "Bookmark deleted") reach every module.
+      assert.deepEqual(route(['ai.js']).modules, ids);
+      assert.deepEqual(route(['_locales/en/messages.json']).modules, ids);
+      const popupIds = live.expandRegistry().filter(m => m.surfaces.includes('popup')).map(m => m.id);
+      assert(popupIds.includes('linkding.edges.quote-unread') && popupIds.includes('pinboard.readonly'));
+      assert.deepEqual(route(['popup-offline.js']).modules, popupIds);
       assert.deepEqual(route(['md-bookmark.js']).modules, ['linkding.core.popup-reader', 'linkding.sharing.popup-reader', 'karakeep.core.popup-reader', 'karakeep.edges.tags', 'pinboard.core.popup-reader']);
-      const mixed = route(['jina.js', 'popup-ai.js', 'tests/bookmark-live-preflight-tests.mjs', 'README.md', 'vendor/marked.min.js', 'popup-ai.js']);
-      assert.deepEqual(mixed.modules, ['linkding.ai.popup-summary-tags', 'karakeep.ai.popup-summary-tags']);
-      assert.deepEqual(mixed.uncovered, ['jina.js', 'vendor/marked.min.js'], 'a shipped file nobody declares is listed, not skipped');
+      assert.deepEqual(route(['_locales/zh_CN/messages.json']).modules, ['linkding.ai.popup-summary-tags', 'karakeep.ai.popup-summary-tags']);
+      const mixed = route(['library.js', 'md-bookmark.js', 'tests/bookmark-live-preflight-tests.mjs', 'README.md', 'pinboard-sort.js', 'md-bookmark.js']);
+      assert.deepEqual(mixed.modules, route(['md-bookmark.js']).modules);
+      assert.deepEqual(mixed.uncovered, ['library.js', 'pinboard-sort.js'], 'a shipped file nobody declares is listed, not skipped');
       assert.deepEqual(mixed.ignored, ['README.md', 'tests/bookmark-live-preflight-tests.mjs']);
-      assert.deepEqual(mixed.byFile, { 'popup-ai.js': ['linkding.ai.popup-summary-tags', 'karakeep.ai.popup-summary-tags'] });
+      assert.deepEqual(Object.keys(mixed.byFile), ['md-bookmark.js']);
       // Selection: target and service filters still apply; --scenario intersects.
       const changedSel = (files, values = {}) => live.resolveSelection({ values, flags: new Set(['--changed']) }, { changedFiles: (d, base) => ({ base, mergeBase: 'f'.repeat(40), files }) });
-      const offline = changedSel(['popup-offline.js', 'jina.js']);
-      assert.deepEqual(offline.selected.map(m => m.id), ['linkding.edges.offline', 'linkding-pg.limits.long-tag']);
-      assert.deepEqual([offline.scenario, offline.changed.base, offline.changed.files, offline.changed.uncovered], ['all', 'main', 2, ['jina.js']]);
-      assert(offline.changed.note.includes('未覆盖'));
-      assert.deepEqual(changedSel(['popup-offline.js'], { scenario: 'edges' }).selected.map(m => m.id), ['linkding.edges.offline']);
-      assert.deepEqual(changedSel(['popup-offline.js'], { target: 'user' }).selected.map(m => m.id), ['linkding.edges.offline']);
+      const zh = changedSel(['_locales/zh_CN/messages.json', 'library.js']);
+      assert.deepEqual(zh.selected.map(m => m.id), ['linkding.ai.popup-summary-tags', 'karakeep.ai.popup-summary-tags']);
+      assert.deepEqual([zh.scenario, zh.changed.base, zh.changed.files, zh.changed.uncovered], ['all', 'main', 2, ['library.js']]);
+      assert(zh.changed.note.includes('未覆盖'));
+      assert.deepEqual(changedSel(['popup-offline.js'], { scenario: 'edges' }).selected.map(m => m.id), ['linkding.edges.quote-unread', 'linkding.edges.offline', 'karakeep.edges.tags']);
+      assert.deepEqual(changedSel(['_locales/zh_CN/messages.json'], { target: 'user', service: 'karakeep' }).selected.map(m => m.id), ['karakeep.ai.popup-summary-tags']);
       assert.deepEqual(changedSel(['md-bookmark.js'], { target: 'user', service: 'karakeep' }).selected.map(m => m.id), ['karakeep.core.popup-reader', 'karakeep.edges.tags']);
       assert.deepEqual(changedSel(['shared.js'], { changed: 'origin/main', target: 'user', service: 'pinboard' }).selected.map(m => m.id), ids.filter(id => id.startsWith('pinboard.')));
       assert.equal(changedSel(['shared.js'], { changed: 'origin/main' }).changed.base, 'origin/main');
@@ -290,11 +318,11 @@ try {
         process.stdout.write = (chunk, cb) => { chunks.push(String(chunk)); if (typeof cb === 'function') cb(); return true; };
         try { return { code: await live.main(argv, { changedFiles: (d, base) => ({ base, mergeBase: '', files }) }), value: JSON.parse(chunks.join('')) }; } finally { process.stdout.write = write; }
       };
-      const cp = await planOut(['--plan', '--changed'], ['popup-offline.js', 'wayback.js']);
+      const cp = await planOut(['--plan', '--changed'], ['_locales/zh_CN/messages.json', 'library.js']);
       assert.equal(cp.code, 0);
-      assert.deepEqual([cp.value.modules.map(m => m.id), cp.value.changed.uncovered], [['linkding.edges.offline', 'linkding-pg.limits.long-tag'], ['wayback.js']]);
-      const none = await planOut(['--plan', '--changed'], ['wayback.js', 'docs/index.md']);
-      assert.deepEqual([none.code, none.value.error, none.value.changed.uncovered, none.value.changed.ignored], [1, 'no_modules_selected', ['wayback.js'], ['docs/index.md']]);
+      assert.deepEqual([cp.value.modules.map(m => m.id), cp.value.changed.uncovered], [['linkding.ai.popup-summary-tags', 'karakeep.ai.popup-summary-tags'], ['library.js']]);
+      const none = await planOut(['--plan', '--changed'], ['library.js', 'docs/index.md']);
+      assert.deepEqual([none.code, none.value.error, none.value.changed.uncovered, none.value.changed.ignored], [1, 'no_modules_selected', ['library.js'], ['docs/index.md']]);
     }
     // A temp-only row is skipped by a group on the user target and refused by name.
     const tempOnly = { ...MODULES.find(m => m.id === 'readonly'), id: 'temp.only', services: ['linkding'], needs: { ...MODULES[0].needs, target: 'temp' } };

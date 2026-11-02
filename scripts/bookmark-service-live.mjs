@@ -307,18 +307,71 @@ export function isProductRuntimeFile(path) {
   if (parts.length === 1) return /\.(html|js|css)$/.test(parts[0]) || parts[0] === 'manifest.json';
   return ['vendor', 'icons', '_locales'].includes(parts[0]);
 }
-export function moduleFiles(mod) {
-  const files = mod.files || [];
-  return Array.isArray(files) ? files : [...(files.all || []), ...(files[mod.service] || [])];
+// The product files each surface loads, read from the tree under test rather
+// than listed by hand: the worker's importScripts, each page's script and
+// stylesheet tags, and the files those scripts inject with
+// scripting.executeScript({ files }). A loaded file runs; a change to any of
+// them can break the surface. Every module connects through options.html
+// and waits for English text, so the worker, the options page and the
+// default locale's messages belong to all of them.
+export const SURFACE_PAGES = Object.freeze({ options: 'options.html', popup: 'popup.html', reader: 'md-preview.html' });
+const SURFACE_ALIASES = Object.freeze({ background: 'worker', worker: 'worker', options: 'options', popup: 'popup', reader: 'reader' });
+const surfaceCache = new Map();
+export function surfaceFiles(dir = ROOT) {
+  const key = String(dir);
+  if (surfaceCache.has(key)) return surfaceCache.get(key);
+  const read = rel => { try { return readFileSync(join(dir, rel), 'utf8'); } catch { return ''; } };
+  const local = f => !/^[a-z][a-z0-9+.-]*:|^\/\//i.test(f);
+  const norm = f => f.replace(/^\.?\//, '');
+  const literals = text => [...text.matchAll(/["']([^"'\s]+)["']/g)].map(x => x[1]);
+  // Follow executeScript({ files: [...] }) one script at a time.
+  const close = start => {
+    const out = new Set(start.map(norm));
+    const queue = [...out].filter(f => f.endsWith('.js'));
+    while (queue.length) {
+      const text = read(queue.shift());
+      for (const m of text.matchAll(/\bfiles\s*:\s*\[([^\]]*)\]/g)) {
+        for (const f of literals(m[1]).filter(local).map(norm)) if (!out.has(f)) { out.add(f); if (f.endsWith('.js')) queue.push(f); }
+      }
+    }
+    return [...out].sort();
+  };
+  let manifest = {};
+  try { manifest = JSON.parse(read('manifest.json')); } catch { manifest = {}; }
+  const sw = manifest.background?.service_worker || '';
+  const locale = manifest.default_locale ? ['_locales/' + manifest.default_locale + '/messages.json'] : [];
+  const imported = [...read(sw).matchAll(/\bimportScripts\s*\(([\s\S]*?)\)/g)].flatMap(m => literals(m[1]));
+  const out = { worker: close(['manifest.json', ...locale, ...(sw ? [sw] : []), ...imported]) };
+  for (const [name, page] of Object.entries(SURFACE_PAGES)) {
+    const html = read(page);
+    const scripts = [...html.matchAll(/<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi)].map(x => x[1]);
+    const styles = [...html.matchAll(/<link\b[^>]*>/gi)].filter(x => /\brel\s*=\s*["']?stylesheet/i.test(x[0])).map(x => (x[0].match(/\bhref\s*=\s*["']([^"']+)["']/i) || [])[1]).filter(Boolean);
+    out[name] = close([page, ...scripts, ...styles].filter(local));
+  }
+  surfaceCache.set(key, Object.freeze(out));
+  return out;
 }
-// Routes changed paths to expanded modules by their declared files. Paths
-// outside the shipped product are ignored; shipped ones no module declares
+// A module's files: what its surfaces load (plus the worker, options page and
+// default locale every module uses) and the extra files its row declares.
+export function moduleFiles(mod, surfaces = surfaceFiles()) {
+  const files = mod.files || [];
+  const declared = Array.isArray(files) ? files : [...(files.all || []), ...(files[mod.service] || [])];
+  const names = ['worker', 'options'];
+  for (const s of mod.surfaces || []) {
+    if (!SURFACE_ALIASES[s]) fail('module_surface_unknown');
+    names.push(SURFACE_ALIASES[s]);
+  }
+  return [...new Set([...names.flatMap(n => surfaces[n] || []), ...declared])];
+}
+// Routes changed paths to expanded modules by the files they cover. Paths
+// outside the shipped product are ignored; shipped ones no module covers
 // are uncovered.
-export function routeChangedFiles(files, modules = expandRegistry(MODULES)) {
+export function routeChangedFiles(files, modules = expandRegistry(MODULES), surfaces = surfaceFiles()) {
   const byFile = {}, uncovered = [], ignored = [], chosen = new Set();
+  const covers = new Map(modules.map(m => [m.id, moduleFiles(m, surfaces).map(globToRegExp)]));
   for (const file of [...new Set(files)].sort()) {
     if (!isProductRuntimeFile(file)) { ignored.push(file); continue; }
-    const ids = modules.filter(m => moduleFiles(m).some(glob => globToRegExp(glob).test(file))).map(m => m.id);
+    const ids = modules.filter(m => covers.get(m.id).some(re => re.test(file))).map(m => m.id);
     if (!ids.length) { uncovered.push(file); continue; }
     byFile[file] = ids;
     for (const id of ids) chosen.add(id);
@@ -393,12 +446,12 @@ export function resolveSelection({ values = {}, flags = new Set() }, { modules =
   let changed = null;
   if (flags.has('--changed')) {
     const read = changedFiles(dir, values.changed || CHANGED_DEFAULT_BASE);
-    const routed = routeChangedFiles(read.files, expandRegistry(modules));
+    const routed = routeChangedFiles(read.files, expandRegistry(modules), surfaceFiles(dir));
     const keep = new Set(routed.modules);
     selected = selected.filter(m => keep.has(m.id));
     skipped = skipped.filter(s => keep.has(s.id));
     changed = { base: read.base, mergeBase: read.mergeBase || '', files: read.files.length, ...routed };
-    if (routed.uncovered.length) changed.note = `未覆盖：${routed.uncovered.length} 个改动的产品运行时文件没有模块声明（uncovered），真实测试不检查它们`;
+    if (routed.uncovered.length) changed.note = `未覆盖：${routed.uncovered.length} 个改动的产品运行时文件没有模块覆盖（uncovered），真实测试不检查它们`;
   }
   // --round N: the N-th of the rounds this selection packs into.
   let round = null;
@@ -3873,9 +3926,9 @@ function printHelp() {
     '  Pinboard runs on --target user only, with pinboardToken ("user:HEX") from --credentials; without that key its',
     '  modules are skipped. Every Pinboard request waits 3 s after the previous answer; --plan shows the floor.',
     '--shots [--shots-dir DIR] saves masked screenshots; --headed launches a visible browser; --allow-dirty runs on a dirty tree.',
-    '--changed [BASE] picks the modules whose declared product files changed since the merge base of BASE (default main)',
+    '--changed [BASE] picks the modules covering a product file changed since the merge base of BASE (default main)',
     '  and HEAD or in the worktree, in the tree the extension loads; with --scenario it takes the intersection. --plan',
-    '  lists changed product files no module declares under changed.uncovered.',
+    '  lists changed product files no module covers (surface loads plus row.files) under changed.uncovered.',
     '--plan packs a selection over one run\'s caps into the fewest rounds within every cap (rounds.rounds, with totals);',
     '  more than 3 on --target user is an error naming the modules left over. --run --round N runs round N only.',
     '--rerun-failed REPORT runs only the modules that did not pass in REPORT, on its target and services (the user target',

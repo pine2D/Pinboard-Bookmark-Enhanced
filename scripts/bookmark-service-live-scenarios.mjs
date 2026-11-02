@@ -26,11 +26,15 @@
 //             (measured on temporary instances: report.modules[].paths
 //             "GET tags"). The browser budget covers each at TAG_PAGES
 //             pages; a user library with more pages raises it at run time.
-//   files     product files the module exercises, for --changed: paths or
-//             globs from the repository root, an array or { all, <service> }.
-//             A changed file selects every module that declares it; a
-//             product runtime file no module declares is listed by --plan as
-//             uncovered. Declare what the steps drive, not what merely loads.
+//   files     product files the module covers beyond its surfaces, for
+//             --changed: paths or globs from the repository root, an array
+//             or { all, <service> }; usually empty. The runner adds what each
+//             surface in `surfaces` loads (read from the tree under test:
+//             importScripts, script and stylesheet tags, injected files) and,
+//             for every module, the worker, options.html (Connect) and the
+//             default locale. A changed file selects every module covering
+//             it; a product runtime file none covers is listed by --plan as
+//             uncovered. `surfaces` must use background|options|popup|reader.
 //   settings  chrome.storage.local overrides applied for this module only
 //   steps(t)  drives the extension; verify(t) reads back (optional)
 //
@@ -70,17 +74,6 @@ export function budgetValue(value, service) {
   if (typeof value === 'number') return value;
   return Number(value[service] || 0);
 }
-
-// ---- product files per surface (row.files) --------------------------------
-
-// Every module saves or reads through the service worker's save path.
-const WORKER = ['manifest.json', 'background.js', 'shared.js'];
-// linkding and Karakeep go through their API client; Pinboard does not.
-const SELF_HOSTED = Object.freeze({ linkding: ['bookmark-services.js'], karakeep: ['bookmark-services.js'] });
-// The options page's Connect flow and the shared library owner it checks.
-const OPTIONS = ['options.html', 'options.js', 'vocab-store.js'];
-const POPUP = ['popup.html', 'popup.css', 'popup.js', 'popup-tags.js', 'popup-theme-early.js'];
-const READER = ['md-preview.html', 'md-preview.css', 'md-preview.js', 'md-bookmark.js'];
 
 // ---- shared module steps -------------------------------------------------
 
@@ -129,7 +122,7 @@ export const MODULES = [
     features: ['connect', 'tags-recent', 'popup-prefill'],
     needs: needs({ writes: false }),
     budget: { bookmarks: 0, urls: 1, node: 4, browser: { linkding: 40, karakeep: 60, pinboard: 12 }, ai: 0, tags: 0, seconds: 60, calls: { pinboard: 4 }, tagReads: { linkding: 2, karakeep: 2 } },
-    files: { all: [...WORKER, ...OPTIONS, ...POPUP], ...SELF_HOSTED },
+    files: [],
     settings: {},
     async steps(t) {
       await t.phase('readonly_extension');
@@ -156,7 +149,7 @@ export const MODULES = [
     // One assets read per poll: at most 21 in 120 s on a user instance (15 on
     // a temporary one), plus the create lookups.
     budget: { bookmarks: 1, urls: 1, node: 30, browser: 10, ai: 0, tags: 0, seconds: 120 },
-    files: [...WORKER, ...SELF_HOSTED.linkding],
+    files: [],
     settings: {},
     async steps(t) {
       const url = t.claimUrl();
@@ -204,7 +197,7 @@ export const MODULES = [
     features: ['popup-save', 'linkding-description', 'pinboard-popup-format', 'reader-read-later', 'reader-edit', 'reader-tag-separator', 'reader-delete'],
     needs: needs(),
     budget: { bookmarks: 1, urls: 1, node: 16, browser: { linkding: 90, karakeep: 130, pinboard: 40 }, ai: 0, tags: 2, lists: { karakeep: 1 }, seconds: { linkding: 90, karakeep: 90, pinboard: 120 }, calls: { pinboard: 24 } },
-    files: { all: [...WORKER, ...POPUP, ...READER], ...SELF_HOSTED },
+    files: [],
     settings: {},
     async steps(t) {
       const { prefix } = t;
@@ -301,7 +294,7 @@ export const MODULES = [
     features: ['worker-create', 'worker-merge', 'worker-conflict', 'archived-preserved', 'tags-recent', 'pinboard-required', 'shared-library'],
     needs: needs(),
     budget: { bookmarks: 1, urls: 1, node: { linkding: 20, karakeep: 12, pinboard: 6 }, browser: { linkding: 30, karakeep: 40, pinboard: 16 }, ai: 0, tags: 2, seconds: { linkding: 60, karakeep: 60, pinboard: 90 }, calls: { pinboard: 9 }, tagReads: { linkding: 1, karakeep: 1 } },
-    files: { all: [...WORKER, 'vocab-store.js'], ...SELF_HOSTED },
+    files: [],
     settings: {},
     async steps(t) {
       const { prefix } = t;
@@ -360,7 +353,7 @@ export const MODULES = [
     features: ['pinboard-quick-save-format', 'pinboard-quote-tag', 'pinboard-batch-save-format'],
     needs: needs(),
     budget: { bookmarks: 2, urls: 2, node: 8, browser: 20, ai: 0, tags: 4, seconds: 100, calls: { pinboard: 8 } },
-    files: [...WORKER],
+    files: [],
     settings: { aiTagSeparator: '-', optRespectTagCase: true, qsAutoNotes: true, qsBlockquote: true, qsAiTags: false, qsAiSummary: false, batchAiTags: false, batchAiSummary: false, batchSkipExisting: false, optReadlaterDefault: false },
     async steps(t) {
       const { prefix } = t;
@@ -428,7 +421,7 @@ export const MODULES = [
     features: ['native-space-tag', 'tag-spelling-alignment', 'malformed-quote', 'library-majority', 'no-twin-tags'],
     needs: needs(),
     budget: { bookmarks: 4, urls: 4, node: 30, browser: 120, ai: 0, tags: 5, seconds: 90, tagReads: 4 },
-    files: [...WORKER, ...SELF_HOSTED.karakeep, ...POPUP, ...READER],
+    files: [],
     settings: { optBlockquote: true, optAutoDescription: true, optRespectTagCase: true, tagSyncMode: 'fresh' },
     async steps(t) {
       const { prefix } = t;
@@ -511,7 +504,7 @@ export const MODULES = [
     features: ['selection-quote-escape', 'quote-description-separate', 'unread-link'],
     needs: needs(),
     budget: { bookmarks: 1, urls: 1, node: 4, browser: 40, ai: 0, tags: 0, seconds: 60, tagReads: 1 },
-    files: [...WORKER, ...SELF_HOSTED.linkding, ...POPUP],
+    files: [],
     settings: { optBlockquote: true, optAutoDescription: true, optRespectTagCase: true, tagSyncMode: 'fresh' },
     async steps(t) {
       await t.phase('linkding_quote_and_unread');
@@ -546,7 +539,7 @@ export const MODULES = [
     features: ['offline-queue', 'offline-create-fields', 'offline-update-fields', 'explicit-empty-description'],
     needs: needs(),
     budget: { bookmarks: 1, urls: 1, node: 6, browser: 60, ai: 0, tags: 1, seconds: 90, tagReads: 2 },
-    files: [...WORKER, ...SELF_HOSTED.linkding, ...POPUP, 'popup-offline.js'],
+    files: [],
     settings: { optBlockquote: true, optAutoDescription: true, optRespectTagCase: true, tagSyncMode: 'fresh', offlineQueueEnabled: true },
     async steps(t) {
       const { prefix } = t;
@@ -628,8 +621,8 @@ export const MODULES = [
     budget: { bookmarks: 1, urls: 1, node: 6, browser: { linkding: 40, karakeep: 60 }, ai: 3, tags: 2, seconds: 90 },
     // The fake AI provider is configured by the runner (needs.fakeAi); these
     // only reveal the popup's AI actions for this module.
-    // Re-shot in zh_CN: the two locales' message files are what it reads.
-    files: { all: [...WORKER, ...POPUP, 'popup-ai.js', 'ai.js', 'ai-cache.js', 'i18n.js', '_locales/en/messages.json', '_locales/zh_CN/messages.json'], ...SELF_HOSTED },
+    // Re-shot in zh_CN: that locale's messages are the one file it adds.
+    files: ['_locales/zh_CN/messages.json'],
     settings: { optShowAiTags: true, optShowAiSummary: true, optAiAutoTags: false },
     async steps(t) {
       const url = t.claimUrl();
@@ -679,7 +672,7 @@ export const MODULES = [
     // reconnects so the extension records it, and switches it back after.
     needs: needs({ target: 'temp', sharing: 'on', shots: true }),
     budget: { bookmarks: 2, urls: 2, node: 16, browser: 200, ai: 0, tags: 1, seconds: 150 },
-    files: [...WORKER, ...SELF_HOSTED.linkding, ...OPTIONS, ...POPUP, ...READER],
+    files: [],
     settings: {},
     async steps(t) {
       const { prefix } = t;
@@ -765,7 +758,7 @@ export const MODULES = [
     // reported success and no request storm.
     needs: needs({ target: 'temp', container: 'linkding-pg', shots: true }),
     budget: { bookmarks: 2, urls: 2, node: 12, browser: 80, ai: 0, tags: 1, seconds: 120, tagReads: 1 },
-    files: [...WORKER, ...SELF_HOSTED.linkding, ...POPUP, 'popup-offline.js'],
+    files: [],
     settings: { offlineQueueEnabled: true },
     async steps(t) {
       const { prefix } = t;
