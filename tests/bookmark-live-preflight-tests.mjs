@@ -556,6 +556,48 @@ try {
     rmSync(run.runDir, { recursive: true, force: true });
   }
 
+  // A guard violation stops the run, but cleanup still needs the API (run
+  // f1446f8e deleted only 3 of its 5 ledger bookmarks when every cleanup
+  // request failed with the violation): finalize deletes the ledger bookmark,
+  // adopts and deletes an unrecorded pool bookmark, and verifies.
+  {
+    const fatalRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    const pool = live.poolUrls('user', fatalRun.runId, 'linkding', 3);
+    const rows = new Map([['7', { id: 7, url: pool[0], tag_names: [] }], ['8', { id: 8, url: pool[1], tag_names: [] }], ['99', { id: 99, url: 'https://example.com/personal', tag_names: ['personal'] }]]);
+    const seen = [];
+    const server = createServer((req, res) => {
+      const url = new URL(req.url, 'http://x');
+      seen.push(req.method + ' ' + url.pathname);
+      const json = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
+      const record = url.pathname.match(/^\/api\/bookmarks\/(\d+)\/$/);
+      if (record) {
+        const row = rows.get(record[1]);
+        if (!row) return json(404, { detail: 'No Bookmark matches the given query.' });
+        if (req.method === 'DELETE') { rows.delete(record[1]); res.writeHead(204); return res.end(); }
+        return json(200, row);
+      }
+      if (url.pathname === '/api/bookmarks/check/') return json(200, { bookmark: [...rows.values()].find(r => r.url === url.searchParams.get('url')) || null, metadata: { title: null, description: null }, auto_tags: [] });
+      if (url.pathname === '/api/tags/') return json(200, { count: 0, next: null, previous: null, results: [] });
+      json(404, { detail: 'Not found.' });
+    });
+    const port = await listen(server);
+    const base = `http://127.0.0.1:${port}/`;
+    fatalRun.target = 'user';
+    fatalRun.instances.linkding = { id: 'linkding', service: 'linkding', base, root: live.apiRootFor('linkding', base), token: 'f'.repeat(40) };
+    fatalRun.caps = { linkding: live.BUDGETS.user.linkding };
+    fatalRun.reserve = { linkding: 60 };
+    fatalRun.pools.linkding = pool;
+    fatalRun.writesPossible = true;
+    fatalRun.report.ledger.created.push({ instance: 'linkding', id: '7', url: pool[0], source: 'route', module: 'linkding.core.worker', deleted: false });
+    fatalRun.setFatal('live_guard_mutation');
+    await fatalRun.finalize();
+    assert.deepEqual(seen.filter(s => s.startsWith('DELETE')), ['DELETE /api/bookmarks/7/', 'DELETE /api/bookmarks/8/'], 'ledger and pool bookmarks are deleted after a guard violation');
+    assert(rows.has('99'), 'a personal bookmark is untouched');
+    assert.deepEqual(fatalRun.report.ledger.created.map(e => [e.id, e.source, e.deleted]), [['7', 'route', true], ['8', 'pool', true]]);
+    assert.deepEqual([fatalRun.report.cleanup.apiVerified, fatalRun.report.cleanup.complete, fatalRun.fatal], [true, true, 'live_guard_mutation'], 'cleanup verifies; the violation stays on record');
+    await closeServer(server);
+  }
+
   // ---------------------------------------------------------------------
   // linkding tag cleanup: a run tag is deleted only after its own searches
   // (active and archived) find no bookmark. linkding 1.47 has two search
