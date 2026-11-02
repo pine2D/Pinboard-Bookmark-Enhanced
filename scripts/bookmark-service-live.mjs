@@ -170,7 +170,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // ---------------------------------------------------------------------------
 
 const BOOL_FLAGS = new Set(['--run', '--plan', '--list', '--help', '--read-only', '--confirm-karakeep-no-auto-ai', '--allow-dirty', '--shots', '--headed']);
-const VALUE_FLAGS = new Set(['--target', '--scenario', '--service', '--linkding', '--karakeep', '--credentials', '--cleanup', '--shots-dir', '--authorization']);
+const VALUE_FLAGS = new Set(['--target', '--scenario', '--service', '--linkding', '--karakeep', '--credentials', '--cleanup', '--shots-dir', '--authorization', '--ext-root']);
 
 export function parseArgs(argv) {
   const flags = new Set(), values = {}, errors = [];
@@ -190,6 +190,26 @@ export function parseArgs(argv) {
   else if (flags.has('--plan')) mode = 'plan';
   else if (flags.has('--list')) mode = 'list';
   return { mode, flags, values, errors };
+}
+
+// --ext-root: the unpacked extension the browser loads, by default this
+// repository. Another worktree (say a `git worktree add --detach` checkout of
+// a fix commit) lets this harness test that product code. A real directory
+// holding manifest.json; the path stays as resolved, links followed.
+export function resolveExtRoot(raw) {
+  if (raw === undefined) return ROOT;
+  let dir = '';
+  try { dir = realpathSync(resolve(String(raw))); } catch { fail('ext_root_invalid'); }
+  check(lstatSync(dir).isDirectory() && existsSync(join(dir, 'manifest.json')), 'ext_root_invalid');
+  return dir.endsWith('/') ? dir : dir + '/';
+}
+
+// A directory's HEAD and whether its worktree is clean (git status shows
+// nothing). Outside a git worktree: no HEAD, not clean.
+export function gitState(dir, git = (args, cwd) => spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8' })) {
+  const head = git(['rev-parse', 'HEAD'], dir);
+  const status = git(['status', '--porcelain'], dir);
+  return { head: head.status === 0 ? head.stdout.trim() : '', clean: head.status === 0 && status.status === 0 && status.stdout.trim() === '' };
 }
 
 export const SNAPSHOT_SKIP_NOTE = id => `工具读不到用户 linkding 的「自动 HTML 快照」开关，user 目标默认跳过；确认开关已开后可用 --scenario ${id} 显式点名运行`;
@@ -1244,6 +1264,7 @@ export class LiveRun {
     // The CLI never sets it, so a real run always uses pinboardHttp and the
     // 3 s interval.
     this.pinboardOpts = opts.pinboard || null;
+    this.extRoot = ROOT;
     this.instances = {};
     this.pools = {};
     this.claimed = {};
@@ -1268,7 +1289,7 @@ export class LiveRun {
     this.scheme = 'light';
     this.report = {
       harness: HARNESS_VERSION, runId: this.runId, prefix: this.prefix, mode: opts.mode, started: new Date().toISOString(),
-      head: '', clean: null, target: '', scenario: '', modules: [], skipped: [], instances: {}, pools: {},
+      head: '', clean: null, extRoot: '', productHead: '', productClean: null, target: '', scenario: '', modules: [], skipped: [], instances: {}, pools: {},
       ledger: { created: [], lists: [], tags: [] }, counts: {}, checks: [], readBackDiffs: [], console: [], swConsole: [],
       pageErrors: [], requestFailed: [], blockedOrigins: [], blockedSamples: [], violations: [], findings: [], shots: { dir: '', count: 0, manifest: '' },
       fakeAi: null, temp: null, cleanup: { complete: false, entries: [] }, failure: null, finished: null, passed: false,
@@ -1637,6 +1658,8 @@ export class LiveRun {
     check(['temp', 'user'].includes(target), 'target');
     this.target = target;
     this.report.target = target;
+    this.extRoot = resolveExtRoot(values['ext-root']);
+    this.report.extRoot = this.extRoot;
     const services = values.service ? values.service.split(',').map(s => s.trim()) : [...DEFAULT_SERVICES];
     check(services.length && services.every(s => SERVICE_TYPES.includes(s)), 'service');
     let scenario = values.scenario || 'core';
@@ -1731,12 +1754,19 @@ export class LiveRun {
       release = acquireLock(this.state, { pid: process.pid, runId: this.runId, reportPath: this.reportPath, started: this.report.started }, { onForeign: path => { (this.report.foreignLocks ||= []).push(path); this.persist(); } });
       const incomplete = scanIncompleteReports(this.state, this.runId);
       if (incomplete.length) { for (const file of incomplete) console.error('Previous report not cleaned: ' + file); fail('previous_cleanup_incomplete'); }
-      const head = spawnSync('git', ['-C', ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' });
-      this.report.head = head.status === 0 ? head.stdout.trim() : '';
-      const status = spawnSync('git', ['-C', ROOT, 'status', '--porcelain'], { encoding: 'utf8' });
-      this.report.clean = status.status === 0 && status.stdout.trim() === '';
+      // head / clean: this harness's tree. productHead / productClean: the
+      // extension the browser loads (--ext-root, else the same tree).
+      const tool = gitState(ROOT);
+      this.report.head = tool.head;
+      this.report.clean = tool.clean;
       check(this.report.clean || this.opts.flags.has('--allow-dirty'), 'worktree_dirty');
       this.report.allowDirty = this.opts.flags.has('--allow-dirty');
+      const product = this.extRoot === ROOT ? tool : gitState(this.extRoot);
+      this.report.productHead = product.head;
+      this.report.productClean = product.clean;
+      // Another tree is there to test one commit: --allow-dirty (for this
+      // harness's own tree) does not cover it.
+      check(this.extRoot === ROOT || (product.head && product.clean), 'ext_root_dirty');
       this.report.plan = { instances: this.plan.budget, fakeAi: this.plan.fakeAi, limits: this.plan.limits };
       this.runDeadline = Date.now() + BUDGETS[this.target].run.runMinutes * 60000;
       this.runTimer = setTimeout(() => { this.setFatal('run_time_budget'); this.closeBrowserNow(); }, BUDGETS[this.target].run.runMinutes * 60000);
@@ -2146,7 +2176,7 @@ export class LiveRun {
     this.headed = this.plan.headed;
     const launch = () => chromium.launchPersistentContext(this.profile, {
       headless: !this.headed, executablePath: chromium.executablePath(), viewport: { width: 1280, height: 900 },
-      args: [`--disable-extensions-except=${ROOT}`, `--load-extension=${ROOT}`, '--no-first-run', '--disable-background-networking', '--disable-component-update', '--disable-sync', '--no-pings', '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost'],
+      args: [`--disable-extensions-except=${this.extRoot}`, `--load-extension=${this.extRoot}`, '--no-first-run', '--disable-background-networking', '--disable-component-update', '--disable-sync', '--no-pings', '--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost'],
     });
     const getWorker = async ctx => ctx.serviceWorkers().find(w => w.url().startsWith('chrome-extension://')) || ctx.waitForEvent('serviceworker', { predicate: w => w.url().startsWith('chrome-extension://') });
     let ctx = await launch();
@@ -3214,7 +3244,7 @@ export class LiveRun {
       if (items.length > max) lines.push(rest(items.length - max));
     };
     lines.push(`# 真实测试摘要 ${r.runId}`);
-    lines.push(`- 结论：${r.passed ? '通过' : '未通过'}${r.failure ? `（${r.failure.phase}：${r.failure.code}）` : ''}；目标 ${r.target || '未定'}；HEAD ${(r.head || '未知').slice(0, 12)}；工作区干净：${r.clean === null ? '未检查' : r.clean ? '是' : '否'}`);
+    lines.push(`- 结论：${r.passed ? '通过' : '未通过'}${r.failure ? `（${r.failure.phase}：${r.failure.code}）` : ''}；目标 ${r.target || '未定'}；工具 HEAD ${(r.head || '未知').slice(0, 12)}；工作区干净：${r.clean === null ? '未检查' : r.clean ? '是' : '否'}${r.extRoot && r.extRoot !== ROOT ? `；产品 HEAD ${(r.productHead || '未知').slice(0, 12)}（--ext-root）` : ''}`);
     for (const path of (Array.isArray(r.foreignLocks) ? r.foreignLocks : []).slice(-2)) lines.push(`- 已释放外来版本的陈旧锁：${oneLine(path, 200)}（报告留给人工核对）`);
     const instanceNames = Object.keys(r.instances || {});
     if (instanceNames.length) lines.push(`- 请求：${instanceNames.map(i => `${i} Node ${r.counts?.[i]?.node ?? 0} / 浏览器 ${r.counts?.[i]?.browser ?? 0}`).join('；')}${r.fakeAi ? `；假 AI ${(r.fakeAi.calls || []).filter(c => c.status === 200).length}/${r.fakeAi.limit}` : ''}`);
@@ -3627,6 +3657,8 @@ function printHelp() {
     '  Pinboard runs on --target user only, with pinboardToken ("user:HEX") from --credentials; without that key its',
     '  modules are skipped. Every Pinboard request waits 3 s after the previous answer; --plan shows the floor.',
     '--shots [--shots-dir DIR] saves masked screenshots; --headed launches a visible browser; --allow-dirty runs on a dirty tree.',
+    '--ext-root DIR loads the extension from another worktree (e.g. a `git worktree add --detach` of a fix commit); it must',
+    '  be clean (--allow-dirty covers only this harness\'s tree); the report records both HEADs.',
     '--cleanup REPORT resumes an incomplete cleanup of a report in the state directory; the user target needs',
     '  --credentials and the same --linkding / --karakeep again. It deletes no Karakeep list: one still present is',
     '  reported as residue for a person to check and remove.',
@@ -3655,6 +3687,7 @@ export async function main(argv = process.argv.slice(2), { dockerExec, modules, 
       const plan = buildPlan({ target, selected, skipped, shotsEnabled: opts.flags.has('--shots') || !!opts.values['shots-dir'], headedFlag: opts.flags.has('--headed') });
       plan.scenario = scenario;
       plan.services = services;
+      plan.extRoot = resolveExtRoot(opts.values['ext-root']);
       if (target === 'user') plan.bases = Object.fromEntries(services.filter(s => opts.values[s]).map(s => [s, validateBase(opts.values[s])]));
       // Rounds left under the named authorisation: a local count, no credential.
       plan.authorization = target === 'user' ? authorizationStatus(stateDir(), opts.values.authorization || '', BUDGETS.user.run.roundsPerAuthorization) : { required: false };

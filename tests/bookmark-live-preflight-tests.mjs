@@ -9,11 +9,11 @@
 //  - the browser is the bundled Chromium: a plain page for the screenshot
 //    canary and the extension for the read-only loopback path.
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createServer, request as httpRequest } from 'node:http';
 import { EventEmitter } from 'node:events';
 import { createRequire } from 'node:module';
-import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -2146,6 +2146,43 @@ try {
     assert.equal(edgePlan.budget.karakeep.bookmarks, 4);
     assert.equal(edgePlan.budget.karakeep.caps.bookmarks, 12);
     assert.equal(edgePlan.karakeepWritesRequireAutoAiDisabled, true);
+    // --ext-root (H3a): the browser loads another worktree's extension. The
+    // report keeps this harness's HEAD and the product's apart; a product
+    // tree that is not clean is refused before any credential, round or
+    // request (--allow-dirty covers only the harness's own tree).
+    {
+      const ext = join(dir, 'ext-root');
+      mkdirSync(ext);
+      writeFileSync(join(ext, 'manifest.json'), '{}\n');
+      const git = (...args) => spawnSync('git', ['-C', ext, '-c', 'user.name=pbp', '-c', 'user.email=pbp@example.invalid', '-c', 'commit.gpgsign=false', ...args], { encoding: 'utf8' });
+      git('init', '-q');
+      git('add', 'manifest.json');
+      git('commit', '-q', '-m', 'synthetic product');
+      const productHead = git('rev-parse', 'HEAD').stdout.trim();
+      assert.match(productHead, /^[0-9a-f]{40}$/);
+      const extState = stateDirFor('ext-root');
+      const extArgs = ['--run', '--target', 'user', '--read-only', '--service', 'linkding', '--linkding', 'http://127.0.0.1:9', '--allow-dirty', '--ext-root', ext];
+      const clean = await run(extArgs, { credentials: false, state: extState });
+      assert.equal(clean.report.failure.code, 'credentials_path', clean.output);
+      assert.equal(clean.report.extRoot, realpathSync(ext) + '/');
+      assert.equal(clean.report.productHead, productHead);
+      assert.equal(clean.report.productClean, true);
+      assert.match(clean.report.head, /^[0-9a-f]{40}$/);
+      assert.notEqual(clean.report.head, productHead);
+      assert(readFileSync(join(clean.reportPath, '..', 'summary.zh.md'), 'utf8').includes('产品 HEAD ' + productHead.slice(0, 12)));
+      writeFileSync(join(ext, 'popup.js'), '// uncommitted\n');
+      const dirty = await run(extArgs, { credentials: false, state: extState });
+      assert.equal(dirty.code, 1);
+      assert.equal(dirty.report.failure.code, 'ext_root_dirty');
+      assert.equal(dirty.report.productClean, false);
+      assert.equal(dirty.report.authorization, undefined, 'no round claimed');
+      const missing = await run([...extArgs.slice(0, -1), join(dir, 'no-such-tree')], { credentials: false, state: extState });
+      assert.equal(missing.report.failure.code, 'ext_root_invalid');
+      const extPlan = JSON.parse((await run(['--plan', '--ext-root', ext], { credentials: false })).output);
+      assert.equal(extPlan.extRoot, realpathSync(ext) + '/');
+      assert.equal(JSON.parse((await run(['--plan'], { credentials: false })).output).extRoot, root);
+    }
+
     // Rounds per authorisation: three per label, refused before any credential
     // read or request, and shown by --plan.
     {
