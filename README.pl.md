@@ -78,7 +78,7 @@ Po instalacji otwórz **Ustawienia → Konto** i wybierz usługę. Dla Karakeep 
 
 Okienko, czytnik, skróty i zapis zbiorczy korzystają z wybranej usługi. Karakeep używa osobnej prywatnej listy „Przeczytaj później”; oznaczenie zakładki jako przeczytanej usuwa ją z listy bez zmiany stanu archiwizacji. linkding używa znacznika nieprzeczytanych. Podpowiedzi Pinboard, porządkowanie tagów, licznik nieprzeczytanych, wyszukiwanie w witrynie i zestawy kart pozostają funkcjami Pinboard.
 
-Słownictwo, wyróżnienia, notatki, zapisane hasła AI i historia Ask tworzą wspólną bibliotekę osobistą dla wszystkich trzech usług. Zmiana usługi ani wylogowanie nie przełącza biblioteki. Aktualizacja zachowuje obecną bibliotekę Pinboard bez łączenia dawnych kont. Pamięć podręczna zakładek, szkice i kolejki offline pozostają przypisane do pierwotnego połączenia. Ponowne połączenie z linkding tworzy nowe połączenie; wcześniejsze oczekujące zapisy wymagają sprawdzenia.
+Słownictwo, wyróżnienia, notatki, zapisane hasła AI i historia Ask tworzą wspólną bibliotekę osobistą dla wszystkich trzech usług. Zmiana usługi ani wylogowanie nie przełącza biblioteki. Aktualizacja zachowuje obecną bibliotekę Pinboard bez łączenia dawnych kont. Pamięć podręczna zakładek, szkice i kolejki offline pozostają przypisane do pierwotnego połączenia. Ponowne połączenie z linkding po wylogowaniu tworzy nowe połączenie; zapisy, które czekały w poprzednim, nie są ponawiane automatycznie.
 
 ## Prywatność
 

@@ -78,7 +78,7 @@ After installing, open **Settings → Account** and choose your bookmark service
 
 Popup, reader, shortcut and batch saves use the selected service. Karakeep uses a dedicated private list for Read Later; marking an item as read removes it from the list without archiving it. linkding uses its unread flag. Pinboard suggestions, tag cleanup, unread counts, site search and Tab Sets remain Pinboard-only.
 
-Vocabulary, highlights, notes, AI dictionary archives and Ask history share one personal library across all three services. Switching services or signing out does not switch the library. Upgrading preserves the current Pinboard library; other historical accounts are not merged. Bookmark caches, drafts and offline queues remain tied to their original connection. Reconnecting linkding creates a new connection, so earlier pending saves require review.
+Vocabulary, highlights, notes, AI dictionary archives and Ask history share one personal library across all three services. Switching services or signing out does not switch the library. Upgrading preserves the current Pinboard library; other historical accounts are not merged. Bookmark caches, drafts and offline queues remain tied to their original connection. Connecting to linkding again after signing out counts as a new connection, so saves still waiting from the earlier one are not retried automatically.
 
 ## Privacy
 

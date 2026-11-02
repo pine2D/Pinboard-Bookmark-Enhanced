@@ -78,7 +78,7 @@ Der Quellcode verwendet eine eigene feste Entwicklungs-ID und kann deshalb zu Te
 
 Popup, Reader, Tastenkürzel und Stapelspeicherung verwenden den ausgewählten Dienst. Karakeep verwaltet „Später lesen“ in einer eigenen privaten Liste. Als gelesen markierte Einträge werden daraus entfernt; ihr Archivstatus bleibt unverändert. linkding verwendet die Ungelesen-Markierung. Pinboard-Vorschläge, Tag-Bereinigung, Ungelesen-Zähler, Website-Suche und Tab-Sets bleiben Pinboard vorbehalten.
 
-Vokabeln, Markierungen, Notizen, gespeicherte KI-Wörterbucheinträge und Ask-Verläufe gehören zu einer persönlichen Bibliothek für alle drei Dienste. Ein Dienstwechsel oder eine Abmeldung wechselt die Bibliothek nicht. Beim Update bleibt die aktuelle Pinboard-Bibliothek erhalten; ältere andere Konten werden nicht zusammengeführt. Lesezeichen-Caches, Entwürfe und Offline-Warteschlangen bleiben an ihre ursprüngliche Verbindung gebunden. Eine erneute Verbindung mit linkding erhält eine neue Kennung; frühere ausstehende Speicherungen müssen geprüft werden.
+Vokabeln, Markierungen, Notizen, gespeicherte KI-Wörterbucheinträge und Ask-Verläufe gehören zu einer persönlichen Bibliothek für alle drei Dienste. Ein Dienstwechsel oder eine Abmeldung wechselt die Bibliothek nicht. Beim Update bleibt die aktuelle Pinboard-Bibliothek erhalten; ältere andere Konten werden nicht zusammengeführt. Lesezeichen-Caches, Entwürfe und Offline-Warteschlangen bleiben an ihre ursprüngliche Verbindung gebunden. Wer sich bei linkding abmeldet und sich erneut verbindet, startet eine neue Verbindung; noch wartende Speicherungen der früheren Verbindung werden nicht automatisch wiederholt.
 
 ## Datenschutz
 

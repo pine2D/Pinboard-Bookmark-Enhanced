@@ -78,7 +78,7 @@ Après l’installation, ouvrez **Paramètres → Compte** et choisissez votre s
 
 Le popup, le lecteur, les raccourcis et l’enregistrement par lot utilisent le service choisi. Karakeep gère « À lire plus tard » dans une liste privée dédiée ; marquer un signet comme lu le retire de cette liste sans changer son archivage. linkding utilise son indicateur non lu. Les suggestions Pinboard, le nettoyage des étiquettes, le compteur de non-lus, la recherche sur le site et les ensembles d’onglets restent réservés à Pinboard.
 
-Le vocabulaire, les surlignages, les notes, les entrées IA archivées et l’historique Ask partagent une bibliothèque personnelle entre les trois services. Changer de service ou se déconnecter ne change pas de bibliothèque. La mise à jour conserve la bibliothèque Pinboard actuelle sans fusionner les anciens comptes. Les caches, brouillons et files d’attente hors ligne des signets restent liés à leur connexion d’origine. Une reconnexion à linkding crée une nouvelle connexion ; les anciens enregistrements en attente doivent être vérifiés.
+Le vocabulaire, les surlignages, les notes, les entrées IA archivées et l’historique Ask partagent une bibliothèque personnelle entre les trois services. Changer de service ou se déconnecter ne change pas de bibliothèque. La mise à jour conserve la bibliothèque Pinboard actuelle sans fusionner les anciens comptes. Les caches, brouillons et files d’attente hors ligne des signets restent liés à leur connexion d’origine. Se reconnecter à linkding après une déconnexion crée une nouvelle connexion ; les enregistrements encore en attente de l’ancienne ne sont pas relancés automatiquement.
 
 ## Confidentialité
 
