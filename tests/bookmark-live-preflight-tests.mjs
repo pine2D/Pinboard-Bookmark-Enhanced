@@ -216,6 +216,18 @@ try {
   // Registry, selection and wildcards
   // ---------------------------------------------------------------------
   if (only('registry and selection')) {
+    // Parts are declared in their rows, which is what the runner reads
+    // (review of H3b, should-fix: long_chip's features had landed on an
+    // evaluate() call, so the part decided no feature). Every declared part
+    // names at least one of its row's features and only its row's fix groups.
+    {
+      assert.deepEqual(live.registryProblems(), [], 'the registry declares its parts');
+      const withParts = MODULES.filter(m => m.parts);
+      assert(withParts.length >= 10 && withParts.every(m => Object.keys(m.parts).length), 'the rows with parts declare them');
+      assert.deepEqual(MODULES.find(m => m.id === 'sh.tag-input').parts.long_chip.features, ['long-tag-chip-geometry']);
+      const bad = { id: 'x', services: ['linkding'], features: ['a'], fixRefs: ['G1'], parts: { p: { fixRefs: ['G1'], features: [] }, q: { fixRefs: ['G9'], features: ['b'] }, r: { fixRefs: ['G1'] } } };
+      assert.deepEqual(live.registryProblems([bad]), ['x:p:no_features', 'x:q:feature_not_in_row:b', 'x:q:fixref_not_in_row:G9', 'x:r:no_features']);
+    }
     // H3c modules: the screenshot matrix writes nothing and covers every
     // locale the extension ships (pictures or geometry alone).
     {
@@ -234,7 +246,7 @@ try {
       const fake = {
         service: 'linkding', shotsEnabled: true, claimUrl: () => 'https://example.com/x',
         phase: async () => {}, note: () => {}, check: () => {}, expectEq: (a, b, code) => assert.equal(a, b, code),
-        part: async (name, refs, fn) => fn(),
+        part: async (name, fn) => fn(),
         openPopup: async () => ({ popup: {}, close: async () => {} }), openOptions: async () => ({ locator: () => ({ scrollIntoViewIfNeeded: async () => {} }), close: async () => {} }), openReader: async () => ({ close: async () => {} }),
         shot: async (page, name, { locales, schemes, onState, geometryOnly }) => {
           const out = [];
@@ -1334,6 +1346,7 @@ try {
       const seen = [];
       const mod = {
         id: 'linkding.parts.check', instance: 'linkding', service: 'linkding', needs: { writes: false }, settings: {}, fixRefs: ['G1', 'G2'], features: ['f-first', 'f-second', 'f-outside'],
+        parts: { first: { fixRefs: ['G1'], features: ['f-first'] }, second: { fixRefs: ['G2'], features: ['f-second'] }, fatal: { fixRefs: ['G1'], features: ['f-first'] } },
         budget: { bookmarks: 0, urls: 0, node: 0, browser: 0, ai: 0, tags: 0, seconds: 5 },
         async steps(t) {
           t.inject({ method: 'POST', path: /^bookmarks/, status: 502 });
@@ -1341,14 +1354,14 @@ try {
           for (const spec of [{ method: 'POST', status: 201, body: { id: 1 } }, { status: 200, body: {} }, { method: 'PATCH', status: 204 }]) {
             assert.throws(() => t.inject(spec), e => e.code === 'inject_write_success' && e.fatal === true, 'a made-up write success would be recorded by the worker guard: ' + JSON.stringify(spec));
           }
-          await t.part('first', ['G1'], async () => {
+          await t.part('first', async () => {
             await t.phase('first_phase');
             t.inject({ method: 'GET', path: /^bookmarks\/check/, status: 503 });
             t.expectEq('shown', 'wanted', 'first_failed');
             seen.push('after the failed expectation');
-          }, ['f-first']);
+          });
           seen.push(run.faults.length);
-          const ok = await t.part('second', ['G2'], async () => { await t.phase('second_phase'); seen.push('second'); }, ['f-second']);
+          const ok = await t.part('second', async () => { await t.phase('second_phase'); seen.push('second'); });
           seen.push(ok);
           seen.push(t.pending('one line', 'two\n\nlines', 'pending_split', 'Description control shape'));
         },
@@ -1374,13 +1387,22 @@ try {
       assert(/- 通过（1）：f-second\n/.test(summary), 'a passed part\'s feature passes');
       assert(summary.includes('- 未通过 f-first：linkding.parts.check') && summary.includes('- 未通过 f-outside：linkding.parts.check'), 'the failed part\'s feature and an unmapped one fail');
       const strayRun = partRun();
-      const strayMod = { ...mod, id: 'linkding.parts.stray', async steps(t) { await t.part('stray', ['G1'], async () => {}, ['not-declared']); } };
+      const strayMod = { ...mod, id: 'linkding.parts.stray', parts: { stray: { fixRefs: ['G1'], features: ['not-declared'] } }, async steps(t) { await t.part('stray', async () => {}); } };
       await assert.rejects(quiet(() => strayRun.runModule(strayMod)), e => e.code === 'part_feature_undeclared');
+      // A part the row does not declare, or the old four-argument form
+      // (whose features once landed on the wrong call unnoticed), is fatal.
+      for (const [name, steps, code] of [
+        ['undeclared', async t => { await t.part('nowhere', async () => {}); }, 'part_undeclared'],
+        ['old-form', async t => { await t.part('first', ['G1'], async () => {}, ['f-first']); }, 'part_signature'],
+      ]) {
+        const r = partRun();
+        await assert.rejects(quiet(() => r.runModule({ ...mod, id: 'linkding.parts.' + name, steps })), e => e.code === code, name);
+      }
       assert(summary.includes('分段：first 失败于 first_phase，first_failed（依赖 G1）；second 通过（依赖 G2）'), 'the summary names each part with its own fix groups');
       assert(summary.includes('linkding.parts.check 待裁定：pending_split（Description control shape'), 'the summary lists pending rulings');
       const fatalRun = partRun();
       let after = false;
-      const fatalMod = { ...mod, id: 'linkding.parts.fatal', async steps(t) { await t.part('fatal', ['G1'], async () => { fatalRun.setFatal('live_guard_mutation'); t.expect(true, 'x'); }); after = true; } };
+      const fatalMod = { ...mod, id: 'linkding.parts.fatal', async steps(t) { await t.part('fatal', async () => { fatalRun.setFatal('live_guard_mutation'); t.expect(true, 'x'); }); after = true; } };
       await assert.rejects(quiet(() => fatalRun.runModule(fatalMod)), e => e.code === 'live_guard_mutation');
       assert.deepEqual([fatalRun.report.modules[0].status, after], ['aborted', false], 'a fatal finding in a part ends the module');
       // A failed part does not skip the module's closing checks: a module
@@ -1388,8 +1410,8 @@ try {
       // and an undeclared surface or an uncaught page error is recorded.
       const overRun = partRun();
       const overMod = { ...mod, id: 'linkding.parts.over', surfaces: [], async steps(t) {
-        await t.part('first', ['G1'], async () => { t.expectEq('shown', 'wanted', 'first_failed'); });
-        await t.part('second', ['G2'], async () => { overRun.count('linkding').browser += 5; overRun.report.pageErrors.push({ message: 'boom' }); });
+        await t.part('first', async () => { t.expectEq('shown', 'wanted', 'first_failed'); });
+        await t.part('second', async () => { overRun.count('linkding').browser += 5; overRun.report.pageErrors.push({ message: 'boom' }); });
       } };
       await assert.rejects(quiet(() => overRun.runModule(overMod)), e => e.code === 'module_request_budget');
       const over = overRun.report.modules[0];
@@ -1419,7 +1441,7 @@ try {
       // names the abort, not the earlier part's code.
       const lateRun = partRun();
       const lateMod = { ...mod, id: 'linkding.parts.late', async steps(t) {
-        await t.part('first', ['G1'], async () => { t.expectEq('shown', 'wanted', 'first_failed'); });
+        await t.part('first', async () => { t.expectEq('shown', 'wanted', 'first_failed'); });
         lateRun.fatal = 'live_guard_mutation';
       } };
       await assert.rejects(quiet(() => lateRun.runModule(lateMod)), e => e.code === 'live_guard_mutation');
@@ -1428,8 +1450,8 @@ try {
       // undeclared surface are kept beside it.
       const softRun = partRun();
       const softMod = { ...mod, id: 'linkding.parts.soft', surfaces: [], async steps(t) {
-        await t.part('first', ['G1'], async () => { t.expectEq('shown', 'wanted', 'first_failed'); });
-        await t.part('second', ['G2'], async () => { softRun.report.pageErrors.push({ message: 'boom' }); softRun.currentModule.driven.add('popup'); });
+        await t.part('first', async () => { t.expectEq('shown', 'wanted', 'first_failed'); });
+        await t.part('second', async () => { softRun.report.pageErrors.push({ message: 'boom' }); softRun.currentModule.driven.add('popup'); });
       } };
       await quiet(() => softRun.runModule(softMod));
       const soft = softRun.report.modules[0];
@@ -1533,7 +1555,7 @@ try {
             const popup = { evaluate: async fn => (String(fn).includes("'idle', 'pending'") ? done : 'error') };
             return { popup, close: async () => {} };
           },
-          part: async (name, refs, fn) => { try { await fn(); parts[name] = 'passed'; } catch (e) { parts[name] = e.code || e.message; } },
+          part: async (name, fn) => { try { await fn(); parts[name] = 'passed'; } catch (e) { parts[name] = e.code || e.message; } },
         };
         await statusModule.steps(t);
         return parts;
@@ -1576,7 +1598,7 @@ try {
           base: 'http://127.0.0.1:9/',
           openPopup: async (url, opts) => { if (opts?.locale) locale = opts.locale; return { popup, close: async () => {} }; },
           openReader: async () => fail('stand_in_reader'),
-          part: async (name, refs, fn) => { part = name; try { await fn(); parts[name] = 'passed'; } catch (e) { parts[name] = e.code || e.message; } },
+          part: async (name, fn) => { part = name; try { await fn(); parts[name] = 'passed'; } catch (e) { parts[name] = e.code || e.message; } },
         };
         await copyModule.steps(t);
         return [parts.popup_delete_failure, parts.lookup_5xx];
@@ -1634,7 +1656,7 @@ try {
           if (text.includes('__pbpItHeldToken')) { const was = world.held; world.held = false; return was; }
           throw new Error('unexpected worker call ' + text.slice(0, 60));
         },
-        part: async (name, refs, fn) => { if (!want.has(name)) return; try { await fn(); parts[name] = 'passed'; } catch (e) { parts[name] = e.code || e.message; } },
+        part: async (name, fn) => { if (!want.has(name)) return; try { await fn(); parts[name] = 'passed'; } catch (e) { parts[name] = e.code || e.message; } },
       };
       await barModule.steps(t);
       assert.deepEqual(parts, { empty_title: 'passed', not_connected: 'passed' }, JSON.stringify(parts));

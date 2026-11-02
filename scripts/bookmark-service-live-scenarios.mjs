@@ -24,6 +24,12 @@
 //             decisions require once those fixes land, so a row whose groups
 //             are not committed yet is expected to fail on that tree; the
 //             Chinese summary names the groups next to a failed row
+//   parts     { <name>: { fixRefs, features } } for each t.part(name, fn) the
+//             steps call: the part's own fix groups (a subset of the row's)
+//             and the features it decides (at least one, all from the row's
+//             features). The summary judges a feature by the parts naming
+//             it; the preflight checks every declaration (registryProblems)
+//             and a call naming an undeclared part is fatal (part_undeclared)
 //   needs     { fakeAi, target: 'temp'|'user'|'any', container, sharing: 'any'|'on'|'off',
 //               headed, shots, pinboard, writes, urls, snapshots }
 //             longTag: 'none' | 'injected' | 'server'. A row that sends a tag
@@ -1060,6 +1066,14 @@ export const SELFHOSTED_MODULES = [
     surfaces: ['popup'],
     features: ['linkding-no-page-info', 'linkding-empty-description-hint', 'linkding-browser-metadata', 'linkding-preload'],
     fixRefs: ['G2', 'G2b', 'G26'],
+    parts: {
+      unreadable_abort: { fixRefs: ['G2b'], features: ['linkding-no-page-info'] },
+      empty_hint: { fixRefs: ['G26'], features: ['linkding-empty-description-hint'] },
+      readable_no_hint: { fixRefs: ['G26'], features: ['linkding-empty-description-hint'] },
+      server_metadata: { fixRefs: ['G26'], features: ['linkding-browser-metadata'] },
+      preload: { fixRefs: ['G26'], features: ['linkding-preload'] },
+      unreadable_pdf: { fixRefs: ['G2b', 'G26'], features: ['linkding-no-page-info', 'linkding-empty-description-hint'] },
+    },
     needs: needs({ shots: true }),
     // The readable-page hint part claims one more URL and opens two popups
     // without saving.
@@ -1099,7 +1113,7 @@ export const SELFHOSTED_MODULES = [
       };
       let aborted = null, abortUrl = '';
 
-      await t.part('unreadable_abort', ['G2b'], async () => {
+      await t.part('unreadable_abort', async () => {
         await t.phase('page_info_abort');
         abortUrl = t.claimUrl();
         t.inject({ on: 'page', path: abortUrl, abort: 'connectionrefused' });
@@ -1108,16 +1122,16 @@ export const SELFHOSTED_MODULES = [
         t.expect(!!aborted.sent, 'abort_create_sent');
         t.expect(!aborted.sent.description, 'abort_description_sent');
         t.expect(!aborted.sent.scrapingDisabled, 'abort_scraping_disabled');
-      }, ['linkding-no-page-info']);
-      await t.part('empty_hint', ['G26'], async () => {
+      });
+      await t.part('empty_hint', async () => {
         t.expect(!!aborted, 'abort_case_missing');
         t.expect(aborted.hint.any, 'abort_empty_hint');
-      }, ['linkding-empty-description-hint']);
+      });
       // The other half of decision 14: a page that could be read shows no
       // hint, whether its meta description filled the box or it had none
       // (the box may then be empty or filled from the page). One URL, two
       // page variants, nothing saved.
-      await t.part('readable_no_hint', ['G26'], async () => {
+      await t.part('readable_no_hint', async () => {
         await t.phase('page_info_readable_hint');
         const url = t.claimUrl();
         const variants = [['filled', articleHtml({ title: prefix + ' readable' })], ['no_meta', articleHtml({ title: prefix + ' readable', description: null })]];
@@ -1133,9 +1147,9 @@ export const SELFHOSTED_MODULES = [
           await form.close();
           served.clear();
         }
-      }, ['linkding-empty-description-hint']);
+      });
 
-      await t.part('server_metadata', ['G26'], async () => {
+      await t.part('server_metadata', async () => {
         await t.phase('page_info_server_metadata');
         const metaKey = await t.productSetting(/linkding.*(browser|metadata)|browser.*meta/, 'linkding_browser_metadata');
         t.expectEq(await t.sw(key => SETTINGS_DEFAULTS[key], metaKey), true, 'browser_metadata_default');
@@ -1151,11 +1165,11 @@ export const SELFHOSTED_MODULES = [
         const [metaCreate] = createsOf(t, meta, since);
         t.expect(!!metaCreate && /disable_scraping/.test(metaCreate.path), 'server_metadata_disable_scraping');
         await form.close();
-      }, ['linkding-browser-metadata']);
+      });
 
       // Pre-read off (the default): neither loading a page nor switching to
       // it asks /check/; on, switching tabs does and the icon follows.
-      await t.part('preload', ['G26'], async () => {
+      await t.part('preload', async () => {
         await t.phase('page_info_preload');
         const preloadKey = await t.productSetting(/linkding.*(preload|prefetch|preread|whilebrows|browsing)|(preload|prefetch).*page/, 'linkding_preload');
         t.expectEq(await t.sw(key => SETTINGS_DEFAULTS[key], preloadKey), false, 'preload_default');
@@ -1178,14 +1192,14 @@ export const SELFHOSTED_MODULES = [
         t.expectEq(icon, 'saved', 'preload_icon_saved');
         await first.close();
         await second.close();
-      }, ['linkding-preload']);
+      });
 
       // A PDF served for the URL. Chrome's PDF viewer page can still be
       // scripted, so the product may read it as a page: whether that counts
       // as "no page info" is the user's ruling (H3b open question). The
       // expectations are recorded as pending, not failed; last, so they
       // hold nothing up.
-      await t.part('unreadable_pdf', ['G2b', 'G26'], async () => {
+      await t.part('unreadable_pdf', async () => {
         await t.phase('page_info_pdf');
         const pdf = t.claimUrl();
         t.inject({ on: 'page', path: pdf, status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n' });
@@ -1210,6 +1224,11 @@ export const SELFHOSTED_MODULES = [
     surfaces: ['popup', 'reader'],
     features: ['linkding-singlefile', 'singlefile-paths', 'singlefile-missing-notice'],
     fixRefs: ['G26'],
+    parts: {
+      popup: { fixRefs: ['G26'], features: ['linkding-singlefile', 'singlefile-missing-notice'] },
+      quick_save: { fixRefs: ['G26'], features: ['linkding-singlefile', 'singlefile-paths'] },
+      not_batch_reader_replay: { fixRefs: ['G26'], features: ['singlefile-paths'] },
+    },
     needs: needs({ target: 'temp', shots: true }),
     budget: { bookmarks: 5, urls: 5, node: 4, browser: 70, ai: 0, tags: 0, seconds: 90, tagReads: 1 },
     files: [],
@@ -1225,7 +1244,7 @@ export const SELFHOSTED_MODULES = [
       t.expectEq(await t.sw(key => SETTINGS_DEFAULTS[key], singleKey), false, 'singlefile_default');
       await t.settings({ [singleKey]: true });
 
-      await t.part('popup', ['G26'], async () => {
+      await t.part('popup', async () => {
         await t.phase('singlefile_popup');
         const url = t.claimUrl();
         const form = await t.openPopup(url);
@@ -1241,15 +1260,15 @@ export const SELFHOSTED_MODULES = [
         await t.shot(form.popup, 'singlefile-missing', { surface: 'popup', keys: ['#submit-btn'] });
         await t.axe(form.popup, 'singlefile-missing');
         await form.close();
-      }, ['linkding-singlefile', 'singlefile-missing-notice']);
-      await t.part('quick_save', ['G26'], async () => {
+      });
+      await t.part('quick_save', async () => {
         await t.phase('singlefile_quick_save');
         const url = t.claimUrl(), since = t.now();
         const r = await shortcutSave(t, url, 'qs');
         t.note('quickSave', r);
         t.expect(marked(await createOf(url, since, 'singlefile_quick_create')), 'singlefile_quick_marker');
-      }, ['linkding-singlefile', 'singlefile-paths']);
-      await t.part('not_batch_reader_replay', ['G26'], async () => {
+      });
+      await t.part('not_batch_reader_replay', async () => {
         await t.phase('singlefile_batch');
         const batchUrl = t.claimUrl();
         let since = t.now();
@@ -1271,7 +1290,7 @@ export const SELFHOSTED_MODULES = [
         since = t.now();
         await drainQueue(t);
         t.expect(!marked(await createOf(replayUrl, since, 'singlefile_replay_create')), 'singlefile_replay_marker');
-      }, ['singlefile-paths']);
+      });
       t.check('linkding: with SingleFile on, popup and quick-save creates carry disable_html_snapshot, the popup saves and says SingleFile did not answer (console.warn too); batch, reader and offline replay creates do not');
     },
   },
@@ -1283,6 +1302,11 @@ export const SELFHOSTED_MODULES = [
     surfaces: ['popup'],
     features: ['fake-ai', 'ai-summary-description-rules', 'ai-summary-remove-restores'],
     fixRefs: ['G24'],
+    parts: {
+      replace_meta_or_empty: { fixRefs: ['G24'], features: ['ai-summary-description-rules', 'ai-summary-remove-restores'] },
+      append_after_user_text: { fixRefs: ['G24'], features: ['ai-summary-description-rules', 'ai-summary-remove-restores'] },
+      append_after_server_text: { fixRefs: ['G24'], features: ['ai-summary-description-rules'] },
+    },
     needs: needs({ fakeAi: true, shots: true }),
     budget: { bookmarks: 2, urls: 2, node: 6, browser: 40, ai: 7, tags: 0, seconds: 90, tagReads: 1 },
     files: [],
@@ -1324,7 +1348,7 @@ export const SELFHOSTED_MODULES = [
       const form = await t.openPopup(url);
       const { popup } = form;
 
-      await t.part('replace_meta_or_empty', ['G24'], async () => {
+      await t.part('replace_meta_or_empty', async () => {
         await t.phase('ai_description_meta');
         t.expectEq(await field(popup).inputValue(), META_DESCRIPTION, 'meta_prefill');
         let s = next();
@@ -1339,9 +1363,9 @@ export const SELFHOSTED_MODULES = [
         t.expectEq(await field(popup).inputValue(), s, 'empty_replaced');
         await action(popup, 'remove').click();
         t.expectEq(await field(popup).inputValue(), '', 'remove_restores_empty');
-      }, ['ai-summary-description-rules', 'ai-summary-remove-restores']);
+      });
 
-      await t.part('append_after_user_text', ['G24'], async () => {
+      await t.part('append_after_user_text', async () => {
         await t.phase('ai_description_user_text');
         const own = 'My own words.';
         await field(popup).fill(own);
@@ -1365,10 +1389,10 @@ export const SELFHOSTED_MODULES = [
         await popup.locator('#title-input').fill(prefix + ' ai description');
         await t.savePopup(popup);
         t.expectEq((await t.ownRow(url)).description, shown, 'saved_as_shown');
-      }, ['ai-summary-description-rules', 'ai-summary-remove-restores']);
+      });
       await form.close();
 
-      await t.part('append_after_server_text', ['G24'], async () => {
+      await t.part('append_after_server_text', async () => {
         await t.phase('ai_description_server_text');
         const seeded = t.claimUrl();
         await t.seed({ url: seeded, title: prefix + ' server description', description: 'Server words.', notes: '' });
@@ -1382,7 +1406,7 @@ export const SELFHOSTED_MODULES = [
         await t.savePopup(again.popup);
         t.expectEq((await t.ownRow(seeded)).description, shown, 'server_text_saved');
         await again.close();
-      }, ['ai-summary-description-rules']);
+      });
       // Every paid call wrote what it produced: no "generated, then kept".
       t.expectEq(paid() - before, n, 'summary_calls_match_writes');
       t.expect(t.fakeAi.unknown() === 0, 'fake_ai_unknown_request');
@@ -1448,6 +1472,9 @@ export const SELFHOSTED_MODULES = [
     surfaces: ['popup'],
     features: ['linkding-long-tag-500', 'linkding-long-tag-not-queued', 'queue-long-tag-needs-attention'],
     fixRefs: ['G3', 'G4b', 'G17'],
+    parts: {
+      queued_long_tag: { fixRefs: ['G3', 'G17'], features: ['queue-long-tag-needs-attention'] },
+    },
     needs: needs({ target: 'temp', container: 'linkding-pg', shots: true, longTag: 'server' }),
     // The queued replay's 500 may leave an untagged bookmark (G3) and holds
     // a slot: one more bookmark and URL.
@@ -1483,7 +1510,7 @@ export const SELFHOSTED_MODULES = [
       // its replay meets the real 500 and the item is set aside as needing
       // attention for tag_too_long (G17 takes in G3's code); another replay
       // sends nothing.
-      await t.part('queued_long_tag', ['G3', 'G17'], async () => {
+      await t.part('queued_long_tag', async () => {
         await t.phase('long_tag_pg_queued');
         const queuedUrl = t.claimUrl();
         await t.offline('self');
@@ -1501,7 +1528,7 @@ export const SELFHOSTED_MODULES = [
         await drainQueue(t);
         await drainQueue(t);
         t.expectEq(writesSince(t, again).length, 0, 'queued_long_tag_retried');
-      }, ['queue-long-tag-needs-attention']);
+      });
       t.check('linkding-pg: an over-long tag is tag_too_long in the popup and quick save, never queued or replayed; a queued one needs attention after its replay');
     },
   },
@@ -1748,6 +1775,12 @@ export const SELFHOSTED_MODULES = [
     surfaces: ['popup'],
     features: ['queue-needs-attention', 'queue-retry-after', 'queue-legacy-record'],
     fixRefs: ['G8', 'G13', 'G17'],
+    parts: {
+      attention_rejected: { fixRefs: ['G13', 'G17'], features: ['queue-needs-attention'] },
+      attention_token: { fixRefs: ['G8', 'G17'], features: ['queue-needs-attention'] },
+      attention_retry_after: { fixRefs: ['G17'], features: ['queue-retry-after'] },
+      attention_legacy_title: { fixRefs: ['G17'], features: ['queue-legacy-record'] },
+    },
     needs: needs({ shots: true }),
     budget: { bookmarks: 2, urls: 4, node: 6, browser: { linkding: 70, karakeep: 90 }, ai: 0, tags: 0, seconds: 60, tagReads: 1 },
     files: [],
@@ -1782,7 +1815,7 @@ export const SELFHOSTED_MODULES = [
       // back); the legacy record copies the first queued item, so it fails
       // as legacy_base_missing when there is none.
       let first = null, rejected = '', revoked = '';
-      await t.part('attention_rejected', ['G13', 'G17'], async () => {
+      await t.part('attention_rejected', async () => {
         await t.phase('attention_rejected');
         rejected = t.claimUrl();
         first = await queueOffline(rejected);
@@ -1802,11 +1835,11 @@ export const SELFHOSTED_MODULES = [
         await t.axe(form.popup, 'queue-attention');
         await form.close();
         await drop(rejected);
-      }, ['queue-needs-attention']);
+      });
 
       // linkding 401 / Karakeep 401: the connection is paused (G8 invariant
       // 4) and the item kept for attention.
-      await t.part('attention_token', ['G8', 'G17'], async () => {
+      await t.part('attention_token', async () => {
         await t.phase('attention_token');
         revoked = t.claimUrl();
         await queueOffline(revoked);
@@ -1833,9 +1866,9 @@ export const SELFHOSTED_MODULES = [
         t.expect(/auth|not_logged_in/.test(pause?.reason || '') && !/gateway/.test(pause?.reason || ''), 'token_pause_reason');
         unauth.clear();
         await drop(revoked);
-      }, ['queue-needs-attention']);
+      });
 
-      await t.part('attention_retry_after', ['G17'], async () => {
+      await t.part('attention_retry_after', async () => {
         await t.phase('attention_retry_after');
         const limited = t.claimUrl();
         await queueOffline(limited);
@@ -1858,9 +1891,9 @@ export const SELFHOSTED_MODULES = [
         await t.until(async () => !(await queue(t)).some(i => i.url === limited), 'manual_retry');
         await t.ownRow(limited);
         await manual.close();
-      }, ['queue-retry-after']);
+      });
 
-      await t.part('attention_legacy_title', ['G17'], async () => {
+      await t.part('attention_legacy_title', async () => {
         await t.phase('attention_legacy_title');
         t.expect(!!first, 'legacy_base_missing');
         const legacy = t.claimUrl();
@@ -1872,7 +1905,7 @@ export const SELFHOSTED_MODULES = [
         t.expectEq(createsOf(t, legacy, legacySince).length, 0, 'legacy_title_sent');
         await marked(legacy, 'legacy_title');
         await drop(legacy);
-      }, ['queue-legacy-record']);
+      });
       t.check(`${t.service}: rejected, unauthorised and over-long queued saves need attention and stop retrying; 429 waits for Retry-After; the bar shows the reason with a retry`);
     },
   },
@@ -1884,6 +1917,10 @@ export const SELFHOSTED_MODULES = [
     surfaces: ['popup', 'reader'],
     features: ['hash-variant-notice', 'reader-cleaned-url'],
     fixRefs: ['G10', 'G14'],
+    parts: {
+      variant_hash: { fixRefs: ['G14'], features: ['hash-variant-notice'] },
+      variant_reader: { fixRefs: ['G10'], features: ['reader-cleaned-url'] },
+    },
     needs: needs({ shots: true }),
     budget: { bookmarks: 1, urls: 1, node: 4, browser: { linkding: 30, karakeep: 45 }, ai: 0, tags: 0, seconds: 30, tagReads: 1 },
     files: [],
@@ -1893,7 +1930,7 @@ export const SELFHOSTED_MODULES = [
       await t.seed({ url, title: t.prefix + ' variants', notes: '' });
       // Parts: the reader's utm verdict (G10) does not wait on the # notice
       // (G14), which lands later.
-      await t.part('variant_hash', ['G14'], async () => {
+      await t.part('variant_hash', async () => {
         await t.phase('variant_hash');
         const hashed = url + '#section-2';
         const since = t.now();
@@ -1907,8 +1944,8 @@ export const SELFHOSTED_MODULES = [
         t.expect(notice.length > 0, 'hash_notice');
         await t.shot(form.popup, 'hash-variant', { surface: 'popup', keys: ['#submit-btn'] });
         await form.close();
-      }, ['hash-variant-notice']);
-      await t.part('variant_reader', ['G10'], async () => {
+      });
+      await t.part('variant_reader', async () => {
         await t.phase('variant_reader');
         const judge = async variant => {
           const reader = await t.openReader(variant, { ready: '#reader-bookmark-save' });
@@ -1921,7 +1958,7 @@ export const SELFHOSTED_MODULES = [
         const upper = url.replace(/^(\w+:\/\/)([^/]+)/, (m, scheme, host) => scheme + host.toUpperCase());
         const slash = url.replace('/?', '?');
         t.note('readerVariants', { utm: true, hostCase: await judge(upper), noSlash: await judge(slash) });
-      }, ['reader-cleaned-url']);
+      });
       t.check(`${t.service}: a # variant of a saved URL is looked up again without #, noticed and left as typed; the reader judges a utm variant saved`);
     },
   },
@@ -2087,6 +2124,12 @@ export const SELFHOSTED_MODULES = [
     surfaces: ['options', 'popup'],
     features: ['tag-panel-follows-service', 'connect-before-switch', 'connect-errors', 'connect-aria-invalid', 'failed-connect-keeps-credentials', 'disconnect', 'pinboard-roundtrip'],
     fixRefs: ['G5', 'G8', 'G22', 'G28'],
+    parts: {
+      tag_panel_roundtrip: { fixRefs: ['G5'], features: ['tag-panel-follows-service', 'pinboard-roundtrip'] },
+      connect_errors: { fixRefs: ['G8', 'G22'], features: ['connect-errors', 'connect-aria-invalid', 'failed-connect-keeps-credentials'] },
+      switch_needs_connect: { fixRefs: ['G28'], features: ['connect-before-switch'] },
+      disconnect: { fixRefs: ['G22'], features: ['disconnect'] },
+    },
     needs: needs({ target: 'temp', shots: true }),
     budget: { bookmarks: 0, urls: 1, node: 4, browser: { linkding: 120, karakeep: 200 }, ai: 0, tags: 0, seconds: 120, tagReads: 3 },
     files: [],
@@ -2106,7 +2149,7 @@ export const SELFHOSTED_MODULES = [
       // Landed fix first (49beb7a8, 0638cf0c): the Tags panel follows a
       // stored service change without a reload, both ways, and the popup
       // opens normally after the round trip through an unconfigured Pinboard.
-      await t.part('tag_panel_roundtrip', ['G5'], async () => {
+      await t.part('tag_panel_roundtrip', async () => {
         await t.phase('options_tag_panel_roundtrip');
         const options = await t.openOptions('tags');
         const state = () => options.evaluate(() => document.getElementById('panel-tags')?.dataset.tagGovState || '');
@@ -2122,12 +2165,12 @@ export const SELFHOSTED_MODULES = [
         const form = await t.openPopup(t.claimUrl());
         t.expect(await form.popup.locator('#main-section').isVisible(), 'popup_stuck_after_roundtrip');
         await form.close();
-      }, ['tag-panel-follows-service', 'pinboard-roundtrip']);
+      });
 
       // Connect errors: a hint, aria-invalid on the field at fault, no
       // write, and the stored connection untouched (compared by digest in
       // the worker; no value leaves it).
-      await t.part('connect_errors', ['G8', 'G22'], async () => {
+      await t.part('connect_errors', async () => {
         const writesBefore = await t.writes();
         const stored = await connectionDigest(t);
         const options = await t.openOptions();
@@ -2164,11 +2207,11 @@ export const SELFHOSTED_MODULES = [
         t.expect(JSON.stringify(await conn()) === JSON.stringify(original), 'failed_connect_changed_connection');
         t.expectEq(await connectionDigest(t), stored, 'failed_connect_overwrote_credentials');
         await options.close();
-      }, ['connect-errors', 'connect-aria-invalid', 'failed-connect-keeps-credentials']);
+      });
 
       // Choosing a service only opens its form; the switch waits for a
       // successful Connect (decision 6).
-      await t.part('switch_needs_connect', ['G28'], async () => {
+      await t.part('switch_needs_connect', async () => {
         await t.phase('options_switch_needs_connect');
         const options = await t.openOptions();
         await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
@@ -2176,9 +2219,9 @@ export const SELFHOSTED_MODULES = [
         t.expectEq((await conn()).service, s, 'switched_before_connect');
         await options.locator(`input[name="bookmark-service"][value="${s}"]`).check();
         await options.close();
-      }, ['connect-before-switch']);
+      });
 
-      await t.part('disconnect', ['G22'], async () => {
+      await t.part('disconnect', async () => {
         await t.phase('options_disconnect');
         const options = await t.openOptions();
         const disconnect = options.locator(`#disconnect-${s}`);
@@ -2191,7 +2234,7 @@ export const SELFHOSTED_MODULES = [
         await options.locator('.confirm-yes').click();
         await t.until(async () => !(await hasToken()), 'disconnect_token_removed', 8000);
         await options.close();
-      }, ['disconnect']);
+      });
       // Whatever the parts did, the module ends connected as it began.
       if ((await conn()).service !== s || !(await t.sw(async key => !!(await pbpReadSettingsWithSecrets({ [key]: '' }))[key], s + 'Token'))) await t.reconnect();
       t.expectEq((await conn()).service, s, 'reconnected');
@@ -2207,6 +2250,10 @@ export const SELFHOSTED_MODULES = [
     surfaces: ['popup'],
     features: ['quoted-tag-space', 'long-tag-chip-geometry'],
     fixRefs: ['G21+G23', 'G29'],
+    parts: {
+      quoted_tag: { fixRefs: ['G21+G23'], features: ['quoted-tag-space'] },
+      long_chip: { fixRefs: ['G29'], features: ['long-tag-chip-geometry'] },
+    },
     // Temp only (user-target rounds): chip geometry and quote typing are
     // the popup's, not the server's; a temporary instance shows the same.
     needs: needs({ target: 'temp', writes: false, shots: true }),
@@ -2216,7 +2263,7 @@ export const SELFHOSTED_MODULES = [
     async steps(t) {
       const url = t.claimUrl();
       let form;
-      await t.part('quoted_tag', ['G21+G23'], async () => {
+      await t.part('quoted_tag', async () => {
         await t.phase('tag_input_quotes');
         form = await t.openPopup(url);
         const input = form.popup.locator('#tags-input');
@@ -2247,9 +2294,9 @@ export const SELFHOSTED_MODULES = [
         t.expectEq(committed[0], pasted[0], 'quote_closed_matches_paste');
         t.expect(!committed[0].includes('"') && /two/.test(committed[0]) && /words/.test(committed[0]), 'quote_closed_name');
         await form.close();
-      }, ['quoted-tag-space']);
+      });
 
-      await t.part('long_chip', ['G29'], async () => {
+      await t.part('long_chip', async () => {
         await t.phase('tag_input_long_chip');
         form = await t.openPopup(url, { locale: 'de', width: 550 });
         const long = (t.prefix + '_' + 'abcdefghijklmnopqrstuvwxyz').slice(0, 68);
@@ -2263,17 +2310,17 @@ export const SELFHOSTED_MODULES = [
           const c = chip.getBoundingClientRect(), w = wrap.getBoundingClientRect(), r = remove.getBoundingClientRect();
           const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
           return { scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth, chipRight: Math.round(c.right), wrapRight: Math.round(w.right), removeLeft: Math.round(r.left), removeRight: Math.round(r.right), hit: !!hit && (hit === remove || remove.contains(hit)) };
-      }, ['long-tag-chip-geometry']);
-      t.note('longChip', g);
-      t.expect(!g.missing, 'long_chip_missing');
-      t.expect(g.scrollWidth <= g.innerWidth, 'long_chip_page_overflow');
-      t.expect(g.chipRight <= g.wrapRight + 1, 'long_chip_wrap_overflow');
-      t.expect(g.removeLeft >= 0 && g.removeRight <= g.innerWidth && g.hit, 'long_chip_remove_unreachable');
-      await t.shot(form.popup, 'long-chip-de', { surface: 'popup', keys: ['#tags-display .tag-remove', '#submit-btn'] });
-      await t.axe(form.popup, 'long-chip-de');
-      await form.popup.locator('#tags-display .tag-remove').first().click();
-      t.expectEq(await form.popup.locator('#tags-display .tag-item').count(), 0, 'long_chip_not_removed');
-      await form.close();
+        });
+        t.note('longChip', g);
+        t.expect(!g.missing, 'long_chip_missing');
+        t.expect(g.scrollWidth <= g.innerWidth, 'long_chip_page_overflow');
+        t.expect(g.chipRight <= g.wrapRight + 1, 'long_chip_wrap_overflow');
+        t.expect(g.removeLeft >= 0 && g.removeRight <= g.innerWidth && g.hit, 'long_chip_remove_unreachable');
+        await t.shot(form.popup, 'long-chip-de', { surface: 'popup', keys: ['#tags-display .tag-remove', '#submit-btn'] });
+        await t.axe(form.popup, 'long-chip-de');
+        await form.popup.locator('#tags-display .tag-remove').first().click();
+        t.expectEq(await form.popup.locator('#tags-display .tag-item').count(), 0, 'long_chip_not_removed');
+        await form.close();
       });
       t.check(`${t.service}: a quoted tag keeps its spaces until the closing quote; a 68-character chip in German stays inside the popup with a reachable remove button`);
     },
@@ -2287,6 +2334,12 @@ export const SELFHOSTED_MODULES = [
     surfaces: ['options'],
     features: ['fake-ai', 'karakeep-auth-not-gateway', 'permission-before-ai', 'revoked-key-not-queued', 'batch-stops-on-auth'],
     fixRefs: ['G8'],
+    parts: {
+      wrong_key: { fixRefs: ['G8'], features: ['karakeep-auth-not-gateway'] },
+      permission_missing: { fixRefs: ['G8'], features: ['permission-before-ai'] },
+      revoked_quick_save: { fixRefs: ['G8'], features: ['revoked-key-not-queued'] },
+      revoked_batch: { fixRefs: ['G8'], features: ['batch-stops-on-auth'] },
+    },
     // Temp only (user-target rounds): it sends a wrong key on purpose, which
     // has no place on the user's instance; the answer is Karakeep's own.
     needs: needs({ target: 'temp', fakeAi: true }),
@@ -2295,7 +2348,7 @@ export const SELFHOSTED_MODULES = [
     settings: { offlineQueueEnabled: true, qsAiTags: true, qsAiSummary: true, batchAiTags: true, batchAiSummary: false, batchSkipExisting: false },
     async steps(t) {
       const resetQueue = () => t.sw(async () => { await chrome.storage.local.remove('offlineQueuePause'); await chrome.storage.local.set({ offlineQueue: [] }); });
-      await t.part('wrong_key', ['G8'], async () => {
+      await t.part('wrong_key', async () => {
         await t.phase('karakeep_wrong_key');
         const stored = await connectionDigest(t);
         const options = await t.openOptions();
@@ -2311,13 +2364,13 @@ export const SELFHOSTED_MODULES = [
         await options.close();
         t.expectEq(await t.sw(async () => (await pbpReadBookmarkConnection()).service), 'karakeep', 'wrong_key_disconnected');
         t.expectEq(await connectionDigest(t), stored, 'wrong_key_overwrote_connection');
-      }, ['karakeep-auth-not-gateway']);
+      });
 
       // G8 invariant 5: without the origin's host permission, quick save
       // neither extracts nor pays for AI, queues nothing and says so. The
       // worker's permissions.contains answers false for this origin only,
       // and is put back whatever happens.
-      await t.part('permission_missing', ['G8'], async () => {
+      await t.part('permission_missing', async () => {
         await t.phase('karakeep_permission_missing');
         const origin = new URL(t.base).origin;
         const patched = await t.sw(async origin => {
@@ -2340,11 +2393,11 @@ export const SELFHOSTED_MODULES = [
         } finally {
           await t.sw(async () => { if (globalThis.pbpLiveContains) chrome.permissions.contains = globalThis.pbpLiveContains; });
         }
-      }, ['permission-before-ai']);
+      });
 
       // A revoked key (401): quick save ends as an authentication failure,
       // not queued (G8 does not move its AI call before delivery).
-      await t.part('revoked_quick_save', ['G8'], async () => {
+      await t.part('revoked_quick_save', async () => {
         await t.phase('karakeep_revoked_quick_save');
         const fault = t.inject({ status: 401, contentType: 'text/plain;charset=UTF-8', body: 'Unauthorized' });
         const queued = (await queue(t)).length;
@@ -2354,11 +2407,11 @@ export const SELFHOSTED_MODULES = [
         t.expectEq((await queue(t)).length, queued, 'revoked_quick_save_queued');
         fault.clear();
         await resetQueue();
-      }, ['revoked-key-not-queued']);
+      });
 
       // Batch over two pages: a 401 on the first stops the run, so the AI
       // is asked at most once and the second page is never delivered.
-      await t.part('revoked_batch', ['G8'], async () => {
+      await t.part('revoked_batch', async () => {
         await t.phase('karakeep_revoked_batch');
         const fault = t.inject({ status: 401, contentType: 'text/plain;charset=UTF-8', body: 'Unauthorized' });
         const urls = [t.claimUrl(), t.claimUrl()];
@@ -2371,7 +2424,7 @@ export const SELFHOSTED_MODULES = [
         t.expectEq(second.length, 0, 'revoked_batch_second_page');
         fault.clear();
         await resetQueue();
-      }, ['batch-stops-on-auth']);
+      });
       t.check('karakeep: a wrong key reads as an authentication failure and leaves the stored connection alone; without host permission quick save stops before AI; a revoked key is an auth failure, not queued; batch stops at the first 401 with at most one AI call');
     },
   },
@@ -2450,6 +2503,12 @@ export const REGRESS_MODULES = [
     surfaces: ['background', 'reader'],
     features: ['pinboard-plain-tags', 'pinboard-twin-merge', 'pinboard-case-dedupe-order', 'pinboard-duplicate-result-code', 'pinboard-title-extended'],
     fixRefs: ['G4b'],
+    parts: {
+      create_plain: { fixRefs: [], features: ['pinboard-plain-tags', 'pinboard-title-extended'] },
+      merge_twins: { fixRefs: ['G4b'], features: ['pinboard-twin-merge', 'pinboard-case-dedupe-order'] },
+      duplicate_result_code: { fixRefs: [], features: ['pinboard-duplicate-result-code'] },
+      reader_title_extended: { fixRefs: [], features: ['pinboard-title-extended'] },
+    },
     needs: needs(),
     // Measured on the mock: create 2, merge 3, duplicate 1, reader 7-8.
     budget: { bookmarks: 1, urls: 1, node: 6, browser: 30, ai: 0, tags: 6, seconds: 120, calls: { pinboard: 18 } },
@@ -2465,7 +2524,7 @@ export const REGRESS_MODULES = [
       const created = [prefix + '_Café', prefix + '_x-ray', prefix + '_Foo'];
       let since = t.now();
 
-      await t.part('create_plain', [], async () => {
+      await t.part('create_plain', async () => {
         await t.phase('pinboard_regress_create');
         t.expectEq((await submit({ ...base, mode: 'create', tags: created.join(' ') })).status, 'saved', 'regress_create');
         const [add] = pinboardAdds(t, since);
@@ -2475,13 +2534,13 @@ export const REGRESS_MODULES = [
         t.expectEq(row.description, title, 'regress_create_title');
         t.expectEq(row.extended, notes, 'regress_create_extended');
         t.expectEq(row.shared, 'no', 'privacy');
-      }, ['pinboard-plain-tags', 'pinboard-title-extended']);
+      });
 
       // The server's spelling first: case, NFD and zero-width twins fold into
       // it (unionTags, G4b), a separator variant of a bookmark tag takes the
       // bookmark's spelling (G4 alignment: x_ray -> x-ray, nothing new), a
       // plain case repeat among the new names is dropped, order is kept.
-      await t.part('merge_twins', ['G4b'], async () => {
+      await t.part('merge_twins', async () => {
         await t.phase('pinboard_regress_merge');
         since = t.now();
         const incoming = [prefix + '_FOO', prefix + '_café', prefix + '_fo​o', prefix + '_x_ray', prefix + '_new', prefix + '_NEW'];
@@ -2494,11 +2553,11 @@ export const REGRESS_MODULES = [
         t.expectEq(row.tags, expected, 'regress_merge_tags');
         t.expectEq(row.description, title, 'regress_merge_title');
         t.expectEq(row.extended, notes, 'regress_merge_extended');
-      }, ['pinboard-twin-merge', 'pinboard-case-dedupe-order']);
+      });
 
       // A second create of the stored URL: replace=no, Pinboard answers with
       // its own result_code text, and the extension must call it a conflict.
-      await t.part('duplicate_result_code', [], async () => {
+      await t.part('duplicate_result_code', async () => {
         await t.phase('pinboard_regress_duplicate');
         since = t.now();
         const result = await submit({ ...base, mode: 'create', tags: created[0] });
@@ -2508,11 +2567,11 @@ export const REGRESS_MODULES = [
         t.expectEq(pinboardAdds(t, since).map(a => a.replace).join(','), 'no', 'regress_duplicate_replace');
         t.expect(!!last && last.status === 200 && last.code !== 'done', 'regress_duplicate_answer');
         t.expectEq(result.reason, 'conflict', 'duplicate_result_code');
-      }, ['pinboard-duplicate-result-code']);
+      });
 
       // The reader writes title (description) and notes (extended) and
       // keeps the tags it did not touch.
-      await t.part('reader_title_extended', [], async () => {
+      await t.part('reader_title_extended', async () => {
         await t.phase('pinboard_regress_reader');
         const before = (await t.ownRow(url)).tags;
         const reader = await t.openReader(url, { ready: '#reader-bookmark-edit' });
@@ -2528,7 +2587,7 @@ export const REGRESS_MODULES = [
         t.expectEq(row.tags, before, 'regress_reader_tags');
         t.expectEq(row.shared, 'no', 'privacy');
         await reader.close();
-      }, ['pinboard-title-extended']);
+      });
       t.check('pinboard: plain tags, twin merge (case/NFD/zero-width fold, separators kept, order kept), the real replace=no duplicate answer recognised as a conflict, title and extended through the worker and the reader');
     },
   },
@@ -2591,6 +2650,14 @@ export const H3C_MODULES = [
     surfaces: ['reader', 'options'],
     features: ['reader-badge-service-link', 'reader-badge-one-lookup', 'reader-empty-title', 'reader-not-connected-hint', 'reader-connection-refresh', 'reader-cleaned-url-save', 'reader-kept-no-delivery'],
     fixRefs: ['G2d', 'G10', 'G19', 'G20'],
+    parts: {
+      badge: { fixRefs: ['G20'], features: ['reader-badge-service-link', 'reader-badge-one-lookup'] },
+      empty_title: { fixRefs: ['G19'], features: ['reader-empty-title'] },
+      not_connected: { fixRefs: ['G19'], features: ['reader-not-connected-hint'] },
+      connection_refresh: { fixRefs: ['G19'], features: ['reader-connection-refresh'] },
+      cleaned_url_save: { fixRefs: ['G10'], features: ['reader-cleaned-url-save'] },
+      kept_no_delivery: { fixRefs: ['G2d'], features: ['reader-kept-no-delivery'] },
+    },
     needs: needs({ shots: true }),
     budget: { bookmarks: 3, urls: 3, node: 20, browser: { linkding: 90, karakeep: 160 }, ai: 0, tags: 0, lists: { karakeep: 1 }, seconds: 100, tagReads: 2 },
     files: [],
@@ -2608,7 +2675,7 @@ export const H3C_MODULES = [
       // G20: the badge points at the connected service, shows no padlock
       // (self-hosted privacy is not Pinboard's shared flag), and one reader
       // open looks the page up once.
-      await t.part('badge', ['G20'], async () => {
+      await t.part('badge', async () => {
         await t.phase('reader_badge');
         const since = t.now();
         const reader = await t.openReader(a, { ready: '#reader-bookmark-edit' });
@@ -2624,10 +2691,10 @@ export const H3C_MODULES = [
         t.expectEq(hrefOrigin, origin, 'reader_badge_service_link');
         t.expect(!badge.lock, 'reader_badge_lock');
         t.expectEq(lookups, 1, 'reader_badge_second_lookup');
-      }, ['reader-badge-service-link', 'reader-badge-one-lookup']);
+      });
 
       // G19: a title of spaces is refused in the reader, nothing is sent.
-      await t.part('empty_title', ['G19'], async () => {
+      await t.part('empty_title', async () => {
         await t.phase('reader_empty_title');
         const reader = await t.openReader(a, { ready: '#reader-bookmark-edit' });
         await reader.locator('#reader-bookmark-edit').click();
@@ -2647,12 +2714,12 @@ export const H3C_MODULES = [
         await reader.close();
         t.expectEq(writes, 0, 'reader_empty_title_sent');
         t.expectEq(status, t.message('urlAndTitleRequired'), 'reader_empty_title_copy');
-      }, ['reader-empty-title']);
+      });
 
       // G19: no connection at all. The bar says where to connect (bgSetToken)
       // instead of "account changed", on a switch and on a fresh open, and
       // asks the service nothing. The token is put back as it was.
-      await t.part('not_connected', ['G19'], async () => {
+      await t.part('not_connected', async () => {
         await t.phase('reader_not_connected');
         const before = await connection(t);
         const reader = await t.openReader(a, { ready: '#reader-bookmark-edit' });
@@ -2681,11 +2748,11 @@ export const H3C_MODULES = [
           if (!back) await t.reconnect();
           await t.until(async () => (await connection(t)).account === before.account, 'reader_token_restored', 8000);
         }
-      }, ['reader-not-connected-hint']);
+      });
 
       // G19 invariant 3: a Connect again with the same address and token
       // (same account) clears the bar's old error and looks again.
-      await t.part('connection_refresh', ['G19'], async () => {
+      await t.part('connection_refresh', async () => {
         await t.phase('reader_connection_refresh');
         const before = await connection(t);
         const fault = t.inject({ method: 'GET', path: CHECK_PATH[t.service], status: 503, contentType: 'application/json', body: { detail: 'unavailable' } });
@@ -2704,12 +2771,12 @@ export const H3C_MODULES = [
         await reader.close();
         t.expect(refreshed, 'reader_connection_not_refreshed');
         t.expect(status !== failed, 'reader_old_error_kept');
-      }, ['reader-connection-refresh']);
+      });
 
       // G10: a utm variant of a saved page is that bookmark: Save changes
       // it, never creates another. Saved only once the lookup finds it: a
       // create of the utm address would be a URL outside the run's pool.
-      await t.part('cleaned_url_save', ['G10'], async () => {
+      await t.part('cleaned_url_save', async () => {
         await t.phase('reader_cleaned_url');
         await t.seed({ url: b, title: prefix + ' cleaned', notes: 'before' });
         const variant = b + '&utm_source=pbp-it';
@@ -2725,14 +2792,14 @@ export const H3C_MODULES = [
         await reader.close();
         t.expectEq(createsOf(t, '', since).length, 0, 'reader_cleaned_created');
         t.expectEq(notesOfRow(t, await t.ownRow(b)), 'after', 'reader_cleaned_updated');
-      }, ['reader-cleaned-url-save']);
+      });
 
       // G2d: the reader shows Read Later, a second reader has marked the
       // bookmark read since; Save (mark read) finds it already read and
       // finishes without a write or a queue record, even when every later
       // lookup fails. The second reader is the extension's own write (the
       // runner's Node layer never touches Karakeep list members).
-      await t.part('kept_no_delivery', ['G2d'], async () => {
+      await t.part('kept_no_delivery', async () => {
         await t.phase('reader_kept');
         await t.seed({ url: c, title: prefix + ' kept', notes: '' });
         const reader = await t.openReader(c, { ready: '#reader-bookmark-later' });
@@ -2761,7 +2828,7 @@ export const H3C_MODULES = [
         t.expectEq(writes, 0, 'reader_kept_write');
         t.expectEq(queued, 0, 'reader_kept_queued');
         t.expect(status !== t.message('readerBookmarkQueued'), 'reader_kept_queued_copy');
-      }, ['reader-kept-no-delivery']);
+      });
       t.check(`${t.service}: reader badge links to the service with one lookup; empty title refused; no connection explained; reconnect refreshes the bar; a utm variant updates the saved bookmark; an action already in effect sends and queues nothing`);
     },
   },
@@ -2773,6 +2840,12 @@ export const H3C_MODULES = [
     surfaces: ['popup', 'reader'],
     features: ['popup-delete-failure-copy', 'reader-permission-copy', 'reader-created-copy', 'lookup-5xx-copy'],
     fixRefs: ['G11', 'G12', 'G18'],
+    parts: {
+      popup_delete_failure: { fixRefs: ['G18'], features: ['popup-delete-failure-copy'] },
+      reader_permission: { fixRefs: ['G11'], features: ['reader-permission-copy'] },
+      reader_created: { fixRefs: ['G12'], features: ['reader-created-copy'] },
+      lookup_5xx: { fixRefs: ['G11'], features: ['lookup-5xx-copy'] },
+    },
     needs: needs({ shots: true }),
     budget: { bookmarks: 2, urls: 3, node: 10, browser: { linkding: 90, karakeep: 150 }, ai: 0, tags: 0, seconds: 100, tagReads: 2 },
     files: [],
@@ -2790,7 +2863,7 @@ export const H3C_MODULES = [
       await t.seed({ url: d, title: prefix + ' copy exits', notes: '' });
 
       // G18: a failed delete says it was the delete, not "couldn't save".
-      await t.part('popup_delete_failure', ['G18'], async () => {
+      await t.part('popup_delete_failure', async () => {
         for (const locale of LOCALES) {
           await t.phase('copy_delete_' + locale);
           const form = await t.openPopup(d, { locale });
@@ -2815,11 +2888,11 @@ export const H3C_MODULES = [
           t.expect(shown.includes(t.message('readerBookmarkDeleteFailed', locale)), 'popup_delete_copy_' + locale);
           t.expect(!shown.includes(t.message('saveFailedGeneric', locale)), 'popup_delete_says_save_' + locale);
         }
-      }, ['popup-delete-failure-copy']);
+      });
 
       // G11: a revoked host grant gives the reader the permission copy, not
       // "could not check". The worker's answer is overridden, then put back.
-      await t.part('reader_permission', ['G11'], async () => {
+      await t.part('reader_permission', async () => {
         await t.phase('copy_reader_permission');
         let reader = null;
         try {
@@ -2841,10 +2914,10 @@ export const H3C_MODULES = [
           await permissionBack(t);
           await t.settings({ optLang: 'en' });
         }
-      }, ['reader-permission-copy']);
+      });
 
       // G12: a bookmark the reader creates is reported saved, not updated.
-      await t.part('reader_created', ['G12'], async () => {
+      await t.part('reader_created', async () => {
         await t.phase('copy_reader_created');
         const reader = await t.openReader(e, { ready: '#reader-bookmark-save' });
         await reader.locator('#reader-bookmark-save').click();
@@ -2857,10 +2930,10 @@ export const H3C_MODULES = [
         await reader.close();
         t.expect(text !== t.message('readerBookmarkUpdated'), 'reader_created_says_updated');
         t.expectEq(text, t.message('readerBookmarkSaved'), 'reader_created_copy');
-      }, ['reader-created-copy']);
+      });
 
       // G11: a 5xx from the duplicate check is not called a Pinboard outage.
-      await t.part('lookup_5xx', ['G11'], async () => {
+      await t.part('lookup_5xx', async () => {
         for (const locale of LOCALES) {
           await t.phase('copy_lookup_5xx_' + locale);
           const fault = t.inject({ method: 'GET', path: CHECK_PATH[t.service], status: 503, contentType: 'application/json', body: { detail: 'unavailable' } });
@@ -2881,7 +2954,7 @@ export const H3C_MODULES = [
           t.expect(!/pinboard/i.test(shown), 'lookup_5xx_names_pinboard_' + locale);
           t.expect(!shown.includes(t.message('pinboardErrorOffline', locale)), 'lookup_5xx_network_' + locale);
         }
-      }, ['lookup-5xx-copy']);
+      });
       await t.settings({ optLang: 'en' });
       t.check(`${t.service}: copy exits in en and zh_CN: delete failure, revoked grant in the reader, reader create, 5xx duplicate check`);
     },
@@ -2895,6 +2968,11 @@ export const H3C_MODULES = [
     surfaces: ['popup'],
     features: ['status-check-cost', 'status-failure-keeps-icon', 'status-failure-one-lookup'],
     fixRefs: ['G14'],
+    parts: {
+      switch_cost: { fixRefs: [], features: ['status-check-cost'] },
+      failure_icon: { fixRefs: ['G14'], features: ['status-failure-keeps-icon'] },
+      failure_popup: { fixRefs: ['G14'], features: ['status-failure-one-lookup'] },
+    },
     needs: needs(),
     budget: { bookmarks: 1, urls: 2, node: 6, browser: { linkding: 50, karakeep: 90 }, ai: 0, tags: 0, seconds: 75, tagReads: 1 },
     files: [],
@@ -2924,7 +3002,7 @@ export const H3C_MODULES = [
         return reads[reads.length - 1];
       };
 
-      await t.part('switch_cost', [], async () => {
+      await t.part('switch_cost', async () => {
         await t.phase('status_switches');
         const switches = [];
         for (let i = 0; i < 6; i++) {
@@ -2940,13 +3018,13 @@ export const H3C_MODULES = [
         t.note('switches', switches);
         t.check(`${t.service}: status check per tab switch ${switches.map(s => `${s.to} ${s.checks}/${s.requests} req ${s.ms ?? 'n/a'} ms`).join('; ')}`);
         t.expect(switches.every(s => s.ms !== null), 'status_icon_not_set');
-      }, ['status-check-cost']);
+      });
 
       // G14: the cached entry expires, the check fails: the saved page keeps
       // its saved icon; the popup then asks once, not twice.
       // Two parts, so the popup's count is measured even while the icon
       // still flips (each part brings its own fault).
-      await t.part('failure_icon', ['G14'], async () => {
+      await t.part('failure_icon', async () => {
         await t.phase('status_failure_icon');
         await pages[saved].bringToFront();
         await t.activateTab(saved);
@@ -2969,9 +3047,9 @@ export const H3C_MODULES = [
         t.note('failureIcon', { icon, checks: t.requests({ path: CHECK_PATH[t.service], since }).length });
         fault.clear();
         t.expectEq(icon, 'saved', 'status_failure_icon_flipped');
-      }, ['status-failure-keeps-icon']);
+      });
 
-      await t.part('failure_popup', ['G14'], async () => {
+      await t.part('failure_popup', async () => {
         await t.phase('status_failure_popup');
         // Only the popup's own lookup is counted. openPopup opens and
         // activates an article tab, and with the toolbar check on that tab
@@ -2994,7 +3072,7 @@ export const H3C_MODULES = [
         fault.clear();
         await form.close();
         t.expectEq(checks, 1, 'status_failure_popup_lookups');
-      }, ['status-failure-one-lookup']);
+      });
       for (const p of Object.values(pages)) await p.close().catch(() => {});
       t.check(`${t.service}: a failed status check keeps the saved icon and the popup asks once`);
     },
@@ -3010,6 +3088,11 @@ export const H3C_MODULES = [
     surfaces: ['popup', 'options', 'reader'],
     features: ['shots-matrix', 'shots-geometry-popup', 'shots-geometry-options', 'shots-geometry-reader'],
     fixRefs: [],
+    parts: {
+      popup: { fixRefs: [], features: ['shots-geometry-popup'] },
+      options: { fixRefs: [], features: ['shots-geometry-options'] },
+      reader: { fixRefs: [], features: ['shots-geometry-reader'] },
+    },
     needs: needs({ shots: true, writes: false }),
     budget: { bookmarks: 0, urls: 1, node: 2, browser: { linkding: 40, karakeep: 80 }, ai: 0, tags: 0, seconds: 120, tagReads: 2 },
     files: [],
@@ -3024,7 +3107,7 @@ export const H3C_MODULES = [
       ];
       const axed = [];
       for (const { surface, keys, open } of surfaces) {
-        await t.part(surface, [], async () => {
+        await t.part(surface, async () => {
           await t.phase('shots_' + surface);
           const { page, close } = await open();
           const bad = [];
@@ -3044,7 +3127,7 @@ export const H3C_MODULES = [
           } finally { await close().catch(() => {}); }
           t.note('geometry_' + surface, bad);
           t.expectEq(bad.join(','), '', 'geometry_' + surface);
-        }, ['shots-geometry-' + surface]);
+        });
       }
       t.note('axe', axed.filter(a => a.violations).map(a => `${a.surface}:${a.locale}:${a.scheme}=${a.violations}`));
       t.check(`${s}: ${t.shotsEnabled ? 'screenshots and axe in ' + SHOT_LOCALES.join('/') + ' light/dark, ' : ''}geometry in all ${SHOT_LOCALES.length + GEOMETRY_LOCALES.length} locales for popup, options connection and reader bar`);

@@ -1623,6 +1623,30 @@ export function manualReviewItems(extRoot = ROOT) {
   ];
 }
 
+// Registry rows declare their parts: parts: { <name>: { fixRefs, features } }.
+// Each part names at least one of its row's features and only fix groups
+// its row lists, so the summary can judge every feature a part decides.
+export function partProblems(row, name) {
+  const decl = row.parts?.[name];
+  const out = [];
+  if (!decl || typeof decl !== 'object') return [name + ':undeclared'];
+  if (!Array.isArray(decl.features) || !decl.features.length) out.push(name + ':no_features');
+  else for (const f of decl.features) if (!(row.features || []).includes(f)) out.push(name + ':feature_not_in_row:' + f);
+  if (!Array.isArray(decl.fixRefs)) out.push(name + ':no_fixrefs');
+  else for (const g of decl.fixRefs) if (!(row.fixRefs || []).includes(g)) out.push(name + ':fixref_not_in_row:' + g);
+  return out;
+}
+// What the registry rows get wrong before any run (the preflight requires
+// none): a part declared without features, or naming a feature or fix group
+// its row does not list.
+export function registryProblems(modules = MODULES) {
+  const out = [];
+  for (const row of modules) {
+    for (const name of Object.keys(row.parts || {})) out.push(...partProblems(row, name).map(p => row.id + ':' + p));
+  }
+  return out;
+}
+
 // axe violations for the report: per rule its impact, node count and the
 // first AXE_NODES_KEPT nodes, each with its selector and, where axe measured
 // them (color-contrast and the like), foreground, background, ratio and the
@@ -3106,11 +3130,17 @@ export class LiveRun {
       // (a subset of the module's) are the ones this part decides: when the
       // module fails only on its parts, each such feature takes the verdict
       // of the parts that name it.
-      async part(name, fixRefs, fn, features = []) {
+      // A part's fix groups and features are declared in its row
+      // (row.parts[name]), where registryProblems() checks them before any
+      // run; a call naming no declared part, or the old (name, fixRefs, fn,
+      // features) form, is fatal at once.
+      async part(name, fn) {
         alive();
-        const stray = features.filter(f => !(mod.features || []).includes(f));
-        if (stray.length) { run.setFatal('part_feature_undeclared'); run.throwIfFatal(); }
-        const part = { name, fixRefs: [...(fixRefs || [])], features: [...features], status: 'running' };
+        const decl = Object.hasOwn(mod.parts || {}, name) ? mod.parts[name] : null;
+        if (typeof fn !== 'function') { run.setFatal('part_signature'); run.throwIfFatal(); }
+        if (!decl) { run.setFatal('part_undeclared'); run.throwIfFatal(); }
+        if (partProblems(mod, name).length) { run.setFatal('part_feature_undeclared'); run.throwIfFatal(); }
+        const part = { name, fixRefs: [...decl.fixRefs], features: [...decl.features], status: 'running' };
         (mod.record.parts ||= []).push(part);
         const faults = new Set(run.faults);
         const pages = new Set(run.ctx.pages());
