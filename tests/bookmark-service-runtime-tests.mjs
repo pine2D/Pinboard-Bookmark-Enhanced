@@ -13,7 +13,35 @@ const root=fileURLToPath(new URL('../',import.meta.url));
 // prints the names and exits. Neither set: every block runs. Each block's own connection needs are declared on its
 // block() call and set up before every block (reset first), filtered or not, so one
 // block run alone reaches the same verdict as in the full run.
-const BLOCKS=['archive explanation and JSON restore','services: connect, save, reader','access gateway form','linkding sharing capability','Karakeep create race','linkding merge and server dates','linkding multi-line Description','linkding over-long tag','linkding unknown Description','linkding queued empty Description','linkding restored draft for another URL','linkding address typed after open','linkding cleaned page address','linkding Description server semantics','gateway probes','settings tag panel follows the service'];
+const BLOCKS=[
+  'archive explanation and JSON restore',
+  'services: connect, save, reader',
+  'access gateway form',
+  'linkding sharing capability',
+  'Karakeep create race',
+  'linkding merge and server dates',
+  'linkding multi-line Description',
+  'linkding over-long tag',
+  'linkding unknown Description',
+  'linkding queued empty Description',
+  'linkding restored draft for another URL',
+  'linkding address typed after open',
+  'linkding cleaned page address',
+  'linkding Description server semantics',
+  'gateway probes',
+  'settings tag panel follows the service',
+];
+// Self-check before any browser starts: the list above and the block() calls
+// below must name exactly the same blocks, so a block added to one place only
+// is an error here, not a silent skip under PBP_RUNTIME_ONLY.
+{
+  const registered=[...readFileSync(fileURLToPath(import.meta.url),'utf8').matchAll(/^\s*await block\('([^']+)'/gm)].map(match=>match[1]);
+  const missing=registered.filter(name=>!BLOCKS.includes(name)), unregistered=BLOCKS.filter(name=>!registered.includes(name));
+  if(missing.length||unregistered.length||new Set(BLOCKS).size!==BLOCKS.length||registered.length!==BLOCKS.length){
+    console.error('BLOCKS and the block() calls differ. In block() only: '+JSON.stringify(missing)+'; in BLOCKS only: '+JSON.stringify(unregistered)+'; BLOCKS '+BLOCKS.length+', block() '+registered.length);
+    process.exit(1);
+  }
+}
 const only=(process.env.PBP_RUNTIME_ONLY||'').split(',').map(part=>part.trim().toLowerCase()).filter(Boolean);
 const selected=name=>!only.length||only.some(part=>name.toLowerCase().includes(part));
 if(process.argv.includes('--list')){console.log(BLOCKS.join('\n'));process.exit(0);}
