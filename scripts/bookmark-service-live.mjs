@@ -1223,6 +1223,10 @@ export class LiveRun {
       fakeAi: null, temp: null, cleanup: { complete: false, entries: [] }, failure: null, finished: null, passed: false,
       stages: [], timing: { phases: [], totals: {}, slowest: [], throttle: null }, pinboard: null,
     };
+    // The live counters themselves: every persist() carries them, so a run
+    // cut off by kill -9, OOM, a crash or a second signal (none reaches
+    // cleanupAll) still leaves its request counts on disk for --cleanup.
+    this.report.counts = this.counts;
   }
 
   // Wall time of the setup steps and the cleanup (modules carry their own
@@ -3057,7 +3061,9 @@ export class LiveRun {
     }
     if (r.stages?.length) lines.push(`- 阶段耗时：${r.stages.map(st => `${st.name} ${sec(st.ms)}${st.ok ? '' : '（失败）'}`).join('，')}`);
     const tt = r.timing?.totals || {};
-    lines.push(`- 耗时分类：容器启动 ${sec(tt.containerStartMs || 0)}，浏览器启动 ${sec(tt.browserStartMs || 0)}，连接 ${sec(tt.connectMs || 0)}，模块 ${sec(tt.modulesMs || 0)}，等待 ${sec(tt.waitMs || 0)}，节流等待 ${sec(tt.throttleMs || 0)}，清理 ${sec(tt.cleanupMs || 0)}`);
+    // timingSummary() runs in conclude(); a run cut off before it has none.
+    if (!('modulesMs' in tt)) lines.push('- 耗时分类：未统计（运行未正常结束，见上方阶段耗时）');
+    else lines.push(`- 耗时分类：容器启动 ${sec(tt.containerStartMs || 0)}，浏览器启动 ${sec(tt.browserStartMs || 0)}，连接 ${sec(tt.connectMs || 0)}，模块 ${sec(tt.modulesMs || 0)}，等待 ${sec(tt.waitMs || 0)}，节流等待 ${sec(tt.throttleMs || 0)}，清理 ${sec(tt.cleanupMs || 0)}`);
     if (r.timing?.slowest?.length) lines.push(`- 最慢 5 个阶段：${r.timing.slowest.map(x => `${x.name} ${sec(x.ms)}（${x.requests} 次请求${x.throttleMs ? `，节流 ${sec(x.throttleMs)}` : ''}${x.waitMs ? `，等待 ${sec(x.waitMs)}` : ''}）`).join('；')}`);
     lines.push('', '## 失败与证据');
     const bad = r.modules.filter(m => m.status !== 'passed');
@@ -3065,7 +3071,10 @@ export class LiveRun {
     capped(bad, 5, m => {
       const shots = (this.shotsManifest || []).filter(x => x.module === m.id && x.file).map(x => x.file);
       const diffs = r.readBackDiffs.filter(d => d.module === m.id);
-      return `- ${m.id}：${m.status === 'aborted' ? '中止' : '失败'}于 ${m.failure?.phase}，${m.failure?.code}；读回差异 ${diffs.length} 条${diffs[0] ? `（${diffs[0].code}：期望 ${diffs[0].expected.slice(0, 60)}，实际 ${diffs[0].actual.slice(0, 60)}）` : ''}；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；截图 ${shots[shots.length - 1]}` : ''}`;
+      // Still "running": the run was cut off in this module (kill -9, OOM, a
+      // crash, a second signal) before it reached a verdict.
+      const verdict = m.status === 'running' ? '中断（运行在此模块中被打断，未得出结论）' : `${m.status === 'aborted' ? '中止' : '失败'}于 ${m.failure?.phase}，${m.failure?.code}`;
+      return `- ${m.id}：${verdict}；读回差异 ${diffs.length} 条${diffs[0] ? `（${diffs[0].code}：期望 ${diffs[0].expected.slice(0, 60)}，实际 ${diffs[0].actual.slice(0, 60)}）` : ''}；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；截图 ${shots[shots.length - 1]}` : ''}`;
     });
     if (r.violations.length) lines.push(`- 守卫/预算触发：${r.violations.slice(0, 5).map(v => `${v.code}@${v.phase}`).join('，')}${r.violations.length > 5 ? ` 等 ${r.violations.length} 条` : ''}`);
     if (r.blockedOrigins.length) lines.push(`- 被拦截的外部来源（${r.blockedOrigins.length}）：${r.blockedOrigins.slice(0, 5).join('，')}`);
@@ -3085,15 +3094,19 @@ export class LiveRun {
         const owner = SERVICE_TYPES.find(svc => f.startsWith(svc + '-'));
         if (owner && owner !== row.service) continue;
         const list = features.get(f) || [];
-        list.push({ id: m.id, ok: m.status === 'passed' });
+        list.push({ id: m.id, ok: m.status === 'passed', open: m.status === 'running' });
         features.set(f, list);
       }
     }
     if (!features.size) lines.push('- 本轮没有执行模块。');
     else {
-      const failed = [...features].filter(([, list]) => list.some(x => !x.ok));
+      // A feature some module failed is failed; one whose only shortfall is
+      // a module the run was cut off in is unfinished, not failed.
+      const failed = [...features].filter(([, list]) => list.some(x => !x.ok && !x.open));
+      const open = [...features].filter(([, list]) => list.some(x => x.open) && list.every(x => x.ok || x.open)).map(([f]) => f);
       const passed = [...features].filter(([, list]) => list.every(x => x.ok)).map(([f]) => f);
       if (passed.length) lines.push(`- 通过（${passed.length}）：${passed.join('，').slice(0, 300)}`);
+      if (open.length) lines.push(`- 未完成（${open.length}，运行被打断，不算失败）：${open.join('，').slice(0, 300)}`);
       capped(failed, 4, ([f, list]) => `- 未通过 ${f}：${list.filter(x => !x.ok).map(x => x.id).join('，')}`);
     }
     lines.push('', '## 截图与布局');

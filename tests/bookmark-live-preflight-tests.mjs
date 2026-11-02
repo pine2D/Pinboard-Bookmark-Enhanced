@@ -1883,9 +1883,14 @@ try {
   assert.match(summaryText, /阶段耗时：credentials \d+\.\ds，preflight \d+\.\ds，browser_start \d+\.\ds，connect:linkding \d+\.\ds，cleanup \d+\.\ds/);
   assert.equal(statSync(join(success.reportPath, '..', 'summary.zh.md')).mode & 0o777, 0o600);
 
-  // An unfinished earlier run blocks the next one before any request.
-  const pendingId = randomUUID();
-  const pendingPrefix = 'pbp-it-' + pendingId;
+  // An unfinished earlier run blocks the next one before any request. The
+  // report is the one a run cut off by kill -9, OOM or a crash leaves: what
+  // its own persist() wrote mid-run, one module passed and the next still
+  // running. No conclude(), no cleanupAll(): nothing hand-written stands in
+  // for what such a run records (review of H1b, must-fix 1).
+  const pendingRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+  const pendingId = pendingRun.runId;
+  const pendingPrefix = pendingRun.prefix;
   const pendingDir = join(linkdingState, pendingPrefix);
   mkdirSync(pendingDir, { mode: 0o700 });
   const pendingPool = live.poolUrls('user', pendingId, 'linkding', 3);
@@ -1898,19 +1903,23 @@ try {
   store.tags.set('6', { id: 6, name: 'personal', date_added: '2026-11-01T00:00:00Z' });
   // The run prefix on a tag the ledger does not hold: residue (H1b).
   store.tags.set('10', { id: 10, name: pendingPrefix + '_stray', date_added: '2026-11-01T00:00:00Z' });
-  const pendingReport = {
-    harness: live.HARNESS_VERSION, runId: pendingId, prefix: pendingPrefix, target: 'user',
-    instances: { linkding: { service: 'linkding', base: linkdingBase + '/' } }, pools: { linkding: pendingPool },
-    ledger: { created: [{ instance: 'linkding', id: '7', url: pendingPool[0], source: 'route', module: 'linkding.core.worker', deleted: false }], lists: [], tags: [
-      { instance: 'linkding', key: pendingPrefix + '_x', id: '5', source: 'route', module: 'linkding.core.worker' },
-      { instance: 'linkding', key: pendingPrefix + '_upper', id: '', source: 'sw', module: 'linkding.core.worker' },
-    ] },
-    // What the cut-off run itself recorded: its module verdicts and request
-    // counts. A --cleanup of the report must not rewrite them away.
-    modules: [{ id: 'linkding.core.worker', status: 'passed' }], counts: { linkding: { node: 105, browser: 77, browserWrites: 3, sw: 70, setup: 4 } },
-    cleanup: { complete: false, entries: [] }, checks: [], readBackDiffs: [], console: [], swConsole: [], pageErrors: [], requestFailed: [], blockedOrigins: [], violations: [], findings: [], skipped: [], shots: { count: 0 },
-  };
-  live.writePrivateJson(join(pendingDir, 'report.json'), pendingReport);
+  pendingRun.runDir = pendingDir;
+  pendingRun.reportPath = join(pendingDir, 'report.json');
+  pendingRun.target = 'user';
+  Object.assign(pendingRun.report, { target: 'user', instances: { linkding: { service: 'linkding', base: linkdingBase + '/' } }, pools: { linkding: pendingPool } });
+  pendingRun.report.ledger.created.push({ instance: 'linkding', id: '7', url: pendingPool[0], source: 'route', module: 'linkding.core.worker', deleted: false });
+  pendingRun.report.ledger.tags.push(
+    { instance: 'linkding', key: pendingPrefix + '_x', id: '5', source: 'route', module: 'linkding.core.worker' },
+    { instance: 'linkding', key: pendingPrefix + '_upper', id: '', source: 'sw', module: 'linkding.core.worker' },
+  );
+  await pendingRun.timed('credentials', async () => {});
+  // Requests go through the run's own counter, as api() and the route count them.
+  Object.assign(pendingRun.count('linkding'), { node: 105, browser: 77, browserWrites: 3, sw: 70, setup: 4 });
+  pendingRun.report.modules.push({ id: 'linkding.core.worker', instance: 'linkding', status: 'passed', started: '2026-11-01T00:00:00.000Z', finished: '2026-11-01T00:00:10.000Z', ms: 10000, checks: [], notes: {}, failure: null, counts: {}, timing: { waitMs: 0, throttleMs: 0 } },
+    { id: 'linkding.core.popup-reader', instance: 'linkding', status: 'running', started: '2026-11-01T00:00:10.000Z', ms: 0, checks: [], notes: {}, failure: null, counts: {}, timing: { waitMs: 0, throttleMs: 0 } });
+  pendingRun.persist();
+  const pendingReport = JSON.parse(readFileSync(join(pendingDir, 'report.json'), 'utf8'));
+  assert.deepEqual(pendingReport.counts.linkding, { node: 105, browser: 77, browserWrites: 3, sw: 70, setup: 4 }, 'every persist carries the live request counts');
   // The run that left it was cut off with its lock in place (kill -9, OOM, a
   // crash): the lock names a pid above the kernel's limit, so it is dead.
   const deadLock = join(linkdingState, 'pbp-it-live.lock');
@@ -1942,6 +1951,13 @@ try {
   assert.match(resumedSummary, /通过（\d+）：[^\n]*worker-create/, resumedSummary);
   assert(!resumedSummary.includes('本轮没有执行模块'), resumedSummary);
   assert.match(resumedSummary, /请求：linkding Node 105 \/ 浏览器 77/, resumedSummary);
+  // The module the run was cut off in is interrupted, not failed: its
+  // features are unfinished, and a run that never summed its timing says so.
+  assert.match(resumedSummary, /linkding\.core\.popup-reader：中断/, resumedSummary);
+  assert(!resumedSummary.includes('undefined'), resumedSummary);
+  assert.match(resumedSummary, /未完成（\d+，[^）]*）：[^\n]*popup-save/, resumedSummary);
+  assert(!/未通过 (popup-save|reader-edit)/.test(resumedSummary), resumedSummary);
+  assert.match(resumedSummary, /耗时分类：未统计/, resumedSummary);
   assert.deepEqual(resumed.report.counts.linkding, pendingReport.counts.linkding, 'a --cleanup leaves the run counts as they were');
   assert(resumed.report.cleanup.counts.linkding.node > 0, 'the cleanup pass counts its own requests');
   const tagQuery = requests.find(q => q.path === '/api/bookmarks/' && q.url.includes('q='));
