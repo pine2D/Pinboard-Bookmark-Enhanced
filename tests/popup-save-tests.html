@@ -2092,23 +2092,39 @@ test("posts/add default remains replace=yes for existing callers", () => {
       return source.slice(from, source.indexOf("\n}", from) + 2) + "\n" + popupAiSource.slice(holds, popupAiSource.indexOf("\n}", holds) + 2);
     })();
 
+    // One builder for the sliced Description prefill. The slice runs in strict
+    // mode with every module-level name it touches declared here, so a
+    // forgotten declaration throws a ReferenceError instead of becoming a
+    // sloppy-mode implicit global. `initial` seeds the Description state
+    // (default: known, nothing pending, no page text); the returned function
+    // runs the prefill once and reports the state it left behind.
+    const prefillHarness = ({ known = true, pending = false, pageText = null } = {}) => {
+      const start = source.indexOf("function pbpPopupPrefillDescription("), end = source.indexOf("function recomputeArchiveCheck(", start);
+      assert(start >= 0 && end > start, "prefill source not found");
+      const run = new Function("pageInfo", "settings", "shouldUpdateField", "$id", "pbpNotesDescription", "_aiUrlEquivalent", "_initial",
+        '"use strict";\n' +
+        "let _linkdingDescriptionKnown = _initial.known;\n" +
+        "let _linkdingDescriptionPending = _initial.pending;\n" +
+        "let _linkdingPageDescription = _initial.pageText;\n" +
+        loadUrlCleanSource + "\n" + source.slice(start, end) +
+        "\npbpPopupPrefillDescription();\nreturn { known: _linkdingDescriptionKnown, pending: _linkdingDescriptionPending, pageText: _linkdingPageDescription };");
+      return (pageInfo, settings, shouldUpdateField, $id) => run(pageInfo, settings, shouldUpdateField, $id, pbpNotesDescription, aiUrlEquivalent, { known, pending, pageText });
+    };
+
     test("popup prefill formats selected text for the connected service", () => {
-      const start = source.indexOf('function pbpPopupPrefillDescription(');
-      const end = source.indexOf('function recomputeArchiveCheck(', start);
       const elements = {"description-input":{value:""},"linkding-description-input":{value:""},"linkding-description-row":document.createElement("div"),"url-input":{value:""}};
-      const fill = new Function("pageInfo", "settings", "shouldUpdateField", "$id", "pbpNotesDescription", "_aiUrlEquivalent", "let _linkdingDescriptionKnown = true; let _linkdingDescriptionPending = false; let _linkdingPageDescription = null;"+loadUrlCleanSource+source.slice(start, end)+";pbpPopupPrefillDescription();");
+      const fill = prefillHarness();
       for (const [service, expected] of [["pinboard", "<blockquote># heading\n\n&lt;b&gt; *bold*</blockquote>"],
         ["linkding", "> \\# heading\n>\n> &lt;b> \\*bold\\*"], ["karakeep", "> # heading\n>\n> <b> *bold*"]]) {
-        fill({ selectedText: "# heading\n\n<b> *bold*" }, { bookmarkService: service, optBlockquote: true }, () => true, id=>elements[id], pbpNotesDescription, aiUrlEquivalent);
+        fill({ selectedText: "# heading\n\n<b> *bold*" }, { bookmarkService: service, optBlockquote: true }, () => true, id=>elements[id]);
         assert(elements["description-input"].value === expected, service + " prefill: " + elements["description-input"].value);
       }
     });
 
     test("fresh linkding metadata enters Description while Notes keep only selection and via", () => {
-      const a=source.indexOf('function pbpPopupPrefillDescription('),b=source.indexOf('function recomputeArchiveCheck(',a);
       const elements={"description-input":{value:""},"linkding-description-input":document.createElement("input"),"linkding-description-row":document.createElement("div"),"url-input":{value:URL}};
-      const fill=new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription","_aiUrlEquivalent","let _linkdingDescriptionKnown = true; let _linkdingDescriptionPending = false; let _linkdingPageDescription = null;"+loadUrlCleanSource+source.slice(a,b)+";pbpPopupPrefillDescription();");
-      for(const selectedText of ["", "Selected text"]){fill({url:URL,metaDescription:"Meta\ndescription",selectedText,referrer:"https://source.example/"},{bookmarkService:"linkding",optIncludeReferrer:true},()=>true,id=>elements[id],pbpNotesDescription,aiUrlEquivalent);assert(elements["linkding-description-input"].value==="Meta description");assert(elements["description-input"].value===(selectedText?selectedText+"\n\n":"")+"via: https://source.example/");}
+      const fill=prefillHarness();
+      for(const selectedText of ["", "Selected text"]){fill({url:URL,metaDescription:"Meta\ndescription",selectedText,referrer:"https://source.example/"},{bookmarkService:"linkding",optIncludeReferrer:true},()=>true,id=>elements[id]);assert(elements["linkding-description-input"].value==="Meta description");assert(elements["description-input"].value===(selectedText?selectedText+"\n\n":"")+"via: https://source.example/");}
     });
 
     // A page the popup read has a known Description, its meta description or
@@ -2119,12 +2135,11 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // provenance. The page describes only itself: a form holding another URL
     // gets none of it, and its empty box is known only with auto-fill off.
     test("linkding prefill knows the Description only when the page was read or auto-fill is off", () => {
-      const a=source.indexOf('function pbpPopupPrefillDescription('),b=source.indexOf('function recomputeArchiveCheck(',a);
       const run=(pageInfo,settings,dirty=false,formUrl=pageInfo.url)=>{
         const elements={"description-input":{value:""},"linkding-description-input":document.createElement("input"),"linkding-description-row":document.createElement("div"),"url-input":{value:formUrl}};
         elements["linkding-description-input"].value=dirty?"Typed":"";
-        const [known,pending]=new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription","_aiUrlEquivalent","let _linkdingDescriptionKnown = 'untouched'; let _linkdingDescriptionPending = 'untouched'; let _linkdingPageDescription = null;"+loadUrlCleanSource+source.slice(a,b)+";pbpPopupPrefillDescription();return [_linkdingDescriptionKnown,_linkdingDescriptionPending];")
-          (pageInfo,{bookmarkService:"linkding",...settings},id=>!(dirty&&id==="linkding-description-input"),id=>elements[id],pbpNotesDescription,aiUrlEquivalent);
+        const {known,pending}=prefillHarness({known:"untouched",pending:"untouched"})
+          (pageInfo,{bookmarkService:"linkding",...settings},id=>!(dirty&&id==="linkding-description-input"),id=>elements[id]);
         return {known,pending,value:elements["linkding-description-input"].value};
       };
       const read={url:URL,title:"Article",metaDescription:"Meta\ndescription"},bare={url:URL,title:"Article",metaDescription:""},unread={url:URL,title:"Article",metaDescription:"",_pbpUnavailable:true};
@@ -2143,8 +2158,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const loaded=new Promise(r=>iframe.onload=r);iframe.srcdoc=popupHtml.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,"").replace(/<link\b[^>]*>/g,"");await loaded;
       const doc=iframe.contentDocument;const css=doc.createElement("style");css.textContent=popupCss+'\n*,*::before,*::after { transition:none!important; animation:none!important; }';doc.head.appendChild(css);
       doc.getElementById("main-section").classList.remove("hidden");doc.documentElement.dataset.section="main";
-      const a=source.indexOf('function pbpPopupPrefillDescription('),b=source.indexOf('function recomputeArchiveCheck(',a);
-      for(const service of ["pinboard","karakeep","linkding"]){new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription","_aiUrlEquivalent","let _linkdingDescriptionKnown = true; let _linkdingDescriptionPending = false; let _linkdingPageDescription = null;"+loadUrlCleanSource+source.slice(a,b)+";pbpPopupPrefillDescription();")({},{bookmarkService:service},()=>true,id=>doc.getElementById(id),pbpNotesDescription,aiUrlEquivalent);const row=doc.getElementById("linkding-description-row");assert(iframe.contentWindow.getComputedStyle(row).display===(service==="linkding"?"flex":"none"),service+" Description visibility is wrong");}
+      for(const service of ["pinboard","karakeep","linkding"]){prefillHarness()({},{bookmarkService:service},()=>true,id=>doc.getElementById(id));const row=doc.getElementById("linkding-description-row");assert(iframe.contentWindow.getComputedStyle(row).display===(service==="linkding"?"flex":"none"),service+" Description visibility is wrong");}
       const { FIELD_TARGETS }=await import('../docs/theme-surface/composers/ui-components.mjs');
       const input=doc.getElementById("linkding-description-input"),title=doc.getElementById("title-input");
       const registrations=FIELD_TARGETS.pp.filter(entry=>input.matches(entry.rest));
