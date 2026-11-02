@@ -67,12 +67,15 @@ globalThis.fetch=()=>{throw new Error('network_access_blocked');};
 // A spawned temporary-target run with a scripted Docker executor, so real
 // signals and a real process.exit are exercised without a Docker daemon.
 // Every command logs "start<TAB>key<TAB>args" and "done<TAB>key"; the keys in
-// the JSON argument (key -> ms) are held that long before they answer.
+// the JSON argument (key -> ms) are held that long before they answer, and
+// its "__states" map (container suffix -> inspect state, say "exited 1")
+// scripts a container that dies.
 const dockerChild = join(dir, 'docker-child.mjs');
 writeFileSync(dockerChild, `import { appendFileSync } from 'node:fs';
 const [runner, log, holdSpec, ...argv] = process.argv.slice(2);
 const live = await import(runner);
 const holds = JSON.parse(holdSpec);
+const states = holds.__states || {};
 const keyOf = args => {
   const name = args.includes('--name') ? args[args.indexOf('--name') + 1].replace(/^pbp-it-[0-9a-f-]{36}-/, '') : '';
   return args[0] + (args[1] && !args[1].startsWith('-') && ['network', 'image', 'volume'].includes(args[0]) ? ' ' + args[1] : '') + (name ? ':' + name : '');
@@ -86,7 +89,7 @@ const exec = async args => {
   const ok = (stdout = '') => ({ code: 0, stdout, stderr: '' });
   if (cmd === 'ps' || (cmd === 'network' && sub === 'ls') || (cmd === 'volume' && sub === 'ls')) return ok('');
   if (cmd === 'inspect' && args[2] === '{{.Image}}') return ok('sha256:' + 'a'.repeat(64) + '\\n');
-  if (cmd === 'inspect') return ok('running 0\\n');
+  if (cmd === 'inspect') return ok((states[String(args[3]).replace(/^pbp-it-[0-9a-f-]{36}-/, '')] || 'running 0') + '\\n');
   if (cmd === 'image') return ok('sha256:' + 'c'.repeat(64) + '\\n');
   if (cmd === 'port') return ok('127.0.0.1:9\\n');
   return ok('');
@@ -2162,6 +2165,48 @@ try {
       assert(!existsSync(join(state, 'pbp-it-live.lock')));
       assert(['rm', 'ps'].every(cmd => live.isTeardownCommand([cmd])) && !['run', 'create', 'start', 'exec'].some(cmd => live.isTeardownCommand([cmd])));
       assert(live.isTeardownCommand(['network', 'rm', 'x']) && !live.isTeardownCommand(['network', 'create', 'x']) && !live.isTeardownCommand(['network', 'connect', 'x', 'y']));
+    }
+    {
+      // Two services start side by side (E25): a signal or a failure in one
+      // branch while the other's `docker run` is in flight. Each time only
+      // teardown reaches Docker afterwards, the in-flight command settles
+      // before anything is removed, every recorded name is removed (the one
+      // being created too) and no env file is left.
+      const both = ['--run', '--target', 'temp', '--scenario', 'linkding.readonly,karakeep.readonly', '--service', 'linkding,karakeep', '--allow-dirty'];
+      const interleaved = async (name, { holds, signals = [], held, expect }) => {
+        const r = await dockerChildRun({ state: stateDirFor(name), args: both, holds, signals });
+        assert.deepEqual([r.code, r.report.failure.code], expect, name + ': ' + r.output);
+        const begun = signals.length ? r.lines.indexOf('signal\tSIGINT') : r.lines.findIndex(l => l.startsWith('start\tlogs'));
+        assert(begun > 0, name + ': the trigger is in the log');
+        const settled = r.lines.indexOf('done\t' + held), removal = r.lines.findIndex(l => l.startsWith('start\trm\t'));
+        assert(settled > begun && removal > settled, name + ': the held command settles before anything is removed');
+        const later = r.lines.slice(settled + 1).filter(l => l.startsWith('start\t')).map(l => l.split('\t')[1]);
+        assert(later.every(key => teardown.includes(key)), name + ': only teardown after the cleanup began: ' + later.join(', '));
+        const removed = r.lines.filter(l => l.startsWith('start\trm\t')).flatMap(l => JSON.parse(l.split('\t')[2]).slice(3));
+        const own = live.tempNames(r.report.runId);
+        assert(r.report.temp.names.includes(own[held.split(':')[1]]), name + ': the held container is on record');
+        assert.deepEqual(removed.sort(), [...r.report.temp.names].sort(), name + ': every recorded name is removed');
+        assert.deepEqual([r.report.temp.removed, r.report.cleanup.complete], [true, true], name);
+        assert(!readdirSync(join(r.reportPath, '..')).some(n => n.startsWith('env-')), name + ': no env file is left');
+        return r;
+      };
+      await interleaved('signal-two-services', { holds: { 'run:karakeep': 1500 }, signals: ['start\trun:karakeep\t'], held: 'run:karakeep', expect: [130, 'interrupted_sigint'] });
+      const kExit = await interleaved('linkding-exits', { holds: { 'run:karakeep': 3000, __states: { linkding: 'exited 1' } }, held: 'run:karakeep', expect: [1, 'container_start_failed'] });
+      assert(!kExit.lines.some(l => l.startsWith('start\trun:karakeep-fixture')), 'the fixture of a branch still starting is never created');
+      const lExit = await interleaved('karakeep-exits', { holds: { 'run:linkding-fixture': 3000, __states: { karakeep: 'exited 1' } }, held: 'run:linkding-fixture', expect: [1, 'container_start_failed'] });
+      assert(lExit.report.temp.names.includes(live.tempNames(lExit.report.runId)['linkding-fixture']));
+      // A forced exit (second signal) while run:karakeep is in flight: the
+      // name was recorded before the command, so --cleanup removes it.
+      const state = stateDirFor('force-two-services');
+      const forced = await dockerChildRun({ state, args: both, holds: { 'run:karakeep': 3000 }, signals: ['start\trun:karakeep\t', 'signal\tSIGINT'] });
+      assert.deepEqual([forced.code, forced.report.cleanup.complete], [130, false], forced.output);
+      const own = live.tempNames(forced.report.runId);
+      assert(forced.report.temp.names.includes(own.karakeep), 'the container being created is on record before its command');
+      const resumed = await dockerChildRun({ state, args: ['--cleanup', forced.reportPath] });
+      assert.equal(resumed.code, 0, resumed.output);
+      const removed = resumed.lines.filter(l => l.startsWith('start\trm\t')).flatMap(l => JSON.parse(l.split('\t')[2]).slice(3));
+      assert(removed.includes(own.karakeep) && resumed.lines.every(l => !l.startsWith('start\t') || teardown.includes(l.split('\t')[1])), 'the resume removes it by name and only tears down');
+      assert(!readdirSync(join(forced.reportPath, '..')).some(n => n.startsWith('env-')), 'no env file is left');
     }
     {
       // A second signal skips the rest of cleanup, marks the report incomplete
