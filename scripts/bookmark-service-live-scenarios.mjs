@@ -1826,6 +1826,11 @@ export const SELFHOSTED_MODULES = [
         const pause = await t.sw(async () => (await chrome.storage.local.get('offlineQueuePause')).offlineQueuePause || null);
         t.note('tokenPause', pause ? { reason: pause.reason, sameAccount: pause.account === account } : null);
         t.expect(!!pause && pause.account === account, 'token_not_paused');
+        // Paused as an authentication failure (G8 invariant 2: Karakeep's
+        // text/plain 401 is auth; G17 ruling 3: connection-level failures use
+        // G8's pause), never as a gateway refusal. Same test as
+        // sh.karakeep-auth's revoked_quick_save_reason.
+        t.expect(/auth|not_logged_in/.test(pause?.reason || '') && !/gateway/.test(pause?.reason || ''), 'token_pause_reason');
         unauth.clear();
         await drop(revoked);
       }, ['queue-needs-attention']);
