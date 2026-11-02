@@ -13,7 +13,7 @@ const root=fileURLToPath(new URL('../',import.meta.url));
 // prints the names and exits. Neither set: every block runs. Each block's own connection needs are declared on its
 // block() call and set up before every block (reset first), filtered or not, so one
 // block run alone reaches the same verdict as in the full run.
-const BLOCKS=['archive explanation and JSON restore','services: connect, save, reader','access gateway form','linkding sharing capability','Karakeep create race','linkding merge and server dates','linkding multi-line Description','linkding over-long tag','linkding unknown Description','linkding restored draft for another URL','linkding address typed after open','linkding cleaned page address','linkding Description server semantics','gateway probes'];
+const BLOCKS=['archive explanation and JSON restore','services: connect, save, reader','access gateway form','linkding sharing capability','Karakeep create race','linkding merge and server dates','linkding multi-line Description','linkding over-long tag','linkding unknown Description','linkding queued empty Description','linkding restored draft for another URL','linkding address typed after open','linkding cleaned page address','linkding Description server semantics','gateway probes'];
 const only=(process.env.PBP_RUNTIME_ONLY||'').split(',').map(part=>part.trim().toLowerCase()).filter(Boolean);
 const selected=name=>!only.length||only.some(part=>name.toLowerCase().includes(part));
 if(process.argv.includes('--list')){console.log(BLOCKS.join('\n'));process.exit(0);}
@@ -659,6 +659,12 @@ try{
     assert.equal(multiPatches().at(-1).data.title,'Reader title edit');
     assert(!Object.hasOwn(multiPatches().at(-1).data,'description'),'a title-only reader edit rewrote the Description');
     assert.equal(records.linkding.get(multiId).description,multiLine,'a title-only reader edit flattened the Description');
+    // Only a Description the user changed is sent, as the one line the editor shows.
+    await reader.locator('#reader-bookmark-edit[aria-busy="false"]').click();await reader.locator('#reader-bookmark-editor:popover-open').waitFor();
+    await reader.locator('#reader-bookmark-summary').fill('Reader   edited ');
+    const beforeEdit=multiPatches().length;await reader.locator('#reader-bookmark-apply').click();
+    await until(()=>multiPatches().length>beforeEdit,'reader Description edit');
+    assert.equal(multiPatches().at(-1).data.description,'Reader edited','an edited reader Description was not written as its one line');
     await reader.close();
   }
   records.linkding.delete(multiId);await article.goto(origin+'/article');
@@ -750,6 +756,29 @@ try{
   }
   await article.goto(origin+'/article');
   console.log('linkding unknown Description: an unread popup page and a draft-free reader save let linkding scrape it');
+  });
+  // A record queued before the Description became optional carries "" when the
+  // extension knew there was none. Replaying it must stay an explicit empty
+  // Description (sent with disable_scraping), not turn into "unknown" and let
+  // linkding scrape. Hand-written storage shape; the account binding is the
+  // connection identity the queue keeps.
+  await block('linkding queued empty Description',['linkding'],async()=>{
+    const queuedUrl=origin+'/article-meta?queued-empty';
+    const account=(await worker.evaluate(()=>getCurrentBookmarkAuth())).account;
+    const record={queueId:'legacy-empty',queuedAt:1,account,mode:'merge',url:queuedUrl,title:'Queued title',notes:'',summary:'',tags:'queued',private:true,toread:false};
+    await worker.evaluate(async item=>chrome.storage.local.set({offlineQueue:[item]}),record);
+    const before=requests.length;
+    const outcome=await worker.evaluate(()=>retryOfflineItem('legacy-empty'));
+    assert.equal(outcome.ok,true,'the queued record was not delivered: '+JSON.stringify(outcome));
+    const create=linkdingCreates(before)[0];
+    assert.equal(create?.data.url,queuedUrl);
+    assert.equal(create.query,'?disable_scraping','a queued empty Description let linkding scrape');
+    assert(Object.hasOwn(create.data,'description')&&create.data.description==='','a queued empty Description was not sent as empty');
+    const row=[...records.linkding.values()].find(b=>b.url===queuedUrl);
+    assert.equal(row?.description,'','linkding stored a Description for a known-empty one');
+    records.linkding.delete(String(row.id));
+    assert.deepEqual(await worker.evaluate(async()=>(await chrome.storage.local.get('offlineQueue')).offlineQueue||[]),[],'the delivered record stayed queued');
+    console.log('linkding queued empty Description: a record queued with "" replays as an explicit empty Description');
   });
   // A draft made by editing a recent bookmark is kept for the tab the popup was
   // opened on but holds that bookmark's URL. The tab's meta description is the
