@@ -425,7 +425,8 @@ export const TAG_WRITE_SOURCES = Object.freeze(['route', 'sw', 'node']);
 // view.lists and view.tags hold what the calling layer has recorded (a
 // deleted bookmark still counts), view.pending the creations it has in
 // flight. An allowed write carries the run-prefix tag keys it names that
-// are not yet known (`tags`), for the layer to reserve as it sends it.
+// are not yet known (`tags`), for the layer to reserve as it sends it. With
+// cfg.prefix a write naming any tag outside that prefix is refused.
 export function liveGuardRule(cfg, view, req) {
   const url = String(req.url || '');
   const method = String(req.method || 'GET').toUpperCase();
@@ -452,6 +453,11 @@ export function liveGuardRule(cfg, view, req) {
   const created = view.created || [];
   const own = id => created.some(r => r.instance === instance && r.id === String(id));
   const capped = (decision, names) => {
+    // Every tag a write names carries the run prefix: a tag the product (or
+    // a fake AI reply) adds under any other name would stay on a user
+    // instance, where cleanup removes ledger tags only. Fatal, not sent.
+    const runPrefix = String(cfg.prefix || '');
+    if (runPrefix && names.some(name => { const key = liveTagKey(inst.service, name); return key && !key.toLowerCase().startsWith(runPrefix); })) return { ok: false, instance, code: 'live_guard_foreign_tag' };
     if (!cfg.limits) return decision;
     const limit = cfg.limits[instance] || {};
     const cap = key => (typeof limit[key] === 'number' ? limit[key] : 0);
@@ -977,6 +983,16 @@ export async function startFakeAi({ prefix, limit = 60 } = {}) {
     combined: () => JSON.stringify({ summary: replies.summary(), tags: JSON.parse(replies.tags()) }),
     connectivity: () => 'OK',
   };
+  // Every tag a reply suggests carries the run prefix: the guards refuse a
+  // write naming any other tag, so a foreign suggestion would only fail the
+  // run later. A JSON reply is checked; free text is left to the guards.
+  const foreignTags = (kind, content) => {
+    if (kind !== 'tags' && kind !== 'combined') return false;
+    let value;
+    try { value = JSON.parse(content); } catch { return false; }
+    const tags = kind === 'tags' ? value : value?.tags;
+    return Array.isArray(tags) && tags.some(tag => !String(tag).startsWith(String(prefix || '')));
+  };
   let port = 0;
   const server = createServer((req, res) => {
     const send = (status, body, type = 'application/json') => { res.writeHead(status, { 'Content-Type': type }); res.end(typeof body === 'string' ? body : JSON.stringify(body)); };
@@ -1005,6 +1021,7 @@ export async function startFakeAi({ prefix, limit = 60 } = {}) {
       if (meta.kind === 'unknown') return reject(404, 'fake_ai_unknown_request');
       const queued = queues[meta.kind].shift();
       const content = String(typeof queued === 'function' ? queued(meta) : queued ?? replies[meta.kind]());
+      if (foreignTags(meta.kind, content)) return reject(503, 'fake_ai_foreign_tag');
       meta.status = 200;
       const usage = { prompt_tokens: Math.ceil(meta.promptBytes / 4), completion_tokens: Math.ceil(content.length / 4) };
       usage.total_tokens = usage.prompt_tokens + usage.completion_tokens;
@@ -1028,7 +1045,7 @@ export async function startFakeAi({ prefix, limit = 60 } = {}) {
     all: () => calls.map(c => ({ ...c })),
     unknown: () => state.unknown,
     failed: () => state.failed,
-    expect({ kind, reply }) { check(queues[kind], 'fake_ai_kind'); queues[kind].push(reply); },
+    expect({ kind, reply }) { check(queues[kind], 'fake_ai_kind'); check(typeof reply === 'function' || !foreignTags(kind, String(reply)), 'fake_ai_foreign_tag'); queues[kind].push(reply); },
     reset() { for (const q of Object.values(queues)) q.length = 0; },
     close: () => new Promise(r => server.close(() => r())),
   };

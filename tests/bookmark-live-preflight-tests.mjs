@@ -502,10 +502,17 @@ try {
     // Run-prefix tags are reserved the moment a write naming them leaves.
     routeRun.fatal = null;
     routeRun.report.ledger.created.push({ instance: 'karakeep', id: 'k7', url: cfg.pools.karakeep[0], source: 'route', module: '', deleted: false });
-    const tagged = fakeRoute('bookmarks/k7/tags', 'POST', JSON.stringify({ tags: [{ tagName: routeRun.prefix + ' machine learning' }, { tagName: 'personal' }] }));
+    const tagged = fakeRoute('bookmarks/k7/tags', 'POST', JSON.stringify({ tags: [{ tagName: routeRun.prefix + ' machine learning' }] }));
     await routeRun.onRoute(tagged.route);
     assert.equal(tagged.continued, true);
     assert.deepEqual(routeRun.report.ledger.tags.map(t => [t.instance, t.key, t.source]), [['karakeep', routeRun.prefix + ' machine learning', 'route']]);
+    // A write naming a tag outside the run prefix is fatal and not sent
+    // (H1b): such a tag could never be cleaned up from a user instance.
+    sent.length = 0;
+    const foreign = fakeRoute('bookmarks/k7/tags', 'POST', JSON.stringify({ tags: [{ tagName: routeRun.prefix + '_ok' }, { tagName: 'personal' }] }));
+    await routeRun.onRoute(foreign.route);
+    assert.deepEqual([foreign.aborted, foreign.continued, sent, routeRun.fatal], ['blockedbyclient', undefined, [], 'live_guard_foreign_tag']);
+    assert.equal(routeRun.report.ledger.tags.length, 1, 'a refused write reserves nothing');
 
     // A list create without an answer may have made a list nobody recorded:
     // its slot stays held and the next one is not sent. A refusal (4xx)
@@ -550,7 +557,9 @@ try {
     vm.runInContext(`pbpLiveGuard.created.push({ instance: 'karakeep', id: 'k7', url: ${JSON.stringify(cfg.pools.karakeep[0])} })`, sandbox);
     const tagsUrl = cfg.instances.karakeep.root + 'bookmarks/k7/tags';
     const tagBody = names => JSON.stringify({ tags: names.map(tagName => ({ tagName })) });
-    const attached = post(tagsUrl, tagBody([prefix0 + '_a', prefix0 + '_b', 'personal']));
+    await assert.rejects(post(tagsUrl, tagBody([prefix0 + '_a', 'personal'])), e => e.message === 'live_guard_foreign_tag', 'a foreign tag name is refused in the worker too');
+    assert.equal(sent.length, 1, 'and not sent');
+    const attached = post(tagsUrl, tagBody([prefix0 + '_a', prefix0 + '_b']));
     answers[1]({ ok: true, status: 200 });
     await attached;
     const overTags = await Promise.race([post(tagsUrl, tagBody([prefix0 + '_c', prefix0 + '_d'])).then(() => 'answered', e => e.message), new Promise(r => setTimeout(() => r('sent and waiting'), 100))]);
@@ -597,15 +606,21 @@ try {
     // linkding: tag_names split on commas, spaces become hyphens and ASCII
     // case folds, as linkding stores them; names outside the run prefix are
     // not run tags; names already known are not new.
-    let d = rule(limited, at(), linkdingTags([prefix0 + '_a', prefix0 + ' b', prefix0.toUpperCase() + '_A', 'personal']));
+    let d = rule(limited, at(), linkdingTags([prefix0 + '_a', prefix0 + ' b', prefix0.toUpperCase() + '_A']));
     assert.deepEqual([d.ok, d.tags], [true, [prefix0 + '_a', prefix0 + '-b']]);
+    // Any tag name outside the run prefix is refused (H1b), in every write
+    // shape of every service, whatever caps remain.
+    for (const req of [linkdingTags([prefix0 + '_a', 'personal']), create([prefix0 + '_a,personal']), linkdingTags(['pbp-it-' + randomUUID() + '_a']), karakeepTags([prefix0 + '_a', 'Personal']), karakeepTags(['#personal']), pinboardAdd(prefix0 + '_x personal'), pinboardAdd('personal,' + prefix0 + '_x')]) {
+      assert.equal(verdict(at(), req), 'live_guard_foreign_tag', req.url + ' ' + (req.body || ''));
+      assert.equal(verdict(at(), req, { ...limited, limits: undefined }), 'live_guard_foreign_tag', 'without limits too');
+    }
     d = rule(limited, at({ tags: [{ instance: 'linkding', key: prefix0 + '_a' }] }), linkdingTags([prefix0 + '_a,' + prefix0 + '_c', prefix0 + '_d']));
     assert.deepEqual([d.ok, d.tags], [true, [prefix0 + '_c', prefix0 + '_d']]);
     assert.equal(verdict(at({ tags: [{ instance: 'linkding', key: prefix0 + '_a' }] }), linkdingTags([prefix0 + '_b,' + prefix0 + '_c', prefix0 + '_d'])), 'live_guard_tag_budget', 'one name with commas is three tags');
     assert.equal(verdict(at(), create([1, 2, 3, 4].map(n => prefix0 + '_' + n))), 'live_guard_tag_budget', 'a create naming too many run tags');
-    assert.equal(verdict(at({ tags: known('linkding', 3) }), linkdingTags([prefix0 + '_1', prefix0 + '_3', 'personal'])), 'ok', 'known run tags and foreign names add nothing');
+    assert.equal(verdict(at({ tags: known('linkding', 3) }), linkdingTags([prefix0 + '_1', prefix0 + '_3'])), 'ok', 'known run tags add nothing');
     // Karakeep: exact names once trimmed and stripped of leading '#'.
-    d = rule(limited, at(), karakeepTags(['#' + prefix0 + '_A', ' ' + prefix0 + '_a ', 'Personal']));
+    d = rule(limited, at(), karakeepTags(['#' + prefix0 + '_A', ' ' + prefix0 + '_a ']));
     assert.deepEqual([d.ok, d.tags], [true, [prefix0 + '_A', prefix0 + '_a']]);
     assert.equal(verdict(at({ tags: known('karakeep', 3) }), karakeepTags([prefix0 + '_4'])), 'live_guard_tag_budget');
     assert.equal(verdict(at({ tags: known('karakeep', 3) }), { ...karakeepTags([], 'DELETE'), body: JSON.stringify({ tags: [{ tagId: 't1' }] }) }), 'ok', 'a detach names no tag');
@@ -622,8 +637,12 @@ try {
     const roomy = { ...limited, limits: { linkding: { bookmarks: 9, lists: 0, tags: 99 }, karakeep: { bookmarks: 9, lists: 1, tags: 99 } } };
     const samples = [prefix0 + ' x y', prefix0 + '_Mixed', ' ' + prefix0 + '-z ', '#' + prefix0 + '_h', prefix0 + '_中文', prefix0 + '  double  space'];
     for (const [service, req] of [['linkding', linkdingTags], ['karakeep', karakeepTags]]) {
-      const expected = [...new Set(samples.map(n => live.liveTagKey(service, n)))].filter(k => k.toLowerCase().startsWith(prefix0));
-      assert.deepEqual(rule(roomy, at(), req(samples)).tags, expected, service + ' keys agree with liveTagKey');
+      // linkding keeps a leading '#': that name is outside the prefix there.
+      const names = samples.filter(n => live.liveTagKey(service, n).toLowerCase().startsWith(prefix0));
+      assert.deepEqual(names.length, service === 'linkding' ? samples.length - 1 : samples.length);
+      const expected = [...new Set(names.map(n => live.liveTagKey(service, n)))];
+      assert.deepEqual(rule(roomy, at(), req(names)).tags, expected, service + ' keys agree with liveTagKey');
+      if (names.length < samples.length) assert.equal(rule(roomy, at(), req(samples)).code, 'live_guard_foreign_tag');
     }
   }
 
@@ -981,7 +1000,7 @@ try {
     run.caps = { linkding: { ...live.BUDGETS.temp.linkding, node: 10 } };
     run.reserve = { linkding: 2 };
     run.pools.linkding = live.poolUrls('temp', run.runId, 'linkding', 2);
-    const reproduced = await run.api('linkding', 'bookmarks/', { method: 'POST', body: { url: run.pools.linkding[0], tag_names: ['x'.repeat(70)] }, allowStatus: [500] });
+    const reproduced = await run.api('linkding', 'bookmarks/', { method: 'POST', body: { url: run.pools.linkding[0], tag_names: [run.prefix + '_' + 'x'.repeat(26)] }, allowStatus: [500] });
     assert.deepEqual(reproduced, { failedStatus: 500 });
     assert.equal(run.report.ledger.created.length, 0, 'a reproduced failure records nothing');
     await assert.rejects(run.api('linkding', 'bookmarks/', { method: 'POST', body: { url: run.pools.linkding[1] } }), e => e.code === 'api_http_500');
@@ -1032,7 +1051,11 @@ try {
     };
     let r = nodeRun({ tags: 2 });
     const p = r.prefix;
-    await r.api('linkding', 'bookmarks/', { method: 'POST', body: { url: r.pools.linkding[0], tag_names: [p + '_a', 'personal'] } });
+    // A seed naming a tag outside the run prefix is refused unsent (H1b).
+    await assert.rejects(r.api('linkding', 'bookmarks/', { method: 'POST', body: { url: r.pools.linkding[0], tag_names: [p + '_a', 'personal'] } }), e => e.code === 'live_guard_foreign_tag' && e.fatal === true);
+    assert.deepEqual([seen, r.report.ledger.tags, r.fatal], [[], [], 'live_guard_foreign_tag']);
+    r.fatal = null;
+    await r.api('linkding', 'bookmarks/', { method: 'POST', body: { url: r.pools.linkding[0], tag_names: [p + '_a'] } });
     assert.deepEqual(r.report.ledger.tags.map(t => [t.key, t.source]), [[p + '_a', 'node']], 'reserved when the seed leaves');
     r.trackTag('linkding', { id: 5, name: p + '_a' });
     assert.deepEqual(r.report.ledger.tags.map(t => [t.key, t.id, t.source]), [[p + '_a', '5', 'node']], 'a read-back confirms a reserved tag');
@@ -1255,6 +1278,10 @@ try {
   fake.expect({ kind: 'tags', reply: '["' + prefix + '_queued"]' });
   r = await ask(product.tags);
   assert.deepEqual(Array.from(product.parseTags(replyOf(r).message.content, '_')), [prefix + '_queued'], 'expect() queues one reply');
+  // A reply suggesting a tag outside the run prefix is refused (H1b): when
+  // queued as text at once, from a function when it is asked for.
+  assert.throws(() => fake.expect({ kind: 'tags', reply: '["' + prefix + '_ok", "personal"]' }), e => e.code === 'fake_ai_foreign_tag');
+  assert.throws(() => fake.expect({ kind: 'combined', reply: JSON.stringify({ summary: 's', tags: ['other'] }) }), e => e.code === 'fake_ai_foreign_tag');
   r = await ask(product.summary, { stream: true });
   assert.equal(r.status, 200);
   assert(r.type.startsWith('text/event-stream'));
@@ -1285,6 +1312,11 @@ try {
   assert.equal(capReply.status, 503);
   assert.equal(capped.failed(), 'fake_ai_budget', 'exceeding the cap fails the run');
   await capped.close();
+  const foreignAi = await live.startFakeAi({ prefix, limit: 2 });
+  foreignAi.expect({ kind: 'tags', reply: () => '["' + prefix + '_ok", "personal"]' });
+  const foreignReply = await httpCall({ port: foreignAi.port, headers: { Authorization: 'Bearer ' + foreignAi.key }, body: { model: 'm', messages: [{ role: 'user', content: product.tags }] } });
+  assert.deepEqual([foreignReply.status, foreignAi.failed(), foreignAi.calls()], [503, 'fake_ai_foreign_tag', 0], 'a computed foreign tag reply is refused and fails the run');
+  await foreignAi.close();
 
   // ---------------------------------------------------------------------
   // Docker: names, refusals, and the temp lifecycle with a fake executor
