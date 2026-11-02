@@ -215,7 +215,11 @@ try {
     assert.equal(new Set(ids).size, ids.length, 'module ids must be unique');
     for (const id of ids) assert.match(id, /^(linkding|linkding-pg|karakeep|pinboard)\.[a-z0-9.-]+$/);
     for (const row of MODULES) {
-      for (const key of ['id', 'services', 'surfaces', 'features', 'needs', 'budget', 'steps']) assert(row[key] !== undefined, row.id + ' lacks ' + key);
+      for (const key of ['id', 'services', 'surfaces', 'features', 'fixRefs', 'needs', 'budget', 'files', 'steps']) assert(row[key] !== undefined, row.id + ' lacks ' + key);
+      // Fix groups as the fix branch names them (G2, G2b, G21+G23).
+      assert(Array.isArray(row.fixRefs) && row.fixRefs.every(g => /^G\d+[a-z]?(\+G\d+[a-z]?)*$/.test(g)), row.id + ' fixRefs');
+      // Every self-hosted save row (H3b) names the fixes it asserts.
+      if (row.id.startsWith('sh.')) assert(row.fixRefs.length > 0 && row.services.every(s => s !== 'pinboard'), row.id + ' is a self-hosted row with fix groups');
       assert(['temp', 'user', 'any'].includes(row.needs.target) && ['any', 'on', 'off'].includes(row.needs.sharing), row.id + ' needs');
       assert.equal(typeof row.needs.snapshots, 'boolean', row.id + ' needs.snapshots');
       if (row.needs.snapshots) assert.deepEqual(row.services, ['linkding'], row.id + ': only linkding builds HTML snapshots');
@@ -302,8 +306,15 @@ try {
       const popupIds = live.expandRegistry().filter(m => m.surfaces.includes('popup')).map(m => m.id);
       assert(popupIds.includes('linkding.edges.quote-unread') && popupIds.includes('pinboard.readonly'));
       assert.deepEqual(route(['popup-offline.js']).modules, popupIds);
-      assert.deepEqual(route(['md-bookmark.js']).modules, ['linkding.core.popup-reader', 'linkding.sharing.popup-reader', 'karakeep.core.popup-reader', 'karakeep.edges.tags', 'pinboard.core.popup-reader']);
-      assert.deepEqual(route(['_locales/zh_CN/messages.json']).modules, ['linkding.ai.popup-summary-tags', 'karakeep.ai.popup-summary-tags']);
+      // Rows that open the reader, and rows that name a locale file in
+      // `files`: read from the registry rows, then the known members.
+      const readerIds = live.expandRegistry().filter(m => m.surfaces.includes('reader')).map(m => m.id);
+      for (const id of ['linkding.core.popup-reader', 'linkding.sharing.popup-reader', 'karakeep.core.popup-reader', 'karakeep.edges.tags', 'pinboard.core.popup-reader', 'linkding.sh.changed-elsewhere', 'karakeep.sh.read-later']) assert(readerIds.includes(id), id + ' opens the reader');
+      assert.deepEqual(route(['md-bookmark.js']).modules, readerIds);
+      const declares = file => live.expandRegistry().filter(m => (Array.isArray(m.files) ? m.files : [...(m.files.all || []), ...(m.files[m.service] || [])]).includes(file)).map(m => m.id);
+      assert.deepEqual(declares('_locales/zh_CN/messages.json'), ['linkding.ai.popup-summary-tags', 'karakeep.ai.popup-summary-tags']);
+      assert.deepEqual(route(['_locales/zh_CN/messages.json']).modules, declares('_locales/zh_CN/messages.json'));
+      assert.deepEqual(route(['_locales/de/messages.json']).modules, ['linkding.sh.tag-input', 'karakeep.sh.tag-input'], 'the German chip geometry row');
       const mixed = route(['library.js', 'md-bookmark.js', 'tests/bookmark-live-preflight-tests.mjs', 'README.md', 'pinboard-sort.js', 'md-bookmark.js']);
       assert.deepEqual(mixed.modules, route(['md-bookmark.js']).modules);
       assert.deepEqual(mixed.uncovered, ['library.js', 'pinboard-sort.js'], 'a shipped file nobody declares is listed, not skipped');
@@ -317,7 +328,7 @@ try {
       assert(zh.changed.note.includes('未覆盖'));
       assert.deepEqual(changedSel(['popup-offline.js'], { scenario: 'edges' }).selected.map(m => m.id), ['linkding.edges.quote-unread', 'linkding.edges.offline', 'karakeep.edges.tags']);
       assert.deepEqual(changedSel(['_locales/zh_CN/messages.json'], { target: 'user', service: 'karakeep' }).selected.map(m => m.id), ['karakeep.ai.popup-summary-tags']);
-      assert.deepEqual(changedSel(['md-bookmark.js'], { target: 'user', service: 'karakeep' }).selected.map(m => m.id), ['karakeep.core.popup-reader', 'karakeep.edges.tags']);
+      assert.deepEqual(changedSel(['md-bookmark.js'], { target: 'user', service: 'karakeep' }).selected.map(m => m.id), readerIds.filter(id => id.startsWith('karakeep.')));
       assert.deepEqual(changedSel(['shared.js'], { changed: 'origin/main', target: 'user', service: 'pinboard' }).selected.map(m => m.id), ids.filter(id => id.startsWith('pinboard.')));
       assert.equal(changedSel(['shared.js'], { changed: 'origin/main' }).changed.base, 'origin/main');
       assert.deepEqual(changedSel(['README.md']).selected, []);
@@ -466,7 +477,10 @@ try {
   // ---------------------------------------------------------------------
   if (only('budgets')) {
     for (const target of ['temp', 'user']) {
-      for (const spec of ['core', 'edges', 'readonly', 'ai', 'all']) {
+      for (const spec of ['core', 'edges', 'readonly', 'ai', 'selfhosted', 'all']) {
+        // One run holds the groups older than the self-hosted rows; those
+        // and the whole registry are packed into rounds (checked below).
+        const oneRun = !['selfhosted', 'all'].includes(spec);
         const { selected, skipped } = live.selectModules(spec, { target });
         const plan = live.buildPlan({ target, selected, skipped });
         for (const instance of plan.instances) {
@@ -483,11 +497,21 @@ try {
           assert.deepEqual(Object.keys(row.caps).sort(), ['bookmarks', 'browser', 'cleanupReserve', 'lists', 'node', 'tags']);
           // The policy reserve is shown next to the computed one, which never undercuts it.
           assert.equal(row.caps.cleanupReserve, live.BUDGETS[target][instance].cleanupReserve);
-          assert(row.cleanupReserve >= row.caps.cleanupReserve && row.node + row.cleanupReserve <= row.caps.node, `${target}/${spec}/${instance} node + reserve`);
+          assert(row.cleanupReserve >= row.caps.cleanupReserve && (!oneRun || row.node + row.cleanupReserve <= row.caps.node), `${target}/${spec}/${instance} node + reserve`);
         }
-        assert.equal(plan.withinCaps, true, `${target}/${spec} must fit its caps: ${plan.problems.join(',')}`);
-        // Every timeout plus the setup estimate fits the run cap.
-        assert(plan.limits.worstCaseSeconds + plan.limits.setupAllowanceSeconds <= plan.limits.runMinutes * 60, `${target}/${spec} worst case ${plan.limits.worstCaseSeconds}s`);
+        if (oneRun) {
+          assert.equal(plan.withinCaps, true, `${target}/${spec} must fit its caps: ${plan.problems.join(',')}`);
+          // Every timeout plus the setup estimate fits the run cap.
+          assert(plan.limits.worstCaseSeconds + plan.limits.setupAllowanceSeconds <= plan.limits.runMinutes * 60, `${target}/${spec} worst case ${plan.limits.worstCaseSeconds}s`);
+        } else {
+          // Rounds: every module fits one; on the user target all of them fit
+          // the three rounds of one authorisation.
+          const packed = live.packRounds(selected, target);
+          assert.deepEqual([packed.unfit, packed.overflow], [[], []], `${target}/${spec} rounds`);
+          assert.equal(packed.ok, true);
+          if (target === 'user') assert(packed.count <= 3, `${target}/${spec} takes ${packed.count} rounds`);
+          for (const round of packed.rounds) assert.equal(live.buildPlan({ target, selected: selected.filter(m => round.modules.includes(m.id)) }).withinCaps, true, `${target}/${spec} round ${round.n}`);
+        }
         assert.equal(plan.fakeAi.needed, selected.some(m => m.needs.fakeAi));
         if (target === 'temp') assert(plan.containers.includes('edge') && plan.instances.every(i => plan.containers.includes(i)));
         else assert.deepEqual(plan.containers, []);
@@ -498,9 +522,11 @@ try {
     assert.equal(live.BUDGETS.user.karakeep.lists, 1);
     assert.equal(live.BUDGETS.user.pinboard.minIntervalMs, 3000);
     for (const target of ['temp', 'user']) assert.equal(live.BUDGETS[target].run.fakeAi, 60);
-    // The user caps as authorised on 2026-11-01, as --plan shows them.
+    // The user caps as authorised on 2026-11-01, as --plan shows them, on
+    // the rows that fit one run (the registry before the self-hosted rows).
+    const ONE_RUN = 'readonly,core,edges,ai,*.sharing.*,*.limits.*';
     {
-      const { selected, skipped } = live.selectModules('all', { target: 'user' });
+      const { selected, skipped } = live.selectModules(ONE_RUN, { target: 'user' });
       const plan = live.buildPlan({ target: 'user', selected, skipped });
       assert.deepEqual(plan.budget.linkding.caps, { bookmarks: 15, node: 250, cleanupReserve: 60, browser: 350, tags: 20, lists: 0 });
       assert.deepEqual(plan.budget.karakeep.caps, { bookmarks: 12, node: 250, cleanupReserve: 60, browser: 500, tags: 20, lists: 1 });
@@ -527,12 +553,12 @@ try {
         assert.equal(row.node - moduleNode - live.preflightCost({ service: row.service, urls: row.urls, writes }), { linkding: 1, karakeep: 6 }[instance], instance);
       }
       // The temporary target counts nothing: its libraries hold the run's tags only.
-      const tempPlan = live.buildPlan({ target: 'temp', ...live.selectModules('all', { target: 'temp' }) });
+      const tempPlan = live.buildPlan({ target: 'temp', ...live.selectModules(ONE_RUN, { target: 'temp' }) });
       assert(Object.values(tempPlan.budget).every(row => row.tagPages === undefined));
       assert.deepEqual([plan.limits.runMinutes, plan.limits.moduleSeconds, plan.limits.fakeAi, plan.limits.automaticRetries], [20, 120, 60, 0]);
       assert.deepEqual(plan.skipped.map(s => s.reason), ['snapshot_setting_unreadable', 'target_temp', 'target_temp'], 'the snapshot module and temp-only modules are skipped on the user target');
       // Named exactly next to all, the snapshot module still fits the caps.
-      const named = live.selectModules('linkding.core.snapshot,all', { target: 'user' });
+      const named = live.selectModules('linkding.core.snapshot,' + ONE_RUN, { target: 'user' });
       const namedPlan = live.buildPlan({ target: 'user', selected: named.selected, skipped: named.skipped });
       assert.equal(namedPlan.withinCaps, true, namedPlan.problems.join(','));
       assert(namedPlan.limits.worstCaseSeconds + namedPlan.limits.setupAllowanceSeconds <= namedPlan.limits.runMinutes * 60);
@@ -582,7 +608,9 @@ try {
       const packed = live.packRounds(userAll, 'user');
       assert.deepEqual(live.packRounds([...userAll].reverse(), 'user').rounds.map(r => [...r.modules].sort()).sort(), packed.rounds.map(r => [...r.modules].sort()).sort(), 'the order given does not change the rounds');
       assert.deepEqual(live.packRounds(userAll, 'user'), packed, 'recomputed the same');
-      assert.deepEqual([packed.ok, packed.exhaustive, packed.count, packed.maxRounds, packed.overflow, packed.unfit], [true, true, 2, 3, [], []]);
+      assert.deepEqual([packed.ok, packed.exhaustive, packed.count, packed.maxRounds, packed.overflow, packed.unfit], [true, true, 3, 3, [], []]);
+      // Three since the self-hosted save rows (H3b): the rounds of one
+      // authorisation, with nothing left over.
       const placed = packed.rounds.flatMap(r => r.modules);
       assert.deepEqual([...placed].sort(), userAll.map(m => m.id).sort(), 'every module in exactly one round');
       for (const round of packed.rounds) {
@@ -597,7 +625,10 @@ try {
         assert(round.fakeAi <= live.BUDGETS.user.run.fakeAi && round.worstCaseSeconds <= live.BUDGETS.user.run.runMinutes * 60);
       }
       assert.deepEqual([packed.caps.linkding.bookmarks, packed.caps.karakeep.bookmarks, packed.caps.pinboard.bookmarks, packed.caps.linkding.node, packed.caps.linkding.cleanupReserve, packed.caps.linkding.browser, packed.caps.karakeep.browser, packed.caps.run.fakeAi, packed.caps.run.runMinutes], [15, 12, 8, 250, 60, 350, 500, 60, 20]);
-      assert.deepEqual(live.packRounds(live.selectModules('all').selected, 'temp').count, 1);
+      // The temporary target: the self-hosted rows fit one 45-minute run,
+      // the whole registry two.
+      assert.deepEqual(live.packRounds(live.selectModules('selfhosted').selected, 'temp').count, 1);
+      assert.deepEqual(live.packRounds(live.selectModules('all').selected, 'temp').count, 2);
       // Seven Karakeep bookmarks each: one module per round, four rounds.
       const big = Array.from({ length: 4 }, (_, i) => ({ ...base, id: 'big.' + i, services: ['karakeep'], budget: { bookmarks: 7, urls: 7, node: 10, browser: 20, ai: 0, tags: 0, seconds: 30 } }));
       const overRound = { ...base, id: 'big.alone', services: ['karakeep'], budget: { bookmarks: 13, urls: 13, node: 10, browser: 20, seconds: 30 } };
@@ -606,8 +637,8 @@ try {
       assert.deepEqual([four.ok, four.count, four.overflow, four.unfit], [false, 4, ['karakeep.big.3'], ['karakeep.big.alone']]);
       const roundSel = (values, rows = undefined) => live.resolveSelection({ values: { target: 'user', service: 'linkding,karakeep,pinboard', scenario: 'all', ...values }, flags: new Set() }, rows ? { modules: rows } : {});
       assert.deepEqual(roundSel({ round: '2' }).selected.map(m => m.id), packed.rounds[1].modules);
-      assert.deepEqual(roundSel({ round: '2' }).round, { n: 2, of: 2, modules: packed.rounds[1].modules });
-      assert.throws(() => roundSel({ round: '3' }), e => e.code === 'round_out_of_range');
+      assert.deepEqual(roundSel({ round: '2' }).round, { n: 2, of: 3, modules: packed.rounds[1].modules });
+      assert.throws(() => roundSel({ round: '4' }), e => e.code === 'round_out_of_range');
       for (const bad of ['0', 'x', '-1', '1.5']) assert.throws(() => roundSel({ round: bad }), e => e.code === 'round', bad);
       assert.throws(() => roundSel({ round: '1', service: 'karakeep' }, fourRows), e => e.code === 'rounds_exceeded');
       // --plan: rounds and their totals; an error past three rounds.
@@ -618,12 +649,12 @@ try {
         try { return { code: await live.main(argv, rows ? { modules: rows } : {}), value: JSON.parse(chunks.join('')) }; } finally { process.stdout.write = write; }
       };
       const shown = await planOut(['--plan', '--target', 'user', '--service', 'linkding,karakeep,pinboard', '--scenario', 'all']);
-      assert.equal(shown.code, 0, 'over one round but within two: the plan stands');
+      assert.equal(shown.code, 0, 'over one round but within three: the plan stands');
       assert.equal(shown.value.withinCaps, false);
       assert.deepEqual(shown.value.rounds.rounds, packed.rounds);
-      assert(shown.value.rounds.hint.includes('--round 1..2'), shown.value.rounds.hint);
+      assert(shown.value.rounds.hint.includes('--round 1..3'), shown.value.rounds.hint);
       const second = await planOut(['--plan', '--target', 'user', '--service', 'linkding,karakeep,pinboard', '--scenario', 'all', '--round', '2']);
-      assert.deepEqual([second.value.withinCaps, second.value.modules.map(m => m.id), second.value.round.n, second.value.rounds.count], [true, packed.rounds[1].modules, 2, 2]);
+      assert.deepEqual([second.value.withinCaps, second.value.modules.map(m => m.id), second.value.round.n, second.value.rounds.count], [true, packed.rounds[1].modules, 2, 3]);
       const tooMany = await planOut(['--plan', '--target', 'user', '--service', 'karakeep', '--scenario', '*', '--authorization', 'rounds-test'], fourRows);
       assert.equal(tooMany.code, 1);
       assert(tooMany.value.problems.includes('rounds'));
@@ -635,7 +666,7 @@ try {
       assert.equal(code, 1);
       const roundReport = JSON.parse(readFileSync(join(state, readdirSync(state).find(n => /^pbp-it-[0-9a-f-]{36}$/.test(n)), 'report.json'), 'utf8'));
       assert.equal(roundReport.failure.code, 'credentials_unreadable');
-      assert.deepEqual(roundReport.round, { n: 2, of: 2, modules: packed.rounds[1].modules });
+      assert.deepEqual(roundReport.round, { n: 2, of: 3, modules: packed.rounds[1].modules });
       assert.deepEqual(roundReport.selected, packed.rounds[1].modules);
     }
   }
@@ -1839,7 +1870,7 @@ try {
       const kPort = await listen(kServer);
       const kBase = `http://127.0.0.1:${kPort}/`;
       const kRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
-      const { selected, skipped } = live.selectModules('karakeep.*', { target: 'user' });
+      const { selected, skipped } = live.selectModules('karakeep.readonly,karakeep.core.*,karakeep.edges.*,karakeep.ai.*', { target: 'user' });
       kRun.target = 'user';
       kRun.plan = live.buildPlan({ target: 'user', selected, skipped });
       kRun.instances.karakeep = { id: 'karakeep', service: 'karakeep', base: kBase, root: live.apiRootFor('karakeep', kBase), token: 'k'.repeat(40) };
@@ -1864,7 +1895,7 @@ try {
       const lPort = await listen(lServer);
       const lBase = `http://127.0.0.1:${lPort}/`;
       const lRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
-      const { selected, skipped } = live.selectModules('linkding.*', { target: 'user' });
+      const { selected, skipped } = live.selectModules('linkding.readonly,linkding.core.*,linkding.edges.*,linkding.ai.*', { target: 'user' });
       lRun.target = 'user';
       lRun.plan = live.buildPlan({ target: 'user', selected, skipped });
       lRun.instances.linkding = { id: 'linkding', service: 'linkding', base: lBase, root: live.apiRootFor('linkding', lBase), token: 'l'.repeat(40) };

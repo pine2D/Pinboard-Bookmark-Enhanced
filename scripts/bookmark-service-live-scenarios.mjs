@@ -19,6 +19,11 @@
 //             fails one that drives a surface left out here
 //             (surface_undeclared). options and the worker need no entry.
 //   features  fix/feature tags; the Chinese summary groups results by them
+//   fixRefs   fix groups of feat/selfhosted-save-adaptation (G2, G24, ...) the
+//             row's assertions depend on: they state the behaviour the user's
+//             decisions require once those fixes land, so a row whose groups
+//             are not committed yet is expected to fail on that tree; the
+//             Chinese summary names the groups next to a failed row
 //   needs     { fakeAi, target: 'temp'|'user'|'any', container, sharing: 'any'|'on'|'off',
 //               headed, shots, pinboard, writes, urls, snapshots }
 //             snapshots: the module waits for linkding's automatic HTML
@@ -125,6 +130,7 @@ export const MODULES = [
     services: ['linkding', 'karakeep', 'pinboard'],
     surfaces: ['options', 'popup'],
     features: ['connect', 'tags-recent', 'popup-prefill'],
+    fixRefs: [],
     needs: needs({ writes: false }),
     budget: { bookmarks: 0, urls: 1, node: 4, browser: { linkding: 40, karakeep: 60, pinboard: 12 }, ai: 0, tags: 0, seconds: 60, calls: { pinboard: 4 }, tagReads: { linkding: 2, karakeep: 2 } },
     files: [],
@@ -150,6 +156,7 @@ export const MODULES = [
     services: ['linkding'],
     surfaces: ['background'],
     features: ['linkding-snapshot'],
+    fixRefs: [],
     needs: needs({ snapshots: true }),
     // One assets read per poll: at most 21 in 120 s on a user instance (15 on
     // a temporary one), plus the create lookups.
@@ -200,6 +207,7 @@ export const MODULES = [
     services: ['linkding', 'karakeep', 'pinboard'],
     surfaces: ['popup', 'reader'],
     features: ['popup-save', 'linkding-description', 'pinboard-popup-format', 'reader-read-later', 'reader-edit', 'reader-tag-separator', 'reader-delete'],
+    fixRefs: ['G2'],
     needs: needs(),
     budget: { bookmarks: 1, urls: 1, node: 16, browser: { linkding: 90, karakeep: 130, pinboard: 40 }, ai: 0, tags: 2, lists: { karakeep: 1 }, seconds: { linkding: 90, karakeep: 90, pinboard: 120 }, calls: { pinboard: 24 } },
     files: [],
@@ -297,6 +305,7 @@ export const MODULES = [
     services: ['linkding', 'karakeep', 'pinboard'],
     surfaces: ['background'],
     features: ['worker-create', 'worker-merge', 'worker-conflict', 'archived-preserved', 'tags-recent', 'pinboard-required', 'shared-library'],
+    fixRefs: [],
     needs: needs(),
     budget: { bookmarks: 1, urls: 1, node: { linkding: 20, karakeep: 12, pinboard: 6 }, browser: { linkding: 30, karakeep: 40, pinboard: 16 }, ai: 0, tags: 2, seconds: { linkding: 60, karakeep: 60, pinboard: 90 }, calls: { pinboard: 9 }, tagReads: { linkding: 1, karakeep: 1 } },
     files: [],
@@ -356,6 +365,7 @@ export const MODULES = [
     services: ['pinboard'],
     surfaces: ['background'],
     features: ['pinboard-quick-save-format', 'pinboard-quote-tag', 'pinboard-batch-save-format'],
+    fixRefs: ['G4b'],
     needs: needs(),
     budget: { bookmarks: 2, urls: 2, node: 8, browser: 20, ai: 0, tags: 4, seconds: 100, calls: { pinboard: 8 } },
     files: [],
@@ -424,6 +434,7 @@ export const MODULES = [
     services: ['karakeep'],
     surfaces: ['popup', 'reader'],
     features: ['native-space-tag', 'tag-spelling-alignment', 'malformed-quote', 'library-majority', 'no-twin-tags'],
+    fixRefs: ['G4'],
     needs: needs(),
     budget: { bookmarks: 4, urls: 4, node: 30, browser: 120, ai: 0, tags: 5, seconds: 90, tagReads: 4 },
     files: [],
@@ -507,6 +518,7 @@ export const MODULES = [
     services: ['linkding'],
     surfaces: ['popup'],
     features: ['selection-quote-escape', 'quote-description-separate', 'unread-link'],
+    fixRefs: [],
     needs: needs(),
     budget: { bookmarks: 1, urls: 1, node: 4, browser: 40, ai: 0, tags: 0, seconds: 60, tagReads: 1 },
     files: [],
@@ -542,6 +554,7 @@ export const MODULES = [
     services: ['linkding'],
     surfaces: ['popup'],
     features: ['offline-queue', 'offline-create-fields', 'offline-update-fields', 'explicit-empty-description'],
+    fixRefs: ['G2'],
     needs: needs(),
     budget: { bookmarks: 1, urls: 1, node: 6, browser: 60, ai: 0, tags: 1, seconds: 90, tagReads: 2 },
     files: [],
@@ -622,6 +635,7 @@ export const MODULES = [
     services: ['linkding', 'karakeep'],
     surfaces: ['popup'],
     features: ['fake-ai', 'ai-summary-description', 'ai-summary-note', 'ai-tags-prefix'],
+    fixRefs: ['G1'],
     needs: needs({ fakeAi: true, shots: true }),
     budget: { bookmarks: 1, urls: 1, node: 6, browser: { linkding: 40, karakeep: 60 }, ai: 3, tags: 2, seconds: 90 },
     // The fake AI provider is configured by the runner (needs.fakeAi); these
@@ -673,6 +687,7 @@ export const MODULES = [
     services: ['linkding'],
     surfaces: ['popup', 'reader'],
     features: ['linkding-sharing-control', 'linkding-explicit-share', 'linkding-untouched-share', 'linkding-reader-new-unshared'],
+    fixRefs: ['G3'],
     // Sharing is switched on only inside a temporary instance; the runner
     // reconnects so the extension records it, and switches it back after.
     needs: needs({ target: 'temp', sharing: 'on', shots: true }),
@@ -756,6 +771,7 @@ export const MODULES = [
     services: ['linkding'],
     surfaces: ['popup'],
     features: ['linkding-long-tag-500', 'linkding-long-tag-no-retry-loop'],
+    fixRefs: ['G3', 'G4b'],
     // linkding keeps tag names in varchar(64): SQLite ignores the limit and
     // Postgres answers 500, so only the temporary Postgres-backed instance
     // reproduces it. The module records what the popup shows (notes) and
@@ -818,6 +834,1193 @@ export const MODULES = [
   },
 ];
 
+// ---- self-hosted save modules (H3b) ----------------------------------------
+// Each row asserts the behaviour the user's decisions (decisions-2026-11-02)
+// require once its fixes land, never the code as it stood. `fixRefs` names
+// the fix groups (feat/selfhosted-save-adaptation) a row depends on: a row
+// whose fixes are not committed yet is expected to fail there, and the
+// Chinese summary says which groups it waits for. A product setting or
+// control a pending fix introduces is looked up by name (t.productSetting);
+// until it exists the row fails as pending_setting_<label>.
+
+// A pool page variant the browser gets instead of the shared fixture (t.inject
+// on: 'page'): another title or meta description, or a #quote-fixture text.
+export function articleHtml({ title = '联调样例', description = META_DESCRIPTION, quote = '' } = {}) {
+  const esc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(title) + '</title>'
+    + (description === null ? '' : '<meta name="description" content="' + esc(description) + '">') + '</head><body><article><h1>'
+    + esc(title) + '</h1>' + (quote ? '<pre id="quote-fixture">' + esc(quote) + '</pre>' : '') + '<p>' + '公开合成文本，不含个人资料。 '.repeat(60) + '</p></article></body></html>';
+}
+const page = (t, url, html) => t.inject({ on: 'page', path: url, status: 200, contentType: 'text/html; charset=utf-8', body: html });
+
+// The duplicate check each service answers (no server-side fetch on Karakeep).
+const CHECK_PATH = { linkding: /^bookmarks\/check\/\?/, karakeep: /^bookmarks\/check-url\?/ };
+// A bookmark create as the service sees it (linkding may add ?disable_scraping).
+const isCreate = (t, r) => r.method === 'POST' && (t.service === 'linkding' ? /^bookmarks\/(\?|$)/.test(r.path) : /^bookmarks(\?|$)/.test(r.path));
+const createsOf = (t, url, since = 0) => t.requests({ method: 'POST', since }).filter(r => isCreate(t, r) && (!url || r.body?.url === url));
+const writesSince = (t, since) => t.requests({ since }).filter(r => !['GET', 'HEAD', 'OPTIONS'].includes(r.method));
+
+// Quick save (qs) or Read Later (rl) exactly as the keyboard command calls it.
+async function shortcutSave(t, url, prefix = 'qs', { open = true } = {}) {
+  let article = null;
+  if (open) { article = await t.ctx.newPage(); await article.goto(url).catch(() => {}); }
+  const result = await t.sw(async ({ url, prefix }) => {
+    const tab = (await chrome.tabs.query({})).find(x => x.url === url);
+    if (!tab) return { status: 'no_tab' };
+    const r = await saveFromBackground({ url: tab.url, title: tab.title || tab.url, tab, settingsOverrides: resolvePrefixSettings(await loadSettings(), prefix), toread: prefix === 'rl', notifyId: prefix, notifyTitle: prefix, notifyCategory: prefix === 'rl' ? 'readLater' : 'quickSave' });
+    return { status: r?.status || '', reason: r?.reason || '', mutation: r?.mutation || '' };
+  }, { url, prefix });
+  if (article) await article.close().catch(() => {});
+  return result;
+}
+
+// Batch save of the given open tabs through the worker's own entry.
+async function batchSave(t, urls) {
+  const pages = [];
+  for (const url of urls) { const p = await t.ctx.newPage(); await p.goto(url).catch(() => {}); pages.push(p); }
+  const progress = await t.sw(async urls => {
+    const all = await chrome.tabs.query({});
+    const tabs = urls.map(url => all.find(x => x.url === url)).filter(Boolean).map(tab => ({ id: tab.id, title: tab.title || tab.url, url: tab.url, incognito: !!tab.incognito }));
+    if (tabs.length !== urls.length) return { error: 'no_tab' };
+    await chrome.storage.local.remove('batch_progress');
+    await handleBatchSave(tabs, (await getCurrentBookmarkAuth()).account);
+    const { batch_progress: p } = await chrome.storage.local.get('batch_progress');
+    return { done: p?.done === true, saved: p?.saved || 0, failed: p?.failed || 0, skipped: p?.skipped || 0, queued: p?.queued || 0, tooLong: p?.tooLong || 0, error: p?.error || '' };
+  }, urls);
+  for (const p of pages) await p.close().catch(() => {});
+  return progress;
+}
+
+const queue = t => t.sw(async () => { const { offlineQueue = [] } = await chrome.storage.local.get('offlineQueue'); return Array.isArray(offlineQueue) ? offlineQueue : []; });
+const drainQueue = t => t.sw(async () => { await processOfflineQueue(); return true; });
+
+// What the popup shows after Save: saved (button), queued / error (card or
+// status line), with the visible text. Null while it is still working.
+async function popupOutcome(popup) {
+  return popup.evaluate(() => {
+    const btn = document.getElementById('submit-btn');
+    if (btn.classList.contains('saved-success')) return { outcome: 'saved', text: document.getElementById('status-msg')?.innerText.trim().slice(0, 300) || '' };
+    const card = document.querySelector('.submit-bar + .feedback-card');
+    if (card) return { outcome: card.dataset.variant === 'warning' ? 'queued' : 'error', text: card.innerText.trim().slice(0, 300) };
+    const status = document.getElementById('status-msg');
+    if (btn.classList.contains('save-error') || (status && status.innerText.trim() && !btn.disabled && !btn.classList.contains('loading'))) return { outcome: 'notice', text: status?.innerText.trim().slice(0, 300) || '' };
+    return null;
+  });
+}
+async function clickSave(t, popup, label, timeout = 30000) {
+  await popup.locator('#submit-btn').click();
+  let seen = null;
+  await t.until(async () => (seen = await popupOutcome(popup)), label, timeout);
+  return seen;
+}
+
+const titleOfRow = (t, row) => row.title;
+const notesOfRow = (t, row) => (t.service === 'linkding' ? row.notes : row.note);
+const tagsOfRow = (t, row) => (t.service === 'linkding' ? row.tag_names : (row.tags || []).map(tag => tag.name));
+// "Changed elsewhere": a second client edits title and tags through the API.
+async function editElsewhere(t, row, title, addTag) {
+  if (t.service === 'linkding') {
+    await t.api(t.recordPath(row.id), { method: 'PATCH', body: { title, tag_names: [...row.tag_names, addTag] } });
+  } else {
+    await t.api(t.recordPath(row.id), { method: 'PATCH', body: { title } });
+    await t.api('bookmarks/' + encodeURIComponent(row.id) + '/tags', { method: 'POST', body: { tags: [{ tagName: addTag }] } });
+  }
+}
+
+// Visible text of rendered HTML as a browser lays it out, line by line, with
+// each line's whitespace collapsed (what a reader of linkding's page sees).
+async function renderedLines(t, html) {
+  const scratch = await t.ctx.newPage();
+  try {
+    await scratch.setContent('<!doctype html><meta charset="utf-8"><body>' + html + '</body>');
+    return await scratch.evaluate(() => {
+      const tags = [...document.body.querySelectorAll('*')].map(e => e.tagName.toLowerCase());
+      return { tags, text: document.body.innerText };
+    });
+  } finally { await scratch.close().catch(() => {}); }
+}
+const visibleLines = text => String(text).split('\n').map(line => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
+
+const LONG_TAG = t => t.prefix + '_' + 'long'.repeat(6);
+const QUOTE_LINES = ['    First line indented', 'Setext title', '===', 'Another', '---', 'a & b < c', '1) item', '', '    indented after blank', 'tab\tseparated', '\tleading tab'];
+
+export const SELFHOSTED_MODULES = [
+  // 1a. linkding Description written elsewhere survives every entry point
+  // that saves the bookmark without touching it (G2: untouched means unsent;
+  // multi-line and repeated whitespace stay as the server holds them).
+  {
+    id: 'sh.description-keep',
+    services: ['linkding'],
+    surfaces: ['popup', 'reader'],
+    features: ['linkding-description', 'description-untouched-kept'],
+    fixRefs: ['G2', 'G2c'],
+    needs: needs(),
+    budget: { bookmarks: 1, urls: 1, node: 8, browser: 40, ai: 0, tags: 1, seconds: 45, tagReads: 1 },
+    files: [],
+    settings: { optAutoDescription: true, batchSkipExisting: false, batchAiTags: false, batchAiSummary: false, qsAiTags: false, qsAiSummary: false, qsAutoNotes: false, qsDefaultTags: '' },
+    async steps(t) {
+      const { prefix } = t;
+      const url = t.claimUrl();
+      const description = '第一行 keep\n\n第二行  两个空格\t制表';
+      await t.phase('description_seed');
+      await t.seed({ url, title: prefix + ' 多行描述', description, notes: 'seed notes', tags: [prefix] });
+      const kept = async code => t.expectEq((await t.ownRow(url)).description, description, code);
+      await t.phase('description_popup');
+      const form = await t.openPopup(url);
+      await t.until(async () => (await form.popup.locator('#title-input').inputValue()) === prefix + ' 多行描述', 'description_prefill');
+      await form.popup.locator('#description-input').fill('popup notes');
+      await t.savePopup(form.popup);
+      await kept('popup_keeps_description');
+      await form.close();
+      await t.phase('description_quick_save');
+      const quick = await shortcutSave(t, url, 'qs');
+      t.note('quickSave', quick);
+      t.expect(['saved', 'skipped'].includes(quick.status), 'quick_save_status');
+      await kept('quick_save_keeps_description');
+      await t.phase('description_reader');
+      const reader = await t.openReader(url, { ready: '#reader-bookmark-edit' });
+      await reader.locator('#reader-bookmark-edit').click();
+      await reader.locator('#reader-bookmark-notes').fill('reader notes');
+      await t.applyReader(reader);
+      await kept('reader_keeps_description');
+      await reader.close();
+      await t.phase('description_batch');
+      const batch = await batchSave(t, [url]);
+      t.note('batch', batch);
+      t.expect(batch.done && !batch.failed && !batch.error, 'batch_status');
+      await kept('batch_keeps_description');
+      t.check('linkding: a multi-line Description set elsewhere survives popup, quick save, reader and batch saves that leave it alone');
+    },
+  },
+
+  // 1b. Page information (G2b, G26): no readable page leaves Description to
+  // the server; "use browser metadata" off prefills /check/ metadata; the
+  // pre-read switch is off by default; SingleFile marks new bookmarks.
+  {
+    id: 'sh.page-info',
+    services: ['linkding'],
+    surfaces: ['popup'],
+    features: ['linkding-no-page-info', 'linkding-empty-description-hint', 'linkding-browser-metadata', 'linkding-preload', 'linkding-singlefile'],
+    fixRefs: ['G2', 'G2b', 'G26'],
+    needs: needs({ shots: true }),
+    budget: { bookmarks: 4, urls: 4, node: 6, browser: 60, ai: 0, tags: 0, seconds: 60, tagReads: 1 },
+    files: [],
+    settings: { optAutoDescription: true, optCheckBookmarkStatus: true },
+    async steps(t) {
+      const { prefix } = t;
+      const unread = async (url, mode) => {
+        const form = await t.openPopup(url, { article: 'error' });
+        const field = form.popup.locator('#linkding-description-input');
+        t.expectEq(await field.inputValue(), '', mode + '_description_empty');
+        // G26's grey hint is judged after the save (G2b) checks below.
+        const hint = await field.getAttribute('placeholder');
+        t.note(mode + 'Hint', hint || '');
+        if (mode === 'abort') { await t.shot(form.popup, 'no-page-info', { surface: 'popup', keys: ['#linkding-description-input', '#submit-btn'] }); await t.axe(form.popup, 'no-page-info'); }
+        await form.popup.locator('#title-input').fill(prefix + ' ' + mode);
+        const since = t.now();
+        await t.savePopup(form.popup);
+        const [create] = createsOf(t, url, since);
+        t.expect(!!create, mode + '_create_sent');
+        if ('description' in (create.body || {})) t.note(mode + 'SentDescription', { value: String(create.body.description).slice(0, 80), meta: create.body.description === META_DESCRIPTION, path: create.path.split('?')[0] + (/disable_scraping/.test(create.path) ? '?disable_scraping' : ''), articleUrl: form.article.url().slice(0, 120) });
+        t.expect(!('description' in (create.body || {})), mode + '_description_sent');
+        t.expect(!/disable_scraping/.test(create.path), mode + '_scraping_disabled');
+        t.note(mode + 'ServerDescription', (await t.ownRow(url)).description ? 'filled' : 'empty');
+        await form.close();
+        return hint;
+      };
+      await t.phase('page_info_abort');
+      const aborted = t.claimUrl();
+      t.inject({ on: 'page', path: aborted, abort: 'connectionrefused' });
+      const abortHint = await unread(aborted, 'abort');
+      await t.phase('page_info_pdf');
+      const pdf = t.claimUrl();
+      t.inject({ on: 'page', path: pdf, status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n' });
+      const pdfHint = await unread(pdf, 'pdf');
+      t.expect(!!(abortHint && abortHint.trim()), 'abort_empty_hint');
+      t.expect(!!(pdfHint && pdfHint.trim()), 'pdf_empty_hint');
+
+      await t.phase('page_info_server_metadata');
+      const metaKey = await t.productSetting(/linkding.*(browser|metadata)|browser.*meta/, 'linkding_browser_metadata');
+      t.expectEq(await t.sw(key => SETTINGS_DEFAULTS[key], metaKey), true, 'browser_metadata_default');
+      await t.settings({ [metaKey]: false });
+      const meta = t.claimUrl();
+      page(t, meta, articleHtml({ title: 'Browser-only title', description: 'Browser-only description.' }));
+      const server = (await t.api('bookmarks/check/?url=' + encodeURIComponent(meta))).metadata || {};
+      let form = await t.openPopup(meta);
+      t.expectEq(await form.popup.locator('#title-input').inputValue(), server.title || '', 'server_metadata_title');
+      t.expectEq(await form.popup.locator('#linkding-description-input').inputValue(), server.description || '', 'server_metadata_description');
+      let since = t.now();
+      await t.savePopup(form.popup);
+      const [metaCreate] = createsOf(t, meta, since);
+      t.expect(!!metaCreate && /disable_scraping/.test(metaCreate.path), 'server_metadata_disable_scraping');
+      await form.close();
+      await t.settings({ [metaKey]: true });
+
+      await t.phase('page_info_preload');
+      const preloadKey = await t.productSetting(/linkding.*(preload|prefetch|preread|whilebrows|browsing)|(preload|prefetch).*page/, 'linkding_preload');
+      t.expectEq(await t.sw(key => SETTINGS_DEFAULTS[key], preloadKey), false, 'preload_default');
+      const other = await t.ctx.newPage();
+      await other.goto(pdf).catch(() => {});
+      const tab = await t.ctx.newPage();
+      await tab.goto(aborted).catch(() => {});
+      since = t.now();
+      await t.activateTab(pdf);
+      await t.activateTab(aborted);
+      await t.sleep(1500);
+      t.expectEq(t.requests({ path: CHECK_PATH.linkding, since }).length, 0, 'preload_off_checks');
+      await t.settings({ [preloadKey]: true });
+      since = t.now();
+      await t.activateTab(pdf);
+      await t.activateTab(aborted);
+      await t.until(async () => t.requests({ path: CHECK_PATH.linkding, since }).length > 0, 'preload_on_checks', 8000);
+      const icon = await t.sw(async url => { const tab = (await chrome.tabs.query({})).find(x => x.url === url); return tab ? _lastIconState.get(tab.id) || '' : 'no_tab'; }, aborted);
+      t.expectEq(icon, 'saved', 'preload_icon_saved');
+      await other.close();
+      await tab.close();
+      await t.settings({ [preloadKey]: false });
+
+      await t.phase('page_info_singlefile');
+      const singleKey = await t.productSetting(/singlefile/, 'singlefile');
+      t.expectEq(await t.sw(key => SETTINGS_DEFAULTS[key], singleKey), false, 'singlefile_default');
+      await t.settings({ [singleKey]: true });
+      const single = t.claimUrl();
+      form = await t.openPopup(single);
+      const mark = t.consoleMark();
+      since = t.now();
+      await t.savePopup(form.popup);
+      const [singleCreate] = createsOf(t, single, since);
+      t.expect(!!singleCreate && /disable_html_snapshot/.test(singleCreate.path + JSON.stringify(singleCreate.body || {})), 'singlefile_disable_snapshot');
+      await t.until(async () => t.consoleSince(mark).some(c => c.type === 'warning' && /singlefile/i.test(c.text)), 'singlefile_warn', 8000);
+      await t.shot(form.popup, 'singlefile-missing', { surface: 'popup', keys: ['#submit-btn'] });
+      await form.close();
+      t.check('linkding: unreadable page (aborted, PDF) leaves Description empty with a hint and unsent; server metadata prefill with disable_scraping; pre-read off by default and on when asked; SingleFile marks new bookmarks and warns when absent');
+    },
+  },
+
+  // 2. linkding AI summary in Description (G24, decision 4), fake AI.
+  {
+    id: 'sh.ai-description',
+    services: ['linkding'],
+    surfaces: ['popup'],
+    features: ['fake-ai', 'ai-summary-description-rules', 'ai-summary-remove-restores'],
+    fixRefs: ['G24'],
+    needs: needs({ fakeAi: true, shots: true }),
+    budget: { bookmarks: 2, urls: 2, node: 6, browser: 35, ai: 7, tags: 0, seconds: 60, tagReads: 1 },
+    files: [],
+    settings: { optShowAiSummary: true, optShowAiTags: false, optAutoDescription: true, aiCacheDuration: 0 },
+    async steps(t) {
+      const { prefix } = t;
+      // The popup asks for a summary alone or, when it can, for summary and
+      // tags in one call: both answer with the latest text, and the calls
+      // of both kinds are counted.
+      let n = 0, latest = '';
+      const next = () => {
+        latest = `${t.fakeAi.marker} summary ${++n}: one synthetic sentence.`;
+        t.fakeAi.expect({ kind: 'summary', reply: () => latest });
+        t.fakeAi.expect({ kind: 'combined', reply: () => JSON.stringify({ summary: latest, tags: [] }) });
+        return latest;
+      };
+      const paid = () => t.fakeAi.calls('summary') + t.fakeAi.calls('combined');
+      const before = paid();
+      const field = popup => popup.locator('#linkding-description-input');
+      const summarize = async (popup, expected, code) => {
+        await popup.locator('#ai-summary-btn').click();
+        try { await t.until(async () => (await field(popup).inputValue()).includes(expected), code, 15000); } catch (error) {
+          t.note(code, { field: (await field(popup).inputValue()).slice(0, 160), notes: (await popup.locator('#description-input').inputValue()).slice(0, 160), status: (await popup.locator('#status-msg').innerText()).slice(0, 160) });
+          throw error;
+        }
+      };
+      const action = (popup, name) => popup.locator(`.cache-hint-wrap .regen-link[data-action="${name}"]`);
+      const kept = t.message('aiSummaryKeptDescription');
+
+      await t.phase('ai_description_meta');
+      const url = t.claimUrl();
+      const form = await t.openPopup(url);
+      const { popup } = form;
+      t.expectEq(await field(popup).inputValue(), META_DESCRIPTION, 'meta_prefill');
+      let s = next();
+      await summarize(popup, s, 'meta_summary');
+      t.expectEq(await field(popup).inputValue(), s, 'meta_replaced');
+      await action(popup, 'remove').click();
+      t.expectEq(await field(popup).inputValue(), META_DESCRIPTION, 'remove_restores_meta');
+
+      await t.phase('ai_description_empty');
+      await field(popup).fill('');
+      s = next();
+      await summarize(popup, s, 'empty_summary');
+      t.expectEq(await field(popup).inputValue(), s, 'empty_replaced');
+      await action(popup, 'remove').click();
+      t.expectEq(await field(popup).inputValue(), '', 'remove_restores_empty');
+
+      await t.phase('ai_description_user_text');
+      const own = 'My own words.';
+      await field(popup).fill(own);
+      s = next();
+      await summarize(popup, s, 'user_summary');
+      t.expectEq(await field(popup).inputValue(), own + '\n\n' + s, 'user_text_appended');
+      s = next();
+      await action(popup, 'regenerate').click();
+      await t.until(async () => (await field(popup).inputValue()).includes(s), 'user_regenerated');
+      t.expectEq(await field(popup).inputValue(), own + '\n\n' + s, 'regenerate_replaces_ai_part');
+      await t.shot(popup, 'ai-appended', { surface: 'popup', keys: ['#linkding-description-input', '#submit-btn'] });
+      await t.axe(popup, 'ai-appended');
+      await action(popup, 'remove').click();
+      t.expectEq(await field(popup).inputValue(), own, 'remove_restores_user_text');
+      s = next();
+      await summarize(popup, s, 'user_summary_again');
+      const shown = await field(popup).inputValue();
+      await popup.locator('#title-input').fill(prefix + ' ai description');
+      await t.savePopup(popup);
+      t.expectEq((await t.ownRow(url)).description, shown, 'saved_as_shown');
+      await form.close();
+
+      await t.phase('ai_description_server_text');
+      const seeded = t.claimUrl();
+      await t.seed({ url: seeded, title: prefix + ' server description', description: 'Server words.', notes: '' });
+      const again = await t.openPopup(seeded);
+      await t.until(async () => (await field(again.popup).inputValue()) === 'Server words.', 'server_prefill');
+      s = next();
+      await summarize(again.popup, s, 'server_summary');
+      t.expectEq(await field(again.popup).inputValue(), 'Server words.\n\n' + s, 'server_text_appended');
+      if (kept) t.expect(!(await again.popup.locator('#status-msg').innerText()).includes(kept), 'paid_but_kept');
+      await t.savePopup(again.popup);
+      t.expectEq((await t.ownRow(seeded)).description, 'Server words.\n\n' + s, 'server_text_saved');
+      await again.close();
+      // Every paid call wrote what it produced: no "generated, then kept".
+      t.expectEq(paid() - before, n, 'summary_calls_match_writes');
+      t.expect(t.fakeAi.unknown() === 0, 'fake_ai_unknown_request');
+      t.check('linkding: AI summary replaces an empty or page-meta Description, appends after the user\'s or server\'s words, regenerates only its own paragraph, and Remove restores the earlier value; no paid summary is discarded');
+    },
+  },
+
+  // 3. Selection quote escaping (G5): what linkding renders equals the
+  // selection; Karakeep's note is plain text.
+  {
+    id: 'sh.quote-escape',
+    services: ['linkding', 'karakeep'],
+    surfaces: ['popup'],
+    features: ['selection-quote-escape-matrix', 'karakeep-note-plain'],
+    fixRefs: ['G5'],
+    // Temp only (user-target rounds): the escaping is the extension's and
+    // the rendering the replica's; the user's instance adds nothing to it.
+    needs: needs({ target: 'temp' }),
+    budget: { bookmarks: 1, urls: 1, node: 4, browser: { linkding: 20, karakeep: 30 }, ai: 0, tags: 0, seconds: 30, tagReads: 1 },
+    files: [],
+    settings: { optBlockquote: true, optAutoDescription: true },
+    async steps(t) {
+      const url = t.claimUrl();
+      const quote = QUOTE_LINES.join('\n');
+      page(t, url, articleHtml({ quote }));
+      await t.phase('quote_popup');
+      const form = await t.openPopup(url, { selection: true });
+      await form.popup.locator('#title-input').fill(t.prefix + ' quote matrix');
+      await t.savePopup(form.popup);
+      await form.close();
+      const row = await t.ownRow(url);
+      const notes = notesOfRow(t, row);
+      const expected = visibleLines(quote);
+      if (t.service === 'karakeep') {
+        t.expect(!notes.includes('<blockquote') && !notes.includes('&lt;') && !notes.includes('&amp;'), 'karakeep_note_markup');
+        const lines = visibleLines(notes);
+        t.expect(expected.every(line => lines.some(l => l.includes(line))), 'karakeep_note_text');
+      } else {
+        await t.phase('quote_render');
+        const html = t.renderNotes([notes]);
+        if (!html) { t.note('render', 'skipped: PBP_LD_RENDER_PYTHON / PBP_LD_RENDER_SCRIPT not set'); t.check('linkding: quote saved; rendering skipped (renderer not configured)'); return; }
+        const shown = await renderedLines(t, html[0]);
+        t.note('renderedTags', [...new Set(shown.tags)].sort());
+        t.expect(shown.tags.includes('blockquote'), 'quote_not_blockquote');
+        t.expect(!shown.tags.some(tag => ['h1', 'h2', 'hr', 'ol', 'ul', 'pre', 'code'].includes(tag)), 'quote_markdown_structure');
+        t.expectEq(visibleLines(shown.text).join('\n'), expected.join('\n'), 'quote_rendered_text');
+      }
+      t.check(`${t.service}: selection quote with ===, ---, a & b < c, 1) item, indents and tabs reads back as written`);
+    },
+  },
+
+  // 4. Over-long tags (G3, G4b): Postgres answers 500 and the save is
+  // tag_too_long, not queued, not replayed.
+  {
+    id: 'sh.long-tag-pg',
+    services: ['linkding'],
+    surfaces: ['popup'],
+    features: ['linkding-long-tag-500', 'linkding-long-tag-not-queued'],
+    fixRefs: ['G3', 'G4b'],
+    needs: needs({ target: 'temp', container: 'linkding-pg', shots: true }),
+    budget: { bookmarks: 3, urls: 2, node: 4, browser: 30, ai: 0, tags: 1, seconds: 60, tagReads: 1 },
+    files: [],
+    settings: { offlineQueueEnabled: true, qsAiTags: false, qsAiSummary: false },
+    async steps(t) {
+      const long = LONG_TAG(t);
+      await t.phase('long_tag_pg_popup');
+      const url = t.claimUrl();
+      const form = await t.openPopup(url);
+      await form.popup.locator('#title-input').fill(t.prefix + ' long tag pg');
+      await form.popup.locator('#tags-input').fill(long);
+      await form.popup.locator('#tags-input').press('Enter');
+      const seen = await clickSave(t, form.popup, 'long_tag_outcome');
+      t.note('popupOutcome', seen);
+      t.expect(seen.outcome !== 'saved' && seen.outcome !== 'queued', 'long_tag_outcome');
+      t.expectEq((await queue(t)).length, 0, 'long_tag_queued');
+      await t.shot(form.popup, 'long-tag-pg', { surface: 'popup', keys: ['#submit-btn'] });
+      const settled = await t.writes();
+      await t.sleep(5000);
+      t.expectEq(await t.writes(), settled, 'long_tag_retry_loop');
+      await form.close();
+      await t.phase('long_tag_pg_quick_save');
+      await t.settings({ qsDefaultTags: long });
+      const quickUrl = t.claimUrl();
+      const quick = await shortcutSave(t, quickUrl, 'qs');
+      t.note('quickSave', quick);
+      t.expect(quick.status === 'failed' && quick.reason === 'tag_too_long', 'quick_save_tag_too_long');
+      t.expectEq((await queue(t)).length, 0, 'quick_save_queued');
+      t.check('linkding-pg: an over-long tag is tag_too_long in the popup and quick save, never queued or replayed');
+    },
+  },
+  {
+    id: 'sh.long-tag-inject',
+    services: ['linkding'],
+    surfaces: ['popup'],
+    features: ['linkding-long-tag-sqlite', 'linkding-long-tag-500-injected', 'linkding-502-queued'],
+    fixRefs: ['G3', 'G4b'],
+    needs: needs(),
+    // Injected 5xx creates keep a worker-guard slot each (the creation may
+    // exist): two of the four bookmarks.
+    budget: { bookmarks: 4, urls: 3, node: 5, browser: 40, ai: 0, tags: 1, seconds: 45, tagReads: 1 },
+    files: [],
+    settings: { offlineQueueEnabled: true },
+    async steps(t) {
+      const long = LONG_TAG(t);
+      const fill = async (popup, title) => {
+        await popup.locator('#title-input').fill(t.prefix + ' ' + title);
+        await popup.locator('#tags-input').fill(long);
+        await popup.locator('#tags-input').press('Enter');
+      };
+      await t.phase('long_tag_sqlite');
+      const plain = t.claimUrl();
+      let form = await t.openPopup(plain);
+      await fill(form.popup, 'long tag sqlite');
+      await t.savePopup(form.popup);
+      t.expect(tagsOfRow(t, await t.ownRow(plain)).map(n => n.toLowerCase()).includes(long.toLowerCase()), 'sqlite_long_tag_saved');
+      await form.close();
+
+      await t.phase('long_tag_injected_500');
+      const failed = t.claimUrl();
+      const fault500 = t.inject({ method: 'POST', path: /^bookmarks\/(\?|$)/, status: 500, contentType: 'text/html', body: '<h1>Server Error (500)</h1>' });
+      form = await t.openPopup(failed);
+      await fill(form.popup, 'long tag 500');
+      const seen = await clickSave(t, form.popup, 'long_tag_500_outcome');
+      t.note('popup500', seen);
+      t.expect(seen.outcome !== 'saved' && seen.outcome !== 'queued', 'injected_500_outcome');
+      t.expectEq((await queue(t)).length, 0, 'injected_500_queued');
+      const settled = await t.writes();
+      await t.sleep(4000);
+      t.expectEq(await t.writes(), settled, 'injected_500_retry_loop');
+      fault500.clear();
+      await form.close();
+
+      await t.phase('long_tag_injected_502');
+      const proxied = t.claimUrl();
+      const fault502 = t.inject({ method: 'POST', path: /^bookmarks\/(\?|$)/, status: 502, contentType: 'text/html', body: '<h1>502 Bad Gateway</h1>', times: 1 });
+      form = await t.openPopup(proxied);
+      await fill(form.popup, 'long tag 502');
+      const proxiedSeen = await clickSave(t, form.popup, 'long_tag_502_outcome');
+      t.note('popup502', proxiedSeen);
+      t.expectEq(fault502.hits(), 1, 'injected_502_sent');
+      const q = await queue(t);
+      t.expect(q.length === 1 && q[0].url === proxied, 'injected_502_queued');
+      await form.close();
+      await drainQueue(t);
+      t.expectEq((await queue(t)).length, 0, 'injected_502_replayed');
+      t.expect(tagsOfRow(t, await t.ownRow(proxied)).length === 1, 'injected_502_replay_tag');
+      t.check('linkding: SQLite stores an over-long tag; an injected 500 with it is tag_too_long and not queued; an injected 502 is a server failure, queued and replayed');
+    },
+  },
+
+  // 5. Changed elsewhere (G25, decision 1): an update compares the
+  // server's modification time with the one the form loaded.
+  {
+    id: 'sh.changed-elsewhere',
+    services: ['linkding', 'karakeep'],
+    surfaces: ['popup', 'reader'],
+    features: ['update-checks-modified', 'changed-elsewhere-notice'],
+    fixRefs: ['G25'],
+    needs: needs({ shots: true }),
+    budget: { bookmarks: 1, urls: 1, node: 12, browser: { linkding: 45, karakeep: 70 }, ai: 0, tags: 3, seconds: 45, tagReads: 1 },
+    files: [],
+    settings: {},
+    async steps(t) {
+      const { prefix } = t;
+      const url = t.claimUrl();
+      await t.phase('elsewhere_create');
+      let form = await t.openPopup(url);
+      await form.popup.locator('#title-input').fill(prefix + ' A');
+      await form.popup.locator('#description-input').fill('n1');
+      await form.popup.locator('#tags-input').fill(prefix);
+      await form.popup.locator('#tags-input').press('Enter');
+      await t.savePopup(form.popup);
+      await form.close();
+      await t.sleep(1100);
+      await editElsewhere(t, await t.ownRow(url), prefix + ' B', prefix + '_else');
+
+      await t.phase('elsewhere_popup');
+      form = await t.openPopup(url);
+      await form.popup.locator('#description-input').fill('n2');
+      const since = t.now();
+      const seen = await clickSave(t, form.popup, 'elsewhere_outcome');
+      t.note('popupOutcome', seen);
+      t.expect(seen.outcome !== 'saved', 'elsewhere_saved_over');
+      t.expectEq(writesSince(t, since).length, 0, 'elsewhere_write_sent');
+      await t.until(async () => (await form.popup.locator('#title-input').inputValue()) === prefix + ' B', 'elsewhere_latest_shown', 8000);
+      t.expectEq(await form.popup.locator('#description-input').inputValue(), 'n2', 'elsewhere_user_edit_kept');
+      await t.shot(form.popup, 'changed-elsewhere', { surface: 'popup', keys: ['#submit-btn'] });
+      await t.axe(form.popup, 'changed-elsewhere');
+      let row = await t.ownRow(url);
+      t.expectEq(titleOfRow(t, row), prefix + ' B', 'elsewhere_title_reverted');
+      t.expect(tagsOfRow(t, row).includes(prefix + '_else'), 'elsewhere_tag_reverted');
+      await t.savePopup(form.popup);
+      row = await t.ownRow(url);
+      t.expect(notesOfRow(t, row) === 'n2' && titleOfRow(t, row) === prefix + ' B' && tagsOfRow(t, row).includes(prefix + '_else'), 'elsewhere_second_save');
+      await form.close();
+
+      await t.phase('elsewhere_reader');
+      const reader = await t.openReader(url, { ready: '#reader-bookmark-edit' });
+      await reader.locator('#reader-bookmark-edit').click();
+      await t.sleep(1100);
+      await editElsewhere(t, await t.ownRow(url), prefix + ' C', prefix + '_else2');
+      await reader.locator('#reader-bookmark-notes').fill('n3');
+      const readerSince = t.now();
+      await reader.locator('#reader-bookmark-apply').click();
+      await t.until(async () => reader.evaluate(() => {
+        const s = document.getElementById('reader-bookmark-editor-status');
+        return !!(s && s.textContent.trim()) || !document.getElementById('reader-bookmark-editor').matches(':popover-open');
+      }), 'reader_elsewhere_outcome');
+      await t.sleep(1000);
+      t.expectEq(writesSince(t, readerSince).length, 0, 'reader_elsewhere_write_sent');
+      t.expectEq(await reader.locator('#reader-bookmark-title').inputValue(), prefix + ' C', 'reader_latest_shown');
+      row = await t.ownRow(url);
+      t.expect(titleOfRow(t, row) === prefix + ' C' && tagsOfRow(t, row).includes(prefix + '_else2'), 'reader_elsewhere_reverted');
+      await t.applyReader(reader);
+      row = await t.ownRow(url);
+      t.expect(notesOfRow(t, row) === 'n3' && titleOfRow(t, row) === prefix + ' C', 'reader_second_apply');
+      await reader.close();
+      t.check(`${t.service}: popup and reader updates stop when the bookmark changed elsewhere, show the latest, keep the user's edit and save on the second try`);
+    },
+  },
+
+  // 6. Duplicate check failing (G12, G13; decisions 5, 5a).
+  {
+    id: 'sh.lookup-failure',
+    services: ['linkding', 'karakeep'],
+    surfaces: ['popup'],
+    features: ['lookup-failure-popup-stops', 'lookup-failure-queued', 'replay-checks-first'],
+    fixRefs: ['G12', 'G13'],
+    needs: needs({ shots: true }),
+    budget: { bookmarks: 2, urls: 3, node: 6, browser: { linkding: 50, karakeep: 70 }, ai: 0, tags: 0, seconds: 45, tagReads: 1 },
+    files: [],
+    settings: { offlineQueueEnabled: true, qsAiTags: false, qsAiSummary: false, batchAiTags: false, batchAiSummary: false, batchSkipExisting: false },
+    async steps(t) {
+      const fault = () => t.inject({ method: 'GET', path: CHECK_PATH[t.service], status: 503, contentType: 'application/json', body: { detail: 'unavailable' } });
+      await t.phase('lookup_failure_popup');
+      const url = t.claimUrl();
+      let f = fault();
+      const form = await t.openPopup(url, { settle: false });
+      await form.popup.locator('#title-input').fill(t.prefix + ' lookup failed');
+      await form.popup.locator('#description-input').fill('kept notes');
+      const since = t.now();
+      const seen = await clickSave(t, form.popup, 'lookup_failure_outcome');
+      t.note('popupOutcome', seen);
+      t.expect(seen.outcome !== 'saved' && seen.outcome !== 'queued', 'lookup_failure_saved');
+      t.expectEq(writesSince(t, since).length, 0, 'lookup_failure_write_sent');
+      t.expectEq(await form.popup.locator('#description-input').inputValue(), 'kept notes', 'lookup_failure_form_kept');
+      t.expect(!await form.popup.locator('#submit-btn').isDisabled(), 'lookup_failure_submit_disabled');
+      await t.shot(form.popup, 'lookup-failed', { surface: 'popup', keys: ['#submit-btn'] });
+      await form.close();
+
+      await t.phase('lookup_failure_quick_batch');
+      const quickUrl = t.claimUrl(), batchUrl = t.claimUrl();
+      const quick = await shortcutSave(t, quickUrl, 'qs');
+      t.note('quickSave', quick);
+      t.expectEq(quick.status, 'queued', 'quick_save_queued');
+      const batch = await batchSave(t, [batchUrl]);
+      t.note('batch', batch);
+      let q = await queue(t);
+      t.expect(q.some(i => i.url === quickUrl) && q.some(i => i.url === batchUrl), 'lookup_failure_queue');
+      t.expectEq(createsOf(t, '', since).length, 0, 'lookup_failure_create_sent');
+      await t.phase('lookup_failure_replay');
+      const replaySince = t.now();
+      await drainQueue(t);
+      t.expectEq(writesSince(t, replaySince).length, 0, 'replay_without_check');
+      t.expect((await queue(t)).length === 2, 'replay_dropped');
+      f.clear();
+      await drainQueue(t);
+      q = await queue(t);
+      t.expectEq(q.length, 0, 'replay_after_check');
+      await t.ownRow(quickUrl);
+      await t.ownRow(batchUrl);
+      t.check(`${t.service}: a failing duplicate check stops the popup save with the form kept; quick save and batch queue, and replay checks before it saves`);
+    },
+  },
+
+  // 7. Offline queue: deterministic failures need attention (G17, decision 2).
+  {
+    id: 'sh.offline-attention',
+    services: ['linkding', 'karakeep'],
+    surfaces: ['popup'],
+    features: ['queue-needs-attention', 'queue-retry-after', 'queue-legacy-record'],
+    fixRefs: ['G13', 'G17'],
+    needs: needs({ shots: true }),
+    budget: { bookmarks: 2, urls: 4, node: 6, browser: { linkding: 70, karakeep: 90 }, ai: 0, tags: 0, seconds: 60, tagReads: 1 },
+    files: [],
+    settings: { offlineQueueEnabled: true, qsAiTags: false, qsAiSummary: false, qsDefaultTags: '' },
+    async steps(t) {
+      const FIELDS = new Set(['account', 'mode', 'url', 'title', 'notes', 'summary', 'tags', 'private', 'sharedExplicit', 'toread', 'archive', 'time', 'queuedAt', 'queueId', 'failure']);
+      const createPath = t.service === 'linkding' ? /^bookmarks\/(\?|$)/ : /^bookmarks(\?|$)/;
+      const queueOffline = async url => {
+        await t.offline('self');
+        const r = await shortcutSave(t, url, 'qs');
+        await t.offline('');
+        t.expectEq(r.status, 'queued', 'offline_queue');
+        return (await queue(t)).find(i => i.url === url);
+      };
+      const marked = async (url, code) => {
+        const item = (await queue(t)).find(i => i.url === url);
+        t.expect(!!item, code + '_dropped');
+        t.note(code, item.failure || null);
+        t.expect(Object.keys(item).every(k => FIELDS.has(k)), code + '_fields');
+        t.expect(item.failure && typeof item.failure === 'object' && typeof item.failure.code === 'string', code + '_marker');
+        const since = t.now();
+        await drainQueue(t);
+        await drainQueue(t);
+        t.expectEq(writesSince(t, since).length, 0, code + '_retried');
+        return item;
+      };
+      const drop = url => t.sw(async url => { const { offlineQueue = [] } = await chrome.storage.local.get('offlineQueue'); await chrome.storage.local.set({ offlineQueue: offlineQueue.filter(i => i.url !== url) }); await chrome.storage.local.remove('offlineQueuePause'); }, url);
+
+      await t.phase('attention_rejected');
+      const rejected = t.claimUrl();
+      const first = await queueOffline(rejected);
+      const reject = t.inject({ method: 'POST', path: createPath, status: 400, body: t.service === 'linkding' ? { url: ['Enter a valid URL.'] } : { code: 'BAD_REQUEST', message: 'Invalid input' } });
+      await drainQueue(t);
+      t.expect(reject.hits() >= 1, 'rejected_sent');
+      await marked(rejected, 'rejected');
+      reject.clear();
+      const form = await t.openPopup(rejected);
+      await form.popup.bringToFront();
+      await form.popup.locator('#offline-queue-bar:not(.hidden)').waitFor();
+      await form.popup.locator('#offline-queue-toggle').click();
+      const rowText = await form.popup.locator('#offline-queue-list').innerText();
+      t.note('queueRow', rowText.slice(0, 200));
+      t.expect(rowText.trim().length > 0 && await form.popup.locator('#offline-queue-list .offline-queue-retry').count() >= 1, 'attention_row_actions');
+      await t.shot(form.popup, 'queue-attention', { surface: 'popup', keys: ['#offline-queue-bar'] });
+      await t.axe(form.popup, 'queue-attention');
+      await form.close();
+      await drop(rejected);
+
+      await t.phase('attention_token');
+      const revoked = t.claimUrl();
+      await queueOffline(revoked);
+      const unauth = t.service === 'linkding'
+        ? t.inject({ status: 401, body: { detail: 'Invalid token.' } })
+        : t.inject({ status: 401, contentType: 'text/plain;charset=UTF-8', body: 'Unauthorized' });
+      await drainQueue(t);
+      const since = t.now();
+      await drainQueue(t);
+      t.expectEq(writesSince(t, since).length, 0, 'token_retried');
+      t.expect((await queue(t)).some(i => i.url === revoked), 'token_dropped');
+      unauth.clear();
+      await drop(revoked);
+
+      await t.phase('attention_retry_after');
+      const limited = t.claimUrl();
+      await queueOffline(limited);
+      const started = Date.now();
+      t.inject({ method: 'POST', path: createPath, status: 429, headers: { 'Retry-After': '120' }, body: { detail: 'Request was throttled.' }, times: 1 });
+      await drainQueue(t);
+      const item = (await queue(t)).find(i => i.url === limited);
+      t.expect(!!item, 'retry_after_dropped');
+      const raw = item.failure?.retryAfter;
+      const until = typeof raw === 'number' ? raw : Date.parse(raw || '') || 0;
+      t.note('retryAfterMs', until ? until - started : null);
+      t.expect(until >= started + 110000 && until <= Date.now() + 130000, 'retry_after_deadline');
+      const limitedSince = t.now();
+      await drainQueue(t);
+      t.expectEq(writesSince(t, limitedSince).length, 0, 'retry_after_ignored');
+      const manual = await t.openPopup(revoked);
+      await manual.popup.bringToFront();
+      await manual.popup.locator('#offline-queue-toggle').click();
+      await manual.popup.locator('#offline-queue-list .offline-queue-retry').first().click();
+      await t.until(async () => !(await queue(t)).some(i => i.url === limited), 'manual_retry');
+      await t.ownRow(limited);
+      await manual.close();
+
+      await t.phase('attention_legacy_title');
+      const legacy = t.claimUrl();
+      const record = { ...first, url: legacy, queueId: 'pbp-it-legacy-' + t.runId.slice(0, 8), title: 'T'.repeat(1200), queuedAt: Date.now() };
+      delete record.failure;
+      await t.sw(async record => { const { offlineQueue = [] } = await chrome.storage.local.get('offlineQueue'); await chrome.storage.local.set({ offlineQueue: [...offlineQueue, record] }); }, record);
+      const legacySince = t.now();
+      await drainQueue(t);
+      t.expectEq(createsOf(t, legacy, legacySince).length, 0, 'legacy_title_sent');
+      await marked(legacy, 'legacy_title');
+      await drop(legacy);
+      t.check(`${t.service}: rejected, unauthorised and over-long queued saves need attention and stop retrying; 429 waits for Retry-After; the bar shows the reason with a retry`);
+    },
+  },
+
+  // 8. URL variants (G14 decision 9; G10): # fragment, utm, host case.
+  {
+    id: 'sh.url-variants',
+    services: ['linkding', 'karakeep'],
+    surfaces: ['popup', 'reader'],
+    features: ['hash-variant-notice', 'reader-cleaned-url'],
+    fixRefs: ['G10', 'G14'],
+    needs: needs({ shots: true }),
+    budget: { bookmarks: 1, urls: 1, node: 4, browser: { linkding: 30, karakeep: 45 }, ai: 0, tags: 0, seconds: 30, tagReads: 1 },
+    files: [],
+    settings: {},
+    async steps(t) {
+      const url = t.claimUrl();
+      await t.seed({ url, title: t.prefix + ' variants', notes: '' });
+      await t.phase('variant_hash');
+      const hashed = url + '#section-2';
+      const since = t.now();
+      const form = await t.openPopup(hashed);
+      t.expectEq(await form.popup.locator('#url-input').inputValue(), hashed, 'hash_save_url_changed');
+      const checks = t.requests({ path: CHECK_PATH[t.service], since }).map(r => new URL('http://x/' + r.path).searchParams.get('url'));
+      t.note('hashChecks', checks.map(u => (u === url ? 'plain' : u === hashed ? 'hashed' : 'other')));
+      t.expect(checks.includes(hashed) && checks.includes(url), 'hash_second_lookup');
+      const notice = await form.popup.evaluate(() => ['existing-banner', 'url-warning', 'status-msg'].map(id => document.getElementById(id)).filter(el => el && el.offsetParent !== null && el.innerText.trim()).map(el => el.id + ': ' + el.innerText.trim().slice(0, 160)));
+      t.note('hashNotice', notice);
+      t.expect(notice.length > 0, 'hash_notice');
+      await t.shot(form.popup, 'hash-variant', { surface: 'popup', keys: ['#submit-btn'] });
+      await form.close();
+      await t.phase('variant_reader');
+      const judge = async variant => {
+        const reader = await t.openReader(variant, { ready: '#reader-bookmark-save' });
+        const saved = await reader.locator('#reader-bookmark-save').getAttribute('data-saved');
+        await reader.close();
+        return saved === 'true';
+      };
+      const utm = url + '&utm_source=pbp-it';
+      t.expect(await judge(utm), 'reader_utm_unsaved');
+      const upper = url.replace(/^(\w+:\/\/)([^/]+)/, (m, scheme, host) => scheme + host.toUpperCase());
+      const slash = url.replace('/?', '?');
+      t.note('readerVariants', { utm: true, hostCase: await judge(upper), noSlash: await judge(slash) });
+      t.check(`${t.service}: a # variant of a saved URL is looked up again without #, noticed and left as typed; the reader judges a utm variant saved`);
+    },
+  },
+
+  // 9. Merge result keeps the popup open (G12, decision 8).
+  {
+    id: 'sh.merge-autoclose',
+    services: ['linkding', 'karakeep'],
+    surfaces: ['popup'],
+    features: ['autoclose-normal', 'autoclose-merge-stays'],
+    fixRefs: ['G12'],
+    // Temp only (user-target rounds): the merge is staged with injected
+    // lookups, the same on any instance; it takes two pool URLs a round.
+    needs: needs({ target: 'temp', shots: true }),
+    budget: { bookmarks: 2, urls: 2, node: 6, browser: { linkding: 30, karakeep: 45 }, ai: 0, tags: 0, seconds: 45, tagReads: 1 },
+    files: [],
+    settings: { optAutoCloseAfterSave: true },
+    async steps(t) {
+      await t.phase('autoclose_normal');
+      const plain = t.claimUrl();
+      let form = await t.openPopup(plain);
+      await form.popup.locator('#title-input').fill(t.prefix + ' autoclose');
+      const closed = form.popup.waitForEvent('close', { timeout: 8000 }).then(() => true, () => false);
+      await form.popup.locator('#submit-btn').click();
+      t.expect(await closed, 'normal_save_stays_open');
+      await t.ownRow(plain);
+      await form.close();
+      await t.phase('autoclose_merge');
+      // A merge is the server's answer to a create of a URL another client
+      // saved after the popup's checks: the bookmark is seeded, and every
+      // duplicate check answers "not saved" as it did when the popup opened,
+      // so the create reaches the server and merges (linkding judges a merge
+      // by date_modified - date_added > 2 s, hence the wait).
+      const merged = t.claimUrl();
+      form = await t.openPopup(merged);
+      await t.seed({ url: merged, title: t.prefix + ' seeded elsewhere', notes: 'seeded' });
+      await t.sleep(2500);
+      t.inject({ method: 'GET', path: CHECK_PATH[t.service], status: 200, body: t.service === 'linkding' ? { bookmark: null, metadata: { url: merged, title: '', description: '' }, auto_tags: [] } : { bookmarkId: null } });
+      await form.popup.locator('#title-input').fill(t.prefix + ' merge');
+      const since = t.now();
+      const seen = await clickSave(t, form.popup, 'merge_outcome');
+      t.note('mergeOutcome', seen);
+      t.expectEq(createsOf(t, merged, since).length, 1, 'merge_create_sent');
+      await t.sleep(4000);
+      t.expect(!form.popup.isClosed(), 'merge_auto_closed');
+      t.expect(!!seen.text, 'merge_notice');
+      await t.shot(form.popup, 'merge-kept-open', { surface: 'popup', keys: ['#submit-btn'] });
+      await form.close();
+      t.check(`${t.service}: a normal save auto-closes; a merge into an existing bookmark keeps its notice open`);
+    },
+  },
+
+  // 10. Batch (G13, decision 7): skip mode checks before AI; the merge-mode
+  // confirmation says what it does; an over-long title fails.
+  {
+    id: 'sh.batch',
+    services: ['linkding', 'karakeep'],
+    surfaces: ['popup'],
+    features: ['fake-ai', 'batch-skip-checks-first', 'batch-confirm-copy', 'batch-title-too-long'],
+    fixRefs: ['G13'],
+    needs: needs({ fakeAi: true }),
+    budget: { bookmarks: 2, urls: 3, node: 8, browser: { linkding: 50, karakeep: 75 }, ai: 3, tags: 3, seconds: 45, tagReads: 1 },
+    files: [],
+    settings: { batchAiSummary: false, aiTagLang: 'en' },
+    async steps(t) {
+      const existing = t.claimUrl(), fresh = t.claimUrl(), long = t.claimUrl();
+      await t.seed({ url: existing, title: t.prefix + ' batch existing', notes: 'kept', tags: [t.prefix] });
+      await t.phase('batch_confirm_merge');
+      await t.settings({ batchSkipExisting: false, batchAiTags: true });
+      const form = await t.openPopup(existing);
+      await form.popup.bringToFront();
+      const since = t.now();
+      await form.popup.locator('#batch-bookmark-btn').click();
+      await form.popup.locator('#batch-permission:not(.hidden)').waitFor({ timeout: 8000 });
+      const detail = await form.popup.locator('#batch-permission-detail').innerText();
+      t.note('mergeConfirm', detail.slice(0, 200));
+      t.expect(!/skip/i.test(detail), 'merge_confirm_says_skip');
+      await form.popup.locator('#batch-permission-cancel').click();
+      t.expectEq(writesSince(t, since).length, 0, 'confirm_cancel_wrote');
+      await form.close();
+
+      await t.phase('batch_skip_mode');
+      await t.settings({ batchSkipExisting: true, batchAiTags: true });
+      const before = t.fakeAi.calls();
+      const skip = await batchSave(t, [existing, fresh]);
+      t.note('skip', skip);
+      t.expectEq(t.fakeAi.calls() - before, 1, 'skip_mode_ai_calls');
+      t.expect(tagsOfRow(t, await t.ownRow(existing)).length === 1, 'skip_mode_existing_changed');
+      await t.ownRow(fresh);
+
+      await t.phase('batch_long_title');
+      await t.settings({ batchSkipExisting: false, batchAiTags: false });
+      page(t, long, articleHtml({ title: 'Long '.repeat(240) }));
+      const longSince = t.now();
+      const result = await batchSave(t, [long]);
+      t.note('longTitle', result);
+      t.expect(result.saved === 0 && (result.failed >= 1 || result.tooLong >= 1), 'long_title_not_failed');
+      t.expectEq(createsOf(t, long, longSince).length, 0, 'long_title_sent');
+      t.check(`${t.service}: batch merge confirmation does not promise skipping; skip mode checks before AI (one call for one new page); an over-long title fails without a request`);
+    },
+  },
+
+  // 11. Read Later and recent (G16, decision 12): the shortcut's rl*
+  // settings; Karakeep reuses its marked list; recent omits archived.
+  {
+    id: 'sh.read-later',
+    services: ['linkding', 'karakeep'],
+    surfaces: ['reader'],
+    features: ['read-later-shortcut', 'read-later-list-reuse', 'recent-not-archived'],
+    fixRefs: ['G16', 'G18'],
+    needs: needs(),
+    budget: { bookmarks: 3, urls: 3, node: { linkding: 8, karakeep: 18 }, browser: { linkding: 30, karakeep: 75 }, ai: 0, tags: 1, lists: { karakeep: 1 }, seconds: 45, tagReads: 1 },
+    files: [],
+    settings: { rlAutoNotes: false, rlBlockquote: false, rlAiTags: false, rlAiSummary: false },
+    async steps(t) {
+      const tag = t.prefix + '_rl';
+      await t.settings({ rlDefaultTags: tag });
+      const markerLists = async () => (await t.api('lists')).lists.filter(l => l.description === LIST_MARKER).map(l => l.id);
+      const inList = async (row, ids) => (await karakeepLists(t, row)).some(l => ids.includes(l.id));
+      const first = t.claimUrl(), second = t.claimUrl(), archived = t.claimUrl();
+      await t.phase('read_later_shortcut');
+      const listsBefore = t.service === 'karakeep' ? await markerLists() : [];
+      const r = await shortcutSave(t, first, 'rl');
+      t.note('readLater', r);
+      t.expectEq(r.status, 'saved', 'read_later_status');
+      let row = await t.ownRow(first);
+      t.expect(tagsOfRow(t, row).includes(tag), 'read_later_tag');
+      if (t.service === 'linkding') t.expectEq(row.unread, true, 'read_later_unread');
+      else {
+        const lists = await markerLists();
+        t.expect(lists.length === 1 && (listsBefore.length === 0 || lists[0] === listsBefore[0]), 'read_later_list');
+        t.expect(await inList(row, lists), 'read_later_member');
+        await t.phase('read_later_list_reuse');
+        await t.sw(async () => chrome.storage.local.set({ karakeepReadLaterListId: '', karakeepReadLaterListOwner: '' }));
+        t.expectEq((await shortcutSave(t, second, 'rl')).status, 'saved', 'reuse_status');
+        const after = await markerLists();
+        t.expect(after.length === 1 && after[0] === lists[0], 'read_later_list_duplicated');
+        const secondRow = await t.ownRow(second);
+        t.expect(await inList(secondRow, after), 'reuse_member');
+        const reader = await t.openReader(second, { ready: '#reader-bookmark-later' });
+        await reader.locator('#reader-bookmark-save').click();
+        await reader.waitForFunction(() => document.getElementById('reader-bookmark-later')?.getAttribute('aria-pressed') === 'false');
+        await reader.close();
+        t.expect(!(await inList(secondRow, after)), 'reuse_remove_member');
+        t.expect(await inList(row, after), 'reuse_removed_other_member');
+      }
+      await t.phase('recent_not_archived');
+      const seeded = await t.seed({ url: archived, title: t.prefix + ' archived', notes: '' });
+      await t.api(t.recordPath(seeded.id), { method: 'PATCH', body: t.service === 'linkding' ? { is_archived: true } : { archived: true } });
+      const recent = await t.sw(async () => (await pbpBookmarkClient(await getCurrentBookmarkAuth()).recent(20)).map(b => b.url));
+      t.expect(recent.includes(first), 'recent_missing_unarchived');
+      t.expect(!recent.includes(archived), 'recent_lists_archived');
+      t.check(`${t.service}: the rl* Read Later shortcut tags and marks the bookmark${t.service === 'karakeep' ? ', reusing the one marked list and changing only its own members' : ''}; recent bookmarks omit archived ones`);
+    },
+  },
+
+  // 12. Options: connect before switching, errors, disconnect (G22, G28;
+  // decisions 6, 11). Temporary instances only: it sends wrong tokens,
+  // removes the stored token and connects again.
+  {
+    id: 'sh.options-connect',
+    services: ['linkding', 'karakeep'],
+    surfaces: ['options', 'popup'],
+    features: ['connect-before-switch', 'connect-errors', 'connect-aria-invalid', 'disconnect', 'pinboard-roundtrip'],
+    fixRefs: ['G8', 'G22', 'G28'],
+    needs: needs({ target: 'temp', shots: true }),
+    budget: { bookmarks: 0, urls: 1, node: 4, browser: { linkding: 120, karakeep: 200 }, ai: 0, tags: 0, seconds: 90, tagReads: 3 },
+    files: [],
+    settings: {},
+    async steps(t) {
+      const s = t.service;
+      const conn = () => t.sw(async () => { const c = await pbpReadBookmarkConnection(); return { service: c.service, account: c.account || '' }; });
+      const original = await conn();
+      t.expectEq(original.service, s, 'connected_service');
+      const writesBefore = await t.writes();
+      let options = await t.openOptions();
+      await t.phase('options_switch_needs_connect');
+      await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
+      await t.sleep(800);
+      t.expectEq((await conn()).service, s, 'switched_before_connect');
+      await options.locator(`input[name="bookmark-service"][value="${s}"]`).check();
+
+      const connectError = async (code, invalidSelector) => {
+        const status = options.locator(`#connect-${s}-status`);
+        await options.locator(`#connect-${s}`).click();
+        await t.until(async () => { const text = (await status.innerText()).trim(); return text && !/Connecting|Checking/i.test(text); }, code + '_status', 20000);
+        const text = (await status.innerText()).trim();
+        t.note(code, text.slice(0, 200));
+        t.expect(!/^Connected/.test(text), code + '_connected');
+        t.expectEq(await options.locator(invalidSelector).getAttribute('aria-invalid'), 'true', code + '_aria_invalid');
+        return text;
+      };
+      await t.phase('options_wrong_token');
+      await options.locator(`#opt-${s}-token`).fill('pbp-it-wrong-token-' + t.runId.slice(0, 8));
+      const tokenText = await connectError('wrong_token', `#opt-${s}-token`);
+      const auth = t.message('bookmarkConnectErrAuth');
+      if (auth) t.expect(tokenText.includes(auth.split('$')[0].trim().slice(0, 20)), 'wrong_token_not_auth');
+      await t.shot(options, 'wrong-token', { surface: 'options', keys: [`#connect-${s}`] });
+      await t.axe(options, 'wrong-token');
+      await t.phase('options_wrong_port');
+      const other = t.otherBases().find(b => b.service !== s);
+      if (other) {
+        await options.locator(`#opt-${s}-url`).fill(other.base);
+        await connectError('wrong_port', `#opt-${s}-url`);
+      } else t.note('wrong_port', 'skipped: no other instance in this run');
+      await t.phase('options_gateway_empty');
+      await options.locator(`#opt-${s}-url`).fill(t.base);
+      await options.evaluate(s => { const sel = document.getElementById('opt-' + s + '-gateway'); sel.value = 'cloudflare'; sel.dispatchEvent(new Event('change', { bubbles: true })); }, s);
+      const gwSince = t.now();
+      await connectError('gateway_empty', `#opt-${s}-cf-id`);
+      t.expectEq(t.requests({ since: gwSince }).length, 0, 'gateway_empty_request');
+      t.expectEq(await t.writes(), writesBefore, 'connect_errors_wrote');
+      t.expect(JSON.stringify(await conn()) === JSON.stringify(original), 'failed_connect_changed_connection');
+      await options.close();
+
+      await t.phase('options_disconnect');
+      options = await t.openOptions();
+      const disconnect = options.locator(`#disconnect-${s}`);
+      t.expect(await disconnect.count() === 1, 'pending_disconnect_button');
+      await disconnect.click();
+      await options.locator('.confirm-yes').waitFor({ timeout: 5000 });
+      const tokenKey = s + 'Token';
+      const hasToken = () => t.sw(async key => !!(await pbpReadSettingsWithSecrets({ [key]: '' }))[key], tokenKey);
+      t.expect(await hasToken(), 'disconnect_without_confirm');
+      await options.locator('.confirm-yes').click();
+      await t.until(async () => !(await hasToken()), 'disconnect_token_removed', 8000);
+      await options.close();
+      await t.reconnect();
+      t.expectEq((await conn()).service, s, 'reconnected');
+
+      await t.phase('options_pinboard_roundtrip');
+      options = await t.openOptions();
+      await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
+      await t.sleep(500);
+      await options.locator(`input[name="bookmark-service"][value="${s}"]`).check();
+      await t.sleep(500);
+      await options.close();
+      const form = await t.openPopup(t.claimUrl());
+      t.expect(await form.popup.locator('#main-section').isVisible(), 'popup_stuck_after_roundtrip');
+      await form.close();
+      t.check(`${s}: choosing a service only opens its form; wrong token, wrong port and empty gateway fail with aria-invalid and no writes; Disconnect asks first and removes the token; a Pinboard round trip leaves the popup working`);
+    },
+  },
+
+  // 13. Tag input (G21+G23 decision 13; G29): quoted names with spaces and a
+  // long chip in German. No writes.
+  {
+    id: 'sh.tag-input',
+    services: ['linkding', 'karakeep'],
+    surfaces: ['popup'],
+    features: ['quoted-tag-space', 'long-tag-chip-geometry'],
+    fixRefs: ['G21+G23', 'G29'],
+    // Temp only (user-target rounds): chip geometry and quote typing are
+    // the popup's, not the server's; a temporary instance shows the same.
+    needs: needs({ target: 'temp', writes: false, shots: true }),
+    budget: { bookmarks: 0, urls: 1, node: 2, browser: { linkding: 15, karakeep: 25 }, ai: 0, tags: 0, seconds: 45, tagReads: 1 },
+    files: ['_locales/de/messages.json'],
+    settings: {},
+    async steps(t) {
+      const url = t.claimUrl();
+      await t.phase('tag_input_quotes');
+      let form = await t.openPopup(url);
+      const input = form.popup.locator('#tags-input');
+      const chips = () => form.popup.locator('#tags-display .tag-item').allTextContents();
+      await input.click();
+      await form.popup.keyboard.type('"' + t.prefix + ' two');
+      await form.popup.keyboard.press('Space');
+      await form.popup.keyboard.type('words');
+      t.expectEq((await chips()).length, 0, 'quote_space_committed');
+      t.expectEq(await input.inputValue(), '"' + t.prefix + ' two words', 'quote_input_kept');
+      await form.popup.keyboard.type('"');
+      await form.popup.keyboard.press('Space');
+      const committed = await chips();
+      t.note('quotedChips', committed.length);
+      t.expect(committed.length === 1 && committed[0].includes('two words') && !committed[0].includes('"'), 'quote_closed_commit');
+      await form.close();
+
+      await t.phase('tag_input_long_chip');
+      form = await t.openPopup(url, { locale: 'de', width: 550 });
+      const long = (t.prefix + '_' + 'abcdefghijklmnopqrstuvwxyz').slice(0, 68);
+      await form.popup.locator('#tags-input').fill(long);
+      await form.popup.locator('#tags-input').press('Enter');
+      const g = await form.popup.evaluate(() => {
+        const chip = document.querySelector('#tags-display .tag-item');
+        const wrap = chip?.closest('.tags-input-wrap') || document.getElementById('tags-display');
+        const remove = chip?.querySelector('.tag-remove');
+        if (!chip || !remove) return { missing: true };
+        const c = chip.getBoundingClientRect(), w = wrap.getBoundingClientRect(), r = remove.getBoundingClientRect();
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return { scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth, chipRight: Math.round(c.right), wrapRight: Math.round(w.right), removeLeft: Math.round(r.left), removeRight: Math.round(r.right), hit: !!hit && (hit === remove || remove.contains(hit)) };
+      });
+      t.note('longChip', g);
+      t.expect(!g.missing, 'long_chip_missing');
+      t.expect(g.scrollWidth <= g.innerWidth, 'long_chip_page_overflow');
+      t.expect(g.chipRight <= g.wrapRight + 1, 'long_chip_wrap_overflow');
+      t.expect(g.removeLeft >= 0 && g.removeRight <= g.innerWidth && g.hit, 'long_chip_remove_unreachable');
+      await t.shot(form.popup, 'long-chip-de', { surface: 'popup', keys: ['#tags-display .tag-remove', '#submit-btn'] });
+      await t.axe(form.popup, 'long-chip-de');
+      await form.popup.locator('#tags-display .tag-remove').first().click();
+      t.expectEq(await form.popup.locator('#tags-display .tag-item').count(), 0, 'long_chip_not_removed');
+      await form.close();
+      t.check(`${t.service}: a quoted tag keeps its spaces until the closing quote; a 68-character chip in German stays inside the popup with a reachable remove button`);
+    },
+  },
+
+  // 14. Karakeep authentication (G8): a wrong key is an auth failure, not a
+  // gateway refusal, and nothing pays for AI first.
+  {
+    id: 'sh.karakeep-auth',
+    services: ['karakeep'],
+    surfaces: ['options'],
+    features: ['fake-ai', 'karakeep-auth-not-gateway', 'auth-before-ai'],
+    fixRefs: ['G8'],
+    // Temp only (user-target rounds): it sends a wrong key on purpose, which
+    // has no place on the user's instance; the answer is Karakeep's own.
+    needs: needs({ target: 'temp', fakeAi: true }),
+    budget: { bookmarks: 0, urls: 2, node: 2, browser: 40, ai: 2, tags: 0, seconds: 60, tagReads: 1 },
+    files: [],
+    settings: { offlineQueueEnabled: true, qsAiTags: true, qsAiSummary: true, batchAiTags: true, batchAiSummary: false, batchSkipExisting: false },
+    async steps(t) {
+      await t.phase('karakeep_wrong_key');
+      const options = await t.openOptions();
+      await options.locator('#opt-karakeep-token').fill('pbp-it-wrong-key-' + t.runId.slice(0, 8));
+      const status = options.locator('#connect-karakeep-status');
+      await options.locator('#connect-karakeep').click();
+      await t.until(async () => { const text = (await status.innerText()).trim(); return text && !/Connecting|Checking/i.test(text); }, 'wrong_key_status', 20000);
+      const text = (await status.innerText()).trim();
+      t.note('wrongKey', text.slice(0, 200));
+      const gateway = t.message('bookmarkErrGatewayDenied'), auth = t.message('bookmarkConnectErrAuth');
+      if (gateway) t.expect(!text.includes(gateway.split('$')[0].trim().slice(0, 24)), 'wrong_key_gateway');
+      if (auth) t.expect(text.includes(auth.split('$')[0].trim().slice(0, 20)), 'wrong_key_not_auth');
+      await options.close();
+      t.expectEq(await t.sw(async () => (await pbpReadBookmarkConnection()).service), 'karakeep', 'wrong_key_disconnected');
+
+      await t.phase('karakeep_revoked_quick_save');
+      const unauthorized = () => t.inject({ status: 401, contentType: 'text/plain;charset=UTF-8', body: 'Unauthorized' });
+      let fault = unauthorized();
+      const before = t.fakeAi.calls();
+      const quick = await shortcutSave(t, t.claimUrl(), 'qs');
+      t.note('quickSave', quick);
+      t.expect(quick.status !== 'saved' && /auth|not_logged_in/.test(quick.reason), 'revoked_quick_save_reason');
+      t.expectEq(t.fakeAi.calls() - before, 0, 'revoked_quick_save_paid_ai');
+      fault.clear();
+      await t.sw(async () => { await chrome.storage.local.remove('offlineQueuePause'); await chrome.storage.local.set({ offlineQueue: [] }); });
+      await t.phase('karakeep_revoked_batch');
+      fault = unauthorized();
+      const batchBefore = t.fakeAi.calls();
+      const batch = await batchSave(t, [t.claimUrl()]);
+      t.note('batch', batch);
+      t.expect(batch.saved === 0, 'revoked_batch_saved');
+      t.expect(t.fakeAi.calls() - batchBefore <= 1, 'revoked_batch_paid_ai');
+      fault.clear();
+      await t.sw(async () => { await chrome.storage.local.remove('offlineQueuePause'); await chrome.storage.local.set({ offlineQueue: [] }); });
+      t.check('karakeep: a wrong key reads as an authentication failure; a revoked key stops quick save before AI and batch after at most one AI call');
+    },
+  },
+
+  // 15. Karakeep tag library spelling (handoff §9-12, §9-16).
+  {
+    id: 'sh.karakeep-tag-library',
+    services: ['karakeep'],
+    surfaces: ['popup'],
+    features: ['fake-ai', 'ai-tag-library-spelling', 'autocomplete-by-count'],
+    fixRefs: ['G4'],
+    needs: needs({ fakeAi: true, shots: true }),
+    budget: { bookmarks: 4, urls: 4, node: 14, browser: 35, ai: 2, tags: 4, seconds: 45, tagReads: 2 },
+    files: [],
+    settings: { optShowAiTags: true, optRespectTagCase: true, tagSyncMode: 'fresh' },
+    async steps(t) {
+      const { prefix } = t;
+      const names = { lib: prefix + ' machine learning', alpha: prefix + ' auto alpha', beta: prefix + ' auto beta', gamma: prefix + ' auto gamma' };
+      const urls = [t.claimUrl(), t.claimUrl(), t.claimUrl(), t.claimUrl()];
+      const runTags = () => t.sw(async prefix => (await pbpBookmarkClient(await getCurrentBookmarkAuth()).tags()).map(tag => tag.name).filter(n => n.startsWith(prefix)).sort(), prefix);
+      await t.phase('library_seed');
+      const seeds = [[names.lib, names.alpha, names.gamma], [names.lib, names.alpha, names.gamma], [names.alpha, names.beta]];
+      for (let i = 0; i < 3; i++) await t.seed({ url: urls[i], title: prefix + ' library ' + i, notes: '', tags: seeds[i] });
+      const before = await runTags();
+      await t.phase('library_autocomplete');
+      const form = await t.openPopup(urls[3]);
+      const { popup } = form;
+      await popup.waitForFunction(name => allUserTagCounts[name] === 3, names.alpha);
+      await popup.locator('#tags-input').click();
+      // The prefix alone: a space would commit what was typed as a chip.
+      await popup.keyboard.type(prefix);
+      await popup.locator('#tags-autocomplete .ac-item[data-tag]').first().waitFor();
+      const order = await popup.locator('#tags-autocomplete .ac-item[data-tag]').evaluateAll(els => els.map(el => el.dataset.tag));
+      t.note('autocomplete', order.map(n => n.slice(prefix.length)));
+      t.expectEq(order.filter(n => [names.alpha, names.beta, names.gamma].includes(n)).join('|'), [names.alpha, names.gamma, names.beta].join('|'), 'autocomplete_by_count');
+      await popup.locator('#tags-input').fill('');
+      await popup.keyboard.press('Escape');
+      t.expectEq(await popup.locator('#tags-display .tag-item').count(), 0, 'autocomplete_left_no_chip');
+      await t.phase('library_ai_spelling');
+      // The button asks for tags alone or for tags and summary in one call.
+      const variant = [prefix + '_Machine-Learning'];
+      t.fakeAi.expect({ kind: 'tags', reply: JSON.stringify(variant) });
+      t.fakeAi.expect({ kind: 'combined', reply: JSON.stringify({ summary: t.fakeAi.marker + ' summary.', tags: variant }) });
+      await popup.locator('#ai-tags-btn').click();
+      await popup.locator('#ai-suggest-tags .stag.ai').first().waitFor();
+      const suggested = await popup.locator('#ai-suggest-tags .stag.ai').evaluateAll(els => els.map(el => el.dataset.tag));
+      t.expectEq(suggested.join('|'), names.lib, 'ai_chip_library_spelling');
+      await popup.locator('#ai-suggest-tags .add-all-link').click();
+      t.expect((await popup.locator('#tags-display .tag-item').allTextContents()).some(text => text.includes(names.lib)), 'chip_library_spelling');
+      await t.shot(popup, 'ai-library-spelling', { surface: 'popup', keys: ['#submit-btn'] });
+      await t.savePopup(popup);
+      await form.close();
+      const row = await t.ownRow(urls[3]);
+      t.expectEq(tagsOfRow(t, row).join('|'), names.lib, 'saved_library_spelling');
+      t.expectEq((await runTags()).join('|'), before.join('|'), 'prefix_tag_count_changed');
+      t.check('karakeep: an AI tag in another spelling (case, hyphen, underscore) becomes the library\'s spelling; no new tag; autocomplete orders by use count');
+    },
+  },
+];
+
+MODULES.push(...SELFHOSTED_MODULES);
+
 // Group aliases. The pre-registry --scenario values keep their meaning:
 // core = the original smoke, edges = tag/offline/quote regressions.
 export const GROUPS = Object.freeze({
@@ -825,6 +2028,7 @@ export const GROUPS = Object.freeze({
   edges: ['*.edges.*'],
   readonly: ['*.readonly'],
   ai: ['*.ai.*'],
+  selfhosted: ['*.sh.*'],
   all: ['*'],
 });
 
@@ -833,7 +2037,7 @@ export const GROUPS = Object.freeze({
 export const UNCOVERED = Object.freeze([
   { text: 'Pinboard 回归 §9-17（popup/快捷/批量保存格式、含 " 标签）：--target user --service pinboard --scenario core', coveredBy: 'pinboard.core.save-paths' },
   { text: 'Pinboard §9-18（分隔符说明文案中英文读感）：需人工阅读，无模块' },
-  { text: '稍后读快捷键（rl* 设置）与 linkding / Karakeep 的快捷保存、批量保存' },
+  { text: '稍后读快捷键（rl* 设置）与 linkding / Karakeep 的快捷保存、批量保存', coveredBy: '*.sh.read-later' },
   { text: 'linkding 共享开启分支（只在临时容器跑：--scenario linkding.sharing.*）', coveredBy: 'linkding.sharing.*' },
   { text: 'linkding 超长标签 500（只在临时 Postgres 跑：--scenario linkding-pg.limits.*）', coveredBy: 'linkding-pg.limits.*' },
   { text: '上千标签下的标签缓存、补全与治理性能（临时容器批量造标签，尚无模块）' },
