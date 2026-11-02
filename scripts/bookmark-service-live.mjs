@@ -1657,8 +1657,11 @@ export class LiveRun {
     const inst = this.instances[instance];
     // Every harness call checks that the module is still current: a module
     // that timed out keeps running in the background until its pages close,
-    // and must not reach the services while the next module runs.
+    // and must not reach the services while its cleanup or the next module
+    // runs. The Node API and the worker are only reached through these two.
     const alive = () => { if (mod.revoked) fail('module_revoked'); run.throwIfFatal(); };
+    const api = (path, opts) => { alive(); return run.api(instance, path, opts); };
+    const sw = (fn, arg) => { alive(); return run.sw(fn, arg); };
     const t = {
       service: mod.service, instance, prefix: run.prefix, runId: run.runId, target: run.target,
       base: inst.base, root: inst.root, ctx: run.ctx, worker: run.worker, extension: run.extension,
@@ -1698,7 +1701,7 @@ export class LiveRun {
         mod.claimed++;
         return pool[run.claimed[instance]++];
       },
-      api: (path, opts) => { alive(); return run.api(instance, path, opts); },
+      api,
       recordPath: id => recordPath(mod.service, id),
       rowUrl: row => rowUrl(mod.service, row),
       async seed({ url, title = '', tags = [], description = '', notes = '' } = {}) {
@@ -1706,10 +1709,10 @@ export class LiveRun {
         const target = url || t.claimUrl();
         let row;
         if (mod.service === 'linkding') {
-          row = await run.api(instance, 'bookmarks/', { method: 'POST', body: { url: target, title, description, notes, tag_names: tags, is_archived: false, unread: false, shared: false } });
+          row = await api('bookmarks/', { method: 'POST', body: { url: target, title, description, notes, tag_names: tags, is_archived: false, unread: false, shared: false } });
         } else {
-          row = await run.api(instance, 'bookmarks', { method: 'POST', body: { type: 'link', url: target, title, note: notes, source: 'api' } });
-          if (tags.length) await run.api(instance, 'bookmarks/' + encodeURIComponent(row.id) + '/tags', { method: 'POST', body: { tags: tags.map(tagName => ({ tagName })) } });
+          row = await api('bookmarks', { method: 'POST', body: { type: 'link', url: target, title, note: notes, source: 'api' } });
+          if (tags.length) await api('bookmarks/' + encodeURIComponent(row.id) + '/tags', { method: 'POST', body: { tags: tags.map(tagName => ({ tagName })) } });
         }
         return row;
       },
@@ -1719,7 +1722,7 @@ export class LiveRun {
         run.throwIfFatal();
         const entry = run.report.ledger.created.find(r => r.instance === instance && r.url === url && !r.deleted);
         check(entry, 'created_id_missing');
-        const row = await run.api(instance, recordPath(mod.service, entry.id));
+        const row = await api(recordPath(mod.service, entry.id));
         check(rowUrl(mod.service, row) === url, 'created_url_mismatch', true);
         if (mod.service === 'karakeep') for (const tag of row.tags || []) run.trackTag(instance, tag);
         else for (const name of row.tag_names || []) run.trackTag(instance, { name });
@@ -1740,7 +1743,7 @@ export class LiveRun {
           selected.addRange(range);
         });
         const opened = run.ctx.waitForEvent('page');
-        await run.sw(url => chrome.tabs.create({ url, active: false }), run.extension + 'popup.html');
+        await sw(url => chrome.tabs.create({ url, active: false }), run.extension + 'popup.html');
         const popup = await opened;
         if (width) await popup.setViewportSize({ width, height: 900 });
         await popup.waitForLoadState();
@@ -1756,8 +1759,8 @@ export class LiveRun {
       },
       async openReader(url, { markdown = '# Synthetic article\n\nPublic fixture.', title = 'Synthetic article', ready = '#reader-bookmark-save' } = {}) {
         alive();
-        const account = await run.sw(async () => (await getCurrentBookmarkAuth()).account);
-        await run.sw(async data => chrome.storage.local.set({ md_preview_data_live: { markdown: data.markdown, title: data.title, url: data.url, baseUrl: data.url, account: data.account, tags: [], description: '', source: 'local', ts: Date.now() } }), { url, account, markdown, title });
+        const account = await sw(async () => (await getCurrentBookmarkAuth()).account);
+        await sw(async data => chrome.storage.local.set({ md_preview_data_live: { markdown: data.markdown, title: data.title, url: data.url, baseUrl: data.url, account: data.account, tags: [], description: '', source: 'local', ts: Date.now() } }), { url, account, markdown, title });
         const reader = await run.ctx.newPage();
         await reader.goto(run.extension + 'md-preview.html?k=live');
         await reader.waitForFunction(sel => document.querySelector(sel)?.getAttribute('aria-busy') === 'false', ready);
@@ -1772,10 +1775,10 @@ export class LiveRun {
         await page.goto(run.extension + 'options.html' + (hash ? '#' + String(hash).replace(/^#/, '') : ''));
         return page;
       },
-      sw: (fn, arg) => { alive(); return run.sw(fn, arg); },
+      sw,
       async settings(values) {
         alive();
-        await run.sw(async values => { await chrome.storage.local.set(values); await new Promise(r => setTimeout(r, 50)); }, values);
+        await sw(async values => { await chrome.storage.local.set(values); await new Promise(r => setTimeout(r, 50)); }, values);
         if (typeof values.optLang === 'string') run.locale = values.optLang;
       },
       async offline(which) {
@@ -1829,11 +1832,14 @@ export class LiveRun {
       current.deadline = Date.now() + seconds * 1000;
       const work = (async () => { await mod.steps(t); if (mod.verify) await mod.verify(t); })();
       // After a timeout the steps fail on revoked calls or closed pages;
-      // those late rejections are expected, not uncaught errors.
+      // those late rejections are expected, not uncaught errors. The module is
+      // revoked the moment it times out, before its cleanup starts: cleanup
+      // switches the Node guard to deletions, where a late seed would read as
+      // a guard violation and abort the whole run.
       work.catch(() => {});
       await Promise.race([
         work,
-        new Promise((_, reject) => { timer = setTimeout(() => reject(new HarnessFailure('module_timeout')), seconds * 1000); }),
+        new Promise((_, reject) => { timer = setTimeout(() => { current.revoked = true; reject(new HarnessFailure('module_timeout')); }, seconds * 1000); }),
       ]);
       await this.syncGuard();
       this.throwIfFatal();
@@ -1847,6 +1853,9 @@ export class LiveRun {
       record.status = 'passed';
       console.log(mod.id + ': passed');
     } catch (error) {
+      // Whatever failed, nothing the module still has in flight may reach a
+      // service from here on.
+      current.revoked = true;
       const code = failureCode(error, this.secrets);
       record.failure = { phase: this.phaseName, code };
       const after = this.count(mod.instance);

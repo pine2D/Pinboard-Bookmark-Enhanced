@@ -401,6 +401,74 @@ try {
     assert.deepEqual(guardRun.report.violations.map(v => [v.code, v.phase]), [['live_guard_missing', 'second']]);
   }
 
+  // A module that times out is revoked before its cleanup starts. Its steps
+  // keep running in the background; a late seed must fail locally with
+  // module_revoked, not reach the Node guard while cleanup deletes (where a
+  // create reads as node_guard_mutation and aborts the whole run).
+  {
+    const rows = new Map(), seen = [];
+    let next = 1;
+    const server = createServer((req, res) => {
+      let body = '';
+      req.on('data', c => { body += c; });
+      req.on('end', () => {
+        const path = req.url.split('?')[0];
+        seen.push(req.method + ' ' + path);
+        const json = (status, value) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(value)); };
+        if (req.method === 'POST' && path === '/api/bookmarks/') {
+          const b = JSON.parse(body);
+          const row = { id: next++, url: b.url, title: b.title, tag_names: [] };
+          rows.set(String(row.id), row);
+          return json(201, row);
+        }
+        const record = path.match(/^\/api\/bookmarks\/(\d+)\/$/);
+        if (record) {
+          const row = rows.get(record[1]);
+          if (!row) return json(404, { detail: 'No Bookmark matches the given query.' });
+          // A slow DELETE keeps the module cleanup running while the late seed fires.
+          if (req.method === 'DELETE') return setTimeout(() => { rows.delete(record[1]); res.writeHead(204); res.end(); }, 600);
+          return json(200, row);
+        }
+        json(404, { detail: 'Not found.' });
+      });
+    });
+    const port = await listen(server);
+    const base = `http://127.0.0.1:${port}/`;
+    const timeoutRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    timeoutRun.target = 'user';
+    timeoutRun.instances.linkding = { id: 'linkding', service: 'linkding', base, root: live.apiRootFor('linkding', base), token: 'f'.repeat(40) };
+    timeoutRun.caps = { linkding: live.BUDGETS.user.linkding };
+    timeoutRun.reserve = { linkding: 60 };
+    timeoutRun.pools.linkding = live.poolUrls('user', timeoutRun.runId, 'linkding', 2);
+    timeoutRun.claimed.linkding = 0;
+    timeoutRun.guardCfg = {};
+    timeoutRun.ctx = { pages: () => [] };
+    timeoutRun.worker = { evaluate: async () => {} };
+    timeoutRun.syncGuard = async () => {};
+    timeoutRun.pushGuardWrites = async () => {};
+    // No browser here: the settings snapshot and restore get empty answers.
+    timeoutRun.sw = async fn => (String(fn).includes('SETTINGS_DEFAULTS') ? [] : String(fn).includes('storage.local.get') ? {} : undefined);
+    let late = '';
+    const mod = {
+      id: 'linkding.timeout.check', instance: 'linkding', service: 'linkding', needs: { writes: true }, settings: {},
+      budget: { bookmarks: 2, urls: 2, node: 40, browser: 0, ai: 0, tags: 0, seconds: 0.3 },
+      async steps(t) {
+        await t.seed({ title: 'first' });
+        await t.sleep(500);
+        try { await t.seed({ title: 'late' }); } catch (e) { late = e.code; throw e; }
+      },
+    };
+    await quiet(() => timeoutRun.runModule(mod));
+    await new Promise(r => setTimeout(r, 50));
+    const record = timeoutRun.report.modules[0];
+    assert.deepEqual([record.status, record.failure.code, timeoutRun.fatal], ['failed', 'module_timeout', null], 'a timeout fails the module, not the run');
+    assert.equal(late, 'module_revoked', 'the late seed is refused before it reaches the service');
+    assert.equal(record.restore, undefined, 'the module settings are restored');
+    assert.deepEqual(seen, ['POST /api/bookmarks/', 'GET /api/bookmarks/1/', 'DELETE /api/bookmarks/1/', 'GET /api/bookmarks/1/'], 'one create, then the module cleanup');
+    assert.equal(timeoutRun.report.ledger.created[0].deleted, true);
+    await closeServer(server);
+  }
+
   // ---------------------------------------------------------------------
   // Pure helpers: endpoints, redaction, Karakeep config, signals, lock
   // ---------------------------------------------------------------------
