@@ -655,7 +655,7 @@ test("update and overwrite retain existing same-group twins supplied by the user
 test("update and overwrite can explicitly remove one same-group twin",async()=>{
   const remote={...kk,tags:[{id:"tag-one",name:"web-design",attachedBy:"human"},{id:"tag-two",name:"web_design",attachedBy:"human"}]};
   for(const mode of ["update","overwrite"]){
-    const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,remote],[200,{id:"bk1"}],[200,{removed:["tag-two"]}]]);
+    const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,remote],[200,{id:"bk1"}],[200,{detached:["tag-two"]}]]);
     const result=await h.submitSaveIntent({...saveIntent,mode,tags:"web-design",...(mode==="update"?{time:"2026-10-01T10:00:00Z"}:{})});
     equal(result.status,"saved");
     equal(h.state.calls.at(-1).body,{tags:[{tagId:"tag-two"}]});
