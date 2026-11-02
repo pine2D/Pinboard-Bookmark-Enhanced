@@ -718,7 +718,9 @@ export function writePrivateJson(path, value) {
 // not, only a --cleanup of that very report (resume: its path) may take the
 // lock over: that is how a run cut off by a second signal, kill -9, OOM or a
 // crash gets finished. Any other run is refused.
-export function acquireLock(dir, info, { resume = '' } = {}) {
+// onForeign(reportPath) hears of a stale lock freed because another harness
+// version wrote its report, for the caller's own report and summary.
+export function acquireLock(dir, info, { resume = '', onForeign = () => {} } = {}) {
   const path = join(dir, 'pbp-it-live.lock');
   const real = file => { try { return realpathSync(file); } catch { return ''; } };
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -742,7 +744,7 @@ export function acquireLock(dir, info, { resume = '' } = {}) {
       // (validateResumeReport), so its lock would block every run for good.
       // The stale lock goes; the report stays, named for a person to check.
       const foreign = !!report && typeof report === 'object' && report.harness !== HARNESS_VERSION;
-      if (foreign) console.warn('Removing a stale lock whose report another harness version wrote; check it by hand: ' + held.reportPath);
+      if (foreign) { console.warn('Removing a stale lock whose report another harness version wrote; check it by hand: ' + held.reportPath); onForeign(String(held.reportPath)); }
       const resuming = !!resume && typeof held.reportPath === 'string' && !!real(held.reportPath) && real(held.reportPath) === real(resume);
       if (!complete && !foreign && !resuming && held.reportPath && existsSync(held.reportPath)) fail('previous_cleanup_incomplete');
       unlinkSync(path);
@@ -1677,7 +1679,7 @@ export class LiveRun {
       this.stage = 'preconditions';
       // Lock first: a run still in progress reports run_locked, not an
       // incomplete cleanup.
-      release = acquireLock(this.state, { pid: process.pid, runId: this.runId, reportPath: this.reportPath, started: this.report.started });
+      release = acquireLock(this.state, { pid: process.pid, runId: this.runId, reportPath: this.reportPath, started: this.report.started }, { onForeign: path => { (this.report.foreignLocks ||= []).push(path); this.persist(); } });
       const incomplete = scanIncompleteReports(this.state, this.runId);
       if (incomplete.length) { for (const file of incomplete) console.error('Previous report not cleaned: ' + file); fail('previous_cleanup_incomplete'); }
       const head = spawnSync('git', ['-C', ROOT, 'rev-parse', 'HEAD'], { encoding: 'utf8' });
@@ -3097,6 +3099,7 @@ export class LiveRun {
     };
     lines.push(`# 真实测试摘要 ${r.runId}`);
     lines.push(`- 结论：${r.passed ? '通过' : '未通过'}${r.failure ? `（${r.failure.phase}：${r.failure.code}）` : ''}；目标 ${r.target || '未定'}；HEAD ${(r.head || '未知').slice(0, 12)}；工作区干净：${r.clean === null ? '未检查' : r.clean ? '是' : '否'}`);
+    for (const path of (Array.isArray(r.foreignLocks) ? r.foreignLocks : []).slice(-2)) lines.push(`- 已释放外来版本的陈旧锁：${oneLine(path, 200)}（报告留给人工核对）`);
     const instanceNames = Object.keys(r.instances || {});
     if (instanceNames.length) lines.push(`- 请求：${instanceNames.map(i => `${i} Node ${r.counts?.[i]?.node ?? 0} / 浏览器 ${r.counts?.[i]?.browser ?? 0}`).join('；')}${r.fakeAi ? `；假 AI ${(r.fakeAi.calls || []).filter(c => c.status === 200).length}/${r.fakeAi.limit}` : ''}`);
     // The latest --cleanup pass, counted apart from the run.
@@ -3433,7 +3436,7 @@ async function resumeCleanup(opts) {
   const ran = new Set([...(Array.isArray(report.modules) ? report.modules : []).map(m => m?.id), ...(Array.isArray(report.selected) ? report.selected : [])]);
   run.selected = expandRegistry(opts.modules || MODULES).filter(m => ran.has(m.id));
   run.shotsManifest = readShotsManifest(report.shots?.manifest);
-  const release = acquireLock(run.state, { pid: process.pid, runId: run.runId, reportPath: path, started: new Date().toISOString() }, { resume: path });
+  const release = acquireLock(run.state, { pid: process.pid, runId: run.runId, reportPath: path, started: new Date().toISOString() }, { resume: path, onForeign: freed => { (report.foreignLocks ||= []).push(freed); } });
   let started = false;
   try {
     report.cleanup.resumed = (report.cleanup.resumed || 0) + 1;

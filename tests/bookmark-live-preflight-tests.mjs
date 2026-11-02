@@ -932,6 +932,14 @@ try {
     release();
     assert(warned.some(w => w.includes(join(oldDir, 'report.json'))), 'the foreign report is named: ' + warned.join(' | '));
     assert(existsSync(join(oldDir, 'report.json')), 'the foreign report itself is left as it was');
+    // A run that frees such a lock says so in its own report and summary,
+    // not only once on stderr (main-session ruling on H1b).
+    writeFileSync(lockPath, JSON.stringify({ pid: 2 ** 22 + 12345, runId, reportPath: join(oldDir, 'report.json') }));
+    const freed = await run(['--run', '--target', 'user', '--service', 'linkding', '--scenario', 'linkding.readonly', '--linkding', 'http://127.0.0.1:9', '--allow-dirty'], { credentials: false, state });
+    assert.equal(freed.report.failure.code, 'credentials_path', freed.output);
+    assert.deepEqual(freed.report.foreignLocks, [join(oldDir, 'report.json')]);
+    assert(readFileSync(join(freed.reportPath, '..', 'summary.zh.md'), 'utf8').includes('已释放外来版本的陈旧锁：' + join(oldDir, 'report.json')), 'named in the summary');
+    rmSync(join(freed.reportPath, '..'), { recursive: true, force: true });
     // A lock whose report is this version and unfinished still blocks.
     const ownDir = join(state, 'pbp-it-' + randomUUID());
     mkdirSync(ownDir, { mode: 0o700 });
