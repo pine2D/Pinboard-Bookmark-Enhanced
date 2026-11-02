@@ -1,4 +1,4 @@
-// Synthetic preflight for scripts/bookmark-service-live.mjs (harness v2).
+// Synthetic preflight for scripts/bookmark-service-live.mjs (harness v3).
 // Nothing here reaches a real bookmark service, credential, AI provider or
 // Docker daemon:
 //  - spawned CLI runs load a hook that blocks the synthetic credential file
@@ -818,6 +818,23 @@ try {
     live.writePrivateJson(join(stale, 'report.json'), { harness: live.HARNESS_VERSION, cleanup: { complete: true } });
     live.acquireLock(state, { pid: process.pid, runId: 'e' })();
     assert.deepEqual(live.scanIncompleteReports(state), []);
+  }
+  // Harness v3 (H1b): the pool URL format changed after v2 reports were
+  // written (http://pbp-it-fixture.test/ without a port), so an unfinished v2
+  // report could neither be resumed (its pools no longer match poolUrls) nor
+  // be stepped over. It is foreign now: not a blocking report, and --cleanup
+  // refuses it before reading anything.
+  {
+    assert.equal(live.HARNESS_VERSION, 3);
+    const state = stateDirFor('old-format');
+    const runId = randomUUID();
+    const oldDir = join(state, 'pbp-it-' + runId);
+    mkdirSync(oldDir, { mode: 0o700 });
+    const oldReport = { harness: 2, runId, prefix: 'pbp-it-' + runId, target: 'temp', instances: { linkding: { service: 'linkding', base: 'http://127.0.0.1:9/' } }, pools: { linkding: ['http://pbp-it-fixture.test/?pbp-it=' + runId + '-linkding-1'] }, ledger: { created: [], lists: [], tags: [] }, cleanup: { complete: false, entries: [] }, violations: [] };
+    live.writePrivateJson(join(oldDir, 'report.json'), oldReport);
+    assert.deepEqual(live.scanIncompleteReports(state), [], 'an unfinished v2 report does not block a run');
+    live.acquireLock(state, { pid: process.pid, runId: 'v3' })();
+    assert.throws(() => live.validateResumeReport(oldReport, join(oldDir, 'report.json'), { state }), e => e.code === 'cleanup_report_invalid');
   }
 
   // --cleanup holds its report to what this harness writes for that run id

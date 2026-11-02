@@ -1,4 +1,4 @@
-// Opt-in real-service acceptance runner (harness v2). verify.sh never points
+// Opt-in real-service acceptance runner (harness v3). verify.sh never points
 // it at a service: tests/bookmark-live-preflight-tests.mjs exercises it with
 // synthetic fixtures, an injected Docker executor and a loopback fake AI.
 //
@@ -58,7 +58,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { GROUPS, LIST_MARKER, META_DESCRIPTION, MODULES, UNCOVERED, budgetValue } from './bookmark-service-live-scenarios.mjs';
 
-export const HARNESS_VERSION = 2;
+// v3: pool URLs changed format after v2 (H1b), so an unfinished v2 report
+// is foreign: it neither blocks a run nor resumes.
+export const HARNESS_VERSION = 3;
 export const ROOT = fileURLToPath(new URL('../', import.meta.url));
 export const SERVICE_TYPES = ['linkding', 'karakeep', 'pinboard'];
 // Pinboard is opt-in (--service ...,pinboard): it is the user's real account
@@ -3165,8 +3167,9 @@ async function resumeCleanup(opts) {
   run.runDir = join(realpathSync(stateDir()), 'pbp-it-' + report.runId);
   run.reportPath = path;
   run.report = report;
-  // Reports from before the timing section (harness v2, pre-H2) lack it;
-  // a resumed cleanup times its Pinboard throttle like a run does.
+  // A report without a timing section (none this version writes, kept as a
+  // guard) gets one: a resumed cleanup times its Pinboard throttle like a
+  // run does.
   const plain = v => !!v && typeof v === 'object' && !Array.isArray(v);
   if (!plain(report.timing) || !Array.isArray(report.timing.phases)) report.timing = { phases: [], totals: {}, slowest: [], throttle: null };
   if (!plain(report.timing.totals)) report.timing.totals = {};
