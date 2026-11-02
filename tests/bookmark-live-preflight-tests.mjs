@@ -1584,6 +1584,9 @@ try {
       });
       const port = await listen(server);
       const run = new live.LiveRun({ mode: 'run' });
+      // A temporary instance, as limits.long-tag runs on: the over-long tag
+      // below would be refused on a user one (live_guard_long_tag_user).
+      run.target = 'temp';
       const base = `http://127.0.0.1:${port}/`;
       run.instances.linkding = { id: 'linkding', service: 'linkding', base, root: live.apiRootFor('linkding', base), token: 'f'.repeat(40) };
       // Complete caps, as a run has them: a missing bookmark cap allows none.
