@@ -424,7 +424,9 @@ try {
     [{ url: live.PINBOARD_ROOT + 'posts/delete?url=' + encodeURIComponent(cfg.pools.pinboard[0]) + '&url=' + encodeURIComponent('https://real.example.org/'), method: 'GET' }, false, 'live_guard_pinboard_params'],
     [{ url: pbAdd(cfg.pools.pinboard[1], 'no') + '&url=' + encodeURIComponent('https://real.example.org/'), method: 'GET' }, false, 'live_guard_pinboard_params'],
     [{ url: pbAdd(cfg.pools.pinboard[1], 'no') + '&shared=yes', method: 'GET' }, false, 'live_guard_pinboard_params'],
-    ...['tags=x', 'auth_token=b%3A2', 'replace=no', 'toread=yes'].map(extra => [{ url: pbAdd(cfg.pools.pinboard[1], 'no') + '&' + extra, method: 'GET' }, false, 'live_guard_pinboard_params']),
+    // description, extended and dt too (H1b): a second value could carry a
+    // title, note or date the guard never saw.
+    ...['tags=x', 'auth_token=b%3A2', 'replace=no', 'toread=yes', 'description=y', 'extended=z', 'dt=2020-01-01T00%3A00%3A00Z&dt=2021-01-01T00%3A00%3A00Z'].map(extra => [{ url: pbAdd(cfg.pools.pinboard[1], 'no') + '&' + extra, method: 'GET' }, false, 'live_guard_pinboard_params']),
     [{ url: live.PINBOARD_ROOT + 'posts/get?url=' + encodeURIComponent(cfg.pools.pinboard[0]) + '&url=' + encodeURIComponent('https://real.example.org/'), method: 'GET' }, false, 'live_guard_pinboard_params'],
   ];
   for (const rule of [live.liveGuardRule, transported]) {

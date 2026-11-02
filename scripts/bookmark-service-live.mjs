@@ -475,8 +475,9 @@ export function liveGuardRule(cfg, view, req) {
     if (!read || method === 'OPTIONS') return { ok: false, instance, code: 'live_guard_mutation' };
     // Each judged parameter once: get() reads the first value, a server may
     // act on the last, so a repeat could delete, save or publish a URL the
-    // guard never judged.
-    if (['url', 'shared', 'tags', 'auth_token', 'replace', 'toread'].some(key => params.getAll(key).length > 1)) return { ok: false, instance, code: 'live_guard_pinboard_params' };
+    // guard never judged. The fields a save carries (title, note, date) are
+    // held to one value as well.
+    if (['url', 'shared', 'tags', 'auth_token', 'replace', 'toread', 'description', 'extended', 'dt'].some(key => params.getAll(key).length > 1)) return { ok: false, instance, code: 'live_guard_pinboard_params' };
     const endpoint = path.replace(/\/+$/, '');
     const target = params.get('url');
     const mine = created.some(r => r.instance === instance && r.url === target && !r.deleted);
