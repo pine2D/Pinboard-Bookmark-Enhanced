@@ -5110,6 +5110,18 @@
       }
     }
   },
+  "bgTagTooLongSkip": {
+    "message": "linkding saved this page without tags: the tag \"$TAG$\" is longer than its $MAX$-character limit. Shortcut saves skip pages that are already bookmarked, so shorten the tag and add it from the popup.",
+    "description": "Replaces bookmarkErrTagTooLong for a shortcut save when \"When a shortcut save finds an existing bookmark\" is set to Skip. linkding on PostgreSQL created the bookmark without tags, and the next shortcut save would skip it, so the sentence points to the popup. $TAG$ is that tag (cut with an ellipsis when long), $MAX$ the limit.",
+    "placeholders": {
+      "tag": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
+  },
   "bookmarkConnectErrAuth": {
     "message": "The server rejected the API token. Check the token above, then connect again."
   },

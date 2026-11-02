@@ -5093,6 +5093,17 @@
       }
     }
   },
+  "bgTagTooLongSkip": {
+    "message": "linkding 已把这个页面存成无标签书签：标签「$TAG$」超过 $MAX$ 个字符上限。快捷键保存会跳过已收藏的页面，请缩短标签后在弹窗里补上。",
+    "placeholders": {
+      "tag": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
+  },
   "bookmarkConnectErrAuth": {
     "message": "服务器拒绝了 API Token。请检查上方的 Token，然后重新连接。"
   },

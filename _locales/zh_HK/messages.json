@@ -5099,6 +5099,17 @@
       }
     }
   },
+  "bgTagTooLongSkip": {
+    "message": "linkding 已將這個頁面存成沒有標籤的書籤：標籤「$TAG$」超出 $MAX$ 個字元上限。快捷鍵儲存會跳過已收藏的頁面，請縮短標籤後在彈窗補上。",
+    "placeholders": {
+      "tag": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
+  },
   "bookmarkConnectErrAuth": {
     "message": "伺服器拒絕了 API Token。請檢查上方的 Token，然後重新連線。"
   },

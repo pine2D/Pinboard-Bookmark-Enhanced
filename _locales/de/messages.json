@@ -5099,6 +5099,17 @@
       }
     }
   },
+  "bgTagTooLongSkip": {
+    "message": "linkding hat die Seite ohne Tags gespeichert: Das Tag „$TAG$“ ist länger als die erlaubten $MAX$ Zeichen. Beim Speichern per Tastenkürzel werden bereits gespeicherte Seiten übersprungen. Das Tag deshalb kürzen und im Popup ergänzen.",
+    "placeholders": {
+      "tag": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
+  },
   "bookmarkConnectErrAuth": {
     "message": "Der Server hat das API-Token abgelehnt. Das Token oben prüfen und erneut verbinden."
   },

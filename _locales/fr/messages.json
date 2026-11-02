@@ -5099,6 +5099,17 @@
       }
     }
   },
+  "bgTagTooLongSkip": {
+    "message": "linkding a enregistré cette page sans tags : le tag « $TAG$ » dépasse la limite de $MAX$ caractères. L’enregistrement par raccourci ignore les pages déjà enregistrées : raccourcissez le tag, puis ajoutez-le depuis le popup.",
+    "placeholders": {
+      "tag": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
+  },
   "bookmarkConnectErrAuth": {
     "message": "Le serveur a refusé le jeton API. Vérifiez le jeton ci-dessus, puis reconnectez-vous."
   },

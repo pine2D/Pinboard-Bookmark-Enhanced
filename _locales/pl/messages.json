@@ -5099,6 +5099,17 @@
       }
     }
   },
+  "bgTagTooLongSkip": {
+    "message": "linkding zapisał tę stronę bez tagów, bo tag „$TAG$” przekracza limit $MAX$ znaków. Zapis skrótem pomija strony już dodane, więc skróć tag i dodaj go w popupie.",
+    "placeholders": {
+      "tag": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
+  },
   "bookmarkConnectErrAuth": {
     "message": "Serwer odrzucił token API. Sprawdź token powyżej i połącz ponownie."
   },

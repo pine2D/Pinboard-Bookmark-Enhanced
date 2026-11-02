@@ -5099,6 +5099,17 @@
       }
     }
   },
+  "bgTagTooLongSkip": {
+    "message": "linkding はこのページをタグなしで保存しました。タグ「$TAG$」が上限（$MAX$ 文字）を超えています。ショートカットでの保存はブックマーク済みのページをスキップするため、タグを短くしてからポップアップで追加してください。",
+    "placeholders": {
+      "tag": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      }
+    }
+  },
   "bookmarkConnectErrAuth": {
     "message": "サーバーがAPIトークンを拒否しました。上のトークンを確認して、もう一度接続してください。"
   },

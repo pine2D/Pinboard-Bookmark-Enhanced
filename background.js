@@ -1921,7 +1921,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     showNotification(notifyId + "-skipped", t("bgSkippedTitle"), t("bgSkippedExists"), notifyCategory);
     return result;
   }
-  notifySaveFailure(notifyId, result, startAuth.service);
+  notifySaveFailure(notifyId, result, startAuth.service, mode);
   return result;
 }
 
@@ -1929,11 +1929,15 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
 // quick-save path above (saveFromBackground) and the popup save_intent
 // router branch below (submitPopupSaveIntent has no popup document left to
 // hand the result to once it fails). `service` comes from the caller's
-// connection; unknown reasons never surface as raw codes.
-function notifySaveFailure(notifyId, result, service) {
+// connection; unknown reasons never surface as raw codes. mode: the quick
+// save's bgSaveMode.
+function notifySaveFailure(notifyId, result, service, mode) {
   // Self-hosted causes first: their auth and gateway codes must not fall into
   // the Pinboard login copy below.
-  const key = pbpBookmarkFailureKey(result, service);
+  let key = pbpBookmarkFailureKey(result, service);
+  // linkding on PostgreSQL stored the page untagged before refusing the tag,
+  // and the next skip-mode shortcut save would skip it: say where to add it.
+  if (key === "bookmarkErrTagTooLong" && mode === "skip") key = "bgTagTooLongSkip";
   if (key) {
     showNotification(notifyId + "-error", t("bgSaveFailed"), t(key, ...pbpBookmarkFailureArgs(result)), "error");
   } else if (result.reason === "not_logged_in") {
