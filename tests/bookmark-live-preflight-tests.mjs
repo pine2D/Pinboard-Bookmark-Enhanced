@@ -1438,6 +1438,36 @@ try {
       softRun.summaryPath = join(softRun.runDir, 'summary.zh.md');
       softRun.writeSummary();
       assert(readFileSync(softRun.summaryPath, 'utf8').includes('另有收尾检查未过：surface_undeclared、browser_page_error'), 'the summary names the closing checks that failed beside the part');
+      // A module that failed only because its row left out a surface it
+      // drove (review of H3a, note): the summary names the surface and
+      // calls it a registry problem; its product features are not failed.
+      const regRun = partRun();
+      const regMod = { ...mod, id: 'linkding.parts.registry', surfaces: [], features: ['f-product'], async steps() { regRun.currentModule.driven.add('popup'); regRun.currentModule.driven.add('reader'); } };
+      await quiet(() => regRun.runModule(regMod));
+      const reg = regRun.report.modules[0];
+      assert.deepEqual([reg.status, reg.failure.code, reg.undeclaredSurfaces, reg.alsoFailed], ['failed', 'surface_undeclared', ['popup', 'reader'], undefined]);
+      regRun.selected = [regMod];
+      regRun.runDir = mkdtempSync(join(dir, 'parts-registry-'));
+      regRun.summaryPath = join(regRun.runDir, 'summary.zh.md');
+      regRun.writeSummary();
+      const regSummary = readFileSync(regRun.summaryPath, 'utf8');
+      assert(regSummary.includes('linkding.parts.registry：注册表问题（模块行漏声明表面 popup、reader；产品断言已通过）'), 'the failure line names the surfaces and the registry');
+      assert(/- 通过（1）：f-product\n/.test(regSummary) && !regSummary.includes('未通过 f-product'), 'its product feature is not failed');
+      assert(regSummary.includes('- 注册表问题（产品断言已通过，按通过计）：linkding.parts.registry'), 'the features section says why');
+      // A page error beside it is a product finding: no registry label, and
+      // the second closing check is kept.
+      const bothRun = partRun();
+      await quiet(() => bothRun.runModule({ ...regMod, id: 'linkding.parts.both', async steps() { bothRun.currentModule.driven.add('popup'); bothRun.report.pageErrors.push({ message: 'boom' }); } }));
+      assert.deepEqual([bothRun.report.modules[0].failure.code, bothRun.report.modules[0].alsoFailed], ['surface_undeclared', ['browser_page_error']]);
+      bothRun.selected = [{ ...regMod, id: 'linkding.parts.both' }];
+      bothRun.runDir = mkdtempSync(join(dir, 'parts-both-'));
+      bothRun.summaryPath = join(bothRun.runDir, 'summary.zh.md');
+      bothRun.writeSummary();
+      const bothSummary = readFileSync(bothRun.summaryPath, 'utf8');
+      assert(!bothSummary.includes('注册表问题') && bothSummary.includes('未通过 f-product') && bothSummary.includes('漏声明的表面：popup'), 'with a page error the module fails as usual and still names the surface');
+      // A part failure beside an undeclared surface: the parts still decide
+      // the features they name.
+      assert(softRun.report.modules[0].undeclaredSurfaces.includes('popup'));
     }
   }
 

@@ -3420,6 +3420,7 @@ export class LiveRun {
         if (soft.length) record.alsoFailed = soft;
         const error = new HarnessFailure(failedPart.code); error.partPhase = failedPart.phase; error.partName = failedPart.name; throw error;
       }
+      if (soft.length > 1) record.alsoFailed = soft.slice(1);
       if (soft.length) fail(soft[0]);
       record.status = 'passed';
       console.log(mod.id + ': passed');
@@ -4033,6 +4034,9 @@ export class LiveRun {
     if (r.temp?.timing && 'waitSumMs' in r.temp.timing) lines.push(`- 容器启动等待：墙钟 ${sec(r.temp.timing.waitMs || 0)}，各并行分支合计 ${sec(r.temp.timing.waitSumMs || 0)}（等待总计只计墙钟）`);
     if (r.timing?.slowest?.length) lines.push(`- 最慢 5 个阶段：${r.timing.slowest.map(x => `${x.name} ${sec(x.ms)}（${x.requests} 次请求${x.throttleMs ? `，节流 ${sec(x.throttleMs)}` : ''}${x.waitMs ? `，等待 ${sec(x.waitMs)}` : ''}）`).join('；')}`);
     lines.push('', '## 失败与证据');
+    // Failed only because the row left out a surface the module drove:
+    // every product assertion passed, the registry needs the fix.
+    const registryOnly = m => m.status === 'failed' && m.failure?.code === 'surface_undeclared' && !m.failure.part && !(m.alsoFailed || []).length && (m.undeclaredSurfaces || []).length > 0;
     const bad = r.modules.filter(m => m.status !== 'passed');
     // Selected but never started: the run stopped (a fatal finding, a
     // signal, a crash) before them. Neither passed nor failed.
@@ -4045,8 +4049,9 @@ export class LiveRun {
       // crash, a second signal) before it reached a verdict.
       const verdict = m.status === 'running' ? '中断（运行在此模块中被打断，未得出结论）'
         : m.beforeSteps ? `中止于开始前（未执行任何步骤，未得出结论），${m.failure?.code}`
+        : registryOnly(m) ? `注册表问题（模块行漏声明表面 ${m.undeclaredSurfaces.join('、')}；产品断言已通过）`
         : `${m.status === 'aborted' ? '中止' : '失败'}于 ${m.failure?.phase}，${m.failure?.code}${m.failure?.stepCode ? `（步骤本身失败于 ${m.failure.stepCode}）` : ''}`;
-      return `- ${m.id}：${verdict}；读回差异 ${diffs.length} 条${diffs[0] ? `（${diffs[0].code}：期望 ${oneLine(diffs[0].expected, 60)}，实际 ${oneLine(diffs[0].actual, 60)}）` : ''}；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；截图 ${shots[shots.length - 1]}` : ''}${(m.fixRefs || []).length ? `；依赖修复组 ${m.fixRefs.map(g => oneLine(g, 12)).join('、')}（产品树未含这些修复时属预期失败）` : ''}${(m.parts || []).length ? `；分段：${m.parts.map(p => `${oneLine(p.name, 40)} ${p.status === 'passed' ? '通过' : p.status === 'failed' ? `失败于 ${p.phase}，${p.code}` : '未完成'}（依赖 ${(p.fixRefs || []).map(g => oneLine(g, 12)).join('、') || '无'}）`).join('；')}` : ''}${(m.alsoFailed || []).length ? `；另有收尾检查未过：${m.alsoFailed.join('、')}` : ''}`;
+      return `- ${m.id}：${verdict}；读回差异 ${diffs.length} 条${diffs[0] ? `（${diffs[0].code}：期望 ${oneLine(diffs[0].expected, 60)}，实际 ${oneLine(diffs[0].actual, 60)}）` : ''}；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；截图 ${shots[shots.length - 1]}` : ''}${(m.fixRefs || []).length ? `；依赖修复组 ${m.fixRefs.map(g => oneLine(g, 12)).join('、')}（产品树未含这些修复时属预期失败）` : ''}${(m.parts || []).length ? `；分段：${m.parts.map(p => `${oneLine(p.name, 40)} ${p.status === 'passed' ? '通过' : p.status === 'failed' ? `失败于 ${p.phase}，${p.code}` : '未完成'}（依赖 ${(p.fixRefs || []).map(g => oneLine(g, 12)).join('、') || '无'}）`).join('；')}` : ''}${(m.alsoFailed || []).length ? `；另有收尾检查未过：${m.alsoFailed.join('、')}` : ''}${(m.undeclaredSurfaces || []).length && !registryOnly(m) ? `；漏声明的表面：${m.undeclaredSurfaces.join('、')}` : ''}`;
     });
     const pendingRows = r.modules.filter(m => (m.pendingDecisions || []).length);
     for (const m of pendingRows.slice(0, 5)) lines.push(`- ${m.id} 待裁定：${m.pendingDecisions.slice(0, 3).map(d => `${d.code}（${oneLine(d.question || '', 60)}；期望 ${oneLine(d.expected, 50)}，实际 ${oneLine(d.actual, 50)}）`).join('；')}`);
@@ -4076,12 +4081,17 @@ export class LiveRun {
         // else failed): a feature its parts name takes those parts' verdict,
         // so a passed part's feature is not reported failed for another
         // part's pending fix. Any other feature follows the module.
-        const parts = m.status === 'failed' && m.failure?.part && !(m.alsoFailed || []).length ? (m.parts || []).filter(p => (p.features || []).includes(f)) : [];
-        if (parts.length) list.push({ id: m.id, ok: parts.every(p => p.status === 'passed'), open: false });
+        // An undeclared surface beside the parts is the registry's problem,
+        // not the product's: the parts still decide.
+        const parts = m.status === 'failed' && m.failure?.part && !(m.alsoFailed || []).filter(c => c !== 'surface_undeclared').length ? (m.parts || []).filter(p => (p.features || []).includes(f)) : [];
+        if (registryOnly(m)) list.push({ id: m.id, ok: true, open: false });
+        else if (parts.length) list.push({ id: m.id, ok: parts.every(p => p.status === 'passed'), open: false });
         else list.push({ id: m.id, ok: m.status === 'passed', open: m.status === 'running' || m.status === 'not_started' || m.beforeSteps === true });
         features.set(f, list);
       }
     }
+    const registryRows = r.modules.filter(registryOnly).map(m => m.id);
+    if (registryRows.length) lines.push(`- 注册表问题（产品断言已通过，按通过计）：${registryRows.join('，').slice(0, 300)}`);
     if (!features.size) lines.push('- 本轮没有执行模块。');
     else {
       // A feature some module failed is failed; one whose only shortfall is
