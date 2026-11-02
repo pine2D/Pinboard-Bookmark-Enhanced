@@ -1015,6 +1015,28 @@ try{
     await options.locator('input[name="bookmark-service"][value="linkding"]').check();
     await until(()=>worker.evaluate(async()=>(await chrome.storage.local.get('bookmarkService')).bookmarkService==='linkding'),'linkding choice autosaved');
     await until(async()=>(await state())==='pinboard-only'&&(await stats.textContent()).trim()===en.tagGovPinboardOnly.message,'Tags panel cleared the Pinboard tags after switching to linkding; stats: '+await stats.textContent());
+    // The same changes made elsewhere (another tab, or another device through
+    // settings sync) reach this page only as storage events: its radios keep
+    // the old choice, so the explanation must follow the stored service.
+    await options.locator('#tab-general').click();
+    await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
+    await until(()=>worker.evaluate(async()=>(await chrome.storage.local.get('bookmarkService')).bookmarkService==='pinboard'),'Pinboard choice autosaved again');
+    await options.locator('#tab-tags').click();
+    await until(async()=>(await stats.textContent()).trim()===overview,'Tags panel reloaded the Pinboard tags again');
+    const elsewhere=async(patch,want,label)=>{
+      await worker.evaluate(async patch=>{if(patch.removeToken)await chrome.storage.local.remove('pinboardToken');if(patch.service)await chrome.storage.local.set({bookmarkService:patch.service});},patch);
+      const wantText=want==='pinboard-only'?en.tagGovPinboardOnly.message:en.tagGovNeedToken.message;
+      await until(async()=>(await state())===want&&(await stats.textContent()).trim()===wantText,label).catch(async e=>{throw new Error(e.message+' '+await panelNow());});
+      assert.equal(await options.evaluate(()=>!document.getElementById('tag-gov-need-token').hidden),want==='no-token',label+': token prompt shown');
+    };
+    await elsewhere({service:'linkding'},'pinboard-only','linkding chosen elsewhere while this page still shows Pinboard selected');
+    assert.equal(await options.evaluate(()=>document.querySelector('input[name="bookmark-service"]:checked')?.value),'pinboard','the page radios followed storage, so this step proves nothing');
+    await elsewhere({removeToken:true},'pinboard-only','Pinboard token removed elsewhere under linkding');
+    await elsewhere({service:'pinboard'},'no-token','Pinboard chosen elsewhere without a token');
+    await options.locator('#tab-general').click();
+    await options.locator('input[name="bookmark-service"][value="karakeep"]').check();
+    await until(()=>worker.evaluate(async()=>(await chrome.storage.local.get('bookmarkService')).bookmarkService==='karakeep'),'Karakeep choice autosaved');
+    await elsewhere({service:'pinboard'},'no-token','Pinboard chosen elsewhere while this page shows Karakeep selected');
   }finally{
     await options.close();
     await worker.evaluate(async before=>{await chrome.storage.local.remove(['cached_user_tags','pinboardToken','bookmarkService']);await chrome.storage.local.set(before);},before);

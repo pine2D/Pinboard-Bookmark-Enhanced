@@ -1517,7 +1517,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (refreshBtn) refreshBtn.addEventListener("click", async () => {
       refreshBtn.disabled = true;
       const auth = await getTagGovAuth();
-      if (!auth) { _tagGovShowLoadFailed("no-token"); return; }
+      if (!auth) { _tagGovShowLoadFailed("no-token", await pbpTagGovStoredService()); return; }
       const aiKey = pbpAccountStorageKey("_tagGovAiGroups", auth.account);
       await chrome.storage.local.set({ [aiKey]: { account: auth.account, groups: [], ts: Date.now() } });
       const fresh = await loadTagCounts(true, auth.account);
@@ -1531,7 +1531,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (counts && overview) {
       updateTagGovOverview(counts);
     } else if (overview) {
-      _tagGovShowLoadFailed(initialAuth ? "failed" : "no-token");
+      _tagGovShowLoadFailed(initialAuth ? "failed" : "no-token", await pbpTagGovStoredService());
     }
     // Restore the last run's outcome if it left anything needing attention —
     // all-ok runs are not resurrected (no nagging).
@@ -1605,7 +1605,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (state && !serviceChanged && !pbpAuthStorageChangeIsRelevant(changes, area, state)) return;
       const auth = state ? await getTagGovAuth() : null;
       const nextAccount = auth?.account || "";
-      if (nextAccount === _tagGovVisibleAccount) return;
+      // The change may come from another tab or device, so the explanation
+      // follows the stored service; this page's radios do not track storage.
+      if (nextAccount === _tagGovVisibleAccount) {
+        if (!auth && serviceChanged) _tagGovShowLoadFailed("no-token", await pbpTagGovStoredService());
+        return;
+      }
       _tagGovVisibleAccount = nextAccount;
       if (_tagGovUnfinishedBatches === 0) _tagGovProblems.length = 0;
       _tagGovUser = auth?.account || "";
@@ -1637,7 +1642,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         // #tag-gov-stats is the only readout neither writes.
         await renderTagGov();
         await renderLowCountTags();
-        _tagGovShowLoadFailed("no-token");
+        _tagGovShowLoadFailed("no-token", await pbpTagGovStoredService());
         return;
       }
       const counts = await loadTagCounts(false, auth.account);
@@ -5327,16 +5332,29 @@ function pbpSetTagGovHasData(hasData) {
 // Loading tag counts failed: say why in the overview line instead of leaving
 // the unfilled "$TAGS$ tags" template visible. `reason` "no-token" names the
 // missing step for Pinboard or the unsupported-service explanation; anything
-// else is the offline / API-error message.
-function _tagGovShowLoadFailed(reason = "failed") {
+// else is the offline / API-error message. `service` is the stored bookmark
+// service when the caller reacted to storage (another tab or device may have
+// changed it); without it, this page's selected radio decides.
+function _tagGovShowLoadFailed(reason = "failed", service) {
   const noToken = reason === "no-token";
-  const service = document.querySelector('input[name="bookmark-service"]:checked')?.value;
+  if (service === undefined) service = document.querySelector('input[name="bookmark-service"]:checked')?.value;
   const pinboardOnly = noToken && ["karakeep", "linkding"].includes(service);
   const stats = $id("tag-gov-stats");
   if (stats) stats.textContent = t(noToken
     ? (pinboardOnly ? "tagGovPinboardOnly" : "tagGovNeedToken")
     : "tagGovLoadFailed");
   pbpSetTagGovDataState(pinboardOnly ? "pinboard-only" : noToken ? "no-token" : "failed");
+}
+
+// The bookmark service as stored (sync or local, per the settings route), or
+// undefined when it cannot be read so the caller falls back to the radios.
+async function pbpTagGovStoredService() {
+  try {
+    return pbpBookmarkServiceId(await pbpReadSettingsWithSecrets({ bookmarkService: "pinboard" }));
+  } catch (e) {
+    console.warn("[tag-gov] reading the bookmark service failed:", e?.name, e?.message);
+    return undefined;
+  }
 }
 
 // Shared token reader for tag-governance operations.
