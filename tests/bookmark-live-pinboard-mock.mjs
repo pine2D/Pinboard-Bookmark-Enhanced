@@ -21,7 +21,9 @@ import { createHash, randomBytes } from 'node:crypto';
 
 export const PINBOARD_MOCK_ROOT = 'https://api.pinboard.in/v1/';
 
-export function createPinboardMock({ token, user = String(token || '').split(':')[0], libraryTags = { personal: 3, reading: 1 }, now = () => new Date() } = {}) {
+// latencyMs delays every answer, as the real service does (a few hundred ms),
+// for the rehearsal at the real 3 s interval.
+export function createPinboardMock({ token, user = String(token || '').split(':')[0], libraryTags = { personal: 3, reading: 1 }, now = () => new Date(), latencyMs = 0 } = {}) {
   const hex = String(token || '').split(':')[1] || '';
   const posts = new Map();
   const calls = [];
@@ -78,7 +80,7 @@ export function createPinboardMock({ token, user = String(token || '').split(':'
   return {
     posts, calls, state,
     // The runner's transport contract: async (url) -> { status, contentType, body }.
-    transport: async url => handle(url),
+    transport: async url => { if (latencyMs > 0) await new Promise(r => setTimeout(r, latencyMs)); return handle(url); },
     rateLimit(n) { state.rateLimitNext = n; },
   };
 }

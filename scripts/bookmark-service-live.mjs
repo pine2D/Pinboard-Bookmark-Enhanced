@@ -80,6 +80,10 @@ export const PINBOARD_MIN_INTERVAL_MS = 3000;
 export const PINBOARD_MAX_BACKOFF_MS = 60000;
 export const PINBOARD_429_RETRIES = 3;
 export const PINBOARD_BOOKMARKS_PER_RUN = 8;
+// A request queued at the gate longer than this is a finding: the extension
+// gives each Pinboard request 15 s (_executePinboardFetch) from its own
+// start, and the route holds it while it queues here.
+export const PINBOARD_QUEUE_WARN_MS = 10000;
 // The endpoints a run may reach, by who sends them. The extension's save
 // chain under HARDENED_SETTINGS: posts/get (lookups), posts/add (every save
 // and edit), posts/delete (reader delete), tags/get (tag list) and
@@ -522,23 +526,37 @@ export const pinboardLedgerId = (pool, url) => { const i = (pool || []).indexOf(
 // the previous one answered and `interval` has passed since; a 429 doubles
 // the interval (up to maxBackoffMs) until an answer is not a 429. `wait` and
 // `now` are injectable for the preflight's fake clock.
-export function createPinboardGate({ intervalMs = PINBOARD_MIN_INTERVAL_MS, maxBackoffMs = PINBOARD_MAX_BACKOFF_MS, now = () => Date.now(), wait = sleep, onWait = () => {} } = {}) {
-  let tail = Promise.resolve(), lastEnd = -Infinity, interval = intervalMs;
-  const stats = { requests: 0, waitedMs: 0, rateLimited: 0, maxIntervalMs: intervalMs };
+//
+// Queue depth (requests waiting or in flight, this one included) and time
+// (from run() to the request's start) are kept: the extension spaces its own
+// requests 3.1 s apart by start and aborts each after 15 s (shared.js
+// pinboardFetch), while this gate waits after each answer, so a burst queues
+// here, and one queued past the extension's deadline fails in the extension
+// for a reason of the harness's making. onSlow hears of each request that
+// waited longer than warnMs.
+export function createPinboardGate({ intervalMs = PINBOARD_MIN_INTERVAL_MS, maxBackoffMs = PINBOARD_MAX_BACKOFF_MS, now = () => Date.now(), wait = sleep, onWait = () => {}, warnMs = PINBOARD_QUEUE_WARN_MS, onSlow = () => {} } = {}) {
+  let tail = Promise.resolve(), lastEnd = -Infinity, interval = intervalMs, depth = 0;
+  const stats = { requests: 0, waitedMs: 0, rateLimited: 0, maxIntervalMs: intervalMs, maxQueueDepth: 0, maxQueueMs: 0, slowQueued: 0 };
   return {
     stats,
     get intervalMs() { return interval; },
     run(fn) {
+      const enqueued = now();
+      depth++;
+      stats.maxQueueDepth = Math.max(stats.maxQueueDepth, depth);
       const turn = tail.then(async () => {
         const delay = lastEnd + interval - now();
         if (delay > 0) { stats.waitedMs += delay; onWait(delay); await wait(delay); }
+        const queuedMs = now() - enqueued;
+        stats.maxQueueMs = Math.max(stats.maxQueueMs, queuedMs);
+        if (queuedMs > warnMs) { stats.slowQueued++; onSlow({ queuedMs, depth }); }
         stats.requests++;
         try {
           const res = await fn();
           if (res && res.status === 429) { stats.rateLimited++; interval = Math.min(maxBackoffMs, interval * 2); } else interval = intervalMs;
           stats.maxIntervalMs = Math.max(stats.maxIntervalMs, interval);
           return res;
-        } finally { lastEnd = now(); }
+        } finally { lastEnd = now(); depth--; }
       });
       tail = turn.catch(() => {});
       return turn;
@@ -1313,7 +1331,14 @@ export class LiveRun {
       const mock = this.pinboardOpts?.mock === true && typeof this.pinboardOpts.transport === 'function';
       // Only the in-process mock may shorten the interval.
       const intervalMs = mock && Number.isFinite(this.pinboardOpts.intervalMs) ? this.pinboardOpts.intervalMs : PINBOARD_MIN_INTERVAL_MS;
-      this.gate = createPinboardGate({ intervalMs, onWait: ms => this.noteWait('throttle', ms) });
+      this.gate = createPinboardGate({
+        intervalMs, onWait: ms => this.noteWait('throttle', ms),
+        // Ten at most in the report; the gate's stats count all of them.
+        onSlow: ({ queuedMs, depth }) => {
+          if (this.report.findings.filter(f => f.kind === 'pinboard_queue').length >= 10) return;
+          this.report.findings.push({ kind: 'pinboard_queue', module: this.currentModule?.id || '', phase: this.phaseName, queuedMs, depth });
+        },
+      });
       this.pinboardTransport = mock ? this.pinboardOpts.transport : pinboardHttp;
       this.report.timing.throttle = this.gate.stats;
     }
@@ -2884,7 +2909,11 @@ export class LiveRun {
     // The Pinboard account is named nowhere in this file.
     if (r.pinboard) {
       const th = r.timing?.throttle;
-      lines.push(`- Pinboard：${r.pinboard.configured ? '已配置' : '未配置（凭据缺 pinboardToken，Pinboard 模块已跳过，不算失败）'}${th ? `；节流请求 ${th.requests} 次，等待 ${sec(th.waitedMs)}，429 ${th.rateLimited} 次` : ''}`);
+      lines.push(`- Pinboard：${r.pinboard.configured ? '已配置' : '未配置（凭据缺 pinboardToken，Pinboard 模块已跳过，不算失败）'}${th ? `；节流请求 ${th.requests} 次，等待 ${sec(th.waitedMs)}，429 ${th.rateLimited} 次；最大排队 ${th.maxQueueDepth ?? 0} 个、${sec(th.maxQueueMs || 0)}` : ''}`);
+      // Queued past PINBOARD_QUEUE_WARN_MS: an extension-side timeout there
+      // is the harness's doing, not a product defect.
+      const queue = r.findings.filter(f => f.kind === 'pinboard_queue');
+      if (th?.slowQueued) lines.push(`  - 排队超过 ${PINBOARD_QUEUE_WARN_MS / 1000}s 的请求 ${th.slowQueued} 个（扩展单请求超时 15s，此时的超时多半是工具造成的）：${queue.slice(0, 3).map(f => `${f.module || f.phase} ${sec(f.queuedMs)}`).join('，')}`);
     }
     if (r.stages?.length) lines.push(`- 阶段耗时：${r.stages.map(st => `${st.name} ${sec(st.ms)}${st.ok ? '' : '（失败）'}`).join('，')}`);
     const tt = r.timing?.totals || {};

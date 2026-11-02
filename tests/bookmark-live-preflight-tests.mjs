@@ -1862,7 +1862,7 @@ try {
       for (const status of [200, 200, 429, 429, 429, 200, 200]) await gate.run(answer(status));
       const gaps = starts.slice(1).map((s, i) => s - (starts[i] + 200));
       assert.deepEqual(gaps, [3000, 3000, 6000, 10000, 10000, 3000], 'gap after each answer');
-      assert.deepEqual({ ...gate.stats }, { requests: 7, waitedMs: 3000 + 3000 + 6000 + 10000 + 10000 + 3000, rateLimited: 3, maxIntervalMs: 10000 });
+      assert.deepEqual({ ...gate.stats }, { requests: 7, waitedMs: 3000 + 3000 + 6000 + 10000 + 10000 + 3000, rateLimited: 3, maxIntervalMs: 10000, maxQueueDepth: 1, maxQueueMs: 10000, slowQueued: 0 });
       // Concurrent callers queue: the second starts after the first answers.
       clock = 100000;
       const order = [];
@@ -1872,6 +1872,21 @@ try {
       // A thrown request still frees the queue and counts as an answer.
       await assert.rejects(gate.run(async () => { throw new Error('net'); }));
       assert.equal((await gate.run(async () => ({ status: 200 }))).status, 200);
+      // Queue depth and time (third review): the extension spaces its own
+      // Pinboard requests 3.1 s apart by start and aborts each after 15 s,
+      // while this gate waits 3 s after each answer, so a burst queues here.
+      // Every request waiting longer than warnMs is reported.
+      let qclock = 0;
+      const slow = [];
+      const burst = live.createPinboardGate({ intervalMs: 3000, now: () => qclock, wait: async ms => { qclock += ms; }, onSlow: info => slow.push(info) });
+      qclock = 50000;
+      await Promise.all([1, 2, 3, 4, 5].map(() => burst.run(async () => { qclock += 500; return { status: 200 }; })));
+      // Starts at 0, 3.5, 7, 10.5, 14 s after the burst.
+      assert.equal(burst.stats.maxQueueDepth, 5);
+      assert.equal(burst.stats.maxQueueMs, 14000);
+      assert.equal(burst.stats.slowQueued, 2);
+      assert.deepEqual(slow.map(s => [s.queuedMs, s.depth]), [[10500, 2], [14000, 1]]);
+      assert.equal(live.PINBOARD_QUEUE_WARN_MS, 10000);
     }
 
     // Selection and plan: Pinboard is opt-in, user target only, 8 bookmarks.
@@ -2062,7 +2077,7 @@ try {
     const badCredentials = join(pbState, '..', 'pinboard-bad.json');
     writeFileSync(badCredentials, JSON.stringify({ pinboardToken: 'no-colon-' + hex }), { mode: 0o600 });
     const INTERVAL = 40;
-    const inProcess = async (args, mock) => {
+    const inProcess = async (args, mock, { intervalMs = INTERVAL } = {}) => {
       const before = process.env.PBP_LIVE_STATE_DIR;
       process.env.PBP_LIVE_STATE_DIR = pbState;
       const lines = [];
@@ -2071,7 +2086,7 @@ try {
       console.error = (...a) => lines.push(a.join(' '));
       let code;
       // As the CLI entry: a thrown failure prints its code and exits 1.
-      try { code = await live.main(args, { pinboard: { transport: mock.transport, intervalMs: INTERVAL, mock: true } }); }
+      try { code = await live.main(args, { pinboard: { transport: mock.transport, intervalMs, mock: true } }); }
       catch (error) { lines.push('FAILED: ' + live.failureCode(error)); code = 1; }
       finally { console.log = log; console.error = err; if (before === undefined) delete process.env.PBP_LIVE_STATE_DIR; else process.env.PBP_LIVE_STATE_DIR = before; }
       const reportLine = lines.find(l => l.startsWith('Local report: '));
@@ -2141,6 +2156,22 @@ try {
       assert(summary.includes('Pinboard：已配置') && summary.includes('最慢 5 个阶段') && summary.includes('耗时分类'));
       const texts = [done.output, readFileSync(done.reportPath, 'utf8'), summary];
       for (const s of secretsOf) assert(!texts.some(t => t.includes(s)), 'leaked ' + (s === user ? 'account name' : 'token'));
+    }
+
+    // Rehearsal at the real interval (third review), behind a switch: about
+    // two minutes. The 40 ms interval above hides how deep the gate's queue
+    // gets when the reader opens; this runs pinboard.core.popup-reader on the
+    // mock with 3 s between requests and 400 ms answers, and prints the
+    // queue depth and time the real run will meet.
+    if (process.env.PBP_LIVE_PINBOARD_REAL_INTERVAL === '1') {
+      const mock = createPinboardMock({ token, latencyMs: 400 });
+      const started = Date.now();
+      const done = await inProcess(pbArgs(pbCredentials, 'pinboard.core.popup-reader', 'pb-real-interval'), mock, { intervalMs: live.PINBOARD_MIN_INTERVAL_MS });
+      const th = done.report?.timing?.throttle || {};
+      console.log(`pinboard real-interval rehearsal: exit ${done.code}, ${((Date.now() - started) / 1000).toFixed(1)} s, ${th.requests} requests, max queue ${th.maxQueueDepth} deep / ${th.maxQueueMs} ms, ${th.slowQueued} over ${live.PINBOARD_QUEUE_WARN_MS} ms, throttle wait ${th.waitedMs} ms; endpoints ${JSON.stringify(mock.calls.reduce((o, c) => ({ ...o, [c.path]: (o[c.path] || 0) + 1 }), {}))}`);
+      console.log('pinboard real-interval rehearsal slowest: ' + JSON.stringify(done.report?.timing?.slowest || []));
+      assert.equal(done.code, 0, done.output);
+      assert.equal(mock.posts.size, 0);
     }
 
     // --cleanup resume: a run cut off after creating one pool bookmark.
