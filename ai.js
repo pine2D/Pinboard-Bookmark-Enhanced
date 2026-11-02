@@ -2337,8 +2337,9 @@ function refineTags(tags, opts) {
     if (typeof raw !== "string") continue;
     const tag = raw.trim();
     if (!tag) continue;
-    // Canonical key: lowercase, strip separators/spaces so "token-relay" == "token_relay" == "tokenrelay".
-    const key = tag.toLowerCase().replace(/[\s_-]+/g, "");
+    // shared.js group key: "token-relay" == "token_relay" == "tokenrelay";
+    // a separator-only reply (empty key) is dropped, not kept as a tag.
+    const key = pbpTagGroupKey(tag);
     if (!key || seen.has(key)) continue;
     seen.add(key);
     out.push(tag);

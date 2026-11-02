@@ -130,7 +130,6 @@ function buildAiHarness(source, opts) {
     // nothing about it.
     getOrCreateInflight,
     parseAICombined, parseAITags, refineTags,
-    buildTagCaseMap, resolveTagCase,
     AI_TAG_CAP, API_KEY_FIELDS, PBP_AI_OVERRIDE_FIELDS, pbpSanitizeAiOverrides,
     // The real resolver; t is pinned so a localized message is exact.
     pbpAiResolveTarget, t: (key) => "msg:" + key,
@@ -175,7 +174,7 @@ function buildPopupHarness(source, opts) {
     _inflightAI: inflight,
     chrome: { runtime: { sendMessage: (msg) => { sent.push(msg); return o.send(msg); } } },
     _ensureAIHostPermission: async () => {},
-    pbpSanitizeAiOverrides, resolveTagCase, AI_TAG_CAP,
+    pbpSanitizeAiOverrides, AI_TAG_CAP,
     $id: () => ({ value: "" }),
     getOrCreateInflight: (key, factory) => {
       if (inflight.has(key)) return inflight.get(key);

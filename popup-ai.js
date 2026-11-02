@@ -1466,10 +1466,10 @@ function renderAITags(tags, fromCache) {
       // the click actually came from this chip (Tab+Enter), never on the
       // Alt+N synthetic .click() path.
       const hadFocus = document.activeElement === el;
-      const priorKeys = new Set(currentTags.map(pbpPopupTagGroupKey));
+      const priorKeys = new Set(currentTags.map(pbpTagDedupeKey));
       const added = addTag(tag);
-      if (added && !priorKeys.has(pbpPopupTagGroupKey(added))) {
-        _aiSessionAddedTags.add(pbpPopupTagGroupKey(added));
+      if (added && !priorKeys.has(pbpTagDedupeKey(added))) {
+        _aiSessionAddedTags.add(pbpTagDedupeKey(added));
       }
       el.classList.add("used");
       el.disabled = true;
@@ -1488,10 +1488,10 @@ function renderAITags(tags, fromCache) {
     // any chip (or this button) gets disabled.
     const hadFocus = document.activeElement === aa;
     container.querySelectorAll(".stag:not(.used)").forEach((el) => {
-      const priorKeys = new Set(currentTags.map(pbpPopupTagGroupKey));
+      const priorKeys = new Set(currentTags.map(pbpTagDedupeKey));
       const added = addTag(el.dataset.tag);
-      if (added && !priorKeys.has(pbpPopupTagGroupKey(added))) {
-        _aiSessionAddedTags.add(pbpPopupTagGroupKey(added));
+      if (added && !priorKeys.has(pbpTagDedupeKey(added))) {
+        _aiSessionAddedTags.add(pbpTagDedupeKey(added));
       }
       el.classList.add("used");
     });
@@ -1505,7 +1505,7 @@ function renderAITags(tags, fromCache) {
   // and the cached pair "Regenerate" (append) / "Replace" read as the
   // opposite of the summary's "Regenerate" (replace). "New set" retracts the
   // chips this round added, then asks again.
-  const cachedTagSet = new Set(tags.map(pbpPopupTagGroupKey));
+  const cachedTagSet = new Set(tags.map(pbpTagDedupeKey));
   // No inline display/margin-left here (T5 fix round F2, dropped): #ai-
   // suggest-tags is a flex row (popup.css chip-flow rule), which blockifies
   // every child regardless of its own `display` -- an explicit
@@ -1550,7 +1550,7 @@ function renderAITags(tags, fromCache) {
     // tag with no AI provenance (typed, or from the saved bookmark)
     // stays (audit A10).
     const wasAddedByThisRound = (t) =>
-      cachedTagSet.has(pbpPopupTagGroupKey(t)) && _aiSessionAddedTags.has(pbpPopupTagGroupKey(t));
+      cachedTagSet.has(pbpTagDedupeKey(t)) && _aiSessionAddedTags.has(pbpTagDedupeKey(t));
     let retracted = [];
     // A refused regeneration restores the same adopted tags. Preserve the
     // prior dirty flag across addTag's rollback pushes; duplicate chip clicks

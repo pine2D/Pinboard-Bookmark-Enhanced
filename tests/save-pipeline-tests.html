@@ -385,7 +385,6 @@ async function createBatchSaveHarness(options) {
     refineTags: (tags) => tags,
     chrome: { storage: { local: { get: opts.storageGet || (async () => ({})),
       set: async (value) => { if (value.batch_job) jobs.push(JSON.parse(JSON.stringify(value.batch_job))); } } } },
-    buildTagCaseMap: () => ({}),
     pbpReadTagVocab: async () => opts.tagVocabIndex || null,
     pbpCanonicalTagName, pbpTagGroupKey,
     pbpServiceEffectivePrivate,

@@ -205,10 +205,6 @@ function pbpPopupTagContext(s = settings) {
     respectCase: s.optRespectTagCase };
 }
 
-function pbpPopupTagGroupKey(name) {
-  return pbpTagGroupKey(name) || name.toLowerCase();
-}
-
 // Prewarmed mode serves cache ignoring the 10-min TTL (the SW alarm refreshes it),
 // but with a staleness ceiling: if the alarm clearly hasn't run (cache older than
 // this), fall through to a one-shot fetch so tags can't be stuck stale forever.
@@ -590,8 +586,8 @@ function addTag(tag) {
   if (typeof tag !== "string" || !tag) return;
   tag = pbpCanonicalTagName(tag, pbpPopupTagContext());
   if (!tag) return;
-  const key = pbpPopupTagGroupKey(tag);
-  const already = currentTags.find(t => pbpPopupTagGroupKey(t) === key);
+  const key = pbpTagDedupeKey(tag);
+  const already = currentTags.find(t => pbpTagDedupeKey(t) === key);
   if (already !== undefined) return already;
   currentTags.push(tag);
   // K75: this is the only entry point that pushes a tag on the user's
@@ -608,7 +604,7 @@ function removeTag(tag) {
   // Codex r2 M3: a removed tag loses its AI provenance - if the user
   // re-adds the same name by hand, replace-mode regen must treat it as
   // the user's tag and never retract it.
-  if (typeof _aiSessionAddedTags !== "undefined") _aiSessionAddedTags.delete(pbpPopupTagGroupKey(tag));
+  if (typeof _aiSessionAddedTags !== "undefined") _aiSessionAddedTags.delete(pbpTagDedupeKey(tag));
   renderTags();
 }
 
@@ -683,9 +679,9 @@ function renderTags() {
 }
 
 function syncSuggestTagStates() {
-  const usedTags = new Set(currentTags.map(pbpPopupTagGroupKey));
+  const usedTags = new Set(currentTags.map(pbpTagDedupeKey));
   document.querySelectorAll("#pinboard-suggest-tags .stag, #ai-suggest-tags .stag").forEach((el) => {
-    const tag = pbpPopupTagGroupKey(el.dataset.tag || "");
+    const tag = pbpTagDedupeKey(el.dataset.tag || "");
     if (usedTags.has(tag)) { el.classList.add("used"); el.disabled = true; }
     else { el.classList.remove("used"); el.disabled = false; }
   });

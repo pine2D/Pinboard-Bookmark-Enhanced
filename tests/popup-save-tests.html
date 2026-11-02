@@ -1726,7 +1726,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(hotkey.slice(0, 400).includes("el.click();") && !hotkey.slice(0, 400).includes("addTag(el.dataset.tag)"),
         "Alt+N must route through the chip click handler");
       const removeSrc = await fetch("../popup-tags.js").then(r => r.text());
-      assert(removeSrc.includes("_aiSessionAddedTags.delete(pbpPopupTagGroupKey(tag))"),
+      assert(removeSrc.includes("_aiSessionAddedTags.delete(pbpTagDedupeKey(tag))"),
         "removeTag must drop AI provenance for re-added names");
       // The third leg of r2 M3 -- the replace-mode regen link must abort when
       // the form was switched to another bookmark -- is a BEHAVIOUR, not a
@@ -2024,7 +2024,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
 
     test("replace-mode regen retracts only session-AI-added tags (A10)", () => {
       assert(popupAiSource.includes("const _aiSessionAddedTags = new Set()"), "provenance set missing");
-      assert(popupAiSource.includes("cachedTagSet.has(pbpPopupTagGroupKey(t)) && _aiSessionAddedTags.has(pbpPopupTagGroupKey(t))"),
+      assert(popupAiSource.includes("cachedTagSet.has(pbpTagDedupeKey(t)) && _aiSessionAddedTags.has(pbpTagDedupeKey(t))"),
         "replace filter must require AI provenance, not just name equality");
       const chipAdds = (popupAiSource.match(/_aiSessionAddedTags\.add\(/g) || []).length;
       assert(chipAdds >= 2, "both the single-chip and add-all paths must record provenance, got " + chipAdds);
@@ -2723,7 +2723,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         // A case that sends real custom entries over the bus passes a sanitizer
         // evaluated with the real URL constructor (this page's global `const URL`
         // string shadows it for shared.js's own copy).
-        pbpSanitizeAiOverrides: o.sanitize || pbpSanitizeAiOverrides, resolveTagCase, AI_TAG_CAP,
+        pbpSanitizeAiOverrides: o.sanitize || pbpSanitizeAiOverrides, AI_TAG_CAP,
         $id: (id) => (id in fields ? fields[id] : null),
         getOrCreateInflight: (key, factory) => {
           if (inflight.has(key)) return inflight.get(key);

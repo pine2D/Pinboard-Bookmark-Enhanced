@@ -766,6 +766,13 @@ function pbpTagGroupKey(name) {
   return String(name).replace(PBP_TAG_ZERO_WIDTH, "").normalize("NFC").toLowerCase().replace(/[\s_-]+/g, "");
 }
 
+// The one dedupe key for tag lists in every context (popup, SW, reader): a
+// name whose group key is empty (only separators or zero-width characters)
+// is compared by its exact text, so "-" and "_" stay two tags.
+function pbpTagDedupeKey(name) {
+  return pbpTagGroupKey(name) || `exact:${name}`;
+}
+
 // The empty key is never grouped: names such as "-" and "_" only match exactly.
 function pbpTagVocabIndex(counts) {
   const exact = new Set();
@@ -862,20 +869,6 @@ function pbpSplitTagInput(text) {
     names.push(source.slice(start, i));
   }
   return names;
-}
-
-// Legacy case helpers remain for popup/SW callers until they adopt the index.
-function normalizeTagKey(tag) { return pbpTagGroupKey(tag); }
-function buildTagCaseMap(tagCounts) {
-  const index = pbpTagVocabIndex(tagCounts);
-  const map = Object.create(null);
-  for (const [key, variants] of index.groups) map[key] = pbpPreferredTagVariant(variants, "").name;
-  for (const name of index.exact) if (!pbpTagGroupKey(name)) map[name] = name;
-  return map;
-}
-function resolveTagCase(tag, caseMap) {
-  const key = normalizeTagKey(tag);
-  return (key ? caseMap?.[key] : caseMap?.[tag]) || tag;
 }
 
 // Response.json() rejects an empty or malformed body. The popup/options SW
@@ -1036,10 +1029,10 @@ function buildPostsAddUri({ token, url, title = "", extended = "", tags = "", sh
 // provide a fresh lookup for merge/skip/overwrite modes.
 function pbpAlignIncomingTags(incoming, bookmarkNames, index, respectCase, keepExisting = false) {
   const names = keepExisting ? bookmarkNames.slice() : [];
-  const seen = new Set(names.map(name => pbpTagGroupKey(name) || `exact:${name}`));
+  const seen = new Set(names.map(pbpTagDedupeKey));
   for (const raw of incoming) {
     const name = pbpAlignTagName(raw, {bookmarkNames, index, respectCase}).name;
-    const key = pbpTagGroupKey(name) || `exact:${name}`;
+    const key = pbpTagDedupeKey(name);
     // In update/overwrite an exact existing name is an explicit user choice:
     // two same-group names supplied together remain two associations. A sole
     // choice can still remove its sibling. New spellings are group-deduped.

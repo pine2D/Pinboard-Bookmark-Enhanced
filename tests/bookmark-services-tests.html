@@ -362,7 +362,7 @@ async function producers(h, {autoNotes, summary, settings: overrides = {}}) {
     showNotification:(...args)=>h.state.notifications.push(args), t:(key,...args)=>args.length?key+":"+args.join(":"):key,
     pbpI18nReady:async()=>{}, processOfflineQueue:async()=>{}, updateBadge:async()=>{},
     _newBatchRunId:()=>"run-1", _removeBatchRecordIfOwned:async()=>true, _writeBatchProgress:async()=>{},
-    buildTagCaseMap:()=>({}), chrome:{storage:{local:{get:async()=>({}),set:async()=>{}}}},
+    chrome:{storage:{local:{get:async()=>({}),set:async()=>{}}}},
   };
   const api = new Function(...Object.keys(deps), "let _batchRunning = false;\n"
     + slice("async function saveFromBackground", "// Helper: resolve prefix-specific settings")
@@ -927,7 +927,7 @@ test("credential removal adopts the legacy library before deleting its token",as
 test("popup tag selection preserves native spaces for both self-hosted services",async()=>{
   const source=await(await fetch("../popup-tags.js")).text();const start=source.indexOf("function addTag(");const end=source.indexOf("function removeTag(",start);
   for(const service of ["karakeep","linkding","pinboard"]){
-    const tags=[];new Function("settings","currentTags","renderTags","pbpPopupTagContext","pbpCanonicalTagName","pbpPopupTagGroupKey",source.slice(start,end)+';addTag("machine learning");')({bookmarkService:service},tags,()=>{},()=>({service,separator:"-",bookmarkNames:[],index:pbpTagVocabIndex(service==="pinboard"?{}:{"machine learning":1}),respectCase:false}),pbpCanonicalTagName,pbpTagGroupKey);
+    const tags=[];new Function("settings","currentTags","renderTags","pbpPopupTagContext","pbpCanonicalTagName","pbpTagDedupeKey",source.slice(start,end)+';addTag("machine learning");')({bookmarkService:service},tags,()=>{},()=>({service,separator:"-",bookmarkNames:[],index:pbpTagVocabIndex(service==="pinboard"?{}:{"machine learning":1}),respectCase:false}),pbpCanonicalTagName,pbpTagDedupeKey);
     equal(tags,[service==="pinboard"?"machine-learning":"machine learning"]);
   }
 });

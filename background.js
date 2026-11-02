@@ -5197,7 +5197,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         const seenTags = new Set();
         for (const tag of tags) {
           const name = pbpCanonicalTagName(tag, tagContext);
-          const key = pbpTagGroupKey(name) || `exact:${name}`;
+          const key = pbpTagDedupeKey(name);
           if (name && !seenTags.has(key)) { dedupedTags.push(name); seenTags.add(key); }
         }
         const isPrivate = pbpServiceEffectivePrivate(s, { incognito: tab.incognito });

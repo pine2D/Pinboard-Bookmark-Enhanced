@@ -1923,7 +1923,7 @@ suite("shared tag canonicalization", () => {
   test("group key folds whitespace, hyphen, underscore and case, but empty keys do not group", () => {
     assertEq(pbpTagGroupKey("  Web-_Design\u00a0"), "webdesign");
     for (const name of ["JavaScript", "c-", "x_y", "A.B"]) {
-      assertEq(normalizeTagKey(name), name.toLowerCase().replace(/[-_]/g, ""), name);
+      assertEq(pbpTagGroupKey(name), name.toLowerCase().replace(/[-_]/g, ""), name);
     }
     assertEq(pbpTagGroupKey("-- _"), "");
     const index = pbpTagVocabIndex({"-": 9, "_": 2});
@@ -2062,10 +2062,20 @@ suite("shared tag canonicalization", () => {
     }
   });
 
-  test("legacy case wrappers keep majority-case behavior", () => {
-    const map = buildTagCaseMap({JavaScript: 9, javascript: 1, web_design: 3});
-    assertEq(resolveTagCase("javascript", map), "JavaScript");
-    assertEq(resolveTagCase("web design", map), "web_design");
+  test("vocabulary alignment keeps the majority-case behavior the removed case map had", () => {
+    const c = ctx({JavaScript: 9, javascript: 1, web_design: 3});
+    assertEq(pbpAlignTagName("javascript", c).name, "JavaScript");
+    assertEq(pbpAlignTagName("web design", c).name, "web_design");
+  });
+
+  test("one dedupe key: group key when present, exact text for separator-only names", () => {
+    assertEq(pbpTagDedupeKey("Web-Design"), pbpTagDedupeKey("web design"));
+    assert(pbpTagDedupeKey("-") !== pbpTagDedupeKey("_"), "separator-only names stay apart");
+    assertEq(pbpTagDedupeKey("-"), pbpTagDedupeKey("-"));
+    assert(pbpTagDedupeKey("\u200b") !== pbpTagDedupeKey(""), "a zero-width-only name is its own exact key");
+    for (const name of ["-", "_", "--", " _ "]) assert(pbpTagDedupeKey(name) !== pbpTagDedupeKey("exact"), name);
+    assertEq(JSON.stringify(refineTags(["caf\u00e9", "cafe\u0301", "Caf\u200b\u00e9", "-", "token_relay", "token relay"])),
+      JSON.stringify(["caf\u00e9", "token_relay"]), "AI reply dedupe uses the same group key");
   });
 });
 </script>
