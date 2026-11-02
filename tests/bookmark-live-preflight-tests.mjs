@@ -5,6 +5,7 @@
 //    and global fetch, and PATH starts with a docker stub that records calls;
 //  - runs that must talk to a service talk to loopback fixtures shaped like
 //    the real responses (linkding 1.47 / Karakeep 0.34.1);
+//  - temporary-container runs get an injected Docker executor;
 //  - the browser is the bundled Chromium with the extension, for the
 //    read-only loopback path.
 import assert from 'node:assert/strict';
@@ -129,7 +130,7 @@ try {
   // ---------------------------------------------------------------------
   // Budgets: sums come from the rows, caps from the target
   // ---------------------------------------------------------------------
-  for (const target of ['user']) {
+  for (const target of ['temp', 'user']) {
     for (const spec of ['core', 'edges', 'readonly']) {
       const { selected, skipped } = live.selectModules(spec, { target });
       const plan = live.buildPlan({ target, selected, skipped });
@@ -148,13 +149,15 @@ try {
       }
       assert.equal(plan.withinCaps, true, `${target}/${spec} must fit its caps: ${plan.problems.join(',')}`);
       assert.equal(plan.fakeAi.needed, selected.some(m => m.needs.fakeAi));
+      if (target === 'temp') assert(plan.containers.includes('edge') && plan.instances.every(i => plan.containers.includes(i)));
+      else assert.deepEqual(plan.containers, []);
     }
   }
   assert.equal(live.BUDGETS.user.linkding.bookmarks, 15);
   assert.equal(live.BUDGETS.user.karakeep.bookmarks, 12);
   assert.equal(live.BUDGETS.user.karakeep.lists, 1);
   assert.equal(live.BUDGETS.user.pinboard.minIntervalMs, 3000);
-  assert.equal(live.BUDGETS.user.run.fakeAi, 60);
+  for (const target of ['temp', 'user']) assert.equal(live.BUDGETS[target].run.fakeAi, 60);
   // Over-budget rows are refused by --plan and by --run before anything starts.
   const base = MODULES.find(m => m.id === 'core.worker');
   const over = (id, budget) => ({ ...base, id, services: ['linkding'], budget: { ...base.budget, ...budget } });
@@ -188,7 +191,7 @@ try {
       karakeep: { service: 'karakeep', base: 'http://127.0.0.1:1002/', root: 'http://127.0.0.1:1002/api/v1/' },
       pinboard: { service: 'pinboard', base: '', root: live.PINBOARD_ROOT },
     },
-    pools: { linkding: live.poolUrls('user', runId, 'linkding', 2), karakeep: live.poolUrls('user', runId, 'karakeep', 2), pinboard: live.poolUrls('user', runId, 'pinboard', 1) },
+    pools: { linkding: live.poolUrls('temp', runId, 'linkding', 2), karakeep: live.poolUrls('temp', runId, 'karakeep', 2), pinboard: live.poolUrls('user', runId, 'pinboard', 1) },
     listMarker: 'Pinboard Bookmark Enhanced: Read Later', writes: true,
   };
   const view = { created: [{ instance: 'linkding', id: '7', url: cfg.pools.linkding[0] }, { instance: 'karakeep', id: 'k7', url: cfg.pools.karakeep[0] }, { instance: 'pinboard', id: cfg.pools.pinboard[0], url: cfg.pools.pinboard[0] }] };
@@ -294,7 +297,7 @@ try {
     run.instances.linkding = { id: 'linkding', service: 'linkding', base, root: live.apiRootFor('linkding', base), token: 'f'.repeat(40) };
     run.caps = { linkding: { node: 10 } };
     run.reserve = { linkding: 2 };
-    run.pools.linkding = live.poolUrls('user', run.runId, 'linkding', 2);
+    run.pools.linkding = live.poolUrls('temp', run.runId, 'linkding', 2);
     const reproduced = await run.api('linkding', 'bookmarks/', { method: 'POST', body: { url: run.pools.linkding[0], tag_names: ['x'.repeat(70)] }, allowStatus: [500] });
     assert.deepEqual(reproduced, { failedStatus: 500 });
     assert.equal(run.report.ledger.created.length, 0, 'a reproduced failure records nothing');
@@ -311,15 +314,167 @@ try {
   }
 
   // ---------------------------------------------------------------------
+  // Docker: names, refusals, and the temp lifecycle with a fake executor
+  // ---------------------------------------------------------------------
+  const names = live.tempNames(runId);
+  for (const [key, name] of Object.entries(names)) assert(name.startsWith('pbp-it-' + runId + '-'), key);
+  const own = names.linkding;
+  const refused = [
+    [['rm', '-f', '-v', 'linkding'], 'docker_foreign_object'],
+    [['rm', '-f', '-v', own, 'karakeep-web'], 'docker_foreign_object'],
+    [['stop', own], 'docker_command_refused'],
+    [['restart', 'linkding'], 'docker_command_refused'],
+    [['update', '--memory', '1g', 'karakeep-web'], 'docker_command_refused'],
+    [['exec', 'karakeep-web', 'sh'], 'docker_foreign_object'],
+    [['pull', 'postgres:18'], 'docker_command_refused'],
+    [['inspect', 'linkding'], 'docker_command_refused'],
+    [['inspect', '--format', '{{json .Config.Env}}', 'karakeep-web'], 'docker_command_refused'],
+    [['network', 'connect', 'bridge', 'linkding'], 'docker_foreign_object'],
+    [['run', '-d', '--pull', 'never', '--name', names['linkding-fixture'], '--network', 'container:linkding', 'img'], 'docker_foreign_object'],
+    [['network', 'create', '--subnet', '10.1.2.0/24', names.net], 'docker_foreign_object'],
+    [['network', 'rm', 'bridge'], 'docker_foreign_object'],
+    [['run', '-d', '--pull', 'never', '--name', 'pbp-it-' + randomUUID() + '-linkding', '--network', names.net, 'img'], 'docker_foreign_object'],
+    [['run', '-d', '--pull', 'missing', '--name', own, '--network', names.net, 'img'], 'docker_command_refused'],
+    [['run', '-d', '--pull', 'never', '--name', own, '--network', 'host', 'img'], 'docker_foreign_object'],
+    [['run', '-d', '--pull', 'never', '--name', own, '--network', names.net, '-v', '/:/host', 'img'], 'docker_command_refused'],
+    [['run', '-d', '--pull', 'never', '--name', own, '--network', 'bridge', '-p', '0.0.0.0::80', 'img'], 'docker_command_refused'],
+    [['ps', '-a'], 'docker_command_refused'],
+  ];
+  for (const [args, code] of refused) assert.throws(() => live.assertDockerArgs(args, runId), e => e.code === code && e.fatal === true, args.join(' '));
+  for (const args of [['inspect', '--format', '{{.Image}}', 'linkding'], ['image', 'inspect', '--format', '{{.Id}}', 'postgres:18'], ['ps', '-a', '--filter', 'name=pbp-it-', '--format', '{{.Names}}'], ['rm', '-f', '-v', own, names.edge], ['exec', own, 'python', 'manage.py', 'shell', '-c', 'x'], ['run', '-d', '--pull', 'never', '--name', names['linkding-fixture'], '--network', 'container:' + own, 'img']]) {
+    live.assertDockerArgs(args, runId);
+  }
+
+  const linkdingHealth = createServer((req, res) => { res.writeHead(req.url === '/health' ? 200 : 404, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ status: 'healthy' })); });
+  const karakeepHealth = createServer((req, res) => { res.writeHead(req.url === '/api/health' ? 200 : 404, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ status: 'ok', message: 'Web app is working' })); });
+  servers.push(linkdingHealth, karakeepHealth);
+  const ports = { '9101/tcp': await listen(linkdingHealth), '9102/tcp': await listen(karakeepHealth) };
+  const fakeDocker = ({ leftovers = [], imageMissing = false, states = {}, token = 'Traceback (most recent call last)' } = {}) => {
+    const calls = [], envFiles = {};
+    let password = '';
+    const exec = async args => {
+      calls.push([...args]);
+      const [cmd, sub] = args;
+      const ok = (stdout = '') => ({ code: 0, stdout, stderr: '' });
+      if (cmd === 'ps' || (cmd === 'network' && sub === 'ls') || (cmd === 'volume' && sub === 'ls')) return ok(cmd === 'ps' ? leftovers.join('\n') : '');
+      if (cmd === 'inspect' && args[2] === '{{.Image}}') return imageMissing ? { code: 1, stdout: '', stderr: 'Error: No such object' } : ok('sha256:' + (args[3] === 'linkding' ? 'a' : 'b').repeat(64) + '\n');
+      if (cmd === 'inspect') return ok((states[args[3]] || 'running 0') + '\n');
+      if (cmd === 'image') return ok('sha256:' + 'c'.repeat(64) + '\n');
+      if (cmd === 'create' || cmd === 'run') {
+        const name = args[args.indexOf('--name') + 1];
+        const text = readFileSync(args[args.indexOf('--env-file') + 1], 'utf8');
+        envFiles[name] = text;
+        password ||= (text.match(/^LD_SUPERUSER_PASSWORD=(.+)$/m) || [])[1] || '';
+        return ok('0123456789ab\n');
+      }
+      if (cmd === 'network' || cmd === 'start' || cmd === 'rm') return ok();
+      if (cmd === 'port') return ok('127.0.0.1:' + ports[args[2]] + '\n');
+      if (cmd === 'logs') return ok('Superuser password ' + password + '\nlinkding exited\n');
+      if (cmd === 'exec') return ok(token + '\n');
+      return { code: 1, stdout: '', stderr: 'unexpected command' };
+    };
+    return { exec, calls, envFiles, password: () => password };
+  };
+  const tempRun = async (name, docker, scenario = 'readonly') => {
+    const state = stateDirFor(name);
+    process.env.PBP_LIVE_STATE_DIR = state;
+    const code = await quiet(() => live.main(['--run', '--target', 'temp', '--scenario', scenario, '--allow-dirty'], { dockerExec: docker.exec }));
+    const runDirs = readdirSync(state).filter(n => n.startsWith('pbp-it-') && n !== 'pbp-it-live.lock');
+    assert.equal(runDirs.length, 1);
+    const runDir = join(state, runDirs[0]);
+    const raw = readFileSync(join(runDir, 'report.json'), 'utf8');
+    if (docker.password()) {
+      assert(!raw.includes(docker.password()), 'temp superuser password leaked to report');
+      assert(!readFileSync(join(runDir, 'summary.zh.md'), 'utf8').includes(docker.password()));
+    }
+    assert(!readdirSync(runDir).some(n => n.startsWith('env-') || n === 'profile'), 'env files and profile are removed');
+    assert(!existsSync(join(state, 'pbp-it-live.lock')), 'lock released');
+    const report = JSON.parse(raw);
+    for (const args of docker.calls) live.assertDockerArgs(args, report.runId);
+    const ownPrefix = 'pbp-it-' + report.runId + '-';
+    for (const args of docker.calls) {
+      if (['create', 'run', 'start', 'exec', 'rm'].includes(args[0]) || (args[0] === 'network' && ['create', 'connect', 'rm'].includes(args[1]))) {
+        // Every run-scoped name anywhere in the call (container:<name> too)
+        // belongs to this run.
+        const named = args.join(' ').match(/pbp-it-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/g) || [];
+        assert(named.length && named.every(a => a === 'pbp-it-' + report.runId), 'mutating docker call outside this run: ' + args[0]);
+      }
+      if (args[0] === 'inspect' && args[2] === '{{.Image}}') assert(['linkding', 'karakeep-web'].includes(args[3]));
+    }
+    return { code, report, ownPrefix };
+  };
+
+  {
+    const foreign = 'pbp-it-' + randomUUID() + '-edge';
+    const docker = fakeDocker({ leftovers: [foreign] });
+    const { code, report } = await tempRun('leftovers', docker);
+    assert.equal(code, 1);
+    assert.equal(report.failure.code, 'temp_leftovers_present');
+    assert.deepEqual(report.temp.leftovers, [foreign]);
+    assert(!docker.calls.some(a => ['create', 'run', 'rm', 'exec', 'start'].includes(a[0]) || (a[0] === 'network' && a[1] !== 'ls')), 'leftovers stop the run before any docker change');
+    assert.equal(report.cleanup.complete, true);
+  }
+  {
+    const docker = fakeDocker({ imageMissing: true });
+    const { report } = await tempRun('image-missing', docker);
+    assert.equal(report.failure.code, 'temp_image_missing');
+    assert(!docker.calls.some(a => a[0] === 'pull'));
+  }
+  {
+    const docker = fakeDocker();
+    const { code, report, ownPrefix } = await tempRun('token-failure', docker);
+    assert.equal(code, 1);
+    assert.equal(report.failure.code, 'temp_token_failed');
+    const created = docker.calls.filter(a => a[0] === 'create' || a[0] === 'run').map(a => a[a.indexOf('--name') + 1]);
+    assert.deepEqual(created.sort(), ['edge', 'karakeep', 'karakeep-fixture', 'linkding', 'linkding-fixture'].map(n => ownPrefix + n).sort());
+    const removedNames = docker.calls.filter(a => a[0] === 'rm').flatMap(a => a.slice(3));
+    assert.deepEqual(removedNames.sort(), created.sort(), 'cleanup removes exactly what this run created');
+    const net = docker.calls.find(a => a[0] === 'network' && a[1] === 'create');
+    assert(net.includes('--internal') && net.includes('--subnet') && net.at(-1) === ownPrefix + 'net', 'services sit on an --internal network');
+    assert(docker.calls.some(a => a[0] === 'network' && a[1] === 'rm' && a[2] === ownPrefix + 'net'));
+    const edge = docker.calls.find(a => a[0] === 'create');
+    assert.equal(edge[edge.indexOf('--network') + 1], 'bridge');
+    assert(edge.filter((a, i) => edge[i - 1] === '-p').every(p => /^127\.0\.0\.1::\d+$/.test(p)), 'edge publishes on 127.0.0.1 only');
+    assert(docker.calls.some(a => a.join(' ') === `network connect ${ownPrefix}net ${ownPrefix}edge`), 'edge joins the internal network to forward');
+    for (const svc of docker.calls.filter(a => a[0] === 'run')) {
+      const name = svc[svc.indexOf('--name') + 1], network = svc[svc.indexOf('--network') + 1];
+      // Services sit on the internal network; each fixture sidecar shares
+      // its service's namespace so `localhost` there is the fixture.
+      if (name.endsWith('-fixture')) assert.equal(network, 'container:' + name.slice(0, -'-fixture'.length));
+      else assert(network === ownPrefix + 'net' && svc.includes('--tmpfs'));
+      assert(svc[svc.indexOf('--pull') + 1] === 'never' && !svc.includes('-p'));
+    }
+    assert.match(docker.envFiles[ownPrefix + 'linkding'], /^LD_ALLOWED_INTERNAL_HOSTS=localhost$/m);
+    assert.match(docker.envFiles[ownPrefix + 'linkding-fixture'], new RegExp('^PBP_FIXTURE_PORT=' + live.TEMP_FIXTURE_PORT + '$', 'm'));
+    assert.match(docker.envFiles[ownPrefix + 'karakeep'], /^INFERENCE_ENABLE_AUTO_TAGGING=false$/m);
+    assert.match(docker.envFiles[ownPrefix + 'karakeep'], /^INFERENCE_ENABLE_AUTO_SUMMARIZATION=false$/m);
+    assert.match(docker.envFiles[ownPrefix + 'karakeep'], /^CRAWLER_ALLOWED_INTERNAL_HOSTNAMES=localhost$/m);
+    assert(live.poolUrls('temp', report.runId, 'linkding', 1)[0].startsWith(`http://localhost:${live.TEMP_FIXTURE_PORT}/?pbp-it=`), 'temp bookmark URLs use the loopback fixture the extension may be granted');
+    assert.equal(report.temp.removed, true);
+    assert.equal(report.cleanup.complete, true);
+    assert(!docker.calls.some(a => a[0] === 'exec' && !a[1].startsWith(ownPrefix)));
+  }
+  {
+    const docker = fakeDocker({ states: {} });
+    // The linkding container dies right after start: its logs are kept, redacted.
+    const exitDocker = { ...docker, exec: async args => (args[0] === 'inspect' && args[2] !== '{{.Image}}' && /-linkding$/.test(args[3]) ? (docker.calls.push(args), { code: 0, stdout: 'exited 1\n', stderr: '' }) : docker.exec(args)) };
+    const { report } = await tempRun('container-exit', exitDocker);
+    assert.equal(report.failure.code, 'container_start_failed');
+    assert(report.temp.logs.linkding.some(line => line.includes('[redacted]')), 'container logs are redacted');
+    assert.equal(report.temp.removed, true);
+  }
+
+  // ---------------------------------------------------------------------
   // Spawned CLI: plan, list, gates (credential file and fetch blocked)
   // ---------------------------------------------------------------------
   const plan = await run(['--plan'], { credentials: false });
   assert.equal(plan.code, 0, '--plan must succeed without credential, network or docker access');
   const value = JSON.parse(plan.output);
   assert.equal(value.harness, live.HARNESS_VERSION);
-  assert.equal(value.target, 'user');
+  assert.equal(value.target, 'temp');
   assert.deepEqual(value.modules.map(m => m.id), pick('core'));
   assert.deepEqual(value.instances, ['linkding', 'karakeep']);
+  assert(value.containers.includes('edge'));
   assert.equal(value.credentialsRead, false);
   assert.equal(value.realRequests, 0);
   assert.equal(value.docker, false);
@@ -351,6 +506,10 @@ try {
     const result = await run(['--run', '--target', 'user', '--service', 'linkding', '--linkding', badBase]);
     assert.equal(result.code, 1);
     assert.equal(result.report.failure.code, 'loopback_required');
+  }
+  for (const args of [['--linkding', 'http://127.0.0.1:48100'], ['--credentials', credentialsPath]]) {
+    const result = await run(['--run', '--target', 'temp', ...args], { credentials: false });
+    assert.equal(result.report.failure.code, 'temp_target_rejects_user_endpoints');
   }
   const inference = await run(['--run', '--target', 'user', '--service', 'karakeep', '--karakeep', 'http://127.0.0.1:48101']);
   assert.equal(inference.code, 1);
@@ -508,7 +667,7 @@ try {
   assert(!existsSync(join(linkdingState, 'pbp-it-live.lock')), 'lock released on SIGINT');
   hang = false;
 
-  console.log('bookmark live preflight: registry/selection/budgets/guard rule/plan/gates/Karakeep auto-AI/linkding read-only browser/cleanup resume/SIGINT passed');
+  console.log('bookmark live preflight: registry/selection/budgets/guard rule/docker fake executor/plan/gates/Karakeep auto-AI/linkding read-only browser/cleanup resume/SIGINT passed');
 } finally {
   for (const server of servers) await closeServer(server);
   rmSync(dir, { recursive: true, force: true });

@@ -1,15 +1,31 @@
 // Opt-in real-service acceptance runner (harness v2). verify.sh never points
 // it at a service: tests/bookmark-live-preflight-tests.mjs exercises it with
-// synthetic loopback fixtures.
+// synthetic fixtures and an injected Docker executor.
 //
-// Target
+// Targets
+//   --target temp (default): throwaway linkding (SQLite), linkding-pg
+//     (postgres:18) and Karakeep containers built from the images the user's
+//     own containers already run (read-only `docker inspect`; never pulled).
+//     Data lives in tmpfs, every object is named pbp-it-<runId>-*, and the
+//     services sit on an --internal Docker network: they cannot reach the
+//     internet at all. An edge container (also pbp-it-<runId>-*) publishes
+//     each service on a random 127.0.0.1 port. Bookmark URLs are
+//     http://localhost:<TEMP_FIXTURE_PORT>/?pbp-it=... because the extension
+//     may only be granted https://* or loopback HTTP hosts: the browser gets
+//     the synthetic article from ctx.route, and inside each service a
+//     fixture sidecar sharing the service's network namespace serves the
+//     same article on that loopback port. Server-side fetches (linkding
+//     /check/ metadata and HTML snapshots, the Karakeep crawler) therefore
+//     reach a controlled page and nothing else; only `localhost` is
+//     allow-listed in each service's SSRF guard. No credential file is read:
+//     the run creates a throwaway account and token inside the containers.
 //   --target user: the user's own loopback instances with tokens from a
 //     0600 credential file, read by this process only. Tight per-service
 //     budgets; Karakeep writes need the public /signin configuration to show
 //     server-side auto tagging and summarisation disabled, plus
 //     --confirm-karakeep-no-auto-ai.
 //
-// Safety layers
+// Safety layers (both targets)
 //   - Node API calls: loopback base only, no redirects, no cookies, 20 s
 //     timeout, zero retries, and writes limited to objects this run created.
 //   - Browser: one throwaway profile, host resolver maps everything except
@@ -25,7 +41,7 @@
 //     fully cleaned. Reports and the profile stay in a 0700
 //     directory with 0600 files. No tracing, HAR or video is ever enabled.
 import { createRequire } from 'node:module';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync,
   renameSync, rmSync, unlinkSync, writeFileSync, writeSync,
@@ -39,15 +55,33 @@ import { GROUPS, LIST_MARKER, META_DESCRIPTION, MODULES, UNCOVERED, budgetValue 
 export const HARNESS_VERSION = 2;
 export const ROOT = fileURLToPath(new URL('../', import.meta.url));
 export const SERVICE_TYPES = ['linkding', 'karakeep', 'pinboard'];
+export const TEMP_FIXTURE_HOST = 'localhost';
+// Fixture port inside each temporary service's network namespace (and in the
+// bookmark URLs). The browser never connects to it: ctx.route answers it.
+export const TEMP_FIXTURE_PORT = 47391;
 export const PINBOARD_ROOT = 'https://api.pinboard.in/v1/';
 
-// Per-instance caps for one run: the 2026-11-01 authorisation.
+// Temporary instances: container port, edge port and the service type.
+export const TEMP_INSTANCES = Object.freeze({
+  linkding: { service: 'linkding', port: 9090, edgePort: 9101 },
+  karakeep: { service: 'karakeep', port: 3000, edgePort: 9102 },
+  'linkding-pg': { service: 'linkding', port: 9090, edgePort: 9103 },
+});
+
+// Per-instance caps for one run. user = the 2026-11-01 authorisation; temp is
+// looser because every object dies with its tmpfs, but still bounded.
 export const BUDGETS = Object.freeze({
   user: {
     linkding: { bookmarks: 15, node: 250, cleanupReserve: 60, browser: 350, tags: 20, lists: 0 },
     karakeep: { bookmarks: 12, node: 250, cleanupReserve: 60, browser: 500, tags: 20, lists: 1 },
     pinboard: { bookmarks: 5, node: 80, cleanupReserve: 30, browser: 80, tags: 10, lists: 0, minIntervalMs: 3000 },
     run: { fakeAi: 60, moduleSeconds: 120, runMinutes: 20, urlMargin: 3 },
+  },
+  temp: {
+    linkding: { bookmarks: 60, node: 1200, cleanupReserve: 300, browser: 2000, tags: 120, lists: 0 },
+    'linkding-pg': { bookmarks: 60, node: 1200, cleanupReserve: 300, browser: 2000, tags: 120, lists: 0 },
+    karakeep: { bookmarks: 60, node: 1200, cleanupReserve: 300, browser: 3000, tags: 120, lists: 3 },
+    run: { fakeAi: 60, moduleSeconds: 180, runMinutes: 45, urlMargin: 5 },
   },
 });
 // Connect (options page) cost per instance, added to the browser plan.
@@ -122,7 +156,7 @@ export function listIds(modules = MODULES) {
 }
 
 // --scenario: comma list of group names and/or globs over expanded ids.
-export function selectModules(spec, { services = SERVICE_TYPES, target = 'user', modules = MODULES, groups = GROUPS } = {}) {
+export function selectModules(spec, { services = SERVICE_TYPES, target = 'temp', modules = MODULES, groups = GROUPS } = {}) {
   const all = expandRegistry(modules);
   const tokens = String(spec || 'core').split(',').map(s => s.trim()).filter(Boolean);
   if (!tokens.length) fail('scenario');
@@ -185,10 +219,11 @@ export function preflightCost({ service, urls = 0, writes = false }) {
 }
 
 export function poolUrls(target, runId, instance, count) {
-  return Array.from({ length: count }, (_, i) => `https://example.com/?pbp-it=${runId}-${instance}-${i + 1}`);
+  const origin = target === 'temp' ? `http://${TEMP_FIXTURE_HOST}:${TEMP_FIXTURE_PORT}` : 'https://example.com';
+  return Array.from({ length: count }, (_, i) => `${origin}/?pbp-it=${runId}-${instance}-${i + 1}`);
 }
 
-export function buildPlan({ target = 'user', selected, skipped = [], headedFlag = false }) {
+export function buildPlan({ target = 'temp', selected, skipped = [], headedFlag = false }) {
   const caps = BUDGETS[target];
   const instances = [...new Set(selected.map(m => m.instance))];
   const perInstance = {}, problems = [];
@@ -233,6 +268,7 @@ export function buildPlan({ target = 'user', selected, skipped = [], headedFlag 
     fakeAi: { needed: selected.some(m => m.needs?.fakeAi), calls: fakeAiCalls, cap: caps.run.fakeAi },
     headed: headedFlag || selected.some(m => m.needs?.headed),
     shots: { modules: shotModules },
+    containers: target === 'temp' ? [...new Set(instances.flatMap(i => (i === 'linkding-pg' ? ['postgres', 'linkding-pg'] : [i])))].concat(instances.length ? ['edge'] : []) : [],
     limits: { moduleSeconds: caps.run.moduleSeconds, runMinutes: caps.run.runMinutes, worstCaseSeconds, automaticRetries: 0 },
     karakeepWritesRequireAutoAiDisabled: target === 'user' && selected.some(m => m.service === 'karakeep' && m.needs?.writes !== false),
     cleanup: 'ledger bookmarks, ledger lists and zero-use run-prefix tags; then a read-only pass over the URL pool',
@@ -354,7 +390,8 @@ export function parseKarakeepClientConfig(html) {
 export const karakeepAutoAiOff = config => !!config && !!config.inference
   && config.inference.enableAutoTagging === false && config.inference.enableAutoSummarization === false;
 
-// One synthetic article, served to the browser by ctx.route.
+// One synthetic article: the browser route serves it and so does the edge
+// container's fixture host, so server-side metadata equals what the popup reads.
 export function fixtureHtml() {
   return '<!doctype html><html><head><meta charset="utf-8"><title>联调样例</title><meta name="description" content="' + META_DESCRIPTION + '"></head>'
     + '<body><article><h1>联调样例</h1><pre id="quote-fixture">First line\n\n# Heading\n**bold** &lt;tag&gt;\n1. item</pre><p>'
@@ -424,6 +461,188 @@ export function acquireLock(dir, info) {
 }
 
 // ---------------------------------------------------------------------------
+// Docker (temp target). Every call passes assertDockerArgs: mutating
+// commands may only name pbp-it-<runId>-* objects, `docker inspect` of a
+// foreign container is read-only and limited to fixed --format templates,
+// nothing is ever pulled, and published ports are 127.0.0.1 only.
+// ---------------------------------------------------------------------------
+export function tempNames(runId) {
+  const p = 'pbp-it-' + runId + '-';
+  const names = { prefix: p, net: p + 'net', edge: p + 'edge', postgres: p + 'postgres' };
+  for (const instance of Object.keys(TEMP_INSTANCES)) { names[instance] = p + instance; names[instance + '-fixture'] = p + instance + '-fixture'; }
+  return names;
+}
+const USER_CONTAINERS = { linkding: 'linkding', karakeep: 'karakeep-web' };
+const INSPECT_FORMATS = new Set(['{{.Image}}', '{{.State.Status}} {{.State.ExitCode}}', '{{.Id}}']);
+
+export function assertDockerArgs(args, runId) {
+  const own = name => typeof name === 'string' && name.startsWith('pbp-it-' + runId + '-');
+  const [cmd, sub] = args;
+  const refuse = code => fail(code, true);
+  const formatOk = () => args[1] === '--format' && INSPECT_FORMATS.has(args[2]) && args.length === 4;
+  if (cmd === 'inspect') { if (!formatOk()) refuse('docker_command_refused'); return 'read'; }
+  if (cmd === 'image' && sub === 'inspect') { if (!(args[2] === '--format' && args[3] === '{{.Id}}' && args.length === 5)) refuse('docker_command_refused'); return 'read'; }
+  if (cmd === 'ps' || (cmd === 'network' && sub === 'ls') || (cmd === 'volume' && sub === 'ls')) {
+    const filter = args[args.indexOf('--filter') + 1] || '';
+    if (!filter.startsWith('name=pbp-it-')) refuse('docker_command_refused');
+    return 'read';
+  }
+  if (cmd === 'network' && sub === 'create') {
+    if (!own(args[args.length - 1]) || !args.includes('--internal')) refuse('docker_foreign_object');
+    return 'write';
+  }
+  if (cmd === 'network' && sub === 'connect') { if (!own(args[args.length - 2]) || !own(args[args.length - 1])) refuse('docker_foreign_object'); return 'write'; }
+  if (cmd === 'network' && sub === 'rm') { if (args.length !== 3 || !own(args[2])) refuse('docker_foreign_object'); return 'write'; }
+  if (cmd === 'create' || cmd === 'run') {
+    const name = args[args.indexOf('--name') + 1];
+    const network = args[args.indexOf('--network') + 1] || '';
+    if (!args.includes('--name') || !own(name)) refuse('docker_foreign_object');
+    // bridge (the edge), this run's network, or the namespace of one of this
+    // run's containers (a fixture sidecar).
+    const shared = network.startsWith('container:') ? network.slice('container:'.length) : '';
+    if (!args.includes('--network') || !(own(network) || network === 'bridge' || own(shared))) refuse('docker_foreign_object');
+    if (args[args.indexOf('--pull') + 1] !== 'never') refuse('docker_command_refused');
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
+      if (['-v', '--volume', '--mount', '--privileged', '--cap-add', '--device', '--pid', '--ipc', '--userns', '--volumes-from'].includes(a) || a.startsWith('--volume=') || a.startsWith('--mount=')) refuse('docker_command_refused');
+      if ((a === '-p' || a === '--publish') && !/^127\.0\.0\.1::\d+$/.test(args[i + 1] || '')) refuse('docker_command_refused');
+    }
+    return 'write';
+  }
+  if (['start', 'port', 'logs', 'exec'].includes(cmd)) {
+    const target = cmd === 'exec' ? args[1] : cmd === 'logs' ? args[args.length - 1] : args[1];
+    if (!own(target)) refuse('docker_foreign_object');
+    return cmd === 'exec' ? 'write' : 'read';
+  }
+  if (cmd === 'rm') {
+    if (args[1] !== '-f' || args[2] !== '-v' || args.length < 4 || !args.slice(3).every(own)) refuse('docker_foreign_object');
+    return 'write';
+  }
+  refuse('docker_command_refused');
+}
+
+export function defaultDockerExec(args, { timeoutMs = 120000 } = {}) {
+  return new Promise(resolvePromise => {
+    const child = spawn('docker', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '', stderr = '';
+    const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
+    child.stdout.on('data', c => { stdout += c; });
+    child.stderr.on('data', c => { stderr += c; });
+    child.on('error', () => { clearTimeout(timer); resolvePromise({ code: 127, stdout, stderr: 'docker_unavailable' }); });
+    child.on('close', code => { clearTimeout(timer); resolvePromise({ code, stdout, stderr }); });
+  });
+}
+
+export function createDocker({ runId, exec = defaultDockerExec, log = () => {} }) {
+  const names = tempNames(runId);
+  const run = async (args, { allowFail = false, timeoutMs } = {}) => {
+    assertDockerArgs(args, runId);
+    const result = await exec(args, { timeoutMs });
+    log({ cmd: args[0] + (args[1] && !args[1].startsWith('-') && ['network', 'image', 'volume'].includes(args[0]) ? ' ' + args[1] : ''), code: result.code });
+    if (result.code !== 0 && !allowFail) fail('docker_' + args[0] + '_failed');
+    return result;
+  };
+  return {
+    names, run,
+    async leftovers() {
+      const out = [];
+      for (const args of [['ps', '-a', '--filter', 'name=pbp-it-', '--format', '{{.Names}}'], ['network', 'ls', '--filter', 'name=pbp-it-', '--format', '{{.Name}}'], ['volume', 'ls', '--filter', 'name=pbp-it-', '--format', '{{.Name}}']]) {
+        const r = await run(args);
+        out.push(...r.stdout.split('\n').map(s => s.trim()).filter(s => s.startsWith('pbp-it-')));
+      }
+      return out;
+    },
+    async ownLeftovers() {
+      return (await this.leftovers()).filter(n => n.startsWith(names.prefix));
+    },
+    async userImage(kind) {
+      const r = await run(['inspect', '--format', '{{.Image}}', USER_CONTAINERS[kind]], { allowFail: true });
+      const id = r.stdout.trim();
+      check(r.code === 0 && /^sha256:[0-9a-f]{64}$/.test(id), 'temp_image_missing');
+      return id;
+    },
+    async image(ref) {
+      const r = await run(['image', 'inspect', '--format', '{{.Id}}', ref], { allowFail: true });
+      const id = r.stdout.trim();
+      check(r.code === 0 && /^sha256:[0-9a-f]{64}$/.test(id), 'temp_image_missing');
+      return id;
+    },
+    async state(name) {
+      const r = await run(['inspect', '--format', '{{.State.Status}} {{.State.ExitCode}}', name], { allowFail: true });
+      return r.code === 0 ? r.stdout.trim() : 'missing';
+    },
+    async port(name, privatePort) {
+      const r = await run(['port', name, privatePort + '/tcp']);
+      const m = r.stdout.match(/127\.0\.0\.1:(\d+)/);
+      check(m, 'temp_port_missing');
+      return Number(m[1]);
+    },
+    async exec(name, cmd, opts) { return run(['exec', name, ...cmd], opts); },
+    async logs(name) { return (await run(['logs', '--tail', '20', name], { allowFail: true })).stdout; },
+    async remove(list) {
+      if (list.length) await run(['rm', '-f', '-v', ...list], { allowFail: true });
+    },
+    async removeNetwork(net) { await run(['network', 'rm', net], { allowFail: true }); },
+  };
+}
+
+// One script, two roles (Python from the linkding image). The edge forwards
+// its 127.0.0.1-published ports to the services on the internal network
+// (PBP_FORWARDS); a fixture sidecar serves the synthetic article on
+// 127.0.0.1:PBP_FIXTURE_PORT inside a service's network namespace, only for
+// GET/HEAD of ?pbp-it= URLs.
+const EDGE_SCRIPT = String.raw`
+import asyncio, base64, os
+html = base64.b64decode(os.environ.get('PBP_FIXTURE_HTML_B64', ''))
+fixture_port = int(os.environ.get('PBP_FIXTURE_PORT', '0') or 0)
+fw = [x.split('=', 1) for x in os.environ.get('PBP_FORWARDS', '').split(',') if x]
+async def pipe(r, w):
+    try:
+        while True:
+            d = await r.read(65536)
+            if not d: break
+            w.write(d); await w.drain()
+    except Exception: pass
+    finally:
+        try: w.close()
+        except Exception: pass
+def forward(host, port):
+    async def handle(r, w):
+        try: ur, uw = await asyncio.open_connection(host, int(port))
+        except Exception:
+            w.close(); return
+        await asyncio.gather(pipe(r, uw), pipe(ur, w))
+    return handle
+async def fixture(r, w):
+    try:
+        req = await r.readuntil(b'\r\n\r\n')
+        parts = req.split(b'\r\n', 1)[0].decode('latin-1').split(' ')
+        ok = len(parts) >= 2 and parts[0] in ('GET', 'HEAD') and '?pbp-it=' in parts[1]
+        body = html if ok else b'not found'
+        head = 'HTTP/1.1 %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n' % ('200 OK' if ok else '404 Not Found', 'text/html; charset=utf-8' if ok else 'text/plain', len(body))
+        w.write(head.encode() + (body if parts[0] != 'HEAD' else b''))
+        await w.drain()
+    except Exception: pass
+    finally: w.close()
+async def main():
+    servers = []
+    if fixture_port:
+        servers.append(await asyncio.start_server(fixture, '127.0.0.1', fixture_port))
+        try: servers.append(await asyncio.start_server(fixture, '::1', fixture_port))
+        except Exception: pass
+    for listen, target in fw:
+        host, port = target.rsplit(':', 1)
+        servers.append(await asyncio.start_server(forward(host, port), '0.0.0.0', int(listen)))
+    print('edge ready', flush=True)
+    await asyncio.gather(*(s.serve_forever() for s in servers))
+asyncio.run(main())
+`;
+
+const TEMP_SECRET_ENV = new Set(['LD_SUPERUSER_PASSWORD', 'POSTGRES_PASSWORD', 'LD_DB_PASSWORD', 'NEXTAUTH_SECRET']);
+const LINKDING_TOKEN_SCRIPT = "from django.contrib.auth.models import User\nfrom bookmarks.models import ApiToken\nu=User.objects.get(username='pbp-it')\nprint('PBPTOKEN='+ApiToken.objects.create(user=u,name='pbp-it').key)";
+const linkdingSharingScript = on => `from django.contrib.auth.models import User\nu=User.objects.get(username='pbp-it')\nu.profile.enable_sharing=${on ? 'True' : 'False'}\nu.profile.save()\nprint('PBPSHARING=' + str(u.profile.enable_sharing))`;
+
+// ---------------------------------------------------------------------------
 // The run
 // ---------------------------------------------------------------------------
 export class LiveRun {
@@ -454,7 +673,7 @@ export class LiveRun {
       head: '', clean: null, target: '', scenario: '', modules: [], skipped: [], instances: {}, pools: {},
       ledger: { created: [], lists: [], tags: [] }, counts: {}, checks: [], readBackDiffs: [], console: [], swConsole: [],
       pageErrors: [], requestFailed: [], blockedOrigins: [], violations: [],
-       cleanup: { complete: false, entries: [] }, failure: null, finished: null, passed: false,
+      temp: null, cleanup: { complete: false, entries: [] }, failure: null, finished: null, passed: false,
     };
   }
 
@@ -578,8 +797,8 @@ export class LiveRun {
   configure() {
     const { values, flags, errors } = this.opts;
     check(!errors.length, errors[0] || 'arguments');
-    const target = values.target || 'user';
-    check(target === 'user', 'target');
+    const target = values.target || 'temp';
+    check(['temp', 'user'].includes(target), 'target');
     this.target = target;
     this.report.target = target;
     const services = values.service ? values.service.split(',').map(s => s.trim()) : ['linkding', 'karakeep'];
@@ -608,6 +827,8 @@ export class LiveRun {
         this.instances[instance] = { id: instance, service, base, root: apiRootFor(service, base), token: '' };
       }
       check(!this.plan.karakeepWritesRequireAutoAiDisabled || flags.has('--confirm-karakeep-no-auto-ai'), 'karakeep_auto_ai_not_confirmed_off');
+    } else {
+      check(!values.credentials && !values.linkding && !values.karakeep, 'temp_target_rejects_user_endpoints');
     }
   }
 
@@ -671,7 +892,8 @@ export class LiveRun {
       }
       this.report.pools = this.pools;
       this.persist();
-      await this.loadCredentials();
+      if (this.target === 'temp') await this.startTemp();
+      else await this.loadCredentials();
       await this.preflight();
       await this.setupBrowser();
       for (const instance of this.plan.instances) {
@@ -748,6 +970,143 @@ export class LiveRun {
     this.persist();
   }
 
+  async startTemp() {
+    this.phase('temp_containers');
+    const docker = this.docker = createDocker({ runId: this.runId, exec: this.opts.dockerExec, log: entry => (this.report.temp.commands ||= []).push(entry) });
+    const names = docker.names;
+    this.report.temp = { names: [], network: '', images: {}, fixture: `http://${TEMP_FIXTURE_HOST}:${TEMP_FIXTURE_PORT}`, commands: [] };
+    const leftovers = await docker.leftovers();
+    if (leftovers.length) { this.report.temp.leftovers = leftovers; this.persist(); fail('temp_leftovers_present'); }
+    const need = new Set(this.plan.instances);
+    const images = { linkding: await docker.userImage('linkding') };
+    if (need.has('karakeep')) images.karakeep = await docker.userImage('karakeep');
+    if (need.has('linkding-pg')) images.postgres = await docker.image('postgres:18');
+    this.report.temp.images = images;
+    const envFile = values => {
+      const file = join(this.runDir, 'env-' + randomBytes(4).toString('hex'));
+      writeFileSync(file, Object.entries(values).map(([k, v]) => `${k}=${v}`).join('\n') + '\n', { mode: 0o600 });
+      // Only real secrets join the redaction/canary list; names, hosts and
+      // flags such as the run prefix would turn every screenshot into a hit.
+      for (const [k, v] of Object.entries(values)) if (TEMP_SECRET_ENV.has(k)) this.addSecret(String(v));
+      return file;
+    };
+    const created = name => { this.report.temp.names.push(name); this.persist(); };
+    // Explicit subnets: Docker Desktop here has no free default pool, and an
+    // --internal network is what cuts the services off from the internet.
+    let netOk = false;
+    for (let attempt = 0; attempt < 8 && !netOk; attempt++) {
+      const third = 1 + ((parseInt(this.runId.slice(0, 2), 16) + attempt * 37) % 250);
+      const r = await docker.run(['network', 'create', '--internal', '--subnet', `10.234.${third}.0/24`, '--label', 'pbp-it=' + this.runId, names.net], { allowFail: true });
+      netOk = r.code === 0;
+    }
+    check(netOk, 'temp_network_failed');
+    this.report.temp.network = names.net;
+    this.persist();
+    const forwards = [...need].map(i => `${TEMP_INSTANCES[i].edgePort}=${names[i]}:${TEMP_INSTANCES[i].port}`).join(',');
+    const publish = [...need].flatMap(i => ['-p', '127.0.0.1::' + TEMP_INSTANCES[i].edgePort]);
+    created(names.edge);
+    const edgeEnv = envFile({ PBP_FORWARDS: forwards });
+    await docker.run(['create', '--pull', 'never', '--name', names.edge, '--label', 'pbp-it=' + this.runId, '--network', 'bridge', '--memory', '128m', ...publish, '--env-file', edgeEnv, images.linkding, 'python3', '-c', EDGE_SCRIPT]);
+    rmSync(edgeEnv, { force: true });
+    await docker.run(['network', 'connect', names.net, names.edge]);
+    await docker.run(['start', names.edge]);
+    // Fixture sidecar: joins the service's network namespace, so the
+    // service's own `localhost:TEMP_FIXTURE_PORT` is the synthetic article.
+    const startFixture = async instance => {
+      const env = envFile({ PBP_FIXTURE_HTML_B64: Buffer.from(fixtureHtml()).toString('base64'), PBP_FIXTURE_PORT: String(TEMP_FIXTURE_PORT) });
+      created(names[instance + '-fixture']);
+      await docker.run(['run', '-d', '--pull', 'never', '--name', names[instance + '-fixture'], '--label', 'pbp-it=' + this.runId, '--network', 'container:' + names[instance], '--memory', '64m', '--env-file', env, images.linkding, 'python3', '-c', EDGE_SCRIPT]);
+      rmSync(env, { force: true });
+    };
+    const edgePorts = {};
+    for (const instance of need) edgePorts[instance] = await docker.port(names.edge, TEMP_INSTANCES[instance].edgePort);
+    const baseOf = instance => `http://127.0.0.1:${edgePorts[instance]}/`;
+    const startLinkding = async (instance, extra = {}) => {
+      const password = randomBytes(18).toString('base64url');
+      const env = envFile({ LD_SUPERUSER_NAME: 'pbp-it', LD_SUPERUSER_PASSWORD: password, LD_SUPERVISOR_MANAGED: 'True', LD_ALLOWED_INTERNAL_HOSTS: TEMP_FIXTURE_HOST, ...extra });
+      created(names[instance]);
+      await docker.run(['run', '-d', '--pull', 'never', '--name', names[instance], '--label', 'pbp-it=' + this.runId, '--network', names.net, '--memory', '1g', '--tmpfs', '/etc/linkding/data:rw,size=256m', '--env-file', env, images.linkding]);
+      rmSync(env, { force: true });
+      await startFixture(instance);
+    };
+    if (need.has('linkding')) await startLinkding('linkding');
+    if (need.has('linkding-pg')) {
+      const pgPassword = randomBytes(18).toString('base64url');
+      const env = envFile({ POSTGRES_USER: 'linkding', POSTGRES_PASSWORD: pgPassword, POSTGRES_DB: 'linkding' });
+      created(names.postgres);
+      await docker.run(['run', '-d', '--pull', 'never', '--name', names.postgres, '--label', 'pbp-it=' + this.runId, '--network', names.net, '--memory', '512m', '--tmpfs', '/var/lib/postgresql:rw,size=256m', '--env-file', env, images.postgres]);
+      rmSync(env, { force: true });
+      await this.waitFor(async () => (await docker.exec(names.postgres, ['pg_isready', '-U', 'linkding', '-d', 'linkding'], { allowFail: true })).code === 0, 60000, names.postgres, 'container_unhealthy');
+      await startLinkding('linkding-pg', { LD_DB_ENGINE: 'postgres', LD_DB_HOST: names.postgres, LD_DB_PORT: '5432', LD_DB_DATABASE: 'linkding', LD_DB_USER: 'linkding', LD_DB_PASSWORD: pgPassword });
+    }
+    if (need.has('karakeep')) {
+      const env = envFile({
+        DATA_DIR: '/data', NEXTAUTH_SECRET: randomBytes(32).toString('base64url'), NEXTAUTH_URL: baseOf('karakeep').replace(/\/$/, ''),
+        INFERENCE_ENABLE_AUTO_TAGGING: 'false', INFERENCE_ENABLE_AUTO_SUMMARIZATION: 'false', CRAWLER_ALLOWED_INTERNAL_HOSTNAMES: TEMP_FIXTURE_HOST,
+      });
+      created(names.karakeep);
+      await docker.run(['run', '-d', '--pull', 'never', '--name', names.karakeep, '--label', 'pbp-it=' + this.runId, '--network', names.net, '--memory', '2g', '--tmpfs', '/data:rw,size=512m', '--env-file', env, images.karakeep]);
+      rmSync(env, { force: true });
+      await startFixture('karakeep');
+    }
+    for (const instance of need) {
+      const service = TEMP_INSTANCES[instance].service;
+      const base = baseOf(instance);
+      this.instances[instance] = { id: instance, service, base, root: apiRootFor(service, base), token: '' };
+      await this.waitFor(async () => {
+        const st = await docker.state(names[instance]);
+        if (!st.startsWith('running')) { this.report.temp.logs = { [instance]: this.sanitize(await docker.logs(names[instance])).split('\n').slice(-15) }; fail('container_start_failed'); }
+        try {
+          const r = await fetch(base + (service === 'linkding' ? 'health' : 'api/health'), { redirect: 'error', signal: AbortSignal.timeout(3000) });
+          this.count(instance).setup++;
+          const data = r.ok ? await r.json() : {};
+          return ['healthy', 'ok'].includes(data.status);
+        } catch { return false; }
+      }, 120000, names[instance], 'container_unhealthy');
+    }
+    for (const instance of need) {
+      const inst = this.instances[instance];
+      if (inst.service === 'linkding') {
+        const r = await docker.exec(names[instance], ['python', 'manage.py', 'shell', '-c', LINKDING_TOKEN_SCRIPT], { timeoutMs: 60000 });
+        const token = (r.stdout.match(/^PBPTOKEN=([0-9a-f]{40})$/m) || [])[1];
+        check(token, 'temp_token_failed');
+        inst.token = token;
+        this.sharing[instance] = false;
+      } else {
+        const email = `pbp-it-${this.runId.slice(0, 8)}@example.invalid`, password = randomBytes(18).toString('base64url');
+        this.addSecret(password);
+        const signup = await fetch(inst.base + 'api/auth/sign-up/email', { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(20000), headers: { 'Content-Type': 'application/json', Origin: inst.base.replace(/\/$/, '') }, body: JSON.stringify({ name: 'pbp-it', email, password }) });
+        this.count(instance).setup++;
+        check(signup.ok, 'temp_signup_failed');
+        const exchange = await fetch(inst.base + 'api/trpc/apiKeys.exchange', { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(20000), headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ json: { keyName: 'pbp-it', email, password } }) });
+        this.count(instance).setup++;
+        const key = exchange.ok ? (await exchange.json())?.result?.data?.json?.key : '';
+        check(typeof key === 'string' && key.length > 20, 'temp_api_key_failed');
+        inst.token = key;
+      }
+      this.addSecret(inst.token);
+    }
+    this.report.instances = Object.fromEntries(Object.values(this.instances).map(i => [i.id, { service: i.service, base: i.base }]));
+    this.persist();
+  }
+
+  async waitFor(read, timeoutMs, label, code) {
+    const end = Date.now() + timeoutMs;
+    while (Date.now() < end) { this.throwIfFatal(); if (await read()) return; await sleep(1000); }
+    void label;
+    fail(code);
+  }
+
+  // Returns true when the switch changed (the caller then reconnects).
+  async setTempSharing(instance, on) {
+    check(this.target === 'temp' && this.docker, 'sharing_requires_temp', true);
+    if (this.sharing[instance] === on) return false;
+    const r = await this.docker.exec(this.docker.names[instance], ['python', 'manage.py', 'shell', '-c', linkdingSharingScript(on)], { timeoutMs: 60000 });
+    check(r.stdout.includes('PBPSHARING=' + (on ? 'True' : 'False')), 'temp_sharing_failed');
+    this.sharing[instance] = on;
+    return true;
+  }
+
   async preflight() {
     for (const instance of this.plan.instances) {
       const inst = this.instances[instance];
@@ -766,7 +1125,7 @@ export class LiveRun {
         if (inst.service === 'linkding') check(!Array.isArray(data.auto_tags) || data.auto_tags.length === 0, 'linkding_auto_tags_present');
       }
       const writes = this.selected.some(m => m.instance === instance && m.needs?.writes !== false);
-      if (inst.service === 'karakeep' && writes) {
+      if (inst.service === 'karakeep' && (writes || this.target === 'temp')) {
         const html = await this.api(instance, inst.base + 'signin', { auth: false, accept: 'html' });
         const config = parseKarakeepClientConfig(html);
         this.report.instances[instance].autoAi = config?.inference ? { tagging: config.inference.enableAutoTagging, summarization: config.inference.enableAutoSummarization } : null;
@@ -965,7 +1324,8 @@ export class LiveRun {
     console.log(instance + ': connected');
   }
 
-  // The options-page Connect flow.
+  // The options-page Connect flow; also re-run after a temporary instance's
+  // sharing switch changes, since the extension reads it at Connect time.
   async connectUi(instance, { keepOpen = true } = {}) {
     const inst = this.instances[instance];
     const options = await this.ctx.newPage();
@@ -1135,7 +1495,10 @@ export class LiveRun {
     let timer;
     try {
       this.phase(mod.id);
-      if (mod.needs?.sharing && mod.needs.sharing !== 'any' && mod.service === 'linkding') check((mod.needs.sharing === 'on') === !!this.sharing[mod.instance], 'sharing_state_mismatch');
+      if (mod.needs?.sharing && mod.needs.sharing !== 'any' && mod.service === 'linkding') {
+        if (this.target !== 'temp') check((mod.needs.sharing === 'on') === !!this.sharing[mod.instance], 'sharing_state_mismatch');
+        else if (await this.setTempSharing(mod.instance, mod.needs.sharing === 'on')) await this.connectUi(mod.instance, { keepOpen: false });
+      }
       this.guardCfg.writes = mod.needs?.writes !== false;
       await this.pushGuardWrites(this.guardCfg.writes);
       if (mod.settings && Object.keys(mod.settings).length) await t.settings(mod.settings);
@@ -1189,6 +1552,7 @@ export class LiveRun {
           this.locale = typeof snapshot.optLang === 'string' ? snapshot.optLang : 'en';
           this.guardCfg.writes = false;
           await this.pushGuardWrites(false);
+          if (mod.needs?.sharing === 'on' && this.target === 'temp' && await this.setTempSharing(mod.instance, false)) await this.connectUi(mod.instance, { keepOpen: false });
         } catch (error) {
           this.setFatal('module_restore_failed');
           record.restore = failureCode(error, this.secrets);
@@ -1255,7 +1619,7 @@ export class LiveRun {
       const inst = this.instances[instance];
       const ledgered = this.report.ledger.created.some(r => r.instance === instance && !r.deleted) || this.report.ledger.lists.some(l => l.instance === instance && !l.deleted);
       if (!inst.token) {
-        if (ledgered) { apiOk = false; entries.push({ kind: 'instance', instance, deleted: false, code: 'cleanup_token_missing' }); }
+        if (ledgered && this.target === 'user') { apiOk = false; entries.push({ kind: 'instance', instance, deleted: false, code: 'cleanup_token_missing' }); }
         continue;
       }
       if (!this.writesPossible && !ledgered) { entries.push({ kind: 'instance', instance, deleted: true, skipped: 'no_writes_possible' }); continue; }
@@ -1276,10 +1640,35 @@ export class LiveRun {
       for (const name of existsSync(this.runDir) ? readdirSync(this.runDir) : []) if (name === 'profile' || name.startsWith('env-')) rmSync(join(this.runDir, name), { recursive: true, force: true });
       entries.push({ kind: 'profile', deleted: true });
     } catch { filesOk = false; entries.push({ kind: 'profile', deleted: false }); }
+    // 8. Temporary containers and network, by this run's exact names.
+    const tempOk = this.docker ? await this.removeTemp() : true;
     this.report.counts = this.counts;
     this.report.cleanup.apiVerified = apiOk;
-    this.report.cleanup.complete = filesOk && apiOk;
+    // Removing a temporary container removes its tmpfs data, so residue on a
+    // temporary instance cannot outlive the run; apiVerified still fails the
+    // run so cleanup code is proven against temp before it meets a user
+    // instance. On the user target the API pass is the only cleanup.
+    this.report.cleanup.complete = filesOk && tempOk && (this.target === 'temp' ? true : apiOk);
     this.persist();
+  }
+
+  async removeTemp() {
+    const docker = this.docker;
+    const names = [...(this.report.temp?.names || [])].reverse();
+    try {
+      await docker.remove(names);
+      if (this.report.temp?.network) await docker.removeNetwork(this.report.temp.network);
+      const left = await docker.ownLeftovers();
+      this.report.temp.removed = left.length === 0;
+      this.report.temp.residue = left;
+      this.report.cleanup.entries.push({ kind: 'temp', deleted: left.length === 0, names: names.length });
+      this.persist();
+      return left.length === 0;
+    } catch (error) {
+      this.report.cleanup.entries.push({ kind: 'temp', deleted: false, code: failureCode(error, this.secrets) });
+      this.persist();
+      return false;
+    }
   }
 
   async cleanupLists(instance) {
@@ -1457,7 +1846,7 @@ export class LiveRun {
     }
     lines.push('', '## 清理', '');
     lines.push(`- 书签：创建 ${r.ledger.created.length}，删除 ${r.ledger.created.filter(x => x.deleted).length}；列表：创建 ${r.ledger.lists.length}，删除 ${r.ledger.lists.filter(x => x.deleted).length}；前缀标签记录 ${r.ledger.tags.length}`);
-    lines.push(`- 清理完成：${r.cleanup.complete ? '是' : '否'}`);
+    lines.push(`- 清理完成：${r.cleanup.complete ? '是' : '否'}${r.temp ? `；临时容器已删除：${r.temp.removed ? '是' : '否'}` : ''}`);
     const failedEntries = r.cleanup.entries.filter(e => e.deleted === false);
     for (const e of failedEntries) lines.push(`- 未清理：${e.kind} ${e.instance || ''} ${e.id || ''} ${e.code || ''}`.trim());
     this.summaryPath = join(this.runDir, 'summary.zh.md');
@@ -1537,6 +1926,7 @@ async function resumeCleanup(opts) {
       run.plan = { instances: Object.keys(run.instances) };
       await run.loadCredentials();
     }
+    if (report.target === 'temp') run.docker = createDocker({ runId: run.runId, exec: opts.dockerExec });
     run.cleaning = true;
     run.stage = 'cleanup';
     await run.cleanupAll();
@@ -1554,18 +1944,20 @@ async function resumeCleanup(opts) {
 
 function printHelp() {
   console.log([
-    'Opt-in: node scripts/bookmark-service-live.mjs --run [--target user] [--scenario core|edges|readonly|<glob>,...]',
-    '  --credentials /private/credentials.json --linkding http://127.0.0.1:PORT --karakeep http://127.0.0.1:PORT',
+    'Opt-in: node scripts/bookmark-service-live.mjs --run [--target temp|user] [--scenario core|edges|readonly|<glob>,...]',
+    '  --target temp (default) starts throwaway containers from the images of the existing linkding / karakeep-web containers.',
+    '  --target user --credentials /private/credentials.json --linkding http://127.0.0.1:PORT --karakeep http://127.0.0.1:PORT',
     '  Karakeep writes on --target user also require --confirm-karakeep-no-auto-ai (and a /signin check that auto AI is off).',
-    '--plan prints modules, budgets, URLs, headed and shot needs without credentials, network or browser.',
+    '--plan prints modules, budgets, URLs, containers, headed and shot needs without credentials, network, browser or Docker.',
     '--list prints module ids. --service linkding,karakeep filters. --read-only = --scenario readonly.',
     '--headed launches a visible browser; --allow-dirty runs on a dirty tree.',
     '--cleanup REPORT resumes an incomplete cleanup (user target needs --credentials again).',
   ].join('\n'));
 }
 
-export async function main(argv = process.argv.slice(2), { modules } = {}) {
+export async function main(argv = process.argv.slice(2), { dockerExec, modules } = {}) {
   const opts = parseArgs(argv);
+  opts.dockerExec = dockerExec;
   opts.modules = modules;
   if (opts.mode === 'help') { printHelp(); return 0; }
   if (opts.mode === 'usage') { printHelp(); return 2; }
@@ -1573,8 +1965,8 @@ export async function main(argv = process.argv.slice(2), { modules } = {}) {
   if (opts.mode === 'plan') {
     try {
       check(!opts.errors.length, opts.errors[0] || 'arguments');
-      const target = opts.values.target || 'user';
-      check(target === 'user', 'target');
+      const target = opts.values.target || 'temp';
+      check(['temp', 'user'].includes(target), 'target');
       const services = opts.values.service ? opts.values.service.split(',').map(s => s.trim()) : ['linkding', 'karakeep'];
       check(services.every(s => SERVICE_TYPES.includes(s)), 'service');
       const scenario = opts.flags.has('--read-only') ? 'readonly' : (opts.values.scenario || 'core');

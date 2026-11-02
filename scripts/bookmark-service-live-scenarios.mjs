@@ -387,6 +387,151 @@ export const MODULES = [
       t.check('linkding: offline popup create and update replay through queue UI; secret-free identity-bound records; explicit empty Description preserved; Notes/unread/default privacy preserved; changed separator does not remint queued tags');
     },
   },
+
+  {
+    id: 'sharing.popup-reader',
+    services: ['linkding'],
+    surfaces: ['popup', 'reader'],
+    features: ['linkding-sharing-control', 'linkding-explicit-share', 'linkding-untouched-share', 'linkding-reader-new-unshared'],
+    // Sharing is switched on only inside a temporary instance; the runner
+    // reconnects so the extension records it, and switches it back after.
+    needs: needs({ target: 'temp', sharing: 'on', shots: true }),
+    budget: { bookmarks: 2, urls: 2, node: 16, browser: 200, ai: 0, tags: 1, seconds: 150 },
+    settings: {},
+    async steps(t) {
+      const { prefix } = t;
+      const url = t.claimUrl();
+      const title = prefix + ' sharing';
+      const open = async expectedTitle => {
+        const form = await t.openPopup(url);
+        // Wait for the saved bookmark to land in the form before judging it.
+        if (expectedTitle) await t.until(async () => (await form.popup.locator('#title-input').inputValue()) === expectedTitle, 'sharing_existing_prefill');
+        await form.popup.waitForFunction(() => {
+          const box = document.getElementById('share-check');
+          return box && !box.disabled && !box.closest('label').hidden;
+        });
+        return form;
+      };
+
+      t.phase('sharing_popup_new');
+      let form = await open('');
+      let { popup } = form;
+      t.expect(await popup.locator('#private-check').isHidden(), 'linkding_private_control');
+      t.expect(!await popup.locator('#share-check').isChecked(), 'linkding_default_shared');
+      await popup.locator('#title-input').fill(title);
+      await popup.locator('#tags-input').fill(prefix);
+      await popup.locator('#tags-input').press('Enter');
+      await t.savePopup(popup);
+      let row = await t.ownRow(url);
+      t.expectEq(row.shared, false, 'new_bookmark_shared');
+      await form.close();
+
+      t.phase('sharing_popup_explicit');
+      form = await open(title);
+      popup = form.popup;
+      t.expect(!await popup.locator('#share-check').isChecked(), 'existing_shared_prefill');
+      await popup.locator('#share-check').check();
+      await t.savePopup(popup);
+      row = await t.ownRow(url);
+      t.expectEq(row.shared, true, 'explicit_share');
+      await form.close();
+
+      t.phase('sharing_popup_untouched');
+      form = await open(title);
+      popup = form.popup;
+      t.expect(await popup.locator('#share-check').isChecked(), 'existing_shared_prefill');
+      await popup.locator('#title-input').fill(title + ' edited');
+      await t.savePopup(popup);
+      row = await t.ownRow(url);
+      t.expectEq(row.title, title + ' edited', 'popup_title');
+      t.expectEq(row.shared, true, 'untouched_share_changed');
+      await form.close();
+
+      t.phase('sharing_reader_edit');
+      let reader = await t.openReader(url, { ready: '#reader-bookmark-edit' });
+      await reader.locator('#reader-bookmark-edit').click();
+      await reader.locator('#reader-bookmark-notes').fill('reader notes');
+      await t.applyReader(reader);
+      row = await t.ownRow(url);
+      t.expectEq(row.notes, 'reader notes', 'reader_fields');
+      t.expectEq(row.shared, true, 'reader_edit_changed_share');
+      await reader.close();
+
+      t.phase('sharing_reader_new');
+      const fresh = t.claimUrl();
+      reader = await t.openReader(fresh, { ready: '#reader-bookmark-save' });
+      await reader.locator('#reader-bookmark-save').click();
+      await reader.waitForFunction(() => document.getElementById('reader-bookmark-save')?.dataset.saved === 'true');
+      row = await t.ownRow(fresh);
+      t.expectEq(row.shared, false, 'reader_new_shared');
+      await reader.close();
+      t.check('linkding (sharing on): Share box replaces Private, new saves unshared, explicit share kept, untouched share kept by popup and reader edits, reader-created bookmark unshared');
+    },
+  },
+
+  {
+    id: 'limits.long-tag',
+    services: ['linkding'],
+    surfaces: ['popup'],
+    features: ['linkding-long-tag-500', 'linkding-long-tag-no-retry-loop'],
+    // linkding keeps tag names in varchar(64): SQLite ignores the limit and
+    // Postgres answers 500, so only the temporary Postgres-backed instance
+    // reproduces it. The module records what the popup shows (notes) and
+    // asserts only what must hold before and after the planned fix: no
+    // reported success and no request storm.
+    needs: needs({ target: 'temp', container: 'linkding-pg', shots: true }),
+    budget: { bookmarks: 2, urls: 2, node: 12, browser: 80, ai: 0, tags: 1, seconds: 120 },
+    settings: { offlineQueueEnabled: true },
+    async steps(t) {
+      const { prefix } = t;
+      const long = prefix + '_' + 'long'.repeat(6);
+      t.expect(long.length > 64, 'long_tag_length');
+
+      t.phase('long_tag_server');
+      const direct = t.claimUrl();
+      const res = await t.api('bookmarks/', { method: 'POST', body: { url: direct, title: prefix + ' long tag (API)', tag_names: [long], is_archived: false, unread: false, shared: false }, allowStatus: [500] });
+      t.expectEq(res?.failedStatus, 500, 'long_tag_server_status');
+      // A non-atomic create may leave the bookmark without its tag; run
+      // cleanup adopts such pool URLs, so this is only recorded.
+      t.note('serverPartialCreate', !!(await t.api('bookmarks/check/?url=' + encodeURIComponent(direct)))?.bookmark);
+
+      t.phase('long_tag_popup');
+      const url = t.claimUrl();
+      const form = await t.openPopup(url);
+      const { popup } = form;
+      await popup.locator('#title-input').fill(prefix + ' long tag');
+      await popup.locator('#tags-input').fill(long);
+      await popup.locator('#tags-input').press('Enter');
+      const writesBefore = await t.writes();
+      await popup.locator('#submit-btn').click();
+      let seen = null;
+      await t.until(async () => {
+        seen = await popup.evaluate(() => {
+          const btn = document.getElementById('submit-btn');
+          if (btn.classList.contains('saved-success')) return { outcome: 'saved', text: '' };
+          const card = document.querySelector('.submit-bar + .feedback-card');
+          if (card) return { outcome: card.dataset.variant === 'warning' ? 'queued' : 'error', text: card.innerText.trim().slice(0, 300) };
+          if (btn.classList.contains('save-error')) return { outcome: 'error', text: document.getElementById('status-msg')?.innerText.trim().slice(0, 300) || '' };
+          return null;
+        });
+        return seen;
+      }, 'long_tag_outcome', 30000);
+      t.note('popupOutcome', seen.outcome);
+      t.note('popupMessage', seen.text);
+      t.expect(seen.outcome !== 'saved', 'long_tag_reported_saved');
+      // A permanent server failure must not turn into a request storm.
+      const settled = await t.writes();
+      await t.sleep(8000);
+      const later = await t.writes();
+      t.note('popupWrites', settled - writesBefore);
+      t.note('writesWhileIdle', later - settled);
+      t.expect(later - settled <= 1, 'long_tag_retry_loop');
+      t.note('queuedItems', await t.sw(async () => ((await chrome.storage.local.get('offlineQueue')).offlineQueue || []).length));
+      t.note('extensionPartialCreate', !!(await t.api('bookmarks/check/?url=' + encodeURIComponent(url)))?.bookmark);
+      await form.close();
+      t.check('linkding-pg: overlong tag reproduces the server 500; the popup does not report success or retry in a loop (outcome in notes)');
+    },
+  },
 ];
 
 // Group aliases. The pre-registry --scenario values keep their meaning:
@@ -404,8 +549,8 @@ export const UNCOVERED = Object.freeze([
   { text: 'Pinboard 真实回归（§9-17/18）：等待 pinboardToken，注册表暂无 Pinboard 模块' },
   { text: '快捷保存与稍后读（saveFromBackground，qs*/rl* 设置）' },
   { text: '批量保存（startBatchSave，batchAi*）' },
-  { text: 'linkding 共享开启分支（需要可开关共享的临时实例）' },
-  { text: 'linkding 超长标签 500（需要 Postgres 后端的临时实例）' },
+  { text: 'linkding 共享开启分支（只在临时容器跑：--scenario linkding.sharing.*）', coveredBy: 'linkding.sharing.*' },
+  { text: 'linkding 超长标签 500（只在临时 Postgres 跑：--scenario linkding-pg.limits.*）', coveredBy: 'linkding-pg.limits.*' },
   { text: '上千标签下的标签缓存、补全与治理性能（临时容器批量造标签，尚无模块）' },
   { text: 'linkding / Karakeep 网页本身的渲染（Notes Markdown、note 显示）' },
   { text: '真实工具栏弹窗尺寸、焦点与冷启动字体（标签页模式无法覆盖）' },
