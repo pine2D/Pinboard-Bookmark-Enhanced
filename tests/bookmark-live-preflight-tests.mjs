@@ -4334,7 +4334,7 @@ try {
       // pool-1: delete + get; pool-2: get, delete, get; pool-3: get; tags/get.
       // Nothing is read twice (it was 12 requests).
       assert.deepEqual(mock.calls.map(c => c.path + ' ' + (c.url ? 'pool-' + (pool.indexOf(c.url) + 1) : '')), ['posts/delete pool-1', 'posts/get pool-1', 'posts/get pool-2', 'posts/delete pool-2', 'posts/get pool-2', 'posts/get pool-3', 'tags/get ']);
-      for (let i = 1; i < mock.calls.length; i++) assert(mock.calls[i].at - mock.calls[i - 1].at >= INTERVAL - 2);
+      for (let i = 1; i < mock.calls.length; i++) assert(mock.calls[i].at - mock.calls[i - 1].at >= INTERVAL - 2, 'gate gap ' + i + ': ' + mock.calls.map(c => c.at - mock.calls[0].at).join(','));
       // The run's gate statistics and waits stay as the run left them; the
       // cleanup pass keeps its own beside its request counts.
       assert.deepEqual(after.timing, runTiming, 'a --cleanup leaves the run timing as it was');
