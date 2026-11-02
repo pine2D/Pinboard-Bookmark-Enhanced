@@ -1384,7 +1384,10 @@ try {
             } else { world.icons[url] = url === saved() ? 'saved' : 'default'; world.pending--; }
           }, delay);
         };
-        const activate = url => { if (world.checkOn) check(url); return true; };
+        // noRecheck: switching back to the saved page asks nothing while
+        // the fault is on (should-fix 3: the old wait passed on the fresh
+        // page's hit and the icon was never put to the test).
+        const activate = url => { if (world.checkOn && !(variant.noRecheck && url === saved() && world.faults.some(f => f.on))) check(url); return true; };
         const parts = {};
         const fail = code => { const e = new Error(code); e.code = code; throw e; };
         const t = {
@@ -1424,6 +1427,8 @@ try {
       };
       assert.deepEqual(await drive({ popupAsks: 1 }), { switch_cost: 'passed', failure: 'passed' }, 'a product that asks once passes');
       assert.deepEqual(await drive({ popupAsks: 2 }), { switch_cost: 'passed', failure: 'status_failure_popup_lookups' }, 'a second popup lookup fails');
+      assert.deepEqual(await drive({ popupAsks: 1, noRecheck: true }), { switch_cost: 'passed', failure: 'timeout_status_failure_checked' }, 'a switch back that never checks is not a kept icon');
+      assert.deepEqual(await drive({ popupAsks: 1, flips: true }), { switch_cost: 'passed', failure: 'status_failure_icon_flipped' }, 'an icon flipped after the failed check is caught');
     }
     // H3c: a fault with `pass` lets the first n matching requests through.
     {

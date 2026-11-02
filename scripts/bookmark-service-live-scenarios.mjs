@@ -2890,6 +2890,14 @@ export const H3C_MODULES = [
       const want = { [saved]: 'saved', [fresh]: 'default' };
       // No status check in flight in the worker (its own dedup map).
       const checksSettled = () => t.until(async () => t.sw(() => _pendingChecks.size === 0), 'status_checks_settled', 8000);
+      // The icon once no check is in flight and three reads 150ms apart
+      // agree (the icon is set a few awaits after the check settles).
+      const settledIcon = async url => {
+        await checksSettled();
+        const reads = [];
+        await t.until(async () => { reads.push(await tabIcon(url)); return reads.length >= 3 && reads.slice(-3).every(v => v === reads[reads.length - 1]); }, 'status_icon_settled', 8000);
+        return reads[reads.length - 1];
+      };
 
       await t.part('switch_cost', [], async () => {
         await t.phase('status_switches');
@@ -2920,13 +2928,17 @@ export const H3C_MODULES = [
         const fault = t.inject({ method: 'GET', path: CHECK_PATH[t.service], status: 503, contentType: 'application/json', body: { detail: 'unavailable' } });
         await pages[fresh].bringToFront();
         await t.activateTab(fresh);
-        await t.sleep(600);
+        await t.until(async () => fault.hits() > 0, 'status_failure_fresh_checked', 8000);
+        await checksSettled();
         await pages[saved].bringToFront();
+        // The switch back must itself ask (and fail): the fresh page's hit
+        // above says nothing about it, and with no check at all the icon
+        // would keep "saved" without a failure ever being met.
+        const hitsBefore = fault.hits();
         const since = t.now();
         await t.activateTab(saved);
-        await t.until(async () => fault.hits() > 0, 'status_failure_checked', 8000);
-        await t.sleep(1200);
-        const icon = await tabIcon(saved);
+        await t.until(async () => fault.hits() > hitsBefore, 'status_failure_checked', 8000);
+        const icon = await settledIcon(saved);
         t.note('failureIcon', { icon, checks: t.requests({ path: CHECK_PATH[t.service], since }).length });
         t.expectEq(icon, 'saved', 'status_failure_icon_flipped');
 
