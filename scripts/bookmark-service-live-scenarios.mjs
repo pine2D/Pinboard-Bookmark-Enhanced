@@ -2572,6 +2572,12 @@ const permissionBack = t => t.sw(async () => {
   return true;
 });
 
+// The closing screenshot matrix: pictures in these locales and schemes,
+// geometry alone in the rest of _locales.
+export const SHOT_LOCALES = Object.freeze(['en', 'zh_CN', 'ja', 'de', 'ru']);
+export const SHOT_SCHEMES = Object.freeze(['light', 'dark']);
+export const GEOMETRY_LOCALES = Object.freeze(['fr', 'pl', 'zh_HK', 'zh_TW']);
+
 export const H3C_MODULES = [
   // G19 + G20, G10, G2d: the reader's bookmark bar.
   {
@@ -2941,6 +2947,55 @@ export const H3C_MODULES = [
     },
   },
 
+  // Closing screenshots, read-only: popup, the options connection area and
+  // the reader's bookmark bar in five locales x light/dark, each state with
+  // axe; the other locales by geometry only (scrollWidth - innerWidth <= 1,
+  // key controls reachable). Nothing is saved; one URL is only looked up.
+  {
+    id: 'shots.matrix',
+    services: ['linkding', 'karakeep'],
+    surfaces: ['popup', 'options', 'reader'],
+    features: ['shots-matrix', 'shots-geometry-popup', 'shots-geometry-options', 'shots-geometry-reader'],
+    fixRefs: [],
+    needs: needs({ shots: true, writes: false }),
+    budget: { bookmarks: 0, urls: 1, node: 2, browser: { linkding: 40, karakeep: 80 }, ai: 0, tags: 0, seconds: 120, tagReads: 2 },
+    files: [],
+    settings: {},
+    async steps(t) {
+      const url = t.claimUrl();
+      const s = t.service;
+      const surfaces = [
+        { surface: 'popup', keys: ['#title-input', '#tags-input', '#submit-btn'], open: async () => { const form = await t.openPopup(url); return { page: form.popup, close: form.close }; } },
+        { surface: 'options', keys: [`#opt-${s}-url`, `#connect-${s}`], open: async () => { const page = await t.openOptions('general'); await page.locator(`#connect-${s}`).scrollIntoViewIfNeeded(); return { page, close: () => page.close() }; } },
+        { surface: 'reader', keys: ['#reader-bookmark-save', '#reader-bookmark-later', '#reader-bookmark-edit'], open: async () => { const page = await t.openReader(url, { ready: '#reader-bookmark-save' }); return { page, close: () => page.close() }; } },
+      ];
+      const axed = [];
+      for (const { surface, keys, open } of surfaces) {
+        await t.part(surface, [], async () => {
+          await t.phase('shots_' + surface);
+          const { page, close } = await open();
+          const bad = [];
+          try {
+            for (const locale of SHOT_LOCALES) {
+              for (const scheme of SHOT_SCHEMES) {
+                const [entry] = (await t.shot(page, 'matrix', { surface, keys, locales: [locale], schemes: [scheme], geometryOnly: !t.shotsEnabled })) || [];
+                if (entry?.geometry && !entry.geometry.ok) bad.push(`${locale}/${scheme}`);
+                if (t.shotsEnabled) { const v = await t.axe(page, `matrix:${locale}:${scheme}`); axed.push({ surface, locale, scheme, violations: v ? v.length : null }); }
+              }
+            }
+            for (const locale of GEOMETRY_LOCALES) {
+              const [entry] = (await t.shot(page, 'matrix', { surface, keys, locales: [locale], schemes: ['light'], geometryOnly: true })) || [];
+              if (entry?.geometry && !entry.geometry.ok) bad.push(`${locale}/light`);
+            }
+          } finally { await close().catch(() => {}); }
+          t.note('geometry_' + surface, bad);
+          t.expectEq(bad.join(','), '', 'geometry_' + surface);
+        }, ['shots-geometry-' + surface]);
+      }
+      t.note('axe', axed.filter(a => a.violations).map(a => `${a.surface}:${a.locale}:${a.scheme}=${a.violations}`));
+      t.check(`${s}: ${t.shotsEnabled ? 'screenshots and axe in ' + SHOT_LOCALES.join('/') + ' light/dark, ' : ''}geometry in all ${SHOT_LOCALES.length + GEOMETRY_LOCALES.length} locales for popup, options connection and reader bar`);
+    },
+  },
 ];
 MODULES.push(...H3C_MODULES);
 
@@ -2953,10 +3008,11 @@ export const GROUPS = Object.freeze({
   ai: ['*.ai.*'],
   selfhosted: ['*.sh.*'],
   regress: ['*.regress.*'],
+  shots: ['*.shots.*'],
   // Reader, copy and status-check rows (H3c): outside selfhosted, so that
   // group still fits the three rounds of one user-target authorisation.
   ux: ['*.ux.*'],
-  h3c: ['*.ux.*', '*.regress.*'],
+  h3c: ['*.ux.*', '*.shots.*', '*.regress.*'],
   all: ['*'],
 });
 

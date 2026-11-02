@@ -1509,7 +1509,9 @@ export const SECRET_FIELD_SELECTOR = ['input[type="password"]', ...['token', 'se
 // Text that names the signed-in account (Pinboard's "Connected as <name>").
 export const ACCOUNT_TEXT_SELECTOR = '#test-pinboard-status';
 
-export async function takeShot(page, { file, secrets = [], keys = [] }) {
+// capture: false measures the geometry (and refuses a revealed secret field)
+// without writing a picture: the locales checked by layout only.
+export async function takeShot(page, { file, secrets = [], keys = [], capture = true }) {
   await page.evaluate(async () => {
     await document.fonts.ready;
     if (typeof pbpI18nReady === 'function') await pbpI18nReady();
@@ -1576,6 +1578,7 @@ export async function takeShot(page, { file, secrets = [], keys = [] }) {
       ok: overflow <= 1 && keyState.every(k => k.state === 'ok' || k.state === 'scroll'),
     };
   }, keys);
+  if (!capture) return { ok: true, geometry };
   await page.screenshot({ path: file, mask: [page.locator(SECRET_FIELD_SELECTOR), page.locator(ACCOUNT_TEXT_SELECTOR)], animations: 'disabled', caret: 'hide' });
   chmodSync(file, 0o600);
   const texts = await page.evaluate(() => {
@@ -1586,6 +1589,46 @@ export async function takeShot(page, { file, secrets = [], keys = [] }) {
   });
   if (findSecret(texts, secrets)) { rmSync(file, { force: true }); return { ok: false, code: 'shot_secret_canary' }; }
   return { ok: true, geometry };
+}
+
+// The summary's 待人工看 lines: the §9-18 separator copy quoted from the
+// tree under test (en and zh_CN, so it is read as shipped), the Karakeep list
+// icon and linkding's Notes page, both only visible in the services' own web
+// UI after signing in.
+export const MANUAL_COPY_KEYS = Object.freeze(['tagSeparatorHint', 'batchTagsHint']);
+export function manualReviewItems(extRoot = ROOT) {
+  const quote = (key, locale) => {
+    try { const m = JSON.parse(readFileSync(join(extRoot, '_locales', locale, 'messages.json'), 'utf8'))[key]?.message; return typeof m === 'string' ? '「' + m.replace(/\s+/g, ' ').trim() + '」' : '（缺）'; } catch { return '（读不到）'; }
+  };
+  return [
+    ...MANUAL_COPY_KEYS.map(key => `§9-18 分隔符说明 ${key} 读起来是否通顺：en ${quote(key, 'en')}；zh_CN ${quote(key, 'zh_CN')}`),
+    `Karakeep 列表图标：网页侧栏里扩展建的稍后读列表（描述「${LIST_MARKER}」）是否显示成单词 bookmark 而非图标（需登录网页）`,
+    'linkding Notes 渲染页面：引用块、换行、多行 Description 在书签列表与详情中的样子（需登录网页；离线渲染比对见 sh.quote-escape）',
+  ];
+}
+
+// Impeccable modes per surface (CLAUDE.md design workflow: Operate for the
+// popup, options and library, Read for the reader).
+export const REVIEW_MODES = Object.freeze({ popup: 'Operate', options: 'Operate', reader: 'Read' });
+// Pure: the review list from manifest entries with a file and the run's
+// axe findings.
+export function reviewList(shots, findings = []) {
+  const axe = (findings || []).filter(f => f.kind === 'axe');
+  const entries = shots.map(e => {
+    const hit = axe.find(f => f.module === e.module && (f.state === e.state || f.state === `${e.state}:${e.locale}:${e.scheme}`));
+    const byImpact = {};
+    for (const v of hit?.violations || []) byImpact[v.impact || 'unknown'] = (byImpact[v.impact || 'unknown'] || 0) + 1;
+    return {
+      file: e.file, mode: REVIEW_MODES[e.surface] || 'Operate', surface: e.surface, service: e.service, module: e.module, state: e.state, locale: e.locale, scheme: e.scheme,
+      geometryOk: e.geometry ? e.geometry.ok : null,
+      axe: hit ? (hit.skipped ? { skipped: hit.skipped } : { violations: (hit.violations || []).map(v => `${v.id}(${v.impact || '?'})x${v.nodes}`), byImpact }) : null,
+    };
+  });
+  return {
+    note: 'Impeccable: popup and options pages in Operate mode, the reader in Read mode; one entry per picture with its axe result.',
+    modes: { Operate: entries.filter(e => e.mode === 'Operate').map(e => e.file), Read: entries.filter(e => e.mode === 'Read').map(e => e.file) },
+    entries,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -3254,6 +3297,7 @@ export class LiveRun {
         return { url, observed: () => !!run.probe?.seen, clear: () => { run.probe = null; } };
       },
       shot: (page, state, opts = {}) => { alive(); return run.shot(page, state, { service: mod.service, ...opts }); },
+      get shotsEnabled() { return !!run.shotsEnabled; },
       // Temporary linkding only (null elsewhere): snapshot task state.
       snapshotDiagnostics: async () => { alive(); return run.target === 'temp' && mod.service === 'linkding' ? run.snapshotDiagnostics(instance) : null; },
       // Pinboard only: this module's posts/add answers (replace, status,
@@ -3456,20 +3500,27 @@ export class LiveRun {
     await page.emulateMedia({ colorScheme: scheme });
     await page.evaluate(scheme => {
       const root = document.documentElement;
+      // The reader follows prefers-color-scheme itself and never takes a
+      // preset (md-preview-theme-early.js): the media emulation is all it needs.
+      if (/\/md-preview\.html$/.test(location.pathname)) return;
       // Mirror the early theme scripts for the default (no preset) theme.
       if (!localStorage.getItem('pp-theme-preset')) { if (scheme === 'dark') root.dataset.theme = 'flexoki-dark'; else delete root.dataset.theme; }
     }, scheme);
     this.scheme = scheme;
   }
 
-  async shot(page, state, { surface = 'page', service = '', keys = [], locales, schemes } = {}) {
-    if (!this.shotsEnabled || !page) return null;
+  // geometryOnly: the same geometry check and manifest entry with no
+  // picture (file ''); it runs without --shots too.
+  async shot(page, state, { surface = 'page', service = '', keys = [], locales, schemes, geometryOnly = false } = {}) {
+    if ((!this.shotsEnabled && !geometryOnly) || !page) return null;
     this.throwIfFatal();
     const dir = this.shotsDir || join(this.runDir, 'shots');
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
-    chmodSync(dir, 0o700);
-    this.report.shots.dir = dir;
-    this.report.shots.manifest = join(dir, 'shots.json');
+    if (this.shotsEnabled) {
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
+      chmodSync(dir, 0o700);
+      this.report.shots.dir = dir;
+      this.report.shots.manifest = join(dir, 'shots.json');
+    }
     const locs = locales || [this.locale], schs = schemes || [this.scheme];
     const originalLocale = this.locale, originalScheme = this.scheme;
     const results = [];
@@ -3495,21 +3546,21 @@ export class LiveRun {
         const safe = v => String(v || 'x').replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 40);
         const file = join(dir, `${n}-${safe(service)}-${safe(surface)}-${safe(state)}-${safe(locale)}-${safe(scheme)}.png`);
         const consoleBefore = this.report.console.length, errorsBefore = this.report.pageErrors.length;
-        const result = await takeShot(page, { file, secrets: this.secrets, keys });
+        const result = await takeShot(page, { file, secrets: this.secrets, keys, capture: !geometryOnly });
         const entry = {
-          n: Number(n), file: result.ok ? file : '', module: this.currentModule?.id || 'connect', service, surface, state, locale, scheme,
+          n: Number(n), file: result.ok && !geometryOnly ? file : '', ...(geometryOnly ? { geometryOnly: true } : {}), module: this.currentModule?.id || 'connect', service, surface, state, locale, scheme,
           geometry: result.geometry || null, consoleDelta: this.report.console.length - consoleBefore, pageErrorDelta: this.report.pageErrors.length - errorsBefore,
           consoleTotal: this.report.console.filter(c => c.surface && page.url().includes(c.surface)).length,
         };
         this.shotsManifest ||= [];
         this.shotsManifest.push(entry);
-        writePrivateJson(this.report.shots.manifest, this.shotsManifest);
+        if (this.shotsEnabled) writePrivateJson(this.report.shots.manifest, this.shotsManifest);
         this.report.shots.count = this.shotsManifest.filter(s => s.file).length;
         if (!result.ok) { this.persist(); fail(result.code); }
         if (result.geometry && !result.geometry.ok) {
           const g = result.geometry;
           this.report.findings.push({
-            kind: 'geometry', module: entry.module, shot: file, overflow: g.overflow, viewport: g.viewport, scrollWidth: g.scrollWidth, scrollHeight: g.scrollHeight,
+            kind: 'geometry', module: entry.module, shot: geometryOnly ? `${surface}:${locale}:${scheme}（仅几何）` : file, overflow: g.overflow, viewport: g.viewport, scrollWidth: g.scrollWidth, scrollHeight: g.scrollHeight,
             overflowBy: g.overflowBy.map(e => `${e.el}@${e.left}-${e.right}`), keys: g.keys.filter(k => k.state !== 'ok' && k.state !== 'scroll').map(k => k.selector + ':' + k.state),
           });
         }
@@ -3850,6 +3901,22 @@ export class LiveRun {
   // Two layers: report.json holds everything; summary.zh.md fits one screen
   // (SUMMARY_MAX_LINES) and is what the main session reads. Each section
   // shows its first entries and counts the rest, which stay in the report.
+  // The screenshot list handed to an Impeccable review (H3c): the popup
+  // and the options page in Operate mode, the reader in Read mode, each
+  // picture with its locale, scheme and the axe result taken in that state
+  // (the axe state names the shot state, or state:locale:scheme). Only
+  // pictures on disk; geometry-only checks stay in the manifest.
+  writeReviewList() {
+    const dir = this.report.shots?.dir;
+    const shots = (this.shotsManifest || []).filter(e => e.file);
+    if (!dir || !existsSync(dir) || !shots.length) return null;
+    const list = reviewList(shots, this.report.findings);
+    const path = join(dir, 'impeccable-review.json');
+    writePrivateJson(path, list);
+    this.report.shots.review = path;
+    return { path, operate: list.modes.Operate.length, read: list.modes.Read.length };
+  }
+
   writeSummary() {
     if (!existsSync(this.runDir)) return;
     const r = this.report;
@@ -3973,11 +4040,19 @@ export class LiveRun {
     lines.push('', '## 截图与布局');
     const geometry = r.findings.filter(x => x.kind === 'geometry');
     lines.push(`- 截图 ${r.shots.count} 张${r.shots.dir ? `，目录 ${r.shots.dir}` : '（本轮未开启 --shots）'}；几何断言未通过 ${geometry.length} 张`);
+    let review = null;
+    try { review = this.writeReviewList(); } catch { review = null; }
+    if (review) lines.push(`- Impeccable 评审清单：${review.path}（Operate ${review.operate} 张：popup 与设置页；Read ${review.read} 张：阅读器；每张附 axe 结果）`);
     capped(geometry, 2, f => `- ${f.shot}：视口 ${f.viewport?.width}×${f.viewport?.height}，横向溢出 ${f.overflow}px${f.overflowBy?.length ? `，越界 ${f.overflowBy.join('、')}` : ''}；够不到 ${f.keys.join('、') || '无'}`);
     begin('gaps');
     lines.push('', '## 未覆盖项');
     const gaps = [...r.skipped.map(x => `${x.id}：因 ${x.reason} 未执行${x.note ? `（${x.note}）` : ''}`), ...UNCOVERED.filter(u => !(u.coveredBy && r.modules.some(m => globToRegExp(u.coveredBy).test(m.id)))).map(u => u.text)];
     capped(gaps, 4, g => `- ${g}`);
+    // Left to a person (H3c): what no module can judge. Kept with the
+    // cleanup section, which the one-screen cap never cuts.
+    begin('manual');
+    lines.push('', '## 待人工看');
+    for (const item of manualReviewItems(this.extRoot || ROOT)) lines.push('- ' + item);
     begin('cleanup');
     lines.push('', '## 清理');
     lines.push(`- 书签：创建 ${r.ledger.created.length}，删除 ${r.ledger.created.filter(x => x.deleted).length}；列表：创建 ${r.ledger.lists.length}，删除 ${r.ledger.lists.filter(x => x.deleted).length}；前缀标签 ${r.ledger.tags.length}；清理完成：${r.cleanup.complete ? '是' : '否'}${r.temp ? `；临时容器已删除：${r.temp.removed ? '是' : '否'}` : ''}`);
@@ -3999,7 +4074,7 @@ export class LiveRun {
     const labels = { observed: '观察记录', gaps: '未覆盖项', shots: '截图与布局' };
     // Every entry is one physical line, whatever text it carries.
     for (const name of Object.keys(sections)) sections[name] = sections[name].map(line => String(line).replace(/\s*[\r\n]+\s*/g, ' '));
-    const tail = sections.cleanup;
+    const tail = [...sections.manual, ...sections.cleanup];
     const dropped = [];
     const bodySize = () => order.filter(n => !dropped.includes(n)).reduce((n, k) => n + sections[k].length, 0);
     let out = order.flatMap(n => sections[n]).concat(tail);

@@ -212,8 +212,15 @@ try {
   // Registry, selection and wildcards
   // ---------------------------------------------------------------------
   if (only('registry and selection')) {
-    // H3c modules are registered.
+    // H3c modules: the screenshot matrix writes nothing and covers every
+    // locale the extension ships (pictures or geometry alone).
     {
+      const scen = await import('../scripts/bookmark-service-live-scenarios.mjs');
+      const matrix = MODULES.find(m => m.id === 'shots.matrix');
+      assert.ok(matrix && matrix.budget.bookmarks === 0, 'shots.matrix creates no bookmark');
+      assert.equal(matrix.needs.writes, false, 'shots.matrix is read-only');
+      const shipped = readdirSync(join(root, '_locales')).sort();
+      assert.deepEqual([...scen.SHOT_LOCALES, ...scen.GEOMETRY_LOCALES].sort(), shipped, 'every shipped locale is shot or measured');
       for (const id of ['ux.reader-bar', 'ux.copy-exits', 'ux.status-check', 'regress.tags-notes']) assert.ok(MODULES.some(m => m.id === id), id);
     }
     assert.equal(new Set(ids).size, ids.length, 'module ids must be unique');
@@ -616,10 +623,10 @@ try {
     // modules left over; --round N runs one of them.
     {
       // Every row but the H3c ux/shots ones, which a user-target run takes
-      // as their own authorisation (group h3c).
+      // as their own authorisation (group h3c, two rounds).
       const USER_ROUNDS = 'core,edges,readonly,ai,selfhosted,regress';
       const userAll = live.selectModules(USER_ROUNDS, { target: 'user', services: ['linkding', 'karakeep', 'pinboard'] }).selected;
-      assert.equal(live.packRounds(live.selectModules('h3c', { target: 'user', services: ['linkding', 'karakeep', 'pinboard'] }).selected, 'user').count, 1, 'h3c: one user round');
+      assert.equal(live.packRounds(live.selectModules('h3c', { target: 'user', services: ['linkding', 'karakeep', 'pinboard'] }).selected, 'user').count, 2, 'h3c: two user rounds');
       assert.equal(live.buildPlan({ target: 'user', selected: userAll }).withinCaps, false, 'all modules do not fit one user round');
       const packed = live.packRounds(userAll, 'user');
       assert.deepEqual(live.packRounds([...userAll].reverse(), 'user').rounds.map(r => [...r.modules].sort()).sort(), packed.rounds.map(r => [...r.modules].sort()).sort(), 'the order given does not change the rounds');
@@ -1337,6 +1344,40 @@ try {
       assert.equal(run.passFault(fault), false, 'the next one is answered');
       assert.equal(fault.passed, 1);
       assert.equal(run.passFault({ pass: 0 }), false, 'no pass: every request is answered');
+    }
+    // The Impeccable list: Operate for popup and options, Read for the
+    // reader; axe matched by state or state:locale:scheme; pictures only.
+    {
+      const shots = [
+        { file: '/s/1.png', surface: 'popup', module: 'linkding.shots.matrix', state: 'matrix', locale: 'ja', scheme: 'dark', geometry: { ok: true } },
+        { file: '/s/2.png', surface: 'options', module: 'linkding.shots.matrix', state: 'matrix', locale: 'en', scheme: 'light' },
+        { file: '/s/3.png', surface: 'reader', module: 'linkding.sh.copy-exits', state: 'created', locale: 'en', scheme: 'light' },
+      ];
+      const findings = [
+        { kind: 'axe', module: 'linkding.shots.matrix', state: 'matrix:ja:dark', violations: [{ id: 'color-contrast', impact: 'serious', nodes: 5 }] },
+        { kind: 'axe', module: 'linkding.sh.copy-exits', state: 'created', violations: [] },
+        { kind: 'geometry', module: 'linkding.shots.matrix', state: 'matrix:en:light' },
+      ];
+      const list = live.reviewList(shots, findings);
+      assert.deepEqual(list.modes, { Operate: ['/s/1.png', '/s/2.png'], Read: ['/s/3.png'] });
+      assert.deepEqual(list.entries[0].axe, { violations: ['color-contrast(serious)x5'], byImpact: { serious: 1 } });
+      assert.equal(list.entries[1].axe, null, 'no axe run in that state');
+      assert.deepEqual(list.entries[2].axe, { violations: [], byImpact: {} });
+      assert.equal(list.entries[2].mode, 'Read');
+    }
+    // 待人工看 quotes the §9-18 copy from the tree under test.
+    {
+      const manualRoot = join(dir, 'manual-root');
+      for (const locale of ['en', 'zh_CN']) {
+        mkdirSync(join(manualRoot, '_locales', locale), { recursive: true });
+        writeFileSync(join(manualRoot, '_locales', locale, 'messages.json'), JSON.stringify({ tagSeparatorHint: { message: locale + ' sep\n hint' } }));
+      }
+      const items = live.manualReviewItems(manualRoot);
+      assert.match(items[0], /tagSeparatorHint.*en 「en sep hint」；zh_CN 「zh_CN sep hint」/);
+      assert.match(items[1], /batchTagsHint.*en （缺）/, 'a missing key is said, not skipped');
+      assert.ok(items.some(i => i.includes('Karakeep 列表图标') && i.includes(LIST_MARKER)));
+      assert.ok(items.some(i => i.includes('linkding Notes')));
+      assert.match(live.manualReviewItems(join(dir, 'nowhere'))[0], /（读不到）/);
     }
     // Route faults (t.inject): page faults match the whole URL, service
     // faults one instance's path after its API root; `times` runs out.
@@ -2616,6 +2657,20 @@ try {
       const file = join(shotsDir, name + '.png');
       return { file, result: await live.takeShot(page, { file, secrets: [syntheticKey], keys: ['#save'] }) };
     };
+    // capture: false measures without a picture, and still refuses a
+    // revealed secret.
+    {
+      await page.setContent('<!doctype html><title>Shot</title><body style="margin:0"><button id="save">Save</button></body>');
+      const file = join(shotsDir, 'geometry-only.png');
+      const result = await live.takeShot(page, { file, secrets: [syntheticKey], keys: ['#save'], capture: false });
+      assert.equal(result.ok, true);
+      assert.equal(result.geometry.ok, true);
+      assert.equal(existsSync(file), false, 'no picture written');
+      await page.setContent(`<!doctype html><title>Shot</title><body><input type="text" id="opt-linkding-token" value="${syntheticKey}"></body>`);
+      const revealed = await live.takeShot(page, { file, secrets: [syntheticKey], keys: [], capture: false });
+      assert.equal(revealed.ok, false, 'a revealed secret field is refused without a picture too');
+      assert.equal(existsSync(file), false);
+    }
     let shot = await shoot(`<input type="password" id="opt-linkding-token" value="${syntheticKey}"><input type="text" id="opt-linkding-cf-id" value="client-id"><input type="checkbox" id="opt-sync-api-keys"><button class="key-toggle" data-target="opt-linkding-token" aria-pressed="false">show</button><button id="save">Save</button>`, 'masked');
     assert.equal(shot.result.ok, true, 'masked password field passes');
     assert(existsSync(shot.file) && (statSync(shot.file).mode & 0o777) === 0o600);
