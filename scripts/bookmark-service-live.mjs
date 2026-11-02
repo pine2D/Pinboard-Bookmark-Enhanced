@@ -2282,7 +2282,12 @@ export function installWorkerGuard(rule, cfg, token) {
   globalThis.fetch = async function pbpGuardFetch(input, opts = {}) {
     // fetch accepts a string, a URL or a Request.
     const url = typeof input === 'string' ? input : (input && typeof input.url === 'string' ? input.url : String(input));
-    if (url.startsWith('chrome-extension://')) return original(input, opts);
+    // fetch resolves a relative URL against the worker script, so it names an
+    // extension resource; Chrome's own chrome.action.setIcon({ path }) binding
+    // fetches "icons/..." that way. Extension resources never leave the browser.
+    let resolved = '';
+    try { resolved = new URL(url, globalThis.location?.href).href; } catch (_) { /* judged as given below */ }
+    if (url.startsWith('chrome-extension://') || resolved.startsWith('chrome-extension://')) return original(input, opts);
     const method = String(opts.method || (typeof input !== 'string' && input.method) || 'GET').toUpperCase();
     const body = typeof opts.body === 'string' ? opts.body : null;
     const decision = rule(state.cfg, { created: state.created }, { url, method, body });
