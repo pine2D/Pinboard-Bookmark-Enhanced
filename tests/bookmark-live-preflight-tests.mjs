@@ -23,7 +23,7 @@ import vm from 'node:vm';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), 'pbp-live-preflight-'));
 const live = await import('../scripts/bookmark-service-live.mjs');
-const { MODULES, GROUPS, SNAPSHOT_POLL_MS, SNAPSHOT_MARGIN_MS } = await import('../scripts/bookmark-service-live-scenarios.mjs');
+const { MODULES, GROUPS, LIST_MARKER, SNAPSHOT_POLL_MS, SNAPSHOT_MARGIN_MS } = await import('../scripts/bookmark-service-live-scenarios.mjs');
 
 const credentialsPath = join(dir, 'synthetic-credentials.json');
 const marker = join(dir, 'credential-access');
@@ -375,7 +375,8 @@ try {
     listMarker: 'Pinboard Bookmark Enhanced: Read Later', writes: true, aiOrigin: 'http://127.0.0.1:1003', aiPath: '/v1/chat/completions',
   };
   const view = { created: [{ instance: 'linkding', id: '7', url: cfg.pools.linkding[0] }, { instance: 'karakeep', id: 'k7', url: cfg.pools.karakeep[0] }, { instance: 'pinboard', id: cfg.pools.pinboard[0], url: cfg.pools.pinboard[0] }] };
-  const transported = new Function('return (' + live.liveGuardRule.toString() + ')')();
+  // The worker's copy: the rule's source with liveTagKey bound in.
+  const transported = new Function('return ' + live.guardRuleSource())();
   const cases = [
     [{ url: 'https://example.org/x', method: 'GET' }, false, 'live_guard_origin'],
     [{ url: 'http://127.0.0.1:1003/v1/chat/completions', method: 'POST' }, true],
@@ -409,6 +410,183 @@ try {
     assert.equal(readOnly.code, 'live_guard_read_only', 'read-only modules refuse every write');
   }
 
+  // ---------------------------------------------------------------------
+  // Caps before dispatch (second review). A bookmark, a Read Later list or
+  // run-prefix tags beyond the run's limits used to be judged only after the
+  // service had created them: two saves that both found no marked list could
+  // each create one, and the run would learn of the second only once the
+  // user's Karakeep held it. Now both layers refuse such a request before it
+  // leaves, counting the ledger and the creations still in flight, and tags
+  // count once however a write spells them (keyed the way each service
+  // stores them).
+  // ---------------------------------------------------------------------
+  const prefix0 = 'pbp-it-' + runId;
+  const limits0 = { linkding: { bookmarks: 2, lists: 0, tags: 3 }, karakeep: { bookmarks: 2, lists: 1, tags: 3 }, pinboard: { bookmarks: 2, lists: 0, tags: 2 } };
+  const listBody = JSON.stringify({ name: 'Read later', icon: 'bookmark', description: cfg.listMarker, type: 'manual' });
+  {
+    // Route layer: the first list create holds its slot while the service
+    // answers; the second is aborted without being sent, and the first is
+    // recorded for cleanup.
+    const routeRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    routeRun.target = 'user';
+    routeRun.instances.karakeep = { id: 'karakeep', service: 'karakeep', ...cfg.instances.karakeep, token: 'k'.repeat(40) };
+    routeRun.caps = { karakeep: live.BUDGETS.user.karakeep };
+    routeRun.pools.karakeep = cfg.pools.karakeep;
+    routeRun.guardCfg = { instances: { karakeep: cfg.instances.karakeep }, pools: routeRun.pools, listMarker: LIST_MARKER, writes: true, aiOrigin: '', aiPath: '', caps: { karakeep: 500 }, prefix: routeRun.prefix, limits: { karakeep: { bookmarks: 12, lists: 1, tags: 20 } } };
+    routeRun.poolSet = new Set(routeRun.pools.karakeep);
+    routeRun.routeProbe = { url: 'http://pbp-it-route-probe.invalid/' + routeRun.runId, seen: false };
+    const sent = [];
+    const answers = [];
+    const fakeRoute = (path, method, body) => {
+      const out = {};
+      out.route = {
+        request: () => ({ url: () => cfg.instances.karakeep.root + path, method: () => method, postData: () => body }),
+        fetch: () => { sent.push(method + ' ' + path); return new Promise(r => answers.push(r)); },
+        fulfill: async () => { out.fulfilled = true; },
+        abort: async code => { out.aborted = code; },
+        continue: async () => { sent.push(method + ' ' + path); out.continued = true; },
+      };
+      return out;
+    };
+    const first = fakeRoute('lists', 'POST', listBody), second = fakeRoute('lists', 'POST', listBody);
+    const firstDone = routeRun.onRoute(first.route);
+    // A second create that is sent waits on its answer forever: bound it.
+    await Promise.race([routeRun.onRoute(second.route), new Promise(r => setTimeout(r, 300))]);
+    assert.deepEqual(sent, ['POST lists'], 'the second list create is not sent');
+    assert.deepEqual([second.aborted, routeRun.fatal, routeRun.report.violations.map(v => v.code)], ['blockedbyclient', 'live_guard_list_budget', ['live_guard_list_budget']]);
+    answers[0]({ ok: () => true, text: async () => JSON.stringify({ id: 'L1', name: 'Read later', description: LIST_MARKER, type: 'manual', public: false, hasCollaborators: false, userRole: 'owner' }) });
+    await firstDone;
+    assert.equal(first.fulfilled, true);
+    assert.deepEqual(routeRun.report.ledger.lists.map(l => [l.instance, l.id]), [['karakeep', 'L1']], 'the list that exists is on the ledger for cleanup');
+    assert.deepEqual(routeRun.pending.karakeep, { bookmarks: 0, lists: 0 }, 'the slot is released once its answer is recorded');
+    // Run-prefix tags are reserved the moment a write naming them leaves.
+    routeRun.fatal = null;
+    routeRun.report.ledger.created.push({ instance: 'karakeep', id: 'k7', url: cfg.pools.karakeep[0], source: 'route', module: '', deleted: false });
+    const tagged = fakeRoute('bookmarks/k7/tags', 'POST', JSON.stringify({ tags: [{ tagName: routeRun.prefix + ' machine learning' }, { tagName: 'personal' }] }));
+    await routeRun.onRoute(tagged.route);
+    assert.equal(tagged.continued, true);
+    assert.deepEqual(routeRun.report.ledger.tags.map(t => [t.instance, t.key, t.source]), [['karakeep', routeRun.prefix + ' machine learning', 'route']]);
+
+    // A list create without an answer may have made a list nobody recorded:
+    // its slot stays held and the next one is not sent. A refusal (4xx)
+    // made nothing and frees it.
+    for (const [label, answer, secondSent] of [['no answer', null, false], ['server error', 503, false], ['refusal', 409, true]]) {
+      routeRun.fatal = null;
+      routeRun.report.ledger.lists.length = 0;
+      routeRun.pending = {};
+      sent.length = 0;
+      answers.length = 0;
+      const lost = fakeRoute('lists', 'POST', listBody);
+      if (answer === null) lost.route.fetch = async () => { sent.push('POST lists'); throw new Error('socket hang up'); };
+      const lostDone = routeRun.onRoute(lost.route);
+      if (answer !== null) {
+        for (let i = 0; i < 100 && !answers.length; i++) await new Promise(r => setTimeout(r, 1));
+        answers[0]({ ok: () => false, status: () => answer, text: async () => '{}' });
+      }
+      await lostDone;
+      const next = fakeRoute('lists', 'POST', listBody);
+      await Promise.race([routeRun.onRoute(next.route), new Promise(r => setTimeout(r, 100))]);
+      assert.deepEqual([sent.length, routeRun.fatal], secondSent ? [2, null] : [1, 'live_guard_list_budget'], label);
+    }
+  }
+  {
+    // Worker layer, same race: the worker sends one list create, refuses the
+    // second (and any later one) and records the violation for syncGuard.
+    const sent = [];
+    const answers = [];
+    const sandbox = vm.createContext({ fetch: (input, opts) => { sent.push((opts?.method || 'GET') + ' ' + input); return new Promise(r => answers.push(r)); }, URL, location: { href: 'chrome-extension://' + 'a'.repeat(32) + '/background.js' } });
+    vm.runInContext(`(${live.installWorkerGuard.toString()})(${live.guardRuleSource()}, ${JSON.stringify({ ...cfg, caps: {}, prefix: prefix0, limits: limits0 })}, 'tok')`, sandbox);
+    const post = vm.runInContext('(function readLater(u, body) { return fetch(u, { method: "POST", body }); })', sandbox);
+    const listsUrl = cfg.instances.karakeep.root + 'lists';
+    const firstList = post(listsUrl, listBody);
+    const secondList = await Promise.race([post(listsUrl, listBody).then(() => 'answered', e => e.message), new Promise(r => setTimeout(() => r('sent and waiting'), 300))]);
+    assert.deepEqual([secondList, sent], ['live_guard_list_budget', ['POST ' + listsUrl]], 'the worker sends one list create');
+    answers[0]({ ok: true, clone: () => ({ json: async () => ({ id: 'L1' }) }) });
+    await firstList;
+    await assert.rejects(post(listsUrl, listBody), e => e.message === 'live_guard_list_budget', 'nor any after it');
+    const g = JSON.parse(JSON.stringify(sandbox.pbpLiveGuard));
+    assert.deepEqual([g.lists, g.violations.map(v => v.code), g.pending], [[{ instance: 'karakeep', id: 'L1' }], ['live_guard_list_budget', 'live_guard_list_budget'], { karakeep: { bookmarks: 0, lists: 0 } }]);
+    // Run tags are reserved as the write leaves; past the cap it is not sent.
+    vm.runInContext(`pbpLiveGuard.created.push({ instance: 'karakeep', id: 'k7', url: ${JSON.stringify(cfg.pools.karakeep[0])} })`, sandbox);
+    const tagsUrl = cfg.instances.karakeep.root + 'bookmarks/k7/tags';
+    const tagBody = names => JSON.stringify({ tags: names.map(tagName => ({ tagName })) });
+    const attached = post(tagsUrl, tagBody([prefix0 + '_a', prefix0 + '_b', 'personal']));
+    answers[1]({ ok: true, status: 200 });
+    await attached;
+    const overTags = await Promise.race([post(tagsUrl, tagBody([prefix0 + '_c', prefix0 + '_d'])).then(() => 'answered', e => e.message), new Promise(r => setTimeout(() => r('sent and waiting'), 100))]);
+    assert.deepEqual([overTags, JSON.parse(JSON.stringify(sandbox.pbpLiveGuard.tags)), sent.length], ['live_guard_tag_budget', [{ instance: 'karakeep', key: prefix0 + '_a' }, { instance: 'karakeep', key: prefix0 + '_b' }], 2]);
+  }
+  for (const [label, answer, secondSent] of [['no answer', null, false], ['server error', 503, false], ['refusal', 409, true]]) {
+    // As in the route layer: a list create without an answer, or after a
+    // server error, keeps its slot in the worker too.
+    const sent = [];
+    const sandbox = vm.createContext({
+      fetch: async (input, opts) => {
+        sent.push((opts?.method || 'GET') + ' ' + input);
+        if (sent.length > 1) return new Promise(() => {});
+        if (answer === null) throw new TypeError('Failed to fetch');
+        return { ok: false, status: answer };
+      },
+      URL, location: { href: 'chrome-extension://' + 'a'.repeat(32) + '/background.js' },
+    });
+    vm.runInContext(`(${live.installWorkerGuard.toString()})(${live.guardRuleSource()}, ${JSON.stringify({ ...cfg, caps: {}, prefix: prefix0, limits: limits0 })}, 'tok')`, sandbox);
+    const post = vm.runInContext('(function readLater(u, body) { return fetch(u, { method: "POST", body }); })', sandbox);
+    await post(cfg.instances.karakeep.root + 'lists', listBody).catch(() => {});
+    const second = await Promise.race([post(cfg.instances.karakeep.root + 'lists', listBody).then(() => 'answered', e => e.message), new Promise(r => setTimeout(() => r('sent and waiting'), 100))]);
+    assert.deepEqual([second, sent.length], secondSent ? ['sent and waiting', 2] : ['live_guard_list_budget', 1], 'worker: ' + label);
+  }
+  for (const rule of [live.liveGuardRule, transported]) {
+    const limited = { ...cfg, prefix: prefix0, limits: limits0 };
+    const at = (over = {}) => ({ created: view.created, lists: [], tags: [], pending: {}, ...over });
+    const verdict = (v, req, c = limited) => { const d = rule(c, v, req); return d.ok ? 'ok' : d.code; };
+    const listPost = { url: cfg.instances.karakeep.root + 'lists', method: 'POST', body: listBody };
+    const create = (tagNames = []) => ({ url: cfg.instances.linkding.root + 'bookmarks/?disable_scraping', method: 'POST', body: JSON.stringify({ url: cfg.pools.linkding[1], tag_names: tagNames }) });
+    const linkdingTags = names => ({ url: cfg.instances.linkding.root + 'bookmarks/7/', method: 'PATCH', body: JSON.stringify({ tag_names: names }) });
+    const karakeepTags = (names, method = 'POST') => ({ url: cfg.instances.karakeep.root + 'bookmarks/k7/tags', method, body: JSON.stringify({ tags: names.map(tagName => ({ tagName })) }) });
+    const pinboardAdd = tags => ({ url: live.PINBOARD_ROOT + 'posts/add?url=' + encodeURIComponent(cfg.pools.pinboard[0]) + '&shared=no&tags=' + encodeURIComponent(tags), method: 'GET' });
+    const known = (instance, n) => Array.from({ length: n }, (_, i) => ({ instance, key: prefix0 + '_' + (i + 1) }));
+    // Lists: one per run on the user target, a create in flight included.
+    assert.equal(verdict(at(), listPost), 'ok', 'the first Read Later list');
+    assert.equal(verdict(at({ lists: [{ instance: 'karakeep', id: 'L1' }] }), listPost), 'live_guard_list_budget', 'a second list is refused before it is sent');
+    assert.equal(verdict(at({ pending: { karakeep: { lists: 1 } } }), listPost), 'live_guard_list_budget', 'a list create in flight holds its slot');
+    // Bookmarks: every create counts, a deleted one and one in flight too.
+    assert.equal(verdict(at(), create()), 'ok');
+    assert.equal(verdict(at({ pending: { linkding: { bookmarks: 1 } } }), create()), 'live_guard_bookmark_budget');
+    assert.equal(verdict(at({ created: [...view.created, { instance: 'linkding', id: '6', url: cfg.pools.linkding[1], deleted: true }] }), create()), 'live_guard_bookmark_budget', 'a deleted run bookmark still counts');
+    assert.equal(verdict(at({ created: [...view.created, { instance: 'linkding', id: '6', url: cfg.pools.linkding[1] }] }), listPost), 'ok', 'caps are per instance');
+    // linkding: tag_names split on commas, spaces become hyphens and ASCII
+    // case folds, as linkding stores them; names outside the run prefix are
+    // not run tags; names already known are not new.
+    let d = rule(limited, at(), linkdingTags([prefix0 + '_a', prefix0 + ' b', prefix0.toUpperCase() + '_A', 'personal']));
+    assert.deepEqual([d.ok, d.tags], [true, [prefix0 + '_a', prefix0 + '-b']]);
+    d = rule(limited, at({ tags: [{ instance: 'linkding', key: prefix0 + '_a' }] }), linkdingTags([prefix0 + '_a,' + prefix0 + '_c', prefix0 + '_d']));
+    assert.deepEqual([d.ok, d.tags], [true, [prefix0 + '_c', prefix0 + '_d']]);
+    assert.equal(verdict(at({ tags: [{ instance: 'linkding', key: prefix0 + '_a' }] }), linkdingTags([prefix0 + '_b,' + prefix0 + '_c', prefix0 + '_d'])), 'live_guard_tag_budget', 'one name with commas is three tags');
+    assert.equal(verdict(at(), create([1, 2, 3, 4].map(n => prefix0 + '_' + n))), 'live_guard_tag_budget', 'a create naming too many run tags');
+    assert.equal(verdict(at({ tags: known('linkding', 3) }), linkdingTags([prefix0 + '_1', prefix0 + '_3', 'personal'])), 'ok', 'known run tags and foreign names add nothing');
+    // Karakeep: exact names once trimmed and stripped of leading '#'.
+    d = rule(limited, at(), karakeepTags(['#' + prefix0 + '_A', ' ' + prefix0 + '_a ', 'Personal']));
+    assert.deepEqual([d.ok, d.tags], [true, [prefix0 + '_A', prefix0 + '_a']]);
+    assert.equal(verdict(at({ tags: known('karakeep', 3) }), karakeepTags([prefix0 + '_4'])), 'live_guard_tag_budget');
+    assert.equal(verdict(at({ tags: known('karakeep', 3) }), { ...karakeepTags([], 'DELETE'), body: JSON.stringify({ tags: [{ tagId: 't1' }] }) }), 'ok', 'a detach names no tag');
+    assert.equal(verdict(at({ tags: known('linkding', 3) }), karakeepTags([prefix0 + '_9'])), 'ok', 'tag caps are per instance');
+    // Pinboard posts/add: space-separated tags.
+    assert.equal(verdict(at(), pinboardAdd(prefix0 + '_x ' + prefix0 + '_y ' + prefix0 + '_z')), 'live_guard_tag_budget');
+    assert.equal(verdict(at(), pinboardAdd(prefix0 + '_x ' + prefix0 + '_y')), 'ok');
+    // An instance missing from the limits gets none; a configuration without
+    // limits (the earlier shape, kept by the cases above) judges no budget.
+    assert.equal(verdict(at(), listPost, { ...limited, limits: {} }), 'live_guard_list_budget');
+    assert.equal(verdict(at({ lists: [{ instance: 'karakeep', id: 'L1' }] }), listPost, cfg), 'ok');
+    // trackTag keys read-backs with liveTagKey, the rule's own key outside
+    // the worker: they must agree, or one tag would count twice.
+    const roomy = { ...limited, limits: { linkding: { bookmarks: 9, lists: 0, tags: 99 }, karakeep: { bookmarks: 9, lists: 1, tags: 99 } } };
+    const samples = [prefix0 + ' x y', prefix0 + '_Mixed', ' ' + prefix0 + '-z ', '#' + prefix0 + '_h', prefix0 + '_中文', prefix0 + '  double  space'];
+    for (const [service, req] of [['linkding', linkdingTags], ['karakeep', karakeepTags]]) {
+      const expected = [...new Set(samples.map(n => live.liveTagKey(service, n)))].filter(k => k.toLowerCase().startsWith(prefix0));
+      assert.deepEqual(rule(roomy, at(), req(samples)).tags, expected, service + ' keys agree with liveTagKey');
+    }
+  }
+
   // fetch resolves a relative URL against the worker script, and so does the
   // guard: Chrome's own chrome.action.setIcon({ path }) binding fetches
   // "icons/pin-default-16.png" through the worker's fetch (run afd11fff), and
@@ -419,7 +597,7 @@ try {
   {
     const passed = [];
     const sandbox = vm.createContext({ fetch: async input => { passed.push(String(input)); return { ok: true }; }, URL, location: { href: 'chrome-extension://' + 'a'.repeat(32) + '/background.js' } });
-    vm.runInContext(`(${live.installWorkerGuard.toString()})(${live.liveGuardRule.toString()}, ${JSON.stringify({ ...cfg, caps: {} })}, 'tok')`, sandbox);
+    vm.runInContext(`(${live.installWorkerGuard.toString()})(${live.guardRuleSource()}, ${JSON.stringify({ ...cfg, caps: {} })}, 'tok')`, sandbox);
     const call = vm.runInContext('(function productCaller(u) { return fetch(u); })', sandbox);
     for (const resource of ['icons/pin-default-16.png', '/_locales/en/messages.json', '']) assert.equal((await call(resource)).ok, true, 'extension resource ' + JSON.stringify(resource));
     assert.deepEqual(passed, ['icons/pin-default-16.png', '/_locales/en/messages.json', ''], 'passed to fetch as given');
@@ -732,7 +910,8 @@ try {
     const run = new live.LiveRun({ mode: 'run' });
     const base = `http://127.0.0.1:${port}/`;
     run.instances.linkding = { id: 'linkding', service: 'linkding', base, root: live.apiRootFor('linkding', base), token: 'f'.repeat(40) };
-    run.caps = { linkding: { node: 10 } };
+    // Complete caps, as a run has them: a missing bookmark cap allows none.
+    run.caps = { linkding: { ...live.BUDGETS.temp.linkding, node: 10 } };
     run.reserve = { linkding: 2 };
     run.pools.linkding = live.poolUrls('temp', run.runId, 'linkding', 2);
     const reproduced = await run.api('linkding', 'bookmarks/', { method: 'POST', body: { url: run.pools.linkding[0], tag_names: ['x'.repeat(70)] }, allowStatus: [500] });
@@ -748,6 +927,119 @@ try {
     run.persist();
     assert(!readFileSync(run.reportPath, 'utf8').includes(syntheticKey), 'persisted report is redacted');
     rmSync(run.runDir, { recursive: true, force: true });
+  }
+
+  // Node writes (seeds) count against the same caps by the same rule
+  // (second review): a seed past a cap is refused before it is sent, the run
+  // tags it names are reserved before it leaves, and a Node create in flight
+  // holds its slot against a browser create. A read-back confirms a reserved
+  // tag instead of counting it again, and still catches a run tag no write
+  // named.
+  {
+    const seen = [], answers = [];
+    let next = 1, holdPosts = false, failStatus = 0;
+    const server = createServer((req, res) => {
+      let raw = '';
+      req.on('data', c => { raw += c; });
+      req.on('end', () => {
+        seen.push(req.method + ' ' + req.url.split('?')[0]);
+        const send = () => {
+          if (failStatus) { res.writeHead(failStatus, { 'Content-Type': 'application/json' }); res.end('{}'); return; }
+          const b = JSON.parse(raw);
+          res.writeHead(201, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ id: next++, url: b.url, tag_names: b.tag_names || [] }));
+        };
+        if (holdPosts) answers.push(send); else send();
+      });
+    });
+    const port = await listen(server);
+    const base = `http://127.0.0.1:${port}/`;
+    const nodeRun = caps => {
+      const r = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+      r.target = 'user';
+      r.instances.linkding = { id: 'linkding', service: 'linkding', base, root: live.apiRootFor('linkding', base), token: 'f'.repeat(40) };
+      r.caps = { linkding: { ...live.BUDGETS.user.linkding, ...caps } };
+      r.reserve = { linkding: 60 };
+      r.pools.linkding = live.poolUrls('user', r.runId, 'linkding', 3);
+      return r;
+    };
+    let r = nodeRun({ tags: 2 });
+    const p = r.prefix;
+    await r.api('linkding', 'bookmarks/', { method: 'POST', body: { url: r.pools.linkding[0], tag_names: [p + '_a', 'personal'] } });
+    assert.deepEqual(r.report.ledger.tags.map(t => [t.key, t.source]), [[p + '_a', 'node']], 'reserved when the seed leaves');
+    r.trackTag('linkding', { id: 5, name: p + '_a' });
+    assert.deepEqual(r.report.ledger.tags.map(t => [t.key, t.id, t.source]), [[p + '_a', '5', 'node']], 'a read-back confirms a reserved tag');
+    await assert.rejects(r.api('linkding', 'bookmarks/', { method: 'POST', body: { url: r.pools.linkding[1], tag_names: [p + '_b', p + '_c'] } }), e => e.code === 'live_guard_tag_budget' && e.fatal === true);
+    assert.deepEqual(seen, ['POST /api/bookmarks/'], 'a seed past the tag cap is not sent');
+    r = nodeRun({ tags: 1 });
+    r.trackTag('linkding', { id: 6, name: r.prefix + '_x' });
+    assert.equal(r.fatal, null);
+    r.trackTag('linkding', { id: 7, name: r.prefix.toUpperCase() + '_X' });
+    assert.equal(r.fatal, null, 'one linkding tag in two cases');
+    r.trackTag('linkding', { id: 8, name: r.prefix + '_y' });
+    assert.equal(r.fatal, 'tag_budget', 'a run tag no write named still counts');
+    seen.length = 0;
+    r = nodeRun({ bookmarks: 1 });
+    r.report.ledger.created.push({ instance: 'linkding', id: '9', url: r.pools.linkding[0], source: 'route', module: '', deleted: true });
+    await assert.rejects(r.api('linkding', 'bookmarks/', { method: 'POST', body: { url: r.pools.linkding[1] } }), e => e.code === 'live_guard_bookmark_budget' && e.fatal === true);
+    assert.deepEqual(seen, [], 'a seed past the bookmark cap is not sent');
+    r = nodeRun({ bookmarks: 1 });
+    holdPosts = true;
+    const seeding = r.api('linkding', 'bookmarks/', { method: 'POST', body: { url: r.pools.linkding[0] } });
+    r.guardCfg = r.buildGuardCfg();
+    r.guardCfg.writes = true;
+    r.poolSet = new Set(r.pools.linkding);
+    r.routeProbe = { url: 'http://pbp-it-route-probe.invalid/' + r.runId, seen: false };
+    const browser = { sent: 0, aborted: '' };
+    await r.onRoute({
+      request: () => ({ url: () => r.instances.linkding.root + 'bookmarks/', method: () => 'POST', postData: () => JSON.stringify({ url: r.pools.linkding[1], tag_names: [] }) }),
+      fetch: async () => { browser.sent++; throw new Error('sent'); }, fulfill: async () => {}, continue: async () => { browser.sent++; },
+      abort: async code => { browser.aborted = code; },
+    });
+    assert.deepEqual([browser.sent, browser.aborted, r.fatal], [0, 'blockedbyclient', 'live_guard_bookmark_budget'], 'a browser create meets the Node create in flight');
+    for (let i = 0; i < 400 && !answers.length; i++) await new Promise(res => setTimeout(res, 5));
+    holdPosts = false;
+    answers.shift()();
+    await seeding;
+    assert.deepEqual([r.report.ledger.created.map(e => e.source), r.pending.linkding], [['node'], { bookmarks: 0, lists: 0 }], 'the seed is recorded and its slot released');
+    // A seed that failed with a server error may exist unrecorded: its slot
+    // stays held. One the service refused (4xx) made nothing.
+    for (const [status, nextSent] of [[500, false], [400, true]]) {
+      r = nodeRun({ bookmarks: 1 });
+      seen.length = 0;
+      failStatus = status;
+      assert.deepEqual(await r.api('linkding', 'bookmarks/', { method: 'POST', body: { url: r.pools.linkding[0] }, allowStatus: [status] }), { failedStatus: status });
+      failStatus = 0;
+      const after = r.api('linkding', 'bookmarks/', { method: 'POST', body: { url: r.pools.linkding[1] } });
+      if (nextSent) await after; else await assert.rejects(after, e => e.code === 'live_guard_bookmark_budget');
+      assert.equal(seen.length, nextSent ? 2 : 1, 'after status ' + status);
+    }
+    await closeServer(server);
+
+    // The guard configuration a run hands both layers carries its limits and
+    // prefix, and survives the JSON trip to the worker.
+    const cfgRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    for (const id of ['linkding', 'karakeep']) cfgRun.instances[id] = { id, service: id, ...cfg.instances[id], token: 'x'.repeat(40) };
+    cfgRun.caps = { linkding: live.BUDGETS.user.linkding, karakeep: live.BUDGETS.user.karakeep };
+    cfgRun.pools = { linkding: cfg.pools.linkding, karakeep: cfg.pools.karakeep };
+    const built = JSON.parse(JSON.stringify(cfgRun.buildGuardCfg()));
+    assert.deepEqual(built.limits, { linkding: { bookmarks: 15, lists: 0, tags: 20 }, karakeep: { bookmarks: 12, lists: 1, tags: 20 } });
+    assert.deepEqual([built.prefix, built.writes, built.caps, built.listMarker], [cfgRun.prefix, false, { linkding: 350, karakeep: 500 }, LIST_MARKER]);
+    // syncGuard confirms the worker's own reservations.
+    cfgRun.ctx = {};
+    cfgRun.swToken = 'tok';
+    cfgRun.worker = { evaluate: async () => ({ created: [], lists: [], tags: [{ instance: 'karakeep', key: cfgRun.prefix + '_w' }], counts: {}, violations: [] }) };
+    await cfgRun.syncGuard();
+    assert.deepEqual(cfgRun.report.ledger.tags.map(t => [t.instance, t.key, t.source]), [['karakeep', cfgRun.prefix + '_w', 'sw']]);
+    // What the other layers record reaches the worker guard, so it judges
+    // by the same counts; what the worker reported is not sent back.
+    const g = { token: 'tok', created: [], lists: [], tags: [{ instance: 'karakeep', key: cfgRun.prefix + '_w' }] };
+    const shares = [];
+    cfgRun.worker = { evaluate: async (fn, arg) => { shares.push(arg.field); const saved = globalThis.pbpLiveGuard; globalThis.pbpLiveGuard = g; try { return fn(arg); } finally { globalThis.pbpLiveGuard = saved; } } };
+    cfgRun.noteTags('karakeep', [{ key: cfgRun.prefix + '_w' }, { key: cfgRun.prefix + '_r' }], 'route');
+    cfgRun.noteTags('karakeep', [{ key: cfgRun.prefix + '_s' }], 'sw');
+    for (let i = 0; i < 2; i++) await cfgRun.shareGuard('lists', [{ instance: 'karakeep', id: 'L9' }]);
+    assert.deepEqual([shares, g.tags.map(t => t.key), g.lists], [['tags', 'lists', 'lists'], [cfgRun.prefix + '_w', cfgRun.prefix + '_r'], [{ instance: 'karakeep', id: 'L9' }]]);
   }
 
   // A guard violation stops the run, but cleanup still needs the API (run

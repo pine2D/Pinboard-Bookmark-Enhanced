@@ -33,6 +33,9 @@
 //     other origin. The route layer applies the same rule as the service
 //     worker guard (liveGuardRule), counts page and worker requests, and
 //     records each creation the moment its response arrives.
+//   - Caps: both layers, and Node API writes, refuse a bookmark, a Read Later
+//     list or run-prefix tags beyond the run's caps before the request
+//     leaves, counting the ledger and the creations still in flight.
 //   - Service worker: a second guard wraps fetch; a new worker (restart)
 //     aborts the run because that second layer would be gone.
 //   - Fake AI: a loopback OpenAI-compatible server; only POST chat/completions
@@ -302,9 +305,30 @@ export function validateBase(raw) {
 
 export const apiRootFor = (service, base) => (service === 'pinboard' ? PINBOARD_ROOT : base + (service === 'linkding' ? 'api/' : 'api/v1/'));
 
+// How a service keys a tag name, so one tag counts once however a write or a
+// read-back spells it: linkding replaces spaces with hyphens and matches
+// names case-insensitively (Django iexact; on SQLite only ASCII folds),
+// Karakeep trims and drops a leading '#', then matches exactly. Pinboard
+// keys stay as given. A key stricter than the service's only counts a tag
+// twice, which refuses earlier, never later.
+export function liveTagKey(service, name) {
+  const text = String(name == null ? '' : name).trim();
+  if (service === 'linkding') return text.replace(/ /g, '-').replace(/[A-Z]/g, c => c.toLowerCase());
+  if (service === 'karakeep') return text.replace(/^#+/, '');
+  return text;
+}
+
 // The one request rule both guard layers apply: Node's ctx.route handler
-// calls it directly and the service worker gets its source text. Keep it
-// free of outer references.
+// and the Node API call it directly, the service worker gets its source
+// text from guardRuleSource(). Its only outer reference is liveTagKey,
+// which that source carries along.
+//
+// With cfg.limits ({ [instance]: { bookmarks, lists, tags } }) a write that
+// would take the run past a cap is refused before it leaves: view.created,
+// view.lists and view.tags hold what the calling layer has recorded (a
+// deleted bookmark still counts), view.pending the creations it has in
+// flight. An allowed write carries the run-prefix tag keys it names that
+// are not yet known (`tags`), for the layer to reserve as it sends it.
 export function liveGuardRule(cfg, view, req) {
   const url = String(req.url || '');
   const method = String(req.method || 'GET').toUpperCase();
@@ -328,7 +352,26 @@ export function liveGuardRule(cfg, view, req) {
   const path = full.split('?')[0];
   const segs = path.split('/').filter(Boolean);
   const pool = cfg.pools[instance] || [];
-  const own = id => view.created.some(r => r.instance === instance && r.id === String(id));
+  const created = view.created || [];
+  const own = id => created.some(r => r.instance === instance && r.id === String(id));
+  const capped = (decision, names) => {
+    if (!cfg.limits) return decision;
+    const limit = cfg.limits[instance] || {};
+    const cap = key => (typeof limit[key] === 'number' ? limit[key] : 0);
+    const pending = (view.pending && view.pending[instance]) || {};
+    const mine = list => (list || []).filter(r => r.instance === instance).length;
+    if (decision.kind === 'create' && mine(created) + (pending.bookmarks || 0) >= cap('bookmarks')) return { ok: false, instance, code: 'live_guard_bookmark_budget' };
+    if (decision.kind === 'list-create' && mine(view.lists) + (pending.lists || 0) >= cap('lists')) return { ok: false, instance, code: 'live_guard_list_budget' };
+    const prefix = String(cfg.prefix || '');
+    const known = new Set((view.tags || []).filter(t => t.instance === instance).map(t => t.key));
+    const fresh = [];
+    for (const name of names) {
+      const key = liveTagKey(inst.service, name);
+      if (key && key.toLowerCase().startsWith(prefix) && !known.has(key) && !fresh.includes(key)) fresh.push(key);
+    }
+    if (fresh.length && known.size + fresh.length > cap('tags')) return { ok: false, instance, code: 'live_guard_tag_budget' };
+    return { ...decision, tags: fresh };
+  };
   if (inst.service === 'pinboard') {
     // Pinboard writes are GETs: posts/add may only create a private run URL,
     // posts/delete only a run URL already in the ledger.
@@ -337,11 +380,13 @@ export function liveGuardRule(cfg, view, req) {
     if (!read) return { ok: false, instance, code: 'live_guard_mutation' };
     if (path === 'posts/add') {
       if (!cfg.writes) return { ok: false, instance, code: 'live_guard_read_only' };
-      return pool.includes(params.get('url')) && params.get('shared') === 'no' ? { ok: true, instance, kind: 'create', url: params.get('url') } : { ok: false, instance, code: 'live_guard_create' };
+      // Tags are space-separated; a comma splits too (counting more names
+      // only refuses earlier).
+      return pool.includes(params.get('url')) && params.get('shared') === 'no' ? capped({ ok: true, instance, kind: 'create', url: params.get('url') }, String(params.get('tags') || '').split(/[\s,]+/)) : { ok: false, instance, code: 'live_guard_create' };
     }
     if (path === 'posts/delete') {
       if (!cfg.writes) return { ok: false, instance, code: 'live_guard_read_only' };
-      return view.created.some(r => r.instance === instance && r.url === params.get('url')) ? { ok: true, instance, kind: 'mutate' } : { ok: false, instance, code: 'live_guard_mutation' };
+      return created.some(r => r.instance === instance && r.url === params.get('url')) ? capped({ ok: true, instance, kind: 'mutate' }, []) : { ok: false, instance, code: 'live_guard_mutation' };
     }
     return ['posts/get', 'posts/recent', 'posts/suggest', 'posts/update', 'tags/get', 'user/api_token'].includes(path)
       ? { ok: true, instance, kind: 'read' } : { ok: false, instance, code: 'live_guard_mutation' };
@@ -350,16 +395,27 @@ export function liveGuardRule(cfg, view, req) {
   if (!cfg.writes) return { ok: false, instance, code: 'live_guard_read_only' };
   let body = req.body;
   if (typeof body === 'string') { try { body = JSON.parse(body); } catch (_) { body = null; } }
-  if (method === 'POST' && segs.length === 1 && segs[0] === 'bookmarks') {
-    return body && pool.includes(body.url) ? { ok: true, instance, kind: 'create', url: body.url } : { ok: false, instance, code: 'live_guard_create' };
+  // The tag names a write body carries, as the service splits them: linkding
+  // joins tag_names with commas and splits the string again; Karakeep names
+  // each tag in tags[].tagName (an attach by tagId names none).
+  let names = [];
+  if (body && typeof body === 'object') {
+    if (inst.service === 'linkding' && Array.isArray(body.tag_names)) names = body.tag_names.map(String).join(',').split(',');
+    if (inst.service === 'karakeep' && Array.isArray(body.tags)) names = body.tags.map(t => (t && typeof t.tagName === 'string' ? t.tagName : ''));
   }
-  if (segs[0] === 'bookmarks' && segs.length >= 2 && own(segs[1])) return { ok: true, instance, kind: 'mutate' };
+  if (method === 'POST' && segs.length === 1 && segs[0] === 'bookmarks') {
+    return body && pool.includes(body.url) ? capped({ ok: true, instance, kind: 'create', url: body.url }, names) : { ok: false, instance, code: 'live_guard_create' };
+  }
+  if (segs[0] === 'bookmarks' && segs.length >= 2 && own(segs[1])) return capped({ ok: true, instance, kind: 'mutate' }, names);
   if (inst.service === 'karakeep') {
-    if (method === 'POST' && path === 'lists' && body && body.description === cfg.listMarker) return { ok: true, instance, kind: 'list-create' };
-    if (segs[0] === 'lists' && segs.length === 4 && segs[2] === 'bookmarks' && own(segs[3])) return { ok: true, instance, kind: 'member' };
+    if (method === 'POST' && path === 'lists' && body && body.description === cfg.listMarker) return capped({ ok: true, instance, kind: 'list-create' }, []);
+    if (segs[0] === 'lists' && segs.length === 4 && segs[2] === 'bookmarks' && own(segs[3])) return capped({ ok: true, instance, kind: 'member' }, []);
   }
   return { ok: false, instance, code: 'live_guard_mutation' };
 }
+
+// liveGuardRule as source text for the worker, with liveTagKey bound in.
+export const guardRuleSource = () => `(() => { const liveTagKey = ${liveTagKey.toString()}; return ${liveGuardRule.toString()}; })()`;
 
 export const rowUrl = (service, row) => (service === 'linkding' ? row?.url : row?.content?.url);
 export const recordPath = (service, id) => 'bookmarks/' + encodeURIComponent(id) + (service === 'linkding' ? '/' : '');
@@ -923,6 +979,9 @@ export class LiveRun {
     this.pages = new Set();
     this.consoleSeen = [];
     this.guardCfg = null;
+    // Creations in flight per instance ({ bookmarks, lists }), counted by
+    // the caps until their answer is recorded.
+    this.pending = {};
     this.deletableTags = new Set();
     this.sharing = {};
     this.snapshots = {};
@@ -972,11 +1031,15 @@ export class LiveRun {
     check(inst, 'api_instance', true);
     const url = new URL(path, inst.root).href;
     check(url.startsWith(auth ? inst.root : inst.base), 'api_origin', true);
-    this.nodeGuard(instance, method, url, body);
+    const guard = this.nodeGuard(instance, method, url, body);
     const c = this.count(instance);
     const cap = this.caps[instance];
     const limit = this.cleaning ? cap.node : cap.node - this.reserve[instance];
     if (++c.node > limit) { this.setFatal(this.cleaning ? 'cleanup_request_budget' : 'node_request_budget'); this.throwIfFatal(); }
+    // What leaves counts from here, before any wait: the run tags it names,
+    // and a create's slot until its answer is recorded.
+    if (guard.tags.length) this.noteTags(instance, guard.tags.map(key => ({ key })), 'node');
+    const release = guard.create ? this.hold(instance, 'bookmarks') : null;
     if (cap.minIntervalMs) {
       const wait = (this.lastCall?.[instance] || 0) + cap.minIntervalMs - Date.now();
       if (wait > 0) await sleep(wait);
@@ -986,11 +1049,13 @@ export class LiveRun {
     if (auth && inst.service !== 'pinboard') headers.Authorization = (inst.service === 'linkding' ? 'Token ' : 'Bearer ') + inst.token;
     if (body) headers['Content-Type'] = 'application/json';
     const response = await fetch(url, { method, redirect: 'error', credentials: 'omit', signal: AbortSignal.timeout(20000), headers, ...(body ? { body: JSON.stringify(body) } : {}) });
+    // A create the service refused (4xx) made nothing. Without an answer or
+    // after a server error it may have: the slot stays held.
+    if (release && !response.ok && response.status < 500) release();
     if (allow404 && response.status === 404) return null;
     // A module reproducing a server failure names the status it expects:
     // nothing is parsed or recorded as created.
     if (!response.ok && allowStatus.includes(response.status)) {
-      this.nodeCreate = null;
       await response.body?.cancel().catch(() => {});
       return { failedStatus: response.status };
     }
@@ -999,11 +1064,11 @@ export class LiveRun {
     if (accept !== 'json') return response.text();
     check((response.headers.get('content-type') || '').includes('json'), 'api_not_json');
     const data = await response.json();
-    if (method === 'POST' && this.nodeCreate) {
-      const pending = this.nodeCreate; this.nodeCreate = null;
+    if (guard.create) {
       const actual = rowUrl(inst.service, data);
-      check(actual === pending.url, 'seed_response_url', true);
+      check(actual === guard.create, 'seed_response_url', true);
       this.recordCreated({ instance, id: String(data.id), url: actual, source: 'node' });
+      release();
       // The worker guard must know a seeded bookmark before the extension
       // edits it, or it refuses the edit as foreign.
       await this.shareCreated({ instance, id: String(data.id), url: actual });
@@ -1011,30 +1076,65 @@ export class LiveRun {
     return data;
   }
 
-  // Node-side writes may only touch this run's objects.
+  // Node-side writes may only touch this run's objects, and count against
+  // the run's caps by the browser layers' rule. Returns what a write may
+  // create: a pool URL, and the run-prefix tag keys it names first.
   nodeGuard(instance, method, url, body) {
-    this.nodeCreate = null;
-    if (method === 'GET' || method === 'HEAD') return;
+    const none = { create: '', tags: [] };
+    if (method === 'GET' || method === 'HEAD') return none;
     this.writesPossible = true;
     const inst = this.instances[instance];
     const segs = url.slice(inst.root.length).split('?')[0].split('/').filter(Boolean);
     const own = id => this.report.ledger.created.some(r => r.instance === instance && r.id === String(id) && !r.deleted);
     const refuse = code => { this.setFatal(code); throw new HarnessFailure(code, { fatal: true }); };
+    // What the checks here allow, the rule allows too unless a cap would be
+    // passed; the caps are the rule's alone.
+    const capped = create => {
+      const decision = liveGuardRule({ ...this.buildGuardCfg(), writes: true }, this.guardView(), { url, method, body });
+      if (!decision.ok) refuse(decision.code);
+      return { create, tags: decision.tags || [] };
+    };
     if (method === 'POST' && segs.length === 1 && segs[0] === 'bookmarks' && !this.cleaning) {
       const pool = this.pools[instance] || [];
       if (!pool.includes(body?.url) || this.report.ledger.created.some(r => r.instance === instance && r.url === body.url)) refuse('node_guard_create');
-      this.nodeCreate = { url: body.url };
-      return;
+      return capped(body.url);
     }
     if (segs[0] === 'bookmarks' && segs[1] && own(segs[1])) {
       if (method === 'DELETE' && segs.length === 2 && !this.cleaning) refuse('node_guard_mutation');
-      return;
+      return this.cleaning ? none : capped('');
     }
     if (this.cleaning && method === 'DELETE' && segs.length === 2) {
-      if (segs[0] === 'lists' && this.report.ledger.lists.some(l => l.instance === instance && l.id === segs[1])) return;
-      if (segs[0] === 'tags' && this.deletableTags.has(instance + ':' + segs[1])) return;
+      if (segs[0] === 'lists' && this.report.ledger.lists.some(l => l.instance === instance && l.id === segs[1])) return none;
+      if (segs[0] === 'tags' && this.deletableTags.has(instance + ':' + segs[1])) return none;
     }
     refuse('node_guard_mutation');
+  }
+
+  // The configuration the guard rule judges by: both browser layers (the
+  // worker gets it as JSON) and, with writes on, the Node layer.
+  buildGuardCfg() {
+    const ids = Object.keys(this.instances);
+    const capOf = (id, key) => this.caps?.[id]?.[key] ?? 0;
+    return {
+      instances: Object.fromEntries(Object.values(this.instances).map(i => [i.id, { service: i.service, base: i.base, root: i.root }])),
+      pools: this.pools, listMarker: LIST_MARKER, writes: false,
+      aiOrigin: this.fakeAi ? this.fakeAi.origin : '', aiPath: this.fakeAi ? this.fakeAi.path : '',
+      caps: Object.fromEntries(ids.map(id => [id, capOf(id, 'browser')])),
+      limits: Object.fromEntries(ids.map(id => [id, { bookmarks: capOf(id, 'bookmarks'), lists: capOf(id, 'lists'), tags: capOf(id, 'tags') }])),
+      prefix: this.prefix,
+    };
+  }
+  guardView() {
+    const { created, lists, tags } = this.report.ledger;
+    return { created, lists, tags, pending: this.pending };
+  }
+  // A creation in flight holds its slot, so one sent meanwhile is judged as
+  // if this one had succeeded. The returned release frees it once.
+  hold(instance, slot) {
+    const pending = (this.pending[instance] ||= { bookmarks: 0, lists: 0 });
+    pending[slot]++;
+    let held = true;
+    return () => { if (held) { held = false; pending[slot]--; } };
   }
 
   recordCreated(entry) {
@@ -1055,15 +1155,33 @@ export class LiveRun {
     this.persist();
     if (this.report.ledger.lists.filter(l => l.instance === entry.instance).length > this.caps[entry.instance].lists) this.setFatal('list_budget');
   }
-  trackTag(instance, tag) {
-    if (!String(tag.name || '').toLowerCase().startsWith(this.prefix)) return;
+  // Run-prefix tag keys (liveTagKey), once per instance: reserved as a write
+  // naming them leaves (source route, sw or node) or found on a read-back
+  // (read), which also fills in the id. The guards refuse a write past the
+  // tag cap before it leaves, so only a tag no write named can pass the cap
+  // here, which is fatal.
+  noteTags(instance, entries, source) {
     const tags = this.report.ledger.tags;
-    const key = String(tag.name).toLowerCase();
-    if (!tags.some(t => t.instance === instance && t.key === key)) {
-      tags.push({ instance, key, id: tag.id == null ? '' : String(tag.id), module: this.currentModule?.id || '' });
-      this.persist();
-      if (tags.filter(t => t.instance === instance).length > this.caps[instance].tags) this.setFatal('tag_budget');
+    const added = [];
+    let changed = false;
+    for (const { key, id = '' } of entries) {
+      const known = tags.find(t => t.instance === instance && t.key === key);
+      if (known) { if (id && !known.id) { known.id = id; changed = true; } continue; }
+      const entry = { instance, key, id, source, module: this.currentModule?.id || '' };
+      tags.push(entry);
+      added.push({ instance, key });
+      changed = true;
     }
+    if (!changed) return;
+    this.persist();
+    // The worker reports its own; tell it the others.
+    if (added.length && source !== 'sw') this.shareGuard('tags', added);
+    if (added.length && tags.filter(t => t.instance === instance).length > (this.caps?.[instance]?.tags ?? 0)) this.setFatal('tag_budget');
+  }
+  trackTag(instance, tag) {
+    const key = liveTagKey(this.instances[instance]?.service, tag.name);
+    if (!key.toLowerCase().startsWith(this.prefix)) return;
+    this.noteTags(instance, [{ key, id: tag.id == null ? '' : String(tag.id) }], 'read');
   }
 
   // ---- configuration -------------------------------------------------------
@@ -1495,12 +1613,7 @@ export class LiveRun {
     this.worker = worker;
     this.extension = 'chrome-extension://' + extId + '/';
     await worker.evaluate(() => primeSettings());
-    this.guardCfg = {
-      instances: Object.fromEntries(Object.values(this.instances).map(i => [i.id, { service: i.service, base: i.base, root: i.root }])),
-      pools: this.pools, listMarker: LIST_MARKER, writes: false,
-      aiOrigin: this.fakeAi ? this.fakeAi.origin : '', aiPath: this.fakeAi ? this.fakeAi.path : '',
-      caps: Object.fromEntries(Object.keys(this.instances).map(i => [i, this.caps[i].browser])),
-    };
+    this.guardCfg = this.buildGuardCfg();
     this.poolSet = new Set(Object.values(this.pools).flat());
     this.routeProbe = { url: 'http://pbp-it-route-probe.invalid/' + this.runId, seen: false };
     await ctx.route(/^https?:\/\//, route => this.onRoute(route));
@@ -1508,7 +1621,7 @@ export class LiveRun {
     await worker.evaluate(url => fetch(url).then(r => r.status).catch(() => 0), this.routeProbe.url);
     check(this.routeProbe.seen, 'route_guard_blind_to_worker', true);
     this.swToken = randomBytes(8).toString('hex');
-    await worker.evaluate(`(${installWorkerGuard.toString()})(${liveGuardRule.toString()}, ${JSON.stringify(this.guardCfg)}, ${JSON.stringify(this.swToken)})`);
+    await worker.evaluate(`(${installWorkerGuard.toString()})(${guardRuleSource()}, ${JSON.stringify(this.guardCfg)}, ${JSON.stringify(this.swToken)})`);
     ctx.on('serviceworker', w => {
       if (!w.url().startsWith(this.extension)) return;
       this.setFatal('live_guard_sw_restart');
@@ -1540,7 +1653,7 @@ export class LiveRun {
     if (url === this.routeProbe.url) { this.routeProbe.seen = true; return route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*' }, body: '' }); }
     if (this.probe && url === this.probe.url) { this.probe.seen = true; return route.fulfill({ contentType: 'text/html', body: '<title>Navigation probe</title>' }); }
     if (this.poolSet.has(url) && (method === 'GET' || method === 'HEAD')) return route.fulfill({ contentType: 'text/html; charset=utf-8', body: fixtureHtml() });
-    const decision = liveGuardRule(this.guardCfg, { created: this.report.ledger.created }, { url, method, body: request.postData() });
+    const decision = liveGuardRule(this.guardCfg, this.guardView(), { url, method, body: request.postData() });
     if (decision.kind === 'outside') {
       const origin = (() => { try { return new URL(url).origin; } catch { return 'invalid'; } })();
       if (!this.report.blockedOrigins.includes(origin) && this.report.blockedOrigins.length < 50) this.report.blockedOrigins.push(origin);
@@ -1555,8 +1668,14 @@ export class LiveRun {
     if (counter > cap) { this.setFatal(decision.instance === 'ai' ? 'fake_ai_budget' : 'browser_request_budget'); return route.abort('blockedbyclient'); }
     if (decision.instance !== 'ai' && method !== 'GET' && method !== 'HEAD') this.count(decision.instance).browserWrites++;
     if (this.offline && decision.instance === this.offline) return route.abort('internetdisconnected');
+    // What leaves counts from here: its run tags now, a creation's slot
+    // until its answer is recorded.
+    if (decision.tags?.length) this.noteTags(decision.instance, decision.tags.map(key => ({ key })), 'route');
     if (decision.kind === 'create' || decision.kind === 'list-create') {
+      const release = this.hold(decision.instance, decision.kind === 'create' ? 'bookmarks' : 'lists');
       let response;
+      // Without an answer, or after a server error, the creation may exist
+      // unrecorded: the slot stays held. A refusal (4xx) made nothing.
       try { response = await route.fetch({ maxRedirects: 0 }); } catch { return route.abort('failed'); }
       if (response.ok()) {
         try {
@@ -1567,25 +1686,38 @@ export class LiveRun {
             if (actual !== decision.url) this.setFatal('live_guard_response');
             else {
               this.recordCreated({ instance: decision.instance, id: String(row.id), url: actual, source: 'route' });
+              release();
               // A page-context create never passes the worker guard; tell it,
               // so a later worker update of that bookmark is not refused.
               this.shareCreated({ instance: decision.instance, id: String(row.id), url: actual });
             }
-          } else this.recordList({ instance: decision.instance, id: String(row.id) });
+          } else {
+            const entry = { instance: decision.instance, id: String(row.id) };
+            this.recordList(entry);
+            release();
+            this.shareGuard('lists', [entry]);
+          }
         } catch { this.setFatal('live_guard_response'); }
-      }
+      } else if (response.status() < 500) release();
       return route.fulfill({ response });
     }
     return route.continue();
   }
 
-  shareCreated(entry) {
-    if (!this.worker) return Promise.resolve();
-    return this.worker.evaluate(({ token, entry }) => {
+  // Tell the worker guard what another layer recorded (page-context and
+  // Node requests never pass the worker), so both layers count the same
+  // bookmarks, lists and tags.
+  shareGuard(field, entries) {
+    if (!this.worker || !entries.length) return Promise.resolve();
+    return this.worker.evaluate(({ token, field, entries }) => {
       const g = globalThis.pbpLiveGuard;
-      if (g && g.token === token && !g.created.some(r => r.instance === entry.instance && r.id === entry.id)) g.created.push(entry);
-    }, { token: this.swToken, entry }).catch(() => {});
+      if (!g || g.token !== token || !Array.isArray(g[field])) return;
+      for (const entry of entries) {
+        if (!g[field].some(r => r.instance === entry.instance && (field === 'tags' ? r.key === entry.key : r.id === entry.id))) g[field].push(entry);
+      }
+    }, { token: this.swToken, field, entries }).catch(() => {});
   }
+  shareCreated(entry) { return this.shareGuard('created', [entry]); }
 
   // Merge the worker guard's view: creations it saw, counts, violations.
   async syncGuard() {
@@ -1596,7 +1728,7 @@ export class LiveRun {
         this.worker.evaluate(token => {
           const g = globalThis.pbpLiveGuard;
           if (!g || g.token !== token) return null;
-          return { created: g.created, lists: g.lists, counts: g.counts, violations: g.violations.splice(0) };
+          return { created: g.created, lists: g.lists, tags: g.tags, counts: g.counts, violations: g.violations.splice(0) };
         }, this.swToken),
         sleep(5000).then(() => 'timeout'),
       ]);
@@ -1605,6 +1737,9 @@ export class LiveRun {
     if (!state) { this.setFatal('live_guard_missing'); return; }
     for (const entry of state.created) this.recordCreated({ ...entry, source: 'sw' });
     for (const entry of state.lists) this.recordList(entry);
+    const swTags = {};
+    for (const tag of state.tags || []) (swTags[tag.instance] ||= []).push({ key: tag.key });
+    for (const [instance, entries] of Object.entries(swTags)) this.noteTags(instance, entries, 'sw');
     for (const [instance, n] of Object.entries(state.counts)) if (this.counts[instance]) this.counts[instance].sw = n;
     for (const v of state.violations) {
       if (v.code === 'live_guard_origin') {
@@ -2337,7 +2472,7 @@ export class LiveRun {
 // the whole expression is how Playwright delivers any worker function).
 export function installWorkerGuard(rule, cfg, token) {
   const original = globalThis.fetch;
-  const state = globalThis.pbpLiveGuard = { token, cfg, created: [], lists: [], counts: {}, writes: {}, offline: '', violations: [] };
+  const state = globalThis.pbpLiveGuard = { token, cfg, created: [], lists: [], tags: [], pending: {}, counts: {}, writes: {}, offline: '', violations: [] };
   globalThis.fetch = async function pbpGuardFetch(input, opts = {}) {
     // fetch accepts a string, a URL or a Request.
     const url = typeof input === 'string' ? input : (input && typeof input.url === 'string' ? input.url : String(input));
@@ -2349,7 +2484,7 @@ export function installWorkerGuard(rule, cfg, token) {
     if (url.startsWith('chrome-extension://') || resolved.startsWith('chrome-extension://')) return original(input, opts);
     const method = String(opts.method || (typeof input !== 'string' && input.method) || 'GET').toUpperCase();
     const body = typeof opts.body === 'string' ? opts.body : null;
-    const decision = rule(state.cfg, { created: state.created }, { url, method, body });
+    const decision = rule(state.cfg, { created: state.created, lists: state.lists, tags: state.tags, pending: state.pending }, { url, method, body });
     if (!decision.ok) {
       let origin = 'invalid';
       try { origin = new URL(url).origin; } catch (_) { /* keep invalid */ }
@@ -2369,15 +2504,26 @@ export function installWorkerGuard(rule, cfg, token) {
     // Only the transport fails; the product save, queue and replay code is real.
     if (state.offline && state.offline === id) throw new TypeError('Failed to fetch');
     if (method !== 'GET' && method !== 'HEAD') state.writes[id] = (state.writes[id] || 0) + 1;
+    // What leaves counts from here: its run tags now, a creation's slot until
+    // its answer is recorded (kept without an answer or after a server
+    // error, when the creation may exist; a refusal, 4xx, made nothing).
+    for (const key of decision.tags || []) if (!state.tags.some(t => t.instance === id && t.key === key)) state.tags.push({ instance: id, key });
+    const slot = decision.kind === 'create' ? 'bookmarks' : decision.kind === 'list-create' ? 'lists' : '';
+    const pending = slot ? (state.pending[id] = state.pending[id] || { bookmarks: 0, lists: 0 }) : null;
+    let held = !!slot;
+    const release = () => { if (held) { held = false; pending[slot]--; } };
+    if (slot) pending[slot]++;
     const response = await original(input, opts);
-    if ((decision.kind === 'create' || decision.kind === 'list-create') && response.ok) {
+    if (slot && !response.ok && response.status < 500) release();
+    if (slot && response.ok) {
       const row = await response.clone().json();
       if (decision.kind === 'create') {
         const service = cfg.instances[id].service;
         const actual = service === 'linkding' ? row.url : row.content?.url;
         if (actual !== decision.url) { state.violations.push({ code: 'live_guard_response', instance: id }); throw new Error('live_guard_response'); }
         if (!state.created.some(r => r.instance === id && r.id === String(row.id))) state.created.push({ instance: id, id: String(row.id), url: actual });
-      } else state.lists.push({ instance: id, id: String(row.id) });
+      } else if (!state.lists.some(l => l.instance === id && l.id === String(row.id))) state.lists.push({ instance: id, id: String(row.id) });
+      release();
     }
     return response;
   };
