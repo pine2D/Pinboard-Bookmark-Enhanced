@@ -5,16 +5,34 @@
 // green, 1 = red, 2 = unknown suite / invalid invocation.
 //
 // Usage: node .qa-scan/run-test.mjs tests/<file>.html
+//        node .qa-scan/run-test.mjs --print-counts tests/<file>.html [more.html ...]
+// --print-counts only reports: the rows a page actually rendered next to its
+// EXPECTED_RESULTS entry (waiting until the count has stopped changing, since
+// the registered number may be stale). It edits nothing and leaves the normal
+// mode untouched; exit 0 unless the page could not be measured.
 import { chromium } from "playwright";
 import { createServer } from "http";
 import { readFile } from "fs/promises";
 import { resolve, dirname, extname, relative } from "path";
 import { fileURLToPath } from "url";
 
-const file = process.argv[2];
+const argv = process.argv.slice(2);
+const printCounts = argv.includes("--print-counts");
+const files = argv.filter((arg) => arg !== "--print-counts");
+const file = files[0];
 if (!file) {
-  console.error("usage: node .qa-scan/run-test.mjs <test.html>");
+  console.error("usage: node .qa-scan/run-test.mjs [--print-counts] <test.html> [...]");
   process.exit(2);
+}
+if (printCounts && files.length > 1) {
+  // One page per process: the runner keeps its server and browser in module state.
+  const { spawnSync } = await import("child_process");
+  let worst = 0;
+  for (const one of files) {
+    const child = spawnSync(process.execPath, [fileURLToPath(import.meta.url), "--print-counts", one], { stdio: "inherit" });
+    worst = Math.max(worst, child.status === null ? 1 : child.status);
+  }
+  process.exit(worst);
 }
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const abs = resolve(file);
@@ -124,7 +142,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/wayback-tests.html": 45,
 });
 const expected = EXPECTED_RESULTS[rel];
-if (expected === undefined) {
+if (expected === undefined && !printCounts) {
   console.error(`ERROR: no expected result count registered for ${rel}`);
   process.exit(2);
 }
@@ -254,13 +272,22 @@ try {
     // browser closes — attach a no-op catch so that later settlement can't
     // surface as an unhandled rejection; it doesn't affect what Promise.race
     // observes below.
-    const waitForRows = page.waitForFunction((resultCount) => {
-      let total = 0;
-      for (const el of document.querySelectorAll(".pass, .fail, .skip")) {
-        if (el.classList.contains("pass") || el.classList.contains("fail") || el.classList.contains("skip")) total++;
-      }
-      return total >= resultCount;
-    }, expected, { polling: 50, timeout: 0 });
+    // --print-counts cannot trust the registered number, so it waits for the
+    // row count to hold still instead (and stops at the same stall deadline).
+    const waitForRows = printCounts
+      ? page.waitForFunction(() => {
+        const total = document.querySelectorAll(".pass, .fail, .skip").length;
+        const seen = window.__pbpCountWatch || (window.__pbpCountWatch = { total: -1, since: performance.now() });
+        if (seen.total !== total) { seen.total = total; seen.since = performance.now(); }
+        return total > 0 && performance.now() - seen.since >= 1500;
+      }, undefined, { polling: 100, timeout: 0 })
+      : page.waitForFunction((resultCount) => {
+        let total = 0;
+        for (const el of document.querySelectorAll(".pass, .fail, .skip")) {
+          if (el.classList.contains("pass") || el.classList.contains("fail") || el.classList.contains("skip")) total++;
+        }
+        return total >= resultCount;
+      }, expected, { polling: 50, timeout: 0 });
     waitForRows.catch(() => {});
     try {
       const outcome = await Promise.race([
@@ -302,24 +329,34 @@ try {
   });
 
   const total = dom.pass + dom.fail + dom.skip;
-  const stalledNote = dom.stalled
-    ? ` STALLED(rendered=${total}, last row: "${(dom.lastRows && dom.lastRows[dom.lastRows.length - 1]) || ""}")`
-    : "";
-  console.log(`pass=${dom.pass} fail=${dom.fail} skip=${dom.skip} expected=${expected} title="${dom.title}"${stalledNote}`);
-  if (dom.sampleError) console.error(`ERROR: diagnostic sample failed after the suite stalled: ${dom.sampleError}`);
-  if (dom.failures?.length) console.error("failures:\n  " + dom.failures.join("\n  "));
-  if (total !== expected) console.error(`ERROR: expected ${expected} result rows, found ${total}`);
-  if (runtimeErrors.length) console.error("errors:\n  " + runtimeErrors.slice(0, 25).join("\n  "));
-  if (browserDisconnected) console.error("ERROR: browser disconnected before the suite completed");
-  if (blockedExternal.length) {
-    const unique = [...new Set(blockedExternal)];
-    console.error(`NOTE: closed network blocked ${blockedExternal.length} external subresource(s):\n  ` + unique.slice(0, 10).join("\n  "));
+  if (printCounts) {
+    const registered = expected === undefined ? "unregistered" : String(expected);
+    const verdict = expected === undefined ? "NOT REGISTERED"
+      : total === expected ? "match" : `DIFFERS (${total > expected ? "+" : ""}${total - expected})`;
+    console.log(`${rel}: pass=${dom.pass} fail=${dom.fail} skip=${dom.skip} total=${total} expected=${registered} ${verdict}${dom.stalled ? " STALLED" : ""}`);
+    if (dom.failures?.length) console.error("failures:\n  " + dom.failures.join("\n  "));
+    if (runtimeErrors.length) console.error("errors:\n  " + runtimeErrors.slice(0, 25).join("\n  "));
+    if (dom.stalled || browserDisconnected || dom.sampleError) process.exitCode = 1;
+  } else {
+    const stalledNote = dom.stalled
+      ? ` STALLED(rendered=${total}, last row: "${(dom.lastRows && dom.lastRows[dom.lastRows.length - 1]) || ""}")`
+      : "";
+    console.log(`pass=${dom.pass} fail=${dom.fail} skip=${dom.skip} expected=${expected} title="${dom.title}"${stalledNote}`);
+    if (dom.sampleError) console.error(`ERROR: diagnostic sample failed after the suite stalled: ${dom.sampleError}`);
+    if (dom.failures?.length) console.error("failures:\n  " + dom.failures.join("\n  "));
+    if (total !== expected) console.error(`ERROR: expected ${expected} result rows, found ${total}`);
+    if (runtimeErrors.length) console.error("errors:\n  " + runtimeErrors.slice(0, 25).join("\n  "));
+    if (browserDisconnected) console.error("ERROR: browser disconnected before the suite completed");
+    if (blockedExternal.length) {
+      const unique = [...new Set(blockedExternal)];
+      console.error(`NOTE: closed network blocked ${blockedExternal.length} external subresource(s):\n  ` + unique.slice(0, 10).join("\n  "));
+    }
+    if (blockedProgrammatic.length) {
+      const unique = [...new Set(blockedProgrammatic)];
+      console.error(`ERROR: closed network blocked ${blockedProgrammatic.length} PROGRAMMATIC external request(s) — a mock is missing:\n  ` + unique.slice(0, 10).join("\n  "));
+    }
+    if (dom.fail > 0 || total !== expected || runtimeErrors.length > 0 || browserDisconnected || blockedProgrammatic.length > 0 || dom.stalled) process.exitCode = 1;
   }
-  if (blockedProgrammatic.length) {
-    const unique = [...new Set(blockedProgrammatic)];
-    console.error(`ERROR: closed network blocked ${blockedProgrammatic.length} PROGRAMMATIC external request(s) — a mock is missing:\n  ` + unique.slice(0, 10).join("\n  "));
-  }
-  if (dom.fail > 0 || total !== expected || runtimeErrors.length > 0 || browserDisconnected || blockedProgrammatic.length > 0 || dom.stalled) process.exitCode = 1;
 } catch (error) {
   console.error(`ERROR: ${error && error.message ? error.message : error}`);
   if (runtimeErrors.length) console.error("errors:\n  " + runtimeErrors.slice(0, 25).join("\n  "));
