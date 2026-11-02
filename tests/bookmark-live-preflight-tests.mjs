@@ -2331,6 +2331,37 @@ try {
       assert.equal(dirty.report.failure.code, 'ext_root_dirty');
       assert.equal(dirty.report.productClean, false);
       assert.equal(dirty.report.authorization, undefined, 'no round claimed');
+      // A directory git ignores inside a clean tree is not that tree: it
+      // holds files of no commit (say an unpacked release ZIP), so it is
+      // refused and never reported under the outer HEAD. An ignored file
+      // the extension would load is refused too; other ignored files are not.
+      rmSync(join(ext, 'popup.js'));
+      writeFileSync(join(ext, '.gitignore'), 'release/\nlocal-*.js\nnode_modules/\n');
+      git('add', '.gitignore');
+      git('commit', '-q', '-m', 'ignore build output');
+      mkdirSync(join(ext, 'node_modules'));
+      writeFileSync(join(ext, 'node_modules', 'x.js'), '// tooling\n');
+      assert.deepEqual(live.gitState(realpathSync(ext) + '/'), { head: git('rev-parse', 'HEAD').stdout.trim(), clean: true, reason: '' }, 'ignored tooling outside the product stays clean');
+      mkdirSync(join(ext, 'release', 'unpacked'), { recursive: true });
+      writeFileSync(join(ext, 'release', 'unpacked', 'manifest.json'), '{}\n');
+      writeFileSync(join(ext, 'release', 'unpacked', 'background.js'), '// edited copy\n');
+      const nested = live.gitState(realpathSync(join(ext, 'release', 'unpacked')) + '/');
+      assert.deepEqual([nested.clean, nested.reason], [false, 'not_toplevel']);
+      const ignoredDir = await run([...extArgs.slice(0, -1), join(ext, 'release', 'unpacked')], { credentials: false, state: extState });
+      assert.equal(ignoredDir.report.failure.code, 'ext_root_dirty', ignoredDir.output);
+      assert.equal(ignoredDir.report.productClean, false);
+      writeFileSync(join(ext, 'local-debug.js'), '// ignored but loadable\n');
+      assert.deepEqual([live.gitState(realpathSync(ext) + '/').clean, live.gitState(realpathSync(ext) + '/').reason], [false, 'ignored_product_files']);
+      rmSync(join(ext, 'local-debug.js'));
+      // manifest.json itself untracked (ignored) in a clean tree.
+      const loose = join(dir, 'ext-loose');
+      mkdirSync(loose);
+      spawnSync('git', ['-C', loose, 'init', '-q']);
+      writeFileSync(join(loose, '.gitignore'), 'manifest.json\n');
+      writeFileSync(join(loose, 'manifest.json'), '{}\n');
+      spawnSync('git', ['-C', loose, '-c', 'user.name=pbp', '-c', 'user.email=pbp@example.invalid', '-c', 'commit.gpgsign=false', 'add', '.gitignore']);
+      spawnSync('git', ['-C', loose, '-c', 'user.name=pbp', '-c', 'user.email=pbp@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 'x']);
+      assert.equal(live.gitState(realpathSync(loose) + '/').clean, false, 'an untracked manifest is not a commit');
       const missing = await run([...extArgs.slice(0, -1), join(dir, 'no-such-tree')], { credentials: false, state: extState });
       assert.equal(missing.report.failure.code, 'ext_root_invalid');
       const extPlan = JSON.parse((await run(['--plan', '--ext-root', ext], { credentials: false })).output);

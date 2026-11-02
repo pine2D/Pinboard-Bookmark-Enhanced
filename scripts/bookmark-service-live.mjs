@@ -209,12 +209,28 @@ export function resolveExtRoot(raw) {
   return dir.endsWith('/') ? dir : dir + '/';
 }
 
-// A directory's HEAD and whether its worktree is clean (git status shows
-// nothing). Outside a git worktree: no HEAD, not clean.
+// A directory's HEAD and whether it is exactly that commit: the top of its
+// worktree (an ignored subdirectory, say an unpacked release ZIP, holds
+// files of no commit), manifest.json tracked, git status empty, and no
+// ignored file the extension would load. Outside a git worktree: no HEAD,
+// not clean. `reason` names the first check that failed.
 export function gitState(dir, git = (args, cwd) => spawnSync('git', ['-C', cwd, ...args], { encoding: 'utf8' })) {
   const head = git(['rev-parse', 'HEAD'], dir);
+  const out = { head: head.status === 0 ? head.stdout.trim() : '', clean: false, reason: '' };
+  if (head.status !== 0) { out.reason = 'not_git'; return out; }
+  const top = git(['rev-parse', '--show-toplevel'], dir);
+  let topReal = '', dirReal = '';
+  try { topReal = realpathSync(top.stdout.trim()); dirReal = realpathSync(String(dir)); } catch { /* compared below */ }
+  if (top.status !== 0 || !topReal || topReal !== dirReal) { out.reason = 'not_toplevel'; return out; }
+  if (git(['ls-files', '--error-unmatch', '--', 'manifest.json'], dir).status !== 0) { out.reason = 'manifest_untracked'; return out; }
   const status = git(['status', '--porcelain'], dir);
-  return { head: head.status === 0 ? head.stdout.trim() : '', clean: head.status === 0 && status.status === 0 && status.stdout.trim() === '' };
+  if (status.status !== 0 || status.stdout.trim() !== '') { out.reason = 'uncommitted'; return out; }
+  const ignored = git(['status', '--porcelain', '--ignored', '-z'], dir);
+  if (ignored.status !== 0) { out.reason = 'uncommitted'; return out; }
+  const loaded = ignored.stdout.split('\0').filter(e => e.startsWith('!! ')).map(e => e.slice(3).replace(/\/$/, '')).filter(isProductRuntimeFile);
+  if (loaded.length) { out.reason = 'ignored_product_files'; return out; }
+  out.clean = true;
+  return out;
 }
 
 export const SNAPSHOT_SKIP_NOTE = id => `工具读不到用户 linkding 的「自动 HTML 快照」开关，user 目标默认跳过；确认开关已开后可用 --scenario ${id} 显式点名运行`;
