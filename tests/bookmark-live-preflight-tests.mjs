@@ -3325,8 +3325,16 @@ try {
       assert.deepEqual(temp.selected, []);
       assert(temp.skipped.length > 0 && temp.skipped.every(s => s.reason === 'pinboard_user_only'));
       assert.throws(() => live.selectModules('pinboard.core.worker', { services: ['pinboard'], target: 'temp' }), e => e.code === 'module_requires_user');
-      const { selected, skipped } = live.selectModules('pinboard.*', { services: ['pinboard'], target: 'user' });
+      // The pre-H3c set (readonly and core) fits one round; the H3c
+      // regression module takes a second (Pinboard: 8 URLs, 10 run tags).
+      const { selected, skipped } = live.selectModules('pinboard.readonly,pinboard.core.*', { services: ['pinboard'], target: 'user' });
       assert(selected.length >= 4 && selected.every(m => m.id.startsWith('pinboard.')));
+      const every = live.selectModules('pinboard.*', { services: ['pinboard'], target: 'user' }).selected;
+      assert(every.some(m => m.id === 'pinboard.regress.tags-notes'));
+      const packed = live.packRounds(every, 'user');
+      assert.equal(packed.ok, true, JSON.stringify(packed.overflow));
+      assert.equal(packed.count, 2);
+      assert.deepEqual(packed.overflow, []);
       const plan = live.buildPlan({ target: 'user', selected, skipped });
       assert.deepEqual(plan.problems, []);
       const pb = plan.budget.pinboard.pinboard;
@@ -3578,7 +3586,7 @@ try {
     // No pinboardToken: the modules are skipped with a reason, nothing is sent.
     if (only('pinboard token')) {
       const mock = createPinboardMock({ token });
-      const skipped = await inProcess(pbArgs(noTokenCredentials, 'pinboard.*', 'pb-none'), mock);
+      const skipped = await inProcess(pbArgs(noTokenCredentials, 'pinboard.readonly,pinboard.core.*', 'pb-none'), mock);
       assert.equal(skipped.code, 0, skipped.output);
       assert.deepEqual(mock.calls, []);
       assert.equal(skipped.report.pinboard.configured, false);
@@ -3646,6 +3654,48 @@ try {
       const texts = [done.output, readFileSync(done.reportPath, 'utf8'), summary];
       for (const s of secretsOf) assert(!texts.some(t => t.includes(s)), 'leaked ' + (s === user ? 'account name' : 'token'));
       assert(Array.isArray(rep.modules[0].surfaces), 'the surfaces a module drove are recorded');
+    }
+    // H3c Pinboard regression on the mock: twin merge, the duplicate-URL
+    // answer recorded as Pinboard wrote it and recognised as a conflict, the
+    // reader's title/extended write. A mock that words the duplicate answer
+    // differently fails that part alone, with the text in the report.
+    if (only('pinboard mock browser write round')) {
+      const mock = createPinboardMock({ token });
+      const extRoot = process.env.PBP_PREFLIGHT_EXT_ROOT ? ['--ext-root', process.env.PBP_PREFLIGHT_EXT_ROOT] : [];
+      const done = await inProcess([...pbArgs(pbCredentials, 'pinboard.regress.*', 'pb-regress'), ...extRoot], mock);
+      const mod = done.report.modules.find(m => m.id === 'pinboard.regress.tags-notes');
+      // The twin merge is G4b (ec31de02): a product tree without it sends the
+      // NFD and zero-width twins next to their visible spelling, and only that
+      // part fails (PBP_PREFLIGHT_EXT_ROOT=<a G4b tree> checks the pass).
+      const merge = mod.parts.find(p => p.name === 'merge_twins');
+      assert(merge.status === 'passed' || (merge.status === 'failed' && merge.code === 'regress_merge_sent_tags'), JSON.stringify(merge));
+      if (merge.status === 'failed') assert(done.report.readBackDiffs.some(d => d.code === 'regress_merge_sent_tags'), JSON.stringify(done.report.readBackDiffs));
+      if (extRoot.length) assert.equal(merge.status, 'passed');
+      assert.equal(done.code, merge.status === 'passed' ? 0 : 1, done.output);
+      assert.equal(mod.status, merge.status, done.output);
+      assert.deepEqual(mod.parts.map(p => [p.name, p.status]), [['create_plain', 'passed'], ['merge_twins', merge.status], ['duplicate_result_code', 'passed'], ['reader_title_extended', 'passed']]);
+      assert.deepEqual(mod.notes.duplicateResultCode, { code: 'item already exists', status: 200, recognizedAs: 'conflict' });
+      assert(done.report.pinboardResults.some(r => r.replace === 'no' && r.code === 'item already exists'));
+      assert(done.report.pinboardResults.every(r => Object.keys(r).sort().join() === 'code,module,replace,status'), 'only replace, status and the code are kept');
+      assert.equal(mock.posts.size, 0);
+      assert(mock.calls.filter(c => c.path !== 'tags/get').length <= 18 + 1 + live.cleanupCost({ service: 'pinboard', bookmarks: 1, urls: done.report.pools.pinboard.length }), 'calls ' + mock.calls.length);
+      const summary = readFileSync(join(done.reportPath, '..', 'summary.zh.md'), 'utf8');
+      assert(summary.includes('实测 result_code：「item already exists」'), summary);
+      for (const s of secretsOf) assert(!readFileSync(done.reportPath, 'utf8').includes(s));
+
+      const other = createPinboardMock({ token });
+      const transport = async url => {
+        const u = new URL(url);
+        if (live.pinboardEndpoint(url) === 'posts/add' && u.searchParams.get('replace') === 'no' && other.posts.has(u.searchParams.get('url'))) return { status: 200, contentType: 'application/json; charset=utf-8', body: JSON.stringify({ result_code: 'duplicate URL' }) };
+        return other.transport(url);
+      };
+      const worded = await inProcess([...pbArgs(pbCredentials, 'pinboard.regress.*', 'pb-regress-worded'), ...extRoot], { transport });
+      assert.notEqual(worded.code, 0);
+      const wmod = worded.report.modules[0];
+      assert.deepEqual(wmod.parts.map(p => [p.name, p.status, p.code || '']), [['create_plain', 'passed', ''], ['merge_twins', merge.status, merge.code || ''], ['duplicate_result_code', 'failed', 'duplicate_result_code'], ['reader_title_extended', 'passed', '']]);
+      assert.deepEqual(wmod.notes.duplicateResultCode, { code: 'duplicate URL', status: 200, recognizedAs: 'api' });
+      assert.equal(worded.report.cleanup.complete, true);
+      assert.equal(other.posts.size, 0);
     }
     // The review's counterexample: a row that opens the popup but leaves it
     // out of `surfaces` (so --changed would never pick it for popup.js)

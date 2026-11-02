@@ -2429,6 +2429,107 @@ export const SELFHOSTED_MODULES = [
 
 MODULES.push(...SELFHOSTED_MODULES);
 
+// The posts/add query fields a module's request carried (never the token).
+const pinboardAdds = (t, since = 0) => t.requests({ path: /^posts\/add\?/, since }).map(r => {
+  const q = new URLSearchParams(r.path.slice(r.path.indexOf('?') + 1));
+  return { url: q.get('url') || '', tags: q.get('tags') || '', replace: q.get('replace') || '', description: q.get('description'), extended: q.get('extended') };
+});
+
+// H3c. Pinboard regression after the self-hosted work (§9-17, G4b) and the
+// duplicate-URL answer nobody had seen live (open-items). User target only,
+// every request through the 3 s gate; one private bookmark carries all of it.
+export const REGRESS_MODULES = [
+  {
+    id: 'regress.tags-notes',
+    services: ['pinboard'],
+    surfaces: ['background', 'reader'],
+    features: ['pinboard-plain-tags', 'pinboard-twin-merge', 'pinboard-case-dedupe-order', 'pinboard-duplicate-result-code', 'pinboard-title-extended'],
+    fixRefs: ['G4b'],
+    needs: needs(),
+    // Measured on the mock: create 2, merge 3, duplicate 1, reader 7-8.
+    budget: { bookmarks: 1, urls: 1, node: 6, browser: 30, ai: 0, tags: 6, seconds: 120, calls: { pinboard: 18 } },
+    files: [],
+    settings: { optRespectTagCase: true },
+    async steps(t) {
+      const { prefix } = t;
+      const url = t.claimUrl();
+      const title = prefix + ' 回归 & <b>';
+      const notes = '第一行 & <b>x</b> "q"\n第二行  两个空格';
+      const submit = intent => t.sw(async intent => { const r = await submitSaveIntent(intent); return { status: r.status, reason: r.reason || '' }; }, intent);
+      const base = { url, title, notes, private: true, toread: false, archive: false };
+      const created = [prefix + '_Café', prefix + '_x-ray', prefix + '_Foo'];
+      let since = t.now();
+
+      await t.part('create_plain', [], async () => {
+        await t.phase('pinboard_regress_create');
+        t.expectEq((await submit({ ...base, mode: 'create', tags: created.join(' ') })).status, 'saved', 'regress_create');
+        const [add] = pinboardAdds(t, since);
+        t.expectEq(add?.tags, created.join(' '), 'regress_create_sent_tags');
+        const row = await t.ownRow(url);
+        t.expectEq(row.tags, created.join(' '), 'regress_create_tags');
+        t.expectEq(row.description, title, 'regress_create_title');
+        t.expectEq(row.extended, notes, 'regress_create_extended');
+        t.expectEq(row.shared, 'no', 'privacy');
+      }, ['pinboard-plain-tags', 'pinboard-title-extended']);
+
+      // The server's spelling first: case, NFD and zero-width twins fold into
+      // it (unionTags, G4b), a separator variant of a bookmark tag takes the
+      // bookmark's spelling (G4 alignment: x_ray -> x-ray, nothing new), a
+      // plain case repeat among the new names is dropped, order is kept.
+      await t.part('merge_twins', ['G4b'], async () => {
+        await t.phase('pinboard_regress_merge');
+        since = t.now();
+        const incoming = [prefix + '_FOO', prefix + '_café', prefix + '_fo​o', prefix + '_x_ray', prefix + '_new', prefix + '_NEW'];
+        t.expectEq((await submit({ ...base, mode: 'merge', title: 'must keep the stored title', notes: '', tags: incoming.join(' ') })).status, 'saved', 'regress_merge');
+        const expected = [...created, prefix + '_new'].join(' ');
+        const adds = pinboardAdds(t, since);
+        t.note('mergeSent', { adds: adds.length, tags: adds.map(a => a.tags.split(' ').length) });
+        t.expectEq(adds[adds.length - 1]?.tags, expected, 'regress_merge_sent_tags');
+        const row = await t.ownRow(url);
+        t.expectEq(row.tags, expected, 'regress_merge_tags');
+        t.expectEq(row.description, title, 'regress_merge_title');
+        t.expectEq(row.extended, notes, 'regress_merge_extended');
+      }, ['pinboard-twin-merge', 'pinboard-case-dedupe-order']);
+
+      // A second create of the stored URL: replace=no, Pinboard answers with
+      // its own result_code text, and the extension must call it a conflict.
+      await t.part('duplicate_result_code', [], async () => {
+        await t.phase('pinboard_regress_duplicate');
+        since = t.now();
+        const result = await submit({ ...base, mode: 'create', tags: created[0] });
+        const answers = t.pinboardResults().filter(r => r.replace === 'no');
+        const last = answers[answers.length - 1] || null;
+        t.note('duplicateResultCode', { code: last?.code ?? null, status: last?.status ?? null, recognizedAs: result.reason || result.status });
+        t.expectEq(pinboardAdds(t, since).map(a => a.replace).join(','), 'no', 'regress_duplicate_replace');
+        t.expect(!!last && last.status === 200 && last.code !== 'done', 'regress_duplicate_answer');
+        t.expectEq(result.reason, 'conflict', 'duplicate_result_code');
+      }, ['pinboard-duplicate-result-code']);
+
+      // The reader writes title (description) and notes (extended) and
+      // keeps the tags it did not touch.
+      await t.part('reader_title_extended', [], async () => {
+        await t.phase('pinboard_regress_reader');
+        const before = (await t.ownRow(url)).tags;
+        const reader = await t.openReader(url, { ready: '#reader-bookmark-edit' });
+        await reader.locator('#reader-bookmark-edit').click();
+        await t.until(async () => (await reader.locator('#reader-bookmark-title').inputValue()) === title, 'regress_reader_prefill');
+        const edited = notes.replace('第二行', '编辑后的第二行') + '\n第三行';
+        await reader.locator('#reader-bookmark-title').fill(title + ' 已编辑');
+        await reader.locator('#reader-bookmark-notes').fill(edited);
+        await t.applyReader(reader);
+        const row = await t.ownRow(url);
+        t.expectEq(row.description, title + ' 已编辑', 'regress_reader_title');
+        t.expectEq(row.extended, edited, 'regress_reader_extended');
+        t.expectEq(row.tags, before, 'regress_reader_tags');
+        t.expectEq(row.shared, 'no', 'privacy');
+        await reader.close();
+      }, ['pinboard-title-extended']);
+      t.check('pinboard: plain tags, twin merge (case/NFD/zero-width fold, separators kept, order kept), the real replace=no duplicate answer recognised as a conflict, title and extended through the worker and the reader');
+    },
+  },
+];
+MODULES.push(...REGRESS_MODULES);
+
 // Group aliases. The pre-registry --scenario values keep their meaning:
 // core = the original smoke, edges = tag/offline/quote regressions.
 export const GROUPS = Object.freeze({
@@ -2437,6 +2538,7 @@ export const GROUPS = Object.freeze({
   readonly: ['*.readonly'],
   ai: ['*.ai.*'],
   selfhosted: ['*.sh.*'],
+  regress: ['*.regress.*'],
   all: ['*'],
 });
 
@@ -2445,6 +2547,7 @@ export const GROUPS = Object.freeze({
 export const UNCOVERED = Object.freeze([
   { text: 'Pinboard 回归 §9-17（popup/快捷/批量保存格式、含 " 标签）：--target user --service pinboard --scenario core', coveredBy: 'pinboard.core.save-paths' },
   { text: 'Pinboard §9-18（分隔符说明文案中英文读感）：需人工阅读，无模块' },
+  { text: 'Pinboard 429 的响应体：不故意触发限流，仍未实测（mock 按文档写作 HTML）' },
   { text: '稍后读快捷键（rl* 设置）与 linkding / Karakeep 的快捷保存、批量保存', coveredBy: '*.sh.read-later' },
   { text: 'linkding 共享开启分支（只在临时容器跑：--scenario linkding.sharing.*）', coveredBy: 'linkding.sharing.*' },
   { text: 'linkding 超长标签 500（只在临时 Postgres 跑：--scenario linkding-pg.limits.*）', coveredBy: 'linkding-pg.limits.*' },

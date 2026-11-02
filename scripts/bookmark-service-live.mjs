@@ -2778,7 +2778,21 @@ export class LiveRun {
       if (code === 'done') reservation.confirm();
       else if (res.status < 500) reservation.abandon();
     }
+    if (pinboardEndpoint(url) === 'posts/add') this.notePinboardResult(url, res);
     return route.fulfill({ status: res.status, headers: { 'content-type': res.contentType || 'application/json; charset=utf-8' }, body: res.body }).catch(() => {});
+  }
+
+  // What Pinboard answered a posts/add with (open-items: the duplicate-URL
+  // result_code was never seen live, only inferred from the docs): the
+  // replace flag, the HTTP status and the result_code text, per module. No
+  // query value beyond replace is kept, so no token, URL or tag.
+  notePinboardResult(url, res) {
+    let replace = '', code = '';
+    try { replace = new URL(url).searchParams.get('replace') || ''; } catch { /* unparsable */ }
+    if (res?.status === 200) { try { const c = JSON.parse(res.body)?.result_code; code = typeof c === 'string' ? c : ''; } catch { code = 'unparsable'; } }
+    const list = (this.report.pinboardResults ||= []);
+    list.push({ module: this.currentModule?.id || '', replace, status: res?.status ?? 0, code: this.sanitize(code).slice(0, 80) });
+    if (list.length > 200) list.splice(0, list.length - 200);
   }
 
   // The ledger entry of a Pinboard create about to be sent: a new entry, or
@@ -3231,6 +3245,9 @@ export class LiveRun {
       shot: (page, state, opts = {}) => { alive(); return run.shot(page, state, { service: mod.service, ...opts }); },
       // Temporary linkding only (null elsewhere): snapshot task state.
       snapshotDiagnostics: async () => { alive(); return run.target === 'temp' && mod.service === 'linkding' ? run.snapshotDiagnostics(instance) : null; },
+      // Pinboard only: this module's posts/add answers (replace, status,
+      // result_code), oldest first.
+      pinboardResults: () => (run.report.pinboardResults || []).filter(r => r.module === mod.id).map(r => ({ ...r })),
     };
     return t;
   }
@@ -3857,6 +3874,11 @@ export class LiveRun {
       // Queued past PINBOARD_QUEUE_WARN_MS: an extension-side timeout there
       // is the harness's doing, not a product defect.
       const queue = r.findings.filter(f => f.kind === 'pinboard_queue');
+      // The duplicate-URL answer, as Pinboard wrote it (open-items: never
+      // seen live before H3c); the module judges whether the extension
+      // recognised it.
+      const dup = (r.pinboardResults || []).filter(x => x.replace === 'no' && x.status === 200 && x.code && x.code !== 'done');
+      if (dup.length) lines.push(`  - posts/add replace=no 遇已存网址的实测 result_code：${[...new Set(dup.map(x => '「' + oneLine(x.code, 60) + '」'))].join('，')}（扩展是否识别为重复见 regress.tags-notes 的 duplicate_result_code）`);
       if (th?.slowQueued) lines.push(`  - 排队超过 ${PINBOARD_QUEUE_WARN_MS / 1000}s 的请求 ${th.slowQueued} 个（扩展单请求超时 15s，此时的超时多半是工具造成的）：${queue.slice(0, 3).map(f => `${f.module || f.phase} ${sec(f.queuedMs)}`).join('，')}`);
     }
     for (const [instance, tp] of Object.entries(r.tagPages || {})) {
