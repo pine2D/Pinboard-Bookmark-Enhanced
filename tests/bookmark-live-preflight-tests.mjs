@@ -1933,6 +1933,12 @@ try {
   assert.equal(confirmed.code, 0, confirmed.output);
   assert.equal(confirmed.report.cleanup.complete, true);
   assert.deepEqual(requests.filter(q => q.method !== 'GET'), [], 'the confirming pass deletes nothing');
+  // The summary reports this pass: the residue removed by hand is gone.
+  const confirmedSummary = readFileSync(join(pendingDir, 'summary.zh.md'), 'utf8');
+  assert.match(confirmedSummary, /清理完成：是/);
+  assert(!/残留|未清理/.test(confirmedSummary), confirmedSummary);
+  assert.match(confirmedSummary, /请求：linkding Node 105 \/ 浏览器 77/, confirmedSummary);
+  assert(confirmed.report.cleanup.entries.some(e => e.code === 'residue_tag_not_in_ledger'), 'earlier passes stay in report.json');
 
   requests.length = 0;
   const unblocked = await run(readOnlyArgs, { guard: false, state: linkdingState });
@@ -1992,6 +1998,12 @@ try {
     kRequests.length = 0;
     assert.equal(await own.cleanupLists('karakeep'), true);
     assert(!lists.has('L1') && kRequests.includes('DELETE /api/v1/lists/L1'), 'deleted in-process after its checks');
+    // With the list gone, the next --cleanup confirms it and its summary no
+    // longer reports the earlier pass's residue.
+    const kConfirmed = await run(['--cleanup', join(kDir, 'report.json'), '--karakeep', kBase], { guard: false, state });
+    assert.equal(kConfirmed.code, 0, kConfirmed.output);
+    const kSummary = readFileSync(join(kDir, 'summary.zh.md'), 'utf8');
+    assert(/清理完成：是/.test(kSummary) && !/残留|未清理/.test(kSummary), kSummary);
     await closeServer(kServer);
   }
 

@@ -3098,9 +3098,13 @@ export class LiveRun {
     capped(gaps, 4, g => `- ${g}`);
     lines.push('', '## 清理');
     lines.push(`- 书签：创建 ${r.ledger.created.length}，删除 ${r.ledger.created.filter(x => x.deleted).length}；列表：创建 ${r.ledger.lists.length}，删除 ${r.ledger.lists.filter(x => x.deleted).length}；前缀标签 ${r.ledger.tags.length}；清理完成：${r.cleanup.complete ? '是' : '否'}${r.temp ? `；临时容器已删除：${r.temp.removed ? '是' : '否'}` : ''}`);
-    const residue = r.cleanup.entries.filter(e => e.residue);
+    // This pass only: report.cleanup.entries keeps every pass, and a
+    // --cleanup that confirms residue removed by hand must not report it again.
+    const start = r.cleanup.passStart;
+    const pass = r.cleanup.entries.slice(Number.isInteger(start) && start >= 0 && start <= r.cleanup.entries.length ? start : 0);
+    const residue = pass.filter(e => e.residue);
     if (residue.length) lines.push(`- 残留 ${residue.length} 项（工具不删，需人工核对后处理，再跑 --cleanup 复核）：${[...new Set(residue.map(e => e.kind === 'list' ? '续清不删的 Karakeep 列表' : '带本轮前缀但不在账本里或未经写入预留的标签'))].join('；')}`);
-    capped(r.cleanup.entries.filter(e => e.deleted === false), 3, e => `- 未清理：${e.kind} ${e.instance || ''} ${e.id || ''} ${e.code || ''}`.trim());
+    capped(pass.filter(e => e.deleted === false), 3, e => `- 未清理：${e.kind} ${e.instance || ''} ${e.id || ''} ${e.code || ''}`.trim());
     lines.push(`- 完整报告：${this.reportPath}`);
     // One screen: anything past the cap is in report.json.
     const out = lines.length > SUMMARY_MAX_LINES ? [...lines.slice(0, SUMMARY_MAX_LINES - 1), '- （摘要已截断，完整内容见 report.json）'] : lines;
@@ -3340,6 +3344,8 @@ async function resumeCleanup(opts) {
     if (report.target === 'temp') run.docker = createDocker({ runId: run.runId, exec: opts.dockerExec, stopped: () => true });
     run.cleaning = true;
     run.stage = 'cleanup';
+    // Entries from here on are this pass's; earlier ones stay in the report.
+    report.cleanup.passStart = report.cleanup.entries.length;
     await run.cleanupAll();
   } catch (error) {
     report.cleanup.complete = false;
