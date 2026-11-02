@@ -3006,6 +3006,42 @@ try {
       res = await page.evaluate(live.settleAnimations, 300);
       assert.deepEqual(res, { waited: 0, infinite: 0, timedOut: false }, 'no animation, no wait');
     }
+    {
+      // axe findings keep, per rule, each node's selector and, for contrast
+      // rules, its colours and ratio (H3a note 4), read from a real axe run
+      // on a page with three low-contrast lines and one fine one.
+      // axe-core/playwright needs a page from a context of its own.
+      const axeContext = await browser.newContext();
+      const axePage = await axeContext.newPage();
+      await axePage.setContent('<!doctype html><html lang="en"><title>axe</title><body style="background:#fff">'
+        + ['a', 'b', 'c', 'd'].map(id => `<p id="low-${id}" style="color:#aaaaaa">low ${id}</p>`).join('') + '<p id="fine" style="color:#000">fine</p></body></html>');
+      const axeRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+      axeRun.extRoot = root;
+      axeRun.persist = () => {};
+      await axeRun.axe(axePage, 'canary', 'linkding.axe.check');
+      await axeContext.close();
+      const finding = axeRun.report.findings.find(f => f.kind === 'axe');
+      assert(finding && !finding.skipped, 'axe ran: ' + JSON.stringify(finding));
+      const contrast = finding.violations.find(v => v.id === 'color-contrast');
+      assert(contrast, 'the low-contrast lines are found');
+      assert.equal(contrast.nodes, 4, 'the count stays the number of nodes');
+      assert.equal(contrast.targets.length, live.AXE_NODES_KEPT >= 4 ? 4 : live.AXE_NODES_KEPT);
+      assert.deepEqual(contrast.targets.map(n => n.target), ['#low-a', '#low-b', '#low-c', '#low-d'].slice(0, contrast.targets.length));
+      for (const n of contrast.targets) {
+        assert.equal(n.fg, '#aaaaaa');
+        assert.equal(n.bg, '#ffffff');
+        assert(typeof n.ratio === 'number' && n.ratio > 2 && n.ratio < 2.5, 'the ratio is axe\'s number: ' + n.ratio);
+        assert.equal(n.expected, '4.5:1');
+      }
+      for (const v of finding.violations.filter(v => v.id !== 'color-contrast')) for (const n of v.targets) assert(typeof n.target === 'string' && !('fg' in n), 'a rule without colours keeps the selector only');
+      axeRun.runDir = mkdtempSync(join(dir, 'axe-'));
+      axeRun.summaryPath = join(axeRun.runDir, 'summary.zh.md');
+      axeRun.selected = [];
+      axeRun.writeSummary();
+      const axeSummary = readFileSync(axeRun.summaryPath, 'utf8');
+      const line = axeSummary.split('\n').find(l => l.includes('color-contrast'));
+      assert(line && line.includes('linkding.axe.check / canary') && line.includes('#low-a 前景 #aaaaaa / 背景 #ffffff，对比度 ') && line.includes('#low-c') && !line.includes('#low-d') && line.includes('另 1 个'), 'the summary lists the first 3 nodes of each rule: ' + line);
+    }
     const shoot = async (html, name) => {
       await page.setContent('<!doctype html><title>Shot</title><body style="margin:0">' + html + '</body>');
       const file = join(shotsDir, name + '.png');

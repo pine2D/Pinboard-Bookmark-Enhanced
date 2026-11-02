@@ -1623,6 +1623,21 @@ export function manualReviewItems(extRoot = ROOT) {
   ];
 }
 
+// axe violations for the report: per rule its impact, node count and the
+// first AXE_NODES_KEPT nodes, each with its selector and, where axe measured
+// them (color-contrast and the like), foreground, background, ratio and the
+// ratio required. Selectors only, no page text; `clean` masks what a
+// selector could carry.
+export const AXE_NODES_KEPT = 10;
+export function axeViolations(result, clean = v => v) {
+  const node = n => {
+    const target = clean((n.target || []).map(x => (Array.isArray(x) ? x.join(' >>> ') : String(x))).join(' >>> ')).slice(0, 200);
+    const data = [...(n.any || []), ...(n.all || []), ...(n.none || [])].map(c => c?.data).find(d => d && typeof d === 'object' && 'fgColor' in d);
+    return data ? { target, fg: data.fgColor ?? null, bg: data.bgColor ?? null, ratio: typeof data.contrastRatio === 'number' ? data.contrastRatio : null, expected: data.expectedContrastRatio ?? null } : { target };
+  };
+  return (result?.violations || []).map(v => ({ id: v.id, impact: v.impact || '', nodes: (v.nodes || []).length, targets: (v.nodes || []).slice(0, AXE_NODES_KEPT).map(node) }));
+}
+
 // Impeccable modes per surface (CLAUDE.md design workflow: Operate for the
 // popup, options and library, Read for the reader).
 export const REVIEW_MODES = Object.freeze({ popup: 'Operate', options: 'Operate', reader: 'Read' });
@@ -3531,7 +3546,7 @@ export class LiveRun {
     } catch { this.report.findings.push({ kind: 'axe', module: moduleId, state, skipped: 'axe_unavailable' }); return null; }
     try {
       const result = await new AxeBuilder({ page }).analyze();
-      const violations = result.violations.map(v => ({ id: v.id, impact: v.impact || '', nodes: v.nodes.length }));
+      const violations = axeViolations(result, value => this.sanitize(value));
       this.report.findings.push({ kind: 'axe', module: moduleId, state, violations });
       this.persist();
       return violations;
@@ -4117,6 +4132,11 @@ export class LiveRun {
     try { review = this.writeReviewList(); } catch { review = null; }
     if (review) lines.push(`- Impeccable 评审清单：${review.path}（Operate ${review.operate} 张：popup 与设置页；Read ${review.read} 张：阅读器；每张附 axe 结果）`);
     capped(geometry, 2, f => `- ${f.shot}：视口 ${f.viewport?.width}×${f.viewport?.height}，横向溢出 ${f.overflow}px${f.overflowBy?.length ? `，越界 ${f.overflowBy.join('、')}` : ''}；够不到 ${f.keys.join('、') || '无'}`);
+    // axe: one line per rule and state, its first three nodes with colours
+    // and ratio where axe measured them.
+    const axeRows = r.findings.filter(f => f.kind === 'axe' && !f.skipped).flatMap(f => (f.violations || []).map(v => ({ f, v })));
+    if (axeRows.length) lines.push(`- axe 违规 ${axeRows.length} 条（规则×状态；每条列前 3 个节点）：`);
+    capped(axeRows, 6, ({ f, v }) => `  - ${oneLine(f.module, 60)} / ${oneLine(f.state, 60)}：${v.id}（${v.impact || '?'}）×${v.nodes}：${(v.targets || []).slice(0, 3).map(n => oneLine(n.target, 80) + (n.fg ? ` 前景 ${n.fg} / 背景 ${n.bg}，对比度 ${n.ratio}（要求 ${n.expected}）` : '')).join('；')}${v.nodes > 3 ? `；另 ${v.nodes - 3} 个` : ''}`, n => `  - 另有 ${n} 条，见 report.json 的 findings`);
     begin('gaps');
     lines.push('', '## 未覆盖项');
     const gaps = [...r.skipped.map(x => `${x.id}：因 ${x.reason} 未执行${x.note ? `（${x.note}）` : ''}`), ...UNCOVERED.filter(u => !(u.coveredBy && r.modules.some(m => globToRegExp(u.coveredBy).test(m.id)))).map(u => u.text)];
