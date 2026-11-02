@@ -152,6 +152,9 @@ export const HARDENED_SETTINGS = Object.freeze({
   // and the popup's suggestions (posts/suggest) and recent list (posts/recent).
   // optCheckBookmarkStatus above covers the icon's status lookups.
   optShowBadge: false, tagSyncMode: 'cached', optShowSuggestTags: false, optShowRecent: false,
+  // Batch saves add "batch_saved" by default: a tag outside the run prefix,
+  // which both guards refuse. A module that tests the batch tag sets its own.
+  optBatchTagEnabled: false,
 });
 const LOCAL_ONLY_SETTINGS = ['optSyncEnabled', 'syncApiKeys'];
 
@@ -657,7 +660,7 @@ export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnable
   const shotModules = selected.filter(m => m.needs?.shots).map(m => m.id);
   return {
     harness: HARNESS_VERSION, target, credentialsRead: false, realRequests: 0, docker: false, browser: false,
-    modules: selected.map(m => ({ id: m.id, instance: m.instance, service: m.service, surfaces: m.surfaces, features: m.features, needs: m.needs, budget: resolveBudget(m) })),
+    modules: selected.map(m => ({ id: m.id, instance: m.instance, service: m.service, surfaces: m.surfaces, features: m.features, fixRefs: m.fixRefs || [], needs: m.needs, budget: resolveBudget(m) })),
     skipped, instances, budget: perInstance,
     fakeAi: { needed: selected.some(m => m.needs?.fakeAi), calls: fakeAiCalls, cap: caps.run.fakeAi },
     headed: headedFlag || selected.some(m => m.needs?.headed),
@@ -963,6 +966,7 @@ export function findSecret(texts, secrets) {
   const values = secrets.filter(s => typeof s === 'string' && s.length >= 12);
   return texts.some(text => values.some(value => String(text ?? '').includes(value)));
 }
+export const originOf = raw => { try { return new URL(raw).origin; } catch { return 'invalid'; } };
 export const stripQuery = raw => { try { const u = new URL(raw); return u.origin + u.pathname; } catch { return 'invalid-url'; } };
 
 // Karakeep's root layout serialises clientConfig into the RSC stream of every
@@ -998,6 +1002,61 @@ export function classifyPrompt(text) {
   if (/^\s*Suggest up to \d+ bookmark tags/.test(value)) return 'tags';
   if (/^\s*You are writing a bookmark note, not an article summary\./.test(value)) return 'summary';
   return 'unknown';
+}
+
+// Faults a module injects at the route layer (t.inject). `on: 'page'`
+// answers the browser's own page loads of the run's fixture origins (a pool
+// URL or a variant of one: an aborted load, a PDF, another title), so the
+// extension cannot read the page; `on: 'service'` answers one instance's API
+// requests instead of the server (502, 429 with Retry-After, a failing
+// duplicate check). A matched request never reaches the service. `path`
+// matches the URL after the instance's API root (service) or the whole URL
+// (page); `times` limits the answers, then the fault lets requests through.
+export function faultMatches(fault, req) {
+  if (!fault || fault.left === 0) return false;
+  if (fault.on !== req.on) return false;
+  if (fault.on === 'service' && fault.instance !== req.instance) return false;
+  if (fault.method && fault.method !== String(req.method || 'GET').toUpperCase()) return false;
+  const subject = fault.on === 'page' ? req.url : req.path;
+  if (fault.path instanceof RegExp) return fault.path.test(subject);
+  if (typeof fault.path === 'string') return subject === fault.path;
+  return true;
+}
+// The answer a fault gives, for route.fulfill (null: route.abort).
+export function faultResponse(fault) {
+  if (fault.abort) return null;
+  const headers = { ...(fault.headers || {}) };
+  if (fault.contentType) headers['content-type'] = fault.contentType;
+  else if (!Object.keys(headers).some(k => k.toLowerCase() === 'content-type')) headers['content-type'] = 'application/json';
+  return { status: fault.status || 503, headers, body: fault.body === undefined ? '' : (typeof fault.body === 'string' || Buffer.isBuffer(fault.body) ? fault.body : JSON.stringify(fault.body)) };
+}
+// What a module may read back about the requests it caused (t.requests):
+// method, the path after the API root with its query, and the body. Kept in
+// memory for the module only, never written to the report.
+export function parseRequestBody(raw) {
+  if (raw === null || raw === undefined || raw === '') return null;
+  try { return JSON.parse(raw); } catch { return String(raw); }
+}
+
+// The linkding Notes renderer replica (tools of the research directory,
+// v1.47.0: markdown + bleach + linkify), run as a subprocess. Its python
+// and script come from PBP_LD_RENDER_PYTHON / PBP_LD_RENDER_SCRIPT; without
+// both a module records that rendering was skipped. Returns the rendered
+// HTML per input, or null.
+export function linkdingRenderer(env = process.env) {
+  const python = env.PBP_LD_RENDER_PYTHON || '', script = env.PBP_LD_RENDER_SCRIPT || '';
+  if (!python || !script || !existsSync(python) || !existsSync(script)) return null;
+  return { python, script };
+}
+export function renderLinkdingNotes(renderer, notes, dir) {
+  if (!renderer) return null;
+  const file = join(dir, 'ld-render-' + randomBytes(6).toString('hex') + '.json');
+  writeFileSync(file, JSON.stringify(notes.map((text, i) => ({ key: 'n' + i, selection: '', notes: text }))), { mode: 0o600 });
+  try {
+    const out = spawnSync(renderer.python, ['-I', renderer.script, file], { encoding: 'utf8', timeout: 30000 });
+    check(out.status === 0, 'ld_render_failed');
+    return JSON.parse(out.stdout).cases.map(c => c.html);
+  } finally { rmSync(file, { force: true }); }
 }
 
 // One synthetic article: the browser route serves it and so does the edge
@@ -2522,6 +2581,7 @@ export class LiveRun {
     const prefsPath = join(this.profile, 'Default', 'Preferences');
     const prefs = JSON.parse(readFileSync(prefsPath, 'utf8'));
     const fixtureOrigins = [...new Set(Object.values(this.pools).flat().map(u => new URL(u).origin))];
+    this.fixtureOrigins = new Set(fixtureOrigins);
     for (const key of ['granted_permissions', 'active_permissions']) {
       const bucket = prefs.extensions.settings[extId][key] ||= {};
       const hosts = bucket.explicit_host ||= [];
@@ -2585,6 +2645,12 @@ export class LiveRun {
     const method = request.method();
     if (url === this.routeProbe.url) { this.routeProbe.seen = true; return route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*' }, body: '' }); }
     if (this.probe && url === this.probe.url) { this.probe.seen = true; return route.fulfill({ contentType: 'text/html', body: '<title>Navigation probe</title>' }); }
+    // A page fault answers the run's fixture origins only (never a service):
+    // the request would otherwise be the pool's fixture or aborted.
+    if ((method === 'GET' || method === 'HEAD') && this.faults?.length && this.fixtureOrigins?.has(originOf(url))) {
+      const fault = this.faults.find(f => faultMatches(f, { on: 'page', url, method }));
+      if (fault) return this.answerFault(route, fault);
+    }
     if (this.poolSet.has(url) && (method === 'GET' || method === 'HEAD')) return route.fulfill({ contentType: 'text/html; charset=utf-8', body: fixtureHtml() });
     const decision = liveGuardRule(this.guardCfg, this.guardView(), { url, method, body: request.postData() });
     if (decision.kind === 'outside') {
@@ -2607,7 +2673,16 @@ export class LiveRun {
       const key = method + ' ' + endpointKey(url, this.instances[decision.instance]?.root || '');
       paths[key] = (paths[key] || 0) + 1;
     }
+    if (decision.instance !== 'ai' && this.currentModule?.requests) {
+      const root = this.instances[decision.instance]?.root || '';
+      this.currentModule.requests.push({ instance: decision.instance, method, path: root && url.startsWith(root) ? url.slice(root.length) : url, body: parseRequestBody(request.postData()), at: Date.now() });
+    }
     if (this.offline && decision.instance === this.offline) return route.abort('internetdisconnected');
+    if (decision.instance !== 'ai' && this.faults?.length) {
+      const root = this.instances[decision.instance]?.root || '';
+      const fault = this.faults.find(f => faultMatches(f, { on: 'service', instance: decision.instance, method, path: root && url.startsWith(root) ? url.slice(root.length) : url }));
+      if (fault) return this.answerFault(route, fault);
+    }
     // What leaves counts from here: its run tags now, a creation's slot
     // until its answer is recorded.
     if (decision.tags?.length) this.noteTags(decision.instance, decision.tags.map(key => ({ key })), 'route');
@@ -2643,6 +2718,13 @@ export class LiveRun {
       return route.fulfill({ response });
     }
     return route.continue();
+  }
+
+  answerFault(route, fault) {
+    if (fault.left > 0) fault.left--;
+    fault.hits++;
+    const answer = faultResponse(fault);
+    return answer ? route.fulfill(answer).catch(() => {}) : route.abort(fault.abort === true ? 'failed' : fault.abort).catch(() => {});
   }
 
   // The browser never reaches Pinboard itself (its resolver maps every
@@ -2945,11 +3027,15 @@ export class LiveRun {
         const entry = run.report.ledger.created.find(r => r.instance === instance && r.url === url);
         return entry ? api(recordPath(mod.service, entry.id), { allow404: true }) : null;
       },
-      async openPopup(url, { selection = false, width, locale, scheme } = {}) {
+      // article: 'error' tolerates a load the module made fail (t.inject on
+      // the page); settle: false skips waiting for the duplicate check to
+      // finish (a module that makes it fail).
+      async openPopup(url, { selection = false, width, locale, scheme, article: articleMode = 'load', settle = true } = {}) {
         alive();
         if (locale) await t.settings({ optLang: locale });
         const article = await run.ctx.newPage();
-        await article.goto(url);
+        if (articleMode === 'error') await article.goto(url).catch(() => {});
+        else await article.goto(url);
         await article.bringToFront();
         if (selection) await article.evaluate(() => {
           const range = document.createRange();
@@ -2964,8 +3050,9 @@ export class LiveRun {
         if (width) await popup.setViewportSize({ width, height: 900 });
         await popup.waitForLoadState();
         await popup.locator('#main-section:not(.hidden)').waitFor();
-        await popup.waitForFunction(() => typeof _popupDraftContext !== 'undefined' && _popupDraftContext?.ready === true
+        if (settle) await popup.waitForFunction(() => typeof _popupDraftContext !== 'undefined' && _popupDraftContext?.ready === true
           && ['found', 'missing'].includes(bookmarkLookup.status) && !document.getElementById('submit-btn').disabled);
+        else await popup.waitForFunction(() => typeof _popupDraftContext !== 'undefined' && _popupDraftContext?.ready === true);
         if (scheme) await run.applyScheme(popup, scheme);
         return { popup, article, close: async () => { await popup.close().catch(() => {}); await article.close().catch(() => {}); } };
       },
@@ -2992,6 +3079,51 @@ export class LiveRun {
         return page;
       },
       sw,
+      // Route-layer faults for this module (see faultMatches); cleared when
+      // it ends. Page faults answer the run's fixture origins only.
+      inject(spec) {
+        alive();
+        const fault = { on: spec.on === 'page' ? 'page' : 'service', instance: spec.instance || instance, method: spec.method ? String(spec.method).toUpperCase() : '', path: spec.path, status: spec.status, headers: spec.headers, contentType: spec.contentType, body: spec.body, abort: spec.abort || false, left: Number.isFinite(spec.times) ? spec.times : -1, hits: 0 };
+        if (fault.on === 'page') check(fault.path instanceof RegExp || (typeof fault.path === 'string' && run.fixtureOrigins.has(originOf(fault.path))), 'inject_page_origin', true);
+        else check(!!run.instances[fault.instance], 'inject_instance', true);
+        run.faults.push(fault);
+        return { hits: () => fault.hits, clear: () => { const i = run.faults.indexOf(fault); if (i >= 0) run.faults.splice(i, 1); } };
+      },
+      // This module's requests to the service, oldest first (method, path
+      // after the API root with its query, parsed body); in memory only.
+      requests: ({ method, path, since = 0 } = {}) => run.currentModule.requests.filter(r => r.instance === instance && r.at >= since
+        && (!method || r.method === method) && (!path || (path instanceof RegExp ? path.test(r.path) : r.path === path))),
+      now: () => Date.now(),
+      // linkding's Notes renderer (null: not configured; the module notes it).
+      renderNotes: notes => renderLinkdingNotes(linkdingRenderer(), notes, run.runDir),
+      // axe on a page: rule ids, impact and node counts into the report's
+      // findings (no page text), as UX material.
+      axe: (page, state) => { alive(); return run.axe(page, state, mod.id); },
+      // Console and worker messages (error, warning) since a mark.
+      consoleMark: () => ({ page: run.report.console.length, sw: run.report.swConsole.length }),
+      consoleSince: mark => [...run.report.console.slice(mark.page), ...run.report.swConsole.slice(mark.sw).map(c => ({ ...c, surface: 'worker' }))],
+      // Connect this instance again through the options page (after a module
+      // disconnected it or replaced its token).
+      reconnect: async () => { alive(); await run.connectUi(instance, { keepOpen: false }); },
+      // The other instances' bases in this run (a wrong-service port).
+      otherBases: () => Object.entries(run.instances).filter(([id, i]) => id !== instance && i.base).map(([id, i]) => ({ instance: id, service: i.service, base: i.base })),
+      // A message of the loaded tree's locale file (en by default).
+      message(key, locale = 'en') {
+        const file = join(run.extRoot, '_locales', locale, 'messages.json');
+        const data = JSON.parse(readFileSync(file, 'utf8'));
+        return data[key]?.message ?? null;
+      },
+      // A product setting found by name in SETTINGS_DEFAULTS; one that does
+      // not exist yet (its fix not committed) fails as pending_setting_<label>.
+      async productSetting(pattern, label) {
+        const keys = await sw(source => Object.keys(SETTINGS_DEFAULTS).filter(k => new RegExp(source, 'i').test(k)), pattern.source);
+        t.note('setting_' + label, keys);
+        if (keys.length !== 1) fail('pending_setting_' + label);
+        return keys[0];
+      },
+      // Bring a page's tab to the front the way a user switching tabs does
+      // (chrome.tabs.update fires onActivated in the worker).
+      activateTab: url => sw(async url => { const tab = (await chrome.tabs.query({})).find(x => x.url === url); if (!tab) return false; await chrome.tabs.update(tab.id, { active: true }); return true; }, url),
       async settings(values) {
         alive();
         await sw(async values => { await chrome.storage.local.set(values); await new Promise(r => setTimeout(r, 50)); }, values);
@@ -3025,14 +3157,15 @@ export class LiveRun {
     const budget = resolveBudget(mod);
     // Each tag-list read costs one request per page past what the budget covers.
     budget.browser += budget.tagReads * (this.tagExtraPages?.[mod.instance] || 0);
-    const record = { id: mod.id, instance: mod.instance, status: 'running', started: new Date().toISOString(), ms: 0, checks: [], notes: {}, failure: null, counts: {}, timing: { waitMs: 0, throttleMs: 0 } };
+    const record = { id: mod.id, instance: mod.instance, fixRefs: [...(mod.fixRefs || [])], status: 'running', started: new Date().toISOString(), ms: 0, checks: [], notes: {}, failure: null, counts: {}, timing: { waitMs: 0, throttleMs: 0 } };
     this.report.modules.push(record);
     // From here a failure belongs to this module, not to the previous
     // module's last step still in phaseName. No throwIfFatal here: that ran
     // above, and phase() would add it again.
     this.phaseName = mod.id;
     this.persist();
-    const current = { id: mod.id, budget, created: 0, claimed: 0, record, driven: new Set() };
+    const current = { id: mod.id, budget, created: 0, claimed: 0, record, driven: new Set(), requests: [] };
+    this.faults = [];
     this.currentModule = current;
     const before = { ...this.count(mod.instance), ai: this.fakeAi ? this.fakeAi.calls() : 0 };
     const pagesBefore = new Set(this.ctx.pages());
@@ -3113,6 +3246,7 @@ export class LiveRun {
       }
       record.status = 'failed';
       console.error('FAILED ' + mod.id + ' at ' + this.phaseName + ': ' + code);
+      this.faults = [];
       await this.closePagesSince(pagesBefore);
       await this.cleanupModule(mod);
     } finally {
@@ -3126,6 +3260,7 @@ export class LiveRun {
         try {
           await this.closePagesSince(pagesBefore);
           await t.offline('');
+          this.faults = [];
           this.fakeAi?.reset();
           this.probe = null;
           await this.sw(async ({ keys, snapshot }) => {
@@ -3164,6 +3299,25 @@ export class LiveRun {
         if (!ok) { this.setFatal('module_cleanup_failed'); break; }
       }
     } finally { this.cleaning = wasCleaning; }
+  }
+
+  async axe(page, state, moduleId) {
+    if (!page) return null;
+    let AxeBuilder;
+    try {
+      const req = createRequire(join(this.extRoot, '.qa-scan', 'package.json'));
+      ({ default: AxeBuilder } = await import(pathToFileURL(req.resolve('@axe-core/playwright')).href));
+    } catch { this.report.findings.push({ kind: 'axe', module: moduleId, state, skipped: 'axe_unavailable' }); return null; }
+    try {
+      const result = await new AxeBuilder({ page }).analyze();
+      const violations = result.violations.map(v => ({ id: v.id, impact: v.impact || '', nodes: v.nodes.length }));
+      this.report.findings.push({ kind: 'axe', module: moduleId, state, violations });
+      this.persist();
+      return violations;
+    } catch (error) {
+      this.report.findings.push({ kind: 'axe', module: moduleId, state, skipped: failureCode(error, this.secrets) });
+      return null;
+    }
   }
 
   // ---- screenshots -----------------------------------------------------------
@@ -3626,7 +3780,7 @@ export class LiveRun {
       const verdict = m.status === 'running' ? '中断（运行在此模块中被打断，未得出结论）'
         : m.beforeSteps ? `中止于开始前（未执行任何步骤，未得出结论），${m.failure?.code}`
         : `${m.status === 'aborted' ? '中止' : '失败'}于 ${m.failure?.phase}，${m.failure?.code}`;
-      return `- ${m.id}：${verdict}；读回差异 ${diffs.length} 条${diffs[0] ? `（${diffs[0].code}：期望 ${oneLine(diffs[0].expected, 60)}，实际 ${oneLine(diffs[0].actual, 60)}）` : ''}；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；截图 ${shots[shots.length - 1]}` : ''}`;
+      return `- ${m.id}：${verdict}；读回差异 ${diffs.length} 条${diffs[0] ? `（${diffs[0].code}：期望 ${oneLine(diffs[0].expected, 60)}，实际 ${oneLine(diffs[0].actual, 60)}）` : ''}；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；截图 ${shots[shots.length - 1]}` : ''}${(m.fixRefs || []).length ? `；依赖修复组 ${m.fixRefs.map(g => oneLine(g, 12)).join('、')}（产品树未含这些修复时属预期失败）` : ''}`;
     });
     if (notStarted.length) lines.push(`- 未执行（${notStarted.length}，运行在它们开始前已停止，不算通过也不算失败）：${notStarted.join('，').slice(0, 300)}`);
     if (r.violations.length) lines.push(`- 守卫/预算触发：${r.violations.slice(0, 5).map(v => `${v.code}@${v.phase}`).join('，')}${r.violations.length > 5 ? ` 等 ${r.violations.length} 条` : ''}`);

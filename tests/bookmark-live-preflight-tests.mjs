@@ -1089,6 +1089,38 @@ try {
   // Pure helpers: endpoints, redaction, Karakeep config, signals, lock
   // ---------------------------------------------------------------------
   if (only('pure helpers')) {
+    // Route faults (t.inject): page faults match the whole URL, service
+    // faults one instance's path after its API root; `times` runs out.
+    {
+      const svc = { on: 'service', instance: 'linkding', method: 'POST', path: /^bookmarks\/(\?|$)/, left: -1 };
+      assert.equal(live.faultMatches(svc, { on: 'service', instance: 'linkding', method: 'post', path: 'bookmarks/?disable_scraping' }), true);
+      assert.equal(live.faultMatches(svc, { on: 'service', instance: 'linkding', method: 'POST', path: 'bookmarks/12/' }), false, 'an update is not a create');
+      assert.equal(live.faultMatches(svc, { on: 'service', instance: 'karakeep', method: 'POST', path: 'bookmarks/' }), false, 'another instance');
+      assert.equal(live.faultMatches(svc, { on: 'page', url: 'bookmarks/' }), false, 'a page load is not a service request');
+      assert.equal(live.faultMatches({ ...svc, left: 0 }, { on: 'service', instance: 'linkding', method: 'POST', path: 'bookmarks/' }), false, 'used up');
+      assert.equal(live.faultMatches({ on: 'service', instance: 'linkding', method: '', path: undefined, left: -1 }, { on: 'service', instance: 'linkding', method: 'DELETE', path: 'x' }), true, 'no method or path: every request');
+      const pageFault = { on: 'page', path: 'http://localhost:47391/?pbp-it=a-1', left: 1 };
+      assert.equal(live.faultMatches(pageFault, { on: 'page', url: 'http://localhost:47391/?pbp-it=a-1', method: 'GET' }), true);
+      assert.equal(live.faultMatches(pageFault, { on: 'page', url: 'http://localhost:47391/?pbp-it=a-10', method: 'GET' }), false, 'a string path is exact');
+      assert.deepEqual(live.faultResponse({ status: 429, headers: { 'Retry-After': '120' }, body: { detail: 'x' } }), { status: 429, headers: { 'Retry-After': '120', 'content-type': 'application/json' }, body: '{"detail":"x"}' });
+      assert.deepEqual(live.faultResponse({ status: 401, contentType: 'text/plain;charset=UTF-8', body: 'Unauthorized' }), { status: 401, headers: { 'content-type': 'text/plain;charset=UTF-8' }, body: 'Unauthorized' });
+      assert.equal(live.faultResponse({ abort: 'connectionrefused' }), null, 'an abort has no response');
+      assert.equal(live.faultResponse({}).status, 503);
+      assert.deepEqual([live.parseRequestBody('{"url":"u"}'), live.parseRequestBody('a=b'), live.parseRequestBody(''), live.parseRequestBody(null)], [{ url: 'u' }, 'a=b', null, null]);
+      // The Notes renderer runs only when both paths are given and exist;
+      // its input file is removed afterwards. A stand-in "python" echoes
+      // the cases back as the replica's JSON shape.
+      assert.equal(live.linkdingRenderer({}), null);
+      assert.equal(live.linkdingRenderer({ PBP_LD_RENDER_PYTHON: join(dir, 'missing-python'), PBP_LD_RENDER_SCRIPT: join(dir, 'missing.py') }), null);
+      const fakePython = join(dir, 'fake-python.sh'), fakeScript = join(dir, 'fake-render.py');
+      writeFileSync(fakePython, `#!/bin/sh\n# $1 is -I, $2 the script, $3 the cases\nnode -e 'const c=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(JSON.stringify({cases:c.map(x=>({key:x.key,html:"<p>"+x.notes+"</p>"}))}))' "$3"\n`, { mode: 0o755 });
+      writeFileSync(fakeScript, '# stand-in\n');
+      const renderer = live.linkdingRenderer({ PBP_LD_RENDER_PYTHON: fakePython, PBP_LD_RENDER_SCRIPT: fakeScript });
+      const renderDir = mkdtempSync(join(dir, 'render-'));
+      assert.deepEqual(live.renderLinkdingNotes(renderer, ['a', 'b'], renderDir), ['<p>a</p>', '<p>b</p>']);
+      assert.deepEqual(readdirSync(renderDir), [], 'the cases file is removed');
+      assert.equal(live.renderLinkdingNotes(null, ['a'], renderDir), null);
+    }
     for (const bad of ['https://example.com', 'http://127.0.0.1.evil.test', 'http://user:password@127.0.0.1:48100', 'http://127.0.0.1:48100/?key=x', 'http://[::1]:48100', 'http://127.0.0.1:48100/sub/']) {
       assert.throws(() => live.validateBase(bad), e => e.code === 'loopback_required', bad);
     }
