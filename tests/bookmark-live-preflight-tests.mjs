@@ -1430,6 +1430,50 @@ try {
       assert.deepEqual(await drive({ popupAsks: 1, noRecheck: true }), { switch_cost: 'passed', failure: 'timeout_status_failure_checked' }, 'a switch back that never checks is not a kept icon');
       assert.deepEqual(await drive({ popupAsks: 1, flips: true }), { switch_cost: 'passed', failure: 'status_failure_icon_flipped' }, 'an icon flipped after the failed check is caught');
     }
+    // H3c ux.copy-exits: the delete-failure and 5xx-lookup copy is judged by
+    // what it says, not only by what it leaves out (review of H3c,
+    // should-fix 4). The reader parts fail on the stand-in page; only the
+    // two popup parts are read here.
+    {
+      const copyModule = MODULES.find(m => m.id === 'ux.copy-exits');
+      const msg = (key, locale = 'en') => JSON.parse(readFileSync(join(root, '_locales', locale, 'messages.json'), 'utf8'))[key]?.message ?? null;
+      const drive = async (shown) => {
+        const parts = {}, notes = {};
+        const fail = code => { const e = new Error(code); e.code = code; throw e; };
+        let locale = 'en', part = '';
+        const popup = {
+          locator: () => ({ isVisible: async () => true, click: async () => {} }),
+          evaluate: async () => shown[part](locale),
+        };
+        const t = {
+          service: 'linkding', prefix: 'pbp-it-x', shotsEnabled: false,
+          claimUrl: () => 'https://example.com/' + Math.random(),
+          phase: async () => {}, seed: async () => {}, check: () => {}, shot: async () => null,
+          note: (k, v) => { notes[k] = v; }, noted: k => notes[k] ?? '',
+          expect: (ok, code) => { if (!ok) fail(code); },
+          expectEq: (a, b, code) => { if (a !== b) fail(code); },
+          message: msg, sleep: async () => {}, now: () => Date.now(),
+          until: async (read, label) => { for (let i = 0; i < 5; i++) if (await read()) return; fail('timeout_' + label); },
+          settings: async values => { if (values.optLang) locale = values.optLang; },
+          inject: () => ({ hits: () => 1, clear: () => {} }),
+          lookup: async () => ({ id: 1 }),
+          sw: async () => true,
+          base: 'http://127.0.0.1:9/',
+          openPopup: async (url, opts) => { if (opts?.locale) locale = opts.locale; return { popup, close: async () => {} }; },
+          openReader: async () => fail('stand_in_reader'),
+          part: async (name, refs, fn) => { part = name; try { await fn(); parts[name] = 'passed'; } catch (e) { parts[name] = e.code || e.message; } },
+        };
+        await copyModule.steps(t);
+        return [parts.popup_delete_failure, parts.lookup_5xx];
+      };
+      const right = { popup_delete_failure: l => msg('readerBookmarkDeleteFailed', l), lookup_5xx: () => 'The server answered with an error (503)' };
+      assert.deepEqual(await drive(right), ['passed', 'passed']);
+      assert.deepEqual(await drive({ ...right, popup_delete_failure: () => 'Bookmark deleted' }), ['popup_delete_copy_en', 'passed'], 'a delete failure reported as done fails');
+      assert.deepEqual(await drive({ ...right, popup_delete_failure: l => msg('saveFailedGeneric', l) }), ['popup_delete_copy_en', 'passed']);
+      assert.deepEqual(await drive({ ...right, lookup_5xx: l => msg('pinboardErrorOffline', l) }), ['passed', 'lookup_5xx_network_en'], 'a 5xx called a network failure fails');
+      assert.deepEqual(await drive({ ...right, lookup_5xx: l => msg('pinboardErrorServer', l) }), ['passed', 'lookup_5xx_names_pinboard_en']);
+      assert.deepEqual(await drive({ ...right, lookup_5xx: () => '' }), ['passed', 'timeout_copy_lookup_status']);
+    }
     // H3c: a fault with `pass` lets the first n matching requests through.
     {
       const run = new live.LiveRun({ mode: 'plan', flags: new Set(), values: {}, errors: [] });

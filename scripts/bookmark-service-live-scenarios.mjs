@@ -2795,8 +2795,14 @@ export const H3C_MODULES = [
           await form.close();
           t.expect(!!(await t.lookup(d)), 'copy_delete_removed');
         }
-        // Judged after both locales ran, so each has its picture.
-        for (const locale of LOCALES) t.expect(!t.noted('deleteFailure_' + locale).includes(t.message('saveFailedGeneric', locale)), 'popup_delete_says_save_' + locale);
+        // Judged after both locales ran, so each has its picture. The copy
+        // G18 names: the existing readerBookmarkDeleteFailed ("could not
+        // confirm deletion"), not just anything but "couldn't save".
+        for (const locale of LOCALES) {
+          const shown = t.noted('deleteFailure_' + locale);
+          t.expect(shown.includes(t.message('readerBookmarkDeleteFailed', locale)), 'popup_delete_copy_' + locale);
+          t.expect(!shown.includes(t.message('saveFailedGeneric', locale)), 'popup_delete_says_save_' + locale);
+        }
       }, ['popup-delete-failure-copy']);
 
       // G11: a revoked host grant gives the reader the permission copy, not
@@ -2855,7 +2861,14 @@ export const H3C_MODULES = [
           fault.clear();
           await form.close();
         }
-        for (const locale of LOCALES) t.expect(!/pinboard/i.test(t.noted('lookup5xx_' + locale)), 'lookup_5xx_names_pinboard_' + locale);
+        // G11 gives a server failure its own copy; until that key exists
+        // the check rules out the two wrong ones: a Pinboard outage and the
+        // network copy a 5xx falls back to (pinboardErrorOffline).
+        for (const locale of LOCALES) {
+          const shown = t.noted('lookup5xx_' + locale);
+          t.expect(!/pinboard/i.test(shown), 'lookup_5xx_names_pinboard_' + locale);
+          t.expect(!shown.includes(t.message('pinboardErrorOffline', locale)), 'lookup_5xx_network_' + locale);
+        }
       }, ['lookup-5xx-copy']);
       await t.settings({ optLang: 'en' });
       t.check(`${t.service}: copy exits in en and zh_CN: delete failure, revoked grant in the reader, reader create, 5xx duplicate check`);
