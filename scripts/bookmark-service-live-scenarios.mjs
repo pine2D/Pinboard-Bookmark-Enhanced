@@ -1340,15 +1340,12 @@ export const SELFHOSTED_MODULES = [
       };
       const action = (popup, name) => popup.locator(`.cache-hint-wrap .regen-link[data-action="${name}"]`);
       const kept = t.message('aiSummaryKeptDescription');
-      // "Another paragraph" after the user's words (decision 4). The box is
-      // a single-line input, which drops line breaks: how the paragraph
-      // shows is the user's ruling, so the exact two-newline join is
-      // pending; the order, the kept words and the summary are not.
-      const SPLIT = 'Description 控件形态与「另起一段」的写法（单行 input 会剥掉换行）';
-      const appended = (value, head, summary, code) => {
-        t.expect(value.startsWith(head) && value.endsWith(summary) && value.length > head.length + summary.length, code);
-        t.pending(value, head + '\n\n' + summary, code + '_paragraph', SPLIT);
-      };
+      // "Another paragraph" after the user's words (decision 4), one blank
+      // line between them: '\n\n'. G24 makes linkding's Description a
+      // multi-line box for this (main session, 11-03; awaiting the user's
+      // confirmation, adjusted if the user rules otherwise). Today's
+      // single-line input drops the line breaks, so these fail until G24.
+      const appended = (value, head, summary, code) => t.expectEq(value, head + '\n\n' + summary, code);
       const url = t.claimUrl();
       const form = await t.openPopup(url);
       const { popup } = form;
@@ -1415,7 +1412,7 @@ export const SELFHOSTED_MODULES = [
       // Every paid call wrote what it produced: no "generated, then kept".
       t.expectEq(paid() - before, n, 'summary_calls_match_writes');
       t.expect(t.fakeAi.unknown() === 0, 'fake_ai_unknown_request');
-      t.check('linkding: AI summary replaces an empty or page-meta Description, follows the user\'s or server\'s words, regenerates only its own part, and Remove restores the earlier value; no paid summary is discarded; the paragraph join waits for a ruling');
+      t.check('linkding: AI summary replaces an empty or page-meta Description, follows the user\'s or server\'s words, regenerates only its own part, and Remove restores the earlier value; no paid summary is discarded; the summary follows a blank line');
     },
   },
 
