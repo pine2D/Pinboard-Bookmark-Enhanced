@@ -1061,7 +1061,9 @@ export const SELFHOSTED_MODULES = [
     features: ['linkding-no-page-info', 'linkding-empty-description-hint', 'linkding-browser-metadata', 'linkding-preload'],
     fixRefs: ['G2', 'G2b', 'G26'],
     needs: needs({ shots: true }),
-    budget: { bookmarks: 4, urls: 4, node: 6, browser: 70, ai: 0, tags: 0, seconds: 90, tagReads: 1 },
+    // The readable-page hint part claims one more URL and opens two popups
+    // without saving.
+    budget: { bookmarks: 4, urls: 5, node: 6, browser: 85, ai: 0, tags: 0, seconds: 105, tagReads: 1 },
     files: [],
     settings: { optAutoDescription: true, optCheckBookmarkStatus: true, optAutoCloseAfterSave: false },
     async steps(t) {
@@ -1110,6 +1112,27 @@ export const SELFHOSTED_MODULES = [
       await t.part('empty_hint', ['G26'], async () => {
         t.expect(!!aborted, 'abort_case_missing');
         t.expect(aborted.hint.any, 'abort_empty_hint');
+      }, ['linkding-empty-description-hint']);
+      // The other half of decision 14: a page that could be read shows no
+      // hint, whether its meta description filled the box or it had none
+      // (the box may then be empty or filled from the page). One URL, two
+      // page variants, nothing saved.
+      await t.part('readable_no_hint', ['G26'], async () => {
+        await t.phase('page_info_readable_hint');
+        const url = t.claimUrl();
+        const variants = [['filled', articleHtml({ title: prefix + ' readable' })], ['no_meta', articleHtml({ title: prefix + ' readable', description: null })]];
+        for (const [label, html] of variants) {
+          const served = page(t, url, html);
+          const form = await t.openPopup(url);
+          await t.until(async () => (await form.popup.locator('#title-input').inputValue()) === prefix + ' readable', 'readable_prefill_' + label);
+          const value = await form.popup.locator('#linkding-description-input').inputValue();
+          const hint = await hintOf(form.popup);
+          t.note('readableHint_' + label, { empty: !value, hint });
+          if (label === 'filled') t.expectEq(value, META_DESCRIPTION, 'readable_filled_prefill');
+          t.expect(!hint.any, 'readable_' + label + '_hint');
+          await form.close();
+          served.clear();
+        }
       }, ['linkding-empty-description-hint']);
 
       await t.part('server_metadata', ['G26'], async () => {
@@ -1172,7 +1195,7 @@ export const SELFHOSTED_MODULES = [
         t.pending(!!r.sent && !r.sent.description && !r.sent.scrapingDisabled, true, 'pdf_left_to_server', question);
         t.pending(r.hint.any, true, 'pdf_empty_hint', question);
       });
-      t.check('linkding: an unreadable page (aborted) leaves Description empty and unsent with a hint; server metadata prefill with disable_scraping when browser metadata is off; pre-read off by default (no /check/ on load or switch) and on when asked; the PDF case is recorded for a ruling');
+      t.check('linkding: an unreadable page (aborted) leaves Description empty and unsent with a hint, a readable one shows none; server metadata prefill with disable_scraping when browser metadata is off; pre-read off by default (no /check/ on load or switch) and on when asked; the PDF case is recorded for a ruling');
     },
   },
 
