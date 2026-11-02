@@ -1370,7 +1370,9 @@ export class LiveRun {
     for (const instance of this.plan.instances) {
       const inst = this.instances[instance];
       const token = credentials[inst.service + 'Token'];
-      check(typeof token === 'string' && token.trim() && !/[\r\n]/.test(token), 'missing_' + inst.service + 'Token');
+      // Lower case: failureCode keeps only [a-z_0-9] codes, so the old
+      // "missing_linkdingToken" reached reports as a bare "Error".
+      check(typeof token === 'string' && token.trim() && !/[\r\n]/.test(token), 'missing_' + inst.service + '_token');
       inst.token = token;
       this.addSecret(token);
     }
