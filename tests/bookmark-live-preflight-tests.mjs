@@ -2027,6 +2027,34 @@ try {
         rmSync(r.runDir, { recursive: true, force: true });
       }
     }
+
+    // The runner's own reads: a 429 is retried PINBOARD_429_RETRIES times,
+    // each a counted request, then fails; the Node cap and the cleanup cap
+    // stop a request before it is sent.
+    {
+      const read = r => r.pinboardApi('pinboard', 'posts/get?url=' + encodeURIComponent(r.pools.pinboard[0]));
+      let mock = createPinboardMock({ token });
+      let r = unitRun(mock);
+      mock.rateLimit(5);
+      await assert.rejects(read(r), e => e.code === 'api_http_429');
+      assert.equal(live.PINBOARD_429_RETRIES, 3);
+      assert.equal(r.counts.pinboard.node, 1 + live.PINBOARD_429_RETRIES);
+      assert.equal(mock.calls.length, 1 + live.PINBOARD_429_RETRIES);
+      assert.equal(r.gate.stats.rateLimited, 1 + live.PINBOARD_429_RETRIES);
+      // Run budget: node cap minus the cleanup reserve.
+      mock = createPinboardMock({ token });
+      r = unitRun(mock, { node: live.BUDGETS.user.pinboard.cleanupReserve });
+      await assert.rejects(read(r), e => e.code === 'node_request_budget');
+      assert.deepEqual(mock.calls, []);
+      // Cleanup budget: the whole cap, retries included.
+      mock = createPinboardMock({ token });
+      r = unitRun(mock, { node: 2 });
+      r.cleaning = true;
+      mock.rateLimit(5);
+      await assert.rejects(read(r), e => e.code === 'cleanup_request_budget');
+      assert.equal(mock.calls.length, 2);
+      assert.equal(r.fatal, 'cleanup_request_budget');
+    }
     const pbCredentials = join(pbState, '..', 'pinboard-credentials.json');
     writeFileSync(pbCredentials, JSON.stringify({ pinboardToken: token }), { mode: 0o600 });
     const noTokenCredentials = join(pbState, '..', 'pinboard-none.json');
