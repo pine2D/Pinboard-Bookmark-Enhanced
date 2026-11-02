@@ -1072,7 +1072,7 @@ export const SELFHOSTED_MODULES = [
       readable_no_hint: { fixRefs: ['G26'], features: ['linkding-empty-description-hint'] },
       server_metadata: { fixRefs: ['G26'], features: ['linkding-browser-metadata'] },
       preload: { fixRefs: ['G26'], features: ['linkding-preload'] },
-      unreadable_pdf: { fixRefs: ['G2b', 'G26'], features: ['linkding-no-page-info', 'linkding-empty-description-hint'] },
+      unreadable_pdf: { fixRefs: ['G26'], features: ['linkding-no-page-info', 'linkding-empty-description-hint'] },
     },
     needs: needs({ shots: true }),
     // The readable-page hint part claims one more URL and opens two popups
@@ -1198,22 +1198,23 @@ export const SELFHOSTED_MODULES = [
         await second.close();
       });
 
-      // A PDF served for the URL. Chrome's PDF viewer page can still be
-      // scripted, so the product may read it as a page: whether that counts
-      // as "no page info" is the user's ruling (H3b open question). The
-      // expectations are recorded as pending, not failed; last, so they
-      // hold nothing up.
+      // A PDF served for the URL counts as a page that could not be read
+      // (main-session ruling 11-03, G26): Chrome's PDF viewer can be
+      // scripted, but the product must judge by the document type, send no
+      // Description and no disable_scraping, and show the grey hint so
+      // linkding fetches the page itself.
       await t.part('unreadable_pdf', async () => {
         await t.phase('page_info_pdf');
         const pdf = t.claimUrl();
         t.inject({ on: 'page', path: pdf, status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n' });
         const r = await unread(pdf, 'pdf');
-        const question = 'PDF 页（Chrome PDF 查看器可被脚本读取）是否按「读不到网页」处理';
-        t.pending(r.value, '', 'pdf_description_empty', question);
-        t.pending(!!r.sent && !r.sent.description && !r.sent.scrapingDisabled, true, 'pdf_left_to_server', question);
-        t.pending(r.hint.any, true, 'pdf_empty_hint', question);
+        t.expectEq(r.value, '', 'pdf_description_empty');
+        t.expect(!!r.sent, 'pdf_create_sent');
+        t.expect(!r.sent.description, 'pdf_description_sent');
+        t.expect(!r.sent.scrapingDisabled, 'pdf_scraping_disabled');
+        t.expect(r.hint.any, 'pdf_empty_hint');
       });
-      t.check('linkding: an unreadable page (aborted) leaves Description empty and unsent with a hint, a readable one shows none; server metadata prefill with disable_scraping when browser metadata is off; pre-read off by default (no /check/ on load or switch) and on when asked; the PDF case is recorded for a ruling');
+      t.check('linkding: an unreadable page (aborted) leaves Description empty and unsent with a hint, a readable one shows none; server metadata prefill with disable_scraping when browser metadata is off; pre-read off by default (no /check/ on load or switch) and on when asked; a PDF counts as unreadable');
     },
   },
 
