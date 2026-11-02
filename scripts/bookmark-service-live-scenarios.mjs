@@ -15,7 +15,11 @@
 //   surfaces  extension surfaces it drives (report and summary only)
 //   features  fix/feature tags; the Chinese summary groups results by them
 //   needs     { fakeAi, target: 'temp'|'user'|'any', container, sharing: 'any'|'on'|'off',
-//               headed, shots, pinboard, writes, urls }
+//               headed, shots, pinboard, writes, urls, snapshots }
+//             snapshots: the module waits for linkding's automatic HTML
+//             snapshot. Temporary linkding instances start with automatic
+//             snapshots off; the runner switches them on for such a module
+//             only. A user instance keeps its own profile setting.
 //   budget    { bookmarks, urls, node, browser, ai, tags, lists, seconds }
 //             any field may be a number or { <service>: number }
 //   settings  chrome.storage.local overrides applied for this module only
@@ -30,8 +34,14 @@ export const META_DESCRIPTION = 'Public synthetic meta description.';
 
 const NEEDS = Object.freeze({
   fakeAi: false, target: 'any', container: null, sharing: 'any', headed: false,
-  shots: false, pinboard: false, writes: true,
+  shots: false, pinboard: false, writes: true, snapshots: false,
 });
+
+// linkding builds HTML snapshots one at a time in the background. Only the
+// snapshot module waits for one, polling every 5 s and stopping while its
+// module still has SNAPSHOT_MARGIN_MS left for checks and cleanup.
+export const SNAPSHOT_POLL_MS = 5000;
+export const SNAPSHOT_MARGIN_MS = 15000;
 const needs = (over = {}) => ({ ...NEEDS, ...over });
 
 // Row fields that vary by service resolve through this helper (number or map).
@@ -83,6 +93,46 @@ export const MODULES = [
       await t.shot(form.popup, 'prefill', { surface: 'popup', keys: ['#submit-btn'] });
       t.check(`${t.service}: synthetic article popup prefill without saving`);
       await form.close();
+    },
+  },
+
+  // First writing module on purpose: linkding snapshots run one at a time,
+  // so on a user instance this bookmark does not queue behind the others.
+  {
+    id: 'core.snapshot',
+    services: ['linkding'],
+    surfaces: ['background'],
+    features: ['linkding-snapshot'],
+    needs: needs({ snapshots: true }),
+    // One assets read per poll: at most 21 in 120 s, plus the create lookups.
+    budget: { bookmarks: 1, urls: 1, node: 30, browser: 10, ai: 0, tags: 0, seconds: 120 },
+    settings: {},
+    async steps(t) {
+      const url = t.claimUrl();
+      t.phase('snapshot_create');
+      const saved = await t.sw(async intent => {
+        const result = await submitSaveIntent(intent);
+        return { status: result.status, reason: result.reason };
+      }, { mode: 'create', url, title: t.prefix + ' 快照', notes: '', tags: '', private: true, toread: false, archive: false });
+      t.expectEq(saved.status, 'saved', 'snapshot_create');
+      const row = await t.ownRow(url);
+      t.phase('snapshot_wait');
+      const started = Date.now();
+      let status = 'missing', polls = 0;
+      for (;;) {
+        await t.sleep(SNAPSHOT_POLL_MS);
+        polls++;
+        const assets = await t.api('bookmarks/' + row.id + '/assets/');
+        status = (assets.results || []).find(a => a.asset_type === 'snapshot')?.status || 'missing';
+        // linkding stores the pending asset inside the create request, so
+        // "missing" already means automatic snapshots are off for this account.
+        if (status !== 'pending' || t.remainingMs() < SNAPSHOT_POLL_MS + SNAPSHOT_MARGIN_MS) break;
+      }
+      t.note('snapshot', { status, polls, waitedMs: Date.now() - started });
+      t.expect(status !== 'missing', 'snapshot_not_queued');
+      t.expect(status !== 'failure', 'snapshot_failed');
+      t.expectEq(status, 'complete', 'snapshot_incomplete');
+      t.check('linkding: a worker save gets a completed HTML snapshot');
     },
   },
 
@@ -167,9 +217,9 @@ export const MODULES = [
     id: 'core.worker',
     services: ['linkding', 'karakeep'],
     surfaces: ['background'],
-    features: ['worker-create', 'worker-merge', 'worker-conflict', 'archived-preserved', 'linkding-snapshot', 'tags-recent', 'pinboard-required', 'shared-library'],
+    features: ['worker-create', 'worker-merge', 'worker-conflict', 'archived-preserved', 'tags-recent', 'pinboard-required', 'shared-library'],
     needs: needs(),
-    budget: { bookmarks: 1, urls: 1, node: { linkding: 75, karakeep: 12 }, browser: { linkding: 30, karakeep: 40 }, ai: 0, tags: 2, seconds: { linkding: 120, karakeep: 90 } },
+    budget: { bookmarks: 1, urls: 1, node: { linkding: 20, karakeep: 12 }, browser: { linkding: 30, karakeep: 40 }, ai: 0, tags: 2, seconds: 90 },
     settings: {},
     async steps(t) {
       const { prefix } = t;
@@ -190,20 +240,6 @@ export const MODULES = [
       t.expectEq(t.service === 'linkding' ? row.is_archived : row.archived, true, 'merge_preserves_fields');
       t.phase('worker_conflict');
       t.expectEq((await submit(intent)).reason, 'conflict', 'duplicate_create');
-      if (t.service === 'linkding') {
-        t.phase('linkding_snapshot');
-        let status = 'missing';
-        // Inside the 120 s module cap (a temporary instance took about 60 s).
-        const deadline = Date.now() + 90000;
-        while (Date.now() < deadline) {
-          const assets = await t.api('bookmarks/' + row.id + '/assets/');
-          status = assets.results.find(a => a.asset_type === 'snapshot')?.status || 'missing';
-          if (['complete', 'failure'].includes(status)) break;
-          await t.sleep(2000);
-        }
-        t.note('snapshot', status);
-        t.expectEq(status, 'complete', 'snapshot_incomplete');
-      }
       t.phase('worker_tags_recent');
       const data = await t.sw(async () => {
         const client = pbpBookmarkClient(await getCurrentBookmarkAuth());
@@ -212,7 +248,7 @@ export const MODULES = [
       t.expect(data.tags >= 1 && data.recent >= 0, 'tags_recent');
       t.expect(await t.sw(async () => !(await pbpReadSettingsWithSecrets({ pinboardToken: '' })).pinboardToken), 'pinboard_required');
       t.expectEq(await t.sw(() => pbpVocabCurrentOwner()), t.libraryOwner, 'library_changed');
-      t.check(`${t.service}: worker create/merge/duplicate, archived-field preservation, tags/recent, shared library${t.service === 'linkding' ? ', HTML snapshot' : ''}`);
+      t.check(`${t.service}: worker create/merge/duplicate, archived-field preservation, tags/recent, shared library`);
     },
   },
 

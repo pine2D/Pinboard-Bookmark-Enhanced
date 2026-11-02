@@ -656,8 +656,18 @@ asyncio.run(main())
 `;
 
 const TEMP_SECRET_ENV = new Set(['LD_SUPERUSER_PASSWORD', 'POSTGRES_PASSWORD', 'LD_DB_PASSWORD', 'NEXTAUTH_SECRET']);
-const LINKDING_TOKEN_SCRIPT = "from django.contrib.auth.models import User\nfrom bookmarks.models import ApiToken\nu=User.objects.get(username='pbp-it')\nprint('PBPTOKEN='+ApiToken.objects.create(user=u,name='pbp-it').key)";
-const linkdingSharingScript = on => `from django.contrib.auth.models import User\nu=User.objects.get(username='pbp-it')\nu.profile.enable_sharing=${on ? 'True' : 'False'}\nu.profile.save()\nprint('PBPSHARING=' + str(u.profile.enable_sharing))`;
+// The throwaway account also starts with automatic HTML snapshots off: each
+// one runs Chromium inside the container, one at a time, and only the
+// snapshot module waits for them (E2 in live-test-efficiency.md).
+const LINKDING_TOKEN_SCRIPT = "from django.contrib.auth.models import User\nfrom bookmarks.models import ApiToken\nu=User.objects.get(username='pbp-it')\nu.profile.enable_automatic_html_snapshots=False\nu.profile.save()\nprint('PBPSNAPSHOTS='+str(u.profile.enable_automatic_html_snapshots))\nprint('PBPTOKEN='+ApiToken.objects.create(user=u,name='pbp-it').key)";
+// Profile switches the runner may flip on a temporary linkding account, and
+// only there. The REST API does not expose them for writing.
+export const TEMP_PROFILE_FIELDS = Object.freeze(['enable_sharing', 'enable_automatic_html_snapshots']);
+export function linkdingProfileScript(field, on) {
+  check(TEMP_PROFILE_FIELDS.includes(field), 'temp_profile_field', true);
+  const value = on ? 'True' : 'False';
+  return `from django.contrib.auth.models import User\nu=User.objects.get(username='pbp-it')\nu.profile.${field}=${value}\nu.profile.save()\nprint('PBPPROFILE=${field}=' + str(u.profile.${field}))`;
+}
 
 // ---------------------------------------------------------------------------
 // Fake AI: OpenAI-compatible chat completions on 127.0.0.1, metadata only.
@@ -806,6 +816,7 @@ export class LiveRun {
     this.guardCfg = null;
     this.deletableTags = new Set();
     this.sharing = {};
+    this.snapshots = {};
     this.shotCount = 0;
     this.locale = 'en';
     this.scheme = 'light';
@@ -1220,7 +1231,9 @@ export class LiveRun {
         const token = (r.stdout.match(/^PBPTOKEN=([0-9a-f]{40})$/m) || [])[1];
         check(token, 'temp_token_failed');
         inst.token = token;
+        check(/^PBPSNAPSHOTS=False$/m.test(r.stdout), 'temp_profile_failed');
         this.sharing[instance] = false;
+        this.snapshots[instance] = false;
       } else {
         const email = `pbp-it-${this.runId.slice(0, 8)}@example.invalid`, password = randomBytes(18).toString('base64url');
         this.addSecret(password);
@@ -1246,15 +1259,20 @@ export class LiveRun {
     fail(code);
   }
 
-  // Returns true when the switch changed (the caller then reconnects).
-  async setTempSharing(instance, on) {
-    check(this.target === 'temp' && this.docker, 'sharing_requires_temp', true);
-    if (this.sharing[instance] === on) return false;
-    const r = await this.docker.exec(this.docker.names[instance], ['python', 'manage.py', 'shell', '-c', linkdingSharingScript(on)], { timeoutMs: 60000 });
-    check(r.stdout.includes('PBPSHARING=' + (on ? 'True' : 'False')), 'temp_sharing_failed');
-    this.sharing[instance] = on;
+  // Flips one profile switch of the throwaway linkding account. Never used on
+  // a user instance. Returns true when the value changed.
+  async setTempProfile(instance, field, on) {
+    check(this.target === 'temp' && this.docker && TEMP_PROFILE_FIELDS.includes(field), 'profile_requires_temp', true);
+    const state = field === 'enable_sharing' ? this.sharing : this.snapshots;
+    if (state[instance] === on) return false;
+    const r = await this.docker.exec(this.docker.names[instance], ['python', 'manage.py', 'shell', '-c', linkdingProfileScript(field, on)], { timeoutMs: 60000 });
+    check(new RegExp(`^PBPPROFILE=${field}=${on ? 'True' : 'False'}$`, 'm').test(r.stdout), 'temp_profile_failed');
+    state[instance] = on;
     return true;
   }
+
+  // Returns true when the switch changed (the caller then reconnects).
+  setTempSharing(instance, on) { return this.setTempProfile(instance, 'enable_sharing', on); }
 
   async preflight() {
     for (const instance of this.plan.instances) {
@@ -1543,6 +1561,8 @@ export class LiveRun {
       check: text => { mod.record.checks.push(text); run.report.checks.push(text); },
       note: (key, value) => { mod.record.notes[key] = value; },
       sleep,
+      // Time left before this module's own seconds budget runs out.
+      remainingMs: () => Math.max(0, (mod.deadline || 0) - Date.now()),
       until: (read, label, timeout) => { alive(); return run.until(read, label, timeout); },
       claimUrl() {
         alive();
@@ -1659,7 +1679,7 @@ export class LiveRun {
     const errorsBefore = this.report.pageErrors.length;
     const settingsKeys = await this.sw(() => Object.keys(SETTINGS_DEFAULTS).concat(['optSyncEnabled', 'offlineQueue']));
     const snapshot = await this.sw(keys => chrome.storage.local.get(keys), settingsKeys);
-    const t = this.harness({ ...mod, record, budget, get claimed() { return current.claimed; }, set claimed(v) { current.claimed = v; }, get revoked() { return current.revoked === true; } });
+    const t = this.harness({ ...mod, record, budget, get claimed() { return current.claimed; }, set claimed(v) { current.claimed = v; }, get revoked() { return current.revoked === true; }, get deadline() { return current.deadline; } });
     let timer;
     try {
       this.phase(mod.id);
@@ -1667,6 +1687,9 @@ export class LiveRun {
         if (this.target !== 'temp') check((mod.needs.sharing === 'on') === !!this.sharing[mod.instance], 'sharing_state_mismatch');
         else if (await this.setTempSharing(mod.instance, mod.needs.sharing === 'on')) await this.connectUi(mod.instance, { keepOpen: false });
       }
+      // Background snapshots stay off on a temporary instance except for the
+      // module that waits for one; a user instance keeps its own setting.
+      if (mod.needs?.snapshots && mod.service === 'linkding' && this.target === 'temp') await this.setTempProfile(mod.instance, 'enable_automatic_html_snapshots', true);
       this.guardCfg.writes = mod.needs?.writes !== false;
       await this.pushGuardWrites(this.guardCfg.writes);
       if (mod.needs?.fakeAi) {
@@ -1676,6 +1699,7 @@ export class LiveRun {
       }
       if (mod.settings && Object.keys(mod.settings).length) await t.settings(mod.settings);
       const seconds = budget.seconds || BUDGETS[this.target].run.moduleSeconds;
+      current.deadline = Date.now() + seconds * 1000;
       const work = (async () => { await mod.steps(t); if (mod.verify) await mod.verify(t); })();
       // After a timeout the steps fail on revoked calls or closed pages;
       // those late rejections are expected, not uncaught errors.
@@ -1729,6 +1753,7 @@ export class LiveRun {
           this.guardCfg.writes = false;
           await this.pushGuardWrites(false);
           if (mod.needs?.sharing === 'on' && this.target === 'temp' && await this.setTempSharing(mod.instance, false)) await this.connectUi(mod.instance, { keepOpen: false });
+          if (mod.needs?.snapshots && mod.service === 'linkding' && this.target === 'temp') await this.setTempProfile(mod.instance, 'enable_automatic_html_snapshots', false);
         } catch (error) {
           this.setFatal('module_restore_failed');
           record.restore = failureCode(error, this.secrets);

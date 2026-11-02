@@ -23,7 +23,7 @@ import vm from 'node:vm';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), 'pbp-live-preflight-'));
 const live = await import('../scripts/bookmark-service-live.mjs');
-const { MODULES, GROUPS } = await import('../scripts/bookmark-service-live-scenarios.mjs');
+const { MODULES, GROUPS, SNAPSHOT_POLL_MS, SNAPSHOT_MARGIN_MS } = await import('../scripts/bookmark-service-live-scenarios.mjs');
 
 const credentialsPath = join(dir, 'synthetic-credentials.json');
 const marker = join(dir, 'credential-access');
@@ -113,6 +113,8 @@ try {
   for (const row of MODULES) {
     for (const key of ['id', 'services', 'surfaces', 'features', 'needs', 'budget', 'steps']) assert(row[key] !== undefined, row.id + ' lacks ' + key);
     assert(['temp', 'user', 'any'].includes(row.needs.target) && ['any', 'on', 'off'].includes(row.needs.sharing), row.id + ' needs');
+    assert.equal(typeof row.needs.snapshots, 'boolean', row.id + ' needs.snapshots');
+    if (row.needs.snapshots) assert.deepEqual(row.services, ['linkding'], row.id + ': only linkding builds HTML snapshots');
     for (const service of row.services) {
       const b = live.resolveBudget({ ...row, service });
       assert(b.seconds > 0 && b.urls >= b.bookmarks && b.node > 0 && b.browser > 0, row.id + ' budget for ' + service);
@@ -126,7 +128,10 @@ try {
     const expected = ids.filter(id => patterns.some(p => live.globToRegExp(p).test(id)) && !id.startsWith('pinboard.'));
     assert.deepEqual(selected, expected, group + ' group');
   }
-  assert.deepEqual(pick('core'), ['linkding.core.popup-reader', 'linkding.core.worker', 'karakeep.core.popup-reader', 'karakeep.core.worker']);
+  // The snapshot module is linkding's first writing module: snapshots run one
+  // at a time, so its bookmark must not queue behind the others.
+  assert.deepEqual(pick('core'), ['linkding.core.snapshot', 'linkding.core.popup-reader', 'linkding.core.worker', 'karakeep.core.popup-reader', 'karakeep.core.worker']);
+  assert.deepEqual(MODULES.filter(m => m.needs.snapshots).map(m => m.id), ['core.snapshot'], 'only the snapshot module waits for snapshots');
   assert.deepEqual(pick('edges'), ['linkding.edges.quote-unread', 'linkding.edges.offline', 'karakeep.edges.tags']);
   const karakeepAll = pick('karakeep.*');
   assert(karakeepAll.length >= 4 && karakeepAll.every(id => id.startsWith('karakeep.')), 'karakeep.* wildcard');
@@ -143,6 +148,73 @@ try {
   assert.deepEqual(live.selectModules('*', { target: 'user', modules: [tempOnly, sharingOn] }).skipped.map(s => s.reason), ['target_temp', 'sharing_on_temp_only']);
   assert.throws(() => live.selectModules('linkding.temp.only', { target: 'user', modules: [tempOnly] }), e => e.code === 'module_requires_temp');
   assert.deepEqual(live.selectModules('linkding.temp.only', { target: 'temp', modules: [tempOnly] }).selected.map(m => m.id), ['linkding.temp.only']);
+
+  // The snapshot module polls every 5 s and stops while its module still has
+  // time for its checks and cleanup (E2); "missing" fails at once.
+  {
+    const snap = MODULES.find(m => m.id === 'core.snapshot');
+    const budget = live.resolveBudget({ ...snap, service: 'linkding' });
+    assert.equal(SNAPSHOT_POLL_MS, 5000);
+    const drive = async statuses => {
+      let now = 0, polls = 0;
+      const sleeps = [], notes = {};
+      const failWith = code => { const e = new Error(code); e.code = code; throw e; };
+      const t = {
+        service: 'linkding', prefix: 'pbp-it-x',
+        claimUrl: () => 'http://localhost:47391/?pbp-it=x-linkding-1',
+        phase: () => {}, check: () => {}, note: (k, v) => { notes[k] = v; },
+        sw: async (fn, intent) => { assert.equal(intent.mode, 'create'); return { status: 'saved' }; },
+        ownRow: async () => ({ id: 7 }),
+        api: async path => {
+          assert.equal(path, 'bookmarks/7/assets/');
+          const s = statuses[Math.min(polls++, statuses.length - 1)];
+          return { count: 1, results: s === 'missing' ? [] : [{ id: 3, asset_type: 'snapshot', status: s }] };
+        },
+        sleep: async ms => { sleeps.push(ms); now += ms; },
+        remainingMs: () => Math.max(0, budget.seconds * 1000 - now),
+        expect: (c, code) => { if (!c) failWith(code); },
+        expectEq: (a, b, code) => { if (a !== b) failWith(code); },
+      };
+      let code = '';
+      try { await snap.steps(t); } catch (e) { code = e.code || String(e); }
+      return { code, polls, sleeps, now, notes };
+    };
+    const done = await drive(['pending', 'pending', 'complete']);
+    assert.equal(done.code, '');
+    assert.equal(done.polls, 3);
+    assert.equal(done.notes.snapshot.status, 'complete');
+    for (const [statuses, code, polls] of [[['pending'], 'snapshot_incomplete', 21], [['missing'], 'snapshot_not_queued', 1], [['pending', 'failure'], 'snapshot_failed', 2], [done.sleeps.map(() => 'pending').concat('complete'), '', 4]]) {
+      const r = await drive(statuses);
+      assert.equal(r.code, code, statuses.join());
+      assert.equal(r.polls, polls, statuses.join());
+      assert(r.sleeps.length && r.sleeps.every(ms => ms === SNAPSHOT_POLL_MS), 'one poll every 5 s');
+      assert(r.now <= budget.seconds * 1000 - SNAPSHOT_MARGIN_MS, 'stops while the module has time left: ' + r.now);
+      assert(r.polls + 3 <= budget.node, 'polls fit the module node budget');
+    }
+  }
+
+  // Profile switches on a throwaway linkding account: allow-listed fields,
+  // temp target only, and the container must confirm the new value.
+  {
+    assert.throws(() => live.linkdingProfileScript('is_superuser', true), e => e.code === 'temp_profile_field' && e.fatal === true);
+    assert.match(live.linkdingProfileScript('enable_automatic_html_snapshots', false), /^u\.profile\.enable_automatic_html_snapshots=False$/m);
+    const run = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    const calls = [];
+    let reply = script => 'PBPPROFILE=enable_automatic_html_snapshots=' + (/=True$/m.test(script) ? 'True' : 'False') + '\n';
+    run.target = 'temp';
+    run.snapshots.linkding = false;
+    run.docker = { names: { linkding: 'pbp-it-x-linkding' }, exec: async (name, cmd) => { calls.push([name, ...cmd]); return { code: 0, stdout: reply(cmd.at(-1)) }; } };
+    assert.equal(await run.setTempProfile('linkding', 'enable_automatic_html_snapshots', true), true);
+    assert.equal(await run.setTempProfile('linkding', 'enable_automatic_html_snapshots', true), false, 'no exec when the value is already set');
+    assert.equal(calls.length, 1);
+    assert.deepEqual(calls[0].slice(0, 5), ['pbp-it-x-linkding', 'python', 'manage.py', 'shell', '-c']);
+    reply = () => 'Traceback (most recent call last)\n';
+    await assert.rejects(run.setTempProfile('linkding', 'enable_automatic_html_snapshots', false), e => e.code === 'temp_profile_failed');
+    assert.equal(run.snapshots.linkding, true, 'an unconfirmed switch keeps the known state');
+    run.target = 'user';
+    await assert.rejects(run.setTempProfile('linkding', 'enable_sharing', true), e => e.code === 'profile_requires_temp' && e.fatal === true);
+    assert.equal(calls.length, 2, 'a user target never reaches docker');
+  }
 
   // ---------------------------------------------------------------------
   // Budgets: sums come from the rows, caps from the target
@@ -544,6 +616,21 @@ try {
     assert(!docker.calls.some(a => a[0] === 'exec' && !a[1].startsWith(ownPrefix)));
   }
   {
+    // The throwaway account must confirm that automatic snapshots are off.
+    const docker = fakeDocker({ token: 'PBPTOKEN=' + 'a'.repeat(40) });
+    const { report } = await tempRun('profile-unconfirmed', docker);
+    assert.equal(report.failure.code, 'temp_profile_failed');
+    const script = docker.calls.find(a => a[0] === 'exec' && a.includes('manage.py')).at(-1);
+    assert.match(script, /^u\.profile\.enable_automatic_html_snapshots=False$/m);
+  }
+  {
+    const docker = fakeDocker({ token: 'PBPSNAPSHOTS=False\nPBPTOKEN=' + 'a'.repeat(40) });
+    const { report } = await tempRun('profile-confirmed', docker);
+    // linkding is ready; the fake Karakeep only answers its health route.
+    assert.equal(report.failure.code, 'temp_signup_failed');
+    assert(!JSON.stringify(report).includes('a'.repeat(40)), 'the temp token stays out of the report');
+  }
+  {
     const docker = fakeDocker({ states: {} });
     // The linkding container dies right after start: its logs are kept, redacted.
     const exitDocker = { ...docker, exec: async args => (args[0] === 'inspect' && args[2] !== '{{.Image}}' && /-linkding$/.test(args[3]) ? (docker.calls.push(args), { code: 0, stdout: 'exited 1\n', stderr: '' }) : docker.exec(args)) };
@@ -613,7 +700,8 @@ try {
   assert.equal(value.realRequests, 0);
   assert.equal(value.docker, false);
   assert.equal(value.browser, false);
-  assert.equal(value.budget.linkding.bookmarks, 2);
+  // core on linkding: the snapshot, popup/reader and worker modules, one bookmark each.
+  assert.equal(value.budget.linkding.bookmarks, 3);
   const userPlan = JSON.parse((await run(['--plan', '--target', 'user', '--service', 'linkding', '--linkding', 'http://127.0.0.1:48100'])).output);
   assert.deepEqual(userPlan.services, ['linkding']);
   assert.deepEqual(userPlan.bases, { linkding: 'http://127.0.0.1:48100/' });
