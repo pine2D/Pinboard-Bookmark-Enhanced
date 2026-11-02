@@ -1036,6 +1036,9 @@ const TEMP_SECRET_ENV = new Set(['LD_SUPERUSER_PASSWORD', 'POSTGRES_PASSWORD', '
 // one runs Chromium inside the container, one at a time, and only the
 // snapshot module waits for them (E2 in live-test-efficiency.md).
 const LINKDING_TOKEN_SCRIPT = "from django.contrib.auth.models import User\nfrom bookmarks.models import ApiToken\nu=User.objects.get(username='pbp-it')\nu.profile.enable_automatic_html_snapshots=False\nu.profile.save()\nprint('PBPSNAPSHOTS='+str(u.profile.enable_automatic_html_snapshots))\nprint('PBPTOKEN='+ApiToken.objects.create(user=u,name='pbp-it').key)";
+// Read-only state of a temporary linkding's snapshot work: the huey queue
+// (pending and scheduled tasks, their names) and the snapshot assets by status.
+const LINKDING_SNAPSHOT_DIAG_SCRIPT = "from collections import Counter\nfrom huey.contrib.djhuey import HUEY\nfrom bookmarks.models import BookmarkAsset\nprint('PBPHUEY pending=%d scheduled=%d' % (HUEY.pending_count(), HUEY.scheduled_count()))\nc = Counter(BookmarkAsset.objects.filter(asset_type='snapshot').values_list('status', flat=True))\nprint('PBPASSETS ' + ' '.join('%s=%d' % kv for kv in sorted(c.items())))\nprint('PBPTASKS ' + ','.join(sorted({t.name for t in HUEY.pending(limit=20)})))";
 // Profile switches the runner may flip on a temporary linkding account, and
 // only there. The REST API does not expose them for writing.
 export const TEMP_PROFILE_FIELDS = Object.freeze(['enable_sharing', 'enable_automatic_html_snapshots']);
@@ -2022,6 +2025,25 @@ export class LiveRun {
     return true;
   }
 
+  // Why a temporary linkding's snapshot is still pending: its task queue and
+  // asset states, the background jobs process and how many Chromium
+  // processes run. Temp only; reads, never changes, the container.
+  async snapshotDiagnostics(instance) {
+    check(this.target === 'temp' && this.docker, 'profile_requires_temp', true);
+    const name = this.docker.names[instance];
+    const out = { hueyPending: null, hueyScheduled: null, assets: {}, tasks: [], jobs: '', chromium: null };
+    const shell = await this.docker.exec(name, ['python', 'manage.py', 'shell', '-c', LINKDING_SNAPSHOT_DIAG_SCRIPT], { allowFail: true, timeoutMs: 60000 });
+    const huey = /^PBPHUEY pending=(\d+) scheduled=(\d+)$/m.exec(shell.stdout || '');
+    if (huey) { out.hueyPending = Number(huey[1]); out.hueyScheduled = Number(huey[2]); }
+    for (const [, key, n] of ((/^PBPASSETS (.*)$/m.exec(shell.stdout || '') || [])[1] || '').matchAll(/([a-z_]+)=(\d+)/g)) out.assets[key] = Number(n);
+    out.tasks = (((/^PBPTASKS (.*)$/m.exec(shell.stdout || '') || [])[1]) || '').split(',').filter(x => /^[A-Za-z0-9_.]+$/.test(x)).slice(0, 10);
+    const sup = await this.docker.exec(name, ['supervisorctl', '-c', '/etc/linkding/supervisord-all.conf', 'status', 'jobs'], { allowFail: true, timeoutMs: 20000 });
+    out.jobs = (/^jobs\s+([A-Z]+)/m.exec(sup.stdout || '') || [])[1] || 'unknown';
+    const ps = await this.docker.exec(name, ['ps', '-eo', 'comm'], { allowFail: true, timeoutMs: 20000 });
+    if (ps.code === 0) out.chromium = (ps.stdout || '').split('\n').filter(line => /chrom/i.test(line)).length;
+    return out;
+  }
+
   // Returns true when the switch changed (the caller then reconnects).
   setTempSharing(instance, on) { return this.setTempProfile(instance, 'enable_sharing', on); }
 
@@ -2621,6 +2643,8 @@ export class LiveRun {
         return { url, observed: () => !!run.probe?.seen, clear: () => { run.probe = null; } };
       },
       shot: (page, state, opts = {}) => { alive(); return run.shot(page, state, { service: mod.service, ...opts }); },
+      // Temporary linkding only (null elsewhere): snapshot task state.
+      snapshotDiagnostics: async () => { alive(); return run.target === 'temp' && mod.service === 'linkding' ? run.snapshotDiagnostics(instance) : null; },
     };
     return t;
   }

@@ -49,6 +49,11 @@ const NEEDS = Object.freeze({
 // module still has SNAPSHOT_MARGIN_MS left for checks and cleanup.
 export const SNAPSHOT_POLL_MS = 5000;
 export const SNAPSHOT_MARGIN_MS = 15000;
+// A temporary linkding finishes a snapshot after two polls (about 10 s); one
+// run in four sat pending for the whole module. There it stops after six
+// polls (30 s) as snapshot_pending_timeout, still a failure, and records the
+// container's snapshot task state. A user instance keeps the full wait.
+export const SNAPSHOT_TEMP_POLLS = 6;
 const needs = (over = {}) => ({ ...NEEDS, ...over });
 
 // Row fields that vary by service resolve through this helper (number or map).
@@ -151,8 +156,17 @@ export const MODULES = [
         // linkding stores the pending asset inside the create request, so
         // "missing" already means automatic snapshots are off for this account.
         if (status !== 'pending' || t.remainingMs() < SNAPSHOT_POLL_MS + SNAPSHOT_MARGIN_MS) break;
+        if (t.target === 'temp' && polls >= SNAPSHOT_TEMP_POLLS) break;
       }
       t.note('snapshot', { status, polls, waitedMs: Date.now() - started });
+      if (status === 'pending' && t.target === 'temp' && polls >= SNAPSHOT_TEMP_POLLS) {
+        // Is it the temporary container? Its task queue, asset states, the
+        // jobs process and Chromium, read-only.
+        let tasks;
+        try { tasks = await t.snapshotDiagnostics(); } catch (error) { tasks = { error: String(error?.code || error?.name || 'Error') }; }
+        t.note('snapshotTasks', tasks);
+        t.expectEq(status, 'complete', 'snapshot_pending_timeout');
+      }
       t.expect(status !== 'missing', 'snapshot_not_queued');
       t.expect(status !== 'failure', 'snapshot_failed');
       t.expectEq(status, 'complete', 'snapshot_incomplete');

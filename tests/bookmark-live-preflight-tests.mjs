@@ -23,7 +23,7 @@ import vm from 'node:vm';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), 'pbp-live-preflight-'));
 const live = await import('../scripts/bookmark-service-live.mjs');
-const { MODULES, GROUPS, LIST_MARKER, SNAPSHOT_POLL_MS, SNAPSHOT_MARGIN_MS } = await import('../scripts/bookmark-service-live-scenarios.mjs');
+const { MODULES, GROUPS, LIST_MARKER, SNAPSHOT_POLL_MS, SNAPSHOT_MARGIN_MS, SNAPSHOT_TEMP_POLLS } = await import('../scripts/bookmark-service-live-scenarios.mjs');
 
 const credentialsPath = join(dir, 'synthetic-credentials.json');
 const marker = join(dir, 'credential-access');
@@ -233,12 +233,13 @@ try {
     const snap = MODULES.find(m => m.id === 'core.snapshot');
     const budget = live.resolveBudget({ ...snap, service: 'linkding' });
     assert.equal(SNAPSHOT_POLL_MS, 5000);
-    const drive = async statuses => {
-      let now = 0, polls = 0;
+    const drive = async (statuses, { target = 'user', diagnostics = null } = {}) => {
+      let now = 0, polls = 0, diagnosed = 0;
       const sleeps = [], notes = {};
       const failWith = code => { const e = new Error(code); e.code = code; throw e; };
       const t = {
-        service: 'linkding', prefix: 'pbp-it-x',
+        service: 'linkding', prefix: 'pbp-it-x', target,
+        snapshotDiagnostics: async () => { diagnosed++; return diagnostics; },
         claimUrl: () => 'http://localhost:47391/?pbp-it=x-linkding-1',
         phase: () => {}, check: () => {}, note: (k, v) => { notes[k] = v; },
         sw: async (fn, intent) => { assert.equal(intent.mode, 'create'); return { status: 'saved' }; },
@@ -255,7 +256,7 @@ try {
       };
       let code = '';
       try { await snap.steps(t); } catch (e) { code = e.code || String(e); }
-      return { code, polls, sleeps, now, notes };
+      return { code, polls, sleeps, now, notes, diagnosed };
     };
     const done = await drive(['pending', 'pending', 'complete']);
     assert.equal(done.code, '');
@@ -268,7 +269,35 @@ try {
       assert(r.sleeps.length && r.sleeps.every(ms => ms === SNAPSHOT_POLL_MS), 'one poll every 5 s');
       assert(r.now <= budget.seconds * 1000 - SNAPSHOT_MARGIN_MS, 'stops while the module has time left: ' + r.now);
       assert(r.polls + 3 <= budget.node, 'polls fit the module node budget');
+      assert.equal(r.diagnosed, 0, 'the user target reads no task queue');
     }
+    // Temporary linkding (E-H1c): a snapshot normally completes after two
+    // polls (about 10 s), but one run in four sat pending for the whole
+    // 100 s. The temp target stops after SNAPSHOT_TEMP_POLLS polls (30 s)
+    // with its own code, still a failure, and records the container's
+    // snapshot task state for diagnosis.
+    assert.equal(SNAPSHOT_TEMP_POLLS * SNAPSHOT_POLL_MS, 30000);
+    const diag = { hueyPending: 1, hueyScheduled: 0, assets: { pending: 1 }, tasks: ['bookmarks.services.tasks._create_html_snapshot_task'], jobs: 'RUNNING', chromium: 0 };
+    const stuck = await drive(['pending'], { target: 'temp', diagnostics: diag });
+    assert.deepEqual([stuck.code, stuck.polls, stuck.diagnosed], ['snapshot_pending_timeout', SNAPSHOT_TEMP_POLLS, 1]);
+    assert.deepEqual(stuck.notes.snapshotTasks, diag);
+    assert.equal(stuck.notes.snapshot.status, 'pending');
+    const quick = await drive(['pending', 'complete'], { target: 'temp', diagnostics: diag });
+    assert.deepEqual([quick.code, quick.polls, quick.diagnosed], ['', 2, 0]);
+    // The task state comes from the run's own container, read-only.
+    const dRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    const dCalls = [];
+    dRun.target = 'temp';
+    dRun.docker = { names: { linkding: 'pbp-it-x-linkding' }, exec: async (name, cmd) => {
+      dCalls.push([name, ...cmd]);
+      if (cmd[0] === 'python') return { code: 0, stdout: '23 objects imported automatically\nPBPHUEY pending=1 scheduled=0\nPBPASSETS complete=3 pending=1\nPBPTASKS bookmarks.services.tasks._create_html_snapshot_task\n' };
+      if (cmd[0] === 'supervisorctl') return { code: 0, stdout: 'jobs                             RUNNING   pid 17, uptime 0:01:40\n' };
+      return { code: 0, stdout: 'COMMAND\npython\nchromium\nchrome_crashpad\nuwsgi\n' };
+    } };
+    assert.deepEqual(await dRun.snapshotDiagnostics('linkding'), { hueyPending: 1, hueyScheduled: 0, assets: { complete: 3, pending: 1 }, tasks: ['bookmarks.services.tasks._create_html_snapshot_task'], jobs: 'RUNNING', chromium: 2 });
+    assert(dCalls.every(c => c[0] === 'pbp-it-x-linkding'));
+    dRun.target = 'user';
+    await assert.rejects(dRun.snapshotDiagnostics('linkding'), e => e.code === 'profile_requires_temp');
   }
 
   // Profile switches on a throwaway linkding account: allow-listed fields,
