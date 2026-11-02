@@ -68,8 +68,8 @@ async function test(name,fn){const d=document.createElement('div');d.className='
    const recentStart=uiSource.indexOf('async function loadBookmarkForEdit('),recentEnd=uiSource.indexOf('// ===================== Recent Bookmarks',recentStart);
    const aiSlice=name=>{const s=aiSource.indexOf('function '+name+'(');return aiSource.slice(s,aiSource.indexOf('\n}',s)+2);};
    const cacheSlice=name=>{const s=cacheSource.indexOf('function '+name+'(');return cacheSource.slice(s,cacheSource.indexOf('\n}',s)+2);};
-   const names=Object.keys(deps);let api;api=new Function(...names,[uiSource.slice(a,b),sliceFn('pbpPopupFormIsDirty'),sliceFn('updateCharCount'),sliceFn('recomputeArchiveCheck'),uiSource.slice(recentStart,recentEnd),aiSlice('pbpAiWrapSummary'),aiSlice('upsertSummary'),aiSlice('removeSummary'),sliceFn('shouldUpdateField'),aiSlice('_aiUrlEquivalent'),cacheSlice('pbpAiPageUrlNorm'),sliceFn('_loadUrlCleanSettings'),sliceFn('pbpPopupFormHoldsOpenedPage'),sliceFn('pbpPopupPrefillDescription'),
-     'return {prefill:pbpPopupPrefillDescription,initPopupDraft,setupPopupDraftTracking,pbpPopupDraftSnapshot,pbpRememberPopupDraft,pbpPopupDescriptionKnown,forgetDescription(){_linkdingDescriptionKnown=false;},pbpDiscardPopupDraft,updateCharCount,recomputeArchiveCheck,loadBookmarkForEdit,exitEditMode,pbpPopupFormIsDirty,upsertSummary,removeSummary,chip(){_tagsUserTouched=true;currentTags.push("Chip");renderTags();},failedSubmit(){'+uiSource.slice(uiSource.indexOf('      Object.keys(fieldDirtyFlags).forEach',uiSource.indexOf('function setupSubmit(')),uiSource.indexOf('      // Host permission first:',uiSource.indexOf('function setupSubmit(')))+'}};'].join('\n'))(...names.map(n=>deps[n]));api.setupPopupDraftTracking();
+   const names=Object.keys(deps);let api;api=new Function(...names,[uiSource.slice(a,b),sliceFn('pbpPopupFormIsDirty'),sliceFn('updateCharCount'),sliceFn('recomputeArchiveCheck'),uiSource.slice(recentStart,recentEnd),aiSlice('pbpAiWrapSummary'),aiSlice('upsertSummary'),aiSlice('removeSummary'),sliceFn('shouldUpdateField'),aiSlice('_aiUrlEquivalent'),cacheSlice('pbpAiPageUrlNorm'),sliceFn('_loadUrlCleanSettings'),sliceFn('pbpPopupFormHoldsOpenedPage'),sliceFn('pbpPopupPrefillDescription'),sliceFn('pbpPopupFillPageDescription'),sliceFn('pbpPopupSyncPageDescription'),
+     'return {prefill:pbpPopupPrefillDescription,syncPageDescription:pbpPopupSyncPageDescription,initPopupDraft,setupPopupDraftTracking,pbpPopupDraftSnapshot,pbpRememberPopupDraft,pbpPopupDescriptionKnown,forgetDescription(){_linkdingDescriptionKnown=false;},pbpDiscardPopupDraft,updateCharCount,recomputeArchiveCheck,loadBookmarkForEdit,exitEditMode,pbpPopupFormIsDirty,upsertSummary,removeSummary,chip(){_tagsUserTouched=true;currentTags.push("Chip");renderTags();},failedSubmit(){'+uiSource.slice(uiSource.indexOf('      Object.keys(fieldDirtyFlags).forEach',uiSource.indexOf('function setupSubmit(')),uiSource.indexOf('      // Host permission first:',uiSource.indexOf('function setupSubmit(')))+'}};'].join('\n'))(...names.map(n=>deps[n]));api.setupPopupDraftTracking();
    return {api,elements,flags,sent,statuses,delayClears(){delayClear=true;},releaseClear:ok=>resolveClear({ok}),delayWrites(){delayWrite=true;},failWrite(){resolveWrite({ok:false});},rejectRestore:()=>rejectRead(new Error('Synthetic IPC failure')),failRestore:()=>resolveRead({ok:false,error:'storage'}),release:(d=draft)=>resolveRead({ok:true,account:'alice',draft:d}),owner:o=>{currentOwner=o;}};
  }
  await test('restore applies the full form and guards later prefills',async()=>{const h=uiHarness();const pending=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release();await pending;assert(JSON.stringify(h.api.pbpPopupDraftSnapshot())===JSON.stringify(draft));assert(Object.entries(h.flags).filter(([id])=>id!=='linkding-description-input').every(([,v])=>v));});
@@ -227,6 +227,68 @@ async function test(name,fn){const d=document.createElement('div');d.className='
      }
    }finally{console.warn=warn;}
    assert(warned.length===1&&warned[0].includes('page URL cleaning failed'),'the failure was not logged exactly once: '+JSON.stringify(warned));
+ });
+ // The page's text belongs to the page. The box takes it for the address the
+ // popup opened with, and the address can change afterwards: typed over, pasted
+ // over, put back by Undo. A bookmark for the other page must not be created
+ // with this page's description and ?disable_scraping, so for as long as the
+ // box holds only what the page put there it follows the address: another page
+ // takes the text out (an empty box is left to linkding, which reads that page),
+ // and the opened page's own address brings it back.
+ await test('the page description follows the address edited after the popup opened: another page takes it out, the same page brings it back',async()=>{
+   const PAGE='https://example.com/article',META='Page meta';
+   const opened=async({pageInfo,settings,restored=null})=>{const h=uiHarness('linkding',{pageInfo,settings});const p=h.api.initPopupDraft('alice',{url:PAGE});h.elements['url-input'].value=PAGE;h.release(restored);await p;h.api.prefill();return h;};
+   // What the url-input listener of showMain does on an input event: the draft
+   // tracking sees the edit, then the box is synced to the address. The wiring of
+   // that listener itself is driven by real typing in bookmark-service-runtime-tests.
+   const edit=(h,url)=>{const input=h.elements['url-input'];input.value=url;input.dispatchEvent(new Event('input'));h.api.syncPageDescription();};
+   const box=h=>h.elements['linkding-description-input'].value,known=h=>h.api.pbpPopupDescriptionKnown(),drafted=h=>Object.hasOwn(h.api.pbpPopupDraftSnapshot(),'summary');
+   const state=h=>JSON.stringify([box(h),known(h)]);
+   const same=[['the same URL',PAGE],['a fragment',PAGE+'#intro'],['a tracking parameter',PAGE+'?utm_source=newsletter']];
+   const other=[['another path','https://example.com/recent'],['another host','https://other.example.org/article'],['another query',PAGE+'?id=2'],['another scheme','http://example.com/article'],['the site root','https://example.com/']];
+   // [kind of page, page, auto-fill, [box, known] on the page itself, [box, known] on any other address]
+   for(const [kind,pageInfo,auto,own,away] of [
+     ['a read page',{url:PAGE,metaDescription:META},true,[META,true],['',false]],
+     ['a read page, auto-fill off',{url:PAGE,metaDescription:META},false,['',true],['',true]],
+     ['a page without a description',{url:PAGE,metaDescription:''},true,['',true],['',false]],
+     ['an unread page',{url:PAGE,metaDescription:'',_pbpUnavailable:true},true,['',false],['',false]],
+     ['an unread page, auto-fill off',{url:PAGE,metaDescription:'',_pbpUnavailable:true},false,['',true],['',true]]]){
+     const h=await opened({pageInfo,settings:{optAutoDescription:auto}});
+     const at=(label,url,want)=>{edit(h,url);assert(state(h)===JSON.stringify(want)&&!drafted(h),kind+', '+label+': box/known '+state(h)+', wanted '+JSON.stringify(want)+', drafted '+drafted(h));};
+     at('as opened',PAGE,own);
+     for(const [awayLabel,awayUrl] of other)for(const [sameLabel,sameUrl] of same){at(awayLabel,awayUrl,away);at(sameLabel+' again, after '+awayLabel,sameUrl,own);}
+   }
+   // Whatever else the box holds is not the page's and stays, at any address:
+   // text the user typed, or emptied the box of, an AI summary, a cached one. Two
+   // rows hold exactly what the page put there (its text, or nothing on a page
+   // without one), typed by the user: the user's choice, not the page's.
+   const read={url:PAGE,metaDescription:META},bare={url:PAGE,metaDescription:''};
+   const typed=text=>h=>{const el=h.elements['linkding-description-input'];el.value=text;el.dispatchEvent(new Event('input'));};
+   for(const [label,pageInfo,write,want] of [
+     ['typed text',read,typed('Typed description'),['Typed description',true]],
+     ['an emptied box',read,typed(''),['',true]],
+     ['the page text typed back',read,typed(META),[META,true]],
+     ['an emptied box on a page without a description',bare,typed(''),['',true]],
+     ['an AI summary',read,h=>h.api.upsertSummary('AI summary'),['AI summary',true]],
+     ['a cached AI summary',read,h=>h.api.upsertSummary('Cached summary',{userEdit:false}),['Cached summary',true]]]){
+     const h=await opened({pageInfo});write(h);
+     for(const url of ['https://example.com/recent',PAGE,PAGE+'?id=2','https://other.example.org/article']){edit(h,url);assert(state(h)===JSON.stringify(want),label+' at '+url+': box/known '+state(h));}
+   }
+   const restored=await opened({pageInfo:read,restored:{...draft,summary:'Restored description',summaryTouched:true}});
+   edit(restored,'https://example.com/recent');
+   assert(box(restored)==='Restored description'&&known(restored)&&restored.api.pbpPopupDraftSnapshot().summary==='Restored description','a restored Description was taken out: '+state(restored));
+   // The sync replaces only text it wrote itself: a value that got into the box
+   // by any other route stays, even where nothing marks it as the user's.
+   const foreign=await opened({pageInfo:read});foreign.elements['linkding-description-input'].value='Written elsewhere';
+   edit(foreign,'https://example.com/recent');
+   assert(box(foreign)==='Written elsewhere'&&known(foreign),'text the page did not put there was replaced: '+state(foreign));
+   // A recent bookmark loaded for editing resets the form for that bookmark: the
+   // opened page's text no longer applies, whatever address is typed next.
+   const recent=await opened({pageInfo:{url:PAGE,metaDescription:''},settings:{}});
+   await recent.api.loadBookmarkForEdit('https://example.com/recent','alice:fake');
+   assert(!known(recent),'loading a recent bookmark left the Description known');
+   edit(recent,PAGE);
+   assert(!known(recent)&&box(recent)==='','the opened page took over the form of a recent bookmark: '+state(recent));
  });
  await test('linkding regeneration and removal touch only generated Description',async()=>{const h=uiHarness('linkding');const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release({...draft,summary:'Generated',summaryTouched:false});await p;h.api.upsertSummary('Replacement');assert(h.api.removeSummary()===true);assert(h.elements['linkding-description-input'].value===''&&h.elements['description-input'].value===draft.notes);h.api.upsertSummary('Another');h.elements['linkding-description-input'].value='Manual';h.elements['linkding-description-input'].dispatchEvent(new Event('input'));assert(h.api.removeSummary()===false&&h.elements['linkding-description-input'].value==='Manual');});
  await test('cancel prevents late programmatic writes from recreating the discarded draft',async()=>{const h=uiHarness();const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release();await p;h.delayClears();const clearing=h.api.exitEditMode();h.elements['description-input'].value='Late AI result';h.api.updateCharCount();assert(!h.sent.some(m=>m.action==='write'));h.releaseClear(true);await clearing;assert(h.sent.at(-1).action==='reload');});

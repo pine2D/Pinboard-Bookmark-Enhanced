@@ -137,19 +137,7 @@ function pbpPopupPrefillDescription() {
   const row = $id("linkding-description-row");
   row.hidden = !linkding;
   row.classList.toggle("hidden", !linkding);
-  if (linkding && shouldUpdateField("linkding-description-input")) {
-    const auto = settings.optAutoDescription !== false;
-    // The meta description describes the page the popup opened on, not whatever
-    // URL the form holds (a restored draft of a recent bookmark, a typed URL).
-    // For another URL the lookup fills in the stored Description, and a create
-    // leaves it to linkding, which reads that URL itself.
-    const ownPage = pbpPopupFormHoldsOpenedPage();
-    $id("linkding-description-input").value = auto && ownPage ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : "";
-    // A page that could not be read has no known description of its own, and
-    // nothing has read another URL: an empty box is known only with auto-fill off.
-    _linkdingDescriptionKnown = !auto || (ownPage && pageInfo?._pbpUnavailable !== true);
-    _linkdingDescriptionPending = false;
-  }
+  if (linkding && shouldUpdateField("linkding-description-input")) pbpPopupFillPageDescription();
   let notes = "";
   if (pageInfo.selectedText) {
     notes = settings.optBlockquote ? pbpFormatQuote(pageInfo.selectedText, pbpBookmarkServiceId(settings)) : pageInfo.selectedText;
@@ -174,6 +162,34 @@ function pbpPopupFormHoldsOpenedPage() {
     console.warn("page URL cleaning failed:", e && e.name, e && e.message);
     return false;
   }
+}
+// The Description box for the address the form holds. The meta description
+// describes the page the popup opened on, not whatever URL the form holds (a
+// restored draft of a recent bookmark, a typed URL). For another URL the lookup
+// fills in the stored Description, and a create leaves it to linkding, which
+// reads that URL itself.
+function pbpPopupFillPageDescription() {
+  const auto = settings.optAutoDescription !== false;
+  const ownPage = pbpPopupFormHoldsOpenedPage();
+  const input = $id("linkding-description-input");
+  input.value = auto && ownPage ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : "";
+  // A page that could not be read has no known description of its own, and
+  // nothing has read another URL: an empty box is known only with auto-fill off.
+  _linkdingDescriptionKnown = !auto || (ownPage && pageInfo?._pbpUnavailable !== true);
+  _linkdingDescriptionPending = false;
+  _linkdingPageDescription = input.value;
+}
+// The address can change after the popup opened (typed, pasted, put back by
+// Undo). For as long as the box holds only what the page put there it follows
+// that address: another page takes the text out and leaves the Description to
+// linkding, the opened page's own address brings it back. Nothing else is
+// touched: text the user, an AI summary or a restored draft wrote (pending), and
+// the Description a lookup filled in or a form reset for a recent bookmark
+// (_linkdingPageDescription is null then, as it is for every other service).
+function pbpPopupSyncPageDescription() {
+  if (_linkdingPageDescription === null || _linkdingDescriptionPending
+      || $id("linkding-description-input").value !== _linkdingPageDescription) return;
+  pbpPopupFillPageDescription();
 }
 function recomputeArchiveCheck() {
   if (_archiveUserTouched) return;
@@ -272,6 +288,12 @@ let _linkdingDescriptionKnown = false;
 // Description changed elsewhere meanwhile is shown there, not overwritten with
 // the line this popup loaded.
 let _linkdingDescriptionPending = false;
+// What the page-based prefill last put in the Description box while the box
+// still holds only that: the opened page's meta description, or "" for another
+// address. It lets the box follow the address edited afterwards
+// (pbpPopupSyncPageDescription). null before the prefill ran and once anything
+// else owns the box: the stored bookmark, a form reset for a recent bookmark.
+let _linkdingPageDescription = null;
 // Only an actual visible Share change (or its owner-scoped draft) sets this.
 let _linkdingSharedExplicit = false;
 let _linkdingSharedRevision = 0;
@@ -952,6 +974,8 @@ async function showMain(token) {
     // audit A1: AI is anchored to the opened page - grey it out while the
     // URL points somewhere non-equivalent (popup-ai.js owns the check).
     if (typeof pbpAiSyncUrlEditState === "function") pbpAiSyncUrlEditState();
+    // The Description is anchored to the opened page the same way.
+    pbpPopupSyncPageDescription();
     updateCharCount();
   });
   $id("title-input").addEventListener("input", updateCharCount);
@@ -1713,6 +1737,8 @@ async function checkExistingBookmark(token, url, prefetch, forceFresh = false, s
           $id("linkding-description-input").value = pbpBookmarkDescriptionLine(existingBookmark.summary);
           _linkdingDescriptionKnown = true;
           _linkdingDescriptionPending = false;
+          // The bookmark's own Description, not the page's: no address edit takes it out.
+          _linkdingPageDescription = null;
         }
         if (shouldUpdateField("private-check")) {
           $id("private-check").checked = existingBookmark.shared === "no";
@@ -2444,6 +2470,8 @@ async function loadBookmarkForEdit(url, token) {
   // Nothing has read that bookmark's page; the lookup refills a stored one.
   _linkdingDescriptionKnown = settings.optAutoDescription === false;
   _linkdingDescriptionPending = false;
+  // The form now belongs to that bookmark: the opened page's text no longer applies.
+  _linkdingPageDescription = null;
   $id("private-check").checked = pbpBookmarkServiceId(settings) !== "pinboard";
   $id("share-check").checked = false;
   _linkdingSharedExplicit = false;

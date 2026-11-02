@@ -685,6 +685,54 @@ try{
     await worker.evaluate(()=>chrome.storage.local.set({optShowRecent:false}));await article.goto(origin+'/article');
     console.log("linkding restored draft for another URL: the tab's description stays out of the Description, linkding reads the bookmark itself; the tab's own draft still takes it");
   }
+  // The box is filled for the page the popup opened on, and that page owns the
+  // text. An address typed over it afterwards names another page: a create for
+  // it must leave the Description to linkding (no text, no ?disable_scraping),
+  // which reads that page itself, not save this page's meta description onto
+  // it. Typing the page's own address back (a fragment makes no other page)
+  // returns the text, and a Description the lookup filled in for a stored
+  // bookmark stays whatever address is typed after it.
+  {
+    const tabUrl=origin+'/article-meta', awayUrl=origin+'/article-recent', otherUrl=origin+'/article-away';
+    const box=popup=>popup.locator('#linkding-description-input').inputValue();
+    const createFrom=async(popup,label)=>{const before=requests.length;await popup.locator('#submit-btn').click();await until(()=>linkdingCreates(before).length>0,label);
+      await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));return linkdingCreates(before)[0];};
+    await worker.evaluate(()=>statusCache.clear());
+    await article.goto(tabUrl);
+    let popup=await openOnTab();
+    assert.equal(await box(popup),'Server-scraped description','a first open did not take its own page description');
+    await popup.locator('#url-input').fill(awayUrl);
+    assert.equal(await box(popup),'',"the tab's description stayed in the box of an address typed over it");
+    const away=await createFrom(popup,'create for an address typed over the page');
+    assert.equal(away.data.url,awayUrl);
+    assert.equal(away.query,'',"an address typed over the page told linkding not to read it");
+    assert(!Object.hasOwn(away.data,'description'),"the tab's description was sent for another page");
+    assert.equal([...records.linkding.values()].find(b=>b.url===awayUrl)?.description,'Recent page description','linkding did not fill in the typed page Description itself');
+    await popup.close();
+    assert.equal(await draftFor(tabUrl),null,'the delivered draft was still stored for the tab');
+    popup=await openOnTab();
+    await popup.locator('#url-input').fill(otherUrl);
+    assert.equal(await box(popup),'',"the tab's description stayed in the box of a second address");
+    await popup.locator('#url-input').fill(tabUrl+'#intro');
+    assert.equal(await box(popup),'Server-scraped description',"typing the page's own address back did not return its description");
+    await popup.locator('#url-input').fill(tabUrl);
+    const back=await createFrom(popup,'create after typing the page address back');
+    assert.deepEqual([back.data.url,back.query,back.data.description],[tabUrl,'?disable_scraping','Server-scraped description'],"a create on the page's own address did not send its known Description");
+    await popup.close();
+    // The bookmark just made stores the very text the page has. Opened again the
+    // lookup shows it as the bookmark's own Description, and typing another
+    // address leaves it with the bookmark's title and tags.
+    popup=await openOnTab();await settled(popup,'found');
+    assert.equal(await box(popup),'Server-scraped description','a reopened popup did not show the stored Description');
+    await popup.locator('#url-input').fill(otherUrl);
+    assert.equal(await box(popup),'Server-scraped description',"an address typed over a stored bookmark took its Description out");
+    await popup.evaluate(()=>pbpDiscardPopupDraft());
+    assert.equal(await draftFor(tabUrl),null,'the typed address stayed drafted for the tab');
+    await popup.close();
+    for(const row of [...records.linkding.values()].filter(b=>[tabUrl,awayUrl,otherUrl].includes(b.url)))records.linkding.delete(String(row.id));
+    await worker.evaluate(()=>statusCache.clear());await article.goto(origin+'/article');
+    console.log("linkding address typed after the popup opened: another page leaves the Description to linkding, the page's own address brings its text back, a stored Description stays");
+  }
   // URL cleaning can remove more than the same-page check ignores: aggressive
   // mode takes off ref and source, a custom parameter whatever was listed. The
   // popup puts the cleaned address of its own page in the form, and that is
