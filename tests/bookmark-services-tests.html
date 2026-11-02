@@ -1091,15 +1091,28 @@ test("failure keys apply only to self-hosted services",()=>{
     equal(pbpBookmarkFailureKey(null,service),"");
   }
 });
-test("a linkding server error names a tag longer than 64 characters, and only such a tag",async()=>{
-  for(const tag of overlongTags)for(const existing of [undefined,{id:"7",url:pageUrl,private:true,summary:""}])for(const status of [500,502,503]){
-    const reply=status===500?djangoServerError():new Response("<html><body><h1>"+status+"</h1></body></html>",{status,headers:{"Content-Type":"text/html"}});
-    const h=harness("linkding",[reply]);
+// What nginx in front of linkding answers while gunicorn restarts or times
+// out (ngx_http_special_response.c): the request never reached Django.
+const proxyError = status => {
+  const title = {502:"502 Bad Gateway",503:"503 Service Temporarily Unavailable",504:"504 Gateway Time-out"}[status];
+  return new Response("<html>\r\n<head><title>"+title+"</title></head>\r\n<body>\r\n<center><h1>"+title+"</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n",
+    {status,headers:{"Content-Type":"text/html","Server":"nginx"}});
+};
+test("a linkding 500 names a tag longer than 64 characters, and only such a tag",async()=>{
+  for(const tag of overlongTags)for(const existing of [undefined,{id:"7",url:pageUrl,private:true,summary:""}]){
+    const h=harness("linkding",[djangoServerError()]);
     let error;
     try{await h.client.save({url:pageUrl,title:"T",notes:"",tags:["work",tag]},existing);}catch(e){error=e;}
-    equal([error?.code,error?.status,error?.tag],["tag_too_long",status,tag]);
+    equal([error?.code,error?.status,error?.tag],["tag_too_long",500,tag]);
     // The request carried the tag as typed: nothing is cut or held back.
     equal([h.calls[0].method,h.calls[0].body.tag_names],[existing?"PATCH":"POST",["work",tag]]);
+  }
+  // A proxy's 502/503/504 never reached Django's database: an outage, even
+  // with an over-long tag (SQLite stores it), so it stays retryable.
+  for(const status of [502,503,504])for(const existing of [undefined,{id:"7",url:pageUrl,private:true,summary:""}]){
+    let error;
+    try{await harness("linkding",[proxyError(status)]).client.save({url:pageUrl,title:"T",notes:"",tags:["work",overlongTags[0]]},existing);}catch(e){error=e;}
+    equal([status,error?.code,error?.status,error?.tag],[status,"server",status,undefined]);
   }
   // linkding splits a name at commas and trims the parts (parse_tag_string).
   const long="y".repeat(65), comma=harness("linkding",[djangoServerError()]);
@@ -1128,7 +1141,7 @@ test("failure copy names the tag by whole code points and the 64-character limit
   for(const reason of [...PBP_BOOKMARK_GATEWAY_CODES,"auth","not_logged_in","server","partial",undefined])equal(pbpBookmarkFailureArgs({reason,tag:"x".repeat(65)}),[]);
   equal(pbpBookmarkFailureArgs(null),[]);
 });
-test("the worker never queues a save stopped by an over-long linkding tag and drops the page's cached status",async()=>{
+test("the worker never queues a save stopped by an over-long linkding tag, queues a proxy outage, and drops the page's cached status",async()=>{
   const tag=overlongTags[2];
   for(const submit of ["submitSaveIntent","submitPopupSaveIntent"]){
     const h=await workerHarness("linkding",[[200,{bookmark:null}],djangoServerError()]);
@@ -1141,6 +1154,12 @@ test("the worker never queues a save stopped by an over-long linkding tag and dr
   const queued=await workerHarness("linkding",[[200,{bookmark:null}],djangoServerError()]);
   const later=await queued.submitSaveIntent({...saveIntent,tags:"work "+fittingTags[1]});
   equal([later.status,later.cause,queued.state.queue.length],["queued","server",1]);
+  // A proxy outage with an over-long tag is queued too, tag kept whole.
+  for(const status of [502,503,504]){
+    const outage=await workerHarness("linkding",[[200,{bookmark:null}],proxyError(status)]);
+    const result=await outage.submitSaveIntent({...saveIntent,tags:"work "+tag});
+    equal([status,result.status,result.cause,result.reason,outage.state.queue.map(item=>item.tags)],[status,"queued","server",undefined,["work "+tag]]);
+  }
 });
 test("an over-long tag already in the offline queue stays queued on replay and is named on a manual retry",async()=>{
   const tag=overlongTags[0];

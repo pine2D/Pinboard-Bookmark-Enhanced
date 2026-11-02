@@ -240,9 +240,11 @@ function pbpCreateBookmarkServiceClient(config) {
         ({data} = await request(existing ? "bookmarks/" + pbpBookmarkRecordId(existing.id) + "/"
           : described ? "bookmarks/?disable_scraping" : "bookmarks/", existing ? "PATCH" : "POST", body));
       } catch (error) {
-        // A server error while a tag is longer than linkding's column is the
-        // PostgreSQL rejection: name the tag, and nothing will retry it.
-        const tag = error?.code === "server" ? pbpLinkdingOverlongTag(tags) : "";
+        // Django answers PostgreSQL's DataError with a 500: with a tag longer
+        // than linkding's column that is the rejection, so name the tag and
+        // retry nothing. A proxy's 502/503/504 (linkding restarting) never
+        // reached the database and SQLite stores long tags: still "server".
+        const tag = error?.code === "server" && error.status === 500 ? pbpLinkdingOverlongTag(tags) : "";
         if (tag) throw Object.assign(pbpBookmarkServiceError("tag_too_long", error.status), {tag});
         throw error;
       }

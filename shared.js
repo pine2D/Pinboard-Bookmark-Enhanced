@@ -2130,7 +2130,7 @@ const PBP_BOOKMARK_FAILURE_KEYS = Object.freeze({
   not_api:"bookmarkErrNotApi", auth:"bookmarkErrAuth", tag_too_long:"bookmarkErrTagTooLong"});
 // linkding keeps a tag name in a 64-character column (models.py Tag.name).
 // SQLite stores a longer one anyway; PostgreSQL rejects the write and linkding
-// answers with a server error. This only names the cause of such an error:
+// answers with an HTTP 500. This only names the cause of such an error:
 // tag input is never limited or cut.
 const PBP_LINKDING_TAG_MAX = 64;
 // First tag in a linkding tag_names list that the column cannot hold, or "".
