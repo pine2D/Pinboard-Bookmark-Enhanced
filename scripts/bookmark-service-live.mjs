@@ -3275,6 +3275,11 @@ export class LiveRun {
         await popup.locator('#submit-btn').click();
         await run.until(() => popup.evaluate(() => document.getElementById('submit-btn').classList.contains('saved-success')), 'popup_save');
       },
+      // Writes the reader's handoff slot itself: an old-style slot (url,
+      // baseUrl, account), not what a product entry writes. No field the
+      // entries compute (G10's bookmark URL) is in it, so a check that
+      // depends on the entries opens the reader through them instead
+      // (readerFromProduct in the scenarios).
       async openReader(url, { markdown = '# Synthetic article\n\nPublic fixture.', title = 'Synthetic article', ready = '#reader-bookmark-save' } = {}) {
         alive();
         const account = await sw(async () => (await getCurrentBookmarkAuth()).account);

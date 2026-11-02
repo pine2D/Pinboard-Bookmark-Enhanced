@@ -906,6 +906,40 @@ async function batchSave(t, urls) {
   return progress;
 }
 
+// The reader opened through a product entry, so the product writes the
+// handoff slot (G10: its bookmark-URL field is computed only there):
+// 'shortcut' runs the worker's openMarkdownPreviewFromShortcut() on the
+// article tab, 'popup' opens the popup on it, extracts Markdown and clicks
+// Preview. t.openReader writes the slot itself, an old-style slot without
+// that field. `html` serves a URL outside the pool (a utm variant). Returns
+// the reader, the slot's field names (never values) and a close().
+async function readerFromProduct(t, url, entry, { html = articleHtml({ title: t.prefix + ' reader entry' }), ready = '#reader-bookmark-save' } = {}) {
+  const served = page(t, url, html);
+  const slotKeys = reader => t.sw(async k => Object.keys((await chrome.storage.local.get('md_preview_data_' + k))['md_preview_data_' + k] || {}).sort(), new URL(reader.url()).searchParams.get('k') || '');
+  const settle = reader => reader.waitForFunction(sel => document.querySelector(sel)?.getAttribute('aria-busy') === 'false', ready);
+  if (entry === 'popup') {
+    const form = await t.openPopup(url);
+    await form.popup.locator('#jina-md-btn').click();
+    await form.popup.locator('#md-actions-strip:not(.hidden) #md-strip-preview').waitFor();
+    const opened = t.ctx.waitForEvent('page');
+    await form.popup.locator('#md-strip-preview').click();
+    const reader = await opened;
+    const keys = await slotKeys(reader);
+    await settle(reader);
+    return { reader, keys, close: async () => { await reader.close().catch(() => {}); await form.close(); served.clear(); } };
+  }
+  const article = await t.ctx.newPage();
+  await article.goto(url);
+  await article.bringToFront();
+  await t.sw(async url => { const tab = (await chrome.tabs.query({})).find(x => x.url === url); if (tab) { await chrome.windows.update(tab.windowId, { focused: true }); await chrome.tabs.update(tab.id, { active: true }); } }, url);
+  const opened = t.ctx.waitForEvent('page');
+  await t.sw(() => openMarkdownPreviewFromShortcut());
+  const reader = await opened;
+  const keys = await slotKeys(reader);
+  await settle(reader);
+  return { reader, keys, close: async () => { await reader.close().catch(() => {}); await article.close().catch(() => {}); served.clear(); } };
+}
+
 const queue = t => t.sw(async () => { const { offlineQueue = [] } = await chrome.storage.local.get('offlineQueue'); return Array.isArray(offlineQueue) ? offlineQueue : []; });
 const drainQueue = t => t.sw(async () => { await processOfflineQueue(); return true; });
 // A SHA-256 of the stored connection (the <service>Token envelope with its
@@ -1924,9 +1958,12 @@ export const SELFHOSTED_MODULES = [
       variant_reader: { fixRefs: ['G10'], features: ['reader-cleaned-url'] },
     },
     needs: needs({ shots: true }),
+    // The reader opens through the popup (Markdown, Preview), the shortcut
+    // and three old slots: 11 (linkding) and 18 (Karakeep) browser requests
+    // and one tags read in 4.3 s on a temporary run (H3d).
     budget: { bookmarks: 1, urls: 1, node: 4, browser: { linkding: 30, karakeep: 45 }, ai: 0, tags: 0, seconds: 30, tagReads: 1 },
     files: [],
-    settings: {},
+    settings: { aiContentSource: 'local' },
     async steps(t) {
       const url = t.claimUrl();
       await t.seed({ url, title: t.prefix + ' variants', notes: '' });
@@ -1947,19 +1984,34 @@ export const SELFHOSTED_MODULES = [
         await t.shot(form.popup, 'hash-variant', { surface: 'popup', keys: ['#submit-btn'] });
         await form.close();
       });
+      // G10 through the product's own entries: the popup's Preview after
+      // Markdown, and the keyboard shortcut. Each writes the bookmark URL
+      // into the handoff slot; the reader on the utm variant finds the
+      // saved bookmark. An old slot without that field (t.openReader)
+      // falls back to its url: the saved address itself is found.
       await t.part('variant_reader', async () => {
         await t.phase('variant_reader');
-        const judge = async variant => {
-          const reader = await t.openReader(variant, { ready: '#reader-bookmark-save' });
-          const saved = await reader.locator('#reader-bookmark-save').getAttribute('data-saved');
-          await reader.close();
-          return saved === 'true';
-        };
-        const utm = url + '&utm_source=pbp-it';
-        t.expect(await judge(utm), 'reader_utm_unsaved');
+        const isSaved = async reader => (await reader.locator('#reader-bookmark-save').getAttribute('data-saved')) === 'true';
+        // The old slot first: it holds on any tree, so a pending G10 does
+        // not hide it.
+        await t.phase('variant_reader_old_slot');
+        const judgeOld = async variant => { const reader = await t.openReader(variant, { ready: '#reader-bookmark-save' }); try { return await isSaved(reader); } finally { await reader.close(); } };
+        t.expect(await judgeOld(url), 'reader_old_slot_url');
         const upper = url.replace(/^(\w+:\/\/)([^/]+)/, (m, scheme, host) => scheme + host.toUpperCase());
         const slash = url.replace('/?', '?');
-        t.note('readerVariants', { utm: true, hostCase: await judge(upper), noSlash: await judge(slash) });
+        t.note('readerOldSlotVariants', { hostCase: await judgeOld(upper), noSlash: await judgeOld(slash) });
+        const utm = url + '&utm_source=pbp-it';
+        const verdicts = {};
+        for (const entry of ['popup', 'shortcut']) {
+          await t.phase('variant_reader_' + entry);
+          const opened = await readerFromProduct(t, utm, entry);
+          t.note('readerSlot_' + entry, opened.keys);
+          verdicts[entry] = await isSaved(opened.reader);
+          await opened.close();
+        }
+        t.note('readerUtm', verdicts);
+        t.expect(verdicts.popup, 'reader_utm_unsaved_popup');
+        t.expect(verdicts.shortcut, 'reader_utm_unsaved_shortcut');
       });
       t.check(`${t.service}: a # variant of a saved URL is looked up again without #, noticed and left as typed; the reader judges a utm variant saved`);
     },
@@ -2782,16 +2834,20 @@ export const H3C_MODULES = [
         await t.phase('reader_cleaned_url');
         await t.seed({ url: b, title: prefix + ' cleaned', notes: 'before' });
         const variant = b + '&utm_source=pbp-it';
-        const reader = await t.openReader(variant, { ready: '#reader-bookmark-edit' });
+        // Through the shortcut entry, which writes G10's bookmark URL (an
+        // old slot from t.openReader carries none and would look up the utm
+        // address).
+        const opened = await readerFromProduct(t, variant, 'shortcut', { ready: '#reader-bookmark-edit' });
+        const { reader } = opened;
         const saved = (await reader.locator('#reader-bookmark-save').getAttribute('data-saved')) === 'true';
-        t.note('cleanedUrl', { shownSaved: saved });
-        if (!saved) { await reader.close(); t.expect(false, 'reader_utm_unsaved'); }
+        t.note('cleanedUrl', { shownSaved: saved, slot: opened.keys });
+        if (!saved) { await opened.close(); t.expect(false, 'reader_utm_unsaved'); }
         await reader.locator('#reader-bookmark-edit').click();
         await t.until(async () => (await reader.locator('#reader-bookmark-title').inputValue()) === prefix + ' cleaned', 'reader_cleaned_prefill');
         await reader.locator('#reader-bookmark-notes').fill('after');
         const since = t.now();
         await t.applyReader(reader);
-        await reader.close();
+        await opened.close();
         t.expectEq(createsOf(t, '', since).length, 0, 'reader_cleaned_created');
         t.expectEq(notesOfRow(t, await t.ownRow(b)), 'after', 'reader_cleaned_updated');
       });
