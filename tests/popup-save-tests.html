@@ -1750,7 +1750,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // after the handler's entry guard has already passed.
     function regenRuntime({ formUrl, pageUrl, tags, seedTags = ["manual"], accept = tags,
       counts = {}, bookmarkNames = [], attach = false, duringCall = null, lateLookup = false,
-      disableRefreshedChip = false }) {
+      disableRefreshedChip = false, urlClean }) {
       const renderStart = popupAiSource.indexOf("function renderAITags(");
       const renderEnd = popupAiSource.indexOf("\n}\n", renderStart);
       assert(renderStart >= 0 && renderEnd > renderStart, "renderAITags source not found");
@@ -1795,6 +1795,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         "renderTags", "doAITags", "showStatus", "pbpAssignAltNumBadges",
         "_aiClearTagsOutput", "_aiAppendEmptyState", "_aiParkTagsBtn",
         "pbpAiPageUrlNorm", "URL", "seedTags", "settings", "counts", "bookmarkNames",
+        "stripTrackingParams", "_loadUrlCleanSettings",
         "let currentTags = seedTags.slice();\n" +
         "const _aiSessionAddedTags = new Set();\n" +
         "let bookmarkLookup = {status:'pending',url:pageInfo.url,formLoaded:false};\n" +
@@ -1830,7 +1831,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         (host) => host.querySelectorAll(".stag, .add-all-link, .cache-hint-wrap, .empty-state").forEach((node) => node.remove()),
         () => {},
         () => {},
-        summaryReceiptApi({ stripTrackingParams: window.stripTrackingParams }).pbpAiPageUrlNorm,
+        summaryReceiptApi({ stripTrackingParams: urlClean ? pageGuardStrip : window.stripTrackingParams }).pbpAiPageUrlNorm,
         window.URL,
         seedTags,
         // pbpPopupAiAccount derives the owner from this token via shared.js's
@@ -1838,7 +1839,12 @@ test("posts/add default remains replace=yes for existing callers", () => {
         // guard runs for real and only the URL half varies per case.
         { pinboardToken: "alice:0123456789ABCDEF" },
         counts,
-        bookmarkNames
+        bookmarkNames,
+        // urlClean: the popup's own cleaning settings, over the real (re-scoped)
+        // stripTrackingParams; without it the same-page check is the plain
+        // equivalence, as before.
+        urlClean ? pageGuardStrip : window.stripTrackingParams,
+        urlClean ? () => urlClean : undefined
       );
 
       if (lateLookup) runtime.show(tags, true, {pinboardToken:"alice:0123456789ABCDEF"}, runtime.account());
@@ -2866,6 +2872,59 @@ test("posts/add default remains replace=yes for existing callers", () => {
           assert(same ? h.calls.sent.length === sentBefore + 1 && !refused(h) : h.calls.sent.length === sentBefore && refused(h),
             where + ": tags sent " + (h.calls.sent.length - sentBefore) + ", status " + JSON.stringify(h.calls.status));
         }
+      }
+    });
+    // The two links that start an AI op without the entry buttons -- the
+    // summary's Regenerate and the tags' Replace -- ask the same same-page
+    // check: an address the popup cleaned itself goes through, another page
+    // is refused before anything starts.
+    function summaryLinksRuntime({ urlClean, pageUrl, formUrl }) {
+      const from = popupAiSource.indexOf("function _aiUrlEquivalent(");
+      const to = popupAiSource.indexOf("function pbpAiSyncUrlEditState", from);
+      const start = popupAiSource.indexOf("function showSummaryActions(");
+      const end = popupAiSource.indexOf("\n}\n", start);
+      const clean = source.indexOf("function _loadUrlCleanSettings(");
+      assert(from >= 0 && to > from && start >= 0 && end > start && clean >= 0, "summary action source not found");
+      const bar = document.createElement("div");
+      const btn = document.createElement("button");
+      bar.appendChild(btn);
+      document.body.appendChild(bar);
+      const fields = { "url-input": { value: formUrl }, "ai-summary-btn": btn };
+      const calls = { doAISummary: 0, status: [] };
+      const show = new Function("$id", "t", "pageInfo", "settings", "stripTrackingParams", "pbpAiPageUrlNorm",
+        "doAISummary", "showStatus", "removeSummary", "_aiResetSummaryActions",
+        popupAiSource.slice(from, to) + "\n" + source.slice(clean, source.indexOf("\n}", clean) + 2) + "\n" +
+        popupAiSource.slice(start, end + 2) + "\nreturn showSummaryActions;"
+      )(id => fields[id] || null, key => key, { url: pageUrl }, { urlClean }, pageGuardStrip,
+        summaryReceiptApi({ stripTrackingParams: pageGuardStrip }).pbpAiPageUrlNorm,
+        async () => { calls.doAISummary++; }, (id, message) => calls.status.push(message), () => true, () => {});
+      show(false);
+      const regen = bar.querySelector('.regen-link[data-action="regenerate"]');
+      assert(regen, "showSummaryActions rendered no Regenerate link");
+      return { bar, regen, calls };
+    }
+    await testAsync("the summary Regenerate and tag Replace links take the address the popup cleaned itself and still refuse another page", async () => {
+      const PAGE = URL, cleaning = (aggressiveMode, customParams) => ({ enabled: true, onPopupOpen: true, onPaste: true,
+        aggressiveMode, customParams, excludeParams: [] });
+      for (const [label, urlClean, pageUrl, formUrl, same] of [
+        ["aggressive mode removed ref=", cleaning(true, []), PAGE + "?ref=abc", PAGE, true],
+        ["a custom parameter was removed", cleaning(false, ["campaign"]), PAGE + "?campaign=spring", PAGE, true],
+        ["the form is another page", cleaning(true, ["campaign"]), PAGE + "?campaign=spring", "https://example.com/other", false],
+        ["the form kept a real parameter the page lacks", cleaning(true, []), PAGE + "?ref=abc", PAGE + "?id=2", false],
+      ]) {
+        const summary = summaryLinksRuntime({ urlClean, pageUrl, formUrl });
+        summary.regen.click();
+        await settle();
+        summary.bar.remove();
+        const summaryRefused = summary.calls.status.includes("aiUrlEdited");
+        assert(same ? summary.calls.doAISummary === 1 && !summaryRefused : summary.calls.doAISummary === 0 && summaryRefused,
+          label + ": Regenerate ran " + summary.calls.doAISummary + " summaries, status " + JSON.stringify(summary.calls.status));
+        const tags = regenRuntime({ formUrl, pageUrl, tags: ["alpha", "beta"], urlClean });
+        tags.replaceLink.click();
+        await settle();
+        const tagsRefused = tags.calls.status.some(row => row.message === "aiUrlEdited");
+        assert(same ? tags.calls.doAITags === 1 && !tagsRefused : tags.calls.doAITags === 0 && tagsRefused,
+          label + ": Replace ran " + tags.calls.doAITags + " tag requests, status " + JSON.stringify(tags.calls.status));
       }
     });
     // The ownership check the worker relies on is tied to the receipt it
