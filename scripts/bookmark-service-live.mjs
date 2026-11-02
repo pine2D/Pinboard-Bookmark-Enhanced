@@ -215,9 +215,10 @@ export function resolveBudget(mod) {
 // Requests cleanup and its read-only verification may need for one instance.
 export function cleanupCost({ service, bookmarks = 0, urls = 0, tags = 0, lists = 0 }) {
   const tagPages = service === 'karakeep' ? 6 : 2;
-  const tagCost = service === 'linkding' ? 2 + 2 * tags : 2 * tags;
+  const tagCost = service === 'linkding' ? 4 * tags : 2 * tags;
   // ledger bookmarks: GET + DELETE + GET; pool: check each URL once, then a
-  // read-only pass; lists: GET + members + DELETE + GET; tags: sweep + verify.
+  // read-only pass; lists: GET + members + DELETE + GET; tags: DELETE + GET,
+  // after two reference searches per tag on linkding; sweep and verify pages.
   return 3 * bookmarks + 2 * urls + 4 * lists + tagCost + 2 * tagPages + 2;
 }
 
@@ -2094,20 +2095,20 @@ export class LiveRun {
     let ok = true;
     const tags = await this.runTags(instance);
     if (!tags.length) return true;
-    if (inst.service === 'linkding') {
-      // One OR search per state proves no bookmark (active or archived) still
-      // references any run tag before deleting them.
-      const query = '?limit=1&q=' + encodeURIComponent(tags.map(t => '#' + t.name).join(' or '));
-      const active = await this.api(instance, 'bookmarks/' + query), archived = await this.api(instance, 'bookmarks/archived/' + query);
-      if (active.count !== 0 || archived.count !== 0) {
-        this.report.cleanup.entries.push({ kind: 'tag', instance, deleted: false, code: 'cleanup_tag_referenced', count: tags.length });
-        return false;
-      }
-    }
     for (const tag of tags) {
       const id = String(tag.id);
       try {
         if (inst.service === 'karakeep') check(tag.numBookmarks === 0, 'cleanup_tag_referenced');
+        if (inst.service === 'linkding') {
+          // Each tag gets its own searches, active and archived: with
+          // profile.legacy_search (not visible in the profile API) every word
+          // is ANDed, so one "#a or #b" query would miss a bookmark that
+          // carries only one of them. A name the search syntax cannot express
+          // as a single tag is kept.
+          check(/^[^\s()"']+$/.test(tag.name), 'cleanup_tag_unsearchable');
+          const query = '?limit=1&q=' + encodeURIComponent('#' + tag.name);
+          for (const list of ['bookmarks/', 'bookmarks/archived/']) check((await this.api(instance, list + query)).count === 0, 'cleanup_tag_referenced');
+        }
         this.deletableTags.add(instance + ':' + id);
         const path = 'tags/' + encodeURIComponent(id) + (inst.service === 'linkding' ? '/' : '');
         await this.api(instance, path, { method: 'DELETE' });

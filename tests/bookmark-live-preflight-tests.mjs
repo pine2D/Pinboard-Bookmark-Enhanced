@@ -456,6 +456,66 @@ try {
   }
 
   // ---------------------------------------------------------------------
+  // linkding tag cleanup: a run tag is deleted only after its own searches
+  // (active and archived) find no bookmark. linkding 1.47 has two search
+  // modes (bookmarks/queries.py): the expression parser, where "or" is an
+  // operator, and profile.legacy_search, which splits on spaces and ANDs
+  // every word ("#x" = tag iexact, other words = title/description/notes/url
+  // icontains), so "#a or #b" there matches only bookmarks carrying both tags
+  // and "or". The profile API does not say which mode is on.
+  // ---------------------------------------------------------------------
+  for (const mode of ['legacy', 'expression']) {
+    const run = new live.LiveRun({ mode: 'run' });
+    const p = run.prefix;
+    const tags = [{ id: 1, name: p + '_a' }, { id: 2, name: p + '_b' }, { id: 3, name: p.toUpperCase() + '_C' }, { id: 4, name: p + '_q"x' }, { id: 5, name: 'personal' }];
+    const bookmarks = [
+      { id: 10, url: 'https://example.com/kept', title: 'Kept', description: '', notes: '', is_archived: false, tag_names: [p + '_b', 'personal'] },
+      { id: 11, url: 'https://example.com/old', title: 'Old', description: '', notes: '', is_archived: true, tag_names: [p.toUpperCase() + '_C'] },
+    ];
+    const hasTag = (b, name) => b.tag_names.some(t => t.toLowerCase() === name.toLowerCase());
+    const legacy = (b, q) => q.trim().split(' ').filter(Boolean).every(w => w[0] === '#' ? hasTag(b, w.slice(1)) : [b.title, b.description, b.notes, b.url].some(f => f.toLowerCase().includes(w.toLowerCase())));
+    // The subset of the expression grammar a cleanup query can use: tags and
+    // words joined by implicit AND, alternatives joined by "or".
+    const expression = (b, q) => q.trim().split(/\s+or\s+/i).some(alt => legacy(b, alt));
+    const requests = [];
+    const server = createServer((req, res) => {
+      const url = new URL(req.url, 'http://x');
+      requests.push(req.method + ' ' + url.pathname + (url.searchParams.has('q') ? ' q=' + url.searchParams.get('q') : ''));
+      const json = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(body === undefined ? '' : JSON.stringify(body)); };
+      const tag = url.pathname.match(/^\/api\/tags\/(\d+)\/$/);
+      if (tag) {
+        const at = tags.findIndex(t => String(t.id) === tag[1]);
+        if (at < 0) return json(404, { detail: 'No Tag matches the given query.' });
+        if (req.method === 'DELETE') { tags.splice(at, 1); res.writeHead(204); return res.end(); }
+        return json(200, tags[at]);
+      }
+      if (url.pathname === '/api/tags/') return json(200, { count: tags.length, next: null, previous: null, results: tags });
+      const archived = url.pathname === '/api/bookmarks/archived/';
+      if (archived || url.pathname === '/api/bookmarks/') {
+        const q = url.searchParams.get('q') || '';
+        const hits = bookmarks.filter(b => b.is_archived === archived && (mode === 'legacy' ? legacy : expression)(b, q));
+        return json(200, { count: hits.length, next: null, previous: null, results: hits.slice(0, Number(url.searchParams.get('limit')) || 100) });
+      }
+      return json(404, { detail: 'Not found.' });
+    });
+    const port = await listen(server);
+    const base = `http://127.0.0.1:${port}/`;
+    run.instances.linkding = { id: 'linkding', service: 'linkding', base, root: live.apiRootFor('linkding', base), token: 'f'.repeat(40) };
+    run.caps = { linkding: { node: 100 } };
+    run.reserve = { linkding: 0 };
+    run.cleaning = true;
+    assert.equal(await run.cleanupTags('linkding'), false, mode + ': referenced run tags fail the cleanup');
+    assert.deepEqual(tags.map(t => t.id), [2, 3, 4, 5], mode + ': only the unreferenced run tag is deleted');
+    assert.deepEqual(run.report.cleanup.entries.map(e => [e.id, e.deleted, e.code || '']), [['1', true, ''], ['2', false, 'cleanup_tag_referenced'], ['3', false, 'cleanup_tag_referenced'], ['4', false, 'cleanup_tag_unsearchable']], mode);
+    const searches = requests.filter(r => r.includes(' q='));
+    assert(searches.every(r => /^GET \/api\/bookmarks\/(archived\/)? q=#\S+$/.test(r)), mode + ': each search names one tag: ' + searches.join(' | '));
+    assert(!searches.some(r => r.includes('personal')), 'only run tags are searched');
+    assert(requests.length <= 2 + 4 * 4, mode + ': a tag costs at most two searches, a DELETE and a GET, on top of the sweep');
+    assert(requests.length <= live.cleanupCost({ service: 'linkding', tags: 4 }), mode + ': cleanupCost covers the tag cleanup');
+    await closeServer(server);
+  }
+
+  // ---------------------------------------------------------------------
   // Fake AI: product prompts classify, replies parse with product parsers
   // ---------------------------------------------------------------------
   const productCtx = vm.createContext({ console, URL, TextEncoder, TextDecoder, setTimeout, clearTimeout, btoa, atob, encodeURIComponent, decodeURIComponent, escape, unescape });
