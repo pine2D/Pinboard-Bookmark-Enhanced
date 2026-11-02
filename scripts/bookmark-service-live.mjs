@@ -1437,12 +1437,10 @@ export class LiveRun {
 
   recordCreated(entry) {
     const ledger = this.report.ledger.created;
-    const service = this.instances[entry.instance]?.service;
-    const known = ledger.find(r => r.instance === entry.instance && r.id === entry.id);
-    // A Pinboard URL the run deleted and saved again is live again. Only the
-    // route sees each Pinboard save as it is answered (the worker repeats
-    // what it saw on every sync), so only the route reopens an entry.
-    if (known) { if (known.deleted && entry.source === 'route' && service === 'pinboard') { known.deleted = false; this.persist(); } return; }
+    // Known already: a later report of the same creation. (A Pinboard URL
+    // the run deleted and saves again is reopened by reservePinboardCreate,
+    // which the route calls before the save leaves.)
+    if (ledger.some(r => r.instance === entry.instance && r.id === entry.id)) return;
     const total = ledger.filter(r => r.instance === entry.instance).length + 1;
     ledger.push({ ...entry, module: this.currentModule?.id || '', deleted: false });
     this.persist();
@@ -2061,24 +2059,54 @@ export class LiveRun {
 
   // The browser never reaches Pinboard itself (its resolver maps every
   // non-loopback name to NOTFOUND): the route answers each allowed request
-  // with what the gate got from Pinboard (or the mock), and records a
-  // posts/add answered "done" as a creation.
+  // with what the gate got from Pinboard (or the mock). A create's ledger
+  // entry is on disk before the request joins the gate (pending until the
+  // answer): a run killed while posts/add is in flight leaves the URL named
+  // for --cleanup. "done" settles it; an answer that made nothing (a 4xx,
+  // or a 200 with another result_code) takes it back; no answer or a 5xx
+  // keeps it, as the save may exist.
   async routePinboard(route, url, decision) {
     const instance = decision.instance;
-    const release = decision.kind === 'create' ? this.hold(instance, 'bookmarks') : null;
+    const reservation = decision.kind === 'create' ? this.reservePinboardCreate({ instance, id: pinboardLedgerId(this.pools[instance], decision.url), url: decision.url }) : null;
+    if (this.fatal) { reservation?.abandon(); return route.abort('blockedbyclient').catch(() => {}); }
     let res;
     try { res = await this.pinboardSend(instance, url); } catch { return route.abort('failed').catch(() => {}); }
-    if (release) {
+    if (reservation) {
       let code = '';
       if (res.status === 200) { try { code = JSON.parse(res.body)?.result_code || ''; } catch { /* no creation */ } }
-      if (code === 'done') {
-        const entry = { instance, id: pinboardLedgerId(this.pools[instance], decision.url), url: decision.url };
-        this.recordCreated({ ...entry, source: 'route' });
-        release();
-        this.shareCreated(entry);
-      } else if (res.status < 500) release();
+      if (code === 'done') reservation.confirm();
+      else if (res.status < 500) reservation.abandon();
     }
     return route.fulfill({ status: res.status, headers: { 'content-type': res.contentType || 'application/json; charset=utf-8' }, body: res.body }).catch(() => {});
+  }
+
+  // The ledger entry of a Pinboard create about to be sent: a new entry, or
+  // the run's deleted entry for that URL reopened. It counts against the
+  // caps as soon as it is written (no separate pending slot). The worker
+  // guard learns of it only once it is confirmed: its list only grows, and
+  // syncGuard would bring an abandoned entry back into the ledger.
+  reservePinboardCreate(entry) {
+    const ledger = this.report.ledger.created;
+    let known = ledger.find(r => r.instance === entry.instance && r.id === entry.id);
+    const reopened = !!known;
+    const mod = this.currentModule;
+    if (known) { known.deleted = false; known.pending = true; this.persist(); }
+    else { this.recordCreated({ ...entry, source: 'route', pending: true }); known = ledger.find(r => r.instance === entry.instance && r.id === entry.id); }
+    let open = true;
+    return {
+      confirm: () => { if (!open) return; open = false; delete known.pending; this.persist(); this.shareCreated({ instance: entry.instance, id: entry.id, url: entry.url }); },
+      abandon: () => {
+        if (!open) return;
+        open = false;
+        if (reopened) { known.deleted = true; delete known.pending; }
+        else {
+          const i = ledger.indexOf(known);
+          if (i >= 0) ledger.splice(i, 1);
+          if (mod && mod.created > 0) mod.created--;
+        }
+        this.persist();
+      },
+    };
   }
 
   // Tell the worker guard what another layer recorded (page-context and

@@ -1962,6 +1962,71 @@ try {
       live.validateResumeReport(back, r.reportPath, { state: pbState });
       rmSync(r.runDir, { recursive: true, force: true });
     }
+
+    // The extension's posts/add through the route: the ledger on disk names
+    // the bookmark before Pinboard sees the request; an answer that made
+    // nothing (a 4xx such as 429) takes the entry back, one that may have
+    // (no answer, 5xx) keeps it pending for cleanup.
+    {
+      const fakeRoute = () => { const out = { fulfilled: null, aborted: false }; out.route = { fulfill: async o => { out.fulfilled = o; }, abort: async () => { out.aborted = true; } }; return out; };
+      const addUrl = url => live.PINBOARD_ROOT + 'posts/add?auth_token=' + encodeURIComponent(token) + '&format=json&url=' + encodeURIComponent(url) + '&description=x&shared=no';
+      const setup = (status) => {
+        const mock = createPinboardMock({ token });
+        const seen = [];
+        const transport = async url => {
+          if (live.pinboardEndpoint(url) === 'posts/add') seen.push(JSON.parse(readFileSync(r.reportPath, 'utf8')).ledger.created.map(e => ({ ...e })));
+          return status ? { status, contentType: 'text/html', body: '<html></html>' } : mock.transport(url);
+        };
+        const r = unitRun({ transport });
+        mkdirSync(r.runDir, { recursive: true, mode: 0o700 });
+        return { r, mock, seen };
+      };
+      const onDisk = r => JSON.parse(readFileSync(r.reportPath, 'utf8')).ledger.created;
+      // done: written before the send, settled after.
+      {
+        const { r, mock, seen } = setup(0);
+        const pool = r.pools.pinboard;
+        const fr = fakeRoute();
+        await r.routePinboard(fr.route, addUrl(pool[0]), { instance: 'pinboard', kind: 'create', url: pool[0] });
+        assert.equal(fr.fulfilled.status, 200);
+        assert.equal(seen.length, 1);
+        assert.deepEqual(seen[0].map(e => [e.id, e.url, e.deleted, e.pending]), [['pool-1', pool[0], false, true]], 'ledger on disk before posts/add');
+        assert.deepEqual(onDisk(r).map(e => [e.id, e.deleted, e.pending]), [['pool-1', false, undefined]]);
+        assert.equal(r.pending.pinboard?.bookmarks || 0, 0);
+        assert.equal(mock.posts.size, 1);
+        // Saved again after the run deleted it: reopened before the send; a
+        // refusal puts it back as deleted.
+        r.report.ledger.created[0].deleted = true;
+        mock.rateLimit(1);
+        const again = fakeRoute();
+        await r.routePinboard(again.route, addUrl(pool[0]), { instance: 'pinboard', kind: 'create', url: pool[0] });
+        assert.equal(again.fulfilled.status, 429);
+        assert.deepEqual(seen[1].map(e => [e.id, e.deleted, e.pending]), [['pool-1', false, true]]);
+        assert.deepEqual(onDisk(r).map(e => [e.id, e.deleted, e.pending]), [['pool-1', true, undefined]]);
+        rmSync(r.runDir, { recursive: true, force: true });
+      }
+      // 429 (Pinboard's rate limit, a 4xx): nothing made, entry and slot gone.
+      {
+        const { r, seen } = setup(429);
+        const pool = r.pools.pinboard;
+        const fr = fakeRoute();
+        await r.routePinboard(fr.route, addUrl(pool[1]), { instance: 'pinboard', kind: 'create', url: pool[1] });
+        assert.equal(fr.fulfilled.status, 429);
+        assert.equal(seen[0].length, 1, 'held while in flight');
+        assert.deepEqual(onDisk(r), []);
+        assert.deepEqual(r.report.ledger.created, []);
+        assert.equal(r.pending.pinboard?.bookmarks || 0, 0);
+        rmSync(r.runDir, { recursive: true, force: true });
+      }
+      // 502: the save may exist, so the entry stays (pending) for cleanup.
+      {
+        const { r } = setup(502);
+        const pool = r.pools.pinboard;
+        await r.routePinboard(fakeRoute().route, addUrl(pool[2]), { instance: 'pinboard', kind: 'create', url: pool[2] });
+        assert.deepEqual(onDisk(r).map(e => [e.id, e.deleted, e.pending]), [['pool-3', false, true]]);
+        rmSync(r.runDir, { recursive: true, force: true });
+      }
+    }
     const pbCredentials = join(pbState, '..', 'pinboard-credentials.json');
     writeFileSync(pbCredentials, JSON.stringify({ pinboardToken: token }), { mode: 0o600 });
     const noTokenCredentials = join(pbState, '..', 'pinboard-none.json');
