@@ -38,7 +38,7 @@ if (filterNote) console.log(filterNote.replace('only ran', 'Running only'));
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), 'pbp-live-preflight-'));
 const live = await import('../scripts/bookmark-service-live.mjs');
-const { MODULES, GROUPS, LIST_MARKER, SNAPSHOT_POLL_MS, SNAPSHOT_MARGIN_MS, SNAPSHOT_TEMP_POLLS } = await import('../scripts/bookmark-service-live-scenarios.mjs');
+const { MODULES, GROUPS, LIST_MARKER, SNAPSHOT_POLL_MS, SNAPSHOT_TEMP_POLL_MS, SNAPSHOT_MARGIN_MS, SNAPSHOT_TEMP_POLLS } = await import('../scripts/bookmark-service-live-scenarios.mjs');
 
 const credentialsPath = join(dir, 'synthetic-credentials.json');
 const marker = join(dir, 'credential-access');
@@ -362,19 +362,25 @@ try {
         assert(r.polls + 3 <= budget.node, 'polls fit the module node budget');
         assert.equal(r.diagnosed, 0, 'the user target reads no task queue');
       }
-      // Temporary linkding (E-H1c): a snapshot normally completes after two
-      // polls (about 10 s), but one run in four sat pending for the whole
-      // 100 s. The temp target stops after SNAPSHOT_TEMP_POLLS polls (30 s)
-      // with its own code, still a failure, and records the container's
-      // snapshot task state for diagnosis.
-      assert.equal(SNAPSHOT_TEMP_POLLS * SNAPSHOT_POLL_MS, 30000);
+      // Temporary linkding (E-H1c): a snapshot normally completes in about
+      // 10 s, but one run in four sat pending for the whole 100 s. The temp
+      // target stops after SNAPSHOT_TEMP_POLLS polls (30 s) with its own
+      // code, still a failure, and records the container's snapshot task
+      // state for diagnosis. It polls every 2 s (E26: the wait ends within
+      // 2 s of completion, not 5 s), within the module's node budget.
+      assert.equal(SNAPSHOT_TEMP_POLL_MS, 2000);
+      assert.equal(SNAPSHOT_TEMP_POLLS * SNAPSHOT_TEMP_POLL_MS, 30000);
       const diag = { hueyPending: 1, hueyScheduled: 0, assets: { pending: 1 }, tasks: ['bookmarks.services.tasks._create_html_snapshot_task'], jobs: 'RUNNING', chromium: 0 };
       const stuck = await drive(['pending'], { target: 'temp', diagnostics: diag });
       assert.deepEqual([stuck.code, stuck.polls, stuck.diagnosed], ['snapshot_pending_timeout', SNAPSHOT_TEMP_POLLS, 1]);
+      assert(stuck.sleeps.every(ms => ms === SNAPSHOT_TEMP_POLL_MS) && stuck.now === 30000, 'temp: one poll every 2 s for 30 s');
+      assert(stuck.polls + 3 <= budget.node, 'temp polls fit the module node budget');
+      const tempDone = await drive(['pending', 'pending', 'pending', 'pending', 'complete'], { target: 'temp', diagnostics: diag });
+      assert.deepEqual([tempDone.code, tempDone.now], ['', 10000], 'a 10 s snapshot is seen at 10 s');
       assert.deepEqual(stuck.notes.snapshotTasks, diag);
       assert.equal(stuck.notes.snapshot.status, 'pending');
       const quick = await drive(['pending', 'complete'], { target: 'temp', diagnostics: diag });
-      assert.deepEqual([quick.code, quick.polls, quick.diagnosed], ['', 2, 0]);
+      assert.deepEqual([quick.code, quick.polls, quick.diagnosed, quick.now], ['', 2, 0, 2 * SNAPSHOT_TEMP_POLL_MS]);
       // The task state comes from the run's own container, read-only.
       const dRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
       const dCalls = [];

@@ -54,11 +54,14 @@ const NEEDS = Object.freeze({
 // module still has SNAPSHOT_MARGIN_MS left for checks and cleanup.
 export const SNAPSHOT_POLL_MS = 5000;
 export const SNAPSHOT_MARGIN_MS = 15000;
-// A temporary linkding finishes a snapshot after two polls (about 10 s); one
-// run in four sat pending for the whole module. There it stops after six
-// polls (30 s) as snapshot_pending_timeout, still a failure, and records the
-// container's snapshot task state. A user instance keeps the full wait.
-export const SNAPSHOT_TEMP_POLLS = 6;
+// A temporary linkding finishes a snapshot in about 10 s; one run in four
+// sat pending for the whole module. There it polls every 2 s (E26: loopback
+// and tmpfs, so the wait ends within 2 s of completion, not 5) and stops
+// after 15 polls (30 s) as snapshot_pending_timeout, still a failure, and
+// records the container's snapshot task state. A user instance keeps the
+// 5 s poll and the full wait.
+export const SNAPSHOT_TEMP_POLL_MS = 2000;
+export const SNAPSHOT_TEMP_POLLS = 15;
 const needs = (over = {}) => ({ ...NEEDS, ...over });
 
 // Row fields that vary by service resolve through this helper (number or map).
@@ -150,7 +153,8 @@ export const MODULES = [
     surfaces: ['background'],
     features: ['linkding-snapshot'],
     needs: needs({ snapshots: true }),
-    // One assets read per poll: at most 21 in 120 s, plus the create lookups.
+    // One assets read per poll: at most 21 in 120 s on a user instance (15 on
+    // a temporary one), plus the create lookups.
     budget: { bookmarks: 1, urls: 1, node: 30, browser: 10, ai: 0, tags: 0, seconds: 120 },
     files: [...WORKER, ...SELF_HOSTED.linkding],
     settings: {},
@@ -166,14 +170,15 @@ export const MODULES = [
       await t.phase('snapshot_wait');
       const started = Date.now();
       let status = 'missing', polls = 0;
+      const pollMs = t.target === 'temp' ? SNAPSHOT_TEMP_POLL_MS : SNAPSHOT_POLL_MS;
       for (;;) {
-        await t.sleep(SNAPSHOT_POLL_MS);
+        await t.sleep(pollMs);
         polls++;
         const assets = await t.api('bookmarks/' + row.id + '/assets/');
         status = (assets.results || []).find(a => a.asset_type === 'snapshot')?.status || 'missing';
         // linkding stores the pending asset inside the create request, so
         // "missing" already means automatic snapshots are off for this account.
-        if (status !== 'pending' || t.remainingMs() < SNAPSHOT_POLL_MS + SNAPSHOT_MARGIN_MS) break;
+        if (status !== 'pending' || t.remainingMs() < pollMs + SNAPSHOT_MARGIN_MS) break;
         if (t.target === 'temp' && polls >= SNAPSHOT_TEMP_POLLS) break;
       }
       t.note('snapshot', { status, polls, waitedMs: Date.now() - started });
