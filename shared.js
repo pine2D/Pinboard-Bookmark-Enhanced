@@ -757,8 +757,13 @@ function pbpRelevantTagsFirst(tags, title, url) {
 
 // ---- Shared tag spelling helpers ----
 const PBP_TAG_VOCAB_STALE_CEILING = 2 * 60 * 60 * 1000;
+// Zero-width characters are dropped and canonical forms composed (NFC) so a
+// pasted or macOS-typed twin groups with the stored name. NFKC is avoided on
+// purpose: it would merge full-width, superscript and ligature spellings the
+// user can see as different tags.
+const PBP_TAG_ZERO_WIDTH = /[\u200B-\u200D\u2060\uFEFF]/g;
 function pbpTagGroupKey(name) {
-  return name.toLowerCase().replace(/[\s_-]+/g, "");
+  return String(name).replace(PBP_TAG_ZERO_WIDTH, "").normalize("NFC").toLowerCase().replace(/[\s_-]+/g, "");
 }
 
 // The empty key is never grouped: names such as "-" and "_" only match exactly.

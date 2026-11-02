@@ -1934,6 +1934,22 @@ suite("shared tag canonicalization", () => {
     assertEq(pbpAlignTagName("--", ctx({"-": 9, "_": 2})).hit, false);
   });
 
+  test("group key folds Unicode normalization forms and zero-width characters, never compatibility forms", () => {
+    const nfc = "café", nfd = "café";
+    assertEq(pbpTagGroupKey(nfd), pbpTagGroupKey(nfc), "NFD and NFC share a group");
+    assertEq(pbpTagGroupKey("CafÉ"), pbpTagGroupKey(nfd), "case folds after NFC");
+    for (const zw of ["​", "‌", "‍", "⁠", "﻿"]) {
+      assertEq(pbpTagGroupKey("java" + zw + "script"), "javascript", "zero-width " + zw.codePointAt(0).toString(16));
+      assertEq(pbpTagGroupKey(zw), "", "a zero-width-only name has an empty key");
+    }
+    assert(pbpTagGroupKey("ａｂｃ") !== pbpTagGroupKey("abc"), "full-width stays apart from half-width");
+    assert(pbpTagGroupKey("x²") !== pbpTagGroupKey("x2"), "superscript stays apart");
+    assert(pbpTagGroupKey("ﬁ") !== pbpTagGroupKey("fi"), "ligature stays apart");
+    const c = ctx({}, [nfc]);
+    assertEq(pbpCanonicalTagName(nfd, c), nfc, "an NFD input aligns to the bookmark's NFC name");
+    assertEq(pbpCanonicalTagName("Java​Script", ctx({JavaScript: 3})), "JavaScript", "a zero-width twin aligns to the vocabulary");
+  });
+
   test("bookmark exact and same-group spellings win before the vocabulary", () => {
     const c = ctx({machine_learning: 90, Nick_Drake: 30}, ["machine learning", "Nick Drake"]);
     assertEq(pbpAlignTagName("  machine learning  ", c).name, "machine learning");
