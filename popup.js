@@ -511,10 +511,7 @@ async function resetPinboardSession(expectedToken) {
 }
 
 // ===================== URL Clean Helpers (B4) =====================
-// urlClean is loaded as part of SETTINGS_DEFAULTS — no separate storage hit needed.
-// Also fixes a latent bug: the previous direct chrome.storage.sync.get bypassed the
-// optSyncEnabled toggle, so users with sync disabled would have read defaults instead
-// of their saved values (options.js writes via getSettingsStorage, which respects the toggle).
+
 // Everything derived from the address once it is edited after the popup
 // opened (typed, pasted, put back by Undo): the bookmark lookup starts over,
 // the non-web warning, the AI entry points (popup-ai.js anchors AI to the
@@ -529,6 +526,7 @@ function pbpPopupUrlEdited() {
   pbpPopupSyncPageDescription();
   updateCharCount();
 }
+
 // The address and title inputs' listeners, registered once by showMain on a
 // page the popup can save.
 function setupUrlInput() {
@@ -562,6 +560,7 @@ function setupUrlInput() {
     }
   });
 }
+
 // stripTrackingParams over the stored cleaning settings, for the popup's own
 // steps (the prefetch key, the address put in the form, a paste). Settings it
 // cannot apply (hand-edited storage, an old backup: customParams not a list)
@@ -574,6 +573,11 @@ function pbpPopupCleanAddress(url, ucs) {
     return { cleaned: url, removedCount: 0, original: url };
   }
 }
+
+// urlClean is loaded as part of SETTINGS_DEFAULTS — no separate storage hit needed.
+// Also fixes a latent bug: the previous direct chrome.storage.sync.get bypassed the
+// optSyncEnabled toggle, so users with sync disabled would have read defaults instead
+// of their saved values (options.js writes via getSettingsStorage, which respects the toggle).
 function _loadUrlCleanSettings() {
   return settings.urlClean || { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: false, customParams: [], excludeParams: [] };
 }
