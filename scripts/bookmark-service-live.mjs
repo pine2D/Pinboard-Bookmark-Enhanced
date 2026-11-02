@@ -2385,13 +2385,13 @@ export function installWorkerGuard(rule, cfg, token) {
 // ---------------------------------------------------------------------------
 // --cleanup acts with the user's credentials on whatever its report names, so
 // before anything is read or sent the report is held to what this harness
-// writes for its run id: its own directory in the state directory (cleanup
-// removes `profile` and `env-*` next to it), the prefix that selects tags, the
-// target, instance ids and services, loopback bases (given again on the
-// command line for the user target, so a report cannot send a token
-// elsewhere), the exact URL pools, the ledger's shape and the container
-// names. A report that fails any of this was edited, damaged or written
-// elsewhere, and is refused whole, without a write.
+// writes for its run id: its own directory in the state directory, a real one
+// and not a link (cleanup removes `profile` and `env-*` next to the report),
+// the prefix that selects tags, the target, instance ids and services,
+// loopback bases (given again on the command line for the user target, so a
+// report cannot send a token elsewhere), the exact URL pools, the ledger's
+// shape and the container names. A report that fails any of this was edited,
+// damaged or written elsewhere, and is refused whole, without a write.
 export function validateResumeReport(report, reportPath, { values = {}, state = stateDir() } = {}) {
   const invalid = 'cleanup_report_invalid';
   const isObject = v => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -2399,8 +2399,13 @@ export function validateResumeReport(report, reportPath, { values = {}, state = 
   check(isObject(report) && report.harness === HARNESS_VERSION && typeof report.runId === 'string' && RUN_DIR_RE.test('pbp-it-' + report.runId), invalid);
   const runId = report.runId;
   const real = file => { try { return realpathSync(file); } catch { return ''; } };
-  const runDir = real(join(state, 'pbp-it-' + runId));
-  check(runDir && real(reportPath) === join(runDir, 'report.json'), 'cleanup_report_location');
+  // The run directory itself, never a link to one: its realpath alone would
+  // pass a link, and cleanup would then remove `profile` and `env-*` inside
+  // the link's target. The state directory may be reached through a link.
+  let entry = null;
+  try { entry = lstatSync(join(state, 'pbp-it-' + runId)); } catch { /* missing: refused below */ }
+  const runDir = entry && entry.isDirectory() && !entry.isSymbolicLink() && real(state) ? join(real(state), 'pbp-it-' + runId) : '';
+  check(runDir && real(join(state, 'pbp-it-' + runId)) === runDir && real(reportPath) === join(runDir, 'report.json'), 'cleanup_report_location');
   check(report.prefix === 'pbp-it-' + runId && ['', 'user', 'temp'].includes(report.target), invalid);
   check(['instances', 'pools', 'ledger', 'cleanup'].every(key => isObject(report[key])) && Array.isArray(report.cleanup.entries) && Array.isArray(report.violations), invalid);
   const { created, lists } = report.ledger;
@@ -2455,7 +2460,9 @@ async function resumeCleanup(opts) {
   const run = new LiveRun(opts);
   run.runId = report.runId;
   run.prefix = report.prefix;
-  run.runDir = resolve(path, '..');
+  // The directory validateResumeReport checked, not whatever spelling of the
+  // report path was given: cleanup removes files inside it.
+  run.runDir = join(realpathSync(stateDir()), 'pbp-it-' + report.runId);
   run.reportPath = path;
   run.report = report;
   run.target = report.target;

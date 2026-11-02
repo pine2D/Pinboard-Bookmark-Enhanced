@@ -679,8 +679,24 @@ try {
     mkdirSync(join(state, 'pbp-it-' + linkedId), { mode: 0o700 });
     symlinkSync(join(elsewhere, 'report.json'), join(state, 'pbp-it-' + linkedId, 'report.json'));
     assert.throws(() => validate(Object.assign(genuine(), { runId: linkedId, prefix: 'pbp-it-' + linkedId, pools: { linkding: live.poolUrls('user', linkedId, 'linkding', 4) } }), userValues, join(state, 'pbp-it-' + linkedId, 'report.json')), e => e.code === 'cleanup_report_location', 'a symlinked report is not in its run directory');
+    // Nor may the run directory itself be a link (second review): its
+    // realpath used to pass, and cleanup then removed `profile` and `env-*`
+    // inside the link's target.
+    const linkedDirId = randomUUID();
+    const linkTarget = join(dir, 'link-target-' + linkedDirId);
+    mkdirSync(linkTarget, { mode: 0o700 });
+    const linkedDir = Object.assign(genuine(), { runId: linkedDirId, prefix: 'pbp-it-' + linkedDirId, pools: { linkding: live.poolUrls('user', linkedDirId, 'linkding', 4) } });
+    live.writePrivateJson(join(linkTarget, 'report.json'), linkedDir);
+    symlinkSync(linkTarget, join(state, 'pbp-it-' + linkedDirId));
+    assert.throws(() => validate(linkedDir, userValues, join(state, 'pbp-it-' + linkedDirId, 'report.json')), e => e.code === 'cleanup_report_location', 'a run directory that is a link is refused');
+    // A link to the state directory (or one inside it) still names the real run directory.
+    symlinkSync(state, join(dir, 'state-alias-' + runId));
+    validate(genuine(), userValues, join(dir, 'state-alias-' + runId, 'pbp-it-' + runId, 'report.json'));
+    live.validateResumeReport(genuine(), reportPath, { values: userValues, state: join(dir, 'state-alias-' + runId) });
+    rmSync(join(dir, 'state-alias-' + runId));
     rmSync(state, { recursive: true, force: true });
     rmSync(elsewhere, { recursive: true, force: true });
+    rmSync(linkTarget, { recursive: true, force: true });
 
     // Cleanup itself: a ledger entry outside the pool is not even read, and
     // the tag sweep refuses any prefix but the run's own. No request leaves.
@@ -1450,6 +1466,31 @@ try {
     assert.deepEqual(requests, []);
     assert.equal(readFileSync(join(tamperedDir, 'report.json'), 'utf8'), before, 'a refused report is not written');
     assert.deepEqual(readdirSync(state).sort(), ['pbp-it-' + id], 'no lock or other file is left');
+  }
+  {
+    // Second review: a run directory that is a link to another directory.
+    // Through the CLI the temporary report is refused before the lock, Docker
+    // (the stub would mark it) or any file; the link's target keeps its
+    // `profile` and `env-*`, which cleanup removes next to a report.
+    const state = stateDirFor('resume-linked-dir');
+    const id = randomUUID();
+    const linkTarget = join(dir, 'linked-run-' + id);
+    mkdirSync(join(linkTarget, 'profile'), { recursive: true, mode: 0o700 });
+    writeFileSync(join(linkTarget, 'profile', 'keep.txt'), 'x');
+    writeFileSync(join(linkTarget, 'env-keep'), 'x');
+    const linked = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] }).report;
+    Object.assign(linked, { runId: id, prefix: 'pbp-it-' + id, target: 'temp', pools: { linkding: live.poolUrls('temp', id, 'linkding', 3) } });
+    linked.temp = { names: [live.tempNames(id).edge], network: live.tempNames(id).net };
+    live.writePrivateJson(join(linkTarget, 'report.json'), linked);
+    symlinkSync(linkTarget, join(state, 'pbp-it-' + id));
+    const before = readFileSync(join(linkTarget, 'report.json'), 'utf8');
+    const refusedRun = await run(['--cleanup', join(state, 'pbp-it-' + id, 'report.json')], { credentials: false, state });
+    assert.equal(refusedRun.code, 1);
+    assert(refusedRun.output.includes('FAILED: cleanup_report_location'), refusedRun.output);
+    assert(existsSync(join(linkTarget, 'profile', 'keep.txt')) && existsSync(join(linkTarget, 'env-keep')), 'the link target keeps its files');
+    assert.equal(readFileSync(join(linkTarget, 'report.json'), 'utf8'), before, 'a refused report is not written');
+    assert.deepEqual(readdirSync(state), ['pbp-it-' + id], 'no lock or other file is left');
+    rmSync(linkTarget, { recursive: true, force: true });
   }
 
   // SIGINT while the preflight waits on the service: cleanup, report, exit 130.
