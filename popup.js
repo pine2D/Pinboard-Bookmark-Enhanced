@@ -134,6 +134,8 @@ function pbpPopupBookmarkPrivacy() {
 }
 function pbpPopupPrefillDescription() {
   const linkding = pbpBookmarkServiceId(settings) === "linkding";
+  // The label column follows the row (popup-theme-early.js keeps the mirror).
+  if (typeof pbpPopupApplyBookmarkService === "function") pbpPopupApplyBookmarkService(pbpBookmarkServiceId(settings));
   const row = $id("linkding-description-row");
   row.hidden = !linkding;
   row.classList.toggle("hidden", !linkding);

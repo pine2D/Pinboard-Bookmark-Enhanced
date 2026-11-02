@@ -8,11 +8,20 @@ const PBP_POPUP_ADAPTIVE_MAP = {
   catppuccin: ["catppuccin-latte", "catppuccin-mocha"]
 };
 
+// Mirrors shared.js pbpBookmarkServiceId(): this file runs before shared.js.
+const PBP_POPUP_BOOKMARK_SERVICES = ["pinboard", "karakeep", "linkding"];
+
 (function applyFromLocalStorageMirror() {
   const root = document.documentElement;
 
   // Section visibility (main vs login)
   root.dataset.section = localStorage.getItem("pp-logged-in") === "1" ? "main" : "login";
+
+  // Bookmark service: linkding's Description row widens the label column in
+  // some languages (popup.css html[data-bookmark-service=...]). Set before
+  // first paint so the fields never jump from wide to narrow.
+  const service = localStorage.getItem("pp-bookmark-service");
+  if (PBP_POPUP_BOOKMARK_SERVICES.includes(service)) root.dataset.bookmarkService = service;
 
   // Popup width
   const w = Number(localStorage.getItem("pp-popup-width")) || 550;
@@ -92,7 +101,7 @@ try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
   : chrome.storage.local.get({ optSyncEnabled: false })
 ).then(({ optSyncEnabled }) => {
   return (optSyncEnabled ? chrome.storage.sync : chrome.storage.local)
-    .get({ optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true, popupWidth: 550 });
+    .get({ optTheme: "auto", themePresetKey: "", optPopupFollowTheme: true, popupWidth: 550, bookmarkService: "pinboard" });
 }).then(s => {
   // Update localStorage mirror for next popup boot
   try {
@@ -101,6 +110,7 @@ try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
     localStorage.setItem("pp-theme-follow", s.optPopupFollowTheme === false ? "0" : "1");
     localStorage.setItem("pp-popup-width", String(s.popupWidth || 550));
   } catch (_) {}
+  pbpPopupApplyBookmarkService(s.bookmarkService);
 
   // Re-apply in case the mirror was stale. Compute the target first and write
   // ONLY on a real difference: the old delete-then-reset invalidated every
@@ -134,3 +144,19 @@ try { _optSyncMirror = localStorage.getItem("pp-sync-enabled"); } catch (_) {}
   const w = Math.max(420, Math.min(720, Number(s.popupWidth) || 550));
   root.style.setProperty("--pp-popup-width", w + "px");
 }).catch(() => { /* storage unavailable: localStorage mirror already applied */ });
+
+// The bookmark service attribute and its mirror, from the stored setting.
+// popup.js calls it too, with the settings it renders the form from.
+function pbpPopupApplyBookmarkService(value) {
+  const service = PBP_POPUP_BOOKMARK_SERVICES.includes(value) ? value : "";
+  const root = document.documentElement;
+  if (service) {
+    if (root.dataset.bookmarkService !== service) root.dataset.bookmarkService = service;
+  } else if ("bookmarkService" in root.dataset) {
+    delete root.dataset.bookmarkService;
+  }
+  try {
+    if (service) localStorage.setItem("pp-bookmark-service", service);
+    else localStorage.removeItem("pp-bookmark-service");
+  } catch (_) {}
+}

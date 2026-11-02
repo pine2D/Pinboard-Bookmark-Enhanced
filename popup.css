@@ -242,12 +242,18 @@
    rounded up to an even px; --pp-label-indent derives from it, so every
    row's control edge stays aligned. tests/popup-label-fit-tests.mjs
    re-measures every locale against this cascade. */
-html:lang(en) { --pp-label-w: 64px; }
 html:lang(ja) { --pp-label-w: 56px; }
-html:lang(de) { --pp-label-w: 76px; }
+html:lang(de) { --pp-label-w: 62px; }
 html:lang(fr) { --pp-label-w: 68px; }
 html:lang(pl) { --pp-label-w: 86px; }
 html:lang(ru) { --pp-label-w: 90px; }
+/* linkding adds a Description row (#linkding-description-row). Where its
+   label is the widest, the column widens for linkding only, so Pinboard and
+   Karakeep keep the fields as wide as before. popup-theme-early.js sets
+   data-bookmark-service from its localStorage mirror before first paint, so
+   the column never jumps from narrow to wide. */
+html[data-bookmark-service="linkding"]:lang(en) { --pp-label-w: 64px; }
+html[data-bookmark-service="linkding"]:lang(de) { --pp-label-w: 76px; }
 
 body {
   /* Chrome caps an action popup at 800px wide. The hi-DPI tiers below zoom
