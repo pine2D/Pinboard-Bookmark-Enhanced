@@ -13,7 +13,7 @@ import { spawn } from 'node:child_process';
 import { createServer, request as httpRequest } from 'node:http';
 import { EventEmitter } from 'node:events';
 import { createRequire } from 'node:module';
-import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -135,8 +135,9 @@ async function dockerChildRun({ state, args, holds = {}, signals = [] }) {
   }
   const code = await exit;
   assert(!existsSync(dockerMarker), 'the scripted run reached the docker binary');
+  // The report the run names, else (a forced exit names none) the only one.
   const runDirs = readdirSync(state).filter(n => /^pbp-it-[0-9a-f-]{36}$/.test(n));
-  const reportPath = runDirs.length === 1 ? join(state, runDirs[0], 'report.json') : '';
+  const reportPath = output.match(/Local report: (.+)/)?.[1] || (runDirs.length === 1 ? join(state, runDirs[0], 'report.json') : '');
   return { code, output, lines: lines(), reportPath, report: reportPath ? JSON.parse(readFileSync(reportPath, 'utf8')) : null };
 }
 
@@ -576,6 +577,23 @@ try {
     writeFileSync(join(state, 'pbp-it-live.lock'), JSON.stringify({ pid: 2 ** 22 + 12345, runId: 'dead', reportPath: join(stale, 'report.json') }));
     assert.throws(() => live.acquireLock(state, { pid: process.pid, runId: 'd' }), e => e.code === 'previous_cleanup_incomplete');
     assert.deepEqual(live.scanIncompleteReports(state), [join(stale, 'report.json')]);
+    // Only a --cleanup of that very report takes a dead holder's lock over (a
+    // second Ctrl-C, kill -9, OOM or a crash), under any spelling of its path.
+    const other = join(state, 'pbp-it-' + randomUUID());
+    mkdirSync(other, { mode: 0o700 });
+    live.writePrivateJson(join(other, 'report.json'), { harness: live.HARNESS_VERSION, cleanup: { complete: false } });
+    assert.throws(() => live.acquireLock(state, { pid: process.pid, runId: 'f' }, { resume: join(other, 'report.json') }), e => e.code === 'previous_cleanup_incomplete', 'resuming another report does not free the lock');
+    symlinkSync(stale, join(state, 'alias'));
+    const takeover = live.acquireLock(state, { pid: process.pid, runId: 'dead' }, { resume: join(state, 'alias', 'report.json') });
+    assert.equal(JSON.parse(readFileSync(join(state, 'pbp-it-live.lock'), 'utf8')).pid, process.pid, 'the --cleanup of that report now holds the lock');
+    takeover();
+    assert(!existsSync(join(state, 'pbp-it-live.lock')));
+    // A live holder is never taken over, not even by a --cleanup of its report.
+    writeFileSync(join(state, 'pbp-it-live.lock'), JSON.stringify({ pid: process.pid, runId: 'live', reportPath: join(stale, 'report.json') }));
+    assert.throws(() => live.acquireLock(state, { pid: process.pid, runId: 'g' }, { resume: join(stale, 'report.json') }), e => e.code === 'run_locked');
+    rmSync(join(state, 'pbp-it-live.lock'));
+    rmSync(join(state, 'alias'));
+    live.writePrivateJson(join(other, 'report.json'), { harness: live.HARNESS_VERSION, cleanup: { complete: true } });
     live.writePrivateJson(join(stale, 'report.json'), { harness: live.HARNESS_VERSION, cleanup: { complete: true } });
     live.acquireLock(state, { pid: process.pid, runId: 'e' })();
     assert.deepEqual(live.scanIncompleteReports(state), []);
@@ -978,6 +996,30 @@ try {
     assert(['rm', 'ps'].every(cmd => live.isTeardownCommand([cmd])) && !['run', 'create', 'start', 'exec'].some(cmd => live.isTeardownCommand([cmd])));
     assert(live.isTeardownCommand(['network', 'rm', 'x']) && !live.isTeardownCommand(['network', 'create', 'x']) && !live.isTeardownCommand(['network', 'connect', 'x', 'y']));
   }
+  {
+    // A second signal skips the rest of cleanup, marks the report incomplete
+    // and exits, but drops its lock: the report alone keeps new runs out and
+    // --cleanup can finish the job at once. Before, the forced exit left its
+    // lock and --cleanup was refused with previous_cleanup_incomplete.
+    const state = stateDirFor('signal-force');
+    const args = ['--run', '--target', 'temp', '--scenario', 'linkding.readonly', '--service', 'linkding', '--allow-dirty'];
+    const forced = await dockerChildRun({ state, args, holds: { 'network create': 1500, 'network rm': 20000 }, signals: ['start\tnetwork create\t', 'start\tnetwork rm\t'] });
+    assert.equal(forced.code, 130, forced.output);
+    assert.deepEqual([forced.report.cleanup.forced, forced.report.cleanup.complete, forced.report.failure.code], [true, false, 'cleanup_incomplete']);
+    assert(!existsSync(join(state, 'pbp-it-live.lock')), 'the forced exit releases its lock');
+    assert(forced.output.includes('--cleanup ' + forced.reportPath), 'the forced exit names the report to resume');
+    const own = live.tempNames(forced.report.runId);
+    assert.equal(forced.report.temp.network, own.net, 'the network is on record although its creation was cut short');
+    const blocked = await dockerChildRun({ state, args });
+    assert.deepEqual([blocked.code, blocked.report.failure.code, blocked.lines], [1, 'previous_cleanup_incomplete', []], 'a new run is refused before Docker');
+    const resumed = await dockerChildRun({ state, args: ['--cleanup', forced.reportPath] });
+    assert.equal(resumed.code, 0, resumed.output);
+    assert.equal(resumed.reportPath, forced.reportPath);
+    assert(resumed.lines.includes('start\tnetwork rm\t' + JSON.stringify(['network', 'rm', own.net])), 'the resume removes the network');
+    assert(resumed.lines.filter(l => l.startsWith('start\t')).every(l => teardown.includes(l.split('\t')[1])), 'the resume only tears down');
+    assert.deepEqual([resumed.report.cleanup.complete, resumed.report.temp.removed, resumed.report.cleanup.resumed], [true, true, 1]);
+    assert(!existsSync(join(state, 'pbp-it-live.lock')));
+  }
 
   // ---------------------------------------------------------------------
   // Screenshot canary on a plain page (no extension, no network)
@@ -1244,13 +1286,19 @@ try {
     modules: [], cleanup: { complete: false, entries: [] }, checks: [], readBackDiffs: [], console: [], swConsole: [], pageErrors: [], requestFailed: [], blockedOrigins: [], violations: [], findings: [], skipped: [], shots: { count: 0 },
   };
   live.writePrivateJson(join(pendingDir, 'report.json'), pendingReport);
+  // The run that left it was cut off with its lock in place (kill -9, OOM, a
+  // crash): the lock names a pid above the kernel's limit, so it is dead.
+  const deadLock = join(linkdingState, 'pbp-it-live.lock');
+  writeFileSync(deadLock, JSON.stringify({ pid: 2 ** 22 + 12345, runId: pendingId, reportPath: join(pendingDir, 'report.json'), started: '2026-11-01T00:00:00Z' }), { mode: 0o600 });
   requests.length = 0;
   const blocked = await run(readOnlyArgs, { guard: false, state: linkdingState });
   assert.equal(blocked.report.failure.code, 'previous_cleanup_incomplete');
   assert.deepEqual(requests, [], 'refused before any request');
+  assert(existsSync(deadLock), 'a new run leaves the dead lock to the --cleanup of its report');
 
   const resumed = await run(['--cleanup', join(pendingDir, 'report.json')], { guard: false, state: linkdingState });
   assert.equal(resumed.code, 0, resumed.output);
+  assert(!existsSync(deadLock), 'the --cleanup took the dead lock over and released it');
   assert.equal(resumed.report.cleanup.complete, true);
   assert.equal(resumed.report.cleanup.apiVerified, true);
   const writes = requests.filter(q => q.method !== 'GET');

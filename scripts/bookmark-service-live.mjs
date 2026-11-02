@@ -47,7 +47,7 @@ import { createServer } from 'node:http';
 import { spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync,
-  renameSync, rmSync, unlinkSync, writeFileSync, writeSync,
+  realpathSync, renameSync, rmSync, unlinkSync, writeFileSync, writeSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -461,8 +461,14 @@ export function writePrivateJson(path, value) {
   renameSync(tmp, path);
 }
 
-export function acquireLock(dir, info) {
+// One run (or one --cleanup) at a time per state directory. A lock whose
+// holder has died is free once that holder's report is clean. While it is
+// not, only a --cleanup of that very report (resume: its path) may take the
+// lock over: that is how a run cut off by a second signal, kill -9, OOM or a
+// crash gets finished. Any other run is refused.
+export function acquireLock(dir, info, { resume = '' } = {}) {
   const path = join(dir, 'pbp-it-live.lock');
+  const real = file => { try { return realpathSync(file); } catch { return ''; } };
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const fd = openSync(path, 'wx', 0o600);
@@ -478,7 +484,8 @@ export function acquireLock(dir, info) {
       if (alive) fail('run_locked');
       let complete = false;
       try { complete = JSON.parse(readFileSync(held.reportPath, 'utf8')).cleanup?.complete === true; } catch { /* missing report */ }
-      if (!complete && held.reportPath && existsSync(held.reportPath)) fail('previous_cleanup_incomplete');
+      const resuming = !!resume && typeof held.reportPath === 'string' && !!real(held.reportPath) && real(held.reportPath) === real(resume);
+      if (!complete && !resuming && held.reportPath && existsSync(held.reportPath)) fail('previous_cleanup_incomplete');
       unlinkSync(path);
     }
   }
@@ -1112,7 +1119,9 @@ export class LiveRun {
     let release = () => {};
     // Signals and uncaught errors run the same cleanup as a normal exit; a
     // second signal skips it and leaves the report marked incomplete, so the
-    // next run refuses to start until --cleanup has finished the job.
+    // next run refuses to start until --cleanup has finished the job. The
+    // forced exit still drops this run's lock: the incomplete report alone
+    // keeps other runs out, and --cleanup can start at once.
     const removeSignals = installSignalHandlers({
       onFirst: signal => {
         this.report.interrupted = signal;
@@ -1127,6 +1136,8 @@ export class LiveRun {
         this.report.failure = { phase: this.phaseName, code: 'cleanup_incomplete' };
         this.report.passed = false;
         this.persist();
+        release();
+        console.error('Cleanup skipped by a second signal; finish it with --cleanup ' + this.reportPath);
         process.exit(130);
       },
     });
@@ -2376,7 +2387,7 @@ async function resumeCleanup(opts) {
   run.target = report.target;
   run.stage = 'resume';
   run.writesPossible = true;
-  const release = acquireLock(run.state, { pid: process.pid, runId: run.runId, reportPath: path, started: new Date().toISOString() });
+  const release = acquireLock(run.state, { pid: process.pid, runId: run.runId, reportPath: path, started: new Date().toISOString() }, { resume: path });
   try {
     report.cleanup.resumed = (report.cleanup.resumed || 0) + 1;
     run.pools = report.pools || {};
