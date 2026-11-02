@@ -6,8 +6,10 @@
 //     existing backup (a crashed earlier run) makes the tool refuse to start;
 //   - the original is restored after every mutation, on failure, exception,
 //     SIGINT/SIGTERM/SIGHUP and process exit.
-// Only an uncatchable SIGKILL or power loss leaves the backup behind; the next
-// run prints the command that puts the file back.
+// Only an uncatchable SIGKILL or power loss leaves the backup behind. Every
+// backup is also listed in one registry directory (inside the .git of the first target's checkout when there is
+// one, else the system temp dir), so the next run - on ANY file - refuses to
+// start and prints the commands that put every stranded file back.
 //
 //   node scripts/mutate-check.mjs [options] <file> <old> <new> -- <test command...>
 //   node scripts/mutate-check.mjs [options] --json <mutations.json> [-- <test command...>]
@@ -18,8 +20,10 @@
 // unmutated run that must pass first), --verbose (show test output).
 // Exit: 0 every mutation killed; 1 some survived; 2 refused or misused.
 import { spawn, execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync, writeFileSync, rmSync, mkdirSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { resolve, join, isAbsolute, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const BACKUP_SUFFIX = '.mutate-check.bak';
@@ -27,8 +31,33 @@ const backupOf = file => file + BACKUP_SUFFIX;
 
 export class MutateRefusal extends Error {}
 
+// No -p: cp onto an existing file keeps that file's own mode (an executable
+// stays executable); -p would stamp the backup's 0644 over it.
 export function restoreHint(file) {
-  return `cp -p ${JSON.stringify(backupOf(file))} ${JSON.stringify(file)} && rm ${JSON.stringify(backupOf(file))}`;
+  return `cp ${JSON.stringify(backupOf(file))} ${JSON.stringify(file)} && rm ${JSON.stringify(backupOf(file))}`;
+}
+
+// One tiny entry per in-flight backup, naming the target file. An entry whose
+// backup file is gone (restored by hand or by the hint) is stale and ignored.
+function registryDir(cwd) {
+  try {
+    const common = execFileSync('git', ['rev-parse', '--git-common-dir'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (common) return join(isAbsolute(common) ? common : resolve(cwd, common), 'mutate-check-inflight');
+  } catch { /* not a git checkout */ }
+  return join(tmpdir(), 'pbp-mutate-check-inflight');
+}
+const entryPath = (dir, file) => join(dir, createHash('sha1').update(file).digest('hex').slice(0, 16));
+function strandedFiles(dir) {
+  const found = [];
+  let names = [];
+  try { names = readdirSync(dir); } catch { return found; }
+  for (const name of names) {
+    let target = '';
+    try { target = readFileSync(join(dir, name), 'utf8'); } catch { continue; }
+    if (target && existsSync(backupOf(target))) found.push(target);
+    else rmSync(join(dir, name), { force: true });
+  }
+  return found;
 }
 
 function occurrences(text, needle) {
@@ -37,19 +66,27 @@ function occurrences(text, needle) {
   return count;
 }
 
+function killGroup(child) {
+  try { process.kill(-child.pid, 'SIGKILL'); } catch { try { child.kill('SIGKILL'); } catch { /* already gone */ } }
+}
+
 function runCommand(command, { timeoutMs, verbose, cwd, onChild }) {
   return new Promise(resolveRun => {
-    let output = '', settled = false, timedOut = false;
-    const done = result => { if (!settled) { settled = true; clearTimeout(timer); onChild(null); resolveRun({ ...result, timedOut, output }); } };
+    let output = '', settled = false, timedOut = false, graceTimer = null;
+    const done = result => { if (!settled) { settled = true; clearTimeout(timer); clearTimeout(graceTimer); onChild(null); resolveRun({ ...result, timedOut, output }); } };
     let child;
-    try { child = spawn(command[0], command.slice(1), { cwd, stdio: ['ignore', 'pipe', 'pipe'] }); }
+    // Own process group, so a timeout or signal ends grandchildren too (a
+    // grandchild holding the pipes would otherwise keep 'close' away).
+    try { child = spawn(command[0], command.slice(1), { cwd, stdio: ['ignore', 'pipe', 'pipe'], detached: true }); }
     catch (error) { resolveRun({ code: null, error: error.message, timedOut: false, output: '' }); return; }
     onChild(child);
     const collect = chunk => { output += chunk; if (output.length > 200000) output = output.slice(-100000); if (verbose) process.stdout.write(chunk); };
     child.stdout.on('data', collect); child.stderr.on('data', collect);
-    const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, timeoutMs);
+    const timer = setTimeout(() => { timedOut = true; killGroup(child); }, timeoutMs);
     child.once('error', error => done({ code: null, error: error.message }));
     child.once('close', (code, signal) => done({ code, signal }));
+    // 'exit' is the verdict; leave the pipes a moment to drain, then stop waiting.
+    child.once('exit', (code, signal) => { killGroup(child); graceTimer = setTimeout(() => done({ code, signal }), 300); });
   });
 }
 
@@ -57,9 +94,9 @@ function runCommand(command, { timeoutMs, verbose, cwd, onChild }) {
 export async function runMutations(mutations, { command = null, timeoutMs = 300000, baseline = true, verbose = false, cwd = process.cwd(), log = console.log, warn = console.error } = {}) {
   const files = [...new Set(mutations.map(m => resolve(cwd, m.file)))];
   const originals = new Map();
-  for (const file of files) {
-    if (existsSync(backupOf(file))) throw new MutateRefusal(`A backup from an earlier run exists: ${backupOf(file)}\nThe previous run may have crashed with ${file} still mutated. Check it, then put it back with:\n  ${restoreHint(file)}`);
-  }
+  const registry = registryDir(dirname(files[0]));
+  const stranded = [...new Set([...files.filter(file => existsSync(backupOf(file))), ...strandedFiles(registry)])];
+  if (stranded.length) throw new MutateRefusal(`A backup from an earlier run exists (or another run is still going):\n${stranded.map(file => '  ' + backupOf(file)).join('\n')}\nThe previous run may have crashed with these files still mutated. Check them, then put each back with:\n${stranded.map(file => '  ' + restoreHint(file)).join('\n')}`);
   for (const file of files) {
     if (!existsSync(file)) throw new MutateRefusal(`No such file: ${file}`);
     originals.set(file, readFileSync(file));
@@ -84,19 +121,26 @@ export async function runMutations(mutations, { command = null, timeoutMs = 3000
   let child = null, restored = true;
   const restoreAll = () => {
     for (const [file, bytes] of originals) { try { writeFileSync(file, bytes); } catch (error) { warn(`CANNOT RESTORE ${file}: ${error.message}\nRestore with: ${restoreHint(file)}`); return false; } }
-    for (const file of files) { try { rmSync(backupOf(file), { force: true }); } catch { /* the original is back; a stray backup is harmless */ } }
+    for (const file of files) {
+      try { rmSync(backupOf(file), { force: true }); } catch { /* the original is back; a stray backup is harmless */ }
+      try { rmSync(entryPath(registry, file), { force: true }); } catch { /* a stale entry is ignored next run */ }
+    }
     return true;
   };
   const onExit = () => { if (!restored) restoreAll(); };
-  const onSignal = signal => { try { child?.kill('SIGKILL'); } catch { /* already gone */ } onExit(); restored = true; process.exit(128 + ({ SIGINT: 2, SIGHUP: 1, SIGTERM: 15 }[signal] || 0)); };
+  const onSignal = signal => { if (child) killGroup(child); onExit(); restored = true; process.exit(128 + ({ SIGINT: 2, SIGHUP: 1, SIGTERM: 15 }[signal] || 0)); };
   const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'];
   process.on('exit', onExit);
   for (const signal of signals) process.on(signal, onSignal);
   const opts = { timeoutMs, verbose, cwd, onChild: c => { child = c; } };
   const results = [];
   try {
-    for (const file of files) writeFileSync(backupOf(file), originals.get(file));
+    mkdirSync(registry, { recursive: true });
     restored = false;
+    for (const file of files) {
+      writeFileSync(backupOf(file), originals.get(file));
+      writeFileSync(entryPath(registry, file), file);
+    }
     if (baseline) {
       const seen = new Set();
       for (const m of prepared) {

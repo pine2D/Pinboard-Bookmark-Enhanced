@@ -3,7 +3,7 @@
 // run's backup blocks the next one.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync, chmodSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
@@ -173,6 +173,94 @@ test('SIGKILL cannot be caught: the backup stays, the next run refuses, the prin
     assert.equal(code, 2);
     assert.ok(stderr.includes(restoreHint(s.file)), stderr);
     execFileSync('sh', ['-c', restoreHint(s.file)]);
+    assert.equal(readFileSync(s.file, 'utf8'), ORIGINAL);
+  } finally { s.done(); }
+});
+
+for (const [signal, expected] of [['SIGTERM', 143], ['SIGHUP', 129]]) {
+  test(`${signal} in the middle of a run restores the file and removes the backup`, async () => {
+    const s = sandbox();
+    try {
+      const child = startCli(s.file), closed = exited(child);
+      await waitMutated(s.file);
+      child.kill(signal);
+      const { code } = await closed;
+      assert.equal(code, expected);
+      assert.equal(readFileSync(s.file, 'utf8'), ORIGINAL);
+      assert.equal(existsSync(s.file + BACKUP_SUFFIX), false);
+    } finally { s.done(); }
+  });
+}
+
+// An exit that no signal handler sees: an uncaught exception or a bare process.exit
+// while the file is mutated and the test command is still running.
+for (const [name, trigger] of [['an uncaught exception', "throw new Error('boom')"], ['process.exit()', 'process.exit(3)']]) {
+  test(`${name} while mutated still restores the file`, async () => {
+    const s = sandbox();
+    try {
+      const driver = `import { runMutations } from ${JSON.stringify(new URL('../scripts/mutate-check.mjs', import.meta.url).href)};
+        setTimeout(() => { ${trigger} }, 700);
+        await runMutations([{ file: ${JSON.stringify(s.file)}, old: 'GOOD', new: 'BAD' }], { command: ${JSON.stringify(checker('hang').concat(s.file))}, log() {}, warn() {} });`;
+      const child = spawn(process.execPath, ['--input-type=module', '-e', driver], { stdio: ['ignore', 'ignore', 'ignore'] });
+      const closed = exited(child);
+      await waitMutated(s.file);
+      await closed;
+      assert.equal(readFileSync(s.file, 'utf8'), ORIGINAL);
+      assert.equal(existsSync(s.file + BACKUP_SUFFIX), false);
+    } finally { s.done(); }
+  });
+}
+
+test('a backup stranded for one file blocks a run on another file and lists the way back', async () => {
+  const s = sandbox();
+  try {
+    const other = join(s.dir, 'other.js');
+    writeFileSync(other, ORIGINAL);
+    const child = startCli(s.file), closed = exited(child);
+    await waitMutated(s.file);
+    child.kill('SIGKILL');
+    await closed;
+    const second = spawn(process.execPath, [CLI, other, 'GOOD', 'BAD', '--', ...checker(), other], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let stderr = '';
+    second.stderr.on('data', chunk => { stderr += chunk; });
+    assert.equal((await exited(second)).code, 2);
+    assert.ok(stderr.includes(restoreHint(s.file)), stderr);
+    assert.equal(readFileSync(other, 'utf8'), ORIGINAL, 'the refused run touched an unrelated file');
+    execFileSync('sh', ['-c', restoreHint(s.file)]);
+    // With the stranded file put back, the same run goes through.
+    const third = await runMutations([{ file: other, old: 'GOOD', new: 'BAD' }], { command: withFile(other, checker()), cwd: s.dir, ...quiet });
+    assert.equal(third.survived, 0);
+  } finally { s.done(); }
+});
+
+test('the printed restore command keeps an executable file executable', async () => {
+  const s = sandbox();
+  try {
+    chmodSync(s.file, 0o755);
+    const child = startCli(s.file), closed = exited(child);
+    await waitMutated(s.file);
+    child.kill('SIGKILL');
+    await closed;
+    execFileSync('sh', ['-c', restoreHint(s.file)]);
+    assert.equal(readFileSync(s.file, 'utf8'), ORIGINAL);
+    assert.equal(statSync(s.file).mode & 0o777, 0o755);
+  } finally { s.done(); }
+});
+
+test('a timeout also ends grandchildren that hold the output pipes', async () => {
+  const s = sandbox();
+  try {
+    const started = Date.now(), pidFile = join(s.dir, 'grandchild.pid');
+    const command = ['sh', '-c', `sleep 6 & echo $! > ${JSON.stringify(pidFile)}; wait`];
+    const { results } = await runMutations([{ file: s.file, old: 'GOOD', new: 'BAD' }], { command, timeoutMs: 400, baseline: false, ...quiet });
+    assert.deepEqual(results.map(r => [r.status, r.detail]), [['killed', 'timeout']]);
+    assert.ok(Date.now() - started < 3000, 'the timeout waited for the grandchild');
+    const pid = Number(readFileSync(pidFile, 'utf8'));
+    await new Promise(r => setTimeout(r, 200));
+    let alive = true;
+    try { process.kill(pid, 0); } catch { alive = false; }
+    if (alive) process.kill(pid, 'SIGKILL');
+    assert.equal(alive, false, 'the grandchild outlived the timeout');
     assert.equal(readFileSync(s.file, 'utf8'), ORIGINAL);
   } finally { s.done(); }
 });
