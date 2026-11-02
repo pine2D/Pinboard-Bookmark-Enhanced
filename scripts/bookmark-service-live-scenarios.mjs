@@ -1047,106 +1047,205 @@ export const SELFHOSTED_MODULES = [
   },
 
   // 1b. Page information (G2b, G26): no readable page leaves Description to
-  // the server; "use browser metadata" off prefills /check/ metadata; the
-  // pre-read switch is off by default; SingleFile marks new bookmarks.
+  // the server, with a grey hint; "use browser metadata" off prefills
+  // /check/ metadata; the pre-read switch is off by default. Each in its own
+  // part. The PDF case waits on a ruling (see the part).
   {
     id: 'sh.page-info',
     services: ['linkding'],
     surfaces: ['popup'],
-    features: ['linkding-no-page-info', 'linkding-empty-description-hint', 'linkding-browser-metadata', 'linkding-preload', 'linkding-singlefile'],
+    features: ['linkding-no-page-info', 'linkding-empty-description-hint', 'linkding-browser-metadata', 'linkding-preload'],
     fixRefs: ['G2', 'G2b', 'G26'],
     needs: needs({ shots: true }),
-    budget: { bookmarks: 4, urls: 4, node: 6, browser: 60, ai: 0, tags: 0, seconds: 60, tagReads: 1 },
+    budget: { bookmarks: 4, urls: 4, node: 6, browser: 70, ai: 0, tags: 0, seconds: 90, tagReads: 1 },
     files: [],
-    settings: { optAutoDescription: true, optCheckBookmarkStatus: true },
+    settings: { optAutoDescription: true, optCheckBookmarkStatus: true, optAutoCloseAfterSave: false },
     async steps(t) {
       const { prefix } = t;
+      // The grey hint as a reader meets it, whatever carries it: the field's
+      // placeholder, what aria-describedby names, or a visible hint next to
+      // the field (decision 14: only when the page could not be read and the
+      // box is empty).
+      const hintOf = popup => popup.evaluate(() => {
+        const field = document.getElementById('linkding-description-input');
+        const visible = el => !!el && el.offsetParent !== null && el.innerText.trim();
+        const described = (field.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean).map(id => document.getElementById(id)).filter(visible).map(el => el.innerText.trim());
+        const near = [...(field.parentElement?.children || [])].filter(el => el !== field && /hint|help|note/i.test(el.className) && visible(el)).map(el => el.innerText.trim());
+        return { placeholder: (field.getAttribute('placeholder') || '').trim(), described, near, any: !!((field.getAttribute('placeholder') || '').trim() || described.length || near.length) };
+      });
+      // Opens the unreadable page, records the field and its hint, saves.
       const unread = async (url, mode) => {
         const form = await t.openPopup(url, { article: 'error' });
         const field = form.popup.locator('#linkding-description-input');
-        t.expectEq(await field.inputValue(), '', mode + '_description_empty');
-        // G26's grey hint is judged after the save (G2b) checks below.
-        const hint = await field.getAttribute('placeholder');
-        t.note(mode + 'Hint', hint || '');
+        const value = await field.inputValue();
+        const hint = await hintOf(form.popup);
+        t.note(mode + 'Hint', hint);
         if (mode === 'abort') { await t.shot(form.popup, 'no-page-info', { surface: 'popup', keys: ['#linkding-description-input', '#submit-btn'] }); await t.axe(form.popup, 'no-page-info'); }
         await form.popup.locator('#title-input').fill(prefix + ' ' + mode);
         const since = t.now();
         await t.savePopup(form.popup);
         const [create] = createsOf(t, url, since);
-        t.expect(!!create, mode + '_create_sent');
-        if ('description' in (create.body || {})) t.note(mode + 'SentDescription', { value: String(create.body.description).slice(0, 80), meta: create.body.description === META_DESCRIPTION, path: create.path.split('?')[0] + (/disable_scraping/.test(create.path) ? '?disable_scraping' : ''), articleUrl: form.article.url().slice(0, 120) });
-        t.expect(!('description' in (create.body || {})), mode + '_description_sent');
-        t.expect(!/disable_scraping/.test(create.path), mode + '_scraping_disabled');
+        const sent = create ? { description: 'description' in (create.body || {}), scrapingDisabled: /disable_scraping/.test(create.path) } : null;
+        if (create && 'description' in (create.body || {})) t.note(mode + 'SentDescription', { meta: create.body.description === META_DESCRIPTION, length: String(create.body.description).length, articleUrl: form.article.url().slice(0, 120) });
         t.note(mode + 'ServerDescription', (await t.ownRow(url)).description ? 'filled' : 'empty');
         await form.close();
-        return hint;
+        return { value, hint, sent };
       };
-      await t.phase('page_info_abort');
-      const aborted = t.claimUrl();
-      t.inject({ on: 'page', path: aborted, abort: 'connectionrefused' });
-      const abortHint = await unread(aborted, 'abort');
-      await t.phase('page_info_pdf');
-      const pdf = t.claimUrl();
-      t.inject({ on: 'page', path: pdf, status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n' });
-      const pdfHint = await unread(pdf, 'pdf');
-      t.expect(!!(abortHint && abortHint.trim()), 'abort_empty_hint');
-      t.expect(!!(pdfHint && pdfHint.trim()), 'pdf_empty_hint');
+      let aborted = null, abortUrl = '';
 
-      await t.phase('page_info_server_metadata');
-      const metaKey = await t.productSetting(/linkding.*(browser|metadata)|browser.*meta/, 'linkding_browser_metadata');
-      t.expectEq(await t.sw(key => SETTINGS_DEFAULTS[key], metaKey), true, 'browser_metadata_default');
-      await t.settings({ [metaKey]: false });
-      const meta = t.claimUrl();
-      page(t, meta, articleHtml({ title: 'Browser-only title', description: 'Browser-only description.' }));
-      const server = (await t.api('bookmarks/check/?url=' + encodeURIComponent(meta))).metadata || {};
-      let form = await t.openPopup(meta);
-      t.expectEq(await form.popup.locator('#title-input').inputValue(), server.title || '', 'server_metadata_title');
-      t.expectEq(await form.popup.locator('#linkding-description-input').inputValue(), server.description || '', 'server_metadata_description');
-      let since = t.now();
-      await t.savePopup(form.popup);
-      const [metaCreate] = createsOf(t, meta, since);
-      t.expect(!!metaCreate && /disable_scraping/.test(metaCreate.path), 'server_metadata_disable_scraping');
-      await form.close();
-      await t.settings({ [metaKey]: true });
+      await t.part('unreadable_abort', ['G2b'], async () => {
+        await t.phase('page_info_abort');
+        abortUrl = t.claimUrl();
+        t.inject({ on: 'page', path: abortUrl, abort: 'connectionrefused' });
+        aborted = await unread(abortUrl, 'abort');
+        t.expectEq(aborted.value, '', 'abort_description_empty');
+        t.expect(!!aborted.sent, 'abort_create_sent');
+        t.expect(!aborted.sent.description, 'abort_description_sent');
+        t.expect(!aborted.sent.scrapingDisabled, 'abort_scraping_disabled');
+      });
+      await t.part('empty_hint', ['G26'], async () => {
+        t.expect(!!aborted, 'abort_case_missing');
+        t.expect(aborted.hint.any, 'abort_empty_hint');
+      });
 
-      await t.phase('page_info_preload');
-      const preloadKey = await t.productSetting(/linkding.*(preload|prefetch|preread|whilebrows|browsing)|(preload|prefetch).*page/, 'linkding_preload');
-      t.expectEq(await t.sw(key => SETTINGS_DEFAULTS[key], preloadKey), false, 'preload_default');
-      const other = await t.ctx.newPage();
-      await other.goto(pdf).catch(() => {});
-      const tab = await t.ctx.newPage();
-      await tab.goto(aborted).catch(() => {});
-      since = t.now();
-      await t.activateTab(pdf);
-      await t.activateTab(aborted);
-      await t.sleep(1500);
-      t.expectEq(t.requests({ path: CHECK_PATH.linkding, since }).length, 0, 'preload_off_checks');
-      await t.settings({ [preloadKey]: true });
-      since = t.now();
-      await t.activateTab(pdf);
-      await t.activateTab(aborted);
-      await t.until(async () => t.requests({ path: CHECK_PATH.linkding, since }).length > 0, 'preload_on_checks', 8000);
-      const icon = await t.sw(async url => { const tab = (await chrome.tabs.query({})).find(x => x.url === url); return tab ? _lastIconState.get(tab.id) || '' : 'no_tab'; }, aborted);
-      t.expectEq(icon, 'saved', 'preload_icon_saved');
-      await other.close();
-      await tab.close();
-      await t.settings({ [preloadKey]: false });
+      await t.part('server_metadata', ['G26'], async () => {
+        await t.phase('page_info_server_metadata');
+        const metaKey = await t.productSetting(/linkding.*(browser|metadata)|browser.*meta/, 'linkding_browser_metadata');
+        t.expectEq(await t.sw(key => SETTINGS_DEFAULTS[key], metaKey), true, 'browser_metadata_default');
+        await t.settings({ [metaKey]: false });
+        const meta = t.claimUrl();
+        page(t, meta, articleHtml({ title: 'Browser-only title', description: 'Browser-only description.' }));
+        const server = (await t.api('bookmarks/check/?url=' + encodeURIComponent(meta))).metadata || {};
+        const form = await t.openPopup(meta);
+        t.expectEq(await form.popup.locator('#title-input').inputValue(), server.title || '', 'server_metadata_title');
+        t.expectEq(await form.popup.locator('#linkding-description-input').inputValue(), server.description || '', 'server_metadata_description');
+        const since = t.now();
+        await t.savePopup(form.popup);
+        const [metaCreate] = createsOf(t, meta, since);
+        t.expect(!!metaCreate && /disable_scraping/.test(metaCreate.path), 'server_metadata_disable_scraping');
+        await form.close();
+      });
 
-      await t.phase('page_info_singlefile');
+      // Pre-read off (the default): neither loading a page nor switching to
+      // it asks /check/; on, switching tabs does and the icon follows.
+      await t.part('preload', ['G26'], async () => {
+        await t.phase('page_info_preload');
+        const preloadKey = await t.productSetting(/linkding.*(preload|prefetch|preread|whilebrows|browsing)|(preload|prefetch).*page/, 'linkding_preload');
+        t.expectEq(await t.sw(key => SETTINGS_DEFAULTS[key], preloadKey), false, 'preload_default');
+        const seeded = t.claimUrl();
+        await t.seed({ url: seeded, title: prefix + ' preload', notes: '' });
+        let since = t.now();
+        const first = await t.ctx.newPage();
+        await first.goto(seeded).catch(() => {});
+        const second = await t.ctx.newPage();
+        await second.goto(abortUrl || seeded).catch(() => {});
+        await t.activateTab(seeded);
+        await t.activateTab(abortUrl || seeded);
+        await t.sleep(1500);
+        t.expectEq(t.requests({ path: CHECK_PATH.linkding, since }).length, 0, 'preload_off_checks');
+        await t.settings({ [preloadKey]: true });
+        since = t.now();
+        await t.activateTab(seeded);
+        await t.until(async () => t.requests({ path: CHECK_PATH.linkding, since }).length > 0, 'preload_on_checks', 8000);
+        const icon = await t.sw(async url => { const tab = (await chrome.tabs.query({})).find(x => x.url === url); return tab ? _lastIconState.get(tab.id) || '' : 'no_tab'; }, seeded);
+        t.expectEq(icon, 'saved', 'preload_icon_saved');
+        await first.close();
+        await second.close();
+      });
+
+      // A PDF served for the URL. Chrome's PDF viewer page can still be
+      // scripted, so the product may read it as a page: whether that counts
+      // as "no page info" is the user's ruling (H3b open question). The
+      // expectations are recorded as pending, not failed; last, so they
+      // hold nothing up.
+      await t.part('unreadable_pdf', ['G2b', 'G26'], async () => {
+        await t.phase('page_info_pdf');
+        const pdf = t.claimUrl();
+        t.inject({ on: 'page', path: pdf, status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n' });
+        const r = await unread(pdf, 'pdf');
+        const question = 'PDF 页（Chrome PDF 查看器可被脚本读取）是否按「读不到网页」处理';
+        t.pending(r.value, '', 'pdf_description_empty', question);
+        t.pending(!!r.sent && !r.sent.description && !r.sent.scrapingDisabled, true, 'pdf_left_to_server', question);
+        t.pending(r.hint.any, true, 'pdf_empty_hint', question);
+      });
+      t.check('linkding: an unreadable page (aborted) leaves Description empty and unsent with a hint; server metadata prefill with disable_scraping when browser metadata is off; pre-read off by default (no /check/ on load or switch) and on when asked; the PDF case is recorded for a ruling');
+    },
+  },
+
+  // 1c. SingleFile (decision 3c): only a popup or quick-save create of a new
+  // linkding bookmark carries disable_html_snapshot and asks SingleFile;
+  // batch, the reader and offline replay do not. Not installed here: a
+  // non-blocking notice in the popup and a console.warn. Temp only: the
+  // marker is in the extension's request; the user's instance adds nothing.
+  {
+    id: 'sh.singlefile',
+    services: ['linkding'],
+    surfaces: ['popup', 'reader'],
+    features: ['linkding-singlefile', 'singlefile-paths', 'singlefile-missing-notice'],
+    fixRefs: ['G26'],
+    needs: needs({ target: 'temp', shots: true }),
+    budget: { bookmarks: 5, urls: 5, node: 4, browser: 70, ai: 0, tags: 0, seconds: 90, tagReads: 1 },
+    files: [],
+    settings: { optAutoDescription: true, optAutoCloseAfterSave: false, offlineQueueEnabled: true, qsAiTags: false, qsAiSummary: false, batchAiTags: false, batchAiSummary: false, batchSkipExisting: false },
+    async steps(t) {
+      const marked = r => /disable_html_snapshot/.test(r.path + JSON.stringify(r.body || {}));
+      const createOf = async (url, since, label) => {
+        await t.until(async () => createsOf(t, url, since).length > 0, label, 15000);
+        return createsOf(t, url, since)[0];
+      };
+      await t.phase('singlefile_setting');
       const singleKey = await t.productSetting(/singlefile/, 'singlefile');
       t.expectEq(await t.sw(key => SETTINGS_DEFAULTS[key], singleKey), false, 'singlefile_default');
       await t.settings({ [singleKey]: true });
-      const single = t.claimUrl();
-      form = await t.openPopup(single);
-      const mark = t.consoleMark();
-      since = t.now();
-      await t.savePopup(form.popup);
-      const [singleCreate] = createsOf(t, single, since);
-      t.expect(!!singleCreate && /disable_html_snapshot/.test(singleCreate.path + JSON.stringify(singleCreate.body || {})), 'singlefile_disable_snapshot');
-      await t.until(async () => t.consoleSince(mark).some(c => c.type === 'warning' && /singlefile/i.test(c.text)), 'singlefile_warn', 8000);
-      await t.shot(form.popup, 'singlefile-missing', { surface: 'popup', keys: ['#submit-btn'] });
-      await form.close();
-      t.check('linkding: unreadable page (aborted, PDF) leaves Description empty with a hint and unsent; server metadata prefill with disable_scraping; pre-read off by default and on when asked; SingleFile marks new bookmarks and warns when absent');
+
+      await t.part('popup', ['G26'], async () => {
+        await t.phase('singlefile_popup');
+        const url = t.claimUrl();
+        const form = await t.openPopup(url);
+        const mark = t.consoleMark(), since = t.now();
+        await t.savePopup(form.popup);
+        t.expect(marked(await createOf(url, since, 'singlefile_popup_create')), 'singlefile_popup_marker');
+        await t.until(async () => t.consoleSince(mark).some(c => c.type === 'warning' && /singlefile/i.test(c.text)), 'singlefile_warn', 8000);
+        // Non-blocking: saved, and the popup says SingleFile did not answer.
+        const notice = await form.popup.evaluate(() => [...document.querySelectorAll('#status-msg, .feedback-card, [role="status"], [role="alert"]')].filter(el => el.offsetParent !== null).map(el => el.innerText.trim()).filter(Boolean).join(' | ').slice(0, 300));
+        t.note('singlefileNotice', notice);
+        t.expect(/singlefile/i.test(notice), 'singlefile_notice');
+        t.expect(await form.popup.locator('#submit-btn.saved-success').count() === 1, 'singlefile_blocked_save');
+        await t.shot(form.popup, 'singlefile-missing', { surface: 'popup', keys: ['#submit-btn'] });
+        await t.axe(form.popup, 'singlefile-missing');
+        await form.close();
+      });
+      await t.part('quick_save', ['G26'], async () => {
+        await t.phase('singlefile_quick_save');
+        const url = t.claimUrl(), since = t.now();
+        const r = await shortcutSave(t, url, 'qs');
+        t.note('quickSave', r);
+        t.expect(marked(await createOf(url, since, 'singlefile_quick_create')), 'singlefile_quick_marker');
+      });
+      await t.part('not_batch_reader_replay', ['G26'], async () => {
+        await t.phase('singlefile_batch');
+        const batchUrl = t.claimUrl();
+        let since = t.now();
+        await batchSave(t, [batchUrl]);
+        t.expect(!marked(await createOf(batchUrl, since, 'singlefile_batch_create')), 'singlefile_batch_marker');
+        await t.phase('singlefile_reader');
+        const readerUrl = t.claimUrl();
+        since = t.now();
+        const reader = await t.openReader(readerUrl, { ready: '#reader-bookmark-save' });
+        await reader.locator('#reader-bookmark-save').click();
+        t.expect(!marked(await createOf(readerUrl, since, 'singlefile_reader_create')), 'singlefile_reader_marker');
+        await reader.close();
+        await t.phase('singlefile_replay');
+        const replayUrl = t.claimUrl();
+        await t.offline('self');
+        const queued = await shortcutSave(t, replayUrl, 'qs');
+        await t.offline('');
+        t.expectEq(queued.status, 'queued', 'singlefile_replay_queued');
+        since = t.now();
+        await drainQueue(t);
+        t.expect(!marked(await createOf(replayUrl, since, 'singlefile_replay_create')), 'singlefile_replay_marker');
+      });
+      t.check('linkding: with SingleFile on, popup and quick-save creates carry disable_html_snapshot, the popup saves and says SingleFile did not answer (console.warn too); batch, reader and offline replay creates do not');
     },
   },
 
@@ -1158,7 +1257,7 @@ export const SELFHOSTED_MODULES = [
     features: ['fake-ai', 'ai-summary-description-rules', 'ai-summary-remove-restores'],
     fixRefs: ['G24'],
     needs: needs({ fakeAi: true, shots: true }),
-    budget: { bookmarks: 2, urls: 2, node: 6, browser: 35, ai: 7, tags: 0, seconds: 60, tagReads: 1 },
+    budget: { bookmarks: 2, urls: 2, node: 6, browser: 40, ai: 7, tags: 0, seconds: 90, tagReads: 1 },
     files: [],
     settings: { optShowAiSummary: true, optShowAiTags: false, optAutoDescription: true, aiCacheDuration: 0 },
     async steps(t) {
@@ -1185,64 +1284,82 @@ export const SELFHOSTED_MODULES = [
       };
       const action = (popup, name) => popup.locator(`.cache-hint-wrap .regen-link[data-action="${name}"]`);
       const kept = t.message('aiSummaryKeptDescription');
-
-      await t.phase('ai_description_meta');
+      // "Another paragraph" after the user's words (decision 4). The box is
+      // a single-line input, which drops line breaks: how the paragraph
+      // shows is the user's ruling, so the exact two-newline join is
+      // pending; the order, the kept words and the summary are not.
+      const SPLIT = 'Description 控件形态与「另起一段」的写法（单行 input 会剥掉换行）';
+      const appended = (value, head, summary, code) => {
+        t.expect(value.startsWith(head) && value.endsWith(summary) && value.length > head.length + summary.length, code);
+        t.pending(value, head + '\n\n' + summary, code + '_paragraph', SPLIT);
+      };
       const url = t.claimUrl();
       const form = await t.openPopup(url);
       const { popup } = form;
-      t.expectEq(await field(popup).inputValue(), META_DESCRIPTION, 'meta_prefill');
-      let s = next();
-      await summarize(popup, s, 'meta_summary');
-      t.expectEq(await field(popup).inputValue(), s, 'meta_replaced');
-      await action(popup, 'remove').click();
-      t.expectEq(await field(popup).inputValue(), META_DESCRIPTION, 'remove_restores_meta');
 
-      await t.phase('ai_description_empty');
-      await field(popup).fill('');
-      s = next();
-      await summarize(popup, s, 'empty_summary');
-      t.expectEq(await field(popup).inputValue(), s, 'empty_replaced');
-      await action(popup, 'remove').click();
-      t.expectEq(await field(popup).inputValue(), '', 'remove_restores_empty');
+      await t.part('replace_meta_or_empty', ['G24'], async () => {
+        await t.phase('ai_description_meta');
+        t.expectEq(await field(popup).inputValue(), META_DESCRIPTION, 'meta_prefill');
+        let s = next();
+        await summarize(popup, s, 'meta_summary');
+        t.expectEq(await field(popup).inputValue(), s, 'meta_replaced');
+        await action(popup, 'remove').click();
+        t.expectEq(await field(popup).inputValue(), META_DESCRIPTION, 'remove_restores_meta');
+        await t.phase('ai_description_empty');
+        await field(popup).fill('');
+        s = next();
+        await summarize(popup, s, 'empty_summary');
+        t.expectEq(await field(popup).inputValue(), s, 'empty_replaced');
+        await action(popup, 'remove').click();
+        t.expectEq(await field(popup).inputValue(), '', 'remove_restores_empty');
+      });
 
-      await t.phase('ai_description_user_text');
-      const own = 'My own words.';
-      await field(popup).fill(own);
-      s = next();
-      await summarize(popup, s, 'user_summary');
-      t.expectEq(await field(popup).inputValue(), own + '\n\n' + s, 'user_text_appended');
-      s = next();
-      await action(popup, 'regenerate').click();
-      await t.until(async () => (await field(popup).inputValue()).includes(s), 'user_regenerated');
-      t.expectEq(await field(popup).inputValue(), own + '\n\n' + s, 'regenerate_replaces_ai_part');
-      await t.shot(popup, 'ai-appended', { surface: 'popup', keys: ['#linkding-description-input', '#submit-btn'] });
-      await t.axe(popup, 'ai-appended');
-      await action(popup, 'remove').click();
-      t.expectEq(await field(popup).inputValue(), own, 'remove_restores_user_text');
-      s = next();
-      await summarize(popup, s, 'user_summary_again');
-      const shown = await field(popup).inputValue();
-      await popup.locator('#title-input').fill(prefix + ' ai description');
-      await t.savePopup(popup);
-      t.expectEq((await t.ownRow(url)).description, shown, 'saved_as_shown');
+      await t.part('append_after_user_text', ['G24'], async () => {
+        await t.phase('ai_description_user_text');
+        const own = 'My own words.';
+        await field(popup).fill(own);
+        let s = next();
+        await summarize(popup, s, 'user_summary');
+        appended(await field(popup).inputValue(), own, s, 'user_text_appended');
+        const old = s;
+        s = next();
+        await action(popup, 'regenerate').click();
+        await t.until(async () => (await field(popup).inputValue()).includes(s), 'user_regenerated');
+        const regenerated = await field(popup).inputValue();
+        appended(regenerated, own, s, 'regenerate_replaces_ai_part');
+        t.expect(!regenerated.includes(old), 'regenerate_kept_old_summary');
+        await t.shot(popup, 'ai-appended', { surface: 'popup', keys: ['#linkding-description-input', '#submit-btn'] });
+        await t.axe(popup, 'ai-appended');
+        await action(popup, 'remove').click();
+        t.expectEq(await field(popup).inputValue(), own, 'remove_restores_user_text');
+        s = next();
+        await summarize(popup, s, 'user_summary_again');
+        const shown = await field(popup).inputValue();
+        await popup.locator('#title-input').fill(prefix + ' ai description');
+        await t.savePopup(popup);
+        t.expectEq((await t.ownRow(url)).description, shown, 'saved_as_shown');
+      });
       await form.close();
 
-      await t.phase('ai_description_server_text');
-      const seeded = t.claimUrl();
-      await t.seed({ url: seeded, title: prefix + ' server description', description: 'Server words.', notes: '' });
-      const again = await t.openPopup(seeded);
-      await t.until(async () => (await field(again.popup).inputValue()) === 'Server words.', 'server_prefill');
-      s = next();
-      await summarize(again.popup, s, 'server_summary');
-      t.expectEq(await field(again.popup).inputValue(), 'Server words.\n\n' + s, 'server_text_appended');
-      if (kept) t.expect(!(await again.popup.locator('#status-msg').innerText()).includes(kept), 'paid_but_kept');
-      await t.savePopup(again.popup);
-      t.expectEq((await t.ownRow(seeded)).description, 'Server words.\n\n' + s, 'server_text_saved');
-      await again.close();
+      await t.part('append_after_server_text', ['G24'], async () => {
+        await t.phase('ai_description_server_text');
+        const seeded = t.claimUrl();
+        await t.seed({ url: seeded, title: prefix + ' server description', description: 'Server words.', notes: '' });
+        const again = await t.openPopup(seeded);
+        await t.until(async () => (await field(again.popup).inputValue()) === 'Server words.', 'server_prefill');
+        const s = next();
+        await summarize(again.popup, s, 'server_summary');
+        const shown = await field(again.popup).inputValue();
+        appended(shown, 'Server words.', s, 'server_text_appended');
+        if (kept) t.expect(!(await again.popup.locator('#status-msg').innerText()).includes(kept), 'paid_but_kept');
+        await t.savePopup(again.popup);
+        t.expectEq((await t.ownRow(seeded)).description, shown, 'server_text_saved');
+        await again.close();
+      });
       // Every paid call wrote what it produced: no "generated, then kept".
       t.expectEq(paid() - before, n, 'summary_calls_match_writes');
       t.expect(t.fakeAi.unknown() === 0, 'fake_ai_unknown_request');
-      t.check('linkding: AI summary replaces an empty or page-meta Description, appends after the user\'s or server\'s words, regenerates only its own paragraph, and Remove restores the earlier value; no paid summary is discarded');
+      t.check('linkding: AI summary replaces an empty or page-meta Description, follows the user\'s or server\'s words, regenerates only its own part, and Remove restores the earlier value; no paid summary is discarded; the paragraph join waits for a ruling');
     },
   },
 
