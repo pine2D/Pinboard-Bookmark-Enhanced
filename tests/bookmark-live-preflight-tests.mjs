@@ -338,13 +338,16 @@ try {
   // Over-budget rows are refused by --plan and by --run before anything starts.
   const base = MODULES.find(m => m.id === 'core.worker');
   const over = (id, budget) => ({ ...base, id, services: ['linkding'], budget: { ...base.budget, ...budget } });
-  const overRows = [over('over.bookmarks', { bookmarks: 16, urls: 16 }), over('over.node', { node: 400 }), over('over.browser', { browser: 900 }), over('over.tags', { tags: 21 }), over('over.ai', { ai: 61, node: 1 })];
+  const overRows = [over('over.bookmarks', { bookmarks: 16, urls: 16 }), over('over.node', { node: 400 }), over('over.browser', { browser: 900 }), over('over.tags', { tags: 21 }), over('over.ai', { ai: 61, node: 1 }), over('over.urls', { urls: 13 })];
   for (const row of overRows) {
     const { selected } = live.selectModules('*', { target: 'user', modules: [row] });
     const plan = live.buildPlan({ target: 'user', selected });
     assert.equal(plan.withinCaps, false, row.id);
-    const expectProblem = { 'over.bookmarks': 'linkding:bookmarks', 'over.node': 'linkding:node', 'over.browser': 'linkding:browser', 'over.tags': 'linkding:tags', 'over.ai': 'fake_ai' }[row.id];
+    const expectProblem = { 'over.bookmarks': 'linkding:bookmarks', 'over.node': 'linkding:node', 'over.browser': 'linkding:browser', 'over.tags': 'linkding:tags', 'over.ai': 'fake_ai', 'over.urls': 'linkding:urls' }[row.id];
     assert(plan.problems.includes(expectProblem), row.id + ' -> ' + plan.problems.join(','));
+    // A pool larger than the bookmark cap is refused even when the rows'
+    // bookmarks fit (second review): each pool URL can hold a run bookmark.
+    if (row.id === 'over.urls') assert.deepEqual([plan.budget.linkding.bookmarks, plan.budget.linkding.urls, plan.problems], [1, 16, ['linkding:urls']]);
   }
   {
     const state = stateDirFor('over');

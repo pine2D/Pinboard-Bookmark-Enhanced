@@ -257,6 +257,9 @@ export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnable
       caps: { bookmarks: cap.bookmarks, node: cap.node, cleanupReserve: cap.cleanupReserve, browser: cap.browser, tags: cap.tags, lists: cap.lists },
     };
     if (sum.bookmarks > cap.bookmarks) problems.push(instance + ':bookmarks');
+    // Each pool URL can hold a run bookmark (the guards create pool URLs
+    // only), so a pool larger than the cap offers more than the run may make.
+    if (urls > cap.bookmarks) problems.push(instance + ':urls');
     if (node + reserve > cap.node) problems.push(instance + ':node');
     if (sum.browser > cap.browser) problems.push(instance + ':browser');
     if (sum.tags > cap.tags) problems.push(instance + ':tags');
