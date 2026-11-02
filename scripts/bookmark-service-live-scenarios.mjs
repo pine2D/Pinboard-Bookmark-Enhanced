@@ -2939,7 +2939,9 @@ export const H3C_MODULES = [
 
       // G14: the cached entry expires, the check fails: the saved page keeps
       // its saved icon; the popup then asks once, not twice.
-      await t.part('failure', ['G14'], async () => {
+      // Two parts, so the popup's count is measured even while the icon
+      // still flips (each part brings its own fault).
+      await t.part('failure_icon', ['G14'], async () => {
         await t.phase('status_failure_icon');
         await pages[saved].bringToFront();
         await t.activateTab(saved);
@@ -2960,8 +2962,11 @@ export const H3C_MODULES = [
         await t.until(async () => fault.hits() > hitsBefore, 'status_failure_checked', 8000);
         const icon = await settledIcon(saved);
         t.note('failureIcon', { icon, checks: t.requests({ path: CHECK_PATH[t.service], since }).length });
+        fault.clear();
         t.expectEq(icon, 'saved', 'status_failure_icon_flipped');
+      }, ['status-failure-keeps-icon']);
 
+      await t.part('failure_popup', ['G14'], async () => {
         await t.phase('status_failure_popup');
         // Only the popup's own lookup is counted. openPopup opens and
         // activates an article tab, and with the toolbar check on that tab
@@ -2972,6 +2977,7 @@ export const H3C_MODULES = [
         await t.until(async () => t.sw(() => _settingsCache?.optCheckBookmarkStatus !== true), 'status_check_off', 5000);
         await checksSettled();
         await t.sw(() => { statusCache.clear(); return true; });
+        const fault = t.inject({ method: 'GET', path: CHECK_PATH[t.service], status: 503, contentType: 'application/json', body: { detail: 'unavailable' } });
         const popupSince = t.now();
         const form = await t.openPopup(saved, { settle: false });
         await t.until(async () => form.popup.evaluate(() => typeof bookmarkLookup !== 'undefined' && !['idle', 'pending'].includes(bookmarkLookup.status)), 'status_failure_popup', 30000);
@@ -2983,7 +2989,7 @@ export const H3C_MODULES = [
         fault.clear();
         await form.close();
         t.expectEq(checks, 1, 'status_failure_popup_lookups');
-      }, ['status-failure-keeps-icon', 'status-failure-one-lookup']);
+      }, ['status-failure-one-lookup']);
       for (const p of Object.values(pages)) await p.close().catch(() => {});
       t.check(`${t.service}: a failed status check keeps the saved icon and the popup asks once`);
     },

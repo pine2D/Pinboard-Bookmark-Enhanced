@@ -1483,10 +1483,12 @@ try {
         await statusModule.steps(t);
         return parts;
       };
-      assert.deepEqual(await drive({ popupAsks: 1 }), { switch_cost: 'passed', failure: 'passed' }, 'a product that asks once passes');
-      assert.deepEqual(await drive({ popupAsks: 2 }), { switch_cost: 'passed', failure: 'status_failure_popup_lookups' }, 'a second popup lookup fails');
-      assert.deepEqual(await drive({ popupAsks: 1, noRecheck: true }), { switch_cost: 'passed', failure: 'timeout_status_failure_checked' }, 'a switch back that never checks is not a kept icon');
-      assert.deepEqual(await drive({ popupAsks: 1, flips: true }), { switch_cost: 'passed', failure: 'status_failure_icon_flipped' }, 'an icon flipped after the failed check is caught');
+      assert.deepEqual(await drive({ popupAsks: 1 }), { switch_cost: 'passed', failure_icon: 'passed', failure_popup: 'passed' }, 'a product that asks once passes');
+      assert.deepEqual(await drive({ popupAsks: 2 }), { switch_cost: 'passed', failure_icon: 'passed', failure_popup: 'status_failure_popup_lookups' }, 'a second popup lookup fails');
+      assert.deepEqual(await drive({ popupAsks: 1, noRecheck: true }), { switch_cost: 'passed', failure_icon: 'timeout_status_failure_checked', failure_popup: 'passed' }, 'a switch back that never checks is not a kept icon');
+      assert.deepEqual(await drive({ popupAsks: 1, flips: true }), { switch_cost: 'passed', failure_icon: 'status_failure_icon_flipped', failure_popup: 'passed' }, 'an icon flipped after the failed check is caught');
+      // The popup's count is still measured while the icon flips.
+      assert.deepEqual(await drive({ popupAsks: 2, flips: true }), { switch_cost: 'passed', failure_icon: 'status_failure_icon_flipped', failure_popup: 'status_failure_popup_lookups' });
     }
     // H3c ux.copy-exits: the delete-failure and 5xx-lookup copy is judged by
     // what it says, not only by what it leaves out (review of H3c,
