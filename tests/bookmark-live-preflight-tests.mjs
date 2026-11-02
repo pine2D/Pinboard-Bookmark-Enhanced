@@ -1467,6 +1467,54 @@ try {
     assert(lines.some(l => l.includes('quick_save_quote_format：期望 > First line > > # Heading')), text);
     assert(lines.every(l => l.length <= 400), 'snippets are cut short');
   }
+  // Review of H1b r2, notes: a failed feature names its failed modules and
+  // its interrupted ones apart; a run with no stage says nothing of stage
+  // times; residue names each tag and why it is residue (an id the ledger
+  // holds differently, a tag the ledger lacks, one only a read-back found);
+  // a skipped snapshot module keeps its note in the summary.
+  {
+    const tagRequests = [];
+    const tRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    const p = tRun.prefix;
+    const tServer = createServer((req, res) => {
+      const url = new URL(req.url, 'http://x');
+      tagRequests.push(req.method + ' ' + url.pathname);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      if (url.pathname === '/api/tags/') return res.end(JSON.stringify({ count: 3, next: null, previous: null, results: [{ id: 5, name: p + '_moved', date_added: '2026-11-01T00:00:00Z' }, { id: 6, name: p + '_stray', date_added: '2026-11-01T00:00:00Z' }, { id: 7, name: p + '_seen', date_added: '2026-11-01T00:00:00Z' }] }));
+      res.end(JSON.stringify({ count: 0, next: null, previous: null, results: [] }));
+    });
+    const tPort = await listen(tServer);
+    const tBase = `http://127.0.0.1:${tPort}/`;
+    tRun.runDir = join(dir, 'summary-notes');
+    mkdirSync(tRun.runDir, { mode: 0o700 });
+    tRun.reportPath = join(tRun.runDir, 'report.json');
+    tRun.target = 'user';
+    tRun.cleaning = true;
+    tRun.instances.linkding = { id: 'linkding', service: 'linkding', base: tBase, root: live.apiRootFor('linkding', tBase), token: 'f'.repeat(40) };
+    tRun.caps = { linkding: live.BUDGETS.user.linkding };
+    tRun.reserve = { linkding: 60 };
+    tRun.report.ledger.tags.push({ instance: 'linkding', key: p + '_moved', id: '99', source: 'route', module: '' }, { instance: 'linkding', key: p + '_seen', id: '7', source: 'read', module: '' });
+    assert.equal(await tRun.cleanupTags('linkding'), false);
+    assert.deepEqual(tagRequests.filter(q => !q.startsWith('GET')), [], 'no residue is deleted');
+    assert.deepEqual(tRun.report.cleanup.entries.map(e => [e.id, e.name, e.code]), [['5', p + '_moved', 'residue_tag_id_mismatch'], ['6', p + '_stray', 'residue_tag_not_in_ledger'], ['7', p + '_seen', 'residue_tag_unreserved']]);
+    await closeServer(tServer);
+    const r = tRun.report;
+    r.target = 'user';
+    r.instances = { linkding: { service: 'linkding', base: tBase } };
+    r.cleanup.passStart = 0;
+    const chosen = ['linkding.readonly', 'linkding.core.worker'];
+    tRun.selected = live.expandRegistry(MODULES).filter(m => chosen.includes(m.id));
+    r.selected = chosen;
+    r.modules.push({ id: 'linkding.readonly', status: 'failed', failure: { phase: 'linkding.readonly', code: 'read_back_mismatch' }, notes: {}, counts: {} }, { id: 'linkding.core.worker', status: 'running', notes: {}, counts: {} });
+    r.skipped = live.selectModules('core', { target: 'user' }).skipped;
+    assert(r.skipped.some(x => x.reason === 'snapshot_setting_unreadable'));
+    tRun.writeSummary();
+    const text = readFileSync(join(tRun.runDir, 'summary.zh.md'), 'utf8');
+    assert(text.includes('- 未通过 tags-recent：linkding.readonly（另有中断：linkding.core.worker）'), text);
+    assert(text.includes('耗时分类：未统计（运行未正常结束）') && !text.includes('见上方阶段耗时'), text);
+    for (const want of ['账本里同名标签的 id 与服务上的不一致', '带本轮前缀但不在账本里的标签', '只在读回时发现、未经写入预留的标签', p + '_moved', p + '_stray', p + '_seen']) assert(text.includes(want), want + ': ' + text);
+    assert(text.includes(live.SNAPSHOT_SKIP_NOTE('linkding.core.snapshot')), 'the snapshot skip keeps its note: ' + text);
+  }
 
   // ---------------------------------------------------------------------
   // Fake AI: product prompts classify, replies parse with product parsers

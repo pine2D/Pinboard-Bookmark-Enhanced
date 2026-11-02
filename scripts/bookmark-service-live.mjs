@@ -3014,7 +3014,8 @@ export class LiveRun {
       if (!entry || (entry.id && entry.id !== id)) {
         ok = false;
         const known = (this.report.ledger.tags || []).some(t => t.instance === instance && t.key === key);
-        this.report.cleanup.entries.push({ kind: 'tag', instance, id, deleted: false, residue: true, code: !known ? 'residue_tag_not_in_ledger' : entry ? 'residue_tag_id_mismatch' : 'residue_tag_unreserved' });
+        // The name carries the run prefix (runTags), so a person can find it.
+        this.report.cleanup.entries.push({ kind: 'tag', instance, id, name: String(tag.name).slice(0, 120), deleted: false, residue: true, code: !known ? 'residue_tag_not_in_ledger' : entry ? 'residue_tag_id_mismatch' : 'residue_tag_unreserved' });
         this.persist();
         continue;
       }
@@ -3113,7 +3114,7 @@ export class LiveRun {
     if (r.stages?.length) lines.push(`- 阶段耗时：${r.stages.map(st => `${st.name} ${sec(st.ms)}${st.ok ? '' : '（失败）'}`).join('，')}`);
     const tt = r.timing?.totals || {};
     // timingSummary() runs in conclude(); a run cut off before it has none.
-    if (!('modulesMs' in tt)) lines.push('- 耗时分类：未统计（运行未正常结束，见上方阶段耗时）');
+    if (!('modulesMs' in tt)) lines.push(`- 耗时分类：未统计（运行未正常结束${r.stages?.length ? '，见上方阶段耗时' : ''}）`);
     else lines.push(`- 耗时分类：容器启动 ${sec(tt.containerStartMs || 0)}，浏览器启动 ${sec(tt.browserStartMs || 0)}，连接 ${sec(tt.connectMs || 0)}，模块 ${sec(tt.modulesMs || 0)}，等待 ${sec(tt.waitMs || 0)}，节流等待 ${sec(tt.throttleMs || 0)}，清理 ${sec(tt.cleanupMs || 0)}`);
     if (r.timing?.slowest?.length) lines.push(`- 最慢 5 个阶段：${r.timing.slowest.map(x => `${x.name} ${sec(x.ms)}（${x.requests} 次请求${x.throttleMs ? `，节流 ${sec(x.throttleMs)}` : ''}${x.waitMs ? `，等待 ${sec(x.waitMs)}` : ''}）`).join('；')}`);
     lines.push('', '## 失败与证据');
@@ -3166,7 +3167,12 @@ export class LiveRun {
       const passed = [...features].filter(([, list]) => list.every(x => x.ok)).map(([f]) => f);
       if (passed.length) lines.push(`- 通过（${passed.length}）：${passed.join('，').slice(0, 300)}`);
       if (open.length) lines.push(`- 未完成（${open.length}，运行被打断或模块未执行，不算失败）：${open.join('，').slice(0, 300)}`);
-      capped(failed, 4, ([f, list]) => `- 未通过 ${f}：${list.filter(x => !x.ok).map(x => x.id).join('，')}`);
+      // The modules that failed it; an interrupted or unstarted one reached
+      // no verdict and is named apart.
+      capped(failed, 4, ([f, list]) => {
+        const open = list.filter(x => x.open).map(x => x.id);
+        return `- 未通过 ${f}：${list.filter(x => !x.ok && !x.open).map(x => x.id).join('，')}${open.length ? `（另有中断：${open.join('，')}）` : ''}`;
+      });
     }
     begin('shots');
     lines.push('', '## 截图与布局');
@@ -3186,8 +3192,9 @@ export class LiveRun {
     const pass = r.cleanup.entries.slice(Number.isInteger(start) && start >= 0 && start <= r.cleanup.entries.length ? start : 0);
     if (r.cleanup.error) lines.push(r.cleanup.errorBeforeStart ? `- 本轮续清在开始清理前失败：${r.cleanup.error}（未发请求、未删除任何对象；修正后再跑 --cleanup）` : `- 清理出错：${r.cleanup.error}`);
     const residue = pass.filter(e => e.residue);
-    if (residue.length) lines.push(`- 残留 ${residue.length} 项（工具不删，需人工核对后处理，再跑 --cleanup 复核）：${[...new Set(residue.map(e => e.kind === 'list' ? '续清不删的 Karakeep 列表' : '带本轮前缀但不在账本里或未经写入预留的标签'))].join('；')}`);
-    capped(pass.filter(e => e.deleted === false), 3, e => `- 未清理：${e.kind} ${e.instance || ''} ${e.id || ''} ${e.code || ''}`.trim());
+    const residueReason = { residue_list_resume: '续清不删的 Karakeep 列表', residue_tag_not_in_ledger: '带本轮前缀但不在账本里的标签', residue_tag_id_mismatch: '账本里同名标签的 id 与服务上的不一致', residue_tag_unreserved: '只在读回时发现、未经写入预留的标签' };
+    if (residue.length) lines.push(`- 残留 ${residue.length} 项（工具不删，需人工核对后处理，再跑 --cleanup 复核）：${[...new Set(residue.map(e => residueReason[e.code] || e.code))].join('；')}`);
+    capped(pass.filter(e => e.deleted === false), 3, e => `- 未清理：${e.kind} ${e.instance || ''} ${e.id || ''}${e.name ? ` ${oneLine(e.name, 120)}` : ''} ${e.code || ''}`.replace(/ +/g, ' ').trim());
     lines.push(`- 完整报告：${this.reportPath}`);
     // One screen: anything past the cap is in report.json. Observations,
     // uncovered items and screenshots go first, whole; then the body is cut
