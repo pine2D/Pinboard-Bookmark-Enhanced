@@ -1113,7 +1113,17 @@ await suite("unified save pipeline", async () => {
     const end = source.indexOf('if (message.type === "archive_url"', start);
     const branch = source.slice(start, end);
     assert(start >= 0 && end > start, "save_intent branch not found");
-    assert(branch.includes("submitPopupSaveIntent(message.intent, message.account, message.summaryRange)"), "message uses the guarded popup boundary");
+    {
+      // Run the branch itself against a recording boundary: what the worker hands
+      // submitPopupSaveIntent is observable, how the call is spelled is not.
+      const received = [];
+      const run = new Function("message", "sender", "sendResponse", "submitPopupSaveIntent", "pbpRunPopupDraft", "chrome", "notifySaveFailure", "pbpBookmarkAccountService", "pbpSaveFailure", "console", "return " + "(() => {" + branch + " return 'fell-through'; })();");
+      const intent = { mode: "update" }, summaryRange = { start: 3, end: 9 };
+      const held = run({ type: "save_intent", intent, account: "alice", summaryRange }, {}, () => {}, (...args) => { received.push(args); return new Promise(() => {}); },
+        async () => {}, { runtime: { getContexts: async () => [] } }, () => {}, () => "pinboard", () => ({}), console);
+      assert(held === true && received.length === 1, "the branch did not hand off to the popup boundary exactly once");
+      assert(received[0][0] === intent && received[0][1] === "alice" && received[0][2] === summaryRange, "the guarded boundary did not receive (intent, account, summaryRange)");
+    }
     assert(branch.includes("return true;"), "listener keeps the response channel open");
     // K45's sendResponse-before-getContexts ordering, and the deferred notify
     // that fires only after the probe resolves, are exercised behaviourally
