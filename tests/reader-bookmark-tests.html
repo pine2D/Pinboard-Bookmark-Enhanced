@@ -533,6 +533,103 @@ await test("the reader names a linkding tag the server cannot store, queues noth
     equal(tags.value, fits);
   } finally { frame.remove(); }
 });
+// A reader runtime over the pipeline harness h, with the worker's
+// PBP_READER_BOOKMARK_COMMAND listener captured: the global quick-save and
+// read-later shortcuts reach the reader through it.
+async function tagFixReader(h, account, bookmarkDraft) {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  const frame = document.createElement("iframe"); document.body.append(frame);
+  const w = frame.contentWindow, pending = [], listeners = [];
+  w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+  w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
+    sendMessage: msg => { const request = h.pbpReaderBookmarkRequest(msg, SENDER); pending.push(request); return request; },
+    onMessage: { addListener: fn => listeners.push(fn) } } };
+  w.eval(await (await fetch("../shared.js")).text());
+  w.t = (k, ...args) => args.length ? k + ":" + args.join(":") : k; w.eval(runtime);
+  w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "", draft: bookmarkDraft } } }));
+  await settle(pending);
+  const command = async action => {
+    let answered = null;
+    for (const fn of listeners) fn({ type: "PBP_READER_BOOKMARK_COMMAND", action }, { id: "test-id" }, value => { answered = value; });
+    await settle(pending);
+    assert(answered?.ok === true, action + ": the reader did not take the command");
+  };
+  const el = name => w.document.getElementById("reader-bookmark-" + name);
+  return { w, frame, pending, command, el };
+}
+// While the editor is open on tags linkding could not store, a global
+// shortcut (quick save, read later) must not refill it: the user may already
+// have shortened the tag there. It only puts the cursor back in the tags box.
+await test("a save shortcut while the tag editor is open keeps the tags the user is shortening", async () => {
+  const account = "linkding:https://links.example/:conn-1";
+  const long = "x".repeat(65);
+  const server = selfHostedServer("linkding", null, { postgres: true });
+  const h = await pipelineHarness({ account, token: "linkding-token", service: "linkding", post: null,
+    slot: { account, bookmarkDraft: { title: "Popup title", tags: long, notes: "", private: true, toread: false } }, clientFor: server.clientFor, settings: { bookmarkService: "linkding" } });
+  const r = await tagFixReader(h, account, { title: "Popup title", tags: long, notes: "", private: true, toread: false });
+  try {
+    await r.command("save");
+    const editor = r.el("editor"), tags = r.el("tags");
+    assert(editor?.matches(":popover-open") && tags.value === long, "the failed save did not open the editor on its tags");
+    const requests = () => server.requests.length;
+    for (const action of ["save", "later"]) {
+      const typed = "short-" + action;
+      tags.value = typed; tags.dispatchEvent(new r.w.Event("input", { bubbles: true }));
+      r.el("title").focus();
+      const before = requests();
+      await r.command(action);
+      assert(editor.matches(":popover-open"), action + ": the shortcut closed the editor");
+      equal(tags.value, typed);
+      assert(r.w.document.activeElement === tags, action + ": the shortcut did not put the cursor in the tags box");
+      equal(requests(), before);
+    }
+  } finally { r.frame.remove(); }
+});
+// The pending tag fix lives only in this reader. Tags stored meanwhile from
+// another client (the popup, linkding's own pages) retire it: the next Save
+// opens the editor on what the server holds, without the stale error. A
+// bookmark whose stored tags are the ones it already had when the update
+// failed has not been fixed, so the editor still opens on the failed tags.
+await test("tags stored elsewhere retire the reader's pending tag fix; unchanged stored tags do not", async () => {
+  const account = "linkding:https://links.example/:conn-1";
+  const long = "x".repeat(65), shown = "x".repeat(40) + "…";
+  const draft = { title: "Popup title", tags: long, notes: "", private: true, toread: false };
+  const existing = () => ({ id: 7, url: URL_ARTICLE, title: "Server title", description: "", notes: "", is_archived: false, unread: false, shared: false,
+    tag_names: ["old"], date_added: "2026-10-30T03:01:22.656384Z", date_modified: "2026-10-30T03:01:22.656384Z" });
+  for (const [label, row, fail, elsewhere, expectTags, fixed] of [
+    ["a create stored without tags, then tagged elsewhere", null, r => r.command("save"), ["fixed"], "fixed", true],
+    ["a create stored without tags, still without", null, r => r.command("save"), null, long, false],
+    ["an update that kept the old tags, then retagged elsewhere", existing(), null, ["fixed"], "fixed", true],
+    ["an update that kept the old tags, unchanged since", existing(), null, null, long, false]]) {
+    const server = selfHostedServer("linkding", row, { postgres: true });
+    const h = await pipelineHarness({ account, token: "linkding-token", service: "linkding", post: null,
+      slot: { account, bookmarkDraft: draft }, clientFor: server.clientFor, settings: { bookmarkService: "linkding" } });
+    const r = await tagFixReader(h, account, draft);
+    try {
+      if (fail) await fail(r);
+      else {
+        await r.w.pbpReaderBookmarkAction("edit"); await settle(r.pending);
+        const tags = r.el("tags");
+        tags.value = long; tags.dispatchEvent(new r.w.Event("input", { bubbles: true }));
+        r.el("apply").click(); await settle(r.pending);
+      }
+      equal(r.el("status").textContent, "bookmarkErrTagTooLong:" + shown + ":64");
+      const editor = r.el("editor"), tags = r.el("tags"), editorStatus = r.el("editor-status");
+      r.el("cancel").click();
+      if (elsewhere) server.row.tag_names = elsewhere;
+      await r.command("save");
+      assert(editor.matches(":popover-open"), label + ": Save did not open the editor");
+      equal(tags.value, expectTags);
+      equal(editorStatus.hidden, fixed);
+      r.el("cancel").click();
+      const writes = server.requests.filter(q => q.method !== "GET").length;
+      await r.command("save");
+      // Once retired, Save is an ordinary Save again: it no longer reopens the editor.
+      assert(editor.matches(":popover-open") === !fixed, label + ": the second Save " + (fixed ? "still reopened the editor" : "skipped the tags that still need shortening"));
+      if (!fixed) equal(server.requests.filter(q => q.method !== "GET").length, writes);
+    } finally { r.frame.remove(); }
+  }
+});
 await test("Pinboard and Karakeep reader bookmarks keep the popup's privacy draft and carry no sharing intent", async () => {
   for (const service of ["pinboard", "karakeep"]) for (const isPrivate of [false, true]) {
     const account = service === "pinboard" ? "alice" : "karakeep:fixture";

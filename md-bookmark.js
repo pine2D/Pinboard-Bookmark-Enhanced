@@ -16,7 +16,9 @@
   // save stores them. A plain Save sends the popup draft's tags, which the
   // reader never shows, and a PostgreSQL create keeps the bookmark without
   // them: Save and Read Later reopen the editor on these tags instead of
-  // reporting that tagless bookmark as saved.
+  // reporting that tagless bookmark as saved. `stored` is what the server held
+  // for the bookmark right after the failure ("" for none): tags stored there
+  // since then, from the popup or linkding itself, retire the fix (edit()).
   let tagFix = null;
   let editor = null;
   let editorSource = null;
@@ -255,6 +257,11 @@
     });
   }
 
+  // The tags the server holds for this page's bookmark, "" for none or no bookmark.
+  function storedTags() {
+    return state.known && state.bookmarked && typeof state.bookmark?.tags === "string" ? state.bookmark.tags.trim() : "";
+  }
+
   async function edit() {
     if (inflight || !context?.account) return;
     inflight = true; paint(); const gen = generation;
@@ -262,6 +269,8 @@
     if (gen !== generation) return;
     inflight = false; paint();
     if (!known) return;
+    // Tags stored elsewhere since the failure fixed it there: open on those.
+    if (tagFix && storedTags() !== "" && storedTags() !== tagFix.stored) tagFix = null;
     ensureEditor();
     editorStatusKey = ""; paint();
     const values = { ...(state.bookmark || context.bookmark?.draft || {}),
@@ -376,7 +385,7 @@
       failureArgs = typeof pbpBookmarkFailureArgs === "function" ? pbpBookmarkFailureArgs(result) : [];
       statusKey = failureKey(result) || "readerBookmarkFailed";
       if (statusKey === "bookmarkErrTagTooLong") {
-        tagFix = { tags: sentTags, args: failureArgs };
+        tagFix = { tags: sentTags, args: failureArgs, stored: storedTags() };
         reopen = action !== "edit";
       }
       if (action === "edit") editorStatusKey = statusKey;
@@ -391,7 +400,12 @@
   window.pbpReaderBookmarkAction = function (action) {
     if (action === "edit") return edit();
     if (action !== "save" && action !== "later") return;
-    if (tagFix) return edit();
+    if (tagFix) {
+      // An editor already open on those tags may hold the user's shortened
+      // ones: a shortcut only puts the cursor back there, it does not refill it.
+      if (editor?.matches(":popover-open")) { id("tags").focus(); return; }
+      return edit();
+    }
     return save(action === "save" && state.known && state.bookmarked && state.bookmark?.toread ? "read" : action);
   };
 
