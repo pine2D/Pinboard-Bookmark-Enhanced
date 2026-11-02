@@ -53,7 +53,7 @@ import {
   realpathSync, renameSync, rmSync, unlinkSync, writeFileSync, writeSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { GROUPS, LIST_MARKER, META_DESCRIPTION, MODULES, UNCOVERED, budgetValue } from './bookmark-service-live-scenarios.mjs';
@@ -2796,7 +2796,10 @@ export class LiveRun {
     } catch { filesOk = false; entries.push({ kind: 'profile', deleted: false }); }
     // 8. Temporary containers and network, by this run's exact names.
     const tempOk = this.docker ? await this.removeTemp() : true;
-    this.report.counts = this.counts;
+    // A --cleanup of a report on disk keeps the run's own counts (the
+    // summary's request line is the run's) and records its own apart.
+    if (this.resumed) this.report.cleanup.counts = this.counts;
+    else this.report.counts = this.counts;
     this.report.cleanup.apiVerified = apiOk;
     // Removing a temporary container removes its tmpfs data, so residue on a
     // temporary instance cannot outlive the run; apiVerified still fails the
@@ -3034,6 +3037,8 @@ export class LiveRun {
     lines.push(`- 结论：${r.passed ? '通过' : '未通过'}${r.failure ? `（${r.failure.phase}：${r.failure.code}）` : ''}；目标 ${r.target || '未定'}；HEAD ${(r.head || '未知').slice(0, 12)}；工作区干净：${r.clean === null ? '未检查' : r.clean ? '是' : '否'}`);
     const instanceNames = Object.keys(r.instances || {});
     if (instanceNames.length) lines.push(`- 请求：${instanceNames.map(i => `${i} Node ${r.counts?.[i]?.node ?? 0} / 浏览器 ${r.counts?.[i]?.browser ?? 0}`).join('；')}${r.fakeAi ? `；假 AI ${(r.fakeAi.calls || []).filter(c => c.status === 200).length}/${r.fakeAi.limit}` : ''}`);
+    // The latest --cleanup pass, counted apart from the run.
+    if (r.cleanup?.counts && instanceNames.length) lines.push(`- 续清请求（第 ${r.cleanup.resumed || 1} 次 --cleanup）：${instanceNames.map(i => `${i} Node ${r.cleanup.counts[i]?.node ?? 0}`).join('；')}`);
     // The Pinboard account is named nowhere in this file.
     if (r.pinboard) {
       const th = r.timing?.throttle;
@@ -3274,6 +3279,16 @@ export function validateResumeReport(report, reportPath, { values = {}, state = 
   return report;
 }
 
+// The screenshot manifest a run wrote next to its shots: only file names
+// for the summary, read as data. Anything else reads as no screenshots.
+function readShotsManifest(path) {
+  if (typeof path !== 'string' || basename(path) !== 'shots.json') return [];
+  try {
+    const list = JSON.parse(readFileSync(path, 'utf8'));
+    return Array.isArray(list) ? list.filter(x => x && typeof x.module === 'string' && typeof x.file === 'string') : [];
+  } catch { return []; }
+}
+
 async function resumeCleanup(opts) {
   check(!opts.errors.length, opts.errors[0] || 'arguments');
   const path = resolve(opts.values.cleanup);
@@ -3300,6 +3315,12 @@ async function resumeCleanup(opts) {
   run.writesPossible = true;
   // Lists are only checked here, never deleted (cleanupLists).
   run.resumed = true;
+  // The summary is rewritten after this pass; it still reports the run's
+  // module verdicts by feature (from the registry rows of the modules the
+  // report lists) and the failed modules' screenshots.
+  const ran = new Set((Array.isArray(report.modules) ? report.modules : []).map(m => m?.id));
+  run.selected = expandRegistry(opts.modules || MODULES).filter(m => ran.has(m.id));
+  run.shotsManifest = readShotsManifest(report.shots?.manifest);
   const release = acquireLock(run.state, { pid: process.pid, runId: run.runId, reportPath: path, started: new Date().toISOString() }, { resume: path });
   try {
     report.cleanup.resumed = (report.cleanup.resumed || 0) + 1;

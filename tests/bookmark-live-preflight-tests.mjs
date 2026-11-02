@@ -1884,7 +1884,10 @@ try {
       { instance: 'linkding', key: pendingPrefix + '_x', id: '5', source: 'route', module: 'linkding.core.worker' },
       { instance: 'linkding', key: pendingPrefix + '_upper', id: '', source: 'sw', module: 'linkding.core.worker' },
     ] },
-    modules: [], cleanup: { complete: false, entries: [] }, checks: [], readBackDiffs: [], console: [], swConsole: [], pageErrors: [], requestFailed: [], blockedOrigins: [], violations: [], findings: [], skipped: [], shots: { count: 0 },
+    // What the cut-off run itself recorded: its module verdicts and request
+    // counts. A --cleanup of the report must not rewrite them away.
+    modules: [{ id: 'linkding.core.worker', status: 'passed' }], counts: { linkding: { node: 105, browser: 77, browserWrites: 3, sw: 70, setup: 4 } },
+    cleanup: { complete: false, entries: [] }, checks: [], readBackDiffs: [], console: [], swConsole: [], pageErrors: [], requestFailed: [], blockedOrigins: [], violations: [], findings: [], skipped: [], shots: { count: 0 },
   };
   live.writePrivateJson(join(pendingDir, 'report.json'), pendingReport);
   // The run that left it was cut off with its lock in place (kill -9, OOM, a
@@ -1910,7 +1913,16 @@ try {
   assert(store.tags.has('10'), 'a run-prefix tag outside the ledger is never deleted');
   assert.deepEqual(resumed.report.cleanup.entries.filter(e => e.residue).map(e => [e.kind, e.id, e.code]), [['tag', '10', 'residue_tag_not_in_ledger']]);
   assert(resumed.report.cleanup.entries.some(e => e.kind === 'verify' && e.code === 'verify_tag_residue'));
-  assert.match(readFileSync(join(pendingDir, 'summary.zh.md'), 'utf8'), /残留 1 项/);
+  const resumedSummary = readFileSync(join(pendingDir, 'summary.zh.md'), 'utf8');
+  assert.match(resumedSummary, /残留 1 项/);
+  // The rewritten summary keeps the run's own findings (review of H1b):
+  // module verdicts by feature and the run's request counts; the cleanup's
+  // own requests are kept apart.
+  assert.match(resumedSummary, /通过（\d+）：[^\n]*worker-create/, resumedSummary);
+  assert(!resumedSummary.includes('本轮没有执行模块'), resumedSummary);
+  assert.match(resumedSummary, /请求：linkding Node 105 \/ 浏览器 77/, resumedSummary);
+  assert.deepEqual(resumed.report.counts.linkding, pendingReport.counts.linkding, 'a --cleanup leaves the run counts as they were');
+  assert(resumed.report.cleanup.counts.linkding.node > 0, 'the cleanup pass counts its own requests');
   const tagQuery = requests.find(q => q.path === '/api/bookmarks/' && q.url.includes('q='));
   assert(tagQuery && !decodeURIComponent(tagQuery.url).includes('#personal'), 'reference check names only run tags');
   assert.equal(resumed.report.ledger.created.find(e => e.id === '8').source, 'pool', 'unrecorded pool bookmark adopted by exact URL');
