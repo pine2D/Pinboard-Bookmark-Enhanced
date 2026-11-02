@@ -7,14 +7,16 @@
 // Usage: node .qa-scan/run-test.mjs tests/<file>.html
 //        node .qa-scan/run-test.mjs --print-counts tests/<file>.html [more.html ...]
 // --print-counts only reports: the rows a page actually rendered next to its
-// EXPECTED_RESULTS entry. A page that announces its end (document.title starting
-// with PASS/FAIL, or a #summary reading "N passed, M failed") is measured 1.5s
-// after the count reaches the registered number with that signal showing; some
-// pages write it at load while async cases still add rows, so it never ends a
-// page by itself. Any other page is measured after its registered count (any
-// row, when unregistered) has been followed by 3 seconds without a new row, so a
-// row that appears later is not seen; the report says so. A page that never
-// reaches its registered count is UNCONFIRMED, exit 1. It edits nothing and
+// EXPECTED_RESULTS entry. The page is measured once its registered count (any row,
+// when unregistered) has been reached and no new row has come for a quiet window.
+// A page's own end signal (document.title starting with PASS/FAIL, or a non-empty
+// #summary) shortens that window to 1.5s, but only a trusted one: it was not yet
+// showing when the page loaded and no row came after it appeared. Suites that
+// write theirs at load, or on every row, get the 3s window. A #summary that is
+// still empty keeps a 10s window. An unregistered page always waits 3s. After the
+// window a later row is not seen, and the report names the window it used. A
+// registered page that never reaches its count is UNCONFIRMED, exit 1, even if it
+// announced its end below that count (the message says so). It edits nothing and
 // leaves the normal mode untouched; exit 0 unless the page could not be measured.
 import { chromium } from "playwright";
 import { createServer } from "http";
@@ -280,29 +282,32 @@ try {
     // observes below.
     // --print-counts must not call a page finished just because its row count
     // paused: a case that waits a second or two (a setTimeout, a mock delay)
-    // looks exactly like the end. The page's own end signal decides when it has
-    // one: document.title starting with PASS/FAIL, or #summary reading "N passed,
-    // M failed". Some pages write theirs at load while async cases still add rows
-    // (ai-tags, md-ai, library-listbox), so a signal only shortens the quiet window
-    // to 1.5s; it never ends the page by itself. A page with a #summary element that
-    // has not been filled is waited on (10s quiet window as the fallback); a page
-    // without any signal is finished after 3s with no new row. The count must have
-    // reached the registered number (any row, when unregistered) first; a row that
-    // comes after the quiet window is not seen, and the report says so for a page
-    // without a signal. A registered page that never gets there is UNCONFIRMED,
-    // not a smaller "actual" count.
+    // looks exactly like the end. The count must reach the registered number
+    // (any row, when unregistered) and then stay still for a quiet window: 3s by
+    // default; 1.5s when the page's own end signal (title PASS/FAIL, non-empty
+    // #summary) is trusted, i.e. it was absent at the first poll and no row came
+    // after it showed up (ai-tags, md-ai and library-listbox write theirs at load
+    // or per row, so they never qualify); 10s while a #summary is still empty. An
+    // unregistered page always gets 3s. A registered page that never gets there
+    // is UNCONFIRMED, not a smaller "actual" count.
     const waitForRows = printCounts
       ? page.waitForFunction((registered) => {
+        const now = performance.now();
         const total = document.querySelectorAll(".pass, .fail, .skip").length;
-        const seen = window.__pbpCountWatch || (window.__pbpCountWatch = { total: -1, since: performance.now() });
-        if (seen.total !== total) { seen.total = total; seen.since = performance.now(); }
-        const quiet = performance.now() - seen.since;
+        const seen = window.__pbpCountWatch || (window.__pbpCountWatch = { total: -1, since: now, sigTotal: null, sigAtLoad: false, broken: false, trusted: false, windowMs: 3000 });
+        const firstPoll = seen.total === -1;
+        if (seen.total !== total) {
+          if (seen.sigTotal !== null) seen.broken = true; // a row after the signal appeared
+          seen.total = total; seen.since = now;
+        }
         const summary = document.getElementById("summary");
-        const signalled = /^(PASS|FAIL)\b/.test(document.title || "") || !!(summary && /\d+ passed, \d+ failed/.test(summary.textContent || ""));
+        const summaryFilled = !!(summary && (summary.textContent || "").trim());
+        const signalled = /^(PASS|FAIL)\b/.test(document.title || "") || summaryFilled;
+        if (signalled && seen.sigTotal === null) { seen.sigTotal = total; seen.sigAtLoad = firstPoll; }
+        seen.trusted = signalled && !seen.sigAtLoad && !seen.broken;
+        seen.windowMs = registered === undefined ? 3000 : seen.trusted ? 1500 : summary && !summaryFilled ? 10000 : 3000;
         const enough = registered === undefined ? total > 0 : total >= registered;
-        // A signal still needs 1.5s without a new row: ai-tags, md-ai and
-        // library-listbox write theirs at load, while async cases keep adding rows.
-        return enough && quiet >= (signalled ? 1500 : summary ? 10000 : 3000);
+        return enough && now - seen.since >= seen.windowMs;
       }, expected, { polling: 100, timeout: 0 })
       : page.waitForFunction((resultCount) => {
         let total = 0;
@@ -340,9 +345,8 @@ try {
           else if (el.classList.contains("skip")) skip++;
         }
         const lastRows = [...rows].slice(-3).map((el) => (el.textContent || "").trim());
-        const summary = document.getElementById("summary");
-        const signalled = /^(PASS|FAIL)\b/.test(document.title || "") || !!(summary && /\d+ passed, \d+ failed/.test(summary.textContent || ""));
-        return { pass, fail, skip, failures: failures.slice(0, 20), title: document.title || "", lastRows, signalled };
+        const watch = window.__pbpCountWatch;
+        return { pass, fail, skip, failures: failures.slice(0, 20), title: document.title || "", lastRows, trusted: !!(watch && watch.trusted), windowMs: watch ? watch.windowMs : 3000 };
       }));
     } catch (sampleError) {
       dom = {
@@ -357,11 +361,11 @@ try {
   if (printCounts) {
     const registered = expected === undefined ? "unregistered" : String(expected);
     const verdict = expected === undefined ? "NOT REGISTERED"
-      : dom.stalled && total < expected && !dom.signalled ? `UNCONFIRMED (never reached ${expected} before the stall deadline: a slow case or fewer rows, run the normal mode to see which)`
+      : dom.stalled && total < expected ? `UNCONFIRMED (never reached ${expected} before the stall deadline${dom.trusted ? `; the page announced its end at ${total} rows, so the registered count may be too high` : ": a slow case or fewer rows"}, run the normal mode to see which)`
       : total === expected ? "match" : `DIFFERS (${total > expected ? "+" : ""}${total - expected})`;
-    // Without a PASS/FAIL title or "N passed, M failed" summary the end of the page is a guess.
-    const caveat = dom.signalled || verdict.startsWith("UNCONFIRMED") ? ""
-      : " (page gave no end signal: no new row for 3s after the count was reached, so later rows are not seen)";
+    // Only a trusted end signal makes the measurement certain; otherwise say what the window could not see.
+    const caveat = (dom.trusted && expected !== undefined) || verdict.startsWith("UNCONFIRMED") ? ""
+      : ` (no trusted end signal: no new row for ${dom.windowMs / 1000}s after the count was reached, so later rows are not seen)`;
     console.log(`${rel}: pass=${dom.pass} fail=${dom.fail} skip=${dom.skip} total=${total} expected=${registered} ${verdict}${caveat}${dom.stalled ? " STALLED" : ""}`);
     if (dom.failures?.length) console.error("failures:\n  " + dom.failures.join("\n  "));
     if (runtimeErrors.length) console.error("errors:\n  " + runtimeErrors.slice(0, 25).join("\n  "));
