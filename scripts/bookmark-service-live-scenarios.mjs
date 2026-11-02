@@ -902,6 +902,16 @@ async function batchSave(t, urls) {
 
 const queue = t => t.sw(async () => { const { offlineQueue = [] } = await chrome.storage.local.get('offlineQueue'); return Array.isArray(offlineQueue) ? offlineQueue : []; });
 const drainQueue = t => t.sw(async () => { await processOfflineQueue(); return true; });
+// A SHA-256 of the stored connection (the <service>Token envelope with its
+// gateway, the address and the chosen service, in local and sync), so a
+// module can tell that a failed Connect left it alone without any value
+// leaving the worker.
+const connectionDigest = t => t.sw(async service => {
+  const keys = [service + 'Token', service + 'Url', 'bookmarkService'];
+  const [local, sync] = await Promise.all([chrome.storage.local.get(keys), chrome.storage.sync.get(keys)]);
+  const bytes = new TextEncoder().encode(JSON.stringify(keys.map(k => [k, local[k] ?? null, sync[k] ?? null])));
+  return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(b => b.toString(16).padStart(2, '0')).join('');
+}, t.service);
 
 // What the popup shows after Save: saved (button), queued / error (card or
 // status line), with the visible text. Null while it is still working.
@@ -2036,49 +2046,94 @@ export const SELFHOSTED_MODULES = [
     id: 'sh.karakeep-auth',
     services: ['karakeep'],
     surfaces: ['options'],
-    features: ['fake-ai', 'karakeep-auth-not-gateway', 'auth-before-ai'],
+    features: ['fake-ai', 'karakeep-auth-not-gateway', 'permission-before-ai', 'revoked-key-not-queued', 'batch-stops-on-auth'],
     fixRefs: ['G8'],
     // Temp only (user-target rounds): it sends a wrong key on purpose, which
     // has no place on the user's instance; the answer is Karakeep's own.
     needs: needs({ target: 'temp', fakeAi: true }),
-    budget: { bookmarks: 0, urls: 2, node: 2, browser: 40, ai: 2, tags: 0, seconds: 60, tagReads: 1 },
+    budget: { bookmarks: 0, urls: 4, node: 2, browser: 60, ai: 3, tags: 0, seconds: 75, tagReads: 1 },
     files: [],
     settings: { offlineQueueEnabled: true, qsAiTags: true, qsAiSummary: true, batchAiTags: true, batchAiSummary: false, batchSkipExisting: false },
     async steps(t) {
-      await t.phase('karakeep_wrong_key');
-      const options = await t.openOptions();
-      await options.locator('#opt-karakeep-token').fill('pbp-it-wrong-key-' + t.runId.slice(0, 8));
-      const status = options.locator('#connect-karakeep-status');
-      await options.locator('#connect-karakeep').click();
-      await t.until(async () => { const text = (await status.innerText()).trim(); return text && !/Connecting|Checking/i.test(text); }, 'wrong_key_status', 20000);
-      const text = (await status.innerText()).trim();
-      t.note('wrongKey', text.slice(0, 200));
-      const gateway = t.message('bookmarkErrGatewayDenied'), auth = t.message('bookmarkConnectErrAuth');
-      if (gateway) t.expect(!text.includes(gateway.split('$')[0].trim().slice(0, 24)), 'wrong_key_gateway');
-      if (auth) t.expect(text.includes(auth.split('$')[0].trim().slice(0, 20)), 'wrong_key_not_auth');
-      await options.close();
-      t.expectEq(await t.sw(async () => (await pbpReadBookmarkConnection()).service), 'karakeep', 'wrong_key_disconnected');
+      const resetQueue = () => t.sw(async () => { await chrome.storage.local.remove('offlineQueuePause'); await chrome.storage.local.set({ offlineQueue: [] }); });
+      await t.part('wrong_key', ['G8'], async () => {
+        await t.phase('karakeep_wrong_key');
+        const stored = await connectionDigest(t);
+        const options = await t.openOptions();
+        await options.locator('#opt-karakeep-token').fill('pbp-it-wrong-key-' + t.runId.slice(0, 8));
+        const status = options.locator('#connect-karakeep-status');
+        await options.locator('#connect-karakeep').click();
+        await t.until(async () => { const text = (await status.innerText()).trim(); return text && !/Connecting|Checking/i.test(text); }, 'wrong_key_status', 20000);
+        const text = (await status.innerText()).trim();
+        t.note('wrongKey', text.slice(0, 200));
+        const gateway = t.message('bookmarkErrGatewayDenied'), auth = t.message('bookmarkConnectErrAuth');
+        if (gateway) t.expect(!text.includes(gateway.split('$')[0].trim().slice(0, 24)), 'wrong_key_gateway');
+        if (auth) t.expect(text.includes(auth.split('$')[0].trim().slice(0, 20)), 'wrong_key_not_auth');
+        await options.close();
+        t.expectEq(await t.sw(async () => (await pbpReadBookmarkConnection()).service), 'karakeep', 'wrong_key_disconnected');
+        t.expectEq(await connectionDigest(t), stored, 'wrong_key_overwrote_connection');
+      });
 
-      await t.phase('karakeep_revoked_quick_save');
-      const unauthorized = () => t.inject({ status: 401, contentType: 'text/plain;charset=UTF-8', body: 'Unauthorized' });
-      let fault = unauthorized();
-      const before = t.fakeAi.calls();
-      const quick = await shortcutSave(t, t.claimUrl(), 'qs');
-      t.note('quickSave', quick);
-      t.expect(quick.status !== 'saved' && /auth|not_logged_in/.test(quick.reason), 'revoked_quick_save_reason');
-      t.expectEq(t.fakeAi.calls() - before, 0, 'revoked_quick_save_paid_ai');
-      fault.clear();
-      await t.sw(async () => { await chrome.storage.local.remove('offlineQueuePause'); await chrome.storage.local.set({ offlineQueue: [] }); });
-      await t.phase('karakeep_revoked_batch');
-      fault = unauthorized();
-      const batchBefore = t.fakeAi.calls();
-      const batch = await batchSave(t, [t.claimUrl()]);
-      t.note('batch', batch);
-      t.expect(batch.saved === 0, 'revoked_batch_saved');
-      t.expect(t.fakeAi.calls() - batchBefore <= 1, 'revoked_batch_paid_ai');
-      fault.clear();
-      await t.sw(async () => { await chrome.storage.local.remove('offlineQueuePause'); await chrome.storage.local.set({ offlineQueue: [] }); });
-      t.check('karakeep: a wrong key reads as an authentication failure; a revoked key stops quick save before AI and batch after at most one AI call');
+      // G8 invariant 5: without the origin's host permission, quick save
+      // neither extracts nor pays for AI, queues nothing and says so. The
+      // worker's permissions.contains answers false for this origin only,
+      // and is put back whatever happens.
+      await t.part('permission_missing', ['G8'], async () => {
+        await t.phase('karakeep_permission_missing');
+        const origin = new URL(t.base).origin;
+        const patched = await t.sw(async origin => {
+          const api = chrome.permissions;
+          if (!globalThis.pbpLiveContains) globalThis.pbpLiveContains = api.contains.bind(api);
+          const real = globalThis.pbpLiveContains;
+          try {
+            api.contains = async (q, ...rest) => ((q?.origins || []).some(o => String(o).startsWith(origin)) ? false : real(q, ...rest));
+          } catch (_) { return false; }
+          return (await chrome.permissions.contains({ origins: [origin + '/*'] })) === false;
+        }, origin);
+        try {
+          t.expect(patched, 'permission_patch_unavailable');
+          const before = t.fakeAi.calls(), queued = (await queue(t)).length;
+          const quick = await shortcutSave(t, t.claimUrl(), 'qs');
+          t.note('permissionQuickSave', quick);
+          t.expectEq(t.fakeAi.calls() - before, 0, 'permission_quick_save_paid_ai');
+          t.expectEq((await queue(t)).length, queued, 'permission_quick_save_queued');
+          t.expect(quick.status !== 'saved' && quick.status !== 'queued' && quick.reason === 'permission', 'permission_quick_save_reason');
+        } finally {
+          await t.sw(async () => { if (globalThis.pbpLiveContains) chrome.permissions.contains = globalThis.pbpLiveContains; });
+        }
+      });
+
+      // A revoked key (401): quick save ends as an authentication failure,
+      // not queued (G8 does not move its AI call before delivery).
+      await t.part('revoked_quick_save', ['G8'], async () => {
+        await t.phase('karakeep_revoked_quick_save');
+        const fault = t.inject({ status: 401, contentType: 'text/plain;charset=UTF-8', body: 'Unauthorized' });
+        const queued = (await queue(t)).length;
+        const quick = await shortcutSave(t, t.claimUrl(), 'qs');
+        t.note('quickSave', quick);
+        t.expect(quick.status !== 'saved' && /auth|not_logged_in/.test(quick.reason), 'revoked_quick_save_reason');
+        t.expectEq((await queue(t)).length, queued, 'revoked_quick_save_queued');
+        fault.clear();
+        await resetQueue();
+      });
+
+      // Batch over two pages: a 401 on the first stops the run, so the AI
+      // is asked at most once and the second page is never delivered.
+      await t.part('revoked_batch', ['G8'], async () => {
+        await t.phase('karakeep_revoked_batch');
+        const fault = t.inject({ status: 401, contentType: 'text/plain;charset=UTF-8', body: 'Unauthorized' });
+        const urls = [t.claimUrl(), t.claimUrl()];
+        const before = t.fakeAi.calls(), since = t.now();
+        const batch = await batchSave(t, urls);
+        t.note('batch', { ...batch, ai: t.fakeAi.calls() - before });
+        t.expect(batch.saved === 0, 'revoked_batch_saved');
+        t.expect(t.fakeAi.calls() - before <= 1, 'revoked_batch_paid_ai');
+        const second = t.requests({ since }).filter(r => r.body?.url === urls[1] || r.path.includes(encodeURIComponent(urls[1])));
+        t.expectEq(second.length, 0, 'revoked_batch_second_page');
+        fault.clear();
+        await resetQueue();
+      });
+      t.check('karakeep: a wrong key reads as an authentication failure and leaves the stored connection alone; without host permission quick save stops before AI; a revoked key is an auth failure, not queued; batch stops at the first 401 with at most one AI call');
     },
   },
 
