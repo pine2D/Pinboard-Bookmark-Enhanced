@@ -1586,9 +1586,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   // possibly before this closure's remaining top-level awaits have run far
   // enough to reach the declaration further down.
   let tagGovAiPendingSettings = null;
+  // The bookmark service decides whether the Pinboard token counts at all
+  // (getTagGovToken), so choosing Pinboard again, here or in another tab, is
+  // an account change for this panel too. bookmarkService is an ordinary
+  // setting: it lives in sync when settings sync is on, otherwise in local.
   chrome.storage.onChanged.addListener((changes, area) => {
     if (!_tagGovInited || (area !== "sync" && area !== "local")
-        || !(changes.pinboardToken || changes.syncApiKeys || changes.optSyncEnabled)) return;
+        || !(changes.pinboardToken || changes.syncApiKeys || changes.optSyncEnabled || changes.bookmarkService)) return;
     _tagGovAccountReloadTail = _tagGovAccountReloadTail.then(async () => {
       let state;
       try {
@@ -1596,7 +1600,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       } catch (_) {
         state = null;
       }
-      if (state && !pbpAuthStorageChangeIsRelevant(changes, area, state)) return;
+      const serviceChanged = !!changes.bookmarkService
+        && area === (state?.optSyncEnabled === true ? "sync" : "local");
+      if (state && !serviceChanged && !pbpAuthStorageChangeIsRelevant(changes, area, state)) return;
       const auth = state ? await getTagGovAuth() : null;
       const nextAccount = auth?.account || "";
       if (nextAccount === _tagGovVisibleAccount) return;
@@ -2836,6 +2842,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     radio.addEventListener("change", () => scheduleConnectionOverview());
   }
   refreshBookmarkServiceFields();
+  // A deep link (#tags) can open the Tags panel before the stored service is
+  // checked above; its no-auth explanation read no service then.
+  pbpSyncTagGovServiceSelection();
   // ---- Access gateway form (Cloudflare Access or custom headers) ----
   // Like the URL and token, the gateway is only written by a successful
   // Connect, sealed inside the credential envelope; the form never autosaves.

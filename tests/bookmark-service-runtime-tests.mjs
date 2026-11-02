@@ -13,7 +13,7 @@ const root=fileURLToPath(new URL('../',import.meta.url));
 // prints the names and exits. Neither set: every block runs. Each block's own connection needs are declared on its
 // block() call and set up before every block (reset first), filtered or not, so one
 // block run alone reaches the same verdict as in the full run.
-const BLOCKS=['archive explanation and JSON restore','services: connect, save, reader','access gateway form','linkding sharing capability','Karakeep create race','linkding merge and server dates','linkding multi-line Description','linkding over-long tag','linkding unknown Description','linkding queued empty Description','linkding restored draft for another URL','linkding address typed after open','linkding cleaned page address','linkding Description server semantics','gateway probes'];
+const BLOCKS=['archive explanation and JSON restore','services: connect, save, reader','access gateway form','linkding sharing capability','Karakeep create race','linkding merge and server dates','linkding multi-line Description','linkding over-long tag','linkding unknown Description','linkding queued empty Description','linkding restored draft for another URL','linkding address typed after open','linkding cleaned page address','linkding Description server semantics','gateway probes','settings tag panel follows the service'];
 const only=(process.env.PBP_RUNTIME_ONLY||'').split(',').map(part=>part.trim().toLowerCase()).filter(Boolean);
 const selected=name=>!only.length||only.some(part=>name.toLowerCase().includes(part));
 if(process.argv.includes('--list')){console.log(BLOCKS.join('\n'));process.exit(0);}
@@ -984,6 +984,42 @@ try{
   assert(!wire.some(w=>w.path.startsWith('/cdn-cgi/')),'redirect was followed');
   assert(wire.every(w=>!w.hasCookie),'a request carried cookies');
   console.log('gateway probes classified; no preflight; redirect not followed');
+  });
+  await block('settings tag panel follows the service',[],async()=>{
+  // The Tags panel opened by a deep link while linkding is chosen explains it
+  // is Pinboard-only. Choosing Pinboard on the General tab autosaves
+  // bookmarkService; that storage change must reload the panel with the
+  // Pinboard account's tags (a synthetic token and a fresh owned tag cache,
+  // so nothing leaves the browser), and choosing linkding again must clear
+  // them. Before, the panel stayed on "add your Pinboard token" until reload.
+  const before=await worker.evaluate(()=>chrome.storage.local.get(['bookmarkService','pinboardToken']));
+  await worker.evaluate(async()=>{await chrome.storage.local.set({bookmarkService:'linkding',pinboardToken:obfuscateKey('tagfixture:0123456789ABCDEF0123'),
+    cached_user_tags:{account:'tagfixture',counts:{reading:3,qa:2},timestamp:Date.now()}});});
+  const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
+  const overview=en.tagGovOverview.message.replace('$TAGS$','2').replace('$USES$','5');
+  const options=await ctx.newPage();await options.goto(pageUrl+'options.html#tags');
+  const stats=options.locator('#tag-gov-stats');
+  const state=()=>options.evaluate(()=>document.getElementById('panel-tags').dataset.tagGovState||'');
+  try{
+    const panelNow=async()=>JSON.stringify({state:await state(),stats:(await stats.textContent()).trim(),service:await options.evaluate(()=>document.querySelector('input[name="bookmark-service"]:checked')?.value||'')});
+    await until(async()=>(await state())==='pinboard-only'&&(await stats.textContent()).trim()===en.tagGovPinboardOnly.message,'deep-linked Tags panel explains linkding is not supported').catch(async e=>{throw new Error(e.message+' '+await panelNow());});
+    await options.locator('#tab-general').click();
+    await options.locator('input[name="bookmark-service"][value="pinboard"]').check();
+    await until(()=>worker.evaluate(async()=>(await chrome.storage.local.get('bookmarkService')).bookmarkService==='pinboard'),'Pinboard choice autosaved');
+    await options.locator('#tab-tags').click();
+    await until(async()=>(await stats.textContent()).trim()===overview,'Tags panel reloaded with the Pinboard tags after the service change; stats: '+await stats.textContent());
+    assert.equal(await state(),'ready','a loaded panel still carries a no-auth state');
+    assert(await options.locator('#tag-gov-need-token').isHidden(),'the Pinboard token prompt stays after the tags loaded');
+    assert(await options.locator('#tag-gov-refresh').isEnabled(),'refresh stays disabled after the Pinboard tags loaded');
+    await options.locator('#tab-general').click();
+    await options.locator('input[name="bookmark-service"][value="linkding"]').check();
+    await until(()=>worker.evaluate(async()=>(await chrome.storage.local.get('bookmarkService')).bookmarkService==='linkding'),'linkding choice autosaved');
+    await until(async()=>(await state())==='pinboard-only'&&(await stats.textContent()).trim()===en.tagGovPinboardOnly.message,'Tags panel cleared the Pinboard tags after switching to linkding; stats: '+await stats.textContent());
+  }finally{
+    await options.close();
+    await worker.evaluate(async before=>{await chrome.storage.local.remove(['cached_user_tags','pinboardToken','bookmarkService']);await chrome.storage.local.set(before);},before);
+  }
+  console.log('settings Tags panel reloads on a bookmark service change: Pinboard tags in, linkding explanation back');
   });
   assert.equal(errors.length,0,errors.join('\n'));
   assert(requests.every(r=>r.service==='linkding'||r.service==='karakeep'));
