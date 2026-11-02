@@ -849,6 +849,44 @@ try {
       routeRun.target = 'user';
       routeRun.faults = [];
       routeRun.fatal = null;
+      // Where faults sit in onRoute (t.inject): a page fault answers only the
+      // run's fixture origins; a service fault answers only after the guard
+      // judged and counted the request, so a forbidden write still trips the
+      // guard; an injected create records nothing for cleanup.
+      {
+        sent.length = 0;
+        const fixture = cfg.pools.karakeep[1];
+        routeRun.fixtureOrigins = new Set([live.originOf(fixture)]);
+        routeRun.poolSet = new Set();
+        const pageFault = { on: 'page', method: '', path: /./, abort: 'connectionrefused', left: -1, hits: 0 };
+        const serviceFault = { on: 'service', instance: 'karakeep', method: '', path: undefined, status: 502, left: -1, hits: 0 };
+        routeRun.faults = [pageFault, serviceFault];
+        const pageAt = (url, method = 'GET') => {
+          const out = {};
+          out.route = { request: () => ({ url: () => url, method: () => method, postData: () => null }), fetch: async () => { sent.push(method + ' ' + url); }, fulfill: async () => { out.fulfilled = true; }, abort: async code => { out.aborted = code; }, continue: async () => { sent.push(method + ' ' + url); out.continued = true; } };
+          return out;
+        };
+        const fixtureLoad = pageAt(fixture);
+        await routeRun.onRoute(fixtureLoad.route);
+        assert.deepEqual([fixtureLoad.aborted, pageFault.hits], ['connectionrefused', 1], 'a fixture page load gets the page fault');
+        const elsewhere = pageAt('https://example.org/page');
+        await routeRun.onRoute(elsewhere.route);
+        assert.deepEqual([elsewhere.aborted, pageFault.hits, routeRun.fatal], ['blockedbyclient', 1, null], 'another origin is never answered by a page fault');
+        const serviceRead = pageAt(cfg.instances.karakeep.root + 'bookmarks/check-url?url=x');
+        const browserBefore = routeRun.count('karakeep').browser;
+        await routeRun.onRoute(serviceRead.route);
+        assert.deepEqual([serviceRead.fulfilled, pageFault.hits, serviceFault.hits, routeRun.count('karakeep').browser - browserBefore], [true, 1, 1, 1], 'a service request is not a page load: the service fault answers it, counted');
+        const forbidden = fakeRoute('bookmarks/not-ours', 'DELETE', null);
+        await routeRun.onRoute(forbidden.route);
+        assert.deepEqual([forbidden.aborted, forbidden.fulfilled, serviceFault.hits, routeRun.fatal], ['blockedbyclient', undefined, 1, 'live_guard_mutation'], 'a forbidden write trips the guard even when a fault would answer it');
+        routeRun.fatal = null;
+        const ledgerBefore = routeRun.report.ledger.created.length;
+        const injectedCreate = fakeRoute('bookmarks', 'POST', JSON.stringify({ type: 'link', url: cfg.pools.karakeep[0] }));
+        const createsBefore = routeRun.count('karakeep').browserWrites;
+        await routeRun.onRoute(injectedCreate.route);
+        assert.deepEqual([injectedCreate.fulfilled, sent, routeRun.report.ledger.created.length - ledgerBefore, routeRun.count('karakeep').browserWrites - createsBefore, routeRun.pending.karakeep?.bookmarks || 0], [true, [], 0, 1, 0], 'an injected create is counted, never sent, records nothing and holds no slot');
+        routeRun.faults = [];
+      }
       // The Node API (t.api, t.seed) refuses it on a user instance too.
       for (const target of ['user', 'temp']) {
         const nodeRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
@@ -1188,6 +1226,10 @@ try {
         budget: { bookmarks: 0, urls: 0, node: 0, browser: 0, ai: 0, tags: 0, seconds: 5 },
         async steps(t) {
           t.inject({ method: 'POST', path: /^bookmarks/, status: 502 });
+          t.inject({ method: 'GET', path: /^bookmarks\/check/, status: 200, body: { bookmark: null } });
+          for (const spec of [{ method: 'POST', status: 201, body: { id: 1 } }, { status: 200, body: {} }, { method: 'PATCH', status: 204 }]) {
+            assert.throws(() => t.inject(spec), e => e.code === 'inject_write_success' && e.fatal === true, 'a made-up write success would be recorded by the worker guard: ' + JSON.stringify(spec));
+          }
           await t.part('first', ['G1'], async () => {
             await t.phase('first_phase');
             t.inject({ method: 'GET', path: /^bookmarks\/check/, status: 503 });
@@ -1204,7 +1246,8 @@ try {
       const record = run.report.modules[0];
       assert.deepEqual([record.status, record.failure.code, record.failure.phase], ['failed', 'first_failed', 'first_phase'], 'the module fails on its first failed part, at that part');
       assert.deepEqual(record.parts.map(p => [p.name, p.status, p.fixRefs.join(','), p.code || '']), [['first', 'failed', 'G1', 'first_failed'], ['second', 'passed', 'G2', '']]);
-      assert.deepEqual(seen, [1, 'second', true, false], 'the part stops at its failure; its fault is cleared, the earlier one stays; the next part runs');
+      assert.deepEqual(seen, [2, 'second', true, false], 'the part stops at its failure; its fault is cleared, the earlier ones stay; the next part runs');
+      assert.deepEqual(run.faults, [], 'the module leaves no fault behind');
       assert.deepEqual(run.restores, [{ optA: 'before' }, { optA: 'before' }], 'the failed part restores its settings, then the module does');
       assert.deepEqual(record.pendingDecisions.map(d => [d.code, d.actual]), [['pending_split', 'one line']], 'a pending ruling is recorded, not failed');
       assert.equal(run.fatal, null);

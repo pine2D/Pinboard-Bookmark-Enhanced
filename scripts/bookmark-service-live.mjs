@@ -3144,6 +3144,10 @@ export class LiveRun {
         const fault = { on: spec.on === 'page' ? 'page' : 'service', instance: spec.instance || instance, method: spec.method ? String(spec.method).toUpperCase() : '', path: spec.path, status: spec.status, headers: spec.headers, contentType: spec.contentType, body: spec.body, abort: spec.abort || false, left: Number.isFinite(spec.times) ? spec.times : -1, hits: 0 };
         if (fault.on === 'page') check(fault.path instanceof RegExp || (typeof fault.path === 'string' && run.fixtureOrigins.has(originOf(fault.path))), 'inject_page_origin', true);
         else check(!!run.instances[fault.instance], 'inject_instance', true);
+        // A made-up success for a write would reach the worker guard as a
+        // real answer: it records the made-up bookmark or list id, and the
+        // run's cleanup would then delete that id on the instance.
+        if (fault.on === 'service' && !fault.abort && !['GET', 'HEAD'].includes(fault.method)) check(!((fault.status || 503) >= 200 && (fault.status || 503) < 300), 'inject_write_success', true);
         run.faults.push(fault);
         return { hits: () => fault.hits, clear: () => { const i = run.faults.indexOf(fault); if (i >= 0) run.faults.splice(i, 1); } };
       },
