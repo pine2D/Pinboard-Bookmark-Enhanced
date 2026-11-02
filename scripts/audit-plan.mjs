@@ -54,13 +54,36 @@ export function addedIconKeys(before, after) {
   return keys.length ? keys : null;
 }
 
+// .qa-scan/run-test.mjs is the runner for every html suite, but its
+// EXPECTED_RESULTS table is per-suite data: a diff whose every changed line is
+// one `"tests/<page>.html": <count>,` entry concerns only those pages. Any
+// other changed line (logic, the table's frame, a different shape) returns
+// null so the caller keeps the conservative unmapped-input recommendation.
+export function expectedCountPages(patch) {
+  if (typeof patch !== 'string') return null;
+  const pages = new Set();
+  let inHunk = false;
+  for (const line of patch.split('\n')) {
+    if (line.startsWith('@@')) { inHunk = true; continue; }
+    if (!inHunk || !/^[+-]/.test(line)) continue;
+    const entry = line.match(/^[+-]\s*"(tests\/[\w.-]+\.html)":\s*\d+,?\s*$/);
+    if (!entry) return null;
+    pages.add(entry[1]);
+  }
+  return pages.size ? [...pages] : null;
+}
+
 export function inferAuditImpact(catalog, changes, { consumers = [] } = {}) {
   const ids = new Set(), reasons = [], warnings = [];
   function include(rows, path, reason) {
     for (const row of rows) { ids.add(row.id); reasons.push({ id: row.id, path, reason }); }
   }
   for (const change of changes) {
-    const path = change.path, direct = catalog.filter(row => row.file === path || row.files?.some(pattern => match(path, pattern)));
+    const path = change.path;
+    const countPages = path === '.qa-scan/run-test.mjs' ? expectedCountPages(change.patch) : null;
+    const countRows = countPages ? catalog.filter(row => row.runner === 'html' && countPages.includes(row.file)) : [];
+    if (countRows.length) { include(countRows, path, 'EXPECTED_RESULTS entries changed for ' + countPages.join(', ')); continue; }
+    const direct = catalog.filter(row => row.file === path || row.files?.some(pattern => match(path, pattern)));
     let surfaces = surfaceOf(path) ? [surfaceOf(path)] : null;
     let reason = 'surface owner', isolated = false;
     if (path === 'listbox.js') { surfaces = ['options', 'library']; reason = 'shared listbox: options and library consumers'; }

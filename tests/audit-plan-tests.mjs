@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getAuditCatalog } from '../scripts/audit-catalog.mjs';
-import { addedIconKeys, createAuditPlan, inferAuditImpact, parseAuditArgs } from '../scripts/audit-plan.mjs';
+import { addedIconKeys, createAuditPlan, expectedCountPages, inferAuditImpact, parseAuditArgs } from '../scripts/audit-plan.mjs';
 
 const catalog = getAuditCatalog();
 const plan = (...args) => createAuditPlan(catalog, parseAuditArgs(args));
@@ -127,4 +127,38 @@ test('dictionary feature plans retain the actual registered AI entry states on b
     const result = createAuditPlan(catalog, parseAuditArgs(['--changed', '--feature=dictionary', '--plan']), impact);
     for (const row of rows) assert.ok(result.scenarios.some(selected => selected.id === row.id), `${path}: ${row.id}`);
   }
+});
+
+// git diff --unified=1 of .qa-scan/run-test.mjs, hand-written in the shape git prints.
+const runnerPatch = body => 'diff --git a/.qa-scan/run-test.mjs b/.qa-scan/run-test.mjs\nindex 1111111..2222222 100644\n--- a/.qa-scan/run-test.mjs\n+++ b/.qa-scan/run-test.mjs\n' + body;
+const tableHunk = (...rows) => '@@ -60,3 +60,3 @@ const EXPECTED_RESULTS = Object.freeze({\n   "tests/ai-cache-tests.html": 32,\n' + rows.join('\n') + '\n   "tests/anki-connect-tests.html": 62,\n';
+test('expected-count edits recommend only the suites whose rows changed', () => {
+  const impact = inferAuditImpact(catalog, [{ path: '.qa-scan/run-test.mjs', patch: runnerPatch(tableHunk('-  "tests/wayback-tests.html": 45,', '+  "tests/wayback-tests.html": 47,')) }]);
+  assert.deepEqual(impact.ids, ['test.wayback']);
+  assert.deepEqual(impact.warnings, []);
+  const several = inferAuditImpact(catalog, [{ path: '.qa-scan/run-test.mjs', patch: runnerPatch(tableHunk('-  "tests/wayback-tests.html": 45,', '+  "tests/wayback-tests.html": 47,') + '@@ -90,2 +90,2 @@\n-  "tests/url-strip-tests.html": 21,\n+  "tests/url-strip-tests.html": 22,\n') }]);
+  assert.deepEqual([...several.ids].sort(), ['test.url-strip', 'test.wayback']);
+  // A new entry and a removed entry are table edits too.
+  assert.deepEqual(expectedCountPages(runnerPatch('@@ -1,1 +1,2 @@\n+  "tests/new-suite-tests.html": 3,\n-  "tests/old-suite-tests.html": 4\n')), ['tests/new-suite-tests.html', 'tests/old-suite-tests.html']);
+});
+test('any other change to the runner keeps the conservative recommendation', () => {
+  const conservative = inferAuditImpact(catalog, [{ path: '.qa-scan/run-test.mjs' }]);
+  assert.ok(conservative.ids.length > 50 && conservative.ids.includes('test.wayback'), 'baseline lost its breadth');
+  const sameAs = patch => inferAuditImpact(catalog, [{ path: '.qa-scan/run-test.mjs', patch }]);
+  // Logic edit next to a count edit: the logic edit decides.
+  const mixed = runnerPatch(tableHunk('-  "tests/wayback-tests.html": 45,', '+  "tests/wayback-tests.html": 47,') + '@@ -200,1 +200,1 @@\n-const TEST_TIMEOUT_MS = 30000;\n+const TEST_TIMEOUT_MS = 40000;\n');
+  assert.deepEqual(sameAs(mixed).ids, conservative.ids);
+  // The same value touched without a table shape (a timeout that names a page), an empty patch and an unreadable one.
+  assert.deepEqual(sameAs(runnerPatch('@@ -30,1 +30,1 @@\n-const t = rel === "tests/library-vocab-tests.html" ? 60000\n+const t = rel === "tests/library-vocab-tests.html" ? 90000\n')).ids, conservative.ids);
+  assert.deepEqual(sameAs('').ids, conservative.ids);
+  assert.deepEqual(sameAs(undefined).ids, conservative.ids);
+  // Only a page the catalog has no suite for: nothing to narrow to.
+  assert.deepEqual(sameAs(runnerPatch(tableHunk('-  "tests/ghost-tests.html": 1,', '+  "tests/ghost-tests.html": 2,'))).ids, conservative.ids);
+  // The path decides too: the same patch on another file is not a count edit.
+  assert.ok(inferAuditImpact(catalog, [{ path: 'scripts/other.mjs', patch: runnerPatch(tableHunk('-  "tests/wayback-tests.html": 45,', '+  "tests/wayback-tests.html": 47,')) }]).ids.length > 1);
+});
+test('a count edit plans exactly that suite as one html job', () => {
+  const impact = inferAuditImpact(catalog, [{ path: '.qa-scan/run-test.mjs', patch: runnerPatch(tableHunk('-  "tests/wayback-tests.html": 45,', '+  "tests/wayback-tests.html": 47,')) }]);
+  const p = createAuditPlan(catalog, parseAuditArgs(['--changed']), impact);
+  assert.deepEqual(p.jobs.map(job => [job.runner, job.file]), [['html', 'tests/wayback-tests.html']]);
 });
