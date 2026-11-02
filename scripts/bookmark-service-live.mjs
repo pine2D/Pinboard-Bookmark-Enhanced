@@ -3480,6 +3480,11 @@ async function resumeCleanup(opts) {
   }
   console.log('Local report: ' + path);
   if (report.cleanup.error) console.error('Cleanup error: ' + report.cleanup.error);
+  // What this pass left, by code (kind, instance and code only: ids and tag
+  // names stay in the report and the summary).
+  const left = report.cleanup.entries.slice(report.cleanup.passStart || 0).filter(e => e && e.deleted === false);
+  for (const e of left.slice(0, 5)) console.error('Not cleaned: ' + [e.kind, e.instance, e.code].filter(x => typeof x === 'string' && /^[a-z0-9_.-]+$/.test(x)).join(' '));
+  if (left.length > 5) console.error('Not cleaned: ' + (left.length - 5) + ' more in the report');
   console.log('Cleanup complete: ' + report.cleanup.complete);
   return report.cleanup.complete ? 0 : 1;
 }

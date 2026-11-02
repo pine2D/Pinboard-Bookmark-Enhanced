@@ -1835,6 +1835,20 @@ try {
     assert.equal(resumed.code, 0, resumed.output);
     assert.deepEqual(resumed.lines.filter(l => l.startsWith('start\t')).map(l => l.split('\t')[1]), ['ps', 'network ls', 'volume ls'], 'only the leftover check');
     assert.deepEqual([resumed.report.cleanup.complete, resumed.report.temp.removed, resumed.report.temp.residue], [true, true, []]);
+    // Docker unavailable on a later --cleanup (main-session ruling on H1b):
+    // the terminal and the summary name the code, not only "complete: false".
+    const before = process.env.PBP_LIVE_STATE_DIR;
+    process.env.PBP_LIVE_STATE_DIR = state;
+    const out = [];
+    const { log, error } = console;
+    console.log = (...a) => out.push(a.join(' '));
+    console.error = (...a) => out.push(a.join(' '));
+    let code;
+    try { code = await live.main(['--cleanup', join(state, 'pbp-it-' + id, 'report.json')], { dockerExec: async () => ({ code: 127, stdout: '', stderr: 'docker_unavailable' }) }); }
+    finally { console.log = log; console.error = error; if (before === undefined) delete process.env.PBP_LIVE_STATE_DIR; else process.env.PBP_LIVE_STATE_DIR = before; }
+    assert.equal(code, 1, out.join('\n'));
+    assert(out.includes('Not cleaned: temp docker_ps_failed'), out.join('\n'));
+    assert(readFileSync(join(state, 'pbp-it-' + id, 'summary.zh.md'), 'utf8').includes('未清理：temp docker_ps_failed'));
   }
 
   // ---------------------------------------------------------------------
@@ -2201,6 +2215,18 @@ try {
   const misreadSummary = readFileSync(join(pendingDir, 'summary.zh.md'), 'utf8');
   assert.match(misreadSummary, /本轮续清在开始清理前失败：credentials_unreadable/, misreadSummary);
   assert(!/残留|未清理|续清请求/.test(misreadSummary), misreadSummary);
+  // The same for a credential file that is not 0600 or not JSON: the code
+  // reaches the terminal and the summary, the file's content does not.
+  for (const [mode, text, code] of [[0o644, JSON.stringify({ linkdingToken: syntheticKey }), 'credentials_permissions'], [0o600, '{"linkdingToken":"' + syntheticKey + '"', 'credentials_json']]) {
+    const bad = join(dir, 'bad-credentials-' + code + '.json');
+    writeFileSync(bad, text, { mode });
+    chmodSync(bad, mode);
+    requests.length = 0;
+    const failed = await run(['--cleanup', join(pendingDir, 'report.json'), '--linkding', linkdingBase, '--credentials', bad], { guard: false, credentials: false, state: linkdingState });
+    assert.deepEqual([failed.code, requests, failed.report.cleanup.error, failed.report.cleanup.errorBeforeStart], [1, [], code, true], failed.output);
+    assert(failed.output.includes('Cleanup error: ' + code), failed.output);
+    assert(readFileSync(join(pendingDir, 'summary.zh.md'), 'utf8').includes('本轮续清在开始清理前失败：' + code));
+  }
   // The next --cleanup, with the right credentials, confirms and completes.
   requests.length = 0;
   const confirmed = await run(['--cleanup', join(pendingDir, 'report.json'), '--linkding', linkdingBase], { guard: false, state: linkdingState });
@@ -2215,7 +2241,7 @@ try {
   // The latest pass's number and requests: a confirming pass deletes
   // nothing, so it costs fewer requests than the first.
   assert(confirmed.report.cleanup.counts.linkding.node < resumed.report.cleanup.counts.linkding.node);
-  assert(confirmedSummary.includes(`续清请求（第 3 次 --cleanup）：linkding Node ${confirmed.report.cleanup.counts.linkding.node}\n`), confirmedSummary);
+  assert(confirmedSummary.includes(`续清请求（第 5 次 --cleanup）：linkding Node ${confirmed.report.cleanup.counts.linkding.node}\n`), confirmedSummary);
   assert(confirmed.report.cleanup.entries.some(e => e.code === 'residue_tag_not_in_ledger'), 'earlier passes stay in report.json');
 
   requests.length = 0;
