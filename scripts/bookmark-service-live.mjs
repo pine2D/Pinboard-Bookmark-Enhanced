@@ -89,6 +89,10 @@ export const BUDGETS = Object.freeze({
 });
 // Connect (options page) cost per instance, added to the browser plan.
 const CONNECT_BROWSER = { linkding: 30, karakeep: 60, pinboard: 20 };
+// Planning estimate for everything outside the modules (containers, browser,
+// Connect, preflight, cleanup). Temporary runs measured 11-16 s of setup and
+// 2-20 s of cleanup; a user run adds Karakeep tag sweeps over a large library.
+export const SETUP_ALLOWANCE_SECONDS = Object.freeze({ user: 120, temp: 300 });
 
 // Settings every run starts from. Each key must exist in SETTINGS_DEFAULTS
 // (checked inside the worker) except the per-device sync switch.
@@ -249,7 +253,7 @@ export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnable
     const row = {
       service, modules: mods.map(m => m.id), bookmarks: sum.bookmarks, urls, node, cleanupReserve: reserve,
       browser: sum.browser, ai: sum.ai, tags: sum.tags, lists: sum.lists, moduleSeconds: sum.seconds,
-      caps: { bookmarks: cap.bookmarks, node: cap.node, browser: cap.browser, tags: cap.tags, lists: cap.lists },
+      caps: { bookmarks: cap.bookmarks, node: cap.node, cleanupReserve: cap.cleanupReserve, browser: cap.browser, tags: cap.tags, lists: cap.lists },
     };
     if (sum.bookmarks > cap.bookmarks) problems.push(instance + ':bookmarks');
     if (node + reserve > cap.node) problems.push(instance + ':node');
@@ -260,9 +264,12 @@ export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnable
     perInstance[instance] = row;
   }
   if (fakeAiCalls > caps.run.fakeAi) problems.push('fake_ai');
-  // Module seconds are timeouts, not estimates: their sum is a worst case
-  // shown in the plan; the run-time limit itself is enforced by a timer.
+  // Module seconds are timeouts, not estimates. A timer enforces the run
+  // cap; the plan also refuses a selection whose timeouts plus the setup
+  // estimate could outlast it, so a slow round is not cut off half-way.
   const worstCaseSeconds = Object.values(perInstance).reduce((n, r) => n + r.moduleSeconds, 0);
+  const setupAllowanceSeconds = SETUP_ALLOWANCE_SECONDS[target];
+  if (worstCaseSeconds + setupAllowanceSeconds > caps.run.runMinutes * 60) problems.push('run_minutes');
   const shotModules = selected.filter(m => m.needs?.shots).map(m => m.id);
   return {
     harness: HARNESS_VERSION, target, credentialsRead: false, realRequests: 0, docker: false, browser: false,
@@ -272,7 +279,7 @@ export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnable
     headed: headedFlag || selected.some(m => m.needs?.headed),
     shots: { modules: shotModules, enabled: shotsEnabled },
     containers: target === 'temp' ? [...new Set(instances.flatMap(i => (i === 'linkding-pg' ? ['postgres', 'linkding-pg'] : [i])))].concat(instances.length ? ['edge'] : []) : [],
-    limits: { moduleSeconds: caps.run.moduleSeconds, runMinutes: caps.run.runMinutes, worstCaseSeconds, automaticRetries: 0 },
+    limits: { moduleSeconds: caps.run.moduleSeconds, runMinutes: caps.run.runMinutes, worstCaseSeconds, setupAllowanceSeconds, fakeAi: caps.run.fakeAi, automaticRetries: 0 },
     karakeepWritesRequireAutoAiDisabled: target === 'user' && selected.some(m => m.service === 'karakeep' && m.needs?.writes !== false),
     cleanup: 'ledger bookmarks, ledger lists and zero-use run-prefix tags; then a read-only pass over the URL pool',
     withinCaps: problems.length === 0, problems,

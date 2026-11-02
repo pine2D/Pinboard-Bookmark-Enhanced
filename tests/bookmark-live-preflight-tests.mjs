@@ -220,7 +220,7 @@ try {
   // Budgets: sums come from the rows, caps from the target
   // ---------------------------------------------------------------------
   for (const target of ['temp', 'user']) {
-    for (const spec of ['core', 'edges', 'readonly', 'ai']) {
+    for (const spec of ['core', 'edges', 'readonly', 'ai', 'all']) {
       const { selected, skipped } = live.selectModules(spec, { target });
       const plan = live.buildPlan({ target, selected, skipped });
       for (const instance of plan.instances) {
@@ -234,9 +234,14 @@ try {
         assert(row.browser >= sum('browser'), 'browser plan includes every module');
         assert(row.node > sum('node'), 'node plan includes the read-only preflight');
         assert(row.cleanupReserve >= live.cleanupCost({ service: row.service, bookmarks: row.bookmarks, urls: row.urls, tags: row.tags, lists: row.lists }));
-        assert.deepEqual(Object.keys(row.caps).sort(), ['bookmarks', 'browser', 'lists', 'node', 'tags']);
+        assert.deepEqual(Object.keys(row.caps).sort(), ['bookmarks', 'browser', 'cleanupReserve', 'lists', 'node', 'tags']);
+        // The policy reserve is shown next to the computed one, which never undercuts it.
+        assert.equal(row.caps.cleanupReserve, live.BUDGETS[target][instance].cleanupReserve);
+        assert(row.cleanupReserve >= row.caps.cleanupReserve && row.node + row.cleanupReserve <= row.caps.node, `${target}/${spec}/${instance} node + reserve`);
       }
       assert.equal(plan.withinCaps, true, `${target}/${spec} must fit its caps: ${plan.problems.join(',')}`);
+      // Every timeout plus the setup estimate fits the run cap.
+      assert(plan.limits.worstCaseSeconds + plan.limits.setupAllowanceSeconds <= plan.limits.runMinutes * 60, `${target}/${spec} worst case ${plan.limits.worstCaseSeconds}s`);
       assert.equal(plan.fakeAi.needed, selected.some(m => m.needs.fakeAi));
       if (target === 'temp') assert(plan.containers.includes('edge') && plan.instances.every(i => plan.containers.includes(i)));
       else assert.deepEqual(plan.containers, []);
@@ -247,6 +252,25 @@ try {
   assert.equal(live.BUDGETS.user.karakeep.lists, 1);
   assert.equal(live.BUDGETS.user.pinboard.minIntervalMs, 3000);
   for (const target of ['temp', 'user']) assert.equal(live.BUDGETS[target].run.fakeAi, 60);
+  // The user caps as authorised on 2026-11-01, as --plan shows them.
+  {
+    const { selected, skipped } = live.selectModules('all', { target: 'user' });
+    const plan = live.buildPlan({ target: 'user', selected, skipped });
+    assert.deepEqual(plan.budget.linkding.caps, { bookmarks: 15, node: 250, cleanupReserve: 60, browser: 350, tags: 20, lists: 0 });
+    assert.deepEqual(plan.budget.karakeep.caps, { bookmarks: 12, node: 250, cleanupReserve: 60, browser: 500, tags: 20, lists: 1 });
+    assert.deepEqual([plan.limits.runMinutes, plan.limits.moduleSeconds, plan.limits.fakeAi, plan.limits.automaticRetries], [20, 120, 60, 0]);
+    assert.deepEqual(plan.skipped.map(s => s.reason), ['target_temp', 'target_temp'], 'temp-only modules are skipped on the user target');
+  }
+  // Timeouts that could outlast the 20-minute run are refused up front.
+  {
+    const slow = Array.from({ length: 9 }, (_, i) => ({ ...MODULES.find(m => m.id === 'core.worker'), id: 'slow.' + i, services: ['linkding'], budget: { bookmarks: 0, urls: 1, node: 2, browser: 2, seconds: 120 } }));
+    const fits = live.buildPlan({ target: 'user', selected: live.selectModules('*', { target: 'user', modules: slow }).selected });
+    assert.equal(fits.limits.worstCaseSeconds, 1080);
+    assert.equal(fits.withinCaps, true, fits.problems.join(','));
+    const tooSlow = [...slow, { ...slow[0], id: 'slow.9' }];
+    const refused = live.buildPlan({ target: 'user', selected: live.selectModules('*', { target: 'user', modules: tooSlow }).selected });
+    assert.deepEqual(refused.problems, ['run_minutes']);
+  }
   // Over-budget rows are refused by --plan and by --run before anything starts.
   const base = MODULES.find(m => m.id === 'core.worker');
   const over = (id, budget) => ({ ...base, id, services: ['linkding'], budget: { ...base.budget, ...budget } });

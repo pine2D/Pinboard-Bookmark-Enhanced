@@ -27,7 +27,10 @@
 //
 // Budgets are per module and per service. The runner adds them up per
 // instance, refuses a plan that exceeds the target's caps, and aborts the
-// whole run when a module overruns its own row at run time.
+// whole run when a module overruns its own row at run time. `seconds` is a
+// timeout, not an estimate: the modules took 1-11 s on temporary instances
+// (snapshot waits aside), and the plan refuses a selection whose timeouts
+// plus setup could outlast the run cap (20 minutes on --target user).
 
 export const LIST_MARKER = 'Pinboard Bookmark Enhanced: Read Later';
 export const META_DESCRIPTION = 'Public synthetic meta description.';
@@ -78,7 +81,7 @@ export const MODULES = [
     surfaces: ['options', 'popup'],
     features: ['connect', 'tags-recent', 'popup-prefill'],
     needs: needs({ writes: false }),
-    budget: { bookmarks: 0, urls: 1, node: 4, browser: { linkding: 40, karakeep: 60 }, ai: 0, tags: 0, seconds: 90 },
+    budget: { bookmarks: 0, urls: 1, node: 4, browser: { linkding: 40, karakeep: 60 }, ai: 0, tags: 0, seconds: 60 },
     settings: {},
     async steps(t) {
       t.phase('readonly_extension');
@@ -142,7 +145,7 @@ export const MODULES = [
     surfaces: ['popup', 'reader'],
     features: ['popup-save', 'linkding-description', 'reader-read-later', 'reader-edit', 'reader-tag-separator', 'reader-delete'],
     needs: needs(),
-    budget: { bookmarks: 1, urls: 1, node: 16, browser: { linkding: 90, karakeep: 130 }, ai: 0, tags: 2, lists: { karakeep: 1 }, seconds: 120 },
+    budget: { bookmarks: 1, urls: 1, node: 16, browser: { linkding: 90, karakeep: 130 }, ai: 0, tags: 2, lists: { karakeep: 1 }, seconds: 90 },
     settings: {},
     async steps(t) {
       const { prefix } = t;
@@ -219,7 +222,7 @@ export const MODULES = [
     surfaces: ['background'],
     features: ['worker-create', 'worker-merge', 'worker-conflict', 'archived-preserved', 'tags-recent', 'pinboard-required', 'shared-library'],
     needs: needs(),
-    budget: { bookmarks: 1, urls: 1, node: { linkding: 20, karakeep: 12 }, browser: { linkding: 30, karakeep: 40 }, ai: 0, tags: 2, seconds: 90 },
+    budget: { bookmarks: 1, urls: 1, node: { linkding: 20, karakeep: 12 }, browser: { linkding: 30, karakeep: 40 }, ai: 0, tags: 2, seconds: 60 },
     settings: {},
     async steps(t) {
       const { prefix } = t;
@@ -258,7 +261,7 @@ export const MODULES = [
     surfaces: ['popup', 'reader'],
     features: ['native-space-tag', 'tag-spelling-alignment', 'malformed-quote', 'library-majority', 'no-twin-tags'],
     needs: needs(),
-    budget: { bookmarks: 4, urls: 4, node: 30, browser: 120, ai: 0, tags: 5, seconds: 120 },
+    budget: { bookmarks: 4, urls: 4, node: 30, browser: 120, ai: 0, tags: 5, seconds: 90 },
     settings: { optBlockquote: true, optAutoDescription: true, optRespectTagCase: true, tagSyncMode: 'fresh' },
     async steps(t) {
       const { prefix } = t;
@@ -336,7 +339,7 @@ export const MODULES = [
     surfaces: ['popup'],
     features: ['selection-quote-escape', 'quote-description-separate', 'unread-link'],
     needs: needs(),
-    budget: { bookmarks: 1, urls: 1, node: 4, browser: 40, ai: 0, tags: 0, seconds: 90 },
+    budget: { bookmarks: 1, urls: 1, node: 4, browser: 40, ai: 0, tags: 0, seconds: 60 },
     settings: { optBlockquote: true, optAutoDescription: true, optRespectTagCase: true, tagSyncMode: 'fresh' },
     async steps(t) {
       t.phase('linkding_quote_and_unread');
@@ -370,7 +373,7 @@ export const MODULES = [
     surfaces: ['popup'],
     features: ['offline-queue', 'offline-create-fields', 'offline-update-fields', 'explicit-empty-description'],
     needs: needs(),
-    budget: { bookmarks: 1, urls: 1, node: 6, browser: 60, ai: 0, tags: 1, seconds: 120 },
+    budget: { bookmarks: 1, urls: 1, node: 6, browser: 60, ai: 0, tags: 1, seconds: 90 },
     settings: { optBlockquote: true, optAutoDescription: true, optRespectTagCase: true, tagSyncMode: 'fresh', offlineQueueEnabled: true },
     async steps(t) {
       const { prefix } = t;
@@ -433,7 +436,7 @@ export const MODULES = [
     surfaces: ['popup'],
     features: ['fake-ai', 'ai-summary-description', 'ai-summary-note', 'ai-tags-prefix'],
     needs: needs({ fakeAi: true, shots: true }),
-    budget: { bookmarks: 1, urls: 1, node: 6, browser: { linkding: 40, karakeep: 60 }, ai: 3, tags: 2, seconds: 120 },
+    budget: { bookmarks: 1, urls: 1, node: 6, browser: { linkding: 40, karakeep: 60 }, ai: 3, tags: 2, seconds: 90 },
     // The fake AI provider is configured by the runner (needs.fakeAi); these
     // only reveal the popup's AI actions for this module.
     settings: { optShowAiTags: true, optShowAiSummary: true, optAiAutoTags: false },
