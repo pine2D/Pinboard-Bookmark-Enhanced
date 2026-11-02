@@ -16,7 +16,9 @@ mkdirSync(join(tree, '.qa-scan')); mkdirSync(join(tree, 'tests'));
 symlinkSync(join(repo, '.qa-scan/node_modules'), join(tree, '.qa-scan/node_modules'));
 const source = readFileSync(join(repo, '.qa-scan/run-test.mjs'), 'utf8');
 assert.ok(source.includes('Object.freeze({'), 'the EXPECTED_RESULTS table moved');
-writeFileSync(join(tree, '.qa-scan/run-test.mjs'), source.replace('Object.freeze({', 'Object.freeze({\n  "tests/gap-tests.html": 3,\n  "tests/extra-tests.html": 2,\n  "tests/low-tests.html": 2,\n  "tests/summary-tests.html": 2,\n  "tests/title-tests.html": 2,\n  "tests/early-tests.html": 2,'));
+assert.ok(source.includes(': 30000;'), 'the TEST_TIMEOUT_MS default moved');
+// A 20s stall deadline (instead of 30s; about 13s of waiting) so the UNCONFIRMED case below ends quickly.
+writeFileSync(join(tree, '.qa-scan/run-test.mjs'), source.replace(': 30000;', ': 20000;').replace('Object.freeze({', 'Object.freeze({\n  "tests/gap-tests.html": 3,\n  "tests/extra-tests.html": 2,\n  "tests/low-tests.html": 2,\n  "tests/summary-tests.html": 2,\n  "tests/title-tests.html": 2,\n  "tests/short-tests.html": 3,\n  "tests/early-tests.html": 2,'));
 writeFileSync(join(tree, '.qa-scan/package.json'), '{"type":"module"}');
 // rows: [[delayMs, class], ...] appended one by one after load.
 const page = (name, rows) => writeFileSync(join(tree, 'tests', name), `<!doctype html><meta charset=utf-8><title>${name}</title><body><script>
@@ -43,6 +45,8 @@ writeFileSync(join(tree, 'tests/early-tests.html'), `<!doctype html><meta charse
 const add = () => { const d = document.createElement('div'); d.className = 'pass'; d.textContent = 'ok'; document.body.append(d); };
 add(); setTimeout(add, 800); setTimeout(add, 1400);
 </script>`);
+// Registered 3, only one row ever appears.
+page('short-tests.html', [[0, 'pass']]);
 const run = file => spawnSync(process.execPath, [join(tree, '.qa-scan/run-test.mjs'), '--print-counts', 'tests/' + file], { cwd: tree, encoding: 'utf8', timeout: 90000 });
 test.after(() => rmSync(tree, { recursive: true, force: true }));
 
@@ -77,6 +81,11 @@ test('a PASS/FAIL document title ends the page without the silence caveat', () =
   const r = run('title-tests.html');
   assert.match(r.stdout, /total=2 expected=2 match/, r.stdout + r.stderr);
   assert.doesNotMatch(r.stdout, /silent|not seen/i, r.stdout);
+});
+test('a page that never reaches its registered count is UNCONFIRMED and exits 1', () => {
+  const r = run('short-tests.html');
+  assert.match(r.stdout, /UNCONFIRMED/, r.stdout + r.stderr);
+  assert.equal(r.status, 1);
 });
 test('a signal written at load does not end the page while rows keep coming', () => {
   const r = run('early-tests.html');
