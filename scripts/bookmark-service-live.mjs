@@ -3091,7 +3091,28 @@ export class LiveRun {
 // the whole expression is how Playwright delivers any worker function).
 export function installWorkerGuard(rule, cfg, token) {
   const original = globalThis.fetch;
-  const state = globalThis.pbpLiveGuard = { token, cfg, created: [], lists: [], tags: [], pending: {}, counts: {}, writes: {}, offline: '', violations: [] };
+  const state = globalThis.pbpLiveGuard = { token, cfg, created: [], lists: [], tags: [], pending: {}, inflight: [], counts: {}, writes: {}, offline: '', violations: [] };
+  // The route layer shares a create it recorded (shareCreated) as soon as it
+  // has the answer, possibly before this layer reads the same answer and
+  // frees the slot. A bookmark create in flight is not counted again once a
+  // record of its URL arrived after it left: per URL, the records added since
+  // the earliest such flight left offset at most that many flights. A record
+  // that was there before (a deleted bookmark whose URL is saved again)
+  // offsets nothing.
+  const view = () => {
+    const shared = {};
+    const groups = {};
+    for (const f of state.inflight) (groups[f.instance + ' ' + f.url] = groups[f.instance + ' ' + f.url] || []).push(f);
+    for (const flights of Object.values(groups)) {
+      const { instance, url } = flights[0];
+      const now = state.created.filter(r => r.instance === instance && r.url === url).length;
+      const added = now - Math.min(...flights.map(f => f.before));
+      shared[instance] = (shared[instance] || 0) + Math.max(0, Math.min(flights.length, added));
+    }
+    const pending = {};
+    for (const [id, p] of Object.entries(state.pending)) pending[id] = { bookmarks: Math.max(0, p.bookmarks - (shared[id] || 0)), lists: p.lists };
+    return { created: state.created, lists: state.lists, tags: state.tags, pending };
+  };
   globalThis.fetch = async function pbpGuardFetch(input, opts = {}) {
     // fetch accepts a string, a URL or a Request.
     const url = typeof input === 'string' ? input : (input && typeof input.url === 'string' ? input.url : String(input));
@@ -3103,7 +3124,7 @@ export function installWorkerGuard(rule, cfg, token) {
     if (url.startsWith('chrome-extension://') || resolved.startsWith('chrome-extension://')) return original(input, opts);
     const method = String(opts.method || (typeof input !== 'string' && input.method) || 'GET').toUpperCase();
     const body = typeof opts.body === 'string' ? opts.body : null;
-    const decision = rule(state.cfg, { created: state.created, lists: state.lists, tags: state.tags, pending: state.pending }, { url, method, body });
+    const decision = rule(state.cfg, view(), { url, method, body });
     if (!decision.ok) {
       let origin = 'invalid';
       try { origin = new URL(url).origin; } catch (_) { /* keep invalid */ }
@@ -3130,8 +3151,10 @@ export function installWorkerGuard(rule, cfg, token) {
     const slot = decision.kind === 'create' ? 'bookmarks' : decision.kind === 'list-create' ? 'lists' : '';
     const pending = slot ? (state.pending[id] = state.pending[id] || { bookmarks: 0, lists: 0 }) : null;
     let held = !!slot;
-    const release = () => { if (held) { held = false; pending[slot]--; } };
+    const flight = slot === 'bookmarks' ? { instance: id, url: decision.url, before: state.created.filter(r => r.instance === id && r.url === decision.url).length } : null;
+    const release = () => { if (held) { held = false; pending[slot]--; if (flight) state.inflight.splice(state.inflight.indexOf(flight), 1); } };
     if (slot) pending[slot]++;
+    if (flight) state.inflight.push(flight);
     const response = await original(input, opts);
     if (slot && !response.ok && response.status < 500) release();
     if (slot && response.ok) {

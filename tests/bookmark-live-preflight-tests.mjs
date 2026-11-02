@@ -584,6 +584,41 @@ try {
     const overTags = await Promise.race([post(tagsUrl, tagBody([prefix0 + '_c', prefix0 + '_d'])).then(() => 'answered', e => e.message), new Promise(r => setTimeout(() => r('sent and waiting'), 100))]);
     assert.deepEqual([overTags, JSON.parse(JSON.stringify(sandbox.pbpLiveGuard.tags)), sent.length], ['live_guard_tag_budget', [{ instance: 'karakeep', key: prefix0 + '_a' }, { instance: 'karakeep', key: prefix0 + '_b' }], 2]);
   }
+  {
+    // Second H1 review note: the route layer records a worker create and
+    // shares it with the worker (shareCreated) as soon as it has the answer,
+    // which can reach the worker before the worker reads that same answer
+    // and frees the slot. For that moment one bookmark counted twice
+    // (created and pending), so at cap - 1 a second, legitimate create was
+    // refused and the run failed. A slot whose URL is already recorded no
+    // longer counts.
+    const sent = [];
+    const answers = [];
+    const sandbox = vm.createContext({ fetch: (input, opts) => { sent.push((opts?.method || 'GET') + ' ' + input); return new Promise(r => answers.push(r)); }, URL, location: { href: 'chrome-extension://' + 'a'.repeat(32) + '/background.js' } });
+    vm.runInContext(`(${live.installWorkerGuard.toString()})(${live.guardRuleSource()}, ${JSON.stringify({ ...cfg, caps: {}, prefix: prefix0, limits: { ...limits0, linkding: { bookmarks: 2, lists: 0, tags: 3 } } })}, 'tok')`, sandbox);
+    const post = vm.runInContext('(function save(u, body) { return fetch(u, { method: "POST", body }); })', sandbox);
+    const createUrl = cfg.instances.linkding.root + 'bookmarks/';
+    const firstCreate = post(createUrl, JSON.stringify({ url: cfg.pools.linkding[0] }));
+    // shareCreated from the route layer lands first.
+    vm.runInContext(`pbpLiveGuard.created.push({ instance: 'linkding', id: '41', url: ${JSON.stringify(cfg.pools.linkding[0])} })`, sandbox);
+    const secondCreate = await Promise.race([post(createUrl, JSON.stringify({ url: cfg.pools.linkding[1] })).then(() => 'answered', e => e.message), new Promise(r => setTimeout(() => r('sent and waiting'), 100))]);
+    assert.deepEqual([secondCreate, sent.length, JSON.parse(JSON.stringify(sandbox.pbpLiveGuard.violations))], ['sent and waiting', 2, []], 'one recorded bookmark and one in flight do not count as two');
+    answers[0]({ ok: true, clone: () => ({ json: async () => ({ id: 41, url: cfg.pools.linkding[0] }) }) });
+    await firstCreate;
+    assert.deepEqual(JSON.parse(JSON.stringify(sandbox.pbpLiveGuard.created)).map(r => r.id), ['41'], 'recorded once');
+    // The cap still holds: two bookmarks (one recorded, one in flight) fill it.
+    const third = await Promise.race([post(createUrl, JSON.stringify({ url: cfg.pools.linkding[1] })).then(() => 'answered', e => e.message), new Promise(r => setTimeout(() => r('sent and waiting'), 100))]);
+    assert.equal(third, 'live_guard_bookmark_budget');
+    // A record that predates the flight (a deleted bookmark whose URL is
+    // saved again makes a new one) offsets nothing.
+    const again = vm.createContext({ fetch: () => new Promise(() => {}), URL, location: { href: 'chrome-extension://' + 'a'.repeat(32) + '/background.js' } });
+    vm.runInContext(`(${live.installWorkerGuard.toString()})(${live.guardRuleSource()}, ${JSON.stringify({ ...cfg, caps: {}, prefix: prefix0, limits: { ...limits0, linkding: { bookmarks: 2, lists: 0, tags: 3 } } })}, 'tok')`, again);
+    vm.runInContext(`pbpLiveGuard.created.push({ instance: 'linkding', id: '40', url: ${JSON.stringify(cfg.pools.linkding[0])} })`, again);
+    const postAgain = vm.runInContext('(function save(u, body) { return fetch(u, { method: "POST", body }); })', again);
+    postAgain(createUrl, JSON.stringify({ url: cfg.pools.linkding[0] }));
+    const over = await Promise.race([postAgain(createUrl, JSON.stringify({ url: cfg.pools.linkding[1] })).then(() => 'answered', e => e.message), new Promise(r => setTimeout(() => r('sent and waiting'), 100))]);
+    assert.equal(over, 'live_guard_bookmark_budget', 'a re-save of a recorded URL still holds its slot');
+  }
   for (const [label, answer, secondSent] of [['no answer', null, false], ['server error', 503, false], ['refusal', 409, true]]) {
     // As in the route layer: a list create without an answer, or after a
     // server error, keeps its slot in the worker too.
