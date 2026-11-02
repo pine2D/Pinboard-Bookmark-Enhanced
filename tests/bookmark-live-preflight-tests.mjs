@@ -241,6 +241,61 @@ try {
     assert.deepEqual(pick('linkding.core.wo?ker'), ['linkding.core.worker'], '? wildcard');
     assert.throws(() => live.selectModules('nothing.matches.this'), e => e.code === 'scenario');
     assert.throws(() => live.selectModules(' , '), e => e.code === 'scenario');
+    // --changed (E7): modules are picked by the product files they declare,
+    // from synthetic file lists here (no git). Every declared path or glob
+    // names a shipped file of this repository.
+    {
+      const shipped = [];
+      const walk = rel => { for (const e of readdirSync(join(root, rel), { withFileTypes: true })) { const p = rel ? rel + '/' + e.name : e.name; if (e.isDirectory()) { if (!rel ? ['vendor', 'icons', '_locales'].includes(e.name) : true) walk(p); } else if (live.isProductRuntimeFile(p)) shipped.push(p); } };
+      walk('');
+      for (const mod of live.expandRegistry()) {
+        const files = live.moduleFiles(mod);
+        assert(files.length, mod.id + ' declares no product file');
+        for (const glob of files) {
+          assert(live.isProductRuntimeFile(glob), mod.id + ': ' + glob + ' is not shipped');
+          assert(shipped.some(f => live.globToRegExp(glob).test(f)), mod.id + ': ' + glob + ' matches no file');
+        }
+      }
+      for (const [path, product] of [['popup.js', true], ['manifest.json', true], ['_locales/de/messages.json', true], ['vendor/marked.min.js', true], ['icons/pin-default-16.png', true], ['tests/x.html', false], ['scripts/release.sh', false], ['README.md', false], ['docs/index.md', false], ['.claude/rules/l10n.md', false]]) assert.equal(live.isProductRuntimeFile(path), product, path);
+      const route = files => live.routeChangedFiles(files);
+      // A common file selects every module that declares it.
+      assert.deepEqual(route(['shared.js']).modules, ids);
+      assert.deepEqual(route(['background.js']).modules, ids);
+      assert.deepEqual(route(['bookmark-services.js']).modules, ids.filter(id => !id.startsWith('pinboard.')));
+      assert.deepEqual(route(['popup-offline.js']).modules, ['linkding.edges.offline', 'linkding-pg.limits.long-tag']);
+      assert.deepEqual(route(['md-bookmark.js']).modules, ['linkding.core.popup-reader', 'linkding.sharing.popup-reader', 'karakeep.core.popup-reader', 'karakeep.edges.tags', 'pinboard.core.popup-reader']);
+      const mixed = route(['jina.js', 'popup-ai.js', 'tests/bookmark-live-preflight-tests.mjs', 'README.md', 'vendor/marked.min.js', 'popup-ai.js']);
+      assert.deepEqual(mixed.modules, ['linkding.ai.popup-summary-tags', 'karakeep.ai.popup-summary-tags']);
+      assert.deepEqual(mixed.uncovered, ['jina.js', 'vendor/marked.min.js'], 'a shipped file nobody declares is listed, not skipped');
+      assert.deepEqual(mixed.ignored, ['README.md', 'tests/bookmark-live-preflight-tests.mjs']);
+      assert.deepEqual(mixed.byFile, { 'popup-ai.js': ['linkding.ai.popup-summary-tags', 'karakeep.ai.popup-summary-tags'] });
+      // Selection: target and service filters still apply; --scenario intersects.
+      const changedSel = (files, values = {}) => live.resolveSelection({ values, flags: new Set(['--changed']) }, { changedFiles: (d, base) => ({ base, mergeBase: 'f'.repeat(40), files }) });
+      const offline = changedSel(['popup-offline.js', 'jina.js']);
+      assert.deepEqual(offline.selected.map(m => m.id), ['linkding.edges.offline', 'linkding-pg.limits.long-tag']);
+      assert.deepEqual([offline.scenario, offline.changed.base, offline.changed.files, offline.changed.uncovered], ['all', 'main', 2, ['jina.js']]);
+      assert(offline.changed.note.includes('未覆盖'));
+      assert.deepEqual(changedSel(['popup-offline.js'], { scenario: 'edges' }).selected.map(m => m.id), ['linkding.edges.offline']);
+      assert.deepEqual(changedSel(['popup-offline.js'], { target: 'user' }).selected.map(m => m.id), ['linkding.edges.offline']);
+      assert.deepEqual(changedSel(['md-bookmark.js'], { target: 'user', service: 'karakeep' }).selected.map(m => m.id), ['karakeep.core.popup-reader', 'karakeep.edges.tags']);
+      assert.deepEqual(changedSel(['shared.js'], { changed: 'origin/main', target: 'user', service: 'pinboard' }).selected.map(m => m.id), ids.filter(id => id.startsWith('pinboard.')));
+      assert.equal(changedSel(['shared.js'], { changed: 'origin/main' }).changed.base, 'origin/main');
+      assert.deepEqual(changedSel(['README.md']).selected, []);
+      assert.throws(() => live.resolveSelection({ values: { 'rerun-failed': 'x' }, flags: new Set(['--changed']) }, { readReport: () => ({}) }), e => e.code === 'rerun_conflict');
+      // The optional base: a value only when the next argument is not a flag.
+      assert.deepEqual([live.parseArgs(['--plan', '--changed']).values.changed, live.parseArgs(['--changed', '--plan']).flags.has('--plan'), live.parseArgs(['--changed', 'v2.121', '--plan']).values.changed], [undefined, true, 'v2.121']);
+      // --plan, in process: the uncovered files are listed even with nothing to run.
+      const planOut = async (argv, files) => {
+        const write = process.stdout.write, chunks = [];
+        process.stdout.write = (chunk, cb) => { chunks.push(String(chunk)); if (typeof cb === 'function') cb(); return true; };
+        try { return { code: await live.main(argv, { changedFiles: (d, base) => ({ base, mergeBase: '', files }) }), value: JSON.parse(chunks.join('')) }; } finally { process.stdout.write = write; }
+      };
+      const cp = await planOut(['--plan', '--changed'], ['popup-offline.js', 'wayback.js']);
+      assert.equal(cp.code, 0);
+      assert.deepEqual([cp.value.modules.map(m => m.id), cp.value.changed.uncovered], [['linkding.edges.offline', 'linkding-pg.limits.long-tag'], ['wayback.js']]);
+      const none = await planOut(['--plan', '--changed'], ['wayback.js', 'docs/index.md']);
+      assert.deepEqual([none.code, none.value.error, none.value.changed.uncovered, none.value.changed.ignored], [1, 'no_modules_selected', ['wayback.js'], ['docs/index.md']]);
+    }
     // A temp-only row is skipped by a group on the user target and refused by name.
     const tempOnly = { ...MODULES.find(m => m.id === 'readonly'), id: 'temp.only', services: ['linkding'], needs: { ...MODULES[0].needs, target: 'temp' } };
     const sharingOn = { ...tempOnly, id: 'sharing.on', needs: { ...tempOnly.needs, target: 'any', sharing: 'on' } };

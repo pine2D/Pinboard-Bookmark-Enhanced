@@ -177,7 +177,12 @@ export function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (BOOL_FLAGS.has(arg)) flags.add(arg);
-    else if (VALUE_FLAGS.has(arg)) {
+    // --changed takes an optional base ref.
+    else if (arg === '--changed') {
+      flags.add(arg);
+      const value = argv[i + 1];
+      if (value !== undefined && !value.startsWith('--')) { values.changed = value; i++; }
+    } else if (VALUE_FLAGS.has(arg)) {
       const value = argv[i + 1];
       if (value === undefined || value.startsWith('--')) errors.push('missing_value');
       else { values[arg.slice(2)] = value; i++; }
@@ -291,6 +296,45 @@ export function selectModules(spec, { services = DEFAULT_SERVICES, target = 'tem
   return { selected, skipped: skipped.filter(s => !chosen.has(s.id)) };
 }
 
+// --changed [BASE]: modules picked by the product files changed since the
+// merge base of BASE (default main) and HEAD, plus the worktree's own
+// changes (staged, unstaged, untracked), in the tree the extension loads.
+export const CHANGED_DEFAULT_BASE = 'main';
+// The files the release ZIP ships (scripts/release.sh TOP_LEVEL_PATTERNS and
+// INCLUDE_DIRS): only these can change what the extension does.
+export function isProductRuntimeFile(path) {
+  const parts = String(path).split('/');
+  if (parts.length === 1) return /\.(html|js|css)$/.test(parts[0]) || parts[0] === 'manifest.json';
+  return ['vendor', 'icons', '_locales'].includes(parts[0]);
+}
+export function moduleFiles(mod) {
+  const files = mod.files || [];
+  return Array.isArray(files) ? files : [...(files.all || []), ...(files[mod.service] || [])];
+}
+// Routes changed paths to expanded modules by their declared files. Paths
+// outside the shipped product are ignored; shipped ones no module declares
+// are uncovered.
+export function routeChangedFiles(files, modules = expandRegistry(MODULES)) {
+  const byFile = {}, uncovered = [], ignored = [], chosen = new Set();
+  for (const file of [...new Set(files)].sort()) {
+    if (!isProductRuntimeFile(file)) { ignored.push(file); continue; }
+    const ids = modules.filter(m => moduleFiles(m).some(glob => globToRegExp(glob).test(file))).map(m => m.id);
+    if (!ids.length) { uncovered.push(file); continue; }
+    byFile[file] = ids;
+    for (const id of ids) chosen.add(id);
+  }
+  return { modules: modules.filter(m => chosen.has(m.id)).map(m => m.id), byFile, uncovered, ignored };
+}
+export function readChangedFiles(dir, base = CHANGED_DEFAULT_BASE) {
+  const git = args => spawnSync('git', ['-C', dir, ...args], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+  const mergeBase = git(['merge-base', base, 'HEAD']);
+  check(mergeBase.status === 0, 'changed_base_unknown');
+  const from = mergeBase.stdout.trim();
+  const lists = [git(['diff', '--name-only', '-z', from + '..HEAD']), git(['diff', '--name-only', '-z', 'HEAD']), git(['ls-files', '--others', '--exclude-standard', '-z'])];
+  check(lists.every(r => r.status === 0), 'changed_git_failed');
+  return { base, mergeBase: from, files: [...new Set(lists.flatMap(r => r.stdout.split('\0').filter(Boolean)))] };
+}
+
 // --rerun-failed REPORT: the modules of an earlier report that did not pass
 // (failed, aborted, interrupted, or selected and never started; skipped ones
 // were never meant to run), on the same target and services. Refused while
@@ -325,16 +369,17 @@ export function readRerunSource(path) {
 }
 
 // The run's modules from its arguments, for --plan and --run alike:
-// --scenario (default core) and --service, or --rerun-failed.
-export function resolveSelection({ values = {}, flags = new Set() }, { modules = MODULES, readReport = readRerunSource } = {}) {
+// --scenario (default core; all with --changed) and --service, or
+// --rerun-failed; --changed keeps the modules its files route to.
+export function resolveSelection({ values = {}, flags = new Set() }, { modules = MODULES, readReport = readRerunSource, changedFiles = readChangedFiles, dir = ROOT } = {}) {
   let target = values.target || 'temp';
   check(['temp', 'user'].includes(target), 'target');
   let services = values.service ? values.service.split(',').map(s => s.trim()) : [...DEFAULT_SERVICES];
-  let scenario = values.scenario || 'core';
+  let scenario = values.scenario || (flags.has('--changed') ? 'all' : 'core');
   if (flags.has('--read-only')) { check(!values.scenario || values.scenario === 'readonly', 'read_only_conflict'); scenario = 'readonly'; }
   let rerunOf = null;
   if (values['rerun-failed']) {
-    check(!values.scenario && !values.service && !flags.has('--read-only'), 'rerun_conflict');
+    check(!values.scenario && !values.service && !flags.has('--read-only') && !flags.has('--changed'), 'rerun_conflict');
     const source = rerunSource(readReport(values['rerun-failed']), values);
     target = source.target;
     const all = expandRegistry(modules);
@@ -344,8 +389,18 @@ export function resolveSelection({ values = {}, flags = new Set() }, { modules =
     rerunOf = { runId: source.runId, modules: source.ids };
   }
   check(services.length && services.every(s => SERVICE_TYPES.includes(s)), 'service');
-  const { selected, skipped } = selectModules(scenario, { services, target, modules });
-  return { target, services, scenario, selected, skipped, rerunOf };
+  let { selected, skipped } = selectModules(scenario, { services, target, modules });
+  let changed = null;
+  if (flags.has('--changed')) {
+    const read = changedFiles(dir, values.changed || CHANGED_DEFAULT_BASE);
+    const routed = routeChangedFiles(read.files, expandRegistry(modules));
+    const keep = new Set(routed.modules);
+    selected = selected.filter(m => keep.has(m.id));
+    skipped = skipped.filter(s => keep.has(s.id));
+    changed = { base: read.base, mergeBase: read.mergeBase || '', files: read.files.length, ...routed };
+    if (routed.uncovered.length) changed.note = `未覆盖：${routed.uncovered.length} 个改动的产品运行时文件没有模块声明（uncovered），真实测试不检查它们`;
+  }
+  return { target, services, scenario, selected, skipped, rerunOf, changed };
 }
 
 export function resolveBudget(mod) {
@@ -1713,11 +1768,12 @@ export class LiveRun {
     check(!errors.length, errors[0] || 'arguments');
     this.extRoot = resolveExtRoot(values['ext-root']);
     this.report.extRoot = this.extRoot;
-    const { target, scenario, selected, skipped, rerunOf } = resolveSelection(this.opts, { modules: this.opts.modules || MODULES });
+    const { target, scenario, selected, skipped, rerunOf, changed } = resolveSelection(this.opts, { modules: this.opts.modules || MODULES, dir: this.extRoot, changedFiles: this.opts.changedFiles });
     this.target = target;
     this.report.target = target;
     this.report.scenario = scenario;
     if (rerunOf) this.report.rerunOf = rerunOf;
+    if (changed) this.report.changed = changed;
     check(selected.length, 'no_modules_selected');
     this.report.skipped = skipped;
     this.selected = selected;
@@ -3297,6 +3353,8 @@ export class LiveRun {
     };
     lines.push(`# 真实测试摘要 ${r.runId}`);
     lines.push(`- 结论：${r.passed ? '通过' : '未通过'}${r.failure ? `（${r.failure.phase}：${r.failure.code}）` : ''}；目标 ${r.target || '未定'}；工具 HEAD ${(r.head || '未知').slice(0, 12)}；工作区干净：${r.clean === null ? '未检查' : r.clean ? '是' : '否'}${r.extRoot && r.extRoot !== ROOT ? `；产品 HEAD ${(r.productHead || '未知').slice(0, 12)}（--ext-root）` : ''}`);
+    if (r.rerunOf) lines.push(`- 重跑上一轮未通过的模块：来源 ${oneLine(r.rerunOf.runId, 40)}，${(r.rerunOf.modules || []).length} 个`);
+    if (r.changed) lines.push(`- 按改动选择：基准 ${oneLine(r.changed.base, 40)}，改动的产品文件 ${Object.keys(r.changed.byFile || {}).length + (r.changed.uncovered || []).length} 个；未覆盖 ${(r.changed.uncovered || []).length} 个${(r.changed.uncovered || []).length ? '：' + oneLine(r.changed.uncovered.slice(0, 5).join('，'), 200) : ''}`);
     for (const path of (Array.isArray(r.foreignLocks) ? r.foreignLocks : []).slice(-2)) lines.push(`- 已释放外来版本的陈旧锁：${oneLine(path, 200)}（报告留给人工核对）`);
     const instanceNames = Object.keys(r.instances || {});
     if (instanceNames.length) lines.push(`- 请求：${instanceNames.map(i => `${i} Node ${r.counts?.[i]?.node ?? 0} / 浏览器 ${r.counts?.[i]?.browser ?? 0}`).join('；')}${r.fakeAi ? `；假 AI ${(r.fakeAi.calls || []).filter(c => c.status === 200).length}/${r.fakeAi.limit}` : ''}`);
@@ -3709,6 +3767,9 @@ function printHelp() {
     '  Pinboard runs on --target user only, with pinboardToken ("user:HEX") from --credentials; without that key its',
     '  modules are skipped. Every Pinboard request waits 3 s after the previous answer; --plan shows the floor.',
     '--shots [--shots-dir DIR] saves masked screenshots; --headed launches a visible browser; --allow-dirty runs on a dirty tree.',
+    '--changed [BASE] picks the modules whose declared product files changed since the merge base of BASE (default main)',
+    '  and HEAD or in the worktree, in the tree the extension loads; with --scenario it takes the intersection. --plan',
+    '  lists changed product files no module declares under changed.uncovered.',
     '--rerun-failed REPORT runs only the modules that did not pass in REPORT, on its target and services (the user target',
     '  takes the same bases again); refused while that report\'s cleanup is unfinished. The new report names its runId.',
     '--ext-root DIR loads the extension from another worktree (e.g. a `git worktree add --detach` of a fix commit); it must',
@@ -3719,9 +3780,11 @@ function printHelp() {
   ].join('\n'));
 }
 
-export async function main(argv = process.argv.slice(2), { dockerExec, modules, pinboard } = {}) {
+export async function main(argv = process.argv.slice(2), { dockerExec, modules, pinboard, changedFiles } = {}) {
   const opts = parseArgs(argv);
   opts.dockerExec = dockerExec;
+  // In-process only (the preflight's synthetic file lists); the CLI reads git.
+  opts.changedFiles = changedFiles;
   // In-process only (the preflight's Pinboard mock); never from the CLI.
   opts.pinboard = pinboard;
   opts.modules = modules;
@@ -3731,13 +3794,20 @@ export async function main(argv = process.argv.slice(2), { dockerExec, modules, 
   if (opts.mode === 'plan') {
     try {
       check(!opts.errors.length, opts.errors[0] || 'arguments');
-      const { target, services, scenario, selected, skipped, rerunOf } = resolveSelection(opts, { modules: modules || MODULES });
+      const extRoot = resolveExtRoot(opts.values['ext-root']);
+      const { target, services, scenario, selected, skipped, rerunOf, changed } = resolveSelection(opts, { modules: modules || MODULES, dir: extRoot, changedFiles });
+      // Nothing to run for these files: say which were uncovered all the same.
+      if (!selected.length && changed) {
+        await new Promise(r => process.stdout.write(JSON.stringify({ error: 'no_modules_selected', changed }, null, 2) + '\n', r));
+        return 1;
+      }
       check(selected.length, 'no_modules_selected');
       const plan = buildPlan({ target, selected, skipped, shotsEnabled: opts.flags.has('--shots') || !!opts.values['shots-dir'], headedFlag: opts.flags.has('--headed') });
       plan.scenario = scenario;
       plan.services = services;
       if (rerunOf) plan.rerunOf = rerunOf;
-      plan.extRoot = resolveExtRoot(opts.values['ext-root']);
+      if (changed) plan.changed = changed;
+      plan.extRoot = extRoot;
       if (target === 'user') plan.bases = Object.fromEntries(services.filter(s => opts.values[s]).map(s => [s, validateBase(opts.values[s])]));
       // Rounds left under the named authorisation: a local count, no credential.
       plan.authorization = target === 'user' ? authorizationStatus(stateDir(), opts.values.authorization || '', BUDGETS.user.run.roundsPerAuthorization) : { required: false };
