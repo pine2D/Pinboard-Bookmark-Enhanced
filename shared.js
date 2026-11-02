@@ -771,18 +771,22 @@ const PBP_TAG_VOCAB_STALE_CEILING = 2 * 60 * 60 * 1000;
 // Zero-width characters are dropped and canonical forms composed (NFC) so a
 // pasted or macOS-typed twin groups with the stored name. NFKC is avoided on
 // purpose: it would merge full-width, superscript and ligature spellings the
-// user can see as different tags.
+// user can see as different tags. NFC runs again after lowercasing (see
+// pbpTagTwinKey).
 const PBP_TAG_ZERO_WIDTH = /[\u200B-\u200D\u2060\uFEFF]/g;
 function pbpTagGroupKey(name) {
-  return String(name).replace(PBP_TAG_ZERO_WIDTH, "").normalize("NFC").toLowerCase().replace(/[\s_-]+/g, "");
+  return String(name).replace(PBP_TAG_ZERO_WIDTH, "").normalize("NFC").toLowerCase().normalize("NFC").replace(/[\s_-]+/g, "");
 }
 
 // Pinboard merges compare twins only: names that differ in case, canonical
 // form (NFC/NFD) or zero-width characters. Separators stay significant, so
 // "x-ray" and "x_ray" remain two Pinboard tags as they are on the server. A
-// name with nothing left is compared by its exact text.
+// name with nothing left is compared by its exact text. NFC runs again after
+// lowercasing: a capital such as J + U+030C has no composed form while its
+// lowercase U+01F0 does, so the decomposed spellings only meet once the
+// lowercase result is composed.
 function pbpTagTwinKey(name) {
-  const key = String(name).replace(PBP_TAG_ZERO_WIDTH, "").normalize("NFC").toLowerCase();
+  const key = String(name).replace(PBP_TAG_ZERO_WIDTH, "").normalize("NFC").toLowerCase().normalize("NFC");
   return key ? `twin:${key}` : `exact:${name}`;
 }
 

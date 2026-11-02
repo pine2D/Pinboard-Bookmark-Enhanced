@@ -2015,6 +2015,22 @@ suite("shared tag canonicalization", () => {
     assertEq(pbpCanonicalTagName("Java​Script", ctx({JavaScript: 3})), "JavaScript", "a zero-width twin aligns to the vocabulary");
   });
 
+  test("group and twin keys keep together every spelling plain toLowerCase made equal", () => {
+    // Capitals such as J + U+030C have no composed form while the lowercase
+    // U+01F0 does: the keys must compose again after lowercasing.
+    const split = [];
+    for (let cp = 0; cp < 0x30000; cp++) {
+      if (cp >= 0xd800 && cp < 0xe000) continue;
+      const c = String.fromCodePoint(cp), up = c.toUpperCase(), low = c.toLowerCase();
+      const forms = [...new Set([c, c.normalize("NFD"), up, up.normalize("NFD"), low, low.normalize("NFD")])];
+      for (const a of forms) for (const b of forms) {
+        if (a.toLowerCase() !== b.toLowerCase()) continue;
+        if (pbpTagGroupKey(a) !== pbpTagGroupKey(b) || pbpTagTwinKey(a) !== pbpTagTwinKey(b)) split.push(cp.toString(16));
+      }
+    }
+    assertEq([...new Set(split)].join(" "), "");
+  });
+
   test("bookmark exact and same-group spellings win before the vocabulary", () => {
     const c = ctx({machine_learning: 90, Nick_Drake: 30}, ["machine learning", "Nick Drake"]);
     assertEq(pbpAlignTagName("  machine learning  ", c).name, "machine learning");
