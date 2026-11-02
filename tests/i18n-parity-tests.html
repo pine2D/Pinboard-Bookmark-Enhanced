@@ -37,6 +37,56 @@ async function loadLocale(loc) {
       pbpI18nScriptFamily("プロンプト") === "cjk",
     "mixed CJK text and pure alphabetic text no longer choose distinct optical calibration families");
 
+  // Frozen copy of the sequential substitution _resolveMsg used before the
+  // single-pass fix. For arguments without "$" both must agree on every
+  // message of every locale; only re-scanning of substituted text differs.
+  function legacyResolve(entry, args) {
+    let msg = entry.message;
+    if (!msg) return "";
+    if (entry.placeholders && args.length) {
+      for (const [name, def] of Object.entries(entry.placeholders)) {
+        const m = (def.content || "").match(/^\$(\d+)$/);
+        if (m) {
+          const idx = parseInt(m[1]) - 1;
+          if (idx >= 0 && idx < args.length) {
+            msg = msg.replace(new RegExp("\\$" + name + "\\$", "gi"), () => String(args[idx]));
+          }
+        }
+      }
+    }
+    return msg;
+  }
+  {
+    const argSets = [[], ["A1"], ["A1", "B2"], ["A1", "B2", "C3", "D4", "E5", "F6", "G7", "H8", "I9"], [0, 64, "x y", "%s"]];
+    const diffs = [];
+    let compared = 0;
+    for (const loc of LOCALES) {
+      for (const [key, entry] of Object.entries(msgs[loc])) {
+        for (const args of argSets) {
+          compared++;
+          const got = _resolveMsg(entry, args), want = legacyResolve(entry, args);
+          if (got !== want) diffs.push(`${loc}.${key}(${args.length}): ${JSON.stringify(got)} != ${JSON.stringify(want)}`);
+        }
+      }
+    }
+    check("Single-pass placeholder substitution matches the old output for every message without $ in its arguments",
+      compared > 9 * 1000 && diffs.length === 0, `${compared} compared; ` + diffs.slice(0, 5).join("\n   "));
+  }
+  {
+    const entry = msgs.en.bookmarkErrTagTooLong;
+    const tag = "a$MAX$b$tag$c$1$$";
+    const out = _resolveMsg(entry, [tag, 64]);
+    check("Text substituted into a placeholder is never scanned again",
+      out.includes(`"${tag}"`) && (out.match(/64/g) || []).length === 1 && !/\$(?:TAG|MAX)\$/.test(out.replace(tag, "")),
+      out);
+    const batch = _resolveMsg(msgs.en.batchTagTooLong, ["$TAG$", "$COUNT$", 64]);
+    check("A placeholder value naming another placeholder stays literal",
+      batch.startsWith(". $TAG$ not saved") && batch.includes(`"$COUNT$"`), batch);
+    check("Placeholder names still match case-insensitively and unknown $names$ stay literal",
+      _resolveMsg({message: "$Who$ and $who$ meet $nobody$", placeholders: {WHO: {content: "$1"}}}, ["Ann"]) === "Ann and Ann meet $nobody$"
+        && _resolveMsg({message: "$x$a$", placeholders: {a: {content: "$1"}, x: {content: "literal"}}}, ["A"]) === "$xA");
+  }
+
   check("Removed WebDAV messages stay absent in every locale",
     LOCALES.every((loc) => !Object.keys(msgs[loc]).some((key) => key.startsWith("webdav"))));
   const BACKUP_RESTORE_TITLES = {

@@ -148,23 +148,26 @@ async function _refreshI18nAsync() {
  * Resolve a message entry's placeholders with provided arguments.
  */
 function _resolveMsg(entry, args) {
-  let msg = entry.message;
+  const msg = entry.message;
   if (!msg) return "";
-  if (entry.placeholders && args.length) {
-    for (const [name, def] of Object.entries(entry.placeholders)) {
-      const m = (def.content || "").match(/^\$(\d+)$/);
-      if (m) {
-        const idx = parseInt(m[1]) - 1;
-        if (idx >= 0 && idx < args.length) {
-          // Function replacement (not a bare string) -- a string replacement
-          // interprets $&, $`, $', $$, $N in the arg as special patterns and
-          // would corrupt any placeholder value containing them.
-          msg = msg.replace(new RegExp("\\$" + name + "\\$", "gi"), () => String(args[idx]));
-        }
-      }
-    }
+  if (!entry.placeholders || !args.length) return msg;
+  // One pass over the message: text substituted into a placeholder (a tag
+  // name, a page title) is never scanned again, so a value such as "$max$"
+  // stays literal. Only placeholders whose content is "$N" with an argument
+  // in range are substituted; names match case-insensitively, as in Chrome.
+  const values = new Map();
+  for (const [name, def] of Object.entries(entry.placeholders)) {
+    const m = (def.content || "").match(/^\$(\d+)$/);
+    if (!m) continue;
+    const idx = parseInt(m[1]) - 1;
+    const lower = name.toLowerCase();
+    if (idx >= 0 && idx < args.length && !values.has(lower)) values.set(lower, String(args[idx]));
   }
-  return msg;
+  if (!values.size) return msg;
+  const names = [...values.keys()].map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  // Function replacement: a string replacement would interpret $&, $`, $', $$
+  // and $N inside the argument as special patterns.
+  return msg.replace(new RegExp("\\$(" + names.join("|") + ")\\$", "gi"), (_, name) => values.get(name.toLowerCase()));
 }
 
 /**
