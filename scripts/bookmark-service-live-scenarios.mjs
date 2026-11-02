@@ -1964,7 +1964,8 @@ export const SELFHOSTED_MODULES = [
     needs: needs({ shots: true }),
     // The reader opens through the popup (Markdown, Preview), the shortcut
     // and three old slots: 11 (linkding) and 18 (Karakeep) browser requests
-    // and one tags read in 4.3 s on a temporary run (H3d).
+    // and one tags read in 4.3 s on a temporary run (H3d); a fourth old
+    // slot (the utm variant) adds one reader's lookups.
     budget: { bookmarks: 1, urls: 1, node: 4, browser: { linkding: 30, karakeep: 45 }, ai: 0, tags: 0, seconds: 30, tagReads: 1 },
     files: [],
     settings: { aiContentSource: 'local' },
@@ -1992,19 +1993,31 @@ export const SELFHOSTED_MODULES = [
       // Markdown, and the keyboard shortcut. Each writes the bookmark URL
       // into the handoff slot; the reader on the utm variant finds the
       // saved bookmark. An old slot without that field (t.openReader)
-      // falls back to its url: the saved address itself is found.
+      // falls back to its url as written: the saved address is found, its
+      // utm variant is not.
       await t.part('variant_reader', async () => {
         await t.phase('variant_reader');
         const isSaved = async reader => (await reader.locator('#reader-bookmark-save').getAttribute('data-saved')) === 'true';
         // The old slot first: it holds on any tree, so a pending G10 does
         // not hide it.
         await t.phase('variant_reader_old_slot');
-        const judgeOld = async variant => { const reader = await t.openReader(variant, { ready: '#reader-bookmark-save' }); try { return await isSaved(reader); } finally { await reader.close(); } };
+        // An old slot's verdict: saved, and whether the status line shows
+        // anything (a failed lookup leaves data-saved 'false' too, with its
+        // reason shown).
+        const readOld = async variant => { const reader = await t.openReader(variant, { ready: '#reader-bookmark-save' }); try { return { saved: await isSaved(reader), status: await reader.locator('#reader-bookmark-status').evaluate(el => !el.hidden && !!el.textContent.trim()) }; } finally { await reader.close(); } };
+        const judgeOld = async variant => (await readOld(variant)).saved;
         t.expect(await judgeOld(url), 'reader_old_slot_url');
+        const utm = url + '&utm_source=pbp-it';
+        // An old slot keeps its url as is (G10 test 3, invariant 2): the
+        // utm variant is looked up as written and is known not saved. A
+        // reader that cleaned every slot url itself would pass both entry
+        // checks below and the line above, but not this one.
+        const oldUtm = await readOld(utm);
+        t.note('readerOldSlotUtm', oldUtm);
+        t.expect(!oldUtm.saved && !oldUtm.status, 'reader_old_slot_utm_cleaned');
         const upper = url.replace(/^(\w+:\/\/)([^/]+)/, (m, scheme, host) => scheme + host.toUpperCase());
         const slash = url.replace('/?', '?');
         t.note('readerOldSlotVariants', { hostCase: await judgeOld(upper), noSlash: await judgeOld(slash) });
-        const utm = url + '&utm_source=pbp-it';
         const verdicts = {};
         for (const entry of ['popup', 'shortcut']) {
           await t.phase('variant_reader_' + entry);
