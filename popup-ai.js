@@ -240,9 +240,11 @@ function _aiUrlEquivalent(a, b) {
 // and the popup's own cleaning (aggressive mode, custom parameters) can take
 // off more before it puts the page's address in the form: the address it
 // cleans the page URL to is the same page too. This is the one same-page
-// check of the popup: the AI guards below, the summary ownership snapshot and
-// the Description prefill (popup.js) all ask it, so an address the popup
-// cleaned itself is never mistaken for an edit to another page.
+// check of the popup: the AI guards below and the Description prefill
+// (popup.js) ask it, so an address the popup cleaned itself is never mistaken
+// for an edit to another page. The summary ownership snapshot asks something
+// else -- whether the receipt it read is the one the save will write -- and
+// compares receipt keys (_aiUrlEquivalent) instead.
 // _loadUrlCleanSettings lives in popup.js; without it only the plain
 // equivalence decides.
 function pbpPopupFormHoldsOpenedPage(pageUrl = pageInfo.url) {
@@ -394,7 +396,11 @@ function pbpAiSummaryOwnershipSnapshot(description) {
   const checked = _aiSummaryOwnershipChecked;
   if (!checked) return undefined;
   const bookmark = typeof existingBookmark === "undefined" ? null : existingBookmark;
-  return checked.bookmark === bookmark && pbpPopupFormHoldsOpenedPage(checked.url)
+  // The worker writes (or retires) the receipt under the form's address, so
+  // "none" holds only when the check read that same key; a form the popup
+  // cleaned to another key is still the opened page, but its receipt was
+  // never read.
+  return checked.bookmark === bookmark && _aiUrlEquivalent($id("url-input").value, checked.url)
     ? null : undefined;
 }
 
@@ -696,7 +702,7 @@ function setupAIFeatures() {
       await _aiAwaitBookmarkLookup();
       if (!_aiOpStillCurrent(restoreAccount)) return;
       if (existingBookmark) {
-        await _aiRestoreSummaryOwnership(restoreAccount, pageInfo.url, cached);
+        await _aiRestoreSummaryOwnership(restoreAccount, $id("url-input").value, cached);
         return;
       }
       // The notes may already hold this summary: a restored draft carries the
@@ -705,7 +711,7 @@ function setupAIFeatures() {
       // a legacy block is adoptable on its own. pbpShouldRestoreCachedSummary
       // only knows the legacy "[AI Summary]" block, so on its own it let every
       // reopen stack one more copy (2026-10-19 report).
-      const adopted = await _aiRestoreSummaryOwnership(restoreAccount, pageInfo.url, cached);
+      const adopted = await _aiRestoreSummaryOwnership(restoreAccount, $id("url-input").value, cached);
       if (!_aiOpStillCurrent(restoreAccount) || adopted || !cached) return;
       // A restored draft is the user's last state of this form: a summary
       // missing from it was removed or rewritten on purpose -- never put back.
@@ -749,6 +755,10 @@ function _aiAdoptSummaryRange(value, range, fromCache) {
   return true;
 }
 
+// `url` is the form's address, which callers pass only while it holds the
+// opened page: the worker records the receipt under the address it saves
+// (intent.url), and the popup's own cleaning can make that a different
+// receipt key than pageInfo.url. The AI cache stays keyed by pageInfo.url.
 async function _aiRestoreSummaryOwnership(account, url, cachedSummary) {
   // linkding Description is plain text, separate from legacy Notes ownership.
   if (pbpBookmarkServiceId(settings) === "linkding") return null;
@@ -1192,7 +1202,7 @@ async function doAISummary(forceRefresh, sOverride) {
     if (!forceRefresh) {
       const cached = await pbpAiFastCached("summary", s, account);
       if (cached && _aiOpStillCurrent(account)) {
-        const adopted = await _aiRestoreSummaryOwnership(account, pageInfo.url, cached);
+        const adopted = await _aiRestoreSummaryOwnership(account, $id("url-input").value, cached);
         if (!_aiOpStillCurrent(account)) return;
         if (adopted) return;
         if (upsertSummary(cached) === false) return "kept";

@@ -2868,27 +2868,86 @@ test("posts/add default remains replace=yes for existing callers", () => {
         }
       }
     });
-    // The ownership check the worker relies on is tied to the page it ran
-    // for. A form holding the address the popup cleaned that page to is still
-    // that page, so a completed check that found no summary of this popup's
-    // own reports "none" (null); another page in the form cannot tell
-    // (undefined), and the worker leaves the receipt alone.
-    test("the summary ownership check answers for the page's cleaned address and not for another page", () => {
+    // The ownership check the worker relies on is tied to the receipt it
+    // read: the worker writes or retires the receipt under the form's address,
+    // so a completed check that found no summary of this popup's own reports
+    // "none" (null) only while the form's address has the receipt key the
+    // check read. A form the popup cleaned to another key is still the opened
+    // page, but that receipt was never read (undefined), and neither was
+    // another page's; the worker then leaves the receipt alone.
+    function ownershipSnapshotRuntime(pageUrl, formUrl) {
       const from = popupAiSource.indexOf("function _aiUrlEquivalent");
       const to = popupAiSource.indexOf("// ---- Setup AI feature listeners ----", from);
       const clean = source.indexOf("function _loadUrlCleanSettings(");
       assert(from >= 0 && to > from && clean >= 0, "summary ownership runtime missing");
+      const fields = { "url-input": { value: formUrl } };
+      return new Function("pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "_AI_BQ_REGEX_SHARED", "$id", "pageInfo", "existingBookmark", "settings", "stripTrackingParams",
+        popupAiSource.slice(from, to) + "\n" + source.slice(clean, source.indexOf("\n}", clean) + 2) +
+        "; return { snapshot: pbpAiSummaryOwnershipSnapshot, checked(url) { _aiSummaryOwnershipChecked = { bookmark: existingBookmark, url }; } };"
+      )(summaryReceiptApi({ stripTrackingParams: pageGuardStrip }).pbpAiPageUrlNorm, summaryReceiptApi().pbpAiSummaryRangeValid, /$a/g,
+        id => fields[id] || null, { url: pageUrl }, null,
+        { urlClean: { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: true, customParams: ["campaign"], excludeParams: [] } }, pageGuardStrip);
+    }
+    test("the summary ownership check answers only for the receipt key it read", () => {
       const page = URL + "?campaign=spring&ref=abc";
-      for (const [label, formUrl, expected] of [["the cleaned address", URL, null], ["the page's own address", page, null], ["another page", URL + "/other", undefined]]) {
-        const fields = { "url-input": { value: formUrl } };
-        const h = new Function("pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "_AI_BQ_REGEX_SHARED", "$id", "pageInfo", "existingBookmark", "settings", "stripTrackingParams",
-          popupAiSource.slice(from, to) + "\n" + source.slice(clean, source.indexOf("\n}", clean) + 2) +
-          "; return { snapshot: pbpAiSummaryOwnershipSnapshot, checked(url) { _aiSummaryOwnershipChecked = { bookmark: existingBookmark, url }; } };"
-        )(summaryReceiptApi({ stripTrackingParams: pageGuardStrip }).pbpAiPageUrlNorm, summaryReceiptApi().pbpAiSummaryRangeValid, /$a/g,
-          id => fields[id] || null, { url: page }, null,
-          { urlClean: { enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode: true, customParams: ["campaign"], excludeParams: [] } }, pageGuardStrip);
-        h.checked(page);
+      for (const [label, readUrl, formUrl, expected] of [
+        ["read the raw page address, the form holds its cleaned address", page, URL, undefined],
+        ["read the cleaned address the form holds", URL, URL, null],
+        ["read the raw page address, the form holds it", page, page, null],
+        ["the form differs only in what the receipt key ignores", URL + "?utm_source=mail", URL + "#part", null],
+        ["the form holds another page", URL, URL + "/other", undefined],
+      ]) {
+        const h = ownershipSnapshotRuntime(page, formUrl);
+        h.checked(readUrl);
         assert(h.snapshot("Notes") === expected, label + ": the snapshot was " + h.snapshot("Notes"));
+      }
+    });
+    // The receipt is written under the address the worker saved (the form's),
+    // so reopening reads it there: aggressive mode or custom parameters can
+    // clean the page's address to another receipt key. With no AI cache left
+    // (expired, another model) the block is still owned, and a regenerated
+    // summary replaces it instead of appending a second one.
+    await testAsync("a summary saved from a cleaned address is owned again on reopen without an AI cache", async () => {
+      const from = popupAiSource.indexOf("function _aiUrlEquivalent");
+      const to = popupAiSource.indexOf('// Unified "no AI key"', from);
+      const blockStart = popupAiSource.indexOf("  const restoreAccount = pbpPopupAiAccount();");
+      const blockEnd = popupAiSource.indexOf('  $id("ai-tags-btn").addEventListener', blockStart);
+      const clean = source.indexOf("function _loadUrlCleanSettings(");
+      assert(from >= 0 && to > from && blockStart >= 0 && blockEnd > blockStart && clean >= 0, "summary restore source missing");
+      const cleaning = (aggressiveMode, customParams) => ({ enabled: true, onPopupOpen: true, onPaste: true, aggressiveMode, customParams, excludeParams: [] });
+      for (const [label, urlClean, page] of [["aggressive mode removed ref=", cleaning(true, []), URL + "?ref=abc"],
+        ["a custom parameter was removed", cleaning(false, ["campaign"]), URL + "?campaign=spring"]]) {
+        for (const service of ["pinboard", "karakeep"]) {
+          const where = service + ", " + label;
+          const receipts = summaryReceiptApi({ stripTrackingParams: pageGuardStrip });
+          const formUrl = pageGuardStrip(page, urlClean).cleaned;
+          assert(formUrl === URL && receipts.pbpAiSummaryOwnershipKey("alice", formUrl) !== receipts.pbpAiSummaryOwnershipKey("alice", page),
+            where + ": the case does not separate the two receipt keys");
+          const notes = "my note\n\n<blockquote>old summary</blockquote>";
+          const range = { start: notes.indexOf("<blockquote>"), end: notes.length };
+          // What the worker does after delivering these notes (intent.url = the form).
+          await receipts.pbpAiSaveSummaryOwnership("alice", formUrl, notes, range);
+          const fields = { "url-input": { value: formUrl }, "description-input": { value: notes }, "linkding-description-input": { value: "" } };
+          const shown = [];
+          const api = new Function("pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "pbpAiLoadSummaryOwnership", "_AI_BQ_REGEX_SHARED",
+            "$id", "pbpPopupAiAccount", "pbpPopupAiAccountIsCurrent", "pbpAiFastCached", "pageInfo", "existingBookmark", "settings",
+            "stripTrackingParams", "escapeForExtended", "showSummaryActions", "pbpShouldRestoreCachedSummary", "updateCharCount", "autoResizeTextarea",
+            "let bookmarkLookup = { promise: null };" + popupAiSource.slice(from, to) + "\n" + source.slice(clean, source.indexOf("\n}", clean) + 2) +
+            "\nfunction start() {" + popupAiSource.slice(blockStart, blockEnd) + "}" +
+            "\nreturn { start, upsertSummary, snapshot: pbpAiSummaryOwnershipSnapshot };"
+          )(receipts.pbpAiPageUrlNorm, receipts.pbpAiSummaryRangeValid, receipts.pbpAiLoadSummaryOwnership, _AI_BQ_REGEX_SHARED,
+            id => fields[id] || null, () => "alice", a => a === "alice", async () => null, { url: page }, { extended: notes },
+            { bookmarkService: service, urlClean, optShowAiSummary: true }, pageGuardStrip, v => v, c => shown.push(c), () => false, () => {}, () => {});
+          api.start();
+          await new Promise(resolve => setTimeout(resolve, 0)); await flushMicrotasks();
+          const owned = api.snapshot(notes);
+          assert(owned && owned.start === range.start && owned.end === range.end && shown.length === 1,
+            where + ": the reopened popup did not own the block: " + JSON.stringify(owned) + ", actions shown " + shown.length);
+          api.upsertSummary("new summary", { userEdit: false });
+          const after = fields["description-input"].value;
+          assert(!after.includes("old summary") && after.split("new summary").length === 2 && after.startsWith("my note\n\n"),
+            where + ": the regenerated summary did not replace the owned block: " + JSON.stringify(after));
+        }
       }
     });
     function pressCombinedAi(h) {

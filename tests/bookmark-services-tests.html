@@ -478,6 +478,22 @@ test("a Karakeep create merged into a concurrent bookmark without a note of its 
   equal([result.status, result.mutation, Object.hasOwn(h.state.calls[1].body,"note")],["saved","merged",false]);
   equal(await (await kkPopup(h, notes)).restore(),"receipt");
 });
+// The popup sends no range (undefined) when its ownership check did not read
+// the receipt the save writes, e.g. a form the popup cleaned to another
+// receipt key than the page it read. That update leaves the receipt alone;
+// "none" (null) retires it.
+test("a Karakeep update that cannot say which block it owns leaves the page's receipt alone", async()=>{
+  const notes="Auto notes\n\n" + KK_SUMMARY, range={start:"Auto notes\n\n".length, end:notes.length};
+  for (const [label, snapshot, receipts] of [["cannot tell", undefined, 1], ["owns none", null, 0]]) {
+    await pbpFixtureClearSummaryOwnership();
+    const h=await workerHarness("karakeep",[[200,{bookmarkId:"bk1"}],[200,kk],[200,{id:"bk1",title:"Title",note:notes}]]);
+    const account=(await h.auth()).account;
+    await pbpAiSaveSummaryOwnership(account, saveIntent.url, notes, range);
+    const result=await h.submitPopupSaveIntent({...saveIntent,mode:"update",time:kk.createdAt,tags:"work",notes},account,snapshot);
+    equal([label, result.status, h.state.calls.map(c=>c.method)],[label, "saved", ["GET","GET","PATCH"]]);
+    equal([label, (await pbpFixtureSummaryOwnershipEntries()).length],[label, receipts]);
+  }
+});
 // Karakeep posts the note with the create (an update patches it first); only
 // the tags and Read Later steps follow. A save that fails in one of those
 // still reports the failure, but the note on the server is the one it wrote.
