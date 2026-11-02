@@ -3510,8 +3510,12 @@ export class LiveRun {
   }
 
   // geometryOnly: the same geometry check and manifest entry with no
-  // picture (file ''); it runs without --shots too.
-  async shot(page, state, { surface = 'page', service = '', keys = [], locales, schemes, geometryOnly = false } = {}) {
+  // picture (file ''); it runs without --shots too. onState(page, { locale,
+  // scheme, entry }) runs at each state right after its picture, while the
+  // page is still in that locale and scheme (with no transition left
+  // running): what checks the state (axe) belongs there, since the page is
+  // put back to the run's locale and scheme before shot() returns.
+  async shot(page, state, { surface = 'page', service = '', keys = [], locales, schemes, geometryOnly = false, onState } = {}) {
     if ((!this.shotsEnabled && !geometryOnly) || !page) return null;
     this.throwIfFatal();
     const dir = this.shotsDir || join(this.runDir, 'shots');
@@ -3565,6 +3569,13 @@ export class LiveRun {
           });
         }
         results.push(entry);
+        if (onState) {
+          // A scheme switch starts colour transitions (popup/options
+          // --pp-motion-state); a check reading mid-transition colours
+          // would judge neither scheme.
+          await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
+          await onState(page, { locale, scheme, entry });
+        }
       }
     }
     if (this.locale !== originalLocale) {

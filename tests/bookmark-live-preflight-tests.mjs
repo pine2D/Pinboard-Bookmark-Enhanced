@@ -222,6 +222,32 @@ try {
       const shipped = readdirSync(join(root, '_locales')).sort();
       assert.deepEqual([...scen.SHOT_LOCALES, ...scen.GEOMETRY_LOCALES].sort(), shipped, 'every shipped locale is shot or measured');
       for (const id of ['ux.reader-bar', 'ux.copy-exits', 'ux.status-check', 'regress.tags-notes']) assert.ok(MODULES.some(m => m.id === id), id);
+      // Each axe result is taken in the state its label names: a stand-in
+      // shot() that, like the runner's, is back in en/light once it returns
+      // (review of H3c, must-fix 1).
+      let state = { locale: 'en', scheme: 'light' };
+      const axed = [];
+      const fake = {
+        service: 'linkding', shotsEnabled: true, claimUrl: () => 'https://example.com/x',
+        phase: async () => {}, note: () => {}, check: () => {}, expectEq: (a, b, code) => assert.equal(a, b, code),
+        part: async (name, refs, fn) => fn(),
+        openPopup: async () => ({ popup: {}, close: async () => {} }), openOptions: async () => ({ locator: () => ({ scrollIntoViewIfNeeded: async () => {} }), close: async () => {} }), openReader: async () => ({ close: async () => {} }),
+        shot: async (page, name, { locales, schemes, onState, geometryOnly }) => {
+          const out = [];
+          for (const locale of locales) for (const scheme of schemes) {
+            state = { locale, scheme };
+            const entry = { locale, scheme, geometry: { ok: true }, geometryOnly: !!geometryOnly };
+            out.push(entry);
+            if (onState) await onState(page, { locale, scheme, entry });
+          }
+          state = { locale: 'en', scheme: 'light' };
+          return out;
+        },
+        axe: async (page, label) => { axed.push([label, `matrix:${state.locale}:${state.scheme}`]); return []; },
+      };
+      await matrix.steps(fake);
+      assert.equal(axed.length, 3 * scen.SHOT_LOCALES.length * scen.SHOT_SCHEMES.length, 'axe at every pictured state of the three surfaces');
+      for (const [label, at] of axed) assert.equal(label, at, 'axe ran in the state it is labelled with');
     }
     assert.equal(new Set(ids).size, ids.length, 'module ids must be unique');
     for (const id of ids) assert.match(id, /^(linkding|linkding-pg|karakeep|pinboard)\.[a-z0-9.-]+$/);
@@ -2721,6 +2747,40 @@ try {
     assert.deepEqual([shot.result.geometry.keys[0].state, shot.result.geometry.ok], ['hidden', false]);
     shot = await shoot(`<p>No button</p>`, 'missing');
     assert.deepEqual([shot.result.geometry.keys[0].state, shot.result.geometry.ok], ['missing', false]);
+    // onState runs at each state in that state's locale and scheme, after the
+    // scheme's colour transition ended (review of H3c, must-fix 1: an axe
+    // run after shot() returned saw en/light, a dark one mid-transition).
+    {
+      const server = createServer((req, res) => {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end('<!doctype html><title>Scheme</title><style>body{margin:0;background:rgb(255,255,255);transition:background-color .6s linear}@media (prefers-color-scheme: dark){body{background:rgb(0,0,0)}}</style><body><button id="save">Save</button></body>');
+      });
+      const port = await listen(server);
+      await page.goto(`http://127.0.0.1:${port}/`);
+      const stateRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+      stateRun.runDir = join(dir, 'state-run');
+      const stored = [];
+      stateRun.sw = async (fn, arg) => { stored.push(arg); };
+      stateRun.locale = 'en';
+      stateRun.scheme = 'light';
+      const seen = [];
+      const entries = await stateRun.shot(page, 'matrix', {
+        surface: 'reader', keys: ['#save'], locales: ['en', 'ja'], schemes: ['light', 'dark'], geometryOnly: true,
+        onState: async (p, { locale, scheme, entry }) => {
+          seen.push({ locale, scheme, runLocale: stateRun.locale, dark: await p.evaluate(() => matchMedia('(prefers-color-scheme: dark)').matches), bg: await p.evaluate(() => getComputedStyle(document.body).backgroundColor), entry: entry.locale + '/' + entry.scheme });
+        },
+      });
+      assert.equal(entries.length, 4);
+      assert.deepEqual(seen.map(s => [s.locale, s.scheme, s.runLocale, s.dark, s.bg, s.entry]), [
+        ['en', 'light', 'en', false, 'rgb(255, 255, 255)', 'en/light'],
+        ['en', 'dark', 'en', true, 'rgb(0, 0, 0)', 'en/dark'],
+        ['ja', 'light', 'ja', false, 'rgb(255, 255, 255)', 'ja/light'],
+        ['ja', 'dark', 'ja', true, 'rgb(0, 0, 0)', 'ja/dark'],
+      ], JSON.stringify(seen));
+      assert.deepEqual([stateRun.locale, stateRun.scheme, await page.evaluate(() => matchMedia('(prefers-color-scheme: dark)').matches)], ['en', 'light', false], 'put back after the last state');
+      assert.deepEqual(stored, ['ja', 'en']);
+      await closeServer(server);
+    }
     await browser.close();
     browser = null;
   }

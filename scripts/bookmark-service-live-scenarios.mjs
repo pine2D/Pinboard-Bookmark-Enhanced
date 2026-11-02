@@ -2976,17 +2976,18 @@ export const H3C_MODULES = [
           const { page, close } = await open();
           const bad = [];
           try {
-            for (const locale of SHOT_LOCALES) {
-              for (const scheme of SHOT_SCHEMES) {
-                const [entry] = (await t.shot(page, 'matrix', { surface, keys, locales: [locale], schemes: [scheme], geometryOnly: !t.shotsEnabled })) || [];
-                if (entry?.geometry && !entry.geometry.ok) bad.push(`${locale}/${scheme}`);
-                if (t.shotsEnabled) { const v = await t.axe(page, `matrix:${locale}:${scheme}`); axed.push({ surface, locale, scheme, violations: v ? v.length : null }); }
-              }
-            }
-            for (const locale of GEOMETRY_LOCALES) {
-              const [entry] = (await t.shot(page, 'matrix', { surface, keys, locales: [locale], schemes: ['light'], geometryOnly: true })) || [];
-              if (entry?.geometry && !entry.geometry.ok) bad.push(`${locale}/light`);
-            }
+            // One call for the whole matrix: axe runs inside it, at the state
+            // each picture shows (after shot() returns, the page is back in
+            // the run's locale and scheme).
+            const onState = t.shotsEnabled ? async (p, { locale, scheme }) => {
+              const v = await t.axe(p, `matrix:${locale}:${scheme}`);
+              axed.push({ surface, locale, scheme, violations: v ? v.length : null });
+            } : undefined;
+            const entries = [
+              ...((await t.shot(page, 'matrix', { surface, keys, locales: [...SHOT_LOCALES], schemes: [...SHOT_SCHEMES], geometryOnly: !t.shotsEnabled, onState })) || []),
+              ...((await t.shot(page, 'matrix', { surface, keys, locales: [...GEOMETRY_LOCALES], schemes: ['light'], geometryOnly: true })) || []),
+            ];
+            for (const entry of entries) if (entry?.geometry && !entry.geometry.ok) bad.push(`${entry.locale}/${entry.scheme}`);
           } finally { await close().catch(() => {}); }
           t.note('geometry_' + surface, bad);
           t.expectEq(bad.join(','), '', 'geometry_' + surface);
