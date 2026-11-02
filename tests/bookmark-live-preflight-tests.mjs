@@ -2244,6 +2244,28 @@ try {
       for (const f of popupReader.features.filter(f => !/^(pinboard|karakeep)-/.test(f))) assert.match(goneText, new RegExp('未完成（[^\\n]*：[^\\n]*' + f), goneText);
       assert.match(goneText, /linkding\.core\.popup-reader：[^\n]*未执行任何步骤[^\n]*worker_gone/, goneText);
 
+      // The posts/add answer Pinboard gives a replace=no duplicate is
+      // recorded whatever the HTTP status (review of H3c, should-fix 6): a
+      // 4xx carrying a result_code is the very answer the module went to see.
+      {
+        const pb = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+        pb.runDir = join(dir, 'summary-pinboard-results');
+        mkdirSync(pb.runDir, { mode: 0o700 });
+        pb.reportPath = join(pb.runDir, 'report.json');
+        pb.currentModule = { id: 'pinboard.regress.tags-notes' };
+        const add = replace => 'https://api.pinboard.in/v1/posts/add?auth_token=u:' + 'A'.repeat(20) + '&format=json&url=https%3A%2F%2Fexample.com%2Fp&replace=' + replace;
+        pb.notePinboardResult(add('no'), { status: 200, body: JSON.stringify({ result_code: 'done' }) });
+        pb.notePinboardResult(add('no'), { status: 400, body: JSON.stringify({ result_code: 'item already exists' }) });
+        pb.notePinboardResult(add('no'), { status: 503, body: '<html>busy</html>' });
+        pb.notePinboardResult(add('yes'), { status: 409, body: JSON.stringify({ result_code: 'something else' }) });
+        assert.deepEqual(pb.report.pinboardResults.map(x => [x.replace, x.status, x.code]), [['no', 200, 'done'], ['no', 400, 'item already exists'], ['no', 503, 'unparsable'], ['yes', 409, 'something else']]);
+        pb.currentModule = null;
+        Object.assign(pb.report, { target: 'user', pinboard: { configured: true }, instances: { pinboard: { service: 'pinboard', base: 'https://api.pinboard.in/' } } });
+        pb.writeSummary();
+        const pbText = readFileSync(join(pb.runDir, 'summary.zh.md'), 'utf8');
+        assert(pbText.includes('实测 result_code：「item already exists」（HTTP 400）'), pbText);
+        assert(!pbText.includes('unparsable') && !pbText.includes('something else'), pbText);
+      }
       const run = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
       run.runDir = join(dir, 'summary-not-started');
       mkdirSync(run.runDir, { mode: 0o700 });
