@@ -133,6 +133,12 @@ await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const origin='http://127.0.0.1:'+server.address().port;
 // The same pages under a name the extension is never granted, so it cannot read them.
 const unreadOrigin='http://localhost:'+server.address().port;
+// URL cleaning leaves IP hosts and the bare `localhost` alone as OAuth-like
+// (shared.js _isOAuthCallback), and plain HTTP is only ever granted for those
+// loopback names (manifest optional_host_permissions). A page meant to be
+// cleaned is therefore an https one: the browser never reaches the network (see
+// the route in the cleaning case), the grant is the manifest's https wildcard.
+const cleanOrigin='https://cleaning.test';
 const launch=()=>chromium.launchPersistentContext(profile,{headless:true,executablePath:chromium.executablePath(),viewport:{width:1280,height:900},args:[`--disable-extensions-except=${root}`,`--load-extension=${root}`,'--no-first-run','--disable-background-networking','--disable-component-update','--disable-sync','--no-pings','--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE localhost']});
 const getWorker=async ctx=>ctx.serviceWorkers().find(w=>w.url().startsWith('chrome-extension://'))||ctx.waitForEvent('serviceworker');
 let ctx;
@@ -150,7 +156,7 @@ try{
   const prefsPath=join(profile,'Default','Preferences'),prefs=JSON.parse(readFileSync(prefsPath,'utf8'));
   for(const key of ['granted_permissions','active_permissions']){
     const bucket=prefs.extensions.settings[extId][key] ||= {};
-    const hosts=bucket.explicit_host ||= [];if(!hosts.includes(origin+'/*'))hosts.push(origin+'/*');
+    const hosts=bucket.explicit_host ||= [];for(const granted of [origin,cleanOrigin])if(!hosts.includes(granted+'/*'))hosts.push(granted+'/*');
   }
   writeFileSync(prefsPath,JSON.stringify(prefs));ctx=await launch();worker=await getWorker(ctx);await worker.evaluate(()=>primeSettings());
   ctx.on('page',page=>page.on('pageerror',error=>errors.push(error.message)));
@@ -616,6 +622,14 @@ try{
   }
   await article.goto(origin+'/article');
   console.log('linkding unknown Description: an unread popup page and a draft-free reader save let linkding scrape it');
+  // Popup helpers shared by the Description blocks below: the draft stored for a
+  // tab's raw URL, a popup opened on the active tab once its draft scope is ready,
+  // and the wait for its bookmark lookup to settle.
+  const draftFor=pageUrl=>worker.evaluate(async url=>Object.values(await chrome.storage.session.get(null)).find(row=>row?.pageUrl===url)?.draft||null,pageUrl);
+  const openOnTab=async()=>{await article.bringToFront();const opened=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');const popup=await opened;
+    await popup.waitForFunction(()=>typeof _popupDraftContext!=='undefined'&&_popupDraftContext?.ready===true&&!document.getElementById('submit-btn').disabled);
+    await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});return popup;};
+  const settled=(popup,status)=>popup.waitForFunction(status=>bookmarkLookup.status===status,status);
   // A draft made by editing a recent bookmark is kept for the tab the popup was
   // opened on but holds that bookmark's URL. The tab's meta description is the
   // tab's, not that bookmark's: once the bookmark is gone (deleted elsewhere)
@@ -624,11 +638,6 @@ try{
   // URL still takes the meta description, as a first open does.
   {
     const tabUrl=origin+'/article-meta', recentUrl=origin+'/article-recent', recentId='50';
-    const draftFor=pageUrl=>worker.evaluate(async url=>Object.values(await chrome.storage.session.get(null)).find(row=>row?.pageUrl===url)?.draft||null,pageUrl);
-    const openOnTab=async()=>{await article.bringToFront();const opened=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');const popup=await opened;
-      await popup.waitForFunction(()=>typeof _popupDraftContext!=='undefined'&&_popupDraftContext?.ready===true&&!document.getElementById('submit-btn').disabled);
-      await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});return popup;};
-    const settled=(popup,status)=>popup.waitForFunction(status=>bookmarkLookup.status===status,status);
     records.linkding.set(recentId,{id:50,url:recentUrl,title:'Recent title',description:'Stored recent description',notes:'',web_archive_snapshot_url:null,favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:['kept'],date_added:serverNow(),date_modified:serverNow(),website_title:null,website_description:null});
     await worker.evaluate(()=>chrome.storage.local.set({optShowRecent:true}));
     await article.goto(tabUrl);
@@ -675,6 +684,40 @@ try{
     for(const row of [...records.linkding.values()].filter(b=>b.url===tabUrl||b.url===recentUrl))records.linkding.delete(String(row.id));
     await worker.evaluate(()=>chrome.storage.local.set({optShowRecent:false}));await article.goto(origin+'/article');
     console.log("linkding restored draft for another URL: the tab's description stays out of the Description, linkding reads the bookmark itself; the tab's own draft still takes it");
+  }
+  // URL cleaning can remove more than the same-page check ignores: aggressive
+  // mode takes off ref and source, a custom parameter whatever was listed. The
+  // popup puts the cleaned address of its own page in the form, and that is
+  // still the page it was opened on: a first open and a restored draft of it
+  // take the page's meta description and send it with ?disable_scraping, as an
+  // address that needed no cleaning does.
+  {
+    const cleanedUrl=cleanOrigin+'/article-meta', tabUrl=cleanedUrl+'?ref=abc&campaign=spring';
+    const meta=pageMetadata('/article-meta');
+    await ctx.route(cleanOrigin+'/**',route=>route.fulfill({status:200,contentType:'text/html',body:'<html><head><title>'+meta.title+'</title><meta name="description" content="'+meta.description+'"></head><body><h1>'+meta.title+'</h1></body></html>'}));
+    await worker.evaluate(()=>chrome.storage.local.set({urlClean:{enabled:true,onPopupOpen:true,onPaste:true,aggressiveMode:true,customParams:['campaign'],excludeParams:[]}}));
+    const createFrom=async(popup,label)=>{const before=requests.length;await popup.locator('#submit-btn').click();await until(()=>linkdingCreates(before).length>0,label);
+      await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));await popup.close();return linkdingCreates(before)[0];};
+    await article.goto(tabUrl);
+    let popup=await openOnTab();
+    assert.equal(await popup.locator('#url-input').inputValue(),cleanedUrl,'the popup did not clean the address of its own page');
+    assert.equal(await popup.locator('#linkding-description-input').inputValue(),'Server-scraped description',"cleaning the address kept its own page's description out of the box");
+    await popup.locator('#title-input').fill('Cleaned page draft');
+    await until(async()=>(await draftFor(tabUrl))?.title==='Cleaned page draft','title edit drafted on the cleaned page');
+    const drafted=await draftFor(tabUrl);
+    assert.equal(drafted.url,cleanedUrl,'the draft did not keep the cleaned address');
+    assert(!Object.hasOwn(drafted,'summary'),"the page's own description was drafted as the user's");
+    await popup.close();
+    popup=await openOnTab();await settled(popup,'missing');
+    assert.equal(await popup.locator('#title-input').inputValue(),'Cleaned page draft','the title draft was not restored');
+    assert.equal(await popup.locator('#url-input').inputValue(),cleanedUrl,'the restored draft lost the cleaned address');
+    assert.equal(await popup.locator('#linkding-description-input').inputValue(),'Server-scraped description','a restored draft of the cleaned page lost its page description');
+    const create=await createFrom(popup,'create from the restored draft of a cleaned page');
+    assert.deepEqual([create.data.url,create.query,create.data.description],[cleanedUrl,'?disable_scraping','Server-scraped description'],'a create from the cleaned page did not send its known Description');
+    for(const row of [...records.linkding.values()].filter(b=>b.url===cleanedUrl))records.linkding.delete(String(row.id));
+    await worker.evaluate(()=>{statusCache.clear();return chrome.storage.local.remove('urlClean');});
+    await article.goto(origin+'/article');await ctx.unroute(cleanOrigin+'/**');
+    console.log("linkding page address cleaned by aggressive mode and a custom parameter: a first open and a restored draft still take the page's description and send it with ?disable_scraping");
   }
   // linkding Description against the server's own v1.47 create and update
   // semantics (the mock above). /article-meta publishes a meta description,

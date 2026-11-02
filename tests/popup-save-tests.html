@@ -2046,11 +2046,20 @@ test("posts/add default remains replace=yes for existing callers", () => {
       return new Function("pbpAiPageUrlNorm", popupAiSource.slice(from, popupAiSource.indexOf("\n}", from) + 2) + "\nreturn _aiUrlEquivalent;")(summaryReceiptApi().pbpAiPageUrlNorm);
     })();
 
+    // The same-page check also asks for the popup's own cleaned address of its
+    // page (pbpPopupFormHoldsOpenedPage): the real _loadUrlCleanSettings, run
+    // beside the sliced prefill so it reads the `settings` that slice gets.
+    const loadUrlCleanSource = (() => {
+      const from = source.indexOf("function _loadUrlCleanSettings(");
+      assert(from >= 0, "_loadUrlCleanSettings missing from popup.js");
+      return source.slice(from, source.indexOf("\n}", from) + 2);
+    })();
+
     test("popup prefill formats selected text for the connected service", () => {
       const start = source.indexOf('function pbpPopupPrefillDescription(');
       const end = source.indexOf('function recomputeArchiveCheck(', start);
       const elements = {"description-input":{value:""},"linkding-description-input":{value:""},"linkding-description-row":document.createElement("div"),"url-input":{value:""}};
-      const fill = new Function("pageInfo", "settings", "shouldUpdateField", "$id", "pbpNotesDescription", "_aiUrlEquivalent", "let _linkdingDescriptionKnown = true; let _linkdingDescriptionPending = false;"+source.slice(start, end)+";pbpPopupPrefillDescription();");
+      const fill = new Function("pageInfo", "settings", "shouldUpdateField", "$id", "pbpNotesDescription", "_aiUrlEquivalent", "let _linkdingDescriptionKnown = true; let _linkdingDescriptionPending = false;"+loadUrlCleanSource+source.slice(start, end)+";pbpPopupPrefillDescription();");
       for (const [service, expected] of [["pinboard", "<blockquote># heading\n\n&lt;b&gt; *bold*</blockquote>"],
         ["linkding", "> \\# heading\n>\n> &lt;b> \\*bold\\*"], ["karakeep", "> # heading\n>\n> <b> *bold*"]]) {
         fill({ selectedText: "# heading\n\n<b> *bold*" }, { bookmarkService: service, optBlockquote: true }, () => true, id=>elements[id], pbpNotesDescription, aiUrlEquivalent);
@@ -2061,7 +2070,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     test("fresh linkding metadata enters Description while Notes keep only selection and via", () => {
       const a=source.indexOf('function pbpPopupPrefillDescription('),b=source.indexOf('function recomputeArchiveCheck(',a);
       const elements={"description-input":{value:""},"linkding-description-input":document.createElement("input"),"linkding-description-row":document.createElement("div"),"url-input":{value:URL}};
-      const fill=new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription","_aiUrlEquivalent","let _linkdingDescriptionKnown = true; let _linkdingDescriptionPending = false;"+source.slice(a,b)+";pbpPopupPrefillDescription();");
+      const fill=new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription","_aiUrlEquivalent","let _linkdingDescriptionKnown = true; let _linkdingDescriptionPending = false;"+loadUrlCleanSource+source.slice(a,b)+";pbpPopupPrefillDescription();");
       for(const selectedText of ["", "Selected text"]){fill({url:URL,metaDescription:"Meta\ndescription",selectedText,referrer:"https://source.example/"},{bookmarkService:"linkding",optIncludeReferrer:true},()=>true,id=>elements[id],pbpNotesDescription,aiUrlEquivalent);assert(elements["linkding-description-input"].value==="Meta description");assert(elements["description-input"].value===(selectedText?selectedText+"\n\n":"")+"via: https://source.example/");}
     });
 
@@ -2077,7 +2086,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const run=(pageInfo,settings,dirty=false,formUrl=pageInfo.url)=>{
         const elements={"description-input":{value:""},"linkding-description-input":document.createElement("input"),"linkding-description-row":document.createElement("div"),"url-input":{value:formUrl}};
         elements["linkding-description-input"].value=dirty?"Typed":"";
-        const [known,pending]=new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription","_aiUrlEquivalent","let _linkdingDescriptionKnown = 'untouched'; let _linkdingDescriptionPending = 'untouched';"+source.slice(a,b)+";pbpPopupPrefillDescription();return [_linkdingDescriptionKnown,_linkdingDescriptionPending];")
+        const [known,pending]=new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription","_aiUrlEquivalent","let _linkdingDescriptionKnown = 'untouched'; let _linkdingDescriptionPending = 'untouched';"+loadUrlCleanSource+source.slice(a,b)+";pbpPopupPrefillDescription();return [_linkdingDescriptionKnown,_linkdingDescriptionPending];")
           (pageInfo,{bookmarkService:"linkding",...settings},id=>!(dirty&&id==="linkding-description-input"),id=>elements[id],pbpNotesDescription,aiUrlEquivalent);
         return {known,pending,value:elements["linkding-description-input"].value};
       };
@@ -2098,7 +2107,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const doc=iframe.contentDocument;const css=doc.createElement("style");css.textContent=popupCss+'\n*,*::before,*::after { transition:none!important; animation:none!important; }';doc.head.appendChild(css);
       doc.getElementById("main-section").classList.remove("hidden");doc.documentElement.dataset.section="main";
       const a=source.indexOf('function pbpPopupPrefillDescription('),b=source.indexOf('function recomputeArchiveCheck(',a);
-      for(const service of ["pinboard","karakeep","linkding"]){new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription","_aiUrlEquivalent","let _linkdingDescriptionKnown = true; let _linkdingDescriptionPending = false;"+source.slice(a,b)+";pbpPopupPrefillDescription();")({},{bookmarkService:service},()=>true,id=>doc.getElementById(id),pbpNotesDescription,aiUrlEquivalent);const row=doc.getElementById("linkding-description-row");assert(iframe.contentWindow.getComputedStyle(row).display===(service==="linkding"?"flex":"none"),service+" Description visibility is wrong");}
+      for(const service of ["pinboard","karakeep","linkding"]){new Function("pageInfo","settings","shouldUpdateField","$id","pbpNotesDescription","_aiUrlEquivalent","let _linkdingDescriptionKnown = true; let _linkdingDescriptionPending = false;"+loadUrlCleanSource+source.slice(a,b)+";pbpPopupPrefillDescription();")({},{bookmarkService:service},()=>true,id=>doc.getElementById(id),pbpNotesDescription,aiUrlEquivalent);const row=doc.getElementById("linkding-description-row");assert(iframe.contentWindow.getComputedStyle(row).display===(service==="linkding"?"flex":"none"),service+" Description visibility is wrong");}
       const { FIELD_TARGETS }=await import('../docs/theme-surface/composers/ui-components.mjs');
       const input=doc.getElementById("linkding-description-input"),title=doc.getElementById("title-input");
       const registrations=FIELD_TARGETS.pp.filter(entry=>input.matches(entry.rest));
