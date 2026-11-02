@@ -2043,6 +2043,19 @@ try {
       }
     }
 
+    // A URL read empty is skipped later only once the browser is closed: a
+    // module's own cleanup runs with the extension still able to save.
+    {
+      const r = unitRun(createPinboardMock({ token }));
+      r.pinboardEmpty = new Set();
+      r.ctx = {};
+      r.notePinboardEmpty('pinboard', r.pools.pinboard[0]);
+      assert.equal(r.pinboardEmpty.size, 0);
+      r.ctx = null;
+      r.notePinboardEmpty('pinboard', r.pools.pinboard[0]);
+      assert.equal(r.pinboardEmpty.size, 1);
+    }
+
     // The runner's own reads: a 429 is retried PINBOARD_429_RETRIES times,
     // each a counted request, then fails; the Node cap and the cleanup cap
     // stop a request before it is sent.
@@ -2146,6 +2159,17 @@ try {
       const deletes = mock.calls.filter(c => c.path === 'posts/delete');
       assert.deepEqual(deletes.map(c => c.url).sort(), rep.ledger.created.map(e => e.url).sort());
       for (const d of deletes) assert(mock.calls.slice(mock.calls.indexOf(d) + 1).some(c => c.path === 'posts/get' && c.url === d.url), 'verified after delete');
+      // Requests spent outside the module (third review, E6): the preflight
+      // reads one pool URL (the run id makes the others new too), plus the
+      // 429 retry; cleanup deletes each ledger URL straight away, reads it
+      // once, and does not read a URL again once it read it empty with the
+      // browser closed: 2 per bookmark, one posts/get per other pool URL
+      // (the pool scan) and one tags/get; the verify pass reads nothing again.
+      const stageRequests = name => rep.stages.filter(st => st.name === name).reduce((n, st) => n + st.requests, 0);
+      assert.equal(live.preflightCost({ service: 'pinboard', urls: rep.pools.pinboard.length }), 1);
+      assert.equal(stageRequests('preflight'), 1 + 1);
+      assert.equal(stageRequests('cleanup'), 2 * rep.ledger.created.length + (rep.pools.pinboard.length - rep.ledger.created.length) + 1);
+      assert(stageRequests('cleanup') <= live.cleanupCost({ service: 'pinboard', bookmarks: rep.ledger.created.length, urls: rep.pools.pinboard.length }));
       // Timing: stages, module phases, top five.
       assert(rep.timing.slowest.length > 0 && rep.timing.slowest.length <= 5);
       assert(rep.timing.slowest.every((s, i, a) => i === 0 || a[i - 1].ms >= s.ms));
@@ -2217,6 +2241,9 @@ try {
       assert.deepEqual([...mock.posts.keys()], ['https://example.com/personal'], 'pool URLs gone, the personal bookmark kept');
       assert.deepEqual(mock.calls.filter(c => c.path === 'posts/delete').map(c => c.url).sort(), [pool[0], pool[1]].sort());
       assert.deepEqual(after.ledger.created.map(e => [e.id, e.deleted]).sort(), [['pool-1', true], ['pool-2', true]]);
+      // pool-1: delete + get; pool-2: get, delete, get; pool-3: get; tags/get.
+      // Nothing is read twice (it was 12 requests).
+      assert.deepEqual(mock.calls.map(c => c.path + ' ' + (c.url ? 'pool-' + (pool.indexOf(c.url) + 1) : '')), ['posts/delete pool-1', 'posts/get pool-1', 'posts/get pool-2', 'posts/delete pool-2', 'posts/get pool-2', 'posts/get pool-3', 'tags/get ']);
       for (let i = 1; i < mock.calls.length; i++) assert(mock.calls[i].at - mock.calls[i - 1].at >= INTERVAL - 2);
     }
   }

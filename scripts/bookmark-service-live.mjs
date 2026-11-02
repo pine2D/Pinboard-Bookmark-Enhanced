@@ -274,11 +274,13 @@ export function resolveBudget(mod) {
 
 // Requests cleanup and its read-only verification may need for one instance.
 export function cleanupCost({ service, bookmarks = 0, urls = 0, tags = 0, lists = 0 }) {
-  // Pinboard: posts/get + posts/delete + posts/get per ledger bookmark, one
-  // posts/get per pool URL and one in the verify pass, a tags/get to see no
-  // run tag is left (Pinboard drops a tag with its last bookmark), and the
+  // Pinboard: posts/delete + posts/get per ledger bookmark (delete answers
+  // "item not found" for nothing, so no read first), at most one posts/get
+  // per pool URL (a URL read empty after the browser closed is not read
+  // again, by the pool scan or the verify pass), a tags/get to see no run
+  // tag is left (Pinboard drops a tag with its last bookmark), and the
   // margin of the other services.
-  if (service === 'pinboard') return 3 * bookmarks + 2 * urls + 1 + 2;
+  if (service === 'pinboard') return 2 * bookmarks + urls + 1 + 2;
   const tagPages = service === 'karakeep' ? 6 : 2;
   const tagCost = service === 'linkding' ? 4 * tags : 2 * tags;
   // ledger bookmarks: GET + DELETE + GET; pool: check each URL once, then a
@@ -288,9 +290,10 @@ export function cleanupCost({ service, bookmarks = 0, urls = 0, tags = 0, lists 
 }
 
 export function preflightCost({ service, urls = 0, writes = false }) {
-  // Pinboard has no health endpoint: the posts/get of each pool URL also
-  // proves the token.
-  if (service === 'pinboard') return urls;
+  // Pinboard has no health endpoint: one posts/get of the first pool URL
+  // proves the token. The others carry the same fresh run id, so they
+  // cannot exist either.
+  if (service === 'pinboard') return Math.min(urls, 1);
   return 2 + urls + (service === 'linkding' ? 1 : 0) + (service === 'karakeep' && writes ? 1 : 0);
 }
 
@@ -1903,9 +1906,12 @@ export class LiveRun {
       const inst = this.instances[instance];
       this.phase(instance + '_readonly');
       if (inst.service === 'pinboard') {
-        // One posts/get per pool URL: it proves the token and that no run URL
-        // exists yet. No other read is spent on Pinboard here.
-        for (const url of this.pools[instance]) check(await this.pinboardPost(instance, url) === null, 'fixture_already_exists');
+        // One posts/get of the first pool URL proves the token and that this
+        // run's URLs are new (each carries the run's fresh UUID, so the
+        // others cannot exist either; cleanup reads every one anyway). No
+        // other read is spent on Pinboard here.
+        const first = this.pools[instance][0];
+        if (first) check(await this.pinboardPost(instance, first) === null, 'fixture_already_exists');
         this.report.checks.push(instance + ': authentication, unique URLs');
         this.persist();
         console.log(instance + ': readonly preflight passed');
@@ -2640,14 +2646,13 @@ export class LiveRun {
       // Only this run's pool URLs are deleted; any other entry is not even read.
       check((this.pools[entry.instance] || []).includes(entry.url), 'cleanup_url');
       if (inst.service === 'pinboard') {
-        // By the ledger's URL only: posts/get, posts/delete, then posts/get
-        // again must find nothing.
+        // By the ledger's URL only: posts/delete ("done", or "item not
+        // found" when nothing is there), then posts/get must find nothing.
         check(entry.id === pinboardLedgerId(this.pools[entry.instance], entry.url), 'cleanup_url');
-        if (await this.pinboardPost(entry.instance, entry.url) !== null) {
-          const answer = await this.api(entry.instance, 'posts/delete?url=' + encodeURIComponent(entry.url));
-          check(['done', 'item not found'].includes(answer?.result_code), 'cleanup_delete');
-        }
+        const answer = await this.api(entry.instance, 'posts/delete?url=' + encodeURIComponent(entry.url));
+        check(['done', 'item not found'].includes(answer?.result_code), 'cleanup_delete');
         check(await this.pinboardPost(entry.instance, entry.url) === null, 'cleanup_delete');
+        this.notePinboardEmpty(entry.instance, entry.url);
         entry.deleted = true;
         this.report.cleanup.entries.push({ kind: 'bookmark', instance: entry.instance, id: entry.id, deleted: true });
         this.persist();
@@ -2671,6 +2676,12 @@ export class LiveRun {
     }
   }
 
+  // Pinboard pool URLs read empty in this cleanup after the browser closed.
+  // Nothing writes to Pinboard after that but this cleanup, which only
+  // deletes, so such a URL stays empty and is not read again. Never filled
+  // while a browser is open (a module's own cleanup).
+  notePinboardEmpty(instance, url) { if (this.pinboardEmpty && !this.ctx) this.pinboardEmpty.add(instance + ' ' + url); }
+
   async cleanupAll() {
     const entries = this.report.cleanup.entries;
     // 1. Stop the browser (and with it queue replays and other workers).
@@ -2679,6 +2690,7 @@ export class LiveRun {
     this.ctx = null;
     if (ctx) await ctx.close().catch(() => {});
     this.worker = null;
+    this.pinboardEmpty = new Set();
     if (this.fakeAi) {
       this.report.fakeAi.calls = this.fakeAi.all();
       await this.fakeAi.close().catch(() => {});
@@ -2782,7 +2794,8 @@ export class LiveRun {
       if (this.report.ledger.created.some(r => r.instance === instance && r.url === url && r.deleted)) continue;
       try {
         if (inst.service === 'pinboard') {
-          if (await this.pinboardPost(instance, url) === null) continue;
+          if (this.pinboardEmpty?.has(instance + ' ' + url)) continue;
+          if (await this.pinboardPost(instance, url) === null) { this.notePinboardEmpty(instance, url); continue; }
           const id = pinboardLedgerId(this.pools[instance], url);
           let known = this.report.ledger.created.find(r => r.instance === instance && r.id === id);
           if (!known) { known = { instance, id, url, source: 'pool', module: '', deleted: false }; this.report.ledger.created.push(known); this.persist(); }
@@ -2875,7 +2888,10 @@ export class LiveRun {
     const inst = this.instances[instance];
     try {
       for (const url of this.pools[instance] || []) {
-        if (inst.service === 'pinboard') { check(await this.pinboardPost(instance, url) === null, 'verify_pool_residue'); continue; }
+        if (inst.service === 'pinboard') {
+          if (!this.pinboardEmpty?.has(instance + ' ' + url)) check(await this.pinboardPost(instance, url) === null, 'verify_pool_residue');
+          continue;
+        }
         const data = await this.api(instance, (inst.service === 'linkding' ? 'bookmarks/check/' : 'bookmarks/check-url') + '?url=' + encodeURIComponent(url));
         check(!(inst.service === 'linkding' ? data.bookmark : data.bookmarkId), 'verify_pool_residue');
       }
