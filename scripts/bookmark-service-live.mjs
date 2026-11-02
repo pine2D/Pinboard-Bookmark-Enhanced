@@ -585,7 +585,7 @@ export function poolUrls(target, runId, instance, count) {
   return Array.from({ length: count }, (_, i) => `${origin}/?pbp-it=${runId}-${instance}-${i + 1}`);
 }
 
-export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnabled = false, headedFlag = false }) {
+export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnabled = false, headedFlag = false, env = process.env }) {
   const caps = BUDGETS[target];
   const instances = [...new Set(selected.map(m => m.instance))];
   const perInstance = {}, problems = [];
@@ -658,6 +658,11 @@ export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnable
   const setupAllowanceSeconds = SETUP_ALLOWANCE_SECONDS[target];
   if (worstCaseSeconds + setupAllowanceSeconds > caps.run.runMinutes * 60) problems.push('run_minutes');
   const shotModules = selected.filter(m => m.needs?.shots).map(m => m.id);
+  // What a selected row needs from this machine and does not have: the run
+  // still starts, those rows fail on it (never a silent pass).
+  const missing = [];
+  const renderRows = selected.filter(m => m.needs?.ldRender && m.service === 'linkding').map(m => m.id);
+  if (renderRows.length && !linkdingRenderer(env)) missing.push({ code: 'ld_render_missing', modules: renderRows, hint: 'set PBP_LD_RENDER_PYTHON and PBP_LD_RENDER_SCRIPT (linkding Notes renderer replica)' });
   return {
     harness: HARNESS_VERSION, target, credentialsRead: false, realRequests: 0, docker: false, browser: false,
     modules: selected.map(m => ({ id: m.id, instance: m.instance, service: m.service, surfaces: m.surfaces, features: m.features, fixRefs: m.fixRefs || [], needs: m.needs, budget: resolveBudget(m) })),
@@ -669,7 +674,7 @@ export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnable
     limits: { moduleSeconds: caps.run.moduleSeconds, runMinutes: caps.run.runMinutes, worstCaseSeconds, setupAllowanceSeconds, fakeAi: caps.run.fakeAi, roundsPerAuthorization: caps.run.roundsPerAuthorization ?? null, automaticRetries: 0 },
     karakeepWritesRequireAutoAiDisabled: target === 'user' && selected.some(m => m.service === 'karakeep' && m.needs?.writes !== false),
     cleanup: 'ledger bookmarks, ledger lists and zero-use run-prefix tags; then a read-only pass over the URL pool',
-    withinCaps: problems.length === 0, problems,
+    withinCaps: problems.length === 0, problems, missing,
   };
 }
 
@@ -1046,22 +1051,32 @@ export function parseRequestBody(raw) {
 
 // The linkding Notes renderer replica (tools of the research directory,
 // v1.47.0: markdown + bleach + linkify), run as a subprocess. Its python
-// and script come from PBP_LD_RENDER_PYTHON / PBP_LD_RENDER_SCRIPT; without
-// both a module records that rendering was skipped. Returns the rendered
-// HTML per input, or null.
+// and script come from PBP_LD_RENDER_PYTHON / PBP_LD_RENDER_SCRIPT. A row
+// that needs it (needs.ldRender) fails as ld_render_missing without them,
+// and --plan lists the gap (missing) before a run. Resolves to the rendered
+// HTML per input, or null without a renderer. The child runs asynchronously
+// so signals and the module timer stay live while it works.
 export function linkdingRenderer(env = process.env) {
   const python = env.PBP_LD_RENDER_PYTHON || '', script = env.PBP_LD_RENDER_SCRIPT || '';
   if (!python || !script || !existsSync(python) || !existsSync(script)) return null;
   return { python, script };
 }
-export function renderLinkdingNotes(renderer, notes, dir) {
+export async function renderLinkdingNotes(renderer, notes, dir, { timeoutMs = 30000 } = {}) {
   if (!renderer) return null;
   const file = join(dir, 'ld-render-' + randomBytes(6).toString('hex') + '.json');
   writeFileSync(file, JSON.stringify(notes.map((text, i) => ({ key: 'n' + i, selection: '', notes: text }))), { mode: 0o600 });
   try {
-    const out = spawnSync(renderer.python, ['-I', renderer.script, file], { encoding: 'utf8', timeout: 30000 });
-    check(out.status === 0, 'ld_render_failed');
-    return JSON.parse(out.stdout).cases.map(c => c.html);
+    const { status, stdout } = await new Promise(resolve => {
+      const child = spawn(renderer.python, ['-I', renderer.script, file], { stdio: ['ignore', 'pipe', 'ignore'] });
+      let out = '';
+      const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
+      child.stdout.setEncoding('utf8');
+      child.stdout.on('data', chunk => { out += chunk; });
+      child.on('error', () => { clearTimeout(timer); resolve({ status: -1, stdout: '' }); });
+      child.on('close', code => { clearTimeout(timer); resolve({ status: code, stdout: out }); });
+    });
+    check(status === 0, 'ld_render_failed');
+    return JSON.parse(stdout).cases.map(c => c.html);
   } finally { rmSync(file, { force: true }); }
 }
 
@@ -2024,6 +2039,7 @@ export class LiveRun {
       if (packed.ok) console.error(`Over one run's caps: run it as --round 1..${packed.count} (--plan shows the rounds)`);
     }
     check(this.plan.withinCaps, 'budget_exceeded_plan');
+    for (const gap of this.plan.missing || []) console.error(`Missing ${gap.code}: ${gap.modules.join(', ')} will fail (${gap.hint})`);
     this.caps = {};
     this.reserve = {};
     for (const instance of this.plan.instances) {
@@ -3157,7 +3173,12 @@ export class LiveRun {
         && (!method || r.method === method) && (!path || (path instanceof RegExp ? path.test(r.path) : r.path === path))),
       now: () => Date.now(),
       // linkding's Notes renderer (null: not configured; the module notes it).
-      renderNotes: notes => renderLinkdingNotes(linkdingRenderer(), notes, run.runDir),
+      renderNotes: async notes => {
+        alive();
+        const renderer = linkdingRenderer();
+        check(renderer, 'ld_render_missing');
+        return renderLinkdingNotes(renderer, notes, run.runDir);
+      },
       // axe on a page: rule ids, impact and node counts into the report's
       // findings (no page text), as UX material.
       axe: (page, state) => { alive(); return run.axe(page, state, mod.id); },

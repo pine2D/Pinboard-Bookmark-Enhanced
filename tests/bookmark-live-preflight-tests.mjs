@@ -1297,9 +1297,33 @@ try {
       writeFileSync(fakeScript, '# stand-in\n');
       const renderer = live.linkdingRenderer({ PBP_LD_RENDER_PYTHON: fakePython, PBP_LD_RENDER_SCRIPT: fakeScript });
       const renderDir = mkdtempSync(join(dir, 'render-'));
-      assert.deepEqual(live.renderLinkdingNotes(renderer, ['a', 'b'], renderDir), ['<p>a</p>', '<p>b</p>']);
+      assert.deepEqual(await live.renderLinkdingNotes(renderer, ['a', 'b'], renderDir), ['<p>a</p>', '<p>b</p>']);
       assert.deepEqual(readdirSync(renderDir), [], 'the cases file is removed');
-      assert.equal(live.renderLinkdingNotes(null, ['a'], renderDir), null);
+      assert.equal(await live.renderLinkdingNotes(null, ['a'], renderDir), null);
+      // Asynchronous, with its own deadline: a stuck renderer is killed and
+      // fails the module, and the event loop keeps running meanwhile.
+      const slowPython = join(dir, 'slow-python.sh');
+      writeFileSync(slowPython, '#!/bin/sh\nexec sleep 5\n', { mode: 0o755 });
+      let ticks = 0;
+      const ticker = setInterval(() => ticks++, 20);
+      await assert.rejects(live.renderLinkdingNotes({ python: slowPython, script: fakeScript }, ['a'], renderDir, { timeoutMs: 300 }), e => e.code === 'ld_render_failed');
+      clearInterval(ticker);
+      assert(ticks >= 5, 'the event loop ran while the renderer worked: ' + ticks);
+      assert.deepEqual(readdirSync(renderDir), [], 'the cases file is removed after a failure too');
+      // A selected row that needs the renderer is listed by --plan when it is
+      // missing (and fails as ld_render_missing when run), never skipped.
+      const quoteRows = live.selectModules('linkding.sh.quote-escape', { services: ['linkding'], target: 'temp' }).selected;
+      assert.deepEqual(live.buildPlan({ target: 'temp', selected: quoteRows, env: {} }).missing.map(m => [m.code, m.modules.join()]), [['ld_render_missing', 'linkding.sh.quote-escape']]);
+      assert.deepEqual(live.buildPlan({ target: 'temp', selected: quoteRows, env: { PBP_LD_RENDER_PYTHON: fakePython, PBP_LD_RENDER_SCRIPT: fakeScript } }).missing, []);
+      // The quote judge (sh.quote-escape): visible lines inside a blockquote,
+      // no Markdown structure.
+      const { judgeRenderedQuote, QUOTE_CASES } = await import('../scripts/bookmark-service-live-scenarios.mjs');
+      assert.equal(judgeRenderedQuote('Setext title\n===', { tags: ['blockquote', 'p', 'br'], text: 'Setext title\n===' }).ok, true);
+      assert.deepEqual(judgeRenderedQuote('Setext title\n===', { tags: ['blockquote', 'h1'], text: 'Setext title' }).problems, ['structure:h1', 'text']);
+      assert.deepEqual(judgeRenderedQuote('literal &lt;tag&gt;', { tags: ['blockquote', 'p'], text: 'literal <tag>' }).problems, ['text'], 'a decoded entity is a different text');
+      assert.deepEqual(judgeRenderedQuote('1. item', { tags: ['p'], text: '1. item' }).problems, ['not_blockquote']);
+      for (const needle of ['Setext title\n===', '1. item', '# heading', '&lt;tag&gt;', '\n\n    indented']) assert(QUOTE_CASES.some(c => c.includes(needle)), 'quote cases cover ' + JSON.stringify(needle));
+      assert(QUOTE_CASES.some(c => /^.+\n=+$/.test(c)), 'a setext underline as the second line of its own case');
     }
     for (const bad of ['https://example.com', 'http://127.0.0.1.evil.test', 'http://user:password@127.0.0.1:48100', 'http://127.0.0.1:48100/?key=x', 'http://[::1]:48100', 'http://127.0.0.1:48100/sub/']) {
       assert.throws(() => live.validateBase(bad), e => e.code === 'loopback_required', bad);

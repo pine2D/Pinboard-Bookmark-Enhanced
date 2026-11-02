@@ -32,6 +32,9 @@
 //             it to needs.target 'temp'), 'injected' has every such write
 //             answered by t.inject. The runner refuses an over-long tag that
 //             would reach a user instance either way (live_guard_long_tag_user).
+//             ldRender: the linkding instance compares Notes through the
+//             renderer replica (PBP_LD_RENDER_PYTHON / _SCRIPT); without it
+//             the module fails as ld_render_missing and --plan lists it.
 //             snapshots: the module waits for linkding's automatic HTML
 //             snapshot. Temporary linkding instances start with automatic
 //             snapshots off; the runner switches them on for such a module
@@ -66,7 +69,7 @@ export const META_DESCRIPTION = 'Public synthetic meta description.';
 
 const NEEDS = Object.freeze({
   fakeAi: false, target: 'any', container: null, sharing: 'any', headed: false,
-  shots: false, pinboard: false, writes: true, snapshots: false, longTag: 'none',
+  shots: false, pinboard: false, writes: true, snapshots: false, longTag: 'none', ldRender: false,
 });
 
 // linkding builds HTML snapshots one at a time in the background. Only the
@@ -948,7 +951,41 @@ async function renderedLines(t, html) {
 const visibleLines = text => String(text).split('\n').map(line => line.replace(/\s+/g, ' ').trim()).filter(Boolean);
 
 const LONG_TAG = t => t.prefix + '_' + 'long'.repeat(6);
-const QUOTE_LINES = ['    First line indented', 'Setext title', '===', 'Another', '---', 'a & b < c', '1) item', '', '    indented after blank', 'tab\tseparated', '\tleading tab'];
+// Selection quote inputs (G5), each rendered on its own as its own Notes
+// block, so a construct sits where Python-Markdown acts on it: a setext
+// underline as the second line of a block, an ordered list or heading at a
+// block's start, an indent at a block's start or after a blank line, and
+// text that is already an entity. The last case is the earlier merged
+// matrix, kept as an extra. The saved selection joins all of them with
+// blank lines (end to end through the popup).
+export const QUOTE_CASES = Object.freeze([
+  '    First line indented',
+  'Setext title\n===',
+  'Another title\n---',
+  'a & b < c',
+  '1) item',
+  '1. item',
+  '# heading',
+  'literal &lt;tag&gt; &amp; text',
+  'Paragraph line\n\n    indented after blank',
+  'tab\tseparated',
+  '\tleading tab',
+  ['    First line indented', 'Setext title', '===', 'Another', '---', 'a & b < c', '1) item', '', '    indented after blank', 'tab\tseparated', '\tleading tab'].join('\n'),
+]);
+// Tags whose presence means Markdown structure leaked out of the quote.
+export const QUOTE_STRUCTURE_TAGS = Object.freeze(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'ol', 'ul', 'li', 'pre', 'code']);
+// What one rendered case shows against its input (pure, for the preflight
+// and the offline mutation check): the visible lines must match, inside a
+// blockquote, with no Markdown structure.
+export function judgeRenderedQuote(input, shown) {
+  const problems = [];
+  if (!shown.tags.includes('blockquote')) problems.push('not_blockquote');
+  const leaked = [...new Set(shown.tags.filter(tag => QUOTE_STRUCTURE_TAGS.includes(tag)))];
+  if (leaked.length) problems.push('structure:' + leaked.join('+'));
+  const want = visibleLines(input).join('\n'), got = visibleLines(shown.text).join('\n');
+  if (want !== got) problems.push('text');
+  return { ok: !problems.length, problems, want, got };
+}
 
 export const SELFHOSTED_MODULES = [
   // 1a. linkding Description written elsewhere survives every entry point
@@ -1209,37 +1246,43 @@ export const SELFHOSTED_MODULES = [
     fixRefs: ['G5'],
     // Temp only (user-target rounds): the escaping is the extension's and
     // the rendering the replica's; the user's instance adds nothing to it.
-    needs: needs({ target: 'temp' }),
-    budget: { bookmarks: 1, urls: 1, node: 4, browser: { linkding: 20, karakeep: 30 }, ai: 0, tags: 0, seconds: 30, tagReads: 1 },
+    needs: needs({ target: 'temp', ldRender: true }),
+    budget: { bookmarks: 1, urls: 1, node: 4, browser: { linkding: 20, karakeep: 30 }, ai: 0, tags: 0, seconds: 45, tagReads: 1 },
     files: [],
     settings: { optBlockquote: true, optAutoDescription: true },
     async steps(t) {
       const url = t.claimUrl();
-      const quote = QUOTE_LINES.join('\n');
+      const quote = QUOTE_CASES.join('\n\n');
       page(t, url, articleHtml({ quote }));
       await t.phase('quote_popup');
       const form = await t.openPopup(url, { selection: true });
+      // Each case as the product quotes it, from the page that saved it.
+      const quoted = t.service === 'linkding' ? await form.popup.evaluate(cases => cases.map(text => pbpFormatQuote(text, 'linkding')), [...QUOTE_CASES]) : [];
       await form.popup.locator('#title-input').fill(t.prefix + ' quote matrix');
       await t.savePopup(form.popup);
       await form.close();
       const row = await t.ownRow(url);
       const notes = notesOfRow(t, row);
-      const expected = visibleLines(quote);
       if (t.service === 'karakeep') {
-        t.expect(!notes.includes('<blockquote') && !notes.includes('&lt;') && !notes.includes('&amp;'), 'karakeep_note_markup');
+        // Plain text: no markup, and no escaping of the raw & and < (the
+        // literal-entity case is meant to read "&lt;tag&gt;").
+        t.expect(!notes.includes('<blockquote') && !notes.includes('a &amp; b') && !notes.includes('b &lt; c') && !notes.includes('&amp;lt;'), 'karakeep_note_markup');
         const lines = visibleLines(notes);
-        t.expect(expected.every(line => lines.some(l => l.includes(line))), 'karakeep_note_text');
+        t.expect(visibleLines(quote).every(line => lines.some(l => l.includes(line))), 'karakeep_note_text');
       } else {
         await t.phase('quote_render');
-        const html = t.renderNotes([notes]);
-        if (!html) { t.note('render', 'skipped: PBP_LD_RENDER_PYTHON / PBP_LD_RENDER_SCRIPT not set'); t.check('linkding: quote saved; rendering skipped (renderer not configured)'); return; }
-        const shown = await renderedLines(t, html[0]);
-        t.note('renderedTags', [...new Set(shown.tags)].sort());
-        t.expect(shown.tags.includes('blockquote'), 'quote_not_blockquote');
-        t.expect(!shown.tags.some(tag => ['h1', 'h2', 'hr', 'ol', 'ul', 'pre', 'code'].includes(tag)), 'quote_markdown_structure');
-        t.expectEq(visibleLines(shown.text).join('\n'), expected.join('\n'), 'quote_rendered_text');
+        // Every case on its own, then the saved Notes (the whole selection).
+        const html = await t.renderNotes([...quoted, notes]);
+        const verdicts = [];
+        for (let i = 0; i < html.length; i++) {
+          const input = i < QUOTE_CASES.length ? QUOTE_CASES[i] : quote;
+          const verdict = judgeRenderedQuote(input, await renderedLines(t, html[i]));
+          if (!verdict.ok) verdicts.push({ case: i < QUOTE_CASES.length ? i : 'saved', problems: verdict.problems, want: verdict.want.slice(0, 80), got: verdict.got.slice(0, 80) });
+        }
+        t.note('renderFailures', verdicts);
+        t.expectEq(verdicts.map(v => v.case + ':' + v.problems.join('+')).join(' '), '', 'quote_rendered_cases');
       }
-      t.check(`${t.service}: selection quote with ===, ---, a & b < c, 1) item, indents and tabs reads back as written`);
+      t.check(`${t.service}: each selection case (setext ===/---, 1) and 1. items, # heading, literal entities, &, <, indents, tabs) and the whole selection read back as written`);
     },
   },
 
