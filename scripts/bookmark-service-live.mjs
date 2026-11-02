@@ -811,18 +811,55 @@ export async function takeShot(page, { file, secrets = [], keys = [] }) {
   if (revealed) return { ok: false, code: 'shot_secret_field_revealed' };
   const geometry = await page.evaluate(selectors => {
     const vw = window.innerWidth, vh = window.innerHeight;
-    const overflow = document.documentElement.scrollWidth - vw;
-    // missing: not in the DOM; hidden: zero-sized (display:none, consumed
-    // action); offscreen: rendered but outside the viewport (below the fold).
+    const doc = document.documentElement, scroller = document.scrollingElement || doc;
+    const overflow = doc.scrollWidth - vw;
+    // The viewport takes html's overflow, or body's when html's is visible.
+    const htmlStyle = getComputedStyle(doc), bodyStyle = document.body ? getComputedStyle(document.body) : null;
+    const viewportOverflow = axis => htmlStyle[axis] !== 'visible' || !bodyStyle ? htmlStyle[axis] : bodyStyle[axis];
+    const userScrolls = value => value !== 'hidden' && value !== 'clip';
+    const describe = el => el.tagName.toLowerCase() + (/^[A-Za-z0-9_-]{1,40}$/.test(el.id) ? '#' + el.id : '')
+      + [...el.classList].filter(c => /^[A-Za-z0-9_-]{1,40}$/.test(c)).slice(0, 2).map(c => '.' + c).join('');
+    // Evidence for a horizontal overflow: the outermost boxes past the right edge.
+    const overflowBy = [];
+    if (overflow > 1) {
+      const wide = [...document.querySelectorAll('body *')].filter(el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.right > vw + 1; });
+      for (const el of wide.filter(el => !wide.includes(el.parentElement)).slice(0, 3)) {
+        const r = el.getBoundingClientRect();
+        overflowBy.push({ el: describe(el), left: Math.round(r.left), right: Math.round(r.right), width: Math.round(r.width) });
+      }
+    }
+    // missing: not in the DOM; hidden: zero-sized (display:none, a consumed
+    // action); ok: fully in view; scroll: reachable by scrolling the page or
+    // a scrollable ancestor (a toolbar popup is at most 600px tall and
+    // scrolls vertically); clipped: cut off where nothing can scroll
+    // (overflow hidden or clip, or past the edge of a page that clips
+    // horizontally).
     const keyState = selectors.map(sel => {
       const el = document.querySelector(sel);
       if (!el) return { selector: sel, state: 'missing', inViewport: false };
       const r = el.getBoundingClientRect();
       if (r.width === 0 || r.height === 0) return { selector: sel, state: 'hidden', inViewport: false };
-      const inViewport = r.left >= -1 && r.top >= -1 && r.right <= vw + 1 && r.bottom <= vh + 1;
-      return { selector: sel, state: inViewport ? 'ok' : 'offscreen', inViewport };
+      let clipped = false, inScroller = false;
+      for (let a = el.parentElement; a && a !== document.body && a !== doc; a = a.parentElement) {
+        const s = getComputedStyle(a);
+        if (s.overflowX === 'visible' && s.overflowY === 'visible') continue;
+        const ar = a.getBoundingClientRect();
+        const outX = r.left < ar.left - 1 || r.right > ar.right + 1, outY = r.top < ar.top - 1 || r.bottom > ar.bottom + 1;
+        if ((outX && !userScrolls(s.overflowX)) || (outY && !userScrolls(s.overflowY))) { clipped = true; break; }
+        if (outX || outY) inScroller = true;
+      }
+      const inX = r.left >= -1 && r.right <= vw + 1, inY = r.top >= -1 && r.bottom <= vh + 1;
+      const top = r.top + scroller.scrollTop, left = r.left + scroller.scrollLeft;
+      const reachX = inX || (userScrolls(viewportOverflow('overflowX')) && left >= -1 && left + r.width <= scroller.scrollWidth + 1);
+      const reachY = inY || (userScrolls(viewportOverflow('overflowY')) && top >= -1 && top + r.height <= scroller.scrollHeight + 1);
+      const state = clipped || !reachX || !reachY ? 'clipped' : inX && inY && !inScroller ? 'ok' : 'scroll';
+      return { selector: sel, state, inViewport: inX && inY && !inScroller && !clipped };
     });
-    return { overflow, overflowOk: overflow <= 1, keys: keyState, ok: overflow <= 1 && keyState.every(k => k.state === 'ok') };
+    return {
+      viewport: { width: vw, height: vh }, scrollWidth: scroller.scrollWidth, scrollHeight: scroller.scrollHeight,
+      overflow, overflowOk: overflow <= 1, overflowBy, keys: keyState,
+      ok: overflow <= 1 && keyState.every(k => k.state === 'ok' || k.state === 'scroll'),
+    };
   }, keys);
   await page.screenshot({ path: file, mask: [page.locator(SECRET_FIELD_SELECTOR)], animations: 'disabled', caret: 'hide' });
   chmodSync(file, 0o600);
@@ -1878,8 +1915,10 @@ export class LiveRun {
     const locs = locales || [this.locale], schs = schemes || [this.scheme];
     const originalLocale = this.locale, originalScheme = this.scheme;
     const results = [];
-    // A toolbar popup is as wide as its body and at most 600px tall; shoot
-    // it at that size so key controls below the fold show up as findings.
+    // A toolbar popup is as wide as its body (at most 800px) and at most
+    // 600px tall, and scrolls vertically past that. Shoot it at that size:
+    // a key control below the fold is reachable by scrolling, one pushed past
+    // the clipped right edge is a finding.
     let viewport = null;
     if (surface === 'popup') {
       viewport = page.viewportSize();
@@ -1909,7 +1948,13 @@ export class LiveRun {
         writePrivateJson(this.report.shots.manifest, this.shotsManifest);
         this.report.shots.count = this.shotsManifest.filter(s => s.file).length;
         if (!result.ok) { this.persist(); fail(result.code); }
-        if (result.geometry && !result.geometry.ok) this.report.findings.push({ kind: 'geometry', module: entry.module, shot: file, overflow: result.geometry.overflow, keys: result.geometry.keys.filter(k => k.state !== 'ok').map(k => k.selector + ':' + k.state) });
+        if (result.geometry && !result.geometry.ok) {
+          const g = result.geometry;
+          this.report.findings.push({
+            kind: 'geometry', module: entry.module, shot: file, overflow: g.overflow, viewport: g.viewport, scrollWidth: g.scrollWidth, scrollHeight: g.scrollHeight,
+            overflowBy: g.overflowBy.map(e => `${e.el}@${e.left}-${e.right}`), keys: g.keys.filter(k => k.state !== 'ok' && k.state !== 'scroll').map(k => k.selector + ':' + k.state),
+          });
+        }
         results.push(entry);
       }
     }
@@ -2189,7 +2234,7 @@ export class LiveRun {
     for (const [f, list] of features) lines.push(`- ${f}：${list.join('，')}`);
     lines.push('', '## 截图与布局', '');
     lines.push(`- 截图 ${r.shots.count} 张${r.shots.dir ? `，目录 ${r.shots.dir}` : '（本轮未开启 --shots）'}`);
-    for (const f of r.findings.filter(x => x.kind === 'geometry')) lines.push(`- 几何断言未通过：${f.shot}（横向溢出 ${f.overflow}px，视口外控件 ${f.keys.join('、') || '无'}）`);
+    for (const f of r.findings.filter(x => x.kind === 'geometry')) lines.push(`- 几何断言未通过：${f.shot}（视口 ${f.viewport?.width}×${f.viewport?.height}，横向溢出 ${f.overflow}px${f.overflowBy?.length ? `，越界元素 ${f.overflowBy.join('、')}` : ''}；滚动也到不了的控件 ${f.keys.join('、') || '无'}）`);
     lines.push('', '## 未覆盖项', '');
     for (const s of r.skipped) lines.push(`- ${s.id}：因 ${s.reason} 未执行`);
     for (const u of UNCOVERED) {

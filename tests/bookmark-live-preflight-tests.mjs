@@ -784,8 +784,29 @@ try {
   shot = await shoot(`<div style="width:900px;height:10px"></div><button id="save" style="margin-top:2000px">Save</button>`, 'geometry');
   assert.equal(shot.result.ok, true);
   assert.equal(shot.result.geometry.overflowOk, false, 'horizontal overflow is reported');
-  assert.equal(shot.result.geometry.keys[0].inViewport, false, 'off-screen key control is reported');
-  assert.equal(shot.result.geometry.keys[0].state, 'offscreen');
+  assert.equal(shot.result.geometry.ok, false);
+  assert.deepEqual([shot.result.geometry.scrollWidth, shot.result.geometry.viewport.width], [900, 420]);
+  assert.equal(shot.result.geometry.overflowBy[0].el, 'div', 'the element that widens the page is named');
+  assert.equal(shot.result.geometry.keys[0].inViewport, false);
+  assert.equal(shot.result.geometry.keys[0].state, 'scroll', 'a key below the fold is reachable by scrolling');
+  // A toolbar popup is at most 600px tall and scrolls vertically: a key
+  // control below the fold is reachable, not a finding.
+  shot = await shoot(`<div style="height:900px"></div><button id="save">Save</button>`, 'below-fold');
+  assert.deepEqual([shot.result.geometry.keys[0].state, shot.result.geometry.ok], ['scroll', true]);
+  assert(shot.result.geometry.scrollHeight > 900);
+  // The popup clips horizontally (body overflow-x: hidden): a control pushed
+  // past the right edge cannot be scrolled to.
+  shot = await shoot(`<style>body{overflow-x:hidden}</style><span class="tag-item" style="display:inline-flex;white-space:nowrap;margin-left:380px">long-tag<button id="save">x</button></span>`, 'clipped-x');
+  assert.deepEqual([shot.result.geometry.keys[0].state, shot.result.geometry.ok, shot.result.geometry.overflowOk], ['clipped', false, false]);
+  assert.equal(shot.result.geometry.overflowBy[0].el, 'span.tag-item');
+  // Clipped by an ancestor that cannot scroll, versus one that can.
+  shot = await shoot(`<div style="height:50px;overflow:hidden"><div style="height:200px"></div><button id="save">Save</button></div>`, 'clipped-ancestor');
+  assert.deepEqual([shot.result.geometry.keys[0].state, shot.result.geometry.ok], ['clipped', false]);
+  shot = await shoot(`<div style="height:50px;overflow:auto"><div style="height:200px"></div><button id="save">Save</button></div>`, 'scroll-ancestor');
+  assert.deepEqual([shot.result.geometry.keys[0].state, shot.result.geometry.ok], ['scroll', true]);
+  // A page that cannot scroll vertically hides what is below the fold.
+  shot = await shoot(`<style>html,body{overflow:hidden}</style><div style="height:900px"></div><button id="save">Save</button>`, 'no-scroll');
+  assert.deepEqual([shot.result.geometry.keys[0].state, shot.result.geometry.ok], ['clipped', false]);
   // A consumed action (display:none) and a control that never rendered are
   // told apart from one that is merely below the fold.
   shot = await shoot(`<button id="save" style="display:none">Save</button>`, 'hidden');

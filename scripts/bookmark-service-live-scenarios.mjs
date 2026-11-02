@@ -453,6 +453,9 @@ export const MODULES = [
       const written = await popup.locator(field).inputValue();
       t.expect(!written.includes('[AI Summary]'), 'ai_summary_legacy_label');
       if (t.service === 'linkding') t.expect(!(await popup.locator('#description-input').inputValue()).includes(t.fakeAi.marker), 'ai_summary_in_notes');
+      // The summary button is consumed by design (regenerate / remove links
+      // replace it), so it is not a key control of the screenshot below.
+      t.note('summaryActions', { summaryButtonVisible: await popup.locator('#ai-summary-btn').isVisible(), followUpLinks: await popup.locator('.cache-hint-wrap .regen-link').count() });
       await t.phase('ai_tags');
       await popup.locator('#ai-tags-btn').click();
       await popup.locator('#ai-suggest-tags .stag.ai').first().waitFor();
