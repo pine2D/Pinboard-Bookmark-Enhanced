@@ -313,6 +313,59 @@ test('uncommitted changes in the target are warned about and kept', async () => 
   } finally { s.done(); }
 });
 
+// Which processes does a test command leave behind? It records its own pid and a
+// grandchild's, then sits; with the file intact (the baseline) it exits at once.
+const pidAlive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
+const lingering = file => ['sh', '-c', 'if grep -q GOOD "$1"; then exit 0; fi; echo $$ > "$2"; sleep 30 & echo $! >> "$2"; wait', 'sh', file];
+const waitPids = async pidFile => {
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    const pids = existsSync(pidFile) ? readFileSync(pidFile, 'utf8').split('\n').filter(Boolean).map(Number) : [];
+    if (pids.length === 2) return pids;
+    await new Promise(r => setTimeout(r, 20));
+  }
+  throw new Error('the test command never recorded its pids');
+};
+const gone = async pids => {
+  const deadline = Date.now() + 2000;
+  while (Date.now() < deadline && pids.some(pidAlive)) await new Promise(r => setTimeout(r, 20));
+  return pids.filter(pidAlive);
+};
+
+for (const [signal, expected] of [['SIGINT', 130], ['SIGTERM', 143]]) {
+  test(`${signal} also ends the test command and its grandchild, not just the tool`, async () => {
+    const s = sandbox();
+    let pids = [];
+    try {
+      const pidFile = join(s.dir, 'pids');
+      const child = spawn(process.execPath, [CLI, s.file, 'GOOD', 'BAD', '--', ...lingering(s.file).concat(pidFile)], { stdio: ['ignore', 'pipe', 'pipe'] });
+      const closed = exited(child);
+      pids = await waitPids(pidFile);
+      child.kill(signal);
+      assert.equal((await closed).code, expected);
+      const left = await gone(pids);
+      for (const pid of left) process.kill(pid, 'SIGKILL');
+      assert.deepEqual(left, [], 'the test command or its grandchild outlived the tool');
+      assert.equal(readFileSync(s.file, 'utf8'), ORIGINAL);
+    } finally { for (const pid of pids) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } } s.done(); }
+  });
+}
+
+test('a test command that exits while a background child keeps running returns at once', async () => {
+  const s = sandbox();
+  let leftover = null;
+  try {
+    const marker = join(s.dir, 'bg.pid');
+    const command = ['sh', '-c', 'if grep -q GOOD "$1"; then exit 0; fi; sleep 5 & echo $! > "$2"; exit 1', 'sh', s.file, marker];
+    const started = Date.now();
+    const { results } = await runMutations([{ file: s.file, old: 'GOOD', new: 'BAD' }], { command, baseline: false, ...quiet });
+    assert.ok(Date.now() - started < 1000, `waited ${Date.now() - started}ms for the background child`);
+    assert.deepEqual(results.map(r => [r.status, r.detail]), [['killed', 'exit 1']]);
+    leftover = Number(readFileSync(marker, 'utf8'));
+    assert.deepEqual(await gone([leftover]), [], 'the background child outlived the run');
+  } finally { if (leftover) { try { process.kill(leftover, 'SIGKILL'); } catch { /* gone */ } } s.done(); }
+});
+
 // Runs: a run that is still going is not a crash.
 test('a run in progress does not block a run on another file and is never told to restore', async () => {
   const s = sandbox();
