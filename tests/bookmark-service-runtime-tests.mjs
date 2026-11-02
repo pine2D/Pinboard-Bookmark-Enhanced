@@ -8,6 +8,19 @@ import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
 const root=fileURLToPath(new URL('../',import.meta.url));
+// Blocks, in run order. PBP_RUNTIME_ONLY=<name part>[,<name part>...] runs only
+// the blocks whose name contains one of the parts (case-insensitive); --list
+// prints the names and exits. Neither set: the whole script runs exactly as it
+// always did. Each block's own connection needs are declared on its
+// block() call and set up only when a filter is active, so one block run alone
+// reaches the same verdict as in the full run.
+const BLOCKS=['archive explanation and JSON restore','services: connect, save, reader','access gateway form','linkding sharing capability','Karakeep create race','linkding merge and server dates','linkding multi-line Description','linkding over-long tag','linkding unknown Description','linkding restored draft for another URL','linkding address typed after open','linkding cleaned page address','linkding Description server semantics','gateway probes'];
+const only=(process.env.PBP_RUNTIME_ONLY||'').split(',').map(part=>part.trim().toLowerCase()).filter(Boolean);
+const selected=name=>!only.length||only.some(part=>name.toLowerCase().includes(part));
+if(process.argv.includes('--list')){console.log(BLOCKS.join('\n'));process.exit(0);}
+if(only.length&&!BLOCKS.some(selected)){console.error('PBP_RUNTIME_ONLY='+process.env.PBP_RUNTIME_ONLY+' matched no block; run with --list for the names');process.exit(2);}
+const filterNote=only.length?'Only ran '+BLOCKS.filter(selected).length+'/'+BLOCKS.length+' blocks (PBP_RUNTIME_ONLY='+process.env.PBP_RUNTIME_ONLY+'): '+BLOCKS.filter(selected).join('; '):'';
+if(filterNote)console.log(filterNote.replace('Only ran','Running only'));
 const {chromium}=createRequire(resolve(root,'.qa-scan/package.json'))('playwright');
 const profile=mkdtempSync(join(tmpdir(),'pbp-bookmark-runtime-'));
 const records={linkding:new Map(),karakeep:new Map()}, requests=[], membership=new Set(), wire=[];
@@ -181,6 +194,49 @@ try{
   assert(await worker.evaluate(origin=>chrome.permissions.contains({origins:[origin+'/*']}),origin));
   const article=await ctx.newPage();await article.goto(origin+'/article');
   const pageUrl='chrome-extension://'+extId+'/';
+  const linkdingCreates=since=>requests.slice(since).filter(r=>r.service==='linkding'&&r.method==='POST'&&r.path==='bookmarks/');
+  const draftFor=pageUrl=>worker.evaluate(async url=>Object.values(await chrome.storage.session.get(null)).find(row=>row?.pageUrl===url)?.draft||null,pageUrl);
+  const openOnTab=async()=>{await article.bringToFront();const opened=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');const popup=await opened;
+    await popup.waitForFunction(()=>typeof _popupDraftContext!=='undefined'&&_popupDraftContext?.ready===true&&!document.getElementById('submit-btn').disabled);
+    await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});return popup;};
+  const settled=(popup,status)=>popup.waitForFunction(status=>bookmarkLookup.status===status,status);
+  // Between blocks of a filtered run: everything a block may leave behind in
+  // the worker, the server fixture and the browser, so a block never depends on
+  // the one before it. A full run skips this and keeps its original flow.
+  const resetForBlock=async()=>{
+    await worker.evaluate(async()=>{
+      statusCache.clear();
+      const rows=await chrome.storage.session.get(null);
+      const drafts=Object.entries(rows).filter(([,row])=>row?.pageUrl).map(([key])=>key);
+      if(drafts.length)await chrome.storage.session.remove(drafts);
+      await chrome.storage.local.set({offlineQueue:[]});await chrome.storage.local.remove('urlClean');
+    });
+    for(const page of ctx.pages())if(page!==article)await page.close();
+    records.linkding.clear();records.karakeep.clear();membership.clear();raceCreates.clear();
+    postgres.linkding=false;down.linkding=false;gate.linkding=false;holdLinkdingPatch=null;
+    await article.goto(origin+'/article');
+  };
+  // The connection a block needs, made through the settings page like a user.
+  const ensureConnected=async service=>{
+    const current=await worker.evaluate(()=>pbpReadBookmarkConnection());
+    if(current.service===service&&current.account)return;
+    const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
+    await options.locator(`input[name="bookmark-service"][value="${service}"]`).check();
+    await options.locator('#opt-'+service+'-url').fill(origin+'/'+service+'/');
+    await options.locator('#opt-'+service+'-token').fill('fixture-key');
+    await options.locator('#connect-'+service).click();
+    await options.locator('#connect-'+service+'-status').filter({hasText:'Connected'}).waitFor({timeout:10000});
+    await until(()=>options.evaluate(async service=>{const c=await pbpReadBookmarkConnection();return c.service===service&&!!c.account;},service),service+' connection persisted');
+    await options.close();
+  };
+  let blockIndex=0;
+  async function block(name,needs,run){
+    assert.equal(BLOCKS[blockIndex++],name,'runtime blocks drifted from the BLOCKS list');
+    if(!selected(name))return;
+    if(only.length){await resetForBlock();for(const service of needs)await ensureConnected(service);}
+    await run();
+  }
+  await block('archive explanation and JSON restore',[],async()=>{
   const backupPage=await ctx.newPage();await backupPage.goto(pageUrl+'options.html');
   // The archive explanation follows the selected service immediately, before
   // any Connect or Save, and switching back must hide it again.
@@ -209,7 +265,9 @@ try{
   assert.equal(restored.owner,'restored-personal');assert.equal(restored.populated,false);assert.equal(restored.denied,'');
   await backupPage.close();
   console.log('empty-library JSON restore adopted its owner; a populated library refused another owner');
+  });
   let personalOwner;
+  await block('services: connect, save, reader',[],async()=>{
   for(const service of ['linkding','karakeep']){
     const options=await ctx.newPage();await options.goto(pageUrl+'options.html');
     await options.locator(`input[name="bookmark-service"][value="${service}"]`).check();
@@ -379,7 +437,8 @@ try{
     }
     console.log(service+': settings, popup save, reader Read Later/delete, shared vocabulary passed');
   }
-  {
+  });
+  await block('access gateway form',['linkding'],async()=>{
     // Access gateway form: validation before any request, Cloudflare headers
     // sealed on Connect, linkding keeps its connection ID for the same URL and token.
     const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
@@ -441,7 +500,8 @@ try{
     assert(!wire.some(w=>w.path==='/cdn-cgi/access/login/fixture'),'gateway redirect was followed');
     gate.linkding=false;await options.close();
     console.log('access gateway form: validation, Cloudflare connect, restore and connection ID reuse passed');
-  }
+  });
+  await block('linkding sharing capability',['linkding'],async()=>{
   // Old envelopes and disabled sharing expose no checkbox in either surface.
   const sharingCredential=await worker.evaluate(async()=>(await loadSettings()).linkdingToken);
   for(const capability of ['missing','disabled']){
@@ -462,6 +522,8 @@ try{
   assert.equal((await worker.evaluate(url=>submitSaveIntent({mode:'create',url,title:'Explicit share',notes:'',tags:'',private:false,toread:false,sharedExplicit:true}),publicUrl)).status,'saved');
   const publicRow=[...records.linkding.values()].find(row=>row.url===publicUrl);assert.equal(publicRow.shared,true,'enabled explicit new sharing was lost');records.linkding.delete(String(publicRow.id));
   console.log('linkding missing/disabled sharing: popup and reader controls hidden, new shared=false, existing shared=true preserved');
+  });
+  await block('Karakeep create race',[],async()=>{
   // A second client saves after check-url. The server response is authored
   // independently of the submitted fields (Karakeep 0.34.1 B2 shape).
   const raceUrl=origin+'/article-race';
@@ -481,6 +543,8 @@ try{
   assert(raceCalls.some(r=>r.path==='lists/later1/bookmarks/race1'&&r.method==='PUT'),'Read Later did not continue');
   assert(!Object.hasOwn(raceCalls.find(r=>r.method==='PATCH').data,'title'),'crawled title was written back');
   console.log('Karakeep create race merged safely, preserved tags and continued Read Later');
+  });
+  await block('linkding merge and server dates',['linkding'],async()=>{
   // linkding 1.47 T7: a repeated POST is still 201 with the original id and
   // date_added. Only the server's own timestamps identify the merged record.
   const linkdingRaceUrl=origin+'/article-linkding-race';
@@ -510,6 +574,8 @@ try{
     assert(result.account,label+' create lost its undo account');
   }
   console.log('linkding equal, near-equal, two-second and unparseable server dates remain created');
+  });
+  await block('linkding multi-line Description',['linkding'],async()=>{
   // A Description written elsewhere keeps its line breaks. The popup and the
   // reader show it as one line; a save that leaves that line alone must not
   // flatten it. Hand-written v1.47 record for a URL no lookup has cached yet.
@@ -598,11 +664,12 @@ try{
   }
   records.linkding.delete(multiId);await article.goto(origin+'/article');
   console.log('linkding multi-line Description: tag-only popup updates keep it, also after a change elsewhere; a reopened title draft shows and keeps the current one; a title-only reader update keeps it; an edit writes its one line');
+  });
   // A tag longer than PostgreSQL's 64-character column, typed in the popup:
   // the error names it, nothing is queued or offered for a retry, and the
   // form keeps the tag and the bookmark the create left behind, so a shorter
   // tag of 64 code points (128 UTF-16 units) updates that bookmark.
-  {
+  await block('linkding over-long tag',['linkding'],async()=>{
     postgres.linkding=true;
     const tagUrl=origin+'/article-tag-limit', long='research-'+'x'.repeat(56), fits='\u{1F600}'.repeat(64);
     const en=JSON.parse(readFileSync(new URL('../_locales/en/messages.json',import.meta.url),'utf8'));
@@ -642,13 +709,13 @@ try{
     await popup.close();records.linkding.delete(String(kept.id));postgres.linkding=false;
     await worker.evaluate(()=>statusCache.clear());await article.goto(origin+'/article');
     console.log('linkding over-long tag on PostgreSQL: the 500 names the tag, nothing is queued or offered for retry, the form updates the kept bookmark with a 64-code-point tag, and the same 500 without an over-long tag is queued');
-  }
+  });
   // A page the extension may not read (the localhost name was never granted)
   // leaves the popup nothing to vouch for: the create sends no Description
   // and no disable_scraping, and linkding fills in the page's own meta
   // description. The reader has no page description of its own either, so a
   // reader save without a popup draft does the same.
-  const linkdingCreates=since=>requests.slice(since).filter(r=>r.service==='linkding'&&r.method==='POST'&&r.path==='bookmarks/');
+  await block('linkding unknown Description',['linkding'],async()=>{
   {
     const unreadUrl=unreadOrigin+'/article-meta';
     await article.goto(unreadUrl);await article.bringToFront();
@@ -684,21 +751,14 @@ try{
   }
   await article.goto(origin+'/article');
   console.log('linkding unknown Description: an unread popup page and a draft-free reader save let linkding scrape it');
-  // Popup helpers shared by the Description blocks below: the draft stored for a
-  // tab's raw URL, a popup opened on the active tab once its draft scope is ready,
-  // and the wait for its bookmark lookup to settle.
-  const draftFor=pageUrl=>worker.evaluate(async url=>Object.values(await chrome.storage.session.get(null)).find(row=>row?.pageUrl===url)?.draft||null,pageUrl);
-  const openOnTab=async()=>{await article.bringToFront();const opened=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');const popup=await opened;
-    await popup.waitForFunction(()=>typeof _popupDraftContext!=='undefined'&&_popupDraftContext?.ready===true&&!document.getElementById('submit-btn').disabled);
-    await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});return popup;};
-  const settled=(popup,status)=>popup.waitForFunction(status=>bookmarkLookup.status===status,status);
+  });
   // A draft made by editing a recent bookmark is kept for the tab the popup was
   // opened on but holds that bookmark's URL. The tab's meta description is the
   // tab's, not that bookmark's: once the bookmark is gone (deleted elsewhere)
   // the restored form creates it again and must leave the Description to
   // linkding, which reads the page it is given. The same draft on the tab's own
   // URL still takes the meta description, as a first open does.
-  {
+  await block('linkding restored draft for another URL',['linkding'],async()=>{
     const tabUrl=origin+'/article-meta', recentUrl=origin+'/article-recent', recentId='50';
     records.linkding.set(recentId,{id:50,url:recentUrl,title:'Recent title',description:'Stored recent description',notes:'',web_archive_snapshot_url:null,favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:['kept'],date_added:serverNow(),date_modified:serverNow(),website_title:null,website_description:null});
     await worker.evaluate(()=>chrome.storage.local.set({optShowRecent:true}));
@@ -746,7 +806,7 @@ try{
     for(const row of [...records.linkding.values()].filter(b=>b.url===tabUrl||b.url===recentUrl))records.linkding.delete(String(row.id));
     await worker.evaluate(()=>chrome.storage.local.set({optShowRecent:false}));await article.goto(origin+'/article');
     console.log("linkding restored draft for another URL: the tab's description stays out of the Description, linkding reads the bookmark itself; the tab's own draft still takes it");
-  }
+  });
   // The box is filled for the page the popup opened on, and that page owns the
   // text. An address typed over it afterwards names another page: a create for
   // it must leave the Description to linkding (no text, no ?disable_scraping),
@@ -754,7 +814,7 @@ try{
   // it. Typing the page's own address back (a fragment makes no other page)
   // returns the text, and a Description the lookup filled in for a stored
   // bookmark stays whatever address is typed after it.
-  {
+  await block('linkding address typed after open',['linkding'],async()=>{
     const tabUrl=origin+'/article-meta', awayUrl=origin+'/article-recent', otherUrl=origin+'/article-away';
     const box=popup=>popup.locator('#linkding-description-input').inputValue();
     const createFrom=async(popup,label)=>{const before=requests.length;await popup.locator('#submit-btn').click();await until(()=>linkdingCreates(before).length>0,label);
@@ -794,14 +854,14 @@ try{
     for(const row of [...records.linkding.values()].filter(b=>[tabUrl,awayUrl,otherUrl].includes(b.url)))records.linkding.delete(String(row.id));
     await worker.evaluate(()=>statusCache.clear());await article.goto(origin+'/article');
     console.log("linkding address typed after the popup opened: another page leaves the Description to linkding, the page's own address brings its text back, a stored Description stays");
-  }
+  });
   // URL cleaning can remove more than the same-page check ignores: aggressive
   // mode takes off ref and source, a custom parameter whatever was listed. The
   // popup puts the cleaned address of its own page in the form, and that is
   // still the page it was opened on: a first open and a restored draft of it
   // take the page's meta description and send it with ?disable_scraping, as an
   // address that needed no cleaning does.
-  {
+  await block('linkding cleaned page address',['linkding'],async()=>{
     const cleanedUrl=cleanOrigin+'/article-meta', tabUrl=cleanedUrl+'?ref=abc&campaign=spring';
     const meta=pageMetadata('/article-meta');
     await ctx.route(cleanOrigin+'/**',route=>route.fulfill({status:200,contentType:'text/html',body:'<html><head><title>'+meta.title+'</title><meta name="description" content="'+meta.description+'"></head><body><h1>'+meta.title+'</h1></body></html>'}));
@@ -828,7 +888,8 @@ try{
     await worker.evaluate(()=>{statusCache.clear();return chrome.storage.local.remove('urlClean');});
     await article.goto(origin+'/article');await ctx.unroute(cleanOrigin+'/**');
     console.log("linkding page address cleaned by aggressive mode and a custom parameter: a first open and a restored draft still take the page's description and send it with ?disable_scraping");
-  }
+  });
+  await block('linkding Description server semantics',['linkding'],async()=>{
   // linkding Description against the server's own v1.47 create and update
   // semantics (the mock above). /article-meta publishes a meta description,
   // so a create the server may scrape picks it up by itself.
@@ -858,6 +919,8 @@ try{
   assert.deepEqual([descriptions.post.description,descriptions.post.extended,descriptions.post.summary],['T','My note','Custom description']);
   for(const bookmark of [descriptions.unknown,descriptions.empty,descriptions.custom])records.linkding.delete(String(bookmark.id));
   console.log('linkding Description: known creates disable scraping, an unknown one is scraped; unchanged/changed/cleared PATCH and independent post projection passed');
+  });
+  await block('gateway probes',[],async()=>{
   const probes=await worker.evaluate(async origin=>{
     const out={};
     for(const kind of ['redirect','challenge','basic','denied','page','headers']){
@@ -874,9 +937,12 @@ try{
   assert(!wire.some(w=>w.path.startsWith('/cdn-cgi/')),'redirect was followed');
   assert(wire.every(w=>!w.hasCookie),'a request carried cookies');
   console.log('gateway probes classified; no preflight; redirect not followed');
+  });
   assert.equal(errors.length,0,errors.join('\n'));
   assert(requests.every(r=>r.service==='linkding'||r.service==='karakeep'));
+  assert.equal(blockIndex,BLOCKS.length,'a runtime block is missing from the script');
   console.log('bookmark service runtime smoke passed; synthetic loopback APIs only');
+  if(filterNote)console.log(filterNote);
 }finally{
   if(ctx)await ctx.close();await new Promise(r=>server.close(r));rmSync(profile,{recursive:true,force:true});
 }
