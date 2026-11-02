@@ -651,6 +651,23 @@ await test("reader linkding creates leave an unknown Description to linkding", a
     equal(prepared.intent.mode, "create"); has(prepared.intent, "untouched edit create");
   }
 });
+// The shortcut hand-off slot (background.js) and the library Ask opener
+// (library-ask.js) both write description: "" and tags: [] with no popup draft.
+// That "" is the slot's placeholder for the notes, not a Description the
+// extension knows is empty, so it must not become one.
+await test("reader slots written by the shortcut and the library Ask opener leave the Description to linkding", async () => {
+  const account = "linkding:fixture";
+  for (const [settings, expected] of [[{}, undefined], [{ optAutoDescription: false }, ""]]) {
+    const h = await harness({ account, service: "linkding", post: null, settings,
+      slot: { account, pending: true, tags: [], description: "", sourceIncognito: false } });
+    const state = (await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER)).bookmark;
+    const where = JSON.stringify(settings);
+    assert(Object.hasOwn(state, "summary") === (expected !== undefined) && state.summary === expected, where + " state: " + JSON.stringify(state.summary));
+    equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action: "save" }, SENDER)).status, "saved");
+    const intent = h.env.submitted.intent;
+    assert(Object.hasOwn(intent, "summary") === (expected !== undefined) && intent.summary === expected, where + " intent: " + JSON.stringify(intent.summary));
+  }
+});
 await test("non-linkding reader state hides Description", async () => {
   for (const service of ["pinboard", "karakeep"]) {
     const account = service === "pinboard" ? "alice" : "karakeep:fixture";

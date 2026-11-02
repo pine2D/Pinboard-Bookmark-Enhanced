@@ -757,11 +757,12 @@ try{
   await article.goto(origin+'/article');
   console.log('linkding unknown Description: an unread popup page and a draft-free reader save let linkding scrape it');
   });
-  // A record queued before the Description became optional carries "" when the
-  // extension knew there was none. Replaying it must stay an explicit empty
-  // Description (sent with disable_scraping), not turn into "unknown" and let
-  // linkding scrape. Hand-written storage shape; the account binding is the
-  // connection identity the queue keeps.
+  // Before the Description became optional, every save without one wrote "",
+  // pages the extension could not read included, so a queued "" is ambiguous:
+  // known empty or never read. Replay cannot tell them apart and keeps what
+  // those versions did: an explicit empty Description sent with
+  // disable_scraping, not "unknown" for linkding to scrape. Hand-written
+  // storage shape; the account binding is the connection identity the queue keeps.
   await block('linkding queued empty Description',['linkding'],async()=>{
     const queuedUrl=origin+'/article-meta?queued-empty';
     const account=(await worker.evaluate(()=>getCurrentBookmarkAuth())).account;
