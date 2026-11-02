@@ -147,6 +147,23 @@ test("posts/add default remains replace=yes for existing callers", () => {
     const aiJsSource = await (await fetch("../ai.js")).text();
     const aiCacheSource = await (await fetch("../ai-cache.js")).text();
     const pbpNotesDescription = new Function(aiJsSource.slice(aiJsSource.indexOf("function pbpNotesDescription("),aiJsSource.indexOf("function buildAutoNotes("))+";return pbpNotesDescription;")();
+    // The one place a sliced popup/popup-ai fragment becomes runnable code.
+    // The body runs in strict mode, so a module-level name the fragment needs
+    // but nobody declared throws a ReferenceError the first time it runs (sloppy
+    // mode would turn a forgotten assignment into an implicit global and let an
+    // assertion pass on leaked state). This page's top-level `const URL` is a
+    // string that shadows the constructor in every new Function body, so the
+    // real constructor is always handed in as `URL` unless the slice names its
+    // own `URL` parameter.
+    //   sliceFn(...paramNames, body)  -> a function taking those params
+    //   sliceRuntime({name: value}, body) -> runs the body once with the values
+    const sliceFn = (...parts) => {
+      const body = parts.pop();
+      if (parts.includes("URL")) return new Function(...parts, '"use strict";\n' + body);
+      const raw = new Function(...parts, "URL", '"use strict";\n' + body);
+      return (...args) => { args.length = parts.length; return raw(...args, window.URL); };
+    };
+    const sliceRuntime = (params, body) => sliceFn(...Object.keys(params), body)(...Object.values(params));
     const start = source.indexOf("function setupSubmit(token)");
     const handlerEnd = source.indexOf('  document.addEventListener("keydown"', start);
     assert(start >= 0 && handlerEnd > start, "setupSubmit source not found");
@@ -1540,15 +1557,15 @@ test("posts/add default remains replace=yes for existing callers", () => {
       // against stubs, and the assertions are on what they read.
       const fnSrc = (name) => { const i = popupAiSource.indexOf("async function " + name); return popupAiSource.slice(i, popupAiSource.indexOf("\n}\n", i) + 3); };
       const calls = [];
-      const build = new Function("pbpVideoDetect", "pageInfo", "chrome", "getAICache", "PBP_BILI_ORIGIN_PATTERN", "PBP_YT_ORIGIN_PATTERN",
-        fnSrc("pbpAiVideoGrant") + "\n" + fnSrc("pbpAiFastCached") + "\nreturn pbpAiFastCached;");
       let probed = 0;
-      const run = (granted, url) => build(
-        (u) => /youtube\.com\/watch/.test(u) ? { provider: "youtube", videoId: "x" } : null,
-        { url },
-        { permissions: { contains: async () => { probed++; return granted; } } },
-        async (u, kind, dur, source) => { calls.push(source); return source === "local" ? "STALE_PAGE_TEXT" : null; },
-        "https://api.bilibili.com/*", "https://www.youtube.com/*")("summary", { aiContentSource: "local", aiCacheDuration: 1 }, "acct");
+      const run = (granted, url) => sliceRuntime({
+        pbpVideoDetect: (u) => /youtube\.com\/watch/.test(u) ? { provider: "youtube", videoId: "x" } : null,
+        pageInfo: { url },
+        chrome: { permissions: { contains: async () => { probed++; return granted; } } },
+        getAICache: async (u, kind, dur, source) => { calls.push(source); return source === "local" ? "STALE_PAGE_TEXT" : null; },
+        PBP_BILI_ORIGIN_PATTERN: "https://api.bilibili.com/*",
+        PBP_YT_ORIGIN_PATTERN: "https://www.youtube.com/*"
+      }, fnSrc("pbpAiVideoGrant") + "\n" + fnSrc("pbpAiFastCached") + "\nreturn pbpAiFastCached;")("summary", { aiContentSource: "local", aiCacheDuration: 1 }, "acct");
       const withGrant = await run(true, "https://www.youtube.com/watch?v=x");
       assert(withGrant === null && calls.join(",") === "transcript", "grant standing: transcript only -- the stale page-text hit is NOT served: " + calls.join(","));
       calls.length = 0;
@@ -1617,30 +1634,25 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(lookupStart >= 0 && lookupEnd > lookupStart && blockStart >= 0 && blockEnd > blockStart,
         "cached-summary initialization source not found");
       const events = [];
-      const start = new Function(
-        "pbpPopupAiAccount", "getAICache", "pbpAiFastCached", "pageInfo", "settings", "_aiOpStillCurrent",
-        "_aiRestoreSummaryOwnership", "pbpShouldRestoreCachedSummary", "$id",
-        "upsertSummary", "showSummaryActions",
-        "let bookmarkLookup = { promise: null }; let existingBookmark = null;" +
+      const start = sliceRuntime({
+        pbpPopupAiAccount: () => "alice",
+        getAICache: () => Promise.resolve("cached"),
+        pbpAiFastCached: () => Promise.resolve("cached"), // the restore reads through pbpAiFastCached (review C9)
+        pageInfo: { url: URL },
+        settings: { aiCacheDuration: 60, aiContentSource: "local" },
+        _aiOpStillCurrent: () => true,
+        _aiRestoreSummaryOwnership: async () => { events.push("restore"); },
+        pbpShouldRestoreCachedSummary: () => true,
+        $id: () => ({ value: "" }),
+        upsertSummary: () => { events.push("upsert"); },
+        showSummaryActions: () => {}
+      }, "let bookmarkLookup = { promise: null }; let existingBookmark = null;" +
         popupAiSource.slice(lookupStart, lookupEnd) +
         "function start() {" + popupAiSource.slice(blockStart, blockEnd) + "}" +
         "start(); return {" +
         " installLookup(promise) { bookmarkLookup = { promise }; }," +
         " setExisting(bookmark) { existingBookmark = bookmark; }" +
-        "};"
-      )(
-        () => "alice",
-        () => Promise.resolve("cached"),
-        () => Promise.resolve("cached"), // the restore reads through pbpAiFastCached (review C9)
-        { url: URL },
-        { aiCacheDuration: 60, aiContentSource: "local" },
-        () => true,
-        async () => { events.push("restore"); },
-        () => true,
-        () => ({ value: "" }),
-        () => { events.push("upsert"); },
-        () => {}
-      );
+        "};");
       let resolveLookup;
       const lookup = new Promise((resolve) => { resolveLookup = resolve; });
       start.installLookup(lookup);
@@ -1668,25 +1680,20 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const blockEnd = popupAiSource.indexOf('  $id("ai-tags-btn").addEventListener', blockStart);
       const run = async ({ notes, adopt, draftRestored }) => {
         const events = [];
-        new Function(
-          "pbpPopupAiAccount", "pbpAiFastCached", "pageInfo", "settings", "_aiOpStillCurrent",
-          "_aiRestoreSummaryOwnership", "pbpShouldRestoreCachedSummary", "$id",
-          "upsertSummary", "showSummaryActions", "_popupDraftRestored",
-          "let bookmarkLookup = { promise: null }; let existingBookmark = null;" +
-          popupAiSource.slice(lookupStart, lookupEnd) + popupAiSource.slice(blockStart, blockEnd)
-        )(
-          () => "alice",
-          () => Promise.resolve("cached summary"),
-          { url: URL },
-          { aiCacheDuration: 60, aiContentSource: "local" },
-          () => true,
-          async () => { events.push("adopt-check"); return adopt; },
+        sliceRuntime({
+          pbpPopupAiAccount: () => "alice",
+          pbpAiFastCached: () => Promise.resolve("cached summary"),
+          pageInfo: { url: URL },
+          settings: { aiCacheDuration: 60, aiContentSource: "local" },
+          _aiOpStillCurrent: () => true,
+          _aiRestoreSummaryOwnership: async () => { events.push("adopt-check"); return adopt; },
           pbpShouldRestoreCachedSummary,
-          () => ({ value: notes }),
-          () => { events.push("upsert"); },
-          () => {},
-          draftRestored
-        );
+          $id: () => ({ value: notes }),
+          upsertSummary: () => { events.push("upsert"); },
+          showSummaryActions: () => {},
+          _popupDraftRestored: draftRestored
+        }, "let bookmarkLookup = { promise: null }; let existingBookmark = null;" +
+          popupAiSource.slice(lookupStart, lookupEnd) + popupAiSource.slice(blockStart, blockEnd));
         await new Promise((resolve) => setTimeout(resolve, 0));
         return events.join(",");
       };
@@ -1698,8 +1705,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(fresh === "adopt-check,upsert", "a fresh, empty page still gets the cached summary: " + fresh);
       const hs = popupAiSource.indexOf("function pbpAiWrapSummary");
       const he = popupAiSource.indexOf("const AI_BQ_REGEX", hs);
-      const helpers = new Function("escapeForExtended", popupAiSource.slice(hs, he) +
-        "; return { pbpAiWrapSummary, pbpAiFindLastExactSummaryRange };")((v) => v);
+      const helpers = sliceRuntime({ escapeForExtended: (v) => v }, popupAiSource.slice(hs, he) +
+        "; return { pbpAiWrapSummary, pbpAiFindLastExactSummaryRange };");
       const range = helpers.pbpAiFindLastExactSummaryRange("note\n\n" + helpers.pbpAiWrapSummary("cached summary"), "cached summary");
       assert(range && range.start === 6, "the exact-range finder must locate the current <blockquote> format");
       assert(pbpShouldRestoreCachedSummary(null, helpers.pbpAiWrapSummary("cached summary")) === true,
@@ -1817,17 +1824,38 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const clearAllSource = popupTagsSource.slice(clearStart, clearEnd);
       // `const URL = ...` at the top of this page is a GLOBAL LEXICAL binding,
       // so it shadows the constructor for new Function bodies AND for every
-      // other classic script in the realm -- hand the real one in explicitly.
+      // other classic script in the realm -- sliceRuntime hands the real one in.
       // Corollary: shared.js's own `new URL()` throws here, so the real
       // stripTrackingParams degrades to identity inside this page. Fragments
       // are still dropped (that path uses the URL injected above), but do NOT
       // write a tracking-param equivalence case here: it would pass vacuously.
-      const runtime = new Function(
-        "$id", "t", "PBP_ICONS", "allUserTagCounts", "pageInfo",
-        "renderTags", "doAITags", "showStatus", "pbpAssignAltNumBadges",
-        "_aiClearTagsOutput", "_aiAppendEmptyState", "_aiParkTagsBtn",
-        "pbpAiPageUrlNorm", "URL", "seedTags", "settings", "counts", "bookmarkNames",
-        "stripTrackingParams", "_loadUrlCleanSettings",
+      const runtime = sliceRuntime({
+        $id: (id) => (id === "url-input" ? urlInput : id === "ai-suggest-tags" ? container : id === "tags-clear-all" ? clearBtn : id === "tags-input" ? tagsInput : null),
+        t: (key) => key,
+        PBP_ICONS: { check: "<svg></svg>" },
+        allUserTagCounts: {},
+        pageInfo: { url: pageUrl },
+        renderTags: () => { calls.renderTags++; },
+        doAITags: async () => { calls.doAITags++; if (duringCall) duringCall(urlInput); },
+        showStatus: (id, message, kind) => calls.status.push({ id, message, kind }),
+        pbpAssignAltNumBadges: () => {if (disableRefreshedChip && ++badgeCalls > 1) container.querySelector(".stag.ai").disabled = true;},
+        _aiClearTagsOutput: (host) => host.querySelectorAll(".stag, .add-all-link, .cache-hint-wrap, .empty-state").forEach((node) => node.remove()),
+        _aiAppendEmptyState: () => {},
+        _aiParkTagsBtn: () => {},
+        pbpAiPageUrlNorm: summaryReceiptApi({ stripTrackingParams: urlClean ? pageGuardStrip : window.stripTrackingParams }).pbpAiPageUrlNorm,
+        seedTags,
+        // pbpPopupAiAccount derives the owner from this token via shared.js's
+        // real pbpPinboardAccountFromToken, so the account half of the liveness
+        // guard runs for real and only the URL half varies per case.
+        settings: { pinboardToken: "alice:0123456789ABCDEF" },
+        counts,
+        bookmarkNames,
+        // urlClean: the popup's own cleaning settings, over the real (re-scoped)
+        // stripTrackingParams; without it the same-page check is the plain
+        // equivalence, as before.
+        stripTrackingParams: urlClean ? pageGuardStrip : window.stripTrackingParams,
+        _loadUrlCleanSettings: urlClean ? () => urlClean : undefined
+      },
         "let currentTags = seedTags.slice();\n" +
         "const _aiSessionAddedTags = new Set();\n" +
         "let bookmarkLookup = {status:'pending',url:pageInfo.url,formLoaded:false};\n" +
@@ -1850,33 +1878,6 @@ test("posts/add default remains replace=yes for existing callers", () => {
         " touched: () => _tagsUserTouched, account: pbpPopupAiAccount, show: pbpShowAITagResult, refresh: pbpRefreshDisplayedAITagsForBookmark," +
         " setLookup: state => {bookmarkLookup=state;}, acceptLookup: post => { const existingBookmark=post; let submittedTags; const _popupDraftRestored=false; " +
         source.slice(source.indexOf("        const ownTagNames ="), source.indexOf('        $id("submit-btn").textContent = t("update");', source.indexOf("        const ownTagNames ="))) + "} };"
-      )(
-        (id) => (id === "url-input" ? urlInput : id === "ai-suggest-tags" ? container : id === "tags-clear-all" ? clearBtn : id === "tags-input" ? tagsInput : null),
-        (key) => key,
-        { check: "<svg></svg>" },
-        {},
-        { url: pageUrl },
-        () => { calls.renderTags++; },
-        async () => { calls.doAITags++; if (duringCall) duringCall(urlInput); },
-        (id, message, kind) => calls.status.push({ id, message, kind }),
-        () => {if (disableRefreshedChip && ++badgeCalls > 1) container.querySelector(".stag.ai").disabled = true;},
-        (host) => host.querySelectorAll(".stag, .add-all-link, .cache-hint-wrap, .empty-state").forEach((node) => node.remove()),
-        () => {},
-        () => {},
-        summaryReceiptApi({ stripTrackingParams: urlClean ? pageGuardStrip : window.stripTrackingParams }).pbpAiPageUrlNorm,
-        window.URL,
-        seedTags,
-        // pbpPopupAiAccount derives the owner from this token via shared.js's
-        // real pbpPinboardAccountFromToken, so the account half of the liveness
-        // guard runs for real and only the URL half varies per case.
-        { pinboardToken: "alice:0123456789ABCDEF" },
-        counts,
-        bookmarkNames,
-        // urlClean: the popup's own cleaning settings, over the real (re-scoped)
-        // stripTrackingParams; without it the same-page check is the plain
-        // equivalence, as before.
-        urlClean ? pageGuardStrip : window.stripTrackingParams,
-        urlClean ? () => urlClean : undefined
       );
 
       if (lateLookup) runtime.show(tags, true, {pinboardToken:"alice:0123456789ABCDEF"}, runtime.account());
@@ -2083,11 +2084,12 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const helperStart = popupAiSource.indexOf("function pbpAiWrapSummary");
       const helperEnd = popupAiSource.indexOf("const AI_BQ_REGEX", helperStart);
       assert(helperStart >= 0 && helperEnd > helperStart, "summary ownership helpers missing");
-      return new Function("escapeForExtended", "pbpAiSummaryRangeValid",
-        popupAiSource.slice(helperStart, helperEnd) +
+      return sliceRuntime({
+        escapeForExtended: (value) => "[" + value + "]",
+        pbpAiSummaryRangeValid: summaryReceiptApi().pbpAiSummaryRangeValid
+      }, popupAiSource.slice(helperStart, helperEnd) +
         "; return { pbpAiWrapSummary, pbpAiTrackSummaryRange, pbpAiRemoveSummaryRange," +
-        " pbpAiFindLastExactSummaryRange };"
-      )((value) => "[" + value + "]", summaryReceiptApi().pbpAiSummaryRangeValid);
+        " pbpAiFindLastExactSummaryRange };");
     }
 
     // The same-page check pbpPopupPrefillDescription asks: popup-ai.js's own
@@ -2097,7 +2099,8 @@ test("posts/add default remains replace=yes for existing callers", () => {
     const aiUrlEquivalent = (() => {
       const from = popupAiSource.indexOf("function _aiUrlEquivalent(");
       assert(from >= 0, "_aiUrlEquivalent missing from popup-ai.js");
-      return new Function("pbpAiPageUrlNorm", popupAiSource.slice(from, popupAiSource.indexOf("\n}", from) + 2) + "\nreturn _aiUrlEquivalent;")(summaryReceiptApi().pbpAiPageUrlNorm);
+      return sliceRuntime({ pbpAiPageUrlNorm: summaryReceiptApi().pbpAiPageUrlNorm },
+        popupAiSource.slice(from, popupAiSource.indexOf("\n}", from) + 2) + "\nreturn _aiUrlEquivalent;");
     })();
 
     // The same-page check also asks for the popup's own cleaned address of its
@@ -2121,14 +2124,15 @@ test("posts/add default remains replace=yes for existing callers", () => {
     const prefillHarness = ({ known = true, pending = false, pageText = null } = {}) => {
       const start = source.indexOf("function pbpPopupPrefillDescription("), end = source.indexOf("function recomputeArchiveCheck(", start);
       assert(start >= 0 && end > start, "prefill source not found");
-      const run = new Function("pageInfo", "settings", "shouldUpdateField", "$id", "pbpNotesDescription", "_aiUrlEquivalent", "_initial",
-        '"use strict";\n' +
+      const run = (pageInfo, settings, shouldUpdateField, $id) => sliceRuntime({
+        pageInfo, settings, shouldUpdateField, $id, pbpNotesDescription, _aiUrlEquivalent: aiUrlEquivalent, _initial: { known, pending, pageText }
+      },
         "let _linkdingDescriptionKnown = _initial.known;\n" +
         "let _linkdingDescriptionPending = _initial.pending;\n" +
         "let _linkdingPageDescription = _initial.pageText;\n" +
         loadUrlCleanSource + "\n" + source.slice(start, end) +
         "\npbpPopupPrefillDescription();\nreturn { known: _linkdingDescriptionKnown, pending: _linkdingDescriptionPending, pageText: _linkdingPageDescription };");
-      return (pageInfo, settings, shouldUpdateField, $id) => run(pageInfo, settings, shouldUpdateField, $id, pbpNotesDescription, aiUrlEquivalent, { known, pending, pageText });
+      return run;
     };
 
     test("popup prefill formats selected text for the connected service", () => {
@@ -2217,21 +2221,16 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(start >= 0 && end > start && prefix, "summary ownership receipt section missing");
       const entries = new Map();
       const deletes = [];
-      const api = new Function(
-        "stripTrackingParams", "pbpAiCacheGet", "pbpAiCacheSet", "pbpAiCacheDelete",
-        "crypto", "TextEncoder", "URL",
-        prefix[0] + "\n" + aiCacheSource.slice(start, end) +
-        "; return { pbpAiPageUrlNorm, pbpAiSummaryRangeValid, pbpAiSummaryOwnershipKey," +
-        " pbpAiSaveSummaryOwnership, pbpAiLoadSummaryOwnership };"
-      )(
+      const api = sliceRuntime({
         stripTrackingParams,
-        async (key) => entries.get(key) || null,
-        async (key, result, ts) => { entries.set(key, { key, result, ts }); return true; },
-        async (key) => { deletes.push(key); entries.delete(key); },
+        pbpAiCacheGet: async (key) => entries.get(key) || null,
+        pbpAiCacheSet: async (key, result, ts) => { entries.set(key, { key, result, ts }); return true; },
+        pbpAiCacheDelete: async (key) => { deletes.push(key); entries.delete(key); },
         crypto,
-        TextEncoder,
-        window.URL
-      );
+        TextEncoder
+      }, prefix[0] + "\n" + aiCacheSource.slice(start, end) +
+        "; return { pbpAiPageUrlNorm, pbpAiSummaryRangeValid, pbpAiSummaryOwnershipKey," +
+        " pbpAiSaveSummaryOwnership, pbpAiLoadSummaryOwnership };");
       return { entries, deletes, ...api };
     }
 
@@ -2246,12 +2245,13 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const start = popupAiSource.indexOf("function _aiUrlEquivalent");
       const end = popupAiSource.indexOf("// ---- Setup AI feature listeners ----", start);
       assert(start >= 0 && end > start, "summary ownership runtime missing");
-      const api = new Function(
-        "pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "_AI_BQ_REGEX_SHARED",
-        popupAiSource.slice(start, end) +
+      const api = sliceRuntime({
+        pbpAiPageUrlNorm: receipts.pbpAiPageUrlNorm,
+        pbpAiSummaryRangeValid: receipts.pbpAiSummaryRangeValid,
+        _AI_BQ_REGEX_SHARED: /$a/g
+      }, popupAiSource.slice(start, end) +
         "; function setSummaryState(value, range) { _aiSummaryValue = value; _aiSummaryRange = range; }" +
-        "; return { pbpAiSummaryOwnershipSnapshot, setSummaryState };"
-      )(receipts.pbpAiPageUrlNorm, receipts.pbpAiSummaryRangeValid, /$a/g);
+        "; return { pbpAiSummaryOwnershipSnapshot, setSummaryState };");
       return { field: { value: description }, ...receipts, ...api };
     }
 
@@ -2271,29 +2271,25 @@ test("posts/add default remains replace=yes for existing callers", () => {
         if (!options.delayed) return Promise.resolve(options.receipt || null);
         return new Promise((resolve) => { resolveReceipt = () => resolve(options.receipt || null); });
       };
-      const api = new Function(
-        "pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "pbpAiLoadSummaryOwnership",
-        "_AI_BQ_REGEX_SHARED", "$id",
-        "pbpPopupAiAccountIsCurrent", "pageInfo", "existingBookmark", "escapeForExtended",
-        "showSummaryActions", "settings", "updateCharCount", "autoResizeTextarea",
-        popupAiSource.slice(start, end) +
+      const api = sliceRuntime({
+        pbpAiPageUrlNorm: receipts.pbpAiPageUrlNorm,
+        pbpAiSummaryRangeValid: receipts.pbpAiSummaryRangeValid,
+        pbpAiLoadSummaryOwnership: (account, url, value) => loadReceipt(account, url, value),
+        _AI_BQ_REGEX_SHARED,
+        $id: (id) => id === "description-input" ? field : urlField,
+        pbpPopupAiAccountIsCurrent: (account) => account === "alice" && state.accountCurrent,
+        pageInfo: { url: URL },
+        existingBookmark: options.existingBookmark || null,
+        escapeForExtended: (value) => value,
+        showSummaryActions: (fromCache) => actions.push(fromCache),
+        settings: { bookmarkService: options.service || "pinboard" },
+        updateCharCount: () => {},
+        autoResizeTextarea: () => {}
+      }, popupAiSource.slice(start, end) +
         "; function setSummaryState(value, range) { _aiSummaryValue = value; _aiSummaryRange = range; }" +
         "; function setExistingBookmark(value) { existingBookmark = value; }" +
         "; return { _aiRestoreSummaryOwnership, setSummaryState, upsertSummary, removeSummary," +
-        " pbpAiSummaryOwnershipSnapshot, setExistingBookmark };"
-      )(
-        receipts.pbpAiPageUrlNorm,
-        receipts.pbpAiSummaryRangeValid,
-        (account, url, value) => loadReceipt(account, url, value),
-        _AI_BQ_REGEX_SHARED,
-        (id) => id === "description-input" ? field : urlField,
-        (account) => account === "alice" && state.accountCurrent,
-        { url: URL },
-        options.existingBookmark || null,
-        (value) => value,
-        (fromCache) => actions.push(fromCache),
-        { bookmarkService: options.service || "pinboard" }, () => {}, () => {}
-      );
+        " pbpAiSummaryOwnershipSnapshot, setExistingBookmark };");
       return {
         field,
         urlField,
@@ -2575,7 +2571,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(runtimeStart >= 0 && runtimeEnd > runtimeStart, "summary runtime source missing");
       const createRuntime = (description, service = "pinboard") => {
         const field = { value: description };
-        const api = new Function("_AI_BQ_REGEX_SHARED", "escapeForExtended", "$id",
+        const api = sliceFn("_AI_BQ_REGEX_SHARED", "escapeForExtended", "$id",
           "updateCharCount", "autoResizeTextarea", "settings", "_linkdingDescriptionTouched", "pbpAiSummaryRangeValid",
           popupAiSource.slice(runtimeStart, runtimeEnd) +
           "; return { upsertSummary, removeSummary };"
@@ -2612,7 +2608,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       // Pinned to the pre-K44 branch on purpose: this case is about the inflight
       // KEY, which is computed before the switch and is the same string either
       // way. The worker route has its own cases below.
-      const make = new Function(
+      const make = sliceFn(
         "pageInfo", "settings", "pbpPopupAiAccountIsCurrent", "getOrCreateInflight",
         "$id", "callAI", "buildSummaryPrompt", "aiCacheFingerprint", "PBP_AI_VIA_SW",
         popupAiSource.slice(fetchStart, fetchEnd) + "; return fetchAIArtifacts;"
@@ -2685,7 +2681,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     const providerLabelSource = popupAiSource.slice(
       popupAiSource.indexOf("const AI_PROVIDER_LABEL = {"),
       popupAiSource.indexOf("// Find first provider OTHER than"));
-    const { AI_PROVIDER_LABEL, pbpAiProviderLabel } = new Function("t", providerLabelSource +
+    const { AI_PROVIDER_LABEL, pbpAiProviderLabel } = sliceFn("t", providerLabelSource +
       "; return { AI_PROVIDER_LABEL, pbpAiProviderLabel };")(tEn);
     assert(AI_PROVIDER_LABEL.openai === "OpenAI", "provider label table not found");
     function fakeEl() {
@@ -2870,9 +2866,13 @@ test("posts/add default remains replace=yes for existing callers", () => {
       // the case decides which addresses count as the opened page.
       if (o.realPageGuard) Object.assign(deps, { stripTrackingParams: pageGuardStrip,
         pbpAiPageUrlNorm: summaryReceiptApi({ stripTrackingParams: pageGuardStrip }).pbpAiPageUrlNorm });
-      const body = k44SliceA + "\n" + k44SliceB + "\n" + realSummary + "\n" + realDraftEdit + (o.realErrorCard ? "\n" + k44SliceC : "")
+      // popup-ai.js's module-level summary ownership state, which the real
+      // upsertSummary and doAISummary write (declared as there; strict mode
+      // would otherwise throw on the first write).
+      const summaryState = o.realSummary ? 'let _aiSummaryRange = null;\nlet _aiSummaryValue = "";\n' : "";
+      const body = summaryState + k44SliceA + "\n" + k44SliceB + "\n" + realSummary + "\n" + realDraftEdit + (o.realErrorCard ? "\n" + k44SliceC : "")
         + (o.realPageGuard ? "\n" + pageGuardSource : "");
-      const api = new Function(...Object.keys(deps),
+      const api = sliceFn(...Object.keys(deps),
         body + "\n; return { fetchAIArtifacts, doAISummary, doAITags, refreshAITags: typeof pbpRefreshDisplayedAITagsForBookmark === 'function' ? pbpRefreshDisplayedAITagsForBookmark : null, syncUrlEditState: typeof pbpAiSyncUrlEditState === 'function' ? pbpAiSyncUrlEditState : null, editDescription(value) { fieldsEdit(value); pbpPopupDraftFieldEdited('linkding-description-input'); } };"
       )(...Object.values(deps));
       return { ...api, calls, snapshot, account, el: fields, lookupState };
@@ -2942,7 +2942,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       document.body.appendChild(bar);
       const fields = { "url-input": { value: formUrl }, "ai-summary-btn": btn };
       const calls = { doAISummary: 0, status: [] };
-      const show = new Function("$id", "t", "pageInfo", "settings", "stripTrackingParams", "pbpAiPageUrlNorm",
+      const show = sliceFn("$id", "t", "pageInfo", "settings", "stripTrackingParams", "pbpAiPageUrlNorm",
         "doAISummary", "showStatus", "removeSummary", "_aiResetSummaryActions",
         popupAiSource.slice(from, to) + "\n" + source.slice(clean, source.indexOf("\n}", clean) + 2) + "\n" +
         popupAiSource.slice(start, end + 2) + "\nreturn showSummaryActions;"
@@ -2991,7 +2991,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const clean = source.indexOf("function _loadUrlCleanSettings(");
       assert(from >= 0 && to > from && clean >= 0, "summary ownership runtime missing");
       const fields = { "url-input": { value: formUrl } };
-      return new Function("pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "_AI_BQ_REGEX_SHARED", "$id", "pageInfo", "existingBookmark", "settings", "stripTrackingParams",
+      return sliceFn("pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "_AI_BQ_REGEX_SHARED", "$id", "pageInfo", "existingBookmark", "settings", "stripTrackingParams",
         popupAiSource.slice(from, to) + "\n" + source.slice(clean, source.indexOf("\n}", clean) + 2) +
         "; return { snapshot: pbpAiSummaryOwnershipSnapshot, checked(url) { _aiSummaryOwnershipChecked = { bookmark: existingBookmark, url }; } };"
       )(summaryReceiptApi({ stripTrackingParams: pageGuardStrip }).pbpAiPageUrlNorm, summaryReceiptApi().pbpAiSummaryRangeValid, /$a/g,
@@ -3039,7 +3039,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
           await receipts.pbpAiSaveSummaryOwnership("alice", formUrl, notes, range);
           const fields = { "url-input": { value: formUrl }, "description-input": { value: notes }, "linkding-description-input": { value: "" } };
           const shown = [];
-          const api = new Function("pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "pbpAiLoadSummaryOwnership", "_AI_BQ_REGEX_SHARED",
+          const api = sliceFn("pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "pbpAiLoadSummaryOwnership", "_AI_BQ_REGEX_SHARED",
             "$id", "pbpPopupAiAccount", "pbpPopupAiAccountIsCurrent", "pbpAiFastCached", "pageInfo", "existingBookmark", "settings",
             "stripTrackingParams", "escapeForExtended", "showSummaryActions", "pbpShouldRestoreCachedSummary", "updateCharCount", "autoResizeTextarea",
             "let bookmarkLookup = { promise: null };" + popupAiSource.slice(from, to) + "\n" + source.slice(clean, source.indexOf("\n}", clean) + 2) +
@@ -3082,7 +3082,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         const fields = { "url-input": { value: formUrl }, "description-input": { value: notes }, "linkding-description-input": { value: "" } };
         const shown = [];
         const status = [];
-        const api = new Function("pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "pbpAiLoadSummaryOwnership", "_AI_BQ_REGEX_SHARED",
+        const api = sliceFn("pbpAiPageUrlNorm", "pbpAiSummaryRangeValid", "pbpAiLoadSummaryOwnership", "_AI_BQ_REGEX_SHARED",
           "$id", "pbpPopupAiAccount", "pbpPopupAiAccountIsCurrent", "pbpAiFastCached", "pageInfo", "existingBookmark", "settings",
           "stripTrackingParams", "escapeForExtended", "showSummaryActions", "pbpShouldRestoreCachedSummary", "updateCharCount", "autoResizeTextarea",
           "hasAIKey", "showSetKeyError", "showStatus", "t",
@@ -3493,7 +3493,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     test("AI progress and error text use provider display names", () => {
       const zh = { provCustomShort: "自定义", provQwenShort: "百炼", aiStage_calling: "调用 {provider}…" };
       const tZh = (key) => zh[key] || key;
-      const { pbpAiProviderLabel: labelZh } = new Function("t", providerLabelSource +
+      const { pbpAiProviderLabel: labelZh } = sliceFn("t", providerLabelSource +
         "; return { pbpAiProviderLabel };")(tZh);
       assert(labelZh("custom") === "自定义", "custom provider name is not localized: " + labelZh("custom"));
       assert(labelZh("zhipu") === "Zhipu", "brand name lost: " + labelZh("zhipu"));
@@ -3502,7 +3502,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
         popupAiSource.indexOf("function clearAiProgress("));
       const label = { textContent: "", setAttribute() {} };
       const btn = { childNodes: [], dataset: {}, classList: { contains: () => false }, querySelector: () => label };
-      new Function("$id", "t", "pbpAiProviderLabel", "AI_BUTTON_BASE_TEXT", "AI_STAGE_STARTED", "AI_STAGE_TIMERS", "Node", "setTimeout",
+      sliceFn("$id", "t", "pbpAiProviderLabel", "AI_BUTTON_BASE_TEXT", "AI_STAGE_STARTED", "AI_STAGE_TIMERS", "Node", "setTimeout",
         progressSrc + "\nreturn setAiProgress;")(() => btn, tZh, labelZh, new Map(), new Map(), new Map(), { TEXT_NODE: 3 }, () => 0)(
         "ai-summary-btn", { provider: "custom", stage: "calling" });
       assert(label.textContent === " · 调用 自定义…", "progress label shows the internal id: " + label.textContent);
@@ -3518,12 +3518,12 @@ test("posts/add default remains replace=yes for existing callers", () => {
     // shared.js so both see the real URL constructor: this page's global
     // `const URL` string shadows it for the copy loaded by <script>, which
     // would make every custom entry's base URL (and its sealed key) invalid.
-    const realAi = new Function("t", "URL", "chrome", sharedSource + "\n" + aiJsSource +
+    const realAi = sliceFn("t", "URL", "chrome", sharedSource + "\n" + aiJsSource +
       "\nreturn { hasAIKey, pbpAiResolveTarget, pbpAiExpandProviderOrder, pbpAiFirstConfiguredProvider, pbpAiCustomKeySeal, pbpSanitizeAiOverrides };")(
       tEn, window.URL, undefined);
     const fallbackSrc = popupAiSource.slice(popupAiSource.indexOf("const AI_PROVIDER_ORDER = ["),
       popupAiSource.indexOf("function showAIError(op, err, opSettings)"));
-    const buildFallback = ({ granted = false } = {}) => new Function(
+    const buildFallback = ({ granted = false } = {}) => sliceFn(
       "hasAIKey", "pbpAiResolveTarget", "pbpAiExpandProviderOrder", "pbpAiFirstConfiguredProvider",
       "SETTINGS_DEFAULTS", "_aiTargetOriginPattern", "chrome", "t",
       fallbackSrc + "\nreturn { pbpAiFallbackCandidates, pickFallbackProvider, _aiPopupProviderLabel, probe: _aiProbeOllamaGrant };")(
@@ -3637,14 +3637,14 @@ test("posts/add default remains replace=yes for existing callers", () => {
     test("AI progress names a custom entry by its user-given name", () => {
       const zh = { provCustomShort: "自定义", aiStage_calling: "调用 {provider}…" };
       const tZh = (key) => zh[key] || key;
-      const { pbpAiProviderLabel: labelZh } = new Function("t", providerLabelSource +
+      const { pbpAiProviderLabel: labelZh } = sliceFn("t", providerLabelSource +
         "; return { pbpAiProviderLabel };")(tZh);
       const progressSrc = popupAiSource.slice(popupAiSource.indexOf("function setAiProgress("),
         popupAiSource.indexOf("function clearAiProgress("));
       const run = (args) => {
         const label = { textContent: "", setAttribute() {} };
         const btn = { childNodes: [], dataset: {}, classList: { contains: () => false }, querySelector: () => label };
-        new Function("$id", "t", "pbpAiProviderLabel", "AI_BUTTON_BASE_TEXT", "AI_STAGE_STARTED", "AI_STAGE_TIMERS", "Node", "setTimeout",
+        sliceFn("$id", "t", "pbpAiProviderLabel", "AI_BUTTON_BASE_TEXT", "AI_STAGE_STARTED", "AI_STAGE_TIMERS", "Node", "setTimeout",
           progressSrc + "\nreturn setAiProgress;")(() => btn, tZh, labelZh, new Map(), new Map(), new Map(), { TEXT_NODE: 3 }, () => 0)(
           "ai-summary-btn", args);
         return label.textContent;
@@ -3670,7 +3670,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
           addEventListener(type, fn) { handlers[id] = fn; } });
         // hideAIError clears the card state exactly as popup-ai.js's does, so
         // a handler that read the snapshot only after hiding would rerun nothing.
-        new Function("$id", "doAITags", "doAISummary", "requestAIHostPermissions", "_aiTargetOriginPattern",
+        sliceFn("$id", "doAITags", "doAISummary", "requestAIHostPermissions", "_aiTargetOriginPattern",
           "settings", "lastOp", "lastPermission", "lastSettings", "onHide",
           "let _aiErrorLastOp = lastOp, _aiErrorLastPermission = lastPermission, _aiErrorLastSettings = lastSettings;\n" +
           "function hideAIError() { onHide(); _aiErrorLastOp = null; _aiErrorLastPermission = null; _aiErrorLastSettings = null; }\n" +
@@ -4661,7 +4661,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       tagsInput.focus = (opts) => { focusCalls.push(opts); realFocus(opts); };
       const added = [];
       const currentTags = [];
-      const runtime = new Function(
+      const runtime = sliceFn(
         "$id", "t", "PBP_ICONS", "allUserTagCounts",
         "addTag", "currentTags", "_aiSessionAddedTags", "pbpAssignAltNumBadges",
         "_aiClearTagsOutput", "_aiAppendEmptyState", "_aiParkTagsBtn",
@@ -4900,7 +4900,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const container = document.createElement("div");
       document.body.appendChild(container);
       const currentTags = [];
-      const runtime = new Function(
+      const runtime = sliceFn(
         "$id", "t", "PBP_ICONS", "allUserTagCounts",
         "addTag", "currentTags", "_aiSessionAddedTags", "pbpAssignAltNumBadges",
         "_aiClearTagsOutput", "_aiAppendEmptyState", "_aiParkTagsBtn",
@@ -5925,7 +5925,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const pipeline = new Function("currentTags", "$id", "document", "t",
         `${tagsPipelineSource}\nreturn { syncSuggestTagStates, pbpAssignAltNumBadges };`
       )([], idLookup, document, label);
-      const renderAITags = new Function(
+      const renderAITags = sliceFn(
         "$id", "document", "t", "allUserTagCounts", "pbpAssignAltNumBadges", "injectEmptyState",
         `${aiRenderSource}\nreturn renderAITags;`
       )(idLookup, document, label, {}, pipeline.pbpAssignAltNumBadges, () => {});
