@@ -212,6 +212,10 @@ try {
   // Registry, selection and wildcards
   // ---------------------------------------------------------------------
   if (only('registry and selection')) {
+    // H3c modules are registered.
+    {
+      for (const id of ['ux.reader-bar', 'ux.copy-exits', 'ux.status-check', 'regress.tags-notes']) assert.ok(MODULES.some(m => m.id === id), id);
+    }
     assert.equal(new Set(ids).size, ids.length, 'module ids must be unique');
     for (const id of ids) assert.match(id, /^(linkding|linkding-pg|karakeep|pinboard)\.[a-z0-9.-]+$/);
     for (const row of MODULES) {
@@ -482,10 +486,10 @@ try {
   // ---------------------------------------------------------------------
   if (only('budgets')) {
     for (const target of ['temp', 'user']) {
-      for (const spec of ['core', 'edges', 'readonly', 'ai', 'selfhosted', 'all']) {
+      for (const spec of ['core', 'edges', 'readonly', 'ai', 'selfhosted', 'h3c', 'all']) {
         // One run holds the groups older than the self-hosted rows; those
         // and the whole registry are packed into rounds (checked below).
-        const oneRun = !['selfhosted', 'all'].includes(spec);
+        const oneRun = !['selfhosted', 'h3c', 'all'].includes(spec);
         const { selected, skipped } = live.selectModules(spec, { target });
         const plan = live.buildPlan({ target, selected, skipped });
         for (const instance of plan.instances) {
@@ -511,10 +515,13 @@ try {
         } else {
           // Rounds: every module fits one; on the user target all of them fit
           // the three rounds of one authorisation.
-          const packed = live.packRounds(selected, target);
+          // The whole registry outgrew three user rounds with the H3c rows:
+          // on the user target it has to be split across authorisations, so
+          // there only every round fitting is checked; each group still fits.
+          const packed = live.packRounds(selected, target, target === 'user' && spec === 'all' ? { maxRounds: 99 } : undefined);
           assert.deepEqual([packed.unfit, packed.overflow], [[], []], `${target}/${spec} rounds`);
           assert.equal(packed.ok, true);
-          if (target === 'user') assert(packed.count <= 3, `${target}/${spec} takes ${packed.count} rounds`);
+          if (target === 'user' && spec !== 'all') assert(packed.count <= 3, `${target}/${spec} takes ${packed.count} rounds`);
           for (const round of packed.rounds) assert.equal(live.buildPlan({ target, selected: selected.filter(m => round.modules.includes(m.id)) }).withinCaps, true, `${target}/${spec} round ${round.n}`);
         }
         assert.equal(plan.fakeAi.needed, selected.some(m => m.needs.fakeAi));
@@ -608,7 +615,11 @@ try {
     // time); past three on the user target the plan fails and names the
     // modules left over; --round N runs one of them.
     {
-      const userAll = live.selectModules('all', { target: 'user', services: ['linkding', 'karakeep', 'pinboard'] }).selected;
+      // Every row but the H3c ux/shots ones, which a user-target run takes
+      // as their own authorisation (group h3c).
+      const USER_ROUNDS = 'core,edges,readonly,ai,selfhosted,regress';
+      const userAll = live.selectModules(USER_ROUNDS, { target: 'user', services: ['linkding', 'karakeep', 'pinboard'] }).selected;
+      assert.equal(live.packRounds(live.selectModules('h3c', { target: 'user', services: ['linkding', 'karakeep', 'pinboard'] }).selected, 'user').count, 1, 'h3c: one user round');
       assert.equal(live.buildPlan({ target: 'user', selected: userAll }).withinCaps, false, 'all modules do not fit one user round');
       const packed = live.packRounds(userAll, 'user');
       assert.deepEqual(live.packRounds([...userAll].reverse(), 'user').rounds.map(r => [...r.modules].sort()).sort(), packed.rounds.map(r => [...r.modules].sort()).sort(), 'the order given does not change the rounds');
@@ -640,12 +651,12 @@ try {
       const fourRows = [...big, overRound];
       const four = live.packRounds(live.selectModules('*', { target: 'user', services: ['karakeep'], modules: fourRows }).selected, 'user');
       assert.deepEqual([four.ok, four.count, four.overflow, four.unfit], [false, 4, ['karakeep.big.3'], ['karakeep.big.alone']]);
-      const roundSel = (values, rows = undefined) => live.resolveSelection({ values: { target: 'user', service: 'linkding,karakeep,pinboard', scenario: 'all', ...values }, flags: new Set() }, rows ? { modules: rows } : {});
+      const roundSel = (values, rows = undefined) => live.resolveSelection({ values: { target: 'user', service: 'linkding,karakeep,pinboard', scenario: USER_ROUNDS, ...values }, flags: new Set() }, rows ? { modules: rows } : {});
       assert.deepEqual(roundSel({ round: '2' }).selected.map(m => m.id), packed.rounds[1].modules);
       assert.deepEqual(roundSel({ round: '2' }).round, { n: 2, of: 3, modules: packed.rounds[1].modules });
       assert.throws(() => roundSel({ round: '4' }), e => e.code === 'round_out_of_range');
       for (const bad of ['0', 'x', '-1', '1.5']) assert.throws(() => roundSel({ round: bad }), e => e.code === 'round', bad);
-      assert.throws(() => roundSel({ round: '1', service: 'karakeep' }, fourRows), e => e.code === 'rounds_exceeded');
+      assert.throws(() => roundSel({ round: '1', service: 'karakeep', scenario: '*' }, fourRows), e => e.code === 'rounds_exceeded');
       // --plan: rounds and their totals; an error past three rounds.
       const planOut = async (argv, rows) => {
         const write = process.stdout.write, chunks = [];
@@ -653,12 +664,12 @@ try {
         process.env.PBP_LIVE_STATE_DIR = stateDirFor('rounds');
         try { return { code: await live.main(argv, rows ? { modules: rows } : {}), value: JSON.parse(chunks.join('')) }; } finally { process.stdout.write = write; }
       };
-      const shown = await planOut(['--plan', '--target', 'user', '--service', 'linkding,karakeep,pinboard', '--scenario', 'all']);
+      const shown = await planOut(['--plan', '--target', 'user', '--service', 'linkding,karakeep,pinboard', '--scenario', USER_ROUNDS]);
       assert.equal(shown.code, 0, 'over one round but within three: the plan stands');
       assert.equal(shown.value.withinCaps, false);
       assert.deepEqual(shown.value.rounds.rounds, packed.rounds);
       assert(shown.value.rounds.hint.includes('--round 1..3'), shown.value.rounds.hint);
-      const second = await planOut(['--plan', '--target', 'user', '--service', 'linkding,karakeep,pinboard', '--scenario', 'all', '--round', '2']);
+      const second = await planOut(['--plan', '--target', 'user', '--service', 'linkding,karakeep,pinboard', '--scenario', USER_ROUNDS, '--round', '2']);
       assert.deepEqual([second.value.withinCaps, second.value.modules.map(m => m.id), second.value.round.n, second.value.rounds.count], [true, packed.rounds[1].modules, 2, 3]);
       const tooMany = await planOut(['--plan', '--target', 'user', '--service', 'karakeep', '--scenario', '*', '--authorization', 'rounds-test'], fourRows);
       assert.equal(tooMany.code, 1);
@@ -667,7 +678,7 @@ try {
       // --run --round records which round it ran.
       const state = stateDirFor('round-run');
       process.env.PBP_LIVE_STATE_DIR = state;
-      const code = await quiet(() => live.main(['--run', '--target', 'user', '--service', 'linkding,karakeep,pinboard', '--scenario', 'all', '--round', '2', '--linkding', 'http://127.0.0.1:9', '--karakeep', 'http://127.0.0.1:10', '--confirm-karakeep-no-auto-ai', '--allow-dirty', '--authorization', 'round-run', '--credentials', join(dir, 'absent.json')]));
+      const code = await quiet(() => live.main(['--run', '--target', 'user', '--service', 'linkding,karakeep,pinboard', '--scenario', USER_ROUNDS, '--round', '2', '--linkding', 'http://127.0.0.1:9', '--karakeep', 'http://127.0.0.1:10', '--confirm-karakeep-no-auto-ai', '--allow-dirty', '--authorization', 'round-run', '--credentials', join(dir, 'absent.json')]));
       assert.equal(code, 1);
       const roundReport = JSON.parse(readFileSync(join(state, readdirSync(state).find(n => /^pbp-it-[0-9a-f-]{36}$/.test(n)), 'report.json'), 'utf8'));
       assert.equal(roundReport.failure.code, 'credentials_unreadable');
@@ -1318,6 +1329,15 @@ try {
   // Pure helpers: endpoints, redaction, Karakeep config, signals, lock
   // ---------------------------------------------------------------------
   if (only('pure helpers')) {
+    // H3c: a fault with `pass` lets the first n matching requests through.
+    {
+      const run = new live.LiveRun({ mode: 'plan', flags: new Set(), values: {}, errors: [] });
+      const fault = { pass: 1 };
+      assert.equal(run.passFault(fault), true, 'the first request passes');
+      assert.equal(run.passFault(fault), false, 'the next one is answered');
+      assert.equal(fault.passed, 1);
+      assert.equal(run.passFault({ pass: 0 }), false, 'no pass: every request is answered');
+    }
     // Route faults (t.inject): page faults match the whole URL, service
     // faults one instance's path after its API root; `times` runs out.
     {

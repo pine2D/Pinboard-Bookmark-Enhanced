@@ -2672,7 +2672,7 @@ export class LiveRun {
     // the request would otherwise be the pool's fixture or aborted.
     if ((method === 'GET' || method === 'HEAD') && this.faults?.length && this.fixtureOrigins?.has(originOf(url))) {
       const fault = this.faults.find(f => faultMatches(f, { on: 'page', url, method }));
-      if (fault) return this.answerFault(route, fault);
+      if (fault && !this.passFault(fault)) return this.answerFault(route, fault);
     }
     if (this.poolSet.has(url) && (method === 'GET' || method === 'HEAD')) return route.fulfill({ contentType: 'text/html; charset=utf-8', body: fixtureHtml() });
     const decision = liveGuardRule(this.guardCfg, this.guardView(), { url, method, body: request.postData() });
@@ -2704,7 +2704,7 @@ export class LiveRun {
     if (decision.instance !== 'ai' && this.faults?.length) {
       const root = this.instances[decision.instance]?.root || '';
       const fault = this.faults.find(f => faultMatches(f, { on: 'service', instance: decision.instance, method, path: root && url.startsWith(root) ? url.slice(root.length) : url }));
-      if (fault) return this.answerFault(route, fault);
+      if (fault && !this.passFault(fault)) return this.answerFault(route, fault);
     }
     // An over-long tag reaches only a temporary instance: on a user
     // instance PostgreSQL would answer 500 and may keep the bookmark without
@@ -2746,6 +2746,15 @@ export class LiveRun {
       return route.fulfill({ response });
     }
     return route.continue();
+  }
+
+  // A fault with `pass` lets that many matching requests through first (the
+  // request an action itself needs), then answers every later one.
+  passFault(fault) {
+    if (!(fault.pass > 0)) return false;
+    fault.pass--;
+    fault.passed = (fault.passed || 0) + 1;
+    return true;
   }
 
   answerFault(route, fault) {
@@ -3062,6 +3071,7 @@ export class LiveRun {
         return false;
       },
       note: (key, value) => { mod.record.notes[key] = value; },
+      noted: key => mod.record.notes[key] ?? '',
       sleep: async ms => { const started = Date.now(); try { await sleep(ms); } finally { run.noteWait('wait', Date.now() - started); } },
       // Time left before this module's own seconds budget runs out.
       remainingMs: () => Math.max(0, (mod.deadline || 0) - Date.now()),
@@ -3173,10 +3183,11 @@ export class LiveRun {
       },
       sw,
       // Route-layer faults for this module (see faultMatches); cleared when
-      // it ends. Page faults answer the run's fixture origins only.
+      // it ends. `pass: n` lets the first n matching requests through, `times`
+      // caps the answers. Page faults answer the run's fixture origins only.
       inject(spec) {
         alive();
-        const fault = { on: spec.on === 'page' ? 'page' : 'service', instance: spec.instance || instance, method: spec.method ? String(spec.method).toUpperCase() : '', path: spec.path, status: spec.status, headers: spec.headers, contentType: spec.contentType, body: spec.body, abort: spec.abort || false, left: Number.isFinite(spec.times) ? spec.times : -1, hits: 0 };
+        const fault = { on: spec.on === 'page' ? 'page' : 'service', instance: spec.instance || instance, method: spec.method ? String(spec.method).toUpperCase() : '', path: spec.path, status: spec.status, headers: spec.headers, contentType: spec.contentType, body: spec.body, abort: spec.abort || false, left: Number.isFinite(spec.times) ? spec.times : -1, pass: Number.isInteger(spec.pass) && spec.pass > 0 ? spec.pass : 0, hits: 0 };
         if (fault.on === 'page') check(fault.path instanceof RegExp || (typeof fault.path === 'string' && run.fixtureOrigins.has(originOf(fault.path))), 'inject_page_origin', true);
         else check(!!run.instances[fault.instance], 'inject_instance', true);
         // A made-up success for a write would reach the worker guard as a
@@ -3184,7 +3195,7 @@ export class LiveRun {
         // run's cleanup would then delete that id on the instance.
         if (fault.on === 'service' && !fault.abort && !['GET', 'HEAD'].includes(fault.method)) check(!((fault.status || 503) >= 200 && (fault.status || 503) < 300), 'inject_write_success', true);
         run.faults.push(fault);
-        return { hits: () => fault.hits, clear: () => { const i = run.faults.indexOf(fault); if (i >= 0) run.faults.splice(i, 1); } };
+        return { hits: () => fault.hits, passed: () => fault.passed || 0, clear: () => { const i = run.faults.indexOf(fault); if (i >= 0) run.faults.splice(i, 1); } };
       },
       // This module's requests to the service, oldest first (method, path
       // after the API root with its query, parsed body); in memory only.

@@ -2530,6 +2530,420 @@ export const REGRESS_MODULES = [
 ];
 MODULES.push(...REGRESS_MODULES);
 
+// ---- H3c: reader, copy exits, status checks, screenshots -------------------
+
+// The visible text of the reader's bookmark status line ("" when hidden).
+const readerStatus = reader => reader.evaluate(() => { const el = document.getElementById('reader-bookmark-status'); return el && !el.hidden ? el.innerText.trim() : ''; });
+const readerIdle = reader => reader.waitForFunction(() => document.getElementById('reader-bookmark-save')?.getAttribute('aria-busy') === 'false');
+// The stored connection as the extension reads it (no secret leaves the worker).
+const connection = t => t.sw(async () => { const c = await pbpReadBookmarkConnection(); return { service: c.service, account: c.account || '' }; });
+// Takes this service's stored token away inside the worker and puts back the
+// very same value later: the connection id, its account and every other
+// setting stay as they were, and the value never leaves the worker. A
+// worker restart loses it, which the runner already treats as fatal; the
+// caller falls back to a Connect then.
+const tokenAway = t => t.sw(async key => {
+  const [local, sync] = await Promise.all([chrome.storage.local.get(key), chrome.storage.sync.get(key)]);
+  globalThis.__pbpItHeldToken = { key, local: local[key], sync: sync[key] };
+  if (local[key] !== undefined) await chrome.storage.local.remove(key);
+  if (sync[key] !== undefined) await chrome.storage.sync.remove(key);
+  return local[key] !== undefined || sync[key] !== undefined;
+}, t.service + 'Token');
+const tokenBack = t => t.sw(async () => {
+  const held = globalThis.__pbpItHeldToken;
+  if (!held) return false;
+  if (held.local !== undefined) await chrome.storage.local.set({ [held.key]: held.local });
+  if (held.sync !== undefined) await chrome.storage.sync.set({ [held.key]: held.sync });
+  delete globalThis.__pbpItHeldToken;
+  return true;
+});
+// The worker's host-permission answer for this instance, overridden in place
+// (the same answer a revoked grant gives) and put back. chrome.permissions
+// itself is untouched, so no prompt is needed to restore it.
+const permissionAway = t => t.sw(async origin => {
+  const api = chrome.permissions;
+  if (!globalThis.__pbpItContains) globalThis.__pbpItContains = api.contains;
+  const original = globalThis.__pbpItContains;
+  api.contains = async query => ((query?.origins || []).some(o => o === origin + '/*' || o === origin + '/') ? false : original.call(api, query));
+  return true;
+}, new URL(t.base).origin);
+const permissionBack = t => t.sw(async () => {
+  if (globalThis.__pbpItContains) { chrome.permissions.contains = globalThis.__pbpItContains; delete globalThis.__pbpItContains; }
+  return true;
+});
+
+export const H3C_MODULES = [
+  // G19 + G20, G10, G2d: the reader's bookmark bar.
+  {
+    id: 'ux.reader-bar',
+    services: ['linkding', 'karakeep'],
+    surfaces: ['reader', 'options'],
+    features: ['reader-badge-service-link', 'reader-badge-one-lookup', 'reader-empty-title', 'reader-not-connected-hint', 'reader-connection-refresh', 'reader-cleaned-url-save', 'reader-kept-no-delivery'],
+    fixRefs: ['G2d', 'G10', 'G19', 'G20'],
+    needs: needs({ shots: true }),
+    budget: { bookmarks: 3, urls: 3, node: 20, browser: { linkding: 90, karakeep: 160 }, ai: 0, tags: 0, lists: { karakeep: 1 }, seconds: 100, tagReads: 2 },
+    files: [],
+    settings: { offlineQueueEnabled: true },
+    async steps(t) {
+      const { prefix } = t;
+      const [a, b, c] = [t.claimUrl(), t.claimUrl(), t.claimUrl()];
+      await t.phase('reader_bar_seed');
+      await t.seed({ url: a, title: prefix + ' reader bar', notes: 'seed' });
+      const origin = new URL(t.base).origin;
+
+      // G20: the badge points at the connected service, shows no padlock
+      // (self-hosted privacy is not Pinboard's shared flag), and one reader
+      // open looks the page up once.
+      await t.part('badge', ['G20'], async () => {
+        await t.phase('reader_badge');
+        const since = t.now();
+        const reader = await t.openReader(a, { ready: '#reader-bookmark-edit' });
+        await t.until(async () => (await reader.locator('.bookmark-badge').count()) > 0, 'reader_badge_shown', 8000);
+        const badge = await reader.evaluate(() => { const el = document.querySelector('.bookmark-badge'); return { href: el.getAttribute('href') || '', lock: !!el.querySelector('.bb-lock') }; });
+        let hrefOrigin = '';
+        try { hrefOrigin = new URL(badge.href).origin; } catch { hrefOrigin = 'invalid'; }
+        const lookups = t.requests({ path: CHECK_PATH[t.service], since }).length;
+        t.note('badge', { pinboard: /pinboard\.in/i.test(badge.href), sameOrigin: hrefOrigin === origin, lock: badge.lock, lookups });
+        await t.shot(reader, 'badge', { surface: 'reader', keys: ['.bookmark-badge', '#reader-bookmark-save'] });
+        await reader.close();
+        t.expect(!/pinboard\.in/i.test(badge.href), 'reader_badge_pinboard_link');
+        t.expectEq(hrefOrigin, origin, 'reader_badge_service_link');
+        t.expect(!badge.lock, 'reader_badge_lock');
+        t.expectEq(lookups, 1, 'reader_badge_second_lookup');
+      }, ['reader-badge-service-link', 'reader-badge-one-lookup']);
+
+      // G19: a title of spaces is refused in the reader, nothing is sent.
+      await t.part('empty_title', ['G19'], async () => {
+        await t.phase('reader_empty_title');
+        const reader = await t.openReader(a, { ready: '#reader-bookmark-edit' });
+        await reader.locator('#reader-bookmark-edit').click();
+        await reader.locator('#reader-bookmark-title').fill('   ');
+        const since = t.now();
+        await reader.locator('#reader-bookmark-apply').click();
+        await t.sleep(1500);
+        // The editor's own status line, or the bar's when the editor closed.
+        const status = await reader.evaluate(() => ['reader-bookmark-editor-status', 'reader-bookmark-status'].map(id => document.getElementById(id)).filter(el => el && !el.hidden && el.offsetParent !== null).map(el => el.innerText.trim()).filter(Boolean)[0] || '');
+        const writes = writesSince(t, since).length;
+        t.note('emptyTitle', { status, writes });
+        await t.shot(reader, 'empty-title', { surface: 'reader' });
+        await reader.close();
+        t.expectEq(writes, 0, 'reader_empty_title_sent');
+        t.expectEq(status, t.message('urlAndTitleRequired'), 'reader_empty_title_copy');
+      }, ['reader-empty-title']);
+
+      // G19: no connection at all. The bar says where to connect (bgSetToken)
+      // instead of "account changed", on a switch and on a fresh open, and
+      // asks the service nothing. The token is put back as it was.
+      await t.part('not_connected', ['G19'], async () => {
+        await t.phase('reader_not_connected');
+        const before = await connection(t);
+        const reader = await t.openReader(a, { ready: '#reader-bookmark-edit' });
+        let fresh = null;
+        try {
+          const since = t.now();
+          t.expect(await tokenAway(t), 'reader_token_missing');
+          await t.until(async () => (await connection(t)).account === '', 'reader_disconnected', 8000);
+          await t.until(async () => !!(await readerStatus(reader)), 'reader_disconnected_status', 8000);
+          const switched = await readerStatus(reader);
+          fresh = await t.openReader(a, { ready: '#reader-bookmark-save' });
+          await t.sleep(800);
+          const opened = await readerStatus(fresh);
+          const disabled = await fresh.locator('#reader-bookmark-save').isDisabled();
+          const asked = t.requests({ since }).length;
+          t.note('notConnected', { switched, opened, disabled, asked });
+          await t.shot(fresh, 'not-connected', { surface: 'reader', keys: ['#reader-bookmark-status'] });
+          t.expectEq(asked, 0, 'reader_not_connected_requests');
+          t.expect(disabled, 'reader_not_connected_enabled');
+          t.expectEq(switched, t.message('bgSetToken'), 'reader_not_connected_switch_copy');
+          t.expectEq(opened, t.message('bgSetToken'), 'reader_not_connected_open_copy');
+        } finally {
+          await fresh?.close().catch(() => {});
+          await reader.close().catch(() => {});
+          const back = await tokenBack(t).catch(() => false);
+          if (!back) await t.reconnect();
+          await t.until(async () => (await connection(t)).account === before.account, 'reader_token_restored', 8000);
+        }
+      }, ['reader-not-connected-hint']);
+
+      // G19 invariant 3: a Connect again with the same address and token
+      // (same account) clears the bar's old error and looks again.
+      await t.part('connection_refresh', ['G19'], async () => {
+        await t.phase('reader_connection_refresh');
+        const before = await connection(t);
+        const fault = t.inject({ method: 'GET', path: CHECK_PATH[t.service], status: 503, contentType: 'application/json', body: { detail: 'unavailable' } });
+        const reader = await t.openReader(a, { ready: '#reader-bookmark-save' });
+        await t.until(async () => !!(await readerStatus(reader)), 'reader_refresh_error', 8000);
+        const failed = await readerStatus(reader);
+        fault.clear();
+        const since = t.now();
+        await t.reconnect();
+        const after = await connection(t);
+        t.expectEq(after.account, before.account, 'reader_reconnect_account');
+        let refreshed = false;
+        try { await t.until(async () => (await reader.locator('#reader-bookmark-save').getAttribute('data-saved')) === 'true', 'reader_refresh_saved', 10000); refreshed = true; } catch { refreshed = false; }
+        const status = await readerStatus(reader);
+        t.note('connectionRefresh', { failed, refreshed, status, lookups: t.requests({ path: CHECK_PATH[t.service], since }).length });
+        await reader.close();
+        t.expect(refreshed, 'reader_connection_not_refreshed');
+        t.expect(status !== failed, 'reader_old_error_kept');
+      }, ['reader-connection-refresh']);
+
+      // G10: a utm variant of a saved page is that bookmark: Save changes
+      // it, never creates another. Saved only once the lookup finds it: a
+      // create of the utm address would be a URL outside the run's pool.
+      await t.part('cleaned_url_save', ['G10'], async () => {
+        await t.phase('reader_cleaned_url');
+        await t.seed({ url: b, title: prefix + ' cleaned', notes: 'before' });
+        const variant = b + '&utm_source=pbp-it';
+        const reader = await t.openReader(variant, { ready: '#reader-bookmark-edit' });
+        const saved = (await reader.locator('#reader-bookmark-save').getAttribute('data-saved')) === 'true';
+        t.note('cleanedUrl', { shownSaved: saved });
+        if (!saved) { await reader.close(); t.expect(false, 'reader_utm_unsaved'); }
+        await reader.locator('#reader-bookmark-edit').click();
+        await t.until(async () => (await reader.locator('#reader-bookmark-title').inputValue()) === prefix + ' cleaned', 'reader_cleaned_prefill');
+        await reader.locator('#reader-bookmark-notes').fill('after');
+        const since = t.now();
+        await t.applyReader(reader);
+        await reader.close();
+        t.expectEq(createsOf(t, '', since).length, 0, 'reader_cleaned_created');
+        t.expectEq(notesOfRow(t, await t.ownRow(b)), 'after', 'reader_cleaned_updated');
+      }, ['reader-cleaned-url-save']);
+
+      // G2d: the reader shows Read Later, a second reader has marked the
+      // bookmark read since; Save (mark read) finds it already read and
+      // finishes without a write or a queue record, even when every later
+      // lookup fails. The second reader is the extension's own write (the
+      // runner's Node layer never touches Karakeep list members).
+      await t.part('kept_no_delivery', ['G2d'], async () => {
+        await t.phase('reader_kept');
+        await t.seed({ url: c, title: prefix + ' kept', notes: '' });
+        const reader = await t.openReader(c, { ready: '#reader-bookmark-later' });
+        await reader.locator('#reader-bookmark-later').click();
+        await reader.waitForFunction(() => document.getElementById('reader-bookmark-later')?.getAttribute('aria-pressed') === 'true');
+        await readerIdle(reader);
+        const other = await t.openReader(c, { ready: '#reader-bookmark-later' });
+        await other.waitForFunction(() => document.getElementById('reader-bookmark-later')?.getAttribute('aria-pressed') === 'true');
+        await other.locator('#reader-bookmark-save').click();
+        await other.waitForFunction(() => document.getElementById('reader-bookmark-later')?.getAttribute('aria-pressed') === 'false');
+        await readerIdle(other);
+        await other.close();
+        await reader.bringToFront();
+        t.expectEq(await reader.locator('#reader-bookmark-later').getAttribute('aria-pressed'), 'true', 'reader_kept_stale_state');
+        const fault = t.inject({ method: 'GET', path: CHECK_PATH[t.service], status: 503, contentType: 'application/json', body: { detail: 'unavailable' }, pass: 1 });
+        const since = t.now();
+        await reader.locator('#reader-bookmark-save').click();
+        await t.until(async () => fault.passed() === 1 && (await reader.locator('#reader-bookmark-save').getAttribute('aria-busy')) === 'false', 'reader_kept_settled', 15000);
+        await t.sleep(500);
+        const status = await readerStatus(reader);
+        const queued = (await queue(t)).filter(i => i.url === c).length;
+        const writes = writesSince(t, since).length;
+        t.note('kept', { writes, queued, status, laterLookups: fault.hits() });
+        fault.clear();
+        await reader.close();
+        t.expectEq(writes, 0, 'reader_kept_write');
+        t.expectEq(queued, 0, 'reader_kept_queued');
+        t.expect(status !== t.message('readerBookmarkQueued'), 'reader_kept_queued_copy');
+      }, ['reader-kept-no-delivery']);
+      t.check(`${t.service}: reader badge links to the service with one lookup; empty title refused; no connection explained; reconnect refreshes the bar; a utm variant updates the saved bookmark; an action already in effect sends and queues nothing`);
+    },
+  },
+
+  // G18, G11, G12: copy at each exit, in en and zh_CN, faults by route.
+  {
+    id: 'ux.copy-exits',
+    services: ['linkding', 'karakeep'],
+    surfaces: ['popup', 'reader'],
+    features: ['popup-delete-failure-copy', 'reader-permission-copy', 'reader-created-copy', 'lookup-5xx-copy'],
+    fixRefs: ['G11', 'G12', 'G18'],
+    needs: needs({ shots: true }),
+    budget: { bookmarks: 2, urls: 3, node: 10, browser: { linkding: 90, karakeep: 150 }, ai: 0, tags: 0, seconds: 100, tagReads: 2 },
+    files: [],
+    settings: { optAutoCloseAfterSave: false },
+    async steps(t) {
+      const { prefix } = t;
+      const [d, e, f] = [t.claimUrl(), t.claimUrl(), t.claimUrl()];
+      const LOCALES = ['en', 'zh_CN'];
+      const statusMsg = popup => popup.evaluate(() => {
+        const texts = [document.getElementById('status-msg'), document.querySelector('.submit-bar + .feedback-card'), ...document.querySelectorAll('.feedback-card')]
+          .filter(el => el && el.offsetParent !== null).map(el => el.innerText.trim()).filter(Boolean);
+        return [...new Set(texts)].join(' | ').slice(0, 300);
+      });
+      await t.phase('copy_seed');
+      await t.seed({ url: d, title: prefix + ' copy exits', notes: '' });
+
+      // G18: a failed delete says it was the delete, not "couldn't save".
+      await t.part('popup_delete_failure', ['G18'], async () => {
+        for (const locale of LOCALES) {
+          await t.phase('copy_delete_' + locale);
+          const form = await t.openPopup(d, { locale });
+          await t.until(async () => form.popup.locator('#delete-btn').isVisible(), 'copy_delete_button', 8000);
+          const fault = t.inject({ method: 'DELETE', path: /^bookmarks\//, status: 503, contentType: 'application/json', body: { detail: 'unavailable' } });
+          await form.popup.locator('#delete-btn').click();
+          await form.popup.locator('.confirm-yes').click();
+          await t.until(async () => fault.hits() > 0 && !!(await statusMsg(form.popup)), 'copy_delete_status', 10000);
+          await t.sleep(300);
+          const text = await statusMsg(form.popup);
+          t.note('deleteFailure_' + locale, text);
+          await t.shot(form.popup, 'delete-failed', { surface: 'popup', keys: ['#delete-btn', '#submit-btn'] });
+          fault.clear();
+          await form.close();
+          t.expect(!!(await t.lookup(d)), 'copy_delete_removed');
+        }
+        // Judged after both locales ran, so each has its picture.
+        for (const locale of LOCALES) t.expect(!t.noted('deleteFailure_' + locale).includes(t.message('saveFailedGeneric', locale)), 'popup_delete_says_save_' + locale);
+      }, ['popup-delete-failure-copy']);
+
+      // G11: a revoked host grant gives the reader the permission copy, not
+      // "could not check". The worker's answer is overridden, then put back.
+      await t.part('reader_permission', ['G11'], async () => {
+        await t.phase('copy_reader_permission');
+        let reader = null;
+        try {
+          await permissionAway(t);
+          const shown = {};
+          for (const locale of LOCALES) {
+            await t.settings({ optLang: locale });
+            reader = await t.openReader(d, { ready: '#reader-bookmark-save' });
+            await t.until(async () => !!(await readerStatus(reader)), 'copy_permission_status_' + locale, 8000);
+            shown[locale] = await readerStatus(reader);
+            await t.shot(reader, 'permission-revoked', { surface: 'reader', keys: ['#reader-bookmark-status'] });
+            await reader.close();
+            reader = null;
+          }
+          t.note('readerPermission', shown);
+          for (const locale of LOCALES) t.expectEq(shown[locale], t.message('bookmarkPermissionDenied', locale), 'reader_permission_copy_' + locale);
+        } finally {
+          await reader?.close().catch(() => {});
+          await permissionBack(t);
+          await t.settings({ optLang: 'en' });
+        }
+      }, ['reader-permission-copy']);
+
+      // G12: a bookmark the reader creates is reported saved, not updated.
+      await t.part('reader_created', ['G12'], async () => {
+        await t.phase('copy_reader_created');
+        const reader = await t.openReader(e, { ready: '#reader-bookmark-save' });
+        await reader.locator('#reader-bookmark-save').click();
+        await reader.waitForFunction(() => document.getElementById('reader-bookmark-save')?.dataset.saved === 'true');
+        await readerIdle(reader);
+        await t.ownRow(e);
+        const text = await readerStatus(reader);
+        t.note('readerCreated', text);
+        await t.shot(reader, 'created', { surface: 'reader', keys: ['#reader-bookmark-status'], locales: LOCALES });
+        await reader.close();
+        t.expect(text !== t.message('readerBookmarkUpdated'), 'reader_created_says_updated');
+        t.expectEq(text, t.message('readerBookmarkSaved'), 'reader_created_copy');
+      }, ['reader-created-copy']);
+
+      // G11: a 5xx from the duplicate check is not called a Pinboard outage.
+      await t.part('lookup_5xx', ['G11'], async () => {
+        for (const locale of LOCALES) {
+          await t.phase('copy_lookup_5xx_' + locale);
+          const fault = t.inject({ method: 'GET', path: CHECK_PATH[t.service], status: 503, contentType: 'application/json', body: { detail: 'unavailable' } });
+          const form = await t.openPopup(f, { locale, settle: false });
+          await t.until(async () => fault.hits() > 0 && !!(await statusMsg(form.popup)), 'copy_lookup_status', 15000);
+          await t.sleep(300);
+          const text = await statusMsg(form.popup);
+          t.note('lookup5xx_' + locale, text);
+          await t.shot(form.popup, 'lookup-5xx', { surface: 'popup', keys: ['#submit-btn'] });
+          fault.clear();
+          await form.close();
+        }
+        for (const locale of LOCALES) t.expect(!/pinboard/i.test(t.noted('lookup5xx_' + locale)), 'lookup_5xx_names_pinboard_' + locale);
+      }, ['lookup-5xx-copy']);
+      await t.settings({ optLang: 'en' });
+      t.check(`${t.service}: copy exits in en and zh_CN: delete failure, revoked grant in the reader, reader create, 5xx duplicate check`);
+    },
+  },
+
+  // G14 (SW-08/P32): what the status check costs per tab switch, and that
+  // a failed check keeps the icon and the popup asks once.
+  {
+    id: 'ux.status-check',
+    services: ['linkding', 'karakeep'],
+    surfaces: ['popup'],
+    features: ['status-check-cost', 'status-failure-keeps-icon', 'status-failure-one-lookup'],
+    fixRefs: ['G14'],
+    needs: needs(),
+    budget: { bookmarks: 1, urls: 2, node: 6, browser: { linkding: 50, karakeep: 90 }, ai: 0, tags: 0, seconds: 75, tagReads: 1 },
+    files: [],
+    settings: { optCheckBookmarkStatus: true },
+    async steps(t) {
+      const { prefix } = t;
+      const [saved, fresh] = [t.claimUrl(), t.claimUrl()];
+      await t.phase('status_seed');
+      await t.seed({ url: saved, title: prefix + ' status', notes: '' });
+      // linkding asks /check/ while browsing only with pre-read on (3a).
+      if (t.service === 'linkding') {
+        try { await t.settings({ [await t.productSetting(/linkding.*(preload|prefetch|preread|whilebrows|browsing)|(preload|prefetch).*page/, 'linkding_preload')]: true }); }
+        catch (error) { if (!/^pending_setting_/.test(error?.code || '')) throw error; t.note('preload', 'setting missing'); }
+      }
+      const pages = {};
+      for (const url of [saved, fresh]) { pages[url] = await t.ctx.newPage(); await pages[url].goto(url).catch(() => {}); }
+      const tabIcon = url => t.sw(async url => { const tab = (await chrome.tabs.query({})).find(x => x.url === url); return tab ? _lastIconState.get(tab.id) || '' : 'no_tab'; }, url);
+      const want = { [saved]: 'saved', [fresh]: 'default' };
+
+      await t.part('switch_cost', [], async () => {
+        await t.phase('status_switches');
+        const switches = [];
+        for (let i = 0; i < 6; i++) {
+          const url = i % 2 ? fresh : saved;
+          await pages[url].bringToFront();
+          const since = t.now();
+          await t.activateTab(url);
+          let ms = null;
+          try { await t.until(async () => (await tabIcon(url)) === want[url], 'status_icon', 8000); ms = t.now() - since; } catch { ms = null; }
+          await t.sleep(400);
+          switches.push({ to: url === saved ? 'saved' : 'new', requests: t.requests({ since }).length, checks: t.requests({ path: CHECK_PATH[t.service], since }).length, ms });
+        }
+        t.note('switches', switches);
+        t.check(`${t.service}: status check per tab switch ${switches.map(s => `${s.to} ${s.checks}/${s.requests} req ${s.ms ?? 'n/a'} ms`).join('; ')}`);
+        t.expect(switches.every(s => s.ms !== null), 'status_icon_not_set');
+      }, ['status-check-cost']);
+
+      // G14: the cached entry expires, the check fails: the saved page keeps
+      // its saved icon; the popup then asks once, not twice.
+      await t.part('failure', ['G14'], async () => {
+        await t.phase('status_failure_icon');
+        await pages[saved].bringToFront();
+        await t.activateTab(saved);
+        await t.until(async () => (await tabIcon(saved)) === 'saved', 'status_failure_baseline', 8000);
+        await t.sw(() => { statusCache.clear(); return true; });
+        const fault = t.inject({ method: 'GET', path: CHECK_PATH[t.service], status: 503, contentType: 'application/json', body: { detail: 'unavailable' } });
+        await pages[fresh].bringToFront();
+        await t.activateTab(fresh);
+        await t.sleep(600);
+        await pages[saved].bringToFront();
+        const since = t.now();
+        await t.activateTab(saved);
+        await t.until(async () => fault.hits() > 0, 'status_failure_checked', 8000);
+        await t.sleep(1200);
+        const icon = await tabIcon(saved);
+        t.note('failureIcon', { icon, checks: t.requests({ path: CHECK_PATH[t.service], since }).length });
+        t.expectEq(icon, 'saved', 'status_failure_icon_flipped');
+
+        await t.phase('status_failure_popup');
+        await t.sw(() => { statusCache.clear(); return true; });
+        const popupSince = t.now();
+        const form = await t.openPopup(saved, { settle: false });
+        await t.until(async () => form.popup.evaluate(() => typeof bookmarkLookup !== 'undefined' && !['idle', 'pending'].includes(bookmarkLookup.status)), 'status_failure_popup', 30000);
+        await t.sleep(800);
+        const lookup = await form.popup.evaluate(() => bookmarkLookup.status);
+        const checks = t.requests({ path: CHECK_PATH[t.service], since: popupSince }).length;
+        const ms = t.now() - popupSince;
+        t.note('failurePopup', { lookup, checks, ms });
+        fault.clear();
+        await form.close();
+        t.expectEq(checks, 1, 'status_failure_popup_lookups');
+      }, ['status-failure-keeps-icon', 'status-failure-one-lookup']);
+      for (const p of Object.values(pages)) await p.close().catch(() => {});
+      t.check(`${t.service}: a failed status check keeps the saved icon and the popup asks once`);
+    },
+  },
+
+];
+MODULES.push(...H3C_MODULES);
+
 // Group aliases. The pre-registry --scenario values keep their meaning:
 // core = the original smoke, edges = tag/offline/quote regressions.
 export const GROUPS = Object.freeze({
@@ -2539,6 +2953,10 @@ export const GROUPS = Object.freeze({
   ai: ['*.ai.*'],
   selfhosted: ['*.sh.*'],
   regress: ['*.regress.*'],
+  // Reader, copy and status-check rows (H3c): outside selfhosted, so that
+  // group still fits the three rounds of one user-target authorisation.
+  ux: ['*.ux.*'],
+  h3c: ['*.ux.*', '*.regress.*'],
   all: ['*'],
 });
 
