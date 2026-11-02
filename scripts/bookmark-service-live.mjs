@@ -78,7 +78,7 @@ export const BUDGETS = Object.freeze({
     linkding: { bookmarks: 15, node: 250, cleanupReserve: 60, browser: 350, tags: 20, lists: 0 },
     karakeep: { bookmarks: 12, node: 250, cleanupReserve: 60, browser: 500, tags: 20, lists: 1 },
     pinboard: { bookmarks: 5, node: 80, cleanupReserve: 30, browser: 80, tags: 10, lists: 0, minIntervalMs: 3000 },
-    run: { fakeAi: 60, moduleSeconds: 120, runMinutes: 20, urlMargin: 3 },
+    run: { fakeAi: 60, moduleSeconds: 120, runMinutes: 20, urlMargin: 3, roundsPerAuthorization: 3 },
   },
   temp: {
     linkding: { bookmarks: 60, node: 1200, cleanupReserve: 300, browser: 2000, tags: 120, lists: 0 },
@@ -117,7 +117,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // ---------------------------------------------------------------------------
 
 const BOOL_FLAGS = new Set(['--run', '--plan', '--list', '--help', '--read-only', '--confirm-karakeep-no-auto-ai', '--allow-dirty', '--shots', '--headed']);
-const VALUE_FLAGS = new Set(['--target', '--scenario', '--service', '--linkding', '--karakeep', '--credentials', '--cleanup', '--shots-dir']);
+const VALUE_FLAGS = new Set(['--target', '--scenario', '--service', '--linkding', '--karakeep', '--credentials', '--cleanup', '--shots-dir', '--authorization']);
 
 export function parseArgs(argv) {
   const flags = new Set(), values = {}, errors = [];
@@ -279,7 +279,7 @@ export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnable
     headed: headedFlag || selected.some(m => m.needs?.headed),
     shots: { modules: shotModules, enabled: shotsEnabled },
     containers: target === 'temp' ? [...new Set(instances.flatMap(i => (i === 'linkding-pg' ? ['postgres', 'linkding-pg'] : [i])))].concat(instances.length ? ['edge'] : []) : [],
-    limits: { moduleSeconds: caps.run.moduleSeconds, runMinutes: caps.run.runMinutes, worstCaseSeconds, setupAllowanceSeconds, fakeAi: caps.run.fakeAi, automaticRetries: 0 },
+    limits: { moduleSeconds: caps.run.moduleSeconds, runMinutes: caps.run.runMinutes, worstCaseSeconds, setupAllowanceSeconds, fakeAi: caps.run.fakeAi, roundsPerAuthorization: caps.run.roundsPerAuthorization ?? null, automaticRetries: 0 },
     karakeepWritesRequireAutoAiDisabled: target === 'user' && selected.some(m => m.service === 'karakeep' && m.needs?.writes !== false),
     cleanup: 'ledger bookmarks, ledger lists and zero-use run-prefix tags; then a read-only pass over the URL pool',
     withinCaps: problems.length === 0, problems,
@@ -482,6 +482,43 @@ export function acquireLock(dir, info) {
     }
   }
   fail('run_locked');
+}
+
+// Rounds per user authorisation. Every --run --target user names the
+// authorisation it runs under (--authorization LABEL); the rounds are
+// counted in the state directory next to the reports and claimed under the
+// run lock, after the tree and earlier-cleanup checks and before any
+// credential is read. A refused or failed round still counts; --cleanup
+// never does. Temporary targets need no authorisation.
+const AUTH_LEDGER = 'pbp-it-authorizations.json';
+const AUTH_LABEL_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
+export function validateAuthorizationLabel(label) {
+  check(typeof label === 'string' && AUTH_LABEL_RE.test(label), 'authorization_label');
+  return label;
+}
+export function readAuthorizations(dir = stateDir()) {
+  const path = join(dir, AUTH_LEDGER);
+  if (!existsSync(path)) return { version: 1, labels: {} };
+  let data = null;
+  try { data = JSON.parse(readFileSync(path, 'utf8')); } catch { /* checked below */ }
+  // An unreadable count is refused, never reset.
+  check(data?.version === 1 && data.labels && typeof data.labels === 'object' && Object.values(data.labels).every(Array.isArray), 'authorization_ledger_invalid');
+  return data;
+}
+export function authorizationStatus(dir, label, cap) {
+  if (!label) return { required: true, label: '', roundsPerAuthorization: cap, used: null, left: null };
+  validateAuthorizationLabel(label);
+  const used = (readAuthorizations(dir).labels[label] || []).length;
+  return { required: true, label, roundsPerAuthorization: cap, used, left: Math.max(0, cap - used) };
+}
+export function claimAuthorizationRound(dir, label, entry, cap) {
+  validateAuthorizationLabel(label);
+  const data = readAuthorizations(dir);
+  const rounds = (data.labels[label] ||= []);
+  check(rounds.length < cap, 'authorization_rounds_exhausted');
+  rounds.push(entry);
+  writePrivateJson(join(dir, AUTH_LEDGER), data);
+  return { label, round: rounds.length, roundsPerAuthorization: cap };
 }
 
 // ---------------------------------------------------------------------------
@@ -987,6 +1024,8 @@ export class LiveRun {
         this.instances[instance] = { id: instance, service, base, root: apiRootFor(service, base), token: '' };
       }
       check(!this.plan.karakeepWritesRequireAutoAiDisabled || flags.has('--confirm-karakeep-no-auto-ai'), 'karakeep_auto_ai_not_confirmed_off');
+      check(values.authorization, 'authorization_required');
+      this.authorization = validateAuthorizationLabel(values.authorization);
     } else {
       check(!values.credentials && !values.linkding && !values.karakeep, 'temp_target_rejects_user_endpoints');
     }
@@ -1058,6 +1097,10 @@ export class LiveRun {
       }
       this.report.pools = this.pools;
       this.persist();
+      if (this.target === 'user') {
+        this.report.authorization = claimAuthorizationRound(this.state, this.authorization, { runId: this.runId, started: this.report.started, scenario: this.report.scenario }, BUDGETS.user.run.roundsPerAuthorization);
+        this.persist();
+      }
       if (this.target === 'temp') await this.startTemp();
       else await this.loadCredentials();
       await this.preflight();
@@ -2233,6 +2276,8 @@ function printHelp() {
     '  --target temp (default) starts throwaway containers from the images of the existing linkding / karakeep-web containers.',
     '  --target user --credentials /private/credentials.json --linkding http://127.0.0.1:PORT --karakeep http://127.0.0.1:PORT',
     '  Karakeep writes on --target user also require --confirm-karakeep-no-auto-ai (and a /signin check that auto AI is off).',
+    '  --target user also requires --authorization LABEL: at most 3 rounds per label, counted in the state directory;',
+    '  --plan --target user --authorization LABEL shows the rounds used and left. --cleanup never uses a round.',
     '--plan prints modules, budgets, URLs, containers, headed and shot needs without credentials, network, browser or Docker.',
     '--list prints module ids. --service linkding,karakeep filters. --read-only = --scenario readonly.',
     '--shots [--shots-dir DIR] saves masked screenshots; --headed launches a visible browser; --allow-dirty runs on a dirty tree.',
@@ -2261,8 +2306,10 @@ export async function main(argv = process.argv.slice(2), { dockerExec, modules }
       plan.scenario = scenario;
       plan.services = services;
       if (target === 'user') plan.bases = Object.fromEntries(services.filter(s => opts.values[s]).map(s => [s, validateBase(opts.values[s])]));
+      // Rounds left under the named authorisation: a local count, no credential.
+      plan.authorization = target === 'user' ? authorizationStatus(stateDir(), opts.values.authorization || '', BUDGETS.user.run.roundsPerAuthorization) : { required: false };
       await new Promise(r => process.stdout.write(JSON.stringify(plan, null, 2) + '\n', r));
-      return plan.withinCaps ? 0 : 1;
+      return plan.withinCaps && plan.authorization.left !== 0 ? 0 : 1;
     } catch (error) {
       await new Promise(r => process.stdout.write(JSON.stringify({ error: failureCode(error) }) + '\n', r));
       return 1;

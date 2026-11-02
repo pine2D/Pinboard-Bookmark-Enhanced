@@ -52,8 +52,12 @@ globalThis.fetch=()=>{throw new Error('network_access_blocked');};
 const stateDirFor = name => { const d = join(dir, 'state-' + name); mkdirSync(d, { recursive: true, mode: 0o700 }); return d; };
 const secretValues = [syntheticKey, syntheticKarakeepKey];
 
-async function run(args, { guard = true, credentials = true, state = stateDirFor('default'), onSpawn } = {}) {
-  const child = spawn(process.execPath, [...(guard ? ['--import', hook] : []), 'scripts/bookmark-service-live.mjs', ...args, ...(credentials ? ['--credentials', credentialsPath] : [])], {
+// A user-target run names its authorisation; each spawned run gets a label of
+// its own unless the test is about authorisation itself.
+async function run(args, { guard = true, credentials = true, state = stateDirFor('default'), onSpawn, authorization = true } = {}) {
+  const userRun = args.includes('--run') && args[args.indexOf('--target') + 1] === 'user' && !args.includes('--authorization');
+  const auth = authorization && userRun ? ['--authorization', 'preflight-' + randomUUID().slice(0, 8)] : [];
+  const child = spawn(process.execPath, [...(guard ? ['--import', hook] : []), 'scripts/bookmark-service-live.mjs', ...args, ...auth, ...(credentials ? ['--credentials', credentialsPath] : [])], {
     cwd: root, stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, PATH: binDir + ':' + process.env.PATH, PBP_LIVE_STATE_DIR: state },
   });
@@ -739,6 +743,35 @@ try {
   assert.equal(edgePlan.budget.karakeep.bookmarks, 4);
   assert.equal(edgePlan.budget.karakeep.caps.bookmarks, 12);
   assert.equal(edgePlan.karakeepWritesRequireAutoAiDisabled, true);
+  // Rounds per authorisation: three per label, refused before any credential
+  // read or request, and shown by --plan.
+  {
+    const state = stateDirFor('authorization');
+    const cap = live.BUDGETS.user.run.roundsPerAuthorization;
+    assert.equal(cap, 3);
+    assert.deepEqual(live.authorizationStatus(state, 'auth-a', cap), { required: true, label: 'auth-a', roundsPerAuthorization: 3, used: 0, left: 3 });
+    for (let i = 1; i <= 3; i++) assert.equal(live.claimAuthorizationRound(state, 'auth-a', { runId: 'r' + i }, cap).round, i);
+    assert.throws(() => live.claimAuthorizationRound(state, 'auth-a', { runId: 'r4' }, cap), e => e.code === 'authorization_rounds_exhausted');
+    assert.equal(live.claimAuthorizationRound(state, 'auth-b', { runId: 'r5' }, cap).round, 1, 'labels count separately');
+    assert.equal(statSync(join(state, 'pbp-it-authorizations.json')).mode & 0o777, 0o600);
+    for (const bad of ['', ' x', 'a b', 'x'.repeat(65), '../x', 'a/b', '-x']) assert.throws(() => live.validateAuthorizationLabel(bad), e => e.code === 'authorization_label', JSON.stringify(bad));
+    const shown = JSON.parse((await run(['--plan', '--target', 'user', '--authorization', 'auth-a'], { credentials: false, state })).output);
+    assert.deepEqual(shown.authorization, { required: true, label: 'auth-a', roundsPerAuthorization: 3, used: 3, left: 0 });
+    assert.equal(shown.limits.roundsPerAuthorization, 3);
+    assert.equal((await run(['--plan', '--target', 'user', '--authorization', 'auth-a'], { credentials: false, state })).code, 1, 'an exhausted label fails --plan');
+    assert.deepEqual(JSON.parse((await run(['--plan', '--target', 'user'], { credentials: false, state })).output).authorization, { required: true, label: '', roundsPerAuthorization: 3, used: null, left: null });
+    assert.deepEqual(JSON.parse((await run(['--plan'], { credentials: false, state })).output).authorization, { required: false });
+    const missing = await run(['--run', '--target', 'user', '--service', 'linkding', '--linkding', 'http://127.0.0.1:48100'], { state, authorization: false });
+    assert.equal(missing.code, 1);
+    assert.equal(missing.report.failure.code, 'authorization_required');
+    const exhausted = await run(['--run', '--target', 'user', '--service', 'linkding', '--linkding', 'http://127.0.0.1:48100', '--read-only', '--allow-dirty', '--authorization', 'auth-a'], { state });
+    assert.equal(exhausted.code, 1);
+    assert.equal(exhausted.report.failure.code, 'authorization_rounds_exhausted');
+    assert.equal(exhausted.report.cleanup.complete, true);
+    assert.equal(live.readAuthorizations(state).labels['auth-a'].length, 3, 'a refused round is not recorded twice');
+    writeFileSync(join(state, 'pbp-it-authorizations.json'), '{not json');
+    assert.throws(() => live.claimAuthorizationRound(state, 'auth-c', {}, cap), e => e.code === 'authorization_ledger_invalid');
+  }
   const listed = await run(['--list'], { credentials: false });
   assert.deepEqual(listed.output.trim().split('\n'), ids);
   const unknown = await run(['--run', '--target', 'user', '--scenario', 'unknown', '--service', 'linkding', '--linkding', 'http://127.0.0.1:48100']);
