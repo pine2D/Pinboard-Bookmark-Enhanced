@@ -1234,6 +1234,7 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
 
     // A caller's range describes the notes it submitted.
     let ownershipRange = summaryRange;
+    let readerKept = null;
     // Reader edits/flag changes resolve server metadata inside this same
     // lookup-to-write transaction. The offline record remains a normal intent.
     if (readerAction) {
@@ -1249,13 +1250,21 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
       // cannot be followed through those, and a hold for it would later claim
       // text the worker never wrote.
       if (prepared.kept || (intent.mode !== "create" && intent.mode !== "skip") || intent.notes !== handedNotes) ownershipRange = undefined;
+      if (prepared.kept) {
+        const skip = pbpResolveSavePlan(intent, prepared.lookup);
+        if (skip.action === "skip") readerKept = { result: { status: "skipped" }, persisted: pbpSkippedPersisted(skip, prepared.lookup), retryable: false };
+      }
     }
 
-    let envelope;
-    try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth, { tagVocab }); }
-    catch (e) {
-      console.warn("save intent failed:", e?.name, e?.message);
-      return pbpSaveFailure("internal");
+    // A reader action that found the bookmark already in its state (kept)
+    // finishes on that lookup's skip: nothing is delivered or queued.
+    let envelope = readerKept;
+    if (!envelope) {
+      try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth, { tagVocab }); }
+      catch (e) {
+        console.warn("save intent failed:", e?.name, e?.message);
+        return pbpSaveFailure("internal");
+      }
     }
 
     if (envelope.result.status === "saved" || envelope.result.status === "skipped") {
@@ -1522,9 +1531,12 @@ async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth)
   const plan = pbpResolveSavePlan({ ...intent, mode: "overwrite", tags: lookup.post?.tags, private: false, toread: false }, lookup);
   if (plan.action !== "send") return { result: plan.result || pbpSaveFailure("lookup") };
   if (action !== "edit" && plan.fields.toread === (action === "later")) {
-    // kept: the bookmark was just found in the requested state, so this skip
-    // only keeps it, and submitSaveIntent hands the delivery no summary range.
-    return { intent: { ...intent, mode: "skip" }, kept: true };
+    // kept: the bookmark was just found in the requested state, so there is
+    // nothing to deliver. submitSaveIntent finishes on this lookup as a
+    // delivered skip would, without a second lookup or a queue record: a
+    // queued skip replayed after the bookmark was deleted elsewhere would
+    // rebuild it from the popup draft, against what the user asked for.
+    return { intent: { ...intent, mode: "skip" }, kept: true, lookup };
   }
   // The stored Description (and Karakeep's own summary) was read, not edited.
   // An update leaves it alone without it, and a queued replay of this intent

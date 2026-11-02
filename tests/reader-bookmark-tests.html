@@ -99,8 +99,12 @@ async function pipelineHarness(options = {}) {
 // A longer tag (parse_tag_string splits at commas) fails the write with
 // Django's stock 500 page; a create has already stored the bookmark by then
 // (create_bookmark saves it before its tags, outside a transaction).
-function selfHostedServer(service, row, { postgres = false } = {}) {
+// readLater (Karakeep): the user's private Read Later list, bound by its id
+// as the extension stores it; `members` holds the bookmark ids on it.
+function selfHostedServer(service, row, { postgres = false, readLater = null } = {}) {
   const requests = [], failures = [];
+  const laterList = { id: "kklaterlist01", name: "Read Later", description: "Pinboard Bookmark Enhanced: Read Later", icon: "bookmark",
+    parentId: null, type: "manual", query: null, public: false, hasCollaborators: false, userRole: "owner" };
   const overlong = names => postgres && (names || []).some(name => String(name).split(",").some(part => Array.from(part.trim()).length > 64));
   const serverError = () => new Response("\n<!doctype html>\n<html lang=\"en\">\n<head>\n  <title>Server Error (500)</title>\n</head>\n<body>\n  <h1>Server Error (500)</h1><p></p>\n</body>\n</html>\n",
     { status: 500, headers: { "Content-Type": "text/html; charset=utf-8" } });
@@ -141,6 +145,13 @@ function selfHostedServer(service, row, { postgres = false } = {}) {
       return json(404, { detail: "Not found." });
     }
     if (method === "GET" && url.pathname === "/api/v1/bookmarks/check-url") return json(200, { bookmarkId: page === row.content.url ? row.id : null });
+    if (readLater && method === "GET" && url.pathname === "/api/v1/lists/" + laterList.id) return json(200, structuredClone(laterList));
+    if (readLater && method === "GET" && url.pathname === "/api/v1/bookmarks/" + row.id + "/lists")
+      return json(200, { lists: readLater.members.has(row.id) ? [structuredClone(laterList)] : [] });
+    if (readLater && (method === "PUT" || method === "DELETE") && url.pathname === "/api/v1/lists/" + laterList.id + "/bookmarks/" + row.id) {
+      if (method === "PUT") readLater.members.add(row.id); else readLater.members.delete(row.id);
+      return new Response(null, { status: 204 });
+    }
     if (method === "GET" && url.pathname === "/api/v1/bookmarks/" + row.id) return json(200, structuredClone(row));
     if (method === "PATCH" && url.pathname === "/api/v1/bookmarks/" + row.id) {
       for (const key of ["title", "note", "summary", "archived", "favourited"]) if (body[key] !== undefined) row[key] = body[key];
@@ -151,7 +162,8 @@ function selfHostedServer(service, row, { postgres = false } = {}) {
     return json(404, { code: "NOT_FOUND", message: "Bookmark not found" });
   };
   const connection = { service, baseUrl: service === "linkding" ? "https://links.example/" : "https://keep.example/",
-    beforeRequest: async () => ({ token: service + "-token" }), fetchImpl };
+    beforeRequest: async () => ({ token: service + "-token" }), fetchImpl,
+    ...(readLater ? { readLaterListId: laterList.id, saveReadLaterList: async () => {} } : {}) };
   const client = pbpCreateBookmarkServiceClient(connection);
   const clientFor = config => pbpCreateBookmarkServiceClient({ ...connection, sharingEnabled: config?.sharingEnabled });
   return { get row() { return row; }, requests, failures, client, clientFor };
@@ -903,6 +915,59 @@ await test("a queued reader edit replays a linkding Description only when the re
     equal(patches.length, 2);
     assert(Object.hasOwn(patches[1].body, "description") === (typed !== undefined), label + ": the replay sent Description " + JSON.stringify(patches[1].body.description));
     equal(server.row.title, "Edited title"); equal(server.row.description, expected);
+  }
+});
+// Read Later on a bookmark already on the read-later list, or Save (mark as
+// read) on one already read elsewhere: the action's own lookup just found the
+// bookmark in the requested state, so there is nothing to deliver. The reader
+// finishes as a delivered skip would (saved, status cache and icon updated)
+// without a second lookup or any write, and never queues: a queued skip
+// replayed after the bookmark was deleted elsewhere would rebuild it from the
+// popup draft, against what the user asked for. Here the request after the
+// action's lookup fails, as an outage would make a delivery's own lookup fail.
+await test("a reader action that finds the bookmark already in its state finishes without delivering or queueing", async () => {
+  for (const service of ["pinboard", "karakeep", "linkding"]) for (const action of ["later", "read"]) {
+    const where = service + " " + action, toread = action === "later";
+    const account = service === "pinboard" ? "alice" : service === "linkding" ? "linkding:https://links.example/:conn-1" : "karakeep:https://keep.example/:user-1";
+    const draft = { title: "Popup title", tags: "draft", notes: "Popup notes", private: false, toread: true };
+    const readLater = service === "karakeep" ? { members: new Set() } : null;
+    const server = service === "linkding" ? selfHostedServer("linkding", { id: 7, url: URL_ARTICLE, title: "Server title", description: "", notes: "Server notes",
+        is_archived: false, unread: true, shared: false, tag_names: ["server"], date_added: "2026-10-30T03:01:22.656384Z", date_modified: "2026-10-30T03:01:22.656384Z" })
+      : service === "karakeep" ? selfHostedServer("karakeep", { id: "kk1bookmark", createdAt: "2026-10-30T03:05:10.000Z", modifiedAt: "2026-10-30T03:05:10.000Z",
+        title: "Server title", archived: false, favourited: false, note: "Server notes", summary: null, source: "web",
+        taggingStatus: "success", summarizationStatus: "success", tags: [{ id: "tagserver01", name: "server", attachedBy: "human" }],
+        content: { type: "link", url: URL_ARTICLE, title: "Example Domain", description: null }, assets: [] }, { readLater })
+      : null;
+    if (readLater) readLater.members.add("kk1bookmark");
+    let lookups = 0, failAfter = Infinity;
+    const h = await pipelineHarness({ account, token: service === "pinboard" ? "alice:token" : service + "-token", service, slot: { account, bookmarkDraft: draft },
+      ...(server ? { client: server.client } : {}), settings: { bookmarkService: service },
+      post: { ...POST, toread: "yes" }, onLookup: () => { if (++lookups > failAfter) throw new TypeError("Failed to fetch"); } });
+    const r = await tagFixReader(h, account, draft);
+    try {
+      // The bookmark reaches the requested state elsewhere: marked read for Save.
+      if (action === "read") {
+        if (service === "pinboard") h.env.post.toread = "no";
+        else if (service === "linkding") server.row.unread = false;
+        else readLater.members.delete("kk1bookmark");
+      }
+      // The action's own lookup gets through; every request after it fails.
+      failAfter = lookups + 1;
+      if (server) {
+        const path = service === "linkding" ? "/api/bookmarks/check/" : "/api/v1/bookmarks/check-url";
+        server.failures.push({ method: "GET", path, skip: 1 });
+      }
+      const writesBefore = server ? server.requests.filter(q => q.method !== "GET").length : 0;
+      const cacheBefore = (h.env.cacheWrites || []).length;
+      await r.command(action === "later" ? "later" : "save");
+      equal(r.el("status").textContent, "readerBookmarkSaved");
+      equal(JSON.stringify(h.env.queue), "[]");
+      if (server) equal(server.requests.filter(q => q.method !== "GET").length, writesBefore);
+      else assert(!h.env.calls.some(u => u.pathname.endsWith("/add") || u.pathname.endsWith("/delete")), where + ": Pinboard was written");
+      // As a delivered skip: the status cache records the bookmark as saved.
+      assert((h.env.cacheWrites || []).slice(cacheBefore).some(w => w.url === URL_ARTICLE && w.account === account && w.bookmarked === true && Object.hasOwn(w, "toreadHint")),
+        where + ": the save result did not reach the status cache: " + JSON.stringify((h.env.cacheWrites || []).slice(cacheBefore)));
+    } finally { r.frame.remove(); }
   }
 });
 // Karakeep's summary is the server's own AI text, which the extension never

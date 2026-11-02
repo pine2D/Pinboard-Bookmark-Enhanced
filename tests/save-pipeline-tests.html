@@ -2803,13 +2803,14 @@ await suite("summary ownership after worker saves", async () => {
     equal(await receipts(), "[]", "the queued update holds a range for text the worker did not write");
   });
 
-  // Read Later and mark-as-read resolve to a skip when the reader's own lookup
-  // finds the bookmark already in that state. The skip writes nothing, so the
-  // handed block was never written; but the delivery looks the bookmark up once
-  // more, and when that lookup fails the skip is queued. A hold for the handed
-  // range would turn into a receipt on replay for whatever notes it finds,
-  // byte-equal to the handed ones or not, and replace the page's own receipt.
-  await test("a queued reader Read Later or mark-as-read of a bookmark already in that state holds no ownership for a handed block", async () => {
+  // Read Later and mark-as-read resolve to a kept skip when the reader's own
+  // lookup finds the bookmark already in that state. Nothing is delivered: no
+  // second lookup, no write, and no queue record, even when the network fails
+  // right after that lookup (a queued skip used to wait for it, and its replay
+  // would rebuild a bookmark deleted elsewhere from the popup draft). The
+  // handed block was never written, so it gains no receipt or hold, and a
+  // receipt the page already had for those notes stays as it was.
+  await test("a reader Read Later or mark-as-read of a bookmark already in that state delivers, queues and holds nothing", async () => {
     for (const [action, toread, failure] of [["later", "yes", "dropped connection"], ["read", "no", "dropped connection"],
       ["later", "yes", "503 answer"], ["read", "no", "503 answer"]]) {
       for (const held of [false, true]) {
@@ -2820,12 +2821,10 @@ await suite("summary ownership after worker saves", async () => {
         // A receipt the page already had for these very notes, at a range the
         // popup does not hand over.
         if (held) await pbpAiSaveSummaryOwnership("alice", PAGE, handed, { start: 0, end: "Auto notes".length });
-        // The reader's lookup is the first posts/get; the delivery's own lookup
-        // fails until the network is back.
-        let online = false, lookups = 0;
+        // The reader's lookup is the first posts/get; every request after it fails.
+        let lookups = 0;
         const core = await createHarness({ pinboardFetch: async (url) => {
-          if (!url.includes("/posts/get?")) return response(200, ADDED);
-          if (online || ++lookups === 1) return response(200, postsGet(handed, toread));
+          if (url.includes("/posts/get?") && ++lookups === 1) return response(200, postsGet(handed, toread));
           if (failure === "503 answer") return response(503, null, true);
           throw new TypeError("Failed to fetch");
         } });
@@ -2833,16 +2832,10 @@ await suite("summary ownership after worker saves", async () => {
         const before = await receipts();
         equal(before === "[]", !held, where + ": unexpected receipts before the save");
         const result = await readerSave(core, action);
-        equal(result.status, "queued", where + ": " + JSON.stringify(result));
-        equal(core.storageData.offlineQueue.length, 1, where + ": the save was not queued");
-        equal(core.storageData.offlineQueue[0].mode, "skip", where + ": the queued save is not the resolved skip");
-        equal(await receipts(), before, where + ": the queued skip holds a range for text the worker did not write");
-        online = true;
-        core.fetchCalls.length = 0;
-        await core.processOfflineQueue();
-        equal(core.storageData.offlineQueue.length, 0, where + ": the replay did not land");
-        equal(core.fetchCalls.filter((url) => url.includes("/posts/add?")).length, 0, where + ": the replay wrote");
-        equal(await receipts(), before, where + ": the replay wrote or dropped a receipt");
+        equal(result.status, "skipped", where + ": " + JSON.stringify(result));
+        equal(core.fetchCalls.length, 1, where + ": requests after the reader's lookup " + JSON.stringify(core.fetchCalls.slice(1)));
+        equal(JSON.stringify(core.storageData.offlineQueue), "[]", where + ": the action was queued");
+        equal(await receipts(), before, where + ": the action wrote or dropped a receipt");
         if (!held) equal(await (await popupOpens(handed)).restore(), null, where + ": the popup reclaimed text it never wrote");
       }
     }
