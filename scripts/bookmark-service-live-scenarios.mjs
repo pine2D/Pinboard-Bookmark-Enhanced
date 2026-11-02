@@ -559,6 +559,18 @@ export const MODULES = [
         return offlineQueue.length === 1 && item.url === url && item.account === auth.account && item.summary === summary && item.notes === notes
           && item.tags === tag && item.private === true && Object.keys(item).every(key => fields.has(key)) && !JSON.stringify(item).includes(auth.token);
       }, { url, tag, summary: expectedSummary, notes: expectedNotes });
+      // The popup opens as an inactive tab so the article stays the tab it
+      // reads; Chromium then barely paints it, and a Playwright click could
+      // wait about 2 s for its element to be "stable" (E27: that was most of
+      // this module's 6-13 s; the retry button starts the replay at once).
+      // Once open, the popup keeps the tab it read (_activeTabAtOpen) and
+      // nothing here reads another, so it comes to the front, as a real
+      // popup is.
+      const open = async () => {
+        const form = await t.openPopup(url);
+        await form.popup.bringToFront();
+        return form;
+      };
       const replay = async (form, label) => {
         await form.popup.locator('#offline-queue-toggle').click();
         await t.offline('');
@@ -567,19 +579,21 @@ export const MODULES = [
       };
 
       await t.phase('linkding_offline_create');
-      let form = await t.openPopup(url);
+      let form = await open();
       await form.popup.locator('#title-input').fill(prefix + ' offline create');
       await form.popup.locator('#description-input').fill('Offline notes\nSecond line');
       await form.popup.locator('#linkding-description-input').fill('Offline description');
       await form.popup.locator('#tags-input').fill(JSON.stringify(prefix + ' offline tag'));
       await form.popup.locator('#tags-input').press('Enter');
       await form.popup.locator('#readlater-check').check();
+      await t.phase('linkding_offline_create_queue');
       await t.offline('self');
       await form.popup.locator('#submit-btn').click();
       await form.popup.locator('#offline-queue-bar:not(.hidden)').waitFor();
       t.expect(await queueIsSafe('Offline description', 'Offline notes\nSecond line'), 'offline_create_queue_fields');
       await t.shot(form.popup, 'offline-queue', { surface: 'popup', keys: ['#offline-queue-bar'] });
       await t.settings({ aiTagSeparator: '-' });
+      await t.phase('linkding_offline_create_replay');
       await replay(form, 'offline_create_replay');
       let row = await t.ownRow(url);
       t.expect(row.description === 'Offline description' && row.notes === 'Offline notes\nSecond line' && row.unread === true && row.shared === false, 'offline_create_fields');
@@ -587,14 +601,16 @@ export const MODULES = [
       await form.close();
 
       await t.phase('linkding_offline_update');
-      form = await t.openPopup(url);
+      form = await open();
       await form.popup.locator('#description-input').fill('Updated offline notes');
       await form.popup.locator('#linkding-description-input').fill('');
       await form.popup.locator('#readlater-check').uncheck();
+      await t.phase('linkding_offline_update_queue');
       await t.offline('self');
       await form.popup.locator('#submit-btn').click();
       await form.popup.locator('#offline-queue-bar:not(.hidden)').waitFor();
       t.expect(await queueIsSafe('', 'Updated offline notes'), 'offline_update_queue_fields');
+      await t.phase('linkding_offline_update_replay');
       await replay(form, 'offline_update_replay');
       row = await t.ownRow(url);
       t.expect(row.description === '' && row.notes === 'Updated offline notes' && !row.unread && !row.shared && row.tag_names.length === 1 && row.tag_names[0] === tag, 'offline_update_fields');
