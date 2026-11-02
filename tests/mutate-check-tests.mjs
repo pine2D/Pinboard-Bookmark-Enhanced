@@ -3,7 +3,7 @@
 // run's backup blocks the next one.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync, chmodSync, statSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, chmodSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
@@ -14,10 +14,14 @@ const CLI = fileURLToPath(new URL('../scripts/mutate-check.mjs', import.meta.url
 const ORIGINAL = 'const a = "GOOD";\nconst b = 1;\nconst c = 1;\n';
 // Exit 0 while the file still says GOOD; with it broken, either fail or hang a few seconds.
 const checker = (mode = 'fail') => [process.execPath, '-e', `const t=require('fs').readFileSync(process.argv[1],'utf8');if(t.includes('GOOD'))process.exit(0);${mode === 'hang' ? 'setTimeout(()=>process.exit(1),4000)' : 'process.exit(1)'}`];
-const sandbox = () => {
+// Each sandbox is its own git repository, so its in-flight registry lives in its own
+// .git and runs in different sandboxes (or two copies of this very test) never see
+// each other. { git: false } keeps the system-temp registry branch reachable.
+const sandbox = ({ git = true } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), 'pbp-mutate-'));
   const file = join(dir, 'target.js');
   writeFileSync(file, ORIGINAL);
+  if (git) execFileSync('git', ['init', '-q'], { cwd: dir });
   return { dir, file, done: () => rmSync(dir, { recursive: true, force: true }) };
 };
 const quiet = { log: () => {}, warn: () => {} };
@@ -305,3 +309,83 @@ test('uncommitted changes in the target are warned about and kept', async () => 
     assert.deepEqual(warnings, []);
   } finally { s.done(); }
 });
+
+// Runs: a run that is still going is not a crash.
+test('a run in progress does not block a run on another file and is never told to restore', async () => {
+  const s = sandbox();
+  try {
+    const other = join(s.dir, 'other.js');
+    writeFileSync(other, ORIGINAL);
+    const child = startCli(s.file), closed = exited(child);
+    await waitMutated(s.file);
+    const second = spawn(process.execPath, [CLI, other, 'GOOD', 'BAD', '--', ...checker(), other], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    second.stdout.on('data', c => { out += c; }); second.stderr.on('data', c => { out += c; });
+    const second_ = await exited(second);
+    assert.equal(second_.code, 0, out);
+    assert.ok(!out.includes('cp '), 'a live run was offered a restore command: ' + out);
+    assert.equal(readFileSync(other, 'utf8'), ORIGINAL);
+    assert.equal(readFileSync(s.file, 'utf8').includes('BAD'), true, 'the first run lost its mutation');
+    child.kill('SIGINT');
+    await closed;
+    assert.equal(readFileSync(s.file, 'utf8'), ORIGINAL);
+  } finally { s.done(); }
+});
+
+test('a run on the same file while another is going is refused with "wait", not a restore command', async () => {
+  const s = sandbox();
+  try {
+    const child = startCli(s.file), closed = exited(child);
+    await waitMutated(s.file);
+    const second = spawn(process.execPath, [CLI, s.file, 'BAD', 'GOOD', '--', ...checker(), s.file], { stdio: ['ignore', 'pipe', 'pipe'] });
+    let err = '';
+    second.stderr.on('data', c => { err += c; });
+    assert.equal((await exited(second)).code, 2);
+    assert.match(err, /still working/);
+    assert.ok(!err.includes('cp '), err);
+    assert.ok(err.includes(String(child.pid)), 'the message does not name the running pid');
+    assert.equal(readFileSync(s.file, 'utf8').includes('BAD'), true, 'the refused run touched the first run\'s file');
+    child.kill('SIGINT');
+    await closed;
+    assert.equal(readFileSync(s.file, 'utf8'), ORIGINAL);
+  } finally { s.done(); }
+});
+
+test('an entry whose pid now belongs to a different process (pid reuse) counts as a crash', async () => {
+  const s = sandbox();
+  try {
+    writeFileSync(s.file, ORIGINAL.replace('GOOD', 'BAD'));
+    writeFileSync(s.file + BACKUP_SUFFIX, ORIGINAL);
+    const dir = join(s.dir, '.git', 'mutate-check-inflight');
+    mkdirSync(dir, { recursive: true });
+    // This test process is alive, but it did not start at tick 1.
+    writeFileSync(join(dir, 'entry'), JSON.stringify({ file: s.file, pid: process.pid, start: '1' }));
+    await assert.rejects(runMutations([{ file: s.file, old: 'BAD', new: 'GOOD' }], { command: withFile(s.file, checker()), ...quiet }),
+      error => error instanceof MutateRefusal && error.message.includes(restoreHint(s.file)));
+  } finally { s.done(); }
+});
+
+test('without a git checkout the system-temp registry works the same way', async () => {
+  const s = sandbox({ git: false });
+  try {
+    const { survived } = await runMutations([{ file: s.file, old: 'GOOD', new: 'BAD' }], { command: withFile(s.file, checker()), ...quiet });
+    assert.equal(survived, 0);
+    assert.equal(readFileSync(s.file, 'utf8'), ORIGINAL);
+  } finally { s.done(); }
+});
+
+// Two copies of this whole file at once, as two verify.sh runs on one machine would do.
+if (!process.env.PBP_MUTATE_SELFTEST_INNER) {
+  test('two copies of this self-test can run at the same time and both pass', async () => {
+    const copy = () => new Promise(resolve => {
+      const child = spawn(process.execPath, ['--test', fileURLToPath(import.meta.url)], { env: { ...process.env, PBP_MUTATE_SELFTEST_INNER: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = '';
+      child.stdout.on('data', c => { out += c; }); child.stderr.on('data', c => { out += c; });
+      child.once('close', code => resolve({ code, out }));
+    });
+    for (let round = 0; round < 3; round++) {
+      const [a, b] = await Promise.all([copy(), copy()]);
+      for (const r of [a, b]) assert.equal(r.code, 0, `round ${round + 1}:\n${r.out.split('\n').filter(l => /✖|not ok|fail/.test(l)).slice(0, 12).join('\n')}`);
+    }
+  });
+}

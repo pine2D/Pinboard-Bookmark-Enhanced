@@ -7,9 +7,12 @@
 //   - the original is restored after every mutation, on failure, exception,
 //     SIGINT/SIGTERM/SIGHUP and process exit.
 // Only an uncatchable SIGKILL or power loss leaves the backup behind. Every
-// backup is also listed in one registry directory (inside the .git of the first target's checkout when there is
-// one, else the system temp dir), so the next run - on ANY file - refuses to
-// start and prints the commands that put every stranded file back.
+// backup is also listed in one registry directory (inside the .git of the first
+// target's checkout when there is one, else the system temp dir) with the pid of
+// the run that made it. A dead pid with its backup still there is a crash: the
+// next run - on ANY file - refuses to start and prints the commands that put
+// every stranded file back. A live pid is a run still going: a run on the same
+// file is refused ("wait", no restore commands); a run on other files proceeds.
 //
 //   node scripts/mutate-check.mjs [options] <file> <old> <new> -- <test command...>
 //   node scripts/mutate-check.mjs [options] --json <mutations.json> [-- <test command...>]
@@ -37,8 +40,10 @@ export function restoreHint(file) {
   return `cp ${JSON.stringify(backupOf(file))} ${JSON.stringify(file)} && rm ${JSON.stringify(backupOf(file))}`;
 }
 
-// One tiny entry per in-flight backup, naming the target file. An entry whose
-// backup file is gone (restored by hand or by the hint) is stale and ignored.
+// One tiny entry per in-flight backup: the target file plus the pid (and its
+// start time, so a recycled pid is not mistaken for the owner) of the run that
+// made it. A live owner means "a run is going on, wait"; a dead owner whose
+// backup is still there means a crash that left the file mutated.
 function registryDir(cwd) {
   try {
     const common = execFileSync('git', ['rev-parse', '--git-common-dir'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -47,17 +52,40 @@ function registryDir(cwd) {
   return join(tmpdir(), 'pbp-mutate-check-inflight');
 }
 const entryPath = (dir, file) => join(dir, createHash('sha1').update(file).digest('hex').slice(0, 16));
-function strandedFiles(dir) {
-  const found = [];
+// Field 22 of /proc/<pid>/stat; the command name (field 2) may hold spaces and
+// parentheses, so count from the last ")". null where /proc is unavailable.
+function processStart(pid) {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+    return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19] || null;
+  } catch { return null; }
+}
+function ownerAlive({ pid, start }) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try { process.kill(pid, 0); } catch (error) { if (error.code !== 'EPERM') return false; }
+  const now = processStart(pid);
+  return !(start && now && start !== now);
+}
+function readEntry(path) {
+  try {
+    const entry = JSON.parse(readFileSync(path, 'utf8'));
+    if (entry && typeof entry.file === 'string') return entry;
+  } catch { /* unreadable or a legacy plain-path entry */ }
+  return null;
+}
+// Sorts the registry into runs still going (file -> pid) and crash leftovers.
+// An entry whose backup is gone, or that cannot be read, is dropped.
+function scanRegistry(dir) {
+  const running = new Map(), stranded = [];
   let names = [];
-  try { names = readdirSync(dir); } catch { return found; }
+  try { names = readdirSync(dir); } catch { return { running, stranded }; }
   for (const name of names) {
-    let target = '';
-    try { target = readFileSync(join(dir, name), 'utf8'); } catch { continue; }
-    if (target && existsSync(backupOf(target))) found.push(target);
-    else rmSync(join(dir, name), { force: true });
+    const entry = readEntry(join(dir, name));
+    if (!entry || !existsSync(backupOf(entry.file))) { rmSync(join(dir, name), { force: true }); continue; }
+    if (ownerAlive(entry)) running.set(entry.file, entry.pid);
+    else stranded.push(entry.file);
   }
-  return found;
+  return { running, stranded };
 }
 
 function occurrences(text, needle) {
@@ -95,8 +123,11 @@ export async function runMutations(mutations, { command = null, timeoutMs = 3000
   const files = [...new Set(mutations.map(m => resolve(cwd, m.file)))];
   const originals = new Map();
   const registry = registryDir(dirname(files[0]));
-  const stranded = [...new Set([...files.filter(file => existsSync(backupOf(file))), ...strandedFiles(registry)])];
-  if (stranded.length) throw new MutateRefusal(`A backup from an earlier run exists (or another run is still going):\n${stranded.map(file => '  ' + backupOf(file)).join('\n')}\nThe previous run may have crashed with these files still mutated. Check them, then put each back with:\n${stranded.map(file => '  ' + restoreHint(file)).join('\n')}`);
+  const scan = scanRegistry(registry);
+  const busy = files.filter(file => scan.running.has(file));
+  if (busy.length) throw new MutateRefusal(`Another mutate-check run is still working on:\n${busy.map(file => `  ${file} (pid ${scan.running.get(file)})`).join('\n')}\nWait for it to finish, then run again. Nothing to restore: that run puts the file back itself.`);
+  const stranded = [...new Set([...files.filter(file => existsSync(backupOf(file))), ...scan.stranded])];
+  if (stranded.length) throw new MutateRefusal(`A backup from an earlier run exists:\n${stranded.map(file => '  ' + backupOf(file)).join('\n')}\nThe run that made it is gone and may have crashed with these files still mutated. Check them, then put each back with:\n${stranded.map(file => '  ' + restoreHint(file)).join('\n')}`);
   for (const file of files) {
     if (!existsSync(file)) throw new MutateRefusal(`No such file: ${file}`);
     originals.set(file, readFileSync(file));
@@ -118,7 +149,7 @@ export async function runMutations(mutations, { command = null, timeoutMs = 3000
     } catch { /* not a git checkout: nothing to warn about */ }
   }
 
-  let child = null, restored = true;
+  let child = null, restored = true, armed = false;
   const restoreAll = () => {
     for (const [file, bytes] of originals) { try { writeFileSync(file, bytes); } catch (error) { warn(`CANNOT RESTORE ${file}: ${error.message}\nRestore with: ${restoreHint(file)}`); return false; } }
     for (const file of files) {
@@ -136,10 +167,22 @@ export async function runMutations(mutations, { command = null, timeoutMs = 3000
   const results = [];
   try {
     mkdirSync(registry, { recursive: true });
-    restored = false;
+    // Claim every file first, exclusively: a run that started in the same instant
+    // loses here, before it has touched anything that restoreAll would write back.
+    const claimed = [];
+    try {
+      for (const file of files) {
+        writeFileSync(entryPath(registry, file), JSON.stringify({ file, pid: process.pid, start: processStart(process.pid) }), { flag: 'wx' });
+        claimed.push(file);
+      }
+    } catch (error) {
+      for (const file of claimed) rmSync(entryPath(registry, file), { force: true });
+      if (error.code === 'EEXIST') throw new MutateRefusal('Another mutate-check run claimed one of these files a moment ago; wait for it to finish, then run again.');
+      throw error;
+    }
+    restored = false; armed = true;
     for (const file of files) {
       writeFileSync(backupOf(file), originals.get(file));
-      writeFileSync(entryPath(registry, file), file);
     }
     if (baseline) {
       const seen = new Set();
@@ -164,7 +207,7 @@ export async function runMutations(mutations, { command = null, timeoutMs = 3000
       if (status === 'survived' && !verbose) log(run.output.split('\n').filter(Boolean).slice(-3).map(line => '    | ' + line.slice(0, 200)).join('\n'));
     }
   } finally {
-    restored = restoreAll();
+    if (armed) restored = restoreAll();
     process.off('exit', onExit);
     for (const signal of signals) process.off(signal, onSignal);
   }
