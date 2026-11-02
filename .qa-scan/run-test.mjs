@@ -7,10 +7,15 @@
 // Usage: node .qa-scan/run-test.mjs tests/<file>.html
 //        node .qa-scan/run-test.mjs --print-counts tests/<file>.html [more.html ...]
 // --print-counts only reports: the rows a page actually rendered next to its
-// EXPECTED_RESULTS entry (waiting for the registered count, then a quiet window
-// for extra rows; a page that never gets there is UNCONFIRMED, exit 1). It
-// edits nothing and leaves the normal mode untouched; exit 0 unless the page
-// could not be measured.
+// EXPECTED_RESULTS entry. A page that announces its end (document.title starting
+// with PASS/FAIL, or a #summary reading "N passed, M failed") is measured 1.5s
+// after the count reaches the registered number with that signal showing; some
+// pages write it at load while async cases still add rows, so it never ends a
+// page by itself. Any other page is measured after its registered count (any
+// row, when unregistered) has been followed by 3 seconds without a new row, so a
+// row that appears later is not seen; the report says so. A page that never
+// reaches its registered count is UNCONFIRMED, exit 1. It edits nothing and
+// leaves the normal mode untouched; exit 0 unless the page could not be measured.
 import { chromium } from "playwright";
 import { createServer } from "http";
 import { readFile } from "fs/promises";
@@ -275,19 +280,29 @@ try {
     // observes below.
     // --print-counts must not call a page finished just because its row count
     // paused: a case that waits a second or two (a setTimeout, a mock delay)
-    // looks exactly like the end. A registered page is therefore waited for the
-    // way the normal mode waits - until it reaches its registered count or the
-    // stall deadline - and only then watched for extra rows during a quiet
-    // window. A page that never reaches its number is reported UNCONFIRMED, not
-    // as a smaller "actual" count. An unregistered page has no number to wait
-    // for, so it gets a longer quiet window and says so.
+    // looks exactly like the end. The page's own end signal decides when it has
+    // one: document.title starting with PASS/FAIL, or #summary reading "N passed,
+    // M failed". Some pages write theirs at load while async cases still add rows
+    // (ai-tags, md-ai, library-listbox), so a signal only shortens the quiet window
+    // to 1.5s; it never ends the page by itself. A page with a #summary element that
+    // has not been filled is waited on (10s quiet window as the fallback); a page
+    // without any signal is finished after 3s with no new row. The count must have
+    // reached the registered number (any row, when unregistered) first; a row that
+    // comes after the quiet window is not seen, and the report says so for a page
+    // without a signal. A registered page that never gets there is UNCONFIRMED,
+    // not a smaller "actual" count.
     const waitForRows = printCounts
       ? page.waitForFunction((registered) => {
         const total = document.querySelectorAll(".pass, .fail, .skip").length;
         const seen = window.__pbpCountWatch || (window.__pbpCountWatch = { total: -1, since: performance.now() });
         if (seen.total !== total) { seen.total = total; seen.since = performance.now(); }
         const quiet = performance.now() - seen.since;
-        return registered === undefined ? total > 0 && quiet >= 3000 : total >= registered && quiet >= 1500;
+        const summary = document.getElementById("summary");
+        const signalled = /^(PASS|FAIL)\b/.test(document.title || "") || !!(summary && /\d+ passed, \d+ failed/.test(summary.textContent || ""));
+        const enough = registered === undefined ? total > 0 : total >= registered;
+        // A signal still needs 1.5s without a new row: ai-tags, md-ai and
+        // library-listbox write theirs at load, while async cases keep adding rows.
+        return enough && quiet >= (signalled ? 1500 : summary ? 10000 : 3000);
       }, expected, { polling: 100, timeout: 0 })
       : page.waitForFunction((resultCount) => {
         let total = 0;
@@ -325,7 +340,9 @@ try {
           else if (el.classList.contains("skip")) skip++;
         }
         const lastRows = [...rows].slice(-3).map((el) => (el.textContent || "").trim());
-        return { pass, fail, skip, failures: failures.slice(0, 20), title: document.title || "", lastRows };
+        const summary = document.getElementById("summary");
+        const signalled = /^(PASS|FAIL)\b/.test(document.title || "") || !!(summary && /\d+ passed, \d+ failed/.test(summary.textContent || ""));
+        return { pass, fail, skip, failures: failures.slice(0, 20), title: document.title || "", lastRows, signalled };
       }));
     } catch (sampleError) {
       dom = {
@@ -339,10 +356,13 @@ try {
   const total = dom.pass + dom.fail + dom.skip;
   if (printCounts) {
     const registered = expected === undefined ? "unregistered" : String(expected);
-    const verdict = expected === undefined ? "NOT REGISTERED (count held 3s; a slower page may have more)"
-      : dom.stalled && total < expected ? `UNCONFIRMED (never reached ${expected} before the stall deadline: a slow case or fewer rows, run the normal mode to see which)`
+    const verdict = expected === undefined ? "NOT REGISTERED"
+      : dom.stalled && total < expected && !dom.signalled ? `UNCONFIRMED (never reached ${expected} before the stall deadline: a slow case or fewer rows, run the normal mode to see which)`
       : total === expected ? "match" : `DIFFERS (${total > expected ? "+" : ""}${total - expected})`;
-    console.log(`${rel}: pass=${dom.pass} fail=${dom.fail} skip=${dom.skip} total=${total} expected=${registered} ${verdict}${dom.stalled ? " STALLED" : ""}`);
+    // Without a PASS/FAIL title or "N passed, M failed" summary the end of the page is a guess.
+    const caveat = dom.signalled || verdict.startsWith("UNCONFIRMED") ? ""
+      : " (page gave no end signal: no new row for 3s after the count was reached, so later rows are not seen)";
+    console.log(`${rel}: pass=${dom.pass} fail=${dom.fail} skip=${dom.skip} total=${total} expected=${registered} ${verdict}${caveat}${dom.stalled ? " STALLED" : ""}`);
     if (dom.failures?.length) console.error("failures:\n  " + dom.failures.join("\n  "));
     if (runtimeErrors.length) console.error("errors:\n  " + runtimeErrors.slice(0, 25).join("\n  "));
     if (dom.stalled || browserDisconnected || dom.sampleError) process.exitCode = 1;

@@ -16,7 +16,7 @@ mkdirSync(join(tree, '.qa-scan')); mkdirSync(join(tree, 'tests'));
 symlinkSync(join(repo, '.qa-scan/node_modules'), join(tree, '.qa-scan/node_modules'));
 const source = readFileSync(join(repo, '.qa-scan/run-test.mjs'), 'utf8');
 assert.ok(source.includes('Object.freeze({'), 'the EXPECTED_RESULTS table moved');
-writeFileSync(join(tree, '.qa-scan/run-test.mjs'), source.replace('Object.freeze({', 'Object.freeze({\n  "tests/gap-tests.html": 3,\n  "tests/extra-tests.html": 2,'));
+writeFileSync(join(tree, '.qa-scan/run-test.mjs'), source.replace('Object.freeze({', 'Object.freeze({\n  "tests/gap-tests.html": 3,\n  "tests/extra-tests.html": 2,\n  "tests/low-tests.html": 2,\n  "tests/summary-tests.html": 2,\n  "tests/title-tests.html": 2,\n  "tests/early-tests.html": 2,'));
 writeFileSync(join(tree, '.qa-scan/package.json'), '{"type":"module"}');
 // rows: [[delayMs, class], ...] appended one by one after load.
 const page = (name, rows) => writeFileSync(join(tree, 'tests', name), `<!doctype html><meta charset=utf-8><title>${name}</title><body><script>
@@ -26,6 +26,23 @@ for (const [delay, cls] of ${JSON.stringify(rows)}) setTimeout(() => { const d =
 page('gap-tests.html', [[0, 'pass'], [2200, 'pass'], [4400, 'pass']]);
 page('extra-tests.html', [[0, 'pass'], [100, 'pass'], [900, 'pass']]);
 page('unreg-tests.html', [[0, 'pass'], [2200, 'pass']]);
+// A registered count that is too low: the third row arrives 2s after the second.
+page('low-tests.html', [[0, 'pass'], [100, 'pass'], [2100, 'pass']]);
+// Pages that announce their own end: the extra row comes after any plausible quiet window.
+writeFileSync(join(tree, 'tests/summary-tests.html'), `<!doctype html><meta charset=utf-8><title>summary</title><body><div id="summary"></div><script>
+const add = () => { const d = document.createElement('div'); d.className = 'pass'; d.textContent = 'ok'; document.body.append(d); };
+add(); setTimeout(add, 100); setTimeout(add, 4000);
+setTimeout(() => { document.getElementById('summary').textContent = '3 passed, 0 failed'; }, 4100);
+</script>`);
+writeFileSync(join(tree, 'tests/title-tests.html'), `<!doctype html><meta charset=utf-8><title>title</title><body><script>
+const add = () => { const d = document.createElement('div'); d.className = 'pass'; d.textContent = 'ok'; document.body.append(d); };
+add(); setTimeout(add, 100); setTimeout(() => { document.title = 'PASS title'; }, 300);
+</script>`);
+// A title that says PASS from the start (some suites write theirs at load) while rows still come.
+writeFileSync(join(tree, 'tests/early-tests.html'), `<!doctype html><meta charset=utf-8><title>PASS early</title><body><script>
+const add = () => { const d = document.createElement('div'); d.className = 'pass'; d.textContent = 'ok'; document.body.append(d); };
+add(); setTimeout(add, 800); setTimeout(add, 1400);
+</script>`);
 const run = file => spawnSync(process.execPath, [join(tree, '.qa-scan/run-test.mjs'), '--print-counts', 'tests/' + file], { cwd: tree, encoding: 'utf8', timeout: 90000 });
 test.after(() => rmSync(tree, { recursive: true, force: true }));
 
@@ -41,4 +58,27 @@ test('rows beyond the registered number are reported as DIFFERS', () => {
 test('an unregistered page with a 2.2s pause still gets both rows counted', () => {
   const r = run('unreg-tests.html');
   assert.match(r.stdout, /total=2 expected=unregistered NOT REGISTERED/, r.stdout + r.stderr);
+});
+
+test('a registered count that is too low is not trusted when more rows follow a 2s pause', () => {
+  const r = run('low-tests.html');
+  assert.match(r.stdout, /total=3 expected=2 DIFFERS \(\+1\)/, r.stdout + r.stderr);
+});
+test('a match without a page-side end signal says what the tool could not see', () => {
+  const r = run('extra-tests.html');
+  assert.match(r.stdout, /later rows are not seen|silent/i, r.stdout);
+});
+test('a #summary line "N passed, M failed" ends the page, however late the last row came', () => {
+  const r = run('summary-tests.html');
+  assert.match(r.stdout, /total=3 expected=2 DIFFERS \(\+1\)/, r.stdout + r.stderr);
+  assert.doesNotMatch(r.stdout, /silent|not seen/i, r.stdout);
+});
+test('a PASS/FAIL document title ends the page without the silence caveat', () => {
+  const r = run('title-tests.html');
+  assert.match(r.stdout, /total=2 expected=2 match/, r.stdout + r.stderr);
+  assert.doesNotMatch(r.stdout, /silent|not seen/i, r.stdout);
+});
+test('a signal written at load does not end the page while rows keep coming', () => {
+  const r = run('early-tests.html');
+  assert.match(r.stdout, /total=3 expected=2 DIFFERS \(\+1\)/, r.stdout + r.stderr);
 });
