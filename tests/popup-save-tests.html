@@ -4342,6 +4342,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
       const cases = [
         ["pinboard", { ok: true, status: 200, text: JSON.stringify({ posts: [{ description: "Saved title", extended: "", tags: "alpha gamma", shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }] }) }, ["alpha", "gamma"]],
         ["linkding", { ok: true, status: 200, data: { posts: [{ href: URL, description: "Saved title", extended: "", tags: 'alpha "big idea"', tagNames: ["alpha", "big idea"], shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }] } }, ["alpha", "big idea"]],
+        ["karakeep", { ok: true, status: 200, data: { posts: [{ href: URL, description: "Saved title", extended: "", tags: 'alpha "big idea"', tagNames: ["alpha", "big idea"], shared: "no", toread: "no", time: "2026-01-01T00:00:00Z" }] } }, ["alpha", "big idea"]],
       ];
       for (const [service, reply, serverTags] of cases) {
         const withBaseline = createLookupHarness(reply, { service });
