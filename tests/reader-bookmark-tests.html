@@ -180,7 +180,8 @@ async function settle(pending) {
 // Waits for something the page shows or sends, never for a fixed time: polls
 // the condition until it holds, and fails with its label after two seconds.
 async function until(read, label) {
-  for (let i = 0; i < 2000; i++) { if (read()) return; await new Promise(resolve => setTimeout(resolve, 1)); }
+  const end = performance.now() + 2000;
+  while (performance.now() < end) { if (read()) return; await new Promise(resolve => setTimeout(resolve, 1)); }
   throw new Error("timed out waiting for " + label);
 }
 // The reader has fetched the bookmark's state and is idle.
@@ -1243,6 +1244,7 @@ await test("reader validates self-hosted quotes locally and shows the edit hint"
       input.value=quoted?'"unfinished':'literal"tag';apply.click();
       const status=w.document.getElementById("reader-bookmark-editor-status");
       await until(()=>quoted?status.dataset.state==="error":messages.some(m=>m.type==="mdReaderBookmarkSave"),quoted?"the local quote error":"the save request");
+      await new Promise(resolve=>setTimeout(resolve,0)); // drain the queue so a late send is still caught below
       if(quoted){
         assert(!messages.some(m=>m.type==="mdReaderBookmarkSave"));
         equal(status.textContent,"readerBookmarkTagsQuoteError");equal(status.dataset.state,"error");
@@ -1281,6 +1283,7 @@ await test("reader editor rejects over-limit titles locally, keeps the full inpu
       title.value="a".repeat(limit+1);apply.click();
       const status=w.document.getElementById("reader-bookmark-editor-status");
       await until(()=>status.dataset.state==="error","the title limit message");
+      await new Promise(resolve=>setTimeout(resolve,0)); // drain the queue so a late send is still caught below
       assert(!messages.some(m=>m.type==="mdReaderBookmarkSave"),"over-limit reader title sent a request");
       equal(title.value,"a".repeat(limit+1));
       equal(status.hidden,false);equal(status.textContent,"titleTooLong:"+limit);equal(status.dataset.state,"error");
