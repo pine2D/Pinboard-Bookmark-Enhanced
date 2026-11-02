@@ -780,8 +780,10 @@ export const TAG_WRITE_SOURCES = Object.freeze(['route', 'sw', 'node']);
 // flight. An allowed write carries the run-prefix tag keys it names that
 // are not yet known (`tags`), for the layer to reserve as it sends it, and
 // `longTag` when it names a tag past linkding's varchar(64) (in code
-// points): the Node layers refuse that on a user instance unless an
-// injected answer stands in for the service. With cfg.prefix a write naming
+// points), on every service, Karakeep included although its own limit is
+// not 64 (main-session ruling 14: keep the conservative guard): the Node
+// layers refuse that on a user instance unless an injected answer stands
+// in for the service. With cfg.prefix a write naming
 // any tag outside that prefix is refused.
 export function liveGuardRule(cfg, view, req) {
   const url = String(req.url || '');

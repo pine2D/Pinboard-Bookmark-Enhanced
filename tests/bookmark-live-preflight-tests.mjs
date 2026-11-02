@@ -900,8 +900,9 @@ try {
       assert.deepEqual([foreign.aborted, foreign.continued, sent, routeRun.fatal], ['blockedbyclient', undefined, [], 'live_guard_foreign_tag']);
       assert.equal(routeRun.report.ledger.tags.length, 1, 'a refused write reserves nothing');
       // An over-long tag (past 64 code points) never reaches a user
-      // instance: fatal and not sent, unless an injected answer stands in
-      // for the service. A temporary instance gets it.
+      // instance, Karakeep's included (ruling 14): fatal and not sent,
+      // unless an injected answer stands in for the service. A temporary
+      // instance gets it.
       const longName = routeRun.prefix + '_' + 'long'.repeat(6);
       assert(longName.length > 64);
       for (const [target, injected, outcome] of [['user', false, ['blockedbyclient', undefined, [], live.LONG_TAG_USER_CODE]], ['user', true, [undefined, undefined, [], null]], ['temp', false, [undefined, true, ['POST bookmarks/k7/tags'], null]]]) {
