@@ -346,6 +346,32 @@ try {
     assert.equal(readOnly.code, 'live_guard_read_only', 'read-only modules refuse every write');
   }
 
+  // A worker fetch whose URL does not parse (run 22df1c6e listed a blocked
+  // origin "invalid" with nothing to trace it by) keeps a query-free sample
+  // and the calling frames; syncGuard files them under the module and phase.
+  {
+    const sandbox = vm.createContext({ fetch: async () => ({ ok: true }), URL, Error, String, JSON });
+    vm.runInContext(`(${live.installWorkerGuard.toString()})(${live.liveGuardRule.toString()}, ${JSON.stringify({ ...cfg, caps: {} })}, 'tok')`, sandbox);
+    const call = vm.runInContext('(function productCaller(u) { return fetch(u); })', sandbox);
+    for (const bad of ['', '/api/assets/x?token=' + syntheticKey]) await assert.rejects(call(bad), e => e.message === 'live_guard_origin');
+    await assert.rejects(call('https://example.org/x'), e => e.message === 'live_guard_origin');
+    // The guard state lives in the vm realm: copy before strict deepEqual.
+    const seen = JSON.parse(JSON.stringify(sandbox.pbpLiveGuard.violations));
+    assert.deepEqual(seen.map(v => [v.origin, v.sample || '']), [['invalid', 'string:'], ['invalid', 'string:/api/assets/x'], ['https://example.org', '']]);
+    assert(seen.slice(0, 2).every(v => v.where.includes('productCaller')), 'the calling frame is kept: ' + seen[0].where);
+    assert(!JSON.stringify(seen).includes(syntheticKey), 'no query string in a sample');
+    const syncRun = new live.LiveRun({ mode: 'run' });
+    syncRun.ctx = {};
+    syncRun.swToken = 'tok';
+    syncRun.worker = { evaluate: async () => ({ created: [], lists: [], counts: {}, violations: seen.splice(0) }) };
+    syncRun.currentModule = { id: 'linkding.core.snapshot' };
+    syncRun.phaseName = 'snapshot_wait';
+    await syncRun.syncGuard();
+    assert.deepEqual(syncRun.report.blockedOrigins, ['invalid', 'https://example.org']);
+    assert.deepEqual(syncRun.report.blockedSamples.map(s => [s.module, s.phase, s.sample]), [['linkding.core.snapshot', 'snapshot_wait', 'string:'], ['linkding.core.snapshot', 'snapshot_wait', 'string:/api/assets/x']]);
+    assert.equal(syncRun.fatal, null, 'a blocked outside request is evidence, not a fatal violation');
+  }
+
   // Every module phase confirms the worker guard is still installed. A phase
   // that is not awaited still stops the next harness call.
   {

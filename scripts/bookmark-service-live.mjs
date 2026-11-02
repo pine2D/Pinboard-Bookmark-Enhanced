@@ -906,7 +906,7 @@ export class LiveRun {
       harness: HARNESS_VERSION, runId: this.runId, prefix: this.prefix, mode: opts.mode, started: new Date().toISOString(),
       head: '', clean: null, target: '', scenario: '', modules: [], skipped: [], instances: {}, pools: {},
       ledger: { created: [], lists: [], tags: [] }, counts: {}, checks: [], readBackDiffs: [], console: [], swConsole: [],
-      pageErrors: [], requestFailed: [], blockedOrigins: [], violations: [], findings: [], shots: { dir: '', count: 0, manifest: '' },
+      pageErrors: [], requestFailed: [], blockedOrigins: [], blockedSamples: [], violations: [], findings: [], shots: { dir: '', count: 0, manifest: '' },
       fakeAi: null, temp: null, cleanup: { complete: false, entries: [] }, failure: null, finished: null, passed: false,
       stages: [],
     };
@@ -1569,7 +1569,11 @@ export class LiveRun {
     for (const entry of state.lists) this.recordList(entry);
     for (const [instance, n] of Object.entries(state.counts)) if (this.counts[instance]) this.counts[instance].sw = n;
     for (const v of state.violations) {
-      if (v.code === 'live_guard_origin') { if (!this.report.blockedOrigins.includes(v.origin) && this.report.blockedOrigins.length < 50) this.report.blockedOrigins.push(v.origin); continue; }
+      if (v.code === 'live_guard_origin') {
+        if (!this.report.blockedOrigins.includes(v.origin) && this.report.blockedOrigins.length < 50) this.report.blockedOrigins.push(v.origin);
+        if (v.sample !== undefined && this.report.blockedSamples.length < 20) this.report.blockedSamples.push({ module: this.currentModule?.id || '', phase: this.phaseName, sample: this.sanitize(String(v.sample)), where: this.sanitize(String(v.where || '')) });
+        continue;
+      }
       this.setFatal(v.code);
     }
   }
@@ -2222,6 +2226,7 @@ export class LiveRun {
     }
     if (r.violations.length) lines.push(`- 守卫/预算触发：${r.violations.map(v => `${v.code}@${v.phase}`).join('，')}`);
     if (r.blockedOrigins.length) lines.push(`- 被拦截的外部来源：${r.blockedOrigins.join('，')}`);
+    for (const b of (r.blockedSamples || []).slice(0, 5)) lines.push(`  - 无法解析的 URL：${b.sample || '（空）'}，模块 ${b.module || '无'}，阶段 ${b.phase}，调用方 ${b.where || '未知'}`);
     // What modules observed without asserting (e.g. the popup's wording for a
     // permanent server failure): evidence for review, not a verdict.
     const observed = r.modules.filter(m => Object.keys(m.notes || {}).length);
@@ -2271,10 +2276,10 @@ export class LiveRun {
 // Second guard layer, evaluated inside the service worker. It receives the
 // rule as source text (CSP forbids eval inside the worker; CDP evaluation of
 // the whole expression is how Playwright delivers any worker function).
-function installWorkerGuard(rule, cfg, token) {
+export function installWorkerGuard(rule, cfg, token) {
   const original = globalThis.fetch;
   const state = globalThis.pbpLiveGuard = { token, cfg, created: [], lists: [], counts: {}, writes: {}, offline: '', violations: [] };
-  globalThis.fetch = async (input, opts = {}) => {
+  globalThis.fetch = async function pbpGuardFetch(input, opts = {}) {
     // fetch accepts a string, a URL or a Request.
     const url = typeof input === 'string' ? input : (input && typeof input.url === 'string' ? input.url : String(input));
     if (url.startsWith('chrome-extension://')) return original(input, opts);
@@ -2284,7 +2289,14 @@ function installWorkerGuard(rule, cfg, token) {
     if (!decision.ok) {
       let origin = 'invalid';
       try { origin = new URL(url).origin; } catch (_) { /* keep invalid */ }
-      state.violations.push({ code: decision.code, instance: decision.instance || '', origin });
+      const violation = { code: decision.code, instance: decision.instance || '', origin };
+      // A URL that does not parse cannot be told apart by origin: keep its
+      // shape without query or fragment, and the calling frames.
+      if (origin === 'invalid') {
+        violation.sample = typeof input + ':' + url.split(/[?#]/)[0].slice(0, 60);
+        violation.where = String(new Error().stack || '').split('\n').slice(1).map(line => line.trim().replace(/^at /, '')).filter(line => !line.startsWith('pbpGuardFetch') && !line.includes('.pbpGuardFetch')).slice(0, 3).join(' < ').slice(0, 300);
+      }
+      state.violations.push(violation);
       throw new Error(decision.code);
     }
     const id = decision.instance;
