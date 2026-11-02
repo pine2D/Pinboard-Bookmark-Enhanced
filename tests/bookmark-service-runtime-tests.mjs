@@ -30,6 +30,7 @@ const BLOCKS=[
   'linkding Description server semantics',
   'gateway probes',
   'settings tag panel follows the service',
+  'archive log follows the bookmark connection',
 ];
 // Self-check before any browser starts: the list above and the block() calls
 // below must name exactly the same blocks, so a block added to one place only
@@ -1105,6 +1106,45 @@ try{
     },beforeSync);
   }
   console.log('settings Tags panel reloads on a bookmark service change: Pinboard tags in, linkding explanation back, in local and in sync');
+  });
+  await block('archive log follows the bookmark connection',['linkding'],async()=>{
+  // The archive log lists page URLs (private bookmarks included) for the
+  // connection that saved them. A change of service or of the connection's
+  // credential, made in another tab or on another device, reaches an open
+  // Settings page only as a storage event; the log must switch to the new
+  // connection's rows then, not keep the previous connection's on screen.
+  const linkdingAccount=await worker.evaluate(async()=>(await pbpReadBookmarkConnection()).account);
+  assert(linkdingAccount.startsWith('linkding:'),'linkding is connected for this block');
+  const before=await worker.evaluate(async()=>({local:await chrome.storage.local.get(['bookmarkService','pinboardToken','_waybackLog']),credential:(await loadSettings()).linkdingToken}));
+  const pinboardUrl='https://pinboard-private.test/only-pinboard', linkdingUrl='https://linkding-private.test/only-linkding';
+  await worker.evaluate(async({linkdingAccount,pinboardUrl,linkdingUrl})=>{
+    const ts=Date.now();
+    await chrome.storage.local.set({pinboardToken:obfuscateKey('logfixture:0123456789ABCDEF0123'),
+      _waybackLog:[{url:pinboardUrl,ts,outcome:'requested',account:'logfixture'},{url:linkdingUrl,ts,outcome:'requested',account:linkdingAccount}]});
+  },{linkdingAccount,pinboardUrl,linkdingUrl});
+  const options=await ctx.newPage();await options.goto(pageUrl+'options.html#archive');
+  const shown=()=>options.locator('#wayback-log .wayback-log-url-text').allTextContents();
+  const showing=(want,label)=>until(async()=>JSON.stringify(await shown())===JSON.stringify(want),label).catch(async e=>{throw new Error(e.message+' shown: '+JSON.stringify(await shown()));});
+  try{
+    await showing([linkdingUrl],'the linkding connection shows only its own archive rows');
+    await worker.evaluate(()=>chrome.storage.local.set({bookmarkService:'pinboard'}));
+    await showing([pinboardUrl],'Pinboard chosen elsewhere: the log switched to the Pinboard rows');
+    await worker.evaluate(()=>chrome.storage.local.set({bookmarkService:'linkding'}));
+    await showing([linkdingUrl],'linkding chosen elsewhere: the log switched back to the linkding rows');
+    // A new linkding connection (a fresh connection id from Connect) is a
+    // different owner: the previous connection's rows must leave the page.
+    await worker.evaluate(async credential=>{const value=JSON.parse(credential);value.connectionId='another-connection';await persistSettings({linkdingToken:JSON.stringify(value)});},before.credential);
+    assert.notEqual(await worker.evaluate(async()=>(await pbpReadBookmarkConnection()).account),linkdingAccount,'the credential change did not change the owner');
+    await showing([],'a new linkding connection elsewhere: the previous connection\'s rows left the page');
+  }finally{
+    await options.close();
+    await worker.evaluate(async before=>{
+      await persistSettings({linkdingToken:before.credential});
+      await chrome.storage.local.remove(['bookmarkService','pinboardToken','_waybackLog']);await chrome.storage.local.set(before.local);
+    },before);
+  }
+  assert.equal(await worker.evaluate(async()=>(await pbpReadBookmarkConnection()).account),linkdingAccount,'the linkding connection was not restored');
+  console.log('archive log follows service and credential changes made elsewhere');
   });
   assert.equal(errors.length,0,errors.join('\n'));
   assert(requests.every(r=>r.service==='linkding'||r.service==='karakeep'));

@@ -6632,14 +6632,17 @@ async function renderWaybackLog() {
 // The owner gate above runs once per render, and the Archive panel is NOT in
 // activateTab's lazy-rerender set -- so a token swap made in another tab of this
 // same page left the previous account's rows (page URLs, private bookmarks
-// included) on screen for as long as the page stayed open. Re-render on the
-// three keys that can change who is signed in, whichever area carries them;
-// renderWaybackLog re-derives the account itself and its generation stamp
-// settles concurrent runs. Same shape as options-vocab.js's account listener.
+// included) on screen for as long as the page stayed open. The owner is the
+// bookmark connection (pbpReadBookmarkConnection), so re-render on every key
+// that can change it -- the service choice, each service's address and
+// credential -- and on the two keys that route those settings, whichever area
+// carries them; renderWaybackLog re-derives the account itself and its
+// generation stamp settles concurrent runs. Same shape as md-preview.js's
+// bookmark-connection listener.
 if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener((changes, area) => {
     if ((area !== "sync" && area !== "local")
-        || !(changes.pinboardToken || changes.optSyncEnabled || changes.syncApiKeys)) return;
+        || !(pbpBookmarkSettingsChanged(changes) || changes.optSyncEnabled || changes.syncApiKeys)) return;
     renderWaybackLog();
   });
 }
