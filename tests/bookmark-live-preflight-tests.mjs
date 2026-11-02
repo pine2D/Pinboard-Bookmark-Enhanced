@@ -1114,6 +1114,75 @@ try {
       assert.equal(timeoutRun.report.ledger.created[0].deleted, true);
       await closeServer(server);
     }
+    {
+      // Parts (t.part): a failed expectation inside one is recorded with the
+      // part's own fix groups, its faults are cleared, the settings it found
+      // are put back, and the module goes on; the module still fails on the
+      // first failed part, at that part's phase. A pending ruling (t.pending)
+      // is recorded without failing. A fatal finding ends the module at once.
+      const partRun = () => {
+        const r = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+        r.target = 'temp';
+        r.instances.linkding = { id: 'linkding', service: 'linkding', base: 'http://127.0.0.1:9/', root: 'http://127.0.0.1:9/api/', token: 'f'.repeat(40) };
+        r.caps = { linkding: live.BUDGETS.temp.linkding };
+        r.reserve = { linkding: 60 };
+        r.pools.linkding = live.poolUrls('temp', r.runId, 'linkding', 2);
+        r.claimed.linkding = 0;
+        r.guardCfg = {};
+        r.ctx = { pages: () => [] };
+        r.worker = { evaluate: async () => {} };
+        r.syncGuard = async () => {};
+        r.pushGuardWrites = async () => {};
+        r.restores = [];
+        r.sw = async (fn, arg) => {
+          const text = String(fn);
+          if (text.includes('SETTINGS_DEFAULTS')) return ['optA'];
+          if (text.includes('local.set(saved)')) { r.restores.push(arg.saved); return undefined; }
+          if (text.includes('local.set(snapshot)')) { r.restores.push(arg.snapshot); return undefined; }
+          if (text.includes('storage.local.get')) return { optA: 'before' };
+          return undefined;
+        };
+        return r;
+      };
+      const run = partRun();
+      const seen = [];
+      const mod = {
+        id: 'linkding.parts.check', instance: 'linkding', service: 'linkding', needs: { writes: false }, settings: {}, fixRefs: ['G1', 'G2'],
+        budget: { bookmarks: 0, urls: 0, node: 0, browser: 0, ai: 0, tags: 0, seconds: 5 },
+        async steps(t) {
+          t.inject({ method: 'POST', path: /^bookmarks/, status: 502 });
+          await t.part('first', ['G1'], async () => {
+            await t.phase('first_phase');
+            t.inject({ method: 'GET', path: /^bookmarks\/check/, status: 503 });
+            t.expectEq('shown', 'wanted', 'first_failed');
+            seen.push('after the failed expectation');
+          });
+          seen.push(run.faults.length);
+          const ok = await t.part('second', ['G2'], async () => { await t.phase('second_phase'); seen.push('second'); });
+          seen.push(ok);
+          seen.push(t.pending('one line', 'two\n\nlines', 'pending_split', 'Description control shape'));
+        },
+      };
+      await quiet(() => run.runModule(mod));
+      const record = run.report.modules[0];
+      assert.deepEqual([record.status, record.failure.code, record.failure.phase], ['failed', 'first_failed', 'first_phase'], 'the module fails on its first failed part, at that part');
+      assert.deepEqual(record.parts.map(p => [p.name, p.status, p.fixRefs.join(','), p.code || '']), [['first', 'failed', 'G1', 'first_failed'], ['second', 'passed', 'G2', '']]);
+      assert.deepEqual(seen, [1, 'second', true, false], 'the part stops at its failure; its fault is cleared, the earlier one stays; the next part runs');
+      assert.deepEqual(run.restores, [{ optA: 'before' }, { optA: 'before' }], 'the failed part restores its settings, then the module does');
+      assert.deepEqual(record.pendingDecisions.map(d => [d.code, d.actual]), [['pending_split', 'one line']], 'a pending ruling is recorded, not failed');
+      assert.equal(run.fatal, null);
+      run.runDir = mkdtempSync(join(dir, 'parts-'));
+      run.summaryPath = join(run.runDir, 'summary.zh.md');
+      run.writeSummary();
+      const summary = readFileSync(run.summaryPath, 'utf8');
+      assert(summary.includes('分段：first 失败于 first_phase，first_failed（依赖 G1）；second 通过（依赖 G2）'), 'the summary names each part with its own fix groups');
+      assert(summary.includes('linkding.parts.check 待裁定：pending_split（Description control shape'), 'the summary lists pending rulings');
+      const fatalRun = partRun();
+      let after = false;
+      const fatalMod = { ...mod, id: 'linkding.parts.fatal', async steps(t) { await t.part('fatal', ['G1'], async () => { fatalRun.setFatal('live_guard_mutation'); t.expect(true, 'x'); }); after = true; } };
+      await assert.rejects(quiet(() => fatalRun.runModule(fatalMod)), e => e.code === 'live_guard_mutation');
+      assert.deepEqual([fatalRun.report.modules[0].status, after], ['aborted', false], 'a fatal finding in a part ends the module');
+    }
   }
 
   // ---------------------------------------------------------------------

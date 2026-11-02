@@ -2968,6 +2968,52 @@ export class LiveRun {
         fail(code);
       },
       check: text => { mod.record.checks.push(text); run.report.checks.push(text); },
+      // A part of a module with its own fix groups. An expectation that
+      // fails inside is recorded on the part (record.parts) and the module
+      // goes on with its next part, after this part's faults are cleared,
+      // its pages closed and the module's settings put back as the part
+      // found them; the module still fails at its end, on the first failed
+      // part. A fatal finding, a revoked module or a timeout ends the
+      // module at once. So one pending fix no longer hides the parts behind
+      // it, and the summary names each failed part's own groups.
+      async part(name, fixRefs, fn) {
+        alive();
+        const part = { name, fixRefs: [...(fixRefs || [])], status: 'running' };
+        (mod.record.parts ||= []).push(part);
+        const faults = new Set(run.faults);
+        const pages = new Set(run.ctx.pages());
+        const keys = run.currentModule?.settingsKeys || [];
+        const saved = keys.length ? await sw(k => chrome.storage.local.get(k), keys) : null;
+        try {
+          await fn();
+          part.status = 'passed';
+        } catch (error) {
+          if ((error instanceof HarnessFailure && error.fatal) || run.fatal || mod.revoked) throw error;
+          part.status = 'failed';
+          part.code = failureCode(error, run.secrets);
+          part.phase = run.phaseName;
+          console.error('PART FAILED ' + mod.id + ' / ' + name + ' at ' + part.phase + ': ' + part.code);
+          run.faults = run.faults.filter(f => faults.has(f));
+          for (const page of run.ctx.pages()) if (!pages.has(page)) await page.close().catch(() => {});
+          await run.sw(async ({ keys, saved }) => {
+            const extra = keys.filter(k => !(k in saved));
+            if (extra.length) await chrome.storage.local.remove(extra);
+            await chrome.storage.local.set(saved);
+          }, { keys, saved: saved || {} });
+        }
+        run.persist();
+        return part.status === 'passed';
+      },
+      // An expectation that waits on a ruling the user has not made yet: a
+      // match passes, a mismatch is recorded under pendingDecisions (and in
+      // the summary as 待裁定) without failing the module.
+      pending(actual, expected, code, question) {
+        run.throwIfFatal();
+        if (actual === expected) return true;
+        const show = v => (v === undefined ? 'undefined' : run.sanitize(typeof v === 'string' ? v : JSON.stringify(v)).slice(0, 200));
+        (mod.record.pendingDecisions ||= []).push({ code, phase: run.phaseName, question, expected: show(expected), actual: show(actual) });
+        return false;
+      },
       note: (key, value) => { mod.record.notes[key] = value; },
       sleep: async ms => { const started = Date.now(); try { await sleep(ms); } finally { run.noteWait('wait', Date.now() - started); } },
       // Time left before this module's own seconds budget runs out.
@@ -3164,7 +3210,7 @@ export class LiveRun {
     // above, and phase() would add it again.
     this.phaseName = mod.id;
     this.persist();
-    const current = { id: mod.id, budget, created: 0, claimed: 0, record, driven: new Set(), requests: [] };
+    const current = { id: mod.id, budget, created: 0, claimed: 0, record, driven: new Set(), requests: [], settingsKeys: [] };
     this.faults = [];
     this.currentModule = current;
     const before = { ...this.count(mod.instance), ai: this.fakeAi ? this.fakeAi.calls() : 0 };
@@ -3174,6 +3220,7 @@ export class LiveRun {
     try {
       settingsKeys = await this.sw(() => Object.keys(SETTINGS_DEFAULTS).concat(['optSyncEnabled', 'offlineQueue']));
       snapshot = await this.sw(keys => chrome.storage.local.get(keys), settingsKeys);
+      current.settingsKeys = settingsKeys;
     } catch (error) {
       // Before its steps: aborted with the cause, never left "running".
       // No step ran, so its features reach no verdict (unfinished).
@@ -3217,6 +3264,9 @@ export class LiveRun {
         work,
         new Promise((_, reject) => { timer = setTimeout(() => { current.revoked = true; reject(new HarnessFailure('module_timeout')); }, seconds * 1000); }),
       ]);
+      // Every part ran; the module fails on the first part that failed.
+      const failedPart = (record.parts || []).find(p => p.status === 'failed');
+      if (failedPart) { const error = new HarnessFailure(failedPart.code); error.partPhase = failedPart.phase; throw error; }
       await this.syncGuard();
       this.throwIfFatal();
       const undeclared = undeclaredSurfaces(mod.surfaces, [...current.driven]);
@@ -3235,7 +3285,7 @@ export class LiveRun {
       // service from here on.
       current.revoked = true;
       const code = failureCode(error, this.secrets);
-      record.failure = { phase: this.phaseName, code };
+      record.failure = { phase: error?.partPhase || this.phaseName, code };
       const after = this.count(mod.instance);
       record.counts = { node: after.node - before.node, browser: after.browser - before.browser, ai: this.fakeAi ? this.fakeAi.calls() - before.ai : 0 };
       if (error instanceof HarnessFailure && error.fatal || this.fatal) {
@@ -3780,8 +3830,10 @@ export class LiveRun {
       const verdict = m.status === 'running' ? '中断（运行在此模块中被打断，未得出结论）'
         : m.beforeSteps ? `中止于开始前（未执行任何步骤，未得出结论），${m.failure?.code}`
         : `${m.status === 'aborted' ? '中止' : '失败'}于 ${m.failure?.phase}，${m.failure?.code}`;
-      return `- ${m.id}：${verdict}；读回差异 ${diffs.length} 条${diffs[0] ? `（${diffs[0].code}：期望 ${oneLine(diffs[0].expected, 60)}，实际 ${oneLine(diffs[0].actual, 60)}）` : ''}；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；截图 ${shots[shots.length - 1]}` : ''}${(m.fixRefs || []).length ? `；依赖修复组 ${m.fixRefs.map(g => oneLine(g, 12)).join('、')}（产品树未含这些修复时属预期失败）` : ''}`;
+      return `- ${m.id}：${verdict}；读回差异 ${diffs.length} 条${diffs[0] ? `（${diffs[0].code}：期望 ${oneLine(diffs[0].expected, 60)}，实际 ${oneLine(diffs[0].actual, 60)}）` : ''}；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；截图 ${shots[shots.length - 1]}` : ''}${(m.fixRefs || []).length ? `；依赖修复组 ${m.fixRefs.map(g => oneLine(g, 12)).join('、')}（产品树未含这些修复时属预期失败）` : ''}${(m.parts || []).length ? `；分段：${m.parts.map(p => `${oneLine(p.name, 40)} ${p.status === 'passed' ? '通过' : p.status === 'failed' ? `失败于 ${p.phase}，${p.code}` : '未完成'}（依赖 ${(p.fixRefs || []).map(g => oneLine(g, 12)).join('、') || '无'}）`).join('；')}` : ''}`;
     });
+    const pendingRows = r.modules.filter(m => (m.pendingDecisions || []).length);
+    for (const m of pendingRows.slice(0, 5)) lines.push(`- ${m.id} 待裁定：${m.pendingDecisions.slice(0, 3).map(d => `${d.code}（${oneLine(d.question || '', 60)}；期望 ${oneLine(d.expected, 50)}，实际 ${oneLine(d.actual, 50)}）`).join('；')}`);
     if (notStarted.length) lines.push(`- 未执行（${notStarted.length}，运行在它们开始前已停止，不算通过也不算失败）：${notStarted.join('，').slice(0, 300)}`);
     if (r.violations.length) lines.push(`- 守卫/预算触发：${r.violations.slice(0, 5).map(v => `${v.code}@${v.phase}`).join('，')}${r.violations.length > 5 ? ` 等 ${r.violations.length} 条` : ''}`);
     if (r.blockedOrigins.length) lines.push(`- 被拦截的外部来源（${r.blockedOrigins.length}）：${r.blockedOrigins.slice(0, 5).join('，')}`);
