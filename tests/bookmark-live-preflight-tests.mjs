@@ -2922,6 +2922,28 @@ try {
     const page = await browser.newPage({ viewport: { width: 420, height: 600 } });
     const shotsDir = join(dir, 'shots');
     mkdirSync(shotsDir, { mode: 0o700 });
+    // The wait before an onState check skips infinite animations (their
+    // finished never resolves) and gives up on finite ones after a cap,
+    // so a spinner on screen cannot hold a state until the module times
+    // out (review of H3c, should-fix: unbounded getAnimations wait).
+    {
+      await page.setContent('<!doctype html><style>@keyframes s{to{transform:rotate(1turn)}}@keyframes f{to{opacity:.5}}</style>'
+        + '<div style="animation:s 1s linear infinite">spin</div><div style="animation:f 120ms linear 1">fade</div>');
+      let t0 = Date.now();
+      let res = await page.evaluate(live.settleAnimations, 2000);
+      assert.equal(res.timedOut, false, 'a finite animation settles inside the cap');
+      assert.equal(res.infinite, 1, 'the infinite spinner is not awaited');
+      assert.equal(res.waited, 1, 'the finite fade is awaited');
+      assert.ok(Date.now() - t0 < 1500, 'an infinite animation does not hold the wait');
+      await page.setContent('<!doctype html><style>@keyframes f{to{opacity:.5}}</style><div style="animation:f 30s linear 1">slow</div>');
+      t0 = Date.now();
+      res = await page.evaluate(live.settleAnimations, 300);
+      assert.equal(res.timedOut, true, 'a finite animation longer than the cap is reported, not awaited');
+      assert.ok(Date.now() - t0 < 2000, 'the cap bounds the wait');
+      await page.setContent('<!doctype html><p>still</p>');
+      res = await page.evaluate(live.settleAnimations, 300);
+      assert.deepEqual(res, { waited: 0, infinite: 0, timedOut: false }, 'no animation, no wait');
+    }
     const shoot = async (html, name) => {
       await page.setContent('<!doctype html><title>Shot</title><body style="margin:0">' + html + '</body>');
       const file = join(shotsDir, name + '.png');

@@ -1509,6 +1509,22 @@ export const SECRET_FIELD_SELECTOR = ['input[type="password"]', ...['token', 'se
 // Text that names the signed-in account (Pinboard's "Connected as <name>").
 export const ACCOUNT_TEXT_SELECTOR = '#test-pinboard-status';
 
+// Runs in the page (page.evaluate): waits for the finite animations to end,
+// for at most capMs. An infinite animation (a spinner, a skeleton pulse)
+// never finishes, so it is counted and not awaited; a finite one still
+// running at the cap is reported instead of holding the caller.
+export const ANIMATION_SETTLE_CAP_MS = 2500;
+export function settleAnimations(capMs) {
+  const all = document.getAnimations();
+  const finite = all.filter(a => { try { return a.effect?.getComputedTiming?.().endTime !== Infinity; } catch { return false; } });
+  const base = { waited: finite.length, infinite: all.length - finite.length };
+  if (!finite.length) return { ...base, timedOut: false };
+  let timer;
+  const cap = new Promise(resolve => { timer = setTimeout(() => resolve(true), capMs); });
+  const done = Promise.all(finite.map(a => a.finished.catch(() => {}))).then(() => false);
+  return Promise.race([done, cap]).then(timedOut => { clearTimeout(timer); return { ...base, timedOut }; });
+}
+
 // capture: false measures the geometry (and refuses a revealed secret field)
 // without writing a picture: the locales checked by layout only.
 export async function takeShot(page, { file, secrets = [], keys = [], capture = true }) {
@@ -3592,7 +3608,14 @@ export class LiveRun {
           // A scheme switch starts colour transitions (popup/options
           // --pp-motion-state); a check reading mid-transition colours
           // would judge neither scheme.
-          await page.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));
+          // Infinite animations are skipped and the wait is capped, so a
+          // spinner on screen cannot hold this state until the module times
+          // out; an unsettled wait is noted on the entry.
+          const settled = await page.evaluate(settleAnimations, ANIMATION_SETTLE_CAP_MS);
+          if (settled?.timedOut) {
+            entry.animationsUnsettled = settled.waited;
+            if (this.shotsEnabled) writePrivateJson(this.report.shots.manifest, this.shotsManifest);
+          }
           await onState(page, { locale, scheme, entry });
         }
       }
