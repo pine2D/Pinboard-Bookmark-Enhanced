@@ -983,6 +983,10 @@ try {
     const freed = await run(['--run', '--target', 'user', '--service', 'linkding', '--scenario', 'linkding.readonly', '--linkding', 'http://127.0.0.1:9', '--allow-dirty'], { credentials: false, state });
     assert.equal(freed.report.failure.code, 'credentials_path', freed.output);
     assert.deepEqual(freed.report.foreignLocks, [join(oldDir, 'report.json')]);
+    // configure() records every module the run means to start, before any
+    // later step can fail: the summary's "not run" list and --cleanup read
+    // it back (review of H1c, should-fix 1).
+    assert.deepEqual(freed.report.selected, ['linkding.readonly']);
     assert(readFileSync(join(freed.reportPath, '..', 'summary.zh.md'), 'utf8').includes('已释放外来版本的陈旧锁：' + join(oldDir, 'report.json')), 'named in the summary');
     rmSync(join(freed.reportPath, '..'), { recursive: true, force: true });
     // A lock whose report is this version and unfinished still blocks.
@@ -1439,6 +1443,16 @@ try {
     closed.ctx = null;
     await assert.rejects(closed.runModule(all.find(m => m.id === 'linkding.core.worker')), e => e.code === 'browser_closed');
     assert.deepEqual(closed.report.modules, []);
+    // A worker gone before the module's settings snapshot: the record it
+    // just made is aborted with the cause, never left "running" to read as
+    // an interruption (review of H1c, should-fix 1).
+    const gone = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    const offline = all.find(m => m.id === 'linkding.edges.offline');
+    gone.ctx = { pages: () => [] };
+    gone.sw = async () => { throw new live.HarnessFailure('worker_gone'); };
+    await assert.rejects(gone.runModule(offline), e => e.code === 'worker_gone');
+    assert.deepEqual(gone.report.modules.map(m => [m.id, m.status, m.failure?.code]), [['linkding.edges.offline', 'aborted', 'worker_gone']]);
+    assert.equal(gone.currentModule, null);
 
     const run = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
     run.runDir = join(dir, 'summary-not-started');
