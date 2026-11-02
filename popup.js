@@ -1338,7 +1338,7 @@ async function htmlToMarkdownAsync(html, opts) {
                 description: handoffNotes,
                 // Without a draft the reader saves `description`; a summary
                 // range needs the notes it describes beside it.
-                ...(pbpBookmarkServiceId(settings) === "linkding" ? { bookmarkDraft: { ...(pbpPopupDescriptionKnown() ? { summary: pbpBookmarkDescriptionLine($id("linkding-description-input")?.value) } : {}), private: $id("private-check")?.checked === true, sharedExplicit: _linkdingSharedExplicit } } : handoffSummaryRange ? { bookmarkDraft: { notes: handoffNotes, summaryRange: handoffSummaryRange } } : {}),
+                ...(pbpBookmarkServiceId(settings) === "linkding" ? { bookmarkDraft: { ...(pbpPopupDescriptionKnown() ? { summary: pbpBookmarkDescriptionLine($id("linkding-description-input")?.value) } : {}) } } : handoffSummaryRange ? { bookmarkDraft: { notes: handoffNotes, summaryRange: handoffSummaryRange } } : {}),
                 ts: Date.now()
               }
             });
@@ -1477,8 +1477,12 @@ async function htmlToMarkdownAsync(html, opts) {
                 tags: Array.isArray(currentTags) ? (pbpBookmarkServiceId(settings) === "pinboard" ? currentTags.join(" ") : pbpBookmarkFormatTags(currentTags)) : "",
                 notes: handoffNotes,
                 ...(handoffSummaryRange ? { summaryRange: handoffSummaryRange } : {}),
-                ...(pbpBookmarkServiceId(settings) === "linkding" ? { ...(pbpPopupDescriptionKnown() ? { summary: pbpBookmarkDescriptionLine($id("linkding-description-input")?.value) } : {}), sharedExplicit: _linkdingSharedExplicit } : {}),
-                private: $id("private-check")?.checked === true,
+                // A linkding bookmark the reader creates starts unshared whatever
+                // the Share box says (user decision 2026-11-01), so a linkding
+                // handoff carries no privacy or sharing choice.
+                ...(pbpBookmarkServiceId(settings) === "linkding"
+                  ? (pbpPopupDescriptionKnown() ? { summary: pbpBookmarkDescriptionLine($id("linkding-description-input")?.value) } : {})
+                  : { private: $id("private-check")?.checked === true }),
                 toread: $id("readlater-check")?.checked === true,
               },
               account: sessionAccount,

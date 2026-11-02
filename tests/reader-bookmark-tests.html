@@ -381,7 +381,10 @@ await test("normal and pending popup preview payloads carry linkding Description
         // A bookmark the reader creates starts unshared, whatever the popup's Share box said.
         assert(state.bookmark.sharedExplicit !== true, "the popup's sharing choice reached the reader");
         equal(state.bookmark.private, true);
-      } else assert(!draft || !("summary" in draft));
+        // Nothing reads the popup's Share box or privacy from a linkding
+        // handoff (user decision 2026-11-01), so it carries neither.
+        assert(!("sharedExplicit" in draft) && !("private" in draft), "the linkding handoff still carries " + Object.keys(draft).join());
+      } else assert(!draft || (!("summary" in draft) && !("sharedExplicit" in draft) && draft.private === false), service + " handoff: " + JSON.stringify(draft));
     }
   }
 });
