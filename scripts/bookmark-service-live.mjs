@@ -3003,10 +3003,15 @@ export class LiveRun {
       // found them; the module still fails at its end, on the first failed
       // part. A fatal finding, a revoked module or a timeout ends the
       // module at once. So one pending fix no longer hides the parts behind
-      // it, and the summary names each failed part's own groups.
-      async part(name, fixRefs, fn) {
+      // it, and the summary names each failed part's own groups. features
+      // (a subset of the module's) are the ones this part decides: when the
+      // module fails only on its parts, each such feature takes the verdict
+      // of the parts that name it.
+      async part(name, fixRefs, fn, features = []) {
         alive();
-        const part = { name, fixRefs: [...(fixRefs || [])], status: 'running' };
+        const stray = features.filter(f => !(mod.features || []).includes(f));
+        if (stray.length) { run.setFatal('part_feature_undeclared'); run.throwIfFatal(); }
+        const part = { name, fixRefs: [...(fixRefs || [])], features: [...features], status: 'running' };
         (mod.record.parts ||= []).push(part);
         const faults = new Set(run.faults);
         const pages = new Set(run.ctx.pages());
@@ -3323,7 +3328,7 @@ export class LiveRun {
       if (this.report.pageErrors.length !== errorsBefore) soft.push('browser_page_error');
       if (failedPart) {
         if (soft.length) record.alsoFailed = soft;
-        const error = new HarnessFailure(failedPart.code); error.partPhase = failedPart.phase; throw error;
+        const error = new HarnessFailure(failedPart.code); error.partPhase = failedPart.phase; error.partName = failedPart.name; throw error;
       }
       if (soft.length) fail(soft[0]);
       record.status = 'passed';
@@ -3333,7 +3338,7 @@ export class LiveRun {
       // service from here on.
       current.revoked = true;
       const code = failureCode(error, this.secrets);
-      record.failure = { phase: error?.partPhase || this.phaseName, code };
+      record.failure = { phase: error?.partPhase || this.phaseName, code, ...(error?.partName ? { part: error.partName } : {}) };
       const after = this.count(mod.instance);
       record.counts = { node: after.node - before.node, browser: after.browser - before.browser, ai: this.fakeAi ? this.fakeAi.calls() - before.ai : 0 };
       if (error instanceof HarnessFailure && error.fatal || this.fatal) {
@@ -3904,7 +3909,13 @@ export class LiveRun {
         const owner = SERVICE_TYPES.find(svc => f.startsWith(svc + '-'));
         if (owner && owner !== row.service) continue;
         const list = features.get(f) || [];
-        list.push({ id: m.id, ok: m.status === 'passed', open: m.status === 'running' || m.status === 'not_started' || m.beforeSteps === true });
+        // A module that failed only on its parts (every part ran, nothing
+        // else failed): a feature its parts name takes those parts' verdict,
+        // so a passed part's feature is not reported failed for another
+        // part's pending fix. Any other feature follows the module.
+        const parts = m.status === 'failed' && m.failure?.part && !(m.alsoFailed || []).length ? (m.parts || []).filter(p => (p.features || []).includes(f)) : [];
+        if (parts.length) list.push({ id: m.id, ok: parts.every(p => p.status === 'passed'), open: false });
+        else list.push({ id: m.id, ok: m.status === 'passed', open: m.status === 'running' || m.status === 'not_started' || m.beforeSteps === true });
         features.set(f, list);
       }
     }

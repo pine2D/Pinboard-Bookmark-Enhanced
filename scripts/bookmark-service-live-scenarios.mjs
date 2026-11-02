@@ -1106,11 +1106,11 @@ export const SELFHOSTED_MODULES = [
         t.expect(!!aborted.sent, 'abort_create_sent');
         t.expect(!aborted.sent.description, 'abort_description_sent');
         t.expect(!aborted.sent.scrapingDisabled, 'abort_scraping_disabled');
-      });
+      }, ['linkding-no-page-info']);
       await t.part('empty_hint', ['G26'], async () => {
         t.expect(!!aborted, 'abort_case_missing');
         t.expect(aborted.hint.any, 'abort_empty_hint');
-      });
+      }, ['linkding-empty-description-hint']);
 
       await t.part('server_metadata', ['G26'], async () => {
         await t.phase('page_info_server_metadata');
@@ -1128,7 +1128,7 @@ export const SELFHOSTED_MODULES = [
         const [metaCreate] = createsOf(t, meta, since);
         t.expect(!!metaCreate && /disable_scraping/.test(metaCreate.path), 'server_metadata_disable_scraping');
         await form.close();
-      });
+      }, ['linkding-browser-metadata']);
 
       // Pre-read off (the default): neither loading a page nor switching to
       // it asks /check/; on, switching tabs does and the icon follows.
@@ -1155,7 +1155,7 @@ export const SELFHOSTED_MODULES = [
         t.expectEq(icon, 'saved', 'preload_icon_saved');
         await first.close();
         await second.close();
-      });
+      }, ['linkding-preload']);
 
       // A PDF served for the URL. Chrome's PDF viewer page can still be
       // scripted, so the product may read it as a page: whether that counts
@@ -1218,14 +1218,14 @@ export const SELFHOSTED_MODULES = [
         await t.shot(form.popup, 'singlefile-missing', { surface: 'popup', keys: ['#submit-btn'] });
         await t.axe(form.popup, 'singlefile-missing');
         await form.close();
-      });
+      }, ['linkding-singlefile', 'singlefile-missing-notice']);
       await t.part('quick_save', ['G26'], async () => {
         await t.phase('singlefile_quick_save');
         const url = t.claimUrl(), since = t.now();
         const r = await shortcutSave(t, url, 'qs');
         t.note('quickSave', r);
         t.expect(marked(await createOf(url, since, 'singlefile_quick_create')), 'singlefile_quick_marker');
-      });
+      }, ['linkding-singlefile', 'singlefile-paths']);
       await t.part('not_batch_reader_replay', ['G26'], async () => {
         await t.phase('singlefile_batch');
         const batchUrl = t.claimUrl();
@@ -1248,7 +1248,7 @@ export const SELFHOSTED_MODULES = [
         since = t.now();
         await drainQueue(t);
         t.expect(!marked(await createOf(replayUrl, since, 'singlefile_replay_create')), 'singlefile_replay_marker');
-      });
+      }, ['singlefile-paths']);
       t.check('linkding: with SingleFile on, popup and quick-save creates carry disable_html_snapshot, the popup saves and says SingleFile did not answer (console.warn too); batch, reader and offline replay creates do not');
     },
   },
@@ -1316,7 +1316,7 @@ export const SELFHOSTED_MODULES = [
         t.expectEq(await field(popup).inputValue(), s, 'empty_replaced');
         await action(popup, 'remove').click();
         t.expectEq(await field(popup).inputValue(), '', 'remove_restores_empty');
-      });
+      }, ['ai-summary-description-rules', 'ai-summary-remove-restores']);
 
       await t.part('append_after_user_text', ['G24'], async () => {
         await t.phase('ai_description_user_text');
@@ -1342,7 +1342,7 @@ export const SELFHOSTED_MODULES = [
         await popup.locator('#title-input').fill(prefix + ' ai description');
         await t.savePopup(popup);
         t.expectEq((await t.ownRow(url)).description, shown, 'saved_as_shown');
-      });
+      }, ['ai-summary-description-rules', 'ai-summary-remove-restores']);
       await form.close();
 
       await t.part('append_after_server_text', ['G24'], async () => {
@@ -1359,7 +1359,7 @@ export const SELFHOSTED_MODULES = [
         await t.savePopup(again.popup);
         t.expectEq((await t.ownRow(seeded)).description, shown, 'server_text_saved');
         await again.close();
-      });
+      }, ['ai-summary-description-rules']);
       // Every paid call wrote what it produced: no "generated, then kept".
       t.expectEq(paid() - before, n, 'summary_calls_match_writes');
       t.expect(t.fakeAi.unknown() === 0, 'fake_ai_unknown_request');
@@ -1478,7 +1478,7 @@ export const SELFHOSTED_MODULES = [
         await drainQueue(t);
         await drainQueue(t);
         t.expectEq(writesSince(t, again).length, 0, 'queued_long_tag_retried');
-      });
+      }, ['queue-long-tag-needs-attention']);
       t.check('linkding-pg: an over-long tag is tag_too_long in the popup and quick save, never queued or replayed; a queued one needs attention after its replay');
     },
   },
@@ -2071,7 +2071,7 @@ export const SELFHOSTED_MODULES = [
         const form = await t.openPopup(t.claimUrl());
         t.expect(await form.popup.locator('#main-section').isVisible(), 'popup_stuck_after_roundtrip');
         await form.close();
-      });
+      }, ['tag-panel-follows-service', 'pinboard-roundtrip']);
 
       // Connect errors: a hint, aria-invalid on the field at fault, no
       // write, and the stored connection untouched (compared by digest in
@@ -2113,7 +2113,7 @@ export const SELFHOSTED_MODULES = [
         t.expect(JSON.stringify(await conn()) === JSON.stringify(original), 'failed_connect_changed_connection');
         t.expectEq(await connectionDigest(t), stored, 'failed_connect_overwrote_credentials');
         await options.close();
-      });
+      }, ['connect-errors', 'connect-aria-invalid', 'failed-connect-keeps-credentials']);
 
       // Choosing a service only opens its form; the switch waits for a
       // successful Connect (decision 6).
@@ -2125,7 +2125,7 @@ export const SELFHOSTED_MODULES = [
         t.expectEq((await conn()).service, s, 'switched_before_connect');
         await options.locator(`input[name="bookmark-service"][value="${s}"]`).check();
         await options.close();
-      });
+      }, ['connect-before-switch']);
 
       await t.part('disconnect', ['G22'], async () => {
         await t.phase('options_disconnect');
@@ -2140,7 +2140,7 @@ export const SELFHOSTED_MODULES = [
         await options.locator('.confirm-yes').click();
         await t.until(async () => !(await hasToken()), 'disconnect_token_removed', 8000);
         await options.close();
-      });
+      }, ['disconnect']);
       // Whatever the parts did, the module ends connected as it began.
       if ((await conn()).service !== s || !(await t.sw(async key => !!(await pbpReadSettingsWithSecrets({ [key]: '' }))[key], s + 'Token'))) await t.reconnect();
       t.expectEq((await conn()).service, s, 'reconnected');
@@ -2196,7 +2196,7 @@ export const SELFHOSTED_MODULES = [
         t.expectEq(committed[0], pasted[0], 'quote_closed_matches_paste');
         t.expect(!committed[0].includes('"') && /two/.test(committed[0]) && /words/.test(committed[0]), 'quote_closed_name');
         await form.close();
-      });
+      }, ['quoted-tag-space']);
 
       await t.part('long_chip', ['G29'], async () => {
         await t.phase('tag_input_long_chip');
@@ -2212,7 +2212,7 @@ export const SELFHOSTED_MODULES = [
           const c = chip.getBoundingClientRect(), w = wrap.getBoundingClientRect(), r = remove.getBoundingClientRect();
           const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
           return { scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth, chipRight: Math.round(c.right), wrapRight: Math.round(w.right), removeLeft: Math.round(r.left), removeRight: Math.round(r.right), hit: !!hit && (hit === remove || remove.contains(hit)) };
-      });
+      }, ['long-tag-chip-geometry']);
       t.note('longChip', g);
       t.expect(!g.missing, 'long_chip_missing');
       t.expect(g.scrollWidth <= g.innerWidth, 'long_chip_page_overflow');
@@ -2260,7 +2260,7 @@ export const SELFHOSTED_MODULES = [
         await options.close();
         t.expectEq(await t.sw(async () => (await pbpReadBookmarkConnection()).service), 'karakeep', 'wrong_key_disconnected');
         t.expectEq(await connectionDigest(t), stored, 'wrong_key_overwrote_connection');
-      });
+      }, ['karakeep-auth-not-gateway']);
 
       // G8 invariant 5: without the origin's host permission, quick save
       // neither extracts nor pays for AI, queues nothing and says so. The
@@ -2289,7 +2289,7 @@ export const SELFHOSTED_MODULES = [
         } finally {
           await t.sw(async () => { if (globalThis.pbpLiveContains) chrome.permissions.contains = globalThis.pbpLiveContains; });
         }
-      });
+      }, ['permission-before-ai']);
 
       // A revoked key (401): quick save ends as an authentication failure,
       // not queued (G8 does not move its AI call before delivery).
@@ -2303,7 +2303,7 @@ export const SELFHOSTED_MODULES = [
         t.expectEq((await queue(t)).length, queued, 'revoked_quick_save_queued');
         fault.clear();
         await resetQueue();
-      });
+      }, ['revoked-key-not-queued']);
 
       // Batch over two pages: a 401 on the first stops the run, so the AI
       // is asked at most once and the second page is never delivered.
@@ -2320,7 +2320,7 @@ export const SELFHOSTED_MODULES = [
         t.expectEq(second.length, 0, 'revoked_batch_second_page');
         fault.clear();
         await resetQueue();
-      });
+      }, ['batch-stops-on-auth']);
       t.check('karakeep: a wrong key reads as an authentication failure and leaves the stored connection alone; without host permission quick save stops before AI; a revoked key is an auth failure, not queued; batch stops at the first 401 with at most one AI call');
     },
   },

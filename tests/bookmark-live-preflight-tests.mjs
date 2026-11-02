@@ -1227,7 +1227,7 @@ try {
       const run = partRun();
       const seen = [];
       const mod = {
-        id: 'linkding.parts.check', instance: 'linkding', service: 'linkding', needs: { writes: false }, settings: {}, fixRefs: ['G1', 'G2'],
+        id: 'linkding.parts.check', instance: 'linkding', service: 'linkding', needs: { writes: false }, settings: {}, fixRefs: ['G1', 'G2'], features: ['f-first', 'f-second', 'f-outside'],
         budget: { bookmarks: 0, urls: 0, node: 0, browser: 0, ai: 0, tags: 0, seconds: 5 },
         async steps(t) {
           t.inject({ method: 'POST', path: /^bookmarks/, status: 502 });
@@ -1240,9 +1240,9 @@ try {
             t.inject({ method: 'GET', path: /^bookmarks\/check/, status: 503 });
             t.expectEq('shown', 'wanted', 'first_failed');
             seen.push('after the failed expectation');
-          });
+          }, ['f-first']);
           seen.push(run.faults.length);
-          const ok = await t.part('second', ['G2'], async () => { await t.phase('second_phase'); seen.push('second'); });
+          const ok = await t.part('second', ['G2'], async () => { await t.phase('second_phase'); seen.push('second'); }, ['f-second']);
           seen.push(ok);
           seen.push(t.pending('one line', 'two\n\nlines', 'pending_split', 'Description control shape'));
         },
@@ -1257,10 +1257,19 @@ try {
       assert.deepEqual(record.pendingDecisions.map(d => [d.code, d.actual]), [['pending_split', 'one line']], 'a pending ruling is recorded, not failed');
       assert.equal(run.fatal, null);
       for (const key of ['optA', 'offlineQueue', 'offlineQueuePause']) assert(run.snapshotKeys.includes(key), 'a module restores ' + key + ' when it ends');
+      assert.equal(record.failure.part, 'first', 'the failure names its part');
+      run.selected = [mod];
       run.runDir = mkdtempSync(join(dir, 'parts-'));
       run.summaryPath = join(run.runDir, 'summary.zh.md');
       run.writeSummary();
       const summary = readFileSync(run.summaryPath, 'utf8');
+      // A feature takes the verdict of the parts that name it; one no part
+      // names follows the module.
+      assert(/- 通过（1）：f-second\n/.test(summary), 'a passed part\'s feature passes');
+      assert(summary.includes('- 未通过 f-first：linkding.parts.check') && summary.includes('- 未通过 f-outside：linkding.parts.check'), 'the failed part\'s feature and an unmapped one fail');
+      const strayRun = partRun();
+      const strayMod = { ...mod, id: 'linkding.parts.stray', async steps(t) { await t.part('stray', ['G1'], async () => {}, ['not-declared']); } };
+      await assert.rejects(quiet(() => strayRun.runModule(strayMod)), e => e.code === 'part_feature_undeclared');
       assert(summary.includes('分段：first 失败于 first_phase，first_failed（依赖 G1）；second 通过（依赖 G2）'), 'the summary names each part with its own fix groups');
       assert(summary.includes('linkding.parts.check 待裁定：pending_split（Description control shape'), 'the summary lists pending rulings');
       const fatalRun = partRun();
