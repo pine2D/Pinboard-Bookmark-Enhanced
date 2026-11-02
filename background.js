@@ -1472,16 +1472,26 @@ async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth)
     // ordinary save's skip intent can still safely enter the offline queue.
     return { result: pbpSaveFailure(lookup.reason || "lookup") };
   }
-  if (action === "edit" && pbpSelfHostedAuth(auth)) {
+  if (action === "edit") {
+    // Same entry rule as the popup for each service: self-hosted text uses the
+    // quoted syntax, Pinboard splits on whitespace and keeps quotes literally.
+    const selfHosted = pbpSelfHostedAuth(auth);
     let names;
-    try { names = pbpBookmarkParseTags(draft.tags); }
-    catch (_) { return { result: pbpSaveFailure("invalid") }; }
-    const bookmarkNames = Array.isArray(lookup.post?.tagNames) ? lookup.post.tagNames : [];
+    if (selfHosted) {
+      try { names = pbpBookmarkParseTags(draft.tags); }
+      catch (_) { return { result: pbpSaveFailure("invalid") }; }
+    } else {
+      names = String(draft.tags || "").split(/\s+/).filter(Boolean);
+    }
+    const bookmarkNames = selfHosted
+      ? (Array.isArray(lookup.post?.tagNames) ? lookup.post.tagNames : [])
+      : String(lookup.post?.tags || "").split(/\s+/).filter(Boolean);
     const index = await pbpReadTagVocab(auth.account);
     if (!pbpBookmarkAuthIsCurrent(auth)) return { result: pbpSaveFailure("account_changed") };
-    const tagContext = { bookmarkNames, index, service: auth.service,
+    const service = selfHosted ? auth.service : "pinboard";
+    const tagContext = { bookmarkNames, index, service,
       separator: settings.aiTagSeparator, respectCase: settings.optRespectTagCase === true };
-    draft = { ...draft, tags: pbpSerializeIntentTags(pbpCanonicalTagList(names, tagContext), auth.service) };
+    draft = { ...draft, tags: pbpSerializeIntentTags(pbpCanonicalTagList(names, tagContext), service) };
   }
   if (!lookup.exists) {
     if (action === "read") return { result: pbpSaveFailure("lookup") };

@@ -259,6 +259,24 @@ await test("self-hosted malformed quotes fail before dispatch while Pinboard kee
   const ok = await pin.pbpPrepareReaderSaveIntent(base(),"edit",{title:"T",notes:"",tags:'literal"tag',private:true,toread:false},{pinboardToken:pin.env.token},{account:"alice",service:"pinboard",epoch:1});
   equal(ok.intent.tags,'literal"tag');
 });
+await test("Pinboard reader edit splits on whitespace, keeps literal quotes and aligns to the bookmark and library spelling", async () => {
+  const settings = { pinboardToken: "alice:new-token", optRespectTagCase: true, aiTagSeparator: "-" };
+  for (const [post, vocab, tags, expected] of [
+    [null, { JavaScript: 9, javascript: 1 }, "javascript", "JavaScript"],
+    [null, { JavaScript: 9 }, '  javascript   "quoted"  say"hi  JAVASCRIPT\tnew-tag ', 'JavaScript "quoted" say"hi new-tag'],
+    [null, {}, '"machine learning"', '"machine learning"'],
+    [{ ...POST, tags: "server two" }, { Server: 50 }, "SERVER Two extra", "server two extra"],
+  ]) {
+    const h = await harness({ post, vocab });
+    const prepared = await h.pbpPrepareReaderSaveIntent(base(), "edit", { title: "T", notes: "", tags, private: true, toread: false }, settings, { account: "alice", service: "pinboard", epoch: 1 });
+    equal(prepared.intent.tags, expected);
+    equal(prepared.intent.mode, post ? "update" : "create");
+  }
+  const off = await harness({ post: null, vocab: { JavaScript: 9 } });
+  const kept = await off.pbpPrepareReaderSaveIntent(base(), "edit", { title: "T", notes: "", tags: "javascript JavaScript", private: true, toread: false },
+    { ...settings, optRespectTagCase: false }, { account: "alice", service: "pinboard", epoch: 1 });
+  equal(kept.intent.tags, "javascript");
+});
 await test("owner change during lookup cancels prepared mutation", async () => {
   const h = await harness(); h.env.onLookup = () => { h.env.account = "bob"; h.env.epoch++; }; const p = await h.pbpPrepareReaderSaveIntent(base(), "read", null, { pinboardToken: h.env.token }, { account: "alice", epoch: 1 }); equal(p.result.reason, "account_changed");
 });
