@@ -20,8 +20,12 @@
 //             snapshot. Temporary linkding instances start with automatic
 //             snapshots off; the runner switches them on for such a module
 //             only. A user instance keeps its own profile setting.
-//   budget    { bookmarks, urls, node, browser, ai, tags, lists, seconds }
+//   budget    { bookmarks, urls, node, browser, ai, tags, lists, seconds, tagReads }
 //             any field may be a number or { <service>: number }
+//             tagReads: full tag-list reads the extension makes in one pass
+//             (measured on temporary instances: report.modules[].paths
+//             "GET tags"). The browser budget covers each at TAG_PAGES
+//             pages; a user library with more pages raises it at run time.
 //   settings  chrome.storage.local overrides applied for this module only
 //   steps(t)  drives the extension; verify(t) reads back (optional)
 //
@@ -100,7 +104,7 @@ export const MODULES = [
     surfaces: ['options', 'popup'],
     features: ['connect', 'tags-recent', 'popup-prefill'],
     needs: needs({ writes: false }),
-    budget: { bookmarks: 0, urls: 1, node: 4, browser: { linkding: 40, karakeep: 60, pinboard: 12 }, ai: 0, tags: 0, seconds: 60, calls: { pinboard: 4 } },
+    budget: { bookmarks: 0, urls: 1, node: 4, browser: { linkding: 40, karakeep: 60, pinboard: 12 }, ai: 0, tags: 0, seconds: 60, calls: { pinboard: 4 }, tagReads: { linkding: 2, karakeep: 2 } },
     settings: {},
     async steps(t) {
       await t.phase('readonly_extension');
@@ -258,7 +262,7 @@ export const MODULES = [
     surfaces: ['background'],
     features: ['worker-create', 'worker-merge', 'worker-conflict', 'archived-preserved', 'tags-recent', 'pinboard-required', 'shared-library'],
     needs: needs(),
-    budget: { bookmarks: 1, urls: 1, node: { linkding: 20, karakeep: 12, pinboard: 6 }, browser: { linkding: 30, karakeep: 40, pinboard: 16 }, ai: 0, tags: 2, seconds: { linkding: 60, karakeep: 60, pinboard: 90 }, calls: { pinboard: 9 } },
+    budget: { bookmarks: 1, urls: 1, node: { linkding: 20, karakeep: 12, pinboard: 6 }, browser: { linkding: 30, karakeep: 40, pinboard: 16 }, ai: 0, tags: 2, seconds: { linkding: 60, karakeep: 60, pinboard: 90 }, calls: { pinboard: 9 }, tagReads: { linkding: 1, karakeep: 1 } },
     settings: {},
     async steps(t) {
       const { prefix } = t;
@@ -383,7 +387,7 @@ export const MODULES = [
     surfaces: ['popup', 'reader'],
     features: ['native-space-tag', 'tag-spelling-alignment', 'malformed-quote', 'library-majority', 'no-twin-tags'],
     needs: needs(),
-    budget: { bookmarks: 4, urls: 4, node: 30, browser: 120, ai: 0, tags: 5, seconds: 90 },
+    budget: { bookmarks: 4, urls: 4, node: 30, browser: 120, ai: 0, tags: 5, seconds: 90, tagReads: 4 },
     settings: { optBlockquote: true, optAutoDescription: true, optRespectTagCase: true, tagSyncMode: 'fresh' },
     async steps(t) {
       const { prefix } = t;
@@ -465,7 +469,7 @@ export const MODULES = [
     surfaces: ['popup'],
     features: ['selection-quote-escape', 'quote-description-separate', 'unread-link'],
     needs: needs(),
-    budget: { bookmarks: 1, urls: 1, node: 4, browser: 40, ai: 0, tags: 0, seconds: 60 },
+    budget: { bookmarks: 1, urls: 1, node: 4, browser: 40, ai: 0, tags: 0, seconds: 60, tagReads: 1 },
     settings: { optBlockquote: true, optAutoDescription: true, optRespectTagCase: true, tagSyncMode: 'fresh' },
     async steps(t) {
       await t.phase('linkding_quote_and_unread');
@@ -499,7 +503,7 @@ export const MODULES = [
     surfaces: ['popup'],
     features: ['offline-queue', 'offline-create-fields', 'offline-update-fields', 'explicit-empty-description'],
     needs: needs(),
-    budget: { bookmarks: 1, urls: 1, node: 6, browser: 60, ai: 0, tags: 1, seconds: 90 },
+    budget: { bookmarks: 1, urls: 1, node: 6, browser: 60, ai: 0, tags: 1, seconds: 90, tagReads: 2 },
     settings: { optBlockquote: true, optAutoDescription: true, optRespectTagCase: true, tagSyncMode: 'fresh', offlineQueueEnabled: true },
     async steps(t) {
       const { prefix } = t;
@@ -698,7 +702,7 @@ export const MODULES = [
     // asserts only what must hold before and after the planned fix: no
     // reported success and no request storm.
     needs: needs({ target: 'temp', container: 'linkding-pg', shots: true }),
-    budget: { bookmarks: 2, urls: 2, node: 12, browser: 80, ai: 0, tags: 1, seconds: 120 },
+    budget: { bookmarks: 2, urls: 2, node: 12, browser: 80, ai: 0, tags: 1, seconds: 120, tagReads: 1 },
     settings: { offlineQueueEnabled: true },
     async steps(t) {
       const { prefix } = t;

@@ -277,15 +277,26 @@ export function resolveBudget(mod) {
   return {
     bookmarks, urls: Math.max(bookmarks, budgetValue(b.urls, s)), node: budgetValue(b.node, s),
     browser: budgetValue(b.browser, s), ai: budgetValue(b.ai, s), tags: budgetValue(b.tags, s),
-    lists: budgetValue(b.lists, s), seconds: budgetValue(b.seconds, s),
+    lists: budgetValue(b.lists, s), seconds: budgetValue(b.seconds, s), tagReads: budgetValue(b.tagReads, s),
     // Expected Pinboard requests (extension and Node) of one pass, measured
     // on the mock: the throttle floor --plan shows. Not a cap.
     calls: budgetValue(b.calls, s),
   };
 }
 
+// A service's tag list, page by page: the page size the extension and the
+// cleanup sweep use, the pages each module's browser budget already covers
+// per tag-list read (linkding budgets were measured with one page; Karakeep's
+// leave room for six, the user's library being about five), the pages
+// cleanupCost assumes for its sweep and verify pass, and the most pages a
+// run accepts (the cleanup sweep's own pagination limits).
+export const TAG_PAGES = Object.freeze({
+  linkding: Object.freeze({ perPage: 100, browser: 1, cleanup: 2, limit: 99 }),
+  karakeep: Object.freeze({ perPage: 1000, browser: 6, cleanup: 6, limit: 20 }),
+});
+
 // Requests cleanup and its read-only verification may need for one instance.
-export function cleanupCost({ service, bookmarks = 0, urls = 0, tags = 0, lists = 0 }) {
+export function cleanupCost({ service, bookmarks = 0, urls = 0, tags = 0, lists = 0, tagPages: measuredPages = 0 }) {
   // Pinboard: posts/delete + posts/get per ledger bookmark (delete answers
   // "item not found" for nothing, so no read first), at most one posts/get
   // per pool URL (a URL read empty after the browser closed is not read
@@ -293,7 +304,7 @@ export function cleanupCost({ service, bookmarks = 0, urls = 0, tags = 0, lists 
   // tag is left (Pinboard drops a tag with its last bookmark), and the
   // margin of the other services.
   if (service === 'pinboard') return 2 * bookmarks + urls + 1 + 2;
-  const tagPages = service === 'karakeep' ? 6 : 2;
+  const tagPages = Math.max(TAG_PAGES[service]?.cleanup || 2, measuredPages);
   const tagCost = service === 'linkding' ? 4 * tags : 2 * tags;
   // ledger bookmarks: GET + DELETE + GET; pool: check each URL once, then a
   // read-only pass; lists: GET + members + DELETE + GET; tags: DELETE + GET,
@@ -301,12 +312,41 @@ export function cleanupCost({ service, bookmarks = 0, urls = 0, tags = 0, lists 
   return 3 * bookmarks + 2 * urls + 4 * lists + tagCost + 2 * tagPages + 2;
 }
 
-export function preflightCost({ service, urls = 0, writes = false }) {
+export function preflightCost({ service, urls = 0, writes = false, target = 'temp' }) {
   // Pinboard has no health endpoint: one posts/get of the first pool URL
   // proves the token. The others carry the same fresh run id, so they
   // cannot exist either.
   if (service === 'pinboard') return Math.min(urls, 1);
-  return 2 + urls + (service === 'linkding' ? 1 : 0) + (service === 'karakeep' && writes ? 1 : 0);
+  // On the user target the tag library is measured first: linkding answers
+  // its count with one page, Karakeep is paged through (about five pages).
+  const tagCount = target === 'user' ? (service === 'linkding' ? 1 : TAG_PAGES.karakeep.browser) : 0;
+  return 2 + urls + (service === 'linkding' ? 1 : 0) + (service === 'karakeep' && writes ? 1 : 0) + tagCount;
+}
+
+// An instance's budgets once its tag library is known to span `pages` pages
+// (row: a buildPlan budget row). Every tag-list read past the pages the
+// module budgets cover costs one browser request per extra page; the
+// cleanup sweep and its verify pass read every page. Refused past the caps
+// or past the cleanup sweep's own pagination limit.
+export function tagPageBudget(row, pages) {
+  const spec = TAG_PAGES[row?.service];
+  if (!spec) return null;
+  const extraPages = Math.max(0, pages - spec.browser);
+  const browser = row.browser + (row.tagReads || 0) * extraPages;
+  const cleanupReserve = Math.max(row.caps.cleanupReserve, cleanupCost({ service: row.service, bookmarks: row.bookmarks, urls: row.urls, tags: row.tags, lists: row.lists, tagPages: pages }));
+  const problems = [];
+  if (pages > spec.limit) problems.push('tag_pages');
+  if (browser > row.caps.browser) problems.push('browser');
+  if (row.node + cleanupReserve > row.caps.node) problems.push('node');
+  return { pages, perPage: spec.perPage, assumedPages: spec.browser, extraPages, tagReads: row.tagReads || 0, browser, browserCap: row.caps.browser, cleanupReserve, node: row.node, nodeCap: row.caps.node, ok: !problems.length, problems };
+}
+// The most tag pages an instance's plan stays within its caps at (0: none).
+export function maxTagPages(row) {
+  const spec = TAG_PAGES[row?.service];
+  if (!spec || !tagPageBudget(row, 1).ok) return 0;
+  let pages = 1;
+  while (pages < spec.limit && tagPageBudget(row, pages + 1).ok) pages++;
+  return pages;
 }
 
 export function poolUrls(target, runId, instance, count) {
@@ -325,7 +365,7 @@ export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnable
     const service = mods[0].service;
     const cap = caps[instance];
     if (!cap) { problems.push(instance + ':no_budget'); continue; }
-    const sum = { bookmarks: 0, urls: 0, node: 0, browser: CONNECT_BROWSER[service] || 0, ai: 0, tags: 0, lists: 0, seconds: 0, calls: 0 };
+    const sum = { bookmarks: 0, urls: 0, node: 0, browser: CONNECT_BROWSER[service] || 0, ai: 0, tags: 0, lists: 0, seconds: 0, calls: 0, tagReads: 0 };
     for (const mod of mods) {
       const b = resolveBudget(mod);
       for (const key of Object.keys(sum)) sum[key] += key === 'browser' ? b.browser : b[key];
@@ -333,13 +373,19 @@ export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnable
     const writes = mods.some(m => m.needs?.writes !== false);
     const urls = sum.urls ? sum.urls + (writes ? caps.run.urlMargin : 0) : 0;
     const reserve = Math.max(cap.cleanupReserve, cleanupCost({ service, bookmarks: sum.bookmarks, urls, tags: sum.tags, lists: sum.lists }));
-    const node = preflightCost({ service, urls, writes }) + sum.node;
+    const node = preflightCost({ service, urls, writes, target }) + sum.node;
     fakeAiCalls += sum.ai;
     const row = {
       service, modules: mods.map(m => m.id), bookmarks: sum.bookmarks, urls, node, cleanupReserve: reserve,
-      browser: sum.browser, ai: sum.ai, tags: sum.tags, lists: sum.lists, moduleSeconds: sum.seconds,
+      browser: sum.browser, ai: sum.ai, tags: sum.tags, lists: sum.lists, moduleSeconds: sum.seconds, tagReads: sum.tagReads,
       caps: { bookmarks: cap.bookmarks, node: cap.node, cleanupReserve: cap.cleanupReserve, browser: cap.browser, tags: cap.tags, lists: cap.lists },
     };
+    // The user's tag library is counted by the read-only preflight; past
+    // maxPagesWithinCaps pages the run is refused before any write.
+    if (target === 'user' && TAG_PAGES[service]) {
+      const spec = TAG_PAGES[service];
+      row.tagPages = { perPage: spec.perPage, assumedPages: spec.browser, cleanupPages: spec.cleanup, tagReads: sum.tagReads, maxPagesWithinCaps: maxTagPages(row), measuredAt: 'preflight' };
+    }
     if (sum.bookmarks > cap.bookmarks) problems.push(instance + ':bookmarks');
     // Each pool URL can hold a run bookmark (the guards create pool URLs
     // only), so a pool larger than the cap offers more than the run may make.
@@ -2015,10 +2061,48 @@ export class LiveRun {
         this.report.instances[instance].autoAi = config?.inference ? { tagging: config.inference.enableAutoTagging, summarization: config.inference.enableAutoSummarization } : null;
         if (writes) check(karakeepAutoAiOff(config), 'karakeep_auto_ai_not_verified_off');
       }
-      this.report.checks.push(instance + ': health, authentication, unique URLs' + (inst.service === 'karakeep' && writes ? ', server auto AI off' : ''));
+      if (this.target === 'user') await this.checkTagPages(instance);
+      this.report.checks.push(instance + ': health, authentication, unique URLs' + (inst.service === 'karakeep' && writes ? ', server auto AI off' : '') + (this.target === 'user' ? ', tag pages' : ''));
       this.persist();
       console.log(instance + ': readonly preflight passed');
     }
+  }
+
+  // The user's tag library, counted before any write: linkding answers its
+  // count on one page, Karakeep is paged through (counting rows, keeping no
+  // name) until it ends or passes what the plan can take. The browser budget
+  // and the cleanup reserve are then recomputed for the pages found; past
+  // the caps the run is refused here (tag_pages_over_budget).
+  async checkTagPages(instance) {
+    const inst = this.instances[instance];
+    const row = this.plan.budget[instance];
+    const spec = TAG_PAGES[inst.service];
+    if (!spec || !row) return;
+    const most = maxTagPages(row);
+    let tags = 0, pages = 0, complete = true;
+    if (inst.service === 'linkding') {
+      const data = await this.api(instance, 'tags/?limit=1');
+      tags = Number(data?.count);
+      check(Number.isInteger(tags) && tags >= 0, 'tag_count_shape');
+      pages = Math.max(1, Math.ceil(tags / spec.perPage));
+    } else {
+      let cursor = '';
+      do {
+        const data = await this.api(instance, 'tags?limit=' + spec.perPage + (cursor ? '&cursor=' + encodeURIComponent(cursor) : ''));
+        check(Array.isArray(data?.tags), 'tag_count_shape');
+        pages++;
+        tags += data.tags.length;
+        cursor = typeof data.nextCursor === 'string' ? data.nextCursor : '';
+      } while (cursor && pages <= most);
+      // Stopped early: at least this many.
+      if (cursor) complete = false;
+    }
+    const budget = tagPageBudget(row, pages);
+    (this.report.tagPages ||= {})[instance] = { tags, complete, maxPagesWithinCaps: most, ...budget };
+    this.persist();
+    check(budget.ok, 'tag_pages_over_budget');
+    this.reserve[instance] = budget.cleanupReserve;
+    (this.tagExtraPages ||= {})[instance] = budget.extraPages;
   }
 
   async startFakeAi() {
@@ -2549,6 +2633,8 @@ export class LiveRun {
     this.throwIfFatal();
     check(this.ctx, 'browser_closed', true);
     const budget = resolveBudget(mod);
+    // Each tag-list read costs one request per page past what the budget covers.
+    budget.browser += budget.tagReads * (this.tagExtraPages?.[mod.instance] || 0);
     const record = { id: mod.id, instance: mod.instance, status: 'running', started: new Date().toISOString(), ms: 0, checks: [], notes: {}, failure: null, counts: {}, timing: { waitMs: 0, throttleMs: 0 } };
     this.report.modules.push(record);
     this.persist();
@@ -3114,6 +3200,9 @@ export class LiveRun {
       const queue = r.findings.filter(f => f.kind === 'pinboard_queue');
       if (th?.slowQueued) lines.push(`  - 排队超过 ${PINBOARD_QUEUE_WARN_MS / 1000}s 的请求 ${th.slowQueued} 个（扩展单请求超时 15s，此时的超时多半是工具造成的）：${queue.slice(0, 3).map(f => `${f.module || f.phase} ${sec(f.queuedMs)}`).join('，')}`);
     }
+    for (const [instance, tp] of Object.entries(r.tagPages || {})) {
+      lines.push(`- 标签页数：${instance} ${tp.tags}${tp.complete === false ? '+' : ''} 个标签，${tp.pages} 页（每页 ${tp.perPage}，模块预算按 ${tp.assumedPages} 页，上限 ${tp.maxPagesWithinCaps} 页）；浏览器预算 ${tp.browser}/${tp.browserCap}，清理预留 ${tp.cleanupReserve}${tp.ok ? '' : `；超出上限（${(tp.problems || []).join('、')}），未开跑`}`);
+    }
     if (r.stages?.length) lines.push(`- 阶段耗时：${r.stages.map(st => `${st.name} ${sec(st.ms)}${st.ok ? '' : '（失败）'}`).join('，')}`);
     const tt = r.timing?.totals || {};
     // timingSummary() runs in conclude(); a run cut off before it has none.
@@ -3498,6 +3587,8 @@ function printHelp() {
     '  --target user also requires --authorization LABEL: at most 3 rounds per label, counted in the state directory;',
     '  --plan --target user --authorization LABEL shows the rounds used and left. --cleanup never uses a round.',
     '--plan prints modules, budgets, URLs, containers, headed and shot needs without credentials, network, browser or Docker.',
+    '  On --target user each linkding / Karakeep row shows tagPages.maxPagesWithinCaps: the read-only preflight counts the',
+    '  user\'s tag pages first, recomputes the browser budget and cleanup reserve, and refuses the run past that many.',
     '--list prints module ids. --service linkding,karakeep[,pinboard] filters. --read-only = --scenario readonly.',
     '  On --target user linkding.core.snapshot runs only when named exactly (the harness cannot read the user\'s',
     '  automatic HTML snapshot switch); groups and globs skip it with that reason in --plan and the summary.',

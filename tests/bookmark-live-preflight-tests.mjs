@@ -336,6 +336,22 @@ try {
     const plan = live.buildPlan({ target: 'user', selected, skipped });
     assert.deepEqual(plan.budget.linkding.caps, { bookmarks: 15, node: 250, cleanupReserve: 60, browser: 350, tags: 20, lists: 0 });
     assert.deepEqual(plan.budget.karakeep.caps, { bookmarks: 12, node: 250, cleanupReserve: 60, browser: 500, tags: 20, lists: 1 });
+    // Tag pages (main-session ruling on H1b): the plan states how many pages
+    // of the user's tag library it can take; the preflight counts them.
+    // linkding: six tag-list reads at 100 a page, 330/350 browser requests
+    // planned, so four pages; Karakeep's budgets cover six pages of 1000.
+    const ld = plan.budget.linkding, kk = plan.budget.karakeep;
+    assert.deepEqual([ld.tagPages.perPage, ld.tagPages.assumedPages, ld.tagPages.tagReads, ld.tagPages.maxPagesWithinCaps], [100, 1, 6, 4]);
+    assert.deepEqual([kk.tagPages.perPage, kk.tagPages.assumedPages, kk.tagPages.maxPagesWithinCaps >= 6], [1000, 6, true]);
+    assert.deepEqual(live.tagPageBudget(ld, 4).problems, []);
+    assert.deepEqual([live.tagPageBudget(ld, 4).browser, live.tagPageBudget(ld, 5).problems], [ld.browser + 18, ['browser']]);
+    assert.deepEqual(live.tagPageBudget(kk, 5).extraPages, 0, 'the user Karakeep library (about five pages) costs nothing extra');
+    assert.deepEqual(live.tagPageBudget(ld, 200).problems, ['tag_pages', 'browser', 'node']);
+    assert.equal(live.cleanupCost({ service: 'linkding', tagPages: 10 }) - live.cleanupCost({ service: 'linkding' }), 16, 'the sweep and verify pass read every page');
+    assert(live.tagPageBudget(ld, 3).cleanupReserve >= live.cleanupCost({ service: 'linkding', bookmarks: ld.bookmarks, urls: ld.urls, tags: ld.tags, lists: ld.lists, tagPages: 3 }));
+    // The temporary target counts nothing: its libraries hold the run's tags only.
+    const tempPlan = live.buildPlan({ target: 'temp', ...live.selectModules('all', { target: 'temp' }) });
+    assert(Object.values(tempPlan.budget).every(row => row.tagPages === undefined));
     assert.deepEqual([plan.limits.runMinutes, plan.limits.moduleSeconds, plan.limits.fakeAi, plan.limits.automaticRetries], [20, 120, 60, 0]);
     assert.deepEqual(plan.skipped.map(s => s.reason), ['snapshot_setting_unreadable', 'target_temp', 'target_temp'], 'the snapshot module and temp-only modules are skipped on the user target');
     // Named exactly next to all, the snapshot module still fits the caps.
@@ -1475,6 +1491,34 @@ try {
     assert(lines.some(l => l.includes('quick_save_quote_format：期望 > First line > > # Heading')), text);
     assert(lines.every(l => l.length <= 400), 'snippets are cut short');
   }
+  // Karakeep has no tag count: the preflight pages through, counting rows
+  // only, and stops as soon as it has passed what the plan can take.
+  {
+    const kTagRequests = [];
+    const kServer = createServer((req, res) => {
+      const url = new URL(req.url, 'http://x');
+      kTagRequests.push(url.pathname + (url.searchParams.get('cursor') ? '?cursor' : ''));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      const n = kTagRequests.length;
+      res.end(JSON.stringify({ tags: Array.from({ length: 1000 }, (_, i) => ({ id: 't' + n + '-' + i, name: 'tag' + i, numBookmarks: 1, numBookmarksByAttachedType: { ai: 0, human: 1 } })), nextCursor: 'c' + n }));
+    });
+    const kPort = await listen(kServer);
+    const kBase = `http://127.0.0.1:${kPort}/`;
+    const kRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    const { selected, skipped } = live.selectModules('karakeep.*', { target: 'user' });
+    kRun.target = 'user';
+    kRun.plan = live.buildPlan({ target: 'user', selected, skipped });
+    kRun.instances.karakeep = { id: 'karakeep', service: 'karakeep', base: kBase, root: live.apiRootFor('karakeep', kBase), token: 'k'.repeat(40) };
+    kRun.caps = { karakeep: live.BUDGETS.user.karakeep };
+    kRun.reserve = { karakeep: kRun.plan.budget.karakeep.cleanupReserve };
+    const most = kRun.plan.budget.karakeep.tagPages.maxPagesWithinCaps;
+    await assert.rejects(kRun.checkTagPages('karakeep'), e => e.code === 'tag_pages_over_budget');
+    assert.equal(kTagRequests.length, most + 1, 'stops one page past the maximum');
+    assert.deepEqual([kRun.report.tagPages.karakeep.complete, kRun.report.tagPages.karakeep.tags, kRun.report.tagPages.karakeep.ok], [false, 1000 * (most + 1), false]);
+    assert(!JSON.stringify(kRun.report.tagPages).includes('tag1'), 'no tag name is kept');
+    await closeServer(kServer);
+  }
+
   // Review of H1b r2, notes: a failed feature names its failed modules and
   // its interrupted ones apart; a run with no stage says nothing of stage
   // times; residue names each tag and why it is residue (an id the ledger
@@ -2031,7 +2075,7 @@ try {
   // ---------------------------------------------------------------------
   const linkdingState = stateDirFor('linkding');
   const requests = [];
-  let allowAuthentication = false, hang = false;
+  let allowAuthentication = false, hang = false, tagCount = null;
   const store = { bookmarks: new Map(), tags: new Map() };
   const server = createServer((req, res) => {
     const path = req.url.split('?')[0];
@@ -2059,7 +2103,7 @@ try {
       if (req.method === 'GET') return json(200, row);
       if (req.method === 'DELETE') { store.tags.delete(tag[1]); res.writeHead(204); return res.end(); }
     }
-    if (path === '/api/tags/') return json(200, { count: store.tags.size, next: null, previous: null, results: [...store.tags.values()] });
+    if (path === '/api/tags/') return json(200, { count: tagCount ?? store.tags.size, next: null, previous: null, results: [...store.tags.values()] });
     if (path === '/api/bookmarks/' || path === '/api/bookmarks/archived/') return json(200, { count: 0, next: null, previous: null, results: [] });
     return json(404, { detail: 'Unknown fixture route' });
   });
@@ -2095,6 +2139,26 @@ try {
   assert(success.report.stages.every(s => Number.isInteger(s.ms) && s.ms >= 0 && !Number.isNaN(Date.parse(s.started))));
   assert.match(summaryText, /阶段耗时：credentials \d+\.\ds，preflight \d+\.\ds，browser_start \d+\.\ds，connect:linkding \d+\.\ds，cleanup \d+\.\ds/);
   assert.equal(statSync(join(success.reportPath, '..', 'summary.zh.md')).mode & 0o777, 0o600);
+  // The tag library was counted, by its count alone, before the browser.
+  assert.deepEqual([success.report.tagPages.linkding.pages, success.report.tagPages.linkding.ok, success.report.tagPages.linkding.extraPages], [1, true, 0]);
+  assert.match(summaryText, /标签页数：linkding 0 个标签，1 页/);
+  // A library past what the plan can take is refused in the read-only
+  // preflight: no browser, no module, no write; the plan's maximum and the
+  // count are in the report and the summary.
+  tagCount = 100000;
+  requests.length = 0;
+  const tooMany = await run(readOnlyArgs, { guard: false, state: linkdingState });
+  tagCount = null;
+  assert.equal(tooMany.code, 1);
+  assert.equal(tooMany.report.failure.code, 'tag_pages_over_budget');
+  assert.deepEqual(tooMany.report.modules, []);
+  assert(!tooMany.report.stages.some(st => st.name === 'browser_start'), 'refused before the browser');
+  assert(requests.every(q => q.method === 'GET'));
+  assert.equal(requests.filter(q => q.path === '/api/tags/').length, 1, 'one count read; nothing was written, so no cleanup sweep');
+  const overPages = tooMany.report.tagPages.linkding;
+  assert.deepEqual([overPages.tags, overPages.pages, overPages.ok, overPages.maxPagesWithinCaps], [100000, 1000, false, tooMany.report.plan.instances.linkding.tagPages.maxPagesWithinCaps]);
+  const overSummary = readFileSync(join(tooMany.reportPath, '..', 'summary.zh.md'), 'utf8');
+  assert(overSummary.includes('标签页数：linkding 100000 个标签，1000 页') && overSummary.includes('超出上限（tag_pages、browser、node），未开跑'), overSummary);
 
   // An unfinished earlier run blocks the next one before any request. The
   // report is the one a run cut off by kill -9, OOM or a crash leaves: what
