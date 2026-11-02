@@ -595,17 +595,34 @@ export function defaultDockerExec(args, { timeoutMs = 120000 } = {}) {
   });
 }
 
-export function createDocker({ runId, exec = defaultDockerExec, log = () => {} }) {
+// Once cleanup has begun (a signal, a fatal finding, the end of the run or
+// --cleanup), only the teardown may still reach Docker: removing this run's
+// containers and network, and listing what is left.
+export function isTeardownCommand(args) {
+  const [cmd, sub] = args;
+  return cmd === 'rm' || cmd === 'ps' || (cmd === 'network' && (sub === 'rm' || sub === 'ls')) || (cmd === 'volume' && sub === 'ls');
+}
+
+export function createDocker({ runId, exec = defaultDockerExec, log = () => {}, stopped = () => false }) {
   const names = tempNames(runId);
+  // Commands still running when cleanup begins (a `docker run` creating its
+  // container as a signal arrives). Removal waits for them to settle, or the
+  // container could appear after the leftover check has passed.
+  const inflight = new Set();
   const run = async (args, { allowFail = false, timeoutMs } = {}) => {
     assertDockerArgs(args, runId);
-    const result = await exec(args, { timeoutMs });
+    if (stopped() && !isTeardownCommand(args)) fail('docker_after_cleanup');
+    const pending = exec(args, { timeoutMs });
+    inflight.add(pending);
+    let result;
+    try { result = await pending; } finally { inflight.delete(pending); }
     log({ cmd: args[0] + (args[1] && !args[1].startsWith('-') && ['network', 'image', 'volume'].includes(args[0]) ? ' ' + args[1] : ''), code: result.code });
     if (result.code !== 0 && !allowFail) fail('docker_' + args[0] + '_failed');
     return result;
   };
   return {
     names, run,
+    async settle() { while (inflight.size) await Promise.allSettled([...inflight]); },
     async leftovers() {
       const out = [];
       for (const args of [['ps', '-a', '--filter', 'name=pbp-it-', '--format', '{{.Names}}'], ['network', 'ls', '--filter', 'name=pbp-it-', '--format', '{{.Name}}'], ['volume', 'ls', '--filter', 'name=pbp-it-', '--format', '{{.Name}}']]) {
@@ -1232,7 +1249,9 @@ export class LiveRun {
 
   async startTemp() {
     this.phase('temp_containers');
-    const docker = this.docker = createDocker({ runId: this.runId, exec: this.opts.dockerExec, log: entry => (this.report.temp.commands ||= []).push(entry) });
+    // After a signal or a fatal finding only the teardown reaches Docker.
+    const stopped = () => this.cleaning || !!this.fatal;
+    const docker = this.docker = createDocker({ runId: this.runId, exec: this.opts.dockerExec, log: entry => (this.report.temp.commands ||= []).push(entry), stopped });
     const names = docker.names;
     this.report.temp = { names: [], network: '', images: {}, fixture: `http://${TEMP_FIXTURE_HOST}:${TEMP_FIXTURE_PORT}`, commands: [] };
     const leftovers = await docker.leftovers();
@@ -1243,6 +1262,8 @@ export class LiveRun {
     if (need.has('linkding-pg')) images.postgres = await docker.image('postgres:18');
     this.report.temp.images = images;
     const envFile = values => {
+      // Cleanup removes env files before the containers; none may appear after.
+      check(!stopped(), 'docker_after_cleanup');
       const file = join(this.runDir, 'env-' + randomBytes(4).toString('hex'));
       writeFileSync(file, Object.entries(values).map(([k, v]) => `${k}=${v}`).join('\n') + '\n', { mode: 0o600 });
       // Only real secrets join the redaction/canary list; names, hosts and
@@ -1251,8 +1272,13 @@ export class LiveRun {
       return file;
     };
     const created = name => { this.report.temp.names.push(name); this.persist(); };
-    // Explicit subnets: Docker Desktop here has no free default pool, and an
-    // --internal network is what cuts the services off from the internet.
+    // Registered before it exists, like every container: a signal, a crash
+    // or a forced exit during `network create` must still leave --cleanup a
+    // name to remove. Explicit subnets: Docker Desktop here has no free
+    // default pool, and an --internal network is what cuts the services off
+    // from the internet.
+    this.report.temp.network = names.net;
+    this.persist();
     let netOk = false;
     for (let attempt = 0; attempt < 8 && !netOk; attempt++) {
       const third = 1 + ((parseInt(this.runId.slice(0, 2), 16) + attempt * 37) % 250);
@@ -1260,8 +1286,6 @@ export class LiveRun {
       netOk = r.code === 0;
     }
     check(netOk, 'temp_network_failed');
-    this.report.temp.network = names.net;
-    this.persist();
     const forwards = [...need].map(i => `${TEMP_INSTANCES[i].edgePort}=${names[i]}:${TEMP_INSTANCES[i].port}`).join(',');
     const publish = [...need].flatMap(i => ['-p', '127.0.0.1::' + TEMP_INSTANCES[i].edgePort]);
     created(names.edge);
@@ -2071,8 +2095,11 @@ export class LiveRun {
 
   async removeTemp() {
     const docker = this.docker;
-    const names = [...(this.report.temp?.names || [])].reverse();
     try {
+      // A command still running when cleanup began finishes first; only then
+      // are the names read, removed and the leftovers checked.
+      await docker.settle();
+      const names = [...(this.report.temp?.names || [])].reverse();
       await docker.remove(names);
       if (this.report.temp?.network) await docker.removeNetwork(this.report.temp.network);
       const left = await docker.ownLeftovers();
@@ -2365,7 +2392,7 @@ async function resumeCleanup(opts) {
       run.plan = { instances: Object.keys(run.instances) };
       await run.loadCredentials();
     }
-    if (report.target === 'temp') run.docker = createDocker({ runId: run.runId, exec: opts.dockerExec });
+    if (report.target === 'temp') run.docker = createDocker({ runId: run.runId, exec: opts.dockerExec, stopped: () => true });
     run.cleaning = true;
     run.stage = 'cleanup';
     await run.cleanupAll();

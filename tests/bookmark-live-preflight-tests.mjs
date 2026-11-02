@@ -13,7 +13,7 @@ import { spawn } from 'node:child_process';
 import { createServer, request as httpRequest } from 'node:http';
 import { EventEmitter } from 'node:events';
 import { createRequire } from 'node:module';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -49,6 +49,35 @@ for (const name of ['readFileSync','lstatSync']) {
 syncBuiltinESMExports();
 globalThis.fetch=()=>{throw new Error('network_access_blocked');};
 `);
+// A spawned temporary-target run with a scripted Docker executor, so real
+// signals and a real process.exit are exercised without a Docker daemon.
+// Every command logs "start<TAB>key<TAB>args" and "done<TAB>key"; the keys in
+// the JSON argument (key -> ms) are held that long before they answer.
+const dockerChild = join(dir, 'docker-child.mjs');
+writeFileSync(dockerChild, `import { appendFileSync } from 'node:fs';
+const [runner, log, holdSpec, ...argv] = process.argv.slice(2);
+const live = await import(runner);
+const holds = JSON.parse(holdSpec);
+const keyOf = args => {
+  const name = args.includes('--name') ? args[args.indexOf('--name') + 1].replace(/^pbp-it-[0-9a-f-]{36}-/, '') : '';
+  return args[0] + (args[1] && !args[1].startsWith('-') && ['network', 'image', 'volume'].includes(args[0]) ? ' ' + args[1] : '') + (name ? ':' + name : '');
+};
+const exec = async args => {
+  const key = keyOf(args);
+  appendFileSync(log, 'start\\t' + key + '\\t' + JSON.stringify(args) + '\\n');
+  if (holds[key]) await new Promise(r => setTimeout(r, holds[key]));
+  appendFileSync(log, 'done\\t' + key + '\\n');
+  const [cmd, sub] = args;
+  const ok = (stdout = '') => ({ code: 0, stdout, stderr: '' });
+  if (cmd === 'ps' || (cmd === 'network' && sub === 'ls') || (cmd === 'volume' && sub === 'ls')) return ok('');
+  if (cmd === 'inspect' && args[2] === '{{.Image}}') return ok('sha256:' + 'a'.repeat(64) + '\\n');
+  if (cmd === 'inspect') return ok('running 0\\n');
+  if (cmd === 'image') return ok('sha256:' + 'c'.repeat(64) + '\\n');
+  if (cmd === 'port') return ok('127.0.0.1:9\\n');
+  return ok('');
+};
+process.exitCode = await live.main(argv, { dockerExec: exec });
+`);
 const stateDirFor = name => { const d = join(dir, 'state-' + name); mkdirSync(d, { recursive: true, mode: 0o700 }); return d; };
 const secretValues = [syntheticKey, syntheticKarakeepKey];
 
@@ -79,6 +108,36 @@ async function run(args, { guard = true, credentials = true, state = stateDirFor
     report = JSON.parse(raw);
   }
   return { code, output, report, reportPath };
+}
+
+// Runs docker-child.mjs in `state` and sends one SIGINT each time the Docker
+// log gains a line starting with the next entry of `signals` (marking it in
+// the log as "signal"). Returns the exit code, the log lines and the report.
+async function dockerChildRun({ state, args, holds = {}, signals = [] }) {
+  const log = join(state, 'docker.log');
+  writeFileSync(log, '');
+  const runner = new URL('../scripts/bookmark-service-live.mjs', import.meta.url).href;
+  const child = spawn(process.execPath, ['--import', hook, dockerChild, runner, log, JSON.stringify(holds), ...args], {
+    cwd: root, stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, PATH: binDir + ':' + process.env.PATH, PBP_LIVE_STATE_DIR: state },
+  });
+  let output = '', closed = false;
+  child.stdout.on('data', chunk => { output += chunk; });
+  child.stderr.on('data', chunk => { output += chunk; });
+  const exit = new Promise(resolve => child.on('close', (c, signal) => { closed = true; resolve(c ?? signal); }));
+  const lines = () => readFileSync(log, 'utf8').split('\n').filter(Boolean);
+  for (const prefix of signals) {
+    const end = Date.now() + 20000;
+    while (!closed && Date.now() < end && !lines().some(l => l.startsWith(prefix))) await new Promise(r => setTimeout(r, 20));
+    if (closed || Date.now() >= end) break;
+    appendFileSync(log, 'signal\tSIGINT\n');
+    child.kill('SIGINT');
+  }
+  const code = await exit;
+  assert(!existsSync(dockerMarker), 'the scripted run reached the docker binary');
+  const runDirs = readdirSync(state).filter(n => /^pbp-it-[0-9a-f-]{36}$/.test(n));
+  const reportPath = runDirs.length === 1 ? join(state, runDirs[0], 'report.json') : '';
+  return { code, output, lines: lines(), reportPath, report: reportPath ? JSON.parse(readFileSync(reportPath, 'utf8')) : null };
 }
 
 function httpCall({ port, method = 'POST', path = '/v1/chat/completions', headers = {}, body }) {
@@ -891,6 +950,33 @@ try {
     assert.equal(report.failure.code, 'container_start_failed');
     assert(report.temp.logs.linkding.some(line => line.includes('[redacted]')), 'container logs are redacted');
     assert.equal(report.temp.removed, true);
+  }
+
+  // ---------------------------------------------------------------------
+  // Signals during a temporary run (real signals, scripted Docker executor)
+  // ---------------------------------------------------------------------
+  const teardown = ['rm', 'ps', 'network rm', 'network ls', 'volume ls'];
+  {
+    // SIGINT while `docker run` is still creating linkding (container start
+    // takes 9-15 s, the likeliest moment for Ctrl-C): cleanup waits for that
+    // command, every later create/run/start/exec is refused (the fixture
+    // sidecar came next), and only then are the names removed and checked.
+    const state = stateDirFor('signal-start');
+    const { code, lines, report, reportPath } = await dockerChildRun({ state, holds: { 'run:linkding': 1500 }, signals: ['start\trun:linkding\t'], args: ['--run', '--target', 'temp', '--scenario', 'linkding.readonly', '--service', 'linkding', '--allow-dirty'] });
+    assert.equal(code, 130);
+    const signalled = lines.indexOf('signal\tSIGINT');
+    const later = lines.slice(signalled + 1).filter(l => l.startsWith('start\t')).map(l => l.split('\t')[1]);
+    assert(signalled > 0 && later.length && later.every(key => teardown.includes(key)), 'only teardown reaches Docker after the signal: ' + later.join(', '));
+    const settled = lines.indexOf('done\trun:linkding'), removal = lines.findIndex(l => l.startsWith('start\trm\t'));
+    assert(settled > signalled && removal > settled, 'the in-flight run settles before anything is removed');
+    const own = live.tempNames(report.runId);
+    assert.deepEqual(JSON.parse(lines[removal].split('\t')[2]).slice(3).sort(), [own.edge, own.linkding].sort(), 'the container created during the signal is removed by name');
+    assert(lines.slice(removal).some(l => l === 'start\tnetwork rm\t' + JSON.stringify(['network', 'rm', own.net])));
+    assert.deepEqual([report.failure.code, report.temp.removed, report.cleanup.complete], ['interrupted_sigint', true, true]);
+    assert(!readdirSync(join(reportPath, '..')).some(n => n.startsWith('env-')), 'no env file is written after cleanup began');
+    assert(!existsSync(join(state, 'pbp-it-live.lock')));
+    assert(['rm', 'ps'].every(cmd => live.isTeardownCommand([cmd])) && !['run', 'create', 'start', 'exec'].some(cmd => live.isTeardownCommand([cmd])));
+    assert(live.isTeardownCommand(['network', 'rm', 'x']) && !live.isTeardownCommand(['network', 'create', 'x']) && !live.isTeardownCommand(['network', 'connect', 'x', 'y']));
   }
 
   // ---------------------------------------------------------------------
