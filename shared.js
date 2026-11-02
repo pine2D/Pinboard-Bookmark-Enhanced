@@ -234,10 +234,19 @@ function pbpFormatQuote(text, service = "pinboard") {
   // In linkding, a line opens a Markdown block when it is the first line or
   // follows a blank one; only there can indentation make a code block.
   let blockStart = true;
-  return String(text || "").split(/\r\n|\r|\n/).map((line) => {
+  let source = String(text || "");
+  // linkding deletes STX and ETX before parsing; dropping them here keeps a
+  // marker or indentation behind one from slipping past the escapes below.
+  if (service === "linkding") source = source.replace(/[\u0002\u0003]/g, "");
+  return source.split(/\r\n|\r|\n/).map((line) => {
     if (service === "linkding") {
-      // A whitespace-only line ends the paragraph, as an empty one does.
-      if (!/\S/.test(line)) { blockStart = true; return ">"; }
+      // A line linkding reads as blank ends the paragraph, as an empty one
+      // does. Blank there is Python's str.strip(): its whitespace also takes
+      // U+001C to U+001F and U+0085 but not U+FEFF, unlike JavaScript's \s.
+      if (/^[\t-\r\u001c-\u0020\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$/.test(line)) {
+        blockStart = true;
+        return ">";
+      }
       line = pbpLinkdingQuoteLine(line, blockStart);
       blockStart = false;
     }

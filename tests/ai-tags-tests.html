@@ -1953,6 +1953,17 @@ test("linkding quotes render as the selection under linkding's Markdown", () => 
     ["intro\r# heading", "> intro\n> \\# heading"],
     ["intro\r\r    code", "> intro\n>\n> &#32;   code"],
     ["Title\r===", "> Title\n> &#61;=="],
+    // linkding's blank line is Python's: str.strip() also drops U+001C to
+    // U+001F and U+0085, so a line of only those starts a block as well
+    ["first\n\u0085\n    code", "> first\n>\n> &#32;   code"],
+    ["first\n\u001c\n    code", "> first\n>\n> &#32;   code"],
+    ["first\n\u001f \u001e\n    - item", "> first\n>\n> &#32;   \\- item"],
+    // U+FEFF is no whitespace to Python: that line continues the paragraph
+    ["first\n\ufeff\n    code", "> first\n> \ufeff\n>     code"],
+    // linkding deletes STX and ETX before parsing, so the quote does too
+    ["first\n\u0002\n    code", "> first\n>\n> &#32;   code"],
+    ["\u0002    code", "> &#32;   code"],
+    ["\u0003# h\u0002", "> \\# h"],
   ];
   for (const [text, expected] of cases) {
     assertEq(pbpFormatQuote(text, "linkding"), expected, JSON.stringify(text));
@@ -1981,17 +1992,19 @@ test("no quoted linkding line can start a Markdown block or decode to other text
   // A character reference the user typed must reach linkding escaped; the
   // quote's own references are &amp; &lt; and the &#9; &#32; &#61; it writes.
   const rawRef = /&(?!amp;|lt;|#(?:9|32|61);)(?=#\d+;|#x[0-9a-f]+;|[0-9a-z]+;)/i;
-  const leads = ["", " ", "  ", "   ", "    ", "\t", " \t", "  \t", "\t\t", "1", "12"];
+  const leads = ["", " ", "  ", "   ", "    ", "\t", " \t", "  \t", "\t\t", "1", "12", "\u0002    ", " \u0003\t"];
   const marks = ["#", ">", "-", "+", "*", "=", "===", "=-=", "---", "1.", "1)", "```", "~~~", "<b>", "&amp;", "&copy", "&#X41;", "&x;", "&", "\\", "_", "[", "`", ""];
   const tails = ["", " x", "x", "  ", " & y"];
   let n = 0;
   for (const lead of leads) for (const mark of marks) for (const tail of tails) {
     const line = lead + mark + tail;
-    if (!/\S/.test(line)) continue;
+    if (!/\S/.test(line.replace(/[\u0002\u0003]/g, ""))) continue;
     const quoted = pbpFormatQuote(`prev\n\n${line}`, "linkding");
     // linkding's Markdown and a textarea both read a lone CR, or CRLF, as a
     // line break: every spelling of the break quotes the same lines.
-    for (const sep of ["\r\r", "\r\n\r\n", "\r\n\r", "\n\r", "\r\n\n"]) {
+    // So does a line linkding reads as blank: one of only characters
+    // Python strips, or STX and ETX, which it deletes.
+    for (const sep of ["\r\r", "\r\n\r\n", "\r\n\r", "\n\r", "\r\n\n", "\n\u0085\n", "\n\u001c\u001f\n", "\n \u0002\t\u0003\n", "\n\u001d\u3000\u001e\n"]) {
       assertEq(pbpFormatQuote(`prev${sep}${line}`, "linkding"), quoted, `${JSON.stringify(sep)} ${JSON.stringify(line)}`);
     }
     // At a block start, and inside a paragraph where indentation is text.
@@ -2002,7 +2015,7 @@ test("no quoted linkding line can start a Markdown block or decode to other text
       assert(!blockStart.test(body.replace(/^[ \t]+/, "")), `${JSON.stringify(line)} -> ${JSON.stringify(body)} opens a block`);
       assert(!opens || indentOf(body) < 4, `${JSON.stringify(line)} -> ${JSON.stringify(body)} opens a code block`);
       assert(!rawRef.test(body), `${JSON.stringify(line)} -> ${JSON.stringify(body)} keeps a raw &`);
-      assertEq(unescape(body), line, JSON.stringify(line));
+      assertEq(unescape(body), line.replace(/[\u0002\u0003]/g, ""), JSON.stringify(line));
     }
     n++;
   }
