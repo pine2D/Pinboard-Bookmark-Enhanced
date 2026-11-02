@@ -2001,6 +2001,31 @@ suite("shared tag canonicalization", () => {
     assertEq(pbpCanonicalTagName(" ## ", ctx({}, [], true, "karakeep")), "");
   });
 
+  test("minting is idempotent for adversarial hash and whitespace input on every service", () => {
+    const samples = ["# #foo", "  #  bar ", "##", "#", " # ", "# #tag", "machine learning", "# deep  learning  models",
+      "foo #", "a# #b", "\t#\t#\tx", "##tag", "#-x", "_#y"];
+    for (const service of ["pinboard", "linkding", "karakeep"]) {
+      for (const separator of ["-", "_"]) {
+        for (const raw of samples) {
+          const once = pbpMintTagName(raw, {service, separator});
+          assertEq(pbpMintTagName(once, {service, separator}), once, service + separator + " " + JSON.stringify(raw));
+        }
+      }
+    }
+    const kk = raw => pbpMintTagName(raw, {service: "karakeep", separator: "-"});
+    assertEq(kk("# #foo"), "foo");
+    assertEq(kk("  #  bar "), "bar");
+    assertEq(kk("##"), "");
+    assertEq(kk("# deep  learning  models"), "deep-learning-models");
+    assertEq(kk("a# #b"), "a#-#b", "only leading hashes are removed");
+    const ld = raw => pbpMintTagName(raw, {service: "linkding", separator: "_"});
+    assertEq(ld("# #foo"), "#_#foo");
+    assertEq(ld("  #  bar "), "#_bar");
+    assertEq(ld("##"), "##");
+    assertEq(ld("machine learning"), "machine_learning");
+    assertEq(pbpMintTagName("# #foo", {service: "pinboard", separator: "-"}), "#-#foo");
+  });
+
   test("alignment leaves new text untouched while canonicalization mints and can realign", () => {
     const c = ctx({Nick_Drake: 3}, [], false);
     assertEq(pbpAlignTagName("new name", c).name, "new name");

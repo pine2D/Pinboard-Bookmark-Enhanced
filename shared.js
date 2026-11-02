@@ -818,7 +818,9 @@ function pbpAlignTagName(name, ctx) {
 // behavior is outside this client-side name normalization.
 function pbpMintTagName(raw, {service, separator} = {}) {
   let name = String(raw ?? "").trim();
-  if (service === "karakeep") name = name.replace(/^#+/, "").trim();
+  // Karakeep's server drops a leading "#"; strip every leading hash and space
+  // in one pass so minting an already minted name never changes it again.
+  if (service === "karakeep") name = name.replace(/^[#\s]+/, "");
   return name.replace(/\s+/g, separator === "_" ? "_" : "-");
 }
 
