@@ -3081,6 +3081,9 @@ export class LiveRun {
     if (!existsSync(this.runDir)) return;
     const r = this.report;
     const sec = ms => (ms / 1000).toFixed(1) + 's';
+    // Text from a page or a service on one line, cut short: a multi-line
+    // value must not add lines past the cap, or a heading ("# ...").
+    const oneLine = (value, max) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
     // Built section by section (begin): past the cap, whole low-priority
     // sections go first and the cleanup section is never cut.
     const sections = {};
@@ -3125,7 +3128,7 @@ export class LiveRun {
       // Still "running": the run was cut off in this module (kill -9, OOM, a
       // crash, a second signal) before it reached a verdict.
       const verdict = m.status === 'running' ? '中断（运行在此模块中被打断，未得出结论）' : `${m.status === 'aborted' ? '中止' : '失败'}于 ${m.failure?.phase}，${m.failure?.code}`;
-      return `- ${m.id}：${verdict}；读回差异 ${diffs.length} 条${diffs[0] ? `（${diffs[0].code}：期望 ${diffs[0].expected.slice(0, 60)}，实际 ${diffs[0].actual.slice(0, 60)}）` : ''}；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；截图 ${shots[shots.length - 1]}` : ''}`;
+      return `- ${m.id}：${verdict}；读回差异 ${diffs.length} 条${diffs[0] ? `（${diffs[0].code}：期望 ${oneLine(diffs[0].expected, 60)}，实际 ${oneLine(diffs[0].actual, 60)}）` : ''}；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；截图 ${shots[shots.length - 1]}` : ''}`;
     });
     if (notStarted.length) lines.push(`- 未执行（${notStarted.length}，运行在它们开始前已停止，不算通过也不算失败）：${notStarted.join('，').slice(0, 300)}`);
     if (r.violations.length) lines.push(`- 守卫/预算触发：${r.violations.slice(0, 5).map(v => `${v.code}@${v.phase}`).join('，')}${r.violations.length > 5 ? ` 等 ${r.violations.length} 条` : ''}`);
@@ -3192,6 +3195,8 @@ export class LiveRun {
     // hand, the report path) always stays.
     const order = ['head', 'observed', 'features', 'shots', 'gaps'];
     const labels = { observed: '观察记录', gaps: '未覆盖项', shots: '截图与布局' };
+    // Every entry is one physical line, whatever text it carries.
+    for (const name of Object.keys(sections)) sections[name] = sections[name].map(line => String(line).replace(/\s*[\r\n]+\s*/g, ' '));
     const tail = sections.cleanup;
     const dropped = [];
     const bodySize = () => order.filter(n => !dropped.includes(n)).reduce((n, k) => n + sections[k].length, 0);

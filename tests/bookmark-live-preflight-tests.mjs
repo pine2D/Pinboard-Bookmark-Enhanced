@@ -1439,6 +1439,34 @@ try {
     assert(text.includes('linkding.edges.offline：失败') && text.includes('## 在修项结论'), text);
     assert(!text.includes('## 观察记录'), 'observations are dropped first: ' + text);
   }
+  // Read-back diffs are folded onto one line like observations (review of
+  // H1b r2): a multi-line expected value (a blockquote with "# Heading")
+  // must neither break the one-screen cap counted in physical lines nor
+  // add a heading to the summary.
+  {
+    const run = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    run.runDir = join(dir, 'summary-multiline');
+    mkdirSync(run.runDir, { mode: 0o700 });
+    run.reportPath = join(run.runDir, 'report.json');
+    const r = run.report;
+    Object.assign(r, { target: 'user', instances: { pinboard: { service: 'pinboard', base: '' } } });
+    const failedIds = ['linkding.core.worker', 'linkding.core.popup-reader', 'karakeep.core.worker', 'karakeep.core.popup-reader', 'linkding.edges.offline'];
+    run.selected = live.expandRegistry(MODULES).filter(m => failedIds.includes(m.id));
+    const quote = '> First line\n>\n> # Heading\n> **bold** <tag>\n> 1. item\n\n# Heading\n';
+    for (const id of failedIds) {
+      r.modules.push({ id, status: 'failed', failure: { phase: id, code: 'quick_save_quote_format' }, notes: {}, counts: {} });
+      r.readBackDiffs.push({ module: id, phase: id, code: 'quick_save_quote_format', expected: quote, actual: quote.replace('First', 'Second') });
+    }
+    r.cleanup.passStart = 0;
+    r.cleanup.entries.push({ kind: 'tag', instance: 'karakeep', id: 'abc', name: 'pbp-it-x_stray', deleted: false, residue: true, code: 'residue_tag_not_in_ledger' });
+    run.writeSummary();
+    const text = readFileSync(join(run.runDir, 'summary.zh.md'), 'utf8');
+    const lines = text.trimEnd().split('\n');
+    assert(lines.length <= live.SUMMARY_MAX_LINES, 'one screen in physical lines: ' + lines.length);
+    assert.equal(lines.filter(l => l.startsWith('# ')).length, 1, 'only the title is a heading: ' + text);
+    assert(lines.some(l => l.includes('quick_save_quote_format：期望 > First line > > # Heading')), text);
+    assert(lines.every(l => l.length <= 400), 'snippets are cut short');
+  }
 
   // ---------------------------------------------------------------------
   // Fake AI: product prompts classify, replies parse with product parsers
