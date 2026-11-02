@@ -177,6 +177,15 @@ async function settle(pending) {
     await new Promise(resolve => setTimeout(resolve, 0));
   }
 }
+// Waits for something the page shows or sends, never for a fixed time: polls
+// the condition until it holds, and fails with its label after two seconds.
+async function until(read, label) {
+  for (let i = 0; i < 2000; i++) { if (read()) return; await new Promise(resolve => setTimeout(resolve, 1)); }
+  throw new Error("timed out waiting for " + label);
+}
+// The reader has fetched the bookmark's state and is idle.
+const readerIdle = w => until(() => w.document.getElementById("reader-bookmark-edit")?.getAttribute("aria-busy") === "false", "the reader's initial state");
+const sentEdit = messages => messages.some(m => m.action === "edit");
 // CLAUDE.md: a queued save keeps only these fields, the Description only for linkding.
 const QUEUE_FIELDS = ["account", "mode", "url", "title", "notes", "tags", "private", "toread", "archive", "sharedExplicit", "time", "queueId", "queuedAt"];
 function assertQueueFields(item, service) {
@@ -1128,10 +1137,10 @@ await test("reader linkding editor shows supported sharing and inverts the saved
       w.t=k=>k;
       w.chrome={runtime:{id:"test-id",getURL:p=>p,onMessage:{addListener(){}},sendMessage:async msg=>{messages.push(msg);return {known:true,bookmarked:true,account:"linkding:c1",privacySupported:false,sharingSupported,bookmark:{title:"T",notes:"",tags:"",private:false,toread:false}};}}};
       w.eval(runtime);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account:"linkding:c1"}}));
-      await new Promise(r=>setTimeout(r,30));await w.pbpReaderBookmarkAction("edit");
+      await readerIdle(w);await w.pbpReaderBookmarkAction("edit");
       const box=w.document.getElementById("reader-bookmark-private");
       equal(box.closest("label").hidden,sharingSupported!==true);
-      if(sharingSupported){equal(box.checked,true);assert(box.closest("label").textContent.includes("bookmarkShare"));box.click();w.document.getElementById("reader-bookmark-apply").click();await new Promise(r=>setTimeout(r,0));equal(messages.find(m=>m.action==="edit").draft.private,true);equal(messages.find(m=>m.action==="edit").draft.sharedExplicit,true);}
+      if(sharingSupported){equal(box.checked,true);assert(box.closest("label").textContent.includes("bookmarkShare"));box.click();w.document.getElementById("reader-bookmark-apply").click();await until(()=>sentEdit(messages),"the edit request");equal(messages.find(m=>m.action==="edit").draft.private,true);equal(messages.find(m=>m.action==="edit").draft.sharedExplicit,true);}
     } finally {frame.remove();}
   }
 });
@@ -1145,11 +1154,11 @@ await test("reader title-only edit does not fabricate sharing intent, but explic
       w.eval(await(await fetch("../shared.js")).text());w.t=k=>k;
       w.chrome={runtime:{id:"test-id",getURL:p=>p,onMessage:{addListener(){}},sendMessage:async msg=>{messages.push(msg);return {known:true,bookmarked:true,account:"linkding:c1",privacySupported:false,sharingSupported:true,bookmark:{title:"T",notes:"",tags:"",private:false,toread:false}};}}};
       w.eval(runtime);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account:"linkding:c1"}}));
-      await new Promise(r=>setTimeout(r,30));await w.pbpReaderBookmarkAction("edit");
+      await readerIdle(w);await w.pbpReaderBookmarkAction("edit");
       const box=w.document.getElementById("reader-bookmark-private");
       for(let i=0;i<toggles;i++)box.click();
       w.document.getElementById("reader-bookmark-title").value="Title only";
-      w.document.getElementById("reader-bookmark-apply").click();await new Promise(r=>setTimeout(r,0));
+      w.document.getElementById("reader-bookmark-apply").click();await until(()=>sentEdit(messages),"the edit request");
       const draft=messages.find(m=>m.action==="edit").draft;
       equal(draft.sharedExplicit,toggles>0);equal(draft.private,toggles===1);
     } finally {frame.remove();}
@@ -1169,12 +1178,12 @@ await test("reader Description uses a text input, shows only for linkding, and p
           : { status: "queued", account };
       } } };
       w.eval(runtime); w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "T", account } }));
-      await new Promise(resolve => setTimeout(resolve, 20)); await w.pbpReaderBookmarkAction("edit");
+      await readerIdle(w); await w.pbpReaderBookmarkAction("edit");
       const input = w.document.getElementById("reader-bookmark-summary");
       if (!supported) { assert(!input || input.closest("label").hidden); continue; }
       assert(input && input.type === "text"); equal(input.value, "first second");
       input.value = "changed value"; w.document.getElementById("reader-bookmark-apply").click();
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await until(() => sentEdit(messages), "the edit request");
       const draft = messages.find(msg => msg.action === "edit")?.draft;
       equal(draft?.summary, "changed value"); assert(!("summaryTouched" in draft));
     } finally { frame.remove(); }
@@ -1186,10 +1195,6 @@ await test("reader Description uses a text input, shows only for linkding, and p
 // linkding to fill. Polls the editor's own busy state; no fixed waits.
 await test("reader edits send a Description only when the user changed its one line", async () => {
   runtime ||= await (await fetch("../md-bookmark.js")).text();
-  const settle = async (read, label) => {
-    for (let i = 0; i < 400; i++) { if (read()) return; await new Promise(resolve => setTimeout(resolve, 5)); }
-    throw new Error("timed out: " + label);
-  };
   for (const [bookmarked, stored, typed, sent] of [
     [true, "first\nsecond", undefined, undefined], [true, "first\nsecond", "first   second", undefined],
     [true, "first\nsecond", "", ""], [true, "first\nsecond", " changed \n value", "changed value"],
@@ -1206,13 +1211,13 @@ await test("reader edits send a Description only when the user changed its one l
           : { status: "queued", account };
       } } };
       w.eval(runtime); w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "T", account } }));
-      await settle(() => w.document.getElementById("reader-bookmark-edit")?.getAttribute("aria-busy") === "false", where + " initial state");
+      await readerIdle(w);
       await w.pbpReaderBookmarkAction("edit");
       const input = w.document.getElementById("reader-bookmark-summary");
       equal(input.value, stored === undefined ? "" : pbpBookmarkDescriptionLine(stored));
       if (typed !== undefined) { input.value = typed; input.dispatchEvent(new w.Event("input", { bubbles: true })); }
       w.document.getElementById("reader-bookmark-apply").click();
-      await settle(() => messages.some(msg => msg.action === "edit"), where + " apply");
+      await until(() => sentEdit(messages), where + " apply");
       const draft = messages.find(msg => msg.action === "edit").draft;
       assert(Object.hasOwn(draft, "summary") === (sent !== undefined) && draft.summary === sent, where + ": sent " + JSON.stringify(draft.summary));
     } finally { frame.remove(); }
@@ -1232,15 +1237,16 @@ await test("reader validates self-hosted quotes locally and shows the edit hint"
           : {status:"queued",account};
       }}};
       w.eval(runtime);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account}}));
-      await new Promise(r=>setTimeout(r,20));await w.pbpReaderBookmarkAction("edit");
+      await readerIdle(w);await w.pbpReaderBookmarkAction("edit");
       const input=w.document.getElementById("reader-bookmark-tags"),apply=w.document.getElementById("reader-bookmark-apply");
       equal(input.closest("label").firstElementChild.textContent,quoted?"readerBookmarkTagsQuoted":"readerBookmarkTags");
-      input.value=quoted?'"unfinished':'literal"tag';apply.click();await new Promise(r=>setTimeout(r,0));
+      input.value=quoted?'"unfinished':'literal"tag';apply.click();
+      const status=w.document.getElementById("reader-bookmark-editor-status");
+      await until(()=>quoted?status.dataset.state==="error":messages.some(m=>m.type==="mdReaderBookmarkSave"),quoted?"the local quote error":"the save request");
       if(quoted){
         assert(!messages.some(m=>m.type==="mdReaderBookmarkSave"));
-        const status=w.document.getElementById("reader-bookmark-editor-status");
         equal(status.textContent,"readerBookmarkTagsQuoteError");equal(status.dataset.state,"error");
-        input.value='machine learning';apply.click();await new Promise(r=>setTimeout(r,0));
+        input.value='machine learning';apply.click();await until(()=>messages.some(m=>m.type==="mdReaderBookmarkSave"),"the corrected save request");
         equal(messages.find(m=>m.type==="mdReaderBookmarkSave")?.draft.tags,"machine learning");
       }else equal(messages.find(m=>m.type==="mdReaderBookmarkSave")?.draft.tags,'literal"tag');
     }finally{frame.remove();}
@@ -1269,16 +1275,17 @@ await test("reader editor rejects over-limit titles locally, keeps the full inpu
           : {status:"queued",account};
       }}};
       w.eval(runtime);w.document.dispatchEvent(new w.CustomEvent("pbp:rendered",{detail:{url:URL_ARTICLE,title:"T",account}}));
-      await new Promise(r=>setTimeout(r,20));await w.pbpReaderBookmarkAction("edit");
+      await readerIdle(w);await w.pbpReaderBookmarkAction("edit");
       const title=w.document.getElementById("reader-bookmark-title"), apply=w.document.getElementById("reader-bookmark-apply");
       equal(title.maxLength,-1);
-      title.value="a".repeat(limit+1);apply.click();await new Promise(r=>setTimeout(r,0));
+      title.value="a".repeat(limit+1);apply.click();
+      const status=w.document.getElementById("reader-bookmark-editor-status");
+      await until(()=>status.dataset.state==="error","the title limit message");
       assert(!messages.some(m=>m.type==="mdReaderBookmarkSave"),"over-limit reader title sent a request");
       equal(title.value,"a".repeat(limit+1));
-      const status=w.document.getElementById("reader-bookmark-editor-status");
       equal(status.hidden,false);equal(status.textContent,"titleTooLong:"+limit);equal(status.dataset.state,"error");
       w.document.getElementById("reader-bookmark-notes").value="n".repeat(100001);
-      title.value="𠮷".repeat(service==="linkding"?limit:limit/2);apply.click();await new Promise(r=>setTimeout(r,0));
+      title.value="𠮷".repeat(service==="linkding"?limit:limit/2);apply.click();await until(()=>messages.some(m=>m.type==="mdReaderBookmarkSave"),"the corrected save request");
       equal(messages.find(m=>m.type==="mdReaderBookmarkSave")?.draft.title,title.value);
       equal(messages.find(m=>m.type==="mdReaderBookmarkSave")?.draft.notes.length,100001);
     } finally {frame.remove();}
