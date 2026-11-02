@@ -7,9 +7,10 @@
 // Usage: node .qa-scan/run-test.mjs tests/<file>.html
 //        node .qa-scan/run-test.mjs --print-counts tests/<file>.html [more.html ...]
 // --print-counts only reports: the rows a page actually rendered next to its
-// EXPECTED_RESULTS entry (waiting until the count has stopped changing, since
-// the registered number may be stale). It edits nothing and leaves the normal
-// mode untouched; exit 0 unless the page could not be measured.
+// EXPECTED_RESULTS entry (waiting for the registered count, then a quiet window
+// for extra rows; a page that never gets there is UNCONFIRMED, exit 1). It
+// edits nothing and leaves the normal mode untouched; exit 0 unless the page
+// could not be measured.
 import { chromium } from "playwright";
 import { createServer } from "http";
 import { readFile } from "fs/promises";
@@ -272,15 +273,22 @@ try {
     // browser closes — attach a no-op catch so that later settlement can't
     // surface as an unhandled rejection; it doesn't affect what Promise.race
     // observes below.
-    // --print-counts cannot trust the registered number, so it waits for the
-    // row count to hold still instead (and stops at the same stall deadline).
+    // --print-counts must not call a page finished just because its row count
+    // paused: a case that waits a second or two (a setTimeout, a mock delay)
+    // looks exactly like the end. A registered page is therefore waited for the
+    // way the normal mode waits - until it reaches its registered count or the
+    // stall deadline - and only then watched for extra rows during a quiet
+    // window. A page that never reaches its number is reported UNCONFIRMED, not
+    // as a smaller "actual" count. An unregistered page has no number to wait
+    // for, so it gets a longer quiet window and says so.
     const waitForRows = printCounts
-      ? page.waitForFunction(() => {
+      ? page.waitForFunction((registered) => {
         const total = document.querySelectorAll(".pass, .fail, .skip").length;
         const seen = window.__pbpCountWatch || (window.__pbpCountWatch = { total: -1, since: performance.now() });
         if (seen.total !== total) { seen.total = total; seen.since = performance.now(); }
-        return total > 0 && performance.now() - seen.since >= 1500;
-      }, undefined, { polling: 100, timeout: 0 })
+        const quiet = performance.now() - seen.since;
+        return registered === undefined ? total > 0 && quiet >= 3000 : total >= registered && quiet >= 1500;
+      }, expected, { polling: 100, timeout: 0 })
       : page.waitForFunction((resultCount) => {
         let total = 0;
         for (const el of document.querySelectorAll(".pass, .fail, .skip")) {
@@ -331,7 +339,8 @@ try {
   const total = dom.pass + dom.fail + dom.skip;
   if (printCounts) {
     const registered = expected === undefined ? "unregistered" : String(expected);
-    const verdict = expected === undefined ? "NOT REGISTERED"
+    const verdict = expected === undefined ? "NOT REGISTERED (count held 3s; a slower page may have more)"
+      : dom.stalled && total < expected ? `UNCONFIRMED (never reached ${expected} before the stall deadline: a slow case or fewer rows, run the normal mode to see which)`
       : total === expected ? "match" : `DIFFERS (${total > expected ? "+" : ""}${total - expected})`;
     console.log(`${rel}: pass=${dom.pass} fail=${dom.fail} skip=${dom.skip} total=${total} expected=${registered} ${verdict}${dom.stalled ? " STALLED" : ""}`);
     if (dom.failures?.length) console.error("failures:\n  " + dom.failures.join("\n  "));

@@ -54,6 +54,8 @@ node tests/bookmark-service-runtime-tests.mjs
 node tests/bookmark-live-preflight-tests.mjs
 echo "[mutate-check] self-test: restore, exactly-once, crash backup"
 node tests/mutate-check-tests.mjs
+echo "[run-test] self-test: --print-counts waits for the registered count"
+node tests/run-test-print-counts-tests.mjs
 
 echo "[selection] real pointer selection with native popover light-dismiss"
 node scripts/qa-drive.mjs --headless --surfaces selection --check --label selection-default-contract
