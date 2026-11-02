@@ -227,9 +227,11 @@ function escapeForExtended(text) {
 }
 
 // Notes are HTML on Pinboard, Markdown on linkding, and plain text on Karakeep.
+// A lone CR breaks the line as CRLF and LF do: linkding's Markdown and the
+// popup's textarea both read it so, and the text after it must stay quoted.
 function pbpFormatQuote(text, service = "pinboard") {
   if (service === "pinboard") return `<blockquote>${escapeForExtended(text)}</blockquote>`;
-  return String(text || "").split(/\r?\n/).map((line) => {
+  return String(text || "").split(/\r\n|\r|\n/).map((line) => {
     if (service === "linkding") {
       // A whitespace-only line ends the paragraph, as an empty one does.
       if (!/\S/.test(line)) return ">";

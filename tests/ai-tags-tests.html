@@ -1935,6 +1935,10 @@ test("linkding quotes render as the selection under linkding's Markdown", () => 
     ["a\tb", "> a\tb"],
     // a whitespace-only line separates paragraphs like an empty one
     ["a\n   \n    b", "> a\n>\n> &#32;   b"],
+    // a lone CR is a line break there, so the text after it is quoted too
+    ["intro\r# heading", "> intro\n> \\# heading"],
+    ["intro\r\r    code", "> intro\n>\n> &#32;   code"],
+    ["Title\r===", "> Title\n> &#61;=="],
   ];
   for (const [text, expected] of cases) {
     assertEq(pbpFormatQuote(text, "linkding"), expected, JSON.stringify(text));
@@ -1959,7 +1963,13 @@ test("no quoted linkding line can start a Markdown block or decode to other text
   for (const lead of leads) for (const mark of marks) for (const tail of tails) {
     const line = lead + mark + tail;
     if (!/\S/.test(line)) continue;
-    const out = pbpFormatQuote(`prev\n\n${line}`, "linkding").split("\n")[2];
+    const quoted = pbpFormatQuote(`prev\n\n${line}`, "linkding");
+    // linkding's Markdown and a textarea both read a lone CR, or CRLF, as a
+    // line break: every spelling of the break quotes the same lines.
+    for (const sep of ["\r\r", "\r\n\r\n", "\r\n\r", "\n\r", "\r\n\n"]) {
+      assertEq(pbpFormatQuote(`prev${sep}${line}`, "linkding"), quoted, `${JSON.stringify(sep)} ${JSON.stringify(line)}`);
+    }
+    const out = quoted.split("\n")[2];
     assert(out.startsWith("> "), JSON.stringify(line));
     const body = out.slice(2);
     assert(!blockStart.test(body), `${JSON.stringify(line)} -> ${JSON.stringify(body)} opens a block`);
@@ -1974,6 +1984,9 @@ test("only linkding quotes are escaped; Pinboard and Karakeep keep their bytes",
   assertEq(pbpFormatQuote(text, "pinboard"), "<blockquote>Title\n===\n    a &amp; b\n1) x</blockquote>");
   assertEq(pbpFormatQuote(text, "karakeep"), "> Title\n> ===\n>     a & b\n> 1) x");
   assertEq(pbpFormatQuote("a\n   \nb", "karakeep"), "> a\n>    \n> b");
+  // A lone CR is a line break in Karakeep's textarea too; Pinboard keeps it.
+  assertEq(pbpFormatQuote("a\rb\r\nc", "karakeep"), "> a\n> b\n> c");
+  assertEq(pbpFormatQuote("a\rb", "pinboard"), "<blockquote>a\rb</blockquote>");
 });
 test("AI summary blocks omit the legacy marker and Karakeep stays plain text", () => {
   assertEq(pbpFormatSummaryBlock(" <b> summary \n", "karakeep"), "<b> summary");
