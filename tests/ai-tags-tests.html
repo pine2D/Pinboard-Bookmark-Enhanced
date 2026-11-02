@@ -1897,7 +1897,7 @@ test("selected text uses each service's quote syntax without changing Pinboard b
   const text = "# heading\n\n<b> *bold*\n  12. list";
   const cases = [
     ["pinboard", "<blockquote># heading\n\n&lt;b&gt; *bold*\n  12. list</blockquote>"],
-    ["linkding", "> \\# heading\n>\n> &lt;b> \\*bold\\*\n>   12\\. list"],
+    ["linkding", "> \\# heading\n>\n> &lt;b> \\*bold\\*\n> &#32; 12\\. list"],
     ["karakeep", "> # heading\n>\n> <b> *bold*\n>   12. list"],
   ];
   for (const [service, expected] of cases) {
@@ -1909,6 +1909,71 @@ test("selected text uses each service's quote syntax without changing Pinboard b
 test("linkding quotes escape Markdown markers, literal slashes and inline syntax", () => {
   assertEq(pbpFormatQuote("+ a\n- b\n> c\n`code` [x]_y_\\z", "linkding"),
     "> \\+ a\n> \\- b\n> \\> c\n> \\`code\\` \\[x\\]\\_y\\_\\\\z");
+});
+// linkding v1.47.0 renders Notes with Python-Markdown 3.10 (fenced_code,
+// nl2br) and bleach. Each expected string below was rendered offline through
+// that exact stack (the uv.lock versions) and shown as the selection itself:
+// no heading, list, code block or rule, and no entity the user typed decoded.
+test("linkding quotes render as the selection under linkding's Markdown", () => {
+  const cases = [
+    // "===" under a line is a setext heading; = has no backslash escape
+    ["Title\n===", "> Title\n> &#61;=="],
+    ["=== title", "> &#61;== title"],
+    // "---" under a line is a setext heading too, and alone a rule
+    ["Title\n---", "> Title\n> \\---"],
+    // & goes first, so a typed entity stays as typed
+    ["a & b < c", "> a &amp; b &lt; c"],
+    ["a &amp; b &lt; c &#33;", "> a &amp;amp; b &amp;lt; c &amp;#33;"],
+    // "1)" is no list in Python-Markdown; it is left as written
+    ["intro\n\n1) item", "> intro\n>\n> 1) item"],
+    // indentation that starts a block would be a code block
+    ["    code", "> &#32;   code"],
+    ["para\n\n    code", "> para\n>\n> &#32;   code"],
+    ["x\n\n\t\ty", "> x\n>\n> &#9;\ty"],
+    ["x\n\n  \tcode", "> x\n>\n> &#32; \tcode"],
+    // a tab inside a line stays a tab
+    ["a\tb", "> a\tb"],
+    // a whitespace-only line separates paragraphs like an empty one
+    ["a\n   \n    b", "> a\n>\n> &#32;   b"],
+  ];
+  for (const [text, expected] of cases) {
+    assertEq(pbpFormatQuote(text, "linkding"), expected, JSON.stringify(text));
+  }
+});
+test("no quoted linkding line can start a Markdown block or decode to other text", () => {
+  // Python-Markdown's backslash escapes, and the character references the
+  // quote writes; reversing them must give the selected line back.
+  const unescape = (line) => line
+    .replace(/\\([\\`*_{}\[\]()>#+\-.!])/g, "$1")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&lt;/g, "<").replace(/&amp;/g, "&");
+  // What opens a block in a quoted line: indentation, heading, nested quote,
+  // list, rule or setext underline, or raw HTML. (fenced_code matches only at
+  // the very start of a source line, never after "> ": "~~~" renders as text.)
+  const blockStart = /^(?:[ \t]|#|>|[-+*](?:[ \t]|$)|\d+\.|=+[ \t]*$|-+[ \t]*$|<)/;
+  const rawRef = /&(?!amp;|lt;|#\d+;)/;
+  const leads = ["", " ", "  ", "    ", "\t", " \t", "\t\t", "1", "12"];
+  const marks = ["#", ">", "-", "+", "*", "=", "===", "---", "1.", "1)", "```", "~~~", "<b>", "&amp;", "&", "\\", "_", "[", "`", ""];
+  const tails = ["", " x", "x", "  ", " & y"];
+  let n = 0;
+  for (const lead of leads) for (const mark of marks) for (const tail of tails) {
+    const line = lead + mark + tail;
+    if (!/\S/.test(line)) continue;
+    const out = pbpFormatQuote(`prev\n\n${line}`, "linkding").split("\n")[2];
+    assert(out.startsWith("> "), JSON.stringify(line));
+    const body = out.slice(2);
+    assert(!blockStart.test(body), `${JSON.stringify(line)} -> ${JSON.stringify(body)} opens a block`);
+    assert(!rawRef.test(body), `${JSON.stringify(line)} -> ${JSON.stringify(body)} keeps a raw &`);
+    assertEq(unescape(body), line, JSON.stringify(line));
+    n++;
+  }
+  assert(n > 800, `only ${n} lines checked`);
+});
+test("only linkding quotes are escaped; Pinboard and Karakeep keep their bytes", () => {
+  const text = "Title\n===\n    a & b\n1) x";
+  assertEq(pbpFormatQuote(text, "pinboard"), "<blockquote>Title\n===\n    a &amp; b\n1) x</blockquote>");
+  assertEq(pbpFormatQuote(text, "karakeep"), "> Title\n> ===\n>     a & b\n> 1) x");
+  assertEq(pbpFormatQuote("a\n   \nb", "karakeep"), "> a\n>    \n> b");
 });
 test("AI summary blocks omit the legacy marker and Karakeep stays plain text", () => {
   assertEq(pbpFormatSummaryBlock(" <b> summary \n", "karakeep"), "<b> summary");

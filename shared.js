@@ -230,14 +230,37 @@ function escapeForExtended(text) {
 function pbpFormatQuote(text, service = "pinboard") {
   if (service === "pinboard") return `<blockquote>${escapeForExtended(text)}</blockquote>`;
   return String(text || "").split(/\r?\n/).map((line) => {
-    if (!line) return ">";
     if (service === "linkding") {
-      line = line.replace(/\\/g, "\\\\").replace(/[`*_\[\]]/g, "\\$&").replace(/</g, "&lt;")
-        .replace(/^(\s*)([#+\->])/, "$1\\$2")
-        .replace(/^(\s*\d+)\./, "$1\\.");
+      // A whitespace-only line ends the paragraph, as an empty one does.
+      if (!/\S/.test(line)) return ">";
+      line = pbpLinkdingQuoteLine(line);
     }
+    if (!line) return ">";
     return "> " + line;
   }).join("\n");
+}
+
+// One quoted line as linkding v1.47.0 renders Notes: Python-Markdown 3.10
+// with fenced_code and nl2br, then bleach. Backslash escapes cover the
+// characters Python-Markdown can escape; the rest become numeric character
+// references, which Markdown passes through and the browser shows as the
+// original character.
+//   - & first, so an entity the user selected ("&amp;") stays as written,
+//     then < (inline HTML and autolinks);
+//   - inline markers ` * _ [ ] and a literal backslash;
+//   - a leading # + - > (heading, list, rule, nested quote, the "---" of a
+//     setext heading) and "12." (ordered list); "12)" is no list there;
+//   - a leading "=" (the "===" of a setext heading; = has no escape);
+//   - leading spaces or a tab: an indented code block once the line starts a
+//     block. Only the first character is replaced, so the rest of the
+//     indentation, and every later tab, is left as it was.
+function pbpLinkdingQuoteLine(line) {
+  return line.replace(/\\/g, "\\\\").replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/[`*_\[\]]/g, "\\$&")
+    .replace(/^(\s*)([#+\->])/, "$1\\$2")
+    .replace(/^(\s*\d+)\./, "$1\\.")
+    .replace(/^(\s*)=/, "$1&#61;")
+    .replace(/^[ \t]/, (c) => `&#${c.charCodeAt(0)};`);
 }
 
 function pbpFormatSummaryBlock(summary, service = "pinboard") {
