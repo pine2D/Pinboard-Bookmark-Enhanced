@@ -165,6 +165,29 @@ await test("mark read only clears toread and repeated read remains idempotent", 
 await test("plain save uses skip so existing server metadata cannot be overwritten", async () => {
   const h = await harness(); const p = await h.pbpPrepareReaderSaveIntent(base(), "save", null, {}, { account: "alice", epoch: 1 }); equal(p.intent.mode, "skip");
 });
+// A skip the lookup resolved because the bookmark is already in the requested
+// state only keeps it: submitSaveIntent drops the popup's handed summary range
+// for it, so no hold or receipt can name text the save never wrote. A plain
+// Save's skip may create the bookmark, so it keeps the range, like a create.
+// [mode, kept] by action and by the bookmark's state: absent, toread yes/no.
+await test("only a Read Later or mark-as-read that finds the bookmark already in that state resolves to a kept skip", async () => {
+  const table = {
+    save: { absent: ["skip", false], yes: ["skip", false], no: ["skip", false] },
+    later: { absent: ["create", false], yes: ["skip", true], no: ["update", false] },
+    read: { absent: ["failed", false], yes: ["update", false], no: ["skip", true] },
+    edit: { absent: ["create", false], yes: ["update", false], no: ["update", false] },
+  };
+  for (const [action, states] of Object.entries(table)) {
+    for (const [state, [mode, kept]] of Object.entries(states)) {
+      const h = await harness({ post: state === "absent" ? null : { ...POST, toread: state } });
+      const draft = action === "edit" ? { title: "Edited", tags: "t", notes: "", private: false, toread: false } : null;
+      const p = await h.pbpPrepareReaderSaveIntent(base(), action, draft, { pinboardToken: h.env.token }, { account: "alice", epoch: 1 });
+      const where = action + ", bookmark " + (state === "absent" ? "absent" : "toread=" + state);
+      assert((p.intent ? p.intent.mode : "failed") === mode, where + ": expected " + mode + ", got " + JSON.stringify(p));
+      assert((p.kept === true) === kept, where + ": expected kept " + kept + ", got " + JSON.stringify(p.kept));
+    }
+  }
+});
 await test("unknown lookup never becomes an update or creates an edit", async () => {
   const h = await harness({ lookup: { exists: false, lookupFailed: true, reason: "lookup", retryable: true } }); const p = await h.pbpPrepareReaderSaveIntent(base(), "edit", { title: "bad" }, { pinboardToken: h.env.token }, { account: "alice", epoch: 1 }); equal(p.result.reason, "lookup"); assert(!p.intent);
 });

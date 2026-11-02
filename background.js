@@ -1213,11 +1213,14 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
       const prepared = await pbpPrepareReaderSaveIntent(intent, readerAction, readerDraft, deliverySettings, deliveryAuth);
       if (prepared.result) return prepared.result;
       intent = prepared.intent;
-      // The popup's handed range still describes a create (or a skip, which
-      // creates or keeps) that writes exactly the handed notes. An update
-      // writes the server's notes or the reader editor's, and the range cannot
-      // be followed through either.
-      if ((intent.mode !== "create" && intent.mode !== "skip") || intent.notes !== handedNotes) ownershipRange = undefined;
+      // The popup's handed range still describes a create, and a Save's skip,
+      // which creates the bookmark when it is not there yet: either writes
+      // exactly the handed notes or nothing. An update writes the server's
+      // notes or the reader editor's, and a skip that found the bookmark
+      // already in the requested state (kept) can only keep it. The range
+      // cannot be followed through those, and a hold for it would later claim
+      // text the worker never wrote.
+      if (prepared.kept || (intent.mode !== "create" && intent.mode !== "skip") || intent.notes !== handedNotes) ownershipRange = undefined;
     }
 
     let envelope;
@@ -1481,7 +1484,9 @@ async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth)
   const plan = pbpResolveSavePlan({ ...intent, mode: "overwrite", tags: lookup.post?.tags, private: false, toread: false }, lookup);
   if (plan.action !== "send") return { result: plan.result || pbpSaveFailure("lookup") };
   if (action !== "edit" && plan.fields.toread === (action === "later")) {
-    return { intent: { ...intent, mode: "skip" } };
+    // kept: the bookmark was just found in the requested state, so this skip
+    // only keeps it, and submitSaveIntent hands the delivery no summary range.
+    return { intent: { ...intent, mode: "skip" }, kept: true };
   }
   // The stored Description (and Karakeep's own summary) was read, not edited.
   // An update leaves it alone without it, and a queued replay of this intent
