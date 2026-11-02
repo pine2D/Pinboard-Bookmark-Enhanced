@@ -389,6 +389,50 @@ export const MODULES = [
   },
 
   {
+    id: 'ai.popup-summary-tags',
+    services: ['linkding', 'karakeep'],
+    surfaces: ['popup'],
+    features: ['fake-ai', 'ai-summary-description', 'ai-summary-note', 'ai-tags-prefix'],
+    needs: needs({ fakeAi: true, shots: true }),
+    budget: { bookmarks: 1, urls: 1, node: 6, browser: { linkding: 40, karakeep: 60 }, ai: 3, tags: 2, seconds: 120 },
+    // The fake AI provider is configured by the runner (needs.fakeAi); these
+    // only reveal the popup's AI actions for this module.
+    settings: { optShowAiTags: true, optShowAiSummary: true, optAiAutoTags: false },
+    async steps(t) {
+      const url = t.claimUrl();
+      const before = t.fakeAi.calls();
+      t.phase('ai_popup_open');
+      const form = await t.openPopup(url);
+      const { popup } = form;
+      const field = t.service === 'linkding' ? '#linkding-description-input' : '#description-input';
+      t.phase('ai_summary');
+      await popup.locator('#ai-summary-btn').click();
+      await t.until(async () => (await popup.locator(field).inputValue()).includes(t.fakeAi.marker), 'ai_summary_written');
+      const written = await popup.locator(field).inputValue();
+      t.expect(!written.includes('[AI Summary]'), 'ai_summary_legacy_label');
+      if (t.service === 'linkding') t.expect(!(await popup.locator('#description-input').inputValue()).includes(t.fakeAi.marker), 'ai_summary_in_notes');
+      t.phase('ai_tags');
+      await popup.locator('#ai-tags-btn').click();
+      await popup.locator('#ai-suggest-tags .stag.ai').first().waitFor();
+      const suggested = await popup.locator('#ai-suggest-tags .stag.ai').evaluateAll(els => els.map(el => el.dataset.tag));
+      t.expect(suggested.length >= 1 && suggested.every(tag => tag.startsWith(t.prefix)), 'ai_tags_prefixed');
+      await popup.locator('#ai-suggest-tags .add-all-link').click();
+      t.phase('ai_save');
+      await t.savePopup(popup);
+      const row = await t.ownRow(url);
+      const stored = t.service === 'linkding' ? row.description : row.note;
+      t.expect(typeof stored === 'string' && stored.includes(t.fakeAi.marker), 'ai_summary_saved');
+      t.expect(!stored.includes('[AI Summary]') && !stored.includes('<blockquote'), 'ai_summary_saved_plain');
+      const saved = tagNamesOf(t, row);
+      t.expect(suggested.every(tag => saved.includes(tag)), 'ai_tags_saved');
+      t.expect(t.fakeAi.calls() - before >= 1, 'fake_ai_not_called');
+      t.expect(t.fakeAi.unknown() === 0, 'fake_ai_unknown_request');
+      await form.close();
+      t.check(`${t.service}: popup AI summary and AI tags through the local fake provider, saved and read back`);
+    },
+  },
+
+  {
     id: 'sharing.popup-reader',
     services: ['linkding'],
     surfaces: ['popup', 'reader'],
@@ -540,6 +584,7 @@ export const GROUPS = Object.freeze({
   core: ['*.core.*'],
   edges: ['*.edges.*'],
   readonly: ['*.readonly'],
+  ai: ['*.ai.*'],
   all: ['*'],
 });
 

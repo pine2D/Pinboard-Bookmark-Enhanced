@@ -1,6 +1,6 @@
 // Opt-in real-service acceptance runner (harness v2). verify.sh never points
 // it at a service: tests/bookmark-live-preflight-tests.mjs exercises it with
-// synthetic fixtures and an injected Docker executor.
+// synthetic fixtures, an injected Docker executor and a loopback fake AI.
 //
 // Targets
 //   --target temp (default): throwaway linkding (SQLite), linkding-pg
@@ -35,12 +35,15 @@
 //     records each creation the moment its response arrives.
 //   - Service worker: a second guard wraps fetch; a new worker (restart)
 //     aborts the run because that second layer would be gone.
+//   - Fake AI: a loopback OpenAI-compatible server; only POST chat/completions
+//     on its exact origin is allowed; 60 calls per run; metadata only.
 //   - Cleanup: one idempotent cleanupAll on success, failure, signals and
 //     uncaught errors; ledger written to disk at every creation; --cleanup
 //     <report> resumes; a run refuses to start while an earlier report is not
 //     fully cleaned. Reports and the profile stay in a 0700
 //     directory with 0600 files. No tracing, HAR or video is ever enabled.
 import { createRequire } from 'node:module';
+import { createServer } from 'node:http';
 import { spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync,
@@ -294,6 +297,10 @@ export const apiRootFor = (service, base) => (service === 'pinboard' ? PINBOARD_
 export function liveGuardRule(cfg, view, req) {
   const url = String(req.url || '');
   const method = String(req.method || 'GET').toUpperCase();
+  if (cfg.aiOrigin && (url === cfg.aiOrigin || url.startsWith(cfg.aiOrigin + '/'))) {
+    const path = url.slice(cfg.aiOrigin.length).split('?')[0];
+    return method === 'POST' && path === cfg.aiPath ? { ok: true, instance: 'ai', kind: 'ai' } : { ok: false, instance: 'ai', code: 'live_guard_ai' };
+  }
   let instance = '';
   for (const id of Object.keys(cfg.instances)) {
     const inst = cfg.instances[id];
@@ -389,6 +396,16 @@ export function parseKarakeepClientConfig(html) {
 }
 export const karakeepAutoAiOff = config => !!config && !!config.inference
   && config.inference.enableAutoTagging === false && config.inference.enableAutoSummarization === false;
+
+// The fake AI tells requests apart by the product's own prompt openings.
+export function classifyPrompt(text) {
+  const value = String(text || '');
+  if (/Reply with just the word: OK/.test(value)) return 'connectivity';
+  if (value.includes('exactly two keys: "summary" and "tags"')) return 'combined';
+  if (/^\s*Suggest up to \d+ bookmark tags/.test(value)) return 'tags';
+  if (/^\s*You are writing a bookmark note, not an article summary\./.test(value)) return 'summary';
+  return 'unknown';
+}
 
 // One synthetic article: the browser route serves it and so does the edge
 // container's fixture host, so server-side metadata equals what the popup reads.
@@ -643,6 +660,78 @@ const LINKDING_TOKEN_SCRIPT = "from django.contrib.auth.models import User\nfrom
 const linkdingSharingScript = on => `from django.contrib.auth.models import User\nu=User.objects.get(username='pbp-it')\nu.profile.enable_sharing=${on ? 'True' : 'False'}\nu.profile.save()\nprint('PBPSHARING=' + str(u.profile.enable_sharing))`;
 
 // ---------------------------------------------------------------------------
+// Fake AI: OpenAI-compatible chat completions on 127.0.0.1, metadata only.
+// ---------------------------------------------------------------------------
+export async function startFakeAi({ prefix, limit = 60 } = {}) {
+  const key = 'pbp-fake-' + randomBytes(12).toString('hex');
+  const marker = `${prefix} fake-ai`;
+  const calls = [];
+  const queues = { combined: [], tags: [], summary: [], connectivity: [] };
+  const state = { failed: '', unknown: 0 };
+  const replies = {
+    summary: () => `${marker} summary v1: a synthetic bookmark note for the live harness.\nSecond line keeps > # ** <b> literal.`,
+    tags: () => JSON.stringify([`${prefix}_ai_alpha`, `${prefix}_ai_beta`]),
+    combined: () => JSON.stringify({ summary: replies.summary(), tags: JSON.parse(replies.tags()) }),
+    connectivity: () => 'OK',
+  };
+  let port = 0;
+  const server = createServer((req, res) => {
+    const send = (status, body, type = 'application/json') => { res.writeHead(status, { 'Content-Type': type }); res.end(typeof body === 'string' ? body : JSON.stringify(body)); };
+    const remote = req.socket.remoteAddress || '';
+    const n = calls.length + 1;
+    const meta = { n, path: (req.url || '').split('?')[0], method: req.method, kind: 'unknown', model: '', stream: false, promptBytes: 0, hasPrefix: false, auth: false, status: 0 };
+    calls.push(meta);
+    const reject = (status, code) => { meta.status = status; state.failed ||= code; if (code === 'fake_ai_unknown_request') state.unknown++; send(status, { error: { message: code, type: 'pbp_fake_ai' } }); };
+    if (!['127.0.0.1', '::ffff:127.0.0.1'].includes(remote) || req.headers.host !== `127.0.0.1:${port}`) return reject(403, 'fake_ai_foreign_client');
+    if (n > limit) return reject(503, 'fake_ai_budget');
+    if (req.method !== 'POST' || meta.path !== '/v1/chat/completions') return reject(404, 'fake_ai_unknown_request');
+    meta.auth = req.headers.authorization === 'Bearer ' + key;
+    if (!meta.auth) return reject(401, 'fake_ai_auth');
+    let raw = '';
+    req.setEncoding('utf8');
+    req.on('data', chunk => { raw += chunk; if (raw.length > 2_000_000) req.destroy(); });
+    req.on('end', () => {
+      let body = null;
+      try { body = JSON.parse(raw); } catch { return reject(404, 'fake_ai_unknown_request'); }
+      const prompt = (Array.isArray(body?.messages) ? body.messages : []).filter(m => m && m.role !== 'system').map(m => (typeof m.content === 'string' ? m.content : '')).join('\n');
+      meta.model = typeof body?.model === 'string' ? body.model.slice(0, 60) : '';
+      meta.stream = body?.stream === true;
+      meta.promptBytes = Buffer.byteLength(prompt);
+      meta.hasPrefix = !!prefix && prompt.includes(prefix);
+      meta.kind = classifyPrompt(prompt);
+      if (meta.kind === 'unknown') return reject(404, 'fake_ai_unknown_request');
+      const queued = queues[meta.kind].shift();
+      const content = String(typeof queued === 'function' ? queued(meta) : queued ?? replies[meta.kind]());
+      meta.status = 200;
+      const usage = { prompt_tokens: Math.ceil(meta.promptBytes / 4), completion_tokens: Math.ceil(content.length / 4) };
+      usage.total_tokens = usage.prompt_tokens + usage.completion_tokens;
+      if (meta.stream) {
+        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
+        const step = Math.max(1, Math.ceil(content.length / 3));
+        for (let i = 0; i < content.length; i += step) res.write(`data: ${JSON.stringify({ id: 'chatcmpl-pbp-' + n, object: 'chat.completion.chunk', choices: [{ index: 0, delta: { content: content.slice(i, i + step) }, finish_reason: null }] })}\n\n`);
+        res.write(`data: ${JSON.stringify({ id: 'chatcmpl-pbp-' + n, object: 'chat.completion.chunk', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], ...(body?.stream_options?.include_usage ? { usage } : {}) })}\n\n`);
+        res.end('data: [DONE]\n\n');
+        return;
+      }
+      send(200, { id: 'chatcmpl-pbp-' + n, object: 'chat.completion', created: Math.floor(Date.now() / 1000), model: meta.model, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }], usage });
+    });
+  });
+  await new Promise((resolvePromise, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolvePromise); });
+  port = server.address().port;
+  const origin = `http://127.0.0.1:${port}`;
+  return {
+    key, port, origin, base: origin + '/v1', path: '/v1/chat/completions', marker, limit,
+    calls: kind => calls.filter(c => c.status === 200 && (!kind || c.kind === kind)).length,
+    all: () => calls.map(c => ({ ...c })),
+    unknown: () => state.unknown,
+    failed: () => state.failed,
+    expect({ kind, reply }) { check(queues[kind], 'fake_ai_kind'); queues[kind].push(reply); },
+    reset() { for (const q of Object.values(queues)) q.length = 0; },
+    close: () => new Promise(r => server.close(() => r())),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The run
 // ---------------------------------------------------------------------------
 export class LiveRun {
@@ -673,7 +762,7 @@ export class LiveRun {
       head: '', clean: null, target: '', scenario: '', modules: [], skipped: [], instances: {}, pools: {},
       ledger: { created: [], lists: [], tags: [] }, counts: {}, checks: [], readBackDiffs: [], console: [], swConsole: [],
       pageErrors: [], requestFailed: [], blockedOrigins: [], violations: [],
-      temp: null, cleanup: { complete: false, entries: [] }, failure: null, finished: null, passed: false,
+      fakeAi: null, temp: null, cleanup: { complete: false, entries: [] }, failure: null, finished: null, passed: false,
     };
   }
 
@@ -895,6 +984,7 @@ export class LiveRun {
       if (this.target === 'temp') await this.startTemp();
       else await this.loadCredentials();
       await this.preflight();
+      if (this.plan.fakeAi.needed) await this.startFakeAi();
       await this.setupBrowser();
       for (const instance of this.plan.instances) {
         await this.connect(instance);
@@ -1137,6 +1227,14 @@ export class LiveRun {
     }
   }
 
+  async startFakeAi() {
+    this.phase('fake_ai');
+    this.fakeAi = await startFakeAi({ prefix: this.prefix, limit: BUDGETS[this.target].run.fakeAi });
+    this.addSecret(this.fakeAi.key);
+    this.report.fakeAi = { origin: this.fakeAi.origin, limit: this.fakeAi.limit, calls: [] };
+    this.persist();
+  }
+
   // ---- browser ---------------------------------------------------------------
   async setupBrowser() {
     this.phase('browser_setup');
@@ -1169,8 +1267,8 @@ export class LiveRun {
       const bucket = prefs.extensions.settings[extId][key] ||= {};
       const hosts = bucket.explicit_host ||= [];
       // popup.html opened as a tab has no activeTab grant; permit only the
-      // intercepted synthetic article origin and the services.
-      for (const origin of [...Object.values(this.instances).map(i => new URL(i.base).origin), ...fixtureOrigins]) {
+      // intercepted synthetic article origin, the services and the fake AI.
+      for (const origin of [...Object.values(this.instances).map(i => new URL(i.base).origin), ...fixtureOrigins, ...(this.fakeAi ? [this.fakeAi.origin] : [])]) {
         const pattern = origin + '/*';
         if (!hosts.includes(pattern)) hosts.push(pattern);
       }
@@ -1185,6 +1283,7 @@ export class LiveRun {
     this.guardCfg = {
       instances: Object.fromEntries(Object.values(this.instances).map(i => [i.id, { service: i.service, base: i.base, root: i.root }])),
       pools: this.pools, listMarker: LIST_MARKER, writes: false,
+      aiOrigin: this.fakeAi ? this.fakeAi.origin : '', aiPath: this.fakeAi ? this.fakeAi.path : '',
       caps: Object.fromEntries(Object.keys(this.instances).map(i => [i, this.caps[i].browser])),
     };
     this.poolSet = new Set(Object.values(this.pools).flat());
@@ -1236,8 +1335,10 @@ export class LiveRun {
       this.setFatal(decision.code);
       return route.abort('blockedbyclient');
     }
-    if (++this.count(decision.instance).browser > this.caps[decision.instance].browser) { this.setFatal('browser_request_budget'); return route.abort('blockedbyclient'); }
-    if (method !== 'GET' && method !== 'HEAD') this.count(decision.instance).browserWrites++;
+    const counter = decision.instance === 'ai' ? (this.aiCount = (this.aiCount || 0) + 1) : ++this.count(decision.instance).browser;
+    const cap = decision.instance === 'ai' ? BUDGETS[this.target].run.fakeAi : this.caps[decision.instance].browser;
+    if (counter > cap) { this.setFatal(decision.instance === 'ai' ? 'fake_ai_budget' : 'browser_request_budget'); return route.abort('blockedbyclient'); }
+    if (decision.instance !== 'ai' && method !== 'GET' && method !== 'HEAD') this.count(decision.instance).browserWrites++;
     if (this.offline && decision.instance === this.offline) return route.abort('internetdisconnected');
     if (decision.kind === 'create' || decision.kind === 'list-create') {
       let response;
@@ -1365,6 +1466,11 @@ export class LiveRun {
       service: mod.service, instance, prefix: run.prefix, runId: run.runId, target: run.target,
       base: inst.base, root: inst.root, ctx: run.ctx, worker: run.worker, extension: run.extension,
       libraryOwner: run.libraryOwner,
+      get fakeAi() {
+        const f = run.fakeAi;
+        check(f, 'fake_ai_not_started');
+        return { marker: f.marker, calls: kind => f.calls(kind), unknown: () => f.unknown(), expect: spec => f.expect(spec) };
+      },
       phase: name => run.phase(name),
       expect: (condition, code) => { run.throwIfFatal(); check(condition, code); },
       expectEq(actual, expected, code) {
@@ -1486,7 +1592,7 @@ export class LiveRun {
     this.persist();
     const current = { id: mod.id, budget, created: 0, claimed: 0, record };
     this.currentModule = current;
-    const before = { ...this.count(mod.instance) };
+    const before = { ...this.count(mod.instance), ai: this.fakeAi ? this.fakeAi.calls() : 0 };
     const pagesBefore = new Set(this.ctx.pages());
     const errorsBefore = this.report.pageErrors.length;
     const settingsKeys = await this.sw(() => Object.keys(SETTINGS_DEFAULTS).concat(['optSyncEnabled', 'offlineQueue']));
@@ -1501,6 +1607,11 @@ export class LiveRun {
       }
       this.guardCfg.writes = mod.needs?.writes !== false;
       await this.pushGuardWrites(this.guardCfg.writes);
+      if (mod.needs?.fakeAi) {
+        check(this.fakeAi, 'fake_ai_not_started', true);
+        const key = await this.sw(k => obfuscateKey(k), this.fakeAi.key);
+        await t.settings({ aiProvider: 'custom', customProtocol: 'openai', customBaseUrl: this.fakeAi.base, customApiKey: key, customModel: 'pbp-fake-ai', customDisplayName: 'Fake AI', aiContentSource: 'local', aiTagSeparator: '_', aiTagLang: 'en', aiSummaryLang: 'en', optRespectTagCase: true });
+      }
       if (mod.settings && Object.keys(mod.settings).length) await t.settings(mod.settings);
       const seconds = budget.seconds || BUDGETS[this.target].run.moduleSeconds;
       const work = (async () => { await mod.steps(t); if (mod.verify) await mod.verify(t); })();
@@ -1516,15 +1627,17 @@ export class LiveRun {
       check(this.report.pageErrors.length === errorsBefore, 'browser_page_error');
       const after = this.count(mod.instance);
       const usedNode = after.node - before.node, usedBrowser = after.browser - before.browser;
-      record.counts = { node: usedNode, browser: usedBrowser };
-      if (usedNode > budget.node || usedBrowser > budget.browser) { this.setFatal('module_request_budget'); this.throwIfFatal(); }
+      const usedAi = this.fakeAi ? this.fakeAi.calls() - before.ai : 0;
+      record.counts = { node: usedNode, browser: usedBrowser, ai: usedAi };
+      if (usedNode > budget.node || usedBrowser > budget.browser || usedAi > budget.ai) { this.setFatal('module_request_budget'); this.throwIfFatal(); }
+      if (this.fakeAi?.failed()) { this.setFatal(this.fakeAi.failed()); this.throwIfFatal(); }
       record.status = 'passed';
       console.log(mod.id + ': passed');
     } catch (error) {
       const code = failureCode(error, this.secrets);
       record.failure = { phase: this.phaseName, code };
       const after = this.count(mod.instance);
-      record.counts = { node: after.node - before.node, browser: after.browser - before.browser };
+      record.counts = { node: after.node - before.node, browser: after.browser - before.browser, ai: this.fakeAi ? this.fakeAi.calls() - before.ai : 0 };
       if (error instanceof HarnessFailure && error.fatal || this.fatal) {
         record.status = 'aborted';
         console.error('ABORTED ' + mod.id + ' at ' + this.phaseName + ': ' + code);
@@ -1543,6 +1656,7 @@ export class LiveRun {
         try {
           await this.closePagesSince(pagesBefore);
           await t.offline('');
+          this.fakeAi?.reset();
           this.probe = null;
           await this.sw(async ({ keys, snapshot }) => {
             const extra = keys.filter(k => !(k in snapshot));
@@ -1611,6 +1725,10 @@ export class LiveRun {
     this.ctx = null;
     if (ctx) await ctx.close().catch(() => {});
     this.worker = null;
+    if (this.fakeAi) {
+      this.report.fakeAi.calls = this.fakeAi.all();
+      await this.fakeAi.close().catch(() => {});
+    }
     // 2-6. Service objects, per instance. Before the browser starts and
     // before any Node write, nothing can exist, so a failed preflight costs
     // no cleanup requests.
@@ -1803,6 +1921,7 @@ export class LiveRun {
     lines.push(`- 开始 ${r.started}，结束 ${r.finished || '未结束'}；整轮结论：${r.passed ? '通过' : '未通过'}${r.failure ? `（${r.failure.phase}：${r.failure.code}）` : ''}`);
     const instanceNames = Object.keys(r.instances || {});
     if (instanceNames.length) lines.push(`- 实例：${instanceNames.map(i => `${i}（Node ${r.counts?.[i]?.node ?? 0} / 浏览器 ${r.counts?.[i]?.browser ?? 0} 次请求）`).join('；')}`);
+    if (r.fakeAi) lines.push(`- 假 AI：${(r.fakeAi.calls || []).filter(c => c.status === 200).length} 次成功调用，上限 ${r.fakeAi.limit}`);
     lines.push('', '## 新发现（失败或中止的模块与证据）', '');
     const bad = r.modules.filter(m => m.status !== 'passed');
     if (!bad.length) lines.push('- 无模块失败。');
@@ -1944,7 +2063,7 @@ async function resumeCleanup(opts) {
 
 function printHelp() {
   console.log([
-    'Opt-in: node scripts/bookmark-service-live.mjs --run [--target temp|user] [--scenario core|edges|readonly|<glob>,...]',
+    'Opt-in: node scripts/bookmark-service-live.mjs --run [--target temp|user] [--scenario core|edges|readonly|ai|<glob>,...]',
     '  --target temp (default) starts throwaway containers from the images of the existing linkding / karakeep-web containers.',
     '  --target user --credentials /private/credentials.json --linkding http://127.0.0.1:PORT --karakeep http://127.0.0.1:PORT',
     '  Karakeep writes on --target user also require --confirm-karakeep-no-auto-ai (and a /signin check that auto AI is off).',

@@ -10,13 +10,14 @@
 //    read-only loopback path.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { createServer } from 'node:http';
+import { createServer, request as httpRequest } from 'node:http';
 import { EventEmitter } from 'node:events';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
+import vm from 'node:vm';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dir = mkdtempSync(join(tmpdir(), 'pbp-live-preflight-'));
@@ -75,6 +76,20 @@ async function run(args, { guard = true, credentials = true, state = stateDirFor
   return { code, output, report, reportPath };
 }
 
+function httpCall({ port, method = 'POST', path = '/v1/chat/completions', headers = {}, body }) {
+  return new Promise((resolve, reject) => {
+    const data = body === undefined ? '' : (typeof body === 'string' ? body : JSON.stringify(body));
+    const req = httpRequest({ host: '127.0.0.1', port, method, path, headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data), ...headers } }, res => {
+      let text = '';
+      res.setEncoding('utf8');
+      res.on('data', c => { text += c; });
+      res.on('end', () => resolve({ status: res.statusCode, type: res.headers['content-type'] || '', text }));
+    });
+    req.on('error', reject);
+    req.end(data);
+  });
+}
+
 // In-process runs print their own progress; keep it unless an assertion fails.
 async function quiet(fn) {
   const { log, error } = console, lines = [];
@@ -114,7 +129,7 @@ try {
   const karakeepAll = pick('karakeep.*');
   assert(karakeepAll.length >= 4 && karakeepAll.every(id => id.startsWith('karakeep.')), 'karakeep.* wildcard');
   assert.deepEqual(pick('karakeep.*', { services: ['linkding'] }), [], '--service filters wildcard matches');
-  assert.deepEqual(pick('*.readonly,*.edges.*'), ids.filter(id => id.endsWith('.readonly') || id.includes('.edges.')).filter(id => !id.startsWith('pinboard.')));
+  assert.deepEqual(pick('*.readonly,*.ai.*'), ids.filter(id => id.endsWith('.readonly') || id.includes('.ai.')).filter(id => !id.startsWith('pinboard.')));
   assert.deepEqual(pick('linkding.core.worker,linkding.core.worker'), ['linkding.core.worker'], 'duplicates collapse');
   assert.deepEqual(pick('linkding.core.wo?ker'), ['linkding.core.worker'], '? wildcard');
   assert.throws(() => live.selectModules('nothing.matches.this'), e => e.code === 'scenario');
@@ -131,7 +146,7 @@ try {
   // Budgets: sums come from the rows, caps from the target
   // ---------------------------------------------------------------------
   for (const target of ['temp', 'user']) {
-    for (const spec of ['core', 'edges', 'readonly']) {
+    for (const spec of ['core', 'edges', 'readonly', 'ai']) {
       const { selected, skipped } = live.selectModules(spec, { target });
       const plan = live.buildPlan({ target, selected, skipped });
       for (const instance of plan.instances) {
@@ -192,12 +207,15 @@ try {
       pinboard: { service: 'pinboard', base: '', root: live.PINBOARD_ROOT },
     },
     pools: { linkding: live.poolUrls('temp', runId, 'linkding', 2), karakeep: live.poolUrls('temp', runId, 'karakeep', 2), pinboard: live.poolUrls('user', runId, 'pinboard', 1) },
-    listMarker: 'Pinboard Bookmark Enhanced: Read Later', writes: true,
+    listMarker: 'Pinboard Bookmark Enhanced: Read Later', writes: true, aiOrigin: 'http://127.0.0.1:1003', aiPath: '/v1/chat/completions',
   };
   const view = { created: [{ instance: 'linkding', id: '7', url: cfg.pools.linkding[0] }, { instance: 'karakeep', id: 'k7', url: cfg.pools.karakeep[0] }, { instance: 'pinboard', id: cfg.pools.pinboard[0], url: cfg.pools.pinboard[0] }] };
   const transported = new Function('return (' + live.liveGuardRule.toString() + ')')();
   const cases = [
     [{ url: 'https://example.org/x', method: 'GET' }, false, 'live_guard_origin'],
+    [{ url: 'http://127.0.0.1:1003/v1/chat/completions', method: 'POST' }, true],
+    [{ url: 'http://127.0.0.1:1003/v1/chat/completions', method: 'GET' }, false, 'live_guard_ai'],
+    [{ url: 'http://127.0.0.1:1003/v1/models', method: 'POST' }, false, 'live_guard_ai'],
     [{ url: 'http://127.0.0.1:1001/api/bookmarks/', method: 'POST', body: JSON.stringify({ url: cfg.pools.linkding[1] }) }, true],
     [{ url: 'http://127.0.0.1:1001/api/bookmarks/', method: 'POST', body: JSON.stringify({ url: 'https://example.com/private' }) }, false, 'live_guard_create'],
     [{ url: 'http://127.0.0.1:1001/api/bookmarks/7/', method: 'PATCH', body: '{}' }, true],
@@ -312,6 +330,75 @@ try {
     assert(!readFileSync(run.reportPath, 'utf8').includes(syntheticKey), 'persisted report is redacted');
     rmSync(run.runDir, { recursive: true, force: true });
   }
+
+  // ---------------------------------------------------------------------
+  // Fake AI: product prompts classify, replies parse with product parsers
+  // ---------------------------------------------------------------------
+  const productCtx = vm.createContext({ console, URL, TextEncoder, TextDecoder, setTimeout, clearTimeout, btoa, atob, encodeURIComponent, decodeURIComponent, escape, unescape });
+  for (const file of ['shared.js', 'ai.js']) vm.runInContext(readFileSync(join(root, file), 'utf8'), productCtx, { filename: file });
+  const product = vm.runInContext(`({
+    tags: buildTagPrompt({ aiTagSeparator: '_' }, 'Title', 'http://localhost:47391/', 'Body', '', ['existing']),
+    summary: buildSummaryPrompt({}, 'Title', 'http://localhost:47391/', 'Body', ''),
+    combined: buildCombinedPrompt({ aiTagSeparator: '_' }, 'Title', 'http://localhost:47391/', 'Body', '', ['existing']),
+    parseTags: parseAITags, parseCombined: parseAICombined,
+  })`, productCtx);
+  for (const kind of ['tags', 'summary', 'combined']) assert.equal(live.classifyPrompt(product[kind]), kind, kind + ' prompt drifted from the fake AI classifier');
+  assert.equal(live.classifyPrompt('Translate this'), 'unknown');
+
+  const prefix = 'pbp-it-' + randomUUID();
+  const fake = await live.startFakeAi({ prefix, limit: 7 });
+  const statuses = [];
+  const ask = async (prompt, extra = {}) => {
+    const r = await httpCall({ port: fake.port, headers: { Authorization: 'Bearer ' + fake.key, ...extra.headers }, path: extra.path, method: extra.method, body: extra.body ?? { model: 'pbp-fake-ai', messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 1024, ...(extra.stream ? { stream: true } : {}) } });
+    statuses.push(r.status);
+    return r;
+  };
+  const replyOf = r => JSON.parse(r.text).choices[0];
+  let r = await ask(product.tags);
+  assert.equal(r.status, 200);
+  assert.equal(replyOf(r).finish_reason, 'stop');
+  // Product parsers run in a vm realm; copy results before strict deepEqual.
+  const tags = Array.from(product.parseTags(replyOf(r).message.content, '_'));
+  assert(tags.length >= 1 && tags.every(t => t.startsWith(prefix)), 'fake tags carry the run prefix after the product parser');
+  r = await ask(product.summary);
+  const summary = replyOf(r).message.content;
+  assert(summary.includes(fake.marker) && summary.includes('\n'), 'summary is multi-line and carries the run marker');
+  r = await ask(product.combined);
+  const combined = JSON.parse(JSON.stringify(product.parseCombined(replyOf(r).message.content, '_')));
+  assert(combined.summary.includes(fake.marker) && combined.tags.every(t => t.startsWith(prefix)));
+  fake.expect({ kind: 'tags', reply: '["' + prefix + '_queued"]' });
+  r = await ask(product.tags);
+  assert.deepEqual(Array.from(product.parseTags(replyOf(r).message.content, '_')), [prefix + '_queued'], 'expect() queues one reply');
+  r = await ask(product.summary, { stream: true });
+  assert.equal(r.status, 200);
+  assert(r.type.startsWith('text/event-stream'));
+  const events = r.text.split('\n\n').filter(Boolean);
+  assert.equal(events.at(-1), 'data: [DONE]');
+  const streamed = events.slice(0, -1).map(e => JSON.parse(e.slice(6))).map(e => e.choices[0].delta.content || '').join('');
+  assert(streamed.includes(fake.marker), 'SSE chunks reassemble the summary');
+  r = await ask(product.tags, { headers: { Authorization: 'Bearer wrong' } });
+  assert.equal(r.status, 401);
+  r = await ask('Translate this page');
+  assert.equal(r.status, 404);
+  assert.equal(fake.unknown(), 1);
+  // 8th request: over the cap of 7, refused with 503 and the run marked failed.
+  r = await ask(product.tags);
+  assert.equal(r.status, 503);
+  assert.equal(fake.failed(), 'fake_ai_auth', 'first failure is kept');
+  const forged = await httpCall({ port: fake.port, headers: { Host: 'example.com', Authorization: 'Bearer ' + fake.key }, body: {} });
+  assert.equal(forged.status, 403, 'foreign Host header is refused');
+  assert(!statuses.includes(400) && !statuses.includes(422), 'never 400/422: they trigger dialect fallback retries');
+  const metadata = fake.all();
+  for (const entry of metadata) assert.deepEqual(Object.keys(entry).sort(), ['auth', 'hasPrefix', 'kind', 'method', 'model', 'n', 'path', 'promptBytes', 'status', 'stream']);
+  assert(!JSON.stringify(metadata).includes('Suggest up to') && !JSON.stringify(metadata).includes(fake.key), 'fake AI records metadata only');
+  assert.equal(fake.calls(), 5);
+  await fake.close();
+  const capped = await live.startFakeAi({ prefix, limit: 1 });
+  await httpCall({ port: capped.port, headers: { Authorization: 'Bearer ' + capped.key }, body: { model: 'm', messages: [{ role: 'user', content: product.summary }] } });
+  const capReply = await httpCall({ port: capped.port, headers: { Authorization: 'Bearer ' + capped.key }, body: { model: 'm', messages: [{ role: 'user', content: product.summary }] } });
+  assert.equal(capReply.status, 503);
+  assert.equal(capped.failed(), 'fake_ai_budget', 'exceeding the cap fails the run');
+  await capped.close();
 
   // ---------------------------------------------------------------------
   // Docker: names, refusals, and the temp lifecycle with a fake executor
@@ -667,7 +754,7 @@ try {
   assert(!existsSync(join(linkdingState, 'pbp-it-live.lock')), 'lock released on SIGINT');
   hang = false;
 
-  console.log('bookmark live preflight: registry/selection/budgets/guard rule/docker fake executor/plan/gates/Karakeep auto-AI/linkding read-only browser/cleanup resume/SIGINT passed');
+  console.log('bookmark live preflight: registry/selection/budgets/guard rule/fake AI/docker fake executor/plan/gates/Karakeep auto-AI/linkding read-only browser/cleanup resume/SIGINT passed');
 } finally {
   for (const server of servers) await closeServer(server);
   rmSync(dir, { recursive: true, force: true });
