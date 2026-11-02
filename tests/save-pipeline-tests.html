@@ -2405,10 +2405,10 @@ await suite("summary ownership after worker saves", async () => {
   const BATCH_NOTES = "<blockquote>AI summary</blockquote>";
   const SERVER_NOTES = "Typed on pinboard.in\n\n<blockquote>Older summary</blockquote>";
   const SERVER_RANGE = Object.freeze({ start: "Typed on pinboard.in\n\n".length, end: SERVER_NOTES.length });
-  const postsGet = (extended) => ({ date: "2026-11-01T09:00:00Z", user: "alice", posts: [{
+  const postsGet = (extended, toread = "no") => ({ date: "2026-11-01T09:00:00Z", user: "alice", posts: [{
     href: PAGE, description: "New title", extended,
     meta: "5d41402abc4b2a76b9719d911017c592", hash: "7d793037a0760186574b0282f2f435e7",
-    time: "2026-11-01T09:00:00Z", shared: "yes", toread: "no", tags: "base-tag",
+    time: "2026-11-01T09:00:00Z", shared: "yes", toread, tags: "base-tag",
   }] });
   const pinboard = (body) => async (url) => url.includes("/posts/get?") ? response(200, body) : response(200, ADDED);
   const extendedSent = (core) => {
@@ -2683,6 +2683,54 @@ await suite("summary ownership after worker saves", async () => {
       equal(await receipts(), before, action + " changed the page's receipts");
       equal(await (await popupOpens(SERVER_NOTES)).restore(), "receipt", action + ": the server's block lost its receipt");
     }
+  });
+
+  // The notes guard compares bytes, and bytes can agree by chance: the server
+  // may hold exactly the text the popup handed over (typed on another client, or
+  // saved earlier without a receipt). An update still writes the server's notes
+  // as it read them, never the handed ones, so the handed range describes
+  // nothing the worker wrote and must neither become a receipt nor replace one.
+  // Only a create (or a skip, which creates or keeps) writes the handed notes.
+  await test("a reader update of an existing bookmark takes no receipt for a handed block, even when the server notes equal the handed ones", async () => {
+    for (const action of ["later", "read", "edit"]) {
+      for (const held of [false, true]) {
+        const where = action + (held ? " over a receipt for the same text" : "");
+        await pbpFixtureClearSummaryOwnership();
+        const popup = await popupWithFreshSummary();
+        const handed = popup.field.value;
+        // A receipt the page already had for these very notes, at a range the
+        // popup does not hand over.
+        if (held) await pbpAiSaveSummaryOwnership("alice", PAGE, handed, { start: 0, end: "Auto notes".length });
+        const core = await createHarness({ pinboardFetch: pinboard(postsGet(handed, action === "read" ? "yes" : "no")) });
+        handToReader(core, { notes: handed, summaryRange: popup.snapshot() });
+        const before = await receipts();
+        equal(before === "[]", !held, where + ": unexpected receipts before the save");
+        const result = await readerSave(core, action);
+        equal(result.status, "saved", where + ": " + JSON.stringify(result));
+        equal(extendedSent(core), handed, where + ": the update did not write the server notes it read");
+        equal(await receipts(), before, where + ": the update wrote or dropped a receipt");
+        if (!held) equal(await (await popupOpens(handed)).restore(), null, where + ": the popup reclaimed text it never wrote");
+      }
+    }
+  });
+
+  // An edit that cannot be delivered is queued as the resolved update; a hold
+  // for the handed range would later become a receipt for whatever notes the
+  // replay finds, so the update queues without one.
+  await test("a queued reader edit of an existing bookmark holds no ownership for a handed block", async () => {
+    await pbpFixtureClearSummaryOwnership();
+    const popup = await popupWithFreshSummary();
+    const handed = popup.field.value;
+    const core = await createHarness({ pinboardFetch: async (url) => {
+      if (url.includes("/posts/get?")) return response(200, postsGet(handed));
+      throw new TypeError("Failed to fetch");
+    } });
+    handToReader(core, { notes: handed, summaryRange: popup.snapshot() });
+    const result = await readerSave(core, "edit");
+    equal(result.status, "queued", JSON.stringify(result));
+    equal(core.storageData.offlineQueue.length, 1, "the edit was not queued");
+    equal(core.storageData.offlineQueue[0].mode, "update", "the queued edit is not the resolved update");
+    equal(await receipts(), "[]", "the queued update holds a range for text the worker did not write");
   });
 
   await test("removing a queued save drops its offline hold", async () => {
