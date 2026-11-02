@@ -557,8 +557,19 @@
       }
     }
   },
-  "batchTagTooLongSkipHint": {
-    "message": " linkding zapisał już te strony bez tagów, a przy włączonej opcji „Pomiń już dodane URL-e” kolejny zapis zbiorczy je pominie. Wyłącz ją przed ponownym uruchomieniem albo dodaj tag do każdej strony w popupie."
+  "batchTagTooLongSkip": {
+    "message": ". Zapisano bez tagów: $COUNT$, bo tag „$TAG$” przekracza limit $MAX$ znaków w linkding. Skróć go, wyłącz „Pomiń już dodane URL-e” i uruchom zapis zbiorczy ponownie albo dodaj tag do każdej strony w popupie.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "tag": {
+        "content": "$2"
+      },
+      "max": {
+        "content": "$3"
+      }
+    }
   },
   "batchAiFailed": {
     "message": ", błąd AI: $COUNT$",

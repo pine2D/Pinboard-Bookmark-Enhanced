@@ -5294,8 +5294,10 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     const queuedMsg = queued > 0 ? ` · ${t("offlineQueued", String(queued))}` : "";
     // A sentence of its own after the summary: which tag, the limit, what to do.
     const tagTooLongMsg = tagTooLong > 0
-      ? t("batchTagTooLong", String(tagTooLong), ...pbpBookmarkFailureArgs({ reason: "tag_too_long", tag: longTag }))
-        + (longTagSkip ? t("batchTagTooLongSkipHint") : "") : "";
+      // Skip mode gets its own sentence: those pages were created untagged, so
+      // "run Batch Save again" alone would skip them; it names the way out.
+      ? t(longTagSkip ? "batchTagTooLongSkip" : "batchTagTooLong", String(tagTooLong), ...pbpBookmarkFailureArgs({ reason: "tag_too_long", tag: longTag }))
+      : "";
     if (saved > 0 || queued > 0 || failed > 0 || tooLong > 0 || tagTooLong > 0) {
       const message = t("batchDone", String(saved), String(failed)) + skippedMsg + tooLongMsg + queuedMsg + tagsSuffix + tagTooLongMsg;
       if (saved > 0 || queued > 0) {

@@ -557,8 +557,19 @@
       }
     }
   },
-  "batchTagTooLongSkipHint": {
-    "message": " linkding a déjà créé ces signets sans tags, et l’option « Ignorer les URL déjà enregistrées » les ignorerait au prochain passage. Désactivez-la avant de relancer l’enregistrement groupé, ou ajoutez le tag à chaque page depuis le popup."
+  "batchTagTooLongSkip": {
+    "message": ". Signets enregistrés sans tags ($COUNT$) : le tag « $TAG$ » dépasse la limite de $MAX$ caractères de linkding. Raccourcissez-le, désactivez « Ignorer les URL déjà enregistrées » et relancez l’enregistrement groupé, ou ajoutez le tag page par page depuis le popup.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "tag": {
+        "content": "$2"
+      },
+      "max": {
+        "content": "$3"
+      }
+    }
   },
   "batchAiFailed": {
     "message": ", échec de l'IA pour $COUNT$",

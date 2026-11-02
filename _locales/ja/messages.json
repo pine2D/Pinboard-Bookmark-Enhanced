@@ -557,8 +557,19 @@
       }
     }
   },
-  "batchTagTooLongSkipHint": {
-    "message": "linkding はこれらのページをタグなしで保存済みです。「既にブックマーク済みの URL をスキップ」がオンのままだと、次回はスキップされます。オフにしてから一括保存し直すか、ポップアップで 1 件ずつタグを追加してください。"
+  "batchTagTooLongSkip": {
+    "message": "。ほかに $COUNT$ 件は、タグ「$TAG$」が linkding の上限（$MAX$ 文字）を超えたため、タグなしで保存されました。短くしてから「既にブックマーク済みの URL をスキップ」をオフにして一括保存し直すか、ポップアップで 1 件ずつタグを追加してください。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "tag": {
+        "content": "$2"
+      },
+      "max": {
+        "content": "$3"
+      }
+    }
   },
   "batchAiFailed": {
     "message": "、$COUNT$ 件は AI 処理に失敗",

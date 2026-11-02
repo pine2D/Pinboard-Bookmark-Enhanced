@@ -562,9 +562,20 @@
       }
     }
   },
-  "batchTagTooLongSkipHint": {
-    "message": " linkding has already saved these pages without tags, and \"Skip already bookmarked URLs\" would pass them by next time. Turn that setting off before running Batch Save again, or add the tag to each page from the popup.",
-    "description": "Sentence appended after batchTagTooLong when Batch Save ran with \"Skip already bookmarked URLs\" on (it starts with its own separator). linkding on PostgreSQL created those bookmarks without tags, so a rerun in that mode would skip them."
+  "batchTagTooLongSkip": {
+    "message": ". $COUNT$ saved without tags because the tag \"$TAG$\" is longer than linkding's $MAX$-character limit. Shorten it, turn off \"Skip already bookmarked URLs\" and run Batch Save again, or add it page by page from the popup.",
+    "description": "Replaces batchTagTooLong when Batch Save ran with \"Skip already bookmarked URLs\" on; it starts with its own separator. linkding on PostgreSQL created those $COUNT$ bookmarks without tags, so the sentence ends with the way to add them: turn the option off and rerun, or tag each page from the popup. $TAG$ is the first such tag, $MAX$ the limit.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "tag": {
+        "content": "$2"
+      },
+      "max": {
+        "content": "$3"
+      }
+    }
   },
   "batchAiFailed": {
     "message": ", AI failed for $COUNT$",

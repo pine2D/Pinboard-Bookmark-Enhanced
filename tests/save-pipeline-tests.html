@@ -2423,7 +2423,7 @@ await suite("unified save pipeline", async () => {
     equal(last.saved, 2); equal(last.tagTooLong, 1); equal(last.longTag, shown);
     assert(resumed.notifications[0][2].endsWith("batchTagTooLong:1:" + shown + ":64"), resumed.notifications[0][2]);
     for (const run of [h, all, resumed]) {
-      assert(!run.notifications[0][2].includes("batchTagTooLongSkipHint"), "a merge run told the user to switch modes");
+      assert(!run.notifications[0][2].includes("batchTagTooLongSkip"), "a merge run told the user to switch modes");
       assert(run.progress.every((p) => p.longTagSkip !== true), "a merge run flagged skip mode");
     }
   });
@@ -2436,7 +2436,9 @@ await suite("unified save pipeline", async () => {
     await skip.handleBatchSave(batchTabs(3));
     assert(skip.intents.every((i) => i.prepared.mode === "skip"), "the run did not use skip mode");
     const body = skip.notifications[0][2];
-    assert(body.endsWith("batchTagTooLong:1:" + shown + ":64batchTagTooLongSkipHint"), "skip hint missing after the tag sentence: " + body);
+    assert(body.endsWith("batchTagTooLongSkip:1:" + shown + ":64"), "skip-mode sentence missing: " + body);
+    // One sentence, not the merge advice with a correction after it.
+    assert(!body.includes("batchTagTooLong:"), "skip mode still carries the rerun-only sentence: " + body);
     equal(skip.progress[skip.progress.length - 1].longTagSkip, true, "the popup's terminal record lost the skip flag");
     equal(skip.jobs[skip.jobs.length - 1].counts.longTagSkip, true, "the checkpoint a resume reads lost the skip flag");
     // A skip run without an over-long tag says nothing about it.
@@ -2447,7 +2449,8 @@ await suite("unified save pipeline", async () => {
     const resumed = await createBatchSaveHarness({ settings: { batchSkipExisting: true }, outcomes: [{ status: "saved", mutation: "created" }] });
     await resumed.handleBatchSave(batchTabs(3), "alice", false, { runId: "test-batch-run", startIndex: 2, resumeCount: 1,
       counts: { processed: 2, saved: 1, queued: 0, failed: 0, aiFailed: 0, skipped: 0, tooLong: 0, tagTooLong: 1, longTag: shown, longTagSkip: true } });
-    assert(resumed.notifications[0][2].endsWith("batchTagTooLongSkipHint"), resumed.notifications[0][2]);
+    assert(resumed.notifications[0][2].endsWith("batchTagTooLongSkip:1:" + shown + ":64"), resumed.notifications[0][2]);
+    assert(!resumed.notifications[0][2].includes("batchTagTooLong:"), resumed.notifications[0][2]);
   });
 
   await test("first gateway failure stops the batch and records the code", async () => {

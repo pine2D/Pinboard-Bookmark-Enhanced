@@ -673,10 +673,11 @@ async function createUiHarness(storedProgress, now, opts = {}) {
     const plain = await createUiHarness(null, 5000);
     plain.renderBatchProgress({ running: false, done: true, total: 1, saved: 1, queued: 0, failed: 0, skipped: 0, tooLong: 0 });
     assert(!plain.statuses[0].message.includes("batchTagTooLong"), "a run without tag failures mentions them");
-    assert(!h.statuses[0].message.includes("batchTagTooLongSkipHint"), "a merge run told the user to switch modes");
+    assert(!h.statuses[0].message.includes("batchTagTooLongSkip"), "a merge run told the user to switch modes");
     const skip = await createUiHarness(null, 5000);
     skip.renderBatchProgress({ running: false, done: true, total: 3, saved: 0, queued: 0, failed: 0, skipped: 2, tooLong: 0, tagTooLong: 1, longTag: shown, longTagSkip: true });
-    assert(skip.statuses[0].message.endsWith("batchTagTooLong:1:" + shown + ":64batchTagTooLongSkipHint"), "skip hint missing: " + skip.statuses[0].message);
+    assert(skip.statuses[0].message.endsWith("batchTagTooLongSkip:1:" + shown + ":64"), "skip-mode sentence missing: " + skip.statuses[0].message);
+    assert(!skip.statuses[0].message.includes("batchTagTooLong:"), "skip mode still carries the rerun-only sentence: " + skip.statuses[0].message);
   });
 
   await test("completion copy is localized and names an account switch (B33/B51)", async () => {

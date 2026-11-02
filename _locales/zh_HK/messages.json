@@ -557,8 +557,19 @@
       }
     }
   },
-  "batchTagTooLongSkipHint": {
-    "message": "linkding 已將這些網頁存成沒有標籤的書籤，開著「跳過已收藏的網址」再次執行會略過它們。請先關閉此選項再批量儲存，或在彈窗逐一補上標籤。"
+  "batchTagTooLongSkip": {
+    "message": "。另有 $COUNT$ 個已存成沒有標籤的書籤：標籤「$TAG$」超出 linkding 的 $MAX$ 個字元上限。請縮短後關閉「跳過已收藏的網址」再批量儲存，或在彈窗逐一補上標籤。",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      },
+      "tag": {
+        "content": "$2"
+      },
+      "max": {
+        "content": "$3"
+      }
+    }
   },
   "batchAiFailed": {
     "message": "，AI 處理失敗 $COUNT$ 個",
