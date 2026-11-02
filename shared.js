@@ -1965,6 +1965,14 @@ function pbpOfflineQueueReduce(queue, action) {
       delete item.token;
       return [...q, item];
     }
+    // Only a skip turns into a merge: background.js's replay does this once a
+    // skip's create was refused over a tag the server may still have stored
+    // the bookmark without, so the next replay tags that bookmark instead of
+    // skipping it. A legacy item without a mode is one the replay resolved to
+    // skip from the settings. Other modes and unknown targets stay as they are.
+    case "skip_to_merge":
+      return q.map((it) => it && it.queueId === action.queueId && (it.mode === "skip" || it.mode === undefined)
+        ? { ...it, mode: "merge" } : it);
     case "ensure_ids":
       if (!action.prefix) return q.slice();
       return q.map((it, index) =>

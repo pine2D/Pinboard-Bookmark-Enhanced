@@ -1185,6 +1185,34 @@ test("an over-long tag already in the offline queue stays queued on replay and i
   equal([retried.ok,retried.result.reason,retried.result.tag],[false,"tag_too_long",tag]);
   equal([h.state.calls.length,h.state.queue.map(item=>item.queueId)],[5,[queueId]]);
 });
+// linkding on PostgreSQL inserts the bookmark before its tags (G3), so the
+// failed create leaves this untagged record behind; /check/ finds it next time.
+const ldUntaggedLeftover = {...ldUnscraped,id:23,title:"Title",notes:"Note",tag_names:[],date_added:"2026-11-02T08:00:00.000000Z",date_modified:"2026-11-02T08:00:00.000000Z"};
+test("a queued skip-mode save that hit an over-long tag keeps trying to tag the bookmark it left behind instead of skipping it",async()=>{
+  const tag=overlongTags[0];
+  const sources=[
+    ["quick save",async h=>(await producers(h,{autoNotes:"",summary:"",settings:{_aiSummary:false,bgSaveMode:"skip",_defaultTags:tag}})).quickSave()],
+    ["Batch",async h=>(await producers(h,{autoNotes:"",summary:"",settings:{batchAiSummary:false,batchSkipExisting:true,optBatchTagEnabled:true,optBatchTag:tag}})).batchSave()],
+    ["skip intent",h=>h.submitSaveIntent({...saveIntent,mode:"skip",tags:tag})],
+  ];
+  for(const [label,enqueue] of sources){
+    // A proxy outage queues the save; the first replay's create then fails
+    // on the tag after PostgreSQL stored the bookmark; the next replay finds it.
+    const h=await workerHarness("linkding",[[200,{bookmark:null}],proxyError(502),
+      [200,{bookmark:null}],djangoServerError(),
+      [200,{bookmark:ldUntaggedLeftover,metadata:{},auto_tags:[]}],djangoServerError(),
+      [200,{bookmark:ldUntaggedLeftover,metadata:{},auto_tags:[]}],djangoServerError()]);
+    await enqueue(h);
+    equal([label,h.state.queue.map(item=>item.mode)],[label,["skip"]]);
+    await h.processOfflineQueue();
+    await h.processOfflineQueue();
+    equal([label,h.state.calls.map(c=>c.method)],[label,["GET","POST","GET","POST","GET","PATCH"]]);
+    equal([label,h.state.calls[5].body.tag_names],[label,[tag]]);
+    equal([label,h.state.queue.length],[label,1]);
+    const retried=await h.retryOfflineItem(h.state.queue[0].queueId);
+    equal([label,retried.ok,retried.result.reason],[label,false,"tag_too_long"]);
+  }
+});
 test("quick save and Batch notify which linkding tag is too long and queue nothing",async()=>{
   const tag=overlongTags[1], shown="標".repeat(40)+"…";
   for(const run of ["quickSave","batchSave"]){

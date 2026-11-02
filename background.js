@@ -1326,7 +1326,7 @@ function sendOfflineItem(item) {
       envelope = { result: pbpSaveFailure("internal"), persisted: null, retryable: false };
     }
     await pbpSettleSummaryOwnershipHold(item.queueId, intent, envelope, deliveryAuth);
-    return { ...envelope, settings: deliverySettings, auth: deliveryAuth };
+    return { ...envelope, mode: intent.mode, settings: deliverySettings, auth: deliveryAuth };
   });
 }
 
@@ -1403,6 +1403,14 @@ function drainOfflineQueueIds(queueIds, { manual = false, pausedAccount = "" } =
     },
     onFailure: async (item, delivered) => {
       const reason = (delivered?.result || delivered)?.reason;
+      // linkding on PostgreSQL stores a new bookmark before its tags, so a
+      // skip whose create failed on an over-long tag may have left it behind
+      // untagged; a later skip would find it and drop the item unreported.
+      // From now on the item merges its tags into that bookmark instead and
+      // keeps reporting the tag until it is shortened.
+      if (reason === "tag_too_long" && delivered?.mode === "skip") {
+        await mutateOfflineQueue({ kind: "skip_to_merge", queueId: item.queueId });
+      }
       if (!PBP_BOOKMARK_GATEWAY_CODES.includes(reason) || typeof item.account !== "string" || !item.account) return;
       paused.add(item.account);
       await pbpSetOfflineQueuePause(item.account, reason);

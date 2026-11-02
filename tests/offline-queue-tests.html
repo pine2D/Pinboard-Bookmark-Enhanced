@@ -82,6 +82,22 @@ await suite("offline queue", async () => {
     const out = pbpOfflineQueueReduce(Q(), { kind: "enqueue", item: { queueId: "a", url: "https://a.com" } });
     assert(out.length === 3, "no duplicate for same queueId");
   });
+  await test("skip_to_merge turns only the named skip (or modeless legacy) item into a merge", () => {
+    const input = [
+      { queueId: "a", mode: "skip", url: "https://a.com", tags: "t" },
+      { queueId: "b", mode: "skip", url: "https://b.com" },
+      { queueId: "c", url: "https://c.com" },
+    ];
+    const out = pbpOfflineQueueReduce(input, { kind: "skip_to_merge", queueId: "a" });
+    assert(JSON.stringify(out) === JSON.stringify([{ ...input[0], mode: "merge" }, input[1], input[2]]), "only a changes, every other field kept");
+    assert(input[0].mode === "skip", "input not mutated");
+    assert(pbpOfflineQueueReduce(input, { kind: "skip_to_merge", queueId: "c" })[2].mode === "merge", "legacy modeless item pinned to merge");
+    for (const mode of ["merge", "update", "overwrite", "create"]) {
+      const kept = pbpOfflineQueueReduce([{ queueId: "a", mode }], { kind: "skip_to_merge", queueId: "a" });
+      assert(kept[0].mode === mode, mode + " stays " + mode);
+    }
+    assert(JSON.stringify(pbpOfflineQueueReduce(input, { kind: "skip_to_merge", queueId: "zzz" })) === JSON.stringify(input), "unknown id is a no-op");
+  });
   await test("new queue payload does not persist credentials", () => {
     const out = pbpOfflineQueueReduce([], { kind: "enqueue", item: { queueId: "a", account: "alice", url: "https://a.com", token: "secret" } });
     assert(out.length === 1 && !("token" in out[0]), "new item strips token");
