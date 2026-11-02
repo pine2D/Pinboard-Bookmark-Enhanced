@@ -1362,6 +1362,69 @@ try {
   // Pure helpers: endpoints, redaction, Karakeep config, signals, lock
   // ---------------------------------------------------------------------
   if (only('pure helpers')) {
+    // H3c ux.status-check against a stand-in worker (review of H3c, must-fix
+    // 2): the toolbar check of the article tab openPopup activates is not
+    // counted as the popup's, so a product that asks once passes and one
+    // that asks again after a failed shared check fails.
+    {
+      const statusModule = MODULES.find(m => m.id === 'ux.status-check');
+      const drive = async variant => {
+        const CHECK = 'bookmarks/check-url?url=x';
+        const world = { checkOn: true, pending: 0, icons: {}, reqs: [], faults: [], urls: [] };
+        const saved = () => world.urls[0];
+        const check = (url, delay = 20) => {
+          world.pending++;
+          setTimeout(() => {
+            world.reqs.push({ path: CHECK, at: Date.now() });
+            const fault = world.faults.find(f => f.on);
+            if (fault) {
+              fault.hits++;
+              if (variant.flips) setTimeout(() => { world.icons[url] = 'default'; world.pending--; }, 60);
+              else world.pending--;
+            } else { world.icons[url] = url === saved() ? 'saved' : 'default'; world.pending--; }
+          }, delay);
+        };
+        const activate = url => { if (world.checkOn) check(url); return true; };
+        const parts = {};
+        const fail = code => { const e = new Error(code); e.code = code; throw e; };
+        const t = {
+          service: 'karakeep', prefix: 'pbp-it-x', shotsEnabled: false,
+          claimUrl: () => { const u = 'https://example.com/' + world.urls.length; world.urls.push(u); return u; },
+          phase: async () => {}, seed: async () => {}, note: () => {}, check: () => {},
+          expect: (ok, code) => { if (!ok) fail(code); },
+          expectEq: (a, b, code) => { if (a !== b) fail(code); },
+          now: () => Date.now(),
+          sleep: ms => new Promise(r => setTimeout(r, Math.min(ms, 30))),
+          until: async (read, label, timeout = 2000) => { const end = Date.now() + Math.min(timeout, 2000); while (Date.now() < end) { if (await read()) return; await new Promise(r => setTimeout(r, 10)); } fail('timeout_' + label); },
+          settings: async values => { if ('optCheckBookmarkStatus' in values) world.checkOn = values.optCheckBookmarkStatus; },
+          inject: () => { const f = { on: true, hits: 0 }; world.faults.push(f); return { hits: () => f.hits, passed: () => 0, clear: () => { f.on = false; } }; },
+          requests: ({ path, since = 0 } = {}) => world.reqs.filter(r => r.at >= since && (!path || path.test(r.path))),
+          activateTab: async url => activate(url),
+          ctx: { newPage: async () => ({ goto: async () => {}, bringToFront: async () => {}, close: async () => {} }) },
+          sw: async (fn, arg) => {
+            const text = String(fn);
+            if (text.includes('_lastIconState')) return world.icons[arg] || '';
+            if (text.includes('statusCache.clear')) return true;
+            if (text.includes('_pendingChecks.size')) return world.pending === 0;
+            if (text.includes('_settingsCache')) return world.checkOn !== true;
+            throw new Error('unexpected worker call ' + text.slice(0, 60));
+          },
+          openPopup: async url => {
+            if (variant.recheckOnPopup !== false) activate(url);
+            let done = false;
+            for (let i = 0; i < variant.popupAsks; i++) check(url, 30 + i * 20);
+            setTimeout(() => { done = true; }, 30 + variant.popupAsks * 20 + 10);
+            const popup = { evaluate: async fn => (String(fn).includes("'idle', 'pending'") ? done : 'error') };
+            return { popup, close: async () => {} };
+          },
+          part: async (name, refs, fn) => { try { await fn(); parts[name] = 'passed'; } catch (e) { parts[name] = e.code || e.message; } },
+        };
+        await statusModule.steps(t);
+        return parts;
+      };
+      assert.deepEqual(await drive({ popupAsks: 1 }), { switch_cost: 'passed', failure: 'passed' }, 'a product that asks once passes');
+      assert.deepEqual(await drive({ popupAsks: 2 }), { switch_cost: 'passed', failure: 'status_failure_popup_lookups' }, 'a second popup lookup fails');
+    }
     // H3c: a fault with `pass` lets the first n matching requests through.
     {
       const run = new live.LiveRun({ mode: 'plan', flags: new Set(), values: {}, errors: [] });

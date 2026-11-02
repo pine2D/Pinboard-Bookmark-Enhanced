@@ -2888,6 +2888,8 @@ export const H3C_MODULES = [
       for (const url of [saved, fresh]) { pages[url] = await t.ctx.newPage(); await pages[url].goto(url).catch(() => {}); }
       const tabIcon = url => t.sw(async url => { const tab = (await chrome.tabs.query({})).find(x => x.url === url); return tab ? _lastIconState.get(tab.id) || '' : 'no_tab'; }, url);
       const want = { [saved]: 'saved', [fresh]: 'default' };
+      // No status check in flight in the worker (its own dedup map).
+      const checksSettled = () => t.until(async () => t.sw(() => _pendingChecks.size === 0), 'status_checks_settled', 8000);
 
       await t.part('switch_cost', [], async () => {
         await t.phase('status_switches');
@@ -2929,11 +2931,19 @@ export const H3C_MODULES = [
         t.expectEq(icon, 'saved', 'status_failure_icon_flipped');
 
         await t.phase('status_failure_popup');
+        // Only the popup's own lookup is counted. openPopup opens and
+        // activates an article tab, and with the toolbar check on that tab
+        // asks too (one more check before and after G14 alike); the popup's
+        // lookup_bookmark does not read the setting, so turning it off here
+        // leaves just the lookup this step is about.
+        await t.settings({ optCheckBookmarkStatus: false });
+        await t.until(async () => t.sw(() => _settingsCache?.optCheckBookmarkStatus !== true), 'status_check_off', 5000);
+        await checksSettled();
         await t.sw(() => { statusCache.clear(); return true; });
         const popupSince = t.now();
         const form = await t.openPopup(saved, { settle: false });
         await t.until(async () => form.popup.evaluate(() => typeof bookmarkLookup !== 'undefined' && !['idle', 'pending'].includes(bookmarkLookup.status)), 'status_failure_popup', 30000);
-        await t.sleep(800);
+        await checksSettled();
         const lookup = await form.popup.evaluate(() => bookmarkLookup.status);
         const checks = t.requests({ path: CHECK_PATH[t.service], since: popupSince }).length;
         const ms = t.now() - popupSince;
