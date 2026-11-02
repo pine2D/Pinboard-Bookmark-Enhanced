@@ -412,6 +412,9 @@ export function liveTagKey(service, name) {
   return text;
 }
 
+// Ledger tag sources that mean a write named the tag before it left.
+export const TAG_WRITE_SOURCES = Object.freeze(['route', 'sw', 'node']);
+
 // The one request rule both guard layers apply: Node's ctx.route handler
 // and the Node API call it directly, the service worker gets its source
 // text from guardRuleSource(). Its only outer reference is liveTagKey,
@@ -2836,9 +2839,11 @@ export class LiveRun {
     return ok;
   }
 
+  // Every tag on the instance whose name starts with this run's full prefix:
+  // a read-only sweep that resolves ledger keys to ids and finds residue.
+  // Nothing is deleted because it is listed here (cleanupTags deletes only
+  // ledger tags).
   async runTags(instance) {
-    // Cleanup may delete every tag this returns: match on this run's full
-    // prefix only, never on a shorter one.
     check(this.prefix === 'pbp-it-' + this.runId && RUN_DIR_RE.test(this.prefix), 'cleanup_prefix_invalid', true);
     const inst = this.instances[instance];
     const out = [];
@@ -2869,15 +2874,44 @@ export class LiveRun {
     return out;
   }
 
+  // The tags cleanup may delete: ledger entries a write reserved before it
+  // left (source route, sw or node), under this run's full prefix. A tag
+  // only a read-back found (source read) was named by no write the guards
+  // judged, so it is residue like a tag missing from the ledger.
+  ledgerTagKeys(instance) {
+    const keys = new Map();
+    for (const t of this.report.ledger.tags || []) {
+      if (t.instance === instance && TAG_WRITE_SOURCES.includes(t.source) && typeof t.key === 'string' && t.key.toLowerCase().startsWith(this.prefix)) keys.set(t.key, t);
+    }
+    return keys;
+  }
+
+  // Deletes only this run's ledger tags (ledgerTagKeys), each after checking
+  // its name carries the run's full prefix and no bookmark refers to it, then
+  // reading it back gone. The sweep is how a ledger key finds its id; a
+  // run-prefix tag outside the ledger is residue: reported, never deleted,
+  // and the cleanup is incomplete until someone removes it by hand. The same
+  // rule holds on a temporary instance (its container goes anyway).
   async cleanupTags(instance) {
     const inst = this.instances[instance];
     if (inst.service === 'pinboard') return true;
     let ok = true;
     const tags = await this.runTags(instance);
     if (!tags.length) return true;
+    const ledgerKeys = this.ledgerTagKeys(instance);
     for (const tag of tags) {
       const id = String(tag.id);
+      const key = liveTagKey(inst.service, tag.name);
+      const entry = ledgerKeys.get(key);
+      if (!entry || (entry.id && entry.id !== id)) {
+        ok = false;
+        const known = (this.report.ledger.tags || []).some(t => t.instance === instance && t.key === key);
+        this.report.cleanup.entries.push({ kind: 'tag', instance, id, deleted: false, residue: true, code: !known ? 'residue_tag_not_in_ledger' : entry ? 'residue_tag_id_mismatch' : 'residue_tag_unreserved' });
+        this.persist();
+        continue;
+      }
       try {
+        check(String(tag.name).toLowerCase().startsWith(this.prefix) && key.toLowerCase().startsWith(this.prefix), 'cleanup_tag_prefix');
         if (inst.service === 'karakeep') check(tag.numBookmarks === 0, 'cleanup_tag_referenced');
         if (inst.service === 'linkding') {
           // Each tag gets its own searches, active and archived: with
@@ -3000,6 +3034,8 @@ export class LiveRun {
     capped(gaps, 4, g => `- ${g}`);
     lines.push('', '## 清理');
     lines.push(`- 书签：创建 ${r.ledger.created.length}，删除 ${r.ledger.created.filter(x => x.deleted).length}；列表：创建 ${r.ledger.lists.length}，删除 ${r.ledger.lists.filter(x => x.deleted).length}；前缀标签 ${r.ledger.tags.length}；清理完成：${r.cleanup.complete ? '是' : '否'}${r.temp ? `；临时容器已删除：${r.temp.removed ? '是' : '否'}` : ''}`);
+    const residue = r.cleanup.entries.filter(e => e.residue);
+    if (residue.length) lines.push(`- 残留 ${residue.length} 项：带本轮前缀但不在账本里（或未经写入预留），工具不删，需人工核对后处理，再跑 --cleanup 复核`);
     capped(r.cleanup.entries.filter(e => e.deleted === false), 3, e => `- 未清理：${e.kind} ${e.instance || ''} ${e.id || ''} ${e.code || ''}`.trim());
     lines.push(`- 完整报告：${this.reportPath}`);
     // One screen: anything past the cap is in report.json.
@@ -3105,12 +3141,12 @@ export function validateResumeReport(report, reportPath, { values = {}, state = 
   check(runDir && real(join(state, 'pbp-it-' + runId)) === runDir && real(reportPath) === join(runDir, 'report.json'), 'cleanup_report_location');
   check(report.prefix === 'pbp-it-' + runId && ['', 'user', 'temp'].includes(report.target), invalid);
   check(['instances', 'pools', 'ledger', 'cleanup'].every(key => isObject(report[key])) && Array.isArray(report.cleanup.entries) && Array.isArray(report.violations), invalid);
-  const { created, lists } = report.ledger;
-  check(Array.isArray(created) && Array.isArray(lists), invalid);
+  const { created, lists, tags } = report.ledger;
+  check(Array.isArray(created) && Array.isArray(lists) && Array.isArray(tags), invalid);
   const target = report.target;
   if (!target) {
     // Written before the arguments were read: nothing can exist yet.
-    check(!Object.keys(report.instances).length && !Object.keys(report.pools).length && !created.length && !lists.length && report.temp == null, invalid);
+    check(!Object.keys(report.instances).length && !Object.keys(report.pools).length && !created.length && !lists.length && !tags.length && report.temp == null, invalid);
     return report;
   }
   check(!values.target || values.target === target, 'cleanup_target_mismatch');
@@ -3143,6 +3179,9 @@ export function validateResumeReport(report, reportPath, { values = {}, state = 
   // A Pinboard entry is deleted by its URL: it must be one of the run's pool
   // URLs, under the id the runner gives it.
   for (const e of created.filter(r => r.instance === 'pinboard')) check(Array.isArray(report.pools.pinboard) && e.id === pinboardLedgerId(report.pools.pinboard, e.url), invalid);
+  // Cleanup deletes ledger tags: each names a known instance, a key under
+  // the run's full prefix, and how it was recorded.
+  for (const t of tags) check(isObject(t) && known(t.instance) && typeof t.key === 'string' && t.key.toLowerCase().startsWith(report.prefix) && [...TAG_WRITE_SOURCES, 'read'].includes(t.source) && (t.id === '' || safeId(t.id) || (typeof t.id === 'string' && t.id.toLowerCase().startsWith(report.prefix))), invalid);
   for (const l of lists) check(isObject(l) && known(l.instance) && report.instances[l.instance].service === 'karakeep' && safeId(l.id) && [undefined, true, false].includes(l.deleted), invalid);
   if (target === 'user') check(report.temp == null, invalid);
   else if (report.temp != null) {
@@ -3202,6 +3241,9 @@ async function resumeCleanup(opts) {
     report.cleanup.error = failureCode(error, run.secrets);
   } finally {
     run.persist();
+    // The summary shows this pass's cleanup (residue included); a report
+    // missing a section the summary reads keeps the earlier summary.
+    try { run.writeSummary(); } catch { /* report.json stays authoritative */ }
     release();
   }
   console.log('Local report: ' + path);

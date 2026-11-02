@@ -894,6 +894,16 @@ try {
     refused('user', r => { r.ledger.created[0].id = '../7'; }, invalid);
     refused('user', r => { r.ledger.created[0].instance = 'karakeep'; }, invalid);
     refused('user', r => { r.ledger.lists.push({ instance: 'linkding', id: 'abc' }); }, invalid);
+    // Ledger tags are what cleanup deletes (H1b): each under the run's full
+    // prefix, on a known instance, recorded by a write or a read-back.
+    const ledgerTag = { instance: 'linkding', key: 'pbp-it-' + runId + '_a', id: '5', source: 'route', module: '' };
+    validate(Object.assign(genuine(), { ledger: { ...genuine().ledger, tags: [ledgerTag, { ...ledgerTag, key: 'pbp-it-' + runId + '_b', id: '', source: 'read' }] } }), userValues);
+    refused('user', r => { r.ledger.tags.push({ ...ledgerTag, key: 'personal' }); }, invalid);
+    refused('user', r => { r.ledger.tags.push({ ...ledgerTag, key: 'pbp-it-' + randomUUID() + '_a' }); }, invalid);
+    refused('user', r => { r.ledger.tags.push({ ...ledgerTag, instance: 'karakeep' }); }, invalid);
+    refused('user', r => { r.ledger.tags.push({ ...ledgerTag, source: 'pool' }); }, invalid);
+    refused('user', r => { r.ledger.tags.push({ ...ledgerTag, id: '../5' }); }, invalid);
+    refused('user', r => { delete r.ledger.tags; }, invalid);
     refused('user', r => { r.ledger = []; }, invalid);
     refused('user', r => { r.cleanup = null; }, invalid);
     refused('user', r => { r.temp = { names: [], network: '' }; }, invalid);
@@ -1153,7 +1163,10 @@ try {
   for (const mode of ['legacy', 'expression']) {
     const run = new live.LiveRun({ mode: 'run' });
     const p = run.prefix;
-    const tags = [{ id: 1, name: p + '_a' }, { id: 2, name: p + '_b' }, { id: 3, name: p.toUpperCase() + '_C' }, { id: 4, name: p + '_q"x' }, { id: 5, name: 'personal' }];
+    // 6 carries the run prefix but no write reserved it (not in the ledger),
+    // 7 only a read-back found: both are residue, reported and never deleted
+    // (H1b: a user instance loses only ledger tags).
+    const tags = [{ id: 1, name: p + '_a' }, { id: 2, name: p + '_b' }, { id: 3, name: p.toUpperCase() + '_C' }, { id: 4, name: p + '_q"x' }, { id: 5, name: 'personal' }, { id: 6, name: p + '_stray' }, { id: 7, name: p + '_seen' }];
     const bookmarks = [
       { id: 10, url: 'https://example.com/kept', title: 'Kept', description: '', notes: '', is_archived: false, tag_names: [p + '_b', 'personal'] },
       { id: 11, url: 'https://example.com/old', title: 'Old', description: '', notes: '', is_archived: true, tag_names: [p.toUpperCase() + '_C'] },
@@ -1190,9 +1203,12 @@ try {
     run.caps = { linkding: { node: 100 } };
     run.reserve = { linkding: 0 };
     run.cleaning = true;
+    run.report.ledger.tags.push(...[p + '_a', p + '_b', p + '_c', p + '_q"x'].map((key, i) => ({ instance: 'linkding', key, id: '', source: ['route', 'sw', 'node', 'route'][i], module: '' })),
+      { instance: 'linkding', key: p + '_seen', id: '7', source: 'read', module: '' });
     assert.equal(await run.cleanupTags('linkding'), false, mode + ': referenced run tags fail the cleanup');
-    assert.deepEqual(tags.map(t => t.id), [2, 3, 4, 5], mode + ': only the unreferenced run tag is deleted');
-    assert.deepEqual(run.report.cleanup.entries.map(e => [e.id, e.deleted, e.code || '']), [['1', true, ''], ['2', false, 'cleanup_tag_referenced'], ['3', false, 'cleanup_tag_referenced'], ['4', false, 'cleanup_tag_unsearchable']], mode);
+    assert.deepEqual(tags.map(t => t.id), [2, 3, 4, 5, 6, 7], mode + ': only the unreferenced ledger tag is deleted');
+    assert.deepEqual(run.report.cleanup.entries.map(e => [e.id, e.deleted, e.code || '', !!e.residue]), [['1', true, '', false], ['2', false, 'cleanup_tag_referenced', false], ['3', false, 'cleanup_tag_referenced', false], ['4', false, 'cleanup_tag_unsearchable', false], ['6', false, 'residue_tag_not_in_ledger', true], ['7', false, 'residue_tag_unreserved', true]], mode);
+    assert(!requests.some(r => r.startsWith('DELETE') && /\/(6|7)\/$/.test(r)) && !requests.some(r => r.includes('_stray') || r.includes('_seen')), mode + ': residue is neither searched nor deleted');
     const searches = requests.filter(r => r.includes(' q='));
     assert(searches.every(r => /^GET \/api\/bookmarks\/(archived\/)? q=#\S+$/.test(r)), mode + ': each search names one tag: ' + searches.join(' | '));
     assert(!searches.some(r => r.includes('personal')), 'only run tags are searched');
@@ -1763,10 +1779,15 @@ try {
   // Same prefix in another case: cleanup matches run tags case-insensitively.
   store.tags.set('9', { id: 9, name: pendingPrefix.toUpperCase() + '_Upper', date_added: '2026-11-01T00:00:00Z' });
   store.tags.set('6', { id: 6, name: 'personal', date_added: '2026-11-01T00:00:00Z' });
+  // The run prefix on a tag the ledger does not hold: residue (H1b).
+  store.tags.set('10', { id: 10, name: pendingPrefix + '_stray', date_added: '2026-11-01T00:00:00Z' });
   const pendingReport = {
     harness: live.HARNESS_VERSION, runId: pendingId, prefix: pendingPrefix, target: 'user',
     instances: { linkding: { service: 'linkding', base: linkdingBase + '/' } }, pools: { linkding: pendingPool },
-    ledger: { created: [{ instance: 'linkding', id: '7', url: pendingPool[0], source: 'route', module: 'linkding.core.worker', deleted: false }], lists: [], tags: [] },
+    ledger: { created: [{ instance: 'linkding', id: '7', url: pendingPool[0], source: 'route', module: 'linkding.core.worker', deleted: false }], lists: [], tags: [
+      { instance: 'linkding', key: pendingPrefix + '_x', id: '5', source: 'route', module: 'linkding.core.worker' },
+      { instance: 'linkding', key: pendingPrefix + '_upper', id: '', source: 'sw', module: 'linkding.core.worker' },
+    ] },
     modules: [], cleanup: { complete: false, entries: [] }, checks: [], readBackDiffs: [], console: [], swConsole: [], pageErrors: [], requestFailed: [], blockedOrigins: [], violations: [], findings: [], skipped: [], shots: { count: 0 },
   };
   live.writePrivateJson(join(pendingDir, 'report.json'), pendingReport);
@@ -1782,17 +1803,28 @@ try {
 
   // The user target names its instance again (finding B).
   const resumed = await run(['--cleanup', join(pendingDir, 'report.json'), '--linkding', linkdingBase], { guard: false, state: linkdingState });
-  assert.equal(resumed.code, 0, resumed.output);
+  assert.equal(resumed.code, 1, 'run-prefix residue outside the ledger leaves the cleanup incomplete');
   assert(!existsSync(deadLock), 'the --cleanup took the dead lock over and released it');
-  assert.equal(resumed.report.cleanup.complete, true);
-  assert.equal(resumed.report.cleanup.apiVerified, true);
+  assert.equal(resumed.report.cleanup.complete, false);
+  assert.equal(resumed.report.cleanup.apiVerified, false);
   const writes = requests.filter(q => q.method !== 'GET');
-  assert.deepEqual(writes.map(q => q.method + ' ' + q.path).sort(), ['DELETE /api/bookmarks/7/', 'DELETE /api/bookmarks/8/', 'DELETE /api/tags/5/', 'DELETE /api/tags/9/'].sort(), 'only ledger, pool and run-prefix objects are deleted');
+  assert.deepEqual(writes.map(q => q.method + ' ' + q.path).sort(), ['DELETE /api/bookmarks/7/', 'DELETE /api/bookmarks/8/', 'DELETE /api/tags/5/', 'DELETE /api/tags/9/'].sort(), 'only ledger and pool objects are deleted');
   assert(requests.every(q => q.authenticated));
   assert(store.bookmarks.has('99') && store.tags.has('6'), 'personal bookmark and tag untouched');
+  assert(store.tags.has('10'), 'a run-prefix tag outside the ledger is never deleted');
+  assert.deepEqual(resumed.report.cleanup.entries.filter(e => e.residue).map(e => [e.kind, e.id, e.code]), [['tag', '10', 'residue_tag_not_in_ledger']]);
+  assert(resumed.report.cleanup.entries.some(e => e.kind === 'verify' && e.code === 'verify_tag_residue'));
+  assert.match(readFileSync(join(pendingDir, 'summary.zh.md'), 'utf8'), /残留 1 项/);
   const tagQuery = requests.find(q => q.path === '/api/bookmarks/' && q.url.includes('q='));
   assert(tagQuery && !decodeURIComponent(tagQuery.url).includes('#personal'), 'reference check names only run tags');
   assert.equal(resumed.report.ledger.created.find(e => e.id === '8').source, 'pool', 'unrecorded pool bookmark adopted by exact URL');
+  // Removed by hand, the next --cleanup confirms it and completes.
+  store.tags.delete('10');
+  requests.length = 0;
+  const confirmed = await run(['--cleanup', join(pendingDir, 'report.json'), '--linkding', linkdingBase], { guard: false, state: linkdingState });
+  assert.equal(confirmed.code, 0, confirmed.output);
+  assert.equal(confirmed.report.cleanup.complete, true);
+  assert.deepEqual(requests.filter(q => q.method !== 'GET'), [], 'the confirming pass deletes nothing');
 
   requests.length = 0;
   const unblocked = await run(readOnlyArgs, { guard: false, state: linkdingState });
