@@ -80,6 +80,7 @@ export const MODULES = [
       t.phase('readonly_popup');
       const form = await t.openPopup(t.claimUrl());
       if (t.service === 'linkding') await linkdingPrefill(t, form.popup);
+      await t.shot(form.popup, 'prefill', { surface: 'popup', keys: ['#submit-btn'] });
       t.check(`${t.service}: synthetic article popup prefill without saving`);
       await form.close();
     },
@@ -308,6 +309,7 @@ export const MODULES = [
       const expectedQuote = '> First line\n>\n> \\# Heading\n> \\*\\*bold\\*\\* &lt;tag>\n> 1\\. item';
       t.expectEq(await quote.popup.locator('#description-input').inputValue(), expectedQuote, 'selection_markdown_source');
       t.expectEq(await quote.popup.locator('#linkding-description-input').inputValue(), META_DESCRIPTION, 'quote_description_separate');
+      await t.shot(quote.popup, 'selection-quote', { surface: 'popup', keys: ['#submit-btn'] });
       await t.savePopup(quote.popup);
       const row = await t.ownRow(url);
       t.expectEq(row.notes, expectedQuote, 'quote_server_fields');
@@ -364,6 +366,7 @@ export const MODULES = [
       await form.popup.locator('#submit-btn').click();
       await form.popup.locator('#offline-queue-bar:not(.hidden)').waitFor();
       t.expect(await queueIsSafe('Offline description', 'Offline notes\nSecond line'), 'offline_create_queue_fields');
+      await t.shot(form.popup, 'offline-queue', { surface: 'popup', keys: ['#offline-queue-bar'] });
       await t.settings({ aiTagSeparator: '-' });
       await replay(form, 'offline_create_replay');
       let row = await t.ownRow(url);
@@ -417,6 +420,8 @@ export const MODULES = [
       const suggested = await popup.locator('#ai-suggest-tags .stag.ai').evaluateAll(els => els.map(el => el.dataset.tag));
       t.expect(suggested.length >= 1 && suggested.every(tag => tag.startsWith(t.prefix)), 'ai_tags_prefixed');
       await popup.locator('#ai-suggest-tags .add-all-link').click();
+      // Re-shot in place for zh_CN and dark: no extra request or bookmark.
+      await t.shot(popup, 'ai-summary-tags', { surface: 'popup', keys: ['#submit-btn'], locales: ['en', 'zh_CN'], schemes: ['light', 'dark'] });
       t.phase('ai_save');
       await t.savePopup(popup);
       const row = await t.ownRow(url);
@@ -462,6 +467,7 @@ export const MODULES = [
       let { popup } = form;
       t.expect(await popup.locator('#private-check').isHidden(), 'linkding_private_control');
       t.expect(!await popup.locator('#share-check').isChecked(), 'linkding_default_shared');
+      await t.shot(popup, 'sharing-new', { surface: 'popup', keys: ['#share-check', '#submit-btn'] });
       await popup.locator('#title-input').fill(title);
       await popup.locator('#tags-input').fill(prefix);
       await popup.locator('#tags-input').press('Enter');
@@ -563,6 +569,7 @@ export const MODULES = [
       t.note('popupOutcome', seen.outcome);
       t.note('popupMessage', seen.text);
       t.expect(seen.outcome !== 'saved', 'long_tag_reported_saved');
+      await t.shot(popup, 'long-tag-' + seen.outcome, { surface: 'popup', keys: ['#submit-btn'] });
       // A permanent server failure must not turn into a request storm.
       const settled = await t.writes();
       await t.sleep(8000);

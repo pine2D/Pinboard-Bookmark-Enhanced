@@ -6,12 +6,13 @@
 //  - runs that must talk to a service talk to loopback fixtures shaped like
 //    the real responses (linkding 1.47 / Karakeep 0.34.1);
 //  - temporary-container runs get an injected Docker executor;
-//  - the browser is the bundled Chromium with the extension, for the
-//    read-only loopback path.
+//  - the browser is the bundled Chromium: a plain page for the screenshot
+//    canary and the extension for the read-only loopback path.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer, request as httpRequest } from 'node:http';
 import { EventEmitter } from 'node:events';
+import { createRequire } from 'node:module';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -100,6 +101,7 @@ async function quiet(fn) {
 const listen = server => new Promise(resolve => server.listen(0, '127.0.0.1', () => resolve(server.address().port)));
 const closeServer = server => new Promise(resolve => { server.closeAllConnections?.(); server.close(() => resolve()); });
 const servers = [];
+let browser;
 
 try {
   // ---------------------------------------------------------------------
@@ -552,6 +554,51 @@ try {
   }
 
   // ---------------------------------------------------------------------
+  // Screenshot canary on a plain page (no extension, no network)
+  // ---------------------------------------------------------------------
+  const { chromium } = createRequire(join(root, '.qa-scan/package.json'))('playwright');
+  browser = await chromium.launch({ headless: true, executablePath: chromium.executablePath() });
+  const page = await browser.newPage({ viewport: { width: 420, height: 600 } });
+  const shotsDir = join(dir, 'shots');
+  mkdirSync(shotsDir, { mode: 0o700 });
+  const shoot = async (html, name) => {
+    await page.setContent('<!doctype html><title>Shot</title><body style="margin:0">' + html + '</body>');
+    const file = join(shotsDir, name + '.png');
+    return { file, result: await live.takeShot(page, { file, secrets: [syntheticKey], keys: ['#save'] }) };
+  };
+  let shot = await shoot(`<input type="password" id="opt-linkding-token" value="${syntheticKey}"><input type="text" id="opt-linkding-cf-id" value="client-id"><input type="checkbox" id="opt-sync-api-keys"><button class="key-toggle" data-target="opt-linkding-token" aria-pressed="false">show</button><button id="save">Save</button>`, 'masked');
+  assert.equal(shot.result.ok, true, 'masked password field passes');
+  assert(existsSync(shot.file) && (statSync(shot.file).mode & 0o777) === 0o600);
+  assert.equal(shot.result.geometry.ok, true);
+  shot = await shoot(`<p>Token: ${syntheticKey}</p><button id="save">Save</button>`, 'body-leak');
+  assert.equal(shot.result.code, 'shot_secret_canary');
+  assert(!existsSync(shot.file), 'a leaking screenshot is deleted');
+  shot = await shoot(`<input id="title-input" value="${syntheticKey}"><button id="save">Save</button>`, 'value-leak');
+  assert.equal(shot.result.code, 'shot_secret_canary');
+  shot = await shoot(`<button id="save" title="${syntheticKey}">Save</button>`, 'title-leak');
+  assert.equal(shot.result.code, 'shot_secret_canary');
+  shot = await shoot(`<button id="save" aria-label="Copy ${syntheticKey}">Save</button>`, 'aria-leak');
+  assert.equal(shot.result.code, 'shot_secret_canary');
+  shot = await shoot(`<input type="text" id="opt-karakeep-token" value="x"><button id="save">Save</button>`, 'revealed');
+  assert.equal(shot.result.code, 'shot_secret_field_revealed');
+  assert(!existsSync(shot.file), 'nothing is captured while a secret field is revealed');
+  shot = await shoot(`<input type="password" id="opt-karakeep-token" value="x"><button class="key-toggle" data-target="opt-karakeep-token" aria-pressed="true">hide</button><button id="save">Save</button>`, 'toggle-pressed');
+  assert.equal(shot.result.code, 'shot_secret_field_revealed');
+  shot = await shoot(`<div style="width:900px;height:10px"></div><button id="save" style="margin-top:2000px">Save</button>`, 'geometry');
+  assert.equal(shot.result.ok, true);
+  assert.equal(shot.result.geometry.overflowOk, false, 'horizontal overflow is reported');
+  assert.equal(shot.result.geometry.keys[0].inViewport, false, 'off-screen key control is reported');
+  assert.equal(shot.result.geometry.keys[0].state, 'offscreen');
+  // A consumed action (display:none) and a control that never rendered are
+  // told apart from one that is merely below the fold.
+  shot = await shoot(`<button id="save" style="display:none">Save</button>`, 'hidden');
+  assert.deepEqual([shot.result.geometry.keys[0].state, shot.result.geometry.ok], ['hidden', false]);
+  shot = await shoot(`<p>No button</p>`, 'missing');
+  assert.deepEqual([shot.result.geometry.keys[0].state, shot.result.geometry.ok], ['missing', false]);
+  await browser.close();
+  browser = null;
+
+  // ---------------------------------------------------------------------
   // Spawned CLI: plan, list, gates (credential file and fetch blocked)
   // ---------------------------------------------------------------------
   const plan = await run(['--plan'], { credentials: false });
@@ -712,7 +759,7 @@ try {
     harness: live.HARNESS_VERSION, runId: pendingId, prefix: pendingPrefix, target: 'user',
     instances: { linkding: { service: 'linkding', base: linkdingBase + '/' } }, pools: { linkding: pendingPool },
     ledger: { created: [{ instance: 'linkding', id: '7', url: pendingPool[0], source: 'route', module: 'linkding.core.worker', deleted: false }], lists: [], tags: [] },
-    modules: [], cleanup: { complete: false, entries: [] }, checks: [], readBackDiffs: [], console: [], swConsole: [], pageErrors: [], requestFailed: [], blockedOrigins: [], violations: [], skipped: [],
+    modules: [], cleanup: { complete: false, entries: [] }, checks: [], readBackDiffs: [], console: [], swConsole: [], pageErrors: [], requestFailed: [], blockedOrigins: [], violations: [], findings: [], skipped: [], shots: { count: 0 },
   };
   live.writePrivateJson(join(pendingDir, 'report.json'), pendingReport);
   requests.length = 0;
@@ -754,8 +801,9 @@ try {
   assert(!existsSync(join(linkdingState, 'pbp-it-live.lock')), 'lock released on SIGINT');
   hang = false;
 
-  console.log('bookmark live preflight: registry/selection/budgets/guard rule/fake AI/docker fake executor/plan/gates/Karakeep auto-AI/linkding read-only browser/cleanup resume/SIGINT passed');
+  console.log('bookmark live preflight: registry/selection/budgets/guard rule/fake AI/docker fake executor/screenshot canary/plan/gates/Karakeep auto-AI/linkding read-only browser/cleanup resume/SIGINT passed');
 } finally {
+  if (browser) await browser.close().catch(() => {});
   for (const server of servers) await closeServer(server);
   rmSync(dir, { recursive: true, force: true });
 }

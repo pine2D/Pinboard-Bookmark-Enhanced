@@ -40,7 +40,7 @@
 //   - Cleanup: one idempotent cleanupAll on success, failure, signals and
 //     uncaught errors; ledger written to disk at every creation; --cleanup
 //     <report> resumes; a run refuses to start while an earlier report is not
-//     fully cleaned. Reports and the profile stay in a 0700
+//     fully cleaned. Reports, screenshots and the profile stay in a 0700
 //     directory with 0600 files. No tracing, HAR or video is ever enabled.
 import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
@@ -112,8 +112,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // Pure helpers (exported for the synthetic preflight tests)
 // ---------------------------------------------------------------------------
 
-const BOOL_FLAGS = new Set(['--run', '--plan', '--list', '--help', '--read-only', '--confirm-karakeep-no-auto-ai', '--allow-dirty', '--headed']);
-const VALUE_FLAGS = new Set(['--target', '--scenario', '--service', '--linkding', '--karakeep', '--credentials', '--cleanup']);
+const BOOL_FLAGS = new Set(['--run', '--plan', '--list', '--help', '--read-only', '--confirm-karakeep-no-auto-ai', '--allow-dirty', '--shots', '--headed']);
+const VALUE_FLAGS = new Set(['--target', '--scenario', '--service', '--linkding', '--karakeep', '--credentials', '--cleanup', '--shots-dir']);
 
 export function parseArgs(argv) {
   const flags = new Set(), values = {}, errors = [];
@@ -226,7 +226,7 @@ export function poolUrls(target, runId, instance, count) {
   return Array.from({ length: count }, (_, i) => `${origin}/?pbp-it=${runId}-${instance}-${i + 1}`);
 }
 
-export function buildPlan({ target = 'temp', selected, skipped = [], headedFlag = false }) {
+export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnabled = false, headedFlag = false }) {
   const caps = BUDGETS[target];
   const instances = [...new Set(selected.map(m => m.instance))];
   const perInstance = {}, problems = [];
@@ -270,7 +270,7 @@ export function buildPlan({ target = 'temp', selected, skipped = [], headedFlag 
     skipped, instances, budget: perInstance,
     fakeAi: { needed: selected.some(m => m.needs?.fakeAi), calls: fakeAiCalls, cap: caps.run.fakeAi },
     headed: headedFlag || selected.some(m => m.needs?.headed),
-    shots: { modules: shotModules },
+    shots: { modules: shotModules, enabled: shotsEnabled },
     containers: target === 'temp' ? [...new Set(instances.flatMap(i => (i === 'linkding-pg' ? ['postgres', 'linkding-pg'] : [i])))].concat(instances.length ? ['edge'] : []) : [],
     limits: { moduleSeconds: caps.run.moduleSeconds, runMinutes: caps.run.runMinutes, worstCaseSeconds, automaticRetries: 0 },
     karakeepWritesRequireAutoAiDisabled: target === 'user' && selected.some(m => m.service === 'karakeep' && m.needs?.writes !== false),
@@ -732,6 +732,56 @@ export async function startFakeAi({ prefix, limit = 60 } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Screenshots: masked, canary-checked, geometry recorded.
+// ---------------------------------------------------------------------------
+// Masked in every screenshot. Switches whose id mentions a key (e.g.
+// opt-sync-api-keys) hold no secret and stay visible.
+const FIELD = 'input:not([type="checkbox"]):not([type="radio"])';
+export const SECRET_FIELD_SELECTOR = ['input[type="password"]', ...['token', 'secret', 'key', 'gw-value', 'cf-id'].map(word => `${FIELD}[id*="${word}" i]`), 'textarea[id*="token" i]', 'textarea[id*="secret" i]'].join(', ');
+
+export async function takeShot(page, { file, secrets = [], keys = [] }) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    if (typeof pbpI18nReady === 'function') await pbpI18nReady();
+  });
+  const revealed = await page.evaluate(() => {
+    const rx = /token|secret|key|gw-value/i, bad = [];
+    for (const el of document.querySelectorAll('input, textarea')) {
+      if (el.type === 'checkbox' || el.type === 'radio' || /cf-id/i.test(el.id || '')) continue;
+      if (rx.test(el.id || '') && el.type !== 'password') bad.push(el.id);
+    }
+    for (const btn of document.querySelectorAll('.key-toggle[aria-pressed="true"]')) if (rx.test(btn.dataset.target || '')) bad.push(btn.dataset.target);
+    return bad.length;
+  });
+  if (revealed) return { ok: false, code: 'shot_secret_field_revealed' };
+  const geometry = await page.evaluate(selectors => {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const overflow = document.documentElement.scrollWidth - vw;
+    // missing: not in the DOM; hidden: zero-sized (display:none, consumed
+    // action); offscreen: rendered but outside the viewport (below the fold).
+    const keyState = selectors.map(sel => {
+      const el = document.querySelector(sel);
+      if (!el) return { selector: sel, state: 'missing', inViewport: false };
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.height === 0) return { selector: sel, state: 'hidden', inViewport: false };
+      const inViewport = r.left >= -1 && r.top >= -1 && r.right <= vw + 1 && r.bottom <= vh + 1;
+      return { selector: sel, state: inViewport ? 'ok' : 'offscreen', inViewport };
+    });
+    return { overflow, overflowOk: overflow <= 1, keys: keyState, ok: overflow <= 1 && keyState.every(k => k.state === 'ok') };
+  }, keys);
+  await page.screenshot({ path: file, mask: [page.locator(SECRET_FIELD_SELECTOR)], animations: 'disabled', caret: 'hide' });
+  chmodSync(file, 0o600);
+  const texts = await page.evaluate(() => {
+    const out = [document.title, document.body ? document.body.innerText : ''];
+    for (const el of document.querySelectorAll('input, textarea')) if (el.type !== 'password') out.push(el.value || '');
+    for (const el of document.querySelectorAll('[title], [aria-label]')) out.push(el.getAttribute('title') || '', el.getAttribute('aria-label') || '');
+    return out;
+  });
+  if (findSecret(texts, secrets)) { rmSync(file, { force: true }); return { ok: false, code: 'shot_secret_canary' }; }
+  return { ok: true, geometry };
+}
+
+// ---------------------------------------------------------------------------
 // The run
 // ---------------------------------------------------------------------------
 export class LiveRun {
@@ -756,12 +806,14 @@ export class LiveRun {
     this.guardCfg = null;
     this.deletableTags = new Set();
     this.sharing = {};
+    this.shotCount = 0;
     this.locale = 'en';
+    this.scheme = 'light';
     this.report = {
       harness: HARNESS_VERSION, runId: this.runId, prefix: this.prefix, mode: opts.mode, started: new Date().toISOString(),
       head: '', clean: null, target: '', scenario: '', modules: [], skipped: [], instances: {}, pools: {},
       ledger: { created: [], lists: [], tags: [] }, counts: {}, checks: [], readBackDiffs: [], console: [], swConsole: [],
-      pageErrors: [], requestFailed: [], blockedOrigins: [], violations: [],
+      pageErrors: [], requestFailed: [], blockedOrigins: [], violations: [], findings: [], shots: { dir: '', count: 0, manifest: '' },
       fakeAi: null, temp: null, cleanup: { complete: false, entries: [] }, failure: null, finished: null, passed: false,
     };
   }
@@ -899,7 +951,8 @@ export class LiveRun {
     check(selected.length, 'no_modules_selected');
     this.report.skipped = skipped;
     this.selected = selected;
-    this.plan = buildPlan({ target, selected, skipped, headedFlag: flags.has('--headed') });
+    this.shotsEnabled = flags.has('--shots') || !!values['shots-dir'];
+    this.plan = buildPlan({ target, selected, skipped, shotsEnabled: this.shotsEnabled, headedFlag: flags.has('--headed') });
     check(this.plan.withinCaps, 'budget_exceeded_plan');
     this.caps = {};
     this.reserve = {};
@@ -918,6 +971,12 @@ export class LiveRun {
       check(!this.plan.karakeepWritesRequireAutoAiDisabled || flags.has('--confirm-karakeep-no-auto-ai'), 'karakeep_auto_ai_not_confirmed_off');
     } else {
       check(!values.credentials && !values.linkding && !values.karakeep, 'temp_target_rejects_user_endpoints');
+    }
+    if (values['shots-dir']) {
+      const dir = resolve(values['shots-dir']);
+      check(!dir.startsWith(resolve(ROOT, 'docs')), 'shots_dir_public');
+      if (dir.startsWith(ROOT)) check(spawnSync('git', ['-C', ROOT, 'check-ignore', '-q', dir]).status === 0, 'shots_dir_not_ignored');
+      this.shotsDir = dir;
     }
   }
 
@@ -1419,6 +1478,7 @@ export class LiveRun {
     }
     check(owner === this.libraryOwner, 'library_switched');
     check(await this.sw(async owner => (await pbpVocabAll(owner)).length === 1, owner), 'library_lost');
+    await this.shot(options, 'connected', { surface: 'options', service: inst.service, keys: ['#connect-' + inst.service] });
     await options.close();
     await this.syncGuard();
     this.throwIfFatal();
@@ -1519,7 +1579,7 @@ export class LiveRun {
         run.throwIfFatal();
         return row;
       },
-      async openPopup(url, { selection = false, width, locale } = {}) {
+      async openPopup(url, { selection = false, width, locale, scheme } = {}) {
         alive();
         if (locale) await t.settings({ optLang: locale });
         const article = await run.ctx.newPage();
@@ -1540,6 +1600,7 @@ export class LiveRun {
         await popup.locator('#main-section:not(.hidden)').waitFor();
         await popup.waitForFunction(() => typeof _popupDraftContext !== 'undefined' && _popupDraftContext?.ready === true
           && ['found', 'missing'].includes(bookmarkLookup.status) && !document.getElementById('submit-btn').disabled);
+        if (scheme) await run.applyScheme(popup, scheme);
         return { popup, article, close: async () => { await popup.close().catch(() => {}); await article.close().catch(() => {}); } };
       },
       async savePopup(popup) {
@@ -1581,6 +1642,7 @@ export class LiveRun {
         run.probe = { url, seen: false };
         return { url, observed: () => !!run.probe?.seen, clear: () => { run.probe = null; } };
       },
+      shot: (page, state, opts = {}) => { alive(); return run.shot(page, state, { service: mod.service, ...opts }); },
     };
     return t;
   }
@@ -1693,6 +1755,74 @@ export class LiveRun {
         if (!ok) { this.setFatal('module_cleanup_failed'); break; }
       }
     } finally { this.cleaning = wasCleaning; }
+  }
+
+  // ---- screenshots -----------------------------------------------------------
+  async applyScheme(page, scheme) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.evaluate(scheme => {
+      const root = document.documentElement;
+      // Mirror the early theme scripts for the default (no preset) theme.
+      if (!localStorage.getItem('pp-theme-preset')) { if (scheme === 'dark') root.dataset.theme = 'flexoki-dark'; else delete root.dataset.theme; }
+    }, scheme);
+    this.scheme = scheme;
+  }
+
+  async shot(page, state, { surface = 'page', service = '', keys = [], locales, schemes } = {}) {
+    if (!this.shotsEnabled || !page) return null;
+    this.throwIfFatal();
+    const dir = this.shotsDir || join(this.runDir, 'shots');
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true, mode: 0o700 });
+    chmodSync(dir, 0o700);
+    this.report.shots.dir = dir;
+    this.report.shots.manifest = join(dir, 'shots.json');
+    const locs = locales || [this.locale], schs = schemes || [this.scheme];
+    const originalLocale = this.locale, originalScheme = this.scheme;
+    const results = [];
+    // A toolbar popup is as wide as its body and at most 600px tall; shoot
+    // it at that size so key controls below the fold show up as findings.
+    let viewport = null;
+    if (surface === 'popup') {
+      viewport = page.viewportSize();
+      const width = await page.evaluate(() => Math.ceil(document.body.getBoundingClientRect().width));
+      await page.setViewportSize({ width: Math.max(320, Math.min(800, width)), height: 600 });
+    }
+    for (const locale of locs) {
+      if (locale !== this.locale) {
+        await this.sw(async locale => chrome.storage.local.set({ optLang: locale }), locale);
+        await page.evaluate(async () => { if (typeof initI18n === 'function') { initI18n(); await pbpI18nReady(); } });
+        this.locale = locale;
+      }
+      for (const scheme of schs) {
+        if (scheme !== this.scheme) await this.applyScheme(page, scheme);
+        const n = String(++this.shotCount).padStart(2, '0');
+        const safe = v => String(v || 'x').replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 40);
+        const file = join(dir, `${n}-${safe(service)}-${safe(surface)}-${safe(state)}-${safe(locale)}-${safe(scheme)}.png`);
+        const consoleBefore = this.report.console.length, errorsBefore = this.report.pageErrors.length;
+        const result = await takeShot(page, { file, secrets: this.secrets, keys });
+        const entry = {
+          n: Number(n), file: result.ok ? file : '', module: this.currentModule?.id || 'connect', service, surface, state, locale, scheme,
+          geometry: result.geometry || null, consoleDelta: this.report.console.length - consoleBefore, pageErrorDelta: this.report.pageErrors.length - errorsBefore,
+          consoleTotal: this.report.console.filter(c => c.surface && page.url().includes(c.surface)).length,
+        };
+        this.shotsManifest ||= [];
+        this.shotsManifest.push(entry);
+        writePrivateJson(this.report.shots.manifest, this.shotsManifest);
+        this.report.shots.count = this.shotsManifest.filter(s => s.file).length;
+        if (!result.ok) { this.persist(); fail(result.code); }
+        if (result.geometry && !result.geometry.ok) this.report.findings.push({ kind: 'geometry', module: entry.module, shot: file, overflow: result.geometry.overflow, keys: result.geometry.keys.filter(k => k.state !== 'ok').map(k => k.selector + ':' + k.state) });
+        results.push(entry);
+      }
+    }
+    if (this.locale !== originalLocale) {
+      await this.sw(async locale => chrome.storage.local.set({ optLang: locale }), originalLocale);
+      await page.evaluate(async () => { if (typeof initI18n === 'function') { initI18n(); await pbpI18nReady(); } });
+      this.locale = originalLocale;
+    }
+    if (this.scheme !== originalScheme) await this.applyScheme(page, originalScheme);
+    if (viewport) await page.setViewportSize(viewport);
+    this.persist();
+    return results;
   }
 
   // ---- cleanup ----------------------------------------------------------------
@@ -1926,8 +2056,9 @@ export class LiveRun {
     const bad = r.modules.filter(m => m.status !== 'passed');
     if (!bad.length) lines.push('- 无模块失败。');
     for (const m of bad) {
+      const shots = (this.shotsManifest || []).filter(s => s.module === m.id && s.file).map(s => s.file);
       const diffs = r.readBackDiffs.filter(d => d.module === m.id);
-      lines.push(`- ${m.id}：${m.status === 'aborted' ? '中止' : '失败'}于 ${m.failure?.phase}，失败码 ${m.failure?.code}；读回差异 ${diffs.length} 条；console 错误 ${r.console.filter(c => c.module === m.id).length} 条`);
+      lines.push(`- ${m.id}：${m.status === 'aborted' ? '中止' : '失败'}于 ${m.failure?.phase}，失败码 ${m.failure?.code}；读回差异 ${diffs.length} 条；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；最后截图 ${shots[shots.length - 1]}` : ''}`);
     }
     if (r.violations.length) lines.push(`- 守卫/预算触发：${r.violations.map(v => `${v.code}@${v.phase}`).join('，')}`);
     if (r.blockedOrigins.length) lines.push(`- 被拦截的外部来源：${r.blockedOrigins.join('，')}`);
@@ -1957,6 +2088,9 @@ export class LiveRun {
     }
     if (!features.size) lines.push('- 本轮没有执行模块。');
     for (const [f, list] of features) lines.push(`- ${f}：${list.join('，')}`);
+    lines.push('', '## 截图与布局', '');
+    lines.push(`- 截图 ${r.shots.count} 张${r.shots.dir ? `，目录 ${r.shots.dir}` : '（本轮未开启 --shots）'}`);
+    for (const f of r.findings.filter(x => x.kind === 'geometry')) lines.push(`- 几何断言未通过：${f.shot}（横向溢出 ${f.overflow}px，视口外控件 ${f.keys.join('、') || '无'}）`);
     lines.push('', '## 未覆盖项', '');
     for (const s of r.skipped) lines.push(`- ${s.id}：因 ${s.reason} 未执行`);
     for (const u of UNCOVERED) {
@@ -2069,7 +2203,7 @@ function printHelp() {
     '  Karakeep writes on --target user also require --confirm-karakeep-no-auto-ai (and a /signin check that auto AI is off).',
     '--plan prints modules, budgets, URLs, containers, headed and shot needs without credentials, network, browser or Docker.',
     '--list prints module ids. --service linkding,karakeep filters. --read-only = --scenario readonly.',
-    '--headed launches a visible browser; --allow-dirty runs on a dirty tree.',
+    '--shots [--shots-dir DIR] saves masked screenshots; --headed launches a visible browser; --allow-dirty runs on a dirty tree.',
     '--cleanup REPORT resumes an incomplete cleanup (user target needs --credentials again).',
   ].join('\n'));
 }
@@ -2091,7 +2225,7 @@ export async function main(argv = process.argv.slice(2), { dockerExec, modules }
       const scenario = opts.flags.has('--read-only') ? 'readonly' : (opts.values.scenario || 'core');
       const { selected, skipped } = selectModules(scenario, { services, target, modules: modules || MODULES });
       check(selected.length, 'no_modules_selected');
-      const plan = buildPlan({ target, selected, skipped, headedFlag: opts.flags.has('--headed') });
+      const plan = buildPlan({ target, selected, skipped, shotsEnabled: opts.flags.has('--shots') || !!opts.values['shots-dir'], headedFlag: opts.flags.has('--headed') });
       plan.scenario = scenario;
       plan.services = services;
       if (target === 'user') plan.bases = Object.fromEntries(services.filter(s => opts.values[s]).map(s => [s, validateBase(opts.values[s])]));
