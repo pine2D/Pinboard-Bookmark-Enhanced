@@ -636,6 +636,11 @@ await test("tags stored elsewhere retire the reader's pending tag fix; unchanged
       assert(editor.matches(":popover-open"), label + ": Save did not open the editor");
       equal(tags.value, expectTags);
       equal(editorStatus.hidden, fixed);
+      // The rail and footer status name the long tag only while the fix is pending.
+      for (const name of ["status", "footer-status"]) {
+        const shownError = !r.el(name).hidden && r.el(name).textContent.startsWith("bookmarkErrTagTooLong");
+        assert(shownError === !fixed, label + ": #reader-bookmark-" + name + " " + (fixed ? "still names the retired long tag: " : "lost the pending tag error: ") + JSON.stringify(r.el(name).textContent));
+      }
       r.el("cancel").click();
       const writes = server.requests.filter(q => q.method !== "GET").length;
       await r.command("save");

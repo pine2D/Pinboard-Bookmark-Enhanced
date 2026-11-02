@@ -269,8 +269,12 @@
     if (gen !== generation) return;
     inflight = false; paint();
     if (!known) return;
-    // Tags stored elsewhere since the failure fixed it there: open on those.
-    if (tagFix && storedTags() !== "" && storedTags() !== tagFix.stored) tagFix = null;
+    // Tags stored elsewhere since the failure fixed it there: open on those,
+    // and stop naming the long tag in the rail and footer status.
+    if (tagFix && storedTags() !== "" && storedTags() !== tagFix.stored) {
+      tagFix = null;
+      if (statusKey === "bookmarkErrTagTooLong") { statusKey = ""; failureArgs = []; }
+    }
     ensureEditor();
     editorStatusKey = ""; paint();
     const values = { ...(state.bookmark || context.bookmark?.draft || {}),
