@@ -515,6 +515,53 @@ async function resetPinboardSession(expectedToken) {
 // Also fixes a latent bug: the previous direct chrome.storage.sync.get bypassed the
 // optSyncEnabled toggle, so users with sync disabled would have read defaults instead
 // of their saved values (options.js writes via getSettingsStorage, which respects the toggle).
+// Everything derived from the address once it is edited after the popup
+// opened (typed, pasted, put back by Undo): the bookmark lookup starts over,
+// the non-web warning, the AI entry points (popup-ai.js anchors AI to the
+// opened page and owns that check), the Description the page put in the box
+// (anchored to the opened page the same way), and the character count.
+function pbpPopupUrlEdited() {
+  invalidateBookmarkLookup();
+  const val = $id("url-input").value.trim();
+  const bad = !val || (!val.startsWith("http://") && !val.startsWith("https://"));
+  $id("url-warning").classList.toggle("hidden", !bad);
+  if (typeof pbpAiSyncUrlEditState === "function") pbpAiSyncUrlEditState();
+  pbpPopupSyncPageDescription();
+  updateCharCount();
+}
+// The address and title inputs' listeners, registered once by showMain on a
+// page the popup can save.
+function setupUrlInput() {
+  $id("url-input").addEventListener("input", pbpPopupUrlEdited);
+  $id("title-input").addEventListener("input", updateCharCount);
+  $id("url-input").addEventListener("paste", async (e) => {
+    const settings = await _loadUrlCleanSettings();
+    if (!settings.enabled || !settings.onPaste) return;
+    const pasted = e.clipboardData?.getData("text") || "";
+    if (!pasted) return;
+    const { cleaned, removedCount, original } = pbpPopupCleanAddress(pasted, settings);
+    if (removedCount > 0) {
+      e.preventDefault();
+      $id("url-input").value = cleaned;
+      // dispatch input event so any input listeners pick up the change
+      $id("url-input").dispatchEvent(new Event("input", { bubbles: true }));
+      showFeedback({
+        variant: "success",
+        message: t("urlPasteCleanedN").replace("{n}", removedCount),
+        actions: [{
+          label: t("undo"),
+          onClick: (card) => {
+            $id("url-input").value = original;
+            $id("url-input").dispatchEvent(new Event("input", { bubbles: true }));
+            card.classList.add("dismissing");
+            setTimeout(() => card.remove(), 120);
+          }
+        }],
+        autoHide: 1800,
+      });
+    }
+  });
+}
 // stripTrackingParams over the stored cleaning settings, for the popup's own
 // steps (the prefetch key, the address put in the form, a paste). Settings it
 // cannot apply (hand-edited storage, an old backup: customParams not a list)
@@ -962,46 +1009,7 @@ async function showMain(token) {
     return;
   }
 
-  $id("url-input").addEventListener("input", () => {
-    invalidateBookmarkLookup();
-    const val = $id("url-input").value.trim();
-    const bad = !val || (!val.startsWith("http://") && !val.startsWith("https://"));
-    $id("url-warning").classList.toggle("hidden", !bad);
-    // audit A1: AI is anchored to the opened page - grey it out while the
-    // URL points somewhere non-equivalent (popup-ai.js owns the check).
-    if (typeof pbpAiSyncUrlEditState === "function") pbpAiSyncUrlEditState();
-    // The Description is anchored to the opened page the same way.
-    pbpPopupSyncPageDescription();
-    updateCharCount();
-  });
-  $id("title-input").addEventListener("input", updateCharCount);
-  $id("url-input").addEventListener("paste", async (e) => {
-    const settings = await _loadUrlCleanSettings();
-    if (!settings.enabled || !settings.onPaste) return;
-    const pasted = e.clipboardData?.getData("text") || "";
-    if (!pasted) return;
-    const { cleaned, removedCount, original } = pbpPopupCleanAddress(pasted, settings);
-    if (removedCount > 0) {
-      e.preventDefault();
-      $id("url-input").value = cleaned;
-      // dispatch input event so any input listeners pick up the change
-      $id("url-input").dispatchEvent(new Event("input", { bubbles: true }));
-      showFeedback({
-        variant: "success",
-        message: t("urlPasteCleanedN").replace("{n}", removedCount),
-        actions: [{
-          label: t("undo"),
-          onClick: (card) => {
-            $id("url-input").value = original;
-            $id("url-input").dispatchEvent(new Event("input", { bubbles: true }));
-            card.classList.add("dismissing");
-            setTimeout(() => card.remove(), 120);
-          }
-        }],
-        autoHide: 1800,
-      });
-    }
-  });
+  setupUrlInput();
 
   pbpPopupPrefillDescription();
   updateCharCount();
