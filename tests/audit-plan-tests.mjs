@@ -162,3 +162,8 @@ test('a count edit plans exactly that suite as one html job', () => {
   const p = createAuditPlan(catalog, parseAuditArgs(['--changed']), impact);
   assert.deepEqual(p.jobs.map(job => [job.runner, job.file]), [['html', 'tests/wayback-tests.html']]);
 });
+test('a change to the mutation check tool recommends only its own self-test', () => {
+  const impact = inferAuditImpact(catalog, [{ path: 'scripts/mutate-check.mjs' }]);
+  assert.deepEqual(impact.ids, ['test.mutate-check']);
+  assert.deepEqual(impact.warnings, []);
+});
