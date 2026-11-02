@@ -2640,8 +2640,14 @@ try {
         harness: live.HARNESS_VERSION, runId: id, prefix, target: 'user',
         instances: { pinboard: { service: 'pinboard', base: '' } }, pools: { pinboard: pool },
         ledger: { created: [{ instance: 'pinboard', id: 'pool-1', url: pool[0], source: 'route', module: 'pinboard.core.worker', deleted: false }], lists: [], tags: [] },
-        modules: [], cleanup: { complete: false, entries: [] }, checks: [], readBackDiffs: [], console: [], swConsole: [], pageErrors: [], requestFailed: [], blockedOrigins: [], violations: [], findings: [], skipped: [], shots: { count: 0 },
+        modules: [], cleanup: { complete: false, entries: [] }, checks: [], readBackDiffs: [], console: [], swConsole: [], pageErrors: [], requestFailed: [], blockedOrigins: [], violations: [], skipped: [], shots: { count: 0 },
+        // The run's own gate statistics: a --cleanup must not overwrite them
+        // (review of H1b r2), or a run that met a 429 reads as one that did not.
+        findings: [{ kind: 'pinboard_queue', module: 'pinboard.core.worker', phase: 'pinboard.core.worker', queuedMs: 12000, depth: 3 }],
+        timing: { phases: [], totals: { throttleMs: 120000, waitMs: 500 }, slowest: [], throttle: { requests: 40, waitedMs: 120000, rateLimited: 1, maxIntervalMs: 6000, maxQueueDepth: 3, maxQueueMs: 12000, slowQueued: 1 } },
+        pinboard: { configured: true },
       });
+      const runTiming = JSON.parse(readFileSync(join(runDir, 'report.json'), 'utf8')).timing;
       // A ledger id that is not the URL's pool slot is refused untouched.
       const tamperedDir = join(pbState, 'pbp-it-' + randomUUID());
       mkdirSync(tamperedDir, { mode: 0o700 });
@@ -2669,6 +2675,15 @@ try {
       // Nothing is read twice (it was 12 requests).
       assert.deepEqual(mock.calls.map(c => c.path + ' ' + (c.url ? 'pool-' + (pool.indexOf(c.url) + 1) : '')), ['posts/delete pool-1', 'posts/get pool-1', 'posts/get pool-2', 'posts/delete pool-2', 'posts/get pool-2', 'posts/get pool-3', 'tags/get ']);
       for (let i = 1; i < mock.calls.length; i++) assert(mock.calls[i].at - mock.calls[i - 1].at >= INTERVAL - 2);
+      // The run's gate statistics and waits stay as the run left them; the
+      // cleanup pass keeps its own beside its request counts.
+      assert.deepEqual(after.timing, runTiming, 'a --cleanup leaves the run timing as it was');
+      assert.deepEqual(after.findings.filter(f => f.kind === 'pinboard_queue').length, 1);
+      assert.equal(after.cleanup.throttle.requests, mock.calls.length);
+      assert(after.cleanup.timing.throttleMs > 0, JSON.stringify(after.cleanup.timing));
+      const pbSummary = readFileSync(join(runDir, 'summary.zh.md'), 'utf8');
+      assert(pbSummary.includes('节流请求 40 次') && pbSummary.includes('429 1 次') && pbSummary.includes('排队超过 10s 的请求 1 个'), pbSummary);
+      assert(pbSummary.includes(`Pinboard 节流 ${mock.calls.length} 次`), pbSummary);
     }
   }
 

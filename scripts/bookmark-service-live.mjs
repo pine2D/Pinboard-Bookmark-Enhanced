@@ -1256,7 +1256,8 @@ export class LiveRun {
   noteWait(kind, ms) {
     const key = kind + 'Ms';
     const add = obj => { if (obj) obj[key] = (obj[key] || 0) + ms; };
-    add(this.report.timing.totals);
+    // A --cleanup times its own pass apart: the run's totals stay the run's.
+    add(this.resumed ? (this.report.cleanup.timing ||= {}) : this.report.timing.totals);
     add(this.openStage);
     add(this.openPhase);
     if (this.currentModule?.record) add(this.currentModule.record.timing ||= {});
@@ -1396,12 +1397,16 @@ export class LiveRun {
         intervalMs, onWait: ms => this.noteWait('throttle', ms),
         // Ten at most in the report; the gate's stats count all of them.
         onSlow: ({ queuedMs, depth }) => {
-          if (this.report.findings.filter(f => f.kind === 'pinboard_queue').length >= 10) return;
-          this.report.findings.push({ kind: 'pinboard_queue', module: this.currentModule?.id || '', phase: this.phaseName, queuedMs, depth });
+          const findings = this.resumed ? (this.report.cleanup.findings ||= []) : this.report.findings;
+          if (findings.filter(f => f.kind === 'pinboard_queue').length >= 10) return;
+          findings.push({ kind: 'pinboard_queue', module: this.currentModule?.id || '', phase: this.phaseName, queuedMs, depth });
         },
       });
       this.pinboardTransport = mock ? this.pinboardOpts.transport : pinboardHttp;
-      this.report.timing.throttle = this.gate.stats;
+      // A --cleanup keeps its gate statistics beside its request counts; the
+      // run's (429s, queueing) stay what the summary reports for the run.
+      if (this.resumed) this.report.cleanup.throttle = this.gate.stats;
+      else this.report.timing.throttle = this.gate.stats;
     }
     return this.gate;
   }
@@ -3063,7 +3068,8 @@ export class LiveRun {
     const instanceNames = Object.keys(r.instances || {});
     if (instanceNames.length) lines.push(`- 请求：${instanceNames.map(i => `${i} Node ${r.counts?.[i]?.node ?? 0} / 浏览器 ${r.counts?.[i]?.browser ?? 0}`).join('；')}${r.fakeAi ? `；假 AI ${(r.fakeAi.calls || []).filter(c => c.status === 200).length}/${r.fakeAi.limit}` : ''}`);
     // The latest --cleanup pass, counted apart from the run.
-    if (r.cleanup?.counts && instanceNames.length) lines.push(`- 续清请求（第 ${r.cleanup.resumed || 1} 次 --cleanup）：${instanceNames.map(i => `${i} Node ${r.cleanup.counts[i]?.node ?? 0}`).join('；')}`);
+    const cth = r.cleanup?.throttle;
+    if (r.cleanup?.counts && instanceNames.length) lines.push(`- 续清请求（第 ${r.cleanup.resumed || 1} 次 --cleanup）：${instanceNames.map(i => `${i} Node ${r.cleanup.counts[i]?.node ?? 0}`).join('；')}${cth ? `；Pinboard 节流 ${cth.requests} 次，等待 ${sec(cth.waitedMs || 0)}，429 ${cth.rateLimited} 次` : ''}`);
     // The Pinboard account is named nowhere in this file.
     if (r.pinboard) {
       const th = r.timing?.throttle;
@@ -3390,6 +3396,9 @@ async function resumeCleanup(opts) {
     // are this pass's; earlier ones stay in the report.
     report.cleanup.passStart = report.cleanup.entries.length;
     delete report.cleanup.counts;
+    delete report.cleanup.throttle;
+    delete report.cleanup.timing;
+    delete report.cleanup.findings;
     run.pools = report.pools;
     run.caps = {};
     run.reserve = {};
