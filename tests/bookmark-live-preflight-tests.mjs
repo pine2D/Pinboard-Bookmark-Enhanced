@@ -1211,7 +1211,12 @@ try {
         r.restores = [];
         r.sw = async (fn, arg) => {
           const text = String(fn);
-          if (text.includes('SETTINGS_DEFAULTS')) return ['optA'];
+          if (text.includes('SETTINGS_DEFAULTS')) {
+            // The module's snapshot keys, as the worker would list them.
+            globalThis.SETTINGS_DEFAULTS = { optA: 1 };
+            try { r.snapshotKeys = fn(); } finally { delete globalThis.SETTINGS_DEFAULTS; }
+            return ['optA'];
+          }
           if (text.includes('local.set(saved)')) { r.restores.push(arg.saved); return undefined; }
           if (text.includes('local.set(snapshot)')) { r.restores.push(arg.snapshot); return undefined; }
           if (text.includes('storage.local.get')) return { optA: 'before' };
@@ -1251,6 +1256,7 @@ try {
       assert.deepEqual(run.restores, [{ optA: 'before' }, { optA: 'before' }], 'the failed part restores its settings, then the module does');
       assert.deepEqual(record.pendingDecisions.map(d => [d.code, d.actual]), [['pending_split', 'one line']], 'a pending ruling is recorded, not failed');
       assert.equal(run.fatal, null);
+      for (const key of ['optA', 'offlineQueue', 'offlineQueuePause']) assert(run.snapshotKeys.includes(key), 'a module restores ' + key + ' when it ends');
       run.runDir = mkdtempSync(join(dir, 'parts-'));
       run.summaryPath = join(run.runDir, 'summary.zh.md');
       run.writeSummary();

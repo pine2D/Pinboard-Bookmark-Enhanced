@@ -3255,7 +3255,9 @@ export class LiveRun {
     const errorsBefore = this.report.pageErrors.length;
     let settingsKeys, snapshot;
     try {
-      settingsKeys = await this.sw(() => Object.keys(SETTINGS_DEFAULTS).concat(['optSyncEnabled', 'offlineQueue']));
+      // offlineQueuePause too: a module that pauses the queue (a revoked
+      // key) must not leave the pause to the modules after it.
+      settingsKeys = await this.sw(() => Object.keys(SETTINGS_DEFAULTS).concat(['optSyncEnabled', 'offlineQueue', 'offlineQueuePause']));
       snapshot = await this.sw(keys => chrome.storage.local.get(keys), settingsKeys);
       current.settingsKeys = settingsKeys;
     } catch (error) {

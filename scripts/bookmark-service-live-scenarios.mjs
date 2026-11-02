@@ -1302,10 +1302,12 @@ export const SELFHOSTED_MODULES = [
     id: 'sh.long-tag-pg',
     services: ['linkding'],
     surfaces: ['popup'],
-    features: ['linkding-long-tag-500', 'linkding-long-tag-not-queued'],
-    fixRefs: ['G3', 'G4b'],
+    features: ['linkding-long-tag-500', 'linkding-long-tag-not-queued', 'queue-long-tag-needs-attention'],
+    fixRefs: ['G3', 'G4b', 'G17'],
     needs: needs({ target: 'temp', container: 'linkding-pg', shots: true, longTag: 'server' }),
-    budget: { bookmarks: 3, urls: 2, node: 4, browser: 30, ai: 0, tags: 1, seconds: 60, tagReads: 1 },
+    // The queued replay's 500 may leave an untagged bookmark (G3) and holds
+    // a slot: one more bookmark and URL.
+    budget: { bookmarks: 4, urls: 4, node: 4, browser: 45, ai: 0, tags: 1, seconds: 75, tagReads: 1 },
     files: [],
     settings: { offlineQueueEnabled: true, qsAiTags: false, qsAiSummary: false },
     async steps(t) {
@@ -1332,7 +1334,31 @@ export const SELFHOSTED_MODULES = [
       t.note('quickSave', quick);
       t.expect(quick.status === 'failed' && quick.reason === 'tag_too_long', 'quick_save_tag_too_long');
       t.expectEq((await queue(t)).length, 0, 'quick_save_queued');
-      t.check('linkding-pg: an over-long tag is tag_too_long in the popup and quick save, never queued or replayed');
+
+      // A queued save with the tag (taken offline, so it was never judged):
+      // its replay meets the real 500 and the item is set aside as needing
+      // attention for tag_too_long (G17 takes in G3's code); another replay
+      // sends nothing.
+      await t.part('queued_long_tag', ['G3', 'G17'], async () => {
+        await t.phase('long_tag_pg_queued');
+        const queuedUrl = t.claimUrl();
+        await t.offline('self');
+        const offline = await shortcutSave(t, queuedUrl, 'qs');
+        await t.offline('');
+        t.expectEq(offline.status, 'queued', 'queued_long_tag_offline');
+        const since = t.now();
+        await drainQueue(t);
+        t.expect(createsOf(t, queuedUrl, since).length >= 1, 'queued_long_tag_replayed');
+        const item = (await queue(t)).find(i => i.url === queuedUrl);
+        t.note('queuedLongTag', item?.failure || null);
+        t.expect(!!item, 'queued_long_tag_dropped');
+        t.expectEq(item.failure?.code, 'tag_too_long', 'queued_long_tag_marker');
+        const again = t.now();
+        await drainQueue(t);
+        await drainQueue(t);
+        t.expectEq(writesSince(t, again).length, 0, 'queued_long_tag_retried');
+      });
+      t.check('linkding-pg: an over-long tag is tag_too_long in the popup and quick save, never queued or replayed; a queued one needs attention after its replay');
     },
   },
   // On any target: every write that carries the over-long tag is answered
@@ -1633,10 +1659,18 @@ export const SELFHOSTED_MODULES = [
         ? t.inject({ status: 401, body: { detail: 'Invalid token.' } })
         : t.inject({ status: 401, contentType: 'text/plain;charset=UTF-8', body: 'Unauthorized' });
       await drainQueue(t);
+      // The 401 already fails the duplicate check (a GET): counting writes
+      // alone could not tell a paused connection from one retried every
+      // time. Paused means no request at all, and the pause names this
+      // connection.
       const since = t.now();
       await drainQueue(t);
-      t.expectEq(writesSince(t, since).length, 0, 'token_retried');
+      t.expectEq(t.requests({ since }).length, 0, 'token_retried');
       t.expect((await queue(t)).some(i => i.url === revoked), 'token_dropped');
+      const account = await t.sw(async () => (await getCurrentBookmarkAuth()).account || '');
+      const pause = await t.sw(async () => (await chrome.storage.local.get('offlineQueuePause')).offlineQueuePause || null);
+      t.note('tokenPause', pause ? { reason: pause.reason, sameAccount: pause.account === account } : null);
+      t.expect(!!pause && pause.account === account, 'token_not_paused');
       unauth.clear();
       await drop(revoked);
 
