@@ -469,21 +469,50 @@ await test("the reader names a linkding tag the server cannot store, queues noth
     // PostgreSQL kept the bookmark without its tags; the reader shows it saved.
     same(server.row.tag_names, []);
     equal(w.document.getElementById("reader-bookmark-save").dataset.saved, "true");
-    await w.pbpReaderBookmarkAction("edit"); await settle(pending);
+    // The tags came from the popup draft, not the reader, and the server kept
+    // none of them: the editor opens on the tags that failed, not the empty
+    // stored list, so nothing has to be retyped.
     const editor = w.document.getElementById("reader-bookmark-editor"), tags = w.document.getElementById("reader-bookmark-tags");
+    const editorStatus = w.document.getElementById("reader-bookmark-editor-status");
+    const tagError = ["bookmarkErrTagTooLong:" + shown + ":64", "error", false];
+    assert(editor?.matches(":popover-open"), "a plain Save that failed on a tag left nowhere to shorten it");
+    equal(tags.value, long);
+    same([editorStatus.textContent, editorStatus.dataset.state, editorStatus.hidden], tagError);
+    // Saving again without the editor must not report the tagless bookmark as
+    // saved: it sends nothing and reopens the editor on the same tags.
+    const writes = () => server.requests.filter(r => r.method !== "GET").length;
+    const sent = writes();
+    w.document.getElementById("reader-bookmark-cancel").click();
+    assert(!editor.matches(":popover-open"), "Cancel did not close the editor");
+    for (const action of ["save", "later"]) {
+      await w.pbpReaderBookmarkAction(action); await settle(pending);
+      equal(writes(), sent);
+      assert(editor.matches(":popover-open"), action + " skipped the tags that still need shortening");
+      equal(tags.value, long);
+      equal(status.textContent, "bookmarkErrTagTooLong:" + shown + ":64");
+      same([editorStatus.textContent, editorStatus.dataset.state, editorStatus.hidden], tagError);
+      w.document.getElementById("reader-bookmark-cancel").click();
+    }
+    await w.pbpReaderBookmarkAction("edit"); await settle(pending);
+    equal(tags.value, long);
     const apply = async value => {
       tags.value = value; tags.dispatchEvent(new w.Event("input", { bubbles: true }));
       w.document.getElementById("reader-bookmark-apply").click(); await settle(pending);
     };
     await apply(long);
     assert(editor.matches(":popover-open"), "the editor closed on a tag the user still has to shorten");
-    const editorStatus = w.document.getElementById("reader-bookmark-editor-status");
-    same([editorStatus.textContent, editorStatus.dataset.state, editorStatus.hidden], ["bookmarkErrTagTooLong:" + shown + ":64", "error", false]);
+    same([editorStatus.textContent, editorStatus.dataset.state, editorStatus.hidden], tagError);
     same(h.env.queue, []);
     await apply(fits);
     assert(!editor.matches(":popover-open"), "the shortened tag did not save");
     same(server.row.tag_names, [fits]);
     same(server.requests.filter(r => r.method === "PATCH").map(r => r.body.tag_names), [[long], [fits]]);
+    // Once the tags are stored, Save is an ordinary Save again.
+    await w.pbpReaderBookmarkAction("save"); await settle(pending);
+    assert(!editor.matches(":popover-open"), "a Save after the fix reopened the editor");
+    equal(status.textContent, "readerBookmarkSaved");
+    await w.pbpReaderBookmarkAction("edit"); await settle(pending);
+    equal(tags.value, fits);
   } finally { frame.remove(); }
 });
 await test("Pinboard and Karakeep reader bookmarks keep the popup's privacy draft and carry no sharing intent", async () => {

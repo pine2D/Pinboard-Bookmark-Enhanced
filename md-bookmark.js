@@ -12,6 +12,12 @@
   // Placeholder values for a failure key whose copy names something (the tag
   // linkding could not store); set together with that key.
   let failureArgs = [];
+  // Tags linkding could not store, with their copy's placeholders, until a
+  // save stores them. A plain Save sends the popup draft's tags, which the
+  // reader never shows, and a PostgreSQL create keeps the bookmark without
+  // them: Save and Read Later reopen the editor on these tags instead of
+  // reporting that tagless bookmark as saved.
+  let tagFix = null;
   let editor = null;
   let editorSource = null;
   let sharedExplicit = false;
@@ -258,7 +264,9 @@
     if (!known) return;
     ensureEditor();
     editorStatusKey = ""; paint();
-    const values = state.bookmark || context.bookmark?.draft || {};
+    const values = { ...(state.bookmark || context.bookmark?.draft || {}),
+      ...(typeof tagFix?.tags === "string" ? { tags: tagFix.tags } : {}) };
+    if (tagFix) { failureArgs = tagFix.args; editorStatusKey = "bookmarkErrTagTooLong"; paint(); }
     id("title").value = typeof values.title === "string" ? values.title : context.title || "";
     label(id("tags").closest("label").firstElementChild, state.quotedTags === true ? "readerBookmarkTagsQuoted" : "readerBookmarkTags");
     id("tags").value = typeof values.tags === "string" ? values.tags : pbpBookmarkFormatTags(context.bookmark?.tags || []);
@@ -275,7 +283,8 @@
     sharedExplicit = false;
     sharingChoice = id("private").checked;
     editorSource = document.activeElement;
-    editor.showPopover(); id("title").focus();
+    if (!editor.matches(":popover-open")) editor.showPopover();
+    id(tagFix ? "tags" : "title").focus();
   }
 
   function confirmDelete() {
@@ -304,7 +313,7 @@
       // The successful delete is authoritative; a second lookup could fail
       // or return stale data and must not paint the removed bookmark as saved.
       state = { known: true, bookmarked: false, account: context.account };
-      editorStatusKey = ""; statusKey = "readerBookmarkDeleted";
+      editorStatusKey = ""; statusKey = "readerBookmarkDeleted"; tagFix = null;
       closeEditor();
       document.dispatchEvent(new CustomEvent("pbp:bookmark-changed", { detail: { url: context.url, account: context.account } }));
     } else {
@@ -334,12 +343,17 @@
     }
     editorStatusKey = "";
     const gen = generation;
+    // The tags a plain Save sends: the popup draft's, for a page not yet saved.
+    const sentTags = action === "edit" ? draft?.tags
+      : state.known && !state.bookmarked && typeof state.bookmark?.tags === "string" ? state.bookmark.tags : undefined;
+    let reopen = false;
     inflight = true; showStatus("readerBookmarkSaving");
     const result = await request({ type: "mdReaderBookmarkSave", action, ...(draft ? { draft } : {}) });
     if (gen !== generation) return;
     if (result?.account && result.account !== context.account) {
       inflight = false; showStatus("readerBookmarkAccountChanged"); return;
     }
+    if (["saved", "skipped", "queued"].includes(result?.status)) tagFix = null;
     if (result?.status === "saved" || result?.status === "skipped") {
       closeEditor();
       await refresh(gen);
@@ -355,22 +369,29 @@
       statusKey = "bookmarkPartialSave";
     } else if (result?.reason === "tag_too_long") {
       // linkding writes a new bookmark before its tags, so read it again. An
-      // open editor stays open to shorten the tag the copy names.
+      // open editor stays open to shorten the tag the copy names; a plain
+      // Save opens it on the tags it sent.
       await refresh(gen);
       if (gen !== generation) return;
       failureArgs = typeof pbpBookmarkFailureArgs === "function" ? pbpBookmarkFailureArgs(result) : [];
       statusKey = failureKey(result) || "readerBookmarkFailed";
+      if (statusKey === "bookmarkErrTagTooLong") {
+        tagFix = { tags: sentTags, args: failureArgs };
+        reopen = action !== "edit";
+      }
       if (action === "edit") editorStatusKey = statusKey;
     } else if (action === "edit" && state.quotedTags === true && result?.reason === "invalid") {
       editorStatusKey = "readerBookmarkTagsQuoteError";
       statusKey = "readerBookmarkFailed";
     } else statusKey = failureKey(result) || (result?.reason === "account_changed" || result?.reason === "not_logged_in" ? "readerBookmarkAccountChanged" : "readerBookmarkFailed");
     inflight = false; paint();
+    if (reopen) return edit();
   }
 
   window.pbpReaderBookmarkAction = function (action) {
     if (action === "edit") return edit();
     if (action !== "save" && action !== "later") return;
+    if (tagFix) return edit();
     return save(action === "save" && state.known && state.bookmarked && state.bookmark?.toread ? "read" : action);
   };
 
@@ -398,12 +419,12 @@
     // A second render of the same article must not unlock an in-flight write.
     if (context?.url === next?.url && context?.account === next?.account) return;
     closeEditor();
-    generation++; context = next; state = { known: false }; inflight = true; deleting = false; editorStatusKey = "";
+    generation++; context = next; state = { known: false }; inflight = true; deleting = false; editorStatusKey = ""; tagFix = null;
     mount(); showStatus("readerBookmarkChecking"); const gen = generation;
     refresh(gen).finally(() => { if (gen === generation) { inflight = false; if (state.known) statusKey = ""; paint(); } });
   });
   document.addEventListener("pbp:bookmark-account-changed", event => {
-    generation++; context = event.detail || null; state = { known: false }; inflight = true; deleting = false; editorStatusKey = "";
+    generation++; context = event.detail || null; state = { known: false }; inflight = true; deleting = false; editorStatusKey = ""; tagFix = null;
     closeEditor();
     if (editor) for (const input of editor.querySelectorAll("input, textarea")) { input.value = ""; input.checked = false; }
     if (!context?.account) { showStatus("readerBookmarkAccountChanged"); return; }
