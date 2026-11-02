@@ -2661,6 +2661,10 @@ export class LiveRun {
     budget.browser += budget.tagReads * (this.tagExtraPages?.[mod.instance] || 0);
     const record = { id: mod.id, instance: mod.instance, status: 'running', started: new Date().toISOString(), ms: 0, checks: [], notes: {}, failure: null, counts: {}, timing: { waitMs: 0, throttleMs: 0 } };
     this.report.modules.push(record);
+    // From here a failure belongs to this module, not to the previous
+    // module's last step still in phaseName. No throwIfFatal here: that ran
+    // above, and phase() would add it again.
+    this.phaseName = mod.id;
     this.persist();
     const current = { id: mod.id, budget, created: 0, claimed: 0, record };
     this.currentModule = current;
@@ -2673,7 +2677,9 @@ export class LiveRun {
       snapshot = await this.sw(keys => chrome.storage.local.get(keys), settingsKeys);
     } catch (error) {
       // Before its steps: aborted with the cause, never left "running".
+      // No step ran, so its features reach no verdict (unfinished).
       record.status = 'aborted';
+      record.beforeSteps = true;
       record.failure = { phase: this.phaseName, code: failureCode(error, this.secrets) };
       record.finished = new Date().toISOString();
       this.currentModule = null;
@@ -3244,7 +3250,9 @@ export class LiveRun {
       const diffs = r.readBackDiffs.filter(d => d.module === m.id);
       // Still "running": the run was cut off in this module (kill -9, OOM, a
       // crash, a second signal) before it reached a verdict.
-      const verdict = m.status === 'running' ? '中断（运行在此模块中被打断，未得出结论）' : `${m.status === 'aborted' ? '中止' : '失败'}于 ${m.failure?.phase}，${m.failure?.code}`;
+      const verdict = m.status === 'running' ? '中断（运行在此模块中被打断，未得出结论）'
+        : m.beforeSteps ? `中止于开始前（未执行任何步骤，未得出结论），${m.failure?.code}`
+        : `${m.status === 'aborted' ? '中止' : '失败'}于 ${m.failure?.phase}，${m.failure?.code}`;
       return `- ${m.id}：${verdict}；读回差异 ${diffs.length} 条${diffs[0] ? `（${diffs[0].code}：期望 ${oneLine(diffs[0].expected, 60)}，实际 ${oneLine(diffs[0].actual, 60)}）` : ''}；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；截图 ${shots[shots.length - 1]}` : ''}`;
     });
     if (notStarted.length) lines.push(`- 未执行（${notStarted.length}，运行在它们开始前已停止，不算通过也不算失败）：${notStarted.join('，').slice(0, 300)}`);
@@ -3269,7 +3277,7 @@ export class LiveRun {
         const owner = SERVICE_TYPES.find(svc => f.startsWith(svc + '-'));
         if (owner && owner !== row.service) continue;
         const list = features.get(f) || [];
-        list.push({ id: m.id, ok: m.status === 'passed', open: m.status === 'running' || m.status === 'not_started' });
+        list.push({ id: m.id, ok: m.status === 'passed', open: m.status === 'running' || m.status === 'not_started' || m.beforeSteps === true });
         features.set(f, list);
       }
     }

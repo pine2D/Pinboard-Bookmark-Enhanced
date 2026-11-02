@@ -1469,6 +1469,30 @@ try {
     assert.equal(budgetSeen, planned.browser + planned.tagReads * 2, 'tag-list reads cost one request per extra page');
     assert.deepEqual(gone.report.modules.map(m => [m.id, m.status, m.failure?.code]), [['linkding.edges.offline', 'aborted', 'worker_gone']]);
     assert.equal(gone.currentModule, null);
+    // The phase is the module's own, never the previous module's last step
+    // left in phaseName, and the record says no step of it ran (review of
+    // H1c round 2): its features are unfinished, not failed.
+    const prev = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    const popupReader = all.find(m => m.id === 'linkding.core.popup-reader');
+    prev.runDir = join(dir, 'summary-gone-before-steps');
+    mkdirSync(prev.runDir, { mode: 0o700 });
+    prev.reportPath = join(prev.runDir, 'report.json');
+    prev.ctx = { pages: () => [] };
+    prev.selected = [popupReader];
+    prev.phaseName = 'readonly_popup';
+    prev.sw = async () => { throw new live.HarnessFailure('worker_gone'); };
+    await assert.rejects(prev.runModule(popupReader), e => e.code === 'worker_gone');
+    const goneRec = prev.report.modules[0];
+    assert.equal(goneRec.failure.phase, popupReader.id, 'the module\'s own phase, not readonly_popup');
+    assert.equal(goneRec.beforeSteps, true);
+    Object.assign(prev.report, { target: 'temp', selected: [popupReader.id], failure: goneRec.failure, instances: { linkding: { service: 'linkding', base: 'http://127.0.0.1:9/' } } });
+    prev.writeSummary();
+    const goneText = readFileSync(join(prev.runDir, 'summary.zh.md'), 'utf8');
+    assert(!goneText.includes('readonly_popup'), goneText);
+    assert(!/^- 未通过 /m.test(goneText), 'no feature failed on a module that ran no step: ' + goneText);
+    // A feature named after another service is not this module's.
+    for (const f of popupReader.features.filter(f => !/^(pinboard|karakeep)-/.test(f))) assert.match(goneText, new RegExp('未完成（[^\\n]*：[^\\n]*' + f), goneText);
+    assert.match(goneText, /linkding\.core\.popup-reader：[^\n]*未执行任何步骤[^\n]*worker_gone/, goneText);
 
     const run = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
     run.runDir = join(dir, 'summary-not-started');
