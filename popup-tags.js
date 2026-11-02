@@ -198,6 +198,19 @@ function applyTagData(counts) {
   tagVocabIndex = pbpTagVocabIndex(counts);
 }
 
+// Completion compares NFC lowercase text and excludes by the shared dedupe
+// key. Both are derived once per vocabulary (keyed on the allUserTags array
+// itself), never per keystroke.
+let _acTagEntries = [];
+let _acTagEntriesFor = null;
+function pbpAutocompleteTagEntries() {
+  if (_acTagEntriesFor !== allUserTags) {
+    _acTagEntries = allUserTags.map(name => ({ name, text: name.normalize("NFC").toLowerCase(), key: pbpTagDedupeKey(name) }));
+    _acTagEntriesFor = allUserTags;
+  }
+  return _acTagEntries;
+}
+
 function pbpPopupTagContext(s = settings) {
   return { service: pbpBookmarkServiceId(s), separator: s.aiTagSeparator,
     bookmarkNames: pbpBookmarkServiceId(s) === "pinboard"
@@ -335,18 +348,18 @@ function setupTagsInput() {
   });
   input.addEventListener("compositionend", () => handleTagInput());
   function handleTagInput() {
-    const val = input.value.trim().toLowerCase(); acIndex = -1;
+    const val = input.value.trim().normalize("NFC").toLowerCase(); acIndex = -1;
     input.removeAttribute("aria-activedescendant");
     if (!val) { closeAutocomplete(); return; }
-    const matches = allUserTags.filter((t) =>
-      t.toLowerCase().includes(val) &&
-      !currentTags.some((ct) => ct.toLowerCase() === t.toLowerCase())
+    // A selected tag's whole group counts as selected: no twin is offered.
+    const selected = new Set(currentTags.map(pbpTagDedupeKey));
+    const matches = pbpAutocompleteTagEntries().filter((entry) =>
+      entry.text.includes(val) && !selected.has(entry.key)
     ).sort((a, b) => {
-      const al = a.toLowerCase(), bl = b.toLowerCase();
-      const ap = al.startsWith(val), bp = bl.startsWith(val);
+      const ap = a.text.startsWith(val), bp = b.text.startsWith(val);
       if (ap !== bp) return ap ? -1 : 1;
       return 0;
-    }).slice(0, 10);
+    }).slice(0, 10).map(entry => entry.name);
     if (!matches.length) {
       dropdown.innerHTML = "";
       const hint = document.createElement("div");
@@ -598,8 +611,14 @@ function addTag(tag) {
   return tag;
 }
 
+// An exact chip name removes only that chip (a bookmark may hold two server
+// names of one group); any other spelling removes its group.
 function removeTag(tag) {
-  currentTags = currentTags.filter((t) => t.toLowerCase() !== tag.toLowerCase());
+  if (currentTags.includes(tag)) currentTags = currentTags.filter((t) => t !== tag);
+  else {
+    const key = pbpTagDedupeKey(tag);
+    currentTags = currentTags.filter((t) => pbpTagDedupeKey(t) !== key);
+  }
   if (typeof _tagsUserTouched !== "undefined") _tagsUserTouched = true;
   // Codex r2 M3: a removed tag loses its AI provenance - if the user
   // re-adds the same name by hand, replace-mode regen must treat it as
@@ -820,14 +839,14 @@ function pbpSyncRovingToolbars() {
 // ([data-alt-num]), so what the user sees is what Alt+N does by construction.
 function pbpAssignAltNumBadges() {
   syncSuggestTagStates(); // used-state must be settled BEFORE slots are handed out
-  const byTag = new Map(); // lowercase tag -> slot (duplicates share)
+  const byTag = new Map(); // dedupe key -> slot (group twins share, as syncSuggestTagStates marks them used together)
   let next = 1;
   document.querySelectorAll("#pinboard-suggest-tags .stag, #ai-suggest-tags .stag").forEach((el) => {
     delete el.dataset.altNum;
     el.removeAttribute("aria-keyshortcuts");
     const old = el.querySelector(".stag-num");
     if (old) old.remove();
-    const tag = (el.dataset.tag || "").toLowerCase();
+    const tag = pbpTagDedupeKey(el.dataset.tag || "");
     let slot = byTag.get(tag);
     if (slot === undefined) {
       if (el.classList.contains("used") || next > 9) return; // used at render time gets no slot
