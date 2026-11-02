@@ -266,7 +266,11 @@ export const MODULES = [
     async steps(t) {
       const { prefix } = t;
       const urls = [t.claimUrl(), t.claimUrl(), t.claimUrl(), t.claimUrl()];
+      // Earlier modules leave their run-prefix tags until the run's cleanup:
+      // only the tags this module adds are judged for twins.
+      const runTagNames = () => t.sw(async prefix => (await pbpBookmarkClient(await getCurrentBookmarkAuth()).tags()).map(tag => tag.name).filter(name => name.startsWith(prefix)), prefix);
       await t.phase('karakeep_seed_spellings');
+      const before = new Set(await runTagNames());
       const names = { own: prefix + ' machine learning', double: prefix + ' double  space', minority: prefix + ' popular topic', twin: prefix + '_machine_learning', majority: prefix + '_popular_topic' };
       // Independent service-native spellings through the real API, not the
       // extension's canonicalizer; every write still passes the Node guard.
@@ -327,8 +331,8 @@ export const MODULES = [
       const added = await t.ownRow(urls[3]);
       t.expect(added.tags.length === 1 && added.tags[0].name === names.majority, 'library_majority_reused');
       await fresh.close();
-      const runTags = await t.sw(async prefix => (await pbpBookmarkClient(await getCurrentBookmarkAuth()).tags()).filter(tag => tag.name.startsWith(prefix)), prefix);
-      t.expect(runTags.length === 5 && runTags.every(tag => Object.values(names).includes(tag.name)), 'unexpected_twin_tag');
+      const after = await runTagNames();
+      t.expect(Object.values(names).every(name => after.includes(name)) && after.filter(name => !before.has(name)).every(name => Object.values(names).includes(name)), 'unexpected_twin_tag');
       t.check('karakeep: existing space/double-space tag IDs preserved in popup and reader; own spelling beats library majority; malformed quote sends no writes; alignment-off preservation; new bookmark reuses majority without a twin');
     },
   },
