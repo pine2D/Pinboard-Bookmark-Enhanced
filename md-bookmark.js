@@ -261,7 +261,9 @@
     privacyLabel.hidden = state.privacySupported === false && state.sharingSupported !== true;
     label(privacyLabel.lastElementChild, state.sharingSupported === true ? "bookmarkShare" : "readerBookmarkPrivate");
     id("private").checked = state.sharingSupported === true ? values.private === false : state.privacySupported === false || values.private === true; id("toread").checked = values.toread === true;
-    sharedExplicit = state.sharingSupported === true && !state.bookmarked && values.sharedExplicit === true;
+    // Only a click on this Share box records a sharing choice; the popup's
+    // draft never shares a bookmark the reader creates.
+    sharedExplicit = false;
     sharingChoice = id("private").checked;
     editorSource = document.activeElement;
     editor.showPopover(); id("title").focus();

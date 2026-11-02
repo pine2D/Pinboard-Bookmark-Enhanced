@@ -1511,8 +1511,10 @@ function pbpReaderInitialIntent(context, settings, action) {
     notes: typeof originalDraft?.notes === "string" ? originalDraft.notes : typeof context.description === "string" ? context.description : "",
     ...(summary !== undefined ? { summary } : {}),
     tags: typeof originalDraft?.tags === "string" ? originalDraft.tags : Array.isArray(context.tags) ? pbpSerializeIntentTags(context.tags, pbpBookmarkServiceId(settings)) : "",
-    ...(linkding ? { sharedExplicit: originalDraft?.sharedExplicit === true } : {}),
-    private: linkding ? !(originalDraft?.sharedExplicit === true && originalDraft?.private === false) : typeof originalDraft?.private === "boolean" ? originalDraft.private : pbpServiceEffectivePrivate(settings, { incognito: context.sourceIncognito === true }),
+    // A linkding bookmark the reader creates starts unshared, whatever the
+    // popup's Share box said (user decision 2026-11-01). Only a click on the
+    // reader editor's own Share box records a sharing choice (md-bookmark.js).
+    private: linkding ? true : typeof originalDraft?.private === "boolean" ? originalDraft.private : pbpServiceEffectivePrivate(settings, { incognito: context.sourceIncognito === true }),
     toread: action === "later" || (typeof originalDraft?.toread === "boolean" ? originalDraft.toread : settings.optReadlaterDefault === true),
   };
 }

@@ -44,21 +44,24 @@ async function pipelineHarness(options = {}) {
   const start = background.indexOf("const PBP_SAVE_MODES");
   const end = background.indexOf("// ---- P1: Shared save function ----", start);
   const env = { account: "alice", token: "alice:rotated-token", epoch: 1, post: { ...POST }, calls: [], queue: [], ...options };
+  // A linkding connection whose instance allows sharing (shared.js pbpBookmarkConnection).
+  const sharing = () => env.sharingEnabled === undefined ? {} : { sharingEnabled: env.sharingEnabled };
   const deps = {
     chrome: { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p }, storage: { local: { get: async key => ({ offlineQueue: env.queue, [typeof key === "string" ? key : "unused"]: key === "offlineQueue" ? env.queue : { ...SLOT, ...env.slot } }), set: async values => { if (env.queueWriteFailure) throw new Error("queue storage unavailable"); if (values.offlineQueue) env.queue = values.offlineQueue; } } }, tabs: { query: async () => [], get: async tabId => { assert(tabId === 9, "saving must never inspect the source tab"); if (env.readerClosed) throw new Error("reader closed"); return { id: 9, url: READER }; } } },
     console, pbpCreateRecoveringTail, pbpOfflineQueueReduce, pbpPinboardAccountFromToken, pbpEffectivePrivate,
     pbpResolveOfflineQueueToken, pbpDrainOfflineQueue, pbpResolveSavePlan, buildPostsAddUri, POSTS_ADD_URI_BUDGET,
     loadSettings: async () => ({ pinboardToken: "alice:stale-token", offlineQueueEnabled: true, optPrivateDefault: false, optPrivateIncognito: true, optReadlaterDefault: false, ...env.settings }),
-    getCurrentBookmarkAuth: async () => ({ account: env.account, token: env.token, epoch: env.epoch, service: env.service }),
+    getCurrentBookmarkAuth: async () => ({ account: env.account, token: env.token, epoch: env.epoch, service: env.service, ...sharing() }),
     pbpCaptureBookmarkAuth: () => ({ account: env.account, epoch: env.epoch }),
     t: key => key,
-    // Self-hosted cases inject the client so its failures can be scripted.
-    pbpCreateBookmarkServiceClient: () => env.client,
+    // Self-hosted cases inject the client so its failures can be scripted. A
+    // clientFor factory also receives the worker's own client settings.
+    pbpCreateBookmarkServiceClient: config => env.clientFor ? env.clientFor(config) : env.client,
     pbpBookmarkAuthIsCurrent: auth => auth.account === env.account && auth.epoch === env.epoch,
     // As in the worker, the write lands only for the current owner (a
     // self-hosted lookup fails closed without it).
     pbpStatusCacheSet: (url, auth, state) => { (env.cacheWrites ||= []).push({ url, account: auth.account, ...state }); return auth.account === env.account && auth.epoch === env.epoch; }, pbpStatusCacheGet: () => null,
-    pbpReadFreshBookmarkAuthForAccount: async account => account === env.account ? { account, token: env.token, epoch: env.epoch, service: env.service } : null,
+    pbpReadFreshBookmarkAuthForAccount: async account => account === env.account ? { account, token: env.token, epoch: env.epoch, service: env.service, ...sharing() } : null,
     pbpWaybackArchive: async () => {}, updateBadge: async () => {}, setIcon: () => {},
     pinboardFetch: async raw => {
       const url = new URL(raw); env.calls.push(url);
@@ -82,11 +85,15 @@ async function pipelineHarness(options = {}) {
   return { ...new Function(...Object.keys(deps), background.slice(start, end) + "\nreturn { submitSaveIntent, pbpReaderBookmarkRequest, processOfflineQueue }; ")(...Object.values(deps)), env };
 }
 // The two self-hosted APIs as the adapter meets them, hand-written from
-// linkding v1.47 (routes.py check(), serializers.py update()) and Karakeep
-// 0.34.1's /api/v1 OpenAPI. A check answers the stored record; PATCH changes
-// only the fields it is sent and answers the stored record. Each failures[]
-// row lets `skip` matching requests through, then answers the next one with
-// the 503 a proxy in front of the server gives while it is down.
+// linkding v1.47 (routes.py check(), serializers.py create() and update())
+// and Karakeep 0.34.1's /api/v1 OpenAPI. A check answers the stored record;
+// a linkding POST for a URL it does not hold (row null) stores a new record
+// with the serializer's defaults and answers it with 201; PATCH changes only
+// the fields it is sent and answers the stored record. Each failures[] row
+// lets `skip` matching requests through, then answers the next one with the
+// 503 a proxy in front of the server gives while it is down. clientFor builds
+// the adapter with the worker's own sharing setting (background.js
+// pbpBookmarkClient), so a test exercises the setting the worker passes.
 function selfHostedServer(service, row) {
   const requests = [], failures = [];
   const json = (status, value) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
@@ -107,9 +114,16 @@ function selfHostedServer(service, row) {
     const page = url.searchParams.get("url");
     if (service === "linkding") {
       if (method === "GET" && url.pathname === "/api/bookmarks/check/") {
-        return json(200, { bookmark: page === row.url ? linkdingRecord() : null, metadata: { url: page, title: null, description: null, preview_image: null }, auto_tags: [] });
+        return json(200, { bookmark: row && page === row.url ? linkdingRecord() : null, metadata: { url: page, title: null, description: null, preview_image: null }, auto_tags: [] });
       }
-      if (method === "PATCH" && url.pathname === "/api/bookmarks/" + row.id + "/") {
+      if (method === "POST" && url.pathname === "/api/bookmarks/" && !row) {
+        const now = new Date().toISOString();
+        row = { id: 21, url: body.url, title: body.title ?? "", description: body.description ?? "", notes: body.notes ?? "",
+          is_archived: body.is_archived ?? false, unread: body.unread ?? false, shared: body.shared ?? false,
+          tag_names: [...(body.tag_names ?? [])], date_added: now, date_modified: now };
+        return json(201, linkdingRecord());
+      }
+      if (method === "PATCH" && row && url.pathname === "/api/bookmarks/" + row.id + "/") {
         for (const key of ["url", "title", "description", "notes", "is_archived", "unread", "shared", "tag_names"]) if (body[key] !== undefined) row[key] = body[key];
         row.date_modified = new Date().toISOString();
         return json(200, linkdingRecord());
@@ -126,9 +140,20 @@ function selfHostedServer(service, row) {
     }
     return json(404, { code: "NOT_FOUND", message: "Bookmark not found" });
   };
-  const client = pbpCreateBookmarkServiceClient({ service, baseUrl: service === "linkding" ? "https://links.example/" : "https://keep.example/",
-    beforeRequest: async () => ({ token: service + "-token" }), fetchImpl });
-  return { row, requests, failures, client };
+  const connection = { service, baseUrl: service === "linkding" ? "https://links.example/" : "https://keep.example/",
+    beforeRequest: async () => ({ token: service + "-token" }), fetchImpl };
+  const client = pbpCreateBookmarkServiceClient(connection);
+  const clientFor = config => pbpCreateBookmarkServiceClient({ ...connection, sharingEnabled: config?.sharingEnabled });
+  return { get row() { return row; }, requests, failures, client, clientFor };
+}
+// Lets every reader request the runtime started, including the ones a result
+// starts (a refresh after a save), finish before the test reads the outcome.
+async function settle(pending) {
+  for (let seen = -1; seen !== pending.length;) {
+    seen = pending.length;
+    await Promise.all(pending);
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
 }
 // CLAUDE.md: a queued save keeps only these fields, the Description only for linkding.
 const QUEUE_FIELDS = ["account", "mode", "url", "title", "notes", "tags", "private", "toread", "archive", "sharedExplicit", "time", "queueId", "queuedAt"];
@@ -325,9 +350,95 @@ await test("normal and pending popup preview payloads carry linkding Description
         const h = await harness({ account, service, post: null, slot: { account, bookmarkDraft: draft } });
         const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER);
         equal(state.bookmark.summary, "first second");
-        equal(state.bookmark.sharedExplicit, sharedExplicit); equal(state.bookmark.private, !sharedExplicit);
+        // A bookmark the reader creates starts unshared, whatever the popup's Share box said.
+        assert(state.bookmark.sharedExplicit !== true, "the popup's sharing choice reached the reader");
+        equal(state.bookmark.private, true);
       } else assert(!draft || !("summary" in draft));
     }
+  }
+});
+// User decision 2026-11-01: a linkding bookmark the reader creates is never
+// shared because of the popup's draft, whatever its Share box said. The
+// popup's handoff shapes (popup.js bookmarkDraft) reach a real worker, adapter
+// and linkding whose instance allows sharing.
+await test("a reader-created linkding bookmark stays unshared whatever the popup draft chose", async () => {
+  const account = "linkding:https://links.example/:conn-1";
+  for (const bookmarkDraft of [
+    { private: false, sharedExplicit: true },
+    { title: "Popup title", tags: "one", notes: "Popup notes", private: false, sharedExplicit: true, toread: false },
+    { private: false, sharedExplicit: false },
+    { private: true, sharedExplicit: true },
+  ]) for (const action of ["save", "later"]) {
+    const where = action + " " + JSON.stringify(bookmarkDraft);
+    const server = selfHostedServer("linkding", null);
+    const h = await pipelineHarness({ account, token: "linkding-token", service: "linkding", sharingEnabled: true, post: null,
+      slot: { account, bookmarkDraft }, clientFor: server.clientFor, settings: { bookmarkService: "linkding" } });
+    const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER);
+    equal(state.sharingSupported, true); equal(state.bookmarked, false);
+    assert(state.bookmark.private === true && state.bookmark.sharedExplicit !== true, where + ": reader state " + JSON.stringify(state.bookmark));
+    equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action }, SENDER)).status, "saved");
+    const create = server.requests.find(request => request.method === "POST" && request.path === "/api/bookmarks/");
+    assert(create, where + ": the reader did not create the bookmark");
+    assert(create.body.shared === false && server.row.shared === false, where + ": linkding was asked to share it");
+  }
+  // Through the offline queue too: the reader's own lookup gets through, the
+  // save's lookup meets an outage, and the replay creates it unshared.
+  const server = selfHostedServer("linkding", null);
+  const h = await pipelineHarness({ account, token: "linkding-token", service: "linkding", sharingEnabled: true, post: null,
+    slot: { account, bookmarkDraft: { private: false, sharedExplicit: true } }, clientFor: server.clientFor, settings: { bookmarkService: "linkding" } });
+  server.failures.push({ method: "GET", path: "/api/bookmarks/check/", skip: 1 });
+  equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER)).bookmarked, false);
+  equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action: "save" }, SENDER)).status, "queued");
+  const stored = assertQueueFields(h.env.queue[0], "linkding");
+  assert(stored.private === true && stored.sharedExplicit !== true, "queued reader save " + JSON.stringify(stored));
+  await h.processOfflineQueue();
+  equal(h.env.queue.length, 0);
+  equal(server.requests.find(request => request.method === "POST" && request.path === "/api/bookmarks/")?.body.shared, false);
+  equal(server.row.shared, false);
+});
+// The reader editor's own Share box (handoff D5 c) still decides: it opens
+// unticked for a new bookmark, and only the user's own click shares it.
+await test("reader editor shares a new linkding bookmark only when its own Share box is clicked", async () => {
+  runtime ||= await (await fetch("../md-bookmark.js")).text();
+  const account = "linkding:https://links.example/:conn-1";
+  const bookmarkDraft = { title: "Popup title", tags: "one", notes: "Popup notes", private: false, sharedExplicit: true, toread: false };
+  for (const clicks of [0, 1, 2]) {
+    const server = selfHostedServer("linkding", null);
+    const h = await pipelineHarness({ account, token: "linkding-token", service: "linkding", sharingEnabled: true, post: null,
+      slot: { account, bookmarkDraft }, clientFor: server.clientFor, settings: { bookmarkService: "linkding" } });
+    const frame = document.createElement("iframe"); document.body.append(frame);
+    try {
+      const w = frame.contentWindow, pending = [];
+      w.document.body.innerHTML = '<aside id="action-rail"><div class="rail-badges"></div></aside><div id="rendered-view"></div>';
+      w.chrome = { runtime: { id: "test-id", getURL: p => "chrome-extension://test-id/" + p,
+        sendMessage: msg => { const request = h.pbpReaderBookmarkRequest(msg, SENDER); pending.push(request); return request; },
+        onMessage: { addListener: () => {} } } };
+      w.eval(await (await fetch("../shared.js")).text());
+      w.t = k => k; w.eval(runtime);
+      w.document.dispatchEvent(new w.CustomEvent("pbp:rendered", { detail: { url: URL_ARTICLE, title: "Article", account, bookmark: { tags: [], notes: "", draft: bookmarkDraft } } }));
+      await settle(pending);
+      await w.pbpReaderBookmarkAction("edit");
+      assert(w.document.getElementById("reader-bookmark-editor").matches(":popover-open"), "editor did not open");
+      const box = w.document.getElementById("reader-bookmark-private");
+      assert(!box.closest("label").hidden && box.closest("label").textContent.includes("bookmarkShare"), "Share must show for an instance that allows it");
+      equal(box.checked, false);
+      for (let i = 0; i < clicks; i++) box.click();
+      w.document.getElementById("reader-bookmark-apply").click();
+      await settle(pending);
+      const create = server.requests.find(request => request.method === "POST" && request.path === "/api/bookmarks/");
+      assert(create, clicks + " clicks: the reader edit did not create the bookmark");
+      equal(create.body.shared, clicks === 1); equal(server.row.shared, clicks === 1);
+    } finally { frame.remove(); }
+  }
+});
+await test("Pinboard and Karakeep reader bookmarks keep the popup's privacy draft and carry no sharing intent", async () => {
+  for (const service of ["pinboard", "karakeep"]) for (const isPrivate of [false, true]) {
+    const account = service === "pinboard" ? "alice" : "karakeep:fixture";
+    const h = await harness({ account, service, post: null, slot: { account, bookmarkDraft: { private: isPrivate, sharedExplicit: true } } });
+    const state = await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkState", account }, SENDER);
+    equal(state.bookmark.private, isPrivate); assert(!("sharedExplicit" in state.bookmark), service + " reader state carries a sharing intent");
+    equal((await h.pbpReaderBookmarkRequest({ type: "mdReaderBookmarkSave", account, action: "save" }, SENDER)).status, "saved");
+    equal(h.env.submitted.intent.private, isPrivate); assert(!("sharedExplicit" in h.env.submitted.intent), service + " save carries a sharing intent");
   }
 });
 // A popup that could not read the page and has nothing in the Description box
