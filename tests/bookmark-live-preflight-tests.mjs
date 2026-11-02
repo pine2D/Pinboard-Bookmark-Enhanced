@@ -1881,6 +1881,63 @@ try {
   const unblocked = await run(readOnlyArgs, { guard: false, state: linkdingState });
   assert.equal(unblocked.code, 0, 'a completed --cleanup unblocks the next run');
 
+  // Karakeep lists (H1b): a --cleanup acts on a report read from disk, which
+  // could have been edited to name the user's own Read Later list (same
+  // marker, possibly empty). So it never deletes a list: one still there is
+  // residue for a person; one already gone is confirmed. In the run's own
+  // process the ledger list is deleted after its checks, as before.
+  {
+    const kRequests = [];
+    const lists = new Map([['L1', { id: 'L1', name: 'Read later', icon: 'bookmark', description: LIST_MARKER, type: 'manual', public: false, hasCollaborators: false, userRole: 'owner', parentId: null }]]);
+    const kServer = createServer((req, res) => {
+      const url = new URL(req.url, 'http://x');
+      kRequests.push(req.method + ' ' + url.pathname);
+      const json = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(body === undefined ? '' : JSON.stringify(body)); };
+      if (req.headers.authorization !== 'Bearer ' + syntheticKarakeepKey) return json(401, { code: 'UNAUTHORIZED', message: 'Unauthorized' });
+      const list = url.pathname.match(/^\/api\/v1\/lists\/([^/]+)(\/bookmarks)?$/);
+      if (list) {
+        if (!lists.has(list[1])) return json(404, { code: 'NOT_FOUND', message: 'List not found' });
+        if (list[2]) return json(200, { bookmarks: [], nextCursor: null });
+        if (req.method === 'DELETE') { lists.delete(list[1]); res.writeHead(204); return res.end(); }
+        return json(200, lists.get(list[1]));
+      }
+      if (url.pathname === '/api/v1/bookmarks/check-url') return json(200, { bookmarkId: null });
+      if (url.pathname === '/api/v1/tags') return json(200, { tags: [], nextCursor: null });
+      return json(404, { code: 'NOT_FOUND', message: 'Unknown fixture route' });
+    });
+    const kPort = await listen(kServer);
+    const kBase = 'http://127.0.0.1:' + kPort;
+    const state = stateDirFor('karakeep-list-resume');
+    const id = randomUUID();
+    const kDir = join(state, 'pbp-it-' + id);
+    mkdirSync(kDir, { mode: 0o700 });
+    const kReport = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] }).report;
+    Object.assign(kReport, { runId: id, prefix: 'pbp-it-' + id, target: 'user', instances: { karakeep: { service: 'karakeep', base: kBase + '/' } }, pools: { karakeep: live.poolUrls('user', id, 'karakeep', 2) } });
+    kReport.ledger.lists.push({ instance: 'karakeep', id: 'L1', module: 'karakeep.core.popup-reader' }, { instance: 'karakeep', id: 'L2', module: 'karakeep.core.popup-reader' });
+    live.writePrivateJson(join(kDir, 'report.json'), kReport);
+    const kResumed = await run(['--cleanup', join(kDir, 'report.json'), '--karakeep', kBase], { guard: false, state });
+    assert.equal(kResumed.code, 1, kResumed.output);
+    assert(lists.has('L1'), 'a --cleanup never deletes a list');
+    assert(!kRequests.some(r => r.startsWith('DELETE')), kRequests.join(' | '));
+    const listEntries = kResumed.report.cleanup.entries.filter(e => e.kind === 'list').map(e => [e.id, e.deleted, e.code || '', !!e.residue]);
+    assert.deepEqual(listEntries, [['L1', false, 'residue_list_resume', true], ['L2', true, '', false]]);
+    assert.deepEqual(kResumed.report.ledger.lists.map(l => [l.id, l.deleted]), [['L1', undefined], ['L2', true]]);
+    assert.equal(kResumed.report.cleanup.complete, false);
+    assert.match(readFileSync(join(kDir, 'summary.zh.md'), 'utf8'), /残留 1 项/);
+    // In the run's own process the same ledger list is deleted.
+    const own = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    own.target = 'user';
+    own.instances.karakeep = { id: 'karakeep', service: 'karakeep', base: kBase + '/', root: live.apiRootFor('karakeep', kBase + '/'), token: syntheticKarakeepKey };
+    own.caps = { karakeep: live.BUDGETS.user.karakeep };
+    own.reserve = { karakeep: 60 };
+    own.cleaning = true;
+    own.report.ledger.lists.push({ instance: 'karakeep', id: 'L1', module: '' });
+    kRequests.length = 0;
+    assert.equal(await own.cleanupLists('karakeep'), true);
+    assert(!lists.has('L1') && kRequests.includes('DELETE /api/v1/lists/L1'), 'deleted in-process after its checks');
+    await closeServer(kServer);
+  }
+
   // The reviewer's report for finding B, through the CLI: prefix '' and a
   // Karakeep base on 127.0.0.2. Refused before the credential file is read
   // (the guard hook would record it) and before any request; the report and

@@ -1189,6 +1189,8 @@ export class LiveRun {
     // the caps until their answer is recorded.
     this.pending = {};
     this.deletableTags = new Set();
+    // A --cleanup of a report on disk (resumeCleanup) deletes no list.
+    this.resumed = false;
     this.sharing = {};
     this.snapshots = {};
     this.shotCount = 0;
@@ -2811,11 +2813,22 @@ export class LiveRun {
     }
   }
 
+  // In the run's own process a ledger list is deleted after its checks. A
+  // --cleanup (this.resumed) knows its lists only from a report on disk,
+  // which could have been edited to name the user's own Read Later list
+  // (same marker, possibly empty): it reads each one and deletes none. A
+  // list still there is residue for a person; one already gone is confirmed.
   async cleanupLists(instance) {
     let ok = true;
     for (const item of this.report.ledger.lists.filter(l => l.instance === instance && !l.deleted)) {
       try {
         const row = await this.api(instance, 'lists/' + item.id, { allow404: true });
+        if (row !== null && this.resumed) {
+          ok = false;
+          this.report.cleanup.entries.push({ kind: 'list', instance, id: item.id, deleted: false, residue: true, code: 'residue_list_resume' });
+          this.persist();
+          continue;
+        }
         if (row !== null) {
           const members = await this.api(instance, 'lists/' + item.id + '/bookmarks?limit=1');
           check(row.description === LIST_MARKER && !row.public && !row.hasCollaborators && row.userRole === 'owner' && !members.bookmarks.length, 'cleanup_list');
@@ -3062,7 +3075,7 @@ export class LiveRun {
     lines.push('', '## 清理');
     lines.push(`- 书签：创建 ${r.ledger.created.length}，删除 ${r.ledger.created.filter(x => x.deleted).length}；列表：创建 ${r.ledger.lists.length}，删除 ${r.ledger.lists.filter(x => x.deleted).length}；前缀标签 ${r.ledger.tags.length}；清理完成：${r.cleanup.complete ? '是' : '否'}${r.temp ? `；临时容器已删除：${r.temp.removed ? '是' : '否'}` : ''}`);
     const residue = r.cleanup.entries.filter(e => e.residue);
-    if (residue.length) lines.push(`- 残留 ${residue.length} 项：带本轮前缀但不在账本里（或未经写入预留），工具不删，需人工核对后处理，再跑 --cleanup 复核`);
+    if (residue.length) lines.push(`- 残留 ${residue.length} 项（工具不删，需人工核对后处理，再跑 --cleanup 复核）：${[...new Set(residue.map(e => e.kind === 'list' ? '续清不删的 Karakeep 列表' : '带本轮前缀但不在账本里或未经写入预留的标签'))].join('；')}`);
     capped(r.cleanup.entries.filter(e => e.deleted === false), 3, e => `- 未清理：${e.kind} ${e.instance || ''} ${e.id || ''} ${e.code || ''}`.trim());
     lines.push(`- 完整报告：${this.reportPath}`);
     // One screen: anything past the cap is in report.json.
@@ -3243,6 +3256,8 @@ async function resumeCleanup(opts) {
   run.target = report.target;
   run.stage = 'resume';
   run.writesPossible = true;
+  // Lists are only checked here, never deleted (cleanupLists).
+  run.resumed = true;
   const release = acquireLock(run.state, { pid: process.pid, runId: run.runId, reportPath: path, started: new Date().toISOString() }, { resume: path });
   try {
     report.cleanup.resumed = (report.cleanup.resumed || 0) + 1;
@@ -3294,7 +3309,8 @@ function printHelp() {
     '  modules are skipped. Every Pinboard request waits 3 s after the previous answer; --plan shows the floor.',
     '--shots [--shots-dir DIR] saves masked screenshots; --headed launches a visible browser; --allow-dirty runs on a dirty tree.',
     '--cleanup REPORT resumes an incomplete cleanup of a report in the state directory; the user target needs',
-    '  --credentials and the same --linkding / --karakeep again.',
+    '  --credentials and the same --linkding / --karakeep again. It deletes no Karakeep list: one still present is',
+    '  reported as residue for a person to check and remove.',
   ].join('\n'));
 }
 
