@@ -18,7 +18,7 @@ const source = readFileSync(join(repo, '.qa-scan/run-test.mjs'), 'utf8');
 assert.ok(source.includes('Object.freeze({'), 'the EXPECTED_RESULTS table moved');
 assert.ok(source.includes(': 30000;'), 'the TEST_TIMEOUT_MS default moved');
 // A 20s stall deadline (instead of 30s; about 13s of waiting) so the UNCONFIRMED case below ends quickly.
-writeFileSync(join(tree, '.qa-scan/run-test.mjs'), source.replace(': 30000;', ': 20000;').replace('Object.freeze({', 'Object.freeze({\n  "tests/gap-tests.html": 3,\n  "tests/extra-tests.html": 2,\n  "tests/low-tests.html": 2,\n  "tests/summary-tests.html": 2,\n  "tests/title-tests.html": 2,\n  "tests/short-tests.html": 3,\n  "tests/early-tests.html": 2,\n  "tests/late-tests.html": 2,\n  "tests/latesum-tests.html": 2,\n  "tests/sigstall-tests.html": 3,\n  "tests/fmt-tests.html": 2,'));
+writeFileSync(join(tree, '.qa-scan/run-test.mjs'), source.replace(': 30000;', ': 20000;').replace('Object.freeze({', 'Object.freeze({\n  "tests/gap-tests.html": 3,\n  "tests/extra-tests.html": 2,\n  "tests/low-tests.html": 2,\n  "tests/summary-tests.html": 2,\n  "tests/title-tests.html": 2,\n  "tests/short-tests.html": 3,\n  "tests/early-tests.html": 2,\n  "tests/late-tests.html": 2,\n  "tests/latesum-tests.html": 2,\n  "tests/sigstall-tests.html": 3,\n  "tests/fmt-tests.html": 2,\n  "tests/g1-tests.html": 3,\n  "tests/g2-tests.html": 2,'));
 writeFileSync(join(tree, '.qa-scan/package.json'), '{"type":"module"}');
 // rows: [[delayMs, class], ...] appended one by one after load.
 const page = (name, rows) => writeFileSync(join(tree, 'tests', name), `<!doctype html><meta charset=utf-8><title>${name}</title><body><script>
@@ -59,6 +59,18 @@ add(); setTimeout(add, 100); setTimeout(() => { document.title = 'PASS sigstall'
 // Another summary format (pass=N fail=M, as ten suites write it), filled in at the end.
 writeFileSync(join(tree, 'tests/fmt-tests.html'), `<!doctype html><meta charset=utf-8><title>fmt</title><body><div id="summary"></div><script>${add}
 add(); setTimeout(add, 100); setTimeout(() => { document.getElementById('summary').textContent = 'pass=2 fail=0'; }, 300);</script>`);
+// Unregistered, #summary still empty through a 3.5s pause, filled after the last row (md-video shape).
+writeFileSync(join(tree, 'tests/slowsum-tests.html'), `<!doctype html><meta charset=utf-8><title>slowsum</title><body><div id="summary"></div><script>${add}
+add(); setTimeout(add, 100); setTimeout(add, 3600); setTimeout(() => { document.getElementById('summary').textContent = '3 passed, 0 failed'; }, 3700);</script>`);
+// g1: registered 3, the title says PASS after two rows, then a row comes at once and another 2s later.
+writeFileSync(join(tree, 'tests/g1-tests.html'), `<!doctype html><meta charset=utf-8><title>g1</title><body><script>${add}
+add(); setTimeout(add, 100); setTimeout(() => { document.title = 'PASS g1'; }, 300); setTimeout(add, 400); setTimeout(add, 2400);</script>`);
+// g2: registered 2, title PASS and both rows already there at load, a third row 2s later.
+writeFileSync(join(tree, 'tests/g2-tests.html'), `<!doctype html><meta charset=utf-8><title>PASS g2</title><body><script>${add}
+add(); add(); setTimeout(add, 2000);</script>`);
+// g3: unregistered, a trusted-looking signal after two rows, a third row 2s after it.
+writeFileSync(join(tree, 'tests/g3-tests.html'), `<!doctype html><meta charset=utf-8><title>g3</title><body><script>${add}
+add(); setTimeout(add, 100); setTimeout(() => { document.title = 'PASS g3'; }, 300); setTimeout(add, 2300);</script>`);
 // Registered 3, only one row ever appears.
 page('short-tests.html', [[0, 'pass']]);
 const run = file => spawnSync(process.execPath, [join(tree, '.qa-scan/run-test.mjs'), '--print-counts', 'tests/' + file], { cwd: tree, encoding: 'utf8', timeout: 90000 });
@@ -134,4 +146,24 @@ test('a summary in the "pass=N fail=M" format counts as the page filling in its 
   assert.match(r.stdout, /total=2 expected=2 match/, r.stdout + r.stderr);
   assert.doesNotMatch(r.stdout, /not seen|no new row/, r.stdout);
   assert.equal(r.status, 0);
+});
+
+test('an unregistered page with an empty #summary is waited out past a 3.5s pause', () => {
+  const r = run('slowsum-tests.html');
+  assert.match(r.stdout, /total=3 expected=unregistered NOT REGISTERED/, r.stdout + r.stderr);
+  assert.doesNotMatch(r.stdout, /no trusted end signal/, r.stdout);
+  assert.match(r.stdout, /unregistered.*later rows are not seen/, r.stdout);
+});
+test('a row that comes after the signal makes the signal untrusted', () => {
+  const r = run('g1-tests.html');
+  assert.match(r.stdout, /total=4 expected=3 DIFFERS \(\+1\)/, r.stdout + r.stderr);
+  assert.match(r.stdout, /later rows are not seen/, r.stdout);
+});
+test('a signal that was showing at the first poll is untrusted even with no row after it appeared', () => {
+  const r = run('g2-tests.html');
+  assert.match(r.stdout, /total=3 expected=2 DIFFERS \(\+1\)/, r.stdout + r.stderr);
+});
+test('an unregistered page does not shorten its window to follow a signal', () => {
+  const r = run('g3-tests.html');
+  assert.match(r.stdout, /total=3 expected=unregistered NOT REGISTERED/, r.stdout + r.stderr);
 });

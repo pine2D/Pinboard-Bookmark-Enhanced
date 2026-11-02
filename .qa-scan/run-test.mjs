@@ -13,7 +13,8 @@
 // #summary) shortens that window to 1.5s, but only a trusted one: it was not yet
 // showing when the page loaded and no row came after it appeared. Suites that
 // write theirs at load, or on every row, get the 3s window. A #summary that is
-// still empty keeps a 10s window. An unregistered page always waits 3s. After the
+// still empty keeps a 10s window, registered or not. An unregistered page never
+// shortens its window to follow a signal (3s at least). After the
 // window a later row is not seen, and the report names the window it used. A
 // registered page that never reaches its count is UNCONFIRMED, exit 1, even if it
 // announced its end below that count (the message says so). It edits nothing and
@@ -287,8 +288,8 @@ try {
     // default; 1.5s when the page's own end signal (title PASS/FAIL, non-empty
     // #summary) is trusted, i.e. it was absent at the first poll and no row came
     // after it showed up (ai-tags, md-ai and library-listbox write theirs at load
-    // or per row, so they never qualify); 10s while a #summary is still empty. An
-    // unregistered page always gets 3s. A registered page that never gets there
+    // or per row, so they never qualify); 10s while a #summary is still empty, registered
+    // or not. An unregistered page never shortens its window (3s at least). A registered page that never gets there
     // is UNCONFIRMED, not a smaller "actual" count.
     const waitForRows = printCounts
       ? page.waitForFunction((registered) => {
@@ -305,7 +306,7 @@ try {
         const signalled = /^(PASS|FAIL)\b/.test(document.title || "") || summaryFilled;
         if (signalled && seen.sigTotal === null) { seen.sigTotal = total; seen.sigAtLoad = firstPoll; }
         seen.trusted = signalled && !seen.sigAtLoad && !seen.broken;
-        seen.windowMs = registered === undefined ? 3000 : seen.trusted ? 1500 : summary && !summaryFilled ? 10000 : 3000;
+        seen.windowMs = registered !== undefined && seen.trusted ? 1500 : summary && !summaryFilled ? 10000 : 3000;
         const enough = registered === undefined ? total > 0 : total >= registered;
         return enough && now - seen.since >= seen.windowMs;
       }, expected, { polling: 100, timeout: 0 })
@@ -365,7 +366,9 @@ try {
       : total === expected ? "match" : `DIFFERS (${total > expected ? "+" : ""}${total - expected})`;
     // Only a trusted end signal makes the measurement certain; otherwise say what the window could not see.
     const caveat = (dom.trusted && expected !== undefined) || verdict.startsWith("UNCONFIRMED") ? ""
-      : ` (no trusted end signal: no new row for ${dom.windowMs / 1000}s after the count was reached, so later rows are not seen)`;
+      : expected === undefined
+        ? ` (unregistered: sampled after no new row for ${dom.windowMs / 1000}s, so later rows are not seen)`
+        : ` (no trusted end signal: no new row for ${dom.windowMs / 1000}s after the count was reached, so later rows are not seen)`;
     console.log(`${rel}: pass=${dom.pass} fail=${dom.fail} skip=${dom.skip} total=${total} expected=${registered} ${verdict}${caveat}${dom.stalled ? " STALLED" : ""}`);
     if (dom.failures?.length) console.error("failures:\n  " + dom.failures.join("\n  "));
     if (runtimeErrors.length) console.error("errors:\n  " + runtimeErrors.slice(0, 25).join("\n  "));
