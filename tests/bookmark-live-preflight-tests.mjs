@@ -1364,6 +1364,10 @@ try {
       assert.deepEqual(judgeRenderedQuote('1. item', { tags: ['p'], text: '1. item' }).problems, ['not_blockquote']);
       for (const needle of ['Setext title\n===', '1. item', '# heading', '&lt;tag&gt;', '\n\n    indented']) assert(QUOTE_CASES.some(c => c.includes(needle)), 'quote cases cover ' + JSON.stringify(needle));
       assert(QUOTE_CASES.some(c => /^.+\n=+$/.test(c)), 'a setext underline as the second line of its own case');
+      // The rest of each escaped class, not only the inputs the brief named:
+      // inline markup, a leading backslash, an HTML tag with no space after <.
+      for (const re of [/\*\*\S/, /(^|\s)_\S/, /`[^`]+`/, /\[[^\]]+\]\(/, /^\\/m, /<[a-z]/]) assert(QUOTE_CASES.slice(0, -1).some(c => re.test(c)), 'a case of its own covers ' + re);
+      assert.deepEqual(judgeRenderedQuote('x <b>y</b> z', { tags: ['blockquote', 'p', 'b'], text: 'x y z' }).problems, ['text'], 'a tag that renders is a different text');
     }
     for (const bad of ['https://example.com', 'http://127.0.0.1.evil.test', 'http://user:password@127.0.0.1:48100', 'http://127.0.0.1:48100/?key=x', 'http://[::1]:48100', 'http://127.0.0.1:48100/sub/']) {
       assert.throws(() => live.validateBase(bad), e => e.code === 'loopback_required', bad);

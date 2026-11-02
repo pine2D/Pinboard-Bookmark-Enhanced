@@ -965,7 +965,8 @@ const LONG_TAG = t => t.prefix + '_' + 'long'.repeat(6);
 // block, so a construct sits where Python-Markdown acts on it: a setext
 // underline as the second line of a block, an ordered list or heading at a
 // block's start, an indent at a block's start or after a blank line, and
-// text that is already an entity. The last case is the earlier merged
+// text that is already an entity; inline markup (* _ ` [ ]), a leading
+// backslash and an HTML tag stay literal too. The last case is the earlier merged
 // matrix, kept as an extra. The saved selection joins all of them with
 // blank lines (end to end through the popup).
 export const QUOTE_CASES = Object.freeze([
@@ -980,6 +981,9 @@ export const QUOTE_CASES = Object.freeze([
   'Paragraph line\n\n    indented after blank',
   'tab\tseparated',
   '\tleading tab',
+  '**bold** _em_ `code` [link](https://example.com/)',
+  '\\# not a heading',
+  'x <b>y</b> z',
   ['    First line indented', 'Setext title', '===', 'Another', '---', 'a & b < c', '1) item', '', '    indented after blank', 'tab\tseparated', '\tleading tab'].join('\n'),
 ]);
 // Tags whose presence means Markdown structure leaked out of the quote.
@@ -1409,7 +1413,7 @@ export const SELFHOSTED_MODULES = [
         t.note('renderFailures', verdicts);
         t.expectEq(verdicts.map(v => v.case + ':' + v.problems.join('+')).join(' '), '', 'quote_rendered_cases');
       }
-      t.check(`${t.service}: each selection case (setext ===/---, 1) and 1. items, # heading, literal entities, &, <, indents, tabs) and the whole selection read back as written`);
+      t.check(`${t.service}: each selection case (setext ===/---, 1) and 1. items, # heading, literal entities, &, <, inline emphasis, code and link markup, a leading backslash, an HTML tag, indents, tabs) and the whole selection read back as written`);
     },
   },
 
