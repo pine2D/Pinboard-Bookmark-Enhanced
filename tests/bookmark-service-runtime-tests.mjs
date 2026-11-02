@@ -10,10 +10,9 @@ import assert from 'node:assert/strict';
 const root=fileURLToPath(new URL('../',import.meta.url));
 // Blocks, in run order. PBP_RUNTIME_ONLY=<name part>[,<name part>...] runs only
 // the blocks whose name contains one of the parts (case-insensitive); --list
-// prints the names and exits. Neither set: the whole script runs exactly as it
-// always did. Each block's own connection needs are declared on its
-// block() call and set up only when a filter is active, so one block run alone
-// reaches the same verdict as in the full run.
+// prints the names and exits. Neither set: every block runs. Each block's own connection needs are declared on its
+// block() call and set up before every block (reset first), filtered or not, so one
+// block run alone reaches the same verdict as in the full run.
 const BLOCKS=['archive explanation and JSON restore','services: connect, save, reader','access gateway form','linkding sharing capability','Karakeep create race','linkding merge and server dates','linkding multi-line Description','linkding over-long tag','linkding unknown Description','linkding restored draft for another URL','linkding address typed after open','linkding cleaned page address','linkding Description server semantics','gateway probes'];
 const only=(process.env.PBP_RUNTIME_ONLY||'').split(',').map(part=>part.trim().toLowerCase()).filter(Boolean);
 const selected=name=>!only.length||only.some(part=>name.toLowerCase().includes(part));
@@ -202,7 +201,7 @@ try{
   const settled=(popup,status)=>popup.waitForFunction(status=>bookmarkLookup.status===status,status);
   // Between blocks of a filtered run: everything a block may leave behind in
   // the worker, the server fixture and the browser, so a block never depends on
-  // the one before it. A full run skips this and keeps its original flow.
+  // the one before it. Every block runs it, in a full run too, so a full run is exactly the blocks' lone runs in order.
   const resetForBlock=async()=>{
     await worker.evaluate(async()=>{
       statusCache.clear();
@@ -233,7 +232,7 @@ try{
   async function block(name,needs,run){
     assert.equal(BLOCKS[blockIndex++],name,'runtime blocks drifted from the BLOCKS list');
     if(!selected(name))return;
-    if(only.length){await resetForBlock();for(const service of needs)await ensureConnected(service);}
+    await resetForBlock();for(const service of needs)await ensureConnected(service);
     await run();
   }
   await block('archive explanation and JSON restore',[],async()=>{
