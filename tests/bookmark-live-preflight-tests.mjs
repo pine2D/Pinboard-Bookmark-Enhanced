@@ -2009,15 +2009,51 @@ try {
         assert.deepEqual(onDisk(r).map(e => [e.id, e.deleted, e.pending]), [['pool-1', false, undefined]]);
         assert.equal(r.pending.pinboard?.bookmarks || 0, 0);
         assert.equal(mock.posts.size, 1);
-        // Saved again after the run deleted it: reopened before the send; a
-        // refusal puts it back as deleted.
+        // Saved again after the run deleted it: reopened before the send. A
+        // refusal leaves it open (not deleted): a save of the same URL let
+        // through as a mutate meanwhile may have made it, and cleanup's
+        // posts/delete takes "item not found".
         r.report.ledger.created[0].deleted = true;
+        mock.posts.clear();
         mock.rateLimit(1);
         const again = fakeRoute();
         await r.routePinboard(again.route, addUrl(pool[0]), { instance: 'pinboard', kind: 'create', url: pool[0] });
         assert.equal(again.fulfilled.status, 429);
         assert.deepEqual(seen[1].map(e => [e.id, e.deleted, e.pending]), [['pool-1', false, true]]);
-        assert.deepEqual(onDisk(r).map(e => [e.id, e.deleted, e.pending]), [['pool-1', true, undefined]]);
+        assert.deepEqual(onDisk(r).map(e => [e.id, e.deleted, e.pending]), [['pool-1', false, undefined]]);
+        r.cleaning = true;
+        assert.equal(await r.deleteBookmark(r.report.ledger.created[0]), true, 'cleanup takes the reopened entry');
+        assert.equal(r.report.ledger.created[0].deleted, true);
+        rmSync(r.runDir, { recursive: true, force: true });
+      }
+      // Two saves of one URL in the gate queue: the first is judged a create
+      // (it writes the entry), the second a mutate of that pending entry. The
+      // first gets a 429, the second saves. Cleanup must still find it, both
+      // for a URL the run deleted before (reopened) and for a new one.
+      for (const reopened of [true, false]) {
+        const mock = createPinboardMock({ token });
+        let first = true;
+        const transport = async url => {
+          if (live.pinboardEndpoint(url) === 'posts/add' && first) { first = false; return { status: 429, contentType: 'text/html', body: '' }; }
+          return mock.transport(url);
+        };
+        const r = unitRun({ transport });
+        mkdirSync(r.runDir, { recursive: true, mode: 0o700 });
+        r.guardCfg = { ...r.buildGuardCfg(), writes: true };
+        const u = r.pools.pinboard[0];
+        if (reopened) r.report.ledger.created.push({ instance: 'pinboard', id: 'pool-1', url: u, source: 'route', module: '', deleted: true });
+        const d1 = live.liveGuardRule(r.guardCfg, r.guardView(), { url: addUrl(u), method: 'GET' });
+        const p1 = r.routePinboard(fakeRoute().route, addUrl(u), d1);
+        const d2 = live.liveGuardRule(r.guardCfg, r.guardView(), { url: addUrl(u), method: 'GET' });
+        const p2 = r.routePinboard(fakeRoute().route, addUrl(u), d2);
+        await Promise.all([p1, p2]);
+        assert.deepEqual([d1.kind, d2.kind], ['create', 'mutate'], `judged (${reopened})`);
+        assert.equal(mock.posts.has(u), true);
+        assert.deepEqual(onDisk(r).map(e => [e.id, e.deleted, e.pending]), [['pool-1', false, undefined]], `still named on disk (${reopened})`);
+        r.cleaning = true;
+        for (const entry of r.report.ledger.created.filter(e => !e.deleted)) assert.equal(await r.deleteBookmark(entry), true);
+        assert.equal(await r.cleanupPool('pinboard'), true);
+        assert.equal(mock.posts.has(u), false, `cleanup removed it (${reopened})`);
         rmSync(r.runDir, { recursive: true, force: true });
       }
       // 429 (Pinboard's rate limit, a 4xx): nothing made, entry and slot gone.
