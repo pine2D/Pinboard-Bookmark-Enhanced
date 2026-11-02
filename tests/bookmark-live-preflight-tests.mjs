@@ -371,10 +371,11 @@ try {
       karakeep: { service: 'karakeep', base: 'http://127.0.0.1:1002/', root: 'http://127.0.0.1:1002/api/v1/' },
       pinboard: { service: 'pinboard', base: '', root: live.PINBOARD_ROOT },
     },
-    pools: { linkding: live.poolUrls('temp', runId, 'linkding', 2), karakeep: live.poolUrls('temp', runId, 'karakeep', 2), pinboard: live.poolUrls('user', runId, 'pinboard', 1) },
+    pools: { linkding: live.poolUrls('temp', runId, 'linkding', 2), karakeep: live.poolUrls('temp', runId, 'karakeep', 2), pinboard: live.poolUrls('user', runId, 'pinboard', 3) },
     listMarker: 'Pinboard Bookmark Enhanced: Read Later', writes: true, aiOrigin: 'http://127.0.0.1:1003', aiPath: '/v1/chat/completions',
   };
-  const view = { created: [{ instance: 'linkding', id: '7', url: cfg.pools.linkding[0] }, { instance: 'karakeep', id: 'k7', url: cfg.pools.karakeep[0] }, { instance: 'pinboard', id: cfg.pools.pinboard[0], url: cfg.pools.pinboard[0] }] };
+  const view = { created: [{ instance: 'linkding', id: '7', url: cfg.pools.linkding[0] }, { instance: 'karakeep', id: 'k7', url: cfg.pools.karakeep[0] }, { instance: 'pinboard', id: 'pool-1', url: cfg.pools.pinboard[0] }, { instance: 'pinboard', id: 'pool-3', url: cfg.pools.pinboard[2], deleted: true }] };
+  const pbAdd = (url, shared) => live.PINBOARD_ROOT + 'posts/add?auth_token=a%3A1&format=json&url=' + encodeURIComponent(url) + '&description=x&extended=&tags=' + (shared ? '&shared=' + shared : '') + '&toread=no&replace=yes';
   // The worker's copy: the rule's source with liveTagKey bound in.
   const transported = new Function('return ' + live.guardRuleSource())();
   const cases = [
@@ -395,20 +396,49 @@ try {
     [{ url: 'http://127.0.0.1:1002/api/v1/lists/L1/bookmarks/k7', method: 'PUT' }, true],
     [{ url: 'http://127.0.0.1:1002/api/v1/lists/L1/bookmarks/k8', method: 'PUT' }, false, 'live_guard_mutation'],
     [{ url: 'http://127.0.0.1:1002/api/v1/bookmarks/k8/tags', method: 'POST', body: '{}' }, false, 'live_guard_mutation'],
-    [{ url: live.PINBOARD_ROOT + 'posts/add?url=' + encodeURIComponent(cfg.pools.pinboard[0]) + '&shared=no', method: 'GET' }, true],
-    [{ url: live.PINBOARD_ROOT + 'posts/add?url=' + encodeURIComponent(cfg.pools.pinboard[0]) + '&shared=yes', method: 'GET' }, false, 'live_guard_create'],
+    // Pinboard (H2): writes are GETs. posts/add saves only a private pool
+    // URL (a create unless the run holds it), posts/delete only a ledger URL;
+    // the save chain's reads pass; every other endpoint, bulk ones first, is
+    // refused; pinboard.in pages and other API versions are outside.
+    [{ url: pbAdd(cfg.pools.pinboard[0], 'no'), method: 'GET' }, true, '', 'mutate'],
+    [{ url: pbAdd(cfg.pools.pinboard[1], 'no'), method: 'GET' }, true, '', 'create'],
+    [{ url: pbAdd(cfg.pools.pinboard[2], 'no'), method: 'GET' }, true, '', 'create'],
+    [{ url: pbAdd(cfg.pools.pinboard[0], 'yes'), method: 'GET' }, false, 'live_guard_create'],
+    [{ url: pbAdd(cfg.pools.pinboard[1], ''), method: 'GET' }, false, 'live_guard_create'],
+    [{ url: pbAdd('https://example.com/mine', 'no'), method: 'GET' }, false, 'live_guard_create'],
+    [{ url: pbAdd(cfg.pools.pinboard[1], 'no'), method: 'POST' }, false, 'live_guard_mutation'],
+    [{ url: live.PINBOARD_ROOT + 'posts/delete?url=' + encodeURIComponent(cfg.pools.pinboard[0]) + '&auth_token=t&format=json', method: 'GET' }, true, '', 'mutate'],
+    [{ url: live.PINBOARD_ROOT + 'posts/delete?url=' + encodeURIComponent(cfg.pools.pinboard[1]), method: 'GET' }, false, 'live_guard_mutation'],
     [{ url: live.PINBOARD_ROOT + 'posts/delete?url=' + encodeURIComponent('https://example.com/mine'), method: 'GET' }, false, 'live_guard_mutation'],
-    [{ url: live.PINBOARD_ROOT + 'posts/rename?old=a&new=b', method: 'GET' }, false, 'live_guard_mutation'],
+    [{ url: live.PINBOARD_ROOT + 'posts/get?url=' + encodeURIComponent('https://example.com/mine') + '&format=json', method: 'GET' }, true, '', 'read'],
+    [{ url: live.PINBOARD_ROOT + 'tags/get?format=json', method: 'GET' }, true, '', 'read'],
+    [{ url: live.PINBOARD_ROOT + 'user/api_token/?auth_token=a%3A1&format=json', method: 'GET' }, true, '', 'read'],
+    [{ url: live.PINBOARD_ROOT + 'posts/get?format=json', method: 'OPTIONS' }, false, 'live_guard_mutation'],
+    ...['posts/all?toread=yes', 'posts/recent?count=5', 'posts/suggest?url=x', 'posts/update', 'posts/dates', 'tags/rename?old=a&new=b', 'tags/delete?tag=a', 'notes/list', 'user/secret', 'posts/rename?old=a&new=b']
+      .map(path => [{ url: live.PINBOARD_ROOT + path, method: 'GET' }, false, 'live_guard_pinboard_endpoint']),
+    [{ url: 'https://pinboard.in/u:someone/', method: 'GET' }, false, 'live_guard_origin'],
+    [{ url: 'https://api.pinboard.in/v2/bookmarks', method: 'GET' }, false, 'live_guard_origin'],
   ];
   for (const rule of [live.liveGuardRule, transported]) {
-    for (const [req, ok, code] of cases) {
+    for (const [req, ok, code, kind] of cases) {
       const d = rule(cfg, view, req);
       assert.equal(d.ok, ok, req.method + ' ' + req.url);
       if (code) assert.equal(d.code, code, req.method + ' ' + req.url);
+      if (kind) assert.equal(d.kind, kind, req.method + ' ' + req.url);
     }
     const readOnly = rule({ ...cfg, writes: false }, view, { url: 'http://127.0.0.1:1001/api/bookmarks/7/', method: 'PATCH', body: '{}' });
     assert.equal(readOnly.code, 'live_guard_read_only', 'read-only modules refuse every write');
+    for (const url of [pbAdd(cfg.pools.pinboard[1], 'no'), live.PINBOARD_ROOT + 'posts/delete?url=' + encodeURIComponent(cfg.pools.pinboard[0])]) assert.equal(rule({ ...cfg, writes: false }, view, { url, method: 'GET' }).code, 'live_guard_read_only', url);
   }
+  // The rule's endpoint list is the one --plan prints, minus what only the
+  // runner may send.
+  for (const endpoint of live.PINBOARD_ENDPOINTS.extension) assert(cases.some(([req, ok]) => ok && live.pinboardEndpoint(req.url) === endpoint), endpoint + ' allowed');
+  for (const endpoint of live.PINBOARD_REFUSED_EXAMPLES.filter(e => !e.startsWith('https:'))) assert(cases.some(([req, ok]) => !ok && live.pinboardEndpoint(req.url) === endpoint), endpoint + ' refused');
+  assert.equal(live.pinboardEndpoint('https://api.pinboard.in/v1/user/api_token/?x=1'), 'user/api_token');
+  assert.equal(live.pinboardEndpoint('https://api.pinboard.in.evil.test/v1/posts/get'), '');
+  assert.equal(live.pinboardEndpoint('https://pinboard.in/v1/posts/get'), '');
+  // Pool URLs: a reserved .example name per run, https, never a loopback port.
+  for (const url of cfg.pools.pinboard) assert.match(url, new RegExp('^https://' + runId + '\\.pbp-it\\.example/\\?pbp-it=' + runId + '-pinboard-\\d+$'));
 
   // ---------------------------------------------------------------------
   // Caps before dispatch (second review). A bookmark, a Read Later list or
@@ -1806,7 +1836,210 @@ try {
   assert(!existsSync(join(linkdingState, 'pbp-it-live.lock')), 'lock released on SIGINT');
   hang = false;
 
-  console.log('bookmark live preflight: registry/selection/budgets/guard rule/fake AI/docker fake executor/screenshot canary/plan/gates/Karakeep auto-AI/linkding read-only browser/cleanup resume/SIGINT passed');
+  // ---------------------------------------------------------------------
+  // Pinboard (H2). Everything runs against tests/bookmark-live-pinboard-mock.mjs
+  // in this process; nothing reaches api.pinboard.in. The runner takes the
+  // mock only through main()'s in-process options, so the CLI cannot.
+  // ---------------------------------------------------------------------
+  {
+    const { createPinboardMock } = await import('./bookmark-live-pinboard-mock.mjs');
+
+    // The gate, on a fake clock: each request starts one interval after the
+    // previous answer; a 429 doubles it up to the cap; a good answer resets.
+    {
+      let clock = 0;
+      const starts = [];
+      const gate = live.createPinboardGate({ intervalMs: 3000, maxBackoffMs: 10000, now: () => clock, wait: async ms => { clock += ms; } });
+      const answer = (status, took = 200) => () => { starts.push(clock); clock += took; return { status }; };
+      for (const status of [200, 200, 429, 429, 429, 200, 200]) await gate.run(answer(status));
+      const gaps = starts.slice(1).map((s, i) => s - (starts[i] + 200));
+      assert.deepEqual(gaps, [3000, 3000, 6000, 10000, 10000, 3000], 'gap after each answer');
+      assert.deepEqual({ ...gate.stats }, { requests: 7, waitedMs: 3000 + 3000 + 6000 + 10000 + 10000 + 3000, rateLimited: 3, maxIntervalMs: 10000 });
+      // Concurrent callers queue: the second starts after the first answers.
+      clock = 100000;
+      const order = [];
+      await Promise.all([1, 2, 3].map(n => gate.run(async () => { order.push([n, clock]); clock += 50; return { status: 200 }; })));
+      assert.deepEqual(order.map(o => o[0]), [1, 2, 3]);
+      assert(order[1][1] - order[0][1] >= 3050 && order[2][1] - order[1][1] >= 3050, 'serialised with the interval');
+      // A thrown request still frees the queue and counts as an answer.
+      await assert.rejects(gate.run(async () => { throw new Error('net'); }));
+      assert.equal((await gate.run(async () => ({ status: 200 }))).status, 200);
+    }
+
+    // Selection and plan: Pinboard is opt-in, user target only, 8 bookmarks.
+    {
+      assert(!live.DEFAULT_SERVICES.includes('pinboard'), 'Pinboard only on request');
+      const temp = live.selectModules('pinboard.*', { services: ['pinboard'], target: 'temp' });
+      assert.deepEqual(temp.selected, []);
+      assert(temp.skipped.length > 0 && temp.skipped.every(s => s.reason === 'pinboard_user_only'));
+      assert.throws(() => live.selectModules('pinboard.core.worker', { services: ['pinboard'], target: 'temp' }), e => e.code === 'module_requires_user');
+      const { selected, skipped } = live.selectModules('pinboard.*', { services: ['pinboard'], target: 'user' });
+      assert(selected.length >= 4 && selected.every(m => m.id.startsWith('pinboard.')));
+      const plan = live.buildPlan({ target: 'user', selected, skipped });
+      assert.deepEqual(plan.problems, []);
+      const pb = plan.budget.pinboard.pinboard;
+      assert.equal(pb.bookmarksPerRun, 8);
+      assert.equal(live.PINBOARD_BOOKMARKS_PER_RUN, 8);
+      assert(plan.budget.pinboard.caps.bookmarks <= 8 && plan.budget.pinboard.bookmarks <= 8);
+      assert.equal(pb.minIntervalMs, 3000);
+      assert.equal(pb.privateOnly, true);
+      assert.deepEqual(pb.endpoints, live.PINBOARD_ENDPOINTS);
+      assert(pb.floorSeconds >= pb.expectedRequests * 3, 'floor = requests x 3 s');
+      assert(plan.limits.worstCaseSeconds <= plan.limits.runMinutes * 60);
+      const sum = selected.reduce((n, m) => n + live.resolveBudget(m, 'pinboard').urls, 0);
+      assert(sum <= 8, 'urls of every Pinboard module fit one round');
+    }
+
+    // Account names: whole words, never a JSON key.
+    {
+      const r = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+      r.accountNames.push('pinboard');
+      assert.equal(r.sanitize('{"pinboard":{"user":"pinboard"},"x":"pinboard-ish pinboard."}'), '{"pinboard":{"user":"[account]"},"x":"pinboard-ish pinboard."}');
+      r.accountNames.length = 0;
+      r.accountNames.push('alice');
+      assert.equal(r.sanitize('status: alice ok; malice; alice_2'), 'status: [account] ok; malice; alice_2');
+    }
+
+    const pbState = stateDirFor('pinboard');
+    const user = 'pbpsynthetic';
+    const hex = '0f1e2d3c4b5a69788796a5b4';
+    const token = user + ':' + hex;
+    const pbCredentials = join(pbState, '..', 'pinboard-credentials.json');
+    writeFileSync(pbCredentials, JSON.stringify({ pinboardToken: token }), { mode: 0o600 });
+    const noTokenCredentials = join(pbState, '..', 'pinboard-none.json');
+    writeFileSync(noTokenCredentials, JSON.stringify({}), { mode: 0o600 });
+    const badCredentials = join(pbState, '..', 'pinboard-bad.json');
+    writeFileSync(badCredentials, JSON.stringify({ pinboardToken: 'no-colon-' + hex }), { mode: 0o600 });
+    const INTERVAL = 40;
+    const inProcess = async (args, mock) => {
+      const before = process.env.PBP_LIVE_STATE_DIR;
+      process.env.PBP_LIVE_STATE_DIR = pbState;
+      const lines = [];
+      const log = console.log, err = console.error;
+      console.log = (...a) => lines.push(a.join(' '));
+      console.error = (...a) => lines.push(a.join(' '));
+      let code;
+      // As the CLI entry: a thrown failure prints its code and exits 1.
+      try { code = await live.main(args, { pinboard: { transport: mock.transport, intervalMs: INTERVAL, mock: true } }); }
+      catch (error) { lines.push('FAILED: ' + live.failureCode(error)); code = 1; }
+      finally { console.log = log; console.error = err; if (before === undefined) delete process.env.PBP_LIVE_STATE_DIR; else process.env.PBP_LIVE_STATE_DIR = before; }
+      const reportLine = lines.find(l => l.startsWith('Local report: '));
+      const reportPath = reportLine ? reportLine.slice('Local report: '.length).trim() : '';
+      const report = reportPath ? JSON.parse(readFileSync(reportPath, 'utf8')) : null;
+      return { code, output: lines.join('\n'), reportPath, report };
+    };
+    const pbArgs = (credentials, scenario, auth) => ['--run', '--target', 'user', '--service', 'pinboard', '--scenario', scenario, '--credentials', credentials, '--allow-dirty', '--authorization', auth];
+    const secretsOf = [token, encodeURIComponent(token), hex, hex.toUpperCase(), user];
+
+    // No pinboardToken: the modules are skipped with a reason, nothing is sent.
+    {
+      const mock = createPinboardMock({ token });
+      const skipped = await inProcess(pbArgs(noTokenCredentials, 'pinboard.*', 'pb-none'), mock);
+      assert.equal(skipped.code, 0, skipped.output);
+      assert.deepEqual(mock.calls, []);
+      assert.equal(skipped.report.pinboard.configured, false);
+      assert.equal(skipped.report.pinboard.reason, 'pinboard_token_missing');
+      assert(skipped.report.skipped.some(s => s.reason === 'pinboard_token_missing'));
+      assert.deepEqual(skipped.report.modules, []);
+      assert(readFileSync(join(skipped.reportPath, '..', 'summary.zh.md'), 'utf8').includes('Pinboard：未配置'));
+    }
+    // A token not in "user:HEX" form fails before any request, and is not echoed.
+    {
+      const mock = createPinboardMock({ token });
+      const bad = await inProcess(pbArgs(badCredentials, 'pinboard.readonly', 'pb-bad'), mock);
+      assert.equal(bad.code, 1);
+      assert.equal(bad.report.failure.code, 'pinboard_token_format');
+      assert.deepEqual(mock.calls, []);
+      assert(!bad.output.includes(hex) && !readFileSync(bad.reportPath, 'utf8').includes(hex));
+    }
+
+    // A full write round on the mock: quick save and batch save (with a "
+    // tag), one 429 on the first request, ledger before create, delete per
+    // ledger entry, posts/get afterwards, no secret or account name anywhere.
+    {
+      const mock = createPinboardMock({ token });
+      mock.rateLimit(1);
+      const done = await inProcess(pbArgs(pbCredentials, 'pinboard.core.save-paths', 'pb-mock'), mock);
+      assert.equal(done.code, 0, done.output);
+      const rep = done.report;
+      assert.equal(rep.passed, true);
+      assert.deepEqual(rep.modules.map(m => [m.id, m.status]), [['pinboard.core.save-paths', 'passed']]);
+      assert.equal(rep.pinboard.configured, true);
+      assert.equal(mock.posts.size, 0, 'nothing left in the account');
+      assert.equal(rep.ledger.created.length, 2);
+      assert(rep.ledger.created.every(e => e.instance === 'pinboard' && e.deleted && /^pool-\d+$/.test(e.id) && rep.pools.pinboard.includes(e.url)));
+      assert.equal(rep.cleanup.complete, true);
+      // Throttle: one 429 counted and retried; every request after an answer waited.
+      assert.equal(rep.timing.throttle.rateLimited, 1);
+      assert.equal(rep.timing.throttle.requests, mock.calls.length);
+      for (let i = 1; i < mock.calls.length; i++) assert(mock.calls[i].at - mock.calls[i - 1].at >= INTERVAL - 2, 'gap ' + i);
+      // Only listed endpoints; adds private; deletes only ledger URLs; a
+      // check after each delete.
+      const allowed = new Set([...live.PINBOARD_ENDPOINTS.extension, ...live.PINBOARD_ENDPOINTS.node]);
+      assert(mock.calls.every(c => allowed.has(c.path)), JSON.stringify([...new Set(mock.calls.map(c => c.path))]));
+      const deletes = mock.calls.filter(c => c.path === 'posts/delete');
+      assert.deepEqual(deletes.map(c => c.url).sort(), rep.ledger.created.map(e => e.url).sort());
+      for (const d of deletes) assert(mock.calls.slice(mock.calls.indexOf(d) + 1).some(c => c.path === 'posts/get' && c.url === d.url), 'verified after delete');
+      // Timing: stages, module phases, top five.
+      assert(rep.timing.slowest.length > 0 && rep.timing.slowest.length <= 5);
+      assert(rep.timing.slowest.every((s, i, a) => i === 0 || a[i - 1].ms >= s.ms));
+      assert(Number.isInteger(rep.timing.totals.throttleMs) || typeof rep.timing.totals.throttleMs === 'number');
+      assert(rep.modules[0].timing && Number.isInteger(rep.modules[0].ms));
+      const summary = readFileSync(join(done.reportPath, '..', 'summary.zh.md'), 'utf8');
+      assert(summary.split('\n').length <= live.SUMMARY_MAX_LINES, 'one screen');
+      assert(summary.includes('Pinboard：已配置') && summary.includes('最慢 5 个阶段') && summary.includes('耗时分类'));
+      const texts = [done.output, readFileSync(done.reportPath, 'utf8'), summary];
+      for (const s of secretsOf) assert(!texts.some(t => t.includes(s)), 'leaked ' + (s === user ? 'account name' : 'token'));
+    }
+
+    // --cleanup resume: a run cut off after creating one pool bookmark.
+    {
+      const mock = createPinboardMock({ token });
+      const id = randomUUID();
+      const prefix = 'pbp-it-' + id;
+      const pool = live.poolUrls('user', id, 'pinboard', 3);
+      const runDir = join(pbState, prefix);
+      mkdirSync(runDir, { mode: 0o700 });
+      const add = (url, tags) => mock.transport(live.PINBOARD_ROOT + 'posts/add?auth_token=' + encodeURIComponent(token) + '&url=' + encodeURIComponent(url) + '&description=x&tags=' + encodeURIComponent(tags) + '&shared=no');
+      await add(pool[0], prefix);
+      // Saved but not yet in the ledger when the run was cut off: adopted.
+      await add(pool[1], prefix + '_b');
+      await add('https://example.com/personal', 'personal');
+      mock.calls.length = 0;
+      live.writePrivateJson(join(runDir, 'report.json'), {
+        harness: live.HARNESS_VERSION, runId: id, prefix, target: 'user',
+        instances: { pinboard: { service: 'pinboard', base: '' } }, pools: { pinboard: pool },
+        ledger: { created: [{ instance: 'pinboard', id: 'pool-1', url: pool[0], source: 'route', module: 'pinboard.core.worker', deleted: false }], lists: [], tags: [] },
+        modules: [], cleanup: { complete: false, entries: [] }, checks: [], readBackDiffs: [], console: [], swConsole: [], pageErrors: [], requestFailed: [], blockedOrigins: [], violations: [], findings: [], skipped: [], shots: { count: 0 },
+      });
+      // A ledger id that is not the URL's pool slot is refused untouched.
+      const tamperedDir = join(pbState, 'pbp-it-' + randomUUID());
+      mkdirSync(tamperedDir, { mode: 0o700 });
+      const tamperedId = tamperedDir.split('pbp-it-')[1];
+      live.writePrivateJson(join(tamperedDir, 'report.json'), { ...JSON.parse(readFileSync(join(runDir, 'report.json'), 'utf8')), runId: tamperedId, prefix: 'pbp-it-' + tamperedId, ledger: { created: [{ instance: 'pinboard', id: 'pool-2', url: pool[0], source: 'route', deleted: false }], lists: [], tags: [] } });
+      const refused = await inProcess(['--cleanup', join(tamperedDir, 'report.json'), '--credentials', pbCredentials], mock);
+      assert.equal(refused.code, 1);
+      assert(refused.output.includes('cleanup_report_invalid'), refused.output);
+      assert.deepEqual(mock.calls, []);
+      rmSync(tamperedDir, { recursive: true, force: true });
+      // Without the token the cleanup fails rather than skipping.
+      const noToken = await inProcess(['--cleanup', join(runDir, 'report.json'), '--credentials', noTokenCredentials], mock);
+      assert.equal(noToken.code, 1);
+      assert.equal(noToken.report.cleanup.error, 'missing_pinboard_token', noToken.output);
+      assert.equal(noToken.report.cleanup.complete, false);
+      assert.deepEqual(mock.calls, []);
+      const resumed = await inProcess(['--cleanup', join(runDir, 'report.json'), '--credentials', pbCredentials], mock);
+      assert.equal(resumed.code, 0, JSON.stringify(resumed.report?.cleanup));
+      const after = JSON.parse(readFileSync(join(runDir, 'report.json'), 'utf8'));
+      assert.equal(after.cleanup.complete, true);
+      assert.deepEqual([...mock.posts.keys()], ['https://example.com/personal'], 'pool URLs gone, the personal bookmark kept');
+      assert.deepEqual(mock.calls.filter(c => c.path === 'posts/delete').map(c => c.url).sort(), [pool[0], pool[1]].sort());
+      assert.deepEqual(after.ledger.created.map(e => [e.id, e.deleted]).sort(), [['pool-1', true], ['pool-2', true]]);
+      for (let i = 1; i < mock.calls.length; i++) assert(mock.calls[i].at - mock.calls[i - 1].at >= INTERVAL - 2);
+    }
+  }
+
+  console.log('bookmark live preflight: registry/selection/budgets/guard rule/fake AI/docker fake executor/screenshot canary/plan/gates/Karakeep auto-AI/linkding read-only browser/cleanup resume/SIGINT/Pinboard mock passed');
 } finally {
   if (browser) await browser.close().catch(() => {});
   for (const server of servers) await closeServer(server);

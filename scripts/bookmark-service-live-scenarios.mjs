@@ -65,8 +65,27 @@ async function linkdingPrefill(t, popup) {
   t.expect(!(await popup.locator('#description-input').inputValue()).includes(META_DESCRIPTION), 'linkding_meta_repeated_in_notes');
 }
 
-const noteOf = (t, row) => (t.service === 'linkding' ? row.notes : row.note);
-const tagNamesOf = (t, row) => (t.service === 'linkding' ? row.tag_names : (row.tags || []).map(tag => tag.name));
+// Read-back fields per service. Pinboard rows are posts/get post objects:
+// description (title), extended (notes), tags (one space-separated string),
+// shared / toread ("yes" | "no").
+const noteOf = (t, row) => (t.service === 'linkding' ? row.notes : t.service === 'pinboard' ? row.extended : row.note);
+const titleOf = (t, row) => (t.service === 'pinboard' ? row.description : row.title);
+const tagNamesOf = (t, row) => (t.service === 'linkding' ? row.tag_names : t.service === 'pinboard' ? String(row.tags || '').split(/\s+/).filter(Boolean) : (row.tags || []).map(tag => tag.name));
+
+// The tag count the extension itself reads: its client for linkding and
+// Karakeep, the worker's tags/get wrapper for Pinboard.
+const extensionTagCount = t => t.sw(async service => {
+  const auth = await getCurrentBookmarkAuth();
+  if (service === 'pinboard') return { tags: Object.keys(await pbpBookmarkTagCounts(auth)).length, recent: 0 };
+  const client = pbpBookmarkClient(auth);
+  return { tags: (await client.tags()).length, recent: (await client.recent(2)).length };
+}, t.service);
+
+// The Pinboard popup keeps its Private box; the run defaults to private.
+async function pinboardPrefill(t, popup) {
+  t.expect(await popup.locator('#private-check').isVisible(), 'pinboard_private_control');
+  t.expect(await popup.locator('#private-check').isChecked(), 'pinboard_default_private');
+}
 
 async function karakeepLists(t, row) {
   return (await t.api('bookmarks/' + encodeURIComponent(row.id) + '/lists')).lists || [];
@@ -77,22 +96,20 @@ async function karakeepLists(t, row) {
 export const MODULES = [
   {
     id: 'readonly',
-    services: ['linkding', 'karakeep'],
+    services: ['linkding', 'karakeep', 'pinboard'],
     surfaces: ['options', 'popup'],
     features: ['connect', 'tags-recent', 'popup-prefill'],
     needs: needs({ writes: false }),
-    budget: { bookmarks: 0, urls: 1, node: 4, browser: { linkding: 40, karakeep: 60 }, ai: 0, tags: 0, seconds: 60 },
+    budget: { bookmarks: 0, urls: 1, node: 4, browser: { linkding: 40, karakeep: 60, pinboard: 12 }, ai: 0, tags: 0, seconds: 60, calls: { pinboard: 4 } },
     settings: {},
     async steps(t) {
       await t.phase('readonly_extension');
-      const result = await t.sw(async () => {
-        const client = pbpBookmarkClient(await getCurrentBookmarkAuth());
-        return { tags: (await client.tags()).length, recent: (await client.recent(2)).length };
-      });
+      const result = await extensionTagCount(t);
       t.check(`${t.service}: authenticated extension tags/recent passed (${result.tags} usable tags)`);
       await t.phase('readonly_popup');
       const form = await t.openPopup(t.claimUrl());
       if (t.service === 'linkding') await linkdingPrefill(t, form.popup);
+      if (t.service === 'pinboard') await pinboardPrefill(t, form.popup);
       await t.shot(form.popup, 'prefill', { surface: 'popup', keys: ['#submit-btn'] });
       t.check(`${t.service}: synthetic article popup prefill without saving`);
       await form.close();
@@ -141,11 +158,11 @@ export const MODULES = [
 
   {
     id: 'core.popup-reader',
-    services: ['linkding', 'karakeep'],
+    services: ['linkding', 'karakeep', 'pinboard'],
     surfaces: ['popup', 'reader'],
-    features: ['popup-save', 'linkding-description', 'reader-read-later', 'reader-edit', 'reader-tag-separator', 'reader-delete'],
+    features: ['popup-save', 'linkding-description', 'pinboard-popup-format', 'reader-read-later', 'reader-edit', 'reader-tag-separator', 'reader-delete'],
     needs: needs(),
-    budget: { bookmarks: 1, urls: 1, node: 16, browser: { linkding: 90, karakeep: 130 }, ai: 0, tags: 2, lists: { karakeep: 1 }, seconds: 90 },
+    budget: { bookmarks: 1, urls: 1, node: 16, browser: { linkding: 90, karakeep: 130, pinboard: 40 }, ai: 0, tags: 2, lists: { karakeep: 1 }, seconds: { linkding: 90, karakeep: 90, pinboard: 120 }, calls: { pinboard: 24 } },
     settings: {},
     async steps(t) {
       const { prefix } = t;
@@ -157,17 +174,29 @@ export const MODULES = [
         await linkdingPrefill(t, popup);
         await popup.locator('#linkding-description-input').fill('手工描述，与笔记分开');
       }
+      if (t.service === 'pinboard') await pinboardPrefill(t, popup);
       await popup.locator('#title-input').fill(prefix + ' 中文标题');
       await popup.locator('#description-input').fill('中文笔记\n第二行');
       await popup.locator('#tags-input').fill(prefix);
       await popup.locator('#tags-input').press('Enter');
+      if (t.service === 'pinboard') {
+        await popup.locator('#tags-input').fill(prefix + '_popup');
+        await popup.locator('#tags-input').press('Enter');
+      }
       await t.savePopup(popup);
       let row = await t.ownRow(url);
-      t.expectEq(row.title, prefix + ' 中文标题', 'popup_title');
+      t.expectEq(titleOf(t, row), prefix + ' 中文标题', 'popup_title');
       t.expectEq(noteOf(t, row), '中文笔记\n第二行', 'popup_note');
       if (t.service === 'linkding') {
         t.expectEq(row.shared, false, 'privacy');
         t.expectEq(row.description, '手工描述，与笔记分开', 'linkding_description');
+      }
+      if (t.service === 'pinboard') {
+        // As before the self-hosted work: notes verbatim in extended, tags
+        // one space-separated string in entry order, private, not to-read.
+        t.expectEq(row.tags, prefix + ' ' + prefix + '_popup', 'pinboard_popup_tags');
+        t.expectEq(row.shared, 'no', 'privacy');
+        t.expectEq(row.toread, 'no', 'pinboard_popup_toread');
       }
       await form.close();
 
@@ -177,7 +206,10 @@ export const MODULES = [
       await reader.waitForFunction(() => document.getElementById('reader-bookmark-later')?.getAttribute('aria-pressed') === 'true');
       row = await t.ownRow(url);
       if (t.service === 'linkding') t.expectEq(row.unread, true, 'read_later');
-      else {
+      else if (t.service === 'pinboard') {
+        t.expectEq(row.toread, 'yes', 'read_later');
+        t.expectEq(row.shared, 'no', 'later_changed_privacy');
+      } else {
         const lists = await karakeepLists(t, row);
         t.expect(lists.some(l => l.type === 'manual' && !l.public && !l.hasCollaborators && l.userRole === 'owner'), 'private_read_later');
         t.expectEq(row.archived, false, 'later_changed_archive');
@@ -188,12 +220,15 @@ export const MODULES = [
       await reader.locator('#reader-bookmark-edit').click();
       await reader.locator('#reader-bookmark-title').fill(prefix + ' 已编辑');
       await reader.locator('#reader-bookmark-notes').fill('编辑后的笔记\n第二行');
-      await reader.locator('#reader-bookmark-tags').fill(JSON.stringify(prefix + ' 空格'));
+      // Pinboard tags hold no spaces and quotes are literal there: its reader
+      // field is whitespace-separated, as in the popup.
+      await reader.locator('#reader-bookmark-tags').fill(t.service === 'pinboard' ? prefix + '_reader ' + prefix : JSON.stringify(prefix + ' 空格'));
       await t.applyReader(reader);
       row = await t.ownRow(url);
-      t.expectEq(row.title, prefix + ' 已编辑', 'reader_fields');
+      t.expectEq(titleOf(t, row), prefix + ' 已编辑', 'reader_fields');
       t.expectEq(noteOf(t, row), '编辑后的笔记\n第二行', 'reader_fields');
-      t.expect(tagNamesOf(t, row).includes(prefix + '_空格'), 'new_tag_separator');
+      if (t.service === 'pinboard') t.expectEq(row.tags, prefix + '_reader ' + prefix, 'reader_pinboard_tags');
+      else t.expect(tagNamesOf(t, row).includes(prefix + '_空格'), 'new_tag_separator');
       if (t.service === 'linkding') t.expectEq(row.description, '手工描述，与笔记分开', 'reader_preserves_description');
 
       await t.phase('reader_mark_read');
@@ -202,6 +237,7 @@ export const MODULES = [
       await reader.waitForFunction(() => document.getElementById('reader-bookmark-later')?.getAttribute('aria-pressed') === 'false');
       row = await t.ownRow(url);
       if (t.service === 'linkding') t.expect(!row.unread, 'mark_read');
+      else if (t.service === 'pinboard') t.expectEq(row.toread, 'no', 'mark_read');
       else t.expect(!(await karakeepLists(t, row)).some(l => l.description === LIST_MARKER), 'remove_later');
 
       await t.phase('reader_delete');
@@ -210,7 +246,7 @@ export const MODULES = [
       await reader.locator('#reader-bookmark-delete').click();
       await reader.locator('.confirm-yes').click();
       await reader.waitForFunction(() => document.getElementById('reader-bookmark-status')?.textContent === 'Bookmark deleted');
-      t.expect(await t.api(t.recordPath(row.id), { allow404: true }) === null, 'reader_delete');
+      t.expect(await t.lookup(url) === null, 'reader_delete');
       await reader.close();
       t.check(`${t.service}: popup save, reader Read Later/edit/tags/read/delete`);
     },
@@ -218,40 +254,126 @@ export const MODULES = [
 
   {
     id: 'core.worker',
-    services: ['linkding', 'karakeep'],
+    services: ['linkding', 'karakeep', 'pinboard'],
     surfaces: ['background'],
     features: ['worker-create', 'worker-merge', 'worker-conflict', 'archived-preserved', 'tags-recent', 'pinboard-required', 'shared-library'],
     needs: needs(),
-    budget: { bookmarks: 1, urls: 1, node: { linkding: 20, karakeep: 12 }, browser: { linkding: 30, karakeep: 40 }, ai: 0, tags: 2, seconds: 60 },
+    budget: { bookmarks: 1, urls: 1, node: { linkding: 20, karakeep: 12, pinboard: 6 }, browser: { linkding: 30, karakeep: 40, pinboard: 16 }, ai: 0, tags: 2, seconds: { linkding: 60, karakeep: 60, pinboard: 90 }, calls: { pinboard: 9 } },
     settings: {},
     async steps(t) {
       const { prefix } = t;
       const url = t.claimUrl();
       await t.phase('worker_create');
-      const intent = { mode: 'create', url, title: prefix + ' 第二条', notes: '第二条笔记', tags: JSON.stringify(prefix + ' 空格'), private: true, toread: false, archive: false };
+      // A save intent carries tags in the service's own text form: quoted
+      // names for linkding / Karakeep, space-separated names for Pinboard.
+      const intent = { mode: 'create', url, title: prefix + ' 第二条', notes: '第二条笔记', tags: t.service === 'pinboard' ? prefix + '_空格' : JSON.stringify(prefix + ' 空格'), private: true, toread: false, archive: false };
       const submit = value => t.sw(async intent => {
         const result = await submitSaveIntent(intent);
         return { status: result.status, reason: result.reason };
       }, value);
       t.expectEq((await submit(intent)).status, 'saved', 'worker_create');
       let row = await t.ownRow(url);
+      if (t.service === 'pinboard') {
+        t.expectEq(row.extended, intent.notes, 'worker_create_fields');
+        t.expectEq(row.tags, prefix + '_空格', 'worker_create_fields');
+        t.expectEq(row.shared, 'no', 'privacy');
+      }
       await t.phase('worker_merge');
-      await t.api(t.recordPath(row.id), { method: 'PATCH', body: t.service === 'linkding' ? { is_archived: true } : { archived: true } });
+      // Pinboard has no archive flag to preserve (and the runner never
+      // writes a Pinboard bookmark): the merge keeps title and notes, adds the tag.
+      if (t.service !== 'pinboard') await t.api(t.recordPath(row.id), { method: 'PATCH', body: t.service === 'linkding' ? { is_archived: true } : { archived: true } });
       t.expectEq((await submit({ ...intent, mode: 'merge', title: 'must preserve original', notes: '', tags: prefix })).status, 'saved', 'worker_merge');
       row = await t.ownRow(url);
-      t.expectEq(row.title, intent.title, 'merge_preserves_fields');
-      t.expectEq(t.service === 'linkding' ? row.is_archived : row.archived, true, 'merge_preserves_fields');
+      t.expectEq(titleOf(t, row), intent.title, 'merge_preserves_fields');
+      if (t.service === 'pinboard') {
+        t.expectEq(row.extended, intent.notes, 'merge_preserves_fields');
+        t.expect(tagNamesOf(t, row).includes(prefix) && tagNamesOf(t, row).includes(prefix + '_空格'), 'merge_adds_tags');
+      } else t.expectEq(t.service === 'linkding' ? row.is_archived : row.archived, true, 'merge_preserves_fields');
       await t.phase('worker_conflict');
       t.expectEq((await submit(intent)).reason, 'conflict', 'duplicate_create');
       await t.phase('worker_tags_recent');
-      const data = await t.sw(async () => {
-        const client = pbpBookmarkClient(await getCurrentBookmarkAuth());
-        return { tags: (await client.tags()).length, recent: (await client.recent(2)).length };
-      });
+      const data = await extensionTagCount(t);
       t.expect(data.tags >= 1 && data.recent >= 0, 'tags_recent');
-      t.expect(await t.sw(async () => !(await pbpReadSettingsWithSecrets({ pinboardToken: '' })).pinboardToken), 'pinboard_required');
+      // Self-hosted saves never need a Pinboard token; on Pinboard it is the connection.
+      const hasPinboardToken = await t.sw(async () => !!(await pbpReadSettingsWithSecrets({ pinboardToken: '' })).pinboardToken);
+      t.expect(t.service === 'pinboard' ? hasPinboardToken : !hasPinboardToken, 'pinboard_required');
       t.expectEq(await t.sw(() => pbpVocabCurrentOwner()), t.libraryOwner, 'library_changed');
       t.check(`${t.service}: worker create/merge/duplicate, archived-field preservation, tags/recent, shared library`);
+    },
+  },
+
+  // handoff §9-17 (Pinboard regression): one quick save and one batch save,
+  // through the product's own entry points (saveFromBackground with the qs*
+  // settings the keyboard command resolves; handleBatchSave with the batch
+  // snapshot shape the popup sends). The popup save is core.popup-reader's.
+  // Expected values are the pre-change formats (9009bca2): quick-save default
+  // tags split on spaces/commas and joined by spaces, a selected quote as
+  // <blockquote> with &, <, > escaped; batch tags split on commas with inner
+  // spaces turned into "-" (the default separator, set here).
+  {
+    id: 'core.save-paths',
+    services: ['pinboard'],
+    surfaces: ['background'],
+    features: ['pinboard-quick-save-format', 'pinboard-quote-tag', 'pinboard-batch-save-format'],
+    needs: needs(),
+    budget: { bookmarks: 2, urls: 2, node: 8, browser: 20, ai: 0, tags: 4, seconds: 100, calls: { pinboard: 8 } },
+    settings: { aiTagSeparator: '-', optRespectTagCase: true, qsAutoNotes: true, qsBlockquote: true, qsAiTags: false, qsAiSummary: false, batchAiTags: false, batchAiSummary: false, batchSkipExisting: false, optReadlaterDefault: false },
+    async steps(t) {
+      const { prefix } = t;
+      const openArticle = async (url, selection) => {
+        const page = await t.ctx.newPage();
+        await page.goto(url);
+        if (selection) await page.evaluate(() => {
+          const range = document.createRange();
+          range.selectNodeContents(document.getElementById('quote-fixture'));
+          window.getSelection().removeAllRanges();
+          window.getSelection().addRange(range);
+        });
+        return page;
+      };
+
+      await t.phase('pinboard_quick_save');
+      const quickUrl = t.claimUrl();
+      const quoteTag = prefix + '_q"uote';
+      await t.settings({ qsDefaultTags: prefix + '_qs ' + quoteTag });
+      const quickPage = await openArticle(quickUrl, true);
+      const quick = await t.sw(async url => {
+        const tab = (await chrome.tabs.query({})).find(x => x.url === url);
+        if (!tab) return { status: 'no_tab' };
+        const result = await saveFromBackground({ url: tab.url, title: tab.title || tab.url, tab, settingsOverrides: resolvePrefixSettings(await loadSettings(), 'qs'), toread: false, notifyId: 'qs', notifyTitle: 'Quick saved', notifyCategory: 'quickSave' });
+        return { status: result.status, reason: result.reason || '' };
+      }, quickUrl);
+      t.expectEq(quick.status, 'saved', 'quick_save_status');
+      const quickRow = await t.ownRow(quickUrl);
+      t.expectEq(quickRow.description, '联调样例', 'quick_save_title');
+      t.expectEq(quickRow.extended, '<blockquote>First line\n\n# Heading\n**bold** &lt;tag&gt;\n1. item</blockquote>', 'quick_save_quote_format');
+      t.expectEq(quickRow.tags, prefix + '_qs ' + quoteTag, 'quick_save_tags');
+      t.expect(tagNamesOf(t, quickRow).includes(quoteTag), 'quick_save_quote_tag');
+      t.expectEq(quickRow.shared, 'no', 'privacy');
+      t.expectEq(quickRow.toread, 'no', 'quick_save_toread');
+      await quickPage.close();
+
+      await t.phase('pinboard_batch_save');
+      const batchUrl = t.claimUrl();
+      await t.settings({ optBatchTagEnabled: true, optBatchTag: prefix + '_batch, ' + prefix + ' two words' });
+      const batchPage = await openArticle(batchUrl, false);
+      const progress = await t.sw(async url => {
+        const tabs = (await chrome.tabs.query({})).filter(x => x.url === url).map(tab => ({ id: tab.id, title: tab.title || tab.url, url: tab.url, incognito: !!tab.incognito }));
+        if (tabs.length !== 1) return { error: 'no_tab' };
+        await chrome.storage.local.remove('batch_progress');
+        await handleBatchSave(tabs, (await getCurrentBookmarkAuth()).account);
+        const { batch_progress: p } = await chrome.storage.local.get('batch_progress');
+        return { done: p?.done, saved: p?.saved, failed: p?.failed, error: p?.error || '' };
+      }, batchUrl);
+      t.expect(progress.done === true && progress.saved === 1 && !progress.failed && !progress.error, 'batch_save_status');
+      const batchRow = await t.ownRow(batchUrl);
+      t.expectEq(batchRow.description, '联调样例', 'batch_save_title');
+      t.expectEq(batchRow.extended, '', 'batch_save_notes');
+      t.expectEq(batchRow.tags, prefix + '_batch ' + prefix + '-two-words', 'batch_save_tags');
+      t.expectEq(batchRow.shared, 'no', 'privacy');
+      t.expectEq(batchRow.toread, 'no', 'batch_save_toread');
+      await batchPage.close();
+      t.check('pinboard: quick save (selected quote, default tags incl. a " tag) and batch save (comma tags, default separator) keep the pre-change formats, read back from posts/get');
     },
   },
 
@@ -644,9 +766,9 @@ export const GROUPS = Object.freeze({
 // Known gaps the Chinese summary lists under 未覆盖项 (research survey). An
 // entry with coveredBy drops out once a module matching that glob ran.
 export const UNCOVERED = Object.freeze([
-  { text: 'Pinboard 真实回归（§9-17/18）：等待 pinboardToken，注册表暂无 Pinboard 模块' },
-  { text: '快捷保存与稍后读（saveFromBackground，qs*/rl* 设置）' },
-  { text: '批量保存（startBatchSave，batchAi*）' },
+  { text: 'Pinboard 回归 §9-17（popup/快捷/批量保存格式、含 " 标签）：--target user --service pinboard --scenario core', coveredBy: 'pinboard.core.save-paths' },
+  { text: 'Pinboard §9-18（分隔符说明文案中英文读感）：需人工阅读，无模块' },
+  { text: '稍后读快捷键（rl* 设置）与 linkding / Karakeep 的快捷保存、批量保存' },
   { text: 'linkding 共享开启分支（只在临时容器跑：--scenario linkding.sharing.*）', coveredBy: 'linkding.sharing.*' },
   { text: 'linkding 超长标签 500（只在临时 Postgres 跑：--scenario linkding-pg.limits.*）', coveredBy: 'linkding-pg.limits.*' },
   { text: '上千标签下的标签缓存、补全与治理性能（临时容器批量造标签，尚无模块）' },

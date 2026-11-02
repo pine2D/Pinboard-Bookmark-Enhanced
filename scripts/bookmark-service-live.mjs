@@ -61,11 +61,47 @@ import { GROUPS, LIST_MARKER, META_DESCRIPTION, MODULES, UNCOVERED, budgetValue 
 export const HARNESS_VERSION = 2;
 export const ROOT = fileURLToPath(new URL('../', import.meta.url));
 export const SERVICE_TYPES = ['linkding', 'karakeep', 'pinboard'];
+// Pinboard is opt-in (--service ...,pinboard): it is the user's real account
+// on a 3-second throttle.
+export const DEFAULT_SERVICES = Object.freeze(['linkding', 'karakeep']);
 export const TEMP_FIXTURE_HOST = 'localhost';
 // Fixture port inside each temporary service's network namespace (and in the
 // bookmark URLs). The browser never connects to it: ctx.route answers it.
 export const TEMP_FIXTURE_PORT = 47391;
 export const PINBOARD_ROOT = 'https://api.pinboard.in/v1/';
+// Pinboard (user target only; there is no temporary Pinboard). One call per
+// user every three seconds (pinboard.in/api): every Pinboard request, the
+// extension's and the runner's own, passes one gate that waits this long
+// after the previous answer, and doubles the wait after a 429 until an
+// answer is not one (capped). Only the runner's own reads and deletions are
+// retried after a 429, each retry counted against the Node budget; the
+// extension gets the 429 as Pinboard sent it.
+export const PINBOARD_MIN_INTERVAL_MS = 3000;
+export const PINBOARD_MAX_BACKOFF_MS = 60000;
+export const PINBOARD_429_RETRIES = 3;
+export const PINBOARD_BOOKMARKS_PER_RUN = 8;
+// The endpoints a run may reach, by who sends them. The extension's save
+// chain under HARDENED_SETTINGS: posts/get (lookups), posts/add (every save
+// and edit), posts/delete (reader delete), tags/get (tag list) and
+// user/api_token (the options page's token test). The runner reads with
+// posts/get and tags/get and deletes its ledger with posts/delete. Anything
+// else under /v1/ (posts/all, posts/recent, posts/suggest, posts/update,
+// posts/dates, tags/rename, tags/delete, notes/*, user/secret) is refused as
+// a guard violation; pinboard.in pages are outside every instance and aborted.
+export const PINBOARD_ENDPOINTS = Object.freeze({
+  extension: Object.freeze(['posts/add', 'posts/get', 'posts/delete', 'tags/get', 'user/api_token']),
+  node: Object.freeze(['posts/get', 'posts/delete', 'tags/get']),
+});
+export const PINBOARD_REFUSED_EXAMPLES = Object.freeze(['posts/all', 'posts/recent', 'posts/suggest', 'posts/update', 'posts/dates', 'tags/rename', 'tags/delete', 'notes/list', 'user/secret', 'https://pinboard.in/']);
+// The endpoint a Pinboard v1 URL names: no query, no trailing slash
+// (user/api_token/ is how the extension spells that one).
+export const pinboardEndpoint = url => { try { const u = new URL(url); return u.origin + '/v1/' === PINBOARD_ROOT && u.pathname.startsWith('/v1/') ? u.pathname.slice(4).replace(/\/+$/, '') : ''; } catch { return ''; } };
+// The run's Pinboard bookmark URLs live under a reserved .example name that
+// ctx.route answers; no loopback port is ever stored in the user's account.
+export const pinboardPoolHost = runId => runId + '.pbp-it.example';
+// "username:HEX" on one line. The name is account data: only "configured"
+// reaches the report.
+export const PINBOARD_TOKEN_RE = /^([^:\s]+):([0-9A-Fa-f]{8,})$/;
 
 // Temporary instances: container port, edge port and the service type.
 export const TEMP_INSTANCES = Object.freeze({
@@ -80,7 +116,7 @@ export const BUDGETS = Object.freeze({
   user: {
     linkding: { bookmarks: 15, node: 250, cleanupReserve: 60, browser: 350, tags: 20, lists: 0 },
     karakeep: { bookmarks: 12, node: 250, cleanupReserve: 60, browser: 500, tags: 20, lists: 1 },
-    pinboard: { bookmarks: 5, node: 80, cleanupReserve: 30, browser: 80, tags: 10, lists: 0, minIntervalMs: 3000 },
+    pinboard: { bookmarks: PINBOARD_BOOKMARKS_PER_RUN, node: 100, cleanupReserve: 40, browser: 150, tags: 10, lists: 0, minIntervalMs: PINBOARD_MIN_INTERVAL_MS },
     run: { fakeAi: 60, moduleSeconds: 120, runMinutes: 20, urlMargin: 3, roundsPerAuthorization: 3 },
   },
   temp: {
@@ -105,6 +141,11 @@ export const HARDENED_SETTINGS = Object.freeze({
   rlAiSummary: false, batchAiTags: false, batchAiSummary: false, aiContentSource: 'local',
   optAutoCloseAfterSave: false, optLang: 'en', optCheckBookmarkStatus: false, waybackArchiveEnabled: false,
   optPrivateDefault: true, offlineQueueEnabled: false, aiTagSeparator: '_', optAutoDescription: true,
+  // The extension's own background Pinboard calls: the unread badge
+  // (posts/all), the 15-minute tag prewarm (tags/get; only in "prewarmed"),
+  // and the popup's suggestions (posts/suggest) and recent list (posts/recent).
+  // optCheckBookmarkStatus above covers the icon's status lookups.
+  optShowBadge: false, tagSyncMode: 'cached', optShowSuggestTags: false, optShowRecent: false,
 });
 const LOCAL_ONLY_SETTINGS = ['optSyncEnabled', 'syncApiKeys'];
 
@@ -166,7 +207,7 @@ export function listIds(modules = MODULES) {
 }
 
 // --scenario: comma list of group names and/or globs over expanded ids.
-export function selectModules(spec, { services = SERVICE_TYPES, target = 'temp', modules = MODULES, groups = GROUPS } = {}) {
+export function selectModules(spec, { services = DEFAULT_SERVICES, target = 'temp', modules = MODULES, groups = GROUPS } = {}) {
   const all = expandRegistry(modules);
   const tokens = String(spec || 'core').split(',').map(s => s.trim()).filter(Boolean);
   if (!tokens.length) fail('scenario');
@@ -181,6 +222,12 @@ export function selectModules(spec, { services = SERVICE_TYPES, target = 'temp',
         if (!re.test(mod.id)) continue;
         matched++;
         if (!services.includes(mod.service)) continue;
+        // There is no temporary Pinboard: its modules run on the user target.
+        if (mod.service === 'pinboard' && target !== 'user') {
+          if (explicit) fail('module_requires_user');
+          skipped.push({ id: mod.id, reason: 'pinboard_user_only' });
+          continue;
+        }
         const need = mod.needs?.target || 'any';
         if (need !== 'any' && need !== target) {
           if (explicit) fail('module_requires_' + need);
@@ -212,11 +259,19 @@ export function resolveBudget(mod) {
     bookmarks, urls: Math.max(bookmarks, budgetValue(b.urls, s)), node: budgetValue(b.node, s),
     browser: budgetValue(b.browser, s), ai: budgetValue(b.ai, s), tags: budgetValue(b.tags, s),
     lists: budgetValue(b.lists, s), seconds: budgetValue(b.seconds, s),
+    // Expected Pinboard requests (extension and Node) of one pass, measured
+    // on the mock: the throttle floor --plan shows. Not a cap.
+    calls: budgetValue(b.calls, s),
   };
 }
 
 // Requests cleanup and its read-only verification may need for one instance.
 export function cleanupCost({ service, bookmarks = 0, urls = 0, tags = 0, lists = 0 }) {
+  // Pinboard: posts/get + posts/delete + posts/get per ledger bookmark, one
+  // posts/get per pool URL and one in the verify pass, a tags/get to see no
+  // run tag is left (Pinboard drops a tag with its last bookmark), and the
+  // margin of the other services.
+  if (service === 'pinboard') return 3 * bookmarks + 2 * urls + 1 + 2;
   const tagPages = service === 'karakeep' ? 6 : 2;
   const tagCost = service === 'linkding' ? 4 * tags : 2 * tags;
   // ledger bookmarks: GET + DELETE + GET; pool: check each URL once, then a
@@ -226,10 +281,14 @@ export function cleanupCost({ service, bookmarks = 0, urls = 0, tags = 0, lists 
 }
 
 export function preflightCost({ service, urls = 0, writes = false }) {
+  // Pinboard has no health endpoint: the posts/get of each pool URL also
+  // proves the token.
+  if (service === 'pinboard') return urls;
   return 2 + urls + (service === 'linkding' ? 1 : 0) + (service === 'karakeep' && writes ? 1 : 0);
 }
 
 export function poolUrls(target, runId, instance, count) {
+  if (instance === 'pinboard') return Array.from({ length: count }, (_, i) => `https://${pinboardPoolHost(runId)}/?pbp-it=${runId}-pinboard-${i + 1}`);
   const origin = target === 'temp' ? `http://${TEMP_FIXTURE_HOST}:${TEMP_FIXTURE_PORT}` : 'https://example.com';
   return Array.from({ length: count }, (_, i) => `${origin}/?pbp-it=${runId}-${instance}-${i + 1}`);
 }
@@ -238,13 +297,13 @@ export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnable
   const caps = BUDGETS[target];
   const instances = [...new Set(selected.map(m => m.instance))];
   const perInstance = {}, problems = [];
-  let fakeAiCalls = 0;
+  let fakeAiCalls = 0, throttleSeconds = 0;
   for (const instance of instances) {
     const mods = selected.filter(m => m.instance === instance);
     const service = mods[0].service;
     const cap = caps[instance];
     if (!cap) { problems.push(instance + ':no_budget'); continue; }
-    const sum = { bookmarks: 0, urls: 0, node: 0, browser: CONNECT_BROWSER[service] || 0, ai: 0, tags: 0, lists: 0, seconds: 0 };
+    const sum = { bookmarks: 0, urls: 0, node: 0, browser: CONNECT_BROWSER[service] || 0, ai: 0, tags: 0, lists: 0, seconds: 0, calls: 0 };
     for (const mod of mods) {
       const b = resolveBudget(mod);
       for (const key of Object.keys(sum)) sum[key] += key === 'browser' ? b.browser : b[key];
@@ -268,13 +327,36 @@ export function buildPlan({ target = 'temp', selected, skipped = [], shotsEnable
     if (sum.tags > cap.tags) problems.push(instance + ':tags');
     if (sum.lists > cap.lists) problems.push(instance + ':lists');
     for (const mod of mods) if (resolveBudget(mod).seconds > caps.run.moduleSeconds) problems.push(mod.id + ':seconds');
+    if (service === 'pinboard') {
+      // Every Pinboard request waits for the gate, so the throttle alone
+      // sets a floor: the expected requests (preflight, the modules' measured
+      // calls, cleanup) times the interval. Outside the modules (preflight
+      // and a cleanup that may use its whole reserve) it adds to the run's
+      // worst case; inside, each module's own timeout must leave room for it.
+      const interval = cap.minIntervalMs || PINBOARD_MIN_INTERVAL_MS;
+      const pre = preflightCost({ service, urls, writes });
+      const cleanupExpected = cleanupCost({ service, bookmarks: sum.bookmarks, urls });
+      const expectedRequests = pre + sum.calls + cleanupExpected;
+      const capRequests = node + reserve + sum.browser;
+      row.pinboard = {
+        minIntervalMs: interval, maxBackoffMs: PINBOARD_MAX_BACKOFF_MS, retriesOn429: PINBOARD_429_RETRIES, bookmarksPerRun: cap.bookmarks,
+        privateOnly: true, endpoints: PINBOARD_ENDPOINTS, refusedExamples: PINBOARD_REFUSED_EXAMPLES,
+        poolHost: '<runId>.pbp-it.example', expectedRequests, floorSeconds: expectedRequests * interval / 1000,
+        capRequests, capSeconds: capRequests * interval / 1000, outsideModulesSeconds: (pre + reserve) * interval / 1000,
+      };
+      throttleSeconds += row.pinboard.outsideModulesSeconds;
+      for (const mod of mods) {
+        const b = resolveBudget(mod);
+        if (b.calls * interval / 1000 + 15 > b.seconds) problems.push(mod.id + ':throttle_seconds');
+      }
+    }
     perInstance[instance] = row;
   }
   if (fakeAiCalls > caps.run.fakeAi) problems.push('fake_ai');
   // Module seconds are timeouts, not estimates. A timer enforces the run
   // cap; the plan also refuses a selection whose timeouts plus the setup
   // estimate could outlast it, so a slow round is not cut off half-way.
-  const worstCaseSeconds = Object.values(perInstance).reduce((n, r) => n + r.moduleSeconds, 0);
+  const worstCaseSeconds = Object.values(perInstance).reduce((n, r) => n + r.moduleSeconds, 0) + throttleSeconds;
   const setupAllowanceSeconds = SETUP_ALLOWANCE_SECONDS[target];
   if (worstCaseSeconds + setupAllowanceSeconds > caps.run.runMinutes * 60) problems.push('run_minutes');
   const shotModules = selected.filter(m => m.needs?.shots).map(m => m.id);
@@ -373,23 +455,29 @@ export function liveGuardRule(cfg, view, req) {
     return { ...decision, tags: fresh };
   };
   if (inst.service === 'pinboard') {
-    // Pinboard writes are GETs: posts/add may only create a private run URL,
-    // posts/delete only a run URL already in the ledger.
+    // Pinboard writes are GETs: posts/add may only save a private run URL
+    // (a create unless the run already made it and has not deleted it),
+    // posts/delete only a run URL in the ledger. Reads are the save chain's
+    // own (posts/get, tags/get, the options token test); every other
+    // endpoint, bulk ones included, is refused.
     let params;
     try { params = new URL(url).searchParams; } catch (_) { return { ok: false, instance, code: 'live_guard_mutation' }; }
-    if (!read) return { ok: false, instance, code: 'live_guard_mutation' };
-    if (path === 'posts/add') {
+    if (!read || method === 'OPTIONS') return { ok: false, instance, code: 'live_guard_mutation' };
+    const endpoint = path.replace(/\/+$/, '');
+    const target = params.get('url');
+    const mine = created.some(r => r.instance === instance && r.url === target && !r.deleted);
+    if (endpoint === 'posts/add') {
       if (!cfg.writes) return { ok: false, instance, code: 'live_guard_read_only' };
       // Tags are space-separated; a comma splits too (counting more names
       // only refuses earlier).
-      return pool.includes(params.get('url')) && params.get('shared') === 'no' ? capped({ ok: true, instance, kind: 'create', url: params.get('url') }, String(params.get('tags') || '').split(/[\s,]+/)) : { ok: false, instance, code: 'live_guard_create' };
+      return pool.includes(target) && params.get('shared') === 'no' ? capped({ ok: true, instance, kind: mine ? 'mutate' : 'create', url: target }, String(params.get('tags') || '').split(/[\s,]+/)) : { ok: false, instance, code: 'live_guard_create' };
     }
-    if (path === 'posts/delete') {
+    if (endpoint === 'posts/delete') {
       if (!cfg.writes) return { ok: false, instance, code: 'live_guard_read_only' };
-      return created.some(r => r.instance === instance && r.url === params.get('url')) ? capped({ ok: true, instance, kind: 'mutate' }, []) : { ok: false, instance, code: 'live_guard_mutation' };
+      return created.some(r => r.instance === instance && r.url === target) ? capped({ ok: true, instance, kind: 'mutate' }, []) : { ok: false, instance, code: 'live_guard_mutation' };
     }
-    return ['posts/get', 'posts/recent', 'posts/suggest', 'posts/update', 'tags/get', 'user/api_token'].includes(path)
-      ? { ok: true, instance, kind: 'read' } : { ok: false, instance, code: 'live_guard_mutation' };
+    return ['posts/get', 'tags/get', 'user/api_token'].includes(endpoint)
+      ? { ok: true, instance, kind: 'read' } : { ok: false, instance, code: 'live_guard_pinboard_endpoint' };
   }
   if (read) return { ok: true, instance, kind: 'read' };
   if (!cfg.writes) return { ok: false, instance, code: 'live_guard_read_only' };
@@ -416,6 +504,49 @@ export function liveGuardRule(cfg, view, req) {
 
 // liveGuardRule as source text for the worker, with liveTagKey bound in.
 export const guardRuleSource = () => `(() => { const liveTagKey = ${liveTagKey.toString()}; return ${liveGuardRule.toString()}; })()`;
+
+// Pinboard keys a bookmark by its URL; the ledger names it by its place in
+// the run's pool, so its id stays a short safe token like the others.
+export const pinboardLedgerId = (pool, url) => { const i = (pool || []).indexOf(url); return i < 0 ? '' : 'pool-' + (i + 1); };
+// ---------------------------------------------------------------------------
+// Pinboard gate and transport
+// ---------------------------------------------------------------------------
+// One queue for every Pinboard request of a run. A request starts only after
+// the previous one answered and `interval` has passed since; a 429 doubles
+// the interval (up to maxBackoffMs) until an answer is not a 429. `wait` and
+// `now` are injectable for the preflight's fake clock.
+export function createPinboardGate({ intervalMs = PINBOARD_MIN_INTERVAL_MS, maxBackoffMs = PINBOARD_MAX_BACKOFF_MS, now = () => Date.now(), wait = sleep, onWait = () => {} } = {}) {
+  let tail = Promise.resolve(), lastEnd = -Infinity, interval = intervalMs;
+  const stats = { requests: 0, waitedMs: 0, rateLimited: 0, maxIntervalMs: intervalMs };
+  return {
+    stats,
+    get intervalMs() { return interval; },
+    run(fn) {
+      const turn = tail.then(async () => {
+        const delay = lastEnd + interval - now();
+        if (delay > 0) { stats.waitedMs += delay; onWait(delay); await wait(delay); }
+        stats.requests++;
+        try {
+          const res = await fn();
+          if (res && res.status === 429) { stats.rateLimited++; interval = Math.min(maxBackoffMs, interval * 2); } else interval = intervalMs;
+          stats.maxIntervalMs = Math.max(stats.maxIntervalMs, interval);
+          return res;
+        } finally { lastEnd = now(); }
+      });
+      tail = turn.catch(() => {});
+      return turn;
+    },
+  };
+}
+
+// The real transport: Node fetch to api.pinboard.in only, no redirects (the
+// token rides the query string), no cookies, 20 s. Request headers from the
+// browser are never forwarded. Answers { status, contentType, body }.
+export async function pinboardHttp(url) {
+  check(pinboardEndpoint(url) !== '', 'api_origin', true);
+  const res = await fetch(url, { redirect: 'error', credentials: 'omit', signal: AbortSignal.timeout(20000), headers: { Accept: 'application/json' } });
+  return { status: res.status, contentType: res.headers.get('content-type') || '', body: await res.text() };
+}
 
 export const rowUrl = (service, row) => (service === 'linkding' ? row?.url : row?.content?.url);
 export const recordPath = (service, id) => 'bookmarks/' + encodeURIComponent(id) + (service === 'linkding' ? '/' : '');
@@ -877,6 +1008,9 @@ export async function startFakeAi({ prefix, limit = 60 } = {}) {
 const FIELD = 'input:not([type="checkbox"]):not([type="radio"])';
 export const SECRET_FIELD_SELECTOR = ['input[type="password"]', ...['token', 'secret', 'key', 'gw-value', 'cf-id'].map(word => `${FIELD}[id*="${word}" i]`), 'textarea[id*="token" i]', 'textarea[id*="secret" i]'].join(', ');
 
+// Text that names the signed-in account (Pinboard's "Connected as <name>").
+export const ACCOUNT_TEXT_SELECTOR = '#test-pinboard-status';
+
 export async function takeShot(page, { file, secrets = [], keys = [] }) {
   await page.evaluate(async () => {
     await document.fonts.ready;
@@ -944,7 +1078,7 @@ export async function takeShot(page, { file, secrets = [], keys = [] }) {
       ok: overflow <= 1 && keyState.every(k => k.state === 'ok' || k.state === 'scroll'),
     };
   }, keys);
-  await page.screenshot({ path: file, mask: [page.locator(SECRET_FIELD_SELECTOR)], animations: 'disabled', caret: 'hide' });
+  await page.screenshot({ path: file, mask: [page.locator(SECRET_FIELD_SELECTOR), page.locator(ACCOUNT_TEXT_SELECTOR)], animations: 'disabled', caret: 'hide' });
   chmodSync(file, 0o600);
   const texts = await page.evaluate(() => {
     const out = [document.title, document.body ? document.body.innerText : ''];
@@ -959,6 +1093,9 @@ export async function takeShot(page, { file, secrets = [], keys = [] }) {
 // ---------------------------------------------------------------------------
 // The run
 // ---------------------------------------------------------------------------
+// The summary file is read on one screen.
+export const SUMMARY_MAX_LINES = 40;
+
 export class LiveRun {
   constructor(opts) {
     this.opts = opts;
@@ -968,6 +1105,14 @@ export class LiveRun {
     this.runDir = join(this.state, 'pbp-it-' + this.runId);
     this.reportPath = join(this.runDir, 'report.json');
     this.secrets = [];
+    // Account names (the Pinboard user name) are redacted from the report
+    // like secrets, but never canary-checked: a short name would match
+    // ordinary page text.
+    this.accountNames = [];
+    // In-process only (the preflight's mock): { transport, intervalMs, mock }.
+    // The CLI never sets it, so a real run always uses pinboardHttp and the
+    // 3 s interval.
+    this.pinboardOpts = opts.pinboard || null;
     this.instances = {};
     this.pools = {};
     this.claimed = {};
@@ -994,7 +1139,7 @@ export class LiveRun {
       ledger: { created: [], lists: [], tags: [] }, counts: {}, checks: [], readBackDiffs: [], console: [], swConsole: [],
       pageErrors: [], requestFailed: [], blockedOrigins: [], blockedSamples: [], violations: [], findings: [], shots: { dir: '', count: 0, manifest: '' },
       fakeAi: null, temp: null, cleanup: { complete: false, entries: [] }, failure: null, finished: null, passed: false,
-      stages: [],
+      stages: [], timing: { phases: [], totals: {}, slowest: [], throttle: null }, pinboard: null,
     };
   }
 
@@ -1002,19 +1147,85 @@ export class LiveRun {
   // started/finished), so a slow stage shows up without a profiler.
   async timed(name, fn) {
     const started = new Date();
-    let ok = false;
-    try { const value = await fn(); ok = true; return value; } finally {
-      this.report.stages.push({ name, started: started.toISOString(), ms: Date.now() - started.getTime(), ok });
+    const stage = { name, started: started.toISOString(), ms: 0, ok: false, requests: 0, waitMs: 0, throttleMs: 0 };
+    const requestsBefore = this.requestTotal();
+    const outer = this.openStage;
+    this.openStage = stage;
+    try { const value = await fn(); stage.ok = true; return value; } finally {
+      this.openStage = outer;
+      stage.ms = Date.now() - started.getTime();
+      stage.requests = this.requestTotal() - requestsBefore;
+      this.report.stages.push(stage);
       this.persist();
     }
+  }
+
+  // Requests sent so far, every instance and the fake AI.
+  requestTotal() {
+    return Object.values(this.counts).reduce((n, c) => n + c.node + c.browser + c.setup, 0) + (this.aiCount || 0);
+  }
+  // Time spent waiting (until/waitFor polls, module sleeps: "wait") or at the
+  // Pinboard gate ("throttle"), charged to the run, the open stage, the
+  // module and its current phase.
+  noteWait(kind, ms) {
+    const key = kind + 'Ms';
+    const add = obj => { if (obj) obj[key] = (obj[key] || 0) + ms; };
+    add(this.report.timing.totals);
+    add(this.openStage);
+    add(this.openPhase);
+    if (this.currentModule?.record) add(this.currentModule.record.timing ||= {});
+  }
+  // Module phases (t.phase) are timed one after the other; the next phase,
+  // or the module's end, closes the open one.
+  closePhase() {
+    const open = this.openPhase;
+    if (!open) return;
+    this.openPhase = null;
+    open.ms = Date.now() - open.startedAt;
+    open.requests = this.requestTotal() - open.requestsBefore;
+    delete open.startedAt;
+    delete open.requestsBefore;
+    this.report.timing.phases.push(open);
+  }
+  openModulePhase(name) {
+    this.closePhase();
+    if (!this.currentModule) return;
+    this.openPhase = { module: this.currentModule.id, name, ms: 0, requests: 0, waitMs: 0, throttleMs: 0, startedAt: Date.now(), requestsBefore: this.requestTotal() };
+  }
+  // Totals by kind and the five slowest spans (setup and cleanup stages,
+  // module phases), for the summary.
+  timingSummary() {
+    const timing = this.report.timing;
+    const stageMs = prefix => this.report.stages.filter(st => st.name === prefix || st.name.startsWith(prefix + ':')).reduce((n, st) => n + st.ms, 0);
+    Object.assign(timing.totals, {
+      containerStartMs: stageMs('temp_start'), browserStartMs: stageMs('browser_start'), connectMs: stageMs('connect'), cleanupMs: stageMs('cleanup'),
+      modulesMs: this.report.modules.reduce((n, m) => n + (m.ms || 0), 0), waitMs: timing.totals.waitMs || 0, throttleMs: timing.totals.throttleMs || 0,
+    });
+    const spans = [...this.report.stages.map(st => ({ name: st.name, ms: st.ms, requests: st.requests || 0, waitMs: st.waitMs || 0, throttleMs: st.throttleMs || 0 })),
+      ...timing.phases.map(ph => ({ name: ph.module + ' ' + ph.name, ms: ph.ms, requests: ph.requests, waitMs: ph.waitMs || 0, throttleMs: ph.throttleMs || 0 }))];
+    timing.slowest = spans.sort((a, b) => b.ms - a.ms).slice(0, 5);
+    return timing;
   }
 
   // Free text (module notes, console lines) may echo anything: redact the
   // whole report on every write, not only the fields known to carry text.
   persist() { if (existsSync(this.runDir)) writePrivateJson(this.reportPath, JSON.parse(this.sanitize(JSON.stringify(this.report)))); }
-  sanitize(text) { return redact(text, this.secrets); }
+  sanitize(text) {
+    let out = redact(text, this.secrets);
+    // Whole names only, and never a JSON key (the instance id "pinboard"
+    // must survive a user called pinboard).
+    for (const name of this.accountNames) {
+      const esc = name.replace(/[\\^$.*+?()[\]{}|/-]/g, '\\$&');
+      out = out.replace(new RegExp(`(?<![A-Za-z0-9_.-])${esc}(?![A-Za-z0-9_.-])(?!":)`, 'g'), '[account]');
+    }
+    return out;
+  }
   addSecret(value) { if (typeof value === 'string' && value && !this.secrets.includes(value)) this.secrets.push(value); }
-  phase(name) { this.phaseName = name; this.throwIfFatal(); }
+  phase(name) {
+    this.phaseName = name;
+    if (this.currentModule) this.openModulePhase(name);
+    this.throwIfFatal();
+  }
   setFatal(code) {
     if (!this.fatal) { this.fatal = code; this.report.violations.push({ code, phase: this.phaseName }); this.persist(); }
   }
@@ -1029,6 +1240,7 @@ export class LiveRun {
     if (!this.cleaning) this.throwIfFatal();
     const inst = this.instances[instance];
     check(inst, 'api_instance', true);
+    if (inst.service === 'pinboard') return this.pinboardApi(instance, path, { allow404 });
     const url = new URL(path, inst.root).href;
     check(url.startsWith(auth ? inst.root : inst.base), 'api_origin', true);
     const guard = this.nodeGuard(instance, method, url, body);
@@ -1040,11 +1252,6 @@ export class LiveRun {
     // and a create's slot until its answer is recorded.
     if (guard.tags.length) this.noteTags(instance, guard.tags.map(key => ({ key })), 'node');
     const release = guard.create ? this.hold(instance, 'bookmarks') : null;
-    if (cap.minIntervalMs) {
-      const wait = (this.lastCall?.[instance] || 0) + cap.minIntervalMs - Date.now();
-      if (wait > 0) await sleep(wait);
-      (this.lastCall ||= {})[instance] = Date.now();
-    }
     const headers = { Accept: accept === 'json' ? 'application/json' : 'text/html' };
     if (auth && inst.service !== 'pinboard') headers.Authorization = (inst.service === 'linkding' ? 'Token ' : 'Bearer ') + inst.token;
     if (body) headers['Content-Type'] = 'application/json';
@@ -1074,6 +1281,70 @@ export class LiveRun {
       await this.shareCreated({ instance, id: String(data.id), url: actual });
     }
     return data;
+  }
+
+  // ---- Pinboard ------------------------------------------------------------
+  pinboardGate() {
+    if (!this.gate) {
+      const mock = this.pinboardOpts?.mock === true && typeof this.pinboardOpts.transport === 'function';
+      // Only the in-process mock may shorten the interval.
+      const intervalMs = mock && Number.isFinite(this.pinboardOpts.intervalMs) ? this.pinboardOpts.intervalMs : PINBOARD_MIN_INTERVAL_MS;
+      this.gate = createPinboardGate({ intervalMs, onWait: ms => this.noteWait('throttle', ms) });
+      this.pinboardTransport = mock ? this.pinboardOpts.transport : pinboardHttp;
+      this.report.timing.throttle = this.gate.stats;
+    }
+    return this.gate;
+  }
+
+  // Every Pinboard request of the run, extension or Node, leaves through
+  // here: the URL must carry this run's token (another account's token is a
+  // guard violation), then it waits its turn at the gate.
+  async pinboardSend(instance, url) {
+    const inst = this.instances[instance];
+    check(inst?.service === 'pinboard' && pinboardEndpoint(url), 'api_origin', true);
+    let token = '';
+    try { token = new URL(url).searchParams.get('auth_token') || ''; } catch { /* refused below */ }
+    if (!inst.token || token !== inst.token) { this.setFatal('live_guard_pinboard_token'); this.throwIfFatal(); }
+    const gate = this.pinboardGate();
+    return gate.run(() => this.pinboardTransport(url));
+  }
+
+  // The runner's own Pinboard calls: posts/get and tags/get any time,
+  // posts/delete only during cleanup and only for a run URL in the ledger.
+  // A 429 is retried after the gate's backoff, each retry a counted request.
+  async pinboardApi(instance, path, { allow404 = false } = {}) {
+    const inst = this.instances[instance];
+    const url = new URL(path, PINBOARD_ROOT);
+    const endpoint = pinboardEndpoint(url.href);
+    const refuse = code => { this.setFatal(code); throw new HarnessFailure(code, { fatal: true }); };
+    if (!PINBOARD_ENDPOINTS.node.includes(endpoint)) refuse('node_guard_pinboard_endpoint');
+    if (endpoint === 'posts/delete') {
+      const target = url.searchParams.get('url');
+      this.writesPossible = true;
+      if (!this.cleaning || !(this.pools[instance] || []).includes(target) || !this.report.ledger.created.some(r => r.instance === instance && r.url === target && !r.deleted)) refuse('node_guard_mutation');
+    }
+    url.searchParams.set('auth_token', inst.token);
+    url.searchParams.set('format', 'json');
+    const c = this.count(instance);
+    const cap = this.caps[instance];
+    for (let attempt = 0; ; attempt++) {
+      const limit = this.cleaning ? cap.node : cap.node - this.reserve[instance];
+      if (++c.node > limit) { this.setFatal(this.cleaning ? 'cleanup_request_budget' : 'node_request_budget'); this.throwIfFatal(); }
+      const res = await this.pinboardSend(instance, url.href);
+      if (res.status === 429 && attempt < PINBOARD_429_RETRIES) continue;
+      if (allow404 && res.status === 404) return null;
+      check(res.status === 200, 'api_http_' + res.status);
+      try { return JSON.parse(res.body); } catch { fail('api_not_json'); }
+    }
+  }
+
+  // The post Pinboard holds for one URL, or null.
+  async pinboardPost(instance, target) {
+    const data = await this.api(instance, 'posts/get?url=' + encodeURIComponent(target));
+    check(Array.isArray(data?.posts), 'pinboard_posts_shape');
+    const post = data.posts[0] || null;
+    if (post) check(post.href === target, 'pinboard_post_url', true);
+    return post;
   }
 
   // Node-side writes may only touch this run's objects, and count against
@@ -1139,15 +1410,18 @@ export class LiveRun {
 
   recordCreated(entry) {
     const ledger = this.report.ledger.created;
-    if (ledger.some(r => r.instance === entry.instance && r.id === entry.id)) return;
     const service = this.instances[entry.instance]?.service;
+    const known = ledger.find(r => r.instance === entry.instance && r.id === entry.id);
+    // A Pinboard URL the run deleted and saved again is live again. Only the
+    // route sees each Pinboard save as it is answered (the worker repeats
+    // what it saw on every sync), so only the route reopens an entry.
+    if (known) { if (known.deleted && entry.source === 'route' && service === 'pinboard') { known.deleted = false; this.persist(); } return; }
     const total = ledger.filter(r => r.instance === entry.instance).length + 1;
     ledger.push({ ...entry, module: this.currentModule?.id || '', deleted: false });
     this.persist();
     if (total > this.caps[entry.instance].bookmarks) this.setFatal('bookmark_budget');
     if (this.currentModule && this.currentModule.created + 1 > this.currentModule.budget.bookmarks) this.setFatal('module_bookmark_budget');
     if (this.currentModule) this.currentModule.created++;
-    void service;
   }
   recordList(entry) {
     if (this.report.ledger.lists.some(l => l.instance === entry.instance && l.id === entry.id)) return;
@@ -1192,7 +1466,7 @@ export class LiveRun {
     check(['temp', 'user'].includes(target), 'target');
     this.target = target;
     this.report.target = target;
-    const services = values.service ? values.service.split(',').map(s => s.trim()) : ['linkding', 'karakeep'];
+    const services = values.service ? values.service.split(',').map(s => s.trim()) : [...DEFAULT_SERVICES];
     check(services.length && services.every(s => SERVICE_TYPES.includes(s)), 'service');
     let scenario = values.scenario || 'core';
     if (flags.has('--read-only')) { check(!values.scenario || values.scenario === 'readonly', 'read_only_conflict'); scenario = 'readonly'; }
@@ -1213,7 +1487,11 @@ export class LiveRun {
     if (target === 'user') {
       for (const instance of this.plan.instances) {
         const service = this.plan.budget[instance].service;
-        check(service !== 'pinboard', 'pinboard_modules_not_available');
+        // Pinboard's API has one fixed root; no base is taken for it.
+        if (service === 'pinboard') {
+          this.instances[instance] = { id: instance, service, base: '', root: PINBOARD_ROOT, token: '' };
+          continue;
+        }
         check(values[service], 'missing_base');
         const base = validateBase(values[service]);
         this.instances[instance] = { id: instance, service, base, root: apiRootFor(service, base), token: '' };
@@ -1302,13 +1580,16 @@ export class LiveRun {
       }
       if (this.target === 'temp') await this.timed('temp_start', () => this.startTemp());
       else await this.timed('credentials', () => this.loadCredentials());
-      await this.timed('preflight', () => this.preflight());
-      if (this.plan.fakeAi.needed) await this.timed('fake_ai_start', () => this.startFakeAi());
-      await this.timed('browser_start', () => this.setupBrowser());
-      for (const instance of this.plan.instances) {
-        await this.timed('connect:' + instance, () => this.connect(instance));
-        for (const mod of this.selected.filter(m => m.instance === instance)) await this.runModule(mod);
-      }
+      // Every module may have been skipped (no pinboardToken): nothing to start.
+      if (this.selected.length) {
+        await this.timed('preflight', () => this.preflight());
+        if (this.selected.some(m => m.needs?.fakeAi)) await this.timed('fake_ai_start', () => this.startFakeAi());
+        await this.timed('browser_start', () => this.setupBrowser());
+        for (const instance of this.plan.instances) {
+          await this.timed('connect:' + instance, () => this.connect(instance));
+          for (const mod of this.selected.filter(m => m.instance === instance)) await this.runModule(mod);
+        }
+      } else console.log('No module left to run after the skips above.');
       this.stage = 'final';
       await this.syncGuard();
       this.throwIfFatal();
@@ -1330,6 +1611,7 @@ export class LiveRun {
   conclude() {
     if (this.concluded) return;
     this.concluded = true;
+    this.timingSummary();
     const modulesFailed = this.report.modules.some(m => m.status !== 'passed');
     this.report.passed = !this.report.failure && !modulesFailed && this.report.cleanup.complete === true && this.report.cleanup.apiVerified !== false;
     this.persist();
@@ -1367,18 +1649,50 @@ export class LiveRun {
     const stat = lstatSync(path);
     check(stat.isFile() && !stat.isSymbolicLink() && (stat.mode & 0o077) === 0, 'credentials_permissions');
     const credentials = JSON.parse(readFileSync(path, 'utf8'));
-    for (const instance of this.plan.instances) {
+    for (const value of Object.values(credentials)) if (typeof value === 'string') this.addPinboardSecrets(value);
+    for (const instance of [...this.plan.instances]) {
       const inst = this.instances[instance];
       const token = credentials[inst.service + 'Token'];
+      // Without pinboardToken the Pinboard modules are skipped, not failed;
+      // a --cleanup that must finish Pinboard work fails instead.
+      if (inst.service === 'pinboard' && token === undefined && this.stage !== 'resume') { this.dropInstance(instance, 'pinboard_token_missing'); continue; }
       // Lower case: failureCode keeps only [a-z_0-9] codes, so the old
       // "missing_linkdingToken" reached reports as a bare "Error".
       check(typeof token === 'string' && token.trim() && !/[\r\n]/.test(token), 'missing_' + inst.service + '_token');
+      if (inst.service === 'pinboard') {
+        const m = PINBOARD_TOKEN_RE.exec(token);
+        check(m, 'pinboard_token_format');
+        if (!this.accountNames.includes(m[1])) this.accountNames.push(m[1]);
+        this.report.pinboard = { configured: true };
+      }
       inst.token = token;
       this.addSecret(token);
     }
     for (const value of Object.values(credentials)) if (typeof value === 'string') this.addSecret(value);
     this.report.instances = Object.fromEntries(Object.values(this.instances).map(i => [i.id, { service: i.service, base: i.base }]));
     this.persist();
+  }
+
+  // A token shows up in a request as given and percent-encoded, and its
+  // secret half on its own: all three are redacted and canary-checked.
+  addPinboardSecrets(value) {
+    const m = PINBOARD_TOKEN_RE.exec(String(value || ''));
+    if (!m) return;
+    this.addSecret(value);
+    this.addSecret(encodeURIComponent(value));
+    this.addSecret(m[2]);
+  }
+
+  // Leaves an instance out of this run before any request reaches it.
+  dropInstance(instance, reason) {
+    for (const mod of this.selected.filter(m => m.instance === instance)) this.report.skipped.push({ id: mod.id, reason });
+    this.selected = this.selected.filter(m => m.instance !== instance);
+    this.plan.instances = this.plan.instances.filter(i => i !== instance);
+    delete this.instances[instance];
+    delete this.pools[instance];
+    delete this.report.pools[instance];
+    if (instance === 'pinboard') this.report.pinboard = { configured: false, reason };
+    console.log(instance + ': skipped (' + reason + '); its modules are listed under skipped');
   }
 
   async startTemp() {
@@ -1511,8 +1825,10 @@ export class LiveRun {
   }
 
   async waitFor(read, timeoutMs, label, code) {
-    const end = Date.now() + timeoutMs;
-    while (Date.now() < end) { this.throwIfFatal(); if (await read()) return; await sleep(1000); }
+    const started = Date.now(), end = started + timeoutMs;
+    try {
+      while (Date.now() < end) { this.throwIfFatal(); if (await read()) return; await sleep(1000); }
+    } finally { this.noteWait('wait', Date.now() - started); }
     void label;
     fail(code);
   }
@@ -1536,6 +1852,15 @@ export class LiveRun {
     for (const instance of this.plan.instances) {
       const inst = this.instances[instance];
       this.phase(instance + '_readonly');
+      if (inst.service === 'pinboard') {
+        // One posts/get per pool URL: it proves the token and that no run URL
+        // exists yet. No other read is spent on Pinboard here.
+        for (const url of this.pools[instance]) check(await this.pinboardPost(instance, url) === null, 'fixture_already_exists');
+        this.report.checks.push(instance + ': authentication, unique URLs');
+        this.persist();
+        console.log(instance + ': readonly preflight passed');
+        continue;
+      }
       const health = await this.api(instance, new URL(inst.service === 'linkding' ? 'health' : 'api/health', inst.base).href, { auth: false });
       check(['ok', 'healthy'].includes(health.status), 'health');
       if (inst.service === 'linkding') {
@@ -1603,7 +1928,7 @@ export class LiveRun {
       const hosts = bucket.explicit_host ||= [];
       // popup.html opened as a tab has no activeTab grant; permit only the
       // intercepted synthetic article origin, the services and the fake AI.
-      for (const origin of [...Object.values(this.instances).map(i => new URL(i.base).origin), ...fixtureOrigins, ...(this.fakeAi ? [this.fakeAi.origin] : [])]) {
+      for (const origin of [...Object.values(this.instances).filter(i => i.base).map(i => new URL(i.base).origin), ...fixtureOrigins, ...(this.fakeAi ? [this.fakeAi.origin] : [])]) {
         const pattern = origin + '/*';
         if (!hosts.includes(pattern)) hosts.push(pattern);
       }
@@ -1673,6 +1998,7 @@ export class LiveRun {
     // What leaves counts from here: its run tags now, a creation's slot
     // until its answer is recorded.
     if (decision.tags?.length) this.noteTags(decision.instance, decision.tags.map(key => ({ key })), 'route');
+    if (this.instances[decision.instance]?.service === 'pinboard') return this.routePinboard(route, url, decision);
     if (decision.kind === 'create' || decision.kind === 'list-create') {
       const release = this.hold(decision.instance, decision.kind === 'create' ? 'bookmarks' : 'lists');
       let response;
@@ -1704,6 +2030,28 @@ export class LiveRun {
       return route.fulfill({ response });
     }
     return route.continue();
+  }
+
+  // The browser never reaches Pinboard itself (its resolver maps every
+  // non-loopback name to NOTFOUND): the route answers each allowed request
+  // with what the gate got from Pinboard (or the mock), and records a
+  // posts/add answered "done" as a creation.
+  async routePinboard(route, url, decision) {
+    const instance = decision.instance;
+    const release = decision.kind === 'create' ? this.hold(instance, 'bookmarks') : null;
+    let res;
+    try { res = await this.pinboardSend(instance, url); } catch { return route.abort('failed').catch(() => {}); }
+    if (release) {
+      let code = '';
+      if (res.status === 200) { try { code = JSON.parse(res.body)?.result_code || ''; } catch { /* no creation */ } }
+      if (code === 'done') {
+        const entry = { instance, id: pinboardLedgerId(this.pools[instance], decision.url), url: decision.url };
+        this.recordCreated({ ...entry, source: 'route' });
+        release();
+        this.shareCreated(entry);
+      } else if (res.status < 500) release();
+    }
+    return route.fulfill({ status: res.status, headers: { 'content-type': res.contentType || 'application/json; charset=utf-8' }, body: res.body }).catch(() => {});
   }
 
   // Tell the worker guard what another layer recorded (page-context and
@@ -1790,7 +2138,7 @@ export class LiveRun {
     }
     check(owner === this.libraryOwner, 'library_switched');
     check(await this.sw(async owner => (await pbpVocabAll(owner)).length === 1, owner), 'library_lost');
-    await this.shot(options, 'connected', { surface: 'options', service: inst.service, keys: ['#connect-' + inst.service] });
+    await this.shot(options, 'connected', { surface: 'options', service: inst.service, keys: [inst.service === 'pinboard' ? '#test-pinboard-token' : '#connect-' + inst.service] });
     await options.close();
     await this.syncGuard();
     this.throwIfFatal();
@@ -1804,6 +2152,19 @@ export class LiveRun {
     const options = await this.ctx.newPage();
     await options.goto(this.extension + 'options.html');
     await options.locator(`input[name="bookmark-service"][value="${inst.service}"]`).check();
+    if (inst.service === 'pinboard') {
+      // Pinboard has no Connect button: the token field auto-saves, and Test
+      // connection (user/api_token) proves it. Its status line names the
+      // account, so screenshots mask it.
+      await options.locator('#opt-pinboard-token').fill(inst.token);
+      await options.locator('#test-pinboard-token').click();
+      await options.locator('#test-pinboard-status.ok, #test-pinboard-status.bad').first().waitFor({ timeout: 25000 });
+      check(await options.locator('#test-pinboard-status.ok').count() === 1, 'pinboard_token_test');
+      await this.until(() => this.sw(async () => { const c = await pbpReadBookmarkConnection(); return c.service === 'pinboard' && !!c.account; }), 'selected_service');
+      if (keepOpen) return options;
+      await options.close();
+      return null;
+    }
     await options.locator('#opt-' + inst.service + '-url').fill(inst.base);
     await options.locator('#opt-' + inst.service + '-token').fill(inst.token);
     await options.locator('#connect-' + inst.service).click();
@@ -1820,8 +2181,10 @@ export class LiveRun {
   }
 
   async until(read, label, timeout = 20000) {
-    const end = Date.now() + timeout;
-    while (Date.now() < end) { this.throwIfFatal(); if (await read()) return; await sleep(150); }
+    const started = Date.now(), end = started + timeout;
+    try {
+      while (Date.now() < end) { this.throwIfFatal(); if (await read()) return; await sleep(150); }
+    } finally { this.noteWait('wait', Date.now() - started); }
     fail('timeout_' + label);
   }
 
@@ -1865,7 +2228,7 @@ export class LiveRun {
       },
       check: text => { mod.record.checks.push(text); run.report.checks.push(text); },
       note: (key, value) => { mod.record.notes[key] = value; },
-      sleep,
+      sleep: async ms => { const started = Date.now(); try { await sleep(ms); } finally { run.noteWait('wait', Date.now() - started); } },
       // Time left before this module's own seconds budget runs out.
       remainingMs: () => Math.max(0, (mod.deadline || 0) - Date.now()),
       until: (read, label, timeout) => { alive(); return run.until(read, label, timeout); },
@@ -1881,6 +2244,8 @@ export class LiveRun {
       rowUrl: row => rowUrl(mod.service, row),
       async seed({ url, title = '', tags = [], description = '', notes = '' } = {}) {
         alive();
+        // The runner never writes a Pinboard bookmark itself.
+        check(mod.service !== 'pinboard', 'pinboard_seed_refused', true);
         const target = url || t.claimUrl();
         let row;
         if (mod.service === 'linkding') {
@@ -1897,12 +2262,29 @@ export class LiveRun {
         run.throwIfFatal();
         const entry = run.report.ledger.created.find(r => r.instance === instance && r.url === url && !r.deleted);
         check(entry, 'created_id_missing');
+        if (mod.service === 'pinboard') {
+          // Assertions read what Pinboard holds: posts/get's post object.
+          alive();
+          const post = await run.pinboardPost(instance, url);
+          check(post, 'created_row_missing');
+          for (const name of String(post.tags || '').split(/\s+/).filter(Boolean)) run.trackTag(instance, { name });
+          run.throwIfFatal();
+          return post;
+        }
         const row = await api(recordPath(mod.service, entry.id));
         check(rowUrl(mod.service, row) === url, 'created_url_mismatch', true);
         if (mod.service === 'karakeep') for (const tag of row.tags || []) run.trackTag(instance, tag);
         else for (const name of row.tag_names || []) run.trackTag(instance, { name });
         run.throwIfFatal();
         return row;
+      },
+      // What the service holds for a run URL now, or null (Pinboard: the
+      // post; linkding / Karakeep: the ledger row by id).
+      async lookup(url) {
+        alive();
+        if (mod.service === 'pinboard') return run.pinboardPost(instance, url);
+        const entry = run.report.ledger.created.find(r => r.instance === instance && r.url === url);
+        return entry ? api(recordPath(mod.service, entry.id), { allow404: true }) : null;
       },
       async openPopup(url, { selection = false, width, locale, scheme } = {}) {
         alive();
@@ -1974,7 +2356,7 @@ export class LiveRun {
 
   async runModule(mod) {
     const budget = resolveBudget(mod);
-    const record = { id: mod.id, instance: mod.instance, status: 'running', started: new Date().toISOString(), checks: [], notes: {}, failure: null, counts: {} };
+    const record = { id: mod.id, instance: mod.instance, status: 'running', started: new Date().toISOString(), ms: 0, checks: [], notes: {}, failure: null, counts: {}, timing: { waitMs: 0, throttleMs: 0 } };
     this.report.modules.push(record);
     this.persist();
     const current = { id: mod.id, budget, created: 0, claimed: 0, record };
@@ -2048,7 +2430,9 @@ export class LiveRun {
     } finally {
       clearTimeout(timer);
       current.revoked = true;
+      this.closePhase();
       record.finished = new Date().toISOString();
+      record.ms = Date.parse(record.finished) - Date.parse(record.started);
       if (!this.fatal) {
         try {
           await this.closePagesSince(pagesBefore);
@@ -2175,6 +2559,20 @@ export class LiveRun {
     try {
       // Only this run's pool URLs are deleted; any other entry is not even read.
       check((this.pools[entry.instance] || []).includes(entry.url), 'cleanup_url');
+      if (inst.service === 'pinboard') {
+        // By the ledger's URL only: posts/get, posts/delete, then posts/get
+        // again must find nothing.
+        check(entry.id === pinboardLedgerId(this.pools[entry.instance], entry.url), 'cleanup_url');
+        if (await this.pinboardPost(entry.instance, entry.url) !== null) {
+          const answer = await this.api(entry.instance, 'posts/delete?url=' + encodeURIComponent(entry.url));
+          check(['done', 'item not found'].includes(answer?.result_code), 'cleanup_delete');
+        }
+        check(await this.pinboardPost(entry.instance, entry.url) === null, 'cleanup_delete');
+        entry.deleted = true;
+        this.report.cleanup.entries.push({ kind: 'bookmark', instance: entry.instance, id: entry.id, deleted: true });
+        this.persist();
+        return true;
+      }
       const path = recordPath(inst.service, entry.id);
       const row = await this.api(entry.instance, path, { allow404: true });
       if (row !== null) {
@@ -2303,6 +2701,14 @@ export class LiveRun {
     for (const url of this.pools[instance] || []) {
       if (this.report.ledger.created.some(r => r.instance === instance && r.url === url && r.deleted)) continue;
       try {
+        if (inst.service === 'pinboard') {
+          if (await this.pinboardPost(instance, url) === null) continue;
+          const id = pinboardLedgerId(this.pools[instance], url);
+          let known = this.report.ledger.created.find(r => r.instance === instance && r.id === id);
+          if (!known) { known = { instance, id, url, source: 'pool', module: '', deleted: false }; this.report.ledger.created.push(known); this.persist(); }
+          ok = (await this.deleteBookmark(known)) && ok;
+          continue;
+        }
         const data = await this.api(instance, (inst.service === 'linkding' ? 'bookmarks/check/' : 'bookmarks/check-url') + '?url=' + encodeURIComponent(url));
         const id = inst.service === 'linkding' ? data.bookmark?.id : data.bookmarkId;
         if (!id) continue;
@@ -2324,7 +2730,12 @@ export class LiveRun {
     check(this.prefix === 'pbp-it-' + this.runId && RUN_DIR_RE.test(this.prefix), 'cleanup_prefix_invalid', true);
     const inst = this.instances[instance];
     const out = [];
-    if (inst.service === 'karakeep') {
+    if (inst.service === 'pinboard') {
+      // tags/get: { "<tag>": count, ... } over the whole account.
+      const data = await this.api(instance, 'tags/get');
+      check(data && typeof data === 'object' && !Array.isArray(data), 'pinboard_tags_shape');
+      for (const name of Object.keys(data)) if (name.toLowerCase().startsWith(this.prefix)) out.push({ id: name, name });
+    } else if (inst.service === 'karakeep') {
       let cursor = '', pages = 0;
       do {
         check(++pages <= 20, 'cleanup_pagination');
@@ -2384,6 +2795,7 @@ export class LiveRun {
     const inst = this.instances[instance];
     try {
       for (const url of this.pools[instance] || []) {
+        if (inst.service === 'pinboard') { check(await this.pinboardPost(instance, url) === null, 'verify_pool_residue'); continue; }
         const data = await this.api(instance, (inst.service === 'linkding' ? 'bookmarks/check/' : 'bookmarks/check-url') + '?url=' + encodeURIComponent(url));
         check(!(inst.service === 'linkding' ? data.bookmark : data.bookmarkId), 'verify_pool_residue');
       }
@@ -2398,73 +2810,83 @@ export class LiveRun {
   }
 
   // ---- summary ----------------------------------------------------------------
+  // Two layers: report.json holds everything; summary.zh.md fits one screen
+  // (SUMMARY_MAX_LINES) and is what the main session reads. Each section
+  // shows its first entries and counts the rest, which stay in the report.
   writeSummary() {
     if (!existsSync(this.runDir)) return;
     const r = this.report;
+    const sec = ms => (ms / 1000).toFixed(1) + 's';
     const lines = [];
-    lines.push(`# 真实测试摘要 ${r.runId}`, '');
-    lines.push(`- 目标：${r.target || '未定'}；HEAD：${r.head || '未知'}；工作区干净：${r.clean === null ? '未检查' : r.clean ? '是' : '否'}`);
-    lines.push(`- 开始 ${r.started}，结束 ${r.finished || '未结束'}；整轮结论：${r.passed ? '通过' : '未通过'}${r.failure ? `（${r.failure.phase}：${r.failure.code}）` : ''}`);
+    const capped = (items, max, render, rest = n => `- 另有 ${n} 条，见 report.json`) => {
+      for (const item of items.slice(0, max)) lines.push(render(item));
+      if (items.length > max) lines.push(rest(items.length - max));
+    };
+    lines.push(`# 真实测试摘要 ${r.runId}`);
+    lines.push(`- 结论：${r.passed ? '通过' : '未通过'}${r.failure ? `（${r.failure.phase}：${r.failure.code}）` : ''}；目标 ${r.target || '未定'}；HEAD ${(r.head || '未知').slice(0, 12)}；工作区干净：${r.clean === null ? '未检查' : r.clean ? '是' : '否'}`);
     const instanceNames = Object.keys(r.instances || {});
-    if (instanceNames.length) lines.push(`- 实例：${instanceNames.map(i => `${i}（Node ${r.counts?.[i]?.node ?? 0} / 浏览器 ${r.counts?.[i]?.browser ?? 0} 次请求）`).join('；')}`);
-    if (r.fakeAi) lines.push(`- 假 AI：${(r.fakeAi.calls || []).filter(c => c.status === 200).length} 次成功调用，上限 ${r.fakeAi.limit}`);
-    if (r.stages?.length) {
-      const slow = r.modules.filter(m => m.started && m.finished).map(m => [m.id, Date.parse(m.finished) - Date.parse(m.started)]).sort((a, b) => b[1] - a[1]).slice(0, 3);
-      lines.push(`- 阶段耗时：${r.stages.map(s => `${s.name} ${(s.ms / 1000).toFixed(1)}s${s.ok ? '' : '（失败）'}`).join('，')}${slow.length ? `；最慢模块：${slow.map(([id, ms]) => `${id} ${(ms / 1000).toFixed(1)}s`).join('，')}` : ''}`);
+    if (instanceNames.length) lines.push(`- 请求：${instanceNames.map(i => `${i} Node ${r.counts?.[i]?.node ?? 0} / 浏览器 ${r.counts?.[i]?.browser ?? 0}`).join('；')}${r.fakeAi ? `；假 AI ${(r.fakeAi.calls || []).filter(c => c.status === 200).length}/${r.fakeAi.limit}` : ''}`);
+    // The Pinboard account is named nowhere in this file.
+    if (r.pinboard) {
+      const th = r.timing?.throttle;
+      lines.push(`- Pinboard：${r.pinboard.configured ? '已配置' : '未配置（凭据缺 pinboardToken，Pinboard 模块已跳过，不算失败）'}${th ? `；节流请求 ${th.requests} 次，等待 ${sec(th.waitedMs)}，429 ${th.rateLimited} 次` : ''}`);
     }
-    lines.push('', '## 新发现（失败或中止的模块与证据）', '');
+    if (r.stages?.length) lines.push(`- 阶段耗时：${r.stages.map(st => `${st.name} ${sec(st.ms)}${st.ok ? '' : '（失败）'}`).join('，')}`);
+    const tt = r.timing?.totals || {};
+    lines.push(`- 耗时分类：容器启动 ${sec(tt.containerStartMs || 0)}，浏览器启动 ${sec(tt.browserStartMs || 0)}，连接 ${sec(tt.connectMs || 0)}，模块 ${sec(tt.modulesMs || 0)}，等待 ${sec(tt.waitMs || 0)}，节流等待 ${sec(tt.throttleMs || 0)}，清理 ${sec(tt.cleanupMs || 0)}`);
+    if (r.timing?.slowest?.length) lines.push(`- 最慢 5 个阶段：${r.timing.slowest.map(x => `${x.name} ${sec(x.ms)}（${x.requests} 次请求${x.throttleMs ? `，节流 ${sec(x.throttleMs)}` : ''}${x.waitMs ? `，等待 ${sec(x.waitMs)}` : ''}）`).join('；')}`);
+    lines.push('', '## 失败与证据');
     const bad = r.modules.filter(m => m.status !== 'passed');
-    if (!bad.length) lines.push('- 无模块失败。');
-    for (const m of bad) {
-      const shots = (this.shotsManifest || []).filter(s => s.module === m.id && s.file).map(s => s.file);
+    if (!bad.length) lines.push(`- 无模块失败（${r.modules.length} 个通过：${r.modules.map(m => m.id).join('，').slice(0, 300) || '无'}）。`);
+    capped(bad, 5, m => {
+      const shots = (this.shotsManifest || []).filter(x => x.module === m.id && x.file).map(x => x.file);
       const diffs = r.readBackDiffs.filter(d => d.module === m.id);
-      lines.push(`- ${m.id}：${m.status === 'aborted' ? '中止' : '失败'}于 ${m.failure?.phase}，失败码 ${m.failure?.code}；读回差异 ${diffs.length} 条；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；最后截图 ${shots[shots.length - 1]}` : ''}`);
-    }
-    if (r.violations.length) lines.push(`- 守卫/预算触发：${r.violations.map(v => `${v.code}@${v.phase}`).join('，')}`);
-    if (r.blockedOrigins.length) lines.push(`- 被拦截的外部来源：${r.blockedOrigins.join('，')}`);
-    for (const b of (r.blockedSamples || []).slice(0, 5)) lines.push(`  - 无法解析的 URL：${b.sample || '（空）'}，模块 ${b.module || '无'}，阶段 ${b.phase}，调用方 ${b.where || '未知'}`);
-    // What modules observed without asserting (e.g. the popup's wording for a
-    // permanent server failure): evidence for review, not a verdict.
+      return `- ${m.id}：${m.status === 'aborted' ? '中止' : '失败'}于 ${m.failure?.phase}，${m.failure?.code}；读回差异 ${diffs.length} 条${diffs[0] ? `（${diffs[0].code}：期望 ${diffs[0].expected.slice(0, 60)}，实际 ${diffs[0].actual.slice(0, 60)}）` : ''}；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；截图 ${shots[shots.length - 1]}` : ''}`;
+    });
+    if (r.violations.length) lines.push(`- 守卫/预算触发：${r.violations.slice(0, 5).map(v => `${v.code}@${v.phase}`).join('，')}${r.violations.length > 5 ? ` 等 ${r.violations.length} 条` : ''}`);
+    if (r.blockedOrigins.length) lines.push(`- 被拦截的外部来源（${r.blockedOrigins.length}）：${r.blockedOrigins.slice(0, 5).join('，')}`);
+    for (const b of (r.blockedSamples || []).slice(0, 2)) lines.push(`  - 无法解析的 URL：${b.sample || '（空）'}，模块 ${b.module || '无'}，调用方 ${(b.where || '未知').slice(0, 80)}`);
+    // What modules observed without asserting: evidence for review, not a verdict.
     const observed = r.modules.filter(m => Object.keys(m.notes || {}).length);
     if (observed.length) {
-      lines.push('', '## 观察记录（模块 notes，未作断言）', '');
-      for (const m of observed) {
-        const parts = Object.entries(m.notes).map(([k, v]) => `${k}=${this.sanitize(typeof v === 'string' ? v : JSON.stringify(v)).replace(/\s+/g, ' ').slice(0, 200)}`);
-        lines.push(`- ${m.id}：${parts.join('；')}`);
-      }
+      lines.push('', '## 观察记录（未作断言）');
+      capped(observed, 3, m => `- ${m.id}：${Object.entries(m.notes).map(([k, v]) => `${k}=${this.sanitize(typeof v === 'string' ? v : JSON.stringify(v)).replace(/\s+/g, ' ').slice(0, 90)}`).join('；').slice(0, 220)}`);
     }
-    lines.push('', '## 在修项结论（按 features）', '');
+    lines.push('', '## 在修项结论（按 features）');
     const features = new Map();
     for (const m of r.modules) {
-      const row = this.selected?.find(s => s.id === m.id);
+      const row = this.selected?.find(x => x.id === m.id);
       for (const f of row?.features || []) {
-        // A feature named after another service (linkding-snapshot on a
-        // Karakeep run) says nothing about this module.
+        // A feature named after another service says nothing about this module.
         const owner = SERVICE_TYPES.find(svc => f.startsWith(svc + '-'));
         if (owner && owner !== row.service) continue;
         const list = features.get(f) || [];
-        list.push(`${m.id}=${m.status === 'passed' ? '通过' : m.status === 'failed' ? '失败' : '中止'}`);
+        list.push({ id: m.id, ok: m.status === 'passed' });
         features.set(f, list);
       }
     }
     if (!features.size) lines.push('- 本轮没有执行模块。');
-    for (const [f, list] of features) lines.push(`- ${f}：${list.join('，')}`);
-    lines.push('', '## 截图与布局', '');
-    lines.push(`- 截图 ${r.shots.count} 张${r.shots.dir ? `，目录 ${r.shots.dir}` : '（本轮未开启 --shots）'}`);
-    for (const f of r.findings.filter(x => x.kind === 'geometry')) lines.push(`- 几何断言未通过：${f.shot}（视口 ${f.viewport?.width}×${f.viewport?.height}，横向溢出 ${f.overflow}px${f.overflowBy?.length ? `，越界元素 ${f.overflowBy.join('、')}` : ''}；滚动也到不了的控件 ${f.keys.join('、') || '无'}）`);
-    lines.push('', '## 未覆盖项', '');
-    for (const s of r.skipped) lines.push(`- ${s.id}：因 ${s.reason} 未执行`);
-    for (const u of UNCOVERED) {
-      if (u.coveredBy && r.modules.some(m => globToRegExp(u.coveredBy).test(m.id))) continue;
-      lines.push(`- ${u.text}`);
+    else {
+      const failed = [...features].filter(([, list]) => list.some(x => !x.ok));
+      const passed = [...features].filter(([, list]) => list.every(x => x.ok)).map(([f]) => f);
+      if (passed.length) lines.push(`- 通过（${passed.length}）：${passed.join('，').slice(0, 300)}`);
+      capped(failed, 4, ([f, list]) => `- 未通过 ${f}：${list.filter(x => !x.ok).map(x => x.id).join('，')}`);
     }
-    lines.push('', '## 清理', '');
-    lines.push(`- 书签：创建 ${r.ledger.created.length}，删除 ${r.ledger.created.filter(x => x.deleted).length}；列表：创建 ${r.ledger.lists.length}，删除 ${r.ledger.lists.filter(x => x.deleted).length}；前缀标签记录 ${r.ledger.tags.length}`);
-    lines.push(`- 清理完成：${r.cleanup.complete ? '是' : '否'}${r.temp ? `；临时容器已删除：${r.temp.removed ? '是' : '否'}` : ''}`);
-    const failedEntries = r.cleanup.entries.filter(e => e.deleted === false);
-    for (const e of failedEntries) lines.push(`- 未清理：${e.kind} ${e.instance || ''} ${e.id || ''} ${e.code || ''}`.trim());
+    lines.push('', '## 截图与布局');
+    const geometry = r.findings.filter(x => x.kind === 'geometry');
+    lines.push(`- 截图 ${r.shots.count} 张${r.shots.dir ? `，目录 ${r.shots.dir}` : '（本轮未开启 --shots）'}；几何断言未通过 ${geometry.length} 张`);
+    capped(geometry, 2, f => `- ${f.shot}：视口 ${f.viewport?.width}×${f.viewport?.height}，横向溢出 ${f.overflow}px${f.overflowBy?.length ? `，越界 ${f.overflowBy.join('、')}` : ''}；够不到 ${f.keys.join('、') || '无'}`);
+    lines.push('', '## 未覆盖项');
+    const gaps = [...r.skipped.map(x => `${x.id}：因 ${x.reason} 未执行`), ...UNCOVERED.filter(u => !(u.coveredBy && r.modules.some(m => globToRegExp(u.coveredBy).test(m.id)))).map(u => u.text)];
+    capped(gaps, 4, g => `- ${g}`);
+    lines.push('', '## 清理');
+    lines.push(`- 书签：创建 ${r.ledger.created.length}，删除 ${r.ledger.created.filter(x => x.deleted).length}；列表：创建 ${r.ledger.lists.length}，删除 ${r.ledger.lists.filter(x => x.deleted).length}；前缀标签 ${r.ledger.tags.length}；清理完成：${r.cleanup.complete ? '是' : '否'}${r.temp ? `；临时容器已删除：${r.temp.removed ? '是' : '否'}` : ''}`);
+    capped(r.cleanup.entries.filter(e => e.deleted === false), 3, e => `- 未清理：${e.kind} ${e.instance || ''} ${e.id || ''} ${e.code || ''}`.trim());
+    lines.push(`- 完整报告：${this.reportPath}`);
+    // One screen: anything past the cap is in report.json.
+    const out = lines.length > SUMMARY_MAX_LINES ? [...lines.slice(0, SUMMARY_MAX_LINES - 1), '- （摘要已截断，完整内容见 report.json）'] : lines;
     this.summaryPath = join(this.runDir, 'summary.zh.md');
-    writeFileSync(this.summaryPath, lines.join('\n') + '\n', { mode: 0o600 });
+    writeFileSync(this.summaryPath, this.sanitize(out.join('\n')) + '\n', { mode: 0o600 });
     chmodSync(this.summaryPath, 0o600);
   }
 }
@@ -2519,7 +2941,12 @@ export function installWorkerGuard(rule, cfg, token) {
     if (slot && !response.ok && response.status < 500) release();
     if (slot && response.ok) {
       const row = await response.clone().json();
-      if (decision.kind === 'create') {
+      if (decision.kind === 'create' && cfg.instances[id].service === 'pinboard') {
+        // posts/add answers {"result_code":"done"} with HTTP 200 for a save,
+        // and a 200 with another code ("item already exists") for none.
+        const entryId = 'pool-' + ((cfg.pools[id] || []).indexOf(decision.url) + 1);
+        if (row?.result_code === 'done' && !state.created.some(r => r.instance === id && r.id === entryId)) state.created.push({ instance: id, id: entryId, url: decision.url });
+      } else if (decision.kind === 'create') {
         const service = cfg.instances[id].service;
         const actual = service === 'linkding' ? row.url : row.content?.url;
         if (actual !== decision.url) { state.violations.push({ code: 'live_guard_response', instance: id }); throw new Error('live_guard_response'); }
@@ -2569,10 +2996,12 @@ export function validateResumeReport(report, reportPath, { values = {}, state = 
   }
   check(!values.target || values.target === target, 'cleanup_target_mismatch');
   if (target === 'temp') check(!values.credentials && !values.linkding && !values.karakeep, 'temp_target_rejects_user_endpoints');
-  const ids = target === 'temp' ? Object.keys(TEMP_INSTANCES) : ['linkding', 'karakeep'];
+  const ids = target === 'temp' ? Object.keys(TEMP_INSTANCES) : ['linkding', 'karakeep', 'pinboard'];
   const serviceOf = id => (target === 'temp' ? TEMP_INSTANCES[id].service : id);
   for (const [id, info] of Object.entries(report.instances)) {
     check(ids.includes(id) && isObject(info) && info.service === serviceOf(id), invalid);
+    // Pinboard's root is fixed: a report naming any base for it is refused.
+    if (id === 'pinboard') { check(info.base === '', invalid); continue; }
     let base = '';
     try { base = validateBase(info.base); } catch { /* refused below */ }
     check(base && base === info.base, invalid);
@@ -2592,6 +3021,9 @@ export function validateResumeReport(report, reportPath, { values = {}, state = 
   }
   const known = instance => typeof instance === 'string' && Object.hasOwn(report.instances, instance);
   for (const e of created) check(isObject(e) && known(e.instance) && safeId(e.id) && typeof e.url === 'string' && typeof e.deleted === 'boolean', invalid);
+  // A Pinboard entry is deleted by its URL: it must be one of the run's pool
+  // URLs, under the id the runner gives it.
+  for (const e of created.filter(r => r.instance === 'pinboard')) check(Array.isArray(report.pools.pinboard) && e.id === pinboardLedgerId(report.pools.pinboard, e.url), invalid);
   for (const l of lists) check(isObject(l) && known(l.instance) && report.instances[l.instance].service === 'karakeep' && safeId(l.id) && [undefined, true, false].includes(l.deleted), invalid);
   if (target === 'user') check(report.temp == null, invalid);
   else if (report.temp != null) {
@@ -2616,6 +3048,12 @@ async function resumeCleanup(opts) {
   run.runDir = join(realpathSync(stateDir()), 'pbp-it-' + report.runId);
   run.reportPath = path;
   run.report = report;
+  // Reports from before the timing section (harness v2, pre-H2) lack it;
+  // a resumed cleanup times its Pinboard throttle like a run does.
+  const plain = v => !!v && typeof v === 'object' && !Array.isArray(v);
+  if (!plain(report.timing) || !Array.isArray(report.timing.phases)) report.timing = { phases: [], totals: {}, slowest: [], throttle: null };
+  if (!plain(report.timing.totals)) report.timing.totals = {};
+  delete report.cleanup.error;
   run.target = report.target;
   run.stage = 'resume';
   run.writesPossible = true;
@@ -2660,16 +3098,20 @@ function printHelp() {
     '  --target user also requires --authorization LABEL: at most 3 rounds per label, counted in the state directory;',
     '  --plan --target user --authorization LABEL shows the rounds used and left. --cleanup never uses a round.',
     '--plan prints modules, budgets, URLs, containers, headed and shot needs without credentials, network, browser or Docker.',
-    '--list prints module ids. --service linkding,karakeep filters. --read-only = --scenario readonly.',
+    '--list prints module ids. --service linkding,karakeep[,pinboard] filters. --read-only = --scenario readonly.',
+    '  Pinboard runs on --target user only, with pinboardToken ("user:HEX") from --credentials; without that key its',
+    '  modules are skipped. Every Pinboard request waits 3 s after the previous answer; --plan shows the floor.',
     '--shots [--shots-dir DIR] saves masked screenshots; --headed launches a visible browser; --allow-dirty runs on a dirty tree.',
     '--cleanup REPORT resumes an incomplete cleanup of a report in the state directory; the user target needs',
     '  --credentials and the same --linkding / --karakeep again.',
   ].join('\n'));
 }
 
-export async function main(argv = process.argv.slice(2), { dockerExec, modules } = {}) {
+export async function main(argv = process.argv.slice(2), { dockerExec, modules, pinboard } = {}) {
   const opts = parseArgs(argv);
   opts.dockerExec = dockerExec;
+  // In-process only (the preflight's Pinboard mock); never from the CLI.
+  opts.pinboard = pinboard;
   opts.modules = modules;
   if (opts.mode === 'help') { printHelp(); return 0; }
   if (opts.mode === 'usage') { printHelp(); return 2; }
@@ -2679,7 +3121,7 @@ export async function main(argv = process.argv.slice(2), { dockerExec, modules }
       check(!opts.errors.length, opts.errors[0] || 'arguments');
       const target = opts.values.target || 'temp';
       check(['temp', 'user'].includes(target), 'target');
-      const services = opts.values.service ? opts.values.service.split(',').map(s => s.trim()) : ['linkding', 'karakeep'];
+      const services = opts.values.service ? opts.values.service.split(',').map(s => s.trim()) : [...DEFAULT_SERVICES];
       check(services.every(s => SERVICE_TYPES.includes(s)), 'service');
       const scenario = opts.flags.has('--read-only') ? 'readonly' : (opts.values.scenario || 'core');
       const { selected, skipped } = selectModules(scenario, { services, target, modules: modules || MODULES });
