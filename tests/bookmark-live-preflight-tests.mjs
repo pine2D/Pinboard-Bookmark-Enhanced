@@ -346,6 +346,28 @@ try {
     assert.equal(readOnly.code, 'live_guard_read_only', 'read-only modules refuse every write');
   }
 
+  // Every module phase confirms the worker guard is still installed. A phase
+  // that is not awaited still stops the next harness call.
+  {
+    const guardRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    let present = true;
+    const asked = [];
+    guardRun.swToken = 'guard-token';
+    guardRun.worker = { evaluate: async (fn, token) => { asked.push(token); return present; } };
+    guardRun.instances.linkding = cfg.instances.linkding;
+    const mod = { id: 'linkding.guard.check', instance: 'linkding', service: 'linkding', record: { checks: [], notes: {} }, budget: { urls: 1 }, claimed: 0, revoked: false };
+    const t = guardRun.harness(mod);
+    await t.phase('first');
+    assert.deepEqual([guardRun.phaseName, guardRun.fatal, asked], ['first', null, ['guard-token']]);
+    present = false;
+    const unawaited = t.phase('second');
+    await new Promise(r => setTimeout(r, 0));
+    assert.throws(() => t.expect(true, 'next_step'), e => e.code === 'live_guard_missing' && e.fatal === true);
+    await assert.rejects(unawaited, e => e.code === 'live_guard_missing');
+    assert.equal(guardRun.fatal, 'live_guard_missing');
+    assert.deepEqual(guardRun.report.violations.map(v => [v.code, v.phase]), [['live_guard_missing', 'second']]);
+  }
+
   // ---------------------------------------------------------------------
   // Pure helpers: endpoints, redaction, Karakeep config, signals, lock
   // ---------------------------------------------------------------------

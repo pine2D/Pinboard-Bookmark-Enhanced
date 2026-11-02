@@ -84,13 +84,13 @@ export const MODULES = [
     budget: { bookmarks: 0, urls: 1, node: 4, browser: { linkding: 40, karakeep: 60 }, ai: 0, tags: 0, seconds: 60 },
     settings: {},
     async steps(t) {
-      t.phase('readonly_extension');
+      await t.phase('readonly_extension');
       const result = await t.sw(async () => {
         const client = pbpBookmarkClient(await getCurrentBookmarkAuth());
         return { tags: (await client.tags()).length, recent: (await client.recent(2)).length };
       });
       t.check(`${t.service}: authenticated extension tags/recent passed (${result.tags} usable tags)`);
-      t.phase('readonly_popup');
+      await t.phase('readonly_popup');
       const form = await t.openPopup(t.claimUrl());
       if (t.service === 'linkding') await linkdingPrefill(t, form.popup);
       await t.shot(form.popup, 'prefill', { surface: 'popup', keys: ['#submit-btn'] });
@@ -112,14 +112,14 @@ export const MODULES = [
     settings: {},
     async steps(t) {
       const url = t.claimUrl();
-      t.phase('snapshot_create');
+      await t.phase('snapshot_create');
       const saved = await t.sw(async intent => {
         const result = await submitSaveIntent(intent);
         return { status: result.status, reason: result.reason };
       }, { mode: 'create', url, title: t.prefix + ' 快照', notes: '', tags: '', private: true, toread: false, archive: false });
       t.expectEq(saved.status, 'saved', 'snapshot_create');
       const row = await t.ownRow(url);
-      t.phase('snapshot_wait');
+      await t.phase('snapshot_wait');
       const started = Date.now();
       let status = 'missing', polls = 0;
       for (;;) {
@@ -150,7 +150,7 @@ export const MODULES = [
     async steps(t) {
       const { prefix } = t;
       const url = t.claimUrl();
-      t.phase('popup');
+      await t.phase('popup');
       const form = await t.openPopup(url);
       const { popup } = form;
       if (t.service === 'linkding') {
@@ -171,7 +171,7 @@ export const MODULES = [
       }
       await form.close();
 
-      t.phase('reader_later');
+      await t.phase('reader_later');
       const reader = await t.openReader(url, { markdown: '# 合成文章\n\n不含个人资料。', title: '合成文章', ready: '#reader-bookmark-later' });
       await reader.locator('#reader-bookmark-later').click();
       await reader.waitForFunction(() => document.getElementById('reader-bookmark-later')?.getAttribute('aria-pressed') === 'true');
@@ -183,7 +183,7 @@ export const MODULES = [
         t.expectEq(row.archived, false, 'later_changed_archive');
       }
 
-      t.phase('reader_edit');
+      await t.phase('reader_edit');
       await reader.waitForFunction(() => document.getElementById('reader-bookmark-save')?.getAttribute('aria-busy') === 'false');
       await reader.locator('#reader-bookmark-edit').click();
       await reader.locator('#reader-bookmark-title').fill(prefix + ' 已编辑');
@@ -196,7 +196,7 @@ export const MODULES = [
       t.expect(tagNamesOf(t, row).includes(prefix + '_空格'), 'new_tag_separator');
       if (t.service === 'linkding') t.expectEq(row.description, '手工描述，与笔记分开', 'reader_preserves_description');
 
-      t.phase('reader_mark_read');
+      await t.phase('reader_mark_read');
       await reader.waitForFunction(() => document.getElementById('reader-bookmark-save')?.getAttribute('aria-busy') === 'false');
       await reader.locator('#reader-bookmark-save').click();
       await reader.waitForFunction(() => document.getElementById('reader-bookmark-later')?.getAttribute('aria-pressed') === 'false');
@@ -204,7 +204,7 @@ export const MODULES = [
       if (t.service === 'linkding') t.expect(!row.unread, 'mark_read');
       else t.expect(!(await karakeepLists(t, row)).some(l => l.description === LIST_MARKER), 'remove_later');
 
-      t.phase('reader_delete');
+      await t.phase('reader_delete');
       await reader.waitForFunction(() => document.getElementById('reader-bookmark-save')?.getAttribute('aria-busy') === 'false');
       await reader.locator('#reader-bookmark-edit').click();
       await reader.locator('#reader-bookmark-delete').click();
@@ -227,7 +227,7 @@ export const MODULES = [
     async steps(t) {
       const { prefix } = t;
       const url = t.claimUrl();
-      t.phase('worker_create');
+      await t.phase('worker_create');
       const intent = { mode: 'create', url, title: prefix + ' 第二条', notes: '第二条笔记', tags: JSON.stringify(prefix + ' 空格'), private: true, toread: false, archive: false };
       const submit = value => t.sw(async intent => {
         const result = await submitSaveIntent(intent);
@@ -235,15 +235,15 @@ export const MODULES = [
       }, value);
       t.expectEq((await submit(intent)).status, 'saved', 'worker_create');
       let row = await t.ownRow(url);
-      t.phase('worker_merge');
+      await t.phase('worker_merge');
       await t.api(t.recordPath(row.id), { method: 'PATCH', body: t.service === 'linkding' ? { is_archived: true } : { archived: true } });
       t.expectEq((await submit({ ...intent, mode: 'merge', title: 'must preserve original', notes: '', tags: prefix })).status, 'saved', 'worker_merge');
       row = await t.ownRow(url);
       t.expectEq(row.title, intent.title, 'merge_preserves_fields');
       t.expectEq(t.service === 'linkding' ? row.is_archived : row.archived, true, 'merge_preserves_fields');
-      t.phase('worker_conflict');
+      await t.phase('worker_conflict');
       t.expectEq((await submit(intent)).reason, 'conflict', 'duplicate_create');
-      t.phase('worker_tags_recent');
+      await t.phase('worker_tags_recent');
       const data = await t.sw(async () => {
         const client = pbpBookmarkClient(await getCurrentBookmarkAuth());
         return { tags: (await client.tags()).length, recent: (await client.recent(2)).length };
@@ -266,7 +266,7 @@ export const MODULES = [
     async steps(t) {
       const { prefix } = t;
       const urls = [t.claimUrl(), t.claimUrl(), t.claimUrl(), t.claimUrl()];
-      t.phase('karakeep_seed_spellings');
+      await t.phase('karakeep_seed_spellings');
       const names = { own: prefix + ' machine learning', double: prefix + ' double  space', minority: prefix + ' popular topic', twin: prefix + '_machine_learning', majority: prefix + '_popular_topic' };
       // Independent service-native spellings through the real API, not the
       // extension's canonicalizer; every write still passes the Node guard.
@@ -282,7 +282,7 @@ export const MODULES = [
         t.expectEq(row.tags.map(tag => tag.id).sort().join(','), initialIds, code);
         t.expectEq(row.tags.map(tag => tag.name).sort().join('|'), [names.own, names.double, names.minority].sort().join('|'), code + '_names');
       };
-      t.phase('karakeep_popup_existing_tags');
+      await t.phase('karakeep_popup_existing_tags');
       const form = await t.openPopup(url);
       await form.popup.waitForFunction(name => allUserTagCounts[name] === 2, names.majority);
       const chips = await form.popup.locator('#tags-display .tag-item').allTextContents();
@@ -292,7 +292,7 @@ export const MODULES = [
       await preserved('popup_preserves_existing_tag_ids');
       await form.close();
 
-      t.phase('karakeep_reader_tag_boundaries');
+      await t.phase('karakeep_reader_tag_boundaries');
       let reader = await t.openReader(url);
       await reader.locator('#reader-bookmark-edit').click();
       const quoted = await reader.locator('#reader-bookmark-tags').inputValue();
@@ -317,7 +317,7 @@ export const MODULES = [
       await reader.close();
       await t.settings({ optRespectTagCase: true });
 
-      t.phase('karakeep_library_majority');
+      await t.phase('karakeep_library_majority');
       const fresh = await t.openPopup(urls[3]);
       await fresh.popup.waitForFunction(name => allUserTagCounts[name] === 2, names.majority);
       await fresh.popup.locator('#tags-input').fill(JSON.stringify(names.minority));
@@ -342,7 +342,7 @@ export const MODULES = [
     budget: { bookmarks: 1, urls: 1, node: 4, browser: 40, ai: 0, tags: 0, seconds: 60 },
     settings: { optBlockquote: true, optAutoDescription: true, optRespectTagCase: true, tagSyncMode: 'fresh' },
     async steps(t) {
-      t.phase('linkding_quote_and_unread');
+      await t.phase('linkding_quote_and_unread');
       const url = t.claimUrl();
       const quote = await t.openPopup(url, { selection: true });
       const expectedQuote = '> First line\n>\n> \\# Heading\n> \\*\\*bold\\*\\* &lt;tag>\n> 1\\. item';
@@ -393,7 +393,7 @@ export const MODULES = [
         await t.until(() => t.sw(async () => (await chrome.storage.local.get('offlineQueue')).offlineQueue?.length === 0), label);
       };
 
-      t.phase('linkding_offline_create');
+      await t.phase('linkding_offline_create');
       let form = await t.openPopup(url);
       await form.popup.locator('#title-input').fill(prefix + ' offline create');
       await form.popup.locator('#description-input').fill('Offline notes\nSecond line');
@@ -413,7 +413,7 @@ export const MODULES = [
       t.expect(row.tag_names.length === 1 && row.tag_names[0] === tag, 'offline_replay_reminted_tag');
       await form.close();
 
-      t.phase('linkding_offline_update');
+      await t.phase('linkding_offline_update');
       form = await t.openPopup(url);
       await form.popup.locator('#description-input').fill('Updated offline notes');
       await form.popup.locator('#linkding-description-input').fill('');
@@ -443,17 +443,17 @@ export const MODULES = [
     async steps(t) {
       const url = t.claimUrl();
       const before = t.fakeAi.calls();
-      t.phase('ai_popup_open');
+      await t.phase('ai_popup_open');
       const form = await t.openPopup(url);
       const { popup } = form;
       const field = t.service === 'linkding' ? '#linkding-description-input' : '#description-input';
-      t.phase('ai_summary');
+      await t.phase('ai_summary');
       await popup.locator('#ai-summary-btn').click();
       await t.until(async () => (await popup.locator(field).inputValue()).includes(t.fakeAi.marker), 'ai_summary_written');
       const written = await popup.locator(field).inputValue();
       t.expect(!written.includes('[AI Summary]'), 'ai_summary_legacy_label');
       if (t.service === 'linkding') t.expect(!(await popup.locator('#description-input').inputValue()).includes(t.fakeAi.marker), 'ai_summary_in_notes');
-      t.phase('ai_tags');
+      await t.phase('ai_tags');
       await popup.locator('#ai-tags-btn').click();
       await popup.locator('#ai-suggest-tags .stag.ai').first().waitFor();
       const suggested = await popup.locator('#ai-suggest-tags .stag.ai').evaluateAll(els => els.map(el => el.dataset.tag));
@@ -461,7 +461,7 @@ export const MODULES = [
       await popup.locator('#ai-suggest-tags .add-all-link').click();
       // Re-shot in place for zh_CN and dark: no extra request or bookmark.
       await t.shot(popup, 'ai-summary-tags', { surface: 'popup', keys: ['#submit-btn'], locales: ['en', 'zh_CN'], schemes: ['light', 'dark'] });
-      t.phase('ai_save');
+      await t.phase('ai_save');
       await t.savePopup(popup);
       const row = await t.ownRow(url);
       const stored = t.service === 'linkding' ? row.description : row.note;
@@ -501,7 +501,7 @@ export const MODULES = [
         return form;
       };
 
-      t.phase('sharing_popup_new');
+      await t.phase('sharing_popup_new');
       let form = await open('');
       let { popup } = form;
       t.expect(await popup.locator('#private-check').isHidden(), 'linkding_private_control');
@@ -515,7 +515,7 @@ export const MODULES = [
       t.expectEq(row.shared, false, 'new_bookmark_shared');
       await form.close();
 
-      t.phase('sharing_popup_explicit');
+      await t.phase('sharing_popup_explicit');
       form = await open(title);
       popup = form.popup;
       t.expect(!await popup.locator('#share-check').isChecked(), 'existing_shared_prefill');
@@ -525,7 +525,7 @@ export const MODULES = [
       t.expectEq(row.shared, true, 'explicit_share');
       await form.close();
 
-      t.phase('sharing_popup_untouched');
+      await t.phase('sharing_popup_untouched');
       form = await open(title);
       popup = form.popup;
       t.expect(await popup.locator('#share-check').isChecked(), 'existing_shared_prefill');
@@ -536,7 +536,7 @@ export const MODULES = [
       t.expectEq(row.shared, true, 'untouched_share_changed');
       await form.close();
 
-      t.phase('sharing_reader_edit');
+      await t.phase('sharing_reader_edit');
       let reader = await t.openReader(url, { ready: '#reader-bookmark-edit' });
       await reader.locator('#reader-bookmark-edit').click();
       await reader.locator('#reader-bookmark-notes').fill('reader notes');
@@ -546,7 +546,7 @@ export const MODULES = [
       t.expectEq(row.shared, true, 'reader_edit_changed_share');
       await reader.close();
 
-      t.phase('sharing_reader_new');
+      await t.phase('sharing_reader_new');
       const fresh = t.claimUrl();
       reader = await t.openReader(fresh, { ready: '#reader-bookmark-save' });
       await reader.locator('#reader-bookmark-save').click();
@@ -576,7 +576,7 @@ export const MODULES = [
       const long = prefix + '_' + 'long'.repeat(6);
       t.expect(long.length > 64, 'long_tag_length');
 
-      t.phase('long_tag_server');
+      await t.phase('long_tag_server');
       const direct = t.claimUrl();
       const res = await t.api('bookmarks/', { method: 'POST', body: { url: direct, title: prefix + ' long tag (API)', tag_names: [long], is_archived: false, unread: false, shared: false }, allowStatus: [500] });
       t.expectEq(res?.failedStatus, 500, 'long_tag_server_status');
@@ -584,7 +584,7 @@ export const MODULES = [
       // cleanup adopts such pool URLs, so this is only recorded.
       t.note('serverPartialCreate', !!(await t.api('bookmarks/check/?url=' + encodeURIComponent(direct)))?.bookmark);
 
-      t.phase('long_tag_popup');
+      await t.phase('long_tag_popup');
       const url = t.claimUrl();
       const form = await t.openPopup(url);
       const { popup } = form;

@@ -1524,6 +1524,21 @@ export class LiveRun {
     }
   }
 
+  // The worker guard is the second layer behind ctx.route. A busy or closing
+  // worker (timeout, error) is left to the serviceworker event and syncGuard;
+  // a live worker without this run's guard is fatal.
+  async assertGuardPresent() {
+    if (!this.worker || !this.swToken) return;
+    let present, timer;
+    try {
+      present = await Promise.race([
+        this.worker.evaluate(token => globalThis.pbpLiveGuard?.token === token, this.swToken),
+        new Promise(r => { timer = setTimeout(() => r('timeout'), 5000); }),
+      ]);
+    } catch { present = 'error'; } finally { clearTimeout(timer); }
+    if (present === false) this.setFatal('live_guard_missing');
+  }
+
   async sw(fn, arg) {
     this.throwIfFatal();
     check(this.worker, 'worker_missing', true);
@@ -1599,7 +1614,15 @@ export class LiveRun {
         check(f, 'fake_ai_not_started');
         return { marker: f.marker, calls: kind => f.calls(kind), unknown: () => f.unknown(), expect: spec => f.expect(spec) };
       },
-      phase: name => run.phase(name),
+      // Each phase also confirms the worker guard is still installed. The
+      // returned promise is marked handled, so a phase that is not awaited
+      // cannot crash the run; its finding stops the next harness call.
+      phase(name) {
+        run.phase(name);
+        const checked = run.assertGuardPresent().then(() => run.throwIfFatal());
+        checked.catch(() => {});
+        return checked;
+      },
       expect: (condition, code) => { run.throwIfFatal(); check(condition, code); },
       expectEq(actual, expected, code) {
         run.throwIfFatal();
