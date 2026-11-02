@@ -278,10 +278,19 @@ try {
       for (const mod of live.expandRegistry()) {
         const files = new Set(live.moduleFiles(mod));
         for (const name of ['worker', 'options', ...mod.surfaces.map(s => (s === 'background' ? 'worker' : s))]) {
-          for (const f of surfaces[name]) assert(files.has(f), mod.id + ' drives ' + name + ' but leaves out ' + f);
+          for (const f of surfaces[name]) assert(files.has(f), mod.id + ' declares ' + name + ' but its files leave out ' + f);
         }
       }
       assert.throws(() => live.moduleFiles({ id: 'x', surfaces: ['library'], files: [] }), e => e.code === 'module_surface_unknown');
+      // What a module drives is read at run time from the extension pages it
+      // opens, not from its row: a row that leaves out a surface it opens
+      // fails surface_undeclared (the mock browser round runs one).
+      const ext = 'chrome-extension://abcdefghijklmnopabcdefghijklmnop/';
+      assert.deepEqual(['popup.html', 'popup.html?x=1#y', 'md-preview.html?k=live', 'options.html#tab-ai', 'library.html', 'batch.html'].map(p => live.surfaceOfUrl(ext + p, ext)), ['popup', 'popup', 'reader', 'options', '', '']);
+      assert.deepEqual(['https://example.test/popup.html', 'chrome-extension://otherotherotherotherotherotherot/popup.html', 'about:blank', 'not a url'].map(u => live.surfaceOfUrl(u, ext)), ['', '', '', '']);
+      assert.deepEqual(live.undeclaredSurfaces(['popup'], ['popup', 'options']), [], 'options and the worker belong to every module');
+      assert.deepEqual(live.undeclaredSurfaces([], ['popup']), ['popup']);
+      assert.deepEqual(live.undeclaredSurfaces(['background'], ['reader', 'popup', 'reader']), ['popup', 'reader']);
       // A common file selects every module that declares it.
       assert.deepEqual(route(['shared.js']).modules, ids);
       assert.deepEqual(route(['background.js']).modules, ids);
@@ -3222,7 +3231,7 @@ try {
     const badCredentials = join(pbState, '..', 'pinboard-bad.json');
     writeFileSync(badCredentials, JSON.stringify({ pinboardToken: 'no-colon-' + hex }), { mode: 0o600 });
     const INTERVAL = 40;
-    const inProcess = async (args, mock, { intervalMs = INTERVAL } = {}) => {
+    const inProcess = async (args, mock, { intervalMs = INTERVAL, modules } = {}) => {
       const before = process.env.PBP_LIVE_STATE_DIR;
       process.env.PBP_LIVE_STATE_DIR = pbState;
       const lines = [];
@@ -3231,7 +3240,7 @@ try {
       console.error = (...a) => lines.push(a.join(' '));
       let code;
       // As the CLI entry: a thrown failure prints its code and exits 1.
-      try { code = await live.main(args, { pinboard: { transport: mock.transport, intervalMs, mock: true } }); }
+      try { code = await live.main(args, { pinboard: { transport: mock.transport, intervalMs, mock: true }, modules }); }
       catch (error) { lines.push('FAILED: ' + live.failureCode(error)); code = 1; }
       finally { console.log = log; console.error = err; if (before === undefined) delete process.env.PBP_LIVE_STATE_DIR; else process.env.PBP_LIVE_STATE_DIR = before; }
       const reportLine = lines.find(l => l.startsWith('Local report: '));
@@ -3312,6 +3321,27 @@ try {
       assert(summary.includes('Pinboard：已配置') && summary.includes('最慢 5 个阶段') && summary.includes('耗时分类'));
       const texts = [done.output, readFileSync(done.reportPath, 'utf8'), summary];
       for (const s of secretsOf) assert(!texts.some(t => t.includes(s)), 'leaked ' + (s === user ? 'account name' : 'token'));
+      assert(Array.isArray(rep.modules[0].surfaces), 'the surfaces a module drove are recorded');
+    }
+    // The review's counterexample: a row that opens the popup but leaves it
+    // out of `surfaces` (so --changed would never pick it for popup.js)
+    // fails at run time instead of passing.
+    if (only('pinboard mock browser write round')) {
+      const mock = createPinboardMock({ token });
+      const readonly = MODULES.find(m => m.id === 'readonly');
+      const rows = [{ ...readonly, services: ['pinboard'], surfaces: ['options'] }];
+      const done = await inProcess(pbArgs(pbCredentials, 'pinboard.readonly', 'pb-undeclared'), mock, { modules: rows });
+      assert.notEqual(done.code, 0, done.output);
+      const mod = done.report.modules[0];
+      assert.deepEqual([mod.id, mod.status, mod.failure?.code], ['pinboard.readonly', 'failed', 'surface_undeclared'], done.output);
+      assert.deepEqual(mod.undeclaredSurfaces, ['popup']);
+      assert(mod.surfaces.includes('popup'));
+      assert.equal(done.report.cleanup.complete, true);
+      assert.equal(mock.posts.size, 0);
+      // The same row with the popup declared passes.
+      const ok = await inProcess(pbArgs(pbCredentials, 'pinboard.readonly', 'pb-declared'), createPinboardMock({ token }), { modules: [{ ...rows[0], surfaces: ['options', 'popup'] }] });
+      assert.equal(ok.code, 0, ok.output);
+      assert.deepEqual(ok.report.modules[0].undeclaredSurfaces || [], []);
     }
 
     // Rehearsal at the real interval (third review), behind a switch: about

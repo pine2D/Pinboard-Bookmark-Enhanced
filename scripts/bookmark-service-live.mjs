@@ -367,6 +367,18 @@ export function surfaceFiles(dir = ROOT) {
   surfaceCache.set(key, Object.freeze(out));
   return out;
 }
+// The surface an extension page belongs to ('' for any other URL), and the
+// surfaces a module drove that its row leaves out. Every module reaches the
+// worker and connects through options.html, so neither needs declaring.
+export function surfaceOfUrl(url, extension) {
+  if (!extension || typeof url !== 'string' || !url.startsWith(extension)) return '';
+  const path = url.slice(extension.length).split(/[?#]/)[0];
+  return Object.keys(SURFACE_PAGES).find(name => SURFACE_PAGES[name] === path) || '';
+}
+export function undeclaredSurfaces(declared = [], driven = []) {
+  const covered = new Set(['options', ...declared.map(s => SURFACE_ALIASES[s] || s)]);
+  return [...new Set(driven)].filter(s => s && !covered.has(s)).sort();
+}
 // A module's files: what its surfaces load (plus the worker, options page and
 // default locale every module uses) and the extra files its row declares.
 export function moduleFiles(mod, surfaces = surfaceFiles()) {
@@ -2539,8 +2551,15 @@ export class LiveRun {
       page.on('pageerror', error => this.report.pageErrors.push({ module: this.currentModule?.id || '', surface: surfaceOf(page.url()), name: error.name, message: this.sanitize(error.message).slice(0, 200) }));
       page.on('console', msg => { if (['error', 'warning'].includes(msg.type())) this.report.console.push({ module: this.currentModule?.id || '', surface: surfaceOf(page.url()), type: msg.type(), text: this.sanitize(msg.text()).slice(0, 240) }); });
     };
-    for (const page of ctx.pages()) watch(page);
-    ctx.on('page', page => { watch(page); this.pages.add(page); });
+    // Which surfaces the current module drives, from the pages it actually
+    // loads (its own steps or the product opening one): --changed routes by
+    // the row's `surfaces`, so a surface left out of it fails the module.
+    const drove = url => { const s = surfaceOfUrl(url, this.extension); if (s && this.currentModule?.driven) this.currentModule.driven.add(s); };
+    // A tab the worker opens can reach Playwright already loaded: read its
+    // URL on arrival and on every later navigation.
+    const track = page => { drove(page.url()); page.on('framenavigated', frame => { if (frame === page.mainFrame()) drove(frame.url()); }); };
+    for (const page of ctx.pages()) { watch(page); track(page); }
+    ctx.on('page', page => { watch(page); track(page); this.pages.add(page); });
     worker.on('console', msg => { if (['error', 'warning'].includes(msg.type())) this.report.swConsole.push({ module: this.currentModule?.id || '', type: msg.type(), text: this.sanitize(msg.text()).slice(0, 240) }); });
     ctx.on('requestfailed', request => {
       const url = request.url();
@@ -3007,7 +3026,7 @@ export class LiveRun {
     // above, and phase() would add it again.
     this.phaseName = mod.id;
     this.persist();
-    const current = { id: mod.id, budget, created: 0, claimed: 0, record };
+    const current = { id: mod.id, budget, created: 0, claimed: 0, record, driven: new Set() };
     this.currentModule = current;
     const before = { ...this.count(mod.instance), ai: this.fakeAi ? this.fakeAi.calls() : 0 };
     const pagesBefore = new Set(this.ctx.pages());
@@ -3061,6 +3080,8 @@ export class LiveRun {
       ]);
       await this.syncGuard();
       this.throwIfFatal();
+      const undeclared = undeclaredSurfaces(mod.surfaces, [...current.driven]);
+      if (undeclared.length) { record.undeclaredSurfaces = undeclared; fail('surface_undeclared'); }
       check(this.report.pageErrors.length === errorsBefore, 'browser_page_error');
       const after = this.count(mod.instance);
       const usedNode = after.node - before.node, usedBrowser = after.browser - before.browser;
@@ -3091,6 +3112,7 @@ export class LiveRun {
     } finally {
       clearTimeout(timer);
       current.revoked = true;
+      record.surfaces = [...current.driven].sort();
       this.closePhase();
       record.finished = new Date().toISOString();
       record.ms = Date.parse(record.finished) - Date.parse(record.started);

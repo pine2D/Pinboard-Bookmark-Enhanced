@@ -12,7 +12,12 @@
 // Row shape:
 //   id        stable module id (dots allowed; globs match the expanded id)
 //   services  service types the row runs against ('linkding' | 'karakeep' | 'pinboard')
-//   surfaces  extension surfaces it drives (report and summary only)
+//   surfaces  extension surfaces it drives: background|options|popup|reader.
+//             --changed routes by them (see `files`), so list every page the
+//             module loads, whether its steps open it or the product does;
+//             the runner records the pages each module actually loads and
+//             fails one that drives a surface left out here
+//             (surface_undeclared). options and the worker need no entry.
 //   features  fix/feature tags; the Chinese summary groups results by them
 //   needs     { fakeAi, target: 'temp'|'user'|'any', container, sharing: 'any'|'on'|'off',
 //               headed, shots, pinboard, writes, urls, snapshots }
