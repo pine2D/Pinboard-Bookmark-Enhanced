@@ -1757,9 +1757,14 @@ export class LiveRun {
     this.phase('credentials');
     const path = this.opts.values.credentials;
     check(path, 'credentials_path');
-    const stat = lstatSync(path);
+    // Own codes for a missing, unreadable or malformed file: failureCode
+    // would reduce ENOENT or a SyntaxError to a bare "Error".
+    let stat, text, credentials;
+    try { stat = lstatSync(path); } catch { fail('credentials_unreadable'); }
     check(stat.isFile() && !stat.isSymbolicLink() && (stat.mode & 0o077) === 0, 'credentials_permissions');
-    const credentials = JSON.parse(readFileSync(path, 'utf8'));
+    try { text = readFileSync(path, 'utf8'); } catch { fail('credentials_unreadable'); }
+    try { credentials = JSON.parse(text); } catch { fail('credentials_json'); }
+    check(credentials && typeof credentials === 'object' && !Array.isArray(credentials), 'credentials_json');
     for (const value of Object.values(credentials)) if (typeof value === 'string') this.addPinboardSecrets(value);
     for (const instance of [...this.plan.instances]) {
       const inst = this.instances[instance];
@@ -3122,6 +3127,7 @@ export class LiveRun {
     // --cleanup that confirms residue removed by hand must not report it again.
     const start = r.cleanup.passStart;
     const pass = r.cleanup.entries.slice(Number.isInteger(start) && start >= 0 && start <= r.cleanup.entries.length ? start : 0);
+    if (r.cleanup.error) lines.push(r.cleanup.errorBeforeStart ? `- 本轮续清在开始清理前失败：${r.cleanup.error}（未发请求、未删除任何对象；修正后再跑 --cleanup）` : `- 清理出错：${r.cleanup.error}`);
     const residue = pass.filter(e => e.residue);
     if (residue.length) lines.push(`- 残留 ${residue.length} 项（工具不删，需人工核对后处理，再跑 --cleanup 复核）：${[...new Set(residue.map(e => e.kind === 'list' ? '续清不删的 Karakeep 列表' : '带本轮前缀但不在账本里或未经写入预留的标签'))].join('；')}`);
     capped(pass.filter(e => e.deleted === false), 3, e => `- 未清理：${e.kind} ${e.instance || ''} ${e.id || ''} ${e.code || ''}`.trim());
@@ -3334,6 +3340,7 @@ async function resumeCleanup(opts) {
   if (!plain(report.timing) || !Array.isArray(report.timing.phases)) report.timing = { phases: [], totals: {}, slowest: [], throttle: null };
   if (!plain(report.timing.totals)) report.timing.totals = {};
   delete report.cleanup.error;
+  delete report.cleanup.errorBeforeStart;
   run.target = report.target;
   run.stage = 'resume';
   run.writesPossible = true;
@@ -3346,8 +3353,15 @@ async function resumeCleanup(opts) {
   run.selected = expandRegistry(opts.modules || MODULES).filter(m => ran.has(m.id));
   run.shotsManifest = readShotsManifest(report.shots?.manifest);
   const release = acquireLock(run.state, { pid: process.pid, runId: run.runId, reportPath: path, started: new Date().toISOString() }, { resume: path });
+  let started = false;
   try {
     report.cleanup.resumed = (report.cleanup.resumed || 0) + 1;
+    // This pass starts here, before anything that can fail (credentials,
+    // Docker): a pass that stops early must not show the previous pass's
+    // entries (residue) or request counts as its own. Entries from here on
+    // are this pass's; earlier ones stay in the report.
+    report.cleanup.passStart = report.cleanup.entries.length;
+    delete report.cleanup.counts;
     run.pools = report.pools;
     run.caps = {};
     run.reserve = {};
@@ -3364,12 +3378,12 @@ async function resumeCleanup(opts) {
     if (report.target === 'temp') run.docker = createDocker({ runId: run.runId, exec: opts.dockerExec, stopped: () => true });
     run.cleaning = true;
     run.stage = 'cleanup';
-    // Entries from here on are this pass's; earlier ones stay in the report.
-    report.cleanup.passStart = report.cleanup.entries.length;
+    started = true;
     await run.cleanupAll();
   } catch (error) {
     report.cleanup.complete = false;
     report.cleanup.error = failureCode(error, run.secrets);
+    if (!started) report.cleanup.errorBeforeStart = true;
   } finally {
     run.persist();
     // The summary shows this pass's cleanup (residue included); a report
@@ -3378,6 +3392,7 @@ async function resumeCleanup(opts) {
     release();
   }
   console.log('Local report: ' + path);
+  if (report.cleanup.error) console.error('Cleanup error: ' + report.cleanup.error);
   console.log('Cleanup complete: ' + report.cleanup.complete);
   return report.cleanup.complete ? 0 : 1;
 }

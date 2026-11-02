@@ -1963,8 +1963,23 @@ try {
   const tagQuery = requests.find(q => q.path === '/api/bookmarks/' && q.url.includes('q='));
   assert(tagQuery && !decodeURIComponent(tagQuery.url).includes('#personal'), 'reference check names only run tags');
   assert.equal(resumed.report.ledger.created.find(e => e.id === '8').source, 'pool', 'unrecorded pool bookmark adopted by exact URL');
-  // Removed by hand, the next --cleanup confirms it and completes.
+  // Removed by hand. A --cleanup that fails before it starts cleaning (a
+  // wrong --credentials path) must not report the previous pass's residue
+  // and requests as its own (review of H1b, must-fix 2): its summary shows
+  // why it stopped and nothing of the earlier pass.
   store.tags.delete('10');
+  requests.length = 0;
+  const misread = await run(['--cleanup', join(pendingDir, 'report.json'), '--linkding', linkdingBase, '--credentials', join(dir, 'no-such-credentials.json')], { guard: false, credentials: false, state: linkdingState });
+  assert.equal(misread.code, 1);
+  assert.deepEqual(requests, [], 'nothing is sent without credentials');
+  assert.equal(misread.report.cleanup.error, 'credentials_unreadable');
+  assert.equal(misread.report.cleanup.resumed, 2);
+  assert.equal(misread.report.cleanup.counts, undefined, 'the previous pass\'s request counts are not this pass\'s');
+  assert(misread.output.includes('Cleanup error: credentials_unreadable'), misread.output);
+  const misreadSummary = readFileSync(join(pendingDir, 'summary.zh.md'), 'utf8');
+  assert.match(misreadSummary, /本轮续清在开始清理前失败：credentials_unreadable/, misreadSummary);
+  assert(!/残留|未清理|续清请求/.test(misreadSummary), misreadSummary);
+  // The next --cleanup, with the right credentials, confirms and completes.
   requests.length = 0;
   const confirmed = await run(['--cleanup', join(pendingDir, 'report.json'), '--linkding', linkdingBase], { guard: false, state: linkdingState });
   assert.equal(confirmed.code, 0, confirmed.output);
