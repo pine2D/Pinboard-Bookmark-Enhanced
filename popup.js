@@ -92,16 +92,16 @@ function pbpRebasePopupTags(serverTags, submittedTags, liveTags) {
     const baseline = Array.isArray(submittedTags) ? submittedTags : [];
     const current = Array.isArray(liveTags) ? liveTags : [];
     const unchanged = baseline.length === current.length && baseline.every((tag,index)=>tag===current[index]);
-    const controlled = new Set([...baseline,...current].map(tag=>tag.toLowerCase()));
-    return [...new Set([...(unchanged ? serverTags : serverTags.filter(tag=>!controlled.has(tag.toLowerCase()))),...current])];
+    const controlled = new Set([...baseline,...current].map(tag=>pbpTagTwinKey(tag)));
+    return [...new Set([...(unchanged ? serverTags : serverTags.filter(tag=>!controlled.has(pbpTagTwinKey(tag)))),...current])];
   }
   const baseline = Array.isArray(submittedTags) ? submittedTags : [];
   const current = Array.isArray(liveTags) ? liveTags : [];
   const unchanged = baseline.length === current.length && baseline.every((tag, index) => tag === current[index]);
   if (unchanged) return unionTags(serverTags, current.join(" ")).split(/\s+/).filter(Boolean);
 
-  const controlled = new Set([...baseline, ...current].map((tag) => String(tag).toLowerCase()));
-  const serverOnly = String(serverTags || "").split(/\s+/).filter((tag) => tag && !controlled.has(tag.toLowerCase()));
+  const controlled = new Set([...baseline, ...current].map((tag) => pbpTagTwinKey(tag)));
+  const serverOnly = String(serverTags || "").split(/\s+/).filter((tag) => tag && !controlled.has(pbpTagTwinKey(tag)));
   return unionTags(serverOnly.join(" "), current.join(" ")).split(/\s+/).filter(Boolean);
 }
 

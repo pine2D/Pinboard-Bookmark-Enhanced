@@ -503,33 +503,21 @@ async function pbpOpenOptionsTab(panel) {
 }
 
 // ---- Tag merge helper (pure function for union with dedup) ----
-// Merges two space-separated tag strings (existing, new), deduplicates case-insensitively,
-// preserves existing tag casing for duplicates, and appends unique new tags.
+// Merges two space-separated Pinboard tag strings (existing, new), deduplicates
+// by pbpTagTwinKey (case, NFC/NFD and zero-width twins), keeps the first
+// spelling seen (the server's existing one first), and appends unique new tags.
 // Returns a space-separated string of merged tags.
 function unionTags(existingStr, newStr) {
   const existing = (existingStr || "").split(/\s+/).filter(Boolean);
   const newTags = (newStr || "").split(/\s+/).filter(Boolean);
-
-  // Map of normalized tag → preferred (existing) casing
-  const seenNorm = {};
+  const seen = new Set();
   const result = [];
-
-  for (const tag of existing) {
-    const norm = tag.toLowerCase();
-    if (!seenNorm[norm]) {
-      seenNorm[norm] = tag;
-      result.push(tag);
-    }
+  for (const tag of [...existing, ...newTags]) {
+    const key = pbpTagTwinKey(tag);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(tag);
   }
-
-  for (const tag of newTags) {
-    const norm = tag.toLowerCase();
-    if (!seenNorm[norm]) {
-      seenNorm[norm] = tag;
-      result.push(tag);
-    }
-  }
-
   return result.join(" ");
 }
 
@@ -764,6 +752,15 @@ const PBP_TAG_VOCAB_STALE_CEILING = 2 * 60 * 60 * 1000;
 const PBP_TAG_ZERO_WIDTH = /[\u200B-\u200D\u2060\uFEFF]/g;
 function pbpTagGroupKey(name) {
   return String(name).replace(PBP_TAG_ZERO_WIDTH, "").normalize("NFC").toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+// Pinboard merges compare twins only: names that differ in case, canonical
+// form (NFC/NFD) or zero-width characters. Separators stay significant, so
+// "x-ray" and "x_ray" remain two Pinboard tags as they are on the server. A
+// name with nothing left is compared by its exact text.
+function pbpTagTwinKey(name) {
+  const key = String(name).replace(PBP_TAG_ZERO_WIDTH, "").normalize("NFC").toLowerCase();
+  return key ? `twin:${key}` : `exact:${name}`;
 }
 
 // The one dedupe key for tag lists in every context (popup, SW, reader): a

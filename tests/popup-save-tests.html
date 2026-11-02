@@ -777,6 +777,23 @@ test("posts/add default remains replace=yes for existing callers", () => {
       assert(JSON.stringify(result) === JSON.stringify(["ServerOnly", "gamma", "ALPHA", "New"]), result.join(" "));
     });
 
+    test("tag rebase treats invisible twins of a tag the user controls as that tag", () => {
+      const nfc = "b\u00e4r", nfd = "ba\u0308r", zw = "fo\u200bo";
+      const cases = [
+        // Pinboard: a server twin of a tag the user removed must not come back.
+        [rebasePopupTags(`${nfd} ${zw} Other`, [nfc, "foo"], []), ["Other"]],
+        // Pinboard: an unchanged form merges into the server's spelling.
+        [rebasePopupTags(`${nfd} Other`, [nfc], [nfc]), [nfd, "Other"]],
+        // Self-hosted: same for the array branch's controlled set.
+        [rebasePopupTags([nfd, zw, "Other"], [nfc, "foo"], ["New"]), ["Other", "New"]],
+        // Plain case behavior and order are unchanged.
+        [rebasePopupTags("Alpha beta x_ray", ["alpha"], ["ALPHA", "x-ray"]), ["beta", "x_ray", "ALPHA", "x-ray"]],
+      ];
+      for (const [got, want] of cases) {
+        assert(JSON.stringify(got) === JSON.stringify(want), JSON.stringify(got) + " !== " + JSON.stringify(want));
+      }
+    });
+
     test("fresh bookmark lookup wires the submitted tag baseline into the rebase helper", () => {
       assert(lookupSource.includes("Array.isArray(submittedTags)"), "lookup does not detect the submitted tag baseline");
       assert(lookupSource.includes('pbpRebasePopupTags(pbpBookmarkServiceId(settings) === "pinboard"'), "lookup bypasses the service-aware rebase helper");
