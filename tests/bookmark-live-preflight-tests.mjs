@@ -73,6 +73,10 @@ globalThis.fetch=()=>{throw new Error('network_access_blocked');};
 const dockerChild = join(dir, 'docker-child.mjs');
 writeFileSync(dockerChild, `import { appendFileSync } from 'node:fs';
 const [runner, log, holdSpec, ...argv] = process.argv.slice(2);
+// Registered before the runner's own listeners, so it runs first in the
+// same tick: every start line after "handled" was issued once the runner
+// knew of the signal (the parent's "signal" line only says it was sent).
+process.on('SIGINT', () => appendFileSync(log, 'handled\\tSIGINT\\n'));
 const live = await import(runner);
 const holds = JSON.parse(holdSpec);
 const states = holds.__states || {};
@@ -2800,9 +2804,13 @@ try {
       const state = stateDirFor('signal-start');
       const { code, lines, report, reportPath } = await dockerChildRun({ state, holds: { 'run:linkding': 1500 }, signals: ['start\trun:linkding\t'], args: ['--run', '--target', 'temp', '--scenario', 'linkding.readonly', '--service', 'linkding', '--allow-dirty'] });
       assert.equal(code, 130);
-      const signalled = lines.indexOf('signal\tSIGINT');
-      const later = lines.slice(signalled + 1).filter(l => l.startsWith('start\t')).map(l => l.split('\t')[1]);
-      assert(signalled > 0 && later.length && later.every(key => teardown.includes(key)), 'only teardown reaches Docker after the signal: ' + later.join(', '));
+      // The boundary is where the child handled the signal, not where the
+      // parent sent it: the edge branch starts side by side (E25), so its
+      // network connect / start / port can land between the two.
+      const signalled = lines.indexOf('signal\tSIGINT'), handled = lines.indexOf('handled\tSIGINT');
+      assert(signalled > 0 && handled > signalled, 'the child handles the signal after it was sent');
+      const later = lines.slice(handled + 1).filter(l => l.startsWith('start\t')).map(l => l.split('\t')[1]);
+      assert(later.length && later.every(key => teardown.includes(key)), 'only teardown reaches Docker after the signal is handled: ' + later.join(', '));
       const settled = lines.indexOf('done\trun:linkding'), removal = lines.findIndex(l => l.startsWith('start\trm\t'));
       assert(settled > signalled && removal > settled, 'the in-flight run settles before anything is removed');
       const own = live.tempNames(report.runId);
@@ -2844,9 +2852,12 @@ try {
       const lExit = await interleaved('karakeep-exits', { holds: { 'run:linkding-fixture': 3000, __states: { karakeep: 'exited 1' } }, held: 'run:linkding-fixture', expect: [1, 'container_start_failed'] });
       assert(lExit.report.temp.names.includes(live.tempNames(lExit.report.runId)['linkding-fixture']));
       // A forced exit (second signal) while run:karakeep is in flight: the
-      // name was recorded before the command, so --cleanup removes it.
+      // name was recorded before the command, so --cleanup removes it. The
+      // second signal waits until the child handled the first: sent right
+      // after it, the two can reach the child as one (1 run in 30 then
+      // finished its cleanup unforced).
       const state = stateDirFor('force-two-services');
-      const forced = await dockerChildRun({ state, args: both, holds: { 'run:karakeep': 3000 }, signals: ['start\trun:karakeep\t', 'signal\tSIGINT'] });
+      const forced = await dockerChildRun({ state, args: both, holds: { 'run:karakeep': 3000 }, signals: ['start\trun:karakeep\t', 'handled\tSIGINT'] });
       assert.deepEqual([forced.code, forced.report.cleanup.complete], [130, false], forced.output);
       const own = live.tempNames(forced.report.runId);
       assert(forced.report.temp.names.includes(own.karakeep), 'the container being created is on record before its command');
