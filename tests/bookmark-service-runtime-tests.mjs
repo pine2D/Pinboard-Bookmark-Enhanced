@@ -776,7 +776,7 @@ try{
     assert.equal(create.query,'?disable_scraping','a queued empty Description let linkding scrape');
     assert(Object.hasOwn(create.data,'description')&&create.data.description==='','a queued empty Description was not sent as empty');
     const row=[...records.linkding.values()].find(b=>b.url===queuedUrl);
-    assert.equal(row?.description,'','linkding stored a Description for a known-empty one');
+    assert.equal(row?.description,'','a queued "" did not stay an explicit empty Description');
     records.linkding.delete(String(row.id));
     assert.deepEqual(await worker.evaluate(async()=>(await chrome.storage.local.get('offlineQueue')).offlineQueue||[]),[],'the delivered record stayed queued');
     console.log('linkding queued empty Description: a record queued with "" replays as an explicit empty Description');
