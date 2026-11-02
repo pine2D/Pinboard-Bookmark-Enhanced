@@ -1595,6 +1595,9 @@ export class LiveRun {
     check(selected.length, 'no_modules_selected');
     this.report.skipped = skipped;
     this.selected = selected;
+    // Every module the run means to start: the summary lists those it never
+    // started, and --cleanup reads them back.
+    this.report.selected = selected.map(m => m.id);
     this.shotsEnabled = flags.has('--shots') || !!values['shots-dir'];
     this.plan = buildPlan({ target, selected, skipped, shotsEnabled: this.shotsEnabled, headedFlag: flags.has('--headed') });
     check(this.plan.withinCaps, 'budget_exceeded_plan');
@@ -1812,6 +1815,7 @@ export class LiveRun {
   dropInstance(instance, reason) {
     for (const mod of this.selected.filter(m => m.instance === instance)) this.report.skipped.push({ id: mod.id, reason });
     this.selected = this.selected.filter(m => m.instance !== instance);
+    this.report.selected = this.selected.map(m => m.id);
     this.plan.instances = this.plan.instances.filter(i => i !== instance);
     delete this.instances[instance];
     delete this.pools[instance];
@@ -2536,6 +2540,12 @@ export class LiveRun {
   }
 
   async runModule(mod) {
+    // A fatal finding the previous module left (a failed restore, a guard
+    // violation between modules, the run timer closing the browser) stops
+    // the run here, before this module has a record: it is listed as not
+    // run, not as one the run was cut off in.
+    this.throwIfFatal();
+    check(this.ctx, 'browser_closed', true);
     const budget = resolveBudget(mod);
     const record = { id: mod.id, instance: mod.instance, status: 'running', started: new Date().toISOString(), ms: 0, checks: [], notes: {}, failure: null, counts: {}, timing: { waitMs: 0, throttleMs: 0 } };
     this.report.modules.push(record);
@@ -2545,8 +2555,19 @@ export class LiveRun {
     const before = { ...this.count(mod.instance), ai: this.fakeAi ? this.fakeAi.calls() : 0 };
     const pagesBefore = new Set(this.ctx.pages());
     const errorsBefore = this.report.pageErrors.length;
-    const settingsKeys = await this.sw(() => Object.keys(SETTINGS_DEFAULTS).concat(['optSyncEnabled', 'offlineQueue']));
-    const snapshot = await this.sw(keys => chrome.storage.local.get(keys), settingsKeys);
+    let settingsKeys, snapshot;
+    try {
+      settingsKeys = await this.sw(() => Object.keys(SETTINGS_DEFAULTS).concat(['optSyncEnabled', 'offlineQueue']));
+      snapshot = await this.sw(keys => chrome.storage.local.get(keys), settingsKeys);
+    } catch (error) {
+      // Before its steps: aborted with the cause, never left "running".
+      record.status = 'aborted';
+      record.failure = { phase: this.phaseName, code: failureCode(error, this.secrets) };
+      record.finished = new Date().toISOString();
+      this.currentModule = null;
+      this.persist();
+      throw error;
+    }
     const t = this.harness({ ...mod, record, budget, get claimed() { return current.claimed; }, set claimed(v) { current.claimed = v; }, get revoked() { return current.revoked === true; }, get deadline() { return current.deadline; } });
     let timer;
     try {
@@ -3046,6 +3067,13 @@ export class LiveRun {
   }
 
   // ---- summary ----------------------------------------------------------------
+  // Modules the report lists as selected (report.selected) that have no
+  // record and were not skipped.
+  notStartedModules() {
+    const r = this.report;
+    const done = new Set([...(r.modules || []).map(m => m?.id), ...(r.skipped || []).map(s => s?.id)]);
+    return (Array.isArray(r.selected) ? r.selected : []).filter(id => typeof id === 'string' && !done.has(id));
+  }
   // Two layers: report.json holds everything; summary.zh.md fits one screen
   // (SUMMARY_MAX_LINES) and is what the main session reads. Each section
   // shows its first entries and counts the rest, which stay in the report.
@@ -3087,7 +3115,10 @@ export class LiveRun {
     if (r.timing?.slowest?.length) lines.push(`- 最慢 5 个阶段：${r.timing.slowest.map(x => `${x.name} ${sec(x.ms)}（${x.requests} 次请求${x.throttleMs ? `，节流 ${sec(x.throttleMs)}` : ''}${x.waitMs ? `，等待 ${sec(x.waitMs)}` : ''}）`).join('；')}`);
     lines.push('', '## 失败与证据');
     const bad = r.modules.filter(m => m.status !== 'passed');
-    if (!bad.length) lines.push(`- 无模块失败（${r.modules.length} 个通过：${r.modules.map(m => m.id).join('，').slice(0, 300) || '无'}）。`);
+    // Selected but never started: the run stopped (a fatal finding, a
+    // signal, a crash) before them. Neither passed nor failed.
+    const notStarted = this.notStartedModules();
+    if (!bad.length && !notStarted.length) lines.push(`- 无模块失败（${r.modules.length} 个通过：${r.modules.map(m => m.id).join('，').slice(0, 300) || '无'}）。`);
     capped(bad, 5, m => {
       const shots = (this.shotsManifest || []).filter(x => x.module === m.id && x.file).map(x => x.file);
       const diffs = r.readBackDiffs.filter(d => d.module === m.id);
@@ -3096,6 +3127,7 @@ export class LiveRun {
       const verdict = m.status === 'running' ? '中断（运行在此模块中被打断，未得出结论）' : `${m.status === 'aborted' ? '中止' : '失败'}于 ${m.failure?.phase}，${m.failure?.code}`;
       return `- ${m.id}：${verdict}；读回差异 ${diffs.length} 条${diffs[0] ? `（${diffs[0].code}：期望 ${diffs[0].expected.slice(0, 60)}，实际 ${diffs[0].actual.slice(0, 60)}）` : ''}；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；截图 ${shots[shots.length - 1]}` : ''}`;
     });
+    if (notStarted.length) lines.push(`- 未执行（${notStarted.length}，运行在它们开始前已停止，不算通过也不算失败）：${notStarted.join('，').slice(0, 300)}`);
     if (r.violations.length) lines.push(`- 守卫/预算触发：${r.violations.slice(0, 5).map(v => `${v.code}@${v.phase}`).join('，')}${r.violations.length > 5 ? ` 等 ${r.violations.length} 条` : ''}`);
     if (r.blockedOrigins.length) lines.push(`- 被拦截的外部来源（${r.blockedOrigins.length}）：${r.blockedOrigins.slice(0, 5).join('，')}`);
     for (const b of (r.blockedSamples || []).slice(0, 2)) lines.push(`  - 无法解析的 URL：${b.sample || '（空）'}，模块 ${b.module || '无'}，调用方 ${(b.where || '未知').slice(0, 80)}`);
@@ -3109,26 +3141,28 @@ export class LiveRun {
     begin('features');
     lines.push('', '## 在修项结论（按 features）');
     const features = new Map();
-    for (const m of r.modules) {
+    const records = [...r.modules, ...notStarted.map(id => ({ id, status: 'not_started' }))];
+    for (const m of records) {
       const row = this.selected?.find(x => x.id === m.id);
       for (const f of row?.features || []) {
         // A feature named after another service says nothing about this module.
         const owner = SERVICE_TYPES.find(svc => f.startsWith(svc + '-'));
         if (owner && owner !== row.service) continue;
         const list = features.get(f) || [];
-        list.push({ id: m.id, ok: m.status === 'passed', open: m.status === 'running' });
+        list.push({ id: m.id, ok: m.status === 'passed', open: m.status === 'running' || m.status === 'not_started' });
         features.set(f, list);
       }
     }
     if (!features.size) lines.push('- 本轮没有执行模块。');
     else {
       // A feature some module failed is failed; one whose only shortfall is
-      // a module the run was cut off in is unfinished, not failed.
+      // a module the run was cut off in, or one it never started, is
+      // unfinished: neither failed nor passed.
       const failed = [...features].filter(([, list]) => list.some(x => !x.ok && !x.open));
       const open = [...features].filter(([, list]) => list.some(x => x.open) && list.every(x => x.ok || x.open)).map(([f]) => f);
       const passed = [...features].filter(([, list]) => list.every(x => x.ok)).map(([f]) => f);
       if (passed.length) lines.push(`- 通过（${passed.length}）：${passed.join('，').slice(0, 300)}`);
-      if (open.length) lines.push(`- 未完成（${open.length}，运行被打断，不算失败）：${open.join('，').slice(0, 300)}`);
+      if (open.length) lines.push(`- 未完成（${open.length}，运行被打断或模块未执行，不算失败）：${open.join('，').slice(0, 300)}`);
       capped(failed, 4, ([f, list]) => `- 未通过 ${f}：${list.filter(x => !x.ok).map(x => x.id).join('，')}`);
     }
     begin('shots');
@@ -3383,7 +3417,8 @@ async function resumeCleanup(opts) {
   // The summary is rewritten after this pass; it still reports the run's
   // module verdicts by feature (from the registry rows of the modules the
   // report lists) and the failed modules' screenshots.
-  const ran = new Set((Array.isArray(report.modules) ? report.modules : []).map(m => m?.id));
+  // report.selected adds the modules the run never started.
+  const ran = new Set([...(Array.isArray(report.modules) ? report.modules : []).map(m => m?.id), ...(Array.isArray(report.selected) ? report.selected : [])]);
   run.selected = expandRegistry(opts.modules || MODULES).filter(m => ran.has(m.id));
   run.shotsManifest = readShotsManifest(report.shots?.manifest);
   const release = acquireLock(run.state, { pid: process.pid, runId: run.runId, reportPath: path, started: new Date().toISOString() }, { resume: path });

@@ -1366,6 +1366,49 @@ try {
     await closeServer(server);
   }
 
+  // A fatal finding left by the previous module (a failed restore, a guard
+  // violation between modules, the run timer) stops the run before the next
+  // module starts: no record stays "running" to read as an interruption
+  // (review of H1b r2). The modules selected but never started are listed
+  // as not run, and the features they share stay unfinished, never passed
+  // on the strength of another service's module.
+  {
+    const all = live.expandRegistry(MODULES);
+    const fr = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    let swCalls = 0;
+    fr.ctx = { pages: () => [] };
+    fr.sw = async () => { swCalls++; return []; };
+    fr.setFatal('module_restore_failed');
+    await assert.rejects(fr.runModule(all.find(m => m.id === 'linkding.core.worker')), e => e.code === 'module_restore_failed' && e.fatal === true);
+    assert.deepEqual([fr.report.modules, swCalls], [[], 0], 'refused before its record or any worker call');
+    // A browser the run timer closed: the same, without a TypeError.
+    const closed = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    closed.ctx = null;
+    await assert.rejects(closed.runModule(all.find(m => m.id === 'linkding.core.worker')), e => e.code === 'browser_closed');
+    assert.deepEqual(closed.report.modules, []);
+
+    const run = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    run.runDir = join(dir, 'summary-not-started');
+    mkdirSync(run.runDir, { mode: 0o700 });
+    run.reportPath = join(run.runDir, 'report.json');
+    const chosen = ['linkding.core.popup-reader', 'linkding.core.worker', 'karakeep.core.popup-reader', 'karakeep.core.worker'];
+    run.selected = all.filter(m => chosen.includes(m.id));
+    const r = run.report;
+    Object.assign(r, { target: 'user', selected: chosen, failure: { phase: 'linkding.core.worker', code: 'module_restore_failed' }, instances: { linkding: { service: 'linkding', base: 'http://127.0.0.1:9/' }, karakeep: { service: 'karakeep', base: 'http://127.0.0.1:9/' } } });
+    r.modules.push({ id: 'linkding.core.popup-reader', status: 'passed', notes: {}, counts: {} }, { id: 'linkding.core.worker', status: 'passed', notes: {}, counts: {} });
+    run.writeSummary();
+    const text = readFileSync(join(run.runDir, 'summary.zh.md'), 'utf8');
+    assert.match(text, /未执行（2[^\n]*）：karakeep\.core\.popup-reader，karakeep\.core\.worker/, text);
+    assert(!text.includes('无模块失败'), text);
+    const passedLine = text.split('\n').find(l => l.startsWith('- 通过')) || '';
+    for (const f of ['popup-save', 'reader-edit', 'worker-create']) {
+      assert(!passedLine.includes(f), f + ' is not passed while the Karakeep module never ran: ' + text);
+      assert.match(text, new RegExp('未完成（[^\\n]*：[^\\n]*' + f), text);
+    }
+    // linkding-description belongs to linkding alone: its module passed.
+    assert(passedLine.includes('linkding-description'), text);
+  }
+
   // ---------------------------------------------------------------------
   // Summary cap (review of H1b, should-fix 5): with many failures the
   // one-screen summary is cut, but never its cleanup section, which tells
@@ -2004,6 +2047,8 @@ try {
   assert(pendingShot.file && existsSync(pendingShot.file), 'the run wrote the screenshot');
   pendingRun.report.modules.push(
     { id: 'linkding.core.popup-reader', instance: 'linkding', status: 'running', started: '2026-11-01T00:00:10.000Z', ms: 0, checks: [], notes: {}, failure: null, counts: {}, timing: { waitMs: 0, throttleMs: 0 } });
+  // Selected but never started when the run was cut off.
+  pendingRun.report.selected = ['linkding.core.worker', 'linkding.edges.quote-unread', 'linkding.core.popup-reader', 'linkding.edges.offline'];
   pendingRun.persist();
   const pendingReport = JSON.parse(readFileSync(join(pendingDir, 'report.json'), 'utf8'));
   assert.deepEqual(pendingReport.counts.linkding, { node: 105, browser: 77, browserWrites: 3, sw: 70, setup: 4 }, 'every persist carries the live request counts');
@@ -2041,6 +2086,8 @@ try {
   // The module the run was cut off in is interrupted, not failed: its
   // features are unfinished, and a run that never summed its timing says so.
   assert.match(resumedSummary, /linkding\.core\.popup-reader：中断/, resumedSummary);
+  assert.match(resumedSummary, /未执行（1[^\n]*）：linkding\.edges\.offline/, resumedSummary);
+  assert.match(resumedSummary, /未完成（[^\n]*：[^\n]*offline-queue/, resumedSummary);
   // The failed module's screenshot is read back from the run's manifest.
   assert(resumedSummary.includes('linkding.edges.quote-unread：失败于 linkding.edges.quote-unread，read_back_mismatch') && resumedSummary.includes('截图 ' + pendingShot.file), resumedSummary);
   // The cleanup pass's own requests, apart from the run's.
