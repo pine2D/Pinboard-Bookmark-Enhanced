@@ -1724,7 +1724,7 @@ export const SELFHOSTED_MODULES = [
     services: ['linkding', 'karakeep'],
     surfaces: ['popup'],
     features: ['queue-needs-attention', 'queue-retry-after', 'queue-legacy-record'],
-    fixRefs: ['G13', 'G17'],
+    fixRefs: ['G8', 'G13', 'G17'],
     needs: needs({ shots: true }),
     budget: { bookmarks: 2, urls: 4, node: 6, browser: { linkding: 70, karakeep: 90 }, ai: 0, tags: 0, seconds: 60, tagReads: 1 },
     files: [],
@@ -1753,81 +1753,98 @@ export const SELFHOSTED_MODULES = [
       };
       const drop = url => t.sw(async url => { const { offlineQueue = [] } = await chrome.storage.local.get('offlineQueue'); await chrome.storage.local.set({ offlineQueue: offlineQueue.filter(i => i.url !== url) }); await chrome.storage.local.remove('offlineQueuePause'); }, url);
 
-      await t.phase('attention_rejected');
-      const rejected = t.claimUrl();
-      const first = await queueOffline(rejected);
-      const reject = t.inject({ method: 'POST', path: createPath, status: 400, body: t.service === 'linkding' ? { url: ['Enter a valid URL.'] } : { code: 'BAD_REQUEST', message: 'Invalid input' } });
-      await drainQueue(t);
-      t.expect(reject.hits() >= 1, 'rejected_sent');
-      await marked(rejected, 'rejected');
-      reject.clear();
-      const form = await t.openPopup(rejected);
-      await form.popup.bringToFront();
-      await form.popup.locator('#offline-queue-bar:not(.hidden)').waitFor();
-      await form.popup.locator('#offline-queue-toggle').click();
-      const rowText = await form.popup.locator('#offline-queue-list').innerText();
-      t.note('queueRow', rowText.slice(0, 200));
-      t.expect(rowText.trim().length > 0 && await form.popup.locator('#offline-queue-list .offline-queue-retry').count() >= 1, 'attention_row_actions');
-      await t.shot(form.popup, 'queue-attention', { surface: 'popup', keys: ['#offline-queue-bar'] });
-      await t.axe(form.popup, 'queue-attention');
-      await form.close();
-      await drop(rejected);
+      // Parts, each with its own fix groups, so a pending group does not
+      // hide the checks behind it. Each later part works without what an
+      // earlier failed one left (its settings, queue and faults are put
+      // back); the legacy record copies the first queued item, so it fails
+      // as legacy_base_missing when there is none.
+      let first = null, rejected = '', revoked = '';
+      await t.part('attention_rejected', ['G13', 'G17'], async () => {
+        await t.phase('attention_rejected');
+        rejected = t.claimUrl();
+        first = await queueOffline(rejected);
+        const reject = t.inject({ method: 'POST', path: createPath, status: 400, body: t.service === 'linkding' ? { url: ['Enter a valid URL.'] } : { code: 'BAD_REQUEST', message: 'Invalid input' } });
+        await drainQueue(t);
+        t.expect(reject.hits() >= 1, 'rejected_sent');
+        await marked(rejected, 'rejected');
+        reject.clear();
+        const form = await t.openPopup(rejected);
+        await form.popup.bringToFront();
+        await form.popup.locator('#offline-queue-bar:not(.hidden)').waitFor();
+        await form.popup.locator('#offline-queue-toggle').click();
+        const rowText = await form.popup.locator('#offline-queue-list').innerText();
+        t.note('queueRow', rowText.slice(0, 200));
+        t.expect(rowText.trim().length > 0 && await form.popup.locator('#offline-queue-list .offline-queue-retry').count() >= 1, 'attention_row_actions');
+        await t.shot(form.popup, 'queue-attention', { surface: 'popup', keys: ['#offline-queue-bar'] });
+        await t.axe(form.popup, 'queue-attention');
+        await form.close();
+        await drop(rejected);
+      }, ['queue-needs-attention']);
 
-      await t.phase('attention_token');
-      const revoked = t.claimUrl();
-      await queueOffline(revoked);
-      const unauth = t.service === 'linkding'
-        ? t.inject({ status: 401, body: { detail: 'Invalid token.' } })
-        : t.inject({ status: 401, contentType: 'text/plain;charset=UTF-8', body: 'Unauthorized' });
-      await drainQueue(t);
-      // The 401 already fails the duplicate check (a GET): counting writes
-      // alone could not tell a paused connection from one retried every
-      // time. Paused means no request at all, and the pause names this
-      // connection.
-      const since = t.now();
-      await drainQueue(t);
-      t.expectEq(t.requests({ since }).length, 0, 'token_retried');
-      t.expect((await queue(t)).some(i => i.url === revoked), 'token_dropped');
-      const account = await t.sw(async () => (await getCurrentBookmarkAuth()).account || '');
-      const pause = await t.sw(async () => (await chrome.storage.local.get('offlineQueuePause')).offlineQueuePause || null);
-      t.note('tokenPause', pause ? { reason: pause.reason, sameAccount: pause.account === account } : null);
-      t.expect(!!pause && pause.account === account, 'token_not_paused');
-      unauth.clear();
-      await drop(revoked);
+      // linkding 401 / Karakeep 401: the connection is paused (G8 invariant
+      // 4) and the item kept for attention.
+      await t.part('attention_token', ['G8', 'G17'], async () => {
+        await t.phase('attention_token');
+        revoked = t.claimUrl();
+        await queueOffline(revoked);
+        const unauth = t.service === 'linkding'
+          ? t.inject({ status: 401, body: { detail: 'Invalid token.' } })
+          : t.inject({ status: 401, contentType: 'text/plain;charset=UTF-8', body: 'Unauthorized' });
+        await drainQueue(t);
+        // The 401 already fails the duplicate check (a GET): counting writes
+        // alone could not tell a paused connection from one retried every
+        // time. Paused means no request at all, and the pause names this
+        // connection.
+        const since = t.now();
+        await drainQueue(t);
+        t.expectEq(t.requests({ since }).length, 0, 'token_retried');
+        t.expect((await queue(t)).some(i => i.url === revoked), 'token_dropped');
+        const account = await t.sw(async () => (await getCurrentBookmarkAuth()).account || '');
+        const pause = await t.sw(async () => (await chrome.storage.local.get('offlineQueuePause')).offlineQueuePause || null);
+        t.note('tokenPause', pause ? { reason: pause.reason, sameAccount: pause.account === account } : null);
+        t.expect(!!pause && pause.account === account, 'token_not_paused');
+        unauth.clear();
+        await drop(revoked);
+      }, ['queue-needs-attention']);
 
-      await t.phase('attention_retry_after');
-      const limited = t.claimUrl();
-      await queueOffline(limited);
-      const started = Date.now();
-      t.inject({ method: 'POST', path: createPath, status: 429, headers: { 'Retry-After': '120' }, body: { detail: 'Request was throttled.' }, times: 1 });
-      await drainQueue(t);
-      const item = (await queue(t)).find(i => i.url === limited);
-      t.expect(!!item, 'retry_after_dropped');
-      const raw = item.failure?.retryAfter;
-      const until = typeof raw === 'number' ? raw : Date.parse(raw || '') || 0;
-      t.note('retryAfterMs', until ? until - started : null);
-      t.expect(until >= started + 110000 && until <= Date.now() + 130000, 'retry_after_deadline');
-      const limitedSince = t.now();
-      await drainQueue(t);
-      t.expectEq(writesSince(t, limitedSince).length, 0, 'retry_after_ignored');
-      const manual = await t.openPopup(revoked);
-      await manual.popup.bringToFront();
-      await manual.popup.locator('#offline-queue-toggle').click();
-      await manual.popup.locator('#offline-queue-list .offline-queue-retry').first().click();
-      await t.until(async () => !(await queue(t)).some(i => i.url === limited), 'manual_retry');
-      await t.ownRow(limited);
-      await manual.close();
+      await t.part('attention_retry_after', ['G17'], async () => {
+        await t.phase('attention_retry_after');
+        const limited = t.claimUrl();
+        await queueOffline(limited);
+        const started = Date.now();
+        t.inject({ method: 'POST', path: createPath, status: 429, headers: { 'Retry-After': '120' }, body: { detail: 'Request was throttled.' }, times: 1 });
+        await drainQueue(t);
+        const item = (await queue(t)).find(i => i.url === limited);
+        t.expect(!!item, 'retry_after_dropped');
+        const raw = item.failure?.retryAfter;
+        const until = typeof raw === 'number' ? raw : Date.parse(raw || '') || 0;
+        t.note('retryAfterMs', until ? until - started : null);
+        t.expect(until >= started + 110000 && until <= Date.now() + 130000, 'retry_after_deadline');
+        const limitedSince = t.now();
+        await drainQueue(t);
+        t.expectEq(writesSince(t, limitedSince).length, 0, 'retry_after_ignored');
+        const manual = await t.openPopup(revoked || rejected || limited);
+        await manual.popup.bringToFront();
+        await manual.popup.locator('#offline-queue-toggle').click();
+        await manual.popup.locator('#offline-queue-list .offline-queue-retry').first().click();
+        await t.until(async () => !(await queue(t)).some(i => i.url === limited), 'manual_retry');
+        await t.ownRow(limited);
+        await manual.close();
+      }, ['queue-retry-after']);
 
-      await t.phase('attention_legacy_title');
-      const legacy = t.claimUrl();
-      const record = { ...first, url: legacy, queueId: 'pbp-it-legacy-' + t.runId.slice(0, 8), title: 'T'.repeat(1200), queuedAt: Date.now() };
-      delete record.failure;
-      await t.sw(async record => { const { offlineQueue = [] } = await chrome.storage.local.get('offlineQueue'); await chrome.storage.local.set({ offlineQueue: [...offlineQueue, record] }); }, record);
-      const legacySince = t.now();
-      await drainQueue(t);
-      t.expectEq(createsOf(t, legacy, legacySince).length, 0, 'legacy_title_sent');
-      await marked(legacy, 'legacy_title');
-      await drop(legacy);
+      await t.part('attention_legacy_title', ['G17'], async () => {
+        await t.phase('attention_legacy_title');
+        t.expect(!!first, 'legacy_base_missing');
+        const legacy = t.claimUrl();
+        const record = { ...first, url: legacy, queueId: 'pbp-it-legacy-' + t.runId.slice(0, 8), title: 'T'.repeat(1200), queuedAt: Date.now() };
+        delete record.failure;
+        await t.sw(async record => { const { offlineQueue = [] } = await chrome.storage.local.get('offlineQueue'); await chrome.storage.local.set({ offlineQueue: [...offlineQueue, record] }); }, record);
+        const legacySince = t.now();
+        await drainQueue(t);
+        t.expectEq(createsOf(t, legacy, legacySince).length, 0, 'legacy_title_sent');
+        await marked(legacy, 'legacy_title');
+        await drop(legacy);
+      }, ['queue-legacy-record']);
       t.check(`${t.service}: rejected, unauthorised and over-long queued saves need attention and stop retrying; 429 waits for Retry-After; the bar shows the reason with a retry`);
     },
   },
@@ -1846,31 +1863,37 @@ export const SELFHOSTED_MODULES = [
     async steps(t) {
       const url = t.claimUrl();
       await t.seed({ url, title: t.prefix + ' variants', notes: '' });
-      await t.phase('variant_hash');
-      const hashed = url + '#section-2';
-      const since = t.now();
-      const form = await t.openPopup(hashed);
-      t.expectEq(await form.popup.locator('#url-input').inputValue(), hashed, 'hash_save_url_changed');
-      const checks = t.requests({ path: CHECK_PATH[t.service], since }).map(r => new URL('http://x/' + r.path).searchParams.get('url'));
-      t.note('hashChecks', checks.map(u => (u === url ? 'plain' : u === hashed ? 'hashed' : 'other')));
-      t.expect(checks.includes(hashed) && checks.includes(url), 'hash_second_lookup');
-      const notice = await form.popup.evaluate(() => ['existing-banner', 'url-warning', 'status-msg'].map(id => document.getElementById(id)).filter(el => el && el.offsetParent !== null && el.innerText.trim()).map(el => el.id + ': ' + el.innerText.trim().slice(0, 160)));
-      t.note('hashNotice', notice);
-      t.expect(notice.length > 0, 'hash_notice');
-      await t.shot(form.popup, 'hash-variant', { surface: 'popup', keys: ['#submit-btn'] });
-      await form.close();
-      await t.phase('variant_reader');
-      const judge = async variant => {
-        const reader = await t.openReader(variant, { ready: '#reader-bookmark-save' });
-        const saved = await reader.locator('#reader-bookmark-save').getAttribute('data-saved');
-        await reader.close();
-        return saved === 'true';
-      };
-      const utm = url + '&utm_source=pbp-it';
-      t.expect(await judge(utm), 'reader_utm_unsaved');
-      const upper = url.replace(/^(\w+:\/\/)([^/]+)/, (m, scheme, host) => scheme + host.toUpperCase());
-      const slash = url.replace('/?', '?');
-      t.note('readerVariants', { utm: true, hostCase: await judge(upper), noSlash: await judge(slash) });
+      // Parts: the reader's utm verdict (G10) does not wait on the # notice
+      // (G14), which lands later.
+      await t.part('variant_hash', ['G14'], async () => {
+        await t.phase('variant_hash');
+        const hashed = url + '#section-2';
+        const since = t.now();
+        const form = await t.openPopup(hashed);
+        t.expectEq(await form.popup.locator('#url-input').inputValue(), hashed, 'hash_save_url_changed');
+        const checks = t.requests({ path: CHECK_PATH[t.service], since }).map(r => new URL('http://x/' + r.path).searchParams.get('url'));
+        t.note('hashChecks', checks.map(u => (u === url ? 'plain' : u === hashed ? 'hashed' : 'other')));
+        t.expect(checks.includes(hashed) && checks.includes(url), 'hash_second_lookup');
+        const notice = await form.popup.evaluate(() => ['existing-banner', 'url-warning', 'status-msg'].map(id => document.getElementById(id)).filter(el => el && el.offsetParent !== null && el.innerText.trim()).map(el => el.id + ': ' + el.innerText.trim().slice(0, 160)));
+        t.note('hashNotice', notice);
+        t.expect(notice.length > 0, 'hash_notice');
+        await t.shot(form.popup, 'hash-variant', { surface: 'popup', keys: ['#submit-btn'] });
+        await form.close();
+      }, ['hash-variant-notice']);
+      await t.part('variant_reader', ['G10'], async () => {
+        await t.phase('variant_reader');
+        const judge = async variant => {
+          const reader = await t.openReader(variant, { ready: '#reader-bookmark-save' });
+          const saved = await reader.locator('#reader-bookmark-save').getAttribute('data-saved');
+          await reader.close();
+          return saved === 'true';
+        };
+        const utm = url + '&utm_source=pbp-it';
+        t.expect(await judge(utm), 'reader_utm_unsaved');
+        const upper = url.replace(/^(\w+:\/\/)([^/]+)/, (m, scheme, host) => scheme + host.toUpperCase());
+        const slash = url.replace('/?', '?');
+        t.note('readerVariants', { utm: true, hostCase: await judge(upper), noSlash: await judge(slash) });
+      }, ['reader-cleaned-url']);
       t.check(`${t.service}: a # variant of a saved URL is looked up again without #, noticed and left as typed; the reader judges a utm variant saved`);
     },
   },
