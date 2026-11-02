@@ -1648,6 +1648,28 @@ await suite("unified save pipeline", async () => {
     }
   });
 
+  await test("quick save and batch keep the first of default and AI tags that canonicalize into one group", async () => {
+    // "café" typed as NFC in the default tags and returned as NFD by the AI.
+    const aiTags = ["ai", "café", "Web_Design", "new-tag"];
+    for (const service of ["pinboard", "linkding", "karakeep"]) {
+      const quick = await createBackgroundSaveHarness({
+        cachedSettings:{bookmarkService:service,pinboardToken:"alice:token",bgSaveMode:"merge",_defaultTags:"AI café web-design",
+          _autoNotes:false,_blockquote:false,_aiTags:true,_aiSummary:false,optRespectTagCase:false,optPrivateDefault:false,optPrivateIncognito:false},
+        auth:{service},
+        deps:{hasAIKey:()=>true, getPageInfoFromTab:async()=>({pageText:"Synthetic public text"}),
+          getAICache:async(_url, kind)=>kind === "tags" ? aiTags.slice() : null, setAICache:async()=>{}},
+      });
+      await runBackgroundSave(quick);
+      const batch = await createBatchSaveHarness({settings:{bookmarkService:service,optBatchTag:"AI,café,web-design",optBatchTagEnabled:true,batchAiTags:true,optRespectTagCase:false},
+        hasAIKey:true,pageInfo:{pageText:"Synthetic public text"},cached:{tags:aiTags.slice()}});
+      await batch.handleBatchSave(batchTabs(1));
+      const names = service === "pinboard" ? quick.intents[0].tags.split(" ") : pbpBookmarkParseTags(quick.intents[0].tags);
+      equal(JSON.stringify(names), JSON.stringify(["AI", "café", "web-design", "new-tag"]), service + " quick save");
+      equal(new Set(names.map(pbpTagDedupeKey)).size, names.length, service + " two names share a group");
+      equal(quick.intents[0].tags, batch.intents[0].prepared.tags, service + " quick save and batch disagree");
+    }
+  });
+
   await test("quick save splits default tags on spaces and commas", async () => {
     const h=await createBackgroundSaveHarness({cachedSettings:{pinboardToken:"alice:token",bgSaveMode:"merge",_defaultTags:"a b, c",_aiTags:false,_aiSummary:false,optPrivateDefault:false,optPrivateIncognito:false}});
     await runBackgroundSave(h);

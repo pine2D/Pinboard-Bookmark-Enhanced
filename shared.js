@@ -840,6 +840,25 @@ function pbpCanonicalTagName(raw, ctx) {
   return mintedMatch.hit ? mintedMatch.name : minted;
 }
 
+// Every input boundary canonicalizes a whole list the same way: names that
+// collapse into one group keep the first one seen. An exact name already on
+// the bookmark is still kept, as pbpAlignIncomingTags does, so editing a
+// bookmark that holds two same-group server names never drops one of them.
+function pbpCanonicalTagList(names, ctx) {
+  const bookmarkNames = ctx?.bookmarkNames || [];
+  const out = [];
+  const seen = new Set();
+  for (const raw of names || []) {
+    const name = pbpCanonicalTagName(raw, ctx);
+    if (!name) continue;
+    const key = pbpTagDedupeKey(name);
+    if (seen.has(key) && !(bookmarkNames.includes(name) && !out.includes(name))) continue;
+    out.push(name);
+    seen.add(key);
+  }
+  return out;
+}
+
 // Multi-value input accepts JSON-quoted names, retaining malformed quotes as
 // literal characters in ordinary tokens instead of rejecting the whole paste.
 function pbpSplitTagInput(text) {

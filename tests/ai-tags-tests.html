@@ -2026,6 +2026,20 @@ suite("shared tag canonicalization", () => {
     assertEq(pbpMintTagName("# #foo", {service: "pinboard", separator: "-"}), "#-#foo");
   });
 
+  test("a canonicalized list never holds two names of one group, keeping the first, unless both are on the bookmark", () => {
+    const c = ctx({}, [], false, "linkding", "-");
+    assertEq(JSON.stringify(pbpCanonicalTagList(["AI", "ai", "caf\u00e9", "cafe\u0301", "web design", "Web_Design", "", " ", "-", "_", "-"], c)),
+      JSON.stringify(["AI", "caf\u00e9", "web-design", "-", "_"]));
+    const both = ctx({}, ["Foo", "foo"], false);
+    assertEq(JSON.stringify(pbpCanonicalTagList(["Foo", "foo", "FOO", "foo"], both)), JSON.stringify(["Foo", "foo"]),
+      "two exact bookmark names stay, a third spelling aligns into the first");
+    for (const list of [["x", "X", "x\u200b"], ["a b", "a_b", "a-b", "AB"]]) {
+      const out = pbpCanonicalTagList(list, c);
+      assertEq(out.length, new Set(out.map(pbpTagDedupeKey)).size, JSON.stringify(list));
+      assertEq(out.length, 1, JSON.stringify(list));
+    }
+  });
+
   test("alignment leaves new text untouched while canonicalization mints and can realign", () => {
     const c = ctx({Nick_Drake: 3}, [], false);
     assertEq(pbpAlignTagName("new name", c).name, "new name");

@@ -1481,7 +1481,7 @@ async function pbpPrepareReaderSaveIntent(intent, action, draft, settings, auth)
     if (!pbpBookmarkAuthIsCurrent(auth)) return { result: pbpSaveFailure("account_changed") };
     const tagContext = { bookmarkNames, index, service: auth.service,
       separator: settings.aiTagSeparator, respectCase: settings.optRespectTagCase === true };
-    draft = { ...draft, tags: pbpSerializeIntentTags(names.map(name => pbpCanonicalTagName(name, tagContext)).filter(Boolean), auth.service) };
+    draft = { ...draft, tags: pbpSerializeIntentTags(pbpCanonicalTagList(names, tagContext), auth.service) };
   }
   if (!lookup.exists) {
     if (action === "read") return { result: pbpSaveFailure("lookup") };
@@ -1844,7 +1844,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     title,
     notes,
     ...(description !== undefined ? { summary: description } : {}),
-    tags: pbpSerializeIntentTags(tags.map(tag => pbpCanonicalTagName(tag, tagContext)).filter(Boolean), startAuth.service),
+    tags: pbpSerializeIntentTags(pbpCanonicalTagList(tags, tagContext), startAuth.service),
     private: isPrivate,
     toread: toread === true ? true : undefined,
     archive: undefined,
@@ -5053,7 +5053,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     const tagContext = {service:currentAuth.service, separator:s.aiTagSeparator,
       bookmarkNames:[], index:tagVocabIndex, respectCase:s.optRespectTagCase === true};
     const baseTags = s.optBatchTagEnabled && s.optBatchTag
-      ? s.optBatchTag.split(/[,，]+/).map(x => pbpCanonicalTagName(x, tagContext)).filter(Boolean)
+      ? pbpCanonicalTagList(s.optBatchTag.split(/[,，]+/), tagContext)
       : [];
     const useAiTags = s.batchAiTags && hasAIKey(s);
     const useAiSummary = s.batchAiSummary && hasAIKey(s);
@@ -5193,13 +5193,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
           }
         }
 
-        const dedupedTags = [];
-        const seenTags = new Set();
-        for (const tag of tags) {
-          const name = pbpCanonicalTagName(tag, tagContext);
-          const key = pbpTagDedupeKey(name);
-          if (name && !seenTags.has(key)) { dedupedTags.push(name); seenTags.add(key); }
-        }
+        const dedupedTags = pbpCanonicalTagList(tags, tagContext);
         const isPrivate = pbpServiceEffectivePrivate(s, { incognito: tab.incognito });
         // Same rule as quick save: a tab Batch could not read (no site
         // access without AI) leaves the Description to linkding.
