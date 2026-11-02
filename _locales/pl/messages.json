@@ -1439,7 +1439,7 @@
     "message": "Dodawaj opis strony: w linkding do pola Opis, w innych usługach do notki, jeśli nie zaznaczono tekstu"
   },
   "qsBlockquote": {
-    "message": "Zawijaj zaznaczony tekst w blockquote"
+    "message": "Oznaczaj zaznaczony tekst jako cytat"
   },
   "labelDefaultTags": {
     "message": "Domyślne tagi (rozdzielone spacjami lub przecinkami)"

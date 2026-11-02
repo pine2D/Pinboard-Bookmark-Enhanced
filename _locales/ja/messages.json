@@ -1439,7 +1439,7 @@
     "message": "ページの説明を追加：linkdingでは「説明」に、他のサービスではテキスト未選択時のみメモに追加"
   },
   "qsBlockquote": {
-    "message": "選択テキストを blockquote で囲む"
+    "message": "選択したテキストを引用として表示"
   },
   "labelDefaultTags": {
     "message": "デフォルトタグ（スペースまたはカンマ区切り）"

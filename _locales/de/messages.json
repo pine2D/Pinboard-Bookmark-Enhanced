@@ -1439,7 +1439,7 @@
     "message": "Seitenbeschreibung einfügen: in linkding als Beschreibung, sonst nur ohne Textauswahl als Notiz"
   },
   "qsBlockquote": {
-    "message": "Markierten Text mit blockquote umschließen"
+    "message": "Ausgewählten Text als Zitat kennzeichnen"
   },
   "labelDefaultTags": {
     "message": "Standard-Tags (durch Leerzeichen oder Kommas getrennt)"

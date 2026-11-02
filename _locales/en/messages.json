@@ -1447,7 +1447,7 @@
     "message": "Add page description: Description in linkding; Notes elsewhere when no text is selected"
   },
   "qsBlockquote": {
-    "message": "Wrap selected text with blockquote"
+    "message": "Mark selected text as a quote"
   },
   "labelDefaultTags": {
     "message": "Default tags (separated by spaces or commas)"

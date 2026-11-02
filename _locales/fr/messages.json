@@ -1439,7 +1439,7 @@
     "message": "Ajouter la description de la page : dans la description du signet sur linkding, sinon dans les notes si aucun texte n’est sélectionné"
   },
   "qsBlockquote": {
-    "message": "Encadrer le texte sélectionné avec blockquote"
+    "message": "Mettre le texte sélectionné en citation"
   },
   "labelDefaultTags": {
     "message": "Tags par défaut (séparés par des espaces ou des virgules)"

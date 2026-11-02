@@ -1439,7 +1439,7 @@
     "message": "填入網頁描述：linkding 寫入描述，其他服務僅在未選取文字時寫入備註"
   },
   "qsBlockquote": {
-    "message": "以引用格式包裹選取文字"
+    "message": "將選取文字標為引用"
   },
   "labelDefaultTags": {
     "message": "預設標籤（以空格或逗號分隔）"
