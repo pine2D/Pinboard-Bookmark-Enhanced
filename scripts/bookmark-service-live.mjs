@@ -1655,6 +1655,66 @@ export function registryProblems(modules = MODULES) {
   return out;
 }
 
+// The t.part calls each row's steps make, against row.parts (the preflight
+// requires none): read from the steps function the runner calls
+// (Function.prototype.toString) and parsed by `parse` (espree, injected so
+// the runner itself does not load it), never by matching text. A literal
+// name must be declared; a name held in a variable takes the string values
+// that key holds in the steps' own object literals (shots.matrix's
+// { surface: 'popup' }), and anything else is dynamic_unresolved; every
+// declared part must be called. With `fileSource` (the scenarios file), a
+// t.part call outside every row's steps, which no row's declarations
+// check, is a problem too.
+export function partCallProblems(parse, modules = MODULES, fileSource = null) {
+  const opts = { ecmaVersion: 'latest', range: true };
+  const walk = (node, visit) => {
+    if (!node || typeof node.type !== 'string') return;
+    visit(node);
+    for (const value of Object.values(node)) {
+      if (Array.isArray(value)) for (const child of value) walk(child, visit);
+      else if (value && typeof value === 'object' && typeof value.type === 'string') walk(value, visit);
+    }
+  };
+  const isPartCall = n => n.type === 'CallExpression' && n.callee.type === 'MemberExpression' && !n.callee.computed && n.callee.property.name === 'part' && n.callee.object.type === 'Identifier';
+  const parseSteps = src => { try { return parse('(' + src + ')', opts); } catch { return parse('({' + src + '})', opts); } };
+  const out = [];
+  const stepsSources = new Set();
+  for (const row of modules) {
+    if (typeof row.steps !== 'function') continue;
+    const src = row.steps.toString();
+    stepsSources.add(src);
+    const ast = parseSteps(src);
+    let fn = null;
+    walk(ast, n => { if (!fn && /Function/.test(n.type)) fn = n; });
+    const tName = fn?.params[0]?.type === 'Identifier' ? fn.params[0].name : null;
+    const called = new Set();
+    let unresolved = false;
+    walk(ast, n => {
+      if (!isPartCall(n) || n.callee.object.name !== tName) return;
+      const arg = n.arguments[0];
+      if (arg?.type === 'Literal' && typeof arg.value === 'string') { called.add(arg.value); return; }
+      const values = [];
+      if (arg?.type === 'Identifier') walk(ast, p => { if (p.type === 'Property' && !p.computed && p.key.type === 'Identifier' && p.key.name === arg.name && p.value.type === 'Literal' && typeof p.value.value === 'string') values.push(p.value.value); });
+      if (values.length) values.forEach(v => called.add(v));
+      else unresolved = true;
+    });
+    const declared = Object.keys(row.parts || {});
+    for (const name of called) if (!declared.includes(name)) out.push(row.id + ':' + name + ':call_undeclared');
+    // An unresolved name could be any declared part: that is the finding.
+    if (!unresolved) for (const name of declared) if (!called.has(name)) out.push(row.id + ':' + name + ':declared_uncalled');
+    if (unresolved) out.push(row.id + ':dynamic_unresolved');
+  }
+  if (fileSource !== null) {
+    const ranges = [...stepsSources].map(src => { const at = fileSource.indexOf(src); return at < 0 ? null : [at, at + src.length]; });
+    if (ranges.includes(null)) out.push('file:steps_not_in_file');
+    const ast = parse(fileSource, { ...opts, sourceType: 'module' });
+    let outside = false;
+    walk(ast, n => { if (isPartCall(n) && !ranges.some(r => r && n.range[0] >= r[0] && n.range[1] <= r[1])) outside = true; });
+    if (outside) out.push('file:part_calls_outside_steps');
+  }
+  return out;
+}
+
 // axe violations for the report: per rule its impact, node count and the
 // first AXE_NODES_KEPT nodes, each with its selector and, where axe measured
 // them (color-contrast and the like), foreground, background, ratio and the

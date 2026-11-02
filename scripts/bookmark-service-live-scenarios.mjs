@@ -29,7 +29,9 @@
 //             and the features it decides (at least one, all from the row's
 //             features). The summary judges a feature by the parts naming
 //             it; the preflight checks every declaration (registryProblems)
-//             and a call naming an undeclared part is fatal (part_undeclared)
+//             and, from the parsed steps, that every call names a declared
+//             part and every declared part is called (partCallProblems); a
+//             call naming an undeclared part is fatal (part_undeclared)
 //   tempReason  why a row is needs.target 'temp' (Chinese, one line); --plan
 //             and the summary show it beside the skipped row on the user target
 //   needs     { fakeAi, target: 'temp'|'user'|'any', container, sharing: 'any'|'on'|'off',

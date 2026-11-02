@@ -233,6 +233,36 @@ try {
       assert.deepEqual(live.registryProblems([{ id: 'y', services: ['linkding', 'karakeep'], features: ['pinboard-roundtrip', 'linkding-x', 'karakeep-y', 'plain'] }]), ['y:feature_service:pinboard-roundtrip']);
       assert(MODULES.find(m => m.id === 'sh.options-connect').features.includes('service-switch-roundtrip'));
     }
+    // Every t.part call the steps make names a declared part, and every
+    // declared part is called (review of H3d, should-fix: a misspelt or
+    // new part left out of row.parts passed the preflight and only failed
+    // a live round as part_undeclared). Read from the steps functions the
+    // runner calls, parsed by espree, not by matching text.
+    {
+      const { parse } = createRequire(new URL('../.qa-scan/package.json', import.meta.url))('espree');
+      const fileSource = readFileSync(new URL('../scripts/bookmark-service-live-scenarios.mjs', import.meta.url), 'utf8');
+      assert.deepEqual(live.partCallProblems(parse, MODULES, fileSource), [], 'every t.part call is declared and every declared part is called');
+      const row = (id, parts, steps) => ({ id, services: ['linkding'], features: ['a'], fixRefs: [], parts, steps });
+      const decl = { fixRefs: [], features: ['a'] };
+      const cases = [
+        row('typo', { quoted: decl }, async t => { await t.part('qouted', async () => {}); await t.part('quoted', async () => {}); }),
+        row('unused', { used: decl, stale: decl }, async function steps(t) { await t.part('used', async () => {}); }),
+        { ...row('dynamic', { popup: decl, reader: decl }), async steps(x) { for (const { surface } of [{ surface: 'popup' }, { surface: 'reader' }, { surface: 'options' }]) await x.part(surface, async () => {}); } },
+        row('unresolved', { a: decl }, async t => { const n = 'a'; await t.part(`${n}`, async () => {}); }),
+        row('none', null, async t => { await t.part('loose', async () => {}); }),
+      ];
+      assert.deepEqual(live.partCallProblems(parse, cases), [
+        'typo:qouted:call_undeclared',
+        'unused:stale:declared_uncalled',
+        'dynamic:options:call_undeclared',
+        'unresolved:dynamic_unresolved',
+        'none:loose:call_undeclared',
+      ]);
+      // A call outside any row's steps (a helper the steps pass t to) is
+      // seen in the file and never checked against a row: it is a problem.
+      const helperFile = fileSource + '\nconst helper = async t => { await t.part("anywhere", async () => {}); };\n';
+      assert.deepEqual(live.partCallProblems(parse, MODULES, helperFile).filter(p => p.startsWith('file:')), [`file:part_calls_outside_steps`]);
+    }
     // H3c modules: the screenshot matrix writes nothing and covers every
     // locale the extension ships (pictures or geometry alone).
     {
