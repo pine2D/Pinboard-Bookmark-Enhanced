@@ -2145,6 +2145,19 @@ try {
     kRequests.length = 0;
     assert.equal(await own.cleanupLists('karakeep'), true);
     assert(!lists.has('L1') && kRequests.includes('DELETE /api/v1/lists/L1'), 'deleted in-process after its checks');
+    // The guard itself refuses a list deletion on a --cleanup (review of
+    // H1b r2): its ledger comes from a report on disk, so a DELETE lists/:id
+    // that bypasses cleanupLists is fatal before it leaves, even for a list
+    // the ledger names.
+    lists.set('L3', { id: 'L3', name: 'Read later', icon: 'bookmark', description: LIST_MARKER, type: 'manual', public: false, hasCollaborators: false, userRole: 'owner', parentId: null });
+    own.report.ledger.lists.push({ instance: 'karakeep', id: 'L3', module: '' });
+    own.resumed = true;
+    kRequests.length = 0;
+    await assert.rejects(own.api('karakeep', 'lists/L3', { method: 'DELETE' }), e => e.code === 'node_guard_resume_list' && e.fatal === true);
+    assert.deepEqual([lists.has('L3'), kRequests, own.fatal], [true, [], 'node_guard_resume_list'], 'refused before it leaves');
+    assert.equal(await own.cleanupLists('karakeep'), false, 'cleanupLists on a resume reports the list as residue');
+    assert(lists.has('L3') && !kRequests.some(r => r.startsWith('DELETE')), kRequests.join(' | '));
+    lists.delete('L3');
     // With the list gone, the next --cleanup confirms it and its summary no
     // longer reports the earlier pass's residue.
     const kConfirmed = await run(['--cleanup', join(kDir, 'report.json'), '--karakeep', kBase], { guard: false, state });

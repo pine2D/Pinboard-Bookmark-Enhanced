@@ -1487,6 +1487,10 @@ export class LiveRun {
       if (method === 'DELETE' && segs.length === 2 && !this.cleaning) refuse('node_guard_mutation');
       return this.cleaning ? none : capped('');
     }
+    // A --cleanup knows its lists only from a report on disk, which could
+    // name the user's own Read Later list: no list deletion leaves, whatever
+    // calls api(). cleanupLists only reads them there.
+    if (this.resumed && segs[0] === 'lists') refuse('node_guard_resume_list');
     if (this.cleaning && method === 'DELETE' && segs.length === 2) {
       if (segs[0] === 'lists' && this.report.ledger.lists.some(l => l.instance === instance && l.id === segs[1])) return none;
       if (segs[0] === 'tags' && this.deletableTags.has(instance + ':' + segs[1])) return none;
