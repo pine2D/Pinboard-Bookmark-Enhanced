@@ -1367,6 +1367,37 @@ try {
   }
 
   // ---------------------------------------------------------------------
+  // Summary cap (review of H1b, should-fix 5): with many failures the
+  // one-screen summary is cut, but never its cleanup section, which tells
+  // a person what to remove by hand.
+  // ---------------------------------------------------------------------
+  {
+    const run = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    run.runDir = join(dir, 'summary-cap');
+    mkdirSync(run.runDir, { mode: 0o700 });
+    run.reportPath = join(run.runDir, 'report.json');
+    const r = run.report;
+    Object.assign(r, { target: 'user', instances: { linkding: { service: 'linkding', base: 'http://127.0.0.1:9/' }, karakeep: { service: 'karakeep', base: 'http://127.0.0.1:9/' } } });
+    const failedIds = ['linkding.core.worker', 'linkding.core.popup-reader', 'karakeep.core.worker', 'karakeep.core.popup-reader', 'linkding.edges.offline', 'karakeep.edges.tags'];
+    run.selected = live.expandRegistry(MODULES).filter(m => failedIds.includes(m.id));
+    for (const id of failedIds) r.modules.push({ id, status: 'failed', failure: { phase: id, code: 'read_back_mismatch' }, notes: { observed: 'x'.repeat(40) }, counts: {} });
+    r.violations.push({ code: 'live_guard_mutation', phase: 'karakeep.core.worker' });
+    r.blockedOrigins.push('https://blocked.example');
+    r.blockedSamples.push({ sample: 'https://blocked.example/a', module: 'karakeep.core.worker', where: 'fetch' });
+    r.cleanup.passStart = 0;
+    r.cleanup.entries.push({ kind: 'tag', instance: 'karakeep', id: 'abc', deleted: false, residue: true, code: 'residue_tag_not_in_ledger' });
+    run.writeSummary();
+    const text = readFileSync(join(run.runDir, 'summary.zh.md'), 'utf8');
+    const lines = text.trimEnd().split('\n');
+    assert(lines.length <= live.SUMMARY_MAX_LINES, 'one screen: ' + lines.length);
+    assert(text.includes('摘要已截断'), 'this summary does not fit: ' + text);
+    for (const want of ['## 清理', '清理完成：否', '残留 1 项', '未清理：tag karakeep abc residue_tag_not_in_ledger', '完整报告：' + run.reportPath]) assert(text.includes(want), want + ' kept: ' + text);
+    // Low-priority sections go before the failures and the verdicts.
+    assert(text.includes('linkding.edges.offline：失败') && text.includes('## 在修项结论'), text);
+    assert(!text.includes('## 观察记录'), 'observations are dropped first: ' + text);
+  }
+
+  // ---------------------------------------------------------------------
   // Fake AI: product prompts classify, replies parse with product parsers
   // ---------------------------------------------------------------------
   const productCtx = vm.createContext({ console, URL, TextEncoder, TextDecoder, setTimeout, clearTimeout, btoa, atob, encodeURIComponent, decodeURIComponent, escape, unescape });

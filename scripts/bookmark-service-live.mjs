@@ -3044,7 +3044,12 @@ export class LiveRun {
     if (!existsSync(this.runDir)) return;
     const r = this.report;
     const sec = ms => (ms / 1000).toFixed(1) + 's';
-    const lines = [];
+    // Built section by section (begin): past the cap, whole low-priority
+    // sections go first and the cleanup section is never cut.
+    const sections = {};
+    let lines = [];
+    const begin = name => { lines = sections[name] = []; };
+    begin('head');
     const capped = (items, max, render, rest = n => `- 另有 ${n} 条，见 report.json`) => {
       for (const item of items.slice(0, max)) lines.push(render(item));
       if (items.length > max) lines.push(rest(items.length - max));
@@ -3086,10 +3091,12 @@ export class LiveRun {
     for (const b of (r.blockedSamples || []).slice(0, 2)) lines.push(`  - 无法解析的 URL：${b.sample || '（空）'}，模块 ${b.module || '无'}，调用方 ${(b.where || '未知').slice(0, 80)}`);
     // What modules observed without asserting: evidence for review, not a verdict.
     const observed = r.modules.filter(m => Object.keys(m.notes || {}).length);
+    begin('observed');
     if (observed.length) {
       lines.push('', '## 观察记录（未作断言）');
       capped(observed, 3, m => `- ${m.id}：${Object.entries(m.notes).map(([k, v]) => `${k}=${this.sanitize(typeof v === 'string' ? v : JSON.stringify(v)).replace(/\s+/g, ' ').slice(0, 90)}`).join('；').slice(0, 220)}`);
     }
+    begin('features');
     lines.push('', '## 在修项结论（按 features）');
     const features = new Map();
     for (const m of r.modules) {
@@ -3114,13 +3121,16 @@ export class LiveRun {
       if (open.length) lines.push(`- 未完成（${open.length}，运行被打断，不算失败）：${open.join('，').slice(0, 300)}`);
       capped(failed, 4, ([f, list]) => `- 未通过 ${f}：${list.filter(x => !x.ok).map(x => x.id).join('，')}`);
     }
+    begin('shots');
     lines.push('', '## 截图与布局');
     const geometry = r.findings.filter(x => x.kind === 'geometry');
     lines.push(`- 截图 ${r.shots.count} 张${r.shots.dir ? `，目录 ${r.shots.dir}` : '（本轮未开启 --shots）'}；几何断言未通过 ${geometry.length} 张`);
     capped(geometry, 2, f => `- ${f.shot}：视口 ${f.viewport?.width}×${f.viewport?.height}，横向溢出 ${f.overflow}px${f.overflowBy?.length ? `，越界 ${f.overflowBy.join('、')}` : ''}；够不到 ${f.keys.join('、') || '无'}`);
+    begin('gaps');
     lines.push('', '## 未覆盖项');
     const gaps = [...r.skipped.map(x => `${x.id}：因 ${x.reason} 未执行${x.note ? `（${x.note}）` : ''}`), ...UNCOVERED.filter(u => !(u.coveredBy && r.modules.some(m => globToRegExp(u.coveredBy).test(m.id)))).map(u => u.text)];
     capped(gaps, 4, g => `- ${g}`);
+    begin('cleanup');
     lines.push('', '## 清理');
     lines.push(`- 书签：创建 ${r.ledger.created.length}，删除 ${r.ledger.created.filter(x => x.deleted).length}；列表：创建 ${r.ledger.lists.length}，删除 ${r.ledger.lists.filter(x => x.deleted).length}；前缀标签 ${r.ledger.tags.length}；清理完成：${r.cleanup.complete ? '是' : '否'}${r.temp ? `；临时容器已删除：${r.temp.removed ? '是' : '否'}` : ''}`);
     // This pass only: report.cleanup.entries keeps every pass, and a
@@ -3132,8 +3142,22 @@ export class LiveRun {
     if (residue.length) lines.push(`- 残留 ${residue.length} 项（工具不删，需人工核对后处理，再跑 --cleanup 复核）：${[...new Set(residue.map(e => e.kind === 'list' ? '续清不删的 Karakeep 列表' : '带本轮前缀但不在账本里或未经写入预留的标签'))].join('；')}`);
     capped(pass.filter(e => e.deleted === false), 3, e => `- 未清理：${e.kind} ${e.instance || ''} ${e.id || ''} ${e.code || ''}`.trim());
     lines.push(`- 完整报告：${this.reportPath}`);
-    // One screen: anything past the cap is in report.json.
-    const out = lines.length > SUMMARY_MAX_LINES ? [...lines.slice(0, SUMMARY_MAX_LINES - 1), '- （摘要已截断，完整内容见 report.json）'] : lines;
+    // One screen: anything past the cap is in report.json. Observations,
+    // uncovered items and screenshots go first, whole; then the body is cut
+    // from its end. The cleanup section (residue, what is left to remove by
+    // hand, the report path) always stays.
+    const order = ['head', 'observed', 'features', 'shots', 'gaps'];
+    const labels = { observed: '观察记录', gaps: '未覆盖项', shots: '截图与布局' };
+    const tail = sections.cleanup;
+    const dropped = [];
+    const bodySize = () => order.filter(n => !dropped.includes(n)).reduce((n, k) => n + sections[k].length, 0);
+    let out = order.flatMap(n => sections[n]).concat(tail);
+    if (out.length > SUMMARY_MAX_LINES) {
+      const room = SUMMARY_MAX_LINES - tail.length - 1;
+      for (const name of ['observed', 'gaps', 'shots']) { if (bodySize() <= room) break; if (sections[name].length) dropped.push(name); }
+      const body = order.filter(n => !dropped.includes(n)).flatMap(n => sections[n]).slice(0, room);
+      out = [...body, `- （摘要已截断${dropped.length ? `，略去${dropped.map(n => labels[n]).join('、')}` : ''}；完整内容见 report.json）`, ...tail];
+    }
     this.summaryPath = join(this.runDir, 'summary.zh.md');
     writeFileSync(this.summaryPath, this.sanitize(out.join('\n')) + '\n', { mode: 0o600 });
     chmodSync(this.summaryPath, 0o600);
