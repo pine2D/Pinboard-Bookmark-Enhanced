@@ -139,9 +139,17 @@ function pbpPopupPrefillDescription() {
   row.classList.toggle("hidden", !linkding);
   if (linkding && shouldUpdateField("linkding-description-input")) {
     const auto = settings.optAutoDescription !== false;
-    $id("linkding-description-input").value = auto ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : "";
-    // A page that could not be read has no known description of its own.
-    _linkdingDescriptionKnown = !auto || pageInfo?._pbpUnavailable !== true;
+    // The meta description describes the page the popup opened on, not whatever
+    // URL the form holds (a restored draft of a recent bookmark, a typed URL).
+    // For another URL the lookup fills in the stored Description, and a create
+    // leaves it to linkding, which reads that URL itself. Same page = the
+    // equivalence the AI summary is anchored by (popup-ai.js); where it is not
+    // loaded the popup cannot tell, which counts as another page.
+    const ownPage = typeof _aiUrlEquivalent === "function" && _aiUrlEquivalent($id("url-input").value, pageInfo.url);
+    $id("linkding-description-input").value = auto && ownPage ? pbpBookmarkDescriptionLine(pbpNotesDescription(pageInfo)) : "";
+    // A page that could not be read has no known description of its own, and
+    // nothing has read another URL: an empty box is known only with auto-fill off.
+    _linkdingDescriptionKnown = !auto || (ownPage && pageInfo?._pbpUnavailable !== true);
     _linkdingDescriptionPending = false;
   }
   let notes = "";
@@ -234,13 +242,13 @@ let _popupDraftContext = null;
 // Draft-only provenance: AI/meta writes must remain regenerable after reopening.
 let _linkdingDescriptionTouched = false;
 // Whether the Description box holds a value the popup can vouch for: the
-// page's meta description or the fact it has none, an AI summary, the user's
-// edit, a restored draft, the stored bookmark, or "" with auto-fill off. It
-// starts false: until the page is read or the bookmark looked up, the empty
-// box is not known to be empty, and an edit drafted in that window must not
-// save it as "". It stays false when the page could not be read and nothing
-// filled the box; a save then leaves the Description out, and linkding fills
-// it in itself.
+// page's meta description or the fact it has none (for the opened page itself,
+// not for another URL in the form), an AI summary, the user's edit, a restored
+// draft, the stored bookmark, or "" with auto-fill off. It starts false: until
+// the page is read or the bookmark looked up, the empty box is not known to be
+// empty, and an edit drafted in that window must not save it as "". It stays
+// false when the page could not be read and nothing filled the box; a save then
+// leaves the Description out, and linkding fills it in itself.
 let _linkdingDescriptionKnown = false;
 // Whether the Description box holds a value the user or an AI summary wrote
 // that no save has delivered yet. Only that value belongs in the draft: one the

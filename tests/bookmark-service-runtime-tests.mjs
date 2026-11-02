@@ -16,7 +16,9 @@ const raceCreates=new Map();
 // same title and meta description, so a "server-scraped" value below comes
 // from the page itself, never from the request the extension sent.
 const pageMetadata=pathname=>pathname==='/article-meta'
-  ?{title:'Meta article',description:'Server-scraped description'}:{title:'Runtime article',description:null};
+  ?{title:'Meta article',description:'Server-scraped description'}
+  :pathname==='/article-recent'?{title:'Recent article',description:'Recent page description'}
+  :{title:'Runtime article',description:null};
 // linkding v1.47 serializer timestamps carry microseconds.
 const serverNow=()=>new Date().toISOString().replace(/Z$/,'000Z');
 const list={id:'later1',name:'Read Later',description:'Pinboard Bookmark Enhanced: Read Later',icon:'bookmark',type:'manual',public:false,hasCollaborators:false,userRole:'owner'};
@@ -82,7 +84,8 @@ const server=createServer(async(req,res)=>{
     if(req.method==='PUT')membership.add(path.split('/').pop());else membership.delete(path.split('/').pop());return reply(204);
   }
   if(/^bookmarks\/?$/.test(path)){
-    if(req.method==='GET')return reply(200,service==='linkding'?{count:store.size,next:null,previous:null,results:[...store.values()].map(serialize)}:{bookmarks:[...store.values()],nextCursor:null});
+    // queries.py query_bookmarks: newest first unless the request sorts otherwise.
+    if(req.method==='GET')return reply(200,service==='linkding'?{count:store.size,next:null,previous:null,results:[...store.values()].sort((a,b)=>(Date.parse(b.date_added)||0)-(Date.parse(a.date_added)||0)).map(serialize)}:{bookmarks:[...store.values()],nextCursor:null});
     const race=raceCreates.get(service+':'+data.url);
     if(race){store.set(String(race.record.id),structuredClone(race.record));return reply(race.status,race.record);}
     if(service==='linkding'){
@@ -613,6 +616,66 @@ try{
   }
   await article.goto(origin+'/article');
   console.log('linkding unknown Description: an unread popup page and a draft-free reader save let linkding scrape it');
+  // A draft made by editing a recent bookmark is kept for the tab the popup was
+  // opened on but holds that bookmark's URL. The tab's meta description is the
+  // tab's, not that bookmark's: once the bookmark is gone (deleted elsewhere)
+  // the restored form creates it again and must leave the Description to
+  // linkding, which reads the page it is given. The same draft on the tab's own
+  // URL still takes the meta description, as a first open does.
+  {
+    const tabUrl=origin+'/article-meta', recentUrl=origin+'/article-recent', recentId='50';
+    const draftFor=pageUrl=>worker.evaluate(async url=>Object.values(await chrome.storage.session.get(null)).find(row=>row?.pageUrl===url)?.draft||null,pageUrl);
+    const openOnTab=async()=>{await article.bringToFront();const opened=ctx.waitForEvent('page');await worker.evaluate(url=>chrome.tabs.create({url,active:false}),pageUrl+'popup.html');const popup=await opened;
+      await popup.waitForFunction(()=>typeof _popupDraftContext!=='undefined'&&_popupDraftContext?.ready===true&&!document.getElementById('submit-btn').disabled);
+      await popup.evaluate(()=>{settings.optAutoCloseAfterSave=false;});return popup;};
+    const settled=(popup,status)=>popup.waitForFunction(status=>bookmarkLookup.status===status,status);
+    records.linkding.set(recentId,{id:50,url:recentUrl,title:'Recent title',description:'Stored recent description',notes:'',web_archive_snapshot_url:null,favicon_url:null,preview_image_url:null,is_archived:false,unread:false,shared:false,tag_names:['kept'],date_added:serverNow(),date_modified:serverNow(),website_title:null,website_description:null});
+    await worker.evaluate(()=>chrome.storage.local.set({optShowRecent:true}));
+    await article.goto(tabUrl);
+    let popup=await openOnTab();
+    assert.equal(await popup.locator('#linkding-description-input').inputValue(),'Server-scraped description','a first open did not take its own page description');
+    // The list is newest first, so the bookmark made for this case leads it.
+    await popup.locator('.recent-bm-row:has(a[href="'+recentUrl+'"]) .recent-bm-edit').click({timeout:8000}).catch(async error=>{console.error({recent:await popup.locator('#recent-bookmarks a').evaluateAll(links=>links.map(a=>a.getAttribute('href'))),errors});throw error;});
+    await popup.waitForFunction(()=>document.getElementById('title-input').value==='Recent title'&&!document.getElementById('existing-banner').classList.contains('hidden'));
+    assert.equal(await popup.locator('#linkding-description-input').inputValue(),'Stored recent description','editing a recent bookmark did not show its stored Description');
+    await popup.locator('#tags-input').fill('drafted');await popup.locator('#tags-input').press('Enter');
+    await until(async()=>{const d=await draftFor(tabUrl);return d?.url===recentUrl&&d.tags.includes('drafted');},'recent-bookmark edit drafted for the tab');
+    assert(!Object.hasOwn(await draftFor(tabUrl),'summary'),'the draft kept the Description the lookup filled in');
+    await popup.close();
+    records.linkding.delete(recentId);await worker.evaluate(()=>statusCache.clear());
+    popup=await openOnTab();
+    assert.equal(await popup.locator('#url-input').inputValue(),recentUrl,'the draft for the tab was not restored');
+    await settled(popup,'missing');
+    assert.equal(await popup.locator('#linkding-description-input').inputValue(),'',"the tab's description filled another bookmark's Description");
+    const before=requests.length;await popup.locator('#submit-btn').click();
+    await until(()=>linkdingCreates(before).length>0,'create from the restored recent-bookmark draft');
+    const create=linkdingCreates(before)[0];
+    assert.equal(create.data.url,recentUrl);
+    assert.equal(create.query,'',"the restored draft told linkding not to read the bookmark's own page");
+    assert(!Object.hasOwn(create.data,'description'),"the tab's description was sent for another bookmark");
+    assert.equal([...records.linkding.values()].find(b=>b.url===recentUrl)?.description,'Recent page description','linkding did not fill in the bookmark Description itself');
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    await popup.close();
+    // The same draft shape on the tab's own URL: the meta description still fills the box.
+    assert.equal(await draftFor(tabUrl),null,'the delivered recent-bookmark draft was still stored for the tab');
+    popup=await openOnTab();
+    await popup.locator('#title-input').fill('Same page draft');
+    await until(async()=>(await draftFor(tabUrl))?.title==='Same page draft','title edit drafted on the tab itself');
+    assert(!Object.hasOwn(await draftFor(tabUrl),'summary'),"the tab's own description was drafted as the user's");
+    await popup.close();
+    popup=await openOnTab();await settled(popup,'missing');
+    assert.equal(await popup.locator('#title-input').inputValue(),'Same page draft','the title draft was not restored');
+    assert.equal(await popup.locator('#linkding-description-input').inputValue(),'Server-scraped description','a draft on the tab itself lost its page description');
+    const beforeOwn=requests.length;await popup.locator('#submit-btn').click();
+    await until(()=>linkdingCreates(beforeOwn).length>0,'create from the restored same-page draft');
+    const own=linkdingCreates(beforeOwn)[0];
+    assert.deepEqual([own.data.url,own.query,own.data.description],[tabUrl,'?disable_scraping','Server-scraped description'],'a same-page create did not send its known Description');
+    await popup.waitForFunction(()=>!document.getElementById('submit-btn').classList.contains('loading'));
+    await popup.close();
+    for(const row of [...records.linkding.values()].filter(b=>b.url===tabUrl||b.url===recentUrl))records.linkding.delete(String(row.id));
+    await worker.evaluate(()=>chrome.storage.local.set({optShowRecent:false}));await article.goto(origin+'/article');
+    console.log("linkding restored draft for another URL: the tab's description stays out of the Description, linkding reads the bookmark itself; the tab's own draft still takes it");
+  }
   // linkding Description against the server's own v1.47 create and update
   // semantics (the mock above). /article-meta publishes a meta description,
   // so a create the server may scrape picks it up by itself.

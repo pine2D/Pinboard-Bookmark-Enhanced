@@ -10360,7 +10360,11 @@ async function runSweep(page, sw, extBase) {
       const input = document.getElementById("linkding-description-input");
       const row = document.getElementById("linkding-description-row");
       const visible = () => getComputedStyle(row).display !== "none" && input.getBoundingClientRect().height > 0;
-      pageInfo = { ...pageInfo, metaDescription:"Metadata\ndescription", selectedText:"Selected note" };
+      // The page's description fills the Description only for the page the
+      // form holds (pbpPopupPrefillDescription), so the fixture page is that one.
+      const pageUrl = "https://example.test/article";
+      document.getElementById("url-input").value = pageUrl;
+      pageInfo = { ...pageInfo, url:pageUrl, metaDescription:"Metadata\ndescription", selectedText:"Selected note" };
       for (const service of ["pinboard", "karakeep", "linkding"]) {
         settings = { ...settings, bookmarkService:service };
         pbpPopupPrefillDescription();

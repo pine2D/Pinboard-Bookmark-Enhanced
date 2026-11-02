@@ -44,14 +44,15 @@ async function test(name,fn){const d=document.createElement('div');d.className='
  });
  const uiSource=await(await fetch('../popup.js')).text();
  const aiSource=await(await fetch('../popup-ai.js')).text();
+ const cacheSource=await(await fetch('../ai-cache.js')).text();
  const a=uiSource.indexOf('let _popupDraftContext ='),b=uiSource.indexOf('// Popup draft UI end',a);
- function uiHarness(service="pinboard",{worker=false,pageInfo={}}={}){
+ function uiHarness(service="pinboard",{worker=false,pageInfo={},settings={}}={}){
    const elements={};for(const id of ['url-input','title-input','description-input','linkding-description-input','tags-input','private-check','share-check','readlater-check','archive-check','desc-char-count','submit-btn','delete-btn','existing-banner']){const e=document.createElement('input');e.type=id.endsWith('check')?'checkbox':'text';elements[id]=e;if(id.endsWith('check')){const label=document.createElement('label');label.append(e);}}elements['status-msg']=document.createElement('p');elements['linkding-description-row']=document.createElement('div');
    const flags={'title-input':false,'description-input':false,'linkding-description-input':false,'private-check':false,'readlater-check':false};
    let resolveRead,rejectRead,resolveWrite,resolveClear;let delayWrite=false,delayClear=false;let currentOwner='alice';const sent=[],statuses=[];
    const deps={$id:id=>elements[id],currentTags:[],fieldDirtyFlags:flags,_tagsUserTouched:false,_archiveUserTouched:false,
      renderTags(){if(api)api.pbpRememberPopupDraft();},showStatus:(...args)=>statuses.push(args),t:k=>k,
-     existingBookmark:null,settings:{waybackArchiveEnabled:true},pbpBookmarkServiceId:()=>service,pbpBookmarkConnection:()=>({account:currentOwner,sharingEnabled:true}),pbpReadBookmarkConnection:async()=>({account:currentOwner}),_waybackHostGranted:true,_pageInfoReady:true,
+     existingBookmark:null,settings:{waybackArchiveEnabled:true,...settings},pbpBookmarkServiceId:()=>service,pbpBookmarkConnection:()=>({account:currentOwner,sharingEnabled:true}),pbpReadBookmarkConnection:async()=>({account:currentOwner}),_waybackHostGranted:true,_pageInfoReady:true,
      buildPostsAddUri:()=>'',POSTS_ADD_URI_BUDGET:8192,pbpWaybackShouldArchive:({isPrivate})=>!isPrivate,
      _activeTabAtOpen:{url:'https://example.com/article'},invalidateBookmarkLookup(){},
      _aiSummaryValue:'',_aiSummaryRange:null,_aiLastLegacySummaryRange:()=>null,pbpAiSummaryRangeValid:()=>false,
@@ -66,7 +67,8 @@ async function test(name,fn){const d=document.createElement('div');d.className='
    const sliceFn=name=>{const s=uiSource.indexOf('function '+name+'(');return uiSource.slice(s,uiSource.indexOf('\n}',s)+2);};
    const recentStart=uiSource.indexOf('async function loadBookmarkForEdit('),recentEnd=uiSource.indexOf('// ===================== Recent Bookmarks',recentStart);
    const aiSlice=name=>{const s=aiSource.indexOf('function '+name+'(');return aiSource.slice(s,aiSource.indexOf('\n}',s)+2);};
-   const names=Object.keys(deps);let api;api=new Function(...names,[uiSource.slice(a,b),sliceFn('pbpPopupFormIsDirty'),sliceFn('updateCharCount'),sliceFn('recomputeArchiveCheck'),uiSource.slice(recentStart,recentEnd),aiSlice('pbpAiWrapSummary'),aiSlice('upsertSummary'),aiSlice('removeSummary'),sliceFn('shouldUpdateField'),sliceFn('pbpPopupPrefillDescription'),
+   const cacheSlice=name=>{const s=cacheSource.indexOf('function '+name+'(');return cacheSource.slice(s,cacheSource.indexOf('\n}',s)+2);};
+   const names=Object.keys(deps);let api;api=new Function(...names,[uiSource.slice(a,b),sliceFn('pbpPopupFormIsDirty'),sliceFn('updateCharCount'),sliceFn('recomputeArchiveCheck'),uiSource.slice(recentStart,recentEnd),aiSlice('pbpAiWrapSummary'),aiSlice('upsertSummary'),aiSlice('removeSummary'),sliceFn('shouldUpdateField'),aiSlice('_aiUrlEquivalent'),cacheSlice('pbpAiPageUrlNorm'),sliceFn('pbpPopupPrefillDescription'),
      'return {prefill:pbpPopupPrefillDescription,initPopupDraft,setupPopupDraftTracking,pbpPopupDraftSnapshot,pbpRememberPopupDraft,pbpPopupDescriptionKnown,forgetDescription(){_linkdingDescriptionKnown=false;},pbpDiscardPopupDraft,updateCharCount,recomputeArchiveCheck,loadBookmarkForEdit,exitEditMode,pbpPopupFormIsDirty,upsertSummary,removeSummary,chip(){_tagsUserTouched=true;currentTags.push("Chip");renderTags();},failedSubmit(){'+uiSource.slice(uiSource.indexOf('      Object.keys(fieldDirtyFlags).forEach',uiSource.indexOf('function setupSubmit(')),uiSource.indexOf('      // Host permission first:',uiSource.indexOf('function setupSubmit(')))+'}};'].join('\n'))(...names.map(n=>deps[n]));api.setupPopupDraftTracking();
    return {api,elements,flags,sent,statuses,delayClears(){delayClear=true;},releaseClear:ok=>resolveClear({ok}),delayWrites(){delayWrite=true;},failWrite(){resolveWrite({ok:false});},rejectRestore:()=>rejectRead(new Error('Synthetic IPC failure')),failRestore:()=>resolveRead({ok:false,error:'storage'}),release:(d=draft)=>resolveRead({ok:true,account:'alice',draft:d}),owner:o=>{currentOwner=o;}};
  }
@@ -138,6 +140,39 @@ async function test(name,fn){const d=document.createElement('div');d.className='
  // One the page or the stored bookmark filled in is read again on the next
  // open, so a Description changed elsewhere meanwhile is shown, not overwritten.
  await test('a Description the page filled in is not drafted, one an AI summary wrote is',async()=>{const h=uiHarness('linkding',{pageInfo:{metaDescription:'Page meta'}});const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release(null);await p;h.api.prefill();assert(h.elements['linkding-description-input'].value==='Page meta'&&h.api.pbpPopupDescriptionKnown(),'the page did not fill the Description');h.elements['title-input'].value='Edited title';h.elements['title-input'].dispatchEvent(new Event('input'));const written=h.sent.at(-1).draft;assert(written.title==='Edited title'&&!Object.hasOwn(written,'summary'),'the page Description was drafted as the user\'s: '+JSON.stringify(written.summary));h.api.upsertSummary('Cached AI summary',{userEdit:false});assert(h.sent.at(-1).draft.summary==='Cached AI summary','an AI summary shown in the box was not drafted');});
+ // A draft made by editing a recent bookmark belongs to the tab the popup was
+ // opened on but holds that bookmark's URL. The page's meta description
+ // describes the tab, not the bookmark: filling the box with it saved the other
+ // page's text onto the bookmark (created again once it was deleted), with
+ // linkding asked not to scrape. Only a form on the page itself takes it; for
+ // any other URL the box stays empty, known to be empty only with auto-fill off.
+ await test('the page description fills a linkding Description only when the form holds that page',async()=>{
+   const PAGE='https://example.com/article',META='Page meta';
+   // `via`: a restored draft, or a URL typed into the form with no draft.
+   const opened=async({via,url,pageUrl=PAGE,settings,restored={}})=>{const h=uiHarness('linkding',{pageInfo:{url:pageUrl,metaDescription:META},settings});const p=h.api.initPopupDraft('alice',{url:PAGE});
+     if(via==='draft')h.release({...draft,url,...restored});else{const input=h.elements['url-input'];input.value=url;input.dispatchEvent(new Event('input'));h.release(null);}
+     await p;h.api.prefill();return h;};
+   const box=h=>h.elements['linkding-description-input'].value,drafted=h=>Object.hasOwn(h.api.pbpPopupDraftSnapshot(),'summary');
+   for(const via of ['draft','typed']){
+     // The same page, however the form spells it: the usual path is unchanged.
+     for(const [label,url,pageUrl] of [['the same URL',PAGE,PAGE],['a fragment',PAGE+'#intro',PAGE],['tracking parameters stripped',PAGE,PAGE+'?utm_source=newsletter&fbclid=abc'],['tracking parameters typed back',PAGE+'?utm_medium=email',PAGE]]){
+       const h=await opened({via,url,pageUrl}),where=via+', '+label;
+       assert(box(h)===META,where+': the page description did not fill its own page, got '+JSON.stringify(box(h)));
+       assert(h.api.pbpPopupDescriptionKnown()&&!drafted(h),where+': known/pending '+h.api.pbpPopupDescriptionKnown()+'/'+drafted(h));
+     }
+     // Any other URL: nothing of this page belongs in the box.
+     for(const [label,url] of [['another path','https://example.com/recent'],['another host','https://other.example.org/article'],['another query',PAGE+'?id=2'],['another scheme','http://example.com/article'],['the site root','https://example.com/']]){
+       for(const [auto,known] of [[true,false],[false,true]]){
+         const h=await opened({via,url,settings:{optAutoDescription:auto}}),where=via+', '+label+', auto-fill '+auto;
+         assert(box(h)==='',where+': this page\'s description filled another URL\'s box: '+JSON.stringify(box(h)));
+         assert(h.api.pbpPopupDescriptionKnown()===known&&!drafted(h),where+': known/pending '+h.api.pbpPopupDescriptionKnown()+'/'+drafted(h));
+       }
+     }
+   }
+   // A Description the user or an AI summary wrote stays theirs, whatever the URL.
+   const h=await opened({via:'draft',url:'https://example.com/recent',restored:{summary:'Typed description',summaryTouched:true}});
+   assert(box(h)==='Typed description'&&h.api.pbpPopupDescriptionKnown()&&h.api.pbpPopupDraftSnapshot().summary==='Typed description','a drafted Description was replaced');
+ });
  await test('linkding regeneration and removal touch only generated Description',async()=>{const h=uiHarness('linkding');const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release({...draft,summary:'Generated',summaryTouched:false});await p;h.api.upsertSummary('Replacement');assert(h.api.removeSummary()===true);assert(h.elements['linkding-description-input'].value===''&&h.elements['description-input'].value===draft.notes);h.api.upsertSummary('Another');h.elements['linkding-description-input'].value='Manual';h.elements['linkding-description-input'].dispatchEvent(new Event('input'));assert(h.api.removeSummary()===false&&h.elements['linkding-description-input'].value==='Manual');});
  await test('cancel prevents late programmatic writes from recreating the discarded draft',async()=>{const h=uiHarness();const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release();await p;h.delayClears();const clearing=h.api.exitEditMode();h.elements['description-input'].value='Late AI result';h.api.updateCharCount();assert(!h.sent.some(m=>m.action==='write'));h.releaseClear(true);await clearing;assert(h.sent.at(-1).action==='reload');});
  await test('failed cancel leaves the draft editable without reloading',async()=>{const h=uiHarness();const p=h.api.initPopupDraft('alice',{url:'https://example.com/article'});h.release();await p;h.delayClears();const clearing=h.api.exitEditMode();h.releaseClear(false);await clearing;assert(!h.sent.some(m=>m.action==='reload'));assert(h.statuses.some(s=>s[1]==='popupDraftDiscardFailed')&&!h.statuses.some(s=>s[1]==='popupDraftFailed'),'discard failure must not tell the user the draft was lost');h.elements['description-input'].value='Retry edit';h.elements['description-input'].dispatchEvent(new Event('input'));assert(h.sent.at(-1).action==='write');});
