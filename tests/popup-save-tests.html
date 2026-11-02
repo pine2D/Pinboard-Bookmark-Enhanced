@@ -1700,7 +1700,7 @@ test("posts/add default remains replace=yes for existing callers", () => {
     });
 
     test("SW tag prompts anchor on the cached user vocabulary (A14)", () => {
-      assert((backgroundSource.match(/userTagsTop = pbpTagsByCount/g) || []).length === 2,
+      assert((backgroundSource.match(/userTagsTop = tagVocab\.counts \? pbpTagsByCount\(tagVocab\.counts\)/g) || []).length === 2,
         "quick-save AND batch must derive the frequency-sorted list");
       const fed = (backgroundSource.match(/pbpRelevantTagsFirst\(userTagsTop/g) || []).length;
       assert(fed === 4, "all four SW tag/combined builders must receive the relevance-ordered vocabulary, got " + fed);

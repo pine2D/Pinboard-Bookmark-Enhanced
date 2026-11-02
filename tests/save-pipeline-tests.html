@@ -285,7 +285,7 @@ async function createBackgroundSaveHarness(options) {
   const deps = {
     loadSettings: opts.loadSettings || (async () => settingsSequence[Math.min(loadCount++, settingsSequence.length - 1)]),
     pbpServiceEffectivePrivate,
-    pbpReadTagVocab: async () => opts.tagVocabIndex || null,
+    pbpLoadTagVocab: async (account) => ({ account, timestamp: Date.now(), counts: null, index: opts.tagVocabIndex || null }),
     pbpCanonicalTagName, pbpTagGroupKey,
     pbpSaveFailure: (reason) => ({ status: "failed", reason }),
     showNotification: (...args) => notifications.push(args),
@@ -385,7 +385,7 @@ async function createBatchSaveHarness(options) {
     refineTags: (tags) => tags,
     chrome: { storage: { local: { get: opts.storageGet || (async () => ({})),
       set: async (value) => { if (value.batch_job) jobs.push(JSON.parse(JSON.stringify(value.batch_job))); } } } },
-    pbpReadTagVocab: async () => opts.tagVocabIndex || null,
+    pbpLoadTagVocab: async (account) => ({ account, timestamp: Date.now(), counts: null, index: opts.tagVocabIndex || null }),
     pbpCanonicalTagName, pbpTagGroupKey,
     pbpServiceEffectivePrivate,
     submitSaveIntent: async (prepared, deliveryOptions) => {

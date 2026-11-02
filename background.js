@@ -679,14 +679,36 @@ function pbpBookmarkFailure(error) {
 }
 // A vocabulary cache is advisory. Never use another owner's or an old device
 // snapshot to choose a spelling at dispatch time.
-async function pbpReadTagVocab(account) {
+function pbpTagVocabIsFresh(entry, account) {
+  return entry?.account === account && Number.isFinite(entry.timestamp)
+    && Date.now() - entry.timestamp <= PBP_TAG_VOCAB_STALE_CEILING;
+}
+// cached_user_tags holds the whole tag library (tens of KB for a heavy
+// Pinboard user). A quick save or a batch reads it once here: its counts
+// anchor the AI tag prompts and its index is handed to every delivery of that
+// run, which checks owner and age again before using it.
+async function pbpLoadTagVocab(account) {
+  let entry;
+  try { entry = (await chrome.storage.local.get("cached_user_tags"))?.cached_user_tags; }
+  catch (error) {
+    console.warn("[bookmark-tags] vocabulary read failed:", error?.name, error?.message);
+    return { account, timestamp: undefined, counts: null, index: null };
+  }
+  const owned = entry?.account === account && entry?.counts ? entry : null;
+  if (!owned) console.warn("[bookmark-tags] vocabulary missing for current account");
+  else if (!pbpTagVocabIsFresh(owned, account)) console.warn("[bookmark-tags] vocabulary stale");
+  return { account, timestamp: owned?.timestamp, counts: owned?.counts || null,
+    index: owned && pbpTagVocabIsFresh(owned, account) ? pbpTagVocabIndex(owned.counts) : null };
+}
+async function pbpReadTagVocab(account, loaded) {
+  if (loaded?.index && pbpTagVocabIsFresh(loaded, account)) return loaded.index;
   try {
     const entry = (await chrome.storage.local.get("cached_user_tags"))?.cached_user_tags;
     if (entry?.account !== account || !entry?.counts) {
       console.warn("[bookmark-tags] vocabulary missing for current account");
       return null;
     }
-    if (!Number.isFinite(entry.timestamp) || Date.now() - entry.timestamp > PBP_TAG_VOCAB_STALE_CEILING) {
+    if (!pbpTagVocabIsFresh(entry, account)) {
       console.warn("[bookmark-tags] vocabulary stale");
       return null;
     }
@@ -696,7 +718,7 @@ async function pbpReadTagVocab(account) {
     return null;
   }
 }
-async function pbpDeliverSelfHosted(intent, auth, settings) {
+async function pbpDeliverSelfHosted(intent, auth, settings, tagVocab) {
   try {
     const lookup = await fetchExistingBookmark(intent.url, auth.token, auth);
     if (lookup.lookupFailed) return {result:pbpSaveFailure(lookup.reason || "lookup", {httpStatus:lookup.httpStatus}), persisted:null, retryable:lookup.retryable};
@@ -705,7 +727,7 @@ async function pbpDeliverSelfHosted(intent, auth, settings) {
     if (plan.action === "failed") return {result:plan.result, persisted:null, retryable:false};
     if (plan.action === "skip") return {result:{status:"skipped"}, persisted:pbpSkippedPersisted(plan, lookup), retryable:false};
     const incomingTags = pbpBookmarkParseTags(intent.tags);
-    const index = await pbpReadTagVocab(auth.account);
+    const index = await pbpReadTagVocab(auth.account, tagVocab);
     const bookmarkNames = lookup.exists ? lookup.bookmark.tags : [];
     const respectCase = settings?.optRespectTagCase === true;
     const names = pbpAlignIncomingTags(incomingTags, bookmarkNames, index, respectCase, intent.mode === "merge" && lookup.exists);
@@ -896,10 +918,10 @@ async function pbpSendResolvedPlan(plan, settings) {
   };
 }
 
-async function deliverSaveIntent(intent, settings, auth = pbpCaptureBookmarkAuth(settings)) {
+async function deliverSaveIntent(intent, settings, auth = pbpCaptureBookmarkAuth(settings), { tagVocab } = {}) {
   const invalid = validateSaveIntent(intent);
   if (invalid) return { result: invalid, persisted: null, retryable: false };
-  if (pbpSelfHostedAuth(auth)) return pbpDeliverSelfHosted(intent, auth, settings);
+  if (pbpSelfHostedAuth(auth)) return pbpDeliverSelfHosted(intent, auth, settings, tagVocab);
   if (!settings?.pinboardToken) {
     return { result: pbpSaveFailure("not_logged_in"), persisted: null, retryable: false };
   }
@@ -1186,7 +1208,7 @@ async function pbpReleaseDroppedSummaryHolds(before, after) {
   }
 }
 
-function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", readerAction = "", readerDraft = null, summaryRange } = {}) {
+function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", readerAction = "", readerDraft = null, summaryRange, tagVocab } = {}) {
   return runSaveDeliveryTransaction(async () => {
     let settings;
     try { settings = await loadSettings(); }
@@ -1230,7 +1252,7 @@ function submitSaveIntent(intent, { deferBadge = false, expectedAccount = "", re
     }
 
     let envelope;
-    try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth); }
+    try { envelope = await deliverSaveIntent(intent, deliverySettings, deliveryAuth, { tagVocab }); }
     catch (e) {
       console.warn("save intent failed:", e?.name, e?.message);
       return pbpSaveFailure("internal");
@@ -1709,15 +1731,11 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
   // Popup parity (audit A14): feed the tag prompts the same frequency-
   // sorted vocabulary the popup injects; without it quick-saved bookmarks
   // got tags with zero anchoring to the user's existing tag system.
-  let userTagsTop = [];
-  try {
-    const cachedTags = await chrome.storage.local.get("cached_user_tags");
-    const entry = cachedTags?.cached_user_tags;
-    if (entry?.account === startAuth.account && entry.counts) userTagsTop = pbpTagsByCount(entry.counts);
-  } catch (_) { /* no cache -> unanchored prompt, same as before */ }
-  const tagVocabIndex = await pbpReadTagVocab(startAuth.account);
+  // No owned cache -> unanchored prompt, same as before.
+  const tagVocab = await pbpLoadTagVocab(startAuth.account);
+  const userTagsTop = tagVocab.counts ? pbpTagsByCount(tagVocab.counts) : [];
   const tagContext = {service:startAuth.service, separator:s.aiTagSeparator,
-    bookmarkNames:[], index:tagVocabIndex, respectCase:s.optRespectTagCase === true};
+    bookmarkNames:[], index:tagVocab.index, respectCase:s.optRespectTagCase === true};
   const aiPromises = [];
   let aiHostPermissionMissing = false;
   let combinedCachedTags = null;
@@ -1858,7 +1876,7 @@ async function saveFromBackground({ url, title, tab, settingsOverrides, toread, 
     private: isPrivate,
     toread: toread === true ? true : undefined,
     archive: undefined,
-  }, { expectedAccount: startAuth.account, summaryRange });
+  }, { expectedAccount: startAuth.account, summaryRange, tagVocab });
 
   if (result.status === "saved") {
     const undoInfo = result.mutation === "created" && result.account
@@ -5059,9 +5077,12 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
       return;
     }
 
-    const tagVocabIndex = await pbpReadTagVocab(account);
+    // One read for the whole run: the owned counts anchor the tag prompts
+    // (audit A14, popup parity) and the index is reused by every tab's
+    // canonicalization and delivery.
+    const tagVocab = await pbpLoadTagVocab(account);
     const tagContext = {service:currentAuth.service, separator:s.aiTagSeparator,
-      bookmarkNames:[], index:tagVocabIndex, respectCase:s.optRespectTagCase === true};
+      bookmarkNames:[], index:tagVocab.index, respectCase:s.optRespectTagCase === true};
     const baseTags = s.optBatchTagEnabled && s.optBatchTag
       ? pbpCanonicalTagList(s.optBatchTag.split(/[,，]+/), tagContext)
       : [];
@@ -5073,19 +5094,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     // saveFromBackground).
     const aiCacheSource = "local";
 
-    // popup's global tagCaseMap is unreachable in the SW; rebuild from the cached
-    // user-tag counts (popup-tags.js persists them under "cached_user_tags").
-    // The same counts also feed the frequency-sorted vocabulary the tag
-    // prompts anchor on (audit A14, popup parity).
-    let userTagsTop = [];
-    try {
-      const cached = await chrome.storage.local.get("cached_user_tags");
-      const entry = cached?.cached_user_tags;
-      const counts = entry?.account === account ? entry.counts : null;
-      if (counts) {
-        userTagsTop = pbpTagsByCount(counts);
-      }
-    } catch (_) { /* no cache -> prompt unanchored (same as before) */ }
+    const userTagsTop = tagVocab.counts ? pbpTagsByCount(tagVocab.counts) : [];
 
     for (let i = startIndex; i < tabs.length; i++) {
       const tab = tabs[i];
@@ -5224,7 +5233,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
           private: isPrivate,
           toread: s.optReadlaterDefault ? true : undefined,
           archive: s.waybackArchiveBatch ? undefined : false,
-        }, { deferBadge: true, expectedAccount: account, summaryRange });
+        }, { deferBadge: true, expectedAccount: account, summaryRange, tagVocab });
         if (result.reason === "account_changed") {
           const error = new Error("account_changed");
           error.code = "account_changed";

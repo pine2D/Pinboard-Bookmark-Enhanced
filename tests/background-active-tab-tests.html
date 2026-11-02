@@ -227,7 +227,7 @@ function buildBackgroundSaveHarness(source, callAI, cached = {}, settingsPatch =
     getCurrentBookmarkAuth: async () => ({ token: "alice:token", account: "alice", epoch: 1 }),
     loadSettings: async () => settings,
     pbpServiceEffectivePrivate,
-    pbpReadTagVocab: async () => null,
+    pbpLoadTagVocab: async (account) => ({ account, timestamp: undefined, counts: null, index: null }),
     pbpCanonicalTagName,
     showNotification: (...args) => notifications.push(args),
     pbpSaveFailure: (reason) => ({ status: "failed", reason }),
