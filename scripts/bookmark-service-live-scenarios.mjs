@@ -2596,6 +2596,9 @@ export const H3C_MODULES = [
       await t.phase('reader_bar_seed');
       await t.seed({ url: a, title: prefix + ' reader bar', notes: 'seed' });
       const origin = new URL(t.base).origin;
+      // Waits for a condition; when it never comes, the expectation after it
+      // fails with its own code (the copy it found) instead of a timeout.
+      const settle = (read, label, timeout = 8000) => t.until(read, label, timeout).then(() => true, error => { if (!/^timeout_/.test(error?.code || '')) throw error; return false; });
 
       // G20: the badge points at the connected service, shows no padlock
       // (self-hosted privacy is not Pinboard's shared flag), and one reader
@@ -2626,9 +2629,13 @@ export const H3C_MODULES = [
         await reader.locator('#reader-bookmark-title').fill('   ');
         const since = t.now();
         await reader.locator('#reader-bookmark-apply').click();
-        await t.sleep(1500);
         // The editor's own status line, or the bar's when the editor closed.
-        const status = await reader.evaluate(() => ['reader-bookmark-editor-status', 'reader-bookmark-status'].map(id => document.getElementById(id)).filter(el => el && !el.hidden && el.offsetParent !== null).map(el => el.innerText.trim()).filter(Boolean)[0] || '');
+        const shownStatus = () => reader.evaluate(() => ['reader-bookmark-editor-status', 'reader-bookmark-status'].map(id => document.getElementById(id)).filter(el => el && !el.hidden && el.offsetParent !== null).map(el => el.innerText.trim()).filter(Boolean)[0] || '');
+        // Whatever the apply led to (a refusal, or a write and its answer)
+        // ends in a status line and an idle bar; the writes are counted then.
+        await settle(async () => !!(await shownStatus()), 'reader_empty_title_status');
+        await readerIdle(reader);
+        const status = await shownStatus();
         const writes = writesSince(t, since).length;
         t.note('emptyTitle', { status, writes });
         await t.shot(reader, 'empty-title', { surface: 'reader' });
@@ -2652,7 +2659,7 @@ export const H3C_MODULES = [
           await t.until(async () => !!(await readerStatus(reader)), 'reader_disconnected_status', 8000);
           const switched = await readerStatus(reader);
           fresh = await t.openReader(a, { ready: '#reader-bookmark-save' });
-          await t.sleep(800);
+          await settle(async () => !!(await readerStatus(fresh)), 'reader_not_connected_open_status');
           const opened = await readerStatus(fresh);
           const disabled = await fresh.locator('#reader-bookmark-save').isDisabled();
           const asked = t.requests({ since }).length;

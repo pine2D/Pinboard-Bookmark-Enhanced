@@ -1532,6 +1532,56 @@ try {
       assert.deepEqual(await drive({ ...right, lookup_5xx: l => msg('pinboardErrorServer', l) }), ['passed', 'lookup_5xx_names_pinboard_en']);
       assert.deepEqual(await drive({ ...right, lookup_5xx: () => '' }), ['passed', 'timeout_copy_lookup_status']);
     }
+    // H3c ux.reader-bar, G19: the empty-title and not-connected parts wait
+    // for the status line itself, not a fixed sleep (review of H3c,
+    // should-fix 7). The stand-in reader paints its status 300ms late; the
+    // stand-in sleep is cut short, as a loaded machine would stretch the
+    // paint past a fixed one.
+    {
+      const barModule = MODULES.find(m => m.id === 'ux.reader-bar');
+      const msg = key => JSON.parse(readFileSync(join(root, '_locales', 'en', 'messages.json'), 'utf8'))[key]?.message ?? null;
+      const want = new Set(['empty_title', 'not_connected']);
+      const parts = {};
+      const world = { held: false };
+      const fail = code => { const e = new Error(code); e.code = code; throw e; };
+      const later = (ms, fn) => setTimeout(fn, ms);
+      const reader = () => {
+        const page = { status: '', editor: '' };
+        if (world.held) later(300, () => { page.status = msg('bgSetToken'); });
+        page.locator = sel => ({
+          click: async () => { if (sel === '#reader-bookmark-apply') later(300, () => { page.editor = msg('urlAndTitleRequired'); }); },
+          fill: async () => {}, isDisabled: async () => true, count: async () => 0, getAttribute: async () => null,
+        });
+        page.evaluate = async fn => (String(fn).includes('reader-bookmark-editor-status') ? page.editor : page.status);
+        page.waitForFunction = async () => {};
+        page.close = async () => {};
+        world.pages.push(page);
+        return page;
+      };
+      world.pages = [];
+      const t = {
+        service: 'linkding', prefix: 'pbp-it-x', base: 'http://127.0.0.1:9/', shotsEnabled: false,
+        claimUrl: () => 'https://example.com/' + Math.random(),
+        phase: async () => {}, seed: async () => {}, note: () => {}, check: () => {}, shot: async () => null,
+        expect: (ok, code) => { if (!ok) fail(code); },
+        expectEq: (a, b, code) => { if (a !== b) fail(code); },
+        message: msg, now: () => Date.now(), requests: () => [],
+        sleep: ms => new Promise(r => setTimeout(r, Math.min(ms, 20))),
+        until: async (read, label, timeout = 2000) => { const end = Date.now() + Math.min(timeout, 2000); while (Date.now() < end) { if (await read()) return; await new Promise(r => setTimeout(r, 20)); } fail('timeout_' + label); },
+        reconnect: async () => { world.held = false; },
+        openReader: async () => reader(),
+        sw: async fn => {
+          const text = String(fn);
+          if (text.includes('pbpReadBookmarkConnection')) return { service: 'linkding', account: world.held ? '' : 'acct' };
+          if (text.includes('storage.local.remove')) { world.held = true; for (const p of world.pages) later(100, () => { p.status = msg('bgSetToken'); }); return true; }
+          if (text.includes('__pbpItHeldToken')) { const was = world.held; world.held = false; return was; }
+          throw new Error('unexpected worker call ' + text.slice(0, 60));
+        },
+        part: async (name, refs, fn) => { if (!want.has(name)) return; try { await fn(); parts[name] = 'passed'; } catch (e) { parts[name] = e.code || e.message; } },
+      };
+      await barModule.steps(t);
+      assert.deepEqual(parts, { empty_title: 'passed', not_connected: 'passed' }, JSON.stringify(parts));
+    }
     // H3c: a fault with `pass` lets the first n matching requests through.
     {
       const run = new live.LiveRun({ mode: 'plan', flags: new Set(), values: {}, errors: [] });
