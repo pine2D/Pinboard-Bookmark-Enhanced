@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { runMutations, MutateRefusal, BACKUP_SUFFIX, restoreHint } from '../scripts/mutate-check.mjs';
+import { runMutations, MutateRefusal, BACKUP_SUFFIX, restoreHint, registryDir, entryPath } from '../scripts/mutate-check.mjs';
 
 const CLI = fileURLToPath(new URL('../scripts/mutate-check.mjs', import.meta.url));
 const ORIGINAL = 'const a = "GOOD";\nconst b = 1;\nconst c = 1;\n';
@@ -421,6 +421,63 @@ test('an entry whose pid now belongs to a different process (pid reuse) counts a
   } finally { s.done(); }
 });
 
+// This process's own start time, read from /proc/self/stat field 22 on purpose without
+// the tool's code: an entry written with it must match what the tool reads back.
+const ownStart = () => readFileSync('/proc/self/stat', 'utf8').replace(/^.*\) /s, '').split(' ')[19];
+const hasProc = existsSync('/proc/self/stat');
+
+test('a live owner counts as running even before its backup is written, and its entry survives the refusal', { skip: !hasProc && 'no /proc' }, async () => {
+  const s = sandbox();
+  try {
+    const dir = registryDir(s.dir);
+    mkdirSync(dir, { recursive: true });
+    const entry = entryPath(dir, s.file);
+    // The window between a run claiming the file and writing its backup: entry, live pid, no backup yet.
+    writeFileSync(entry, JSON.stringify({ file: s.file, pid: process.pid, start: ownStart() }));
+    await assert.rejects(runMutations([{ file: s.file, old: 'GOOD', new: 'BAD' }], { command: withFile(s.file, checker()), ...quiet }),
+      error => error instanceof MutateRefusal && /still working/.test(error.message) && !error.message.includes('cp ') && error.message.includes(String(process.pid)));
+    assert.equal(existsSync(entry), true, 'the refused run deleted a live run\'s entry');
+    assert.equal(readFileSync(s.file, 'utf8'), ORIGINAL);
+  } finally { s.done(); }
+});
+
+test('a dead owner without a backup leaves nothing to restore: its entry is dropped and the run proceeds', async () => {
+  const s = sandbox();
+  try {
+    const dir = registryDir(s.dir);
+    mkdirSync(dir, { recursive: true });
+    const gonePid = (() => { const r = spawn(process.execPath, ['-e', '']); return r.pid; })();
+    await new Promise(r => setTimeout(r, 300));
+    const entry = entryPath(dir, s.file);
+    writeFileSync(entry, JSON.stringify({ file: s.file, pid: gonePid, start: '1' }));
+    const { survived } = await runMutations([{ file: s.file, old: 'GOOD', new: 'BAD' }], { command: withFile(s.file, checker()), ...quiet });
+    assert.equal(survived, 0);
+    assert.equal(existsSync(entry), false);
+  } finally { s.done(); }
+});
+
+test('losing the claim to a run that got in after the scan refuses, keeps that run\'s entry and file, and drops only our own claims', { skip: !hasProc && 'no /proc' }, async () => {
+  const s = sandbox();
+  try {
+    const other = join(s.dir, 'other.js');
+    writeFileSync(other, ORIGINAL);
+    let theirEntry = null;
+    const beforeClaim = ({ registry }) => {
+      // The other run claims other.js and mutates it between our scan and our claim.
+      theirEntry = entryPath(registry, other);
+      writeFileSync(theirEntry, JSON.stringify({ file: other, pid: process.pid, start: ownStart() }));
+      writeFileSync(other, ORIGINAL.replace('GOOD', 'BAD'));
+    };
+    await assert.rejects(runMutations([{ file: s.file, old: 'GOOD', new: 'BAD' }, { file: other, old: 'GOOD', new: 'BAD' }], { command: withFile(s.file, checker()), beforeClaim, ...quiet }),
+      error => error instanceof MutateRefusal && /claimed/.test(error.message));
+    assert.equal(existsSync(theirEntry), true, 'the loser deleted the winner\'s entry');
+    assert.equal(readFileSync(other, 'utf8'), ORIGINAL.replace('GOOD', 'BAD'), 'the loser wrote its copy over the winner\'s file');
+    assert.equal(existsSync(entryPath(registryDir(s.dir), s.file)), false, 'the loser left its claim on the first file behind');
+    assert.equal(existsSync(s.file + BACKUP_SUFFIX), false);
+    assert.equal(readFileSync(s.file, 'utf8'), ORIGINAL);
+  } finally { s.done(); }
+});
+
 test('without a git checkout the system-temp registry works the same way', async () => {
   const s = sandbox({ git: false });
   try {
@@ -431,17 +488,25 @@ test('without a git checkout the system-temp registry works the same way', async
 });
 
 // Two copies of this whole file at once, as two verify.sh runs on one machine would do.
+// Under `node --test` the child would inherit NODE_TEST_CONTEXT and skip itself with
+// exit 0, so that is removed, and a run that executed no test cannot count as a pass.
 if (!process.env.PBP_MUTATE_SELFTEST_INNER) {
   test('two copies of this self-test can run at the same time and both pass', async () => {
+    const { NODE_TEST_CONTEXT, ...env } = process.env;
     const copy = () => new Promise(resolve => {
-      const child = spawn(process.execPath, ['--test', fileURLToPath(import.meta.url)], { env: { ...process.env, PBP_MUTATE_SELFTEST_INNER: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
+      const child = spawn(process.execPath, ['--test', fileURLToPath(import.meta.url)], { env: { ...env, PBP_MUTATE_SELFTEST_INNER: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
       let out = '';
       child.stdout.on('data', c => { out += c; }); child.stderr.on('data', c => { out += c; });
       child.once('close', code => resolve({ code, out }));
     });
     for (let round = 0; round < 3; round++) {
       const [a, b] = await Promise.all([copy(), copy()]);
-      for (const r of [a, b]) assert.equal(r.code, 0, `round ${round + 1}:\n${r.out.split('\n').filter(l => /✖|not ok|fail/.test(l)).slice(0, 12).join('\n')}`);
+      for (const r of [a, b]) {
+        assert.equal(r.code, 0, `round ${round + 1}:\n${r.out.split('\n').filter(l => /✖|not ok|fail/.test(l)).slice(0, 12).join('\n')}`);
+        const passed = Number(/^\S*\s*pass (\d+)/m.exec(r.out)?.[1]);
+        assert.ok(passed > 0, `round ${round + 1}: the inner run executed no test:\n${r.out.slice(-400)}`);
+        assert.match(r.out, /^\S*\s*fail 0$/m, r.out.slice(-400));
+      }
     }
   });
 }

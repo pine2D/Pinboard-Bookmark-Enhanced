@@ -11,7 +11,9 @@
 // target's checkout when there is one, else the system temp dir) with the pid of
 // the run that made it. A dead pid with its backup still there is a crash: the
 // next run - on ANY file - refuses to start and prints the commands that put
-// every stranded file back. A live pid is a run still going: a run on the same
+// every stranded file back. The entry is claimed (hard-link, exclusive) before the
+// backup is written, and a live pid counts as a run going from that moment: it is
+// never judged by whether its backup exists yet. A live pid is a run still going: a run on the same
 // file is refused ("wait", no restore commands); a run on other files proceeds.
 //
 //   node scripts/mutate-check.mjs [options] <file> <old> <new> -- <test command...>
@@ -23,7 +25,7 @@
 // unmutated run that must pass first), --verbose (show test output).
 // Exit: 0 every mutation killed; 1 some survived; 2 refused or misused.
 import { spawn, execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync, rmSync, mkdirSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, rmSync, mkdirSync, readdirSync, linkSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { resolve, join, isAbsolute, dirname } from 'node:path';
@@ -44,14 +46,14 @@ export function restoreHint(file) {
 // start time, so a recycled pid is not mistaken for the owner) of the run that
 // made it. A live owner means "a run is going on, wait"; a dead owner whose
 // backup is still there means a crash that left the file mutated.
-function registryDir(cwd) {
+export function registryDir(cwd) {
   try {
     const common = execFileSync('git', ['rev-parse', '--git-common-dir'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     if (common) return join(isAbsolute(common) ? common : resolve(cwd, common), 'mutate-check-inflight');
   } catch { /* not a git checkout */ }
   return join(tmpdir(), 'pbp-mutate-check-inflight');
 }
-const entryPath = (dir, file) => join(dir, createHash('sha1').update(file).digest('hex').slice(0, 16));
+export const entryPath = (dir, file) => join(dir, createHash('sha1').update(file).digest('hex').slice(0, 16));
 // Field 22 of /proc/<pid>/stat; the command name (field 2) may hold spaces and
 // parentheses, so count from the last ")". null where /proc is unavailable.
 function processStart(pid) {
@@ -74,18 +76,34 @@ function readEntry(path) {
   return null;
 }
 // Sorts the registry into runs still going (file -> pid) and crash leftovers.
-// An entry whose backup is gone, or that cannot be read, is dropped.
+// The owner decides first: a live owner is a run in progress whether or not its
+// backup is written yet (the entry is claimed before the backup). Only a dead
+// owner is then judged by its backup: still there = a crash, gone = nothing
+// left to restore, so the entry is dropped. A ".tmp" name is an entry still
+// being written (see claim); it only gets cleaned up once its writer is dead.
 function scanRegistry(dir) {
   const running = new Map(), stranded = [];
   let names = [];
   try { names = readdirSync(dir); } catch { return { running, stranded }; }
   for (const name of names) {
-    const entry = readEntry(join(dir, name));
-    if (!entry || !existsSync(backupOf(entry.file))) { rmSync(join(dir, name), { force: true }); continue; }
+    const path = join(dir, name), entry = readEntry(path);
+    if (name.endsWith('.tmp')) { if (!entry || !ownerAlive(entry)) rmSync(path, { force: true }); continue; }
+    if (!entry) { rmSync(path, { force: true }); continue; }
     if (ownerAlive(entry)) running.set(entry.file, entry.pid);
-    else stranded.push(entry.file);
+    else if (existsSync(backupOf(entry.file))) stranded.push(entry.file);
+    else rmSync(path, { force: true });
   }
   return { running, stranded };
+}
+
+// Exclusive and never half-written: the content goes into a private temp file,
+// which is then hard-linked to the entry's name. link() fails with EEXIST when
+// another run holds the name, and a reader can only ever see the whole entry.
+function claim(registry, file) {
+  const path = entryPath(registry, file), tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify({ file, pid: process.pid, start: processStart(process.pid) }));
+  try { linkSync(tmp, path); }
+  finally { rmSync(tmp, { force: true }); }
 }
 
 // Overlapping hits count: '==' appears twice inside '===' and is not a unique spot.
@@ -120,7 +138,7 @@ function runCommand(command, { timeoutMs, verbose, cwd, onChild }) {
 }
 
 // mutations: [{file, old, new, label?, command?}] with absolute or cwd-relative files.
-export async function runMutations(mutations, { command = null, timeoutMs = 300000, baseline = true, verbose = false, cwd = process.cwd(), log = console.log, warn = console.error } = {}) {
+export async function runMutations(mutations, { command = null, timeoutMs = 300000, baseline = true, verbose = false, cwd = process.cwd(), log = console.log, warn = console.error, beforeClaim = null } = {}) {
   const files = [...new Set(mutations.map(m => resolve(cwd, m.file)))];
   const originals = new Map();
   const registry = registryDir(dirname(files[0]));
@@ -168,12 +186,13 @@ export async function runMutations(mutations, { command = null, timeoutMs = 3000
   const results = [];
   try {
     mkdirSync(registry, { recursive: true });
+    if (beforeClaim) beforeClaim({ registry }); // test seam: lets a test play the other run between the scan and the claim
     // Claim every file first, exclusively: a run that started in the same instant
     // loses here, before it has touched anything that restoreAll would write back.
     const claimed = [];
     try {
       for (const file of files) {
-        writeFileSync(entryPath(registry, file), JSON.stringify({ file, pid: process.pid, start: processStart(process.pid) }), { flag: 'wx' });
+        claim(registry, file);
         claimed.push(file);
       }
     } catch (error) {
