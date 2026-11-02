@@ -1,13 +1,16 @@
 <!DOCTYPE html>
 <html><head><meta charset="UTF-8"><title>Reader Bookmark Tests</title></head><body>
-<div id="results"></div><script src="../shared.js"></script><script src="../wayback.js"></script><script src="../bookmark-services.js"></script><script>
+<div id="results"></div><script src="../shared.js"></script><script src="../wayback.js"></script><script src="../bookmark-services.js"></script><script src="fixtures/case-filter.js"></script><script>
 function assert(x, msg) { if (!x) throw new Error(msg || "assertion failed"); }
 function equal(a, b) { assert(a === b, JSON.stringify(a) + " !== " + JSON.stringify(b)); }
 async function test(name, fn) {
+  const done = pbpCaseGate(name);
+  if (!done) return;
   const row = document.createElement("div");
   try { await fn(); row.className = "pass"; row.textContent = "PASS " + name; }
   catch (e) { row.className = "fail"; row.textContent = "FAIL " + name + ": " + e.message; }
   document.getElementById("results").append(row);
+  done();
 }
 const URL_ARTICLE = "https://example.com/article";
 // Hand-authored Pinboard posts/get response, including its real yes/no flags.

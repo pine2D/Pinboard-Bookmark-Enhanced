@@ -15,8 +15,11 @@ h2 { margin-top: 24px; font-size: 16px; }
 <script src="../wayback.js"></script>
 <script src="../ai-cache.js"></script>
 <script src="fixtures/summary-ownership.js"></script>
+<script src="fixtures/case-filter.js"></script>
 <script>
 async function test(name, fn) {
+  const done = pbpCaseGate(name);
+  if (!done) return;
   try {
     await fn();
     const div = document.createElement("div"); div.className = "case pass";
@@ -24,7 +27,7 @@ async function test(name, fn) {
   } catch (e) {
     const div = document.createElement("div"); div.className = "case fail";
     div.textContent = "FAIL " + name + "\n  " + e.message; document.getElementById("results").appendChild(div);
-  }
+  } finally { done(); }
 }
 function assert(cond, msg) { if (!cond) throw new Error(msg || "assertion failed"); }
 function equal(actual, expected, msg) {

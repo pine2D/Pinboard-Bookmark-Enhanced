@@ -5,6 +5,13 @@
 // green, 1 = red, 2 = unknown suite / invalid invocation.
 //
 // Usage: node .qa-scan/run-test.mjs tests/<file>.html
+//        PBP_ONLY=<case name part>[,<part>...] node .qa-scan/run-test.mjs tests/<file>.html
+// PBP_ONLY (dev-time only) runs just the cases whose name contains a part
+// (case-insensitive), for pages that load tests/fixtures/case-filter.js. The
+// row count is NOT checked against EXPECTED_RESULTS then: the run says
+// "FILTERED ... row count not checked", reports how many cases ran, and exits
+// 1 only for a failure, a page error, a stall or no matching case (exit 2 when
+// the page has no filter support). It is never a substitute for the full run.
 //        node .qa-scan/run-test.mjs --print-counts tests/<file>.html [more.html ...]
 // --print-counts only reports: the rows a page actually rendered next to its
 // EXPECTED_RESULTS entry. The page is measured once its registered count (any row,
@@ -27,6 +34,11 @@ import { fileURLToPath } from "url";
 
 const argv = process.argv.slice(2);
 const printCounts = argv.includes("--print-counts");
+const onlyFilter = (process.env.PBP_ONLY || "").trim();
+if (onlyFilter && printCounts) {
+  console.error("ERROR: PBP_ONLY cannot be combined with --print-counts (a filtered page has no row count to print)");
+  process.exit(2);
+}
 const files = argv.filter((arg) => arg !== "--print-counts");
 const file = files[0];
 if (!file) {
@@ -151,7 +163,7 @@ const EXPECTED_RESULTS = Object.freeze({
   "tests/wayback-tests.html": 45,
 });
 const expected = EXPECTED_RESULTS[rel];
-if (expected === undefined && !printCounts) {
+if (expected === undefined && !printCounts && !onlyFilter) {
   console.error(`ERROR: no expected result count registered for ${rel}`);
   process.exit(2);
 }
@@ -204,7 +216,7 @@ try {
     });
   }));
   const port = server.address().port;
-  const url = `http://127.0.0.1:${port}/${rel}`;
+  const url = `http://127.0.0.1:${port}/${rel}` + (onlyFilter ? `?pbp_only=${encodeURIComponent(onlyFilter)}` : "");
 
   const dom = await bounded("test", TEST_TIMEOUT_MS, async () => {
     const taskStartedAt = Date.now();
@@ -291,7 +303,27 @@ try {
     // or per row, so they never qualify); 10s while a #summary is still empty, registered
     // or not. An unregistered page never shortens its window (3s at least). A registered page that never gets there
     // is UNCONFIRMED, not a smaller "actual" count.
-    const waitForRows = printCounts
+    if (onlyFilter) {
+      const supported = await bounded("filter probe", CLEANUP_TIMEOUT_MS, () => page.evaluate(() => !!(window.__pbpCases && window.__pbpCases.filtered)));
+      if (!supported) {
+        console.error(`ERROR: ${rel} has no case filter (tests/fixtures/case-filter.js); PBP_ONLY cannot be used with it`);
+        process.exitCode = 2;
+        return { unsupported: true, pass: 0, fail: 0, skip: 0, failures: [], stalled: false };
+      }
+    }
+    const waitForRows = onlyFilter
+      // Filtered: done when every call has been seen, no started case is still
+      // pending, and nothing new has been called or rendered for a quiet window.
+      ? page.waitForFunction(() => {
+        const now = performance.now();
+        const cases = window.__pbpCases;
+        const rows = document.querySelectorAll(".pass, .fail, .skip").length;
+        const key = cases.seen + ":" + cases.ran + ":" + cases.pending + ":" + rows;
+        const w = window.__pbpFilterWatch || (window.__pbpFilterWatch = { key: "", since: now });
+        if (w.key !== key) { w.key = key; w.since = now; }
+        return cases.seen > 0 && cases.pending === 0 && now - w.since >= 1500;
+      }, null, { polling: 100, timeout: 0 })
+      : printCounts
       ? page.waitForFunction((registered) => {
         const now = performance.now();
         const total = document.querySelectorAll(".pass, .fail, .skip").length;
@@ -347,7 +379,8 @@ try {
         }
         const lastRows = [...rows].slice(-3).map((el) => (el.textContent || "").trim());
         const watch = window.__pbpCountWatch;
-        return { pass, fail, skip, failures: failures.slice(0, 20), title: document.title || "", lastRows, trusted: !!(watch && watch.trusted), windowMs: watch ? watch.windowMs : 3000 };
+        const cases = window.__pbpCases;
+        return { pass, fail, skip, failures: failures.slice(0, 20), title: document.title || "", lastRows, cases: cases ? { seen: cases.seen, ran: cases.ran, pending: cases.pending } : null, trusted: !!(watch && watch.trusted), windowMs: watch ? watch.windowMs : 3000 };
       }));
     } catch (sampleError) {
       dom = {
@@ -359,7 +392,22 @@ try {
   });
 
   const total = dom.pass + dom.fail + dom.skip;
-  if (printCounts) {
+  if (dom.unsupported) {
+    // exit code 2 already set above
+  } else if (onlyFilter) {
+    const c = dom.cases || { seen: 0, ran: 0, pending: 0 };
+    console.log(`FILTERED (PBP_ONLY=${onlyFilter}): ran ${c.ran} of ${c.seen} cases, pass=${dom.pass} fail=${dom.fail} skip=${dom.skip} rows=${total}; 已过滤，未做条数核对 (row count not checked against EXPECTED_RESULTS)${dom.stalled ? ` STALLED(pending=${c.pending}, last row: "${(dom.lastRows && dom.lastRows[dom.lastRows.length - 1]) || ""}")` : ""}`);
+    if (dom.sampleError) console.error(`ERROR: diagnostic sample failed: ${dom.sampleError}`);
+    if (dom.failures?.length) console.error("failures:\n  " + dom.failures.join("\n  "));
+    if (runtimeErrors.length) console.error("errors:\n  " + runtimeErrors.slice(0, 25).join("\n  "));
+    if (browserDisconnected) console.error("ERROR: browser disconnected before the suite completed");
+    if (blockedProgrammatic.length) {
+      const unique = [...new Set(blockedProgrammatic)];
+      console.error(`ERROR: closed network blocked ${blockedProgrammatic.length} PROGRAMMATIC external request(s) — a mock is missing:\n  ` + unique.slice(0, 10).join("\n  "));
+    }
+    if (c.ran === 0 && !dom.stalled) { console.error(`ERROR: PBP_ONLY=${onlyFilter} matched no case (of ${c.seen})`); process.exitCode = 2; }
+    else if (dom.fail > 0 || runtimeErrors.length > 0 || browserDisconnected || blockedProgrammatic.length > 0 || dom.stalled || dom.sampleError) process.exitCode = 1;
+  } else if (printCounts) {
     const registered = expected === undefined ? "unregistered" : String(expected);
     const verdict = expected === undefined ? "NOT REGISTERED"
       : dom.stalled && total < expected ? `UNCONFIRMED (never reached ${expected} before the stall deadline${dom.trusted ? `; the page announced its end at ${total} rows, so the registered count may be too high` : ": a slow case or fewer rows"}, run the normal mode to see which)`
