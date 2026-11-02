@@ -3427,10 +3427,20 @@ export class LiveRun {
       // Whatever failed, nothing the module still has in flight may reach a
       // service from here on.
       current.revoked = true;
-      const code = failureCode(error, this.secrets);
+      let code = failureCode(error, this.secrets);
       record.failure = { phase: error?.partPhase || this.phaseName, code, ...(error?.partName ? { part: error.partName } : {}) };
+      // A step that failed on its own skipped the closing checks: the
+      // request budget is compared here too, so a module over its row still
+      // aborts the run (module_request_budget), its own failure kept beside.
+      if (!(error instanceof HarnessFailure && error.fatal) && !this.fatal) { try { await this.syncGuard(); } catch { /* counts as recorded */ } }
       const after = this.count(mod.instance);
       record.counts = { node: after.node - before.node, browser: after.browser - before.browser, ai: this.fakeAi ? this.fakeAi.calls() - before.ai : 0 };
+      if (!this.fatal && (record.counts.node > budget.node || record.counts.browser > budget.browser || record.counts.ai > budget.ai)) {
+        this.setFatal('module_request_budget');
+        record.failure = { ...record.failure, code: 'module_request_budget', stepCode: code };
+        code = 'module_request_budget';
+        error = new HarnessFailure(code, { fatal: true });
+      }
       if (error instanceof HarnessFailure && error.fatal || this.fatal) {
         record.status = 'aborted';
         console.error('ABORTED ' + mod.id + ' at ' + this.phaseName + ': ' + code);
@@ -4035,7 +4045,7 @@ export class LiveRun {
       // crash, a second signal) before it reached a verdict.
       const verdict = m.status === 'running' ? '中断（运行在此模块中被打断，未得出结论）'
         : m.beforeSteps ? `中止于开始前（未执行任何步骤，未得出结论），${m.failure?.code}`
-        : `${m.status === 'aborted' ? '中止' : '失败'}于 ${m.failure?.phase}，${m.failure?.code}`;
+        : `${m.status === 'aborted' ? '中止' : '失败'}于 ${m.failure?.phase}，${m.failure?.code}${m.failure?.stepCode ? `（步骤本身失败于 ${m.failure.stepCode}）` : ''}`;
       return `- ${m.id}：${verdict}；读回差异 ${diffs.length} 条${diffs[0] ? `（${diffs[0].code}：期望 ${oneLine(diffs[0].expected, 60)}，实际 ${oneLine(diffs[0].actual, 60)}）` : ''}；console 错误 ${r.console.filter(c => c.module === m.id).length} 条${shots.length ? `；截图 ${shots[shots.length - 1]}` : ''}${(m.fixRefs || []).length ? `；依赖修复组 ${m.fixRefs.map(g => oneLine(g, 12)).join('、')}（产品树未含这些修复时属预期失败）` : ''}${(m.parts || []).length ? `；分段：${m.parts.map(p => `${oneLine(p.name, 40)} ${p.status === 'passed' ? '通过' : p.status === 'failed' ? `失败于 ${p.phase}，${p.code}` : '未完成'}（依赖 ${(p.fixRefs || []).map(g => oneLine(g, 12)).join('、') || '无'}）`).join('；')}` : ''}${(m.alsoFailed || []).length ? `；另有收尾检查未过：${m.alsoFailed.join('、')}` : ''}`;
     });
     const pendingRows = r.modules.filter(m => (m.pendingDecisions || []).length);

@@ -1394,6 +1394,27 @@ try {
       await assert.rejects(quiet(() => overRun.runModule(overMod)), e => e.code === 'module_request_budget');
       const over = overRun.report.modules[0];
       assert.deepEqual([over.status, over.failure.code, overRun.fatal, over.counts.browser], ['aborted', 'module_request_budget', 'module_request_budget', 5], 'the budget is checked after a failed part');
+      // Outside parts too (review of H3a, should-fix): a step that fails on
+      // its own, or a surface left out of the row, never hides a module over
+      // its budget; it still aborts the run as module_request_budget.
+      let overRun2;
+      for (const [name, steps] of [
+        ['step', async t => { overRun2.count('linkding').browser += 5; t.expectEq('shown', 'wanted', 'step_failed'); }],
+        ['surface', async () => { overRun2.count('linkding').browser += 5; overRun2.currentModule.driven.add('popup'); }],
+      ]) {
+        overRun2 = partRun();
+        await assert.rejects(quiet(() => overRun2.runModule({ ...mod, id: 'linkding.over.' + name, surfaces: [], steps })), e => e.code === 'module_request_budget', name);
+        const rec = overRun2.report.modules[0];
+        assert.deepEqual([rec.status, rec.failure.code, overRun2.fatal], ['aborted', 'module_request_budget', 'module_request_budget'], name + ': over budget outside a part aborts the run');
+        if (name === 'step') {
+          assert.equal(rec.failure.stepCode, 'step_failed', 'the step\'s own failure is kept beside the abort');
+          overRun2.selected = [];
+          overRun2.runDir = mkdtempSync(join(dir, 'over-step-'));
+          overRun2.summaryPath = join(overRun2.runDir, 'summary.zh.md');
+          overRun2.writeSummary();
+          assert(readFileSync(overRun2.summaryPath, 'utf8').includes('module_request_budget（步骤本身失败于 step_failed）'), 'the summary names both');
+        }
+      }
       // A fatal finding the parts left (set after the last harness call)
       // names the abort, not the earlier part's code.
       const lateRun = partRun();
