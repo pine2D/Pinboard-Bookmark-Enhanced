@@ -1917,6 +1917,10 @@ try {
     // paths one at a time.
     const unitRun = (mock, { node = live.BUDGETS.user.pinboard.node } = {}) => {
       const r = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [], pinboard: { transport: mock.transport, intervalMs: 1, mock: true } });
+      // Never the default state directory: this test's own.
+      r.state = pbState;
+      r.runDir = join(pbState, 'pbp-it-' + r.runId);
+      r.reportPath = join(r.runDir, 'report.json');
       r.target = 'user';
       r.instances = { pinboard: { id: 'pinboard', service: 'pinboard', base: '', root: live.PINBOARD_ROOT, token } };
       r.pools = { pinboard: live.poolUrls('user', r.runId, 'pinboard', 3) };
@@ -1932,6 +1936,31 @@ try {
       const t = encodeURIComponent(token);
       await assert.rejects(r.pinboardSend('pinboard', live.PINBOARD_ROOT + 'posts/get?auth_token=' + t + '&auth_token=other%3A00000000'), e => e.code === 'live_guard_pinboard_token');
       assert.deepEqual(mock.calls, []);
+    }
+
+    // A user name equal to a value the harness writes (the instance id
+    // "pinboard", a status "passed") must not corrupt report.json: --cleanup
+    // reads it back. Free text is still masked.
+    for (const name of ['pinboard', 'passed', 'user', 'route']) {
+      const r = unitRun(createPinboardMock({ token }));
+      mkdirSync(r.runDir, { recursive: true, mode: 0o700 });
+      r.accountNames.push(name);
+      Object.assign(r.report, { target: 'user', instances: { pinboard: { service: 'pinboard', base: '' } }, pools: { pinboard: r.pools.pinboard } });
+      r.report.ledger.created.push({ instance: 'pinboard', id: 'pool-1', url: r.pools.pinboard[0], source: 'route', module: 'pinboard.core.worker', deleted: false });
+      r.report.modules.push({ id: 'pinboard.core.worker', status: 'passed' });
+      r.report.console.push({ type: 'error', text: `Connected as ${name} (ok)` });
+      r.report.checks.push(`${name}: signed in`);
+      r.persist();
+      const back = JSON.parse(readFileSync(r.reportPath, 'utf8'));
+      assert.equal(back.instances.pinboard.service, 'pinboard', name);
+      assert.equal(back.ledger.created[0].instance, 'pinboard', name);
+      assert.equal(back.ledger.created[0].source, 'route', name);
+      assert.equal(back.modules[0].status, 'passed', name);
+      assert.equal(back.target, 'user', name);
+      assert.equal(back.console[0].text, 'Connected as [account] (ok)', name);
+      assert.equal(back.checks[0], '[account]: signed in', name);
+      live.validateResumeReport(back, r.reportPath, { state: pbState });
+      rmSync(r.runDir, { recursive: true, force: true });
     }
     const pbCredentials = join(pbState, '..', 'pinboard-credentials.json');
     writeFileSync(pbCredentials, JSON.stringify({ pinboardToken: token }), { mode: 0o600 });

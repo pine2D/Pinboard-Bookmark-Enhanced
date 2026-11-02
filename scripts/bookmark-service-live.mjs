@@ -149,6 +149,9 @@ export const HARDENED_SETTINGS = Object.freeze({
 });
 const LOCAL_ONLY_SETTINGS = ['optSyncEnabled', 'syncApiKeys'];
 
+// Report fields whose values the harness writes itself (ids, states, codes),
+// never text from a page, a service or the account.
+export const REPORT_IDENTIFIER_KEYS = new Set(['service', 'instance', 'id', 'status', 'kind', 'source', 'module', 'phase', 'code', 'target', 'mode', 'scenario', 'reason', 'surface', 'type', 'state', 'error']);
 export class HarnessFailure extends Error {
   constructor(code, { fatal = false } = {}) { super(code); this.code = code; this.fatal = fatal; }
 }
@@ -1213,9 +1216,26 @@ export class LiveRun {
 
   // Free text (module notes, console lines) may echo anything: redact the
   // whole report on every write, not only the fields known to carry text.
-  persist() { if (existsSync(this.runDir)) writePrivateJson(this.reportPath, JSON.parse(this.sanitize(JSON.stringify(this.report)))); }
-  sanitize(text) {
-    let out = redact(text, this.secrets);
+  persist() { if (existsSync(this.runDir)) writePrivateJson(this.reportPath, this.sanitizeReport(this.report)); }
+  // Secrets go everywhere. Account names go everywhere but object keys and
+  // a value of a field the harness itself writes (REPORT_IDENTIFIER_KEYS)
+  // that is exactly the name: a user called "pinboard" or "passed" must not
+  // turn the instance id or a module status into [account], or --cleanup
+  // refuses its own report. Such a value names the harness's own state, not
+  // the account.
+  sanitizeReport(report) {
+    const parsed = JSON.parse(redact(JSON.stringify(report), this.secrets));
+    const walk = (value, key) => {
+      if (typeof value === 'string') return REPORT_IDENTIFIER_KEYS.has(key) && this.accountNames.includes(value) ? value : this.maskAccounts(value);
+      if (Array.isArray(value)) return value.map(item => walk(item, key));
+      if (value && typeof value === 'object') { for (const k of Object.keys(value)) value[k] = walk(value[k], k); }
+      return value;
+    };
+    return walk(parsed, '');
+  }
+  sanitize(text) { return this.maskAccounts(redact(text, this.secrets)); }
+  maskAccounts(text) {
+    let out = text;
     // Whole names only, and never a JSON key (the instance id "pinboard"
     // must survive a user called pinboard).
     for (const name of this.accountNames) {
