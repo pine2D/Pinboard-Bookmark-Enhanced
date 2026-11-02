@@ -599,6 +599,18 @@ export async function pinboardHttp(url) {
 }
 
 export const rowUrl = (service, row) => (service === 'linkding' ? row?.url : row?.content?.url);
+// A request's endpoint without ids or query values: "GET tags",
+// "GET tags?cursor" (a later page), "PATCH bookmarks/:id". Outside the API
+// root only "page" is kept. No account data reaches the report this way.
+export function endpointKey(url, root) {
+  if (!root || !String(url).startsWith(root)) return 'page';
+  const [path, query = ''] = String(url).slice(root.length).split('?');
+  // Karakeep ids are 24+ lower-case letters (cuid2), linkding's digits; the
+  // API's own words are short.
+  const segs = path.split('/').filter(Boolean).map(seg => (/^[a-z_-]+$/.test(seg) && seg.length <= 12 ? seg : ':id'));
+  return segs.join('/') + (/(^|&)cursor=/.test(query) ? '?cursor' : /(^|&)offset=/.test(query) ? '?offset' : '');
+}
+
 export const recordPath = (service, id) => 'bookmarks/' + encodeURIComponent(id) + (service === 'linkding' ? '/' : '');
 
 // Replace every secret value; then keep only a fixed code when the text is
@@ -2085,6 +2097,13 @@ export class LiveRun {
     const cap = decision.instance === 'ai' ? BUDGETS[this.target].run.fakeAi : this.caps[decision.instance].browser;
     if (counter > cap) { this.setFatal(decision.instance === 'ai' ? 'fake_ai_budget' : 'browser_request_budget'); return route.abort('blockedbyclient'); }
     if (decision.instance !== 'ai' && method !== 'GET' && method !== 'HEAD') this.count(decision.instance).browserWrites++;
+    if (decision.instance !== 'ai' && this.currentModule?.record) {
+      // Browser requests per endpoint, for budgeting (E: which reads a
+      // module repeats, e.g. Karakeep tags pages on a large library).
+      const paths = this.currentModule.record.paths ||= {};
+      const key = method + ' ' + endpointKey(url, this.instances[decision.instance]?.root || '');
+      paths[key] = (paths[key] || 0) + 1;
+    }
     if (this.offline && decision.instance === this.offline) return route.abort('internetdisconnected');
     // What leaves counts from here: its run tags now, a creation's slot
     // until its answer is recorded.

@@ -466,6 +466,16 @@ try {
   assert.equal(live.pinboardEndpoint('https://api.pinboard.in/v1/user/api_token/?x=1'), 'user/api_token');
   assert.equal(live.pinboardEndpoint('https://api.pinboard.in.evil.test/v1/posts/get'), '');
   assert.equal(live.pinboardEndpoint('https://pinboard.in/v1/posts/get'), '');
+  // Per-endpoint tallies keep no ids or query values.
+  assert.equal(live.endpointKey('http://127.0.0.1:1002/api/v1/tags?limit=1000', 'http://127.0.0.1:1002/api/v1/'), 'tags');
+  assert.equal(live.endpointKey('http://127.0.0.1:1002/api/v1/tags?limit=1000&cursor=abc', 'http://127.0.0.1:1002/api/v1/'), 'tags?cursor');
+  assert.equal(live.endpointKey('http://127.0.0.1:1002/api/v1/bookmarks/clx9z8k2/tags', 'http://127.0.0.1:1002/api/v1/'), 'bookmarks/:id/tags');
+  // A Karakeep id from run 8bdd50c7: letters only.
+  assert.equal(live.endpointKey('http://127.0.0.1:1002/api/v1/bookmarks/jrpkwzchichxdmmsuksxvkqh/tags', 'http://127.0.0.1:1002/api/v1/'), 'bookmarks/:id/tags');
+  assert.equal(live.endpointKey('http://127.0.0.1:1002/api/v1/bookmarks/check-url?url=x', 'http://127.0.0.1:1002/api/v1/'), 'bookmarks/check-url');
+  assert.equal(live.endpointKey('http://127.0.0.1:1001/api/bookmarks/12/', 'http://127.0.0.1:1001/api/'), 'bookmarks/:id');
+  assert.equal(live.endpointKey(live.PINBOARD_ROOT + 'posts/get?url=x&auth_token=a%3A1', live.PINBOARD_ROOT), 'posts/get');
+  assert.equal(live.endpointKey('http://127.0.0.1:1001/bookmarks?q=x', 'http://127.0.0.1:1001/api/'), 'page');
   // Pool URLs: a reserved .example name per run, https, never a loopback port.
   for (const url of cfg.pools.pinboard) assert.match(url, new RegExp('^https://' + runId + '\\.pbp-it\\.example/\\?pbp-it=' + runId + '-pinboard-\\d+$'));
 
