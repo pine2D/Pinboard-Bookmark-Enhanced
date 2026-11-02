@@ -2033,10 +2033,12 @@ export class LiveRun {
   async deleteBookmark(entry) {
     const inst = this.instances[entry.instance];
     try {
+      // Only this run's pool URLs are deleted; any other entry is not even read.
+      check((this.pools[entry.instance] || []).includes(entry.url), 'cleanup_url');
       const path = recordPath(inst.service, entry.id);
       const row = await this.api(entry.instance, path, { allow404: true });
       if (row !== null) {
-        check(rowUrl(inst.service, row) === entry.url && (this.pools[entry.instance] || []).includes(entry.url), 'cleanup_url');
+        check(rowUrl(inst.service, row) === entry.url, 'cleanup_url');
         await this.api(entry.instance, path, { method: 'DELETE' });
       }
       check(await this.api(entry.instance, path, { allow404: true }) === null, 'cleanup_delete');
@@ -2173,6 +2175,9 @@ export class LiveRun {
   }
 
   async runTags(instance) {
+    // Cleanup may delete every tag this returns: match on this run's full
+    // prefix only, never on a shorter one.
+    check(this.prefix === 'pbp-it-' + this.runId && RUN_DIR_RE.test(this.prefix), 'cleanup_prefix_invalid', true);
     const inst = this.instances[instance];
     const out = [];
     if (inst.service === 'karakeep') {
@@ -2374,10 +2379,75 @@ export function installWorkerGuard(rule, cfg, token) {
 // ---------------------------------------------------------------------------
 // --cleanup <report>: resume an incomplete cleanup with a fresh reserve.
 // ---------------------------------------------------------------------------
+// --cleanup acts with the user's credentials on whatever its report names, so
+// before anything is read or sent the report is held to what this harness
+// writes for its run id: its own directory in the state directory (cleanup
+// removes `profile` and `env-*` next to it), the prefix that selects tags, the
+// target, instance ids and services, loopback bases (given again on the
+// command line for the user target, so a report cannot send a token
+// elsewhere), the exact URL pools, the ledger's shape and the container
+// names. A report that fails any of this was edited, damaged or written
+// elsewhere, and is refused whole, without a write.
+export function validateResumeReport(report, reportPath, { values = {}, state = stateDir() } = {}) {
+  const invalid = 'cleanup_report_invalid';
+  const isObject = v => !!v && typeof v === 'object' && !Array.isArray(v);
+  const safeId = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(id);
+  check(isObject(report) && report.harness === HARNESS_VERSION && typeof report.runId === 'string' && RUN_DIR_RE.test('pbp-it-' + report.runId), invalid);
+  const runId = report.runId;
+  const real = file => { try { return realpathSync(file); } catch { return ''; } };
+  const runDir = real(join(state, 'pbp-it-' + runId));
+  check(runDir && real(reportPath) === join(runDir, 'report.json'), 'cleanup_report_location');
+  check(report.prefix === 'pbp-it-' + runId && ['', 'user', 'temp'].includes(report.target), invalid);
+  check(['instances', 'pools', 'ledger', 'cleanup'].every(key => isObject(report[key])) && Array.isArray(report.cleanup.entries) && Array.isArray(report.violations), invalid);
+  const { created, lists } = report.ledger;
+  check(Array.isArray(created) && Array.isArray(lists), invalid);
+  const target = report.target;
+  if (!target) {
+    // Written before the arguments were read: nothing can exist yet.
+    check(!Object.keys(report.instances).length && !Object.keys(report.pools).length && !created.length && !lists.length && report.temp == null, invalid);
+    return report;
+  }
+  check(!values.target || values.target === target, 'cleanup_target_mismatch');
+  if (target === 'temp') check(!values.credentials && !values.linkding && !values.karakeep, 'temp_target_rejects_user_endpoints');
+  const ids = target === 'temp' ? Object.keys(TEMP_INSTANCES) : ['linkding', 'karakeep'];
+  const serviceOf = id => (target === 'temp' ? TEMP_INSTANCES[id].service : id);
+  for (const [id, info] of Object.entries(report.instances)) {
+    check(ids.includes(id) && isObject(info) && info.service === serviceOf(id), invalid);
+    let base = '';
+    try { base = validateBase(info.base); } catch { /* refused below */ }
+    check(base && base === info.base, invalid);
+    if (target === 'user') {
+      check(values[info.service], 'cleanup_base_required');
+      check(validateBase(values[info.service]) === base, 'cleanup_base_mismatch');
+    }
+  }
+  for (const [id, pool] of Object.entries(report.pools)) {
+    check(ids.includes(id) && Array.isArray(pool), invalid);
+    // A plan within caps checks each pool URL once in its preflight, so no
+    // genuine pool is longer than this.
+    const cap = BUDGETS[target][id];
+    check(pool.length <= cap.node - cap.cleanupReserve - 2, invalid);
+    const expected = poolUrls(target, runId, id, pool.length);
+    check(pool.every((url, i) => url === expected[i]), invalid);
+  }
+  const known = instance => typeof instance === 'string' && Object.hasOwn(report.instances, instance);
+  for (const e of created) check(isObject(e) && known(e.instance) && safeId(e.id) && typeof e.url === 'string' && typeof e.deleted === 'boolean', invalid);
+  for (const l of lists) check(isObject(l) && known(l.instance) && report.instances[l.instance].service === 'karakeep' && safeId(l.id) && [undefined, true, false].includes(l.deleted), invalid);
+  if (target === 'user') check(report.temp == null, invalid);
+  else if (report.temp != null) {
+    const names = tempNames(runId);
+    const ownNames = new Set(Object.values(names).filter(n => n !== names.prefix));
+    check(isObject(report.temp) && (report.temp.names === undefined || (Array.isArray(report.temp.names) && report.temp.names.every(n => ownNames.has(n)))) && [undefined, '', names.net].includes(report.temp.network), invalid);
+  }
+  return report;
+}
+
 async function resumeCleanup(opts) {
+  check(!opts.errors.length, opts.errors[0] || 'arguments');
   const path = resolve(opts.values.cleanup);
-  const report = JSON.parse(readFileSync(path, 'utf8'));
-  check(report.harness === HARNESS_VERSION && /^[0-9a-f-]{36}$/.test(report.runId || ''), 'cleanup_report_invalid');
+  let report;
+  try { report = JSON.parse(readFileSync(path, 'utf8')); } catch { fail('cleanup_report_invalid'); }
+  validateResumeReport(report, path, { values: opts.values, state: stateDir() });
   const run = new LiveRun(opts);
   run.runId = report.runId;
   run.prefix = report.prefix;
@@ -2390,11 +2460,11 @@ async function resumeCleanup(opts) {
   const release = acquireLock(run.state, { pid: process.pid, runId: run.runId, reportPath: path, started: new Date().toISOString() }, { resume: path });
   try {
     report.cleanup.resumed = (report.cleanup.resumed || 0) + 1;
-    run.pools = report.pools || {};
+    run.pools = report.pools;
     run.caps = {};
     run.reserve = {};
-    for (const [instance, info] of Object.entries(report.instances || {})) {
-      run.caps[instance] = BUDGETS[report.target]?.[instance] || BUDGETS.user[info.service];
+    for (const [instance, info] of Object.entries(report.instances)) {
+      run.caps[instance] = BUDGETS[report.target][instance];
       run.reserve[instance] = 0;
       run.instances[instance] = { id: instance, service: info.service, base: info.base, root: apiRootFor(info.service, info.base), token: '' };
     }
@@ -2430,7 +2500,8 @@ function printHelp() {
     '--plan prints modules, budgets, URLs, containers, headed and shot needs without credentials, network, browser or Docker.',
     '--list prints module ids. --service linkding,karakeep filters. --read-only = --scenario readonly.',
     '--shots [--shots-dir DIR] saves masked screenshots; --headed launches a visible browser; --allow-dirty runs on a dirty tree.',
-    '--cleanup REPORT resumes an incomplete cleanup (user target needs --credentials again).',
+    '--cleanup REPORT resumes an incomplete cleanup of a report in the state directory; the user target needs',
+    '  --credentials and the same --linkding / --karakeep again.',
   ].join('\n'));
 }
 

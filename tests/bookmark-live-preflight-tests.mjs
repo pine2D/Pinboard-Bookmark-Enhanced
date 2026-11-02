@@ -599,6 +599,104 @@ try {
     assert.deepEqual(live.scanIncompleteReports(state), []);
   }
 
+  // --cleanup holds its report to what this harness writes for that run id
+  // before it reads a credential or sends a request. Review finding B: an
+  // edited prefix '' made the tag sweep delete an unrelated zero-use tag,
+  // and an edited base sent the token to 127.0.0.2.
+  {
+    const state = stateDirFor('resume-validate');
+    const runId = randomUUID();
+    const runDir = join(state, 'pbp-it-' + runId);
+    mkdirSync(runDir, { mode: 0o700 });
+    const reportPath = join(runDir, 'report.json');
+    const base = 'http://127.0.0.1:48999/';
+    const names = live.tempNames(runId);
+    const genuine = (target = 'user') => {
+      const r = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] }).report;
+      Object.assign(r, { runId, prefix: 'pbp-it-' + runId, target, instances: { linkding: { service: 'linkding', base } }, pools: { linkding: live.poolUrls(target, runId, 'linkding', 4) } });
+      r.ledger.created.push({ instance: 'linkding', id: '7', url: r.pools.linkding[0], source: 'route', module: 'linkding.core.worker', deleted: false });
+      if (target === 'temp') r.temp = { names: [names.edge, names.linkding], network: names.net };
+      return r;
+    };
+    live.writePrivateJson(reportPath, genuine());
+    const userValues = { cleanup: reportPath, credentials: credentialsPath, linkding: 'http://127.0.0.1:48999' };
+    const tempValues = { cleanup: reportPath };
+    const validate = (r, values, path = reportPath) => live.validateResumeReport(r, path, { values, state });
+    validate(genuine(), userValues);
+    validate(genuine('temp'), tempValues);
+    // Written before its arguments were read: valid, and nothing to clean.
+    const skeleton = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] }).report;
+    validate(Object.assign(skeleton, { runId, prefix: 'pbp-it-' + runId }), tempValues);
+    const refused = (target, mutate, code, values = target === 'user' ? userValues : tempValues, path = reportPath) => {
+      const r = genuine(target);
+      mutate(r);
+      assert.throws(() => validate(r, values, path), e => e.code === code, `${target}: ${code} expected`);
+    };
+    const invalid = 'cleanup_report_invalid';
+    refused('user', r => { r.prefix = ''; }, invalid);
+    refused('user', r => { r.prefix = 'pbp-it-'; }, invalid);
+    refused('user', r => { r.runId = '-'.repeat(36); }, invalid);
+    refused('user', r => { r.runId = [runId]; }, invalid);
+    refused('user', r => { r.target = 'pinboard'; }, invalid);
+    refused('user', r => { r.instances.linkding.service = 'pinboard'; }, invalid);
+    refused('user', r => { r.instances.pinboard = { service: 'pinboard', base: 'https://api.pinboard.in/' }; }, invalid);
+    refused('user', r => { r.instances.linkding.base = 'http://127.0.0.2:48999/'; }, invalid);
+    refused('user', r => { r.instances.linkding.base = 'http://127.0.0.1:48999/api/'; }, invalid);
+    refused('user', r => { r.instances.linkding.base = 'https://127.0.0.1:48999/'; }, invalid);
+    // The user target names its instances again; the report cannot redirect.
+    refused('user', () => {}, 'cleanup_base_required', { ...userValues, linkding: undefined });
+    refused('user', () => {}, 'cleanup_base_mismatch', { ...userValues, linkding: 'http://127.0.0.1:48100' });
+    refused('user', () => {}, 'cleanup_target_mismatch', { ...userValues, target: 'temp' });
+    // Pools are this run's exact URLs, never a personal one or another run's.
+    refused('user', r => { r.pools.linkding[1] = 'https://example.com/personal'; }, invalid);
+    refused('user', r => { r.pools.linkding = live.poolUrls('user', randomUUID(), 'linkding', 4); }, invalid);
+    refused('user', r => { r.pools.linkding = live.poolUrls('temp', runId, 'linkding', 4); }, invalid);
+    refused('user', r => { r.pools.linkding = live.poolUrls('user', runId, 'linkding', 189); }, invalid);
+    refused('user', r => { r.pools.linkding = 'https://example.com/'; }, invalid);
+    refused('user', r => { r.ledger.created[0].id = '../7'; }, invalid);
+    refused('user', r => { r.ledger.created[0].instance = 'karakeep'; }, invalid);
+    refused('user', r => { r.ledger.lists.push({ instance: 'linkding', id: 'abc' }); }, invalid);
+    refused('user', r => { r.ledger = []; }, invalid);
+    refused('user', r => { r.cleanup = null; }, invalid);
+    refused('user', r => { r.temp = { names: [], network: '' }; }, invalid);
+    refused('temp', r => { r.temp.names.push('linkding'); }, invalid);
+    refused('temp', r => { r.temp.names.push('pbp-it-' + randomUUID() + '-edge'); }, invalid);
+    refused('temp', r => { r.temp.names.push(names.prefix); }, invalid);
+    refused('temp', r => { r.temp.network = 'bridge'; }, invalid);
+    refused('temp', r => { r.instances['linkding-pg'] = { service: 'karakeep', base }; }, invalid);
+    refused('temp', () => {}, 'temp_target_rejects_user_endpoints', userValues);
+    assert.throws(() => validate(Object.assign(genuine('temp'), { target: '' }), tempValues), e => e.code === invalid, 'an untargeted report holds nothing');
+    // The report lives in its own run directory of this state directory.
+    const elsewhere = join(dir, 'elsewhere-' + runId);
+    mkdirSync(elsewhere, { mode: 0o700 });
+    live.writePrivateJson(join(elsewhere, 'report.json'), genuine());
+    refused('user', () => {}, 'cleanup_report_location', userValues, join(elsewhere, 'report.json'));
+    const otherDir = join(state, 'pbp-it-' + randomUUID());
+    mkdirSync(otherDir, { mode: 0o700 });
+    live.writePrivateJson(join(otherDir, 'report.json'), genuine());
+    refused('user', () => {}, 'cleanup_report_location', userValues, join(otherDir, 'report.json'));
+    const linkedId = randomUUID();
+    mkdirSync(join(state, 'pbp-it-' + linkedId), { mode: 0o700 });
+    symlinkSync(join(elsewhere, 'report.json'), join(state, 'pbp-it-' + linkedId, 'report.json'));
+    assert.throws(() => validate(Object.assign(genuine(), { runId: linkedId, prefix: 'pbp-it-' + linkedId, pools: { linkding: live.poolUrls('user', linkedId, 'linkding', 4) } }), userValues, join(state, 'pbp-it-' + linkedId, 'report.json')), e => e.code === 'cleanup_report_location', 'a symlinked report is not in its run directory');
+    rmSync(state, { recursive: true, force: true });
+    rmSync(elsewhere, { recursive: true, force: true });
+
+    // Cleanup itself: a ledger entry outside the pool is not even read, and
+    // the tag sweep refuses any prefix but the run's own. No request leaves.
+    const guarded = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+    guarded.instances.linkding = { id: 'linkding', service: 'linkding', base, root: live.apiRootFor('linkding', base), token: 'f'.repeat(40) };
+    guarded.caps = { linkding: live.BUDGETS.user.linkding };
+    guarded.reserve = { linkding: 0 };
+    guarded.pools.linkding = live.poolUrls('user', guarded.runId, 'linkding', 2);
+    guarded.cleaning = true;
+    assert.equal(await guarded.deleteBookmark({ instance: 'linkding', id: '99', url: 'https://example.com/personal', deleted: false }), false);
+    assert.equal(guarded.report.cleanup.entries.at(-1).code, 'cleanup_url');
+    guarded.prefix = 'pbp-it-';
+    await assert.rejects(guarded.runTags('linkding'), e => e.code === 'cleanup_prefix_invalid' && e.fatal);
+    assert.equal(guarded.counts.linkding?.node ?? 0, 0, 'no request before the checks');
+  }
+
   // ---------------------------------------------------------------------
   // Node API: a module reproducing a server failure names the status; it
   // gets the status back and nothing is recorded. Other failures throw.
@@ -1296,7 +1394,8 @@ try {
   assert.deepEqual(requests, [], 'refused before any request');
   assert(existsSync(deadLock), 'a new run leaves the dead lock to the --cleanup of its report');
 
-  const resumed = await run(['--cleanup', join(pendingDir, 'report.json')], { guard: false, state: linkdingState });
+  // The user target names its instance again (finding B).
+  const resumed = await run(['--cleanup', join(pendingDir, 'report.json'), '--linkding', linkdingBase], { guard: false, state: linkdingState });
   assert.equal(resumed.code, 0, resumed.output);
   assert(!existsSync(deadLock), 'the --cleanup took the dead lock over and released it');
   assert.equal(resumed.report.cleanup.complete, true);
@@ -1312,6 +1411,28 @@ try {
   requests.length = 0;
   const unblocked = await run(readOnlyArgs, { guard: false, state: linkdingState });
   assert.equal(unblocked.code, 0, 'a completed --cleanup unblocks the next run');
+
+  // The reviewer's report for finding B, through the CLI: prefix '' and a
+  // Karakeep base on 127.0.0.2. Refused before the credential file is read
+  // (the guard hook would record it) and before any request; the report and
+  // the state directory are left as they were.
+  {
+    const state = stateDirFor('resume-tampered');
+    const id = randomUUID();
+    const tamperedDir = join(state, 'pbp-it-' + id);
+    mkdirSync(tamperedDir, { mode: 0o700 });
+    const tampered = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] }).report;
+    Object.assign(tampered, { runId: id, prefix: '', target: 'user', instances: { karakeep: { service: 'karakeep', base: 'http://127.0.0.2:3030/' } }, pools: {} });
+    live.writePrivateJson(join(tamperedDir, 'report.json'), tampered);
+    const before = readFileSync(join(tamperedDir, 'report.json'), 'utf8');
+    requests.length = 0;
+    const refusedRun = await run(['--cleanup', join(tamperedDir, 'report.json'), '--karakeep', 'http://127.0.0.1:3030'], { guard: true, state });
+    assert.equal(refusedRun.code, 1);
+    assert(refusedRun.output.includes('FAILED: cleanup_report_invalid'), refusedRun.output);
+    assert.deepEqual(requests, []);
+    assert.equal(readFileSync(join(tamperedDir, 'report.json'), 'utf8'), before, 'a refused report is not written');
+    assert.deepEqual(readdirSync(state).sort(), ['pbp-it-' + id], 'no lock or other file is left');
+  }
 
   // SIGINT while the preflight waits on the service: cleanup, report, exit 130.
   hang = true;
