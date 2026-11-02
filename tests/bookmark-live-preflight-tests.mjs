@@ -227,6 +227,11 @@ try {
       assert.deepEqual(MODULES.find(m => m.id === 'sh.tag-input').parts.long_chip.features, ['long-tag-chip-geometry']);
       const bad = { id: 'x', services: ['linkding'], features: ['a'], fixRefs: ['G1'], parts: { p: { fixRefs: ['G1'], features: [] }, q: { fixRefs: ['G9'], features: ['b'] }, r: { fixRefs: ['G1'] } } };
       assert.deepEqual(live.registryProblems([bad]), ['x:p:no_features', 'x:q:feature_not_in_row:b', 'x:q:fixref_not_in_row:G9', 'x:r:no_features']);
+      // A feature named after a service the row does not run against never
+      // reaches the summary (review of H3b: sh.options-connect's
+      // pinboard-roundtrip on a linkding/Karakeep row).
+      assert.deepEqual(live.registryProblems([{ id: 'y', services: ['linkding', 'karakeep'], features: ['pinboard-roundtrip', 'linkding-x', 'karakeep-y', 'plain'] }]), ['y:feature_service:pinboard-roundtrip']);
+      assert(MODULES.find(m => m.id === 'sh.options-connect').features.includes('service-switch-roundtrip'));
     }
     // H3c modules: the screenshot matrix writes nothing and covers every
     // locale the extension ships (pictures or geometry alone).

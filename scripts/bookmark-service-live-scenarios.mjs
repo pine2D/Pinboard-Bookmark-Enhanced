@@ -2122,10 +2122,10 @@ export const SELFHOSTED_MODULES = [
     id: 'sh.options-connect',
     services: ['linkding', 'karakeep'],
     surfaces: ['options', 'popup'],
-    features: ['tag-panel-follows-service', 'connect-before-switch', 'connect-errors', 'connect-aria-invalid', 'failed-connect-keeps-credentials', 'disconnect', 'pinboard-roundtrip'],
+    features: ['tag-panel-follows-service', 'connect-before-switch', 'connect-errors', 'connect-aria-invalid', 'failed-connect-keeps-credentials', 'disconnect', 'service-switch-roundtrip'],
     fixRefs: ['G5', 'G8', 'G22', 'G28'],
     parts: {
-      tag_panel_roundtrip: { fixRefs: ['G5'], features: ['tag-panel-follows-service', 'pinboard-roundtrip'] },
+      tag_panel_roundtrip: { fixRefs: ['G5'], features: ['tag-panel-follows-service', 'service-switch-roundtrip'] },
       connect_errors: { fixRefs: ['G8', 'G22'], features: ['connect-errors', 'connect-aria-invalid', 'failed-connect-keeps-credentials'] },
       switch_needs_connect: { fixRefs: ['G28'], features: ['connect-before-switch'] },
       disconnect: { fixRefs: ['G22'], features: ['disconnect'] },

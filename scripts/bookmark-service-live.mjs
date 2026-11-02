@@ -1638,11 +1638,17 @@ export function partProblems(row, name) {
 }
 // What the registry rows get wrong before any run (the preflight requires
 // none): a part declared without features, or naming a feature or fix group
-// its row does not list.
+// its row does not list; and a feature named after a service ("pinboard-…")
+// on a row that does not run against that service, which the summary would
+// drop for every module of the row.
 export function registryProblems(modules = MODULES) {
   const out = [];
   for (const row of modules) {
     for (const name of Object.keys(row.parts || {})) out.push(...partProblems(row, name).map(p => row.id + ':' + p));
+    for (const f of row.features || []) {
+      const owner = SERVICE_TYPES.find(svc => f.startsWith(svc + '-'));
+      if (owner && !(row.services || []).includes(owner)) out.push(row.id + ':feature_service:' + f);
+    }
   }
   return out;
 }
