@@ -1382,10 +1382,26 @@ try {
       run.summaryPath = join(run.runDir, 'summary.zh.md');
       run.writeSummary();
       const summary = readFileSync(run.summaryPath, 'utf8');
-      // A feature takes the verdict of the parts that name it; one no part
-      // names follows the module.
-      assert(/- 通过（1）：f-second\n/.test(summary), 'a passed part\'s feature passes');
-      assert(summary.includes('- 未通过 f-first：linkding.parts.check') && summary.includes('- 未通过 f-outside：linkding.parts.check'), 'the failed part\'s feature and an unmapped one fail');
+      // A feature takes the verdict of the parts that name it. One no part
+      // names was decided by the code outside the parts, which all ran and
+      // passed when the module failed on its parts alone (review of H3b,
+      // should-fix: it used to follow the module and read as failed).
+      assert(/- 通过（2）：f-second，f-outside\n/.test(summary), 'a passed part\'s feature and one decided outside the parts pass');
+      assert(summary.includes('- 未通过 f-first：linkding.parts.check') && !summary.includes('未通过 f-outside'), 'only the failed part\'s feature fails');
+      // When code outside the parts fails too, the module's failure is
+      // that code's, and a feature no part names follows the module.
+      const outRun = partRun();
+      const outMod = { ...mod, id: 'linkding.parts.outside', async steps(t) {
+        await t.part('first', async () => { t.expectEq('shown', 'wanted', 'first_failed'); });
+        t.expectEq('outside', 'wanted', 'outside_failed');
+      } };
+      await quiet(() => outRun.runModule(outMod));
+      assert.deepEqual([outRun.report.modules[0].failure.code, outRun.report.modules[0].failure.part], ['outside_failed', undefined]);
+      outRun.selected = [outMod];
+      outRun.runDir = mkdtempSync(join(dir, 'parts-outside-'));
+      outRun.summaryPath = join(outRun.runDir, 'summary.zh.md');
+      outRun.writeSummary();
+      assert(readFileSync(outRun.summaryPath, 'utf8').includes('- 未通过 f-outside：linkding.parts.outside'), 'a failure outside the parts fails the unnamed feature');
       const strayRun = partRun();
       const strayMod = { ...mod, id: 'linkding.parts.stray', parts: { stray: { fixRefs: ['G1'], features: ['not-declared'] } }, async steps(t) { await t.part('stray', async () => {}); } };
       await assert.rejects(quiet(() => strayRun.runModule(strayMod)), e => e.code === 'part_feature_undeclared');

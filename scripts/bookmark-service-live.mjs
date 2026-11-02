@@ -4122,15 +4122,18 @@ export class LiveRun {
         const owner = SERVICE_TYPES.find(svc => f.startsWith(svc + '-'));
         if (owner && owner !== row.service) continue;
         const list = features.get(f) || [];
-        // A module that failed only on its parts (every part ran, nothing
-        // else failed): a feature its parts name takes those parts' verdict,
-        // so a passed part's feature is not reported failed for another
-        // part's pending fix. Any other feature follows the module.
-        // An undeclared surface beside the parts is the registry's problem,
-        // not the product's: the parts still decide.
-        const parts = m.status === 'failed' && m.failure?.part && !(m.alsoFailed || []).filter(c => c !== 'surface_undeclared').length ? (m.parts || []).filter(p => (p.features || []).includes(f)) : [];
+        // A module that failed only on its parts (every part ran, the code
+        // outside them passed, no other closing check failed): a feature its
+        // parts name takes those parts' verdict, so a passed part's feature
+        // is not reported failed for another part's pending fix, and one no
+        // part names was decided by that outside code: passed. An undeclared
+        // surface beside the parts is the registry's problem, not the
+        // product's: the parts still decide. Any other module: the feature
+        // follows it.
+        const partsOnly = m.status === 'failed' && !!m.failure?.part && !(m.alsoFailed || []).filter(c => c !== 'surface_undeclared').length;
+        const parts = partsOnly ? (m.parts || []).filter(p => (p.features || []).includes(f)) : [];
         if (registryOnly(m)) list.push({ id: m.id, ok: true, open: false });
-        else if (parts.length) list.push({ id: m.id, ok: parts.every(p => p.status === 'passed'), open: false });
+        else if (partsOnly) list.push({ id: m.id, ok: parts.every(p => p.status === 'passed'), open: false });
         else list.push({ id: m.id, ok: m.status === 'passed', open: m.status === 'running' || m.status === 'not_started' || m.beforeSteps === true });
         features.set(f, list);
       }
