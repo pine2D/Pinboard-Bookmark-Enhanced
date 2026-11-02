@@ -562,6 +562,10 @@
       }
     }
   },
+  "batchTagTooLongSkipHint": {
+    "message": " linkding has already saved these pages without tags, and \"Skip already bookmarked URLs\" would pass them by next time. Turn that setting off before running Batch Save again, or add the tag to each page from the popup.",
+    "description": "Sentence appended after batchTagTooLong when Batch Save ran with \"Skip already bookmarked URLs\" on (it starts with its own separator). linkding on PostgreSQL created those bookmarks without tags, so a rerun in that mode would skip them."
+  },
   "batchAiFailed": {
     "message": ", AI failed for $COUNT$",
     "description": "Appended to the batch-done status when AI tags or summaries failed.",

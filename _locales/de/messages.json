@@ -557,6 +557,9 @@
       }
     }
   },
+  "batchTagTooLongSkipHint": {
+    "message": " linkding hat diese Seiten bereits ohne Tags angelegt; mit „Bereits gespeicherte URLs überspringen“ würden sie beim nächsten Lauf übersprungen. Die Option vor der nächsten Stapelspeicherung ausschalten oder das Tag im Popup für jede Seite einzeln ergänzen."
+  },
   "batchAiFailed": {
     "message": ", KI bei $COUNT$ fehlgeschlagen",
     "placeholders": {

@@ -557,6 +557,9 @@
       }
     }
   },
+  "batchTagTooLongSkipHint": {
+    "message": "linkding 已把这些网页存成无标签的书签，开着「跳过已收藏的网址」再次运行会跳过它们。请先关闭该选项再批量保存，或在弹窗里逐个补上标签。"
+  },
   "batchAiFailed": {
     "message": "，AI 处理失败 $COUNT$ 个",
     "placeholders": {

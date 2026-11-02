@@ -5044,9 +5044,12 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
   // The first tag linkding could not store, as the summary names it. It rides
   // with the counts so a resumed run can still name it.
   let longTag = typeof rc.longTag === "string" ? rc.longTag : "";
+  // Set when that failure was a skip-mode create: PostgreSQL linkding kept the
+  // bookmark without tags, so a rerun in skip mode would pass it by.
+  let longTagSkip = rc.longTagSkip === true;
   const startIndex = resumeState ? Math.max(0, Number(resumeState.startIndex) || 0) : 0;
   const resumeCount = Number(resumeState?.resumeCount) || 0;
-  const base = () => ({ runId, resumeCount, account, total, i: processed, saved, queued, failed, aiFailed, skipped, tooLong, tagTooLong, longTag });
+  const base = () => ({ runId, resumeCount, account, total, i: processed, saved, queued, failed, aiFailed, skipped, tooLong, tagTooLong, longTag, longTagSkip });
   // Persist the job snapshot BEFORE the first item: everything a resume needs
   // (public tab identity + cursor + counts), never a token. The per-item
   // checkpoint below rewrites cursor+counts; every terminal path removes it.
@@ -5055,7 +5058,7 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     account,
     tabs: tabs.map((tb) => ({ id: tb.id, url: tb.url, title: tb.title, incognito: !!tb.incognito })),
     next: processed,
-    counts: { processed, saved, queued, failed, aiFailed, skipped, tooLong, tagTooLong, longTag },
+    counts: { processed, saved, queued, failed, aiFailed, skipped, tooLong, tagTooLong, longTag, longTagSkip },
     resumeCount,
     ts: Date.now(),
   });
@@ -5235,8 +5238,9 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         await requireAccount();
         // Batch notes hold the summary block and nothing else (null: no block).
         const summaryRange = !linkding && notes ? { start: 0, end: notes.length } : null;
+        const mode = s.batchSkipExisting ? "skip" : "merge";
         const result = await submitSaveIntent({
-          mode: s.batchSkipExisting ? "skip" : "merge",
+          mode,
           url: tab.url,
           title: tab.title || tab.url,
           notes,
@@ -5260,7 +5264,10 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
         else if (result.status === "queued") queued++;
         else if (result.status === "skipped") skipped++;
         else if (result.reason === "too_long") tooLong++;
-        else if (result.reason === "tag_too_long") { tagTooLong++; longTag ||= pbpBookmarkFailureArgs(result)[0]; }
+        else if (result.reason === "tag_too_long") {
+          tagTooLong++; longTag ||= pbpBookmarkFailureArgs(result)[0];
+          if (mode === "skip") longTagSkip = true;
+        }
         else failed++;
       } catch (e) {
         if (e?.code === "account_changed" || PBP_BOOKMARK_GATEWAY_CODES.includes(e?.code)) throw e;
@@ -5287,7 +5294,8 @@ async function _runBatchSave(tabs, expectedAccount, resumeState = null) {
     const queuedMsg = queued > 0 ? ` · ${t("offlineQueued", String(queued))}` : "";
     // A sentence of its own after the summary: which tag, the limit, what to do.
     const tagTooLongMsg = tagTooLong > 0
-      ? t("batchTagTooLong", String(tagTooLong), ...pbpBookmarkFailureArgs({ reason: "tag_too_long", tag: longTag })) : "";
+      ? t("batchTagTooLong", String(tagTooLong), ...pbpBookmarkFailureArgs({ reason: "tag_too_long", tag: longTag }))
+        + (longTagSkip ? t("batchTagTooLongSkipHint") : "") : "";
     if (saved > 0 || queued > 0 || failed > 0 || tooLong > 0 || tagTooLong > 0) {
       const message = t("batchDone", String(saved), String(failed)) + skippedMsg + tooLongMsg + queuedMsg + tagsSuffix + tagTooLongMsg;
       if (saved > 0 || queued > 0) {

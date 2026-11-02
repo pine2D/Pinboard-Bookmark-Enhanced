@@ -557,6 +557,9 @@
       }
     }
   },
+  "batchTagTooLongSkipHint": {
+    "message": "linkding はこれらのページをタグなしで保存済みです。「既にブックマーク済みの URL をスキップ」がオンのままだと、次回はスキップされます。オフにしてから一括保存し直すか、ポップアップで 1 件ずつタグを追加してください。"
+  },
   "batchAiFailed": {
     "message": "、$COUNT$ 件は AI 処理に失敗",
     "placeholders": {

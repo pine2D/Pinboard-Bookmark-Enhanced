@@ -381,7 +381,8 @@ function renderBatchProgress(p, currentAccount) {
     const queuedDoneMsg = p.queued > 0 ? ` · ${t("offlineQueued", String(p.queued))}` : "";
     const aiWarnMsg = p.aiFailed > 0 ? t("batchAiFailed", String(p.aiFailed)) : "";
     const tagTooLongMsg = p.tagTooLong > 0
-      ? t("batchTagTooLong", String(p.tagTooLong), ...pbpBookmarkFailureArgs({ reason: "tag_too_long", tag: p.longTag })) : "";
+      ? t("batchTagTooLong", String(p.tagTooLong), ...pbpBookmarkFailureArgs({ reason: "tag_too_long", tag: p.longTag }))
+        + (p.longTagSkip === true ? t("batchTagTooLongSkipHint") : "") : "";
     if (p.error === "not_logged_in") showStatus("status-msg", t("batchNotLoggedIn"), "error");
     else if (p.error === "account_changed") showStatus("status-msg", t("batchAccountChanged"), "error");
     // The SW's interrupted-batch sweep writes this terminal record; without its

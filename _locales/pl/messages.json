@@ -557,6 +557,9 @@
       }
     }
   },
+  "batchTagTooLongSkipHint": {
+    "message": " linkding zapisał już te strony bez tagów, a przy włączonej opcji „Pomiń już dodane URL-e” kolejny zapis zbiorczy je pominie. Wyłącz ją przed ponownym uruchomieniem albo dodaj tag do każdej strony w popupie."
+  },
   "batchAiFailed": {
     "message": ", błąd AI: $COUNT$",
     "placeholders": {

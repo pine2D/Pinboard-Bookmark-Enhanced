@@ -557,6 +557,9 @@
       }
     }
   },
+  "batchTagTooLongSkipHint": {
+    "message": " linkding a déjà créé ces signets sans tags, et l’option « Ignorer les URL déjà enregistrées » les ignorerait au prochain passage. Désactivez-la avant de relancer l’enregistrement groupé, ou ajoutez le tag à chaque page depuis le popup."
+  },
   "batchAiFailed": {
     "message": ", échec de l'IA pour $COUNT$",
     "placeholders": {

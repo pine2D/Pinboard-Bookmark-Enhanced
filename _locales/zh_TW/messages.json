@@ -557,6 +557,9 @@
       }
     }
   },
+  "batchTagTooLongSkipHint": {
+    "message": "linkding 已將這些網頁存成沒有標籤的書籤，開著「跳過已收藏的網址」再次執行會略過它們。請先關閉此選項再批次儲存，或在彈窗中逐一補上標籤。"
+  },
   "batchAiFailed": {
     "message": "，AI 處理失敗 $COUNT$ 個",
     "placeholders": {
