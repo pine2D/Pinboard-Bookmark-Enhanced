@@ -3438,6 +3438,23 @@ export class LiveRun {
           this.faults = [];
           this.fakeAi?.reset();
           this.probe = null;
+          // What a module held away in the worker and puts back in its own
+          // finally (the service token, the host-permission answer): after a
+          // timeout that finally is refused (module_revoked), so the modules
+          // after it would run with no token or no grant.
+          const held = await this.sw(async () => {
+            const out = [];
+            const token = globalThis.__pbpItHeldToken;
+            if (token) {
+              if (token.local !== undefined) await chrome.storage.local.set({ [token.key]: token.local });
+              if (token.sync !== undefined) await chrome.storage.sync.set({ [token.key]: token.sync });
+              delete globalThis.__pbpItHeldToken;
+              out.push('token');
+            }
+            if (globalThis.__pbpItContains) { chrome.permissions.contains = globalThis.__pbpItContains; delete globalThis.__pbpItContains; out.push('permission'); }
+            return out;
+          });
+          if (held?.length) record.restoredWorkerState = held;
           await this.sw(async ({ keys, snapshot }) => {
             const extra = keys.filter(k => !(k in snapshot));
             if (extra.length) await chrome.storage.local.remove(extra);

@@ -1234,6 +1234,64 @@ try {
       await closeServer(server);
     }
     {
+      // A module that times out while it holds the service token away or
+      // overrides the worker's host-permission answer (ux.reader-bar,
+      // ux.copy-exits): its own finally cannot put them back (t.sw refuses a
+      // revoked module), so the runner does at the module's end (review of
+      // H3c, should-fix 5). The worker calls run against a stand-in chrome.
+      const local = new Map([['linkdingToken', 'held-envelope']]);
+      const area = map => ({
+        get: async keys => Object.fromEntries((Array.isArray(keys) ? keys : [keys]).filter(k => map.has(k)).map(k => [k, map.get(k)])),
+        set: async values => { for (const [k, v] of Object.entries(values)) map.set(k, v); },
+        remove: async keys => { for (const k of [].concat(keys)) map.delete(k); },
+      });
+      const original = async () => true;
+      const fakeChrome = { storage: { local: area(local), sync: area(new Map()) }, permissions: { contains: original } };
+      const heldRun = new live.LiveRun({ mode: 'run', flags: new Set(), values: {}, errors: [] });
+      heldRun.target = 'temp';
+      heldRun.instances.linkding = { id: 'linkding', service: 'linkding', base: 'http://127.0.0.1:9/', root: 'http://127.0.0.1:9/api/', token: 'f'.repeat(40) };
+      heldRun.caps = { linkding: live.BUDGETS.temp.linkding };
+      heldRun.reserve = { linkding: 60 };
+      heldRun.pools.linkding = live.poolUrls('temp', heldRun.runId, 'linkding', 1);
+      heldRun.claimed.linkding = 0;
+      heldRun.guardCfg = {};
+      heldRun.ctx = { pages: () => [] };
+      heldRun.worker = { evaluate: async () => {} };
+      heldRun.syncGuard = async () => {};
+      heldRun.pushGuardWrites = async () => {};
+      heldRun.sw = async (fn, arg) => {
+        const saved = { chrome: globalThis.chrome, SETTINGS_DEFAULTS: globalThis.SETTINGS_DEFAULTS };
+        globalThis.chrome = fakeChrome;
+        globalThis.SETTINGS_DEFAULTS = {};
+        try { return await fn(arg); } finally { globalThis.chrome = saved.chrome; globalThis.SETTINGS_DEFAULTS = saved.SETTINGS_DEFAULTS; }
+      };
+      let lateBack = '';
+      const mod = {
+        id: 'linkding.held.check', instance: 'linkding', service: 'linkding', needs: { writes: false }, settings: {},
+        budget: { bookmarks: 0, urls: 0, node: 0, browser: 0, ai: 0, tags: 0, seconds: 0.2 },
+        async steps(t) {
+          await t.sw(async key => {
+            globalThis.__pbpItHeldToken = { key, local: (await chrome.storage.local.get(key))[key] };
+            await chrome.storage.local.remove(key);
+            globalThis.__pbpItContains = chrome.permissions.contains;
+            chrome.permissions.contains = async () => false;
+          }, 'linkdingToken');
+          try { await t.sleep(400); } finally { try { await t.sw(async () => {}); } catch (e) { lateBack = e.code; } }
+        },
+      };
+      await quiet(() => heldRun.runModule(mod));
+      await new Promise(r => setTimeout(r, 400));
+      const record = heldRun.report.modules[0];
+      assert.deepEqual([record.status, record.failure.code, heldRun.fatal], ['failed', 'module_timeout', null]);
+      assert.equal(lateBack, 'module_revoked', 'the module could not put them back itself');
+      assert.equal(local.get('linkdingToken'), 'held-envelope', 'the held token is back');
+      assert.equal(fakeChrome.permissions.contains, original, 'the permission answer is back');
+      assert.equal(globalThis.__pbpItHeldToken, undefined);
+      assert.equal(globalThis.__pbpItContains, undefined);
+      assert.deepEqual(record.restoredWorkerState, ['token', 'permission']);
+      assert.equal(record.restore, undefined);
+    }
+    {
       // Parts (t.part): a failed expectation inside one is recorded with the
       // part's own fix groups, its faults are cleared, the settings it found
       // are put back, and the module goes on; the module still fails on the
