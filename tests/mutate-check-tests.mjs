@@ -83,12 +83,15 @@ test('the old string must occur exactly once: none or several is refused before 
   try {
     const marker = join(s.dir, 'ran');
     const command = [process.execPath, '-e', `require('fs').writeFileSync(${JSON.stringify(marker)},'x')`];
-    for (const old of ['absent', 'const c = 1;\n'.slice(0, 5), 'const']) {
+    // Occurrences that overlap themselves count too: '==' sits twice inside '==='.
+    writeFileSync(s.file, ORIGINAL + 'if (a === b) {}\nconst run = aaa;\n');
+    for (const old of ['absent', 'const c = 1;\n'.slice(0, 5), 'const', '==', 'aa']) {
       await assert.rejects(runMutations([{ file: s.file, old, new: 'x' }], { command, ...quiet }), error => error instanceof MutateRefusal && /exactly once/.test(error.message));
     }
     assert.equal(existsSync(marker), false, 'the test command ran for a refused mutation');
-    assert.equal(readFileSync(s.file, 'utf8'), ORIGINAL);
+    assert.equal(readFileSync(s.file, 'utf8'), ORIGINAL + 'if (a === b) {}\nconst run = aaa;\n');
     assert.equal(existsSync(s.file + BACKUP_SUFFIX), false);
+    writeFileSync(s.file, ORIGINAL);
     // One bad entry refuses the whole batch, even when an earlier entry is fine.
     await assert.rejects(runMutations([{ file: s.file, old: 'GOOD', new: 'BAD' }, { file: s.file, old: 'absent', new: 'x' }], { command, ...quiet }), MutateRefusal);
     assert.equal(existsSync(marker), false);

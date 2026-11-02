@@ -88,9 +88,10 @@ function scanRegistry(dir) {
   return { running, stranded };
 }
 
+// Overlapping hits count: '==' appears twice inside '===' and is not a unique spot.
 function occurrences(text, needle) {
   let count = 0;
-  for (let at = text.indexOf(needle); at >= 0; at = text.indexOf(needle, at + needle.length)) count++;
+  for (let at = text.indexOf(needle); at >= 0; at = text.indexOf(needle, at + 1)) count++;
   return count;
 }
 
