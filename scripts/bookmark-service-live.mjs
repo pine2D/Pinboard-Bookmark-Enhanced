@@ -734,10 +734,17 @@ export function acquireLock(dir, info, { resume = '' } = {}) {
       let alive = false;
       try { if (held.pid) { process.kill(held.pid, 0); alive = true; } } catch (e) { alive = e.code === 'EPERM'; }
       if (alive) fail('run_locked');
-      let complete = false;
-      try { complete = JSON.parse(readFileSync(held.reportPath, 'utf8')).cleanup?.complete === true; } catch { /* missing report */ }
+      let report = null;
+      try { report = JSON.parse(readFileSync(held.reportPath, 'utf8')); } catch { /* missing report */ }
+      const complete = report?.cleanup?.complete === true;
+      // A report another harness version wrote is foreign, as in
+      // scanIncompleteReports: no --cleanup of this version accepts it
+      // (validateResumeReport), so its lock would block every run for good.
+      // The stale lock goes; the report stays, named for a person to check.
+      const foreign = !!report && typeof report === 'object' && report.harness !== HARNESS_VERSION;
+      if (foreign) console.warn('Removing a stale lock whose report another harness version wrote; check it by hand: ' + held.reportPath);
       const resuming = !!resume && typeof held.reportPath === 'string' && !!real(held.reportPath) && real(held.reportPath) === real(resume);
-      if (!complete && !resuming && held.reportPath && existsSync(held.reportPath)) fail('previous_cleanup_incomplete');
+      if (!complete && !foreign && !resuming && held.reportPath && existsSync(held.reportPath)) fail('previous_cleanup_incomplete');
       unlinkSync(path);
     }
   }

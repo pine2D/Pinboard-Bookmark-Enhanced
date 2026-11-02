@@ -918,6 +918,27 @@ try {
     assert.deepEqual(live.scanIncompleteReports(state), [], 'an unfinished v2 report does not block a run');
     live.acquireLock(state, { pid: process.pid, runId: 'v3' })();
     assert.throws(() => live.validateResumeReport(oldReport, join(oldDir, 'report.json'), { state }), e => e.code === 'cleanup_report_invalid');
+    // The v2 run was killed (kill -9, OOM) with its lock in place. That lock
+    // names the foreign report, which no --cleanup can take: a new run
+    // removes the stale lock and names the report for a person to check.
+    const lockPath = join(state, 'pbp-it-live.lock');
+    writeFileSync(lockPath, JSON.stringify({ pid: 2 ** 22 + 12345, runId, reportPath: join(oldDir, 'report.json') }));
+    const warned = [];
+    const warn = console.warn;
+    console.warn = (...args) => warned.push(args.join(' '));
+    let release;
+    try { release = live.acquireLock(state, { pid: process.pid, runId: 'v3-after-v2' }); } finally { console.warn = warn; }
+    assert.equal(JSON.parse(readFileSync(lockPath, 'utf8')).runId, 'v3-after-v2', 'the stale lock of a foreign report is replaced');
+    release();
+    assert(warned.some(w => w.includes(join(oldDir, 'report.json'))), 'the foreign report is named: ' + warned.join(' | '));
+    assert(existsSync(join(oldDir, 'report.json')), 'the foreign report itself is left as it was');
+    // A lock whose report is this version and unfinished still blocks.
+    const ownDir = join(state, 'pbp-it-' + randomUUID());
+    mkdirSync(ownDir, { mode: 0o700 });
+    live.writePrivateJson(join(ownDir, 'report.json'), { harness: live.HARNESS_VERSION, cleanup: { complete: false } });
+    writeFileSync(lockPath, JSON.stringify({ pid: 2 ** 22 + 12345, runId: 'own', reportPath: join(ownDir, 'report.json') }));
+    assert.throws(() => live.acquireLock(state, { pid: process.pid, runId: 'v3-blocked' }), e => e.code === 'previous_cleanup_incomplete');
+    rmSync(lockPath);
   }
 
   // --cleanup holds its report to what this harness writes for that run id
