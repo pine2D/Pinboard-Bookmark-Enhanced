@@ -30,6 +30,8 @@
 //             features). The summary judges a feature by the parts naming
 //             it; the preflight checks every declaration (registryProblems)
 //             and a call naming an undeclared part is fatal (part_undeclared)
+//   tempReason  why a row is needs.target 'temp' (Chinese, one line); --plan
+//             and the summary show it beside the skipped row on the user target
 //   needs     { fakeAi, target: 'temp'|'user'|'any', container, sharing: 'any'|'on'|'off',
 //               headed, shots, pinboard, writes, urls, snapshots }
 //             longTag: 'none' | 'injected' | 'server'. A row that sends a tag
@@ -2712,7 +2714,11 @@ export const H3C_MODULES = [
       cleaned_url_save: { fixRefs: ['G10'], features: ['reader-cleaned-url-save'] },
       kept_no_delivery: { fixRefs: ['G2d'], features: ['reader-kept-no-delivery'] },
     },
-    needs: needs({ shots: true }),
+    // Temp only (main-session ruling 13, H3d): one authorisation's three
+    // user rounds cannot hold every row, and this one checks the
+    // extension's own UI, which a temporary instance shows the same.
+    tempReason: '阅读器书签条的文案与状态由扩展决定，临时实例上结果相同；user 目标 3 轮装不下全部模块，按价值留给临时目标（H3d 裁决 13）',
+    needs: needs({ target: 'temp', shots: true }),
     budget: { bookmarks: 3, urls: 3, node: 20, browser: { linkding: 90, karakeep: 160 }, ai: 0, tags: 0, lists: { karakeep: 1 }, seconds: 100, tagReads: 2 },
     files: [],
     settings: { offlineQueueEnabled: true },
@@ -2904,7 +2910,11 @@ export const H3C_MODULES = [
       reader_created: { fixRefs: ['G12'], features: ['reader-created-copy'] },
       lookup_5xx: { fixRefs: ['G11'], features: ['lookup-5xx-copy'] },
     },
-    needs: needs({ shots: true }),
+    // Temp only (main-session ruling 13, H3d): one authorisation's three
+    // user rounds cannot hold every row, and this one checks the
+    // extension's own UI, which a temporary instance shows the same.
+    tempReason: '各出口文案与路由故障由扩展决定，临时实例上结果相同；user 目标 3 轮装不下全部模块，按价值留给临时目标（H3d 裁决 13）',
+    needs: needs({ target: 'temp', shots: true }),
     budget: { bookmarks: 2, urls: 3, node: 10, browser: { linkding: 90, karakeep: 150 }, ai: 0, tags: 0, seconds: 100, tagReads: 2 },
     files: [],
     settings: { optAutoCloseAfterSave: false },
@@ -3031,7 +3041,11 @@ export const H3C_MODULES = [
       failure_icon: { fixRefs: ['G14'], features: ['status-failure-keeps-icon'] },
       failure_popup: { fixRefs: ['G14'], features: ['status-failure-one-lookup'] },
     },
-    needs: needs(),
+    // Temp only (main-session ruling 13, H3d): one authorisation's three
+    // user rounds cannot hold every row, and this one checks the
+    // extension's own UI, which a temporary instance shows the same.
+    tempReason: '状态检查的次数与图标由扩展决定，临时实例上结果相同；user 目标 3 轮装不下全部模块，按价值留给临时目标（H3d 裁决 13）',
+    needs: needs({ target: 'temp' }),
     budget: { bookmarks: 1, urls: 2, node: 6, browser: { linkding: 50, karakeep: 90 }, ai: 0, tags: 0, seconds: 75, tagReads: 1 },
     files: [],
     settings: { optCheckBookmarkStatus: true },
@@ -3151,7 +3165,11 @@ export const H3C_MODULES = [
       options: { fixRefs: [], features: ['shots-geometry-options'] },
       reader: { fixRefs: [], features: ['shots-geometry-reader'] },
     },
-    needs: needs({ shots: true, writes: false }),
+    // Temp only (main-session ruling 13, H3d): one authorisation's three
+    // user rounds cannot hold every row, and this one checks the
+    // extension's own UI, which a temporary instance shows the same.
+    tempReason: '截图与几何矩阵看的是扩展界面，临时实例上结果相同；user 目标 3 轮装不下全部模块，按价值留给临时目标（H3d 裁决 13）',
+    needs: needs({ target: 'temp', shots: true, writes: false }),
     budget: { bookmarks: 0, urls: 1, node: 2, browser: { linkding: 40, karakeep: 80 }, ai: 0, tags: 0, seconds: 120, tagReads: 2 },
     files: [],
     settings: {},

@@ -391,7 +391,10 @@ try {
       assert(zh.changed.note.includes('未覆盖'));
       assert.deepEqual(changedSel(['popup-offline.js'], { scenario: 'edges' }).selected.map(m => m.id), ['linkding.edges.quote-unread', 'linkding.edges.offline', 'karakeep.edges.tags']);
       assert.deepEqual(changedSel(['_locales/zh_CN/messages.json'], { target: 'user', service: 'karakeep' }).selected.map(m => m.id), ['karakeep.ai.popup-summary-tags']);
-      assert.deepEqual(changedSel(['md-bookmark.js'], { target: 'user', service: 'karakeep' }).selected.map(m => m.id), readerIds.filter(id => id.startsWith('karakeep.')));
+      // On the user target the temp-only rows drop out (ruling 13).
+      const tempOnlyIds = live.expandRegistry().filter(m => m.needs?.target === 'temp').map(m => m.id);
+      assert(tempOnlyIds.includes('karakeep.ux.reader-bar') && tempOnlyIds.includes('karakeep.shots.matrix'));
+      assert.deepEqual(changedSel(['md-bookmark.js'], { target: 'user', service: 'karakeep' }).selected.map(m => m.id), readerIds.filter(id => id.startsWith('karakeep.') && !tempOnlyIds.includes(id)));
       assert.deepEqual(changedSel(['shared.js'], { changed: 'origin/main', target: 'user', service: 'pinboard' }).selected.map(m => m.id), ids.filter(id => id.startsWith('pinboard.')));
       assert.equal(changedSel(['shared.js'], { changed: 'origin/main' }).changed.base, 'origin/main');
       assert.deepEqual(changedSel(['README.md']).selected, []);
@@ -568,14 +571,13 @@ try {
           assert(plan.limits.worstCaseSeconds + plan.limits.setupAllowanceSeconds <= plan.limits.runMinutes * 60, `${target}/${spec} worst case ${plan.limits.worstCaseSeconds}s`);
         } else {
           // Rounds: every module fits one; on the user target all of them fit
-          // the three rounds of one authorisation.
-          // The whole registry outgrew three user rounds with the H3c rows:
-          // on the user target it has to be split across authorisations, so
-          // there only every round fitting is checked; each group still fits.
-          const packed = live.packRounds(selected, target, target === 'user' && spec === 'all' ? { maxRounds: 99 } : undefined);
+          // the three rounds of one authorisation, the whole registry too
+          // (main-session ruling 13: never a second authorisation; rows
+          // that do not fit are temp-only, with their reason).
+          const packed = live.packRounds(selected, target);
           assert.deepEqual([packed.unfit, packed.overflow], [[], []], `${target}/${spec} rounds`);
           assert.equal(packed.ok, true);
-          if (target === 'user' && spec !== 'all') assert(packed.count <= 3, `${target}/${spec} takes ${packed.count} rounds`);
+          if (target === 'user') assert(packed.count <= 3 && packed.exhaustive, `${target}/${spec} takes ${packed.count} rounds`);
           for (const round of packed.rounds) assert.equal(live.buildPlan({ target, selected: selected.filter(m => round.modules.includes(m.id)) }).withinCaps, true, `${target}/${spec} round ${round.n}`);
         }
         assert.equal(plan.fakeAi.needed, selected.some(m => m.needs.fakeAi));
@@ -669,11 +671,14 @@ try {
     // time); past three on the user target the plan fails and names the
     // modules left over; --round N runs one of them.
     {
-      // Every row but the H3c ux/shots ones, which a user-target run takes
-      // as their own authorisation (group h3c, two rounds).
-      const USER_ROUNDS = 'core,edges,readonly,ai,selfhosted,regress';
+      // The whole registry, Pinboard included, fits the three rounds of one
+      // authorisation (main-session ruling 13: no second authorisation for
+      // a group); the H3c ux/shots rows are temp-only to make room.
+      const USER_ROUNDS = 'all';
       const userAll = live.selectModules(USER_ROUNDS, { target: 'user', services: ['linkding', 'karakeep', 'pinboard'] }).selected;
-      assert.equal(live.packRounds(live.selectModules('h3c', { target: 'user', services: ['linkding', 'karakeep', 'pinboard'] }).selected, 'user').count, 2, 'h3c: two user rounds');
+      const h3cUser = live.selectModules('h3c', { target: 'user', services: ['linkding', 'karakeep', 'pinboard'] });
+      assert.deepEqual(h3cUser.selected.map(m => m.id), ['pinboard.regress.tags-notes'], 'of the H3c rows only the Pinboard regression runs on the user target');
+      assert(h3cUser.skipped.filter(x => /\.(ux|shots)\./.test(x.id)).every(x => x.reason === 'target_temp' && /临时实例上结果相同/.test(x.note || '')) && h3cUser.skipped.length >= 8, 'the others are skipped with their reason');
       assert.equal(live.buildPlan({ target: 'user', selected: userAll }).withinCaps, false, 'all modules do not fit one user round');
       const packed = live.packRounds(userAll, 'user');
       assert.deepEqual(live.packRounds([...userAll].reverse(), 'user').rounds.map(r => [...r.modules].sort()).sort(), packed.rounds.map(r => [...r.modules].sort()).sort(), 'the order given does not change the rounds');

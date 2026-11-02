@@ -288,7 +288,7 @@ export function selectModules(spec, { services = DEFAULT_SERVICES, target = 'tem
         const need = mod.needs?.target || 'any';
         if (need !== 'any' && need !== target) {
           if (explicit) fail('module_requires_' + need);
-          skipped.push({ id: mod.id, reason: 'target_' + need });
+          skipped.push({ id: mod.id, reason: 'target_' + need, ...(mod.tempReason ? { note: mod.tempReason } : {}) });
           continue;
         }
         if (target === 'user' && mod.needs?.sharing === 'on') {
